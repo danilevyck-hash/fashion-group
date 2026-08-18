@@ -349,6 +349,53 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > Candados: `src/__tests__/lib/guias-reglas-nombres-exactos.test.ts` (18), `clientes-sugerencias.test.ts` (45, todos con TEXTOS REALES de `guia_items` contra CLIENTES REALES) y **`src/__tests__/components/guias-sugerencias-cliente.test.tsx` (11), que RENDERIZA la ventana y toca los botones** — el riesgo de verdad no es la matemática sino que la sugerencia se convierta en un atado, y eso un test de función pura no lo puede ver. **Verificado por mutación: 6 de 6 cazadas** — borrar los dígitos al normalizar (3 tests), cruzar `N2 → D-118` (2), que la vista previa difiera del UPDATE (el archivo entero se pone rojo), dejar de excluir D-201 (3), sacarle al número su peso en el orden (1) y hacer que tocar una sugerencia guarde (3).
 
+## 🔴 ABRIR UNA GUÍA PARA EDITARLA NO ESCRIBE NADA — el formulario contaba renders, no cambios (17-ago-2026)
+
+> Daniel abrió `/guias/[id]/editar` de **GT-204** para sacarle una captura, no tocó una tecla, y la guía **se guardó sola dos veces**. Su instrucción, textual: ***"quita el guardado automático si hace fricción"***.
+>
+> 🩸 **EL BUG: "¿cambió algo?" se contestaba contando cuántas veces había corrido un `useEffect`** (`changeCount.current > 1` en `GuiaForm.tsx`). Eso no mide que alguien haya cambiado algo: mide que el efecto corrió dos veces, y corre dos veces por motivos que no tienen nada que ver con la persona — que terminen de cargar los datos de la guía, que React vuelva a montar el árbol, que cambie la identidad del router. A los ~1,5 s salía un `PUT /api/guias/[id]`.
+>
+> 🔴 **Y ESE PUT MANDA `items`, QUE EN EL SERVIDOR ES UN REEMPLAZO COMPLETO**: borra los renglones de `guia_items` e inserta otros con **ids NUEVOS**. O sea que **abrir la pantalla y arrepentirse ya le había cambiado el id a cada línea** — exactamente lo que este archivo venía advirtiendo desde el 10-ago (*"usarlo en pleno despacho le cambiaría el id a cada línea y tiraría el trabajo de atar clientes"*), solo que ahora pasaba sin que nadie tocara nada.
+>
+> ### La regla nueva: cambió = lo que se mandaría es DISTINTO de lo que el servidor ya tiene
+>
+> Módulo PURO **`src/lib/guias/cambios-form.ts`**. Se arma una **instantánea** con EXACTAMENTE los campos que el PUT escribe, en el mismo orden y con la misma normalización que usa `saveGuia` al armar el cuerpo, y se compara contra la instantánea de **lo último que el servidor ya tiene**. Esa referencia se toma UNA vez —con los mismos valores que se acaban de poner en el formulario al cargar la guía— y se renueva con lo que se acaba de mandar cada vez que un guardado **sale bien**.
+> - 🔑 **Cargar la guía no puede producir una diferencia contra sí misma**, así que el número de veces que corra el efecto dejó de importar. Es lo que hace que el arreglo no dependa de adivinar por qué corría dos veces.
+> - **Sin referencia, NO se afirma un cambio** (`hayCambios(null, x) === false`): mientras la guía no terminó de cargar no hay contra qué comparar, y sin cambio no hay autoguardado. **Al revés con los renglones**: sin referencia SÍ viajan (`renglonesCambiaron(null, x) === true`) — perder un renglón es peor que reescribirlo igual.
+> - **`null`, `undefined` y `""` son el MISMO estado** (la base devuelve `cliente_codigo: null` y la pantalla muestra ""), y **el transportista guardado no cuenta mientras el modo sea entrega directa** (el PUT manda `transportista_id: null`). Sin esas dos, el formulario nacería sucio igual.
+> - **Una fila en blanco no cuenta**: es el MISMO filtro que ya aplicaba `validItems`, así que tocar "+ Agregar envío" antes de escribir nada no dispara nada.
+> - ⚠️ **Un espacio de más SÍ cuenta.** El PUT escribe el texto tal cual: `"David "` y `"David"` son dos filas distintas en la base.
+>
+> ### 🔑 EL AUTOGUARDADO SE QUEDA — pero solo después de un cambio de verdad
+>
+> Daniel dijo *"si hace fricción"*, y la fricción era abrir-y-guardar, no guardar. **Bodega despacha desde el celular** y una pestaña que se cierra no puede llevarse los renglones que ya se escribieron; el borrador de `localStorage` es la red de `/guias/nueva`, no la de editar. Lo que sí se recortó es **cuánto** escribe:
+> - 🔴 **Los renglones solo viajan cuando cambió un renglón.** Anotar una observación, corregir la fecha o cambiar el transportista **ya no le rota el id a cada línea**: el PUT sale sin `items` y `guia_items` no se toca. Medido sobre el doble: cambiar las observaciones dejó los dos uuid **idénticos**.
+> - **El mismo guardado no se reintenta.** Un PUT que el servidor RECHAZA (una guía ya despachada → 400) deja "hay cambios" en true —y está bien, porque de verdad no se guardó—, así que sin freno el temporizador dispararía cada 1,5 s para siempre. Se reintenta recién cuando algo vuelve a cambiar.
+> - **"Listo, guardado" sale de un guardado ACEPTADO.** Antes se ponía apenas se disparaba el pedido: una guía despachada mostraba "Listo, guardado" con el servidor contestando 400.
+> - ⚠️ **`/guias/nueva` NO cambió**: ahí no hay PUT que pise nada, el borrador de `localStorage` se sigue escribiendo cada 5 s sin mirar esto, y el banner de restaurar sigue igual. Medido en el navegador: abrir `/guias/nueva` = **0 escrituras**, y tras escribir una fila el borrador queda en `localStorage` como siempre.
+> - ⚠️ **El candado del PUT sobre una guía despachada y el `PATCH …/cliente` que ata sin mirar el estado NO se tocaron.**
+>
+> ### La medición, contra el LOG DEL SERVIDOR y con un DOBLE
+>
+> 🔴 **No se usó ninguna guía real para escribir.** GT-204 ya había pagado dos veces. El doble es **GT-205**, creado y borrado el mismo día (mismo procedimiento que GT-192 el 10-ago), con dos envíos completos.
+>
+> | | abrir y esperar | tocar una observación | tocar los bultos |
+> |---|---|---|---|
+> | **ANTES** | **1 PUT** (`200` en el log) · los **dos uuid de `guia_items` ROTARON** (`6cdd457d…`→`40506ebd…`, `20c49d34…`→`078cf5a6…`) | 1 PUT, con `items` | — |
+> | **DESPUÉS** | **0 PUT — ni una línea en el log** | 1 PUT **sin `items`** · uuid **intactos** | 1 PUT con `items`, bultos 7→8 guardados |
+>
+> `BASE=… GUIA=<uuid> [NAVEGACION=suave] [DEJAR_PASAR=1] node scripts/_medir-guias-editar-sin-escrituras.mjs`. **Por defecto ABORTA toda escritura en el navegador**, así que se puede correr contra una guía real sin tocarle un renglón; `DEJAR_PASAR=1` es solo para el doble, y sirve para que el PUT quede en el **log del servidor** y la prueba no dependa de lo que diga el navegador. Mide las tres fases (abrir · cabecera · renglón) **y los cuatro anchos**.
+> - 🩸 **GT-204 es un objetivo SEGURO y por eso se midió también ahí:** está `Completada`, y el PUT la rechaza con 400 **antes** de tocar una fila. En el log del servidor: **antes 1 PUT al abrir, después 0**.
+> - **Los 3 anchos (+ el iPad acostado), contra el build de producción y con datos de producción:** **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px.** El cambio es de conducta, no de dibujo: lo único que cambia de texto es el rótulo de estado.
+> - ⚠️ **Dónde SÍ se reproduce y dónde no, dicho de frente.** En `next dev` (React monta el árbol dos veces) el bug sale **siempre**: abrir = 1 PUT. En un build de producción con red local rápida **no se pudo reproducir** el PUT espontáneo, ni recargando la URL ni entrando por "Cambiar los envíos de esta guía". O sea que el disparo depende de que ese efecto corra una segunda vez, y eso pasa por caminos que cambian con el navegador y la red. **Lo que se retiró es el mecanismo entero**, así que la pregunta de por qué corría dos veces deja de tener consecuencias.
+>
+> ### Candados
+>
+> **`src/__tests__/components/guias-editar-no-guarda-sola.test.tsx` (7) MONTA LA PANTALLA REAL** —la página de editar, con su hook— y **cuenta lo que sale por `fetch`**, que es lo único que la base llega a ver. Con `GuiaForm` suelto habría que pasarle a mano el "hay cambios" que calcula el hook, y el candado probaría el mock en vez del producto. Se monta también dentro de `<StrictMode>`, que es la configuración en la que el bug se dispara siempre. Más `src/__tests__/lib/guias-cambios-form.test.ts` (30), sobre los renglones REALES de GT-204.
+> - 🩸 **DOS GOTCHAS DE MEDICIÓN, y los dos daban VERDE sin haber mirado nada.** (a) El `fetch` simulado contestaba **al instante**: React nunca llegaba a renderizar con el guardado en curso, así que un autoguardado en bucle se veía igual que uno que dispara una sola vez — el candado del bucle pasaba con la mutación puesta. Ahora el doble del servidor **tarda 60 ms**, como en la vida real (medido: 866-2412 ms). (b) Dejar pasar el tiempo en UN tramo de 3,2 s acumula los cambios de estado hasta el final y produce el mismo espejismo: ahora se avanza en tramos de 100 ms.
+> - **Verificado por mutación, 8 de 8 cazadas** (`bash scripts/_mutar-candados-guia-autoguardado.sh`): el formulario vuelve a nacer sucio · sin referencia se declara sucio · los renglones viajan siempre · los renglones no viajan nunca · el autoguardado deja de mirar si hubo cambios · se cae el freno anti-bucle · al cargar no se guarda la referencia · la pantalla dice "Listo, guardado" apenas abre.
+> - 🩸 **La restauración del script va por COPIA, no por `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada, así que las mutaciones se apilan y ninguna se prueba por separado. Ya pasó en este repo.
+
 ## 🔴 UN SOLO SELECTOR DE CLIENTE EN TODO EL SISTEMA — y la salida a mano se llama con todas las letras (17-ago-2026)
 
 > Daniel vio una guía donde alguien **escribió a mano el nombre de un cliente que SÍ estaba en la lista** y el renglón quedó sin atar. Su propuesta, textual: *"que se escriba como un buscador los clientes y solo texto libre si ponen la opción de otros (debería de haber 'un cliente' como otro)"* — *"sin hacer fricción ni complicarlo"*. Y sobre el alcance: ***"sí, todos deben de tener mismo selector, tiene que hacer sentido con el sistema"***.

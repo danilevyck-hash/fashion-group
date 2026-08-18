@@ -56,6 +56,9 @@ export default function GuiaNuevaPage() {
         validationErrors={s.validationErrors}
         error={s.error}
         saving={s.saving}
+        hayCambios={s.hayCambios}
+        instantanea={s.instantanea}
+        guardadoEn={s.guardadoEn}
         onAddDireccion={s.addDireccion}
         onUpdateItem={s.updateItem}
         onUpdateItemFields={s.updateItemFields}

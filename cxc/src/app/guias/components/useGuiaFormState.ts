@@ -14,6 +14,12 @@ import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import { DEFAULT_DIRECCIONES, loadList, saveList, emptyItem } from "./constants";
 import { nuevoUid, quitarFila, restaurarFila, validarGuia } from "./guia-form-logic";
+import {
+  hayCambios as calcularHayCambios,
+  instantaneaGuia,
+  renglonesCambiaron,
+  type InstantaneaGuia,
+} from "@/lib/guias/cambios-form";
 
 interface Options {
   editingId?: string | null; // null = creación
@@ -59,6 +65,22 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(editingId === null);
 
+  // ── Lo ÚLTIMO que el servidor ya tiene ─────────────────────────────────────
+  // 🔴 ES EL CANDADO. Mientras esto sea `null`, el formulario NO puede
+  // declararse sucio y por lo tanto NO puede autoguardar: no hay contra qué
+  // comparar. Se llena UNA vez, con lo que se acaba de cargar (o, al crear, con
+  // el formulario vacío), y se vuelve a llenar con lo que se acaba de mandar
+  // cada vez que un guardado sale bien.
+  //
+  // 🩸 Antes esto era `changeCount.current > 1` dentro de GuiaForm: contar
+  // renders, no cambios. Abrir la pantalla de editar disparaba un PUT solo, y
+  // ese PUT REEMPLAZA los renglones (borra e inserta) → abrir una guía y
+  // arrepentirse le cambiaba el id a cada línea. Medido contra el log del
+  // servidor el 17-ago-2026 con GT-204.
+  const [guardado, setGuardado] = useState<InstantaneaGuia | null>(null);
+  /** Hora del último guardado que el servidor aceptó (no del que se intentó). */
+  const [guardadoEn, setGuardadoEn] = useState<string | null>(null);
+
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
@@ -87,22 +109,41 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
         setFormNumero(g.numero);
         setFecha(g.fecha);
         // Sprint 2: modo + FK directos del backend
-        if (g.modo_entrega === "transportista" || g.modo_entrega === "entrega_directa") {
-          setModoEntrega(g.modo_entrega);
-        } else {
-          setModoEntrega(g.transportista_id ? "transportista" : "entrega_directa");
-        }
+        const modoCargado: ModoEntrega =
+          g.modo_entrega === "transportista" || g.modo_entrega === "entrega_directa"
+            ? g.modo_entrega
+            : g.transportista_id
+              ? "transportista"
+              : "entrega_directa";
+        setModoEntrega(modoCargado);
         setTransportistaId(g.transportista_id || null);
         setEntregadoPor(g.entregado_por || "");
         setObservaciones(g.observaciones || "");
         setNumeroGuiaTransp(g.numero_guia_transp || "");
         const guiaItems = (g.guia_items || []) as GuiaItem[];
-        setItems(
+        const itemsCargados =
           guiaItems.length > 0
             // `uid` no viene de la base: se genera acá para que las filas de una
             // guía existente también tengan identidad estable al editarlas.
             ? guiaItems.map((item, i) => ({ ...item, uid: item.uid ?? nuevoUid(), orden: i + 1 }))
-            : [emptyItem(1)],
+            : [emptyItem(1)];
+        setItems(itemsCargados);
+        // 🔴 La referencia contra la que se mide "¿cambió algo?" se toma de los
+        // MISMOS valores que se acaban de poner en el formulario, no de un
+        // render posterior: si se tomara después, cualquier render de más
+        // (los datos que llegan, un remontaje) volvería a producir el bug.
+        setGuardado(
+          instantaneaGuia(
+            {
+              fecha: g.fecha,
+              modoEntrega: modoCargado,
+              transportistaId: g.transportista_id || null,
+              entregadoPor: g.entregado_por || "",
+              observaciones: g.observaciones || "",
+              numeroGuiaTransp: g.numero_guia_transp || "",
+            },
+            itemsCargados,
+          ),
         );
         setLoaded(true);
       } catch {
@@ -127,6 +168,35 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
       })
       .catch(() => {});
   }, [editingId]);
+
+  // Al CREAR no hay nada que cargar, así que la referencia es el formulario tal
+  // como nace (con los valores que recuerda el navegador: modo, transportista y
+  // quién despacha). Sin esto, `/guias/nueva` no podría decir "Sin guardar"
+  // nunca. No hay PUT en esta pantalla: lo único que gobierna es el aviso de
+  // salir con cambios y el rótulo, y el borrador de localStorage sigue
+  // guardándose solo cada 5 s como siempre, sin mirar esto.
+  useEffect(() => {
+    if (editingId) return;
+    setGuardado(
+      instantaneaGuia(
+        { fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp },
+        items,
+      ),
+    );
+    // Solo al montar: son los valores iniciales, a propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId]);
+
+  /** Lo que se le mandaría al servidor AHORA. Es lo que se compara. */
+  const instantanea = useMemo(
+    () =>
+      instantaneaGuia(
+        { fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp },
+        items,
+      ),
+    [fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp, items],
+  );
+  const hayCambios = calcularHayCambios(guardado, instantanea);
 
   // Draft auto-save (incluye modo + FK)
   const guiaDraftData = useMemo(() => ({
@@ -204,6 +274,16 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     const validItems = items.filter(
       (i) => i.cliente || i.direccion || i.facturas || i.bultos > 0,
     );
+    // La instantánea de lo que se manda, tomada ANTES del fetch: si la persona
+    // sigue escribiendo mientras el pedido viaja, eso queda SIN guardar (que es
+    // la verdad), en vez de darse por guardado con lo que se tecleó después.
+    const enviada = instantanea;
+    // 🔴 `items` en el PUT es un REEMPLAZO COMPLETO: borra los renglones e
+    // inserta otros con ids NUEVOS. Cambiar la fecha, el transportista o las
+    // observaciones no puede costar el id de cada línea, así que los renglones
+    // solo viajan cuando de verdad cambiaron. Al CREAR siempre viajan (no hay
+    // nada guardado que conservar).
+    const mandarItems = !editingId || renglonesCambiaron(guardado, enviada);
     setSaving(true);
     const url = editingId ? `/api/guias/${editingId}` : "/api/guias";
     const method = editingId ? "PUT" : "POST";
@@ -218,11 +298,14 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
         observaciones,
         numero_guia_transp: numeroGuiaTransp.trim() || null,
         estado: editingId && editingEstado ? editingEstado : "Pendiente Bodega",
-        items: validItems,
+        ...(mandarItems ? { items: validItems } : {}),
       }),
     });
     if (res.ok) {
       setError(null);
+      // Recién ahora lo enviado ES lo que el servidor tiene.
+      setGuardado(enviada);
+      setGuardadoEn(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
       clearGuiaDraft();
       // Aviso de creación eliminado (antes mandaba email interno a info@).
       // El único aviso de guías ahora es el de DESPACHO (Telegram), en
@@ -259,6 +342,11 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     numeroGuiaTransp, setNumeroGuiaTransp,
     items,
     saving,
+    // "¿de verdad se cambió algo?" — se compara contra lo último que el
+    // servidor tiene, nunca contra un contador de renders.
+    hayCambios,
+    instantanea: instantanea.todo,
+    guardadoEn,
     updateItem, updateItemFields, addRow, removeRow, restoreRow,
     saveGuia,
     // draft: banner de restaurar en /guias/nueva + limpieza al guardar
