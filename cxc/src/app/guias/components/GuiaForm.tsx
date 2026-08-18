@@ -44,10 +44,14 @@
 //
 // Test manual de regresión — correr tras tocar GuiaForm o saveGuia:
 //   1. Abrir una guía existente (ej GT-042) en edición
-//   2. Click "+ Agregar envío" tres veces seguidas
-//   3. NO debe redirigir al listado /guias ni limpiar el form
-//   4. El auto-save silencioso dispara cada 1.5s sin perder el contexto
-//   5. Click "Guardar" final sí debe redirigir al listado
+//   2. ESPERAR sin tocar nada: NO debe salir ni un PUT (17-ago-2026 — ver el
+//      bloque del autoguardado más abajo; hay candado automático en
+//      src/__tests__/components/guias-editar-no-guarda-sola.test.tsx)
+//   3. Click "+ Agregar envío" tres veces seguidas
+//   4. NO debe redirigir al listado /guias ni limpiar el form
+//   5. Cambiar un campo: el auto-save silencioso dispara a los 1,5 s sin perder
+//      el contexto
+//   6. Click "Guardar" final sí debe redirigir al listado
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
@@ -85,8 +89,22 @@ interface GuiaFormProps {
   onAddRow: () => void;
   onRemoveRow: (idx: number) => void;
   onRestoreRow: (idx: number, fila: GuiaItem) => void;
-  onSave: (opts?: { silent?: boolean }) => void;
+  onSave: (opts?: { silent?: boolean }) => void | Promise<void>;
   onCancel: () => void;
+  /**
+   * ¿Lo que hay en el formulario es DISTINTO de lo último que el servidor tiene?
+   * Lo calcula `useGuiaFormState` comparando instantáneas (`@/lib/guias/cambios-form`).
+   *
+   * 🔴 Por defecto `false`, y eso es el candado: sin que alguien afirme que hubo
+   * un cambio, este componente no autoguarda ni avisa al salir. Antes se
+   * deducía acá contando cuántas veces había corrido un `useEffect`, y por eso
+   * abrir `/guias/[id]/editar` guardaba solo.
+   */
+  hayCambios?: boolean;
+  /** Instantánea de lo que se mandaría. Solo se usa para no repetir el mismo autoguardado. */
+  instantanea?: string;
+  /** Hora del último guardado que el servidor ACEPTÓ. */
+  guardadoEn?: string | null;
 }
 
 // ── Primitivas del formulario ────────────────────────────────────────────────
@@ -173,6 +191,7 @@ export default function GuiaForm({
   validationErrors, error, saving,
   onAddDireccion,
   onUpdateItem, onUpdateItemFields, onAddRow, onRemoveRow, onRestoreRow, onSave, onCancel,
+  hayCambios = false, instantanea = "", guardadoEn = null,
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
@@ -267,52 +286,67 @@ export default function GuiaForm({
     setUndoRow(null);
   }
 
-  // Track unsaved changes
-  const [dirty, setDirty] = useState(false);
-  const [lastSaved, setLastSaved] = useState<string | null>(null);
-  const changeCount = useRef(0);
-
-  // Mark dirty on any change
+  // ── El guardado automático, y por qué SOLO después de un cambio de verdad ──
+  //
+  // 🩸 Hasta el 17-ago-2026 esto marcaba el formulario como sucio contando
+  // renders (`changeCount.current > 1`): terminar de cargar los datos ya
+  // contaba como "cambio", y a los ~1,5 s salía un `PUT /api/guias/[id]` que
+  // REEMPLAZA los renglones (los borra e inserta otros con ids nuevos). O sea
+  // que **abrir la pantalla y arrepentirse ya le cambiaba el id a cada línea.**
+  // Medido contra el log del servidor con GT-204 el 17-ago-2026: abrir la
+  // pantalla y no tocar nada = 1 PUT.
+  //
+  // Ahora la pregunta la contesta `hayCambios`, que compara lo que se mandaría
+  // contra lo último que el servidor ya tiene (`@/lib/guias/cambios-form`).
+  // Cargar los datos no puede producir una diferencia contra sí mismo, así que
+  // el número de veces que corra este efecto deja de importar.
+  //
+  // 🔑 EL AUTOGUARDADO SE QUEDA, y es a propósito: bodega despacha desde el
+  // celular y una pestaña que se cierra no puede llevarse los renglones que ya
+  // se escribieron. `/guias/nueva` NO tiene PUT que la pise (su red es el
+  // borrador de localStorage) y por eso `editingId` sigue siendo condición.
+  /**
+   * Lo último que este autoguardado YA intentó mandar. Es el freno anti-bucle:
+   * un guardado que el servidor RECHAZA (una guía ya despachada, por ejemplo)
+   * deja `hayCambios` en true —y está bien, porque de verdad no se guardó—, así
+   * que sin esto el temporizador volvería a dispararse cada 1,5 s contra la
+   * misma guía para siempre. Se reintenta recién cuando algo vuelve a cambiar.
+   */
+  const ultimoIntento = useRef<string | null>(null);
   useEffect(() => {
-    changeCount.current++;
-    if (changeCount.current > 1) setDirty(true);
-  }, [fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp, items]);
-
-  // Auto-save with debounce (only when editing existing guía)
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoSaveInFlight = useRef(false);
-  useEffect(() => {
-    if (!editingId || !dirty || saving || autoSaveInFlight.current) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(async () => {
+    // `saving` es estado, no un ref: mientras el pedido viaja este efecto sale
+    // por acá, y cuando vuelve a false React lo despierta solo.
+    if (!editingId || !hayCambios || saving) return;
+    if (instantanea === ultimoIntento.current) return;
+    const timer = setTimeout(() => {
       const hasItems = items.some(i => i.cliente && i.direccion && i.empresa && i.facturas && i.bultos > 0);
       const hasModo = modoEntrega === "entrega_directa" || (modoEntrega === "transportista" && !!transportistaId);
       const hasHeader = fecha.trim() && hasModo && entregadoPor.trim();
-      if (hasItems && hasHeader && !autoSaveInFlight.current) {
-        autoSaveInFlight.current = true;
-        try { handleSave({ silent: true }); } finally { autoSaveInFlight.current = false; }
-      }
+      if (!hasItems || !hasHeader) return;
+      ultimoIntento.current = instantanea;
+      void handleSave({ silent: true });
     }, 1500);
-    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+    return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, dirty, editingId, saving]);
+  }, [instantanea, hayCambios, editingId, saving]);
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
     function handler(e: BeforeUnloadEvent) {
-      if (dirty && !saving) { e.preventDefault(); e.returnValue = ""; }
+      if (hayCambios && !saving) { e.preventDefault(); e.returnValue = ""; }
     }
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty, saving]);
+  }, [hayCambios, saving]);
 
   function handleSave(opts?: { silent?: boolean }) {
-    onSave(opts);
-    setDirty(false);
-    setLastSaved(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
+    return onSave(opts);
   }
 
-  const saveStatus = saving ? "saving" : dirty ? "dirty" : lastSaved ? "saved" : null;
+  // "Listo, guardado" sale de la hora que dejó un guardado ACEPTADO por el
+  // servidor. Antes se ponía apenas se disparaba el pedido, así que un guardado
+  // rechazado igual decía "listo".
+  const saveStatus = saving ? "saving" : hayCambios ? "dirty" : guardadoEn ? "saved" : null;
 
   function SaveButton({ size = "normal" }: { size?: "normal" | "small" }) {
     const cls = size === "small"
@@ -328,7 +362,7 @@ export default function GuiaForm({
   function StatusBadge() {
     if (saveStatus === "saving") return <span className="text-sm text-gray-400">Guardando...</span>;
     if (saveStatus === "dirty") return <span className="text-sm text-orange-500">Sin guardar</span>;
-    if (saveStatus === "saved") return <span className="text-sm text-green-600 animate-save-flash">Listo, guardado {lastSaved}</span>;
+    if (saveStatus === "saved") return <span className="text-sm text-green-600 animate-save-flash">Listo, guardado {guardadoEn}</span>;
     return null;
   }
 
