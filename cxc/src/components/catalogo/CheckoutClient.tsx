@@ -17,6 +17,17 @@
 // textual: *"Que arranque vacío y el botón apagado hasta elegir cliente."*
 // La regla vive en `lib/catalogo/cliente-elegido.ts`, compartida con el detalle
 // del pedido; acá NO se vuelve a escribir el `if`.
+//
+// 🔴 Y EL SELECTOR TAMBIÉN ES UNO SOLO (17-ago-2026).
+// Esta pantalla tenía su PROPIA lista de clientes —su propia ruta, su propio
+// buscador, su propia forma de resolver el mostrador— sobre el MISMO universo
+// de Switch que `ClienteSwitchPicker`, el control que ya usaban el detalle del
+// pedido y "Duplicar". Dos controles para la misma pregunta se separan solos: el
+// que gana una mejora deja al otro viejo, y acá el otro es el que manda plata a
+// Switch. Daniel, textual: *"si unificalo"*.
+// Quedó `ClienteSwitchPicker`. Lo único propio que tenía el checkout —convertir
+// lo elegido en el cuerpo del POST— se mudó a `cliente-elegido.ts`, que ya era
+// el módulo compartido. Ver `src/__tests__/un-solo-selector-de-cliente.test.ts`.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
@@ -28,10 +39,14 @@ import { getMarcaTheme, type MarcaTheme, type MarcaUiKey } from "@/lib/catalogo/
 import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
 import VendedorSwitchPicker from "@/components/catalogo/VendedorSwitchPicker";
 import { nombreDeVendedor } from "@/lib/catalogo/vendedor-switch";
-import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
+import ClienteSwitchPicker, {
+  type ClienteSwitchOpcion,
+  nombreDeCliente,
+} from "@/components/catalogo/ClienteSwitchPicker";
 import {
-  LABEL_CONTADO,
   SIN_CLIENTE_ELEGIDO,
+  clienteParaCheckout,
+  esClienteDeMostrador,
   faltaParaEnviar,
   textoFaltaEnviar,
 } from "@/lib/catalogo/cliente-elegido";
@@ -72,23 +87,6 @@ function brandCfg(theme: MarcaTheme): BrandCfg {
   };
 }
 
-interface Cliente { id: number; codigo: string | null; nombre: string }
-
-// La venta de mostrador de la empresa. El `id` histórico es 1 y está medido:
-// el cliente con código TCKCTA es el id 1 en las 4 empresas (active_shoes
-// "Contado" · joystep "Contado" · fashion_shoes "VENTAS LOCA" · vistana
-// "VENTAS"). Igual NO se confía en la constante: cuando el directorio carga se
-// busca el TCKCTA de verdad (`contadoDelDirectorio`) y se usa ESE id.
-//
-// ⚠️ El `nombre` se queda en "Contado" a propósito: es lo que se escribe en
-// `client_name` desde el primer día y cambiarlo cambiaría el dato de los
-// pedidos, no la pantalla. Lo que se ve en pantalla es `LABEL_CONTADO`.
-const CONTADO: Cliente = { id: 1, codigo: CODIGO_CLIENTE_CONTADO, nombre: "Contado" };
-
-/** ¿Lo elegido es la venta de mostrador? (para rotularlo con todas las letras) */
-const esContado = (c: Cliente | undefined): boolean =>
-  !!c && (c.codigo === CODIGO_CLIENTE_CONTADO || c.nombre === CONTADO.nombre);
-
 export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
   const cfg = brandCfg(theme);
@@ -98,10 +96,8 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   const [loaded, setLoaded] = useState(false);
   // 🔴 ARRANCA VACÍO. `undefined` = todavía no eligió, y sin elección no hay
   // envío. Ver la cabecera del archivo: el default puesto costó $53.124.
-  const [cliente, setCliente] = useState<Cliente | undefined>(undefined);
-  const [clientes, setClientes] = useState<Cliente[] | null>(null);
+  const [cliente, setCliente] = useState<ClienteSwitchOpcion | undefined>(undefined);
   const [clientePickerOpen, setClientePickerOpen] = useState(false);
-  const [clienteQuery, setClienteQuery] = useState("");
   const [vendedor, setVendedor] = useState<{ id: number; nombre: string | null } | null | undefined>(undefined);
   // El que mapea tu login: es el DEFAULT y el que se rotula "tu vendedor".
   // Se guarda aparte de `vendedor` para poder decir cuándo se cambió.
@@ -134,14 +130,9 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
       .catch(() => { setVendedor(null); setVendedorDelLogin(null); });
   }, [marca]);
 
-  // ── Directorio de clientes (al abrir el selector) ──
-  useEffect(() => {
-    if (!clientePickerOpen || clientes !== null) return;
-    fetch(`/api/catalogo/switch-clientes?marca=${marca}`)
-      .then((r) => (r.ok ? r.json() : { clientes: [] }))
-      .then((d) => setClientes(d.clientes ?? []))
-      .catch(() => setClientes([]));
-  }, [clientePickerOpen, clientes, marca]);
+  // (El directorio de clientes de Switch lo lee `ClienteSwitchPicker` — la
+  // MISMA pieza que usan el detalle del pedido y "Duplicar". Dos buscadores
+  // sobre el mismo universo se separan solos.)
 
   // ── Derivados ──
   const lineas = useMemo(() => cart.map((i) => {
@@ -161,14 +152,6 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
     preordersEnCarrito: preorders.length,
   });
   const puedeConfirmar = loaded && falta.length === 0 && !sending;
-
-  // La venta de mostrador REAL de la empresa: se busca por su código de Switch
-  // (TCKCTA) en el directorio que ya se cargó. Si no aparece se usa el id
-  // histórico — nunca se deja al usuario sin la opción.
-  const contado: Cliente = useMemo(() => {
-    const real = (clientes ?? []).find((c) => (c.codigo || "").trim().toUpperCase() === CODIGO_CLIENTE_CONTADO);
-    return real ? { ...CONTADO, id: real.id } : CONTADO;
-  }, [clientes]);
 
   const setQty = (productId: string, qty: number) => {
     if (qty <= 0) persistCart(cart.filter((i) => i.product_id !== productId));
@@ -205,9 +188,12 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
       const res = await fetch("/api/catalogo/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // `cliente`: el MISMO `{ id, nombre }` de siempre. Lo arma el módulo
+        // compartido (`clienteParaCheckout`) para que el selector único no
+        // cambie ni un valor de lo que se manda.
         // `vendedor_id`: el elegido en pantalla. El server igual lo valida
         // contra Switch y, si no viene, cae al mapeo del login como siempre.
-        body: JSON.stringify({ marca, cliente: { id: cliente.id, nombre: cliente.nombre }, vendedor_id: vendedor?.id ?? null, items: cart, idempotency_key: token }),
+        body: JSON.stringify({ marca, cliente: clienteParaCheckout(cliente), vendedor_id: vendedor?.id ?? null, items: cart, idempotency_key: token }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -225,18 +211,6 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
       setSending(false);
     }
   }
-
-  const clientesFiltrados = useMemo(() => {
-    if (!clientes) return [];
-    // La venta de mostrador ya tiene su propia opción arriba: dejarla también
-    // adentro de la lista serían DOS formas de elegir lo mismo, con nombres
-    // distintos según la empresa ("Contado" en dos, "VENTAS LOCA" y "VENTAS"
-    // en las otras dos) — justo la confusión que este cambio vino a sacar.
-    const sinContado = clientes.filter((c) => (c.codigo || "").trim().toUpperCase() !== CODIGO_CLIENTE_CONTADO);
-    const q = clienteQuery.trim().toLowerCase();
-    if (!q) return sinContado;
-    return sinContado.filter((c) => c.nombre.toLowerCase().includes(q) || (c.codigo || "").toLowerCase().includes(q));
-  }, [clientes, clienteQuery]);
 
   if (!loaded) return null;
 
@@ -346,8 +320,11 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                   <div className="mt-0.5 text-sm font-medium text-amber-800">{SIN_CLIENTE_ELEGIDO}</div>
                 ) : (
                   <div className="mt-0.5 text-sm font-medium">
-                    {esContado(cliente) ? LABEL_CONTADO : cliente.nombre}
-                    {cliente.codigo && !esContado(cliente) ? <span className="ml-1.5 text-xs text-gray-400">{cliente.codigo}</span> : null}
+                    {/* El mostrador se dice SIEMPRE con la misma frase, aunque
+                        en Switch cada empresa lo llame distinto. Sale de la
+                        MISMA función que rotula el detalle del pedido. */}
+                    {nombreDeCliente(cliente)}
+                    {cliente.codigo && !esClienteDeMostrador(cliente) ? <span className="ml-1.5 text-xs text-gray-400">{cliente.codigo}</span> : null}
                   </div>
                 )}
               </div>
@@ -362,33 +339,19 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
             </div>
             {clientePickerOpen && (
               <div className="mt-3 border-t border-gray-100 pt-3">
-                <input
-                  type="search"
-                  value={clienteQuery}
-                  onChange={(e) => setClienteQuery(e.target.value)}
-                  placeholder="Buscar cliente…"
-                  className="w-full border border-gray-200 rounded-md px-3 min-h-[44px] text-sm outline-none focus:border-black transition"
+                {/* 🔴 EL SELECTOR ÚNICO. Contado SIGUE EXISTIENDO y sigue
+                    primero en la lista para que la venta de mostrador cueste un
+                    solo toque, con su id REAL (TCKCTA) — pero hay que TOCARLO.
+                    ⚠️ `valor` va `undefined` cuando no se eligió: pasarle el
+                    mostrador marcaría "Contado" como si ya se hubiera elegido,
+                    que es el mismo default silencioso disfrazado de estado. */}
+                <ClienteSwitchPicker
+                  api={theme.api}
+                  directorioLabel={theme.switchDirectorioLabel}
+                  valor={cliente}
+                  onElegir={(c) => { setCliente(c); setClientePickerOpen(false); }}
+                  disabled={sending}
                 />
-                <ul className="mt-2 max-h-56 overflow-y-auto divide-y divide-gray-50">
-                  {/* 🔴 Contado SIGUE EXISTIENDO, y sigue primero en la lista
-                      para que la venta de mostrador cueste un solo toque. Lo
-                      que ya no es, es el valor de arranque: dejó de decir
-                      "(default)" porque ya no lo es. */}
-                  <li>
-                    <button onClick={() => { setCliente(contado); setClientePickerOpen(false); }} className="w-full px-2 min-h-[44px] py-2.5 text-left text-sm hover:bg-gray-50 transition">
-                      {LABEL_CONTADO}
-                    </button>
-                  </li>
-                  {clientes === null ? (
-                    <li className="px-2 py-3 text-sm text-gray-400">Cargando directorio…</li>
-                  ) : clientesFiltrados.map((c) => (
-                    <li key={c.id}>
-                      <button onClick={() => { setCliente(c); setClientePickerOpen(false); }} className="w-full px-2 min-h-[44px] py-2.5 text-left text-sm hover:bg-gray-50 transition">
-                        {c.nombre} {c.codigo && <span className="text-xs text-gray-400">{c.codigo}</span>}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
           </section>

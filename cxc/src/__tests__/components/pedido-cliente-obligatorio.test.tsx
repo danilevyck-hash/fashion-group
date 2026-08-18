@@ -55,19 +55,30 @@ const ITEM_CARRITO = {
   quantity: 2, unit_price: 20, category: "footwear", bulto_pzas: 12,
 };
 
-/** Directorio de la empresa tal como lo devuelve `/api/catalogo/switch-clientes`. */
-const DIRECTORIO = [
-  { id: 1, codigo: "TCKCTA", nombre: "VENTAS LOCA" }, // el mostrador de fashion_shoes
-  { id: 42, codigo: "D-42", nombre: "Sporting Shoes" },
-];
+/**
+ * Directorio de la empresa tal como lo devuelve `/api/catalogo/[marca]/clientes-switch`.
+ *
+ * 🔴 17-ago-2026: el checkout dejó de tener su lista propia y pasó al selector
+ * único (`ClienteSwitchPicker`), el mismo del detalle y de "Duplicar". Por eso
+ * el stub responde a ESA ruta y con SU forma —`cliente_switch_id` + el `contado`
+ * resuelto aparte—, que es lo que la pantalla recibe de verdad.
+ */
+const DIRECTORIO = [{ cliente_switch_id: 42, codigo: "D-42", nombre: "Sporting Shoes" }];
+/** El mostrador de fashion_shoes: en Switch se llama "VENTAS LOCA". */
+const CONTADO_FILA = { cliente_switch_id: 1, codigo: "TCKCTA", nombre: "VENTAS LOCA" };
 
-function stubCheckout(opts: { clientes?: unknown[]; vendedor?: unknown } = {}) {
+function stubCheckout(opts: { clientes?: unknown[]; contado?: unknown; vendedor?: unknown } = {}) {
   const llamadas: Llamada[] = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     llamadas.push({ url, method: (init?.method || "GET").toUpperCase(), body: (init?.body as string) ?? null });
     const j = (b: unknown) => ({ ok: true, status: 200, json: async () => b });
     if (url.includes("/mi-vendedor")) return j({ vendedor: "vendedor" in opts ? opts.vendedor : { id: 7, nombre: "Rey" } });
-    if (url.includes("/switch-clientes")) return j({ clientes: opts.clientes ?? DIRECTORIO });
+    if (url.includes("/clientes-switch")) {
+      return j({
+        clientes: opts.clientes ?? DIRECTORIO,
+        contado: "contado" in opts ? opts.contado : CONTADO_FILA,
+      });
+    }
     if (url.includes("/catalogo/checkout")) return j({ ok: true, order_id: OID, order_number: "TOM-999", switch: { ok: true } });
     return j({});
   });
@@ -157,9 +168,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
 
   it("Contado usa el id REAL del mostrador de la empresa, no un número escrito a mano", async () => {
     // Empresa cuyo TCKCTA no es el id 1: el pedido tiene que salir con el suyo.
-    const llamadas = stubCheckout({
-      clientes: [{ id: 908, codigo: "TCKCTA", nombre: "VENTAS" }, { id: 42, codigo: "D-42", nombre: "Sporting Shoes" }],
-    });
+    const llamadas = stubCheckout({ contado: { cliente_switch_id: 908, codigo: "TCKCTA", nombre: "VENTAS" } });
     await pintarCheckout();
     fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
     await screen.findByRole("button", { name: /Sporting Shoes/ });
@@ -168,14 +177,59 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     expect(JSON.parse(enviosDeCheckout(llamadas)[0].body!).cliente.id).toBe(908);
   });
 
+  it("🔴 si el directorio no resuelve el mostrador, elegirlo NO se pierde: cae al id histórico", async () => {
+    // Ante la duda se conserva la elección de la persona. Sin el respaldo, el
+    // botón se encendería y el servidor contestaría 400 con el cliente ya
+    // elegido en pantalla — la peor forma de fallar.
+    const llamadas = stubCheckout({ contado: null });
+    await pintarCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    await screen.findByRole("button", { name: /Sporting Shoes/ });
+    fireEvent.click(screen.getByRole("button", { name: LABEL_CONTADO }));
+    await act(async () => { fireEvent.click(botonEnviar()); });
+    expect(JSON.parse(enviosDeCheckout(llamadas)[0].body!).cliente).toEqual({ id: 1, nombre: "Contado" });
+  });
+
+  it("🔴 el mostrador viaja SIEMPRE con el nombre 'Contado', se llame como se llame en Switch", async () => {
+    // En fashion_shoes el TCKCTA se llama "VENTAS LOCA". El nombre que se
+    // ESCRIBE en el pedido es el literal histórico; cambiarlo cambiaría el dato
+    // de los pedidos nuevos, y eso no es parte de unificar el selector.
+    const llamadas = stubCheckout();
+    await pintarCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    await screen.findByRole("button", { name: /Sporting Shoes/ });
+    fireEvent.click(screen.getByRole("button", { name: LABEL_CONTADO }));
+    await act(async () => { fireEvent.click(botonEnviar()); });
+    expect(JSON.parse(enviosDeCheckout(llamadas)[0].body!).cliente).toEqual({ id: 1, nombre: "Contado" });
+    // Y en pantalla se dice con todas las letras, no "VENTAS LOCA".
+    const caja = document.querySelector('[data-medir="cliente-checkout"]')!;
+    expect(caja.textContent).toContain(LABEL_CONTADO);
+    expect(caja.textContent).not.toContain("VENTAS LOCA");
+  });
+
   it("el mostrador NO aparece dos veces (una opción, no dos formas de lo mismo)", async () => {
+    stubCheckout({ clientes: [CONTADO_FILA, ...DIRECTORIO] });
+    await pintarCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    await screen.findByRole("button", { name: /Sporting Shoes/ });
+    // "VENTAS LOCA" es el nombre del TCKCTA en fashion_shoes: aunque el
+    // directorio lo devuelva en la lista, no puede salir como un cliente más.
+    expect(screen.queryByRole("button", { name: /VENTAS LOCA/ })).toBeNull();
+    expect(screen.getAllByRole("button", { name: LABEL_CONTADO })).toHaveLength(1);
+  });
+
+  it("🔴 el checkout usa EL selector único: ver Contado no es haberlo elegido", async () => {
+    // Es la pieza compartida con el detalle y con "Duplicar" — su buscador, su
+    // `aria-pressed` y su forma de resolver el mostrador. Un archivo puede
+    // importarla y no dibujarla; esto lo mira en el DOM.
     stubCheckout();
     await pintarCheckout();
     fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
-    await screen.findByRole("button", { name: LABEL_CONTADO });
-    // "VENTAS LOCA" es el nombre del TCKCTA en fashion_shoes: no puede salir
-    // además como un cliente más de la lista.
-    expect(screen.queryByRole("button", { name: /VENTAS LOCA/ })).toBeNull();
+    await screen.findByRole("button", { name: /Sporting Shoes/ });
+    expect(screen.getByPlaceholderText("Buscar por nombre o código...")).toBeTruthy();
+    expect(screen.getByRole("button", { name: LABEL_CONTADO }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: /Sporting Shoes/ }).getAttribute("aria-pressed")).toBe("false");
+    expect(botonEnviar().disabled).toBe(true);
   });
 
   it("sin vendedor Y sin cliente, el aviso los nombra a los dos", async () => {

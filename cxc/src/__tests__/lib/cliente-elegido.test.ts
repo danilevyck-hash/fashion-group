@@ -16,8 +16,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
 import {
+  ID_CONTADO_RESPALDO,
   LABEL_CONTADO,
+  NOMBRE_CONTADO_GUARDADO,
   SIN_CLIENTE_ELEGIDO,
+  clienteParaCheckout,
+  esClienteDeMostrador,
   esPedidoDelLink,
   faltaParaEnviar,
   textoFaltaEnviar,
@@ -141,6 +145,81 @@ describe("los textos", () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DE LO QUE DEVUELVE EL SELECTOR ÚNICO A LO QUE VIAJA EN EL CHECKOUT
+//
+// 🔴 17-ago-2026: el checkout dejó de tener su lista propia. Lo único suyo que
+// quedaba —convertir lo elegido en `{ id, nombre }`— se mudó acá. El servidor
+// exige id entero > 0 y nombre no vacío (si no, 400), así que estos bordes son
+// la diferencia entre un pedido que sale y uno que se traba con el cliente ya
+// elegido en pantalla.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("esClienteDeMostrador / clienteParaCheckout", () => {
+  const MOSTRADOR = { id: 1, codigo: "TCKCTA", nombre: "VENTAS LOCA" };
+  const REAL = { id: 42, codigo: "D-42", nombre: "Sporting Shoes" };
+
+  it("🔴 el mostrador se reconoce por CÓDIGO, no por nombre", () => {
+    // En Switch cada empresa lo llama distinto: "Contado" · "VENTAS" ·
+    // "VENTAS LOCA". Comparar por nombre habría sido un colador.
+    expect(esClienteDeMostrador(MOSTRADOR)).toBe(true);
+    expect(esClienteDeMostrador({ id: 908, codigo: "tckcta", nombre: "VENTAS" })).toBe(true);
+    expect(esClienteDeMostrador({ id: 5, codigo: " TCKCTA ", nombre: "Contado" })).toBe(true);
+    expect(esClienteDeMostrador(REAL)).toBe(false);
+    // Ojo: un cliente que SE LLAME "Contado" pero tenga otro código NO lo es.
+    expect(esClienteDeMostrador({ id: 9, codigo: "D-9", nombre: "Contado" })).toBe(false);
+    expect(esClienteDeMostrador(null)).toBe(false);
+  });
+
+  it("sin id resuelto también es el mostrador (es su opción, con el respaldo)", () => {
+    expect(esClienteDeMostrador({ id: null, codigo: null, nombre: LABEL_CONTADO })).toBe(true);
+  });
+
+  it("🔴 el mostrador viaja con el nombre literal de siempre, no con la etiqueta de pantalla", () => {
+    // Cambiar lo que se ESCRIBE cambiaría el dato de los pedidos nuevos.
+    expect(clienteParaCheckout(MOSTRADOR)).toEqual({ id: 1, nombre: NOMBRE_CONTADO_GUARDADO });
+    expect(NOMBRE_CONTADO_GUARDADO).toBe("Contado");
+    expect(NOMBRE_CONTADO_GUARDADO).not.toBe(LABEL_CONTADO);
+  });
+
+  it("🔴 y con el id REAL de SU empresa, no con un número escrito a mano", () => {
+    expect(clienteParaCheckout({ id: 908, codigo: "TCKCTA", nombre: "VENTAS" }).id).toBe(908);
+  });
+
+  it("🔴 si el directorio no resolvió el mostrador, la elección NO se pierde", () => {
+    // Ante la duda se conserva lo que tocó la persona. Mandar id 0/null haría
+    // que el servidor conteste 400 con el cliente ya elegido en pantalla.
+    expect(clienteParaCheckout({ id: null, codigo: null, nombre: LABEL_CONTADO }))
+      .toEqual({ id: ID_CONTADO_RESPALDO, nombre: NOMBRE_CONTADO_GUARDADO });
+    expect(ID_CONTADO_RESPALDO).toBe(1);
+  });
+
+  it("un cliente real viaja tal cual", () => {
+    expect(clienteParaCheckout(REAL)).toEqual({ id: 42, nombre: "Sporting Shoes" });
+  });
+
+  it("🔴 el nombre nunca queda vacío (el servidor lo rechazaría con 400)", () => {
+    expect(clienteParaCheckout({ id: 42, codigo: "D-42", nombre: null }))
+      .toEqual({ id: 42, nombre: "D-42" });
+    expect(clienteParaCheckout({ id: 42, codigo: "  ", nombre: "   " }))
+      .toEqual({ id: 42, nombre: "Cliente 42" });
+  });
+
+  it("lo que sale de acá SIEMPRE pasa el candado del servidor", () => {
+    const casos = [
+      MOSTRADOR, REAL,
+      { id: null, codigo: null, nombre: null },
+      { id: 908, codigo: "TCKCTA", nombre: "VENTAS" },
+      { id: 7, codigo: null, nombre: "" },
+    ];
+    for (const c of casos) {
+      const { id, nombre } = clienteParaCheckout(c);
+      expect(Number.isInteger(id) && id > 0, JSON.stringify(c)).toBe(true);
+      expect(nombre.trim().length, JSON.stringify(c)).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("BARRIDO — el default no puede volver por la puerta de atrás", () => {
   const CHECKOUT = "src/components/catalogo/CheckoutClient.tsx";
   const DETALLE = "src/components/catalogo/PedidoDetalleClient.tsx";
@@ -149,7 +228,9 @@ describe("BARRIDO — el default no puede volver por la puerta de atrás", () =>
     const src = sinComentarios(leer(CHECKOUT));
     // El estado del cliente nace vacío. Cualquier otra cosa (CONTADO, un
     // objeto literal, el primero de la lista) es el bug de vuelta.
-    expect(src).toMatch(/useState<Cliente \| undefined>\(undefined\)/);
+    // (El tipo pasó a ser el del selector único el 17-ago-2026.)
+    expect(src).toMatch(/useState<ClienteSwitchOpcion \| undefined>\(undefined\)/);
+    expect(src).not.toMatch(/useState<ClienteSwitchOpcion>\(/);
     expect(src).not.toMatch(/useState<Cliente>\(\s*CONTADO\s*\)/);
   });
 

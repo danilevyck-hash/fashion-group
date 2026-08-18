@@ -51,6 +51,8 @@
 // nombre de nadie.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { CODIGO_CLIENTE_CONTADO } from "./publico-switch-actor";
+
 /** Lo mínimo que hay que saber de un pedido para contestar las dos preguntas. */
 export interface PedidoParaCliente {
   /** `<marca>_orders.cliente_switch_id` — null = nadie eligió. */
@@ -147,3 +149,69 @@ export const SIN_CLIENTE_ELEGIDO = "Elige el cliente";
  * checkout) — cambiar lo que se ESCRIBE es otra cosa y no se tocó.
  */
 export const LABEL_CONTADO = "Contado (venta de mostrador)";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DE LO QUE DEVUELVE EL SELECTOR A LO QUE VIAJA EN EL CHECKOUT
+//
+// 🔴 UN SOLO SELECTOR DE CLIENTE DE SWITCH (17-ago-2026). Hasta hoy había DOS
+// controles sobre el MISMO universo: `ClienteSwitchPicker` (detalle del pedido y
+// duplicar) y una lista escrita a mano dentro de `CheckoutClient`. Quedó el
+// primero. Lo único propio que tenía el checkout era CÓMO se convierte lo
+// elegido en el cuerpo que manda a `/api/catalogo/checkout` — y eso vive acá,
+// en el mismo módulo que ya define la regla, para que no vuelva a ser una copia.
+//
+// ⚠️ ESTO NO CAMBIA CÓMO SE MANDA UN PEDIDO A SWITCH. El cuerpo sigue siendo el
+// mismo `{ id, nombre }` de siempre, con los mismos valores; lo que se elimina
+// es el segundo control que lo armaba.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Un cliente del directorio de Switch, tal como lo entrega el selector único. */
+export interface ClienteDeSwitch {
+  /** `null` solo cuando el directorio no pudo resolver el mostrador. */
+  id: number | null;
+  nombre: string | null;
+  codigo: string | null;
+}
+
+/**
+ * El id histórico del mostrador. Medido: el cliente con código TCKCTA es el id 1
+ * en las 4 empresas. Es RESPALDO, no default: se usa únicamente cuando alguien
+ * TOCÓ "Contado (venta de mostrador)" y el directorio no pudo devolver su id.
+ * Ante la duda se conserva la elección de la persona, nunca se inventa una.
+ */
+export const ID_CONTADO_RESPALDO = 1;
+
+/**
+ * El nombre con el que el checkout escribe la venta de mostrador desde el primer
+ * día (`<marca>_orders.client_name`).
+ *
+ * ⚠️ NO es `LABEL_CONTADO`: aquél es la etiqueta de PANTALLA. Cambiar lo que se
+ * ESCRIBE cambiaría el dato de los pedidos nuevos, y eso no es parte de unificar
+ * el selector. El nombre que viaja a Switch tampoco sale de acá — lo lee el
+ * servidor del directorio.
+ */
+export const NOMBRE_CONTADO_GUARDADO = "Contado";
+
+/**
+ * ¿Lo elegido ES la venta de mostrador? Por CÓDIGO (TCKCTA), no por nombre: en
+ * Switch cada empresa lo llama distinto ("Contado" · "VENTAS" · "VENTAS LOCA").
+ * Sin id resuelto también cuenta: es la opción de mostrador con su respaldo.
+ */
+export function esClienteDeMostrador(c: ClienteDeSwitch | null | undefined): boolean {
+  if (!c) return false;
+  if (c.id == null) return true;
+  return (c.codigo || "").trim().toUpperCase() === CODIGO_CLIENTE_CONTADO;
+}
+
+/**
+ * Lo que viaja en `cliente` al crear el pedido. El servidor exige un id entero
+ * positivo y un nombre no vacío (si no, 400), así que el nombre nunca puede
+ * quedar en blanco: se cae al código y, en última instancia, al id.
+ */
+export function clienteParaCheckout(c: ClienteDeSwitch): { id: number; nombre: string } {
+  if (esClienteDeMostrador(c)) {
+    return { id: c.id ?? ID_CONTADO_RESPALDO, nombre: NOMBRE_CONTADO_GUARDADO };
+  }
+  const id = c.id as number;
+  return { id, nombre: (c.nombre || "").trim() || (c.codigo || "").trim() || `Cliente ${id}` };
+}

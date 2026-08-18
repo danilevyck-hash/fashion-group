@@ -180,9 +180,11 @@ const PERMITIDOS: Record<string, string> = {
 
   // ── Otro universo de clientes: los de Switch, por empresa, con "Contado" ──
   "components/catalogo/ClienteSwitchPicker.tsx":
-    "Pedidos: elige clientes de SWITCH (switch_clientes por empresa, con Contado), que no son los D-XXX del directorio.",
-  "components/catalogo/CheckoutClient.tsx":
-    "🔴 HALLAZGO REPORTADO A DANIEL: tiene su propia lista sobre el MISMO universo de Switch que ClienteSwitchPicker. Se dejó como está (es el checkout de pedidos, recién rehecho) y espera su decisión.",
+    "Pedidos: elige clientes de SWITCH (switch_clientes por empresa, con Contado), que no son los D-XXX del directorio. Es EL ÚNICO de ese universo.",
+  // 🔴 `CheckoutClient` ESTUVO ACÁ y ya no está (17-ago-2026). Tenía su propia
+  // lista sobre el MISMO universo de Switch; Daniel decidió unificar ("si
+  // unificalo") y ahora delega en `ClienteSwitchPicker`. La excepción se quitó,
+  // así que si alguien le devuelve su lista propia el build se pone ROJO.
 
   // ── Filtros de reporte: no atan a nadie a ningún registro ──
   "app/marketing/components/ReportePorTiendaView.tsx":
@@ -231,6 +233,79 @@ describe("🔴 no puede haber una segunda forma de elegir cliente", () => {
       expect(sinComentarios(readFileSync(join(SRC, rel), "utf8"))).not.toContain(
         "ClienteTypeahead",
       );
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL UNIVERSO DE SWITCH TAMBIÉN TIENE UN SOLO SELECTOR (17-ago-2026)
+//
+// El barrido de arriba mira "¿este archivo elige cliente con un control propio?"
+// y con eso solo, un segundo selector se delataba. Pero el hallazgo de
+// `CheckoutClient` había sobrevivido como EXCEPCIÓN ESCRITA: tenía su propia
+// lista, su propia ruta (`/api/catalogo/switch-clientes`) y su propia forma de
+// resolver el mostrador, sobre el MISMO universo que `ClienteSwitchPicker`.
+//
+// Este bloque cierra ese costado por el otro lado: **quién puede PEDIR el
+// directorio de clientes de Switch**. Si la lista la pide UNA sola pieza, no
+// puede haber dos controles dibujándola con reglas distintas.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El ÚNICO que puede listar el directorio de clientes de Switch. */
+const PICKER_SWITCH = "components/catalogo/ClienteSwitchPicker.tsx";
+
+/**
+ * ¿Este archivo PIDE la lista de clientes de Switch por su cuenta?
+ *
+ * Pedir la lista es `…/clientes-switch?q=` (o el `switch-clientes?marca=` que se
+ * retiró). NO cuenta preguntar por el cliente de UN pedido (`?orderId=`) ni
+ * asignarlo (PATCH): eso no es elegir de una lista, y el detalle lo hace a
+ * propósito. Tampoco `clientes-search`, que es el directorio D-XXX (otro
+ * universo, y ahí el texto libre es legítimo).
+ */
+export function pideElDirectorioDeSwitch(fuenteCruda: string): boolean {
+  const src = sinComentarios(fuenteCruda);
+  return /clientes-switch\?q=/.test(src) || /switch-clientes\?marca=/.test(src);
+}
+
+describe("🔴 el directorio de clientes de Switch lo pide UNA sola pieza", () => {
+  it("el detector distingue LISTAR de preguntar por el cliente de un pedido", () => {
+    expect(pideElDirectorioDeSwitch('fetch(`${api}/clientes-switch?q=${q}`)')).toBe(true);
+    expect(pideElDirectorioDeSwitch('fetch(`/api/catalogo/switch-clientes?marca=${m}`)')).toBe(true);
+    // Lo que NO es elegir de una lista:
+    expect(pideElDirectorioDeSwitch('fetch(`${api}/clientes-switch?orderId=${id}`)')).toBe(false);
+    expect(pideElDirectorioDeSwitch('fetch(`${api}/clientes-switch`, { method: "PATCH" })')).toBe(false);
+    expect(pideElDirectorioDeSwitch('fetch(`${api}/clientes-search?q=${q}`)')).toBe(false);
+    // Y un comentario no lo dispara.
+    expect(pideElDirectorioDeSwitch("// antes acá iba /clientes-switch?q=")).toBe(false);
+  });
+
+  it("solo ClienteSwitchPicker lo pide — nadie más arma su propia lista", () => {
+    const otros = archivosDelSistema().filter(
+      (rel) => rel !== PICKER_SWITCH && pideElDirectorioDeSwitch(readFileSync(join(SRC, rel), "utf8")),
+    );
+    expect(otros).toEqual([]);
+  });
+
+  it("y él SÍ lo pide (si no, el barrido no está mirando nada)", () => {
+    expect(pideElDirectorioDeSwitch(readFileSync(join(SRC, PICKER_SWITCH), "utf8"))).toBe(true);
+  });
+
+  it("⛔ la ruta paralela `/api/catalogo/switch-clientes` no vuelve", () => {
+    // Era la fuente propia del checkout sobre el MISMO universo. Dos puertas al
+    // mismo directorio es lo que deja que los dos controles se separen.
+    expect(existsSync(join(SRC, "app", "api", "catalogo", "switch-clientes", "route.ts"))).toBe(false);
+  });
+
+  it("🔴 las TRES pantallas de pedido delegan en el selector único", () => {
+    for (const rel of [
+      "components/catalogo/CheckoutClient.tsx",
+      "components/catalogo/PedidoDetalleClient.tsx",
+      "components/catalogo/DuplicarPedidoModal.tsx",
+    ]) {
+      const src = sinComentarios(readFileSync(join(SRC, rel), "utf8"));
+      expect(src, `${rel} dejó de delegar`).toMatch(SELECTORES_COMPARTIDOS);
+      expect(src, `${rel} dibuja el selector`).toContain("<ClienteSwitchPicker");
     }
   });
 });
