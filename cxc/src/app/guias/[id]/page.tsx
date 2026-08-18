@@ -120,13 +120,18 @@ export default function GuiaPage() {
                 que se pierda: queda dicho acá y en la lista de guías, para que
                 alguien pueda encontrarlas.
 
-                ⚠️ NO se ofrece anotarlo desde acá: una guía despachada está
-                cerrada a edición y ese candado no se toca. Abrirle una puerta de
-                escritura a una guía firmada es otra decisión, y es de Daniel. */}
+                🔴 Y SÍ se puede anotar, desde el renglón que corresponda
+                (Daniel: *"hazle la excepción para ese número"*). Es la ÚNICA
+                excepción: va por `PATCH /api/guias/[id]/numero-transp`, que
+                escribe UNA columna de UNA línea. El candado del PUT sobre una
+                guía despachada NO se tocó. */}
             {guiaSinNumeroTransp(g) && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
                 <p className="text-sm text-amber-900">
-                  Esta guía salió sin el N° del transportista.
+                  Esta guía salió sin el N° del transportista.{" "}
+                  {puedeDespachar
+                    ? "Cuando lo tengas, anótalo en el envío que corresponda."
+                    : ""}
                 </p>
               </div>
             )}
@@ -143,6 +148,8 @@ export default function GuiaPage() {
               editable={!s.despachada && puedeDespachar}
               externo={s.tipoDespacho === "externo"}
               onCorregir={s.corregirItem}
+              puedeAnotarNumero={s.despachada && puedeDespachar && !esEntregaDirecta(g)}
+              onAnotarNumero={s.anotarNumeroTransp}
             />
 
             {/* 🔴 LAS OBSERVACIONES, DONDE SE CARGA EL CAMIÓN.

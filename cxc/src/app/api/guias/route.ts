@@ -23,9 +23,15 @@ export async function GET(req: NextRequest) {
   // se sirve desde /api/guias/[id] cuando el usuario expande una fila.
   // Sprint 3: JOIN a transportistas para resolver el label canónico; la
   // columna TEXT vieja ya no se selecciona ni se lee.
+  //
+  // ⚠️ `guia_items.numero_guia_transp` SÍ viaja, y no es adorno: la marca
+  // "Falta N° transportista" se calcula por LÍNEA. Sin él, el listado solo
+  // podía mirar el de la cabecera —que NO se reescribe al anotar un número
+  // tarde— y el chip ámbar se quedaría puesto para siempre en una guía que ya
+  // tiene su número. Es un TEXT corto; las firmas base64 siguen fuera.
   const { data, error } = await supabaseServer
     .from("guia_transporte")
-    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, numero_guia_transp, created_at, deleted, guia_items(bultos, facturas, cliente)")
+    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, numero_guia_transp, created_at, deleted, guia_items(bultos, facturas, cliente, numero_guia_transp)")
     .eq("deleted", false)
     .order("numero", { ascending: false });
 

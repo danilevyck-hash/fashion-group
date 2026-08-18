@@ -54,6 +54,13 @@ interface ListaEnviosProps {
   externo: boolean;
   /** Guarda los campos tocados de UNA fila. Devuelve el error, o null si salió. */
   onCorregir: (itemId: string, cambios: CorreccionEnvio) => Promise<string | null>;
+  /**
+   * 🔴 LA EXCEPCIÓN DE LA GUÍA YA DESPACHADA. El N° del transportista dejó de
+   * bloquear el despacho, así que hay guías que salieron sin él: acá se anota
+   * cuando llega. Es lo ÚNICO que se puede escribir en una guía cerrada.
+   */
+  puedeAnotarNumero?: boolean;
+  onAnotarNumero?: (itemId: string, numero: string) => Promise<string | null>;
 }
 
 function Resumen({ item }: { item: GuiaItem }) {
@@ -202,6 +209,84 @@ function Correccion({
   );
 }
 
+/**
+ * 🔴 ANOTAR EL N° DEL TRANSPORTISTA EN UNA GUÍA QUE YA SALIÓ — la única
+ * excepción, y se ve que es una sola: un campo, nada más.
+ *
+ * Va por `PATCH /api/guias/[id]/numero-transp`, que escribe UNA columna de UNA
+ * línea y ni siquiera consulta el estado. Todo lo demás del despacho —bultos,
+ * facturas, cliente escrito, placa, receptor, cédula, firmas— sigue cerrado.
+ */
+function AnotarNumero({
+  item,
+  onGuardar,
+  onCerrar,
+}: {
+  item: GuiaItem;
+  onGuardar: (numero: string) => Promise<string | null>;
+  onCerrar: () => void;
+}) {
+  const [numero, setNumero] = useState(item.numero_guia_transp || "");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function guardar() {
+    if (guardando) return;
+    setGuardando(true);
+    setError(null);
+    const err = await onGuardar(numero);
+    setGuardando(false);
+    if (err) setError(err);
+    else onCerrar();
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+      <div>
+        <label
+          htmlFor={`tarde-${item.id}`}
+          className="text-xs uppercase tracking-wide text-gray-400 mb-1 block"
+        >
+          N° de guía del transportista
+        </label>
+        <input
+          id={`tarde-${item.id}`}
+          type="text"
+          value={numero}
+          onChange={(e) => setNumero(e.target.value)}
+          placeholder="El que te dio el transportista"
+          className={`${CAMPO} bg-white`}
+        />
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => { void guardar(); }}
+          disabled={guardando}
+          className={`flex-1 min-w-[8rem] rounded-lg text-sm font-semibold min-h-[44px] px-4 transition ${
+            guardando
+              ? "bg-gray-300 text-white cursor-not-allowed"
+              : "bg-black text-white hover:bg-gray-800 active:scale-[0.97]"
+          }`}
+        >
+          {guardando ? "Guardando…" : "Guardar el N°"}
+        </button>
+        <button
+          type="button"
+          onClick={onCerrar}
+          className="rounded-lg border border-gray-200 text-sm min-h-[44px] px-4 hover:bg-gray-50 transition"
+        >
+          Cancelar
+        </button>
+      </div>
+      <p className="text-xs text-gray-500">
+        Es lo único que se puede cambiar de una guía ya despachada.
+      </p>
+    </div>
+  );
+}
+
 export default function ListaEnvios({
   items,
   numeroGuiaCabecera,
@@ -210,9 +295,13 @@ export default function ListaEnvios({
   editable,
   externo,
   onCorregir,
+  puedeAnotarNumero = false,
+  onAnotarNumero,
 }: ListaEnviosProps) {
   /** Solo UN renglón abierto a la vez: con 7 envíos, todos abiertos es un muro. */
   const [corrigiendo, setCorrigiendo] = useState<string | null>(null);
+  /** El renglón al que se le está anotando el N° del transportista (guía cerrada). */
+  const [anotando, setAnotando] = useState<string | null>(null);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -230,6 +319,7 @@ export default function ListaEnvios({
       <ul className="divide-y divide-gray-100">
         {items.map((item, idx) => {
           const abierto = !!item.id && corrigiendo === item.id;
+          const anotandoEste = !!item.id && anotando === item.id;
           return (
             <li key={item.id || idx} className="py-3">
               <div className="flex items-start justify-between gap-3">
@@ -269,12 +359,39 @@ export default function ListaEnvios({
                   )}
                 </div>
               ) : (
-                <span className="block text-xs text-gray-500 mt-0.5">
-                  N° guía transportista:{" "}
-                  <span className="font-medium text-gray-700">
-                    {numeroTranspImpreso(item.numero_guia_transp, numeroGuiaCabecera) || "—"}
+                <div className="mt-0.5 flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs text-gray-500">
+                    N° guía transportista:{" "}
+                    <span className="font-medium text-gray-700">
+                      {numeroTranspImpreso(item.numero_guia_transp, numeroGuiaCabecera) || "—"}
+                    </span>
                   </span>
-                </span>
+                  {/* 🔴 LA EXCEPCIÓN, Y ES UNA SOLA: en una guía YA DESPACHADA se
+                      puede anotar el N° del transportista que llegó tarde, y
+                      NADA MÁS. Daniel: *"hazle la excepción para ese número"*.
+                      Todo lo demás del despacho sigue cerrado. */}
+                  {puedeAnotarNumero && item.id && (
+                    <button
+                      type="button"
+                      onClick={() => setAnotando(anotandoEste ? null : item.id!)}
+                      className="shrink-0 text-sm text-blue-700 hover:text-blue-900 transition inline-flex items-center min-h-[44px] px-2"
+                    >
+                      {anotandoEste
+                        ? "Cerrar"
+                        : numeroTranspImpreso(item.numero_guia_transp, numeroGuiaCabecera)
+                          ? "Cambiar el N°"
+                          : "Anotar el N°"}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {anotandoEste && item.id && onAnotarNumero && (
+                <AnotarNumero
+                  item={item}
+                  onGuardar={(numero) => onAnotarNumero(item.id!, numero)}
+                  onCerrar={() => setAnotando(null)}
+                />
               )}
 
               {abierto && item.id && (

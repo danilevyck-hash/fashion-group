@@ -715,6 +715,47 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - 🩸 **El script de mutación restaura por COPIA, no con `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada, así que las mutaciones se apilarían y ninguna se probaría por separado. Ya pasó en este repo.
 > - **Candados que CAMBIARON DE DIRECCIÓN**: `guias-placa-entrega-directa.test.ts` exigía `tipo_despacho === "externo" && !numero_guia_transp` en el servidor —o sea, fijaba justo lo que Daniel pidió sacar— y `guias-despacho-una-sola-puerta.test.ts` exigía que faltando todos los números el botón se apagara.
 
+## 🔴 Guías — LA EXCEPCIÓN: el N° del transportista SÍ se anota en una guía ya despachada (18-ago-2026)
+
+> Daniel, al aprobar lo de arriba, textual: ***"si publicalo y hazle la excepcion para ese numero"***.
+>
+> **El problema que quedaba abierto.** Desde el 17-ago el número **no bloquea** el despacho —*"a veces el transportista lo da, a veces no"*—, así que hay guías que salen sin él y quedan con el chip ámbar *"Falta N° transportista"*. Una marca que nadie puede apagar es una marca inútil: la guía queda cerrada y el número, cuando llega, no tenía dónde entrar.
+>
+> ### 🔑 EL MOLDE ES `PATCH /api/guias/[id]/cliente`, Y SE COPIA — no se inventó uno nuevo
+>
+> Ese endpoint existe **precisamente por esto**: **174 de 177 guías vivas están Completada**, el PUT las rechaza, y anotar un dato sobre un renglón **no es editar el despacho**. `PATCH /api/guias/[id]/numero-transp` aplica el mismo criterio, palabra por palabra:
+> - **UNA columna** (`guia_items.numero_guia_transp`) **de UNA línea**, acotada con `.eq("id", itemId).eq("guia_id", id)` — sin el segundo, el id de cualquier renglón del sistema serviría para escribirle encima;
+> - **el estado ni se mira**: no es una condición. Comprueba que la guía exista y no esté borrada, y nada más;
+> - **no escribe en `guia_transporte`**, ni siquiera el N° de la cabecera;
+> - **queda quién y cuándo**: `activity_log` con `guia_item_numero_transp`, el usuario, el rol, el valor viejo y el nuevo — el mismo patrón que usa `…/cliente` para atar un cliente sobre una guía cerrada.
+>
+> 🔴 **EL CANDADO DEL PUT NO SE TOCÓ.** En una guía Completada siguen bloqueados **bultos, facturas, empresa, dirección, el cliente escrito, placa, receptor, cédula, firmas y estado** — el PUT, el PATCH de la guía y `/api/guias/[id]/item` (la corrección de bodega, que SÍ mira el estado, al revés que éste) los rechazan igual que antes. La excepción es **una sola** y el candado lo prueba: el único `.update({…})` del archivo nombra `numero_guia_transp` y nada más.
+>
+> ### 🔴 UN "0" NO SE PUEDE GUARDAR, y no es una manía
+>
+> El papel trata el `"0"` pelado como vacío (`sinCeroPelado`) y la marca ámbar también. Si se dejara escribir, la pantalla diría *"guardado"* y el aviso de que FALTA el número seguiría ahí — **una pantalla que se contradice a sí misma**. Se dice con todas las letras: *"Un 0 no es un N° de guía. Déjalo vacío si el transportista no dio ninguno."* ⚠️ **Nada que CONTENGA un cero se pierde**: `EK0700`, `TR-0` y `00` se guardan tal cual. Regla en `src/lib/guias/numero-transp-tarde.ts` (módulo PURO). **Borrarlo sí es válido**: alguien pudo anotar el número equivocado.
+>
+> ### El papel sigue diciendo la verdad
+>
+> Completar un número tarde **no rompe las dos reglas del impreso**, y hay candado para las dos: con **una sola** línea completada el encabezado la anuncia (hay un solo número en la guía — es exactamente lo que pasa hoy al despachar llenando una sola línea); al completar una **segunda distinta**, el encabezado **se calla**. Cada línea imprime el suyo y la vacía no hereda el del vecino.
+>
+> ### En pantalla
+>
+> - En la guía despachada, cada renglón tiene **"Anotar el N°"** al lado del número (o **"Cambiar el N°"** si ya tiene uno). Un toque abre **UN campo** y un botón, con el pie *"Es lo único que se puede cambiar de una guía ya despachada."*
+> - **El aviso ámbar se apaga solo** al guardar, sin recargar. En `/guias` también: por eso el listado ahora **lee `guia_items.numero_guia_transp`**.
+> - 🩸 **Sin ese campo en el SELECT del listado, el chip no se apagaría NUNCA.** La cabecera `guia_transporte.numero_guia_transp` **no se reescribe** al anotar tarde (este endpoint toca UNA columna de UNA línea), así que el listado tenía que mirar las líneas. Es un TEXT corto; las firmas base64 siguen fuera.
+> - **En entrega directa no se ofrece**: no hay transportista a quien pedírselo. Y **vendedor no lo ve**: es escritura.
+>
+> **Los 3 anchos, medidos en el navegador contra el build de producción** (`BASE=… node scripts/_medir-guias-anotar-numero.mjs`, solo lectura): **390 · 834 · 1440 → 0 px de arrastre, 0 recortados, 0 tocables bajo 44 px y 0 textos bajo 12 px**, en los tres estados (aviso / renglón abierto / número guardado). En los tres anchos se midió además que el aviso ámbar **se apaga** al anotar, que el renglón abierto tiene **exactamente 1 campo**, y que **no hay ni un "Corregir" ni un campo del despacho** en la guía cerrada.
+> - 🩸 **La guía despachada sin número es un DOBLE.** Se intercepta el GET y **se aborta todo lo que no sea GET**; el PATCH del N° lo contesta el propio script y nunca sale al servidor. No se escribió sobre ninguna guía real.
+> - 🩸 **Gotcha que costó una vuelta:** el `-mr-2` del botón para pegarlo al borde **desbordaba 8 px** el contenedor — 7 elementos recortados en los tres anchos. Salió en la medición, no a ojo.
+>
+> ### Candados
+>
+> `src/__tests__/api/guias-numero-transp-tarde-route.test.ts` (17, **llama al handler y mira qué se escribió**) y `src/__tests__/components/guias-anotar-numero-tarde.test.tsx` (10, **renderiza la página real y toca los botones**), más 7 casos nuevos en `guias-numero-transp-no-bloquea.test.ts`.
+> - **Verificado por mutación, 10 de 10 cazadas** (`bash scripts/_mutar-candados-numero-transp-tarde.sh`): el endpoint escribe también los bultos · el UPDATE deja de acotar a las líneas de ESTA guía · se puede guardar un "0" pelado · se rechaza cualquier número que contenga un cero · la pantalla deja de ofrecerlo · se ofrece en entrega directa · se cuela un segundo campo en el renglón abierto · la corrección de bodega deja de mirar el estado · el listado deja de leer el número por línea · guardar no apaga el aviso ámbar.
+
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`
