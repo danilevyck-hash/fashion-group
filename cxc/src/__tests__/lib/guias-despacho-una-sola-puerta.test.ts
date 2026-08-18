@@ -43,6 +43,7 @@ const LISTA = leer("src/app/guias/components/GuiasList.tsx");
 const PAGE_LISTA = leer("src/app/guias/page.tsx");
 const PAGE_GUIA = leer("src/app/guias/[id]/page.tsx");
 const FORM = leer("src/app/guias/components/DespachoForm.tsx");
+const LISTA_ENVIOS = leer("src/app/guias/components/ListaEnvios.tsx");
 const ESTADO_LISTA = leer("src/app/guias/components/useGuiasState.ts");
 const RUTA = leer("src/app/api/guias/[id]/route.ts");
 const IMPRESO = leer("src/app/guias/components/PrintDocument.tsx");
@@ -126,11 +127,15 @@ describe("🔴 la página de la guía es donde se termina", () => {
 });
 
 describe("🔴 el N° del transportista es POR LÍNEA", () => {
-  it("el formulario pide uno por cada envío, no uno para toda la guía", () => {
-    expect(FORM).toContain("items.map((item, idx)");
-    expect(FORM).toContain("setNumeroTransp(idx, e.target.value)");
-    // El campo único de guía ya no existe en el formulario.
+  it("se pide uno por cada envío, no uno para toda la guía", () => {
+    // ⚠️ Desde el 17-ago-2026 las cajas viven en `ListaEnvios`, pegadas a su
+    // renglón: el formulario tenía una SEGUNDA copia de la lista entera. Que
+    // sean una sola lo prueba `guias-lista-unica-envios.test.tsx`.
+    expect(LISTA_ENVIOS).toContain("items.map((item, idx)");
+    expect(LISTA_ENVIOS).toContain("setNumeroTransp(idx, e.target.value)");
+    // El campo único de guía no existe en ninguno de los dos.
     expect(FORM).not.toContain("bNumeroGuiaTransp");
+    expect(LISTA_ENVIOS).not.toContain("bNumeroGuiaTransp");
   });
 
   it("se guarda con su propio campo, NUNCA mandando `items` (que reemplaza todo)", () => {
@@ -197,7 +202,7 @@ describe("🔴 el botón se apaga y DICE qué falta", () => {
   const lleno = {
     tipoDespacho: "externo" as const,
     placa: "AB-1234", receptor: "Juan", cedula: "8-8-8", chofer: "",
-    numerosTransp: ["TR-1", ""], tieneFirma1: true, tieneFirma2: true,
+    tieneFirma1: true, tieneFirma2: true,
   };
 
   it("todo lleno → no falta nada", () => {
@@ -215,29 +220,28 @@ describe("🔴 el botón se apaga y DICE qué falta", () => {
     expect(textoFalta([])).toBe("");
   });
 
-  it("una línea sin número NO traba el despacho — sí lo hace que no haya ninguna", () => {
-    // En el mockup aprobado, "Grupo Hanna" va sin número y el botón no lo pide.
+  it("el N° del transportista NO traba el despacho, ni faltando en TODAS las líneas", () => {
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 17-ago-2026. Antes se exigía que al menos una
+    // línea lo trajera; Daniel: *"a veces el transportista lo da, a veces no"*.
+    // El candado completo vive en `guias-numero-transp-no-bloquea.test.ts`.
     expect(faltaParaDespachar(lleno)).toEqual([]);
-    expect(faltaParaDespachar({ ...lleno, numerosTransp: ["", ""] }))
-      .toEqual(["N° de guía del transportista"]);
   });
 
   it("en entrega directa se pide chofer y NO se piden placa ni N° de transportista", () => {
-    const directo = { ...lleno, tipoDespacho: "directo" as const, placa: "", chofer: "", numerosTransp: [""] };
+    const directo = { ...lleno, tipoDespacho: "directo" as const, placa: "", chofer: "" };
     expect(faltaParaDespachar(directo)).toEqual(["chofer"]);
     expect(faltaParaDespachar({ ...directo, chofer: "Pedro" })).toEqual([]);
   });
 
   it("los espacios en blanco no cuentan como lleno", () => {
     expect(faltaParaDespachar({ ...lleno, placa: "   " })).toContain("placa");
-    expect(faltaParaDespachar({ ...lleno, numerosTransp: ["  "] }))
-      .toContain("N° de guía del transportista");
+    expect(faltaParaDespachar({ ...lleno, receptor: "  " })).toContain("recibido por");
   });
 
   it("el texto de lo que falta va en español simple, sin jerga ni nombres de columna", () => {
     const todo = faltaParaDespachar({
       tipoDespacho: "externo", placa: "", receptor: "", cedula: "", chofer: "",
-      numerosTransp: [""], tieneFirma1: false, tieneFirma2: false,
+      tieneFirma1: false, tieneFirma2: false,
     });
     for (const t of todo) {
       expect(t, t).not.toMatch(/_/); // nada de `receptor_nombre` ni `firma_base64`

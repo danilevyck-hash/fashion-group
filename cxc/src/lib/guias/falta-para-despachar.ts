@@ -20,11 +20,22 @@
 // en "Pendiente Bodega" para siempre (medido el 3-ago-2026). Ver la cabecera de
 // `guias-placa-entrega-directa.test.ts`.
 //
-// ⚠️ EL N° DE GUÍA DEL TRANSPORTISTA ES POR LÍNEA. El transportista arma varias
-// guías suyas por cada guía nuestra, así que cada renglón lleva el suyo. Lo que
-// el servidor exige es que **al menos una** línea lo traiga (era el campo único
-// de la guía y ese requisito no se aflojó); que TODAS lo tengan no se pide,
-// porque hay envíos que se van sin número propio.
+// 🔴 EL N° DE GUÍA DEL TRANSPORTISTA **NO BLOQUEA** (17-ago-2026). Daniel,
+// textual: *"a veces el transportista lo da, a veces no"*. Antes se exigía que
+// al menos una línea lo trajera, y esa exigencia no describía el trabajo real:
+// el camión llega, se carga, se firma, y el número aparece —o no— después. Un
+// requisito que la realidad no puede cumplir se paga con ceros tecleados para
+// destrabar el botón (GT-194, GT-195 y GT-196 tienen `numero_guia_transp = "0"`
+// justamente por eso).
+//
+// Lo que falta queda MARCADO —en la guía y en la lista de guías— para que
+// alguien lo complete después: ver `guiaSinNumeroTransp` en `modo-despacho.ts`.
+//
+// ⚠️ LO QUE SÍ BLOQUEA NO SE AFLOJA, y no es negociable: placa (salvo entrega
+// directa), quién recibe, cédula y **las dos firmas**. Cuando nada bloqueaba se
+// cerraron 65 guías sin firma; el bloqueo se puso el 10-ago-2026 y desde
+// entonces son 0 de 15. Daniel, preguntado explícito: *"Placa · quién recibe ·
+// cédula debería de bloquear no?"* — sí.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type TipoDespacho = "externo" | "directo";
@@ -35,8 +46,10 @@ export interface EstadoDespacho {
   receptor: string;
   cedula: string;
   chofer: string;
-  /** El N° de guía del transportista de CADA línea, en el orden de la guía. */
-  numerosTransp: readonly string[];
+  // 🔴 Acá NO hay `numerosTransp`, y su ausencia es el candado: lo que este
+  // objeto lleva es lo que BLOQUEA. Mientras el número viviera adentro, volver a
+  // exigirlo era agregar dos líneas. Para saber si quedó pendiente está
+  // `pendienteNumeroTransp`, que es otra pregunta y otra función.
   tieneFirma1: boolean;
   tieneFirma2: boolean;
 }
@@ -53,8 +66,7 @@ export function faltaParaDespachar(e: EstadoDespacho): string[] {
 
   if (externo) {
     if (vacio(e.placa)) falta.push("placa");
-    // Al menos una línea con el número del transportista.
-    if (!e.numerosTransp.some((n) => !vacio(n))) falta.push("N° de guía del transportista");
+    // 🔴 El N° del transportista NO entra acá. Ver la cabecera del archivo.
   } else {
     if (vacio(e.chofer)) falta.push("chofer");
   }
@@ -66,6 +78,24 @@ export function faltaParaDespachar(e: EstadoDespacho): string[] {
   if (!e.tieneFirma2) falta.push(externo ? "la firma del entregador" : "la firma del cliente");
 
   return falta;
+}
+
+/**
+ * ¿Esta guía sale SIN el número del transportista?
+ *
+ * 🔴 NO BLOQUEA — ver la cabecera. Es una MARCA: se muestra en la guía y en la
+ * lista de guías para que alguien lo complete después. Una guía puede salir así
+ * y está bien que salga: *"a veces el transportista lo da, a veces no"*.
+ *
+ * En entrega directa nunca está pendiente: no hay transportista a quien
+ * pedírselo, así que marcarlo sería inventar una tarea que nadie puede hacer.
+ */
+export function pendienteNumeroTransp(
+  tipoDespacho: TipoDespacho,
+  numerosTransp: readonly (string | null | undefined)[],
+): boolean {
+  if (tipoDespacho !== "externo") return false;
+  return !numerosTransp.some((n) => !vacio(n));
 }
 
 /**

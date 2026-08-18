@@ -20,12 +20,13 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
 import DespachoForm from "../components/DespachoForm";
+import ListaEnvios from "../components/ListaEnvios";
 import { useDespachoGuia } from "../components/useDespachoGuia";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import {
   ETIQUETA_TIPO_DESPACHO,
   esEntregaDirecta,
-  numeroTranspImpreso,
+  guiaSinNumeroTransp,
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
@@ -95,7 +96,11 @@ export default function GuiaPage() {
                 <Dato etiqueta="Fecha" valor={fmtDate(g.fecha)} />
                 <Dato etiqueta="Transportista" valor={g.transportista || ""} />
                 <Dato etiqueta="Envíos" valor={String(items.length)} />
-                <Dato etiqueta="Bultos" valor={String(g.total_bultos ?? items.reduce((a, i) => a + (i.bultos || 0), 0))} />
+                {/* Los bultos se SUMAN de los renglones, siempre: bodega los
+                    corrige acá mismo y el total tiene que moverse con ellos.
+                    (`guia_transporte` no tiene columna de total; el listado la
+                    calcula igual.) */}
+                <Dato etiqueta="Bultos" valor={String(items.reduce((a, i) => a + (i.bultos || 0), 0))} />
               </div>
               {/* Cambiar los envíos vive en su propia pantalla, la de siempre.
                   Acá se termina el despacho; allá se corrigen los renglones. */}
@@ -109,37 +114,36 @@ export default function GuiaPage() {
               )}
             </div>
 
-            {/* Los envíos, siempre visibles: se despacha mirándolos. */}
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              {/* "de esta guía" se fue: se está DENTRO de la guía. */}
-              <span className="text-xs uppercase tracking-wide text-gray-400 block mb-3">
-                Envíos
-              </span>
-              <ul className="divide-y divide-gray-100">
-                {items.map((item, idx) => (
-                  <li key={item.id || idx} className="py-2.5 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium break-words">{item.cliente || "Sin cliente"}</span>
-                      <span className="block text-xs text-gray-500 break-words">
-                        {[item.direccion, item.empresa, item.facturas].filter(Boolean).join(" · ")}
-                      </span>
-                      {(s.despachada || !puedeDespachar) && (
-                        <span className="block text-xs text-gray-500 mt-0.5">
-                          N° guía transportista:{" "}
-                          <span className="font-medium text-gray-700">
-                            {numeroTranspImpreso(item.numero_guia_transp, g.numero_guia_transp) || "—"}
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-sm tabular-nums shrink-0">{item.bultos || 0} bultos</span>
-                  </li>
-                ))}
-                {items.length === 0 && (
-                  <li className="py-2.5 text-sm text-gray-400">Esta guía no tiene envíos cargados.</li>
-                )}
-              </ul>
-            </div>
+            {/* 🔴 LA MARCA DE LO QUE FALTÓ. El N° del transportista dejó de
+                bloquear el despacho —*"a veces el transportista lo da, a veces
+                no"*— y una guía puede salir sin él. Que no bloquee no significa
+                que se pierda: queda dicho acá y en la lista de guías, para que
+                alguien pueda encontrarlas.
+
+                ⚠️ NO se ofrece anotarlo desde acá: una guía despachada está
+                cerrada a edición y ese candado no se toca. Abrirle una puerta de
+                escritura a una guía firmada es otra decisión, y es de Daniel. */}
+            {guiaSinNumeroTransp(g) && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm text-amber-900">
+                  Esta guía salió sin el N° del transportista.
+                </p>
+              </div>
+            )}
+
+            {/* 🔴 UNA SOLA LISTA DE ENVÍOS. Cada renglón trae su caja del N° del
+                transportista y su botón "Corregir" — antes los mismos 7 envíos
+                se dibujaban dos veces en esta pantalla (acá de solo lectura y
+                otra vez completos dentro del formulario de despacho). */}
+            <ListaEnvios
+              items={items}
+              numeroGuiaCabecera={g.numero_guia_transp}
+              numerosTransp={s.numerosTransp}
+              setNumeroTransp={s.setNumeroTransp}
+              editable={!s.despachada && puedeDespachar}
+              externo={s.tipoDespacho === "externo"}
+              onCorregir={s.corregirItem}
+            />
 
             {/* 🔴 LAS OBSERVACIONES, DONDE SE CARGA EL CAMIÓN.
                 Se escriben al crear la guía y vivían SOLO en el acordeón de la
@@ -215,9 +219,6 @@ export default function GuiaPage() {
               </div>
             ) : puedeDespachar ? (
               <DespachoForm
-                items={items}
-                numerosTransp={s.numerosTransp}
-                setNumeroTransp={s.setNumeroTransp}
                 tipoDespacho={s.tipoDespacho}
                 setTipoDespacho={s.setTipoDespacho}
                 bPlaca={s.bPlaca}

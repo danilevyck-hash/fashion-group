@@ -139,7 +139,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (tipo_despacho !== "directo" && !placa) {
       return NextResponse.json({ error: "Placa del vehículo requerida" }, { status: 400 });
     }
-    if (tipo_despacho === "externo" && !numero_guia_transp) return NextResponse.json({ error: "Falta el N° de guía del transportista" }, { status: 400 });
+    // 🔴 EL N° DE GUÍA DEL TRANSPORTISTA NO SE EXIGE (17-ago-2026). Daniel,
+    // textual: *"a veces el transportista lo da, a veces no"*. Acá vivía
+    // `tipo_despacho === "externo" && !numero_guia_transp` → 400. La guía sale
+    // sin él y queda MARCADA (ver `guiaSinNumeroTransp` en modo-despacho.ts).
+    // Se saca de LOS DOS lados a la vez: si el servidor lo siguiera pidiendo,
+    // el botón se pondría verde y el PUT rechazaría igual — peor que el botón
+    // apagado. Lo que SÍ bloquea (placa, receptor, cédula) no se tocó.
     if (tipo_despacho === "directo" && !nombre_chofer) return NextResponse.json({ error: "Nombre del chofer requerido para entrega directa" }, { status: 400 });
   }
 

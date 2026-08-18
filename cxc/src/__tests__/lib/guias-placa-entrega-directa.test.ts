@@ -43,7 +43,7 @@ const form = sinComentarios(leer("src/app/guias/components/DespachoForm.tsx"));
 // exige placa y quién no— pero se prueba sobre la función, que es donde vive.
 const base = {
   placa: "", receptor: "Juan", cedula: "8-888-8888", chofer: "Pedro",
-  numerosTransp: ["TR-1"], tieneFirma1: true, tieneFirma2: true,
+  tieneFirma1: true, tieneFirma2: true,
 } as const;
 
 describe("🔴 la placa ya no traba la entrega directa", () => {
@@ -87,9 +87,10 @@ describe("⚠️ en transportista externo NADA se aflojó", () => {
     expect(faltaParaDespachar({ ...base, tipoDespacho: "externo" })).toContain("placa");
   });
 
-  it("el N° de guía del transportista sigue exigiéndose", () => {
-    expect(api).toContain('tipo_despacho === "externo" && !numero_guia_transp');
-  });
+  // ⚠️ El N° de guía del transportista SÍ se aflojó, y a propósito (17-ago-2026):
+  // Daniel, textual, *"a veces el transportista lo da, a veces no"*. Ese candado
+  // se mudó a `guias-numero-transp-no-bloquea.test.ts`, que exige lo contrario —
+  // que el servidor NO lo pida— y que lo que falte quede MARCADO.
 });
 
 describe("⚠️ el resto de requisitos de despacho no se tocó", () => {

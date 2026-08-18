@@ -14,11 +14,25 @@
 // línea (`numerosTransp`).
 
 import { useCallback, useEffect, useState } from "react";
-import type { Guia } from "./types";
+import type { Guia, GuiaItem } from "./types";
 import type { TipoDespacho } from "@/lib/guias/falta-para-despachar";
 import { numeroGuiaDeCabecera } from "@/lib/guias/falta-para-despachar";
 import { guiaYaDespachada, tipoDespachoEfectivo } from "@/lib/guias/modo-despacho";
 import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
+
+/**
+ * Lo que bodega puede corregir de un renglón sin salir de la pantalla. Viaja al
+ * endpoint que escribe SOLO estos campos de UNA fila — ver la nota de
+ * `corregirItem` más abajo.
+ */
+export interface CorreccionEnvio {
+  cliente?: string;
+  cliente_codigo?: string | null;
+  direccion?: string;
+  empresa?: string;
+  facturas?: string;
+  bultos?: number;
+}
 
 interface Draft {
   placa?: string;
@@ -199,6 +213,55 @@ export function useDespachoGuia(id: string | null) {
     } catch { /* */ }
   };
 
+  /**
+   * 🔴 CORREGIR UN RENGLÓN SIN REEMPLAZAR LA LISTA.
+   *
+   * Va por `PATCH /api/guias/[id]/item`, que escribe los campos tocados de UNA
+   * fila. **NUNCA por `items` del PUT**: eso borra todos los renglones e inserta
+   * otros nuevos, cambiándoles el id — se perderían los clientes atados y los
+   * ids que esta misma pantalla tiene en la mano para el N° del transportista.
+   *
+   * Devuelve el mensaje de error, o `null` si se guardó.
+   */
+  async function corregirItem(itemId: string, cambios: CorreccionEnvio): Promise<string | null> {
+    if (!id) return "No se pudo guardar. Intenta de nuevo en unos segundos.";
+    try {
+      const res = await fetch(`/api/guias/${id}/item`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId, ...cambios }),
+      });
+      const cuerpo = await res.json().catch(() => ({}));
+      if (!res.ok) return cuerpo.error || "No se pudo guardar. Intenta de nuevo en unos segundos.";
+      // Se actualiza SOLO esa fila del estado local: recargar la guía entera
+      // tiraría lo que se está tipeando en los otros renglones y las firmas ya
+      // dibujadas.
+      const devuelto = (cuerpo.item ?? {}) as Record<string, unknown>;
+      const aplicado = { ...cambios, ...devuelto };
+      setGuia((prev) => {
+        if (!prev) return prev;
+        const items = (prev.guia_items || []).map((it) => {
+          if (it.id !== itemId) return it;
+          return {
+            ...it,
+            cliente: String(aplicado.cliente ?? it.cliente ?? ""),
+            // "" = sin vincular. El endpoint guarda NULL; en pantalla es lo mismo.
+            cliente_codigo: String(aplicado.cliente_codigo ?? ""),
+            direccion: String(aplicado.direccion ?? it.direccion ?? ""),
+            empresa: String(aplicado.empresa ?? it.empresa ?? ""),
+            facturas: String(aplicado.facturas ?? it.facturas ?? ""),
+            bultos: Number(aplicado.bultos ?? it.bultos ?? 0),
+          };
+        });
+        return { ...prev, guia_items: items };
+      });
+      showToast("Envío corregido");
+      return null;
+    } catch {
+      return "Sin conexión. Intenta de nuevo en unos segundos.";
+    }
+  }
+
   async function confirmarDespacho(firma1: string, firma2: string) {
     if (!guia || !id) return;
     setBSaving(true);
@@ -279,6 +342,7 @@ export function useDespachoGuia(id: string | null) {
     bChofer, setBChofer,
     juegos, usarJuego,
     numerosTransp, setNumeroTransp,
+    corregirItem,
     bSaving, confirmarDespacho,
     pendingFirma1, setPendingFirma1,
     pendingFirma2, setPendingFirma2,

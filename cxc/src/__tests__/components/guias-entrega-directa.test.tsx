@@ -35,6 +35,7 @@ import { useState } from "react";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import PrintDocument from "@/app/guias/components/PrintDocument";
 import DespachoForm from "@/app/guias/components/DespachoForm";
+import ListaEnvios from "@/app/guias/components/ListaEnvios";
 import GuiasList from "@/app/guias/components/GuiasList";
 import GuiaForm from "@/app/guias/components/GuiaForm";
 import type { Guia, GuiaItem, ModoEntrega } from "@/app/guias/components/types";
@@ -168,12 +169,8 @@ function Despacho({ inicial }: { inicial: TipoDespacho }) {
   const [receptor, setReceptor] = useState("");
   const [cedula, setCedula] = useState("");
   const [chofer, setChofer] = useState("");
-  const [numeros, setNumeros] = useState<string[]>([""]);
   return (
     <DespachoForm
-      items={ITEMS}
-      numerosTransp={numeros}
-      setNumeroTransp={(i, v) => setNumeros((p) => p.map((x, k) => (k === i ? v : x)))}
       tipoDespacho={tipo}
       setTipoDespacho={setTipo}
       bPlaca={placa}
@@ -194,17 +191,42 @@ describe("🔴 en entrega directa la pantalla NO pide placa ni N° de transporti
   it("los campos no existen — no es que estén marcados como opcionales", () => {
     render(<Despacho inicial="directo" />);
     expect(document.getElementById("despacho-placa")).toBeNull();
-    expect(document.getElementById("transp-0")).toBeNull();
-    expect(screen.queryByText(/N° de guía del transportista/i)).toBeNull();
     // Y sí pide lo que corresponde.
     expect(document.getElementById("despacho-chofer")).not.toBeNull();
     expect(document.getElementById("despacho-receptor")).not.toBeNull();
     expect(document.getElementById("despacho-cedula")).not.toBeNull();
   });
 
+  it("la caja del N° tampoco: vive en la lista de envíos, y ahí también se esconde", () => {
+    // ⚠️ Desde el 17-ago-2026 los N° del transportista NO se dibujan en el
+    // formulario: están pegados a su renglón en `ListaEnvios` (una sola lista).
+    // La regla de entrega directa no cambió — se mide donde ahora vive.
+    render(
+      <ListaEnvios
+        items={ITEMS}
+        numerosTransp={[""]}
+        setNumeroTransp={() => {}}
+        editable
+        externo={false}
+        onCorregir={async () => null}
+      />,
+    );
+    expect(document.getElementById("transp-0")).toBeNull();
+  });
+
   it("con transportista externo los dos campos SIGUEN estando", () => {
     render(<Despacho inicial="externo" />);
     expect(document.getElementById("despacho-placa")).not.toBeNull();
+    render(
+      <ListaEnvios
+        items={ITEMS}
+        numerosTransp={[""]}
+        setNumeroTransp={() => {}}
+        editable
+        externo
+        onCorregir={async () => null}
+      />,
+    );
     expect(document.getElementById("transp-0")).not.toBeNull();
   });
 

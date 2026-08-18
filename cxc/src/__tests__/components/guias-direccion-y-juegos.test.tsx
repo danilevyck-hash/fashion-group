@@ -181,9 +181,6 @@ function Despacho({ tipo, juegos }: { tipo: "externo" | "directo"; juegos: Juego
   const [chofer, setChofer] = useState("");
   return (
     <DespachoForm
-      items={[fila({ id: "i1", cliente: "CITY MALL" })]}
-      numerosTransp={[""]}
-      setNumeroTransp={() => {}}
       tipoDespacho={tipo}
       setTipoDespacho={() => {}}
       bPlaca={placa} setBPlaca={setPlaca}
