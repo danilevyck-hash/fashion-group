@@ -651,6 +651,70 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > **Diagnóstico read-only contra producción:** `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-guias-observaciones.ts`.
 
+## 🔴 Guías — UNA SOLA LISTA DE ENVÍOS, bodega corrige ahí mismo, y el N° del transportista deja de bloquear (17-ago-2026)
+
+> El flujo, con las palabras de Daniel. **La secretaria, en la mañana:** crea la guía (transportista + envíos) y **la imprime — ese papel se lo lleva el chofer**. **Bodega, cuando llega el camión** (desde el celular de quien entrega o el iPad de la empresa): abre la guía, **corrige lo que esté mal**, pone placa / quién recibe / cédula, escribe el número del transportista **si lo tiene**, firman los dos, y **Despachar**.
+>
+> Textual sobre bodega: *"la parte de bodega es firmar más que nada para que quede registrado, y si hay algún cambio que hacer por error por ejemplo nombre, dirección, cantidad de bultos, que lo pueda arreglar"* · *"bodega puede corregir"* · *"a veces el transportista lo da, a veces no"*.
+>
+> ### 1. 🩸 LOS 7 ENVÍOS APARECÍAN DOS VECES EN LA MISMA PANTALLA
+>
+> Una vez en el bloque `ENVÍOS` (solo lectura) y otra vez COMPLETOS —cliente, dirección, empresa y bultos— dentro de `N° DE GUÍA DEL TRANSPORTISTA · UNO POR LÍNEA`, cada uno en su cajita. Había que bajar por la misma lista dos veces.
+>
+> **Ahora es UNA lista** (`src/app/guias/components/ListaEnvios.tsx`): cada renglón dice cliente · dirección · empresa · facturas · bultos **y trae su caja del N° del transportista ahí mismo**, con su botón "Corregir" al lado.
+>
+> **Medido en el navegador contra el build de producción y CONTRA `origin/main`**, con una guía de 7 envíos (`BASE=… ETAPA=antes|despues node scripts/_medir-guias-lista-unica.mjs`, solo lectura):
+>
+> | | 390 px | 1440 px |
+> |---|---:|---:|
+> | antes (`origin/main`) | **3.392 px** de alto | 2.753 px |
+> | después | **2.596 px** | 1.996 px |
+> | | **−796 px (−23%)** | −757 px (−27%) |
+>
+> Y cada cliente pasa de aparecer **2 veces a 1** (medido contando los nodos de texto, no a ojo). **0 px de arrastre, 0 tocables bajo 44 px y 0 textos bajo 12 px** en los dos anchos, antes y después.
+> - ⚠️ **El rótulo `N° GUÍA TRANSPORTISTA` de cada renglón pasó a `sr-only` + placeholder.** Repetido 7 veces sumaba **154 px** —media pantalla de celular— y arriba de la lista ya está explicado. Quien no ve la pantalla lo sigue teniendo.
+> - 🩸 **Gotcha de medición:** "ENVÍOS" aparece **dos veces** en la pantalla y siempre lo hará — el segundo es el rótulo del CONTADOR en la tarjeta de arriba. El recorte hay que anclarlo a la caja que tiene la `<ul>` adentro, si no se mide la tarjeta equivocada.
+> - 🩸 **Y no hay ninguna guía pendiente en producción** (las 187 están Completadas), así que la guía de 7 envíos es un **DOBLE**: se intercepta `GET /api/guias/<id>` y **se aborta cualquier pedido que no sea GET**. No se fabricó ni se despachó una guía real.
+>
+> ### 2. 🔴 BODEGA CORRIGE SIN SALIR DE LA PANTALLA — y corregir un campo NO reemplaza la lista
+>
+> Antes, arreglar un nombre, una dirección o los bultos obligaba a irse a `/guias/[id]/editar` y volver. Con el camión esperando, eso es tiempo. Ahora "Corregir" abre el renglón ahí mismo (cliente, dirección, empresa, bultos, facturas) y **Guardar cambios** lo escribe.
+>
+> ⚠️ **`items` en el PUT es un REEMPLAZO COMPLETO**: borra todos los renglones e inserta otros nuevos, o sea **les cambia el id**, y eso *"tiraría el trabajo de atar clientes"*. Por eso la corrección va por **`PATCH /api/guias/[id]/item`**, que escribe **los campos tocados de UNA fila** con `.eq("id", itemId).eq("guia_id", id)` — el resto de los renglones ni se lee. Mismo mecanismo que ya usaba `items_guia_transp`.
+> - **Solo los campos que vinieron.** Un cuerpo con `{ bultos: 5 }` escribe `bultos` y nada más: mandar el objeto entero borraría la dirección con un `""` que nadie escribió (el error de `items`, en chico). Regla en `src/lib/guias/correccion-item.ts` (módulo PURO).
+> - 🔴 **EL CANDADO DE LA GUÍA YA DESPACHADA SIGUE INTACTO**, y acá es al revés que en `/api/guias/[id]/cliente`: ese endpoint no mira el estado a propósito (atar un cliente no es editar el despacho, y el 98% de las guías está cerrada). Esto SÍ cambia el despacho, así que una **Completada** se rechaza con el MISMO mensaje que el PUT.
+> - **El cliente se elige con `ClientePicker`, el único selector del sistema.** Un `<input>` libre acá sería estrenar el segundo selector el día después de que se retirara el último (#567). La empresa va por `<select>` cerrado a las 8 del grupo **más el valor sucio que esa línea ya tenía** (una guía vieja se corrige en otro campo sin pelear).
+> - **El código del cliente pasa por la puerta única** (`leerClientesDelGrupo` + `validarCodigoParaAtar`): un `D-XXX` que no existe, o un código de Boston, se rechazan. Desatar guarda **NULL**, nunca `""`.
+> - **Las escrituras que no cambian nada no se hacen** (`hayCambioReal`).
+> - **El camino viejo NO se perdió**: "Cambiar los envíos de esta guía" sigue llevando a `/guias/[id]/editar` para AGREGAR o QUITAR renglones.
+> - **Los bultos de la cabecera se suman de los renglones, siempre**, para que el total se mueva con la corrección (`guia_transporte` no tiene columna de total; el listado ya la calculaba igual).
+>
+> ### 3. 🔴 EL N° DEL TRANSPORTISTA DEJA DE BLOQUEAR — y lo que SÍ bloquea no se aflojó
+>
+> | campo | ¿bloquea? |
+> |---|---|
+> | **N° de guía del transportista** | **NO** — *"a veces el transportista lo da, a veces no"* |
+> | Placa (salvo entrega directa) · quién recibe · cédula | **SÍ** |
+> | **Las dos firmas** | **SÍ** |
+>
+> 🔴 **LAS FIRMAS Y LOS TRES CAMPOS NO SE TOCARON, y no es negociable.** Cuando nada bloqueaba se cerraron **65 guías sin firma**; el bloqueo se puso el 10-ago-2026 y desde entonces son **0 de 15**. Preguntado explícito, Daniel: *"Placa · quién recibe · cédula debería de bloquear no?"* — sí.
+> - **Se sacó de LOS DOS lados a la vez**: del módulo puro (`falta-para-despachar`) y del PUT. Si el servidor lo siguiera pidiendo, el botón se pondría verde y el PUT rechazaría igual — peor que el botón apagado.
+> - 🔑 **`EstadoDespacho` ya no RECIBE los números, y su ausencia ES el candado**: mientras vivieran adentro, volver a exigirlos era agregar dos líneas. Para saber si quedó pendiente está `pendienteNumeroTransp`, que es otra pregunta y otra función.
+> - **Lo que falta queda MARCADO** (`guiaSinNumeroTransp`, en `modo-despacho.ts`): chip ámbar **"Falta N° transportista"** en la lista de guías (escritorio y celular) y una línea en la guía abierta. Mira lo mismo que imprime el papel — el modo EFECTIVO, el `"0"` pelado como vacío, y la herencia línea → cabecera. **Una guía PENDIENTE no se marca** (todavía se está llenando) y **en entrega directa nunca** (no hay transportista a quien pedírselo).
+> - 🔴 **NO se ofrece anotarlo desde la guía despachada, y es a propósito**: esa guía está cerrada a edición y ese candado no se toca. **Abrirle una puerta de escritura a una guía firmada es decisión de Daniel** — queda anotado, no construido.
+>
+> ### Lo que NO se tocó
+>
+> **Una sola puerta al despacho** (la lista no despacha, ni por swipe ni por formulario) · **el candado de la guía YA DESPACHADA** y que **atar cliente vaya por su propio endpoint sin mirar el estado** · **el papel impreso** (`HojaEscalada` + `PrintDocument` + `pdf-guia`: el encabezado solo anuncia un N° cuando hay UNO SOLO, el `"0"` pelado se trata como vacío, y en entrega directa no se imprimen placa ni transportista) · **"Los que más usa este transportista"** · **la empresa por envío, no por guía**.
+>
+> ### Candados
+>
+> `src/__tests__/lib/guias-numero-transp-no-bloquea.test.ts` (16), **`src/__tests__/components/guias-lista-unica-envios.test.tsx` (8, RENDERIZA la página real con el hook real y toca los botones)** y **`src/__tests__/api/guias-corregir-item-route.test.ts` (17, LLAMA al handler y mira qué se escribió)**.
+> - 🩸 **Ninguno busca texto en un archivo para lo que importa.** Que la lista quedó una sola no lo puede ver un barrido —y en este repo esos barridos ya pasaron **estando mutados** cuatro veces, porque el comentario que explica el cambio contiene el texto que el barrido busca—; los pocos barridos que quedan **borran los comentarios primero**.
+> - **Verificado por mutación, 9 de 9 cazadas** (`bash scripts/_mutar-candados-lista-envios.sh`): el N° vuelve a bloquear el botón · el servidor vuelve a exigirlo · lo que falta deja de marcarse · la caja del N° desaparece del renglón · corregir vuelve a mandar `items` por el PUT · se puede corregir una guía YA despachada · la corrección pisa los campos que nadie tocó · el UPDATE deja de acotar a las líneas de ESTA guía · vuelve la segunda copia de la lista.
+> - 🩸 **El script de mutación restaura por COPIA, no con `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada, así que las mutaciones se apilarían y ninguna se probaría por separado. Ya pasó en este repo.
+> - **Candados que CAMBIARON DE DIRECCIÓN**: `guias-placa-entrega-directa.test.ts` exigía `tipo_despacho === "externo" && !numero_guia_transp` en el servidor —o sea, fijaba justo lo que Daniel pidió sacar— y `guias-despacho-una-sola-puerta.test.ts` exigía que faltando todos los números el botón se apagara.
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`

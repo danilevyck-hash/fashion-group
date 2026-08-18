@@ -36,6 +36,7 @@
 import {
   numeroTranspDeLinea,
   numeroTranspUnico,
+  pendienteNumeroTransp,
   type TipoDespacho,
 } from "./falta-para-despachar";
 
@@ -130,4 +131,38 @@ export function numeroTranspUnicoImpreso(
     items.map((i) => ({ numero_guia_transp: sinCeroPelado(i.numero_guia_transp) })),
     sinCeroPelado(numeroGuia),
   );
+}
+
+/**
+ * 🔴 LA MARCA DE "LE FALTA EL N° DEL TRANSPORTISTA", para la lista de guías.
+ *
+ * El número dejó de bloquear el despacho (Daniel: *"a veces el transportista lo
+ * da, a veces no"*), así que hay guías que salen sin él. Que no bloquee no
+ * significa que se pierda: quedan marcadas para que alguien lo complete después.
+ *
+ * Se mira lo MISMO que imprime el papel:
+ *   · el modo EFECTIVO (`tipoDespachoEfectivo`) — en entrega directa no aplica;
+ *   · el "0" pelado cuenta como vacío (`sinCeroPelado`), porque es lo que
+ *     alguien tecleó para destrabar el botón, no un número;
+ *   · una línea sin número propio HEREDA el de la cabecera, igual que el papel.
+ *
+ * ⚠️ Solo se marcan las guías que YA salieron. En una pendiente todavía se está
+ * llenando el dato: acusarla de que le falta algo sería ruido en la única
+ * pantalla donde bodega mira el trabajo del día.
+ */
+export function guiaSinNumeroTransp(
+  g: GuiaModo & {
+    numero_guia_transp?: string | null;
+    guia_items?: ReadonlyArray<{ numero_guia_transp?: string | null }> | null;
+  },
+): boolean {
+  if (!guiaYaDespachada(g.estado)) return false;
+  if (esEntregaDirecta(g)) return false;
+  const cabecera = sinCeroPelado(g.numero_guia_transp);
+  const items = g.guia_items ?? [];
+  // Sin líneas cargadas, lo único que hay es la cabecera.
+  const numeros = items.length
+    ? items.map((i) => numeroTranspImpreso(i.numero_guia_transp, cabecera))
+    : [cabecera];
+  return pendienteNumeroTransp("externo", numeros);
 }

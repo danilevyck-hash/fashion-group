@@ -11,10 +11,26 @@ import TimeGroupHeader from "@/components/TimeGroupHeader";
 import {
   ETIQUETA_TIPO_DESPACHO,
   esEntregaDirecta,
+  guiaSinNumeroTransp,
   guiaYaDespachada,
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
+
+/**
+ * 🔴 LA GUÍA QUE SALIÓ SIN EL N° DEL TRANSPORTISTA, DICHO EN LA LISTA.
+ *
+ * El número dejó de bloquear el despacho (Daniel: *"a veces el transportista lo
+ * da, a veces no"*). Que no bloquee no puede significar que se pierda de vista:
+ * acá es donde alguien las encuentra después.
+ */
+function FaltaNumeroTransp() {
+  return (
+    <span className="inline-flex items-center rounded-md bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 text-xs whitespace-nowrap">
+      Falta N° transportista
+    </span>
+  );
+}
 
 interface GuiasListProps {
   guias: Guia[];
@@ -350,6 +366,9 @@ export default function GuiasList({
                               <span className="tabular-nums w-24 text-right shrink-0">
                                 {g.total_bultos} <span className="text-gray-400">bultos</span>
                               </span>
+                              {guiaSinNumeroTransp(g) && (
+                                <span className="shrink-0"><FaltaNumeroTransp /></span>
+                              )}
                               <span className="w-24 shrink-0">
                                 <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
                               </span>
@@ -380,13 +399,16 @@ export default function GuiasList({
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                               </div>
-                              <div className="flex items-center gap-3 mt-1.5">
+                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                                 <span className="text-gray-500 text-xs">{fmtDate(g.fecha)}</span>
                                 <span className="tabular-nums text-xs text-gray-500">{g.total_bultos} bultos</span>
                                 <span className="ml-auto">
                                   <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
                                 </span>
                               </div>
+                              {guiaSinNumeroTransp(g) && (
+                                <div className="mt-1.5"><FaltaNumeroTransp /></div>
+                              )}
                               {/* Cliente + destino visibles sin expandir (bodega ve a quién va) */}
                               {(clientesSummary(g.guia_items || []) || destinosSummary(g.guia_items || [])) && (
                                 <div className="mt-1.5 text-xs text-gray-700 truncate">

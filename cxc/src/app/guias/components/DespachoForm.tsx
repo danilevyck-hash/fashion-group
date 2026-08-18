@@ -3,7 +3,6 @@
 import { useRef, useEffect, useMemo, useState } from "react";
 import { isCanvasClear } from "./canvasUtils";
 import SignatureCanvas from "./SignatureCanvas";
-import type { GuiaItem } from "./types";
 import {
   faltaParaDespachar,
   textoFalta,
@@ -24,11 +23,17 @@ import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 // entrar a la guia y terminarla"*. Y no era un problema de pantalla chica: lo
 // vio en ESCRITORIO.
 //
-// ⚠️ EL N° DE GUÍA DEL TRANSPORTISTA ES POR LÍNEA. Antes se pedía UNA vez y se
-// guardaba solo en la cabecera de la guía. Daniel: *"la info de guia de transp,
+// 🔴 LOS ENVÍOS NO SE DIBUJAN ACÁ, Y ES EL CAMBIO DEL 17-ago-2026. El N° del
+// transportista sigue siendo POR LÍNEA (Daniel: *"la info de guia de transp,
 // debe de ser por linea, no por guia porque nos hacen varias guias el
-// transportista por guia"*. La columna `guia_items.numero_guia_transp` ya
-// existía; lo que faltaba era pedirla renglón por renglón.
+// transportista por guia"*), pero su caja vive en `ListaEnvios`, pegada al
+// renglón. Este formulario tenía una SEGUNDA copia de los 7 envíos, con su
+// cliente, su dirección y sus bultos repetidos: la misma lista, dos veces en la
+// misma pantalla, y más de 2.000 px de alto en un celular.
+//
+// ⚠️ EL N° DEL TRANSPORTISTA NO BLOQUEA (Daniel: *"a veces el transportista lo
+// da, a veces no"*). Lo que bloquea sigue siendo placa (salvo entrega directa),
+// quién recibe, cédula y las dos firmas.
 //
 // ⚠️ EL BOTÓN SE APAGA Y DICE QUÉ FALTA. Antes se podía tocar siempre y
 // contestaba con un toast por vez, que además se iba solo a los 3 segundos.
@@ -52,10 +57,6 @@ import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface DespachoFormProps {
-  /** Las líneas de la guía: cada una lleva su propio N° del transportista. */
-  items: GuiaItem[];
-  numerosTransp: string[];
-  setNumeroTransp: (idx: number, v: string) => void;
   tipoDespacho: TipoDespacho;
   setTipoDespacho: (v: TipoDespacho) => void;
   bPlaca: string;
@@ -83,9 +84,6 @@ const CAMPO =
   "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base md:text-sm outline-none focus:border-black transition min-h-[44px]";
 
 export default function DespachoForm({
-  items,
-  numerosTransp,
-  setNumeroTransp,
   tipoDespacho, setTipoDespacho,
   bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
   bChofer, setBChofer,
@@ -100,13 +98,8 @@ export default function DespachoForm({
 
   // Warn before leaving if user has filled any field
   const isDirty = useMemo(
-    () =>
-      !!(
-        bPlaca || bReceptor || bCedula || bChofer ||
-        numerosTransp.some((n) => n.trim()) ||
-        pendingFirma1 || pendingFirma2
-      ),
-    [bPlaca, bReceptor, bCedula, bChofer, numerosTransp, pendingFirma1, pendingFirma2]
+    () => !!(bPlaca || bReceptor || bCedula || bChofer || pendingFirma1 || pendingFirma2),
+    [bPlaca, bReceptor, bCedula, bChofer, pendingFirma1, pendingFirma2]
   );
   useEffect(() => {
     function handler(e: BeforeUnloadEvent) {
@@ -127,7 +120,6 @@ export default function DespachoForm({
     receptor: bReceptor,
     cedula: bCedula,
     chofer: bChofer,
-    numerosTransp,
     tieneFirma1: !!pendingFirma1,
     tieneFirma2: !!pendingFirma2,
   });
@@ -263,44 +255,8 @@ export default function DespachoForm({
         </div>
       </div>
 
-      {/* ⚠️ UNO POR LÍNEA. Ver la cabecera del archivo. */}
-      {externo && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <span className="text-xs uppercase tracking-wide text-gray-400 block">
-            N° de guía del transportista · uno por línea
-          </span>
-          <p className="text-xs text-gray-500 mt-1 mb-3">
-            El transportista arma varias guías suyas por cada guía nuestra. Anota
-            en cada envío el número que te dio para ese envío.
-          </p>
-          <div className="space-y-3">
-            {items.map((item, idx) => (
-              <div key={item.id || idx} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div className="text-sm font-medium break-words">{item.cliente || "Sin cliente"}</div>
-                <div className="text-xs text-gray-500 mt-0.5 break-words">
-                  {[item.direccion, item.empresa, `${item.bultos || 0} bultos`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </div>
-                <label htmlFor={`transp-${idx}`} className="text-xs uppercase tracking-wide text-gray-400 mt-3 mb-1 block">
-                  N° guía transportista
-                </label>
-                <input
-                  id={`transp-${idx}`}
-                  type="text"
-                  value={numerosTransp[idx] ?? ""}
-                  onChange={(e) => setNumeroTransp(idx, e.target.value)}
-                  placeholder="—"
-                  className={`${CAMPO} bg-white`}
-                />
-              </div>
-            ))}
-            {items.length === 0 && (
-              <p className="text-sm text-gray-400">Esta guía no tiene envíos cargados.</p>
-            )}
-          </div>
-        </div>
-      )}
+      {/* 🔴 ACÁ NO VA LA LISTA DE ENVÍOS. Ver la cabecera del archivo: los N° del
+          transportista viven en `ListaEnvios`, pegados a su renglón. */}
 
       {/* Firmas */}
       <div className="rounded-lg border border-gray-200 bg-white p-4">
