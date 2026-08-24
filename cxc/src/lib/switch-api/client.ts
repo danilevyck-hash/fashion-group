@@ -569,6 +569,14 @@ export interface SwitchClient {
   /** Notas de débito del rango. Total positivo (suman a ventas). */
   listNotasDebito(params: ListFacturasParams): Promise<SwitchNotasDebitoData>;
   getFactura(facturaId: number | string): Promise<SwitchFacturaDetalle>;
+  /** Detalle de línea de una NOTA DE CRÉDITO (/apinotacredito/info).
+   *
+   *  ⚠️ NO ESTÁ EN `docs/api-switch.pdf` — se descubrió probando el
+   *  20-ago-2026, y es el cuarto endpoint sin documentar de este conector.
+   *  Devuelve el mismo `data.detalle[]` que las facturas, con dos diferencias
+   *  que importan: la CANTIDAD viene NEGATIVA, el monto POSITIVO, y la línea
+   *  **no trae `id`** (la de una factura sí). Ver `factura-lineas-parse.ts`. */
+  getNotaCredito(notaCreditoId: number | string): Promise<SwitchFacturaDetalle>;
   listSucursales(): Promise<SwitchSucursalesData>;
   listVendedores(params: {
     porPagina: number;
@@ -1032,6 +1040,21 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apifactura/info?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async getNotaCredito(notaCreditoId) {
+      // 🔴 EL PARÁMETRO SE LLAMA EXACTAMENTE `notacreditoId`, TODO JUNTO Y CON
+      // LA C MINÚSCULA. Probado contra producción el 20-ago-2026:
+      // `notaCreditoId`, `id` y `facturaId` devuelven code 2148 "FALTA EL
+      // ELEMENTO notacreditoId". Es fácil "corregirlo" a camelCase leyendo el
+      // código y romper el sync entero.
+      const qs = new URLSearchParams({ notacreditoId: String(notaCreditoId) });
+      return authedCall<SwitchFacturaDetalle>(
+        empresaKey,
+        cfg,
+        `/apinotacredito/info?${qs.toString()}`,
         "GET",
       );
     },
