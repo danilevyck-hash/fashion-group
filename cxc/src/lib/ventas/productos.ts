@@ -63,14 +63,22 @@ export interface ProductosResponse {
 // Período → rango de fechas [desde, hasta] (YYYY-MM-DD).
 //   mes 1..12 → mes calendario completo.
 //   mes null  → YTD: 1-ene del año hasta hoy (o fin de año si es año cerrado).
-export function productosRange(year: number, mes: number | null): { desde: string; hasta: string } {
+//
+// `ahora` es un parámetro con default para que el "hoy" del período y el del
+// comparativo salgan del MISMO instante (y para que los tests puedan pararse en
+// un borde de año). El cálculo no cambió ni un carácter.
+export function productosRange(
+  year: number,
+  mes: number | null,
+  ahora: Date = new Date(),
+): { desde: string; hasta: string } {
   const pad = (n: number) => String(n).padStart(2, "0");
   if (mes && mes >= 1 && mes <= 12) {
     const lastDay = new Date(year, mes, 0).getDate(); // día 0 del mes siguiente = último día de `mes`
     return { desde: `${year}-${pad(mes)}-01`, hasta: `${year}-${pad(mes)}-${pad(lastDay)}` };
   }
   const yearEnd = `${year}-12-31`;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = ahora.toISOString().slice(0, 10);
   return { desde: `${year}-01-01`, hasta: todayStr < yearEnd ? todayStr : yearEnd };
 }
 
@@ -127,7 +135,7 @@ export function productosRangoPeriodo(
   mes: number | null,
   ahora: Date,
 ): { desde: string; hasta: string } {
-  if (periodo === "ytd") return productosRange(year, mes);
+  if (periodo === "ytd") return productosRange(year, mes, ahora);
 
   const hoy = diaPanama(ahora);
   const anio = Number(hoy.slice(0, 4));
@@ -146,20 +154,34 @@ export function productosRangoPeriodo(
 /**
  * La ventana contra la que se mide el Δ: EL MISMO PERÍODO DEL AÑO ANTERIOR.
  *
- * ── POR QUÉ HAY DOS CAMINOS Y NO UNO ────────────────────────────────────────
+ * ── LA REGLA, UNA SOLA: UN PERÍODO EMPEZADO SE COMPARA CONTRA EL MISMO TRAMO ─
  *
- * · `ytd` y el mes suelto → `productosRange(year - 1, mes)`, que es EXACTAMENTE
- *   lo que la pantalla hace desde que existe. No se unificó con el otro camino
- *   a propósito: para el año en curso, `productosRange(year-1, null)` devuelve
- *   el año anterior ENTERO (12 meses) contra un año en curso PARCIAL (8 meses
- *   al 24-ago). Corregirlo movería una columna que ya está publicada, y la regla
- *   de este repo es que ningún número existente cambia sin que Daniel lo pida.
- *   Queda anotado como hallazgo, no como cambio silencioso.
+ * 🩸 «Año en curso» comparaba los meses transcurridos de 2026 contra los DOCE
+ * meses enteros de 2025. El año pasado corría con cuatro meses de ventaja, así
+ * que la Δ mostraba caídas que eran del calendario y no del negocio: en Fashion
+ * Wear, *Women-T-Shirts S/S* daba **−38%** en «Año en curso» y **+29% / +15%**
+ * en «Últimos 6 / 12 meses», en la MISMA pantalla y con las mismas ventas. Ahora
+ * se compara 1-ene → el mismo día del año pasado.
  *
- * · Los períodos relativos → la MISMA ventana corrida 12 meses, punta a punta,
- *   con `unAnioAntes` (el 29-feb cae en el 28). Mismo largo y mismo corte de
- *   día, así que no hay nada que recortar ni que aclarar: es el criterio de
- *   `rangoComparativo("12m")` de Multifashion, importado y no recopiado.
+ * Es el criterio que este repo YA usa en `rangoComparativo` de Multifashion —
+ * "un mes empezado se compara contra los MISMOS DÍAS del año pasado"— aplicado
+ * al año en vez de al mes, y con su misma pieza: `unAnioAntes` (que hace caer el
+ * 29-feb en el 28). No hay un tercer criterio dando vueltas.
+ *
+ * · Año en curso → [1-ene del año anterior, `unAnioAntes(hasta del actual)`].
+ *   El `hasta` sale del PERÍODO ACTUAL, no de un "hoy" recalculado acá: las dos
+ *   puntas de la comparación nacen del mismo instante y no se pueden separar ni
+ *   un día (Panamá es UTC−5 fijo, y un `new Date()` de más entre las 7 p.m. y la
+ *   medianoche corre el día de una punta y no de la otra).
+ *   Un año YA CERRADO cae solo en el año entero: su `hasta` es el 31-dic, y
+ *   `unAnioAntes("2024-12-31")` es el 31-dic anterior. No hay caso especial.
+ *
+ * · Mes suelto → `productosRange(year - 1, mes)`, INTACTO. Un mes cerrado ya se
+ *   compara entero contra entero; no hay nada que recortar y su columna no se
+ *   mueve.
+ *
+ * · Períodos relativos → la MISMA ventana corrida 12 meses, punta a punta.
+ *   Mismo largo y mismo corte de día, nada que recortar.
  */
 export function productosRangoComparativo(
   periodo: ProductosPeriodo,
@@ -167,7 +189,12 @@ export function productosRangoComparativo(
   mes: number | null,
   ahora: Date,
 ): { desde: string; hasta: string } {
-  if (periodo === "ytd") return productosRange(year - 1, mes);
+  if (periodo === "ytd") {
+    const anterior = productosRange(year - 1, mes, ahora);
+    if (mes && mes >= 1 && mes <= 12) return anterior;
+    const actual = productosRange(year, mes, ahora);
+    return { desde: anterior.desde, hasta: unAnioAntes(actual.hasta) };
+  }
   const r = productosRangoPeriodo(periodo, year, mes, ahora);
   return { desde: unAnioAntes(r.desde), hasta: unAnioAntes(r.hasta) };
 }
