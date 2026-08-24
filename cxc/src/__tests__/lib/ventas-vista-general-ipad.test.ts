@@ -161,11 +161,21 @@ describe("Ventas › Productos — la tabla ENTRA, así que se queda tabla", () 
     expect(productos).toContain("<tbody>");
   });
 
-  it("las 6 columnas siguen existiendo con sus mismos textos", () => {
-    for (const th of ["Descripción", "Códigos", "Cant", "Venta", "Margen %"]) {
+  it("las columnas siguen existiendo con sus mismos textos, más Precio prom.", () => {
+    for (const th of ["Descripción", "Códigos", "Cant", "Venta", "Precio prom.", "Margen %"]) {
       expect(productos).toContain(th);
     }
-    expect(productos).toContain("Δ {selectedYear - 1}");
+    // El rótulo del Δ pasó a calcularse (`Δ 2025` con año/mes; `Δ año ant.` con
+    // las ventanas relativas, donde nombrar un año sería mentira). Que DIGA lo
+    // correcto en cada caso se prueba tocando el selector, no leyendo el
+    // archivo: src/__tests__/components/ventas-productos-precio-periodos.tsx.
+    expect(productos).toContain("{deltaLabel}");
+    expect(productos).toContain('`Δ ${selectedYear - 1}`');
+  });
+
+  it("Precio prom. se esconde bajo `sm`, como Cant y Δ — a 390 px no cabe una 4a", () => {
+    const th = productos.slice(productos.indexOf('label="Precio prom."'));
+    expect(th.slice(0, 200)).toContain('className="hidden sm:table-cell"');
   });
 });
 

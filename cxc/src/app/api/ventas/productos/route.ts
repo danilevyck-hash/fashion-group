@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/ventas/productos?empresa=&year=&mes=
+// GET /api/ventas/productos?empresa=&year=&mes=&periodo=&previo=
 //
 // Nivel 1 del tab Productos: top por descripción + totales + meses con data.
 // Lee RPCs sobre switch_articulo_diario (RLS service_role → server-only).
@@ -8,6 +8,12 @@
 //   - switch_articulo_margen_mensual: de ahí salen los meses con data (selector).
 // Totales se computan sumando el nivel 1 (0 filas con descripción/código NULL →
 // cuadra al centavo con margen_mensual, la fuente validada).
+//
+// `periodo` (ytd | 6m | 12m | anio_pasado) elige la ventana; `mes` la acota a un
+// mes calendario y solo aplica con `periodo=ytd` (el default, que es lo que la
+// pantalla venía pidiendo). `previo=1` devuelve LA MISMA ventana un año antes —
+// es la que alimenta la columna Δ, y así el rango comparativo lo decide el
+// servidor una sola vez en vez de que el cliente lo rearme y los dos diverjan.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,7 +21,10 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
   PRODUCTOS_EMPRESA_KEYS,
-  productosRange,
+  esProductosPeriodo,
+  productosRangoPeriodo,
+  productosRangoComparativo,
+  type ProductosPeriodo,
   type ProductoNivel1,
   type ProductosResponse,
 } from "@/lib/ventas/productos";
@@ -41,8 +50,18 @@ export async function GET(req: NextRequest) {
   if (mes !== null && (!Number.isInteger(mes) || mes < 1 || mes > 12)) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
+  const periodoRaw = sp.get("periodo") ?? "ytd";
+  if (!esProductosPeriodo(periodoRaw)) {
+    return NextResponse.json({ error: "periodo inválido" }, { status: 400 });
+  }
+  const periodo: ProductosPeriodo = periodoRaw;
+  const previo = sp.get("previo") === "1";
 
-  const { desde, hasta } = productosRange(year, mes);
+  const ahora = new Date();
+  const { desde, hasta } = previo
+    ? productosRangoComparativo(periodo, year, mes, ahora)
+    : productosRangoPeriodo(periodo, year, mes, ahora);
+  const comparativo = productosRangoComparativo(periodo, year, mes, ahora);
 
   const [nivel1Res, margenRes] = await Promise.all([
     supabaseServer.rpc("switch_top_descripciones", {
@@ -50,10 +69,14 @@ export async function GET(req: NextRequest) {
       p_desde: desde,
       p_hasta: hasta,
     }),
-    supabaseServer.rpc("switch_articulo_margen_mensual", {
-      p_empresa_key: empresa,
-      p_year: year,
-    }),
+    // La lista de meses del selector solo hace falta en la llamada principal:
+    // la del comparativo se descarta entera salvo `productos`.
+    previo
+      ? Promise.resolve({ data: [], error: null })
+      : supabaseServer.rpc("switch_articulo_margen_mensual", {
+          p_empresa_key: empresa,
+          p_year: year,
+        }),
   ]);
 
   if (nivel1Res.error) {
@@ -89,8 +112,10 @@ export async function GET(req: NextRequest) {
     empresa,
     year,
     mes,
+    periodo,
     desde,
     hasta,
+    comparativo,
     meses,
     totales: { venta: ventaTotal, costo: costoTotal, margen: margenTotal },
     productos,

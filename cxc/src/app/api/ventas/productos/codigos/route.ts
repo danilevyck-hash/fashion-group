@@ -1,8 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/ventas/productos/codigos?empresa=&year=&mes=&descripcion=
+// GET /api/ventas/productos/codigos?empresa=&year=&mes=&periodo=&descripcion=
 //
 // Nivel 2 (drill-down): códigos de UNA descripción, con cantidad/venta/margen.
-// Lazy-load al expandir una fila del tab Productos. Mismo rango que el nivel 1.
+// Lazy-load al expandir una fila del tab Productos. Mismo rango que el nivel 1:
+// resuelve el período con LA MISMA función, así los códigos de adentro nunca
+// suman un rango distinto del que muestra la fila de arriba.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -10,7 +12,8 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
   PRODUCTOS_EMPRESA_KEYS,
-  productosRange,
+  esProductosPeriodo,
+  productosRangoPeriodo,
   type ProductoCodigo,
 } from "@/lib/ventas/productos";
 
@@ -39,8 +42,12 @@ export async function GET(req: NextRequest) {
   if (!descripcion) {
     return NextResponse.json({ error: "descripcion requerida" }, { status: 400 });
   }
+  const periodo = sp.get("periodo") ?? "ytd";
+  if (!esProductosPeriodo(periodo)) {
+    return NextResponse.json({ error: "periodo inválido" }, { status: 400 });
+  }
 
-  const { desde, hasta } = productosRange(year, mes);
+  const { desde, hasta } = productosRangoPeriodo(periodo, year, mes, new Date());
 
   const { data, error } = await supabaseServer.rpc("switch_articulos_por_descripcion", {
     p_empresa_key: empresa,

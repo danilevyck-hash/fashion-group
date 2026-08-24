@@ -391,8 +391,15 @@ function ultimoDia(anio: number, mes: number): number {
 
 const dd2 = (n: number): string => String(n).padStart(2, "0");
 
-/** La misma fecha un año antes. El 29-feb cae en el 28 del año no bisiesto. */
-function unAnioAntes(fecha: string): string {
+/**
+ * La misma fecha un año antes. El 29-feb cae en el 28 del año no bisiesto.
+ *
+ * EXPORTADA a propósito: es el criterio con el que TODA la app corre una ventana
+ * un año hacia atrás para comparar contra ella. Ventas › Productos la importa
+ * de acá en vez de copiarla — una segunda copia diverge (pasó con el % de
+ * variación, y por eso existe `src/lib/variacion.ts`).
+ */
+export function unAnioAntes(fecha: string): string {
   const anio = Number(fecha.slice(0, 4)) - 1;
   const mes = Number(fecha.slice(5, 7));
   const dia = Math.min(Number(fecha.slice(8, 10)), ultimoDia(anio, mes));
