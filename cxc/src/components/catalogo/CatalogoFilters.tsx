@@ -19,15 +19,27 @@
 // precio EXACTO sin trabajo extra. Tocar «hasta» apaga el espejo (ahí la
 // persona SÍ quiere un rango) y vaciarlo lo vuelve a encender.
 //
-// 🔴 Y DEBAJO SE LISTAN LOS PRECIOS QUE EXISTEN, que no es decoración: el
-// desplegable de tramos ("$23 a $31") tapaba que no todos los precios son
-// dólares enteros. MEDIDO contra producción el 23-ago-2026: Tommy tiene 41
-// precios distintos (entre ellos $17.50 y $19.50) y Calvin 15 (con $15.50).
-// Con precio exacto, quien escribe "17" en Tommy no encuentra NADA aunque haya
-// producto a $17.50, y concluye que la pantalla se rompió. La lista sale de los
-// productos que la pantalla YA tiene en memoria (ninguna consulta nueva), cada
-// precio es un botón que llena los dos campos de una, y si el precio escrito
-// no existe se dice en español simple ANTES de que parezca un error.
+// ── 🔴 LA FILA DE BOTONES DE PRECIO SE FUE. EL AVISO SE QUEDA (24-ago-2026) ──
+//
+// El 23-ago se había pintado, debajo de los campos, un botón por cada precio
+// del catálogo (16 a la vista + "Ver los 41 precios" en Tommy). Daniel lo vio y
+// lo retiró, textual: *"sí, pero no quiero botones de precios, solo escribirlo
+// y ya, me explico?"*, y sobre cuántos precios mostrar en Tommy: *"ninguno"*.
+// Así que acá quedan SOLO los dos campos donde se escribe.
+//
+// ⚠️ PERO EL AVISO DE "ESE PRECIO NO EXISTE" NO ES LA FILA DE BOTONES, Y SE
+// QUEDA. Son dos cosas distintas y solo una la retiró Daniel:
+//   · la fila de botones era permanente y ocupaba media pantalla de iPhone
+//     antes del primer producto → se fue entera;
+//   · el aviso es UNA línea de texto que aparece SOLO cuando el precio escrito
+//     no existe en el catálogo → se queda.
+// Sin él la pantalla parece rota: MEDIDO contra producción el 23-ago-2026,
+// Tommy tiene $17.50 pero NO tiene $17, así que quien escribe "17" ve cero
+// productos sin ninguna explicación. El aviso lo dice en español simple y
+// ofrece la salida ("En este catálogo no hay nada a $17. Lo más cercano: $16 o
+// $17.50."). Los precios reales que necesita salen de los productos que la
+// pantalla YA tiene en memoria — ninguna consulta nueva, y el precio lo sigue
+// mandando Switch.
 //
 // ── LOS CHIPS «OFERTA / NUEVO / PRÓXIMAMENTE» SE FUERON (14-ago-2026) ──
 //
@@ -100,10 +112,9 @@
 import { useRef, useState } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import {
-  BULTOS_CHIP_LABEL, PRECIO_VACIO, mensajeFiltroPrecio, parsePrecio,
+  BULTOS_CHIP_LABEL, PRECIO_VACIO, mensajeFiltroPrecio,
   type FiltroPrecio,
 } from "@/lib/catalogo/filtros-extra";
-import { fmtPrecio } from "@/lib/catalogo/precio";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
 
@@ -196,10 +207,15 @@ export function FiltroDesplegable({
 interface FiltroPrecioExactoProps {
   precio: FiltroPrecio;
   onChange: (precio: FiltroPrecio) => void;
-  /** Precios que existen en el catálogo, de menor a mayor y sin repetir. */
+  /**
+   * Precios que existen en el catálogo, de menor a mayor y sin repetir.
+   *
+   * ⚠️ Ya NO se pintan: desde el 24-ago-2026 no hay fila de botones de precio.
+   * Entran solo para que el aviso pueda decir cuál es el precio real más
+   * cercano al que se escribió — sin ellos el aviso no tendría qué ofrecer.
+   */
   precios: number[];
   chipLabel: string;
-  chipActive: string;
   chipInactive: string;
 }
 
@@ -219,28 +235,13 @@ interface FiltroPrecioExactoProps {
  * teclean. `inputMode="decimal"` igual saca el teclado numérico en el celular,
  * y `parsePrecio` limpia el resto.
  */
-/**
- * Cuántos precios se pintan sin pedir permiso. MEDIDO contra producción
- * (23-ago-2026, catálogo público): Tommy tiene 41 precios distintos y Calvin 15.
- * Los 41 de Tommy son ~8 renglones de botones a 390 px — media pantalla de
- * iPhone entre los filtros y el primer producto, que es exactamente el error
- * que este módulo ya peleó dos veces ("un filtro que no se ve no existe" tiene
- * un gemelo: un filtro que tapa el catálogo tampoco sirve).
- *
- * Así que se muestran los primeros y el resto queda a UN toque, con el número
- * en el botón para que nadie tenga que adivinar cuántos faltan. Calvin (15)
- * entra entero; Tommy muestra 16 y ofrece los 41.
- */
-const PRECIOS_A_LA_VISTA = 16;
-
 export function FiltroPrecioExacto({
-  precio, onChange, precios, chipLabel, chipActive, chipInactive,
+  precio, onChange, precios, chipLabel, chipInactive,
 }: FiltroPrecioExactoProps) {
   // Si el filtro llega con «hasta» escrito (un link compartido con rango), el
   // espejo nace apagado: copiarle encima el «desde» le rompería el link a quien
   // lo abrió.
   const [espejo, setEspejo] = useState(() => !precio.hasta.trim());
-  const [verTodos, setVerTodos] = useState(false);
 
   // `placeholder:text-black/25`: con el color del chip, el "17.50" de ejemplo se
   // leía como un precio YA puesto y hacía dudar de si el filtro estaba activo.
@@ -258,28 +259,16 @@ export function FiltroPrecioExacto({
     onChange({ desde: precio.desde, hasta: v });
   }
 
-  function elegirPrecio(p: number) {
-    setEspejo(true);
-    const txt = String(p);
-    onChange({ desde: txt, hasta: txt });
-  }
-
   function quitar() {
     setEspejo(true);
     onChange(PRECIO_VACIO);
   }
 
   const hayAlgo = !!(precio.desde.trim() || precio.hasta.trim());
+  // 🔴 Los precios reales NO se pintan (Daniel, 24-ago-2026: *"no quiero
+  // botones de precios, solo escribirlo y ya"*). Se usan para UNA sola cosa:
+  // que el aviso de abajo pueda decir el precio más cercano al escrito.
   const aviso = mensajeFiltroPrecio(precio.desde, precio.hasta, precios);
-  // Un precio de la lista se pinta encendido cuando es EXACTAMENTE el filtro
-  // puesto: así se ve de un vistazo cuál está eligiendo, incluso si lo escribió
-  // a mano en vez de tocarlo.
-  const desdeNum = parsePrecio(precio.desde);
-  const hastaNum = parsePrecio(precio.hasta);
-  const exacto =
-    desdeNum !== null && hastaNum !== null && Math.round(desdeNum * 100) === Math.round(hastaNum * 100)
-      ? Math.round(desdeNum * 100)
-      : null;
 
   return (
     <div className="space-y-1.5">
@@ -324,38 +313,11 @@ export function FiltroPrecioExacto({
         Escribe un precio y ves solo ese. El «hasta» se llena solo.
       </p>
 
-      {precios.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={suave}>Precios de este catálogo:</span>
-          {(verTodos ? precios : precios.slice(0, PRECIOS_A_LA_VISTA)).map(p => {
-            const encendido = exacto !== null && exacto === Math.round(p * 100);
-            return (
-              <button
-                key={p}
-                type="button"
-                onClick={() => elegirPrecio(p)}
-                aria-pressed={encendido}
-                className={`px-3 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] tabular-nums ${
-                  encendido ? chipActive : chipInactive
-                }`}
-              >
-                {fmtPrecio(p)}
-              </button>
-            );
-          })}
-          {precios.length > PRECIOS_A_LA_VISTA && (
-            <button
-              type="button"
-              onClick={() => setVerTodos(v => !v)}
-              aria-expanded={verTodos}
-              className={`${chipInactive} min-h-[44px] px-3 rounded-full text-xs font-medium transition whitespace-nowrap`}
-            >
-              {verTodos ? "Ver menos" : `Ver los ${precios.length} precios`}
-            </button>
-          )}
-        </div>
-      )}
-
+      {/* 🔴 ACÁ NO VA UNA FILA DE BOTONES DE PRECIO. Estuvo del 23 al 24-ago-2026
+          y Daniel la retiró: *"no quiero botones de precios, solo escribirlo y
+          ya"* — y sobre cuántos mostrar en Tommy, *"ninguno"*. Lo único que se
+          pinta debajo de los campos es el aviso de acá abajo, y solo cuando el
+          precio escrito no existe. */}
       {aviso && (
         <p role="status" className="text-xs text-amber-700">
           {aviso}
@@ -577,7 +539,6 @@ export default function CatalogoFilters({
           onChange={onPrecioChange!}
           precios={preciosDisponibles}
           chipLabel={f.chipLabel}
-          chipActive={f.chipActive}
           chipInactive={f.chipInactive}
         />
       )}

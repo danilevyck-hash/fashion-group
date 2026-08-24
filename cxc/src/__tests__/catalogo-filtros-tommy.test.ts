@@ -97,14 +97,24 @@ describe("cumpleBultosMinimos — 2 bultos completos", () => {
 // reemplaza a estos tests vive en `catalogo-precio-exacto.test.ts`, que además
 // prueba la CONDUCTA del espejo pintando el componente de verdad.
 
-// ── Flags por marca: Reebok y Joybees NO llevan los filtros nuevos ────────────
-describe("paridad inversa — los filtros nuevos son SOLO de Tommy", () => {
-  it("los flags están encendidos solo en Tommy", () => {
+// ── Flags por marca: el chip de BULTOS sigue siendo solo de Tommy ────────────
+//
+// 🔴 ESTE BLOQUE CAMBIÓ DE DIRECCIÓN EL 24-ago-2026, Y SOLO EN LA MITAD DEL
+// PRECIO. Hasta ese día exigía `filtroPrecio === false` en Reebok y Joybees,
+// o sea que FIJABA una decisión de jul-2026 que **Daniel acaba de revertir**
+// (*"sí, pero no quiero botones de precios, solo escribirlo y ya"*). Un
+// candado que congela una decisión del dueño en contra del dueño no protege
+// nada: pone el build rojo cuando alguien hace lo que le pidieron.
+// Lo que SÍ se defiende ahora es lo contrario — que el campo esté en las
+// CUATRO marcas — y vive en `catalogo-precio-exacto.test.ts`.
+// ⚠️ `filtroBultos` NO se tocó: sigue siendo solo de Tommy y Calvin.
+describe("paridad inversa — el chip de bultos es SOLO de Tommy", () => {
+  it("el chip de bultos está encendido solo en Tommy, y el precio en las cuatro", () => {
     expect(MARCA_THEME.tommy.features.filtroBultos).toBe(true);
-    expect(MARCA_THEME.tommy.features.filtroPrecio).toBe(true);
     for (const marca of ["reebok", "joybees"] as const) {
       expect(MARCA_THEME[marca].features.filtroBultos, marca).toBe(false);
-      expect(MARCA_THEME[marca].features.filtroPrecio, marca).toBe(false);
+      // 🔑 El precio ahora SÍ (Daniel, 24-ago-2026 — ver marcas-ui).
+      expect(MARCA_THEME[marca].features.filtroPrecio, marca).toBe(true);
     }
   });
 
@@ -131,12 +141,13 @@ describe("paridad inversa — los filtros nuevos son SOLO de Tommy", () => {
     expect(screen.queryByLabelText("Filtrar por precio")).toBeNull();
   });
 
-  it("Reebok y Joybees NO los muestran, aunque les pasen los handlers", () => {
+  it("Reebok y Joybees NO muestran el chip de bultos, pero SÍ los campos de precio", () => {
     for (const marca of ["reebok", "joybees"] as const) {
       const { unmount } = render(createElement(CatalogoFilters, props(marca)));
       expect(screen.queryByRole("button", { name: BULTOS_CHIP_LABEL }), marca).toBeNull();
-      expect(screen.queryByLabelText("Precio desde"), marca).toBeNull();
-      expect(screen.queryByLabelText("Precio hasta"), marca).toBeNull();
+      // 🔑 Los campos de precio entraron el 24-ago-2026, por pedido de Daniel.
+      expect(screen.getByLabelText("Precio desde"), marca).toBeTruthy();
+      expect(screen.getByLabelText("Precio hasta"), marca).toBeTruthy();
       expect(screen.queryByLabelText("Filtrar por precio"), marca).toBeNull();
       // El orden sí sigue estando en las 3 marcas.
       expect(screen.getByRole("option", { name: "Ordenar: Relevancia" }), marca).toBeTruthy();
