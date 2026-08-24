@@ -213,7 +213,10 @@ function flatten(r: SearchResults): FlatItem[] {
 const SEARCH_MODULES = [
   { label: "Cuentas por Cobrar", href: "/admin", keywords: ["cxc", "cartera", "cobrar", "deuda", "saldo", "cliente", "vencido"] },
   { label: "Reclamos", href: "/reclamos", keywords: ["reclamo", "nota credito", "devolucion", "queja"] },
-  { label: "Cheques", href: "/cheques", keywords: ["cheque", "deposito", "posfechado", "banco"] },
+  // El módulo se llama "Recordatorios" desde ago-2026 (la key interna sigue
+  // siendo `cheques`). Las palabras viejas se CONSERVAN: quien teclea "cheque"
+  // tiene que seguir llegando acá.
+  { label: "Recordatorios", href: "/cheques", keywords: ["recordatorio", "recordar", "agenda", "cheque", "deposito", "posfechado", "banco"] },
   { label: "Guias", href: "/guias", keywords: ["guia", "despacho", "envio", "transporte"] },
   { label: "Ventas", href: "/ventas", keywords: ["venta", "factura", "ingreso", "vendedor"] },
   { label: "Directorio", href: "/clientes", keywords: ["directorio", "contacto", "correo", "telefono", "whatsapp", "clientes"] },

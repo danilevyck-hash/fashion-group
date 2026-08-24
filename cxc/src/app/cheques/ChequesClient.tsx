@@ -9,6 +9,14 @@ import type { ContextMenuItem, SwipeAction } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import ChequeFormModal, { chequeFormVacio, type ChequeFormValues } from "./components/ChequeFormModal";
+import RecordatorioFormModal, { recordatorioVacio, type RecordatorioFormValues } from "./components/RecordatorioFormModal";
+import {
+  ETIQUETA_REPETICION,
+  ocurreEn,
+  ocurrenciasPorDiaDelMes,
+  proximaOcurrencia,
+  type Recordatorio,
+} from "@/lib/recordatorios/recordatorio";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { fmt, fmtDate } from "@/lib/format";
 import { groupByTimePeriod } from "@/lib/group-by-time";
@@ -27,6 +35,10 @@ import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 
 export interface ChequesInitialData {
   cheques: Cheque[];
+  /** Recordatorios sueltos. Vacío mientras la migración no haya corrido. */
+  recordatorios: Recordatorio[];
+  /** `true` = falta correr el DDL. La pantalla muestra los cheques igual. */
+  faltaMigracionRecordatorios: boolean;
 }
 
 export interface Cheque {
@@ -58,8 +70,33 @@ function pillColor(estado: string) {
   return "bg-gray-100 text-gray-500";
 }
 
-type Filter = "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_manana" | "vencen_semana";
-const VALID_FILTERS: Filter[] = ["pendiente", "depositado", "vencido", "rebotado", "vencen_hoy", "vencen_manana", "vencen_semana"];
+type Filter = "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_manana" | "vencen_semana" | "recordatorios";
+const VALID_FILTERS: Filter[] = ["pendiente", "depositado", "vencido", "rebotado", "vencen_hoy", "vencen_manana", "vencen_semana", "recordatorios"];
+
+/** Píldora del calendario para un RECORDATORIO. Azul y con campanita: en una
+ *  casilla llena de cheques verdes/rojos, el color es lo que lo distingue a
+ *  simple vista sin tener que leerlo. */
+function RecordatorioCalendarioPill({ rec, onAbrir }: { rec: Recordatorio; onAbrir: () => void }) {
+  return (
+    // `min-h-[44px]` medido, no elegido a ojo: en una línea la píldora daba 22 px
+    // y el dedo no le acierta. La casilla crece hacia ABAJO, que es lo único que
+    // un calendario puede regalar sin ensanchar nada.
+    <button
+      onClick={onAbrir}
+      data-recordatorio-pill={rec.id}
+      title={`Recordatorio: ${rec.texto}${rec.cliente ? ` · ${rec.cliente}` : ""}`}
+      className="w-full text-left text-xs px-1.5 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 transition min-h-[44px] flex items-center"
+    >
+      <span className="flex items-center gap-1 min-w-0 w-full">
+        <span aria-hidden className="flex-shrink-0">🔔</span>
+        {/* `min-w-0 break-words`: sin eso el texto no envuelve DENTRO de su
+            caja y `line-clamp` lo recorta de costado — 6 a 17 px que no se
+            pueden alcanzar de ninguna manera. Medido a 834 px. */}
+        <span className="line-clamp-2 min-w-0 break-words">{rec.texto}</span>
+      </span>
+    </button>
+  );
+}
 
 /**
  * Píldora de un cheque dentro de una casilla del calendario, con su globo de
@@ -224,6 +261,19 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
   const [motivoRebote, setMotivoRebote] = useState("");
 
+  // ── RECORDATORIOS ───────────────────────────────────────────────────────
+  // Conviven con los cheques en la MISMA pantalla: mismo calendario, misma
+  // lista (una pestaña propia) y el mismo aviso de Telegram. Mientras la
+  // migración no corra, `faltaMigracionRec` es `true`, la lista viene vacía y la
+  // pantalla se comporta EXACTAMENTE como la de cheques de siempre.
+  const [recordatorios, setRecordatorios] = useState<Recordatorio[]>(initialData.recordatorios);
+  const [faltaMigracionRec, setFaltaMigracionRec] = useState(initialData.faltaMigracionRecordatorios);
+  const [showRecForm, setShowRecForm] = useState(false);
+  const [editingRecId, setEditingRecId] = useState<string | null>(null);
+  const [recInitial, setRecInitial] = useState<RecordatorioFormValues>(recordatorioVacio);
+  const [savingRec, setSavingRec] = useState(false);
+  const [errorRec, setErrorRec] = useState<string | null>(null);
+
   // Valores con los que se abre el formulario. El estado de los campos vive
   // DENTRO de ChequeFormModal: acá solo se dice con qué arranca.
   const [formInitial, setFormInitial] = useState<ChequeFormValues>(chequeFormVacio);
@@ -303,6 +353,19 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
     finally { setLoading(false); loadingRef.current = false; }
   }, []);
 
+  const loadRecordatorios = useCallback(async () => {
+    try {
+      const res = await fetch("/api/recordatorios", { cache: "no-store" });
+      if (!res.ok) return; // 403 o error: se conserva lo que ya está en pantalla
+      const d = await res.json();
+      if (Array.isArray(d?.recordatorios)) setRecordatorios(d.recordatorios);
+      setFaltaMigracionRec(Boolean(d?.faltaMigracion));
+    } catch {
+      // Sin red: queda lo que ya se está viendo. No se vacía la lista — una
+      // lista vacía se leería como "no tenés ningún recordatorio".
+    }
+  }, []);
+
   // Skipear el primer mount cuando ya tenemos initialData del SSR (fresco);
   // solo refetch en mounts subsiguientes.
   const initialLoadRef = useRef(true);
@@ -313,7 +376,8 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       return;
     }
     loadCheques();
-  }, [authChecked, loadCheques, initialData.cheques]);
+    loadRecordatorios();
+  }, [authChecked, loadCheques, loadRecordatorios, initialData.cheques]);
 
   // ESC cierra el modal de "ver todos" los cheques del día
   useEffect(() => {
@@ -343,6 +407,23 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
     return "";
   }
 
+
+  // Los recordatorios que TOCAN hoy (uno mensual puesto en enero toca hoy si
+  // hoy es su día). Es lo que enciende el aviso azul de arriba.
+  const recordatoriosHoy = recordatorios.filter((r) => ocurreEn(r, today));
+
+  // Ordenados por la PRÓXIMA vez que tocan, no por la fecha guardada: un
+  // recordatorio mensual puesto en enero tiene que aparecer donde toca ahora,
+  // no hundido al principio de la lista. Los de una sola vez que ya pasaron van
+  // al final — no se borran solos (borrarlos es una decisión de la persona).
+  const recordatoriosOrdenados = recordatorios
+    .map((rec) => ({ rec, proxima: proximaOcurrencia(rec, today) }))
+    .sort((a, b) => {
+      if (a.proxima === b.proxima) return a.rec.fecha < b.rec.fecha ? -1 : 1;
+      if (a.proxima === null) return 1;
+      if (b.proxima === null) return -1;
+      return a.proxima < b.proxima ? -1 : 1;
+    });
 
   const pendientes = cheques.filter((c) => visualEstado(c) === "pendiente");
   const depositados = cheques.filter((c) => visualEstado(c) === "depositado");
@@ -428,6 +509,81 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); }
     setSaving(false);
+  }
+
+  function nuevoRecordatorio(fecha?: string) {
+    setRecInitial(recordatorioVacio(fecha));
+    setEditingRecId(null);
+    setErrorRec(null);
+    setShowRecForm(true);
+  }
+
+  function editarRecordatorio(r: Recordatorio) {
+    setRecInitial({
+      fecha: r.fecha,
+      texto: r.texto,
+      cliente: r.cliente,
+      // El vínculo guardado se conserva al abrir: resetearlo a "" habría
+      // desvinculado en silencio cualquier recordatorio que se editara y se
+      // volviera a guardar (el bug que Cheques ya pagó con `cliente_codigo`).
+      cliente_codigo: r.clienteCodigo ?? "",
+      repeticion: r.repeticion,
+    });
+    setEditingRecId(r.id);
+    setErrorRec(null);
+    setShowRecForm(true);
+  }
+
+  async function guardarRecordatorio(v: RecordatorioFormValues) {
+    setSavingRec(true);
+    setErrorRec(null);
+    try {
+      const url = editingRecId ? `/api/recordatorios/${editingRecId}` : "/api/recordatorios";
+      const res = await fetch(url, {
+        method: editingRecId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fecha: v.fecha,
+          texto: v.texto,
+          cliente: v.cliente,
+          cliente_codigo: v.cliente_codigo || null,
+          repeticion: v.repeticion,
+        }),
+      });
+      if (res.ok) {
+        const editaba = editingRecId;
+        setShowRecForm(false);
+        setEditingRecId(null);
+        await loadRecordatorios();
+        showToast(editaba ? "Listo, recordatorio actualizado" : "Listo, recordatorio guardado");
+      } else {
+        const err = await res.json().catch(() => null);
+        setErrorRec(err?.error || "No se pudo guardar. Intenta de nuevo.");
+      }
+    } catch {
+      setErrorRec("Error de conexión.");
+    }
+    setSavingRec(false);
+  }
+
+  async function borrarRecordatorio() {
+    if (!editingRecId) return;
+    setSavingRec(true);
+    try {
+      const res = await fetch(`/api/recordatorios/${editingRecId}`, { method: "DELETE" });
+      if (res.ok) {
+        setShowRecForm(false);
+        setEditingRecId(null);
+        await loadRecordatorios();
+        showToast("Recordatorio eliminado");
+      } else {
+        const err = await res.json().catch(() => null);
+        setErrorRec(err?.error || "No se pudo eliminar. Intenta de nuevo.");
+      }
+    } catch {
+      setErrorRec("Error de conexión.");
+    }
+    setSavingRec(false);
   }
 
   async function depositar(id: string) {
@@ -570,6 +726,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       case "vencen_hoy": return "vencen hoy";
       case "vencen_manana": return "vencen mañana";
       case "vencen_semana": return "vencen esta semana";
+      case "recordatorios": return "recordatorios";
       default: return "todos";
     }
   }
@@ -625,6 +782,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       case "vencen_hoy": return vencenHoy;
       case "vencen_manana": return vencenManana;
       case "vencen_semana": return vencenSemana;
+      // Los recordatorios NO son cheques y se dibujan aparte (ver abajo): esta
+      // pestaña no aporta ni un cheque a la lista.
+      case "recordatorios": return [];
       default: return cheques;
     }
   })();
@@ -641,27 +801,72 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   const searchAcrossTabs = searchLower.length > 0;
 
   return (
-    <PullToRefresh onRefresh={loadCheques}>
+    <PullToRefresh onRefresh={async () => { await Promise.all([loadCheques(), loadRecordatorios()]); }}>
     <div>
-      <AppHeader module="Cheques" />
+      <AppHeader module="Recordatorios" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-      {/* Sin título grande: "Cheques" ya lo dicen la barra sticky (celular) y
-          el breadcrumb (escritorio). Queda sr-only para no dejar la página sin
-          encabezado, y la fila pasa a `justify-end` para que Exportar y Nuevo
-          Cheque no se corran a la izquierda al quedar solos. */}
+      {/* Sin título grande: "Recordatorios" ya lo dicen la barra sticky
+          (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar la
+          página sin encabezado, y la fila pasa a `justify-end` para que los
+          botones no se corran a la izquierda al quedar solos. */}
       <div className="flex items-center justify-end mb-5">
-        <h1 className="sr-only">Cheques</h1>
+        <h1 className="sr-only">Recordatorios</h1>
         <div className="flex flex-wrap items-center gap-3">
           {/* min-h-[44px] + inline-flex: medían 35 y 41 px de alto en iPhone,
               por debajo del mínimo táctil de 44. El ancho ya sobraba. */}
-          <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 min-h-[44px] inline-flex items-center justify-center rounded-md active:bg-gray-100 transition-all">
-            ↓ Exportar {exportFilterLabel()}
+          {/* El Excel es de CHEQUES. En la pestaña de recordatorios no hay
+              ninguno que exportar, así que el botón no se ofrece en vez de
+              contestar "no hay cheques para exportar" después del toque. */}
+          {filter !== "recordatorios" && (
+            <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 min-h-[44px] inline-flex items-center justify-center rounded-md active:bg-gray-100 transition-all">
+              ↓ Exportar {exportFilterLabel()}
+            </button>
+          )}
+          {/* El recordatorio es lo NUEVO del módulo, así que tiene su propio
+              botón al lado del de siempre. Sin la migración corrida va apagado
+              y el título dice por qué — un botón que "guarda" y no guarda nada
+              es peor que uno apagado. */}
+          <button
+            onClick={() => nuevoRecordatorio()}
+            disabled={!isOnline || faltaMigracionRec}
+            title={faltaMigracionRec ? "Todavía no están activos" : !isOnline ? "Sin conexión" : undefined}
+            className="text-sm border border-blue-300 text-blue-700 bg-blue-50 px-4 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-blue-100 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            + Recordatorio
           </button>
           <button onClick={() => { resetForm(); setShowForm(true); }} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
             Nuevo Cheque
           </button>
         </div>
       </div>
+
+      {/* 🔴 ÁMBAR, NO ROJO. Rojo se lee como "algo se rompió", y no se rompió
+          nada: los cheques funcionan exactamente igual que siempre — los
+          recordatorios todavía no están encendidos. Y dice QUÉ archivo falta,
+          porque el que lo corre es Daniel a mano. */}
+      {faltaMigracionRec && (
+        <div className="w-full mb-3 flex items-start gap-2 sm:gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 sm:px-4 py-3 text-sm">
+          <span aria-hidden className="flex-shrink-0 mt-0.5">🔔</span>
+          <span>
+            Los recordatorios todavía no están activos. Pídele a Daniel que corra el archivo{" "}
+            <span className="font-mono text-xs">20260824120000_recordatorios.sql</span> en Supabase.
+            Mientras tanto, los cheques funcionan igual que siempre.
+          </span>
+        </div>
+      )}
+
+      {recordatoriosHoy.length > 0 && (
+        <button
+          onClick={() => setFilter("recordatorios")}
+          className="w-full mb-3 flex items-start sm:items-center gap-2 sm:gap-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-3 sm:px-4 py-3 text-sm font-medium hover:bg-blue-100 transition text-left"
+        >
+          <span aria-hidden className="flex-shrink-0 mt-0.5 sm:mt-0">🔔</span>
+          <span>
+            {recordatoriosHoy.length} recordatorio{recordatoriosHoy.length > 1 ? "s" : ""} para hoy
+            {recordatoriosHoy.length === 1 ? ` — ${recordatoriosHoy[0].texto}` : ""}
+          </span>
+        </button>
+      )}
 
       {/* Alert banners — CAMBIO 39 */}
       {vencenHoy.length > 0 && (
@@ -732,6 +937,18 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         error={error}
       />
 
+      <RecordatorioFormModal
+        open={showRecForm}
+        editingId={editingRecId}
+        initial={recInitial}
+        onClose={() => { setShowRecForm(false); setEditingRecId(null); setErrorRec(null); }}
+        onSave={guardarRecordatorio}
+        onDelete={borrarRecordatorio}
+        saving={savingRec}
+        isOnline={isOnline}
+        error={errorRec}
+      />
+
       {/* View toggle */}
       <div className="flex items-center gap-4 mb-6">
         {/* Medían 30 px de alto y quedaban a 4 px uno del otro: con el dedo se
@@ -750,6 +967,10 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             ["depositado", "Depositados", depositados.length, "Cheques ya depositados en el banco", true],
             ["vencido", "Vencidos", vencidos.length, "Pasó la fecha de depósito y no se han depositado", false],
             ["rebotado", "Rebotados", rebotados.length, "El banco rechazó el cheque", false],
+            // Pestaña propia y SIEMPRE visible (aunque sean 0): es la puerta
+            // para crear el primero. Mezclarlos dentro de "Pendientes" habría
+            // hecho mentir a ese contador, que cuenta cheques por depositar.
+            ["recordatorios", "Recordatorios", recordatorios.length, "Recordatorios sueltos, con o sin cliente", true],
           ] as [Filter, string, number, string, boolean][])
             .filter(([, , count, , alwaysShow]) => alwaysShow || count > 0)
             .map(([key, label, count, tooltip]) => (
@@ -822,6 +1043,13 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         }
         const totalMonth = monthCheques.reduce((s, c) => s + (Number(c.monto) || 0), 0);
 
+        // Día del mes → recordatorios que TOCAN ese día. Lo calcula el módulo
+        // puro, que es el mismo que decide qué manda el aviso de Telegram: si
+        // el calendario tuviera su propia cuenta, la pantalla y el aviso
+        // podrían decir días distintos del mismo recordatorio.
+        const recPorDia = ocurrenciasPorDiaDelMes(recordatorios, year, month + 1);
+        const totalRecMes = Object.values(recPorDia).reduce((n, l) => n + l.length, 0);
+
         const goToday = () => { const d = new Date(); setCalMonth({ year: d.getFullYear(), month: d.getMonth() }); };
         const goPrev = () => setCalMonth(p => p.month === 0 ? { year: p.year - 1, month: 11 } : { ...p, month: p.month - 1 });
         const goNext = () => setCalMonth(p => p.month === 11 ? { year: p.year + 1, month: 0 } : { ...p, month: p.month + 1 });
@@ -833,7 +1061,11 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         return (
           <div>
             {/* Nav */}
-            <div className="flex items-center justify-between mb-4">
+            {/* `flex-wrap`: a 390 px el contador del mes no entra al lado de
+                las flechas y empujaba la fila (main ya arrastraba 14 px por
+                eso; con el conteo de recordatorios iba a 32). Al envolver, el
+                contador baja de línea y el arrastre queda en 0. */}
+            <div className="flex flex-wrap items-center justify-between gap-y-1 mb-4">
               <div className="flex items-center gap-2">
                 <button onClick={goPrev} className="w-8 h-8 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">‹</button>
                 <h2 className="text-sm font-medium first-letter:uppercase w-40 text-center">{monthLabel}</h2>
@@ -842,11 +1074,17 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                     que crecer no empuje la fila del mes. */}
                 <button onClick={goToday} className="text-xs text-gray-400 hover:text-black transition ml-2 min-h-[44px] min-w-[44px] -my-1 inline-flex items-center justify-center">Hoy</button>
               </div>
-              <span className="text-xs text-gray-400">{monthCheques.length} cheques · ${fmt(totalMonth)}</span>
+              <span className="text-xs text-gray-400">
+                {monthCheques.length} cheques · ${fmt(totalMonth)}
+                {totalRecMes > 0 ? ` · ${totalRecMes} recordatorio${totalRecMes > 1 ? "s" : ""}` : ""}
+              </span>
             </div>
 
             {/* Desktop grid */}
-            <div className="hidden sm:block">
+            {/* `data-vista` FIJO: los candados buscan el layout por acá y no
+                por su clase de breakpoint — una clase se mueve y el chequeo
+                compara CERO, o sea que pasa en verde sin haber mirado nada. */}
+            <div className="hidden sm:block" data-vista="calendario-grid">
               <div className="grid grid-cols-7 text-center text-xs text-gray-500 uppercase tracking-wide mb-1">
                 {["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"].map(d => <div key={d} className="py-1">{d}</div>)}
               </div>
@@ -860,6 +1098,17 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                     <div key={day} className={`border-r border-b border-gray-200 min-h-[80px] p-1 ${isToday ? "bg-blue-50/60" : ""}`}>
                       <div className={`text-xs mb-0.5 ${isToday ? "font-bold text-blue-600" : "text-gray-400"}`}>{day}</div>
                       <div className="space-y-0.5">
+                        {/* Los recordatorios van PRIMERO en la casilla: son
+                            pocos (0-2 en un día normal) y son lo que Daniel
+                            viene a poner acá. Los cheques quedan debajo, con su
+                            "+N más" de siempre. */}
+                        {(recPorDia[day] ?? []).map(rec => (
+                          <RecordatorioCalendarioPill
+                            key={rec.id}
+                            rec={rec}
+                            onAbrir={() => { setCalPopover(null); editarRecordatorio(rec); }}
+                          />
+                        ))}
                         {dayCheques.slice(0, 3).map(c => {
                           const ve = visualEstado(c);
                           return (
@@ -888,15 +1137,35 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             </div>
 
             {/* Mobile: grouped by day */}
-            <div className="sm:hidden space-y-2">
-              {Array.from({ length: daysInMonth }, (_, i) => i + 1).filter(d => byDay[d]?.length).map(day => {
+            <div className="sm:hidden space-y-2" data-vista="calendario-lista">
+              {Array.from({ length: daysInMonth }, (_, i) => i + 1)
+                .filter(d => byDay[d]?.length || recPorDia[d]?.length)
+                .map(day => {
                 const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                 const isToday = dateStr === todayDate;
                 return (
                   <div key={day} className={`rounded-lg border p-3 ${isToday ? "border-blue-200 bg-blue-50/50" : "border-gray-200"}`}>
                     <div className={`text-xs mb-2 ${isToday ? "font-bold text-blue-600" : "text-gray-400"}`}>{fmtDate(dateStr)}{isToday ? " — Hoy" : ""}</div>
                     <div className="space-y-1.5">
-                      {byDay[day].map(c => {
+                      {(recPorDia[day] ?? []).map(rec => (
+                        <button
+                          key={rec.id}
+                          data-recordatorio-pill={rec.id}
+                          onClick={() => editarRecordatorio(rec)}
+                          className="w-full text-left flex items-start gap-2 rounded bg-blue-50 border border-blue-200 px-2 py-2 min-h-[44px]"
+                        >
+                          <span aria-hidden className="flex-shrink-0 mt-0.5">🔔</span>
+                          <span className="min-w-0">
+                            <span className="block text-sm text-blue-900 break-words">{rec.texto}</span>
+                            {(rec.cliente || rec.repeticion !== "una_vez") && (
+                              <span className="block text-xs text-blue-700/70">
+                                {[rec.cliente, rec.repeticion !== "una_vez" ? ETIQUETA_REPETICION[rec.repeticion] : ""].filter(Boolean).join(" · ")}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                      {(byDay[day] ?? []).map(c => {
                         const ve = visualEstado(c);
                         return (
                         <div key={c.id}>
@@ -929,10 +1198,13 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         );
       })()}
       {viewMode === "calendario" && !loading && (
-        <div className="flex items-center gap-4 text-xs text-gray-500 mt-3 px-1">
+        // 🩸 `flex-wrap`: con la cuarta entrada (el recordatorio) la leyenda no
+        // entra en una línea a 390 px y arrastraba la página. Envuelve.
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 mt-3 px-1">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Pendiente</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Vencido / Rebotado</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300" /> Depositado</span>
+          <span className="flex items-center gap-1"><span aria-hidden>🔔</span> Recordatorio</span>
         </div>
       )}
 
@@ -941,8 +1213,80 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         <p className="text-xs text-gray-400 mb-2">Mostrando coincidencias en todos los cheques (pendientes, depositados y vencidos).</p>
       )}
 
+      {/* ══ Lista de RECORDATORIOS ══
+          Misma lista, pestaña propia. La tarjeta es AZUL con campanita para que
+          se distinga de un cheque de un vistazo, incluso de reojo. */}
+      {viewMode === "lista" && filter === "recordatorios" && (
+        recordatoriosOrdenados.length === 0 ? (
+          <div className="flex flex-col items-center py-16 text-center">
+            <span aria-hidden className="text-3xl mb-3">🔔</span>
+            <p className="text-sm text-gray-500 mb-1">Todavía no hay recordatorios</p>
+            <p className="text-xs text-gray-400 mb-4">
+              Pon una fecha y qué hay que recordar. Ese día te llega el aviso por Telegram.
+            </p>
+            <button
+              onClick={() => nuevoRecordatorio()}
+              disabled={!isOnline || faltaMigracionRec}
+              title={faltaMigracionRec ? "Todavía no están activos" : undefined}
+              className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              + Nuevo recordatorio
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {recordatoriosOrdenados.map(({ rec, proxima }) => {
+              const esHoy = proxima === today;
+              const yaPaso = proxima === null;
+              return (
+                <button
+                  key={rec.id}
+                  data-recordatorio-fila={rec.id}
+                  onClick={() => editarRecordatorio(rec)}
+                  className={`w-full text-left border rounded-lg px-4 py-3 border-l-4 transition ${
+                    yaPaso
+                      ? "border-gray-200 border-l-gray-300 opacity-60 hover:bg-gray-50"
+                      : esHoy
+                        ? "border-blue-200 border-l-blue-500 bg-blue-50/50 hover:bg-blue-50"
+                        : "border-gray-200 border-l-blue-400 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex items-start gap-2 min-w-0">
+                      <span aria-hidden className="flex-shrink-0 mt-0.5">🔔</span>
+                      <span className="text-sm font-medium break-words" data-recordatorio-campo="texto">{rec.texto}</span>
+                    </span>
+                    {rec.repeticion !== "una_vez" && (
+                      <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                        {ETIQUETA_REPETICION[rec.repeticion]}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 ml-6">
+                    <span
+                      className={`text-xs ${esHoy ? "font-medium text-blue-700" : "text-gray-400"}`}
+                      data-recordatorio-campo="fecha"
+                    >
+                      {yaPaso ? `Fue el ${fmtDate(rec.fecha)}` : esHoy ? "HOY" : fmtDate(proxima)}
+                    </span>
+                    {rec.cliente && (
+                      <span className="text-xs text-gray-500">
+                        · {rec.cliente}
+                        {rec.clienteCodigo ? (
+                          <span className="ml-1 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1">{rec.clienteCodigo}</span>
+                        ) : null}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )
+      )}
+
       {/* Table */}
-      {viewMode === "lista" && (loading ? (
+      {viewMode === "lista" && filter !== "recordatorios" && (loading ? (
         <SkeletonTable rows={5} cols={6} />
       ) : filtered.length === 0 ? (
         cheques.length === 0 ? (
@@ -1205,6 +1549,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       {/* Day cheques modal — opened via "+N más" en calendario */}
       {dayChequesModal && (() => {
         const dayItems = cheques.filter(c => c.fecha_deposito === dayChequesModal);
+        // Los recordatorios de ESE día también entran acá: si no, el "+N más"
+        // de una casilla llena los escondería justo el día que hay que verlos.
+        const dayRecs = recordatorios.filter(r => ocurreEn(r, dayChequesModal));
         const close = () => setDayChequesModal(null);
         return (
           <div onClick={close} role="dialog" aria-modal="true" aria-label={`Cheques del ${fmtDate(dayChequesModal)}`} className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
@@ -1216,6 +1563,26 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                 </button>
               </header>
               <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+                {dayRecs.map(rec => (
+                  <button
+                    key={rec.id}
+                    data-recordatorio-pill={rec.id}
+                    onClick={() => { close(); editarRecordatorio(rec); }}
+                    className="w-full text-left px-5 py-3 bg-blue-50/60 hover:bg-blue-50 transition min-h-[44px]"
+                  >
+                    <span className="flex items-start gap-2">
+                      <span aria-hidden className="flex-shrink-0 mt-0.5">🔔</span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-blue-900 break-words">{rec.texto}</span>
+                        {(rec.cliente || rec.repeticion !== "una_vez") && (
+                          <span className="block text-xs text-blue-700/70 mt-0.5">
+                            {[rec.cliente, rec.repeticion !== "una_vez" ? ETIQUETA_REPETICION[rec.repeticion] : ""].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                  </button>
+                ))}
                 {dayItems.map(c => {
                   const ve = visualEstado(c);
                   const isPending = ve === "pendiente" || ve === "vencido";

@@ -47,12 +47,15 @@ export async function GET(req: NextRequest) {
   // de semana o sin cheques: es lo que ve el watchdog (si no, alertaría todos
   // los sábados) y ADEMÁS es el candado anti-duplicado que lee `yaAvisoHoy`.
   await recordCronHeartbeat(CRON_NAME);
-  if (r.count === 0) {
-    return NextResponse.json({ message: r.detail, count: 0 });
+  if (!r.sent) {
+    // Nada que mandar (ni cheques por vencer ni recordatorios), o Telegram
+    // falló. `detail` lo dice; el heartbeat ya quedó registrado arriba.
+    return NextResponse.json({ message: r.detail, count: r.count, recordatorios: r.recordatorios });
   }
   return NextResponse.json({
-    message: r.sent ? "Alerta enviada" : "Alerta no enviada (Telegram falló)",
+    message: "Alerta enviada",
     count: r.count,
+    recordatorios: r.recordatorios,
     sent: r.sent,
   });
 }

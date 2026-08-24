@@ -21,6 +21,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ─── Doble de Supabase: despacha por tabla ───────────────────────────────────
 const filasCheques = vi.fn();
 const heartbeat = vi.fn();
+/** Desde ago-2026 el MISMO cron lleva los recordatorios. Por defecto no hay
+ *  ninguno, así que los 20 casos de cheques miden exactamente lo de siempre. */
+const filasRecordatorios = vi.fn();
 /** Filtros que efectivamente recibió la consulta de cheques (para probar que se
  *  excluye lo depositado y lo borrado). */
 let filtros: Record<string, unknown> = {};
@@ -29,6 +32,19 @@ let rango: { desde?: string; hasta?: string } = {};
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
     from: (tabla: string) => {
+      if (tabla === "recordatorios") {
+        // Cadena mínima de `leerRecordatorios`: select → eq → order → order →
+        // range. Sin esta rama, la lectura de recordatorios caería en el doble
+        // de CHEQUES y contaminaría `filtros` — o sea que los candados de "el
+        // depositado no avisa" medirían otra cosa.
+        const rec = {
+          select: () => rec,
+          eq: () => rec,
+          order: () => rec,
+          range: async () => filasRecordatorios(),
+        } as Record<string, unknown>;
+        return rec;
+      }
       if (tabla === "cron_heartbeats") {
         const hb = {
           select: () => hb,
@@ -107,6 +123,7 @@ const cheque = (
 
 beforeEach(() => {
   filasCheques.mockReset();
+  filasRecordatorios.mockReset();
   heartbeat.mockReset();
   enviado.mockReset();
   filtros = {};
@@ -114,6 +131,7 @@ beforeEach(() => {
   // Por defecto: todavía no se avisó hoy.
   heartbeat.mockResolvedValue({ data: null, error: null });
   filasCheques.mockResolvedValue({ data: [], error: null });
+  filasRecordatorios.mockResolvedValue({ data: [], error: null, count: 0 });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
