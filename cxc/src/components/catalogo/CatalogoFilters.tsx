@@ -1,9 +1,33 @@
 "use client";
 
-// Filtros del catálogo (búsqueda + chips + orden), parametrizados por
+// Filtros del catálogo (búsqueda + chips + precio + orden), parametrizados por
 // MARCA_THEME: opciones de género/categoría y clases vienen del tema, y el
-// chip "2 bultos o más" + el select de precio son feature (filtroBultos /
-// filtroPrecio, hoy solo Tommy — ver lib/catalogo/filtros-extra).
+// chip "2 bultos o más" + los campos de precio son feature (filtroBultos /
+// filtroPrecio — ver lib/catalogo/filtros-extra).
+//
+// ── 💵 EL PRECIO SE ESCRIBE, YA NO SE ELIGE DE UN DESPLEGABLE (23-ago-2026) ──
+//
+// Daniel, textual: *"quita el dropdown del filtro de precio en los catalogos y
+// pon opcion de filtro exacto"*, y sobre el segundo campo: *"me gusto el
+// segundo campo de hasta, pero para facilidad del usuario siempre usara precio
+// exacto, asi que el hasta automaticamente se ponga el precio que puso el
+// usuario de desde para no hacer doble trabajo"*.
+//
+// De ahí sale el ESPEJO, que es el corazón de este control: hay dos campos
+// («desde» y «hasta») pero se escribe UNO solo. Mientras nadie haya tocado
+// «hasta» a mano, cada tecla de «desde» se copia ahí, y el filtro queda en
+// precio EXACTO sin trabajo extra. Tocar «hasta» apaga el espejo (ahí la
+// persona SÍ quiere un rango) y vaciarlo lo vuelve a encender.
+//
+// 🔴 Y DEBAJO SE LISTAN LOS PRECIOS QUE EXISTEN, que no es decoración: el
+// desplegable de tramos ("$23 a $31") tapaba que no todos los precios son
+// dólares enteros. MEDIDO contra producción el 23-ago-2026: Tommy tiene 41
+// precios distintos (entre ellos $17.50 y $19.50) y Calvin 15 (con $15.50).
+// Con precio exacto, quien escribe "17" en Tommy no encuentra NADA aunque haya
+// producto a $17.50, y concluye que la pantalla se rompió. La lista sale de los
+// productos que la pantalla YA tiene en memoria (ninguna consulta nueva), cada
+// precio es un botón que llena los dos campos de una, y si el precio escrito
+// no existe se dice en español simple ANTES de que parezca un error.
 //
 // ── LOS CHIPS «OFERTA / NUEVO / PRÓXIMAMENTE» SE FUERON (14-ago-2026) ──
 //
@@ -75,7 +99,11 @@
 
 import { useRef, useState } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
-import { BULTOS_CHIP_LABEL, PRECIO_RANGO_OPTIONS, type PrecioRango } from "@/lib/catalogo/filtros-extra";
+import {
+  BULTOS_CHIP_LABEL, PRECIO_VACIO, mensajeFiltroPrecio, parsePrecio,
+  type FiltroPrecio,
+} from "@/lib/catalogo/filtros-extra";
+import { fmtPrecio } from "@/lib/catalogo/precio";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
 
@@ -165,6 +193,178 @@ export function FiltroDesplegable({
   );
 }
 
+interface FiltroPrecioExactoProps {
+  precio: FiltroPrecio;
+  onChange: (precio: FiltroPrecio) => void;
+  /** Precios que existen en el catálogo, de menor a mayor y sin repetir. */
+  precios: number[];
+  chipLabel: string;
+  chipActive: string;
+  chipInactive: string;
+}
+
+/**
+ * Filtro de precio: DOS campos, pero el caso normal es escribir UNO.
+ *
+ * 🔴 EL ESPEJO. `espejo` arranca encendido y copia «desde» en «hasta» en cada
+ * tecla, así que escribir 25 filtra el precio EXACTO 25 sin tocar el segundo
+ * campo — que es lo que pidió Daniel para no hacer doble trabajo. Se apaga en
+ * cuanto alguien escribe algo en «hasta» (ahí quiere un rango de verdad) y se
+ * vuelve a encender al vaciarlo. El estado del espejo vive ACÁ y no en la URL:
+ * es una intención de tecleo, no un filtro — lo que se comparte por link son
+ * los dos números, que es lo que el otro necesita para ver lo mismo.
+ *
+ * Los campos son `type="text"` a propósito: `type="number"` descarta `$30` y
+ * `30,00` sin decir por qué, y esos son los dos formatos que de verdad se
+ * teclean. `inputMode="decimal"` igual saca el teclado numérico en el celular,
+ * y `parsePrecio` limpia el resto.
+ */
+/**
+ * Cuántos precios se pintan sin pedir permiso. MEDIDO contra producción
+ * (23-ago-2026, catálogo público): Tommy tiene 41 precios distintos y Calvin 15.
+ * Los 41 de Tommy son ~8 renglones de botones a 390 px — media pantalla de
+ * iPhone entre los filtros y el primer producto, que es exactamente el error
+ * que este módulo ya peleó dos veces ("un filtro que no se ve no existe" tiene
+ * un gemelo: un filtro que tapa el catálogo tampoco sirve).
+ *
+ * Así que se muestran los primeros y el resto queda a UN toque, con el número
+ * en el botón para que nadie tenga que adivinar cuántos faltan. Calvin (15)
+ * entra entero; Tommy muestra 16 y ofrece los 41.
+ */
+const PRECIOS_A_LA_VISTA = 16;
+
+export function FiltroPrecioExacto({
+  precio, onChange, precios, chipLabel, chipActive, chipInactive,
+}: FiltroPrecioExactoProps) {
+  // Si el filtro llega con «hasta» escrito (un link compartido con rango), el
+  // espejo nace apagado: copiarle encima el «desde» le rompería el link a quien
+  // lo abrió.
+  const [espejo, setEspejo] = useState(() => !precio.hasta.trim());
+  const [verTodos, setVerTodos] = useState(false);
+
+  // `placeholder:text-black/25`: con el color del chip, el "17.50" de ejemplo se
+  // leía como un precio YA puesto y hacía dudar de si el filtro estaba activo.
+  const campo = `${chipInactive} w-24 min-h-[44px] rounded-lg px-3 text-sm tabular-nums outline-none transition placeholder:text-black/25`;
+  const suave = "text-xs text-black/50";
+
+  function cambiarDesde(v: string) {
+    onChange({ desde: v, hasta: espejo ? v : precio.hasta });
+  }
+
+  function cambiarHasta(v: string) {
+    // Vaciar «hasta» reactiva el espejo: es la forma de volver al precio exacto
+    // sin tener que adivinar que hay que reescribir el «desde».
+    setEspejo(v.trim() === "");
+    onChange({ desde: precio.desde, hasta: v });
+  }
+
+  function elegirPrecio(p: number) {
+    setEspejo(true);
+    const txt = String(p);
+    onChange({ desde: txt, hasta: txt });
+  }
+
+  function quitar() {
+    setEspejo(true);
+    onChange(PRECIO_VACIO);
+  }
+
+  const hayAlgo = !!(precio.desde.trim() || precio.hasta.trim());
+  const aviso = mensajeFiltroPrecio(precio.desde, precio.hasta, precios);
+  // Un precio de la lista se pinta encendido cuando es EXACTAMENTE el filtro
+  // puesto: así se ve de un vistazo cuál está eligiendo, incluso si lo escribió
+  // a mano en vez de tocarlo.
+  const desdeNum = parsePrecio(precio.desde);
+  const hastaNum = parsePrecio(precio.hasta);
+  const exacto =
+    desdeNum !== null && hastaNum !== null && Math.round(desdeNum * 100) === Math.round(hastaNum * 100)
+      ? Math.round(desdeNum * 100)
+      : null;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={chipLabel}>Precio</span>
+        <label className="flex items-center gap-1.5">
+          <span className={suave}>desde</span>
+          <input
+            value={precio.desde}
+            onChange={e => cambiarDesde(e.target.value)}
+            inputMode="decimal"
+            type="text"
+            placeholder="17.50"
+            aria-label="Precio desde"
+            className={campo}
+          />
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span className={suave}>hasta</span>
+          <input
+            value={precio.hasta}
+            onChange={e => cambiarHasta(e.target.value)}
+            inputMode="decimal"
+            type="text"
+            placeholder="17.50"
+            aria-label="Precio hasta"
+            className={campo}
+          />
+        </label>
+        {hayAlgo && (
+          <button
+            type="button"
+            onClick={quitar}
+            className={`${chipInactive} min-h-[44px] px-3 rounded-full text-xs font-medium transition whitespace-nowrap`}
+          >
+            Quitar precio
+          </button>
+        )}
+      </div>
+
+      <p className={suave}>
+        Escribe un precio y ves solo ese. El «hasta» se llena solo.
+      </p>
+
+      {precios.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={suave}>Precios de este catálogo:</span>
+          {(verTodos ? precios : precios.slice(0, PRECIOS_A_LA_VISTA)).map(p => {
+            const encendido = exacto !== null && exacto === Math.round(p * 100);
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => elegirPrecio(p)}
+                aria-pressed={encendido}
+                className={`px-3 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] tabular-nums ${
+                  encendido ? chipActive : chipInactive
+                }`}
+              >
+                {fmtPrecio(p)}
+              </button>
+            );
+          })}
+          {precios.length > PRECIOS_A_LA_VISTA && (
+            <button
+              type="button"
+              onClick={() => setVerTodos(v => !v)}
+              aria-expanded={verTodos}
+              className={`${chipInactive} min-h-[44px] px-3 rounded-full text-xs font-medium transition whitespace-nowrap`}
+            >
+              {verTodos ? "Ver menos" : `Ver los ${precios.length} precios`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {aviso && (
+        <p role="status" className="text-xs text-amber-700">
+          {aviso}
+        </p>
+      )}
+    </div>
+  );
+}
+
 interface CatalogoFiltersProps {
   marca: MarcaUiKey;
   searchInput: string;
@@ -175,8 +375,13 @@ interface CatalogoFiltersProps {
   onCategoryChange: (v: string) => void;
   bultosFilter?: boolean;
   onBultosFilterChange?: (v: boolean) => void;
-  precioRango?: PrecioRango;
-  onPrecioRangoChange?: (v: PrecioRango) => void;
+  /** Los dos campos de precio, tal cual los escribió la persona. */
+  precio?: FiltroPrecio;
+  /** Se llama con los DOS campos a la vez: el espejo cambia los dos juntos. */
+  onPrecioChange?: (precio: FiltroPrecio) => void;
+  /** Precios que EXISTEN en este catálogo, ya derivados de los productos que
+   *  la pantalla tiene en memoria (`preciosDelCatalogo`). Nunca una consulta. */
+  preciosDisponibles?: number[];
   sortBy: string;
   onSortByChange: (v: string) => void;
   filteredCount: number;
@@ -194,7 +399,7 @@ export default function CatalogoFilters({
   gender, onGenderChange,
   category, onCategoryChange,
   bultosFilter = false, onBultosFilterChange,
-  precioRango = "", onPrecioRangoChange,
+  precio = PRECIO_VACIO, onPrecioChange, preciosDisponibles = [],
   sortBy, onSortByChange,
   filteredCount, onClearAll,
   genderOptions, categoryOptions,
@@ -209,12 +414,12 @@ export default function CatalogoFilters({
   const conGenero = grupoTieneOpciones(generoOpts);
   const conCategorias = theme.features.categoryChips && grupoTieneOpciones(categoriaOpts);
   const conBultos = theme.features.filtroBultos && !!onBultosFilterChange;
-  const conPrecio = theme.features.filtroPrecio && !!onPrecioRangoChange;
+  const conPrecio = theme.features.filtroPrecio && !!onPrecioChange;
 
   const hasActiveFilters = !!(
     searchInput || gender || category ||
     (conBultos && bultosFilter) ||
-    (conPrecio && precioRango)
+    (conPrecio && (precio.desde.trim() || precio.hasta.trim()))
   );
 
   return (
@@ -362,11 +567,27 @@ export default function CatalogoFilters({
 
       </div>
 
+      {/* ── PRECIO: dos campos, pero se escribe uno solo (ver cabecera) ──
+          Va en su propia franja y no metido en la fila de orden: son DOS campos
+          más una lista de precios reales, y apretados contra el select de orden
+          la fila no entraba en un iPhone. */}
+      {conPrecio && (
+        <FiltroPrecioExacto
+          precio={precio}
+          onChange={onPrecioChange!}
+          precios={preciosDisponibles}
+          chipLabel={f.chipLabel}
+          chipActive={f.chipActive}
+          chipInactive={f.chipInactive}
+        />
+      )}
+
       {/* Sort + count + clear.
-          `flex-wrap` en las dos filas: con DOS selects (Tommy: precio + orden)
-          la fila mide 404px y no entra en un iPhone de 390 — sin esto la
-          PÁGINA entera se iba en scroll horizontal (medido en Chrome a 390px).
-          En Reebok y Joybees no cambia nada: con un solo select nunca envuelve. */}
+          `flex-wrap` en las dos filas: se queda aunque el select de precio se
+          haya ido a su propia franja (23-ago-2026). Nació porque con DOS selects
+          la fila medía 404px contra 358 de ancho útil a 390px y la PÁGINA entera
+          se iba en scroll horizontal; sacarlo ahora sería confiar en que
+          "Limpiar filtros" + orden + conteo siempre entren, y no cuesta nada. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {hasActiveFilters && (
@@ -377,20 +598,6 @@ export default function CatalogoFilters({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
-          {/* Rango de precio POR PIEZA (feature filtroPrecio). Va en un select
-              y no en chips: 4 opciones no caben en la fila de chips en móvil. */}
-          {conPrecio && (
-            <select
-              value={precioRango}
-              onChange={e => onPrecioRangoChange!(e.target.value as PrecioRango)}
-              aria-label="Filtrar por precio"
-              className={f.sortSelect}
-            >
-              {PRECIO_RANGO_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          )}
           <select
             value={sortBy}
             onChange={e => onSortByChange(e.target.value)}

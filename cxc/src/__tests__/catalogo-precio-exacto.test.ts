@@ -1,0 +1,494 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Filtro de precio EXACTO del catálogo (23-ago-2026).
+//
+// Daniel, textual: *"quita el dropdown del filtro de precio en los catalogos y
+// pon opcion de filtro exacto"*. Y después, sobre el segundo campo: *"me gusto
+// el segundo campo de hasta, pero para facilidad del usuario siempre usara
+// precio exacto, asi que el hasta automaticamente se ponga el precio que puso
+// el usuario de desde para no hacer doble trabajo"*.
+//
+// 🔴 LOS CANDADOS DE ACÁ SON DE CONDUCTA, NO DE TEXTO. Pintan el componente
+// REAL, escriben en los campos y leen el DOM. Este repo ya pagó cuatro veces el
+// candado que se cumple con su propio comentario, así que el único barrido
+// estático que queda (el de "el desplegable no vuelve") BORRA LOS COMENTARIOS
+// ANTES de mirar.
+//
+// Lo que se defiende:
+//   1. el ESPEJO: escribir en «desde» llena «hasta» solo;
+//   2. tocar «hasta» APAGA el espejo, y vaciarlo lo vuelve a encender;
+//   3. los precios que EXISTEN se listan (medido 23-ago-2026: Tommy tiene 41
+//      precios distintos con $17.50 y $19.50 entre ellos, Calvin 15 con $15.50;
+//      quien escribe "17" en Tommy no encuentra nada aunque haya a $17.50);
+//   4. cuando el precio escrito no existe, se dice en español simple;
+//   5. 44 px de alto en todo lo que se toca y nada de texto bajo 12 px;
+//   6. Reebok y Joybees siguen SIN filtro de precio (paridad inversa).
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { describe, it, expect, vi } from "vitest";
+import { createElement, useState } from "react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { readFileSync } from "fs";
+import path from "path";
+
+vi.mock("@/lib/tommy-supabase-server", () => ({ tommyServer: {} }));
+vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
+
+import { MARCA_THEME, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import {
+  PRECIO_VACIO, parsePrecio, precioDeUrl, precioEnFiltro, preciosDelCatalogo,
+  preciosCercanos, mensajeFiltroPrecio, type FiltroPrecio,
+} from "@/lib/catalogo/filtros-extra";
+import CatalogoFilters from "@/components/catalogo/CatalogoFilters";
+
+const FUENTE = readFileSync(
+  path.join(process.cwd(), "src/components/catalogo/CatalogoFilters.tsx"),
+  "utf8",
+);
+
+// Los precios REALES de Tommy que hacen falta para entender el bug: dos con
+// medio dólar. Escribir "19" no cae en ninguno.
+const PRECIOS_TOMMY = [16, 17.5, 19, 19.5, 22, 28, 38, 52];
+
+// ── La regla pura ────────────────────────────────────────────────────────────
+describe("parsePrecio — tolera lo que de verdad se teclea", () => {
+  it("acepta el número pelado, con decimales y con medio dólar", () => {
+    expect(parsePrecio("30")).toBe(30);
+    expect(parsePrecio("17.5")).toBe(17.5);
+    expect(parsePrecio("17.50")).toBe(17.5);
+  });
+
+  it("acepta el signo de dólar y la coma decimal panameña", () => {
+    expect(parsePrecio("$30")).toBe(30);
+    expect(parsePrecio(" $ 30 ")).toBe(30);
+    expect(parsePrecio("30,00")).toBe(30);
+    expect(parsePrecio("17,5")).toBe(17.5);
+    expect(parsePrecio("1,234.50")).toBe(1234.5);
+  });
+
+  it("dice que no a lo que no es un precio (no lo convierte en 0)", () => {
+    for (const v of ["", "   ", "abc", "-5", "1.2.3", "30$x", null, undefined]) {
+      expect(parsePrecio(v as string | null), String(v)).toBeNull();
+    }
+  });
+
+  it("el precio de la URL es dato NO confiable: entra normalizado o no entra", () => {
+    expect(precioDeUrl("$30")).toBe("30");
+    expect(precioDeUrl("17,50")).toBe("17.5");
+    expect(precioDeUrl("<script>")).toBe("");
+    expect(precioDeUrl(null)).toBe("");
+  });
+});
+
+describe("precioEnFiltro — con los dos campos iguales es igualdad EXACTA", () => {
+  it("filtra el precio exacto, incluidos los de medio dólar", () => {
+    expect(precioEnFiltro(17.5, "17.5", "17.5")).toBe(true);
+    expect(precioEnFiltro(17.5, "17.50", "17.50")).toBe(true);
+    expect(precioEnFiltro(19.5, "17.5", "17.5")).toBe(false);
+    expect(precioEnFiltro(18, "17.5", "17.5")).toBe(false);
+    // El caso que hace fallar la comparación ingenua de floats.
+    expect(precioEnFiltro(0.1 + 0.2, "0.3", "0.3")).toBe(true);
+  });
+
+  it("sigue sirviendo de rango cuando la persona escribe los dos", () => {
+    expect(precioEnFiltro(22, "20", "30")).toBe(true);
+    expect(precioEnFiltro(20, "20", "30")).toBe(true);
+    expect(precioEnFiltro(30, "20", "30")).toBe(true);
+    expect(precioEnFiltro(19.99, "20", "30")).toBe(false);
+    expect(precioEnFiltro(30.01, "20", "30")).toBe(false);
+  });
+
+  it("con un solo campo hace tope: «desde» solo, «hasta» solo", () => {
+    expect(precioEnFiltro(52, "40", "")).toBe(true);
+    expect(precioEnFiltro(38, "40", "")).toBe(false);
+    expect(precioEnFiltro(17.5, "", "20")).toBe(true);
+    expect(precioEnFiltro(22, "", "20")).toBe(false);
+  });
+
+  it("campos vacíos o a medio escribir NO vacían la grilla (fail-open)", () => {
+    expect(precioEnFiltro(52, "", "")).toBe(true);
+    expect(precioEnFiltro(52, "$", "$")).toBe(true);
+    expect(precioEnFiltro(52, "abc", "")).toBe(true);
+    // Un precio roto en el dato tampoco esconde el producto.
+    expect(precioEnFiltro(null, "20", "20")).toBe(true);
+    expect(precioEnFiltro(Number.NaN, "20", "20")).toBe(true);
+  });
+});
+
+describe("preciosDelCatalogo — se derivan de los productos, sin repetir", () => {
+  it("junta, ordena y deduplica al centavo", () => {
+    expect(preciosDelCatalogo([28, 17.5, 28, 52, 17.5, 19.5])).toEqual([17.5, 19.5, 28, 52]);
+  });
+
+  it("descarta lo que no es un precio de verdad (0, null, roto)", () => {
+    expect(preciosDelCatalogo([0, null, undefined, Number.NaN, -3, 22])).toEqual([22]);
+  });
+
+  it("un catálogo vacío da lista vacía, no revienta", () => {
+    expect(preciosDelCatalogo([])).toEqual([]);
+  });
+});
+
+describe("mensajeFiltroPrecio — decirlo antes de que parezca un error", () => {
+  it("callado cuando no hay nada escrito o el precio SÍ existe", () => {
+    expect(mensajeFiltroPrecio("", "", PRECIOS_TOMMY)).toBeNull();
+    expect(mensajeFiltroPrecio("17.5", "17.5", PRECIOS_TOMMY)).toBeNull();
+    expect(mensajeFiltroPrecio("20", "30", PRECIOS_TOMMY)).toBeNull();
+  });
+
+  it("🔴 el caso medido: '17' en Tommy no existe y se ofrecen los vecinos", () => {
+    // Tommy tiene $16 y $17.50, pero NO $17: es el precio que se escribe solo
+    // y devuelve cero productos.
+    const m = mensajeFiltroPrecio("17", "17", PRECIOS_TOMMY);
+    expect(m).toBeTruthy();
+    expect(m).toContain("$17");
+    // No basta con avisar: hay que dar la salida, y en el formato de la casa
+    // (sin `.00`, sin redondear).
+    expect(m).toContain("$16");
+    expect(m).toContain("$17.50");
+  });
+
+  it("ofrece un solo vecino cuando el precio queda fuera de los extremos", () => {
+    expect(mensajeFiltroPrecio("5", "5", PRECIOS_TOMMY)).toContain("$16");
+    expect(mensajeFiltroPrecio("999", "999", PRECIOS_TOMMY)).toContain("$52");
+  });
+
+  it("con un rango vacío dice entre cuánto y cuánto, y dónde SÍ hay", () => {
+    const m = mensajeFiltroPrecio("40", "50", PRECIOS_TOMMY);
+    expect(m).toContain("$40");
+    expect(m).toContain("$50");
+    // Y dónde SÍ hay: los dos extremos reales del catálogo.
+    expect(m).toContain("$16");
+    expect(m).toContain("$52");
+  });
+
+  it("avisa si escribieron letras, en vez de filtrar en silencio", () => {
+    expect(mensajeFiltroPrecio("veinte", "", PRECIOS_TOMMY)).toContain("solo el número");
+  });
+
+  it("avisa si el «hasta» quedó por debajo del «desde»", () => {
+    expect(mensajeFiltroPrecio("50", "20", PRECIOS_TOMMY)).toContain("menor");
+  });
+
+  it("con el catálogo todavía sin cargar NO acusa a nadie", () => {
+    // Lista vacía = "todavía no sé", que es indistinguible de "no hay ninguno".
+    expect(mensajeFiltroPrecio("19", "19", [])).toBeNull();
+  });
+
+  it("preciosCercanos devuelve el de abajo y el de arriba", () => {
+    expect(preciosCercanos(17, PRECIOS_TOMMY)).toEqual({ abajo: 16, arriba: 17.5 });
+    expect(preciosCercanos(5, PRECIOS_TOMMY)).toEqual({ abajo: null, arriba: 16 });
+    expect(preciosCercanos(999, PRECIOS_TOMMY)).toEqual({ abajo: 52, arriba: null });
+  });
+});
+
+// ── 🔴 CANDADOS DE CONDUCTA: se pinta el componente y se escribe en él ────────
+
+/** El filtro de verdad, con estado, como lo usan las dos páginas. */
+function Pantalla(props: { marca?: MarcaUiKey; precios?: number[]; inicial?: FiltroPrecio }) {
+  const [precio, setPrecio] = useState<FiltroPrecio>(props.inicial ?? PRECIO_VACIO);
+  return createElement(CatalogoFilters, {
+    marca: props.marca ?? "tommy",
+    searchInput: "", onSearchChange: () => {},
+    gender: "", onGenderChange: () => {},
+    category: "", onCategoryChange: () => {},
+    bultosFilter: false, onBultosFilterChange: () => {},
+    precio, onPrecioChange: setPrecio,
+    preciosDisponibles: props.precios ?? PRECIOS_TOMMY,
+    sortBy: "relevancia", onSortByChange: () => {},
+    filteredCount: 0, onClearAll: () => {},
+  });
+}
+
+function campos() {
+  return {
+    desde: screen.getByLabelText("Precio desde") as HTMLInputElement,
+    hasta: screen.getByLabelText("Precio hasta") as HTMLInputElement,
+  };
+}
+
+describe("🔴 el espejo: se escribe UN precio y el «hasta» se llena solo", () => {
+  it("cada tecla de «desde» se copia en «hasta»", () => {
+    render(createElement(Pantalla, {}));
+    const { desde, hasta } = campos();
+    fireEvent.change(desde, { target: { value: "2" } });
+    expect(hasta.value).toBe("2");
+    fireEvent.change(desde, { target: { value: "22" } });
+    expect(desde.value).toBe("22");
+    expect(hasta.value).toBe("22");
+  });
+
+  it("funciona con los precios de medio dólar, que son los que rompían", () => {
+    render(createElement(Pantalla, {}));
+    const { desde, hasta } = campos();
+    fireEvent.change(desde, { target: { value: "17.50" } });
+    expect(hasta.value).toBe("17.50");
+    expect(precioEnFiltro(17.5, desde.value, hasta.value)).toBe(true);
+    expect(precioEnFiltro(19.5, desde.value, hasta.value)).toBe(false);
+  });
+
+  it("borrar el «desde» deja los dos campos vacíos (no queda un tope pegado)", () => {
+    render(createElement(Pantalla, {}));
+    const { desde, hasta } = campos();
+    fireEvent.change(desde, { target: { value: "22" } });
+    fireEvent.change(desde, { target: { value: "" } });
+    expect(hasta.value).toBe("");
+  });
+});
+
+describe("🔴 tocar «hasta» APAGA el espejo, y vaciarlo lo vuelve a encender", () => {
+  it("después de escribir en «hasta», el «desde» ya no lo pisa", () => {
+    render(createElement(Pantalla, {}));
+    const { desde, hasta } = campos();
+    fireEvent.change(desde, { target: { value: "22" } });
+    expect(hasta.value).toBe("22");
+    // La persona quiere un rango de verdad.
+    fireEvent.change(hasta, { target: { value: "52" } });
+    fireEvent.change(desde, { target: { value: "28" } });
+    expect(desde.value).toBe("28");
+    expect(hasta.value).toBe("52");
+  });
+
+  it("vaciar «hasta» reactiva el espejo: se vuelve al precio exacto solo", () => {
+    render(createElement(Pantalla, {}));
+    const { desde, hasta } = campos();
+    fireEvent.change(desde, { target: { value: "22" } });
+    fireEvent.change(hasta, { target: { value: "52" } });
+    fireEvent.change(hasta, { target: { value: "" } });
+    fireEvent.change(desde, { target: { value: "38" } });
+    expect(hasta.value).toBe("38");
+  });
+
+  it("un link con rango abre SIN espejo: no se le pisa el «hasta» a quien lo abrió", () => {
+    render(createElement(Pantalla, { inicial: { desde: "20", hasta: "30" } }));
+    const { desde, hasta } = campos();
+    fireEvent.change(desde, { target: { value: "25" } });
+    expect(hasta.value).toBe("30");
+  });
+});
+
+describe("🔴 los precios que EXISTEN están a la vista y se pueden tocar", () => {
+  it("se pinta un botón por cada precio del catálogo, en formato de la casa", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    for (const txt of ["$17.50", "$19.50", "$22", "$28", "$38", "$52"]) {
+      expect(within(container).getByRole("button", { name: txt }), txt).toBeTruthy();
+    }
+  });
+
+  it("tocar un precio llena los DOS campos y deja el filtro exacto", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    fireEvent.click(within(container).getByRole("button", { name: "$19.50" }));
+    const { desde, hasta } = campos();
+    expect(desde.value).toBe("19.5");
+    expect(hasta.value).toBe("19.5");
+    expect(precioEnFiltro(19.5, desde.value, hasta.value)).toBe(true);
+    expect(precioEnFiltro(17.5, desde.value, hasta.value)).toBe(false);
+  });
+
+  it("tocar un precio también reactiva el espejo si estaba apagado", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    const { desde, hasta } = campos();
+    fireEvent.change(hasta, { target: { value: "52" } });
+    fireEvent.click(within(container).getByRole("button", { name: "$22" }));
+    fireEvent.change(desde, { target: { value: "28" } });
+    expect(hasta.value).toBe("28");
+  });
+
+  it("con muchos precios no se tapa el catálogo: se muestran 16 y el resto a un toque", () => {
+    // Medido: Tommy tiene 41 precios distintos. Los 41 de una son ~8 renglones
+    // de botones a 390 px, o sea media pantalla de iPhone entre los filtros y
+    // el primer producto.
+    const muchos = Array.from({ length: 41 }, (_, i) => 10 + i);
+    const { container } = render(createElement(Pantalla, { precios: muchos }));
+    const ver = within(container).getByRole("button", { name: "Ver los 41 precios" });
+    expect(within(container).queryByRole("button", { name: "$25" })).toBeTruthy();  // el 16º
+    expect(within(container).queryByRole("button", { name: "$26" })).toBeNull();    // el 17º
+    fireEvent.click(ver);
+    expect(within(container).queryByRole("button", { name: "$50" })).toBeTruthy();  // el último
+    fireEvent.click(within(container).getByRole("button", { name: "Ver menos" }));
+    expect(within(container).queryByRole("button", { name: "$50" })).toBeNull();
+  });
+
+  it("cuando entran todos no se pinta el botón de «ver más»", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    expect(within(container).queryByRole("button", { name: /Ver los .* precios/ })).toBeNull();
+  });
+
+  it("sin precios cargados no se pinta la lista (no se inventa nada)", () => {
+    const { container } = render(createElement(Pantalla, { precios: [] }));
+    expect(container.textContent).not.toContain("Precios de este catálogo");
+  });
+});
+
+describe("🔴 el precio que no existe se avisa en pantalla, en español simple", () => {
+  it("escribir 17 en Tommy muestra el aviso con los precios más cercanos", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    fireEvent.change(campos().desde, { target: { value: "17" } });
+    const aviso = container.querySelector('[role="status"]');
+    expect(aviso).toBeTruthy();
+    expect(aviso!.textContent).toContain("$16");
+    expect(aviso!.textContent).toContain("$17.50");
+  });
+
+  it("no hay aviso cuando el precio sí existe", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    fireEvent.change(campos().desde, { target: { value: "19.50" } });
+    expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it("el aviso desaparece al corregir el precio", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    fireEvent.change(campos().desde, { target: { value: "17" } });
+    expect(container.querySelector('[role="status"]')).toBeTruthy();
+    fireEvent.change(campos().desde, { target: { value: "22" } });
+    expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it("«Quitar precio» apaga el filtro entero de un toque", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    fireEvent.change(campos().desde, { target: { value: "17" } });
+    fireEvent.click(within(container).getByRole("button", { name: "Quitar precio" }));
+    expect(campos().desde.value).toBe("");
+    expect(campos().hasta.value).toBe("");
+    expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+});
+
+describe("🔴 táctiles de 44 px y nada de texto por debajo de 12 px", () => {
+  it("los dos campos y todos los botones de precio miden 44 px de alto", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    fireEvent.change(campos().desde, { target: { value: "17" } });
+    const bloque = campos().desde.closest("div.space-y-1\\.5") as HTMLElement;
+    expect(bloque).toBeTruthy();
+    const tocables = bloque.querySelectorAll("input, button, select, a");
+    expect(tocables.length).toBeGreaterThan(6);
+    for (const el of tocables) {
+      expect(el.className, el.getAttribute("aria-label") ?? el.textContent ?? "")
+        .toContain("min-h-[44px]");
+    }
+  });
+
+  it("ningún texto del bloque baja de `text-xs` (12 px)", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    const bloque = campos().desde.closest("div.space-y-1\\.5") as HTMLElement;
+    for (const el of bloque.querySelectorAll("*")) {
+      const cls = (el.className || "").toString();
+      // Tailwind no tiene nada entre `text-xs` (12px) y `text-[10px]` & cía:
+      // lo que se prohíbe es cualquier tamaño arbitrario por debajo de 12.
+      expect(cls, cls).not.toMatch(/text-\[(\d|10|11)px\]/);
+      expect(cls, cls).not.toMatch(/text-\[0\.[0-6]\d*rem\]/);
+    }
+  });
+});
+
+// ── Paridad inversa: Reebok y Joybees siguen sin filtro de precio ────────────
+describe("Reebok y Joybees no estrenan filtro de precio por la puerta de atrás", () => {
+  it("los flags siguen apagados y el control no se pinta", () => {
+    for (const marca of ["reebok", "joybees"] as const) {
+      expect(MARCA_THEME[marca].features.filtroPrecio, marca).toBe(false);
+      const { container, unmount } = render(createElement(Pantalla, { marca }));
+      expect(container.textContent, marca).not.toContain("Precios de este catálogo");
+      expect(screen.queryByLabelText("Precio desde"), marca).toBeNull();
+      unmount();
+    }
+  });
+
+  it("Tommy y Calvin sí lo llevan", () => {
+    for (const marca of ["tommy", "calvin"] as const) {
+      expect(MARCA_THEME[marca].features.filtroPrecio, marca).toBe(true);
+      const { unmount } = render(createElement(Pantalla, { marca }));
+      expect(screen.getByLabelText("Precio desde"), marca).toBeTruthy();
+      unmount();
+    }
+  });
+});
+
+// ── Las dos vistas y los DOS pipelines ───────────────────────────────────────
+describe("no quedan dos comportamientos de precio en el sistema", () => {
+  const VISTAS: Record<string, string> = {
+    "catálogo público": "src/components/catalogo/CatalogoPublicoPage.tsx",
+    "catálogo interno": "src/components/catalogo/CatalogoVendedorPage.tsx",
+  };
+
+  /** El código VIVO de una vista, sin comentarios. */
+  function vivo(rel: string): string {
+    return readFileSync(path.join(process.cwd(), rel), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").filter(l => !l.trim().startsWith("//")).join("\n");
+  }
+
+  it("cada vista filtra en la lista PLANA y también en la AGRUPADA", () => {
+    // 🩸 Un `toContain` suelto no alcanza y esto se verificó por mutación:
+    // borrar el filtro del pipeline plano lo dejaba pasar, porque el del
+    // pipeline agrupado seguía ahí. Se cuentan los DOS.
+    for (const [nombre, rel] of Object.entries(VISTAS)) {
+      const veces = vivo(rel).split("precioEnFiltro(p.price, precio.desde, precio.hasta)").length - 1;
+      expect(veces, nombre).toBe(2);
+    }
+  });
+
+  it("cada vista deriva los precios de lo que YA tiene en memoria", () => {
+    for (const [nombre, rel] of Object.entries(VISTAS)) {
+      const code = vivo(rel);
+      expect(code, nombre).toContain("preciosDelCatalogo(products.map(p => p.price))");
+      expect(code, nombre).toContain("preciosDisponibles={preciosDisponibles}");
+      // Ninguna consulta nueva: los precios los manda Switch y esta pantalla
+      // solo filtra lo que ya cargó.
+      expect(code, nombre).not.toMatch(/fetch\([^)]*precio/i);
+    }
+  });
+
+  it("los dos precios viajan en la URL ya validados", () => {
+    for (const [nombre, rel] of Object.entries(VISTAS)) {
+      const code = vivo(rel);
+      expect(code, nombre).toContain('precioDeUrl(searchParams.get("precio_desde"))');
+      expect(code, nombre).toContain('precioDeUrl(searchParams.get("precio_hasta"))');
+      expect(code, nombre).toContain('params.set("precio_desde"');
+      expect(code, nombre).toContain('params.set("precio_hasta"');
+    }
+  });
+});
+
+// ── El desplegable de tramos no vuelve ───────────────────────────────────────
+describe("el desplegable de rangos de precio no vuelve", () => {
+  it("no queda ni el tipo, ni las opciones, ni el <select> en el código VIVO", () => {
+    // 🩸 Se BORRAN LOS COMENTARIOS PRIMERO: este archivo explica el retiro, y un
+    // barrido de texto crudo se cumpliría con su propia explicación.
+    const vivo = FUENTE
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").filter(l => !l.trim().startsWith("//")).join("\n");
+    expect(vivo).not.toContain("PRECIO_RANGO_OPTIONS");
+    expect(vivo).not.toContain("PrecioRango");
+    expect(vivo).not.toContain("Filtrar por precio");
+    expect(vivo).not.toContain("Precio: todos");
+  });
+
+  it("y no queda un solo llamador de la regla vieja en el código de la app", () => {
+    // Barrido SIN lista de archivos: caza también la pantalla que alguien
+    // escriba mañana. Los comentarios se borran antes, igual que arriba, y los
+    // tests quedan fuera porque este mismo archivo nombra la regla vieja para
+    // poder prohibirla.
+    const raiz = path.join(process.cwd(), "src");
+    const pendientes = [raiz];
+    const culpables: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = require("fs") as typeof import("fs");
+    while (pendientes.length) {
+      const dir = pendientes.pop()!;
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          if (e.name !== "__tests__") pendientes.push(full);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(e.name)) continue;
+        const vivo = fs.readFileSync(full, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .split("\n").filter(l => !l.trim().startsWith("//")).join("\n");
+        if (/\bprecioEnRango\b|\besPrecioRango\b|\bPRECIO_RANGO_OPTIONS\b/.test(vivo)) {
+          culpables.push(path.relative(raiz, full));
+        }
+      }
+    }
+    expect(culpables).toEqual([]);
+  });
+});

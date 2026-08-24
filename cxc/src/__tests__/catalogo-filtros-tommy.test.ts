@@ -1,9 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Filtros extra del catálogo — SOLO Tommy (25-jul-2026).
 //
-// Daniel aprobó dos filtros nuevos únicamente para Tommy Hilfiger:
+// Daniel aprobó dos filtros nuevos únicamente para Tommy Hilfiger (Calvin los
+// heredó después, por paridad):
 //   · chip "2 bultos o más" (24 pzas: el bulto de Tommy es 12),
-//   · select de rango de precio POR PIEZA, 4 tramos medidos.
+//   · filtro de precio POR PIEZA — nació como select de 4 tramos y desde el
+//     23-ago-2026 son DOS campos que se escriben (ver catalogo-precio-exacto).
 // Reebok y Joybees NO los llevan — "un filtro que casi no corta enreda al
 // vendedor": medido contra producción, en Joybees el corte de bultos deja pasar
 // el 92% y sus precios no tienen dispersión; en Reebok el precio es ~90%
@@ -28,8 +30,7 @@ vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
 
 import { MARCA_THEME, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import {
-  MIN_BULTOS, BULTOS_CHIP_LABEL, PRECIO_RANGO_OPTIONS,
-  cumpleBultosMinimos, precioEnRango, esPrecioRango, type PrecioRango,
+  MIN_BULTOS, BULTOS_CHIP_LABEL, PRECIO_VACIO, cumpleBultosMinimos,
 } from "@/lib/catalogo/filtros-extra";
 import CatalogoFilters from "@/components/catalogo/CatalogoFilters";
 
@@ -90,61 +91,11 @@ describe("cumpleBultosMinimos — 2 bultos completos", () => {
   });
 });
 
-// ── Tramos de precio ──────────────────────────────────────────────────────────
-describe("precioEnRango — 4 tramos por PIEZA", () => {
-  it("la primera opción del select es 'Precio: todos' y no filtra nada", () => {
-    expect(PRECIO_RANGO_OPTIONS[0]).toEqual({ value: "", label: "Precio: todos" });
-    expect(precioEnRango(999, "")).toBe(true);
-    expect(precioEnRango(null, "")).toBe(true);
-  });
-
-  it("los labels son los tramos aprobados", () => {
-    expect(PRECIO_RANGO_OPTIONS.map(o => o.label)).toEqual([
-      "Precio: todos", "Hasta $22", "$23 a $31", "$32 a $48", "$49 o más",
-    ]);
-  });
-
-  it("los cortes son continuos: cada precio cae en exactamente un tramo", () => {
-    const rangos = PRECIO_RANGO_OPTIONS.map(o => o.value).filter(v => v) as PrecioRango[];
-    for (const p of [0, 10, 17.5, 22, 22.99, 23, 28, 31, 31.99, 32, 40, 48, 48.5, 49, 54, 500]) {
-      const caen = rangos.filter(r => precioEnRango(p, r));
-      expect(caen.length, `precio ${p}`).toBe(1);
-    }
-  });
-
-  it("respeta los bordes medidos (huecos reales 31→34 y 48→50)", () => {
-    expect(precioEnRango(22, "hasta-22")).toBe(true);
-    expect(precioEnRango(23, "hasta-22")).toBe(false);
-    expect(precioEnRango(23, "23-31")).toBe(true);
-    expect(precioEnRango(31, "23-31")).toBe(true);
-    expect(precioEnRango(34, "32-48")).toBe(true);
-    expect(precioEnRango(48, "32-48")).toBe(true);
-    expect(precioEnRango(50, "49-mas")).toBe(true);
-    // Los únicos precios con centavos del catálogo (17.50 y 19.50) caen limpio.
-    expect(precioEnRango(17.5, "hasta-22")).toBe(true);
-    expect(precioEnRango(19.5, "hasta-22")).toBe(true);
-  });
-
-  it("reproduce el reparto medido: 180 / 113 / 107 / 90", () => {
-    const catalogo = [
-      ...Array(180).fill(17.5), ...Array(113).fill(28),
-      ...Array(107).fill(38), ...Array(90).fill(52),
-    ];
-    expect(catalogo.length).toBe(490);
-    expect(catalogo.filter(p => precioEnRango(p, "hasta-22")).length).toBe(180);
-    expect(catalogo.filter(p => precioEnRango(p, "23-31")).length).toBe(113);
-    expect(catalogo.filter(p => precioEnRango(p, "32-48")).length).toBe(107);
-    expect(catalogo.filter(p => precioEnRango(p, "49-mas")).length).toBe(90);
-  });
-
-  it("valida el rango que viene del query (dato no confiable)", () => {
-    expect(esPrecioRango("32-48")).toBe(true);
-    expect(esPrecioRango("")).toBe(true);
-    expect(esPrecioRango(null)).toBe(true);
-    expect(esPrecioRango("hasta-1000")).toBe(false);
-    expect(esPrecioRango("<script>")).toBe(false);
-  });
-});
+// ── Tramos de precio ────────────────────────────────────────────────────────
+// SE FUERON. El desplegable de 4 tramos lo retiró Daniel el 23-ago-2026 ("quita
+// el dropdown del filtro de precio... y pon opcion de filtro exacto"). Lo que
+// reemplaza a estos tests vive en `catalogo-precio-exacto.test.ts`, que además
+// prueba la CONDUCTA del espejo pintando el componente de verdad.
 
 // ── Flags por marca: Reebok y Joybees NO llevan los filtros nuevos ────────────
 describe("paridad inversa — los filtros nuevos son SOLO de Tommy", () => {
@@ -163,38 +114,41 @@ describe("paridad inversa — los filtros nuevos son SOLO de Tommy", () => {
     gender: "", onGenderChange: () => {},
     category: "", onCategoryChange: () => {},
     bultosFilter: false, onBultosFilterChange: () => {},
-    precioRango: "" as PrecioRango, onPrecioRangoChange: () => {},
+    precio: PRECIO_VACIO, onPrecioChange: () => {}, preciosDisponibles: [],
     sortBy: "relevancia", onSortByChange: () => {},
     filteredCount: 0, onClearAll: () => {},
   });
 
-  it("Tommy muestra el chip de bultos y el select de precio", () => {
+  it("Tommy muestra el chip de bultos y los DOS campos de precio", () => {
     render(createElement(CatalogoFilters, props("tommy")));
     // DOS chips: uno en la fila de píldoras (iPad/escritorio) y otro en la fila
     // de desplegables (celular) — ver `catalogo-filtros-movil.test.ts`. Solo uno
     // se ve a la vez; jsdom no aplica CSS, así que acá aparecen los dos.
     expect(screen.getAllByRole("button", { name: BULTOS_CHIP_LABEL })).toHaveLength(2);
-    expect(screen.getByLabelText("Filtrar por precio")).toBeTruthy();
-    for (const o of PRECIO_RANGO_OPTIONS) {
-      expect(screen.getByRole("option", { name: o.label })).toBeTruthy();
-    }
+    expect(screen.getByLabelText("Precio desde")).toBeTruthy();
+    expect(screen.getByLabelText("Precio hasta")).toBeTruthy();
+    // Y el desplegable de tramos NO vuelve.
+    expect(screen.queryByLabelText("Filtrar por precio")).toBeNull();
   });
 
   it("Reebok y Joybees NO los muestran, aunque les pasen los handlers", () => {
     for (const marca of ["reebok", "joybees"] as const) {
       const { unmount } = render(createElement(CatalogoFilters, props(marca)));
       expect(screen.queryByRole("button", { name: BULTOS_CHIP_LABEL }), marca).toBeNull();
+      expect(screen.queryByLabelText("Precio desde"), marca).toBeNull();
+      expect(screen.queryByLabelText("Precio hasta"), marca).toBeNull();
       expect(screen.queryByLabelText("Filtrar por precio"), marca).toBeNull();
-      expect(screen.queryByRole("option", { name: "Precio: todos" }), marca).toBeNull();
       // El orden sí sigue estando en las 3 marcas.
       expect(screen.getByRole("option", { name: "Ordenar: Relevancia" }), marca).toBeTruthy();
       unmount();
     }
   });
 
-  it("la fila de orden envuelve: con DOS selects no entra en un iPhone", () => {
-    // Medido en Chrome a 390px: precio + orden miden 404px contra 358 de ancho
-    // útil, y sin `flex-wrap` la PÁGINA entera se iba en scroll horizontal.
+  it("la fila de orden envuelve, aunque el select de precio ya no esté ahí", () => {
+    // Nació midiendo: precio + orden daban 404px contra 358 de ancho útil a
+    // 390px, y sin `flex-wrap` la PÁGINA entera se iba en scroll horizontal.
+    // El select de precio se fue a su propia franja el 23-ago-2026, pero el
+    // `flex-wrap` se queda: quitarlo sería apostar a que lo que queda entra.
     const filtros = src("src/components/catalogo/CatalogoFilters.tsx");
     expect(filtros).toContain('className="flex flex-wrap items-center justify-between gap-2"');
     expect(filtros).toContain('className="flex flex-wrap items-center justify-end gap-2 ml-auto"');
@@ -241,7 +195,7 @@ describe("paridad inversa — los filtros nuevos son SOLO de Tommy", () => {
 
 // ── Cableado: público e interno comparten el MISMO filtro ─────────────────────
 describe("las dos páginas aplican el filtro igual", () => {
-  it("ambas filtran con cumpleBultosMinimos + precioEnRango", () => {
+  it("ambas filtran con cumpleBultosMinimos + el filtro de precio", () => {
     for (const [nombre, code] of [["publico", PUBLICO], ["vendedor", VENDEDOR]] as const) {
       // `bulto_pzas` (Tommy) entra en el cálculo desde el 6-ago-2026: sus bultos
       // vienen de 8 o de 12 según el estilo. El filtro "2 bultos o más" tiene que
@@ -249,7 +203,7 @@ describe("las dos páginas aplican el filtro igual", () => {
       expect(code, nombre).toContain(
         "cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category, p.bulto_pzas))",
       );
-      expect(code, nombre).toContain("precioEnRango(p.price, precioRango)");
+      expect(code, nombre).toContain("precioEnFiltro(p.price, precio.desde, precio.hasta)");
     }
   });
 
@@ -271,14 +225,14 @@ describe("las dos páginas aplican el filtro igual", () => {
 
   it("ambas limpian los filtros nuevos en 'Limpiar filtros'", () => {
     for (const [nombre, code] of [["publico", PUBLICO], ["vendedor", VENDEDOR]] as const) {
-      expect(code, nombre).toContain('setBultosFilter(false); setPrecioRango("")');
+      expect(code, nombre).toContain("setBultosFilter(false); setPrecio(PRECIO_VACIO)");
     }
   });
 
   it("ambas los cablean detrás del flag de la marca", () => {
     for (const [nombre, code] of [["publico", PUBLICO], ["vendedor", VENDEDOR]] as const) {
       expect(code, nombre).toContain("theme.features.filtroBultos ? setBultosFilter : undefined");
-      expect(code, nombre).toContain("theme.features.filtroPrecio ? setPrecioRango : undefined");
+      expect(code, nombre).toContain("theme.features.filtroPrecio ? setPrecio : undefined");
     }
   });
 });
