@@ -113,7 +113,12 @@ export const ALL_MODULES: AppModule[] = [
   // redirige en next.config.js.
   { key: "gastos-contabilidad", label: "Gastos",         href: "/gastos-contabilidad", icon: Receipt,   roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "prestamos",      label: "Préstamos",         href: "/prestamos",        icon: HandCoins,     roles: ["admin", "contabilidad"],                     group: "operacion" },
-  { key: "cheques",        label: "Cheques",           href: "/cheques",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
+  // 🔴 La `key` sigue siendo `cheques` y NO puede cambiar: está en
+  // `role_permissions` y en `fg_users.modulos_override`, así que renombrarla
+  // rompe permisos y overrides sin comprar nada. Lo único que cambió es el LABEL
+  // (24-ago-2026): adentro conviven los cheques por depositar —intactos— y los
+  // recordatorios sueltos. Misma decisión que "Asistencia y Planilla".
+  { key: "cheques",        label: "Recordatorios",     href: "/cheques",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
 
   // Administración
   //

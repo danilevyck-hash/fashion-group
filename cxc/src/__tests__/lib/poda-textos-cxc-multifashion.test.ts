@@ -388,7 +388,10 @@ const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   { archivo: "app/productos/cargar/DepuradorClient.tsx", nombre: "Depurador de Productos" },
   { archivo: "app/productos/cargar/FacturasTiendaClient.tsx", nombre: "Facturas Tienda" },
   { archivo: "app/asistencia/AsistenciaClient.tsx", nombre: "Asistencia" },
-  { archivo: "app/cheques/ChequesClient.tsx", nombre: "Cheques" },
+  // El módulo pasó a llamarse "Recordatorios" el 24-ago-2026 (la key interna
+  // sigue siendo `cheques`). El invariante NO se aflojó: sigue habiendo UN solo
+  // h1 y sigue siendo `sr-only`; lo único que cambió es la palabra.
+  { archivo: "app/cheques/ChequesClient.tsx", nombre: "Recordatorios" },
   { archivo: "app/caja/components/PeriodoList.tsx", nombre: "Caja Menuda" },
   { archivo: "app/prestamos/PrestamosClient.tsx", nombre: "Préstamos" },
   { archivo: "app/marketing/components/InicioMarketing.tsx", nombre: "Marketing" },

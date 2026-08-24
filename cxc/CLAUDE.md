@@ -118,7 +118,85 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):
 - **Ventas y clientes:** Vista General, Ventas, CXC (`/admin`), Multifashion, Clientes/Directorio (`/clientes`), Proveedores, Catálogos (Reebok, Joybees, Tommy Hilfiger — las 3 marcas ENCENDIDAS: tarjeta en el hub /catalogos/marcas, catálogo público compartible /catalogo-publico/tommy y pedido público /pedido-tommy/[id] accesibles sin sesión, cron tommy-catalogo bajo vigilancia estricta)
-- **Operación:** Guías de Despacho, Packing Lists, **Asistencia y Planilla**, Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos** (2 pestañas: *Gastos* —Egresos Varios, fuente ÚNICA desde el 13-ago-2026— y *Saldos de banco*), Préstamos, Cheques
+- **Operación:** Guías de Despacho, Packing Lists, **Asistencia y Planilla**, Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos** (2 pestañas: *Gastos* —Egresos Varios, fuente ÚNICA desde el 13-ago-2026— y *Saldos de banco*), Préstamos, **Recordatorios** (era *Cheques*; la `key` sigue siendo `cheques` — ver abajo)
+
+> ## 🔴 CHEQUES PASÓ A LLAMARSE «RECORDATORIOS» — y adentro conviven los cheques y los recordatorios sueltos (24-ago-2026)
+>
+> Daniel, textual: ***"en el módulo de cheques, quisiera cambiarlo a recordatorios, ya que quisiera poner ahí en el calendario «recordar cobrar» y pongo la fecha así telegram me recuerda"***.
+>
+> Y a las tres preguntas del diseño: el cliente ***"sí, pero no debería de ser obligatorio"*** · la repetición ***"puede ser, no siempre"*** · quién lo ve ***"admin y secre"***.
+>
+> **Un recordatorio es FECHA + TEXTO.** El **cliente** (selector cerrado a `clientes_master`, D-XXX) y la **repetición** (una sola vez / cada semana / cada mes) son **OPCIONALES**, por decisión suya explícita.
+>
+> ### 🔴 LA `key` DEL MÓDULO NO CAMBIÓ: SIGUE SIENDO `cheques`
+>
+> Está en `role_permissions` y en `fg_users.modulos_override`, así que renombrarla rompe permisos y overrides **sin comprar nada**. Lo único que se movió es el LABEL visible — la misma decisión que "Asistencia" → "Asistencia y Planilla". Verificado contra el **candado de labels parecidos**, que no se aflojó: "Recordatorios" no comparte ninguna palabra que distinga con ninguna otra ficha del catálogo. En la búsqueda global el módulo se llama "Recordatorios" pero **conserva sus palabras viejas** (`cheque`, `deposito`, `posfechado`, `banco`): quien teclea "cheque" tiene que seguir llegando.
+>
+> ⚠️ **Los CHEQUES adentro se siguen llamando cheques.** "Nuevo Cheque", "N° Cheque", depositar / rebotar / re-depositar, el calendario, el Excel y los KPI **no se tocaron**. Lo que cambió de nombre es el MÓDULO, no el documento.
+>
+> ### 🔴 LOS 19 CHEQUES VIVOS NO SE MOVIERON — medido antes y después
+>
+> `19 filas · $279.396,12 · 13 depositado + 6 pendiente`, **idénticas fila por fila y campo por campo** (volcado completo de la tabla comparado con `diff`: 0 diferencias). La migración es **ADITIVA y no nombra `cheques` en ninguna sentencia** — hay candado.
+>
+> ### Qué se ve en pantalla
+>
+> - **CALENDARIO** — es lo que Daniel pidió: el recordatorio aparece en su día, **arriba** de los cheques, en una píldora **azul con 🔔**. En la casilla de escritorio y en la lista por día del celular. Un día lleno lo sigue mostrando: el modal de "+N más" lista **también** los recordatorios de ese día.
+> - **LISTA** — pestaña propia **"Recordatorios (N)"**, siempre visible (aunque sean 0: es la puerta para crear el primero). 🔴 **NO se mezclan dentro de "Pendientes"**: ese contador cuenta CHEQUES POR DEPOSITAR, o sea plata por cobrar, y mezclarlos lo haría mentir. Cada fila dice el texto, cuándo toca, el cliente con su chip `D-XXX` si lo hay, y "Cada mes"/"Cada semana" si se repite.
+> - **Aviso azul arriba** cuando hay alguno para HOY, sin abrir nada — con el texto del recordatorio si es uno solo.
+> - **El orden de la lista es por la PRÓXIMA vez que toca**, no por la fecha guardada: un mensual puesto en enero tiene que aparecer donde toca ahora, no hundido al principio. Los de una sola vez que ya pasaron van al final, en gris, y **no se borran solos** (borrarlos es decisión de la persona).
+> - **El botón "Exportar" no se ofrece en esa pestaña**: el Excel es de cheques y ahí no hay ninguno que exportar.
+>
+> ### 🔴 EL AVISO VA POR EL CRON QUE YA EXISTE — `cheques-alert`, 14:15 UTC (9:15 a.m. Panamá)
+>
+> **NO se creó un cron nuevo**, y no es economía de archivos: ese cron ya tiene resuelto lo difícil —la ventana del **día hábil anterior**, el **anti-duplicado por heartbeat** (`yaAvisoHoy`) y el fail-open— y todo eso vale igual para un recordatorio. Un cron nuevo habría estrenado una segunda ventana, un segundo candado anti-duplicado y una segunda entrada en `vercel.json` que mantener sincronizada. **Sigue habiendo 77 entradas de cron.**
+>
+> **UN SOLO MENSAJE por corrida**, canal 📊 NEGOCIO (`enviarNegocio`), con los **cheques PRIMERO** —es la plata, y es lo que se lee en la notificación del iPhone sin abrirla— y el bloque de recordatorios debajo:
+>
+> ```
+> ⚠️ 4 cheques por vencer — $24,205.45
+> • XTREME SHOES (Vistana International) $5,000.00 — HOY
+> …
+> WhatsApp seguimiento: +50766745522, +50766494096
+>
+> 🔔 4 recordatorios
+> • Recordar cobrar — HOY · City Mall Paso Canoa
+> • Revisar los cheques de la semana — HOY · cada semana
+> • Pagar el alquiler — HOY · cada mes
+> • Llamar al contador — MAÑANA
+> ```
+>
+> - **El texto de los cheques NO se tocó**: sin recordatorios el mensaje es byte por byte el de siempre, y hay candado. Sin cheques pero CON recordatorio, el aviso **sale igual** — antes la corrida se cortaba en "sin cheques por vencer" y nunca habría sonado.
+> - 🔴 **SE REUSA LA VENTANA DE LOS CHEQUES, y no es un capricho.** Si el recordatorio se avisara SOLO el día exacto, uno puesto para un **sábado no sonaría nunca**: sábado y domingo no hay corrida y el lunes ya pasó — el mismo hueco que la ventana de cheques vino a tapar. Corriendo un día hábil D la ventana es [D, próximo día hábil], y cada línea dice para cuándo es con la MISMA etiqueta (`HOY` · `MAÑANA` · `el lunes 31 ago`). Dos formas de decir la misma fecha en el mismo mensaje se leerían como un error.
+> - ⚠️ **Un fallo de recordatorios NO se lleva puesto el aviso de los cheques.** Si su lectura falla (o falta el DDL) queda anotado en el `detail` y el mensaje de cheques sale igual. **Al revés NO**: si la consulta de CHEQUES falla, la corrida sigue quedando `ok:false` como siempre.
+> - La recuperación in-process de `switch-reconciliacion` pasó a reportar el `detail` que arma `runChequesAlert` — rearmarlo con `r.count` haría que una corrida que solo mandó recordatorios se reportara como "sin cheques por vencer".
+> - Dry-run sin spamear el chat: `npx tsx scripts/_dryrun-cheques-aviso.ts`.
+>
+> ### 🔴 EL BORDE QUE SE SALTEA EN SILENCIO: el mensual del 31
+>
+> Un recordatorio mensual puesto el **31** no existe en abril, junio, septiembre, noviembre ni febrero. Sin la regla de fin de mes **no sonaría 5 meses del año y nadie se enteraría**. Cuando el día elegido no cabe, cae en el **ÚLTIMO día de ese mes** (28 de febrero, 29 en bisiesto). ⚠️ Y el defecto simétrico también tiene candado: un recordatorio del **15** nunca puede correrse al último día del mes. `semanal` = el mismo día de la semana; **ninguno suena antes de su propia fecha**.
+>
+> ### ⚠️ DDL ADITIVA PENDIENTE — la corre Daniel A MANO, y la app funciona ANTES
+>
+> **`supabase/migrations/20260824120000_recordatorios.sql`.** Patrón `cols-opcionales`, el de `20260813150000_asistencia_correcciones.sql`: sin la tabla, la pantalla muestra **los cheques exactamente igual que hoy**, el botón de crear va apagado y un aviso en **ÁMBAR** (no rojo: rojo se lee como "algo se rompió", y no se rompió nada) dice **qué archivo falta**. Verificado contra producción con la DDL SIN correr: `GET /api/recordatorios` → **200** con la lista vacía y el aviso; `POST` → **503** con el mismo texto; `POST` incompleto → **400 «Falta: la fecha y qué hay que recordar»**. Nada se escribió.
+> - 🔴 **La degradación solo ocurre cuando el error NOMBRA la tabla.** Tragarse cualquier error convertiría un permiso, un timeout o un RLS en "no hay recordatorios" — la peor forma de fallar: la pantalla se ve normal y vacía, y el aviso deja de sonar sin que nadie lo note. Hay candado con el error REAL de producción (`PGRST205`) y con los cuatro que NO deben confundirse.
+> - Soft delete (`deleted`), como el resto del módulo. RLS encendida sin políticas. La lectura **pagina con `leerTodoPaginado`**: `db-max-rows` = 1000 corta en silencio y acá un truncado se vería como «ese recordatorio no existe», o sea un aviso que deja de sonar sin un solo error.
+>
+> ### Medición
+>
+> **Los 3 anchos + el iPad ACOSTADO, en el navegador contra el build de producción, con los cheques REALES y CONTRA `origin/main`** (`BASE=… node scripts/_medir-recordatorios-anchos.mjs`, solo lectura): **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 textos bajo 12 px**, y **0 recortes y 0 táctiles bajo 44 px NUEVOS** en la lista de recordatorios (1 recorte y 2 táctiles en los cuatro anchos, **idénticos a main**).
+> - 🔴 **El calendario a 390 px MEJORÓ: main arrastra 14 px y esta rama 0.** La fila del mes y la leyenda pasaron a `flex-wrap` — main ya desbordaba y sumarle el conteo de recordatorios lo llevaba a 32. A 834 el arrastre queda en 15 px, **el mismo de main**.
+> - Los recortes del calendario (12 · 12 · 11) y sus 13 táctiles de 40 px son las píldoras de cheque y los `truncate` del nombre: **medidos IDÉNTICOS en main**. En la ventana, los 4 táctiles de más a 1024/1440 son los campos densos de `pointer:fine` (el patrón de la casa, igual que `ChequeFormModal`) — **a 390 px, donde está el dedo, son 2, exactamente los de main**.
+> - 🩸 **La píldora del calendario medía 22 px y el dedo no le acierta**: pasó a `min-h-[44px]`, y la casilla crece hacia abajo. Salió en la medición, no a ojo.
+> - 🩸 **TRES gotchas de medición, y los tres daban verde (o rojo) sin haber mirado nada.** (a) La ventana **NO va en un portal a `<body>`** —`ModalOverlay` se dibuja donde está en el árbol—, así que buscarla como hija directa de `<body>` devolvía siempre vacío y "no abrió" era del medidor. (b) **No alcanza con FIRMAR la cookie**: la página valida el `sessionToken` contra `user_sessions` y una sesión inventada redirige al login; el script toma prestada, **solo leyendo**, una sesión de admin que ya está viva. (c) Escapar el payload a mano (`replace(/"/g, …)`) dejaba dos barras por comilla, el string de JavaScript quedaba roto y **la página no hidrataba**: se mide con `JSON.stringify`.
+> - 🩸 **Los recordatorios se INYECTAN en el HTML del servidor, no en `/api/recordatorios`**: la pantalla los recibe en el primer render y el `fetch` del cliente solo corre en los mounts siguientes, así que interceptar la API habría medido una pantalla vacía. Los **cheques del mismo payload no se tocan**, y el navegador **aborta todo pedido que no sea GET**.
+>
+> ### Candados
+>
+> `src/__tests__/lib/recordatorios-cuando-tocan.test.ts` (56 — el motor de fechas con los 5 meses del borde, el texto del aviso, qué es obligatorio y qué no, la migración aditiva y que la `key` no cambie), **`recordatorios-permiso-y-aviso.test.ts` (28, CONDUCTA: llama a los handlers REALES con cookies FIRMADAS —403 rol por rol, derivado de `SYSTEM_ROLE_KEYS` para que un rol nuevo entre solo— y corre `runChequesAlert` de verdad leyendo el mensaje que salió)** y **`components/recordatorios-pantalla.test.tsx` (25, MONTA la pantalla real y toca los botones)**.
+> - 🔑 **`data-vista` FIJO en los dos layouts del calendario** (`calendario-grid` / `calendario-lista`). En jsdom no hay Tailwind, así que los dos se montan a la vez y un "¿hay alguna píldora?" deja que uno se caiga sin que nada se ponga rojo — **pasó: la mutación sobrevivió**. Es la misma lección del censo de anchos: buscar por la clase del breakpoint compara CERO en cuanto el corte se mueve.
+> - **Verificado por mutación, 29 de 29 cazadas** (`bash scripts/_mutar-candados-recordatorios.sh`): el mensual del 31 se saltea los meses cortos · cae en cualquier día cercano · suena antes de su fecha · los recordatorios se ponen antes de los cheques · sin cheques se corta la corrida · se cae el anti-duplicado · un fallo de recordatorios tumba el aviso de cheques · se manda un mensaje vacío · el cliente se vuelve obligatorio · el texto vacío se guarda (en el código y en el CHECK de la base) · una repetición inventada pasa · "sin vincular" se guarda como `""` · la ruta se abre a cualquier rol · la `key` se renombra · el label vuelve a "Cheques" · borrar deja de ser soft delete · la firma sale del cuerpo · cualquier error se lee como migración faltante · el GET revienta en 500 · el recordatorio no se dibuja en la grilla **ni** en la lista del calendario · se mezclan en el contador de Pendientes · el aviso va en rojo · el botón queda encendido sin la migración · el h1 vuelve a "Cheques" · la ventana guarda con el texto vacío · eliminar borra al primer toque · la migración toca `cheques`.
+> - 🩸 **La restauración del script va por COPIA, no con `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada, así que las mutaciones se apilarían y ninguna se probaría por separado. Y `probar()` **exige encontrar el resumen de vitest**: si la corrida muere, "0 fallos" se leería como "sobrevivió".
+
 
 > ## 🔴 EL MAYOR CONTABLE SE RETIRÓ — queda UNA sola fuente de gasto (13-ago-2026)
 >

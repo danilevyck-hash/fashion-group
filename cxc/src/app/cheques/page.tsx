@@ -3,8 +3,13 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/session-cookie";
 import ChequesClient, { type Cheque } from "./ChequesClient";
+import { leerRecordatorios } from "@/lib/recordatorios/server";
+import { RECORDATORIOS_ROLES } from "@/lib/recordatorios/roles";
 
-const CHEQUES_ROLES = ["admin", "secretaria"];
+// 🔴 Admin y secretaria — Daniel, a la pregunta de quién ve los recordatorios:
+// *"admin y secre"*. Es la MISMA pareja que ya entraba a los cheques, y se lee
+// de un solo lugar para que las dos no se puedan separar.
+const CHEQUES_ROLES = RECORDATORIOS_ROLES;
 
 export const dynamic = "force-dynamic";
 
@@ -55,5 +60,14 @@ export default async function ChequesPage() {
 
   const cheques = (chequesRes.data || []) as Cheque[];
 
-  return <ChequesClient initialData={{ cheques }} />;
+  // ⚠️ Sin la migración corrida esto devuelve la lista VACÍA y
+  // `faltaMigracion: true`: la pantalla dibuja los cheques exactamente igual que
+  // siempre y avisa en ámbar qué archivo falta. Nunca revienta la página.
+  const { recordatorios, faltaMigracion } = await leerRecordatorios();
+
+  return (
+    <ChequesClient
+      initialData={{ cheques, recordatorios, faltaMigracionRecordatorios: faltaMigracion }}
+    />
+  );
 }

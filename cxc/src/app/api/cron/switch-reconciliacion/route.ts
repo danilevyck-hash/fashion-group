@@ -362,7 +362,11 @@ const COLATERAL_CRONS: ColateralCron[] = [
     label: "cheques-alert",
     recover: async () => {
       const r = await runChequesAlert();
-      return { ok: r.ok, detail: r.ok ? (r.count === 0 ? "sin cheques por vencer" : `${r.count} por vencer`) : r.detail };
+      // `detail` ya viene armado por `runChequesAlert` y desde ago-2026 cuenta
+      // también los RECORDATORIOS que van en el mismo mensaje. Rearmarlo acá con
+      // `r.count` haría que una corrida que solo mandó recordatorios se
+      // reportara como "sin cheques por vencer" — o sea, mintiendo.
+      return { ok: r.ok, detail: r.detail };
     },
   },
   {
