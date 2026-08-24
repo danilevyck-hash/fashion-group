@@ -2,11 +2,16 @@
 // Filtros EXTRA del catálogo (25-jul-2026) — hoy Tommy Hilfiger y Calvin Klein.
 //
 // Dos filtros que Daniel aprobó por marca (flags `filtroBultos` y `filtroPrecio`
-// en MARCA_THEME.features). Reebok y Joybees NO los muestran: medido contra
-// producción, en Joybees el corte de bultos deja pasar el 92% y sus precios no
-// tienen dispersión ($10 y $13 son 3 de cada 4 productos); en Reebok el precio
-// es ~90% redundante con los chips de categoría que ya existen. Un filtro que
-// casi no corta enreda al vendedor.
+// en MARCA_THEME.features).
+//
+// ⚠️ Los dos flags YA NO van juntos, y desde el 24-ago-2026 tienen respuestas
+// distintas para Reebok y Joybees:
+//   · `filtroBultos` sigue en `false` ahí — el corte deja pasar el 92% del
+//     catálogo de Joybees y un filtro que casi no corta enreda al vendedor;
+//   · `filtroPrecio` pasó a `true` en las CUATRO marcas, por pedido explícito
+//     de Daniel (*"sí, pero no quiero botones de precios, solo escribirlo y ya,
+//     me explico?"*). Revirtió a propósito la medición de jul-2026 — el porqué
+//     completo está en `marcas-ui`, marca por marca.
 //
 // ── EL DESPLEGABLE DE TRAMOS SE FUE: AHORA SE ESCRIBE EL PRECIO (23-ago-2026) ─
 //
@@ -23,16 +28,20 @@
 // es la REGLA (qué pasa el filtro, qué precios existen, qué decirle a quien
 // escribió un precio que no existe), y la regla no depende de la pantalla.
 //
-// 🔴 POR QUÉ SE LISTAN LOS PRECIOS QUE EXISTEN, Y NO ES DECORACIÓN.
-// Los tramos viejos ("$23 a $31") escondían un dato que ahora queda a la vista:
-// no todos los precios son dólares enteros. MEDIDO contra producción el
-// 23-ago-2026, en el catálogo público: Tommy tiene 41 precios distintos —
-// $10 … $17.50 … $19.50 … $64 — y Calvin 15, con $15.50 entre los dos primeros.
-// Con precio exacto, quien escribe "17" en Tommy no encuentra NADA aunque haya
-// producto a $17.50, y concluye que la pantalla se rompió. Por eso el control
-// muestra los precios reales del catálogo (derivados de los productos que la
-// pantalla YA tiene en memoria — ninguna consulta nueva) y, cuando el precio
-// escrito no existe, lo dice en español simple ANTES de que parezca un error.
+// 🔴 POR QUÉ SE SIGUEN DERIVANDO LOS PRECIOS QUE EXISTEN, AUNQUE YA NO SE
+// PINTEN. Los tramos viejos ("$23 a $31") escondían un dato que con el precio
+// exacto queda al descubierto: no todos los precios son dólares enteros.
+// MEDIDO contra producción el 23-ago-2026, en el catálogo público: Tommy tiene
+// 41 precios distintos — $10 … $17.50 … $19.50 … $64 — y Calvin 15, con $15.50.
+// Quien escribe "17" en Tommy no encuentra NADA aunque haya producto a $17.50,
+// y concluye que la pantalla se rompió.
+//
+// El 24-ago Daniel retiró la FILA DE BOTONES que listaba esos precios (*"no
+// quiero botones de precios, solo escribirlo y ya"*), pero el AVISO se queda —
+// es texto y aparece solo cuando hace falta. `preciosDelCatalogo` sigue viva
+// porque de ella sale el "Lo más cercano: $16 o $17.50" de `mensajeFiltroPrecio`:
+// sin la lista, el aviso no tendría qué ofrecer. Se DERIVA de los productos que
+// la pantalla ya tiene en memoria — ninguna consulta nueva, ni antes ni ahora.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { fmtPrecio } from "@/lib/catalogo/precio";
@@ -108,6 +117,11 @@ export function precioEnFiltro(
 
 /**
  * Los precios que EXISTEN en el catálogo: sin repetir, de menor a mayor.
+ *
+ * ⚠️ Desde el 24-ago-2026 esto NO se pinta. Su único consumidor es
+ * `mensajeFiltroPrecio`, para poder decir cuál es el precio real más cercano
+ * al que alguien escribió. No es una lista de opciones: es la evidencia del
+ * aviso.
  *
  * Se DERIVA de los productos que la pantalla ya cargó. No hay —ni debe haber—
  * una consulta nueva para esto: los precios los manda Switch y esta pantalla

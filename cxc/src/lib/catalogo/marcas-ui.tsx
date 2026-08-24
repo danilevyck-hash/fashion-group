@@ -533,10 +533,21 @@ const REEBOK: MarcaTheme = {
     agrupacionPorModelo: false,
     inventarioPorTalla: true,
     categoryChips: true,
-    // Precio ~90% redundante con los chips de categoría que ya existen (medido
-    // 25-jul-2026) y el corte de bultos casi no corta: no se agregan.
+    // El corte de bultos casi no corta acá: no se agrega.
     filtroBultos: false,
-    filtroPrecio: false,
+    // 🔴 EL FILTRO DE PRECIO SE ENCIENDE — LO PIDIÓ DANIEL (24-ago-2026).
+    // Estuvo en `false` desde el 25-jul-2026 por una medición nuestra: el
+    // precio resultaba ~90% redundante con los chips de categoría que ya
+    // existen (Reebok tiene 24 precios distintos), y un filtro que casi no
+    // corta enreda al vendedor.
+    // Daniel lo revirtió a propósito. Textual, cuando se le propuso ponerlo
+    // también en Reebok y Joybees: *"sí, pero no quiero botones de precios,
+    // solo escribirlo y ya, me explico?"* — o sea que el "sí" es a las cuatro
+    // marcas, y lo único que retiró fue la fila de botones (ver
+    // CatalogoFilters). La medición no estaba mal: el DUEÑO decidió que
+    // poder escribir el precio vale igual, y esa decisión le corresponde.
+    // ⚠️ No volver a apagarlo por la medición de jul-2026: ya se ponderó.
+    filtroPrecio: true,
     roleClienteGuard: true,
     navInicioRequiereRol: true,
   },
@@ -855,10 +866,19 @@ const JOYBEES: MarcaTheme = {
     agrupacionPorModelo: true,
     inventarioPorTalla: false,
     categoryChips: false,
-    // El corte de bultos dejaría pasar el 92% del catálogo y los precios no
-    // tienen dispersión ($10 y $13 = 3 de cada 4 productos): no se agregan.
+    // El corte de bultos dejaría pasar el 92% del catálogo: no se agrega.
     filtroBultos: false,
-    filtroPrecio: false,
+    // 🔴 EL FILTRO DE PRECIO SE ENCIENDE — LO PIDIÓ DANIEL (24-ago-2026).
+    // Estuvo en `false` desde el 25-jul-2026 por una medición nuestra: los
+    // precios de Joybees casi no varían (7 distintos; $10 y $13 son 3 de cada
+    // 4 productos), así que el filtro casi no cortaba.
+    // Daniel lo revirtió a propósito. Textual: *"sí, pero no quiero botones de
+    // precios, solo escribirlo y ya, me explico?"* — el "sí" es a las cuatro
+    // marcas; lo único que retiró fue la fila de botones (ver CatalogoFilters).
+    // 🔑 Y acá vale la regla de la casa: **Joybees es espejo EXACTO de Reebok**,
+    // así que si Reebok lleva el campo, Joybees lo lleva igual.
+    // ⚠️ No volver a apagarlo por la medición de jul-2026: ya se ponderó.
+    filtroPrecio: true,
     roleClienteGuard: false,
     navInicioRequiereRol: false,
   },

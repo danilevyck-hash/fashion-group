@@ -13,15 +13,26 @@
 // estático que queda (el de "el desplegable no vuelve") BORRA LOS COMENTARIOS
 // ANTES de mirar.
 //
+// ── 🔴 LA FILA DE BOTONES SE FUE. EL AVISO SE QUEDA (24-ago-2026) ────────────
+//
+// Daniel, textual: *"sí, pero no quiero botones de precios, solo escribirlo y
+// ya, me explico?"*, y sobre cuántos precios mostrar en Tommy: *"ninguno"*.
+// Así que este archivo defiende AHORA lo contrario de lo que defendía ayer en
+// esa mitad: que NO se pinte ni un botón de precio, ni el "Ver los N precios".
+//
+// ⚠️ Y defiende, con la misma fuerza, que el AVISO de "ese precio no existe"
+// siga vivo: es otra cosa (texto, y solo cuando hace falta) y es lo que evita
+// que la pantalla parezca rota — Tommy tiene $17.50 pero NO $17.
+//
 // Lo que se defiende:
 //   1. el ESPEJO: escribir en «desde» llena «hasta» solo;
 //   2. tocar «hasta» APAGA el espejo, y vaciarlo lo vuelve a encender;
-//   3. los precios que EXISTEN se listan (medido 23-ago-2026: Tommy tiene 41
-//      precios distintos con $17.50 y $19.50 entre ellos, Calvin 15 con $15.50;
-//      quien escribe "17" en Tommy no encuentra nada aunque haya a $17.50);
-//   4. cuando el precio escrito no existe, se dice en español simple;
+//   3. NO hay fila de botones de precio, en ninguna marca ni con ningún dato;
+//   4. cuando el precio escrito no existe, se dice en español simple — y los
+//      precios reales se siguen DERIVANDO de lo que la pantalla tiene en
+//      memoria, sin consulta nueva, porque de ahí sale "lo más cercano";
 //   5. 44 px de alto en todo lo que se toca y nada de texto bajo 12 px;
-//   6. Reebok y Joybees siguen SIN filtro de precio (paridad inversa).
+//   6. las CUATRO marcas llevan el campo de precio (Daniel, 24-ago-2026).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi } from "vitest";
@@ -266,56 +277,50 @@ describe("🔴 tocar «hasta» APAGA el espejo, y vaciarlo lo vuelve a encender"
   });
 });
 
-describe("🔴 los precios que EXISTEN están a la vista y se pueden tocar", () => {
-  it("se pinta un botón por cada precio del catálogo, en formato de la casa", () => {
+describe("🔴 NO hay fila de botones de precio — solo el campo donde se escribe", () => {
+  /** Un botón cuyo texto ES un precio (`$22`, `$17.50`). */
+  function botonesDePrecio(container: HTMLElement): string[] {
+    return [...container.querySelectorAll("button")]
+      .map(b => (b.textContent || "").trim())
+      .filter(t => /^\$[\d.,]+$/.test(t));
+  }
+
+  it("con 8 precios cargados no se pinta NI UNO como botón", () => {
     const { container } = render(createElement(Pantalla, {}));
+    expect(botonesDePrecio(container)).toEqual([]);
     for (const txt of ["$17.50", "$19.50", "$22", "$28", "$38", "$52"]) {
-      expect(within(container).getByRole("button", { name: txt }), txt).toBeTruthy();
+      expect(within(container).queryByRole("button", { name: txt }), txt).toBeNull();
     }
   });
 
-  it("tocar un precio llena los DOS campos y deja el filtro exacto", () => {
-    const { container } = render(createElement(Pantalla, {}));
-    fireEvent.click(within(container).getByRole("button", { name: "$19.50" }));
-    const { desde, hasta } = campos();
-    expect(desde.value).toBe("19.5");
-    expect(hasta.value).toBe("19.5");
-    expect(precioEnFiltro(19.5, desde.value, hasta.value)).toBe(true);
-    expect(precioEnFiltro(17.5, desde.value, hasta.value)).toBe(false);
-  });
-
-  it("tocar un precio también reactiva el espejo si estaba apagado", () => {
-    const { container } = render(createElement(Pantalla, {}));
-    const { desde, hasta } = campos();
-    fireEvent.change(hasta, { target: { value: "52" } });
-    fireEvent.click(within(container).getByRole("button", { name: "$22" }));
-    fireEvent.change(desde, { target: { value: "28" } });
-    expect(hasta.value).toBe("28");
-  });
-
-  it("con muchos precios no se tapa el catálogo: se muestran 16 y el resto a un toque", () => {
-    // Medido: Tommy tiene 41 precios distintos. Los 41 de una son ~8 renglones
-    // de botones a 390 px, o sea media pantalla de iPhone entre los filtros y
-    // el primer producto.
+  it("con 41 precios (el caso de Tommy) tampoco, y no hay «Ver los N precios»", () => {
+    // Medido contra producción el 23-ago-2026: Tommy tiene 41 precios
+    // distintos. Antes se pintaban 16 y el resto detrás de un botón; Daniel,
+    // sobre cuántos mostrar: *"ninguno"*.
     const muchos = Array.from({ length: 41 }, (_, i) => 10 + i);
     const { container } = render(createElement(Pantalla, { precios: muchos }));
-    const ver = within(container).getByRole("button", { name: "Ver los 41 precios" });
-    expect(within(container).queryByRole("button", { name: "$25" })).toBeTruthy();  // el 16º
-    expect(within(container).queryByRole("button", { name: "$26" })).toBeNull();    // el 17º
-    fireEvent.click(ver);
-    expect(within(container).queryByRole("button", { name: "$50" })).toBeTruthy();  // el último
-    fireEvent.click(within(container).getByRole("button", { name: "Ver menos" }));
-    expect(within(container).queryByRole("button", { name: "$50" })).toBeNull();
-  });
-
-  it("cuando entran todos no se pinta el botón de «ver más»", () => {
-    const { container } = render(createElement(Pantalla, {}));
+    expect(botonesDePrecio(container)).toEqual([]);
     expect(within(container).queryByRole("button", { name: /Ver los .* precios/ })).toBeNull();
+    expect(within(container).queryByRole("button", { name: "Ver menos" })).toBeNull();
+    expect(container.textContent).not.toContain("Precios de este catálogo");
   });
 
-  it("sin precios cargados no se pinta la lista (no se inventa nada)", () => {
-    const { container } = render(createElement(Pantalla, { precios: [] }));
-    expect(container.textContent).not.toContain("Precios de este catálogo");
+  it("tampoco en las otras tres marcas", () => {
+    for (const marca of ["reebok", "joybees", "calvin"] as const) {
+      const { container, unmount } = render(createElement(Pantalla, { marca }));
+      expect(botonesDePrecio(container), marca).toEqual([]);
+      expect(container.textContent, marca).not.toContain("Precios de este catálogo");
+      unmount();
+    }
+  });
+
+  it("el único botón del bloque es «Quitar precio», y solo con algo escrito", () => {
+    const { container } = render(createElement(Pantalla, {}));
+    const bloque = () => campos().desde.closest("div.space-y-1\\.5") as HTMLElement;
+    expect([...bloque().querySelectorAll("button")]).toHaveLength(0);
+    fireEvent.change(campos().desde, { target: { value: "22" } });
+    const botones = [...bloque().querySelectorAll("button")].map(b => (b.textContent || "").trim());
+    expect(botones).toEqual(["Quitar precio"]);
   });
 });
 
@@ -354,13 +359,14 @@ describe("🔴 el precio que no existe se avisa en pantalla, en español simple"
 });
 
 describe("🔴 táctiles de 44 px y nada de texto por debajo de 12 px", () => {
-  it("los dos campos y todos los botones de precio miden 44 px de alto", () => {
+  it("los dos campos y «Quitar precio» miden 44 px de alto", () => {
     const { container } = render(createElement(Pantalla, {}));
     fireEvent.change(campos().desde, { target: { value: "17" } });
     const bloque = campos().desde.closest("div.space-y-1\\.5") as HTMLElement;
     expect(bloque).toBeTruthy();
     const tocables = bloque.querySelectorAll("input, button, select, a");
-    expect(tocables.length).toBeGreaterThan(6);
+    // Los dos campos + «Quitar precio». Ya no hay botones de precio (24-ago).
+    expect(tocables.length).toBe(3);
     for (const el of tocables) {
       expect(el.className, el.getAttribute("aria-label") ?? el.textContent ?? "")
         .toContain("min-h-[44px]");
@@ -380,23 +386,40 @@ describe("🔴 táctiles de 44 px y nada de texto por debajo de 12 px", () => {
   });
 });
 
-// ── Paridad inversa: Reebok y Joybees siguen sin filtro de precio ────────────
-describe("Reebok y Joybees no estrenan filtro de precio por la puerta de atrás", () => {
-  it("los flags siguen apagados y el control no se pinta", () => {
-    for (const marca of ["reebok", "joybees"] as const) {
-      expect(MARCA_THEME[marca].features.filtroPrecio, marca).toBe(false);
-      const { container, unmount } = render(createElement(Pantalla, { marca }));
-      expect(container.textContent, marca).not.toContain("Precios de este catálogo");
-      expect(screen.queryByLabelText("Precio desde"), marca).toBeNull();
+// ── 🔴 LAS CUATRO MARCAS LLEVAN EL CAMPO DE PRECIO (Daniel, 24-ago-2026) ─────
+//
+// Este bloque decía lo CONTRARIO hasta hoy: exigía `filtroPrecio === false` en
+// Reebok y Joybees, congelando una medición de jul-2026 (en Joybees los precios
+// casi no varían — 7 distintos; en Reebok el precio es ~90% redundante con la
+// categoría — 24 distintos). **Daniel la revirtió a propósito**: *"sí, pero no
+// quiero botones de precios, solo escribirlo y ya, me explico?"*.
+describe("el campo de precio está en las CUATRO marcas", () => {
+  it("los cuatro flags están encendidos y el control se pinta", () => {
+    for (const marca of ["reebok", "joybees", "tommy", "calvin"] as const) {
+      expect(MARCA_THEME[marca].features.filtroPrecio, marca).toBe(true);
+      const { unmount } = render(createElement(Pantalla, { marca }));
+      expect(screen.getByLabelText("Precio desde"), marca).toBeTruthy();
+      expect(screen.getByLabelText("Precio hasta"), marca).toBeTruthy();
       unmount();
     }
   });
 
-  it("Tommy y Calvin sí lo llevan", () => {
-    for (const marca of ["tommy", "calvin"] as const) {
-      expect(MARCA_THEME[marca].features.filtroPrecio, marca).toBe(true);
-      const { unmount } = render(createElement(Pantalla, { marca }));
-      expect(screen.getByLabelText("Precio desde"), marca).toBeTruthy();
+  it("🔑 Joybees es espejo EXACTO de Reebok en este flag", () => {
+    // Regla del repo: lo que lleva Reebok lo lleva Joybees, y nunca al revés.
+    expect(MARCA_THEME.joybees.features.filtroPrecio)
+      .toBe(MARCA_THEME.reebok.features.filtroPrecio);
+  });
+
+  it("el aviso de «ese precio no existe» funciona igual en Reebok y Joybees", () => {
+    // Es lo que evita que la pantalla parezca rota cuando el precio escrito no
+    // está en ESE catálogo. No es exclusivo de Tommy.
+    for (const marca of ["reebok", "joybees"] as const) {
+      const { container, unmount } = render(createElement(Pantalla, { marca }));
+      fireEvent.change(campos().desde, { target: { value: "17" } });
+      const aviso = container.querySelector('[role="status"]');
+      expect(aviso, marca).toBeTruthy();
+      expect(aviso!.textContent, marca).toContain("$16");
+      expect(aviso!.textContent, marca).toContain("$17.50");
       unmount();
     }
   });
@@ -427,12 +450,15 @@ describe("no quedan dos comportamientos de precio en el sistema", () => {
   });
 
   it("cada vista deriva los precios de lo que YA tiene en memoria", () => {
+    // 🔴 SIGUE HACIENDO FALTA AUNQUE LOS BOTONES SE HAYAN IDO (24-ago-2026):
+    // de esta lista sale el "Lo más cercano: $16 o $17.50" del aviso. Sin
+    // ella el aviso no tendría qué ofrecer y la pantalla volvería a parecer
+    // rota. Lo que NO puede aparecer nunca es una consulta para conseguirla:
+    // el precio lo manda Switch y esta pantalla solo filtra lo que ya cargó.
     for (const [nombre, rel] of Object.entries(VISTAS)) {
       const code = vivo(rel);
       expect(code, nombre).toContain("preciosDelCatalogo(products.map(p => p.price))");
       expect(code, nombre).toContain("preciosDisponibles={preciosDisponibles}");
-      // Ninguna consulta nueva: los precios los manda Switch y esta pantalla
-      // solo filtra lo que ya cargó.
       expect(code, nombre).not.toMatch(/fetch\([^)]*precio/i);
     }
   });
@@ -460,6 +486,24 @@ describe("el desplegable de rangos de precio no vuelve", () => {
     expect(vivo).not.toContain("PrecioRango");
     expect(vivo).not.toContain("Filtrar por precio");
     expect(vivo).not.toContain("Precio: todos");
+  });
+
+  it("ni la fila de botones de precio, ni la constante que decide cuántos mostrar", () => {
+    // 🩸 Mismo barrido, mismos comentarios borrados PRIMERO: este archivo y el
+    // componente explican el retiro nombrando justo lo retirado, y un barrido
+    // de texto crudo se cumpliría con su propia explicación (ya pasó 4 veces).
+    const vivo = FUENTE
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").filter(l => !l.trim().startsWith("//")).join("\n");
+    expect(vivo).not.toContain("PRECIOS_A_LA_VISTA");
+    expect(vivo).not.toContain("Precios de este catálogo");
+    expect(vivo).not.toContain("Ver los ");
+    expect(vivo).not.toContain("Ver menos");
+    expect(vivo).not.toContain("verTodos");
+    expect(vivo).not.toContain("elegirPrecio");
+    // Y el AVISO sigue vivo — es lo que NO se fue.
+    expect(vivo).toContain("mensajeFiltroPrecio");
+    expect(vivo).toContain('role="status"');
   });
 
   it("y no queda un solo llamador de la regla vieja en el código de la app", () => {
