@@ -351,6 +351,8 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
       totales: { venta: 500, costo: 300, margen: 0.4 },
       productos: [
         { descripcion: "CAMISA POLO", num_codigos: 2, cantidad: 10, venta: 500, costo: 300, margen: 0.4 },
+        // Devolución neta: sin unidades, el precio promedio NO existe.
+        { descripcion: "DEVUELTO", num_codigos: 1, cantidad: 0, venta: 40, costo: 20, margen: 0.5 },
       ],
     };
 
@@ -360,14 +362,44 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
 
     expect(s["A1"].v).toBe("FASHION GROUP — Productos · Fashion Wear · Jun 2026");
     expect(String(s["A2"].v)).toContain("Venta total $500.00");
+    // Las dos fechas: un Excel "Últimos 12 meses" guardado no dice cuáles fueron.
+    expect(String(s["A2"].v)).toContain("Del 2026-06-01 al 2026-06-30");
     expect(s[`A${HDR}`].v).toBe("Descripción");
     expect(s[`D${HDR}`].v).toBe("Venta");
     expect(s[`D${DATA}`].t).toBe("n");
     expect(s[`D${DATA}`].v).toBe(500);
     expect(s[`D${DATA}`].z).toBe(MONEY_FMT);
-    const tr = totalsRow(1);
+    // Precio prom.: número de verdad (no texto), con formato de plata.
+    expect(s[`E${HDR}`].v).toBe("Precio prom.");
+    expect(s[`E${DATA}`].t).toBe("n");
+    expect(s[`E${DATA}`].v).toBe(50);
+    expect(s[`E${DATA}`].z).toBe(MONEY_FMT);
+    // Sin unidades netas la celda va VACÍA: un 0 se promedia y se suma.
+    expect(s[`E${DATA + 1}`].v).toBe("");
+    expect(s[`F${HDR}`].v).toBe("Margen%");
+    const tr = totalsRow(2);
     expect(s[`A${tr}`].v).toBe("TOTAL");
     expect(s[`C${tr}`].v).toBe(10);
     expect(s[`D${tr}`].v).toBe(500);
+    expect(s[`E${tr}`].v).toBe(50); // 500 / 10
+  });
+
+  it("productos · el título y el archivo dicen QUÉ período es", async () => {
+    const base: ProductosResponse = {
+      empresa: "fashion_wear",
+      year: 2026,
+      mes: null,
+      periodo: "12m",
+      desde: "2025-09-01",
+      hasta: "2026-08-24",
+      meses: [],
+      totales: { venta: 500, costo: 300, margen: 0.4 },
+      productos: [
+        { descripcion: "CAMISA POLO", num_codigos: 2, cantidad: 10, venta: 500, costo: 300, margen: 0.4 },
+      ],
+    };
+    const s = roundtrip([{ name: "Productos", ws: await buildProductosSheet(base) }]).Sheets["Productos"];
+    expect(s["A1"].v).toBe("FASHION GROUP — Productos · Fashion Wear · Últimos 12 meses");
+    expect(String(s["A2"].v)).toContain("Del 2025-09-01 al 2026-08-24");
   });
 });
