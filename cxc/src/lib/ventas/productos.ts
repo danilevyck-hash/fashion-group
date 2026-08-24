@@ -6,6 +6,10 @@ import { MONTHS } from "./format";
 // El criterio de "la misma ventana un año antes" vive en UN solo lugar (ver la
 // nota de esa función). Acá se importa, no se copia.
 import { unAnioAntes } from "@/lib/multifashion/productos-ranking";
+// El día de negocio en Panamá (UTC−5 fijo) también vive en UN solo lugar. Acá se
+// importa, no se copia: este repo ya pagó dos veces por agrupar en UTC (el borde
+// de mes de Multifashion y el día de las marcaciones del reloj).
+import { hoyPanama } from "@/lib/fecha-panama";
 
 // Las 7 empresas con switch_articulo_diario poblado (todo el grupo menos
 // Confecciones Boston, que no se backfilleó). Default Fashion Wear.
@@ -66,7 +70,18 @@ export interface ProductosResponse {
 //
 // `ahora` es un parámetro con default para que el "hoy" del período y el del
 // comparativo salgan del MISMO instante (y para que los tests puedan pararse en
-// un borde de año). El cálculo no cambió ni un carácter.
+// un borde de año).
+//
+// 🩸 ESE INSTANTE SE LEE EN HORA DE PANAMÁ, NO EN UTC. Panamá es UTC−5 fijo (sin
+// horario de verano), así que entre las 7 de la tarde y la medianoche de Panamá
+// —00:00 a 05:00 UTC del día siguiente— el reloj UTC ya está en MAÑANA: el
+// 25-ago-2026 a las 00:30 UTC son las 19:30 del 24 en Panamá, y «Año en curso»
+// terminaba el 2026-08-25, un día que todavía no pasó. En la MISMA pantalla y a
+// la misma hora, «Últimos 12 meses» terminaba el 24 (ese ya cortaba en Panamá).
+// El caso simétrico duele más: el 1-ene a las 02:00 UTC en Panamá todavía es el
+// 31-dic, así que el año que corre es el VIEJO. El arreglo es que el instante se
+// resuelva en Panamá; las dos puntas (período y comparativo) siguen naciendo del
+// mismo `ahora` y no se pueden separar ni un día.
 export function productosRange(
   year: number,
   mes: number | null,
@@ -78,7 +93,7 @@ export function productosRange(
     return { desde: `${year}-${pad(mes)}-01`, hasta: `${year}-${pad(mes)}-${pad(lastDay)}` };
   }
   const yearEnd = `${year}-12-31`;
-  const todayStr = ahora.toISOString().slice(0, 10);
+  const todayStr = hoyPanama(ahora);
   return { desde: `${year}-01-01`, hasta: todayStr < yearEnd ? todayStr : yearEnd };
 }
 
@@ -112,14 +127,6 @@ export function esProductosPeriodo(v: string): v is ProductosPeriodo {
   return (PRODUCTOS_PERIODO_KEYS as readonly string[]).includes(v);
 }
 
-/** Panamá = UTC-5 fijo, todo el año (CLAUDE.md § Base de datos). */
-const PANAMA_OFFSET_MS = 5 * 60 * 60 * 1000;
-
-/** Día de calendario en Panamá para un instante dado. */
-export function diaPanama(ahora: Date): string {
-  return new Date(ahora.getTime() - PANAMA_OFFSET_MS).toISOString().slice(0, 10);
-}
-
 /**
  * Rango del período elegido.
  *
@@ -137,7 +144,7 @@ export function productosRangoPeriodo(
 ): { desde: string; hasta: string } {
   if (periodo === "ytd") return productosRange(year, mes, ahora);
 
-  const hoy = diaPanama(ahora);
+  const hoy = hoyPanama(ahora);
   const anio = Number(hoy.slice(0, 4));
   const mesHoy = Number(hoy.slice(5, 7));
 
@@ -208,11 +215,11 @@ export function periodoLabel(
 ): string {
   if (periodo === "6m") return "Últimos 6 meses";
   if (periodo === "12m") return "Últimos 12 meses";
-  if (periodo === "anio_pasado") return `Año ${Number(diaPanama(ahora).slice(0, 4)) - 1}`;
+  if (periodo === "anio_pasado") return `Año ${Number(hoyPanama(ahora).slice(0, 4)) - 1}`;
   if (mes) return `${MONTHS[mes - 1]} ${year}`;
   // Un año todavía abierto es "el año en curso"; uno cerrado es el año entero.
   // "YTD" era jerga: Daniel lo nombra "año en curso".
-  return year >= Number(diaPanama(ahora).slice(0, 4)) ? "Año en curso" : `Año ${year}`;
+  return year >= Number(hoyPanama(ahora).slice(0, 4)) ? "Año en curso" : `Año ${year}`;
 }
 
 /** Trozo del nombre de archivo del Excel. */

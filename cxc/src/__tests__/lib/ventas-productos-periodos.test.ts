@@ -4,7 +4,7 @@
 // borde de mes o de año aparece un día de cada 30 (o uno de cada 365) y ninguna
 // corrida de tests lo caza.
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   productosRange,
   productosRangoPeriodo,
@@ -14,21 +14,133 @@ import {
   precioPromedio,
   fmtPrecioProm,
   esProductosPeriodo,
-  diaPanama,
 } from "@/lib/ventas/productos";
 // El criterio de "la misma ventana un año antes" vive en Multifashion y se
 // REUSA; el test lo importa de ahí para no reescribirlo.
 import { unAnioAntes } from "@/lib/multifashion/productos-ranking";
+// El día de negocio en Panamá vive en `fecha-panama` y se REUSA. Si acá se
+// colara una tercera cuenta de fechas, este import dejaría de ser el que manda.
+import { hoyPanama } from "@/lib/fecha-panama";
 
 // 24-ago-2026, 03:00 UTC → en Panamá (UTC-5) todavía es el 23.
 const MADRUGADA = new Date("2026-08-24T03:00:00Z");
 // 24-ago-2026, 18:00 UTC → 13:00 en Panamá, mismo día.
 const TARDE = new Date("2026-08-24T18:00:00Z");
+// 24-ago-2026 a las 23:30 UTC son las 18:30 del 24 en Panamá: TODAVÍA NO cruzó.
+// Es el último instante del día en que UTC y Panamá coinciden, y por eso es el
+// ancla de "acá no se movió nada".
+const NOCHE = new Date("2026-08-24T23:30:00Z");
+// 🔴 EL BORDE, donde mordía: 25-ago-2026 a las 00:30 UTC son las 19:30 del 24 en
+// Panamá. El reloj UTC ya dice 25; el día de NEGOCIO todavía es el 24. Es la
+// ventana de 7 p.m. a medianoche de Panamá = 00:00–05:00 UTC del día siguiente.
+const BORDE = new Date("2026-08-25T00:30:00Z");
+// 🔴 EL BORDE SIMÉTRICO, el caro: 1-ene-2026 a las 02:00 UTC en Panamá todavía
+// es el 31-dic-2025. El «Año en curso» tiene que seguir siendo el año VIEJO.
+const ANIO_NUEVO = new Date("2026-01-01T02:00:00Z");
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("el día es el de PANAMÁ, no el del servidor", () => {
   it("a las 03:00 UTC en Panamá todavía es el día anterior", () => {
-    expect(diaPanama(MADRUGADA)).toBe("2026-08-23");
-    expect(diaPanama(TARDE)).toBe("2026-08-24");
+    expect(hoyPanama(MADRUGADA)).toBe("2026-08-23");
+    expect(hoyPanama(TARDE)).toBe("2026-08-24");
+  });
+
+  it("🩸 entre las 7 p.m. y la medianoche de Panamá el día UTC ya es el de MAÑANA", () => {
+    // A las 18:30 de Panamá todavía coinciden.
+    expect(NOCHE.toISOString().slice(0, 10)).toBe("2026-08-24");
+    expect(hoyPanama(NOCHE)).toBe("2026-08-24");
+    // A las 19:30 de Panamá, no: el reloj UTC ya pasó al 25.
+    expect(BORDE.toISOString().slice(0, 10)).toBe("2026-08-25"); // lo que decía el reloj UTC
+    expect(hoyPanama(BORDE)).toBe("2026-08-24");                 // el día de negocio real
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL BORDE HORARIO DE PANAMÁ (UTC−5 fijo, sin horario de verano).
+//
+// `productosRange` leía el reloj con `new Date().toISOString()` — UTC pelado.
+// Entre las 7 de la tarde y la medianoche de Panamá eso adelanta el día, y
+// «Año en curso» terminaba en un día QUE TODAVÍA NO PASÓ.
+//
+// Los tests se paran en fechas FIJAS (`vi.setSystemTime` para el camino sin
+// argumento, instantes literales para el camino con `ahora`): con `new Date()`
+// este borde aparece 5 horas de cada 24 y una corrida de tests al mediodía lo
+// deja pasar siempre.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 el borde: entre las 7 p.m. y la medianoche de Panamá", () => {
+  it("a las 18:30 de Panamá (23:30 UTC) NADA se mueve — el ancla", () => {
+    // Todavía no cruzó: acá el arreglo no puede cambiar un solo día. Si este
+    // test se moviera, el arreglo estaría corriendo fechas que no debe.
+    expect(productosRange(2026, null, NOCHE)).toEqual({
+      desde: "2026-01-01",
+      hasta: "2026-08-24",
+    });
+    expect(productosRangoPeriodo("12m", 2026, null, NOCHE).hasta).toBe("2026-08-24");
+    expect(productosRangoComparativo("ytd", 2026, null, NOCHE).hasta).toBe("2025-08-24");
+  });
+
+  it("🩸 a las 19:30 de Panamá (00:30 UTC del 25) «Año en curso» NO termina un día que todavía no pasó", () => {
+    // Con el reloj UTC daba `hasta: "2026-08-25"` — un día del futuro.
+    expect(productosRange(2026, null, BORDE)).toEqual({
+      desde: "2026-01-01",
+      hasta: "2026-08-24",
+    });
+    expect(productosRangoPeriodo("ytd", 2026, null, BORDE).hasta).toBe("2026-08-24");
+    // La madrugada UTC es la misma ventana vista desde el otro lado: 03:00 UTC
+    // del 24 son las 22:00 del 23 en Panamá.
+    expect(productosRange(2026, null, MADRUGADA).hasta).toBe("2026-08-23");
+  });
+
+  it("el comparativo se mueve CON el período, no por su cuenta", () => {
+    // Las dos puntas nacen del mismo `ahora`: si una se resolviera en UTC y la
+    // otra en Panamá, se separarían un día justo en este borde.
+    const act = productosRangoPeriodo("ytd", 2026, null, BORDE);
+    const cmp = productosRangoComparativo("ytd", 2026, null, BORDE);
+    expect(cmp).toEqual({ desde: "2025-01-01", hasta: "2025-08-24" });
+    expect(cmp.hasta).toBe(unAnioAntes(act.hasta));
+  });
+
+  it("las cuatro ventanas terminan EL MISMO DÍA en el borde", () => {
+    // Los relativos ya cortaban en Panamá. Antes, en la misma pantalla y a la
+    // misma hora, «Año en curso» terminaba el 25 y «Últimos 12 meses» el 24.
+    expect(productosRangoPeriodo("6m", 2026, null, BORDE).hasta).toBe("2026-08-24");
+    expect(productosRangoPeriodo("12m", 2026, null, BORDE).hasta).toBe("2026-08-24");
+    expect(productosRangoPeriodo("ytd", 2026, null, BORDE).hasta).toBe(
+      productosRangoPeriodo("12m", 2026, null, BORDE).hasta,
+    );
+  });
+
+  it("🩸 el 1-ene temprano el «Año en curso» sigue siendo el año VIEJO", () => {
+    // 02:00 UTC del 1-ene-2026 = 21:00 del 31-dic-2025 en Panamá.
+    expect(hoyPanama(ANIO_NUEVO)).toBe("2025-12-31");
+    // El año 2025 todavía NO está cerrado: su «hasta» es el 31-dic, no un día
+    // del 2026 que no existe.
+    expect(productosRange(2025, null, ANIO_NUEVO)).toEqual({
+      desde: "2025-01-01",
+      hasta: "2025-12-31",
+    });
+    // Y el 2026 —que en Panamá todavía no empezó— no puede terminar en el 1-ene.
+    // Con el reloj UTC daba `hasta: "2026-01-01"`, un día inexistente en Panamá.
+    expect(productosRange(2026, null, ANIO_NUEVO).hasta).toBe("2025-12-31");
+    // El rótulo también: el año en curso en Panamá es 2025.
+    expect(periodoLabel(2025, null, "ytd", ANIO_NUEVO)).toBe("Año en curso");
+    expect(productosRangoPeriodo("anio_pasado", 2026, null, ANIO_NUEVO)).toEqual({
+      desde: "2024-01-01",
+      hasta: "2024-12-31",
+    });
+  });
+
+  it("el camino SIN `ahora` (el que usa la pantalla) también corta en Panamá", () => {
+    // `vi.setSystemTime`, nunca `new Date()`: con el reloj real este test
+    // "pasaría" 19 horas de cada 24 sin probar nada.
+    vi.useFakeTimers();
+    vi.setSystemTime(BORDE);
+    expect(productosRange(2026, null)).toEqual({ desde: "2026-01-01", hasta: "2026-08-24" });
+    vi.setSystemTime(ANIO_NUEVO);
+    expect(productosRange(2026, null).hasta).toBe("2025-12-31");
   });
 });
 
@@ -44,12 +156,15 @@ describe("productosRange NO cambió (es el camino que ya estaba publicado)", () 
   it("el año en curso llega hasta hoy", () => {
     expect(productosRange(2026, null, TARDE)).toEqual({ desde: "2026-01-01", hasta: "2026-08-24" });
   });
-  it("`ahora` es solo un parámetro con default: el cálculo es el mismo de siempre", () => {
-    // Sin el 3er argumento tiene que dar EXACTAMENTE lo mismo que con el reloj
-    // de verdad — es el camino que la pantalla venía usando.
-    const reloj = new Date();
-    expect(productosRange(2026, null)).toEqual(productosRange(2026, null, reloj));
-    expect(productosRange(2026, 6)).toEqual(productosRange(2026, 6, reloj));
+  it("`ahora` es solo un parámetro con default: el default es el reloj, nada más", () => {
+    // Con fecha FIJA (nunca `new Date()`): sin el 3er argumento tiene que dar
+    // EXACTAMENTE lo mismo que pasándole ese mismo instante.
+    vi.useFakeTimers();
+    for (const reloj of [TARDE, MADRUGADA, NOCHE, BORDE, ANIO_NUEVO]) {
+      vi.setSystemTime(reloj);
+      expect(productosRange(2026, null)).toEqual(productosRange(2026, null, reloj));
+      expect(productosRange(2026, 6)).toEqual(productosRange(2026, 6, reloj));
+    }
   });
 });
 
@@ -303,5 +418,36 @@ describe("el criterio de comparación vive en UN solo lugar", () => {
     // acá adentro las separa un día entre las 7 p.m. y la medianoche de Panamá.
     expect(cuerpo).not.toMatch(/new Date\(\)/);
     expect(cuerpo).not.toMatch(/Date\.now\(\)/);
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 🩸 NI UNA TERCERA CUENTA DE FECHAS.
+  //
+  // Este repo ya pagó dos veces por agrupar en UTC: el borde de mes de
+  // Multifashion y el día de las marcaciones del reloj. El día de negocio en
+  // Panamá vive en `src/lib/fecha-panama.ts` y este módulo lo IMPORTA. La copia
+  // local (`diaPanama` + `PANAMA_OFFSET_MS`) que vivía acá se retiró: dos
+  // implementaciones del mismo día empiezan a divergir y nadie se entera.
+  // ───────────────────────────────────────────────────────────────────────────
+  it("el día de Panamá se IMPORTA de fecha-panama, no se reimplementa", async () => {
+    const fs = await import("node:fs");
+    const codigo = sinComentarios(fs.readFileSync(SRC, "utf8"));
+    expect(codigo).toMatch(/import\s*\{[^}]*\bhoyPanama\b[^}]*\}\s*from\s*"@\/lib\/fecha-panama"/);
+    // Ni una definición propia del día, ni el offset a mano.
+    expect(codigo).not.toMatch(/(function|const|let|var)\s+(hoyPanama|diaPanama)\b/);
+    expect(codigo).not.toMatch(/PANAMA_OFFSET/);
+    expect(codigo).not.toMatch(/5\s*\*\s*60\s*\*\s*60\s*\*\s*1000/);
+  });
+
+  it("🔴 NADIE lee el reloj en UTC para cortar un día de negocio", () => {
+    const fs = require("node:fs") as typeof import("node:fs");
+    const codigo = sinComentarios(fs.readFileSync(SRC, "utf8"));
+    // Ésta es la línea exacta que rompía «Año en curso»:
+    //   const todayStr = ahora.toISOString().slice(0, 10);
+    // `toISOString()` sobre un instante da el día UTC, que entre las 7 p.m. y la
+    // medianoche de Panamá ya es el de mañana. Volver a UTC pone esto rojo.
+    expect(codigo).not.toMatch(/ahora\s*\.\s*toISOString\(\)/);
+    expect(codigo).not.toMatch(/new Date\(\)\s*\.\s*toISOString\(\)/);
+    expect(codigo).not.toMatch(/getUTC(FullYear|Month|Date)\(\)/);
   });
 });
