@@ -42,7 +42,7 @@ vi.mock("@/lib/tommy-supabase-server", () => ({ tommyServer: {} }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
 
 import { MARCA_THEME, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
-import { BULTOS_CHIP_LABEL, type PrecioRango } from "@/lib/catalogo/filtros-extra";
+import { BULTOS_CHIP_LABEL, PRECIO_VACIO } from "@/lib/catalogo/filtros-extra";
 import CatalogoFilters from "@/components/catalogo/CatalogoFilters";
 
 const FUENTE = readFileSync(
@@ -59,7 +59,7 @@ function props(marca: MarcaUiKey, extra: Record<string, unknown> = {}) {
     gender: "", onGenderChange: () => {},
     category: "", onCategoryChange: () => {},
     bultosFilter: false, onBultosFilterChange: () => {},
-    precioRango: "" as PrecioRango, onPrecioRangoChange: () => {},
+    precio: PRECIO_VACIO, onPrecioChange: () => {}, preciosDisponibles: [],
     sortBy: "relevancia", onSortByChange: () => {},
     filteredCount: 0, onClearAll: () => {},
     ...extra,

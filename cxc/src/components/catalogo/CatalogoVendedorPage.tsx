@@ -22,7 +22,8 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
 import { compararCodigos } from "@/lib/catalogos/orden-codigo";
 import {
-  cumpleBultosMinimos, precioEnRango, esPrecioRango, type PrecioRango,
+  cumpleBultosMinimos, precioEnFiltro, precioDeUrl, preciosDelCatalogo,
+  PRECIO_VACIO, type FiltroPrecio,
 } from "@/lib/catalogo/filtros-extra";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { Toast } from "@/components/ui";
@@ -64,15 +65,18 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState(searchParams.get("category") || "");
-  // Filtros extra (hoy solo Tommy). El valor del query es dato no confiable:
-  // el rango se valida contra las opciones reales antes de entrar al estado.
+  // Filtros extra (Tommy y Calvin). El valor del query es dato no confiable:
+  // los dos precios se validan como número antes de entrar al estado.
   const [bultosFilter, setBultosFilter] = useState(
     theme.features.filtroBultos ? searchParams.get("bultos") === "1" : false,
   );
-  const [precioRango, setPrecioRango] = useState<PrecioRango>(
-    theme.features.filtroPrecio && esPrecioRango(searchParams.get("precio"))
-      ? (searchParams.get("precio") as PrecioRango)
-      : "",
+  const [precio, setPrecio] = useState<FiltroPrecio>(() =>
+    theme.features.filtroPrecio
+      ? {
+        desde: precioDeUrl(searchParams.get("precio_desde")),
+        hasta: precioDeUrl(searchParams.get("precio_hasta")),
+      }
+      : PRECIO_VACIO,
   );
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
@@ -174,7 +178,8 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     if (category) params.set("category", category);
     if (search) params.set("search", search);
     if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
-    if (theme.features.filtroPrecio && precioRango) params.set("precio", precioRango);
+    if (theme.features.filtroPrecio && precio.desde.trim()) params.set("precio_desde", precio.desde.trim());
+    if (theme.features.filtroPrecio && precio.hasta.trim()) params.set("precio_hasta", precio.hasta.trim());
     // El modo pedido viaja en la URL y esta línea la reescribe entera: sin
     // conservarlo, tocar un filtro apagaba el modo y el "Agregar" siguiente se
     // iba al carrito — un pedido perdido sin que nadie se entere.
@@ -182,7 +187,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", newUrl);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gender, category, search, bultosFilter, precioRango, agregarA]);
+  }, [gender, category, search, bultosFilter, precio.desde, precio.hasta, agregarA]);
 
   // loadProducts también lo reusa el botón "Actualizar ahora" (CatalogoSyncNow)
   // para refrescar la vista tras un sync manual exitoso.
@@ -306,6 +311,14 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     [theme, category, products],
   );
 
+  // Los precios que EXISTEN en este catálogo. Se DERIVAN de los productos que
+  // ya están en memoria: ninguna consulta nueva, y los precios los sigue
+  // mandando Switch (esta pantalla solo filtra lo que ya tiene).
+  const preciosDisponibles = useMemo(
+    () => (theme.features.filtroPrecio ? preciosDelCatalogo(products.map(p => p.price)) : []),
+    [theme, products],
+  );
+
   const filtered = agrupado ? [] : products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => theme.genero.match(p.gender, gender))
@@ -314,7 +327,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     // vendible), nunca la existencia, y el tamaño de bulto sale del tema —
     // el 12 no se escribe a mano. Precio: por PIEZA, no por bulto.
     .filter(p => !bultosFilter || cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category, p.bulto_pzas)))
-    .filter(p => precioEnRango(p.price, precioRango))
+    .filter(p => precioEnFiltro(p.price, precio.desde, precio.hasta))
     // 🔑 El CÓDIGO desempata SIEMPRE, al final de todo (ver `orden-codigo.ts`):
     // el nombre no distingue —Calvin: 81 productos, 5 nombres— y sin este último
     // criterio los cuatro `KCMEENA…` quedaban desperdigados entre los `HW0HW…` y
@@ -356,6 +369,11 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     (products as JoybeesProduct[])
       .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))
       .filter(p => !category || p.category === category)
+      // Misma regla de precio que la lista plana. Hoy es un no-op (Joybees es
+      // la única marca agrupada y no lleva `filtroPrecio`), pero si un día se
+      // le enciende, el filtro tiene que cortar acá también: dos pipelines con
+      // dos comportamientos de precio es el bug que nadie mira hasta que pasa.
+      .filter(p => precioEnFiltro(p.price, precio.desde, precio.hasta))
   ) : [];
 
   const groupsWithSection = allGrouped.map(g => ({ group: g, section: getDisplaySection(g) }));
@@ -417,7 +435,8 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     // Los filtros extra viajan en el link: si el vendedor comparte "2 bultos o
     // más", el cliente abre el catálogo ya filtrado igual que él.
     if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
-    if (theme.features.filtroPrecio && precioRango) params.set("precio", precioRango);
+    if (theme.features.filtroPrecio && precio.desde.trim()) params.set("precio_desde", precio.desde.trim());
+    if (theme.features.filtroPrecio && precio.hasta.trim()) params.set("precio_hasta", precio.hasta.trim());
     const qs = params.toString();
     const url = `${theme.publicoShareUrl}${qs ? `?${qs}` : ""}`;
     navigator.clipboard.writeText(url).then(() => {
@@ -503,7 +522,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
-    setBultosFilter(false); setPrecioRango("");
+    setBultosFilter(false); setPrecio(PRECIO_VACIO);
     setSortBy("relevancia");
   }
 
@@ -715,8 +734,9 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           onCategoryChange={setCategory}
           bultosFilter={bultosFilter}
           onBultosFilterChange={theme.features.filtroBultos ? setBultosFilter : undefined}
-          precioRango={precioRango}
-          onPrecioRangoChange={theme.features.filtroPrecio ? setPrecioRango : undefined}
+          precio={precio}
+          onPrecioChange={theme.features.filtroPrecio ? setPrecio : undefined}
+          preciosDisponibles={preciosDisponibles}
           sortBy={sortBy}
           onSortByChange={setSortBy}
           filteredCount={filteredCount}
