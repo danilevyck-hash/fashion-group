@@ -42,6 +42,10 @@ export const SYNC_LOG_TYPES = [
   "catalogo_calvin",
   "egresos_varios",
   "cuentas_contables",
+  // El detalle de línea de facturas y NC (24-ago-2026). Su DDL va en la MISMA
+  // migración que la tabla — que es justo lo que NO se hizo con catalogo_tommy
+  // ni con articulo_marca, y por eso las dos corrieron invisibles.
+  "factura_lineas",
   // ⚠️ RETIRADO el 13-ago-2026: ningún sync escribe ya este tipo. Se QUEDA en la
   // lista porque el CHECK de `switch_sync_log` sí lo admite y hay filas
   // históricas con ese valor; sacarlo de acá sin una DDL que reescriba el CHECK

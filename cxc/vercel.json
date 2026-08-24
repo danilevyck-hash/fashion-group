@@ -41,6 +41,10 @@
       "schedule": "30 2 * * *"
     },
     {
+      "path": "/api/cron/sync-factura-lineas",
+      "schedule": "30 3 * * *"
+    },
+    {
       "path": "/api/cron/cleanup-packing-lists",
       "schedule": "0 3 * * *"
     },

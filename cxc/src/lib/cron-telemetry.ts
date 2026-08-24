@@ -491,6 +491,13 @@ export const SEED_TOLERANT_CRONS = [
   // EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON). Seed-tolerante hasta que lleve días
   // sembrado; después se puede promover a CRONS_FAIL_CLOSED.
   "boston-cartera",
+  // Detalle de línea de facturas y NC (02:30 UTC = 9:30 p.m. Panamá).
+  // Desplegado el 24-ago-2026. Seed-tolerante DOBLE: además de la siembra
+  // normal, mientras la DDL 20260824120000 no corra el cron no puede escribir y
+  // no registra heartbeat — fila ausente = pendiente, no caído. Promover a
+  // CRONS_FAIL_CLOSED cuando la DDL esté corrida y lleve días sembrado (el
+  // mismo camino que recorrieron Tommy y Calvin).
+  "sync-factura-lineas",
   // Vigía de recursos de la base (11 entradas, 01:45→22:45 UTC). Desplegado el
   // 27-jul-2026: seed-tolerante hasta que lleve días sembrado. Promover a
   // CRONS_FAIL_CLOSED después (corre 11×/día: nunca debería estar stale).
