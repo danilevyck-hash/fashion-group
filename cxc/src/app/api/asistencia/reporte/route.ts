@@ -21,7 +21,9 @@ import {
   type MarcacionConId,
 } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
-import { leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas } from "@/lib/asistencia/config-server";
+import {
+  leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas, leerJustificaciones,
+} from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
 import { hoyPanama } from "@/lib/fecha-panama";
 
@@ -92,12 +94,12 @@ export async function GET(req: NextRequest) {
 
     const [hRes, jRes, fRes] = await Promise.all([
       supabaseServer.from("asistencia_horarios").select("empleado_codigo, entrada, salida, almuerzo_minutos"),
-      supabaseServer.from("asistencia_justificaciones").select("empleado_codigo, desde, hasta, motivo")
-        .lte("desde", hasta).gte("hasta", desde),
+      // 🔑 Por la fuente ÚNICA, no con un `select` copiado: es lo que hace que
+      // el reporte y la planilla no puedan leer distinto la misma fila.
+      leerJustificaciones(desde, hasta),
       supabaseServer.from("asistencia_feriados").select("fecha, nombre").gte("fecha", desde).lte("fecha", hasta),
     ]);
     if (hRes.error) throw new Error(hRes.error.message);
-    if (jRes.error) throw new Error(jRes.error.message);
     if (fRes.error) throw new Error(fRes.error.message);
 
     // 🔴 LAS CORRECCIONES SE APLICAN ANTES DE CALCULAR NADA. Lo que se le pasa
@@ -166,7 +168,7 @@ export async function GET(req: NextRequest) {
         entrada: String(h.entrada).slice(0, 5),
         salida: String(h.salida).slice(0, 5),
       })) as HorarioPersona[],
-      justificaciones: (jRes.data ?? []) as Justificacion[],
+      justificaciones: jRes.filas,
       feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
       desde,
       hasta,

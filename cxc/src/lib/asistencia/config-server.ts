@@ -45,6 +45,8 @@ import {
   esColumnaServicioProfesionalFaltante,
   esServicioProfesional,
 } from "./participacion";
+import { COLS_PERMISO_HORAS, esColumnaPermisoHorasFaltante } from "./permiso-horas";
+import type { Justificacion } from "./reporte";
 import {
   COLUMNA_PAGA_SEGUROS,
   esColumnaPagaSegurosFaltante,
@@ -363,4 +365,56 @@ export async function leerPersonasDelModulo(
     leerCodigosConMarcaciones(dias),
   ]);
   return { personas: armarPersonas(directorio, codigos), directorio, faltaMigracion };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAS JUSTIFICACIONES — en UN solo lugar, y sin asumir que el DDL corrió
+//
+// 🩸 Las leían TRES rutas con su propio `select` copiado (`/reporte`,
+// `/planilla` y `/justificaciones`), que es exactamente el patrón que en este
+// proyecto ya costó dos bugs caros: el día que una gana una columna y las otras
+// no, la misma justificación vale distinto según por dónde se la mire — y acá
+// eso es la diferencia entre «el día entero» y «un permiso de dos horas», o sea
+// ocho horas de sueldo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface JustificacionesLeidas {
+  filas: Justificacion[];
+  /** `true` = falta `MIGRACION_PERMISO_HORAS`. Todas se leen como de DÍA
+   *  ENTERO, que es exactamente como se comportan hoy. */
+  faltaColumnasHoras: boolean;
+}
+
+/** Las justificaciones que TOCAN el rango pedido (se solapan, no "están
+ *  contenidas": unas vacaciones que arrancan antes cubren días de adentro). */
+export async function leerJustificaciones(
+  desde: string,
+  hasta: string,
+): Promise<JustificacionesLeidas> {
+  const BASE = "empleado_codigo, desde, hasta, motivo";
+  const pedir = (cols: string) =>
+    supabaseServer
+      .from("asistencia_justificaciones")
+      .select(cols)
+      .lte("desde", hasta)
+      .gte("hasta", desde);
+
+  const conHoras = await pedir(`${BASE}, ${COLS_PERMISO_HORAS.join(", ")}`);
+  if (!conHoras.error) {
+    return {
+      filas: (conHoras.data ?? []) as unknown as Justificacion[],
+      faltaColumnasHoras: false,
+    };
+  }
+  // ⚠️ Solo se relee si el error NOMBRA las columnas. Tragarse cualquier error
+  // convertiría un problema real —permisos, red, RLS— en una lectura incompleta
+  // que nadie notaría, y con ella una justificación que deja de justificar.
+  if (!esColumnaPermisoHorasFaltante(conHoras.error)) throw new Error(conHoras.error.message);
+
+  const sinHoras = await pedir(BASE);
+  if (sinHoras.error) throw new Error(sinHoras.error.message);
+  return {
+    filas: (sinHoras.data ?? []) as unknown as Justificacion[],
+    faltaColumnasHoras: true,
+  };
 }

@@ -11,7 +11,7 @@ import { useToast } from "@/components/ToastSystem";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { ALMUERZO_FIJO_MIN, MINUTOS_TARDE_QUE_SON_AUSENCIA } from "@/lib/asistencia/config";
-import { esTrabajoFuera, textoDiaJustificado } from "@/lib/asistencia/motivos";
+import { esTrabajoDeVendedor, textoDiaJustificado } from "@/lib/asistencia/motivos";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas from "./RangoFechas";
@@ -502,6 +502,18 @@ function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
               {d.enCurso && (
                 <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">En curso</span>
               )}
+              {/* 🔴 EL PERMISO DE HORAS SE VE EN EL DÍA, y en AZUL: no es una
+                  advertencia (ámbar) ni un problema (rojo) — es una decisión ya
+                  tomada. Sin esto, la persona aparece con menos minutos tarde
+                  que los que marcó el reloj y no hay forma de saber por qué. */}
+              {d.permiso && (
+                <span
+                  className="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-900"
+                  title={`${d.permiso}. Perdona ${fmtMin(d.permisoPerdonaMin)} minutos de tardanza. NO justifica el día entero.`}
+                >
+                  Permiso {fmtMin(d.permisoPerdonaMin)} min
+                </span>
+              )}
               {/* Agregar la marca que falta. Es el caso más común de todos: quien
                   olvidó marcar no tiene nada que corregir. */}
               {puedeCorregir && (
@@ -519,7 +531,7 @@ function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
                 // 🔴 «Trabajando fuera de la oficina», NO «Ausencia justificada
                 // — Trabajo fuera…». Quien trabajó afuera no estuvo ausente, y
                 // el renglón tiene que decir eso.
-                <span className={esTrabajoFuera(d.justificado) ? "text-gray-700" : undefined}>
+                <span className={esTrabajoDeVendedor(d.justificado) ? "text-gray-700" : undefined}>
                   {textoDiaJustificado(d.justificado)}
                 </span>
               )

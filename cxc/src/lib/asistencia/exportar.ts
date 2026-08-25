@@ -20,7 +20,7 @@ import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type DiaReporte, type PersonaReporte, type ReglasReporte } from "./reporte";
 import { ALMUERZO_FIJO_MIN } from "./config";
 import { etiquetaPersona } from "./directorio";
-import { MOTIVO_TRABAJO_FUERA, textoDiaJustificado } from "./motivos";
+import { MOTIVO_TRABAJO_VENDEDOR, textoDiaJustificado } from "./motivos";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -121,7 +121,10 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
   ]];
   for (const p of personas) {
     for (const d of p.dias) {
-      if (!d.marcas.length && !d.ausente && !d.justificado) continue;
+      // 🔑 Un día con PERMISO de horas también entra: la persona vino, y sin
+      // esta condición un día en que se le perdonaron 120 minutos saldría del
+      // Excel sin explicación de por qué la tardanza no cuadra con el reloj.
+      if (!d.marcas.length && !d.ausente && !d.justificado && !d.permiso) continue;
       detalle.push([
         quien(p), p.codigo, fecha(d.fecha),
         d.marcas[0] ?? "", d.marcas[1] ?? "", d.marcas[2] ?? "",
@@ -132,7 +135,12 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
         // El MISMO texto que la pantalla (`textoDiaJustificado`): el Excel es lo
         // que se manda por correo, y no puede decir "ausencia" donde la
         // pantalla dice "trabajando fuera".
-        d.ausente ? "Sin justificar" : d.justificado ? textoDiaJustificado(d.justificado) : d.feriado ? `Feriado — ${d.feriado}` : "",
+        d.ausente ? "Sin justificar"
+          : d.justificado ? textoDiaJustificado(d.justificado)
+          // 🔴 El permiso de HORAS es OTRA cosa que una justificación de día
+          // entero, y el papel lo dice: perdonó N minutos y nada más.
+          : d.permiso ? `${d.permiso} · perdona ${n0(d.permisoPerdonaMin)} min`
+          : d.feriado ? `Feriado — ${d.feriado}` : "",
         // 🔴 El archivo es el que se manda por correo y sobrevive a la
         // discusión: si la pantalla avisa que una hora se tocó a mano y el
         // Excel no, el Excel es el que va a decidir un pago con menos
@@ -225,7 +233,8 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     ["Almuerzo", `${ALMUERZO_FIJO_MIN} minutos, igual para todos. Se mide entre la 2ª y la 3ª marca del día.`],
     ["Horas extra", `Mínimo ${g.extraMinimoMin} minutos, y se le resta el atraso del mismo día.`],
     ["Ausencia", "Día hábil sin ninguna marca, que no sea feriado ni tenga justificación."],
-    ["Trabajo fuera", `"${MOTIVO_TRABAJO_FUERA}" NO es una ausencia: la persona trabajó, solo que en otro lado y sin un reloj donde marcar. No se le descuenta nada, no le consume vacaciones y no genera horas extra (sin marcas no hay horas que medir). Va en columna propia, aparte de las ausencias justificadas.`],
+    ["Trabajo de vendedor", `"${MOTIVO_TRABAJO_VENDEDOR}" NO es una ausencia: la persona trabajó, solo que en otro lado y sin un reloj donde marcar. No se le descuenta nada, no le consume vacaciones y no genera horas extra (sin marcas no hay horas que medir). Va en columna propia, aparte de las ausencias justificadas.`],
+    ["Permiso de horas", "Una justificación puede traer un rango de HORAS (de X a X). Cuando lo trae, NO justifica el día entero: solo perdona los minutos de tardanza que caen adentro de esa ventana, y un día sin ninguna marca sigue contando como ausencia completa."],
     ["Días a revisar", "El día no tiene las 4 marcas. Los minutos SÍ cuentan; la marca es para corregirlo."],
     ["Corregido a mano", "La hora que marcó el reloj NUNCA se borra: la corrección va encima y es la que cuenta. La columna dice la hora del reloj, la corregida, por qué y quién la puso."],
     [],

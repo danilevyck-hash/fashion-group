@@ -23,7 +23,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
-import { MOTIVO_TRABAJO_FUERA, MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
+import { MOTIVO_TRABAJO_VENDEDOR, MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
 import ReporteTab from "@/app/asistencia/ReporteTab";
 import JustificacionesTab from "@/app/asistencia/JustificacionesTab";
 
@@ -71,7 +71,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 // ═════════════════════════════════════════════════════════════════════════════
 describe("🔴 El reporte lo distingue A LA VISTA", () => {
   it("el renglón del día dice «Trabajando fuera de la oficina», sin la palabra ausencia", async () => {
-    servir(conReporte(persona(MOTIVO_TRABAJO_FUERA, 2)));
+    servir(conReporte(persona(MOTIVO_TRABAJO_VENDEDOR, 2)));
     montar(<ReporteTab />);
     fireEvent.click(await screen.findByText(/RODRIGO MIRANDA/));
 
@@ -89,7 +89,7 @@ describe("🔴 El reporte lo distingue A LA VISTA", () => {
   });
 
   it("🔴 se ve SIN abrir nada: el chip «N días trabajando fuera» en la fila", async () => {
-    servir(conReporte(persona(MOTIVO_TRABAJO_FUERA, 2)));
+    servir(conReporte(persona(MOTIVO_TRABAJO_VENDEDOR, 2)));
     montar(<ReporteTab />);
     await screen.findByText(/RODRIGO MIRANDA/);
     // Sin tocar la fila.
@@ -104,7 +104,7 @@ describe("🔴 El reporte lo distingue A LA VISTA", () => {
   });
 
   it("con UN solo día el chip está en singular — «1 día», no «1 días»", async () => {
-    servir(conReporte({ ...persona(MOTIVO_TRABAJO_FUERA, 1) }));
+    servir(conReporte({ ...persona(MOTIVO_TRABAJO_VENDEDOR, 1) }));
     montar(<ReporteTab />);
     await screen.findByText(/RODRIGO MIRANDA/);
     expect(screen.getByText(/1 día trabajando fuera/)).toBeTruthy();
@@ -113,16 +113,21 @@ describe("🔴 El reporte lo distingue A LA VISTA", () => {
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("El motivo se puede ELEGIR en Justificaciones", () => {
-  it("aparece en el desplegable de motivos, junto con los cinco de siempre", async () => {
+  it("aparece en el desplegable, y los cuatro de Daniel son los únicos", async () => {
     servir([["/api/asistencia/justificaciones", {
       justificaciones: [], motivos: MOTIVOS_JUSTIFICACION, personas: [], faltaMigracion: false,
     }]]);
     montar(<JustificacionesTab />);
     // La opción existe y se puede elegir de verdad.
-    const opcion = await screen.findByRole("option", { name: MOTIVO_TRABAJO_FUERA });
+    const opcion = await screen.findByRole("option", { name: MOTIVO_TRABAJO_VENDEDOR });
     expect(opcion).toBeTruthy();
-    for (const m of ["Vacaciones", "Incapacidad", "Permiso", "Luto", "Otro"]) {
+    for (const m of ["Incapacidad", "Catástrofe", "Escolares"]) {
       expect(screen.getByRole("option", { name: m })).toBeTruthy();
+    }
+    // 🔴 Y los retirados NO se pueden elegir: se leen si ya están guardados,
+    // pero nadie puede crear una justificación nueva con ellos.
+    for (const m of ["Vacaciones", "Permiso", "Luto", "Otro"]) {
+      expect(screen.queryByRole("option", { name: m })).toBeNull();
     }
   });
 });
