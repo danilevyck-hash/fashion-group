@@ -84,6 +84,10 @@ const CHECK_INFO: Record<string, { desc: string; action: string }> = {
     desc: "Tipos de comprobante del estado de cuenta sin clasificar (crédito vs débito).",
     action: "Clasifícalos en una migración para que el aging de CXC sea correcto.",
   },
+  ventas_tipos_sin_clasificar: {
+    desc: "Tipos de comprobante de VENTA que ningún reporte sabe contar: esas ventas valen cero en el tablero.",
+    action: "Clasifícalos (¿suman o restan?) en una migración para que la plata vuelva a los totales.",
+  },
   aging_dias_anomalo: {
     desc: "Filas con días NULL o negativos y saldo: no entran en ningún rango del aging.",
     action: "Revisa fechaCreacion/días de esas filas en el estado de cuenta.",

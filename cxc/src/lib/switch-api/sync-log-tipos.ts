@@ -51,6 +51,13 @@ export const SYNC_LOG_TYPES = [
   // (20260825090000) — que es justo lo que NO se hizo con catalogo_tommy ni con
   // articulo_marca, y por eso las dos corrieron invisibles durante meses.
   "ingresos_mercancia",
+  // El CENTINELA de tipos de comprobante de venta (26-ago-2026): deja una fila
+  // por empresa y corrida diciendo si apareció un `tipo_comprobante` que el
+  // tablero no sabe contar. Sin esa fila, la regla de los 2 fallos seguidos de
+  // `alert-policy.ts` no tendría qué medir y avisaría en la primera corrida,
+  // para siempre. Su DDL va en la MISMA migración que lo estrena
+  // (20260826140000).
+  "ventas_tipos",
   // ⚠️ RETIRADO el 13-ago-2026: ningún sync escribe ya este tipo. Se QUEDA en la
   // lista porque el CHECK de `switch_sync_log` sí lo admite y hay filas
   // históricas con ese valor; sacarlo de acá sin una DDL que reescriba el CHECK

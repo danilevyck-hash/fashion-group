@@ -212,7 +212,9 @@ describe("A. el SIGNO — el error que da exactamente el doble", () => {
         clienteId: 1,
         codigo: "X",
         nombre: "X",
-        elements: [{ secuencial: "11-000000001", tipoComprobante: "Vale de Caja", saldo: 999, dias: 10 }],
+        elements: [
+          { secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Vale de Caja", saldo: 999, dias: 10 },
+        ],
       },
     ]);
     expect(resumen.total).toBe(0);
@@ -281,7 +283,9 @@ describe("A-bis. el parseo del reporte, con datos REALES de producción", () => 
       clienteId: dias,
       codigo: `C${dias}`,
       nombre: `C${dias}`,
-      elements: [{ secuencial: `11-00000${1000 + dias}`, tipoComprobante: "Factura", saldo: 100, dias }],
+      elements: [
+        { secuencial: `11-00000${1000 + dias}`, fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 100, dias },
+      ],
     });
     const { resumen } = construirFilas("confecciones_boston", [cli(90), cli(91), cli(120), cli(121)]);
     expect(resumen.d0_90).toBe(100);
@@ -293,8 +297,75 @@ describe("A-bis. el parseo del reporte, con datos REALES de producción", () => 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("D. la llave ccte_id sintética", () => {
   it("es determinista", () => {
-    expect(ccteIdSintetico("11-000000076")).toEqual(ccteIdSintetico("11-000000076"));
-    expect(ccteIdSintetico("11-000000076")).toMatchObject({ ok: true, ccteId: 110000076 });
+    expect(ccteIdSintetico("11-000000076", "2026-07-23")).toEqual(
+      ccteIdSintetico("11-000000076", "2026-07-23"),
+    );
+    // 11 · 26 · 00076 — se lee de corrido: serie, año, correlativo.
+    expect(ccteIdSintetico("11-000000076", "2026-07-23")).toMatchObject({
+      ok: true,
+      ccteId: 112600076,
+      serie: 11,
+      anio: 2026,
+      correlativo: 76,
+    });
+  });
+
+  // ═══ 🔴 EL CASO QUE MOTIVÓ TODO — Switch reinició la numeración ═══════════
+  it("el MISMO secuencial en años distintos son DOS documentos, no uno", () => {
+    // Medido en producción el 25-ago-2026: 52 grupos así en confecciones_boston.
+    //   11-000000009 → Factura 2022-10-14 $285,16  ·  Factura 2026-07-23 $271,25
+    const a = ccteIdSintetico("11-000000009", "2022-10-14");
+    const b = ccteIdSintetico("11-000000009", "2026-07-23");
+    expect(a.ok && b.ok).toBe(true);
+    if (!a.ok || !b.ok) return;
+    expect(a.ccteId).not.toBe(b.ccteId);
+    expect(a.ccteId).toBe(112200009);
+    expect(b.ccteId).toBe(112600009);
+  });
+
+  it("los dos SOBREVIVEN al armado: dos filas, no una pisando a la otra", () => {
+    const { filas } = construirFilas("confecciones_boston", [
+      {
+        clienteId: 1,
+        codigo: "A",
+        nombre: "A",
+        elements: [
+          { secuencial: "11-000000009", fechaCreacion: "2022-10-14", tipoComprobante: "Factura", saldo: 285.16, dias: 1400 },
+          { secuencial: "11-000000009", fechaCreacion: "2026-07-23", tipoComprobante: "Factura", saldo: 271.25, dias: 33 },
+        ],
+      },
+    ]);
+    expect(filas).toHaveLength(2);
+    expect(new Set(filas.map((f) => f.ccte_id)).size).toBe(2);
+    // Y la plata de los dos entra: 285,16 + 271,25.
+    expect(filas.reduce((n, f) => n + (f.saldo ?? 0), 0)).toBeCloseTo(556.41, 2);
+  });
+
+  it("la fecha es OBLIGATORIA: sin ella no hay identidad y el documento se rechaza", () => {
+    expect(ccteIdSintetico("11-000000009", null).ok).toBe(false);
+    expect(ccteIdSintetico("11-000000009", "basura").ok).toBe(false);
+    // Fuera de la ventana de 2 dígitos: 2100 daría el mismo id que 2000.
+    expect(ccteIdSintetico("11-000000009", "2100-01-01").ok).toBe(false);
+    expect(ccteIdSintetico("11-000000009", "1999-12-31").ok).toBe(false);
+    expect(ccteIdSintetico("11-000000009", "2000-01-01")).toMatchObject({ ok: true, anio: 2000 });
+    expect(ccteIdSintetico("11-000000009", "2099-12-31")).toMatchObject({ ok: true, anio: 2099 });
+  });
+
+  it("la identidad usa la MISMA fecha que la columna fecha_creacion", () => {
+    // El API manda DD-MM-YYYY; el reporte, YYYY-MM-DD. Los dos tienen que dar
+    // el mismo id y la misma columna, o la fila mentiría sobre sí misma.
+    const { filas } = construirFilas("confecciones_boston", [
+      {
+        clienteId: 1,
+        codigo: "A",
+        nombre: "A",
+        elements: [
+          { secuencial: "11-000000009", fechaCreacion: "23-07-2026", tipoComprobante: "Factura", saldo: 10, dias: 5 },
+        ],
+      },
+    ]);
+    expect(filas[0].ccte_id).toBe(112600009);
+    expect(filas[0].fecha_creacion).toBe("2026-07-23");
   });
 
   it("NO puede chocar con un ccte_id real del API", () => {
@@ -309,18 +380,22 @@ describe("D. la llave ccte_id sintética", () => {
     }
   });
 
-  it("entra siempre en un int de Postgres", () => {
-    expect(ccteIdSintetico("200-9999999")).toMatchObject({ ok: true });
-    const r = ccteIdSintetico("200-9999999");
-    if (r.ok) expect(r.ccteId).toBeLessThanOrEqual(CCTE_ID_MAX);
+  it("entra siempre en un int de Postgres, incluso en el peor caso", () => {
+    // El techo exacto: serie 200 · año 2099 · correlativo 99.999.
+    const r = ccteIdSintetico("200-0099999", "2099-12-31");
+    expect(r).toMatchObject({ ok: true });
+    if (r.ok) {
+      expect(r.ccteId).toBe(2_009_999_999);
+      expect(r.ccteId).toBeLessThanOrEqual(CCTE_ID_MAX);
+    }
   });
 
   it("RECHAZA en vez de desbordar cuando se sale de rango", () => {
-    expect(ccteIdSintetico("201-000000001").ok).toBe(false); // serie fuera de rango
-    expect(ccteIdSintetico("11-10000000").ok).toBe(false); // correlativo de 8 dígitos
-    expect(ccteIdSintetico("sin-guion-valido").ok).toBe(false);
-    expect(ccteIdSintetico("").ok).toBe(false);
-    expect(ccteIdSintetico(null).ok).toBe(false);
+    expect(ccteIdSintetico("201-000000001", "2026-01-01").ok).toBe(false); // serie fuera de rango
+    expect(ccteIdSintetico("11-100000", "2026-01-01").ok).toBe(false); // correlativo de 6 dígitos
+    expect(ccteIdSintetico("sin-guion-valido", "2026-01-01").ok).toBe(false);
+    expect(ccteIdSintetico("", "2026-01-01").ok).toBe(false);
+    expect(ccteIdSintetico(null, "2026-01-01").ok).toBe(false);
   });
 
   it("un documento que no se puede mapear se OMITE con su motivo, sin tumbar la corrida", () => {
@@ -330,8 +405,8 @@ describe("D. la llave ccte_id sintética", () => {
         codigo: "A",
         nombre: "A",
         elements: [
-          { secuencial: "11-000000001", tipoComprobante: "Factura", saldo: 10, dias: 5 },
-          { secuencial: "999-000000001", tipoComprobante: "Factura", saldo: 99, dias: 5 },
+          { secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 10, dias: 5 },
+          { secuencial: "999-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 99, dias: 5 },
         ],
       },
     ]);
@@ -342,18 +417,78 @@ describe("D. la llave ccte_id sintética", () => {
   it("una COLISIÓN corta la corrida entera (un documento pisando a otro es plata mal contada)", () => {
     // Dos secuenciales distintos que dieran el mismo id: se lanza, no se escribe.
     const chocan: ClienteReporteWeb[] = [
-      { clienteId: 1, codigo: "A", nombre: "A", elements: [{ secuencial: "11-000000001", tipoComprobante: "Factura", saldo: 10, dias: 5 }] },
-      { clienteId: 2, codigo: "B", nombre: "B", elements: [{ secuencial: "11-0000000001", tipoComprobante: "Factura", saldo: 20, dias: 5 }] },
+      { clienteId: 1, codigo: "A", nombre: "A", elements: [{ secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 10, dias: 5 }] },
+      { clienteId: 2, codigo: "B", nombre: "B", elements: [{ secuencial: "11-0000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 20, dias: 5 }] },
     ];
     expect(() => construirFilas("confecciones_boston", chocan)).toThrow(CarteraWebError);
   });
 
-  it("el MISMO documento repetido no es una colisión", () => {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🩸 ESTE CANDADO CAMBIÓ DE DIRECCIÓN (25-ago-2026).
+  //
+  // Decía: «el MISMO documento repetido no es una colisión», y definía "mismo
+  // documento" como "mismo secuencial" y nada más. Esa definición es JUSTO la
+  // que rompió el reinicio de numeración de Switch: `11-000000009` es una
+  // Factura de 2022 Y otra de 2026, con montos distintos, y la regla vieja las
+  // declaraba la misma — el guard se callaba y el upsert colapsaba una de las
+  // dos en silencio.
+  //
+  // Ahora "mismo documento" son los TRES campos: secuencial + fecha + monto.
+  // Un secuencial repetido con cualquier diferencia CORTA la corrida.
+  // ═══════════════════════════════════════════════════════════════════════════
+  it("el MISMO documento repetido de verdad (secuencial + fecha + monto) NO es una colisión", () => {
+    const doc = { secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 10, dias: 5 };
     const { filas } = construirFilas("confecciones_boston", [
-      { clienteId: 1, codigo: "A", nombre: "A", elements: [{ secuencial: "11-000000001", tipoComprobante: "Factura", saldo: 10, dias: 5 }] },
-      { clienteId: 1, codigo: "A", nombre: "A", elements: [{ secuencial: "11-000000001", tipoComprobante: "Factura", saldo: 10, dias: 5 }] },
+      { clienteId: 1, codigo: "A", nombre: "A", elements: [{ ...doc }] },
+      { clienteId: 1, codigo: "A", nombre: "A", elements: [{ ...doc }] },
     ]);
     expect(filas).toHaveLength(2); // el upsert por (empresa, ccte_id) los colapsa
+  });
+
+  it("el mismo secuencial con FECHA distinta dentro del mismo año CORTA la corrida", () => {
+    // El año ya separa 2022 de 2026; lo que el año no puede separar es esto, y
+    // en vez de pisarse, se corta.
+    const chocan: ClienteReporteWeb[] = [
+      { clienteId: 1, codigo: "A", nombre: "A", elements: [{ secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 10, dias: 5 }] },
+      { clienteId: 2, codigo: "B", nombre: "B", elements: [{ secuencial: "11-000000001", fechaCreacion: "2026-09-30", tipoComprobante: "Factura", saldo: 10, dias: 5 }] },
+    ];
+    expect(() => construirFilas("confecciones_boston", chocan)).toThrow(CarteraWebError);
+    expect(() => construirFilas("confecciones_boston", chocan)).toThrow(/fecha distinta/);
+  });
+
+  it("el mismo secuencial con MONTO distinto CORTA la corrida", () => {
+    const chocan: ClienteReporteWeb[] = [
+      { clienteId: 1, codigo: "A", nombre: "A", elements: [{ secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 10, dias: 5 }] },
+      { clienteId: 2, codigo: "B", nombre: "B", elements: [{ secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 999, dias: 5 }] },
+    ];
+    expect(() => construirFilas("confecciones_boston", chocan)).toThrow(CarteraWebError);
+    expect(() => construirFilas("confecciones_boston", chocan)).toThrow(/monto distinto/);
+  });
+
+  it("el error dice QUÉ documentos y POR QUÉ, no solo que hubo colisión", () => {
+    const chocan: ClienteReporteWeb[] = [
+      { clienteId: 1, codigo: "A", nombre: "A", elements: [{ secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 10, dias: 5 }] },
+      { clienteId: 2, codigo: "B", nombre: "B", elements: [{ secuencial: "11-000000001", fechaCreacion: "2026-09-30", tipoComprobante: "Factura", saldo: 20, dias: 5 }] },
+    ];
+    let msg = "";
+    try {
+      construirFilas("confecciones_boston", chocan);
+    } catch (e) {
+      msg = e instanceof Error ? e.message : String(e);
+    }
+    expect(msg).toContain("11-000000001");
+    expect(msg).toContain("2026-01-05");
+    expect(msg).toContain("2026-09-30");
+    expect(msg).toContain("fecha distinta");
+    expect(msg).toContain("monto distinto");
+  });
+
+  it("NINGÚN documento del fixture real pierde su fila por la identidad nueva", () => {
+    const { filas, skips } = construirFilas("confecciones_boston", FIXTURE.clientes);
+    const documentos = FIXTURE.clientes.reduce((n, c) => n + (c.elements?.length ?? 0), 0);
+    expect(filas).toHaveLength(documentos);
+    expect(skips.filter((s) => s.campo === "ccte_id_sintetico")).toEqual([]);
+    expect(new Set(filas.map((f) => f.ccte_id)).size).toBe(documentos);
   });
 });
 
@@ -558,5 +693,141 @@ describe("E. el cron", () => {
       .find((c) => c.path === "/api/cron/boston-cartera")!
       .schedule.split(" ");
     expect(e[0].hhmmUtc).toBe(`${String(hora).padStart(2, "0")}${String(min).padStart(2, "0")}`);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F. CONDUCTA — el sync de verdad contra un doble, mirando QUÉ filas se
+//    escribieron y EN QUÉ ORDEN.
+//
+// 🩸 Por qué de conducta y no de función pura: el bug de la identidad vive en la
+// juntura, no en `construirFilas`. El resumen se calcula ANTES del upsert, así
+// que dos documentos con el mismo `ccte_id` CUADRAN al centavo contando los dos
+// y recién el upsert (lotes de 100, `onConflict empresa_key,ccte_id`) colapsa
+// uno. Un test de `construirFilas` sola nunca lo vería: las dos filas están ahí.
+// Lo que hay que mirar es lo que sale hacia la base.
+// ═════════════════════════════════════════════════════════════════════════════
+describe("F. CONDUCTA — el reinicio de numeración de Switch, de punta a punta", () => {
+  /** El caso real, medido en producción el 25-ago-2026. */
+  const PAR_REINICIADO: ClienteReporteWeb[] = [
+    {
+      clienteId: 7,
+      codigo: "D-042",
+      nombre: "CLIENTE CON DOS 11-000000009",
+      elements: [
+        { secuencial: "11-000000009", fechaCreacion: "2022-10-14", tipoComprobante: "Factura", saldo: 285.16, dias: 1400 },
+        { secuencial: "11-000000009", fechaCreacion: "2026-07-23", tipoComprobante: "Factura", saldo: 271.25, dias: 33 },
+      ],
+    },
+  ];
+  const TOTALES_DEL_PAR = [
+    { title: "0-30", saldo: 271.25 },
+    { title: "Mas de 365", saldo: 285.16 },
+  ];
+
+  const filasEscritas = () =>
+    llamadas.filter((l) => l.op === "upsert").flatMap((l) => (l.filas ?? []) as Array<Record<string, unknown>>);
+
+  it("🔴 los DOS documentos llegan a la base: dos ccte_id, ningún pisado", async () => {
+    const r = await syncCarteraWeb({ reporte: reporte(PAR_REINICIADO, TOTALES_DEL_PAR) });
+    expect(r.ok).toBe(true);
+
+    const filas = filasEscritas();
+    expect(filas).toHaveLength(2);
+    const ids = filas.map((f) => f.ccte_id);
+    expect(new Set(ids).size).toBe(2);
+    expect(ids).toEqual(expect.arrayContaining([112200009, 112600009]));
+
+    // Y la plata de los dos: con la identidad vieja, uno de los dos habría
+    // desaparecido en el upsert y la cartera habría quedado corta en $271,25.
+    const suma = filas.reduce((n, f) => n + Number(f.saldo ?? 0), 0);
+    expect(suma).toBeCloseTo(556.41, 2);
+  });
+
+  it("el upsert sigue colapsando por (empresa_key, ccte_id) — la llave no cambió", async () => {
+    await syncCarteraWeb({ reporte: reporte(PAR_REINICIADO, TOTALES_DEL_PAR) });
+    for (const l of llamadas.filter((x) => x.op === "upsert")) {
+      expect(l.onConflict).toBe("empresa_key,ccte_id");
+    }
+  });
+
+  it("cada fila guarda la fecha con la que se calculó su ccte_id", async () => {
+    await syncCarteraWeb({ reporte: reporte(PAR_REINICIADO, TOTALES_DEL_PAR) });
+    for (const f of filasEscritas()) {
+      const anio = Number(String(f.fecha_creacion).slice(0, 4));
+      // ccte_id = serie·10^7 + (año−2000)·10^5 + correlativo
+      expect(Math.floor((Number(f.ccte_id) % 10_000_000) / 100_000)).toBe(anio - 2000);
+    }
+  });
+
+  // ═══ EL ORDEN — «que la cartera nunca quede en cero ni a medias» ═══════════
+  it("🔴 el RECONCILE va DESPUÉS del upsert, nunca antes", async () => {
+    await syncCarteraWeb({ reporte: reporte(FIXTURE.clientes, FIXTURE.saldosTotales) });
+    const primerUpsert = llamadas.findIndex((l) => l.op === "upsert");
+    const primerUpdate = llamadas.findIndex((l) => l.op === "update");
+    expect(primerUpsert).toBeGreaterThanOrEqual(0);
+    expect(primerUpdate).toBeGreaterThan(primerUpsert);
+    // Y NINGÚN update antes del último upsert: si el reconcile se colara entre
+    // dos lotes, la cartera quedaría a medias mientras corre.
+    const ultimoUpsert = llamadas.map((l) => l.op).lastIndexOf("upsert");
+    expect(llamadas.slice(0, ultimoUpsert).every((l) => l.op === "upsert")).toBe(true);
+  });
+
+  it("el reconcile pone en 0, nunca borra: la cartera no puede pasar por vacía", async () => {
+    await syncCarteraWeb({ reporte: reporte(PAR_REINICIADO, TOTALES_DEL_PAR) });
+    const rec = llamadas.find((l) => l.op === "update")!;
+    expect(rec.parche).toMatchObject({ saldo: 0 });
+    expect(rec.filtros.find((f) => f[0] === "eq" && f[1] === "empresa_key")![2]).toBe("confecciones_boston");
+  });
+
+  it("⛔ una colisión de identidad no escribe NI UNA fila (fail-closed)", async () => {
+    // Mismo secuencial, mismo año, fecha distinta: el año no puede separarlos y
+    // el guard corta antes de tocar la base.
+    const chocan: ClienteReporteWeb[] = [
+      {
+        clienteId: 1,
+        codigo: "A",
+        nombre: "A",
+        elements: [
+          { secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 10, dias: 5 },
+          { secuencial: "11-000000001", fechaCreacion: "2026-09-30", tipoComprobante: "Factura", saldo: 20, dias: 5 },
+        ],
+      },
+    ];
+    const r = await syncCarteraWeb({ reporte: reporte(chocan, [{ title: "0-30", saldo: 30 }]) });
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/colisión de ccte_id/);
+    expect(llamadas).toHaveLength(0);
+  });
+
+  it("⛔ un documento sin fecha desarma el cuadre y corta la corrida, no se escribe nada", async () => {
+    // La fecha es media identidad: sin ella el documento se omite, y como el
+    // resumen se arma con lo que sí se construyó, el cuadre contra Switch se
+    // cae. Preferimos la cartera de ayer entera y un error a la vista.
+    const sinFecha: ClienteReporteWeb[] = [
+      {
+        clienteId: 1,
+        codigo: "A",
+        nombre: "A",
+        elements: [
+          { secuencial: "11-000000001", fechaCreacion: "2026-01-05", tipoComprobante: "Factura", saldo: 10, dias: 5 },
+          { secuencial: "11-000000002", fechaCreacion: null, tipoComprobante: "Factura", saldo: 990, dias: 5 },
+        ],
+      },
+    ];
+    const r = await syncCarteraWeb({ reporte: reporte(sinFecha, [{ title: "0-30", saldo: 1000 }]) });
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/NO cuadra/);
+    expect(llamadas).toHaveLength(0);
+  });
+
+  it("⛔ si el cuadre falla no se escribe nada — el orden es cuadre → upsert", async () => {
+    // Los totales que publica Switch dicen otra cosa que nuestros documentos.
+    const r = await syncCarteraWeb({
+      reporte: reporte(PAR_REINICIADO, [{ title: "0-30", saldo: 999999 }]),
+    });
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/NO cuadra/);
+    expect(llamadas).toHaveLength(0);
   });
 });

@@ -106,6 +106,83 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 > - **Verificado por mutación, 14 de 14 cazadas** (`bash scripts/_mutar-candados-boston-consola.sh`): el saldo suma en vez de restar el crédito · usa `saldoAcumulado` · el secuencial sale de `nFiscal` · la fecha sale de `fechaVence` · los totales dejan de descartar `total` · `claseReporte` 1 en vez de 4 · otro `tipoReporte` · los geográficos vuelven a `"null"` · deja de reconocer la página de excepción · ignora ERROR/CANCELADO · acepta un crear sin uuid · el guard deja pasar todo · el piso baja a 0 · el guard se calcula y no corta.
 > - 🩸 **El verificador de mutaciones se corrigió a sí mismo**: una de las 14 no matcheaba nada, el archivo quedaba intacto, los tests pasaban y el reporte decía *"SOBREVIVIÓ"* — acusaba al candado de un agujero que no existía. Ahora `mutar()` exige que el archivo CAMBIE (md5 antes/después) y aborta el informe entero si alguna es no-op.
 >
+> ## 🔴 SWITCH REINICIÓ LA NUMERACIÓN Y LA CARTERA DE BOSTON SE IDENTIFICABA SOLO POR EL NÚMERO — ✅ RESUELTO (25-ago-2026)
+>
+> **El mismo `secuencial`, en la misma empresa y con el mismo tipo, nombra DOS documentos distintos separados por años.** Medido en producción, **52 grupos** así:
+>
+> ```
+> confecciones_boston  11-000000009 → Factura 2022-10-14 $285,16 · Factura 2026-07-23 $271,25
+> confecciones_boston  13-000000003 → NC      2022-12-13 $9.955,60 · NC     2026-03-19 $187,79
+> ```
+>
+> **Solo Boston está expuesta.** Las otras 7 empresas usan el `ccte_id` **nativo** que trae el API; Boston lo DERIVABA del `secuencial` (`serie × 10⁷ + correlativo`) porque su cartera baja por el reporte web. Dos documentos distintos daban la MISMA fila y el upsert por `(empresa_key, ccte_id)` colapsaba uno **en silencio** (lotes distintos) o **reventaba la corrida** (mismo lote).
+>
+> 🩸 **Y ningún guard lo tapaba, por dos motivos que valen la pena recordar:**
+> - El guard de colisión de `construirFilas` **solo cortaba cuando dos secuenciales DISTINTOS daban el mismo id**. Dos documentos con el **MISMO** secuencial ni lo despertaban — había un test que lo declaraba: *"el MISMO documento repetido no es una colisión"*. **Esa suposición era justo la que rompía el reinicio de serie.**
+> - `cuadraConSwitch` **tampoco puede verlo**: el resumen se calcula sobre las filas **ANTES** del upsert, así que cuadra al centavo contando los dos y recién después el upsert colapsa uno.
+>
+> ### 1. La identidad lleva el AÑO adentro
+>
+> ```
+> ccte_id = serie × 10.000.000 + (año − 2000) × 100.000 + correlativo
+> ```
+>
+> y **se lee de corrido en decimal**: `11-000000009` del 2026 da `112600009`, o sea `11` · `26` · `00009`. Que sea legible no es cosmético — es lo que deja auditar una fila sin volver a correr nada.
+> - **Techo verificado**: 200×10⁷ + 99×10⁵ + 99.999 = **2.009.999.999** < 2^31−1. El presupuesto de un `int` no da para más: con serie ≤ 200 y 100 años, el correlativo no pasa de ~107.000, así que los **100.000** de la fórmula son el máximo redondo que entra. Medido en producción: serie máx **155**, correlativo máx **7.649**, años **2022-2026**, **0** documentos sin fecha.
+> - **Disjunto de los ccteId reales por CONSTRUCCIÓN**: el mínimo que produce es 10.000.000 y el ccte_id real más alto de toda la tabla es 16.388.
+> - 🔴 **Un documento sin fecha, o con el año fuera de 2000-2099, se RECHAZA** y va a `skip_details`. Como el resumen se arma solo con lo que sí se construyó, ese rechazo **desarma el cuadre** y la corrida entera se corta sin escribir. Preferimos la cartera de ayer entera y un error a la vista, que la de hoy con un documento menos.
+>
+> ### 2. El guard CAMBIÓ DE DIRECCIÓN
+>
+> La identidad de un documento son **tres campos: secuencial + fecha + monto**. Un secuencial repetido con **cualquier** diferencia **corta la corrida**; solo la repetición EXACTA se deja pasar (el upsert la colapsa). Con el año adentro del id, el caso que motivó todo ni llega al guard —2022 y 2026 dan ids distintos y conviven como dos filas—; lo que queda para el guard es lo que el año no puede separar (mismo secuencial en el MISMO año), y eso, en vez de pisarse, corta. **Fail-closed y ruidoso, nunca una fila pisando a otra.**
+>
+> ### 3. El orden: la cartera nunca queda en cero ni a medias
+>
+> El reconcile pone `saldo = 0` a todo lo que tenga `synced_at < runStamp`, así que al cambiar el `ccte_id` las filas viejas quedan huérfanas. **El orden `upsert → reconcile` es lo que lo hace seguro**: primero entra la generación nueva CON su plata y recién después se cierra la vieja, así que la cartera **nunca pasa por cero ni por un total corto** — el único estado transitorio posible es "de más", y dura lo que tarda un UPDATE. Invertirlo (reconcile primero) la dejaría en CERO, y hay una mutación que lo caza.
+>
+> **La transición ya ocurrió, una sola vez, medida contra producción el 25-ago-2026:** 931 documentos escritos con la identidad nueva, 931 filas viejas cerradas, y la pestaña **idéntica antes y después, POSICIÓN POR POSICIÓN, campo por campo** — `$198.296,55 · 386 clientes · 0-90 $60.730,75 · 91-120 $16.002,61 · 121+ $121.563,19` —, y el grupo también (`$3.515.744,63 · 98 clientes`, 209 filas de vista). ⚠️ El documento de **$266.541.352** lo sigue rechazando el guard de montos: **está mal EN SWITCH** y es un pendiente de Daniel, no de acá.
+>
+> ⚠️ **Al comparar dos fotos de `switch_estadocuenta_aging`, el orden hay que fijarlo en el cliente**: la vista tiene una fila por (empresa, cliente) y ordenar solo por `codigo` deja empates que PostgREST devuelve como le conviene — dos fotos idénticas se ven distintas. `scripts/_comparar-fotos-cartera.mjs` ordena por la fila entera.
+>
+> ### 4. Las 2.178 filas muertas
+>
+> Boston arrastraba **1.069 filas zombi** del sync viejo por API (`ccte_id` nativo, sincronizadas el 28-30 de julio) y la transición sumó **1.109** más de la identidad vieja. **Las 2.178 en saldo $0,00**, verificado antes de tocarlas; la vista de aging ya las excluía, así que **no mueven plata** — solo ensuciaban cualquier conteo. Se barren en `20260826150000_boston_barrer_filas_muertas.sql` con la **LISTA EXPLÍCITA de cada `ccte_id`, nunca un `LIKE` ni un rango**, más un `COALESCE(saldo,0)=0` de cinturón por si alguna tuviera plata el día que corra. La lista la arma `scripts/_generar-sql-limpieza-boston.ts` (solo lectura), que **se niega a escribir el SQL** si encuentra una con saldo.
+>
+> ### Candados
+>
+> **`src/__tests__/lib/boston-cartera-web.test.ts` — sección D (la llave) y sección F (CONDUCTA).** La F llama al **sync de verdad contra un doble** y mira **qué filas se escribieron y en qué orden**: el bug vive en la juntura `cuadre → upsert`, y un test de `construirFilas` sola nunca lo vería porque ahí las dos filas están. Se prueba el caso real de punta a punta (dos ccte_id, `$556,41` completos), que el reconcile va después del upsert, y que una colisión o un documento sin fecha **no escriben NI UNA fila**.
+> - **Verificado por mutación, 13 de 13 cazadas** (`bash scripts/_mutar-candados-identidad-boston.sh`, primera mitad): la identidad vuelve a ser solo el número · todos los documentos usan la misma fecha · el factor del año es 0 · una fecha inventada tapa la que falta · el año se envuelve fuera de la ventana · el guard vuelve a mirar solo el secuencial · la identidad deja de mirar la fecha · deja de mirar el monto · el guard se calcula y no corta · la fila guarda otra fecha que la de su id · un correlativo de 6 dígitos pisa los dígitos del año · **el reconcile corre ANTES del upsert** · el cuadre se calcula y no corta.
+>
+> ## 🔔 EL CENTINELA DE TIPOS DE COMPROBANTE DE VENTA (25-ago-2026)
+>
+> **En mayo de 2025 Switch estrenó el tipo «Transacción»** (reemplazó a «Tiquete»). Alguien lo agregó a tiempo y no se perdió una venta — **por suerte**. Si mañana Switch inventa otro tipo, esa venta cae al `ELSE 0` de las **19 copias** del CASE que hay en las vistas de ventas y **desaparece del tablero sin una sola alerta**: no hay error, no suena nada, el total sale más bajo y nadie se entera.
+>
+> **En cartera ese guard existía desde mayo-2026** (`switch_estadocuenta_tipos_sin_clasificar` + el check `aging_tipos_sin_clasificar`). **En ventas no había equivalente.** Esto es el mismo mecanismo, calcado a propósito.
+>
+> **La lista se dice en UN solo lugar: `src/lib/ventas/tipos-comprobante.ts`** — los 5 tipos largos (`Factura · Tiquete · Transacción · Nota de Débito · Nota de Crédito`) y los códigos cortos de `switch_articulo_diario` (`FA · TQ=Tiquete · CNF=Transacción · ND · NC`). `clientes-ytd.ts` la **importa** en vez de repetirla, y un test lee el SQL de la migración y exige que diga lo mismo. Una lista paralela es la que un día se aparta en silencio.
+>
+> **Dos vistas, riesgos OPUESTOS** (`20260826140000_ventas_tipos_sin_clasificar.sql`, aditiva):
+> - `switch_facturas_tipos_sin_clasificar` — el `ELSE 0`: un tipo nuevo hace que la venta valga **CERO**. La plata DESAPARECE.
+> - `switch_articulo_diario_tipos_sin_clasificar` — el contrario: ahí es `CASE WHEN tipo='NC' THEN -x ELSE x END`, o sea que un código nuevo **SUMA sin permiso** e infla costo y utilidad.
+>
+> 🔴 **NO estrena una cuarta alerta.** Entra en la **regla 2** y sale por `alertSwitchCronErrors` → canal 🔧 SISTEMA, en la **MISMA** llamada que ya hacía `switch-sync` (dos llamadas serían dos mensajes por la misma corrida). **La venta NO se descarta**: sigue guardada con su tipo y sigue valiendo 0 en los reportes — adivinarle un signo sería inventar plata. Lo único que cambia es que **avisa**.
+> - 🔑 **Y por eso deja su propia fila en `switch_sync_log`** (`sync_type = 'ventas_tipos'`, una por empresa y corrida, con su DDL en la MISMA migración). La racha se mide sobre el par `(empresa, sync_type)`: **sin filas propias**, `evaluateSwitchEscalation` caería en `sin-historia` (fail-open) y avisaría en la PRIMERA corrida **y en todas las siguientes, para siempre**. Con filas, se comporta como cualquier sync: la 1ª se calla, la 2ª avisa, y el día que alguien clasifique el tipo la fila vuelve a `success` y la racha se reinicia sola.
+> - ⚠️ **No toca el heartbeat.** Un tipo nuevo no significa que el cron de facturas haya fallado —las facturas se escribieron bien—, así que el latido se sigue registrando y no despierta además al vigía de crones caídos.
+> - **Un tipo nuevo SIN plata no despierta a nadie**: queda anotado en el log y en `/admin/data-health` (check `ventas_tipos_sin_clasificar`, `warning` sin plata / `critical` con plata). Misma gradación que la cartera.
+> - **Si las vistas todavía no existen** (la migración la corre Daniel a mano), el centinela lo reconoce, lo dice en el log y **no avisa ni tumba nada**. La app funciona igual antes de correrla.
+>
+> **El texto exacto que llega al celular**, cuando ya van 2 corridas:
+> ```
+> 🔧 SISTEMA · Una sincronización con Switch no se está recuperando sola.
+> · Vistana International: van 2 corridas seguidas fallando desde 26 ago 2026, 03:10.
+> Qué significa: hay ventas que el tablero está contando como CERO: Switch estrenó un tipo de comprobante que el sistema todavía no sabe leer.
+> Qué hacer: avisame para revisarlo.
+> Detalle: Switch mandó un tipo de comprobante que el sistema no sabe contar: "Transacción B" en 12 venta(s) por $45,231.50, que el tablero está contando como CERO. Hay que clasificarlo (¿suma o resta?) para que la plata vuelva a los totales.
+> ```
+>
+> **Candado: `src/__tests__/lib/ventas-centinela-tipos.test.ts` (23).** Prueba **las dos direcciones**, que es lo único que sirve en un centinela: con los tipos REALES **no avisa nunca**, con un tipo inventado que trae plata **avisa siempre**. Y el SQL se verificó **contra un Postgres de verdad** (pglite, tablas stub con las columnas reales) antes de entregarse.
+> - **Verificado por mutación, 13 de 13 cazadas** (segunda mitad del script): el centinela nunca avisa · mide y descarta lo medido · no devuelve nada para alertar · avisa también sin plata (el ruido diario) · la lista pierde «Transacción» · CNF deja de ser Transacción · un tipo desconocido suma en vez de valer 0 · el SQL y el TS dejan de decir lo mismo · la vista de artículos pierde CNF · el `sync_type` desaparece del código · los hallazgos no entran a la llamada de alerta · **dos llamadas a `alertSwitchCronErrors`** · **el centinela suprime el heartbeat**.
+>
 > ### Candados de lo anterior
 >
 > **`src/__tests__/components/cxc-boston-fecha-del-dato.test.tsx` (7) RENDERIZA la pestaña** con el dato congelado del 19-ago y con uno fresco, y lee lo que el navegador habría mostrado: con dato viejo el aviso aparece y nombra a Confecciones Boston, con dato fresco **no aparece**. Un barrido estático se satisface con el `import` — dejaría pasar el componente montado con la empresa equivocada, con `className="hidden"` o detrás de un `{false && …}`; hay un caso que recorre la cadena de clases desde el aviso hasta la raíz porque **jsdom no resuelve Tailwind**. Más `datos-viejos.test.ts` (19), donde el candado de Boston cambió de dirección.
