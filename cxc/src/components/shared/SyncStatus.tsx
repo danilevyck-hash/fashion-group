@@ -72,8 +72,17 @@ function fmtShortDate(iso: string): string {
   return DATE_FMT.format(d).replace(/\./g, "");
 }
 
-function buildWarning(stale: StaleEntry[], empresaLabels: Record<string, string>): string | null {
-  if (stale.length === 0) return null;
+function buildWarning(
+  // 🩸 Puede llegar AUSENTE. `/api/sync-status` siempre manda `stale`, pero este
+  // componente pinta plata en el CXC (grupo y Boston) y en Ventas: si un día la
+  // respuesta viniera sin el campo —un 200 de un proxy, una versión vieja
+  // cacheada—, un `stale.length` sobre `undefined` tumbaba el render ENTERO y la
+  // pantalla se quedaba en blanco. Se prefiere quedarse sin el aviso ámbar antes
+  // que sin los números: el aviso es un extra, la cartera no.
+  stale: StaleEntry[] | undefined,
+  empresaLabels: Record<string, string>,
+): string | null {
+  if (!stale?.length) return null;
   const parts = stale.map((s) => {
     const label = empresaLabels[s.empresa] ?? s.empresa;
     if (!s.last_synced_at) return `${label} sin datos`;
@@ -130,7 +139,7 @@ export default function SyncStatus({
   const onStaleRef = useRef(onStale);
   onStaleRef.current = onStale;
   useEffect(() => {
-    onStaleRef.current?.((data?.stale.length ?? 0) > 0);
+    onStaleRef.current?.((data?.stale?.length ?? 0) > 0);
   }, [data]);
 
   useEffect(() => {
