@@ -532,6 +532,16 @@ export const SEED_TOLERANT_CRONS = [
   // CRONS_FAIL_CLOSED cuando la DDL esté corrida y el heartbeat lleve días
   // sembrado (el mismo camino que recorrió Tommy).
   "sync-egresos-varios",
+  // COMPRAS (ingreso de mercancia) de las 6 empresas de Fashion Group (09:05
+  // UTC = 04:05 a.m. Panamá — la franja que dejó libre `sync-mayor`). Desplegado
+  // el 25-ago-2026: seed-tolerante hasta que siembre su fila. La DDL
+  // 20260825090000 (el `sync_type` nuevo) la corre Daniel A MANO, pero acá NO
+  // es seed-tolerante DOBLE como calvin o egresos: **el cron escribe las
+  // compras aunque la DDL no haya corrido** —la tabla ya existe desde el
+  // 11-ago— y registra su heartbeat igual; lo único que falta sin la DDL es la
+  // fila en `switch_sync_log`. Promover a CRONS_FAIL_CLOSED cuando lleve días
+  // sembrado (el mismo camino que recorrió Tommy).
+  "sync-ingresos-mercancia",
 ];
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
@@ -556,6 +566,11 @@ const CRON_EMPRESAS_RECIBOS = empresasConRecibos();
 const CRON_EMPRESAS_CXP = empresasConCxp();
 /** Empresas del cron sync-egresos-varios (10:35): las 7 que no son Boston. */
 const CRON_EMPRESAS_EGRESOS = empresasConEgresosEnCron();
+/** Empresas del cron sync-ingresos-mercancia (09:05): las 6 de Fashion Group.
+ *  DERIVADA de la misma capability que define el universo de Ventas ›
+ *  Referencia — es la pantalla que consume esas compras. Escribir acá un array
+ *  literal dejaría que el calendario y el sync se separaran en silencio. */
+const CRON_EMPRESAS_INGRESOS = empresasConCxc();
 /** Las 8 del grupo: switch-articulos y la reconciliación pueden tocar cualquiera. */
 const CRON_EMPRESAS_TODAS = ALL_EMPRESA_KEYS;
 /**
@@ -630,6 +645,17 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // en la 00:20-05:20 UTC, que en Panamá es la tarde-noche (19:20-00:20).
   // Toca las 8 empresas: queda a 25 min de switch-articulos (08:40) y a 25 de
   // sync-proveedores (09:30), sobre los 15 de SEPARACION_MINIMA_MIN.
+  // COMPRAS (ingreso de mercancía) de las 6 de Fashion Group. Abre sesión web
+  // con changesession=SI, o sea que EXPULSA a quien esté en el panel — por eso
+  // va en la franja de madrugada de Panamá (06:00-11:00 UTC), la misma donde ya
+  // viven sync-utilidad (07:00), boston-cartera (08:10) y sync-egresos-varios
+  // (10:35), y NO en la 00:20-05:20 UTC, que en Panamá es la tarde-noche.
+  //
+  // 09:05 es la franja que dejó libre `sync-mayor` al retirarse el 13-ago-2026
+  // — ya era de un cron de login web. Queda a 25 min de switch-articulos (08:40,
+  // las 8 empresas, 204 s medidos → 22 min de aire real) y a 25 de
+  // sync-proveedores (09:30); la reconciliación de las 10:00 (hasta 740 s) a 55.
+  { cron: "sync-ingresos-mercancia", hhmmUtc: "0905", empresas: CRON_EMPRESAS_INGRESOS },
   { cron: "sync-proveedores", hhmmUtc: "0930", empresas: CRON_EMPRESAS_CXP },
   // EGRESOS VARIOS de las 8 empresas (10:35 UTC = 05:35 a.m. Panamá). Abre
   // sesión web con changesession=SI, o sea que EXPULSA a quien esté en el panel

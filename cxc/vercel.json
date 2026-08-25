@@ -189,6 +189,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/sync-ingresos-mercancia",
+      "schedule": "5 9 * * *"
+    },
+    {
       "path": "/api/cron/sync-proveedores",
       "schedule": "30 9 * * *"
     },
