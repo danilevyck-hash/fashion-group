@@ -9,14 +9,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import path from "path";
 import {
   DOCUMENTO_POR_DEFECTO,
+  NOTA_COTIZACION,
   OPCIONES_DOCUMENTO,
-  TEXTO_COTIZACION_DESPUES,
   TEXTO_NO_RESERVA,
-  TEXTO_SI_RESERVA,
   esCotizacion,
   esDocumentoSwitch,
   etapaTelegram,
@@ -70,30 +69,41 @@ describe("🔴 LA ADVERTENCIA — lo único que no se puede dejar de decir", () 
 
   it("está en español simple: sin jerga de sistemas", () => {
     const jerga = /\b(stock|inventario|reserva de stock|commit|SKU|backorder|hold)\b/i;
-    for (const t of [TEXTO_NO_RESERVA, TEXTO_SI_RESERVA, TEXTO_COTIZACION_DESPUES]) {
+    for (const t of [TEXTO_NO_RESERVA, NOTA_COTIZACION]) {
       expect(t, `"${t}" usa jerga`).not.toMatch(jerga);
     }
   });
 
-  it("el pedido dice lo contrario, con las MISMAS palabras (aparta / no aparta)", () => {
-    expect(TEXTO_SI_RESERVA).toMatch(/Aparta la mercancía/);
+  it("🔴 la ETIQUETA dice lo mismo en tres palabras — y no puede volver a ser un párrafo", () => {
+    // 25-ago-2026. Daniel: *"sin párrafo explicando, btw no siempre hay q estar
+    // explicando todo, se vuelve tedioso"*. La elección es directa y de toda la
+    // explicación queda SOLO el dato material, pegado a la opción. Si mañana
+    // alguien le agrega media frase "para que se entienda mejor", vuelve a ser
+    // el párrafo que Daniel sacó — por eso el largo es parte del candado.
+    expect(NOTA_COTIZACION).toBe("no aparta mercancía");
+    expect(NOTA_COTIZACION.split(/\s+/).length).toBeLessThanOrEqual(4);
+    expect(NOTA_COTIZACION.length).toBeLessThanOrEqual(24);
+    // Una etiqueta, no una oración: sin punto final y sin ejemplo adentro.
+    expect(NOTA_COTIZACION).not.toMatch(/[.;]/);
+    expect(NOTA_COTIZACION).not.toMatch(/500 pares/);
   });
 
-  it("dice qué hacer después de cotizar, para que el pedido no quede trabado", () => {
-    // Un pedido admite UN envío no-fallido: si salió como cotización, el pedido
-    // real se hace duplicando. Decirlo antes evita el llamado de después.
-    expect(TEXTO_COTIZACION_DESPUES).toMatch(/duplica/i);
-  });
-
-  it("🔴 las dos opciones existen, en orden, y la de cotización TRAE la advertencia", () => {
+  it("🔴 las dos opciones existen, en orden, y SOLO la cotización lleva etiqueta", () => {
     expect(OPCIONES_DOCUMENTO.map((o) => o.clave)).toEqual(["pedido", "cotizacion"]);
     const cot = OPCIONES_DOCUMENTO.find((o) => o.clave === "cotizacion")!;
-    expect(cot.queHace).toBe(TEXTO_NO_RESERVA);
-    expect(cot.detalle).toBe(TEXTO_COTIZACION_DESPUES);
+    expect(cot.nota).toBe(NOTA_COTIZACION);
     const ped = OPCIONES_DOCUMENTO.find((o) => o.clave === "pedido")!;
-    expect(ped.queHace).toBe(TEXTO_SI_RESERVA);
+    // El pedido NO lleva nota: es lo de todos los días y no hay nada que avisar.
+    // Ponerle una vuelve a hacer gemelos a los dos botones.
+    expect(ped.nota).toBeUndefined();
     expect(ped.titulo).toBe("Pedido");
     expect(cot.titulo).toBe("Cotización");
+  });
+
+  it("la frase larga sigue viva para DESPUÉS de mandar (confirmación y Telegram)", () => {
+    // No se dibuja antes de mandar, pero no se borró: donde hay lugar para
+    // leerla se lee entera.
+    expect(TEXTO_NO_RESERVA).toMatch(/NO aparta la mercancía/);
   });
 });
 
@@ -138,30 +148,50 @@ describe("🔴 la advertencia y la elección viven en UN solo lugar", () => {
     "src/components/catalogo/ConfirmacionClient.tsx",
   ];
 
-  it("ninguna pantalla reescribe la advertencia a mano", () => {
+  it("ninguna pantalla reescribe la advertencia ni la etiqueta a mano", () => {
     // Tres copias de una advertencia se separan solas, y la que quede vieja es
     // la que manda plata al ERP.
     for (const p of PANTALLAS) {
       const src = sinComentarios(SRC(p));
       expect(src, `${p} escribe la advertencia a mano`).not.toContain("NO aparta la mercancía");
+      expect(src, `${p} escribe la etiqueta a mano`).not.toContain(NOTA_COTIZACION);
     }
   });
 
-  it("las tres pantallas dibujan EL selector compartido", () => {
+  it("las tres pantallas dibujan EL control compartido", () => {
     for (const p of PANTALLAS) {
       const src = sinComentarios(SRC(p));
-      expect(src, `${p} no dibuja ElegirDocumentoSwitch`).toContain("<ElegirDocumentoSwitch");
+      expect(src, `${p} no dibuja EnviarDocumentoSwitch`).toContain("<EnviarDocumentoSwitch");
     }
   });
 
-  it("🔴 el selector dibuja las opciones DEL MÓDULO, no una lista propia", () => {
-    const src = sinComentarios(SRC("src/components/catalogo/ElegirDocumentoSwitch.tsx"));
+  it("🔴 NINGUNA pantalla dice ya «Enviar a Switch» en un botón propio", () => {
+    // 25-ago-2026: lo que se ofrece son las dos salidas, directo. Si alguna
+    // pantalla se quedara con su botón viejo, ahí se perdería la etiqueta de
+    // que la cotización no aparta mercancía — y ése es el camino que manda
+    // plata al ERP.
+    for (const p of PANTALLAS) {
+      const src = sinComentarios(SRC(p));
+      expect(src, `${p} conserva un botón "Enviar a Switch"`).not.toMatch(/>\s*(\{[^}]*)?"?Enviar a Switch/);
+    }
+  });
+
+  it("🔴 el control dibuja las opciones DEL MÓDULO, no una lista propia", () => {
+    const src = sinComentarios(SRC("src/components/catalogo/EnviarDocumentoSwitch.tsx"));
     expect(src).toContain("OPCIONES_DOCUMENTO.map");
-    // Y el modal es el patrón del repo: portal + inset-0 + lock, sin autoFocus.
-    expect(src).toContain("createPortal");
-    expect(src).toContain("inset-0");
-    expect(src).toContain("useBodyScrollLock");
+    // 🔴 Y NO es un modal: la elección es DIRECTA, sin ventana en el medio. Si
+    // volviera a abrirse un portal, volvería el paso que Daniel sacó.
+    expect(src).not.toContain("createPortal");
+    expect(src).not.toContain("useBodyScrollLock");
     expect(src).not.toContain("autoFocus");
+    // La nota se dibuja desde la opción, no escrita a mano.
+    expect(src).toContain("o.nota");
+    expect(src).not.toContain(NOTA_COTIZACION);
+  });
+
+  it("🔴 el modal de elección ya no existe — no quedó una segunda forma de mandar", () => {
+    expect(existsSync(path.join(process.cwd(), "src/components/catalogo/ElegirDocumentoSwitch.tsx")))
+      .toBe(false);
   });
 
   it("🔴 el servidor normaliza en LAS DOS rutas de envío", () => {

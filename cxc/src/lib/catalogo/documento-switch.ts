@@ -34,6 +34,16 @@
 // la elección (checkout, detalle del pedido y confirmación) y tres copias de una
 // advertencia se separan solas; la que quede vieja es la que manda plata al ERP.
 //
+// 🔴 25-ago-2026 — SE OFRECEN LAS DOS DIRECTO, SIN VENTANA EN EL MEDIO.
+// El 24-ago la elección costaba un toque extra en un modal con un párrafo
+// explicando la diferencia. Daniel lo revirtió, textual: ***"quiero que en vez
+// de que diga «enviar a switch», salga cotización o pedido como opción (sin
+// párrafo explicando, btw no siempre hay q estar explicando todo, se vuelve
+// tedioso)"***. Lo que NO se fue con el párrafo es el dato material: la
+// cotización sigue diciendo, en letra chica y pegada a la opción, que no aparta
+// mercancía (`NOTA_COTIZACION`). Y ningún candado del servidor se aflojó — el
+// 422 sin cliente, `normalizarDocumento` y el at-most-once están intactos.
+//
 // Este módulo es PURO: no importa React ni Supabase. Lo usan el navegador (los
 // tres botones) y el servidor (las dos rutas y el motor), y es la única
 // definición de qué valores son válidos.
@@ -72,50 +82,47 @@ export function etiquetaDocumento(d: DocumentoSwitch): string {
 }
 
 /**
- * 🔴 LA FRASE. Es lo único que la pantalla NO puede dejar de decir antes de
- * mandar una cotización, y por eso es una constante y no un texto inline.
- * Español simple, sin jerga: "aparta" y no "reserva stock"/"compromete
- * inventario", y con el ejemplo de los pares adentro porque el número es lo que
- * hace entender la consecuencia.
+ * 🔴 LA FRASE LARGA. Desde el 25-ago-2026 ya NO se dibuja antes de mandar —la
+ * elección es directa y ahí va la etiqueta corta (`NOTA_COTIZACION`)—, pero
+ * sigue viva donde sí hay lugar para leerla: la confirmación DESPUÉS de mandar
+ * y el aviso de Telegram. Español simple, sin jerga: "aparta" y no "reserva
+ * stock"/"compromete inventario", y con el ejemplo de los pares adentro porque
+ * el número es lo que hace entender la consecuencia.
  */
 export const TEXTO_NO_RESERVA =
   "La cotización NO aparta la mercancía: si cotizas 500 pares, a los otros vendedores les siguen apareciendo disponibles y los pueden vender.";
 
-/** Lo que sí hace el pedido, dicho con las mismas palabras. */
-export const TEXTO_SI_RESERVA = "Aparta la mercancía para este cliente.";
-
 /**
- * ⚠️ La consecuencia del candado at-most-once, dicha antes y no después. Un
- * pedido admite UN envío no-fallido: si sale como cotización, ese pedido ya no
- * vuelve a salir. Para vender de verdad se duplica (el botón "Duplicar" ya
- * existe y pregunta el cliente). El candado NO se tocó — ver switch-envio.ts.
+ * 🔴 LA MISMA ADVERTENCIA, EN TRES PALABRAS — y es lo ÚNICO que queda del
+ * párrafo (25-ago-2026). Daniel, textual: ***"que en vez de que diga «enviar a
+ * switch», salga cotización o pedido como opción (sin párrafo explicando, btw
+ * no siempre hay q estar explicando todo, se vuelve tedioso)"***.
+ *
+ * Las dos salidas se ofrecen DIRECTO, sin ventana intermedia. Pero el riesgo que
+ * el paso intermedio protegía no desapareció: una cotización NO aparta
+ * mercancía, y el que toca la equivocada manda 500 pares de la forma que no era.
+ * Así que la información material sobrevive pegada a la opción, en el mínimo de
+ * palabras posible. NO es un párrafo: es una etiqueta, y no puede crecer —
+ * hay candado de largo.
  */
-export const TEXTO_COTIZACION_DESPUES =
-  "Si después lo compran, duplica el pedido y mándalo como pedido.";
+export const NOTA_COTIZACION = "no aparta mercancía";
 
-/** Una salida, tal como se dibuja en el selector. El orden del array ES el orden de la pantalla. */
+/** Una salida, tal como se dibuja. El orden del array ES el orden de la pantalla. */
 export interface OpcionDocumento {
   clave: DocumentoSwitch;
   /** Texto del botón. */
   titulo: string;
-  /** Qué hace con la mercancía, en una línea. */
-  queHace: string;
-  /** Segunda línea, solo donde hace falta. */
-  detalle?: string;
+  /** La etiqueta en letra chica, pegada al título. Solo la cotización la lleva. */
+  nota?: string;
 }
 
 /**
  * Las dos opciones, en el orden en que se leen. PEDIDO va primero: es lo que se
- * hace todos los días y lo que hacía el botón antes de este cambio.
+ * hace todos los días y lo que hacía el botón antes de que hubiera dos.
  */
 export const OPCIONES_DOCUMENTO: readonly OpcionDocumento[] = [
-  { clave: "pedido", titulo: "Pedido", queHace: TEXTO_SI_RESERVA },
-  {
-    clave: "cotizacion",
-    titulo: "Cotización",
-    queHace: TEXTO_NO_RESERVA,
-    detalle: TEXTO_COTIZACION_DESPUES,
-  },
+  { clave: "pedido", titulo: "Pedido" },
+  { clave: "cotizacion", titulo: "Cotización", nota: NOTA_COTIZACION },
 ];
 
 /** "Pedido creado en Switch" / "Cotización creada en Switch". */

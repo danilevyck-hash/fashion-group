@@ -32,6 +32,18 @@ import {
 
 const SRC = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
 
+/**
+ * 🩸 LOS BARRIDOS DE TEXTO DE ESTE REPO BORRAN LOS COMENTARIOS PRIMERO. Un
+ * candado que se cumple —o que se rompe— con la explicación de al lado no es un
+ * candado: es un archivo que se lee bien. Ya pasó cuatro veces acá.
+ */
+const sinComentarios = (src: string) =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1"))
+    .join("\n");
+
 const aviso = (codigo: WarningCodigo, texto = "x"): AvisoEnvio => ({ codigo, texto });
 
 // ── ¿Se detiene o sigue? ─────────────────────────────────────────────────────
@@ -256,9 +268,16 @@ describe('poda: el botón dice "Enviar a Switch" a secas', () => {
     for (const f of ARCHIVOS) expect(SRC(f)).not.toContain("Confirmar y enviar a Switch");
   });
 
-  it("las dos puertas de envío dicen lo mismo", () => {
-    expect(SRC("src/components/catalogo/PedidoDetalleClient.tsx")).toContain('"Enviar a Switch"');
-    expect(SRC("src/components/catalogo/CheckoutClient.tsx")).toContain('"Enviar a Switch"');
+  it("🔴 25-ago-2026: las dos puertas ofrecen LAS DOS SALIDAS, con la misma pieza", () => {
+    // Daniel: *"quiero que en vez de que diga «enviar a switch», salga
+    // cotización o pedido como opción"*. El botón único se fue de las dos
+    // pantallas; lo que queda es el control compartido, que las dibuja iguales
+    // en las 4 marcas.
+    for (const f of ARCHIVOS) {
+      const src = sinComentarios(SRC(f));
+      expect(src, f).toContain("<EnviarDocumentoSwitch");
+      expect(src, f).not.toContain('"Enviar a Switch"');
+    }
   });
 
   it("⚠️ el pedido PÚBLICO no se toca: ahí confirma el CLIENTE y no manda nada a Switch", () => {

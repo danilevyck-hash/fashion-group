@@ -353,9 +353,12 @@ describe("candados estáticos", () => {
 
   it("UN botón encadena confirmar + revisar + enviar, y el correo interno es opcional", () => {
     const src = SRC("src/components/catalogo/PedidoDetalleClient.tsx");
-    // 12-ago-2026: el botón dice "Enviar a Switch" a secas y hace el camino
-    // COMPLETO — el modal de preview dejó de ser un paso obligatorio.
-    expect(src).toContain('"Enviar a Switch"');
+    // 12-ago-2026: el botón hace el camino COMPLETO — el modal de preview dejó
+    // de ser un paso obligatorio.
+    // 25-ago-2026: y ya no es UN botón: son las DOS salidas, directo, con el
+    // control compartido. El texto viejo no puede volver por ningún lado.
+    expect(src).toContain("<EnviarDocumentoSwitch");
+    expect(src).not.toContain('"Enviar a Switch"');
     expect(src).not.toContain("Confirmar y enviar a Switch");
     // ⏱️ 12-ago-2026 (un solo viaje): la pre-validación y la creación viajan
     // juntas (`auto:true`) en vez de un `dry:true` + un POST real que volvía a

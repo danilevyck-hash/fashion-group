@@ -26,7 +26,7 @@ import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
 import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
-import ElegirDocumentoSwitch from "@/components/catalogo/ElegirDocumentoSwitch";
+import EnviarDocumentoSwitch from "@/components/catalogo/EnviarDocumentoSwitch";
 import {
   DOCUMENTO_POR_DEFECTO,
   type DocumentoSwitch,
@@ -134,11 +134,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | "error" | null>(null);
   // ── Envío a Switch (ERP) ──
   const [switchEnvio, setSwitchEnvio] = useState<SwitchEnvio | null>(null);
-  // Pedido o cotización (24-ago-2026): el botón "Enviar a Switch" pregunta qué
-  // antes de mandar. `documentoElegido` es lo que se eligió en ESTE intento —
-  // el botón "Crear en Switch" del modal de problema tiene que mandar lo mismo
-  // que se eligió, no volver al default.
-  const [eligiendoDocumento, setEligiendoDocumento] = useState(false);
+  // Pedido o cotización: se eligen DIRECTO, cada uno con su botón (25-ago-2026;
+  // antes había una ventana en el medio). `documentoElegido` es lo que se eligió
+  // en ESTE intento — el botón "Crear en Switch" del modal de problema tiene que
+  // mandar lo mismo que se eligió, no volver al default.
   const [documentoElegido, setDocumentoElegido] = useState<DocumentoSwitch>(DOCUMENTO_POR_DEFECTO);
   const [switchProblema, setSwitchProblema] = useState<SwitchProblema | null>(null);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
@@ -463,16 +462,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // exactamente igual. El PUT va PRIMERO porque `enviar-switch` sigue exigiendo
   // status==='confirmado'.
   //
-  // 🔴 24-ago-2026: el toque ahora PREGUNTA QUÉ (pedido o cotización) y recién
-  // después hace todo el camino. Es un toque más y es deliberado: una cotización
-  // NO aparta mercancía, y esa diferencia no se ve en la pantalla.
-  function enviarASwitch() {
-    if (enviandoRef.current) return;
-    // MISMA guarda que el envío: sin cliente elegido no se abre ni la elección.
-    if (!clienteElegido) return;
-    setEligiendoDocumento(true);
-  }
-
+  // 🔴 25-ago-2026: las dos salidas se ofrecen DIRECTO. El toque es sobre
+  // "Pedido" o sobre "Cotización" y desde ahí hace todo el camino. Lo que sí
+  // sobrevive del paso intermedio es el dato material —la cotización no aparta
+  // mercancía— como etiqueta pegada a la opción.
   async function enviarASwitchCon(documento: DocumentoSwitch) {
     if (enviandoRef.current) return; // doble toque: el segundo no hace nada
     // Segunda capa contra un cambio futuro del `disabled`. ⚠️ NO es el candado
@@ -482,7 +475,6 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     if (!clienteElegido) return;
     enviandoRef.current = true;
     setDocumentoElegido(documento);
-    setEligiendoDocumento(false);
     setConfirming(true);
     setSwitchProblema(null);
     try {
@@ -1205,27 +1197,21 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   </div>
                 )}
 
-                {/* UN SOLO TOQUE: confirma, revisa contra Switch y crea el
-                    pedido. Solo se detiene si hay algo que decidir.
+                {/* UN SOLO TOQUE, sobre la salida que se quiere: confirma,
+                    revisa contra Switch y lo crea. Solo se detiene si hay algo
+                    que decidir.
                     🔴 Y APAGADO SIN CLIENTE ELEGIDO: es el mismo candado que
                     el checkout, con la misma regla compartida. */}
-                <button onClick={enviarASwitch} disabled={confirming || !items.length || !clienteElegido}
-                  className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition disabled:opacity-40">
-                  {confirming
-                    ? (pasoSwitch ?? "Enviando a Switch...")
-                    : switchEnvio?.estado === "error"
-                      ? "Reintentar envío a Switch"
-                      : "Enviar a Switch"}
-                </button>
-                {/* Apagado, DICE qué falta — acá mismo, no en un toast. */}
-                {!confirming && faltaEnviar.length > 0 && (
-                  <p data-medir="falta-enviar" className="text-xs text-amber-800 mt-2 text-center">
-                    {textoFaltaEnviar(faltaEnviar)}
-                  </p>
-                )}
-                {/* El aviso va ANTES del toque, no en un modal después. */}
+                <EnviarDocumentoSwitch
+                  tono="verde"
+                  onElegir={(d) => { void enviarASwitchCon(d); }}
+                  enviando={confirming}
+                  textoEnviando={pasoSwitch ?? "Enviando a Switch..."}
+                  deshabilitado={!items.length || !clienteElegido}
+                  faltaTexto={faltaEnviar.length > 0 ? textoFaltaEnviar(faltaEnviar) : null}
+                />
                 <p className="text-xs text-gray-500 mt-2 text-center">
-                  Elige pedido o cotización, y se crea de verdad en Switch ({theme.empresaKey}). Si sale mal, hay que borrarlo a mano en el panel de Switch.
+                  Se crea de verdad en Switch ({theme.empresaKey}). Si sale mal, hay que borrarlo a mano en el panel de Switch.
                 </p>
               </div>
             )
@@ -1442,15 +1428,6 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
           onCancel={() => { setShowDupModal(false); setDupError(null); }}
         />
       )}
-
-      {/* Pedido o cotización — el toque que falta antes de mandar. La misma
-          pieza que usan el checkout y la confirmación en las 4 marcas. */}
-      <ElegirDocumentoSwitch
-        open={eligiendoDocumento}
-        enviando={confirming}
-        onClose={() => setEligiendoDocumento(false)}
-        onElegir={(d) => { void enviarASwitchCon(d); }}
-      />
 
       <Toast message={toast} />
     </div>
