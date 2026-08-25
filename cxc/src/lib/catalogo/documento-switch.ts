@@ -81,16 +81,17 @@ export function etiquetaDocumento(d: DocumentoSwitch): string {
   return esCotizacion(d) ? "Cotización" : "Pedido";
 }
 
-/**
- * 🔴 LA FRASE LARGA. Desde el 25-ago-2026 ya NO se dibuja antes de mandar —la
- * elección es directa y ahí va la etiqueta corta (`NOTA_COTIZACION`)—, pero
- * sigue viva donde sí hay lugar para leerla: la confirmación DESPUÉS de mandar
- * y el aviso de Telegram. Español simple, sin jerga: "aparta" y no "reserva
- * stock"/"compromete inventario", y con el ejemplo de los pares adentro porque
- * el número es lo que hace entender la consecuencia.
- */
-export const TEXTO_NO_RESERVA =
-  "La cotización NO aparta la mercancía: si cotizas 500 pares, a los otros vendedores les siguen apareciendo disponibles y los pueden vender.";
+// 🔴 `TEXTO_NO_RESERVA` (la frase larga de los 500 pares) SE BORRÓ el
+// 25-ago-2026. Era lo último que quedaba del párrafo didáctico y se dibujaba en
+// la confirmación, DESPUÉS de mandar. Daniel lo señaló en su captura, textual:
+// ***"no siempre tiene que haber explicación, eso ensucia mi ERP"***.
+//
+// No se deja "por si acaso": una constante muerta con el párrafo adentro es el
+// párrafo esperando a que alguien la vuelva a montar — el mismo motivo por el
+// que `ElegirDocumentoSwitch.tsx` se borró en vez de dejarse sin usar. Lo que
+// SÍ queda es el dato material, en el mínimo de palabras y donde se decide:
+// `NOTA_COTIZACION` pegado a la opción, y la línea propia del aviso de Telegram
+// ("No aparta mercancía — sigue disponible para los demás.").
 
 /**
  * 🔴 LA MISMA ADVERTENCIA, EN TRES PALABRAS — y es lo ÚNICO que queda del
@@ -124,6 +125,67 @@ export const OPCIONES_DOCUMENTO: readonly OpcionDocumento[] = [
   { clave: "pedido", titulo: "Pedido" },
   { clave: "cotizacion", titulo: "Cotización", nota: NOTA_COTIZACION },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LA PALABRA QUE ACOMPAÑA AL NÚMERO — Y POR QUÉ LA DECIDE SWITCH
+// (25-ago-2026)
+//
+// Daniel mandó TOM-027 como COTIZACIÓN, Switch la aceptó, y el papel que le
+// llegó al cliente decía «Pedido: TOM-027». Textual: ***"esto fue una
+// cotización, porque dice pedidos en pdf?"***. Una cotización NO aparta
+// mercancía: llamarla «Pedido» en el papel que se manda es exactamente la
+// confusión que el resto de este módulo existe para evitar.
+//
+// 🔴 EL IDENTIFICADOR NO CAMBIA. `TOM-027` es el número de la casa y se llama
+// así siempre, salga como pedido o como cotización. Lo único que cambia es la
+// PALABRA que lo acompaña.
+//
+// 🔴 MANDA LO QUE HAY EN SWITCH, porque es lo único comprobable: si salió como
+// cotización, el papel dice «Cotización» aunque acá el pedido figure
+// confirmado. Y si TODAVÍA NO SALIÓ no es ninguna de las dos: `palabraEnSwitch`
+// devuelve `null` y no se le inventa etiqueta — cada pantalla se queda con la
+// palabra que ya usaba, que es exactamente lo que decía antes de este cambio.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Los estados de envío que cuentan como «está en Switch». Es el MISMO criterio
+ * que el candado de edición (`switch-lock.ts`) y que la pestaña de la lista: si
+ * un pedido no se puede editar porque ya salió, entonces el papel tiene que
+ * nombrar lo que salió. Dos definiciones de «está en Switch» se separan solas.
+ */
+export const ESTADOS_EN_SWITCH: readonly string[] = ["enviado", "verificado"];
+
+/** Lo mínimo del envío activo para saber qué palabra va en el papel. */
+export interface EnvioParaPalabra {
+  estado?: string | null;
+  /** Columna `documento`. Ausente (DDL 20260824160000 pendiente) = pedido. */
+  documento?: DocumentoSwitch | string | null;
+}
+
+/**
+ * «Pedido» · «Cotización» · `null` si el pedido NO salió a Switch.
+ *
+ * El `null` es el punto del módulo: un pedido que todavía no se mandó no es
+ * ninguna de las dos, y rotularlo sería inventar. Quien llama decide con qué
+ * palabra se queda mientras tanto (`palabraDelPapel`).
+ */
+export function palabraEnSwitch(envio: EnvioParaPalabra | null | undefined): string | null {
+  if (!envio) return null;
+  if (!ESTADOS_EN_SWITCH.includes(String(envio.estado ?? ""))) return null;
+  return etiquetaDocumento(normalizarDocumento(envio.documento));
+}
+
+/**
+ * La palabra que se pinta. Manda Switch; si no salió, la que esa pantalla ya
+ * usaba (`siNoSalio`, por defecto «Pedido» — el `DOCUMENTO_POR_DEFECTO`, que es
+ * lo único que este sistema sabía crear antes del 24-ago-2026).
+ */
+export function palabraDelPapel(
+  envio: EnvioParaPalabra | null | undefined,
+  siNoSalio: string = etiquetaDocumento(DOCUMENTO_POR_DEFECTO),
+): string {
+  return palabraEnSwitch(envio) ?? siNoSalio;
+}
 
 /** "Pedido creado en Switch" / "Cotización creada en Switch". */
 export function tituloCreadoEnSwitch(d: DocumentoSwitch): string {

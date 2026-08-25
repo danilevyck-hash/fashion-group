@@ -195,3 +195,62 @@ describe("catalog-pdf — PDF del catálogo completo compartido", () => {
     expect(text).toContain("3 productos");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL ENCABEZADO NOMBRA LO QUE ES — «Pedido:» o «Cotización:» (25-ago-2026)
+//
+// El PDF se genera de VERDAD y se le lee el texto con pdf.js. Daniel mandó
+// TOM-027 como cotización y el papel que se le manda al cliente decía «Pedido:
+// TOM-027». Una cotización no aparta mercancía: ese papel hacía creer que sí.
+//
+// El papel completo, leído con `pdftotext` sobre el archivo en disco, está en
+// `scripts/_verif-pdf-dice-la-verdad.mjs` — acá se fija la regla del core.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 la palabra del encabezado del PDF", () => {
+  const ITEMS_MIN: PdfOrderItem[] = [
+    { sku: "TH-1", name: "Tee", quantity: 2, unit_price: 18.5, image_url: "", category: "CAMISETAS", bulto_pzas: 12 },
+  ];
+  const papel = (documentoLabel?: string) =>
+    buildOrderPdfDoc({
+      marca: "tommy",
+      orderNumber: "TOM-027",
+      clientName: "COMERCIAL EL MACHETAZO, S.A.",
+      createdAt: "2026-08-25T12:00:00.000Z",
+      items: ITEMS_MIN,
+      bultoSize: (_c, pz) => pz || 12,
+      images: {},
+      documentoLabel,
+    });
+
+  it("dice «Cotización: TOM-027» cuando eso fue lo que salió", async () => {
+    const [p1] = await extractPagesText(docBytes(papel("Cotización")));
+    expect(p1).toContain("Cotización: TOM-027");
+    expect(p1).not.toContain("Pedido: TOM-027");
+  });
+
+  it("dice «Pedido: TOM-027» cuando fue un pedido", async () => {
+    const [p1] = await extractPagesText(docBytes(papel("Pedido")));
+    expect(p1).toContain("Pedido: TOM-027");
+    expect(p1).not.toContain("Cotización: TOM-027");
+  });
+
+  it("sin palabra dice «Pedido:» — lo que decía desde el día uno", async () => {
+    const [p1] = await extractPagesText(docBytes(papel(undefined)));
+    expect(p1).toContain("Pedido: TOM-027");
+  });
+
+  it("🔴 EL NÚMERO NO CAMBIA, y nunca desaparece del papel", async () => {
+    for (const l of ["Cotización", "Pedido", undefined]) {
+      const [p1] = await extractPagesText(docBytes(papel(l)));
+      expect(p1, `documentoLabel=${l}`).toContain("TOM-027");
+      // Ni prefijo raro ni renombre: el número va PELADO detrás de la palabra.
+      expect(p1).toMatch(/(Pedido|Cotización): TOM-027/);
+    }
+  });
+
+  it("la palabra no se monta encima de la Fecha (columnas 90 → 150 mm)", async () => {
+    const [p1] = await extractPagesText(docBytes(papel("Cotización")));
+    // Las tres columnas del encabezado siguen leyéndose enteras y en orden.
+    expect(p1).toMatch(/Cliente:.*Cotización: TOM-027.*Fecha:/s);
+  });
+});

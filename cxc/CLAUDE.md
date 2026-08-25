@@ -1760,6 +1760,112 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > El modal de eliminación masiva y su `switch_numero` · el candado at-most-once · el envío a Switch · la agrupación por mes · el routing de «Editar» (fila y botón al MISMO lado) · el Excel de «Exportar» · y **nada del detalle del pedido**.
 
+## 🔴 EL PAPEL DECÍA «PEDIDO» SIENDO UNA COTIZACIÓN (25-ago-2026)
+
+> Daniel mandó **TOM-027 como COTIZACIÓN**, Switch la aceptó (`15-000000123`), y:
+> - la pantalla de confirmación decía **«Pedido TOM-027 guardado»** en el título grande, y recién abajo, en chico, *«Cotización enviada a Switch»* — **el título mentía y es lo primero que se lee**;
+> - el **PDF decía «Pedido: TOM-027»** en el encabezado, al lado del cliente y la fecha. **Ese papel se le manda al cliente**, y una cotización NO aparta mercancía: el papel que dice «Pedido» hace creer que sí.
+>
+> Daniel, textual: ***"esto fue una cotización, porque dice pedidos en pdf?"***
+>
+> 🩸 **EL CASO ES REAL Y ESTÁ EN PRODUCCIÓN**: al 25-ago-2026, de los **39 envíos activos** de las 4 marcas (reebok 15 · joybees 4 · tommy 18 · calvin 2) hay **UNA sola cotización, y es TOM-027**. Las otras 38 son pedidos. O sea que el bug se disparó con la PRIMERA cotización que existió.
+>
+> ### 🔴 EL NÚMERO NO CAMBIA — CAMBIA LA PALABRA QUE LO ACOMPAÑA
+>
+> `TOM-027` es el número de la casa y se llama así **siempre**, salga como pedido o como cotización. No se le pone otro prefijo ni se renombra. Hay mutación para el caso contrario (*el NÚMERO de la casa se renombra con la palabra adelante*).
+>
+> ### La regla, y por qué son TRES estados y no dos
+>
+> Todo sale de **`palabraEnSwitch` / `palabraDelPapel`** en `src/lib/catalogo/documento-switch.ts` (módulo PURO):
+>
+> ```
+> envío ACTIVO documento='cotizacion'  → "Cotización"
+> envío ACTIVO documento='pedido'      → "Pedido"
+> SIN envío activo                     → null  ← no es ninguna de las dos
+> ```
+>
+> - 🔴 **El `null` es el punto del módulo.** Un pedido que todavía no se mandó no es ninguna de las dos y **no se le inventa etiqueta**: cada pantalla se queda con la palabra que ya usaba, o sea **exactamente lo que decía antes de este cambio**. Cero cambio de conducta para lo que no salió a Switch.
+> - **Manda lo que hay en SWITCH, no el `status` de la casa**, porque es lo único comprobable. 🩸 Y el status solo NO alcanza, medido: **mandar a Switch escribe `status = confirmado`**, así que la regla vieja del #584 (`status === "confirmado" ? "Pedido" : "Cotización"`) bajaba **`Pedido-TOM-027.pdf` para una cotización**.
+> - **«Está en Switch» es el MISMO criterio que el candado de edición** (`ESTADOS_EN_SWITCH = ['enviado','verificado']`, importado por `switch-lock.ts`): dos definiciones de lo mismo se separan solas, y la que quede vieja le miente a alguien sobre si tiene la mercancía apartada.
+> - **Escalón tolerante de siempre** (DDL `20260824160000`): sin la columna `documento` se relee sin ella y sale **«Pedido»**. La lectura vive en `palabraDelEnvioActivo` (`switch-lock.ts`); **cualquier error devuelve `null`**, o sea la palabra de siempre — un PDF que no se genera es peor que uno con el rótulo por defecto.
+>
+> ### Lo que dice AHORA, textual
+>
+> ```
+> COTIZACIÓN          título   «Cotización TOM-027 guardado»
+>                     PDF      «Cotización: TOM-027»
+>                     archivo  Cotización-TOM-027-2026-08-25.pdf
+> PEDIDO              título   «Pedido TOM-027 guardado»
+>                     PDF      «Pedido: TOM-027»
+>                     archivo  Pedido-TOM-027-2026-08-25.pdf
+> NO SALIÓ a Switch   igual que antes: «Pedido …» (y el detalle sigue con el #584)
+> ```
+>
+> ### 🩸 «Cotización» LLEVA TILDE Y `Content-Disposition` ES UN ENCABEZADO HTTP
+>
+> Un `filename="…ó…"` a secas viaja como latin-1 y el navegador baja **`CotizaciÃ³n-TOM-027.pdf`**. La ruta `/orders/[id]/pdf` usa **RFC 6266**: `filename` en ASCII puro de respaldo **más** `filename*=UTF-8''…` percent-encoded, que es el que ganan Chrome, Safari y Firefox. Hay mutación (*el nombre del archivo pierde el RFC 6266 y la tilde viaja rota*). En el detalle NO hace falta: ahí el nombre va por `doc.save()`, sin encabezado de por medio (es el arreglo del #584 y sigue igual).
+>
+> ### Se fue el párrafo — y la constante también
+>
+> Daniel, textual: ***"no siempre tiene que haber explicación, eso ensucia mi ERP"***. La confirmación dibujaba `TEXTO_NO_RESERVA` (*«La cotización NO aparta la mercancía: si cotizas 500 pares…»*) **después** de mandar. Se fue de la pantalla **y la constante se BORRÓ**: dejarla muerta es el párrafo esperando a que alguien la vuelva a montar — el mismo motivo por el que `ElegirDocumentoSwitch.tsx` se borró en vez de dejarse sin usar. Hay candado que exige que el `export` no exista y que **ninguna de las 4 pantallas** vuelva a escribir «500 pares» a mano.
+> - **Lo que se queda:** la etiqueta de 3 palabras pegada al botón (`NOTA_COTIZACION`, con su candado de largo) y la línea propia del **aviso de Telegram** (*«No aparta mercancía — sigue disponible para los demás.»*), que es del armador de Telegram y **no se duplicó**: quien lee el canal no estaba ahí cuando se eligió.
+>
+> ### Las superficies, barridas (con los comentarios borrados antes de grepear)
+>
+> | Superficie | Antes | Ahora |
+> |---|---|---|
+> | Título de la confirmación | `Pedido TOM-027 guardado` | **corregida** — la palabra sale del módulo |
+> | Encabezado del PDF | `Pedido: TOM-027` | **corregida** — `documentoLabel` |
+> | Nombre del archivo, «Ver PDF» de la confirmación | `Pedido-TOM-027-….pdf` | **corregida** + RFC 6266 |
+> | Nombre del archivo, «Descargar PDF» del detalle | por `status` (#584) | **corregida** — Switch manda; sin envío, el #584 intacto |
+> | Adjunto del correo al cliente | `Pedido-TOM-027-….pdf` | **corregida** (y el papel adentro también) |
+> | Detalle: banner del candado y renglón de estado | ya decía cuál | sin tocar |
+> | Lista del admin (`numeros-pedido.ts`) | ya decía cuál (#593) | sin tocar |
+> | Excel de «Exportar» (columna Switch) | ya decía cuál (#596) | sin tocar |
+> | Aviso de Telegram (📝 vs 📦) | ya distinguía | sin tocar, **sin duplicar** |
+> | Párrafo rojo de la confirmación | se dibujaba | **BORRADO**, constante incluida |
+> | 🔴 Asunto del correo + banda de marca (`marcas.ts` ×4 ×2) | `Recibimos tu pedido X` · `Pedido X — cliente` · `Gracias por tu pedido` | **NO corregida — decide Daniel** |
+> | PDF del pedido del LINK público y su WhatsApp | `Pedido-Reebok-….pdf` | no aplica: un pedido del link nunca es una cotización de Switch |
+>
+> - 🔴 **Por qué el asunto y la banda del correo NO se tocaron:** no es un cambio de palabra, es **reescribir copy que ve el cliente** en 8 plantillas (4 marcas × equipo/cliente). *«Recibimos tu pedido»* → *«Recibimos tu cotización»* suena raro (el cliente no la mandó) y *«Gracias por tu pedido»* no tiene equivalente de una palabra. **El adjunto ya sale bien**, así que el papel no miente; lo que falta es la carta que lo acompaña. **Es decisión de Daniel** y queda escrito acá.
+> - 🩸 **MEDIDO Y SE DICE DE FRENTE:** bajo el candado post-envío el detalle **NO dibuja el bloque «Compartir pedido»** (`switchLock ? null : …`, conducta de siempre), así que por «Descargar PDF» **nunca se llega** a la rama de la cotización de Switch. Hoy el papel de una cotización sale por el **«Ver PDF» de la confirmación**, que es una RUTA y está cubierta con 20 casos en las 4 marcas. La regla igual es UNA sola y hay candado de fuente para que el detalle no vuelva a decidir por su cuenta.
+>
+> ### Verificación
+>
+> **🔴 EL PDF SE GENERA DE VERDAD Y SE LEE CON `pdftotext`** (`npx tsx scripts/_verif-pdf-dice-la-verdad.mjs`, solo lectura): genera los tres casos con el MISMO core que usa la app, los guarda y les pasa `pdftotext -layout`. Se lee **«Pedido: TOM-027»** y **«Cotización: TOM-027»**, cada archivo pesa **77,7 KB** y **el número no cambia en ninguno**. Además mide el ANCHO del encabezado con la fuente real: la línea vive en columnas FIJAS (Cliente x=14 · documento x=90 · Fecha x=150) y «Cotización: TOM-027» mide **29,8 mm de los 60 disponibles** — no se monta encima de la fecha (el de «Pedido» mide 24,9).
+>
+> **🔴 EL BUG REPRODUCIDO Y ARREGLADO CONTRA LA APP DE VERDAD, sobre TOM-027**, el mismo pedido de la captura. Los dos builds de producción levantados a la vez (rama :3479 · `origin/main` :3480), el PDF pedido por HTTP y leído con `pdftotext`:
+>
+> ```
+> main   Content-Disposition: inline; filename="Pedido-TOM-027-2026-08-25.pdf"
+>        Cliente: A-Amani, S.A.        Pedido: TOM-027        Fecha: 25 de agosto de 2026
+>        título «Pedido TOM-027 guardado» · renglón «Cotización» → ❌ SE CONTRADICEN · párrafo ❌ presente
+>
+> rama   Content-Disposition: inline; filename="Cotizacion-TOM-027-2026-08-25.pdf";
+>                             filename*=UTF-8''Cotizaci%C3%B3n-TOM-027-2026-08-25.pdf
+>        Cliente: A-Amani, S.A.        Cotización: TOM-027    Fecha: 25 de agosto de 2026
+>        título «Cotización TOM-027 guardado» · renglón «Cotización» → ✅ coinciden · párrafo ✅ 0
+> ```
+>
+> El script corrido contra `main` da **16 hallazgos** (el título contradiciendo al renglón + el párrafo, en los 4 anchos); contra la rama, **0**.
+>
+> **Los 4 anchos, las 4 marcas** (`BASE=… MARCA=… PEDIDO_EDITABLE=… PEDIDO_EN_SWITCH=… node scripts/_medir-documento-directo-anchos.mjs`), contra el build de producción y con datos de producción → **🟢 reebok · joybees · tommy · calvin: 0 arrastre · 0 recorte · 0 táctil <44 px · 0 texto <12 px** en 390 · 834 · 1024 · 1440. Se le sumó al script `verificarTituloConfirmacion`, que exige que **el título nombre lo MISMO que el renglón de abajo**, que **conserve el número** y que **el párrafo no vuelva**. Y una pantalla nueva: la **confirmación de un pedido YA en Switch** —el caso de TOM-027—, donde además se mide que **no vuelva a ofrecer las dos salidas** (at-most-once).
+> - 🔴 **El navegador sigue ABORTANDO todo POST** a `/api/catalogo/checkout` y a `**/enviar-switch`. **Escrituras bloqueadas: 0** en todas las corridas.
+> - 🔴 **Y CONTRA `origin/main`, mismo build de producción y mismos datos**: `SOLO_PANTALLA=1` corre **el MISMO archivo en las dos ramas** (dos scripts distintos no comparan nada). Resultado en las 4 marcas × 4 anchos: **arrastre 0, recorte 0, textos <12 px 0 y los táctiles <44 px IDÉNTICOS** — reebok 4·6·2·2 · joybees 4·2·2 · tommy 3·21·1·1·2 · calvin 3·5·1·1·3, los mismos números en las dos. Con `SOLO_PANTALLA=1` la exigencia del título NO corre: en main el título todavía miente, que es el punto.
+> - Los táctiles <44 px son los **PRE-EXISTENTES** (`← Inicio`, `← Catálogo`, el precio por pieza, `← Volver a Pedidos`, la `x` de quitar línea, `Ocultar de la lista`, `Eliminar pedido`), en código que este cambio no toca.
+>
+> ### Candados
+>
+> `lib/documento-switch.test.ts` (la regla, los tres estados, el criterio compartido, la tolerancia al DDL, que el párrafo no exista y que ninguna pantalla lo reescriba) · **`api/pdf-pedido-o-cotizacion.test.ts`** (llama a las RUTAS de verdad: la palabra que le llega al generador, el `Content-Disposition` con su tilde, el adjunto del correo — **32 casos, las 4 marcas**) · **`components/confirmacion-dice-la-verdad.test.tsx`** (CONDUCTA: monta la pantalla REAL en las 4 marcas, lee el `h1` y cuenta **0 POST**) · **`components/pedido-pdf-dice-la-verdad.test.tsx`** (CONDUCTA: toca «Descargar PDF» de verdad).
+> - **Verificado por mutación, 32 de 32 cazadas** (`bash scripts/_mutar-candados-cotizacion-dice-la-verdad.sh`): toda salida se rotula pedido · toda salida se rotula cotización · **un pedido que NO salió se rotula igual** · un intento fallido cuenta como «está en Switch» · la palabra ignora lo que hay en Switch · sin envío el papel queda en blanco · **vuelve el PÁRRAFO** · la lectura pierde el escalón tolerante · un error de lectura se vuelve cotización · la lectura no filtra por estado · **el PDF vuelve a decir siempre «Pedido:»** · el PDF ignora la palabra · el PDF pierde el número · la ruta no mira el envío · **el nombre del archivo vuelve a «Pedido-»** · el encabezado y el nombre se separan · **pierde el RFC 6266 y la tilde viaja rota** · **el NÚMERO de la casa se renombra** · el correo no mira el envío · **el adjunto vuelve a «Pedido-»** · el adjunto no lleva la palabra adentro · **el título vuelve a mentir** · el título dice siempre cotización · el título pierde el número · **vuelve el párrafo a la confirmación** · el detalle decide solo por status · el detalle pierde el #584 · en el detalle el archivo y el papel se separan · la lista del admin calla cuál fue · el Excel calla cuál fue · Telegram deja de distinguir 📝 de 📦 · Telegram calla que no aparta.
+> - 🩸 **CUATRO NO SE CAZARON EN LA PRIMERA CORRIDA y las cuatro enseñaron algo.** Dos eran del core del PDF: los tests de ruta **mockean** `order-pdf`, así que nadie generaba el papel — se sumó a `catalogo-pdf.test.ts` la lectura del PDF con pdf.js. Una era la consulta: el doble de Supabase **no filtra por su cuenta**, así que sacar el `.in("estado", …)` no cambiaba ningún resultado — ahora se inspecciona la CONSULTA que salió, no la respuesta. Y la cuarta es la del detalle, que abajo se explica por qué solo puede tener candado de FUENTE.
+> - El script restaura **por COPIA y no con `git checkout`** (hay archivos nuevos en la rama y git aborta el comando entero sin restaurar nada), **denuncia el patrón que no muta** en vez de darlo por cazado, y **exige que la corrida haya colectado tests** (si vitest muere, «0 fallos» se leería como «sobrevivió»).
+> - 🩸 **El reemplazo lo hace `python3`, no `perl -0pi -e 's|A|B|'`**: en este repo un `||` del código real se des-escapa dentro del patrón de perl, la expresión se come el archivo entero y el informe dice «SOBREVIVIÓ». Los textos son literales, no regex.
+>
+> ### Lo que NO se tocó
+>
+> El endpoint `/apicotizacion/terminar` y el motor único de envío · el 422 del cliente · `normalizarDocumento` · el at-most-once · el DDL `20260824160000` y su tolerancia · el aviso de Telegram · el pedido del LINK público · la lista del admin (#593) · el Excel (#596) · la etiqueta «no aparta mercancía» pegada al botón · el flujo de 3 toques y «Duplicar».
+
 ## 🔴 LAS DOS SALIDAS SE OFRECEN DIRECTO — se fue la ventana y se fue el párrafo (25-ago-2026)
 
 > Daniel, textual: ***"quiero que en vez de que diga «enviar a switch», salga cotización o pedido como opción (sin párrafo explicando, btw no siempre hay q estar explicando todo, se vuelve tedioso)"***.
@@ -1787,7 +1893,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > Esto **revierte un criterio del 24-ago** (*"dos botones gemelos al lado se tocan sin leer"*). **La decisión nueva es de Daniel y manda**, pero el riesgo que ese criterio protegía es REAL y no desaparece: **una cotización NO aparta mercancía**, y tocar la equivocada manda 500 pares de la forma que no era. Así que de toda la explicación queda **lo único material, pegado a la opción y en el mínimo de palabras**: `NOTA_COTIZACION = "no aparta mercancía"`.
 > - **Eso NO es un párrafo, es una etiqueta, y el largo es parte del candado**: ≤ 4 palabras, ≤ 24 caracteres, sin punto y sin el ejemplo de los 500 pares. Si mañana alguien le agrega media frase "para que se entienda mejor", vuelve a ser lo que Daniel sacó — y el build se pone rojo.
 > - **Se fue todo el resto del texto didáctico**: `TEXTO_SI_RESERVA` (*"Aparta la mercancía para este cliente"*) y `TEXTO_COTIZACION_DESPUÉS` (*"Si después lo compran, duplica el pedido…"*) **ya no existen**.
-> - **`TEXTO_NO_RESERVA` (la frase larga) SIGUE VIVA donde sí hay lugar para leerla**: la confirmación DESPUÉS de mandar y el aviso de Telegram. No se dibuja antes de mandar.
+> - ~~**`TEXTO_NO_RESERVA` (la frase larga) SIGUE VIVA donde sí hay lugar para leerla**: la confirmación DESPUÉS de mandar y el aviso de Telegram. No se dibuja antes de mandar.~~ ⚠️ **SUPERADO el 25-ago-2026** — Daniel lo señaló en su captura (*"no siempre tiene que haber explicación, eso ensucia mi ERP"*): la constante **se BORRÓ** y la confirmación ya no la dibuja. Telegram nunca la usó (tiene su propia línea). Ver *«EL PAPEL DECÍA «PEDIDO» SIENDO UNA COTIZACIÓN»*.
 > - 🔴 **Y las dos NO se ven iguales, que es lo que impide el toque sin leer**: el pedido es el sólido (negro en checkout/confirmación, verde en el detalle) y la cotización es la de **contorno ámbar** con su etiqueta. Hay mutación para el caso simétrico: si el PEDIDO también llevara etiqueta, vuelven a ser gemelos y el build se pone rojo.
 >
 > ### 🔴 NINGÚN CANDADO SE AFLOJÓ — y los cuatro están mutados

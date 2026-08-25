@@ -33,6 +33,7 @@ import {
   esCotizacion,
   etiquetaDocumento,
   normalizarDocumento,
+  palabraDelPapel,
   tituloCreadoEnSwitch,
   tituloEnviadoASwitch,
 } from "@/lib/catalogo/documento-switch";
@@ -739,7 +740,18 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       // El nombre del archivo es lo PRIMERO que ve el cliente en WhatsApp o en su
       // correo, antes de abrirlo: "Cotizacion-TOM-014-2026-08-23.pdf" salía sin
       // tilde desde el día uno. Es el texto del módulo que más lejos llega.
-      const prefix = order.status === "confirmado" ? "Pedido" : "Cotización";
+      //
+      // 🔴 25-ago-2026 — MANDA LO QUE HAY EN SWITCH. Si el pedido salió como
+      // COTIZACIÓN, el papel dice «Cotización» aunque acá figure `confirmado`
+      // (mandar a Switch escribe `confirmado`, así que el status solo NO
+      // alcanza: TOM-027 se bajaba como "Pedido-TOM-027.pdf" siendo cotización).
+      // Mientras NO salió, no es ninguna de las dos y se queda la regla de
+      // siempre: borrador = la cotización que se le pasa al cliente, confirmado
+      // = pedido. El NÚMERO nunca cambia.
+      const prefix = palabraDelPapel(
+        switchEnvio,
+        order.status === "confirmado" ? "Pedido" : "Cotización",
+      );
       const dateStr = new Date().toISOString().slice(0, 10);
       await downloadCatalogoOrderPdf({
         marca,
@@ -751,6 +763,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
           image_url: i.image_url || "", category: i.category || theme.pdfFallbackCategory,
         })),
         bultoSize: (c, bultoPzas) => theme.bulto(c || theme.pdfFallbackCategory, bultoPzas),
+        // La MISMA palabra adentro del papel y en el nombre del archivo: dos
+        // reglas para lo mismo se separan solas.
+        documentoLabel: prefix,
         filename: `${prefix}-${order.order_number}-${dateStr}.pdf`,
       });
       showToast("PDF listo — revisa tu carpeta de descargas");

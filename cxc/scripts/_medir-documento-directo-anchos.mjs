@@ -170,6 +170,53 @@ async function verificarOpciones(page, etiqueta, ancho, exigeEncendido) {
   return info;
 }
 
+/**
+ * 🔴 EL TÍTULO DE LA CONFIRMACIÓN NO PUEDE CONTRADECIR AL RENGLÓN DE ABAJO
+ * (25-ago-2026). Daniel mandó TOM-027 como COTIZACIÓN y la pantalla decía
+ * "Pedido TOM-027 guardado" en grande, con "Cotización enviada a Switch" en
+ * chico debajo. El título es lo primero que se lee: si miente, miente entero.
+ *
+ * Y el PÁRRAFO se fue: *"no siempre tiene que haber explicación, eso ensucia
+ * mi ERP"*. Acá se mide que NO esté en pantalla.
+ *
+ * Con `SOLO_PANTALLA=1` (la corrida contra `origin/main`) esto NO se exige:
+ * allá el título todavía miente y el párrafo todavía está, que es el punto.
+ */
+async function verificarTituloConfirmacion(page, ancho) {
+  if (SOLO_PANTALLA) return null;
+  const info = await page.evaluate(() => {
+    const h1 = document.querySelector("h1");
+    return { titulo: (h1?.textContent || "").trim(), texto: document.body.innerText };
+  });
+  if (!info.titulo) { fallos.push(`confirmación @${ancho}: no hay título`); return null; }
+
+  // Qué dice el renglón chico: es la verdad comprobable contra Switch.
+  const enSwitch = /Cotización enviada a Switch/.test(info.texto)
+    ? "Cotización"
+    : /Enviado a Switch/.test(info.texto)
+      ? "Pedido"
+      : null;
+  if (enSwitch && !info.titulo.startsWith(`${enSwitch} `)) {
+    fallos.push(`confirmación @${ancho}: el renglón dice "${enSwitch}" y el título dice "${info.titulo}"`);
+  }
+  // 🔴 El número de la casa sigue estando, sin renombrar.
+  if (!/\b[A-Z]{2,4}-\d{3,}\b/.test(info.titulo)) {
+    fallos.push(`confirmación @${ancho}: el título perdió el número — "${info.titulo}"`);
+  }
+  // 🔴 El párrafo NO vuelve.
+  for (const prohibido of [/500 pares/, /NO aparta la mercancía/, /otros vendedores/]) {
+    if (prohibido.test(info.texto)) {
+      fallos.push(`confirmación @${ancho}: volvió el párrafo (${prohibido.source})`);
+    }
+  }
+  console.log(
+    `     título "${info.titulo}" · en Switch ${enSwitch ?? "(todavía no salió)"} · ` +
+      `${enSwitch && info.titulo.startsWith(`${enSwitch} `) ? "✅ coinciden" : enSwitch ? "❌ SE CONTRADICEN" : "✅"} · ` +
+      `párrafo ${/500 pares/.test(info.texto) ? "❌ VOLVIÓ" : "✅ 0"}`,
+  );
+  return info;
+}
+
 let escriturasBloqueadas = 0;
 
 async function nuevoContexto() {
@@ -284,7 +331,32 @@ if (PEDIDO_EDITABLE) {
     await page.waitForTimeout(1200);
     console.log(`\n${a.nombre} (${a.w}px)`);
     await verificarOpciones(page, "las dos salidas", a.w, false);
+    await verificarTituloConfirmacion(page, a.w);
     if (!SOLO_PANTALLA) await medir(page, '[data-medir="enviar-documento"]', "las dos salidas", a.w);
+    await medir(page, "body", "pantalla entera", a.w, true);
+  }
+  await ctx.close();
+}
+
+// ── 2c. La CONFIRMACIÓN de un pedido YA en Switch: el TÍTULO no puede mentir ─
+//
+// 🩸 ES EL CASO DE DANIEL, medido sobre el pedido de verdad. TOM-027 salió como
+// COTIZACIÓN y esta pantalla decía "Pedido TOM-027 guardado". Acá no hay
+// salidas que ofrecer (`puedeReintentar` es false: ya salió), así que lo único
+// que se mide es que el título nombre lo mismo que el renglón de abajo.
+if (PEDIDO_EN_SWITCH) {
+  console.log(`\n${"═".repeat(72)}\nCONFIRMACIÓN de un pedido YA en Switch (${MARCA}) — el título\n${"═".repeat(72)}`);
+  const ctx = await nuevoContexto();
+  const page = await ctx.newPage();
+  for (const a of ANCHOS) {
+    await page.setViewportSize({ width: a.w, height: a.h });
+    await page.goto(`${BASE}/catalogo/${MARCA}/confirmacion/${PEDIDO_EN_SWITCH}`, { waitUntil: "networkidle", timeout: 120_000 });
+    await page.waitForTimeout(1200);
+    console.log(`\n${a.nombre} (${a.w}px)`);
+    // 🔴 Un pedido que ya salió NO vuelve a ofrecer salidas (at-most-once).
+    const hayOpciones = await page.evaluate(() => !!document.querySelector('[data-medir="documento-pedido"]'));
+    if (!SOLO_PANTALLA && hayOpciones) fallos.push(`confirmación en Switch @${a.w}: SIGUE ofreciendo las salidas`);
+    await verificarTituloConfirmacion(page, a.w);
     await medir(page, "body", "pantalla entera", a.w, true);
   }
   await ctx.close();

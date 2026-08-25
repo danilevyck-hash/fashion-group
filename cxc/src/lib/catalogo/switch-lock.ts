@@ -14,6 +14,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import {
+  ESTADOS_EN_SWITCH,
+  palabraEnSwitch,
+  type EnvioParaPalabra,
+} from "@/lib/catalogo/documento-switch";
 
 export interface EnvioActivo {
   estado: string;
@@ -93,6 +98,45 @@ export async function numerosSwitchPorPedido(
     fuera.set(String(e.order_id), num ? String(num) : null);
   }
   return fuera;
+}
+
+/**
+ * ── 🔴 LA PALABRA QUE VA EN EL PAPEL, LEÍDA DE LA FUENTE ÚNICA (25-ago-2026) ──
+ *
+ * «Pedido» si el envío ACTIVO fue un pedido, «Cotización» si fue una
+ * cotización, y `null` si este pedido TODAVÍA NO SALIÓ a Switch — ahí no es
+ * ninguna de las dos y no se le inventa etiqueta.
+ *
+ * Existe porque el PDF que recibe el cliente decía «Pedido: TOM-027» aunque lo
+ * mandado hubiera sido una cotización. La regla vive en `documento-switch.ts`
+ * (módulo puro); acá está solo la LECTURA, con el escalón tolerante de siempre:
+ * si la columna `documento` no existe todavía (DDL `20260824160000` pendiente)
+ * se relee sin ella y sale «Pedido», que es lo único que este sistema sabía
+ * crear antes del 24-ago-2026.
+ *
+ * ⚠️ Cualquier error de lectura devuelve `null` — o sea, la palabra de siempre.
+ * Un PDF que no se genera es peor que un PDF con el rótulo por defecto.
+ */
+export async function palabraDelEnvioActivo(
+  db: SupabaseClient,
+  enviosTable: string,
+  orderId: string,
+): Promise<string | null> {
+  const filtrar = (cols: string) =>
+    db
+      .from(enviosTable)
+      .select(cols)
+      .eq("order_id", orderId)
+      .in("estado", ESTADOS_EN_SWITCH as string[])
+      .limit(1)
+      .maybeSingle();
+
+  let leido = await filtrar("estado, documento");
+  if (leido.error && /documento|column/i.test(leido.error.message || "")) {
+    leido = await filtrar("estado");
+  }
+  if (leido.error || !leido.data) return null;
+  return palabraEnSwitch(leido.data as EnvioParaPalabra);
 }
 
 /** 409 estándar cuando se intenta editar contenido de un pedido bloqueado. */

@@ -21,6 +21,7 @@ import { CALVIN_LOGO_BLANCO_BASE64, CALVIN_LOGO_WIDTH, CALVIN_LOGO_HEIGHT } from
 import { JOYBEES_LOGO_BLANCO_BASE64, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT } from "@/lib/joybees-logo";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 import { precioTexto } from "@/lib/catalogo/precio";
+import { DOCUMENTO_POR_DEFECTO, etiquetaDocumento } from "@/lib/catalogo/documento-switch";
 
 export interface PdfOrderItem {
   sku: string;
@@ -43,6 +44,18 @@ export interface OrderPdfOpts {
   bultoSize: (category: string | null | undefined, bultoPzas?: number | null) => number;
   /** image_url → dataURL ya preparado (downscaled). Las ausentes se saltan. */
   images: Record<string, string>;
+  /**
+   * 🔴 LA PALABRA QUE ACOMPAÑA AL NÚMERO EN EL ENCABEZADO (25-ago-2026).
+   * «Pedido» o «Cotización», y la decide quien conoce el envío a Switch —este
+   * archivo solo DIBUJA. Ausente = «Pedido», que es lo que decía este PDF desde
+   * el día uno y lo único que el sistema sabía crear antes del 24-ago-2026.
+   *
+   * Existe porque el papel MENTÍA: Daniel mandó TOM-027 como cotización, Switch
+   * la aceptó, y el PDF que se le manda al cliente igual decía «Pedido:
+   * TOM-027». Una cotización no aparta mercancía; el papel que dice «Pedido»
+   * hace creer que sí. El NÚMERO no cambia, cambia la palabra.
+   */
+  documentoLabel?: string;
 }
 
 /** Lado máximo (px) al que se reduce cada foto antes de embeberla: se pinta a
@@ -68,6 +81,8 @@ export function fitClientName(doc: jsPDF, name: string): string {
 
 export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   const { marca, orderNumber, clientName, createdAt, bultoSize, images } = opts;
+  // La palabra del encabezado: la que le pasen, o la de siempre.
+  const documentoLabel = opts.documentoLabel || etiquetaDocumento(DOCUMENTO_POR_DEFECTO);
   const items = marca === "reebok" ? sortReebokOrderItems(opts.items) : opts.items;
 
   const regularItems = items.filter((i) => !i.is_preorder);
@@ -114,7 +129,7 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   // pedido en el PDF que recibe el cliente).
   doc.setTextColor(100); doc.setFontSize(9);
   doc.text(`Cliente: ${fitClientName(doc, clientName)}`, 14, 26);
-  doc.text(`Pedido: ${orderNumber}`, 90, 26);
+  doc.text(`${documentoLabel}: ${orderNumber}`, 90, 26);
   doc.text(`Fecha: ${fechaLabel}`, 150, 26);
 
   const headFill: [number, number, number] =
