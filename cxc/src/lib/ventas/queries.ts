@@ -28,6 +28,8 @@ import type {
   EmpresaMonthlySales,
   MonthlySeries,
   ProyeccionResp,
+  ProyeccionRespCruda,
+  ProyeccionGrupoCrudo,
 } from "@/components/ventas/types";
 
 interface DashboardSummaryRow {
@@ -72,7 +74,7 @@ function buildEmpresa(key: string): Empresa {
  * construye el shape VentasResumen mapeando empresa key → ventas_id.
  */
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
-  const [curRes, prevRes, metaRes, proyRes, syncedRes] = await Promise.all([
+  const [curRes, prevRes, proyRes, syncedRes] = await Promise.all([
     // withDbRetry: en caché fría estas RPC se pasan del statement_timeout y
     // Postgres las cancela; al segundo intento (caché caliente) pasan en <1s.
     // Ver src/lib/supabase-retry.ts para la medición.
@@ -102,7 +104,18 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
         { label: "ventas_dashboard_prev_same_period" },
       );
     })(),
-    supabaseServer.rpc("get_app_setting", { p_key: "multifashion_meta_anual_2026" }),
+    // 🔴 ACÁ VIVÍA `get_app_setting("multifashion_meta_anual_2026")`, UNA
+    // CONSULTA POR CADA CARGA DE /ventas PARA UN NÚMERO QUE NO SE DIBUJA EN
+    // NINGUNA PANTALLA. Viajaba como `kpis.metaAnualMultifashion` y nadie lo
+    // leía; encima la clave estaba clavada en "2026", así que en 2027 habría
+    // devuelto la meta del año equivocado sin que nada avisara. Es una ida
+    // más a una base en compute Micro por un número fantasma.
+    //
+    // ⚠️ NO SE BORRÓ NI LA FILA NI LA TABLA: `app_settings` conserva su
+    // `multifashion_meta_anual_2026` y las RPC de Multifashion la siguen
+    // leyendo (`multifashion_mensual_v6` y sus versiones). Lo único que se
+    // retira es pedirla desde acá.
+    //
     // Proyección de cierre por empresa + agregado del grupo. v5 agrega
     // cierre_anio_anterior + delta_vs_anio_anterior por empresa y grupo.
     // El hero del Resumen muestra realidad vs realidad (2026 proyectado
@@ -147,8 +160,6 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     dia_corte_anio_anterior: null,
   };
   const prev = prevPayload.rows ?? [];
-
-  const metaAnualMultifashion = Number(metaRes.data ?? 800000) || 800000;
 
   // Build lookup: { [key]: number[12] }
   const buildSeries = (rows: DashboardSummaryRow[], field: "total_subtotal" | "total_utilidad" | "total_costo") => {
@@ -246,8 +257,9 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   const margenYTD     = totalFilteredVCur  > 0 ? totalFilteredUtilCur  / totalFilteredVCur  : 0;
   const margen2025YTD = totalFilteredVPrev > 0 ? totalFilteredUtilPrev / totalFilteredVPrev : 0;
 
-  const multiRow = empresas.find(e => e.empresa.id === "multi");
-  const multifashionYTD = multiRow ? sumYTD(multiRow.ventas2026) : 0;
+  // (Acá se calculaba `multifashionYTD`, que viajaba en `kpis` y tampoco lo
+  // dibujaba ninguna pantalla — el Resumen saca la fila de Multifashion de
+  // `empresas`, como las otras siete. Se retiró junto con la meta.)
 
   // Proyección de cierre: graceful fallback si la RPC falla (ej. migration
   // pendiente o year sin data). No bloquea el resto del Resumen.
@@ -255,7 +267,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   if (proyRes.error) {
     console.error("[ventas/proyeccion_cierre_v1]", proyRes.error.message);
   } else if (proyRes.data) {
-    proyeccion = proyRes.data as ProyeccionResp;
+    proyeccion = stripMetasProyeccion(proyRes.data as ProyeccionRespCruda);
   }
 
   // FASE 2.1b: último sync real (MAX synced_at) — para subtitle "Data actualizada al ..."
@@ -272,8 +284,6 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
       utilidad2025YTD,
       margenYTD,
       margen2025YTD,
-      multifashionYTD,
-      metaAnualMultifashion,
     },
     empresas,
     es_periodo_parcial:      prevPayload.es_periodo_parcial,
@@ -433,7 +443,49 @@ export async function fetchClientes({
   return {
     total: rows.length,
     pageSize: rows.length,
+    // 🔴 EL AÑO CONTRA EL QUE SE COMPARA SALE DE ACÁ, NO DE UN LITERAL EN LA
+    // PANTALLA. Los rótulos decían "Δ vs 2025" fijo: con 2025 elegido en el
+    // selector, la pantalla mostraba "Compras 2025 · Δ vs 2025" mientras la
+    // cuenta comparaba contra 2024. Las DOS ramas de esta función comparan
+    // contra `year - 1` —la RPC `clientes_anio` con `p_year - 1`, y la vista
+    // rolling con `current_year - 1` sobre los mismos meses—, así que el año se
+    // deriva del MISMO dato que hace la división y no puede volver a mentir.
+    anioComparativo: year - 1,
     rows,
+  };
+}
+
+/**
+ * 🔴 LO QUE NADIE LEE, NO VIAJA. `ventas_proyeccion_cierre_v7` devuelve cinco
+ * campos de META por empresa (`meta_anual_manual`, `meta_sugerida`,
+ * `meta_efectiva`, `meta_anual`, `gap_vs_meta`) y dos del grupo (`meta_total`,
+ * `gap_vs_meta`), y **ninguna pantalla los dibuja** — barrido completo de
+ * `src/`: cero renders, solo el tipo. Igual cruzaban el cable en cada carga
+ * de /ventas.
+ *
+ * Se quitan ACÁ, del lado del servidor, y no en el SQL: cambiar la RPC exige
+ * una migración que corre Daniel a mano, y ésa es la consulta que alimenta la
+ * columna "Proyección" que él sí mira todos los días. Tocar el TypeScript no
+ * puede mover un número; tocar la RPC, sí.
+ *
+ * ⚠️ TODO LO DEMÁS SE CONSERVA TAL CUAL —`proyeccion_cierre`,
+ * `cierre_anio_anterior`, `algoritmo`, `factor_final`, `status`…—: es lo que
+ * leen la celda de proyección y `proyeccion-texto.ts`.
+ */
+function stripMetasProyeccion(cruda: ProyeccionRespCruda): ProyeccionResp {
+  const {
+    meta_total: _mt, gap_vs_meta: _gg, ...totales_grupo
+  } = cruda.totales_grupo ?? ({} as ProyeccionGrupoCrudo);
+  return {
+    ...cruda,
+    empresas: (cruda.empresas ?? []).map((e) => {
+      const {
+        meta_anual_manual: _m1, meta_sugerida: _m2, meta_efectiva: _m3,
+        meta_anual: _m4, gap_vs_meta: _m5, ...resto
+      } = e;
+      return resto;
+    }),
+    totales_grupo,
   };
 }
 

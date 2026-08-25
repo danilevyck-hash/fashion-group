@@ -36,8 +36,11 @@ export type ResumenKpis = {
   margenYTD: number;
   /** Margen YTD real del año previo, filtrado por costo > 0 */
   margen2025YTD: number;
-  multifashionYTD: number;
-  metaAnualMultifashion: number;
+  // ⛔ ACÁ VIVÍAN `multifashionYTD` y `metaAnualMultifashion`. Los dos viajaban
+  // en cada carga de /ventas y NINGUNA pantalla los dibujaba; la meta encima
+  // costaba una consulta propia contra la base, con la clave clavada en "2026".
+  // Se retiraron (los datos de `app_settings` NO se tocaron). Ver la nota en
+  // `fetchVentasResumen`.
 };
 
 /** Bloque por empresa que devuelve la proyección viva (v7, con caída a v6). */
@@ -65,16 +68,12 @@ export type ProyeccionEmpresa = {
   factor_final: number | null;
   proyeccion_cierre: number;
   proyeccion_restante: number;  // max(0, proyeccion - ytd)
-  /** v4: tres niveles de meta para que la UI pueda mostrar el origen.
-   *  meta_anual_manual    : valor de ventas_metas (null si no hay override).
-   *  meta_sugerida        : calculo automático sobre histórico (null si sin historia).
-   *  meta_efectiva        : COALESCE(manual, sugerida) — la que el sistema considera vigente.
-   *  meta_anual           : alias = meta_efectiva (retrocompat con frontend v3). */
-  meta_anual_manual: number | null;
-  meta_sugerida: number | null;
-  meta_efectiva: number | null;
-  meta_anual: number | null;
-  gap_vs_meta: number | null;
+  // ⛔ ACÁ VIVÍAN `meta_anual_manual` · `meta_sugerida` · `meta_efectiva` ·
+  // `meta_anual` · `gap_vs_meta`. La RPC los sigue calculando y devolviendo,
+  // pero NINGUNA pantalla los lee (barrido completo de `src/`: cero renders) y
+  // viajaban al navegador en cada carga. Se sacan del contrato y del payload;
+  // el SQL NO se tocó — cambiar la RPC pide una migración a mano y es la ruta
+  // de la proyección que Daniel sí mira. Ver `stripMetasProyeccion`.
   es_fallback_lineal: boolean;
   status: "verde" | "amarillo" | "rojo" | "gris";
 };
@@ -85,8 +84,8 @@ export type ProyeccionGrupo = {
   ventas_ytd: number;
   proyeccion_cierre: number;
   proyeccion_restante: number;
-  meta_total: number;
-  gap_vs_meta: number | null;
+  // ⛔ Acá vivían `meta_total` y `gap_vs_meta`, del mismo grupo de metas sin
+  // consumidor. Mismo criterio que arriba.
   /** v5: cierre real del año anterior completo (suma de empresas). */
   cierre_anio_anterior_total: number;
   /** v5: proyeccion_cierre - cierre_anio_anterior_total. */
@@ -94,6 +93,39 @@ export type ProyeccionGrupo = {
   /** v5: delta / cierre (decimal). */
   delta_vs_anio_anterior_pct: number | null;
   status: "verde" | "amarillo" | "rojo" | "gris";
+};
+
+/** ─────────────────────────────────────────────────────────────────────────────
+ *  LO QUE LA RPC DEVUELVE DE VERDAD, con sus campos de meta.
+ *
+ *  Existe SOLO para que `stripMetasProyeccion` (queries.ts) los pueda nombrar
+ *  al sacarlos. La RPC `ventas_proyeccion_cierre_v7` los sigue calculando —el
+ *  SQL no se tocó—, pero ninguna pantalla los lee, así que no entran al
+ *  contrato que viaja al navegador (`ProyeccionEmpresa` / `ProyeccionGrupo`).
+ *  Si algún día alguien los quiere mostrar, el camino es sacarlos de acá y
+ *  ponerlos en el tipo de arriba, no volver a mandarlos "por las dudas".
+ *  ───────────────────────────────────────────────────────────────────────── */
+export type ProyeccionEmpresaCruda = ProyeccionEmpresa & {
+  meta_anual_manual?: number | null;
+  meta_sugerida?: number | null;
+  meta_efectiva?: number | null;
+  meta_anual?: number | null;
+  gap_vs_meta?: number | null;
+};
+
+export type ProyeccionGrupoCrudo = ProyeccionGrupo & {
+  meta_total?: number;
+  gap_vs_meta?: number | null;
+};
+
+export type ProyeccionRespCruda = {
+  anio: number;
+  fecha_corte: string | null;
+  mes_corte: number;
+  peso_ritmo: number;
+  peso_historico: number;
+  empresas: ProyeccionEmpresaCruda[];
+  totales_grupo: ProyeccionGrupoCrudo;
 };
 
 export type ProyeccionResp = {
@@ -147,7 +179,9 @@ export type Cliente = {
   /** Long key for filtering, e.g. "vistana" */
   empresaKey: string;
   ytd: number;
-  /** Δ vs same period 2025 as decimal: 0.18 = +18% */
+  /** Variación contra el MISMO período del año anterior, como decimal
+   *  (0.18 = +18%). Qué año es "el anterior" lo dice `Clientes.anioComparativo`
+   *  — acá no se puede saber, y escribirlo en el rótulo fue el bug. */
   delta: number;
   /** Display-formatted date "27 abr 2026" */
   ultima: string;
@@ -185,6 +219,11 @@ export type Cliente = {
 export type Clientes = {
   total: number;
   pageSize: number;
+  /** Año contra el que compara la columna de variación. Lo calcula el servidor
+   *  junto con el delta (ver `fetchClientes`) para que el rótulo no pueda
+   *  separarse de la cuenta. Opcional: un payload viejo en la caché de SWR no
+   *  lo trae, y ahí la pantalla cae a `selectedYear - 1`. */
+  anioComparativo?: number;
   rows: Cliente[];
 };
 

@@ -165,12 +165,14 @@ describe("Ventas › Productos — la tabla ENTRA, así que se queda tabla", () 
     for (const th of ["Descripción", "Códigos", "Cant", "Venta", "Precio prom.", "Margen %"]) {
       expect(productos).toContain(th);
     }
-    // El rótulo del Δ pasó a calcularse (`Δ 2025` con año/mes; `Δ año ant.` con
-    // las ventanas relativas, donde nombrar un año sería mentira). Que DIGA lo
-    // correcto en cada caso se prueba tocando el selector, no leyendo el
-    // archivo: src/__tests__/components/ventas-productos-precio-periodos.tsx.
+    // El rótulo de la columna de cambio se calcula (`vs 2025` con año/mes;
+    // `vs año ant.` con las ventanas relativas, donde nombrar un año sería
+    // mentira). La "Δ" se retiró: es notación de matemática en una tabla que
+    // mira gente que no la conoce. Que DIGA lo correcto en cada caso se prueba
+    // tocando el selector, no leyendo el archivo:
+    // src/__tests__/components/ventas-productos-precio-periodos.tsx.
     expect(productos).toContain("{deltaLabel}");
-    expect(productos).toContain('`Δ ${selectedYear - 1}`');
+    expect(productos).toContain('`vs ${selectedYear - 1}`');
   });
 
   it("Precio prom. se esconde bajo `sm`, como Cant y Δ — a 390 px no cabe una 4a", () => {

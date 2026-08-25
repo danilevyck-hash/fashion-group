@@ -21,6 +21,26 @@ export const AGING: Record<AgingKey, AgingMeta> = {
 
 export const AGING_ORDER: AgingKey[] = ["current", "watch", "overdue"];
 
+/**
+ * 🔴 CÓMO SE LLAMA UN TRAMO, EN TODAS PARTES: el nombre y el rango juntos
+ * ("Por vencer 0-90d").
+ *
+ * 🩸 Era EL MISMO BOTÓN CON DOS NOMBRES. En escritorio (`KpiCards`) las
+ * píldoras decían solo el rango —"0-90d · 91-120d · 121d+"— y en el celular
+ * (`PanelCxcMobile`) solo el nombre —"Por vencer · Vencido reciente · Vencido
+ * crítico"—, con la lista de nombres COPIADA adentro de su propio
+ * `AGING_THEME`. Quien aprende a cobrar desde el celular no reconoce el botón
+ * en la computadora, y al revés. El papel (`pdf-cxc.ts`) ya decía los dos desde
+ * jul-2026 y era el único de los tres que se leía sin traducir: se generalizó
+ * ese criterio en vez de inventar uno cuarto.
+ *
+ * ⚠️ NO CAMBIA NI UN NÚMERO NI UN CORTE: los tramos siguen siendo 0-90 /
+ * 91-120 / 121+ y las cifras salen de las mismas sumas. Esto es vocabulario.
+ */
+export function tramoLabel(k: AgingKey): string {
+  return `${AGING[k].label} ${AGING[k].colLabel}`;
+}
+
 /** Días transcurridos desde una fecha ISO hasta hoy (null si no hay fecha válida). */
 export function daysSince(iso: string | null | undefined): number | null {
   if (!iso) return null;

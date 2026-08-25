@@ -159,7 +159,15 @@ describe("los reportes de Exportar no se escriben sus propios rótulos", () => {
   it("los tramos se derivan de `cxc-aging`, la misma fuente que rotula la pantalla", () => {
     const fuente = plano(leer(PDF));
     expect(fuente).toContain('from "@/lib/cxc-aging"');
-    expect(fuente).toContain("const tramo = (k: AgingKey) => `${AGING[k].label} ${AGING[k].colLabel}`");
+    // 🔑 EL NOMBRE DEL TRAMO SE MUDÓ A `cxc-aging` COMO `tramoLabel`. Antes el
+    // papel llevaba su propia lambda —correcta, pero PROPIA— mientras las dos
+    // pantallas rotulaban distinto: el escritorio solo el rango ("0-90d") y el
+    // celular solo el nombre ("Por vencer"), con su lista copiada a mano. Las
+    // TRES superficies llaman ahora a la misma función, así que no pueden
+    // volver a separarse. El candado deja de exigir la copia local y exige la
+    // derivación, que es lo que siempre quiso decir.
+    expect(fuente).toContain("const tramo = tramoLabel;");
+    expect(fuente).not.toMatch(/const tramo = \(k: AgingKey\) =>/);
     // Los tres consumidores: cajas KPI, barra y encabezados de tabla.
     expect(fuente).toContain('{ label: tramo("current")');
     expect(fuente).toContain("${AGING.current.label} ${pctCur.toFixed(0)}%");

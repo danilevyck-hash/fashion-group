@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-import { AGING, type AgingKey } from "@/lib/cxc-aging";
+import { AGING, tramoLabel } from "@/lib/cxc-aging";
 
 // 🔴 EL PAPEL NO ESCRIBE SUS PROPIOS RÓTULOS: los DERIVA de `cxc-aging.ts`, la
 // misma fuente que rotula las píldoras KPI, las columnas de la tabla y las
@@ -25,7 +25,9 @@ import { AGING, type AgingKey } from "@/lib/cxc-aging";
 // las cifras salen de los mismos campos `current`/`watch`/`overdue` que suma la
 // pantalla. "+120d" y "121d+" son dos maneras de escribir EL MISMO corte (más de
 // 120 = 121 en adelante); se elige la de la pantalla, que es la referencia.
-const tramo = (k: AgingKey) => `${AGING[k].label} ${AGING[k].colLabel}`;
+// El nombre del tramo vive en `cxc-aging` y lo comparten el papel, la pantalla
+// de escritorio y la del celular. Acá se importa, no se copia.
+const tramo = tramoLabel;
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

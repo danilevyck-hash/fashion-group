@@ -313,6 +313,10 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
   it("utilidad por cliente", async () => {
     const resp: UtilidadClienteResponse = {
       year: 2026,
+      // Las SEIS de Fashion Group. El título las cuenta de acá: antes decía "5"
+      // escrito a mano mientras la RPC llevaba cinco empresas adentro del SQL
+      // con joystep afuera — dos copias de la misma lista, mintiendo juntas.
+      empresas: ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"],
       totales: { ventas: 1000, costo: 700, utilidad: 300, margen: 0.3 },
       rows: [
         {
@@ -326,7 +330,7 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const wb = roundtrip([{ name: "Utilidad por cliente", ws }]);
     const s = wb.Sheets["Utilidad por cliente"];
 
-    expect(s["A1"].v).toBe("FASHION GROUP — Utilidad por cliente · 2026 · 5 empresas B2B");
+    expect(s["A1"].v).toBe("FASHION GROUP — Utilidad por cliente · 2026 · 6 empresas B2B");
     expect(String(s["A2"].v)).toContain("Margen 30.0%");
     expect(s[`A${HDR}`].v).toBe("Cliente");
     expect(s[`D${HDR}`].v).toBe("Ventas");
@@ -338,6 +342,93 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     expect(s[`C${tr}`].v).toBe(3);
     expect(s[`F${tr}`].t).toBe("n");
     expect(s[`F${tr}`].v).toBe(300);
+  });
+
+  // ── 🔴 EL MARGEN QUE NO SE PUEDE CALCULAR VA VACÍO, NUNCA 0,0% ─────────────
+  //
+  // 🩸 En pantalla un cliente con venta ≤ 0 (devolución neta) muestra "—". El
+  // Excel escribía `margen ?? 0`, o sea 0,0%: un margen REAL que se suma y se
+  // promedia con los demás y baja el promedio sin que nadie lo note. Es la
+  // MISMA regla que `precioPromedio` ya seguía en Productos.
+  it("utilidad · el cliente sin margen calculable deja la celda VACÍA, no 0,0%", async () => {
+    const resp: UtilidadClienteResponse = {
+      year: 2026,
+      empresas: ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"],
+      totales: { ventas: 1000, costo: 700, utilidad: 300, margen: 0.3 },
+      rows: [
+        {
+          clienteSwitchId: 1, cliente: "CLIENTE BUENO", empresaKey: "vistana", empresa: "Vistana",
+          nDocs: 3, ventas: 1200, costo: 800, utilidad: 400, margen: 0.3333,
+        },
+        {
+          // Devolvió más de lo que compró: la venta neta es negativa y el
+          // margen no existe. En pantalla se lee "—".
+          clienteSwitchId: 2, cliente: "CLIENTE DEVUELVE", empresaKey: "vistana", empresa: "Vistana",
+          nDocs: 1, ventas: -200, costo: -100, utilidad: -100, margen: null,
+        },
+      ],
+    };
+    const s = roundtrip([{ name: "Utilidad por cliente", ws: await buildUtilidadSheet(resp) }])
+      .Sheets["Utilidad por cliente"];
+    expect(s[`G${HDR}`].v).toBe("Margen%");
+    expect(s[`G${DATA}`].v).toBe(0.3333);         // el que SÍ tiene margen
+    expect(s[`G${DATA + 1}`].v).toBe("");          // el que no: VACÍO, no 0
+    expect(s[`G${DATA + 1}`].t).not.toBe("n");
+  });
+
+  it("utilidad · un TOTAL sin margen calculable también va vacío", async () => {
+    const resp: UtilidadClienteResponse = {
+      year: 2026,
+      empresas: ["vistana"],
+      totales: { ventas: -200, costo: -100, utilidad: -100, margen: null },
+      rows: [{
+        clienteSwitchId: 2, cliente: "CLIENTE DEVUELVE", empresaKey: "vistana", empresa: "Vistana",
+        nDocs: 1, ventas: -200, costo: -100, utilidad: -100, margen: null,
+      }],
+    };
+    const s = roundtrip([{ name: "Utilidad por cliente", ws: await buildUtilidadSheet(resp) }])
+      .Sheets["Utilidad por cliente"];
+    const tr = totalsRow(1);
+    expect(s[`G${tr}`].v).toBe("");
+  });
+
+  it("productos · el grupo con devolución neta deja el margen VACÍO, no 0,0%", async () => {
+    const resp: ProductosResponse = {
+      empresa: "fashion_wear",
+      year: 2026,
+      mes: 6,
+      periodo: "ytd",
+      desde: "2026-06-01",
+      hasta: "2026-06-30",
+      meses: [6],
+      totales: { venta: 500, costo: 300, margen: 0.4 },
+      productos: [
+        { descripcion: "CAMISA POLO", num_codigos: 2, cantidad: 10, venta: 500, costo: 300, margen: 0.4 },
+        // Sin margen calculable: en pantalla se lee "—".
+        { descripcion: "DEVUELTO", num_codigos: 1, cantidad: 0, venta: -40, costo: -20, margen: null },
+      ],
+    };
+    const s = roundtrip([{ name: "Productos", ws: await buildProductosSheet(resp) }]).Sheets["Productos"];
+    expect(s[`F${HDR}`].v).toBe("Margen%");
+    expect(s[`F${DATA}`].v).toBe(0.4);
+    expect(s[`F${DATA + 1}`].v).toBe("");
+    expect(s[`F${DATA + 1}`].t).not.toBe("n");
+  });
+
+  it("productos · un TOTAL sin margen calculable también va vacío", async () => {
+    const resp: ProductosResponse = {
+      empresa: "fashion_wear", year: 2026, mes: 6, periodo: "ytd",
+      desde: "2026-06-01", hasta: "2026-06-30", meses: [6],
+      // Todo el período quedó en devolución neta: no hay margen que mostrar.
+      totales: { venta: -40, costo: -20, margen: null },
+      productos: [
+        { descripcion: "DEVUELTO", num_codigos: 1, cantidad: 0, venta: -40, costo: -20, margen: null },
+      ],
+    };
+    const s = roundtrip([{ name: "Productos", ws: await buildProductosSheet(resp) }]).Sheets["Productos"];
+    const tr = totalsRow(1);
+    expect(s[`F${tr}`].v).toBe("");
+    expect(s[`F${tr}`].t).not.toBe("n");
   });
 
   it("productos", async () => {
@@ -363,7 +454,11 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     expect(s["A1"].v).toBe("FASHION GROUP — Productos · Fashion Wear · Jun 2026");
     expect(String(s["A2"].v)).toContain("Venta total $500.00");
     // Las dos fechas: un Excel "Últimos 12 meses" guardado no dice cuáles fueron.
-    expect(String(s["A2"].v)).toContain("Del 2026-06-01 al 2026-06-30");
+    // Y van con el formateador de la casa (`fmtDate`), el MISMO de la pantalla:
+    // "Del 2026-06-01 al 2026-06-30" era formato de base de datos en el archivo
+    // que Daniel manda por correo.
+    expect(String(s["A2"].v)).toContain("Del 1 jun 2026 al 30 jun 2026");
+    expect(String(s["A2"].v)).not.toContain("2026-06-01");
     expect(s[`A${HDR}`].v).toBe("Descripción");
     expect(s[`D${HDR}`].v).toBe("Venta");
     expect(s[`D${DATA}`].t).toBe("n");
@@ -400,6 +495,7 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     };
     const s = roundtrip([{ name: "Productos", ws: await buildProductosSheet(base) }]).Sheets["Productos"];
     expect(s["A1"].v).toBe("FASHION GROUP — Productos · Fashion Wear · Últimos 12 meses");
-    expect(String(s["A2"].v)).toContain("Del 2025-09-01 al 2026-08-24");
+    expect(String(s["A2"].v)).toContain("Del 1 sept 2025 al 24 ago 2026");
+    expect(String(s["A2"].v)).not.toContain("2025-09-01");
   });
 });

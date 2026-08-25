@@ -7,6 +7,7 @@ import { Download, Search } from "lucide-react";
 import { SkeletonTable } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import {
+  alcanceEmpresas,
   fmtMargen,
   fmtMoneySigned,
   exportUtilidadToExcel,
@@ -139,7 +140,10 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
             Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargen(data.totales.margen)}</span>
           </span>
           <Ayuda titulo="Cómo se calcula">
-            <p>Costo real por documento (5 empresas B2B).</p>
+            {/* El número sale del alcance REAL de la consulta, no de un texto
+                fijo: decía 5 mientras la lista de verdad son las 6 de Fashion
+                Group, y así es como joystep se volvió invisible en Comisiones. */}
+            <p>Costo real por documento ({alcanceEmpresas(data.empresas)}).</p>
           </Ayuda>
         </p>
       )}

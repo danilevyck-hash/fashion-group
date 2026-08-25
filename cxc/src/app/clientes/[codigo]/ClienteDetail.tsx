@@ -259,7 +259,10 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-1">
               <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400">
-                Historial · YTD {new Date().getFullYear()}
+                {/* "YTD" era jerga en inglés en la ficha que abre todos los
+                    días gente que no es contadora. El año a secas dice lo
+                    mismo, y las columnas de abajo ya lo repiten. */}
+                Historial {new Date().getFullYear()}
               </h2>
               {/* 🩸 POR QUÉ "VENTAS" Y "CXC" NO CUADRAN ENTRE SÍ — la pregunta
                   que se hace cualquiera al ver las dos cifras juntas. Daniel lo
@@ -272,8 +275,8 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 <span className="font-medium text-gray-900">Ventas</span> va sin ITBMS — el impuesto se
                 cobra para el fisco, no es venta de la empresa.{" "}
                 <span className="font-medium text-gray-900">Cobrado</span> y{" "}
-                <span className="font-medium text-gray-900">CXC</span> van con ITBMS, porque es la plata
-                que entra y la que falta cobrar.
+                <span className="font-medium text-gray-900">Por cobrar hoy</span> van con ITBMS, porque
+                es la plata que entra y la que falta cobrar.
               </Ayuda>
             </div>
             <div className="flex items-center gap-2">
@@ -293,7 +296,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 href={verEnCxcHref}
                 className="text-xs text-blue-600 hover:underline whitespace-nowrap"
               >
-                Ver en CXC →
+                Ver en Cuentas por Cobrar →
               </Link>
             </div>
           </div>
@@ -304,9 +307,13 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 {/* Ventas SIN ITBMS, cobros y saldo CON ITBMS. No es un
                     descuido: son dos preguntas distintas y cada una se responde
                     con la cifra que le toca. Ver la nota al pie de la tabla. */}
-                <th className="py-2 font-normal text-right">Ventas YTD</th>
-                <th className="py-2 font-normal text-right">Cobrado YTD</th>
-                <th className="py-2 font-normal text-right">CXC actual</th>
+                {/* Sin "YTD" y sin la sigla: el año va con todas sus cifras y
+                    "CXC" se escribe como se llama la pantalla en todo el resto
+                    del sistema ("Cuentas por Cobrar"). Acá va en dos líneas
+                    porque es un encabezado de columna angosta. */}
+                <th className="py-2 font-normal text-right">Ventas {new Date().getFullYear()}</th>
+                <th className="py-2 font-normal text-right">Cobrado {new Date().getFullYear()}</th>
+                <th className="py-2 font-normal text-right">Por cobrar hoy</th>
                 <th className="py-2 font-normal text-right">Última factura</th>
               </tr>
             </thead>

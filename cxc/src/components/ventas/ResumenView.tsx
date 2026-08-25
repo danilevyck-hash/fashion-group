@@ -215,12 +215,18 @@ export function ResumenView({
   const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
   const margenSign     = margenDeltaPts >= 0 ? "▲ +" : "▼ ";
 
+  // 🔴 "YTD" SE FUE DE LOS RÓTULOS. Es jerga en inglés (year to date) en una
+  // pantalla que mira gente que no es contadora, y encima no decía QUÉ meses.
+  // Lo que se lee ahora es el nombre de la cifra a secas, y el período completo
+  // —con sus meses y su año— en el renglón de abajo, que ya existía. Un año
+  // cerrado dice "Año 2025 completo" en vez de "Año completo": sin el año, la
+  // única forma de saber cuál se está mirando era el selector de arriba.
   const periodoLabel = isClosedYear
-    ? "Año completo"
+    ? `Año ${selectedYear} completo`
     : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear}`;
 
-  const kpiVentasLabel   = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
-  const kpiUtilidadLabel = isClosedYear ? `UTILIDAD ${selectedYear}`     : "UTILIDAD YTD";
+  const kpiVentasLabel   = "VENTAS NETAS";
+  const kpiUtilidadLabel = "UTILIDAD";
   // Indicador de mayoreo de la fila Multifashion. En VENTAS el total INCLUYE el
   // mayoreo (es venta del grupo), así que la nota lo declara con su monto para
   // que se entienda la diferencia contra el módulo Multifashion, que muestra
@@ -237,7 +243,7 @@ export function ResumenView({
 
   const kpiVentasSub   = `${periodoLabel} · ${kpiDeltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
   const kpiUtilidadSub = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
-  const kpiMargenSub   = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
+  const kpiMargenSub   = `${periodoLabel} · ${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
   // El bloque "mes en curso vs mismo mes del año anterior" solo aplica al año
   // en curso. En un año cerrado el encabezado pegado existe igual, con el
   // recuadro del detalle solo.

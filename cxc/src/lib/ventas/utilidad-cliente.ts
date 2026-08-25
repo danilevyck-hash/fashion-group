@@ -1,10 +1,29 @@
-// Utilidad real por cliente (tab Ventas). Fuente: RPC utilidad_por_cliente(p_anio)
-// sobre switch_factura_utilidad (reporte web, la misma que Comisiones). Alcance:
-// 2026 + 5 empresas B2B. Las NC se guardan negativas → un cliente puede tener
-// utilidad/ventas netas NEGATIVAS (devoluciones > ventas): es un dato válido, no
-// un error — la UI lo muestra en rojo con nota, no como fallo.
+// Utilidad real por cliente (tab Ventas). Fuente: switch_factura_utilidad
+// (reporte web, la misma que Comisiones). Las NC se guardan negativas → un
+// cliente puede tener utilidad/ventas netas NEGATIVAS (devoluciones > ventas):
+// es un dato válido, no un error — la UI lo muestra en rojo con nota.
+//
+// 🔴 EL ALCANCE NO SE ESCRIBE A MANO. Cuántas empresas se están mirando llega
+// en `empresas` (lo manda el route, derivado de `empresasConUtilidad()`), y de
+// ahí salen el título del Excel y el ⓘ de la pantalla. Antes decía "5 empresas
+// B2B" como texto fijo mientras la RPC llevaba las cinco escritas adentro del
+// SQL, con `joystep` afuera: dos copias de la misma lista, y las dos mintiendo
+// juntas. Ese olvido ya costó 15.262,00 de cobros invisibles.
 
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+
+/** Las cinco que `utilidad_por_cliente(p_anio)` (v1) lleva escritas en su WHERE.
+ *  Solo se usa para rotular la respuesta cuando la migración de la v2 todavía
+ *  no corrió — NO es la lista del sistema: ésa se deriva y le falta `joystep`. */
+export const EMPRESAS_UTILIDAD_V1: readonly string[] = [
+  "vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear",
+] as const;
+
+/** "6 empresas B2B" / "1 empresa B2B" — el alcance dicho con el número REAL. */
+export function alcanceEmpresas(empresas: readonly string[] | undefined): string {
+  const n = empresas?.length ?? 0;
+  return n === 1 ? "1 empresa B2B" : `${n} empresas B2B`;
+}
 
 export interface UtilidadClienteRow {
   clienteSwitchId: number | null;
@@ -20,6 +39,10 @@ export interface UtilidadClienteRow {
 
 export interface UtilidadClienteResponse {
   year: number;
+  /** Las empresas que la consulta miró de verdad. Derivada de
+   *  `empresasConUtilidad()`; cae a las 5 de la v1 mientras la migración
+   *  20260824180000 no esté corrida. */
+  empresas: string[];
   totales: { ventas: number; costo: number; utilidad: number; margen: number | null };
   rows: UtilidadClienteRow[];
 }
@@ -57,7 +80,7 @@ export async function buildUtilidadSheet(resp: UtilidadClienteResponse): Promise
   const totalDocs = resp.rows.reduce((s, r) => s + r.nDocs, 0);
 
   return buildReportSheet({
-    title: `FASHION GROUP — Utilidad por cliente · ${resp.year} · 5 empresas B2B`,
+    title: `FASHION GROUP — Utilidad por cliente · ${resp.year} · ${alcanceEmpresas(resp.empresas)}`,
     subtitle,
     columns: [
       { header: "Cliente", wch: 34 },
@@ -68,8 +91,13 @@ export async function buildUtilidadSheet(resp: UtilidadClienteResponse): Promise
       { header: "Utilidad", wch: 16, align: "right", fmt: MONEY_FMT },
       { header: "Margen%", wch: 10, align: "right", fmt: PCT_FMT },
     ],
-    rows: resp.rows.map(r => [r.cliente, r.empresa, r.nDocs, r.ventas, r.costo, r.utilidad, r.margen ?? 0]),
-    totals: ["TOTAL", null, totalDocs, resp.totales.ventas, resp.totales.costo, resp.totales.utilidad, resp.totales.margen ?? 0],
+    // 🔴 `r.margen` VA TAL CUAL, sin `?? 0`. En pantalla un margen que no se
+    // puede calcular (venta ≤ 0) se lee "—"; escribir 0,0% en el Excel lo
+    // convierte en un margen REAL que se suma y se promedia con los demás y
+    // baja el promedio sin que nadie lo note. `null` = celda VACÍA (lo soporta
+    // `buildReportSheet`), que es lo que "—" significa.
+    rows: resp.rows.map(r => [r.cliente, r.empresa, r.nDocs, r.ventas, r.costo, r.utilidad, r.margen]),
+    totals: ["TOTAL", null, totalDocs, resp.totales.ventas, resp.totales.costo, resp.totales.utilidad, resp.totales.margen],
   });
 }
 
