@@ -12,9 +12,8 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import EnviarDocumentoSwitch from "@/components/catalogo/EnviarDocumentoSwitch";
 import {
   type DocumentoSwitch,
-  TEXTO_NO_RESERVA,
-  esCotizacion,
   normalizarDocumento,
+  palabraDelPapel,
   tituloEnviadoASwitch,
 } from "@/lib/catalogo/documento-switch";
 
@@ -80,6 +79,10 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   // Qué hay en Switch. Envío viejo o DDL pendiente = pedido, que es lo único
   // que este sistema sabía crear antes del 24-ago-2026.
   const documento = normalizarDocumento(envio?.documento);
+  // 🔴 La palabra del título. `palabraDelPapel` devuelve la de Switch cuando el
+  // pedido YA salió, y la de la casa mientras no salió — no inventa etiqueta
+  // para algo que todavía no es ninguna de las dos.
+  const palabra = palabraDelPapel(envio);
 
 
   return (
@@ -91,8 +94,15 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
           {/* Estado principal */}
           <div className={`rounded-lg border-2 p-6 text-center ${switchOk ? "border-emerald-300 bg-emerald-50" : ambiguo ? "border-amber-300 bg-amber-50" : sinIntento ? "border-gray-300 bg-gray-50" : "border-red-200 bg-red-50"}`}>
             <div className="text-3xl">{switchOk ? "✓" : ambiguo ? "⚠️" : sinIntento ? "→" : "!"}</div>
+            {/* 🔴 EL TÍTULO DICE CUÁL DE LAS DOS FUE. Decía "Pedido TOM-027
+                guardado" en grande aunque lo mandado hubiera sido una
+                COTIZACIÓN, y el renglón chico de abajo la contradecía. El
+                número NO cambia — TOM-027 se llama así siempre —, cambia la
+                palabra que lo acompaña. Si todavía no salió a Switch no es
+                ninguna de las dos: se queda con "Pedido", que es como la casa
+                lo llamó desde siempre. */}
             <h1 className="mt-2 text-lg font-semibold">
-              {order ? `Pedido ${order.order_number} guardado` : "Pedido guardado"}
+              {order ? `${palabra} ${order.order_number} guardado` : `${palabra} guardado`}
             </h1>
             {switchOk ? (
               <p className="mt-1 text-sm text-emerald-800">
@@ -115,12 +125,6 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
                 <p>El envío a Switch falló — el pedido está guardado en el sistema y no se pierde.</p>
                 {envio?.error_detalle && <p className="mt-1 text-xs">{envio.error_detalle}</p>}
               </div>
-            )}
-            {/* 🔴 Lo que hay que saber DESPUÉS de mandar una cotización, con
-                las mismas palabras con que se dijo antes: la mercancía sigue
-                a la venta para los demás vendedores. */}
-            {switchOk && esCotizacion(documento) && (
-              <p className="mt-2 text-xs text-amber-800">{TEXTO_NO_RESERVA}</p>
             )}
             {order && (
               <p className="mt-2 text-xs text-gray-500 tabular-nums">

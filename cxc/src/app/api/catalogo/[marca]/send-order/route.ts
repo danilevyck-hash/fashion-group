@@ -10,6 +10,7 @@ import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { buildCatalogoOrderPdf } from "@/lib/catalogo/order-pdf";
 import { buildOrderEmailHtml, escapeHtml } from "@/lib/catalogo/order-email";
+import { palabraDelEnvioActivo } from "@/lib/catalogo/switch-lock";
 
 function fmt(n: number) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -34,6 +35,10 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   let total: number;
   let comment: string | null = null;
   let createdAt: string = new Date().toISOString();
+  // 🔴 La palabra del papel adjunto. `null` mientras el pedido no salió a
+  // Switch (y siempre en el checkout público, que no tiene `orderId`): ahí no
+  // es ninguna de las dos y el PDF queda como estaba, diciendo "Pedido".
+  let documentoLabel: string | undefined;
 
   if (body.orderId) {
     const db = await cfg.db();
@@ -70,6 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
         bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
       }));
     }
+    documentoLabel = (await palabraDelEnvioActivo(db, cfg.enviosTable, body.orderId)) ?? undefined;
     const resumen = resumirDesdeItems(items, { bultoSize: cfg.bultoSize });
     totalBultos = resumen.bultos;
     totalPiezas = resumen.piezas;
@@ -105,9 +111,13 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     createdAt,
     items: items.map((i) => ({ ...i, category: i.category || cfg.pdfFallbackCategory })),
     bultoSize: cfg.bultoSize,
+    documentoLabel,
   });
   const dateStr = new Date().toISOString().slice(0, 10);
-  const pdfFilename = `Pedido-${orderNumber}-${dateStr}.pdf`;
+  // El adjunto lleva la MISMA palabra que el encabezado del PDF: el papel que
+  // recibe el cliente no puede decir "Pedido" si lo que salió fue una
+  // cotización. Sin envío a Switch queda "Pedido", igual que siempre.
+  const pdfFilename = `${documentoLabel ?? "Pedido"}-${orderNumber}-${dateStr}.pdf`;
 
   // ── A quién le va ─────────────────────────────────────────────────────────
   // Este endpoint sirve a DOS botones del detalle de pedido: "Confirmar

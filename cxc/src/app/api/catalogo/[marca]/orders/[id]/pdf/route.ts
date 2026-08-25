@@ -8,6 +8,19 @@ import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { buildCatalogoOrderPdf, type PdfOrderItem } from "@/lib/catalogo/order-pdf";
+import { palabraDelEnvioActivo } from "@/lib/catalogo/switch-lock";
+
+/**
+ * 🩸 «Cotización» LLEVA TILDE Y ESTO ES UN ENCABEZADO HTTP. Un `filename="…ó…"`
+ * a secas viaja como latin-1 y el navegador baja "CotizaciÃ³n-TOM-027.pdf". La
+ * forma correcta es la de RFC 6266: un `filename` en ASCII puro como respaldo
+ * (para el navegador viejo) MÁS `filename*=UTF-8''…` percent-encoded, que es el
+ * que ganan Chrome, Safari y Firefox. El acento no se pierde y nada se rompe.
+ */
+function contentDisposition(nombre: string): string {
+  const ascii = nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "");
+  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nombre)}`;
+}
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -47,6 +60,13 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     bulto_pzas: bultoPzasByProduct.get(String(i.product_id)) ?? null,
   }));
 
+  // 🔴 QUÉ PALABRA VA EN EL PAPEL. Este PDF es el del botón "Ver PDF" de la
+  // confirmación, o sea el que se comparte por WhatsApp/mail con el visor de
+  // iOS: es el papel que ve el cliente. Si el pedido salió a Switch como
+  // COTIZACIÓN tiene que decirlo — el encabezado y el nombre del archivo. Si
+  // todavía no salió, `null` y queda "Pedido", igual que antes de este cambio.
+  const documentoLabel = (await palabraDelEnvioActivo(db, cfg.enviosTable, params.id)) ?? undefined;
+
   const pdf = await buildCatalogoOrderPdf({
     marca: cfg.marca,
     orderNumber: String(row.order_number),
@@ -54,12 +74,17 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     createdAt: String(row.created_at ?? new Date().toISOString()),
     items,
     bultoSize: cfg.bultoSize,
+    documentoLabel,
   });
 
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="Pedido-${row.order_number}-${new Date().toISOString().slice(0, 10)}.pdf"`,
+      // El nombre del archivo es lo PRIMERO que se ve en WhatsApp o en el
+      // correo, antes de abrirlo. Lleva la MISMA palabra que el encabezado.
+      "Content-Disposition": contentDisposition(
+        `${documentoLabel ?? "Pedido"}-${row.order_number}-${new Date().toISOString().slice(0, 10)}.pdf`,
+      ),
       "Cache-Control": "no-store",
     },
   });
