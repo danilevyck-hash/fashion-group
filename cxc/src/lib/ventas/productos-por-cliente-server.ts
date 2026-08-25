@@ -75,6 +75,18 @@ async function leerMapa(
   hasta: string,
   codigos: readonly string[] | null,
 ): Promise<Map<string, string>> {
+  // 🩸 SIN FILTRO DE FECHA, Y ES A PROPÓSITO. La tabla de arriba rotula cada
+  // grupo con el nombre MÁS RECIENTE del código, que es global (ver
+  // `switch_top_descripciones_reciente`). Acotando el mapa a la ventana, en
+  // «Año pasado» el filtro nombraría al mismo producto con la grafía vieja y no
+  // caería sobre ninguna fila de la tabla que dice filtrar.
+  //
+  // ⚠️ SÍ, ES MÁS CARO: en fashion_wear son 68 páginas en vez de 22. Es el
+  // camino SIN la RPC, o sea el que deja de correr en cuanto se corra la
+  // migración 20260826120000 — y una respuesta rápida que no cruza con la tabla
+  // no sirve para nada. `desde`/`hasta` se siguen recibiendo porque son parte
+  // de la firma y los usa el llamador.
+  void desde; void hasta;
   const filas: FilaDiario[] = [];
   const lotes = codigos == null ? [null] : enLotes([...new Set(codigos)], CODIGOS_POR_LOTE);
   for (const lote of lotes) {
@@ -85,9 +97,7 @@ async function leerMapa(
         let q = supabaseServer
           .from("switch_articulo_diario")
           .select("codigo, descripcion, fecha", pedirCount ? { count: "exact" } : {})
-          .eq("empresa_key", empresa)
-          .gte("fecha", desde)
-          .lte("fecha", hasta);
+          .eq("empresa_key", empresa);
         if (lote != null) q = q.in("codigo", lote);
         // Orden ESTABLE por columna única: sin él, PostgREST puede repetir o
         // saltear filas entre páginas y el mapa queda mal en silencio.

@@ -128,28 +128,22 @@ perl -0pi -e 's/\{PERIODOS_FIJOS\.map\(p => \(/{[...PERIODOS_FIJOS, { key: "ytd"
 probar "vuelve un mes suelto al desplegable" "$VISTA"
 
 # 14 · el desplegable deja de dibujar la lista de clientes
-perl -0pi -e 's/\{tab === "clientes" && \(/{false \&\& (/' "$VISTA"
+perl -0pi -e 's/\{tab === "clientes" && <BloqueClientes/{false \&\& <BloqueClientes/' "$VISTA"
 probar "el desplegable no dibuja quién lo compra" "$VISTA"
 
 # 15 · la lista vacía afirma que no lo compra nadie
 perl -0pi -e 's/Todavía no tenemos el detalle por cliente de estas ventas\./No lo compra nadie./' "$VISTA"
 probar "la lista vacía afirma que no lo compra nadie" "$VISTA"
 
-# 16 · el aviso de las dos grafías DESAPARECE (el descuadre vuelve a ser invisible)
-perl -0pi -e 's/  if \(grafias\.length === 0\) return null;/  return null;/' "$VISTA"
-probar "el aviso de las grafías desaparece" "$VISTA"
-
-# 17 · el aviso es PERMANENTE (la alerta que se deja de leer a la semana)
-perl -0pi -e 's/  if \(grafias\.length === 0\) return null;/  if (false) return null;/' "$VISTA"
-probar "el aviso sale siempre, haya solape o no" "$VISTA"
-
-# 18 · el aviso deja de nombrar la OTRA grafía (no sirve para ir a corregirlo)
-perl -0pi -e 's/&ldquo;\{g\.otra\}&rdquo;/&ldquo;un producto&rdquo;/' "$VISTA"
-probar "el aviso no nombra la otra grafía" "$VISTA"
-
-# 19 · el aviso pasa a ROJO (dice que se rompió algo, y no se rompió nada)
-perl -0pi -e 's/(data-aviso-grafias\s*\n\s*className=")[^"]*amber[^"]*"/${1}mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900"/' "$VISTA"
-probar "el aviso se pone rojo" "$VISTA"
+# ⛔ ACÁ VIVÍAN LAS MUTACIONES 16-19 DEL AVISO ÁMBAR DE LAS DOS GRAFÍAS.
+# Ese aviso decía "la lista de abajo suma más que la venta de la fila" y era
+# cierto mientras la fila sumaba UNA sola grafía. Desde que Ventas › Productos
+# agrupa por el nombre más reciente del código (PR de 25-ago-2026), la fila suma
+# las dos: el aviso pasó a ser falso y se fue. Lo reemplazó otro —el de "código
+# mal clasificado en Switch"— y sus mutaciones están en el script de esa función:
+#     bash scripts/_mutar-candados-descripcion-reciente.sh
+# Dejarlas acá apuntando a código que ya no existe no probaría nada: darían
+# PATRÓN MUERTO, que es justo lo que este barrido está hecho para denunciar.
 
 # 20 · las grafías se NORMALIZAN (tapa 7 casos y deja 29 mintiendo)
 perl -0pi -e 's/    if \(d === descripcionDeLaFila\) continue;/    if (d.trim().toLowerCase() === descripcionDeLaFila.trim().toLowerCase()) continue;/' "$PURO"

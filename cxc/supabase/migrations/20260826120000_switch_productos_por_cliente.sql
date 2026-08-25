@@ -79,15 +79,31 @@ CREATE OR REPLACE FUNCTION switch_productos_por_cliente(
 )
 RETURNS jsonb
 LANGUAGE sql STABLE AS $fn$
+  -- ---------------------------------------------------------------------
+  --  EL NOMBRE DE CADA CODIGO: EXACTAMENTE EL MISMO QUE EL DE LA TABLA
+  -- ---------------------------------------------------------------------
+  --  🩸 ESTA CTE MIRA TODA LA HISTORIA DEL CODIGO, NO LA VENTANA, y no es un
+  --  detalle: la fila de arriba se rotula con el nombre MAS RECIENTE del codigo
+  --  (switch_top_descripciones_reciente, migracion 20260825160000) y ese nombre
+  --  es GLOBAL a proposito. Si aca se acotara al periodo, en «Anio pasado» la
+  --  tabla diria `Agua Dana 600 Ml 20 Und` y el filtro por cliente diria
+  --  `Agua Dana 600 ml 20 Und ` -- dos textos distintos para el mismo producto
+  --  -- y el filtro no encontraria las filas que dice filtrar: los 137 casos
+  --  medidos saldrian como "dejo de comprar" sin que nadie dejara nada.
+  --
+  --  El desempate tambien es el mismo: MIN(id::text) entre las filas de la
+  --  fecha mas nueva. Sin el, dos corridas pueden rotular distinto.
+  --
+  --  ⚠️ SI YA CORRISTE ESTA MIGRACION, HAY QUE VOLVER A CORRERLA.
   WITH mapa AS (
     SELECT DISTINCT ON (d.codigo)
       d.codigo,
       COALESCE(d.descripcion, '(sin descripción)') AS descripcion
     FROM switch_articulo_diario d
     WHERE d.empresa_key = p_empresa_key
-      AND d.fecha BETWEEN p_desde AND p_hasta
       AND d.codigo IS NOT NULL
-    ORDER BY d.codigo, d.fecha DESC
+      AND d.descripcion IS NOT NULL
+    ORDER BY d.codigo, d.fecha DESC, d.id::text ASC
   ),
   -- UNA sola pasada por las lineas: de aca salen las filas agregadas Y el conteo
   -- de las que no tienen descripcion. Contarlas con una segunda consulta seria

@@ -72,8 +72,8 @@ let urlsPedidas: string[] = [];
 /** Cuando true, la llamada del comparativo (`previo=1`) responde 500 — o sea el
  *  tropiezo de red que hacía salir el catálogo entero como "Nuevo". */
 let fallarComparativo = false;
-/** Las otras grafías del mismo producto. Vacío = sin solape, sin aviso. */
-let grafiasDelDrill: { otra: string; codigo: string }[] = [];
+/** El aviso de "mal clasificado" que trae la fila de NIVEL 1. Vacío = sin aviso. */
+let avisoDeLaFila: { otra: string; codigo: string }[] = [];
 /** Qué devuelve el desplegable en «Quién lo compra». `null` = no se pudo. */
 let clientesDelDrill: unknown = [
   { cliente_switch_id: 1, cliente_nombre: "City Mall Paso Canoa", cantidad: 750, venta: 6750 },
@@ -88,7 +88,7 @@ let productosPrevios: ProductosResponse["productos"] = [
 beforeEach(() => {
   urlsPedidas = [];
   fallarComparativo = false;
-  grafiasDelDrill = [];
+  avisoDeLaFila = [];
   clientesDelDrill = [
     { cliente_switch_id: 1, cliente_nombre: "City Mall Paso Canoa", cantidad: 750, venta: 6750 },
     { cliente_switch_id: 2, cliente_nombre: "Golden Mall", cantidad: 250, venta: 2250 },
@@ -109,12 +109,17 @@ beforeEach(() => {
           { codigo: "A-2", descripcion: "CAMISA POLO", cantidad: 200, venta: 1000, costo: 600, margen: 0.4 },
         ],
         clientes: clientesDelDrill,
-        grafias: grafiasDelDrill,
       });
     }
     const previo = String(url).includes("previo=1");
     const periodo = (new URL(String(url), "http://x").searchParams.get("periodo") ?? "ytd") as never;
-    return json(respuesta(previo ? { productos: productosPrevios } : { periodo }));
+    if (previo) return json(respuesta({ productos: productosPrevios }));
+    // El aviso llega en la fila de NIVEL 1 (no en el desplegable): es la
+    // respuesta que la pantalla ya tiene antes de que nadie abra nada.
+    const productos = PRODUCTOS.map(p =>
+      p.descripcion === "CAMISA POLO" && avisoDeLaFila.length > 0 ? { ...p, aviso: avisoDeLaFila } : p,
+    );
+    return json(respuesta({ periodo, productos }));
   }));
 });
 
@@ -643,66 +648,110 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 9 · EL AVISO ÁMBAR — sólo cuando hay solape de verdad
+// 9 · EL AVISO QUE REEMPLAZA AL QUE SE PIERDE
 //
-// 🩸 En Switch el mismo producto está escrito de dos formas
-// («Women-Small Leather Goods» y «Women-Small Leather»), y un código vive bajo
-// las dos. La fila suma sólo SU grafía; la lista trae las líneas de todos esos
-// códigos, así que suma más. Medido: 23 de 103 descripciones de vistana.
+// 🩸 Desde que la pantalla agrupa por el nombre MÁS RECIENTE del código, el
+// mismo producto deja de salir partido en dos renglones. Eso arregla lo que
+// había que arreglar y TAPA una cosa: un código MAL CLASIFICADO en Switch —que
+// vivió bajo dos categorías que las dos existen de verdad— antes se delataba
+// solo saliendo en dos filas, y ahora sale en una.
 //
 // Las dos formas de arruinarlo, y las dos tienen candado acá:
-//   · que el aviso DESAPAREZCA (el descuadre vuelve a ser invisible);
-//   · que el aviso sea PERMANENTE (la alerta que se deja de leer a la semana).
+//   · que el aviso NO SALGA (el código mal clasificado queda invisible);
+//   · que el aviso salga SIEMPRE (la alerta que se deja de leer a la semana).
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("9 · el aviso de las dos grafías", () => {
-  async function abrir() {
+describe("9 · el aviso de código mal clasificado", () => {
+  async function pantalla() {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
-    fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
-    await waitFor(() => expect(document.querySelector("[data-drill-clientes]")).toBeTruthy());
   }
 
-  it("🔴 SIN solape NO hay aviso (si saliera siempre, se deja de leer)", async () => {
-    grafiasDelDrill = [];
-    await abrir();
-    expect(document.querySelector("[data-aviso-grafias]")).toBeNull();
+  it("🔴 SIN aviso en la respuesta NO se dibuja nada (si saliera siempre, se deja de leer)", async () => {
+    avisoDeLaFila = [];
+    await pantalla();
+    expect(document.querySelector("[data-aviso-clasificacion]")).toBeNull();
   });
 
-  it("🔴 CON solape lo dice, nombra LAS DOS grafías y el código que comparten", async () => {
-    grafiasDelDrill = [{ otra: "CAMISA POLOS", codigo: "A-1" }];
-    await abrir();
-    const aviso = document.querySelector("[data-aviso-grafias]");
-    expect(aviso, "no salió el aviso con solape").toBeTruthy();
+  it("🔴 CON aviso lo dice: el CÓDIGO y la OTRA categoría", async () => {
+    avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
+    await pantalla();
+    const aviso = document.querySelector("[data-aviso-clasificacion]");
+    expect(aviso, "no salió el aviso").toBeTruthy();
+    expect(aviso!.getAttribute("data-aviso-clasificacion")).toBe("A-1");
     const texto = (aviso!.textContent ?? "").replace(/\s+/g, " ");
-    expect(texto).toContain("CAMISA POLO");   // la grafía de la fila
-    expect(texto).toContain("CAMISA POLOS");  // la otra
-    expect(texto).toContain("A-1");           // el código que las comparte
-    expect(texto).toMatch(/suma más/i);
-    expect(texto).toMatch(/Switch/);
+    expect(texto).toContain("A-1");      // el código
+    expect(texto).toContain("CAMISETA"); // la otra categoría
+  });
+
+  it("va DENTRO de la fila que avisa, y en NINGUNA otra", async () => {
+    avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
+    await pantalla();
+    const fila = document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!;
+    expect(fila.querySelector("[data-aviso-clasificacion]")).toBeTruthy();
+    const otra = document.querySelector('tr[data-fila-producto="SANDALIA"]')!;
+    expect(otra.querySelector("[data-aviso-clasificacion]")).toBeNull();
+    expect(document.querySelectorAll("[data-aviso-clasificacion]")).toHaveLength(1);
   });
 
   it("es ÁMBAR, no rojo: no se rompió nada", async () => {
-    grafiasDelDrill = [{ otra: "CAMISA POLOS", codigo: "A-1" }];
-    await abrir();
-    const cls = document.querySelector("[data-aviso-grafias]")!.className;
+    avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
+    await pantalla();
+    const cls = document.querySelector("[data-aviso-clasificacion]")!.className;
     expect(cls).toContain("amber");
     expect(cls).not.toContain("red");
     expect(cls).not.toContain("rose");
   });
 
-  it("la lista de clientes se dibuja IGUAL: el aviso no la esconde", async () => {
-    grafiasDelDrill = [{ otra: "CAMISA POLOS", codigo: "A-1" }];
-    await abrir();
+  it("es una ETIQUETA CORTA, no un párrafo: menos de 90 caracteres", async () => {
+    avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
+    await pantalla();
+    const texto = (document.querySelector("[data-aviso-clasificacion]")!.textContent ?? "").trim();
+    expect(texto.length).toBeLessThan(90);
+  });
+
+  it("con más de uno, nombra el primero y CUENTA el resto (no vuelca la lista)", async () => {
+    avisoDeLaFila = [
+      { otra: "CAMISETA", codigo: "A-1" },
+      { otra: "CHOMBA", codigo: "A-2" },
+      { otra: "REMERA", codigo: "A-3" },
+    ];
+    await pantalla();
+    const texto = (document.querySelector("[data-aviso-clasificacion]")!.textContent ?? "");
+    expect(texto).toContain("A-1");
+    expect(texto).toContain("(+2)");
+    expect(texto).not.toContain("A-3");
+  });
+
+  it("⚠️ EL AVISO NO TOCA UN SOLO NÚMERO de la fila", async () => {
+    avisoDeLaFila = [];
+    await pantalla();
+    const sinAviso = {
+      venta: celda("CAMISA POLO", "venta"),
+      cantidad: celda("CAMISA POLO", "cantidad"),
+      margen: celda("CAMISA POLO", "margen"),
+      precio: celda("CAMISA POLO", "precio"),
+      total: document.querySelector("[data-totales-productos]")!.textContent,
+    };
+    cleanup();
+    avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
+    await pantalla();
+    expect({
+      venta: celda("CAMISA POLO", "venta"),
+      cantidad: celda("CAMISA POLO", "cantidad"),
+      margen: celda("CAMISA POLO", "margen"),
+      precio: celda("CAMISA POLO", "precio"),
+      total: document.querySelector("[data-totales-productos]")!.textContent,
+    }).toEqual(sinAviso);
+  });
+
+  it("⚠️ el aviso NO frena el desplegable: «Quién lo compra» abre igual", async () => {
+    avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
+    await pantalla();
+    fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
+    await waitFor(() => expect(document.querySelector("[data-drill-clientes]")).toBeTruthy());
     const tabla = document.querySelector("[data-drill-clientes]")!;
     expect([...tabla.querySelectorAll("tr")]).toHaveLength(2);
     expect(tabla.textContent).toContain("City Mall Paso Canoa");
-  });
-
-  it("⚠️ la FILA DE ARRIBA no se toca: sigue siendo la suma de SU grafía", async () => {
-    grafiasDelDrill = [{ otra: "CAMISA POLOS", codigo: "A-1" }];
-    await abrir();
-    expect(celda("CAMISA POLO", "venta")).toBe("$9,000.00");
-    expect(celda("CAMISA POLO", "cantidad")).toBe("1,000");
   });
 });

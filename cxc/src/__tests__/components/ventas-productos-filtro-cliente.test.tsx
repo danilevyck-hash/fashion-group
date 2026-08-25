@@ -76,7 +76,7 @@ let previaCity = [
   { cliente_switch_id: CITY.id, cliente_nombre: CITY.nombre, descripcion: "BOXER", cantidad: 30, venta: 450 },
   { cliente_switch_id: CITY.id, cliente_nombre: CITY.nombre, descripcion: "PANTUFLA", cantidad: 200, venta: 3200 },
 ];
-let grafiasDelDrill: { otra: string; codigo: string }[] = [];
+let avisoDeLaFila: { otra: string; codigo: string }[] = [];
 let urls: string[] = [];
 
 function json(body: unknown) {
@@ -95,7 +95,7 @@ function respuesta(over: Partial<ProductosResponse> = {}): ProductosResponse {
 
 beforeEach(() => {
   urls = [];
-  grafiasDelDrill = [];
+  avisoDeLaFila = [];
   matriz = [
     { cliente_switch_id: CITY.id, cliente_nombre: CITY.nombre, descripcion: "CAMISA POLO", cantidad: 100, venta: 2000 },
     { cliente_switch_id: CITY.id, cliente_nombre: CITY.nombre, descripcion: "SANDALIA", cantidad: 50, venta: 700 },
@@ -122,11 +122,15 @@ beforeEach(() => {
       return json({
         codigos: [{ codigo: "A-1", descripcion: "CAMISA POLO", cantidad: 800, venta: 8000, costo: 4800, margen: 0.4 }],
         clientes: [{ cliente_switch_id: CITY.id, cliente_nombre: CITY.nombre, cantidad: 100, venta: 2000 }],
-        grafias: grafiasDelDrill,
       });
     }
     const previo = u.includes("previo=1");
-    return json(respuesta(previo ? { productos: PRODUCTOS.map(p => ({ ...p, venta: p.venta * 0.8 })) } : {}));
+    if (previo) return json(respuesta({ productos: PRODUCTOS.map(p => ({ ...p, venta: p.venta * 0.8 })) }));
+    // El aviso viaja en la fila de NIVEL 1, no en el desplegable.
+    return json(respuesta({
+      productos: PRODUCTOS.map(p =>
+        p.descripcion === "CAMISA POLO" && avisoDeLaFila.length > 0 ? { ...p, aviso: avisoDeLaFila } : p),
+    }));
   }));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -367,20 +371,28 @@ describe("5 · «Dejó de comprar»", () => {
   });
 });
 
-describe("6 · el aviso ÁMBAR del sobrepaso sigue apareciendo con el filtro puesto", () => {
-  it("se abre una fila filtrada y el aviso está, con las dos grafías y el código", async () => {
-    grafiasDelDrill = [{ otra: "Camisa Polo M/C", codigo: "A-1" }];
+describe("6 · el aviso ÁMBAR sigue apareciendo con el filtro puesto", () => {
+  // ⛔ ACÁ SE MIRABA `data-aviso-grafias`, el aviso de "la lista suma más que la
+  // fila". Ese cartel existía porque la fila sumaba UNA sola grafía; desde que
+  // la tabla agrupa por el nombre más reciente del código, la fila suma las dos
+  // y el aviso pasó a ser falso. Lo reemplazó el de "código mal clasificado en
+  // Switch", que vive EN LA FILA — y por eso este candado ya no necesita abrir
+  // el desplegable: lo que se exige es que filtrar por un cliente no se lo lleve.
+  it("con un cliente elegido, la fila sigue avisando (código y otra categoría)", async () => {
+    avisoDeLaFila = [{ otra: "Camisa Polo M/C", codigo: "A-1" }];
     render(<ProductosView selectedYear={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
-    fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     const aviso = await waitFor(() => {
-      const a = document.querySelector("[data-aviso-grafias]");
+      const a = document.querySelector("[data-aviso-clasificacion]");
       expect(a).toBeTruthy();
       return a!;
     });
     expect(aviso.textContent).toContain("Camisa Polo M/C");
     expect(aviso.textContent).toContain("A-1");
+    // Y sigue estando DENTRO de la fila filtrada, no suelto arriba.
+    expect(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!
+      .querySelector("[data-aviso-clasificacion]")).toBeTruthy();
   });
 
   it("y el pie que dice que el mostrador no trae detalle también", async () => {
