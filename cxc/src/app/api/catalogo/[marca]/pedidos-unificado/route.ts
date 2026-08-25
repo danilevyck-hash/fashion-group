@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
+import { normalizarDocumento, type DocumentoSwitch } from "@/lib/catalogo/documento-switch";
 
 export const dynamic = "force-dynamic";
 
@@ -86,16 +87,44 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     .filter((r) => (r.fuente ?? (r.origen === "link" ? "publicos" : "orders")) === "orders")
     .map((r) => r.id_natural);
   const switchNumeros = new Map<string, string>();
+  // 🔴 QUÉ SE MANDÓ: pedido o COTIZACIÓN. Una cotización NO aparta mercancía, así
+  // que el número de Switch sin decir cuál de las dos es miente por omisión.
+  // Ausencia ⇒ 'pedido' (`normalizarDocumento`), que es lo único que el sistema
+  // sabía crear antes del 24-ago-2026.
+  const switchDocumentos = new Map<string, DocumentoSwitch>();
+  // El número del PROPIO pedido (PED-017 · TOM-026 · CKP-005). NO está en la
+  // vista unificada —que expone `id_natural`, el uuid— así que se pide a la
+  // tabla de orders en UNA sola query por ids, igual que los envíos.
+  const numerosPedido = new Map<string, string>();
   if (orderIds.length > 0) {
-    const enviosDb = await cfg.db();
-    const { data: envios, error: enviosError } = await enviosDb
-      .from(cfg.enviosTable)
-      .select("order_id, numero_interno, pedido_switch_id")
-      .in("order_id", orderIds)
-      .in("estado", ["enviado", "verificado"]);
-    if (!enviosError) {
-      for (const e of envios || []) {
-        switchNumeros.set(String(e.order_id), String(e.numero_interno || e.pedido_switch_id || "?"));
+    const marcaDb = await cfg.db();
+    // Escalón tolerante por la DDL 20260824160000 (`documento`): si la columna
+    // no existe se relee sin ella y todo queda como antes — pedido.
+    for (const cols of [
+      "order_id, numero_interno, pedido_switch_id, documento",
+      "order_id, numero_interno, pedido_switch_id",
+    ]) {
+      const { data: envios, error: enviosError } = await marcaDb
+        .from(cfg.enviosTable)
+        .select(cols)
+        .in("order_id", orderIds)
+        .in("estado", ["enviado", "verificado"]);
+      if (enviosError) continue;
+      for (const e of (envios || []) as unknown as Record<string, unknown>[]) {
+        const id = String(e.order_id);
+        switchNumeros.set(id, String(e.numero_interno || e.pedido_switch_id || "?"));
+        switchDocumentos.set(id, normalizarDocumento(e.documento));
+      }
+      break;
+    }
+    // Tolerante igual: sin `order_number` la fila dice "Sin número", no un blanco.
+    const { data: ords, error: ordsError } = await marcaDb
+      .from(cfg.ordersTable)
+      .select("id, order_number")
+      .in("id", orderIds);
+    if (!ordsError) {
+      for (const o of (ords || []) as unknown as Record<string, unknown>[]) {
+        if (o.order_number) numerosPedido.set(String(o.id), String(o.order_number));
       }
     }
   }
@@ -120,6 +149,11 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       fuente: r.fuente ?? (r.origen === "link" ? "publicos" : "orders"),
       confirmado_cliente_at: r.confirmado_cliente_at ?? null,
       switch_numero: switchNumeros.get(r.id_natural) ?? null,
+      // Los dos datos nuevos de la fila. `numero_pedido` es null solo en el
+      // pedido del LINK sin convertir (su PED-XXX lo asigna la conversión);
+      // `switch_documento` es null cuando no salió a Switch.
+      numero_pedido: numerosPedido.get(r.id_natural) ?? null,
+      switch_documento: switchDocumentos.get(r.id_natural) ?? null,
     };
   });
 

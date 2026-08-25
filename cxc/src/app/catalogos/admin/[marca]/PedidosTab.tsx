@@ -6,6 +6,13 @@ import { ConfirmModal, ConfirmDeleteModal } from "@/components/ui";
 import BulkDeletePedidosModal from "@/components/catalogo/BulkDeletePedidosModal";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { precioTexto } from "@/lib/catalogo/precio";
+import {
+  estaEnSwitch,
+  textoBuscablePedido,
+  textoEnSwitch,
+  textoNumeroPedido,
+  tieneNumeroPropio,
+} from "@/lib/catalogo/numeros-pedido";
 
 // Pestaña Pedidos del admin — ÚNICA por marca (PR-2, antes gemelos ~83%
 // idénticos). Fila de la vista unificada (presenciales + del link); el total
@@ -27,6 +34,12 @@ export interface UnifiedPedido {
   // numero_interno del envío ACTIVO en Switch (null si nunca se envió). La
   // eliminación masiva lo usa para avisar "sigue en Switch — anúlalo allá".
   switch_numero?: string | null;
+  // Número del PROPIO pedido (PED-017 · JBP-041 · TOM-026 · CKP-005). Null solo
+  // en un pedido del link sin convertir: se lo asigna la conversión.
+  numero_pedido?: string | null;
+  // Qué se mandó a Switch: 'pedido' | 'cotizacion'. Null si no salió. Una
+  // COTIZACIÓN no aparta mercancía, así que la fila tiene que decir cuál fue.
+  switch_documento?: string | null;
 }
 
 // Precio de catálogo: sin `.00` y sin redondear (`35`, `12.50`, `4,422`).
@@ -71,6 +84,43 @@ function OrigenBadge({ marca, origen, confirmadoCliente }: { marca: MarcaUiKey; 
     <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
       Mío
     </span>
+  );
+}
+
+// 🔴 LOS DOS NÚMEROS, DEBAJO DEL NOMBRE — NO EN COLUMNAS NUEVAS (24-ago-2026)
+//
+// Daniel necesitaba cruzar un pedido de esta lista contra Switch sin abrirlos de
+// a uno. Dos columnas más (el número de la casa y el del ERP) ensanchan la tabla
+// justo en el iPad acostado (1024), que es el ancho donde este repo ya se quemó
+// y el que nadie mira. Así que los números van como SEGUNDA LÍNEA bajo el
+// cliente: la tabla crece hacia ABAJO, que es gratis, y no hacia el costado.
+//
+// Los textos NO se escriben acá: salen de `lib/catalogo/numeros-pedido.ts`. Un
+// pedido que no salió dice «No se ha mandado a Switch» y no «—» (un guion en la
+// columna de un número se lee como un cero), y el que sí salió dice SIEMPRE si
+// fue pedido o COTIZACIÓN — una cotización no aparta mercancía y las dos se
+// verían idénticas con solo el número.
+function NumerosPedido({ pedido, esOrders }: { pedido: UnifiedPedido; esOrders: boolean }) {
+  const datos = {
+    numeroPedido: pedido.numero_pedido ?? null,
+    switchNumero: pedido.switch_numero ?? null,
+    switchDocumento: pedido.switch_documento ?? null,
+    fuente: (esOrders ? "orders" : "publicos") as "orders" | "publicos",
+  };
+  const propio = tieneNumeroPropio(datos);
+  const enSwitch = estaEnSwitch(datos);
+  return (
+    <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs leading-snug">
+      <span className={propio ? "font-medium text-gray-600 tabular-nums" : "text-gray-400"}>
+        {textoNumeroPedido(datos)}
+      </span>
+      <span className="text-gray-300" aria-hidden="true">
+        ·
+      </span>
+      <span className={enSwitch ? "text-gray-600 tabular-nums" : "text-gray-400"}>
+        {textoEnSwitch(datos)}
+      </span>
+    </div>
   );
 }
 
@@ -193,8 +243,18 @@ export default function PedidosTab({
   const filtered = pedidos.filter((p) => {
     if (origenFilter !== "todos" && p.origen !== origenFilter) return false;
     if (search) {
-      const q = search.toLowerCase();
-      if (!(p.cliente || "").toLowerCase().includes(q)) return false;
+      // Se busca por cliente Y por los DOS números: el que Daniel tiene a mano
+      // puede ser el de la casa (PED-017) o el que le dice el ERP
+      // (16-000000503). Buscar solo por cliente obligaba a saber el nombre.
+      const q = search.trim().toLowerCase();
+      if (
+        !textoBuscablePedido({
+          cliente: p.cliente,
+          numeroPedido: p.numero_pedido ?? null,
+          switchNumero: p.switch_numero ?? null,
+        }).includes(q)
+      )
+        return false;
     }
     return true;
   });
@@ -374,7 +434,7 @@ export default function PedidosTab({
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por cliente…"
+          placeholder="Buscar por cliente o número…"
           className={theme.admin.pedidos.searchFocus}
         />
       </div>
@@ -422,7 +482,7 @@ export default function PedidosTab({
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="w-8 pl-4 pr-1 py-3"></th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Origen</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Cliente</th>
+                <th className="text-left px-2 lg:px-4 py-3 font-medium text-gray-500">Cliente</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
@@ -447,12 +507,17 @@ export default function PedidosTab({
                   <td className="px-4 py-3">
                     <OrigenBadge marca={marca} origen={pedido.origen} confirmadoCliente={!!pedido.confirmado_cliente_at} />
                   </td>
-                  <td className="px-4 py-3 text-gray-900">
+                  {/* Los gutters de ESTA columna se aprietan por debajo de `lg`: la
+                      segunda línea trae el número de Switch, y con `px-4` la tabla
+                      pedía 13 px más de los que hay en el iPad de 834. De `lg` para
+                      arriba no cambia nada. */}
+                  <td className="px-2 lg:px-4 py-3 text-gray-900">
                     {clienteLabel(pedido) === "Sin nombre" ? (
                       <span className="text-gray-300 italic">Sin nombre</span>
                     ) : (
                       pedido.cliente
                     )}
+                    <NumerosPedido pedido={pedido} esOrders={isOrdersRow(pedido)} />
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
                     ${fmtMoney(pedido.total)}

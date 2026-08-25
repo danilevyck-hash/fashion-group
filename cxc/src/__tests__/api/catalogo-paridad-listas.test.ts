@@ -96,8 +96,9 @@ describe("GET /pedidos-unificado", () => {
       ],
     });
     reebokDb.queue("reebok_switch_envios", {
-      data: [{ order_id: OID, numero_interno: "16-000000489", pedido_switch_id: 489 }],
+      data: [{ order_id: OID, numero_interno: "16-000000489", pedido_switch_id: 489, documento: "pedido" }],
     });
+    reebokDb.queue("reebok_orders", { data: [{ id: OID, order_number: "PED-017" }] });
 
     const res = await rUnificado(makeReq("/x", { role: "admin" }));
     expect(res.status).toBe(200);
@@ -114,11 +115,19 @@ describe("GET /pedidos-unificado", () => {
       fuente: "orders",
       confirmado_cliente_at: null,
       switch_numero: "16-000000489",
+      // Los DOS números de la fila (24-ago-2026): el de la casa y el del ERP,
+      // con qué se mandó (pedido | cotizacion) para que el número no mienta.
+      numero_pedido: "PED-017",
+      switch_documento: "pedido",
     });
     // link sin fuente → publicos; product_id null → fallback apparel (bulto 6)
     expect(rows[1].fuente).toBe("publicos");
     expect(rows[1].total).toBe(30); // 1×6×5
     expect(rows[1].switch_numero).toBeNull();
+    // El pedido del LINK sin convertir NO tiene número propio: se lo asigna la
+    // conversión. Null, y la pantalla lo dice con palabras.
+    expect(rows[1].numero_pedido).toBeNull();
+    expect(rows[1].switch_documento).toBeNull();
 
     // El criterio del candado: solo envíos enviado/verificado
     const enviosChain = reebokDb.chainsFor("reebok_switch_envios")[0];
