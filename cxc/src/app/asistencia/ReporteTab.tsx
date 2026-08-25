@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
-import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
+import { ALMUERZO_FIJO_MIN, MINUTOS_TARDE_QUE_SON_AUSENCIA } from "@/lib/asistencia/config";
 import { esTrabajoFuera, textoDiaJustificado } from "@/lib/asistencia/motivos";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -266,6 +266,10 @@ export default function ReporteTab() {
             Todo en minutos. Entrada 8:00 con {reglas?.toleranciaTardanzaMin ?? TOLERANCIA_MIN} de
             tolerancia · almuerzo de {ALMUERZO_FIJO_MIN} minutos · extras desde{" "}
             {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min, menos el atraso del día.{" "}
+            Los minutos <b className="text-red-700">en rojo</b> son de un día en que se llegó más de{" "}
+            {MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde: en la planilla esos minutos se muestran
+            en la columna <b>Ausencias</b> en vez de en Tardanzas. <b>Se descuentan igual</b> — la
+            columna cambia de nombre, no de precio.{" "}
             <b>&quot;A revisar&quot;</b> es un día TERMINADO sin las 4 marcas: los minutos igual
             cuentan. El día de <b>hoy</b> nunca entra ahí —sigue corriendo, así que todavía no
             se le puede decir que está mal marcado—, y el reporte muestra solo a quien estaba
@@ -461,8 +465,24 @@ function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
             <Hora idx={1} mostrar={d.marcas.length >= 4} tenue />
             <Hora idx={2} mostrar={d.marcas.length >= 4} tenue />
             <Hora idx={ultima} mostrar={d.marcas.length > 1} />
+            {/* 🔴 EL DÍA DICE SOLO CUÁNTO SE LLEGÓ TARDE, y en rojo cuando esos
+                minutos van a la columna «Ausencia» de la planilla. Es el «para
+                que lo veas» de Daniel: sin esto, un día de 45 minutos y uno de
+                15 se ven igual acá y distinto allá. ⚠️ El minuto NO cambia de
+                precio: se descuenta igual de los dos lados. */}
             <td className="px-2 py-1.5 text-right">{d.tardeMin
-              ? <span className="font-medium tabular-nums text-amber-700">{fmtMin(d.tardeMin)}</span>
+              ? (
+                <span
+                  className={`font-medium tabular-nums ${
+                    d.tardeMin > MINUTOS_TARDE_QUE_SON_AUSENCIA ? "text-red-700" : "text-amber-700"
+                  }`}
+                  title={d.tardeMin > MINUTOS_TARDE_QUE_SON_AUSENCIA
+                    ? `Más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos: en la planilla estos minutos se muestran en «Ausencias». Se descuentan igual que una tardanza.`
+                    : undefined}
+                >
+                  {fmtMin(d.tardeMin)}
+                </span>
+              )
               : <span className="text-gray-300">—</span>}</td>
             <td className="px-2 py-1.5 text-right text-gray-600">{n(d.excesoAlmuerzoMin)}</td>
             <td className="px-2 py-1.5 text-right text-gray-600">{n(d.extraMin)}</td>

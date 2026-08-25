@@ -29,6 +29,7 @@ import {
   type ReportCell,
   type ReportColumn,
 } from "@/lib/excel-export";
+import { MINUTOS_TARDE_QUE_SON_AUSENCIA } from "./config";
 import type { ReglasAsistencia } from "./config";
 import {
   EXPLICACION_SERVICIO_PROFESIONAL,
@@ -38,6 +39,7 @@ import {
   aHoras,
   FORMULA_NETO,
   grupoDeLinea,
+  minutosTardanzaMostrados,
   type LineaPlanilla,
   type Periodo,
   type Quincena,
@@ -219,6 +221,11 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
     { header: "Domingo (h)", wch: 11, align: "right" },
     { header: "Feriado (h)", wch: 11, align: "right" },
     { header: "Tardanza (min)", wch: 13, align: "right" },
+    // 🔴 Los minutos de más de 30 tarde van APARTE. Sumados a la tardanza, la
+    // columna no cuadraría con el monto de la hoja del cuadro, que ya los
+    // muestra del lado de la ausencia.
+    { header: "Tarde >30 min (min)", wch: 17, align: "right" },
+    { header: "Tarde >30 min (días)", wch: 18, align: "right" },
     { header: "…de días a revisar", wch: 16, align: "right" },
     { header: "Ausencias (días)", wch: 14, align: "right" },
     { header: "Ausencias (h)", wch: 12, align: "right" },
@@ -241,7 +248,11 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
         c0(aHoras(h.extraDiurnoMin)), c0(aHoras(h.extraNocturnoMin)), c0(aHoras(h.excedenteMin)),
         c0(aHoras(h.domingoMin)), c0(aHoras(h.feriadoMin)),
         // Minutos AL SEGUNDO: se redondean a 2 decimales solo para la celda.
-        c0(Math.round(h.tardanzaMin * 100) / 100),
+        // 🔑 `minutosTardanzaMostrados` y no `h.tardanzaMin`: es el mismo número
+        // que la pantalla, y el que de verdad valúa la columna «Tardanzas».
+        c0(Math.round(minutosTardanzaMostrados(h) * 100) / 100),
+        c0(Math.round((h.tardanzaGraveMin || 0) * 100) / 100),
+        c0(h.tardanzaGraveDias || 0),
         c0(Math.round(h.tardanzaDeDiasARevisarMin * 100) / 100),
         c0(h.ausenciaDias), c0(aHoras(h.ausenciaMin)),
         c0(aHoras(h.sabadoMin)), c0(h.diasARevisar),
@@ -276,13 +287,14 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Hora extra", `Mínimo ${r.extraMinimoMin} minutos y menos el atraso del mismo día. Hasta las ${r.horaCorteNocturno} × ${r.recargoExtraDiurno}; desde el minuto siguiente × ${r.recargoExtraNocturno}.`],
       ["Excedente", `× ${r.recargoExcedenteNocturnaMixta}. Solo las horas que pasan de ${r.excedenteHorasDia} en el día Y caen después de las ${r.horaCorteNocturno}. Las dos condiciones a la vez.`],
       ["Domingos y feriados", `Horas trabajadas × ${r.recargoDomingoFeriado}.`],
-      ["Ausencias", "Horas del día que no se trabajó × rata por hora, sin recargo."],
+      ["Ausencias", "Horas del día que no se trabajó × rata por hora, sin recargo. Es el día completo: quien no marcó ni una vez."],
+      ["Llegar más de 30 minutos tarde", "Se muestra en la columna «Ausencias», no en «Tardanzas» — pero SE DESCUENTAN LOS MINUTOS, exactamente igual que una tardanza. La columna solo cambia de nombre: el total bruto y el neto son los mismos. Hasta 30 minutos va en «Tardanzas»."],
       ["Seguro social", `${r.seguroSocialPct} % del total bruto.`],
       ["Seguro educativo", `${r.seguroEducativoPct} % del total bruto.`],
       ["ISR, préstamo, terceros, mercancía y otros servicios", "No salen de ningún sistema: los escribe la contable a mano."],
       ["Otros servicios", "SE SUMA al neto: es un pago extra, no un descuento. Los otros cuatro se restan."],
       [""],
-      ["Total bruto", "Quincenal + extras + domingos + feriados − ausencias − tardanzas."],
+      ["Total bruto", "Quincenal + extras + domingos + feriados − ausencias − tardanzas. ⚠ Que unos minutos se muestren en «Ausencias» en vez de en «Tardanzas» NO cambia este número: se resta lo mismo de los dos lados."],
       ["Neto a pagar", "Total bruto − total deducciones + otros servicios."],
       [""],
       ["⚠ Quien aparece en rojo", "No tiene todo lo que hace falta para calcularle un número. NO vale $0: quedó fuera del total y hay que configurarlo en la pestaña Configuración."],
@@ -412,7 +424,18 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       doc.setTextColor(156, 163, 175);
       // 🔴 Lo que no puede perderse al mandar el papel por correo. Va arriba de
       // la fórmula porque es lo que cambia la lectura del cuadro entero.
-      const avisos = [d.periodoAbierto?.texto, d.avisoSinFicha].filter(Boolean).join("  ");
+      // 🔴 EL PAPEL ES EL QUE SE FIRMA, y en él la columna «Ausencias» puede
+      // traer minutos de alguien que vino todos los días. Sin esta línea, quien
+      // lo revise dentro de seis meses no tiene forma de saberlo — y el aviso
+      // solo aparece cuando hay algo que avisar, que es lo que hace que se lea.
+      const conAusenciaPorTardanza = d.lineas.some((l) => (l.dinero?.ausenciaPorTardanza ?? 0) > 0);
+      const avisos = [
+        d.periodoAbierto?.texto,
+        d.avisoSinFicha,
+        conAusenciaPorTardanza
+          ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
+          : null,
+      ].filter(Boolean).join("  ");
       if (avisos) doc.text(avisos, 10, h - 11);
       doc.text(FORMULA_NETO, 10, h - 8);
       doc.text(

@@ -169,6 +169,44 @@ export const REGLAS_DEFAULT: ReglasAsistencia = {
  * ────────────────────────────────────────────────────────────────────────── */
 export const ALMUERZO_FIJO_MIN = 30;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * CUÁNTOS MINUTOS TARDE DEJAN DE SER UNA TARDANZA Y PASAN A LLAMARSE AUSENCIA
+ *
+ * Daniel, 25-ago-2026, sobre la columna «Ausencia» que la contadora venía
+ * cargando A MANO:
+ *
+ *     de 1 minuto a 30  → Tardanza
+ *     más de 30 minutos → Ausencia
+ *
+ * 🔴 Y ESTO NO MUEVE UN CENTAVO. Daniel eligió, entre dos opciones, que los
+ * minutos se descuenten **exactamente igual que una tardanza**: *"Los 45
+ * minutos, igual que una tardanza. La columna «Ausencia» es solo para que lo
+ * veas."* O sea que lo único que cambia es EN QUÉ COLUMNA se muestra la misma
+ * plata — el bruto y el neto son idénticos a los de ayer, y hay un candado que
+ * lo prueba en dólares para las 3 quincenas × 3 empresas.
+ *
+ * ⚠️ ES OTRA COSA QUE LA AUSENCIA DE DÍA COMPLETO, y las dos conviven. Quien no
+ * marcó NI UNA VEZ en todo el día sigue costando `jornada × rata` y se sigue
+ * descontando solo, como hasta hoy: ese comportamiento NO se tocó. Éste es el
+ * que llegó, trabajó, y llegó muy tarde.
+ *
+ * ── 🩸 POR QUÉ ES UNA CONSTANTE Y NO UNA CASILLA MÁS EN «REGLAS DEL CÁLCULO» ──
+ *
+ * Porque no es un número del negocio que se negocie: es el nombre que se le
+ * pone a un rango. Bajarlo a 15 no le cobraría a nadie un centavo distinto —
+ * solo movería plata de una columna a la otra— así que una perilla acá no
+ * compra nada y sí ofrece una forma de dejar el cuadro raro sin que nadie lo
+ * note. Es el mismo criterio que `ALMUERZO_FIJO_MIN`. Se declara en la pantalla
+ * de Reglas, en «Esto no se cambia desde acá», junto a las otras.
+ *
+ * 🔑 SE MIDE CONTRA LOS MINUTOS DE TARDANZA YA CONTADOS, o sea DESPUÉS de la
+ * tolerancia. Con la tolerancia en 10, quien llega 8:41 tiene 41 minutos de
+ * tardanza y cae del lado de la ausencia; quien llega 8:39 tiene 39 y también.
+ * La tolerancia perdona, este umbral solo rotula: son dos cosas distintas y por
+ * eso no se suman ni se restan entre sí.
+ * ────────────────────────────────────────────────────────────────────────── */
+export const MINUTOS_TARDE_QUE_SON_AUSENCIA = 30;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ⛔ LO QUE NO ES CONFIGURABLE, A PROPÓSITO — y por qué no debe volverse un campo
 //
@@ -186,8 +224,12 @@ export const ALMUERZO_FIJO_MIN = 30;
 //   4. EL ALMUERZO ES DE 30 MINUTOS PARA TODO EL MUNDO (`ALMUERZO_FIJO_MIN`).
 //      Lo fijó Daniel y es igual en las 33 personas con horario; tener dos
 //      perillas para eso solo servía para que dijeran cosas distintas.
+//   5. PASADOS 30 MINUTOS TARDE, LA COLUMNA SE LLAMA «AUSENCIA»
+//      (`MINUTOS_TARDE_QUE_SON_AUSENCIA`). No cambia cuánto se descuenta —los
+//      minutos valen lo mismo de los dos lados—, solo dónde se muestra, así que
+//      una casilla acá no compraría nada y sí dejaría el cuadro raro.
 //
-// Si algún día alguna de las cuatro cambia, se cambia EN CÓDIGO y con un test
+// Si algún día alguna de las cinco cambia, se cambia EN CÓDIGO y con un test
 // que la respalde. Que a nadie se le ocurra "mejorar" esta pantalla agregándolas.
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -45,7 +45,8 @@ const linea = (over: Partial<LineaPlanilla>): LineaPlanilla => ({
 const dinero = {
   rataHora: 2.88, valorMinuto: 0.048, salarioQuincenal: 300,
   extraDiurno: 0, extraNocturno: 0, excedente: 0, domingos: 0, feriados: 0,
-  ausencias: 0, tardanzas: 0, totalBruto: 300, seguroSocial: 29.25,
+  ausencias: 0, ausenciaPorTardanza: 0, ausenciaDeDiaCompleto: 0,
+  tardanzas: 0, totalBruto: 300, seguroSocial: 29.25,
   seguroEducativo: 3.75, isr: 0, prestamo: 0, terceros: 0, mercancia: 0,
   totalDeducciones: 33, otrosServicios: 0, netoPagar: 267,
 };

@@ -20,7 +20,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
-import { EMPRESAS_ASISTENCIA, etiquetaEmpresa } from "@/lib/asistencia/config";
+import {
+  EMPRESAS_ASISTENCIA,
+  etiquetaEmpresa,
+  MINUTOS_TARDE_QUE_SON_AUSENCIA,
+} from "@/lib/asistencia/config";
 import {
   EXPLICACION_SERVICIO_PROFESIONAL,
   MOTIVO_FUERA_DE_PLANILLA,
@@ -31,6 +35,8 @@ import {
   FORMULA_NETO,
   grupoDeLinea,
   quincenasHasta,
+  textoAusencias,
+  textoTardanzas,
   type LineaPlanilla,
   type ManualesLinea,
   type Periodo,
@@ -532,6 +538,18 @@ export default function PlanillaTab() {
                 </tfoot>
               </table>
             </div>
+            {/* 🔴 EL PIE QUE EXPLICA EL ASTERISCO. Solo aparece cuando hay algo
+                que explicar: un cartel permanente se deja de leer, y éste tiene
+                que leerse el día que aparece un número raro en «Ausencias». */}
+            {buenas.some((l) => (l.dinero?.ausenciaPorTardanza ?? 0) > 0) && (
+              <p className="mt-2 px-1 text-[12px] text-gray-600">
+                <span className="font-semibold text-amber-700">*</span>{" "}
+                Incluye días en que la persona SÍ vino pero llegó más de{" "}
+                {MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde. <b>Se descuentan los minutos, igual
+                que una tardanza</b> — la columna solo cambia de nombre, el total bruto es el mismo.
+                Pasa el cursor por el número para ver cuánto y de cuántos días.
+              </p>
+            )}
           </div>
 
           {/* ── CELULAR: una tarjeta por persona ── */}
@@ -688,7 +706,23 @@ function Fila({
       </td>
       {num(d.salarioQuincenal)}
       {num(d.extraDiurno)}
-      {num(d.ausencias, "text-red-700")}
+      {/* 🔴 EL ASTERISCO NO ES ADORNO. En el escritorio esta celda es todo lo
+          que la contadora ve de la ausencia, y desde el 25-ago-2026 puede traer
+          minutos de alguien que VINO TODOS LOS DÍAS. Sin la marca, ella lee una
+          ausencia donde sabe que la persona trabajó. El `title` da el detalle
+          y el pie de la tabla explica qué significa el asterisco. */}
+      <td className={`px-2 py-1.5 text-right tabular-nums text-red-700 ${d.ausencias === 0 ? "" : ""}`}>
+        {d.ausencias === 0 ? <span className="text-gray-300">—</span> : (
+          <span
+            title={d.ausenciaPorTardanza > 0
+              ? `${$(d.ausenciaPorTardanza)} de estos ${$(d.ausencias)} son de ${l.horas.tardanzaGraveDias} día(s) en que llegó más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde. Se descuentan los minutos, igual que una tardanza.`
+              : undefined}
+          >
+            {$(d.ausencias)}
+            {d.ausenciaPorTardanza > 0 && <span className="ml-0.5 text-amber-700">*</span>}
+          </span>
+        )}
+      </td>
       {num(d.tardanzas, "text-red-700")}
       {num(d.extraNocturno)}
       {num(d.excedente)}
@@ -759,10 +793,13 @@ function Tarjeta({
           {linea(`Excedente 2.625 (${aHoras(h.excedenteMin)} h)`, d.excedente)}
           {linea(`Domingos (${aHoras(h.domingoMin)} h)`, d.domingos)}
           {linea(`Feriados (${aHoras(h.feriadoMin)} h)`, d.feriados)}
-          {linea(`Ausencias (${h.ausenciaDias} días · ${aHoras(h.ausenciaMin)} h)`, d.ausencias, true)}
-          {/* 🔑 `fmtMin`: los minutos se calculan AL SEGUNDO, así que acá pueden
-              traer fracción. Se muestran con 2 decimales cuando la tienen. */}
-          {linea(`Tardanzas (${fmtMin(h.tardanzaMin)} min)`, d.tardanzas, true)}
+          {/* 🔴 LAS DOS ETIQUETAS SALEN DE `planilla.ts`, y no se arman acá.
+              Desde el 25-ago-2026 estas dos columnas SE REPARTEN los mismos
+              minutos —más de 30 tarde se muestran en «Ausencias»— y escribir el
+              texto en la pantalla es la forma de que los minutos dejen de
+              cuadrar con los dólares de al lado sin que nadie lo note. */}
+          {linea(`Ausencias (${textoAusencias(h)})`, d.ausencias, true)}
+          {linea(`Tardanzas (${textoTardanzas(h)})`, d.tardanzas, true)}
           <div className="mt-1 flex justify-between border-t border-gray-200 pt-1 font-semibold">
             <span>Total bruto</span>
             <span className="tabular-nums">${$(d.totalBruto)}</span>
@@ -814,10 +851,26 @@ function Tarjeta({
           {h.diasARevisar > 0 && (
             <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">
               <b>{h.diasARevisar}</b> {h.diasARevisar === 1 ? "día" : "días"} sin las 4 marcas
+              {/* ⚠️ «minutos que llegó tarde» y no «minutos de tardanza»: desde
+                  el 25-ago-2026 esos minutos se reparten entre las dos columnas,
+                  así que llamarlos «de tardanza» ya no cuadraría con el monto
+                  que la columna «Tardanzas» muestra al lado. */}
               {h.tardanzaDeDiasARevisarMin > 0 && (
                 <> — de ahí salen <b>{fmtMin(h.tardanzaDeDiasARevisarMin)}</b> de los {fmtMin(h.tardanzaMin)} minutos
-                de tardanza. Míralos antes de descontar.</>
+                que llegó tarde. Míralos antes de descontar.</>
               )}
+            </p>
+          )}
+          {/* 🔴 UN MONTO EN «AUSENCIAS» DE ALGUIEN QUE VINO TODOS LOS DÍAS NO
+              PUEDE QUEDAR SIN EXPLICACIÓN. Es la contadora la que revisa este
+              cuadro, y sin esta línea vería una ausencia donde ella sabe que la
+              persona trabajó. Se dice el monto y de dónde sale. */}
+          {d.ausenciaPorTardanza > 0 && (
+            <p className="mt-2 rounded bg-blue-50 px-2 py-1.5 text-[12px] text-blue-900">
+              De los <b>${$(d.ausencias)}</b> de ausencia, <b>${$(d.ausenciaPorTardanza)}</b> son de{" "}
+              <b>{h.tardanzaGraveDias}</b> {h.tardanzaGraveDias === 1 ? "día" : "días"} en que llegó más de{" "}
+              {MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde. <b>Se descuentan los minutos, igual que una
+              tardanza</b> — la columna solo cambia de nombre, el monto es el mismo.
             </p>
           )}
           {h.sabadoMin > 0 && (
