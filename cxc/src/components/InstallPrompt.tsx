@@ -1,13 +1,23 @@
 "use client";
 
-// Install prompt de la PWA.
-// - Chromium/Android: captura `beforeinstallprompt`, lo difiere y ofrece un
-//   botón "Instalar app".
-// - iOS Safari (no tiene beforeinstallprompt): hint manual "Compartir →
-//   Agregar a inicio", solo fuera de standalone.
+// Install prompt de la PWA — SOLO donde de verdad se puede instalar.
+//
+// Chromium (Android y escritorio): el navegador dispara `beforeinstallprompt`,
+// lo diferimos y ofrecemos el botón "Instalar app". Un toque y queda instalada.
 // Se oculta en páginas públicas, en login, en standalone (ya instalada) y una
 // vez descartado. (El copy de Modo Viaje / offline se eliminó — la app es
 // siempre online.)
+//
+// 🔴 EN iOS LA BARRA SE FUE, Y NO VUELVE (25-ago-2026). Safari NO dispara
+// `beforeinstallprompt`, así que ahí la barra nunca pudo instalar nada: lo
+// único que hacía era un párrafo explicando cómo hacerlo A MANO ("Toca
+// Compartir y luego Agregar a inicio"). O sea una barra fija, tapando el borde
+// de abajo de la pantalla, para decir algo que el sistema operativo ya ofrece
+// y que quien la necesitó ya hizo una vez. Daniel tiene la app en su inicio y
+// aprobó sacarla.
+//
+// ⚠️ Lo que se fue es SOLO el camino de iOS. Donde SÍ hay botón de instalar
+// —Android y escritorio— la barra sigue viva y con su botón; hay candado.
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -45,23 +55,14 @@ function isStandalone(): boolean {
   );
 }
 
-function isIosSafari(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  const iOS =
-    /iPad|iPhone|iPod/.test(ua) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const webkit = /WebKit/.test(ua);
-  // Excluir navegadores in-app (Chrome/Firefox/Edge/Opera en iOS) — esos no
-  // tienen el menú Compartir → Agregar a inicio nativo de Safari.
-  const inAppBrowser = /CriOS|FxiOS|EdgiOS|OPiOS|GSA/.test(ua);
-  return iOS && webkit && !inAppBrowser;
-}
+// 🔴 `isIosSafari()` SE BORRÓ el 25-ago-2026, junto con el hint manual que era
+// su único consumidor. No se deja "por si acaso": una función que detecta iOS
+// viviendo al lado de un prompt de instalación es el hint esperando a que
+// alguien la vuelva a montar.
 
 export default function InstallPrompt() {
   const pathname = usePathname() || "";
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [iosHint, setIosHint] = useState(false);
   const [standalone, setStandalone] = useState(false);
   const [ready, setReady] = useState(false); // ya evaluamos el entorno
   const [dismissed, setDismissed] = useState(false);
@@ -76,7 +77,6 @@ export default function InstallPrompt() {
       /* localStorage no disponible — seguimos */
     }
     setStandalone(isStandalone());
-    if (isIosSafari()) setIosHint(true);
     setReady(true);
 
     const onBIP = (e: Event) => {
@@ -85,7 +85,6 @@ export default function InstallPrompt() {
     };
     const onInstalled = () => {
       setDeferred(null);
-      setIosHint(false);
       dismiss();
     };
     window.addEventListener("beforeinstallprompt", onBIP);
@@ -117,13 +116,11 @@ export default function InstallPrompt() {
   if (dismissed || !ready) return null;
   if (pathname === "/" || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return null;
 
-  // Qué mostrar:
-  //  - instalable (Chromium) → botón Instalar
-  //  - iOS Safari no-standalone → hint A2HS
-  //  - ya instalada (standalone) o desktop sin soporte → nada
+  // Qué mostrar: SOLO si el navegador ofreció instalar de verdad
+  // (`beforeinstallprompt`) y la app no está ya instalada. Sin eso, no se
+  // dibuja nada — ni una barra que solo explique.
   const installable = !standalone && !!deferred;
-  const showIosHint = !standalone && iosHint;
-  if (!installable && !showIosHint) return null;
+  if (!installable) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none">
@@ -131,14 +128,6 @@ export default function InstallPrompt() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900">Instala Fashion Group</p>
-
-            {showIosHint && (
-              <p className="text-xs text-gray-500 mt-0.5">
-                Toca <span className="font-medium text-gray-700">Compartir</span> y luego{" "}
-                <span className="font-medium text-gray-700">&ldquo;Agregar a inicio&rdquo;</span> para
-                abrirla como una app.
-              </p>
-            )}
           </div>
 
           <button
@@ -153,14 +142,12 @@ export default function InstallPrompt() {
           </button>
         </div>
 
-        {installable && (
-          <button
-            onClick={install}
-            className="mt-3 w-full bg-black text-white text-sm font-medium rounded-lg min-h-[44px] active:scale-[0.98] transition"
-          >
-            Instalar app
-          </button>
-        )}
+        <button
+          onClick={install}
+          className="mt-3 w-full bg-black text-white text-sm font-medium rounded-lg min-h-[44px] active:scale-[0.98] transition"
+        >
+          Instalar app
+        </button>
       </div>
     </div>
   );

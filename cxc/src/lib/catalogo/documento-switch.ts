@@ -197,11 +197,10 @@ export function tituloEnviadoASwitch(d: DocumentoSwitch): string {
   return esCotizacion(d) ? "Cotización enviada a Switch" : "Enviado a Switch";
 }
 
-/**
- * La etapa que va en el aviso de Telegram. Quien lo lee no es técnico y lo que
- * necesita saber de un vistazo es cuál de las dos salió — un pedido aparta
- * mercancía y una cotización no.
- */
-export function etapaTelegram(d: DocumentoSwitch): string {
-  return esCotizacion(d) ? "COTIZACIÓN enviada a Switch" : "enviado a Switch";
-}
+// 🔴 `etapaTelegram` SE BORRÓ el 25-ago-2026. Devolvía "COTIZACIÓN enviada a
+// Switch" / "enviado a Switch" para deletrear la etapa en el aviso de Telegram.
+// Daniel podó el aviso a dos líneas —textual: ***"lo quiero más simple… solo
+// quiero lo útil"***— y esa etapa era lo mismo dicho tres veces: la primera
+// palabra del aviso YA es «Cotización»/«Pedido» (`etiquetaDocumento`) y abajo va
+// el número de Switch. No se deja la función sin usar: una etapa muerta es la
+// etapa esperando a que alguien la vuelva a montar.

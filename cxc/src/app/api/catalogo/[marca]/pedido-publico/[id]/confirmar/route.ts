@@ -298,11 +298,7 @@ async function handleConfirmar(
               cliente: pedido.cliente_nombre,
               total,
               numero,
-              resumen: {
-                referencias: resumenLink.referencias,
-                bultos: resumenLink.bultos,
-                piezas: resumenLink.piezas,
-              },
+              piezas: resumenLink.piezas,
             }),
           );
         }

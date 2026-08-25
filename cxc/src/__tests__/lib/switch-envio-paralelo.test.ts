@@ -594,19 +594,29 @@ describe("🔴 la cotización sale por /apicotizacion/terminar y NADA MÁS cambi
     expect(r.verificado).toBe(false);
   });
 
-  it("🔴 el aviso de Telegram DICE cuál de las dos fue, y que no aparta mercancía", async () => {
+  // 🔴 25-ago-2026 — ESTE CANDADO CAMBIÓ DE DIRECCIÓN. Exigía la etapa
+  // deletreada ("COTIZACIÓN enviada a Switch") y la línea de que no aparta
+  // mercancía, o sea que FIJABA justo lo que Daniel podó: *"lo quiero más
+  // simple… solo quiero lo útil"*. Lo que siempre quiso decir —y sigue
+  // exigiendo— es que el aviso DIGA CUÁL DE LAS DOS FUE: hoy lo dicen el emoji
+  // (📝 vs 📦) y la primera palabra, que es lo primero que se ve en el canal.
+  it("🔴 el aviso de Telegram DICE cuál de las dos salió, en dos líneas", async () => {
     sembrarArticulo("A", 1);
     await enviar(["A"], { auto: true, documento: "cotizacion" });
     const texto = String(vi.mocked(enviarNegocio).mock.calls.at(-1)![0]);
-    expect(texto).toContain("COTIZACIÓN enviada a Switch");
-    expect(texto).toContain("No aparta mercancía");
+    expect(texto.startsWith("📝 Cotización TOM-015 · ")).toBe(true);
     expect(texto).toContain("16-000000555");
+    expect(texto.split("\n").length).toBe(2);
+    // Lo podado no puede volver por este camino.
+    expect(texto).not.toContain("COTIZACIÓN enviada a Switch");
+    expect(texto).not.toContain("No aparta mercancía");
+    expect(texto).not.toContain("Vendedor:");
 
     vi.mocked(enviarNegocio).mockClear();
     await enviar(["A"], { auto: true }, dbFalso());
     const otro = String(vi.mocked(enviarNegocio).mock.calls.at(-1)![0]);
-    expect(otro).toContain("enviado a Switch");
-    expect(otro).not.toContain("COTIZACIÓN");
+    expect(otro.startsWith("📦 Pedido TOM-015 · ")).toBe(true);
+    expect(otro).not.toContain("Cotización");
     expect(otro).not.toContain("No aparta mercancía");
   });
 });

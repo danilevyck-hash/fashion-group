@@ -7,9 +7,12 @@
 //
 //   1. NO SUMA. "son los datos de los costos del proveedor. que no sume ni
 //      nada, solo info personal." → el módulo no exporta ninguna función que
-//      agregue precios, el componente no tiene un `.reduce(`, y el `metricas`
-//      de la página (valor / entregado / disponible / tiendas) no toca las
-//      notas.
+//      agregue precios, el componente que muestra los costos no tiene un
+//      `.reduce(`, y el `metricas` de la página (valor / entregado /
+//      disponible / tiendas) no toca las notas.
+//      ⚠️ ago-2026: ese componente ya NO es `NotasProveedorMobiliario.tsx`
+//      (borrado), es el "?" `PreciosProveedorAyuda.tsx`. La regla no cambió,
+//      cambió el archivo donde se verifica.
 //   2. SOLO ADMIN, EN EL SERVIDOR. La secretaria entra a Mobiliario y no debe
 //      ver estos costos. Esconder el bloque en el cliente no cierra nada —
 //      es exactamente el error del `allowedRoles` decorativo de Catálogos—,
@@ -86,7 +89,13 @@ const RAIZ = process.cwd();
 const leer = (rel: string) => readFileSync(join(RAIZ, rel), "utf8");
 
 const RUTA_PAGINA = "src/app/marketing/mobiliario/page.tsx";
-const RUTA_COMPONENTE = "src/components/marketing/NotasProveedorMobiliario.tsx";
+// 🔁 MUDADO (ago-2026). `NotasProveedorMobiliario.tsx` SE BORRÓ: el bloque
+//    "Notas del proveedor" no se montaba en ningún lado y Daniel mandó sacarlo
+//    ("y despues eliminar notas proveedor"). Los mismos costos se ven hoy en el
+//    "?" de arriba de Mobiliario. Las dos reglas que este candado vigilaba sobre
+//    aquel archivo —NO SUMA, y que la PANTALLA lo diga— siguen vivas, así que se
+//    REAPUNTAN al archivo vivo en vez de borrarse.
+const RUTA_AYUDA_PRECIOS = "src/components/marketing/PreciosProveedorAyuda.tsx";
 const RUTAS_API = [
   "src/app/api/marketing/mobiliario/notas-proveedor/route.ts",
   "src/app/api/marketing/mobiliario/notas-proveedor/[id]/route.ts",
@@ -94,6 +103,19 @@ const RUTAS_API = [
 ];
 const RUTA_MIGRACION =
   "supabase/migrations/20260808120000_mk_mobiliario_notas_proveedor.sql";
+
+/**
+ * El código sin comentarios. `PreciosProveedorAyuda` cita la propia regla en su
+ * encabezado ("ni un `.reduce(` de precios"): contar ese comentario daría un
+ * ROJO falso.
+ */
+function soloCodigo(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("//"))
+    .join("\n");
+}
 
 function renglon(p: Partial<NotaProveedorRenglon>): NotaProveedorRenglon {
   return {
@@ -125,11 +147,14 @@ describe("1 · NO SUMA — la nota es información, no un cálculo", () => {
     expect(infractores).toEqual([]);
   });
 
-  it("el componente no agrega precios: sin .reduce( y sin fila TOTAL", () => {
-    const src = leer(RUTA_COMPONENTE);
-    expect(src).not.toMatch(/\.reduce\(/);
-    // La página SÍ tiene una fila "TOTAL" en sus tablas de inventario; este
-    // bloque no puede tener una.
+  // 🔁 MUDADO del archivo borrado al "?" vivo. Lo que Daniel pidió nunca fue
+  //    "ESE archivo no suma", fue "los costos del proveedor no se suman EN
+  //    NINGÚN LADO"; hoy quien los muestra es `PreciosProveedorAyuda`.
+  it('el "?" de precios no agrega: sin .reduce( y sin fila TOTAL', () => {
+    const src = leer(RUTA_AYUDA_PRECIOS);
+    expect(soloCodigo(src)).not.toMatch(/\.reduce\(/);
+    // La página SÍ tiene una fila "TOTAL" en sus tablas de inventario; el "?"
+    // de costos no puede tener una.
     expect(src).not.toMatch(/>\s*TOTAL\s*</);
   });
 
@@ -156,8 +181,11 @@ describe("1 · NO SUMA — la nota es información, no un cálculo", () => {
     expect(src).toContain("<PreciosProveedorAyuda />");
   });
 
+  // 🔁 MUDADO. La frase se fue con el bloque viejo, pero el "?" la repite:
+  //    "Nota personal. No se suma ni entra en ningún cálculo.". Se conserva el
+  //    mismo trozo corto y distintivo, ahora sobre el archivo vivo.
   it("la pantalla lo DICE, no solo el código", () => {
-    expect(leer(RUTA_COMPONENTE)).toContain("no se suma");
+    expect(leer(RUTA_AYUDA_PRECIOS)).toContain("No se suma");
   });
 });
 

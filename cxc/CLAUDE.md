@@ -1943,6 +1943,75 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > El endpoint `/apicotizacion/terminar` y el motor único de envío · el 422 del cliente · `normalizarDocumento` · el at-most-once · el DDL `20260824160000` y su tolerancia · el aviso de Telegram · el pedido del LINK público · la lista del admin (#593) · el Excel (#596) · la etiqueta «no aparta mercancía» pegada al botón · el flujo de 3 toques y «Duplicar».
 
+## 🔴 EL AVISO DE TELEGRAM, EN DOS LÍNEAS — y la barra de instalar se fue de iOS (25-ago-2026)
+
+> Daniel, textual: ***"lo quiero más simple… solo quiero lo útil"***, y eligió el formato EXACTO:
+>
+> ```
+> 📝 Cotización TOM-027 · A-Amani, S.A.
+> Tommy Hilfiger · $648 · 12 piezas · Switch 15-000000123
+>
+> 📦 Pedido TOM-028 · Hafez, S.A.
+> Tommy Hilfiger · $2,760 · 48 piezas · Switch 16-000002058
+> ```
+>
+> **LA REGLA: línea 1 = QUÉ es + DE QUIÉN es. Línea 2 = marca + monto + piezas + N° de Switch.** El monto va en la SEGUNDA a propósito — lo puso ahí él. Y aplica a **TODOS** los avisos de este tipo: *"este mensaje es solo de ejemplo, así mismo aplicarlo para todos los pedidos, cotizaciones etc"* — los 3 eventos y las 4 marcas.
+>
+> ### 🔴 LO QUE SE FUE, Y NO VUELVE — cada cosa con su motivo
+>
+> | Se fue | Por qué |
+> |---|---|
+> | `No aparta mercancía — sigue disponible para los demás.` | él ya lo sabe, y la advertencia sigue viva **DONDE SE DECIDE** (`NOTA_COTIZACION`, pegada al botón). Un renglón DESPUÉS de mandar no evita nada |
+> | `✓ verificado` | es lo NORMAL. Solo se escribe la excepción: **`⚠️ sin verificar`** sigue pegado al número |
+> | `— COTIZACIÓN enviada a Switch` | lo dicen ya la primera palabra y el número de abajo. Tres veces lo mismo en dos líneas |
+> | `Cliente:` y `Vendedor:` | el nombre tras el `·` ya se lee como el cliente, y **EL VENDEDOR SALIÓ DEL MENSAJE** (sigue en el pedido, en el detalle y en la comisión) |
+> | `1 referencia · 1 bulto` | quedan las **PIEZAS**, la unidad que factura Switch |
+>
+> ⚠️ **LOS AVISOS DE ERROR NO SE PODARON.** Cuando el envío falla o Switch no responde, el mensaje sale por `enviarSistema` desde `switch-envio.ts` y sigue diciendo qué pasó y qué hacer (`🚨 Envío a Switch FALLÓ … (se puede reintentar desde la confirmación)` · `🚨 … AMBIGUO … REVISAR EL PANEL antes de reintentar`). Ahí el detalle ES lo útil. La poda es SOLO del aviso de éxito, y hay candado.
+>
+> ⚠️ **EL ARMADOR SIGUE SIENDO UNO** (`src/lib/catalogo/telegram-pedido.ts`). No se duplicó: `ResumenAviso` se redujo a `piezas` y los tres emisores le mandan `piezas:` — el `resumen: {referencias, bultos, piezas}` ya no existe.
+>
+> **EMOJIS:** la creación lleva el de la MARCA (🛒 Reebok · 🐝 Joybees · 🔵 Tommy · ⚫ Calvin) y la salida a Switch **📦 pedido / 📝 cotización** — el mismo pedido se lee avanzando (🔵 TOM-005 → 📦 TOM-005) y las dos salidas se distinguen antes de leer una palabra. **Pedido y cotización NO pueden compartir emoji.**
+>
+> 🔑 **LA TERCERA LÍNEA DEL PEDIDO DEL LINK NO SE PODÓ** (*"Falta ponerle el cliente y mandarlo a Switch — está en Borradores."*): no es explicación, es una **ACCIÓN pendiente** — es lo único que hay entre el pedido y el ERP, y sin decirla el pedido se queda quieto y nadie se entera.
+>
+> 🔑 **El canal va SIN `parse_mode` y así se queda** (ver `telegram.ts`): texto PLANO, así un cliente que se llame `Ropa & Más <Panamá>` viaja tal cual sin escapes y sin que Telegram rechace el mensaje. Hay candado que exige que no aparezcan `<>` ni marcado.
+>
+> **`etapaTelegram()` SE BORRÓ** de `documento-switch.ts` junto con la etapa deletreada — no se deja sin usar: una etapa muerta es la etapa esperando a que alguien la vuelva a montar. La palabra que grita cuál de las dos es la sigue dando `etiquetaDocumento`.
+>
+> ### 🔴 LA BARRA «Instala Fashion Group» SE FUE DE iOS
+>
+> Safari **NO dispara `beforeinstallprompt`**, así que ahí la barra nunca pudo instalar nada: lo único que hacía era un párrafo explicando cómo hacerlo A MANO (*"Toca Compartir y luego Agregar a inicio"*), fijo al borde de abajo de la pantalla. Daniel ya tiene la app en su inicio y aprobó sacarla. `isIosSafari()` se **BORRÓ** (su único consumidor era el hint).
+>
+> ⚠️ **EN ANDROID Y ESCRITORIO SE QUEDA, y está medido.** Ahí el navegador SÍ ofrece instalar y el botón «Instalar app» sigue vivo — **idéntico a `origin/main`, píxel por píxel**.
+>
+> **Los 4 anchos, en el navegador contra el build de producción y CONTRA `origin/main`** (`BASE=… ETAPA=antes|despues node scripts/_medir-install-prompt-anchos.mjs`, solo lectura — el navegador **aborta todo pedido que no sea GET**; escrituras bloqueadas: 0):
+>
+> | | 390 | 834 | 1024 | 1440 |
+> |---|---|---|---|---|
+> | **iPhone · main** | barra SÍ, **tapa 101 px** | SÍ, 101 | SÍ, 101 | SÍ, 101 |
+> | **iPhone · esta rama** | **no · 0 px** | no · 0 | no · 0 | no · 0 |
+> | **Android · main** | barra SÍ + botón, tapa 138 px | SÍ, 138 | SÍ, 138 | SÍ, 138 |
+> | **Android · esta rama** | **IDÉNTICO** | idéntico | idéntico | idéntico |
+>
+> **0 px de arrastre · 0 táctiles <44 px · textos <12 px IDÉNTICOS (2, PRE-EXISTENTES)** en los 16 casos. Los recortados bajan de 3 a 2 (390) y de 2 a 1 (los otros tres): el que se va es la barra.
+> - 🩸 **El script FALLA si mide cero sin haber mirado nada**: en `ETAPA=antes` exige que la barra de iOS APAREZCA (si no, el "antes" no prueba nada) y en las DOS etapas exige que Android conserve barra y botón. Y limpia `fg_modoviaje_install_dismissed` antes de navegar — con esa key puesta la barra no se dibuja NUNCA y todo daría "0" en verde.
+> - 🩸 Chrome headless no cumple los criterios de instalación por su cuenta: el script dispara el evento **REAL** `beforeinstallprompt`, con la misma forma que manda el navegador.
+>
+> ### `NotasProveedorMobiliario.tsx` se BORRÓ (523 líneas)
+>
+> **Comprobado muerto antes de borrarlo**, con barrido sobre los 1.408 archivos de `src/` **y los comentarios eliminados primero**: 0 imports, 0 `dynamic(`/`import()`, no está en el barril de `components/marketing/`, 0 referencias por string. El único match "vivo" era un comentario de `PreciosProveedorAyuda.tsx` que decía textualmente *"sigue sin montarse en ningún lado"*.
+> - 🔴 **SUS 3 CANDADOS SE MUDARON, NINGUNO SE BORRÓ** — los tres vigilaban reglas que siguen vivas en `PreciosProveedorAyuda.tsx`. En `marketing-notas-proveedor.test.ts`, `RUTA_COMPONENTE` → **`RUTA_AYUDA_PRECIOS`** apuntando al archivo vivo (con un helper `soloCodigo()`, porque el archivo vivo **CITA** la regla en su encabezado y eso daba rojo falso). En `poda-textos-ayuda.test.ts`, la aserción salió de la lista `EN_PANTALLA` —que prohíbe esconder un aviso detrás de un ⓘ, y ahora está detrás de un toque **a propósito**— y se mudó a un `describe` propio con el texto íntegro.
+>
+> ### Candados
+>
+> `telegram-pedido-origen.test.ts` (33, **CAMBIÓ DE DIRECCIÓN**: exigía las 4 cifras y los rótulos, o sea fijaba lo que Daniel podó; hoy compara el mensaje ENTERO carácter por carácter y exige que lo podado no vuelva) · `documento-switch.test.ts` · `switch-envio-paralelo.test.ts` (corre el motor REAL) · **`components/install-prompt-solo-donde-se-instala.test.tsx` (9), que RENDERIZA el componente y dispara el evento** — un barrido de texto no puede ver que el botón siga llegando a la pantalla, y se cumpliría con el propio comentario que explica el cambio.
+> - **Verificado por mutación, 23 de 23 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-telegram-simple.sh`): vuelve el «no aparta mercancía» · vuelve el vendedor · vuelve el «✓ verificado» · vuelve la etapa deletreada · vuelven los rótulos «Cliente:» · vuelven referencias y bultos · **pedido y cotización con el MISMO emoji** · todo se rotula «Pedido» · la marca desaparece de la 2ª línea · el monto se va a la 1ª · el N° de Switch deja de decirse · se inventa un «0 piezas» · el link pierde su acción pendiente · los emisores dejan de mandar las piezas (×2) · **el envío FALLIDO pierde su detalle** · el AMBIGUO pierde el «REVISAR EL PANEL» · el error pierde su 🚨 · la etiqueta del botón deja de decir que no aparta · **la barra vuelve en iOS** · la barra desaparece también de Android · el botón queda decorativo · el botón baja de 44 px.
+> - 🩸 **El script trae una mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido con el comentario adentro.
+> - 🩸 **Restaura por COPIA, no con `git checkout`** (hay archivos NUEVOS y git aborta el comando entero), **denuncia el patrón muerto**, **exige que vitest haya colectado** antes de creerle a un cero, y **el reemplazo es LITERAL con `python3`, no `perl -0pi -e 's|…|…|'`**: con el delimitador `|`, un `||` del código real se des-escapa a una alternación con rama vacía y **se come el archivo entero**, dando un «SOBREVIVIÓ» falso.
+>
+> **Dry-run sin spamear el chat** (no importa el canal ni `sendTelegramAlert`, así que no hay camino por el que pueda escribirle a Daniel): `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_dryrun-avisos-pedido.ts TOM-027`.
+
 ## 🔴 LAS DOS SALIDAS SE OFRECEN DIRECTO — se fue la ventana y se fue el párrafo (25-ago-2026)
 
 > Daniel, textual: ***"quiero que en vez de que diga «enviar a switch», salga cotización o pedido como opción (sin párrafo explicando, btw no siempre hay q estar explicando todo, se vuelve tedioso)"***.

@@ -424,11 +424,10 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
       avisoPedidoDeVendedor({
         emoji: cfg.telegramEmoji,
         label: cfg.label,
-        vendedor: vendedorPedido.vendor_name,
         cliente: client_name,
         total,
         numero: order_number,
-        resumen: { referencias: resumenPed.referencias, bultos: resumenPed.bultos, piezas: resumenPed.piezas },
+        piezas: resumenPed.piezas,
       }),
     );
   }

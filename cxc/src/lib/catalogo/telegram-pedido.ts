@@ -1,55 +1,90 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Textos de los avisos de Telegram de un pedido de catálogo — LOS TRES EVENTOS,
-// UN SOLO FORMATO.
+// UN SOLO FORMATO, DOS LÍNEAS.
 //
 // 🩸 POR QUÉ HAY UN ARMADOR ÚNICO (11-ago-2026). Daniel recibió el mismo pedido
-// contado de dos formas distintas: la creación decía "🔵 Tommy Hilfiger — pedido
-// DEL VENDEDOR / 8 referencias · 1128 piezas / $16,920 · TOM-005" y el envío a
-// Switch decía "📦 Pedido Tommy Hilfiger TOM-002 enviado a Switch → … · Contado
-// / REINALDO ESPINOSA" — sin referencias, sin bultos y sin monto. Textual:
-// *"porq dos diferentes tipo de mensaje. y cada mensaje tiene que decir cuantas
-// referencias, cuantos bultos, cliente y monto"*. El texto del envío vivía
-// inline en switch-envio.ts, o sea que los formatos solo podían divergir.
-// Ahora TODO aviso de pedido pasa por `cuerpoAvisoPedido` y lleva SIEMPRE:
+// contado de dos formas distintas: la creación decía una cosa y el envío a
+// Switch otra, sin monto y sin tamaño, porque el texto del envío vivía inline
+// en switch-envio.ts. Textual: *"porq dos diferentes tipo de mensaje"*. Desde
+// entonces TODO aviso de pedido pasa por `cuerpoAvisoPedido` y ningún emisor
+// arma el cuerpo por su cuenta. Eso no cambió y no puede cambiar.
 //
-//   <emoji> <Marca> · <TOM-002> — <etapa>
-//   Cliente: <cliente> · Vendedor: <vendedor>
-//   <N> referencias · <N> bultos · <N> piezas · $<monto>
-//   [línea extra de la etapa, si aplica]
+// 🔴 25-ago-2026 — LO QUE CAMBIÓ ES EL LARGO. El aviso había llegado a cinco
+// líneas: rótulos "Cliente:"/"Vendedor:", la etapa deletreada, el recuento de
+// referencias y bultos, el "✓ verificado" y un renglón entero explicando que
+// una cotización no aparta mercancía. Daniel, textual: ***"lo quiero más
+// simple… solo quiero lo útil"***, y eligió el formato exacto:
 //
-// Las CUATRO cosas obligatorias en todos: referencias · bultos · cliente ·
-// monto. Las piezas van además porque son la unidad que factura Switch y el
-// resto del sistema las muestra junto a los bultos (ver piezas.ts).
+//   📝 Cotización TOM-027 · A-Amani, S.A.
+//   Tommy Hilfiger · $648 · 12 piezas · Switch 15-000000123
 //
-// EMOJIS: el de la etapa "pedido nuevo" es el de la MARCA (cfg.telegramEmoji:
-// 🛒 Reebok, 🐝 Joybees, 🔵 Tommy) y el de "enviado a Switch" es 📦 — el mismo
-// pedido se lee avanzando (🔵 TOM-005 → 📦 TOM-005).
+//   📦 Pedido TOM-028 · Hafez, S.A.
+//   Tommy Hilfiger · $2,760 · 48 piezas · Switch 16-000002058
+//
+// LA REGLA, y es la que hay que respetar si mañana se agrega un evento:
+//   línea 1 = QUÉ es + DE QUIÉN es.
+//   línea 2 = marca + monto + piezas + N° de Switch.
+// El monto va en la SEGUNDA a propósito — lo puso ahí él.
+//
+// 🔴 LO QUE SE FUE, Y NO VUELVE (cada cosa con su motivo, para que nadie la
+// reponga "por completitud"):
+//   · "No aparta mercancía — sigue disponible para los demás." → él ya lo sabe,
+//     y la advertencia sigue viva DONDE SE DECIDE (`NOTA_COTIZACION`, pegada al
+//     botón en documento-switch.ts). Un renglón en el aviso, después de mandar,
+//     no evita nada.
+//   · "✓ verificado" → es lo NORMAL. Solo se escribe la excepción: si no se
+//     pudo verificar, el aviso dice "⚠️ sin verificar" pegado al número. Un
+//     estado que sale en el 99% de los mensajes no informa; el 1% sí.
+//   · "— COTIZACIÓN enviada a Switch" → lo dicen ya la primera palabra
+//     ("Cotización"/"Pedido") y el número de Switch de abajo. Tres veces lo
+//     mismo en dos líneas.
+//   · Los rótulos "Cliente:" y "Vendedor:" → el nombre después del "·" ya se
+//     lee como el cliente, y EL VENDEDOR SALIÓ DEL MENSAJE por decisión de
+//     Daniel (sigue en el pedido, en el detalle y en la comisión — no se
+//     perdió el dato, se sacó del aviso).
+//   · "N referencias · N bultos" → quedan las PIEZAS, que es la unidad que
+//     factura Switch.
+//
+// ⚠️ LOS AVISOS DE ERROR NO SON DE ESTE ARCHIVO Y NO SE PODAN. Cuando el envío
+// falla o Switch no responde, el mensaje sale por `enviarSistema` desde
+// switch-envio.ts y tiene que seguir diciendo qué pasó y qué hacer. Ahí el
+// detalle es lo útil. La poda es solo del aviso de éxito.
+//
+// EMOJIS: la creación lleva el de la MARCA (cfg.telegramEmoji: 🛒 Reebok,
+// 🐝 Joybees, 🔵 Tommy, ⚫ Calvin) y la salida a Switch lleva 📦 pedido / 📝
+// cotización — así el mismo pedido se lee avanzando (🔵 TOM-005 → 📦 TOM-005) y
+// las dos salidas se distinguen antes de leer una palabra. Pedido y cotización
+// NO pueden compartir emoji: es lo primero que se ve en la lista.
 //
 // LOS DOS ORÍGENES DE CREACIÓN SIGUEN DISTINGUIÉNDOSE, porque para el negocio
 // no son lo mismo:
 //
 //   1. DEL VENDEDOR (checkout con sesión, `POST /api/catalogo/[marca]/orders`):
-//      Rey/Edwin lo arman con el cliente REAL y el vendedor REAL de Switch (el
-//      del mapeo fg_user_switch_vendedor del usuario logueado). Es venta de una
-//      persona y paga comisión.
-//
-//   2. DEL LINK público (el cliente lo arma solo y lo confirma desde
-//      /pedido-<marca>/[short_id]): no hay sesión que aporte cliente ni
-//      vendedor, así que entra al sistema como BORRADOR y sin cliente, y espera
-//      a que una persona le ponga el cliente real y lo mande al ERP
-//      (14-ago-2026; antes salía solo con el mostrador puesto).
+//      Rey/Edwin lo arman con el cliente REAL de Switch. Ya está listo.
+//   2. DEL LINK público (el cliente lo arma solo desde /pedido-<marca>/[id]):
+//      entra como BORRADOR y espera a que una persona le ponga el cliente real
+//      y lo mande al ERP. Ese aviso lleva una TERCERA línea que PIDE ese paso
+//      — no es explicación, es la única cosa que hay entre el pedido y Switch,
+//      y sin decirla el pedido se queda quieto y nadie se entera.
 //
 // El origen no se adivina: cada camino tiene su builder y es el propio endpoint
 // el que llama al suyo. En la DB queda el espejo del mismo dato —
-// `<marca>_orders.origen_original` vale 'mio' para el camino 1 (default de la
-// RPC de creación) y 'link' para el 2 (lo escribe la RPC de conversión).
+// `<marca>_orders.origen_original` vale 'mio' para el camino 1 y 'link' para
+// el 2.
 //
-// Quien lee estos avisos no es técnico: origen en mayúsculas para verlo de un
-// vistazo, español simple, texto PLANO (el canal va sin parse_mode).
+// Quien lee estos avisos no es técnico: español simple y texto PLANO. El canal
+// va SIN parse_mode a propósito (ver telegram.ts): así el nombre de un cliente
+// puede traer `&`, `<` o `_` sin que haya que escapar nada y sin que Telegram
+// rechace el mensaje. Candado: telegram-pedido-origen.test.ts exige que no
+// aparezcan `<>` ni marcado.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { fmtPrecio } from "@/lib/catalogo/precio";
-import { type DocumentoSwitch, esCotizacion, etapaTelegram } from "@/lib/catalogo/documento-switch";
+import {
+  type DocumentoSwitch,
+  esCotizacion,
+  etiquetaDocumento,
+} from "@/lib/catalogo/documento-switch";
 
 /** Monto en el formato de los catálogos: $1,234 / $37.50 (sin `.00`). */
 export function money(n: number): string {
@@ -61,52 +96,31 @@ const nombreODefecto = (v: string | null | undefined, fallback: string) => {
   return s.length > 0 ? s : fallback;
 };
 
-const plural = (n: number, singular: string, plur: string) =>
-  `${n} ${n === 1 ? singular : plur}`;
-
-/** Lo que Daniel pidió ver en TODO aviso: cuánto es y de qué tamaño. */
-export interface ResumenAviso {
-  /** Productos distintos. En el negocio se les dice "referencias". */
-  referencias: number;
-  /** Bultos TOTALES — la unidad en que el cliente pide (items.quantity). */
-  bultos: number;
-  /** Piezas TOTALES — la unidad que se despacha y que factura Switch. */
-  piezas: number;
-}
-
-/**
- * "8 referencias · 94 bultos · 1128 piezas · $16,920". El monto va SIEMPRE;
- * las cifras de tamaño se OMITEN si no hay resumen, en vez de escribir
- * "0 referencias · 0 bultos": un cero inventado en un aviso de plata se lee
- * como un pedido vacío. Los números salen de `resumirPedido`
- * (lineas-pedido.ts), el único lugar del sistema que multiplica bultos por
- * piezas — acá no se calcula nada.
- */
-function lineaCifras(r: ResumenAviso | undefined, total: number): string {
-  const monto = money(total);
-  if (!r || (r.referencias <= 0 && r.bultos <= 0 && r.piezas <= 0)) return monto;
-  return [
-    plural(r.referencias, "referencia", "referencias"),
-    plural(r.bultos, "bulto", "bultos"),
-    plural(r.piezas, "pieza", "piezas"),
-    monto,
-  ].join(" · ");
-}
+/** "12 piezas" / "1 pieza". */
+const enPiezas = (n: number) => `${n} ${n === 1 ? "pieza" : "piezas"}`;
 
 interface CuerpoAviso {
+  /** 📦 / 📝 / el de la marca, según la etapa. */
   emoji: string;
-  label: string;
+  /** "Pedido" o "Cotización" — la primera palabra, la que dice QUÉ es. */
+  queEs: string;
+  /** El número de la casa: TOM-027. No cambia salga como pedido o cotización. */
   numero: string;
-  etapa: string;
+  /** Nombre de la marca (cfg.label), en la segunda línea. */
+  label: string;
   cliente?: string | null;
-  /**
-   * `undefined` = la línea no nombra vendedor (pedido del link: no hay uno
-   * real que nombrar). `null`/vacío = se esperaba y falta → "sin nombre".
-   */
-  vendedor?: string | null;
   total: number;
-  resumen?: ResumenAviso;
-  /** Línea(s) extra de la etapa (p.ej. "→ Switch 16-… ✓ verificado"). */
+  /**
+   * Piezas TOTALES — la unidad que despacha y factura Switch. Ausente = se
+   * OMITE, en vez de escribir "0 piezas": un cero inventado en un aviso de
+   * plata se lee como un pedido vacío. Sale de `resumirPedido`
+   * (lineas-pedido.ts), el único lugar que multiplica bultos por piezas; acá
+   * no se calcula nada.
+   */
+  piezas?: number;
+  /** Cola de la segunda línea, p.ej. "Switch 16-000002058 ⚠️ sin verificar". */
+  switchSegmento?: string;
+  /** Línea(s) extra. Solo el pedido del link tiene una, y pide una acción. */
   extras?: string[];
 }
 
@@ -116,14 +130,13 @@ interface CuerpoAviso {
  * pueden volver a divergir. Candado: telegram-pedido-origen.test.ts.
  */
 function cuerpoAvisoPedido(a: CuerpoAviso): string {
-  const quien = [`Cliente: ${nombreODefecto(a.cliente, "Sin nombre")}`];
-  if (a.vendedor !== undefined) {
-    quien.push(`Vendedor: ${nombreODefecto(a.vendedor, "sin nombre")}`);
-  }
+  const segunda = [a.label, money(a.total)];
+  if (typeof a.piezas === "number" && a.piezas > 0) segunda.push(enPiezas(a.piezas));
+  if (a.switchSegmento) segunda.push(a.switchSegmento);
+
   return [
-    `${a.emoji} ${a.label} · ${a.numero} — ${a.etapa}`,
-    quien.join(" · "),
-    lineaCifras(a.resumen, a.total),
+    `${a.emoji} ${a.queEs} ${a.numero} · ${nombreODefecto(a.cliente, "Sin nombre")}`,
+    segunda.join(" · "),
     ...(a.extras ?? []),
   ].join("\n");
 }
@@ -133,29 +146,27 @@ export interface AvisoPedidoVendedor {
   emoji: string;
   /** Nombre de la marca (cfg.label). */
   label: string;
-  /** Vendedor que lo armó (vendor_name del pedido; puede venir vacío). */
-  vendedor?: string | null;
   cliente?: string | null;
   total: number;
   numero: string;
-  /** Ausente en pedidos viejos o si no se pudo resolver: la línea se omite. */
-  resumen?: ResumenAviso;
+  /** Ausente en pedidos viejos o si no se pudo resolver: se omite la cifra. */
+  piezas?: number;
 }
 
 /**
- * Pedido que metió un VENDEDOR desde el checkout con sesión. Lleva cliente y
- * vendedor reales, así que el vendedor se nombra: es de quien es la venta.
+ * Pedido que metió un VENDEDOR desde el checkout con sesión. Todavía no salió
+ * a Switch, así que la segunda línea no lleva número de Switch — esa ausencia
+ * ES la etapa, y no hace falta deletrearla.
  */
 export function avisoPedidoDeVendedor(a: AvisoPedidoVendedor): string {
   return cuerpoAvisoPedido({
     emoji: a.emoji,
-    label: a.label,
+    queEs: "Pedido",
     numero: a.numero,
-    etapa: "pedido DEL VENDEDOR",
+    label: a.label,
     cliente: a.cliente,
-    vendedor: a.vendedor ?? null,
     total: a.total,
-    resumen: a.resumen,
+    piezas: a.piezas,
   });
 }
 
@@ -166,32 +177,29 @@ export interface AvisoPedidoLink {
   cliente?: string | null;
   total: number;
   numero: string;
-  resumen?: ResumenAviso;
+  piezas?: number;
 }
 
 /**
- * Pedido que el CLIENTE armó y confirmó solo desde el link público. No se
- * nombra vendedor (no hay uno real).
+ * Pedido que el CLIENTE armó y confirmó solo desde el link público.
  *
- * 🔴 LA LÍNEA EXTRA CAMBIÓ EL 14-ago-2026 Y ES LA PARTE QUE MÁS IMPORTA. Decía
- * *"Entra a Switch como Contado y sin vendedor — no paga comisión"*, que era
- * cierto mientras el pedido del link salía SOLO al ERP. Desde que espera a una
- * persona (ver `pedido-publico/[id]/confirmar/route.ts`), el aviso tiene que
- * PEDIR ese paso: es lo único que hay entre el pedido y el ERP, y sin decirlo
- * un pedido podría quedarse quieto sin que nadie se entere.
+ * 🔴 LA TERCERA LÍNEA NO ES DECORACIÓN Y NO SE PODA. Desde el 14-ago-2026 el
+ * pedido del link espera a una persona (ver
+ * `pedido-publico/[id]/confirmar/route.ts`): es lo único que hay entre el
+ * pedido y el ERP, y sin decirlo un pedido podría quedarse quieto sin que nadie
+ * se entere. Es una ACCIÓN pendiente, no una explicación de algo que el lector
+ * ya sabe — que es lo que se podó del resto del aviso.
  */
 export function avisoPedidoDelLink(a: AvisoPedidoLink): string {
   return cuerpoAvisoPedido({
     emoji: a.emoji,
-    label: a.label,
+    queEs: "Pedido",
     numero: a.numero,
-    etapa: "pedido DEL LINK, lo confirmó el cliente",
+    label: a.label,
     cliente: a.cliente,
     total: a.total,
-    resumen: a.resumen,
-    extras: [
-      "Falta ponerle el cliente y mandarlo a Switch — está en Borradores.",
-    ],
+    piezas: a.piezas,
+    extras: ["Falta ponerle el cliente y mandarlo a Switch — está en Borradores."],
   });
 }
 
@@ -200,9 +208,8 @@ export interface AvisoPedidoEnviado {
   label: string;
   numero: string;
   cliente?: string | null;
-  vendedor?: string | null;
   total: number;
-  resumen?: ResumenAviso;
+  piezas?: number;
   /** Secuencial que devolvió Switch (numeroInterno), p.ej. 16-000002012. */
   numeroSwitch: string;
   verificado: boolean;
@@ -215,13 +222,10 @@ export interface AvisoPedidoEnviado {
 
 /**
  * El pedido SALIÓ al ERP (motor switch-envio.ts, cualquiera de sus tres
- * llamadores). Mismo cuerpo que la creación + la línea del secuencial de
- * Switch con el resultado de la verificación post-escritura.
+ * llamadores). Mismo cuerpo que la creación + el secuencial de Switch.
  *
- * 🔴 DICE CUÁL DE LAS DOS FUE, y no solo en la etapa: una cotización lleva
- * además la línea de que NO aparta mercancía. Quien lee el canal decide cosas
- * con esto —si la mercancía está apartada o sigue a la venta— y "📦 enviado a
- * Switch" a secas se lee como pedido.
+ * La verificación SOLO se escribe cuando falla: "✓ verificado" salía en casi
+ * todos los mensajes y por eso no informaba nada. "⚠️ sin verificar" sí.
  */
 export function avisoPedidoEnviado(a: AvisoPedidoEnviado): string {
   const documento = a.documento ?? "pedido";
@@ -230,16 +234,12 @@ export function avisoPedidoEnviado(a: AvisoPedidoEnviado): string {
     // 📝 vs 📦: en una lista de avisos el emoji es lo primero que se ve, y las
     // dos salidas tienen que distinguirse antes de leer una palabra.
     emoji: cotizacion ? "📝" : "📦",
-    label: a.label,
+    queEs: etiquetaDocumento(documento),
     numero: a.numero,
-    etapa: etapaTelegram(documento),
+    label: a.label,
     cliente: a.cliente,
-    vendedor: a.vendedor ?? null,
     total: a.total,
-    resumen: a.resumen,
-    extras: [
-      `→ Switch ${a.numeroSwitch} ${a.verificado ? "✓ verificado" : "⚠️ sin verificar"}`,
-      ...(cotizacion ? ["No aparta mercancía — sigue disponible para los demás."] : []),
-    ],
+    piezas: a.piezas,
+    switchSegmento: `Switch ${a.numeroSwitch}${a.verificado ? "" : " ⚠️ sin verificar"}`,
   });
 }
