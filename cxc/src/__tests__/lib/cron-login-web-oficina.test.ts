@@ -41,6 +41,7 @@ vi.mock("@/lib/telegram", () => ({
 vi.mock("@/lib/alertas/canal", () => ({ enviarSistema: vi.fn(), enviarNegocio: vi.fn() }));
 
 import {
+  SWITCH_CRON_ENTRADAS,
   COLATERALES_LOGIN_WEB,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
   RECONCILIACION_PASS_HOURS,
@@ -68,6 +69,64 @@ function archivosFuente(dir = SRC, acc: string[] = []): string[] {
     }
   }
   return acc;
+}
+
+/** Borra comentarios: este repo ya pagó cuatro veces el candado que se cumple
+ *  con su propia explicación. */
+const sinComentarios = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+/**
+ * Las PUERTAS al login web: llamarlas abre (directa o indirectamente) una
+ * sesión con `changesession="SI"`, que expulsa a quien esté en el panel.
+ *
+ * Es UNA sola lista para los dos candados que la necesitan — el bloque D (un
+ * colateral de la reconciliación tiene que declararse) y el bloque E (un cron
+ * que la llame no puede correr en horario de oficina). Con dos copias, la que
+ * quede vieja deja de vigilar sin que nada avise. El último test del bloque E
+ * la mantiene honesta.
+ */
+const PUERTAS_LOGIN_WEB = [
+  "loginSwitchWeb",
+  "fetchUtilidadMes",
+  "fetchCarteraAntiguedad",
+  "fetchEgresosVarios",
+  "fetchIngresosMercancia",
+  "syncEmpresaUtilidad",
+  "syncAllUtilidad",
+  "syncCarteraWeb",
+  "syncEmpresaEgresos",
+  "syncAllEgresos",
+  "syncEmpresaIngresos",
+  "syncAllIngresos",
+];
+
+/** Crons cuyo route LLAMA a una puerta del login web. Sin listas escritas a
+ *  mano: se recorre `app/api/cron/` y se mira el código, sin comentarios. */
+const aplicanLaReglaSolos: string[] = [];
+
+function cronsConLoginWeb(): string[] {
+  const dir = path.join(SRC, "app", "api", "cron");
+  aplicanLaReglaSolos.length = 0;
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const route = path.join(dir, entry.name, "route.ts");
+    if (!fs.existsSync(route)) continue;
+    const src = sinComentarios(fs.readFileSync(route, "utf8"));
+    if (!PUERTAS_LOGIN_WEB.some((fn) => new RegExp(`\\b${fn}\\s*\\(`).test(src))) continue;
+    // 🔴 `switch-reconciliacion` SÍ llama una puerta, y por eso NO se le exige
+    // horario: es el único que aplica la regla ÉL MISMO, pasada por pasada, con
+    // `pasadaPuedeUsarLoginWeb` — sus corridas de las 14:00 y 18:00 corren pero
+    // SALTEAN el colateral de login web. Eso es lo que prueban los bloques A, B
+    // y D; exigirle acá una hora de madrugada sería pedirle que no exista.
+    if (/\bpasadaPuedeUsarLoginWeb\s*\(/.test(src)) {
+      aplicanLaReglaSolos.push(entry.name);
+      continue;
+    }
+    out.push(entry.name);
+  }
+  return out.sort();
 }
 
 describe("A. qué hora puede abrir el login web", () => {
@@ -147,7 +206,7 @@ describe("B. el silenciamiento sigue la misma regla", () => {
 });
 
 describe("C. quién importa web-client", () => {
-  it("SOLO sync-utilidad, sync-estadocuenta-web y sync-egresos-varios", () => {
+  it("SOLO los cinco módulos declarados abren (o reciben) una sesión web", () => {
     const importadores = archivosFuente()
       .filter((f) => !f.endsWith(path.join("switch-api", "web-client.ts")))
       .filter((f) => /from\s+["'][^"']*web-client["']/.test(fs.readFileSync(f, "utf8")))
@@ -165,6 +224,12 @@ describe("C. quién importa web-client", () => {
       // es responsable de hacerlo en la madrugada de Panamá y de mirar el
       // calendario, porque no hay ningún cron que se lo haga cumplir.
       path.join("app", "api", "diag", "egresos-varios", "route.ts"),
+      // COMPRAS (ingreso de mercancía) de las 6 de Fashion Group: corre 09:05
+      // UTC = 04:05 a.m. Panamá (madrugada, igual que los otros). Es la franja
+      // que dejó libre `sync-mayor` al retirarse, y era de un cron de login web.
+      // NO es colateral de la reconciliación, así que no entra en
+      // COLATERALES_LOGIN_WEB — como boston-cartera y como egresos varios.
+      path.join("lib", "switch-api", "ingresos-mercancia-web.ts"),
       // 🔑 CATÁLOGO DE CUENTAS — importa `web-client` pero **NO ABRE SESIÓN**:
       // recibe una `WebSession` ya abierta y sólo hace un GET. Viaja pegado al
       // sync de egresos, en la MISMA sesión de las 10:35 UTC, justamente para
@@ -222,15 +287,8 @@ describe("C. quién importa web-client", () => {
 });
 
 describe("D. un colateral con login web tiene que estar declarado", () => {
-  /** Funciones que, directa o indirectamente, hacen `loginSwitchWeb`. */
-  const FUNCIONES_LOGIN_WEB = [
-    "loginSwitchWeb",
-    "fetchUtilidadMes",
-    "fetchCarteraAntiguedad",
-    "syncEmpresaUtilidad",
-    "syncAllUtilidad",
-    "syncCarteraWeb",
-  ];
+  // Se REUSA la lista de arriba: dos copias divergen y la vieja deja de vigilar.
+  const FUNCIONES_LOGIN_WEB = PUERTAS_LOGIN_WEB;
 
   it("ningún COLATERAL_CRONS llama a una función de login web sin declararse", () => {
     const src = leer(path.join("app", "api", "cron", "switch-reconciliacion", "route.ts"));
@@ -264,5 +322,99 @@ describe("D. un colateral con login web tiene que estar declarado", () => {
     const src = leer(path.join("app", "api", "cron", "switch-reconciliacion", "route.ts"));
     expect(src).not.toMatch(/"boston-cartera"/);
     expect(COLATERALES_LOGIN_WEB.has("boston-cartera")).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("E. un cron que abre el login web NO corre en horario de oficina", () => {
+  /**
+   * 🩸 ESTA REGLA ESTABA ESCRITA EN PROSA, EN TRES ENCABEZADOS DE ROUTE, Y NO
+   * LA VIGILABA NADIE. Salió en la verificación por mutación del cron de
+   * compras (25-ago-2026): moverlo a las 16:00 UTC —las 11 de la mañana de
+   * Panamá— solo se ponía rojo de casualidad, porque a esa hora ya corre el
+   * estadocuenta de las mismas empresas. A una hora de oficina LIBRE no había
+   * un solo test que se quejara, y el login hace `changesession="SI"`: expulsa
+   * a Daniel del panel mientras trabaja.
+   *
+   * 🔴 SE MIRA QUÉ LLAMA EL ROUTE, NO DE DÓNDE IMPORTA. Un barrido que siga los
+   * imports a secas acusa a `sync-recibos`, que importa de `sync-utilidad`
+   * SOLO helpers de fecha y habla por la API JSON — es exactamente lo que el
+   * bloque C prueba. Por eso se reusa `PUERTAS_LOGIN_WEB`, que es la MISMA
+   * lista del bloque D, y hay un test que la mantiene honesta: si un módulo
+   * abre el login con un nombre que no está ahí, el build se pone rojo.
+   */
+  it("el barrido encuentra crons (si diera 0, no estaría mirando nada)", () => {
+    expect(cronsConLoginWeb().length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("el único que se exime es la reconciliación, y porque aplica la regla sola", () => {
+    cronsConLoginWeb();
+    expect(aplicanLaReglaSolos).toEqual(["switch-reconciliacion"]);
+  });
+
+  it("los cuatro que abren el login web son los esperados", () => {
+    expect(cronsConLoginWeb()).toEqual([
+      "boston-cartera",
+      "sync-egresos-varios",
+      "sync-ingresos-mercancia",
+      "sync-utilidad",
+    ]);
+  });
+
+  it("🔴 todos corren fuera del horario de oficina de Panamá", () => {
+    const enOficina: string[] = [];
+    for (const cron of cronsConLoginWeb()) {
+      const entradas = SWITCH_CRON_ENTRADAS.filter((e) => e.cron === cron);
+      expect(
+        entradas.length,
+        `${cron} abre el login web y no está en SWITCH_CRON_ENTRADAS: nadie vigila su sesión única`,
+      ).toBeGreaterThan(0);
+      for (const e of entradas) {
+        const hora = Number(e.hhmmUtc.slice(0, 2));
+        if (esHorarioDeOficinaPanama(hora)) {
+          enOficina.push(`${cron} ${e.hhmmUtc} = ${horaPanamaDeUtc(hora)}h de Panamá`);
+        }
+      }
+    }
+    expect(
+      enOficina,
+      `estos crons abren el login web en plena jornada y expulsan a Daniel del panel:\n${enOficina.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("la lista de puertas se mantiene honesta: nadie abre el login por un nombre suelto", () => {
+    // Todo módulo que llame a `loginSwitchWeb` tiene que exportar al menos una
+    // puerta declarada. Si no, un cron podría abrir sesión y quedar invisible
+    // para el test de arriba.
+    const sinPuerta: string[] = [];
+    const fueraDeLib: string[] = [];
+    for (const f of archivosFuente()) {
+      if (f.endsWith(path.join("switch-api", "web-client.ts"))) continue;
+      const src = sinComentarios(fs.readFileSync(f, "utf8"));
+      if (!/\bloginSwitchWeb\s*\(/.test(src)) continue;
+      const rel = path.relative(SRC, f);
+      // Un ROUTE que abre la sesión ya es visible por sí mismo (no necesita
+      // exportar una puerta): o está bajo app/api/cron/ y lo ve el barrido de
+      // arriba, o no está programado y va en la lista de excepciones.
+      if (!rel.startsWith("lib" + path.sep)) {
+        fueraDeLib.push(rel);
+        continue;
+      }
+      const exporta = PUERTAS_LOGIN_WEB.some((fn) =>
+        new RegExp(`export\\s+(async\\s+)?function\\s+${fn}\\b`).test(src),
+      );
+      if (!exporta) sinPuerta.push(path.relative(SRC, f));
+    }
+    expect(
+      sinPuerta,
+      `estos módulos abren el login web sin una puerta declarada en PUERTAS_LOGIN_WEB:\n${sinPuerta.join("\n")}`,
+    ).toEqual([]);
+
+    // 🔴 El ÚNICO route que abre sesión sin ser un cron es la ruta de
+    // certificación de egresos varios, que se corre A MANO con curl. No tiene
+    // entrada en vercel.json, así que no le corresponde horario — pero quien la
+    // corra es responsable de hacerlo en la madrugada de Panamá, porque no hay
+    // ningún cron que se lo haga cumplir. Ver el bloque C.
+    expect(fueraDeLib.sort()).toEqual([path.join("app", "api", "diag", "egresos-varios", "route.ts")]);
   });
 });

@@ -667,6 +667,191 @@ export async function fetchCatalogoCuentas(
   return { nodos: json.contacuentacontable, rutaUsada: CUENTAS_LISTA };
 }
 
+// ─── INGRESO DE MERCANCÍA (Stock → Reportes → Reporte ingreso mercancía) ─────
+//
+// Es la ÚNICA fuente del "Compré" de Ventas › Referencia. El API JSON no sirve:
+// `/apiingresomercancia/lista` e `/info` responden 200 pero traen 10 campos
+// escalares y CERO líneas por artículo — saben que entraron $542,08 de
+// mercancía, no de QUÉ artículo. Ver el encabezado de `ingresos-mercancia.ts`.
+//
+// ─── EL REPORTE TIENE DOS BOTONES Y SE BAJAN LOS DOS ────────────────────────
+// "Descargar Detalle" (una fila por artículo) es el dato; "Descargar" (una fila
+// por documento) es la PRUEBA de que no se perdió nada. Se bajan en la MISMA
+// sesión: son dos POST, no dos logins, y cada login expulsa a Daniel del panel.
+//
+// ─── EL MECANISMO, SACADO DEL JS DE LA PROPIA PÁGINA ────────────────────────
+// `/assets/js/reportes/ingresomercancia.js`, funciones `descargarreporte` y
+// `descargardetallereporte`. Mismo acumulador de `fetchEgresosVarios`: mientras
+// la respuesta traiga `response:true` hay que volver a pedir con `key += chunk`
+// y el `file` que devolvió; la ronda que contesta `response:false` deja el
+// archivo en `GET /log/<file>`.
+//
+// 🔑 **El rango de fechas viaja en el POST, no en la sesión.** A diferencia del
+// mayor retirado, acá `desde`/`hasta` van en cada ronda del acumulador, así que
+// no hay un paso previo que se pueda saltear en silencio.
+//
+// ⚠️ La página se identifica por una CONSTANTE, no rastreando el menú. El script
+// manual sí rastrea (`--descubrir`), y ese rastreo fue lo que la encontró
+// —medido el 24-ago-2026 contra vistana: `/menu/stockreportes` la lista—, pero
+// un cron que se adapta solo al menú es un cron que un día baja OTRO reporte sin
+// avisar. Si Switch la mueve, esto tiene que ponerse ROJO y que lo mire alguien.
+/** La página que entrega el `_token` del reporte. */
+const INGRESOS_PAGINA = "/reportes/ingresomercancia";
+/** El acumulador del botón "Descargar Detalle" — una fila por ARTÍCULO. */
+const INGRESOS_EXPORT_DETALLE = "/reportes/stockingresomercanciadetalle";
+/** El acumulador del botón "Descargar" — una fila por DOCUMENTO. Solo cuadra. */
+const INGRESOS_EXPORT_RESUMEN = "/reportes/stockingresomercancia";
+/** Lo que manda el JS de la página. No se toca: es el tamaño que el servidor espera. */
+const INGRESOS_CHUNK = 500;
+/** Techo del acumulador — frena un bucle infinito si nunca dijera `response:false`. */
+const INGRESOS_MAX_RONDAS = 4000;
+
+export interface IngresosDescarga {
+  /** CSV crudo de "Descargar Detalle". NO se parsea acá. */
+  detalleCsv: string;
+  /** CSV crudo de "Descargar" (resumen). Solo sirve para cuadrar. */
+  resumenCsv: string;
+  /** Rondas que hizo falta acumular en cada uno (telemetría). */
+  rondas: { detalle: number; resumen: number };
+  /** Nombres de los archivos que armó Switch. */
+  archivos: { detalle: string; resumen: string };
+}
+
+/** ¿Esto que volvió es el CSV del reporte y no una página HTML? El HTML de
+ *  excepción de Switch llega con HTTP 200, así que el status no alcanza. */
+function pareceCsvDeIngresos(csv: string): boolean {
+  const primera = csv.split(/\r?\n/)[0] ?? "";
+  return primera.includes(";") && /FECHA/i.test(primera) && /N\.?INTERNO/i.test(primera);
+}
+
+/** Corre UNO de los dos acumuladores y devuelve su CSV. */
+async function acumularIngresos(
+  session: WebSession,
+  ruta: string,
+  token: string,
+  desde: string,
+  hasta: string,
+  que: "detalle" | "resumen",
+): Promise<{ csv: string; rondas: number; archivo: string }> {
+  const { empresaKey, baseUrl, cookies } = session;
+  let key = 0;
+  let file = "";
+  let ronda = 0;
+
+  while (ronda < INGRESOS_MAX_RONDAS) {
+    ronda++;
+    const body = new URLSearchParams({
+      chunk: String(INGRESOS_CHUNK),
+      key: String(key),
+      file,
+      // Vacíos = "Todas"/"Todos", tal como vienen los <select> de la página.
+      sucursalId: "",
+      proveedorId: "",
+      search: "",
+      articulos: "[]",
+      marcas: "[]",
+      rubros: "[]",
+      subrubros: "[]",
+      desde,
+      hasta,
+      _token: token,
+    }).toString();
+
+    const { res, text } = await webFetch(`${baseUrl}${ruta}`, cookies, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        Accept: "application/json",
+        Origin: baseUrl,
+        Referer: `${baseUrl}${INGRESOS_PAGINA}`,
+      },
+    });
+
+    let j: { response?: boolean; file?: string };
+    try {
+      j = JSON.parse(text) as { response?: boolean; file?: string };
+    } catch {
+      throw new SwitchWebError(
+        empresaKey,
+        `ingresos-${que}`,
+        `${ruta} respondió algo que no es JSON en la ronda ${ronda} (status ${res.status})`,
+      );
+    }
+    if (j.file) file = j.file;
+    if (j.response === true) {
+      key += INGRESOS_CHUNK;
+      continue;
+    }
+    break;
+  }
+
+  if (!file) {
+    throw new SwitchWebError(empresaKey, `ingresos-${que}`, `${ruta} nunca devolvió un archivo`);
+  }
+  if (ronda >= INGRESOS_MAX_RONDAS) {
+    throw new SwitchWebError(
+      empresaKey,
+      `ingresos-${que}`,
+      `${ruta} no terminó en ${INGRESOS_MAX_RONDAS} rondas; no se usa un archivo a medias`,
+    );
+  }
+
+  const { res: dlRes, text: csv } = await webFetch(`${baseUrl}/log/${file}`, cookies, {
+    headers: { Accept: "text/csv,application/octet-stream,*/*" },
+  });
+  if (dlRes.status !== 200 || !pareceCsvDeIngresos(csv)) {
+    throw new SwitchWebError(
+      empresaKey,
+      `ingresos-${que}`,
+      `/log/${file} devolvió ${dlRes.status} y ${csv.length} bytes que no son el CSV de ${que}`,
+    );
+  }
+  return { csv, rondas: ronda, archivo: file };
+}
+
+/**
+ * Baja los DOS CSV del reporte de ingreso de mercancía para un rango de fechas
+ * (inclusive), en UNA sola sesión. NO parsea: de eso se encarga el módulo PURO
+ * `ingresos-mercancia.ts`, testeado contra las líneas reales del archivo.
+ */
+export async function fetchIngresosMercancia(
+  session: WebSession,
+  desde: string, // YYYY-MM-DD
+  hasta: string, // YYYY-MM-DD
+): Promise<IngresosDescarga> {
+  const { empresaKey, baseUrl, cookies } = session;
+
+  // ── 1) la página, que trae el `_token` ────────────────────────────────────
+  const { res: pgRes, text: pgHtml } = await webFetch(`${baseUrl}${INGRESOS_PAGINA}`, cookies, {
+    headers: { Accept: "text/html" },
+  });
+  if (pgRes.status !== 200) {
+    throw new SwitchWebError(
+      empresaKey,
+      "ingresos-pagina",
+      `${INGRESOS_PAGINA} devolvió ${pgRes.status}`,
+    );
+  }
+  const token = extractToken(pgHtml);
+  if (!token) {
+    throw new SwitchWebError(empresaKey, "ingresos-token", "no se encontró el _token del reporte");
+  }
+
+  // ── 2) los dos acumuladores, en la MISMA sesión ───────────────────────────
+  // El DETALLE primero: es el dato. Si falla, no gastamos el resumen.
+  const detalle = await acumularIngresos(session, INGRESOS_EXPORT_DETALLE, token, desde, hasta, "detalle");
+  const resumen = await acumularIngresos(session, INGRESOS_EXPORT_RESUMEN, token, desde, hasta, "resumen");
+
+  return {
+    detalleCsv: detalle.csv,
+    resumenCsv: resumen.csv,
+    rondas: { detalle: detalle.rondas, resumen: resumen.rondas },
+    archivos: { detalle: detalle.archivo, resumen: resumen.archivo },
+  };
+}
+
 /**
  * Cierra la sesión web. El login usa `changesession=SI`, que EXPULSA a quien
  * esté trabajando en el panel de esa empresa; dejar la sesión abierta alarga ese
