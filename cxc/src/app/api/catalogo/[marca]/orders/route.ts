@@ -27,9 +27,22 @@
 // pedidos internos de siempre. Perder el catálogo de borradores del link es
 // peor que no verlos, pero dejar sin lista a quien ya tenía una es peor todavía.
 //
-// QUIRKS heredados (unificar con OK de Daniel):
-//   · QUIRK 1: la lista de Joybees filtra deleted=false; la de Reebok NO.
-//   · QUIRK 2: Reebok aún acepta el rol legacy 'cliente' al crear.
+// 🔴 LA LISTA NO MUESTRA PEDIDOS BORRADOS — SE ACABÓ EL QUIRK (25-ago-2026)
+//
+// Hasta hoy esto lo decidía `cfg.listaFiltraDeleted`, y en Reebok valía FALSE:
+// la lista devolvía los borrados junto a los vivos. Medido contra producción:
+// **27 filas donde la pantalla del admin mostraba 19** — 8 pedidos ya
+// borrados, y TRES de ellos (PED-005, PED-008, PED-009) siguen en Switch con
+// número. O sea que la pantalla por la que se entra a trabajar ofrecía volver a
+// tocar pedidos que alguien ya había dado de baja. Daniel dio el OK para
+// unificar. Las otras 3 marcas ya filtraban y sus conteos no se mueven.
+//
+// El flag se BORRÓ de la config en vez de ponerlo en `true` en las cuatro: un
+// booleano que vale lo mismo en 4 de 4 marcas no es una opción, es un interruptor
+// muerto — y mientras exista, alguien puede volver a apagarlo.
+//
+// QUIRK heredado que SÍ sigue (unificar con OK de Daniel):
+//   · Reebok aún acepta el rol legacy 'cliente' al crear.
 // Reebok además resuelve category por producto (bulto 6/12) y maneja
 // is_preorder; Joybees es bulto 12 fijo sin preventa.
 
@@ -48,7 +61,7 @@ import {
   resolverClienteSwitch,
   traeEleccionDeCliente,
 } from "@/lib/catalogo/cliente-switch";
-import { numerosSwitchPorPedido } from "@/lib/catalogo/switch-lock";
+import { enviosActivosPorPedido } from "@/lib/catalogo/switch-lock";
 import {
   guardarVendedorSwitchEnPedido,
   leerVendedorDePedido,
@@ -78,12 +91,15 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const colsBase = `id, order_number, client_name, vendor_name, client_email, comment, total, created_at, updated_at, idempotency_key, status${cfg.ordersSelectExtra}`;
   let data: Record<string, unknown>[] | null = null;
   for (const extra of [extraOrigen, ""]) {
-    let query = db
+    const res = await db
       .from(cfg.ordersTable)
-      .select(`${colsBase}${extra}, ${cfg.itemsRelation}(id, product_id, quantity, unit_price)`);
-    // QUIRK 1: solo Joybees filtra los soft-deleted en la query de la lista.
-    if (cfg.listaFiltraDeleted) query = query.eq("deleted", false);
-    const res = await query.order("created_at", { ascending: false });
+      .select(`${colsBase}${extra}, ${cfg.itemsRelation}(id, product_id, quantity, unit_price)`)
+      // 🩸 EL FILTRO DE VIDA. Sin él la lista trae los 67 pedidos borrados de
+      // las 4 marcas y los conteos dicen 110 donde hay 44 — el error que este
+      // repo ya cometió una vez con este mismo dato. No es por marca: es
+      // siempre, y va encadenado para que no se pueda "olvidar" con un if.
+      .eq("deleted", false)
+      .order("created_at", { ascending: false });
     if (!res.error) {
       data = (res.data || []) as unknown as Record<string, unknown>[];
       break;
@@ -97,7 +113,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   // internos. Resolverlos aparte dejaría a Reebok calculando sus totales con el
   // fallback apparel (bulto 6) y la lista del vendedor diría un número distinto
   // del que muestra el panel del admin para el mismo pedido.
-  const filasPublicas = await leerFilasPublicasSinConvertir(cfg);
+  const { sinConvertir: filasPublicas, confirmadoPorShortId } = await leerPublicos(cfg);
 
   // Reebok: una sola query batch para resolver category de todos los items.
   const allProductIds = [
@@ -113,10 +129,14 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   // total con el bulto por default, distinto del que abre el detalle.
   const { bultoPzasByProduct } = await leerCategoriaYBulto(db as never, cfg.productsTable, allProductIds);
 
-  // ¿Cuáles están en Switch? Mismo criterio que el candado de edición
-  // (envío 'enviado'/'verificado'), en UNA sola query. Decide la pestaña de
-  // la lista y el número que se pinta en la fila — ver `switch-lock.ts`.
-  const numerosSwitch = await numerosSwitchPorPedido(
+  // ¿Cuáles están en Switch, y QUÉ se mandó? Mismo criterio que el candado de
+  // edición (envío 'enviado'/'verificado'), en UNA sola query. Decide el chip de
+  // la fila y el número que se pinta — ver `switch-lock.ts`.
+  //
+  // 🔴 `documento` viaja desde acá porque sin él una COTIZACIÓN se lee como un
+  // pedido, y una cotización NO APARTA MERCANCÍA. Contra producción hay una de
+  // verdad: TOM-027, A-Amani S.A., #15-000000123.
+  const enviosSwitch = await enviosActivosPorPedido(
     db as never,
     cfg.enviosTable,
     (data || []).map((o) => String((o as unknown as Record<string, unknown>).id)),
@@ -136,11 +156,14 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       ...row,
       item_count: items.length,
       total: resumen.total,
-      // `en_switch` decide la PESTAÑA; `switch_numero` es lo que se PINTA.
+      // `en_switch` decide si salió; `switch_numero` es lo que se PINTA.
       // Se separan a propósito: un envío activo sin número (hoy 0 casos)
       // sigue estando en Switch, y esconderlo en Borradores sería mentira.
-      en_switch: numerosSwitch.has(idPedido),
-      switch_numero: numerosSwitch.get(idPedido) ?? null,
+      en_switch: enviosSwitch.has(idPedido),
+      switch_numero: enviosSwitch.get(idPedido)?.numero ?? null,
+      // 'pedido' | 'cotizacion'. Null si NO salió: ahí no es ninguna de las dos
+      // y no se le inventa etiqueta.
+      switch_documento: enviosSwitch.get(idPedido)?.documento ?? null,
       fuente: "orders" as const,
       // El MISMO `esPedidoDelLink` que usa el detalle para no pisarle el nombre
       // a quien lo escribió. Una segunda definición de "vino del link" se
@@ -149,6 +172,12 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
         origen_original: (row.origen_original as string) ?? null,
         origen_short_id: (row.origen_short_id as string) ?? null,
       }),
+      // El chulito del badge "Del link": cuándo confirmó el CLIENTE. Vive en la
+      // tabla de públicos y se enlaza por `origen_short_id` — la columna no
+      // existe en orders (medido en las 4 marcas).
+      confirmado_cliente_at: row.origen_short_id
+        ? confirmadoPorShortId.get(String(row.origen_short_id)) ?? null
+        : null,
       [cfg.itemsRelation]: undefined,
     };
   });
@@ -162,15 +191,30 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   return NextResponse.json(todos);
 }
 
+/** Lo que la tabla de públicos aporta a la lista. */
+interface LecturaPublicos {
+  /** Los del LINK que todavía NO se convirtieron: filas propias de la lista. */
+  sinConvertir: Record<string, unknown>[];
+  /**
+   * short_id → cuándo confirmó el CLIENTE desde el link. Incluye los YA
+   * CONVERTIDOS: ésos viven en <marca>_orders y su fecha de confirmación no
+   * está ahí (la columna no existe en orders — medido en las 4 marcas), así
+   * que se trae por `origen_short_id`. Es el chulito del badge "Del link".
+   */
+  confirmadoPorShortId: Map<string, string>;
+}
+
 /**
- * Filas CRUDAS de los pedidos del LINK que todavía no se convirtieron — los que
- * hasta hoy solo veía el admin.
+ * Los pedidos del LINK — los que hasta hoy solo veía el admin — en UNA sola
+ * lectura de la tabla: las filas sin convertir Y las fechas de confirmación de
+ * todas. Traerlas por separado serían dos consultas para el mismo dato.
  *
- * ⚠️ FAIL-OPEN en todos los escalones: cualquier error devuelve `[]` y la lista
- * queda exactamente como estaba. Y `deleted`/`confirmado_cliente_at` se piden en
- * un escalón tolerante: son de migraciones posteriores a la tabla.
+ * ⚠️ FAIL-OPEN en todos los escalones: cualquier error devuelve vacío y la
+ * lista queda exactamente como estaba. Y `deleted`/`confirmado_cliente_at` se
+ * piden en un escalón tolerante: son de migraciones posteriores a la tabla.
  */
-async function leerFilasPublicasSinConvertir(cfg: MarcaConfig): Promise<Record<string, unknown>[]> {
+async function leerPublicos(cfg: MarcaConfig): Promise<LecturaPublicos> {
+  const vacio: LecturaPublicos = { sinConvertir: [], confirmadoPorShortId: new Map() };
   try {
     const publicosDb = await cfg.publicosDb();
     const COLS_FULL = "short_id, cliente_nombre, items, created_at, convertida, deleted, confirmado_cliente_at";
@@ -180,15 +224,20 @@ async function leerFilasPublicasSinConvertir(cfg: MarcaConfig): Promise<Record<s
         .from(cfg.publicosTable)
         .select(cols)
         .order("created_at", { ascending: false });
-      if (!res.error) {
-        return ((res.data || []) as unknown as Record<string, unknown>[]).filter(
-          (f) => !f.convertida && !f.deleted,
-        );
+      if (res.error) continue;
+      const filas = (res.data || []) as unknown as Record<string, unknown>[];
+      const confirmadoPorShortId = new Map<string, string>();
+      for (const f of filas) {
+        if (f.confirmado_cliente_at) confirmadoPorShortId.set(String(f.short_id), String(f.confirmado_cliente_at));
       }
+      return {
+        sinConvertir: filas.filter((f) => !f.convertida && !f.deleted),
+        confirmadoPorShortId,
+      };
     }
-    return [];
+    return vacio;
   } catch {
-    return [];
+    return vacio;
   }
 }
 
@@ -228,7 +277,14 @@ function filaPublicaComoPedido(
     order_number: null,
     client_name: (f.cliente_nombre as string) || "Sin nombre",
     vendor_name: null,
-    status: "borrador",
+    // 🔴 `status` VA NULL, NO "borrador". El status es una columna de la tabla
+    // de orders y esta fila TODAVÍA NO TIENE FILA AHÍ — se la crea la
+    // conversión. Ponerle "borrador" a mano era inventar un dato de una tabla
+    // en la que el pedido no existe, y el chip «Borradores» lo contaba: medido,
+    // habría dicho 12 borradores donde hay 6, porque los 6 pedidos del link
+    // sin convertir entraban al balde equivocado. Un null NO es borrador
+    // (`esBorrador`), y el pedido del link cae en «Pedidos», que es su balde.
+    status: null,
     total,
     item_count: items.length,
     created_at: String(f.created_at),

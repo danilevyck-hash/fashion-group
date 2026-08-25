@@ -14,12 +14,10 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import SyncNowButton from "@/components/shared/SyncNowButton";
-import PedidosTab, { type UnifiedPedido } from "./PedidosTab";
 import { FaltanFotoTarjetasTab, CatalogoCompletoTab } from "./ProductosTarjetas";
 import { FaltanFotoBatchTab, ProductosBatchListTab, ImportarTab } from "./ProductosBatch";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { catalogoAdminRoles } from "@/lib/catalogo/roles";
-import { PANEL_COMPROBANTES, TAB_COMPROBANTES_KEY } from "@/lib/catalogo/numeros-pedido";
 import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
 import { normalizarSkuStorage } from "@/lib/catalogos/fotos-b2b";
 import { contarAlternativas, type StorageMarcaKey } from "@/lib/catalogos/variantes-paths";
@@ -33,7 +31,11 @@ interface VariantesResp {
   exacto: boolean;
 }
 
-type Tab = "faltan-foto" | "completo" | "pedidos" | "importar";
+// 🔴 `pedidos` YA NO ES UNA PESTAÑA DE ESTE PANEL (25-ago-2026). Los
+// comprobantes son UNA pantalla propia, la misma para los tres roles:
+// `/catalogo/<marca>/pedidos`. La `key` vieja no murió — `page.tsx` redirige
+// `?tab=pedidos` allá, así que el marcador guardado sigue llegando.
+type Tab = "faltan-foto" | "completo" | "importar";
 
 const ADMIN_SWR_OPTS = { dedupingInterval: 60_000, revalidateOnFocus: true } as const;
 
@@ -72,11 +74,6 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
     () => fetchJson<AdminProducto[]>(theme.admin.productsUrl, []),
     ADMIN_SWR_OPTS,
   );
-  const { data: pedidosData, mutate: mutatePedidos } = useSWR<UnifiedPedido[]>(
-    authChecked ? `${marca}-catalogo-pedidos` : null,
-    () => fetchJson<UnifiedPedido[]>(`${theme.api}/pedidos-unificado`, []),
-    ADMIN_SWR_OPTS,
-  );
   const { data: syncData, mutate: mutateSyncStatus } = useSWR<{ lastSync: string | null }>(
     authChecked ? `${marca}-sync-status` : null,
     () => fetchJson<{ lastSync: string | null }>(`${theme.api}/sync-status`, { lastSync: null }),
@@ -102,7 +99,6 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   // Cola "Faltan foto": visibles sin foto, ordenados por disponibilidad desc
   // (lo más vendible primero). Regla única en lib/catalogos/fotos-faltantes.ts.
   const sinFoto = useMemo(() => colaSinFoto(visibles), [visibles]);
-  const pedidos = pedidosData ?? [];
   const loading = productsLoading && !productsData;
 
   const metrics = useMemo(() => theme.admin.metrics(visibles), [theme, visibles]);
@@ -133,7 +129,6 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   );
 
   const reloadProducts = useCallback(async () => { await mutateProducts(); }, [mutateProducts]);
-  const reloadPedidos = useCallback(async () => { await mutatePedidos(); }, [mutatePedidos]);
   // Tras el ZIP hay que revalidar productos Y la lista de variantes.
   const reloadTrasZip = useCallback(async () => {
     await Promise.all([mutateProducts(), mutateVariantes()]);
@@ -157,14 +152,6 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
       ? { key: "faltan-foto", label: "Faltan foto", badge: sinFotoCount }
       : { key: "faltan-foto", label: sinFotoCount > 0 ? `Faltan foto (${sinFotoCount})` : "Faltan foto" },
     { key: "completo", label: "Catálogo completo" },
-    // 🔴 EL LABEL DICE «Comprobantes», LA KEY SIGUE SIENDO `pedidos`
-    // (25-ago-2026). Adentro conviven los pedidos y las cotizaciones enviadas
-    // a Switch desde el #579, así que el rótulo viejo nombraba una sola de las
-    // dos. La llave NO se toca: `?tab=pedidos` está en marcadores guardados y
-    // renombrarla los rompe sin comprar nada — misma decisión que
-    // Cheques→«Recordatorios» y Asistencia→«Asistencia y Planilla». El nombre
-    // sale de `numeros-pedido.ts`, no escrito a mano acá.
-    { key: TAB_COMPROBANTES_KEY, label: PANEL_COMPROBANTES },
   ];
 
   return (
@@ -256,9 +243,6 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
               ) : (
                 <ProductosBatchListTab marca={marca} products={products} showToast={showToast} onComplete={reloadProducts} tieneVariantes={tieneVariantes} />
               )
-            )}
-            {tab === "pedidos" && (
-              <PedidosTab marca={marca} pedidos={pedidos} onRefresh={reloadPedidos} showToast={showToast} />
             )}
             {tab === "importar" && theme.admin.importarTab && (
               <ImportarTab marca={marca} products={products} showToast={showToast} onImportComplete={reloadProducts} />

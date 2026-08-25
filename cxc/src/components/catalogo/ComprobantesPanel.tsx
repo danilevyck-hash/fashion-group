@@ -1,9 +1,36 @@
 "use client";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL PANEL DE COMPROBANTES — UNO SOLO, PARA LOS TRES ROLES (25-ago-2026)
+//
+// Daniel, textual: *"En pedidos de los catálogos. En administrar y pedidos
+// debería ser la misma pestaña, no dos aparte."*
+//
+// Antes vivía en `app/catalogos/admin/[marca]/PedidosTab.tsx` y solo lo veían
+// admin y secretaria; el vendedor tenía OTRA lista, con otros filtros, otro
+// endpoint y —medido— otros números. Ahora es UNA pantalla, en la ruta por la
+// que se entra a trabajar (`/catalogo/<marca>/pedidos`), y **lo que cada quien
+// puede hacer ahí depende de SU ROL, no de por qué puerta entró**.
+//
+// 🩸 `puedeAdministrar` NO ES EL CANDADO. Es cosmética: esconde botones que de
+// todos modos mueren en 403 en el SERVIDOR (borrar y borrado masivo →
+// `DELETE_ROLES`/`requireRole(["admin","secretaria"])`; exportar →
+// `pedidos-export`). Medido rol por rol con cookies firmadas: el vendedor recibe
+// 403 en los tres. Esconderlos es para que no se ofrezca lo que no se puede, no
+// para impedirlo — lo impide el servidor, y ninguna acción se movió de un lado
+// al otro en este cambio.
+//
+// Lo que el vendedor SÍ puede, y sigue pudiendo: ver la lista, buscar, abrir,
+// editar, duplicar y convertir un pedido del link.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmModal, ConfirmDeleteModal } from "@/components/ui";
 import BulkDeletePedidosModal from "@/components/catalogo/BulkDeletePedidosModal";
+import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
+import type { ClienteSwitchOpcion } from "@/components/catalogo/ClienteSwitchPicker";
+import { filasDeOrders, type FilaComprobante, type FilaDeOrders } from "@/lib/catalogo/fila-comprobante";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { precioTexto } from "@/lib/catalogo/precio";
 import {
@@ -22,37 +49,12 @@ import {
   type NumerosDePedido,
 } from "@/lib/catalogo/numeros-pedido";
 
-// Pestaña Pedidos del admin — ÚNICA por marca (PR-2, antes gemelos ~83%
-// idénticos). Fila de la vista unificada (presenciales + del link); el total
-// ya viene recalculado por el endpoint /pedidos-unificado.
-export interface UnifiedPedido {
-  origen: "mio" | "link";
-  id_natural: string;
-  cliente: string;
-  total: number;
-  created_at: string;
-  vendor: string | null;
-  item_count: number;
-  // Tabla física de origen. El badge usa `origen`; el routing del detalle y el
-  // borrado usan `fuente` (una pública convertida vive en <marca>_orders pero se
-  // muestra como "Del link").
-  fuente?: "orders" | "publicos";
-  // Cuándo confirmó el CLIENTE desde el link (null/ausente si no ha confirmado).
-  confirmado_cliente_at?: string | null;
-  // numero_interno del envío ACTIVO en Switch (null si nunca se envió). La
-  // eliminación masiva lo usa para avisar "sigue en Switch — anúlalo allá".
-  switch_numero?: string | null;
-  // Número del PROPIO pedido (PED-017 · JBP-041 · TOM-026 · CKP-005). Null solo
-  // en un pedido del link sin convertir: se lo asigna la conversión.
-  numero_pedido?: string | null;
-  // Qué se mandó a Switch: 'pedido' | 'cotizacion'. Null si no salió. Una
-  // COTIZACIÓN no aparta mercancía, así que la fila tiene que decir cuál fue.
-  switch_documento?: string | null;
-  // `status` de la tabla de orders ('borrador' | 'confirmado'). Null en el
-  // pedido del LINK sin convertir. Es lo que mira el chip «Borradores» — y NO
-  // es lo mismo que "no salió a Switch".
-  status?: string | null;
-}
+// La fila que se pinta. Su forma vive en `lib/catalogo/fila-comprobante.ts`,
+// junto al mapeo desde el feed — el tipo y la traducción no pueden separarse.
+export type { FilaComprobante, FilaDeOrders };
+export { filasDeOrders };
+/** Nombre viejo del tipo, mientras quedan candados que lo importan así. */
+export type UnifiedPedido = FilaComprobante;
 
 // Precio de catálogo: sin `.00` y sin redondear (`35`, `12.50`, `4,422`).
 const fmtMoney = precioTexto;
@@ -80,6 +82,7 @@ function OrigenBadge({ marca, origen, confirmadoCliente }: { marca: MarcaUiKey; 
   if (origen === "link") {
     return (
       <span
+        data-chip="del-link"
         title={confirmadoCliente ? "Del link · Confirmado por el cliente" : undefined}
         className={theme.admin.pedidos.linkBadge}
       >
@@ -115,21 +118,22 @@ function OrigenBadge({ marca, origen, confirmadoCliente }: { marca: MarcaUiKey; 
 // La tabla física manda sobre el badge: una pública convertida vive en
 // <marca>_orders aunque se muestre como "Del link". Vive a nivel de módulo
 // porque los conteos del filtro por tipo lo necesitan antes de renderizar.
-function esFilaOrders(p: UnifiedPedido): boolean {
+function esFilaOrders(p: FilaComprobante): boolean {
   return p.fuente ? p.fuente === "orders" : p.origen === "mio";
 }
 
-function datosNumeros(pedido: UnifiedPedido, esOrders: boolean): NumerosDePedido {
+function datosNumeros(pedido: FilaComprobante, esOrders: boolean): NumerosDePedido {
   return {
     numeroPedido: pedido.numero_pedido ?? null,
     switchNumero: pedido.switch_numero ?? null,
     switchDocumento: pedido.switch_documento ?? null,
     status: pedido.status ?? null,
+    enSwitch: pedido.en_switch,
     fuente: esOrders ? "orders" : "publicos",
   };
 }
 
-function NumerosPedido({ pedido, esOrders }: { pedido: UnifiedPedido; esOrders: boolean }) {
+function NumerosPedido({ pedido, esOrders }: { pedido: FilaComprobante; esOrders: boolean }) {
   const datos = datosNumeros(pedido, esOrders);
   const propio = tieneNumeroPropio(datos);
   const enSwitch = estaEnSwitch(datos);
@@ -188,16 +192,20 @@ function MesGroup({
   );
 }
 
-export default function PedidosTab({
+export default function ComprobantesPanel({
   marca,
   pedidos,
   onRefresh,
   showToast,
+  puedeAdministrar,
 }: {
   marca: MarcaUiKey;
-  pedidos: UnifiedPedido[];
+  pedidos: FilaComprobante[];
   onRefresh: () => Promise<void>;
-  showToast: (msg: string) => void;
+  showToast: (msg: string, tono?: "error" | "success") => void;
+  /** admin o secretaria. Esconde borrar/borrado masivo/exportar. NO es el
+   *  candado: el servidor ya responde 403 a los demás (ver la cabecera). */
+  puedeAdministrar: boolean;
 }) {
   const theme = getMarcaTheme(marca)!;
   const router = useRouter();
@@ -208,7 +216,7 @@ export default function PedidosTab({
   // fila viva se queda sin chip — ver `numeros-pedido.ts`.
   const [tipoFilter, setTipoFilter] = useState<FiltroComprobante>(FILTRO_COMPROBANTE_DEFAULT);
   const [search, setSearch] = useState("");
-  const [deleting, setDeleting] = useState<UnifiedPedido | null>(null);
+  const [deleting, setDeleting] = useState<FilaComprobante | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [converting, setConverting] = useState<string | null>(null);
@@ -220,11 +228,20 @@ export default function PedidosTab({
   const [openMeses, setOpenMeses] = useState<Record<string, boolean>>({});
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  // Duplicar: el botón abre el mini-modal, se elige el cliente y "Usar este
+  // cliente" confirma. Viene de la lista del vendedor, que era la única que lo
+  // tenía — al quedar una sola pantalla, lo tienen los tres roles (el POST
+  // /orders ya los aceptaba: `createRoles`).
+  const [dupTarget, setDupTarget] = useState<FilaComprobante | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
+  // El error se ve DENTRO del modal: tocar el cliente ya es la acción, así que
+  // un fallo silencioso se sentiría como "no pasó nada".
+  const [dupError, setDupError] = useState<string | null>(null);
 
   // "Editar del link": convierte la pública en <marca>_orders (idempotente) y
   // redirige a la maquinaria de edición existente. El origen se conserva —
   // el pedido sigue mostrándose como "Del link".
-  async function handleEditLink(p: UnifiedPedido) {
+  async function handleEditLink(p: FilaComprobante) {
     if (converting) return;
     setConverting(p.id_natural);
     try {
@@ -240,6 +257,56 @@ export default function PedidosTab({
       showToast("No se pudo abrir el pedido para editar. Intenta de nuevo.");
       setConverting(null);
     }
+  }
+
+  /**
+   * Duplica copiando los items del original y creando un pedido NUEVO a nombre
+   * del CLIENTE DE SWITCH elegido en el mini-modal. El cliente es siempre una
+   * elección explícita (`null` = Contado); el VENDEDOR, en cambio, se hereda del
+   * original y lo resuelve el SERVIDOR — de él depende la comisión, así que su
+   * id NO se manda desde el navegador (ver `duplicar_de` en POST /orders).
+   */
+  async function duplicateOrder(pedido: FilaComprobante, clientName: string, cliente: ClienteSwitchOpcion) {
+    setDuplicating(true);
+    setDupError(null);
+    try {
+      const res = await fetch(`${theme.api}/orders/${pedido.id_natural}`);
+      if (!res.ok) {
+        setDupError("No se pudo leer el pedido original. Intenta de nuevo.");
+        setDuplicating(false);
+        return;
+      }
+      const full = await res.json();
+      const items = (full[theme.itemsField] || []).map(
+        (i: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }) => ({
+          product_id: i.product_id, sku: i.sku, name: i.name,
+          image_url: i.image_url, quantity: i.quantity, unit_price: i.unit_price,
+        }),
+      );
+      const createRes = await fetch(`${theme.api}/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: clientName,
+          vendor_name: typeof window !== "undefined" ? sessionStorage.getItem("fg_user_name") || null : null,
+          items,
+          cliente_switch_id: cliente.id,
+          duplicar_de: pedido.id_natural,
+        }),
+      });
+      if (!createRes.ok) {
+        setDupError("No se pudo duplicar el pedido. Intenta de nuevo.");
+        setDuplicating(false);
+        return;
+      }
+      const nuevo = await createRes.json();
+      setDupTarget(null);
+      showToast("Pedido duplicado");
+      router.push(`/catalogo/${marca}/pedido/${nuevo.id}`);
+    } catch {
+      setDupError("Error de conexion. Intenta de nuevo.");
+    }
+    setDuplicating(false);
   }
 
   async function handleExport() {
@@ -297,7 +364,7 @@ export default function PedidosTab({
   // El detalle se enruta por la tabla física (fuente), no por el badge: una
   // pública convertida vive en <marca>_orders y se abre en el detalle interno.
   // Fallback por `origen` si la vista aún no expone `fuente`.
-  function isOrdersRow(p: UnifiedPedido): boolean {
+  function isOrdersRow(p: FilaComprobante): boolean {
     return esFilaOrders(p);
   }
 
@@ -312,7 +379,7 @@ export default function PedidosTab({
   //
   // Abrir el editor de un pedido. Del link (público sin convertir) → convierte y
   // redirige (handleEditLink); interno/orders → abre su detalle directo.
-  function handleEdit(p: UnifiedPedido) {
+  function handleEdit(p: FilaComprobante) {
     if (isOrdersRow(p)) {
       router.push(`/catalogo/${marca}/pedido/${p.id_natural}`);
     } else {
@@ -320,25 +387,42 @@ export default function PedidosTab({
     }
   }
 
+  /**
+   * 🩸 SE MIRA EL RESULTADO, Y SE DICE CUÁL FUE. La ventana se cierra y la lista
+   * se recarga SOLO si el servidor dijo que sí; con un 500 o el WiFi caído se
+   * queda abierta con el motivo escrito y el botón listo para reintentar. Antes
+   * de este arreglo (auditoría del 23-ago) se cerraba pasara lo que pasara: el
+   * pedido seguía ahí y la persona creía haberlo borrado — o lo borraba dos
+   * veces buscando que "agarrara".
+   *
+   * Los DOS mensajes distintos vienen de la lista del vendedor, que es la que
+   * los tenía: "revisa tu conexión" y "intenta de nuevo" mandan a hacer cosas
+   * distintas, y un solo texto para los dos casos manda a la equivocada.
+   */
   async function handleDelete() {
     if (!deleting) return;
     setDeleteLoading(true);
+    // Borrado SOFT por tabla física (fuente): orders → <marca>_orders,
+    // publicos → <marca>_pedidos_publicos. Ninguno toca Switch.
+    const url = isOrdersRow(deleting)
+      ? `${theme.api}/orders/${deleting.id_natural}`
+      : `${theme.api}/pedidos-publicos/${deleting.id_natural}`;
     try {
-      // Borrado SOFT por tabla física (fuente): orders → <marca>_orders,
-      // publicos → <marca>_pedidos_publicos. Ninguno toca Switch.
-      const url = isOrdersRow(deleting)
-        ? `${theme.api}/orders/${deleting.id_natural}`
-        : `${theme.api}/pedidos-publicos/${deleting.id_natural}`;
       const res = await fetch(url, { method: "DELETE" });
-      if (!res.ok) throw new Error("delete failed");
-      showToast("Pedido borrado");
-      setDeleting(null);
-      await onRefresh();
+      if (!res.ok) {
+        setDeleteLoading(false);
+        showToast("No se pudo eliminar el pedido. Intenta de nuevo.", "error");
+        return;
+      }
     } catch {
-      showToast("No se pudo borrar el pedido");
-    } finally {
       setDeleteLoading(false);
+      showToast("No se pudo eliminar. Revisa tu conexión e intenta de nuevo.", "error");
+      return;
     }
+    setDeleteLoading(false);
+    setDeleting(null);
+    showToast("Pedido eliminado", "success");
+    await onRefresh();
   }
 
   const filterTabs: { key: OrigenFilter; label: string }[] = [
@@ -349,7 +433,7 @@ export default function PedidosTab({
 
   // Agrupar por mes (el API ya viene ordenado por fecha desc → los grupos salen
   // en orden descendente). Mes actual expandido, los demás colapsados.
-  const grupos: { key: string; label: string; items: UnifiedPedido[] }[] = [];
+  const grupos: { key: string; label: string; items: FilaComprobante[] }[] = [];
   for (const p of filtered) {
     const k = mesKey(p.created_at);
     const last = grupos[grupos.length - 1];
@@ -359,8 +443,8 @@ export default function PedidosTab({
   const mesActual = mesKey(new Date().toISOString());
 
   const isMesOpen = (k: string) => openMeses[k] ?? (k === mesActual);
-  const rowKey = (p: UnifiedPedido) => `${p.fuente ?? p.origen}-${p.id_natural}`;
-  const clienteLabel = (p: UnifiedPedido) =>
+  const rowKey = (p: FilaComprobante) => `${p.fuente ?? p.origen}-${p.id_natural}`;
+  const clienteLabel = (p: FilaComprobante) =>
     p.cliente === "Sin nombre" || !p.cliente?.trim() ? "Sin nombre" : p.cliente;
 
   // Filas elegibles para selección masiva = las VISIBLES ahora mismo: pasan el
@@ -372,7 +456,7 @@ export default function PedidosTab({
   const selEnviados = selectedRows.filter((p) => !!p.switch_numero);
   const selSinEnviar = selectedRows.length - selEnviados.length;
 
-  function toggleRow(p: UnifiedPedido) {
+  function toggleRow(p: FilaComprobante) {
     const k = rowKey(p);
     setSelected((prev) => {
       const next = new Set(prev);
@@ -427,7 +511,10 @@ export default function PedidosTab({
 
   return (
     <div>
-      {/* Acciones */}
+      {/* Acciones. «Exportar Excel» es de admin/secretaria: al vendedor el
+          endpoint le responde 403 (medido), así que ofrecérselo sería ofrecer
+          un botón que no funciona. */}
+      {puedeAdministrar && (
       <div className="flex justify-end mb-4">
         <button
           onClick={handleExport}
@@ -440,6 +527,7 @@ export default function PedidosTab({
           {exporting ? "Generando..." : "Exportar Excel"}
         </button>
       </div>
+      )}
 
       {/* Filtros por origen */}
       <div className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
@@ -520,7 +608,10 @@ export default function PedidosTab({
       ) : (
         <>
         {/* Selección masiva: "todos" = filas visibles (filtro actual + meses
-            expandidos). El botón rojo aparece solo con selección. */}
+            expandidos). El botón rojo aparece solo con selección. Todo el
+            bloque es de admin/secretaria — `bulk-delete` responde 403 al
+            vendedor. */}
+        {puedeAdministrar && (
         <div className="flex items-center justify-between gap-3 mb-3 min-h-[38px]">
           <label className="inline-flex items-center gap-2 px-1 text-sm text-gray-600 cursor-pointer select-none">
             <input
@@ -540,6 +631,7 @@ export default function PedidosTab({
             </button>
           )}
         </div>
+        )}
         {grupos.map((grupo) => (
         <MesGroup
           key={grupo.key}
@@ -552,7 +644,7 @@ export default function PedidosTab({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="w-8 pl-4 pr-1 py-3"></th>
+                <th className={puedeAdministrar ? "w-8 pl-4 pr-1 py-3" : "w-0 p-0"}></th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Origen</th>
                 <th className="text-left px-2 lg:px-4 py-3 font-medium text-gray-500">Cliente</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
@@ -564,17 +656,25 @@ export default function PedidosTab({
               {grupo.items.map((pedido) => (
                 <tr
                   key={`${pedido.fuente ?? pedido.origen}-${pedido.id_natural}`}
+                  // Hooks ESTABLES para los candados de conducta: el número (o el
+                  // short_id cuando todavía no tiene) y la tabla física. Sin
+                  // ellos, un candado que quiera "la fila de PED-018" termina
+                  // agarrando el contenedor de todas — ya pasó.
+                  data-pedido={pedido.numero_pedido ?? pedido.id_natural}
+                  data-fuente={pedido.fuente ?? "orders"}
                   onClick={() => handleEdit(pedido)}
                   className="hover:bg-gray-50 transition cursor-pointer"
                 >
                   <td className="w-8 pl-4 pr-1 py-3" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(rowKey(pedido))}
-                      onChange={() => toggleRow(pedido)}
-                      className="w-4 h-4 accent-black cursor-pointer align-middle"
-                      aria-label={`Seleccionar pedido de ${clienteLabel(pedido)}`}
-                    />
+                    {puedeAdministrar && (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(rowKey(pedido))}
+                        onChange={() => toggleRow(pedido)}
+                        className="w-4 h-4 accent-black cursor-pointer align-middle"
+                        aria-label={`Seleccionar pedido de ${clienteLabel(pedido)}`}
+                      />
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <OrigenBadge marca={marca} origen={pedido.origen} confirmadoCliente={!!pedido.confirmado_cliente_at} />
@@ -596,9 +696,11 @@ export default function PedidosTab({
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(pedido.created_at)}</td>
                   <td className="px-4 py-3 text-right">
-                    {/* Editar/Eliminar en TODAS las filas (Mío y Del link).
-                        Editar: orders → abre su detalle; público sin convertir →
-                        convierte y abre. Eliminar: soft-delete por fuente. */}
+                    {/* Editar en TODAS las filas (Mío y Del link): orders → abre
+                        su detalle; público sin convertir → convierte y abre.
+                        Duplicar solo en las INTERNAS: una del link sin convertir
+                        todavía no existe como pedido, así que tocarlo pediría
+                        algo que no está. Eliminar es de admin/secretaria. */}
                     <div className="inline-flex items-center gap-2">
                       <button
                         onClick={(e) => {
@@ -610,15 +712,28 @@ export default function PedidosTab({
                       >
                         {converting === pedido.id_natural ? "Abriendo..." : "Editar"}
                       </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleting(pedido);
-                        }}
-                        className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
-                      >
-                        Eliminar
-                      </button>
+                      {isOrdersRow(pedido) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDupTarget(pedido);
+                          }}
+                          className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition"
+                        >
+                          Duplicar
+                        </button>
+                      )}
+                      {puedeAdministrar && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleting(pedido);
+                          }}
+                          className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
+                        >
+                          Eliminar
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -629,6 +744,18 @@ export default function PedidosTab({
         </MesGroup>
         ))}
         </>
+      )}
+
+      {dupTarget && (
+        <DuplicarPedidoModal
+          orderNumber={dupTarget.numero_pedido ?? ""}
+          api={theme.api}
+          directorioLabel={theme.switchDirectorioLabel}
+          duplicando={duplicating}
+          error={dupError}
+          onElegir={(nombre, cliente) => duplicateOrder(dupTarget, nombre, cliente)}
+          onCancel={() => { setDupTarget(null); setDupError(null); }}
+        />
       )}
 
       <BulkDeletePedidosModal

@@ -28,7 +28,8 @@ cd "$(dirname "$0")/.."
 REGLA=src/lib/catalogo/numeros-pedido.ts
 DESTINO=src/lib/catalogo/destino-comprobantes.ts
 SHELL_ADMIN='src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx'
-TAB='src/app/catalogos/admin/[marca]/PedidosTab.tsx'
+PAGINA_ADMIN='src/app/catalogos/admin/[marca]/page.tsx'
+TAB='src/components/catalogo/ComprobantesPanel.tsx'
 CONF=src/components/catalogo/ConfirmacionClient.tsx
 TEMA=src/lib/catalogo/marcas-ui.tsx
 CHECKOUT=src/components/catalogo/CheckoutClient.tsx
@@ -43,10 +44,11 @@ CANDADOS=(
   src/__tests__/components/pedido-un-toque.test.tsx
   src/__tests__/lib/numeros-pedido.test.ts
   src/__tests__/lib/catalogo-roles.test.ts
+  src/__tests__/lib/pedidos-una-sola-pantalla.test.ts
   src/__tests__/api/catalogo-vendedor-switch.test.ts
 )
 
-ARCHIVOS=("$REGLA" "$DESTINO" "$SHELL_ADMIN" "$TAB" "$CONF" "$TEMA" "$CHECKOUT" "$DETALLE" "$FILTROS")
+ARCHIVOS=("$REGLA" "$DESTINO" "$SHELL_ADMIN" "$PAGINA_ADMIN" "$TAB" "$CONF" "$TEMA" "$CHECKOUT" "$DETALLE" "$FILTROS")
 RESPALDO="$(mktemp -d)"
 for f in "${ARCHIVOS[@]}"; do
   mkdir -p "$RESPALDO/$(dirname "$f")"; cp "$f" "$RESPALDO/$f"
@@ -115,13 +117,23 @@ mutar "🔴 la KEY de la pestaña cambia (rompe ?tab=pedidos guardado)" "$REGLA"
   'export const TAB_COMPROBANTES_KEY = "pedidos";' \
   'export const TAB_COMPROBANTES_KEY = "comprobantes";'
 
-mutar "el shell escribe el label a mano en vez de usar la constante" "$SHELL_ADMIN" \
-  '    { key: TAB_COMPROBANTES_KEY, label: PANEL_COMPROBANTES },' \
-  '    { key: "pedidos", label: "Comprobantes" },'
+# 🔴 25-ago-2026 — LAS DOS MUTACIONES DEL SHELL SE REEMPLAZAN. Apuntaban a la
+# PESTAÑA de comprobantes del panel de administrar, que ya no existe: los
+# comprobantes son una pantalla propia y la key vieja REDIRIGE. Lo que hay que
+# poder romper ahora es ese redirect, que es lo único que sostiene el marcador
+# guardado de `?tab=pedidos`.
 
-mutar "el shell deja de dibujar la pestaña del panel" "$SHELL_ADMIN" \
-  '    { key: TAB_COMPROBANTES_KEY, label: PANEL_COMPROBANTES },' \
-  ''
+mutar "🔴 el marcador ?tab=pedidos deja de llegar (no redirige)" "$PAGINA_ADMIN" \
+  '  if (searchParams?.tab === TAB_COMPROBANTES_KEY) redirect(`/catalogo/${theme.marca}/pedidos`);' \
+  '  '
+
+mutar "el redirect escribe la key a mano en vez de usar la constante" "$PAGINA_ADMIN" \
+  'searchParams?.tab === TAB_COMPROBANTES_KEY' \
+  'searchParams?.tab === "comprobantes"'
+
+mutar "🔴 la pestaña de comprobantes vuelve al panel de fotos" "$SHELL_ADMIN" \
+  '    { key: "completo", label: "Catálogo completo" },' \
+  '    { key: "completo", label: "Catálogo completo" },\n    { key: "pedidos", label: "Comprobantes" },'
 
 mutar "el vacío vuelve a hablar de pedidos" "$REGLA" \
   'export const VACIO_SIN_COMPROBANTES = "No hay comprobantes aún";' \
@@ -142,25 +154,29 @@ mutar "el vacío del filtro vuelve a hablar de pedidos" "$REGLA" \
 #
 # ── 5 · EL BOTÓN DE UN TOQUE, Y EL ROL ───────────────────────────────────────
 
-mutar "🔴 el VENDEDOR sale apuntado al admin de catálogos (403 seguro)" "$DESTINO" \
-  '  const esAdmin = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(String(role ?? ""));' \
-  '  const esAdmin = true;'
+# 🔴 25-ago-2026 — LAS CINCO MUTACIONES DE ESTE BLOQUE SE REESCRIBIERON.
+# Apuntaban a la BIFURCACIÓN por rol de `destinoLista` (admin al panel,
+# vendedor a su lista), que desapareció al quedar UNA sola pantalla: sus
+# patrones quedaron muertos y el verificador reportaba 5 "⚠️ patrón muerto"
+# corrida tras corrida. Un mutador que no muta nada es exactamente el defecto
+# #2 que este archivo denuncia en su cabecera, así que se ponen al día en vez
+# de dejarlas apagadas.
 
-mutar "🔴 el ADMIN pierde el panel (todos van a la lista del vendedor)" "$DESTINO" \
-  '  const esAdmin = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(String(role ?? ""));' \
-  '  const esAdmin = false;'
+mutar "🔴 el destino vuelve a mandar al panel de administrar (403 al vendedor)" "$DESTINO" \
+  '  return { href: rutas.pedidosHref, label: BOTON_COMPROBANTES, esPanelAdmin: false };' \
+  '  return { href: `${rutas.adminHref}?tab=pedidos`, label: BOTON_COMPROBANTES, esPanelAdmin: true };'
 
-mutar "los roles se invierten (vendedor al admin, admin al vendedor)" "$DESTINO" \
-  '  const esAdmin = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(String(role ?? ""));' \
-  '  const esAdmin = !(CATALOGO_ADMIN_ROLES as readonly string[]).includes(String(role ?? ""));'
+mutar "🔴 el destino se bifurca otra vez por rol" "$DESTINO" \
+  '  return { href: rutas.pedidosHref, label: BOTON_COMPROBANTES, esPanelAdmin: false };' \
+  '  return String(_role) === "admin" ? { href: rutas.adminHref, label: BOTON_COMPROBANTES, esPanelAdmin: true } : { href: rutas.pedidosHref, label: BOTON_COMPROBANTES, esPanelAdmin: false };'
 
-mutar "el rótulo y la dirección se separan (dice pedidos, lleva a comprobantes)" "$DESTINO" \
-  '        label: BOTON_COMPROBANTES,' \
-  '        label: BOTON_PEDIDOS,'
+mutar "el rótulo y la dirección se separan (dice una cosa, lleva a otra)" "$DESTINO" \
+  '  return { href: rutas.pedidosHref, label: BOTON_COMPROBANTES, esPanelAdmin: false };' \
+  '  return { href: rutas.adminHref, label: BOTON_COMPROBANTES, esPanelAdmin: false };'
 
-mutar "el destino pierde el ?tab=pedidos (cae en «Faltan foto»)" "$DESTINO" \
-  '        href: `${rutas.adminHref}?tab=${TAB_COMPROBANTES_KEY}`,' \
-  '        href: rutas.adminHref,'
+mutar "el botón del vendedor vuelve a decir otra cosa que el del admin" "$DESTINO" \
+  'export const BOTON_PEDIDOS = BOTON_COMPROBANTES;' \
+  'export const BOTON_PEDIDOS = "Ver pedidos";'
 
 mutar "la confirmación pierde el botón de la lista" "$CONF" \
   '              href={destino.href}' \
@@ -171,9 +187,12 @@ mutar "la confirmación escribe la dirección a mano" "$CONF" \
   '              href={destino.href}' \
   '              href={`/catalogos/admin/reebok?tab=pedidos`}'
 
-mutar "la confirmación deja de leer el rol (todos como vendedor)" "$CONF" \
-  '  useEffect(() => { setRole(sessionStorage.getItem("cxc_role") || ""); }, []);' \
-  '  useEffect(() => {}, []);'
+# ⚠️ RETIRADA el 25-ago-2026, y dicho en vez de apagado en silencio: mutaba
+# la lectura del rol en la confirmación para ver si el destino cambiaba. Desde
+# que hay UNA pantalla el destino NO depende del rol —los tres van al mismo
+# lado—, así que esta mutación SOBREVIVE con razón: no hay conducta que
+# romper. Lo que la reemplaza es el candado de que NADIE, ni el admin, quede
+# apuntando a `/catalogos/admin/` (ver `pedidos-una-sola-pantalla.test.ts`).
 
 mutar "el adminHref de una marca apunta a otra" "$TEMA" \
   '  adminHref: "/catalogos/admin/tommy",' \

@@ -70,19 +70,26 @@ describe("🔴 el LABEL cambió, la KEY no", () => {
     expect(TAB_COMPROBANTES_KEY).toBe("pedidos");
   });
 
-  it("el shell del admin usa las constantes, no el texto a mano", () => {
+  it("el panel de administrar YA NO tiene pestaña de comprobantes", () => {
+    // 25-ago-2026: los comprobantes dejaron de ser una pestaña de la cola de
+    // fotos y pasaron a ser UNA pantalla propia, la misma para los tres roles.
     const src = soloCodigo(leer("src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx"));
-    expect(src).toContain("label: PANEL_COMPROBANTES");
-    expect(src).toContain("key: TAB_COMPROBANTES_KEY");
-    // Y no quedó una segunda copia escrita a mano.
+    expect(src).not.toContain("label: PANEL_COMPROBANTES");
     expect(src).not.toContain('label: "Pedidos"');
     expect(src).not.toContain('label: "Comprobantes"');
+    // Y no quedó llamando al endpoint del admin desde una pestaña que ya no está.
+    expect(src).not.toContain("pedidos-unificado");
   });
 
-  it("🔴 el tipo `Tab` sigue aceptando `pedidos` (la URL vieja no se rompe)", () => {
-    const src = soloCodigo(leer("src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx"));
-    expect(src).toMatch(/type Tab =[^;]*"pedidos"/);
-    expect(src).toContain('tab === "pedidos"');
+  it("🔴 `?tab=pedidos` SIGUE LLEGANDO: la key vieja redirige a la pantalla", () => {
+    // 🩸 La llave NO se toca — está en marcadores guardados. Lo que cambió es a
+    // dónde lleva, igual que `/saldos-banco` y los slugs viejos de `/g/`.
+    const src = soloCodigo(leer("src/app/catalogos/admin/[marca]/page.tsx"));
+    expect(src).toContain("TAB_COMPROBANTES_KEY");
+    expect(src).toMatch(/redirect\(`\/catalogo\/\$\{theme\.marca\}\/pedidos`\)/);
+    // La constante, no la cadena a mano: una copia que quede vieja rompe el
+    // marcador en silencio.
+    expect(src).not.toContain('tab === "pedidos"');
   });
 
   it("los vacíos del contenedor no dicen «pedidos»", () => {
@@ -295,26 +302,24 @@ describe("🔴 a dónde lleva el botón de la confirmación, por ROL", () => {
     }
   });
 
-  it("admin y secretaria van al panel de Comprobantes, con la key vieja", () => {
-    for (const rol of CATALOGO_ADMIN_ROLES) {
+  it("🔴 LOS TRES ROLES van a la MISMA pantalla, con el MISMO rótulo", () => {
+    // Antes esto bifurcaba: admin/secretaria al panel de administrar y el
+    // vendedor a su lista, porque eran dos pantallas y una le daba 403. Ahora
+    // hay una sola, y el candado es más fuerte: nadie queda apuntado al admin.
+    for (const rol of ["admin", "secretaria", "vendedor"]) {
       for (const m of MARCAS) {
         const d = destinoLista(rutas(m), rol);
-        expect(d.href).toBe(`/catalogos/admin/${m}?tab=pedidos`);
+        expect(d.href, `${rol}/${m}`).toBe(`/catalogo/${m}/pedidos`);
+        expect(d.href).not.toContain("/catalogos/admin/");
         expect(d.label).toBe(BOTON_COMPROBANTES);
-        expect(d.esPanelAdmin).toBe(true);
+        expect(d.esPanelAdmin).toBe(false);
       }
     }
     expect(BOTON_COMPROBANTES).toBe("Ver comprobantes");
-  });
-
-  it("🔴 el VENDEDOR va a SU lista — nunca al admin (le daría 403)", () => {
-    for (const m of MARCAS) {
-      const d = destinoLista(rutas(m), "vendedor");
-      expect(d.href).toBe(`/catalogo/${m}/pedidos`);
-      expect(d.href).not.toContain("/catalogos/admin/");
-      expect(d.label).toBe(BOTON_PEDIDOS);
-      expect(d.esPanelAdmin).toBe(false);
-    }
+    // El rótulo viejo del vendedor quedó como alias del mismo texto: dos
+    // botones que digan cosas distintas para el mismo destino es justo lo que
+    // no puede volver.
+    expect(BOTON_PEDIDOS).toBe(BOTON_COMPROBANTES);
   });
 
   it("🩸 el default es la lista que NO rebota: rol vacío, nulo o desconocido", () => {
@@ -325,11 +330,12 @@ describe("🔴 a dónde lleva el botón de la confirmación, por ROL", () => {
     }
   });
 
-  it("ningún rol FUERA de CATALOGO_ADMIN_ROLES sale apuntado al admin", () => {
+  it("🔴 NINGÚN rol sale apuntado al admin — tampoco el admin mismo", () => {
     const todos = ["admin", "secretaria", "vendedor", "bodega", "contabilidad", "gerente_acs"];
     for (const rol of todos) {
-      const esAdmin = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(rol);
-      expect(destinoLista(rutas("tommy"), rol).esPanelAdmin, rol).toBe(esAdmin);
+      const d = destinoLista(rutas("tommy"), rol);
+      expect(d.esPanelAdmin, rol).toBe(false);
+      expect(d.href, rol).not.toContain("/catalogos/admin/");
     }
   });
 

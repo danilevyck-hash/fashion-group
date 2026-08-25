@@ -52,6 +52,17 @@ export interface NumerosDePedido {
    */
   status?: string | null;
   fuente?: FuentePedido;
+  /**
+   * ¿Tiene envío ACTIVO en Switch? Cuando viene, MANDA sobre el número.
+   *
+   * 🩸 Existe porque "estar en Switch" y "tener número" son dos cosas, y
+   * deducir la primera de la segunda pierde el caso del medio: un envío activo
+   * SIN `numero_interno` se leía como "no se ha mandado a Switch", que es lo
+   * contrario de la verdad. `pedidos-unificado` lo tapaba inventando un `"?"`;
+   * decirlo con un booleano es lo mismo sin el número falso. Ausente ⇒ se
+   * deduce del número, que es como se venía haciendo.
+   */
+  enSwitch?: boolean;
 }
 
 /**
@@ -63,8 +74,9 @@ export interface NumerosDePedido {
  */
 const SIN_NUMERO_REAL = (n: string | null | undefined): boolean => !n || n.trim() === "" || n.trim() === "?";
 
-/** ¿Este pedido salió a Switch? Es tener envío activo, no tener número. */
+/** ¿Este pedido salió a Switch? Es tener envío ACTIVO, no tener número. */
 export function estaEnSwitch(p: NumerosDePedido): boolean {
+  if (typeof p.enSwitch === "boolean") return p.enSwitch;
   return p.switchNumero !== null && p.switchNumero !== undefined;
 }
 

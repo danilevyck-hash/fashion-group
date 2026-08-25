@@ -20,7 +20,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
-import PedidosTab, { type UnifiedPedido } from "@/app/catalogos/admin/[marca]/PedidosTab";
+import ComprobantesPanel, { type UnifiedPedido } from "@/components/catalogo/ComprobantesPanel";
 import { MARCAS_UI, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 const ROUTER = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() };
@@ -82,7 +82,7 @@ const DEL_LINK = base({
 
 function pintar(pedidos: UnifiedPedido[], marca: MarcaUiKey = "reebok") {
   return render(
-    <PedidosTab marca={marca} pedidos={pedidos} onRefresh={async () => {}} showToast={vi.fn()} />,
+    <ComprobantesPanel marca={marca} pedidos={pedidos} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
   );
 }
 

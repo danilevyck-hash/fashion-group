@@ -1,3 +1,27 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠️ ESTE ENDPOINT YA NO ALIMENTA NINGUNA PANTALLA (25-ago-2026), Y NO ES
+// EQUIVALENTE A `/orders`. NO LO READOPTES SIN LEER ESTO.
+//
+// Cuando las dos pantallas de pedidos se volvieron UNA, la que quedó lee
+// `/orders`. No fue una preferencia: fue una MEDICIÓN. Este endpoint calcula el
+// total con `cfg.calcTotal(quantity, unit_price)` y NO le pasa las piezas por
+// bulto del ESTILO, que `/orders` sí lee de la tabla de productos. Medido
+// contra producción el 25-ago-2026, en 5 pedidos de Tommy daba de MÁS:
+//
+//   TOM-024  $3.324 acá · $3.100 en /orders y en el DETALLE
+//   TOM-020 $11.088 acá · $10.408   ·   TOM-018  $7.764 · $7.548
+//   TOM-016  $1.080 acá ·  $1.020   ·   TOM-001  $1.584 · $1.472
+//
+// El DETALLE —la pantalla desde la que se manda a Switch— coincide con
+// `/orders` en los 5. O sea que el que estaba mal era ÉSTE, y por hasta $680 en
+// un solo pedido. Además es de admin+secretaria, así que el vendedor nunca
+// podría leerlo sin que se le abra un permiso.
+//
+// Se conserva porque sus candados son el CHEQUE INDEPENDIENTE de la vista
+// unificada de la base. Si algún día vuelve a pintar una pantalla, primero hay
+// que arreglarle el total.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
