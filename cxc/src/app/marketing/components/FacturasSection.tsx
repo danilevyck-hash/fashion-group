@@ -745,21 +745,34 @@ export default function FacturasSection({
             }
 
             return (
-              <div key={f.id} className="relative group">
+              <div key={f.id} className="space-y-1">
                 <FacturaCard factura={f} porcentajesMarcas={marcasDeEsta} />
-                {/* En pantalla táctil no existe el hover: si quedaran en
-                    opacity-0, Editar/Anular/Eliminar serían INVISIBLES en el
-                    iPhone. Se muestran siempre en móvil y se conserva el
-                    revelado por hover en escritorio. */}
+                {/* 🩸 Las tres acciones vivían FLOTANDO sobre la esquina de la
+                    tarjeta, de ~24 px de alto y a 4 px una de otra. En el
+                    iPhone el dedo caía en "Eliminar" (definitivo, se lleva la
+                    factura para siempre) cuando iba a "Anular" (reversible: la
+                    factura queda plegada abajo y se puede restaurar).
+
+                    Ahora van en su propia FILA debajo de la tarjeta:
+                      · cada botón mide 44 px de alto (mínimo táctil);
+                      · no tapan los badges (Pagado / Zona libre / PDF) que
+                        viven arriba a la derecha de la tarjeta — con 44 px de
+                        alto, flotando, los habrían tapado;
+                      · "Eliminar" se va al EXTREMO OPUESTO de la fila
+                        (`ml-auto`), separado de lo reversible: el dedo no
+                        puede resbalar de "Anular" a "Eliminar".
+                    Se dejan siempre visibles (antes se revelaban por hover en
+                    escritorio): en pantalla táctil el hover no existe y la
+                    fila propia ya no compite con nada. */}
                 {!f.anulado_en && !readonly && (
-                  <div className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition flex gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleAbrirEdicion(f);
                       }}
-                      className="text-xs text-gray-600 hover:text-black bg-white/80 backdrop-blur px-2 py-1 rounded"
+                      className="text-xs text-gray-700 hover:text-black hover:bg-gray-50 border border-gray-200 rounded-md px-3 min-h-[44px] inline-flex items-center transition"
                     >
                       Editar
                     </button>
@@ -770,7 +783,7 @@ export default function FacturasSection({
                         setAnulando(f);
                         setAnulandoMotivo("");
                       }}
-                      className="text-xs text-red-600 hover:text-red-800 bg-white/80 backdrop-blur px-2 py-1 rounded"
+                      className="text-xs text-gray-700 hover:text-black hover:bg-gray-50 border border-gray-200 rounded-md px-3 min-h-[44px] inline-flex items-center transition"
                     >
                       Anular
                     </button>
@@ -781,10 +794,10 @@ export default function FacturasSection({
                           e.stopPropagation();
                           setEliminando(f);
                         }}
-                        className="text-xs text-red-700 hover:text-red-900 bg-white/80 backdrop-blur px-2 py-1 rounded font-medium"
+                        className="ml-auto text-xs text-red-700 hover:text-white hover:bg-red-600 border border-red-300 rounded-md px-3 min-h-[44px] inline-flex items-center font-medium transition"
                         title="Eliminar definitivamente (irreversible)"
                       >
-                        Eliminar
+                        Eliminar definitivamente
                       </button>
                     )}
                   </div>

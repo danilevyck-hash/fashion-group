@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { formatearMonto } from "@/lib/marketing/normalizar";
+import { fmtDate } from "@/lib/format";
 import type { ImpulsadoraConEstado } from "@/lib/marketing/types";
 
 interface PagoMarcaUI {
@@ -83,6 +84,13 @@ export default function HistorialImpulsadoraModal({ impulsadora, onClose, onChan
   const [monto, setMonto] = useState(String(impulsadora.monto_mensual));
   const [guardando, setGuardando] = useState(false);
   const [anulando, setAnulando] = useState<string | null>(null);
+  /** Pago al que se le tocó "Anular" + el motivo que se está escribiendo.
+   *  🩸 Antes esto era `window.prompt()`: el cuadro gris del navegador, que no
+   *  se parece a nada del resto del sistema, no se puede leer en dos líneas y
+   *  en iOS aparece pegado arriba de todo. En Marketing todo lo demás pregunta
+   *  con una ventana de la app (ver DetallePeriodoView), así que ésta también. */
+  const [anularPendiente, setAnularPendiente] = useState<PagoUI | null>(null);
+  const [anularMotivo, setAnularMotivo] = useState("");
 
   const cargar = useCallback(async () => {
     setError(null);
@@ -126,11 +134,7 @@ export default function HistorialImpulsadoraModal({ impulsadora, onClose, onChan
     }
   }
 
-  async function anular(p: PagoUI) {
-    const motivo = window.prompt(
-      `¿Por qué se anula el pago de ${etiquetaPeriodoUI(p)}?\n\nEl gasto deja de contar en los reportes, pero queda el registro.`,
-    );
-    if (motivo === null) return;
+  async function anular(p: PagoUI, motivo: string) {
     if (!motivo.trim()) return toast("Escribe el motivo para poder anularlo", "error");
     setAnulando(p.ref);
     try {
@@ -141,6 +145,8 @@ export default function HistorialImpulsadoraModal({ impulsadora, onClose, onChan
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "No se pudo anular");
       toast("Pago anulado", "success");
+      setAnularPendiente(null);
+      setAnularMotivo("");
       await cargar();
       onChanged();
     } catch (e) {
@@ -312,7 +318,9 @@ export default function HistorialImpulsadoraModal({ impulsadora, onClose, onChan
                     </div>
                     {p.fechaRegistro && (
                       <div className="text-[12px] text-gray-400 mt-0.5">
-                        registrado {p.fechaRegistro}
+                        {/* "registrado 2026-04-03" se lee como código.
+                            fmtDate → "3 abr 2026", igual que el resto. */}
+                        registrado {fmtDate(p.fechaRegistro)}
                       </div>
                     )}
                   </div>
@@ -336,7 +344,7 @@ export default function HistorialImpulsadoraModal({ impulsadora, onClose, onChan
                   {!p.anulado && (
                     <button
                       type="button"
-                      onClick={() => void anular(p)}
+                      onClick={() => { setAnularPendiente(p); setAnularMotivo(""); }}
                       disabled={anulando === p.ref}
                       className="ml-auto text-[13px] text-gray-500 hover:text-red-600 min-h-[44px] px-2 rounded-md hover:bg-red-50 active:scale-[0.97] transition disabled:opacity-50"
                     >
@@ -349,6 +357,66 @@ export default function HistorialImpulsadoraModal({ impulsadora, onClose, onChan
           </div>
         </div>
       </div>
+
+      {/* Ventana de la app para anular un pago — reemplaza al `prompt()` gris
+          del navegador. Mismo cuadro que el resto de Marketing: bottom-sheet en
+          el celular, centrado en escritorio, botones de 44 px, y el botón de
+          anular apagado hasta que haya motivo escrito (el motivo es obligatorio,
+          igual que antes). Va DENTRO del mismo portal, con z superior al
+          historial para que quede encima. */}
+      {anularPendiente && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => { if (!anulando) { setAnularPendiente(null); setAnularMotivo(""); } }}
+          />
+          <div
+            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold mb-1">
+              Anular el pago de {etiquetaPeriodoUI(anularPendiente)}
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              El gasto deja de contar en los reportes, pero queda el registro de
+              que existió y de por qué se anuló.
+            </p>
+            <label
+              htmlFor="mk-motivo-anular-pago"
+              className="block text-sm text-gray-600 mb-1"
+            >
+              Motivo<span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <textarea
+              id="mk-motivo-anular-pago"
+              rows={3}
+              value={anularMotivo}
+              onChange={(e) => setAnularMotivo(e.target.value)}
+              placeholder="Explica qué pasó"
+              /* text-base en mobile para que Safari no haga zoom al enfocar. */
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm focus:border-black focus:outline-none mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => void anular(anularPendiente, anularMotivo)}
+                disabled={anulando !== null || anularMotivo.trim().length === 0}
+                className="flex-1 px-4 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-50 transition"
+              >
+                {anulando ? "Anulando…" : "Anular pago"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAnularPendiente(null); setAnularMotivo(""); }}
+                disabled={anulando !== null}
+                className="flex-1 border border-gray-200 text-gray-600 px-4 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body,
   );

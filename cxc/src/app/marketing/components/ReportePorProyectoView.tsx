@@ -50,9 +50,14 @@ export function ReportePorProyectoView() {
           fetch("/api/marketing/reportes/tienda", { cache: "no-store" }),
         ]);
         if (mkRes.ok) {
-          const json = (await mkRes.json()) as { marcas?: MkMarca[]; items?: MkMarca[] };
-          const lista = json.marcas ?? json.items ?? [];
-          if (!cancel) setMarcas(lista);
+          // 🩸 GET /api/marketing/marcas devuelve el ARRAY pelado
+          // (`NextResponse.json(marcas)`), no un sobre `{ marcas }`. Acá se leía
+          // `json.marcas ?? json.items`, que sobre un array siempre da
+          // undefined: el desplegable "Marca" quedaba con "Todas" y nada más, y
+          // se leía como "no hay marcas cargadas". Las otras 6 pantallas que
+          // consumen esta ruta lo leen como array — ahora esta también.
+          const data = (await mkRes.json()) as unknown;
+          if (!cancel) setMarcas(Array.isArray(data) ? (data as MkMarca[]) : []);
         }
         if (tdRes.ok) {
           const json = (await tdRes.json()) as { tiendas?: string[] };
@@ -128,7 +133,7 @@ export function ReportePorProyectoView() {
             onChange={(e) =>
               setAnio(e.target.value === "todos" ? "todos" : parseInt(e.target.value, 10))
             }
-            className="px-3 py-1.5 rounded-md border border-gray-200 text-sm bg-white"
+            className="px-3 min-h-[44px] rounded-md border border-gray-200 text-sm bg-white"
           >
             <option value="todos">Todos</option>
             {ANIOS.map((y) => (
@@ -144,7 +149,7 @@ export function ReportePorProyectoView() {
           <select
             value={marcaId}
             onChange={(e) => setMarcaId(e.target.value)}
-            className="px-3 py-1.5 rounded-md border border-gray-200 text-sm bg-white"
+            className="px-3 min-h-[44px] rounded-md border border-gray-200 text-sm bg-white"
           >
             <option value="">Todas</option>
             {marcas.map((m) => (
@@ -163,7 +168,7 @@ export function ReportePorProyectoView() {
             onChange={(e) => setTienda(e.target.value)}
             placeholder="Cualquier tienda"
             list="mk-proy-tiendas"
-            className="px-3 py-1.5 rounded-md border border-gray-200 text-sm bg-white min-w-[200px]"
+            className="px-3 min-h-[44px] rounded-md border border-gray-200 text-sm bg-white min-w-[200px]"
           />
           <datalist id="mk-proy-tiendas">
             {tiendas.map((t) => (

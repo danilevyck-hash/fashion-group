@@ -50,7 +50,10 @@ export function validateReclamoItem(item: ReclamoItemInput, n: number): string |
   if (!s(item.referencia)) return `Ítem ${n}: falta el código.`;
   if (!s(item.descripcion)) return `Ítem ${n}: falta la descripción.`;
   if (!s(item.talla)) return `Ítem ${n}: falta la talla.`;
-  if (!s(item.genero)) return `Ítem ${n}: falta el género (Men/Women/Kids/Accessories).`;
+  // El mensaje va en español aunque el valor guardado sea inglés (lo exige el
+  // CHECK de reclamo_items.genero). El usuario lee "Hombre/Mujer/Niños/
+  // Accesorios", que es lo que dice el desplegable.
+  if (!s(item.genero)) return `Ítem ${n}: falta el género (Hombre/Mujer/Niños/Accesorios).`;
   const cant = Number(item.cantidad);
   if (!Number.isFinite(cant) || cant <= 0) return `Ítem ${n}: la cantidad debe ser mayor a 0.`;
   const precio = Number(item.precio_unitario);

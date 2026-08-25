@@ -186,13 +186,23 @@ export default function MobiliarioPage() {
     );
     const entregado = entregas.reduce((s, e) => s + Number(e.total ?? 0), 0);
     const tiendas = new Set(entregas.map((e) => e.proyecto_id)).size;
+    // 🩸 Acá había DOS campos con el MISMO valor: `valor` y `disponible`, los
+    // dos `precio × stock_total`. En pantalla salían como "Valor total" y
+    // "Disponible", que se leen como "lo que tengo" contra "lo que me queda", y
+    // nunca podían diferir ni un centavo.
+    //
+    // Cuál sobraba: `mk_inventario_productos.stock_total` son las UNIDADES
+    // DISPONIBLES AHORA MISMO — cada entrega se lo descuenta
+    // (inventario.ts: `update({ stock_total: actual - unidades })`) y el modelo
+    // es plano, sin histórico de compras. O sea que `precio × stock_total` ya
+    // ES el disponible, y "Valor total" era el rótulo equivocado: no existe en
+    // ningún lado el dato de "lo que se compró en total".
+    //
+    // Queda UN número, con el nombre que le corresponde. No se tocó ningún
+    // monto: es el mismo cálculo de siempre, dicho una sola vez.
     return {
-      valor: Number(valor.toFixed(2)),
+      enBodega: Number(valor.toFixed(2)),
       entregado: Number(entregado.toFixed(2)),
-      // "Disponible" como valor de stock actual (precio × stock disponible).
-      // No es valor − entregado, porque entregado puede haber sido a precios
-      // distintos del precio actual.
-      disponible: Number(valor.toFixed(2)),
       tiendas,
     };
   }, [productos, entregas]);
@@ -491,12 +501,12 @@ export default function MobiliarioPage() {
 
         {/* Resumen sutil — sin cards grandes, solo línea de texto. */}
         <div className="text-xs text-gray-500 tabular-nums">
-          Valor total: {formatearMonto(metricas.valor)} · Entregado:{" "}
-          {formatearMonto(metricas.entregado)} · Disponible:{" "}
+          En bodega:{" "}
           <span className="text-emerald-700">
-            {formatearMonto(metricas.disponible)}
+            {formatearMonto(metricas.enBodega)}
           </span>{" "}
-          · Tiendas: {metricas.tiendas}
+          · Entregado: {formatearMonto(metricas.entregado)} · Tiendas:{" "}
+          {metricas.tiendas}
         </div>
 
         {/* Tabla productos */}
@@ -615,7 +625,7 @@ export default function MobiliarioPage() {
                     <Dato
                       campo="valor"
                       label="Valor"
-                      valor={formatearMonto(metricas.valor)}
+                      valor={formatearMonto(metricas.enBodega)}
                     />
                   </dl>
                 </div>
@@ -732,7 +742,7 @@ export default function MobiliarioPage() {
                         {productos.reduce((s, p) => s + p.stock_total, 0)}
                       </td>
                       <td data-fg-campo="valor" className="px-3 py-2 text-right tabular-nums">
-                        {formatearMonto(metricas.valor)}
+                        {formatearMonto(metricas.enBodega)}
                       </td>
                       <td />
                     </tr>
@@ -748,20 +758,18 @@ export default function MobiliarioPage() {
             (incluidas pendientes), agrupa por tienda (proyecto.tienda o notas),
             y reparte Paneles + montos entre Fashion Wear y Vistana. */}
         <section className="space-y-1.5">
+          {/* 🩸 Acá vivía un segundo botón "Descargar Excel", DENTRO de
+              "Resumen por tienda", que llamaba exactamente a `descargarExcel()`
+              sin argumentos — el mismo archivo completo que baja el botón de
+              arriba. Prometía el resumen y bajaba todo. No hay endpoint que
+              exporte sólo este resumen, así que el botón se retira: el de la
+              cabecera baja el Excel del módulo y es el único que lo dice. */}
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xs uppercase tracking-wide text-gray-500 font-medium">
                 Resumen por tienda
               </h2>
             </div>
-            <button
-              type="button"
-              onClick={() => descargarExcel()}
-              disabled={downloading === "global"}
-              className="text-xs text-gray-500 hover:text-black underline disabled:opacity-60 min-h-[44px] px-1"
-            >
-              {downloading === "global" ? "Generando…" : "Descargar Excel"}
-            </button>
           </div>
           {/* TARJETAS — hasta lg. Una por tienda, con las mismas etiquetas de
               columna ("Total Paneles", "$ <marca>", "Total $"). */}

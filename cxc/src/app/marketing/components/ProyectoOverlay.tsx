@@ -386,11 +386,23 @@ export default function ProyectoOverlay({
                     Anulado
                   </span>
                 )}
-                <div className="flex gap-1.5 mt-1">
+                {/* 🩸 Hay DOS formas de borrar el mismo proyecto y se leían
+                    igual de graves:
+                      · desde la lista del período, "Registrado por error —
+                        eliminar" ESCONDE el proyecto (anular) y se puede
+                        deshacer enseguida;
+                      · este botón BORRA de verdad — proyecto, facturas, fotos
+                        y archivos en Storage — y no hay vuelta atrás.
+                    El de acá decía sólo "Eliminar", medía ~24 px y estaba
+                    pegado a "Editar". Ahora dice lo que hace, mide 44 px y va
+                    en su propia línea, lejos del dedo que iba a "Editar".
+                    (La confirmación pide escribir el nombre del proyecto:
+                    ConfirmTypeNameModal, más abajo. No se aflojó.) */}
+                <div className="flex flex-col items-end gap-2 mt-1">
                   <button
                     type="button"
                     onClick={() => setEditando(true)}
-                    className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+                    className="text-xs px-3 min-h-[44px] inline-flex items-center rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
                   >
                     Editar
                   </button>
@@ -398,9 +410,10 @@ export default function ProyectoOverlay({
                     <button
                       type="button"
                       onClick={() => setEliminando(true)}
-                      className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition"
+                      title="Borra el proyecto, sus facturas, sus fotos y sus archivos. No se puede deshacer."
+                      className="text-xs px-3 min-h-[44px] inline-flex items-center rounded-md border border-red-300 text-red-700 font-medium hover:bg-red-600 hover:text-white transition"
                     >
-                      Eliminar
+                      Eliminar definitivamente
                     </button>
                   )}
                 </div>

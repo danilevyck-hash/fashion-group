@@ -217,11 +217,17 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
                     type="button"
                     onClick={() => solicitarEliminar(f)}
                     aria-label="Eliminar foto"
-                    className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 flex items-center justify-center text-red-600 opacity-0 group-hover:opacity-100 transition"
+                    /* En pantalla táctil no existe el hover: con `opacity-0` la
+                       X era INVISIBLE en el iPhone y el primer toque abría la
+                       foto grande — no había forma de borrar una foto subida
+                       por error desde el celular. Se muestra siempre en móvil y
+                       se conserva el revelado por hover en escritorio, igual
+                       que Editar/Anular/Eliminar en FacturasSection. */
+                    className="absolute top-1 right-1 bg-white/90 rounded-full w-11 h-11 flex items-center justify-center text-red-600 shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 focus-visible:opacity-100 transition"
                   >
                     <svg
-                      width="12"
-                      height="12"
+                      width="14"
+                      height="14"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
