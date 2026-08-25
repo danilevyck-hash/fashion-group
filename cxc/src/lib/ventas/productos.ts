@@ -280,7 +280,18 @@ export function fmtMargen(d: number | null | undefined): string {
 // banda PRI. Venta MONEY_FMT y margen PCT_FMT como números reales.
 
 /** Construcción pura del sheet (sin DOM) — testeable. */
-export async function buildProductosSheet(resp: ProductosResponse): Promise<import("xlsx-js-style").WorkSheet> {
+export async function buildProductosSheet(
+  resp: ProductosResponse,
+  /**
+   * Nombre del cliente cuando la pantalla está filtrada por uno.
+   *
+   * 🔴 CON CLIENTE, LA COLUMNA MARGEN% NO SALE. `switch_factura_lineas` no trae
+   * costo: no hay margen de este cliente. Una columna "Margen%" vacía en un
+   * archivo que se manda por correo se lee como un cero, y el margen del
+   * PRODUCTO al lado de la venta del CLIENTE se lee como si fuera suyo.
+   */
+  cliente?: string,
+): Promise<import("xlsx-js-style").WorkSheet> {
   const { buildReportSheet, MONEY_FMT, PCT_FMT } = await import("@/lib/excel-export");
   const nombre = empresaNombre(resp.empresa);
   const periodo = periodoLabel(resp.year, resp.mes, resp.periodo ?? "ytd");
@@ -291,7 +302,7 @@ export async function buildProductosSheet(resp: ProductosResponse): Promise<impo
   return buildReportSheet({
     // Las dos fechas van en el subtítulo: un Excel titulado "Últimos 12 meses"
     // que se guarda y se abre en noviembre no dice qué 12 meses fueron.
-    title: `FASHION GROUP — Productos · ${nombre} · ${periodo}`,
+    title: `FASHION GROUP — Productos · ${nombre} · ${periodo}` + (cliente ? ` · ${cliente}` : ""),
     // 🔴 LAS FECHAS VAN CON EL FORMATEADOR DE LA CASA (`fmtDate`, "1 mar 2026"),
     // el MISMO que usa la pantalla. Este Excel Daniel lo manda por correo, y
     // "Del 2026-03-01 al 2026-08-24" es formato de base de datos: la misma fecha
@@ -307,7 +318,7 @@ export async function buildProductosSheet(resp: ProductosResponse): Promise<impo
       // Precio prom. va PEGADO a Venta y Cantidad, que son sus dos factores.
       // Vacío (no cero) cuando no hay unidades netas: un 0 se suma y se promedia.
       { header: "Precio prom.", wch: 14, align: "right", fmt: MONEY_FMT },
-      { header: "Margen%", wch: 10, align: "right", fmt: PCT_FMT },
+      ...(cliente ? [] : [{ header: "Margen%", wch: 10, align: "right" as const, fmt: PCT_FMT }]),
     ],
     // 🔴 `p.margen` VA TAL CUAL, sin `?? 0`. En pantalla un grupo sin margen
     // calculable (venta ≤ 0, o sea devolución neta) se lee "—"; un 0,0% en el
@@ -320,18 +331,26 @@ export async function buildProductosSheet(resp: ProductosResponse): Promise<impo
       p.cantidad,
       p.venta,
       precioPromedio(p.venta, p.cantidad),
-      p.margen,
+      ...(cliente ? [] : [p.margen]),
     ]),
-    totals: ["TOTAL", null, totalCant, resp.totales.venta, totalPrecio, resp.totales.margen],
+    totals: [
+      "TOTAL", null, totalCant, resp.totales.venta, totalPrecio,
+      ...(cliente ? [] : [resp.totales.margen]),
+    ],
   });
 }
 
-export async function exportProductosToExcel(resp: ProductosResponse): Promise<void> {
-  const ws = await buildProductosSheet(resp);
+export async function exportProductosToExcel(
+  resp: ProductosResponse,
+  cliente?: string,
+): Promise<void> {
+  const ws = await buildProductosSheet(resp, cliente);
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
   downloadWorkbook(
     workbookFromSheets([{ name: "Productos", ws }]),
-    `productos-${resp.empresa}-${periodoSlug(resp.mes, resp.periodo ?? "ytd")}-${resp.year}.xlsx`,
+    `productos-${resp.empresa}-${periodoSlug(resp.mes, resp.periodo ?? "ytd")}-${resp.year}` +
+      (cliente ? `-${cliente.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}` : "") +
+      ".xlsx",
   );
 }
 

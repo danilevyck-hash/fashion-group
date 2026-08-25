@@ -17,6 +17,16 @@ import {
   type GrafiaSolapada,
 } from "@/lib/ventas/productos-clientes";
 import {
+  claveCliente,
+  clientesDelPeriodo,
+  comprasDe,
+  dejoDeComprar,
+  totalDeCompras,
+  type CompraDelCliente,
+  type DejadoDeComprar,
+  type FilaPorCliente,
+} from "@/lib/ventas/productos-por-cliente";
+import {
   PRODUCTOS_EMPRESAS,
   PRODUCTOS_EMPRESA_KEYS,
   DEFAULT_PRODUCTOS_EMPRESA,
@@ -40,6 +50,31 @@ type SortKey = "cantidad" | "venta" | "precio" | "margen";
 /** Las dos cosas que se ven ADENTRO de una descripción. */
 type DrillTab = "clientes" | "codigos";
 const PAGE = 20;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL FILTRO POR CLIENTE — el camino inverso del #591.
+//
+// El #591 dejó "descripción → clientes". Esto es la vuelta: se elige un cliente
+// y TODA la tabla contesta *"¿qué me compra más éste?"*.
+//
+// 🔴 ES UN FILTRO, NO UN SELECTOR DE CLIENTE. La diferencia la fija el candado
+// `src/__tests__/un-solo-selector-de-cliente.test.ts` con todas las letras:
+// *"«Elegir» no es «buscar»: un buscador que solo FILTRA una lista que ya está
+// en pantalla no ata a nadie a ningún registro"*. Acá no se guarda un cliente en
+// ningún registro, no se consulta ningún directorio y las opciones NO salen de
+// una búsqueda: son exactamente los clientes que ya vinieron en la respuesta de
+// este período. Delegar en `ClienteSwitchPicker` sería peor y no mejor —
+// ofrecería clientes de Switch que no compraron nada acá, o sea un filtro que
+// devuelve la tabla vacía sin decir por qué. Es la misma categoría que los
+// filtros de reporte de Marketing, y el barrido no lo marca (se verifica en
+// `ventas-productos-filtro-cliente.test.tsx`).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Valor del desplegable cuando no hay ningún cliente puesto. */
+const TODOS = "todos";
+
+/** Cuántos renglones muestra «Dejó de comprar» antes de decir cuántos faltan. */
+const DEJADOS_VISIBLES = 5;
 
 /** Valor por el que se ordena cada columna. El precio se calcula al vuelo. */
 function valorOrden(p: ProductoNivel1, key: SortKey): number | null {
@@ -115,6 +150,21 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   // Daniel vino a buscar; los códigos quedan a un toque.
   const [drillTab, setDrillTab] = useState<DrillTab>("clientes");
 
+  // ── El filtro por cliente ────────────────────────────────────────────────
+  const [filtroCliente, setFiltroCliente] = useState<string>(TODOS);
+  // La matriz (cliente × descripción) del período. 🔑 SE PIDE UNA SOLA VEZ, y
+  // sólo cuando alguien TOCA el filtro: quien nunca lo usa no paga ni una
+  // consulta, y quien lo usa filtra, busca, ordena y pagina sin volver a pedir
+  // nada. Medido el 26-ago-2026: son 930 filas en vistana y 1.199 en
+  // fashion_wear sobre 12 meses — cabe de sobra en la respuesta.
+  const [matriz, setMatriz] = useState<FilaPorCliente[] | null>(null);
+  const [matrizEstado, setMatrizEstado] =
+    useState<"sin-pedir" | "cargando" | "listo" | "fallo">("sin-pedir");
+  // Lo que CADA cliente compraba en la ventana anterior. Se pide por cliente
+  // (no el período entero) y se guarda: volver a elegirlo no vuelve a consultar.
+  // `null` = la lectura falló, distinto de `[]`, que es "no compraba nada".
+  const [previo, setPrevio] = useState<Record<string, FilaPorCliente[] | null>>({});
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -146,6 +196,12 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       setCodigos({});
       setClientes({});
       setGrafias({});
+      // La matriz es de ESTE período y de ESTA empresa: dejarla puesta mostraría
+      // los números de la anterior. Se vuelve a pedir sola si el filtro está
+      // puesto (ver el efecto de más abajo).
+      setMatriz(null);
+      setMatrizEstado("sin-pedir");
+      setPrevio({});
       setExpanded(null);
       setVisible(PAGE);
     } catch (e) {
@@ -159,6 +215,129 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // ── LA MATRIZ: UNA consulta por empresa+período, y ninguna por toque ──────
+  const pedirMatriz = useCallback(async () => {
+    setMatrizEstado("cargando");
+    try {
+      const qs = new URLSearchParams({
+        empresa, year: String(selectedYear), periodo, ventana: "actual",
+      });
+      const res = await fetch(`/api/ventas/productos/por-cliente?${qs.toString()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as { filas?: FilaPorCliente[] };
+      setMatriz(json.filas ?? []);
+      setMatrizEstado("listo");
+    } catch {
+      setMatriz(null);
+      setMatrizEstado("fallo");
+    }
+  }, [empresa, periodo, selectedYear]);
+
+  // Con el filtro puesto, cambiar de período la vuelve a pedir sola: un filtro
+  // vivo sobre una matriz vieja mostraría números de otro rango.
+  useEffect(() => {
+    if (filtroCliente !== TODOS && matrizEstado === "sin-pedir") pedirMatriz();
+  }, [filtroCliente, matrizEstado, pedirMatriz]);
+
+  // Los clientes del desplegable salen de la matriz que YA viajó — no de una
+  // búsqueda ni de un directorio. Sin `cliente_switch_id` no se puede pedir su
+  // ventana anterior, así que esas líneas suman en la tabla sin filtro pero no
+  // son una opción del filtro.
+  const clientesDelFiltro = useMemo(
+    () => (matriz ? clientesDelPeriodo(matriz).filter(c => c.id != null) : []),
+    [matriz],
+  );
+
+  // Un cliente que compraba en un período y en el nuevo no, deja de existir en
+  // la lista: el filtro vuelve a «todos» en vez de dejar la tabla vacía sin
+  // decir por qué. Y si la matriz no se pudo leer, tampoco se puede sostener un
+  // filtro: se suelta en vez de dejar la pantalla esperando para siempre.
+  useEffect(() => {
+    if (filtroCliente === TODOS) return;
+    if (matrizEstado === "fallo") { setFiltroCliente(TODOS); return; }
+    if (matrizEstado !== "listo") return;
+    if (!clientesDelFiltro.some(c => claveCliente(c.id) === filtroCliente)) setFiltroCliente(TODOS);
+  }, [matrizEstado, clientesDelFiltro, filtroCliente]);
+
+  // 🩸 CON UN CLIENTE PUESTO Y LA MATRIZ TODAVÍA EN CAMINO, LA TABLA ENTERA SE
+  // VERÍA UN INSTANTE COMO SI FUERA LA DE ESE CLIENTE — números de la empresa
+  // debajo del nombre de un negocio. Mientras no esté, se muestra el esqueleto.
+  const esperandoMatriz = filtroCliente !== TODOS && (matrizEstado === "sin-pedir" || matrizEstado === "cargando");
+
+  // Lo que ese cliente compraba ANTES. Una consulta por cliente, y sólo la
+  // primera vez que se lo elige.
+  useEffect(() => {
+    if (filtroCliente === TODOS || filtroCliente in previo) return;
+    let vivo = true;
+    (async () => {
+      try {
+        const qs = new URLSearchParams({
+          empresa, year: String(selectedYear), periodo, ventana: "previa", cliente: filtroCliente,
+        });
+        const res = await fetch(`/api/ventas/productos/por-cliente?${qs.toString()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as { filas?: FilaPorCliente[] };
+        if (vivo) setPrevio(p => ({ ...p, [filtroCliente]: json.filas ?? [] }));
+      } catch {
+        if (vivo) setPrevio(p => ({ ...p, [filtroCliente]: null }));
+      }
+    })();
+    return () => { vivo = false; };
+  }, [filtroCliente, previo, empresa, periodo, selectedYear]);
+
+  const clienteId = filtroCliente === TODOS ? null : Number(filtroCliente);
+  const conCliente = clienteId != null && Number.isFinite(clienteId);
+  const nombreCliente = clientesDelFiltro.find(c => claveCliente(c.id) === filtroCliente)?.nombre ?? "";
+
+  /** Qué compró ESTE cliente, por descripción. Todo en el navegador. */
+  const comprasActual = useMemo<Map<string, CompraDelCliente> | null>(
+    () => (matriz && conCliente ? comprasDe(matriz, clienteId) : null),
+    [matriz, conCliente, clienteId],
+  );
+  /** Y qué compraba en la ventana anterior. `null` = todavía no está o falló. */
+  const comprasPrevias = useMemo<Map<string, CompraDelCliente> | null>(() => {
+    if (!conCliente) return null;
+    const filas = previo[filtroCliente];
+    return filas ? comprasDe(filas, clienteId) : null;
+  }, [previo, filtroCliente, conCliente, clienteId]);
+  const previoFallo = conCliente && previo[filtroCliente] === null;
+  const previoCargando = conCliente && !(filtroCliente in previo);
+
+  // 🔴 EL FILTRO NO CONSULTA NADA. Toma las descripciones que YA están en
+  // pantalla y les cambia piezas y venta por las de este cliente; la que no
+  // compró, se cae. Ordenar, buscar y paginar siguen siendo gratis.
+  const productosDelFiltro = useMemo(() => {
+    if (!data) return [];
+    if (!comprasActual) return data.productos;
+    const out: ProductoNivel1[] = [];
+    for (const p of data.productos) {
+      const c = comprasActual.get(p.descripcion);
+      if (!c) continue;
+      out.push({ ...p, cantidad: c.cantidad, venta: c.venta });
+    }
+    return out;
+  }, [data, comprasActual]);
+
+  /** Piezas y venta de este cliente en el período — el renglón de totales. */
+  const totalCliente = useMemo(
+    () => (comprasActual ? totalDeCompras(comprasActual) : null),
+    [comprasActual],
+  );
+
+  /**
+   * QUÉ DEJÓ DE COMPRAR — y la distinción que hace que la lista sirva.
+   *
+   * `seVendeHoy` NO se consulta: son las descripciones que la tabla de arriba ya
+   * tiene en pantalla para el período actual, de TODA la empresa. Con eso, la
+   * lista separa "este cliente la dejó y otros la siguen comprando" (hay a quién
+   * llamar) de "la empresa dejó de venderla" (no hay nada que reclamar).
+   */
+  const dejados = useMemo<DejadoDeComprar[]>(() => {
+    if (!data || !comprasActual || !comprasPrevias) return [];
+    const seVendeHoy = new Set(data.productos.filter(p => p.venta > 0).map(p => p.descripcion));
+    return dejoDeComprar(comprasActual, comprasPrevias, seVendeHoy);
+  }, [data, comprasActual, comprasPrevias]);
+
   // 🔴 CAMBIAR DE EMPRESA (O DE AÑO) NO BORRA LO QUE ELEGISTE. Antes esto
   // reseteaba el período a "Año en curso" y vaciaba el buscador: estabas
   // mirando "Últimos 12 meses" de una empresa, cambiabas a otra, y la pantalla
@@ -168,6 +347,11 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   // `VentasShell` ya no remonta la vista.)
   const onEmpresaChange = (key: string) => {
     setEmpresa(key);
+    // 🔴 EL CLIENTE SÍ SE LIMPIA, y es la excepción que confirma la regla de
+    // arriba: `cliente_switch_id` es de UNA empresa. El id 412 de Vistana es
+    // otro negocio —o ninguno— en Fashion Wear, así que arrastrarlo mostraría
+    // la tabla de otro cliente con el nombre del anterior.
+    setFiltroCliente(TODOS);
   };
 
   // ⛔ ACÁ ABAJO VIVÍA EL GUARD QUE RESETEABA EL MES cuando la empresa nueva no
@@ -189,10 +373,20 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
     setVisible(PAGE);
   };
 
+  const onFiltroClienteChange = (v: string) => {
+    setFiltroCliente(v);
+    setVisible(PAGE);
+    setExpanded(null);
+    // Con un cliente puesto, Margen % no se muestra (no hay margen por cliente:
+    // la línea de factura no trae costo). Dejar el orden apuntando a una columna
+    // que no está sería una tabla ordenada por algo invisible.
+    if (v !== TODOS) setSort(prev => (prev.key === "margen" ? { key: "venta", dir: "desc" } : prev));
+  };
+
   const rows = useMemo(() => {
     if (!data) return [];
     const q = search.trim().toLowerCase();
-    let r = data.productos;
+    let r = productosDelFiltro;
     if (q) r = r.filter(p => p.descripcion.toLowerCase().includes(q));
     const dir = sort.dir === "asc" ? 1 : -1;
     return [...r].sort((a, b) => {
@@ -203,7 +397,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       const bv = valorOrden(b, sort.key) ?? -Infinity;
       return (Number(av) - Number(bv)) * dir;
     });
-  }, [data, search, sort]);
+  }, [data, productosDelFiltro, search, sort]);
 
   const visibleRows = rows.slice(0, visible);
 
@@ -248,7 +442,23 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   };
 
   const onExcel = async () => {
-    if (data) await exportProductosToExcel(data);
+    if (!data) return;
+    // Sin filtro, el Excel es el de siempre. Con un cliente puesto exporta LO
+    // QUE SE ESTÁ VIENDO —sus descripciones, sus piezas, su venta— y sin la
+    // columna Margen%: no hay margen por cliente, y una columna vacía en un
+    // archivo que se manda por correo se lee como un cero.
+    if (!comprasActual || !totalCliente) {
+      await exportProductosToExcel(data);
+      return;
+    }
+    await exportProductosToExcel(
+      {
+        ...data,
+        productos: productosDelFiltro,
+        totales: { venta: totalCliente.venta, costo: 0, margen: null },
+      },
+      nombreCliente,
+    );
   };
 
   // Unidades y precio promedio del período completo (no del Top 20 visible):
@@ -256,6 +466,12 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   // base con la que ya se calculan Venta y Margen del renglón de totales.
   const totalUnidades = data ? data.productos.reduce((acc, p) => acc + p.cantidad, 0) : 0;
   const totalPrecio = data ? precioPromedio(data.totales.venta, totalUnidades) : null;
+  // Con el filtro puesto, el renglón de arriba habla del CLIENTE. Sin filtro es
+  // el de siempre, al centavo.
+  const unidadesEnPantalla = totalCliente ? totalCliente.cantidad : totalUnidades;
+  const precioEnPantalla = totalCliente
+    ? precioPromedio(totalCliente.venta, totalCliente.cantidad)
+    : totalPrecio;
 
   // El rótulo de la columna de cambio: para el año/mes sigue diciendo el año
   // contra el que compara (lo que se lee hoy); para las ventanas relativas no
@@ -303,6 +519,51 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
           </SelectContent>
         </Select>
 
+        {/* FILTRO por cliente. Cerrado: no es un campo de texto y no ata a
+            nadie a nada — sólo acota lo que ya está en pantalla. Las opciones
+            son los clientes de ESTE período, del que más compra al que menos:
+            con 66 clientes el orden alfabético deja al que importa en la mitad
+            de la lista. */}
+        <Select
+          value={filtroCliente}
+          onValueChange={onFiltroClienteChange}
+          onOpenChange={abierto => {
+            // 🔑 LA MATRIZ SE PIDE ACÁ Y NO EN LA CARGA DE LA PANTALLA: quien
+            // nunca toca el filtro no paga ni una consulta.
+            if (abierto && matrizEstado === "sin-pedir") pedirMatriz();
+          }}
+        >
+          <SelectTrigger
+            data-filtro-cliente
+            className="h-11 w-auto min-w-[150px] max-w-[220px] text-xs"
+            disabled={loading || !data}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-[320px]">
+            <SelectItem value={TODOS} className="text-xs">Cliente: todos</SelectItem>
+            {matrizEstado === "cargando" && (
+              <div className="px-2 py-2 text-xs text-gray-400">Cargando…</div>
+            )}
+            {matrizEstado === "fallo" && (
+              <div className="px-2 py-2 text-xs text-gray-500">No se pudo cargar la lista.</div>
+            )}
+            {/* 🔴 UN DESPLEGABLE VACÍO NO SE EXPLICA SOLO. Multifashion no tiene
+                ni una línea en `switch_factura_lineas` (medido: 0), así que su
+                lista sale vacía y sin esto quedaría un menú con una sola opción
+                y ningún motivo. NO dice "no le vende a nadie" —sería falso—:
+                dice que falta el detalle. */}
+            {matrizEstado === "listo" && clientesDelFiltro.length === 0 && (
+              <div className="px-2 py-2 text-xs text-gray-500">Sin detalle por cliente en este período.</div>
+            )}
+            {clientesDelFiltro.map(c => (
+              <SelectItem key={claveCliente(c.id)} value={claveCliente(c.id)} className="text-xs">
+                {c.nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <div className="relative min-w-[160px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
           <Input
@@ -326,18 +587,27 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
           la línea de abajo, que es un elemento aparte. */}
       {data && !loading && (
         <>
+          {/* 🔴 CON UN CLIENTE PUESTO, MARGEN NO SE MUESTRA. `switch_factura_lineas`
+              NO TRAE COSTO: no hay margen de este cliente, y el margen del
+              producto pegado a la venta del cliente se lee como si lo fuera.
+              Se saca en vez de explicarlo — es la decisión más corta y la única
+              que no puede malinterpretarse. */}
           <p data-totales-productos className="mb-1 text-sm text-gray-600">
-            Venta <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoney(data.totales.venta)}</span>
-            <span className="mx-2 text-gray-300">·</span>
-            Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargen(data.totales.margen)}</span>
+            Venta <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoney(totalCliente ? totalCliente.venta : data.totales.venta)}</span>
+            {!conCliente && (
+              <>
+                <span className="mx-2 text-gray-300">·</span>
+                Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargen(data.totales.margen)}</span>
+              </>
+            )}
           </p>
           {/* Las piezas y el precio promedio del período, y —clave para los
               períodos relativos— LAS DOS FECHAS. "Últimos 12 meses" sin fechas
               es el rótulo que se malinterpreta. */}
           <p data-resumen-productos className="mb-3 text-xs text-gray-500">
-            <span className="font-mono tabular-nums text-gray-700">{Math.round(totalUnidades).toLocaleString("en-US")}</span> piezas
+            <span className="font-mono tabular-nums text-gray-700">{Math.round(unidadesEnPantalla).toLocaleString("en-US")}</span> piezas
             <span className="mx-1.5 text-gray-300">·</span>
-            Precio prom. <span className="font-mono tabular-nums text-gray-700">{fmtPrecioProm(totalPrecio)}</span>
+            Precio prom. <span className="font-mono tabular-nums text-gray-700">{fmtPrecioProm(precioEnPantalla)}</span>
             <span className="mx-1.5 text-gray-300">·</span>
             {/* 🩸 SIN `whitespace-nowrap`. Medido a 390 px: "Δ contra 1 ene 2025
                 – 31 dic 2025" en una sola línea llegaba hasta el px 490 y se
@@ -349,6 +619,16 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
               <>
                 <span className="mx-1.5 text-gray-300">·</span>
                 <span>comparado con {fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}</span>
+              </>
+            )}
+            {/* Con el filtro puesto los números salen del detalle de facturas y
+                notas de crédito, que no tiene las ventas de mostrador (~1%). Es
+                lo mismo que ya dice el pie de «Quién lo compra», dicho en cinco
+                palabras y una sola vez, y al final del renglón. */}
+            {conCliente && (
+              <>
+                <span className="mx-1.5 text-gray-300">·</span>
+                <span data-sin-mostrador>sin las ventas de mostrador</span>
               </>
             )}
           </p>
@@ -380,20 +660,30 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
         </>
       )}
 
+      {conCliente && !loading && data && (
+        <DejoDeComprar
+          filas={dejados}
+          cargando={previoCargando}
+          fallo={previoFallo}
+          desde={data.comparativo?.desde}
+          hasta={data.comparativo?.hasta}
+        />
+      )}
+
       {error && (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-700">
           No se pudieron cargar los productos. <button onClick={load} className="underline">Reintentar</button>
         </div>
       )}
 
-      {loading && (
+      {(loading || esperandoMatriz) && (
         <div className="rounded-lg border border-gray-200 bg-white p-3">
           <SkeletonTable rows={6} cols={5} />
         </div>
       )}
 
       {/* Tabla nivel 1 */}
-      {data && !loading && !error && (
+      {data && !loading && !esperandoMatriz && !error && (
         /* 🩸 SIN `min-w-[560px]`. Ese mínimo inventado era TODO el arrastre:
            medido en el navegador (scripts/_ancho-util-ventas.mjs), la tabla
            necesita 318 px en un iPhone de 390 (donde sólo se ven Descripción,
@@ -414,12 +704,19 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
                     scripts/_medir-productos-precio-anchos.mjs) y la regla es que
                     una columna más no puede agregar arrastre nuevo en iPhone. */}
                 <SortableTh label="Precio prom." active={sort} sortKey="precio" onClick={toggleSort} className="hidden sm:table-cell" />
-                <SortableTh label="Margen %" active={sort} sortKey="margen" onClick={toggleSort} />
+                {/* 🔴 Margen % SÓLO SIN FILTRO. Es el margen del PRODUCTO (sale
+                    de `switch_articulo_diario`, que sí tiene costo); la venta de
+                    al lado sería la del cliente, y `switch_factura_lineas` no
+                    trae costo, así que un margen por cliente no existe. Pegar
+                    los dos números invita a leer uno como el otro. */}
+                {!conCliente && (
+                  <SortableTh label="Margen %" active={sort} sortKey="margen" onClick={toggleSort} />
+                )}
               </tr>
             </thead>
             <tbody>
               {visibleRows.length === 0 && (
-                <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-400">Sin productos para este filtro.</td></tr>
+                <tr><td colSpan={conCliente ? 6 : 7} className="px-3 py-8 text-center text-gray-400">Sin productos para este filtro.</td></tr>
               )}
               {visibleRows.map(p => (
                 <ProductoRow
@@ -431,8 +728,12 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
                   clientes={clientes[p.descripcion]}
                   grafias={grafias[p.descripcion] ?? []}
                   codigosLoading={codigosLoading === p.descripcion}
-                  prevVenta={prevVenta[p.descripcion]}
-                  comparativoMedido={comparativo !== "fallo"}
+                  /* Con un cliente puesto la columna de cambio compara contra
+                     lo que compraba ÉL, no contra la empresa entera: si no, el
+                     Δ diría "creció" porque creció otro. */
+                  prevVenta={conCliente ? comprasPrevias?.get(p.descripcion)?.venta : prevVenta[p.descripcion]}
+                  comparativoMedido={conCliente ? comprasPrevias != null : comparativo !== "fallo"}
+                  mostrarMargen={!conCliente}
                   tab={drillTab}
                   onTab={setDrillTab}
                 />
@@ -443,7 +744,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       )}
 
       {/* Mostrar más */}
-      {data && !loading && !error && rows.length > visible && (
+      {data && !loading && !esperandoMatriz && !error && rows.length > visible && (
         <div className="mt-3 text-center">
           {/* size="sm" da 32px de alto — min-h-[44px] lo lleva al mínimo. */}
           <Button variant="outline" size="sm" onClick={() => setVisible(v => v + PAGE)} className="min-h-[44px]">
@@ -511,7 +812,7 @@ function DeltaCell({ curr, prev, medido }: { curr: number; prev: number | undefi
 }
 
 function ProductoRow({
-  p, isOpen, onToggle, codigos, clientes, grafias, codigosLoading, prevVenta, comparativoMedido, tab, onTab,
+  p, isOpen, onToggle, codigos, clientes, grafias, codigosLoading, prevVenta, comparativoMedido, mostrarMargen, tab, onTab,
 }: {
   p: ProductoNivel1;
   isOpen: boolean;
@@ -524,6 +825,8 @@ function ProductoRow({
   /** false cuando la consulta del período anterior falló: sin ventana medida,
    *  la columna de cambio no puede afirmar "Nuevo". */
   comparativoMedido: boolean;
+  /** false con un cliente puesto: no hay margen por cliente (ver la cabecera). */
+  mostrarMargen: boolean;
   tab: DrillTab;
   onTab: (t: DrillTab) => void;
 }) {
@@ -549,11 +852,13 @@ function ProductoRow({
         <td data-col="venta" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-900 sm:px-1.5 lg:px-3">{fmtMoney(p.venta)}</td>
         <DeltaCell curr={p.venta} prev={prevVenta} medido={comparativoMedido} />
         <td data-col="precio" className="hidden px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-700 sm:table-cell lg:px-3">{fmtPrecioProm(precioPromedio(p.venta, p.cantidad))}</td>
-        <td data-col="margen" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-700 sm:px-1.5 lg:px-3">{fmtMargen(p.margen)}</td>
+        {mostrarMargen && (
+          <td data-col="margen" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-700 sm:px-1.5 lg:px-3">{fmtMargen(p.margen)}</td>
+        )}
       </tr>
       {isOpen && (
         <tr className="bg-gray-50/60">
-          <td colSpan={7} className="px-2 py-0 lg:px-3">
+          <td colSpan={mostrarMargen ? 7 : 6} className="px-2 py-0 lg:px-3">
             <div className="py-2 pl-5">
               {codigosLoading && <div className="py-2 text-xs text-gray-400">Cargando…</div>}
               {!codigosLoading && (
@@ -762,5 +1067,89 @@ function AvisoGrafias({ grafias, descripcion }: { grafias: GrafiaSolapada[]; des
       . La fila de arriba cuenta sólo la primera; acá abajo están los clientes de
       todas. Se arregla corrigiendo el nombre en Switch.
     </p>
+  );
+}
+
+/**
+ * QUÉ DEJÓ DE COMPRAR — lo que compraba en el período anterior y ahora no.
+ *
+ * Ordenado por CUÁNTA PLATA ERA, de mayor a menor: es el orden en el que uno
+ * decide a quién llamar y por qué.
+ *
+ * 🔴 LAS DOS COSAS QUE NO SON LO MISMO, Y POR ESO CADA RENGLÓN LLEVA SU
+ * ETIQUETA: que el CLIENTE haya dejado de comprar algo que la empresa le sigue
+ * vendiendo a otros (ahí hay a quién llamar) no es lo mismo que la empresa haya
+ * dejado de venderlo (no hay nada que reclamar, y llamar por eso quema la
+ * llamada). Se calcula contra las descripciones que la tabla de arriba YA tiene
+ * en pantalla para el período actual — sin una consulta más.
+ *
+ * Lista CORTA, dentro del mismo filtro: cinco renglones y el resto contado. Si
+ * no dejó de comprar nada, no se dibuja nada — un cartel que dice "sin novedad"
+ * es ruido.
+ */
+function DejoDeComprar({
+  filas, cargando, fallo, desde, hasta,
+}: {
+  filas: DejadoDeComprar[];
+  cargando: boolean;
+  fallo: boolean;
+  desde: string | undefined;
+  hasta: string | undefined;
+}) {
+  if (fallo) {
+    return (
+      <p data-dejo-de-comprar-fallo className="mb-3 text-xs text-gray-500">
+        No se pudo cargar qué dejó de comprar.
+      </p>
+    );
+  }
+  if (cargando) {
+    return <p data-dejo-de-comprar-cargando className="mb-3 text-xs text-gray-400">Cargando…</p>;
+  }
+  if (filas.length === 0) return null;
+
+  const visibles = filas.slice(0, DEJADOS_VISIBLES);
+  const restantes = filas.length - visibles.length;
+  return (
+    <div data-dejo-de-comprar className="mb-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+      <p className="mb-1.5 text-xs font-medium text-gray-700">
+        Dejó de comprar
+        {desde && hasta && (
+          <span className="ml-1.5 font-normal text-gray-400">
+            ({fmtDia(desde)} – {fmtDia(hasta)})
+          </span>
+        )}
+      </p>
+      <table className="w-full text-xs">
+        <tbody>
+          {visibles.map(f => (
+            <tr key={f.descripcion} className="border-b border-gray-100 last:border-0">
+              <td className="py-1.5 pr-3 text-gray-700">{f.descripcion}</td>
+              <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(f.venta)}</td>
+              {/* Dos palabras, no una explicación: ámbar = hay a quién llamar,
+                  gris = el producto ya no se vende y no hay nada que reclamar. */}
+              <td className="py-1.5 text-right">
+                <span
+                  data-etiqueta={f.seSigueVendiendo ? "se-sigue-vendiendo" : "ya-no-se-vende"}
+                  /* 🩸 `text-[11px]` NO: la regla de la casa es 12 px mínimo en
+                     lo que se lee, y la medición de los 4 anchos lo cazó (5
+                     etiquetas a 11 px en los cuatro). `text-xs` son 12. */
+                  className={`whitespace-nowrap rounded px-1.5 py-0.5 text-xs ${
+                    f.seSigueVendiendo ? "bg-amber-50 text-amber-800" : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {f.seSigueVendiendo ? "se sigue vendiendo" : "ya no se vende"}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {restantes > 0 && (
+        <p data-dejados-restantes className="mt-1.5 text-xs text-gray-400">
+          y {restantes} {restantes === 1 ? "más" : "más"}
+        </p>
+      )}
+    </div>
   );
 }
