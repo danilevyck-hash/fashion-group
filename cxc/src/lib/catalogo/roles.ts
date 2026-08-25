@@ -60,3 +60,39 @@ export const ROL_LEGACY_CLIENTE = "cliente";
 export function clienteSwitchRoles(createRoles: readonly string[]): string[] {
   return createRoles.filter((r) => r !== ROL_LEGACY_CLIENTE);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 QUIÉN VE LA LISTA DE COMPROBANTES (25-ago-2026)
+//
+// Daniel, textual: *"En el card donde están las marcas. Hay catálogo,
+// administrar, debe de estar también pedidos para acceso directo."*
+//
+// El acceso directo del hub necesita saber a quién mostrárselo, y la respuesta
+// NO es ninguna de las dos listas de arriba:
+//   · `CATALOGO_ROLES` incluye a **bodega**, y bodega recibe **403** del feed
+//     de la lista (`GET /api/catalogo/<marca>/orders`, `VIEW_ROLES`). Ponerle
+//     el botón sería mandarlo a una pantalla en ceros.
+//   · `CATALOGO_ADMIN_ROLES` deja afuera al **vendedor**, que es justamente
+//     quien más entra a ver lo que acaba de armar (#611).
+//
+// Así que es su propia lista, y vale EXACTAMENTE lo que ya valía el servidor:
+// admin, secretaria y vendedor. Esto no abre un permiso nuevo — le pone nombre
+// al que ya existía en `orders/route.ts` y en el botón «Pedidos» del catálogo
+// (`CatalogoVendedorPage`), para que las tres capas no puedan derivar.
+//
+// MEDIDO el 25-ago-2026 con cookies FIRMADAS, contra el handler real de
+// `orders` y en las 4 marcas: admin, secretaria y vendedor → HTTP 200 con
+// filas (12/12); bodega → HTTP 403 {"error":"Sin permiso"} (4/4). Abrirle la
+// lista a bodega sería un permiso NUEVO, y eso lo decide Daniel.
+//
+// El candado `src/__tests__/lib/hub-marcas-pedidos.test.tsx` compara esta lista
+// contra el literal `VIEW_ROLES` de la ruta y contra el gate del catálogo: si
+// una de las tres se mueve sola, el build se pone rojo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Ven la lista de comprobantes de una marca (`/catalogo/<marca>/pedidos`).
+ *  Mismo trío que `VIEW_ROLES` del GET de `orders`. 🔴 bodega NO está. */
+export const COMPROBANTES_ROLES = ["admin", "secretaria", "vendedor"] as const;
+
+/** Copia mutable para quien reciba `string[]`. */
+export const comprobantesRoles = (): string[] => [...COMPROBANTES_ROLES];

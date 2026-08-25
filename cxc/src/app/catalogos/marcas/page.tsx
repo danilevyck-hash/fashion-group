@@ -5,11 +5,27 @@ import Link from "next/link";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
-import { CATALOGO_ADMIN_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
+import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
 
-// Catálogos en UNA pantalla: una tarjeta por marca con sus dos acciones adentro
-// (Ver catálogo · Administrar) + contadores en vivo (productos, sin foto). Elimina
-// los pasos intermedios (elegir marca → Administrar → elegir marca otra vez).
+// Catálogos en UNA pantalla: una tarjeta por marca con sus acciones adentro
+// (Ver catálogo · Pedidos · Administrar) + contadores en vivo (productos, sin
+// foto). Elimina los pasos intermedios (elegir marca → Administrar → elegir
+// marca otra vez).
+//
+// 🔴 «PEDIDOS», ACCESO DIRECTO DESDE LA TARJETA (25-ago-2026)
+//
+// Daniel, textual: *"En el card donde están las marcas. Hay catálogo,
+// administrar, debe de estar también pedidos para acceso directo."*
+//
+// Lleva a la lista ÚNICA de comprobantes del #611 (`/catalogo/<marca>/pedidos`),
+// que es la que quedó: el panel de administrar ya redirige ahí. Antes, para
+// verla desde el hub había que entrar al catálogo de la marca y buscar el botón
+// «Pedidos» en la fila del logo — dos toques por una lista que se mira todo el
+// día.
+//
+// El destino NO se escribe acá: sale de `theme.pedidosHref`, el mismo campo del
+// que ya sale «Ver comprobantes» de la confirmación. Un href a mano en el hub es
+// exactamente la deriva que ese campo existe para evitar.
 //
 // Los COLORES de cada tarjeta salen del tema de la marca (MARCA_THEME.hub) —
 // aquí solo vive la identidad no-visual (nombre, rutas). Agregar una marca =
@@ -90,11 +106,17 @@ export default function CatalogosMarcasPage() {
 
   if (!authChecked) return null;
 
-  // Quién ve "Administrar": admin y secretaria (CATALOGO_ADMIN_ROLES). Vendedor
-  // y bodega solo ven "Ver catálogo". El gate de verdad está en el server
-  // (requireAdmin/requireRole en /api/catalogo/**) — esto solo evita mostrar un
-  // botón que terminaría en 403.
+  // Quién ve "Administrar": admin y secretaria (CATALOGO_ADMIN_ROLES). El
+  // vendedor NO administra (ve el catálogo y sus pedidos) y bodega solo ve el
+  // catálogo. El gate de verdad está en el server (requireAdmin/requireRole en
+  // /api/catalogo/**) — esto solo evita mostrar un botón que terminaría en 403.
   const puedeAdministrar = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(role);
+
+  // Quién ve "Pedidos": admin, secretaria y vendedor (COMPROBANTES_ROLES).
+  // 🔴 BODEGA NO. Ve el catálogo y punto: el feed de la lista
+  // (GET /api/catalogo/<marca>/orders) le responde 403, así que el botón lo
+  // dejaría frente a una pantalla vacía. Nadie gana un permiso con este botón.
+  const puedeVerPedidos = (COMPROBANTES_ROLES as readonly string[]).includes(role);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -113,7 +135,8 @@ export default function CatalogosMarcasPage() {
           {BRANDS.map((b) => {
             const c = counters[b.key];
             // Paleta de la tarjeta desde el tema de la marca (no hardcodear).
-            const hub = getMarcaTheme(b.key)!.hub;
+            const theme = getMarcaTheme(b.key)!;
+            const hub = theme.hub;
 
             return (
               <div key={b.key} className={`relative overflow-hidden rounded-2xl border p-6 ${hub.card}`}>
@@ -142,10 +165,29 @@ export default function CatalogosMarcasPage() {
                     )}
                   </div>
 
-                  {/* Acciones — iPhone: ambos links medían 39px de alto (px-4
+                  {/* Acciones — iPhone: los links medían 39px de alto (px-4
                       py-2). min-h-[44px] los sube al mínimo táctil de la casa;
-                      el ancho ya pasaba (137px y 111px). Se repite en las 3
-                      marcas porque el bloque se renderiza por cada BRAND. */}
+                      el ancho ya pasaba. Se repite en las 4 marcas porque el
+                      bloque se renderiza por cada BRAND.
+
+                      🔴 CON TRES BOTONES LA FILA BAJA DE LÍNEA, NO SE APLASTA.
+                      Los tres miden 137,6 + 88 + 111,4 px (+2 huecos de 10) =
+                      357, y la tarjeta NUNCA da tanto: el contenedor está
+                      capado en max-w-3xl, así que son 358 px de tarjeta (310
+                      útiles con el p-6) en 390, 1024 y 1440, y 279 en 834. En
+                      TODOS los anchos sobra un botón, y el `flex-wrap` que ya
+                      estaba lo baja de renglón en vez de comprimir a los otros.
+                      La tarjeta CRECE HACIA ABAJO: 187 → 241 px.
+
+                      MEDIDO en el build de producción, los 4 anchos, y
+                      comparado contra origin/main:
+                        · 390 · 1024 · 1440 → [Ver catálogo · Pedidos] / [Administrar]
+                        · 834 (tarjeta 279) → [Ver catálogo] / [Pedidos · Administrar]
+                                              (ahí ya medía 241 px ANTES de este botón)
+                      Cero arrastre horizontal (scrollWidth = clientWidth en los
+                      cuatro), cero botones por debajo de 44 px, cero textos por
+                      debajo de 12 px y ningún botón se sale de su tarjeta — los
+                      mismos cuatro ceros que da origin/main. */}
                   <div className="mt-5 flex flex-wrap gap-2.5">
                     <Link
                       href={b.catalogoHref}
@@ -156,6 +198,14 @@ export default function CatalogosMarcasPage() {
                         <path d="M5 12h14M12 5l7 7-7 7" />
                       </svg>
                     </Link>
+                    {puedeVerPedidos && (
+                      <Link
+                        href={theme.pedidosHref}
+                        className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition active:scale-[0.97] ${hub.outlineBtn}`}
+                      >
+                        Pedidos
+                      </Link>
+                    )}
                     {puedeAdministrar && (
                       <Link
                         href={b.adminHref}
