@@ -189,10 +189,20 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gender, category, search, bultosFilter, precio.desde, precio.hasta, agregarA]);
 
+  // `loadError` separa "no cargó" de "no hay resultados" — la misma regla que
+  // ya usaba el catálogo PÚBLICO desde jul-2026. Hasta hoy, los tres `catch` de
+  // acá abajo dejaban `products=[]` y el vendedor veía "No encontramos
+  // productos con estos filtros" con CERO filtros puestos, más un botón
+  // "Limpiar filtros" que no arregla nada porque el problema era la red o un
+  // 500. En 4G panameño el fetch se cae, y ese es justo el momento en que el
+  // texto tiene que decir la verdad y ofrecer REINTENTAR.
+  const [loadError, setLoadError] = useState(false);
+
   // loadProducts también lo reusa el botón "Actualizar ahora" (CatalogoSyncNow)
   // para refrescar la vista tras un sync manual exitoso.
   const loadProducts = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     // En las 3 marcas `_stock` es DISPONIBILIDAD (lo vendible = saldo −
     // apartado), igual que en el catálogo público (26-jul-2026): antes esta
     // página decidía por EXISTENCIA (la columna `stock`, espejo del saldo
@@ -209,6 +219,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         setProducts(data.filter(p => disponibleVendible(p) > 0 || p.is_regalia));
       } catch {
         setProducts([]);
+        setLoadError(true);
       }
     } else if (theme.features.inventarioPorTalla) {
       try {
@@ -240,7 +251,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             }))
             .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
         );
-      } catch { setProducts([]); }
+      } catch { setProducts([]); setLoadError(true); }
     } else {
       // Grid PLANA sin inventario por talla (Tommy): el stock vive en la fila
       // del producto (patrón Joybees) — sin endpoint /inventory.
@@ -253,7 +264,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             .map(p => ({ ...p, _stock: disponibleVendible(p), _sizes: [] as string[] }))
             .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
         );
-      } catch { setProducts([]); }
+      } catch { setProducts([]); setLoadError(true); }
     }
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -467,6 +478,24 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         if (category) filterDesc.push(catLabel[category] || category);
         if (search) filterDesc.push(`“${search}”`);
       }
+      // 🩸 EL PRECIO Y LOS BULTOS TAMBIÉN SE ESCRIBEN. El subtítulo listaba
+      // género, categoría y búsqueda y NADA MÁS: con el filtro de precio puesto
+      // salía un PDF de 12 productos que se leía como "este es todo el catálogo
+      // Tommy", y quien lo recibe por WhatsApp no tiene cómo saber que estaba
+      // recortado. El link compartido sí llevaba el precio (handleCopyLink),
+      // así que el PDF era el único que mentía. Vale para las dos ramas: los
+      // dos filtros son de Tommy/Calvin, que van por la rama plana, pero
+      // escribirlo acá abajo lo deja atado al FILTRO y no al pipeline.
+      if (theme.features.filtroBultos && bultosFilter) filterDesc.push("2 bultos o más");
+      const pDesde = precio.desde.trim();
+      const pHasta = precio.hasta.trim();
+      if (theme.features.filtroPrecio && (pDesde || pHasta)) {
+        filterDesc.push(
+          pDesde && pHasta ? `$${pDesde} a $${pHasta}`
+            : pDesde ? `desde $${pDesde}`
+              : `hasta $${pHasta}`,
+        );
+      }
       // Sin filtros el subtítulo va VACÍO (poda, 12-ago-2026): decía "Todos los
       // productos" sobre un PDF que ya anuncia "{n} productos" en la portada —
       // no distinguía nada de nada. Con filtros puestos sí informa ("HOMBRE ·
@@ -549,8 +578,36 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     </div>
   );
 
-  // Empty
-  const emptyState = (
+  // ¿Hay ALGÚN filtro puesto? Decide cuál de los tres vacíos se muestra.
+  const hayFiltros = !!(
+    search || gender || category || bultosFilter || precio.desde.trim() || precio.hasta.trim()
+  );
+
+  // Tres estados distintos, porque las tres causas se arreglan distinto — copia
+  // exacta de lo que el catálogo PÚBLICO ya hacía bien:
+  //   1. no cargó (red o 500)            → Reintentar
+  //   2. cargó y no hay nada             → no es culpa de nadie, no ofrecer filtros
+  //   3. cargó y los filtros cortan todo → Limpiar filtros
+  const emptyState = loadError ? (
+    <div className="text-center py-20" role="alert">
+      <div className={theme.grid.emptyIconWrap}>{theme.grid.emptyIcon}</div>
+      <p className={theme.grid.emptyText}>No pudimos cargar el catálogo</p>
+      <p className={`${theme.grid.emptyText} mt-1 font-normal`}>
+        Revisa tu conexión a internet y vuelve a intentar.
+      </p>
+      <button onClick={() => loadProducts()} className={theme.grid.emptyClear}>
+        Reintentar
+      </button>
+    </div>
+  ) : !hayFiltros ? (
+    <div className="text-center py-20">
+      <div className={theme.grid.emptyIconWrap}>{theme.grid.emptyIcon}</div>
+      <p className={theme.grid.emptyText}>Por ahora no hay productos disponibles</p>
+      <p className={`${theme.grid.emptyText} mt-1 font-normal`}>
+        Vuelve a entrar más tarde o toca «Actualizar ahora».
+      </p>
+    </div>
+  ) : (
     <div className="text-center py-20">
       <div className={theme.grid.emptyIconWrap}>{theme.grid.emptyIcon}</div>
       <p className={theme.grid.emptyText}>No encontramos productos con estos filtros</p>
@@ -699,22 +756,21 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           />
         )}
         {theme.vendorShare.enHeader ? (
-          /* Layout heredado Joybees: header + [Ver pedido | Pedidos | Compartir].
+          /* Layout heredado Joybees: header + [Pedidos | Compartir].
              `flex-wrap` + `justify-end`: a 390 px el logo de Tommy es ancho y
-             tres botones no entran en la misma línea — el grupo baja ENTERO a
-             la línea de abajo en vez de aplastarse (que es lo que hacía antes
-             de que hubiera un botón más). Los dos siguen a la misma altura. */
+             los botones no entran en la misma línea — el grupo baja ENTERO a
+             la línea de abajo en vez de aplastarse. Los dos van a la misma
+             altura.
+
+             ⛔ ACÁ NO VA "Ver pedido". Estaba, y era el MISMO botón que el de
+             la barra pegajosa de abajo: con el carrito lleno, Joybees, Tommy y
+             Calvin mostraban dos "Ver pedido" a la vez, los dos llamando a
+             `goCheckout()`. Reebok siempre tuvo uno solo —el de la barra— y esa
+             es la forma buena: la barra aparece justo cuando hay algo que ver y
+             viaja con la pantalla. Las 4 marcas quedan iguales. */
           <div className="flex flex-wrap items-start justify-between gap-2">
             <CatalogoHeader marca={marca} variant="vendor" />
             <div data-medir="acciones-catalogo" className="flex flex-wrap items-center justify-end gap-2 ml-auto">
-              {!modo.activo && cartCount > 0 && (
-                <button onClick={goCheckout} className={theme.vendorShare.verPedidoBtn!}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
-                  </svg>
-                  Ver pedido
-                </button>
-              )}
               {pedidosBtn}
               {shareMenu}
             </div>

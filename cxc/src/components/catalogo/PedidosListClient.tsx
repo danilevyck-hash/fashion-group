@@ -121,9 +121,27 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
     const url = sinConvertir(deleteTarget)
       ? `${theme.api}/pedidos-publicos/${deleteTarget.id}`
       : `${theme.api}/orders/${deleteTarget.id}`;
-    await fetch(url, { method: "DELETE" });
+    // 🩸 SE MIRA EL RESULTADO. Antes esto era `await fetch(...)` a secas: la
+    // ventanita se cerraba y la lista se recargaba SALIERA BIEN O SALIERA MAL.
+    // Con un 500 o el WiFi caído, el pedido seguía ahí y la persona creía
+    // haberlo borrado — o lo borraba dos veces buscando que "agarrara". El
+    // modal solo se cierra cuando el servidor dijo que sí; si falla, se queda
+    // abierto con el motivo escrito y el botón listo para reintentar.
+    try {
+      const res = await fetch(url, { method: "DELETE" });
+      if (!res.ok) {
+        setDeleting(false);
+        toast("No se pudo eliminar el pedido. Intenta de nuevo.", "error");
+        return;
+      }
+    } catch {
+      setDeleting(false);
+      toast("No se pudo eliminar. Revisa tu conexión e intenta de nuevo.", "error");
+      return;
+    }
     setDeleting(false);
     setDeleteTarget(null);
+    toast("Pedido eliminado", "success");
     load();
   }
 
