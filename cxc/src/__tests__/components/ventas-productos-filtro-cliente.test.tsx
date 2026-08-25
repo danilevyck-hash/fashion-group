@@ -25,9 +25,36 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
 import { ProductosView } from "@/components/ventas/ProductosView";
 import type { ProductosResponse } from "@/lib/ventas/productos";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 EN JSDOM LOS DOS LAYOUTS EXISTEN A LA VEZ, y hay que decir cuál se mira.
+//
+// Desde el 25-ago-2026 esta pantalla tiene TABLA (desde `sm`) y TARJETAS (en
+// celular): Daniel a 390 px sólo veía Venta y Margen y pidió ver también las
+// piezas y el precio promedio. En el navegador se ve UNO de los dos; en jsdom
+// no hay CSS, así que los dos están montados y un `screen.getByRole` suelto
+// encuentra DOS botones "Precio prom." y falla por ambigüedad.
+//
+// Por eso los candados de la tabla preguntan DENTRO de `[data-vista="tabla"]` y
+// los de las tarjetas dentro de `[data-vista="tarjetas"]`. No es una molestia
+// del test: con dos layouts, "el botón de ordenar" ya no es una sola cosa, y un
+// candado que no dice cuál mira estaría probando el azar del orden del DOM.
+//
+// 🔑 `data-vista` es FIJO, NO la clase del breakpoint: `.sm\:hidden` deja de
+// existir en cuanto el corte se mueve y el `querySelector` devolvería null.
+// `enTabla()` y `enTarjetas()` REVIENTAN si el layout no está, que es lo único
+// que impide que un candado "pase" sin haber mirado nada.
+// ─────────────────────────────────────────────────────────────────────────────
+function layout(vista: "tabla" | "tarjetas") {
+  const el = document.querySelector(`[data-vista="${vista}"]`);
+  if (!el) throw new Error(`no está el layout data-vista="${vista}" — el candado no miró nada`);
+  return within(el as HTMLElement);
+}
+const enTabla = () => layout("tabla");
+const enTarjetas = () => layout("tarjetas");
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/ventas",
@@ -269,11 +296,11 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
   it("la columna desaparece — no hay margen por cliente y no se puede inventar", async () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
-    expect(screen.queryByRole("button", { name: /Margen/ })).toBeTruthy();
+    expect(enTabla().queryByRole("button", { name: /Margen/ })).toBeTruthy();
     expect(celda("CAMISA POLO", "margen")).toBe("40.0%");
 
     await elegirCliente(CITY.nombre);
-    expect(screen.queryByRole("button", { name: /Margen/ })).toBeNull();
+    expect(enTabla().queryByRole("button", { name: /Margen/ })).toBeNull();
     expect(document.querySelector('[data-col="margen"]')).toBeNull();
     expect((document.querySelector("[data-totales-productos]")!.textContent ?? "")).not.toContain("Margen");
   });
@@ -291,10 +318,10 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
   it("si estaba ordenando por Margen, el orden se muda a Venta y no queda apuntando a nada", async () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
-    fireEvent.click(screen.getByRole("button", { name: /Margen/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /Margen/ }));
     await elegirCliente(CITY.nombre);
     expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]);
-    expect(screen.getByRole("button", { name: /^Venta/ }).textContent).toContain("▼");
+    expect(enTabla().getByRole("button", { name: /^Venta/ }).textContent).toContain("▼");
   });
 });
 
@@ -440,11 +467,11 @@ describe("8 · ordenar y buscar siguen andando, y NO piden nada", () => {
     await pintada();
     await elegirCliente(CITY.nombre);
     const antes = urls.length;
-    fireEvent.click(screen.getByRole("button", { name: /^Cant/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /^Cant/ }));
     expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]);
-    fireEvent.click(screen.getByRole("button", { name: /^Cant/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /^Cant/ }));
     expect(filas()).toEqual(["SANDALIA", "CAMISA POLO"]);
-    fireEvent.click(screen.getByRole("button", { name: /Precio prom\./ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /Precio prom\./ }));
     expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]);
     expect(urls.length).toBe(antes);
   });

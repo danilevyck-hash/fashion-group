@@ -675,15 +675,34 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
         </div>
       )}
 
-      {/* Tabla nivel 1 */}
+      {/* ── NIVEL 1: TABLA desde `sm`, TARJETAS en celular ──────────────────
+          🩸 EN CELULAR LA TABLA ENTRABA, PERO CONTESTABA LA MITAD. Daniel,
+          textual (25-ago-2026): *"solo veo sort venta y margen. Quiero ver
+          cantidad también y precio de venta promedio."* A 390 px sólo caben
+          Descripción · Venta · Margen % —medido, `scripts/_medir-productos-
+          precio-anchos.mjs`— y esa decisión era la correcta PARA UNA TABLA: una
+          columna más agrega arrastre. Lo que había que cambiar era la FORMA.
+
+          Con tarjetas los cuatro números entran sin arrastrar nada, porque no
+          compiten por el mismo renglón. Es el patrón que este repo ya usa dos
+          veces para exactamente esto (`admin/components/PanelCxcMobile.tsx` y
+          `ventas/ResumenViewMobile.tsx`), copiado y no reinventado.
+
+          🔴 DESDE `sm` NO CAMBIA NADA: la tabla es la de siempre, con sus siete
+          columnas y su orden por encabezado.
+
+          🩸 `data-vista` VA FIJO ("tabla" / "tarjetas") y NO se busca el layout
+          por su clase de breakpoint: `.sm\:hidden` deja de existir en cuanto el
+          corte se mueve, `querySelector` devuelve vacío y el medidor compara
+          CERO celdas pasando en verde sin haber mirado nada. Los scripts fallan
+          si encuentran cero.
+
+          ⚠️ LA TABLA VA PRIMERA EN EL DOM a propósito: en jsdom no hay CSS, así
+          que los dos layouts existen a la vez y los candados de siempre —que
+          preguntan por `document.querySelector`— tienen que seguir cayendo
+          sobre la tabla, que es lo que venían mirando. */}
       {data && !loading && !esperandoMatriz && !error && (
-        /* 🩸 SIN `min-w-[560px]`. Ese mínimo inventado era TODO el arrastre:
-           medido en el navegador (scripts/_ancho-util-ventas.mjs), la tabla
-           necesita 318 px en un iPhone de 390 (donde sólo se ven Descripción,
-           Venta y Margen) contra 356 disponibles — ENTRA de sobra. Los 204 px
-           que se arrastraban eran los 560 forzados, no los datos. Acá la tabla
-           no pasa a tarjetas porque no hace falta: entra. */
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div data-vista="tabla" className="hidden overflow-x-auto rounded-lg border border-gray-200 sm:block">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
@@ -732,6 +751,54 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── LAS TARJETAS (sólo celular) ──────────────────────────────────── */}
+      {data && !loading && !esperandoMatriz && !error && (
+        <div className="sm:hidden">
+          {/* 🔴 SIN ENCABEZADO NO HAY DÓNDE TOCAR PARA ORDENAR. La tabla se
+              ordena tocando el título de la columna; sin tabla eso se pierde, y
+              perder el orden sería cambiar una carencia por otra. Los CUATRO
+              criterios quedan acá, que son justo los cuatro números que Daniel
+              pidió ver. El activo dice para qué lado va y se invierte al
+              volverlo a tocar, igual que el encabezado. */}
+          <div
+            data-orden-tarjetas
+            className="mb-2 flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Ordenar por"
+          >
+            <span className="flex min-h-[44px] items-center pr-0.5 text-xs text-gray-400">Ordenar por</span>
+            <ChipOrden label="Piezas" sortKey="cantidad" active={sort} onClick={toggleSort} />
+            <ChipOrden label="Venta" sortKey="venta" active={sort} onClick={toggleSort} />
+            <ChipOrden label="Precio prom." sortKey="precio" active={sort} onClick={toggleSort} />
+            {/* Mismo criterio que la tabla: con un cliente puesto no hay margen
+                por cliente, así que tampoco se puede ordenar por él. */}
+            {!conCliente && <ChipOrden label="Margen %" sortKey="margen" active={sort} onClick={toggleSort} />}
+          </div>
+
+          <ul data-vista="tarjetas" className="space-y-2">
+            {visibleRows.length === 0 && (
+              <li className="rounded-lg border border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-400">
+                Sin productos para este filtro.
+              </li>
+            )}
+            {visibleRows.map(p => (
+              <ProductoCard
+                key={p.descripcion}
+                p={p}
+                isOpen={expanded === p.descripcion}
+                onToggle={() => toggleExpand(p)}
+                codigos={codigos[p.descripcion]}
+                clientes={clientes[p.descripcion]}
+                codigosLoading={codigosLoading === p.descripcion}
+                mostrarMargen={!conCliente}
+                tab={drillTab}
+                onTab={setDrillTab}
+              />
+            ))}
+          </ul>
         </div>
       )}
 
@@ -889,6 +956,132 @@ function ProductoRow({
         </tr>
       )}
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA TARJETA DE CELULAR — el mismo renglón, con forma de tarjeta.
+//
+// 🩸 QUÉ VINO A ARREGLAR. A 390 px la tabla dibujaba Descripción · Venta ·
+// Margen % y nada más: `Cant`, `Precio prom.` y el Δ viven bajo `sm` porque una
+// columna más agrega arrastre (medido). Daniel: *"solo veo sort venta y margen.
+// Quiero ver cantidad también y precio de venta promedio."* En una tarjeta los
+// cuatro números NO compiten por el mismo renglón: van en una grilla de dos por
+// dos, cada uno con su rótulo, y no hay nada que arrastrar.
+//
+// 🔑 CADA NÚMERO LLEVA SU RÓTULO. En la tabla el rótulo está en el encabezado,
+// una sola vez; en una tarjeta suelta, cuatro números sin nombre son cuatro
+// adivinanzas. Cuesta una línea de texto chico y ahorra la pregunta.
+//
+// 🔴 LOS NÚMEROS SON LOS MISMOS Y SE CALCULAN IGUAL: `fmtMoney`, `fmtMargen` y
+// `precioPromedio` son las MISMAS funciones que usa la fila de la tabla. No hay
+// un segundo formateador ni un segundo redondeo — verificado celda por celda
+// contra la tabla en `scripts/_verif-tarjetas-productos.mjs`.
+//
+// El desplegable («Quién lo compra» / «Códigos») abre igual que en la tabla, con
+// los MISMOS componentes: si se dibujaran dos veces distinto, dirían dos cosas.
+// ─────────────────────────────────────────────────────────────────────────────
+function ProductoCard({
+  p, isOpen, onToggle, codigos, clientes, codigosLoading, mostrarMargen, tab, onTab,
+}: {
+  p: ProductoNivel1;
+  isOpen: boolean;
+  onToggle: () => void;
+  codigos: ProductoCodigo[] | undefined;
+  clientes: ClienteDeProducto[] | null | undefined;
+  codigosLoading: boolean;
+  /** false con un cliente puesto: no hay margen por cliente (ver la cabecera). */
+  mostrarMargen: boolean;
+  tab: DrillTab;
+  onTab: (t: DrillTab) => void;
+}) {
+  return (
+    <li data-tarjeta-producto={p.descripcion} className="rounded-lg border border-gray-200 bg-white">
+      {/* La tarjeta ENTERA es el botón que abre el detalle: en un celular el
+          blanco tocable es la tarjeta, no una flechita de 14 px. */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="flex w-full items-start gap-2 px-3 py-2.5 text-left"
+      >
+        <ChevronRight className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+        <div className="min-w-0 flex-1">
+          <div data-tarjeta-descripcion className="text-sm text-gray-800">{p.descripcion}</div>
+          {/* Dos líneas, dos por dos. `grid-cols-2` y no `flex`: con nombres de
+              largo distinto los valores quedan alineados en columna y se
+              comparan de un vistazo entre tarjetas. */}
+          <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
+            <Dato rotulo="Piezas" col="cantidad">{Math.round(p.cantidad).toLocaleString("en-US")}</Dato>
+            <Dato rotulo="Venta" col="venta">{fmtMoney(p.venta)}</Dato>
+            <Dato rotulo="Precio prom." col="precio">{fmtPrecioProm(precioPromedio(p.venta, p.cantidad))}</Dato>
+            {mostrarMargen && <Dato rotulo="Margen %" col="margen">{fmtMargen(p.margen)}</Dato>}
+          </div>
+        </div>
+      </button>
+      {isOpen && (
+        <div className="border-t border-gray-100 bg-gray-50/60 px-3 py-2">
+          {codigosLoading && <div className="py-2 text-xs text-gray-400">Cargando…</div>}
+          {!codigosLoading && (
+            <>
+              <div className="mb-1 flex gap-1" role="tablist" aria-label="Detalle de la descripción">
+                <DrillTabBtn activa={tab === "clientes"} onClick={() => onTab("clientes")}>
+                  Quién lo compra
+                </DrillTabBtn>
+                <DrillTabBtn activa={tab === "codigos"} onClick={() => onTab("codigos")}>
+                  Códigos{codigos ? ` (${codigos.length})` : ""}
+                </DrillTabBtn>
+              </div>
+              {tab === "clientes" && <BloqueClientes clientes={clientes} />}
+              {tab === "codigos" && <BloqueCodigos codigos={codigos} />}
+            </>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** Un número de la tarjeta con su rótulo encima. `data-col` = el de la tabla. */
+function Dato({ rotulo, col, children }: { rotulo: string; col: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      {/* 11 px sería letra <12 y el candado táctil lo marca. Va en 12. */}
+      <div className="text-xs leading-none text-gray-400">{rotulo}</div>
+      <div data-tarjeta-col={col} className="mt-0.5 font-mono text-sm tabular-nums text-gray-800">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * El chip de ordenar de la vista de tarjetas.
+ *
+ * 44 px de alto, la regla táctil de la casa — y el mismo `toggleSort` que el
+ * encabezado de la tabla: un segundo estado de orden en celular sería un
+ * segundo criterio esperando divergir del primero.
+ */
+function ChipOrden({
+  label, sortKey, active, onClick,
+}: {
+  label: string;
+  sortKey: SortKey;
+  active: { key: SortKey; dir: "asc" | "desc" };
+  onClick: (k: SortKey) => void;
+}) {
+  const isActive = active.key === sortKey;
+  return (
+    <button
+      type="button"
+      data-orden-chip={sortKey}
+      aria-pressed={isActive}
+      onClick={() => onClick(sortKey)}
+      className={`inline-flex min-h-[44px] items-center gap-0.5 rounded-full border px-3 text-xs transition active:scale-[0.97] ${
+        isActive ? "border-gray-800 bg-gray-800 text-white" : "border-gray-200 bg-white text-gray-600"
+      }`}
+    >
+      {label}
+      <span className="w-2">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
+    </button>
   );
 }
 

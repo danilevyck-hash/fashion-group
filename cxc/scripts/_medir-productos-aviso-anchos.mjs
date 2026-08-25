@@ -117,20 +117,64 @@ const SONDA = `(() => {
     montosEjemplos: cortesTexto.slice(0, 3),
     letraChica: letraChica.length,
     letraEjemplos: letraChica.slice(0, 3),
-    filas: document.querySelectorAll("tr[data-fila-producto]").length,
-    // 🔑 EL ALTO SE MIDE EN LA TABLA Y EN LA PÁGINA. Sacar el aviso quita un
-    // <p> de debajo del nombre en cada fila que lo tenía: la tabla acorta y la
-    // página con ella. El alto de la PRIMERA fila es la prueba fina — a 390 px
-    // el aviso la partía en dos líneas.
+    // 🩸 SE CUENTA LO QUE SE VE, NO LO QUE ESTA EN EL DOM. Desde el
+    // 25-ago-2026 en celular hay TARJETAS y no tabla, y los DOS layouts estan
+    // montados siempre (el CSS esconde uno). Dos trampas, las dos pisadas:
+    //   · contar solo el tr[data-fila-producto] daba 0 a 390 px -> el veredicto
+    //     seria SIN-DATOS y la medicion del iPhone dejaria de existir;
+    //   · contar los dos sin filtrar por visibilidad daba 40 donde hay 20 ->
+    //     "la tabla gano filas", que es igual de mentiroso.
+    filas: [...document.querySelectorAll("tr[data-fila-producto], li[data-tarjeta-producto]")]
+      .filter(visible).length,
+    filasTabla: [...document.querySelectorAll("tr[data-fila-producto]")].filter(visible).length,
+    tarjetas: [...document.querySelectorAll("li[data-tarjeta-producto]")].filter(visible).length,
+    // Cual de los dos layouts esta VISIBLE en este ancho. Se pregunta por
+    // data-vista (FIJO) y por el alto real, nunca por la clase del corte.
+    vistaVisible: [...document.querySelectorAll("[data-vista]")]
+      .filter(el => el.getBoundingClientRect().height > 0)
+      .map(el => el.getAttribute("data-vista")).join(","),
+    // Los criterios de orden que se pueden tocar en este ancho: en la tabla son
+    // los encabezados; en celular, los chips.
+    ordenDisponible: [
+      ...new Set([
+        ...[...document.querySelectorAll("[data-orden-chip]")]
+          .filter(el => el.getBoundingClientRect().height > 0)
+          .map(el => el.getAttribute("data-orden-chip")),
+        ...[...document.querySelectorAll("thead th button")]
+          .filter(el => el.getBoundingClientRect().height > 0)
+          .map(el => (el.textContent ?? "").replace(/[▼▲]/g, "").trim()),
+      ]),
+    ].join(" · "),
+    // 🔑 EL ALTO SE MIDE EN LA TABLA Y EN LA PAGINA. Sacar el aviso quita un
+    // parrafo de debajo del nombre en cada fila que lo tenia: la tabla acorta y
+    // la pagina con ella. El alto de la PRIMERA fila es la prueba fina.
     altoPaginaPx: document.documentElement.scrollHeight,
-    altoTablaPx: Math.round(document.querySelector("tr[data-fila-producto]")?.closest("table")?.getBoundingClientRect().height ?? 0),
-    altoPrimeraFilaPx: Math.round(document.querySelector("tr[data-fila-producto]")?.getBoundingClientRect().height ?? 0),
+    // El alto del layout que se VE en este ancho -- la tabla o la lista de
+    // tarjetas -- y el de su primer item. Medir siempre el <table> daria 0 en
+    // celular, donde la tabla existe pero esta escondida.
+    //
+    // 🩸 CON RESPALDO PARA MEDIR origin/main. La rama marca los layouts con
+    // data-vista; main NO lo tiene todavia, y sin respaldo el "antes" daria 0 y
+    // la comparacion antes->despues seria una resta contra la nada. Cuando no
+    // hay data-vista visible se mide el contenedor del primer item que se ve.
+    altoTablaPx: Math.round(
+      (
+        [...document.querySelectorAll("[data-vista]")].filter(visible)[0] ??
+        ([...document.querySelectorAll("tr[data-fila-producto], li[data-tarjeta-producto]")]
+          .filter(visible)[0])?.closest("table, ul")
+      )?.getBoundingClientRect().height ?? 0,
+    ),
+    altoPrimeraFilaPx: Math.round(
+      ([...document.querySelectorAll("tr[data-fila-producto], li[data-tarjeta-producto]")]
+        .filter(visible)[0])?.getBoundingClientRect().height ?? 0,
+    ),
     avisos: document.querySelectorAll("[data-aviso-clasificacion]").length,
     avisoTexto: (document.querySelector("[data-aviso-clasificacion]")?.textContent ?? "").replace(/\\s+/g, " ").trim(),
     avisoColor: document.querySelector("[data-aviso-clasificacion]")
       ? getComputedStyle(document.querySelector("[data-aviso-clasificacion]")).color : null,
     columnasVisibles: cols,
-    primerRenglon: (document.querySelector("tr[data-fila-producto]")?.innerText ?? "")
+    primerRenglon: (([...document.querySelectorAll("tr[data-fila-producto], li[data-tarjeta-producto]")]
+      .filter(visible)[0])?.innerText ?? "")
       .replace(/\\s+/g, " ").trim().slice(0, 100),
   };
 })()`;
@@ -162,7 +206,12 @@ for (const ANCHO of ANCHOS) {
   const r = { ancho: ANCHO };
   try {
     await page.goto(`${BASE}/ventas?tab=productos&empresa=${EMPRESA}`, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForSelector("tr[data-fila-producto]", { timeout: 45000 });
+    // 🩸 `:visible` EN EL SELECTOR, y no `state: "visible"` a secas. Los DOS
+    // layouts están montados siempre; sin el filtro Playwright se queda con el
+    // PRIMER match —un `tr`, escondido a 390 px— y espera 45 s a que se vea
+    // algo que el CSS no va a mostrar nunca. Medido: "resolved to 40 elements"
+    // y timeout, o sea el iPhone quedándose sin medición.
+    await page.waitForSelector("tr[data-fila-producto]:visible, li[data-tarjeta-producto]:visible", { timeout: 45000 });
     await page.waitForTimeout(1500);
     Object.assign(r, await page.evaluate(SONDA));
     await page.screenshot({ path: path.join(SALIDA, `productos-${ETAPA}-${EMPRESA}-${ANCHO}.png`), fullPage: true });
@@ -195,7 +244,8 @@ for (const ANCHO of ANCHOS) {
     `montos✂=${String(r.montosCortados ?? "?").padStart(2)} filas=${String(r.filas ?? "?").padStart(3)} ${r.veredicto}` +
     (r.error ? `  ⚠️ ${r.error}` : ""),
   );
-  console.log(`        avisos=${r.avisos ?? "?"}  alto: página=${r.altoPaginaPx ?? "?"} tabla=${r.altoTablaPx ?? "?"} 1ª fila=${r.altoPrimeraFilaPx ?? "?"}`);
+  console.log(`        avisos=${r.avisos ?? "?"}  vista=${r.vistaVisible ?? "?"}  alto: página=${r.altoPaginaPx ?? "?"} tabla=${r.altoTablaPx ?? "?"} 1ª fila=${r.altoPrimeraFilaPx ?? "?"}`);
+  if (r.ordenDisponible) console.log(`        se puede ordenar por: ${r.ordenDisponible}`);
   if (r.avisoTexto) console.log(`        aviso: "${r.avisoTexto}"  color=${r.avisoColor}`);
   if (r.columnasVisibles) console.log(`        columnas: ${r.columnasVisibles.join(" · ")}`);
   if (r.primerRenglon) console.log(`        1er renglón: ${r.primerRenglon}`);
@@ -230,9 +280,15 @@ if (ETAPA === "despues" && existsSync(otro)) {
   console.log(peor === 0 ? "\n✅ El arrastre NO empeoró en ningún ancho." : `\n❌ empeoró en ${peor} anchos.`);
   if (peor > 0) fallos++;
 
-  // 🔑 SACAR EL AVISO TIENE QUE ACORTAR, y con la MISMA cantidad de filas: si
-  // la tabla acortara porque se perdieron renglones, esto no sería una mejora
-  // sino el peor bug posible. Por eso se exige que `filas` no cambie.
+  // 🔑 ACORTAR TIENE QUE SER POR DIBUJAR MENOS, NO POR PERDER RENGLONES: si la
+  // pantalla achicara porque se cayeron filas, no sería una mejora sino el peor
+  // bug posible. Por eso se exige que `filas` no cambie.
+  //
+  // ⚠️ EL ALTO SÓLO SE COMPARA CUANDO EL LAYOUT ES EL MISMO. Donde antes había
+  // tabla y ahora hay tarjetas (390 px), comparar altos sería comparar dos
+  // formas distintas: una tarjeta con cuatro números ES más alta que una fila
+  // con dos, y eso no es un empeoramiento — es lo que se vino a hacer. Ahí se
+  // informa el cambio de layout y no se juzga el alto.
   console.log("\n=== ¿ACORTÓ? (antes → después, por ancho) ===");
   let creció = 0;
   let filasDistintas = 0;
@@ -242,14 +298,16 @@ if (ETAPA === "despues" && existsSync(otro)) {
     const dTabla = (d.altoTablaPx ?? 0) - (A.altoTablaPx ?? 0);
     const dPag = (d.altoPaginaPx ?? 0) - (A.altoPaginaPx ?? 0);
     const dFila = (d.altoPrimeraFilaPx ?? 0) - (A.altoPrimeraFilaPx ?? 0);
-    if (dTabla > 0 || dPag > 0) creció++;
+    const mismoLayout = (A.vistaVisible ?? "") === (d.vistaVisible ?? "");
+    if (mismoLayout && (dTabla > 0 || dPag > 0)) creció++;
     if (d.filas !== A.filas) filasDistintas++;
     console.log(
       `${String(d.ancho).padStart(4)}px  avisos ${String(A.avisos).padStart(2)} → ${String(d.avisos).padStart(2)}` +
       `  tabla ${String(A.altoTablaPx).padStart(5)} → ${String(d.altoTablaPx).padStart(5)} (${dTabla > 0 ? "+" : ""}${dTabla})` +
       `  página ${String(A.altoPaginaPx).padStart(5)} → ${String(d.altoPaginaPx).padStart(5)} (${dPag > 0 ? "+" : ""}${dPag})` +
       `  1ª fila ${String(A.altoPrimeraFilaPx).padStart(3)} → ${String(d.altoPrimeraFilaPx).padStart(3)} (${dFila > 0 ? "+" : ""}${dFila})` +
-      `  filas ${A.filas} → ${d.filas}${d.filas !== A.filas ? " ❌" : ""}`,
+      `  filas ${A.filas} → ${d.filas}${d.filas !== A.filas ? " ❌" : ""}` +
+      (mismoLayout ? "" : `  ⓘ layout ${A.vistaVisible || "?"} → ${d.vistaVisible || "?"}: el alto no se juzga`),
     );
   }
   if (filasDistintas > 0) { console.log(`\n❌ LA TABLA PERDIÓ FILAS en ${filasDistintas} anchos — acortar así no vale.`); fallos++; }

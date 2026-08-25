@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Verificación por MUTACIÓN de «el aviso de código mal clasificado ya no sale».
+# Verificación por MUTACIÓN de los DOS cambios de Ventas › Productos que van
+# juntos (25-ago-2026): se va el aviso ámbar, y en celular la tabla pasa a
+# TARJETAS. Los dos tocan el mismo archivo y por eso se mutan en el mismo
+# barrido — separar los scripts dejaría a cada uno restaurando media pantalla.
 #
 # ── QUÉ SE RETIRÓ, Y POR QUÉ ────────────────────────────────────────────────
 # La fila de Ventas › Productos decía, en ámbar:
@@ -15,6 +18,14 @@
 #   B) que se caiga LA AGRUPACIÓN POR EL NOMBRE MÁS RECIENTE, que es lo que
 #      hace que el Agua Dana salga en un renglón de 35.305,20 y no en dos. Eso
 #      NO se tocó, y el peor final de este cambio sería llevárselo por delante.
+#
+# ── Y LAS TRES DE LAS TARJETAS (sección D) ─────────────────────────────────
+# A 390 px la tabla sólo dibujaba Descripción · Venta · Margen %. Daniel: *"solo
+# veo sort venta y margen. Quiero ver cantidad también y precio de venta
+# promedio."* Ahora en celular hay tarjetas con los cuatro números. Se muta:
+#   · que la tarjeta pierda las PIEZAS;
+#   · que la tarjeta pierda el PRECIO PROM. — o sea, que el cambio no sirva;
+#   · que en ESCRITORIO se dibuje la tarjeta en vez de la tabla.
 #
 # 🩸 LA RESTAURACIÓN VA POR COPIA, NUNCA CON `git checkout`: hay archivos NUEVOS
 # en la rama y git aborta el comando entero sin restaurar nada, así que las
@@ -179,6 +190,51 @@ probar "C15 · la migración pisa la función viva (deja de ser aditiva)" "$SQL"
 # 16 · el total de la pantalla deja de ser la suma del nivel 1
 perl -0pi -e 's/const ventaTotal = productos\.reduce\(\(s, p\) => s \+ p\.venta, 0\);/const ventaTotal = productos.slice(1).reduce((s, p) => s + p.venta, 0);/' "$RUTA"
 probar "C16 · el total deja de sumar todas las filas" "$RUTA"
+
+# ── D. QUE LAS TARJETAS DE CELULAR NO CUMPLAN ──────────────────────────────
+#     🔴 Lo que Daniel pidió es VER cantidad y precio promedio en el iPhone. Si
+#     la tarjeta pierde cualquiera de los dos, el cambio no sirvió para nada.
+
+# 17 · la tarjeta pierde las PIEZAS
+perl -0pi -e 's~<Dato rotulo="Piezas" col="cantidad">.*?</Dato>~~s' "$VISTA"
+probar "D17 · la tarjeta pierde las piezas" "$VISTA"
+
+# 18 · la tarjeta pierde el PRECIO PROM.
+perl -0pi -e 's~<Dato rotulo="Precio prom\." col="precio">.*?</Dato>~~s' "$VISTA"
+probar "D18 · la tarjeta pierde el precio promedio" "$VISTA"
+
+# 19 · 🔴 EN ESCRITORIO SE DIBUJA LA TARJETA Y NO LA TABLA. Desde `sm` no se
+#      podía tocar nada: la tabla de siete columnas es la pantalla de siempre.
+perl -0pi -e 's~<div className="sm:hidden">~<div className="block">~' "$VISTA"
+perl -0pi -e 's~className="hidden overflow-x-auto rounded-lg border border-gray-200 sm:block"~className="hidden overflow-x-auto rounded-lg border border-gray-200"~' "$VISTA"
+probar "D19 · en escritorio se dibuja la tarjeta en vez de la tabla" "$VISTA"
+
+# 20 · al revés: en celular vuelve la tabla y las tarjetas no salen nunca
+perl -0pi -e 's~<div className="sm:hidden">~<div className="hidden">~' "$VISTA"
+perl -0pi -e 's~className="hidden overflow-x-auto rounded-lg border border-gray-200 sm:block"~className="overflow-x-auto rounded-lg border border-gray-200"~' "$VISTA"
+probar "D20 · vuelve la tabla en celular y la tarjeta no se dibuja nunca" "$VISTA"
+
+# 21 · la tarjeta estrena su PROPIO formateador (dos pantallas, dos números)
+perl -0pi -e 's~<Dato rotulo="Venta" col="venta">\{fmtMoney\(p\.venta\)\}</Dato>~<Dato rotulo="Venta" col="venta">{`\$\${Math.round(p.venta)}`}</Dato>~' "$VISTA"
+probar "D21 · la tarjeta formatea la venta a su manera (dice otro número que la tabla)" "$VISTA"
+
+# 22 · se pierde el ORDEN en celular: sin encabezado no hay dónde tocar
+perl -0pi -e 's~<ChipOrden label="Piezas" sortKey="cantidad" active=\{sort\} onClick=\{toggleSort\} />~~' "$VISTA"
+probar "D22 · en celular ya no se puede ordenar por piezas" "$VISTA"
+
+# 23 · el chip de orden estrena su PROPIO estado (dos criterios que divergen)
+perl -0pi -e 's~<ChipOrden label="Precio prom\." sortKey="precio" active=\{sort\} onClick=\{toggleSort\} />~<ChipOrden label="Precio prom." sortKey="precio" active={{ key: "venta", dir: "desc" }} onClick={() => {}} />~' "$VISTA"
+probar "D23 · el chip de orden deja de mover el orden de verdad" "$VISTA"
+
+# 24 · el desplegable deja de abrirse desde la tarjeta
+perl -0pi -e 's~\{isOpen && \(\n        <div className="border-t border-gray-100 bg-gray-50/60 px-3 py-2">~{false \&\& (\n        <div className="border-t border-gray-100 bg-gray-50/60 px-3 py-2">~' "$VISTA"
+probar "D24 · el desplegable no abre desde la tarjeta" "$VISTA"
+
+# 25 · 🩸 `data-vista` DEJA DE SER FIJO y pasa a nombrar el breakpoint. Es la
+#      mutación que este repo ya pagó: un medidor que busca el layout por su
+#      clase compara CERO celdas y pasa en verde sin haber mirado nada.
+perl -0pi -e 's~data-vista="tarjetas"~data-vista="sm-hidden"~' "$VISTA"
+probar "D25 · el ancla del layout deja de ser fija" "$VISTA"
 
 echo
 echo "cazadas: $cazadas · sobrevividas: $sobrevividas"
