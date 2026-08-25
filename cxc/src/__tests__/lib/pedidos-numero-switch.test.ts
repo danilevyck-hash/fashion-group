@@ -143,7 +143,6 @@ describe("🔴 el GET /orders manda en_switch y switch_numero", () => {
         productsTable: "products",
         itemsRelation: "reebok_order_items",
         ordersSelectExtra: "",
-        listaFiltraDeleted: false,
         bultoSize: 12,
         categoryLookup: null,
         fallbackCategory: undefined,

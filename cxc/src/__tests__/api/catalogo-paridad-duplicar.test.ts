@@ -735,8 +735,8 @@ describe("🔴 candado: una sola resolución del vendedor", () => {
     const orders = LEER(ARCHIVOS.orders).replace(/\/\/.*$/gm, "");
     expect(orders).toContain("body.duplicar_de");
     expect(orders).not.toMatch(/body\.vendedor_switch_id|body\.vendedor_id/);
-    const lista = LEER("src/components/catalogo/PedidosListClient.tsx").replace(/\/\/.*$/gm, "");
-    expect(lista).toContain("duplicar_de: order.id");
+    const lista = LEER("src/components/catalogo/ComprobantesPanel.tsx").replace(/\/\/.*$/gm, "");
+    expect(lista).toContain("duplicar_de: pedido.id_natural");
     expect(lista).not.toMatch(/vendedor_switch_id|vendedor_id/);
   });
 });

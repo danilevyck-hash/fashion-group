@@ -8,28 +8,33 @@
 // marca, tocar «Administrar» y recién ahí la pestaña: CUATRO toques para ver la
 // lista de lo que uno acaba de mandar.
 //
-// 🩸 Y EL BOTÓN NO PUEDE SER UNO SOLO, porque la confirmación NO la ve un solo
-// rol. La ven los tres que pueden armar pedidos (`createRoles` = admin,
-// secretaria y vendedor) y `/catalogos/admin/<marca>` es de
-// `CATALOGO_ADMIN_ROLES` (admin + secretaria): mandar ahí a un vendedor es
-// mandarlo a una pantalla cuyas peticiones mueren en 403 en el servidor. El
-// vendedor tiene SU lista —`/catalogo/<marca>/pedidos`, la de siempre— y ahí
-// va, con el nombre que esa pantalla ya usa.
+// 🔴 Y DESDE EL 25-ago-2026 EL BOTÓN SÍ ES UNO SOLO — porque la pantalla es
+// una sola. Antes esto tenía que bifurcar: la lista del admin
+// (`/catalogos/admin/<marca>?tab=pedidos`) le respondía 403 al vendedor en el
+// servidor, así que mandarlo ahí era mandarlo a una pantalla en ceros. Ahora
+// los comprobantes viven en `/catalogo/<marca>/pedidos`, a la que llegan los
+// TRES roles que arman pedidos (`createRoles` = admin, secretaria y vendedor),
+// y lo que cada uno puede hacer adentro lo decide su rol.
 //
-// Por eso el destino y su rótulo salen del MISMO lugar: un `href` y un `label`
-// que se separen es exactamente un botón que dice una cosa y lleva a otra.
+// La función SIGUE recibiendo el rol y sigue existiendo: es el candado de que
+// nadie vuelva a mandar a un vendedor al panel de administrar. Lo que cambió es
+// que ahora los tres van al mismo lado, y `esPanelAdmin` es false SIEMPRE.
+//
+// El destino y su rótulo salen del MISMO lugar: un `href` y un `label` que se
+// separen es exactamente un botón que dice una cosa y lleva a otra.
 //
 // Módulo PURO: no importa React. Lo usan la confirmación y sus candados.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { CATALOGO_ADMIN_ROLES } from "./roles";
-import { PANEL_COMPROBANTES, TAB_COMPROBANTES_KEY } from "./numeros-pedido";
+import { PANEL_COMPROBANTES } from "./numeros-pedido";
 
 /** Lo mínimo del tema de la marca para saber a dónde ir. */
 export interface RutasDeMarca {
   /** `/catalogo/<marca>/pedidos` — la lista que ve cualquiera que arma pedidos. */
   pedidosHref: string;
-  /** `/catalogos/admin/<marca>` — solo admin y secretaria. */
+  /** `/catalogos/admin/<marca>` — el panel de FOTOS, solo admin y secretaria.
+   *  Ya NO es destino de esta función; se conserva porque el tema de la marca
+   *  lo expone y el candado comprueba que nadie vuelva a apuntar acá. */
   adminHref: string;
 }
 
@@ -40,27 +45,21 @@ export interface DestinoLista {
   esPanelAdmin: boolean;
 }
 
-/** «Ver comprobantes» — el panel del admin, que es el que cambió de nombre. */
+/** «Ver comprobantes» — la pantalla, que es una sola para todos. */
 export const BOTON_COMPROBANTES = `Ver ${PANEL_COMPROBANTES.toLowerCase()}`;
 
-/** «Ver pedidos» — la lista del vendedor, que se sigue llamando Pedidos. */
-export const BOTON_PEDIDOS = "Ver pedidos";
+/** Nombre viejo del rótulo del vendedor. Hoy los dos dicen lo mismo. */
+export const BOTON_PEDIDOS = BOTON_COMPROBANTES;
 
 /**
- * A dónde lleva el botón de la confirmación, según el rol de la sesión.
+ * A dónde lleva el botón de la confirmación. Desde que los comprobantes son UNA
+ * pantalla, los tres roles van al mismo lado y el rótulo es el mismo.
  *
- * 🔴 El default es la lista NO-admin: un rol desconocido (o una sesión sin
- * `cxc_role` todavía leído) va a la pantalla que no da 403. El modo de fallo
- * aceptable es mandar a alguien a una lista que puede ver, nunca a una que le
- * va a rebotar.
+ * 🔴 Sigue recibiendo el rol A PROPÓSITO: es lo que deja escrito —y medible—
+ * que NINGÚN rol, ni el admin, se va al panel de administrar. `esPanelAdmin`
+ * false para todos es el invariante que el candado exige.
  */
-export function destinoLista(rutas: RutasDeMarca, role: string | null | undefined): DestinoLista {
-  const esAdmin = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(String(role ?? ""));
-  return esAdmin
-    ? {
-        href: `${rutas.adminHref}?tab=${TAB_COMPROBANTES_KEY}`,
-        label: BOTON_COMPROBANTES,
-        esPanelAdmin: true,
-      }
-    : { href: rutas.pedidosHref, label: BOTON_PEDIDOS, esPanelAdmin: false };
+export function destinoLista(rutas: RutasDeMarca, _role?: string | null): DestinoLista {
+  void _role;
+  return { href: rutas.pedidosHref, label: BOTON_COMPROBANTES, esPanelAdmin: false };
 }

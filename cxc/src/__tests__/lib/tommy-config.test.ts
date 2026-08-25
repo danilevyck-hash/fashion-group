@@ -69,8 +69,11 @@ describe("MARCAS_CONFIG.tommy — modelo Joybees, tablas tommy_*", () => {
     expect(cfg.sortEmailItems).toBeNull();
   });
 
-  it("modelo Joybees: lista filtra deleted, roles sin 'cliente' legacy", () => {
-    expect(cfg.listaFiltraDeleted).toBe(true);
+  it("modelo Joybees: roles sin 'cliente' legacy (el filtro de borrados ya no es por marca)", () => {
+    // `listaFiltraDeleted` se retiró el 25-ago-2026: la lista filtra los
+    // borrados SIEMPRE, en las 4 marcas. Que no exista se exige en
+    // `pedidos-una-sola-pantalla.test.ts`, que además lee la ruta.
+    expect("listaFiltraDeleted" in cfg).toBe(false);
     expect(cfg.createRoles).toEqual(["admin", "secretaria", "vendedor"]);
     expect(cfg.products.authStyle).toBe("roles-modulo");
     expect(cfg.products.editVerb).toBe("POST");

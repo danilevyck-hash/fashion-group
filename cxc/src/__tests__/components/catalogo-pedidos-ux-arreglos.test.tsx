@@ -25,7 +25,7 @@ import { render, screen, cleanup, fireEvent, waitFor, act, within } from "@testi
 import PedidosListClient from "@/components/catalogo/PedidosListClient";
 import CatalogoVendedorPage from "@/components/catalogo/CatalogoVendedorPage";
 import CatalogoStickyCartBar from "@/components/catalogo/CatalogoStickyCartBar";
-import PedidosTab, { type UnifiedPedido } from "@/app/catalogos/admin/[marca]/PedidosTab";
+import ComprobantesPanel, { type UnifiedPedido } from "@/components/catalogo/ComprobantesPanel";
 import { MARCAS_UI } from "@/lib/catalogo/marcas-ui";
 
 const PUSH = vi.fn();
@@ -108,8 +108,14 @@ const deletes = () => llamadas.filter((l) => l.method === "DELETE");
 
 async function abrirBorrado() {
   render(<PedidosListClient marca="reebok" />);
+  // 🔴 Desde que hay UNA sola pantalla, el panel abre en el chip «Pedidos» y
+  // PED-021 es `status='borrador'`: hay que tocar su chip para verlo. No es un
+  // rodeo del candado — es la pantalla que Daniel pidió (#608), y que el
+  // borrado siga funcionando DESDE AHÍ es justamente lo que hay que probar.
+  await waitFor(() => expect(screen.getByRole("button", { name: /Borradores/ })).toBeTruthy());
+  fireEvent.click(screen.getByRole("button", { name: /Borradores/ }));
   await waitFor(() => expect(screen.getByText("PED-021")).toBeTruthy());
-  fireEvent.click(document.querySelector('button[title="Eliminar"]')!);
+  fireEvent.click(screen.getByRole("button", { name: "Eliminar" }));
   // ConfirmDeleteModal habilita el botón rojo recién al segundo.
   const confirmar = await waitFor(() => {
     const b = document.querySelector<HTMLButtonElement>("button.bg-red-600");
@@ -390,7 +396,7 @@ describe("🔴 7. la fila y su botón «Editar» llevan al MISMO lado", () => {
   it("«Del link»: tocar la fila convierte y abre el detalle INTERNO (no la vista del cliente)", async () => {
     redAdmin();
     const { container } = render(
-      <PedidosTab marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} />,
+      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
     );
     await act(async () => { fireEvent.click(filaDe(container, "Nathalie")); });
     await waitFor(() => expect(PUSH).toHaveBeenCalledWith("/catalogo/reebok/pedido/o-nuevo"));
@@ -402,7 +408,7 @@ describe("🔴 7. la fila y su botón «Editar» llevan al MISMO lado", () => {
   it("la fila hace EXACTAMENTE lo mismo que el botón Editar de esa fila", async () => {
     redAdmin();
     const { container } = render(
-      <PedidosTab marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} />,
+      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
     );
     await act(async () => { fireEvent.click(filaDe(container, "Nathalie")); });
     await waitFor(() => expect(PUSH).toHaveBeenCalled());
@@ -413,7 +419,7 @@ describe("🔴 7. la fila y su botón «Editar» llevan al MISMO lado", () => {
     PUSH.mockClear();
     redAdmin();
     const r2 = render(
-      <PedidosTab marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} />,
+      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
     );
     const btn = within(filaDe(r2.container, "Nathalie")).getByRole("button", { name: "Editar" });
     await act(async () => { fireEvent.click(btn); });
@@ -425,7 +431,7 @@ describe("🔴 7. la fila y su botón «Editar» llevan al MISMO lado", () => {
   it("interno: la fila abre su detalle directo, sin pasar por convertir", async () => {
     redAdmin();
     const { container } = render(
-      <PedidosTab marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} />,
+      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
     );
     await act(async () => { fireEvent.click(filaDe(container, "Sporting Shoes")); });
     expect(PUSH).toHaveBeenCalledWith("/catalogo/reebok/pedido/PED-021");

@@ -267,7 +267,7 @@ describe("candados estáticos", () => {
   });
 
   it("los dos caminos de Duplicar pasan por el MISMO mini-modal", () => {
-    expect(SRC("src/components/catalogo/PedidosListClient.tsx")).toContain("DuplicarPedidoModal");
+    expect(SRC("src/components/catalogo/ComprobantesPanel.tsx")).toContain("DuplicarPedidoModal");
     expect(SRC("src/components/catalogo/PedidoDetalleClient.tsx")).toContain("DuplicarPedidoModal");
     // El POST de "Duplicar y corregir" manda el nombre elegido en el body.
     expect(SRC("src/components/catalogo/PedidoDetalleClient.tsx")).toMatch(
@@ -286,7 +286,7 @@ describe("candados estáticos", () => {
     // función que dibuja el texto en pantalla (una sola fuente).
     expect(modal).toMatch(/onElegir\(nombreDeCliente\(cliente\), cliente\)/);
     // Y ningún padre le pasa el nombre del pedido viejo.
-    for (const p of ["PedidosListClient", "PedidoDetalleClient"]) {
+    for (const p of ["ComprobantesPanel", "PedidoDetalleClient"]) {
       expect(SRC(`src/components/catalogo/${p}.tsx`)).not.toContain("nombreInicial");
     }
   });
@@ -304,7 +304,7 @@ describe("candados estáticos", () => {
     expect(modal).toMatch(/disabled=\{duplicando \|\| !cliente\}/);
     // Los dos padres siguen recibiendo la elección por onElegir (el contrato no
     // cambió): el paso nuevo vive DENTRO del modal, uno solo para los dos.
-    for (const p of ["PedidosListClient", "PedidoDetalleClient"]) {
+    for (const p of ["ComprobantesPanel", "PedidoDetalleClient"]) {
       const src = SRC(`src/components/catalogo/${p}.tsx`);
       expect(src).toMatch(/onElegir=\{/);
       expect(src).not.toMatch(/onConfirm=\{[^}]*[Dd]uplic/);
@@ -329,7 +329,7 @@ describe("candados estáticos", () => {
   it("los DOS caminos mandan el cliente de Switch elegido al servidor", () => {
     // Lista → POST /orders ; detalle → POST /duplicar. Si alguno dejara de
     // mandarlo, el pedido nacería en Contado aunque la pantalla mostrara otro.
-    expect(SRC("src/components/catalogo/PedidosListClient.tsx")).toMatch(
+    expect(SRC("src/components/catalogo/ComprobantesPanel.tsx")).toMatch(
       /\$\{theme\.api\}\/orders[\s\S]{0,800}cliente_switch_id/,
     );
     expect(SRC("src/components/catalogo/PedidoDetalleClient.tsx")).toMatch(

@@ -25,9 +25,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
-import PedidosTab, { type UnifiedPedido } from "@/app/catalogos/admin/[marca]/PedidosTab";
+import ComprobantesPanel, { type UnifiedPedido } from "@/components/catalogo/ComprobantesPanel";
 import ConfirmacionClient from "@/components/catalogo/ConfirmacionClient";
 import { type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { destinoLista } from "@/lib/catalogo/destino-comprobantes";
 
 const ROUTER = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() };
 vi.mock("next/navigation", () => ({
@@ -123,7 +124,7 @@ const TODAS = [PEDIDO, PEDIDO_2, COTIZACION, BORRADOR_EN_SWITCH, BORRADOR, CONFI
 
 function pintarTab(pedidos: UnifiedPedido[], marca: MarcaUiKey = "reebok") {
   return render(
-    <PedidosTab marca={marca} pedidos={pedidos} onRefresh={async () => {}} showToast={vi.fn()} />,
+    <ComprobantesPanel marca={marca} pedidos={pedidos} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
   );
 }
 
@@ -399,44 +400,52 @@ function stubConfirmacion(envio: Record<string, unknown> | null) {
 
 const EN_SWITCH = { estado: "verificado", numero_interno: "16-000000503", pedido_switch_id: 7, error_detalle: null, documento: "pedido" };
 
-describe("🔴 la confirmación llega a la lista en UN toque, y cada rol a la suya", () => {
-  for (const marca of MARCAS) {
-    it(`${marca}: admin → «Ver comprobantes» al panel, con ?tab=pedidos`, async () => {
-      sessionStorage.setItem("cxc_role", "admin");
-      stubConfirmacion(EN_SWITCH);
-      render(<ConfirmacionClient marca={marca} orderId={OID} />);
-      const link = (await screen.findByRole("link", { name: "Ver comprobantes" })) as HTMLAnchorElement;
-      expect(link).toBeTruthy();
-      expect(link.getAttribute("href")).toBe(`/catalogos/admin/${marca}?tab=pedidos`);
-    });
+describe("🔴 la confirmación llega a la lista en UN toque — y AHORA A LA MISMA", () => {
+  // ── Antes de hoy este bloque fijaba una BIFURCACIÓN: admin y secretaria iban
+  // a `/catalogos/admin/<marca>?tab=pedidos` y el vendedor a
+  // `/catalogo/<marca>/pedidos`, porque eran DOS pantallas y la del admin le
+  // respondía 403 al vendedor.
+  //
+  // El 25-ago-2026 quedó UNA sola pantalla, así que la bifurcación se fue. Lo
+  // que este candado exige ahora es MÁS FUERTE, no menos: que los TRES roles
+  // lleguen al MISMO lado, que ese lado sea el que ninguno de los tres rebota,
+  // y que NINGÚN rol —el admin incluido— quede apuntando a `/catalogos/admin/`,
+  // que es el panel de FOTOS y no tiene comprobantes adentro.
 
-    it(`${marca}: VENDEDOR → «Ver pedidos», NUNCA a /catalogos/admin/`, async () => {
-      sessionStorage.setItem("cxc_role", "vendedor");
-      stubConfirmacion(EN_SWITCH);
-      render(<ConfirmacionClient marca={marca} orderId={OID} />);
-      const link = (await screen.findByRole("link", { name: "Ver pedidos" })) as HTMLAnchorElement;
-      expect(link.getAttribute("href")).toBe(`/catalogo/${marca}/pedidos`);
-      expect(screen.queryByRole("link", { name: "Ver comprobantes" })).toBeNull();
-      // El 403 que este candado existe para impedir.
-      for (const a of document.querySelectorAll("a")) {
-        expect(a.getAttribute("href") || "").not.toContain("/catalogos/admin/");
-      }
-    });
+  for (const marca of MARCAS) {
+    for (const rol of ["admin", "secretaria", "vendedor"]) {
+      it(`${marca} · ${rol}: «Ver comprobantes» → /catalogo/${marca}/pedidos`, async () => {
+        sessionStorage.setItem("cxc_role", rol);
+        stubConfirmacion(EN_SWITCH);
+        render(<ConfirmacionClient marca={marca} orderId={OID} />);
+        const link = (await screen.findByRole("link", { name: "Ver comprobantes" })) as HTMLAnchorElement;
+        expect(link.getAttribute("href")).toBe(`/catalogo/${marca}/pedidos`);
+        // 🩸 Nadie queda apuntado al panel de administrar — ni el admin.
+        for (const a of document.querySelectorAll("a")) {
+          expect(a.getAttribute("href") || "").not.toContain("/catalogos/admin/");
+        }
+      });
+    }
   }
 
-  it("secretaria va al panel igual que admin (CATALOGO_ADMIN_ROLES)", async () => {
-    sessionStorage.setItem("cxc_role", "secretaria");
+  it("🩸 sin rol en la sesión: mismo destino, no uno peor", async () => {
     stubConfirmacion(EN_SWITCH);
     render(<ConfirmacionClient marca="reebok" orderId={OID} />);
     const link = (await screen.findByRole("link", { name: "Ver comprobantes" })) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/catalogos/admin/reebok?tab=pedidos");
+    expect(link.getAttribute("href")).toBe("/catalogo/reebok/pedidos");
   });
 
-  it("🩸 sin rol en la sesión NO se apunta al admin (iría a un 403)", async () => {
-    stubConfirmacion(EN_SWITCH);
-    render(<ConfirmacionClient marca="reebok" orderId={OID} />);
-    const link = (await screen.findByRole("link", { name: "Ver pedidos" })) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/catalogo/reebok/pedidos");
+  it("los tres roles reciben EXACTAMENTE el mismo destino y el mismo rótulo", async () => {
+    const vistos = new Set<string>();
+    for (const rol of ["admin", "secretaria", "vendedor", "bodega", ""]) {
+      const d = destinoLista(
+        { pedidosHref: "/catalogo/reebok/pedidos", adminHref: "/catalogos/admin/reebok" },
+        rol,
+      );
+      expect(d.esPanelAdmin).toBe(false);
+      vistos.add(`${d.href}|${d.label}`);
+    }
+    expect(vistos.size).toBe(1);
   });
 
   it("el botón está TAMBIÉN cuando el pedido todavía no salió (es un borrador de la lista)", async () => {

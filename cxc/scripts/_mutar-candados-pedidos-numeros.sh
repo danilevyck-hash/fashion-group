@@ -17,7 +17,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 LIB=src/lib/catalogo/numeros-pedido.ts
-TAB='src/app/catalogos/admin/[marca]/PedidosTab.tsx'
+TAB='src/components/catalogo/ComprobantesPanel.tsx'
 RUTA='src/app/api/catalogo/[marca]/pedidos-unificado/route.ts'
 
 CANDADOS=(
@@ -117,7 +117,7 @@ mutar "el buscador vuelve a mirar SOLO el cliente" "$LIB" \
   '  return [p.cliente ?? "", p.numeroPedido ?? "", p.switchNumero ?? ""].join(" ").toLowerCase();' \
   '  return String(p.cliente ?? "").toLowerCase();'
 
-# ── La pantalla (PedidosTab.tsx) ─────────────────────────────────────────────
+# ── La pantalla (ComprobantesPanel.tsx) ─────────────────────────────────────────────
 
 mutar "🔴 la fila deja de dibujar los números" "$TAB" \
   '                    <NumerosPedido pedido={pedido} esOrders={isOrdersRow(pedido)} />' \

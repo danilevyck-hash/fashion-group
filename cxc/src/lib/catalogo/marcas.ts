@@ -185,9 +185,8 @@ export interface MarcaConfig {
   exportTitulo: string;
 
   // ── QUIRKS de negocio heredados (unificar con OK de Daniel) ──
-  /** QUIRK 1: la lista GET /orders de Joybees filtra deleted=false en la
-   *  query; la de Reebok NO filtra (comportamiento pre-refactor). */
-  listaFiltraDeleted: boolean;
+  // (el flag `listaFiltraDeleted` se retiró el 25-ago-2026: valía `true` en 4 de
+  // 4 marcas — un interruptor muerto. La lista SIEMPRE filtra los borrados.)
   /** QUIRK 2: Reebok aún acepta el rol legacy 'cliente' al crear pedidos. */
   createRoles: string[];
   /** QUIRK 3 (resuelto en roles el 27-jul-2026): el Storage sigue siendo
@@ -306,7 +305,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     ordersSelectExtra: ", origen_original, origen_short_id",
     exportCols: "origen, cliente, vendor, items, total, created_at",
     exportTitulo: "REEBOK — Pedidos",
-    listaFiltraDeleted: false, // quirk heredado, unificar con OK de Daniel
     createRoles: ["admin", "secretaria", "vendedor", "cliente"], // quirk heredado ('cliente' legacy)
     upload: { roles: catalogoAdminRoles(), storage: "marca", pathPrefix: STORAGE_PREFIX.reebok },
     telegramEmoji: "🛒",
@@ -390,7 +388,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     ordersSelectExtra: "",
     exportCols: "origen, cliente, vendor, items, created_at",
     exportTitulo: "JOYBEES — Pedidos",
-    listaFiltraDeleted: true,
     createRoles: ["admin", "secretaria", "vendedor"],
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.joybees },
     telegramEmoji: "🐝",
@@ -476,7 +473,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     ordersSelectExtra: "",
     exportCols: "origen, cliente, vendor, items, created_at",
     exportTitulo: "TOMMY HILFIGER — Pedidos",
-    listaFiltraDeleted: true,
     createRoles: ["admin", "secretaria", "vendedor"],
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.tommy },
     telegramEmoji: "🔵",
@@ -564,7 +560,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     ordersSelectExtra: "",
     exportCols: "origen, cliente, vendor, items, created_at",
     exportTitulo: "CALVIN KLEIN — Pedidos",
-    listaFiltraDeleted: true,
     createRoles: ["admin", "secretaria", "vendedor"],
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.calvin },
     telegramEmoji: "⚫",

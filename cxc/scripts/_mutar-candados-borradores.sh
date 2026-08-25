@@ -33,7 +33,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 REGLA=src/lib/catalogo/numeros-pedido.ts
-TAB='src/app/catalogos/admin/[marca]/PedidosTab.tsx'
+TAB='src/components/catalogo/ComprobantesPanel.tsx'
 RUTA='src/app/api/catalogo/[marca]/pedidos-unificado/route.ts'
 
 CANDADOS=(

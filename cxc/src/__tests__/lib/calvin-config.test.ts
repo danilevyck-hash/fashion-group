@@ -84,8 +84,9 @@ describe("MARCAS_CONFIG.calvin — modelo Tommy, tablas calvin_*", () => {
     expect(cfg.sortEmailItems).toBeNull();
   });
 
-  it("modelo Joybees/Tommy: lista filtra deleted, roles sin 'cliente' legacy", () => {
-    expect(cfg.listaFiltraDeleted).toBe(true);
+  it("modelo Joybees/Tommy: roles sin 'cliente' legacy (el filtro de borrados ya no es por marca)", () => {
+    // Ver la nota gemela en tommy-config.test.ts.
+    expect("listaFiltraDeleted" in cfg).toBe(false);
     expect(cfg.createRoles).toEqual(["admin", "secretaria", "vendedor"]);
     expect(cfg.products.authStyle).toBe("roles-modulo");
     expect(cfg.products.editVerb).toBe("POST");

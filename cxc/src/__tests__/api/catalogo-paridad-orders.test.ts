@@ -163,11 +163,21 @@ describe("GET /orders — lista", () => {
     expect(chain._calls.eq).toContainEqual(["deleted", false]);
   });
 
-  it("DIVERGENCIA actual: la lista reebok NO filtra deleted en la query (joybees sí)", async () => {
+  // 🔴 25-ago-2026 — LA DIVERGENCIA SE ACABÓ, Y ESTE CANDADO LA DENUNCIÓ.
+  // Este test congelaba el quirk: reebok NO filtraba `deleted` y joybees sí.
+  // Medido contra producción, eso hacía que la pantalla listara **27** filas
+  // donde el panel del admin mostraba 19 — 8 pedidos YA BORRADOS, y TRES de
+  // ellos todavía en Switch (PED-005, PED-008, PED-009). Daniel dio el OK para
+  // unificar, así que el test se INVIERTE: ahora exige lo contrario, en las dos
+  // marcas, que es lo único que impide que el quirk vuelva por descuido.
+  it("las DOS listas filtran los borrados — no hay marca exenta", async () => {
     reebokDb.queue("reebok_orders", { data: [] });
     await rListGet(makeReq("/x", { role: "admin" }));
-    const chain = reebokDb.chainsFor("reebok_orders")[0];
-    expect(chain._calls.eq ?? []).not.toContainEqual(["deleted", false]);
+    expect(reebokDb.chainsFor("reebok_orders")[0]._calls.eq ?? []).toContainEqual(["deleted", false]);
+
+    joybeesDb.queue("joybees_orders", { data: [] });
+    await jListGet(makeReq("/x", { role: "admin" }));
+    expect(joybeesDb.chainsFor("joybees_orders")[0]._calls.eq ?? []).toContainEqual(["deleted", false]);
   });
 });
 

@@ -16,7 +16,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import {
   ESTADOS_EN_SWITCH,
+  normalizarDocumento,
   palabraEnSwitch,
+  type DocumentoSwitch,
   type EnvioParaPalabra,
 } from "@/lib/catalogo/documento-switch";
 
@@ -83,19 +85,62 @@ export async function numerosSwitchPorPedido(
   orderIds: string[],
 ): Promise<Map<string, string | null>> {
   const fuera = new Map<string, string | null>();
+  for (const [id, envio] of await enviosActivosPorPedido(db, enviosTable, orderIds)) {
+    fuera.set(id, envio.numero);
+  }
+  return fuera;
+}
+
+/** El envío ACTIVO de un pedido: su número y QUÉ se mandó. */
+export interface EnvioActivoDePedido {
+  /** `numero_interno` (o el id de Switch). Null = activo pero sin número. */
+  numero: string | null;
+  /** 'pedido' | 'cotizacion'. Ausencia ⇒ 'pedido' (`normalizarDocumento`). */
+  documento: DocumentoSwitch;
+}
+
+/**
+ * ── 🔴 EL NÚMERO Y LA PALABRA VIAJAN JUNTOS (25-ago-2026) ──
+ *
+ * Igual que `numerosSwitchPorPedido`, pero devuelve además si lo que salió fue
+ * un PEDIDO o una COTIZACIÓN. Se separaron el día que la lista del vendedor no
+ * traía `documento`: TOM-027 —una cotización REAL contra producción, A-Amani
+ * S.A. #15-000000123— se leía ahí como un pedido más, y **una cotización no
+ * aparta mercancía**. Quien la viera en la lista creería tener la mercancía
+ * guardada. El número solo no alcanza: las dos se ven idénticas.
+ *
+ * Escalón TOLERANTE por la DDL `20260824160000`: si la columna `documento` no
+ * existe todavía se relee sin ella y todo queda como antes — pedido —, que es
+ * lo único que el sistema sabía crear antes del 24-ago-2026.
+ */
+export async function enviosActivosPorPedido(
+  db: SupabaseClient,
+  enviosTable: string,
+  orderIds: string[],
+): Promise<Map<string, EnvioActivoDePedido>> {
+  const fuera = new Map<string, EnvioActivoDePedido>();
   if (orderIds.length === 0) return fuera;
-  const { data, error } = await db
-    .from(enviosTable)
-    .select("order_id, numero_interno, pedido_switch_id")
-    .in("order_id", orderIds)
-    .in("estado", ["enviado", "verificado"]);
-  // Tabla ausente (DDL pendiente) u otro error → nadie queda en "Pedidos a
-  // Switch". Fail-open hacia Borradores: es la lectura conservadora, y el
-  // candado de edición usa la misma tolerancia.
-  if (error || !data) return fuera;
-  for (const e of data) {
-    const num = e.numero_interno || e.pedido_switch_id;
-    fuera.set(String(e.order_id), num ? String(num) : null);
+  for (const cols of [
+    "order_id, numero_interno, pedido_switch_id, documento",
+    "order_id, numero_interno, pedido_switch_id",
+  ]) {
+    const { data, error } = await db
+      .from(enviosTable)
+      .select(cols)
+      .in("order_id", orderIds)
+      .in("estado", ["enviado", "verificado"]);
+    // Tabla ausente (DDL pendiente) u otro error → nadie queda en "Pedidos a
+    // Switch". Fail-open hacia Borradores: es la lectura conservadora, y el
+    // candado de edición usa la misma tolerancia.
+    if (error || !data) continue;
+    for (const fila of data as unknown as Record<string, unknown>[]) {
+      const num = fila.numero_interno || fila.pedido_switch_id;
+      fuera.set(String(fila.order_id), {
+        numero: num ? String(num) : null,
+        documento: normalizarDocumento(fila.documento),
+      });
+    }
+    return fuera;
   }
   return fuera;
 }
