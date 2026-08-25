@@ -31,6 +31,7 @@ import {
   etiquetaOrden,
   type RiskFilter,
 } from "@/lib/cxc-orden";
+import { AGING, tramoLabel } from "@/lib/cxc-aging";
 
 // "hoy" / "ayer" / "hace N días" — la forma relativa que ya usaba esta pantalla.
 function haceCuanto(fecha: string): string {
@@ -328,28 +329,33 @@ function MobileHero({ total }: { total: number }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Aging chips filtros — Por vencer / Vencido reciente / Vencido crítico
-// (3 buckets de presentación; los 8 buckets de cxc_aging se siguen agregando
-// abajo en el detalle del cliente y la barra muestra el wedge granular).
+// Aging chips filtros — los MISMOS tres tramos, con el MISMO nombre que el
+// escritorio y el papel (3 buckets de presentación; los 8 buckets de cxc_aging
+// se siguen agregando abajo en el detalle del cliente y la barra muestra el
+// wedge granular).
+//
+// 🩸 ACÁ VIVÍA UNA SEGUNDA LISTA DE NOMBRES ("Por vencer" / "Vencido reciente"
+// / "Vencido crítico") escrita a mano, mientras el escritorio rotulaba las
+// MISMAS píldoras con el rango a secas ("0-90d"). Era el mismo botón con dos
+// nombres, y dos listas que nadie podía mantener iguales. Los nombres ahora
+// salen de `cxc-aging`; lo único propio del celular son sus colores, que sí son
+// de esta pantalla (hexadecimales, no las clases de Tailwind del escritorio).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AGING_THEME = {
   current: {
-    label: "Por vencer",
     border: "border-[#0F6E56]",
     text: "text-[#0F6E56]",
     bgActive: "bg-[#0F6E56]/10",
     borderActive: "border-[#0F6E56]",
   },
   watch: {
-    label: "Vencido reciente",
     border: "border-[#B45309]",
     text: "text-[#B45309]",
     bgActive: "bg-[#B45309]/10",
     borderActive: "border-[#B45309]",
   },
   overdue: {
-    label: "Vencido crítico",
     border: "border-[#A32D2D]",
     text: "text-[#A32D2D]",
     bgActive: "bg-[#A32D2D]/10",
@@ -392,8 +398,16 @@ function MobileAgingChips({
               isActive ? `${theme.borderActive} ${theme.bgActive}` : "border-gray-300 bg-white",
             ].join(" ")}
           >
-            <p className={`text-xs font-semibold uppercase tracking-wide ${theme.text}`}>
-              {theme.label}
+            {/* Nombre y rango en dos renglones. A 390 px cada tarjeta mide
+                ~118 px: "Vencido reciente 91-120d" en una línea no entra, y
+                partir el rango a la mitad sería peor que no ponerlo. El
+                `title` lleva el nombre completo, el mismo que dicen el
+                escritorio y el papel. */}
+            <p className={`text-xs font-semibold uppercase tracking-wide ${theme.text}`} title={tramoLabel(key)}>
+              {AGING[key].label}
+            </p>
+            <p className="mt-0.5 font-mono text-xs tabular-nums text-gray-500">
+              {AGING[key].colLabel}
             </p>
             <p className={`mt-0.5 font-mono text-sm font-medium tabular-nums ${isActive ? theme.text : "text-gray-900"}`}>
               {formatCompactCurrency(value)}
@@ -584,8 +598,15 @@ function BucketChip({
       <p className={`font-mono text-xs font-medium tabular-nums ${isZero ? "text-gray-300" : theme.text}`}>
         {isZero ? "—" : formatCompactCurrency(value)}
       </p>
-      <p className={`text-xs uppercase tracking-wide ${isZero ? "text-gray-300" : theme.text}`}>
-        {theme.label}
+      {/* Desglose por tramo DENTRO de la fila de un cliente: acá van los tres
+          en 3 columnas de ~100 px, así que se dice el nombre y el rango va en
+          el `title`. Los dos salen de `cxc-aging`, la misma lista que rotula
+          los botones de filtro, el escritorio y el papel. */}
+      <p
+        className={`text-xs uppercase tracking-wide ${isZero ? "text-gray-300" : theme.text}`}
+        title={tramoLabel(variant)}
+      >
+        {AGING[variant].label}
       </p>
     </div>
   );

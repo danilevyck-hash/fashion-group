@@ -23,10 +23,15 @@ interface OtrosClientesDialogProps {
   /** Cuando true (modo "Todas") se muestra la columna Empresa.
    *  Cuando false (filtro empresa específica) se omite. */
   showEmpresaColumn: boolean;
+  /** 🔴 Año REAL contra el que compara la columna de cambio. Lo calcula el
+   *  servidor junto con el delta y lo baja `ClientesView`. Antes acá decía
+   *  "Δ vs 2025" escrito a mano, o sea el mismo defecto que en la tabla de
+   *  atrás: con 2025 elegido comparaba contra 2024 y el rótulo decía 2025. */
+  anioComparativo: number;
 }
 
 export function OtrosClientesDialog({
-  open, onClose, orphans, showEmpresaColumn,
+  open, onClose, orphans, showEmpresaColumn, anioComparativo,
 }: OtrosClientesDialogProps) {
   const [sortBy, setSortBy] = useState<SortKey>("ytd");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -82,6 +87,8 @@ export function OtrosClientesDialog({
             </h2>
             <p className="mt-0.5 text-xs text-gray-500">
               {orphans.length} {orphans.length === 1 ? "cliente sin código maestro" : "clientes sin código maestro"}
+              <span className="mx-1.5 text-gray-300">·</span>
+              <span data-comparativo-otros>el cambio compara contra el mismo período de {anioComparativo}</span>
             </p>
           </div>
           <button
@@ -105,7 +112,7 @@ export function OtrosClientesDialog({
                   <SortHeader col="empresa" align="left" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Empresa</SortHeader>
                 )}
                 <SortHeader col="ytd"    align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras del año</SortHeader>
-                <SortHeader col="delta"  align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs 2025</SortHeader>
+                <SortHeader col="delta"  align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>vs {anioComparativo}</SortHeader>
                 <SortHeader col="ultima" align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Última compra</SortHeader>
               </tr>
             </thead>

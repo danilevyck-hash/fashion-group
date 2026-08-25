@@ -67,11 +67,18 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   const [data, setData] = useState<ProductosResponse | null>(null);
   // Venta del MISMO período del año anterior por descripción → columna Δ.
   const [prevVenta, setPrevVenta] = useState<Record<string, number>>({});
-  // 🩸 Si la ventana de comparación NO TIENE NI UNA FILA, cada renglón sale
-  // "Nuevo" y la tabla entera parece un estreno. Con esto la pantalla lo DICE en
-  // vez de dejar que se lea como un dato (pasa de verdad: Joystep arranca en
-  // jul-2025, así que su "Año pasado" se compara contra un 2024 vacío).
-  const [comparativoVacio, setComparativoVacio] = useState(false);
+  // 🩸 SIN VENTANA DE COMPARACIÓN, CADA RENGLÓN SALE "Nuevo" Y LA TABLA ENTERA
+  // PARECE UN ESTRENO. Y eso pasa por DOS motivos que no son lo mismo:
+  //
+  //   "vacio" → la consulta funcionó y ese período no tuvo ni una venta. Es un
+  //             HECHO del negocio (Joystep arranca en jul-2025, así que su "Año
+  //             pasado" se compara contra un 2024 sin nada) y "Nuevo" es cierto.
+  //   "fallo" → la consulta se cayó (un tropiezo de red, un timeout). NO
+  //             sabemos si hubo ventas, así que decir "Nuevo" es AFIRMAR algo
+  //             que no se midió — y antes salía sin ningún aviso, porque el
+  //             cartel ámbar solo miraba el caso vacío. El catálogo entero se
+  //             leía como estreno por un error de red.
+  const [comparativo, setComparativo] = useState<"ok" | "vacio" | "fallo">("ok");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -98,16 +105,17 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       ]);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as ProductosResponse;
-      // Δ es informativo: si el año anterior falla, seguimos sin la columna.
+      // Δ es informativo: si el año anterior falla, seguimos sin la columna —
+      // pero la pantalla lo DICE, y la columna deja de afirmar "Nuevo".
       const prevMap: Record<string, number> = {};
-      let vacio = false;
+      let estado: "ok" | "vacio" | "fallo" = "fallo";
       if (prevRes.ok) {
         const prevJson = (await prevRes.json()) as ProductosResponse;
         for (const p of prevJson.productos) prevMap[p.descripcion] = p.venta;
-        vacio = prevJson.productos.length === 0;
+        estado = prevJson.productos.length === 0 ? "vacio" : "ok";
       }
       setPrevVenta(prevMap);
-      setComparativoVacio(vacio);
+      setComparativo(estado);
       setData(json);
       setCodigos({});
       setExpanded(null);
@@ -115,6 +123,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "error inesperado");
       setData(null);
+      setComparativo("fallo");
     } finally {
       setLoading(false);
     }
@@ -122,13 +131,27 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // 🔴 CAMBIAR DE EMPRESA (O DE AÑO) NO BORRA LO QUE ELEGISTE. Antes esto
+  // reseteaba el período a "Año en curso" y vaciaba el buscador: estabas
+  // mirando "Últimos 12 meses" de una empresa, cambiabas a otra, y la pantalla
+  // volvía sola al año sin decir nada. El único motivo real era que la empresa
+  // nueva podía no tener el MES elegido — y eso ahora lo resuelve el guard de
+  // abajo, con el dato en la mano, en vez de tirar las tres cosas por las
+  // dudas. (Lo mismo al cambiar el año: `VentasShell` ya no remonta la vista.)
   const onEmpresaChange = (key: string) => {
     setEmpresa(key);
-    // La empresa nueva puede no tener el mes seleccionado → se vuelve al año.
-    setMes(null);
-    setPeriodo("ytd");
-    setSearch("");
   };
+
+  // 🩸 EL MES ELEGIDO PUEDE NO EXISTIR EN LA COMBINACIÓN NUEVA. `data.meses`
+  // son los meses CON VENTAS de esa empresa en ese año, así que recién con la
+  // respuesta en la mano se sabe. Si el mes no está, se vuelve al año entero —
+  // no se deja la pantalla en "Sin productos para este filtro", que se lee como
+  // "esta empresa no vendió nada". Solo aplica al mes suelto: los tres períodos
+  // relativos no dependen ni de la empresa ni del año.
+  useEffect(() => {
+    if (!data || loading || periodo !== "ytd" || mes == null) return;
+    if (!data.meses.includes(mes)) setMes(null);
+  }, [data, loading, periodo, mes]);
 
   // Un solo selector para los cuatro períodos + el mes suelto. El valor "ytd"
   // y "1".."12" son los que ya existían; los otros tres son los nuevos.
@@ -210,9 +233,19 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   const totalUnidades = data ? data.productos.reduce((acc, p) => acc + p.cantidad, 0) : 0;
   const totalPrecio = data ? precioPromedio(data.totales.venta, totalUnidades) : null;
 
-  // El rótulo del Δ: para el año/mes sigue diciendo el año contra el que compara
-  // (lo que se lee hoy); para las ventanas relativas no hay un año que nombrar.
-  const deltaLabel = periodo === "ytd" ? `Δ ${selectedYear - 1}` : "Δ año ant.";
+  // El rótulo de la columna de cambio: para el año/mes sigue diciendo el año
+  // contra el que compara (lo que se lee hoy); para las ventanas relativas no
+  // hay un año que nombrar. Sin la "Δ", que es notación de matemática.
+  const deltaLabel = periodo === "ytd" ? `vs ${selectedYear - 1}` : "vs año ant.";
+
+  // 🔴 CON UN PERÍODO RELATIVO, EL SELECTOR DE AÑO DE ARRIBA NO HACE NADA — y
+  // hasta hoy no lo decía. "Últimos 12 meses" y "Año pasado" se cuentan desde
+  // HOY (ver `productosRangoPeriodo`: para esos tres el servidor ni mira el
+  // año), así que había dos controles de tiempo en la misma pantalla y ninguno
+  // aclaraba cuál manda. Ahora lo dice la pantalla, al lado de las fechas que
+  // ya imprime — apagar el selector no se puede: es global de /ventas y lo
+  // comparten los otros tres tabs, donde sí manda.
+  const anioNoAplica = periodo !== "ytd";
 
   return (
     <div>
@@ -294,14 +327,33 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
             {data.comparativo && (
               <>
                 <span className="mx-1.5 text-gray-300">·</span>
-                <span>Δ contra {fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}</span>
+                <span>comparado con {fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}</span>
               </>
             )}
           </p>
-          {comparativoVacio && data.comparativo && (
+          {/* El aviso va JUNTO a las fechas, que son la prueba de lo que dice:
+              el período impreso arranca en otro año que el del selector. */}
+          {anioNoAplica && (
+            <p data-anio-no-aplica className="mb-3 text-xs text-gray-500">
+              El año {selectedYear} de arriba no se aplica a este período: «{periodoLabel(selectedYear, null, periodo)}»
+              se cuenta desde hoy hacia atrás. Para mirar un año elegí «{periodoLabel(selectedYear, null, "ytd")}» o un mes.
+            </p>
+          )}
+          {comparativo === "vacio" && data.comparativo && (
             <p data-sin-comparativo className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               El período de comparación ({fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}) no tiene
-              ventas de esta empresa: la columna Δ no está comparando contra nada.
+              ventas de esta empresa: la columna de cambio no está comparando contra nada.
+            </p>
+          )}
+          {/* 🔴 "No se pudo cargar" NO es "no hubo ventas". Va en gris y no en
+              ámbar —no hay nada roto en los datos, se cayó una consulta— y
+              ofrece reintentar, que es lo único accionable. La columna de
+              cambio, mientras tanto, muestra "—" en vez de "Nuevo". */}
+          {comparativo === "fallo" && (
+            <p data-comparativo-fallo className="mb-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+              No se pudo cargar el período de comparación, así que la columna de cambio queda vacía. Los
+              números de esta tabla no cambian.{" "}
+              <button onClick={load} className="underline">Reintentar</button>
             </p>
           )}
         </>
@@ -361,6 +413,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
                     codigos={codigos[p.descripcion]}
                     codigosLoading={codigosLoading === p.descripcion}
                     prevVenta={prevVenta[p.descripcion]}
+                    comparativoMedido={comparativo !== "fallo"}
                   />
                 );
               })}
@@ -412,10 +465,18 @@ function SortableTh({
   );
 }
 
-// Δ vs año anterior. Producto sin base comparable el año previo = "Nuevo".
-// Antes bastaba con `prev > 0` y un producto que el año pasado vendió $2 salía
-// con +50000%; ahora la regla es la única de la app (`variacionPct`).
-function DeltaCell({ curr, prev }: { curr: number; prev: number | undefined }) {
+// Cambio contra el año anterior. Producto sin base comparable el año previo =
+// "Nuevo". Antes bastaba con `prev > 0` y un producto que el año pasado vendió
+// $2 salía con +50000%; ahora la regla es la única de la app (`variacionPct`).
+//
+// 🔴 `medido` DICE SI HUBO VENTANA DE COMPARACIÓN. Cuando la consulta del año
+// anterior falló, no se midió nada: "Nuevo" sería afirmar que ese producto no
+// existía, y con el catálogo entero en verde el error de red se lee como un
+// dato. Sin medición, la celda va vacía ("—").
+function DeltaCell({ curr, prev, medido }: { curr: number; prev: number | undefined; medido: boolean }) {
+  if (!medido) {
+    return <td data-col="delta" className="hidden px-1.5 py-2.5 text-right font-mono text-xs text-gray-300 sm:table-cell lg:px-3">—</td>;
+  }
   const ratio = variacionPct(curr, prev);
   if (ratio == null) {
     return <td data-col="delta" className="hidden px-1.5 py-2.5 text-right font-mono text-xs text-teal-700 sm:table-cell lg:px-3">Nuevo</td>;
@@ -430,7 +491,7 @@ function DeltaCell({ curr, prev }: { curr: number; prev: number | undefined }) {
 }
 
 function ProductoRow({
-  p, drillable, isOpen, onToggle, codigos, codigosLoading, prevVenta,
+  p, drillable, isOpen, onToggle, codigos, codigosLoading, prevVenta, comparativoMedido,
 }: {
   p: ProductoNivel1;
   drillable: boolean;
@@ -439,6 +500,9 @@ function ProductoRow({
   codigos: ProductoCodigo[] | undefined;
   codigosLoading: boolean;
   prevVenta: number | undefined;
+  /** false cuando la consulta del período anterior falló: sin ventana medida,
+   *  la columna de cambio no puede afirmar "Nuevo". */
+  comparativoMedido: boolean;
 }) {
   return (
     <>
@@ -464,7 +528,7 @@ function ProductoRow({
         <td data-col="codigos" className="hidden px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-500 sm:table-cell lg:px-3">{p.num_codigos}</td>
         <td data-col="cantidad" className="hidden px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-600 sm:table-cell lg:px-3">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
         <td data-col="venta" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-900 sm:px-1.5 lg:px-3">{fmtMoney(p.venta)}</td>
-        <DeltaCell curr={p.venta} prev={prevVenta} />
+        <DeltaCell curr={p.venta} prev={prevVenta} medido={comparativoMedido} />
         <td data-col="precio" className="hidden px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-700 sm:table-cell lg:px-3">{fmtPrecioProm(precioPromedio(p.venta, p.cantidad))}</td>
         <td data-col="margen" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-700 sm:px-1.5 lg:px-3">{fmtMargen(p.margen)}</td>
       </tr>

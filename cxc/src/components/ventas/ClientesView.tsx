@@ -51,6 +51,21 @@ const EMPRESA_PILLS: { id: string; label: string }[] = [
 // huérfanos en una fila agregada.
 const SKIP_OTROS_FOR = new Set(["confecciones_boston", "american_classic"]);
 
+// 🔴 EL MISMO RENGLÓN DICE LA MISMA FRASE EN LAS DOS PANTALLAS. En escritorio
+// decía "click para ver detalle" y en el celular "Ver detalle de huérfanos sin
+// master" — la segunda es jerga de base de datos ("huérfano", "master") que no
+// significa nada para quien usa la app, y encima eran dos textos distintos para
+// el MISMO botón: quien lo aprende en el celular no lo reconoce en la
+// computadora. Una sola constante para que no puedan volver a separarse.
+const OTROS_CLIENTES_PISTA = "Tocar para ver el detalle";
+
+/** Lo que la columna de cambio está comparando, dicho con todas las letras y con
+ *  el año REAL. Criterio del PR #573 en Ventas › Productos: un símbolo suelto no
+ *  dice contra qué se compara, así que el período se imprime al lado del total.
+ *  Una sola frase para las dos pantallas (escritorio y celular). */
+const textoComparativo = (anio: number) =>
+  `El cambio compara contra el mismo período de ${anio}`;
+
 // "VENTAS LOCAL" es el cliente-mostrador (ventas de contado en tienda), no un
 // cliente real → se marca y se saca del ranking de clientes. (Distinto de
 // "VENTAS MAHER", que sí es cliente real.)
@@ -84,6 +99,14 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   const [otrosOpen, setOtrosOpen] = useState(false);
   const [sheetCliente, setSheetCliente] = useState<Cliente | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
+
+  // 🔴 EL AÑO DEL RÓTULO SALE DEL MISMO DATO QUE HACE LA CUENTA. Antes decía
+  // "Δ vs 2025" clavado: con 2025 elegido arriba, la pantalla decía
+  // "Compras 2025 · Δ vs 2025" y en realidad comparaba contra 2024 — el rótulo
+  // afirmaba lo contrario de lo que mostraba la columna. El servidor manda el
+  // año junto con el delta; el respaldo `selectedYear - 1` es para un payload
+  // viejo que quedó en la caché de SWR, y da el MISMO número.
+  const anioComparativo = data.anioComparativo ?? selectedYear - 1;
 
   // Pill click → refetch desde server (la branching cliente/empresa vive en queries.ts)
   const onEmpresaChange = async (next: string) => {
@@ -362,6 +385,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                   lo dice con su flecha, en la misma pantalla y a la vista. */}
               <span className="font-mono text-gray-950">{filtered.length}</span> clientes
             </p>
+            <p data-comparativo-clientes>{textoComparativo(anioComparativo)}</p>
             {isClosedYear ? (
               <span
                 className={cn("rounded-md px-2 py-0.5 text-xs font-medium", vistaChipTone)}
@@ -391,6 +415,11 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
         <div className="lg:hidden">
           <div className="text-xs text-gray-500">
             <span className="font-mono text-gray-950">{filtered.length}</span> clientes
+          </div>
+          {/* En el celular no hay encabezado de columna que rotule el %: sin
+              esta línea, el "▲ +18%" de cada tarjeta no dice contra qué. */}
+          <div data-comparativo-clientes className="mt-0.5 text-xs text-gray-500">
+            {textoComparativo(anioComparativo)}
           </div>
           {isClosedYear ? (
             <span className={cn("mt-1.5 inline-flex rounded px-1.5 py-0.5 text-xs font-medium", vistaChipTone)}>
@@ -480,7 +509,10 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                 <SortHeader col="nombre"  align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Cliente</SortHeader>
                 <SortHeader col="empresa" align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Empresa</SortHeader>
                 <SortHeader col="ytd"     align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras {selectedYear}</SortHeader>
-                <SortHeader col="delta"   align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs 2025</SortHeader>
+                {/* Sin la "Δ": es notación de matemática y esta columna la lee gente
+                    que no la conoce. "vs 2025" con las flechas de cada celda se
+                    entiende solo, y el año es el REAL. */}
+                <SortHeader col="delta"   align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>vs {anioComparativo}</SortHeader>
                 <SortHeader col="ultima"  align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Última compra</SortHeader>
               </tr>
             </thead>
@@ -580,6 +612,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
         onClose={() => setOtrosOpen(false)}
         orphans={orphans}
         showEmpresaColumn={empresa === "todas"}
+        anioComparativo={anioComparativo}
       />
 
       {/* Sheet mobile: equivalente del HoverCard desktop. Aparece sólo
@@ -777,7 +810,7 @@ function OtrosRow({ c, onClick }: { c: Cliente; onClick: () => void }) {
       <td className="border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-400 tabular-nums">—</td>
       <td className="border-b border-gray-200 px-2.5 py-3 text-sm text-gray-950">
         <div className="font-medium leading-tight">{c.nombre}</div>
-        <div className="font-mono text-xs leading-tight text-gray-500">click para ver detalle</div>
+        <div className="text-xs leading-tight text-gray-500">{OTROS_CLIENTES_PISTA}</div>
       </td>
       <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-xs text-gray-700">
         {c.empresa}
@@ -877,7 +910,7 @@ function OtrosCard({ c, onTap }: { c: Cliente; onTap: () => void }) {
       className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3.5 active:bg-gray-100"
     >
       <div className="text-[15px] font-medium leading-tight text-gray-950">{c.nombre}</div>
-      <div className="mt-1 text-xs text-gray-500">Ver detalle de huérfanos sin master</div>
+      <div className="mt-1 text-xs text-gray-500">{OTROS_CLIENTES_PISTA}</div>
       <div className="mt-3 flex items-baseline gap-3">
         <div className="font-mono text-base font-medium tabular-nums text-gray-950">
           {fmtMoneyCompact(c.ytd)}

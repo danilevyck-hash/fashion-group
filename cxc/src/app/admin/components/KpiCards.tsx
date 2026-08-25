@@ -2,7 +2,7 @@
 
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt, fmtCompact } from "@/lib/format";
-import { AGING, AGING_ORDER, type AgingKey } from "@/lib/cxc-aging";
+import { AGING, AGING_ORDER, tramoLabel, type AgingKey } from "@/lib/cxc-aging";
 
 type RiskFilter = "all" | AgingKey;
 
@@ -50,7 +50,11 @@ export default function KpiCards({ roleClients, riskFilter, onRiskFilterChange }
     { key: "all", label: "Total Pendiente", value: totalCxc, count: roleClients.length, dot: "", color: "text-gray-900", activeColor: "border-gray-800" },
     ...AGING_ORDER.map((k) => ({
       key: k,
-      label: AGING[k].colLabel, // solo el rango (formato idéntico a las columnas de la tabla)
+      // 🔴 EL NOMBRE COMPLETO, el MISMO que dicen el celular y el papel. Antes
+      // acá decía solo el rango ("0-90d") y en el celular solo el nombre ("Por
+      // vencer"): el mismo botón con dos nombres. Sale de `cxc-aging`, que es
+      // la única lista.
+      label: tramoLabel(k),
       value: valueByKey[k].value,
       count: valueByKey[k].count,
       dot: AGING[k].dot,

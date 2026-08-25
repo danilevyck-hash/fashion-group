@@ -181,29 +181,45 @@ export function ResumenViewMobile({
 
 function MobileKpis({ data, prevYear, isClosedYear, selectedYear }: { data: VentasResumen; prevYear: number; isClosedYear: boolean; selectedYear: number }) {
   const k = data.kpis;
-  const periodo = isClosedYear ? String(selectedYear) : "YTD";
+  // 🔴 EL CELULAR DECÍA "Ventas YTD · +12% vs '25" Y NO DECÍA QUÉ MESES. Las dos
+  // mitades eran jerga: "YTD" es year-to-date en inglés, y el año cortado a dos
+  // dígitos con apóstrofo es notación de planilla. La cifra grande y su cambio
+  // no dicen nada si no se sabe contra qué período se están mirando.
+  //
+  // El período va en UNA línea arriba de las tres tarjetas, no repetido dentro
+  // de cada una: a 390 px cada tarjeta mide ~120 px y meterle "ene–ago 2026"
+  // adentro la parte en tres renglones. Es el MISMO texto que el escritorio ya
+  // muestra debajo de cada cifra.
+  const periodoLabel = isClosedYear
+    ? `Año ${selectedYear} completo`
+    : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear}`;
   const ventasDelta   = variacionPct(k.ventasNetasYTD, k.ventas2025YTD);
   const utilidadDelta = variacionPct(k.utilidadYTD, k.utilidad2025YTD);
   const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
-  const pct = (r: number) => `${r >= 0 ? "+" : ""}${(r * 100).toFixed(0)}% vs '${String(prevYear).slice(-2)}`;
+  const pct = (r: number) => `${r >= 0 ? "+" : ""}${(r * 100).toFixed(0)}% vs ${prevYear}`;
 
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <KpiTile
-        label={`Ventas ${periodo}`}
-        value={formatCompactCurrency(k.ventasNetasYTD)}
-        sub={ventasDelta == null ? null : { text: pct(ventasDelta), sign: ventasDelta }}
-      />
-      <KpiTile
-        label={`Utilidad ${periodo}`}
-        value={formatCompactCurrency(k.utilidadYTD)}
-        sub={utilidadDelta == null ? null : { text: pct(utilidadDelta), sign: utilidadDelta }}
-      />
-      <KpiTile
-        label={`Margen ${periodo}`}
-        value={`${(k.margenYTD * 100).toFixed(1)}%`}
-        sub={{ text: `${margenDeltaPts >= 0 ? "+" : ""}${margenDeltaPts.toFixed(1)} pts`, sign: margenDeltaPts }}
-      />
+    <div className="space-y-1.5">
+      <p data-periodo-kpis className="text-xs text-gray-500">
+        {periodoLabel} <span className="text-gray-300">·</span> comparado con {prevYear}
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        <KpiTile
+          label="Ventas"
+          value={formatCompactCurrency(k.ventasNetasYTD)}
+          sub={ventasDelta == null ? null : { text: pct(ventasDelta), sign: ventasDelta }}
+        />
+        <KpiTile
+          label="Utilidad"
+          value={formatCompactCurrency(k.utilidadYTD)}
+          sub={utilidadDelta == null ? null : { text: pct(utilidadDelta), sign: utilidadDelta }}
+        />
+        <KpiTile
+          label="Margen"
+          value={`${(k.margenYTD * 100).toFixed(1)}%`}
+          sub={{ text: `${margenDeltaPts >= 0 ? "+" : ""}${margenDeltaPts.toFixed(1)} pts`, sign: margenDeltaPts }}
+        />
+      </div>
     </div>
   );
 }

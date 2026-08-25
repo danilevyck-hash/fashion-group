@@ -10,6 +10,7 @@ import { unAnioAntes } from "@/lib/multifashion/productos-ranking";
 // importa, no se copia: este repo ya pagó dos veces por agrupar en UTC (el borde
 // de mes de Multifashion y el día de las marcaciones del reloj).
 import { hoyPanama } from "@/lib/fecha-panama";
+import { fmtDate } from "@/lib/format";
 
 // Las 7 empresas con switch_articulo_diario poblado (todo el grupo menos
 // Confecciones Boston, que no se backfilleó). Default Fashion Wear.
@@ -277,8 +278,12 @@ export async function buildProductosSheet(resp: ProductosResponse): Promise<impo
     // Las dos fechas van en el subtítulo: un Excel titulado "Últimos 12 meses"
     // que se guarda y se abre en noviembre no dice qué 12 meses fueron.
     title: `FASHION GROUP — Productos · ${nombre} · ${periodo}`,
+    // 🔴 LAS FECHAS VAN CON EL FORMATEADOR DE LA CASA (`fmtDate`, "1 mar 2026"),
+    // el MISMO que usa la pantalla. Este Excel Daniel lo manda por correo, y
+    // "Del 2026-03-01 al 2026-08-24" es formato de base de datos: la misma fecha
+    // se leía distinta en la pantalla y en el archivo que sale de ella.
     subtitle:
-      `Del ${resp.desde} al ${resp.hasta} · Venta total ${fmtMoneyPlain(resp.totales.venta)}` +
+      `Del ${fmtDate(resp.desde)} al ${fmtDate(resp.hasta)} · Venta total ${fmtMoneyPlain(resp.totales.venta)}` +
       ` · Margen ${resp.totales.margen != null ? (resp.totales.margen * 100).toFixed(1) + "%" : "—"}`,
     columns: [
       { header: "Descripción", wch: 34 },
@@ -290,15 +295,20 @@ export async function buildProductosSheet(resp: ProductosResponse): Promise<impo
       { header: "Precio prom.", wch: 14, align: "right", fmt: MONEY_FMT },
       { header: "Margen%", wch: 10, align: "right", fmt: PCT_FMT },
     ],
+    // 🔴 `p.margen` VA TAL CUAL, sin `?? 0`. En pantalla un grupo sin margen
+    // calculable (venta ≤ 0, o sea devolución neta) se lee "—"; un 0,0% en el
+    // Excel es un margen REAL que se suma y se promedia con los demás y baja el
+    // promedio sin que nadie lo note. Es la MISMA regla que ya seguía
+    // `precioPromedio` en la columna de al lado: `null` = celda VACÍA.
     rows: resp.productos.map(p => [
       p.descripcion,
       p.num_codigos,
       p.cantidad,
       p.venta,
       precioPromedio(p.venta, p.cantidad),
-      p.margen ?? 0,
+      p.margen,
     ]),
-    totals: ["TOTAL", null, totalCant, resp.totales.venta, totalPrecio, resp.totales.margen ?? 0],
+    totals: ["TOTAL", null, totalCant, resp.totales.venta, totalPrecio, resp.totales.margen],
   });
 }
 

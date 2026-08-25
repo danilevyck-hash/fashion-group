@@ -317,9 +317,15 @@ export function VentasShell({
           ) : <ErrorState scope="clientes" detail={data?.clientesError ?? null} onRetry={() => mutate()} />}
         </TabsContent>
         <TabsContent value="productos" className="mt-5">
-          {/* key={selectedYear} remonta al cambiar año global → resetea empresa/
-              período/sort internos al universo del año cargado. */}
-          <ProductosView key={selectedYear} selectedYear={selectedYear} />
+          {/* 🔴 SIN `key={selectedYear}`. Ese remonte tiraba TODO el estado
+              interno al cambiar el año de arriba: el período volvía solo a "Año
+              en curso" y el buscador se vaciaba, sin avisar, estando la persona
+              mirando "Últimos 12 meses" — un período que ni siquiera depende
+              del año. Lo único que el remonte protegía era el MES elegido
+              cuando el año nuevo no lo tiene, y eso lo resuelve ProductosView
+              con el dato en la mano (ver su guard de `data.meses`) en vez de
+              borrar tres cosas por las dudas. */}
+          <ProductosView selectedYear={selectedYear} />
         </TabsContent>
         <TabsContent value="utilidad" className="mt-5">
           {/* Utilidad real por cliente (5 B2B). Self-fetch por año; key remonta

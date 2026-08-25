@@ -655,6 +655,9 @@ describe("Referencia · la fila de plata, agrupada", () => {
 
 const UTILIDAD_RESP: UtilidadClienteResponse = {
   year: 2026,
+  // Las SEIS de Fashion Group, que es lo que la consulta mira de verdad desde
+  // que la lista se DERIVA de `empresasConUtilidad()`.
+  empresas: ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"],
   totales: { ventas: 1000, costo: 700, utilidad: 300, margen: 0.3 },
   rows: [
     {
@@ -680,8 +683,23 @@ describe("Utilidad · alcance al ⓘ, aviso en pantalla", () => {
     expect(screen.queryByText(/Costo real por documento/)).toBeNull();
   });
 
-  it("al tocar el ⓘ aparece 'Costo real por documento (5 empresas B2B).'", async () => {
+  // 🔴 EL NÚMERO SE DERIVA DEL PAYLOAD, NO ES UN TEXTO FIJO. Decía "5" mientras
+  // la lista real de Fashion Group son SEIS: joystep sincroniza utilidad desde
+  // el 27-jul-2026 y ya comisiona, y esta pantalla no lo dibujaba. Con el
+  // alcance derivado, encender una empresa la trae acá sola.
+  it("el ⓘ cuenta las empresas que la consulta miró de verdad — SEIS, no cinco", async () => {
     await montar();
+    tocarAyuda("Cómo se calcula");
+    expect(screen.getByText("Costo real por documento (6 empresas B2B).")).toBeTruthy();
+    expect(screen.queryByText(/5 empresas B2B/)).toBeNull();
+  });
+
+  it("si la consulta cae a la v1 (migración sin correr), el ⓘ dice CINCO — no miente hacia arriba", async () => {
+    rutas.push((u) => (u.includes("/api/ventas/utilidad-cliente")
+      ? { ...UTILIDAD_RESP, empresas: ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear"] }
+      : undefined));
+    render(<UtilidadView selectedYear={2026} />);
+    await screen.findAllByText("CLIENTE BUENO");
     tocarAyuda("Cómo se calcula");
     expect(screen.getByText("Costo real por documento (5 empresas B2B).")).toBeTruthy();
   });
