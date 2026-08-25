@@ -26,17 +26,22 @@
 // y siguen separadas.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Lo único que bodega puede corregir desde la pantalla de despacho. */
-export const CAMPOS_CORREGIBLES = [
-  "cliente",
-  "cliente_codigo",
-  "direccion",
-  "empresa",
-  "facturas",
-  "bultos",
-] as const;
+/**
+ * Los campos de un renglón que este endpoint sabe traducir a un UPDATE.
+ *
+ * 🔑 **SE LEE DE `campos-editables.ts`, no se escribe acá.** Había dos listas
+ * —una en cada archivo— y con dos listas el día que una cambiara la pantalla
+ * ofrecería un campo que el servidor no sabe escribir, o al revés.
+ *
+ * ⚠️ Esto dice qué se sabe TRADUCIR. Qué se puede escribir **en una guía en
+ * este estado** lo decide `camposEditablesDeRenglon`, y el endpoint aplica las
+ * dos: una guía ya despachada acepta solo el cliente, las facturas y el N° del
+ * transportista.
+ */
+export { CAMPOS_DE_RENGLON as CAMPOS_CORREGIBLES } from "./campos-editables";
+import { CAMPOS_DE_RENGLON, type CampoDeRenglon } from "./campos-editables";
 
-export type CampoCorregible = (typeof CAMPOS_CORREGIBLES)[number];
+export type CampoCorregible = CampoDeRenglon;
 
 export type ResultadoCorreccion =
   | { ok: true; cambios: Record<string, string | number | null> }
@@ -63,7 +68,7 @@ export function armarCorreccion(body: unknown): ResultadoCorreccion {
   const b = body as Record<string, unknown>;
   const cambios: Record<string, string | number | null> = {};
 
-  for (const campo of CAMPOS_CORREGIBLES) {
+  for (const campo of CAMPOS_DE_RENGLON) {
     if (!(campo in b) || b[campo] === undefined) continue;
 
     if (campo === "bultos") {

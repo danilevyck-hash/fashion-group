@@ -20,20 +20,6 @@ import { numeroCabeceraAlDespachar } from "@/lib/guias/falta-para-despachar";
 import { guiaYaDespachada, tipoDespachoEfectivo } from "@/lib/guias/modo-despacho";
 import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 
-/**
- * Lo que bodega puede corregir de un renglón sin salir de la pantalla. Viaja al
- * endpoint que escribe SOLO estos campos de UNA fila — ver la nota de
- * `corregirItem` más abajo.
- */
-export interface CorreccionEnvio {
-  cliente?: string;
-  cliente_codigo?: string | null;
-  direccion?: string;
-  empresa?: string;
-  facturas?: string;
-  bultos?: number;
-}
-
 interface Draft {
   placa?: string;
   receptor?: string;
@@ -227,92 +213,22 @@ export function useDespachoGuia(id: string | null) {
     } catch { /* */ }
   };
 
-  /**
-   * 🔴 CORREGIR UN RENGLÓN SIN REEMPLAZAR LA LISTA.
-   *
-   * Va por `PATCH /api/guias/[id]/item`, que escribe los campos tocados de UNA
-   * fila. **NUNCA por `items` del PUT**: eso borra todos los renglones e inserta
-   * otros nuevos, cambiándoles el id — se perderían los clientes atados y los
-   * ids que esta misma pantalla tiene en la mano para el N° del transportista.
-   *
-   * Devuelve el mensaje de error, o `null` si se guardó.
-   */
-  async function corregirItem(itemId: string, cambios: CorreccionEnvio): Promise<string | null> {
-    if (!id) return "No se pudo guardar. Intenta de nuevo en unos segundos.";
-    try {
-      const res = await fetch(`/api/guias/${id}/item`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, ...cambios }),
-      });
-      const cuerpo = await res.json().catch(() => ({}));
-      if (!res.ok) return cuerpo.error || "No se pudo guardar. Intenta de nuevo en unos segundos.";
-      // Se actualiza SOLO esa fila del estado local: recargar la guía entera
-      // tiraría lo que se está tipeando en los otros renglones y las firmas ya
-      // dibujadas.
-      const devuelto = (cuerpo.item ?? {}) as Record<string, unknown>;
-      const aplicado = { ...cambios, ...devuelto };
-      setGuia((prev) => {
-        if (!prev) return prev;
-        const items = (prev.guia_items || []).map((it) => {
-          if (it.id !== itemId) return it;
-          return {
-            ...it,
-            cliente: String(aplicado.cliente ?? it.cliente ?? ""),
-            // "" = sin vincular. El endpoint guarda NULL; en pantalla es lo mismo.
-            cliente_codigo: String(aplicado.cliente_codigo ?? ""),
-            direccion: String(aplicado.direccion ?? it.direccion ?? ""),
-            empresa: String(aplicado.empresa ?? it.empresa ?? ""),
-            facturas: String(aplicado.facturas ?? it.facturas ?? ""),
-            bultos: Number(aplicado.bultos ?? it.bultos ?? 0),
-          };
-        });
-        return { ...prev, guia_items: items };
-      });
-      showToast("Envío corregido");
-      return null;
-    } catch {
-      return "Sin conexión. Intenta de nuevo en unos segundos.";
-    }
-  }
+  // ─────────────────────────────────────────────────────────────────────────
+  // 🔴 ACÁ VIVÍAN `corregirItem` Y `anotarNumeroTransp`, Y LOS DOS SE FUERON.
+  //
+  // Daniel, punto 1: *"se retira el «Corregir» por renglón. Un formulario, el
+  // MISMO al crear y al editar"*; punto 4: en una guía despachada se corrigen
+  // el N° del transportista, el cliente y las facturas — con ese mismo
+  // formulario.
+  //
+  // Las dos escrituras que hacían siguen VIVAS y son las mismas
+  // (`PATCH /api/guias/[id]/item` y `PATCH /api/guias/[id]/numero-transp`): lo
+  // que cambió es QUIÉN las llama. Ahora las llama `useGuiaFormState`, al
+  // guardar el formulario de una guía firmada. Dejarlas acá además habría sido
+  // un segundo camino a la misma columna, que es exactamente lo que este
+  // cambio vino a sacar.
+  // ─────────────────────────────────────────────────────────────────────────
 
-  /**
-   * 🔴 LA EXCEPCIÓN: anotar el N° del transportista en una guía YA DESPACHADA.
-   *
-   * El número dejó de bloquear el despacho —Daniel: *"a veces el transportista
-   * lo da, a veces no"*— así que hay guías que salieron sin él. Va por
-   * `PATCH /api/guias/[id]/numero-transp`, el MISMO molde que
-   * `…/cliente`: UNA columna de UNA línea, sin mirar el estado. El PUT sigue
-   * rechazando todo lo demás de una guía cerrada.
-   *
-   * Devuelve el mensaje de error, o `null` si se guardó.
-   */
-  async function anotarNumeroTransp(itemId: string, numero: string): Promise<string | null> {
-    if (!id) return "No se pudo guardar. Intenta de nuevo en unos segundos.";
-    try {
-      const res = await fetch(`/api/guias/${id}/numero-transp`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, numero_guia_transp: numero }),
-      });
-      const cuerpo = await res.json().catch(() => ({}));
-      if (!res.ok) return cuerpo.error || "No se pudo guardar. Intenta de nuevo en unos segundos.";
-      const guardado = String(cuerpo.numero_guia_transp ?? "");
-      setGuia((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          guia_items: (prev.guia_items || []).map((it) =>
-            it.id === itemId ? { ...it, numero_guia_transp: guardado } : it
-          ),
-        };
-      });
-      showToast(guardado ? "N° del transportista guardado" : "N° del transportista borrado");
-      return null;
-    } catch {
-      return "Sin conexión. Intenta de nuevo en unos segundos.";
-    }
-  }
 
   async function confirmarDespacho(firma1: string, firma2: string) {
     if (!guia || !id) return;
@@ -400,7 +316,6 @@ export function useDespachoGuia(id: string | null) {
     bChofer, setBChofer,
     juegos, usarJuego,
     numerosTransp, setNumeroTransp,
-    corregirItem, anotarNumeroTransp,
     bSaving, confirmarDespacho,
     pendingFirma1, setPendingFirma1,
     pendingFirma2, setPendingFirma2,

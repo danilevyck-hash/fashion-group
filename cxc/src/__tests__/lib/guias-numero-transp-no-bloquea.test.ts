@@ -33,6 +33,7 @@ import {
   numeroTranspUnicoImpreso,
 } from "@/lib/guias/modo-despacho";
 import { validarNumeroTransp } from "@/lib/guias/numero-transp-tarde";
+import { camposEditablesDeRenglon } from "@/lib/guias/campos-editables";
 
 /** ⚠️ Los comentarios se borran ANTES de barrer: en este repo ya falló cuatro
  *  veces un candado que se cumplía con su propia explicación. */
@@ -256,9 +257,40 @@ describe("🔴 completar el número TARDE no rompe el papel", () => {
     expect(ruta).toMatch(/guia_items\([^)]*numero_guia_transp[^)]*\)/);
   });
 
-  it("la pantalla de la guía ofrece anotarlo solo a quien puede escribir, y no en entrega directa", () => {
-    const pagina = leer("src/app/guias/[id]/page.tsx");
-    expect(pagina).toContain("puedeAnotarNumero={s.despachada && puedeDespachar && !esEntregaDirecta(g)}");
-    expect(pagina).toContain("onAnotarNumero={s.anotarNumeroTransp}");
+  // ───────────────────────────────────────────────────────────────────────────
+  // ⚠️ ACÁ HABÍA UN BARRIDO DE TEXTO Y SE RETIRÓ. Buscaba en `page.tsx` el botón
+  // «Anotar el N°» por renglón (`puedeAnotarNumero=…` / `onAnotarNumero=…`). Ese
+  // camino ya no existe: Daniel pidió UNA sola forma de editar, así que el N° de
+  // una guía despachada se corrige con el MISMO formulario que abre «Editar».
+  //
+  // 🔴 Y NO SE REEMPLAZA POR OTRO BARRIDO. Este repo ya pagó cuatro veces el
+  // candado que se cumple con su propio comentario explicativo. Lo que se afirma
+  // es la REGLA PURA —la que de verdad decide qué se puede escribir en una guía
+  // ya firmada— y la conducta que la sostiene.
+  // ───────────────────────────────────────────────────────────────────────────
+  it("la regla deja corregir el N° en una guía YA DESPACHADA — y sólo eso más el cliente y las facturas", () => {
+    for (const estado of ["Completada", "Rechazada"]) {
+      const permitidos = camposEditablesDeRenglon(estado);
+      expect(permitidos, estado).toContain("numero_guia_transp");
+      // Las otras dos que Daniel aprobó, para que el N° no quede solo por azar.
+      expect(permitidos, estado).toContain("cliente");
+      expect(permitidos, estado).toContain("facturas");
+      // 🔴 Y lo que sigue cerrado: los bultos son lo que el transportista firmó.
+      for (const cerrado of ["bultos", "direccion", "empresa"]) {
+        expect(permitidos as readonly string[], `${estado}/${cerrado}`).not.toContain(cerrado);
+      }
+    }
+    // Antes de salir se corrige todo, el número incluido.
+    expect(camposEditablesDeRenglon("Pendiente Bodega")).toContain("numero_guia_transp");
+    expect(camposEditablesDeRenglon("Pendiente Bodega")).toContain("bultos");
+  });
+
+  it("las dos mitades se sostienen juntas: no bloquea al despachar, y por eso se anota después", () => {
+    // Si bloqueara, no habría guías sin número que completar y la excepción no
+    // tendría para qué existir; si no se pudiera completar, la marca ámbar sería
+    // una advertencia que nadie puede apagar.
+    expect(faltaParaDespachar(lleno)).toEqual([]);
+    expect(pendienteNumeroTransp("externo", ["", "  "])).toBe(true);
+    expect(camposEditablesDeRenglon("Completada")).toContain("numero_guia_transp");
   });
 });

@@ -78,7 +78,6 @@ function Harness({
       transportistaId={null} setTransportistaId={() => {}}
       entregadoPor="Julio" setEntregadoPor={() => {}}
       observaciones="" setObservaciones={() => {}}
-      numeroGuiaTransp="" setNumeroGuiaTransp={() => {}}
       items={items}
       transportistas={[]}
       direcciones={["David"]}

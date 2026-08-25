@@ -14,11 +14,21 @@
  *
  * Lo que se prueba, y por qué cada cosa:
  *   1. cada envío se dibuja UNA vez, con su caja de N° al lado;
- *   2. corregir un campo va por `PATCH /api/guias/[id]/item` — NUNCA mandando
- *      `items`, que en el PUT borra los renglones e inserta otros nuevos,
- *      cambiándoles el id y tirando el trabajo de atar clientes;
- *   3. lo que se manda son los campos de ESA fila, con su `itemId`;
- *   4. una guía ya despachada no ofrece corregir.
+ *   2. corregir un renglón tiene UNA sola puerta: «Editar», el mismo
+ *      formulario del alta;
+ *   3. la lista no despacha ni escribe por su cuenta.
+ *
+ * 🩸 EL BLOQUE 2 CAMBIÓ DE DIRECCIÓN EL 25-ago-2026. Antes protegía el
+ * «Corregir» por renglón —una cajita con cliente, dirección, empresa, bultos y
+ * facturas que guardaba por `PATCH /api/guias/[id]/item`—. Ese botón se
+ * retiró: abría EXACTAMENTE los mismos campos que el formulario de «Editar»,
+ * con su propio botón de guardar y su propia validación. Daniel, punto 1:
+ * ***"se retira el «Corregir» por renglón. Un formulario, el MISMO al crear y
+ * al editar"***.
+ *
+ * ⚠️ El endpoint por columna NO se retiró y sigue siendo el único camino para
+ * escribir en una guía FIRMADA (candado en `guias-anotar-numero-tarde`). Lo que
+ * se fue es el segundo botón, no la escritura segura.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -31,7 +41,7 @@ vi.mock("@/components/AppHeader", () => ({
   default: () => <div data-testid="app-header" />,
 }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useParams: () => ({ id: "11111111-1111-4111-8111-111111111111" }),
 }));
 
@@ -108,6 +118,9 @@ function stubFetch(over: Record<string, unknown> = {}) {
       if (String(url).includes("despachos-frecuentes")) {
         return { ok: true, json: async () => ({ juegos: [] }) };
       }
+      if (String(url).startsWith("/api/transportistas")) {
+        return { ok: true, json: async () => [{ id: "t1", nombre: "Transporte Sol", activo: true }] };
+      }
       return { ok: true, json: async () => ({ clientes: [], completo: true }) };
     }),
   );
@@ -120,12 +133,22 @@ async function montar(over: Record<string, unknown> = {}) {
   return r;
 }
 
+/** jsdom trae un `localStorage` a medias; el formulario guarda borradores. */
+function memStorage(): Storage {
+  let m: Record<string, string> = {};
+  return {
+    getItem: (k: string) => (k in m ? m[k] : null),
+    setItem: (k: string, v: string) => { m[k] = String(v); },
+    removeItem: (k: string) => { delete m[k]; },
+    clear: () => { m = {}; },
+    key: () => null,
+    length: 0,
+  } as unknown as Storage;
+}
+
 beforeEach(() => {
-  try {
-    localStorage.clear();
-  } catch {
-    /* jsdom sin localStorage */
-  }
+  vi.stubGlobal("localStorage", memStorage());
+  vi.stubGlobal("sessionStorage", memStorage());
 });
 afterEach(() => {
   cleanup();
@@ -163,56 +186,71 @@ describe("🔴 los envíos no pueden aparecer DOS VECES", () => {
   });
 });
 
-describe("🔴 corregir un campo NO puede reemplazar la lista de renglones", () => {
-  async function corregirPrimero() {
-    await montar();
-    fireEvent.click(screen.getAllByRole("button", { name: "Corregir" })[0]);
-    const bultos = document.getElementById(`corr-bultos-${ITEMS[0].id}`) as HTMLInputElement;
-    fireEvent.change(bultos, { target: { value: "9" } });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
-    await waitFor(() => {
-      expect(llamadas.some((l) => l.method === "PATCH")).toBe(true);
-    });
-    return llamadas.find((l) => l.method === "PATCH")!;
-  }
-
-  it("va por el endpoint que toca UNA fila, y con su itemId", async () => {
-    const patch = await corregirPrimero();
-    expect(patch.url).toBe(`/api/guias/${GUIA_ID}/item`);
-    expect((patch.body as Record<string, unknown>).itemId).toBe(ITEMS[0].id);
-    expect((patch.body as Record<string, unknown>).bultos).toBe(9);
+describe("🔴 UNA SOLA PUERTA PARA CORREGIR UN RENGLÓN: «Editar»", () => {
+  it("🩸 el «Corregir» por renglón ya no existe — era el segundo camino", () => {
+    // No hay `it` sin `montar`: el chequeo real está abajo. Este comentario
+    // queda como el porqué.
+    expect(true).toBe(true);
   });
 
-  it("🔴 NUNCA manda `items` — eso borra los renglones y les cambia el id", async () => {
-    await corregirPrimero();
-    for (const l of llamadas) {
-      const b = (l.body ?? {}) as Record<string, unknown>;
-      expect(Object.keys(b), l.url).not.toContain("items");
-      expect(l.method, l.url).not.toBe("PUT");
+  it("ningún renglón ofrece «Corregir», ni abierto ni cerrado", async () => {
+    await montar();
+    expect(screen.queryAllByRole("button", { name: "Corregir" })).toHaveLength(0);
+    expect(screen.queryAllByRole("button", { name: "Cerrar" })).toHaveLength(0);
+    // Y las cajitas de aquel formulario tampoco están.
+    for (const it of ITEMS) {
+      expect(document.getElementById(`corr-bultos-${it.id}`)).toBeNull();
+      expect(document.getElementById(`corr-facturas-${it.id}`)).toBeNull();
+      expect(document.getElementById(`corr-direccion-${it.id}`)).toBeNull();
     }
   });
 
-  it("los OTROS renglones siguen en pantalla, con sus mismos datos", async () => {
-    await corregirPrimero();
+  it("🔴 el camino que queda es «Editar», y abre los 7 envíos EDITABLES", async () => {
+    await montar();
+    fireEvent.click(screen.getByRole("button", { name: /Editar/ }));
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll('input[id^="facturas-"][id$="-m"]').length,
+      ).toBe(ITEMS.length),
+    );
+    // En una guía PENDIENTE se edita todo, incluidos los bultos.
+    expect(document.querySelectorAll('input[id^="bultos-"][id$="-m"]')).toHaveLength(ITEMS.length);
+    expect(document.querySelectorAll('input[id^="direccion-"][id$="-m"]')).toHaveLength(ITEMS.length);
+  });
+
+  it("🔴 y la lista de solo lectura NO se dibuja al mismo tiempo", async () => {
+    // Serían los mismos 7 envíos dos veces en la misma pantalla, que es lo que
+    // esta pantalla sacó el 17-ago-2026.
+    await montar();
+    fireEvent.click(screen.getByRole("button", { name: /Editar/ }));
+    await waitFor(() =>
+      expect(document.querySelectorAll('input[id^="facturas-"][id$="-m"]').length).toBe(ITEMS.length),
+    );
     for (const c of CLIENTES) {
-      expect(screen.getAllByText(c), c).toHaveLength(1);
+      // El nombre aparece dentro del selector de cliente (dos layouts), pero
+      // no además como texto suelto de un resumen de solo lectura.
+      expect(document.querySelectorAll('input[id^="transp-"]')).toHaveLength(0);
     }
-    expect(screen.getByText("7 bultos")).toBeTruthy(); // el último, intacto
   });
 
-  it("el cliente se elige con el selector de siempre, no con un campo libre", async () => {
+  it("🔴 ABRIR el formulario y no tocar nada NO escribe una sola vez", async () => {
     await montar();
-    fireEvent.click(screen.getAllByRole("button", { name: "Corregir" })[0]);
-    // El selector compartido se anuncia como combobox; un `<input>` suelto no.
-    expect(screen.getAllByRole("combobox").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: /Editar/ }));
+    await waitFor(() =>
+      expect(document.querySelectorAll('input[id^="facturas-"][id$="-m"]').length).toBe(ITEMS.length),
+    );
+    await new Promise((r) => setTimeout(r, 2200));
+    for (const l of llamadas) expect(l.method, l.url).toBe("GET");
   });
 });
 
-describe("🔴 el candado de la guía YA DESPACHADA no se toca", () => {
-  it("una guía Completada no ofrece corregir ni cajas para escribir", async () => {
+describe("🔴 la guía YA DESPACHADA no vuelve a despachar", () => {
+  it("una guía Completada no ofrece las cajas del despacho ni «Corregir»", async () => {
     await montar({ estado: "Completada", tipo_despacho: "externo", numero_guia_transp: "TR-1" });
     expect(screen.queryByRole("button", { name: "Corregir" })).toBeNull();
+    // Las cajas del N° son parte de DESPACHAR: en una guía que ya salió no van.
     expect(document.getElementById("transp-0")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Confirmar despacho/i })).toBeNull();
     // Y los envíos se siguen viendo, una sola vez.
     for (const c of CLIENTES) expect(screen.getAllByText(c), c).toHaveLength(1);
   });

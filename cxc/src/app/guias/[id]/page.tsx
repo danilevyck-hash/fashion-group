@@ -45,9 +45,8 @@
 //     que se sacó el 17-ago-2026.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
@@ -63,6 +62,22 @@ import {
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
+import { abrirEnEdicion, urlDeLaGuia } from "@/lib/guias/abrir-en-edicion";
+import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
+// ⚠️ `papel-de-la-guia` arrastra jsPDF (~148 kB) y se pide con `await import`,
+// nunca de arriba: estático acá la carga inicial de esta pantalla pasaba de 204
+// kB a 351 kB, y es la que bodega abre desde el celular. Se PRECARGA al montar
+// (ver `useEffect` más abajo) para que el toque no tenga que esperar red.
+
+/**
+ * `useLayoutEffect` en el navegador, `useEffect` en el servidor.
+ *
+ * ⚠️ React avisa por consola si un `useLayoutEffect` corre en el servidor (allá
+ * no hace nada). El valor se decide UNA vez por entorno, así que el orden de
+ * los hooks no cambia entre dibujos — que es lo único que la regla de hooks
+ * pide.
+ */
+const useLayoutEffectSeguro = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 /** Los mismos que ya podían despachar desde la lista. Vendedor mira, no toca. */
 const DESPACHO_ROLES = ["admin", "secretaria", "bodega"];
@@ -98,22 +113,83 @@ export default function GuiaPage() {
 
   /**
    * ¿La edición está abierta? Se abre con el botón «Editar» y se cierra al
-   * guardar o al cancelar — **sin cambiar de pantalla**.
-   *
-   * `?editar=1` la abre de entrada: es por donde entra el camino viejo
-   * (`/guias/[id]/editar`, que ahora redirige acá), así que un enlace guardado
-   * sigue abriendo lo que abría. Se lee de `window.location` y no con
-   * `useSearchParams` por lo mismo que en `/guias`: ese hook obliga a envolver
-   * la página en un `<Suspense>` para poder compilarla.
+   * guardar o al cancelar — **sin cambiar de pantalla**. Quién la enciende al
+   * llegar con `?editar=1`, y por qué antes de pintar, está en el efecto de
+   * abajo.
    */
   const [editando, setEditando] = useState(false);
-  useEffect(() => {
-    try {
-      if (new URLSearchParams(window.location.search).get("editar") === "1") setEditando(true);
-    } catch {
-      /* sin query: la guía se abre en modo lectura, como siempre */
-    }
+
+  /**
+   * 🔴 ¿LA GUÍA SE ABRE CON EL FORMULARIO YA ABIERTO? — **ANTES DE PINTAR**.
+   *
+   * 🩸 EL PARPADEO. Esto era un `useEffect`, que corre **después** de que el
+   * navegador pintó: tocar «Editar» dibujaba la guía entera en modo LECTURA
+   * —datos, envíos, bloque de despacho— y recién en el cuadro siguiente la
+   * reemplazaba por el formulario. Medido con capturas en secuencia: a los 100
+   * ms se veía la pantalla equivocada.
+   *
+   * 🔑 `useLayoutEffect` corre **antes del pintado**, así que el modo queda
+   * bien sin que se llegue a ver el otro. Es UNA sola pieza a propósito: hubo
+   * una versión con un inicializador perezoso de `useState` ADEMÁS de esto, y
+   * **la mutación que lo sacaba sobrevivía** — dos mecanismos para lo mismo
+   * hacen que ninguno de los dos se pueda probar.
+   *
+   * 🩸 Y NO ALCANZA CON LEER LA URL EN EL PRIMER DIBUJO: medido en el
+   * navegador, entrando por «Editar» desde la lista `router.push` actualiza
+   * `window.location` y renderiza la ruta nueva **sin garantizar el orden**, y
+   * lo que se leía era la dirección VIEJA (`/guias`). La pantalla aterrizaba en
+   * LECTURA y había que tocar «Editar» otra vez. Un efecto de montaje lee la
+   * dirección cuando ya está donde tiene que estar.
+   *
+   * ⚠️ Solo ENCIENDE, nunca apaga. Cerrar la edición limpia la dirección
+   * (`cambiarModo`), así que esto no puede reabrir lo que la persona acaba de
+   * cerrar; y si apagara, pisaría el «Editar» de esta misma pantalla, que no
+   * toca la URL hasta después.
+   *
+   * ⚠️ Se lee de `window.location` y no con `useSearchParams` por lo mismo que
+   * en `/guias`: ese hook obliga a envolver la página en un `<Suspense>` para
+   * poder compilarla.
+   */
+  useLayoutEffectSeguro(() => {
+    if (abrirEnEdicion(window.location.search)) setEditando(true);
+    // Solo al montar: la dirección ya está donde tiene que estar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * 🩸 Y LA DIRECCIÓN DICE LO QUE SE ESTÁ VIENDO. Al cerrar la edición la URL
+   * seguía diciendo `?editar=1`: recargar, compartir el enlace o darle "atrás"
+   * volvía a abrir el formulario que la persona acababa de cerrar.
+   *
+   * `replace` y no `push`: con `push`, el "atrás" del navegador reabriría el
+   * formulario en vez de sacar de la guía.
+   */
+  /**
+   * 🔑 EL MÓDULO DEL PAPEL SE PIDE AL ENTRAR, NO AL TOCAR EL BOTÓN.
+   *
+   * 🩸 En iOS la hoja de compartir y el visor de PDF solo se abren DENTRO del
+   * gesto del toque. Si el módulo se bajara al apretar «Compartir», el `await`
+   * de red haría que el navegador dejara de contarlo como gesto y no abriría
+   * nada — con un `catch` silencioso, sin decir por qué. Pedirlo acá lo deja en
+   * memoria antes de que el botón exista en pantalla, y el `await` del handler
+   * resuelve en un microtask.
+   */
+  useEffect(() => {
+    void import("@/lib/guias/papel-de-la-guia");
+  }, []);
+
+  const cambiarModo = useCallback(
+    (abierto: boolean) => {
+      setEditando(abierto);
+      if (!id) return;
+      try {
+        router.replace(urlDeLaGuia(id, abierto, window.location.search), { scroll: false });
+      } catch {
+        /* sin router disponible: el modo cambió igual, que es lo que importa */
+      }
+    },
+    [id, router],
+  );
 
   if (!authChecked || !id) return null;
 
@@ -122,13 +198,35 @@ export default function GuiaPage() {
   const items = g?.guia_items || [];
   const titulo = g ? `Guía ${fmtGuia(g.numero)}` : "Guía";
 
-  // 🔴 UNA GUÍA YA DESPACHADA NO SE EDITA, Y ESE CANDADO NO SE TOCA. No es
-  // cosmético: el PUT la rechaza igual, así que un botón «Editar» acá sería un
-  // botón que lleva a una pantalla que no puede guardar. Las dos excepciones de
-  // siempre siguen donde estaban (atar el cliente, y anotar el N° del
-  // transportista desde el renglón).
-  const puedeEditar = EDICION_ROLES.includes(role || "") && !s.despachada;
-  const enEdicion = editando && puedeEditar && !!g;
+  /**
+   * 🔴 A UNA GUÍA DESPACHADA **TAMBIÉN** SE ENTRA Y SE ABRE EL FORMULARIO — con
+   * tres cosas editables, no con todo.
+   *
+   * Daniel, punto 4: *"Guía despachada → se puede corregir **N° del
+   * transportista · cliente · facturas**"*; punto 5: *"los **bultos** de una
+   * despachada **NO se tocan** — es lo que el transportista firmó"*; punto 6:
+   * *"la firma queda la vieja, no se vuelve a firmar"*.
+   *
+   * ⚠️ **EL CANDADO DEL PUT NO SE TOCÓ.** Una guía Completada lo sigue
+   * rechazando entero: las tres correcciones van por escrituras POR COLUMNA
+   * (`PATCH …/item` y `PATCH …/numero-transp`), que es lo único que no le rota
+   * el id a cada renglón. La regla vive en `campos-editables.ts` y la leen el
+   * formulario y el servidor.
+   *
+   * 🔴 Y NADIE GANA PERMISOS: es el MISMO conjunto de siempre (admin ·
+   * secretaria · bodega). Vendedor sigue mirando sin tocar.
+   */
+  const puedeEditar = EDICION_ROLES.includes(role || "");
+  /**
+   * 🔴 NO DEPENDE DE QUE LA GUÍA YA HAYA CARGADO, y eso es la otra mitad del
+   * arreglo del parpadeo. Con `&& !!g`, mientras la guía viajaba la pantalla
+   * caía en el modo LECTURA y dibujaba su esqueleto y su encabezado; al llegar
+   * los datos saltaba al formulario. Ahora el modo lo decide quien apretó el
+   * botón, y lo que se muestra mientras carga es el esqueleto DEL FORMULARIO.
+   */
+  const enEdicion = editando && puedeEditar;
+  /** Lo que falta en una guía que ya salió: se DICE, no se puede completar acá. */
+  const faltaEnLaDespachada = g ? textoFaltantesDespachada(g) : "";
 
   /**
    * 🔴 EL DESPACHO, QUE VIVE EN ESTA MISMA PANTALLA — se esté editando o no.
@@ -140,19 +238,20 @@ export default function GuiaPage() {
   const bloqueDespacho = !g ? null : s.despachada ? (
     /* Ya despachada: lo que se firmó, de solo lectura. */
     <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
+      <span className="text-xs uppercase tracking-wide text-gray-400 block mb-3">
         Ya despachada
       </span>
-      {/* 🔴 LA PANTALLA DICE QUE ESTÁ BLOQUEADA. Campos que parecen editables y
-          no dejan escribir son peor que no mostrarlos: acá se dice de frente
-          qué se puede tocar y qué no. Mismo criterio que el aviso "Solo se
-          puede cambiar el cliente" del acordeón de la lista. */}
-      <p className="text-sm text-gray-600 mb-3">
-        Esta guía ya se despachó: no se puede editar.
-        {puedeDespachar && !esEntregaDirecta(g)
-          ? " Lo único que se puede cambiar es el N° del transportista de cada envío."
-          : ""}
-      </p>
+      {/* 🔴 ACÁ VIVÍA EL PRIMERO DE LOS TRES TEXTOS QUE SE CONTRADECÍAN.
+          Decía *"Esta guía ya se despachó: no se puede editar. Lo único que se
+          puede cambiar es el N° del transportista de cada envío"*, mientras el
+          acordeón de la lista decía *"Solo se puede cambiar el cliente"* y el
+          renglón decía *"Es lo único que se puede cambiar de una guía ya
+          despachada"*. Tres frases, tres respuestas distintas, y desde el punto
+          4 las tres son FALSAS: se corrigen el N° del transportista, el cliente
+          y las facturas. Los tres se fueron (Daniel, punto 14).
+
+          Lo que se puede tocar ya no hace falta explicarlo: se ve, porque es lo
+          único que el formulario dibuja como campo. */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <Dato etiqueta="Cómo salió" valor={ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]} />
         {/* En entrega directa no hay placa, y un "0" no es una placa. */}
@@ -181,12 +280,6 @@ export default function GuiaPage() {
           </div>
         )}
       </div>
-      <Link
-        href={`/guias/${id}/imprimir`}
-        className="mt-4 inline-flex items-center min-h-[44px] text-sm text-blue-700 hover:text-blue-900 transition"
-      >
-        Ver e imprimir la guía
-      </Link>
     </div>
   ) : puedeDespachar ? (
     <DespachoForm
@@ -239,18 +332,36 @@ export default function GuiaPage() {
           {/* 🔑 EL MISMO FORMULARIO DEL ALTA, no uno parecido. Trae su propia
               barra pegajosa (con "Guardar Cambios" y el "Falta: …" cuando el
               botón está apagado), así que va FUERA de la caja de esta página
-              — igual que en `/guias/nueva`. */}
-          <EdicionGuia
-            id={id}
-            onSalir={() => setEditando(false)}
-            onGuardado={() => {
-              setEditando(false);
-              // La guía de esta pantalla se relee: el PUT reemplaza los
-              // renglones, así que los ids que el despacho tiene en la mano
-              // para el N° del transportista cambiaron.
-              void s.recargar();
-            }}
-          />
+              — igual que en `/guias/nueva`.
+
+              🔴 MIENTRAS LA GUÍA VIAJA SE MUESTRA **EL ESQUELETO DEL
+              FORMULARIO**, no la pantalla de lectura. Antes, `enEdicion` exigía
+              que la guía ya estuviera cargada, así que el camino era: esqueleto
+              de lectura → pantalla de lectura entera → formulario. Ese salto
+              es el parpadeo.
+
+              🔴 Y LA GUÍA SE LE PASA YA CARGADA (`guia={g}`): sin esto el
+              formulario la pedía POR SEGUNDA VEZ. Eran 6 pedidos para abrir
+              «Editar», con la misma guía viajando dos veces. */}
+          {!g ? (
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+              <div className="h-24 bg-gray-100 rounded-lg animate-pulse mb-4" />
+              <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+            </div>
+          ) : (
+            <EdicionGuia
+              id={id}
+              guia={g}
+              onSalir={() => cambiarModo(false)}
+              onGuardado={() => {
+                cambiarModo(false);
+                // La guía de esta pantalla se relee: el PUT reemplaza los
+                // renglones, así que los ids que el despacho tiene en la mano
+                // para el N° del transportista cambiaron.
+                void s.recargar();
+              }}
+            />
+          )}
           <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-6">{bloqueDespacho}</div>
         </>
       ) : (
@@ -288,16 +399,18 @@ export default function GuiaPage() {
                       calcula igual.) */}
                   <Dato etiqueta="Bultos" valor={String(items.reduce((a, i) => a + (i.bultos || 0), 0))} />
                 </div>
-                {/* 🔴 «EDITAR» — y se abre ACÁ MISMO. Antes esto era un enlace
-                    de texto que decía "Cambiar los envíos de esta guía" y
-                    llevaba a OTRA pantalla, un nivel más adentro. Daniel:
-                    *"quiero botón de editar y que se me abra la guía para
-                    editar así mismo como si estuviese haciendo la guía"*. */}
-                {puedeEditar && (
-                  <div className="mt-3">
+                {/* 🔴 TRES BOTONES, TRES TAREAS, UN TOQUE CADA UNA.
+                    · «Editar» abre el MISMO formulario del alta, acá mismo.
+                    · «Imprimir» manda el papel a la impresora SIN pantalla
+                      intermedia (antes abría una pestaña y adentro había que
+                      buscar otro «Imprimir»).
+                    · «Compartir» abre la hoja del celular con el PDF.
+                    Daniel, puntos 10 y 11. */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {puedeEditar && (
                     <button
                       type="button"
-                      onClick={() => setEditando(true)}
+                      onClick={() => cambiarModo(true)}
                       className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-md border border-gray-200 text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -306,8 +419,47 @@ export default function GuiaPage() {
                       </svg>
                       Editar
                     </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // El módulo ya está en memoria (se precargó al entrar),
+                      // así que esto resuelve en un microtask y el toque sigue
+                      // contando como gesto en iOS.
+                      void import("@/lib/guias/papel-de-la-guia").then(({ imprimirGuia }) => {
+                        if (imprimirGuia(g) === "bloqueado") {
+                          s.showToast("El navegador bloqueó la ventana. Permite las ventanas emergentes y vuelve a intentar.");
+                        }
+                      });
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-md border border-gray-200 text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 6 2 18 2 18 9" />
+                      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                      <rect x="6" y="14" width="12" height="8" />
+                    </svg>
+                    Imprimir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void import("@/lib/guias/papel-de-la-guia")
+                        .then(({ compartirGuia }) => compartirGuia(g))
+                        .then((r) => {
+                          if (r === "descargado") s.showToast("Guía descargada — revisa tu carpeta de descargas");
+                        });
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-md border border-gray-200 text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 16V4" />
+                      <path d="m8 8 4-4 4 4" />
+                      <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+                    </svg>
+                    Compartir
+                  </button>
+                </div>
               </div>
 
               {/* 🔴 LA MARCA DE LO QUE FALTÓ. El N° del transportista dejó de
@@ -325,21 +477,46 @@ export default function GuiaPage() {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
                   <p className="text-sm text-amber-900">
                     Esta guía salió sin el N° del transportista.{" "}
-                    {puedeDespachar
-                      ? "Cuando lo tengas, anótalo en el envío que corresponda."
-                      : ""}
+                    {puedeEditar ? "Cuando lo tengas, anótalo con «Editar»." : ""}
                   </p>
                 </div>
               )}
 
-              {/* 🔴 UNA SOLA LISTA DE ENVÍOS. Cada renglón trae su caja del N° del
-                  transportista y su botón "Corregir" — antes los mismos 7 envíos
-                  se dibujaban dos veces en esta pantalla (acá de solo lectura y
-                  otra vez completos dentro del formulario de despacho).
+              {/* 🔴 LO QUE FALTÓ AL DESPACHAR, DICHO — no arreglado acá.
+                  Daniel, punto 13: *"Las 68 sin placa y 65 sin recibido →
+                  marcadas para completarlas"*.
 
-                  ⚠️ Y sigue siendo UNA SOLA con la edición abierta: cuando se
-                  edita, esta lista no se dibuja — la del formulario es la misma
-                  lista, completa y editable. */}
+                  🩸 De las 207 despachadas, 190 (92%) tienen al menos un dato
+                  en blanco: se cerraron cuando nada bloqueaba. El bloqueo se
+                  puso el 10-ago-2026 y desde entonces son 0 de 15 — es una
+                  deuda del pasado, no un agujero abierto.
+
+                  ⚠️ **SE MARCA, NO SE ABRE.** La placa, quién recibió y la
+                  cédula NO están entre las tres cosas que Daniel abrió (N° del
+                  transportista · cliente · facturas) y siguen cerradas: el
+                  candado del PUT las rechaza igual. Marcarlas es lo que permite
+                  encontrarlas. */}
+              {faltaEnLaDespachada && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm text-amber-900">{faltaEnLaDespachada}.</p>
+                </div>
+              )}
+
+              {/* 🔴 UNA SOLA LISTA DE ENVÍOS, Y **UNA SOLA FORMA DE EDITARLA**.
+                  Daniel, punto 1: *"se retira el «Corregir» por renglón. Un
+                  formulario, el MISMO al crear y al editar"*.
+
+                  🩸 Convivían DOS caminos para arreglar el mismo renglón: el
+                  «Corregir» de acá (que abría una cajita con cliente,
+                  dirección, empresa, bultos y facturas) y «Editar», que abre el
+                  formulario con exactamente los mismos campos. Dos formas de
+                  hacer lo mismo, cada una con su propio botón de guardar y su
+                  propio idioma. Quedó el formulario.
+
+                  ⚠️ Las cajas del N° del transportista SÍ se quedan: no son
+                  otra forma de editar, son parte de DESPACHAR — se llenan con
+                  el papel del chofer en la mano y se confirman con las firmas,
+                  en el mismo acto. */}
               <ListaEnvios
                 items={items}
                 numeroGuiaCabecera={g.numero_guia_transp}
@@ -347,9 +524,6 @@ export default function GuiaPage() {
                 setNumeroTransp={s.setNumeroTransp}
                 editable={!s.despachada && puedeDespachar}
                 externo={s.tipoDespacho === "externo"}
-                onCorregir={s.corregirItem}
-                puedeAnotarNumero={s.despachada && puedeDespachar && !esEntregaDirecta(g)}
-                onAnotarNumero={s.anotarNumeroTransp}
               />
 
               {/* 🔴 LAS OBSERVACIONES, DONDE SE CARGA EL CAMIÓN.

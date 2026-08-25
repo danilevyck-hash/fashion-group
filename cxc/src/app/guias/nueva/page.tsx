@@ -48,8 +48,6 @@ export default function GuiaNuevaPage() {
         setEntregadoPor={s.setEntregadoPor}
         observaciones={s.observaciones}
         setObservaciones={s.setObservaciones}
-        numeroGuiaTransp={s.numeroGuiaTransp}
-        setNumeroGuiaTransp={s.setNumeroGuiaTransp}
         items={s.items}
         transportistas={s.transportistas}
         direcciones={s.direcciones}

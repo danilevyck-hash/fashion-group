@@ -65,8 +65,6 @@ function montarForm(items: GuiaItem[]) {
       setEntregadoPor={() => {}}
       observaciones=""
       setObservaciones={() => {}}
-      numeroGuiaTransp=""
-      setNumeroGuiaTransp={() => {}}
       items={items}
       transportistas={[]}
       direcciones={DIRECCIONES_BASE}
@@ -136,7 +134,6 @@ describe("🔴 la dirección del cliente aparece PRIMERA en la lista", () => {
         editingId={null} formNumero={1} fecha="2026-08-14" setFecha={() => {}}
         modoEntrega="transportista" setModoEntrega={() => {}} transportistaId={null} setTransportistaId={() => {}}
         entregadoPor="" setEntregadoPor={() => {}} observaciones="" setObservaciones={() => {}}
-        numeroGuiaTransp="" setNumeroGuiaTransp={() => {}}
         items={[fila({ cliente: "CITY MALL PASO CANOA", cliente_codigo: "D-25" })]}
         transportistas={[]} direcciones={DIRECCIONES_BASE} validationErrors={new Set()} error={null} saving={false}
         onAddDireccion={() => {}}

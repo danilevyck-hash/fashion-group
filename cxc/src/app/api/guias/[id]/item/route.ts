@@ -14,11 +14,32 @@
 //   · el resto de los renglones **no se lee, no se borra y no se reinserta**:
 //     conservan su id, su `cliente_codigo` y su `numero_guia_transp`.
 //
-// 🔴 EL CANDADO DE LA GUÍA YA DESPACHADA SIGUE INTACTO, y acá es al revés que en
-// `/api/guias/[id]/cliente`: ese endpoint no mira el estado a propósito (atar un
-// cliente no es editar el despacho, y el 98% de las guías están cerradas). Esto
-// SÍ cambia el despacho —bultos, dirección, facturas— así que una guía
-// Completada se rechaza igual que en el PUT.
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 UNA GUÍA YA DESPACHADA ACEPTA **TRES COLUMNAS Y NADA MÁS** (25-ago-2026).
+//
+// Daniel, punto 4: *"Guía despachada → se puede corregir **N° del transportista
+// · cliente · facturas**"*. Punto 5: *"los **bultos** de una despachada **NO se
+// tocan** — es lo que el transportista firmó"*.
+//
+// 🩸 Antes esto rechazaba una guía Completada ENTERA. Pero el papel que sale
+// mal impreso o con la factura equivocada existe igual, y la única forma de
+// arreglarlo era no tenerla: 143 guías sin N° de transportista y facturas
+// cargadas mal que nadie podía tocar.
+//
+// 🔴 LO QUE **NO** CAMBIÓ, y es la mitad de esto:
+//   · **El candado del PUT sigue intacto.** Una guía Completada lo rechaza
+//     entero, y con razón: `items` en el PUT borra los renglones e inserta
+//     otros con ids NUEVOS, o sea que corregir una factura le costaría el
+//     `cliente_codigo` y el N° anotado tarde a cada línea. Por eso esto es un
+//     endpoint por COLUMNA y no un campo más del PUT.
+//   · **`bultos`, `direccion` y `empresa` siguen cerrados** en una guía que ya
+//     salió. No están en la lista y se contestan con un 400 que dice por qué.
+//   · Placa, receptor, cédula y **las dos firmas** no se tocan desde acá — ni
+//     desde ninguna parte: la firma queda la vieja (punto 6).
+//
+// 🔑 LA LISTA NO SE ESCRIBE ACÁ: se LEE de `campos-editables.ts`, el mismo
+// módulo que decide qué campos dibuja el formulario. Con dos copias, la
+// pantalla ofrecería un campo que el servidor rechaza — o peor, al revés.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -29,6 +50,7 @@ import { logActivity } from "@/lib/log-activity";
 import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 import { validarCodigoParaAtar } from "@/lib/guias/atar-cliente";
 import { armarCorreccion, hayCambioReal } from "@/lib/guias/correccion-item";
+import { camposEditablesDeRenglon } from "@/lib/guias/campos-editables";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
 
 export const dynamic = "force-dynamic";
@@ -67,15 +89,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .maybeSingle();
   if (guiaErr) return NextResponse.json({ error: "Error interno" }, { status: 500 });
   if (!guia || guia.deleted) return NextResponse.json({ error: "Guía no encontrada" }, { status: 404 });
-  if (guia.estado === "Completada" || guia.estado === "Rechazada") {
-    // El MISMO mensaje que el PUT: es el mismo candado, dicho igual.
-    return NextResponse.json({ error: "Guía ya despachada, no se puede editar" }, { status: 400 });
+
+  // 🔴 EL FILTRO POR ESTADO. Antes de salir se corrige todo; después de salir,
+  // solo el N° del transportista, el cliente y las facturas. La lista la pone
+  // `campos-editables.ts`, el mismo módulo que usa el formulario.
+  const permitidos = new Set<string>(camposEditablesDeRenglon(guia.estado));
+  const prohibidos = Object.keys(cambios).filter((c) => !permitidos.has(c));
+  if (prohibidos.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Esta guía ya se despachó: de un envío solo se pueden corregir el cliente, las facturas y el N° del transportista.",
+        campos: prohibidos,
+      },
+      { status: 400 },
+    );
   }
 
   // La línea tiene que ser DE ESTA GUÍA.
   const { data: item, error: itemErr } = await supabaseServer
     .from("guia_items")
-    .select("id, cliente, cliente_codigo, direccion, empresa, facturas, bultos")
+    .select("id, cliente, cliente_codigo, direccion, empresa, facturas, bultos, numero_guia_transp")
     .eq("id", itemId)
     .eq("guia_id", id)
     .maybeSingle();

@@ -31,6 +31,16 @@ const read = (...p: string[]) => readFileSync(join(src, ...p), "utf8");
 const guias = (f: string) => read("app", "guias", "components", f);
 
 const form = guias("GuiaForm.tsx");
+/**
+ * 🔑 EL ANCHO MÍNIMO DE LA TABLA SE LEE DEL FUENTE, NO SE ESCRIBE ACÁ.
+ * Hoy el formulario declara `minWidth={pideNumeroTransp ? 820 : 720}`: con
+ * transportista externo la tabla lleva la columna del N° de guía del
+ * transportista y pide 100 px más; en entrega directa esa columna no se
+ * pregunta. Un número copiado a mano es el que se queda viejo el día que la
+ * tabla gana o pierde una columna.
+ */
+const expresionAncho = form.match(/<ScrollableTable minWidth=\{([^}]*)\}/)?.[1] ?? "";
+const anchosTabla = (expresionAncho.match(/\d+/g) ?? []).map(Number);
 // Compartido desde jul-2026: Cheques usa el MISMO selector, así que vive en
 // src/components/ y ya no bajo app/guias/.
 const picker = read("components", "ClientePicker.tsx");
@@ -44,20 +54,40 @@ describe("El cuerpo de la página no puede scrollear de lado en 390px", () => {
     expect(form).toMatch(/<div data-layout="tarjetas" className="lg:hidden/);
   });
 
-  it("ya no hay una tabla de 800px de ancho mínimo", () => {
-    // (El 800 sigue NOMBRADO en el comentario de cabecera, que cuenta la
-    //  historia; lo que no puede volver es en el componente.)
+  it("el ancho lo declara UN ScrollableTable, y el número sale del fuente", () => {
+    // Lo que este candado protege NO es el número: es que exista un ancho
+    // mínimo declarado y que sea el `ScrollableTable` quien lo contenga. El
+    // valor se LEE (hoy 820 con transportista externo, 720 en entrega directa)
+    // para que agregar o quitar una columna no deje el candado midiendo un
+    // ancho que ya no existe.
+    expect(anchosTabla).toHaveLength(2);
+    expect(expresionAncho).toContain("pideNumeroTransp");
+    const [conTransp, sinTransp] = anchosTabla;
+    expect(conTransp).toBeGreaterThan(sinTransp); // la columna del N° ensancha
+    // (El 800 de la tabla vieja sigue NOMBRADO en el comentario de cabecera,
+    //  que cuenta la historia; lo que no puede volver es al componente: era el
+    //  que obligaba a ~410 px de arrastre en un iPhone de 390.)
     expect(form).not.toMatch(/<ScrollableTable minWidth=\{800\}/);
-    expect(form).toMatch(/<ScrollableTable minWidth=\{720\}/);
   });
 
-  it("el ScrollableTable que queda vive dentro del bloque de escritorio", () => {
-    const i = form.indexOf('<div data-layout="tabla" className="hidden lg:block">');
-    const j = form.indexOf("</ScrollableTable>");
-    expect(i).toBeGreaterThan(0);
-    expect(j).toBeGreaterThan(i);
-    // Un solo ScrollableTable en todo el formulario, y es el de escritorio.
+  it("el ScrollableTable contiene TODO el ancho de la tabla — el body nunca scrollea", () => {
+    const iBloque = form.indexOf('<div data-layout="tabla" className="hidden lg:block">');
+    const iScroll = form.indexOf("<ScrollableTable");
+    const iTabla = form.indexOf("<table");
+    const jTabla = form.indexOf("</table>");
+    const jScroll = form.indexOf("</ScrollableTable>");
+    expect(iBloque).toBeGreaterThan(0);
+    // Anidado, en este orden: bloque de escritorio ⊃ ScrollableTable ⊃ <table>.
+    // Con la tabla FUERA del scroller, los px que sobran los arrastra el cuerpo
+    // de la página — que es exactamente lo que el #326 sacó del iPhone.
+    expect(iScroll).toBeGreaterThan(iBloque);
+    expect(iTabla).toBeGreaterThan(iScroll);
+    expect(jTabla).toBeGreaterThan(iTabla);
+    expect(jScroll).toBeGreaterThan(jTabla);
+    // Una sola tabla y un solo scroller en todo el formulario: la vista de
+    // tarjetas (<lg), o sea el iPhone, no tiene ninguna de las dos.
     expect((form.match(/<ScrollableTable/g) ?? []).length).toBe(1);
+    expect((form.match(/<table/g) ?? []).length).toBe(1);
   });
 });
 
@@ -135,19 +165,33 @@ describe("iPad · el corte tarjeta/tabla y el ancho que queda", () => {
   const LG = 1024; // breakpoint `lg` de Tailwind — corte tarjetas/tabla
   const BARRA_LATERAL = 224; // Sidebar `w-56`, fija desde `md:`
   const PADDING = 48; // contenedor del form: `px-6` (24 por lado) desde `sm:`
-  const MIN_TABLA = 720; // ScrollableTable minWidth
+  // 🔴 EL ANCHO SE MOVIÓ: 720 → 820, y por eso este número cambió.
+  // El 24-ago-2026 la tabla de escritorio ganó una columna —el N° de guía del
+  // transportista, POR LÍNEA— y con transportista externo pide 100 px más. En
+  // entrega directa esa columna no se pregunta y la tabla sigue midiendo 720,
+  // así que hay DOS anchos y el que manda para "¿entra?" es el peor caso.
+  // Los dos se LEEN del formulario (`anchosTabla`): copiarlos acá es lo que
+  // dejaría el candado midiendo un ancho que ya no existe.
+  const MIN_TABLA = Math.max(...anchosTabla); // 820 — con transportista externo
+  const MIN_TABLA_DIRECTA = Math.min(...anchosTabla); // 720 — entrega directa
 
   const IPADS = [
-    { nombre: "iPad mini/10.2 vertical", w: 768, esperado: "tarjetas" },
-    { nombre: "iPad mini/10.2 horizontal", w: 1024, esperado: "tabla" },
-    { nombre: "iPad Air/Pro 11 vertical", w: 834, esperado: "tarjetas" },
-    { nombre: "iPad Air/Pro 11 horizontal", w: 1194, esperado: "tabla" },
-    { nombre: "iPad Pro 12.9 vertical", w: 1024, esperado: "tabla" },
-    { nombre: "iPad Pro 12.9 horizontal", w: 1366, esperado: "tabla" },
+    // `arrastreInterno` = px que sobran de la tabla ANCHA (con la columna del
+    // N°) y que se arrastran DENTRO del ScrollableTable. El cuerpo de la
+    // página no se mueve en ninguno: eso lo fija el candado de arriba.
+    { nombre: "iPad mini/10.2 vertical", w: 768, esperado: "tarjetas", arrastreInterno: 0 },
+    { nombre: "iPad mini/10.2 horizontal", w: 1024, esperado: "tabla", arrastreInterno: 68 },
+    { nombre: "iPad Air/Pro 11 vertical", w: 834, esperado: "tarjetas", arrastreInterno: 0 },
+    { nombre: "iPad Air/Pro 11 horizontal", w: 1194, esperado: "tabla", arrastreInterno: 0 },
+    { nombre: "iPad Pro 12.9 vertical", w: 1024, esperado: "tabla", arrastreInterno: 68 },
+    { nombre: "iPad Pro 12.9 horizontal", w: 1366, esperado: "tabla", arrastreInterno: 0 },
   ] as const;
 
   it("los cuatro números salen del fuente, no de la memoria de nadie", () => {
-    expect(form).toMatch(/<ScrollableTable minWidth=\{720\}/); // MIN_TABLA
+    // MIN_TABLA no se escribe: se lee de `minWidth={pideNumeroTransp ? 820 : 720}`.
+    expect(anchosTabla).toHaveLength(2);
+    expect(expresionAncho).toContain("pideNumeroTransp");
+    expect(MIN_TABLA).toBeGreaterThan(MIN_TABLA_DIRECTA);
     expect(form).toContain('className="max-w-6xl mx-auto px-4 sm:px-6 py-6"'); // PADDING
     expect(sidebar).toMatch(/const width = collapsed \? "w-16" : "w-56"/); // BARRA_LATERAL
     expect(sidebar).toContain("hidden md:flex fixed left-0"); // la barra existe desde md
@@ -158,16 +202,22 @@ describe("iPad · el corte tarjeta/tabla y el ancho que queda", () => {
       const layout = d.w >= LG ? "tabla" : "tarjetas";
       expect(layout).toBe(d.esperado);
       if (layout === "tabla") {
-        // Con tabla, lo que queda tiene que dar para los 720 px: si no, vuelve
-        // el arrastre horizontal que el #326 sacó del iPhone.
-        expect(d.w - BARRA_LATERAL - PADDING).toBeGreaterThanOrEqual(MIN_TABLA);
+        const disponible = d.w - BARRA_LATERAL - PADDING;
+        // La tabla ANGOSTA (entrega directa) tiene que entrar SIEMPRE donde se
+        // dibuja tabla: si no, vuelve el arrastre que el #326 sacó del iPhone.
+        expect(disponible).toBeGreaterThanOrEqual(MIN_TABLA_DIRECTA);
+        // Con la columna del N°, en el iPad ACOSTADO (1024) sobran 68 px. Se
+        // arrastran dentro del ScrollableTable —el cuerpo de la página no se
+        // mueve, que es el invariante— y el número se fija acá para que la
+        // tabla no siga engordando sin que nadie se entere.
+        expect(Math.max(0, MIN_TABLA - disponible)).toBe(d.arrastreInterno);
       }
     });
   }
 
-  it("en 768 y 834 la tabla NO cabría — por eso van a tarjetas", () => {
+  it("en 768 y 834 no cabría NI la tabla angosta — por eso van a tarjetas", () => {
     for (const w of [768, 834]) {
-      expect(w - BARRA_LATERAL - PADDING).toBeLessThan(MIN_TABLA);
+      expect(w - BARRA_LATERAL - PADDING).toBeLessThan(MIN_TABLA_DIRECTA);
     }
   });
 

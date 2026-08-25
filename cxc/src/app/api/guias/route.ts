@@ -24,6 +24,18 @@ export async function GET(req: NextRequest) {
   // Sprint 3: JOIN a transportistas para resolver el label canónico; la
   // columna TEXT vieja ya no se selecciona ni se lee.
   //
+  // ⚠️ `direccion`, `empresa` y `orden` viajan desde el 25-ago-2026: el Excel
+  // pasó a UNA FILA POR ENVÍO y se arma con lo que trae el listado. Sin ellos
+  // las columnas «Destino» y «Empresa» salían VACÍAS — de hecho «Empresa» ya
+  // salía vacía antes, y nadie lo había notado porque el resumen por guía las
+  // juntaba en una celda. `orden` es lo que hace que los envíos salgan en el
+  // orden de la guía y no en el que la base los devuelva.
+  //
+  // ⚠️ `cedula` también viaja, y por el mismo motivo: la marca "salió
+  // incompleta" mira placa, quién recibió y cédula (Daniel, punto 13). Sin ella
+  // el listado marcaría a TODAS las guías como si les faltara la cédula. Es un
+  // TEXT de 13 caracteres; las firmas base64 siguen fuera.
+  //
   // ⚠️ `guia_items.numero_guia_transp` SÍ viaja, y no es adorno: la marca
   // "Falta N° transportista" se calcula por LÍNEA. Sin él, el listado solo
   // podía mirar el de la cabecera —que NO se reescribe al anotar un número
@@ -31,7 +43,7 @@ export async function GET(req: NextRequest) {
   // tiene su número. Es un TEXT corto; las firmas base64 siguen fuera.
   const { data, error } = await supabaseServer
     .from("guia_transporte")
-    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, numero_guia_transp, created_at, deleted, guia_items(bultos, facturas, cliente, numero_guia_transp)")
+    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, cedula, numero_guia_transp, created_at, deleted, guia_items(orden, bultos, facturas, cliente, direccion, empresa, numero_guia_transp)")
     .eq("deleted", false)
     .order("numero", { ascending: false });
 
@@ -41,6 +53,11 @@ export async function GET(req: NextRequest) {
 
   const result = (data || []).map((g) => ({
     ...g,
+    // Los envíos, en el orden de la guía. La base no garantiza ninguno, y el
+    // Excel (una fila por envío) y el papel numeran por posición.
+    guia_items: [...(g.guia_items || [])].sort(
+      (a: { orden?: number }, b: { orden?: number }) => (a.orden ?? 0) - (b.orden ?? 0),
+    ),
     // Override transportista con label computado para mantener compat con UI
     // que ya consume g.transportista como string display-ready.
     transportista: transportistaLabel(g),

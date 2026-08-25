@@ -8,10 +8,10 @@
 // (modoEntrega, transportistaId). El catálogo se lee de /api/transportistas
 // (tabla canónica con 6 registros activos seedeados en Sprint 1).
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
-import type { GuiaItem, ModoEntrega, Transportista } from "./types";
+import type { Guia, GuiaItem, ModoEntrega, Transportista } from "./types";
 import { DEFAULT_DIRECCIONES, loadList, saveList, emptyItem } from "./constants";
 import { nuevoUid, quitarFila, restaurarFila, validarGuia } from "./guia-form-logic";
 import {
@@ -20,6 +20,9 @@ import {
   renglonesCambiaron,
   type InstantaneaGuia,
 } from "@/lib/guias/cambios-form";
+import { numeroCabeceraAlDespachar } from "@/lib/guias/falta-para-despachar";
+import { guiaYaDespachada } from "@/lib/guias/modo-despacho";
+import { cabeceraEditable, cambiosDeRenglon } from "@/lib/guias/campos-editables";
 
 interface Options {
   editingId?: string | null; // null = creación
@@ -31,9 +34,94 @@ interface Options {
    * persona de la guía que estaba por despachar.
    */
   alGuardar?: () => void;
+  /**
+   * 🔴 LA GUÍA QUE LA PANTALLA YA TIENE EN LA MANO — para no pedirla dos veces.
+   *
+   * 🩸 Al tocar «Editar» salían **6 pedidos** y la guía viajaba DOS VECES: una
+   * la pide `useDespachoGuia` (la pantalla) y otra la pedía este hook al
+   * montarse el formulario. Además de la red, eso es lo que hacía que el
+   * formulario apareciera un rato después que la pantalla — el segundo tiempo
+   * del parpadeo.
+   *
+   * Con la guía servida de acá, el formulario nace LLENO en el mismo dibujo.
+   * Sin ella (nadie la cargó todavía) se pide, como siempre.
+   */
+  guiaInicial?: Guia | null;
 }
 
-export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) {
+
+/**
+ * 🔴 LA INSTANTÁNEA DE "LO QUE EL SERVIDOR YA TIENE" — con la MISMA derivación
+ * del N° de cabecera que usa la instantánea de "lo que se mandaría".
+ *
+ * 🩸 SIN ESTO EL FORMULARIO NACE SUCIO, y es un caso REAL, no teórico. Desde el
+ * 18-ago-2026 el N° del transportista se puede anotar TARDE, y eso escribe UNA
+ * columna de UNA línea **sin tocar `guia_transporte`**: hay guías con la
+ * cabecera vacía y `725` en un renglón. Como el N° de cabecera pasó a
+ * DERIVARSE de los renglones, la referencia (`""`, lo guardado) y lo actual
+ * (`"725"`, lo derivado) diferían apenas se abría la guía — y el formulario se
+ * declaraba "Sin guardar" sin que nadie tocara una tecla. Es exactamente el
+ * defecto que `cambios-form.ts` vino a matar: *cargar la guía no puede producir
+ * una diferencia contra sí misma*.
+ *
+ * ⚠️ La cabecera SÍ se actualiza cuando se guarda por otro motivo — eso es lo
+ * que `numeroCabeceraAlDespachar` decide, y es lo correcto (gana la línea, que
+ * es el dato más específico y el que el papel imprime). Lo que no puede es
+ * contar como un cambio PENDIENTE de algo que nadie pidió.
+ */
+function instantaneaDeLoGuardado(c: ReturnType<typeof camposDeLaGuia>): InstantaneaGuia {
+  return instantaneaGuia(
+    {
+      fecha: c.fecha,
+      modoEntrega: c.modoEntrega,
+      transportistaId: c.transportistaId,
+      entregadoPor: c.entregadoPor,
+      observaciones: c.observaciones,
+      numeroGuiaTransp: numeroCabeceraAlDespachar(
+        c.items.map((i) => i.numero_guia_transp ?? ""),
+        c.numeroGuiaTransp,
+      ),
+    },
+    c.items,
+  );
+}
+
+/**
+ * 🔑 UNA GUÍA CARGADA, TRADUCIDA A LOS CAMPOS DEL FORMULARIO — en un solo lugar.
+ *
+ * Lo usan los DOS caminos: el formulario que nace con la guía ya en la mano
+ * (`guiaInicial`) y el que la pide él mismo. Con dos traducciones distintas,
+ * abrir por un camino o por el otro llenaría el formulario distinto, y la
+ * instantánea de "lo último que el servidor tiene" nacería mintiendo.
+ */
+function camposDeLaGuia(g: Guia) {
+  const modoEntrega: ModoEntrega =
+    g.modo_entrega === "transportista" || g.modo_entrega === "entrega_directa"
+      ? g.modo_entrega
+      : g.transportista_id
+        ? "transportista"
+        : "entrega_directa";
+  const guiaItems = (g.guia_items || []) as GuiaItem[];
+  const items =
+    guiaItems.length > 0
+      // `uid` no viene de la base: se genera acá para que las filas de una guía
+      // existente también tengan identidad estable al editarlas.
+      ? guiaItems.map((item, i) => ({ ...item, uid: item.uid ?? nuevoUid(), orden: i + 1 }))
+      : [emptyItem(1)];
+  return {
+    estado: (g.estado as string | null) ?? null,
+    numero: g.numero,
+    fecha: g.fecha,
+    modoEntrega,
+    transportistaId: g.transportista_id || null,
+    entregadoPor: g.entregado_por || "",
+    observaciones: g.observaciones || "",
+    numeroGuiaTransp: g.numero_guia_transp || "",
+    items,
+  };
+}
+
+export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = null }: Options = {}) {
   const router = useRouter();
 
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +132,23 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
   const [transportistas, setTransportistas] = useState<Transportista[]>([]);
   const [direcciones, setDirecciones] = useState<string[]>(DEFAULT_DIRECCIONES);
 
+  // 🔴 LO QUE LA PANTALLA YA CARGÓ, listo antes del primer dibujo. Los
+  // `useState` de abajo lo leen en su inicializador PEREZOSO: si esperaran a un
+  // `useEffect`, el formulario nacería vacío y se llenaría un dibujo después —
+  // que es exactamente el parpadeo que este cambio vino a sacar.
+  // ⚠️ `useState` con inicializador perezoso, no una expresión suelta: se
+  // traduce UNA sola vez. Recalcularla en cada dibujo generaría un `uid` nuevo
+  // por renglón cada vez, que es justo lo que la identidad estable evita.
+  const [inicial] = useState(() => (guiaInicial && editingId ? camposDeLaGuia(guiaInicial) : null));
+  /** ¿La guía llegó servida? Entonces este hook no la vuelve a pedir. */
+  const yaSembrada = useRef(inicial !== null);
+
   // Form state
-  const [editingEstado, setEditingEstado] = useState<string | null>(null);
+  const [editingEstado, setEditingEstado] = useState<string | null>(inicial?.estado ?? null);
   // Fecha default = HOY en hora LOCAL. toISOString() es UTC y en Panamá (UTC-5)
   // de noche devolvía el día siguiente; construimos la fecha local a mano.
   const [fecha, setFecha] = useState(() => {
+    if (inicial) return inicial.fecha;
     const d = new Date();
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -56,22 +156,44 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
     return `${y}-${m}-${day}`;
   });
   const [modoEntrega, setModoEntrega] = useState<ModoEntrega>(() => {
+    if (inicial) return inicial.modoEntrega;
     try { return (localStorage.getItem("fg_last_modo_entrega") as ModoEntrega) || "transportista"; } catch { return "transportista"; }
   });
   const [transportistaId, setTransportistaId] = useState<string | null>(() => {
+    if (inicial) return inicial.transportistaId;
     try { return localStorage.getItem("fg_last_transportista_id") || null; } catch { return null; }
   });
   const [entregadoPor, setEntregadoPor] = useState(() => {
+    if (inicial) return inicial.entregadoPor;
     try { return localStorage.getItem("fg_last_entregado_por") || ""; } catch { return ""; }
   });
-  const [observaciones, setObservaciones] = useState("");
-  // N° de guía del transportista (nivel guía). Opcional al crear; obligatorio
-  // al despachar cuando el modo es transportista externo (validado en despacho).
-  const [numeroGuiaTransp, setNumeroGuiaTransp] = useState("");
-  const [items, setItems] = useState<GuiaItem[]>([emptyItem(1)]);
-  const [formNumero, setFormNumero] = useState(1);
+  const [observaciones, setObservaciones] = useState(inicial?.observaciones ?? "");
+  // ── EL N° DEL TRANSPORTISTA A NIVEL GUÍA ───────────────────────────────────
+  // 🔴 YA NO SE TECLEA ACÁ, Y LA COLUMNA TAMPOCO SE RETIRA.
+  //
+  // Daniel, punto 7: *"N° del transportista → POR LÍNEA, al lado de bultos"*.
+  // El campo de CABECERA salió del formulario: el transportista arma VARIAS
+  // guías suyas por cada guía nuestra, así que preguntarlo una sola vez arriba
+  // era pedir el dato equivocado (*"nos hacen varias guias el transportista por
+  // guia"*, 10-ago-2026).
+  //
+  // 🩸 PERO LA COLUMNA `guia_transporte.numero_guia_transp` SIGUE VIVA: la leen
+  // el buscador de la lista, el Excel, el chip ámbar y el encabezado del papel,
+  // y las guías viejas HEREDAN de ella. Si el formulario dejara de mandarla,
+  // el PUT escribiría `null` y **borraría el número de todas las guías que se
+  // editaran** — la misma trampa que el 25-ago-2026 se tapó al despachar.
+  //
+  // Por eso se conserva lo que la guía ya tenía y se aplica la MISMA regla que
+  // el despacho (`numeroCabeceraAlDespachar`): manda la línea si alguna trae
+  // número, y si ninguna trae, se conserva el de antes. Es la misma función,
+  // no una copia.
+  const [numeroGuiaTransp, setNumeroGuiaTransp] = useState(inicial?.numeroGuiaTransp ?? "");
+  const [items, setItems] = useState<GuiaItem[]>(inicial?.items ?? [emptyItem(1)]);
+  /** Los renglones tal como el SERVIDOR los tiene. Solo se usa en una guía ya despachada. */
+  const [itemsGuardados, setItemsGuardados] = useState<GuiaItem[]>(inicial?.items ?? []);
+  const [formNumero, setFormNumero] = useState(inicial?.numero ?? 1);
   const [saving, setSaving] = useState(false);
-  const [loaded, setLoaded] = useState(editingId === null);
+  const [loaded, setLoaded] = useState(editingId === null || inicial !== null);
 
   // ── Lo ÚLTIMO que el servidor ya tiene ─────────────────────────────────────
   // 🔴 ES EL CANDADO. Mientras esto sea `null`, el formulario NO puede
@@ -85,7 +207,12 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
   // ese PUT REEMPLAZA los renglones (borra e inserta) → abrir una guía y
   // arrepentirse le cambiaba el id a cada línea. Medido contra el log del
   // servidor el 17-ago-2026 con GT-204.
-  const [guardado, setGuardado] = useState<InstantaneaGuia | null>(null);
+  const [guardado, setGuardado] = useState<InstantaneaGuia | null>(
+    // Con la guía servida, la referencia se toma de los MISMOS valores con los
+    // que nacen los campos de arriba. Sin esto el formulario nacería "sucio"
+    // contra un `null` y el aviso de salir con cambios saltaría sin motivo.
+    inicial ? instantaneaDeLoGuardado(inicial) : null,
+  );
   /** Hora del último guardado que el servidor aceptó (no del que se intentó). */
   const [guardadoEn, setGuardadoEn] = useState<string | null>(null);
 
@@ -103,9 +230,16 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
       .catch(() => { /* el form muestra el modo "Entrega directa" como fallback */ });
   }, []);
 
-  // Si es edición: cargar la guía una sola vez
+  // Si es edición: cargar la guía una sola vez.
+  //
+  // 🔴 …salvo que la pantalla ya la haya cargado y nos la haya pasado
+  // (`guiaInicial`). Ese era el SEGUNDO pedido de la misma guía al tocar
+  // «Editar»: seis llamadas para abrir el formulario, con la guía viajando dos
+  // veces. `guiaSemilla` se lee de una ref para que RENOVAR la guía en la
+  // pantalla (después de guardar) no vuelva a disparar este efecto.
   useEffect(() => {
     if (!editingId) return;
+    if (yaSembrada.current) return;
     let cancelado = false;
     (async () => {
       try {
@@ -113,46 +247,25 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
         if (!res.ok) throw new Error("No se pudo cargar la guía");
         const g = await res.json();
         if (cancelado) return;
-        setEditingEstado(g.estado || null);
-        setFormNumero(g.numero);
-        setFecha(g.fecha);
-        // Sprint 2: modo + FK directos del backend
-        const modoCargado: ModoEntrega =
-          g.modo_entrega === "transportista" || g.modo_entrega === "entrega_directa"
-            ? g.modo_entrega
-            : g.transportista_id
-              ? "transportista"
-              : "entrega_directa";
-        setModoEntrega(modoCargado);
-        setTransportistaId(g.transportista_id || null);
-        setEntregadoPor(g.entregado_por || "");
-        setObservaciones(g.observaciones || "");
-        setNumeroGuiaTransp(g.numero_guia_transp || "");
-        const guiaItems = (g.guia_items || []) as GuiaItem[];
-        const itemsCargados =
-          guiaItems.length > 0
-            // `uid` no viene de la base: se genera acá para que las filas de una
-            // guía existente también tengan identidad estable al editarlas.
-            ? guiaItems.map((item, i) => ({ ...item, uid: item.uid ?? nuevoUid(), orden: i + 1 }))
-            : [emptyItem(1)];
-        setItems(itemsCargados);
+        // 🔑 La MISMA traducción que usa el camino de la guía servida. Con dos
+        // copias, abrir por un camino o por el otro llenaría el formulario
+        // distinto.
+        const c = camposDeLaGuia(g as Guia);
+        setEditingEstado(c.estado);
+        setFormNumero(c.numero);
+        setFecha(c.fecha);
+        setModoEntrega(c.modoEntrega);
+        setTransportistaId(c.transportistaId);
+        setEntregadoPor(c.entregadoPor);
+        setObservaciones(c.observaciones);
+        setNumeroGuiaTransp(c.numeroGuiaTransp);
+        setItems(c.items);
+        setItemsGuardados(c.items);
         // 🔴 La referencia contra la que se mide "¿cambió algo?" se toma de los
         // MISMOS valores que se acaban de poner en el formulario, no de un
         // render posterior: si se tomara después, cualquier render de más
         // (los datos que llegan, un remontaje) volvería a producir el bug.
-        setGuardado(
-          instantaneaGuia(
-            {
-              fecha: g.fecha,
-              modoEntrega: modoCargado,
-              transportistaId: g.transportista_id || null,
-              entregadoPor: g.entregado_por || "",
-              observaciones: g.observaciones || "",
-              numeroGuiaTransp: g.numero_guia_transp || "",
-            },
-            itemsCargados,
-          ),
-        );
+        setGuardado(instantaneaDeLoGuardado(c));
         setLoaded(true);
       } catch {
         if (!cancelado) {
@@ -187,7 +300,7 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
     if (editingId) return;
     setGuardado(
       instantaneaGuia(
-        { fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp },
+        { fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp: numeroCabecera },
         items,
       ),
     );
@@ -195,14 +308,27 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId]);
 
+  /**
+   * 🔴 EL N° QUE SE ESCRIBE EN LA CABECERA — calculado, no tecleado.
+   *
+   * Manda la LÍNEA cuando alguna trae número (es el dato más específico y es el
+   * que el papel imprime); si ninguna trae, se conserva el que la guía ya
+   * tenía. Es la MISMA función que usa el despacho: con dos reglas, guardar
+   * desde el formulario y despachar dejarían la columna distinta.
+   */
+  const numeroCabecera = useMemo(
+    () => numeroCabeceraAlDespachar(items.map((i) => i.numero_guia_transp ?? ""), numeroGuiaTransp),
+    [items, numeroGuiaTransp],
+  );
+
   /** Lo que se le mandaría al servidor AHORA. Es lo que se compara. */
   const instantanea = useMemo(
     () =>
       instantaneaGuia(
-        { fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp },
+        { fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp: numeroCabecera },
         items,
       ),
-    [fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp, items],
+    [fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroCabecera, items],
   );
   const hayCambios = calcularHayCambios(guardado, instantanea);
 
@@ -293,8 +419,107 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
     return true;
   }
 
+  /**
+   * 🔴 UNA GUÍA YA DESPACHADA: qué está abierto y qué NO.
+   *
+   * Daniel: *"Guía despachada → se puede corregir **N° del transportista ·
+   * cliente · facturas**"* y *"los **bultos** de una despachada **NO se
+   * tocan** — es lo que el transportista firmó"*. La lista de tres vive en
+   * `campos-editables.ts` y la leen también el formulario y el servidor.
+   */
+  const despachada = guiaYaDespachada(editingEstado);
+  const puedeTocarCabecera = cabeceraEditable(editingEstado);
+
+  /**
+   * 🔴 CORREGIR UNA GUÍA FIRMADA VA POR COLUMNA, NUNCA POR EL PUT.
+   *
+   * 🩸 `items` en el PUT es un REEMPLAZO COMPLETO: borra los renglones e
+   * inserta otros con ids NUEVOS, y con eso se pierden el cliente atado y el N°
+   * que se anotó tarde. Además el candado del PUT rechaza una guía Completada
+   * entera, y ese candado NO se toca. Así que acá se escribe renglón por
+   * renglón, campo por campo, con los dos endpoints que ya existían por
+   * exactamente esta razón:
+   *   · el N° del transportista → `PATCH /api/guias/[id]/numero-transp`
+   *   · cliente y facturas      → `PATCH /api/guias/[id]/item`
+   *
+   * ⚠️ **Las escrituras que no cambian nada no se hacen**: abrir una guía
+   * despachada, mirarla y guardar no manda un solo pedido.
+   *
+   * ⚠️ **No se agregan ni se quitan renglones.** Un renglón sin `id` es uno que
+   * nació en esta pantalla, y agregarle carga a una guía que el transportista
+   * ya firmó sería inventar mercancía que no viajó.
+   */
+  async function guardarCorrecciones(): Promise<void> {
+    if (!editingId) return;
+    const porId = new Map(itemsGuardados.filter((i) => i.id).map((i) => [i.id as string, i]));
+    setSaving(true);
+    let fallo: string | null = null;
+    let escrituras = 0;
+    try {
+      for (const it of items) {
+        if (!it.id) continue;
+        const antes = porId.get(it.id);
+        if (!antes) continue;
+        const cambios = cambiosDeRenglon(editingEstado, antes, it);
+
+        // El N° tiene su propio endpoint desde el 18-ago-2026 y sigue siendo el
+        // mismo: una columna de una línea, sin mirar el estado.
+        if ("numero_guia_transp" in cambios) {
+          const r = await fetch(`/api/guias/${editingId}/numero-transp`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ itemId: it.id, numero_guia_transp: cambios.numero_guia_transp ?? "" }),
+          });
+          escrituras++;
+          if (!r.ok) {
+            fallo = (await r.json().catch(() => ({}))).error || "No se pudo guardar el N° del transportista.";
+            break;
+          }
+          delete cambios.numero_guia_transp;
+        }
+
+        if (Object.keys(cambios).length > 0) {
+          const r = await fetch(`/api/guias/${editingId}/item`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ itemId: it.id, ...cambios }),
+          });
+          escrituras++;
+          if (!r.ok) {
+            fallo = (await r.json().catch(() => ({}))).error || "No se pudo guardar la corrección.";
+            break;
+          }
+        }
+      }
+    } catch {
+      fallo = "Sin conexión. No se guardó nada — revisa el internet y vuelve a intentar.";
+    } finally {
+      setSaving(false);
+    }
+
+    if (fallo) {
+      setError(fallo);
+      return;
+    }
+    setError(null);
+    setItemsGuardados(items);
+    setGuardado(instantanea);
+    if (escrituras > 0) {
+      setGuardadoEn(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
+    }
+    if (alGuardar) alGuardar();
+  }
+
   async function saveGuia(opts?: { silent?: boolean }) {
     const silent = opts?.silent === true;
+    // 🔴 UNA GUÍA FIRMADA NO PASA POR ACÁ. El PUT la rechaza —y con razón—, así
+    // que sus correcciones van por columna. Y NUNCA en silencio: corregir un
+    // documento que alguien ya firmó tiene que ser un acto deliberado, no algo
+    // que pase solo a los 1,5 s de haber mirado la pantalla.
+    if (editingId && despachada) {
+      if (silent) return;
+      return guardarCorrecciones();
+    }
     // 🔴 Un guardado AUTOMÁTICO no pinta nada. Ver `validate`.
     if (!validate({ pintar: !silent })) return;
     try {
@@ -337,7 +562,11 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
           transportista_id: modoEntrega === "transportista" ? transportistaId : null,
           entregado_por: entregadoPor,
           observaciones,
-          numero_guia_transp: numeroGuiaTransp.trim() || null,
+          // 🔴 EL DERIVADO, no un campo tecleado: manda la línea si alguna trae
+          // número, y si ninguna trae se conserva el que la guía ya tenía. Sin
+          // esto, editar una guía vieja le BORRARÍA el número de la cabecera —
+          // el que leen el buscador, el Excel y el encabezado del papel.
+          numero_guia_transp: numeroCabecera.trim() || null,
           estado: editingId && editingEstado ? editingEstado : "Pendiente Bodega",
           ...(mandarItems ? { items: validItems } : {}),
         }),
@@ -353,8 +582,26 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
         // /api/guias/[id] al pasar a estado "Completada".
         // En silent (auto-save) NO navega ni resetea — preserva contexto.
         if (!silent) {
-          if (alGuardar) alGuardar();
-          else router.push("/guias");
+          if (alGuardar) {
+            alGuardar();
+          } else if (!editingId) {
+            // 🔴 GUARDAR UNA GUÍA NUEVA TE DEJA **EN LA GUÍA**, no en el listado.
+            //
+            // Daniel, punto 12. 🩸 Lo que pasaba: se terminaba de cargar la
+            // guía, se apretaba «Guardar Guía» y la pantalla saltaba a `/guias`
+            // — justo cuando lo siguiente que hace la secretaria es
+            // IMPRIMIRLA para dárselas al chofer. Había que buscarla en la
+            // lista, abrir el acordeón y recién ahí imprimir.
+            //
+            // ⚠️ Si el servidor no devolvió el id (no debería pasar: el POST
+            // responde la guía insertada), se vuelve al listado como siempre.
+            // Quedarse quieto sin decir nada sería peor.
+            const creada = await res.json().catch(() => null);
+            const nuevoId = creada && typeof creada.id === "string" ? creada.id : null;
+            router.push(nuevoId ? `/guias/${nuevoId}` : "/guias");
+          } else {
+            router.push("/guias");
+          }
         }
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -389,9 +636,18 @@ export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) 
     transportistaId, setTransportistaId,
     entregadoPor, setEntregadoPor,
     observaciones, setObservaciones,
-    numeroGuiaTransp, setNumeroGuiaTransp,
+    // 🔴 El N° del transportista de la CABECERA ya no se teclea: se DERIVA de
+    // los renglones (ver `numeroCabecera`). Se expone para que la pantalla
+    // pueda decirlo, nunca para escribirlo con un campo aparte.
+    numeroCabecera,
     items,
     saving,
+    /** El estado guardado de la guía ("Pendiente Bodega", "Completada", …). */
+    estado: editingEstado,
+    /** ¿Ya salió? Entonces solo se corrigen N° del transportista, cliente y facturas. */
+    despachada,
+    /** ¿Se pueden tocar fecha, modo, transportista, quién despacha y observaciones? */
+    puedeTocarCabecera,
     // "¿de verdad se cambió algo?" — se compara contra lo último que el
     // servidor tiene, nunca contra un contador de renders.
     hayCambios,
