@@ -5,7 +5,7 @@ import { fmt } from "@/lib/format";
 import { RItem, LocalFoto } from "./types";
 import { AccordionContent, FotoLightbox } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
-import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel } from "./constants";
+import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel } from "./constants";
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 
 interface Props {
@@ -379,7 +379,7 @@ export default function ReclamoForm({
         <div className="mt-6 text-right text-sm space-y-1">
           <div>Subtotal: <span className="tabular-nums font-medium">${fmt(fSubtotal)}</span></div>
           <div className="text-gray-400">Importación ({impLabel(fEmpresa)}): ${fmt(fTax.importacion)}</div>
-          {fTax.hasItbms && <div className="text-gray-400">ITBMS (7% s/imp.): ${fmt(fTax.itbms)}</div>}
+          {fTax.hasItbms && <div className="text-gray-400">ITBMS ({itbmsLabel(fEmpresa)} s/imp.): ${fmt(fTax.itbms)}</div>}
           <div className="text-lg font-semibold">Total: ${fmt(fTax.total)}</div>
         </div>
       </div>

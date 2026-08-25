@@ -2,7 +2,8 @@ import { RItem } from "./types";
 
 // Fuente única del cálculo fiscal: src/lib/reclamos/tax.ts. Se re-exporta aquí para
 // no romper imports existentes. Active Shoes = importación 15% sin ITBMS; resto igual.
-export { TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, reclamoTaxes, esActiveShoes, ocultaPedido, impLabel } from "@/lib/reclamos/tax";
+export { TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, reclamoTaxes, esActiveShoes, ocultaPedido, impLabel, itbmsLabel, pctLabel } from "@/lib/reclamos/tax";
+export { ESTADO_PAGADO, esPendiente, soloPendientes } from "@/lib/reclamos/pendientes";
 
 export const EMPRESAS_MAP: Record<string, { proveedor: string; marca: string }> = {
   "Vistana International": { proveedor: "American Designer Fashion", marca: "Calvin Klein" },

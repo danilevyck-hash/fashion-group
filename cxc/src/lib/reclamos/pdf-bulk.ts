@@ -1,8 +1,13 @@
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
+// Forma FUNCIONAL de jspdf-autotable v5 —`autoTable(doc, …)`— igual que
+// `lib/catalogo/order-pdf-core.ts`. El `import "jspdf-autotable"` a secas solo
+// parcha `jsPDF.API.autoTable` en el build CJS: resuelto como ESM el método no
+// existe y el PDF explota. Por eso este papel no tenía un solo test que lo
+// generara de verdad, y por eso el rótulo del ITBMS pudo mentir a gusto.
 import { supabaseServer } from "@/lib/supabase-server";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-import { reclamoTaxes, ocultaPedido, impLabel, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
+import { reclamoTaxes, ocultaPedido, impLabel, itbmsLabel, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
 
 const PAGE_W = 216;
 const PAGE_H = 279;
@@ -158,7 +163,7 @@ function drawTotalsBlock(doc: jsPDF, empresa: string | undefined, subtotal: numb
   const labels = [
     { label: "Subtotal", value: subtotal, dark: false },
     { label: `Importación ${impLabel(empresa)}`, value: tx.importacion, dark: false },
-    ...(tx.hasItbms ? [{ label: "ITBMS 7%", value: tx.itbms, dark: false }] : []),
+    ...(tx.hasItbms ? [{ label: `ITBMS ${itbmsLabel(empresa)}`, value: tx.itbms, dark: false }] : []),
     { label: "TOTAL", value: tx.total, dark: true },
   ];
   const boxW = (PAGE_W - 2 * MARGIN - 3 * (labels.length - 1)) / labels.length;
@@ -293,8 +298,7 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
       ];
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 50,
       head: [["N° Reclamo", "Fecha", "Factura", "Estado", "Ítems", "Total"]],
       body: summaryRows,
@@ -338,8 +342,7 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
         `$${fmt((Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0))}`,
         i.motivo || "",
       ]);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: cursorY,
         head: [["Código", "Descripción", "Talla", "Cant.", "Precio", "Subtotal", "Motivo"]],
         body: itemRows,

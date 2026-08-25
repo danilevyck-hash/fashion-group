@@ -4,7 +4,7 @@ import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
-import { EMPRESAS, EC, daysSince, calcSub, reclamoTaxes } from "./constants";
+import { EMPRESAS, EC, daysSince, calcSub, reclamoTaxes, soloPendientes } from "./constants";
 import { matchReclamo, matchHint } from "./search";
 import { SkeletonTable, EmptyState, Toast } from "@/components/ui";
 
@@ -39,11 +39,22 @@ export default function EmpresaSelector({
     return contactos.find((c) => c.empresa === empresa) || null;
   }
 
+  // 🔴 SOLO LOS PENDIENTES. Estos botones bajan el papel que se le manda al
+  // proveedor: si arrastran reclamos ya Pagados se le está cobrando dos veces,
+  // y encima el archivo no cuadraría con el "$X pendiente" de la misma tarjeta.
+  // La regla sale de soloPendientes() — la misma que usa la tarjeta abajo.
+  function pendientesDe(empresa: string) {
+    return soloPendientes(reclamos.filter((r) => r.empresa === empresa));
+  }
+
   async function downloadEmpresaExcel(empresa: string, ev: React.MouseEvent) {
     ev.stopPropagation();
     if (excelBusy) return;
-    const ids = reclamos.filter((r) => r.empresa === empresa).map((r) => r.id);
-    if (!ids.length) return;
+    const pend = pendientesDe(empresa);
+    const ids = pend.map((r) => r.id);
+    // Sin pendientes NO se baja nada, y se dice por qué (antes no pasaba nada
+    // al tocar el botón y parecía que la descarga había fallado).
+    if (!ids.length) { showToast(`${empresa} no tiene reclamos pendientes`); return; }
     setExcelBusy(empresa);
     try {
       const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(empresa)}/export-zip`, {
@@ -59,10 +70,11 @@ export default function EmpresaSelector({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      // El nombre del archivo DICE qué trae, para que nadie lo confunda con el histórico.
+      a.download = `Reclamos-pendientes-${empresa}-${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast(`Excel de ${empresa} descargado`);
+      showToast(`Excel de ${empresa} descargado — ${ids.length} reclamo${ids.length === 1 ? "" : "s"} pendiente${ids.length === 1 ? "" : "s"}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Error al generar el Excel");
     } finally {
@@ -73,8 +85,8 @@ export default function EmpresaSelector({
   async function downloadEmpresaPdf(empresa: string, ev: React.MouseEvent) {
     ev.stopPropagation();
     if (pdfBusy) return;
-    const ids = reclamos.filter((r) => r.empresa === empresa).map((r) => r.id);
-    if (!ids.length) return;
+    const ids = pendientesDe(empresa).map((r) => r.id);
+    if (!ids.length) { showToast(`${empresa} no tiene reclamos pendientes`); return; }
     setPdfBusy(empresa);
     try {
       const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(empresa)}/export-pdf`, {
@@ -90,10 +102,10 @@ export default function EmpresaSelector({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.download = `Reclamos-pendientes-${empresa}-${new Date().toISOString().slice(0, 10)}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast(`PDF de ${empresa} descargado`);
+      showToast(`PDF de ${empresa} descargado — ${ids.length} reclamo${ids.length === 1 ? "" : "s"} pendiente${ids.length === 1 ? "" : "s"}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Error al generar el PDF");
     } finally {
@@ -179,7 +191,7 @@ export default function EmpresaSelector({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {EMPRESAS.map((empresa) => {
               const ers = reclamos.filter((r) => r.empresa === empresa);
-              const open = ers.filter((r) => r.estado !== "Pagado");
+              const open = soloPendientes(ers);
               const tot = open.reduce((s, r) => s + reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total, 0);
               const hasAlert = open.some((r) => daysSince(r.fecha_reclamo) > 45);
               const c = getC(empresa);
@@ -192,9 +204,9 @@ export default function EmpresaSelector({
                     {/* 36px de alto y 6px de separación: dos targets chicos y
                         pegados, ×10 empresas. A 44px de alto y gap-2 (8px). */}
                     <div className="flex gap-2 flex-wrap justify-end">
-                      <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} disabled={excelBusy !== null} title="Descargar Excel con links a las facturas y fotos (abren con un clic)"
+                      <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} disabled={excelBusy !== null} title="Descargar Excel de los reclamos PENDIENTES, con links a las facturas y fotos (abren con un clic)"
                         className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 min-h-[44px] rounded-full flex-shrink-0 font-medium disabled:opacity-40">{excelBusy === empresa ? "Excel…" : "↓ Excel"}</button>
-                      <button onClick={(ev) => downloadEmpresaPdf(empresa, ev)} disabled={pdfBusy !== null} title="Descargar PDF consolidado del proveedor (resumen + detalle por reclamo con fotos)"
+                      <button onClick={(ev) => downloadEmpresaPdf(empresa, ev)} disabled={pdfBusy !== null} title="Descargar PDF consolidado de los reclamos PENDIENTES del proveedor (resumen + detalle por reclamo con fotos)"
                         className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 min-h-[44px] rounded-full flex-shrink-0 font-medium disabled:opacity-40">{pdfBusy === empresa ? "PDF…" : "↓ PDF"}</button>
                     </div>
                   </div>
