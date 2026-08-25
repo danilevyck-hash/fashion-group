@@ -5,7 +5,7 @@ import { fmt } from "@/lib/format";
 import { RItem, LocalFoto } from "./types";
 import { AccordionContent, FotoLightbox } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
-import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel } from "./constants";
+import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel } from "./constants";
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 
 interface Props {
@@ -265,7 +265,8 @@ export default function ReclamoForm({
                   <td className="py-2 pr-1">
                     <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b py-1 text-sm outline-none bg-transparent ${item.genero ? "border-gray-200 text-black" : "border-gray-200 text-gray-400"}`} style={{ minWidth: 80 }}>
                       <option value="">Género…</option>
-                      {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
+                      {/* value = lo que se GUARDA (inglés, lo exige el CHECK de la base); el texto = lo que se LEE. */}
+                      {GENEROS.map((g) => <option key={g} value={g}>{generoLabel(g)}</option>)}
                     </select>
                   </td>
                   <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
@@ -340,7 +341,8 @@ export default function ReclamoForm({
                 <span className="text-xs text-gray-500">Género *</span>
                 <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b border-gray-200 py-2.5 text-base outline-none bg-transparent focus:border-black min-h-[44px] ${item.genero ? "text-black" : "text-gray-400"}`}>
                   <option value="">Género…</option>
-                  {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
+                  {/* value = lo que se GUARDA (inglés, lo exige el CHECK de la base); el texto = lo que se LEE. */}
+                      {GENEROS.map((g) => <option key={g} value={g}>{generoLabel(g)}</option>)}
                 </select>
               </label>
               <div className="grid grid-cols-2 gap-3">

@@ -54,8 +54,36 @@ export const DEFAULT_MOTIVOS = [
 
 export const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "OS", "Otros"];
 
-/** Género del ítem reclamado — dropdown FIJO (sin opción libre). Obligatorio. */
+// ─────────────────────────────────────────────────────────────────────────────
+// Género del ítem reclamado — dropdown FIJO (sin opción libre). Obligatorio.
+//
+// 🔴 EL VALOR GUARDADO SIGUE EN INGLÉS Y NO SE PUEDE TRADUCIR.
+// `reclamo_items.genero` tiene un CHECK en la base
+// (`supabase/migrations/20260623120000_reclamo_items_genero.sql`) que sólo
+// admite NULL o exactamente 'Men' | 'Women' | 'Kids' | 'Accessories'. Guardar
+// "Hombre" haría fallar el INSERT, y cambiar el CHECK obligaría a migrar las
+// filas ya escritas. Además el Excel que se le manda al proveedor —que son
+// marcas extranjeras— lleva ese mismo valor.
+//
+// Lo que SÍ se traduce es lo que ve el usuario: la etiqueta del desplegable y
+// del detalle. Era el único campo del sistema en inglés, y encima obligatorio.
+// ─────────────────────────────────────────────────────────────────────────────
 export const GENEROS = ["Men", "Women", "Kids", "Accessories"] as const;
+
+/** Cómo se MUESTRA cada género. La clave es el valor guardado (inglés). */
+export const GENERO_LABEL: Record<string, string> = {
+  Men: "Hombre",
+  Women: "Mujer",
+  Kids: "Niños",
+  Accessories: "Accesorios",
+};
+
+/** Etiqueta en español de un género guardado. Si llega algo que no está en la
+ *  tabla (una fila vieja o rara), se muestra tal cual en vez de esconderla. */
+export function generoLabel(valor: string | null | undefined): string {
+  if (!valor) return "";
+  return GENERO_LABEL[valor] ?? valor;
+}
 
 export const ESTADOS = ["Creado", "En proceso", "Pagado"];
 

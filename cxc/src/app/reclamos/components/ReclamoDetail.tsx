@@ -6,7 +6,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { Reclamo, RItem, Contacto } from "./types";
-import { EMPRESAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, estadoLabel } from "./constants";
+import { EMPRESAS, GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 import FotoBadge from "./FotoBadge";
@@ -599,7 +599,8 @@ export default function ReclamoDetail({
                         <td className="py-2 pr-1">
                           <select value={item.genero || ""} onChange={(e) => updateEditItem(idx, "genero", e.target.value)} className={`w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent ${item.genero ? "text-black" : "text-gray-400"}`} style={{ minWidth: 80 }}>
                             <option value="">Género…</option>
-                            {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
+                            {/* value = lo que se GUARDA (inglés, lo exige el CHECK de la base); el texto = lo que se LEE. */}
+                            {GENEROS.map((g) => <option key={g} value={g}>{generoLabel(g)}</option>)}
                           </select>
                         </td>
                         <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
@@ -688,7 +689,7 @@ export default function ReclamoDetail({
                         </div>
                         <div className="flex justify-between gap-2">
                           <dt className="text-gray-400">Género</dt>
-                          <dd className="text-gray-600 truncate">{item.genero || "—"}</dd>
+                          <dd className="text-gray-600 truncate">{generoLabel(item.genero) || "—"}</dd>
                         </div>
                         {item.motivo && (
                           <div className="col-span-2 flex justify-between gap-2">
@@ -739,7 +740,7 @@ export default function ReclamoDetail({
                           <td className="py-2">{item.referencia}</td>
                           <td className="py-2 text-gray-500">{item.descripcion}</td>
                           <td className="py-2 text-gray-500">{item.talla}</td>
-                          <td className="py-2 text-gray-500 text-xs">{item.genero || "—"}</td>
+                          <td className="py-2 text-gray-500 text-xs">{generoLabel(item.genero) || "—"}</td>
                           <td className="py-2 text-right tabular-nums">{Number(item.cantidad) || 0}</td>
                           <td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td>
                           <td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { Ayuda } from "@/components/shared/Ayuda";
 
 interface EnviarProveedorModalProps {
@@ -69,6 +69,10 @@ export default function EnviarProveedorModal({
   const [editId, setEditId] = useState<string | null>(null);
   const [editEmail, setEditEmail] = useState("");
   const [editNombre, setEditNombre] = useState("");
+  /** Contacto al que se le tocó el tacho: la fila pide confirmar antes de
+   *  borrar. El borrado es GLOBAL (la libreta la comparte todo el equipo) y no
+   *  tiene Deshacer, así que no puede irse con un solo toque. */
+  const [borrandoId, setBorrandoId] = useState<string | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -83,38 +87,60 @@ export default function EnviarProveedorModal({
     }
   }, []);
 
-  // Re-prefilla los campos y carga la libreta cada vez que se abre.
+  // Re-prefilla los campos cada vez que se abre. EN RENDER, no en un efecto:
+  // el modal se queda montado con `open=false`, y useFormModalDismiss toma la
+  // foto del formulario en un efecto. Si el prefill viviera en otro efecto, la
+  // foto saldría sobre los campos VACÍOS y un segundo después el asunto y el
+  // mensaje aparecerían — el guard creería que eso lo escribió el usuario y el
+  // modal ya no cerraría nunca con clic fuera. Es el mismo patrón de
+  // SettlementModal.
+  // Arranca en `false`, NO en `open`: hoy el caller (EmpresaList) monta este
+  // modal siempre y sólo alterna `open`, pero si mañana alguien lo montara ya
+  // abierto (`{abierto && <EnviarProveedorModal open …/>}`), con `useState(open)`
+  // la comparación daría igual en el primer render y el correo saldría SIN
+  // asunto ni mensaje. Un candado lo pinta con `open` ya en true.
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      const nombre = (contactoNombre || "").trim() || "equipo";
+      const plural = count === 1 ? "" : "s";
+      setTo(defaultTo || "");
+      setCc("");
+      setSubject(
+        defaultSubject ||
+          (count === 1 ? `Reclamo pendiente — ${empresa}` : `Reclamos pendientes — ${empresa} (${count})`),
+      );
+      setMessage(
+        `Estimado/a ${nombre},\n\nAdjuntamos ${count} reclamo${plural} pendiente${plural} de ${empresa} con su evidencia fotográfica y el detalle en Excel. Quedamos en espera de la nota de crédito correspondiente.`,
+      );
+      setError(null);
+      setLibretaOpen(false);
+      setEditId(null);
+      setNewEmail("");
+      setNewNombre("");
+      setBorrandoId(null);
+    }
+  }
+
+  // La libreta sí se pide por efecto (es un fetch, no un campo del formulario).
   useEffect(() => {
     if (!open) return;
-    const nombre = (contactoNombre || "").trim() || "equipo";
-    const plural = count === 1 ? "" : "s";
-    setTo(defaultTo || "");
-    setCc("");
-    setSubject(
-      defaultSubject ||
-        (count === 1 ? `Reclamo pendiente — ${empresa}` : `Reclamos pendientes — ${empresa} (${count})`),
-    );
-    setMessage(
-      `Estimado/a ${nombre},\n\nAdjuntamos ${count} reclamo${plural} pendiente${plural} de ${empresa} con su evidencia fotográfica y el detalle en Excel. Quedamos en espera de la nota de crédito correspondiente.`,
-    );
-    setError(null);
-    setLibretaOpen(false);
-    setEditId(null);
-    setNewEmail("");
-    setNewNombre("");
     loadLibreta();
-  }, [open, defaultTo, defaultSubject, contactoNombre, count, empresa, loadLibreta]);
+  }, [open, loadLibreta]);
 
-  // Bloquea el scroll del body mientras está abierto (hook compartido, ref-count).
-  useBodyScrollLock(open);
-
-  // Escape para cerrar
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !sending) onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, sending, onClose]);
+  // 🩸 Clic en el fondo gris + Escape = Cancelar, pero SOLO si el correo está
+  // intacto. Antes cualquiera de los dos cerraba la ventana con el asunto y el
+  // mensaje ya escritos y se perdía todo. Las otras dos ventanas de Reclamos
+  // (SettlementModal, ComprobanteModal) ya protegían lo escrito; ésta no.
+  // El hook además bloquea el scroll del body (por eso se fue el
+  // useBodyScrollLock suelto: lo hace él).
+  // `mounted` va como `refoto` a propósito: el primer render devuelve `null`
+  // (espera al montaje para el portal), así que la foto del formulario se
+  // tomaría sobre un panel que todavía NO existe → saldría vacía, y un render
+  // después el asunto y el mensaje ya prellenados se leerían como "el usuario
+  // escribió algo" y la ventana no cerraría NUNCA con clic fuera.
+  const { panelRef, backdrop } = useFormModalDismiss(open, onClose, !sending, mounted);
 
   if (!open || !mounted) return null;
 
@@ -168,6 +194,7 @@ export default function EnviarProveedorModal({
 
   async function deleteContacto(id: string) {
     setLibretaErr(null);
+    setBorrandoId(null);
     try {
       const res = await fetch(`/api/reclamos/contactos-email?id=${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
@@ -217,12 +244,12 @@ export default function EnviarProveedorModal({
 
   return createPortal(
     <div
+      {...backdrop}
       className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40"
-      onClick={() => { if (!sending) onClose(); }}
     >
       <div
+        ref={panelRef}
         className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto border border-gray-200"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-1">
@@ -237,7 +264,7 @@ export default function EnviarProveedorModal({
               </p>
             </Ayuda>
           </div>
-          <button onClick={() => { if (!sending) onClose(); }} className="text-gray-400 hover:text-black text-2xl leading-none">×</button>
+          <button onClick={() => { if (!sending) onClose(); }} aria-label="Cerrar" className="text-gray-400 hover:text-black text-2xl leading-none w-11 h-11 inline-flex items-center justify-center -mr-2">×</button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
@@ -272,7 +299,7 @@ export default function EnviarProveedorModal({
             <button
               type="button"
               onClick={() => setLibretaOpen((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-gray-600 hover:text-black transition"
+              className="w-full flex items-center justify-between px-3 min-h-[44px] text-xs font-medium text-gray-600 hover:text-black transition"
             >
               <span>Libreta de contactos {libreta.length > 0 && <span className="text-gray-300">({libreta.length})</span>}</span>
               <span className="text-gray-300">{libretaOpen ? "▲" : "▼"}</span>
@@ -287,20 +314,20 @@ export default function EnviarProveedorModal({
                     value={newNombre}
                     onChange={(e) => setNewNombre(e.target.value)}
                     placeholder="Nombre (opcional)"
-                    className="flex-1 border border-gray-200 rounded-md px-2 py-1.5 text-sm outline-none focus:border-black transition"
+                    className="flex-1 border border-gray-200 rounded-md px-2 min-h-[44px] text-sm outline-none focus:border-black transition"
                   />
                   <input
                     type="text"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     placeholder="correo@dominio.com"
-                    className="flex-1 border border-gray-200 rounded-md px-2 py-1.5 text-sm outline-none focus:border-black transition"
+                    className="flex-1 border border-gray-200 rounded-md px-2 min-h-[44px] text-sm outline-none focus:border-black transition"
                   />
                   <button
                     type="button"
                     onClick={saveNewContacto}
                     disabled={savingNew}
-                    className="text-xs bg-black text-white px-3 py-1.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 whitespace-nowrap"
+                    className="text-xs bg-black text-white px-3 min-h-[44px] inline-flex items-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 whitespace-nowrap"
                   >
                     {savingNew ? "Guardando…" : "Agregar"}
                   </button>
@@ -320,32 +347,48 @@ export default function EnviarProveedorModal({
                               value={editNombre}
                               onChange={(e) => setEditNombre(e.target.value)}
                               placeholder="Nombre"
-                              className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs outline-none focus:border-black"
+                              className="flex-1 border border-gray-200 rounded-md px-2 min-h-[44px] text-sm outline-none focus:border-black"
                             />
                             <input
                               type="text"
                               value={editEmail}
                               onChange={(e) => setEditEmail(e.target.value)}
                               placeholder="correo@dominio.com"
-                              className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs outline-none focus:border-black"
+                              className="flex-1 border border-gray-200 rounded-md px-2 min-h-[44px] text-sm outline-none focus:border-black"
                             />
                             <div className="flex gap-1">
-                              <button type="button" onClick={saveEditContacto} className="text-xs bg-black text-white px-2 py-1 rounded hover:bg-gray-800">Guardar</button>
-                              <button type="button" onClick={() => setEditId(null)} className="text-xs text-gray-400 px-2 py-1 hover:text-black">Cancelar</button>
+                              <button type="button" onClick={saveEditContacto} className="text-xs bg-black text-white px-3 min-h-[44px] inline-flex items-center rounded-md hover:bg-gray-800">Guardar</button>
+                              <button type="button" onClick={() => setEditId(null)} className="text-xs text-gray-400 px-3 min-h-[44px] inline-flex items-center hover:text-black">Cancelar</button>
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="min-w-0 flex-1">
                               {ct.nombre && <p className="text-xs font-medium truncate">{ct.nombre}</p>}
                               <p className="text-xs text-gray-400 truncate">{ct.email}</p>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button type="button" onClick={() => setTo((v) => appendEmail(v, ct.email))} title="Agregar a Para" className="text-xs border border-gray-200 px-1.5 py-1 rounded text-gray-500 hover:text-black hover:border-gray-400 transition">+ Para</button>
-                              <button type="button" onClick={() => setCc((v) => appendEmail(v, ct.email))} title="Agregar a CC" className="text-xs border border-gray-200 px-1.5 py-1 rounded text-gray-500 hover:text-black hover:border-gray-400 transition">+ CC</button>
-                              <button type="button" onClick={() => { setEditId(ct.id); setEditEmail(ct.email); setEditNombre(ct.nombre || ""); setLibretaErr(null); }} title="Editar" className="p-1 text-gray-400 hover:text-black transition">{IconPencil}</button>
-                              <button type="button" onClick={() => deleteContacto(ct.id)} title="Eliminar" className="p-1 text-gray-400 hover:text-red-600 transition">{IconTrash}</button>
-                            </div>
+                            {/* 🩸 Eran cuatro botones de ~24 px pegados en fila
+                                y el tacho borraba de una, sin preguntar y sin
+                                Deshacer — para TODO el equipo, porque la
+                                libreta es global. Ahora los cuatro miden 44 px,
+                                el tacho está separado de los otros tres
+                                (`ml-1`, y agrega/edita van juntos) y pide
+                                confirmar EN LA MISMA FILA: no hace falta una
+                                segunda ventana encima de ésta. */}
+                            {borrandoId === ct.id ? (
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-xs text-gray-600">¿Borrar de la libreta?</span>
+                                <button type="button" onClick={() => deleteContacto(ct.id)} className="text-xs px-3 min-h-[44px] inline-flex items-center rounded-md bg-red-600 text-white font-medium hover:bg-red-700 transition">Borrar</button>
+                                <button type="button" onClick={() => setBorrandoId(null)} className="text-xs px-3 min-h-[44px] inline-flex items-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 transition">Cancelar</button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button type="button" onClick={() => setTo((v) => appendEmail(v, ct.email))} title="Agregar a Para" className="text-xs border border-gray-200 px-3 min-h-[44px] inline-flex items-center rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition">+ Para</button>
+                                <button type="button" onClick={() => setCc((v) => appendEmail(v, ct.email))} title="Agregar a CC" className="text-xs border border-gray-200 px-3 min-h-[44px] inline-flex items-center rounded-md text-gray-600 hover:text-black hover:border-gray-400 transition">+ CC</button>
+                                <button type="button" onClick={() => { setEditId(ct.id); setEditEmail(ct.email); setEditNombre(ct.nombre || ""); setLibretaErr(null); }} title="Editar" aria-label="Editar contacto" className="w-11 h-11 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-black hover:bg-gray-50 transition">{IconPencil}</button>
+                                <button type="button" onClick={() => { setBorrandoId(ct.id); setLibretaErr(null); }} title="Borrar de la libreta" aria-label="Borrar contacto de la libreta" className="ml-1 w-11 h-11 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition">{IconTrash}</button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -383,14 +426,14 @@ export default function EnviarProveedorModal({
           <button
             onClick={() => { if (!sending) onClose(); }}
             disabled={sending}
-            className="text-sm px-4 py-2 rounded-md text-gray-500 hover:text-black transition disabled:opacity-40"
+            className="text-sm px-4 min-h-[44px] inline-flex items-center rounded-md text-gray-500 hover:text-black transition disabled:opacity-40"
           >
             Cancelar
           </button>
           <button
             onClick={send}
             disabled={sending}
-            className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
+            className="text-sm bg-black text-white px-5 min-h-[44px] inline-flex items-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
           >
             {sending ? "Enviando…" : "Enviar correo"}
           </button>

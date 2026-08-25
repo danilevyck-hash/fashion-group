@@ -492,6 +492,20 @@ export default function EntregaForm({
     Math.abs(sumPctSel - 100) < 0.01;
   const puedeGuardar = panelesOk && marcasOk && tieneAlMenosUno && !guardando;
 
+  // 🩸 Lo que falta, dicho con todas las letras. Antes el botón se apagaba y la
+  // única explicación era un `title=` — un globito del mouse que en el iPhone
+  // NO EXISTE. Mandar sólo barras y colgadores es un envío real, así que el
+  // usuario se quedaba con un botón gris y sin idea de por qué. Mismo patrón
+  // que MetaFormModal y que Guías: "Falta: …".
+  const falta = useMemo(() => {
+    const f: string[] = [];
+    if (!panelesOk) f.push("la cantidad de paneles");
+    if (marcasSel.length === 0) f.push("al menos una marca");
+    else if (!marcasOk) f.push("que el % de las marcas sume 100");
+    if (!tieneAlMenosUno) f.push("al menos una cantidad");
+    return f;
+  }, [panelesOk, marcasOk, marcasSel.length, tieneAlMenosUno]);
+
   // Warnings de stock por producto (no bloqueantes).
   const warningsStock = useMemo(() => {
     const out: Array<{ nombre: string; pedido: number; disponible: number }> = [];
@@ -800,6 +814,17 @@ export default function EntregaForm({
                 >
                   Cantidad de paneles
                 </label>
+                {/* El campo bloquea el guardado si va en 0 y no lo decía en
+                    ningún lado. Ahora lo dice ACÁ, no sólo en el botón.
+                    ⚠️ VA FUERA del <label> a propósito: adentro se pegaría al
+                    nombre accesible del campo ("Cantidad de paneles Obligatorio
+                    — sin paneles…") y quien use lector de pantalla —o el
+                    candado de este form, que busca el campo por su etiqueta—
+                    dejaría de encontrarlo. */}
+                <p className="text-xs text-gray-500 -mt-1">
+                  <span className="text-red-500">*</span> Obligatorio — sin
+                  paneles no se puede registrar la entrega.
+                </p>
                 {/* Piezas (grande, es el driver del kit) + bultos (chico, es
                     sólo cómo viajó). El bulto NUNCA modifica las piezas. */}
                 <div className="flex items-end gap-2">
@@ -1017,7 +1042,15 @@ export default function EntregaForm({
             </>
           )}
 
-          <div className="flex items-center justify-between gap-3 pt-2">
+          <div className="space-y-2 pt-2">
+          {/* El botón apagado dice POR QUÉ está apagado, en la pantalla y no en
+              un globito del mouse (en el iPhone no hay `title=`). Va en su
+              propia línea, a lo ancho: en 390 px la lista completa no entra al
+              lado del botón sin empujar la fila. */}
+          {!guardando && falta.length > 0 && (
+            <p className="text-xs text-amber-800">Falta: {falta.join(", ")}.</p>
+          )}
+          <div className="flex items-center justify-between gap-3">
             {initial ? (
               <button
                 type="button"
@@ -1044,15 +1077,6 @@ export default function EntregaForm({
                 onClick={handleGuardar}
                 disabled={!puedeGuardar}
                 className="rounded-md bg-gray-900 text-white px-4 min-h-[44px] text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
-                title={
-                  !marcasOk
-                    ? "Selecciona marca(s) y que el % sume 100"
-                    : !panelesOk
-                      ? "Indica al menos 1 panel"
-                      : !tieneAlMenosUno
-                        ? "Agrega al menos una cantidad"
-                        : undefined
-                }
               >
                 {guardando
                   ? "Guardando…"
@@ -1061,6 +1085,7 @@ export default function EntregaForm({
                     : "Registrar entrega"}
               </button>
             </div>
+          </div>
           </div>
         </div>
         )}
