@@ -309,9 +309,12 @@ export function FiltroPrecioExacto({
         )}
       </div>
 
-      <p className={suave}>
-        Escribe un precio y ves solo ese. El «hasta» se llena solo.
-      </p>
+      {/* Se podó "Escribe un precio y ves solo ese. El «hasta» se llena solo."
+          (25-ago-2026, aprobado por Daniel): los dos campos ya dicen "desde" y
+          "hasta" con su placeholder, y el autorrelleno se ve al escribir. Lo
+          que SÍ se queda es el aviso de abajo (`aviso`), que aparece solo
+          cuando el precio escrito no existe — ése informa, no describe.
+          Candado: poda-textos-cxc-multifashion.test.ts. */}
 
       {/* 🔴 ACÁ NO VA UNA FILA DE BOTONES DE PRECIO. Estuvo del 23 al 24-ago-2026
           y Daniel la retiró: *"no quiero botones de precios, solo escribirlo y

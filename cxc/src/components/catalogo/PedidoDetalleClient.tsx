@@ -1123,7 +1123,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   <span className="text-gray-400 text-xs"> · por defecto de la marca</span>
                 )}
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">La venta se le acredita a esta persona.</div>
+              {/* Se podó "La venta se le acredita a esta persona."
+                  (25-ago-2026, aprobado por Daniel) — misma poda que en el
+                  checkout: el rótulo "Vendedor" con el nombre debajo ya lo
+                  dice. Candado: poda-textos-cxc-multifashion.test.ts. */}
             </div>
             {puedeCambiarVendedor ? (
               <button onClick={() => setShowVendedorModal(true)}
@@ -1225,9 +1228,17 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   deshabilitado={!items.length || !clienteElegido}
                   faltaTexto={faltaEnviar.length > 0 ? textoFaltaEnviar(faltaEnviar) : null}
                 />
-                <p className="text-xs text-gray-500 mt-2 text-center">
-                  Se crea de verdad en Switch ({theme.empresaKey}). Si sale mal, hay que borrarlo a mano en el panel de Switch.
-                </p>
+                {/* Se podó "Se crea de verdad en Switch (empresa). Si sale
+                    mal, hay que borrarlo a mano en el panel de Switch."
+                    (25-ago-2026, aprobado por Daniel). Las dos salidas están a
+                    la vista con sus nombres —«Pedido» y «Cotización»— y el
+                    banner del candado post-envío ya dice que está en Switch y
+                    con qué número. Lo que quedaba era la explicación.
+                    ⚠️ Lo que SÍ se queda, 20 líneas más arriba, es el aviso
+                    rojo de "Este pedido reemplaza al PED-XXX. Borra el pedido
+                    #… en el panel de Switch para no duplicar": ese FRENA una
+                    acción y no se esconde. Candado:
+                    poda-textos-cxc-multifashion.test.ts. */}
               </div>
             )
           )}
@@ -1293,8 +1304,16 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       <ConfirmDeleteModal
         open={showDeleteModal}
         title={switchLock ? `Ocultar pedido ${order?.order_number || ""} de la lista?` : `Eliminar pedido ${order?.order_number || ""}?`}
+        /* 🔴 SE FUE EL PÁRRAFO, SE QUEDA EL DATO (25-ago-2026, aprobado por
+           Daniel). Decía "El pedido sigue en Switch como #… — aquí solo se
+           oculta de la lista. Para anularlo de verdad, hazlo en el panel de
+           Switch.": el título ya pregunta "¿Ocultar … de la lista?" y el botón
+           que abre esto dice "Ocultar de la lista (el pedido sigue en Switch)".
+           Lo único que el párrafo traía y no está en ningún otro lado es el
+           NÚMERO, y ése no es explicación — es el dato con el que se busca en
+           Switch. Candado: poda-textos-cxc-multifashion.test.ts. */
         description={switchLock
-          ? `El pedido sigue en Switch como #${switchEnvio?.numero_interno || switchEnvio?.pedido_switch_id || "?"} — aquí solo se oculta de la lista. Para anularlo de verdad, hazlo en el panel de Switch.`
+          ? `En Switch como #${switchEnvio?.numero_interno || switchEnvio?.pedido_switch_id || "?"}.`
           : `Se eliminara el pedido de ${clientName} con ${items.length} productos ($${fmt(totalMoney)}).`}
         confirmLabel={switchLock ? "Ocultar" : undefined}
         loadingLabel={switchLock ? "Ocultando..." : undefined}

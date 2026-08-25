@@ -387,7 +387,12 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                     )}
                   </div>
                 )}
-                <div className="mt-0.5 text-xs text-gray-400">La venta se le acredita a esta persona.</div>
+                {/* Se podó "La venta se le acredita a esta persona."
+                    (25-ago-2026, aprobado por Daniel): el rótulo dice
+                    "Vendedor" y debajo está el nombre. Lo que el texto agregaba
+                    era la definición de la palabra vendedor. Lo que SÍ se queda
+                    es el aviso de "sin vendedor asignado", que frena una acción.
+                    Candado: poda-textos-cxc-multifashion.test.ts. */}
               </div>
               <button onClick={() => setVendedorPickerOpen((v) => !v)} className="rounded-md border border-gray-200 px-3 min-h-[44px] text-sm text-gray-700 hover:border-gray-300 transition">
                 {vendedorPickerOpen ? "Cerrar" : "Cambiar"}

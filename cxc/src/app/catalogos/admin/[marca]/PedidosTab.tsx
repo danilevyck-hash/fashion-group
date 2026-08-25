@@ -7,11 +7,18 @@ import BulkDeletePedidosModal from "@/components/catalogo/BulkDeletePedidosModal
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { precioTexto } from "@/lib/catalogo/precio";
 import {
+  contarComprobantes,
   estaEnSwitch,
+  FILTROS_COMPROBANTE,
+  pasaFiltroComprobante,
   textoBuscablePedido,
   textoEnSwitch,
   textoNumeroPedido,
   tieneNumeroPropio,
+  VACIO_NINGUNO_COINCIDE,
+  VACIO_SIN_COMPROBANTES,
+  type FiltroComprobante,
+  type NumerosDePedido,
 } from "@/lib/catalogo/numeros-pedido";
 
 // Pestaña Pedidos del admin — ÚNICA por marca (PR-2, antes gemelos ~83%
@@ -100,13 +107,24 @@ function OrigenBadge({ marca, origen, confirmadoCliente }: { marca: MarcaUiKey; 
 // columna de un número se lee como un cero), y el que sí salió dice SIEMPRE si
 // fue pedido o COTIZACIÓN — una cotización no aparta mercancía y las dos se
 // verían idénticas con solo el número.
-function NumerosPedido({ pedido, esOrders }: { pedido: UnifiedPedido; esOrders: boolean }) {
-  const datos = {
+// La tabla física manda sobre el badge: una pública convertida vive en
+// <marca>_orders aunque se muestre como "Del link". Vive a nivel de módulo
+// porque los conteos del filtro por tipo lo necesitan antes de renderizar.
+function esFilaOrders(p: UnifiedPedido): boolean {
+  return p.fuente ? p.fuente === "orders" : p.origen === "mio";
+}
+
+function datosNumeros(pedido: UnifiedPedido, esOrders: boolean): NumerosDePedido {
+  return {
     numeroPedido: pedido.numero_pedido ?? null,
     switchNumero: pedido.switch_numero ?? null,
     switchDocumento: pedido.switch_documento ?? null,
-    fuente: (esOrders ? "orders" : "publicos") as "orders" | "publicos",
+    fuente: esOrders ? "orders" : "publicos",
   };
+}
+
+function NumerosPedido({ pedido, esOrders }: { pedido: UnifiedPedido; esOrders: boolean }) {
+  const datos = datosNumeros(pedido, esOrders);
   const propio = tieneNumeroPropio(datos);
   const enSwitch = estaEnSwitch(datos);
   return (
@@ -156,7 +174,7 @@ function MesGroup({
         </svg>
         <span className="text-sm font-semibold text-gray-700 capitalize">{label}</span>
         <span className="text-xs text-gray-400 tabular-nums">
-          ({count} {count === 1 ? "pedido" : "pedidos"})
+          ({count} {count === 1 ? "comprobante" : "comprobantes"})
         </span>
       </button>
       {open && children}
@@ -178,6 +196,9 @@ export default function PedidosTab({
   const theme = getMarcaTheme(marca)!;
   const router = useRouter();
   const [origenFilter, setOrigenFilter] = useState<OrigenFilter>("todos");
+  // 🔴 Qué se mandó a Switch: pedido, cotización, o todavía nada. Es el filtro
+  // que Daniel pidió para ver de un vistazo qué se COTIZÓ y no se vendió.
+  const [tipoFilter, setTipoFilter] = useState<FiltroComprobante>("todos");
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<UnifiedPedido | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -240,8 +261,14 @@ export default function PedidosTab({
     mio: pedidos.filter((p) => p.origen === "mio").length,
   };
 
+  // Los conteos del filtro por TIPO. Una pasada sobre lo que ya está en
+  // memoria: `documento` viaja en la fila desde el #593, así que no hay ni una
+  // consulta nueva (la base está en compute Micro).
+  const countsTipo = contarComprobantes(pedidos.map((p) => datosNumeros(p, esFilaOrders(p))));
+
   const filtered = pedidos.filter((p) => {
     if (origenFilter !== "todos" && p.origen !== origenFilter) return false;
+    if (!pasaFiltroComprobante(datosNumeros(p, esFilaOrders(p)), tipoFilter)) return false;
     if (search) {
       // Se busca por cliente Y por los DOS números: el que Daniel tiene a mano
       // puede ser el de la casa (PED-017) o el que le dice el ERP
@@ -263,7 +290,7 @@ export default function PedidosTab({
   // pública convertida vive en <marca>_orders y se abre en el detalle interno.
   // Fallback por `origen` si la vista aún no expone `fuente`.
   function isOrdersRow(p: UnifiedPedido): boolean {
-    return p.fuente ? p.fuente === "orders" : p.origen === "mio";
+    return esFilaOrders(p);
   }
 
   // 🩸 LA FILA Y EL BOTÓN "Editar" LLEVAN AL MISMO LADO (23-ago-2026).
@@ -426,6 +453,38 @@ export default function PedidosTab({
         })}
       </div>
 
+      {/* 🔴 FILTRO POR TIPO DE COMPROBANTE (25-ago-2026)
+          Adentro del panel hay pedidos y cotizaciones enviadas, y una
+          cotización NO aparta mercancía. Sin este filtro, "qué cotizamos y
+          todavía no se vendió" solo se contestaba leyendo la segunda línea de
+          cada fila, una por una.
+          Los rótulos y los conteos salen de `numeros-pedido.ts`: escribirlos
+          acá sería una segunda definición de qué es una cotización.
+          ⚠️ El que NO salió a Switch tiene su propio balde («Sin mandar») — no
+          se le inventa tipo, que es la misma regla de `textoEnSwitch`. */}
+      <div data-medir="filtro-tipo-comprobante" className="flex flex-wrap gap-2 mb-4">
+        {FILTROS_COMPROBANTE.map((f) => {
+          const active = tipoFilter === f.clave;
+          return (
+            <button
+              key={f.clave}
+              onClick={() => setTipoFilter(f.clave)}
+              aria-pressed={active}
+              className={`inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-full border text-sm font-medium whitespace-nowrap transition ${
+                active
+                  ? "border-gray-900 bg-gray-900 text-white"
+                  : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+              }`}
+            >
+              {f.label}
+              <span className={`tabular-nums text-xs ${active ? "text-white/70" : "text-gray-400"}`}>
+                {countsTipo[f.clave]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Buscador por cliente */}
       <div className="relative mb-4">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -442,7 +501,9 @@ export default function PedidosTab({
       {filtered.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-gray-400 text-sm">
-            {search || origenFilter !== "todos" ? "Ningún pedido coincide" : "No hay pedidos aún"}
+            {search || origenFilter !== "todos" || tipoFilter !== "todos"
+              ? VACIO_NINGUNO_COINCIDE
+              : VACIO_SIN_COMPROBANTES}
           </p>
         </div>
       ) : (

@@ -2021,6 +2021,95 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > El endpoint `/apicotizacion/terminar` y el motor único de envío · el 422 del cliente · `normalizarDocumento` · el at-most-once · el DDL `20260824160000` y su tolerancia · el aviso de Telegram · el pedido del LINK público · los dos números en la LISTA del admin (#593) · el resto de las columnas del Excel y el orden de las filas · el flujo de 3 toques, «Duplicar» y el modo pedido.
 
+## 🔴 EL PANEL SE LLAMA «COMPROBANTES», Y SE LLEGA EN UN TOQUE (25-ago-2026)
+
+> Daniel, textual: ***"al terminar un pedido, un botón para ver los comprobantes… o dejarlo volver a catálogo y ya en catálogo entras al panel de pedidos (debería de llamarse **comprobantes**, ya que dentro podrás ver las cotizaciones enviadas y los pedidos enviados)"***.
+>
+> El panel se llamaba «Pedidos» **cuando adentro solo había pedidos**. Desde el #579 un envío sale como PEDIDO o como COTIZACIÓN, así que adentro hay dos cosas y el rótulo viejo nombraba una sola.
+>
+> 🔑 **EL NOMBRE NO ES UNA OCURRENCIA: ES EL DE SWITCH.** Su propio panel llama **«Reportes de comprobantes»** a esa pantalla y los separa en **8 tipos** —Facturas/Notas · Transacción · Tiquete · Ventas · Pedidos · Cotización · Abonos · Cotización Email— (`docs/switch-panel.md`, extraído de la base pública de Switch el 25-ago-2026). Usamos la palabra del ERP contra el que cuadramos, no una nuestra.
+>
+> ### ⚠️ EL LABEL CAMBIA, LA LLAVE NO
+>
+> La `key` de la pestaña **sigue siendo `pedidos`**: `/catalogos/admin/<marca>?tab=pedidos`. Un marcador guardado tiene que seguir llegando, y la medición lo comprueba entrando **por esa URL** en las 4 marcas × 4 anchos. Es la misma decisión ya escrita dos veces en este repo: **Cheques→«Recordatorios»** (*"la key sigue siendo `cheques`"*) y **Asistencia→«Asistencia y Planilla»**.
+> - **Y los pedidos internos SIGUEN llamándose pedidos cuando son pedidos**: el badge de la fila, «¿Eliminar pedido?», `order_number`, el `documento` de la API y la lista del vendedor (`/catalogo/<marca>/pedidos`, que se llama «Pedidos» a propósito) **no se tocaron**. Lo que cambió de nombre es el CONTENEDOR y su chrome: la pestaña, los vacíos («No hay comprobantes aún» · «Ningún comprobante coincide») y el contador del mes.
+> - **«Comprobantes» no choca con ninguna ficha** de `modules.ts` — hay candado que compara contra las 29 etiquetas, sin tildes y en los dos sentidos (que ninguna sea igual y que ninguna la contenga), y que exige que **no aparezca una key nueva `comprobantes`** (sería un módulo sin fila en `role_permissions`).
+> - **La hoja del Excel sigue llamándose «Pedidos» y el archivo también.** Daniel puede tener una planilla enganchada: renombrar la hoja la desengancha. Es el mismo criterio que puso las dos columnas nuevas AL FINAL.
+>
+> ### 🔴 ADENTRO SE FILTRA POR TIPO — y el que no salió NO es ninguno de los dos
+>
+> ```
+> [ Todos 42 ]  [ Pedidos 30 ]  [ Cotizaciones 2 ]  [ Sin mandar 10 ]
+> ```
+>
+> Daniel quería poder ver **de un vistazo qué se cotizó y todavía no se vendió**. Antes eso se contestaba leyendo la segunda línea de cada fila, una por una.
+> - 🔴 **Un pedido que NO salió a Switch tiene su propio balde.** No se le inventa tipo: rotularlo «Pedido» porque el default del ERP es pedido sería decir que hay algo en Switch que no está. Es la MISMA regla de `textoEnSwitch` porque es el MISMO módulo — `lib/catalogo/numeros-pedido.ts`, puro, no una copia.
+> - **Cero consultas nuevas.** `documento` ya viaja en la fila desde el #593: los cuatro conteos salen de **una pasada sobre lo que ya está en memoria**. La base está en compute Micro.
+> - **El escalón tolerante del DDL `20260824160000` se conserva**: sin la columna `documento` todo lo que está en Switch se lee como PEDIDO. Hay mutación.
+> - **Se cruza con el filtro de ORIGEN** (Todos · Del link · Míos), no lo pisa. Hay test que toca los dos.
+> - 🔴 **NO ES UNA COLUMNA NUEVA**: la fila de filtros va ARRIBA de la tabla, que conserva **exactamente sus 6 columnas** — el ancho del iPad acostado (1024) no se movió ni un píxel (medido, ver abajo).
+>
+> ### 🔴 DE LA CONFIRMACIÓN A LA LISTA: 4 TOQUES → 1, Y EL DESTINO DEPENDE DEL ROL
+>
+> 🩸 **EL BOTÓN NO PUEDE SER UNO SOLO.** La confirmación la ven los **tres** roles que arman pedidos (`createRoles` = admin, secretaria y **vendedor**), y `/catalogos/admin/<marca>` es de `CATALOGO_ADMIN_ROLES` (admin + secretaria): mandar ahí a un vendedor es mandarlo a una pantalla cuyas peticiones mueren en **403** en el servidor.
+>
+> | rol | destino | antes | después |
+> |---|---|---:|---:|
+> | admin · secretaria | `/catalogos/admin/<marca>?tab=pedidos` — **«Ver comprobantes»** | **4** | **1** |
+> | vendedor | `/catalogo/<marca>/pedidos` — **«Ver pedidos»** | **2** | **1** |
+>
+> **Los toques se contaron TOCANDO**, no estimando: el script drivea los clics uno por uno en las 4 marcas y verifica dónde terminó. El camino viejo del admin era `← Inicio` · `Catálogos` · `Administrar` · pestaña `Pedidos`; el del vendedor, `Volver al catálogo` · `Pedidos`.
+> - **El destino y su rótulo salen del MISMO lugar** (`lib/catalogo/destino-comprobantes.ts`, módulo puro): un `href` y un `label` que se puedan separar son exactamente un botón que dice una cosa y lleva a otra. Hay mutación para el caso.
+> - 🩸 **El default es la lista que NO rebota.** Un rol desconocido, vacío o todavía sin leer de `sessionStorage` va a `/catalogo/<marca>/pedidos`. El modo de fallo aceptable es mandar a alguien a una lista que puede ver, nunca a una que le va a dar 403.
+> - `adminHref` pasó a vivir en **`MARCA_THEME`** (las 4 marcas), para que el botón y el «Administrar» del hub salgan del mismo lugar. Hay candado que compara los dos.
+> - **El techo de 3 acciones de la confirmación (5-jul) sigue valiendo en el camino normal**: con el pedido ya en Switch no hay «Enviar», así que quedan exactamente tres. Las cuatro solo aparecen cuando el envío falló o todavía no salió, y ahí «Enviar» es lo que la persona vino a hacer. **«Ver PDF» y «Volver al catálogo» no se tocaron.**
+>
+> ### Y CUATRO TEXTOS QUE SE FUERON (aprobados por Daniel uno por uno)
+>
+> | dónde | lo que decía |
+> |---|---|
+> | `CheckoutClient` + `PedidoDetalleClient` | *"La venta se le acredita a esta persona."* — el rótulo dice **Vendedor** y debajo está el nombre |
+> | `PedidoDetalleClient` (pie del envío) | *"Se crea de verdad en Switch (BOSTON). Si sale mal, hay que borrarlo a mano en el panel de Switch."* — las dos salidas están a la vista con sus nombres |
+> | `PedidoDetalleClient` (modal de ocultar) | *"El pedido sigue en Switch como #4821 — aquí solo se oculta de la lista. Para anularlo de verdad, hazlo en el panel de Switch."* |
+> | `CatalogoFilters` | *"Escribe un precio y ves solo ese. El «hasta» se llena solo."* — los campos ya dicen desde/hasta |
+>
+> 🔴 **SE FUE EL PÁRRAFO, SE QUEDÓ EL DATO.** Del modal de ocultar sobrevive el **número**: el título ya pregunta *"¿Ocultar … de la lista?"* y el botón que lo abre dice *"Ocultar de la lista (el pedido sigue en Switch)"*, así que lo único que el párrafo traía y no estaba en ningún otro lado era `#16-000000503` — y eso no es explicación, es con lo que se busca en Switch. Queda como `En Switch como #16-000000503.`
+>
+> 🔴 **LO QUE **NO** SE PODÓ, y que nadie lo "termine" después** — los tres tienen candado propio en la sección `EN_PANTALLA` de `poda-textos-cxc-multifashion.test.ts`, y mutación:
+> - **`no aparta mercancía`** pegado al botón de Cotización: **no es explicación, es el dato** que decide cuál se toca. Sigue con su candado de LARGO (≤4 palabras, ≤24 caracteres).
+> - **"Este pedido reemplaza al PED-XXX. Borra el pedido #… en el panel de Switch para no duplicar"**: frena una acción.
+> - **"No tienes vendedor de Switch asignado"**: es la salida de un 422, no una descripción.
+>
+> ### Medición
+>
+> **`BASE=… ETAPA=despues node scripts/_medir-comprobantes-anchos.mjs`** — el navegador **ABORTA cualquier petición que no sea GET/HEAD**. Esta medición pasa por pantallas con botones de borrar, de exportar y de **MANDAR A SWITCH**, y desde el 25-ago tocar una salida MANDA sin ventana en el medio: el script no las toca, pero medir no puede depender de que nadie se equivoque. **Escrituras bloqueadas: 35 · mandadas a Switch: 0.**
+>
+> Contra el build de producción, con datos de producción, **4 marcas × 4 anchos (390 · 834 · 1024 · 1440)**, con TODOS los meses desplegados, y **CONTRA `origin/main` corriendo EL MISMO ARCHIVO** (`ETAPA=antes`; dos scripts distintos no comparan nada):
+>
+> | panel, por marca | arrastre | recorte @390 | recorte @834/1024/1440 | táctil <44 | texto <12 |
+> |---|---:|---:|---:|---:|---:|
+> | `origin/main` | 0 | 217 · 209 · 218 · 214 | **0 · 0 · 0** | 57 · 3 · 63 · 12 | 0 |
+> | esta rama | 0 | 217 · 209 · 218 · 214 | **0 · 0 · 0** | 57 · 3 · 63 · 12 | 0 |
+>
+> **IDÉNTICO en las 16 celdas**: la fila de filtros vive ARRIBA del contenedor de la tabla, así que la caja que se mide no cambió ni un píxel. El recorte de 390 px es el `overflow-x-auto` que la tabla ya declaraba —arrastrarla ES el mecanismo— y está en main igual. Los táctiles <44 son los **PRE-EXISTENTES** (las casillas de 16 px y los botones «Editar»/«Eliminar» de 28 px de alto), en código que este cambio no toca.
+>
+> **La confirmación crece 56 px hacia ABAJO y nada más** (main 396/319/319/319 → esta rama 452/375/375/375; Calvin 439/383 → 495/439): **0 arrastre · 0 recorte · 0 táctil <44 · 0 texto <12** en las 4 marcas × 2 roles × 4 anchos, con el botón a la vista en los cuatro.
+>
+> **El filtro se toca y se comprueba que FILTRA**: en cada marca y cada ancho el script toca «Pedidos», «Cotizaciones» y «Sin mandar» y exige que las filas visibles sean **exactamente** el número que el propio chip muestra, y que los tres sumen «Todos».
+> - 🩸 **Gotcha de medición que daba rojo por nada:** por defecto solo se abre el mes ACTUAL y **los 19 pedidos de Reebok son de julio** — el "¿llegué a la lista?" no puede preguntar por un `<table>`, porque con todos los meses cerrados no hay ninguno. Se pregunta por el filtro por tipo (o, en `antes`, por el buscador).
+> - 🩸 **El contador del mes dice «pedidos» en `origin/main` y «comprobantes» acá**: el selector acepta LOS DOS, o `ETAPA=antes` no encontraría un solo mes y el rojo sería del renombre, no de la caja.
+>
+> ### Candados
+>
+> **`lib/comprobantes-nombre-y-tipo.test.ts`** (el nombre, la llave congelada, el choque de labels contra `modules.ts`, `tipoComprobante`, los conteos y el destino por rol) · **`components/comprobantes-panel.test.tsx` (CONDUCTA: monta la pestaña REAL y la confirmación REAL en las 4 marcas, TOCA los filtros, lee el DOM, cuenta las `<th>` y verifica que el vendedor no tenga NI UN enlace a `/catalogos/admin/`)** · `poda-textos-cxc-multifashion.test.ts` (los 4 textos que se fueron + los 3 que se quedan) · `lib/numeros-pedido.test.ts` · `components/pedidos-numeros-en-la-lista.test.tsx` · `lib/catalogo-roles.test.ts`.
+> - **Verificado por mutación, 38 de 38 cazadas** (`bash scripts/_mutar-candados-comprobantes.sh`): la pestaña vuelve a llamarse «Pedidos» · **la key cambia y rompe el marcador** · el shell escribe el label a mano · el shell deja de dibujar la pestaña · los dos vacíos vuelven a hablar de pedidos · **el que no salió se cuenta como PEDIDO** · **toda cotización se cuenta como pedido** · se pierde el escalón tolerante del DDL · todo se cuenta como cotización · el filtro deja pasar todo · «Cotizaciones» y «Sin mandar» desaparecen · los conteos dejan afuera a los que no salieron · los conteos se quedan en cero · la pantalla esconde el filtro · la pantalla dibuja su propia lista · **el filtro se ignora al filtrar** · el filtro pisa al de ORIGEN · los conteos se calculan sobre lo ya filtrado · **la tabla gana una columna** · el vacío se escribe a mano · **el VENDEDOR sale apuntado al admin (403)** · el ADMIN pierde el panel · los roles se invierten · el rótulo y la dirección se separan · el destino pierde el `?tab=pedidos` · la confirmación pierde el botón · escribe la dirección a mano · deja de leer el rol · el `adminHref` de una marca apunta a otra · **vuelven los 4 textos podados** · **se borran los 2 avisos que se quedan**.
+> - 🩸 **DOS mutaciones sobrevivieron en la primera corrida, y las dos eran candados flojos, no falsos positivos**: esconder el filtro con `hidden` y esconder el botón de la lista con el atributo `hidden` dejaban los elementos EN el DOM, y los tests los encontraban con `getByText`. Se arreglaron leyendo la capa que sí distingue: `getAllByRole` (que descarta `hidden`/`aria-hidden`) más un chequeo explícito de las clases que esconden. **Existir en el DOM no es estar en pantalla.**
+> - 🩸 **La restauración del script va por COPIA, no con `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada — las mutaciones se apilarían y ninguna se probaría por separado. Y **no hay delimitador**: los textos viajan como ARGUMENTOS a python (argv), no dentro de un `s|de|a|` de sed — el código real tiene `||`, `/` y `#`, y cualquier delimitador se des-escapa, se come el archivo y deja un "SOBREVIVIÓ" falso.
+>
+> ### Lo que NO se tocó
+>
+> El **422 sin cliente** leído ANTES del documento · `normalizarDocumento` cayendo a PEDIDO ante cualquier basura · el **at-most-once** `(order_id) WHERE estado <> 'error'` · el aviso de Telegram (📝 vs 📦) · el pedido del **LINK público** · el motor único de envío y `/apicotizacion/terminar` · los dos números de la lista (#593) · el Excel, su hoja «Pedidos», sus columnas y el orden de las filas · la lista del vendedor y su «← Volver a Pedidos» · el modal de eliminación masiva · **Joybees sigue siendo espejo exacto de Reebok y no se tocó nada propio de Reebok**.
+
 ## 🔴 Pedidos — EL CLIENTE SE ELIGE, NUNCA VIENE PUESTO (14-ago-2026)
 
 > El checkout del catálogo nacía con **`Contado` PUESTO** y "Enviar a Switch" no exigía tocar nada: se armaba el pedido, se apretaba, y salía a nombre de Contado sin que nadie lo notara. Daniel, textual: ***"Que arranque vacío y el botón apagado hasta elegir cliente."***

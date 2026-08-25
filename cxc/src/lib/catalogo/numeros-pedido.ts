@@ -102,3 +102,83 @@ export function textoEnSwitch(p: NumerosDePedido): string {
 export function textoBuscablePedido(p: NumerosDePedido & { cliente?: string | null }): string {
   return [p.cliente ?? "", p.numeroPedido ?? "", p.switchNumero ?? ""].join(" ").toLowerCase();
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL CONTENEDOR SE LLAMA «COMPROBANTES» — Y ADENTRO SE FILTRA POR TIPO
+// (25-ago-2026)
+//
+// El panel se llamaba «Pedidos» cuando adentro SOLO había pedidos. Desde el
+// #579 un envío puede salir como PEDIDO o como COTIZACIÓN, así que adentro hay
+// dos cosas y el rótulo viejo nombraba una sola. Daniel, textual: *"debería de
+// llamarse comprobantes, ya que dentro podrás ver las cotizaciones enviadas y
+// los pedidos enviados"*.
+//
+// 🔑 EL NOMBRE NO ES UNA OCURRENCIA: es el de Switch. Su propio panel llama
+// «Reportes de comprobantes» a esa pantalla y los separa en 8 tipos —Facturas/
+// Notas · Transacción · Tiquete · Ventas · Pedidos · Cotización · Abonos ·
+// Cotización Email— (ver `docs/switch-panel.md`). Usamos la palabra del ERP
+// contra el que cuadramos, no una nuestra.
+//
+// ⚠️ LO QUE **NO** CAMBIA: la `key` de la pestaña sigue siendo `pedidos`
+// (`?tab=pedidos`). Un marcador guardado tiene que seguir llegando. Es la misma
+// decisión que Cheques→«Recordatorios» y Asistencia→«Asistencia y Planilla»:
+// se cambia el LABEL, nunca la llave. Y los pedidos internos SIGUEN llamándose
+// pedidos cuando son pedidos — lo que cambió de nombre es el contenedor.
+//
+// 🔴 UN PEDIDO QUE NO SALIÓ NO ES NINGUNO DE LOS DOS. No se le inventa tipo:
+// tiene su propio balde («Sin mandar»), que es la misma regla que ya aplica
+// `textoEnSwitch`. Rotularlo «Pedido» porque el default del ERP es pedido sería
+// decir que hay algo en Switch que no está.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El nombre visible del contenedor. La `key` de la pestaña NO es esto. */
+export const PANEL_COMPROBANTES = "Comprobantes";
+
+/** 🔴 La llave de la pestaña, congelada: `/catalogos/admin/<marca>?tab=pedidos`. */
+export const TAB_COMPROBANTES_KEY = "pedidos";
+
+/** Los vacíos del contenedor (no dicen «pedidos»: adentro hay dos cosas). */
+export const VACIO_SIN_COMPROBANTES = "No hay comprobantes aún";
+export const VACIO_NINGUNO_COINCIDE = "Ningún comprobante coincide";
+
+/** Qué es cada fila. `no-enviado` = todavía no es un comprobante de nada. */
+export type TipoComprobante = "pedido" | "cotizacion" | "no-enviado";
+
+/** El tipo de UNA fila. Sale del envío activo, nunca del `status` del pedido. */
+export function tipoComprobante(p: NumerosDePedido): TipoComprobante {
+  if (!estaEnSwitch(p)) return "no-enviado";
+  return normalizarDocumento(p.switchDocumento);
+}
+
+export type FiltroComprobante = "todos" | TipoComprobante;
+
+/**
+ * Los filtros, en el orden en que se leen. «Cotizaciones» es el que Daniel
+ * pidió poder ver de un vistazo: lo que se cotizó y todavía no se vendió.
+ */
+export const FILTROS_COMPROBANTE: readonly { clave: FiltroComprobante; label: string }[] = [
+  { clave: "todos", label: "Todos" },
+  { clave: "pedido", label: "Pedidos" },
+  { clave: "cotizacion", label: "Cotizaciones" },
+  { clave: "no-enviado", label: "Sin mandar" },
+];
+
+export function pasaFiltroComprobante(p: NumerosDePedido, filtro: FiltroComprobante): boolean {
+  return filtro === "todos" || tipoComprobante(p) === filtro;
+}
+
+/**
+ * Los conteos de los cuatro filtros, en UNA pasada sobre las filas que ya
+ * están en memoria. Cero consultas nuevas: `documento` ya viaja en la fila
+ * desde el #593 y la base está en compute Micro.
+ */
+export function contarComprobantes(filas: NumerosDePedido[]): Record<FiltroComprobante, number> {
+  const out: Record<FiltroComprobante, number> = {
+    todos: filas.length,
+    pedido: 0,
+    cotizacion: 0,
+    "no-enviado": 0,
+  };
+  for (const f of filas) out[tipoComprobante(f)] += 1;
+  return out;
+}
