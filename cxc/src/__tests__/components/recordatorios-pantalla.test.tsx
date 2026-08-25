@@ -53,7 +53,24 @@ function almacenFalso(): Storage {
 /** Todo lo que salió por `fetch`, para poder afirmar que NADA se guarda solo. */
 let salidas: Array<{ url: string; metodo: string; cuerpo: unknown }> = [];
 
+// 🔴 EL RELOJ VA CLAVADO, y no es una formalidad: este archivo se puso ROJO
+// SOLO, sin que nadie tocara una línea, al cambiar la fecha del día.
+//
+// El cheque de prueba tiene `fecha_deposito: "2026-08-24"` clavado, pero la
+// pantalla pregunta la hora al reloj REAL (`todayStr()` en ChequesClient) para
+// decidir si un cheque va en "Hoy", en "Esta semana" o en "Vencidos", y para
+// contar la pestaña "Pendientes". El 24-ago pasaba; el 25-ago a las 00:00 UTC
+// el mismo test, con el mismo código, empezó a fallar.
+//
+// Es la regla que este repo ya tiene escrita para asistencia y para los cheques:
+// **fechas FIJAS, nunca `new Date()`**. Un test que depende del calendario no
+// prueba el código: prueba qué día es hoy, y rompe el build una madrugada
+// cualquiera sin que nadie sepa por qué.
+const HOY = new Date("2026-08-24T15:00:00.000Z"); // el día del fixture
+
 beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(HOY);
   vi.stubGlobal("localStorage", almacenFalso());
   vi.stubGlobal("sessionStorage", almacenFalso());
   salidas = [];
@@ -75,6 +92,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 // Un cheque REAL de producción (24-ago-2026: 19 vivos, $279.396,12).
@@ -224,7 +242,7 @@ describe("un recordatorio SE DISTINGUE de un cheque a simple vista", () => {
   for (const vista of ["calendario-grid", "calendario-lista"]) {
     it(`aparece en el CALENDARIO (${vista}) — es donde Daniel dijo que lo quería`, () => {
       // "quisiera poner ahí en el calendario «recordar cobrar»".
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = HOY.toISOString().slice(0, 10); // el reloj está clavado arriba
       const { container } = pintar({ recordatorios: [{ ...REC, fecha: hoy }] });
       fireEvent.click(screen.getByRole("button", { name: /^Calendario$/ }));
 
@@ -237,14 +255,14 @@ describe("un recordatorio SE DISTINGUE de un cheque a simple vista", () => {
   }
 
   it("el calendario sigue dibujando los cheques (no los reemplazó)", () => {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = HOY.toISOString().slice(0, 10); // el reloj está clavado arriba
     pintar({ cheques: [{ ...CHEQUE, fecha_deposito: hoy }], recordatorios: [{ ...REC, fecha: hoy }] });
     fireEvent.click(screen.getByRole("button", { name: /^Calendario$/ }));
     expect(screen.getAllByText("JERUSALEM DE PANAMA").length).toBeGreaterThan(0);
   });
 
   it("avisa arriba cuando hay uno para HOY, sin abrir nada", () => {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = HOY.toISOString().slice(0, 10); // el reloj está clavado arriba
     pintar({ recordatorios: [{ ...REC, fecha: hoy }] });
     expect(screen.getByText(/1 recordatorio para hoy/)).toBeTruthy();
   });
