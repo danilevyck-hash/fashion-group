@@ -36,8 +36,7 @@ import {
   productosRangoPeriodo,
   type ProductoCodigo,
 } from "@/lib/ventas/productos";
-import { clientesDeCodigos } from "@/lib/ventas/productos-clientes-server";
-import type { ClienteDeProducto } from "@/lib/ventas/productos-clientes";
+import { clientesDeCodigos, type ClientesDeDescripcion } from "@/lib/ventas/productos-clientes-server";
 
 export const dynamic = "force-dynamic";
 
@@ -98,12 +97,19 @@ export async function GET(req: NextRequest) {
   // Que esto falle NO puede llevarse los códigos: son dos preguntas distintas y
   // la de arriba ya está contestada. Se devuelve `clientes: null`, que la
   // pantalla lee como "no se pudo" (distinto de `[]`, que es "no hay").
-  let clientes: ClienteDeProducto[] | null = null;
+  let detalle: ClientesDeDescripcion | null = null;
   try {
-    clientes = await clientesDeCodigos(empresa, desde, hasta, codigos.map(c => c.codigo));
+    detalle = await clientesDeCodigos(empresa, desde, hasta, codigos.map(c => c.codigo), descripcion);
   } catch (e) {
     console.error("[api/ventas/productos/codigos] clientes:", e instanceof Error ? e.message : e);
   }
 
-  return NextResponse.json({ codigos, clientes });
+  return NextResponse.json({
+    codigos,
+    clientes: detalle?.clientes ?? null,
+    // Las otras grafías del mismo producto en Switch. Vacío = no hay solape y
+    // la pantalla no dibuja ningún aviso. NUNCA un cartel fijo: una alerta que
+    // sale siempre es la que se deja de leer a la semana.
+    grafias: detalle?.grafias ?? [],
+  });
 }

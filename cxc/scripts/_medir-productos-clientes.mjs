@@ -38,6 +38,10 @@ const BASE = process.env.BASE ?? "http://localhost:3241";
 const SALIDA = process.env.SALIDA ?? "/tmp/t241";
 const ETAPA = process.env.ETAPA ?? "despues";
 const EMPRESA = process.env.EMPRESA ?? "vistana";
+/** Qué descripción desplegar. Vacío = la primera de la tabla. */
+const DESCRIPCION = process.env.DESCRIPCION ?? "";
+/** "si" | "no" | "" — qué se espera del aviso ámbar de las dos grafías. */
+const AVISO = process.env.AVISO ?? "";
 const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 const ANCHOS = [390, 834, 1024, 1440];
 
@@ -112,6 +116,8 @@ const SONDA = `(() => {
     clientes: filasCli.length,
     primerCliente: filasCli[0] ? (filasCli[0].innerText ?? "").replace(/\\s+/g, " ").trim().slice(0, 80) : null,
     pieClientes: (document.querySelector("[data-pie-clientes]")?.textContent ?? "").replace(/\\s+/g, " ").trim().slice(0, 150),
+    aviso: Boolean(document.querySelector("[data-aviso-grafias]")),
+    avisoTexto: (document.querySelector("[data-aviso-grafias]")?.textContent ?? "").replace(/\\s+/g, " ").trim().slice(0, 170),
     codigos: document.querySelectorAll("[data-drill-codigos] tr").length,
     altoDrill: cajaDrill ? Math.round(cajaDrill.getBoundingClientRect().height) : 0,
   };
@@ -157,9 +163,17 @@ for (const ANCHO of ANCHOS) {
     await page.screenshot({ path: path.join(SALIDA, `prod-${ETAPA}-${ANCHO}-cerrado.png`), fullPage: false });
 
     // ── estado 2: desplegado (abre en «Quién lo compra»)
-    await page.locator("tr[data-fila-producto]").first().click();
+    const fila = DESCRIPCION
+      ? page.locator(`tr[data-fila-producto="${DESCRIPCION}"]`)
+      : page.locator("tr[data-fila-producto]").first();
+    if (DESCRIPCION && !(await fila.count())) throw new Error(`no está la fila "${DESCRIPCION}"`);
+    await fila.first().click();
     await page.waitForTimeout(3500);
     const clientes = { ancho: ANCHO, estado: "clientes", ...(await page.evaluate(SONDA)) };
+    // 🔑 Si se pidió medir un caso CON aviso y el aviso no salió (o al revés),
+    // la medición NO probó lo que dice probar.
+    if (AVISO === "si" && !clientes.aviso) { clientes.error = "se esperaba el aviso ámbar y NO salió"; fallos++; }
+    if (AVISO === "no" && clientes.aviso) { clientes.error = "NO se esperaba aviso y salió"; fallos++; }
     filas.push(veredicto(clientes, { exigeClientes: ETAPA === "despues" }));
     await page.screenshot({ path: path.join(SALIDA, `prod-${ETAPA}-${ANCHO}-clientes.png`), fullPage: false });
 
@@ -209,13 +223,15 @@ function veredicto(r, { exigeClientes }) {
   if (r.pestanas?.length) console.log(`        pestañas: ${r.pestanas.join(" · ")}`);
   if (r.primerCliente) console.log(`        1er cliente: ${r.primerCliente}`);
   if (r.pieClientes) console.log(`        pie: ${r.pieClientes}`);
+  if (r.estado === "clientes") console.log(`        aviso ámbar: ${r.aviso ? "SÍ" : "no"}${r.avisoTexto ? ` — ${r.avisoTexto}` : ""}`);
+  if (r.error) console.log(`        ⚠️ ${r.error}`);
   if (r.tapEjemplos?.length) console.log(`        táctil: ${r.tapEjemplos.map(t => `${t.etiqueta} ${t.w}×${t.h}`).join(" · ")}`);
   if (r.letraEjemplos?.length) console.log(`        letra: ${r.letraEjemplos.map(t => `"${t.txt}" ${t.px}px`).join(" · ")}`);
   if (r.arrastrePeor) console.log(`        arrastra: ${r.arrastrePeor.etiqueta} (${r.arrastrePeor.px}px)`);
   return r;
 }
 
-const archivo = path.join(SALIDA, `productos-clientes-${ETAPA}.json`);
+const archivo = path.join(SALIDA, `productos-clientes-${ETAPA}${AVISO ? "-aviso-" + AVISO : ""}.json`);
 writeFileSync(archivo, JSON.stringify(filas, null, 1));
 console.log(`\nGuardado en ${archivo}`);
 

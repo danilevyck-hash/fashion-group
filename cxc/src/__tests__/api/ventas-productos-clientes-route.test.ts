@@ -25,6 +25,10 @@ const estado = vi.hoisted(() => ({
   modoClientes: "ok" as "ok" | "no-existe" | "revienta",
   /** Filtros que recibió la lectura paginada del camino sin RPC. */
   lecturas: [] as Record<string, unknown>[],
+  /** Las otras grafías del mismo producto que devuelve la RPC. */
+  grafias: [] as { otra: string; codigo: string }[],
+  /** Lo que devuelve switch_articulo_diario en el camino sin RPC. */
+  filasDiario: [] as { codigo: string; descripcion: string }[],
 }));
 
 vi.mock("@/lib/supabase-server", () => {
@@ -46,7 +50,7 @@ vi.mock("@/lib/supabase-server", () => {
       subtotal_con_descuento: 600,
     },
   ];
-  const consulta = () => {
+  const consulta = (tabla: string) => {
     const filtros: Record<string, unknown> = {};
     const q: Record<string, unknown> = {
       select: (_c: string, o?: { count?: string }) => {
@@ -57,17 +61,19 @@ vi.mock("@/lib/supabase-server", () => {
       in: (c: string, v: unknown) => { filtros[`in:${c}`] = v; return q; },
       gte: (c: string, v: unknown) => { filtros[`gte:${c}`] = v; return q; },
       lt: (c: string, v: unknown) => { filtros[`lt:${c}`] = v; return q; },
+      lte: (c: string, v: unknown) => { filtros[`lte:${c}`] = v; return q; },
       order: (c: string) => { filtros.order = c; return q; },
       range: () => {
-        estado.lecturas.push(filtros);
-        return Promise.resolve({ data: filas, error: null, count: filas.length });
+        estado.lecturas.push({ ...filtros, tabla });
+        const d = tabla === "switch_articulo_diario" ? estado.filasDiario : filas;
+        return Promise.resolve({ data: d, error: null, count: d.length });
       },
     };
     return q;
   };
   return {
     supabaseServer: {
-      from: () => consulta(),
+      from: (tabla: string) => consulta(tabla),
       rpc: async (fn: string, args: Record<string, unknown>) => {
         estado.rpc.push({ fn, args });
         if (fn === "switch_articulos_por_descripcion") {
@@ -87,7 +93,10 @@ vi.mock("@/lib/supabase-server", () => {
             return { data: null, error: { code: "57014", message: "canceling statement due to statement timeout" } };
           }
           return {
-            data: [{ cliente_switch_id: 1, cliente_nombre: "City Mall Paso Canoa", cantidad: 80, venta: 2400 }],
+            data: {
+              clientes: [{ cliente_switch_id: 1, cliente_nombre: "City Mall Paso Canoa", cantidad: 80, venta: 2400 }],
+              grafias: estado.grafias,
+            },
             error: null,
           };
         }
@@ -106,6 +115,11 @@ beforeEach(() => {
   estado.rpc.length = 0;
   estado.lecturas.length = 0;
   estado.modoClientes = "ok";
+  estado.grafias = [];
+  estado.filasDiario = [
+    { codigo: "AAA-1", descripcion: "Men-T-Shirts S/S" },
+    { codigo: "BBB-2", descripcion: "Men-T-Shirts S/S" },
+  ];
 });
 
 function req(url: string) {
@@ -127,13 +141,14 @@ describe("🔑 los clientes se cruzan por CÓDIGO, con los mismos que se muestra
     expect(body.codigos.map((c: { codigo: string }) => c.codigo)).toEqual(["AAA-1", "BBB-2"]);
   });
 
-  it("⛔ NO se le manda la descripción como llave del cruce", () => {
-    // Si esto falla es que alguien volvió a cruzar por texto: la lista se vacía
-    // para 39 de 136 descripciones y nadie lo ve.
-    return GET(req(URL_BASE)).then(() => {
-      const llamada = estado.rpc.find(r => r.fn === "switch_clientes_por_codigos");
-      expect(Object.keys(llamada!.args)).not.toContain("p_descripcion");
-    });
+  it("⛔ la descripción NO es la llave del cruce: los códigos lo son", async () => {
+    // La descripción viaja SOLO para saber cuál grafía es "esta" en el aviso.
+    // El cruce lo hacen los códigos: si volviera a hacerlo el texto, la lista
+    // se vaciaría para 39 de 136 descripciones y nadie lo vería.
+    await GET(req(URL_BASE));
+    const llamada = estado.rpc.find(r => r.fn === "switch_clientes_por_codigos")!;
+    expect(llamada.args.p_codigos).toEqual(["AAA-1", "BBB-2"]);
+    expect(llamada.args.p_descripcion).toBe("Men-T-Shirts S/S");
   });
 
   it("mismo rango que los códigos: las dos preguntas hablan del mismo período", async () => {

@@ -77,7 +77,10 @@ CREATE OR REPLACE FUNCTION switch_clientes_por_codigos(
   p_empresa_key text,
   p_desde       date,
   p_hasta       date,
-  p_codigos     text[]
+  p_codigos     text[],
+  -- La grafia de la FILA. No decide el cruce (eso lo hacen los codigos): sirve
+  -- para saber cual de las grafias es "esta" y cual es "la otra".
+  p_descripcion text
 )
 RETURNS jsonb
 LANGUAGE sql STABLE AS $fn$
@@ -99,16 +102,57 @@ LANGUAGE sql STABLE AS $fn$
       AND fecha <  (((p_hasta + 1)::text) || 'T00:00:00-05:00')::timestamptz
     GROUP BY cliente_switch_id
   )
-  SELECT COALESCE(jsonb_agg(t ORDER BY t.venta DESC), '[]'::jsonb)
-  FROM (
-    SELECT cliente_switch_id, cliente_nombre, cantidad, venta
-    FROM agg
-    -- Cero de las DOS no dice nada (compro 10 y devolvio 10). Cero en una sola
-    -- SI dice algo -- una NC sin factura en la ventana -- y se queda.
-    WHERE cantidad <> 0 OR venta <> 0
-  ) t;
+  -- ---------------------------------------------------------------------
+  -- LAS GRAFIAS QUE SE SOLAPAN  (el aviso ambar de la pantalla)
+  -- ---------------------------------------------------------------------
+  -- 🩸 EN SWITCH EL MISMO PRODUCTO ESTA ESCRITO DE DOS FORMAS, y esto esta
+  -- medido contra produccion el 25-ago-2026:
+  --
+  --     'Women-Small Leather Goods'  y  'Women-Small Leather'
+  --     'Agua Dana 1.5 Litro'        y  'Agua Dana 1.5 litro '
+  --
+  -- Un CODIGO puede vivir bajo las dos. La FILA de la pantalla suma solo las
+  -- filas de SU grafia; la lista de clientes trae TODAS las lineas de esos
+  -- codigos. Resultado: en vistana, 23 de 103 descripciones muestran una lista
+  -- que suma MAS que la fila -- 'Men-Shirts Woven S/S' dice 142,00 en la fila
+  -- y 2.199,00 en la lista.
+  --
+  -- No se tapa y no se adivina: se DECLARA. Aca se devuelve con que otra
+  -- grafia se solapa y por que codigo, para que la pantalla lo diga con todas
+  -- las letras. Repartir la venta entre las dos grafias seria INVENTAR: el
+  -- detalle de la linea no sabe nada de la descripcion de switch_articulo_diario.
+  --
+  -- ⛔ NO SE NORMALIZA nada (ni minusculas ni espacios). Arreglaria 7 de 36
+  -- casos medidos y dejaria 29 mintiendo igual, y estrenaria una SEGUNDA idea
+  -- de "que es la misma descripcion" conviviendo con la de la fila. La unica
+  -- salida buena es corregir los nombres EN SWITCH; cuando eso pase, el aviso
+  -- desaparece solo.
+  grafias AS (
+    SELECT DISTINCT ON (d.descripcion)
+      d.descripcion AS otra,
+      d.codigo
+    FROM switch_articulo_diario d
+    WHERE d.empresa_key = p_empresa_key
+      AND d.fecha BETWEEN p_desde AND p_hasta
+      AND d.codigo = ANY (p_codigos)
+      AND COALESCE(d.descripcion, '(sin descripcion)') <> p_descripcion
+    ORDER BY d.descripcion, d.codigo
+  )
+  SELECT jsonb_build_object(
+    'clientes', COALESCE((
+      SELECT jsonb_agg(t ORDER BY t.venta DESC)
+      FROM (
+        SELECT cliente_switch_id, cliente_nombre, cantidad, venta
+        FROM agg
+        -- Cero de las DOS no dice nada (compro 10 y devolvio 10). Cero en una
+        -- sola SI dice algo -- una NC sin factura en la ventana -- y se queda.
+        WHERE cantidad <> 0 OR venta <> 0
+      ) t
+    ), '[]'::jsonb),
+    'grafias', COALESCE((SELECT jsonb_agg(g ORDER BY g.otra) FROM grafias g), '[]'::jsonb)
+  );
 $fn$;
 
-GRANT EXECUTE ON FUNCTION switch_clientes_por_codigos(text, date, date, text[]) TO service_role;
+GRANT EXECUTE ON FUNCTION switch_clientes_por_codigos(text, date, date, text[], text) TO service_role;
 
 NOTIFY pgrst, 'reload schema';

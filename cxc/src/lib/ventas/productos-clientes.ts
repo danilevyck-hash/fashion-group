@@ -48,6 +48,22 @@ export interface ClienteDeProducto {
   venta: number;
 }
 
+/**
+ * Una GRAFÍA distinta del mismo producto, y el código por el que se solapa.
+ *
+ * 🩸 En Switch el mismo producto está escrito de dos formas —
+ * `Women-Small Leather Goods` y `Women-Small Leather`— y un código puede vivir
+ * bajo las dos. La fila de la pantalla suma solo SU grafía; la lista de
+ * clientes trae todas las líneas de esos códigos. Por eso la lista puede sumar
+ * más que la fila, y por eso la pantalla lo tiene que DECIR.
+ */
+export interface GrafiaSolapada {
+  /** La otra forma en que está escrito el mismo producto. */
+  otra: string;
+  /** Un código que aparece bajo las dos. */
+  codigo: string;
+}
+
 /** Cuando el documento no trae cliente. No se inventa un nombre. */
 export const CLIENTE_SIN_NOMBRE = "(sin cliente)";
 
@@ -169,4 +185,34 @@ export function enLotes<T>(items: readonly T[], tamano: number): T[][] {
   const lotes: T[][] = [];
   for (let i = 0; i < items.length; i += tamano) lotes.push(items.slice(i, i + tamano));
   return lotes;
+}
+
+/**
+ * Las grafías con las que esta descripción se solapa, sacadas de las filas
+ * (codigo, descripcion) de `switch_articulo_diario` de esos mismos códigos.
+ *
+ * ⛔ NO NORMALIZA NADA — ni minúsculas, ni espacios, ni acentos. Normalizar
+ * arreglaría 7 de los 36 casos medidos y dejaría 29 mintiendo igual, y sobre
+ * todo estrenaría una SEGUNDA idea de "qué es la misma descripción" conviviendo
+ * con la de la fila de arriba. Dos definiciones de lo mismo es el bug que este
+ * repo ya pagó varias veces. La salida buena es corregir los nombres EN SWITCH;
+ * cuando eso pase, el aviso desaparece solo.
+ *
+ * Una grafía por fila, con UN código de ejemplo — el aviso tiene que caber en
+ * un renglón, no ser un volcado de 600 códigos.
+ */
+export function grafiasSolapadas(
+  filas: readonly { codigo: string | null; descripcion: string | null }[],
+  descripcionDeLaFila: string,
+): GrafiaSolapada[] {
+  const porGrafia = new Map<string, string>();
+  for (const f of filas) {
+    if (!f.codigo) continue;
+    const d = f.descripcion ?? "(sin descripcion)";
+    if (d === descripcionDeLaFila) continue;
+    if (!porGrafia.has(d)) porGrafia.set(d, f.codigo);
+  }
+  return [...porGrafia.entries()]
+    .map(([otra, codigo]) => ({ otra, codigo }))
+    .sort((a, b) => a.otra.localeCompare(b.otra));
 }

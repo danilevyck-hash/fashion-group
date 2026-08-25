@@ -22,6 +22,7 @@ import {
   participacion,
   fmtParticipacion,
   CLIENTE_SIN_NOMBRE,
+  grafiasSolapadas,
   enLotes,
   bordePanama,
   diaSiguiente,
@@ -186,6 +187,52 @@ describe("la lectura no se puede truncar ni correr el día", () => {
     expect(diaSiguiente("2026-08-31")).toBe("2026-09-01");
     expect(diaSiguiente("2026-12-31")).toBe("2027-01-01");
     expect(diaSiguiente("2024-02-28")).toBe("2024-02-29"); // bisiesto
+  });
+});
+
+describe("🟡 las grafías con las que se solapa la descripción", () => {
+  // El caso REAL medido: el mismo producto escrito de dos formas en Switch.
+  const FILAS = [
+    { codigo: "4F1135G200", descripcion: "Women-Small Leather Goods" },
+    { codigo: "4F1135G200", descripcion: "Women-Small Leather" },
+    { codigo: "4F1098G200", descripcion: "Women-Small Leather" },
+    { codigo: "ZZZ-1", descripcion: "Women-Small Leather Goods" },
+  ];
+
+  it("nombra la OTRA grafía y un código que la comparte", () => {
+    expect(grafiasSolapadas(FILAS, "Women-Small Leather Goods")).toEqual([
+      { otra: "Women-Small Leather", codigo: "4F1135G200" },
+    ]);
+  });
+
+  it("sin solape devuelve vacío — y ahí la pantalla no dibuja ningún aviso", () => {
+    const limpio = [
+      { codigo: "A-1", descripcion: "Men-T-Shirts S/S" },
+      { codigo: "A-2", descripcion: "Men-T-Shirts S/S" },
+    ];
+    expect(grafiasSolapadas(limpio, "Men-T-Shirts S/S")).toEqual([]);
+  });
+
+  it("⛔ NO normaliza minúsculas ni espacios", () => {
+    // Normalizar arreglaría 7 de 36 casos medidos y dejaría 29 mintiendo igual,
+    // y estrenaría una SEGUNDA idea de "qué es la misma descripción" conviviendo
+    // con la de la fila. La salida buena es corregirlo EN SWITCH.
+    const conEspacio = [
+      { codigo: "3629", descripcion: "Agua Dana 1.5 Litro" },
+      { codigo: "3629", descripcion: "Agua Dana 1.5 litro " },
+    ];
+    expect(grafiasSolapadas(conEspacio, "Agua Dana 1.5 Litro")).toEqual([
+      { otra: "Agua Dana 1.5 litro ", codigo: "3629" },
+    ]);
+  });
+
+  it("una grafía por renglón, aunque la compartan 600 códigos", () => {
+    const muchos = Array.from({ length: 600 }, (_, i) => ({ codigo: `C-${i}`, descripcion: "Otra" }));
+    expect(grafiasSolapadas(muchos, "Esta")).toHaveLength(1);
+  });
+
+  it("las filas sin código no cuentan", () => {
+    expect(grafiasSolapadas([{ codigo: null, descripcion: "Otra" }], "Esta")).toEqual([]);
   });
 });
 

@@ -62,7 +62,6 @@ function respuesta(over: Partial<ProductosResponse> = {}): ProductosResponse {
     desde: "2026-01-01",
     hasta: "2026-08-24",
     comparativo: { desde: "2025-01-01", hasta: "2025-12-31" },
-    meses: mesesDelPeriodo,
     totales: { venta: 14300, costo: 8500, margen: 0.4056 },
     productos: PRODUCTOS,
     ...over,
@@ -73,8 +72,13 @@ let urlsPedidas: string[] = [];
 /** Cuando true, la llamada del comparativo (`previo=1`) responde 500 — o sea el
  *  tropiezo de red que hacía salir el catálogo entero como "Nuevo". */
 let fallarComparativo = false;
-/** Los meses CON ventas que devuelve el servidor para (empresa, año). */
-let mesesDelPeriodo: number[] = [1, 2, 3];
+/** Las otras grafías del mismo producto. Vacío = sin solape, sin aviso. */
+let grafiasDelDrill: { otra: string; codigo: string }[] = [];
+/** Qué devuelve el desplegable en «Quién lo compra». `null` = no se pudo. */
+let clientesDelDrill: unknown = [
+  { cliente_switch_id: 1, cliente_nombre: "City Mall Paso Canoa", cantidad: 750, venta: 6750 },
+  { cliente_switch_id: 2, cliente_nombre: "Golden Mall", cantidad: 250, venta: 2250 },
+];
 /** Qué devuelve la llamada del COMPARATIVO (`previo=1`). */
 let productosPrevios: ProductosResponse["productos"] = [
   { descripcion: "CAMISA POLO", num_codigos: 3, cantidad: 900, venta: 8000, costo: 4800, margen: 0.4 },
@@ -84,7 +88,11 @@ let productosPrevios: ProductosResponse["productos"] = [
 beforeEach(() => {
   urlsPedidas = [];
   fallarComparativo = false;
-  mesesDelPeriodo = [1, 2, 3];
+  grafiasDelDrill = [];
+  clientesDelDrill = [
+    { cliente_switch_id: 1, cliente_nombre: "City Mall Paso Canoa", cantidad: 750, venta: 6750 },
+    { cliente_switch_id: 2, cliente_nombre: "Golden Mall", cantidad: 250, venta: 2250 },
+  ];
   productosPrevios = [
     { descripcion: "CAMISA POLO", num_codigos: 3, cantidad: 900, venta: 8000, costo: 4800, margen: 0.4 },
     { descripcion: "SANDALIA", num_codigos: 2, cantidad: 90, venta: 4500, costo: 2700, margen: 0.4 },
@@ -100,6 +108,8 @@ beforeEach(() => {
           { codigo: "A-1", descripcion: "CAMISA POLO", cantidad: 800, venta: 8000, costo: 4800, margen: 0.4 },
           { codigo: "A-2", descripcion: "CAMISA POLO", cantidad: 200, venta: 1000, costo: 600, margen: 0.4 },
         ],
+        clientes: clientesDelDrill,
+        grafias: grafiasDelDrill,
       });
     }
     const previo = String(url).includes("previo=1");
@@ -437,21 +447,14 @@ describe("5 · el período elegido se conserva", () => {
     expect(shell).not.toMatch(/<ProductosView\s+key=/);
   });
 
-  it("⚠️ el MES que no existe en la combinación nueva SÍ se suelta — con el dato en la mano", async () => {
-    // El único motivo real del reseteo. Ahora se resuelve mirando `data.meses`
-    // (los meses CON ventas de esa empresa y ese año) en vez de tirar el
-    // período y el buscador por las dudas.
-    render(<ProductosView selectedYear={2026} />);
-    await pintada();
-    await elegirEnSelector("Año en curso", "Mar 2026");
-    await waitFor(() => expect(urlsPedidas.some(u => u.includes("mes=3"))).toBe(true));
-
-    // La empresa nueva no tiene marzo.
-    urlsPedidas = [];
-    mesesDelPeriodo = [7, 8];
-    await elegirEnSelector(/Vistana|Fashion Wear|Active/, "Active Shoes");
-    await waitFor(() => expect(urlsPedidas.some(u => !u.includes("mes=") && u.includes("periodo=ytd"))).toBe(true));
-  });
+  // ⛔ ACÁ VIVÍA «el MES que no existe en la combinación nueva SÍ se suelta».
+  // Ese candado cuidaba el guard que miraba `data.meses`, y el guard MURIÓ con
+  // los meses sueltos (Daniel: *"solo dejame las 4 primeras, las otras
+  // quítamelas que sobran, nunca te las pedí"*). Sin meses en el selector no
+  // hay ninguna elección que pueda quedar inválida al cambiar de empresa, así
+  // que no queda nada que cuidar. Lo que ese mismo cambio trajo y SÍ sigue
+  // vivo son los dos candados de arriba: cambiar de empresa no te devuelve al
+  // año en curso ni te borra el buscador.
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -533,12 +536,173 @@ describe("7 · la pantalla avisa cuando el año de arriba no aplica", () => {
     expect(aviso.textContent).toContain("se cuenta desde hoy");
   });
 
-  it("con «Año en curso» o con un mes, el aviso NO está: ahí el año sí manda", async () => {
+  it("con «Año en curso» el aviso NO está: ahí el año sí manda", async () => {
+    // (Antes esto volvía por un mes suelto; los meses ya no están en el
+    // selector, así que se vuelve por «Año en curso», que es el otro período
+    // donde el año de arriba SÍ manda.)
     render(<ProductosView selectedYear={2026} />);
     await pintada();
     await elegirEnSelector("Año en curso", "Últimos 6 meses");
     await waitFor(() => expect(document.querySelector("[data-anio-no-aplica]")).toBeTruthy());
-    await elegirEnSelector("Últimos 6 meses", "Mar 2026");
+    await elegirEnSelector("Últimos 6 meses", "Año en curso");
     await waitFor(() => expect(document.querySelector("[data-anio-no-aplica]")).toBeNull());
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8 · QUIÉN LO COMPRA — conducta, no texto
+//
+// 🩸 ESTE BLOQUE EXISTE PORQUE DOS MUTACIONES SOBREVIVIERON: borrar el bloque
+// de clientes del desplegable, y hacer que la lista vacía AFIRME "no lo compra
+// nadie". Ninguna prueba de función pura ni de ruta puede verlas — hay que
+// desplegar la fila y leer lo que quedó dibujado.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("8 · el desplegable dice QUIÉN lo compra", () => {
+  async function desplegar() {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
+    return waitFor(() => {
+      const t = document.querySelector("[data-drill-clientes]");
+      expect(t, "no se dibujó la lista de clientes").toBeTruthy();
+      return t as HTMLElement;
+    });
+  }
+
+  it("abre en «Quién lo compra» y lista los clientes, del que más compra al que menos", async () => {
+    const tabla = await desplegar();
+    const filas = [...tabla.querySelectorAll("tr")].map(tr => (tr.textContent ?? "").replace(/\s+/g, " ").trim());
+    expect(filas[0]).toContain("City Mall Paso Canoa");
+    expect(filas[1]).toContain("Golden Mall");
+    // El % se mide contra la SUMA DE LA LISTA: 6750/9000 = 75%.
+    expect(filas[0]).toContain("75.0%");
+    expect(filas[1]).toContain("25.0%");
+  });
+
+  it("y el pie dice cuántas piezas y cuánta venta son", async () => {
+    await desplegar();
+    const pie = document.querySelector("[data-pie-clientes]")!.textContent ?? "";
+    expect(pie).toContain("2");
+    expect(pie).toContain("1,000");        // 750 + 250 piezas
+    expect(pie).toContain("$9,000.00");    // 6750 + 2250
+  });
+
+  it("🔴 sin detalle NO afirma que no lo compra nadie", async () => {
+    clientesDelDrill = [];
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
+    const texto = await waitFor(() => {
+      const t = document.body.textContent ?? "";
+      expect(t).toContain("Todavía no tenemos el detalle");
+      return t;
+    });
+    // Fashion Wear está terminando de bajar su detalle: decir "no lo compra
+    // nadie" sería una respuesta falsa dicha con toda seguridad.
+    expect(texto).not.toContain("No lo compra nadie");
+    expect(texto).not.toMatch(/no lo compra nadie/i);
+  });
+
+  it("si la lectura FALLÓ lo dice distinto de «no hay»", async () => {
+    clientesDelDrill = null;
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("No se pudo cargar quién lo compra");
+    });
+    expect(document.body.textContent).not.toContain("Todavía no tenemos el detalle");
+  });
+
+  it("los códigos NO se perdieron: están en su pestaña, a un toque", async () => {
+    await desplegar();
+    expect(document.querySelector("[data-drill-codigos]")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /Códigos/ }));
+    await waitFor(() => expect(document.querySelector("[data-drill-codigos]")).toBeTruthy());
+    // Y la lista de clientes deja de estar: son dos pestañas, no dos bloques.
+    expect(document.querySelector("[data-drill-clientes]")).toBeNull();
+  });
+
+  it("una descripción de UN SOLO código también se despliega", async () => {
+    // 🩸 Antes `num_codigos <= 1` cortaba el despliegue. En Joystep y Active
+    // Wear las descripciones que más venden son justo de un código.
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    fireEvent.click(document.querySelector('tr[data-fila-producto="DEVUELTO"]')!);
+    await waitFor(() => expect(document.querySelector("[data-drill-clientes]")).toBeTruthy());
+  });
+
+  it("cambiar de pestaña NO cierra el desplegable", async () => {
+    await desplegar();
+    fireEvent.click(screen.getByRole("tab", { name: /Códigos/ }));
+    await waitFor(() => expect(document.querySelector("[data-drill-codigos]")).toBeTruthy());
+    // Si el clic se propagara a la fila, el toggle la cerraría al instante.
+    expect(screen.queryByRole("tab", { name: /Quién lo compra/ })).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9 · EL AVISO ÁMBAR — sólo cuando hay solape de verdad
+//
+// 🩸 En Switch el mismo producto está escrito de dos formas
+// («Women-Small Leather Goods» y «Women-Small Leather»), y un código vive bajo
+// las dos. La fila suma sólo SU grafía; la lista trae las líneas de todos esos
+// códigos, así que suma más. Medido: 23 de 103 descripciones de vistana.
+//
+// Las dos formas de arruinarlo, y las dos tienen candado acá:
+//   · que el aviso DESAPAREZCA (el descuadre vuelve a ser invisible);
+//   · que el aviso sea PERMANENTE (la alerta que se deja de leer a la semana).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("9 · el aviso de las dos grafías", () => {
+  async function abrir() {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
+    await waitFor(() => expect(document.querySelector("[data-drill-clientes]")).toBeTruthy());
+  }
+
+  it("🔴 SIN solape NO hay aviso (si saliera siempre, se deja de leer)", async () => {
+    grafiasDelDrill = [];
+    await abrir();
+    expect(document.querySelector("[data-aviso-grafias]")).toBeNull();
+  });
+
+  it("🔴 CON solape lo dice, nombra LAS DOS grafías y el código que comparten", async () => {
+    grafiasDelDrill = [{ otra: "CAMISA POLOS", codigo: "A-1" }];
+    await abrir();
+    const aviso = document.querySelector("[data-aviso-grafias]");
+    expect(aviso, "no salió el aviso con solape").toBeTruthy();
+    const texto = (aviso!.textContent ?? "").replace(/\s+/g, " ");
+    expect(texto).toContain("CAMISA POLO");   // la grafía de la fila
+    expect(texto).toContain("CAMISA POLOS");  // la otra
+    expect(texto).toContain("A-1");           // el código que las comparte
+    expect(texto).toMatch(/suma más/i);
+    expect(texto).toMatch(/Switch/);
+  });
+
+  it("es ÁMBAR, no rojo: no se rompió nada", async () => {
+    grafiasDelDrill = [{ otra: "CAMISA POLOS", codigo: "A-1" }];
+    await abrir();
+    const cls = document.querySelector("[data-aviso-grafias]")!.className;
+    expect(cls).toContain("amber");
+    expect(cls).not.toContain("red");
+    expect(cls).not.toContain("rose");
+  });
+
+  it("la lista de clientes se dibuja IGUAL: el aviso no la esconde", async () => {
+    grafiasDelDrill = [{ otra: "CAMISA POLOS", codigo: "A-1" }];
+    await abrir();
+    const tabla = document.querySelector("[data-drill-clientes]")!;
+    expect([...tabla.querySelectorAll("tr")]).toHaveLength(2);
+    expect(tabla.textContent).toContain("City Mall Paso Canoa");
+  });
+
+  it("⚠️ la FILA DE ARRIBA no se toca: sigue siendo la suma de SU grafía", async () => {
+    grafiasDelDrill = [{ otra: "CAMISA POLOS", codigo: "A-1" }];
+    await abrir();
+    expect(celda("CAMISA POLO", "venta")).toBe("$9,000.00");
+    expect(celda("CAMISA POLO", "cantidad")).toBe("1,000");
   });
 });

@@ -14,6 +14,7 @@ import {
   participacion,
   totalDeClientes,
   type ClienteDeProducto,
+  type GrafiaSolapada,
 } from "@/lib/ventas/productos-clientes";
 import {
   PRODUCTOS_EMPRESAS,
@@ -105,6 +106,9 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   // Quién compra cada descripción. `null` = la lectura falló (distinto de `[]`,
   // que es "no hay detalle"): son dos mensajes distintos y no se pueden mezclar.
   const [clientes, setClientes] = useState<Record<string, ClienteDeProducto[] | null>>({});
+  // Con qué OTRAS grafías del mismo producto se solapa cada descripción. Vacío
+  // = no hay solape y no se dibuja ningún aviso.
+  const [grafias, setGrafias] = useState<Record<string, GrafiaSolapada[]>>({});
   const [codigosLoading, setCodigosLoading] = useState<string | null>(null);
   // Qué pestaña del desplegable se está mirando. Una sola fila se abre a la
   // vez, así que un solo valor alcanza. Arranca en CLIENTES porque es lo que
@@ -141,6 +145,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       setData(json);
       setCodigos({});
       setClientes({});
+      setGrafias({});
       setExpanded(null);
       setVisible(PAGE);
     } catch (e) {
@@ -228,9 +233,11 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
           const json = (await res.json()) as {
             codigos: ProductoCodigo[];
             clientes: ClienteDeProducto[] | null;
+            grafias?: GrafiaSolapada[];
           };
           setCodigos(prev => ({ ...prev, [key]: json.codigos }));
           setClientes(prev => ({ ...prev, [key]: json.clientes ?? null }));
+          setGrafias(prev => ({ ...prev, [key]: json.grafias ?? [] }));
         }
       } catch {
         /* el render muestra "no se pudo cargar" si queda sin data */
@@ -422,6 +429,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
                   onToggle={() => toggleExpand(p)}
                   codigos={codigos[p.descripcion]}
                   clientes={clientes[p.descripcion]}
+                  grafias={grafias[p.descripcion] ?? []}
                   codigosLoading={codigosLoading === p.descripcion}
                   prevVenta={prevVenta[p.descripcion]}
                   comparativoMedido={comparativo !== "fallo"}
@@ -503,13 +511,14 @@ function DeltaCell({ curr, prev, medido }: { curr: number; prev: number | undefi
 }
 
 function ProductoRow({
-  p, isOpen, onToggle, codigos, clientes, codigosLoading, prevVenta, comparativoMedido, tab, onTab,
+  p, isOpen, onToggle, codigos, clientes, grafias, codigosLoading, prevVenta, comparativoMedido, tab, onTab,
 }: {
   p: ProductoNivel1;
   isOpen: boolean;
   onToggle: () => void;
   codigos: ProductoCodigo[] | undefined;
   clientes: ClienteDeProducto[] | null | undefined;
+  grafias: GrafiaSolapada[];
   codigosLoading: boolean;
   prevVenta: number | undefined;
   /** false cuando la consulta del período anterior falló: sin ventana medida,
@@ -568,7 +577,9 @@ function ProductoRow({
                     </DrillTabBtn>
                   </div>
 
-                  {tab === "clientes" && <BloqueClientes clientes={clientes} />}
+                  {tab === "clientes" && (
+                    <BloqueClientes clientes={clientes} grafias={grafias} descripcion={p.descripcion} />
+                  )}
                   {tab === "codigos" && <BloqueCodigos codigos={codigos} />}
                 </>
               )}
@@ -614,7 +625,13 @@ function DrillTabBtn({
  * David devolvió el 58% de lo que se le facturó a $30, y en bruto saldría muy
  * por encima de donde va.
  */
-function BloqueClientes({ clientes }: { clientes: ClienteDeProducto[] | null | undefined }) {
+function BloqueClientes({
+  clientes, grafias, descripcion,
+}: {
+  clientes: ClienteDeProducto[] | null | undefined;
+  grafias: GrafiaSolapada[];
+  descripcion: string;
+}) {
   if (clientes === null) {
     return <div className="py-2 text-xs text-gray-500">No se pudo cargar quién lo compra. Cerrá y volvé a abrir la fila.</div>;
   }
@@ -633,6 +650,7 @@ function BloqueClientes({ clientes }: { clientes: ClienteDeProducto[] | null | u
   const total = totalDeClientes(clientes);
   return (
     <>
+      <AvisoGrafias grafias={grafias} descripcion={descripcion} />
       <table data-drill-clientes className="w-full text-xs">
         <tbody>
           {clientes.map(c => (
@@ -691,5 +709,58 @@ function BloqueCodigos({ codigos }: { codigos: ProductoCodigo[] | undefined }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+/**
+ * 🟡 EL AVISO DE QUE LA LISTA SUMA MÁS QUE LA FILA — y por qué.
+ *
+ * 🩸 EN SWITCH EL MISMO PRODUCTO ESTÁ ESCRITO DE DOS FORMAS, y está medido
+ * contra producción: `Women-Small Leather Goods` y `Women-Small Leather`,
+ * `Agua Dana 1.5 Litro` y `Agua Dana 1.5 litro `. Un código vive bajo las dos.
+ * La fila de arriba suma sólo las filas de SU grafía; la lista de clientes trae
+ * TODAS las líneas de esos códigos. En vistana eso son 23 de 103 descripciones
+ * con una lista que suma de más — «Men-Shirts Woven S/S» dice $142,00 en la
+ * fila y $2.199,00 en la lista.
+ *
+ * Las tres decisiones, y cada una tiene su motivo:
+ *
+ * · SE DICE, no se tapa ni se adivina. Repartir la venta entre las dos grafías
+ *   sería INVENTAR: la línea de la factura no sabe nada de la descripción de
+ *   `switch_articulo_diario`. Y esconder la lista sería sacar justo la función
+ *   que Daniel pidió.
+ *
+ * · LA FILA DE ARRIBA NO SE TOCA: sigue siendo la suma de SU grafía. Dos
+ *   números distintos ya conviven en este módulo; cada uno dice su verdad y el
+ *   aviso explica la diferencia.
+ *
+ * · ÁMBAR, NO ROJO: no se rompió nada. Y SÓLO cuando hay solape de verdad,
+ *   calculado por código — un cartel fijo "los números pueden no cuadrar" es la
+ *   alerta que se deja de leer a la semana.
+ *
+ * Se nombran LAS DOS GRAFÍAS y el código que las comparte: sin eso, el aviso no
+ * le sirve a nadie para ir a corregirlo en Switch, que es la única salida real.
+ */
+function AvisoGrafias({ grafias, descripcion }: { grafias: GrafiaSolapada[]; descripcion: string }) {
+  if (grafias.length === 0) return null;
+  return (
+    <p
+      data-aviso-grafias
+      className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+    >
+      La lista de abajo suma más que la venta de la fila. En Switch este producto
+      está escrito de {grafias.length === 1 ? "dos formas" : `${grafias.length + 1} formas`}
+      {": "}
+      <span className="font-medium">&ldquo;{descripcion}&rdquo;</span>
+      {grafias.map(g => (
+        <span key={g.otra}>
+          {" y "}
+          <span className="font-medium">&ldquo;{g.otra}&rdquo;</span>
+          <span className="opacity-80"> (comparten el código {g.codigo})</span>
+        </span>
+      ))}
+      . La fila de arriba cuenta sólo la primera; acá abajo están los clientes de
+      todas. Se arregla corrigiendo el nombre en Switch.
+    </p>
   );
 }
