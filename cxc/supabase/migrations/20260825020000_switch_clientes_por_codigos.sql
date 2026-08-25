@@ -101,7 +101,7 @@ LANGUAGE sql STABLE AS $fn$
       AND fecha >= ((p_desde::text)     || 'T00:00:00-05:00')::timestamptz
       AND fecha <  (((p_hasta + 1)::text) || 'T00:00:00-05:00')::timestamptz
     GROUP BY cliente_switch_id
-  )
+  ),
   -- ---------------------------------------------------------------------
   -- LAS GRAFIAS QUE SE SOLAPAN  (el aviso ambar de la pantalla)
   -- ---------------------------------------------------------------------
