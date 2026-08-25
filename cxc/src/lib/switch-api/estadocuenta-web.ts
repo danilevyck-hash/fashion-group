@@ -194,6 +194,150 @@ export interface ElementReporteWeb {
   fechaCreacion?: string | null;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL MOTOR DE REPORTES DE SWITCH CAMBIÓ (19-ago-2026 12:37:21)
+//
+// `POST /estadodecuenta/obtener` —el endpoint por rondas que alimentaba todo lo
+// de abajo— dejó de existir: devuelve la página de excepción con HTTP 200 y
+// `Controller method not found` adentro. La cartera de Boston quedó congelada
+// del 20 al 24 de agosto (5 corridas caídas).
+//
+// El reemplazo, leído del PROPIO código del panel (`assets/js/reportesmanager.js`
+// y `assets/js/estadodecuenta.js`), no de una suposición:
+//
+//   1. POST reportesmanager/crearreporteconsola  → {response:true, uuid, estatus:"CREADO"}
+//   2. GET  reportesmanager/buscarreporteconsola/<uuid> cada 2.000 ms
+//        → {response, estatus, data:{data:[...], totales:{...}}}
+//        estatus ∈ CREADO/… → seguir; TERMINADO → listo; ERROR/CANCELADO → cortar.
+//
+// Y el panel documenta el cambio de forma en un comentario propio:
+//   «El .jsonl ahora viene como {data:[...], totales:{...}} en vez de un array
+//    plano, para traer los totales ya calculados y no tener que sumarlos en JS»
+//
+// ═══ LO QUE CAMBIÓ DE NOMBRE, CAMPO POR CAMPO ═══════════════════════════════
+//
+//   VIEJO (elements[])          NUEVO (comprobantes[])     nota
+//   ─────────────────────────   ────────────────────────   ─────────────────────
+//   secuencial                  nSistema                   mismo formato serie-correlativo
+//   numeroFiscal                nFiscal
+//   fechaCreacion               fecha                      ahora con hora; parseFechaReporte la tolera
+//   tipoComprobante             tipoComprobante            igual
+//   debito / credito / dias     debito / credito / dias    iguales
+//   plazoCredito                plazoCredito               igual
+//   saldo (ya firmado)          —                          🔴 se DERIVA: debito − credito
+//   total                       —                          se usa el lado no nulo del movimiento
+//   abrev                       —                          no viene; queda null
+//   numeroOrden                 —                          no hacía falta (el ccte_id sale del secuencial)
+//   saldosTotales[{title,saldo}] totales{bucket: valor, total}
+//   codigo / nombre             clienteCodigo / clienteNombre
+//
+// 🔑 **EL `saldo` POR DOCUMENTO YA NO VIENE Y NO SE ADIVINA: SE DERIVA.**
+// El reporte nuevo trae `saldoAcumulado`, que es el CORRIDO del cliente (en el
+// ejemplo real: 25,15 y después 266.541.377,15), no el saldo del documento.
+// El aporte propio de cada movimiento es `debito − credito`, y eso se verifica
+// solo: el último `saldoAcumulado` de cada cliente es igual a su `saldoTotal`, y
+// —lo que de verdad manda— la suma de los documentos tiene que CUADRAR AL
+// CENTAVO contra los `totales` que publica el propio Switch. Si la derivación
+// estuviera mal, `cuadraConSwitch` corta la corrida y NO se escribe nada. Esa
+// verificación ya existía y es exactamente la que cubre este riesgo.
+//
+// ⚠️ Este módulo sigue siendo PURO y sigue hablando la MISMA lengua hacia abajo:
+// el adaptador convierte el formato nuevo al viejo, así que `construirFilas`, la
+// tabla de signos, `ccteIdSintetico`, el cuadre, el guard de montos y el
+// reconcile NO se tocaron — y sus candados siguen valiendo tal cual.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Un movimiento del reporte NUEVO (`comprobantes[]`). */
+export interface ComprobanteReporteConsola {
+  fecha?: string | null;
+  tipoComprobante?: string | null;
+  nSistema?: string | null;
+  nFiscal?: string | null;
+  debito?: string | number | null;
+  credito?: string | number | null;
+  /** Corrido del CLIENTE, no del documento. No se usa para el saldo. */
+  saldoAcumulado?: string | number | null;
+  plazoCredito?: string | number | null;
+  fechaVence?: string | null;
+  dias?: number | null;
+}
+
+/** Un cliente del reporte NUEVO. */
+export interface ClienteReporteConsola {
+  clienteId?: number | null;
+  clienteCodigo?: string | null;
+  clienteNombre?: string | null;
+  saldoTotal?: string | number | null;
+  buckets?: Record<string, string | number> | null;
+  comprobantes?: ComprobanteReporteConsola[] | null;
+}
+
+/** El cuerpo de `buscarreporteconsola` cuando dice TERMINADO. */
+export interface ReporteConsola {
+  data?: ClienteReporteConsola[] | null;
+  totales?: Record<string, string | number> | null;
+}
+
+/**
+ * Los totales del formato nuevo (`{bucket: valor, total: N}`) dichos en la forma
+ * vieja (`[{title, saldo}]`), que es la que consume `tramosPublicadosPorSwitch`.
+ *
+ * `total` se DESCARTA a propósito: es la suma que Switch ya hizo de los ocho
+ * tramos, y colarlo como un tramo más contaría toda la cartera dos veces (caería
+ * en el `else` de 121+). Los tramos son los que suman; el total es el control.
+ */
+export function saldosTotalesDesdeTotales(
+  totales: Record<string, string | number> | null | undefined,
+): Array<{ title: string; saldo: string | number }> {
+  return Object.entries(totales ?? {})
+    .filter(([titulo]) => titulo !== "total")
+    .map(([title, saldo]) => ({ title, saldo }));
+}
+
+/**
+ * Convierte el reporte NUEVO a la forma VIEJA que entiende `construirFilas`.
+ *
+ * Es una traducción de nombres y una derivación (`saldo = debito − credito`);
+ * ninguna regla de negocio vive acá — el signo, el ccte_id, los tramos y el
+ * cuadre siguen donde estaban.
+ */
+export function adaptarReporteConsola(
+  clientes: readonly ClienteReporteConsola[],
+): ClienteReporteWeb[] {
+  return clientes.map((c) => ({
+    clienteId: c.clienteId ?? null,
+    codigo: c.clienteCodigo ?? null,
+    nombre: c.clienteNombre ?? null,
+    saldoTotal: c.saldoTotal ?? null,
+    saldos: null,
+    elements: (c.comprobantes ?? []).map((m) => {
+      const debito = num(m.debito) ?? 0;
+      const credito = num(m.credito) ?? 0;
+      return {
+        clienteCodigo: c.clienteCodigo ?? null,
+        clienteNombre: c.clienteNombre ?? null,
+        secuencial: m.nSistema ?? null,
+        numeroFiscal: m.nFiscal ?? null,
+        numeroOrden: null,
+        tipoComprobante: m.tipoComprobante ?? null,
+        // El reporte nuevo no manda `abrev`. Se deja en null en vez de inventarlo
+        // — nadie lo lee para la cartera (mismo criterio que los "original").
+        abrev: null,
+        // Tampoco manda un `total` propio: cada renglón es UN movimiento, así que
+        // su valor de cara es el lado que no está en cero.
+        total: debito !== 0 ? debito : credito,
+        // 🔴 El aporte del documento. Ver el encabezado de este bloque.
+        saldo: debito - credito,
+        debito,
+        credito,
+        plazoCredito: m.plazoCredito ?? null,
+        dias: typeof m.dias === "number" ? m.dias : null,
+        fechaCreacion: m.fecha ?? null,
+      };
+    }),
+  }));
+}
+
 export interface ClienteReporteWeb {
   clienteId?: number | null;
   codigo?: string | null;

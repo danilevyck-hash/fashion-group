@@ -4,7 +4,12 @@
 // Reemplaza, SOLO para Boston, el recorrido cliente-por-cliente de
 // `syncEmpresaEstadoCuenta`: 4.912 llamadas HTTP / 54 min medidos contra un
 // techo de función de 800 s → moría siempre. El reporte de antigüedad trae los
-// mismos documentos en 2 llamadas (~3 s medidos el 30-jul-2026).
+// mismos documentos en pocas llamadas (~4 s medidos el 24-ago-2026).
+//
+// ⚠️ El TRANSPORTE cambió el 24-ago-2026 (Switch retiró `/estadodecuenta/obtener`
+// el 19-ago): hoy es el motor de reportes por uuid. Eso vive entero en
+// `web-client.ts` + el adaptador de `estadocuenta-web.ts`; de este archivo hacia
+// abajo no cambió nada.
 //
 // Escribe la MISMA tabla, con la MISMA forma de fila: `switch_estadocuenta`.
 // Ni la pestaña de Boston ni `switch_estadocuenta_aging_boston` se enteran.
@@ -27,7 +32,7 @@
 // tiene que haber venido completo. Un reporte vacío se ve EXACTAMENTE igual que
 // "todos los clientes pagaron", y el endpoint devuelve cero sin dar error si un
 // filtro va mal (ver el aviso de `pais: "null"` en web-client.ts). De ahí las
-// tres guardas:
+// CUATRO guardas:
 //
 //   1. **Reporte vacío ⇒ no se escribe NI se reconcilia.** Cero documentos no se
 //      trata como "la cartera quedó en cero": se corta con error y la cartera
@@ -42,6 +47,12 @@
 //   3. **Todo se arma en memoria antes del primer INSERT.** Si el parseo falla a
 //      la mitad (colisión de ccte_id, por ejemplo), no quedó nada a medio
 //      escribir.
+//   4. **Reporte CORTO ⇒ tampoco se escribe** (24-ago-2026). El guard 1 solo
+//      atrapa el cero absoluto y el guard 2 no puede ver esto: el cuadre compara
+//      nuestros totales contra los totales DEL MISMO reporte, así que un reporte
+//      a medias cuadra al centavo consigo mismo. Si los clientes con saldo caen
+//      por debajo del 70% de los que la tabla ya conoce, la corrida termina en
+//      `error` sin tocar una fila. Ver `PISO_CLIENTES_REPORTE`.
 //
 // Y el reconcile se ejecuta en la MISMA corrida que los upserts, nunca suelto:
 // no existe un camino en el que se ponga en cero sin haber cargado antes.
@@ -88,6 +99,80 @@ const PLAZO_CREDITO_LIMITE = 10 ** 6;
  *  `numeric(12,4)` y los dos lados suman los mismos números, así que cualquier
  *  diferencia real es un error de interpretación, no de redondeo. */
 const TOLERANCIA = 0.01;
+
+/**
+ * Piso de "el reporte vino COMPLETO", como fracción de los clientes con saldo
+ * que la tabla YA conoce para esta empresa.
+ *
+ * 🩸 POR QUÉ ES OBLIGATORIO, y por qué no alcanza con el guard de reporte vacío.
+ * El reconcile pone `saldo = 0` a TODO documento de la empresa que esta corrida
+ * no reescribió (`synced_at < runStamp`). Eso es correcto cuando el universo
+ * llegó entero —"no vino en el reporte" = "ya no debe"— y es una CATÁSTROFE
+ * cuando llegó a medias: cada cliente que faltara quedaría con la deuda en cero,
+ * en silencio y con la corrida anotada `success`. El guard de vacío solo atrapa
+ * el caso extremo (0 clientes); un reporte que trae la mitad se ve perfectamente
+ * sano y es igual de destructivo.
+ *
+ * ⚠️ Y el cuadre contra Switch NO cubre esto: compara nuestros totales contra los
+ * `totales` DEL MISMO reporte. Si el reporte viene corto, los dos lados vienen
+ * cortos y cuadran al centavo. Son guardas de cosas distintas: el cuadre dice
+ * "leí bien lo que me mandaron", éste dice "me mandaron todo".
+ *
+ * El 70% es holgado a propósito —es el mismo piso que usa el guard de barrido
+ * corto de `sync-articulo-marca`, por el mismo motivo—: la cartera se mueve sola
+ * todos los días (clientes que terminan de pagar salen del reporte), así que un
+ * piso ajustado sería la alerta que suena por un martes tranquilo. Que los
+ * clientes con deuda caigan a menos de dos tercios de un día para el otro no es
+ * un movimiento de negocio plausible; media descarga sí. Medido el 24-ago-2026:
+ * la tabla conoce 383 clientes con saldo y el reporte trae 386.
+ */
+export const PISO_CLIENTES_REPORTE = 0.7;
+
+/**
+ * Cuántos clientes DISTINTOS con saldo distinto de cero tiene hoy la tabla para
+ * esta empresa. Es la vara del guard: exactamente los clientes a los que el
+ * reconcile les pondría la deuda en cero si el reporte viniera corto.
+ *
+ * Se leen solo las filas con saldo != 0 (888 de 2.129 en Boston) y solo la
+ * columna del cliente: es la consulta más chica que contesta la pregunta.
+ */
+export async function clientesConSaldoConocidos(empresaKey: string): Promise<number> {
+  const vistos = new Set<number>();
+  const PAGINA = 1000;
+  for (let desde = 0; desde < 100_000; desde += PAGINA) {
+    const { data, error } = await supabaseServer
+      .from("switch_estadocuenta")
+      .select("cliente_switch_id")
+      .eq("empresa_key", empresaKey)
+      .neq("saldo", 0)
+      .range(desde, desde + PAGINA - 1);
+    if (error) throw new Error(`no pude medir la cartera conocida: ${error.message}`);
+    if (!data?.length) break;
+    for (const f of data) {
+      const id = (f as { cliente_switch_id: number | null }).cliente_switch_id;
+      if (id !== null && id !== undefined) vistos.add(id);
+    }
+    if (data.length < PAGINA) break;
+  }
+  return vistos.size;
+}
+
+/**
+ * ¿El reporte trae bastantes clientes como para dejar reconciliar? PURA, para
+ * poder probar las dos direcciones sin tocar la base.
+ *
+ * Con la tabla vacía (`conocidos === 0`) no hay vara y se deja pasar: es la
+ * primera carga, y exigirle un piso a la nada bloquearía el arranque para
+ * siempre. Mismo criterio que `filasPrevias > 0` en `sync-articulo-marca`.
+ */
+export function reporteVieneCompleto(
+  clientesEnReporte: number,
+  conocidos: number,
+  piso: number = PISO_CLIENTES_REPORTE,
+): boolean {
+  if (conocidos === 0) return true;
+  return clientesEnReporte >= conocidos * piso;
+}
 
 export interface SyncCarteraWebResult {
   ok: boolean;
@@ -307,6 +392,20 @@ export async function syncCarteraWeb(opts: {
       rondas: reporte.rondas,
       skipped: skips.length,
     };
+
+    // ─── 4c. 🔴 GUARD DEL REPORTE INCOMPLETO ────────────────────────────────
+    //
+    // Va ANTES del upsert Y antes del corte del dry-run, a propósito: un dry-run
+    // existe justamente para saber si esta corrida se puede escribir, así que
+    // tiene que fallar por lo mismo que fallaría la de verdad.
+    const conocidos = await clientesConSaldoConocidos(empresaKey);
+    if (!reporteVieneCompleto(resumen.clientes, conocidos)) {
+      throw new Error(
+        `el reporte trajo ${resumen.clientes} clientes con saldo contra ${conocidos} que ya conoce la tabla ` +
+          `(menos del ${Math.round(PISO_CLIENTES_REPORTE * 100)}%) — vino incompleto. No se escribe ni se reconcilia: ` +
+          `el reconcile les pondría la deuda en CERO a los que faltan.`,
+      );
+    }
 
     if (opts.dryRun) {
       return { ...conCifras, ok: true, durationMs: Date.now() - startedAt };
