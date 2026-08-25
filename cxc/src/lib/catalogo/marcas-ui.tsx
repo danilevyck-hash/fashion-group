@@ -372,12 +372,14 @@ export interface MarcaTheme {
     qtyNum: string;
     qtyUnit: string;
   };
-  /** Grid vendedor: dónde vive el menú Compartir y el botón "Ver pedido". */
+  /** Grid vendedor: dónde vive el menú Compartir. */
   vendorShare: {
-    /** true (layout Joybees): share + "Ver pedido" junto al header; false
-     *  (layout Reebok): share en la fila del sync, solo con resultados. */
+    /** true (layout Joybees): share junto al header; false (layout Reebok):
+     *  share en la fila del sync, solo con resultados.
+     *
+     *  ⛔ Acá ya NO hay un "Ver pedido": ese botón es UNO solo y vive en la
+     *  barra pegajosa del carrito, en las 4 marcas (ver CatalogoVendedorPage). */
     enHeader: boolean;
-    verPedidoBtn: string | null;
     btn: string;
     /** "Pedidos" — vive en la MISMA fila que Compartir desde el 12-ago-2026
      *  (antes en la navbar, arriba del todo). Daniel: *"cambia el boton de
@@ -486,7 +488,16 @@ export interface MarcaTheme {
     consultaWrap: string;
   };
   pedido: {
-    /** Micro-diferencias heredadas de la página del pedido interno. */
+    /** Micro-diferencias heredadas de la página del pedido interno.
+     *
+     *  🔑 `qtyInputClass` es la casilla de BULTOS de cada línea del pedido, y
+     *  es IGUAL en las 4 marcas desde el 23-ago-2026. Joybees, Tommy y Calvin
+     *  la traían en `w-12 text-sm py-0.5`: ~22 px de alto (la mitad del mínimo
+     *  táctil de 44) y letra de 14 px, que en iPhone dispara el zoom
+     *  automático de iOS al tocarla y deja al vendedor con la pantalla
+     *  ampliada a mitad de un pedido. Reebok ya estaba bien y es la que se
+     *  copió: `min-h-[44px]` + `text-base` en teléfono (16 px = sin zoom) y
+     *  `md:text-sm` de tablet para arriba, donde el zoom no existe. */
     qtyInputClass: string;
     suggDropdownClass: string;
     suggItemClass: string;
@@ -724,7 +735,6 @@ const REEBOK: MarcaTheme = {
   },
   vendorShare: {
     enHeader: false,
-    verPedidoBtn: null,
     btn: "text-xs border border-[#1A2656]/10 text-[#1A2656]/40 px-3 py-1.5 rounded-lg hover:border-[#1A2656]/25 hover:text-[#1A2656]/60 transition flex items-center gap-1.5 min-h-[44px]",
     pedidosBtn: "text-xs border border-[#1A2656]/10 text-[#1A2656] px-3 py-1.5 rounded-lg hover:border-[#1A2656]/25 transition flex items-center gap-1.5 min-h-[44px] font-medium",
     iconSize: 12,
@@ -1028,7 +1038,6 @@ const JOYBEES: MarcaTheme = {
   },
   vendorShare: {
     enHeader: true,
-    verPedidoBtn: "flex items-center gap-1.5 text-xs font-semibold text-[#404041] bg-[#FFE443] hover:bg-[#f5d90a] transition px-3 py-2 rounded-lg min-h-[44px]",
     btn: "flex items-center gap-1.5 text-xs text-[#404041]/50 hover:text-[#404041] transition px-3 py-2 rounded-lg border border-[#404041]/10 hover:border-[#404041]/20 min-h-[44px]",
     pedidosBtn: "flex items-center gap-1.5 text-xs text-[#404041] hover:text-black transition px-3 py-2 rounded-lg border border-[#404041]/10 hover:border-[#404041]/20 min-h-[44px] font-medium",
     iconSize: 14,
@@ -1135,7 +1144,7 @@ const JOYBEES: MarcaTheme = {
     consultaWrap: "bg-[#FFFEF5] border border-[#404041]/10 p-4 rounded text-center",
   },
   pedido: {
-    qtyInputClass: "w-12 text-center border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums",
+    qtyInputClass: "w-14 min-h-[44px] text-center border-b border-gray-200 text-base md:text-sm outline-none focus:border-black tabular-nums",
     suggDropdownClass: "absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-56 overflow-y-auto",
     suggItemClass: "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition",
     suggLimit: null,
@@ -1364,8 +1373,6 @@ const TOMMY: MarcaTheme = {
   },
   vendorShare: {
     enHeader: true,
-    verPedidoBtn:
-      "flex items-center gap-1.5 text-xs font-semibold text-white bg-[#152342] hover:bg-[#0e1830] transition px-3 py-2 rounded-lg min-h-[44px]",
     btn: "flex items-center gap-1.5 text-xs text-[#152342]/50 hover:text-[#152342] transition px-3 py-2 rounded-lg border border-[#152342]/10 hover:border-[#152342]/20 min-h-[44px]",
     pedidosBtn: "flex items-center gap-1.5 text-xs text-[#152342] hover:text-[#AE0029] transition px-3 py-2 rounded-lg border border-[#152342]/10 hover:border-[#152342]/20 min-h-[44px] font-medium",
     iconSize: 14,
@@ -1479,7 +1486,7 @@ const TOMMY: MarcaTheme = {
     consultaWrap: "bg-[#F6F7F9] border border-[#152342]/10 p-4 rounded text-center",
   },
   pedido: {
-    qtyInputClass: "w-12 text-center border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums",
+    qtyInputClass: "w-14 min-h-[44px] text-center border-b border-gray-200 text-base md:text-sm outline-none focus:border-black tabular-nums",
     suggDropdownClass: "absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-56 overflow-y-auto",
     suggItemClass: "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition",
     suggLimit: null,
@@ -1708,8 +1715,6 @@ const CALVIN: MarcaTheme = {
   },
   vendorShare: {
     enHeader: true,
-    verPedidoBtn:
-      "flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1A1A1A] hover:bg-black transition px-3 py-2 rounded-lg min-h-[44px]",
     btn: "flex items-center gap-1.5 text-xs text-[#1A1A1A]/50 hover:text-[#1A1A1A] transition px-3 py-2 rounded-lg border border-[#1A1A1A]/10 hover:border-[#1A1A1A]/20 min-h-[44px]",
     pedidosBtn: "flex items-center gap-1.5 text-xs text-[#1A1A1A] hover:text-black transition px-3 py-2 rounded-lg border border-[#1A1A1A]/10 hover:border-[#1A1A1A]/20 min-h-[44px] font-medium",
     iconSize: 14,
@@ -1824,7 +1829,7 @@ const CALVIN: MarcaTheme = {
     consultaWrap: "bg-[#FAFAFA] border border-[#1A1A1A]/10 p-4 rounded text-center",
   },
   pedido: {
-    qtyInputClass: "w-12 text-center border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums",
+    qtyInputClass: "w-14 min-h-[44px] text-center border-b border-gray-200 text-base md:text-sm outline-none focus:border-black tabular-nums",
     suggDropdownClass: "absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-56 overflow-y-auto",
     suggItemClass: "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition",
     suggLimit: null,

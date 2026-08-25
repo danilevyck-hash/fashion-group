@@ -205,12 +205,16 @@ export default function PedidosTab({
   function isOrdersRow(p: UnifiedPedido): boolean {
     return p.fuente ? p.fuente === "orders" : p.origen === "mio";
   }
-  function detailHref(p: UnifiedPedido): string {
-    return isOrdersRow(p)
-      ? `/catalogo/${marca}/pedido/${p.id_natural}`
-      : `${theme.pedidoPublicoBase}/${p.id_natural}`;
-  }
 
+  // 🩸 LA FILA Y EL BOTÓN "Editar" LLEVAN AL MISMO LADO (23-ago-2026).
+  // Antes la fila tenía su propio `detailHref`: en un pedido "Del link" sin
+  // convertir, TOCAR LA FILA abría la vista que ve el CLIENTE
+  // (`pedidoPublicoBase/...`, de solo lectura y sin cliente, precio ni envío a
+  // Switch) mientras que el botón "Editar" de esa MISMA fila abría la pantalla
+  // interna. Dos destinos distintos para la misma cosa, sin nada que avisara
+  // cuál era cuál — y el que caía en la del cliente creía que el pedido no se
+  // podía trabajar. Ahora los dos pasan por `handleEdit`.
+  //
   // Abrir el editor de un pedido. Del link (público sin convertir) → convierte y
   // redirige (handleEditLink); interno/orders → abre su detalle directo.
   function handleEdit(p: UnifiedPedido) {
@@ -428,7 +432,7 @@ export default function PedidosTab({
               {grupo.items.map((pedido) => (
                 <tr
                   key={`${pedido.fuente ?? pedido.origen}-${pedido.id_natural}`}
-                  onClick={() => router.push(detailHref(pedido))}
+                  onClick={() => handleEdit(pedido)}
                   className="hover:bg-gray-50 transition cursor-pointer"
                 >
                   <td className="w-8 pl-4 pr-1 py-3" onClick={(e) => e.stopPropagation()}>

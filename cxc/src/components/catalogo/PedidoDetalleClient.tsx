@@ -390,7 +390,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         load();
       } else if (!res.ok) {
         setAutoSaveStatus("error");
-        showToast("No se pudo guardar. Revisa tu conexion e intenta de nuevo.");
+        showToast("No se pudo guardar. Revisa tu conexión e intenta de nuevo.");
       } else {
         const now = new Date().toISOString();
         setAutoSaveStatus("saved");
@@ -403,7 +403,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     } catch {
       // Fallo de red: tampoco se guardo. Error visible, no "Guardado".
       setAutoSaveStatus("error");
-      showToast("No se pudo guardar. Revisa tu conexion e intenta de nuevo.");
+      showToast("No se pudo guardar. Revisa tu conexión e intenta de nuevo.");
     }
     saveInFlight.current = false;
     if (pendingSave.current) { pendingSave.current = false; performSave(); }
@@ -496,7 +496,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
           });
           if (!confirmRes.ok) { showToast("No se pudo confirmar el pedido. Intenta de nuevo."); return; }
         } catch {
-          showToast("No se pudo confirmar el pedido. Revisa tu conexion."); return;
+          showToast("No se pudo confirmar el pedido. Revisa tu conexión."); return;
         }
         setJustConfirmed(true);
       }
@@ -545,7 +545,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       } else if (d.ambiguo) {
         setSwitchEnvio({ estado: "enviado", pedido_switch_id: null, numero_interno: null, error_detalle: d.error, documento });
         setShowSwitchModal(false); setSwitchProblema(null);
-        showToast("Switch no respondio — revisa el panel antes de reintentar.");
+        showToast("Switch no respondió — revisa el panel antes de reintentar.");
       } else {
         // 422 = pre-validación con errores: el pedido NO se creó y no hay
         // ningún envío que marcar como fallido. Cualquier otro fallo (preventa,
@@ -571,7 +571,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         const er = await fetch(`${theme.api}/orders/${id}/enviar-switch`);
         if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
       } catch { /* sin red */ }
-      showToast("Error de conexion — revisa el estado del envio antes de reintentar.");
+      showToast("Error de conexión — revisa el estado del envío antes de reintentar.");
     }
     setSwitchSending(false);
   }
@@ -586,7 +586,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       });
       showToast(emailRes.ok ? "Aviso enviado por correo a Fashion Group." : "No se pudo enviar el correo. Intenta de nuevo.");
     } catch {
-      showToast("No se pudo enviar el correo. Revisa tu conexion.");
+      showToast("No se pudo enviar el correo. Revisa tu conexión.");
     }
     setEnviandoAviso(false);
   }
@@ -600,9 +600,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         body: JSON.stringify({ status: "borrador" }),
       });
       if (!res.ok) { showToast("Error al editar pedido"); setSaving(false); return; }
-    } catch { showToast("Error de conexion"); setSaving(false); return; }
+    } catch { showToast("Error de conexión"); setSaving(false); return; }
     setSaving(false);
-    showToast("Pedido en modo edicion");
+    showToast("Pedido en modo edición");
     load();
   }
 
@@ -649,7 +649,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         showToast(d.error || "No se pudo guardar el cliente. Intenta de nuevo.");
       }
     } catch {
-      showToast("No se pudo guardar el cliente. Revisa tu conexion.");
+      showToast("No se pudo guardar el cliente. Revisa tu conexión.");
     }
     setClienteGuardando(false);
   }
@@ -673,7 +673,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         showToast(d.error || "No se pudo guardar el vendedor. Intenta de nuevo.");
       }
     } catch {
-      showToast("No se pudo guardar el vendedor. Revisa tu conexion.");
+      showToast("No se pudo guardar el vendedor. Revisa tu conexión.");
     }
     setVendedorGuardando(false);
   }
@@ -700,8 +700,8 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         setDupError(d.error || "No se pudo duplicar el pedido. Intenta de nuevo.");
       }
     } catch {
-      showToast("Error de conexion. Intenta de nuevo.");
-      setDupError("Error de conexion. Intenta de nuevo.");
+      showToast("Error de conexión. Intenta de nuevo.");
+      setDupError("Error de conexión. Intenta de nuevo.");
     }
     setDuplicando(false);
   }
@@ -711,7 +711,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     try {
       const res = await fetch(`${theme.api}/orders/${id}`, { method: "DELETE" });
       if (!res.ok) { showToast("Error al eliminar pedido"); setDeletingOrder(false); return; }
-    } catch { showToast("Error de conexion"); setDeletingOrder(false); return; }
+    } catch { showToast("Error de conexión"); setDeletingOrder(false); return; }
     setDeletingOrder(false);
     setShowDeleteModal(false);
     router.push(theme.pedidosHref);
@@ -744,7 +744,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       // Lib única de PDF de pedido (mismo layout que el endpoint /pdf y el
       // adjunto de send-order). Imágenes reducidas a ~200px antes de embeber.
       const { downloadCatalogoOrderPdf } = await import("@/lib/catalogo/order-pdf-client");
-      const prefix = order.status === "confirmado" ? "Pedido" : "Cotizacion";
+      // El nombre del archivo es lo PRIMERO que ve el cliente en WhatsApp o en su
+      // correo, antes de abrirlo: "Cotizacion-TOM-014-2026-08-23.pdf" salía sin
+      // tilde desde el día uno. Es el texto del módulo que más lejos llega.
+      const prefix = order.status === "confirmado" ? "Pedido" : "Cotización";
       const dateStr = new Date().toISOString().slice(0, 10);
       await downloadCatalogoOrderPdf({
         marca,
@@ -766,7 +769,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   async function sendToClient() {
     if (!clientEmail.trim() || !clientEmail.includes("@")) {
-      showToast("Ingresa un email valido"); return;
+      showToast("Ingresa un email válido"); return;
     }
     setSendingToClient(true);
     try {
@@ -782,7 +785,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         showToast("No se pudo enviar. Intenta de nuevo.");
       }
     } catch {
-      showToast("Error de conexion. Intenta de nuevo.");
+      showToast("Error de conexión. Intenta de nuevo.");
     }
     setSendingToClient(false);
   }
@@ -938,15 +941,34 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
       {/* Items table */}
       {items.length > 0 ? (
-        <div className="mb-4">
+        /* `overflow-x-auto`: la tabla se desplaza DENTRO de su caja en vez de
+           arrastrar la página entera. Al subir las casillas al mínimo táctil,
+           el pedido más largo de producción (TOM-023, 38 líneas) pasó a medir
+           375 px en un iPhone de 390 y la PÁGINA arrastraba 1 px — el defecto
+           que se siente al deslizar. Es el patrón de la casa para tablas
+           anchas, y además cubre el pedido de mañana con nombres más largos:
+           lo que se mueve es la tabla, nunca la pantalla. */
+        <div className="mb-4 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
                 <th className="py-2 text-left text-xs uppercase text-gray-400 font-normal w-12"></th>
                 <th className="py-2 text-left text-xs uppercase text-gray-400 font-normal">Producto</th>
-                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-16">Bultos</th>
-                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-14">Pzas</th>
-                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-16">Precio</th>
+                {/* Bultos y Precio bajan de w-16 (64 px) a w-14 (56 px): es
+                    EXACTAMENTE el ancho de la casilla que va adentro, así que
+                    no se pierde nada. Junto con «Pzas» devuelven los píxeles
+                    que costó subir las casillas a 44 px de alto — medido en
+                    TOM-023 (38 líneas) a 390 px: 0 px de arrastre, igual que
+                    antes del cambio. */}
+                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-14">Bultos</th>
+                {/* «Pzas» pasó de w-14 a w-12 (−8 px) para PAGAR los 8 px que
+                    ganó la casilla de bultos al subir a 44 px táctiles. Medido
+                    en el pedido más largo de producción (TOM-023, 38 líneas) a
+                    390 px: con w-14 la página arrastraba 1 px, con w-12 arrastra
+                    0. La columna solo muestra un número corto (456 en el caso
+                    más grande de hoy), así que 48 px le sobran. */}
+                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-12">Pzas</th>
+                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-14">Precio</th>
                 <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-20">Subtotal</th>
                 {canEdit && <th className="w-8"></th>}
               </tr>
@@ -985,9 +1007,14 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   <td className="py-2 text-center text-xs text-gray-400 tabular-nums">{linea(item).piezas}</td>
                   <td className="py-2 text-right align-top">
                     {canEdit ? (
+                      /* Misma geometría que la casilla de bultos de al lado
+                         (theme.pedido.qtyInputClass): 44 px de alto y 16 px de
+                         letra en teléfono. A `text-sm py-0.5` medía ~22 px —la
+                         mitad del mínimo táctil— y iOS hacía zoom solo al
+                         tocarla, justo en la casilla del PRECIO. */
                       <input type="number" step={1} min={0} value={item.unit_price}
                         onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
-                        className="w-14 text-right border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums" />
+                        className="w-14 min-h-[44px] text-right border-b border-gray-200 text-base md:text-sm outline-none focus:border-black tabular-nums" />
                     ) : (
                       <span className="tabular-nums">${fmt(item.unit_price)}</span>
                     )}
@@ -1121,8 +1148,8 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
               {(editedAt || order.updated_at) && (
                 <span className={`text-xs block mt-1 ${editedAt ? "text-amber-600 font-medium" : "text-emerald-600/70"}`}>
                   {editedAt
-                    ? `Editado despues de confirmar: ${fmtDateTime(editedAt)}`
-                    : `Ultima edicion interna: ${fmtDateTime(order.updated_at!)}`}
+                    ? `Editado después de confirmar: ${fmtDateTime(editedAt)}`
+                    : `Última edición interna: ${fmtDateTime(order.updated_at!)}`}
                 </span>
               )}
             </div>
@@ -1142,7 +1169,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
                   {switchEnvio.numero_interno
                     ? <>{tituloEnviadoASwitch(documentoEnSwitch)}: <span className="font-mono">{switchEnvio.numero_interno}</span> (sin verificar)</>
-                    : "Envio en revision — confirma en el panel de Switch si el pedido se creo"}
+                    : "Envío en revisión — confirma en el panel de Switch si el pedido se creó"}
                 </div>
                 {/* Lo que hay que saber DESPUÉS de mandar una cotización: la
                     mercancía sigue a la venta para los demás. */}

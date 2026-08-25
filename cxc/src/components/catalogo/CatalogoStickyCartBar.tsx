@@ -8,6 +8,7 @@ import { useState } from "react";
 import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
+import { ConfirmDeleteModal } from "@/components/ui";
 import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { fmtPrecio } from "@/lib/catalogo/precio";
@@ -46,6 +47,14 @@ export default function CatalogoStickyCartBar({
   const theme = getMarcaTheme(marca)!;
   const c = theme.cart;
   const [miniCartOpen, setMiniCartOpen] = useState(false);
+  // "Vaciar" PREGUNTA. Antes borraba el pedido entero de un toque, sin aviso y
+  // sin vuelta atrás: 30 líneas armadas en 20 minutos se iban con un dedo mal
+  // puesto, y el carrito vive en la SESIÓN de la pestaña (no hay copia en el
+  // servidor que recuperar). Es el patrón de la casa para lo destructivo —
+  // ConfirmDeleteModal, con su segundo de espera que además frena el doble
+  // toque. El botón queda donde estaba; lo único que cambia es que hay que
+  // confirmar.
+  const [confirmarVaciar, setConfirmarVaciar] = useState(false);
 
   // Escape cierra el mini-carrito igual que el clic en el backdrop. El hook va
   // ANTES del early return de cartCount (reglas de hooks).
@@ -122,6 +131,7 @@ export default function CatalogoStickyCartBar({
   const hasPreorders = preorders.length > 0;
 
   return (
+    <>
     <div
       className="fixed bottom-0 left-0 right-0 z-40"
       style={{ animation: "slideUp 0.25s ease-out" }}
@@ -166,7 +176,7 @@ export default function CatalogoStickyCartBar({
           <div className="flex items-center gap-3">
             {miniCartLink}
             <button
-              onClick={() => { onClearCart(); setMiniCartOpen(false); }}
+              onClick={() => setConfirmarVaciar(true)}
               className={c.vaciarBtn}
             >
               Vaciar
@@ -290,5 +300,19 @@ export default function CatalogoStickyCartBar({
         </button>
       </div>
     </div>
+
+    {/* HERMANO de la barra, no hijo: la barra es `fixed z-40` y crea su propio
+        contexto de apilado — un modal `fixed z-50` metido adentro quedaría
+        atrapado ahí. */}
+    <ConfirmDeleteModal
+      open={confirmarVaciar}
+      title="¿Vaciar el pedido?"
+      description={`Se quitan ${cart.length} ${cart.length === 1 ? "producto" : "productos"} (${cartCount} ${cartCount === 1 ? "bulto" : "bultos"}, $${formatTotal(cartTotal)}). Hay que volver a agregarlos uno por uno.`}
+      confirmLabel="Vaciar"
+      loadingLabel="Vaciando..."
+      onConfirm={() => { onClearCart(); setConfirmarVaciar(false); setMiniCartOpen(false); }}
+      onCancel={() => setConfirmarVaciar(false)}
+    />
+    </>
   );
 }
