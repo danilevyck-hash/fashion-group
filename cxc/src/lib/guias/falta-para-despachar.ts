@@ -99,14 +99,27 @@ export function pendienteNumeroTransp(
 }
 
 /**
+ * "placa, recibido por y cédula" — con "y" antes del último, como se habla.
+ *
+ * Vive suelto porque lo usan DOS botones: el de despachar y el de guardar la
+ * guía (`faltaParaGuardar`, en `guia-form-logic.ts`). Un segundo unidor sería
+ * un segundo idioma: uno diría "a, b y c" y el otro "a, b, c" el día que
+ * alguien tocara uno de los dos.
+ */
+export function unirEnHumano(partes: readonly string[]): string {
+  if (partes.length === 0) return "";
+  if (partes.length === 1) return partes[0];
+  const previos = partes.slice(0, -1).join(", ");
+  return `${previos} y ${partes[partes.length - 1]}`;
+}
+
+/**
  * "Falta: placa, recibido por y cédula" — con "y" antes del último, como se
  * habla. Sin faltantes devuelve "".
  */
 export function textoFalta(faltantes: readonly string[]): string {
   if (faltantes.length === 0) return "";
-  if (faltantes.length === 1) return `Falta: ${faltantes[0]}`;
-  const previos = faltantes.slice(0, -1).join(", ");
-  return `Falta: ${previos} y ${faltantes[faltantes.length - 1]}`;
+  return `Falta: ${unirEnHumano(faltantes)}`;
 }
 
 /**

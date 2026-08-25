@@ -23,9 +23,17 @@ import {
 
 interface Options {
   editingId?: string | null; // null = creación
+  /**
+   * Qué hacer cuando un guardado A MANO sale bien. Sin esto se vuelve a
+   * `/guias`, que es lo que corresponde cuando el formulario ES la pantalla
+   * entera (`/guias/nueva`). Cuando el formulario se abre DENTRO de la guía
+   * —el botón "Editar" de `/guias/[id]`— irse de la pantalla sería sacar a la
+   * persona de la guía que estaba por despachar.
+   */
+  alGuardar?: () => void;
 }
 
-export function useGuiaFormState({ editingId = null }: Options = {}) {
+export function useGuiaFormState({ editingId = null, alGuardar }: Options = {}) {
   const router = useRouter();
 
   const [error, setError] = useState<string | null>(null);
@@ -253,19 +261,42 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, ...partial } : item)));
   }
 
-  function validate(): boolean {
+  /**
+   * 🔴 EL AUTOGUARDADO NO PINTA ERRORES. `pintar: false` valida igual —y frena
+   * el guardado igual— pero se calla.
+   *
+   * 🩸 EL DEFECTO: al empezar el SEGUNDO envío, el formulario se ponía rojo
+   * solo. Nadie había tocado "Guardar": a los ~1,5 s el guardado automático
+   * llamaba acá, la fila a medio escribir no pasaba la validación, y aparecían
+   * "Completa todos los campos obligatorios" y la fila entera en rojo. Es el
+   * "rojo prematuro" que ya se había eliminado a propósito (un campo no puede
+   * quedar en error por haberlo mirado) y que volvió por la puerta del
+   * autoguardado.
+   *
+   * ⚠️ El autoguardado SE QUEDA — bodega despacha desde el celular y una
+   * pestaña que se cierra no puede llevarse los renglones. Lo que no puede es
+   * pintar: un guardado que la persona no pidió no puede acusarla de nada.
+   * Al apretar "Guardar" se pinta todo lo que falte, igual que siempre.
+   */
+  function validate(opts?: { pintar?: boolean }): boolean {
+    const pintar = opts?.pintar !== false;
     const errors = validarGuia({ fecha, modoEntrega, transportistaId, entregadoPor, items });
-    setValidationErrors(errors);
     if (errors.size > 0) {
-      setError("Completa todos los campos obligatorios antes de guardar.");
+      if (pintar) {
+        setValidationErrors(errors);
+        setError("Completa todos los campos obligatorios antes de guardar.");
+      }
       return false;
     }
+    // Válido: se limpia lo que hubiera quedado pintado de un intento anterior.
+    setValidationErrors(errors);
     return true;
   }
 
   async function saveGuia(opts?: { silent?: boolean }) {
     const silent = opts?.silent === true;
-    if (!validate()) return;
+    // 🔴 Un guardado AUTOMÁTICO no pinta nada. Ver `validate`.
+    if (!validate({ pintar: !silent })) return;
     try {
       localStorage.setItem("fg_last_modo_entrega", modoEntrega);
       if (transportistaId) localStorage.setItem("fg_last_transportista_id", transportistaId);
@@ -287,38 +318,57 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     setSaving(true);
     const url = editingId ? `/api/guias/${editingId}` : "/api/guias";
     const method = editingId ? "PUT" : "POST";
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fecha,
-        modo_entrega: modoEntrega,
-        transportista_id: modoEntrega === "transportista" ? transportistaId : null,
-        entregado_por: entregadoPor,
-        observaciones,
-        numero_guia_transp: numeroGuiaTransp.trim() || null,
-        estado: editingId && editingEstado ? editingEstado : "Pendiente Bodega",
-        ...(mandarItems ? { items: validItems } : {}),
-      }),
-    });
-    if (res.ok) {
-      setError(null);
-      // Recién ahora lo enviado ES lo que el servidor tiene.
-      setGuardado(enviada);
-      setGuardadoEn(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
-      clearGuiaDraft();
-      // Aviso de creación eliminado (antes mandaba email interno a info@).
-      // El único aviso de guías ahora es el de DESPACHO (Telegram), en
-      // /api/guias/[id] al pasar a estado "Completada".
-      // En silent (auto-save) NO navega ni resetea — preserva contexto.
-      if (!silent) {
-        router.push("/guias");
+    // 🔴 LA RED DE SEGURIDAD. Sin el `try`, un `fetch` que REVIENTA —el WiFi de
+    // la bodega se cae a mitad del pedido— tiraba la excepción antes del
+    // `setSaving(false)` de más abajo, así que el botón se quedaba en
+    // "Guardando…" PARA SIEMPRE: sin aviso, sin poder reintentar sin recargar
+    // la página, y con la persona creyendo que guardó. La pantalla de
+    // despachar ya avisaba ("Sin conexión…"); ésta no.
+    //
+    // ⚠️ El `finally` es lo que de verdad destraba el botón: `setSaving(false)`
+    // tiene que correr salga bien, salga mal o reviente.
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fecha,
+          modo_entrega: modoEntrega,
+          transportista_id: modoEntrega === "transportista" ? transportistaId : null,
+          entregado_por: entregadoPor,
+          observaciones,
+          numero_guia_transp: numeroGuiaTransp.trim() || null,
+          estado: editingId && editingEstado ? editingEstado : "Pendiente Bodega",
+          ...(mandarItems ? { items: validItems } : {}),
+        }),
+      });
+      if (res.ok) {
+        setError(null);
+        // Recién ahora lo enviado ES lo que el servidor tiene.
+        setGuardado(enviada);
+        setGuardadoEn(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
+        clearGuiaDraft();
+        // Aviso de creación eliminado (antes mandaba email interno a info@).
+        // El único aviso de guías ahora es el de DESPACHO (Telegram), en
+        // /api/guias/[id] al pasar a estado "Completada".
+        // En silent (auto-save) NO navega ni resetea — preserva contexto.
+        if (!silent) {
+          if (alGuardar) alGuardar();
+          else router.push("/guias");
+        }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || "Error al guardar. Verifica los datos.");
       }
-    } else {
-      const errData = await res.json().catch(() => ({}));
-      setError(errData.error || "Error al guardar. Verifica los datos.");
+    } catch {
+      // 🔴 Se dice que NO se guardó, y se dice también cuando el guardado era
+      // automático: "no se guardó" es exactamente lo que hay que enterarse.
+      // `guardado` no se toca, así que el rótulo sigue diciendo "Sin guardar"
+      // y el botón vuelve a estar tocable para reintentar.
+      setError("Sin conexión. No se guardó nada — revisa el internet y vuelve a intentar.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   return {

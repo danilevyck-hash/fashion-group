@@ -42,6 +42,7 @@ const leer = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 const LISTA = leer("src/app/guias/components/GuiasList.tsx");
 const PAGE_LISTA = leer("src/app/guias/page.tsx");
 const PAGE_GUIA = leer("src/app/guias/[id]/page.tsx");
+const PAGE_EDITAR = leer("src/app/guias/[id]/editar/page.tsx");
 const FORM = leer("src/app/guias/components/DespachoForm.tsx");
 const LISTA_ENVIOS = leer("src/app/guias/components/ListaEnvios.tsx");
 const ESTADO_LISTA = leer("src/app/guias/components/useGuiasState.ts");
@@ -101,8 +102,17 @@ describe("🔴 la página de la guía es donde se termina", () => {
     expect(PAGE_GUIA).toContain('router.push("/guias")');
   });
 
-  it("desde ahí también se llega a cambiar los envíos — no se perdió el camino viejo", () => {
-    expect(PAGE_GUIA).toContain("/guias/${id}/editar");
+  // ⚠️ CANDADO QUE CAMBIÓ DE DIRECCIÓN (23-ago-2026). Antes exigía que la
+  // página de la guía ENLAZARA a `/guias/[id]/editar`, o sea que el formulario
+  // viviera un nivel más adentro — justo lo que Daniel pidió sacar. Lo que
+  // siempre quiso decir es que el camino viejo no se pierda, y eso ahora lo
+  // sostiene el REDIRECT: un enlace guardado sigue abriendo lo que abría.
+  it("el camino viejo no se pierde: `/guias/[id]/editar` redirige a la guía", () => {
+    expect(PAGE_EDITAR).toContain("router.replace(");
+    expect(PAGE_EDITAR).toContain("?editar=1");
+    // `replace` y no `push`: con push el "atrás" volvería acá y encerraría a
+    // la persona en un bucle de redirecciones.
+    expect(PAGE_EDITAR).not.toContain("router.push(");
   });
 
   it("los hooks van ANTES del primer return condicional (regla de React)", () => {
@@ -113,11 +123,25 @@ describe("🔴 la página de la guía es donde se termina", () => {
   });
 
   it("una guía ya despachada se muestra de solo lectura, sin formulario", () => {
-    const i = PAGE_GUIA.indexOf("{s.despachada ? (");
+    const i = PAGE_GUIA.indexOf("s.despachada ? (");
     const j = PAGE_GUIA.indexOf(") : puedeDespachar ? (");
     expect(i).toBeGreaterThan(0);
     expect(j).toBeGreaterThan(i);
-    expect(PAGE_GUIA.slice(i, j)).not.toContain("<DespachoForm");
+    const bloque = PAGE_GUIA.slice(i, j);
+    expect(bloque).not.toContain("<DespachoForm");
+    // 🔴 Y tampoco el formulario del ALTA: desde el 23-ago-2026 «Editar» abre
+    // `GuiaForm` DENTRO de la guía, así que una despachada tiene que quedar
+    // fuera de ese camino igual que del despacho.
+    expect(bloque).not.toContain("<EdicionGuia");
+  });
+
+  // 🔴 El candado de la guía DESPACHADA, del otro lado: quién puede abrir el
+  // formulario tiene que mirar el estado, no solo el rol.
+  it("«Editar» no se ofrece en una guía ya despachada", () => {
+    expect(PAGE_GUIA).toContain("!s.despachada");
+    expect(PAGE_GUIA).toContain("const enEdicion = editando && puedeEditar");
+    // Y la pantalla lo DICE, en vez de mostrar campos que no dejan escribir.
+    expect(PAGE_GUIA).toContain("ya se despachó: no se puede editar");
   });
 
   it("vendedor entra pero no despacha", () => {

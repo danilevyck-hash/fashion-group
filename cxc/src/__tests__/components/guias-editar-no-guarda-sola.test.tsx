@@ -1,5 +1,14 @@
 /**
- * 🔴 EL CANDADO: abrir `/guias/[id]/editar` NO puede producir ni una escritura.
+ * 🔴 EL CANDADO: abrir el formulario de editar NO puede producir ni una
+ * escritura.
+ *
+ * ⚠️ 23-ago-2026: el formulario dejó de vivir en `/guias/[id]/editar` y se abre
+ * DENTRO de la guía, con el botón «Editar» de `/guias/[id]` (Daniel: *"quiero
+ * botón de editar y que se me abra la guía para editar así mismo como si
+ * estuviese haciendo la guía"*). Este candado se MUDÓ con él: ahora monta la
+ * página de la guía y TOCA «Editar», que es el camino que la gente usa. Dejarlo
+ * apuntando a la ruta vieja lo habría convertido en un candado sobre una
+ * pantalla que ya nadie abre.
  *
  * 🩸 El bug, reproducido en producción el 17-ago-2026 sobre GT-204: el
  * formulario se marcaba como sucio contando cuántas veces había corrido un
@@ -32,7 +41,7 @@ const PARAMS = { id: "guia-205" };
 vi.mock("next/navigation", () => ({
   useRouter: () => ROUTER,
   useParams: () => PARAMS,
-  usePathname: () => "/guias/guia-205/editar",
+  usePathname: () => "/guias/guia-205",
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/components/AppHeader", () => ({ default: () => null }));
@@ -123,9 +132,14 @@ async function esperarElAutoguardado() {
 }
 
 async function abrirPantallaDeEditar(envoltorio?: (hijo: ReactNode) => ReactNode) {
-  const Page = (await import("@/app/guias/[id]/editar/page")).default;
+  const Page = (await import("@/app/guias/[id]/page")).default;
   const arbol = <Page />;
   render(<>{envoltorio ? envoltorio(arbol) : arbol}</>);
+  await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+  // 🔴 Se entra POR EL BOTÓN, como la gente. Si el botón no estuviera, este
+  // candado probaría una pantalla que nadie puede abrir.
+  const editar = screen.getByRole("button", { name: /^Editar$/i });
+  await act(async () => { fireEvent.click(editar); });
   await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
   // Si la pantalla no cargó, cualquier "0 escrituras" sería verde por nada.
   expect(screen.getAllByText(/Guardar Cambios/i).length).toBeGreaterThan(0);
