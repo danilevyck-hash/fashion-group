@@ -82,7 +82,24 @@ async function main() {
     const mapAntes = new Map(antes.map((f) => [llave(f), f]));
     const mapDespues = new Map(despues.map((f) => [llave(f), f]));
 
+    /**
+     * 🔴 DOS CLASES DE CAMBIO, y confundirlas sería el error.
+     *
+     * `precio` (el precio de ETIQUETA) y su `utilidad_pct` derivada NO están
+     * congelados al momento del ingreso: el reporte de Switch los recalcula
+     * contra el precio VIGENTE del artículo. Medido el 25-ago-2026 con el
+     * documento `fashion_wear 19-000000743` línea 10 (`69JA520WF5`): la carga a
+     * mano del 11-ago guardó 25.00 / 36.64 y hoy el CSV CRUDO de Switch dice
+     * **21.00 / 24.5714** — alguien le cambió el precio de etiqueta allá. El
+     * sync escribió lo que Switch dice, que es la regla del módulo ("se guarda
+     * TAL COMO VIENE, no se corrige").
+     *
+     * Lo que NO puede moverse nunca es lo que sostiene el "Compré": la
+     * cantidad, los costos, la fecha y la identidad de la línea.
+     */
+    const ESPEJO_DE_SWITCH = new Set(["precio", "utilidad_pct"]);
     const cambiadas: string[] = [];
+    const espejo: string[] = [];
     const desaparecidas: string[] = [];
     let camposComparados = 0;
     for (const [k, a] of mapAntes) {
@@ -94,7 +111,9 @@ async function main() {
       for (const col of Object.keys(a)) {
         camposComparados++;
         if (String(a[col]) !== String(d[col])) {
-          cambiadas.push(`${k} · ${col}: ${String(a[col])} → ${String(d[col])}`);
+          const linea = `${k} · ${col}: ${String(a[col])} → ${String(d[col])}`;
+          if (ESPEJO_DE_SWITCH.has(col)) espejo.push(linea);
+          else cambiadas.push(linea);
         }
       }
     }
@@ -108,10 +127,12 @@ async function main() {
     console.log("\n═══ VEREDICTO ═══");
     console.log(`  filas que ya existían .... ${mapAntes.size}`);
     console.log(`  campos comparados ........ ${camposComparados}`);
-    console.log(`  🔴 filas CAMBIADAS ....... ${cambiadas.length}`);
-    console.log(`  🔴 filas DESAPARECIDAS ... ${desaparecidas.length}`);
-    console.log(`  ✅ filas NUEVAS .......... ${nuevas.length}`);
-    for (const c of cambiadas.slice(0, 20)) console.log(`     ${c}`);
+    console.log(`  🔴 CANTIDAD/COSTO/FECHA cambiados ... ${cambiadas.length}`);
+    console.log(`  🔴 filas DESAPARECIDAS .............. ${desaparecidas.length}`);
+    console.log(`  ⚠️  precio de etiqueta re-espejado ... ${espejo.length}`);
+    console.log(`  ✅ filas NUEVAS ..................... ${nuevas.length}`);
+    for (const c of cambiadas.slice(0, 20)) console.log(`     🔴 ${c}`);
+    for (const c of espejo.slice(0, 20)) console.log(`     ⚠️  ${c}`);
     for (const c of desaparecidas.slice(0, 20)) console.log(`     falta: ${c}`);
 
     // Qué entró, por empresa y por fecha — es lo que hay que poder contar.
@@ -142,7 +163,9 @@ async function main() {
     }
 
     const ok = cambiadas.length === 0 && desaparecidas.length === 0;
-    console.log(`\n${ok ? "🟢 NINGÚN DATO EXISTENTE CAMBIÓ" : "🔴 ALGO SE MOVIÓ"}`);
+    console.log(
+      `\n${ok ? "🟢 NI UNA CANTIDAD, NI UN COSTO, NI UNA FECHA SE MOVIÓ" : "🔴 SE MOVIÓ UN DATO QUE SOSTIENE EL «Compré»"}`,
+    );
     process.exit(ok ? 0 : 1);
   }
 
