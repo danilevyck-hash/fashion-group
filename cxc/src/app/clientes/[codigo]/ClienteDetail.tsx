@@ -216,7 +216,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
         {/* Contacto (editable) */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
-          <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Contacto · editable en fashiongr</h2>
+          <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Contacto</h2>
           {editing ? (
             <div className="space-y-3">
               <FormRow label="Teléfono" value={form.telefono} onChange={(v) => setForm({ ...form, telefono: v })} />

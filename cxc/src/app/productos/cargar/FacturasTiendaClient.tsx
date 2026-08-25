@@ -568,9 +568,6 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
 
           {/* Fórmulas de tienda por marca presente */}
           <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
-            <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
-              Fórmulas de TIENDA (separadas del Depurador) · precio = TECHO(Costo ÷ divisor) + extra
-            </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[13px]">
                 <thead>

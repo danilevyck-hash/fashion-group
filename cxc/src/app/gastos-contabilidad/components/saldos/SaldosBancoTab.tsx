@@ -25,17 +25,6 @@ export default function SaldosBancoTab() {
 
   return (
     <div className="max-w-xl">
-      <div className="mb-5">
-        {/* 🔴 La PRIMERA mitad de esta bajada ("Lo que hay en el banco de cada
-            empresa") se podó en el #510 y NO vuelve: la pestaña se llama
-            "Saldos de banco" y abajo hay una fila por empresa con su monto. La
-            SEGUNDA se queda — amarra este dato con la "Disponibilidad" de Vista
-            General, que es lo único de esta pantalla que ella no enseña sola. */}
-        <p className="text-sm text-gray-600">
-          Es lo que la Vista General muestra como &ldquo;Disponibilidad&rdquo;.
-        </p>
-      </div>
-
       {isLoading && !data ? (
         <SkeletonSaldos />
       ) : error && !data ? (

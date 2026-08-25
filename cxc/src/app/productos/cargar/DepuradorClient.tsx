@@ -724,13 +724,11 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                 active={priceMode === "global"}
                 onClick={() => setPriceMode("global")}
                 title="Una fórmula para todo"
-                desc="Un divisor + extra para todas las filas."
               />
               <ModeBtn
                 active={priceMode === "marca"}
                 onClick={() => setPriceMode("marca")}
                 title="Fórmula guardada por marca"
-                desc="Cada marca usa su fórmula guardada."
                 last
               />
             </div>
@@ -1017,7 +1015,7 @@ const miniInputCls =
 const miniSelectCls =
   "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 
-function ModeBtn({ active, onClick, title, desc, last }: { active: boolean; onClick: () => void; title: string; desc: string; last?: boolean }) {
+function ModeBtn({ active, onClick, title, last }: { active: boolean; onClick: () => void; title: string; last?: boolean }) {
   return (
     <button
       type="button"
@@ -1028,7 +1026,6 @@ function ModeBtn({ active, onClick, title, desc, last }: { active: boolean; onCl
         <span className={`h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 ${active ? "border-teal-600 bg-teal-600 ring-2 ring-inset ring-white" : "border-stone-300"}`} />
         <span className={`text-[13px] font-semibold ${active ? "text-teal-800" : "text-stone-900"}`}>{title}</span>
       </div>
-      <div className="mt-0.5 pl-[22px] text-[11px] text-stone-500">{desc}</div>
     </button>
   );
 }

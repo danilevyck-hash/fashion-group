@@ -739,7 +739,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         submitting={enProcesoSaving}
         requireFile={false}
         title={'Pasar a "En proceso"'}
-        description="Adjunta el comprobante (foto o PDF) si ya lo tienes — en este paso es opcional."
         submitLabel="Pasar a En proceso"
         onClose={() => setEnProcesoOpen(false)}
         onSubmit={submitEnProceso}

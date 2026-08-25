@@ -166,15 +166,6 @@ function GastosContabilidadInner() {
         ) : (
           <>
             <div className="mb-4">
-              {/* La bajada dice qué se está viendo y su corte mensual. Con el
-                  mayor retirado vuelve a decir de DÓNDE sale el número, que
-                  antes era trabajo del selector de fuente. */}
-              <p className="text-sm text-gray-600">
-                Cada pago que salió de caja o del banco, mes por mes.
-              </p>
-            </div>
-
-            <div className="mb-4">
               <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} />
             </div>
 

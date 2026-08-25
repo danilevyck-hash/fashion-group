@@ -236,9 +236,6 @@ export default function CerrarPeriodoModal({
               /* text-base en móvil: con 14 px Safari hace zoom al enfocar. */
               className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none disabled:bg-gray-50"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Los gastos nuevos de {bloque.nombre} van a entrar en ese período.
-            </p>
           </div>
 
           <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
