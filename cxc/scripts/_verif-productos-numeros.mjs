@@ -1,8 +1,22 @@
 // NINGÚN NÚMERO DE Ventas › Productos PUEDE CAMBIAR.
 //
-// Este cambio AGREGA una columna (Precio prom.) y AGREGA opciones de período.
 // Lo que ya se veía —Descripción, Códigos, Cant, Venta, Δ y Margen%— tiene que
 // quedar EXACTAMENTE igual, en la MISMA FILA y en el MISMO ORDEN.
+//
+// ── 25-ago-2026: el script se ADAPTÓ a dos cambios de la pantalla ───────────
+//
+// 1. ⛔ EL MES SUELTO YA NO SE PUEDE ELEGIR. Daniel, textual: *"solo dejame las
+//    4 primeras, las otras quítamelas que sobran, nunca te las pedí"*. El combo
+//    `mes: "primero"` no se puede seguir midiendo porque la opción no existe en
+//    el DESPUÉS — y forzarlo haría fallar el script por el cambio que se pidió,
+//    no por un número movido. Se reemplazó por «Últimos 12 meses», que SÍ
+//    existe en los dos lados y ejercita el mismo camino de servidor.
+//    ⚠️ El servidor sigue aceptando `?mes=6` y contestando lo mismo (hay
+//    candado en la ruta); lo que se retiró es que la pantalla lo pida.
+//
+// 2. LOS CÓDIGOS DEL DESPLEGABLE SIGUEN AHÍ, detrás de la pestaña «Códigos»
+//    (el desplegable abre en «Quién lo compra»). El script la toca antes de
+//    capturar, así que compara EXACTAMENTE los mismos renglones que antes.
 //
 // ⚠️ SE COMPARA POSICIÓN POR POSICIÓN, no como conjunto. Dos filas
 // intercambiadas darían "los mismos números" mirando el conjunto, y es
@@ -32,11 +46,12 @@ const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 // Combinaciones que existen ANTES y DESPUÉS (las nuevas no se pueden comparar
 // contra nada, así que no entran en la garantía de "no cambió").
 const COMBOS = [
-  { id: "fashion_wear-ytd", empresa: "Fashion Wear", mes: null },
-  { id: "vistana-ytd", empresa: "Vistana International", mes: null },
-  { id: "american_classic-ytd", empresa: "Multifashion", mes: null },
-  { id: "fashion_shoes-ytd", empresa: "Fashion Shoes", mes: null },
-  { id: "fashion_wear-mes", empresa: "Fashion Wear", mes: "primero" },
+  { id: "fashion_wear-ytd", empresa: "Fashion Wear", periodo: null },
+  { id: "vistana-ytd", empresa: "Vistana International", periodo: null },
+  { id: "american_classic-ytd", empresa: "Multifashion", periodo: null },
+  { id: "fashion_shoes-ytd", empresa: "Fashion Shoes", periodo: null },
+  { id: "fashion_wear-12m", empresa: "Fashion Wear", periodo: "Últimos 12 meses" },
+  { id: "vistana-12m", empresa: "Vistana International", periodo: "Últimos 12 meses" },
 ];
 
 // Las columnas que YA EXISTÍAN. `precio` no entra: es la nueva.
@@ -89,20 +104,14 @@ async function elegir(page, indiceTrigger, textoOpcion) {
   return txt;
 }
 
-/** El primer mes que ofrezca el selector de período (varía por empresa/año). */
-async function primerMes(page) {
-  const triggers = page.locator("button[role=combobox]");
-  await triggers.nth(IDX_PERIODO).click();
-  const opciones = page.locator("[role=option]");
-  await opciones.first().waitFor({ state: "visible", timeout: 8000 });
-  const textos = await opciones.allTextContents();
-  // El mes es la primera opción que empieza con un nombre de mes.
-  const MES = /^(Ene|Feb|Mar|Abr|May|Jun|Jul|Ago|Sep|Oct|Nov|Dic)\b/;
-  const elegido = textos.map(t => t.trim()).find(t => MES.test(t));
-  if (!elegido) throw new Error(`el selector de período no ofrece ningún mes: ${textos.join(" / ")}`);
-  await page.getByRole("option", { name: elegido, exact: true }).first().click();
-  await page.waitForTimeout(3500);
-  return elegido;
+/** Si el desplegable tiene pestañas (DESPUÉS), toca la de «Códigos». En el
+ *  ANTES no hay ninguna y los códigos ya están a la vista: no-op. */
+async function abrirCodigos(page) {
+  const tab = page.getByRole("tab", { name: /Códigos/ });
+  if (await tab.count()) {
+    await tab.first().click();
+    await page.waitForTimeout(700);
+  }
 }
 
 mkdirSync(SALIDA, { recursive: true });
@@ -128,8 +137,8 @@ for (const combo of COMBOS) {
   const empresaElegida = await elegir(page, IDX_EMPRESA, combo.empresa);
   await page.waitForSelector("tr[data-fila-producto]", { timeout: 45000 });
   let periodo = "YTD";
-  if (combo.mes === "primero") {
-    periodo = await primerMes(page);
+  if (combo.periodo) {
+    periodo = await elegir(page, IDX_PERIODO, combo.periodo);
     await page.waitForSelector("tr[data-fila-producto]", { timeout: 45000 });
   }
   const r = await page.evaluate(SONDA);
@@ -140,6 +149,7 @@ for (const combo of COMBOS) {
   if (await desplegable.count()) {
     await desplegable.click();
     await page.waitForTimeout(3000);
+    await abrirCodigos(page);
     drill = await page.evaluate(SONDA_DRILL);
   }
 
