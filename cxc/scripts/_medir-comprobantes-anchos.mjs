@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// MEDICIÓN — «Comprobantes»: el panel renombrado, su filtro por TIPO, y el
-// botón que lleva a la lista en UN toque (25-ago-2026).
+// MEDICIÓN — «Comprobantes»: el panel renombrado, sus TRES chips de tipo
+// (Pedidos · Cotizaciones · Borradores, sin «Todos»), y el botón que lleva a la
+// lista en UN toque (25-ago-2026).
 //
 // Contra el BUILD DE PRODUCCIÓN, con DATOS DE PRODUCCIÓN, en las 4 marcas y en
 // los cuatro anchos de la casa: 390 (iPhone) · 834 (iPad) · 1024 (iPad
@@ -10,8 +11,14 @@
 //   BASE=http://localhost:3496 ETAPA=despues node scripts/_medir-comprobantes-anchos.mjs
 //
 // `ETAPA=antes` corre EL MISMO ARCHIVO contra `origin/main` (dos scripts
-// distintos no comparan nada): mide lo mismo, no exige lo que todavía no
-// existe, y cuenta los TOQUES por el camino viejo.
+// distintos no comparan nada): mide lo mismo y no exige lo que todavía no
+// existe.
+//
+// 🩸 25-ago-2026 — EL «ANTES» SE CORRIÓ. El #603 ya está en `origin/main`, así
+// que la pestaña se llama «Comprobantes» y el botón de un toque existe EN LAS
+// DOS ETAPAS: exigir «Pedidos» y el camino de 4 toques daba 20 rojos que no
+// eran del cambio sino de un baseline vencido. Lo que separa las etapas ahora
+// es el FILTRO: `antes` = 4 chips con «Todos» · `despues` = 3 sin él.
 //
 // 🔴 NADA SE MANDA A SWITCH. El navegador ABORTA cualquier petición que no sea
 // GET/HEAD — esta medición pasa por pantallas con botones de borrar, de
@@ -29,6 +36,11 @@
 //     DESPUÉS se esperan las filas (Reebok: sus pedidos son de julio).
 //   · El contador del mes dice «pedidos» en `origin/main` y «comprobantes» en
 //     esta rama: el selector acepta LOS DOS o `ETAPA=antes` no encontraría nada.
+//   · 🔴 EL PANEL YA NO ABRE MOSTRANDO TODO. Desde el 25-ago el chip por
+//     defecto es «Pedidos» y no hay «Todos», así que las filas que se ven al
+//     cargar NO son el universo. El total se pide aparte a la API (que lee la
+//     vista unificada, `deleted = false`) y la suma de los tres chips se compara
+//     contra ÉSE — no contra lo que hay en pantalla al llegar.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { chromium } from "playwright";
@@ -78,6 +90,25 @@ const browser = await chromium.launch();
 const fallos = [];
 const heredados = [];
 let escriturasBloqueadas = 0;
+
+/**
+ * 🔴 EL UNIVERSO VIVO de una marca, leído de la MISMA API que alimenta el panel
+ * (la vista unificada ya descarta `deleted = true`). Es la vara contra la que se
+ * comparan los tres chips: sin «Todos» en pantalla, no hay otra forma honesta de
+ * saber si algún criterio está dejando filas invisibles.
+ *
+ * 🩸 Medido el 25-ago-2026 contra producción: 43 pedidos VIVOS en las tablas de
+ * orders (más 6 del link sin convertir = 49 filas de panel) y 67 YA BORRADOS que
+ * no se ven. Contar contra `orders` daría 110.
+ */
+async function universoVivo(marca) {
+  const r = await fetch(`${BASE}/api/catalogo/${marca}/pedidos-unificado`, { headers: { Cookie: `cxc_session=${COOKIE}` } });
+  if (!r.ok) return null;
+  const rows = await r.json();
+  if (!Array.isArray(rows)) return null;
+  const borradores = rows.filter((p) => String(p.status ?? "").trim().toLowerCase() === "borrador");
+  return { total: rows.length, borradores: borradores.length, detalle: borradores.map((b) => `${b.numero_pedido ?? "?"} ${b.cliente}${b.switch_numero ? " (EN SWITCH)" : ""}`) };
+}
 
 /** Un pedido REAL por marca, para poder abrir su pantalla de confirmación. */
 async function pedidoDe(marca) {
@@ -166,6 +197,16 @@ async function medir(page, sel, etiqueta, idx = 0, { recorteEsFallo = true } = {
 const resumen = [];
 const resumenConf = [];
 
+/** El universo vivo de cada marca, leído de la API una sola vez. */
+const UNIVERSO = {};
+if (ETAPA === "despues") {
+  for (const m of MARCAS) {
+    UNIVERSO[m] = await universoVivo(m);
+    const u = UNIVERSO[m];
+    console.log(`universo ${m.padEnd(8)} ${u ? `${u.total} filas vivas · ${u.borradores} borradores${u.detalle.length ? ` → ${u.detalle.join(" · ")}` : ""}` : "❌ no se pudo leer"}`);
+  }
+}
+
 // ── Calentar: la PRIMERA navegación del server recién levantado tarda de más ──
 {
   const ctx = await nuevoContexto();
@@ -226,7 +267,8 @@ for (const marca of MARCAS) {
       const b = [...document.querySelectorAll("button")].find((x) => /^(Pedidos|Comprobantes)$/.test((x.textContent || "").trim()));
       return b ? b.textContent.trim() : null;
     });
-    const esperado = ETAPA === "despues" ? "Comprobantes" : "Pedidos";
+    // El #603 ya está en main: las dos etapas dicen «Comprobantes».
+    const esperado = "Comprobantes";
     console.log(`     pestaña: «${nombreTab}» (se esperaba «${esperado}»)`);
     if (nombreTab !== esperado) fallos.push(`${marca} @${a.w}: la pestaña dice «${nombreTab}» y no «${esperado}»`);
 
@@ -236,8 +278,10 @@ for (const marca of MARCAS) {
     if (filas === 0) fallos.push(`${marca} @${a.w}: 0 filas — no hay nada que medir`);
     if (cols.some((c) => c !== 6)) fallos.push(`${marca} @${a.w}: alguna tabla tiene ${JSON.stringify(cols)} columnas (tienen que ser 6)`);
 
-    // ── El FILTRO POR TIPO (solo existe en esta rama) ──
-    if (ETAPA === "despues") {
+    // ── EL FILTRO POR TIPO ──
+    // `antes` (origin/main): 4 chips, con «Todos». `despues`: 3, sin él. Se mide
+    // la CAJA en las dos etapas para poder comparar alto y táctiles.
+    if (ETAPA === "antes") {
       const f = await page.evaluate(() => {
         const caja = document.querySelector('[data-medir="filtro-tipo-comprobante"]');
         if (!caja) return null;
@@ -251,19 +295,59 @@ for (const marca of MARCAS) {
       if (!f) {
         fallos.push(`${marca} @${a.w}: NO está el filtro por tipo de comprobante`);
       } else {
-        const nums = f.labels.map((l) => Number((l.match(/(\d+)$/) || [])[1] ?? NaN));
-        console.log(`     filtro tipo: ${f.labels.join(" · ")} (alto ${f.alto}px, táctiles<44: ${f.chicos})`);
-        if (f.labels.length !== 4) fallos.push(`${marca} @${a.w}: el filtro tiene ${f.labels.length} opciones y no 4`);
-        if (f.chicos > 0) fallos.push(`${marca} @${a.w}: ${f.chicos} filtros por debajo de 44px`);
-        // 🔴 Los tres baldes tienen que sumar el total: si no, alguna fila se
-        // cuenta dos veces o se pierde.
-        if (nums.length === 4 && nums.every((n) => Number.isFinite(n)) && nums[1] + nums[2] + nums[3] !== nums[0]) {
-          fallos.push(`${marca} @${a.w}: los conteos no suman (${nums[1]}+${nums[2]}+${nums[3]} ≠ ${nums[0]})`);
-        }
-        if (nums[0] !== filas) fallos.push(`${marca} @${a.w}: «Todos» dice ${nums[0]} y hay ${filas} filas`);
+        console.log(`     chips: ${f.labels.join(" · ")} (alto ${f.alto}px, táctiles<44: ${f.chicos})`);
+        if (f.labels.length !== 4) fallos.push(`${marca} @${a.w}: main tiene ${f.labels.length} chips y tenía 4`);
+        if (f.chicos > 0) fallos.push(`${marca} @${a.w}: ${f.chicos} chips por debajo de 44px`);
+      }
+    }
 
-        // Y FILTRA de verdad: tocar «Cotizaciones» deja exactamente su conteo.
-        for (const [i, etiqueta] of [[1, "Pedidos"], [2, "Cotizaciones"], [3, "Sin mandar"]]) {
+    if (ETAPA === "despues") {
+      const f = await page.evaluate(() => {
+        const caja = document.querySelector('[data-medir="filtro-tipo-comprobante"]');
+        if (!caja) return null;
+        const bs = [...caja.querySelectorAll("button")];
+        return {
+          labels: bs.map((b) => (b.textContent || "").replace(/\s+/g, " ").trim()),
+          activos: bs.filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => (b.textContent || "").trim()),
+          chicos: bs.filter((b) => { const r = b.getBoundingClientRect(); return r.height < 44 || r.width < 44; }).length,
+          alto: Math.round(caja.getBoundingClientRect().height),
+        };
+      });
+      if (!f) {
+        fallos.push(`${marca} @${a.w}: NO está el filtro por tipo de comprobante`);
+      } else {
+        const nums = f.labels.map((l) => Number((l.match(/(\d+)$/) || [])[1] ?? NaN));
+        console.log(`     chips: ${f.labels.join(" · ")} (alto ${f.alto}px, táctiles<44: ${f.chicos})`);
+        if (f.labels.length !== 3) fallos.push(`${marca} @${a.w}: el filtro tiene ${f.labels.length} chips y tienen que ser 3`);
+        if (f.chicos > 0) fallos.push(`${marca} @${a.w}: ${f.chicos} chips por debajo de 44px`);
+
+        // 🔴 «Todos» SE FUE. Daniel: "no quiero opción de todos".
+        const rotulos = f.labels.map((l) => l.replace(/\d+$/, "").trim());
+        if (JSON.stringify(rotulos) !== JSON.stringify(["Pedidos", "Cotizaciones", "Borradores"])) {
+          fallos.push(`${marca} @${a.w}: los chips son ${JSON.stringify(rotulos)} y no [Pedidos, Cotizaciones, Borradores]`);
+        }
+
+        // 🔴 Abre en «Pedidos», sin tocar nada.
+        if (f.activos.length !== 1 || !f.activos[0].startsWith("Pedidos")) {
+          fallos.push(`${marca} @${a.w}: arranca con «${f.activos.join(", ") || "ninguno"}» activo y no con «Pedidos»`);
+        }
+
+        // 🔴 LOS TRES PARTICIONAN, contra el universo VIVO de la API — no contra
+        // lo que se ve al cargar (que ya viene filtrado por «Pedidos»).
+        const suma = nums.reduce((t, n) => t + n, 0);
+        const univ = UNIVERSO[marca];
+        console.log(`     universo vivo (API): ${univ ? univ.total : "?"} filas · borradores ${univ ? univ.borradores : "?"} · suma de chips ${suma}`);
+        if (!univ) {
+          fallos.push(`${marca} @${a.w}: no pude leer el universo vivo de la API`);
+        } else {
+          if (suma !== univ.total) fallos.push(`${marca} @${a.w}: los chips suman ${suma} y el panel tiene ${univ.total} filas vivas (alguna quedaría INVISIBLE)`);
+          // 🩸 El conteo del chip «Borradores» tiene que dar el `status` de la
+          // base. Si diera otra cosa, estaría contando filas borradas.
+          if (nums[2] !== univ.borradores) fallos.push(`${marca} @${a.w}: «Borradores» dice ${nums[2]} y la base tiene ${univ.borradores} (${univ.detalle.join(" · ") || "ninguno"})`);
+        }
+
+        // Y FILTRAN de verdad: cada chip deja EXACTAMENTE su número de filas.
+        for (const [i, etiqueta] of [[0, "Pedidos"], [1, "Cotizaciones"], [2, "Borradores"]]) {
           await page.evaluate((lbl) => {
             const caja = document.querySelector('[data-medir="filtro-tipo-comprobante"]');
             [...caja.querySelectorAll("button")].find((b) => (b.textContent || "").trim().startsWith(lbl))?.click();
@@ -279,11 +363,12 @@ for (const marca of MARCAS) {
           if (visibles !== nums[i]) {
             fallos.push(`${marca} @${a.w}: «${etiqueta}» dice ${nums[i]} y muestra ${visibles} filas`);
           }
-          console.log(`       «${etiqueta}»: ${visibles} filas (el conteo dice ${nums[i]}) ${visibles === nums[i] ? "✅" : "❌"}`);
+          console.log(`       «${etiqueta}»: ${visibles} filas (el chip dice ${nums[i]}) ${visibles === nums[i] ? "✅" : "❌"}`);
         }
+        // Se vuelve al default para medir la caja de la tabla como se ve al llegar.
         await page.evaluate(() => {
           const caja = document.querySelector('[data-medir="filtro-tipo-comprobante"]');
-          [...caja.querySelectorAll("button")].find((b) => (b.textContent || "").trim().startsWith("Todos"))?.click();
+          [...caja.querySelectorAll("button")].find((b) => (b.textContent || "").trim().startsWith("Pedidos"))?.click();
         });
         await page.waitForTimeout(250);
         await page.evaluate((re) => {
@@ -381,31 +466,15 @@ async function contarToques(marca, role) {
     if (!ok) { fallos.push(`toques ${marca}/${role}: el paso «${nombre}» no existe`); throw new Error(nombre); }
     await page.waitForTimeout(900);
   };
-  const clickHref = (frag) => page.evaluate((f) => {
-    const el = [...document.querySelectorAll("a")].find((x) => (x.getAttribute("href") || "").includes(f));
-    if (!el) return false; el.click(); return true;
-  }, frag);
-  const clickTexto = (txt) => page.evaluate((t) => {
-    const el = [...document.querySelectorAll("a,button")].find((x) => (x.textContent || "").trim() === t);
-    if (!el) return false; el.click(); return true;
-  }, txt);
-
   try {
-    if (ETAPA === "despues") {
-      await paso(() => page.evaluate(() => {
-        const el = document.querySelector('a[data-medir="ver-lista"]');
-        if (!el) return false; el.click(); return true;
-      }), "el botón a la lista");
-    } else if (role === "admin") {
-      // El camino viejo, tocando: ← Inicio · Catálogos · Administrar · pestaña.
-      await paso(() => clickHref("/home"), "← Inicio");
-      await paso(() => clickHref("/catalogos/marcas"), "Catálogos");
-      await paso(() => clickHref(`/catalogos/admin/${marca}`), "Administrar");
-      await paso(() => clickTexto("Pedidos"), "la pestaña Pedidos");
-    } else {
-      await paso(() => clickTexto("Volver al catálogo"), "Volver al catálogo");
-      await paso(() => clickTexto("Pedidos"), "el botón Pedidos del catálogo");
-    }
+    // El botón de un toque es del #603, que YA está en `origin/main`: el camino
+    // es el mismo en las dos etapas y por eso los toques tienen que dar 1 en
+    // las dos. El camino viejo de 4 toques (← Inicio · Catálogos · Administrar
+    // · pestaña) quedó documentado en CLAUDE.md y ya no existe para medirlo.
+    await paso(() => page.evaluate(() => {
+      const el = document.querySelector('a[data-medir="ver-lista"]');
+      if (!el) return false; el.click(); return true;
+    }), "el botón a la lista");
   } catch {
     await ctx.close();
     return null;

@@ -9,6 +9,7 @@ import { precioTexto } from "@/lib/catalogo/precio";
 import {
   contarComprobantes,
   estaEnSwitch,
+  FILTRO_COMPROBANTE_DEFAULT,
   FILTROS_COMPROBANTE,
   pasaFiltroComprobante,
   textoBuscablePedido,
@@ -47,6 +48,10 @@ export interface UnifiedPedido {
   // Qué se mandó a Switch: 'pedido' | 'cotizacion'. Null si no salió. Una
   // COTIZACIÓN no aparta mercancía, así que la fila tiene que decir cuál fue.
   switch_documento?: string | null;
+  // `status` de la tabla de orders ('borrador' | 'confirmado'). Null en el
+  // pedido del LINK sin convertir. Es lo que mira el chip «Borradores» — y NO
+  // es lo mismo que "no salió a Switch".
+  status?: string | null;
 }
 
 // Precio de catálogo: sin `.00` y sin redondear (`35`, `12.50`, `4,422`).
@@ -119,6 +124,7 @@ function datosNumeros(pedido: UnifiedPedido, esOrders: boolean): NumerosDePedido
     numeroPedido: pedido.numero_pedido ?? null,
     switchNumero: pedido.switch_numero ?? null,
     switchDocumento: pedido.switch_documento ?? null,
+    status: pedido.status ?? null,
     fuente: esOrders ? "orders" : "publicos",
   };
 }
@@ -196,9 +202,11 @@ export default function PedidosTab({
   const theme = getMarcaTheme(marca)!;
   const router = useRouter();
   const [origenFilter, setOrigenFilter] = useState<OrigenFilter>("todos");
-  // 🔴 Qué se mandó a Switch: pedido, cotización, o todavía nada. Es el filtro
-  // que Daniel pidió para ver de un vistazo qué se COTIZÓ y no se vendió.
-  const [tipoFilter, setTipoFilter] = useState<FiltroComprobante>("todos");
+  // 🔴 Qué es cada fila: Pedidos · Cotizaciones · Borradores. NO hay «Todos»
+  // (Daniel lo pidió fuera), así que el filtro SIEMPRE está puesto y abre en
+  // «Pedidos», que es lo que más se mira. Los tres baldes particionan: ninguna
+  // fila viva se queda sin chip — ver `numeros-pedido.ts`.
+  const [tipoFilter, setTipoFilter] = useState<FiltroComprobante>(FILTRO_COMPROBANTE_DEFAULT);
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<UnifiedPedido | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -453,15 +461,16 @@ export default function PedidosTab({
         })}
       </div>
 
-      {/* 🔴 FILTRO POR TIPO DE COMPROBANTE (25-ago-2026)
-          Adentro del panel hay pedidos y cotizaciones enviadas, y una
-          cotización NO aparta mercancía. Sin este filtro, "qué cotizamos y
-          todavía no se vendió" solo se contestaba leyendo la segunda línea de
-          cada fila, una por una.
-          Los rótulos y los conteos salen de `numeros-pedido.ts`: escribirlos
-          acá sería una segunda definición de qué es una cotización.
-          ⚠️ El que NO salió a Switch tiene su propio balde («Sin mandar») — no
-          se le inventa tipo, que es la misma regla de `textoEnSwitch`. */}
+      {/* 🔴 FILTRO POR TIPO DE COMPROBANTE — TRES CHIPS, SIN «TODOS» (25-ago-2026)
+          Daniel, textual: "haz un tap de borrador, para q esté organizado. No
+          quiero opción de todos". Quedan Pedidos · Cotizaciones · Borradores, y
+          el panel abre en «Pedidos».
+          Los rótulos, el default y los conteos salen de `numeros-pedido.ts`:
+          escribirlos acá sería una segunda definición de qué es cada cosa.
+          🔴 Los tres PARTICIONAN. Sin «Todos», una fila que no cayera en ningún
+          chip sería una fila invisible, así que «Pedidos» es el balde de resto.
+          ⚠️ «Borradores» es `status = 'borrador'`, NO "no salió a Switch": hay
+          pedidos EN Switch cuyo status nunca se cerró. */}
       <div data-medir="filtro-tipo-comprobante" className="flex flex-wrap gap-2 mb-4">
         {FILTROS_COMPROBANTE.map((f) => {
           const active = tipoFilter === f.clave;
@@ -501,9 +510,11 @@ export default function PedidosTab({
       {filtered.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-gray-400 text-sm">
-            {search || origenFilter !== "todos" || tipoFilter !== "todos"
-              ? VACIO_NINGUNO_COINCIDE
-              : VACIO_SIN_COMPROBANTES}
+            {/* 🩸 La vara es si el PANEL está vacío, no si hay un filtro puesto:
+                sin «Todos» el filtro por tipo SIEMPRE está puesto y la condición
+                vieja habría dicho "ningún comprobante coincide" hasta con cero
+                comprobantes en la marca. */}
+            {pedidos.length === 0 ? VACIO_SIN_COMPROBANTES : VACIO_NINGUNO_COINCIDE}
           </p>
         </div>
       ) : (

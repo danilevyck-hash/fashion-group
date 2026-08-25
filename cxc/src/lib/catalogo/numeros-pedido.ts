@@ -45,6 +45,12 @@ export interface NumerosDePedido {
   switchNumero?: string | null;
   /** Qué se mandó. Null/ausente ⇒ se asume PEDIDO, igual que la columna `documento`. */
   switchDocumento?: DocumentoSwitch | string | null;
+  /**
+   * `status` de la tabla de orders: 'borrador' | 'confirmado'. Null/ausente en
+   * el pedido del LINK sin convertir, que todavía no tiene fila en orders.
+   * 🔴 NO es lo mismo que "no salió a Switch" — ver `esBorrador`.
+   */
+  status?: string | null;
   fuente?: FuentePedido;
 }
 
@@ -125,10 +131,49 @@ export function textoBuscablePedido(p: NumerosDePedido & { cliente?: string | nu
 // se cambia el LABEL, nunca la llave. Y los pedidos internos SIGUEN llamándose
 // pedidos cuando son pedidos — lo que cambió de nombre es el contenedor.
 //
-// 🔴 UN PEDIDO QUE NO SALIÓ NO ES NINGUNO DE LOS DOS. No se le inventa tipo:
-// tiene su propio balde («Sin mandar»), que es la misma regla que ya aplica
-// `textoEnSwitch`. Rotularlo «Pedido» porque el default del ERP es pedido sería
-// decir que hay algo en Switch que no está.
+// 🔴 «BORRADORES» NO ES «SIN MANDAR»: SON DOS PREGUNTAS DISTINTAS (25-ago-2026)
+//
+// Daniel, textual: *"entonces haz un tap de borrador, para q esté organizado.
+// No quiero opción de todos."* Quedan TRES chips —Pedidos · Cotizaciones ·
+// Borradores— y el panel abre en **Pedidos**, que es lo que más se mira.
+//
+// El balde viejo («Sin mandar») preguntaba *"¿salió a Switch?"*. El nuevo
+// pregunta *"¿está terminado?"* — `status = 'borrador'`, que es lo que la
+// tabla de orders dice y lo que el checkout cambia a `'confirmado'`. NO son la
+// misma pregunta, y hay al menos un caso REAL de producción donde se separan:
+//
+//   reebok PED-018 · Hafez, S.A. · $2.520 · status='borrador' Y EN SWITCH
+//
+// o sea un pedido que salió al ERP y cuyo `status` nunca se cerró (el update
+// del checkout tiene reintento, ver `api/catalogo/checkout`). Con el criterio
+// viejo caía en «Pedidos»; con el nuevo cae en «Borradores», que es lo que
+// Daniel pidió ver. Medido el 25-ago-2026, los borradores VIVOS son 6:
+// reebok 2 · tommy 3 · joybees 0 · calvin 1.
+//
+// ═══ 🔴 LOS TRES CHIPS PARTICIONAN: NINGUNA FILA VIVA SE QUEDA SIN CHIP ═══
+//
+// Esto NO es un detalle: es lo que permite que «Todos» se vaya. Con cuatro
+// chips, uno de ellos «Todos», una fila que no encajara en ninguno seguía
+// siendo alcanzable. Sin «Todos», una fila sin chip es una fila INVISIBLE —
+// y en producción hay 8 filas vivas que ningún criterio estricto atrapa
+// (los 6 pedidos del LINK sin convertir, más 2 confirmados que nunca salieron
+// a Switch). Por eso **«Pedidos» es el balde de resto**, y por eso el candado
+// exige que la suma de los tres dé SIEMPRE el total.
+//
+// El orden de decisión es borrador → cotización → pedido:
+//   · `borrador`   — `status = 'borrador'`. Gana sobre todo lo demás: no está
+//                    terminado, da igual dónde esté.
+//   · `cotizacion` — terminado y en Switch como COTIZACIÓN (no aparta merca).
+//   · `pedido`     — todo lo demás, incluido el pedido del link sin convertir
+//                    (que en la base se llama, literalmente, `pedidos_publicos`).
+//
+// ⚠️ Y la fila SIGUE diciendo la verdad línea por línea: `textoEnSwitch` no se
+// tocó, así que un pedido del chip «Pedidos» que no salió sigue leyéndose
+// «No se ha mandado a Switch». El chip organiza; la fila informa.
+//
+// ⚠️ LO QUE **NO** CAMBIA: la `key` de la pestaña sigue siendo `pedidos`
+// (`?tab=pedidos`), el filtro por ORIGEN (Todos · Del link · Míos) sigue igual
+// y se CRUZA con éste, y los pedidos internos siguen llamándose pedidos.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** El nombre visible del contenedor. La `key` de la pestaña NO es esto. */
@@ -141,43 +186,65 @@ export const TAB_COMPROBANTES_KEY = "pedidos";
 export const VACIO_SIN_COMPROBANTES = "No hay comprobantes aún";
 export const VACIO_NINGUNO_COINCIDE = "Ningún comprobante coincide";
 
-/** Qué es cada fila. `no-enviado` = todavía no es un comprobante de nada. */
-export type TipoComprobante = "pedido" | "cotizacion" | "no-enviado";
-
-/** El tipo de UNA fila. Sale del envío activo, nunca del `status` del pedido. */
-export function tipoComprobante(p: NumerosDePedido): TipoComprobante {
-  if (!estaEnSwitch(p)) return "no-enviado";
-  return normalizarDocumento(p.switchDocumento);
-}
-
-export type FiltroComprobante = "todos" | TipoComprobante;
+/** El `status` que la tabla de orders le pone a un pedido recién creado. */
+export const STATUS_BORRADOR = "borrador";
 
 /**
- * Los filtros, en el orden en que se leen. «Cotizaciones» es el que Daniel
+ * 🔴 ¿Está sin terminar? Es el `status` de la tabla, NUNCA "no salió a Switch".
+ * Tolerante a espacios y mayúsculas porque el dato viene de una columna de
+ * texto libre; ausente (el pedido del link, que aún no tiene fila en orders)
+ * NO es borrador.
+ */
+export function esBorrador(p: NumerosDePedido): boolean {
+  return String(p.status ?? "").trim().toLowerCase() === STATUS_BORRADOR;
+}
+
+/** Qué es cada fila. Los tres son EXCLUYENTES y cubren todo (ver cabecera). */
+export type TipoComprobante = "pedido" | "cotizacion" | "borrador";
+
+/** El tipo de UNA fila. Orden de decisión: borrador → cotización → pedido. */
+export function tipoComprobante(p: NumerosDePedido): TipoComprobante {
+  if (esBorrador(p)) return "borrador";
+  if (estaEnSwitch(p) && normalizarDocumento(p.switchDocumento) === "cotizacion") return "cotizacion";
+  return "pedido";
+}
+
+/** No hay «todos»: Daniel lo pidió fuera. El filtro SIEMPRE está puesto. */
+export type FiltroComprobante = TipoComprobante;
+
+/** 🔴 El panel abre acá: es lo que más se mira. */
+export const FILTRO_COMPROBANTE_DEFAULT: FiltroComprobante = "pedido";
+
+/**
+ * Los tres filtros, en el orden en que se leen. «Cotizaciones» es el que Daniel
  * pidió poder ver de un vistazo: lo que se cotizó y todavía no se vendió.
+ * «Borradores» es lo que todavía no se terminó de armar.
  */
 export const FILTROS_COMPROBANTE: readonly { clave: FiltroComprobante; label: string }[] = [
-  { clave: "todos", label: "Todos" },
   { clave: "pedido", label: "Pedidos" },
   { clave: "cotizacion", label: "Cotizaciones" },
-  { clave: "no-enviado", label: "Sin mandar" },
+  { clave: "borrador", label: "Borradores" },
 ];
 
 export function pasaFiltroComprobante(p: NumerosDePedido, filtro: FiltroComprobante): boolean {
-  return filtro === "todos" || tipoComprobante(p) === filtro;
+  return tipoComprobante(p) === filtro;
 }
 
 /**
- * Los conteos de los cuatro filtros, en UNA pasada sobre las filas que ya
- * están en memoria. Cero consultas nuevas: `documento` ya viaja en la fila
- * desde el #593 y la base está en compute Micro.
+ * Los conteos de los tres filtros, en UNA pasada sobre las filas que ya están
+ * en memoria. Cero consultas nuevas: `documento` viaja en la fila desde el #593
+ * y `status` desde el #607; la base está en compute Micro.
+ *
+ * 🩸 LAS FILAS QUE ENTRAN ACÁ SON LAS QUE LA PANTALLA YA TIENE, y ésas salen de
+ * la vista unificada, que filtra `deleted = false`. Contar contra la tabla de
+ * orders daría 110 en vez de 43: es el error que ya se cometió una vez con este
+ * mismo dato. El conteo del chip y las filas de la tabla son la MISMA lista.
  */
 export function contarComprobantes(filas: NumerosDePedido[]): Record<FiltroComprobante, number> {
   const out: Record<FiltroComprobante, number> = {
-    todos: filas.length,
     pedido: 0,
     cotizacion: 0,
-    "no-enviado": 0,
+    borrador: 0,
   };
   for (const f of filas) out[tipoComprobante(f)] += 1;
   return out;

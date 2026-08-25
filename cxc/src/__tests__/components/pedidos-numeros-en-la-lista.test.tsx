@@ -86,8 +86,28 @@ function pintar(pedidos: UnifiedPedido[], marca: MarcaUiKey = "reebok") {
   );
 }
 
-const fila = (c: HTMLElement, cliente: string) =>
-  [...c.querySelectorAll("tbody tr")].find((tr) => (tr.textContent || "").includes(cliente)) as HTMLElement;
+/**
+ * La fila de un cliente, esté en el chip que esté.
+ *
+ * 🩸 Desde el 25-ago-2026 el panel abre en «Pedidos» y NO tiene chip «Todos»,
+ * así que una cotización o un borrador no están en el DOM al montar. Este
+ * archivo fija cómo se DIBUJA la fila, no qué chip la contiene (eso lo fija
+ * `comprobantes-panel.test.tsx`), así que se recorre chip por chip hasta dar
+ * con ella. Si no aparece en NINGUNO, es una fila invisible y hay que verlo.
+ */
+function fila(c: HTMLElement, cliente: string): HTMLElement {
+  const buscar = () =>
+    [...c.querySelectorAll("tbody tr")].find((tr) => (tr.textContent || "").includes(cliente)) as HTMLElement | undefined;
+  const hallada = buscar();
+  if (hallada) return hallada;
+  const chips = [...(c.querySelector('[data-medir="filtro-tipo-comprobante"]')?.querySelectorAll("button") || [])];
+  for (const chip of chips) {
+    fireEvent.click(chip);
+    const tr = buscar();
+    if (tr) return tr;
+  }
+  throw new Error(`«${cliente}» no aparece en NINGÚN chip del panel`);
+}
 
 beforeEach(() => {
   ROUTER.push.mockClear();
@@ -181,7 +201,12 @@ describe("5. 🔴 los números NO son columnas nuevas", () => {
 });
 
 describe("6. el buscador encuentra por los dos números", () => {
-  function buscar(container: HTMLElement, q: string) {
+  /** Busca dentro del chip `tipo` — el buscador se CRUZA con el filtro, no lo pisa. */
+  function buscar(container: HTMLElement, q: string, tipo = "Pedidos") {
+    const chip = [...(container.querySelector('[data-medir="filtro-tipo-comprobante"]')?.querySelectorAll("button") || [])]
+      .find((b) => (b.textContent || "").startsWith(tipo));
+    expect(chip, `no hay chip «${tipo}»`).toBeTruthy();
+    fireEvent.click(chip!);
     fireEvent.change(screen.getByPlaceholderText(/buscar por cliente o número/i), { target: { value: q } });
     return [...container.querySelectorAll("tbody tr")].map((tr) => tr.textContent || "");
   }
@@ -195,7 +220,8 @@ describe("6. el buscador encuentra por los dos números", () => {
 
   it("por el número de Switch", () => {
     const { container } = pintar([EN_SWITCH, SIN_ENVIAR, COTIZADO]);
-    const filas = buscar(container, "16-000000511");
+    // La cotización vive en el chip «Cotizaciones»: el buscador NO lo pisa.
+    const filas = buscar(container, "16-000000511", "Cotizaciones");
     expect(filas).toHaveLength(1);
     expect(filas[0]).toContain("A-Amani");
   });
