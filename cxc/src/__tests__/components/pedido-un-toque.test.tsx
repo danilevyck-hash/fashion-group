@@ -9,6 +9,8 @@
 // reales (body `{}`) contra los dry-run (body `{"dry":true}`).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import PedidoDetalleClient from "@/components/catalogo/PedidoDetalleClient";
@@ -160,14 +162,25 @@ describe("un solo toque", () => {
     await screen.findByText(/pedido creado en Switch: 16-000000999/i);
   });
 
-  it("el aviso de que crea un pedido REAL va ANTES del toque, no en un modal después", async () => {
-    stubApi();
-    await montar();
-    // 25-ago-2026: el aviso ya no narra la elección (las dos salidas están a la
-    // vista, con sus nombres). Queda lo que NO se ve: que es de verdad.
-    const aviso = screen.getByText(/Se crea de verdad en Switch/);
-    expect(aviso.textContent).toContain("active_shoes");
-    expect(aviso.textContent).toMatch(/borrarlo a mano en el panel de Switch/);
+  // ⛔ SE RETIRÓ "el aviso de que crea un pedido REAL va ANTES del toque"
+  // (25-ago-2026). El texto que miraba —"Se crea de verdad en Switch (empresa).
+  // Si sale mal, hay que borrarlo a mano en el panel de Switch."— lo podó
+  // Daniel: las dos salidas están a la vista con sus nombres y el banner del
+  // candado post-envío dice que está en Switch y con qué número. Que no vuelva
+  // lo fija `poda-textos-cxc-multifashion.test.ts`.
+  //
+  // 🔴 Lo que ese test protegía de verdad —que NO haya una pantalla intermedia
+  // y que un toque baste— NO se aflojó: lo prueba el caso de arriba, que cuenta
+  // los POST y exige `queryByRole("button", { name: "Crear pedido en Switch" })`
+  // en null. Y el aviso rojo del anti-duplicado, que sí frena una acción, sigue
+  // en pantalla con su propio candado.
+  it("el aviso ANTI-DUPLICADO sigue en pantalla (ese NO se podó)", async () => {
+    const src = readFileSync(
+      join(process.cwd(), "src/components/catalogo/PedidoDetalleClient.tsx"),
+      "utf8",
+    );
+    expect(src).toContain("Borra el pedido #");
+    expect(src).toContain("en el panel de Switch para no duplicar");
   });
 
   it("mientras corre dice qué está pasando (la pre-validación tarda)", async () => {

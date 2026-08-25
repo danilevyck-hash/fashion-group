@@ -171,6 +171,28 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "components/catalogo/CheckoutClient.tsx", que: "Catálogos · el subtítulo narraba los tres bloques de la pantalla", texto: "revisa, elige cliente y envía a Switch" },
   { archivo: "components/catalogo/ConfirmacionClient.tsx", que: "Catálogos · señalaba el único botón primario, a 20 px", texto: "Puedes enviarlo con el botón de abajo" },
   { archivo: "components/catalogo/PedidoPublicoClient.tsx", que: "Catálogos · '(opcional)' en la misma frase que ya dice 'Si quieres'", texto: "por WhatsApp (opcional)" },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Cuarta vuelta — Catálogos y Pedidos (25-ago-2026, los cuatro aprobados por
+  // Daniel uno por uno). Misma vara de siempre: se va lo que DESCRIBE, se queda
+  // lo que FRENA o lo que es DATO.
+  //
+  // 🔴 LO QUE **NO** ENTRÓ, y que nadie lo "termine" después:
+  //   · La etiqueta corta `no aparta mercancía` pegada al botón de Cotización
+  //     SE QUEDA: no es explicación, es el dato que decide cuál se toca. Tiene
+  //     candado propio de LARGO en `lib/documento-switch.test.ts`.
+  //   · "Este pedido reemplaza al PED-XXX. Borra el pedido #… para no
+  //     duplicar" SE QUEDA: frena una acción.
+  //   · El número de Switch del modal de ocultar SE QUEDA: se fue el párrafo
+  //     que lo envolvía, no el número.
+  //   · El aviso de "sin vendedor de Switch asignado" SE QUEDA: frena.
+  { archivo: "components/catalogo/CheckoutClient.tsx", que: "Pedidos · la bajada definía la palabra 'Vendedor', que es el rótulo de arriba", texto: "La venta se le acredita a esta persona" },
+  { archivo: "components/catalogo/PedidoDetalleClient.tsx", que: "Pedidos · la misma bajada del vendedor, en el detalle", texto: "La venta se le acredita a esta persona" },
+  { archivo: "components/catalogo/PedidoDetalleClient.tsx", que: "Pedidos · el pie narraba lo que las dos salidas ya dicen con sus nombres", texto: "Se crea de verdad en Switch" },
+  { archivo: "components/catalogo/PedidoDetalleClient.tsx", que: "Pedidos · el párrafo del modal de ocultar (el título y el botón ya lo dicen)", texto: "aquí solo se oculta de la lista" },
+  { archivo: "components/catalogo/PedidoDetalleClient.tsx", que: "Pedidos · …y su segunda mitad", texto: "Para anularlo de verdad, hazlo en el panel de Switch" },
+  { archivo: "components/catalogo/CatalogoFilters.tsx", que: "Catálogos · el instructivo del filtro de precio (los campos ya dicen desde/hasta)", texto: "Escribe un precio y ves solo ese" },
+  { archivo: "components/catalogo/CatalogoFilters.tsx", que: "Catálogos · …y el 'se llena solo', que se ve al escribir", texto: "El «hasta» se llena solo" },
   { archivo: "components/catalogo/CatalogoVendedorPage.tsx", que: "Catálogos · subtítulo 'Todos los productos' del PDF sin filtros", texto: "Todos los productos" },
   { archivo: "lib/catalogo/order-pdf-core.ts", que: "Pedidos · rótulo 'Detalle' sobre la única tabla del PDF", texto: '"Detalle"' },
   { archivo: "lib/catalogo/order-email.ts", que: "Pedidos · rótulo 'Detalle' sobre la única tabla del correo", texto: '"Detalle"' },
@@ -463,6 +485,23 @@ describe("lo que se fue no volvió por la ventana", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const EN_PANTALLA: { archivo: string; por_que: string; texto: string }[] = [
+  // Los tres que la poda del 25-ago-2026 tuvo más cerca de tragarse. Están
+  // pegados a un botón que manda plata al ERP.
+  {
+    archivo: "components/catalogo/PedidoDetalleClient.tsx",
+    por_que: "🩸 este pedido reemplaza a uno que YA está en Switch: sin la línea, se duplica",
+    texto: "en el panel de Switch para no duplicar",
+  },
+  {
+    archivo: "components/catalogo/CheckoutClient.tsx",
+    por_que: "sin vendedor de Switch el checkout respondía 422 y no había salida; el aviso es la salida",
+    texto: "No tienes vendedor de Switch asignado",
+  },
+  {
+    archivo: "lib/catalogo/documento-switch.ts",
+    por_que: "🔴 una COTIZACIÓN no aparta mercancía: es el dato que decide cuál de las dos se toca, no una explicación",
+    texto: "no aparta mercancía",
+  },
   {
     archivo: "components/multifashion/ProductosSubtab.tsx",
     por_que: "🩸 sin esta línea, cuadrar el período contra Switch da EXACTAMENTE el doble de las devoluciones",

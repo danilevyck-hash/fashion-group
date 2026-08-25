@@ -144,6 +144,10 @@ export interface MarcaTheme {
   /** Grid canónica del catálogo con sesión (raíz de /catalogo/<marca>). */
   catalogoHref: string;
   pedidosHref: string;
+  /** «Administrar catálogo» — solo CATALOGO_ADMIN_ROLES (admin + secretaria).
+   *  Vive acá para que el destino de «Ver comprobantes» y el botón del hub
+   *  salgan del MISMO lugar. */
+  adminHref: string;
   checkoutHref: string;
   confirmacionBase: string;
   /** Link público compartible (copiar link del vendedor). */
@@ -522,6 +526,7 @@ const REEBOK: MarcaTheme = {
   api: "/api/catalogo/reebok",
   catalogoHref: "/catalogo/reebok",
   pedidosHref: "/catalogo/reebok/pedidos",
+  adminHref: "/catalogos/admin/reebok",
   checkoutHref: "/catalogo/reebok/checkout",
   confirmacionBase: "/catalogo/reebok/confirmacion",
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/reebok",
@@ -854,6 +859,7 @@ const JOYBEES: MarcaTheme = {
   api: "/api/catalogo/joybees",
   catalogoHref: "/catalogo/joybees",
   pedidosHref: "/catalogo/joybees/pedidos",
+  adminHref: "/catalogos/admin/joybees",
   checkoutHref: "/catalogo/joybees/checkout",
   confirmacionBase: "/catalogo/joybees/confirmacion",
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/joybees",
@@ -1174,6 +1180,7 @@ const TOMMY: MarcaTheme = {
   api: "/api/catalogo/tommy",
   catalogoHref: "/catalogo/tommy",
   pedidosHref: "/catalogo/tommy/pedidos",
+  adminHref: "/catalogos/admin/tommy",
   checkoutHref: "/catalogo/tommy/checkout",
   confirmacionBase: "/catalogo/tommy/confirmacion",
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/tommy",
@@ -1521,6 +1528,7 @@ const CALVIN: MarcaTheme = {
   api: "/api/catalogo/calvin",
   catalogoHref: "/catalogo/calvin",
   pedidosHref: "/catalogo/calvin/pedidos",
+  adminHref: "/catalogos/admin/calvin",
   checkoutHref: "/catalogo/calvin/checkout",
   confirmacionBase: "/catalogo/calvin/confirmacion",
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/calvin",

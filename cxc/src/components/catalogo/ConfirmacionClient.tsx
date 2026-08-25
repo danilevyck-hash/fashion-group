@@ -1,9 +1,16 @@
 "use client";
 
-// Pantalla de CONFIRMACIÓN post-checkout (Reebok y Joybees): estado real del
-// pedido y su envío a Switch leído del server. MÁXIMO 3 acciones (decisión de
-// Daniel 5-jul): Enviar/Reintentar solo si aplica, Ver PDF directo en pestaña
-// nueva (el share nativo del visor cubre WhatsApp/mail), y Volver al catálogo.
+// Pantalla de CONFIRMACIÓN post-checkout (las 4 marcas): estado real del
+// pedido y su envío a Switch leído del server. Acciones: Enviar/Reintentar
+// solo si aplica, la LISTA (el botón que Daniel pidió el 25-ago-2026 — ver
+// `destino-comprobantes.ts`), Ver PDF directo en pestaña nueva (el share
+// nativo del visor cubre WhatsApp/mail), y Volver al catálogo.
+//
+// El techo de 3 acciones (decisión de Daniel del 5-jul) sigue valiendo en el
+// camino NORMAL, que es el que se ve casi siempre: con el pedido ya en Switch
+// no hay «Enviar», así que quedan exactamente tres. Las cuatro solo aparecen
+// cuando el envío falló o todavía no salió — y ahí «Enviar» es lo que la
+// persona vino a hacer.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -16,6 +23,7 @@ import {
   palabraDelPapel,
   tituloEnviadoASwitch,
 } from "@/lib/catalogo/documento-switch";
+import { destinoLista } from "@/lib/catalogo/destino-comprobantes";
 
 interface Envio {
   estado: string;
@@ -35,6 +43,13 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   const [envio, setEnvio] = useState<Envio | null | undefined>(undefined);
   const [retrying, setRetrying] = useState(false);
   const [retryMsg, setRetryMsg] = useState<string | null>(null);
+  // 🔴 EL ROL DECIDE A DÓNDE LLEVA EL BOTÓN DE LA LISTA. Esta pantalla la ven
+  // los tres roles que arman pedidos (admin, secretaria y vendedor) y el panel
+  // de Comprobantes es de admin+secretaria: al vendedor lo lleva a SU lista.
+  // Mismo `sessionStorage.cxc_role` que ya lee el detalle del pedido.
+  const [role, setRole] = useState<string | null>(null);
+  useEffect(() => { setRole(sessionStorage.getItem("cxc_role") || ""); }, []);
+  const destino = destinoLista(theme, role);
 
   const load = useCallback(async () => {
     const [oRes, eRes] = await Promise.all([
@@ -149,6 +164,19 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
                 />
               </div>
             )}
+            {/* 🔴 UN TOQUE HASTA LA LISTA (25-ago-2026). Antes había que volver
+                al catálogo, salir a Catálogos, elegir la marca, tocar
+                «Administrar» y recién ahí la pestaña. El destino y el rótulo
+                salen del MISMO lugar (`destino-comprobantes.ts`) — un botón
+                que dice una cosa y lleva a otra es el modo de fallo que eso
+                impide. */}
+            <Link
+              href={destino.href}
+              data-medir="ver-lista"
+              className="rounded-md border border-gray-300 px-4 min-h-[48px] text-sm font-medium text-gray-800 hover:border-gray-400 transition flex items-center justify-center"
+            >
+              {destino.label}
+            </Link>
             <a
               href={`${cfg.api}/orders/${orderId}/pdf`}
               target="_blank"

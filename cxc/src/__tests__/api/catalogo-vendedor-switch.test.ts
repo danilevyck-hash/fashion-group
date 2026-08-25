@@ -412,7 +412,12 @@ describe("🔴 candados que no se pueden aflojar", () => {
     expect(detalle).toContain("nombreDeVendedor(vendedorSwitch)");
     const checkout = leer("src/components/catalogo/CheckoutClient.tsx");
     expect(checkout).toContain("nombreDeVendedor(vendedor)");
-    expect(checkout).toContain("La venta se le acredita a esta persona.");
+    // La bajada "La venta se le acredita a esta persona." se podó el
+    // 25-ago-2026 (aprobada por Daniel). Lo que este candado protege —que el
+    // vendedor se VEA siempre, no solo con el selector abierto— no se aflojó:
+    // lo prueban el rótulo y el nombre de arriba. Que el texto no vuelva lo
+    // fija `poda-textos-cxc-multifashion.test.ts`.
+    expect(checkout).toContain('text-gray-400">Vendedor<');
   });
 
   it("el checkout manda el vendedor elegido en el body", () => {

@@ -19,6 +19,7 @@ import { FaltanFotoTarjetasTab, CatalogoCompletoTab } from "./ProductosTarjetas"
 import { FaltanFotoBatchTab, ProductosBatchListTab, ImportarTab } from "./ProductosBatch";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { catalogoAdminRoles } from "@/lib/catalogo/roles";
+import { PANEL_COMPROBANTES, TAB_COMPROBANTES_KEY } from "@/lib/catalogo/numeros-pedido";
 import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
 import { normalizarSkuStorage } from "@/lib/catalogos/fotos-b2b";
 import { contarAlternativas, type StorageMarcaKey } from "@/lib/catalogos/variantes-paths";
@@ -156,7 +157,14 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
       ? { key: "faltan-foto", label: "Faltan foto", badge: sinFotoCount }
       : { key: "faltan-foto", label: sinFotoCount > 0 ? `Faltan foto (${sinFotoCount})` : "Faltan foto" },
     { key: "completo", label: "Catálogo completo" },
-    { key: "pedidos", label: "Pedidos" },
+    // 🔴 EL LABEL DICE «Comprobantes», LA KEY SIGUE SIENDO `pedidos`
+    // (25-ago-2026). Adentro conviven los pedidos y las cotizaciones enviadas
+    // a Switch desde el #579, así que el rótulo viejo nombraba una sola de las
+    // dos. La llave NO se toca: `?tab=pedidos` está en marcadores guardados y
+    // renombrarla los rompe sin comprar nada — misma decisión que
+    // Cheques→«Recordatorios» y Asistencia→«Asistencia y Planilla». El nombre
+    // sale de `numeros-pedido.ts`, no escrito a mano acá.
+    { key: TAB_COMPROBANTES_KEY, label: PANEL_COMPROBANTES },
   ];
 
   return (
