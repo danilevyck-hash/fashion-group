@@ -15,7 +15,6 @@ import {
   totalDeClientes,
   type ClienteDeProducto,
 } from "@/lib/ventas/productos-clientes";
-import type { AvisoClasificacion } from "@/lib/ventas/productos-clasificacion";
 import {
   claveCliente,
   clientesDelPeriodo,
@@ -837,11 +836,12 @@ function ProductoRow({
           <div className="flex items-start gap-1.5">
             <ChevronRight className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
             <div className="min-w-0">
+              {/* ⛔ DEBAJO DEL NOMBRE IBA EL AVISO ÁMBAR de «código mal
+                  clasificado» (#597). Se retiró el 25-ago-2026: Daniel ya
+                  revisó los 5 códigos y la clasificación de Switch resultó ser
+                  la buena. Ver `AvisoClasificacionLinea`, que ya no existe.
+                  La celda vuelve a ser el nombre y nada más. */}
               <span className="text-gray-800">{p.descripcion}</span>
-              {/* El aviso va DEBAJO del nombre y no al lado: a 390 px, un chip a
-                  la derecha empuja la columna de Venta fuera de la pantalla.
-                  Debajo ocupa el ancho que ya tenía la celda. */}
-              <AvisoClasificacionLinea aviso={p.aviso} />
             </div>
           </div>
         </td>
@@ -1006,50 +1006,26 @@ function BloqueCodigos({ codigos }: { codigos: ProductoCodigo[] | undefined }) {
   );
 }
 
-/**
- * 🟡 EL AVISO QUE REEMPLAZA AL QUE SE PIERDE.
- *
- * ── QUÉ SE PERDIÓ ───────────────────────────────────────────────────────────
- * Hasta hoy este cartel decía *"la lista de abajo suma más que la venta de la
- * fila, porque en Switch este producto está escrito de dos formas"*. Desde que
- * la pantalla agrupa por el nombre MÁS RECIENTE del código, la fila ya suma las
- * dos grafías: ese aviso pasó a ser FALSO y se fue. Lo que se fue con él es la
- * señal de que un código estaba mal: antes se delataba solo, saliendo partido
- * en dos renglones; ahora sale en uno y no se nota.
- *
- * ── QUÉ AVISA ESTE, Y SÓLO ESTE ─────────────────────────────────────────────
- * Un código que vive bajo DOS CATEGORÍAS QUE LAS DOS EXISTEN DE VERDAD en
- * `depurador_descripciones` (el catálogo aprobado, el mismo árbitro del
- * diagnóstico). Un tipeo —`Agua Dana 600 ml 20 Und ` vs `Agua Dana 600 Ml 20
- * Und`— NO avisa nada: ahí no hay nada que arreglar en Switch.
- *
- * Medido contra producción, 6 empresas x 4 períodos: 18 renglones de 2.074.
- * Un cartel que sale en todos lados es el que se deja de leer a la semana.
- *
- * 🔴 NO FRENA NADA Y NO CORRIGE NADA. Dice el código y la otra categoría, que
- * es lo único accionable: ir a mirarlo en Switch. Cuando allá se reclasifique,
- * el aviso desaparece solo.
- *
- * Ámbar y no rojo: no se rompió nada.
- */
-function AvisoClasificacionLinea({ aviso }: { aviso: AvisoClasificacion[] | undefined }) {
-  if (!aviso || aviso.length === 0) return null;
-  const [primero] = aviso;
-  return (
-    <p
-      data-aviso-clasificacion={primero.codigo}
-      // 🩸 `overflow-wrap:anywhere` Y NO `break-words`. El código es un token
-      // largo sin espacios (`FW0FW05034-DW5`) y en una tabla el ancho mínimo de
-      // la columna lo fija la palabra más larga: medido en el navegador, sin
-      // esto el iPad PARADO (834 px) pasaba de 0 a 10 px de arrastre — el aviso
-      // empujaba la tabla. `break-words` no alcanza: no cambia el min-content.
-      className="mt-0.5 text-xs text-amber-700 [overflow-wrap:anywhere]"
-    >
-      Revisar: {primero.codigo} también está en &laquo;{primero.otra}&raquo;
-      {aviso.length > 1 ? ` (+${aviso.length - 1})` : ""}
-    </p>
-  );
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// ⛔ ACÁ VIVÍA `AvisoClasificacionLinea` — LA LÍNEA ÁMBAR DE LA FILA:
+//    «Revisar: FW0FW05034-DW5 también está en «Women-Sandals»».
+//
+// QUÉ AVISABA: un código que vivía bajo DOS categorías que las dos existían de
+// verdad en `depurador_descripciones`. 18 renglones de 2.074.
+//
+// 🔴 POR QUÉ SE FUE (25-ago-2026, orden de Daniel). El aviso nació para que él
+// revisara esos códigos en Switch. YA LOS REVISÓ y decidió, textual: *"si lo
+// más reciente es 17-ago alguien lo pasó a Flip Flop, entonces es Flip Flop"*.
+// La clasificación que Switch tiene HOY es la correcta: no hay nada que
+// corregir allá, y el aviso quedó pidiendo una acción ya tomada. Un cartel que
+// pide algo que ya se hizo es peor que ninguno — enseña a no leer los avisos.
+//
+// ⚠️ NO SE DESHIZO LA AGRUPACIÓN. El producto sigue saliendo en UN solo
+// renglón por el nombre MÁS RECIENTE de su código (Agua Dana: $35.305,20 en
+// una fila y no en dos). El aviso era una cosa aparte, y sólo se fue el aviso.
+// Los candados que antes exigían que el aviso SALIERA hoy exigen lo contrario,
+// y lo dicen con este mismo motivo escrito al lado.
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * QUÉ DEJÓ DE COMPRAR — lo que compraba en el período anterior y ahora no.

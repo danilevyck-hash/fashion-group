@@ -180,3 +180,98 @@ describe("las fechas se filtran sargables (nunca EXTRACT)", () => {
     expect(SQL).not.toMatch(/EXTRACT\s*\(/i);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LA MIGRACIÓN 20260827120000 — la que PODA `grafias`.
+//
+// Es la que define la versión VIVA de `switch_top_descripciones_reciente`: un
+// `CREATE OR REPLACE` que le saca los CTE `grafias`/`grafias_json`, porque el
+// único consumidor de ese dato —el aviso ámbar de la fila— se retiró por orden
+// de Daniel (ya revisó los códigos: la clasificación de Switch es la correcta).
+//
+// ⚠️ POR ESO LOS MISMOS CANDADOS DE ARRIBA SE VUELVEN A CORRER ACÁ. Podar una
+// columna JSON de la salida no puede llevarse la AGRUPACIÓN por el nombre más
+// reciente ni mover un signo: si esta versión perdiera cualquiera de las dos
+// cosas, la de arriba seguiría verde y nadie se enteraría, porque la que la
+// base termina ejecutando es ÉSTA.
+//
+// El barrido borra los comentarios primero — el encabezado de este archivo
+// nombra `grafias` unas cuantas veces en prosa.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 la poda de `grafias` no se lleva nada más", () => {
+  const RUTA_PODA = path.join(RAIZ, "supabase/migrations/20260827120000_productos_reciente_sin_grafias.sql");
+  const CRUDO_PODA = readFileSync(RUTA_PODA, "utf8");
+  const PODA = CRUDO_PODA.replace(/--[^\n]*/g, "");
+  const c = PODA.slice(
+    PODA.indexOf("CREATE OR REPLACE FUNCTION switch_top_descripciones_reciente("),
+    PODA.indexOf("$fn$;"),
+  );
+
+  it("el barrido mira SQL y no prosa", () => {
+    expect(CRUDO_PODA).toContain("grafias");
+    expect(PODA).not.toContain("grafias");
+  });
+
+  it("🔴 `grafias` desapareció del SQL: no queda CTE, ni JOIN, ni columna", () => {
+    expect(PODA).not.toMatch(/\bgrafias\b/);
+    expect(PODA).not.toMatch(/\bgrafias_json\b/);
+    expect(PODA).not.toMatch(/jsonb_build_object\s*\(\s*'otra'/);
+  });
+
+  it("sigue siendo ADITIVA: no redefine la función viva ni borra nada", () => {
+    expect(PODA).not.toContain("CREATE OR REPLACE FUNCTION switch_top_descripciones(");
+    expect(PODA).not.toMatch(/\bDROP\b/i);
+    expect(PODA).not.toMatch(/\bALTER TABLE\b/i);
+    expect(PODA).not.toMatch(/\bDELETE\b|\bUPDATE\b|\bINSERT\b/i);
+    expect(PODA).toContain("GRANT EXECUTE ON FUNCTION switch_top_descripciones_reciente");
+    expect(PODA).toMatch(/LANGUAGE sql STABLE/);
+  });
+
+  it("⚠️ LA AGRUPACIÓN POR EL NOMBRE RECIENTE SIGUE EN PIE", () => {
+    expect(c).toMatch(
+      /COALESCE\(\s*CASE WHEN d\.codigo IS NOT NULL THEN r\.descripcion END,\s*d\.descripcion,\s*'\(sin descripcion\)',?\s*\)\s*AS descripcion/,
+    );
+    expect(c).toMatch(/FROM base\s*\n\s*GROUP BY descripcion/);
+    expect(c).toContain("ON r.codigo = d.codigo");
+  });
+
+  it("⚠️ el desempate sigue siendo determinista, y por id::text", () => {
+    expect(c).toMatch(/ORDER BY[^;]*fecha DESC, id::text ASC/);
+    expect(c).not.toMatch(/fecha DESC, id ASC/);
+  });
+
+  it("⚠️ «más reciente» sigue siendo GLOBAL, no del período", () => {
+    const desdeElCuerpo = c.slice(c.indexOf("AS $fn$"));
+    const eleccion = desdeElCuerpo.slice(0, desdeElCuerpo.search(/ORDER BY[^;]*fecha DESC/));
+    expect(eleccion).not.toContain("p_desde");
+    expect(eleccion).not.toContain("p_hasta");
+  });
+
+  it("🔴 los signos, el filtro y el margen son los mismos", () => {
+    for (const col of ["cantidad_total", "venta_total", "costo_total"]) {
+      expect(c).toMatch(new RegExp(`CASE WHEN tipo = 'NC' THEN -${col}\\s+ELSE\\s+${col}\\s+END`));
+    }
+    expect(c.match(/THEN -/g) ?? []).toHaveLength(3);
+    expect(c).toContain("WHERE a.venta <> 0");
+    expect(c).toMatch(/CASE WHEN a\.venta > 0 THEN \(a\.venta - a\.costo\) \/ a\.venta ELSE NULL END/);
+  });
+
+  it("🔴 y las columnas de salida son EXACTAMENTE las de antes menos `grafias`", () => {
+    const salida = c.slice(c.lastIndexOf("SELECT COALESCE(jsonb_agg"));
+    for (const col of ["a.descripcion", "a.num_codigos", "a.cantidad", "a.venta", "a.costo"]) {
+      expect(salida).toContain(col);
+    }
+    expect(salida).not.toContain("LEFT JOIN grafias_json");
+  });
+
+  it("la identidad sigue siendo el CÓDIGO, nunca el texto normalizado", () => {
+    expect(c).not.toMatch(/\blower\s*\(/i);
+    expect(c).not.toMatch(/\bunaccent\s*\(/i);
+    expect(c).not.toMatch(/\bregexp_replace\s*\(/i);
+  });
+
+  it("las fechas se filtran sargables", () => {
+    expect(PODA).toMatch(/d\.fecha BETWEEN p_desde AND p_hasta/);
+    expect(PODA).not.toMatch(/EXTRACT\s*\(/i);
+  });
+});

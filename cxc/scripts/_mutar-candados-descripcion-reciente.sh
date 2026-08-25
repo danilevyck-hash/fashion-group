@@ -15,18 +15,15 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-CLAS="src/lib/ventas/productos-clasificacion.ts"
 RUTA="src/app/api/ventas/productos/route.ts"
 COD="src/app/api/ventas/productos/codigos/route.ts"
-VISTA="src/components/ventas/ProductosView.tsx"
 SQL="supabase/migrations/20260825160000_productos_descripcion_reciente.sql"
 VER="src/lib/ventas/rpc-version.ts"
 SQLCLI="supabase/migrations/20260826120000_switch_productos_por_cliente.sql"
 SRVCLI="src/lib/ventas/productos-por-cliente-server.ts"
-ARCHIVOS=("$CLAS" "$RUTA" "$COD" "$VISTA" "$SQL" "$VER" "$SQLCLI" "$SRVCLI")
+ARCHIVOS=("$RUTA" "$COD" "$SQL" "$VER" "$SQLCLI" "$SRVCLI")
 TESTS=(
   "src/__tests__/components/ventas-productos-filtro-cliente.test.tsx"
-  "src/__tests__/lib/ventas-productos-clasificacion.test.ts"
   "src/__tests__/lib/ventas-productos-sql-reciente.test.ts"
   "src/__tests__/api/ventas-productos-descripcion-reciente.test.ts"
   "src/__tests__/api/ventas-productos-periodo-route.test.ts"
@@ -144,76 +141,30 @@ probar "la migración pisa la función viva (deja de ser aditiva)" "$SQL"
 perl -0pi -e 's/  if \(isTransientDbError\(res\.error\)\) return res;/  \/\/ mutado: un timeout ya no frena el segundo viaje/' "$VER"
 probar "un timeout dispara la consulta de respaldo" "$VER"
 
-# ── 4. QUE EL AVISO NO SALGA ────────────────────────────────────────────────
+# ⛔ ACÁ IBAN LAS SECCIONES 4 y 5 — «QUE EL AVISO NO SALGA» y «QUE EL AVISO
+# SALGA SIEMPRE», 11 mutaciones sobre `productos-clasificacion.ts` y sobre
+# `AvisoClasificacionLinea`. Los dos archivos ya no existen: el aviso de «código
+# mal clasificado» se retiró el 25-ago-2026 (Daniel ya revisó los 5 códigos y la
+# clasificación de Switch resultó ser la correcta).
+#
+# 🩸 SE BORRAN Y NO SE COMENTAN A MEDIAS: un `perl` que no encaja con nada se
+# reporta como PATRÓN MUERTO y ensucia el conteo con fallos que no son fallos.
+# Lo que las reemplaza es `scripts/_mutar-candados-sin-aviso-grafias.sh`, que
+# muta en la dirección de HOY: que el aviso VUELVA.
 
-# 12 · el aviso no se dibuja nunca (el código mal clasificado queda invisible)
-perl -0pi -e 's/  if \(!aviso \|\| aviso\.length === 0\) return null;/  return null;/' "$VISTA"
-probar "el aviso no se dibuja nunca" "$VISTA"
+# ── 4. QUE EL FILTRO POR CLIENTE NOMBRE AL PRODUCTO DE OTRA MANERA ─────────
 
-# 13 · la ruta deja de calcular el aviso
-perl -0pi -e 's/      \? avisosDeClasificacion\(p\.descripcion, p\.grafias \?\? \[\], aprobadas\)/      ? []/' "$RUTA"
-probar "la ruta deja de calcular el aviso" "$RUTA"
-
-# 14 · el aviso deja de nombrar el CÓDIGO (no sirve para ir a Switch)
-perl -0pi -e 's/Revisar: \{primero\.codigo\} también está en/Revisar: este producto también está en/' "$VISTA"
-probar "el aviso no nombra el código" "$VISTA"
-
-# 15 · el aviso deja de nombrar la OTRA categoría
-perl -0pi -e 's/&laquo;\{primero\.otra\}&raquo;/&laquo;otra categoría&raquo;/' "$VISTA"
-probar "el aviso no nombra la otra categoría" "$VISTA"
-
-# ── 5. QUE EL AVISO SALGA SIEMPRE ───────────────────────────────────────────
-
-# 16 · el aviso es PERMANENTE (la alerta que se deja de leer a la semana)
-perl -0pi -e 's/  if \(!aviso \|\| aviso\.length === 0\) return null;/  aviso = aviso \&\& aviso.length ? aviso : [{ otra: "?", codigo: "?" }];/' "$VISTA"
-probar "el aviso sale siempre, haya o no algo que revisar" "$VISTA"
-
-# 17 · un TIPEO avisa (25 de los 33 pares saldrían marcados)
-#      Se muta la comparación por PUNTUACIÓN y no la de espacios: la de espacios
-#      es un caso particular de ésta (normalizar y después sacar lo que no es
-#      alfanumérico), así que quitarla sola no cambia una sola respuesta — sería
-#      una mutación que no muta nada aunque el archivo quede distinto.
-perl -0pi -e 's/  if \(soloAlfanumerico\(a\) === soloAlfanumerico\(b\)\) return "tipeo";/  \/\/ mutado/' "$CLAS"
-probar "un tipeo de puntuación se marca como mal clasificado" "$CLAS"
-
-# 18 · 🩸 EL ORDEN DE LAS PREGUNTAS SE INVIERTE: el catálogo se consulta primero
-perl -0pi -e 's/  if \(soloAlfanumerico\(a\) === soloAlfanumerico\(b\)\) return "tipeo";\n  const okA/  const okA/' "$CLAS"
-perl -0pi -e 's/  if \(normalizarDescripcion\(a\) === normalizarDescripcion\(b\)\) return "tipeo";\n//' "$CLAS"
-probar "se pregunta por el catálogo ANTES que por la forma del texto" "$CLAS"
-
-# 19 · lo que no está en el catálogo se afirma igual
-perl -0pi -e 's/  return "a_revisar";/  return "mal_clasificado";/' "$CLAS"
-probar "una grafía que no está en el catálogo se marca igual" "$CLAS"
-
-# 20 · una descripción DESACTIVADA vuelve a contar como categoría real
-perl -0pi -e 's/filas\.filter\(d => d\.activa !== false\)/filas/' "$CLAS"
-probar "una descripción desactivada cuenta como categoría real" "$CLAS"
-
-# 21 · el aviso se pone ROJO (dice que se rompió algo, y no se rompió nada)
-perl -0pi -e 's/text-xs text-amber-700 \[overflow-wrap:anywhere\]/text-xs text-red-600 [overflow-wrap:anywhere]/' "$VISTA"
-probar "el aviso se pone rojo" "$VISTA"
-
-# 22 · el aviso vuelca la lista entera en vez de contarla
-perl -0pi -e 's/\{aviso\.length > 1 \? ` \(\+\$\{aviso\.length - 1\}\)` : ""\}/{aviso.map(a => ` ${a.codigo}`).join("")}/' "$VISTA"
-probar "el aviso vuelca todos los códigos en vez de contarlos" "$VISTA"
-
-# ── 6. QUE EL FILTRO POR CLIENTE NOMBRE AL PRODUCTO DE OTRA MANERA ─────────
-
-# 23 · la matriz del filtro vuelve a mirar sólo la ventana
+# 13 · la matriz del filtro vuelve a mirar sólo la ventana
 perl -0pi -e 's/(WITH mapa AS(?:.|\n)*?AND d\.descripcion IS NOT NULL)/${1}\n      AND d.fecha BETWEEN p_desde AND p_hasta/' "$SQLCLI"
 probar "la matriz por cliente se acota al período (nombra distinto que la tabla)" "$SQLCLI"
 
-# 24 · y pierde el desempate
+# 14 · y pierde el desempate
 perl -0pi -e 's/ORDER BY d\.codigo, d\.fecha DESC, d\.id::text ASC/ORDER BY d.codigo, d.fecha DESC/' "$SQLCLI"
 probar "la matriz por cliente desempata al azar" "$SQLCLI"
 
-# 25 · el camino sin RPC del filtro vuelve a filtrar por fecha
+# 15 · el camino sin RPC del filtro vuelve a filtrar por fecha
 perl -0pi -e 's/          \.eq\("empresa_key", empresa\);/          .eq("empresa_key", empresa).gte("fecha", desde).lte("fecha", hasta);/' "$SRVCLI"
 probar "el camino sin RPC del filtro se acota al período" "$SRVCLI"
-
-# 26 · el aviso se pierde al poner un cliente
-perl -0pi -e 's/              <AvisoClasificacionLinea aviso=\{p\.aviso\} \/>/              {false \&\& <AvisoClasificacionLinea aviso={p.aviso} \/>}/' "$VISTA"
-probar "el aviso desaparece de la fila (también con el filtro puesto)" "$VISTA"
 
 echo
 echo "cazadas: $cazadas · sobrevividas: $sobrevividas"

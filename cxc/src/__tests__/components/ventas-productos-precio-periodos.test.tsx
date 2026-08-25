@@ -72,7 +72,9 @@ let urlsPedidas: string[] = [];
 /** Cuando true, la llamada del comparativo (`previo=1`) responde 500 — o sea el
  *  tropiezo de red que hacía salir el catálogo entero como "Nuevo". */
 let fallarComparativo = false;
-/** El aviso de "mal clasificado" que trae la fila de NIVEL 1. Vacío = sin aviso. */
+/** Un `aviso` INVENTADO en la respuesta del servidor. Ya no existe en el tipo:
+ *  el candado 9 lo inyecta a mano justamente para exigir que, aunque llegara,
+ *  la pantalla no lo dibuje. Ver el encabezado de ese bloque. */
 let avisoDeLaFila: { otra: string; codigo: string }[] = [];
 /** Qué devuelve el desplegable en «Quién lo compra». `null` = no se pudo. */
 let clientesDelDrill: unknown = [
@@ -114,10 +116,13 @@ beforeEach(() => {
     const previo = String(url).includes("previo=1");
     const periodo = (new URL(String(url), "http://x").searchParams.get("periodo") ?? "ytd") as never;
     if (previo) return json(respuesta({ productos: productosPrevios }));
-    // El aviso llega en la fila de NIVEL 1 (no en el desplegable): es la
-    // respuesta que la pantalla ya tiene antes de que nadie abra nada.
+    // El `aviso` viajaba en la fila de NIVEL 1. Ya no lo manda nadie; se
+    // inyecta acá para que el candado 9 pueda exigir que, si volviera a
+    // llegar, la pantalla siga sin dibujarlo.
     const productos = PRODUCTOS.map(p =>
-      p.descripcion === "CAMISA POLO" && avisoDeLaFila.length > 0 ? { ...p, aviso: avisoDeLaFila } : p,
+      p.descripcion === "CAMISA POLO" && avisoDeLaFila.length > 0
+        ? ({ ...p, aviso: avisoDeLaFila } as typeof p)
+        : p,
     );
     return json(respuesta({ periodo, productos }));
   }));
@@ -648,82 +653,77 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 9 · EL AVISO QUE REEMPLAZA AL QUE SE PIERDE
+// 9 · EL AVISO DE «CÓDIGO MAL CLASIFICADO» YA NO SALE
 //
-// 🩸 Desde que la pantalla agrupa por el nombre MÁS RECIENTE del código, el
-// mismo producto deja de salir partido en dos renglones. Eso arregla lo que
-// había que arreglar y TAPA una cosa: un código MAL CLASIFICADO en Switch —que
-// vivió bajo dos categorías que las dos existen de verdad— antes se delataba
-// solo saliendo en dos filas, y ahora sale en una.
+// ⚠️ ESTE CANDADO CAMBIÓ DE DIRECCIÓN, y queda escrito por qué. Hasta el #597
+// exigía lo contrario: que la fila dijera «Revisar: A-1 también está en
+// «CAMISETA»» cuando un código vivía bajo dos categorías reales del catálogo
+// aprobado. Salía en 18 renglones de 2.074.
 //
-// Las dos formas de arruinarlo, y las dos tienen candado acá:
-//   · que el aviso NO SALGA (el código mal clasificado queda invisible);
-//   · que el aviso salga SIEMPRE (la alerta que se deja de leer a la semana).
+// 🔴 Daniel mandó sacarlo el 25-ago-2026. El aviso nació para que él revisara
+// esos 5 códigos en Switch; YA LOS REVISÓ y decidió, textual: *"si lo más
+// reciente es 17-ago alguien lo pasó a Flip Flop, entonces es Flip Flop"*. La
+// clasificación que Switch tiene HOY es la correcta: no queda nada que
+// corregir, y el cartel pedía una acción ya tomada.
+//
+// 🩸 EL CANDADO SE INVIERTE, NO SE BORRA. Borrarlo dejaría el hueco abierto: el
+// próximo que toque esta pantalla podría redibujarlo sin que nada se ponga
+// rojo. Acá se exige que NO salga NI SIQUIERA CUANDO EL SERVIDOR LO MANDA —
+// que es más fuerte que mirar la respuesta pelada, porque caza el redibujo.
+//
+// ⛔ LO QUE NO SE TOCÓ, y tiene su propio candado abajo: la AGRUPACIÓN por el
+// nombre más reciente (el producto sigue en UN renglón) y todos los números.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("9 · el aviso de código mal clasificado", () => {
+describe("9 · el aviso de código mal clasificado ya no existe", () => {
   async function pantalla() {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
   }
 
-  it("🔴 SIN aviso en la respuesta NO se dibuja nada (si saliera siempre, se deja de leer)", async () => {
+  it("🔴 sin aviso en la respuesta no se dibuja nada", async () => {
     avisoDeLaFila = [];
     await pantalla();
     expect(document.querySelector("[data-aviso-clasificacion]")).toBeNull();
   });
 
-  it("🔴 CON aviso lo dice: el CÓDIGO y la OTRA categoría", async () => {
+  it("🔴 Y AUNQUE EL SERVIDOR LO MANDE, la pantalla NO lo dibuja", async () => {
     avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
     await pantalla();
-    const aviso = document.querySelector("[data-aviso-clasificacion]");
-    expect(aviso, "no salió el aviso").toBeTruthy();
-    expect(aviso!.getAttribute("data-aviso-clasificacion")).toBe("A-1");
-    const texto = (aviso!.textContent ?? "").replace(/\s+/g, " ");
-    expect(texto).toContain("A-1");      // el código
-    expect(texto).toContain("CAMISETA"); // la otra categoría
-  });
-
-  it("va DENTRO de la fila que avisa, y en NINGUNA otra", async () => {
-    avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
-    await pantalla();
+    expect(document.querySelector("[data-aviso-clasificacion]")).toBeNull();
+    // Ni por el ancla ni por el texto: el rótulo tampoco puede volver con otro
+    // atributo. La celda de la descripción es el nombre y nada más.
     const fila = document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!;
-    expect(fila.querySelector("[data-aviso-clasificacion]")).toBeTruthy();
-    const otra = document.querySelector('tr[data-fila-producto="SANDALIA"]')!;
-    expect(otra.querySelector("[data-aviso-clasificacion]")).toBeNull();
-    expect(document.querySelectorAll("[data-aviso-clasificacion]")).toHaveLength(1);
+    const texto = (fila.querySelector('[data-col="descripcion"]')!.textContent ?? "").replace(/\s+/g, " ").trim();
+    expect(texto).toBe("CAMISA POLO");
+    expect(document.body.textContent).not.toContain("también está en");
   });
 
-  it("es ÁMBAR, no rojo: no se rompió nada", async () => {
+  it("no queda ni un rastro ámbar en ninguna fila", async () => {
     avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
     await pantalla();
-    const cls = document.querySelector("[data-aviso-clasificacion]")!.className;
-    expect(cls).toContain("amber");
-    expect(cls).not.toContain("red");
-    expect(cls).not.toContain("rose");
+    for (const fila of document.querySelectorAll("tr[data-fila-producto]")) {
+      expect(fila.querySelector('[class*="amber"]')).toBeNull();
+    }
   });
 
-  it("es una ETIQUETA CORTA, no un párrafo: menos de 90 caracteres", async () => {
+  // 🩸 SE MIRA EL HTML DE LA FILA, ATRIBUTOS INCLUIDOS, y no sólo el texto.
+  // La reposición más silenciosa del aviso no es un <p>: es un `title` en la
+  // celda — el globito al pasar el mouse. Eso no toca `textContent` y un
+  // candado que sólo lea el texto lo dejaría pasar entero.
+  it("🔴 ni escondido en un `title`, un `aria-label` o cualquier atributo", async () => {
     avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
     await pantalla();
-    const texto = (document.querySelector("[data-aviso-clasificacion]")!.textContent ?? "").trim();
-    expect(texto.length).toBeLessThan(90);
+    for (const fila of document.querySelectorAll("tr[data-fila-producto]")) {
+      const html = fila.outerHTML.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      expect(html).not.toContain("tambien esta en");
+      expect(html).not.toContain("revisar:");
+      expect(html).not.toContain("amber");
+      expect(html).not.toContain("aviso");
+    }
   });
 
-  it("con más de uno, nombra el primero y CUENTA el resto (no vuelca la lista)", async () => {
-    avisoDeLaFila = [
-      { otra: "CAMISETA", codigo: "A-1" },
-      { otra: "CHOMBA", codigo: "A-2" },
-      { otra: "REMERA", codigo: "A-3" },
-    ];
-    await pantalla();
-    const texto = (document.querySelector("[data-aviso-clasificacion]")!.textContent ?? "");
-    expect(texto).toContain("A-1");
-    expect(texto).toContain("(+2)");
-    expect(texto).not.toContain("A-3");
-  });
-
-  it("⚠️ EL AVISO NO TOCA UN SOLO NÚMERO de la fila", async () => {
+  it("⚠️ sacarlo NO TOCÓ UN SOLO NÚMERO de la fila", async () => {
     avisoDeLaFila = [];
     await pantalla();
     const sinAviso = {
@@ -745,7 +745,7 @@ describe("9 · el aviso de código mal clasificado", () => {
     }).toEqual(sinAviso);
   });
 
-  it("⚠️ el aviso NO frena el desplegable: «Quién lo compra» abre igual", async () => {
+  it("⚠️ y el desplegable «Quién lo compra» abre igual que siempre", async () => {
     avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
     await pantalla();
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);

@@ -11,7 +11,6 @@ import { unAnioAntes } from "@/lib/multifashion/productos-ranking";
 // de mes de Multifashion y el día de las marcaciones del reloj).
 import { hoyPanama } from "@/lib/fecha-panama";
 import { fmtDate } from "@/lib/format";
-import type { AvisoClasificacion } from "@/lib/ventas/productos-clasificacion";
 
 // Las 7 empresas con switch_articulo_diario poblado (todo el grupo menos
 // Confecciones Boston, que no se backfilleó). Default Fashion Wear.
@@ -39,19 +38,16 @@ export interface ProductoNivel1 {
   venta: number;
   costo: number;
   margen: number | null;
-  /**
-   * Los códigos de este grupo que están MAL CLASIFICADOS en Switch: viven bajo
-   * dos categorías que las dos existen de verdad en el catálogo aprobado.
-   *
-   * 🩸 ESTE CAMPO EXISTE PORQUE AGRUPAR TAPA ALGO. Desde que la pantalla junta
-   * el producto por el nombre que tiene HOY, un código mal clasificado ya no se
-   * delata solo saliendo en dos renglones. El aviso no frena nada y no corrige
-   * nada: dice el código y la otra categoría para ir a mirarlo en Switch.
-   *
-   * Ausente (o vacío) = nada que revisar. Las respuestas viejas —y la pantalla
-   * corriendo SIN la migración— no lo traen, y ahí no se dibuja ningún aviso.
-   */
-  aviso?: AvisoClasificacion[];
+  // ⛔ ACÁ VIVÍA `aviso` — los códigos «mal clasificados en Switch» (#597).
+  // Se retiró el 25-ago-2026 por orden de Daniel: el aviso nació para que él
+  // revisara los 5 códigos y YA LOS REVISÓ, textual: *"si lo más reciente es
+  // 17-ago alguien lo pasó a Flip Flop, entonces es Flip Flop"*. O sea que la
+  // clasificación de Switch es la BUENA y no había nada que corregir: el aviso
+  // quedó pidiendo una acción ya tomada, en 18 renglones de 2.074.
+  //
+  // 🔴 LO QUE NO SE FUE CON ÉL: la agrupación por el nombre MÁS RECIENTE del
+  // código, que es lo que hace que el Agua Dana salga en UN renglón de
+  // $35.305,20 en vez de dos. El aviso era otra cosa.
 }
 
 export interface ProductoCodigo {

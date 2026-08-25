@@ -16,6 +16,11 @@
 //   · montos cortados   — "$1,23…" parece un número y no lo es
 //   · AVISOS            — cuántos renglones lo muestran (con 0 la medición del
 //                         aviso no prueba nada)
+//   · ALTO              — px de alto de la página y de la tabla. 25-ago-2026:
+//                         el aviso SE RETIRÓ, así que lo que se exige acá ya no
+//                         es "que no empeore el arrastre" sino que la pantalla
+//                         ACORTE — cada aviso era un renglón de más debajo del
+//                         nombre. Se reporta antes → después.
 //
 // GOTCHAS heredados (no tocar sin leer): cookie firmada, `sessionStorage.cxc_role`
 // y `delete Navigator.prototype.serviceWorker` ANTES de navegar.
@@ -113,6 +118,13 @@ const SONDA = `(() => {
     letraChica: letraChica.length,
     letraEjemplos: letraChica.slice(0, 3),
     filas: document.querySelectorAll("tr[data-fila-producto]").length,
+    // 🔑 EL ALTO SE MIDE EN LA TABLA Y EN LA PÁGINA. Sacar el aviso quita un
+    // <p> de debajo del nombre en cada fila que lo tenía: la tabla acorta y la
+    // página con ella. El alto de la PRIMERA fila es la prueba fina — a 390 px
+    // el aviso la partía en dos líneas.
+    altoPaginaPx: document.documentElement.scrollHeight,
+    altoTablaPx: Math.round(document.querySelector("tr[data-fila-producto]")?.closest("table")?.getBoundingClientRect().height ?? 0),
+    altoPrimeraFilaPx: Math.round(document.querySelector("tr[data-fila-producto]")?.getBoundingClientRect().height ?? 0),
     avisos: document.querySelectorAll("[data-aviso-clasificacion]").length,
     avisoTexto: (document.querySelector("[data-aviso-clasificacion]")?.textContent ?? "").replace(/\\s+/g, " ").trim(),
     avisoColor: document.querySelector("[data-aviso-clasificacion]")
@@ -183,6 +195,7 @@ for (const ANCHO of ANCHOS) {
     `montos✂=${String(r.montosCortados ?? "?").padStart(2)} filas=${String(r.filas ?? "?").padStart(3)} ${r.veredicto}` +
     (r.error ? `  ⚠️ ${r.error}` : ""),
   );
+  console.log(`        avisos=${r.avisos ?? "?"}  alto: página=${r.altoPaginaPx ?? "?"} tabla=${r.altoTablaPx ?? "?"} 1ª fila=${r.altoPrimeraFilaPx ?? "?"}`);
   if (r.avisoTexto) console.log(`        aviso: "${r.avisoTexto}"  color=${r.avisoColor}`);
   if (r.columnasVisibles) console.log(`        columnas: ${r.columnasVisibles.join(" · ")}`);
   if (r.primerRenglon) console.log(`        1er renglón: ${r.primerRenglon}`);
@@ -216,6 +229,32 @@ if (ETAPA === "despues" && existsSync(otro)) {
   }
   console.log(peor === 0 ? "\n✅ El arrastre NO empeoró en ningún ancho." : `\n❌ empeoró en ${peor} anchos.`);
   if (peor > 0) fallos++;
+
+  // 🔑 SACAR EL AVISO TIENE QUE ACORTAR, y con la MISMA cantidad de filas: si
+  // la tabla acortara porque se perdieron renglones, esto no sería una mejora
+  // sino el peor bug posible. Por eso se exige que `filas` no cambie.
+  console.log("\n=== ¿ACORTÓ? (antes → después, por ancho) ===");
+  let creció = 0;
+  let filasDistintas = 0;
+  for (const d of filas) {
+    const A = a.find(x => x.ancho === d.ancho);
+    if (!A) continue;
+    const dTabla = (d.altoTablaPx ?? 0) - (A.altoTablaPx ?? 0);
+    const dPag = (d.altoPaginaPx ?? 0) - (A.altoPaginaPx ?? 0);
+    const dFila = (d.altoPrimeraFilaPx ?? 0) - (A.altoPrimeraFilaPx ?? 0);
+    if (dTabla > 0 || dPag > 0) creció++;
+    if (d.filas !== A.filas) filasDistintas++;
+    console.log(
+      `${String(d.ancho).padStart(4)}px  avisos ${String(A.avisos).padStart(2)} → ${String(d.avisos).padStart(2)}` +
+      `  tabla ${String(A.altoTablaPx).padStart(5)} → ${String(d.altoTablaPx).padStart(5)} (${dTabla > 0 ? "+" : ""}${dTabla})` +
+      `  página ${String(A.altoPaginaPx).padStart(5)} → ${String(d.altoPaginaPx).padStart(5)} (${dPag > 0 ? "+" : ""}${dPag})` +
+      `  1ª fila ${String(A.altoPrimeraFilaPx).padStart(3)} → ${String(d.altoPrimeraFilaPx).padStart(3)} (${dFila > 0 ? "+" : ""}${dFila})` +
+      `  filas ${A.filas} → ${d.filas}${d.filas !== A.filas ? " ❌" : ""}`,
+    );
+  }
+  if (filasDistintas > 0) { console.log(`\n❌ LA TABLA PERDIÓ FILAS en ${filasDistintas} anchos — acortar así no vale.`); fallos++; }
+  else if (creció > 0) { console.log(`\n⚠️ creció en ${creció} anchos.`); }
+  else console.log("\n✅ Acortó (o quedó igual) en todos los anchos, con las MISMAS filas.");
 }
 
 console.log(`\n${filas.length} anchos medidos · ${fallos} con hallazgos · capturas en ${SALIDA}`);
