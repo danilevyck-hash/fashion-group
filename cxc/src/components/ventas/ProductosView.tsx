@@ -14,8 +14,8 @@ import {
   participacion,
   totalDeClientes,
   type ClienteDeProducto,
-  type GrafiaSolapada,
 } from "@/lib/ventas/productos-clientes";
+import type { AvisoClasificacion } from "@/lib/ventas/productos-clasificacion";
 import {
   claveCliente,
   clientesDelPeriodo,
@@ -141,9 +141,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   // Quién compra cada descripción. `null` = la lectura falló (distinto de `[]`,
   // que es "no hay detalle"): son dos mensajes distintos y no se pueden mezclar.
   const [clientes, setClientes] = useState<Record<string, ClienteDeProducto[] | null>>({});
-  // Con qué OTRAS grafías del mismo producto se solapa cada descripción. Vacío
-  // = no hay solape y no se dibuja ningún aviso.
-  const [grafias, setGrafias] = useState<Record<string, GrafiaSolapada[]>>({});
   const [codigosLoading, setCodigosLoading] = useState<string | null>(null);
   // Qué pestaña del desplegable se está mirando. Una sola fila se abre a la
   // vez, así que un solo valor alcanza. Arranca en CLIENTES porque es lo que
@@ -195,7 +192,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       setData(json);
       setCodigos({});
       setClientes({});
-      setGrafias({});
       // La matriz es de ESTE período y de ESTA empresa: dejarla puesta mostraría
       // los números de la anterior. Se vuelve a pedir sola si el filtro está
       // puesto (ver el efecto de más abajo).
@@ -427,11 +423,9 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
           const json = (await res.json()) as {
             codigos: ProductoCodigo[];
             clientes: ClienteDeProducto[] | null;
-            grafias?: GrafiaSolapada[];
           };
           setCodigos(prev => ({ ...prev, [key]: json.codigos }));
           setClientes(prev => ({ ...prev, [key]: json.clientes ?? null }));
-          setGrafias(prev => ({ ...prev, [key]: json.grafias ?? [] }));
         }
       } catch {
         /* el render muestra "no se pudo cargar" si queda sin data */
@@ -726,7 +720,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
                   onToggle={() => toggleExpand(p)}
                   codigos={codigos[p.descripcion]}
                   clientes={clientes[p.descripcion]}
-                  grafias={grafias[p.descripcion] ?? []}
                   codigosLoading={codigosLoading === p.descripcion}
                   /* Con un cliente puesto la columna de cambio compara contra
                      lo que compraba ÉL, no contra la empresa entera: si no, el
@@ -812,14 +805,13 @@ function DeltaCell({ curr, prev, medido }: { curr: number; prev: number | undefi
 }
 
 function ProductoRow({
-  p, isOpen, onToggle, codigos, clientes, grafias, codigosLoading, prevVenta, comparativoMedido, mostrarMargen, tab, onTab,
+  p, isOpen, onToggle, codigos, clientes, codigosLoading, prevVenta, comparativoMedido, mostrarMargen, tab, onTab,
 }: {
   p: ProductoNivel1;
   isOpen: boolean;
   onToggle: () => void;
   codigos: ProductoCodigo[] | undefined;
   clientes: ClienteDeProducto[] | null | undefined;
-  grafias: GrafiaSolapada[];
   codigosLoading: boolean;
   prevVenta: number | undefined;
   /** false cuando la consulta del período anterior falló: sin ventana medida,
@@ -842,9 +834,15 @@ function ProductoRow({
         onClick={onToggle}
       >
         <td data-col="descripcion" className="px-2 py-2.5 lg:px-3">
-          <div className="flex items-center gap-1.5">
-            <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-            <span className="text-gray-800">{p.descripcion}</span>
+          <div className="flex items-start gap-1.5">
+            <ChevronRight className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+            <div className="min-w-0">
+              <span className="text-gray-800">{p.descripcion}</span>
+              {/* El aviso va DEBAJO del nombre y no al lado: a 390 px, un chip a
+                  la derecha empuja la columna de Venta fuera de la pantalla.
+                  Debajo ocupa el ancho que ya tenía la celda. */}
+              <AvisoClasificacionLinea aviso={p.aviso} />
+            </div>
           </div>
         </td>
         <td data-col="codigos" className="hidden px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-500 sm:table-cell lg:px-3">{p.num_codigos}</td>
@@ -882,9 +880,7 @@ function ProductoRow({
                     </DrillTabBtn>
                   </div>
 
-                  {tab === "clientes" && (
-                    <BloqueClientes clientes={clientes} grafias={grafias} descripcion={p.descripcion} />
-                  )}
+                  {tab === "clientes" && <BloqueClientes clientes={clientes} />}
                   {tab === "codigos" && <BloqueCodigos codigos={codigos} />}
                 </>
               )}
@@ -930,13 +926,7 @@ function DrillTabBtn({
  * David devolvió el 58% de lo que se le facturó a $30, y en bruto saldría muy
  * por encima de donde va.
  */
-function BloqueClientes({
-  clientes, grafias, descripcion,
-}: {
-  clientes: ClienteDeProducto[] | null | undefined;
-  grafias: GrafiaSolapada[];
-  descripcion: string;
-}) {
+function BloqueClientes({ clientes }: { clientes: ClienteDeProducto[] | null | undefined }) {
   if (clientes === null) {
     return <div className="py-2 text-xs text-gray-500">No se pudo cargar quién lo compra. Cerrá y volvé a abrir la fila.</div>;
   }
@@ -955,7 +945,6 @@ function BloqueClientes({
   const total = totalDeClientes(clientes);
   return (
     <>
-      <AvisoGrafias grafias={grafias} descripcion={descripcion} />
       <table data-drill-clientes className="w-full text-xs">
         <tbody>
           {clientes.map(c => (
@@ -1018,54 +1007,46 @@ function BloqueCodigos({ codigos }: { codigos: ProductoCodigo[] | undefined }) {
 }
 
 /**
- * 🟡 EL AVISO DE QUE LA LISTA SUMA MÁS QUE LA FILA — y por qué.
+ * 🟡 EL AVISO QUE REEMPLAZA AL QUE SE PIERDE.
  *
- * 🩸 EN SWITCH EL MISMO PRODUCTO ESTÁ ESCRITO DE DOS FORMAS, y está medido
- * contra producción: `Women-Small Leather Goods` y `Women-Small Leather`,
- * `Agua Dana 1.5 Litro` y `Agua Dana 1.5 litro `. Un código vive bajo las dos.
- * La fila de arriba suma sólo las filas de SU grafía; la lista de clientes trae
- * TODAS las líneas de esos códigos. En vistana eso son 23 de 103 descripciones
- * con una lista que suma de más — «Men-Shirts Woven S/S» dice $142,00 en la
- * fila y $2.199,00 en la lista.
+ * ── QUÉ SE PERDIÓ ───────────────────────────────────────────────────────────
+ * Hasta hoy este cartel decía *"la lista de abajo suma más que la venta de la
+ * fila, porque en Switch este producto está escrito de dos formas"*. Desde que
+ * la pantalla agrupa por el nombre MÁS RECIENTE del código, la fila ya suma las
+ * dos grafías: ese aviso pasó a ser FALSO y se fue. Lo que se fue con él es la
+ * señal de que un código estaba mal: antes se delataba solo, saliendo partido
+ * en dos renglones; ahora sale en uno y no se nota.
  *
- * Las tres decisiones, y cada una tiene su motivo:
+ * ── QUÉ AVISA ESTE, Y SÓLO ESTE ─────────────────────────────────────────────
+ * Un código que vive bajo DOS CATEGORÍAS QUE LAS DOS EXISTEN DE VERDAD en
+ * `depurador_descripciones` (el catálogo aprobado, el mismo árbitro del
+ * diagnóstico). Un tipeo —`Agua Dana 600 ml 20 Und ` vs `Agua Dana 600 Ml 20
+ * Und`— NO avisa nada: ahí no hay nada que arreglar en Switch.
  *
- * · SE DICE, no se tapa ni se adivina. Repartir la venta entre las dos grafías
- *   sería INVENTAR: la línea de la factura no sabe nada de la descripción de
- *   `switch_articulo_diario`. Y esconder la lista sería sacar justo la función
- *   que Daniel pidió.
+ * Medido contra producción, 6 empresas x 4 períodos: 18 renglones de 2.074.
+ * Un cartel que sale en todos lados es el que se deja de leer a la semana.
  *
- * · LA FILA DE ARRIBA NO SE TOCA: sigue siendo la suma de SU grafía. Dos
- *   números distintos ya conviven en este módulo; cada uno dice su verdad y el
- *   aviso explica la diferencia.
+ * 🔴 NO FRENA NADA Y NO CORRIGE NADA. Dice el código y la otra categoría, que
+ * es lo único accionable: ir a mirarlo en Switch. Cuando allá se reclasifique,
+ * el aviso desaparece solo.
  *
- * · ÁMBAR, NO ROJO: no se rompió nada. Y SÓLO cuando hay solape de verdad,
- *   calculado por código — un cartel fijo "los números pueden no cuadrar" es la
- *   alerta que se deja de leer a la semana.
- *
- * Se nombran LAS DOS GRAFÍAS y el código que las comparte: sin eso, el aviso no
- * le sirve a nadie para ir a corregirlo en Switch, que es la única salida real.
+ * Ámbar y no rojo: no se rompió nada.
  */
-function AvisoGrafias({ grafias, descripcion }: { grafias: GrafiaSolapada[]; descripcion: string }) {
-  if (grafias.length === 0) return null;
+function AvisoClasificacionLinea({ aviso }: { aviso: AvisoClasificacion[] | undefined }) {
+  if (!aviso || aviso.length === 0) return null;
+  const [primero] = aviso;
   return (
     <p
-      data-aviso-grafias
-      className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+      data-aviso-clasificacion={primero.codigo}
+      // 🩸 `overflow-wrap:anywhere` Y NO `break-words`. El código es un token
+      // largo sin espacios (`FW0FW05034-DW5`) y en una tabla el ancho mínimo de
+      // la columna lo fija la palabra más larga: medido en el navegador, sin
+      // esto el iPad PARADO (834 px) pasaba de 0 a 10 px de arrastre — el aviso
+      // empujaba la tabla. `break-words` no alcanza: no cambia el min-content.
+      className="mt-0.5 text-xs text-amber-700 [overflow-wrap:anywhere]"
     >
-      La lista de abajo suma más que la venta de la fila. En Switch este producto
-      está escrito de {grafias.length === 1 ? "dos formas" : `${grafias.length + 1} formas`}
-      {": "}
-      <span className="font-medium">&ldquo;{descripcion}&rdquo;</span>
-      {grafias.map(g => (
-        <span key={g.otra}>
-          {" y "}
-          <span className="font-medium">&ldquo;{g.otra}&rdquo;</span>
-          <span className="opacity-80"> (comparten el código {g.codigo})</span>
-        </span>
-      ))}
-      . La fila de arriba cuenta sólo la primera; acá abajo están los clientes de
-      todas. Se arregla corrigiendo el nombre en Switch.
+      Revisar: {primero.codigo} también está en &laquo;{primero.otra}&raquo;
+      {aviso.length > 1 ? ` (+${aviso.length - 1})` : ""}
     </p>
   );
 }

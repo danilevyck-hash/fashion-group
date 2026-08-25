@@ -76,7 +76,7 @@ vi.mock("@/lib/supabase-server", () => {
       from: (tabla: string) => consulta(tabla),
       rpc: async (fn: string, args: Record<string, unknown>) => {
         estado.rpc.push({ fn, args });
-        if (fn === "switch_articulos_por_descripcion") {
+        if (fn === "switch_articulos_por_descripcion_reciente" || fn === "switch_articulos_por_descripcion") {
           return {
             data: [
               { codigo: "AAA-1", descripcion: "Men-T-Shirts S/S", cantidad: 10, venta: 300, costo: 180, margen: 0.4 },
@@ -153,7 +153,7 @@ describe("🔑 los clientes se cruzan por CÓDIGO, con los mismos que se muestra
 
   it("mismo rango que los códigos: las dos preguntas hablan del mismo período", async () => {
     await GET(req(URL_BASE));
-    const cods = estado.rpc.find(r => r.fn === "switch_articulos_por_descripcion")!.args;
+    const cods = estado.rpc.find(r => r.fn === "switch_articulos_por_descripcion_reciente")!.args;
     const clis = estado.rpc.find(r => r.fn === "switch_clientes_por_codigos")!.args;
     expect(clis.p_desde).toBe(cods.p_desde);
     expect(clis.p_hasta).toBe(cods.p_hasta);
@@ -210,7 +210,7 @@ describe("un fallo en los clientes no se lleva los códigos", () => {
 describe("el contrato viejo no se rompió", () => {
   it("?mes=6 sigue contestando el mes, aunque la pantalla ya no lo mande", async () => {
     await GET(req("/api/ventas/productos/codigos?empresa=vistana&year=2026&mes=6&descripcion=X"));
-    const cods = estado.rpc.find(r => r.fn === "switch_articulos_por_descripcion")!.args;
+    const cods = estado.rpc.find(r => r.fn === "switch_articulos_por_descripcion_reciente")!.args;
     expect(cods.p_desde).toBe("2026-06-01");
     expect(cods.p_hasta).toBe("2026-06-30");
   });

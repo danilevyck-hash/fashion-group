@@ -26,7 +26,7 @@ vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
     rpc: async (fn: string, args: Record<string, unknown>) => {
       llamadas.push({ fn, args });
-      if (fn === "switch_top_descripciones") {
+      if (fn === "switch_top_descripciones_reciente" || fn === "switch_top_descripciones") {
         return {
           data: [
             { descripcion: "CAMISA POLO", num_codigos: 2, cantidad: 10, venta: 500, costo: 300, margen: 0.4 },
@@ -54,8 +54,8 @@ function req(url: string) {
 
 /** Las fechas con las que se llamó a la RPC del nivel 1. */
 function rangoPedido(): { desde: string; hasta: string } {
-  const l = llamadas.find(x => x.fn === "switch_top_descripciones");
-  expect(l, "no se llamó a switch_top_descripciones").toBeTruthy();
+  const l = llamadas.find(x => x.fn === "switch_top_descripciones_reciente");
+  expect(l, "no se llamó a switch_top_descripciones_reciente").toBeTruthy();
   return { desde: String(l!.args.p_desde), hasta: String(l!.args.p_hasta) };
 }
 
@@ -154,7 +154,7 @@ describe("el desplegable de códigos mira EL MISMO rango que la fila de arriba",
       await GET_CODIGOS(req(
         `/api/ventas/productos/codigos?empresa=fashion_wear&year=2026&periodo=${p}&descripcion=CAMISA%20POLO`,
       ));
-      const l = llamadas.find(x => x.fn === "switch_articulos_por_descripcion");
+      const l = llamadas.find(x => x.fn === "switch_articulos_por_descripcion_reciente");
       expect(l, `periodo=${p}: no se llamó a la RPC del drill-down`).toBeTruthy();
       expect({ desde: String(l!.args.p_desde), hasta: String(l!.args.p_hasta) }, `periodo=${p}`).toEqual(nivel1);
     }
@@ -164,7 +164,7 @@ describe("el desplegable de códigos mira EL MISMO rango que la fila de arriba",
     await GET_CODIGOS(req(
       "/api/ventas/productos/codigos?empresa=fashion_wear&year=2026&mes=6&descripcion=CAMISA%20POLO",
     ));
-    const l = llamadas.find(x => x.fn === "switch_articulos_por_descripcion")!;
+    const l = llamadas.find(x => x.fn === "switch_articulos_por_descripcion_reciente")!;
     expect({ desde: String(l.args.p_desde), hasta: String(l.args.p_hasta) })
       .toEqual({ desde: "2026-06-01", hasta: "2026-06-30" });
   });

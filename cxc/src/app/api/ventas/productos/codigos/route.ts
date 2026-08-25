@@ -37,6 +37,7 @@ import {
   type ProductoCodigo,
 } from "@/lib/ventas/productos";
 import { clientesDeCodigos, type ClientesDeDescripcion } from "@/lib/ventas/productos-clientes-server";
+import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
 
 export const dynamic = "force-dynamic";
 
@@ -70,12 +71,23 @@ export async function GET(req: NextRequest) {
 
   const { desde, hasta } = productosRangoPeriodo(periodo, year, mes, new Date());
 
-  const { data, error } = await supabaseServer.rpc("switch_articulos_por_descripcion", {
+  // La descripción que llega es la del renglón de arriba, o sea el nombre MÁS
+  // RECIENTE del código (ver /api/ventas/productos). Por eso el drill-down usa
+  // la función que resuelve por ese mismo nombre: si preguntara por el texto
+  // congelado, el desplegable mostraría sólo una parte de la fila que abrió.
+  // Sin la migración cae a la de siempre, que es la que va con la agrupación
+  // vieja — las dos puntas se mueven juntas.
+  const args = {
     p_empresa_key: empresa,
     p_desde: desde,
     p_hasta: hasta,
     p_descripcion: descripcion,
-  });
+  };
+  const { data, error } = await rpcConFallbackDeVersion<ProductoCodigo[]>(
+    () => supabaseServer.rpc("switch_articulos_por_descripcion_reciente", args),
+    () => supabaseServer.rpc("switch_articulos_por_descripcion", args),
+    { label: "switch_articulos_por_descripcion_reciente" },
+  );
   if (error) {
     console.error("[api/ventas/productos/codigos]:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });

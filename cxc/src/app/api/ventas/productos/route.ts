@@ -2,11 +2,28 @@
 // GET /api/ventas/productos?empresa=&year=&mes=&periodo=&previo=
 //
 // Nivel 1 del tab Productos: top por descripción + totales.
-// Lee `switch_top_descripciones` sobre switch_articulo_diario (RLS service_role
-// → server-only): una fila por descripción (sin límite; el cliente pagina con
-// Top 20 + "Mostrar más"). La suma = total certificado del período.
+// Lee `switch_top_descripciones_reciente` sobre switch_articulo_diario (RLS
+// service_role → server-only): una fila por descripción (sin límite; el cliente
+// pagina con Top 20 + "Mostrar más"). La suma = total certificado del período.
 // Totales se computan sumando el nivel 1 (0 filas con descripción/código NULL →
 // cuadra al centavo con margen_mensual, la fuente validada).
+//
+// ── EL MISMO PRODUCTO, UN SOLO RENGLÓN (25-ago-2026) ────────────────────────
+//
+// 🩸 `Agua Dana 600 ml 20 Und ` y `Agua Dana 600 Ml 20 Und` eran DOS renglones
+// de vistana. Es la misma agua, y en SWITCH tiene UNA SOLA descripción: el
+// reporte le pega a toda la historia el nombre de HOY, pero nosotros guardamos
+// el nombre del día en que bajamos la fila y el cron sólo re-mira 3 días.
+// Por eso se agrupa por el nombre MÁS RECIENTE de cada CÓDIGO (nunca por
+// parecido de textos: `Outlet Duty Free N2` y `N3` se parecen y son dos cosas).
+//
+// 🔴 LA VENTA TOTAL NO SE MUEVE: agrupar es juntar renglones. Medido contra
+// producción, 6 empresas x 4 períodos, diferencia 0,000000
+// (scripts/_verif-productos-descripcion-reciente.ts).
+//
+// ⛔ SIN LA MIGRACIÓN LA PANTALLA ES LA DE AYER. `rpcConFallbackDeVersion` cae
+// sola a `switch_top_descripciones` cuando PostgREST dice que la función nueva
+// no existe: el producto sigue partido, no hay aviso, y no se rompe nada.
 //
 // ⛔ YA NO SE PIDE `switch_articulo_margen_mensual` (25-ago-2026). Sólo servía
 // para saber QUÉ MESES ofrecer en el selector de período, y Daniel mandó sacar
@@ -36,6 +53,12 @@ import {
   type ProductoNivel1,
   type ProductosResponse,
 } from "@/lib/ventas/productos";
+import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
+import {
+  avisosDeClasificacion,
+  catalogoAprobado,
+  type GrafiaDelGrupo,
+} from "@/lib/ventas/productos-clasificacion";
 
 export const dynamic = "force-dynamic";
 
@@ -71,25 +94,41 @@ export async function GET(req: NextRequest) {
     : productosRangoPeriodo(periodo, year, mes, ahora);
   const comparativo = productosRangoComparativo(periodo, year, mes, ahora);
 
-  const nivel1Res = await supabaseServer.rpc("switch_top_descripciones", {
-    p_empresa_key: empresa,
-    p_desde: desde,
-    p_hasta: hasta,
-  });
+  const args = { p_empresa_key: empresa, p_desde: desde, p_hasta: hasta };
+  const nivel1Res = await rpcConFallbackDeVersion<FilaNivel1[]>(
+    () => supabaseServer.rpc("switch_top_descripciones_reciente", args),
+    () => supabaseServer.rpc("switch_top_descripciones", args),
+    { label: "switch_top_descripciones_reciente" },
+  );
 
   if (nivel1Res.error) {
     console.error("[api/ventas/productos] nivel1:", nivel1Res.error.message);
     return NextResponse.json({ error: nivel1Res.error.message }, { status: 500 });
   }
 
-  const productos = ((nivel1Res.data ?? []) as ProductoNivel1[]).map(p => ({
-    descripcion: p.descripcion,
-    num_codigos: Number(p.num_codigos ?? 0),
-    cantidad: Number(p.cantidad ?? 0),
-    venta: Number(p.venta ?? 0),
-    costo: Number(p.costo ?? 0),
-    margen: p.margen != null ? Number(p.margen) : null,
-  }));
+  const crudas = (nivel1Res.data ?? []) as FilaNivel1[];
+
+  // El catálogo aprobado sólo se pide si hay algo que clasificar: la respuesta
+  // del comparativo (`previo=1`) se descarta entera salvo `productos`, y sin la
+  // migración corrida ninguna fila trae grafías. Una consulta por carga de
+  // pantalla para una respuesta que nadie mira no se regala en compute Micro.
+  const hayGrafias = !previo && crudas.some(p => (p.grafias ?? []).length > 0);
+  const aprobadas = hayGrafias ? await leerCatalogoAprobado() : null;
+
+  const productos: ProductoNivel1[] = crudas.map(p => {
+    const aviso = aprobadas
+      ? avisosDeClasificacion(p.descripcion, p.grafias ?? [], aprobadas)
+      : [];
+    return {
+      descripcion: p.descripcion,
+      num_codigos: Number(p.num_codigos ?? 0),
+      cantidad: Number(p.cantidad ?? 0),
+      venta: Number(p.venta ?? 0),
+      costo: Number(p.costo ?? 0),
+      margen: p.margen != null ? Number(p.margen) : null,
+      ...(aviso.length > 0 ? { aviso } : {}),
+    };
+  });
 
   // Totales = suma del nivel 1 (cuadra con la fuente certificada).
   const ventaTotal = productos.reduce((s, p) => s + p.venta, 0);
@@ -108,4 +147,31 @@ export async function GET(req: NextRequest) {
     productos,
   };
   return NextResponse.json(body);
+}
+
+/** Lo que devuelve la RPC de nivel 1. `grafias` sólo llega con la nueva. */
+interface FilaNivel1 extends ProductoNivel1 {
+  grafias?: GrafiaDelGrupo[];
+}
+
+/**
+ * El catálogo de descripciones APROBADAS — el árbitro del aviso.
+ *
+ * Es la MISMA tabla que usa el Depurador (`depurador_descripciones`, 240 filas)
+ * y el MISMO árbitro que usó el diagnóstico. Un segundo criterio de "qué es una
+ * categoría de verdad" es lo que no puede pasar.
+ *
+ * 🔴 SI ESTA LECTURA FALLA, NO SE AVISA NADA — y la pantalla no se cae. Sin el
+ * catálogo no se puede distinguir un tipeo de una mala clasificación, y un
+ * aviso adivinado es peor que ninguno.
+ */
+async function leerCatalogoAprobado(): Promise<Set<string> | null> {
+  const { data, error } = await supabaseServer
+    .from("depurador_descripciones")
+    .select("descripcion, activa");
+  if (error) {
+    console.error("[api/ventas/productos] catálogo aprobado:", error.message);
+    return null;
+  }
+  return catalogoAprobado(data ?? []);
 }
