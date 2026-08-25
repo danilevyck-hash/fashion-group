@@ -24,9 +24,8 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import {
-  empresasConCxc,
+  empresasConEstadoCuenta,
   empresasConFacturas,
-  EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON,
 } from "@/lib/switch-api/empresas";
 
 /**
@@ -82,16 +81,43 @@ export interface EstadoDato {
   horas: number | null;
 }
 
-/** Empresas que cuentan para cada dato. */
+/**
+ * Empresas que cuentan para cada dato.
+ *
+ * ─── CARTERA = TODA cartera que Daniel MIRA, no solo la del grupo ────────────
+ *
+ * `empresasConEstadoCuenta()` = las 6 del grupo + `confecciones_boston`, o sea
+ * las empresas cuyos saldos traemos a `switch_estadocuenta`. Cada una tiene una
+ * pantalla donde alguien les cree: las 6 en el panel del CXC, Boston en su
+ * pestaña. Si el dato de cualquiera de ellas se congela, la pantalla miente — y
+ * ésa es exactamente la pregunta que esta regla vino a contestar.
+ *
+ * 🩸 **Boston estaba excluida y el motivo se venció** (24-ago-2026). El filtro
+ * era `EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON`, y el motivo escrito era "su cartera
+ * hoy no se sincroniza por cron". Eso fue verdad **cuatro días**: el 30-jul-2026
+ * nació `/api/cron/boston-cartera`, que la trae del reporte web todos los días a
+ * las 08:10 UTC. La lista, en cambio, **nunca dejó de ser correcta para lo suyo**
+ * — dice "el estadocuenta POR API no corre por cron para esta empresa" y sigue
+ * gobernando el bloque `all-0630` y los pares de la reconciliación. Usarla acá
+ * era leerla como si dijera otra cosa, y el precio se cobró entero: del 20 al 24
+ * de agosto la cartera de Boston estuvo congelada (Switch cambió el motor de sus
+ * reportes el 19-ago 12:37 y la ruta que usábamos dejó de existir) y **la regla 1
+ * no sonó ni una vez**. Cinco días de silencio.
+ *
+ * No es una alerta nueva ni una cuarta regla: es la regla 1 de siempre, con el
+ * mismo umbral de 24 h y el mismo dedup, mirando también la cartera que ya
+ * mostrábamos en pantalla. La lista se DERIVA de `EMPRESA_SYNC_CAPABILITIES`, así
+ * que una empresa que mañana empiece a traer saldos nace vigilada.
+ *
+ * ⚠️ **Esto NO mezcla a Boston con el grupo.** La medición es POR EMPRESA
+ * (`.eq("empresa_key", …)`, una consulta por empresa) y el mensaje NOMBRA a cada
+ * una: no hay un total, ni una suma, ni una fila de Boston contestando una
+ * pregunta del grupo. Lo único que comparten es la frase "la cartera está vieja",
+ * que no es plata.
+ */
 export function empresasDe(dato: Dato): string[] {
   if (dato === "ventas") return empresasConFacturas();
-  // Cartera = la del GRUPO (6 B2B). Se excluye a propósito a las empresas cuya
-  // cartera va aparte y hoy no se sincroniza por cron (confecciones_boston):
-  // alertar todos los días por algo que ya sabemos que está roto y que tiene
-  // tarea propia es exactamente la alerta-que-suena-para-siempre que venimos
-  // sacando. Cuando su sync se arregle, entra sola por `empresasConCxc()` o
-  // saliendo de EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON.
-  return empresasConCxc().filter((e) => !EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON.includes(e));
+  return empresasConEstadoCuenta();
 }
 
 /**

@@ -18,6 +18,9 @@ import useSWR from "swr";
 import { fmt } from "@/lib/format";
 import { CARTERA_BOSTON } from "@/lib/cxc/cartera";
 import { AGING } from "@/lib/cxc-aging";
+import SyncStatus from "@/components/shared/SyncStatus";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 import {
   ordenEfectivo,
   ordenAlTocarTitulo,
@@ -57,6 +60,29 @@ function ordenable(c: ClienteBoston) {
     total: c.total,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA FECHA DEL DATO — la pestaña tiene que decir DE CUÁNDO son sus cifras.
+//
+// 🩸 Por qué se agregó (24-ago-2026). El 19-ago a las 12:37 Switch cambió el
+// motor de sus reportes y la ruta que usaba `boston-cartera` dejó de existir, así
+// que la cartera quedó congelada en el 19-ago. Durante cinco días la pantalla
+// mostró sus cuatro cifras SIN decir de cuándo eran: se leían como las de hoy. Un
+// número viejo presentado como actual es peor que no tener número.
+//
+// No es un aviso nuevo ni una alerta nueva: es el MISMO `<SyncStatus />` que el
+// panel del grupo ya monta (`admin/page.tsx` y `PanelCxcMobile.tsx`), con la
+// misma tabla, el mismo umbral y el mismo ámbar. Lo único que cambia es a qué
+// empresa le pregunta.
+//
+// 🔴 Y NO MEZCLA: `empresasCarteraAparte()` es exactamente la lista de empresas
+// con `estadoCuenta:true` y `cxc:false` — o sea SOLO Boston. Se DERIVA de
+// `EMPRESA_SYNC_CAPABILITIES` en vez de escribirse a mano acá, que es la misma
+// regla que ya cumple la vista `switch_estadocuenta_aging`: una lista paralela es
+// la que un día se aparta en silencio. `/api/sync-status` consulta por empresa
+// (`.eq("empresa_key", …)`), así que ni una fila del grupo entra a esta pestaña.
+// ─────────────────────────────────────────────────────────────────────────────
+const EMPRESAS_CARTERA_BOSTON = empresasCarteraAparte();
 
 const fetcher = (u: string) => fetch(u, { cache: "no-store" }).then((r) => {
   if (!r.ok) throw new Error("No se pudo leer la cartera de Boston");
@@ -189,6 +215,15 @@ export default function BostonTab() {
 
   return (
     <div>
+      {/* De cuándo son las cifras de abajo. Va PRIMERO, igual que en el panel del
+          grupo: lo primero que se lee antes de creerle a un número. */}
+      <SyncStatus
+        tabla="estadocuenta"
+        empresasEsperadas={EMPRESAS_CARTERA_BOSTON}
+        empresaLabels={EMPRESA_KEY_TO_NAME}
+        className="mb-3"
+      />
+
       <input
         type="search"
         value={search}
