@@ -1555,6 +1555,71 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - ⚠️ **Las guardas del NAVEGADOR que abren la elección NO son verificables por mutación y se dice de frente**: React no despacha el click de un botón deshabilitado ni forzándole `disabled = false` (vuelto a medir el 24-ago-2026 quitando cada guarda: los 30 casos siguen verdes). Son segunda capa; el candado que no se puede saltear es el 422 del servidor, y ése SÍ está mutado.
 > - 🩸 **La restauración del script va por COPIA, no por `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada — las mutaciones se apilarían y ninguna se probaría por separado.
 
+## 🔴 Pedidos — LA LISTA DEL ADMIN DICE LOS DOS NÚMEROS (25-ago-2026)
+
+> «Administrar catálogo › Pedidos» mostraba **cliente, total y fecha, y ningún número**. Para cruzar un pedido contra Switch había que abrirlos **de a uno**.
+>
+> Un pedido tiene **DOS** números y ninguno reemplaza al otro:
+> - **el de la casa** — `order_number` (`PED-017` · `JBP-041` · `TOM-026` · `CKP-005`), lo pone el sistema al crearlo;
+> - **el de Switch** — el `numero_interno` del envío ACTIVO (`16-000000503`).
+>
+> 🩸 **MEDIDO CONTRA PRODUCCIÓN ANTES DE CONSTRUIR** (`DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-pedidos-numeros-lista.ts`, solo lectura): **42 pedidos internos vivos, los 42 con `order_number` (100%)** · **38 de 42 (90,5%) con número de Switch**, los otros 4 todavía no salieron · **0 envíos activos sin número** · **6 pedidos del LINK sin convertir**, que NO tienen número propio porque se lo asigna la conversión. Un campo que está lleno siempre y otro que falta en el 10% **no se muestran igual**.
+>
+> ### 🔴 EL NÚMERO DE SWITCH SOLO NO ALCANZA — dice si fue PEDIDO o COTIZACIÓN
+>
+> Desde el #579 un envío puede ser un pedido **o una cotización**, y **una cotización NO aparta mercancía**. Pintar `Switch: 16-000000503` a secas hace que las dos se vean idénticas en la lista, y quien lo lea va a creer que la mercancía está apartada cuando no lo está. Por eso el texto **siempre nombra cuál de las dos es**: `Pedido en Switch: 16-000000503` / `Cotización en Switch: 16-000000503`.
+> - **Medido: los 38 envíos activos de las 4 marcas son `documento='pedido'`** — la primera cotización todavía no existe, y **justamente por eso el rótulo tiene que estar puesto ANTES de que aparezca**.
+> - El `documento` se lee con el **escalón tolerante** de siempre (DDL `20260824160000`): si la columna no estuviera, se relee sin ella y todo sale como PEDIDO, que es lo único que el sistema sabía crear. Hay mutación que lo prueba.
+>
+> ### 🔴 UN PEDIDO QUE NO FUE A SWITCH NO DICE «—»
+>
+> Un guion en la columna de un número se lee como un cero, o como un dato que no cargó. Dice lo que es:
+>
+> ```
+> Sporting Shoes                          Zapatería Nueva                 Nathalie   [Del link]
+> PED-017 · Pedido en Switch: 16-000000503   PED-019 · No se ha mandado    Se numera al abrirlo ·
+>                                                       a Switch           No se ha mandado a Switch
+> ```
+>
+> El pedido del **link sin convertir** no tiene número propio y **también lo dice** (*«Se numera al abrirlo»* — se lo asigna la conversión, que es lo que hace «Editar»). Los textos viven en **`src/lib/catalogo/numeros-pedido.ts`** (módulo PURO), no sueltos en la pantalla: la lista es **una sola pieza para las 4 marcas** y una copia que quede vieja es la que le miente a alguien sobre si tiene la mercancía apartada. **Joybees sigue siendo espejo exacto de Reebok y no se tocó nada propio de Reebok.**
+> - ⚠️ El **`"?"` heredado** de `pedidos-unificado` (envío activo sin `numero_interno` ni `pedido_switch_id` — hoy **0 casos**) NO se pinta como si fuera un número: se dice *«Pedido en Switch, sin número»*. Un signo de pregunta donde va un número es el vacío que parece un dato.
+>
+> ### 🔴 NO SON COLUMNAS NUEVAS: van DEBAJO DEL NOMBRE
+>
+> Dos columnas más ensanchan la tabla justo en el **iPad acostado (1024)**, que es el ancho donde este repo ya se quemó. Los números van como **segunda línea bajo el cliente**: la tabla crece **hacia ABAJO**, que es gratis. La tabla conserva **exactamente sus 6 columnas** y hay candado que las cuenta tabla por tabla.
+> - 🩸 **Y aun sin columna nueva la tabla pedía 13 px de más en el iPad de 834**: el número de Switch es un token largo y subía el `min-content` de la columna Cliente de 95 a 108 px. **Los gutters de ESA columna se aprietan por debajo de `lg`** (`px-2 lg:px-4`) — de `lg` para arriba no cambia un píxel. ⛔ **Se probó `overflow-wrap: anywhere` y se DESCARTÓ midiendo**: arregla el ancho, pero **parte el número por la mitad** en 12 de 19 filas de Reebok y 17 de 20 de Tommy a 390 y 834 px. Un número cortado en dos es exactamente lo que este cambio vino a evitar.
+>
+> ### El buscador encuentra por los DOS números
+>
+> Pasó de *«Buscar por cliente…»* a **«Buscar por cliente o número…»**: el número que Daniel tiene a mano puede ser el de la casa o el que le dice el ERP. Es el mismo `textoBuscablePedido` del módulo puro.
+>
+> ### De dónde salen (sin DDL, sin consultas nuevas por fila)
+>
+> `order_number` **NO está en la vista unificada** (que expone `id_natural`, el uuid), así que `/[marca]/pedidos-unificado` lo pide a la tabla de orders **en UNA sola query por ids** (`.in("id", orderIds)`), al lado de la de envíos que ya existía. Sin DDL y sin barrer la tabla entera — hay mutación para las dos cosas. **`switch_numero` no cambió de significado** (lo usa el modal de eliminación masiva y no se tocó); lo nuevo son `numero_pedido` y `switch_documento`.
+>
+> ### Medición
+>
+> **Los 3 anchos + el iPad acostado, en el navegador contra el build de producción, con datos de producción, en las 4 marcas y con TODOS los meses desplegados, y CONTRA `origin/main`** (`BASE=… ETAPA=antes|despues node scripts/_medir-pedidos-numeros-anchos.mjs`, solo lectura — el navegador **aborta todo pedido que no sea GET**):
+>
+> | recorte de la tabla | 390 | 834 | **1024** | 1440 |
+> |---|---:|---:|---:|---:|
+> | `origin/main` | 214 · 201 · 227 · 211 | 0 · 0 · **7** · 0 | **0** | 0 |
+> | esta rama | 217 · 209 · **218** · 214 | **0 · 0 · 0 · 0** | **0** | 0 |
+>
+> **0 px de arrastre de página en los 16 casos · 0 textos <12 px · táctiles <44 px IDÉNTICOS a main** (reebok 57 · joybees 3 · tommy 60 · calvin 12 — son las casillas de 16 px y los botones «Editar»/«Eliminar» de 28 px de alto, **PRE-EXISTENTES**, en código que este cambio no toca). El recorte de 390 px es el `overflow-x-auto` que la tabla ya declaraba —arrastrarla ES el mecanismo— y **Tommy MEJORÓ ahí** (227 → 218). Escrituras bloqueadas: las mismas 12 de main (Sentry).
+> - 🩸 **El script FALLA si alguna fila no trae sus dos números**, si aparece un guion suelto donde va un número, o si alguna tabla deja de tener 6 columnas.
+> - 🩸 **Gotcha de medición que daba «no apareció la tabla» por nada:** por defecto solo se abre el mes ACTUAL, y **los 19 pedidos de Reebok son de julio** — sin desplegar los meses NO hay una sola fila en el DOM. Primero se despliega, después se esperan las filas.
+>
+> ### Candados
+>
+> `src/__tests__/lib/numeros-pedido.test.ts` (la regla y las palabras) · **`src/__tests__/components/pedidos-numeros-en-la-lista.test.tsx` (CONDUCTA: renderiza la pestaña real, lee el DOM, cuenta los `<th>`, verifica que los dos números vivan DENTRO de la celda del cliente y que ninguna otra celda los repita, y compara la segunda línea de Reebok y Joybees carácter por carácter)** · `src/__tests__/api/pedidos-unificado-numeros.test.ts` (contrato en las 4 marcas + el escalón tolerante del DDL) · `catalogo-paridad-listas.test.ts`, actualizado.
+> - **Verificado por mutación, 18 de 18 cazadas** (`bash scripts/_mutar-candados-pedidos-numeros.sh`): el número de Switch se pinta solo · toda cotización se rotula como pedido · el que no salió vuelve a decir «—» · el del link vuelve a un blanco · nadie está en Switch · todos están en Switch · el «?» se pinta como número · el número propio se ignora · el buscador vuelve a mirar solo el cliente (en el módulo y en la pantalla) · la fila deja de dibujar los números · deja de pintar el de Switch · deja de pintar el propio · el pedido del link se trata como interno · el número no viaja al navegador · qué se mandó no viaja · se pierde el escalón tolerante del DDL · los `order_number` se piden barriendo la tabla entera.
+> - 🩸 **La restauración del script va por COPIA, no con `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada — las mutaciones se apilarían y ninguna se probaría por separado.
+>
+> ### Lo que NO se tocó
+>
+> El modal de eliminación masiva y su `switch_numero` · el candado at-most-once · el envío a Switch · la agrupación por mes · el routing de «Editar» (fila y botón al MISMO lado) · el Excel de «Exportar» · y **nada del detalle del pedido**.
+
 ## 🔴 Pedidos — EL CLIENTE SE ELIGE, NUNCA VIENE PUESTO (14-ago-2026)
 
 > El checkout del catálogo nacía con **`Contado` PUESTO** y "Enviar a Switch" no exigía tocar nada: se armaba el pedido, se apretaba, y salía a nombre de Contado sin que nadie lo notara. Daniel, textual: ***"Que arranque vacío y el botón apagado hasta elegir cliente."***
