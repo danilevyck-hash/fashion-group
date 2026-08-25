@@ -13,6 +13,7 @@ import {
   esEntregaDirecta,
   guiaSinNumeroTransp,
   guiaYaDespachada,
+  numerosTranspDeLaGuia,
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
@@ -137,6 +138,8 @@ export default function GuiasList({
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  const [imprimiendo, setImprimiendo] = useState(false);
+
   function toggleSelect(id: string) {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -146,11 +149,41 @@ export default function GuiasList({
     });
   }
 
-  function printSelected() {
-    if (selectedIds.size === 0) return;
-    const ids = Array.from(selectedIds);
-    // Open each in a new tab for printing
-    ids.forEach(id => window.open(`/guias/${id}/imprimir`, '_blank'));
+  /**
+   * 🔴 UN SOLO PDF CON TODAS LAS SELECCIONADAS.
+   *
+   * 🩸 Antes abría **una pestaña por guía** y adentro de cada una había que
+   * apretar Imprimir: el navegador bloquea todas menos la primera, así que se
+   * seleccionaban 8 guías esperando 8 papeles y salía UNA pestaña. Ahora baja
+   * un documento con las 8, una por página, listo para la impresora.
+   *
+   * ⚠️ Las guías van en el orden en que se ven en la lista, no en el orden en
+   * que se fueron tocando: `Set` conserva el orden de inserción, y un papel
+   * salteado es imposible de encontrar en una pila de ocho.
+   */
+  async function printSelected() {
+    if (selectedIds.size === 0 || imprimiendo) return;
+    setImprimiendo(true);
+    try {
+      const seleccionadas = guias.filter((g) => selectedIds.has(g.id));
+      // El detalle de los envíos NO viaja en el listado: se pide guía por guía,
+      // igual que hace la pantalla de imprimir. Sin esto el papel saldría sin
+      // renglones.
+      const completas = await Promise.all(
+        seleccionadas.map(async (g) => {
+          try {
+            const r = await fetch(`/api/guias/${g.id}`, { cache: "no-store" });
+            return r.ok ? ((await r.json()) as Guia) : g;
+          } catch {
+            return g;
+          }
+        }),
+      );
+      const { construirPdfGuias, nombreArchivoGuias } = await import("@/lib/guias/pdf-guia");
+      construirPdfGuias(completas).save(nombreArchivoGuias(completas));
+    } finally {
+      setImprimiendo(false);
+    }
   }
 
   async function exportSelectedExcel() {
@@ -179,7 +212,7 @@ export default function GuiasList({
                 {selectedIds.size > 0 && (
                   <>
                     {/* py-2 daba 36 px de alto: por debajo del mínimo táctil de 44. */}
-                    <button onClick={printSelected} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 rounded-md active:bg-gray-100 transition-all inline-flex items-center justify-center min-h-[44px]">Imprimir todas</button>
+                    <button onClick={() => { void printSelected(); }} disabled={imprimiendo} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 rounded-md active:bg-gray-100 transition-all inline-flex items-center justify-center min-h-[44px] disabled:opacity-50">{imprimiendo ? "Preparando…" : "Imprimir todas"}</button>
                     <button onClick={exportSelectedExcel} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 rounded-md active:bg-gray-100 transition-all inline-flex items-center justify-center min-h-[44px]">&darr; Excel</button>
                   </>
                 )}
@@ -302,7 +335,12 @@ export default function GuiasList({
                       String(g.numero).includes(q) ||
                       `gt-${String(g.numero).padStart(3, "0")}`.includes(q) ||
                       (g.transportista || "").toLowerCase().includes(q) ||
-                      (g.numero_guia_transp || "").toLowerCase().includes(q) ||
+                      // 🔴 Los N° del transportista de LAS LÍNEAS, no solo el
+                      // de la cabecera: el que se anota tarde escribe UNA
+                      // columna de UNA línea y no toca la cabecera, así que
+                      // esa guía no se podía encontrar nunca más. Misma fuente
+                      // que el papel y que el Excel.
+                      numerosTranspDeLaGuia(g).some((n) => n.toLowerCase().includes(q)) ||
                       (g.guia_items || []).some(
                         (item: GuiaItem) =>
                           (item.facturas || "").toLowerCase().includes(q) ||

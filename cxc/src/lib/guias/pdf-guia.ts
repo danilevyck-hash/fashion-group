@@ -35,6 +35,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { fmtDate, fmtGuia } from "@/lib/format";
+import { nombreDespachadoPor } from "@/lib/guias/despachado-por";
 import type { Guia } from "@/app/guias/components/types";
 import {
   ETIQUETA_TIPO_DESPACHO,
@@ -151,8 +152,21 @@ function bloqueFirma(
  * Arma el PDF de la guía. Es un espejo de `PrintDocument.tsx` — mismo título,
  * mismos campos, misma tabla, mismas firmas y el mismo texto legal.
  */
-export function construirPdfGuia(g: Guia): jsPDF {
-  const doc = new jsPDF({ unit: "mm", format: "letter", orientation: "portrait" });
+function nuevoDocumento(): jsPDF {
+  return new jsPDF({ unit: "mm", format: "letter", orientation: "portrait" });
+}
+
+/**
+ * Dibuja UNA guía en la página ACTUAL del documento.
+ *
+ * 🔑 Se extrajo de `construirPdfGuia` sin tocar una sola línea de lo que
+ * dibuja: lo único que se le sacó fue el `new jsPDF()` del principio y el
+ * `return` del final. Es lo que permite meter varias guías en un solo PDF
+ * (una por página) **sin escribir un segundo generador** — dos papeles que se
+ * parecen es uno que se corrige y otro que se queda viejo, y acá el que se
+ * quedaría viejo es el que alguien firma.
+ */
+function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   const items = g.guia_items ?? [];
   const bultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
   // Ver `PrintDocument.tsx`: el modo sale de `modo_entrega` mientras la guía no
@@ -178,7 +192,7 @@ export function construirPdfGuia(g: Guia): jsPDF {
   // En entrega directa no hay placa que declarar (nuestro propio camión), y un
   // "0" no es una placa: es lo que alguien tecleó para pasar la validación.
   if (!esDirecta) campos.push(["PLACA / VEHICULO:", sinCeroPelado(g.placa)]);
-  campos.push(["DESPACHADO POR:", g.entregado_por ?? ""]);
+  campos.push(["DESPACHADO POR:", nombreDespachadoPor(g.entregado_por)]);
   campos.push(["TIPO:", ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]]);
   // ⚠️ Solo se anuncia arriba cuando hay UN número en toda la guía; con varios
   // por línea, un encabezado con uno de ellos mentiría. Ver `PrintDocument`.
@@ -251,7 +265,7 @@ export function construirPdfGuia(g: Guia): jsPDF {
   const colW = ANCHO / 2 - 6;
   bloqueFirma(doc, MARGIN, y, colW, {
     titulo: esDirecta ? "Chofer" : "Despachado por",
-    nombre: (esDirecta ? g.nombre_chofer : g.entregado_por) ?? "",
+    nombre: esDirecta ? (g.nombre_chofer ?? "") : nombreDespachadoPor(g.entregado_por),
     firma: g.firma_base64,
     pie: "Nombre y firma",
   });
@@ -272,5 +286,41 @@ export function construirPdfGuia(g: Guia): jsPDF {
   doc.text(doc.splitTextToSize(TEXTO_LEGAL, ANCHO), PAGE_W / 2, pieY + 5, { align: "center" });
   doc.setTextColor(0);
 
+}
+
+/** El PDF de UNA guía, exactamente el de siempre. */
+export function construirPdfGuia(g: Guia): jsPDF {
+  const doc = nuevoDocumento();
+  dibujarGuiaEnPdf(doc, g);
   return doc;
+}
+
+/**
+ * 🔴 UN SOLO PDF CON VARIAS GUÍAS — una por página, en el orden recibido.
+ *
+ * 🩸 «Imprimir todas» abría **una pestaña por guía** y adentro de cada una
+ * había que apretar Imprimir. El navegador bloquea todas menos la primera, así
+ * que se seleccionaban 8 guías esperando 8 papeles y salía UNA pestaña. Ahora
+ * se baja un solo documento con las 8, listo para mandar a la impresora.
+ *
+ * ⚠️ Con una sola guía devuelve EXACTAMENTE el mismo documento que
+ * `construirPdfGuia` (mismo generador, misma página, sin hoja de más): no hay
+ * un "modo lote" que dibuje distinto. Sin guías devuelve el documento vacío y
+ * quien llama decide qué hacer — inventar una hoja en blanco sería peor.
+ */
+export function construirPdfGuias(guias: readonly Guia[]): jsPDF {
+  const doc = nuevoDocumento();
+  guias.forEach((g, i) => {
+    // La primera va en la página que el documento ya trae: una `addPage()` de
+    // más deja una hoja en blanco al principio de todo lo que se imprima.
+    if (i > 0) doc.addPage();
+    dibujarGuiaEnPdf(doc, g);
+  });
+  return doc;
+}
+
+/** Cómo se llama el archivo cuando lleva varias guías adentro. */
+export function nombreArchivoGuias(guias: readonly Guia[]): string {
+  if (guias.length === 1) return nombreArchivoGuia(guias[0]);
+  return `Guias-${guias.length}-${new Date().toISOString().slice(0, 10)}.pdf`;
 }

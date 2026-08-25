@@ -59,6 +59,7 @@ import AddNewInline from "./AddNewInline";
 import ClientePicker from "@/components/ClientePicker";
 import { ScrollableTable } from "@/components/ui";
 import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, opcionesEmpresa } from "./guia-form-logic";
+import { ENTREGADO_POR_OTRO, entregadoPorElegido } from "@/lib/guias/despachado-por";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
@@ -643,17 +644,22 @@ export default function GuiaForm({
               id="guia-entregado-por"
               value={entregadoPor}
               onChange={e => { setEntregadoPor(e.target.value); marcarTocado("entregadoPor"); }}
-              className={ctrl(hayError("entregadoPor", entregadoPor), "appearance-none")}
+              className={ctrl(hayError("entregadoPor", entregadoPorElegido(entregadoPor) ? entregadoPor : ""), "appearance-none")}
             >
               <option value="">Seleccionar...</option>
               {entregadores.map(e => <option key={e} value={e}>{e}</option>)}
-              <option value="__other__">Otro...</option>
+              <option value={ENTREGADO_POR_OTRO}>Otro...</option>
             </select>
-            {entregadoPor === "__other__" && (
-              <input type="text" placeholder="Nombre de quien entrega" value={entregadoPorOtro}
-                onChange={e => setEntregadoPorOtro(e.target.value)}
-                onBlur={() => { if (entregadoPorOtro.trim()) addEntregador(entregadoPorOtro); }}
-                className={`${ctrl(false)} mt-3`} />
+            {entregadoPor === ENTREGADO_POR_OTRO && (
+              <>
+                <input type="text" placeholder="Nombre de quien entrega" value={entregadoPorOtro}
+                  onChange={e => setEntregadoPorOtro(e.target.value)}
+                  onBlur={() => { if (entregadoPorOtro.trim()) addEntregador(entregadoPorOtro); }}
+                  className={`${ctrl(true)} mt-3`} />
+                {/* 🔴 Se dice ANTES de guardar, no después de imprimir: hasta
+                    que haya un nombre, "Despachado por" está SIN elegir. */}
+                <ErrorCampo>Escribe el nombre de quien despacha</ErrorCampo>
+              </>
             )}
           </Campo>
 

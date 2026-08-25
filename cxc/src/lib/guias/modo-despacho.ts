@@ -134,6 +134,41 @@ export function numeroTranspUnicoImpreso(
 }
 
 /**
+ * 🔴 TODOS LOS N° DEL TRANSPORTISTA DE UNA GUÍA, tal como los IMPRIME el papel.
+ *
+ * Es el de CADA renglón, con la herencia de la cabecera para las guías viejas y
+ * el `"0"` pelado tratado como vacío — las mismas dos reglas que ya aplican
+ * `PrintDocument`, `pdf-guia` y el chip ámbar. Sin repetidos y sin vacíos, en el
+ * orden de los renglones.
+ *
+ * 🩸 POR QUÉ EXISTE: el Excel y el buscador miraban **solo**
+ * `guia_transporte.numero_guia_transp`, o sea el de la CABECERA. Desde el
+ * 18-ago-2026 se puede anotar el número tarde, y eso escribe UNA columna de UNA
+ * línea **sin tocar la cabecera** — así que el reporte que sirve justo para
+ * reclamarle al transportista mostraba **"—"** en guías que sí lo tenían
+ * cargado, y buscar por ese número no las encontraba nunca.
+ *
+ * ⚠️ No mira el modo de entrega a propósito: en entrega directa los números se
+ * escriben VACÍOS al despachar, así que no hay nada que ocultar acá y meter la
+ * regla de nuevo sería una tercera copia de algo que ya se decide al guardar.
+ */
+export function numerosTranspDeLaGuia(g: {
+  numero_guia_transp?: string | null;
+  guia_items?: ReadonlyArray<{ numero_guia_transp?: string | null }> | null;
+}): string[] {
+  // 🔑 El `"0"` pelado y la herencia línea → cabecera las resuelve
+  // `numeroTranspImpreso`, que es lo MISMO que imprime el papel. Repetir acá
+  // `sinCeroPelado` sería una segunda definición de "qué número es de verdad".
+  const cabecera = g.numero_guia_transp ?? null;
+  const items = g.guia_items ?? [];
+  // Sin líneas cargadas, lo único que hay es la cabecera.
+  const crudos = items.length
+    ? items.map((i) => numeroTranspImpreso(i.numero_guia_transp, cabecera))
+    : [numeroTranspImpreso(null, cabecera)];
+  return [...new Set(crudos.map((n) => n.trim()).filter(Boolean))];
+}
+
+/**
  * 🔴 LA MARCA DE "LE FALTA EL N° DEL TRANSPORTISTA", para la lista de guías.
  *
  * El número dejó de bloquear el despacho (Daniel: *"a veces el transportista lo

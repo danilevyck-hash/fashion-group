@@ -913,6 +913,60 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - 🩸 **DOS mutaciones sobrevivieron en la primera corrida y las dos eran candados flojos, no producto sano.** (a) El defecto B no se cazaba porque el test escribía en el CLIENTE del segundo envío, y ése es el `ClientePicker`: teclear ahí no le mueve el estado al formulario, así que el autoguardado nunca se disparaba — se cambió por la DIRECCIÓN, que es un `<input>` pelado. (b) La mutación del `finally` no reproducía nada porque **el `catch` ya destraba el botón**: la mutación fiel devuelve el código a como estaba, sin red de seguridad.
 > - 🩸 **El script de mutación restaura por COPIA, no con `git checkout`** (hay archivos NUEVOS y git aborta el comando entero), **y exige encontrar el resumen de vitest antes de creerle a un cero**: con `pipefail`, un `head -1` cortando el pipe hacía que la corrida se leyera como muerta al azar.
 
+## 🔴 Guías — CUATRO DEFECTOS DE LA MISMA AUDITORÍA (25-ago-2026)
+
+> ### 1. 🩸 EL N° DEL TRANSPORTISTA SE COPIABA A TODOS LOS ENVÍOS
+>
+> El número que la secretaria escribe **una vez** al crear la guía se **prellenaba en los 7 renglones**: bodega abría la guía y los encontraba todos llenos con el mismo, así que tenía que borrarlos y corregirlos uno por uno — o el papel salía mal. **Es exactamente lo contrario de lo que se decidió el 10-ago-2026** (Daniel: *"la info de guia de transp, debe de ser por linea, no por guia porque nos hacen varias guias el transportista por guia"*).
+>
+> La línea era `items.map((it) => it.numero_guia_transp || cabecera || "")` en `useDespachoGuia`. Ahora **cada caja arranca con el número de SU línea y con nada más**.
+> - ⚠️ **LA HERENCIA NO SE FUE**: sigue viva donde siempre estuvo, que es al IMPRIMIR y al MOSTRAR (`numeroTranspDeLinea` / `numeroTranspImpreso`). Una guía histórica sale en el papel igual que siempre. Lo que se quitó es prellenar un campo EDITABLE con un valor que después se **ESCRIBE** en las 7 líneas como si alguien lo hubiera puesto ahí.
+> - 🔴 **Y ESO ABRÍA UN EFECTO COLATERAL QUE HABÍA QUE TAPAR EN EL MISMO PR.** Con las cajas vacías, lo normal pasa a ser despachar sin ningún número —*"a veces el transportista lo da, a veces no"*— y `numeroGuiaDeCabecera` devuelve `""`. Escribir ese `""` **borraría el número que la secretaria anotó al crear la guía**, en el momento del despacho y sin que nadie lo pidiera. Regla nueva con nombre: **`numeroCabeceraAlDespachar(numerosTransp, cabeceraActual)`** — si ninguna línea trae número, se conserva el que ya estaba; si alguna trae, gana la línea (es el dato más específico y es el que el papel imprime).
+> - **El número anotado al crear la guía SE DICE, no se copia**: arriba de la lista, *"Al crear la guía se anotó **TR-4471** para toda la guía: si el transportista dio uno por envío, escríbelo acá."* Escondido del todo, quien despacha no sabría que ya hay uno.
+>
+> ### 2. «IMPRIMIR TODAS» NO IMPRIMÍA NADA
+>
+> Abría **una pestaña por guía** y adentro de cada una había que apretar Imprimir; el navegador bloquea todas menos la primera. Se seleccionaban 8 guías esperando 8 papeles y salía **una pestaña**.
+>
+> **Ahora baja UN solo PDF con todas, una por página**, listo para la impresora.
+> - 🔑 **NO se escribió un segundo generador.** `construirPdfGuia` se partió en `dibujarGuiaEnPdf(doc, g)` **sin tocar una línea de lo que dibuja** —solo se le sacaron el `new jsPDF()` del principio y el `return` del final— y `construirPdfGuias(guias)` lo llama una vez por guía. Con UNA sola guía el documento es **byte por byte el mismo** que el de siempre (hay candado que compara los dos, salvo la fecha de creación): no existe un "modo lote" que dibuje distinto.
+> - **La primera guía va en la página que el documento ya trae**: un `addPage()` de más deja una hoja en blanco al principio de todo lo que se imprima.
+> - **El detalle de los envíos se pide guía por guía** (`GET /api/guias/[id]`), igual que hace la pantalla de imprimir: el listado no lo trae y sin eso el papel saldría sin renglones.
+> - Las guías salen **en el orden en que se ven en la lista** (`Set` conserva el orden de inserción), no en el que se fueron tocando: un papel salteado es imposible de encontrar en una pila de ocho.
+>
+> ### 3. EL EXCEL DECÍA «—» EN EL N° DEL TRANSPORTISTA AUNQUE ESTUVIERA ANOTADO
+>
+> `excel-guias.ts` leía `g.numero_guia_transp` —la CABECERA—, y desde el 18-ago-2026 el número **se puede anotar tarde**: eso escribe UNA columna de UNA línea y **no toca la cabecera**. O sea que **el reporte que sirve justo para reclamarle al transportista mostraba vacío lo que sí estaba cargado**. Y el buscador de la lista tenía el mismo defecto: esa guía **no se podía encontrar nunca más** (el chip ámbar sí se apagaba bien, ése ya se había arreglado).
+>
+> **Fuente única: `numerosTranspDeLaGuia(g)`** (`modo-despacho.ts`) — el número de CADA renglón, con la herencia de la cabecera para las guías viejas y el `"0"` pelado tratado como vacío, sin repetidos y sin vacíos. **Las mismas dos reglas que ya aplican el papel y el chip ámbar**, porque las delega en `numeroTranspImpreso` en vez de reescribirlas.
+> - **Con varios números distintos, el Excel los lista TODOS** (`TR-4471, TR-9999`): poner uno solo sería elegir por el lector. Sin ninguno sigue diciendo «—».
+> - ⚠️ **No mira el modo de entrega a propósito**: en entrega directa los números se escriben VACÍOS al despachar, así que no hay nada que ocultar acá y meter la regla otra vez sería una tercera copia de algo que ya se decide al guardar.
+>
+> ### 4. SE IMPRIMÍA `__other__` EN EL PAPEL QUE FIRMA EL TRANSPORTISTA
+>
+> El desplegable «Despachado por» tiene una opción `Otro…` cuyo `value` es el centinela `__other__`. Al elegirla aparece un campo para escribir el nombre y recién ahí se reemplaza — pero **si nadie escribe nada, la guía se guarda con el centinela y así sale IMPRESO**: `DESPACHADO POR: __other__`. La validación solo miraba que el campo no estuviera vacío.
+>
+> ✅ **Medido contra producción el 25-ago-2026 sobre las 212 guías vivas: `Julio ×178 · Rodrigo ×31 · vacío ×3` — CERO con `__other__`.** Era un defecto **LATENTE**: la puerta estaba abierta y nadie había pasado, así que **no hay nada que corregir hacia atrás**.
+>
+> 🔴 **SE TAPA POR LOS DOS LADOS, y hacen falta los dos** (`src/lib/guias/despachado-por.ts`, módulo PURO):
+> 1. **El formulario no deja guardarlo** — `validarGuia` lo trata como "sin elegir", así que el botón se apaga y dice *"Falta: quién despacha"*, y el campo de texto queda en rojo con *"Escribe el nombre de quien despacha"*. Se dice ANTES de guardar, no después de imprimir.
+> 2. **El papel no lo imprime NUNCA** (`nombreDespachadoPor`, en `PrintDocument` y en `pdf-guia`): es la red para cualquier fila que ya estuviera guardada así, y para el día que alguien escriba una tercera pantalla que guarde este campo. Con el centinela devuelve `""` — la línea queda en blanco para escribirla a mano, que es lo único honesto.
+>
+> El módulo vive en `lib/` y no junto al formulario porque **los DOS papeles lo necesitan**, y `lib/` no puede importar de `app/`.
+>
+> ### Medición
+>
+> **Los 3 anchos + el iPad acostado, en el navegador contra el build de producción** (`BASE=… node scripts/_medir-guias-numero-por-linea.mjs`, solo lectura): **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 textos bajo 12 px, 0 tocables bajo 44 px** en la guía, y las **3 cajas del N° VACÍAS** con el número de la cabecera DICHO arriba. Con «Otro…» elegido y sin nombre: el aviso a la vista, el botón apagado y el *"Falta: … quién despacha"*.
+> - 🩸 **La guía pendiente es un DOBLE** (en producción no hay ninguna): se intercepta el GET y **se aborta cualquier pedido que no sea GET**. El script **falla** si no encuentra las cajas, si alguna viene con el número copiado, si no se dice la cabecera, o si «Otro…» no avisa.
+>
+> ### Candados
+>
+> `src/__tests__/lib/guias-numero-por-linea-y-papel.test.ts` (25) y **`src/__tests__/components/guias-numero-transp-no-se-copia.test.tsx` (4), que RENDERIZA la página real y lee el `value` de cada caja** — un barrido sobre el hook ve la expresión, pero no lo único que importa: qué encuentra bodega escrito en los campos. El PDF se **genera de verdad** y se lee (páginas y contenido), y el Excel se arma y se leen sus celdas.
+> - ⚠️ **Un candado viejo CAMBIÓ DE DIRECCIÓN**: `guias-modo-despacho.test.ts` fijaba `payload.numero_guia_transp = numeroGuiaDeCabecera(numerosTransp)` — correcto mientras las cajas nacían prellenadas, y **la línea exacta que ahora borraría el número**. Hoy exige lo que siempre quiso decir: que la cabecera se mande (no se omita).
+> - **Verificado por mutación, 17 de 17 cazadas** (`bash scripts/_mutar-candados-numero-por-linea.sh`).
+> - 🩸 **TRES mutaciones sobrevivieron en la primera corrida y las tres enseñaron algo distinto.** Dos eran del SCRIPT (un em-dash y un ` ` que el patrón de perl no matcheaba, o sea que la mutación nunca se aplicó y el verde era falso). **La tercera era código REDUNDANTE**: `numerosTranspDeLaGuia` volvía a aplicar `sinCeroPelado` a la cabecera cuando `numeroTranspImpreso` ya lo hace adentro — quitarlo no rompía nada porque no hacía nada. Se borró la redundancia y la mutación pasó a atacar lo que de verdad sostiene la regla.
+> - 🩸 **La restauración va por COPIA, no con `git checkout`** (hay archivos NUEVOS) **y `probar()` exige encontrar el resumen de vitest** antes de creerle a un cero.
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`

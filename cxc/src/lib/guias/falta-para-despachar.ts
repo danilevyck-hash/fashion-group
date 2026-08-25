@@ -137,6 +137,29 @@ export function numeroGuiaDeCabecera(numerosTransp: readonly string[]): string {
 }
 
 /**
+ * 🔴 QUÉ SE ESCRIBE EN LA CABECERA AL DESPACHAR — y por qué no es solo lo de
+ * arriba.
+ *
+ * Las cajas del N° por línea nacen VACÍAS desde el 25-ago-2026: antes se
+ * prellenaban con el de la cabecera y bodega encontraba las 7 iguales. Con eso
+ * corregido, lo normal es despachar con todas vacías —*"a veces el
+ * transportista lo da, a veces no"*— y `numeroGuiaDeCabecera` devuelve "".
+ *
+ * 🩸 Escribir ese "" **borraría el número que la secretaria anotó al crear la
+ * guía**, en el mismo momento del despacho y sin que nadie lo pidiera. Así que
+ * cuando ninguna línea trae número, se conserva el que ya estaba.
+ *
+ * ⚠️ Si alguna línea SÍ trae, gana la línea: es el dato más específico y es el
+ * que el papel imprime.
+ */
+export function numeroCabeceraAlDespachar(
+  numerosTransp: readonly string[],
+  cabeceraActual: string | null | undefined,
+): string {
+  return numeroGuiaDeCabecera(numerosTransp) || String(cabeceraActual ?? "").trim();
+}
+
+/**
  * El número que IMPRIME una línea. Las guías viejas no tienen número por línea
  * —se guardaba uno solo para toda la guía— así que el papel de una guía
  * histórica tiene que seguir saliendo igual que siempre: si la línea no trae el
