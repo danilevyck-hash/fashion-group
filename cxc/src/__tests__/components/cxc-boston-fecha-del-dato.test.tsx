@@ -161,6 +161,33 @@ describe("con el dato FRESCO, el aviso NO aparece", () => {
   });
 });
 
+describe("el aviso es un EXTRA: nunca se lleva puesta la cartera", () => {
+  it("si la respuesta viene sin `stale`, los números se siguen viendo", async () => {
+    // 🩸 `buildWarning` hacía `stale.length` a secas. Una respuesta sin el campo
+    // —un 200 de un proxy, una versión vieja cacheada— tumbaba el render ENTERO
+    // y la pestaña se quedaba EN BLANCO: se perdía la cartera por un aviso.
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url);
+      const cuerpo = u.startsWith("/api/sync-status")
+        ? { ok: true, tabla: "estadocuenta", last_global: CONGELADA_ISO, por_empresa: {} } // sin `stale`
+        : u.startsWith("/api/cxc/favorites")
+          ? { favorites: [] }
+          : CARTERA_BOSTON_RESPUESTA;
+      return { ok: true, status: 200, json: async () => cuerpo } as unknown as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+        <BostonTab />
+      </SWRConfig>,
+    );
+    await waitFor(() => expect(textoPintado()).toContain("187,018.00"));
+    // La fecha sí se pinta; el ámbar simplemente no, que es lo correcto.
+    expect(textoPintado()).toMatch(/Actualizado:/);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+});
+
 describe("🔴 el aviso no mezcla a Boston con el grupo", () => {
   it("solo le pregunta por confecciones_boston, nunca por las 6 del grupo", async () => {
     const fetchMock = montar(CONGELADA_ISO, true);

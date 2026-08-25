@@ -59,12 +59,29 @@ function nuevaQuery(tabla: string, op: "upsert" | "update", extra: Partial<Llama
   return q;
 }
 
+/**
+ * Clientes con saldo que la tabla "ya conoce" — la vara del guard del reporte
+ * incompleto. Por defecto NINGUNO, que es el caso de la primera carga: sin vara
+ * el guard deja pasar, así que los tests que no hablan de él no se enteran.
+ */
+let clientesConocidosMock: Array<{ cliente_switch_id: number }> = [];
+
+/** La LECTURA del guard: `.select().eq().neq().range()` y se espera. */
+function nuevaLectura() {
+  const q: Record<string, unknown> = {};
+  for (const m of ["eq", "neq", "lt", "gt", "not", "in"]) q[m] = () => q;
+  q.range = (desde: number) =>
+    Promise.resolve({ data: desde === 0 ? clientesConocidosMock : [], error: null });
+  return q;
+}
+
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
     from: (tabla: string) => ({
       upsert: (filas: unknown[], opts?: { onConflict?: string }) =>
         nuevaQuery(tabla, "upsert", { filas, onConflict: opts?.onConflict }),
       update: (parche: Record<string, unknown>) => nuevaQuery(tabla, "update", { parche }),
+      select: () => nuevaLectura(),
     }),
   },
 }));
@@ -119,6 +136,7 @@ beforeEach(() => {
   llamadas.length = 0;
   reconcileDevuelve = [];
   upsertFalla = null;
+  clientesConocidosMock = [];
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -390,6 +408,42 @@ describe("B. el RECONCILE", () => {
     const r = await syncCarteraWeb({ reporte: reporte(sinDocs, []) });
     expect(r.ok).toBe(false);
     expect(llamadas).toHaveLength(0);
+  });
+
+  it("⛔ un reporte CORTO no escribe ni reconcilia (les pondría la deuda en CERO)", async () => {
+    // 🔴 EL CASO QUE EL CUADRE NO PUEDE VER. El fixture trae 6 clientes con
+    // saldo; si la tabla ya conoce 383, esto es una descarga a medias — y el
+    // reconcile le pondría `saldo = 0` a los 377 que faltan, en silencio y con
+    // la corrida anotada `success`. El cuadre no lo atrapa: compara el reporte
+    // contra los totales DEL MISMO reporte, así que un reporte corto cuadra al
+    // centavo consigo mismo.
+    clientesConocidosMock = Array.from({ length: 383 }, (_, i) => ({ cliente_switch_id: i + 1 }));
+    const r = await syncCarteraWeb({ reporte: reporte(FIXTURE.clientes, FIXTURE.saldosTotales) });
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/incompleto/i);
+    expect(r.error).toMatch(/383/);
+    expect(llamadas).toHaveLength(0); // ni un upsert, ni un update
+  });
+
+  it("un reporte del tamaño de siempre SÍ escribe (el guard no es un freno de mano)", async () => {
+    // La otra dirección: con una vara que el reporte supera, todo sigue igual.
+    // Sin esto, un guard que bloqueara SIEMPRE también pasaría el test de arriba.
+    const conSaldo = new Set(
+      FIXTURE.clientes.map((c) => c.clienteId).filter((x): x is number => typeof x === "number"),
+    ).size;
+    clientesConocidosMock = Array.from({ length: conSaldo }, (_, i) => ({ cliente_switch_id: i + 1 }));
+    reconcileDevuelve = [{ ccte_id: 1 }];
+    const r = await syncCarteraWeb({ reporte: reporte(FIXTURE.clientes, FIXTURE.saldosTotales) });
+    expect(r.ok).toBe(true);
+    expect(llamadas.some((l) => l.op === "upsert")).toBe(true);
+    expect(llamadas.some((l) => l.op === "update")).toBe(true);
+  });
+
+  it("⛔ un DRY-RUN corto también falla: existe para saber si se puede escribir", async () => {
+    clientesConocidosMock = Array.from({ length: 383 }, (_, i) => ({ cliente_switch_id: i + 1 }));
+    const r = await syncCarteraWeb({ reporte: reporte(FIXTURE.clientes, FIXTURE.saldosTotales), dryRun: true });
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/incompleto/i);
   });
 
   it("⛔ si no cuadra con lo que publica Switch, no se escribe NADA", async () => {

@@ -27,6 +27,14 @@ import { resolveSwitchEnvKey } from "./empresas";
 // baja el archivo. Una segunda copia de "¿esto es el CSV bueno?" es una que
 // alguien corrige y otra que se queda vieja.
 import { pareceCsvDeEgresos } from "@/lib/egresos/parser";
+// La TRADUCCIÓN del formato nuevo vive con el resto de la forma del reporte
+// (módulo puro), no acá: este archivo es TRANSPORTE. `estadocuenta-web` no
+// importa a `web-client`, así que no hay ciclo.
+import {
+  adaptarReporteConsola,
+  saldosTotalesDesdeTotales,
+  type ReporteConsola,
+} from "./estadocuenta-web";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
@@ -310,58 +318,121 @@ export async function fetchUtilidadMes(
 // ─── Reporte de ANTIGÜEDAD (cartera completa de una empresa) ─────────────────
 //
 // Es el mismo reporte que Daniel baja a mano desde `Reportes → Estado de cuenta
-// → Antigüedad`. Descubierto en vivo el 30-jul-2026 contra el panel de Boston:
+// → Antigüedad`, pero por el motor NUEVO de Switch.
 //
-//   1. GET  /estadodecuenta            → HTML con `var token = '…'`.
-//      ⚠️ La ruta es `/estadodecuenta`, NO `/estadocuenta`: esta última no
-//      existe y devuelve la página de excepción de Switch con HTTP 200.
-//   2. POST /estadodecuenta/obtener    → JSON.
-//      Se llama en RONDAS: mientras responde `{response: true}` (y nada más),
-//      el servidor sigue acumulando y hay que volver a pedir con `key += chunk`.
-//      La ronda que responde `response: false` trae el reporte entero.
+// 🩸 EL MOTOR VIEJO SE MURIÓ EL 19-ago-2026 A LAS 12:37:21. Hasta entonces esto
+// era `POST /estadodecuenta/obtener` en RONDAS (`chunk`/`key`, mientras
+// respondiera `{response:true}`). Ese endpoint dejó de existir: hoy devuelve la
+// página de excepción de Switch **con HTTP 200** y `Controller method not found`
+// adentro. La cartera de Boston quedó congelada 5 días (20 al 24 de agosto) y el
+// error que quedó en `switch_sync_log` fue, las 5 veces,
+// `cartera-fetch: respuesta no-JSON en la ronda 1 (status 200)`.
 //
-// ⚠️ Los filtros geográficos van en CADENA VACÍA, no en la palabra "null".
-// Con `pais: "null"` el endpoint responde 200 con `recordsTotal: 0` — o sea, una
-// cartera vacía perfectamente creíble. Es el modo de fallo más peligroso de este
-// reporte: no da error, da CERO. Por eso `syncCarteraWeb` se niega a escribir
-// (y sobre todo a reconciliar) cuando el reporte viene vacío.
+// El reemplazo está en el propio código del panel (`assets/js/reportesmanager.js`),
+// no en una suposición:
 //
-// ⚠️ `fechaHasta` NO sirve para pedir un corte histórico de la antigüedad: con
-// una fecha anterior a hoy el endpoint devuelve los saldos a esa fecha pero SIN
-// `elements`, o sea sin un solo documento. La antigüedad es siempre "al día de
-// hoy" (verificado con 2026-06-30 y 2026-01-31: 0 documentos en ambas).
+//   1. POST reportesmanager/crearreporteconsola
+//        → {response:true, uuid:"…", estatus:"CREADO"}
+//   2. GET  reportesmanager/buscarreporteconsola/<uuid>, cada 2.000 ms
+//        → {response, estatus, data:{data:[…clientes…], totales:{…}}}
+//        TERMINADO = listo · ERROR/CANCELADO = cortar · cualquier otro = seguir
+//
+// Y los parámetros salen de `assets/js/estadodecuenta.js`, del botón que dibuja
+// la tabla de antigüedad:
+//        $(".searchButton").click(() => generarEstadoCuentaCliente(today, today, '4'))
+// o sea `desde = hasta = hoy` con `claseReporte:'4'` (la rama que rinde saldos Y
+// antigüedad) y `tipoReporte:'ESTADOCUENTACLIENTE'`.
+//
+// Medido contra producción el 24-ago-2026: **391 clientes / 932 documentos, uuid
+// TERMINADO en ~4 s (2 sondeos)**, y el resultado CUADRA AL CENTAVO contra los
+// `totales` que publica el propio Switch, en las tres franjas.
+//
+// ⚠️ Ya NO hay rondas ni acumulador: el universo llega COMPLETO en la respuesta
+// del uuid. `rondas` sobrevive como telemetría y ahora cuenta SONDEOS.
+//
+// ⚠️ Los filtros geográficos siguen yendo en CADENA VACÍA, no en la palabra
+// "null". Con `pais: "null"` el reporte responde sin error y con CERO clientes —
+// el modo de fallo más peligroso que tiene: no da error, da CERO. Por eso
+// `syncCarteraWeb` se niega a escribir (y sobre todo a reconciliar) con un
+// reporte vacío. Los de segmentación sí van con la palabra "null", porque el
+// panel manda `JSON.stringify(null)`.
+//
+// 🔴 REGLA DE LA CASA, y acá se pagó cara: un endpoint de Switch se juzga por el
+// SHAPE de la respuesta, NUNCA por el status. El catch-all contesta 200 con HTML.
 
-/** Máximo de rondas del acumulador. 500 clientes por ronda; Boston tiene ~4.900
- *  con ficha y 400 con saldo, así que 60 rondas (30.000) es techo de sobra y a
- *  la vez frena un bucle infinito si el endpoint nunca dijera `response:false`. */
-const ANTIGUEDAD_MAX_RONDAS = 60;
-const ANTIGUEDAD_CHUNK = 500;
+/** Cada cuánto se le pregunta a Switch si el reporte terminó. Es el mismo
+ *  intervalo que usa el panel (`setTimeout(…, 2000)` en reportesmanager.js). */
+const CONSOLA_INTERVALO_MS = 2000;
+
+/** Techo de sondeos. Medido: el reporte de Boston termina en 2 (~4 s). 90 son
+ *  3 minutos — aire de sobra contra el techo de 800 s de la función, y a la vez
+ *  un freno si el reporte quedara colgado en "PROCESANDO" para siempre. */
+const CONSOLA_MAX_SONDEOS = 90;
+
+/** Estatus finales del reporte, tal como los distingue el panel. */
+const CONSOLA_TERMINADO = "TERMINADO";
+const CONSOLA_FALLIDOS = new Set(["ERROR", "CANCELADO"]);
 
 export interface CarteraAntiguedad {
-  /** Clientes con su `elements[]` (los documentos abiertos). */
+  /** Clientes con sus documentos, YA traducidos a la forma que consume
+   *  `construirFilas` (ver `adaptarReporteConsola`). */
   clientes: Record<string, unknown>[];
   /** Totales por tramo que publica el propio Switch — la contraparte con la que
-   *  se cuadra lo que calculamos nosotros documento por documento. */
+   *  se cuadra lo que calculamos nosotros documento por documento. Vienen del
+   *  objeto `totales` del formato nuevo, dichos en la forma vieja. */
   saldosTotales: Array<{ title: string; saldo: string | number }>;
   saldoTotalGlobal: number;
   recordsTotal: number;
   fechaReporte: string | null;
-  /** Cuántas rondas hicieron falta (telemetría, para ver si el reporte crece). */
+  /** Cuántos SONDEOS hicieron falta (telemetría: si un día sube, el reporte se
+   *  está poniendo lento). */
   rondas: number;
 }
 
 /** Fecha de hoy en `YYYY-MM-DD`, que es el formato que usa la página
- *  (`var today = '2026-07-30'`). */
+ *  (`var today = '2026-08-24'`). */
 function hoyISO(now: Date = new Date()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Parsea una respuesta que TIENE que ser JSON. Si llega el HTML de excepción de
+ * Switch (200 + `<!DOCTYPE`), lo dice con esas palabras en vez de vomitar el
+ * error del parser — es el modo de fallo que nos costó los 5 días.
+ */
+function jsonDeSwitch(
+  empresaKey: string,
+  paso: string,
+  texto: string,
+  status: number,
+): Record<string, unknown> {
+  const t = texto.trimStart();
+  if (t.startsWith("<!DOCTYPE") || t.startsWith("<html")) {
+    const pista = /Controller method not found/i.test(texto) ? " (Controller method not found)" : "";
+    throw new SwitchWebError(
+      empresaKey,
+      paso,
+      `Switch devolvió su página de excepción en vez de JSON${pista} — ¿cambió la ruta del reporte? (status ${status})`,
+    );
+  }
+  try {
+    return JSON.parse(texto) as Record<string, unknown>;
+  } catch {
+    throw new SwitchWebError(empresaKey, paso, `respuesta no-JSON (status ${status})`);
+  }
 }
 
 /** Trae la cartera completa (todos los clientes con saldo y sus documentos). */
 export async function fetchCarteraAntiguedad(
   session: WebSession,
   now: Date = new Date(),
+  /** Solo para los tests: el intervalo de sondeo. En producción es el del panel. */
+  opts: { intervaloMs?: number } = {},
 ): Promise<CarteraAntiguedad> {
   const { empresaKey, baseUrl, cookies } = session;
+  const intervaloMs = opts.intervaloMs ?? CONSOLA_INTERVALO_MS;
 
   const { res: pgRes, text: pgHtml } = await webFetch(`${baseUrl}/estadodecuenta`, cookies, {
     headers: { Accept: "text/html" },
@@ -374,76 +445,92 @@ export async function fetchCarteraAntiguedad(
     throw new SwitchWebError(empresaKey, "cartera-token", "no se encontró el _token del reporte");
   }
 
-  const fechaHasta = hoyISO(now);
-  let key = 0;
-  for (let ronda = 1; ronda <= ANTIGUEDAD_MAX_RONDAS; ronda++) {
-    const body = new URLSearchParams({
-      chunk: String(ANTIGUEDAD_CHUNK),
-      key: String(key),
-      sucursalId: "1",
-      saldomayora: "",
-      chkSaldo0: "false",
-      clientesInactivo: "false",
-      clientes: "[]",
-      vendedores: "[]",
-      fechaHasta,
-      // ⚠️ vacías, no "null" — ver el comentario de arriba.
-      pais: "",
-      provincia: "",
-      distrito: "",
-      corregimiento: "",
-      clienteindustria: "null",
-      clientezona: "null",
-      clientecategoria: "null",
-      clientetamano: "null",
-      crmleadreferencia: "null",
-      _token: token,
-    }).toString();
+  const hoy = hoyISO(now);
+  const cuerpo = new URLSearchParams({
+    desde: hoy,
+    hasta: hoy,
+    sucursalId: "1",
+    saldomayora: "",
+    incluirSaldoCero: "false",
+    clientesInactivo: "false",
+    clientes: "[]",
+    vendedores: "[]",
+    // ⚠️ vacías, no "null" — ver el comentario de arriba.
+    pais: "",
+    provincia: "",
+    distrito: "",
+    corregimiento: "",
+    // ...pero éstas SÍ van con "null": el panel manda JSON.stringify(null).
+    clienteindustria: "null",
+    clientezona: "null",
+    clientecategoria: "null",
+    clientetamano: "null",
+    crmleadreferencia: "null",
+    claseReporte: "4",
+    tipoReporte: "ESTADOCUENTACLIENTE",
+    _token: token,
+  }).toString();
 
-    const { res, text } = await webFetch(`${baseUrl}/estadodecuenta/obtener`, cookies, {
+  const cabeceras = {
+    "X-Requested-With": "XMLHttpRequest",
+    Accept: "application/json",
+    Origin: baseUrl,
+    Referer: `${baseUrl}/estadodecuenta`,
+  };
+
+  // ── 1. Encargar el reporte ────────────────────────────────────────────────
+  const { res: crearRes, text: crearTxt } = await webFetch(
+    `${baseUrl}/reportesmanager/crearreporteconsola`,
+    cookies,
+    {
       method: "POST",
-      body,
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "X-Requested-With": "XMLHttpRequest",
-        Accept: "application/json",
-        Origin: baseUrl,
-        Referer: `${baseUrl}/estadodecuenta`,
-      },
-    });
+      body: cuerpo,
+      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", ...cabeceras },
+    },
+  );
+  const creado = jsonDeSwitch(empresaKey, "cartera-crear", crearTxt, crearRes.status);
+  if (creado.response !== true || typeof creado.uuid !== "string" || !creado.uuid) {
+    const motivo = typeof creado.message === "string" ? creado.message : JSON.stringify(creado).slice(0, 200);
+    throw new SwitchWebError(empresaKey, "cartera-crear", `Switch no aceptó el pedido del reporte: ${motivo}`);
+  }
+  const uuid = creado.uuid;
 
-    let json: Record<string, unknown>;
-    try {
-      json = JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      throw new SwitchWebError(
-        empresaKey,
-        "cartera-fetch",
-        `respuesta no-JSON en la ronda ${ronda} (status ${res.status})`,
-      );
+  // ── 2. Esperar a que esté ─────────────────────────────────────────────────
+  for (let sondeo = 1; sondeo <= CONSOLA_MAX_SONDEOS; sondeo++) {
+    await dormir(intervaloMs);
+    const { res, text } = await webFetch(
+      `${baseUrl}/reportesmanager/buscarreporteconsola/${encodeURIComponent(uuid)}`,
+      cookies,
+      { headers: cabeceras },
+    );
+    const json = jsonDeSwitch(empresaKey, "cartera-buscar", text, res.status);
+    const estatus = typeof json.estatus === "string" ? json.estatus : "";
+
+    if (json.response !== true) {
+      throw new SwitchWebError(empresaKey, "cartera-buscar", `Switch no encuentra el reporte ${uuid}`);
     }
-
-    // `response: true` = "seguí pidiendo": el servidor está acumulando.
-    if (json.response === true) {
-      key += ANTIGUEDAD_CHUNK;
-      continue;
+    if (CONSOLA_FALLIDOS.has(estatus)) {
+      throw new SwitchWebError(empresaKey, "cartera-buscar", `el reporte terminó en ${estatus}`);
     }
+    if (estatus !== CONSOLA_TERMINADO) continue;
 
+    // ── 3. Leerlo ───────────────────────────────────────────────────────────
+    const reporte = (json.data ?? {}) as ReporteConsola;
+    const crudos = Array.isArray(reporte.data) ? reporte.data : [];
+    const saldosTotales = saldosTotalesDesdeTotales(reporte.totales);
     return {
-      clientes: Array.isArray(json.data) ? (json.data as Record<string, unknown>[]) : [],
-      saldosTotales: Array.isArray(json.saldosTotales)
-        ? (json.saldosTotales as Array<{ title: string; saldo: string | number }>)
-        : [],
-      saldoTotalGlobal: Number(json.saldoTotalGlobal ?? 0),
-      recordsTotal: Number(json.recordsTotal ?? 0),
-      fechaReporte: typeof json.fechaReporte === "string" ? json.fechaReporte : null,
-      rondas: ronda,
+      clientes: adaptarReporteConsola(crudos) as unknown as Record<string, unknown>[],
+      saldosTotales,
+      saldoTotalGlobal: Number(reporte.totales?.total ?? 0),
+      recordsTotal: crudos.length,
+      fechaReporte: hoy,
+      rondas: sondeo,
     };
   }
   throw new SwitchWebError(
     empresaKey,
-    "cartera-fetch",
-    `el reporte no terminó en ${ANTIGUEDAD_MAX_RONDAS} rondas`,
+    "cartera-buscar",
+    `el reporte no terminó en ${CONSOLA_MAX_SONDEOS} sondeos (~${(CONSOLA_MAX_SONDEOS * CONSOLA_INTERVALO_MS) / 1000} s)`,
   );
 }
 

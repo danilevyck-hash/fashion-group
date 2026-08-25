@@ -46,7 +46,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 > ⚠️ **`cxc_favorites`, `cxc_client_overrides` y `cxc_contact_log` comparten el namespace de `nombre_normalized` entre grupo y Boston** (no tienen columna de empresa): los 5-10 nombres que existen en los dos lados comparten estrella, contacto y correo. **NO es plata y no se tocó** — arreglarlo pide DDL y una decisión de Daniel (¿el contacto de CITY MALL PASO CANOA es el mismo señor para las dos carteras?). Hoy la pestaña de Boston ni siquiera muestra favoritos (`BostonTab.tsx` pasa `esFavorito: () => false`).
 
 
-## 🔴 LA CARTERA DE BOSTON SE CONGELÓ 5 DÍAS Y LA PANTALLA NO LO DIJO (24-ago-2026)
+## 🔴 LA CARTERA DE BOSTON SE CONGELÓ 5 DÍAS Y LA PANTALLA NO LO DIJO — ✅ RESUELTO (24-ago-2026)
 
 > **Switch cambió el motor de sus reportes el 19-ago-2026 a las 12:37:21** y la ruta que usaba `boston-cartera` dejó de existir: `POST /estadodecuenta/obtener` pasó a devolver la página de excepción de Switch con `Controller method not found` adentro. Último sync bueno: **19-ago 03:10**. Primer fallo: **20-ago 03:10**. Cinco corridas seguidas caídas (20, 21, 22, 23 y 24).
 >
@@ -71,7 +71,42 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 > - 🔑 **El invariante que reemplaza a la vieja exclusión, y que NO envejece:** *toda empresa vigilada tiene que tener un cron que le refresque la cartera* — las 6 por `switch-sync estadocuenta`, Boston por su `boston-cartera` de las 08:10 UTC. Antes la protección contra la alerta-que-suena-para-siempre era una lista de empresas a no mirar (y se quedó vieja el día que el cron se arregló); ahora es una condición que se verifica sola contra `SWITCH_CRON_ENTRADAS`. ⚠️ `switch-sync all 0630` también NOMBRA a Boston y **no la certifica**: no le trae la cartera (la excluye `empresasConEstadoCuentaEnCron`).
 > - ⚠️ **Mientras el reporte siga roto, esto va a sonar una vez por día.** Es lo que Daniel pidió y es lo correcto —el dato está viejo de verdad y hay que actuar—, pero **el día que la alerta deje de tener acción posible, la salida NO es volver a excluir a Boston**: es arreglar el sync.
 >
+> ### 3. ✅ LA BAJADA VUELVE A FUNCIONAR — el motor nuevo (24-ago-2026)
+>
+> El reemplazo **no se adivinó**: se leyó del propio código del panel y se ejecutó contra producción ANTES de escribir una línea de parser. Está en `assets/js/reportesmanager.js` y `assets/js/estadodecuenta.js`, que se bajan con la sesión abierta.
+>
+> ```
+> 1. POST reportesmanager/crearreporteconsola      → {response:true, uuid, estatus:"CREADO"}
+> 2. GET  reportesmanager/buscarreporteconsola/<uuid>  cada 2.000 ms
+>      → {response, estatus, data:{data:[…], totales:{…}}}
+>      TERMINADO = listo · ERROR/CANCELADO = cortar · otro = seguir
+> ```
+>
+> 🔑 **Es un UUID, no un número de orden** (`61bfc136…`), y los parámetros salen del botón que dibuja la antigüedad: `generarEstadoCuentaCliente(today, today, '4')` → **`desde = hasta = hoy`, `claseReporte:'4'`, `tipoReporte:'ESTADOCUENTACLIENTE'`**. Sin `tipoReporte` el endpoint contesta `{"error":"TIPO_REPORTE_REQUERIDO"}`. **Ya NO hay rondas** (`chunk`/`key`): el universo llega completo en la respuesta del uuid.
+>
+> **Lo que cambió de nombre**, campo por campo — `elements[]` → **`comprobantes[]`**, `secuencial` → `nSistema`, `numeroFiscal` → `nFiscal`, `fechaCreacion` → `fecha`, `codigo`/`nombre` → `clienteCodigo`/`clienteNombre`, y los totales dejaron de ser el array `saldosTotales[{title,saldo}]` para ser el objeto **`totales{bucket: valor, total}`**. `abrev` y `numeroOrden` ya no vienen.
+>
+> 🔴 **EL `saldo` POR DOCUMENTO YA NO EXISTE Y NO SE ADIVINA: SE DERIVA.** El reporte trae `saldoAcumulado`, que es el **corrido del cliente**, no del documento (en el caso real: 25,15 y después 266.541.377,15). El aporte propio de cada movimiento es **`debito − credito`**. No es una corazonada: **cuadra al centavo** contra los `totales` que publica Switch, en las tres franjas, y si algún día dejara de cuadrar `cuadraConSwitch` corta la corrida y no se escribe nada.
+>
+> ⚠️ **`switch_estadocuenta` NO se enteró.** El módulo puro trae un ADAPTADOR (`adaptarReporteConsola`) que traduce el formato nuevo al viejo, así que `construirFilas`, la tabla de signos, `ccteIdSintetico`, el cuadre, el guard de montos y el reconcile **no se tocaron** y sus candados siguen valiendo tal cual. El `ccte_id` sigue saliendo del secuencial, que en el formato nuevo es `nSistema` y tiene el MISMO formato `serie-correlativo`.
+>
+> **Certificado contra producción el 24-ago-2026** (`scripts/_diag-boston-cartera.ts`, solo lectura): **386 clientes / 932 documentos, uuid TERMINADO en ~4 s (1 sondeo)**, cuadre ✅ al centavo, y contra la base **882 documentos pareados por secuencial con 0 diferencias** en |saldo|, tipo y cliente — la misma certificación que se le hizo al camino viejo el 30-jul.
+>
+> ### 4. 🔴 EL GUARD DEL REPORTE INCOMPLETO — el que impide poner saldos buenos en CERO
+>
+> El reconcile pone `saldo = 0` a TODO documento que la corrida no reescribió. Eso es correcto cuando el universo llegó entero y es una **catástrofe** cuando llegó a medias: cada cliente que faltara quedaría con la deuda en cero, en silencio y con la corrida anotada `success`.
+>
+> ⚠️ **Y el cuadre NO cubre esto**, que es lo que lo hace fácil de pasar por alto: compara nuestros totales contra los `totales` **del mismo reporte**, así que un reporte corto **cuadra al centavo consigo mismo**. Son guardas de cosas distintas — el cuadre dice *"leí bien lo que me mandaron"*, éste dice *"me mandaron todo"*.
+>
+> **`PISO_CLIENTES_REPORTE = 0.7`**, el mismo piso y el mismo patrón que el guard de barrido corto de `sync-articulo-marca`. La vara son los **clientes con saldo != 0 que la tabla ya conoce** — exactamente los que el reconcile zerearía —, no todos los clientes: hay 496 distintos pero 113 ya están en cero de reconciles anteriores, y contarlos correría la vara sin motivo. Medido el 24-ago: la tabla conoce **383** y el reporte trae **386**. Con la tabla vacía no hay vara y se deja pasar (primera carga). **Un dry-run corto también falla**, a propósito: un dry-run existe para saber si la corrida de verdad se podría escribir.
+>
 > ### Candados
+>
+> **`src/__tests__/lib/boston-cartera-consola.test.ts` (25)** — el mapa de nombres campo por campo, los totales, el guard, el transporte por uuid, y el **CUADRE contra una muestra REAL de producción** (`fixtures/boston-cartera-consola.json`: 6 clientes, 37 documentos, los 6 tipos de comprobante y las 3 franjas con plata). Sus `totales` salen de sumar los `buckets` que Switch publica cliente por cliente, o sea **aritmética suya**: nosotros sumamos documento por documento con `dias` y ellos por bucket, así que el cuadre compara dos caminos independientes. Más 3 casos de CONDUCTA en `boston-cartera-web.test.ts` que llaman al sync de verdad y verifican que un reporte corto **no escribe ni una fila**.
+> - **Verificado por mutación, 14 de 14 cazadas** (`bash scripts/_mutar-candados-boston-consola.sh`): el saldo suma en vez de restar el crédito · usa `saldoAcumulado` · el secuencial sale de `nFiscal` · la fecha sale de `fechaVence` · los totales dejan de descartar `total` · `claseReporte` 1 en vez de 4 · otro `tipoReporte` · los geográficos vuelven a `"null"` · deja de reconocer la página de excepción · ignora ERROR/CANCELADO · acepta un crear sin uuid · el guard deja pasar todo · el piso baja a 0 · el guard se calcula y no corta.
+> - 🩸 **El verificador de mutaciones se corrigió a sí mismo**: una de las 14 no matcheaba nada, el archivo quedaba intacto, los tests pasaban y el reporte decía *"SOBREVIVIÓ"* — acusaba al candado de un agujero que no existía. Ahora `mutar()` exige que el archivo CAMBIE (md5 antes/después) y aborta el informe entero si alguna es no-op.
+>
+> ### Candados de lo anterior
 >
 > **`src/__tests__/components/cxc-boston-fecha-del-dato.test.tsx` (7) RENDERIZA la pestaña** con el dato congelado del 19-ago y con uno fresco, y lee lo que el navegador habría mostrado: con dato viejo el aviso aparece y nombra a Confecciones Boston, con dato fresco **no aparece**. Un barrido estático se satisface con el `import` — dejaría pasar el componente montado con la empresa equivocada, con `className="hidden"` o detrás de un `{false && …}`; hay un caso que recorre la cadena de clases desde el aviso hasta la raíz porque **jsdom no resuelve Tailwind**. Más `datos-viejos.test.ts` (19), donde el candado de Boston cambió de dirección.
 > - **Verificado por mutación, 8 de 8 cazadas:** quitar el `<SyncStatus>` de la pestaña · montarlo con las 6 del grupo · esconderlo con una clase · que el aviso nunca se pinte · que se pinte también con el dato fresco · devolver el filtro viejo a `empresasDe("cartera")` · volver a `empresasConCxc()` · borrar la entrada de `boston-cartera` del cronograma (rompe el invariante del cron).
