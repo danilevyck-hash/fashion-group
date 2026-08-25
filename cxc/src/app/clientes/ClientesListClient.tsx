@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import useSWR from "swr";
 import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { telHref, mailtoHref } from "@/lib/contact-links";
@@ -48,42 +49,74 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
   });
   const router = useRouter();
 
-  const [page, setPage] = useState(1);
-  // Input inmediato (UI) vs término que entra a la clave SWR (debounced 250ms).
-  const [q, setQ] = useState("");
-  const [qDebounced, setQDebounced] = useState("");
-  const [provincia, setProvincia] = useState("");
-  const [provinciaDebounced, setProvinciaDebounced] = useState("");
-
-  // Pre-llenar búsqueda desde ?search=. Se lee tras montar para no romper la
-  // hidratación (el render del server usa q="").
+  // 🔴 LA BÚSQUEDA Y LA PÁGINA VIVEN EN LA URL (24-ago-2026)
   //
-  // ⚠️ Desde el 14-ago-2026 NINGUNA pantalla arma este enlace: lo alimentaba el
-  // "Ver en directorio" del CXC, retirado de sus dos menús. Se queda porque un
-  // `?search=` pegado a mano o guardado en un marcador tiene que seguir
-  // llegando — quitarlo rompería enlaces vivos sin comprar nada.
-  useEffect(() => {
-    const s = new URLSearchParams(window.location.search).get("search");
-    if (s) setQ(s);
-  }, []);
+  // 🩸 Estaban en `useState`, así que entrar a la ficha de un cliente y volver
+  // dejaba el buscador VACÍO y de nuevo en la página 1: revisar 10 clientes
+  // seguidos era escribir la búsqueda 10 veces. La regla de navegación de la
+  // casa ya lo resolvía y esta pantalla no la usaba — filtros y páginas van a la
+  // URL con `replace` (no crean entrada de historial: el Atrás no cicla por
+  // ellos), el drill-down a la ficha va con `push` (que es lo que ya hacían el
+  // `<Link>` y el `router.push` de la tarjeta, y no se tocó).
+  //
+  // Se REUSA `useUrlState`, el hook del sistema; no se inventó otro mecanismo.
+  //
+  // ⚠️ El `?search=` pegado a mano o guardado en un marcador sigue llegando
+  // igual — ahora es el mismo parámetro que la pantalla escribe, no un prefill
+  // aparte que se leía una sola vez al montar.
+  const searchParams = useSearchParams();
+  const [qDebounced, setQDebounced] = useUrlState("search", "");
+  const [provincia, setProvincia] = useUrlState("provincia", "");
+  const [page, setPage] = useUrlState("page", 1);
 
-  // Debounce de q/provincia (250ms, igual que antes): solo el valor debounced
-  // entra a la clave SWR → el fetch del nuevo término dispara tras el debounce.
-  // El prefill de ?search= (setQ) también pasa por aquí y dispara el fetch.
+  // Input inmediato (UI) vs término que entra a la URL y a la clave SWR
+  // (debounced 250ms). Lo que se debouncea es la ESCRITURA en la URL: sin eso
+  // cada tecla sería una navegación.
+  const [q, setQ] = useState(qDebounced);
+
+  // La URL manda sobre el input cuando cambia por fuera (atrás/adelante, un
+  // enlace pegado, volver de una ficha).
+  const qEnUrlRef = useRef(qDebounced);
   useEffect(() => {
+    if (qEnUrlRef.current === qDebounced) return;
+    qEnUrlRef.current = qDebounced;
+    setQ(qDebounced);
+  }, [qDebounced]);
+
+  // Debounce de q (250ms, igual que antes): solo el valor estabilizado entra a
+  // la URL → el fetch del nuevo término dispara tras el debounce.
+  useEffect(() => {
+    if (q === qDebounced) return;
     const handle = setTimeout(() => {
+      qEnUrlRef.current = q;
       setQDebounced(q);
-      setProvinciaDebounced(provincia);
-      setPage(1); // cambiar filtro vuelve a la página 1
-    }, q || provincia ? 250 : 0);
+    }, 250);
     return () => clearTimeout(handle);
-  }, [q, provincia]);
+  }, [q, qDebounced, setQDebounced]);
+
+  // Cambiar de filtro vuelve a la página 1.
+  //
+  // 🔑 Se dispara mirando los parámetros REALES de la URL, no el valor
+  // optimista de `useUrlState`: cada setter reconstruye la query desde
+  // `searchParams`, así que dos escrituras en el mismo tick se pisan y la
+  // segunda borraría el filtro que acaba de escribir la primera. Esperando a
+  // que la URL alcance, `setPage` ya ve la búsqueda puesta.
+  const searchEnUrl = searchParams.get("search") ?? "";
+  const provinciaEnUrl = searchParams.get("provincia") ?? "";
+  const filtrosRef = useRef(`${searchEnUrl}|${provinciaEnUrl}`);
+  useEffect(() => {
+    const clave = `${searchEnUrl}|${provinciaEnUrl}`;
+    if (filtrosRef.current === clave) return;
+    filtrosRef.current = clave;
+    if (page !== 1) setPage(1);
+  }, [searchEnUrl, provinciaEnUrl, page, setPage]);
+
 
   // Caché SWR de la lista. La clave incluye TODOS los params que cambian la data
   // (page, q, provincia) → volver a una página/búsqueda ya vista sirve caché al
   // instante (SWRProvider mantiene la caché entre navegaciones).
   const swrKey = authChecked
-    ? (["clientes-list", page, qDebounced, provinciaDebounced] as const)
+    ? (["clientes-list", page, qDebounced, provincia] as const)
     : null;
 
   // Los datos del servidor sirven SOLO para la página 1 sin filtros. Cualquier
@@ -94,7 +127,7 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
   //
   // Memoizado porque su REFERENCIA es la señal de "el servidor mandó datos
   // nuevos" que usa `useSembrarDelServidor`.
-  const isInitialView = page === 1 && !qDebounced && !provinciaDebounced;
+  const isInitialView = page === 1 && !qDebounced && !provincia;
   const delServidor = useMemo<ClientesPage | undefined>(
     () =>
       isInitialView
@@ -340,14 +373,14 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
             <div className="flex gap-2">
               <button
                 disabled={page <= 1 || loading}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => setPage(Math.max(1, page - 1))}
                 className="border border-gray-200 rounded-md px-4 min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition"
               >
                 ← Anterior
               </button>
               <button
                 disabled={page >= totalPages || loading}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
                 className="border border-gray-200 rounded-md px-4 min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition"
               >
                 Siguiente →

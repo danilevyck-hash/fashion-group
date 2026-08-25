@@ -2,7 +2,6 @@
 
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
-import { AGING } from "@/lib/cxc-aging";
 
 function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
   if (total < 0) return { border: "border-l-blue-400", tooltip: "Saldo a favor: saldo negativo (nota de credito o sobrepago)" };
@@ -29,60 +28,17 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
   return (
     <>
       <div className={`border-l-4 ${risk.border} group`} data-tooltip={risk.tooltip}>
-        {/* Mobile card layout — name + total + status badge, age buckets on expand */}
-        <div
-          className={`sm:hidden px-3 py-3 cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
-          onClick={onToggle}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              {onToggleFavorite && (
-                <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none p-2.5 -m-2.5">
-                  {isFavorite ? <span className="text-amber-400">★</span> : <span className="text-gray-300">☆</span>}
-                </button>
-              )}
-              <span className="text-sm font-medium truncate" title={client.nombre_normalized}>{client.nombre_normalized}</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-              {/* Status badge */}
-              {client.total < 0 ? (
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Saldo a favor</span>
-              ) : client.overdue > 0 ? (
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{AGING.overdue.label}</span>
-              ) : client.watch > 0 ? (
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">{AGING.watch.label}</span>
-              ) : (
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">{AGING.current.label}</span>
-              )}
-              <span className="text-sm font-semibold tabular-nums">${fmt(client.total)}</span>
-              {/* Expand chevron */}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}>
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-            </div>
-          </div>
-          {/* Age buckets — revealed on expand (mobile only) */}
-          {isExpanded && (
-            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-              <div className="bg-emerald-50 rounded-md px-2 py-1.5 text-center">
-                <div className="text-xs text-emerald-600 font-medium">0-90d</div>
-                <div className="tabular-nums text-emerald-800 font-semibold">{client.current === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.current)}`}</div>
-              </div>
-              <div className="bg-amber-50 rounded-md px-2 py-1.5 text-center">
-                <div className="text-xs text-amber-600 font-medium">91-120d</div>
-                <div className="tabular-nums text-amber-800 font-semibold">{client.watch === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.watch)}`}</div>
-              </div>
-              <div className="bg-red-50 rounded-md px-2 py-1.5 text-center">
-                <div className="text-xs text-red-600 font-medium">{AGING.overdue.range}</div>
-                <div className="tabular-nums text-red-800 font-semibold">{client.overdue === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.overdue)}`}</div>
-              </div>
-            </div>
-          )}
-        </div>
-
+        {/* 🔴 ACÁ VIVÍA UNA VISTA DE TARJETAS QUE NUNCA SE DIBUJABA (24-ago-2026)
+            Estaba detrás de `sm:hidden` (menos de 640 px) y su ÚNICO padre
+            —`ClientTable`, dentro de `admin/page.tsx`— vive detrás de
+            `hidden md:block` (768 px o más). O sea: los dos tramos no se cruzan
+            nunca y esa tarjeta no se pintó jamás, en ningún ancho. La vista de
+            celular del CXC de verdad es `PanelCxcMobile`, que es la que se
+            mantiene. Con la tarjeta muerta se fueron sus píldoras de estado y su
+            grilla de tramos. */}
         {/* Desktop grid layout */}
         <div
-          className={`hidden sm:grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
+          className={`grid grid-cols-12 gap-2 px-4 py-3 text-sm cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
           onClick={onToggle}
           onContextMenu={onRowContextMenu}
         >

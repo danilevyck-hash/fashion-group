@@ -398,7 +398,15 @@ describe("BARRIDO 3 — los dos lados están cableados, cada uno con SU cartera"
     // existir en este módulo) y la bitácora dejó de escribirse desde acá. La
     // tabla `cxc_contact_log` y sus 141 filas QUEDAN, y la puerta única sigue
     // exigiendo la cartera — lo que bajó es la cuenta de llamadas, no el rigor.
-    expect(panel.match(/CARTERA_GRUPO/g)!.length).toBeGreaterThanOrEqual(4);
+    //
+    // ⚠️ El 24-ago-2026 bajó otra: se retiró `handleSaveEdit`, el POST a
+    // `/api/cxc/overrides` que ya NO llamaba nadie (la edición de contacto se
+    // mudó a la ficha `/clientes/[codigo]` y este panel se quedó con el camino
+    // de escritura sin puerta). Quedan las 3 apariciones que importan —el
+    // import, el GET y el POST de favoritos—, o sea que **toda llamada que
+    // escribe sigue diciendo su cartera**: lo que se retiró fue una llamada, no
+    // una declaración. El piso baja; el invariante no se aflojó.
+    expect(panel.match(/CARTERA_GRUPO/g)!.length).toBeGreaterThanOrEqual(3);
     // overrides (GET) vive en el hook; el GET de contact-log se retiró el mismo
     // día (nadie pintaba el resultado: llegaba como prop y no se leía).
     expect(hook).toContain("cartera=${CARTERA_GRUPO}");

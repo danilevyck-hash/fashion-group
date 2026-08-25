@@ -139,7 +139,11 @@ describe("🔁 la MISMA pantalla no pregunta lo mismo dos veces", () => {
 describe("⚠️ las vistas SIN dato del servidor siguen pidiendo", () => {
   it("Clientes solo considera del servidor la página 1 sin filtros", () => {
     const src = leer("src/app/clientes/ClientesListClient.tsx");
-    expect(src).toContain("const isInitialView = page === 1 && !qDebounced && !provinciaDebounced");
+    // ⚠️ `provinciaDebounced` se llama `provincia` desde el 24-ago-2026: la
+    // provincia dejó de tener una copia debounced y vive directo en la URL
+    // (`useUrlState`). Lo que este candado protege NO cambió: que los datos del
+    // servidor solo se den por buenos en la página 1 SIN filtros.
+    expect(src).toContain("const isInitialView = page === 1 && !qDebounced && !provincia");
     expect(src).toContain("isInitialView\n        ?");
   });
 

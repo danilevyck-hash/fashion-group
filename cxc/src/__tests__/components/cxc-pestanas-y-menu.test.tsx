@@ -137,11 +137,13 @@ function opcionesDelMenu(): string[] {
  * vacío" y hay un caso que lo mira.
  */
 function opcionesClickDerecho(nombre = CLIENTE.nombre_normalized): string[] | null {
-  // ⚠️ ClientRow pinta el nombre DOS veces —la tarjeta de celular y la grilla de
-  // escritorio— y el `onContextMenu` vive SOLO en la de escritorio, que en el
-  // DOM va segunda. Quedarse con la primera coincidencia mide la de celular, el
-  // menú no abre nunca y el test se cae por el motivo equivocado. Se hace click
-  // derecho en las dos: si ninguna abre menú, es que la fila lo perdió.
+  // ⚠️ Se hace click derecho en TODAS las coincidencias del nombre, no en la
+  // primera. Hasta el 24-ago-2026 `ClientRow` lo pintaba DOS veces —una tarjeta
+  // de celular que nunca se dibujaba y la grilla de escritorio— y el
+  // `onContextMenu` vivía SOLO en la segunda: quedarse con la primera medía la
+  // muerta, el menú no abría nunca y el test se caía por el motivo equivocado.
+  // La tarjeta muerta se retiró, pero el barrido se queda igual: si mañana
+  // vuelve a haber dos, el candado sigue midiendo la que importa.
   const filas = document.querySelectorAll(`[title="${nombre}"]`);
   expect(filas.length).toBeGreaterThan(0); // se pintó una fila de verdad
   for (const fila of filas) fireEvent.contextMenu(fila);
@@ -170,7 +172,6 @@ function pintarEscritorio() {
         sortArrow={() => ""}
         userRole="admin"
         onOpenEmail={noop}
-        onSaveEdit={noop}
         onWhatsApp={noop}
         onCopyMessage={noop}
         onOpenEstado={noop}
@@ -289,7 +290,6 @@ describe("el menú de CLICK DERECHO de una fila", () => {
           sortArrow={() => ""}
           userRole="admin"
           onOpenEmail={() => llamados.push("email")}
-          onSaveEdit={noop}
           onWhatsApp={noop}
           onCopyMessage={noop}
           onOpenEstado={noop}
@@ -326,7 +326,6 @@ describe("las acciones que quedan siguen funcionando", () => {
           sortArrow={() => ""}
           userRole="admin"
           onOpenEmail={() => llamados.push("email")}
-          onSaveEdit={noop}
           onWhatsApp={() => llamados.push("whatsapp")}
           onCopyMessage={() => llamados.push("copiar")}
           onOpenEstado={() => llamados.push("estado")}

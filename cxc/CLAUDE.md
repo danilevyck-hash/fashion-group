@@ -2373,6 +2373,73 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > - **Se ven tocables** (Daniel: "no parecen tocables"): la activa lleva borde de color + fondo tenue + label en negrita, las inactivas borde gris-300 con hover de fondo/borde/sombra, y todas `min-h-[44px]` + `active:scale-[0.97]`. **Sin flechitas** — la única flecha de la pantalla es la del selector de mes; agregar más prometería opciones que no existen.
 > - Candado: `src/__tests__/lib/cxc-orden.test.ts` (21 casos, verificado por mutación: que la píldora no reordene rompe 4, que no se pueda apagar rompe 2, que el override no caduque rompe 1). Verificación en navegador con datos de producción: `node scripts/_verif-pildoras.mjs` (solo lectura; **gotchas**: sembrar `sessionStorage.cxc_role` o `useAuth` redirige todo al login, y `delete Navigator.prototype.serviceWorker` antes de navegar).
 
+> ## 🔴 CXC y Clientes — EL AVISO QUE MANDABA A ARREGLAR ALGO QUE NO SE ARREGLABA (24-ago-2026)
+>
+> Cinco defectos de flujo, aprobados por Daniel. **Ningún número de cartera se movió, y está medido.**
+>
+> ### 1. 🩸 El WhatsApp mandaba a la ficha, y al volver seguía diciendo lo mismo
+>
+> Al tocar «WhatsApp» sobre un cliente sin teléfono, el CXC decía *"Este cliente no tiene teléfono registrado. Edite el contacto primero"*. Se iba a la ficha, se escribía el teléfono —que se guarda en **`clientes_master`**—, se volvía… **y seguía diciendo lo mismo**. El panel lee `/api/cxc/aging`, que sale de **`switch_estadocuenta_aging_mv`**: una vista MATERIALIZADA. La persona quedaba pensando que la app está rota.
+>
+> 🔑 **EL ARREGLO ES EL CAMINO MENOS SORPRESIVO: que el CXC lo VEA.** Los montos siguen viniendo de la MV (precalculada, rápida, y es lo que hace que ningún número se mueva); lo único que se relee en vivo son los **TRES campos de contacto que la vista ya toma de `clientes_master`** — `email`, `telefono`, `celular`, los mismos y del mismo lugar.
+> - 🔴 **NO se toca `nombre` ni `nombre_normalized`**: el CXC consolida por nombre, así que pisarlo movería la AGRUPACIÓN de la pantalla. Hay mutación para eso.
+> - ⚠️ La lectura va **ACOTADA a los códigos que la cartera del grupo ya trajo** (~98) y **PAGINADA con `leerTodoPaginado`**: `clientes_master` tiene miles de filas (97% de Boston) y `db-max-rows` = 1000 corta EN SILENCIO. Lotes de 300 por `.in()`.
+> - 🔑 **Boston no entra ni por acá**: sólo se releen códigos que la MV del GRUPO ya devolvió, y los clientes de Boston no están en `clientes_master` (usan ids numéricos de Switch, no D-XXX). El archivo **no toca `switch_estadocuenta`** y hay candado.
+> - 🔴 **FALLA ABIERTO**: si el maestro no se puede leer, se conservan los datos de la MV y el CXC se dibuja igual. Una cartera que no carga es mucho peor que un teléfono viejo.
+> - 🩸 **EL HUECO, medido contra producción** (`DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-telefono-mv-vs-maestro.ts`, solo lectura): la MV se refresca a las **07:35 UTC**, en cada sync de `estadocuenta` (16:0x y 21:1x) y en la reconciliación (10/14/18), o sea que **el hueco más largo es de 21:20 a 07:35 = 10 h 15 min** — justo la noche y la mañana temprano. Medido el 24-ago a la 01:41 UTC: MV materializada hace **4,3 h**, 209 filas, 98 códigos, **0 contactos difiriendo hoy** (nadie había editado desde el último refresco). **El arreglo es LATENTE y se dice así**: no cambia nada hoy, y evita el desconcierto la próxima vez que alguien escriba un teléfono.
+>
+> ### 2. La búsqueda se perdía al volver de una ficha
+>
+> `search`, `provincia` y `page` de `/clientes` vivían en `useState`: entrar a la ficha de un cliente y volver dejaba el buscador **VACÍO** y de nuevo en la página 1. Revisar 10 clientes seguidos era escribir la búsqueda 10 veces. **La regla de navegación de la casa ya lo resolvía y esta pantalla no la usaba**: se REUSÓ `useUrlState` — filtros y páginas a la URL con `replace`, drill-down con `push` (que es lo que ya hacían el `<Link>` y el `router.push` de la tarjeta, y no se tocó).
+> - **Lo que se debouncea (250 ms) es la ESCRITURA en la URL**, no el input: sin eso cada tecla sería una navegación.
+> - 🩸 **DOS `useUrlState` en el MISMO tick se pisan**, y el segundo borra el filtro que acaba de escribir el primero: cada setter reconstruye la query desde `searchParams`, que todavía no alcanzó. Por eso el reset de página a 1 se dispara mirando los parámetros **REALES** de la URL (`useSearchParams()`), no el valor optimista del hook.
+> - ⚠️ El `?search=` pegado a mano o guardado en un marcador **sigue llegando igual** — ahora es el mismo parámetro que la pantalla escribe, no un prefill aparte que se leía una sola vez al montar.
+>
+> ### 3. Boston arrastraba su tabla en el iPad
+>
+> La pestaña de Confecciones Boston dibujaba su tabla de 6 columnas desde `sm` (640). Medido en el navegador contra el build de producción: **184 px de arrastre a 834**. Es el MISMO defecto y el MISMO arreglo de las cuatro pantallas del 30-jul-2026 — **el corte es `lg` (1024)**, porque lo que decide es el ancho ÚTIL (la barra lateral se lleva 224 px, un iPad de 834 deja 610). **No se rediseñó nada: sus tarjetas ya existían y sólo se les amplió el tramo**, y se le pusieron los `data-vista` FIJOS. `BostonTab.tsx` es la QUINTA pantalla de `tablas-anchas-ipad.test.ts`.
+> - **Medido: 834 → de 184 px a 2 px de arrastre.** Los 2 px que quedan son el desbordamiento de la píldora de tramo, **idéntico en `origin/main`** (medido en los dos builds): es PRE-EXISTENTE, estaba tapado detrás de los 184.
+> - 🔴 **Y las tarjetas dicen EXACTAMENTE lo mismo que la tabla**: `BASE=… node scripts/_verif-boston-tarjetas-vs-tabla.mjs` compara 834 contra 1440 **cliente por cliente, POR POSICIÓN y por ROL** — **383 clientes · 1.915 montos · 0 diferencias**. Se compara por rol y no por el orden del texto porque los dos layouts dicen las mismas cifras en distinto orden a propósito (la tarjeta pone el TOTAL arriba, pegado al nombre; la tabla, al final de la fila).
+> - ⚠️ **La pestaña del GRUPO NO se tocó, y su corte NO es `lg`: es `md`** (`hidden md:block` en `admin/page.tsx`). O sea que a 834 el grupo dibuja su tabla, no tarjetas. **No arrastra** porque es una grilla `grid-cols-12` que se reparte el ancho (docOverflow 0 en los cuatro anchos, medido antes y después). Moverlo a `lg` cambiaría el layout del grupo entre 768 y 1023 sin un solo píxel de arrastre que justificarlo: queda anotado, no hecho.
+>
+> ### 4. Dos botones que prometían cosas distintas y hacían la misma
+>
+> En el cajón de estado de cuenta, en la computadora, «Compartir» terminaba **descargando el mismo PDF** que el botón «PDF». Y si el archivo no se podía armar, el `catch` sólo escribía en la consola: el botón volvía a la normalidad, **no pasaba nada visible**, y la persona tocaba de nuevo.
+> - **Un solo botón, rotulado con lo que de verdad va a pasar**: «Compartir» (hoja del sistema) o «Descargar PDF».
+> - 🩸 **La pregunta se hace con un `File` de verdad** (`canShare({ files })` mira el TIPO del archivo): preguntar sólo por `navigator.share` daría un falso sí en navegadores que comparten texto pero no archivos — el mismo defecto con otro disfraz. Hay candado y mutación para ese caso exacto.
+> - **El error se ve** (`role="alert"`, accionable) y **cerrar la hoja de compartir NO es un error** (`AbortError`).
+>
+> ### 5. 🔴 Código muerto retirado — cuatro cosas, y el riesgo de las cuatro es el mismo
+>
+> No es el peso: es que **alguien arregle el buscador EQUIVOCADO y jure que la pantalla no cambia**.
+> - **`ClientTable`**: un SEGUNDO buscador, un botón «Filtros», su `BottomSheet` y una tira de píldoras de tramo, detrás de `!hideSearchAndRiskFilters` — y el único que monta esa tabla le pasaba la bandera **SIEMPRE**. Con el bloque se fueron sus props (`setSearch`, `setRiskFilter`, `hideSearchAndRiskFilters`). ⚠️ **El filtro de EMPRESA sí se dibuja y se queda.**
+> - **`ClientRow`**: una tarjeta de celular tras `sm:hidden`, dentro de un padre que vive tras `hidden md:block` — los dos tramos **no se cruzan nunca**, así que no se pintó jamás en ningún ancho. La vista de celular del CXC de verdad es `PanelCxcMobile`.
+> - **`handleSaveEdit` + `onSaveEdit`**: el guardado de contacto que ya no llamaba nadie (la edición se mudó a la ficha). ⚠️ **`cxc_client_overrides` NO se toca y se sigue LEYENDO**: un override guardado antes le sigue ganando al maestro. Lo que se retiró es la escritura.
+> - **`CompanySummary.tsx`**: una vista entera de deuda por empresa **con cero importadores**. Se BORRÓ (no se encendió): duplicaba lo que ya dan el filtro de empresa y las tarjetas, y encender una superficie nueva de cartera es justo donde este repo se quemó con Boston.
+> - **`/api/vendors` y `/api/upload`**: **2 de 6 peticiones por cada apertura del CXC**, contra una base en compute Micro. La primera llenaba el objeto global `VENDOR_MAP`, que ninguna pantalla lee; la segunda armaba `uploads`, que llegaba a `admin/page.tsx`, se desestructuraba y no se usaba en una sola línea. **Quedan 4.** ⚠️ `src/lib/vendors.ts` y la ruta `/api/vendors` NO se borraron (la ruta tiene su POST y su test).
+>
+> ### La prueba de que ningún número se movió
+>
+> **En el navegador, contra DOS builds de producción con datos de producción y comparando POSICIÓN POR POSICIÓN** (`BASE=… node scripts/_medir-cxc-clientes-t310.mjs`, solo lectura; el «antes» es un build de `origin/main` en el commit base REAL de la rama, no uno viejo):
+>
+> | | grupo | Boston |
+> |---|---|---|
+> | tarjetas / píldoras | **IDÉNTICAS en 390 · 834 · 1024 · 1440** | **IDÉNTICAS en los 4** |
+> | montos en orden | **0 distintos** (258 · 387 · 387 · 387) | **0 distintos** a 390 · 1024 · 1440 |
+> | conteo de la lista | 98 clientes, igual | 383 clientes, igual |
+>
+> Cifras medidas: grupo **Total $3.515.744,63 · 98 clientes · 0-90d $1.410.793,95 · 91-120d $946.759,94 · 121d+ $1.158.190,74**; Boston **$187.018,00 · 383 clientes · 0-90 $52.169,15 · 91-120 $13.969,43 · 121+ $120.879,42** — las mismas antes y después.
+> - **A 834 los montos de Boston cambian de CANTIDAD a propósito** (la tabla pasa a tarjetas y las tarjetas emiten otros textos). Ése es el único caso, y se verifica aparte con `_verif-boston-tarjetas-vs-tabla.mjs`: **1.915 montos, 0 diferencias**.
+> - **El payload crudo también**: `/api/cxc/aging` en los dos builds → **209 filas, 9 campos de plata × 209 = 1.881 comparaciones, 0 distintas**, `nombre`/`nombre_normalized` idénticos, total **$3.515.744,63** en los dos, y **0 filas de `confecciones_boston`** antes y después.
+> - **Arrastre y táctiles**: el único cambio es Boston a 834 (**184 → 2 px**). Todo lo demás queda **idéntico píxel por píxel** (grupo 148/137/74/0; Boston 196/·/0/0; `docOverflow` 0 en los 8 casos, antes y después) y **no aparece ni un blanco táctil nuevo** — Boston a 834 baja de 385 a 383.
+>
+> ### Candados
+>
+> `api/cxc-telefono-en-vivo.test.ts` (11), `components/clientes-busqueda-en-la-url.test.tsx` (7), `components/cxc-estado-cuenta-un-boton.test.tsx` (7) y `components/cxc-codigo-muerto-podado.test.tsx` (14), más `BostonTab` sumado a `tablas-anchas-ipad.test.ts`. **Son de CONDUCTA**: llaman al handler real, montan la pantalla real, escriben en el buscador real y cuentan qué salió por el router y por `fetch`. Los pocos barridos de texto **borran los comentarios primero** — este repo ya pagó cuatro veces el candado que se cumple con su propia explicación, y estos archivos CITAN lo que prohíben.
+> - **Verificado por mutación, 21 de 21 cazadas** (`bash scripts/_mutar-candados-cxc-clientes.sh`): el CXC vuelve a leer el teléfono viejo de la MV · el teléfono no se refresca · el refresco toca la PLATA · borrar el teléfono en la ficha no se refleja · el contacto deja de fallar abierto · el lote del `.in()` pasa el tope de PostgREST · la búsqueda / la página / la provincia vuelven a `useState` · el filtro empieza a crear entradas de historial · el drill-down deja de crearlas · el error del PDF vuelve a ser invisible · el botón vuelve a decir «Compartir» aunque descargue · se promete compartir sin preguntar por el archivo · cerrar la hoja se muestra como error · vuelve un segundo buscador · vuelve la segunda copia del nombre · vuelve la petición a `/api/vendors` · las tarjetas / la tabla de Boston vuelven al corte `sm` · Boston pierde su marca fija.
+> - 🩸 **UNA sobrevivió en la primera corrida y era un hueco REAL**: `setPuedeCompartir(true)` sin preguntar. Ninguno de mis casos la cazaba porque los dos extremos (sin `share` / con `share` y `canShare` true) daban el mismo resultado. El caso que faltaba —**comparte texto pero no archivos**— es exactamente el que produce un botón que dice una cosa y hace otra. Se agregó y quedó 21/21.
+> - 🩸 **Dos candados existentes CAMBIARON DE DIRECCIÓN, y los dos estaban fijando lo retirado**: `cxc-anotaciones-cartera.test.ts` exigía ≥4 apariciones de `CARTERA_GRUPO` en el panel y quedaron 3 al irse la escritura de overrides (**siguen siendo todas las llamadas que escriben: el piso baja, el invariante no se aflojó**), y `swr-datos-del-servidor.test.ts` congelaba el nombre `provinciaDebounced`.
+
 ### Cheques (April 10-11)
 - Guided rebotado → re-depositar flow
 

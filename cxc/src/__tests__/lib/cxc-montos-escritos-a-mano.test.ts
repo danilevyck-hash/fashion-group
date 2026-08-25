@@ -43,7 +43,9 @@ const SUPERFICIE_CXC = [
   "src/app/admin/components/PanelCxcMobile.tsx",
   "src/app/admin/components/ClientTable.tsx",
   "src/app/admin/components/ClientRow.tsx",
-  "src/app/admin/components/CompanySummary.tsx",
+  // `CompanySummary.tsx` se BORRÓ el 24-ago-2026: era una vista entera de deuda
+  // por empresa que no se montaba en ninguna pantalla (cero importadores fuera
+  // de esta lista). No se repone.
   "src/app/admin/components/ContactPanel.tsx",
   "src/app/admin/components/EstadoCuentaDrawer.tsx",
 ];
