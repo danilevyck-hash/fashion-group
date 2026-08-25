@@ -15,7 +15,6 @@ import {
   totalDeClientes,
   type ClienteDeProducto,
 } from "@/lib/ventas/productos-clientes";
-import type { AvisoClasificacion } from "@/lib/ventas/productos-clasificacion";
 import {
   claveCliente,
   clientesDelPeriodo,
@@ -676,15 +675,34 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
         </div>
       )}
 
-      {/* Tabla nivel 1 */}
+      {/* ── NIVEL 1: TABLA desde `sm`, TARJETAS en celular ──────────────────
+          🩸 EN CELULAR LA TABLA ENTRABA, PERO CONTESTABA LA MITAD. Daniel,
+          textual (25-ago-2026): *"solo veo sort venta y margen. Quiero ver
+          cantidad también y precio de venta promedio."* A 390 px sólo caben
+          Descripción · Venta · Margen % —medido, `scripts/_medir-productos-
+          precio-anchos.mjs`— y esa decisión era la correcta PARA UNA TABLA: una
+          columna más agrega arrastre. Lo que había que cambiar era la FORMA.
+
+          Con tarjetas los cuatro números entran sin arrastrar nada, porque no
+          compiten por el mismo renglón. Es el patrón que este repo ya usa dos
+          veces para exactamente esto (`admin/components/PanelCxcMobile.tsx` y
+          `ventas/ResumenViewMobile.tsx`), copiado y no reinventado.
+
+          🔴 DESDE `sm` NO CAMBIA NADA: la tabla es la de siempre, con sus siete
+          columnas y su orden por encabezado.
+
+          🩸 `data-vista` VA FIJO ("tabla" / "tarjetas") y NO se busca el layout
+          por su clase de breakpoint: `.sm\:hidden` deja de existir en cuanto el
+          corte se mueve, `querySelector` devuelve vacío y el medidor compara
+          CERO celdas pasando en verde sin haber mirado nada. Los scripts fallan
+          si encuentran cero.
+
+          ⚠️ LA TABLA VA PRIMERA EN EL DOM a propósito: en jsdom no hay CSS, así
+          que los dos layouts existen a la vez y los candados de siempre —que
+          preguntan por `document.querySelector`— tienen que seguir cayendo
+          sobre la tabla, que es lo que venían mirando. */}
       {data && !loading && !esperandoMatriz && !error && (
-        /* 🩸 SIN `min-w-[560px]`. Ese mínimo inventado era TODO el arrastre:
-           medido en el navegador (scripts/_ancho-util-ventas.mjs), la tabla
-           necesita 318 px en un iPhone de 390 (donde sólo se ven Descripción,
-           Venta y Margen) contra 356 disponibles — ENTRA de sobra. Los 204 px
-           que se arrastraban eran los 560 forzados, no los datos. Acá la tabla
-           no pasa a tarjetas porque no hace falta: entra. */
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div data-vista="tabla" className="hidden overflow-x-auto rounded-lg border border-gray-200 sm:block">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
@@ -733,6 +751,54 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── LAS TARJETAS (sólo celular) ──────────────────────────────────── */}
+      {data && !loading && !esperandoMatriz && !error && (
+        <div className="sm:hidden">
+          {/* 🔴 SIN ENCABEZADO NO HAY DÓNDE TOCAR PARA ORDENAR. La tabla se
+              ordena tocando el título de la columna; sin tabla eso se pierde, y
+              perder el orden sería cambiar una carencia por otra. Los CUATRO
+              criterios quedan acá, que son justo los cuatro números que Daniel
+              pidió ver. El activo dice para qué lado va y se invierte al
+              volverlo a tocar, igual que el encabezado. */}
+          <div
+            data-orden-tarjetas
+            className="mb-2 flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Ordenar por"
+          >
+            <span className="flex min-h-[44px] items-center pr-0.5 text-xs text-gray-400">Ordenar por</span>
+            <ChipOrden label="Piezas" sortKey="cantidad" active={sort} onClick={toggleSort} />
+            <ChipOrden label="Venta" sortKey="venta" active={sort} onClick={toggleSort} />
+            <ChipOrden label="Precio prom." sortKey="precio" active={sort} onClick={toggleSort} />
+            {/* Mismo criterio que la tabla: con un cliente puesto no hay margen
+                por cliente, así que tampoco se puede ordenar por él. */}
+            {!conCliente && <ChipOrden label="Margen %" sortKey="margen" active={sort} onClick={toggleSort} />}
+          </div>
+
+          <ul data-vista="tarjetas" className="space-y-2">
+            {visibleRows.length === 0 && (
+              <li className="rounded-lg border border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-400">
+                Sin productos para este filtro.
+              </li>
+            )}
+            {visibleRows.map(p => (
+              <ProductoCard
+                key={p.descripcion}
+                p={p}
+                isOpen={expanded === p.descripcion}
+                onToggle={() => toggleExpand(p)}
+                codigos={codigos[p.descripcion]}
+                clientes={clientes[p.descripcion]}
+                codigosLoading={codigosLoading === p.descripcion}
+                mostrarMargen={!conCliente}
+                tab={drillTab}
+                onTab={setDrillTab}
+              />
+            ))}
+          </ul>
         </div>
       )}
 
@@ -837,11 +903,12 @@ function ProductoRow({
           <div className="flex items-start gap-1.5">
             <ChevronRight className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
             <div className="min-w-0">
+              {/* ⛔ DEBAJO DEL NOMBRE IBA EL AVISO ÁMBAR de «código mal
+                  clasificado» (#597). Se retiró el 25-ago-2026: Daniel ya
+                  revisó los 5 códigos y la clasificación de Switch resultó ser
+                  la buena. Ver `AvisoClasificacionLinea`, que ya no existe.
+                  La celda vuelve a ser el nombre y nada más. */}
               <span className="text-gray-800">{p.descripcion}</span>
-              {/* El aviso va DEBAJO del nombre y no al lado: a 390 px, un chip a
-                  la derecha empuja la columna de Venta fuera de la pantalla.
-                  Debajo ocupa el ancho que ya tenía la celda. */}
-              <AvisoClasificacionLinea aviso={p.aviso} />
             </div>
           </div>
         </td>
@@ -889,6 +956,132 @@ function ProductoRow({
         </tr>
       )}
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA TARJETA DE CELULAR — el mismo renglón, con forma de tarjeta.
+//
+// 🩸 QUÉ VINO A ARREGLAR. A 390 px la tabla dibujaba Descripción · Venta ·
+// Margen % y nada más: `Cant`, `Precio prom.` y el Δ viven bajo `sm` porque una
+// columna más agrega arrastre (medido). Daniel: *"solo veo sort venta y margen.
+// Quiero ver cantidad también y precio de venta promedio."* En una tarjeta los
+// cuatro números NO compiten por el mismo renglón: van en una grilla de dos por
+// dos, cada uno con su rótulo, y no hay nada que arrastrar.
+//
+// 🔑 CADA NÚMERO LLEVA SU RÓTULO. En la tabla el rótulo está en el encabezado,
+// una sola vez; en una tarjeta suelta, cuatro números sin nombre son cuatro
+// adivinanzas. Cuesta una línea de texto chico y ahorra la pregunta.
+//
+// 🔴 LOS NÚMEROS SON LOS MISMOS Y SE CALCULAN IGUAL: `fmtMoney`, `fmtMargen` y
+// `precioPromedio` son las MISMAS funciones que usa la fila de la tabla. No hay
+// un segundo formateador ni un segundo redondeo — verificado celda por celda
+// contra la tabla en `scripts/_verif-tarjetas-productos.mjs`.
+//
+// El desplegable («Quién lo compra» / «Códigos») abre igual que en la tabla, con
+// los MISMOS componentes: si se dibujaran dos veces distinto, dirían dos cosas.
+// ─────────────────────────────────────────────────────────────────────────────
+function ProductoCard({
+  p, isOpen, onToggle, codigos, clientes, codigosLoading, mostrarMargen, tab, onTab,
+}: {
+  p: ProductoNivel1;
+  isOpen: boolean;
+  onToggle: () => void;
+  codigos: ProductoCodigo[] | undefined;
+  clientes: ClienteDeProducto[] | null | undefined;
+  codigosLoading: boolean;
+  /** false con un cliente puesto: no hay margen por cliente (ver la cabecera). */
+  mostrarMargen: boolean;
+  tab: DrillTab;
+  onTab: (t: DrillTab) => void;
+}) {
+  return (
+    <li data-tarjeta-producto={p.descripcion} className="rounded-lg border border-gray-200 bg-white">
+      {/* La tarjeta ENTERA es el botón que abre el detalle: en un celular el
+          blanco tocable es la tarjeta, no una flechita de 14 px. */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="flex w-full items-start gap-2 px-3 py-2.5 text-left"
+      >
+        <ChevronRight className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+        <div className="min-w-0 flex-1">
+          <div data-tarjeta-descripcion className="text-sm text-gray-800">{p.descripcion}</div>
+          {/* Dos líneas, dos por dos. `grid-cols-2` y no `flex`: con nombres de
+              largo distinto los valores quedan alineados en columna y se
+              comparan de un vistazo entre tarjetas. */}
+          <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
+            <Dato rotulo="Piezas" col="cantidad">{Math.round(p.cantidad).toLocaleString("en-US")}</Dato>
+            <Dato rotulo="Venta" col="venta">{fmtMoney(p.venta)}</Dato>
+            <Dato rotulo="Precio prom." col="precio">{fmtPrecioProm(precioPromedio(p.venta, p.cantidad))}</Dato>
+            {mostrarMargen && <Dato rotulo="Margen %" col="margen">{fmtMargen(p.margen)}</Dato>}
+          </div>
+        </div>
+      </button>
+      {isOpen && (
+        <div className="border-t border-gray-100 bg-gray-50/60 px-3 py-2">
+          {codigosLoading && <div className="py-2 text-xs text-gray-400">Cargando…</div>}
+          {!codigosLoading && (
+            <>
+              <div className="mb-1 flex gap-1" role="tablist" aria-label="Detalle de la descripción">
+                <DrillTabBtn activa={tab === "clientes"} onClick={() => onTab("clientes")}>
+                  Quién lo compra
+                </DrillTabBtn>
+                <DrillTabBtn activa={tab === "codigos"} onClick={() => onTab("codigos")}>
+                  Códigos{codigos ? ` (${codigos.length})` : ""}
+                </DrillTabBtn>
+              </div>
+              {tab === "clientes" && <BloqueClientes clientes={clientes} />}
+              {tab === "codigos" && <BloqueCodigos codigos={codigos} />}
+            </>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** Un número de la tarjeta con su rótulo encima. `data-col` = el de la tabla. */
+function Dato({ rotulo, col, children }: { rotulo: string; col: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      {/* 11 px sería letra <12 y el candado táctil lo marca. Va en 12. */}
+      <div className="text-xs leading-none text-gray-400">{rotulo}</div>
+      <div data-tarjeta-col={col} className="mt-0.5 font-mono text-sm tabular-nums text-gray-800">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * El chip de ordenar de la vista de tarjetas.
+ *
+ * 44 px de alto, la regla táctil de la casa — y el mismo `toggleSort` que el
+ * encabezado de la tabla: un segundo estado de orden en celular sería un
+ * segundo criterio esperando divergir del primero.
+ */
+function ChipOrden({
+  label, sortKey, active, onClick,
+}: {
+  label: string;
+  sortKey: SortKey;
+  active: { key: SortKey; dir: "asc" | "desc" };
+  onClick: (k: SortKey) => void;
+}) {
+  const isActive = active.key === sortKey;
+  return (
+    <button
+      type="button"
+      data-orden-chip={sortKey}
+      aria-pressed={isActive}
+      onClick={() => onClick(sortKey)}
+      className={`inline-flex min-h-[44px] items-center gap-0.5 rounded-full border px-3 text-xs transition active:scale-[0.97] ${
+        isActive ? "border-gray-800 bg-gray-800 text-white" : "border-gray-200 bg-white text-gray-600"
+      }`}
+    >
+      {label}
+      <span className="w-2">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
+    </button>
   );
 }
 
@@ -1006,50 +1199,26 @@ function BloqueCodigos({ codigos }: { codigos: ProductoCodigo[] | undefined }) {
   );
 }
 
-/**
- * 🟡 EL AVISO QUE REEMPLAZA AL QUE SE PIERDE.
- *
- * ── QUÉ SE PERDIÓ ───────────────────────────────────────────────────────────
- * Hasta hoy este cartel decía *"la lista de abajo suma más que la venta de la
- * fila, porque en Switch este producto está escrito de dos formas"*. Desde que
- * la pantalla agrupa por el nombre MÁS RECIENTE del código, la fila ya suma las
- * dos grafías: ese aviso pasó a ser FALSO y se fue. Lo que se fue con él es la
- * señal de que un código estaba mal: antes se delataba solo, saliendo partido
- * en dos renglones; ahora sale en uno y no se nota.
- *
- * ── QUÉ AVISA ESTE, Y SÓLO ESTE ─────────────────────────────────────────────
- * Un código que vive bajo DOS CATEGORÍAS QUE LAS DOS EXISTEN DE VERDAD en
- * `depurador_descripciones` (el catálogo aprobado, el mismo árbitro del
- * diagnóstico). Un tipeo —`Agua Dana 600 ml 20 Und ` vs `Agua Dana 600 Ml 20
- * Und`— NO avisa nada: ahí no hay nada que arreglar en Switch.
- *
- * Medido contra producción, 6 empresas x 4 períodos: 18 renglones de 2.074.
- * Un cartel que sale en todos lados es el que se deja de leer a la semana.
- *
- * 🔴 NO FRENA NADA Y NO CORRIGE NADA. Dice el código y la otra categoría, que
- * es lo único accionable: ir a mirarlo en Switch. Cuando allá se reclasifique,
- * el aviso desaparece solo.
- *
- * Ámbar y no rojo: no se rompió nada.
- */
-function AvisoClasificacionLinea({ aviso }: { aviso: AvisoClasificacion[] | undefined }) {
-  if (!aviso || aviso.length === 0) return null;
-  const [primero] = aviso;
-  return (
-    <p
-      data-aviso-clasificacion={primero.codigo}
-      // 🩸 `overflow-wrap:anywhere` Y NO `break-words`. El código es un token
-      // largo sin espacios (`FW0FW05034-DW5`) y en una tabla el ancho mínimo de
-      // la columna lo fija la palabra más larga: medido en el navegador, sin
-      // esto el iPad PARADO (834 px) pasaba de 0 a 10 px de arrastre — el aviso
-      // empujaba la tabla. `break-words` no alcanza: no cambia el min-content.
-      className="mt-0.5 text-xs text-amber-700 [overflow-wrap:anywhere]"
-    >
-      Revisar: {primero.codigo} también está en &laquo;{primero.otra}&raquo;
-      {aviso.length > 1 ? ` (+${aviso.length - 1})` : ""}
-    </p>
-  );
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// ⛔ ACÁ VIVÍA `AvisoClasificacionLinea` — LA LÍNEA ÁMBAR DE LA FILA:
+//    «Revisar: FW0FW05034-DW5 también está en «Women-Sandals»».
+//
+// QUÉ AVISABA: un código que vivía bajo DOS categorías que las dos existían de
+// verdad en `depurador_descripciones`. 18 renglones de 2.074.
+//
+// 🔴 POR QUÉ SE FUE (25-ago-2026, orden de Daniel). El aviso nació para que él
+// revisara esos códigos en Switch. YA LOS REVISÓ y decidió, textual: *"si lo
+// más reciente es 17-ago alguien lo pasó a Flip Flop, entonces es Flip Flop"*.
+// La clasificación que Switch tiene HOY es la correcta: no hay nada que
+// corregir allá, y el aviso quedó pidiendo una acción ya tomada. Un cartel que
+// pide algo que ya se hizo es peor que ninguno — enseña a no leer los avisos.
+//
+// ⚠️ NO SE DESHIZO LA AGRUPACIÓN. El producto sigue saliendo en UN solo
+// renglón por el nombre MÁS RECIENTE de su código (Agua Dana: $35.305,20 en
+// una fila y no en dos). El aviso era una cosa aparte, y sólo se fue el aviso.
+// Los candados que antes exigían que el aviso SALIERA hoy exigen lo contrario,
+// y lo dicen con este mismo motivo escrito al lado.
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * QUÉ DEJÓ DE COMPRAR — lo que compraba en el período anterior y ahora no.

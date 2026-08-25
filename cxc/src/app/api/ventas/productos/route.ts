@@ -23,7 +23,25 @@
 //
 // ⛔ SIN LA MIGRACIÓN LA PANTALLA ES LA DE AYER. `rpcConFallbackDeVersion` cae
 // sola a `switch_top_descripciones` cuando PostgREST dice que la función nueva
-// no existe: el producto sigue partido, no hay aviso, y no se rompe nada.
+// no existe: el producto sigue partido y no se rompe nada.
+//
+// ── EL AVISO DE «CÓDIGO MAL CLASIFICADO» SE FUE (25-ago-2026) ───────────────
+//
+// 🔴 Salía en la fila: «Revisar: FW0FW05034-DW5 también está en Women-Sandals»,
+// 18 renglones de 2.074. Nació para que Daniel revisara los 5 códigos mal
+// clasificados en Switch. YA LOS REVISÓ y decidió, textual: *"si lo más
+// reciente es 17-ago alguien lo pasó a Flip Flop, entonces es Flip Flop"* — o
+// sea que la clasificación actual de Switch es LA CORRECTA y no hay nada que
+// corregir. Un aviso que pide una acción ya tomada no es una alerta: es ruido
+// que enseña a no leer los avisos.
+//
+// Con él se fueron `grafias` (la RPC ya no las devuelve, migración
+// 20260827120000) y la consulta a `depurador_descripciones` que las arbitraba:
+// una consulta MENOS por carga de pantalla.
+//
+// ⚠️ LO QUE NO SE FUE: la agrupación por el nombre MÁS RECIENTE. El Agua Dana
+// sigue saliendo en UN renglón de $35.305,20. Son dos cosas distintas y sólo
+// se retiró la segunda.
 //
 // ⛔ YA NO SE PIDE `switch_articulo_margen_mensual` (25-ago-2026). Sólo servía
 // para saber QUÉ MESES ofrecer en el selector de período, y Daniel mandó sacar
@@ -54,11 +72,6 @@ import {
   type ProductosResponse,
 } from "@/lib/ventas/productos";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
-import {
-  avisosDeClasificacion,
-  catalogoAprobado,
-  type GrafiaDelGrupo,
-} from "@/lib/ventas/productos-clasificacion";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +108,7 @@ export async function GET(req: NextRequest) {
   const comparativo = productosRangoComparativo(periodo, year, mes, ahora);
 
   const args = { p_empresa_key: empresa, p_desde: desde, p_hasta: hasta };
-  const nivel1Res = await rpcConFallbackDeVersion<FilaNivel1[]>(
+  const nivel1Res = await rpcConFallbackDeVersion<ProductoNivel1[]>(
     () => supabaseServer.rpc("switch_top_descripciones_reciente", args),
     () => supabaseServer.rpc("switch_top_descripciones", args),
     { label: "switch_top_descripciones_reciente" },
@@ -106,29 +119,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: nivel1Res.error.message }, { status: 500 });
   }
 
-  const crudas = (nivel1Res.data ?? []) as FilaNivel1[];
+  const crudas = (nivel1Res.data ?? []) as ProductoNivel1[];
 
-  // El catálogo aprobado sólo se pide si hay algo que clasificar: la respuesta
-  // del comparativo (`previo=1`) se descarta entera salvo `productos`, y sin la
-  // migración corrida ninguna fila trae grafías. Una consulta por carga de
-  // pantalla para una respuesta que nadie mira no se regala en compute Micro.
-  const hayGrafias = !previo && crudas.some(p => (p.grafias ?? []).length > 0);
-  const aprobadas = hayGrafias ? await leerCatalogoAprobado() : null;
-
-  const productos: ProductoNivel1[] = crudas.map(p => {
-    const aviso = aprobadas
-      ? avisosDeClasificacion(p.descripcion, p.grafias ?? [], aprobadas)
-      : [];
-    return {
-      descripcion: p.descripcion,
-      num_codigos: Number(p.num_codigos ?? 0),
-      cantidad: Number(p.cantidad ?? 0),
-      venta: Number(p.venta ?? 0),
-      costo: Number(p.costo ?? 0),
-      margen: p.margen != null ? Number(p.margen) : null,
-      ...(aviso.length > 0 ? { aviso } : {}),
-    };
-  });
+  // ⛔ ACÁ SE LEÍA `depurador_descripciones` para decidir el aviso de «código
+  // mal clasificado». Se fue con el aviso (ver el encabezado): es UNA CONSULTA
+  // MENOS por carga de pantalla, que en compute Micro no se regala.
+  const productos: ProductoNivel1[] = crudas.map(p => ({
+    descripcion: p.descripcion,
+    num_codigos: Number(p.num_codigos ?? 0),
+    cantidad: Number(p.cantidad ?? 0),
+    venta: Number(p.venta ?? 0),
+    costo: Number(p.costo ?? 0),
+    margen: p.margen != null ? Number(p.margen) : null,
+  }));
 
   // Totales = suma del nivel 1 (cuadra con la fuente certificada).
   const ventaTotal = productos.reduce((s, p) => s + p.venta, 0);
@@ -147,31 +150,4 @@ export async function GET(req: NextRequest) {
     productos,
   };
   return NextResponse.json(body);
-}
-
-/** Lo que devuelve la RPC de nivel 1. `grafias` sólo llega con la nueva. */
-interface FilaNivel1 extends ProductoNivel1 {
-  grafias?: GrafiaDelGrupo[];
-}
-
-/**
- * El catálogo de descripciones APROBADAS — el árbitro del aviso.
- *
- * Es la MISMA tabla que usa el Depurador (`depurador_descripciones`, 240 filas)
- * y el MISMO árbitro que usó el diagnóstico. Un segundo criterio de "qué es una
- * categoría de verdad" es lo que no puede pasar.
- *
- * 🔴 SI ESTA LECTURA FALLA, NO SE AVISA NADA — y la pantalla no se cae. Sin el
- * catálogo no se puede distinguir un tipeo de una mala clasificación, y un
- * aviso adivinado es peor que ninguno.
- */
-async function leerCatalogoAprobado(): Promise<Set<string> | null> {
-  const { data, error } = await supabaseServer
-    .from("depurador_descripciones")
-    .select("descripcion, activa");
-  if (error) {
-    console.error("[api/ventas/productos] catálogo aprobado:", error.message);
-    return null;
-  }
-  return catalogoAprobado(data ?? []);
 }

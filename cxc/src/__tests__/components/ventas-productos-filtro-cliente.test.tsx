@@ -16,8 +16,8 @@
 //   4. La columna de cambio compara contra lo que compraba ÉL, no la empresa.
 //   5. «Dejó de comprar» sale ordenado por plata y DISTINGUE "se sigue
 //      vendiendo" de "ya no se vende".
-//   6. El aviso ÁMBAR del sobrepaso de grafías sigue apareciendo con el filtro
-//      puesto.
+//   6. El aviso ÁMBAR de «código mal clasificado» YA NO SALE — tampoco con el
+//      filtro puesto (candado invertido el 25-ago-2026; ver el bloque).
 //   7. Cambiar de empresa suelta el cliente (el id es de UNA empresa).
 //   8. Ordenar y buscar siguen funcionando y NO piden nada al servidor.
 //   9. 🔴 Esto es un FILTRO y no un segundo selector de cliente — se comprueba
@@ -25,9 +25,36 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
 import { ProductosView } from "@/components/ventas/ProductosView";
 import type { ProductosResponse } from "@/lib/ventas/productos";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 EN JSDOM LOS DOS LAYOUTS EXISTEN A LA VEZ, y hay que decir cuál se mira.
+//
+// Desde el 25-ago-2026 esta pantalla tiene TABLA (desde `sm`) y TARJETAS (en
+// celular): Daniel a 390 px sólo veía Venta y Margen y pidió ver también las
+// piezas y el precio promedio. En el navegador se ve UNO de los dos; en jsdom
+// no hay CSS, así que los dos están montados y un `screen.getByRole` suelto
+// encuentra DOS botones "Precio prom." y falla por ambigüedad.
+//
+// Por eso los candados de la tabla preguntan DENTRO de `[data-vista="tabla"]` y
+// los de las tarjetas dentro de `[data-vista="tarjetas"]`. No es una molestia
+// del test: con dos layouts, "el botón de ordenar" ya no es una sola cosa, y un
+// candado que no dice cuál mira estaría probando el azar del orden del DOM.
+//
+// 🔑 `data-vista` es FIJO, NO la clase del breakpoint: `.sm\:hidden` deja de
+// existir en cuanto el corte se mueve y el `querySelector` devolvería null.
+// `enTabla()` y `enTarjetas()` REVIENTAN si el layout no está, que es lo único
+// que impide que un candado "pase" sin haber mirado nada.
+// ─────────────────────────────────────────────────────────────────────────────
+function layout(vista: "tabla" | "tarjetas") {
+  const el = document.querySelector(`[data-vista="${vista}"]`);
+  if (!el) throw new Error(`no está el layout data-vista="${vista}" — el candado no miró nada`);
+  return within(el as HTMLElement);
+}
+const enTabla = () => layout("tabla");
+const enTarjetas = () => layout("tarjetas");
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/ventas",
@@ -76,6 +103,8 @@ let previaCity = [
   { cliente_switch_id: CITY.id, cliente_nombre: CITY.nombre, descripcion: "BOXER", cantidad: 30, venta: 450 },
   { cliente_switch_id: CITY.id, cliente_nombre: CITY.nombre, descripcion: "PANTUFLA", cantidad: 200, venta: 3200 },
 ];
+/** Un `aviso` INVENTADO en la respuesta. Ya no existe en el tipo: se inyecta
+ *  para exigir que, aunque llegara, la pantalla no lo dibuje (bloque 6). */
 let avisoDeLaFila: { otra: string; codigo: string }[] = [];
 let urls: string[] = [];
 
@@ -126,10 +155,13 @@ beforeEach(() => {
     }
     const previo = u.includes("previo=1");
     if (previo) return json(respuesta({ productos: PRODUCTOS.map(p => ({ ...p, venta: p.venta * 0.8 })) }));
-    // El aviso viaja en la fila de NIVEL 1, no en el desplegable.
+    // El `aviso` viajaba en la fila de NIVEL 1. Ya no lo manda nadie; se
+    // inyecta para que el bloque 6 exija que no se dibuje ni así.
     return json(respuesta({
       productos: PRODUCTOS.map(p =>
-        p.descripcion === "CAMISA POLO" && avisoDeLaFila.length > 0 ? { ...p, aviso: avisoDeLaFila } : p),
+        p.descripcion === "CAMISA POLO" && avisoDeLaFila.length > 0
+          ? ({ ...p, aviso: avisoDeLaFila } as typeof p)
+          : p),
     }));
   }));
 });
@@ -264,11 +296,11 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
   it("la columna desaparece — no hay margen por cliente y no se puede inventar", async () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
-    expect(screen.queryByRole("button", { name: /Margen/ })).toBeTruthy();
+    expect(enTabla().queryByRole("button", { name: /Margen/ })).toBeTruthy();
     expect(celda("CAMISA POLO", "margen")).toBe("40.0%");
 
     await elegirCliente(CITY.nombre);
-    expect(screen.queryByRole("button", { name: /Margen/ })).toBeNull();
+    expect(enTabla().queryByRole("button", { name: /Margen/ })).toBeNull();
     expect(document.querySelector('[data-col="margen"]')).toBeNull();
     expect((document.querySelector("[data-totales-productos]")!.textContent ?? "")).not.toContain("Margen");
   });
@@ -286,10 +318,10 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
   it("si estaba ordenando por Margen, el orden se muda a Venta y no queda apuntando a nada", async () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
-    fireEvent.click(screen.getByRole("button", { name: /Margen/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /Margen/ }));
     await elegirCliente(CITY.nombre);
     expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]);
-    expect(screen.getByRole("button", { name: /^Venta/ }).textContent).toContain("▼");
+    expect(enTabla().getByRole("button", { name: /^Venta/ }).textContent).toContain("▼");
   });
 });
 
@@ -371,28 +403,32 @@ describe("5 · «Dejó de comprar»", () => {
   });
 });
 
-describe("6 · el aviso ÁMBAR sigue apareciendo con el filtro puesto", () => {
-  // ⛔ ACÁ SE MIRABA `data-aviso-grafias`, el aviso de "la lista suma más que la
-  // fila". Ese cartel existía porque la fila sumaba UNA sola grafía; desde que
-  // la tabla agrupa por el nombre más reciente del código, la fila suma las dos
-  // y el aviso pasó a ser falso. Lo reemplazó el de "código mal clasificado en
-  // Switch", que vive EN LA FILA — y por eso este candado ya no necesita abrir
-  // el desplegable: lo que se exige es que filtrar por un cliente no se lo lleve.
-  it("con un cliente elegido, la fila sigue avisando (código y otra categoría)", async () => {
+describe("6 · el aviso ÁMBAR ya no sale — tampoco con el filtro puesto", () => {
+  // ⚠️ ESTE CANDADO CAMBIÓ DE DIRECCIÓN DOS VECES, y las dos quedan escritas.
+  //
+  // 1ª — ACÁ SE MIRABA `data-aviso-grafias`, el aviso de "la lista suma más que
+  //      la fila". Ese cartel existía porque la fila sumaba UNA sola grafía;
+  //      desde que la tabla agrupa por el nombre más reciente del código, la
+  //      fila suma las dos y el aviso pasó a ser FALSO.
+  // 2ª — Lo reemplazó el de "código mal clasificado en Switch"
+  //      (`data-aviso-clasificacion`), y ese TAMBIÉN se fue: 25-ago-2026, por
+  //      orden de Daniel. Nació para que él revisara los 5 códigos y ya los
+  //      revisó — *"si lo más reciente es 17-ago alguien lo pasó a Flip Flop,
+  //      entonces es Flip Flop"*: la clasificación de Switch es la buena y no
+  //      quedaba nada que corregir.
+  //
+  // 🩸 EL CANDADO SE INVIERTE, NO SE BORRA: lo que ahora se exige es que poner
+  // un cliente no HAGA APARECER el aviso, ni siquiera si el servidor lo manda.
+  it("con un cliente elegido, la fila NO avisa nada", async () => {
     avisoDeLaFila = [{ otra: "Camisa Polo M/C", codigo: "A-1" }];
     render(<ProductosView selectedYear={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
-    const aviso = await waitFor(() => {
-      const a = document.querySelector("[data-aviso-clasificacion]");
-      expect(a).toBeTruthy();
-      return a!;
-    });
-    expect(aviso.textContent).toContain("Camisa Polo M/C");
-    expect(aviso.textContent).toContain("A-1");
-    // Y sigue estando DENTRO de la fila filtrada, no suelto arriba.
+    await waitFor(() => expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]));
+    expect(document.querySelector("[data-aviso-clasificacion]")).toBeNull();
+    expect(document.body.textContent).not.toContain("también está en");
     expect(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!
-      .querySelector("[data-aviso-clasificacion]")).toBeTruthy();
+      .querySelector('[class*="amber"]')).toBeNull();
   });
 
   it("y el pie que dice que el mostrador no trae detalle también", async () => {
@@ -431,11 +467,11 @@ describe("8 · ordenar y buscar siguen andando, y NO piden nada", () => {
     await pintada();
     await elegirCliente(CITY.nombre);
     const antes = urls.length;
-    fireEvent.click(screen.getByRole("button", { name: /^Cant/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /^Cant/ }));
     expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]);
-    fireEvent.click(screen.getByRole("button", { name: /^Cant/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /^Cant/ }));
     expect(filas()).toEqual(["SANDALIA", "CAMISA POLO"]);
-    fireEvent.click(screen.getByRole("button", { name: /Precio prom\./ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /Precio prom\./ }));
     expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]);
     expect(urls.length).toBe(antes);
   });

@@ -24,6 +24,33 @@ import type { ProductosResponse } from "@/lib/ventas/productos";
 import { readFileSync } from "fs";
 import path from "path";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 EN JSDOM LOS DOS LAYOUTS EXISTEN A LA VEZ, y hay que decir cuál se mira.
+//
+// Desde el 25-ago-2026 esta pantalla tiene TABLA (desde `sm`) y TARJETAS (en
+// celular): Daniel a 390 px sólo veía Venta y Margen y pidió ver también las
+// piezas y el precio promedio. En el navegador se ve UNO de los dos; en jsdom
+// no hay CSS, así que los dos están montados y un `screen.getByRole` suelto
+// encuentra DOS botones "Precio prom." y falla por ambigüedad.
+//
+// Por eso los candados de la tabla preguntan DENTRO de `[data-vista="tabla"]` y
+// los de las tarjetas dentro de `[data-vista="tarjetas"]`. No es una molestia
+// del test: con dos layouts, "el botón de ordenar" ya no es una sola cosa, y un
+// candado que no dice cuál mira estaría probando el azar del orden del DOM.
+//
+// 🔑 `data-vista` es FIJO, NO la clase del breakpoint: `.sm\:hidden` deja de
+// existir en cuanto el corte se mueve y el `querySelector` devolvería null.
+// `enTabla()` y `enTarjetas()` REVIENTAN si el layout no está, que es lo único
+// que impide que un candado "pase" sin haber mirado nada.
+// ─────────────────────────────────────────────────────────────────────────────
+function layout(vista: "tabla" | "tarjetas") {
+  const el = document.querySelector(`[data-vista="${vista}"]`);
+  if (!el) throw new Error(`no está el layout data-vista="${vista}" — el candado no miró nada`);
+  return within(el as HTMLElement);
+}
+const enTabla = () => layout("tabla");
+const enTarjetas = () => layout("tarjetas");
+
 vi.mock("next/navigation", () => ({
   usePathname: () => "/ventas",
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -72,7 +99,9 @@ let urlsPedidas: string[] = [];
 /** Cuando true, la llamada del comparativo (`previo=1`) responde 500 — o sea el
  *  tropiezo de red que hacía salir el catálogo entero como "Nuevo". */
 let fallarComparativo = false;
-/** El aviso de "mal clasificado" que trae la fila de NIVEL 1. Vacío = sin aviso. */
+/** Un `aviso` INVENTADO en la respuesta del servidor. Ya no existe en el tipo:
+ *  el candado 9 lo inyecta a mano justamente para exigir que, aunque llegara,
+ *  la pantalla no lo dibuje. Ver el encabezado de ese bloque. */
 let avisoDeLaFila: { otra: string; codigo: string }[] = [];
 /** Qué devuelve el desplegable en «Quién lo compra». `null` = no se pudo. */
 let clientesDelDrill: unknown = [
@@ -114,10 +143,13 @@ beforeEach(() => {
     const previo = String(url).includes("previo=1");
     const periodo = (new URL(String(url), "http://x").searchParams.get("periodo") ?? "ytd") as never;
     if (previo) return json(respuesta({ productos: productosPrevios }));
-    // El aviso llega en la fila de NIVEL 1 (no en el desplegable): es la
-    // respuesta que la pantalla ya tiene antes de que nadie abra nada.
+    // El `aviso` viajaba en la fila de NIVEL 1. Ya no lo manda nadie; se
+    // inyecta acá para que el candado 9 pueda exigir que, si volviera a
+    // llegar, la pantalla siga sin dibujarlo.
     const productos = PRODUCTOS.map(p =>
-      p.descripcion === "CAMISA POLO" && avisoDeLaFila.length > 0 ? { ...p, aviso: avisoDeLaFila } : p,
+      p.descripcion === "CAMISA POLO" && avisoDeLaFila.length > 0
+        ? ({ ...p, aviso: avisoDeLaFila } as typeof p)
+        : p,
     );
     return json(respuesta({ periodo, productos }));
   }));
@@ -184,7 +216,8 @@ describe("1 · la columna Precio prom. dice venta ÷ unidades", () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
-    fireEvent.click(await screen.findByRole("tab", { name: /Códigos/ }));
+    await waitFor(() => enTabla().getByRole("tab", { name: /Códigos/ }));
+    fireEvent.click(enTabla().getByRole("tab", { name: /Códigos/ }));
     const tabla = await waitFor(() => {
       const t = document.querySelector("[data-drill-codigos]");
       expect(t).toBeTruthy();
@@ -203,7 +236,7 @@ describe("2 · tocar el encabezado REORDENA de verdad", () => {
     // Default = venta desc: la camisa ($9.000) va antes que la sandalia ($5.000).
     expect(ordenEnPantalla()).toEqual(["CAMISA POLO", "SANDALIA", "DEVUELTO"]);
 
-    fireEvent.click(screen.getByRole("button", { name: /Precio prom\./ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /Precio prom\./ }));
     // Por precio desc: sandalia $50 · camisa $9 · devuelto sin precio, al final.
     await waitFor(() => expect(ordenEnPantalla()).toEqual(["SANDALIA", "CAMISA POLO", "DEVUELTO"]));
   });
@@ -211,7 +244,7 @@ describe("2 · tocar el encabezado REORDENA de verdad", () => {
   it("un segundo toque invierte el orden (no lo deja quieto)", async () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
-    const th = screen.getByRole("button", { name: /Precio prom\./ });
+    const th = enTabla().getByRole("button", { name: /Precio prom\./ });
     fireEvent.click(th);
     await waitFor(() => expect(ordenEnPantalla()[0]).toBe("SANDALIA"));
     fireEvent.click(th);
@@ -221,11 +254,11 @@ describe("2 · tocar el encabezado REORDENA de verdad", () => {
   it("las otras tres columnas siguen ordenando como siempre", async () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
-    fireEvent.click(screen.getByRole("button", { name: /^Cant/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /^Cant/ }));
     await waitFor(() => expect(ordenEnPantalla()).toEqual(["CAMISA POLO", "SANDALIA", "DEVUELTO"]));
-    fireEvent.click(screen.getByRole("button", { name: /^Venta/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /^Venta/ }));
     await waitFor(() => expect(ordenEnPantalla()).toEqual(["CAMISA POLO", "SANDALIA", "DEVUELTO"]));
-    fireEvent.click(screen.getByRole("button", { name: /Margen/ }));
+    fireEvent.click(enTabla().getByRole("button", { name: /Margen/ }));
     await waitFor(() => expect(ordenEnPantalla()[0]).toBe("DEVUELTO")); // margen 66,7%
   });
 });
@@ -623,7 +656,7 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
   it("los códigos NO se perdieron: están en su pestaña, a un toque", async () => {
     await desplegar();
     expect(document.querySelector("[data-drill-codigos]")).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: /Códigos/ }));
+    fireEvent.click(enTabla().getByRole("tab", { name: /Códigos/ }));
     await waitFor(() => expect(document.querySelector("[data-drill-codigos]")).toBeTruthy());
     // Y la lista de clientes deja de estar: son dos pestañas, no dos bloques.
     expect(document.querySelector("[data-drill-clientes]")).toBeNull();
@@ -640,90 +673,85 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
 
   it("cambiar de pestaña NO cierra el desplegable", async () => {
     await desplegar();
-    fireEvent.click(screen.getByRole("tab", { name: /Códigos/ }));
+    fireEvent.click(enTabla().getByRole("tab", { name: /Códigos/ }));
     await waitFor(() => expect(document.querySelector("[data-drill-codigos]")).toBeTruthy());
     // Si el clic se propagara a la fila, el toggle la cerraría al instante.
-    expect(screen.queryByRole("tab", { name: /Quién lo compra/ })).toBeTruthy();
+    expect(enTabla().queryByRole("tab", { name: /Quién lo compra/ })).toBeTruthy();
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 9 · EL AVISO QUE REEMPLAZA AL QUE SE PIERDE
+// 9 · EL AVISO DE «CÓDIGO MAL CLASIFICADO» YA NO SALE
 //
-// 🩸 Desde que la pantalla agrupa por el nombre MÁS RECIENTE del código, el
-// mismo producto deja de salir partido en dos renglones. Eso arregla lo que
-// había que arreglar y TAPA una cosa: un código MAL CLASIFICADO en Switch —que
-// vivió bajo dos categorías que las dos existen de verdad— antes se delataba
-// solo saliendo en dos filas, y ahora sale en una.
+// ⚠️ ESTE CANDADO CAMBIÓ DE DIRECCIÓN, y queda escrito por qué. Hasta el #597
+// exigía lo contrario: que la fila dijera «Revisar: A-1 también está en
+// «CAMISETA»» cuando un código vivía bajo dos categorías reales del catálogo
+// aprobado. Salía en 18 renglones de 2.074.
 //
-// Las dos formas de arruinarlo, y las dos tienen candado acá:
-//   · que el aviso NO SALGA (el código mal clasificado queda invisible);
-//   · que el aviso salga SIEMPRE (la alerta que se deja de leer a la semana).
+// 🔴 Daniel mandó sacarlo el 25-ago-2026. El aviso nació para que él revisara
+// esos 5 códigos en Switch; YA LOS REVISÓ y decidió, textual: *"si lo más
+// reciente es 17-ago alguien lo pasó a Flip Flop, entonces es Flip Flop"*. La
+// clasificación que Switch tiene HOY es la correcta: no queda nada que
+// corregir, y el cartel pedía una acción ya tomada.
+//
+// 🩸 EL CANDADO SE INVIERTE, NO SE BORRA. Borrarlo dejaría el hueco abierto: el
+// próximo que toque esta pantalla podría redibujarlo sin que nada se ponga
+// rojo. Acá se exige que NO salga NI SIQUIERA CUANDO EL SERVIDOR LO MANDA —
+// que es más fuerte que mirar la respuesta pelada, porque caza el redibujo.
+//
+// ⛔ LO QUE NO SE TOCÓ, y tiene su propio candado abajo: la AGRUPACIÓN por el
+// nombre más reciente (el producto sigue en UN renglón) y todos los números.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("9 · el aviso de código mal clasificado", () => {
+describe("9 · el aviso de código mal clasificado ya no existe", () => {
   async function pantalla() {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
   }
 
-  it("🔴 SIN aviso en la respuesta NO se dibuja nada (si saliera siempre, se deja de leer)", async () => {
+  it("🔴 sin aviso en la respuesta no se dibuja nada", async () => {
     avisoDeLaFila = [];
     await pantalla();
     expect(document.querySelector("[data-aviso-clasificacion]")).toBeNull();
   });
 
-  it("🔴 CON aviso lo dice: el CÓDIGO y la OTRA categoría", async () => {
+  it("🔴 Y AUNQUE EL SERVIDOR LO MANDE, la pantalla NO lo dibuja", async () => {
     avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
     await pantalla();
-    const aviso = document.querySelector("[data-aviso-clasificacion]");
-    expect(aviso, "no salió el aviso").toBeTruthy();
-    expect(aviso!.getAttribute("data-aviso-clasificacion")).toBe("A-1");
-    const texto = (aviso!.textContent ?? "").replace(/\s+/g, " ");
-    expect(texto).toContain("A-1");      // el código
-    expect(texto).toContain("CAMISETA"); // la otra categoría
-  });
-
-  it("va DENTRO de la fila que avisa, y en NINGUNA otra", async () => {
-    avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
-    await pantalla();
+    expect(document.querySelector("[data-aviso-clasificacion]")).toBeNull();
+    // Ni por el ancla ni por el texto: el rótulo tampoco puede volver con otro
+    // atributo. La celda de la descripción es el nombre y nada más.
     const fila = document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!;
-    expect(fila.querySelector("[data-aviso-clasificacion]")).toBeTruthy();
-    const otra = document.querySelector('tr[data-fila-producto="SANDALIA"]')!;
-    expect(otra.querySelector("[data-aviso-clasificacion]")).toBeNull();
-    expect(document.querySelectorAll("[data-aviso-clasificacion]")).toHaveLength(1);
+    const texto = (fila.querySelector('[data-col="descripcion"]')!.textContent ?? "").replace(/\s+/g, " ").trim();
+    expect(texto).toBe("CAMISA POLO");
+    expect(document.body.textContent).not.toContain("también está en");
   });
 
-  it("es ÁMBAR, no rojo: no se rompió nada", async () => {
+  it("no queda ni un rastro ámbar en ninguna fila", async () => {
     avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
     await pantalla();
-    const cls = document.querySelector("[data-aviso-clasificacion]")!.className;
-    expect(cls).toContain("amber");
-    expect(cls).not.toContain("red");
-    expect(cls).not.toContain("rose");
+    for (const fila of document.querySelectorAll("tr[data-fila-producto]")) {
+      expect(fila.querySelector('[class*="amber"]')).toBeNull();
+    }
   });
 
-  it("es una ETIQUETA CORTA, no un párrafo: menos de 90 caracteres", async () => {
+  // 🩸 SE MIRA EL HTML DE LA FILA, ATRIBUTOS INCLUIDOS, y no sólo el texto.
+  // La reposición más silenciosa del aviso no es un <p>: es un `title` en la
+  // celda — el globito al pasar el mouse. Eso no toca `textContent` y un
+  // candado que sólo lea el texto lo dejaría pasar entero.
+  it("🔴 ni escondido en un `title`, un `aria-label` o cualquier atributo", async () => {
     avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
     await pantalla();
-    const texto = (document.querySelector("[data-aviso-clasificacion]")!.textContent ?? "").trim();
-    expect(texto.length).toBeLessThan(90);
+    for (const fila of document.querySelectorAll("tr[data-fila-producto]")) {
+      const html = fila.outerHTML.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      expect(html).not.toContain("tambien esta en");
+      expect(html).not.toContain("revisar:");
+      expect(html).not.toContain("amber");
+      expect(html).not.toContain("aviso");
+    }
   });
 
-  it("con más de uno, nombra el primero y CUENTA el resto (no vuelca la lista)", async () => {
-    avisoDeLaFila = [
-      { otra: "CAMISETA", codigo: "A-1" },
-      { otra: "CHOMBA", codigo: "A-2" },
-      { otra: "REMERA", codigo: "A-3" },
-    ];
-    await pantalla();
-    const texto = (document.querySelector("[data-aviso-clasificacion]")!.textContent ?? "");
-    expect(texto).toContain("A-1");
-    expect(texto).toContain("(+2)");
-    expect(texto).not.toContain("A-3");
-  });
-
-  it("⚠️ EL AVISO NO TOCA UN SOLO NÚMERO de la fila", async () => {
+  it("⚠️ sacarlo NO TOCÓ UN SOLO NÚMERO de la fila", async () => {
     avisoDeLaFila = [];
     await pantalla();
     const sinAviso = {
@@ -745,7 +773,7 @@ describe("9 · el aviso de código mal clasificado", () => {
     }).toEqual(sinAviso);
   });
 
-  it("⚠️ el aviso NO frena el desplegable: «Quién lo compra» abre igual", async () => {
+  it("⚠️ y el desplegable «Quién lo compra» abre igual que siempre", async () => {
     avisoDeLaFila = [{ otra: "CAMISETA", codigo: "A-1" }];
     await pantalla();
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
@@ -753,5 +781,140 @@ describe("9 · el aviso de código mal clasificado", () => {
     const tabla = document.querySelector("[data-drill-clientes]")!;
     expect([...tabla.querySelectorAll("tr")]).toHaveLength(2);
     expect(tabla.textContent).toContain("City Mall Paso Canoa");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10 · LAS TARJETAS DE CELULAR — los cuatro números que la tabla no mostraba.
+//
+// 🩸 QUÉ VINO A ARREGLAR. A 390 px la tabla dibujaba Descripción · Venta ·
+// Margen %: `Cant` y `Precio prom.` viven bajo `sm` porque una columna más
+// agrega arrastre en iPhone (medido). Daniel, textual: *"solo veo sort venta y
+// margen. Quiero ver cantidad también y precio de venta promedio."*
+//
+// 🔴 LO QUE ESTE BLOQUE EXISTE PARA CAZAR:
+//   · que la tarjeta pierda las PIEZAS o el PRECIO PROM. (o sea, que el cambio
+//     no haya servido para nada);
+//   · que la tarjeta diga un número DISTINTO del de la tabla — el peor final:
+//     dos pantallas del mismo dato que no coinciden;
+//   · que el ORDEN desaparezca en celular (sin encabezado no hay dónde tocar) o
+//     que quede con menos de los cuatro criterios;
+//   · que el desplegable deje de abrirse desde la tarjeta;
+//   · que las tarjetas se dibujen en ESCRITORIO, o la tabla en celular.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El texto de un dato de la tarjeta, por el mismo `col` que usa la tabla. */
+function tarjeta(descripcion: string, col: string): string {
+  const li = document.querySelector(`li[data-tarjeta-producto="${descripcion}"]`);
+  expect(li, `no está la tarjeta de ${descripcion}`).toBeTruthy();
+  return (li!.querySelector(`[data-tarjeta-col="${col}"]`)?.textContent ?? "").trim();
+}
+
+describe("10 · las tarjetas de celular", () => {
+  it("🔴 la tarjeta trae los CUATRO números, PIEZAS y PRECIO PROM. incluidos", async () => {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    expect(tarjeta("CAMISA POLO", "cantidad")).toBe("1,000");
+    expect(tarjeta("CAMISA POLO", "venta")).toBe("$9,000.00");
+    expect(tarjeta("CAMISA POLO", "precio")).toBe("$9.00");
+    expect(tarjeta("CAMISA POLO", "margen")).toBe("40.0%");
+  });
+
+  it("🔴 y dice EXACTAMENTE lo mismo que la tabla, celda por celda", async () => {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    // Las tres filas x los cuatro números. Si la tarjeta tuviera su propio
+    // formateador o su propio redondeo, esto cae.
+    for (const d of ["CAMISA POLO", "SANDALIA", "DEVUELTO"]) {
+      for (const col of ["cantidad", "venta", "precio", "margen"]) {
+        expect(tarjeta(d, col), `${d}/${col}`).toBe(celda(d, col));
+      }
+    }
+  });
+
+  it("hay una tarjeta por fila, con las mismas descripciones y en el mismo orden", async () => {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    const enTarjetasOrden = [...document.querySelectorAll("li[data-tarjeta-producto]")]
+      .map(li => li.getAttribute("data-tarjeta-producto"));
+    expect(enTarjetasOrden).toEqual(ordenEnPantalla());
+  });
+
+  it("🔴 los CUATRO criterios de orden están disponibles en celular", async () => {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    const chips = [...document.querySelectorAll("[data-orden-chip]")]
+      .map(b => b.getAttribute("data-orden-chip"));
+    expect(chips).toEqual(["cantidad", "venta", "precio", "margen"]);
+  });
+
+  it("🔴 tocar un chip REORDENA de verdad, y el segundo toque invierte", async () => {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    expect(ordenEnPantalla()).toEqual(["CAMISA POLO", "SANDALIA", "DEVUELTO"]);
+    const precio = document.querySelector('[data-orden-chip="precio"]')!;
+    fireEvent.click(precio);
+    await waitFor(() => expect(ordenEnPantalla()).toEqual(["SANDALIA", "CAMISA POLO", "DEVUELTO"]));
+    fireEvent.click(precio);
+    await waitFor(() => expect(ordenEnPantalla()).toEqual(["DEVUELTO", "CAMISA POLO", "SANDALIA"]));
+  });
+
+  it("el chip activo dice para qué lado va, y es UNO solo", async () => {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    // Arranca en Venta ▼, igual que la tabla: un segundo estado de orden en
+    // celular sería un segundo criterio esperando divergir del primero.
+    const activos = () => [...document.querySelectorAll('[data-orden-chip][aria-pressed="true"]')];
+    expect(activos()).toHaveLength(1);
+    expect(activos()[0].getAttribute("data-orden-chip")).toBe("venta");
+    expect(activos()[0].textContent).toContain("▼");
+    fireEvent.click(document.querySelector('[data-orden-chip="cantidad"]')!);
+    await waitFor(() => expect(activos()[0].getAttribute("data-orden-chip")).toBe("cantidad"));
+    expect(activos()).toHaveLength(1);
+  });
+
+  it("⚠️ el orden es UNO SOLO: tocar el chip mueve también el encabezado de la tabla", async () => {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    fireEvent.click(document.querySelector('[data-orden-chip="cantidad"]')!);
+    await waitFor(() =>
+      expect(enTabla().getByRole("button", { name: /^Cant/ }).textContent).toContain("▼"));
+    // Y al revés: tocar el encabezado mueve el chip.
+    fireEvent.click(enTabla().getByRole("button", { name: /Precio prom\./ }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-orden-chip="precio"]')!.getAttribute("aria-pressed")).toBe("true"));
+  });
+
+  it("🔴 el desplegable abre DESDE LA TARJETA, con «Quién lo compra» y «Códigos»", async () => {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    const li = document.querySelector('li[data-tarjeta-producto="CAMISA POLO"]') as HTMLElement;
+    fireEvent.click(li.querySelector("button")!);
+    await waitFor(() => expect(within(li).queryByRole("tab", { name: /Quién lo compra/ })).toBeTruthy());
+    expect(within(li).queryByRole("tab", { name: /Códigos/ })).toBeTruthy();
+    await waitFor(() => expect(li.querySelector("[data-drill-clientes]")).toBeTruthy());
+    expect(li.textContent).toContain("City Mall Paso Canoa");
+    // Y los códigos siguen a un toque, dentro de la MISMA tarjeta.
+    fireEvent.click(within(li).getByRole("tab", { name: /Códigos/ }));
+    await waitFor(() => expect(li.querySelector("[data-drill-codigos]")).toBeTruthy());
+  });
+
+  it("🩸 el layout se marca con `data-vista` FIJO, no con la clase del corte", async () => {
+    render(<ProductosView selectedYear={2026} />);
+    await pintada();
+    // Si esto se buscara por `.sm\\:hidden`, mover el corte devolvería null y
+    // cualquier medidor compararía CERO celdas pasando en verde.
+    const tabla = document.querySelector('[data-vista="tabla"]')!;
+    const tarjetas = document.querySelector('[data-vista="tarjetas"]')!;
+    expect(tabla, "falta data-vista=tabla").toBeTruthy();
+    expect(tarjetas, "falta data-vista=tarjetas").toBeTruthy();
+    // La TABLA va primera en el DOM: los candados de siempre preguntan con
+    // `document.querySelector` y tienen que seguir cayendo sobre ella.
+    expect(tabla.compareDocumentPosition(tarjetas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Y cada uno se esconde en el ancho del otro: la tabla desde `sm`, las
+    // tarjetas debajo. Es lo único que se puede afirmar sin CSS en jsdom.
+    expect(tabla.className).toContain("hidden");
+    expect(tabla.className).toContain("sm:block");
+    expect(tarjetas.closest("div")!.className).toContain("sm:hidden");
   });
 });
