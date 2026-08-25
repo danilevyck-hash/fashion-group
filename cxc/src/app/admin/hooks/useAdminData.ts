@@ -12,6 +12,11 @@ const SWR_KEY = "cxc-admin-data";
 interface AdminData {
   clients: ConsolidatedClient[];
   ts: number;
+  /**
+   * Lo que el guard de montos dejó AFUERA de esta cartera, ya redactado por el
+   * servidor y acotado a las 6 del grupo. `null` = no hay nada que decir.
+   */
+  avisoMontos: string | null;
 }
 
 /**
@@ -165,7 +170,11 @@ async function fetchAdminData(): Promise<AdminData> {
     ? new Date(agingJson.refreshedAt as string).getTime()
     : Date.now();
 
-  return { clients: clientsArr, ts: refreshTs };
+  return {
+    clients: clientsArr,
+    ts: refreshTs,
+    avisoMontos: (agingJson?.avisoMontos as string | null | undefined) ?? null,
+  };
 }
 
 /**
@@ -202,6 +211,7 @@ export default function useAdminData(authReady: boolean = true) {
     loadError: error && !hasData ? "Error al cargar datos. Intenta de nuevo." : null,
     loadData,
     dataTs: data?.ts ?? null,
+    avisoMontos: data?.avisoMontos ?? null,
     // Mostrando la caché en memoria (dato viejo) porque el refetch falló.
     fromCache: !!error && hasData,
   };

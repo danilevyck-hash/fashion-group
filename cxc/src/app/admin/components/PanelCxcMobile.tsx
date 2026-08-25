@@ -17,6 +17,7 @@ import Link from "next/link";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 import SyncStatus from "@/components/shared/SyncStatus";
+import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import {
@@ -79,6 +80,8 @@ interface PanelCxcMobileProps {
   empresaRestriction: string | null;
   /** Reload de datos tras un "Actualizar ahora" exitoso. */
   onSyncedNow?: () => void;
+  /** Lo que el guard dejó afuera de estos totales, ya redactado por el servidor. */
+  avisoMontos?: string | null;
 }
 
 export default function PanelCxcMobile({
@@ -101,6 +104,7 @@ export default function PanelCxcMobile({
   onExportarCsv,
   empresaRestriction,
   onSyncedNow,
+  avisoMontos,
 }: PanelCxcMobileProps) {
   // Totales del resumen de buckets. roleClients aquí ya viene filtrado por
   // empresa (kpiClients en page.tsx): con "Todas" es el universo accesible,
@@ -155,6 +159,11 @@ export default function PanelCxcMobile({
           companyFilter={companyFilter}
           onSyncedNow={onSyncedNow}
         />
+
+        {/* Qué se quedó AFUERA del total. Va ARRIBA del número —Daniel:
+            *"sigue diciendo $198.296,55 y arriba aparece…"*— y en el celular
+            eso importa el doble: es lo único que se ve sin bajar. */}
+        <AvisoRechazosSwitch texto={avisoMontos} />
 
         <MobileHero total={totals.total} />
 

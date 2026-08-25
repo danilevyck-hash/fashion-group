@@ -437,10 +437,17 @@ export async function syncCarteraWeb(opts: {
       }
     }
 
+    // 🩸 `skipDetails` FALTABA acá, y era el único camino de confecciones_boston:
+    // el log salía con `records_skipped: 1` y `skip_details: null`, o sea que se
+    // sabía que ALGO se había rechazado pero nunca cuál ni de cuánto. Medido el
+    // 25-ago-2026 en producción: 6 de 6 corridas de `confecciones_boston/
+    // estadocuenta` con rechazo y detalle en blanco, contra 5 de 5 CON detalle
+    // en los demás syncs. Sin esto, la línea en pantalla no tiene qué decir.
     await finishSwitchSyncLog(logId, "success", {
       inserted: filasBuenas.length,
       updated: cerrados,
       skipped: skips.length,
+      skipDetails: skips.length > 0 ? skips : undefined,
     });
     return { ...conCifras, ok: true, cerrados, durationMs: Date.now() - startedAt };
   } catch (err) {

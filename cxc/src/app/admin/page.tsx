@@ -17,6 +17,7 @@ import KpiCards from "./components/KpiCards";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
+import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import TabsCartera from "./components/TabsCartera";
 import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
 import EnviarEmailModal from "./components/EnviarEmailModal";
@@ -140,7 +141,7 @@ function AdminDashboardInner() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "vendedor"] });
   // `uploads` (la lista de cargas de archivo) se dejó de pedir: se desestructuraba
   // acá y no lo leía ninguna línea de la pantalla. Ver `useAdminData`.
-  const { clients, loading, loadError, loadData } = useAdminData(authChecked);
+  const { clients, loading, loadError, loadData, avisoMontos } = useAdminData(authChecked);
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   // Pestaña activa. Las dos carteras NUNCA se ven juntas: son dos consultas a
@@ -503,6 +504,7 @@ function AdminDashboardInner() {
         onExportarCsv={handleMobileExportCsv}
         empresaRestriction={empresaRestriction}
         onSyncedNow={() => loadData()}
+        avisoMontos={avisoMontos}
       />
 
       <div className="hidden md:block max-w-6xl mx-auto px-6 py-8">
@@ -523,6 +525,12 @@ function AdminDashboardInner() {
           onSuccess={() => loadData()}
         />
       </div>
+
+      {/* Qué se quedó AFUERA de estos totales. Pegado a la frescura porque
+          contestan la misma pregunta: "¿le puedo creer a este número?".
+          Acotado a las 6 del grupo por el servidor: Boston lo dice en SU
+          pestaña. Sin rechazos no se dibuja nada. */}
+      <AvisoRechazosSwitch texto={avisoMontos} className="mb-4" />
 
       {/* Export buttons — admin/secretaria only */}
       {canExport && (

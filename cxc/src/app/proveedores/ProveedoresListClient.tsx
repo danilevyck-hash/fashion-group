@@ -12,6 +12,7 @@ import { empresasConCxp } from "@/lib/switch-api/empresas";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
 import { AGING, type AgingKey } from "@/lib/cxc-aging";
+import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
 
@@ -59,6 +60,7 @@ function ProveedoresList() {
 
   const [items, setItems] = useState<ListItem[]>([]);
   const [grupoSaldo, setGrupoSaldo] = useState(0);
+  const [avisoMontos, setAvisoMontos] = useState<string | null>(null);
   // Filtro de empresa, receta CXC (D3): la URL (?empresa=) MANDA si está
   // presente (compartible / sobrevive refresh); si no, cae a la memoria de
   // useLastUsed. Al cambiarlo se escribe en AMBOS. "" = Todas.
@@ -88,6 +90,7 @@ function ProveedoresList() {
         const json = await res.json();
         setItems(json.proveedores ?? []);
         setGrupoSaldo(json.grupo_saldo ?? 0);
+        setAvisoMontos(json.avisoMontos ?? null);
       }
     } finally {
       setLoading(false);
@@ -200,6 +203,10 @@ function ProveedoresList() {
               onSuccess={async () => { await fetchList(empresa, q); }}
             />
           </div>
+
+          {/* Qué se quedó AFUERA del total de abajo. Arriba del número, igual
+              que en el CXC. Sin rechazos no se dibuja nada. */}
+          <AvisoRechazosSwitch texto={avisoMontos} className="mb-3" />
 
           {/* Total por pagar (grupo o empresa filtrada) */}
           <div className="border border-gray-200 rounded-lg p-4 mb-4">

@@ -12,6 +12,7 @@ import dynamic from "next/dynamic";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
 import { PullToRefresh } from "@/components/ui";
 import AppHeader from "@/components/AppHeader";
+import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 
@@ -88,6 +89,13 @@ interface VentasShellProps {
   resumen: VentasResumen | null;
   clientes: Clientes | null;
   multi: Multifashion | null;
+  /**
+   * Lo que el guard de montos dejó AFUERA de estos números, ya redactado por el
+   * servidor. Cubre las 4 familias que alimentan este módulo (facturas,
+   * utilidad, costo diario y venta por artículo) y NO depende del año elegido:
+   * es "qué está mal en Switch ahora", no "qué pasó en 2024".
+   */
+  avisoMontos?: string | null;
 }
 
 export function VentasShell({
@@ -96,6 +104,7 @@ export function VentasShell({
   resumen: initialResumen,
   clientes: initialClientes,
   multi: initialMulti,
+  avisoMontos,
 }: VentasShellProps) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(initialYear);
@@ -253,6 +262,12 @@ export function VentasShell({
           )}
         </div>
       </header>
+
+      {/* Qué se quedó AFUERA de los números de este módulo. Va ARRIBA de las
+          pestañas y no adentro de una: el mismo documento corrupto envenena la
+          venta, el margen y la comisión, así que se dice UNA vez para las
+          cuatro. Sin rechazos no se dibuja nada. */}
+      <AvisoRechazosSwitch texto={avisoMontos} className="mb-4" />
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         {/* 🩸 LOS 54 px QUE SOBRABAN EN LAS 4 PESTAÑAS. No era ninguna tabla: era
