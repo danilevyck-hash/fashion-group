@@ -96,6 +96,11 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   // vista unificada —que expone `id_natural`, el uuid— así que se pide a la
   // tabla de orders en UNA sola query por ids, igual que los envíos.
   const numerosPedido = new Map<string, string>();
+  // 🔴 El `status` de la tabla de orders ('borrador' | 'confirmado'). Es lo que
+  // el chip «Borradores» mira — y NO es lo mismo que "no salió a Switch": hay
+  // pedidos en Switch cuyo status nunca se cerró (PED-018 en producción). Viaja
+  // en la MISMA query que ya traía `order_number`: cero consultas nuevas.
+  const statusPedido = new Map<string, string>();
   if (orderIds.length > 0) {
     const marcaDb = await cfg.db();
     // Escalón tolerante por la DDL 20260824160000 (`documento`): si la columna
@@ -118,14 +123,24 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       break;
     }
     // Tolerante igual: sin `order_number` la fila dice "Sin número", no un blanco.
-    const { data: ords, error: ordsError } = await marcaDb
-      .from(cfg.ordersTable)
-      .select("id, order_number")
-      .in("id", orderIds);
-    if (!ordsError) {
+    // Y con el mismo escalón para `status`: si la columna faltara se relee sin
+    // ella y ninguna fila queda marcada como borrador (nunca se cae la lista).
+    //
+    // 🩸 EL `.in("id", orderIds)` NO ES UNA OPTIMIZACIÓN: es el filtro de vida.
+    // `orderIds` sale de la VISTA, que ya descarta `deleted = true`. Barrer la
+    // tabla entera traería los 67 pedidos borrados y el chip contaría 110 en vez
+    // de 43 — el error que ya se cometió una vez con este mismo dato.
+    for (const cols of ["id, order_number, status", "id, order_number"]) {
+      const { data: ords, error: ordsError } = await marcaDb
+        .from(cfg.ordersTable)
+        .select(cols)
+        .in("id", orderIds);
+      if (ordsError) continue;
       for (const o of (ords || []) as unknown as Record<string, unknown>[]) {
         if (o.order_number) numerosPedido.set(String(o.id), String(o.order_number));
+        if (o.status) statusPedido.set(String(o.id), String(o.status));
       }
+      break;
     }
   }
 
@@ -154,6 +169,9 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       // `switch_documento` es null cuando no salió a Switch.
       numero_pedido: numerosPedido.get(r.id_natural) ?? null,
       switch_documento: switchDocumentos.get(r.id_natural) ?? null,
+      // `status` es null en el pedido del LINK sin convertir: todavía no tiene
+      // fila en orders. Un null NO es borrador (ver `esBorrador`).
+      status: statusPedido.get(r.id_natural) ?? null,
     };
   });
 

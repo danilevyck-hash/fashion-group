@@ -7,11 +7,14 @@
 // repo ya pagó ese defecto cuatro veces. Lo que se lee es el DOM.
 //
 // Lo que fija:
-//   1. El filtro por TIPO existe, trae sus conteos y FILTRA de verdad — en las
-//      4 marcas (una sola pieza; Joybees espejo exacto de Reebok).
+//   1. Los TRES chips —Pedidos · Cotizaciones · Borradores— existen, traen sus
+//      conteos y FILTRAN de verdad, en las 4 marcas (una sola pieza; Joybees
+//      espejo exacto de Reebok). 🔴 NO hay «Todos» y el panel abre en «Pedidos».
 //   2. «Cotizaciones» deja SOLO las cotizaciones: es la pregunta que Daniel
 //      quería contestar de un vistazo (qué se cotizó y no se vendió).
-//   3. El que NO salió a Switch no cae en «Pedidos» ni en «Cotizaciones».
+//   3. 🔴 «Borradores» es `status = 'borrador'`, NO "nunca se envió" — y las
+//      filas visibles son EXACTAMENTE el número del chip, en las 4 marcas,
+//      contra los conteos MEDIDOS en producción el 25-ago-2026.
 //   4. Los vacíos hablan de comprobantes, no de pedidos.
 //   5. 🔴 La tabla conserva sus 6 columnas: el filtro no ensanchó nada.
 //   6. La confirmación lleva a la lista en UN toque, y el destino DEPENDE DEL
@@ -48,15 +51,15 @@ const base = (over: Partial<UnifiedPedido>): UnifiedPedido => ({
   ...over,
 });
 
-// Datos con la forma de producción (medida el 24-ago-2026): PED-017 salió como
-// pedido con 16-000000503; PED-019 todavía no salió; el del link no tiene
-// número propio porque se lo asigna la conversión.
+// Datos con la forma de producción (medida el 25-ago-2026). Los seis casos que
+// el panel puede tener, uno por variante:
 const PEDIDO = base({
   id_natural: "aaaaaaaa-1111-4111-8111-111111111111",
   cliente: "Sporting Shoes",
   numero_pedido: "PED-017",
   switch_numero: "16-000000503",
   switch_documento: "pedido",
+  status: "confirmado",
 });
 const PEDIDO_2 = base({
   id_natural: "dddddddd-4444-4444-8444-444444444444",
@@ -64,6 +67,7 @@ const PEDIDO_2 = base({
   numero_pedido: "PED-021",
   switch_numero: "16-000000512",
   switch_documento: "pedido",
+  status: "confirmado",
 });
 const COTIZACION = base({
   id_natural: "cccccccc-3333-4333-8333-333333333333",
@@ -71,13 +75,37 @@ const COTIZACION = base({
   numero_pedido: "PED-020",
   switch_numero: "16-000000511",
   switch_documento: "cotizacion",
+  status: "confirmado",
 });
-const SIN_MANDAR = base({
+// 🔴 EL CASO QUE SEPARA LOS DOS CRITERIOS: PED-018 salió a Switch como PEDIDO y
+// su `status` nunca se cerró. Es real (reebok · Hafez, S.A. · $2.520). Con el
+// criterio viejo caía en «Pedidos»; ahora cae en «Borradores».
+const BORRADOR_EN_SWITCH = base({
+  id_natural: "eeeeeeee-5555-4555-8555-555555555555",
+  cliente: "Hafez Borrador",
+  numero_pedido: "PED-018",
+  switch_numero: "16-000000499",
+  switch_documento: "pedido",
+  status: "borrador",
+});
+const BORRADOR = base({
   id_natural: "bbbbbbbb-2222-4222-8222-222222222222",
   cliente: "Zapatería Nueva",
   numero_pedido: "PED-019",
   switch_numero: null,
   switch_documento: null,
+  status: "borrador",
+});
+// 🔴 EL OTRO LADO: confirmado que NUNCA salió a Switch. Con el criterio viejo
+// caía en «Sin mandar»; ahora cae en «Pedidos», que es el balde de resto — sin
+// eso sería una fila INVISIBLE, porque «Todos» ya no existe.
+const CONFIRMADO_SIN_SALIR = base({
+  id_natural: "ffffffff-6666-4666-8666-666666666666",
+  cliente: "Calzados del Istmo",
+  numero_pedido: "PED-030",
+  switch_numero: null,
+  switch_documento: null,
+  status: "confirmado",
 });
 const DEL_LINK = base({
   origen: "link",
@@ -88,9 +116,10 @@ const DEL_LINK = base({
   numero_pedido: null,
   switch_numero: null,
   switch_documento: null,
+  status: null,
 });
 
-const TODAS = [PEDIDO, PEDIDO_2, COTIZACION, SIN_MANDAR, DEL_LINK];
+const TODAS = [PEDIDO, PEDIDO_2, COTIZACION, BORRADOR_EN_SWITCH, BORRADOR, CONFIRMADO_SIN_SALIR, DEL_LINK];
 
 function pintarTab(pedidos: UnifiedPedido[], marca: MarcaUiKey = "reebok") {
   return render(
@@ -152,43 +181,145 @@ afterEach(() => {
 
 // ── 1. El filtro por tipo, en las 4 marcas ───────────────────────────────────
 
-describe("🔴 el panel filtra por TIPO DE COMPROBANTE — las 4 marcas", () => {
+/** Cuántas filas se ven ahora mismo. Es lo que el chip promete. */
+const filasVisibles = (c: HTMLElement) => [...c.querySelectorAll("tbody tr")];
+
+/** El número que pinta el chip `label`, leído del DOM. */
+function conteoDelChip(c: HTMLElement, label: string): number {
+  const btn = botonesTipo(c).find((b) => (b.textContent || "").startsWith(label));
+  expect(btn, `no hay chip «${label}»`).toBeTruthy();
+  const n = (btn!.textContent || "").replace(/\s+/g, "").slice(label.length);
+  return Number(n);
+}
+
+describe("🔴 TRES chips, sin «Todos» — las 4 marcas", () => {
   for (const marca of MARCAS) {
-    it(`${marca}: los cuatro filtros con su conteo`, () => {
+    it(`${marca}: son exactamente Pedidos · Cotizaciones · Borradores`, () => {
       const { container } = pintarTab(TODAS, marca);
       const textos = botonesTipo(container).map((b) => (b.textContent || "").replace(/\s+/g, " ").trim());
-      expect(textos).toEqual(["Todos5", "Pedidos2", "Cotizaciones1", "Sin mandar2"]);
+      expect(textos).toEqual(["Pedidos4", "Cotizaciones1", "Borradores2"]);
+      // 🔴 «Todos» se fue, y «Sin mandar» tampoco vuelve por la ventana.
+      expect(textos.join(" ")).not.toContain("Todos");
+      expect(textos.join(" ")).not.toContain("Sin mandar");
+    });
+
+    it(`${marca}: 🔴 abre en «Pedidos» — sin tocar nada`, () => {
+      const { container } = pintarTab(TODAS, marca);
+      const activo = botonesTipo(container).find((b) => b.getAttribute("aria-pressed") === "true");
+      expect(activo, "ningún chip arranca activo").toBeTruthy();
+      expect((activo!.textContent || "").startsWith("Pedidos")).toBe(true);
+      // Y lo que se ve de entrada son los 4 pedidos, no las 7 filas.
+      expect(filasVisibles(container)).toHaveLength(4);
+    });
+
+    it(`${marca}: 🩸 TOCANDO cada chip, las filas visibles son EXACTAMENTE su número`, () => {
+      const { container } = pintarTab(TODAS, marca);
+      for (const label of ["Pedidos", "Cotizaciones", "Borradores"]) {
+        const dice = conteoDelChip(container, label);
+        tocarTipo(container, label);
+        expect(filasVisibles(container), `el chip «${label}» dice ${dice}`).toHaveLength(dice);
+      }
+    });
+
+    it(`${marca}: 🔴 los tres chips PARTICIONAN — nada se pierde ni se cuenta dos veces`, () => {
+      // Es lo que permite que «Todos» se haya ido: si algún criterio dejara una
+      // fila afuera, esa fila sería INVISIBLE en el panel.
+      const { container } = pintarTab(TODAS, marca);
+      const vistas: string[] = [];
+      let suma = 0;
+      for (const label of ["Pedidos", "Cotizaciones", "Borradores"]) {
+        suma += conteoDelChip(container, label);
+        tocarTipo(container, label);
+        vistas.push(...clientesVisibles(container));
+      }
+      expect(suma).toBe(TODAS.length);
+      expect(new Set(vistas).size).toBe(TODAS.length);
+      for (const p of TODAS) expect(vistas.join(" "), `${p.cliente} no se ve en ningún chip`).toContain(p.cliente);
     });
 
     it(`${marca}: «Cotizaciones» deja SOLO la cotización`, () => {
       const { container } = pintarTab(TODAS, marca);
       tocarTipo(container, "Cotizaciones");
-      const filas = container.querySelectorAll("tbody tr");
+      const filas = filasVisibles(container);
       expect(filas).toHaveLength(1);
       expect(filas[0].textContent).toContain("A-Amani");
       expect(filas[0].textContent).toContain("Cotización en Switch: 16-000000511");
-      // Y NO se coló ningún pedido.
       expect(clientesVisibles(container).join(" ")).not.toContain("Sporting Shoes");
     });
 
-    it(`${marca}: «Pedidos» deja los dos pedidos y NADA más`, () => {
+    it(`${marca}: 🔴 «Borradores» es el STATUS — trae al que SÍ salió a Switch`, () => {
       const { container } = pintarTab(TODAS, marca);
-      tocarTipo(container, "Pedidos");
-      const filas = [...container.querySelectorAll("tbody tr")];
+      tocarTipo(container, "Borradores");
+      const filas = filasVisibles(container);
       expect(filas).toHaveLength(2);
-      for (const tr of filas) expect(tr.textContent).toContain("Pedido en Switch:");
-      // 🔴 El que no salió NO se cuela entre los pedidos por el default del ERP.
-      expect(filas.map((t) => t.textContent).join(" ")).not.toContain("Zapatería Nueva");
+      const texto = filas.map((t) => t.textContent).join(" ");
+      // PED-018 está EN Switch y aun así es borrador: el criterio viejo («nunca
+      // se envió») lo habría dejado afuera.
+      expect(texto).toContain("PED-018");
+      expect(texto).toContain("Pedido en Switch: 16-000000499");
+      expect(texto).toContain("PED-019");
+      // Y el confirmado que nunca salió NO es borrador.
+      expect(texto).not.toContain("Calzados del Istmo");
+      expect(texto).not.toContain("Nathalie");
     });
 
-    it(`${marca}: «Sin mandar» junta al que no salió y al del link`, () => {
+    it(`${marca}: 🔴 «Pedidos» es el balde de RESTO (el del link no se pierde)`, () => {
       const { container } = pintarTab(TODAS, marca);
-      tocarTipo(container, "Sin mandar");
-      const filas = [...container.querySelectorAll("tbody tr")];
-      expect(filas).toHaveLength(2);
-      for (const tr of filas) expect(tr.textContent).toContain("No se ha mandado a Switch");
+      tocarTipo(container, "Pedidos");
+      const texto = filasVisibles(container).map((t) => t.textContent).join(" ");
+      expect(filasVisibles(container)).toHaveLength(4);
+      expect(texto).toContain("Nathalie");             // del link sin convertir
+      expect(texto).toContain("Calzados del Istmo");   // confirmado sin salir
+      expect(texto).toContain("Sporting Shoes");
+      // Y el borrador que está en Switch NO se cuela entre los pedidos.
+      expect(texto).not.toContain("PED-018");
+      expect(texto).not.toContain("A-Amani");
+      // 🩸 La FILA sigue diciendo la verdad aunque el chip la agrupe.
+      expect(texto).toContain("No se ha mandado a Switch");
     });
   }
+
+  it("🔴 los conteos MEDIDOS en producción (25-ago-2026), marca por marca", () => {
+    // reebok 2 · tommy 3 · joybees 0 · calvin 1 borradores vivos. Los seis, uno
+    // por uno, tal como salieron de la base. 🩸 Son 6 sobre las filas VIVAS: la
+    // tabla tiene además 67 pedidos borrados que la vista no devuelve, y contar
+    // contra `orders` daría 110 en vez de 43.
+    const PROD: Record<MarcaUiKey, { numero: string; cliente: string; enSwitch: boolean }[]> = {
+      reebok: [
+        { numero: "PED-018", cliente: "Hafez, S.A.", enSwitch: true },
+        { numero: "PED-019", cliente: "Contado", enSwitch: false },
+      ],
+      tommy: [
+        { numero: "TOM-005", cliente: "Contado", enSwitch: false },
+        { numero: "TOM-006", cliente: "Contado", enSwitch: false },
+        { numero: "TOM-023", cliente: "Wolf Mall Center Int", enSwitch: false },
+      ],
+      joybees: [],
+      calvin: [{ numero: "CKP-007", cliente: "ACTIVE SHOES, S.A.", enSwitch: false }],
+    };
+    for (const marca of MARCAS) {
+      const borradores = PROD[marca].map((b, i) =>
+        base({
+          id_natural: `prod-${marca}-${i}`,
+          cliente: b.cliente,
+          numero_pedido: b.numero,
+          switch_numero: b.enSwitch ? "16-000000499" : null,
+          switch_documento: b.enSwitch ? "pedido" : null,
+          status: "borrador",
+        }),
+      );
+      // Más un puñado de filas vivas que NO son borrador (pedidos y del link).
+      const filas = [...borradores, PEDIDO, DEL_LINK, CONFIRMADO_SIN_SALIR];
+      const { container } = pintarTab(filas, marca);
+      expect(conteoDelChip(container, "Borradores"), `${marca}`).toBe(PROD[marca].length);
+      tocarTipo(container, "Borradores");
+      expect(filasVisibles(container)).toHaveLength(PROD[marca].length);
+      for (const b of PROD[marca]) {
+        expect(container.textContent, `${marca} ${b.numero}`).toContain(b.numero);
+      }
+      cleanup();
+    }
+  });
 
   it("🔴 Joybees es espejo EXACTO de Reebok: mismos rótulos y mismos conteos", () => {
     const r = pintarTab(TODAS, "reebok");
@@ -198,21 +329,25 @@ describe("🔴 el panel filtra por TIPO DE COMPROBANTE — las 4 marcas", () => 
     expect(botonesTipo(j.container).map((b) => b.textContent)).toEqual(rt);
   });
 
-  it("«Todos» vuelve a traer las cinco", () => {
+  it("se puede volver de «Cotizaciones» a «Pedidos» (el filtro no se traba)", () => {
     const { container } = pintarTab(TODAS);
     tocarTipo(container, "Cotizaciones");
-    expect(container.querySelectorAll("tbody tr")).toHaveLength(1);
-    tocarTipo(container, "Todos");
-    expect(container.querySelectorAll("tbody tr")).toHaveLength(5);
+    expect(filasVisibles(container)).toHaveLength(1);
+    tocarTipo(container, "Pedidos");
+    expect(filasVisibles(container)).toHaveLength(4);
   });
 
   it("el filtro por TIPO y el de ORIGEN se cruzan (no se pisan)", () => {
     const { container } = pintarTab(TODAS);
     fireEvent.click(screen.getByText(/^Del link \(/));
-    tocarTipo(container, "Sin mandar");
-    const filas = [...container.querySelectorAll("tbody tr")];
+    tocarTipo(container, "Pedidos");
+    const filas = filasVisibles(container);
     expect(filas).toHaveLength(1);
     expect(filas[0].textContent).toContain("Nathalie");
+    // 🔴 El filtro de ORIGEN conserva su «Todos»: ése NO se tocó.
+    expect(screen.getByText(/^Todos \(/)).toBeTruthy();
+    fireEvent.click(screen.getByText(/^Todos \(/));
+    expect(filasVisibles(container)).toHaveLength(4);
   });
 });
 

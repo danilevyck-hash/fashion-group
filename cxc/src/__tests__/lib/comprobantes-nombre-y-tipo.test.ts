@@ -10,9 +10,11 @@
 // Lo que este archivo fija, todo en el módulo PURO:
 //   1. El label visible dice «Comprobantes» y la `key` de la pestaña NO cambió.
 //   2. Ninguna ficha del catálogo de módulos se llama parecido (choque de label).
-//   3. `tipoComprobante` sale del ENVÍO, no del `status`, y el que no salió NO
-//      es ninguno de los dos.
-//   4. Los conteos suman exactamente el total y los tres baldes son disjuntos.
+//   3. `tipoComprobante`: los TRES chips —Pedidos · Cotizaciones · Borradores—
+//      y su orden de decisión (borrador → cotización → pedido). «Borradores» es
+//      `status = 'borrador'`, NO "nunca se envió".
+//   4. 🔴 LOS TRES PARTICIONAN: suman el total y ninguna fila queda sin chip.
+//      Es lo que permite que «Todos» se haya ido.
 //   5. El destino de «ver la lista» depende del ROL — un vendedor NUNCA sale
 //      apuntado al admin de catálogos.
 //
@@ -25,10 +27,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   contarComprobantes,
+  esBorrador,
+  FILTRO_COMPROBANTE_DEFAULT,
   FILTROS_COMPROBANTE,
   PANEL_COMPROBANTES,
   pasaFiltroComprobante,
   TAB_COMPROBANTES_KEY,
+  textoEnSwitch,
   tipoComprobante,
   VACIO_NINGUNO_COINCIDE,
   VACIO_SIN_COMPROBANTES,
@@ -117,20 +122,61 @@ describe("🔴 «Comprobantes» no choca con ninguna ficha del catálogo de mód
 
 // ── 3. Qué es cada fila ──────────────────────────────────────────────────────
 
-const enSwitch = (doc: string | null): NumerosDePedido => ({
+const enSwitch = (doc: string | null, over: Partial<NumerosDePedido> = {}): NumerosDePedido => ({
   numeroPedido: "PED-017",
   switchNumero: "16-000000503",
   switchDocumento: doc,
+  status: "confirmado",
   fuente: "orders",
+  ...over,
 });
 
-describe("🔴 el tipo sale del ENVÍO, y el que no salió no es ninguno de los dos", () => {
+describe("🔴 «Borradores» es el STATUS, no «nunca se envió»", () => {
+  it("`status = 'borrador'` es borrador, y nada más lo es", () => {
+    expect(esBorrador({ status: "borrador" })).toBe(true);
+    expect(esBorrador({ status: "  BORRADOR " })).toBe(true);
+    expect(esBorrador({ status: "confirmado" })).toBe(false);
+    expect(esBorrador({ status: "enviado" })).toBe(false);
+  });
+
+  it("🩸 sin `status` NO es borrador — el pedido del LINK aún no tiene fila en orders", () => {
+    expect(esBorrador({ fuente: "publicos" })).toBe(false);
+    expect(esBorrador({ status: null })).toBe(false);
+    expect(esBorrador({ status: "" })).toBe(false);
+    expect(esBorrador({})).toBe(false);
+  });
+
+  it("🔴 EL CASO REAL DE PRODUCCIÓN: PED-018 está EN SWITCH y ES borrador", () => {
+    // reebok PED-018 · Hafez, S.A. · $2.520 — salió al ERP y su `status` nunca
+    // se cerró. Con el criterio viejo («nunca se envió») caía en «Pedidos»;
+    // con el nuevo cae en «Borradores», que es lo que Daniel pidió ver.
+    const ped018 = enSwitch("pedido", { numeroPedido: "PED-018", status: "borrador" });
+    expect(esBorrador(ped018)).toBe(true);
+    expect(tipoComprobante(ped018)).toBe("borrador");
+    // Y el criterio viejo diría exactamente lo contrario.
+    expect(ped018.switchNumero).not.toBeNull();
+  });
+
+  it("🔴 y al revés: un confirmado que NUNCA salió NO es borrador", () => {
+    // reebok y calvin tienen uno cada uno en producción. Con el criterio viejo
+    // caían en «Sin mandar»; ahora caen en «Pedidos», que es el balde de resto.
+    const sinSalir: NumerosDePedido = { numeroPedido: "PED-030", switchNumero: null, status: "confirmado", fuente: "orders" };
+    expect(esBorrador(sinSalir)).toBe(false);
+    expect(tipoComprobante(sinSalir)).toBe("pedido");
+  });
+});
+
+describe("🔴 el orden de decisión: borrador → cotización → pedido", () => {
+  it("con documento 'cotizacion' y ya confirmado → cotizacion", () => {
+    expect(tipoComprobante(enSwitch("cotizacion"))).toBe("cotizacion");
+  });
+
   it("con documento 'pedido' → pedido", () => {
     expect(tipoComprobante(enSwitch("pedido"))).toBe("pedido");
   });
 
-  it("con documento 'cotizacion' → cotizacion", () => {
-    expect(tipoComprobante(enSwitch("cotizacion"))).toBe("cotizacion");
+  it("🔴 el BORRADOR gana sobre la cotización: no está terminado", () => {
+    expect(tipoComprobante(enSwitch("cotizacion", { status: "borrador" }))).toBe("borrador");
   });
 
   it("🩸 con el DDL pendiente (documento ausente) sigue siendo pedido, no basura", () => {
@@ -142,49 +188,62 @@ describe("🔴 el tipo sale del ENVÍO, y el que no salió no es ninguno de los 
     expect(tipoComprobante(enSwitch("factura"))).toBe("pedido");
   });
 
-  it("🔴 sin envío NO se le inventa tipo: es «no-enviado»", () => {
-    expect(tipoComprobante({ numeroPedido: "PED-019", switchNumero: null })).toBe("no-enviado");
-    expect(tipoComprobante({ fuente: "publicos" })).toBe("no-enviado");
-    // Y ojo: el que está en Switch SIN número tampoco es «no-enviado».
-    expect(tipoComprobante({ switchNumero: "?", switchDocumento: "cotizacion" })).toBe("cotizacion");
+  it("🔴 «Pedidos» es el balde de RESTO: el del link sin convertir cae ahí", () => {
+    // Sin «Todos», una fila que no cayera en ningún chip sería INVISIBLE. En
+    // producción hay 6 pedidos del link sin convertir (5 reebok + 1 joybees).
+    expect(tipoComprobante({ fuente: "publicos" })).toBe("pedido");
+    expect(tipoComprobante({ numeroPedido: "PED-019", switchNumero: null })).toBe("pedido");
+    // Y la FILA sigue diciendo la verdad, que es otra cosa que el chip.
+    expect(textoEnSwitch({ fuente: "publicos" })).toBe("No se ha mandado a Switch");
   });
 });
 
-// ── 4. Los filtros y sus conteos ─────────────────────────────────────────────
+// ── 4. Los tres filtros, sus conteos y la PARTICIÓN ──────────────────────────
 
-describe("los cuatro filtros y sus conteos", () => {
+describe("los TRES filtros — «Todos» se fue", () => {
+  // Una muestra con la forma de producción (medida el 25-ago-2026): pedidos en
+  // Switch, una cotización, un BORRADOR QUE SÍ SALIÓ (PED-018), un borrador que
+  // no salió, un confirmado que nunca salió, y el del link sin convertir.
   const FILAS: NumerosDePedido[] = [
     enSwitch("pedido"),
-    enSwitch("pedido"),
-    enSwitch("cotizacion"),
-    { numeroPedido: "PED-019", switchNumero: null, fuente: "orders" },
+    enSwitch("pedido", { numeroPedido: "PED-021" }),
+    enSwitch("cotizacion", { numeroPedido: "PED-020" }),
+    enSwitch("pedido", { numeroPedido: "PED-018", status: "borrador" }),
+    { numeroPedido: "PED-019", switchNumero: null, status: "borrador", fuente: "orders" },
+    { numeroPedido: "PED-030", switchNumero: null, status: "confirmado", fuente: "orders" },
     { fuente: "publicos" },
   ];
 
-  it("el orden es Todos · Pedidos · Cotizaciones · Sin mandar", () => {
-    expect(FILTROS_COMPROBANTE.map((f) => f.clave)).toEqual([
-      "todos",
-      "pedido",
-      "cotizacion",
-      "no-enviado",
-    ]);
-    expect(FILTROS_COMPROBANTE.map((f) => f.label)).toEqual([
-      "Todos",
-      "Pedidos",
-      "Cotizaciones",
-      "Sin mandar",
-    ]);
+  it("🔴 son TRES y no hay «Todos»", () => {
+    expect(FILTROS_COMPROBANTE).toHaveLength(3);
+    expect(FILTROS_COMPROBANTE.map((f) => f.clave)).toEqual(["pedido", "cotizacion", "borrador"]);
+    expect(FILTROS_COMPROBANTE.map((f) => f.label)).toEqual(["Pedidos", "Cotizaciones", "Borradores"]);
+    expect(FILTROS_COMPROBANTE.some((f) => String(f.clave) === "todos")).toBe(false);
+    expect(FILTROS_COMPROBANTE.some((f) => f.label === "Todos")).toBe(false);
+    // Y el balde viejo tampoco vuelve por la ventana.
+    expect(FILTROS_COMPROBANTE.some((f) => f.label === "Sin mandar")).toBe(false);
+    expect(FILTROS_COMPROBANTE.some((f) => String(f.clave) === "no-enviado")).toBe(false);
+  });
+
+  it("🔴 abre en «Pedidos», que es lo que más se mira", () => {
+    expect(FILTRO_COMPROBANTE_DEFAULT).toBe("pedido");
+    expect(FILTROS_COMPROBANTE[0].clave).toBe(FILTRO_COMPROBANTE_DEFAULT);
   });
 
   it("los conteos son exactos", () => {
-    const c = contarComprobantes(FILAS);
-    expect(c).toEqual({ todos: 5, pedido: 2, cotizacion: 1, "no-enviado": 2 });
+    expect(contarComprobantes(FILAS)).toEqual({ pedido: 4, cotizacion: 1, borrador: 2 });
   });
 
-  it("🔴 los tres baldes suman el total: nada se cuenta dos veces ni se pierde", () => {
+  it("🔴 LOS TRES PARTICIONAN: suman el total y ninguna fila queda sin chip", () => {
+    // Es lo que hace que «Todos» pueda irse. Si algún día un criterio dejara una
+    // fila afuera, esa fila sería INVISIBLE en el panel y este candado se pone
+    // rojo antes de que llegue a producción.
     const c = contarComprobantes(FILAS);
-    expect(c.pedido + c.cotizacion + c["no-enviado"]).toBe(c.todos);
-    expect(c.todos).toBe(FILAS.length);
+    expect(c.pedido + c.cotizacion + c.borrador).toBe(FILAS.length);
+    for (const f of FILAS) {
+      const cae = FILTROS_COMPROBANTE.filter(({ clave }) => pasaFiltroComprobante(f, clave));
+      expect(cae, `${f.numeroPedido ?? "del link"} cae en ${cae.length} chips`).toHaveLength(1);
+    }
   });
 
   it("el filtro deja pasar exactamente lo que su conteo dice", () => {
@@ -194,12 +253,32 @@ describe("los cuatro filtros y sus conteos", () => {
     }
   });
 
-  it("«Todos» no filtra nada", () => {
-    expect(FILAS.every((f) => pasaFiltroComprobante(f, "todos"))).toBe(true);
+  it("🔴 «Borradores» trae los 2 borradores, uno de ellos EN Switch", () => {
+    const b = FILAS.filter((f) => pasaFiltroComprobante(f, "borrador"));
+    expect(b.map((f) => f.numeroPedido)).toEqual(["PED-018", "PED-019"]);
+    expect(b.some((f) => f.switchNumero !== null)).toBe(true);
   });
 
-  it("una lista vacía da cuatro ceros (no rompe ni inventa)", () => {
-    expect(contarComprobantes([])).toEqual({ todos: 0, pedido: 0, cotizacion: 0, "no-enviado": 0 });
+  it("🩸 el criterio VIEJO («nunca se envió») daría OTRA cosa", () => {
+    // La prueba de que son dos preguntas distintas: si «Borradores» volviera a
+    // ser "no salió a Switch", traería 3 filas y NO traería PED-018.
+    const viejo = FILAS.filter((f) => f.switchNumero === null || f.switchNumero === undefined);
+    expect(viejo).toHaveLength(3);
+    expect(viejo.map((f) => f.numeroPedido)).not.toContain("PED-018");
+    expect(contarComprobantes(FILAS).borrador).toBe(2);
+  });
+
+  it("una lista vacía da tres ceros (no rompe ni inventa)", () => {
+    expect(contarComprobantes([])).toEqual({ pedido: 0, cotizacion: 0, borrador: 0 });
+  });
+
+  it("🩸 los conteos salen de las filas QUE SE VEN, no de una segunda lista", () => {
+    // 43 pedidos vivos y 67 borrados en la tabla: contar contra `orders` daría
+    // 110. `contarComprobantes` recibe la MISMA lista que se pinta y no consulta
+    // nada — el chip no puede desincronizarse de la tabla.
+    const c = contarComprobantes(FILAS);
+    expect(c.pedido + c.cotizacion + c.borrador).toBe(FILAS.length);
+    expect(contarComprobantes(FILAS.slice(0, 3)).pedido + contarComprobantes(FILAS.slice(0, 3)).cotizacion).toBe(3);
   });
 });
 

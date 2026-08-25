@@ -17,6 +17,11 @@
 //   4. Sin `order_number` la fila sale con null (la pantalla lo dice con
 //      palabras) — nunca revienta.
 //   5. Las 4 marcas hacen lo mismo.
+//   6. 🔴 `status` ('borrador' | 'confirmado') viaja en la MISMA query que
+//      `order_number` —cero consultas nuevas— y SIEMPRE restringida a los ids
+//      que devolvió la vista. La vista filtra `deleted = false`: barrer la tabla
+//      entera traería los 67 pedidos BORRADOS y el chip «Borradores» contaría
+//      contra 110 en vez de 43. Y hay escalón tolerante si la columna faltara.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
@@ -105,15 +110,58 @@ describe("1-2. los dos números salen de sus tablas y viajan enteros", () => {
     expect(rows[1].switch_documento).toBe("cotizacion");
   });
 
-  it("los order_number se piden POR LOS IDS de la vista, no barriendo la tabla", async () => {
+  it("🩸 order_number y status se piden POR LOS IDS de la vista, no barriendo la tabla", async () => {
+    // 🔴 EL `.in("id", ...)` ES EL FILTRO DE VIDA, no una optimización. La vista
+    // ya descartó `deleted = true` (43 vivos contra 67 borrados en producción);
+    // sin esta restricción el `status` de un pedido BORRADO entraría al conteo.
     mainDb.queue("reebok_pedidos_unificado_vw", { data: [filaVista(OID, "C")] });
     reebokDb.queue("reebok_switch_envios", { data: [] });
-    reebokDb.queue("reebok_orders", { data: [{ id: OID, order_number: "PED-017" }] });
+    reebokDb.queue("reebok_orders", { data: [{ id: OID, order_number: "PED-017", status: "borrador" }] });
 
     await get("reebok")(makeReq("/x", { role: "admin" }));
     const chain = reebokDb.chainsFor("reebok_orders")[0];
     expect(chain._calls.in).toContainEqual(["id", [OID]]);
     expect(chain._calls.select[0][0]).toContain("order_number");
+    expect(chain._calls.select[0][0]).toContain("status");
+    // Y una sola query: `status` no trajo una consulta nueva.
+    expect(reebokDb.chainsFor("reebok_orders")).toHaveLength(1);
+  });
+
+  it("🔴 el `status` viaja tal cual — es lo que mira el chip «Borradores»", async () => {
+    mainDb.queue("reebok_pedidos_unificado_vw", { data: [filaVista(OID, "Hafez"), filaVista(OID2, "A-Amani")] });
+    // PED-018 está EN SWITCH y su status es 'borrador' (caso real de producción).
+    reebokDb.queue("reebok_switch_envios", {
+      data: [{ order_id: OID, numero_interno: "16-000000499", pedido_switch_id: 499, documento: "pedido" }],
+    });
+    reebokDb.queue("reebok_orders", {
+      data: [
+        { id: OID, order_number: "PED-018", status: "borrador" },
+        { id: OID2, order_number: "PED-020", status: "confirmado" },
+      ],
+    });
+
+    const rows = await (await get("reebok")(makeReq("/x", { role: "admin" }))).json();
+    expect(rows[0].status).toBe("borrador");
+    expect(rows[0].switch_numero).toBe("16-000000499");
+    expect(rows[1].status).toBe("confirmado");
+  });
+
+  it("🔴 sin la columna `status` la lectura se reintenta y nada queda como borrador", async () => {
+    mainDb.queue("reebok_pedidos_unificado_vw", { data: [filaVista(OID, "C")] });
+    reebokDb.queue("reebok_switch_envios", { data: [] });
+    reebokDb.queue(
+      "reebok_orders",
+      { data: null, error: { code: "42703", message: 'column "status" does not exist' } },
+      { data: [{ id: OID, order_number: "PED-017" }] },
+    );
+
+    const res = await get("reebok")(makeReq("/x", { role: "admin" }));
+    expect(res.status).toBe(200);
+    const rows = await res.json();
+    // La lista NO se cae, el número sigue estando y el status queda en null.
+    expect(rows[0].numero_pedido).toBe("PED-017");
+    expect(rows[0].status).toBeNull();
+    expect(reebokDb.chainsFor("reebok_orders")).toHaveLength(2);
   });
 });
 
@@ -152,6 +200,7 @@ describe("4. lo que falta no revienta", () => {
     const rows = await res.json();
     expect(rows[0].numero_pedido).toBeNull();
     expect(rows[0].switch_documento).toBeNull();
+    expect(rows[0].status).toBeNull();
   });
 });
 

@@ -131,86 +131,15 @@ mutar "el vacío del filtro vuelve a hablar de pedidos" "$REGLA" \
   'export const VACIO_NINGUNO_COINCIDE = "Ningún comprobante coincide";' \
   'export const VACIO_NINGUNO_COINCIDE = "Ningún pedido coincide";'
 
-# ── 2 · QUÉ ES CADA FILA ─────────────────────────────────────────────────────
-
-mutar "🔴 el que NO salió a Switch se cuenta como PEDIDO" "$REGLA" \
-  '  if (!estaEnSwitch(p)) return "no-enviado";
-  return normalizarDocumento(p.switchDocumento);' \
-  '  return normalizarDocumento(p.switchDocumento);'
-
-mutar "🔴 toda cotización se cuenta como pedido" "$REGLA" \
-  '  return normalizarDocumento(p.switchDocumento);
-}' \
-  '  return "pedido";
-}'
-
-mutar "se pierde el escalón tolerante del DDL (documento crudo)" "$REGLA" \
-  '  return normalizarDocumento(p.switchDocumento);
-}' \
-  '  return (p.switchDocumento ?? "no-enviado") as TipoComprobante;
-}'
-
-mutar "todo se cuenta como cotización" "$REGLA" \
-  '  return normalizarDocumento(p.switchDocumento);
-}' \
-  '  return "cotizacion";
-}'
-
-# ── 3 · EL FILTRO Y SUS CONTEOS ──────────────────────────────────────────────
-
-mutar "el filtro deja pasar todo (no filtra nada)" "$REGLA" \
-  '  return filtro === "todos" || tipoComprobante(p) === filtro;' \
-  '  return true;'
-
-mutar "«Cotizaciones» desaparece de los filtros" "$REGLA" \
-  '  { clave: "cotizacion", label: "Cotizaciones" },' \
-  ''
-
-mutar "«Sin mandar» desaparece de los filtros" "$REGLA" \
-  '  { clave: "no-enviado", label: "Sin mandar" },' \
-  ''
-
-mutar "los conteos dejan afuera a los que no salieron" "$REGLA" \
-  '    todos: filas.length,' \
-  '    todos: filas.filter((f) => estaEnSwitch(f)).length,'
-
-mutar "los conteos se quedan en cero (el número no dice nada)" "$REGLA" \
-  '  for (const f of filas) out[tipoComprobante(f)] += 1;' \
-  '  '
-
-# ── 4 · LA PANTALLA DEL PANEL ────────────────────────────────────────────────
-
-mutar "la pantalla no dibuja el filtro por tipo" "$TAB" \
-  '      <div data-medir="filtro-tipo-comprobante" className="flex flex-wrap gap-2 mb-4">' \
-  '      <div data-medir="filtro-tipo-comprobante" className="hidden">'
-
-mutar "la pantalla dibuja su propia lista de filtros" "$TAB" \
-  '        {FILTROS_COMPROBANTE.map((f) => {' \
-  '        {[{ clave: "todos" as const, label: "Todos" }, { clave: "pedido" as const, label: "Pedido" }].map((f) => {'
-
-mutar "🔴 el filtro por tipo se ignora al filtrar" "$TAB" \
-  '    if (!pasaFiltroComprobante(datosNumeros(p, esFilaOrders(p)), tipoFilter)) return false;' \
-  ''
-
-mutar "el filtro por tipo pisa al de ORIGEN" "$TAB" \
-  '    if (origenFilter !== "todos" && p.origen !== origenFilter) return false;' \
-  ''
-
-mutar "los conteos del filtro se calculan sobre lo YA filtrado" "$TAB" \
-  '  const countsTipo = contarComprobantes(pedidos.map((p) => datosNumeros(p, esFilaOrders(p))));' \
-  '  const countsTipo = contarComprobantes([]);'
-
-mutar "🔴 la tabla gana una columna (ensancha el iPad acostado)" "$TAB" \
-  '                <th className="text-right px-4 py-3 font-medium text-gray-500"></th>' \
-  '                <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Tipo</th>'
-
-mutar "el vacío se escribe a mano en la pantalla" "$TAB" \
-  '              ? VACIO_NINGUNO_COINCIDE
-              : VACIO_SIN_COMPROBANTES}' \
-  '              ? "Ningún pedido coincide"
-              : "No hay pedidos aún"}'
-
+# ── 2-4 · EL FILTRO POR TIPO SE MUDÓ ────────────────────────────────────────
+#
+# Las mutaciones de `tipoComprobante`, de los chips y de sus conteos viven desde
+# el 25-ago-2026 en `scripts/_mutar-candados-borradores.sh`: los tres chips
+# (Pedidos · Cotizaciones · Borradores) cambiaron de criterio y de cantidad, y
+# dejarlas acá con los patrones viejos sería un verificador que denuncia
+# "patrón muerto" en cada corrida. Este archivo se queda con el NOMBRE del
+# contenedor, el botón de un toque por rol y los textos podados.
+#
 # ── 5 · EL BOTÓN DE UN TOQUE, Y EL ROL ───────────────────────────────────────
 
 mutar "🔴 el VENDEDOR sale apuntado al admin de catálogos (403 seguro)" "$DESTINO" \

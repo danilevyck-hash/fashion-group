@@ -119,6 +119,9 @@ describe("GET /pedidos-unificado", () => {
       // con qué se mandó (pedido | cotizacion) para que el número no mienta.
       numero_pedido: "PED-017",
       switch_documento: "pedido",
+      // `status` de la tabla de orders (25-ago-2026): es lo que mira el chip
+      // «Borradores». El mock no lo trae ⇒ null, que NO es borrador.
+      status: null,
     });
     // link sin fuente → publicos; product_id null → fallback apparel (bulto 6)
     expect(rows[1].fuente).toBe("publicos");

@@ -2105,18 +2105,52 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - **«Comprobantes» no choca con ninguna ficha** de `modules.ts` — hay candado que compara contra las 29 etiquetas, sin tildes y en los dos sentidos (que ninguna sea igual y que ninguna la contenga), y que exige que **no aparezca una key nueva `comprobantes`** (sería un módulo sin fila en `role_permissions`).
 > - **La hoja del Excel sigue llamándose «Pedidos» y el archivo también.** Daniel puede tener una planilla enganchada: renombrar la hoja la desengancha. Es el mismo criterio que puso las dos columnas nuevas AL FINAL.
 >
-> ### 🔴 ADENTRO SE FILTRA POR TIPO — y el que no salió NO es ninguno de los dos
+> ### 🔴 ADENTRO SE FILTRA POR TIPO — TRES CHIPS, SIN «TODOS» (25-ago-2026)
 >
 > ```
-> [ Todos 42 ]  [ Pedidos 30 ]  [ Cotizaciones 2 ]  [ Sin mandar 10 ]
+> [ Pedidos ]  [ Cotizaciones ]  [ Borradores ]
 > ```
 >
-> Daniel quería poder ver **de un vistazo qué se cotizó y todavía no se vendió**. Antes eso se contestaba leyendo la segunda línea de cada fila, una por una.
-> - 🔴 **Un pedido que NO salió a Switch tiene su propio balde.** No se le inventa tipo: rotularlo «Pedido» porque el default del ERP es pedido sería decir que hay algo en Switch que no está. Es la MISMA regla de `textoEnSwitch` porque es el MISMO módulo — `lib/catalogo/numeros-pedido.ts`, puro, no una copia.
-> - **Cero consultas nuevas.** `documento` ya viaja en la fila desde el #593: los cuatro conteos salen de **una pasada sobre lo que ya está en memoria**. La base está en compute Micro.
-> - **El escalón tolerante del DDL `20260824160000` se conserva**: sin la columna `documento` todo lo que está en Switch se lee como PEDIDO. Hay mutación.
-> - **Se cruza con el filtro de ORIGEN** (Todos · Del link · Míos), no lo pisa. Hay test que toca los dos.
+> Daniel, textual: ***"entonces haz un tap de borrador, para q esté organizado. No quiero opción de todos."*** El panel **abre en «Pedidos»**, que es lo que más se mira.
+>
+> ~~`[ Todos 42 ] [ Pedidos 30 ] [ Cotizaciones 2 ] [ Sin mandar 10 ]`~~ — **SUPERADO**: se fue «Todos» y **«Sin mandar» pasó a «Borradores» CAMBIANDO DE CRITERIO**.
+>
+> #### 🔴 «BORRADORES» NO ES «SIN MANDAR»: SON DOS PREGUNTAS DISTINTAS
+>
+> El balde viejo preguntaba *"¿salió a Switch?"*. El nuevo pregunta *"¿está terminado?"* — **`status = 'borrador'`**, lo que la tabla de orders dice y lo que el checkout cambia a `'confirmado'`. **Y hay un caso REAL en producción donde se separan:**
+>
+> ```
+> reebok  PED-018  Hafez, S.A.  $2.520  status='borrador'  Y EN SWITCH como pedido
+> ```
+>
+> un pedido que salió al ERP y cuyo `status` nunca se cerró (el update del checkout tiene reintento). Con el criterio viejo caía en «Pedidos»; con el nuevo cae en «Borradores», que es lo que Daniel pidió ver. **Y al revés**: reebok y calvin tienen un `confirmado` cada uno que NUNCA salió — con el criterio viejo caían en «Sin mandar» y ahora caen en «Pedidos».
+>
+> #### 🔴 LOS TRES CHIPS PARTICIONAN — ES LO QUE PERMITE QUE «TODOS» SE VAYA
+>
+> **Esto no es un detalle.** Con «Todos» en la fila, una fila que no encajara en ningún criterio seguía siendo alcanzable. **Sin «Todos», una fila sin chip es una fila INVISIBLE** — y en producción hay **8 filas vivas** que ningún criterio estricto atrapa: los **6 pedidos del LINK sin convertir** (5 reebok + 1 joybees) y **2 confirmados que nunca salieron**. Por eso **«Pedidos» es el balde de RESTO**, y por eso hay candado que exige que la suma de los tres dé SIEMPRE el total y que cada fila caiga en **exactamente un** chip.
+>
+> El orden de decisión es **borrador → cotización → pedido**: el borrador gana sobre todo (no está terminado, da igual dónde esté).
+> - ⚠️ **Y la fila SIGUE diciendo la verdad línea por línea**: `textoEnSwitch` no se tocó, así que un pedido del chip «Pedidos» que no salió sigue leyéndose *«No se ha mandado a Switch»*. **El chip organiza; la fila informa.**
+> - **Cero consultas nuevas.** `documento` viaja en la fila desde el #593 y **`status` desde el #607, en la MISMA query que ya traía `order_number`**. La base está en compute Micro. Hay mutación para el caso "se pide en una consulta aparte".
+> - 🩸 **EL `.in("id", orderIds)` DE ESA QUERY ES EL FILTRO DE VIDA, no una optimización.** `orderIds` sale de la VISTA, que descarta `deleted = true`. Barrer la tabla entera traería los **67 pedidos borrados** y el chip contaría contra **110 en vez de 43** — el error que ya se cometió una vez con este mismo dato. Hay mutación.
+> - **Escalón tolerante también para `status`**: si la columna faltara, la lectura se reintenta sin ella y **nada queda marcado como borrador** (la lista nunca se cae). El del DDL `20260824160000` (`documento`) sigue valiendo. 🩸 Ese sí perdió su mutación **a propósito**: con «Pedidos» de balde de resto la tolerancia dejó de ser una rama que se pueda romper — se intentó y SOBREVIVIÓ con razón, y contarla habría sido inventar una verificación. El lado positivo tiene candado.
+> - **El vacío mira si el PANEL está vacío, no si hay un filtro puesto.** Sin «Todos» el filtro SIEMPRE está puesto, y la condición vieja habría dicho *«Ningún comprobante coincide»* hasta con cero comprobantes en la marca. Hay mutación.
+> - **Se cruza con el filtro de ORIGEN** (Todos · Del link · Míos), que **NO se tocó** — ése conserva su «Todos». Hay test que toca los dos.
+> - **Sin avisos y sin borrado automático.** Daniel: *"no quiero q me avises nada. Que no se borre automático por ahora."*
 > - 🔴 **NO ES UNA COLUMNA NUEVA**: la fila de filtros va ARRIBA de la tabla, que conserva **exactamente sus 6 columnas** — el ancho del iPad acostado (1024) no se movió ni un píxel (medido, ver abajo).
+>
+> **Medido en producción el 25-ago-2026, los tres chips en las 4 marcas × 4 anchos, tocando cada uno y contando las filas que quedan:**
+>
+> | marca | Pedidos | Cotizaciones | Borradores | = filas vivas |
+> |---|---:|---:|---:|---:|
+> | reebok | 17 | 0 | **2** | 19 |
+> | tommy | 17 | 1 | **3** | 21 |
+> | joybees | 5 | 0 | **0** | 5 |
+> | calvin | 3 | 0 | **1** | 4 |
+>
+> 🩸 **Las «filas vivas» del PANEL son 49, no 43.** 43 son los pedidos vivos de las tablas `<marca>_orders` (14 · 21 · 4 · 4); el panel muestra ADEMÁS los **6 pedidos del link sin convertir** que la vista unificada trae. Los **6 borradores** sí son exactamente los 6 medidos: `PED-018` · `PED-019` · `TOM-005` · `TOM-006` · `TOM-023` · `CKP-007`.
+>
+> **Verificado por mutación, 32 de 32 cazadas** (`bash scripts/_mutar-candados-borradores.sh`): vuelve «Todos» · el filtro deja pasar todo · «Borradores» vuelve a llamarse «Sin mandar» · el panel deja de abrir en «Pedidos» · **«Borradores» vuelve al criterio viejo de «nunca se envió»** · nada/todo es borrador · el del link se cuenta como borrador · el status deja de tolerar mayúsculas · **PED-018 se cuenta como PEDIDO (orden invertido)** · **«Pedidos» deja de ser el balde de resto (filas invisibles)** · los chips dejan de ser disjuntos · **la API barre orders SIN filtrar por ids (el chip cuenta filas borradas)** · el status no viaja · se pierde el escalón · los conteos sobre lo ya filtrado · el filtro pisa al de ORIGEN · la tabla gana una columna · el vacío vuelve a mirar el filtro.
 >
 > ### 🔴 DE LA CONFIRMACIÓN A LA LISTA: 4 TOQUES → 1, Y EL DESTINO DEPENDE DEL ROL
 >
@@ -2160,11 +2194,16 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > | `origin/main` | 0 | 217 · 209 · 218 · 214 | **0 · 0 · 0** | 57 · 3 · 63 · 12 | 0 |
 > | esta rama | 0 | 217 · 209 · 218 · 214 | **0 · 0 · 0** | 57 · 3 · 63 · 12 | 0 |
 >
+> **Re-medido el 25-ago-2026 con los TRES chips: los recortes siguen IDÉNTICOS** (217 · 209 · 197 · 218 · 214), 0 arrastre en las 16 celdas, **6 columnas** en las 4 marcas × 4 anchos, y el alto de la caja de chips **no cambió** (96 px en 390, 44 px en 834/1024/1440 — los mismos que con cuatro). Los táctiles del contenedor bajan (reebok 57→51, tommy 63→51) **solo porque el chip por defecto muestra menos filas**, no por markup nuevo. **1 toque de la confirmación a la lista en las dos etapas.**
+>
 > **IDÉNTICO en las 16 celdas**: la fila de filtros vive ARRIBA del contenedor de la tabla, así que la caja que se mide no cambió ni un píxel. El recorte de 390 px es el `overflow-x-auto` que la tabla ya declaraba —arrastrarla ES el mecanismo— y está en main igual. Los táctiles <44 son los **PRE-EXISTENTES** (las casillas de 16 px y los botones «Editar»/«Eliminar» de 28 px de alto), en código que este cambio no toca.
 >
 > **La confirmación crece 56 px hacia ABAJO y nada más** (main 396/319/319/319 → esta rama 452/375/375/375; Calvin 439/383 → 495/439): **0 arrastre · 0 recorte · 0 táctil <44 · 0 texto <12** en las 4 marcas × 2 roles × 4 anchos, con el botón a la vista en los cuatro.
 >
-> **El filtro se toca y se comprueba que FILTRA**: en cada marca y cada ancho el script toca «Pedidos», «Cotizaciones» y «Sin mandar» y exige que las filas visibles sean **exactamente** el número que el propio chip muestra, y que los tres sumen «Todos».
+> **El filtro se toca y se comprueba que FILTRA**: en cada marca y cada ancho el script toca «Pedidos», «Cotizaciones» y «Borradores» y exige que las filas visibles sean **exactamente** el número que el propio chip muestra.
+> - 🔴 **Y que los tres SUMEN el universo vivo — que ya no se puede leer de la pantalla.** Sin «Todos», las filas que se ven al cargar NO son el universo (son solo los pedidos). La vara se pide aparte a `/api/catalogo/<marca>/pedidos-unificado`, que lee la vista (`deleted = false`), y contra ÉSA se compara la suma. **Si algún criterio dejara una fila afuera, el medidor lo dice.**
+> - **El chip «Borradores» se compara contra el `status` de la base, fila por fila**, con los números de pedido en el mensaje de error: si diera otra cosa, estaría contando filas borradas.
+> - 🩸 **El «antes» se venció y daba 20 rojos que no eran del cambio.** `ETAPA=antes` exigía que la pestaña dijera «Pedidos» y contaba el camino de 4 toques — **pero el #603 YA está en `origin/main`**, así que main dice «Comprobantes» y tiene el botón de un toque. Se corrigió: las dos etapas esperan lo mismo y **lo único que las separa es el filtro** (`antes` = 4 chips con «Todos» · `despues` = 3 sin él). Un baseline vencido acusa al cambio de algo que ya estaba.
 > - 🩸 **Gotcha de medición que daba rojo por nada:** por defecto solo se abre el mes ACTUAL y **los 19 pedidos de Reebok son de julio** — el "¿llegué a la lista?" no puede preguntar por un `<table>`, porque con todos los meses cerrados no hay ninguno. Se pregunta por el filtro por tipo (o, en `antes`, por el buscador).
 > - 🩸 **El contador del mes dice «pedidos» en `origin/main` y «comprobantes» acá**: el selector acepta LOS DOS, o `ETAPA=antes` no encontraría un solo mes y el rojo sería del renombre, no de la caja.
 >
