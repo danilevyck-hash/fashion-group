@@ -131,10 +131,11 @@ export default function GuiasPage() {
     <PullToRefresh onRefresh={s.loadGuias}>
       <div>
         <AppHeader module="Guías de Despacho" />
-        {/* 🔴 "Editar" (`onEdit`) lleva a LA PÁGINA DE LA GUÍA, donde se
-            corrige y se despacha. Antes iba directo a `/editar` (solo los
-            renglones) y el despacho se hacía desplegando el formulario dentro
-            de la fila: eran dos caminos para lo mismo y confundían. */}
+        {/* 🔴 LOS DOS BOTONES DE LA FILA NAVEGAN — ninguno despacha ni guarda.
+            «Editar» abre la guía con el formulario ya abierto (`?editar=1`, el
+            mismo query por el que entra el camino viejo `/guias/[id]/editar`) y
+            «Despachar» la abre en el bloque de despacho. El formulario de
+            despacho NO vuelve a la fila: eso se sacó el 10-ago-2026. */}
         <GuiasList
           guias={s.guias}
           loading={s.loading}
@@ -149,8 +150,8 @@ export default function GuiasPage() {
           expandedGuia={s.expandedGuia}
           expandedLoading={s.expandedLoading}
           onToggleExpand={s.toggleExpand}
-          onEdit={(id) => router.push(`/guias/${id}`)}
-          onPrint={(id) => router.push(`/guias/${id}/imprimir`)}
+          onEditar={(id) => router.push(`/guias/${id}?editar=1`)}
+          onDespachar={(id) => router.push(`/guias/${id}`)}
           onDelete={s.requestDeleteGuia}
           onAtarCliente={s.abrirAtarCliente}
           nombresPorCodigo={nombresPorCodigo}

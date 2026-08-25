@@ -59,6 +59,14 @@ import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 interface DespachoFormProps {
   tipoDespacho: TipoDespacho;
   setTipoDespacho: (v: TipoDespacho) => void;
+  /**
+   * ¿Se dibuja el bloque «Cómo sale» con su «Cambiar»? Por defecto SÍ — es el
+   * arreglo del 14-ago-2026 y no se toca. Va en `false` solo cuando la edición
+   * está abierta en la misma pantalla: ahí el modo se elige en el formulario y
+   * dos controles para el mismo campo, con dos estados distintos, es peor que
+   * ninguno.
+   */
+  mostrarModo?: boolean;
   bPlaca: string;
   setBPlaca: (v: string) => void;
   bReceptor: string;
@@ -84,7 +92,7 @@ const CAMPO =
   "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base md:text-sm outline-none focus:border-black transition min-h-[44px]";
 
 export default function DespachoForm({
-  tipoDespacho, setTipoDespacho,
+  tipoDespacho, setTipoDespacho, mostrarModo = true,
   bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
   bChofer, setBChofer,
   juegos = [], onUsarJuego,
@@ -143,6 +151,7 @@ export default function DespachoForm({
   return (
     <div className="space-y-4">
       {/* Cómo sale la mercancía — se MUESTRA lo que ya se eligió al crearla. */}
+      {mostrarModo && (
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <span className="text-xs uppercase tracking-wide text-gray-400 mb-2 block">
           Cómo sale
@@ -184,6 +193,7 @@ export default function DespachoForm({
           </p>
         )}
       </div>
+      )}
 
       {/* Quién recibe y en qué se va */}
       <div className="rounded-lg border border-gray-200 bg-white p-4">

@@ -73,13 +73,13 @@ describe("🔴 la lista NO despacha: ni deslizando ni desplegando el formulario"
     }
   });
 
-  it("queda UN SOLO botón para entrar a la guía — lo que cambia es cómo se llama", () => {
-    // ⚠️ Lo que Daniel pidió sacar era tener "Despachar" Y "Editar" uno al lado
-    // del otro. Eso NO se aflojó: sigue habiendo un solo `onEdit`. Lo que sí
-    // cambió (ago-2026) es el rótulo: en "Pendiente Bodega" dice "Despachar",
-    // porque 185 de las 186 guías terminaron despachadas y ésa es LA acción del
-    // día para bodega. Ver `guias-entrega-directa.test.tsx`, que lo prueba
-    // pintando la lista.
+  // ⚠️ CANDADO QUE CAMBIÓ DE DIRECCIÓN (25-ago-2026). Antes exigía UN SOLO
+  // botón por fila, porque el 10-ago había que sacar el par "Despachar" +
+  // "Editar" que convivía con el FORMULARIO desplegado en la misma tarjeta.
+  // Daniel pidió los dos botones de vuelta: *"Dos botones en la fila: «Editar»
+  // y «Despachar»"*. Lo que nunca se aflojó —y es lo que este archivo
+  // protege— es que la lista NO DESPACHA: los dos botones navegan.
+  it("los dos botones de la fila NAVEGAN: ninguno despacha ni guarda", () => {
     const acciones = LISTA.slice(
       LISTA.indexOf("{/* Acciones rápidas (header de la card expandida) */}"),
       LISTA.indexOf("{/* Items table */}")
@@ -87,11 +87,20 @@ describe("🔴 la lista NO despacha: ni deslizando ni desplegando el formulario"
     expect(acciones).toContain("Editar");
     expect(acciones).toContain("Despachar");
     expect(acciones).toContain("Imprimir");
-    expect((acciones.match(/onEdit\(/g) ?? []).length).toBe(1);
+    // Lo único que hacen es avisar al padre, que hace `router.push`.
+    expect((acciones.match(/onEditar\(/g) ?? []).length).toBe(1);
+    expect((acciones.match(/onDespachar\(/g) ?? []).length).toBe(1);
+    // Ni un campo del despacho, ni un guardado, dentro del bloque de acciones.
+    for (const prohibido of ["confirmarDespacho", "SignatureCanvas", "fetch("]) {
+      expect(acciones, prohibido).not.toContain(prohibido);
+    }
   });
 
-  it("'Editar' lleva a la PÁGINA de la guía, no directo a los renglones", () => {
-    expect(PAGE_LISTA).toContain("onEdit={(id) => router.push(`/guias/${id}`)}");
+  it("los dos botones llevan a la PÁGINA de la guía, cada uno a lo suyo", () => {
+    // «Editar» abre el formulario de una: es el mismo query por el que entra
+    // el camino viejo `/guias/[id]/editar`, así que hay una sola puerta.
+    expect(PAGE_LISTA).toContain("onEditar={(id) => router.push(`/guias/${id}?editar=1`)}");
+    expect(PAGE_LISTA).toContain("onDespachar={(id) => router.push(`/guias/${id}`)}");
   });
 });
 

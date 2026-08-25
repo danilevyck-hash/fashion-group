@@ -88,8 +88,8 @@ function lista(over: Partial<Guia> = {}, role = "admin") {
       expandedGuia={g}
       expandedLoading={false}
       onToggleExpand={() => {}}
-      onEdit={() => {}}
-      onPrint={() => {}}
+      onEditar={() => {}}
+      onDespachar={() => {}}
       onDelete={() => {}}
     />,
   );
@@ -181,9 +181,10 @@ describe("⚠️ lo que NO se tocó sigue en pie", () => {
       .map((b) => (b.textContent || "").trim())
       .filter(Boolean);
 
-  it("Pendiente Bodega → Despachar + Imprimir", () => {
+  it("Pendiente Bodega → Editar + Despachar + Imprimir", () => {
     const { container } = lista({ estado: "Pendiente Bodega" });
     const t = botones(container);
+    expect(t.some((x) => /^Editar$/i.test(x))).toBe(true);
     expect(t.some((x) => /^Despachar$/i.test(x))).toBe(true);
     expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
   });
