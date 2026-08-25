@@ -20,7 +20,6 @@ import {
   palabraEnSwitch,
   esCotizacion,
   esDocumentoSwitch,
-  etapaTelegram,
   etiquetaDocumento,
   normalizarDocumento,
   tituloCreadoEnSwitch,
@@ -116,13 +115,22 @@ describe("🔴 LA ADVERTENCIA — lo único que no se puede dejar de decir", () 
     expect(cot.titulo).toBe("Cotización");
   });
 
-  it("🔴 Telegram SIGUE diciendo que no aparta — y con su propia línea", () => {
-    // El párrafo se fue de la PANTALLA, no del canal: quien lee el aviso no
-    // estaba ahí cuando se eligió y decide cosas con eso. Esa línea es del
-    // armador de Telegram, no de este módulo, y no se duplica.
+  it("🔴 la advertencia vive DONDE SE DECIDE, y ya no en Telegram", () => {
+    // 25-ago-2026, CAMBIO DE DIRECCIÓN. Este candado exigía que el aviso de
+    // Telegram repitiera "No aparta mercancía". Daniel podó el aviso a dos
+    // líneas —textual: ***"lo quiero más simple… solo quiero lo útil"***— y
+    // esa línea fue lo primero que sacó: llega DESPUÉS de mandar, cuando ya no
+    // evita nada, y él ya sabe qué es una cotización.
+    //
+    // Lo que el candado protege ahora es lo que SÍ evita el error: la etiqueta
+    // pegada al botón, ANTES de mandar. Esa no se puede podar.
+    expect(NOTA_COTIZACION).toBe("no aparta mercancía");
+    const cot = OPCIONES_DOCUMENTO.find((o) => o.clave === "cotizacion")!;
+    expect(cot.nota).toBe(NOTA_COTIZACION);
+    // Y el aviso de Telegram NO la repite: dos líneas, y punto.
     const tg = SRC("src/lib/catalogo/telegram-pedido.ts");
-    expect(tg).toMatch(/No aparta mercancía/);
-    expect(tg).toMatch(/etapaTelegram/);
+    expect(tg).not.toMatch(/extras: \[\s*"No aparta mercancía/);
+    expect(tg).toMatch(/etiquetaDocumento/);
   });
 });
 
@@ -140,9 +148,14 @@ describe("cómo se nombra cada salida en pantalla y en Telegram", () => {
     expect(tituloEnviadoASwitch("cotizacion")).toContain("Cotización");
   });
 
-  it("la etapa de Telegram grita COTIZACIÓN — el canal se lee de un vistazo", () => {
-    expect(etapaTelegram("cotizacion")).toContain("COTIZACIÓN");
-    expect(etapaTelegram("pedido")).toBe("enviado a Switch");
+  // 🔴 `etapaTelegram` SE BORRÓ el 25-ago-2026 junto con la etapa deletreada del
+  // aviso ("— COTIZACIÓN enviada a Switch"). Lo que el canal necesita para
+  // leerse de un vistazo lo da `etiquetaDocumento` («Cotización»/«Pedido») como
+  // PRIMERA palabra del mensaje, más el emoji 📝/📦. El candado de eso vive en
+  // telegram-pedido-origen.test.ts, que compara el mensaje entero.
+  it("la palabra que grita cuál de las dos es sigue existiendo", () => {
+    expect(etiquetaDocumento("cotizacion")).toBe("Cotización");
+    expect(etiquetaDocumento("pedido")).toBe("Pedido");
   });
 });
 

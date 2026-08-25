@@ -1,16 +1,27 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Avisos de Telegram de pedidos de catálogo — LOS TRES EVENTOS, UN SOLO FORMATO.
+// Avisos de Telegram de pedidos de catálogo — LOS TRES EVENTOS, UN SOLO
+// FORMATO, DOS LÍNEAS.
 //
-// Daniel (11-ago-2026), textual: *"porq dos diferentes tipo de mensaje. y cada
-// mensaje tiene que decir cuantas referencias, cuantos bultos, cliente y
-// monto"*. Este archivo sostiene las dos mitades del pedido:
+// 🔴 25-ago-2026 — ESTE CANDADO CAMBIÓ DE DIRECCIÓN. Hasta hoy exigía CUATRO
+// cifras en todo aviso (referencias · bultos · cliente · monto) y los rótulos
+// "Cliente:"/"Vendedor:". Daniel podó el aviso, textual: ***"lo quiero más
+// simple… solo quiero lo útil"***, y eligió el formato exacto:
 //
-//   1. Las CUATRO cosas obligatorias — referencias · bultos · cliente · monto —
-//      en TODO aviso de pedido, de los 3 eventos y las 3 marcas.
-//   2. Un solo armador de cuerpo: los tres mensajes comparten las líneas de
-//      quién y de cifras carácter por carácter, y los emisores reales usan los
-//      builders (barrido estático) — así los formatos no pueden volver a
-//      divergir como divergieron.
+//   📝 Cotización TOM-027 · A-Amani, S.A.
+//   Tommy Hilfiger · $648 · 12 piezas · Switch 15-000000123
+//
+//   📦 Pedido TOM-028 · Hafez, S.A.
+//   Tommy Hilfiger · $2,760 · 48 piezas · Switch 16-000002058
+//
+// Lo que este archivo sostiene AHORA:
+//   1. Las dos líneas y su contenido: línea 1 = qué + de quién, línea 2 = marca
+//      + monto + piezas + N° de Switch (el monto en la SEGUNDA, lo puso ahí él).
+//   2. Que lo podado NO VUELVA: "no aparta mercancía", "✓ verificado", la etapa
+//      deletreada, los rótulos "Cliente:"/"Vendedor:", el vendedor entero, y el
+//      recuento de referencias y bultos.
+//   3. Un solo armador de cuerpo, y que los emisores reales usen los builders
+//      (barrido estático) — así los formatos no pueden volver a divergir.
+//   4. Que el aviso de ERROR conserve su detalle: la poda es solo del éxito.
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -23,162 +34,201 @@ import {
 } from "@/lib/catalogo/telegram-pedido";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 
-// Datos con la forma del pedido REAL de la captura de Daniel (TOM-005:
-// 8 referencias · 94 bultos · 1128 piezas · $16,920 · cliente Contado).
-const RESUMEN = { referencias: 8, bultos: 94, piezas: 1128 };
+const PIEZAS = 1128;
 const TOTAL = 16920;
 
 const marcas = Object.values(MARCAS_CONFIG);
 
-describe("avisos de pedido: las 4 obligatorias en TODO evento y TODA marca", () => {
-  // referencias · bultos · cliente · monto (+ piezas, como el resto del sistema).
-  const exigirLasCuatro = (t: string, cliente: string) => {
-    expect(t).toContain("8 referencias");
-    expect(t).toContain("94 bultos");
-    expect(t).toContain("1128 piezas");
-    expect(t).toContain(`Cliente: ${cliente}`);
-    expect(t).toContain("$16,920");
-  };
+/** Lo que Daniel sacó del aviso, en un solo lugar: ninguno puede reaparecer. */
+const PODADO = [
+  "No aparta mercancía",
+  "✓ verificado",
+  "Cliente:",
+  "Vendedor:",
+  "referencias",
+  "bultos",
+  "COTIZACIÓN enviada a Switch",
+];
 
+const sinLoPodado = (t: string) => {
+  for (const frase of PODADO) expect(t).not.toContain(frase);
+};
+
+describe("el formato de DOS LÍNEAS, en los 3 eventos y las 4 marcas", () => {
   it("hay exactamente 4 marcas en el motor", () => {
     expect(marcas.length).toBe(4);
   });
 
   for (const cfg of marcas) {
-    it(`${cfg.label}: pedido DEL VENDEDOR dice las 4 cosas`, () => {
+    it(`${cfg.label}: pedido DEL VENDEDOR — 2 líneas, sin N° de Switch (todavía no salió)`, () => {
       const t = avisoPedidoDeVendedor({
         emoji: cfg.telegramEmoji,
         label: cfg.label,
-        vendedor: "rey",
-        cliente: "Contado",
+        cliente: "A-Amani, S.A.",
         total: TOTAL,
         numero: "X-005",
-        resumen: RESUMEN,
+        piezas: PIEZAS,
       });
-      exigirLasCuatro(t, "Contado");
-      expect(t).toContain("Vendedor: rey");
-      expect(t.startsWith(`${cfg.telegramEmoji} ${cfg.label} · X-005 — pedido DEL VENDEDOR`)).toBe(true);
+      expect(t.split("\n")).toEqual([
+        `${cfg.telegramEmoji} Pedido X-005 · A-Amani, S.A.`,
+        `${cfg.label} · $16,920 · 1128 piezas`,
+      ]);
+      sinLoPodado(t);
     });
 
-    it(`${cfg.label}: pedido DEL LINK dice las 4 cosas`, () => {
+    it(`${cfg.label}: pedido DEL LINK — mismas 2 líneas + la acción pendiente`, () => {
       const t = avisoPedidoDelLink({
         emoji: cfg.telegramEmoji,
         label: cfg.label,
         cliente: "Zapatería Central",
         total: TOTAL,
         numero: "X-006",
-        resumen: RESUMEN,
+        piezas: PIEZAS,
       });
-      exigirLasCuatro(t, "Zapatería Central");
-      expect(t.startsWith(`${cfg.telegramEmoji} ${cfg.label} · X-006 — pedido DEL LINK, lo confirmó el cliente`)).toBe(true);
-      // 🔴 CAMBIÓ DE DIRECCIÓN EL 14-ago-2026. Decía "Entra a Switch como
-      // Contado y sin vendedor — no paga comisión", que era cierto mientras el
-      // pedido del link salía SOLO al ERP. Ahora espera a una persona, y el
-      // aviso tiene que PEDIR ese paso: es lo único que hay entre el pedido y
-      // Switch, y sin decirlo el pedido podría quedarse quieto.
-      expect(t).toContain("Falta ponerle el cliente y mandarlo a Switch — está en Borradores.");
-      expect(t).not.toContain("Entra a Switch como Contado");
-      expect(t).not.toContain("Vendedor:");
+      expect(t.split("\n")).toEqual([
+        `${cfg.telegramEmoji} Pedido X-006 · Zapatería Central`,
+        `${cfg.label} · $16,920 · 1128 piezas`,
+        // 🔴 NO ES EXPLICACIÓN, ES UNA ACCIÓN PENDIENTE. Desde el 14-ago-2026
+        // el pedido del link espera a una persona: es lo único que hay entre el
+        // pedido y el ERP, y sin decirlo se queda quieto y nadie se entera.
+        "Falta ponerle el cliente y mandarlo a Switch — está en Borradores.",
+      ]);
+      sinLoPodado(t);
     });
 
-    it(`${cfg.label}: ENVIADO A SWITCH dice las 4 cosas (el evento que antes no las decía)`, () => {
+    it(`${cfg.label}: PEDIDO enviado a Switch — 📦 + N° de Switch, sin "verificado"`, () => {
       const t = avisoPedidoEnviado({
         label: cfg.label,
-        numero: "X-002",
-        cliente: "Contado",
-        vendedor: "REINALDO ESPINOSA",
-        total: TOTAL,
-        resumen: RESUMEN,
-        numeroSwitch: "16-000002012",
+        numero: "TOM-028",
+        cliente: "Hafez, S.A.",
+        total: 2760,
+        piezas: 48,
+        numeroSwitch: "16-000002058",
         verificado: true,
       });
-      exigirLasCuatro(t, "Contado");
-      expect(t).toContain("Vendedor: REINALDO ESPINOSA");
-      expect(t.startsWith(`📦 ${cfg.label} · X-002 — enviado a Switch`)).toBe(true);
-      // El link al secuencial de Switch se conserva, con su verificación.
-      expect(t).toContain("→ Switch 16-000002012 ✓ verificado");
+      expect(t.split("\n")).toEqual([
+        "📦 Pedido TOM-028 · Hafez, S.A.",
+        `${cfg.label} · $2,760 · 48 piezas · Switch 16-000002058`,
+      ]);
+      sinLoPodado(t);
+    });
+
+    it(`${cfg.label}: COTIZACIÓN enviada a Switch — 📝 y la palabra «Cotización»`, () => {
+      const t = avisoPedidoEnviado({
+        label: cfg.label,
+        numero: "TOM-027",
+        cliente: "A-Amani, S.A.",
+        total: 648,
+        piezas: 12,
+        numeroSwitch: "15-000000123",
+        verificado: true,
+        documento: "cotizacion",
+      });
+      expect(t.split("\n")).toEqual([
+        "📝 Cotización TOM-027 · A-Amani, S.A.",
+        `${cfg.label} · $648 · 12 piezas · Switch 15-000000123`,
+      ]);
+      sinLoPodado(t);
     });
   }
 });
 
-describe("un solo formato: el mismo pedido se lee avanzando", () => {
-  const base = { cliente: "Contado", total: TOTAL, resumen: RESUMEN } as const;
-  const cfg = MARCAS_CONFIG.tommy;
-  const creado = avisoPedidoDeVendedor({
-    emoji: cfg.telegramEmoji, label: cfg.label, numero: "TOM-005", vendedor: "rey", ...base,
-  });
-  const delLink = avisoPedidoDelLink({
-    emoji: cfg.telegramEmoji, label: cfg.label, numero: "TOM-005", ...base,
-  });
-  const enviado = avisoPedidoEnviado({
-    label: cfg.label, numero: "TOM-005", vendedor: "rey",
-    numeroSwitch: "16-000002012", verificado: true, ...base,
+describe("el formato exacto que eligió Daniel, carácter por carácter", () => {
+  it("la cotización de la captura", () => {
+    expect(
+      avisoPedidoEnviado({
+        label: "Tommy Hilfiger", numero: "TOM-027", cliente: "A-Amani, S.A.",
+        total: 648, piezas: 12, numeroSwitch: "15-000000123", verificado: true,
+        documento: "cotizacion",
+      }),
+    ).toBe("📝 Cotización TOM-027 · A-Amani, S.A.\nTommy Hilfiger · $648 · 12 piezas · Switch 15-000000123");
   });
 
-  it("la línea de cifras es IDÉNTICA carácter por carácter en los 3 eventos", () => {
-    const cifras = "8 referencias · 94 bultos · 1128 piezas · $16,920";
-    expect(creado.split("\n")[2]).toBe(cifras);
-    expect(delLink.split("\n")[2]).toBe(cifras);
-    expect(enviado.split("\n")[2]).toBe(cifras);
+  it("el pedido de la captura", () => {
+    expect(
+      avisoPedidoEnviado({
+        label: "Tommy Hilfiger", numero: "TOM-028", cliente: "Hafez, S.A.",
+        total: 2760, piezas: 48, numeroSwitch: "16-000002058", verificado: true,
+        documento: "pedido",
+      }),
+    ).toBe("📦 Pedido TOM-028 · Hafez, S.A.\nTommy Hilfiger · $2,760 · 48 piezas · Switch 16-000002058");
   });
 
-  it("la línea de quién es idéntica entre creado y enviado (el link no inventa vendedor)", () => {
-    const quien = "Cliente: Contado · Vendedor: rey";
-    expect(creado.split("\n")[1]).toBe(quien);
-    expect(enviado.split("\n")[1]).toBe(quien);
-    expect(delLink.split("\n")[1]).toBe("Cliente: Contado");
+  it("📦 y 📝 NO pueden ser el mismo emoji: es lo primero que se ve en la lista", () => {
+    const base = {
+      label: "Reebok", numero: "PED-1", cliente: "C", total: 1, piezas: 1,
+      numeroSwitch: "05-1", verificado: true,
+    } as const;
+    const ped = avisoPedidoEnviado({ ...base, documento: "pedido" });
+    const cot = avisoPedidoEnviado({ ...base, documento: "cotizacion" });
+    expect(ped.startsWith("📦")).toBe(true);
+    expect(cot.startsWith("📝")).toBe(true);
+    // 🩸 `ped[0]` NO sirve: un emoji es un par sustituto y ambos empiezan con
+    // el MISMO code unit alto (\uD83D) — la comparación daba iguales siempre.
+    // Se compara el primer CARACTER real.
+    expect([...ped][0]).not.toBe([...cot][0]);
+    // …y la palabra también cambia, no solo el dibujito.
+    expect(ped).toContain("Pedido PED-1");
+    expect(cot).toContain("Cotización PED-1");
   });
 
-  it("las primeras líneas comparten forma `<emoji> Marca · NUM — etapa` y difieren SOLO en emoji/etapa", () => {
-    const forma = /^\S+ Tommy Hilfiger · TOM-005 — .+$/;
-    for (const t of [creado, delLink, enviado]) {
-      expect(t.split("\n")[0]).toMatch(forma);
-    }
-    // Etapas distinguibles de un vistazo…
-    expect(creado.split("\n")[0]).toContain("pedido DEL VENDEDOR");
-    expect(delLink.split("\n")[0]).toContain("DEL LINK");
-    expect(enviado.split("\n")[0]).toContain("enviado a Switch");
-    // …y el avance de etapa cambia el emoji: marca → 📦.
-    expect(creado.startsWith("🔵")).toBe(true);
-    expect(enviado.startsWith("📦")).toBe(true);
-  });
-
-  it("sin verificar lo dice, sin esconder el secuencial", () => {
+  it("sin `documento` sigue siendo PEDIDO (los envíos viejos no cambian de significado)", () => {
     const t = avisoPedidoEnviado({
-      label: "Reebok", numero: "PED-020", cliente: "C", vendedor: "V",
-      total: 10, resumen: { referencias: 1, bultos: 1, piezas: 12 },
-      numeroSwitch: "05-000000123", verificado: false,
+      label: "Reebok", numero: "PED-2", cliente: "C", total: 1, piezas: 1,
+      numeroSwitch: "05-2", verificado: true,
     });
-    expect(t).toContain("→ Switch 05-000000123 ⚠️ sin verificar");
+    expect(t.startsWith("📦 Pedido PED-2")).toBe(true);
+  });
+
+  it("el mismo pedido se lee avanzando: emoji de marca → 📦, mismo número", () => {
+    const cfg = MARCAS_CONFIG.tommy;
+    const creado = avisoPedidoDeVendedor({
+      emoji: cfg.telegramEmoji, label: cfg.label, numero: "TOM-005",
+      cliente: "Contado", total: TOTAL, piezas: PIEZAS,
+    });
+    const enviado = avisoPedidoEnviado({
+      label: cfg.label, numero: "TOM-005", cliente: "Contado", total: TOTAL,
+      piezas: PIEZAS, numeroSwitch: "16-000002012", verificado: true,
+    });
+    expect(creado.startsWith("🔵 Pedido TOM-005 · Contado")).toBe(true);
+    expect(enviado.startsWith("📦 Pedido TOM-005 · Contado")).toBe(true);
+    // La segunda línea solo se diferencia por el N° de Switch: eso ES la etapa.
+    expect(enviado.split("\n")[1]).toBe(`${creado.split("\n")[1]} · Switch 16-000002012`);
   });
 });
 
 describe("bordes del formato", () => {
-  it("singular: 1 referencia · 1 bulto · 1 pieza", () => {
-    const t = avisoPedidoDeVendedor({
-      emoji: "🛒", label: "Reebok", vendedor: "V", cliente: "C",
-      total: 38, numero: "PED-030", resumen: { referencias: 1, bultos: 1, piezas: 1 },
-    });
-    expect(t).toContain("1 referencia · 1 bulto · 1 pieza · $38");
-    expect(t).not.toContain("1 referencias");
-  });
-
-  it("sin resumen NO se inventan ceros: queda solo el monto (y las demás obligatorias)", () => {
+  it('"✓ verificado" NO se escribe, pero "⚠️ sin verificar" SÍ (solo la excepción informa)', () => {
     const t = avisoPedidoEnviado({
-      label: "Joybees", numero: "JBP-001", cliente: "C", vendedor: "V",
-      total: 500, numeroSwitch: "10-000000001", verificado: true,
+      label: "Reebok", numero: "PED-020", cliente: "C", total: 10, piezas: 12,
+      numeroSwitch: "05-000000123", verificado: false,
     });
-    expect(t.split("\n")[2]).toBe("$500");
-    expect(t).not.toContain("0 referencias");
-    expect(t).not.toContain("0 bultos");
+    expect(t.split("\n")[1]).toBe("Reebok · $10 · 12 piezas · Switch 05-000000123 ⚠️ sin verificar");
+    expect(t).not.toContain("✓");
   });
 
-  it("nombres vacíos no dejan huecos raros", () => {
+  it("singular: 1 pieza", () => {
     const t = avisoPedidoDeVendedor({
-      emoji: "🛒", label: "Reebok", vendedor: "   ", cliente: null,
-      total: 0, numero: "PED-021",
+      emoji: "🛒", label: "Reebok", cliente: "C", total: 38, numero: "PED-030", piezas: 1,
     });
-    expect(t).toContain("Cliente: Sin nombre · Vendedor: sin nombre");
+    expect(t.split("\n")[1]).toBe("Reebok · $38 · 1 pieza");
+    expect(t).not.toContain("1 piezas");
+  });
+
+  it("sin piezas NO se inventa un cero: queda marca + monto", () => {
+    const t = avisoPedidoEnviado({
+      label: "Joybees", numero: "JBP-001", cliente: "C", total: 500,
+      numeroSwitch: "10-000000001", verificado: true,
+    });
+    expect(t.split("\n")[1]).toBe("Joybees · $500 · Switch 10-000000001");
+    expect(t).not.toContain("0 piezas");
+  });
+
+  it("cliente vacío no deja un hueco raro", () => {
+    const t = avisoPedidoDeVendedor({
+      emoji: "🛒", label: "Reebok", cliente: null, total: 0, numero: "PED-021",
+    });
+    expect(t.split("\n")[0]).toBe("🛒 Pedido PED-021 · Sin nombre");
   });
 
   // 26-jul-2026: los montos de catálogo no muestran `.00` (regla de Daniel,
@@ -190,16 +240,22 @@ describe("bordes del formato", () => {
     expect(money(1000000)).toBe("$1,000,000");
   });
 
-  it("son texto PLANO: sin HTML ni Markdown que el canal deba escapar", () => {
+  it("son texto PLANO: el canal va sin parse_mode, así un `&` o un `<` del cliente no rompen nada", () => {
     const textos = [
-      avisoPedidoDeVendedor({ emoji: "🛒", label: "Reebok", vendedor: "V", cliente: "C", total: 1, numero: "N", resumen: RESUMEN }),
-      avisoPedidoDelLink({ emoji: "🐝", label: "Joybees", cliente: "C", total: 1, numero: "N", resumen: RESUMEN }),
-      avisoPedidoEnviado({ label: "Tommy Hilfiger", numero: "N", cliente: "C", vendedor: "V", total: 1, resumen: RESUMEN, numeroSwitch: "16-1", verificado: true }),
+      avisoPedidoDeVendedor({ emoji: "🛒", label: "Reebok", cliente: "C", total: 1, numero: "N", piezas: 1 }),
+      avisoPedidoDelLink({ emoji: "🐝", label: "Joybees", cliente: "C", total: 1, numero: "N", piezas: 1 }),
+      avisoPedidoEnviado({ label: "Tommy Hilfiger", numero: "N", cliente: "C", total: 1, piezas: 1, numeroSwitch: "16-1", verificado: true }),
     ];
     for (const t of textos) {
       expect(t).not.toMatch(/[<>]/);
       expect(t).not.toMatch(/[*_`[\]]/);
     }
+    // Y el nombre del cliente pasa TAL CUAL, sin escapes que ensucien el texto.
+    const conSimbolos = avisoPedidoEnviado({
+      label: "Reebok", numero: "N", cliente: "Ropa & Más <Panamá>", total: 1,
+      piezas: 1, numeroSwitch: "05-1", verificado: true,
+    });
+    expect(conSimbolos.split("\n")[0]).toBe("📦 Pedido N · Ropa & Más <Panamá>");
   });
 });
 
@@ -228,11 +284,22 @@ describe("barrido estático: los emisores usan los builders y el canal de negoci
     expect(s).not.toContain("sendTelegramAlert");
   });
 
-  it("los 3 emisores mandan el resumen COMPLETO (bultos incluidos)", () => {
-    // Si alguien vuelve a pasar solo {referencias, piezas}, el aviso pierde los
-    // bultos en silencio (ResumenAviso es opcional). Se exige la palabra.
-    expect(src("app/api/catalogo/[marca]/orders/route.ts")).toMatch(/resumen:\s*\{[^}]*bultos/);
-    expect(src("app/api/catalogo/[marca]/pedido-publico/[id]/confirmar/route.ts")).toMatch(/bultos:\s*resumenLink\.bultos/);
-    expect(src("lib/catalogo/switch-envio.ts")).toContain("resumirPedido(");
+  it("los 3 emisores mandan las PIEZAS (si se pierden, el aviso queda sin tamaño)", () => {
+    expect(src("app/api/catalogo/[marca]/orders/route.ts")).toMatch(/piezas:\s*resumenPed\.piezas/);
+    expect(src("app/api/catalogo/[marca]/pedido-publico/[id]/confirmar/route.ts")).toMatch(/piezas:\s*resumenLink\.piezas/);
+    expect(src("lib/catalogo/switch-envio.ts")).toMatch(/piezas:\s*resumen\.piezas/);
+  });
+
+  it("🔴 EL AVISO DE ERROR NO SE PODA: sigue diciendo qué pasó y qué hacer", () => {
+    // La poda del 25-ago-2026 es SOLO del aviso de éxito. Cuando Switch falla o
+    // no responde, el detalle ES lo útil: sin él nadie sabe si el pedido se
+    // creó. Estos textos salen por `enviarSistema` (canal de sistema), no por
+    // el armador de dos líneas.
+    const s = src("lib/catalogo/switch-envio.ts");
+    expect(s).toContain("🚨 Envío a Switch FALLÓ");
+    expect(s).toContain("se puede reintentar desde la confirmación");
+    expect(s).toContain("🚨 Envío a Switch AMBIGUO");
+    expect(s).toContain("REVISAR EL PANEL antes de reintentar");
+    expect(s).toContain("shortError(");
   });
 });

@@ -202,8 +202,12 @@ describe("🔴 lo que FRENA una acción sigue en pantalla, nunca adentro de un �
     // Depurador: el bloqueo por descripciones nuevas.
     ["app/productos/cargar/DepuradorClient.tsx", "Bloqueado: hay"],
     ["app/productos/cargar/FacturasTiendaClient.tsx", "Bloqueado: hay"],
-    // Marketing: las notas del proveedor NO se fusionan con el inventario.
-    ["components/marketing/NotasProveedorMobiliario.tsx", "no se suma ni entra en los totales"],
+    // Marketing: el aviso de que los costos del proveedor NO se fusionan con el
+    // inventario ya no vive acá. `NotasProveedorMobiliario.tsx` se BORRÓ
+    // (ago-2026) y Daniel mandó que esos precios se vieran "todo en un solo ?".
+    // O sea: el aviso quedó detrás de un toque A PROPÓSITO, y dejarlo en esta
+    // lista —que existe justamente para prohibir eso— la volvería mentirosa.
+    // La aserción NO se pierde: se muda al describe del final de este archivo.
     // Usuarios: el aviso de "esta función todavía no está activada".
     ["app/admin/usuarios/VendedorSwitchSection.tsx", "falta activar esta función en el sistema"],
   ];
@@ -220,5 +224,24 @@ describe("🔴 lo que FRENA una acción sigue en pantalla, nunca adentro de un �
         "Esconderlo detrás de un toque es igual que borrarlo: nadie abre un ⓘ " +
         "que no sabe que tiene algo adentro.",
     ).toBe(false);
+  });
+});
+
+describe("🔁 el aviso de los costos del proveedor se mudó al '?' y sigue ahí", () => {
+  // MUDADO desde la lista EN_PANTALLA (ago-2026). El bloque "Notas del
+  // proveedor" (`components/marketing/NotasProveedorMobiliario.tsx`) se borró
+  // por orden de Daniel, y su aviso —que esos precios son nota personal y no
+  // entran en ningún total— se mudó al único "?" de Mobiliario.
+  //
+  // Sigue siendo exactamente el riesgo que este archivo existe para cazar: que
+  // "pasarlo a un ⓘ" se convierta, en el commit siguiente, en "borrarlo". Lo
+  // que cambia es la pregunta: acá el ⓘ no es un `<Ayuda>` adentro de una
+  // pantalla, es la pantalla entera (`PreciosProveedorAyuda` es el modal), así
+  // que se verifica que la frase siga estando.
+  it("PreciosProveedorAyuda sigue diciendo que no se suma", () => {
+    const plano = aplanar(
+      leer("components/marketing/PreciosProveedorAyuda.tsx"),
+    );
+    expect(plano).toContain(aplanar("No se suma ni entra en ningún cálculo"));
   });
 });

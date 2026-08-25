@@ -45,7 +45,9 @@
 // 🩸 NO VUELVE LA TABLA DE "NOTAS DEL PROVEEDOR". Daniel pidió eliminarla de
 //    la vista y sigue eliminada: esto es la MISMA lista del "?", que ahora
 //    además se puede corregir. El componente viejo
-//    (`NotasProveedorMobiliario.tsx`) sigue sin montarse en ningún lado.
+//    (`NotasProveedorMobiliario.tsx`) se BORRÓ en ago-2026: llevaba tiempo sin
+//    montarse en ningún lado. La TABLA `mk_mobiliario_notas_proveedor` NO se
+//    tocó — es de donde este "?" saca los precios.
 //
 // 🩸 LAS FOTOS NO SE TOCAN DESDE ACÁ, A PROPÓSITO — ver el bloque "LA FOTO"
 //    más abajo, antes de agregarle un botón de foto a esta ventana.
