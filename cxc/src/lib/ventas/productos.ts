@@ -60,7 +60,21 @@ export interface ProductosResponse {
   /** Ventana contra la que se mide el Δ. La devuelve el servidor para que la
    *  pantalla pueda DECIR contra qué compara, en vez de que Daniel lo adivine. */
   comparativo?: { desde: string; hasta: string };
-  meses: number[];
+  /**
+   * ⛔ YA NO SE MANDA. Quedan los meses sueltos que alimentaban el selector.
+   *
+   * Daniel, textual (24-ago-2026), sobre el desplegable de período: *"solo
+   * dejame las 4 primeras, las otras quítamelas que sobran, nunca te las pedí"*.
+   * Sin esas opciones, `meses` no lo lee NADIE — y lo llenaba una RPC
+   * (`switch_articulo_margen_mensual`) que se pedía en cada carga de la
+   * pantalla. Dejar la consulta viva para una respuesta que nadie mira es
+   * exactamente lo que esta base —en compute Micro, caída 4 veces esta
+   * semana— no se puede seguir pagando.
+   *
+   * Se deja el campo OPCIONAL en vez de borrarlo para que una respuesta vieja
+   * en caché no rompa nada al deserializarse.
+   */
+  meses?: number[];
   totales: { venta: number; costo: number; margen: number | null };
   productos: ProductoNivel1[];
 }

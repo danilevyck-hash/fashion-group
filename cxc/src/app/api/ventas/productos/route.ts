@@ -1,17 +1,25 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/ventas/productos?empresa=&year=&mes=&periodo=&previo=
 //
-// Nivel 1 del tab Productos: top por descripción + totales + meses con data.
-// Lee RPCs sobre switch_articulo_diario (RLS service_role → server-only).
-//   - switch_top_descripciones: una fila por descripción (sin límite; el cliente
-//     pagina con Top 20 + "Mostrar más"). La suma = total certificado del período.
-//   - switch_articulo_margen_mensual: de ahí salen los meses con data (selector).
+// Nivel 1 del tab Productos: top por descripción + totales.
+// Lee `switch_top_descripciones` sobre switch_articulo_diario (RLS service_role
+// → server-only): una fila por descripción (sin límite; el cliente pagina con
+// Top 20 + "Mostrar más"). La suma = total certificado del período.
 // Totales se computan sumando el nivel 1 (0 filas con descripción/código NULL →
 // cuadra al centavo con margen_mensual, la fuente validada).
 //
+// ⛔ YA NO SE PIDE `switch_articulo_margen_mensual` (25-ago-2026). Sólo servía
+// para saber QUÉ MESES ofrecer en el selector de período, y Daniel mandó sacar
+// los meses sueltos: *"solo dejame las 4 primeras, las otras quítamelas que
+// sobran, nunca te las pedí"*. Era una consulta por carga de pantalla para una
+// respuesta que ya no mira nadie — en una base en compute Micro eso no se
+// regala. Ningún número de la pantalla salía de ahí.
+//
 // `periodo` (ytd | 6m | 12m | anio_pasado) elige la ventana; `mes` la acota a un
 // mes calendario y solo aplica con `periodo=ytd` (el default, que es lo que la
-// pantalla venía pidiendo). `previo=1` devuelve LA MISMA ventana un año antes —
+// pantalla venía pidiendo). El parámetro SIGUE ACEPTÁNDOSE aunque la pantalla ya
+// no lo mande: un `?mes=6` guardado en un marcador tiene que seguir contestando
+// lo mismo, no romperse. `previo=1` devuelve LA MISMA ventana un año antes —
 // es la que alimenta la columna Δ, y así el rango comparativo lo decide el
 // servidor una sola vez en vez de que el cliente lo rearme y los dos diverjan.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,29 +71,15 @@ export async function GET(req: NextRequest) {
     : productosRangoPeriodo(periodo, year, mes, ahora);
   const comparativo = productosRangoComparativo(periodo, year, mes, ahora);
 
-  const [nivel1Res, margenRes] = await Promise.all([
-    supabaseServer.rpc("switch_top_descripciones", {
-      p_empresa_key: empresa,
-      p_desde: desde,
-      p_hasta: hasta,
-    }),
-    // La lista de meses del selector solo hace falta en la llamada principal:
-    // la del comparativo se descarta entera salvo `productos`.
-    previo
-      ? Promise.resolve({ data: [], error: null })
-      : supabaseServer.rpc("switch_articulo_margen_mensual", {
-          p_empresa_key: empresa,
-          p_year: year,
-        }),
-  ]);
+  const nivel1Res = await supabaseServer.rpc("switch_top_descripciones", {
+    p_empresa_key: empresa,
+    p_desde: desde,
+    p_hasta: hasta,
+  });
 
   if (nivel1Res.error) {
     console.error("[api/ventas/productos] nivel1:", nivel1Res.error.message);
     return NextResponse.json({ error: nivel1Res.error.message }, { status: 500 });
-  }
-  if (margenRes.error) {
-    console.error("[api/ventas/productos] meses:", margenRes.error.message);
-    return NextResponse.json({ error: margenRes.error.message }, { status: 500 });
   }
 
   const productos = ((nivel1Res.data ?? []) as ProductoNivel1[]).map(p => ({
@@ -102,12 +96,6 @@ export async function GET(req: NextRequest) {
   const costoTotal = productos.reduce((s, p) => s + p.costo, 0);
   const margenTotal = ventaTotal > 0 ? (ventaTotal - costoTotal) / ventaTotal : null;
 
-  // Meses con data (venta neta != 0) para el selector de período.
-  const meses = ((margenRes.data ?? []) as { mes: number; venta: number }[])
-    .filter(m => Number(m.venta ?? 0) !== 0)
-    .map(m => Number(m.mes))
-    .sort((a, b) => a - b);
-
   const body: ProductosResponse = {
     empresa,
     year,
@@ -116,7 +104,6 @@ export async function GET(req: NextRequest) {
     desde,
     hasta,
     comparativo,
-    meses,
     totales: { venta: ventaTotal, costo: costoTotal, margen: margenTotal },
     productos,
   };

@@ -163,9 +163,13 @@ describe("1 · la columna Precio prom. dice venta ÷ unidades", () => {
   });
 
   it("el desplegable de códigos también trae el precio de cada código", async () => {
+    // 🔑 El desplegable abre en «Quién lo compra» desde el 25-ago-2026 (es lo
+    // que pidió Daniel). Los códigos NO se perdieron: están a un toque, en su
+    // pestaña — y esta prueba lo comprueba tocándola.
     render(<ProductosView selectedYear={2026} />);
     await pintada();
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
+    fireEvent.click(await screen.findByRole("tab", { name: /Códigos/ }));
     const tabla = await waitFor(() => {
       const t = document.querySelector("[data-drill-codigos]");
       expect(t).toBeTruthy();
@@ -229,12 +233,27 @@ describe("3 · el selector de período cambia LO QUE SE PIDE", () => {
     }
   });
 
-  it("el mes suelto que ya existía NO desapareció", async () => {
+  // ⛔ ACÁ VIVÍA «el mes suelto que ya existía NO desapareció», y el candado
+  // CAMBIÓ DE DIRECCIÓN el 25-ago-2026. Daniel, textual, mirando el
+  // desplegable: *"solo dejame las 4 primeras, las otras quítamelas que sobran,
+  // nunca te las pedí"*. O sea que el test viejo fijaba justo lo que él mandó
+  // sacar. Ahora se exige lo contrario: que NINGÚN mes vuelva a la lista.
+  it("⛔ los 12 meses sueltos NO vuelven al desplegable", async () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
     const trigger = screen.getByText("Año en curso").closest("button")!;
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
-    expect(await screen.findByRole("option", { name: "Feb 2026" })).toBeTruthy();
+    // Se espera a que la lista esté pintada antes de afirmar una ausencia: sin
+    // esto, "no hay ningún mes" se cumpliría con el desplegable todavía vacío.
+    expect(await screen.findByRole("option", { name: "Últimos 6 meses" })).toBeTruthy();
+    const opciones = screen.getAllByRole("option").map(o => (o.textContent ?? "").trim());
+    expect(opciones).toEqual([
+      "Año en curso",
+      "Últimos 6 meses",
+      "Últimos 12 meses",
+      "Año pasado",
+    ]);
+    expect(opciones.some(t => /^(Ene|Feb|Mar|Abr|May|Jun|Jul|Ago|Sep|Oct|Nov|Dic)\b/.test(t))).toBe(false);
   });
 
   it("elegir 'Últimos 12 meses' pide periodo=12m y su previo=1", async () => {
@@ -250,14 +269,21 @@ describe("3 · el selector de período cambia LO QUE SE PIDE", () => {
     expect(urlsPedidas.every(u => !u.includes("mes="))).toBe(true);
   });
 
-  it("elegir un mes vuelve a periodo=ytd + mes=N (el camino de siempre)", async () => {
+  it("⛔ la pantalla ya no manda `mes=` en ninguna de sus peticiones", async () => {
+    // El servidor SIGUE aceptando `?mes=6` (un marcador viejo tiene que seguir
+    // contestando lo mismo — hay candado en la ruta). Lo que se retiró es que
+    // la PANTALLA lo pida.
     render(<ProductosView selectedYear={2026} />);
     await pintada();
-    urlsPedidas = [];
-    await elegirEnSelector("Año en curso", "Mar 2026");
-    await waitFor(() => {
-      expect(urlsPedidas.some(u => u.includes("periodo=ytd") && u.includes("mes=3"))).toBe(true);
-    });
+    let actual = "Año en curso";
+    for (const periodo of ["Últimos 6 meses", "Últimos 12 meses", "Año pasado"]) {
+      urlsPedidas = [];
+      await elegirEnSelector(actual, periodo);
+      await waitFor(() => expect(urlsPedidas.length).toBeGreaterThan(0));
+      expect(urlsPedidas.every(u => !u.includes("mes="))).toBe(true);
+      // «Año pasado» se dibuja como «Año 2025» una vez elegido.
+      actual = periodo === "Año pasado" ? "Año 2025" : periodo;
+    }
   });
 
   // La "Δ" se fue del rótulo: es notación de matemática en una tabla que mira
@@ -312,17 +338,17 @@ describe("3b · el desplegable de códigos hereda el período elegido", () => {
     });
   });
 
-  it("con un mes suelto, los códigos se piden con ese mes", async () => {
+  it("con «Año pasado», los códigos se piden con ese período y sin mes", async () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
-    await elegirEnSelector("Año en curso", "Mar 2026");
-    await waitFor(() => expect(urlsPedidas.some(u => u.includes("mes=3"))).toBe(true));
+    await elegirEnSelector("Año en curso", "Año pasado");
+    await waitFor(() => expect(urlsPedidas.some(u => u.includes("periodo=anio_pasado"))).toBe(true));
     urlsPedidas = [];
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     await waitFor(() => {
       const drill = urlsPedidas.filter(u => u.includes("/codigos"));
       expect(drill.length).toBeGreaterThan(0);
-      expect(drill.every(u => u.includes("mes=3") && u.includes("periodo=ytd"))).toBe(true);
+      expect(drill.every(u => u.includes("periodo=anio_pasado") && !u.includes("mes="))).toBe(true);
     });
   });
 });

@@ -10,6 +10,12 @@ import { SkeletonTable } from "@/components/ui";
 import { MONTHS, fmtMoney } from "@/lib/ventas/format";
 import { variacionPct } from "@/lib/variacion";
 import {
+  fmtParticipacion,
+  participacion,
+  totalDeClientes,
+  type ClienteDeProducto,
+} from "@/lib/ventas/productos-clientes";
+import {
   PRODUCTOS_EMPRESAS,
   PRODUCTOS_EMPRESA_KEYS,
   DEFAULT_PRODUCTOS_EMPRESA,
@@ -29,6 +35,9 @@ import {
 // orden pasa por `valorOrden` y no por `p[sort.key]` — indexar un campo que no
 // existe daba `undefined` y la tabla quedaba en el orden que venía, sin avisar.
 type SortKey = "cantidad" | "venta" | "precio" | "margen";
+
+/** Las dos cosas que se ven ADENTRO de una descripción. */
+type DrillTab = "clientes" | "codigos";
 const PAGE = 20;
 
 /** Valor por el que se ordena cada columna. El precio se calcula al vuelo. */
@@ -36,10 +45,18 @@ function valorOrden(p: ProductoNivel1, key: SortKey): number | null {
   return key === "precio" ? precioPromedio(p.venta, p.cantidad) : p[key];
 }
 
-// El selector de período: lo que pidió Daniel, textual, más el mes suelto que ya
-// estaba. Los tres relativos están anclados en HOY y no en el año del selector
-// global (ver la nota de `productosRangoPeriodo`), por eso la pantalla imprime
-// siempre las dos fechas debajo del total.
+// El selector de período: los CUATRO que pidió Daniel y nada más.
+//
+// ⛔ ACÁ VIVÍAN TAMBIÉN LOS 12 MESES SUELTOS (Ene 2026, Feb 2026, …). Daniel,
+// textual (24-ago-2026): *"solo dejame las 4 primeras, las otras quítamelas que
+// sobran, nunca te las pedí"*. Se fueron de la LISTA, no del sistema: el
+// servidor sigue aceptando `?mes=6` y contestando exactamente lo mismo, así que
+// nada que ya funcionara dejó de funcionar — simplemente la pantalla no lo pide
+// más, y `productosRange(year, mes)` sigue intacta con sus candados.
+//
+// Los tres relativos están anclados en HOY y no en el año del selector global
+// (ver la nota de `productosRangoPeriodo`), por eso la pantalla imprime siempre
+// las dos fechas debajo del total.
 const PERIODOS_FIJOS: { key: ProductosPeriodo; nombre: string }[] = [
   { key: "6m", nombre: "Últimos 6 meses" },
   { key: "12m", nombre: "Últimos 12 meses" },
@@ -63,7 +80,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   })();
   const [empresa, setEmpresa] = useState(initialEmpresa);
   const [periodo, setPeriodo] = useState<ProductosPeriodo>("ytd");
-  const [mes, setMes] = useState<number | null>(null); // null = el año entero
   const [data, setData] = useState<ProductosResponse | null>(null);
   // Venta del MISMO período del año anterior por descripción → columna Δ.
   const [prevVenta, setPrevVenta] = useState<Record<string, number>>({});
@@ -86,14 +102,20 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   const [visible, setVisible] = useState(PAGE);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [codigos, setCodigos] = useState<Record<string, ProductoCodigo[]>>({});
+  // Quién compra cada descripción. `null` = la lectura falló (distinto de `[]`,
+  // que es "no hay detalle"): son dos mensajes distintos y no se pueden mezclar.
+  const [clientes, setClientes] = useState<Record<string, ClienteDeProducto[] | null>>({});
   const [codigosLoading, setCodigosLoading] = useState<string | null>(null);
+  // Qué pestaña del desplegable se está mirando. Una sola fila se abre a la
+  // vez, así que un solo valor alcanza. Arranca en CLIENTES porque es lo que
+  // Daniel vino a buscar; los códigos quedan a un toque.
+  const [drillTab, setDrillTab] = useState<DrillTab>("clientes");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const qs = new URLSearchParams({ empresa, year: String(selectedYear), periodo });
-      if (periodo === "ytd" && mes) qs.set("mes", String(mes));
       // Mismo período del año anterior (para Δ). Mismo endpoint, y el rango
       // comparativo lo resuelve EL SERVIDOR (`previo=1`): si lo rearmara el
       // cliente, los dos criterios divergen el día que uno de los dos cambie.
@@ -118,6 +140,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       setComparativo(estado);
       setData(json);
       setCodigos({});
+      setClientes({});
       setExpanded(null);
       setVisible(PAGE);
     } catch (e) {
@@ -127,7 +150,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
     } finally {
       setLoading(false);
     }
-  }, [empresa, periodo, mes, selectedYear]);
+  }, [empresa, periodo, selectedYear]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -135,41 +158,29 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   // reseteaba el período a "Año en curso" y vaciaba el buscador: estabas
   // mirando "Últimos 12 meses" de una empresa, cambiabas a otra, y la pantalla
   // volvía sola al año sin decir nada. El único motivo real era que la empresa
-  // nueva podía no tener el MES elegido — y eso ahora lo resuelve el guard de
-  // abajo, con el dato en la mano, en vez de tirar las tres cosas por las
-  // dudas. (Lo mismo al cambiar el año: `VentasShell` ya no remonta la vista.)
+  // nueva podía no tener el MES elegido — y desde que los meses sueltos ya no
+  // están en el selector, ese motivo no existe. (Lo mismo al cambiar el año:
+  // `VentasShell` ya no remonta la vista.)
   const onEmpresaChange = (key: string) => {
     setEmpresa(key);
   };
 
-  // 🩸 EL MES ELEGIDO PUEDE NO EXISTIR EN LA COMBINACIÓN NUEVA. `data.meses`
-  // son los meses CON VENTAS de esa empresa en ese año, así que recién con la
-  // respuesta en la mano se sabe. Si el mes no está, se vuelve al año entero —
-  // no se deja la pantalla en "Sin productos para este filtro", que se lee como
-  // "esta empresa no vendió nada". Solo aplica al mes suelto: los tres períodos
-  // relativos no dependen ni de la empresa ni del año.
-  useEffect(() => {
-    if (!data || loading || periodo !== "ytd" || mes == null) return;
-    if (!data.meses.includes(mes)) setMes(null);
-  }, [data, loading, periodo, mes]);
+  // ⛔ ACÁ ABAJO VIVÍA EL GUARD QUE RESETEABA EL MES cuando la empresa nueva no
+  // lo tenía (miraba `data.meses`). MUERE CON LOS MESES, y se cae porque su
+  // motivo de existir desapareció: sin meses sueltos en el selector no hay
+  // ninguna elección que pueda quedar inválida al cambiar de empresa. Los tres
+  // períodos relativos no dependen ni de la empresa ni del año.
+  //
+  // Lo que SÍ se conserva de ese mismo cambio es lo de arriba: cambiar de
+  // empresa YA NO borra el buscador ni te devuelve al año en curso.
 
-  // Un solo selector para los cuatro períodos + el mes suelto. El valor "ytd"
-  // y "1".."12" son los que ya existían; los otros tres son los nuevos.
-  const valorPeriodo = periodo !== "ytd" ? periodo : mes ? String(mes) : "ytd";
+  // Cuatro opciones y ninguna más. `esProductosPeriodo` sigue guardando la
+  // puerta: un valor que no sea uno de los cuatro no cambia nada (antes acá
+  // convivían los meses "1".."12", y `parseInt("12m")` = 12 convertía "Últimos
+  // 12 meses" en diciembre en silencio — ese enredo ya no existe).
   const onPeriodoChange = (v: string) => {
-    // 🩸 Los períodos se preguntan PRIMERO, y no es un detalle de estilo:
-    // `parseInt("12m", 10)` devuelve 12 y `parseInt("6m", 10)` devuelve 6, así
-    // que preguntar por el mes primero convertía "Últimos 12 meses" en
-    // diciembre y "Últimos 6 meses" en junio, en silencio.
-    if (esProductosPeriodo(v)) {
-      setPeriodo(v);
-      setMes(null);
-    } else {
-      const n = parseInt(v, 10);
-      if (!Number.isInteger(n) || n < 1 || n > 12) return;
-      setPeriodo("ytd");
-      setMes(n);
-    }
+    if (!esProductosPeriodo(v)) return;
+    setPeriodo(v);
     setVisible(PAGE);
   };
 
@@ -195,23 +206,31 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
     setSort(prev => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
   };
 
+  // 🩸 ANTES ESTO ARRANCABA CON `if (p.num_codigos <= 1) return;` — un grupo de
+  // un solo código no tenía nada que desplegar. Con la lista de clientes SÍ
+  // tiene: en Joystep y en Active Wear las descripciones que más venden son
+  // justo de UN código (medido), así que con aquella guarda "quién lo compra"
+  // no se podía abrir precisamente donde más falta hace. Ahora abren todas.
   const toggleExpand = async (p: ProductoNivel1) => {
-    if (p.num_codigos <= 1) return; // grupo de 1 código: nada que desplegar
     const key = p.descripcion;
     if (expanded === key) {
       setExpanded(null);
       return;
     }
     setExpanded(key);
-    if (!codigos[key]) {
+    setDrillTab("clientes");
+    if (!(key in codigos)) {
       setCodigosLoading(key);
       try {
         const qs = new URLSearchParams({ empresa, year: String(selectedYear), periodo, descripcion: key });
-        if (periodo === "ytd" && mes) qs.set("mes", String(mes));
         const res = await fetch(`/api/ventas/productos/codigos?${qs.toString()}`, { cache: "no-store" });
         if (res.ok) {
-          const json = (await res.json()) as { codigos: ProductoCodigo[] };
+          const json = (await res.json()) as {
+            codigos: ProductoCodigo[];
+            clientes: ClienteDeProducto[] | null;
+          };
           setCodigos(prev => ({ ...prev, [key]: json.codigos }));
+          setClientes(prev => ({ ...prev, [key]: json.clientes ?? null }));
         }
       } catch {
         /* el render muestra "no se pudo cargar" si queda sin data */
@@ -224,8 +243,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   const onExcel = async () => {
     if (data) await exportProductosToExcel(data);
   };
-
-  const meses = data?.meses ?? [];
 
   // Unidades y precio promedio del período completo (no del Top 20 visible):
   // se suman TODAS las descripciones que devolvió el nivel 1, que es la misma
@@ -267,7 +284,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
         {/* Los 4 períodos de Daniel + el mes suelto de siempre, en un solo
             desplegable: dos controles de período uno al lado del otro obligan a
             adivinar cuál manda. */}
-        <Select value={valorPeriodo} onValueChange={onPeriodoChange}>
+        <Select value={periodo} onValueChange={onPeriodoChange}>
           <SelectTrigger className="h-11 w-auto min-w-[150px] text-xs" disabled={loading}>
             <SelectValue />
           </SelectTrigger>
@@ -275,9 +292,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
             <SelectItem value="ytd" className="text-xs">{periodoLabel(selectedYear, null, "ytd")}</SelectItem>
             {PERIODOS_FIJOS.map(p => (
               <SelectItem key={p.key} value={p.key} className="text-xs">{p.nombre}</SelectItem>
-            ))}
-            {meses.map(m => (
-              <SelectItem key={m} value={String(m)} className="text-xs">{MONTHS[m - 1]} {selectedYear}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -400,23 +414,21 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
               {visibleRows.length === 0 && (
                 <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-400">Sin productos para este filtro.</td></tr>
               )}
-              {visibleRows.map(p => {
-                const drillable = p.num_codigos > 1;
-                const isOpen = expanded === p.descripcion;
-                return (
-                  <ProductoRow
-                    key={p.descripcion}
-                    p={p}
-                    drillable={drillable}
-                    isOpen={isOpen}
-                    onToggle={() => toggleExpand(p)}
-                    codigos={codigos[p.descripcion]}
-                    codigosLoading={codigosLoading === p.descripcion}
-                    prevVenta={prevVenta[p.descripcion]}
-                    comparativoMedido={comparativo !== "fallo"}
-                  />
-                );
-              })}
+              {visibleRows.map(p => (
+                <ProductoRow
+                  key={p.descripcion}
+                  p={p}
+                  isOpen={expanded === p.descripcion}
+                  onToggle={() => toggleExpand(p)}
+                  codigos={codigos[p.descripcion]}
+                  clientes={clientes[p.descripcion]}
+                  codigosLoading={codigosLoading === p.descripcion}
+                  prevVenta={prevVenta[p.descripcion]}
+                  comparativoMedido={comparativo !== "fallo"}
+                  tab={drillTab}
+                  onTab={setDrillTab}
+                />
+              ))}
             </tbody>
           </table>
         </div>
@@ -491,18 +503,20 @@ function DeltaCell({ curr, prev, medido }: { curr: number; prev: number | undefi
 }
 
 function ProductoRow({
-  p, drillable, isOpen, onToggle, codigos, codigosLoading, prevVenta, comparativoMedido,
+  p, isOpen, onToggle, codigos, clientes, codigosLoading, prevVenta, comparativoMedido, tab, onTab,
 }: {
   p: ProductoNivel1;
-  drillable: boolean;
   isOpen: boolean;
   onToggle: () => void;
   codigos: ProductoCodigo[] | undefined;
+  clientes: ClienteDeProducto[] | null | undefined;
   codigosLoading: boolean;
   prevVenta: number | undefined;
   /** false cuando la consulta del período anterior falló: sin ventana medida,
    *  la columna de cambio no puede afirmar "Nuevo". */
   comparativoMedido: boolean;
+  tab: DrillTab;
+  onTab: (t: DrillTab) => void;
 }) {
   return (
     <>
@@ -512,16 +526,12 @@ function ProductoRow({
           haber comparado una sola celda. */}
       <tr
         data-fila-producto={p.descripcion}
-        className={`border-b border-gray-100 ${drillable ? "cursor-pointer hover:bg-gray-50" : ""}`}
-        onClick={drillable ? onToggle : undefined}
+        className="cursor-pointer border-b border-gray-100 hover:bg-gray-50"
+        onClick={onToggle}
       >
         <td data-col="descripcion" className="px-2 py-2.5 lg:px-3">
           <div className="flex items-center gap-1.5">
-            {drillable ? (
-              <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-            ) : (
-              <span className="w-3.5 shrink-0" />
-            )}
+            <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
             <span className="text-gray-800">{p.descripcion}</span>
           </div>
         </td>
@@ -536,35 +546,150 @@ function ProductoRow({
         <tr className="bg-gray-50/60">
           <td colSpan={7} className="px-2 py-0 lg:px-3">
             <div className="py-2 pl-5">
-              {codigosLoading && <div className="py-2 text-xs text-gray-400">Cargando códigos…</div>}
-              {!codigosLoading && codigos && codigos.length > 0 && (
-                <table data-drill-codigos className="w-full text-xs">
-                  <tbody>
-                    {codigos.map(c => (
-                      <tr key={c.codigo} className="border-b border-gray-100 last:border-0">
-                        <td className="py-1.5 pr-3">
-                          <span className="font-mono text-gray-500">{c.codigo}</span>
-                          {c.descripcion && <span className="ml-2 text-gray-400">{c.descripcion}</span>}
-                        </td>
-                        <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-500 sm:table-cell">{Math.round(c.cantidad).toLocaleString("en-US")}</td>
-                        <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
-                        {/* El precio promedio del código: es el que explica por
-                            qué dos códigos de la misma descripción tienen
-                            márgenes distintos. Mismo corte `sm` que arriba. */}
-                        <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-700 sm:table-cell">{fmtPrecioProm(precioPromedio(c.venta, c.cantidad))}</td>
-                        <td className="py-1.5 text-right font-mono tabular-nums text-gray-600">{fmtMargen(c.margen)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-              {!codigosLoading && codigos && codigos.length === 0 && (
-                <div className="py-2 text-xs text-gray-400">Sin códigos.</div>
+              {codigosLoading && <div className="py-2 text-xs text-gray-400">Cargando…</div>}
+              {!codigosLoading && (
+                <>
+                  {/* 🩸 DOS BLOQUES UNO DEBAJO DEL OTRO NO SERVÍAN, y no es
+                      cuestión de gusto: hay descripciones de 602 códigos
+                      (vistana, "Men-T-Shirts S/S") y hasta de 842
+                      (fashion_wear, "Women-Bags"). Con la lista de códigos
+                      arriba, "quién lo compra" quedaba a 600 renglones de
+                      scroll — o sea, no existía. Con pestañas las dos cosas
+                      están a un toque y ninguna tapa a la otra.
+
+                      Arranca en CLIENTES porque es lo que Daniel pidió; los
+                      códigos siguen ahí, con su rótulo, sin perder nada. */}
+                  <div className="mb-1 flex gap-1" role="tablist" aria-label="Detalle de la descripción">
+                    <DrillTabBtn activa={tab === "clientes"} onClick={() => onTab("clientes")}>
+                      Quién lo compra
+                    </DrillTabBtn>
+                    <DrillTabBtn activa={tab === "codigos"} onClick={() => onTab("codigos")}>
+                      Códigos{codigos ? ` (${codigos.length})` : ""}
+                    </DrillTabBtn>
+                  </div>
+
+                  {tab === "clientes" && <BloqueClientes clientes={clientes} />}
+                  {tab === "codigos" && <BloqueCodigos codigos={codigos} />}
+                </>
               )}
             </div>
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+/** Pestaña del desplegable. 44 px de alto: se toca desde el iPhone. */
+function DrillTabBtn({
+  activa, onClick, children,
+}: {
+  activa: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={activa}
+      // El clic NO puede llegar a la fila de arriba: ahí vive el toggle que
+      // cierra el desplegable, y cambiar de pestaña lo cerraría al instante.
+      onClick={e => { e.stopPropagation(); onClick(); }}
+      className={`min-h-[44px] rounded-md px-3 text-xs transition ${
+        activa ? "bg-white font-medium text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * QUIÉN COMPRA ESTA DESCRIPCIÓN — lo que pidió Daniel el 24-ago-2026.
+ *
+ * Del que más compra al que menos, con unidades, venta y qué parte se lleva.
+ * Todo NETO: la nota de crédito RESTA (el signo lo pone `agruparPorCliente` con
+ * `signoDeTipo`, la única definición del repo). No es un detalle: City Mall
+ * David devolvió el 58% de lo que se le facturó a $30, y en bruto saldría muy
+ * por encima de donde va.
+ */
+function BloqueClientes({ clientes }: { clientes: ClienteDeProducto[] | null | undefined }) {
+  if (clientes === null) {
+    return <div className="py-2 text-xs text-gray-500">No se pudo cargar quién lo compra. Cerrá y volvé a abrir la fila.</div>;
+  }
+  if (!clientes) return <div className="py-2 text-xs text-gray-400">Cargando…</div>;
+  if (clientes.length === 0) {
+    // 🔴 NO dice "no lo compra nadie". Hoy mismo Fashion Wear está terminando de
+    // bajar su detalle y sus descripciones saldrían todas vacías: afirmar que
+    // nadie compra sería una respuesta falsa dicha con toda seguridad.
+    return (
+      <div className="py-2 text-xs text-gray-500">
+        Todavía no tenemos el detalle por cliente de estas ventas.
+      </div>
+    );
+  }
+
+  const total = totalDeClientes(clientes);
+  return (
+    <>
+      <table data-drill-clientes className="w-full text-xs">
+        <tbody>
+          {clientes.map(c => (
+            <tr key={c.cliente_switch_id ?? c.cliente_nombre} className="border-b border-gray-100 last:border-0">
+              <td className="py-1.5 pr-3 text-gray-700">{c.cliente_nombre}</td>
+              {/* Mismo corte `sm` que la tabla de arriba: a 390 px sólo entran
+                  el nombre, la venta y el %. */}
+              <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-500 sm:table-cell">
+                {Math.round(c.cantidad).toLocaleString("en-US")}
+              </td>
+              <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
+              <td className="py-1.5 text-right font-mono tabular-nums text-gray-500">
+                {fmtParticipacion(participacion(c.venta, total.venta))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* El pie dice de dónde sale y por qué puede quedar por debajo de la fila
+          de arriba. Se explica UNA vez acá en vez de dejar que se descubra
+          sumando y se lea como un descuadre. */}
+      <p data-pie-clientes className="mt-1.5 text-xs text-gray-500">
+        <span className="font-mono tabular-nums text-gray-700">{clientes.length}</span>
+        {clientes.length === 1 ? " cliente" : " clientes"}
+        <span className="mx-1.5 text-gray-300">·</span>
+        <span className="font-mono tabular-nums text-gray-700">{Math.round(total.cantidad).toLocaleString("en-US")}</span> piezas
+        <span className="mx-1.5 text-gray-300">·</span>
+        <span className="font-mono tabular-nums text-gray-700">{fmtMoney(total.venta)}</span>
+        <span className="mx-1.5 text-gray-300">·</span>
+        <span>sale de las facturas y notas de crédito; las ventas de mostrador no traen detalle, así que puede quedar un poco por debajo de la venta de la fila</span>
+      </p>
+    </>
+  );
+}
+
+/** Los códigos de la descripción — los colores y tallas de ese modelo. */
+function BloqueCodigos({ codigos }: { codigos: ProductoCodigo[] | undefined }) {
+  if (!codigos) return <div className="py-2 text-xs text-gray-500">No se pudieron cargar los códigos.</div>;
+  if (codigos.length === 0) return <div className="py-2 text-xs text-gray-400">Sin códigos.</div>;
+  return (
+    <table data-drill-codigos className="w-full text-xs">
+      <tbody>
+        {codigos.map(c => (
+          <tr key={c.codigo} className="border-b border-gray-100 last:border-0">
+            <td className="py-1.5 pr-3">
+              <span className="font-mono text-gray-500">{c.codigo}</span>
+              {c.descripcion && <span className="ml-2 text-gray-400">{c.descripcion}</span>}
+            </td>
+            <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-500 sm:table-cell">{Math.round(c.cantidad).toLocaleString("en-US")}</td>
+            <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
+            {/* El precio promedio del código: es el que explica por qué dos
+                códigos de la misma descripción tienen márgenes distintos. */}
+            <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-700 sm:table-cell">{fmtPrecioProm(precioPromedio(c.venta, c.cantidad))}</td>
+            <td className="py-1.5 text-right font-mono tabular-nums text-gray-600">{fmtMargen(c.margen)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
