@@ -64,25 +64,64 @@
 //    y no entran en un `int`. Su mitad alta tampoco sirve: `numeroOrden / 10000`
 //    da 923 valores para 924 documentos (colisiona).
 //
-//    Lo que SÍ es único, chico y estable es el `secuencial`, con formato
-//    `<serie>-<9 dígitos>` (series observadas 11/12/14/139/155; correlativo
-//    máximo 7.473). De ahí sale `ccteIdSintetico`:
+//    Lo que SÍ es chico y estable es el `secuencial`, con formato
+//    `<serie>-<9 dígitos>` (series observadas 11/12/13/14/139/155; correlativo
+//    máximo 7.649 medido el 25-ago-2026).
 //
-//        ccte_id = serie × 10.000.000 + correlativo
+//    ═══ 🩸 PERO EL NÚMERO SOLO NO ES UNA IDENTIDAD (25-ago-2026) ═════════════
 //
-//    • **Determinista**: el mismo documento da siempre el mismo id, así que el
-//      upsert por `(empresa_key, ccte_id)` sigue siendo idempotente.
+//    **Switch REINICIÓ la numeración.** El mismo `secuencial`, en la misma
+//    empresa y con el mismo tipo, identifica DOS documentos distintos separados
+//    por años. Medido en producción, 52 grupos así:
+//
+//        confecciones_boston  11-000000009  → Factura 2022-10-14 $285,16
+//                                             Factura 2026-07-23 $271,25
+//        confecciones_boston  13-000000003  → NC      2022-12-13 $9.955,60
+//                                             NC      2026-03-19 $187,79
+//
+//    Solo Boston está expuesta: las otras 7 empresas usan el `ccte_id` NATIVO
+//    que trae el API. Boston lo derivaba del secuencial porque su cartera baja
+//    por el reporte web, así que dos documentos distintos daban la MISMA fila y
+//    el upsert por `(empresa_key, ccte_id)` colapsaba uno **en silencio** (o
+//    reventaba la corrida, según cayeran en el mismo lote de 100 o en dos).
+//
+//    ⚠️ Y ningún guard lo tapaba. El de colisión solo cortaba cuando dos
+//    secuenciales DISTINTOS daban el mismo id; dos documentos con el MISMO
+//    secuencial ni lo despertaban. Y `cuadraConSwitch` tampoco puede verlo: el
+//    resumen se calcula sobre las filas ANTES del upsert, así que cuadra al
+//    centavo contando los dos y recién DESPUÉS el upsert colapsa uno.
+//
+//    ═══ LA IDENTIDAD LLEVA EL AÑO ADENTRO ═══════════════════════════════════
+//
+//        ccte_id = serie × 10.000.000 + (año − 2000) × 100.000 + correlativo
+//
+//    y se lee de corrido en decimal — `11-000000009` del 2026 da `112600009`,
+//    o sea `11` · `26` · `00009`. Que sea legible no es cosmético: es lo que
+//    permite auditar una fila sin volver a correr nada.
+//
+//    • **Determinista**: mismo documento (mismo secuencial + misma fecha) →
+//      mismo id SIEMPRE, así que el upsert sigue siendo idempotente.
 //    • **Disjunto de los ccteId reales por CONSTRUCCIÓN**: el mínimo que produce
-//      es 11×10⁷ = 110.000.000 y el ccte_id real más alto de TODA la tabla es
+//      es 1×10⁷ = 10.000.000 y el ccte_id real más alto de TODA la tabla es
 //      16.388. No es una apuesta a que no choquen: no pueden.
-//    • **Con techo verificado**: 155×10⁷ + 7.473 = 1.550.007.473 < 2^31−1.
+//    • **Con techo verificado**: 200×10⁷ + 99×10⁵ + 99.999 = 2.009.999.999,
+//      debajo de 2^31−1. El presupuesto de un `int` no da para más: con serie
+//      hasta 200 y 100 años, el correlativo no puede pasar de ~107.000, así que
+//      los 100.000 de acá son el máximo redondo que entra. Medido: 7.649.
+//    • **Ventana de años 2000-2099.** Medido en producción el 25-ago-2026: los
+//      1.109 documentos de la cartera van de 2022 a 2026, ninguno sin fecha.
 //
-//    Los bordes se validan en cada corrida en vez de confiarse: una serie > 200 o
-//    un correlativo ≥ 10.000.000 desbordarían el `int`, así que ese documento se
-//    RECHAZA con su motivo en `skip_details` en lugar de escribir un id envuelto.
-//    Y `construirFilas` corta la corrida entera si dos `secuencial` distintos dan
-//    el mismo id — una colisión silenciosa sería un documento pisando a otro, o
-//    sea plata mal contada.
+//    🔴 **Un documento sin fecha, o con un año fuera de la ventana, se RECHAZA**
+//    (igual que una serie > 200 o un correlativo ≥ 100.000): va a `skip_details`
+//    con su motivo. Y como el resumen se arma solo con las filas que SÍ se
+//    construyeron, ese rechazo desarma el cuadre contra Switch y la corrida
+//    entera se corta sin escribir nada. Es a propósito: preferimos la cartera de
+//    ayer entera y un error a la vista, que la de hoy con un documento menos.
+//
+//    ⚠️ **Lo que el año NO cubre**: dos documentos con el mismo secuencial en el
+//    MISMO año. No existe hoy y no cabe en un `int`, pero tampoco pasa
+//    desapercibido — cae en el guard de identidad de `construirFilas`, que corta
+//    la corrida. Fail-closed y ruidoso, nunca una fila pisando a otra.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SkipDetail } from "./sync-empresa";
@@ -90,12 +129,29 @@ import type { SkipDetail } from "./sync-empresa";
 /** Tope de un `int` de Postgres. `ccte_id` es `int NOT NULL`. */
 export const CCTE_ID_MAX = 2_147_483_647;
 
-/** Multiplicador de la serie en `ccteIdSintetico`. Deja 7 dígitos (0..9.999.999)
- *  para el correlativo — el máximo observado en Boston es 7.473. */
+/** Multiplicador de la serie en `ccteIdSintetico`. Deja 7 dígitos para el par
+ *  (año, correlativo): 2 para el año y 5 para el correlativo. */
 export const CCTE_SERIE_FACTOR = 10_000_000;
 
-/** Serie máxima admitida: 200 × 10⁷ + 9.999.999 = 2.009.999.999 < 2^31−1. Una
- *  serie mayor desbordaría, así que se rechaza el documento en vez de truncarlo. */
+/** Multiplicador del año dentro del bloque de la serie. Deja 5 dígitos
+ *  (0..99.999) para el correlativo — el máximo medido en Boston es 7.649. */
+export const CCTE_ANIO_FACTOR = 100_000;
+
+/** Año 0 de la ventana. `ccte_id` guarda `año − CCTE_ANIO_BASE` en 2 dígitos, o
+ *  sea 2000..2099. Un documento fuera de esa ventana se RECHAZA en vez de
+ *  envolverse: 2100 daría el mismo id que 2000. */
+export const CCTE_ANIO_BASE = 2000;
+
+/** Años que entran en los 2 dígitos reservados (2000..2099). */
+export const CCTE_ANIO_SPAN = 100;
+
+/** Correlativo máximo admitido (exclusivo). Es lo que dejan los 5 dígitos de
+ *  abajo; medido el 25-ago-2026 en Boston: 7.649, o sea 13× de holgura. */
+export const CCTE_CORRELATIVO_MAX = CCTE_ANIO_FACTOR;
+
+/** Serie máxima admitida: 200 × 10⁷ + 99 × 10⁵ + 99.999 = 2.009.999.999 < 2^31−1.
+ *  Una serie mayor desbordaría, así que se rechaza el documento en vez de
+ *  truncarlo. */
 export const CCTE_SERIE_MAX = 200;
 
 /**
@@ -148,15 +204,26 @@ export function saldoSegunLaVista(tipo: string | null | undefined, saldoGuardado
 }
 
 export type CcteIdResultado =
-  | { ok: true; ccteId: number; serie: number; correlativo: number }
+  | { ok: true; ccteId: number; serie: number; correlativo: number; anio: number }
   | { ok: false; motivo: string };
 
 /**
- * `ccte_id` determinista a partir del `secuencial` (`<serie>-<correlativo>`).
- * Ver el encabezado para por qué no se usa `numeroOrden` y por qué no puede
- * chocar con los ccteId reales del API.
+ * `ccte_id` determinista a partir del `secuencial` (`<serie>-<correlativo>`) Y
+ * DE LA FECHA del documento.
+ *
+ * 🔴 La fecha NO es opcional y no tiene default: es la mitad de la identidad.
+ * Switch reinició la numeración y el mismo `secuencial` nombra dos documentos
+ * distintos separados por años (ver el encabezado). Un parámetro con default
+ * dejaría que un llamador nuevo volviera al bug con solo olvidarse de pasarlo.
+ *
+ * Acepta la fecha tal como la manda el reporte (`YYYY-MM-DD…` o `DD-MM-YYYY`) y
+ * la normaliza con `parseFechaReporte`, que es la MISMA función con la que se
+ * guarda `fecha_creacion`: la identidad y la columna no pueden divergir.
  */
-export function ccteIdSintetico(secuencial: string | null | undefined): CcteIdResultado {
+export function ccteIdSintetico(
+  secuencial: string | null | undefined,
+  fechaCreacion: string | null | undefined,
+): CcteIdResultado {
   if (!secuencial) return { ok: false, motivo: "secuencial vacío" };
   const m = /^(\d{1,4})-(\d{1,12})$/.exec(secuencial.trim());
   if (!m) return { ok: false, motivo: `secuencial con formato inesperado: ${secuencial}` };
@@ -165,12 +232,27 @@ export function ccteIdSintetico(secuencial: string | null | undefined): CcteIdRe
   if (serie < 1 || serie > CCTE_SERIE_MAX) {
     return { ok: false, motivo: `serie ${serie} fuera de rango (1..${CCTE_SERIE_MAX})` };
   }
-  if (correlativo >= CCTE_SERIE_FACTOR) {
-    return { ok: false, motivo: `correlativo ${correlativo} no entra en 7 dígitos` };
+  if (correlativo >= CCTE_CORRELATIVO_MAX) {
+    return { ok: false, motivo: `correlativo ${correlativo} no entra en 5 dígitos` };
   }
-  const ccteId = serie * CCTE_SERIE_FACTOR + correlativo;
+  const fecha = parseFechaReporte(fechaCreacion);
+  if (!fecha) {
+    return {
+      ok: false,
+      motivo: `documento sin fecha utilizable (${secuencial}): la fecha es parte de la identidad`,
+    };
+  }
+  const anio = parseInt(fecha.slice(0, 4), 10);
+  const offset = anio - CCTE_ANIO_BASE;
+  if (!Number.isFinite(offset) || offset < 0 || offset >= CCTE_ANIO_SPAN) {
+    return {
+      ok: false,
+      motivo: `año ${anio} fuera de la ventana ${CCTE_ANIO_BASE}..${CCTE_ANIO_BASE + CCTE_ANIO_SPAN - 1}`,
+    };
+  }
+  const ccteId = serie * CCTE_SERIE_FACTOR + offset * CCTE_ANIO_FACTOR + correlativo;
   if (ccteId > CCTE_ID_MAX) return { ok: false, motivo: `ccte_id ${ccteId} desborda int` };
-  return { ok: true, ccteId, serie, correlativo };
+  return { ok: true, ccteId, serie, correlativo, anio };
 }
 
 // ─── Forma de lo que devuelve el reporte ─────────────────────────────────────
@@ -410,13 +492,66 @@ export class CarteraWebError extends Error {
   }
 }
 
+/** Lo que hace que dos renglones sean EL MISMO documento. Si dos renglones caen
+ *  en el mismo `ccte_id` pero difieren en cualquiera de estos tres campos, no
+ *  son una repetición: son dos documentos peleándose una fila. */
+interface IdentidadDocumento {
+  secuencial: string | null;
+  fecha: string | null;
+  saldo: number;
+}
+
+/** Un centavo. Los saldos son `numeric(12,4)` y los dos lados salen del MISMO
+ *  reporte, así que cualquier diferencia real es otro documento, no redondeo. */
+const TOLERANCIA_IDENTIDAD = 0.005;
+
+/** ¿Estos dos renglones son el MISMO documento repetido? */
+export function mismoDocumento(a: IdentidadDocumento, b: IdentidadDocumento): boolean {
+  return (
+    a.secuencial === b.secuencial &&
+    a.fecha === b.fecha &&
+    Math.abs(a.saldo - b.saldo) < TOLERANCIA_IDENTIDAD
+  );
+}
+
+/** Qué campos difieren, para que el error diga POR QUÉ y no solo QUE. */
+function diferencias(a: IdentidadDocumento, b: IdentidadDocumento): string[] {
+  const d: string[] = [];
+  if (a.secuencial !== b.secuencial) d.push("secuencial distinto");
+  if (a.fecha !== b.fecha) d.push("fecha distinta");
+  if (Math.abs(a.saldo - b.saldo) >= TOLERANCIA_IDENTIDAD) d.push("monto distinto");
+  return d;
+}
+
+const describir = (d: IdentidadDocumento) =>
+  `"${d.secuencial ?? "(sin secuencial)"}" del ${d.fecha ?? "(sin fecha)"} por ${d.saldo}`;
+
 /**
  * Arma las filas de `switch_estadocuenta` a partir de los clientes del reporte.
  *
- * Corta la corrida (lanza) ante una COLISIÓN de `ccte_id` entre dos documentos
- * distintos: dejarla pasar sería que un documento pise a otro en el upsert y la
- * cartera quede corta sin que nadie se entere. Un documento suelto que no se
- * puede mapear NO corta nada: se omite con su motivo en `skip_details`.
+ * ═══ EL GUARD DE IDENTIDAD ═══════════════════════════════════════════════════
+ *
+ * Corta la corrida (lanza) cuando dos renglones caen en el mismo `ccte_id` sin
+ * ser el mismo documento: dejarlo pasar sería que uno pise al otro en el upsert
+ * y la cartera quede corta sin que nadie se entere.
+ *
+ * 🩸 **Este guard CAMBIÓ DE DIRECCIÓN el 25-ago-2026.** Antes solo miraba el
+ * `secuencial`: cortaba si dos secuenciales DISTINTOS daban el mismo id, y un
+ * secuencial REPETIDO se declaraba "el mismo documento" y se dejaba pasar. Esa
+ * suposición es exactamente la que rompió el reinicio de numeración de Switch —
+ * `11-000000009` es una Factura de 2022 **y** otra de 2026, y la vieja regla las
+ * daba por la misma. Ahora la identidad son los TRES campos: mismo secuencial,
+ * misma fecha y mismo monto. Cualquier diferencia corta.
+ *
+ * Con el año adentro del `ccte_id`, el caso que motivó todo esto ya ni llega
+ * acá: 2022 y 2026 dan ids distintos y conviven como dos filas. Lo que queda
+ * para el guard es lo que el año NO puede separar —dos documentos con el mismo
+ * secuencial en el MISMO año— y eso, en vez de pisarse, corta.
+ *
+ * Un documento suelto que no se puede mapear NO corta nada acá: se omite con su
+ * motivo en `skip_details`. Pero como el resumen se arma solo con lo que sí se
+ * construyó, el cuadre contra Switch se cae y la corrida termina en error sin
+ * escribir. Omitir nunca es silencioso.
  */
 export function construirFilas(
   empresaKey: string,
@@ -424,7 +559,7 @@ export function construirFilas(
 ): ConstruccionFilas {
   const filas: FilaEstadoCuentaWeb[] = [];
   const skips: SkipDetail[] = [];
-  const porCcteId = new Map<number, string>();
+  const porCcteId = new Map<number, IdentidadDocumento>();
   const conSaldo = new Set<number | string>();
   let d0_90 = 0;
   let d91_120 = 0;
@@ -435,7 +570,7 @@ export function construirFilas(
     let totalCliente = 0;
 
     for (const el of cliente.elements ?? []) {
-      const idres = ccteIdSintetico(el.secuencial);
+      const idres = ccteIdSintetico(el.secuencial, el.fechaCreacion);
       if (!idres.ok) {
         skips.push({
           facturaId: clienteId,
@@ -445,15 +580,26 @@ export function construirFilas(
         });
         continue;
       }
-      const previo = porCcteId.get(idres.ccteId);
-      if (previo !== undefined && previo !== el.secuencial) {
-        throw new CarteraWebError(
-          `colisión de ccte_id ${idres.ccteId}: "${previo}" y "${el.secuencial}" darían la misma fila`,
-        );
-      }
-      porCcteId.set(idres.ccteId, el.secuencial!);
 
       const tipo = el.tipoComprobante ?? null;
+      const saldoReporte = num(el.saldo) ?? 0;
+      const fechaDoc = parseFechaReporte(el.fechaCreacion);
+
+      // ── El guard de identidad. Ver el comentario de la función. ───────────
+      const identidad: IdentidadDocumento = {
+        secuencial: el.secuencial ?? null,
+        fecha: fechaDoc,
+        saldo: saldoReporte,
+      };
+      const previo = porCcteId.get(idres.ccteId);
+      if (previo !== undefined && !mismoDocumento(previo, identidad)) {
+        throw new CarteraWebError(
+          `colisión de ccte_id ${idres.ccteId}: ${describir(previo)} y ${describir(identidad)} ` +
+            `darían la misma fila (${diferencias(previo, identidad).join(", ")})`,
+        );
+      }
+      porCcteId.set(idres.ccteId, identidad);
+
       if (signoDeTipo(tipo) === 0) {
         // La vista lo va a contar como 0. No se adivina un signo: se anota.
         skips.push({
@@ -464,7 +610,6 @@ export function construirFilas(
         });
       }
 
-      const saldoReporte = num(el.saldo) ?? 0;
       const saldoGuardado = saldoParaGuardar(tipo, saldoReporte);
       const dias = typeof el.dias === "number" ? el.dias : null;
       const aporte = saldoSegunLaVista(tipo, saldoGuardado);
@@ -495,7 +640,10 @@ export function construirFilas(
         total_original: null,
         plazo_credito: num(el.plazoCredito),
         dias,
-        fecha_creacion: parseFechaReporte(el.fechaCreacion),
+        // La MISMA fecha con la que se calculó el `ccte_id`. Parsearla dos veces
+        // abriría la puerta a que la identidad y la columna dijeran cosas
+        // distintas.
+        fecha_creacion: fechaDoc,
         // Se guarda el element crudo (con `origen`) para poder auditar de dónde
         // salió cada fila sin tener que adivinar por el ccte_id.
         raw_data: { ...el, origen: "reporte-web-antiguedad" },

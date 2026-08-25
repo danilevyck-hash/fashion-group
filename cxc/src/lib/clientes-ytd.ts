@@ -44,9 +44,15 @@
  *  facturas de switch_facturas: 0 discrepancias (ver CLAUDE.md). */
 const PANAMA_OFFSET_MS = 5 * 60 * 60 * 1000;
 
-/** Comprobantes que SUMAN. Nota de Crédito resta; el resto no cuenta. */
-export const TIPOS_QUE_SUMAN = ["Factura", "Tiquete", "Transacción", "Nota de Débito"] as const;
-const SUMAN = new Set<string>(TIPOS_QUE_SUMAN);
+/** Comprobantes que SUMAN. Nota de Crédito resta; el resto no cuenta.
+ *
+ *  🔑 Se DERIVA de `ventas/tipos-comprobante.ts`, que es donde la lista se dice
+ *  una sola vez. Antes estaba escrita acá y otra vez en cada vista de SQL: dos
+ *  listas paralelas son las que un día se apartan en silencio, y el centinela de
+ *  tipos nuevos se compara contra AQUÉLLA. Se re-exporta para no romper a quien
+ *  ya la importaba de este módulo. */
+export { TIPOS_VENTA_SUMAN as TIPOS_QUE_SUMAN } from "@/lib/ventas/tipos-comprobante";
+import { signoVenta } from "@/lib/ventas/tipos-comprobante";
 
 /** El día-calendario de Panamá al que pertenece un instante, como "YYYY-MM-DD". */
 export function ymdPanama(iso: string): string {
@@ -74,9 +80,10 @@ export function ventanaAnioPanama(ahora: Date = new Date()): { desde: string; ha
 export function montoFirmado(tipoComprobante: string | null | undefined, base: number | string | null | undefined): number {
   const monto = Number(base ?? 0);
   if (!Number.isFinite(monto)) return 0;
-  if (SUMAN.has(tipoComprobante ?? "")) return monto;
-  if (tipoComprobante === "Nota de Crédito") return -monto;
-  return 0;
+  // El `return 0` de un tipo desconocido es el mismo `ELSE 0` de las vistas: la
+  // venta no se descarta de la tabla, pero no entra al total. Lo que impide que
+  // eso sea silencioso es el centinela (`ventas/centinela-tipos.ts`).
+  return signoVenta(tipoComprobante) * monto;
 }
 
 /** Redondeo a centavos, para que no se filtren colas binarias a la pantalla. */

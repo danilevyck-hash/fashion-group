@@ -52,6 +52,7 @@ import {
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
+import { correrCentinelaTipos } from "@/lib/ventas/centinela-tipos";
 
 type SyncTipo = "facturas" | "estadocuenta" | "all";
 
@@ -242,16 +243,35 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // ── EL CENTINELA DE TIPOS DE COMPROBANTE ────────────────────────────────
+  //
+  // 🩸 En mayo-2025 Switch estrenó «Transacción» y alguien lo agregó a tiempo —
+  // POR SUERTE. Un tipo nuevo cae al `ELSE 0` de las vistas de ventas y esa
+  // plata desaparece del tablero SIN un solo error. Acá se mira, justo después
+  // de que las facturas aterrizaron, y se avisa por la política que ya existe.
+  //
+  // Solo en las corridas que traen facturas: es lo que puede estrenar un tipo.
+  // NUNCA lanza y NUNCA toca el heartbeat — las facturas se escribieron bien.
+  const centinela =
+    tipo === "facturas" || tipo === "all"
+      ? await correrCentinelaTipos([...new Set(results.map((r) => r.empresaKey))])
+      : [];
+
   const slotParam = sp.get("slot");
   const slot = slotParam && /^(all|facturas|estadocuenta)-\d{4}$/.test(slotParam) ? slotParam : null;
   if (errors.length === 0) {
     await recordCronHeartbeat(CRON_NAME);
     if (slot) await recordCronHeartbeat(`${CRON_NAME}:${slot}`);
-  } else {
-    await alertSwitchCronErrors(
-      CRON_NAME,
-      errors.map((e) => ({ empresaKey: e.empresaKey, syncType: e.tipo, error: e.error })),
-    );
+  }
+  // UNA sola llamada con TODO lo que hay que avisar — los fallos de sync y los
+  // tipos sin clasificar. Dos llamadas serían dos mensajes por la misma corrida,
+  // que es justo el ruido que la política existe para evitar.
+  const paraAlertar = [
+    ...errors.map((e) => ({ empresaKey: e.empresaKey, syncType: e.tipo, error: e.error })),
+    ...centinela,
+  ];
+  if (paraAlertar.length > 0) {
+    await alertSwitchCronErrors(CRON_NAME, paraAlertar);
   }
   return NextResponse.json(
     {
@@ -260,6 +280,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       range: { desde, hasta },
       results,
       errors,
+      tiposSinClasificar: centinela.length,
     },
     { status: errors.length === 0 ? 200 : 207 },
   );

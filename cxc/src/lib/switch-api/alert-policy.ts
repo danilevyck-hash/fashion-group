@@ -115,6 +115,8 @@ export function consecuenciaDeSyncType(syncType: string): string {
       return "en el tab Referencia de Ventas, la existencia y el precio de etiqueta pueden estar viejos.";
     case "proveedores":
       return "lo que debemos a proveedores puede estar viejo.";
+    case "ventas_tipos":
+      return "hay ventas que el tablero está contando como CERO: Switch estrenó un tipo de comprobante que el sistema todavía no sabe leer.";
     case "catalogo_reebok":
     case "catalogo_joybees":
     case "catalogo_tommy":

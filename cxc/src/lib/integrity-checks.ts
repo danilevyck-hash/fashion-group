@@ -191,6 +191,59 @@ async function checkAgingTiposSinClasificar(): Promise<CheckResult> {
   };
 }
 
+// CHECK 13: EL MISMO GUARD, PARA VENTAS (26-ago-2026).
+//
+// 🩸 En mayo-2025 Switch estrenó el tipo «Transacción» (reemplazó a «Tiquete»).
+// Alguien lo agregó a tiempo y no se perdió una venta — POR SUERTE. Un tipo
+// nuevo cae al `ELSE 0` de las 19 copias del CASE de ventas y esa plata
+// DESAPARECE del tablero sin un solo error. La cartera tenía este guard desde
+// mayo-2026 (CHECK 10); ventas no tenía equivalente.
+//
+// Mira las DOS vistas porque los riesgos son OPUESTOS: en ventas un tipo nuevo
+// vale 0 (la plata se pierde) y en el diario de artículos SUMA sin permiso
+// (infla costo y utilidad).
+//
+// ⚠️ Este check es el tablero; el AVISO va por otro lado y a propósito: el
+// centinela de `switch-sync` lo manda por `alertSwitchCronErrors` (regla 2, la
+// de los 2 fallos seguidos) apenas aterrizan las facturas, sin esperar a la
+// corrida diaria de integridad.
+async function checkVentasTiposSinClasificar(): Promise<CheckResult> {
+  const ventas = await supabaseServer
+    .from("switch_facturas_tipos_sin_clasificar")
+    .select("empresa_key, tipo_comprobante, filas, filas_con_plata, suma_base");
+  if (ventas.error) {
+    return checkError("ventas_tipos_sin_clasificar", "switch_facturas", ventas.error.message);
+  }
+  const arts = await supabaseServer
+    .from("switch_articulo_diario_tipos_sin_clasificar")
+    .select("empresa_key, tipo, filas, filas_con_plata, suma_venta");
+  if (arts.error) {
+    return checkError("ventas_tipos_sin_clasificar", "switch_facturas", arts.error.message);
+  }
+
+  const rows = [
+    ...(ventas.data ?? []).map((r) => ({ fuente: "ventas", ...r })),
+    ...(arts.data ?? []).map((r) => ({ fuente: "articulo_diario", ...r })),
+  ];
+  const conPlata = rows.filter((r) => Number((r as { filas_con_plata?: unknown }).filas_con_plata) > 0);
+  const count = rows.length;
+  const severity: Severity = conPlata.length > 0 ? "critical" : count > 0 ? "warning" : "ok";
+
+  return {
+    check_name: "ventas_tipos_sin_clasificar",
+    table_name: "switch_facturas",
+    severity,
+    rows_affected: count,
+    threshold_exceeded: count > 0,
+    details: {
+      sample: rows.slice(0, 20),
+      con_plata: conPlata.slice(0, 20),
+      hint: "tipo_comprobante (o `tipo` en switch_articulo_diario) que ninguna vista de ventas sabe contar. En ventas cae al ELSE 0 → la plata desaparece del tablero; en artículos suma sin clasificar → infla costo. Clasificarlo en src/lib/ventas/tipos-comprobante.ts + las vistas, en una migration nueva.",
+      threshold: { warning: "tipo nuevo sin plata", critical: "tipo nuevo con plata" },
+    },
+  };
+}
+
 // CHECK 11: continuidad mensual de switch_facturas (🟡-6). Las vistas de ventas
 // asumen cobertura completa; un empresa-mes faltante se muestra como $0 legítimo,
 // indistinguible de "mes futuro". Marca los huecos INTERIORES por empresa: meses
@@ -341,6 +394,7 @@ export const LIVE_CHECK_NAMES = new Set<string>([
   "prestamos_saldo_anomalo",
   "last_upload_age_cxc",
   "aging_tipos_sin_clasificar",
+  "ventas_tipos_sin_clasificar",
   "switch_facturas_continuidad",
   "aging_dias_anomalo",
 ]);
@@ -354,6 +408,7 @@ export async function runAllChecks(): Promise<CheckResult[]> {
     checkPrestamosSaldoAnomalo(),
     checkLastUploadAge(),
     checkAgingTiposSinClasificar(),
+    checkVentasTiposSinClasificar(),
     checkSwitchFacturasContinuidad(),
     checkAgingDiasAnomalo(),
   ]);
