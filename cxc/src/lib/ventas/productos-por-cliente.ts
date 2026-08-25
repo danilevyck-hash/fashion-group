@@ -94,9 +94,15 @@ export interface DejadoDeComprar {
  *
  * 🩸 UN CÓDIGO PUEDE VIVIR BAJO DOS GRAFÍAS (el hallazgo del #591:
  * `Women-Small Leather Goods` y `Women-Small Leather`). Acá gana la MÁS
- * RECIENTE, que es una regla y no un empate resuelto al azar. El solape se
- * sigue DICIENDO donde ya se decía: el aviso ámbar del desplegable, que este
- * módulo no toca.
+ * RECIENTE, que es una regla y no un empate resuelto al azar — y es LA MISMA
+ * regla con la que la tabla de arriba junta el producto en un solo renglón
+ * (`switch_top_descripciones_reciente`). Las filas se toman de una lectura sin
+ * filtro de fecha, así que "más reciente" acá significa lo mismo que allá: el
+ * nombre que el código tiene HOY, no el que tuvo dentro de la ventana.
+ *
+ * El solape se sigue DICIENDO, pero ya no acá: lo dice la fila de la tabla,
+ * cuando las dos grafías son categorías reales del catálogo aprobado
+ * (`avisosDeClasificacion`).
  */
 export function mapaCodigoDescripcion(
   filas: readonly { codigo: string | null; descripcion: string | null; fecha: string | null }[],

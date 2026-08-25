@@ -136,6 +136,44 @@ describe("la identidad es el CÓDIGO", () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL FILTRO POR CLIENTE TIENE QUE NOMBRAR AL PRODUCTO IGUAL QUE LA TABLA.
+//
+// El filtro (#595) arma su matriz cliente × descripción con su propio mapa
+// `código → descripción`. Si ese mapa usara otra regla —la más reciente DE LA
+// VENTANA en vez de la de siempre— en «Año pasado» la tabla diría
+// `Agua Dana 600 Ml 20 Und` y el filtro `Agua Dana 600 ml 20 Und `: dos textos
+// para el mismo producto, y el filtro no caería sobre las filas que dice
+// filtrar. Los 137 casos medidos saldrían como "dejó de comprar" sin que nadie
+// hubiera dejado nada.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 la matriz por cliente nombra al producto con la MISMA regla", () => {
+  const RUTA_CLIENTE = path.join(RAIZ, "supabase/migrations/20260826120000_switch_productos_por_cliente.sql");
+  const SQL_CLIENTE = readFileSync(RUTA_CLIENTE, "utf8").replace(/--[^\n]*/g, "");
+
+  it("su mapa código→descripción NO se acota al período", () => {
+    const mapa = SQL_CLIENTE.slice(SQL_CLIENTE.indexOf("WITH mapa AS"), SQL_CLIENTE.indexOf("base AS"));
+    expect(mapa).not.toContain("p_desde");
+    expect(mapa).not.toContain("p_hasta");
+  });
+
+  it("y desempata por id::text, igual que el nivel 1", () => {
+    const mapa = SQL_CLIENTE.slice(SQL_CLIENTE.indexOf("WITH mapa AS"), SQL_CLIENTE.indexOf("base AS"));
+    expect(mapa).toMatch(/ORDER BY d\.codigo, d\.fecha DESC, d\.id::text ASC/);
+  });
+
+  it("el camino SIN la RPC tampoco filtra por fecha ese mapa", () => {
+    const srv = readFileSync(path.join(RAIZ, "src/lib/ventas/productos-por-cliente-server.ts"), "utf8");
+    const i = srv.indexOf("async function leerMapa");
+    const j = srv.indexOf("mapaCodigoDescripcion(filas)", i);
+    expect(i).toBeGreaterThan(-1);
+    expect(j).toBeGreaterThan(i);
+    const cuerpoLeerMapa = srv.slice(i, j).replace(/\/\/[^\n]*/g, "");
+    expect(cuerpoLeerMapa).not.toContain('.gte("fecha"');
+    expect(cuerpoLeerMapa).not.toContain('.lte("fecha"');
+  });
+});
+
 describe("las fechas se filtran sargables (nunca EXTRACT)", () => {
   it("BETWEEN contra la columna pelada", () => {
     expect(SQL).toMatch(/d\.fecha BETWEEN p_desde AND p_hasta/);

@@ -21,8 +21,11 @@ COD="src/app/api/ventas/productos/codigos/route.ts"
 VISTA="src/components/ventas/ProductosView.tsx"
 SQL="supabase/migrations/20260825160000_productos_descripcion_reciente.sql"
 VER="src/lib/ventas/rpc-version.ts"
-ARCHIVOS=("$CLAS" "$RUTA" "$COD" "$VISTA" "$SQL" "$VER")
+SQLCLI="supabase/migrations/20260826120000_switch_productos_por_cliente.sql"
+SRVCLI="src/lib/ventas/productos-por-cliente-server.ts"
+ARCHIVOS=("$CLAS" "$RUTA" "$COD" "$VISTA" "$SQL" "$VER" "$SQLCLI" "$SRVCLI")
 TESTS=(
+  "src/__tests__/components/ventas-productos-filtro-cliente.test.tsx"
   "src/__tests__/lib/ventas-productos-clasificacion.test.ts"
   "src/__tests__/lib/ventas-productos-sql-reciente.test.ts"
   "src/__tests__/api/ventas-productos-descripcion-reciente.test.ts"
@@ -187,12 +190,30 @@ perl -0pi -e 's/filas\.filter\(d => d\.activa !== false\)/filas/' "$CLAS"
 probar "una descripción desactivada cuenta como categoría real" "$CLAS"
 
 # 21 · el aviso se pone ROJO (dice que se rompió algo, y no se rompió nada)
-perl -0pi -e 's/className="mt-0\.5 text-xs text-amber-700"/className="mt-0.5 text-xs text-red-600"/' "$VISTA"
+perl -0pi -e 's/text-xs text-amber-700 \[overflow-wrap:anywhere\]/text-xs text-red-600 [overflow-wrap:anywhere]/' "$VISTA"
 probar "el aviso se pone rojo" "$VISTA"
 
 # 22 · el aviso vuelca la lista entera en vez de contarla
 perl -0pi -e 's/\{aviso\.length > 1 \? ` \(\+\$\{aviso\.length - 1\}\)` : ""\}/{aviso.map(a => ` ${a.codigo}`).join("")}/' "$VISTA"
 probar "el aviso vuelca todos los códigos en vez de contarlos" "$VISTA"
+
+# ── 6. QUE EL FILTRO POR CLIENTE NOMBRE AL PRODUCTO DE OTRA MANERA ─────────
+
+# 23 · la matriz del filtro vuelve a mirar sólo la ventana
+perl -0pi -e 's/(WITH mapa AS(?:.|\n)*?AND d\.descripcion IS NOT NULL)/${1}\n      AND d.fecha BETWEEN p_desde AND p_hasta/' "$SQLCLI"
+probar "la matriz por cliente se acota al período (nombra distinto que la tabla)" "$SQLCLI"
+
+# 24 · y pierde el desempate
+perl -0pi -e 's/ORDER BY d\.codigo, d\.fecha DESC, d\.id::text ASC/ORDER BY d.codigo, d.fecha DESC/' "$SQLCLI"
+probar "la matriz por cliente desempata al azar" "$SQLCLI"
+
+# 25 · el camino sin RPC del filtro vuelve a filtrar por fecha
+perl -0pi -e 's/          \.eq\("empresa_key", empresa\);/          .eq("empresa_key", empresa).gte("fecha", desde).lte("fecha", hasta);/' "$SRVCLI"
+probar "el camino sin RPC del filtro se acota al período" "$SRVCLI"
+
+# 26 · el aviso se pierde al poner un cliente
+perl -0pi -e 's/              <AvisoClasificacionLinea aviso=\{p\.aviso\} \/>/              {false \&\& <AvisoClasificacionLinea aviso={p.aviso} \/>}/' "$VISTA"
+probar "el aviso desaparece de la fila (también con el filtro puesto)" "$VISTA"
 
 echo
 echo "cazadas: $cazadas · sobrevividas: $sobrevividas"
