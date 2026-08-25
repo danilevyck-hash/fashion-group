@@ -291,6 +291,29 @@ describe("🔴 el directorio de clientes de Switch lo pide UNA sola pieza", () =
     expect(pideElDirectorioDeSwitch(readFileSync(join(SRC, PICKER_SWITCH), "utf8"))).toBe(true);
   });
 
+  it("🔑 el filtro por cliente de Ventas › Productos es un FILTRO, y por eso NO entra acá", () => {
+    // 26-ago-2026. Ventas › Productos estrenó un desplegable «Cliente: todos»
+    // que acota la tabla. NO es un segundo selector, y la diferencia la fija
+    // este mismo archivo más arriba: *"«Elegir» no es «buscar»: un buscador que
+    // solo FILTRA una lista que ya está en pantalla no ata a nadie a ningún
+    // registro"*. Sus opciones no salen de ninguna búsqueda: son los clientes
+    // que YA vinieron en la respuesta de ese período, y elegir uno no guarda
+    // nada en ningún registro.
+    //
+    // Por eso NO está en PERMITIDOS —una excepción para algo que no es un
+    // hallazgo quedaría zombi y rompería el test de más abajo—, y por eso se
+    // afirma acá con todas las letras: el día que alguien le meta una búsqueda
+    // contra el directorio o un `<input>` de cliente, este test lo dice con el
+    // motivo escrito, en vez de que el barrido lo tire con un nombre de archivo.
+    const rel = "components/ventas/ProductosView.tsx";
+    const fuente = readFileSync(join(SRC, rel), "utf8");
+    expect(motivosDeSelectorDeCliente(fuente)).toEqual([]);
+    expect(pideElDirectorioDeSwitch(fuente)).toBe(false);
+    // Y que el archivo siga siendo el que dibuja el filtro (si no, esto no
+    // está mirando nada).
+    expect(sinComentarios(fuente)).toContain("data-filtro-cliente");
+  });
+
   it("⛔ la ruta paralela `/api/catalogo/switch-clientes` no vuelve", () => {
     // Era la fuente propia del checkout sobre el MISMO universo. Dos puertas al
     // mismo directorio es lo que deja que los dos controles se separen.
