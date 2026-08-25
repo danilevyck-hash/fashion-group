@@ -7,6 +7,7 @@ import {
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
+import { nombreDespachadoPor } from "@/lib/guias/despachado-por";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import type { Guia } from "./types";
 
@@ -94,7 +95,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
           <div className="flex gap-2">
             <span className="font-medium">DESPACHADO POR:</span>
             <span className="border-b border-gray-300 flex-1 text-center">
-              {g.entregado_por || "\u00A0"}
+              {nombreDespachadoPor(g.entregado_por) || "\u00A0"}
             </span>
           </div>
           <div className="flex gap-2">
@@ -179,9 +180,9 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
             <div className="mb-4">
               NOMBRE:{" "}
               <span className="ml-1 font-medium">
-                {isDirect ? (g.nombre_chofer || "") : (g.entregado_por || "")}
+                {isDirect ? (g.nombre_chofer || "") : nombreDespachadoPor(g.entregado_por)}
               </span>
-              {!(isDirect ? g.nombre_chofer : g.entregado_por) && (
+              {!(isDirect ? g.nombre_chofer : nombreDespachadoPor(g.entregado_por)) && (
                 <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>
               )}
             </div>

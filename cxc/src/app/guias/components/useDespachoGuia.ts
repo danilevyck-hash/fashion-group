@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Guia, GuiaItem } from "./types";
 import type { TipoDespacho } from "@/lib/guias/falta-para-despachar";
-import { numeroGuiaDeCabecera } from "@/lib/guias/falta-para-despachar";
+import { numeroCabeceraAlDespachar } from "@/lib/guias/falta-para-despachar";
 import { guiaYaDespachada, tipoDespachoEfectivo } from "@/lib/guias/modo-despacho";
 import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 
@@ -101,10 +101,24 @@ export function useDespachoGuia(id: string | null) {
       setGuia(g);
 
       const items = g.guia_items || [];
-      const cabecera = g.numero_guia_transp || "";
-      // Cada línea arranca con SU número; las guías viejas no lo tienen y
-      // heredan el único de la cabecera, que es lo que se imprimía en todas.
-      const desdeServidor = items.map((it) => it.numero_guia_transp || cabecera || "");
+      // 🔴 CADA LÍNEA ARRANCA CON **SU** NÚMERO, Y CON NADA MÁS.
+      //
+      // 🩸 Acá decía `it.numero_guia_transp || cabecera || ""`, o sea que el
+      // número que la secretaria escribe UNA vez al crear la guía se copiaba
+      // SOLO a los 7 envíos: bodega abría la guía y los encontraba todos
+      // llenos con el mismo, y tenía que borrarlos y corregirlos uno por uno
+      // o el papel salía mal. Es exactamente lo contrario de lo que se
+      // decidió el 10-ago-2026 — Daniel: *"la info de guia de transp, debe de
+      // ser por linea, no por guia porque nos hacen varias guias el
+      // transportista por guia"*.
+      //
+      // ⚠️ LA HERENCIA NO SE FUE: sigue viva donde siempre estuvo, que es al
+      // IMPRIMIR y al MOSTRAR una guía vieja (`numeroTranspDeLinea` /
+      // `numeroTranspImpreso`). Una guía histórica sale en el papel igual que
+      // siempre. Lo que se quitó es prellenar un campo EDITABLE con un valor
+      // que después se ESCRIBE en las 7 líneas como si alguien lo hubiera
+      // puesto ahí.
+      const desdeServidor = items.map((it) => it.numero_guia_transp || "");
 
       const yaSalio = guiaYaDespachada(g.estado);
       setDespachada(yaSalio);
@@ -327,7 +341,13 @@ export function useDespachoGuia(id: string | null) {
       payload.items_guia_transp = porLinea;
       // La columna de la guía NO se retira: la usan el buscador, el Excel y el
       // encabezado del papel. Se llena con el primer número que haya.
-      payload.numero_guia_transp = numeroGuiaDeCabecera(numerosTransp);
+      //
+      // 🔴 Y SI NINGUNA LÍNEA TRAE NÚMERO, SE CONSERVA EL QUE YA TENÍA. Desde
+      // que las líneas dejaron de nacer con el de la cabecera, lo normal es
+      // despachar con las 7 vacías —*"a veces el transportista lo da, a veces
+      // no"*—, y sin esto el número que la secretaria escribió al crear la
+      // guía se borraría en ese mismo momento, sin que nadie lo pidiera.
+      payload.numero_guia_transp = numeroCabeceraAlDespachar(numerosTransp, guia.numero_guia_transp);
     } else {
       // 🔴 EN ENTREGA DIRECTA NO HAY TRANSPORTISTA: es nuestro propio camión.
       // La placa y el N° del transportista no se piden en pantalla, así que

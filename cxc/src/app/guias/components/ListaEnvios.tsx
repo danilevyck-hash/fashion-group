@@ -314,6 +314,17 @@ export default function ListaEnvios({
           El transportista arma varias guías suyas por cada guía nuestra. Anota en
           cada envío el número que te dio — si no te dio ninguno, la guía se
           despacha igual y queda marcada.
+          {/* 🔴 El número que se escribió al crear la guía SE DICE, no se
+              copia. Antes se prellenaban las 7 cajas con él y bodega las
+              encontraba todas iguales; escondido del todo, en cambio, quien
+              despacha no sabría que ya hay uno anotado para toda la guía. */}
+          {String(numeroGuiaCabecera ?? "").trim() ? (
+            <>
+              {" "}Al crear la guía se anotó{" "}
+              <span className="font-medium text-gray-700">{String(numeroGuiaCabecera).trim()}</span>{" "}
+              para toda la guía: si el transportista dio uno por envío, escríbelo acá.
+            </>
+          ) : null}
         </p>
       )}
       <ul className="divide-y divide-gray-100">

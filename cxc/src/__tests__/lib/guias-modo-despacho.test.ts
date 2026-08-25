@@ -267,6 +267,13 @@ describe("🔴 en entrega directa no se ESCRIBE placa ni N° de transportista", 
   it("⚠️ con transportista externo se sigue mandando todo lo de siempre", () => {
     expect(hook).toContain("payload.placa = bPlaca");
     expect(hook).toContain("payload.items_guia_transp = porLinea");
-    expect(hook).toContain("payload.numero_guia_transp = numeroGuiaDeCabecera(numerosTransp)");
+    // ⚠️ CANDADO QUE CAMBIÓ DE DIRECCIÓN (25-ago-2026). Antes fijaba
+    // `numeroGuiaDeCabecera(numerosTransp)` a secas — correcto mientras las
+    // cajas por línea nacían prellenadas con el número de la cabecera. Desde
+    // que nacen VACÍAS, esa expresión ESCRIBE "" y borra el número que la
+    // secretaria anotó al crear la guía. Lo que este candado siempre quiso
+    // decir es que la cabecera se manda (no se omite), y eso sigue en pie.
+    expect(hook).toContain("payload.numero_guia_transp = numeroCabeceraAlDespachar(");
+    expect(hook).not.toContain("payload.numero_guia_transp = numeroGuiaDeCabecera(numerosTransp)");
   });
 });

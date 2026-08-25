@@ -8,6 +8,9 @@
 
 import { ALL_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
 import { unirEnHumano } from "@/lib/guias/falta-para-despachar";
+// 🔑 El centinela de «Otro…» vive en `lib/` porque los DOS papeles lo
+// necesitan: acá se REUSA, no se redefine.
+import { entregadoPorElegido } from "@/lib/guias/despachado-por";
 import type { GuiaItem, ModoEntrega } from "./types";
 
 /**
@@ -105,7 +108,9 @@ export function validarGuia(estado: EstadoGuia): Set<string> {
   const errores = new Set<string>();
   if (!estado.fecha) errores.add("fecha");
   if (estado.modoEntrega === "transportista" && !estado.transportistaId) errores.add("transportista");
-  if (!estado.entregadoPor) errores.add("entregadoPor");
+  // 🔴 `__other__` NO es un nombre: es el centinela de "Otro…". Sin esto se
+  // guardaba tal cual y se IMPRIMÍA en el papel que alguien firma.
+  if (!entregadoPorElegido(estado.entregadoPor)) errores.add("entregadoPor");
 
   if (filasConDatos(estado.items).length === 0) errores.add("items-empty");
 

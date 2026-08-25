@@ -14,6 +14,7 @@ import {
   type ReportColumn,
 } from "@/lib/excel-export";
 import XLSX from "xlsx-js-style";
+import { numerosTranspDeLaGuia } from "@/lib/guias/modo-despacho";
 import type { Guia, GuiaItem } from "./types";
 
 function fmtGuia(n: number) {
@@ -71,7 +72,13 @@ export function buildGuiasSheet(guias: Guia[], subtitle?: string): XLSX.WorkShee
       { v: facturasSummary(items), sz: 9, fg: "666666" },
       g.total_bultos || 0,
       { v: g.estado || "", sz: 9, fg: estadoColor(g.estado) },
-      { v: g.numero_guia_transp || "—", sz: 9, fg: "555555" },
+      // 🔴 LOS N° DE LAS LÍNEAS, no el de la cabecera. Es el reporte que sirve
+      // para reclamarle al transportista, y desde el 18-ago-2026 el número se
+      // puede anotar tarde: eso escribe UNA columna de UNA línea y NO toca la
+      // cabecera, así que mirando solo `g.numero_guia_transp` esta celda decía
+      // "—" en guías que sí lo tenían cargado. Con varios distintos se listan
+      // todos: poner uno solo sería elegir por el lector.
+      { v: numerosTranspDeLaGuia(g).join(", ") || "—", sz: 9, fg: "555555" },
     ];
   });
 
