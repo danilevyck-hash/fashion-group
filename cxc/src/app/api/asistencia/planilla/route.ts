@@ -29,6 +29,7 @@ import {
   vigenciasDeFilas,
   servicioProfesionalDeFila,
   pagaSegurosDeFila,
+  leerJustificaciones,
 } from "@/lib/asistencia/config-server";
 import { avisoMigracionServicioProfesional } from "@/lib/asistencia/participacion";
 import {
@@ -171,11 +172,10 @@ export async function GET(req: NextRequest) {
       supabaseServer
         .from("asistencia_horarios")
         .select("empleado_codigo, entrada, salida, almuerzo_minutos"),
-      supabaseServer
-        .from("asistencia_justificaciones")
-        .select("empleado_codigo, desde, hasta, motivo")
-        .lte("desde", q.hasta)
-        .gte("hasta", q.desde),
+      // 🔑 Por la fuente ÚNICA, no con un `select` copiado. Ver la nota de
+      // `leerJustificaciones`: leer distinto acá que en el reporte es la
+      // diferencia entre «el día entero» y «un permiso de dos horas».
+      leerJustificaciones(q.desde, q.hasta),
       supabaseServer
         .from("asistencia_feriados")
         .select("fecha, nombre")
@@ -183,7 +183,6 @@ export async function GET(req: NextRequest) {
         .lte("fecha", q.hasta),
     ]);
     if (hRes.error) throw new Error(hRes.error.message);
-    if (jRes.error) throw new Error(jRes.error.message);
     if (fRes.error) throw new Error(fRes.error.message);
 
     const horarios = (hRes.data ?? []).map((h) => ({
@@ -253,7 +252,7 @@ export async function GET(req: NextRequest) {
     const personas = armarReporte({
       marcaciones: efectivas.marcaciones,
       horarios,
-      justificaciones: (jRes.data ?? []) as Justificacion[],
+      justificaciones: jRes.filas,
       feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
       desde: q.desde,
       hasta: q.hasta,
@@ -310,7 +309,7 @@ export async function GET(req: NextRequest) {
     // ⚠️ `armarPlanilla` solo mira este mapa cuando la persona no tiene UNA sola
     // marca en el período: quien se tomó dos días y trabajó trece cobra normal.
     const justificados = new Map<string, string>();
-    for (const j of (jRes.data ?? []) as Justificacion[]) {
+    for (const j of jRes.filas) {
       const codigo = String(j.empleado_codigo);
       const texto = textoJustificacion(String(j.motivo), String(j.desde), String(j.hasta));
       const previo = justificados.get(codigo);

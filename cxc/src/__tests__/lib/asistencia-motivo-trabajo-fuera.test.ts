@@ -25,7 +25,8 @@
 import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx-js-style";
 import {
-  MOTIVOS_JUSTIFICACION, MOTIVO_TRABAJO_FUERA, esTrabajoFuera, textoDiaJustificado,
+  MOTIVOS_JUSTIFICACION, MOTIVOS_RETIRADOS, MOTIVO_TRABAJO_VENDEDOR,
+  MOTIVO_TRABAJO_FUERA_ANTES, esTrabajoDeVendedor, textoDiaJustificado,
 } from "@/lib/asistencia/motivos";
 import {
   armarReporte, type Marcacion, type HorarioPersona, type Justificacion,
@@ -99,7 +100,7 @@ const lineaDe = (justis: Justificacion[]) => planilla(justis).find((l) => l.codi
 describe("🔴 EL PAGO — el motivo nuevo tiene que pagar EXACTAMENTE igual que uno de hoy", () => {
   it("«Vacaciones» y «Trabajo fuera de la oficina» dan el MISMO dinero, campo por campo", () => {
     const vac = lineaDe(conMotivo("Vacaciones"));
-    const fuera = lineaDe(conMotivo(MOTIVO_TRABAJO_FUERA));
+    const fuera = lineaDe(conMotivo(MOTIVO_TRABAJO_VENDEDOR));
 
     expect(vac.dinero).not.toBeNull();
     expect(fuera.dinero).not.toBeNull();
@@ -112,7 +113,7 @@ describe("🔴 EL PAGO — el motivo nuevo tiene que pagar EXACTAMENTE igual que
   });
 
   it("los otros tres motivos también pagan igual — la paridad no es solo con vacaciones", () => {
-    const fuera = lineaDe(conMotivo(MOTIVO_TRABAJO_FUERA));
+    const fuera = lineaDe(conMotivo(MOTIVO_TRABAJO_VENDEDOR));
     for (const m of ["Incapacidad", "Permiso", "Luto", "Otro"]) {
       expect(lineaDe(conMotivo(m)).dinero).toEqual(fuera.dinero);
     }
@@ -120,7 +121,7 @@ describe("🔴 EL PAGO — el motivo nuevo tiene que pagar EXACTAMENTE igual que
 
   it("NO SE DESCUENTA: el día justificado deja de valer una ausencia, y se nota en el neto", () => {
     const sin = lineaDe([]);
-    const fuera = lineaDe(conMotivo(MOTIVO_TRABAJO_FUERA));
+    const fuera = lineaDe(conMotivo(MOTIVO_TRABAJO_VENDEDOR));
 
     // Sin justificación, ese día se descuenta como ausencia.
     expect(sin.horas.ausenciaMin).toBeGreaterThan(0);
@@ -154,7 +155,7 @@ describe("🔴 EL PAGO — el motivo nuevo tiene que pagar EXACTAMENTE igual que
     });
 
     const antes = arma([]).find((l) => l.codigo === otroCodigo)!;
-    const despues = arma(conMotivo(MOTIVO_TRABAJO_FUERA)).find((l) => l.codigo === otroCodigo)!;
+    const despues = arma(conMotivo(MOTIVO_TRABAJO_VENDEDOR)).find((l) => l.codigo === otroCodigo)!;
     expect(despues.dinero).toEqual(antes.dinero);
     expect(despues.horas).toEqual(antes.horas);
   });
@@ -163,10 +164,10 @@ describe("🔴 EL PAGO — el motivo nuevo tiene que pagar EXACTAMENTE igual que
 // ═════════════════════════════════════════════════════════════════════════════
 describe("⚠️ CERO HORAS EXTRA — sin marcas no hay horas que medir", () => {
   it("un día de trabajo fuera no inventa 8 horas ni genera un minuto de extra", () => {
-    const p = reporte(conMotivo(MOTIVO_TRABAJO_FUERA)).find((x) => x.codigo === CODIGO)!;
+    const p = reporte(conMotivo(MOTIVO_TRABAJO_VENDEDOR)).find((x) => x.codigo === CODIGO)!;
     const d = p.dias.find((x) => x.fecha === DIA_SIN_MARCAS)!;
 
-    expect(d.justificado).toBe(MOTIVO_TRABAJO_FUERA);
+    expect(d.justificado).toBe(MOTIVO_TRABAJO_VENDEDOR);
     expect(d.ausente).toBe(false);
     expect(d.marcas).toEqual([]);
     expect(d.trabajadoMin).toBe(0);
@@ -186,12 +187,12 @@ describe("⚠️ CERO HORAS EXTRA — sin marcas no hay horas que medir", () => 
     }).find((x) => x.codigo === CODIGO)!;
 
     expect(arma([]).resumen.extraMin).toBeGreaterThan(0);
-    expect(arma(conMotivo(MOTIVO_TRABAJO_FUERA)).resumen.extraMin)
+    expect(arma(conMotivo(MOTIVO_TRABAJO_VENDEDOR)).resumen.extraMin)
       .toBe(arma([]).resumen.extraMin);
   });
 
   it("la planilla tampoco le suma extras, domingos ni feriados por estar afuera", () => {
-    const l = lineaDe(conMotivo(MOTIVO_TRABAJO_FUERA));
+    const l = lineaDe(conMotivo(MOTIVO_TRABAJO_VENDEDOR));
     expect(l.horas.extraDiurnoMin).toBe(0);
     expect(l.horas.extraNocturnoMin).toBe(0);
     expect(l.horas.domingoMin).toBe(0);
@@ -204,7 +205,7 @@ describe("⚠️ CERO HORAS EXTRA — sin marcas no hay horas que medir", () => 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("🔴 EL REPORTE LOS DISTINGUE — es el punto de haber agregado el motivo", () => {
   it("un día de trabajo fuera NO se cuenta como ausencia justificada", () => {
-    const fuera = reporte(conMotivo(MOTIVO_TRABAJO_FUERA)).find((x) => x.codigo === CODIGO)!.resumen;
+    const fuera = reporte(conMotivo(MOTIVO_TRABAJO_VENDEDOR)).find((x) => x.codigo === CODIGO)!.resumen;
     expect(fuera.ausenciasJustificadas).toBe(0);
     expect(fuera.diasTrabajandoFuera).toBe(1);
     expect(fuera.ausenciasSinJustificar).toBe(1); // el viernes, que sigue sin justificar
@@ -218,7 +219,7 @@ describe("🔴 EL REPORTE LOS DISTINGUE — es el punto de haber agregado el mot
 
   it("los dos conjuntos son DISJUNTOS: ningún día se cuenta dos veces", () => {
     const justis: Justificacion[] = [
-      { empleado_codigo: CODIGO, desde: DIA_SIN_MARCAS, hasta: DIA_SIN_MARCAS, motivo: MOTIVO_TRABAJO_FUERA },
+      { empleado_codigo: CODIGO, desde: DIA_SIN_MARCAS, hasta: DIA_SIN_MARCAS, motivo: MOTIVO_TRABAJO_VENDEDOR },
       { empleado_codigo: CODIGO, desde: "2026-08-07", hasta: "2026-08-07", motivo: "Vacaciones" },
     ];
     const r = reporte(justis).find((x) => x.codigo === CODIGO)!.resumen;
@@ -228,9 +229,9 @@ describe("🔴 EL REPORTE LOS DISTINGUE — es el punto de haber agregado el mot
   });
 
   it("el renglón NO puede decir «ausencia» cuando la persona estuvo trabajando", () => {
-    const t = textoDiaJustificado(MOTIVO_TRABAJO_FUERA);
+    const t = textoDiaJustificado(MOTIVO_TRABAJO_VENDEDOR);
     expect(t.toLowerCase()).not.toContain("ausen");
-    expect(t).toBe("Trabajando fuera de la oficina");
+    expect(t).toBe("Trabajando fuera de la oficina (vendedor)");
   });
 
   it("los otros motivos SÍ siguen diciendo que fue una ausencia justificada", () => {
@@ -242,26 +243,48 @@ describe("🔴 EL REPORTE LOS DISTINGUE — es el punto de haber agregado el mot
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("El motivo, la lista y el reconocedor", () => {
-  it("está en la lista que ofrece la pantalla, y «Otro» sigue siendo el último", () => {
-    expect(MOTIVOS_JUSTIFICACION).toContain(MOTIVO_TRABAJO_FUERA);
-    expect(MOTIVOS_JUSTIFICACION[MOTIVOS_JUSTIFICACION.length - 1]).toBe("Otro");
-    // Los cinco de siempre no se perdieron por el camino.
-    for (const m of ["Vacaciones", "Incapacidad", "Permiso", "Luto", "Otro"]) {
-      expect(MOTIVOS_JUSTIFICACION).toContain(m);
+  // ⚠️ 25-ago-2026: Daniel cambió la lista. Son CUATRO —Incapacidad,
+  // Catástrofe, Escolares y Trabajo de vendedor— y se fueron «Vacaciones»
+  // (a su propia pestaña), «Permiso», «Luto» y «Otro».
+  it("la lista que ofrece la pantalla son EXACTAMENTE los cuatro de Daniel", () => {
+    expect([...MOTIVOS_JUSTIFICACION]).toEqual([
+      "Incapacidad", "Catástrofe", "Escolares", MOTIVO_TRABAJO_VENDEDOR,
+    ]);
+  });
+
+  it("🔴 los retirados NO se ofrecen pero SIGUEN reconociéndose", () => {
+    // 🩸 Hay 5 justificaciones vivas en producción y una es de ELOYN MENDOZA
+    // con «Vacaciones» (16-jul → 13-ago). Si el módulo dejara de reconocer el
+    // motivo, su fila se volvería una ausencia sin justificar y le costaría la
+    // quincena. Sacarlo de la lista OFRECIDA no borra la fila.
+    for (const m of ["Vacaciones", "Permiso", "Luto", "Otro", MOTIVO_TRABAJO_FUERA_ANTES]) {
+      expect(MOTIVOS_JUSTIFICACION as readonly string[]).not.toContain(m);
+      expect(MOTIVOS_RETIRADOS as readonly string[]).toContain(m);
     }
   });
 
+  it("🔴 EL NOMBRE VIEJO SIGUE VALIENDO — es la fila de Rodrigo en producción", () => {
+    // Su justificación (código 13, 1 al 13 de agosto) dice «Trabajo fuera de la
+    // oficina» y nadie la va a reescribir. Un `===` contra el nombre nuevo la
+    // habría convertido en una ausencia común el día del merge.
+    expect(esTrabajoDeVendedor(MOTIVO_TRABAJO_FUERA_ANTES)).toBe(true);
+    expect(esTrabajoDeVendedor(MOTIVO_TRABAJO_VENDEDOR)).toBe(true);
+    expect(textoDiaJustificado(MOTIVO_TRABAJO_FUERA_ANTES))
+      .toBe(textoDiaJustificado(MOTIVO_TRABAJO_VENDEDOR));
+  });
+
   it("se reconoce por IGUALDAD, no por parecido: un motivo escrito a mano no cuenta", () => {
-    expect(esTrabajoFuera(MOTIVO_TRABAJO_FUERA)).toBe(true);
-    expect(esTrabajoFuera(`  ${MOTIVO_TRABAJO_FUERA}  `)).toBe(true); // espacios de más
+    expect(esTrabajoDeVendedor(MOTIVO_TRABAJO_VENDEDOR)).toBe(true);
+    expect(esTrabajoDeVendedor(`  ${MOTIVO_TRABAJO_VENDEDOR}  `)).toBe(true); // espacios de más
     for (const casi of [
       "Permiso para trabajar afuera",
       "Trabajo fuera",
-      "trabajo fuera de la oficina",   // otra caja: NO es el valor guardado
+      "trabajo de vendedor",           // otra caja: NO es el valor guardado
       "Trabajo fuera de la empresa",
+      "Vendedor",
       "Vacaciones", "", null, undefined,
     ]) {
-      expect(esTrabajoFuera(casi as string)).toBe(false);
+      expect(esTrabajoDeVendedor(casi as string)).toBe(false);
     }
   });
 });
@@ -275,11 +298,11 @@ describe("El EXCEL dice lo mismo que la pantalla", () => {
     XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[hoja], { header: 1 }) as unknown[][];
 
   it("la hoja Detalle dice «Trabajando fuera de la oficina», no «Ausencia»", () => {
-    const f = filas(excel(conMotivo(MOTIVO_TRABAJO_FUERA)), "Detalle");
+    const f = filas(excel(conMotivo(MOTIVO_TRABAJO_VENDEDOR)), "Detalle");
     const col = (f[0] as string[]).indexOf("Ausencia / justificación");
     expect(col).toBeGreaterThan(-1);
     const celdas = f.slice(1).map((r) => String(r[col] ?? ""));
-    expect(celdas).toContain("Trabajando fuera de la oficina");
+    expect(celdas).toContain("Trabajando fuera de la oficina (vendedor)");
     for (const c of celdas) expect(c.toLowerCase()).not.toContain("justificada — trabajo");
   });
 
@@ -290,7 +313,7 @@ describe("El EXCEL dice lo mismo que la pantalla", () => {
   });
 
   it("el Resumen trae la columna propia, y NO suma el día a las ausencias justificadas", () => {
-    const f = filas(excel(conMotivo(MOTIVO_TRABAJO_FUERA)), "Resumen");
+    const f = filas(excel(conMotivo(MOTIVO_TRABAJO_VENDEDOR)), "Resumen");
     const head = f[0] as string[];
     const cFuera = head.indexOf("Días trabajando fuera");
     const cAusJ = head.indexOf("Ausencias justificadas");
@@ -316,7 +339,7 @@ describe("El EXCEL dice lo mismo que la pantalla", () => {
       { empleado_codigo: CODIGO, empleado_nombre: null, ocurrio_en: enPanama("2026-08-03", "17:00") },
     ];
     const personas = armarReporte({
-      marcaciones: marcs, horarios, justificaciones: conMotivo(MOTIVO_TRABAJO_FUERA),
+      marcaciones: marcs, horarios, justificaciones: conMotivo(MOTIVO_TRABAJO_VENDEDOR),
       feriados: new Map(), desde: DESDE, hasta: HASTA, reglas: R,
       nombres: new Map([[CODIGO, "RODRIGO MIRANDA"]]), incluirNoHabiles: true,
     });
@@ -338,7 +361,7 @@ describe("El EXCEL dice lo mismo que la pantalla", () => {
   it("el TOTAL del pie tiene tantas celdas como columnas el encabezado", () => {
     // Si el total se desalinea, cada número queda debajo de la columna de al
     // lado: el peor error posible en la hoja que se mira.
-    const f = filas(excel(conMotivo(MOTIVO_TRABAJO_FUERA)), "Resumen");
+    const f = filas(excel(conMotivo(MOTIVO_TRABAJO_VENDEDOR)), "Resumen");
     const total = f[f.length - 1] as unknown[];
     expect(String(total[0])).toBe("TOTAL");
     expect(total.length).toBe((f[0] as unknown[]).length);
@@ -355,14 +378,14 @@ describe("El EXCEL dice lo mismo que la pantalla", () => {
           .output("arraybuffer") as ArrayBuffer,
       ).toString("latin1");
 
-    expect(texto(conMotivo(MOTIVO_TRABAJO_FUERA))).toContain("trabajo fuera de la oficina");
+    expect(texto(conMotivo(MOTIVO_TRABAJO_VENDEDOR))).toContain("trabajo fuera de la oficina");
     // Y sin días de trabajo fuera, la línea NO aparece: no es un texto fijo.
     expect(texto([])).not.toContain("trabajo fuera de la oficina");
   });
 
   it("la hoja «Cómo se calcula» explica que NO es una ausencia", () => {
-    const f = filas(excel(conMotivo(MOTIVO_TRABAJO_FUERA)), "Cómo se calcula");
-    const fila = f.find((r) => String(r[0] ?? "") === "Trabajo fuera");
+    const f = filas(excel(conMotivo(MOTIVO_TRABAJO_VENDEDOR)), "Cómo se calcula");
+    const fila = f.find((r) => String(r[0] ?? "") === "Trabajo de vendedor");
     expect(fila).toBeDefined();
     expect(String(fila![1])).toContain("NO es una ausencia");
   });
@@ -393,7 +416,7 @@ describe("Lo que NO cambia", () => {
       jornadaDiariaMin: () => 510, reglas: R, empresa: "vistana",
     }).find((l) => l.codigo === CODIGO)!;
 
-    const fuera = sinMarcas(MOTIVO_TRABAJO_FUERA);
+    const fuera = sinMarcas(MOTIVO_TRABAJO_VENDEDOR);
     const vac = sinMarcas("Vacaciones");
     expect(fuera.faltaConfigurar).toEqual([FALTA.sinMarcaciones]);
     expect(fuera.faltaConfigurar).toEqual(vac.faltaConfigurar);

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { textoPermiso, ventanaDe } from "@/lib/asistencia/permiso-horas";
 
 interface Justificacion {
   id: string;
@@ -19,6 +20,9 @@ interface Justificacion {
   motivo: string;
   nota: string | null;
   registrado_por: string | null;
+  /** Opcionales, y van juntas: con las dos es un PERMISO DE HORAS. */
+  hora_desde?: string | null;
+  hora_hasta?: string | null;
 }
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -38,6 +42,11 @@ export default function JustificacionesTab() {
   const [hasta, setHasta] = useState(hoyPanama());
   const [motivo, setMotivo] = useState("");
   const [nota, setNota] = useState("");
+  // 🔴 El permiso de HORAS. Vacías = el día entero, que es lo de siempre.
+  const [horaDesde, setHoraDesde] = useState("");
+  const [horaHasta, setHoraHasta] = useState("");
+  const [puedeHoras, setPuedeHoras] = useState(true);
+  const [avisoHoras, setAvisoHoras] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
   // 🩸 UN solo pedido, y las personas vienen del DIRECTORIO. Antes esta lista
@@ -51,6 +60,10 @@ export default function JustificacionesTab() {
     setMotivos(dj.motivos ?? []);
     if (dj.motivos?.length && !motivo) setMotivo(dj.motivos[0]);
     setPersonas(dj.personas ?? []);
+    // Sin las columnas corridas, las horas no se ofrecen y se dice de entrada,
+    // no al fallar el guardado.
+    setPuedeHoras(dj.puedeCargarHoras !== false);
+    setAvisoHoras(dj.avisoMigracionHoras ?? null);
   }, [motivo]);
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -66,16 +79,22 @@ export default function JustificacionesTab() {
     if (!codigo) return toast("Elige la persona", "error");
     if (!motivo) return toast("Elige el motivo", "error");
     if (hasta < desde) return toast("La fecha final es anterior a la inicial", "error");
+    // La MISMA función que usa el motor decide si la ventana sirve: una regla
+    // escrita dos veces es una regla que se contradice.
+    const pidioHoras = horaDesde !== "" || horaHasta !== "";
+    if (pidioHoras && !ventanaDe(horaDesde, horaHasta)) {
+      return toast("El permiso necesita las DOS horas, y la de fin tiene que ser posterior", "error");
+    }
     setGuardando(true);
     try {
       const res = await fetch("/api/asistencia/justificaciones", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo, desde, hasta, motivo, nota }),
+        body: JSON.stringify({ codigo, desde, hasta, motivo, nota, horaDesde, horaHasta }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
       toast("Listo, guardado", "success");
-      setNota(""); setCodigo("");
+      setNota(""); setCodigo(""); setHoraDesde(""); setHoraHasta("");
       await cargar();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
@@ -146,6 +165,24 @@ export default function JustificacionesTab() {
             <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Hasta</label>
             <input type="date" value={hasta} min={desde} onChange={(e) => setHasta(e.target.value)} className={campo} />
           </div>
+          {/* 🔴 EL PERMISO DE HORAS. Vacías = el día entero, que es lo de
+              siempre y lo que hace que nada cambie hasta que alguien las use.
+              Van al lado de las fechas porque son la MISMA pregunta —¿cuándo?—
+              y separarlas haría creer que es otra cosa. */}
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
+              Desde qué hora <span className="normal-case text-gray-400">(opcional)</span>
+            </label>
+            <input type="time" value={horaDesde} disabled={!puedeHoras} className={`${campo} disabled:opacity-40`}
+              onChange={(e) => setHoraDesde(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
+              Hasta qué hora <span className="normal-case text-gray-400">(opcional)</span>
+            </label>
+            <input type="time" value={horaHasta} disabled={!puedeHoras} className={`${campo} disabled:opacity-40`}
+              onChange={(e) => setHoraHasta(e.target.value)} />
+          </div>
         </div>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <div className="min-w-[200px] flex-1">
@@ -162,6 +199,24 @@ export default function JustificacionesTab() {
           <p className="mt-2 text-[12px] text-gray-500">
             Cubre <b>del {bonito(desde)} al {bonito(hasta)}</b> — se guarda como una sola.
           </p>
+        )}
+        {/* 🔴 LA REGLA SE DICE ANTES DE GUARDAR, no después. La diferencia
+            entre «el día entero» y «un permiso de dos horas» es ocho horas de
+            sueldo, y no se puede dejar que alguien la descubra el día de pago. */}
+        {ventanaDe(horaDesde, horaHasta) ? (
+          <p className="mt-2 rounded bg-blue-50 px-2 py-1.5 text-[12px] text-blue-900">
+            Es un <b>permiso de horas</b>: perdona los minutos de tardanza que caigan entre las{" "}
+            <b>{horaDesde}</b> y las <b>{horaHasta}</b>, y nada más.{" "}
+            <b>No justifica el día entero</b> — si la persona no viene, ese día se le sigue
+            descontando completo.
+          </p>
+        ) : (
+          <p className="mt-2 text-[12px] text-gray-500">
+            Sin horas, se justifica <b>el día entero</b> y no se descuenta nada.
+          </p>
+        )}
+        {avisoHoras && (
+          <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">{avisoHoras}</p>
         )}
       </div>
 
@@ -187,7 +242,12 @@ export default function JustificacionesTab() {
                   <td className="whitespace-nowrap px-3 py-2 text-gray-700">
                     {j.desde === j.hasta ? bonito(j.desde) : `${bonito(j.desde)} — ${bonito(j.hasta)}`}
                   </td>
-                  <td className="px-3 py-2 text-gray-700">{j.motivo}</td>
+                  {/* El MISMO texto que usa el reporte (`textoPermiso`): el
+                      papel y la pantalla no pueden decir cosas distintas del
+                      mismo permiso. */}
+                  <td className="px-3 py-2 text-gray-700">
+                    {textoPermiso(j.motivo, j.hora_desde, j.hora_hasta)}
+                  </td>
                   <td className="px-3 py-2 text-gray-500">{j.nota ?? ""}</td>
                   <td className="px-3 py-2 text-gray-400">{j.registrado_por ?? ""}</td>
                   <td className="px-3 py-2 text-right">

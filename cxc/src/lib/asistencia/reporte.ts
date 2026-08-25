@@ -84,7 +84,8 @@
 import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./config";
 // 🔑 Un motivo de justificación puede significar "trabajó, pero no acá". El
 // motor lo necesita para NO contar esos días como ausencias justificadas.
-import { esTrabajoFuera } from "./motivos";
+import { esTrabajoDeVendedor } from "./motivos";
+import { minutosPerdonados, textoPermiso, ventanaDe } from "./permiso-horas";
 // 🔑 SOLO EL TIPO. `correcciones.ts` importa `diaPanama` de acá (un valor), así
 // que un import normal armaría un ciclo en tiempo de ejecución; `import type`
 // se borra al compilar y no queda ninguno.
@@ -142,6 +143,16 @@ export interface Justificacion {
   desde: string; // YYYY-MM-DD
   hasta: string;
   motivo: string;
+  /**
+   * Opcionales, y VIAJAN JUNTAS: "HH:MM" o "HH:MM:SS". Con las dos, el permiso
+   * es de HORAS —perdona la tardanza que cae adentro de esa ventana y NADA
+   * MÁS—; sin ellas es lo de siempre, el día entero justificado.
+   *
+   * 🔴 No existen hasta que se corra `MIGRACION_PERMISO_HORAS`, y sin ellas
+   * TODO se comporta exactamente igual que hoy. Ver `permiso-horas.ts`.
+   */
+  hora_desde?: string | null;
+  hora_hasta?: string | null;
 }
 
 export interface DiaReporte {
@@ -181,6 +192,17 @@ export interface DiaReporte {
   enCurso: boolean;
   ausente: boolean;
   justificado: string | null;
+  /**
+   * El permiso de HORAS que cubre este día, ya escrito («Escolares — permiso de
+   * 08:00 a 10:00»). `null` = no hay, o la justificación es de día entero.
+   *
+   * 🔑 Es EXCLUYENTE con `justificado`: una justificación con horas NO justifica
+   * el día. Ver `permiso-horas.ts`.
+   */
+  permiso: string | null;
+  /** Cuántos minutos de tardanza perdonó ese permiso. Ya están descontados de
+   *  `tardeMin`: esto es para poder EXPLICARLO, no para volver a restarlo. */
+  permisoPerdonaMin: number;
   feriado: string | null;
   /**
    * El día cae de lunes a viernes.
@@ -239,6 +261,12 @@ export interface PersonaReporte {
     minutosTarde: number;
     /** De `minutosTarde`, cuántos salen de días mal marcados. Ver regla 5. */
     minutosTardeDeDiasARevisar: number;
+    /** Días cubiertos por un permiso de HORAS (no son ausencias: la persona
+     *  vino, con permiso para llegar más tarde). */
+    diasConPermiso: number;
+    /** Minutos de tardanza que perdonaron esos permisos. Ya están FUERA de
+     *  `minutosTarde`; se guardan para poder explicar la diferencia. */
+    minutosPerdonadosPorPermiso: number;
     excesoAlmuerzoMin: number;
     salidaTempranaMin: number;
     extraMin: number;
@@ -364,15 +392,21 @@ function diasDelRango(desde: string, hasta: string, todos: boolean): string[] {
   return out;
 }
 
+/**
+ * La justificación que cubre este día, o `null`.
+ *
+ * 🔴 SE DEVUELVE LA FILA ENTERA Y NO SOLO EL MOTIVO, porque desde el
+ * 25-ago-2026 la diferencia entre "el día entero" y "un permiso de dos horas"
+ * está en las horas, y quedarse con el motivo la borraría.
+ */
 function justificacionDe(
   justis: readonly Justificacion[],
   codigo: string,
   fecha: string,
-): string | null {
-  const j = justis.find(
+): Justificacion | null {
+  return justis.find(
     (x) => x.empleado_codigo === codigo && x.desde <= fecha && fecha <= x.hasta,
-  );
-  return j ? j.motivo : null;
+  ) ?? null;
 }
 
 export function armarReporte(opts: {
@@ -496,7 +530,18 @@ export function armarReporte(opts: {
     const dias: DiaReporte[] = [];
     for (const fecha of habiles) {
       const feriado = feriados.get(fecha) ?? null;
-      const justificado = justificacionDe(justificaciones, codigo, fecha);
+      const just = justificacionDe(justificaciones, codigo, fecha);
+      const ventana = just ? ventanaDe(just.hora_desde, just.hora_hasta) : null;
+      // 🔴 UN PERMISO DE HORAS NO JUSTIFICA EL DÍA ENTERO. `justificado` es lo
+      // que decide si un día SIN MARCAS deja de ser ausencia, y dos horas de
+      // permiso no explican no haber venido: eso borraría ocho horas de sueldo
+      // y nadie lo vería hasta el día de pago. Con ventana, el día NO queda
+      // justificado y el permiso solo perdona minutos de tardanza más abajo.
+      const justificado = just && !ventana ? just.motivo : null;
+      /** El permiso de horas, tal como se muestra. `null` = no hay. */
+      const permiso = just && ventana
+        ? textoPermiso(just.motivo, just.hora_desde, just.hora_hasta)
+        : null;
       const habil = esHabil(fecha);
       // Regla 6. Hoy sigue corriendo y mañana ni empezó: no se los juzga.
       // 🔴 `>=`, no `===`. Ver la nota de `diaEnCurso`.
@@ -520,7 +565,7 @@ export function armarReporte(opts: {
           // "ausencias sin justificar" cada mañana — el mismo error que el de
           // los días mal marcados, con otro nombre.
           ausente: !enCurso && habil && !feriado && !justificado,
-          justificado, feriado, habil,
+          justificado, permiso, permisoPerdonaMin: 0, feriado, habil,
           correcciones,
         });
         continue;
@@ -546,7 +591,14 @@ export function armarReporte(opts: {
 
       // Regla 1. Tolerancia para CLASIFICAR; una vez pasada, se cuenta desde
       // la hora de entrada, no desde el fin de la tolerancia.
-      const tardeMin = ent > entradaProgSeg + toleranciaSeg ? (ent - entradaProgSeg) / 60 : 0;
+      const tardeBrutaMin = ent > entradaProgSeg + toleranciaSeg ? (ent - entradaProgSeg) / 60 : 0;
+      // 🔴 EL PERMISO PERDONA SOLO LO QUE SE SOLAPA CON EL ATRASO DE VERDAD.
+      // Un permiso de 2 a 4 de la tarde no perdona haber llegado a las 8:45:
+      // se cruza la ventana del permiso con la del atraso —de la hora de
+      // entrada a la primera marca— y se perdona la intersección, ni un minuto
+      // más. Sin ventana el número es 0 y esta línea no cambia nada.
+      const permisoPerdonaMin = Math.min(tardeBrutaMin, minutosPerdonados(ventana, entradaProgSeg, ent));
+      const tardeMin = Math.max(0, tardeBrutaMin - permisoPerdonaMin);
 
       // Regla 2. Solo se puede medir con 4 marcas (o más): las del medio son
       // el almuerzo. Con 2 marcas no hay almuerzo que medir.
@@ -581,7 +633,7 @@ export function armarReporte(opts: {
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
         tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
-        revisar, enCurso, ausente: false, justificado, feriado, habil,
+        revisar, enCurso, ausente: false, justificado, permiso, permisoPerdonaMin, feriado, habil,
         correcciones,
       });
     }
@@ -591,12 +643,17 @@ export function armarReporte(opts: {
       diasTrabajados: conMarcas.length,
       ausenciasSinJustificar: dias.filter((d) => d.ausente).length,
       ausenciasJustificadas: dias.filter(
-        (d) => !d.marcas.length && d.justificado && !esTrabajoFuera(d.justificado),
+        (d) => !d.marcas.length && d.justificado && !esTrabajoDeVendedor(d.justificado),
       ).length,
-      diasTrabajandoFuera: dias.filter((d) => !d.marcas.length && esTrabajoFuera(d.justificado)).length,
+      diasTrabajandoFuera: dias.filter((d) => !d.marcas.length && esTrabajoDeVendedor(d.justificado)).length,
       vecesTarde: conMarcas.filter((d) => d.tardeMin > 0).length,
       minutosTarde: conMarcas.reduce((a, d) => a + d.tardeMin, 0),
       minutosTardeDeDiasARevisar: conMarcas.filter((d) => d.revisar).reduce((a, d) => a + d.tardeMin, 0),
+      /** Días con un permiso de HORAS. No son ausencias: la persona vino. */
+      diasConPermiso: dias.filter((d) => d.permiso !== null).length,
+      /** Minutos de tardanza que perdonaron esos permisos. Ya NO están en
+       *  `minutosTarde`: se muestran para poder explicar la diferencia. */
+      minutosPerdonadosPorPermiso: dias.reduce((a, d) => a + d.permisoPerdonaMin, 0),
       excesoAlmuerzoMin: conMarcas.reduce((a, d) => a + d.excesoAlmuerzoMin, 0),
       salidaTempranaMin: conMarcas.reduce((a, d) => a + d.salidaTempranaMin, 0),
       extraMin: conMarcas.reduce((a, d) => a + d.extraMin, 0),
