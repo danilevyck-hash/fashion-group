@@ -54,11 +54,12 @@
 import {
   divisorDe,
   etiquetaEmpresa,
+  MINUTOS_TARDE_QUE_SON_AUSENCIA,
   type EmpresaAsistencia,
   type ReglasAsistencia,
 } from "./config";
 import { etiquetaPersona } from "./directorio";
-import { esHabil, type DiaReporte, type PersonaReporte } from "./reporte";
+import { esHabil, fmtMin, type DiaReporte, type PersonaReporte } from "./reporte";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CENTAVOS — el redondeo, en un solo lugar
@@ -354,8 +355,26 @@ export interface HorasPersona {
   domingoMin: number;
   /** Feriado trabajado. Va al 1,50. */
   feriadoMin: number;
-  /** Minutos de tardanza pasada la tolerancia. SE RESTAN. */
+  /**
+   * Minutos de tardanza pasada la tolerancia. SE RESTAN.
+   *
+   * 🔴 SIGUE SIENDO EL TOTAL, incluidos los días de más de 30 minutos. Es lo
+   * que hace que la plata no se mueva: `calcularDinero` valúa este número
+   * EXACTAMENTE como ayer y después reparte el resultado entre dos columnas.
+   */
   tardanzaMin: number;
+  /**
+   * De `tardanzaMin`, los que vienen de días con MÁS de 30 minutos tarde
+   * (`MINUTOS_TARDE_QUE_SON_AUSENCIA`). Se muestran en la columna «Ausencia»
+   * en vez de en «Tardanzas» — Daniel: *"La columna «Ausencia» es solo para que
+   * lo veas"*.
+   *
+   * ⚠️ NO SE SUMA A `tardanzaMin`: es un SUBCONJUNTO suyo. Sumarlos sería
+   * cobrar dos veces los mismos minutos.
+   */
+  tardanzaGraveMin: number;
+  /** Cuántos días fueron así. Es lo que se escribe en el aviso y en el papel. */
+  tardanzaGraveDias: number;
   /** Ausencias sin justificar, en minutos de jornada. SE RESTAN. */
   ausenciaMin: number;
   ausenciaDias: number;
@@ -377,10 +396,53 @@ export interface HorasPersona {
 export const HORAS_CERO: HorasPersona = {
   extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
   domingoMin: 0, feriadoMin: 0, tardanzaMin: 0,
+  tardanzaGraveMin: 0, tardanzaGraveDias: 0,
   ausenciaMin: 0, ausenciaDias: 0, ausenciaJustificadaDias: 0,
   sabadoMin: 0, diasTrabajados: 0, diasARevisar: 0,
   tardanzaDeDiasARevisarMin: 0, jornadaDiariaMin: 0,
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CÓMO SE LEEN LAS DOS COLUMNAS QUE COMPARTEN LOS MINUTOS DE TARDANZA
+//
+// 🔴 FUENTE ÚNICA. Las mismas tres funciones las usan la pantalla, el Excel y el
+// PDF que se firma. Dos redacciones del mismo hecho es la forma de que terminen
+// diciendo cosas distintas del mismo número — y acá el número es plata.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Los minutos que se muestran en la columna «Tardanzas».
+ *
+ * 🩸 NO ES `h.tardanzaMin`. Ese sigue siendo el TOTAL —es lo que se valúa— y de
+ * él salen las dos columnas. Poner el total en la etiqueta de «Tardanzas»
+ * mientras el monto de al lado ya no lo incluye es la contradicción más fácil de
+ * cometer y la más difícil de ver: los minutos no cuadrarían con los dólares.
+ */
+export function minutosTardanzaMostrados(h: HorasPersona): number {
+  return Math.max(0, h.tardanzaMin - (h.tardanzaGraveMin || 0));
+}
+
+/** La etiqueta de «Ausencias», con lo que hay que saber para explicar el monto. */
+export function textoAusencias(h: HorasPersona): string {
+  const base = `${h.ausenciaDias} días · ${aHoras(h.ausenciaMin)} h`;
+  const dias = h.tardanzaGraveDias || 0;
+  if (!dias) return base;
+  // 🔑 Se DICE que son minutos de llegar tarde, no se deja adivinar. Sin esto,
+  // alguien que vino los 15 días aparece con «0 días · 0 h» de ausencia y un
+  // monto al lado, y la contadora no tiene cómo saber de dónde salió.
+  return `${base} · ${dias} día(s) de más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} min tarde`;
+}
+
+/**
+ * La etiqueta de «Tardanzas», con los minutos que de verdad valúa.
+ *
+ * 🔑 `fmtMin`: los minutos se miden AL SEGUNDO desde el 13-ago-2026, así que
+ * traen fracción. Se muestran con 2 decimales cuando la tienen — redondear cada
+ * celda al entero haría que la columna no sumara su propio total.
+ */
+export function textoTardanzas(h: HorasPersona): string {
+  return `${fmtMin(minutosTardanzaMostrados(h))} min`;
+}
 
 /**
  * "HH:MM" o "HH:MM:SS" → minutos, CON DECIMALES.
@@ -552,6 +614,15 @@ export function medirHoras(
     h.domingoMin += c.domingoMin;
     h.feriadoMin += c.feriadoMin;
     h.tardanzaMin += c.tardanzaMin;
+    // 🔴 EL RÓTULO, NO EL DINERO. Un día de más de 30 minutos tarde se sigue
+    // sumando entero a `tardanzaMin` —que es lo que se valúa— y además se
+    // aparta acá para poder MOSTRARLO en la columna «Ausencia». El umbral se
+    // mide por DÍA, no sobre el total de la quincena: tres días de 15 minutos
+    // son tres tardanzas, no una ausencia.
+    if (c.tardanzaMin > MINUTOS_TARDE_QUE_SON_AUSENCIA) {
+      h.tardanzaGraveMin += c.tardanzaMin;
+      h.tardanzaGraveDias += 1;
+    }
     h.ausenciaMin += c.ausenciaMin;
     h.sabadoMin += c.sabadoMin;
     if (d.marcas.length) {
@@ -619,6 +690,17 @@ export interface DineroLinea {
   domingos: number;
   feriados: number;
   ausencias: number;
+  /**
+   * De `ausencias`, lo que viene de días con MÁS de 30 minutos tarde. SOLO PARA
+   * MOSTRAR: ya está adentro de `ausencias` y no se suma en ningún lado.
+   *
+   * 🔑 Existe para que un número en la columna «Ausencia» de alguien que vino
+   * todos los días se pueda explicar sin abrir el reporte. Sin esto, la
+   * contadora vería una ausencia donde ella sabe que la persona trabajó.
+   */
+  ausenciaPorTardanza: number;
+  /** De `ausencias`, lo que viene de días SIN NINGUNA marca. Solo para mostrar. */
+  ausenciaDeDiaCompleto: number;
   tardanzas: number;
   totalBruto: number;
   seguroSocial: number;
@@ -810,8 +892,32 @@ export function calcularDinero(
   const domingos = centavos(h(horas.domingoMin) * reglas.recargoDomingoFeriado * rataHora);
   const feriados = centavos(h(horas.feriadoMin) * reglas.recargoDomingoFeriado * rataHora);
   // La ausencia va SIN recargo: es la hora que no se trabajó, ni más ni menos.
-  const ausencias = centavos(h(horas.ausenciaMin) * rataHora);
-  const tardanzas = centavos(horas.tardanzaMin * valorMinuto);
+  // Esto es la ausencia de DÍA COMPLETO —quien no marcó ni una vez—, que no se
+  // tocó y se sigue valuando `jornada × rata`.
+  const ausenciaDeDiaCompleto = centavos(h(horas.ausenciaMin) * rataHora);
+
+  // ── 🔴 LOS MINUTOS DE MÁS DE 30 TARDE CAMBIAN DE COLUMNA, NO DE PRECIO ─────
+  //
+  // Daniel, textual, elegido entre dos opciones: *"Los 45 minutos, igual que
+  // una tardanza. La columna «Ausencia» es solo para que lo veas."*
+  //
+  // 🔴 EL REPARTO ESTÁ ESCRITO PARA QUE LA SUMA NO PUEDA MOVERSE, y ésa es la
+  // única razón por la que se hace así y no calculando cada columna por su
+  // lado. `centavos(a) + centavos(b)` NO es `centavos(a + b)`: dos columnas
+  // redondeadas por separado se separan un centavo del total, y un centavo en
+  // una planilla es todo lo que hace falta para que la contable no confíe.
+  //
+  //   tardanzaTotal   = lo de siempre, valuado EXACTAMENTE como ayer
+  //   ausenciaPorTard = la parte que se muestra en «Ausencia»
+  //   tardanzas       = tardanzaTotal − ausenciaPorTard   ← el RESTO, no un cálculo nuevo
+  //
+  // Así `tardanzas + ausencias` da idéntico a `tardanzaTotal + ausenciaVieja`,
+  // que es lo que el bruto restaba ayer. No es "esperamos que dé cero": da cero
+  // por cómo está escrito.
+  const tardanzaTotal = centavos(horas.tardanzaMin * valorMinuto);
+  const ausenciaPorTardanza = centavos((horas.tardanzaGraveMin || 0) * valorMinuto);
+  const tardanzas = centavos(tardanzaTotal - ausenciaPorTardanza);
+  const ausencias = centavos(ausenciaDeDiaCompleto + ausenciaPorTardanza);
 
   const totalBruto = centavos(
     salarioQuincenal + extraDiurno + extraNocturno + excedente + domingos + feriados
@@ -859,7 +965,7 @@ export function calcularDinero(
   return {
     rataHora, valorMinuto, salarioQuincenal,
     extraDiurno, extraNocturno, excedente, domingos, feriados,
-    ausencias, tardanzas, totalBruto,
+    ausencias, ausenciaPorTardanza, ausenciaDeDiaCompleto, tardanzas, totalBruto,
     seguroSocial, seguroEducativo,
     isr: manuales.isr, prestamo: manuales.prestamo,
     terceros: manuales.terceros, mercancia: manuales.mercancia,
@@ -1084,7 +1190,8 @@ export type TotalesPlanilla = Omit<DineroLinea, "rataHora" | "valorMinuto"> & {
 
 export const TOTALES_CERO: TotalesPlanilla = {
   salarioQuincenal: 0, extraDiurno: 0, extraNocturno: 0, excedente: 0,
-  domingos: 0, feriados: 0, ausencias: 0, tardanzas: 0, totalBruto: 0,
+  domingos: 0, feriados: 0, ausencias: 0, ausenciaPorTardanza: 0,
+  ausenciaDeDiaCompleto: 0, tardanzas: 0, totalBruto: 0,
   seguroSocial: 0, seguroEducativo: 0, isr: 0, prestamo: 0, terceros: 0,
   mercancia: 0, totalDeducciones: 0, otrosServicios: 0, netoPagar: 0,
   personas: 0, sinConfigurar: 0, fueraDePlanilla: 0, decidirAMano: 0,
@@ -1121,6 +1228,11 @@ export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
     t.ausencias = centavos(t.ausencias + d.ausencias);
     t.tardanzas = centavos(t.tardanzas + d.tardanzas);
     t.totalBruto = centavos(t.totalBruto + d.totalBruto);
+    // Los dos desgloses de la ausencia se suman para poder EXPLICAR el total
+    // («de los $18,26 de ausencia, $12,40 son de días que llegó muy tarde»).
+    // No entran en ninguna otra cuenta: ya están adentro de `ausencias`.
+    t.ausenciaPorTardanza = centavos(t.ausenciaPorTardanza + d.ausenciaPorTardanza);
+    t.ausenciaDeDiaCompleto = centavos(t.ausenciaDeDiaCompleto + d.ausenciaDeDiaCompleto);
     t.seguroSocial = centavos(t.seguroSocial + d.seguroSocial);
     t.seguroEducativo = centavos(t.seguroEducativo + d.seguroEducativo);
     t.isr = centavos(t.isr + d.isr);

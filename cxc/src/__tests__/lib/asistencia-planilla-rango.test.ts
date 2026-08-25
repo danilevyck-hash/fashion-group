@@ -363,10 +363,17 @@ describe("⚠️ décimo tercer mes y vacaciones: NO se provisionan", () => {
   // 🔑 Hoy el cálculo no provisiona nada de eso —se verificó línea por línea— y
   // este test existe para que siga así: el día que alguien agregue una columna
   // de provisión, se entera acá y no en la planilla de la contable.
+  // ⚠️ 25-ago-2026: entraron `ausenciaPorTardanza` y `ausenciaDeDiaCompleto`.
+  // NO son provisiones ni columnas nuevas del cuadro: son el DESGLOSE de
+  // `ausencias`, que ya existía, y sirven para explicar de dónde sale ese
+  // número. Ninguna de las dos se suma en ningún lado —están adentro de
+  // `ausencias`— y hay un test que lo prueba en dólares. La lista se amplía a
+  // conciencia; el candado sigue cerrado para cualquier OTRA columna.
   it("el desglose del dinero tiene EXACTAMENTE estas columnas, sin provisiones", () => {
     const d = linea(ficha()).dinero!;
     expect(Object.keys(d).sort()).toEqual([
-      "ausencias", "domingos", "excedente", "extraDiurno", "extraNocturno",
+      "ausencias", "ausenciaDeDiaCompleto", "ausenciaPorTardanza",
+      "domingos", "excedente", "extraDiurno", "extraNocturno",
       "feriados", "isr", "mercancia", "netoPagar", "otrosServicios", "prestamo",
       "rataHora", "salarioQuincenal", "seguroEducativo", "seguroSocial",
       "tardanzas", "terceros", "totalBruto", "totalDeducciones", "valorMinuto",
