@@ -106,6 +106,25 @@ async function montar() {
   return await screen.findByRole("button", { name: /Enviar a Switch/ });
 }
 
+/**
+ * EL TOQUE COMPLETO (24-ago-2026). "Enviar a Switch" ya no manda: pregunta QUÉ
+ * —pedido o cotización— y recién la opción elegida dispara el envío. Es un toque
+ * más a propósito: una cotización NO aparta mercancía y esa diferencia no se ve.
+ *
+ * Todo lo que este archivo fija sigue midiéndose sobre el camino COMPLETO, no
+ * sobre el primer toque: qué POST sale, cuántos, y qué pasa si se toca dos veces.
+ */
+const opcion = (clave: "pedido" | "cotizacion") =>
+  document.querySelector(`[data-medir="documento-${clave}"]`) as HTMLButtonElement | null;
+
+async function tocarEnviar(btn: HTMLElement, clave: "pedido" | "cotizacion" = "pedido") {
+  await act(async () => { fireEvent.click(btn); });
+  const o = opcion(clave);
+  if (!o) return null; // el botón estaba apagado: no hay elección que hacer
+  await act(async () => { fireEvent.click(o); });
+  return o;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
@@ -126,7 +145,7 @@ describe("un solo toque", () => {
   it("🔴 con todo limpio, UN toque crea el pedido: confirma, revisa y escribe — sin modal", async () => {
     const llamadas = stubApi();
     const btn = await montar();
-    await act(async () => { fireEvent.click(btn); });
+    await tocarEnviar(btn);
 
     await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
     // Confirmar (el PUT lo exige el servidor) y DESPUÉS un solo viaje a Switch.
@@ -143,7 +162,8 @@ describe("un solo toque", () => {
   it("el aviso de que crea un pedido REAL va ANTES del toque, no en un modal después", async () => {
     stubApi();
     await montar();
-    const aviso = screen.getByText(/Crea el pedido de verdad en Switch/);
+    // 24-ago-2026: el aviso nombra las DOS salidas, porque ahora hay dos.
+    const aviso = screen.getByText(/Elige pedido o cotización, y se crea de verdad en Switch/);
     expect(aviso.textContent).toContain("active_shoes");
     expect(aviso.textContent).toMatch(/borrarlo a mano en el panel de Switch/);
   });
@@ -159,6 +179,7 @@ describe("un solo toque", () => {
     });
     const btn = await montar();
     fireEvent.click(btn);
+    await act(async () => { fireEvent.click(opcion("pedido")!); });
     await screen.findByText(/Revisando el pedido contra Switch/);
     await act(async () => { soltar(null); });
     await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
@@ -167,7 +188,7 @@ describe("un solo toque", () => {
   it("un pedido YA confirmado no se vuelve a confirmar: va directo a Switch", async () => {
     const llamadas = stubApi({ status: "confirmado" });
     const btn = await montar();
-    await act(async () => { fireEvent.click(btn); });
+    await tocarEnviar(btn);
     await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
     expect(llamadas.filter((c) => c.method === "PUT" && (c.body || "").includes("confirmado"))).toHaveLength(0);
   });
@@ -185,7 +206,7 @@ describe("se detiene y muestra el problema", () => {
       } },
     });
     const btn = await montar();
-    await act(async () => { fireEvent.click(btn); });
+    await tocarEnviar(btn);
 
     await screen.findByText("No se puede enviar a Switch");
     expect(screen.getByText("SKU SKU-1 no existe en Switch (active_shoes)")).toBeTruthy();
@@ -205,7 +226,7 @@ describe("se detiene y muestra el problema", () => {
       } },
     });
     const btn = await montar();
-    await act(async () => { fireEvent.click(btn); });
+    await tocarEnviar(btn);
     await screen.findByText(/no tiene permiso para cambiar precios \(proceso 0001\)/);
     expect(creacionesDirectas(llamadas)).toHaveLength(0);
   });
@@ -219,7 +240,7 @@ describe("se detiene y muestra el problema", () => {
       } },
     });
     const btn = await montar();
-    await act(async () => { fireEvent.click(btn); });
+    await tocarEnviar(btn);
     const titulo = await screen.findByText("No se puede enviar a Switch");
     const modal = titulo.closest("div") as HTMLElement;
     expect(screen.getByText("Lo que sí cruzó con Switch")).toBeTruthy();
@@ -234,7 +255,7 @@ describe("se detiene y muestra el problema", () => {
       auto: { ok: false, status: 400, body: { error: "El pedido tiene 2 producto(s) en preventa — no se pueden enviar a Switch (sin inventario todavía)" } },
     });
     const btn = await montar();
-    await act(async () => { fireEvent.click(btn); });
+    await tocarEnviar(btn);
     await screen.findByText(/2 producto\(s\) en preventa/);
     expect(creacionesDirectas(llamadas)).toHaveLength(0);
   });
@@ -246,12 +267,19 @@ describe("🔴 doble toque NO duplica el pedido", () => {
   it("dos clics seguidos hacen UN solo POST real", async () => {
     const llamadas = stubApi();
     const btn = await montar();
+    // El envío nace en la OPCIÓN, así que el triple toque va ahí: es el botón
+    // que hoy puede duplicar un pedido si el `enviandoRef` se rompe.
+    await act(async () => { fireEvent.click(btn); });
+    const pedido = opcion("pedido")!;
     await act(async () => {
-      fireEvent.click(btn);
-      fireEvent.click(btn);
-      fireEvent.click(btn);
+      fireEvent.click(pedido);
+      fireEvent.click(pedido);
+      fireEvent.click(pedido);
     });
     await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
+    expect(postsEnvio(llamadas)).toHaveLength(1);
+    // Y el botón de la pantalla tampoco abre una segunda elección encima.
+    await act(async () => { fireEvent.click(btn); fireEvent.click(btn); });
     expect(postsEnvio(llamadas)).toHaveLength(1);
   });
 
@@ -266,6 +294,7 @@ describe("🔴 doble toque NO duplica el pedido", () => {
     });
     const btn = await montar();
     fireEvent.click(btn);
+    await act(async () => { fireEvent.click(opcion("pedido")!); });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(true));
     await act(async () => { soltar(null); });
   });
@@ -275,7 +304,7 @@ describe("🔴 doble toque NO duplica el pedido", () => {
       auto: { ok: false, status: 409, body: { error: "Este pedido ya fue enviado a Switch (16-000000999)" } },
     });
     const btn = await montar();
-    await act(async () => { fireEvent.click(btn); });
+    await tocarEnviar(btn);
     await screen.findByText("Este pedido ya fue enviado a Switch (16-000000999)");
     expect(postsEnvio(llamadas)).toHaveLength(1);
   });
@@ -287,7 +316,7 @@ describe("🔴 doble toque NO duplica el pedido", () => {
       auto: { ok: true, status: 200, body: { preview: { ...PREVIEW_LIMPIO, avisos: [{ codigo: "precio_distinto", texto: "SKU SKU-1: precio del pedido $15.00 ≠ lista Switch $16.50 — se enviará el del pedido" }] } } },
     });
     const btn = await montar();
-    await act(async () => { fireEvent.click(btn); });
+    await tocarEnviar(btn);
 
     await screen.findByText("Revisa esto antes de enviar");
     expect(creacionesDirectas(llamadas)).toHaveLength(0); // ← todavía NO se creó

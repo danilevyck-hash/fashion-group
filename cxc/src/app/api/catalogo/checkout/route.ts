@@ -1,6 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/catalogo/checkout — Enviar a Switch en UN paso.
-// Body: { marca, cliente: {id, nombre}, vendedor_id?, items: CartItem[], idempotency_key }.
+// Body: { marca, cliente: {id, nombre}, vendedor_id?, items: CartItem[],
+//         idempotency_key, documento? }.
+//
+// `documento` = 'pedido' (default, lo de siempre) o 'cotizacion'. Es la elección
+// que la persona hace en el checkout un toque antes de mandar, y lo único que
+// cambia es a qué endpoint de Switch sale el POST — ver documento-switch.ts.
 //
 // Flujo: (1) crea el pedido en DB vía el RPC idempotente de la marca y lo marca
 // confirmado con cliente/vendedor de Switch guardados (Reintentar los usa);
@@ -26,6 +31,7 @@ import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { enviarPedidoSwitch, type EnvioItem } from "@/lib/catalogo/switch-envio";
+import { normalizarDocumento } from "@/lib/catalogo/documento-switch";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +58,10 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   const clienteNombre = typeof body?.cliente?.nombre === "string" ? body.cliente.nombre.trim() : "";
   const items: CheckoutItem[] = Array.isArray(body?.items) ? body.items : [];
   const idempotencyKey = typeof body?.idempotency_key === "string" ? body.idempotency_key : null;
+  // Qué se crea en Switch: 'pedido' (lo de siempre) o 'cotizacion'. Lo eligió
+  // la persona un toque antes de mandar; un body sin el campo sigue creando un
+  // PEDIDO, exactamente como antes de que existiera la elección.
+  const documento = normalizarDocumento(body?.documento);
 
   if (!Number.isInteger(clienteId) || clienteId <= 0 || !clienteNombre) {
     return NextResponse.json({ error: "Elige el cliente del pedido" }, { status: 400 });
@@ -186,12 +196,16 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     clienteNombre,
     vendedorId,
     vendedorNombre,
+    // 🔴 Va DESPUÉS del 400 de "Elige el cliente del pedido": una cotización
+    // pasa por el MISMO candado que un pedido. Sin cliente no sale ninguna de
+    // las dos.
+    documento,
   });
 
   const base = { ok: true as const, order_id: orderId, order_number: orderNumber };
   switch (result.kind) {
     case "ok":
-      return NextResponse.json({ ...base, switch: { ok: true, numeroInterno: result.numeroInterno, pedidoSwitchId: result.pedidoSwitchId, verificado: result.verificado, warnings: result.warnings } });
+      return NextResponse.json({ ...base, switch: { ok: true, numeroInterno: result.numeroInterno, pedidoSwitchId: result.pedidoSwitchId, verificado: result.verificado, warnings: result.warnings, documento: result.documento } });
     case "ya_enviado": // reintento de un checkout que ya había pasado (idempotencia)
       return NextResponse.json({ ...base, switch: { ok: true, numeroInterno: result.detalle, verificado: false, warnings: [] } });
     case "prevalidacion":

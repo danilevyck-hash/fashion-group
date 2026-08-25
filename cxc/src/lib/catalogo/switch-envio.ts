@@ -54,6 +54,12 @@ import {
 import { enParalelo } from "@/lib/switch-api/en-paralelo";
 import { type AvisoEnvio, hayQueDetenerse, textosDeAvisos } from "./switch-prevalidacion";
 import {
+  DOCUMENTO_POR_DEFECTO,
+  type DocumentoSwitch,
+  esCotizacion,
+  etiquetaDocumento,
+} from "./documento-switch";
+import {
   PROCESO_CAMBIO_PRECIO,
   TEXTO_PERMISO_NO_VERIFICADO,
   TEXTO_SIN_PERMISO_PRECIO,
@@ -138,6 +144,19 @@ export interface EnvioParams {
    * contra Switch— sin cambiar qué detiene el envío.
    */
   auto?: boolean;
+  /**
+   * QUÉ se crea en Switch: un PEDIDO (`/apipedido/terminar`, lo de siempre) o
+   * una COTIZACIÓN (`/apicotizacion/terminar`). Ausente = pedido, que es lo que
+   * este motor hacía antes de que existiera la elección.
+   *
+   * 🔴 Lo ÚNICO que cambia entre las dos es a qué ruta sale el POST y con qué
+   * ruta se verifica después: el contrato del body es el MISMO (medido contra
+   * producción, ver `documento-switch.ts`). Toda la pre-validación —SKU,
+   * códigos de barra, precio 0, permiso 0001, tallas— es idéntica, y el candado
+   * at-most-once tampoco distingue: un pedido sigue admitiendo UN envío
+   * no-fallido, salga como pedido o como cotización.
+   */
+  documento?: DocumentoSwitch;
 }
 
 export interface EnvioLinea {
@@ -162,9 +181,19 @@ export type EnvioResult =
   | { kind: "carrera" }
   | { kind: "rechazado"; error: string; warnings: string[] }
   | { kind: "ambiguo"; error: string }
-  | { kind: "ok"; numeroInterno: string; pedidoSwitchId: number; verificado: boolean; warnings: string[] };
+  // `pedidoSwitchId` puede venir null en una COTIZACIÓN: el nombre del id en la
+  // respuesta de `/apicotizacion/terminar` no está medido (no se manda una
+  // cotización de prueba a producción). Sin id no hay verificación, pero la
+  // cotización quedó creada y su `numeroInterno` la identifica igual.
+  | { kind: "ok"; numeroInterno: string; pedidoSwitchId: number | null; verificado: boolean; warnings: string[]; documento: DocumentoSwitch };
 
 export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
+  const documento: DocumentoSwitch = p.documento ?? DOCUMENTO_POR_DEFECTO;
+  const cotizacion = esCotizacion(documento);
+  // "Pedido" / "Cotización" — lo que dicen las alertas. Sale de la MISMA
+  // función que rotula la pantalla: si un día cambia la palabra, cambia en los
+  // dos lados o en ninguno.
+  const queEs = etiquetaDocumento(documento);
   const preorders = p.items.filter((i) => i.is_preorder === true);
   if (preorders.length) return { kind: "preorders", count: preorders.length };
 
@@ -347,12 +376,20 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
   }
 
   // ── Registro del intento ANTES del POST (at-most-once) ──
+  //
+  // ⚠️ `documento` se guarda para poder DECIR después qué se mandó, y va en su
+  // propia columna (no adentro de `payload`): `payload` es el cuerpo EXACTO que
+  // recibió Switch y ese cuerpo no lleva el campo. La escritura tolera que la
+  // columna todavía no exista —el DDL puede estar pendiente— y en ese caso
+  // guarda la fila igual: quedarse sin poder enviar por una etiqueta sería
+  // peor que no tener la etiqueta.
   const payload = { vendedorId: p.vendedorId, clienteId: p.clienteId, articulos };
-  const { data: envio, error: envioErr } = await p.db
-    .from(p.enviosTable)
-    .insert({ order_id: p.orderId, estado: "pendiente", payload })
-    .select("id")
-    .single();
+  const fila = { order_id: p.orderId, estado: "pendiente", payload };
+  let insercion = await p.db.from(p.enviosTable).insert({ ...fila, documento }).select("id").single();
+  if (insercion.error && /documento|column/i.test(insercion.error.message || "")) {
+    insercion = await p.db.from(p.enviosTable).insert(fila).select("id").single();
+  }
+  const { data: envio, error: envioErr } = insercion;
   if (envioErr || !envio) {
     // 23505 = otro envío ganó la carrera (índice parcial)
     if (envioErr?.code === "23505") return { kind: "carrera" };
@@ -360,12 +397,24 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
   }
 
   // ── POST real al ERP ──
-  let pedidoSwitchId: number;
+  //
+  // 🔴 La ÚNICA diferencia entre las dos salidas está en estas dos líneas: el
+  // body es el mismo objeto `payload`, sin tocar. Lo demás —qué se valida, qué
+  // se escribe y cuándo— es el mismo camino.
+  let pedidoSwitchId: number | null;
   let numeroInterno: string;
   try {
-    const result = await client.apipedidoTerminar(payload);
-    pedidoSwitchId = Number(result.pedidoId);
-    numeroInterno = String(result.numeroInterno);
+    if (cotizacion) {
+      const result = await client.apicotizacionTerminar(payload);
+      // El nombre del id no está medido (no se manda una cotización de prueba a
+      // producción): se prueban los tres y, si ninguno sirve, queda null.
+      pedidoSwitchId = primerIdNumerico(result.cotizacionId, result.pedidoId, result.id);
+      numeroInterno = String(result.numeroInterno);
+    } else {
+      const result = await client.apipedidoTerminar(payload);
+      pedidoSwitchId = primerIdNumerico(result.pedidoId);
+      numeroInterno = String(result.numeroInterno);
+    }
     await p.db
       .from(p.enviosTable)
       .update({ estado: "enviado", pedido_switch_id: pedidoSwitchId, numero_interno: numeroInterno, updated_at: new Date().toISOString() })
@@ -377,10 +426,10 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
         .from(p.enviosTable)
         .update({ estado: "error", error_detalle: e.message, updated_at: new Date().toISOString() })
         .eq("id", envio.id);
-      await enviarSistema(`🚨 Envío a Switch FALLÓ — ${p.marcaLabel} ${p.orderNumber}: ${shortError(e.message)} (se puede reintentar desde la confirmación)`);
+      await enviarSistema(`🚨 Envío a Switch FALLÓ — ${p.marcaLabel} ${p.orderNumber} (${queEs}): ${shortError(e.message)} (se puede reintentar desde la confirmación)`);
       const detalle = hayPrecioEditado
         ? `Switch rechazó el cambio de precio: ${e.message}`
-        : `Switch rechazó el pedido: ${e.message}`;
+        : `Switch rechazó ${cotizacion ? "la cotización" : "el pedido"}: ${e.message}`;
       return { kind: "rechazado", error: detalle, warnings: textosDeAvisos(avisos) };
     }
     // Timeout / fallo de red: NO sabemos si el pedido se creó. Queda 'enviado'
@@ -390,32 +439,48 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       .from(p.enviosTable)
       .update({ estado: "enviado", error_detalle: `AMBIGUO (sin respuesta de Switch): ${msg}`, updated_at: new Date().toISOString() })
       .eq("id", envio.id);
-    await enviarSistema(`🚨 Envío a Switch AMBIGUO — ${p.marcaLabel} ${p.orderNumber}: Switch no respondió (${shortError(msg)}). REVISAR EL PANEL antes de reintentar.`);
-    return { kind: "ambiguo", error: "Switch no respondió — el pedido pudo o no haberse creado. Revisa el panel de Switch antes de reintentar." };
+    await enviarSistema(`🚨 Envío a Switch AMBIGUO — ${p.marcaLabel} ${p.orderNumber} (${queEs}): Switch no respondió (${shortError(msg)}). REVISAR EL PANEL antes de reintentar.`);
+    return {
+      kind: "ambiguo",
+      error: `Switch no respondió — ${cotizacion ? "la cotización" : "el pedido"} pudo o no haberse creado. Revisa el panel de Switch antes de reintentar.`,
+    };
   }
 
-  // ── Verificación post-escritura (GET /apipedido/info) ──
+  // ── Verificación post-escritura (GET /apipedido/info | /apicotizacion/info) ──
+  //
+  // Las dos rutas devuelven `detalle[]` con las mismas columnas (doc págs 50-51
+  // y 45), así que se cuentan igual. Sin id no se puede verificar y se dice tal
+  // cual: "sin verificar" nunca se disfraza de verificado.
   let verificado = false;
-  try {
-    const info = await client.apipedidoInfo(pedidoSwitchId);
-    if ((info.detalle || []).length === lineas.length) {
-      verificado = true;
-      await p.db
-        .from(p.enviosTable)
-        .update({ estado: "verificado", updated_at: new Date().toISOString() })
-        .eq("id", envio.id);
-    } else {
-      await p.db
-        .from(p.enviosTable)
-        .update({ error_detalle: `Verificación: Switch reporta ${(info.detalle || []).length} líneas, se enviaron ${lineas.length}`, updated_at: new Date().toISOString() })
-        .eq("id", envio.id);
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+  if (pedidoSwitchId == null) {
     await p.db
       .from(p.enviosTable)
-      .update({ error_detalle: `Creado pero sin verificar: ${msg}`, updated_at: new Date().toISOString() })
+      .update({ error_detalle: `Creado pero sin verificar: Switch no devolvió el id de la ${queEs.toLowerCase()}`, updated_at: new Date().toISOString() })
       .eq("id", envio.id);
+  } else {
+    try {
+      const info = cotizacion
+        ? await client.apicotizacionInfo(pedidoSwitchId)
+        : await client.apipedidoInfo(pedidoSwitchId);
+      if ((info.detalle || []).length === lineas.length) {
+        verificado = true;
+        await p.db
+          .from(p.enviosTable)
+          .update({ estado: "verificado", updated_at: new Date().toISOString() })
+          .eq("id", envio.id);
+      } else {
+        await p.db
+          .from(p.enviosTable)
+          .update({ error_detalle: `Verificación: Switch reporta ${(info.detalle || []).length} líneas, se enviaron ${lineas.length}`, updated_at: new Date().toISOString() })
+          .eq("id", envio.id);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await p.db
+        .from(p.enviosTable)
+        .update({ error_detalle: `Creado pero sin verificar: ${msg}`, updated_at: new Date().toISOString() })
+        .eq("id", envio.id);
+    }
   }
 
   // Mismo cuerpo que el aviso de creación (armador único en telegram-pedido.ts):
@@ -432,8 +497,25 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       resumen,
       numeroSwitch: numeroInterno,
       verificado,
+      documento,
     }),
   );
 
-  return { kind: "ok", numeroInterno, pedidoSwitchId, verificado, warnings: textosDeAvisos(avisos) };
+  return { kind: "ok", numeroInterno, pedidoSwitchId, verificado, warnings: textosDeAvisos(avisos), documento };
+}
+
+/**
+ * El primer candidato que sea un id de verdad (entero > 0), o `null`.
+ *
+ * 🩸 `Number(undefined)` es `NaN` y `Number(null)` es `0`: cualquiera de los dos
+ * escrito en `pedido_switch_id` sería un id que no existe, y después se
+ * verificaría contra él. Un id inventado es peor que ningún id.
+ */
+function primerIdNumerico(...candidatos: Array<number | string | null | undefined>): number | null {
+  for (const c of candidatos) {
+    if (c === null || c === undefined || c === "") continue;
+    const n = Number(c);
+    if (Number.isFinite(n) && Number.isInteger(n) && n > 0) return n;
+  }
+  return null;
 }

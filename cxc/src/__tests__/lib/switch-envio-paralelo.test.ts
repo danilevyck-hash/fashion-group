@@ -38,6 +38,9 @@ vi.mock("@/lib/alertas/canal", () => ({
   enviarNegocio: vi.fn(async () => true),
   enviarSistema: vi.fn(async () => true),
 }));
+// Se importa DESPUÉS del mock (vitest iza los `vi.mock`): es el doble, y sirve
+// para leer el texto exacto del aviso que sale al canal.
+import { enviarNegocio } from "@/lib/alertas/canal";
 
 // ── Doble de Switch ──────────────────────────────────────────────────────────
 
@@ -58,6 +61,14 @@ const switchState = {
   llamadas: [] as string[],
   clientes: 0,
   terminarLlamado: 0,
+  /** POST a /apicotizacion/terminar (la segunda salida, 24-ago-2026). */
+  cotizacionLlamado: 0,
+  /** GET a /apicotizacion/info (la verificación de esa salida). */
+  cotizacionInfoLlamado: 0,
+  /** GET a /apipedido/info. */
+  pedidoInfoLlamado: 0,
+  /** La respuesta de la cotización llega SIN id (el borde no medido). */
+  sinIdEnCotizacion: false,
 };
 
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -99,7 +110,19 @@ vi.mock("@/lib/switch-api/client", async (importOriginal) => {
           switchState.terminarLlamado++;
           return { pedidoId: 777, numeroInterno: "16-000000777" };
         },
-        async apipedidoInfo() { return { detalle: [] }; },
+        async apipedidoInfo() { switchState.pedidoInfoLlamado++; return { detalle: [] }; },
+        // La segunda salida. Devuelve `cotizacionId` (no `pedidoId`), que es lo
+        // que el motor tiene que saber leer.
+        async apicotizacionTerminar() {
+          switchState.cotizacionLlamado++;
+          // ⚠️ El borde NO es "el campo falta" (eso lo saltea el `continue` del
+          // helper): es un campo que VIENE y no es un id. `Number("SIN-ID")` es
+          // NaN y `Number(null)` es 0 — los dos se escribirían como id.
+          return switchState.sinIdEnCotizacion
+            ? { cotizacionId: "SIN-ID", numeroInterno: "16-000000555", mensaje: "OK" }
+            : { cotizacionId: 555, numeroInterno: "16-000000555", mensaje: "OK" };
+        },
+        async apicotizacionInfo() { switchState.cotizacionInfoLlamado++; return { detalle: [] }; },
       };
     },
   };
@@ -139,6 +162,37 @@ function dbFalso(existentes: FilaEnvio[] = []) {
         },
       };
     },
+  };
+  return db;
+}
+
+/**
+ * La MISMA tabla, pero con el DDL 20260824160000 todavía sin correr: el insert
+ * con `documento` revienta como lo hace PostgREST y el motor tiene que
+ * reintentar sin la columna.
+ */
+function dbSinColumnaDocumento() {
+  const db = dbFalso();
+  const fromReal = db.from.bind(db);
+  db.from = () => {
+    const t = fromReal();
+    const insertReal = t.insert.bind(t);
+    return {
+      ...t,
+      insert(fila: Record<string, unknown>) {
+        if ("documento" in fila) {
+          return {
+            select: () => ({
+              single: async () => ({
+                data: null,
+                error: { code: "42703", message: `column "documento" of relation "x" does not exist` },
+              }),
+            }),
+          };
+        }
+        return insertReal(fila);
+      },
+    };
   };
   return db;
 }
@@ -195,6 +249,10 @@ beforeEach(() => {
   switchState.llamadas = [];
   switchState.clientes = 0;
   switchState.terminarLlamado = 0;
+  switchState.cotizacionLlamado = 0;
+  switchState.cotizacionInfoLlamado = 0;
+  switchState.pedidoInfoLlamado = 0;
+  switchState.sinIdEnCotizacion = false;
   _resetCachePermisoPrecio();
 });
 
@@ -429,6 +487,127 @@ describe("🔴 el candado sigue rechazando el segundo envío", () => {
     expect(primero.kind).toBe("ok");
     expect(segundo.kind).toBe("ya_enviado");
     expect(switchState.terminarLlamado).toBe(1); // UN solo pedido en Switch
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PEDIDO O COTIZACIÓN — el mismo motor, dos salidas (24-ago-2026)
+//
+// Daniel: ***"que estén los dos"***. Lo que se fija acá es que la salida nueva
+// no abrió un segundo camino: MISMA pre-validación, MISMO registro del intento
+// antes del POST, MISMO candado at-most-once. Lo único que cambia es a qué
+// endpoint sale el POST y con cuál se verifica.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("🔴 la cotización sale por /apicotizacion/terminar y NADA MÁS cambia", () => {
+  it("`documento: 'cotizacion'` NO toca /apipedido/terminar", async () => {
+    sembrarArticulo("A", 1);
+    const db = dbFalso();
+    const r = await enviar(["A"], { auto: true, documento: "cotizacion" }, db);
+    expect(r.kind).toBe("ok");
+    if (r.kind !== "ok") return;
+    expect(switchState.cotizacionLlamado).toBe(1);
+    expect(switchState.terminarLlamado).toBe(0); // ← ningún pedido en el ERP
+    expect(r.numeroInterno).toBe("16-000000555");
+    expect(r.documento).toBe("cotizacion");
+  });
+
+  it("sin `documento` sigue siendo un PEDIDO — el default no se movió", async () => {
+    sembrarArticulo("A", 1);
+    const r = await enviar(["A"], { auto: true });
+    expect(r.kind).toBe("ok");
+    if (r.kind !== "ok") return;
+    expect(switchState.terminarLlamado).toBe(1);
+    expect(switchState.cotizacionLlamado).toBe(0);
+    expect(r.documento).toBe("pedido");
+  });
+
+  it("la verificación usa la ruta de SU documento, no la del otro", async () => {
+    sembrarArticulo("A", 1);
+    await enviar(["A"], { auto: true, documento: "cotizacion" });
+    expect(switchState.cotizacionInfoLlamado).toBe(1);
+    expect(switchState.pedidoInfoLlamado).toBe(0);
+  });
+
+  it("lee el id de la cotización aunque se llame `cotizacionId`", async () => {
+    sembrarArticulo("A", 1);
+    const r = await enviar(["A"], { auto: true, documento: "cotizacion" });
+    if (r.kind !== "ok") throw new Error("esperaba ok");
+    expect(r.pedidoSwitchId).toBe(555);
+  });
+
+  it("🔴 la MISMA pre-validación: un SKU que no cruza tampoco cotiza", async () => {
+    sembrarArticulo("A", 1);
+    const db = dbFalso();
+    const r = await enviar(["A", "NOEXISTE"], { auto: true, documento: "cotizacion" }, db);
+    expect(r.kind).toBe("prevalidacion");
+    expect(switchState.cotizacionLlamado).toBe(0);
+    expect(db.registro.inserts).toBe(0);
+  });
+
+  it("🔴 el candado at-most-once NO distingue salidas: cotizar consume el envío", async () => {
+    // Decisión explícita: el índice parcial sigue siendo (order_id) y un pedido
+    // admite UN envío no-fallido, salga como pedido o como cotización. Para
+    // vender lo que se cotizó, se DUPLICA el pedido.
+    sembrarArticulo("A", 1);
+    const db = dbFalso();
+    const primero = await enviar(["A"], { auto: true, documento: "cotizacion" }, db);
+    const segundo = await enviar(["A"], { auto: true, documento: "pedido" }, db);
+    expect(primero.kind).toBe("ok");
+    expect(segundo.kind).toBe("ya_enviado");
+    expect(switchState.terminarLlamado).toBe(0); // el pedido NO se creó
+    expect(switchState.cotizacionLlamado).toBe(1);
+  });
+
+  it("el intento se registra ANTES del POST también cotizando, y guarda qué fue", async () => {
+    sembrarArticulo("A", 1);
+    const db = dbFalso();
+    await enviar(["A"], { auto: true, documento: "cotizacion" }, db);
+    expect(db.registro.ordenDeEventos[0]).toBe("insert");
+    expect((db.filas[0] as unknown as Record<string, unknown>).documento).toBe("cotizacion");
+  });
+
+  it("🔴 con el DDL pendiente (columna `documento` ausente) la cotización SALE IGUAL", async () => {
+    // Quedarse sin poder enviar por una etiqueta sería peor que no tener la
+    // etiqueta: la escritura reintenta sin la columna.
+    sembrarArticulo("A", 1);
+    const db = dbSinColumnaDocumento();
+    const r = await enviar(["A"], { auto: true, documento: "cotizacion" }, db);
+    expect(r.kind).toBe("ok");
+    expect(switchState.cotizacionLlamado).toBe(1);
+    expect(db.registro.inserts).toBe(1);
+    expect((db.filas[0] as unknown as Record<string, unknown>).documento).toBeUndefined();
+  });
+
+  it("🔴 un id que Switch no devolvió NO se inventa: queda null y NO se verifica", async () => {
+    // `Number(undefined)` es NaN y `Number(null)` es 0: cualquiera de los dos
+    // escrito en `pedido_switch_id` sería un id que no existe, y después se
+    // verificaría contra él. Un id inventado es peor que ningún id.
+    switchState.sinIdEnCotizacion = true;
+    sembrarArticulo("A", 1);
+    const r = await enviar(["A"], { auto: true, documento: "cotizacion" });
+    expect(r.kind).toBe("ok");
+    if (r.kind !== "ok") return;
+    expect(r.pedidoSwitchId).toBeNull();
+    expect(r.numeroInterno).toBe("16-000000555"); // la cotización SÍ se creó
+    expect(switchState.cotizacionInfoLlamado).toBe(0); // no hay contra qué verificar
+    expect(r.verificado).toBe(false);
+  });
+
+  it("🔴 el aviso de Telegram DICE cuál de las dos fue, y que no aparta mercancía", async () => {
+    sembrarArticulo("A", 1);
+    await enviar(["A"], { auto: true, documento: "cotizacion" });
+    const texto = String(vi.mocked(enviarNegocio).mock.calls.at(-1)![0]);
+    expect(texto).toContain("COTIZACIÓN enviada a Switch");
+    expect(texto).toContain("No aparta mercancía");
+    expect(texto).toContain("16-000000555");
+
+    vi.mocked(enviarNegocio).mockClear();
+    await enviar(["A"], { auto: true }, dbFalso());
+    const otro = String(vi.mocked(enviarNegocio).mock.calls.at(-1)![0]);
+    expect(otro).toContain("enviado a Switch");
+    expect(otro).not.toContain("COTIZACIÓN");
+    expect(otro).not.toContain("No aparta mercancía");
   });
 });
 

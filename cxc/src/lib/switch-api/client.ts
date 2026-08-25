@@ -645,6 +645,17 @@ export interface SwitchClient {
   apipedidoTerminar(
     params: SwitchPedidoTerminarParams,
   ): Promise<SwitchPedidoTerminarData>;
+  /** Crea una COTIZACIÓN (POST /apicotizacion/terminar). Endpoint NO
+   *  documentado, mapeado contra producción el 24-ago-2026: MISMO contrato que
+   *  apipedidoTerminar (ver el bloque de tipos de cotizaciones más abajo).
+   *  ⚠️ Una cotización NO aparta mercancía — eso lo dice la pantalla antes de
+   *  mandar (lib/catalogo/documento-switch.ts). */
+  apicotizacionTerminar(
+    params: SwitchCotizacionTerminarParams,
+  ): Promise<SwitchCotizacionTerminarData>;
+  /** Detalle de una cotización (/apicotizacion/info?cotizacionId=X, doc pág 45):
+   *  data.cotizacion (cabecera) + data.detalle[] (mismas columnas que el pedido). */
+  apicotizacionInfo(cotizacionId: number | string): Promise<SwitchCotizacionInfoData>;
   /** Cierre diario de caja (/apireporte/diarioventas, doc pág 17): totales de
    *  ventas/NC/impuestos/descuentos + desglose por forma de pago. VERIFICADO EN
    *  VIVO (4-jul-2026, MULTI): `hasta` es EXCLUSIVO — para el día D pasar
@@ -962,6 +973,67 @@ export interface SwitchPedidoInfoData {
   detalle: SwitchPedidoDetalleLinea[];
 }
 
+// ─── Cotizaciones (/apicotizacion/*) ─────────────────────────────────────────
+//
+// 🔴 `POST /apicotizacion/terminar` NO ESTÁ DOCUMENTADO (el PDF solo trae
+// /lista §5.31, /info §5.32 y /correo §5.33). Es el CUARTO endpoint sin
+// documentar de este conector. Mapeado contra producción el 24-ago-2026 contra
+// `active_shoes`, mandando un campo a la vez y SIN `articulos` —sin líneas no
+// puede crear nada, así que cada respuesta es solo una validación y la empresa
+// no queda ensuciada—: {} → 0315 falta vendedor · {vendedorId} → 0316 falta
+// cliente · {vendedorId, clienteId} → 0319 artículos incorrectos. O sea el
+// MISMO contrato que /apipedido/terminar, campo por campo y en el mismo orden.
+//
+// ⚠️ `/apicotizacion/crear`, `/guardar` y `/nueva` NO existen: devuelven la
+// página de excepción de Switch con HTTP **200**. En este conector un endpoint
+// se prueba por el SHAPE de la respuesta, nunca por el status.
+
+/** Params de POST /apicotizacion/terminar. Es el MISMO tipo que el del pedido
+ *  —mismo contrato medido— y se declara aparte solo para que el día que Switch
+ *  los separe no haya que desenredar dos usos de un tipo compartido. */
+export type SwitchCotizacionTerminarParams = SwitchPedidoTerminarParams;
+
+/** Respuesta (data) de POST /apicotizacion/terminar.
+ *
+ *  ⚠️ El nombre del id NO está medido (no se mandó ninguna cotización real a
+ *  producción: la regla es no ensuciar el ERP para mapear). Por eso el id se lee
+ *  con tolerancia —`cotizacionId` primero, `pedidoId` e `id` como respaldo— y el
+ *  motor NUNCA depende de él para dar el envío por bueno: si no viene, la
+ *  cotización queda creada e igual de trazable por su `numeroInterno`, solo que
+ *  sin la verificación post-escritura. */
+export interface SwitchCotizacionTerminarData {
+  mensaje: string;
+  numeroInterno: string | number;
+  cotizacionId?: number | string;
+  /** Respaldo: por si Switch reusa el nombre del pedido en esta respuesta. */
+  pedidoId?: number | string;
+  id?: number | string;
+  clienteEmail?: string | null;
+  [key: string]: unknown;
+}
+
+/** Cabecera de /apicotizacion/info (data.cotizacion, doc pág 45). Mismos campos
+ *  que la del pedido salvo el id, que acá se llama `cotizacionId`. */
+export interface SwitchCotizacionInfo {
+  clienteId: number;
+  cotizacionId: number;
+  cliente: string;
+  clienteEmail: string | null;
+  vendedorId: number;
+  vendedor: string;
+  clienteImpuesto: string | number | null;
+  clienteImpuestoCodigo: string | null;
+  [key: string]: unknown;
+}
+
+/** Respuesta de GET /apicotizacion/info (doc pág 45): `detalle[]` tiene
+ *  EXACTAMENTE las mismas columnas que el del pedido, así que la línea se
+ *  reutiliza en vez de duplicar el tipo. */
+export interface SwitchCotizacionInfoData {
+  cotizacion: SwitchCotizacionInfo;
+  detalle: SwitchPedidoDetalleLinea[];
+}
+
 /** Cierra (best-effort, POST /cierresesion) TODAS las sesiones de Switch que
  *  este proceso abrió — itera el token cache, así que cierra exactamente lo que
  *  se autenticó en esta invocación y nada más (no-op si no hubo logins).
@@ -1243,6 +1315,37 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         "/apipedido/terminar",
         "POST",
         body,
+      );
+    },
+
+    async apicotizacionTerminar(params) {
+      // MISMO cuerpo que el del pedido, campo por campo: así se midió contra
+      // producción (0315 → 0316 → 0319, el mismo orden de validación). Si un
+      // día divergen, diverge acá y no en el motor de envío.
+      const body: Record<string, unknown> = {
+        vendedorId: params.vendedorId,
+        clienteId: params.clienteId,
+        articulos: params.articulos,
+      };
+      if (params.descuentoGlobal !== undefined) {
+        body.descuentoGlobal = params.descuentoGlobal;
+      }
+      return authedCall<SwitchCotizacionTerminarData>(
+        empresaKey,
+        cfg,
+        "/apicotizacion/terminar",
+        "POST",
+        body,
+      );
+    },
+
+    async apicotizacionInfo(cotizacionId) {
+      const qs = new URLSearchParams({ cotizacionId: String(cotizacionId) });
+      return authedCall<SwitchCotizacionInfoData>(
+        empresaKey,
+        cfg,
+        `/apicotizacion/info?${qs.toString()}`,
+        "GET",
       );
     },
 
