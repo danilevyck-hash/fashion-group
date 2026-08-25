@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
+import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
@@ -152,5 +154,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ rows, companyKey, refreshedAt });
+  // Lo que el guard dejó AFUERA de esta cartera. El total sigue siendo el real;
+  // lo que se agrega es decir qué documento no entró y por qué.
+  //
+  // 🔴 ACOTADO A LAS 6 DEL GRUPO. Sin `empresas`, un rechazo de Boston se
+  // dibujaría sobre el total del grupo — exactamente la mezcla que la vista
+  // `switch_estadocuenta_aging` existe para impedir. Boston lo dice en SU
+  // pestaña, con su propia consulta.
+  const avisoMontos = await lineaDeRechazos({
+    familias: ["cxc"],
+    empresas: CXC_GRUPO_EMPRESA_KEYS,
+  });
+
+  return NextResponse.json({ rows, companyKey, refreshedAt, avisoMontos });
 }

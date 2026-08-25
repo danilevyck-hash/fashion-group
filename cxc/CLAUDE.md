@@ -1147,6 +1147,75 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > ⚠️ **Filas absurdas ya guardadas: NINGUNA.** El barrido del 30-jul sobre las 10 tablas de plata dio 0 hallazgos salvo las 3 de `switch_proveedor_estadocuenta`, que **son legítimas y NO se tocan**. La de Boston ya se había borrado el 27-jul.
 
+## 🔴 LO QUE EL GUARD DEJA AFUERA SE DICE EN PANTALLA — el total real + qué no entró (25-ago-2026)
+
+> Daniel, textual: ***"no debería de ser así, el sistema debe de mostrar la info tal cual"***. Cuando el guard de montos rechaza una fila de Switch, el dato **desaparecía en silencio**: la cartera de Boston decía `$198.296,55` y nadie podía saber que un documento se había quedado afuera.
+>
+> De las tres salidas que se le ofrecieron eligió la **B, y general** — *el total real + decir qué se dejó afuera*, en **todas las empresas** y **EN PANTALLA** (no por Telegram):
+>
+> ```
+> $198.296,55 · 386
+> ⚠️ 1 documento fuera de la cuenta: el 155-000000129 llega con $266,541,352.00. Está mal en Switch.
+> ```
+>
+> ### 🔴 LO QUE **NO** CAMBIA — y es la mitad de esto
+>
+> **El guard sigue rechazando igual.** La cifra imposible NO entra a la base; los totales, el margen y las comisiones siguen protegidos. **Se descartó explícitamente mostrar el dato crudo**: la cartera de Boston pasaría a **$266.739.648,55** y dejaría de servir para cobrar. **Boston sigue SIN aviso de Telegram** (`SIN_AVISO_DE_MONTOS`, decisión del 5-ago: sonaba todas las semanas sin que nadie actuara) — lo que gana es la línea en pantalla; las demás empresas conservan su Telegram. El anti-loop de 7 días, el umbral relativo, la simetría por fila y el anti-envenenamiento: **intactos**. Y la cartera de Boston **sigue sin mezclarse con la del grupo**: son dos consultas acotadas por empresa, no un aviso global.
+>
+> ### 🩸 PRIMERO EL REGISTRO: `records_skipped: 1` con `skip_details: NULL`
+>
+> Medido en producción antes de construir nada: **6 de 6 corridas** de `confecciones_boston / estadocuenta` con `records_skipped > 0` y el **detalle en blanco**, contra 5 de 5 CON detalle en los demás syncs. O sea que se sabía que ALGO se había rechazado, pero **no cuál ni de cuánto** — y sin eso la pantalla no tiene qué decir.
+>
+> **La causa era UNA línea, en el ÚNICO camino por el que pasa Boston** (`sync-estadocuenta-web.ts`): `finishSwitchSyncLog` se llamaba con `skipped` pero **sin `skipDetails`**. Se auditaron los 8 syncs protegidos uno por uno: era el único. `sync-recibos`, `sync-proveedores`, `sync-utilidad`, `sync-articulos`, `sync-articulo-info`, `sync-egresos-varios`, `sync-catalogo` y `sync-empresa` ya lo pasaban.
+>
+> ⚠️ **El arreglo NO se puede confirmar contra producción sin escribir**: el detalle aparecerá recién en la **próxima corrida buena de Boston** (la última fue el 25-ago 02:11 UTC, `records_skipped: 1`). Lo que sí está probado es la cadena entera con el sync REAL corriendo contra un doble (`rechazo-queda-registrado.test.ts`): el documento `155-000000129` de `EL MACHETAZO` con sus **$266.541.352,00** queda en `skip_details`, y de ahí sale la línea exacta.
+>
+> ### La redacción vive en UN solo lugar
+>
+> **`src/lib/rechazos-de-switch.ts`** lee `switch_sync_log` y arma el texto; las pantallas solo reciben un string. Son varias superficies y la que quedara vieja diría otra cosa — el modo de fallo con el que este repo ya se quemó (13 copias del guard de montos). Hay barrido que pone el build ROJO si alguien escribe *"fuera de la cuenta"* o *"Está mal en Switch"* a mano, **borrando los comentarios primero**.
+> - **Ventana de 7 días, la MISMA del anti-loop de Telegram**: un solo concepto de "reciente", y si el dato se corrige en Switch la línea **se apaga sola** dentro de la semana.
+> - **Costo medido: 1 consulta, 384 ms**, sobre una tabla de 7.680 filas y con `records_skipped > 0` en el filtro (el resultado real fueron 3 filas). Va **dentro del `Promise.all`** que cada ruta ya tenía, así que no suma latencia en serie. **Sin DDL y sin índice nuevo.**
+> - **FALLA AL SILENCIO**: si la lectura se cae se devuelve vacío y no se dibuja nada. Un error de lectura no puede inventar un aviso ni romper la pantalla que muestra el total.
+> - **Si no hay nada rechazado, no se dibuja NADA.** Un cartel permanente se deja de leer a la semana.
+> - **En ÁMBAR, no en rojo**: no se rompió nada, el problema está EN SWITCH.
+>
+> ### Dónde quedó la línea, familia por familia
+>
+> | Familia del guard | Pantalla | ¿Puesta? |
+> |---|---|---|
+> | `cxc` (`switch_estadocuenta`) | CXC › pestaña de Boston · CXC › grupo (escritorio **y** celular) | ✅ |
+> | `factura` · `utilidad` · `costo_diario` · `articulo_diario` | Ventas — **una sola línea arriba de las 4 pestañas** | ✅ |
+> | `proveedor` (`switch_proveedor_estadocuenta`) | Proveedores | ✅ |
+> | `recibo` (`switch_recibos`) | Comisiones | ✅ |
+> | `producto` (`products` / `joybees_` / `tommy_` / `calvin_`) | Catálogos | ⛔ **NO se construyó** — ver abajo |
+>
+> 🔴 **Ventas lleva UNA línea para sus cuatro familias, no una por pestaña**: el mismo documento corrupto envenena la venta, el margen y la comisión, así que decirlo cuatro veces sería repetir el mismo hecho en la misma pantalla.
+>
+> ⛔ **CATÁLOGOS QUEDÓ AFUERA, a propósito.** Es la única superficie desproporcionada y hay dos razones, cada una alcanza: **(a)** el catálogo NO pasa por nuestras rutas — `CatalogoVendedorPage` le pide los productos **directamente al Supabase de cada marca** (`theme.api/products`), así que meter la línea pide un endpoint nuevo y un pedido más por apertura contra una base en compute Micro, ×4 marcas; **(b)** el catálogo **público** lo ve el CLIENTE FINAL, y decirle *"está mal en Switch"* es exponerle un problema interno. Costo estimado: una ruta nueva + una lectura por carga en 4 marcas × 3 superficies (vendedor, público, admin), más su medición en 4 anchos. **Decisión de Daniel.** Mientras tanto, el precio imposible sigue frenado igual y el rechazo sigue quedando en `skip_details`.
+>
+> ⚠️ **`articulo_info` (Referencia) y `egreso_vario` (Gastos) tampoco llevan línea**: no están en las 8 familias del pedido y su costo es el mismo patrón (ruta + cliente + medición). Anotados, no construidos.
+>
+> ### Medición
+>
+> **Los 4 anchos, en el navegador contra el build de PRODUCCIÓN, con datos de producción, CON la línea a la vista y SIN ella, y CONTRA `origin/main`** (`BASE=… ETAPA=despues node scripts/_medir-rechazos-visibles.mjs`, solo lectura — el navegador **aborta todo pedido que no sea GET**):
+>
+> **390 · 834 · 1024 · 1440 → 0 px de arrastre de página · 0 px de desborde de la línea · 0 textos <12 px NUEVOS · tocables <44 px IDÉNTICOS con y sin la línea.** La línea **crece hacia abajo**: 358×63 px en el iPhone (3 renglones), 554-578×42 en el iPad, 744-768×21 en el iPad acostado y 976-1160×21 en escritorio.
+>
+> 🔴 **NINGÚN NÚMERO SE MOVIÓ, comparado POSICIÓN POR POSICIÓN contra `origin/main`** (mismo build de producción, mismos datos, corridas back-to-back): **30 casos · 7.550 montos · 0 distintos**. Boston sigue en **$198.296,55 · 386 clientes** y el grupo en **$3.515.744,63 · 98 clientes** (verificado también en el payload crudo de `/api/cxc/aging`: 209 filas, **0 de `confecciones_boston`**).
+> - 🩸 **La primera comparación dio 150 montos "movidos" y era DERIVA DE PRODUCCIÓN, no el cambio**: entre las dos mediciones pasaron ~45 minutos y la MV del aging se re-materializó. La firma que lo delató: **los tramos cambiaban pero el TOTAL era idéntico al centavo** (`1.379.773,88 + 908.365,90 + 1.227.604,85` = `1.410.793,95 + 946.759,94 + 1.158.190,74` = $3.515.744,63). Medidas back-to-back, 0 diferencias. **Las dos ramas hay que medirlas seguidas o la comparación acusa al cambio de lo que hizo un cron.**
+> - 🩸 **Y tres gotchas más del MEDIDOR, los tres daban verde o rojo sin haber mirado nada:** el CXC dibuja los **DOS layouts** (celular y escritorio) y esconde uno con CSS, así que un `querySelector` a secas devuelve la caja de **0×0** — hay que quedarse con la VISIBLE; `route.fetch()` de Playwright resuelve `localhost` a **::1** y `next start` escucha en IPv4 (→ ECONNREFUSED con la página cargando bien); y **Comisiones dispara 5 RPC** contra la base en Micro y a veces no contesta en 120 s — si no carga se ANOTA (`no cargó`) en vez de darse por medida.
+> - ⚠️ **Cómo se consiguió «con la línea», dicho de frente:** hoy producción no tiene ni un rechazo registrado (el detalle se empieza a guardar con este mismo cambio). En CXC y Proveedores se **INTERCEPTA** la respuesta y se le agrega `avisoMontos`; en Ventas y Comisiones, que la reciben del SERVIDOR, el nodo se **INSERTA** en el DOM en la posición exacta donde lo pone React. El componente medido es el mismo y las clases son las mismas.
+>
+> ### Candados
+>
+> `src/__tests__/lib/rechazos-de-switch.test.ts` (44 — el texto carácter por carácter, las palabras de las 10 familias, la lectura del log y que las dos carteras pidan su aviso por separado), **`src/__tests__/lib/rechazo-queda-registrado.test.ts` (7, corre `syncCarteraWeb` DE VERDAD** con el documento real y lee qué se escribió en el log) y **`src/__tests__/components/rechazos-visibles-en-pantalla.test.tsx` (13, RENDERIZA la pestaña de Boston** y lee el DOM: que la línea vaya ARRIBA del total, que nadie la esconda con una clase, y que **sin rechazos no se dibuje nada**).
+> - **Verificado por mutación, 25 de 25 cazadas y 0 no-op** (`bash scripts/_mutar-candados-rechazos-visibles.sh`): el guard deja de rechazar · la fila rechazada se escribe igual · el sync de Boston vuelve a NO guardar el detalle · el detalle pierde el documento · pierde el monto · la línea nunca se dibuja · la pestaña deja de montarla · se esconde con una clase · el servidor deja de mandarla · se dibuja SIN rechazos · la pieza dibuja su caja vacía · la línea pierde el número · pierde el monto · deja de decir que está mal en Switch · el documento se pierde al leerlo · se muestra el monto más chico · **Boston recupera el Telegram** · se le apaga a las demás · el aviso del grupo deja de acotar por empresa · el de Boston tampoco · el módulo ignora la lista de empresas · una base caída tumba la pantalla · una fila sin monto se dibuja igual · el mismo documento se cuenta dos veces · la línea pasa a rojo.
+> - 🩸 **La primera corrida fue 16 de 24 con 1 no-op, y se dice porque las 8 brechas eran REALES**: no había un solo test que corriera el sync (la mutación que reponía el bug original SOBREVIVÍA), el fixture del "monto más grande" tenía el mayor PRIMERO (así que "el primero" y "el mayor" no se distinguían), el fail-open solo cubría el error de PostgREST y no el `throw`, y las rutas no tenían candado de acotación por empresa. **Un verificador que da 16/24 y se publica igual es peor que no correrlo.**
+> - 🩸 **UNA MUTACIÓN ROMPÍA EL ARCHIVO Y EL INFORME DECÍA «SOBREVIVIÓ».** En `perl -0pi -e 's|A|B|'` el delimitador es `|`, así que `\|\|` dentro del patrón se DES-escapa a `||` y se convierte en una **alternación con rama vacía**: matchea la cadena vacía en el byte 0 y el reemplazo se come el archivo entero. Con el módulo roto, vitest no llega a colectar y escribe `Tests  no tests` — **cero fallos**, y `probar()` lo leía como sobreviviente, acusando al candado de un agujero que no existe. Se arregló por los dos lados: delimitador `#` cuando el patrón lleva pipes, y `probar()` denuncia la corrida que no colectó nada.
+> - 🩸 **La restauración va por COPIA, no con `git checkout`** (hay archivos NUEVOS y git aborta el comando entero), **`mutar()` exige que el archivo CAMBIE** (md5 antes/después) y **`probar()` exige encontrar el resumen de vitest** antes de creerle a un cero.
+>
+> **Diagnóstico read-only contra producción:** el barrido que midió el hueco vive en el propio informe del PR; la calibración del guard sigue siendo `node scripts/_diag-calibrar-guard-montos.mjs`.
+
 > **Depurador — el DIVISOR tiene rango, y el rango es 0 ó 0.10-1.00 (27-jul-2026).** El precio es `TECHO(Costo CIF ÷ divisor) + extra`: el divisor NO es un porcentaje, es la **fracción del precio que representa el costo** — para 30% de margen se escribe **0.70**. 🩸 `marca_formulas` tenía **`TH Tommy Jeans` con `divisor = 70`** desde el 29-jun (un punto decimal olvidado): un costo CIF de $42 daba **$4** en vez de $63, o sea precios **100× más baratos**. Las 4 rutas que escriben fórmulas solo pedían `divisor >= 0`, así que el 70 entraba igual que el 0.70. Daniel: *"divisor deberia de ser 0.7, y si puedes obligar a que ese error no vuelva a pasar, no existe q sea mas de 1.0"*. Fila corregida a 0.70 con su aprobación; era la **única** fuera de rango en las 4 tablas.
 > - **Fuente única: `src/lib/depurador/divisor.ts` → `validarDivisor()`** (módulo PURO), usada por `formulas`, `rubro-formulas`, `tienda-formulas` y `tienda-rubro-formulas`. El CHECK de la base (`20260727190000_divisor_rango.sql`, las 4 tablas) repite el mismo rango como último freno para lo que no pase por las rutas; **el código funciona con o sin él.**
 > - **El 0 SIGUE SIENDO VÁLIDO y no es un descuido:** es el default de la columna y el centinela que `calcPrecio()` usa (`if (!f.divisor) return null`) para dejar el precio vacío y que se ponga a mano, o para mandarlo a `precio_fijo`. Hay filas reales apoyadas en eso (3 marcas + 10 excepciones). Rechazarlo habría roto guardarlas. Nunca se divide entre 0 — el centinela corta antes.

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { fetchVentasResumen, fetchClientes, fetchMultifashion, fetchAvailableYears } from "@/lib/ventas/queries";
+import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
 import { VentasShell } from "./VentasShell";
 import { verifySession } from "@/lib/session-cookie";
 
@@ -31,7 +32,11 @@ export default async function VentasPage() {
   // es_periodo_parcial=true así que el footer / label sub muestran el corte.
   const mes = now.getMonth() + 1;
 
-  const [resumen, clientes, multi, availableYears] = await Promise.all([
+  // ⚠️ El aviso de montos va DENTRO del mismo Promise.all: en serie le sumaría
+  // ~380 ms a una pantalla que ya es la más pesada del sistema. Es UNA consulta
+  // acotada (corridas exitosas con rechazo, 7 días) sobre una tabla de 7.680
+  // filas — y falla al silencio, así que nunca puede tumbar la página.
+  const [resumen, clientes, multi, availableYears, avisoMontos] = await Promise.all([
     fetchVentasResumen({ year }).catch(err => {
       console.error("[ventas] resumen error", err);
       return null;
@@ -48,6 +53,9 @@ export default async function VentasPage() {
       console.error("[ventas] años error", err);
       return [year];
     }),
+    // Las 4 familias del guard que alimentan este módulo. Sin `empresas`: acá se
+    // miran las 8, que es justo lo que la pantalla suma.
+    lineaDeRechazos({ familias: ["factura", "utilidad", "costo_diario", "articulo_diario"] }),
   ]);
 
   return (
@@ -60,6 +68,7 @@ export default async function VentasPage() {
         resumen={resumen}
         clientes={clientes}
         multi={multi}
+        avisoMontos={avisoMontos}
       />
     </Suspense>
   );

@@ -18,6 +18,7 @@ import useSWR from "swr";
 import { fmt } from "@/lib/format";
 import { CARTERA_BOSTON } from "@/lib/cxc/cartera";
 import { AGING } from "@/lib/cxc-aging";
+import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncStatus from "@/components/shared/SyncStatus";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
@@ -48,6 +49,8 @@ interface ClienteBoston {
 interface Respuesta {
   clientes: ClienteBoston[];
   totales: { total: number; d0_90: number; d91_120: number; d121_plus: number; clientes: number };
+  /** Lo que el guard dejó afuera de esos totales, ya redactado por el servidor. */
+  avisoMontos?: string | null;
 }
 
 /** Shape que espera `cxc-orden`. Los tramos son los mismos, cambia el nombre. */
@@ -223,6 +226,12 @@ export default function BostonTab() {
         empresaLabels={EMPRESA_KEY_TO_NAME}
         className="mb-3"
       />
+
+      {/* Qué se quedó AFUERA de los totales de abajo. Va pegado a la frescura
+          —las dos contestan "¿le puedo creer a este número?"— y ARRIBA de las
+          píldoras, para leerse antes de cobrar. Si no hay nada rechazado no se
+          dibuja nada. */}
+      <AvisoRechazosSwitch texto={data?.avisoMontos} className="mb-3" />
 
       <input
         type="search"

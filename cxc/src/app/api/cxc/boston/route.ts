@@ -25,6 +25,9 @@ export const fetchCache = "force-no-store";
 // lista de la que la pantalla deriva si dibuja o no la pestaña. Escrita acá a
 // mano, la UI se la copiaba (o no) y el vendedor tocaba una pestaña que siempre
 // le contestaba 403.
+import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
+import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
+
 const COLS = "codigo,cliente_switch_id,nombre,nombre_normalized,d0_90,d91_120,d121_plus,total";
 const PAGE = 1000;
 
@@ -121,8 +124,23 @@ export async function GET(req: NextRequest) {
   const suma = (k: "d0_90" | "d91_120" | "d121_plus" | "total") =>
     Math.round(clientes.reduce((s, c) => s + c[k], 0) * 100) / 100;
 
+  // Lo que el guard dejó AFUERA de esos totales. El total sigue siendo el real
+  // —la cifra imposible no entra a la base y la cartera sigue sirviendo para
+  // cobrar—, pero la pestaña lo DICE en vez de callarlo. Daniel: *"el sistema
+  // debe de mostrar la info tal cual"*.
+  //
+  // 🔴 ACOTADO A BOSTON con la MISMA lista de la que sale su `SyncStatus`
+  // (`empresasCarteraAparte()` = estadoCuenta:true + cxc:false, o sea SOLO
+  // Boston). Una lista escrita a mano acá es la que un día se aparta en silencio
+  // y mete una fila del grupo en la pestaña que Daniel prohibió mezclar.
+  const avisoMontos = await lineaDeRechazos({
+    familias: ["cxc"],
+    empresas: empresasCarteraAparte(),
+  });
+
   return NextResponse.json({
     clientes,
+    avisoMontos,
     totales: {
       total: suma("total"),
       d0_90: suma("d0_90"),

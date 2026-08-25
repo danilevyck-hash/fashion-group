@@ -33,6 +33,7 @@ import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
+import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
 import { ComisionesCriterios } from "./ComisionesCriterios";
 import { ComisionesPeriodo } from "./ComisionesPeriodo";
@@ -70,9 +71,11 @@ export interface ExcelApi {
 
 interface ComisionesViewProps {
   availableYears: number[];
+  /** Lo que el guard dejó afuera de los cobros, ya redactado por el servidor. */
+  avisoMontos?: string | null;
 }
 
-export function ComisionesView({ availableYears }: ComisionesViewProps) {
+export function ComisionesView({ availableYears, avisoMontos }: ComisionesViewProps) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
@@ -177,6 +180,11 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
           <FileSpreadsheet className="h-4 w-4 shrink-0" /> Excel
         </button>
       </div>
+
+      {/* Qué se quedó AFUERA de los cobros que alimentan estas comisiones.
+          Va arriba de la tabla, en las dos pestañas: el mismo cobro corrupto
+          afecta a las dos. Sin rechazos no se dibuja nada. */}
+      <AvisoRechazosSwitch texto={avisoMontos} />
 
       {mode === "todas" ? (
         <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} refreshKey={refreshKey} />
