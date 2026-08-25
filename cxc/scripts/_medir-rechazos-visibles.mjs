@@ -47,6 +47,12 @@ const TODOS = [
 ];
 // `SOLO=390,834` mide un subconjunto: la corrida entera son 40 cargas de página
 // y no siempre entra en una sola sesión.
+// `PANTALLAS=cxc,proveedores` mide un subconjunto de superficies. Igual que
+// SOLO: la corrida entera son 40 cargas de página y no siempre entra en una sola
+// sesión (y este entorno corta a los 10 min).
+const PANTALLAS = process.env.PANTALLAS ? process.env.PANTALLAS.split(",") : null;
+const quiero = (n) => !PANTALLAS || PANTALLAS.includes(n);
+
 const ANCHOS = process.env.SOLO
   ? TODOS.filter((a) => process.env.SOLO.split(",").includes(String(a.w)))
   : TODOS;
@@ -202,6 +208,7 @@ async function main() {
       const { ctx, page } = await contexto(browser, ancho, conLinea);
 
       // ── CXC: grupo (escritorio o celular según el ancho) ─────────────────
+      if (quiero("cxc")) {
       await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
       await page.waitForFunction(() => /total pendiente/i.test(document.body.innerText), null, { timeout: 90000 });
       await page.waitForTimeout(2500);
@@ -221,14 +228,18 @@ async function main() {
         await page.waitForTimeout(2000);
         revisar(`cxc-boston/${ancho.w}/${sufijo}`, await page.evaluate(LEER), conLinea);
       }
+      }
 
       // ── Proveedores ──────────────────────────────────────────────────────
+      if (quiero("proveedores")) {
       await page.goto(`${BASE}/proveedores`, { waitUntil: "networkidle" });
       await page.waitForFunction(() => /Por pagar/i.test(document.body.innerText), null, { timeout: 90000 });
       await page.waitForTimeout(2000);
       revisar(`proveedores/${ancho.w}/${sufijo}`, await page.evaluate(LEER), conLinea);
+      }
 
       // ── Ventas (SSR: el nodo se inserta) ─────────────────────────────────
+      if (quiero("ventas")) {
       await page.goto(`${BASE}/ventas`, { waitUntil: "networkidle" });
       await page.waitForFunction(() => /Resumen/.test(document.body.innerText), null, { timeout: 120000 });
       await page.waitForTimeout(3000);
@@ -237,16 +248,28 @@ async function main() {
         if (r !== "insertado") fallos.push(`ventas/${ancho.w}: no pude insertar la línea (${r})`);
       }
       revisar(`ventas/${ancho.w}/${sufijo}`, await page.evaluate(LEER), conLinea);
+      }
 
       // ── Comisiones (SSR: el nodo se inserta) ─────────────────────────────
+      // ⚠️ Esta pantalla dispara 5 RPC de comisión contra una base en compute
+      // Micro y a veces no contesta a tiempo. Si no carga se ANOTA y se sigue:
+      // matar la corrida perdería las otras cuatro pantallas, y dar por buena
+      // una pantalla que no cargó sería peor todavía.
+      if (quiero("comisiones")) {
       await page.goto(`${BASE}/comisiones`, { waitUntil: "networkidle" });
-      await page.waitForFunction(() => /Excel/.test(document.body.innerText), null, { timeout: 120000 });
-      await page.waitForTimeout(3000);
-      if (conLinea && ETAPA === "despues") {
-        const r = await page.evaluate(INSERTAR("main > div > div:first-child"));
-        if (r !== "insertado") fallos.push(`comisiones/${ancho.w}: no pude insertar la línea (${r})`);
+      try {
+        await page.waitForFunction(() => /Excel/.test(document.body.innerText), null, { timeout: 120000 });
+        await page.waitForTimeout(3000);
+        if (conLinea && ETAPA === "despues") {
+          const r = await page.evaluate(INSERTAR("main > div > div:first-child"));
+          if (r !== "insertado") fallos.push(`comisiones/${ancho.w}: no pude insertar la línea (${r})`);
+        }
+        revisar(`comisiones/${ancho.w}/${sufijo}`, await page.evaluate(LEER), conLinea);
+      } catch {
+        salida.casos[`comisiones/${ancho.w}/${sufijo}`] = { noCargo: true };
+        console.error(`  ⚠️  comisiones/${ancho.w}/${sufijo}: no cargó a tiempo — NO se mide`);
       }
-      revisar(`comisiones/${ancho.w}/${sufijo}`, await page.evaluate(LEER), conLinea);
+      }
 
       await ctx.close();
     }
@@ -259,7 +282,7 @@ async function main() {
     if (!clave.endsWith("/con-linea")) continue;
     const base = salida.casos[clave.replace("/con-linea", "/sin-linea")];
     const con = salida.casos[clave];
-    if (!base) continue;
+    if (!base || base.noCargo || con.noCargo) continue;
     // La línea agrega SU propio monto ($266,541,352.00): se descuenta antes de
     // comparar, si no la comparación acusaría al cambio de mover una cifra.
     const conSinElAviso = con.montos.filter((m) => m !== "$266,541,352.00");
@@ -274,6 +297,7 @@ async function main() {
   console.log(JSON.stringify(salida, null, 1));
   console.error("\n═══ RESUMEN ═══");
   for (const [k, v] of Object.entries(salida.casos)) {
+    if (v.noCargo) { console.error(`${k.padEnd(38)} ⚠️  no cargó`); continue; }
     console.error(
       `${k.padEnd(38)} arrastre ${String(v.docOverflow).padStart(4)} · interno ${String(v.arrastre).padStart(4)} · ` +
         `<44px ${String(v.chicos.length).padStart(3)} · <12px ${String(v.chicaLetra.length).padStart(3)} · ` +
