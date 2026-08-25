@@ -31,6 +31,12 @@ const PEDIDOS: PedidoExportRow[] = [
     item_count: 3,
     total: 1234.56,
     created_at: "2026-07-01T14:30:00.000Z",
+    // Del link SIN convertir: todavía no tiene número de la casa, y tampoco
+    // pudo haber salido a Switch.
+    numero_pedido: null,
+    switch_numero: null,
+    switch_documento: null,
+    fuente: "publicos",
   },
   {
     origen: "mio",
@@ -39,6 +45,10 @@ const PEDIDOS: PedidoExportRow[] = [
     item_count: 1,
     total: 100,
     created_at: "2026-07-02T10:00:00.000Z",
+    numero_pedido: "PED-018",
+    switch_numero: "16-000000506",
+    switch_documento: "cotizacion",
+    fuente: "orders",
   },
 ];
 
@@ -58,7 +68,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
   });
 
   it("headers correctos con fill navy 1A2656", () => {
-    const headers = ["Origen", "Cliente", "Vendedor", "Items", "Total", "Fecha"];
+    const headers = ["Origen", "Cliente", "Vendedor", "Items", "Total", "Fecha", "N° pedido", "Switch"];
     headers.forEach((h, c) => {
       expect(ws[A(HDR_ROW, c)].v).toBe(h);
       expect(ws[A(HDR_ROW, c)].s.fill.fgColor.rgb).toBe(NAVY);
@@ -71,6 +81,80 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
     expect(ws[A(DATA_ROW, 5)].v).toBe("01/07/2026");
     expect(ws[A(DATA_ROW + 1, 0)].v).toBe("Mío");
     expect(ws[A(DATA_ROW + 1, 1)].v).toBe("Sin nombre");
+  });
+
+  // ── 🔴 LOS DOS NÚMEROS (25-ago-2026) ───────────────────────────────────────
+  it("🔴 las dos columnas nuevas van AL FINAL — las 6 de siempre no se movieron", () => {
+    // Daniel puede tener una planilla enganchada a este archivo: mover una
+    // columna existente se la corre entera. Las viejas quedan donde estaban.
+    expect(ws[A(HDR_ROW, 0)].v).toBe("Origen");
+    expect(ws[A(HDR_ROW, 5)].v).toBe("Fecha");
+    expect(ws[A(HDR_ROW, 6)].v).toBe("N° pedido");
+    expect(ws[A(HDR_ROW, 7)].v).toBe("Switch");
+    expect(ws[A(HDR_ROW, 8)]).toBeUndefined();
+    // Y el orden de las FILAS tampoco: primero el del link, después el mío.
+    expect(ws[A(DATA_ROW, 0)].v).toBe("Del link");
+    expect(ws[A(DATA_ROW + 1, 0)].v).toBe("Mío");
+  });
+
+  it("🔴 el que no salió DICE que no salió — no un guion", () => {
+    // Un guion en la columna de un número se lee como un cero o como un dato
+    // que no cargó. Criterio EXACTO de la pantalla (#593).
+    expect(ws[A(DATA_ROW, 7)].v).toBe("No se ha mandado a Switch");
+    expect(ws[A(DATA_ROW, 7)].v).not.toBe("—");
+    expect(ws[A(DATA_ROW, 7)].v).not.toBe("-");
+    // Y el del link sin convertir tampoco miente con un blanco.
+    expect(ws[A(DATA_ROW, 6)].v).toBe("Se numera al abrirlo");
+  });
+
+  it("🔴 la columna de Switch DICE si fue pedido o COTIZACIÓN", () => {
+    // Una cotización NO aparta mercancía: con el número solo, las dos se ven
+    // iguales en la planilla.
+    expect(ws[A(DATA_ROW + 1, 6)].v).toBe("PED-018");
+    expect(ws[A(DATA_ROW + 1, 7)].v).toBe("Cotización en Switch: 16-000000506");
+  });
+
+  it("un pedido de verdad (documento='pedido') se nombra pedido", () => {
+    const wb2 = buildPedidosWorkbook({
+      marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true,
+      pedidos: [{ ...PEDIDOS[1], switch_documento: "pedido" }],
+    });
+    expect(wb2.Sheets["Pedidos"][A(DATA_ROW, 7)].v).toBe("Pedido en Switch: 16-000000506");
+  });
+
+  it("un envío VIEJO sin la columna `documento` se sigue leyendo como pedido", () => {
+    // La DDL 20260824160000 puede no estar corrida: ausencia ⇒ pedido, que es
+    // lo único que el sistema sabía crear.
+    const wb2 = buildPedidosWorkbook({
+      marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true,
+      pedidos: [{ ...PEDIDOS[1], switch_documento: null }],
+    });
+    expect(wb2.Sheets["Pedidos"][A(DATA_ROW, 7)].v).toBe("Pedido en Switch: 16-000000506");
+  });
+
+  it("🔴 la banda de TOTALES llega hasta la última columna — no se corta a la mitad", () => {
+    // `buildReportSheet` pinta la fila de totales recorriendo el arreglo que se
+    // le pasa: si queda más corto que las columnas, las últimas quedan SIN
+    // celda y la banda de color se ve cortada justo donde están los números
+    // nuevos. Se mira el ESTILO, no el valor: las dos celdas van vacías.
+    const totRow = DATA_ROW + PEDIDOS.length + 1;
+    for (let c = 0; c <= 7; c++) {
+      const cel = ws[A(totRow, c)];
+      expect(cel, `la fila de totales no llega a la columna ${c}`).toBeTruthy();
+      expect(cel.s.fill.fgColor.rgb, `la columna ${c} de totales sin banda`).toBe(NAVY);
+    }
+    expect(ws[A(totRow, 8)]).toBeUndefined();
+  });
+
+  it("`conNumeros: false` deja el libro EXACTAMENTE como antes (6 columnas)", () => {
+    // El escalón por si la vista no diera `id_natural`/`fuente`: sin esos datos
+    // escribir «No se ha mandado a Switch» en todas las filas sería MENTIRA.
+    const wb2 = buildPedidosWorkbook({
+      marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true, conNumeros: false, pedidos: PEDIDOS,
+    });
+    const ws2 = wb2.Sheets["Pedidos"];
+    expect(ws2[A(HDR_ROW, 5)].v).toBe("Fecha");
+    expect(ws2[A(HDR_ROW, 6)]).toBeUndefined();
   });
 
   it("moneda como número real con MONEY_FMT y cantidades con z '0'", () => {
@@ -118,17 +202,21 @@ describe("buildPedidosWorkbook — Joybees (sin Origen)", () => {
   const wb = buildPedidosWorkbook({ marca: "joybees", titulo: "JOYBEES — Pedidos", conOrigen: false, pedidos });
   const ws = wb.Sheets["Pedidos"];
 
-  it("mismo layout compartido, título propio y 5 columnas (sin Origen)", () => {
+  it("mismo layout compartido, título propio y 7 columnas (sin Origen)", () => {
     expect(ws[A(0, 0)].v).toBe("JOYBEES — Pedidos");
     // La banda es del GRIS de Joybees, no del navy de Reebok.
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(JOYBEES_PALETTE.pri);
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).not.toBe(NAVY);
-    const headers = ["Cliente", "Vendedor", "Items", "Total", "Fecha"];
+    const headers = ["Cliente", "Vendedor", "Items", "Total", "Fecha", "N° pedido", "Switch"];
     headers.forEach((h, c) => {
       expect(ws[A(HDR_ROW, c)].v).toBe(h);
       expect(ws[A(HDR_ROW, c)].s.fill.fgColor.rgb).toBe(JOYBEES_PALETTE.pri);
     });
-    expect(ws[A(HDR_ROW, 5)]).toBeUndefined();
+    expect(ws[A(HDR_ROW, 7)]).toBeUndefined();
+    // Los dos números también acá: Joybees es espejo EXACTO de Reebok.
+    expect(ws[A(DATA_ROW, 5)].v).toBe("Se numera al abrirlo");
+    expect(ws[A(DATA_ROW + 1, 5)].v).toBe("PED-018");
+    expect(ws[A(DATA_ROW + 1, 6)].v).toBe("Cotización en Switch: 16-000000506");
   });
 
   it("moneda numérica y total en la banda de la marca", () => {

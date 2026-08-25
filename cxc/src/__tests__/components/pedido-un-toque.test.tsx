@@ -101,26 +101,24 @@ const toquesAuto = (l: Llamada[]) => postsEnvio(l).filter((c) => (c.body || "").
 /** Creación DIRECTA, sin pre-validar (el "Enviar igual" del modal). */
 const creacionesDirectas = (l: Llamada[]) => postsEnvio(l).filter((c) => !(c.body || "").includes('"auto":true'));
 
-async function montar() {
-  render(<PedidoDetalleClient marca="reebok" />);
-  return await screen.findByRole("button", { name: /Enviar a Switch/ });
-}
-
 /**
- * EL TOQUE COMPLETO (24-ago-2026). "Enviar a Switch" ya no manda: pregunta QUÉ
- * —pedido o cotización— y recién la opción elegida dispara el envío. Es un toque
- * más a propósito: una cotización NO aparta mercancía y esa diferencia no se ve.
- *
- * Todo lo que este archivo fija sigue midiéndose sobre el camino COMPLETO, no
- * sobre el primer toque: qué POST sale, cuántos, y qué pasa si se toca dos veces.
+ * 25-ago-2026: ya NO hay un botón "Enviar a Switch". Están las DOS salidas,
+ * "Pedido" y "Cotización", y tocarlas manda directo — sin ventana en el medio.
+ * Todo lo que este archivo fija sigue midiéndose sobre el camino COMPLETO: qué
+ * POST sale, cuántos, y qué pasa si se toca dos veces.
  */
 const opcion = (clave: "pedido" | "cotizacion") =>
   document.querySelector(`[data-medir="documento-${clave}"]`) as HTMLButtonElement | null;
 
+async function montar() {
+  render(<PedidoDetalleClient marca="reebok" />);
+  await waitFor(() => expect(opcion("pedido")).not.toBeNull());
+  return opcion("pedido")!;
+}
+
 async function tocarEnviar(btn: HTMLElement, clave: "pedido" | "cotizacion" = "pedido") {
-  await act(async () => { fireEvent.click(btn); });
-  const o = opcion(clave);
-  if (!o) return null; // el botón estaba apagado: no hay elección que hacer
+  const o = clave === "pedido" ? (btn as HTMLButtonElement) : opcion(clave);
+  if (!o || o.disabled) return null; // apagado: esa salida no se ofrece
   await act(async () => { fireEvent.click(o); });
   return o;
 }
@@ -135,11 +133,14 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 // ── El camino normal ─────────────────────────────────────────────────────────
 
 describe("un solo toque", () => {
-  it('🔴 el botón dice "Enviar a Switch" — sin "Confirmar y"', async () => {
+  it("🔴 se ofrecen LAS DOS salidas, directo, y la cotización trae su etiqueta", async () => {
     stubApi();
     const btn = await montar();
-    expect(btn.textContent).toBe("Enviar a Switch");
+    expect(btn.textContent).toBe("Pedido");
+    expect(opcion("cotizacion")!.textContent).toBe("Cotizaciónno aparta mercancía");
+    // Ni el texto viejo ni el paso viejo.
     expect(document.body.textContent).not.toContain("Confirmar y enviar a Switch");
+    expect(document.body.textContent).not.toContain("Enviar a Switch");
   });
 
   it("🔴 con todo limpio, UN toque crea el pedido: confirma, revisa y escribe — sin modal", async () => {
@@ -162,8 +163,9 @@ describe("un solo toque", () => {
   it("el aviso de que crea un pedido REAL va ANTES del toque, no en un modal después", async () => {
     stubApi();
     await montar();
-    // 24-ago-2026: el aviso nombra las DOS salidas, porque ahora hay dos.
-    const aviso = screen.getByText(/Elige pedido o cotización, y se crea de verdad en Switch/);
+    // 25-ago-2026: el aviso ya no narra la elección (las dos salidas están a la
+    // vista, con sus nombres). Queda lo que NO se ve: que es de verdad.
+    const aviso = screen.getByText(/Se crea de verdad en Switch/);
     expect(aviso.textContent).toContain("active_shoes");
     expect(aviso.textContent).toMatch(/borrarlo a mano en el panel de Switch/);
   });
@@ -178,8 +180,7 @@ describe("un solo toque", () => {
       return base(u, i);
     });
     const btn = await montar();
-    fireEvent.click(btn);
-    await act(async () => { fireEvent.click(opcion("pedido")!); });
+    await act(async () => { fireEvent.click(btn); });
     await screen.findByText(/Revisando el pedido contra Switch/);
     await act(async () => { soltar(null); });
     await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
@@ -267,23 +268,22 @@ describe("🔴 doble toque NO duplica el pedido", () => {
   it("dos clics seguidos hacen UN solo POST real", async () => {
     const llamadas = stubApi();
     const btn = await montar();
-    // El envío nace en la OPCIÓN, así que el triple toque va ahí: es el botón
-    // que hoy puede duplicar un pedido si el `enviandoRef` se rompe.
-    await act(async () => { fireEvent.click(btn); });
-    const pedido = opcion("pedido")!;
+    // El envío nace en la OPCIÓN misma (25-ago-2026: ya no hay paso previo), así
+    // que el triple toque va ahí: es el botón que puede duplicar un pedido si el
+    // `enviandoRef` se rompe.
     await act(async () => {
-      fireEvent.click(pedido);
-      fireEvent.click(pedido);
-      fireEvent.click(pedido);
+      fireEvent.click(btn);
+      fireEvent.click(btn);
+      fireEvent.click(btn);
     });
     await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
     expect(postsEnvio(llamadas)).toHaveLength(1);
-    // Y el botón de la pantalla tampoco abre una segunda elección encima.
-    await act(async () => { fireEvent.click(btn); fireEvent.click(btn); });
-    expect(postsEnvio(llamadas)).toHaveLength(1);
+    // Y la OTRA salida tampoco se cuela dentro del mismo envío: mientras corre
+    // no está dibujada (el candado de arriba) y el `enviandoRef` la rebota.
+    expect(toquesAuto(llamadas)).toHaveLength(1);
   });
 
-  it("el botón queda deshabilitado mientras corre", async () => {
+  it("mientras corre, las dos salidas dejan de estar en pantalla", async () => {
     let soltar: (v: unknown) => void = () => {};
     const espera = new Promise((r) => { soltar = r; });
     stubApi();
@@ -293,9 +293,14 @@ describe("🔴 doble toque NO duplica el pedido", () => {
       return base(u, i);
     });
     const btn = await montar();
-    fireEvent.click(btn);
-    await act(async () => { fireEvent.click(opcion("pedido")!); });
-    await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(true));
+    await act(async () => { fireEvent.click(btn); });
+    // Sin ventana de por medio, lo que impide el segundo toque es que las dos
+    // opciones se vayan y quede el renglón del paso vivo.
+    await waitFor(() => {
+      expect(opcion("pedido")).toBeNull();
+      expect(opcion("cotizacion")).toBeNull();
+      expect(document.querySelector('[data-medir="enviando-switch"]')).not.toBeNull();
+    });
     await act(async () => { soltar(null); });
   });
 

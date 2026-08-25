@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
-import ElegirDocumentoSwitch from "@/components/catalogo/ElegirDocumentoSwitch";
+import EnviarDocumentoSwitch from "@/components/catalogo/EnviarDocumentoSwitch";
 import {
   type DocumentoSwitch,
   TEXTO_NO_RESERVA,
@@ -36,8 +36,6 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   const [envio, setEnvio] = useState<Envio | null | undefined>(undefined);
   const [retrying, setRetrying] = useState(false);
   const [retryMsg, setRetryMsg] = useState<string | null>(null);
-  // El envío desde acá también elige salida: pedido o cotización.
-  const [eligiendoDocumento, setEligiendoDocumento] = useState(false);
 
   const load = useCallback(async () => {
     const [oRes, eRes] = await Promise.all([
@@ -69,7 +67,6 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
       setRetryMsg("Sin conexión — intenta de nuevo.");
     } finally {
       setRetrying(false);
-      setEligiendoDocumento(false);
     }
   }
 
@@ -137,14 +134,16 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
           {/* Acciones — máximo 3: enviar/reintentar (si aplica), Ver PDF
               directo (share nativo del visor), volver. */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {/* 🔴 Las dos salidas, directo (25-ago-2026): antes era un botón
+                que abría una ventana preguntando cuál. La etiqueta de la
+                cotización viaja pegada a la opción. */}
             {puedeReintentar && (
-              <button
-                onClick={() => setEligiendoDocumento(true)}
-                disabled={retrying}
-                className="rounded-md bg-black px-4 min-h-[48px] text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-40 sm:col-span-2"
-              >
-                {retrying ? "Enviando…" : sinIntento ? "Enviar a Switch" : "Reintentar envío a Switch"}
-              </button>
+              <div className="sm:col-span-2">
+                <EnviarDocumentoSwitch
+                  onElegir={(d) => { void reintentar(d); }}
+                  enviando={retrying}
+                />
+              </div>
             )}
             <a
               href={`${cfg.api}/orders/${orderId}/pdf`}
@@ -159,13 +158,6 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
             </Link>
           </div>
 
-          {/* Misma elección que en el checkout y en el detalle, misma pieza. */}
-          <ElegirDocumentoSwitch
-            open={eligiendoDocumento}
-            enviando={retrying}
-            onClose={() => setEligiendoDocumento(false)}
-            onElegir={(d) => { void reintentar(d); }}
-          />
         </div>
       )}
     </div>

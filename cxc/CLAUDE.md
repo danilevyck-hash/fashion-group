@@ -1562,6 +1562,8 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 
 ## Pedido o COTIZACIÓN — el mismo botón, dos salidas (24-ago-2026)
 
+> ⚠️ **SUPERADO EN PARTE el 25-ago-2026 — ver *«LAS DOS SALIDAS SE OFRECEN DIRECTO»* más abajo.** Lo que cambió es SOLO cómo se ofrecen: **no hay ventana en el medio, no hay párrafo, y el componente `ElegirDocumentoSwitch` YA NO EXISTE**. Todo lo demás de este bloque —el endpoint sin documentar y cómo se mapeó, el 422 del cliente, `normalizarDocumento`, el at-most-once, el aviso de Telegram, el DDL tolerante y el pedido del LINK— **sigue vigente tal cual**.
+>
 > "Enviar a Switch" tenía UNA sola salida: `POST /apipedido/terminar`, que crea un PEDIDO. Daniel pidió poder mandar también una **cotización** y fue textual sobre cómo: ***"que estén los dos"*** — se elige cada vez, ninguna reemplaza a la otra.
 >
 > ### El endpoint, y cómo se mapeó SIN ensuciar producción
@@ -1688,6 +1690,84 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > ### Lo que NO se tocó
 >
 > El modal de eliminación masiva y su `switch_numero` · el candado at-most-once · el envío a Switch · la agrupación por mes · el routing de «Editar» (fila y botón al MISMO lado) · el Excel de «Exportar» · y **nada del detalle del pedido**.
+
+## 🔴 LAS DOS SALIDAS SE OFRECEN DIRECTO — se fue la ventana y se fue el párrafo (25-ago-2026)
+
+> Daniel, textual: ***"quiero que en vez de que diga «enviar a switch», salga cotización o pedido como opción (sin párrafo explicando, btw no siempre hay q estar explicando todo, se vuelve tedioso)"***.
+>
+> ```
+> ANTES (24-ago)                          AHORA
+> [ Enviar a Switch ]                     ┌──────────┬─────────────────────┐
+>        ↓ abre una ventana               │  Pedido  │     Cotización      │
+> ┌────────────────────────────────┐      │          │ no aparta mercancía │
+> │ ¿Qué mandas a Switch?          │      └──────────┴─────────────────────┘
+> │ Pedido — Aparta la mercancía…  │        (sólido)      (ámbar, contorno)
+> │ Cotización — La cotización NO  │
+> │ aparta la mercancía: si coti-  │      Falta: elegir el cliente
+> │ zas 500 pares, a los otros…  · │
+> │ Si después lo compran, dupli-  │
+> │ ca el pedido y mándalo como…   │
+> │ [ Cancelar ]                   │
+> └────────────────────────────────┘
+> ```
+>
+> **Los textos EXACTOS son cuatro palabras: «Pedido» · «Cotización» + «no aparta mercancía».** Un toque manda.
+>
+> ### 🔴 SE VA EL PÁRRAFO, NO EL DATO — y la etiqueta tiene candado de LARGO
+>
+> Esto **revierte un criterio del 24-ago** (*"dos botones gemelos al lado se tocan sin leer"*). **La decisión nueva es de Daniel y manda**, pero el riesgo que ese criterio protegía es REAL y no desaparece: **una cotización NO aparta mercancía**, y tocar la equivocada manda 500 pares de la forma que no era. Así que de toda la explicación queda **lo único material, pegado a la opción y en el mínimo de palabras**: `NOTA_COTIZACION = "no aparta mercancía"`.
+> - **Eso NO es un párrafo, es una etiqueta, y el largo es parte del candado**: ≤ 4 palabras, ≤ 24 caracteres, sin punto y sin el ejemplo de los 500 pares. Si mañana alguien le agrega media frase "para que se entienda mejor", vuelve a ser lo que Daniel sacó — y el build se pone rojo.
+> - **Se fue todo el resto del texto didáctico**: `TEXTO_SI_RESERVA` (*"Aparta la mercancía para este cliente"*) y `TEXTO_COTIZACION_DESPUÉS` (*"Si después lo compran, duplica el pedido…"*) **ya no existen**.
+> - **`TEXTO_NO_RESERVA` (la frase larga) SIGUE VIVA donde sí hay lugar para leerla**: la confirmación DESPUÉS de mandar y el aviso de Telegram. No se dibuja antes de mandar.
+> - 🔴 **Y las dos NO se ven iguales, que es lo que impide el toque sin leer**: el pedido es el sólido (negro en checkout/confirmación, verde en el detalle) y la cotización es la de **contorno ámbar** con su etiqueta. Hay mutación para el caso simétrico: si el PEDIDO también llevara etiqueta, vuelven a ser gemelos y el build se pone rojo.
+>
+> ### 🔴 NINGÚN CANDADO SE AFLOJÓ — y los cuatro están mutados
+>
+> - **El cliente sigue siendo obligatorio.** El **422** de `handlePostEnvio` se lee ANTES del documento y no se tocó; las dos salidas **nacen APAGADAS y diciendo qué falta** (*"Falta: elegir el cliente y elegir el vendedor"*). La elección directa no es una puerta de atrás: hay test de CONDUCTA que toca las dos opciones sin cliente y cuenta **0 envíos**.
+> - **`normalizarDocumento` intacto**: cualquier valor que no sea exactamente `pedido` o `cotizacion` **cae a PEDIDO**. El servidor no confía en el navegador.
+> - **El at-most-once no se tocó** (`(order_id) WHERE estado <> 'error'`): cotizar sigue consumiendo el envío de ese pedido, y para vender de verdad se duplica. ⚠️ **Esa consecuencia ya NO se dice en la elección** (era la línea *"Si después lo compran, duplica…"*, que se fue con el párrafo). Se sigue diciendo el banner del candado post-envío. Es lo que costó sacar el párrafo, y queda escrito.
+> - **Telegram sigue diciendo cuál fue** (📝 vs 📦, *"COTIZACIÓN enviada a Switch"* + *"No aparta mercancía"*), y **el pedido del LINK público no se tocó**.
+> - **Mientras manda, las dos opciones DESAPARECEN** y queda el renglón del paso vivo: sin ventana de por medio, eso es lo que impide el doble toque (más el `enviandoRef` del detalle). Hay mutación.
+>
+> ### Una sola pieza para las 4 marcas y las 3 pantallas
+>
+> `src/components/catalogo/EnviarDocumentoSwitch.tsx` — **NO es un modal**: sin `createPortal`, sin `useBodyScrollLock`, sin `autoFocus`. Lo dibujan `CheckoutClient`, `PedidoDetalleClient` y `ConfirmacionClient`; **Joybees sigue siendo espejo exacto de Reebok y no se tocó nada propio de Reebok**. `ElegirDocumentoSwitch.tsx` **se BORRÓ** — dejarlo sin usar sería una segunda forma de mandar plata al ERP esperando a que alguien la vuelva a montar; hay test que exige que el archivo no exista.
+> - **En el checkout las dos salidas bajaron del costado del total a un renglón propio a todo el ancho**: en 390 px dos opciones no entran al lado del monto.
+> - **Textos que se podaron por quedar repetidos:** en el detalle, *"Elige pedido o cotización, y se crea de verdad en Switch"* → *"Se crea de verdad en Switch (…)"* (las dos salidas están a la vista con sus nombres). En la confirmación se fue el *"Reintentar envío a Switch"*: el estado ya lo dice arriba (*"El envío a Switch falló"* / *"Este pedido aún no se ha enviado"*).
+>
+> ### El Excel de Pedidos lleva los DOS números
+>
+> **«Catálogos › Administrar › Pedidos › Exportar»** bajaba un .xlsx **sin los números que la pantalla muestra desde el #593**. Ahora lleva **dos columnas nuevas, AL FINAL**: `N° pedido` y `Switch`.
+> - 🔴 **AL FINAL, NO INTERCALADAS.** Daniel puede tener una planilla enganchada a ese archivo y mover una columna existente **se la corre entera**. Las 6 de siempre quedan donde estaban, en su orden, y el orden de las FILAS tampoco cambia. Hay mutación que intercala una columna y pone el build rojo.
+> - 🔴 **El que no salió DICE que no salió**: `No se ha mandado a Switch`, **nunca un guion** (un guion en la columna de un número se lee como un cero o como un dato que no cargó). El del LINK sin convertir dice `Se numera al abrirlo`. **Es el criterio EXACTO de la pantalla porque es el MISMO módulo** (`numeros-pedido.ts`), no una copia: hay mutación que reescribe los textos a mano.
+> - 🔴 **La columna de Switch dice si fue PEDIDO o COTIZACIÓN**: `Cotización en Switch: 16-000000506`. Con el número solo, las dos se ven iguales en una planilla.
+> - **Los datos salen de las MISMAS dos consultas que `pedidos-unificado`** (envío activo + `order_number`, acotadas por los ids que la vista ya trajo), con el **escalón tolerante** del DDL `20260824160000`: sin la columna `documento` el Excel sale igual y todo se lee como pedido.
+> - 🔴 **SIN LOS DATOS NO SE INVENTA:** si la vista no pudiera dar `id_natural`/`fuente`, el libro sale **como salía antes, con sus 6 columnas** (`conNumeros: false`). Escribir «No se ha mandado a Switch» en las 42 filas sin haberlo mirado sería una **mentira en una planilla**, que es peor que una columna que no está. Hay mutación.
+> - **La banda de TOTALES crece con las columnas**: un `totals` más corto deja las dos últimas celdas sin celda y la banda se ve cortada justo donde están los números nuevos.
+>
+> ### Medición
+>
+> **`BASE=… MARCA=… PEDIDO_EDITABLE=… PEDIDO_EN_SWITCH=… node scripts/_medir-documento-directo-anchos.mjs`** — el navegador **ABORTA cualquier POST** a `/api/catalogo/checkout` y a `**/enviar-switch`. Ahora importa MÁS que antes: **tocar una opción MANDA**, así que ese candado es lo único que separa una medición de un pedido de verdad (el script ni las toca, pero medir no puede depender de que nadie se equivoque). **Escrituras bloqueadas: 0.**
+>
+> Contra el build de producción y con datos de producción, en las **4 marcas** y las **3 pantallas** (checkout · detalle · confirmación) + el detalle YA en Switch: **390 · 834 · 1024 · 1440 → 0 arrastre · 0 recorte · 0 táctil <44 px · 0 texto <12 px**, con las dos opciones y la etiqueta a la vista en los 4 anchos. Las opciones miden **175×56 px en el iPhone** y hasta 428×56 en escritorio: **crecen hacia abajo, no ensanchan nada**.
+> - 🔴 **Y CONTRA `origin/main`, mismo build de producción y mismos datos**: `SOLO_PANTALLA=1` mide únicamente la pantalla entera y **corre el MISMO archivo en las dos ramas** (dos scripts distintos no comparan nada). Resultado en las 4 marcas × 4 pantallas × 4 anchos: **arrastre 0, recorte 0, textos <12 px 0 y los táctiles <44 px IDÉNTICOS** — tommy 3·21·1·2 · reebok 4·6·2·2 · joybees 4·2 · calvin 3·6·1·3, los mismos números en las dos. Lo único que se mueve es la ALTURA (el detalle de calvin queda **12 px más CORTO** que en main).
+> - Los táctiles <44 px son los **PRE-EXISTENTES** (`← Inicio`, `← Catálogo`, el precio por pieza, `← Volver a Pedidos`, la `x` de quitar línea, `Ocultar de la lista`), en código que este cambio no toca.
+> - 🩸 **Gotcha ya documentado y sigue vigente:** al usuario de medición **no le corresponde vendedor**, así que hay que elegirle uno además del cliente — si no, las salidas quedan apagadas **con razón** y no hay nada que medir.
+> - 🩸 **El detalle bajo el candado post-envío NO ofrece salidas, y eso se mide como exigencia**: si aparecieran, se podría mandar dos veces.
+>
+> **🔴 EL EXCEL SE ABRE DE VERDAD, CON DOS PARSERS** (`BASE=… node scripts/_verif-excel-pedidos-numeros.mjs`, solo lectura): pide el archivo a la app corriendo, lo guarda, verifica la firma `PK` del zip y lo lee con **`xlsx-js-style`** y con **`jszip` + el XML crudo de `sheet1.xml`/`sharedStrings.xml`** — dos caminos que no comparten una línea de código. Medido en las 4 marcas: **48 filas, 96 celdas, 0 distintas entre los dos parsers**, columnas `… Fecha · N° pedido · Switch`, **13 pedidos dicen «No se ha mandado a Switch», 6 del link dicen «Se numera al abrirlo»**, y ni un guion. Un test que mire el workbook en memoria no prueba que el archivo salga bien.
+>
+> ### Candados
+>
+> `lib/documento-switch.test.ts` (la etiqueta, su largo, que el pedido NO la lleve, y que el modal viejo no exista) · **`components/pedido-cliente-obligatorio.test.tsx`** y **`components/pedido-un-toque.test.tsx`** (CONDUCTA: montan las pantallas REALES, tocan las opciones REALES y cuentan qué salió por `fetch`) · **`api/pedidos-export-numeros.test.ts`** (llama al handler del export, **abre el .xlsx que devuelve** y lee las celdas, en las 4 marcas) · `excel-exports-catalogos.test.ts` · `api/catalogo-paridad-enviar-switch.test.ts` · `lib/switch-envio-paralelo.test.ts`.
+> - **Verificado por mutación, 36 de 36 cazadas** (`bash scripts/_mutar-candados-documento-directo.sh`): la etiqueta deja de decir que no aparta · vuelve a ser un párrafo · la cotización la pierde · el PEDIDO también la lleva (gemelos) · un documento inventado se acepta · el default se vuelve cotización · el control dibuja su propia lista · deja de dibujar la etiqueta · las salidas no se apagan sin cliente · el control no dice qué falta · las salidas siguen tocables mientras manda · el checkout / el detalle / la confirmación mandan sin ofrecer las dos salidas · el checkout y el detalle dejan de apagar la elección · **el SERVIDOR deja pasar una cotización sin cliente** · las dos rutas dejan de pasar el documento · todo sale como pedido · todo sale como cotización · el envío no guarda qué se mandó · el Excel pierde las dos columnas · **las columnas se INTERCALAN** · el que no salió vuelve a un guion · la columna de Switch deja de decir cuál fue · toda cotización se rotula como pedido · el Excel escribe los textos a mano · el del link vuelve a un blanco · la banda de totales se corta · la ruta del export no manda el número de la casa / el de Switch / qué se mandó · pierde el escalón tolerante del DDL · barre la tabla de orders entera · **sin `id_natural` el Excel inventa que nadie salió a Switch**.
+> - 🩸 **DOS mutaciones no se cazaron en la primera corrida, y las dos enseñaron algo.** Una era del SCRIPT (patrón muerto: el texto no matcheaba, el archivo quedaba SANO y los tests pasaban) — por eso `mutar()` **denuncia el patrón que no muta** en vez de darlo por cazado, y exige que el archivo CAMBIE. La otra era un **candado flojo**: la banda de totales cortada no rompía nada porque ningún test miraba el ESTILO de las últimas celdas de esa fila.
+> - 🩸 **La restauración va por COPIA, no con `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada — las mutaciones se apilarían y ninguna se probaría por separado.
+> - ⚠️ **Las guardas del NAVEGADOR siguen sin ser verificables por mutación y se dice de frente**: React no despacha el click de un botón deshabilitado ni forzándole `disabled = false`. Son segunda capa; el candado que no se puede saltear es el 422 del servidor, y ése SÍ está mutado.
+>
+> ### Lo que NO se tocó
+>
+> El endpoint `/apicotizacion/terminar` y el motor único de envío · el 422 del cliente · `normalizarDocumento` · el at-most-once · el DDL `20260824160000` y su tolerancia · el aviso de Telegram · el pedido del LINK público · los dos números en la LISTA del admin (#593) · el resto de las columnas del Excel y el orden de las filas · el flujo de 3 toques, «Duplicar» y el modo pedido.
 
 ## 🔴 Pedidos — EL CLIENTE SE ELIGE, NUNCA VIENE PUESTO (14-ago-2026)
 

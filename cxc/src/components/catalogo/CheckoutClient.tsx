@@ -3,8 +3,9 @@
 // Checkout ÚNICO de los catálogos (las 4 marcas) — mockup aprobado:
 // carrito → esta pantalla → confirmación. Items editables, cliente del
 // directorio Switch, vendedor con el del login PUESTO por defecto y cambiable
-// (12-ago-2026 — antes era automático y sin salida), total y UN botón
-// "Enviar a Switch". SIN validación de stock aquí (decisión de Daniel 5-jul: el
+// (12-ago-2026 — antes era automático y sin salida), total y las DOS salidas a
+// Switch —"Pedido" y "Cotización"— ofrecidas directo, sin ventana en el medio
+// (25-ago-2026). SIN validación de stock aquí (decisión de Daniel 5-jul: el
 // stock del sync <24h basta; flujo rápido).
 // El carrito vive en la SESIÓN de la pestaña (lib/catalogo/carrito.ts) y NUNCA
 // se limpia antes de que el pedido quede guardado en DB.
@@ -43,7 +44,7 @@ import ClienteSwitchPicker, {
   type ClienteSwitchOpcion,
   nombreDeCliente,
 } from "@/components/catalogo/ClienteSwitchPicker";
-import ElegirDocumentoSwitch from "@/components/catalogo/ElegirDocumentoSwitch";
+import EnviarDocumentoSwitch from "@/components/catalogo/EnviarDocumentoSwitch";
 import { type DocumentoSwitch } from "@/lib/catalogo/documento-switch";
 import {
   SIN_CLIENTE_ELEGIDO,
@@ -106,9 +107,6 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   const [vendedorDelLogin, setVendedorDelLogin] = useState<{ id: number; nombre: string | null } | null>(null);
   const [vendedorPickerOpen, setVendedorPickerOpen] = useState(false);
   const [sending, setSending] = useState(false);
-  // El selector de salida: pedido o cotización (24-ago-2026). Se abre con el
-  // MISMO botón "Enviar a Switch" — un toque más, con la diferencia explicada.
-  const [eligiendoDocumento, setEligiendoDocumento] = useState(false);
   // Línea con el precio en edición (tap sobre el precio → input numérico).
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState("");
@@ -172,20 +170,11 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
     if (v > 0) persistCart(cart.map((i) => (i.product_id === productId ? { ...i, unit_price: v } : i)));
   };
 
-  // ── Enviar a Switch: primero QUÉ, después mandar ──
+  // ── Enviar a Switch: las dos salidas, DIRECTO ──
   //
-  // El botón ya no manda: abre la elección (pedido o cotización). Es un toque
-  // más a propósito — la diferencia entre las dos no se ve en la pantalla y una
-  // cotización NO aparta mercancía (ver `ElegirDocumentoSwitch`).
-  function abrirEleccionDocumento() {
-    // MISMA guarda que tenía `confirmar`: sin cliente elegido no se abre nada.
-    // Si esto se relajara, el paso siguiente igual rebota — el candado vive en
-    // el servidor (400 de /api/catalogo/checkout) — pero la pantalla no puede
-    // ofrecer un camino que ya sabe que no existe.
-    if (!puedeConfirmar || cliente === undefined) return;
-    setEligiendoDocumento(true);
-  }
-
+  // 25-ago-2026: ya no hay ventana en el medio. Se toca "Pedido" o "Cotización"
+  // y sale. La diferencia material —la cotización no aparta mercancía— viaja
+  // como etiqueta pegada a la opción (ver `EnviarDocumentoSwitch`).
   async function confirmar(documento: DocumentoSwitch) {
     // Segunda capa contra un cambio futuro del `disabled`. ⚠️ NO es el candado
     // y no se puede verificar por mutación: React no despacha el click de un
@@ -232,7 +221,6 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
       setError("Sin conexión — el carrito sigue guardado, intenta de nuevo.");
     } finally {
       setSending(false);
-      setEligiendoDocumento(false);
     }
   }
 
@@ -444,42 +432,26 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
 
           {/* Total + confirmar */}
           <section className="rounded-lg border-2 p-4" style={{ borderColor: cfg.accent }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Total del pedido</div>
-                <div className="text-2xl font-semibold tabular-nums">${fmt(total)}</div>
-                <div className="text-xs text-gray-400 tabular-nums">{cart.length} producto(s) · {totalPiezas} piezas</div>
-              </div>
-              <div className="shrink-0 text-right">
-                <button
-                  onClick={abrirEleccionDocumento}
-                  disabled={!puedeConfirmar}
-                  className="rounded-md bg-black px-5 min-h-[48px] text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-40"
-                >
-                  {sending ? "Enviando…" : "Enviar a Switch"}
-                </button>
-                {/* El botón apagado DICE qué falta, acá mismo. Un botón que se
-                    deja tocar y contesta con un toast obliga a tocarlo una vez
-                    por cada cosa que falta (misma regla que Guías). */}
-                {!sending && falta.length > 0 && (
-                  <p data-medir="falta-enviar" className="mt-1.5 text-xs text-amber-800 max-w-[10rem] ml-auto">
-                    {textoFaltaEnviar(falta)}
-                  </p>
-                )}
-              </div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Total del pedido</div>
+              <div className="text-2xl font-semibold tabular-nums">${fmt(total)}</div>
+              <div className="text-xs text-gray-400 tabular-nums">{cart.length} producto(s) · {totalPiezas} piezas</div>
+            </div>
+            {/* 🔴 Las dos salidas, directo. Antes acá había UN botón "Enviar a
+                Switch" a la derecha del total que abría una ventana; en 390 px
+                dos opciones no entran al lado del monto, así que bajan a un
+                renglón propio a todo el ancho. */}
+            <div className="mt-4">
+              <EnviarDocumentoSwitch
+                onElegir={(d) => { void confirmar(d); }}
+                enviando={sending}
+                deshabilitado={!puedeConfirmar}
+                faltaTexto={falta.length > 0 ? textoFaltaEnviar(falta) : null}
+              />
             </div>
           </section>
         </div>
       )}
-
-      {/* La elección: pedido (aparta) o cotización (no aparta). Un solo toque
-          más, y la diferencia se lee ANTES de mandar. */}
-      <ElegirDocumentoSwitch
-        open={eligiendoDocumento}
-        enviando={sending}
-        onClose={() => setEligiendoDocumento(false)}
-        onElegir={(d) => { void confirmar(d); }}
-      />
     </div>
   );
 }
