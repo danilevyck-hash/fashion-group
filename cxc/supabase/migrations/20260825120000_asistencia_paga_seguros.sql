@@ -1,0 +1,113 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ASISTENCIA — A QUIEN SE LE DESCUENTAN LOS SEGUROS (social y educativo, JUNTOS)
+--
+-- ── 🩸 EL AGUJERO QUE TAPA ───────────────────────────────────────────────────
+--
+-- La planilla le cobraba seguro social (9,75 %) y educativo (1,25 %) a las 31
+-- de 31 personas con dinero calculado, porque los dos porcentajes viven en
+-- `asistencia_reglas` y una regla GLOBAL no tiene forma de decir "a esta no".
+--
+-- El Excel real de la contadora (16 al 31 de julio de 2026, las tres empresas)
+-- dice otra cosa, y se lee celda por celda en sus formulas:
+--   · Confecciones Boston -> 4 de 19 filas tienen `=L*9,75%`. El resto, 0 o vacio.
+--   · Vistana             -> las 6 de la planilla si; las 2 de "Servicios
+--                            Profesionales" (Andrea Perez y Jorman Hernandez) no.
+--   · Fashion Wear        -> NADIE. Su cuadro entero esta bajo "Servicios
+--                            Profesionales".
+-- Total: 8 de 27. Medido, no deducido: son las formulas del archivo.
+--
+-- Diferencia medida en la quincena del 16 al 31 de julio: la planilla cobraba
+-- ~$695 de mas por quincena, que es la mayor parte de los $879 que separaban
+-- nuestro total del suyo.
+--
+-- ── 🔴 POR QUE NO SE PUEDE DEDUCIR DE NINGUN DATO QUE YA TENGAMOS ────────────
+--
+-- No es "tiene salario" ni "es servicio profesional". Las cuatro de Boston que
+-- SI pagan estan en la MISMA lista, con el mismo tipo de sueldo, que las quince
+-- que no. Quien esta inscrito en la Caja de Seguro Social es un hecho externo
+-- al reloj y a la ficha. Por eso es una bandera explicita, igual que
+-- `servicio_profesional`, y no una regla derivada que se equivocaria sola.
+--
+-- ── 🔴 UNA SOLA COLUMNA PARA LOS DOS SEGUROS ─────────────────────────────────
+--
+-- Daniel, textual: *"esto es junto, no es separado cada uno. El que usa uno
+-- usara ambos."* Y el Excel lo confirma: no hay una sola fila con seguro social
+-- y sin educativo, ni al reves. Dos columnas serian dos formas de dejarlo mal
+-- puesto sin comprar ni un caso real: es la misma trampa que el almuerzo, que
+-- tenia dos perillas para el mismo dato y por eso se unifico el 13-ago-2026.
+--
+-- ── 🔴 EL DEFAULT ES `true`, Y ESO NO ES UN DETALLE ──────────────────────────
+--
+-- `DEFAULT true NOT NULL` deja a las 38 fichas EXACTAMENTE como estaban: a
+-- todas se les descuenta, que es lo que la planilla hacia ayer. O sea que el
+-- dia que esta migracion corre NO SE MUEVE UN CENTAVO, y nada cambia hasta que
+-- una persona apague el interruptor a conciencia en la pantalla.
+--
+-- Es la direccion segura por una razon asimetrica: cobrar de mas un seguro se
+-- ve en el neto y se reclama el mismo dia; NO cobrarlo en silencio se descubre
+-- meses despues, cuando la Caja pide lo que no se retuvo.
+--
+-- Aditiva e idempotente: no toca una sola fila existente.
+-- ⚠️ La app FUNCIONA SIN ESTA MIGRACION: `leerPersonas` es una escalera y relee
+-- sin la columna (a todo el mundo se le cobran los seguros, como hoy), y la
+-- pantalla dice que falta correr este archivo en vez de romperse.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE asistencia_personas
+  ADD COLUMN IF NOT EXISTS paga_seguros boolean NOT NULL DEFAULT true;
+
+COMMENT ON COLUMN asistencia_personas.paga_seguros IS
+  'true = se le descuentan el seguro social (9,75 %) y el educativo (1,25 %) del total bruto. LOS DOS VAN JUNTOS: no hay forma de tener uno si y el otro no, porque asi es en el cuadro de la contadora y asi lo pidio Daniel. false = las dos columnas salen en 0,00 y NADA MAS cambia (bruto, recargos, ausencias y montos escritos a mano son los mismos). El DEFAULT true es el comportamiento que la planilla tenia para las 38 fichas: quitar el descuento es una decision que se toma persona por persona en la pantalla.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ⛔ LO QUE ESTA MIGRACION NO HACE, A PROPOSITO
+--
+--   1. NO le quita el seguro a NADIE. Ni a las 19 personas que segun el Excel
+--      de la contadora no lo pagan. Quien esta inscrito en la Caja es plata y
+--      es una decision de negocio: se toma en la pantalla o con el bloque de
+--      abajo, a conciencia, no como efecto secundario de correr un archivo.
+--   2. NO toca salarios, ni jornadas, ni `activo`, ni `servicio_profesional`.
+--   3. NO toca `asistencia_planilla_manual`: los montos escritos a mano de una
+--      quincena vieja siguen ahi y se siguen leyendo igual.
+--   4. NO toca `asistencia_reglas`: los porcentajes 9,75 y 1,25 siguen siendo
+--      globales y correctos. Lo que cambia es A QUIEN se le aplican, no cuanto.
+--
+-- ── APLICAR LA LISTA DE LA CONTADORA SIN ABRIR LA APP ────────────────────────
+--
+-- 🔴 ESTE BLOQUE ESTA COMENTADO Y LO DECIDE DANIEL. Son los 8 codigos que en el
+-- Excel del 16 al 31 de julio de 2026 tienen la formula del 9,75 %, cruzados
+-- contra `asistencia_personas` por nombre:
+--
+--   confecciones_boston   8  BRICEIDA MONTERO             (Excel: BRICEIDA MONTERO)
+--   confecciones_boston  22  ALEJANDRA CAMANO             (Excel: ALEJANDRA CAMANO)
+--   confecciones_boston  18  LUZ BOSQUEZ                  (Excel: LUZ LOPEZ)
+--   confecciones_boston  38  Laura Lismari Casiano Vega   (Excel: LAURA L. CASIANO V.)
+--   vistana              11  JULIO GARAY                  (Excel: Julio Guzman)
+--   vistana               7  ANGELA GARCIA                (Excel: Lucia Angela Garcia)
+--   vistana               1  Roxana Hernandez             (Excel: Roxana Hernandez)
+--   vistana              13  RODRIGO MIRANDA              (Excel: Rodrigo Miranda)
+--   vistana               9  LUIS ARROYO                  (Excel: Luis Adrian Arroyo)
+--
+-- ⚠️ Son NUEVE renglones para OCHO personas del Excel de Vistana porque EDWIN
+-- GOMEZ, que en su cuadro tambien paga seguros, NO EXISTE en el sistema (no
+-- marca: trabaja en la calle). Cuando se le cree la ficha hay que dejarle
+-- `paga_seguros = true`, que ya es el default.
+--
+-- ⚠️ RODRIGO MIRANDA (13) es un caso aparte y este UPDATE NO lo resuelve: su
+-- Excel no usa la formula sino el monto 17,06 escrito a mano, que sobre su
+-- bruto da 4,09 % y no 9,75 %. Con `paga_seguros = true` se le va a calcular el
+-- 9,75 % completo. Eso queda para el PR de "poder editar la planilla y que se
+-- guarde", donde el monto del seguro se va a poder pisar a mano por quincena.
+--
+-- Para dejar la lista aplicada, descomentar y correr:
+--
+--   UPDATE asistencia_personas SET paga_seguros = false, updated_at = now();
+--   UPDATE asistencia_personas SET paga_seguros = true,  updated_at = now()
+--    WHERE (empresa = 'confecciones_boston' AND empleado_codigo IN ('8','22','18','38'))
+--       OR (empresa = 'vistana'             AND empleado_codigo IN ('11','7','1','13','9'));
+--
+-- 🔑 El primer UPDATE apaga a TODOS y el segundo prende a los nueve: escrito
+-- asi, correrlo dos veces da el mismo resultado y no depende del estado previo.
+-- Es la MISMA fila que la pantalla escribe al tocar el interruptor, asi que
+-- hacerlo por cualquiera de los dos caminos da exactamente lo mismo.
+-- ─────────────────────────────────────────────────────────────────────────────

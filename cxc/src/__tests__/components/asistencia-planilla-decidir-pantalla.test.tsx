@@ -37,7 +37,7 @@ const Q = quincena(2026, 8, 1);
 const linea = (over: Partial<LineaPlanilla>): LineaPlanilla => ({
   codigo: "0", etiqueta: "—", nombre: null, empresa: "confecciones_boston",
   empresaEtiqueta: "Confecciones Boston", salarioMensual: 600, jornadaSemanal: 48,
-  horas: { ...HORAS_CERO }, faltaConfigurar: [], fueraDePlanilla: false,
+  horas: { ...HORAS_CERO }, faltaConfigurar: [], fueraDePlanilla: false, pagaSeguros: true,
   decidirAMano: null, quincenalReferencia: null, dinero: null,
   manuales: { ...MANUALES_CERO }, ...over,
 });

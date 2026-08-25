@@ -39,6 +39,7 @@ import {
   DIAS_VENTANA_PERSONAS,
   vigenciaDeFila,
   servicioProfesionalDeFila,
+  pagaSegurosDeFila,
 } from "@/lib/asistencia/config-server";
 import {
   avisoMigracionServicioProfesional,
@@ -46,6 +47,12 @@ import {
   esColumnaServicioProfesionalFaltante,
   validarServicioProfesional,
 } from "@/lib/asistencia/participacion";
+import {
+  avisoMigracionSeguros,
+  COLUMNA_PAGA_SEGUROS,
+  esColumnaPagaSegurosFaltante,
+  validarPagaSeguros,
+} from "@/lib/asistencia/seguros";
 import { crearDirectorio, compararPersonas } from "@/lib/asistencia/directorio";
 import {
   avisoMarcasPosteriores,
@@ -103,6 +110,7 @@ export async function GET(req: NextRequest) {
         faltaMigracion: faltaPersonas,
         faltaColumnasBajas,
         faltaColumnaServicioProfesional,
+        faltaColumnaPagaSeguros,
       },
     ] = await Promise.all([leerReglas(), leerPersonas()]);
 
@@ -170,6 +178,9 @@ export async function GET(req: NextRequest) {
       // 🔴 Sin ficha NO se puede estar fuera de planilla: la bandera vive en la
       // ficha. Un código que marca y nadie configuró sigue siendo un pendiente.
       const servicioProfesional = f ? servicioProfesionalDeFila(f) : false;
+      // 🔑 Sin ficha, SÍ paga seguros: es el default de siempre y lo que hace
+      // que un código todavía sin configurar no aparezca como una excepción.
+      const pagaSeguros = f ? pagaSegurosDeFila(f) : true;
       const ultimaMarca = v ? diaPanama(v.ultima) : null;
       const etiqueta = directorio.nombre(codigo) ?? v?.nombreReloj ?? `Código ${codigo}`;
       if (vig && marcoDespuesDeLaBaja(vig, ultimaMarca)) {
@@ -195,6 +206,10 @@ export async function GET(req: NextRequest) {
         // 🔴 «Va en planilla» o «servicio profesional». La segunda mitad del
         // dato: sigue en el control de asistencia, fuera de todo cálculo de pago.
         servicioProfesional,
+        // 🔴 ¿Se le descuentan el social y el educativo? Los dos JUNTOS —ver
+        // `seguros.ts`—. `true` mientras nadie diga lo contrario: es el
+        // comportamiento que la planilla tenía para las 38 fichas.
+        pagaSeguros,
         // Falta el sueldo, pero la empresa ya está: se puede emitir la planilla
         // de las otras y saber a quién le falta el dato.
         //
@@ -273,6 +288,11 @@ export async function GET(req: NextRequest) {
           ? avisoMigracionServicioProfesional()
           : null,
       puedeMarcarServicioProfesional: !faltaPersonas && !faltaColumnaServicioProfesional,
+      // Un escalón más: sin la columna a todo el mundo se le cobran los seguros
+      // —o sea, como está hoy— y se dice de entrada, no al fallar el guardado.
+      avisoMigracionSeguros:
+        !faltaPersonas && faltaColumnaPagaSeguros ? avisoMigracionSeguros() : null,
+      puedeQuitarSeguros: !faltaPersonas && !faltaColumnaPagaSeguros,
       // 🩸 El que no se puede esconder: dada de baja y sigue marcando.
       avisoBajas: avisoMarcasPosteriores(marcasPosteriores),
     });
@@ -316,6 +336,12 @@ export async function PUT(req: NextRequest) {
   if (!rs.ok) return NextResponse.json({ error: rs.error }, { status: 400 });
   const servicioProfesional = rs.valor;
 
+  // Y lo mismo con los seguros: es OTRA pregunta —si se le retiene o no— y no
+  // debería poder tumbar el guardado de un nombre.
+  const rseg = validarPagaSeguros(body);
+  if (!rseg.ok) return NextResponse.json({ error: rseg.error }, { status: 400 });
+  const pagaSeguros = rseg.valor;
+
   const base = {
     empleado_codigo: p.codigo,
     nombre: p.nombre,
@@ -330,14 +356,37 @@ export async function PUT(req: NextRequest) {
     fecha_salida: v.fechaSalida,
     motivo_salida: v.motivoSalida,
   };
-  const conTodo = {
+  const conServicio = {
     ...conVigencia,
     [COLUMNA_SERVICIO_PROFESIONAL]: servicioProfesional,
+  };
+  const conTodo = {
+    ...conServicio,
+    [COLUMNA_PAGA_SEGUROS]: pagaSeguros,
   };
 
   let { error } = await supabaseServer
     .from(TABLA_PERSONAS)
     .upsert(conTodo, { onConflict: "empleado_codigo" });
+
+  // 🩸 FALTA LA COLUMNA DE LOS SEGUROS. Misma bifurcación que las dos de abajo:
+  //  · si NO se le estaba quitando el seguro a nadie (`pagaSeguros` en `true`,
+  //    que es el default), se reintenta sin la columna y guardar un nombre o un
+  //    salario sigue funcionando igual que ayer;
+  //  · si SÍ se le estaba quitando, NO se guarda a medias. Un "guardado" que se
+  //    traga la bandera le seguiría descontando el 11 % a alguien que la
+  //    contadora no le descuenta, y nadie sabría por qué.
+  if (error && esColumnaPagaSegurosFaltante(error)) {
+    if (!pagaSeguros) {
+      return NextResponse.json(
+        { error: avisoMigracionSeguros(), faltaMigracionSeguros: true },
+        { status: 503 },
+      );
+    }
+    ({ error } = await supabaseServer
+      .from(TABLA_PERSONAS)
+      .upsert(conServicio, { onConflict: "empleado_codigo" }));
+  }
 
   // 🩸 FALTA LA COLUMNA DE SERVICIO PROFESIONAL. Misma bifurcación que la baja,
   // y por la misma razón:
@@ -385,7 +434,7 @@ export async function PUT(req: NextRequest) {
       if (!reintento.error) {
         return NextResponse.json({
           ok: true,
-          persona: { ...p, ...v, servicioProfesional },
+          persona: { ...p, ...v, servicioProfesional, pagaSeguros },
           faltaMigracionBajas: true,
         });
       }
@@ -403,5 +452,5 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional } });
+  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros } });
 }
