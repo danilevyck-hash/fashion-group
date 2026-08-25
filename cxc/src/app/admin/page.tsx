@@ -138,7 +138,9 @@ export default function AdminDashboard() {
 
 function AdminDashboardInner() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "vendedor"] });
-  const { clients, uploads, loading, loadError, loadData } = useAdminData(authChecked);
+  // `uploads` (la lista de cargas de archivo) se dejó de pedir: se desestructuraba
+  // acá y no lo leía ninguna línea de la pantalla. Ver `useAdminData`.
+  const { clients, loading, loadError, loadData } = useAdminData(authChecked);
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   // Pestaña activa. Las dos carteras NUNCA se ven juntas: son dos consultas a
@@ -415,28 +417,14 @@ function AdminDashboardInner() {
   // La tabla y sus filas QUEDAN (son historia y no molestan); lo que se retiró
   // es el camino que las escribía sin que nadie las leyera.
 
-  async function handleSaveEdit(nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) {
-    const res = await fetch("/api/cxc/overrides", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre_normalized: nombre, ...data, cartera: CARTERA_GRUPO }),
-    });
-    if (!res.ok) {
-      showToast("Error al guardar contacto");
-      return;
-    }
-    showToast("Contacto actualizado");
-    loadData();
-
-    // Sync to directorio
-    try {
-      await fetch(`/api/directorio/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre_normalized: nombre, ...data }),
-      });
-    } catch (err) { console.error('Directorio sync error:', err); }
-  }
+  // 🔴 EL GUARDADO DE CONTACTO SE RETIRÓ DE ACÁ (24-ago-2026). `handleSaveEdit`
+  // escribía en `cxc_client_overrides` y sincronizaba el directorio, y **no lo
+  // llamaba nadie**: la edición de contacto vive en la ficha del cliente
+  // (`/clientes/[codigo]`) desde que se retiró el formulario de `ContactPanel`.
+  // Lo que quedaba era el camino de escritura sin ninguna puerta que lo abriera.
+  //
+  // ⚠️ La tabla `cxc_client_overrides` NO se toca y se sigue LEYENDO en
+  // `useAdminData` (un override guardado antes le sigue ganando al maestro).
 
   function buildExportSubtitle() {
     const parts: string[] = [];
@@ -644,22 +632,18 @@ function AdminDashboardInner() {
         companyFilter={companyFilter}
         setCompanyFilter={setCompanyFilter}
         riskFilter={riskFilter}
-        setRiskFilter={handleRiskFilterChange}
         search={search}
-        setSearch={setSearch}
         sortKey={sortKey}
         sortDir={sortDir}
         toggleSort={toggleSort}
         sortArrow={sortArrow}
         userRole={userRole}
         onOpenEmail={openEmail}
-        onSaveEdit={handleSaveEdit}
         onWhatsApp={openWhatsApp}
         onCopyMessage={copyMessage}
         onOpenEstado={openEstadoCuenta}
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
-        hideSearchAndRiskFilters
       />
       </div>
       </>

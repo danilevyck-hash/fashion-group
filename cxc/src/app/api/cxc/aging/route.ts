@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,94 @@ export const dynamic = "force-dynamic";
 // Vendedor sin empresa asociada (null) y admin/secretaria reciben todas.
 // La restricción se aplica acá (no solo en la UI) para que no se pueda
 // saltar manipulando el cliente.
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL TELÉFONO SE LEE EN VIVO; LA PLATA SIGUE SALIENDO DE LA MV (24-ago-2026)
+//
+// 🩸 El aviso mandaba a hacer algo que NO arreglaba el problema. Al tocar
+// "WhatsApp" sin teléfono, el CXC decía *"Este cliente no tiene teléfono
+// registrado. Edite el contacto primero"*. Se iba a la ficha (`/clientes/[codigo]`),
+// se escribía el teléfono —que se guarda en `clientes_master`—, se volvía… y
+// seguía diciendo lo mismo, porque esta ruta lee `switch_estadocuenta_aging_mv`,
+// una vista MATERIALIZADA que se refresca horas después por cron. La persona
+// quedaba pensando que la app está rota.
+//
+// **El arreglo es el camino menos sorpresivo: que el CXC lo VEA.** Los montos
+// siguen viniendo de la MV (precalculada, rápida, y es lo que hace que ningún
+// número de cartera se mueva); lo único que se relee en vivo son los TRES campos
+// de contacto que la vista toma de `clientes_master` —`email`, `telefono`,
+// `celular`— exactamente los mismos y del mismo lugar. No se toca ni un centavo,
+// ni un tramo, ni un nombre: cambiar `nombre`/`nombre_normalized` movería la
+// consolidación del panel, que agrupa por nombre.
+//
+// ⚠️ Se acota con `.in("codigo", …)` a los códigos que YA vienen en la cartera
+// del grupo (~100-150), en lotes: `clientes_master` tiene miles de filas (97%
+// de Boston) y `db-max-rows` = 1000 corta EN SILENCIO. Se pagina con
+// `leerTodoPaginado`, que además verifica contra un COUNT exacto.
+//
+// 🔑 Boston no entra ni por acá: sólo se re-leen códigos que la MV del GRUPO ya
+// trajo, y los clientes de Boston no están en `clientes_master` (usan ids
+// numéricos de Switch, no D-XXX). Este archivo no toca `switch_estadocuenta`.
+//
+// 🔴 FALLA ABIERTO: si la lectura en vivo se cae, se conservan los datos de la
+// MV y el CXC se dibuja igual. Un contacto viejo es mucho menos grave que una
+// cartera que no carga.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Los tres campos que la vista de aging toma de `clientes_master`. */
+interface ContactoMaestro {
+  codigo: string;
+  email: string | null;
+  telefono: string | null;
+  celular: string | null;
+}
+
+/** Tope por lote del `.in()`. Muy por debajo de `db-max-rows` (1000). */
+const LOTE_CODIGOS = 300;
+
+async function contactoEnVivo(codigos: string[]): Promise<Map<string, ContactoMaestro>> {
+  const mapa = new Map<string, ContactoMaestro>();
+  for (let i = 0; i < codigos.length; i += LOTE_CODIGOS) {
+    const lote = codigos.slice(i, i + LOTE_CODIGOS);
+    const filas = await leerTodoPaginado<ContactoMaestro>(
+      "clientes_master (contacto del CXC)",
+      (pedirCount, desde, hasta) =>
+        supabaseServer
+          .from("clientes_master")
+          .select("codigo, email, telefono, celular", pedirCount ? { count: "exact" } : {})
+          .in("codigo", lote)
+          .eq("deleted", false)
+          .order("codigo", { ascending: true })
+          .range(desde, hasta),
+    );
+    for (const f of filas) if (f.codigo) mapa.set(f.codigo, f);
+  }
+  return mapa;
+}
+
+/** Pisa correo/teléfono/celular con lo que HOY dice el maestro. Los montos NO se tocan. */
+async function refrescarContacto(rows: unknown[]): Promise<boolean> {
+  const codigos = [
+    ...new Set(
+      rows
+        .map((r) => (r as { codigo?: string | null }).codigo)
+        .filter((c): c is string => !!c),
+    ),
+  ];
+  if (codigos.length === 0) return true;
+
+  const mapa = await contactoEnVivo(codigos);
+  for (const r of rows) {
+    const fila = r as { codigo?: string | null; correo: string; telefono: string; celular: string };
+    const m = fila.codigo ? mapa.get(fila.codigo) : undefined;
+    // Sin fila en el maestro no se pisa nada: se conserva lo que trajo la MV.
+    if (!m) continue;
+    fila.correo = m.email ?? "";
+    fila.telefono = m.telefono ?? "";
+    fila.celular = m.celular ?? "";
+  }
+  return true;
+}
+
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session) {
@@ -54,6 +143,13 @@ export async function GET(req: NextRequest) {
   } else {
     rows = mvRes.data ?? [];
     refreshedAt = (mvRes.data?.[0] as { materializado_en?: string } | undefined)?.materializado_en ?? null;
+    // El contacto de la MV puede tener horas; el de la ficha se acaba de guardar.
+    // (En la rama del fallback la VIEW ya joinea clientes_master en vivo.)
+    try {
+      await refrescarContacto(rows);
+    } catch (e) {
+      console.error("[api/cxc/aging] contacto en vivo falló, se usa el de la MV:", e);
+    }
   }
 
   return NextResponse.json({ rows, companyKey, refreshedAt });

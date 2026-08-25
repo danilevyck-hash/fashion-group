@@ -42,9 +42,17 @@ const ARCHIVOS = {
   multiVendedoras: "components/multifashion/VendedorasSubtab.tsx",
   proveedores: "app/proveedores/ProveedoresListClient.tsx",
   clientes: "app/clientes/ClientesListClient.tsx",
+  // 🩸 La QUINTA, sumada el 24-ago-2026: la pestaña de Confecciones Boston del
+  // CXC. Tenía el mismo defecto que las otras cuatro y por el mismo motivo —su
+  // tabla de 6 columnas se dibujaba desde `sm` (640)—, así que en el iPad de 834
+  // px había que ARRASTRARLA de lado: **184 px medidos en el navegador contra el
+  // build de producción**. Sus tarjetas ya existían y funcionaban; sólo se les
+  // amplió el tramo hasta `lg`, que es lo mismo que se hizo con las otras tres
+  // que no necesitaron componente nuevo. **No se rediseñó nada.**
+  bostonCxc: "components/cxc/BostonTab.tsx",
 } as const;
 
-describe("las 4 pantallas declaran sus dos layouts con una marca FIJA", () => {
+describe("las 5 pantallas declaran sus dos layouts con una marca FIJA", () => {
   // 🩸 Sin esto, verificar el cambio buscando la clase del breakpoint
   // (`.md\:hidden`) devuelve vacío en cuanto el corte se mueve: el chequeo
   // compara CERO elementos y pasa en verde sin haber mirado nada. `data-vista`
@@ -64,6 +72,7 @@ describe("el corte es lg, porque a sm y md la tabla NO entra", () => {
     { nombre: "multiVendedoras", tabla: /data-vista="tabla"[^>]*hidden[^"]*lg:block/, tarjetas: /data-vista="tarjetas"[^>]*lg:hidden/ },
     { nombre: "proveedores", tabla: /data-vista="tabla"[^>]*hidden lg:block/, tarjetas: /data-vista="tarjetas"[^>]*lg:hidden/ },
     { nombre: "clientes", tabla: /data-vista="tabla"[^>]*hidden lg:block/, tarjetas: /data-vista="tarjetas"[^>]*lg:hidden/ },
+    { nombre: "bostonCxc", tabla: /data-vista="tabla"[^>]*hidden lg:block/, tarjetas: /data-vista="tarjetas"[^>]*lg:hidden/ },
   ];
 
   for (const c of casos) {

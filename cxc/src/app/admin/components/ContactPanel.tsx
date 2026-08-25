@@ -9,9 +9,11 @@ import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 
 interface Props {
   client: ConsolidatedClient;
-  // Se mantiene por compatibilidad con el padre (ClientTable/PanelCxcMobile);
-  // la edición de contacto ahora vive en la ficha /clientes/[codigo].
-  onSaveEdit?: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
+  // 🔴 `onSaveEdit` se RETIRÓ (24-ago-2026). Este panel dejó de editar contacto
+  // cuando la edición se mudó a la ficha (`/clientes/[codigo]`), pero el prop
+  // siguió viajando desde el padre "por compatibilidad" y con él la función que
+  // lo alimentaba. Nadie lo desestructuraba acá: era una promesa de guardado que
+  // no guardaba nada.
   companyFilter: string;
   roleCompanies: Company[];
   onOpenEstado?: (client: ConsolidatedClient) => void;

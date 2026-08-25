@@ -57,6 +57,37 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose }: P
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [errorPdf, setErrorPdf] = useState<string | null>(null);
+
+  // 🔴 UN SOLO BOTÓN, Y EL RÓTULO DICE LO QUE VA A PASAR (24-ago-2026)
+  //
+  // 🩸 Eran dos botones que prometían cosas distintas y hacían la misma. En la
+  // computadora, cuando el navegador no sabe compartir archivos, «Compartir»
+  // terminaba DESCARGANDO el mismo PDF que el botón «PDF» — dos caminos, un
+  // solo resultado. Y si el archivo no se podía armar, el `catch` solo escribía
+  // en la consola: el botón volvía a la normalidad, no pasaba NADA visible, y
+  // la persona tocaba de nuevo esperando otra cosa.
+  //
+  // Ahora se PREGUNTA ANTES si este navegador puede compartir un archivo y el
+  // botón se rotula con lo que de verdad hará: «Compartir» (hoja del sistema,
+  // celular) o «Descargar PDF» (computadora). El error se ve en pantalla.
+  //
+  // La prueba usa un File de verdad — `canShare({ files })` mira el TIPO del
+  // archivo, así que preguntar solo por `navigator.share` daría un falso sí en
+  // navegadores que comparten texto pero no archivos.
+  const [puedeCompartir, setPuedeCompartir] = useState(false);
+  useEffect(() => {
+    try {
+      const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean };
+      if (typeof nav.share !== "function" || typeof nav.canShare !== "function") return;
+      const sonda = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46])], "sonda.pdf", {
+        type: "application/pdf",
+      });
+      setPuedeCompartir(nav.canShare({ files: [sonda] }));
+    } catch {
+      // Ante la duda: descargar, que funciona en todas partes.
+    }
+  }, []);
 
   const open = !!client;
   const codigo = client ? codigoDe(client) : null;
@@ -68,6 +99,7 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose }: P
     let cancel = false;
     setLoading(true);
     setError(false);
+    setErrorPdf(null);
     setData(null);
     fetch(`/api/cxc/estado-cuenta/${encodeURIComponent(codigo)}?empresa=${encodeURIComponent(empresaScope)}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("http"))))
@@ -88,39 +120,33 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose }: P
     URL.revokeObjectURL(url);
   }
 
-  // Compartir por WhatsApp/mail nativo (share sheet del sistema con el PDF
-  // adjunto). En desktop/navegadores sin Web Share cae a descarga directa.
-  async function handleShare() {
+  // Arma el PDF y lo entrega por el ÚNICO camino que este navegador tiene: la
+  // hoja de compartir del sistema, o la descarga.
+  async function handleEntregarPdf() {
     if (!data) return;
     setBusy(true);
+    setErrorPdf(null);
     try {
       const { buildEstadoCuentaPDF } = await import("@/lib/pdf-estado-cuenta");
       const { doc, filename } = buildEstadoCuentaPDF(data, nombre);
       const blob = doc.output("blob");
-      const file = new File([blob], filename, { type: "application/pdf" });
-      const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean };
-      if (typeof nav.share === "function" && nav.canShare?.({ files: [file] })) {
-        await nav.share({ files: [file], title: "Estado de cuenta", text: `Estado de cuenta — ${nombre}` });
-      } else {
-        downloadBlob(blob, filename);
-      }
-    } catch (e) {
-      // AbortError = el usuario cerró el share sheet → no es error.
-      if ((e as Error)?.name !== "AbortError") console.error("[estado-cuenta] compartir:", e);
-    } finally {
-      setBusy(false);
-    }
-  }
 
-  async function handleDownload() {
-    if (!data) return;
-    setBusy(true);
-    try {
-      const { buildEstadoCuentaPDF } = await import("@/lib/pdf-estado-cuenta");
-      const { doc, filename } = buildEstadoCuentaPDF(data, nombre);
-      downloadBlob(doc.output("blob"), filename);
+      if (puedeCompartir) {
+        const file = new File([blob], filename, { type: "application/pdf" });
+        const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean };
+        // Se vuelve a preguntar con el archivo REAL: la sonda dice que el
+        // navegador puede, no que pueda con ESTE archivo.
+        if (typeof nav.share === "function" && nav.canShare?.({ files: [file] })) {
+          await nav.share({ files: [file], title: "Estado de cuenta", text: `Estado de cuenta — ${nombre}` });
+          return;
+        }
+      }
+      downloadBlob(blob, filename);
     } catch (e) {
-      console.error("[estado-cuenta] descargar:", e);
+      // AbortError = la persona cerró la hoja de compartir → no es un error.
+      if ((e as Error)?.name === "AbortError") return;
+      console.error("[estado-cuenta] entregar PDF:", e);
+      setErrorPdf("No se pudo preparar el PDF. Intenta de nuevo en unos segundos.");
     } finally {
       setBusy(false);
     }
@@ -141,30 +167,26 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose }: P
                 <p className="text-lg font-semibold tabular-nums leading-tight">{money(data.total)}</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleShare}
-                disabled={busy}
-                className="flex-1 inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-black px-3 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-60"
-              >
+            {errorPdf && (
+              <p role="alert" className="text-sm text-red-600">{errorPdf}</p>
+            )}
+            <button
+              type="button"
+              onClick={handleEntregarPdf}
+              disabled={busy}
+              className="w-full inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-black px-3 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-60"
+            >
+              {puedeCompartir ? (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
                 </svg>
-                Compartir
-              </button>
-              <button
-                type="button"
-                onClick={handleDownload}
-                disabled={busy}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-800 transition active:scale-[0.97] disabled:opacity-60"
-              >
+              ) : (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                PDF
-              </button>
-            </div>
+              )}
+              {busy ? "Preparando…" : puedeCompartir ? "Compartir" : "Descargar PDF"}
+            </button>
           </div>
         ) : undefined
       }

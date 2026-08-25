@@ -276,8 +276,23 @@ export default function BostonTab() {
         {isLoading ? "Cargando..." : `${filtrados.length} ${filtrados.length === 1 ? "cliente" : "clientes"}`}
       </p>
 
-      {/* ── iPhone: tarjetas ─────────────────────────────────────────────── */}
-      <div className="sm:hidden space-y-2">
+      {/* ── iPhone Y iPad: tarjetas ──────────────────────────────────────
+          🔑 EL CORTE ES `lg` (1024), NO `sm` (640) NI `md` (768) — y lo que
+          decide es el ancho ÚTIL, no el de la ventana. La barra lateral se lleva
+          224 px, así que un iPad de 834 deja **610** px de contenido: más
+          angosto que un iPhone acostado. Con el corte en `sm` esta pestaña
+          dibujaba su tabla de 6 columnas ahí y había que ARRASTRARLA de lado
+          (medido en el navegador contra el build de producción: **184 px** de
+          arrastre a 834). Es la misma regla, el mismo número y el mismo patrón
+          que ya se aplicó a Proveedores, Clientes › Directorio y Multifashion ›
+          Vendedoras el 30-jul-2026 — NO se rediseñó nada: estas tarjetas ya
+          existían y funcionaban, sólo se les amplió el tramo hasta `lg`.
+
+          `data-vista` es FIJO ("tarjetas" / "tabla") a propósito: un medidor que
+          busque el layout por su clase de breakpoint (`.sm\:hidden`) devuelve
+          VACÍO en cuanto el corte se mueve, compara CERO montos y pasa en verde
+          sin haber mirado nada. ─────────────────────────────────────────── */}
+      <div data-vista="tarjetas" className="lg:hidden space-y-2">
         {filtrados.map((c) => (
           <div key={c.codigo} className="flex rounded-xl border border-gray-200 bg-white overflow-hidden">
             <span className={`w-1 shrink-0 ${colorFila(c)}`} aria-hidden />
@@ -314,8 +329,8 @@ export default function BostonTab() {
         ))}
       </div>
 
-      {/* ── iPad y escritorio: tabla ─────────────────────────────────────── */}
-      <div className="hidden sm:block rounded-xl border border-gray-200 bg-white overflow-x-auto">
+      {/* ── iPad ACOSTADO y escritorio: tabla (entra sin arrastre) ─────── */}
+      <div data-vista="tabla" className="hidden lg:block rounded-xl border border-gray-200 bg-white overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[11px] uppercase tracking-wide text-gray-500 border-b border-gray-100">

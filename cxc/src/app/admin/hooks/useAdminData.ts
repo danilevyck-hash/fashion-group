@@ -1,9 +1,7 @@
 import { useCallback } from "react";
 import useSWR from "swr";
-import { VENDOR_MAP } from "@/lib/vendors";
 import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
-import type { VendorMap } from "@/lib/vendors";
-import type { CxcRow, CxcUpload, ConsolidatedClient } from "@/lib/types";
+import type { CxcRow, ConsolidatedClient } from "@/lib/types";
 
 // Clave de caché SWR del módulo CXC. La caché vive a nivel de la app
 // (SWRProvider) y persiste entre navegaciones → volver a CXC pinta al instante
@@ -13,7 +11,6 @@ const SWR_KEY = "cxc-admin-data";
 
 interface AdminData {
   clients: ConsolidatedClient[];
-  uploads: Record<string, CxcUpload>;
   ts: number;
 }
 
@@ -33,34 +30,24 @@ async function fetchAdminData(): Promise<AdminData> {
   // dibujaba. Llegaba hasta la tabla y la tarjeta del celular como prop y
   // ninguna de las dos la desestructuraba. Retirada el 14-ago-2026 junto con las
   // opciones "Ya contacté" del menú — una petición menos por carga del panel.
-  const [vendorRows, upRows, agingJson, overrides, pagos, compras] =
+  //
+  // 🔴 Y OTRAS DOS SE RETIRARON EL 24-ago-2026, por lo mismo: `/api/vendors` y
+  // `/api/upload`. La primera llenaba el objeto global `VENDOR_MAP`, que NINGUNA
+  // pantalla lee; la segunda armaba `uploads` (la frescura por carga de archivo),
+  // que llegaba hasta `admin/page.tsx`, se desestructuraba y no se usaba en una
+  // sola línea — la frescura que SÍ se muestra sale de `refreshedAt` del aging y
+  // del componente `SyncStatus`, que la pide por su cuenta.
+  //
+  // Eran 2 de 6 peticiones POR CADA apertura del CXC, contra una base en compute
+  // Micro. Quedan 4, y una de ellas (el contacto en vivo dentro de `/api/cxc/aging`)
+  // reemplaza a la que hacía falta de verdad.
+  const [agingJson, overrides, pagos, compras] =
     await Promise.all([
-      fetch("/api/vendors").then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      fetch("/api/upload", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch("/api/cxc/aging", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
       fetch(`/api/cxc/overrides?cartera=${CARTERA_GRUPO}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       fetch("/api/cxc/ultimo-pago", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       fetch("/api/cxc/ultima-compra", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
     ]);
-
-  // Vendor map (global VENDOR_MAP) — opcional.
-  if (Array.isArray(vendorRows)) {
-    const vendorMapData: VendorMap = {};
-    for (const row of vendorRows) {
-      if (!vendorMapData[row.company_key]) vendorMapData[row.company_key] = {};
-      vendorMapData[row.company_key][row.client_name] = row.vendor_name;
-    }
-    Object.keys(VENDOR_MAP).forEach((k) => delete VENDOR_MAP[k]);
-    Object.assign(VENDOR_MAP, vendorMapData);
-  }
-
-  // Frescura por empresa (UploadFreshness usa uploaded_at).
-  const latestUploads: Record<string, CxcUpload> = {};
-  if (Array.isArray(upRows)) {
-    for (const u of upRows as { company_key: string; uploaded_at: string }[]) {
-      if (!latestUploads[u.company_key]) latestUploads[u.company_key] = u as CxcUpload;
-    }
-  }
 
   const rows = (agingJson?.rows ?? null) as CxcRow[] | null;
 
@@ -178,7 +165,7 @@ async function fetchAdminData(): Promise<AdminData> {
     ? new Date(agingJson.refreshedAt as string).getTime()
     : Date.now();
 
-  return { clients: clientsArr, uploads: latestUploads, ts: refreshTs };
+  return { clients: clientsArr, ts: refreshTs };
 }
 
 /**
@@ -207,7 +194,6 @@ export default function useAdminData(authReady: boolean = true) {
 
   return {
     clients: data?.clients ?? [],
-    uploads: data?.uploads ?? {},
     // Solo "cargando" cuando no hay nada que mostrar todavía (primer arranque).
     // Al volver, data ya está en la caché SWR en memoria → sin spinner.
     loading: isLoading && !data,
