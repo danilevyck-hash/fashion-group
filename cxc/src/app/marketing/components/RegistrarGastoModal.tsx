@@ -104,23 +104,10 @@ type ProyectoFila = MkProyecto;
 const CAMINOS: ReadonlyArray<{
   key: Camino;
   titulo: string;
-  ayuda: string;
 }> = [
-  {
-    key: "factura",
-    titulo: "Factura",
-    ayuda: "Una factura de un proveedor para una tienda: letreros, material, remodelación.",
-  },
-  {
-    key: "mueble",
-    titulo: "Mueble",
-    ayuda: "Una entrega de mobiliario a una tienda. Descuenta el inventario en piezas.",
-  },
-  {
-    key: "marca",
-    titulo: "Gasto de la marca",
-    ayuda: "Impulsadoras, vallas, eventos, catálogos — para la marca en general, sin tienda.",
-  },
+  { key: "factura", titulo: "Factura" },
+  { key: "mueble", titulo: "Mueble" },
+  { key: "marca", titulo: "Gasto de la marca" },
 ];
 
 const SUB_GASTOS: ReadonlyArray<{
@@ -586,18 +573,16 @@ export default function RegistrarGastoModal({
                 <button
                   key={c.key}
                   type="button"
-                  /* Gancho ESTABLE para la medición: el nombre accesible del
-                     botón incluye su ayuda, así que buscarlo por texto exacto
-                     se rompe en cuanto la ayuda cambia una coma. */
+                  /* Gancho ESTABLE para la medición: buscar el botón por su
+                     texto exacto se rompe en cuanto el rótulo cambia una coma. */
                   data-camino={c.key}
                   onClick={() => {
                     setCamino(c.key);
                     setPaso("datos");
                   }}
-                  className="text-left rounded-lg border border-gray-200 bg-white p-4 min-h-[96px] hover:border-gray-500 active:scale-[0.99] transition"
+                  className="text-left rounded-lg border border-gray-200 bg-white p-4 min-h-[56px] hover:border-gray-500 active:scale-[0.99] transition"
                 >
                   <div className="font-semibold text-gray-900">{c.titulo}</div>
-                  <div className="text-xs text-gray-500 mt-1">{c.ayuda}</div>
                 </button>
               ))}
             </div>
@@ -766,10 +751,6 @@ export default function RegistrarGastoModal({
                     Subir foto
                   </button>
                 )}
-                <p className="text-xs text-gray-500 mt-1">
-                  La del letrero puesto, el mueble armado, el evento. Puede
-                  llegar después — se agrega aunque el período ya esté cerrado.
-                </p>
               </div>
             </div>
 

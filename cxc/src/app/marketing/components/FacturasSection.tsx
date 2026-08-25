@@ -584,10 +584,6 @@ export default function FacturasSection({
             <div className="text-sm text-gray-700 font-medium">
               📤 Subir facturas (varias a la vez)
             </div>
-            <div className="text-xs text-gray-500 mt-0.5">
-              Arrastra PDFs aquí o haz clic para seleccionarlos. La IA leerá
-              cada uno automáticamente.
-            </div>
             {bulk.progress.enProceso && (
               <div className="text-xs text-gray-600 mt-2 inline-flex items-center gap-1.5">
                 <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">

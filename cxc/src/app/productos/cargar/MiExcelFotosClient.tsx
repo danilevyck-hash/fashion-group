@@ -182,12 +182,6 @@ export default function MiExcelFotosClient() {
             Cómo tiene que estar tu archivo
           </div>
           <ul className="list-disc space-y-1 pl-5">
-            <li>El <b>código va en la columna B</b>. La fila 1 es el encabezado.</li>
-            <li>La <b>columna A va vacía</b>: ahí se pegan las fotos.</li>
-            <li>
-              Las demás columnas traen tu información y <b>salen tal cual</b>: no se recalcula
-              nada, no se reordena y no se agrega ni se quita una columna.
-            </li>
             <li>Cada foto tiene que llamarse igual que el código: <b>100262385.jpg</b>.</li>
           </ul>
         </div>
@@ -289,15 +283,6 @@ export default function MiExcelFotosClient() {
         </div>
         <ul className="space-y-1.5 text-[13px] leading-relaxed text-stone-700">
           <li>
-            <b>Solo cambia la columna A</b>: donde hay foto queda la foto, y donde no la hay la celda
-            dice <b>{TEXTO_SIN_FOTO}</b>. Ninguna fila se salta. Todo lo demás —hojas, columnas,
-            valores, orden de las filas y formatos— sale igual que entró.
-          </li>
-          <li>
-            Cada foto queda pegada a su fila: si <b>filtras</b>, se esconde junto con la fila.{" "}
-            <b>Si ordenas la hoja, las fotos no se mueven</b> — ordena antes de pegarlas.
-          </li>
-          <li>
             {analisis.tieneMacro ? (
               <>
                 Tu archivo <b>tiene macros y se conservan</b>: se descarga como{" "}
@@ -308,10 +293,6 @@ export default function MiExcelFotosClient() {
                 Se descarga como <b>{nombreSalida.slice(nombreSalida.lastIndexOf("."))}</b>, igual que entró.
               </>
             )}
-          </li>
-          <li>
-            Las fotos <b>no se suben a ningún lado</b>: se leen de tu computadora, se achican y se
-            pegan dentro del Excel que descargas.
           </li>
         </ul>
       </div>

@@ -13,7 +13,6 @@ interface Props {
    *  comprobante es opcional (flujo a En proceso). */
   requireFile: boolean;
   title: string;
-  description: string;
   submitLabel: string;
   onClose: () => void;
   /** file puede ser null solo cuando requireFile=false. */
@@ -25,7 +24,7 @@ interface Props {
  * Dos usos: pasar a "En proceso" (comprobante opcional) y adjuntar el
  * comprobante obligatorio antes de marcar Pagado.
  */
-export default function ComprobanteModal({ open, submitting, requireFile, title, description, submitLabel, onClose, onSubmit }: Props) {
+export default function ComprobanteModal({ open, submitting, requireFile, title, submitLabel, onClose, onSubmit }: Props) {
   useBodyScrollLock(open);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -82,7 +81,6 @@ export default function ComprobanteModal({ open, submitting, requireFile, title,
         className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg bg-white p-5 shadow-xl"
       >
         <h2 className="text-base font-semibold">{title}</h2>
-        <p className="mt-0.5 text-xs text-gray-500">{description}</p>
 
         <input
           ref={inputRef}

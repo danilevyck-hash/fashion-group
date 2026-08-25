@@ -451,11 +451,7 @@ export function FacturaForm({
       <PasoInstruccion
         numero={1}
         titulo="Sube el PDF de la factura"
-        descripcion={
-          leyendoIA
-            ? "Leyendo factura con IA..."
-            : "Aceptamos solo PDF, máximo 10MB. La IA pre-llenará los campos."
-        }
+        descripcion={leyendoIA ? "Leyendo factura con IA..." : undefined}
         completado={pdfSubido}
       >
         <PdfUploader
@@ -485,7 +481,6 @@ export function FacturaForm({
       <PasoInstruccion
         numero={2}
         titulo="Revisa o llena los datos de la factura"
-        descripcion="Edita lo que la IA no haya leído bien."
         completado={pasoDatos}
       >
         <div className="space-y-3">

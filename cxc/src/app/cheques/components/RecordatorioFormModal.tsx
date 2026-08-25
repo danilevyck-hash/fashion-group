@@ -210,7 +210,7 @@ export default function RecordatorioFormModal({
             />
           </Campo>
 
-          <Campo label="¿Se repite?" hint="— casi siempre, una sola vez">
+          <Campo label="¿Se repite?">
             <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="Se repite">
               {REPETICIONES.map((r) => (
                 <button

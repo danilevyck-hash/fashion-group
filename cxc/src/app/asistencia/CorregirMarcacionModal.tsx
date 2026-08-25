@@ -228,9 +228,6 @@ export default function CorregirMarcacionModal({
                   placeholder="Se le dañó el carro, avisó"
                   className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none transition focus:border-black sm:text-sm"
                 />
-                <span className="mt-1 block text-[12px] text-gray-500">
-                  Obligatorio. En tres meses nadie va a acordarse de por qué esta hora es distinta.
-                </span>
               </label>
             </>
           )}

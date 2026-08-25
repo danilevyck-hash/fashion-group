@@ -323,7 +323,6 @@ export default function DataHealthTab() {
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-gray-700">Historial 30 días</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Cada celda = peor severity del día. Gris = sin corrida.</p>
             </div>
             {/* ── 🩸 EL MAPA DE 31 COLUMNAS, MEDIDO (30-jul-2026) ───────────
                 Era el peor arrastre de la pantalla: 448px en iPhone y 228px en

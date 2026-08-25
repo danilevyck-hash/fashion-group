@@ -84,7 +84,6 @@ export default function PorClienteModal({ bloques, filas, onClose }: Props) {
 
         <div className="px-5 pt-4">
           <p className="text-xs text-gray-500">
-            Cuánto te costó cada tienda en total, sumando todas las marcas.
             Esto es solo para verlo tú — no se le reporta a ninguna marca.
           </p>
         </div>

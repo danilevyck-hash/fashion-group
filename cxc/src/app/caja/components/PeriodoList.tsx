@@ -101,21 +101,13 @@ export default function PeriodoList({
 }: Props) {
   return (
     <div className="max-w-6xl mx-auto px-5 sm:px-9 py-8 sm:py-10">
-      <div className="flex items-end justify-between gap-6 mb-7 sm:mb-10">
-        <div className="max-w-xl">
-          {/* Sin título grande: "Caja Menuda" ya lo dicen la barra sticky
-              (celular) y el breadcrumb (escritorio). Queda sr-only para no
-              dejar la página sin encabezado. La bajada se QUEDA: explica qué es
-              un período y cuándo crear uno, que no está en ningún otro lado. */}
-          <h1 className="sr-only">Caja Menuda</h1>
-          <p
-            className="text-sm"
-            style={{ color: "var(--caja-fg-muted)", maxWidth: 520 }}
-          >
-            Cada período representa un ciclo del fondo fijo de gastos. Crea uno nuevo cuando se reponga el fondo.
-          </p>
-        </div>
-        {!hasOpenPeriod && (
+      {/* Sin título grande: "Caja Menuda" ya lo dicen la barra sticky (celular)
+          y el breadcrumb (escritorio). Queda sr-only para no dejar la página sin
+          encabezado. Sin bajada NO queda un hueco: el bloque de arriba se fue
+          entero y el botón se acomoda solo a la derecha. */}
+      <h1 className="sr-only">Caja Menuda</h1>
+      {!hasOpenPeriod && (
+        <div className="flex justify-end mb-5">
           <button
             onClick={onCreatePeriodo}
             className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-transform active:scale-[0.97]"
@@ -123,8 +115,8 @@ export default function PeriodoList({
           >
             <PlusIcon /> Nuevo período
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {error && (
         <p

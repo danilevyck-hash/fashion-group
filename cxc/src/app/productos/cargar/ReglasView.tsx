@@ -51,16 +51,9 @@ export default function ReglasView() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <div className="mb-5 border-b-2 border-stone-900 pb-4">
-        <p className="text-sm text-stone-500">
-          Si el proveedor cambia algo, manda captura a Daniel para actualizar estas reglas.
-        </p>
-      </div>
-
       {/* Sección B — Principios */}
       <section className="mb-8">
         <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-teal-800">Principios de limpieza</h3>
-        <p className="mb-3 text-[13px] text-stone-500">Se aplican en orden a cada descripción antes de buscar en el catálogo.</p>
         <ol className="space-y-1.5">
           {PRINCIPIOS_LIMPIEZA.map((p, i) => (
             <li key={i} className="rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-[13px]">
