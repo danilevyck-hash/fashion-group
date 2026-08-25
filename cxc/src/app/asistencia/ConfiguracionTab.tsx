@@ -54,6 +54,12 @@ import {
   PREGUNTA_PARTICIPACION,
 } from "@/lib/asistencia/participacion";
 import {
+  ETIQUETA_PAGA_SEGUROS,
+  ETIQUETA_SIN_SEGUROS,
+  EXPLICACION_SEGUROS,
+  PREGUNTA_SEGUROS,
+} from "@/lib/asistencia/seguros";
+import {
   fraseBaja,
   marcoDespuesDeLaBaja,
   MOTIVOS_SALIDA,
@@ -74,6 +80,9 @@ interface Persona {
   faltaSalario: boolean;
   /** `true` = marca en el reloj pero NO va en planilla (servicio profesional). */
   servicioProfesional: boolean;
+  /** `true` = se le descuentan el seguro social y el educativo. Los DOS juntos.
+   *  `true` mientras nadie diga lo contrario: es lo que hacía la planilla. */
+  pagaSeguros: boolean;
   marcaciones: number;
   ultimaMarca: string | null;
   rataHora: number | null;
@@ -109,6 +118,8 @@ interface Datos {
   avisoBajas: { titulo: string; detalle: string[] } | null;
   avisoMigracionServicioProfesional: string | null;
   puedeMarcarServicioProfesional: boolean;
+  avisoMigracionSeguros: string | null;
+  puedeQuitarSeguros: boolean;
 }
 
 /** El formulario guarda TEXTO: hay que poder borrar un campo para reescribirlo.
@@ -132,6 +143,8 @@ interface Borrador {
   motivoSalida: string;
   /** `true` = servicio profesional: se le mide la asistencia y no se le paga. */
   servicioProfesional: boolean;
+  /** `true` = se le descuentan los seguros (social y educativo, juntos). */
+  pagaSeguros: boolean;
 }
 
 const CAMPO =
@@ -180,7 +193,8 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
  *  el `blur` de un campo dispara justo después de que la píldora ya guardó. */
 const firma = (b: Borrador) =>
   `${b.nombre.trim()}|${b.salario.trim()}|${b.jornada}|${b.empresa}`
-  + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}|${b.servicioProfesional}`;
+  + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}|${b.servicioProfesional}`
+  + `|${b.pagaSeguros}`;
 
 /**
  * ¿La baja está completa? La fecha y el motivo VIAJAN JUNTOS: una baja sin
@@ -241,6 +255,7 @@ export default function ConfiguracionTab() {
       fechaSalida: p.fechaSalida ?? "",
       motivoSalida: p.motivoSalida ?? "",
       servicioProfesional: p.servicioProfesional,
+      pagaSeguros: p.pagaSeguros,
     };
     setAbierta(p.codigo);
     setBorrador(b);
@@ -296,6 +311,7 @@ export default function ConfiguracionTab() {
             fechaSalida: b.fechaSalida,
             motivoSalida: b.motivoSalida,
             servicioProfesional: b.servicioProfesional,
+            pagaSeguros: b.pagaSeguros,
           }),
         });
         const d = await res.json();
@@ -315,6 +331,7 @@ export default function ConfiguracionTab() {
               fechaSalida?: string | null;
               motivoSalida?: MotivoSalida | null;
               servicioProfesional?: boolean;
+              pagaSeguros?: boolean;
             }
           | undefined;
         const salarioTexto = b.salario.trim().replace(",", ".");
@@ -329,6 +346,7 @@ export default function ConfiguracionTab() {
           fechaSalida: b.fechaSalida || null,
           motivoSalida: (b.motivoSalida || null) as MotivoSalida | null,
           servicioProfesional: b.servicioProfesional,
+          pagaSeguros: b.pagaSeguros,
         };
         // La vigencia que quedó guardada, ya normalizada por el servidor.
         const vig = {
@@ -349,6 +367,10 @@ export default function ConfiguracionTab() {
                   empresa: p.empresa,
                   configurado: true,
                   servicioProfesional: p.servicioProfesional === true,
+                  // 🔑 `!== false`: si el servidor no lo devolviera, la persona
+                  // sigue pagando seguros. Nunca al revés — apagar un descuento
+                  // por un `undefined` es dejar de retener sin que nadie lo pida.
+                  pagaSeguros: p.pagaSeguros !== false,
                   // 🔴 La MISMA regla del servidor: a quien no va en planilla no
                   // le falta el salario. Dos reglas distintas para lo mismo es
                   // una pantalla que se contradice al recargar.
@@ -432,6 +454,9 @@ export default function ConfiguracionTab() {
             // El PUT es un upsert de la fila entera: sin esto, dar de baja
             // devolvería a la persona a la planilla sin que nadie lo pidiera.
             servicioProfesional: p.servicioProfesional,
+            // Y por lo mismo: sin esto, dar de baja le volvería a poner los
+            // seguros a quien la contadora no se los descuenta.
+            pagaSeguros: p.pagaSeguros,
           }),
         });
         const d = await res.json();
@@ -817,6 +842,45 @@ export default function ConfiguracionTab() {
                               {!datos.puedeMarcarServicioProfesional && (
                                 <p className="mt-1 text-[12px] text-amber-800">
                                   Todavía no se puede marcar servicio profesional: falta correr el
+                                  archivo de la base de datos.
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              {/* 🔴 A QUIÉN SE LE DESCUENTAN LOS SEGUROS. La
+                                  planilla se los cobraba a las 31 de 31; el Excel
+                                  de la contadora se los cobra a 8 de 27. No hay
+                                  forma de deducirlo de ningún dato del reloj:
+                                  quién está inscrito en la Caja es un hecho de
+                                  afuera. Por eso es un interruptor y no una regla.
+                                  ⚠️ UN SOLO CAMPO PARA LOS DOS. Daniel, textual:
+                                  *"esto es junto, no es separado cada uno. El que
+                                  usa uno usará ambos."* */}
+                              <Etiqueta texto={PREGUNTA_SEGUROS} ayuda={EXPLICACION_SEGUROS} />
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button"
+                                  onClick={() => cambiarYGuardar(p.codigo, { pagaSeguros: true })}
+                                  className={`${PILL_BASE} ${borrador.pagaSeguros ? PILL_ON : PILL_OFF}`}>
+                                  {ETIQUETA_PAGA_SEGUROS}
+                                </button>
+                                <button type="button"
+                                  disabled={!datos.puedeQuitarSeguros}
+                                  onClick={() => cambiarYGuardar(p.codigo, { pagaSeguros: false })}
+                                  className={`${PILL_BASE} ${!borrador.pagaSeguros ? PILL_ON : PILL_OFF} disabled:opacity-40`}>
+                                  {ETIQUETA_SIN_SEGUROS}
+                                </button>
+                              </div>
+                              {!borrador.pagaSeguros && (
+                                <p className="mt-1 text-[12px] text-gray-500">
+                                  Las dos columnas de seguros salen en $0,00 en su planilla. Nada
+                                  más cambia.
+                                </p>
+                              )}
+                              {/* Igual que arriba: el aviso de que todavía no se
+                                  puede guardar se dice ANTES de tocar, no al fallar. */}
+                              {!datos.puedeQuitarSeguros && (
+                                <p className="mt-1 text-[12px] text-amber-800">
+                                  Todavía no se le puede quitar el seguro a nadie: falta correr el
                                   archivo de la base de datos.
                                 </p>
                               )}

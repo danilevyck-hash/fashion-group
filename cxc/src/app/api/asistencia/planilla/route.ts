@@ -28,6 +28,7 @@ import {
   leerPersonas,
   vigenciasDeFilas,
   servicioProfesionalDeFila,
+  pagaSegurosDeFila,
 } from "@/lib/asistencia/config-server";
 import { avisoMigracionServicioProfesional } from "@/lib/asistencia/participacion";
 import {
@@ -219,6 +220,10 @@ export async function GET(req: NextRequest) {
         // 🔴 Sin esto la bandera no llegaría al motor y a un servicio profesional
         // con salario cargado se le calcularía la quincena entera.
         servicioProfesional: servicioProfesionalDeFila(f),
+        // 🔴 Lo mismo un escalón más abajo: sin esto el interruptor de los
+        // seguros no llegaría al motor y la planilla se los seguiría cobrando a
+        // todo el mundo, que es justo lo que este campo existe para cambiar.
+        pagaSeguros: pagaSegurosDeFila(f),
       });
     }
     const nombres = new Map<string, string>();

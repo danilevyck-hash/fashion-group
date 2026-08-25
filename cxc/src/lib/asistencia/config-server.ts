@@ -45,6 +45,11 @@ import {
   esColumnaServicioProfesionalFaltante,
   esServicioProfesional,
 } from "./participacion";
+import {
+  COLUMNA_PAGA_SEGUROS,
+  esColumnaPagaSegurosFaltante,
+  pagaSeguros,
+} from "./seguros";
 
 // Se re-exportan para que las rutas importen todo de un solo lugar. La
 // DETECCIÓN es pura y vive en `config.ts`; acá solo está el I/O.
@@ -97,6 +102,9 @@ export interface FilaPersonaDb {
   motivo_salida?: string | null;
   /** Opcional: no existe hasta que se corra `MIGRACION_SERVICIO_PROFESIONAL`. */
   servicio_profesional?: boolean | null;
+  /** Opcional: no existe hasta que se corra `MIGRACION_SEGUROS`. Ausente o
+   *  `null` = SÍ se le descuentan, que es como estaban las 38 fichas. */
+  paga_seguros?: boolean | null;
 }
 
 export interface PersonasLeidas {
@@ -108,6 +116,9 @@ export interface PersonasLeidas {
   /** `true` = falta la columna de servicio profesional. Todo el mundo se lee
    *  como "va en planilla", que es exactamente como estaba antes. */
   faltaColumnaServicioProfesional: boolean;
+  /** `true` = falta la columna de los seguros. A todo el mundo se le descuentan
+   *  el social y el educativo, que es exactamente como estaba antes. */
+  faltaColumnaPagaSeguros: boolean;
 }
 
 /** Lo que se pedía antes de que existieran las altas y bajas. */
@@ -122,7 +133,9 @@ const COLS_CON_BAJAS = `${COLS_BASE}, ${COLUMNAS_BAJAS.join(", ")}`;
  *  castean `as unknown as FilaPersonaDb[]`. Se prefiere el cast a repetir los
  *  nombres de las columnas en dos lugares —esa es la duplicación que en este
  *  proyecto ya costó dos bugs caros. */
-const COLS_TODO = `${COLS_CON_BAJAS}, ${COLUMNA_SERVICIO_PROFESIONAL}`;
+const COLS_CON_SERVICIO = `${COLS_CON_BAJAS}, ${COLUMNA_SERVICIO_PROFESIONAL}`;
+/** Todo, con el interruptor de los seguros. Sale de `seguros.ts` por lo mismo. */
+const COLS_TODO = `${COLS_CON_SERVICIO}, ${COLUMNA_PAGA_SEGUROS}`;
 
 /**
  * Las fichas guardadas.
@@ -136,9 +149,10 @@ const COLS_TODO = `${COLS_CON_BAJAS}, ${COLUMNA_SERVICIO_PROFESIONAL}`;
  * La escalera va de lo nuevo a lo viejo, y cada peldaño solo se baja cuando el
  * error NOMBRA la columna que ese peldaño quita:
  *   1. todo                      → lo normal;
- *   2. sin `servicio_profesional`→ nadie está fuera de planilla (como hoy);
- *   3. sin las columnas de baja  → todo el mundo activo (como estaba antes);
- *   4. sin la tabla              → lista vacía y la pantalla nombra el archivo.
+ *   2. sin `paga_seguros`        → a todo el mundo se le cobran (como hoy);
+ *   3. sin `servicio_profesional`→ nadie está fuera de planilla (como hoy);
+ *   4. sin las columnas de baja  → todo el mundo activo (como estaba antes);
+ *   5. sin la tabla              → lista vacía y la pantalla nombra el archivo.
  *
  * ⚠️ Releer ante CUALQUIER error convertiría un problema real —permisos, red,
  * RLS— en una lectura incompleta que nadie notaría.
@@ -155,6 +169,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
     cols: string;
     faltaColumnasBajas: boolean;
     faltaColumnaServicioProfesional: boolean;
+    faltaColumnaPagaSeguros: boolean;
     /** ¿Este error justifica bajar un peldaño? */
     reintentar: (err: unknown) => boolean;
   }> = [
@@ -162,18 +177,31 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       cols: COLS_TODO,
       faltaColumnasBajas: false,
       faltaColumnaServicioProfesional: false,
+      faltaColumnaPagaSeguros: false,
+      reintentar: (e) =>
+        esColumnaPagaSegurosFaltante(e)
+        || esColumnaServicioProfesionalFaltante(e)
+        || esColumnaDeBajaFaltante(e),
+    },
+    {
+      cols: COLS_CON_SERVICIO,
+      faltaColumnasBajas: false,
+      faltaColumnaServicioProfesional: false,
+      faltaColumnaPagaSeguros: true,
       reintentar: (e) => esColumnaServicioProfesionalFaltante(e) || esColumnaDeBajaFaltante(e),
     },
     {
       cols: COLS_CON_BAJAS,
       faltaColumnasBajas: false,
       faltaColumnaServicioProfesional: true,
+      faltaColumnaPagaSeguros: true,
       reintentar: esColumnaDeBajaFaltante,
     },
     {
       cols: COLS_BASE,
       faltaColumnasBajas: true,
       faltaColumnaServicioProfesional: true,
+      faltaColumnaPagaSeguros: true,
       reintentar: () => false,
     },
   ];
@@ -186,6 +214,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
         faltaMigracion: false,
         faltaColumnasBajas: intento.faltaColumnasBajas,
         faltaColumnaServicioProfesional: intento.faltaColumnaServicioProfesional,
+        faltaColumnaPagaSeguros: intento.faltaColumnaPagaSeguros,
       };
     }
     if (intento.reintentar(error)) continue;
@@ -195,6 +224,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
         faltaMigracion: true,
         faltaColumnasBajas: true,
         faltaColumnaServicioProfesional: true,
+        faltaColumnaPagaSeguros: true,
       };
     }
     throw new Error(error.message);
@@ -207,6 +237,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
     faltaMigracion: true,
     faltaColumnasBajas: true,
     faltaColumnaServicioProfesional: true,
+    faltaColumnaPagaSeguros: true,
   };
 }
 
@@ -219,6 +250,18 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
  */
 export function servicioProfesionalDeFila(f: FilaPersonaDb): boolean {
   return esServicioProfesional(f.servicio_profesional);
+}
+
+/**
+ * ¿A esta ficha se le descuentan los seguros?
+ *
+ * Sin la columna corrida —o con `null`— la respuesta es SÍ, que es como estaban
+ * las 38 fichas antes de este cambio: la planilla se las cobraba a todas. Ante
+ * la duda se retiene; ver `seguros.ts` para por qué la asimetría va para ese
+ * lado.
+ */
+export function pagaSegurosDeFila(f: FilaPersonaDb): boolean {
+  return pagaSeguros(f.paga_seguros);
 }
 
 /** La vigencia de una ficha leída. Sin las columnas —o con la migración sin

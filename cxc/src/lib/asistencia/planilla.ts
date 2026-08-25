@@ -597,6 +597,16 @@ export interface FichaPlanilla {
    * estaban las 38 fichas antes de que este campo existiera.
    */
   servicioProfesional?: boolean;
+  /**
+   * ¿Se le descuentan el seguro social y el educativo? Los DOS van juntos —ver
+   * `seguros.ts`—. Ausente o `true` = sí, que es como estaban las 38 fichas
+   * antes de que este campo existiera: la planilla se los cobraba a todas.
+   *
+   * 🔴 SOLO UN `false` EXPLÍCITO LOS APAGA. Es lo que hace que este cambio no
+   * mueva un centavo el día que sale, y que la planilla siga dando lo de ayer
+   * hasta que una persona apague el interruptor a conciencia.
+   */
+  pagaSeguros?: boolean;
 }
 
 export interface DineroLinea {
@@ -646,6 +656,13 @@ export interface LineaPlanilla {
    * este campo existe para sostener.
    */
   fueraDePlanilla: boolean;
+  /**
+   * ¿Se le descontaron los seguros? Es lo que se muestra —un chip «sin
+   * seguros»— para que un $0,00 en las dos columnas no se lea como un error de
+   * cálculo. Sale de la ficha, no de mirar si el número dio cero: un bruto de
+   * $0 también daría seguros en cero y no es lo mismo.
+   */
+  pagaSeguros: boolean;
   /**
    * 🔴 EL SISTEMA SE ABSTUVO Y LO DECIDE UNA PERSONA. Trae el motivo escrito,
    * tal como se muestra: «entró el 10 de agosto de 2026», «Vacaciones del 16
@@ -765,6 +782,12 @@ export function calcularDinero(
    * Ver `factorBaseDeRango` y la nota larga del PERÍODO.
    */
   factorBase = 1,
+  /**
+   * ¿Se le descuentan los seguros? **`true` por defecto**, o sea el
+   * comportamiento de siempre: sin pasarlo, esta función devuelve exactamente
+   * lo mismo que devolvía antes de que el parámetro existiera.
+   */
+  pagaSeguros = true,
 ): DineroLinea | null {
   const divisor = divisorDe(jornadaSemanal, reglas);
   if (divisor === null || !(salarioMensual > 0)) return null;
@@ -797,8 +820,18 @@ export function calcularDinero(
 
   // Los dos seguros salen del BRUTO, no del quincenal: así lo confirmó la
   // contable y así lo dice la fórmula de su cuadro.
-  const seguroSocial = centavos(totalBruto * (reglas.seguroSocialPct / 100));
-  const seguroEducativo = centavos(totalBruto * (reglas.seguroEducativoPct / 100));
+  //
+  // 🔴 Y VAN JUNTOS O NO VAN. `pagaSeguros` es UN interruptor para los dos
+  // —Daniel: *"esto es junto, no es separado cada uno"*— y el Excel de la
+  // contadora no tiene una sola fila con uno sí y el otro no. Apagado, las dos
+  // columnas quedan en $0,00 y NADA MÁS cambia: el bruto, los recargos, las
+  // ausencias y los montos escritos a mano son los mismos. Ver `seguros.ts`.
+  //
+  // ⚠️ El `!== false` no está de adorno: `undefined` tiene que caer del lado de
+  // "sí se le cobra", que es lo que hacían las 38 fichas antes de esto.
+  const conSeguros = pagaSeguros !== false;
+  const seguroSocial = conSeguros ? centavos(totalBruto * (reglas.seguroSocialPct / 100)) : 0;
+  const seguroEducativo = conSeguros ? centavos(totalBruto * (reglas.seguroEducativoPct / 100)) : 0;
 
   const totalDeducciones = centavos(
     seguroSocial + seguroEducativo + manuales.isr + manuales.prestamo
@@ -868,6 +901,9 @@ export function armarLinea(
       ? calcularDinero(
         ficha.salarioMensual as number, ficha.jornadaSemanal as number,
         horas, manuales, reglas, factorBase,
+        // 🔑 `!== false`, no `=== true`: una ficha vieja sin el campo tiene que
+        // seguir pagando seguros. Ver la nota de `FichaPlanilla.pagaSeguros`.
+        ficha.pagaSeguros !== false,
       )
       : null;
 
@@ -883,6 +919,7 @@ export function armarLinea(
 
   return {
     fueraDePlanilla,
+    pagaSeguros: ficha.pagaSeguros !== false,
     decidirAMano: motivoDecidir,
     quincenalReferencia,
     codigo: ficha.codigo,
