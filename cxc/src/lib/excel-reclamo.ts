@@ -1,6 +1,6 @@
 import XLSX from "xlsx-js-style";
 import { reclamoGaleriaUrl } from "@/lib/reclamos/gallery-token";
-import { reclamoTaxes, ocultaPedido, impLabel } from "@/lib/reclamos/tax";
+import { reclamoTaxes, ocultaPedido, impLabel, itbmsLabel } from "@/lib/reclamos/tax";
 import { addr, makeCellStyles, CASA_PALETTE, MONEY_FMT } from "@/lib/excel-export";
 
 interface ReclamoFoto {
@@ -106,7 +106,7 @@ export function buildReclamoSheet(
 
   ws[addr(r, 6)] = tLbl("Subtotal:"); ws[addr(r, 7)] = tVal(subtotal); h[r] = 16; r++;
   ws[addr(r, 6)] = tLbl(`Importación (${impLabel(empresa)}):`); ws[addr(r, 7)] = tVal(tx.importacion); h[r] = 16; r++;
-  if (tx.hasItbms) { ws[addr(r, 6)] = tLbl("ITBMS (7%):"); ws[addr(r, 7)] = tVal(tx.itbms); h[r] = 16; r++; }
+  if (tx.hasItbms) { ws[addr(r, 6)] = tLbl(`ITBMS (${itbmsLabel(empresa)}):`); ws[addr(r, 7)] = tVal(tx.itbms); h[r] = 16; r++; }
 
   // Final total — banda PRI 13pt (layout de ficha, conservado): banda 0..6 + valor en col 7
   const totalRow = r;

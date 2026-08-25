@@ -5,7 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { mailtoHref } from "@/lib/contact-links";
 import { Reclamo, Contacto } from "./types";
-import { ESTADOS, daysSince, calcSub, reclamoTaxes, estadoLabel } from "./constants";
+import { ESTADOS, daysSince, calcSub, reclamoTaxes, estadoLabel, esPendiente, soloPendientes } from "./constants";
 import { matchReclamo, matchHint } from "./search";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 import FotoBadge from "./FotoBadge";
@@ -352,7 +352,7 @@ export default function EmpresaList({
           {sortedRecs.map((r) => {
             const days = daysSince(r.fecha_reclamo);
             const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
-            const isOpen = r.estado !== "Pagado";
+            const isOpen = esPendiente(r);
             return (
               <div
                 key={r.id}
@@ -402,7 +402,7 @@ export default function EmpresaList({
       )}
 
       {sortedRecs.length === 0 ? (() => {
-        const openCount = allEmpresaRecs.filter(r => r.estado !== "Pagado").length;
+        const openCount = soloPendientes(allEmpresaRecs).length;
         if (allEmpresaRecs.length > 0 && openCount === 0 && filterEstado === "all" && !search) {
           return (
             <div className="flex flex-col items-center py-16 text-center">
@@ -446,7 +446,7 @@ export default function EmpresaList({
             {sortedRecs.map((r) => {
               const days = daysSince(r.fecha_reclamo);
               const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
-              const isOpen = r.estado !== "Pagado";
+              const isOpen = esPendiente(r);
               return (
                 <tr key={r.id}
                   onClick={() => selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id)}

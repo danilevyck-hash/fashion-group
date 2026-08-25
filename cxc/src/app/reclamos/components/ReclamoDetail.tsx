@@ -6,7 +6,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { Reclamo, RItem, Contacto } from "./types";
-import { EMPRESAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, estadoLabel } from "./constants";
+import { EMPRESAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 import FotoBadge from "./FotoBadge";
@@ -474,7 +474,7 @@ export default function ReclamoDetail({
       <div className={`grid grid-cols-2 ${totalsTax.hasItbms ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3 sm:gap-4 mb-8`}>
         <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">Subtotal</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsSub)}</div></div>
         <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">Imp. importación ({impLabel(totalsEmpresa)})</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsTax.importacion)}</div></div>
-        {totalsTax.hasItbms && <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">ITBMS (7%)</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsTax.itbms)}</div></div>}
+        {totalsTax.hasItbms && <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">ITBMS ({itbmsLabel(totalsEmpresa)})</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsTax.itbms)}</div></div>}
         <div className="bg-gray-900 rounded-xl p-4 text-center"><div className="text-xs text-white/70">Total</div><div className="text-[19px] font-semibold tabular-nums mt-1.5 text-white">${fmt(totalsTax.total)}</div></div>
       </div>
 

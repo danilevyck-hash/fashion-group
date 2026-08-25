@@ -50,7 +50,27 @@ export function reclamoTaxes(empresa: string | null | undefined, subtotal: numbe
   return { importacion, itbms, total: sub + importacion + itbms, impRate: TASA_IMPORTACION, itbmsRate: TASA_ITBMS, hasItbms: true };
 }
 
-/** Etiqueta corta de la tasa de importación (ej. "10%", "15%"). */
+/**
+ * Formatea una TASA (0.077) como porcentaje legible: "7.7%", "10%", "15%".
+ * Sin decimales cuando el porcentaje es redondo, con los que hagan falta si no.
+ *
+ * 🔴 El rótulo del ITBMS iba escrito a mano como "7%" en 5 pantallas/papeles
+ * mientras la cuenta usaba TASA_ITBMS = 0.077: en $1.000 el papel decía
+ * "ITBMS (7%) $77.00". El proveedor sacaba 7% = $70 y reclamaba los $7 de
+ * diferencia por cada $1.000. El MONTO está bien (decisión de negocio, con
+ * test); lo que mentía era el rótulo. Por eso el rótulo se DERIVA de la misma
+ * tasa que hace la cuenta y no puede volver a separarse de ella.
+ */
+export function pctLabel(rate: number): string {
+  return `${(rate * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
+}
+
+/** Etiqueta de la tasa de importación aplicada a esa empresa (ej. "10%", "15%"). */
 export function impLabel(empresa: string | null | undefined): string {
-  return `${Math.round((esActiveShoes(empresa) ? TASA_IMPORTACION_ACTIVE_SHOES : TASA_IMPORTACION) * 100)}%`;
+  return pctLabel(reclamoTaxes(empresa, 0).impRate);
+}
+
+/** Etiqueta de la tasa de ITBMS aplicada a esa empresa (ej. "7.7%"). */
+export function itbmsLabel(empresa: string | null | undefined): string {
+  return pctLabel(reclamoTaxes(empresa, 0).itbmsRate);
 }

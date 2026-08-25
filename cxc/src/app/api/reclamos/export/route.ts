@@ -19,7 +19,12 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
-  const header = ["N° Reclamo", "Empresa", "Proveedor", "Marca", "N° Factura", "N° Orden Compra", "Fecha Reclamo", "Estado", "Referencia", "Descripción", "Talla", "Cantidad", "Precio Unit.", "Subtotal Item", "Importación (10%)", "ITBMS (7%)", "Total Item", "Motivo", "Notas"];
+  // Sin porcentaje en el encabezado: este CSV mezcla empresas con tasas
+  // DISTINTAS (Active Shoes importación 15% sin ITBMS; el resto 10% + 7.7%),
+  // así que ningún número fijo acá sería cierto para todas las filas. El
+  // rótulo con la tasa va en los papeles POR EMPRESA (PDF y Excel), que sí
+  // la derivan de la constante — ver itbmsLabel/impLabel en lib/reclamos/tax.
+  const header = ["N° Reclamo", "Empresa", "Proveedor", "Marca", "N° Factura", "N° Orden Compra", "Fecha Reclamo", "Estado", "Referencia", "Descripción", "Talla", "Cantidad", "Precio Unit.", "Subtotal Item", "Importación", "ITBMS", "Total Item", "Motivo", "Notas"];
   const rows: unknown[][] = [];
 
   for (const r of data || []) {

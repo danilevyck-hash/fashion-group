@@ -18,7 +18,7 @@ export interface ReclamosInitialData {
   customMotivos: string[];
   detail: Reclamo | null;
 }
-import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos, fetchCustomMotivos, reclamoTaxes } from "./components/constants";
+import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos, fetchCustomMotivos, reclamoTaxes, soloPendientes } from "./components/constants";
 import EmpresaSelector from "./components/EmpresaSelector";
 import EmpresaList from "./components/EmpresaList";
 import ReclamoForm from "./components/ReclamoForm";
@@ -573,7 +573,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   // "Pendiente" = reclamo abierto (aún no Pagado) = estado "Creado". Pipeline de
   // 2 estados: Creado (abierto) → Pagado (resuelto vía settlement).
   // Pendientes = todo lo que no está Pagado (Creado + En proceso = reclamo abierto).
-  const pendientes = reclamos.filter((r) => r.estado !== "Pagado");
+  const pendientes = soloPendientes(reclamos);
   const totalPendiente = pendientes.reduce((s, r) => s + reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
   // ── Confirm modal — UN solo modal, usado por lista (single + bulk) y detalle ──
