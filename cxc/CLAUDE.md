@@ -1323,6 +1323,70 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - 🔴 **La prueba de que SÍ actualiza lo que cambió**: `MARCA=tommy DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-catalogo-escribe-lo-que-cambio.ts` corre el motor REAL contra los **productos REALES de producción** y el **Switch REAL**, en `dryRun` (cero escrituras), dos veces: control y con **UNA** columna movida en la RESPUESTA de la lectura (no en la base). Medido el 14-ago-2026: **CONTROL 455 comparados · 0 escrituras · 455 sinCambios** · **MUTADO `T1XH343351800` disponibilidad 20→21 ⇒ 455 comparados · 1 escritura · 454 sinCambios**, y la base quedó **INTACTA** (`disponibilidad=20`). Un solo campo distinto ⇒ exactamente una escritura más.
 >   - 🩸 **La primera corrida dio 🔴 y era EL SCRIPT, no el motor**: eligió `FW0FW06158-DW5`, un producto **inactivo**. El loop que compara solo recorre el set de `/stock` (= activos ∪ disponible≥1), así que mover una fila que no está ahí no produce ninguna escritura y el veredicto habría acusado al motor de algo que no hacía. Ahora elige un producto **activo**. Un verificador que miente en cualquiera de las dos direcciones es peor que no tenerlo.
 
+## Pedido o COTIZACIÓN — el mismo botón, dos salidas (24-ago-2026)
+
+> "Enviar a Switch" tenía UNA sola salida: `POST /apipedido/terminar`, que crea un PEDIDO. Daniel pidió poder mandar también una **cotización** y fue textual sobre cómo: ***"que estén los dos"*** — se elige cada vez, ninguna reemplaza a la otra.
+>
+> ### El endpoint, y cómo se mapeó SIN ensuciar producción
+>
+> **`POST /apicotizacion/terminar` EXISTE y NO está documentado** (el PDF solo trae leer cotizaciones —§5.31 `/lista`, §5.32 `/info`— y §5.33 `/correo`). Es el **cuarto endpoint sin documentar** de este conector. Se mapeó el 24-ago-2026 contra `active_shoes` mandando **un campo a la vez y SIN `articulos`**: sin líneas no puede crear nada, así que cada respuesta es solo una validación y la empresa queda intacta.
+>
+> ```
+> {}                       → 400 code 0315 "VENDEDOR NO SE ENCUENTRA DISPONIBLE"
+> {vendedorId}             → 400 code 0316 "CLIENTE NO SE ENCUENTRA DISPONIBLE"
+> {vendedorId, clienteId}  → 400 code 0319 "INFORMACIÓN DE ARTICULOS INCORRECTA"
+> ```
+>
+> O sea: **contrato idéntico al del pedido**, campo por campo y en el mismo orden de validación. Por eso el motor de envío es UNO solo y lo único que cambia son dos líneas: a qué ruta sale el POST y con cuál se verifica después (`/apicotizacion/info` devuelve `detalle[]` con las mismas columnas que el del pedido).
+> - ⚠️ **`/apicotizacion/crear`, `/guardar` y `/nueva` NO existen**: devuelven la página de excepción de Switch con **HTTP 200** (200, no 404). En este conector un endpoint se prueba por el SHAPE de la respuesta, nunca por el status.
+> - ⚠️ **El nombre del id de la respuesta NO está medido** (no se manda una cotización de prueba a producción). Se lee con tolerancia —`cotizacionId`, `pedidoId`, `id`— y **el motor nunca depende de él**: sin id la cotización queda creada igual, con su `numeroInterno`, solo que sin verificación. Un id inventado (`Number(undefined)` = NaN, `Number(null)` = 0) sería peor que ningún id, y hay mutación para eso.
+>
+> ### 🔴 LA PANTALLA DICE LA DIFERENCIA ANTES DE MANDAR
+>
+> Una cotización **NO aparta mercancía**: si se cotizan 500 pares, a los otros vendedores les siguen apareciendo disponibles y los pueden vender. **Enterarse de eso después es el problema**, así que el botón ahora **pregunta qué** y la advertencia viaja pegada a la opción:
+>
+> > **Pedido** — Aparta la mercancía para este cliente.
+> > **Cotización** — La cotización NO aparta la mercancía: si cotizas 500 pares, a los otros vendedores les siguen apareciendo disponibles y los pueden vender. · *Si después lo compran, duplica el pedido y mándalo como pedido.*
+>
+> **Un toque más, no un flujo nuevo.** Dos botones gemelos al lado se tocan sin leer —y el que se toca de más manda 500 pares de la forma equivocada—, así que la elección cuesta un toque y ese toque trae la explicación.
+> - Los textos viven en **`lib/catalogo/documento-switch.ts`**, no en las pantallas: son TRES las que mandan a Switch (checkout, detalle del pedido y confirmación) y tres copias de una advertencia se separan solas — la que quede vieja es la que manda plata al ERP. Hay candado que prohíbe reescribirla a mano en cualquiera de las tres.
+> - **Una sola pieza para las 4 marcas** (`ElegirDocumentoSwitch`): Reebok · Joybees · Tommy · Calvin comparten el mismo componente. **Joybees sigue siendo espejo exacto de Reebok y no se tocó nada propio de Reebok.**
+> - El estado de después también lo dice: *"Cotización creada en Switch: 16-…"*, el banner del candado (*"ya está en Switch como cotización #…"*) y, en la confirmación, la misma frase de que no aparta mercancía.
+>
+> ### 🔴 EL CANDADO DEL CLIENTE CUBRE LAS DOS SALIDAS
+>
+> `documento` se lee **DESPUÉS** del 422 de `handlePostEnvio` y del 400 de `/api/catalogo/checkout`: una cotización pasa por el MISMO candado que un pedido. Si se saltara por este costado, el agujero de los **15 pedidos por $53.124 a nombre de "Contado"** volvería a estar abierto con otro nombre. Hay test de conducta (se renderiza la pantalla, se toca el botón y se cuenta qué salió por `fetch`) y test de contrato para los dos orígenes, interno y del link.
+> - **El servidor NO confía en el navegador**: `normalizarDocumento` acepta exactamente dos valores y **cualquier otra cosa cae a PEDIDO**. El modo de fallo aceptable es crear el documento de siempre, nunca una cotización que nadie pidió. Un body viejo, sin el campo, sigue creando un pedido igual que ayer.
+> - **El pedido del LINK público no se tocó ni se amplió**: sigue esperando a que una persona le ponga el cliente.
+>
+> ### ⚠️ EL CANDADO at-most-once NO SE TOCÓ — y eso tiene una consecuencia que se dice ANTES
+>
+> El índice parcial único sigue siendo **`(order_id) WHERE estado <> 'error'`**: **UN envío no-fallido por pedido, salga como pedido o como cotización**. Meterle `documento` a la clave permitiría dos escrituras al ERP por el mismo pedido, que es exactamente lo que ese índice existe para impedir.
+> - **Consecuencia:** cotizar CONSUME el envío de ese pedido. Para vender de verdad lo cotizado se **duplica** (el botón ya existe y pregunta el cliente). Está dicho en la propia elección —*"Si después lo compran, duplica el pedido y mándalo como pedido"*— y hay test que lo fija.
+> - 🔴 **Si Daniel prefiere que una cotización NO trabe el pedido**, es cambiar el índice a `(order_id, documento)`. Es una decisión suya, no de un refactor: se dejó como está a propósito.
+>
+> ### El aviso de Telegram dice cuál de las dos fue
+>
+> **📝** en vez de 📦, etapa *"COTIZACIÓN enviada a Switch"* y una línea extra: *"No aparta mercancía — sigue disponible para los demás."* En una lista de avisos el emoji es lo primero que se ve, y quien lee el canal decide cosas con eso. Sigue pasando por el armador único (`telegram-pedido.ts`), no por un texto inline.
+>
+> ### DDL
+>
+> **`20260824160000_switch_envios_documento.sql`** agrega `documento TEXT NOT NULL DEFAULT 'pedido'` + CHECK a las 4 tablas de envíos. **No hace falta backfill**: todo lo viejo es pedido, que es lo único que el sistema sabía crear. **El código es TOLERANTE a que no esté corrida** —la escritura reintenta sin la columna y la lectura también—, así que mientras tanto todo se comporta como antes; hay test que lo prueba (con el DDL pendiente la cotización SALE IGUAL).
+>
+> ### Medición
+>
+> **`BASE=… node scripts/_medir-cotizacion-anchos.mjs`** (el navegador **ABORTA cualquier POST** a `/api/catalogo/checkout` y a `**/enviar-switch`: abrir la elección no manda nada por diseño, y así es imposible aunque el diseño cambie). Contra el build de producción y con datos reales, en **390 · 834 · 1024 · 1440**: la elección mide **358×399 px en el iPhone** y **448×381 px en los otros tres** (se topa con el ancho disponible y crece hacia ABAJO — en 390 px es 41 px más alta y 90 px más angosta, no más ancha) → **0 arrastre · 0 recorte · 0 táctil <44 px · 0 texto <12 px**, con las dos opciones y la advertencia a la vista en los cuatro. Escrituras bloqueadas: **0**.
+> - Los tocables <44 px que el script reporta en el resto de la pantalla (`← Inicio`, `← Catálogo`, el precio por pieza, `← Volver a Pedidos`, `Ocultar de la lista`) son los **PRE-EXISTENTES**, en código que este cambio no toca: se listan aparte como informativos y no tumban la medición.
+> - 🩸 **Gotcha de medición:** al usuario de prueba no le corresponde vendedor, así que hay que **elegir uno** además del cliente — si no, el botón queda apagado **con razón** y no hay elección que medir.
+> - 🩸 **Bajo el candado post-envío la pantalla NO dibuja el renglón de estado** (`switchLock ? null : …`, comportamiento de siempre): lo que se lee ahí es el BANNER. La primera versión del script exigía el renglón y daba rojo por nada.
+>
+> ### Candados
+>
+> **`lib/documento-switch.test.ts`** (la regla, las palabras y la estructura) · **`lib/switch-envio-paralelo.test.ts`** (corre el motor REAL: la cotización sale por `/apicotizacion/terminar` y NO toca `/apipedido/terminar`, la verificación usa la ruta de SU documento, la MISMA pre-validación, el at-most-once, el DDL pendiente y el texto exacto del aviso) · **`components/pedido-cliente-obligatorio.test.tsx`** (CONDUCTA: la advertencia está en pantalla y todavía no salió nada; sin cliente no sale ninguna de las dos) · **`api/catalogo-paridad-enviar-switch.test.ts`** (el 422 para la cotización, el passthrough y la normalización).
+> - **Verificado por mutación, 20 de 20 cazadas** (`bash scripts/_mutar-candados-cotizacion.sh`): un documento inventado se acepta · el default se vuelve cotización · la advertencia deja de decir que no aparta · la opción de cotizar pierde su advertencia · todo sale como pedido · todo sale como cotización · la verificación usa siempre la ruta del pedido · el envío no guarda qué se mandó · con el DDL pendiente el envío se cae · un id que no existe se guarda igual · el motor ignora el documento · **el servidor deja pasar una cotización sin cliente** · las dos rutas dejan de pasar el documento · las dos pantallas mandan sin preguntar · el selector dibuja su propia lista · el selector deja de dibujar la advertencia · Telegram no dice cuál fue · Telegram calla que no aparta mercancía.
+> - ⚠️ **Las guardas del NAVEGADOR que abren la elección NO son verificables por mutación y se dice de frente**: React no despacha el click de un botón deshabilitado ni forzándole `disabled = false` (vuelto a medir el 24-ago-2026 quitando cada guarda: los 30 casos siguen verdes). Son segunda capa; el candado que no se puede saltear es el 422 del servidor, y ése SÍ está mutado.
+> - 🩸 **La restauración del script va por COPIA, no por `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada — las mutaciones se apilarían y ninguna se probaría por separado.
+
 ## 🔴 Pedidos — EL CLIENTE SE ELIGE, NUNCA VIENE PUESTO (14-ago-2026)
 
 > El checkout del catálogo nacía con **`Contado` PUESTO** y "Enviar a Switch" no exigía tocar nada: se armaba el pedido, se apretaba, y salía a nombre de Contado sin que nadie lo notara. Daniel, textual: ***"Que arranque vacío y el botón apagado hasta elegir cliente."***

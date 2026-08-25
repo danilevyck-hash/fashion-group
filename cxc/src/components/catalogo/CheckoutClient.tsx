@@ -43,6 +43,8 @@ import ClienteSwitchPicker, {
   type ClienteSwitchOpcion,
   nombreDeCliente,
 } from "@/components/catalogo/ClienteSwitchPicker";
+import ElegirDocumentoSwitch from "@/components/catalogo/ElegirDocumentoSwitch";
+import { type DocumentoSwitch } from "@/lib/catalogo/documento-switch";
 import {
   SIN_CLIENTE_ELEGIDO,
   clienteParaCheckout,
@@ -104,6 +106,9 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   const [vendedorDelLogin, setVendedorDelLogin] = useState<{ id: number; nombre: string | null } | null>(null);
   const [vendedorPickerOpen, setVendedorPickerOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  // El selector de salida: pedido o cotización (24-ago-2026). Se abre con el
+  // MISMO botón "Enviar a Switch" — un toque más, con la diferencia explicada.
+  const [eligiendoDocumento, setEligiendoDocumento] = useState(false);
   // Línea con el precio en edición (tap sobre el precio → input numérico).
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState("");
@@ -167,12 +172,28 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
     if (v > 0) persistCart(cart.map((i) => (i.product_id === productId ? { ...i, unit_price: v } : i)));
   };
 
-  // ── Enviar a Switch ──
-  async function confirmar() {
+  // ── Enviar a Switch: primero QUÉ, después mandar ──
+  //
+  // El botón ya no manda: abre la elección (pedido o cotización). Es un toque
+  // más a propósito — la diferencia entre las dos no se ve en la pantalla y una
+  // cotización NO aparta mercancía (ver `ElegirDocumentoSwitch`).
+  function abrirEleccionDocumento() {
+    // MISMA guarda que tenía `confirmar`: sin cliente elegido no se abre nada.
+    // Si esto se relajara, el paso siguiente igual rebota — el candado vive en
+    // el servidor (400 de /api/catalogo/checkout) — pero la pantalla no puede
+    // ofrecer un camino que ya sabe que no existe.
+    if (!puedeConfirmar || cliente === undefined) return;
+    setEligiendoDocumento(true);
+  }
+
+  async function confirmar(documento: DocumentoSwitch) {
     // Segunda capa contra un cambio futuro del `disabled`. ⚠️ NO es el candado
     // y no se puede verificar por mutación: React no despacha el click de un
     // botón deshabilitado (medido). El candado que no se puede saltear vive en
     // el SERVIDOR (`enviar-switch-route`) y en el 400 de `/api/catalogo/checkout`.
+    //
+    // 🔴 Vale IGUAL para la cotización: la elección de salida no es una puerta
+    // de atrás al envío sin cliente.
     if (!puedeConfirmar || cliente === undefined) return;
     setSending(true);
     setError(null);
@@ -193,7 +214,9 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
         // cambie ni un valor de lo que se manda.
         // `vendedor_id`: el elegido en pantalla. El server igual lo valida
         // contra Switch y, si no viene, cae al mapeo del login como siempre.
-        body: JSON.stringify({ marca, cliente: clienteParaCheckout(cliente), vendedor_id: vendedor?.id ?? null, items: cart, idempotency_key: token }),
+        // `documento`: pedido o cotización, lo que se acaba de elegir. El
+        // servidor lo normaliza igual (nunca confía en el navegador).
+        body: JSON.stringify({ marca, cliente: clienteParaCheckout(cliente), vendedor_id: vendedor?.id ?? null, items: cart, idempotency_key: token, documento }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -209,6 +232,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
       setError("Sin conexión — el carrito sigue guardado, intenta de nuevo.");
     } finally {
       setSending(false);
+      setEligiendoDocumento(false);
     }
   }
 
@@ -428,7 +452,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
               </div>
               <div className="shrink-0 text-right">
                 <button
-                  onClick={confirmar}
+                  onClick={abrirEleccionDocumento}
                   disabled={!puedeConfirmar}
                   className="rounded-md bg-black px-5 min-h-[48px] text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-40"
                 >
@@ -447,6 +471,15 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
           </section>
         </div>
       )}
+
+      {/* La elección: pedido (aparta) o cotización (no aparta). Un solo toque
+          más, y la diferencia se lee ANTES de mandar. */}
+      <ElegirDocumentoSwitch
+        open={eligiendoDocumento}
+        enviando={sending}
+        onClose={() => setEligiendoDocumento(false)}
+        onElegir={(d) => { void confirmar(d); }}
+      />
     </div>
   );
 }

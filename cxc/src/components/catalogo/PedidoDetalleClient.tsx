@@ -26,6 +26,16 @@ import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
 import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
+import ElegirDocumentoSwitch from "@/components/catalogo/ElegirDocumentoSwitch";
+import {
+  DOCUMENTO_POR_DEFECTO,
+  type DocumentoSwitch,
+  esCotizacion,
+  etiquetaDocumento,
+  normalizarDocumento,
+  tituloCreadoEnSwitch,
+  tituloEnviadoASwitch,
+} from "@/lib/catalogo/documento-switch";
 import ClienteSwitchPicker, { type ClienteSwitchOpcion, nombreDeCliente } from "@/components/catalogo/ClienteSwitchPicker";
 import VendedorSwitchPicker, { type VendedorOpcion } from "@/components/catalogo/VendedorSwitchPicker";
 import { nombreDeVendedor } from "@/lib/catalogo/vendedor-switch";
@@ -58,7 +68,9 @@ interface Order { id: string; order_number: string; client_name: string; client_
   origen_original?: string | null; origen_short_id?: string | null;
   [itemsField: string]: unknown; }
 interface DirClient { nombre: string; empresa: string; }
-interface SwitchEnvio { estado: string; pedido_switch_id: number | null; numero_interno: string | null; error_detalle: string | null; }
+/** `documento` puede venir ausente: el DDL 20260824160000 puede estar pendiente
+ *  y los envíos viejos son todos pedidos. `normalizarDocumento` lo resuelve. */
+interface SwitchEnvio { estado: string; pedido_switch_id: number | null; numero_interno: string | null; error_detalle: string | null; documento?: string | null; }
 interface SwitchPreviewLinea { sku: string; descripcionSwitch: string; bultos: number; piezas: number; precioCatalogo: number; precioSwitch: number; }
 interface SwitchPreview { cliente: string; vendedor: string; lineas: SwitchPreviewLinea[]; warnings: string[]; avisos?: AvisoEnvio[]; totalPiezas: number; totalEstimado: number; }
 /** Lo que se enseña cuando el toque SE DETIENE: qué pasó, y el pedido resuelto
@@ -122,6 +134,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | "error" | null>(null);
   // ── Envío a Switch (ERP) ──
   const [switchEnvio, setSwitchEnvio] = useState<SwitchEnvio | null>(null);
+  // Pedido o cotización (24-ago-2026): el botón "Enviar a Switch" pregunta qué
+  // antes de mandar. `documentoElegido` es lo que se eligió en ESTE intento —
+  // el botón "Crear en Switch" del modal de problema tiene que mandar lo mismo
+  // que se eligió, no volver al default.
+  const [eligiendoDocumento, setEligiendoDocumento] = useState(false);
+  const [documentoElegido, setDocumentoElegido] = useState<DocumentoSwitch>(DOCUMENTO_POR_DEFECTO);
   const [switchProblema, setSwitchProblema] = useState<SwitchProblema | null>(null);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [switchSending, setSwitchSending] = useState(false);
@@ -321,6 +339,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // Candado post-envío: con envío activo a Switch ('enviado' o 'verificado')
   // el contenido del pedido queda de solo lectura ('pendiente' no bloquea).
   const switchLock = !!switchEnvio && ["enviado", "verificado"].includes(switchEnvio.estado);
+  // Qué es lo que está en Switch: pedido o cotización. Un envío viejo (o uno
+  // leído con el DDL pendiente) no trae el campo y es un PEDIDO — que es lo
+  // único que el sistema sabía crear hasta el 24-ago-2026.
+  const documentoEnSwitch = normalizarDocumento(switchEnvio?.documento);
   useEffect(() => { switchLockRef.current = switchLock; }, [switchLock]);
 
   // ── AUTO-SAVE (2s debounce) ──
@@ -440,7 +462,18 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // intento ANTES del POST, el índice parcial y el 409 de las 3 capas siguen
   // exactamente igual. El PUT va PRIMERO porque `enviar-switch` sigue exigiendo
   // status==='confirmado'.
-  async function enviarASwitch() {
+  //
+  // 🔴 24-ago-2026: el toque ahora PREGUNTA QUÉ (pedido o cotización) y recién
+  // después hace todo el camino. Es un toque más y es deliberado: una cotización
+  // NO aparta mercancía, y esa diferencia no se ve en la pantalla.
+  function enviarASwitch() {
+    if (enviandoRef.current) return;
+    // MISMA guarda que el envío: sin cliente elegido no se abre ni la elección.
+    if (!clienteElegido) return;
+    setEligiendoDocumento(true);
+  }
+
+  async function enviarASwitchCon(documento: DocumentoSwitch) {
     if (enviandoRef.current) return; // doble toque: el segundo no hace nada
     // Segunda capa contra un cambio futuro del `disabled`. ⚠️ NO es el candado
     // y no se puede verificar por mutación (React no despacha el click de un
@@ -448,6 +481,8 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     // `handlePostEnvio` responde 422 sin cliente elegido.
     if (!clienteElegido) return;
     enviandoRef.current = true;
+    setDocumentoElegido(documento);
+    setEligiendoDocumento(false);
     setConfirming(true);
     setSwitchProblema(null);
     try {
@@ -468,7 +503,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
       // 2. Pre-validación viva contra Switch + creación, en UN solo viaje.
       setPasoSwitch("Revisando el pedido contra Switch...");
-      await crearEnSwitch(true);
+      await crearEnSwitch(true, documento);
     } finally {
       enviandoRef.current = false;
       setConfirming(false);
@@ -482,12 +517,14 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // `auto` = el toque único: el servidor pre-valida y crea en la misma llamada,
   // y solo se detiene si hay algo que decidir (devuelve `preview`). Sin `auto`
   // —el botón "Enviar igual" del modal— crea directo, como siempre.
-  async function crearEnSwitch(auto = false) {
+  async function crearEnSwitch(auto = false, documento: DocumentoSwitch = documentoElegido) {
     setSwitchSending(true);
     try {
       const res = await fetch(`${theme.api}/orders/${id}/enviar-switch`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(auto ? { auto: true } : {}),
+        // `documento` viaja SIEMPRE, con `auto` o sin él: el segundo toque
+        // ("Crear en Switch" del modal) tiene que mandar lo mismo que se eligió.
+        body: JSON.stringify(auto ? { auto: true, documento } : { documento }),
       });
       const d = await res.json();
       // El servidor se detuvo porque hay algo que decidir: NADA se escribió en
@@ -502,11 +539,11 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         });
         setShowSwitchModal(true);
       } else if (res.ok && d.ok) {
-        setSwitchEnvio({ estado: d.verificado ? "verificado" : "enviado", pedido_switch_id: d.pedidoSwitchId, numero_interno: d.numeroInterno, error_detalle: null });
+        setSwitchEnvio({ estado: d.verificado ? "verificado" : "enviado", pedido_switch_id: d.pedidoSwitchId, numero_interno: d.numeroInterno, error_detalle: null, documento: d.documento ?? documento });
         setShowSwitchModal(false); setSwitchProblema(null);
-        showToast(`Listo — pedido creado en Switch: ${d.numeroInterno}`);
+        showToast(`Listo — ${tituloCreadoEnSwitch(normalizarDocumento(d.documento ?? documento)).toLowerCase()}: ${d.numeroInterno}`);
       } else if (d.ambiguo) {
-        setSwitchEnvio({ estado: "enviado", pedido_switch_id: null, numero_interno: null, error_detalle: d.error });
+        setSwitchEnvio({ estado: "enviado", pedido_switch_id: null, numero_interno: null, error_detalle: d.error, documento });
         setShowSwitchModal(false); setSwitchProblema(null);
         showToast("Switch no respondio — revisa el panel antes de reintentar.");
       } else {
@@ -516,7 +553,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         // muestra entero: un problema que impide crear el pedido no puede irse
         // en un toast de 3 segundos.
         if (res.status !== 422) {
-          setSwitchEnvio({ estado: "error", pedido_switch_id: null, numero_interno: null, error_detalle: d.error || null });
+          setSwitchEnvio({ estado: "error", pedido_switch_id: null, numero_interno: null, error_detalle: d.error || null, documento });
         }
         setSwitchProblema({
           errores: (d.errores as string[] | undefined) ?? [String(d.error || "Switch rechazo el pedido.")],
@@ -853,7 +890,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       {switchLock && switchEnvio && (
         <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 mb-4">
           <p className="text-sm text-amber-900 font-medium">
-            Este pedido ya está en Switch como #{switchEnvio.numero_interno || switchEnvio.pedido_switch_id || "?"} — no se puede editar aquí.
+            Este pedido ya está en Switch como {etiquetaDocumento(documentoEnSwitch).toLowerCase()} #{switchEnvio.numero_interno || switchEnvio.pedido_switch_id || "?"} — no se puede editar aquí.
           </p>
           {reemplazadoPor ? (
             <p className="text-sm text-amber-800 mt-2">
@@ -1097,16 +1134,21 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             switchEnvio && switchEnvio.estado === "verificado" ? (
               <div className="flex items-center gap-2 text-sm text-emerald-700">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Pedido creado en Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> · verificado
+                {tituloCreadoEnSwitch(documentoEnSwitch)}: <span className="font-mono">{switchEnvio.numero_interno}</span> · verificado
               </div>
             ) : switchEnvio && switchEnvio.estado === "enviado" ? (
               <div className="text-sm text-amber-700">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
                   {switchEnvio.numero_interno
-                    ? <>Enviado a Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> (sin verificar)</>
+                    ? <>{tituloEnviadoASwitch(documentoEnSwitch)}: <span className="font-mono">{switchEnvio.numero_interno}</span> (sin verificar)</>
                     : "Envio en revision — confirma en el panel de Switch si el pedido se creo"}
                 </div>
+                {/* Lo que hay que saber DESPUÉS de mandar una cotización: la
+                    mercancía sigue a la venta para los demás. */}
+                {esCotizacion(documentoEnSwitch) && (
+                  <p className="text-xs text-amber-600 mt-1">No aparta mercancía.</p>
+                )}
                 {switchEnvio.error_detalle && <p className="text-xs text-amber-600 mt-1">{switchEnvio.error_detalle}</p>}
               </div>
             ) : (
@@ -1156,7 +1198,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                 )}
                 {/* El aviso va ANTES del toque, no en un modal después. */}
                 <p className="text-xs text-gray-500 mt-2 text-center">
-                  Crea el pedido de verdad en Switch ({theme.empresaKey}). Si sale mal, hay que borrarlo a mano en el panel de Switch.
+                  Elige pedido o cotización, y se crea de verdad en Switch ({theme.empresaKey}). Si sale mal, hay que borrarlo a mano en el panel de Switch.
                 </p>
               </div>
             )
@@ -1294,7 +1336,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     volvería a pre-validar y se quedaría trabado en el mismo modal. */}
                 <button onClick={() => crearEnSwitch()} disabled={switchSending}
                   className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
-                  {switchSending ? "Enviando a Switch..." : "Crear pedido en Switch"}
+                  {switchSending
+                    ? "Enviando a Switch..."
+                    : `Crear ${etiquetaDocumento(documentoElegido).toLowerCase()} en Switch`}
                 </button>
                 <button onClick={() => setShowSwitchModal(false)} disabled={switchSending}
                   className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
@@ -1371,6 +1415,15 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
           onCancel={() => { setShowDupModal(false); setDupError(null); }}
         />
       )}
+
+      {/* Pedido o cotización — el toque que falta antes de mandar. La misma
+          pieza que usan el checkout y la confirmación en las 4 marcas. */}
+      <ElegirDocumentoSwitch
+        open={eligiendoDocumento}
+        enviando={confirming}
+        onClose={() => setEligiendoDocumento(false)}
+        onElegir={(d) => { void enviarASwitchCon(d); }}
+      />
 
       <Toast message={toast} />
     </div>

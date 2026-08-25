@@ -9,12 +9,22 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import ElegirDocumentoSwitch from "@/components/catalogo/ElegirDocumentoSwitch";
+import {
+  type DocumentoSwitch,
+  TEXTO_NO_RESERVA,
+  esCotizacion,
+  normalizarDocumento,
+  tituloEnviadoASwitch,
+} from "@/lib/catalogo/documento-switch";
 
 interface Envio {
   estado: string;
   pedido_switch_id: number | null;
   numero_interno: string | null;
   error_detalle: string | null;
+  /** 'pedido' | 'cotizacion'. Ausente en envíos viejos = pedido. */
+  documento?: string | null;
 }
 interface Order { id: string; order_number: string; client_name: string; total: number }
 
@@ -26,6 +36,8 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   const [envio, setEnvio] = useState<Envio | null | undefined>(undefined);
   const [retrying, setRetrying] = useState(false);
   const [retryMsg, setRetryMsg] = useState<string | null>(null);
+  // El envío desde acá también elige salida: pedido o cotización.
+  const [eligiendoDocumento, setEligiendoDocumento] = useState(false);
 
   const load = useCallback(async () => {
     const [oRes, eRes] = await Promise.all([
@@ -38,11 +50,15 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
 
   useEffect(() => { load(); }, [load]);
 
-  async function reintentar() {
+  async function reintentar(documento: DocumentoSwitch) {
     setRetrying(true);
     setRetryMsg(null);
     try {
-      const res = await fetch(`${cfg.api}/orders/${orderId}/enviar-switch`, { method: "POST" });
+      const res = await fetch(`${cfg.api}/orders/${orderId}/enviar-switch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documento }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok && res.status !== 409) {
         setRetryMsg(data?.error || "El reintento falló. Intenta de nuevo en unos minutos.");
@@ -53,6 +69,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
       setRetryMsg("Sin conexión — intenta de nuevo.");
     } finally {
       setRetrying(false);
+      setEligiendoDocumento(false);
     }
   }
 
@@ -63,6 +80,9 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   // (diagnóstico del piloto 4-jul).
   const sinIntento = envio === null;
   const puedeReintentar = sinIntento || envio?.estado === "error";
+  // Qué hay en Switch. Envío viejo o DDL pendiente = pedido, que es lo único
+  // que este sistema sabía crear antes del 24-ago-2026.
+  const documento = normalizarDocumento(envio?.documento);
 
 
   return (
@@ -79,7 +99,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
             </h1>
             {switchOk ? (
               <p className="mt-1 text-sm text-emerald-800">
-                Enviado a Switch — N° <span className="font-semibold tabular-nums">{envio?.numero_interno}</span>
+                {tituloEnviadoASwitch(documento)} — N° <span className="font-semibold tabular-nums">{envio?.numero_interno}</span>
                 {envio?.estado === "verificado" ? " · verificado ✓" : ""}
               </p>
             ) : ambiguo ? (
@@ -99,6 +119,12 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
                 {envio?.error_detalle && <p className="mt-1 text-xs">{envio.error_detalle}</p>}
               </div>
             )}
+            {/* 🔴 Lo que hay que saber DESPUÉS de mandar una cotización, con
+                las mismas palabras con que se dijo antes: la mercancía sigue
+                a la venta para los demás vendedores. */}
+            {switchOk && esCotizacion(documento) && (
+              <p className="mt-2 text-xs text-amber-800">{TEXTO_NO_RESERVA}</p>
+            )}
             {order && (
               <p className="mt-2 text-xs text-gray-500 tabular-nums">
                 {order.client_name} · Total ${fmt(Number(order.total) || 0)}
@@ -113,7 +139,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {puedeReintentar && (
               <button
-                onClick={reintentar}
+                onClick={() => setEligiendoDocumento(true)}
                 disabled={retrying}
                 className="rounded-md bg-black px-4 min-h-[48px] text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-40 sm:col-span-2"
               >
@@ -132,6 +158,14 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
               Volver al catálogo
             </Link>
           </div>
+
+          {/* Misma elección que en el checkout y en el detalle, misma pieza. */}
+          <ElegirDocumentoSwitch
+            open={eligiendoDocumento}
+            enviando={retrying}
+            onClose={() => setEligiendoDocumento(false)}
+            onElegir={(d) => { void reintentar(d); }}
+          />
         </div>
       )}
     </div>

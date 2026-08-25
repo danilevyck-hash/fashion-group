@@ -360,15 +360,17 @@ describe("candados estáticos", () => {
     // ⏱️ 12-ago-2026 (un solo viaje): la pre-validación y la creación viajan
     // juntas (`auto:true`) en vez de un `dry:true` + un POST real que volvía a
     // cruzar TODOS los SKU contra Switch. Primero confirmar, después el toque.
-    expect(src).toMatch(/status: "confirmado"[\s\S]{0,2000}await crearEnSwitch\(true\)/);
-    expect(src).toContain("JSON.stringify(auto ? { auto: true } : {})");
+    expect(src).toMatch(/status: "confirmado"[\s\S]{0,2000}await crearEnSwitch\(true, documento\)/);
+    expect(src).toContain("JSON.stringify(auto ? { auto: true, documento } : { documento })");
     // send-order YA NO cuelga de confirmar: es su propio botón.
     expect(src).toContain("Avisar por correo a Fashion Group");
     expect(src).toMatch(/async function avisarPorCorreo\(\)/);
     expect(src).not.toMatch(/async function confirmOrder\(\)/);
     // "Crear pedido en Switch" sobrevive SOLO como salida de la pantalla de
     // problema (cuando hay un aviso bloqueante que decidir), no como paso.
-    expect(src).toContain("Crear pedido en Switch");
+    // 24-ago-2026: dice "Crear pedido en Switch" o "Crear cotización en
+    // Switch" según lo elegido — el mismo botón, con el nombre de lo elegido.
+    expect(src).toContain("`Crear ${etiquetaDocumento(documentoElegido).toLowerCase()} en Switch`");
   });
 
   it("el selector de cliente del detalle ya no está gated a admin/secretaria", () => {

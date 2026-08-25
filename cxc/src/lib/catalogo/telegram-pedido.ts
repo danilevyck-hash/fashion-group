@@ -49,6 +49,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { fmtPrecio } from "@/lib/catalogo/precio";
+import { type DocumentoSwitch, esCotizacion, etapaTelegram } from "@/lib/catalogo/documento-switch";
 
 /** Monto en el formato de los catálogos: $1,234 / $37.50 (sin `.00`). */
 export function money(n: number): string {
@@ -205,23 +206,40 @@ export interface AvisoPedidoEnviado {
   /** Secuencial que devolvió Switch (numeroInterno), p.ej. 16-000002012. */
   numeroSwitch: string;
   verificado: boolean;
+  /**
+   * PEDIDO o COTIZACIÓN (24-ago-2026). Ausente = pedido, que es lo único que
+   * este aviso podía contar antes de que existiera la elección.
+   */
+  documento?: DocumentoSwitch;
 }
 
 /**
  * El pedido SALIÓ al ERP (motor switch-envio.ts, cualquiera de sus tres
  * llamadores). Mismo cuerpo que la creación + la línea del secuencial de
  * Switch con el resultado de la verificación post-escritura.
+ *
+ * 🔴 DICE CUÁL DE LAS DOS FUE, y no solo en la etapa: una cotización lleva
+ * además la línea de que NO aparta mercancía. Quien lee el canal decide cosas
+ * con esto —si la mercancía está apartada o sigue a la venta— y "📦 enviado a
+ * Switch" a secas se lee como pedido.
  */
 export function avisoPedidoEnviado(a: AvisoPedidoEnviado): string {
+  const documento = a.documento ?? "pedido";
+  const cotizacion = esCotizacion(documento);
   return cuerpoAvisoPedido({
-    emoji: "📦",
+    // 📝 vs 📦: en una lista de avisos el emoji es lo primero que se ve, y las
+    // dos salidas tienen que distinguirse antes de leer una palabra.
+    emoji: cotizacion ? "📝" : "📦",
     label: a.label,
     numero: a.numero,
-    etapa: "enviado a Switch",
+    etapa: etapaTelegram(documento),
     cliente: a.cliente,
     vendedor: a.vendedor ?? null,
     total: a.total,
     resumen: a.resumen,
-    extras: [`→ Switch ${a.numeroSwitch} ${a.verificado ? "✓ verificado" : "⚠️ sin verificar"}`],
+    extras: [
+      `→ Switch ${a.numeroSwitch} ${a.verificado ? "✓ verificado" : "⚠️ sin verificar"}`,
+      ...(cotizacion ? ["No aparta mercancía — sigue disponible para los demás."] : []),
+    ],
   });
 }

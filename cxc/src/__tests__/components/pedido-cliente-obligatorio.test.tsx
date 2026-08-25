@@ -23,6 +23,19 @@ import { render, screen, cleanup, fireEvent, waitFor, act, within } from "@testi
 import CheckoutClient from "@/components/catalogo/CheckoutClient";
 import PedidoDetalleClient from "@/components/catalogo/PedidoDetalleClient";
 import { LABEL_CONTADO, SIN_CLIENTE_ELEGIDO } from "@/lib/catalogo/cliente-elegido";
+import { TEXTO_NO_RESERVA } from "@/lib/catalogo/documento-switch";
+
+/**
+ * 🔴 24-ago-2026 — "Enviar a Switch" ahora PREGUNTA QUÉ: pedido o cotización.
+ * Todo lo que este archivo protege se mide sobre el camino COMPLETO, y el
+ * candado vale para LAS DOS salidas: la elección de salida no puede ser una
+ * puerta de atrás al envío sin cliente.
+ */
+const opcionDoc = (clave: "pedido" | "cotizacion") =>
+  document.querySelector(`[data-medir="documento-${clave}"]`) as HTMLButtonElement | null;
+
+/** ¿Se abrió la elección? (con el botón apagado no debería abrirse siquiera). */
+const hayEleccion = () => document.querySelector('[data-medir="elegir-documento"]') !== null;
 
 const OID = "44444444-4444-4444-8444-444444444444";
 const ROUTER = { push: vi.fn(), replace: vi.fn() };
@@ -96,6 +109,19 @@ async function pintarCheckout() {
 
 const botonEnviar = () => screen.getByRole("button", { name: /Enviar a Switch/ }) as HTMLButtonElement;
 
+/**
+ * El toque COMPLETO del checkout: "Enviar a Switch" → la salida elegida.
+ * Devuelve `false` si la elección ni siquiera se abrió, que es lo que tiene que
+ * pasar cuando falta el cliente.
+ */
+async function tocarEnviarCheckout(clave: "pedido" | "cotizacion" = "pedido", boton?: HTMLButtonElement) {
+  await act(async () => { fireEvent.click(boton ?? botonEnviar()); });
+  const o = opcionDoc(clave);
+  if (!o) return false;
+  await act(async () => { fireEvent.click(o); });
+  return true;
+}
+
 describe("Checkout del catálogo — el cliente arranca vacío", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -116,10 +142,11 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
       .toBe("Falta: elegir el cliente");
   });
 
-  it("🔴 tocar el botón apagado NO manda NADA a Switch", async () => {
+  it("🔴 tocar el botón apagado NO manda NADA a Switch — ni abre la elección", async () => {
     const llamadas = stubCheckout();
     await pintarCheckout();
     await act(async () => { fireEvent.click(botonEnviar()); });
+    expect(hayEleccion()).toBe(false);
     expect(enviosDeCheckout(llamadas)).toHaveLength(0);
   });
 
@@ -131,8 +158,21 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     await pintarCheckout();
     const boton = botonEnviar();
     boton.disabled = false; // se le quita el candado visual
+    // 🔴 Con el candado visual quitado, el handler TAMPOCO abre la elección: la
+    // pantalla no puede ofrecer un camino que ya sabe cerrado.
+    // ⚠️ Esta línea NO es verificable por mutación y se dice de frente: React no
+    // despacha el click de un botón deshabilitado ni forzándole `disabled =
+    // false` (medido en este repo, y vuelto a medir el 24-ago-2026 quitando la
+    // guarda: los 30 casos siguen verdes). El candado que no se puede saltear es
+    // el 422 del SERVIDOR, que sí está verificado por mutación.
     await act(async () => { fireEvent.click(boton); });
-    expect(enviosDeCheckout(llamadas)).toHaveLength(0);
+    expect(hayEleccion()).toBe(false);
+    // Y se recorre TODO el camino igual: si la elección se abriera, se toca la
+    // opción. Cualquiera de las dos salidas tiene que quedarse sin mandar nada.
+    for (const salida of ["pedido", "cotizacion"] as const) {
+      await tocarEnviarCheckout(salida, boton);
+      expect(enviosDeCheckout(llamadas)).toHaveLength(0);
+    }
   });
 
   it("elegir un cliente REAL enciende el botón y ese cliente es el que viaja", async () => {
@@ -142,7 +182,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
     await waitFor(() => expect(botonEnviar().disabled).toBe(false));
     expect(document.querySelector('[data-medir="falta-enviar"]')).toBeNull();
-    await act(async () => { fireEvent.click(botonEnviar()); });
+    await tocarEnviarCheckout();
     const envios = enviosDeCheckout(llamadas);
     expect(envios).toHaveLength(1);
     expect(JSON.parse(envios[0].body!).cliente).toEqual({ id: 42, nombre: "Sporting Shoes" });
@@ -160,7 +200,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     expect(botonEnviar().disabled).toBe(true); // verlo no es elegirlo
     fireEvent.click(contado);
     await waitFor(() => expect(botonEnviar().disabled).toBe(false));
-    await act(async () => { fireEvent.click(botonEnviar()); });
+    await tocarEnviarCheckout();
     const envios = enviosDeCheckout(llamadas);
     expect(envios).toHaveLength(1);
     expect(JSON.parse(envios[0].body!).cliente.id).toBe(1);
@@ -173,7 +213,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
     await screen.findByRole("button", { name: /Sporting Shoes/ });
     fireEvent.click(screen.getByRole("button", { name: LABEL_CONTADO }));
-    await act(async () => { fireEvent.click(botonEnviar()); });
+    await tocarEnviarCheckout();
     expect(JSON.parse(enviosDeCheckout(llamadas)[0].body!).cliente.id).toBe(908);
   });
 
@@ -186,7 +226,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
     await screen.findByRole("button", { name: /Sporting Shoes/ });
     fireEvent.click(screen.getByRole("button", { name: LABEL_CONTADO }));
-    await act(async () => { fireEvent.click(botonEnviar()); });
+    await tocarEnviarCheckout();
     expect(JSON.parse(enviosDeCheckout(llamadas)[0].body!).cliente).toEqual({ id: 1, nombre: "Contado" });
   });
 
@@ -199,7 +239,7 @@ describe("Checkout del catálogo — el cliente arranca vacío", () => {
     fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
     await screen.findByRole("button", { name: /Sporting Shoes/ });
     fireEvent.click(screen.getByRole("button", { name: LABEL_CONTADO }));
-    await act(async () => { fireEvent.click(botonEnviar()); });
+    await tocarEnviarCheckout();
     expect(JSON.parse(enviosDeCheckout(llamadas)[0].body!).cliente).toEqual({ id: 1, nombre: "Contado" });
     // Y en pantalla se dice con todas las letras, no "VENTAS LOCA".
     const caja = document.querySelector('[data-medir="cliente-checkout"]')!;
@@ -298,6 +338,16 @@ function stubDetalle(e: EscenarioDetalle = {}) {
 
 const enviosASwitch = (l: Llamada[]) => l.filter((c) => c.url.includes("/enviar-switch") && c.method === "POST");
 
+/** El toque COMPLETO del detalle: "Enviar a Switch" → la salida elegida. */
+async function tocarEnviarDetalle(clave: "pedido" | "cotizacion" = "pedido", boton?: HTMLButtonElement) {
+  const b = boton ?? (screen.getByRole("button", { name: /Enviar a Switch/ }) as HTMLButtonElement);
+  await act(async () => { fireEvent.click(b); });
+  const o = opcionDoc(clave);
+  if (!o) return false;
+  await act(async () => { fireEvent.click(o); });
+  return true;
+}
+
 async function pintarDetalle(e: EscenarioDetalle = {}) {
   const llamadas = stubDetalle(e);
   await act(async () => { render(<PedidoDetalleClient marca="tommy" />); });
@@ -328,6 +378,7 @@ describe("Detalle del pedido — el cliente es UNO SOLO", () => {
     expect(boton.disabled).toBe(true);
     expect(document.querySelector('[data-medir="falta-enviar"]')!.textContent).toBe("Falta: elegir el cliente");
     await act(async () => { fireEvent.click(boton); });
+    expect(hayEleccion()).toBe(false); // ni siquiera pregunta qué mandar
     expect(enviosASwitch(llamadas)).toHaveLength(0);
   });
 
@@ -335,8 +386,13 @@ describe("Detalle del pedido — el cliente es UNO SOLO", () => {
     const llamadas = await pintarDetalle({ clienteSwitchId: null });
     const boton = screen.getByRole("button", { name: /Enviar a Switch/ }) as HTMLButtonElement;
     boton.disabled = false; // se le quita el candado visual
+    // 🔴 Igual que en el checkout: sin cliente no se abre ni la elección.
     await act(async () => { fireEvent.click(boton); });
-    expect(enviosASwitch(llamadas)).toHaveLength(0);
+    expect(hayEleccion()).toBe(false);
+    for (const salida of ["pedido", "cotizacion"] as const) {
+      await tocarEnviarDetalle(salida, boton);
+      expect(enviosASwitch(llamadas)).toHaveLength(0);
+    }
   });
 
   it("🔴 el selector abre SIN NADA marcado: ver Contado no es haberlo elegido", async () => {
@@ -384,7 +440,7 @@ describe("Detalle del pedido — el cliente es UNO SOLO", () => {
     const llamadas = await pintarDetalle({ clienteSwitchId: 42, clienteNombre: "Sporting Shoes", clienteCodigo: "D-42" });
     const boton = screen.getByRole("button", { name: /Enviar a Switch/ }) as HTMLButtonElement;
     expect(boton.disabled).toBe(false);
-    await act(async () => { fireEvent.click(boton); });
+    await tocarEnviarDetalle();
     expect(enviosASwitch(llamadas)).toHaveLength(1);
   });
 
@@ -407,6 +463,7 @@ describe("Detalle del pedido — el cliente es UNO SOLO", () => {
     expect(boton.disabled).toBe(true);
     expect(document.querySelector('[data-medir="falta-enviar"]')?.textContent).toContain("elegir el cliente");
     await act(async () => { fireEvent.click(boton); });
+    expect(hayEleccion()).toBe(false);
     expect(enviosASwitch(llamadas)).toHaveLength(0);
   });
 
@@ -414,7 +471,7 @@ describe("Detalle del pedido — el cliente es UNO SOLO", () => {
     const llamadas = await pintarDetalle({ origenShortId: "ab12cd34", clientName: "Nathalie", clienteSwitchId: 1, clienteCodigo: "TCKCTA", clienteNombre: "VENTAS LOCA" });
     const boton = screen.getByRole("button", { name: /Enviar a Switch/ }) as HTMLButtonElement;
     expect(boton.disabled).toBe(false);
-    await act(async () => { fireEvent.click(boton); });
+    await tocarEnviarDetalle();
     expect(enviosASwitch(llamadas)).toHaveLength(1);
   });
 
@@ -425,5 +482,97 @@ describe("Detalle del pedido — el cliente es UNO SOLO", () => {
     expect((document.querySelector('input[class*="text-xl"]') as HTMLInputElement).value).toBe("Nathalie");
     const puts = llamadas.filter((c) => c.method === "PUT" && c.url.includes(`/orders/${OID}`));
     expect(puts.every((p) => JSON.parse(p.body!).client_name === "Nathalie")).toBe(true);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 3. PEDIDO O COTIZACIÓN — la segunda salida NO es una puerta de atrás
+//
+// Daniel: ***"que estén los dos"***. Lo que este bloque fija es que la salida
+// nueva no aflojó nada de lo de arriba (sin cliente no sale NINGUNA de las dos)
+// y que la pantalla DICE la diferencia ANTES de mandar: una cotización no
+// aparta mercancía, y enterarse después es justo el problema.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const salidaDeCheckout = (l: Llamada[]) =>
+  JSON.parse(enviosDeCheckout(l)[0].body!).documento as string;
+
+describe("🔴 Pedido o cotización — la elección, y el candado que no se afloja", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("🔴 SIN cliente el botón no abre ni la elección — no hay nada que elegir", async () => {
+    const llamadas = stubCheckout();
+    await pintarCheckout();
+    await act(async () => { fireEvent.click(botonEnviar()); });
+    expect(hayEleccion()).toBe(false);
+    expect(opcionDoc("cotizacion")).toBeNull();
+    expect(enviosDeCheckout(llamadas)).toHaveLength(0);
+  });
+
+  it("🔴 la pantalla DICE que la cotización no aparta mercancía ANTES de mandar", async () => {
+    const llamadas = stubCheckout();
+    await pintarCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
+    await waitFor(() => expect(botonEnviar().disabled).toBe(false));
+
+    await act(async () => { fireEvent.click(botonEnviar()); });
+    // Está la advertencia, con todas las letras…
+    expect(document.querySelector('[data-medir="elegir-documento"]')!.textContent)
+      .toContain(TEXTO_NO_RESERVA);
+    // …y todavía NO salió nada: se lee antes de decidir, no después.
+    expect(enviosDeCheckout(llamadas)).toHaveLength(0);
+  });
+
+  it("elegir COTIZACIÓN manda documento:'cotizacion' — con el mismo cliente elegido", async () => {
+    const llamadas = stubCheckout();
+    await pintarCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
+    await waitFor(() => expect(botonEnviar().disabled).toBe(false));
+
+    expect(await tocarEnviarCheckout("cotizacion")).toBe(true);
+    expect(enviosDeCheckout(llamadas)).toHaveLength(1);
+    expect(salidaDeCheckout(llamadas)).toBe("cotizacion");
+    // El cliente sigue siendo el elegido: la salida no toca al cliente.
+    expect(JSON.parse(enviosDeCheckout(llamadas)[0].body!).cliente).toEqual({ id: 42, nombre: "Sporting Shoes" });
+  });
+
+  it("elegir PEDIDO manda documento:'pedido' — el camino de siempre, explícito", async () => {
+    const llamadas = stubCheckout();
+    await pintarCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
+    await waitFor(() => expect(botonEnviar().disabled).toBe(false));
+
+    await tocarEnviarCheckout("pedido");
+    expect(salidaDeCheckout(llamadas)).toBe("pedido");
+  });
+
+  it("cancelar la elección no manda NADA", async () => {
+    const llamadas = stubCheckout();
+    await pintarCheckout();
+    fireEvent.click(screen.getByRole("button", { name: "Elegir" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Sporting Shoes/ }));
+    await waitFor(() => expect(botonEnviar().disabled).toBe(false));
+
+    await act(async () => { fireEvent.click(botonEnviar()); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Cancelar" })); });
+    expect(hayEleccion()).toBe(false);
+    expect(enviosDeCheckout(llamadas)).toHaveLength(0);
+  });
+
+  it("en el DETALLE la cotización también viaja como cotización", async () => {
+    const llamadas = await pintarDetalle({ clienteSwitchId: 42, clienteNombre: "Sporting Shoes", clienteCodigo: "D-42" });
+    expect(await tocarEnviarDetalle("cotizacion")).toBe(true);
+    const envios = enviosASwitch(llamadas);
+    expect(envios).toHaveLength(1);
+    expect(JSON.parse(envios[0].body!).documento).toBe("cotizacion");
+  });
+
+  it("🔴 y en el DETALLE, sin cliente, la cotización tampoco sale", async () => {
+    const llamadas = await pintarDetalle({ clienteSwitchId: null });
+    expect(await tocarEnviarDetalle("cotizacion")).toBe(false);
+    expect(enviosASwitch(llamadas)).toHaveLength(0);
   });
 });

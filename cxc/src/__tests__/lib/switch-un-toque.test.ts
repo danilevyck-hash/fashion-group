@@ -116,8 +116,16 @@ describe("🔴 candado at-most-once del envío — INTACTO", () => {
   const src = SRC("src/lib/catalogo/switch-envio.ts");
 
   it("el intento se registra ANTES del POST a Switch", () => {
-    const insert = src.indexOf('.insert({ order_id: p.orderId, estado: "pendiente"');
-    const post = src.indexOf("client.apipedidoTerminar(payload)");
+    // La fila del intento (24-ago-2026: se arma en una const porque la
+    // escritura reintenta sin la columna `documento` si el DDL está pendiente).
+    const insert = src.indexOf('const fila = { order_id: p.orderId, estado: "pendiente", payload };');
+    // Las dos salidas (pedido y cotización) salen del MISMO payload y las dos
+    // van DESPUÉS del registro del intento: se toma la primera de las dos.
+    const post = Math.min(
+      ...["client.apipedidoTerminar(payload)", "client.apicotizacionTerminar(payload)"]
+        .map((f) => src.indexOf(f))
+        .filter((i) => i > -1),
+    );
     expect(insert).toBeGreaterThan(-1);
     expect(post).toBeGreaterThan(-1);
     expect(insert).toBeLessThan(post);
@@ -150,13 +158,15 @@ describe("🔴 candado at-most-once del envío — INTACTO", () => {
     // ANTES de cualquier escritura. Lo que se escribe o no se escribe está
     // fijado por `switch-envio-paralelo.test.ts`, que corre el motor de verdad.
     const ui = SRC("src/components/catalogo/PedidoDetalleClient.tsx");
-    expect(ui).toContain("await crearEnSwitch(true);");
-    expect(ui).toContain('JSON.stringify(auto ? { auto: true } : {})');
+    // 24-ago-2026: el toque arrastra ADEMÁS qué se manda (pedido o
+    // cotización). Lo que no cambió es que sigue siendo UN viaje con `auto`.
+    expect(ui).toContain("await crearEnSwitch(true, documento);");
+    expect(ui).toContain('JSON.stringify(auto ? { auto: true, documento } : { documento })');
 
     const motor = SRC("src/lib/catalogo/switch-envio.ts");
     // El corte por `auto` va ANTES del registro del intento y del POST.
     const corte = motor.indexOf("p.auto && hayQueDetenerse(");
-    const insert = motor.indexOf('.insert({ order_id: p.orderId, estado: "pendiente"');
+    const insert = motor.indexOf('const fila = { order_id: p.orderId, estado: "pendiente", payload };');
     expect(corte).toBeGreaterThan(-1);
     expect(insert).toBeGreaterThan(corte);
     // …y los errores de pre-validación siguen cortando antes que todo.

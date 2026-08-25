@@ -22,6 +22,7 @@ import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { enviarPedidoSwitch, type EnvioItem, type EnvioResult } from "@/lib/catalogo/switch-envio";
 import { resolvePublicoSwitchActor } from "@/lib/catalogo/publico-switch-actor";
 import { tieneClienteElegido } from "@/lib/catalogo/cliente-elegido";
+import { normalizarDocumento } from "@/lib/catalogo/documento-switch";
 
 // El vendedor también puede consultar/reintentar el envío: crear+enviar desde
 // el checkout ya es suyo — el Reintentar es la misma operación tras un fallo.
@@ -75,13 +76,28 @@ export async function handleGetEnvio(req: NextRequest, marca: string, orderId: s
   if (auth instanceof NextResponse) return auth;
   const cfg = MARCAS_CONFIG[marca];
   const db = await cfg.db();
-  const { data, error } = await db
+  // `documento` (pedido | cotización) puede no existir todavía — DDL
+  // 20260824120000. Se pide en un escalón tolerante, igual que
+  // cliente/vendedor_switch_id en fetchOrder: sin la columna el envío se lee
+  // igual y la pantalla lo trata como pedido, que es lo que era.
+  const columnasBase = "estado, pedido_switch_id, numero_interno, error_detalle, created_at, updated_at";
+  let leido = await db
     .from(cfg.enviosTable)
-    .select("estado, pedido_switch_id, numero_interno, error_detalle, created_at, updated_at")
+    .select(`${columnasBase}, documento`)
     .eq("order_id", orderId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (leido.error && /documento|column/i.test(leido.error.message || "")) {
+    leido = await db
+      .from(cfg.enviosTable)
+      .select(columnasBase)
+      .eq("order_id", orderId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+  }
+  const { data, error } = leido;
   if (error) {
     // Tabla de envíos ausente (DDL pendiente en Joybees) → sin envío.
     if (/PGRST205|does not exist|could not find the table/i.test(`${error.code} ${error.message}`)) {
@@ -101,12 +117,20 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   // dry:true  = solo pre-validar (preview, cero escrituras)
   // auto:true = pre-validar y crear EN EL MISMO VIAJE si no hay nada que
   //             decidir (toque único). Body vacío = crear directo.
+  //
+  // `documento` = qué se crea en Switch: 'pedido' (lo de siempre) o
+  // 'cotizacion'. Lo elige la persona en la pantalla, un toque antes de mandar.
+  // Cualquier valor raro —o su ausencia— cae a 'pedido': el modo de fallo
+  // aceptable es crear el documento de siempre, nunca una cotización que nadie
+  // pidió (ver `documento-switch.ts`).
   let dry = false;
   let auto = false;
+  let documento = normalizarDocumento(undefined);
   try {
     const body = await req.json();
     dry = body?.dry === true;
     auto = body?.auto === true;
+    documento = normalizarDocumento(body?.documento);
   } catch { /* body vacío = envío real */ }
 
   const order = await fetchOrder(marca, orderId);
@@ -207,6 +231,11 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
     vendedorNombre,
     dry,
     auto,
+    // 🔴 Va DESPUÉS del candado del cliente, no antes: la cotización pasa por
+    // el MISMO 422 que el pedido. Si se saltara el candado por este costado, el
+    // agujero de los 15 pedidos a nombre de "Contado" volvería a estar abierto,
+    // solo que con otro nombre.
+    documento,
   });
 
   return envioResultToResponse(result);
@@ -239,6 +268,8 @@ export function envioResultToResponse(r: EnvioResult): NextResponse {
     case "ambiguo":
       return NextResponse.json({ error: r.error, ambiguo: true }, { status: 502 });
     case "ok":
-      return NextResponse.json({ ok: true, numeroInterno: r.numeroInterno, pedidoSwitchId: r.pedidoSwitchId, verificado: r.verificado, warnings: r.warnings });
+      // `documento` vuelve para que la pantalla diga QUÉ se creó sin tener que
+      // recordar qué mandó (y sin depender de que el DDL ya esté corrido).
+      return NextResponse.json({ ok: true, numeroInterno: r.numeroInterno, pedidoSwitchId: r.pedidoSwitchId, verificado: r.verificado, warnings: r.warnings, documento: r.documento });
   }
 }

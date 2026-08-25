@@ -112,6 +112,7 @@ describe("GET enviar-switch — estado del envío", () => {
       estado: "verificado",
       pedido_switch_id: 489,
       numero_interno: "16-000000489",
+      documento: "cotizacion",
       error_detalle: null,
       created_at: "2026-07-20T10:00:00Z",
       updated_at: "2026-07-20T10:01:00Z",
@@ -236,6 +237,78 @@ describe("POST enviar-switch — validaciones previas al motor", () => {
     expect(mockLogout).toHaveBeenCalledTimes(1);
   });
 
+  // ── Pedido o cotización (24-ago-2026) ────────────────────────────────────
+  //
+  // 🔴 EL CANDADO DEL CLIENTE NO DISTINGUE SALIDAS. Si la cotización se
+  // saltara el 422, el agujero de los 15 pedidos por $53.124 a nombre de
+  // "Contado" volvería a estar abierto por el otro costado.
+  it("🔴 pedido INTERNO sin cliente: la COTIZACIÓN también rebota con 422", async () => {
+    reebokDb.queue("reebok_orders", { data: confirmedOrder() });
+    const res = await rEnvioPost(
+      makeReq("/x", { method: "POST", body: { auto: true, documento: "cotizacion" }, role: "vendedor" }),
+      { params: { id: OID } },
+    );
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toContain("Elige el cliente");
+    expect(mockEnviar).not.toHaveBeenCalled(); // nada llegó al ERP
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it("🔴 el pedido DEL LINK sin cliente tampoco sale como cotización", async () => {
+    reebokDb.queue("reebok_orders", { data: confirmedOrder({ origen_short_id: "ab12cd34" }) });
+    const res = await rEnvioPost(
+      makeReq("/x", { method: "POST", body: { documento: "cotizacion" }, role: "vendedor" }),
+      { params: { id: OID } },
+    );
+    expect(res.status).toBe(422);
+    expect(mockEnviar).not.toHaveBeenCalled();
+  });
+
+  it("con cliente elegido, `documento` llega al motor tal cual", async () => {
+    reebokDb.queue("reebok_orders", { data: confirmedOrder({ cliente_switch_id: 42 }) });
+    mainDb.queue("switch_clientes", { data: { nombre: "Sporting Shoes" } });
+    reebokDb.queue("products", { data: [{ id: P1, category: "footwear" }] });
+    mockEnviar.mockResolvedValueOnce({
+      kind: "ok", numeroInterno: "16-1", pedidoSwitchId: 1, verificado: true, warnings: [], documento: "cotizacion",
+    });
+    const res = await rEnvioPost(
+      makeReq("/x", { method: "POST", body: { auto: true, documento: "cotizacion" }, role: "vendedor" }),
+      { params: { id: OID } },
+    );
+    expect(res.status).toBe(200);
+    expect((mockEnviar.mock.calls[0][0] as Record<string, unknown>).documento).toBe("cotizacion");
+    expect((await res.json()).documento).toBe("cotizacion");
+  });
+
+  it("🔴 un `documento` inventado NO crea nada raro: cae a PEDIDO", async () => {
+    // El servidor no confía en el navegador. El modo de fallo aceptable es
+    // crear el documento de siempre, nunca una cotización que nadie pidió.
+    reebokDb.queue("reebok_orders", { data: confirmedOrder({ cliente_switch_id: 42 }) });
+    mainDb.queue("switch_clientes", { data: { nombre: "Sporting Shoes" } });
+    reebokDb.queue("products", { data: [{ id: P1, category: "footwear" }] });
+    mockEnviar.mockResolvedValueOnce({
+      kind: "ok", numeroInterno: "16-2", pedidoSwitchId: 2, verificado: true, warnings: [], documento: "pedido",
+    });
+    const res = await rEnvioPost(
+      makeReq("/x", { method: "POST", body: { documento: "factura" }, role: "admin" }),
+      { params: { id: OID } },
+    );
+    expect(res.status).toBe(200);
+    expect((mockEnviar.mock.calls[0][0] as Record<string, unknown>).documento).toBe("pedido");
+  });
+
+  it("sin `documento` en el body sigue siendo un PEDIDO (compatibilidad)", async () => {
+    reebokDb.queue("reebok_orders", { data: confirmedOrder({ cliente_switch_id: 42 }) });
+    mainDb.queue("switch_clientes", { data: { nombre: "Sporting Shoes" } });
+    reebokDb.queue("products", { data: [{ id: P1, category: "footwear" }] });
+    mockEnviar.mockResolvedValueOnce({
+      kind: "ok", numeroInterno: "16-3", pedidoSwitchId: 3, verificado: true, warnings: [], documento: "pedido",
+    });
+    const res = await rEnvioPost(makeReq("/x", { method: "POST", role: "admin" }), { params: { id: OID } });
+    expect(res.status).toBe(200);
+    expect((mockEnviar.mock.calls[0][0] as Record<string, unknown>).documento).toBe("pedido");
+  });
+
   it("dry:true = solo pre-validación → preview del motor", async () => {
     // Con cliente elegido: pre-validar un pedido sin cliente ya no llega acá.
     reebokDb.queue("reebok_orders", { data: confirmedOrder({ cliente_switch_id: 42 }) });
@@ -345,9 +418,14 @@ describe("envioResultToResponse — mapeo EnvioResult → HTTP (tabla completa)"
         pedidoSwitchId: 9,
         verificado: true,
         warnings: [],
+        documento: "pedido",
       } as EnvioResult,
       200,
-      (j) => expect(j.ok).toBe(true),
+      (j) => {
+        expect(j.ok).toBe(true);
+        // La pantalla necesita saber QUÉ se creó sin depender del DDL.
+        expect(j.documento).toBe("pedido");
+      },
     ],
   ];
 
