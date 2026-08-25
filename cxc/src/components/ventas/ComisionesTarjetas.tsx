@@ -294,7 +294,10 @@ export interface FilaPorEmpresa {
   comision: number;
   base_cobro: number;
   comision_cobro: number;
+  /** NETO: el servidor ya le restó los descuentos fijos activos del mes. */
   comision_total: number;
+  /** Cuánto se le restó (informativo — ya está descontado del total). */
+  descuento?: number;
 }
 
 interface PropsPorEmpresa {
@@ -344,6 +347,12 @@ export function ComisionesTarjetasPorEmpresa({
                 <Dato etiqueta="Com. venta" valor={v.comision} />
                 <Dato etiqueta="Cobros" valor={v.base_cobro} />
                 <Dato etiqueta="Com. cobro" valor={v.comision_cobro} />
+                {/* Solo cuando hay: si no, sería una línea en $0.00 que dice
+                    que se le descontó algo. El total de arriba YA lo tiene
+                    restado. */}
+                {(v.descuento ?? 0) > 0 && (
+                  <Dato etiqueta="Descuentos" valor={-(v.descuento ?? 0)} />
+                )}
               </dl>
             </button>
           </article>

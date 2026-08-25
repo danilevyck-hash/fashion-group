@@ -1430,6 +1430,51 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - **Verificado por mutación, 6 de 6 cazadas:** volver a restar joystep en `empresas.ts` (5 tests) · devolver el filtro a mano en `ComisionesView.tsx` (1) · el punto decimal mal en la RPC, `0.0050 → 0.5` (1) · un caso especial por empresa dentro de la RPC (1) · quitarle el guard de retenciones (1) · sacar joystep del consolidado (2).
 > - El candado viejo de `comisiones-consolidado-neto.test.ts` exigía un `.filter` en `empresas.ts` — **era el candado el que fijaba el bug**. Pasó a exigir lo que siempre quiso decir: que la lista se DERIVE de `B2B_EMPRESA_KEYS`, y suma `ComisionesView.tsx` a los archivos vigilados.
 
+## 🔴 Comisiones — LOS DESCUENTOS SE RESTAN UNA SOLA VEZ, EN EL SERVIDOR (24-ago-2026)
+
+> 🩸 **LA MISMA PERSONA, EL MISMO MES, DOS NÚMEROS EN LA MISMA PANTALLA.** La pestaña **«Por empresa»** mostraba el SUBTOTAL —sin restar los descuentos fijos— mientras **«Todas las empresas»** y el detalle del vendedor sí los restaban. Medido contra producción, **REINALDO ESPINOSA en Fashion Shoes** (sus dos descuentos: `Descuento` $1.400,00 + `Descuento de adelanto` $173,08 = **$1.573,08**, los ÚNICOS dos descuentos vivos de todo el sistema):
+>
+> | período | Por empresa (antes) | Todas | Por empresa (después) |
+> |---|---:|---:|---:|
+> | junio 2026 | $3.208,42 | **$1.635,34** | **$1.635,34** |
+> | julio 2026 | $2.859,65 | **$1.286,57** | **$1.286,57** |
+> | agosto 2026 | $2.571,48 | **$998,40** | **$998,40** |
+>
+> **Y el Excel de esa vista bajaba el número inflado.** Daniel ya había reclamado exactamente esto el 3-ago-2026 (*"me sale en el web el total, y no me resta el descuento"*) y **se arregló en UNA pestaña y no en la otra** — la resta quedó viviendo DENTRO del pivot de `ComisionesConsolidadoView`, así que la otra pestaña, que pide otro endpoint, nunca la tuvo.
+>
+> ### 🔑 EL ARREGLO NO ES UNA SEGUNDA RESTA: ES MOVER LA ÚNICA AL SERVIDOR
+>
+> **`netearComisiones()` en `src/lib/comisiones/descuentos.ts`** —el módulo que ya existía para que la LECTURA de descuentos y la regla del `activo` efectivo no se duplicaran— y **las DOS rutas la aplican antes de responder**: `/api/ventas/comisiones` y `/api/ventas/comisiones/consolidado`. Las vistas **solo dibujan `comision_total`**; ninguna resta nada.
+> - **Copiar la resta en la vista que faltaba habría cerrado el bug de hoy y dejado el mecanismo intacto** para mañana: dos implementaciones son dos totales posibles para el mismo mes. Hay barrido que pone el build ROJO si una vista vuelve a restar (`- monto`, `- v.descuento`, `-=`…), con los comentarios borrados primero.
+> - La respuesta trae además **`descuento`** por vendedor: es lo que deja explicar en pantalla por qué el total no es la suma de las dos comisiones.
+> - **`DEFAULT` no recibe descuento**: es el centinela "cliente sin dueño", no una persona.
+> - ⚠️ **La RPC `comision_b2b_v5` NO SE TOCÓ.** La base sigue siendo la **VENTA** (`subtotal_con_descuento`) de las facturas con `pct_utilidad > 20`, las NC restan, y las 6 empresas comisionan igual.
+>
+> ### La asimetría de los errores se conserva, y ahora en las DOS rutas
+>
+> **Los descuentos fallan ABIERTO** (si su lectura se cae, la tabla sale con descuentos en 0 en vez de quedar en blanco) y **un error de las COMISIONES sí se propaga (500)**: una tabla vacía silenciosa se leería como *"este mes no se vendió nada"*.
+>
+> ### En pantalla: se dice CUÁNTO se restó, y crece HACIA ABAJO
+>
+> Debajo del nombre del vendedor, `− $1.573,08 en descuentos` (13 px, gris) — y en la tarjeta del celular, una línea `Descuentos`. **No se agregó una columna**: una séptima habría ensanchado la tabla justo en el iPad acostado, que es el ancho que nadie mira. Se sumó también el mismo pie que ya tenía la matriz (*"Ya están descontados lo devuelto y los descuentos"*): las dos pestañas muestran el mismo neto, así que tienen que explicarlo igual.
+>
+> ### Medición contra producción, ANTES y DESPUÉS
+>
+> `BASE=… node scripts/_medir-comisiones-dos-pestanas.mjs` (solo lectura) abre las DOS pestañas en el navegador contra el build de producción, recorre 3 períodos × 6 empresas y compara **la CELDA RENDERIZADA**, no el JSON.
+> - **ANTES: 33 iguales · 6 distintas.** DESPUÉS: **36 iguales · 0 distintas de plata.**
+> - **Ningún otro número se movió** (`node scripts/_verif-comisiones-nada-mas-se-movio.mjs`, por POSICIÓN y no como conjunto): **478 celdas comparadas · 6 cambiaron · las 6 son la celda de Reinaldo y el total al pie de Fashion Shoes en los 3 períodos**. La matriz de «Todas las empresas» **no movió una sola celda**.
+> - **Los 4 anchos + el iPad Pro acostado** (`_medir-comisiones-tabla.mjs`): **390 · 834 · 1024 · 1180 · 1440 → 0 px de arrastre de página, 0 de arrastre interno y 0 de recorte**, en los DOS modos. Y `_medir-comisiones-letra-y-tocables.mjs`: **0 textos bajo 12 px y 0 tocables bajo 44 px**.
+> - ⚠️ **Las 3 diferencias que QUEDAN son de AGUAS y son PRE-EXISTENTES**: la matriz lo esconde a propósito desde el 3-ago-2026 (*"quita el vendedor aguas, no lo quiero ver"*) y «Por empresa» lo sigue mostrando. **No es plata mal sumada, es visibilidad**, y unificarlo es decisión de Daniel — se anota, no se cambia de paso.
+>
+> ### Candados
+>
+> `src/__tests__/lib/comisiones-descuentos-una-sola-resta.test.ts` (16) y `src/__tests__/components/comisiones-por-empresa-neto.test.tsx` (8). **Son de CONDUCTA**: llaman a los handlers REALES con supabase doblado y comparan las dos pestañas celda por celda, y montan las vistas REALES para leer la celda, la tarjeta del celular y **lo que recibe el Excel** (que arma su propia hoja: puede bajar un número que nadie vio).
+> - **El candado viejo de `comisiones-consolidado-neto.test.ts` CAMBIÓ DE DIRECCIÓN**: exigía que la resta viviera dentro del pivot de la vista (`target.porEmpresa[...] = round2(...)`), o sea que **era el candado el que fijaba el bug**. Hoy exige lo que siempre quiso decir: que el descuento caiga en la celda de SU empresa, restado UNA vez.
+> - **Verificado por mutación, 13 de 13 cazadas** (`bash scripts/_mutar-candados-comisiones-descuentos.sh`): `netearComisiones` no resta · no redondea · le resta al centinela DEFAULT · «Por empresa» vuelve a devolver la RPC cruda (el bug) · los descuentos dejan de fallar abierto · un error de comisiones se disfraza de tabla vacía · «Todas» deja de restar · el descuento cae en la empresa equivocada · la pantalla deja de decir cuánto se restó · la celda vuelve a pintar el subtotal · el Excel baja el subtotal · vuelve una SEGUNDA resta a la vista consolidada · la tarjeta del celular deja de decirlo.
+> - 🩸 **DOS mutaciones SOBREVIVIERON en la primera corrida y las dos eran candados flojos**: la segunda resta en la vista consolidada (el barrido miraba `- monto` y no `- v.descuento`) y la tarjeta del celular (no la cubría ningún test). Se cerraron con tests que **pintan** la vista consolidada y la tarjeta, no con más barrido de texto.
+> - 🩸 **La restauración del script de mutación va por COPIA, no con `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada.
+> - 🩸 **Gotchas de medición, y los tres daban verde (o rojo) sin haber mirado nada:** esta app **no tiene `<main>`** —buscar `main table` devuelve `null`—; esperar "hay tabla con filas" JUSTO después del clic mide **la tabla VIEJA**, la que sigue en pantalla mientras sale el pedido nuevo (hay que esperar la RESPUESTA del endpoint); y tocar la pestaña o la empresa que YA está activa **no dispara ningún pedido**, así que esperar una respuesta ahí cuelga la medición.
+
 ## 🔴 Catálogos — EL CÓDIGO DESEMPATA EL ORDEN, y el público ordenaba DISTINTO que el vendedor (17-ago-2026)
 
 > Daniel, mirando el catálogo de **Calvin**: los productos `KCMEENA683`, `KCMEENA004`, `KCMEENA-A210` y `KCMEENAA962` salían **desperdigados** entre los `HW0HW…` y los `KCTO…` en vez de juntos.

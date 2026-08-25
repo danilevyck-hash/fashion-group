@@ -20,6 +20,14 @@
 // vez (7 consultas en vez de 15). Los números no cambian: la misma RPC con los
 // mismos argumentos y la misma regla de descuentos.
 //
+// 🔴 LA RESTA DE LOS DESCUENTOS YA NO VIVE ACÁ (24-ago-2026). El servidor manda
+// `comision_total` NETO (`netearComisiones`, en `lib/comisiones/descuentos`) y
+// esta vista solo lo dibuja. Mientras la resta vivía en este pivot, la pestaña
+// "Por empresa" —que pide otro endpoint— no la tenía: Reinaldo en Fashion
+// Shoes salía $1.573,08 más alto ahí que acá, la misma persona y el mismo mes
+// en la misma pantalla. **No volver a restar acá**: sería la segunda resta, y
+// la primera ya está hecha.
+//
 // Nota de identidad: el pivote es por nombre exacto (no hay vendedor_id en Switch).
 // Si un mismo vendedor está escrito distinto entre empresas, aparece partido en dos
 // filas hasta corregir el nombre en Switch — es dato, no estructura.
@@ -59,27 +67,23 @@ const VENDEDORES_OCULTOS = new Set(["AGUAS"]);
 
 const estaOculto = (v: string) => VENDEDORES_OCULTOS.has(v.trim().toUpperCase());
 
-/** Los montos vienen de dos fuentes; sin esto la resta arrastra centavos. */
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
 interface ApiVendedor {
   vendedor: string;
   base: number;
   base_cobro: number;
+  /** NETO: el servidor ya le restó los descuentos fijos activos del mes. */
   comision_total: number;
+  /** Cuánto se le restó (informativo — ya está descontado del total). */
+  descuento?: number;
 }
 interface ApiResp {
   empresa_key: string;
   vendedores: ApiVendedor[];
-  /** Descuentos fijos ACTIVOS del mes, ya sumados por vendedor. */
-  porVendedor?: Record<string, number>;
 }
 
 interface Row extends ComisionConsolidadoRow {
   sumBase: number;
   sumBaseCobro: number;
-  /** Descuentos fijos activos del mes, ya sumados. Se restan del total. */
-  sumDescuento: number;
 }
 
 interface Props {
@@ -109,11 +113,11 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
       // empresas juntos.
       //
       // Los descuentos siguen fallando ABIERTO del lado del servidor: si su
-      // lectura se cae, `porVendedor` llega vacío y la tabla queda como estaba
-      // antes de que existieran. 🩸 La tabla mostraba el subtotal ANTES de
-      // descuentos mientras el detalle sí restaba: Fashion Shoes de Reinaldo
-      // decía $2.859,65 cuando lo que se paga son $1.286,57. Daniel: *"me sale
-      // en el web el total, y no me resta el descuento"*.
+      // lectura se cae, la tabla sale con descuentos en 0 en vez de quedar en
+      // blanco. 🩸 La tabla mostraba el subtotal ANTES de descuentos mientras
+      // el detalle sí restaba: Fashion Shoes de Reinaldo decía $2.859,65
+      // cuando lo que se paga son $1.286,57. Daniel: *"me sale en el web el
+      // total, y no me resta el descuento"*.
       const res = await fetch(
         `/api/ventas/comisiones/consolidado?year=${year}&mes=${mes}`,
         { cache: "no-store" },
@@ -129,7 +133,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
       const byName = new Map<string, Row>();
       let def: Row | null = null;
       const blank = (vendedor: string): Row => ({
-        vendedor, porEmpresa: {}, total: 0, sumBase: 0, sumBaseCobro: 0, sumDescuento: 0,
+        vendedor, porEmpresa: {}, total: 0, sumBase: 0, sumBaseCobro: 0,
       });
 
       for (const r of resp) {
@@ -144,18 +148,6 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
           target.total += v.comision_total ?? 0;
           target.sumBase += v.base ?? 0;
           target.sumBaseCobro += v.base_cobro ?? 0;
-        }
-        // El descuento es por (empresa, vendedor), así que se resta de LA CELDA
-        // de esa empresa —que es la que Daniel estaba mirando: la columna
-        // Fashion Shoes decía $2.859,65 cuando lo que se paga son $1.286,57— y
-        // por arrastre del total de la fila.
-        for (const [nombre, monto] of Object.entries(r.porVendedor ?? {})) {
-          if (!monto || estaOculto(nombre) || nombre === DEFAULT_VENDEDOR) continue;
-          const target = byName.get(nombre);
-          if (!target) continue; // descuento de alguien sin comisión este mes
-          target.porEmpresa[r.empresa_key] = round2((target.porEmpresa[r.empresa_key] ?? 0) - monto);
-          target.total = round2(target.total - monto);
-          target.sumDescuento = round2(target.sumDescuento + monto);
         }
       }
 
