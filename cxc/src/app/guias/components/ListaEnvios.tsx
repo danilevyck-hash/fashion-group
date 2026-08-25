@@ -309,20 +309,24 @@ export default function ListaEnvios({
       <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
         Envíos
       </span>
+      {/* ⚠️ UNA LÍNEA, NO UN PÁRRAFO. Acá había tres frases explicando que el
+          transportista arma varias guías suyas por cada guía nuestra y que sin
+          número se despacha igual. Daniel: *"no siempre hay q estar explicando
+          todo, se vuelve tedioso"*. Queda la instrucción y el dato; el porqué
+          se fue.
+
+          🔴 El número que se escribió al crear la guía SE DICE, no se copia.
+          Antes se prellenaban las 7 cajas con él y bodega las encontraba todas
+          iguales; escondido del todo, quien despacha no sabría que ya hay uno
+          anotado para toda la guía. */}
       {editable && externo && items.length > 0 && (
         <p className="text-xs text-gray-500 mb-3">
-          El transportista arma varias guías suyas por cada guía nuestra. Anota en
-          cada envío el número que te dio — si no te dio ninguno, la guía se
-          despacha igual y queda marcada.
-          {/* 🔴 El número que se escribió al crear la guía SE DICE, no se
-              copia. Antes se prellenaban las 7 cajas con él y bodega las
-              encontraba todas iguales; escondido del todo, en cambio, quien
-              despacha no sabría que ya hay uno anotado para toda la guía. */}
+          Anota el N° que te dio el transportista; si no dio ninguno, se despacha igual.
           {String(numeroGuiaCabecera ?? "").trim() ? (
             <>
               {" "}Al crear la guía se anotó{" "}
               <span className="font-medium text-gray-700">{String(numeroGuiaCabecera).trim()}</span>{" "}
-              para toda la guía: si el transportista dio uno por envío, escríbelo acá.
+              para toda la guía.
             </>
           ) : null}
         </p>

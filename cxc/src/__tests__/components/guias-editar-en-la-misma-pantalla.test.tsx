@@ -341,3 +341,82 @@ describe("el camino viejo no se pierde", () => {
     expect(replace).toHaveBeenCalledWith("/guias/guia-777?editar=1");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 DOS BOTONES EN LA FILA — y «Editar» tiene que ATERRIZAR en el formulario
+// (25-ago-2026). Daniel: *"Dos botones en la fila: «Editar» y «Despachar», pero
+// que haga sentido"*.
+//
+// El botón de la lista hace `router.push("/guias/<id>?editar=1")`. Que la lista
+// mande ese query lo prueba `guias-despacho-una-sola-puerta`; lo que NO puede
+// ver un barrido es si al llegar con ese query el formulario está abierto. Si
+// no lo estuviera, «Editar» dejaría a la persona en la misma pantalla de
+// «Despachar» y el cambio no habría servido para nada.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("«Editar» de la fila aterriza con el formulario ABIERTO", () => {
+  async function abrirConQuery(query: string) {
+    window.history.replaceState({}, "", `/guias/guia-777${query}`);
+    const Page = (await import("@/app/guias/[id]/page")).default;
+    render(<Page />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+  }
+
+  afterEach(() => { window.history.replaceState({}, "", "/guias/guia-777"); });
+
+  it("con `?editar=1` los envíos ya están editables, sin tocar nada", async () => {
+    await abrirConQuery("?editar=1");
+    expect(screen.getByText(/\+ Agregar envío/i)).toBeTruthy();
+    const direccion = visible('input[id^="direccion-"]') as HTMLInputElement;
+    expect(direccion.value).toBe("Paso Canoas");
+    await act(async () => { fireEvent.change(direccion, { target: { value: "David" } }); });
+    expect((visible('input[id^="direccion-"]') as HTMLInputElement).value).toBe("David");
+  });
+
+  it("sin query, la misma URL abre en lectura — «Despachar» es la otra puerta", async () => {
+    await abrirConQuery("");
+    expect(screen.queryByText(/\+ Agregar envío/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /^Editar$/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Despachar/i })).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 EL MODO DE ENTREGA SE PREGUNTA UNA SOLA VEZ POR PANTALLA.
+//
+// Con la edición abierta convivían DOS controles del mismo campo: el «Modo de
+// entrega» del formulario y el «Cómo sale» + «Cambiar» del bloque de despacho,
+// cada uno con su propio estado (`useGuiaFormState.modoEntrega` y
+// `useDespachoGuia.tipoDespacho`), así que mover uno no movía el otro. En
+// entrega directa la MISMA frase salía dos veces en la misma pantalla.
+//
+// ⚠️ En LECTURA el bloque no se toca: es lo que evitó que 50 de 51 entregas
+// directas quedaran grabadas como transportista externo (14-ago-2026).
+// ─────────────────────────────────────────────────────────────────────────────
+describe("el modo de entrega no se pregunta dos veces", () => {
+  it("en lectura, «Cómo sale» con su «Cambiar» sigue ahí", async () => {
+    await abrirLaGuia();
+    expect(screen.getByText(/Cómo sale/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Cambiar$/i })).toBeTruthy();
+  });
+
+  it("editando, el modo lo pregunta SOLO el formulario", async () => {
+    await abrirLaGuia();
+    await tocarEditar();
+    // El del formulario, vivo: es donde se elige.
+    expect(screen.getByText(/Modo de entrega/i)).toBeTruthy();
+    // El segundo control, afuera.
+    expect(screen.queryByText(/Cómo sale/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Cambiar$/i })).toBeNull();
+    // Y «Despachar» sigue en la misma pantalla: lo que se fue es el duplicado,
+    // no el despacho.
+    expect(screen.getByRole("button", { name: /Despachar/i })).toBeTruthy();
+  });
+
+  it("en entrega directa, la explicación no sale dos veces", async () => {
+    guiaServida = { ...PENDIENTE, modo_entrega: "entrega_directa", transportista_id: null, transportista: null };
+    await abrirLaGuia();
+    await tocarEditar();
+    const veces = (document.body.textContent ?? "").split("Sale en nuestro propio camión").length - 1;
+    expect(veces).toBe(1);
+  });
+});

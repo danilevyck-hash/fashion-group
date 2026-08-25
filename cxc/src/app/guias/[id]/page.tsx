@@ -192,6 +192,17 @@ export default function GuiaPage() {
     <DespachoForm
       tipoDespacho={s.tipoDespacho}
       setTipoDespacho={s.setTipoDespacho}
+      /* 🩸 DOS CONTROLES PARA EL MISMO CAMPO EN LA MISMA PANTALLA. Con la
+         edición abierta, el formulario ya pregunta «Modo de entrega» (y en
+         entrega directa repetía palabra por palabra *"Sale en nuestro propio
+         camión: no lleva placa ni N° de guía de transportista"*). Peor: son
+         DOS estados distintos —`useGuiaFormState.modoEntrega` y
+         `useDespachoGuia.tipoDespacho`—, así que mover uno no movía el otro.
+         Mientras se edita, manda el formulario. En lectura el bloque «Cómo
+         sale» + «Cambiar» sigue EXACTAMENTE igual: es lo que evitó que 50 de
+         51 entregas directas quedaran grabadas como transportista externo
+         (14-ago-2026). */
+      mostrarModo={!enEdicion}
       bPlaca={s.bPlaca}
       setBPlaca={s.setBPlaca}
       bReceptor={s.bReceptor}
@@ -295,9 +306,6 @@ export default function GuiaPage() {
                       </svg>
                       Editar
                     </button>
-                    <p className="text-xs text-gray-500 mt-1.5">
-                      Se abre igual que cuando se crea la guía, sin salir de acá.
-                    </p>
                   </div>
                 )}
               </div>

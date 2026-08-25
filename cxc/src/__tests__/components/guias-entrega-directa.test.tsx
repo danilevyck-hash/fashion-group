@@ -326,36 +326,103 @@ describe("🔴 el botón de la fila dice 'Despachar' cuando la guía está pendi
         expandedGuia={g}
         expandedLoading={false}
         onToggleExpand={() => {}}
-        onEdit={() => {}}
-        onPrint={() => {}}
+        onEditar={() => {}}
+        onDespachar={() => {}}
         onDelete={() => {}}
       />,
     );
   }
 
-  it("Pendiente Bodega → 'Despachar'", () => {
+  // ⚠️ CANDADO QUE CAMBIÓ DE DIRECCIÓN (25-ago-2026). El 14-ago el único botón
+  // pasó a llamarse "Despachar" y "Editar" desapareció de la fila; corregir un
+  // nombre obligaba a entrar por "Despachar" y buscar el formulario adentro.
+  // Daniel: *"Dos botones en la fila: «Editar» y «Despachar»"*.
+  it("Pendiente Bodega → los DOS: 'Editar' y 'Despachar'", () => {
     listaCon("Pendiente Bodega");
     expect(screen.getByRole("button", { name: /Despachar/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /^Editar$/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /^Editar$/ })).toBeTruthy();
   });
 
-  it("los demás estados siguen diciendo 'Editar'", () => {
+  it("los demás estados sin despachar siguen con 'Editar' solo", () => {
     // "Confirmada" es un estado legacy que existe en la base y NO está
-    // despachado: ahí editar sigue siendo lo correcto.
+    // despachado, pero ya salió: no hay nada que despachar, solo corregir.
     listaCon("Confirmada");
     expect(screen.getByRole("button", { name: /Editar/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Despachar/ })).toBeNull();
   });
 
-  it("sigue habiendo UN SOLO botón para entrar a la guía", () => {
-    const { container } = listaCon("Pendiente Bodega");
-    const acciones = container.querySelectorAll("button");
-    const entrar = [...acciones].filter((b) => /Despachar|Editar/.test(b.textContent ?? ""));
-    expect(entrar).toHaveLength(1);
+  it("los dos botones NAVEGAN — la fila no despacha", () => {
+    const editar = vi.fn();
+    const despachar = vi.fn();
+    const g = guiaDirecta({ estado: "Pendiente Bodega", id: "g1", modo_entrega: "transportista", transportista: "Transporte Rápido" });
+    const { container } = render(
+      <GuiasList
+        guias={[g]} loading={false} error={null} search="" setSearch={() => {}}
+        showPending={false} setShowPending={() => {}} role="admin" onNewGuia={() => {}}
+        expandedId="g1" expandedGuia={g} expandedLoading={false} onToggleExpand={() => {}}
+        onEditar={editar} onDespachar={despachar} onDelete={() => {}}
+      />,
+    );
+    const botones = [...container.querySelectorAll("button")];
+    fireEvent.click(botones.find((b) => /^Editar$/.test((b.textContent ?? "").trim()))!);
+    fireEvent.click(botones.find((b) => /^Despachar$/.test((b.textContent ?? "").trim()))!);
+    expect(editar).toHaveBeenCalledWith("g1");
+    expect(despachar).toHaveBeenCalledWith("g1");
+    // 🔴 Y nada más: ni un pedido al servidor salió de la lista.
+    expect(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
   });
 
   it("Imprimir no se perdió", () => {
     listaCon("Pendiente Bodega");
     expect(screen.getByRole("button", { name: /Imprimir/ })).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 EL N° DEL TRANSPORTISTA DE UNA GUÍA DESPACHADA, EN EL ACORDEÓN.
+//
+// Desde el 18-ago-2026 el número se anota TARDE, y eso escribe UNA columna de
+// UNA línea sin tocar `guia_transporte`. El acordeón leía la CABECERA, así que
+// decía "—" con el número ya cargado. Es el mismo defecto que el 25-ago se
+// arregló en el Excel y en el buscador de la lista, y que acá quedó vivo.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 el acordeón lee el N° de los RENGLONES, no el de la cabecera", () => {
+  function despachadaCon(items: GuiaItem[], cabecera = "") {
+    const g = guiaDirecta({
+      estado: "Completada", id: "g9", modo_entrega: "transportista",
+      transportista: "Boston", tipo_despacho: "externo",
+      numero_guia_transp: cabecera, guia_items: items,
+    });
+    return render(
+      <GuiasList
+        guias={[g]} loading={false} error={null} search="" setSearch={() => {}}
+        showPending={false} setShowPending={() => {}} role="admin" onNewGuia={() => {}}
+        expandedId="g9" expandedGuia={g} expandedLoading={false} onToggleExpand={() => {}}
+        onEditar={() => {}} onDespachar={() => {}} onDelete={() => {}}
+      />,
+    );
+  }
+
+  it("el número anotado TARDE en una línea se ve, aunque la cabecera esté vacía", () => {
+    const { container } = despachadaCon([{ ...ITEMS[0], numero_guia_transp: "TR-9999" }], "");
+    expect(container.textContent).toContain("TR-9999");
+    expect(container.textContent).not.toMatch(/N° guía transp\.\s*—/);
+  });
+
+  it("con varios distintos los lista TODOS: elegir uno sería elegir por el que lee", () => {
+    const { container } = despachadaCon(
+      [
+        { ...ITEMS[0], id: "a", numero_guia_transp: "TR-4471" },
+        { ...ITEMS[0], id: "b", numero_guia_transp: "TR-9999" },
+      ],
+      "TR-4471",
+    );
+    expect(container.textContent).toContain("TR-4471, TR-9999");
+  });
+
+  it("sin ninguno sigue diciendo «—»", () => {
+    const { container } = despachadaCon([{ ...ITEMS[0], numero_guia_transp: "" }], "");
+    expect(container.textContent).toMatch(/N° guía transp\./);
+    expect(container.textContent).toContain("—");
   });
 });

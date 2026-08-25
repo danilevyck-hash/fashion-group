@@ -1002,6 +1002,75 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - 🩸 **TRES mutaciones sobrevivieron en la primera corrida y las tres enseñaron algo distinto.** Dos eran del SCRIPT (un em-dash y un ` ` que el patrón de perl no matcheaba, o sea que la mutación nunca se aplicó y el verde era falso). **La tercera era código REDUNDANTE**: `numerosTranspDeLaGuia` volvía a aplicar `sinCeroPelado` a la cabecera cuando `numeroTranspImpreso` ya lo hace adentro — quitarlo no rompía nada porque no hacía nada. Se borró la redundancia y la mutación pasó a atacar lo que de verdad sostiene la regla.
 > - 🩸 **La restauración va por COPIA, no con `git checkout`** (hay archivos NUEVOS) **y `probar()` exige encontrar el resumen de vitest** antes de creerle a un cero.
 
+## 🔴 Guías — DOS BOTONES EN LA FILA, y la poda del workflow (25-ago-2026)
+
+> Daniel, textual: ***"quiero (c) Dos botones en la fila: «Editar» y «Despachar», pero que haga sentido, siento que de TANTOS CAMBIOS no se entiende el workflow, revisa bien porfa que no quiero fricción, tiene que ser un módulo simple, no complicado."*** Y sobre los textos: ***"no siempre hay q estar explicando todo, se vuelve tedioso"***.
+>
+> ### 1. Los dos botones
+>
+> 🩸 **La fila tenía UN botón que decía «Despachar», así que corregir un nombre obligaba a tocar «Despachar» primero** y buscar «Editar» adentro — la queja del 23-ago, sin resolver. El 10-ago se había sacado el par «Despachar»+«Editar» porque convivía con el **formulario de despacho desplegado en la misma tarjeta**; el 14-ago el único botón pasó a llamarse «Despachar» (185 de 186 guías terminan despachadas). **Lo que sobraba era el formulario en la fila, no el segundo botón.**
+>
+> **Ahora, en una guía `Pendiente Bodega`: «Editar» · «Despachar» · «Imprimir» · «···».** Los dos primeros **NAVEGAN**: `«Editar» → /guias/[id]?editar=1` (el MISMO query por el que entra el camino viejo `/guias/[id]/editar`, así que sigue habiendo una sola puerta) y `«Despachar» → /guias/[id]`.
+> - 🔴 **LA LISTA SIGUE SIN DESPACHAR**, ni por swipe ni desplegando nada. Los dos botones son un `router.push` y nada más — candado de conducta que **toca los dos y verifica que no salió ni un `fetch`**.
+> - ⚠️ **Una guía `Completada`/`Rechazada` no muestra ninguno de los dos** (sigue con «Imprimir» y «···»): el candado del PUT no se tocó. **`Confirmada`** —estado legacy, ya salió— muestra solo «Editar»: no hay nada que despachar.
+> - **Toques para corregir un nombre en una pendiente: 4 → 3.** Despachar sigue en 3, imprimir en 2, atar un cliente en 4, crear una guía en 2.
+>
+> ### 2. 🩸 EL MODO DE ENTREGA SE PREGUNTABA DOS VECES EN LA MISMA PANTALLA
+>
+> Con la edición abierta convivían **dos controles del mismo campo**: el «Modo de entrega» del `GuiaForm` y el bloque «Cómo sale» + «Cambiar» del `DespachoForm`. Y no era cosmético: **son dos estados distintos** (`useGuiaFormState.modoEntrega` y `useDespachoGuia.tipoDespacho`), así que mover uno no movía el otro. En entrega directa la MISMA frase —*"Sale en nuestro propio camión: no lleva placa ni N° de guía de transportista"*— salía **dos veces**.
+>
+> **Mientras se edita, manda el formulario** (`mostrarModo={!enEdicion}`). ⚠️ **En LECTURA el bloque no se tocó**: es lo que evitó que **50 de 51 entregas directas quedaran grabadas como transportista externo** (14-ago-2026).
+>
+> ### 3. 🩸 EL ACORDEÓN DE UNA DESPACHADA LEÍA LA CABECERA, NO LOS RENGLONES
+>
+> El mismo defecto que el 25-ago se arregló en el Excel y en el buscador, **vivo en la lista**: `sinCeroPelado(g.numero_guia_transp)`. Desde el 18-ago el N° se anota TARDE y eso escribe UNA columna de UNA línea **sin tocar `guia_transporte`**. Medido contra producción con **GT-229, una guía REAL**: main muestra `725`; con los renglones muestra **`725, 724, 726`**. Fuente única `numerosTranspDeLaGuia`, la misma del Excel — con varios distintos **los lista TODOS**, porque elegir uno sería elegir por el que lee.
+>
+> ### 4. La poda de textos
+>
+> | Qué se sacó | Dónde | Por qué |
+> |---|---|---|
+> | *"Se abre igual que cuando se crea la guía, sin salir de acá."* | `/guias/[id]`, bajo «Editar» | Explicaba el mecanismo. Con «Editar» en la fila ya se entra al formulario de una. |
+> | El párrafo de 3 frases del N° del transportista | `ListaEnvios` | Quedó **una línea**: *"Anota el N° que te dio el transportista; si no dio ninguno, se despacha igual."* + el dato de la cabecera, que **se dice y no se copia** (candado y medición del 25-ago intactos). |
+> | El prop `onPrint` | `GuiasList` | **Muerto**: declarado, exigido, pasado desde `page.tsx` y nunca usado — «Imprimir» abre la pestaña él mismo. |
+> | El segundo control del modo | ver punto 2 | Duplicado con estado propio. |
+>
+> **Lo que se dejó a propósito:** *"Solo se puede cambiar el cliente"* · *"Esta guía ya se despachó: no se puede editar…"* · el aviso ámbar de la guía sin N° · *"Un 0 no es un N° de guía"* · *"Sale en nuestro propio camión…"* (una vez). **Protegen plata o evitan un error**, no explican un mecanismo.
+>
+> ### 5. 🔴 LO QUE **NO** SE TOCÓ
+>
+> El PUT rechaza una guía despachada · `PATCH …/cliente` y `PATCH …/numero-transp` son las DOS excepciones y no miran el estado · el N° del transportista **no** bloquea el despacho · las firmas y placa/receptor/cédula **sí** · una sola lista de envíos · el papel impreso · entrega directa sin placa ni transportista · **nadie gana permisos** (`canEdit` es el mismo conjunto de siempre; vendedor mira sin tocar).
+>
+> ### Medición
+>
+> **Los 3 anchos + el iPad acostado, contra el build de producción y CONTRA `origin/main`** (`BASE=… ETAPA=antes|despues node scripts/_medir-guias-dos-botones.mjs`, solo lectura), en cuatro pantallas: la lista con una guía **PENDIENTE REAL** abierta (GT-230), la lista con una **DESPACHADA REAL** (GT-229), la guía en lectura y la misma con `?editar=1`:
+>
+> | | main | después |
+> |---|---|---|
+> | arrastre de página | 0 · 0 · 0 · 0 | **0 · 0 · 0 · 0** |
+> | textos <12 px | 0 | **0** |
+> | tocables <44 px (listas) | 0 · 1 · 1 · 1 | **idéntico** (el `<input>` del buscador, 39 px, PRE-EXISTENTE) |
+> | tocables <44 px (editando) | 0 · 14 · 14 · 14 | **idéntico** (`pointer:fine` de `GuiaForm`) |
+> | recortados | 0/15/19/4 · 3/3/3/3 · 5/5/12/10 | **idénticos, los tres casos** |
+> | fila pendiente | Despachar 1 · Editar 0 | **Editar 1 · Despachar 1** |
+> | N° transp de GT-229 | `725` | **`725, 724, 726`** |
+> | «Cómo sale» editando | SÍ, con su «Cambiar» | **NO** |
+> | alto a 390 (editando) | 3.035 px | **2.915 px** |
+>
+> - 🔴 **NO SE TOCÓ NINGUNA GUÍA REAL.** La guía de (3) y (4) es un **DOBLE** servido por el script; se **aborta cualquier pedido que no sea GET** y nunca se aprieta «Despachar» ni «Guardar». Los POST de Sentry se abortan igual pero no se cuentan: main los hace idénticos.
+> - 🩸 **GOTCHA DE MEDICIÓN QUE DABA ROJO POR NADA:** el acordeón **no desmonta las filas cerradas**, las aplasta con `grid-rows-[0fr]` + `overflow-hidden`. Sus botones conservan caja propia, así que contar el DOM entero devolvía **los botones de las CINCO pendientes** (`Editar 5 · Despachar 5`) en vez de los de la fila abierta. Hay que subir por los padres y descartar lo que esté dentro de un contenedor de alto 0.
+>
+> ### Candados
+>
+> Todos de **CONDUCTA** (renderizan y tocan los botones): `components/guias-entrega-directa.test.tsx` (la fila pendiente da los DOS, los dos llaman a lo suyo y **no sale ni un `fetch`**; el acordeón lee el N° de los renglones, lista varios y sigue diciendo «—» sin ninguno), `guias-sin-rechazo.test.tsx` (una `Completada` sigue con solo «Imprimir»), `guias-editar-en-la-misma-pantalla.test.tsx` (llegar con `?editar=1` **aterriza con el formulario abierto**; el modo se pregunta una sola vez y la frase de entrega directa no sale dos veces). Más `lib/guias-despacho-una-sola-puerta.test.ts`, cuyo candado **cambió de dirección**: ya no exige UN botón, exige que **los dos NAVEGUEN**.
+> - **Verificado por mutación, 13 de 13 cazadas** (`bash scripts/_mutar-candados-guias-dos-botones.sh`): la fila vuelve a un solo botón (los dos sentidos) · «Despachar» llama a lo mismo que «Editar» · «Despachar» aparece en una guía que ya salió · una DESPACHADA vuelve a ofrecer los dos · «Editar» cae en la pantalla de despachar · la guía ignora `?editar=1` · vuelve el segundo control del modo · «Cómo sale» desaparece de la lectura · el acordeón vuelve a la cabecera · el acordeón muestra uno solo · las cajas del N° vuelven a nacer prellenadas · el N° de la cabecera deja de decirse.
+> - 🩸 **EL SCRIPT DENUNCIA EL PATRÓN QUE NO MUTA NADA**, en vez de cantarlo como "SOBREVIVIÓ" — un rojo inventado sobre un candado que nunca se puso a prueba. Ya pasó dos veces acá (un em-dash, un espacio fino) **y una tercera en este mismo PR**: con `perl -0pi -e 's|…|…|'`, el `||` del código real hacía que la mutación **se pegara al principio del archivo**. Por eso el reemplazo es **LITERAL** (`scripts/_mutar-guias-aplicar.py`) y exige que el texto viejo aparezca las veces que se le dicen. El script trae además **una mutación de control que no matchea a propósito**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido con el comentario adentro.
+>
+> ### ⚠️ Abiertos, para que los decida Daniel (no se construyeron)
+>
+> - 🔴 **A una guía DESPACHADA no se llega desde la pantalla.** La fila no tiene botón de entrar, así que `/guias/[id]` de una `Completada` **solo se abre escribiendo la URL** — y ahí viven *"Anotar el N°"* (la excepción del 18-ago) y el aviso *"Esta guía salió sin el N° del transportista"*. El chip ámbar de la lista marca guías que **nadie puede destildar desde la interfaz**. El arreglo sería un botón «Ver» en la fila; **no se hizo** porque el candado `guias-sin-rechazo` fija *"Completada → solo Imprimir"* y eso es decisión escrita.
+> - **«Corregir» por renglón vs «Editar»**: en la guía pendiente conviven dos caminos para arreglar cliente/dirección/empresa/bultos/facturas. `PATCH …/item` escribe UNA fila sin rotar ids; el PUT reemplaza los renglones. Retirar uno tiene costo real, así que queda anotado.
+> - *"Tócalo y se llenan los tres campos. Puedes cambiarlos después."* y *"Es lo único que se puede cambiar de una guía ya despachada."*: candidatos a poda, **no podados** — el primero quita miedo a tocar, el segundo aparece ARRIBA del bloque que dice lo mismo.
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`

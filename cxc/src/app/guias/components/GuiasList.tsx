@@ -49,8 +49,10 @@ interface GuiasListProps {
   expandedLoading: boolean;
   onToggleExpand: (id: string) => void;
   // Actions
-  onEdit: (id: string) => void;
-  onPrint: (id: string) => void;
+  /** «Editar»: abrir la guía CON el formulario abierto. */
+  onEditar: (id: string) => void;
+  /** «Despachar»: abrir la guía en el bloque de despacho. NO despacha acá. */
+  onDespachar: (id: string) => void;
   onDelete: (id: string) => void;
   /** Abrir la ventana de "¿a qué cliente fue esta línea?". Sin esto, el enlace
    *  no se ofrece (rol de solo lectura). */
@@ -125,7 +127,7 @@ export default function GuiasList({
   showPending, setShowPending, role,
   onNewGuia,
   expandedId, expandedGuia, expandedLoading, onToggleExpand,
-  onEdit, onPrint, onDelete, onAtarCliente,
+  onEditar, onDespachar, onDelete, onAtarCliente,
   nombresPorCodigo,
   readOnly,
 }: GuiasListProps) {
@@ -480,51 +482,61 @@ export default function GuiasList({
                                   )}
 
                                   {/* Acciones rápidas (header de la card expandida) */}
-                                  {/* 🔴 UN SOLO BOTÓN para entrar a la guía.
-                                      Acá vivía TAMBIÉN el formulario de despacho
-                                      entero, desplegado más abajo en esta misma
-                                      tarjeta: dos caminos para lo mismo. Daniel,
-                                      textual: *"solo quiero una y en boton de
-                                      editar para entrar a la guia y terminarla"*.
-                                      El botón lleva a `/guias/[id]`, y ahí se
-                                      corrige y se despacha. Sigue siendo UNO
-                                      SOLO: lo único que cambia es cómo se
-                                      llama.
+                                  {/* 🔴 DOS BOTONES, Y LOS DOS NAVEGAN: NINGUNO DESPACHA.
+                                      Daniel, textual: *"Dos botones en la fila:
+                                      «Editar» y «Despachar», pero que haga
+                                      sentido"*.
 
-                                      🔴 Y SE LLAMA "DESPACHAR" CUANDO LA GUÍA
-                                      ESTÁ PENDIENTE. Medido: 185 de las 186
-                                      guías terminaron despachadas. Despachar es
-                                      LA acción del día para bodega; editar es
-                                      el camino secundario y vive un nivel más
-                                      adentro ("Cambiar los envíos de esta
-                                      guía"). En los demás estados sigue
-                                      diciendo "Editar". */}
-                                  <div className="flex items-center justify-end gap-3 pt-3">
+                                      🩸 Con un solo botón llamado «Despachar»,
+                                      corregir un nombre obligaba a tocar
+                                      «Despachar» primero y buscar «Editar»
+                                      adentro — la queja original, sin resolver.
+                                      Ahora cada tarea tiene su puerta: «Editar»
+                                      abre la guía CON el formulario abierto
+                                      (`?editar=1`) y «Despachar» la abre en el
+                                      bloque de despacho.
+
+                                      🔴 LO QUE NO SE AFLOJÓ: la lista NO
+                                      despacha. Ni por swipe, ni desplegando el
+                                      formulario en la fila (eso se sacó el
+                                      10-ago-2026 y sigue afuera). Los dos
+                                      botones son `router.push`, nada más.
+
+                                      ⚠️ Una guía YA DESPACHADA no muestra
+                                      ninguno de los dos: sigue cerrada a
+                                      edición (candado en
+                                      `guias-sin-rechazo.test.tsx`). */}
+                                  <div className="flex items-center justify-end gap-2 pt-3 flex-wrap">
                                     {canEdit && !isDispatched && (
                                       <button
                                         type="button"
-                                        onClick={() => onEdit(expandedGuia.id)}
+                                        onClick={() => onEditar(expandedGuia.id)}
                                         className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3.5 rounded-md border border-gray-200 hover:bg-gray-100 min-h-[44px]"
                                       >
-                                        {expandedGuia.estado === "Pendiente Bodega" ? (
-                                          <>
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                              <rect x="1" y="3" width="15" height="13" />
-                                              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                                              <circle cx="5.5" cy="18.5" r="2.5" />
-                                              <circle cx="18.5" cy="18.5" r="2.5" />
-                                            </svg>
-                                            Despachar
-                                          </>
-                                        ) : (
-                                          <>
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                              <path d="M12 20h9" />
-                                              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
-                                            </svg>
-                                            Editar
-                                          </>
-                                        )}
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M12 20h9" />
+                                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+                                        </svg>
+                                        Editar
+                                      </button>
+                                    )}
+                                    {/* «Despachar» solo donde hay algo que despachar:
+                                        "Pendiente Bodega". "Confirmada" es un estado
+                                        legacy que ya salió sin firmar y ahí editar es
+                                        lo único que tiene sentido. */}
+                                    {canEdit && !isDispatched && expandedGuia.estado === "Pendiente Bodega" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onDespachar(expandedGuia.id)}
+                                        className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3.5 rounded-md border border-gray-200 hover:bg-gray-100 min-h-[44px]"
+                                      >
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                          <rect x="1" y="3" width="15" height="13" />
+                                          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                                          <circle cx="5.5" cy="18.5" r="2.5" />
+                                          <circle cx="18.5" cy="18.5" r="2.5" />
+                                        </svg>
+                                        Despachar
                                       </button>
                                     )}
                                     <button
@@ -638,10 +650,22 @@ export default function GuiasList({
                                             <span className="font-medium">{sinCeroPelado(expandedGuia.placa)}</span>
                                           </div>
                                         )}
+                                        {/* 🩸 EL N° SALE DE LOS RENGLONES, NO DE LA CABECERA.
+                                            Desde el 18-ago-2026 el número se puede anotar
+                                            TARDE, y eso escribe UNA columna de UNA línea sin
+                                            tocar `guia_transporte`. Leyendo la cabecera, acá
+                                            decía "—" con el número ya cargado — el mismo
+                                            defecto que el 25-ago se arregló en el Excel y en
+                                            el buscador, y que acá quedó vivo. Misma fuente
+                                            única que ellos: `numerosTranspDeLaGuia`, que ya
+                                            aplica la herencia de las guías viejas y trata el
+                                            "0" pelado como vacío. Con varios distintos los
+                                            lista TODOS: elegir uno sería elegir por el que
+                                            lee. */}
                                         {!esEntregaDirecta(expandedGuia) && (
                                           <div>
                                             <span className="text-gray-400 block">N° guía transp.</span>
-                                            <span className="font-medium">{sinCeroPelado(expandedGuia.numero_guia_transp) || "—"}</span>
+                                            <span className="font-medium">{numerosTranspDeLaGuia(expandedGuia).join(", ") || "—"}</span>
                                           </div>
                                         )}
                                         {expandedGuia.nombre_chofer && (
