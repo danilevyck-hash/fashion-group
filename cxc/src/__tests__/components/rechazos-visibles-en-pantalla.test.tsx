@@ -217,6 +217,8 @@ describe("una sola redacción en todo el sistema", () => {
       // El texto se cita en su propio candado y en el de conducta.
       "src/__tests__/lib/rechazos-de-switch.test.ts",
       "src/__tests__/components/rechazos-visibles-en-pantalla.test.tsx",
+      // Este exige la línea EXACTA al final de la cadena sync → log → texto.
+      "src/__tests__/lib/rechazo-queda-registrado.test.ts",
     ];
 
     function listar(dir: string, out: string[] = []): string[] {

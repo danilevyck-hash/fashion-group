@@ -75,6 +75,15 @@ probar() {
     echo "  ⚠️  LA CORRIDA MURIÓ (no hay resumen de vitest) — $nombre"
     restaurar; return
   fi
+  # 🩸 Y si la mutación ROMPE el archivo, vitest no llega a colectar y escribe
+  # «Tests  no tests»: 0 fallos, y el informe diría SOBREVIVIÓ acusando al
+  # candado de un agujero inexistente. Ya pasó en esta misma corrida — el
+  # delimitador `|` de perl convertía `\|\|` en una alternación con rama vacía
+  # y el reemplazo se comía el archivo entero desde el byte 0.
+  if grep -q 'no tests' <<< "$resumen"; then
+    echo "  ⚠️  LA MUTACIÓN ROMPIÓ EL ARCHIVO (vitest no colectó nada) — $nombre"
+    restaurar; return
+  fi
   fallos="$(printf '%s' "$resumen" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+' | head -1)"
   fallos="${fallos:-0}"
   if [ "$fallos" -gt 0 ]; then
@@ -163,7 +172,7 @@ mutar src/lib/rechazos-de-switch.ts \
   && probar "el documento se pierde al leerlo del log"
 
 mutar src/lib/rechazos-de-switch.ts \
-  's|    if \(mayor === null \|\| Math\.abs\(v\) > Math\.abs\(mayor\)\) mayor = v;|    if (mayor === null) mayor = v;|' \
+  's#    if \(mayor === null \|\| Math\.abs\(v\) > Math\.abs\(mayor\)\) mayor = v;#    if (mayor === null) mayor = v;#' \
   && probar "se muestra el monto MÁS CHICO de la fila, no el imposible"
 
 # ── 6 · BOSTON SIGUE SIN TELEGRAM ────────────────────────────────────────────
