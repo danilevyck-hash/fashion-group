@@ -58,8 +58,9 @@ import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
 import ClientePicker from "@/components/ClientePicker";
 import { ScrollableTable } from "@/components/ui";
-import { EMPRESAS_CANONICAS, claveCampo, opcionesEmpresa } from "./guia-form-logic";
+import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, opcionesEmpresa } from "./guia-form-logic";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
+import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
 
 interface GuiaFormProps {
@@ -91,6 +92,14 @@ interface GuiaFormProps {
   onRestoreRow: (idx: number, fila: GuiaItem) => void;
   onSave: (opts?: { silent?: boolean }) => void | Promise<void>;
   onCancel: () => void;
+  /**
+   * Qué dice el botón de volver de la barra pegajosa. Por defecto "← Guías",
+   * que es a donde se va desde `/guias/nueva`. Cuando el formulario se abre
+   * DENTRO de la guía (el botón "Editar" de `/guias/[id]`) no se va a ningún
+   * lado: se cierra la edición y se sigue en la misma guía, así que decir
+   * "Guías" sería mentir sobre a dónde lleva.
+   */
+  etiquetaVolver?: string;
   /**
    * ¿Lo que hay en el formulario es DISTINTO de lo último que el servidor tiene?
    * Lo calcula `useGuiaFormState` comparando instantáneas (`@/lib/guias/cambios-form`).
@@ -191,6 +200,7 @@ export default function GuiaForm({
   validationErrors, error, saving,
   onAddDireccion,
   onUpdateItem, onUpdateItemFields, onAddRow, onRemoveRow, onRestoreRow, onSave, onCancel,
+  etiquetaVolver = "← Guías",
   hayCambios = false, instantanea = "", guardadoEn = null,
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
@@ -348,15 +358,46 @@ export default function GuiaForm({
   // rechazado igual decía "listo".
   const saveStatus = saving ? "saving" : hayCambios ? "dirty" : guardadoEn ? "saved" : null;
 
+  // ── EL BOTÓN SE APAGA Y DICE QUÉ FALTA ────────────────────────────────────
+  // 🩸 Antes se apagaba con `!items.some(i => i.cliente)` —una regla propia,
+  // más floja que la que de verdad decide— y NO decía por qué. Y como era más
+  // floja, también pasaba lo contrario: el botón se veía encendido, se tocaba,
+  // y el formulario entero se ponía rojo de golpe. La pantalla de despachar ya
+  // hacía lo correcto ("Falta: placa, recibido por y cédula") y acá se copia.
+  //
+  // 🔑 `faltaParaGuardar` LLAMA a `validarGuia`, la misma que rechaza el
+  // guardado: el botón no puede estar en desacuerdo con lo que va a pasar.
+  const faltantes = faltaParaGuardar({ fecha, modoEntrega, transportistaId, entregadoPor, items });
+  const puedeGuardar = faltantes.length === 0;
+  const avisoFalta = textoFalta(faltantes);
+
   function SaveButton({ size = "normal" }: { size?: "normal" | "small" }) {
     const cls = size === "small"
       ? "bg-black text-white px-4 rounded-md text-xs font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 inline-flex items-center justify-center min-h-[44px] shrink-0"
       : "bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 inline-flex items-center justify-center min-h-[44px]";
     return (
-      <button type="button" onClick={() => handleSave()} disabled={saving || !items.some(i => i.cliente)} className={cls}>
+      <button
+        type="button"
+        onClick={() => handleSave()}
+        disabled={saving || !puedeGuardar}
+        title={puedeGuardar ? undefined : avisoFalta}
+        className={cls}
+      >
         {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar Guía"}
       </button>
     );
+  }
+
+  /**
+   * El "Falta: …", donde se lo pueda leer. Va en LOS DOS lugares donde hay un
+   * botón de guardar: en la barra pegajosa —que en el celular es la única que
+   * se ve mientras se llena la guía— y al final, al lado del botón grande.
+   * Apagar el botón en un lado y explicarlo solo en el otro es la mitad del
+   * arreglo.
+   */
+  function AvisoFalta({ className = "" }: { className?: string }) {
+    if (puedeGuardar || saving) return null;
+    return <p className={`text-amber-700 ${className}`}>{avisoFalta}</p>;
   }
 
   function StatusBadge() {
@@ -504,17 +545,20 @@ export default function GuiaForm({
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       {/* Sticky top bar */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-6 border-b border-gray-200 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-6 border-b border-gray-200">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
           {/* Volver: era una línea de texto de 18 px de alto. -mx-2 para que el
               "←" siga alineado con el borde izquierdo de la barra. */}
-          <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2 shrink-0">← Guías</button>
+          <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2 shrink-0">{etiquetaVolver}</button>
           <span className="text-sm text-gray-300 font-mono shrink-0">GT-{String(formNumero).padStart(3, "0")}</span>
           {/* En 390px el estado no entra junto al botón: vive abajo, en la
               cabecera de "Detalle de Envío". */}
           <span className="hidden sm:block truncate"><StatusBadge /></span>
         </div>
-        <SaveButton size="small" />
+          <SaveButton size="small" />
+        </div>
+        <AvisoFalta className="mt-1.5 text-xs" />
       </div>
 
       {/* 🔴 ESTE TÍTULO SE QUEDA, y es la ÚNICA excepción de la poda de los 23
@@ -736,6 +780,7 @@ export default function GuiaForm({
         <SaveButton />
         <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-2">Cancelar</button>
       </div>
+      <AvisoFalta className="mt-2 text-sm" />
 
       {/* Undo delete row toast */}
       {undoRow && (

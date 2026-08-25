@@ -7,6 +7,7 @@
 // fila) ahora son funciones sueltas con candados propios.
 
 import { ALL_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
+import { unirEnHumano } from "@/lib/guias/falta-para-despachar";
 import type { GuiaItem, ModoEntrega } from "./types";
 
 /**
@@ -154,4 +155,82 @@ export function quitarFila(items: GuiaItem[], idx: number): GuiaItem[] {
 export function restaurarFila(items: GuiaItem[], idx: number, fila: GuiaItem): GuiaItem[] {
   const destino = Math.max(0, Math.min(idx, items.length));
   return renumerar([...items.slice(0, destino), fila, ...items.slice(destino)]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUÉ LE FALTA A LA GUÍA PARA PODER GUARDARSE — dicho en español simple.
+//
+// 🩸 EL BOTÓN "Guardar Guía" APARECÍA APAGADO Y NO DECÍA POR QUÉ. Se apagaba
+// con `!items.some(i => i.cliente)` —una regla propia, más floja que la que de
+// verdad decide— así que también pasaba lo contrario: el botón se veía
+// encendido, se tocaba, y el formulario entero se ponía rojo con "Completa
+// todos los campos obligatorios". Dos formas de la misma falta de respuesta.
+//
+// La pantalla de despachar ya hacía lo correcto —botón apagado y, justo debajo,
+// *"Falta: placa, recibido por y cédula"*— y esto copia ese patrón.
+//
+// 🔑 LAS REGLAS NO SE COPIAN: esto LLAMA a `validarGuia`, la misma función que
+// rechaza el guardado. Si fueran dos listas, el día que una cambiara el botón
+// se pondría negro y el guardado rechazaría igual — que es peor que el botón
+// apagado, porque miente.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Nombre humano de cada campo de un envío, en el orden en que se leen. */
+const CAMPOS_DE_ENVIO: Array<[campo: string, humano: string]> = [
+  ["cliente", "el cliente"],
+  ["direccion", "la dirección"],
+  ["empresa", "la empresa"],
+  ["facturas", "la factura"],
+  ["bultos", "los bultos"],
+];
+
+/**
+ * Devuelve los faltantes en el orden en que se leen en la pantalla. Lista
+ * vacía = se puede guardar.
+ *
+ * ⚠️ Los envíos van AGRUPADOS, no campo por campo: con 7 envíos a los que les
+ * falta el cliente, una lista plana daría 7 renglones que dicen lo mismo. Con
+ * un solo envío ni siquiera se lo numera — decir "del envío 1" cuando hay uno
+ * solo es ruido.
+ */
+export function faltaParaGuardar(estado: EstadoGuia): string[] {
+  const errores = validarGuia(estado);
+  const falta: string[] = [];
+
+  if (errores.has("fecha")) falta.push("la fecha");
+  if (errores.has("transportista")) falta.push("el transportista");
+  if (errores.has("entregadoPor")) falta.push("quién despacha");
+  if (errores.has("items-empty")) {
+    falta.push("por lo menos un envío");
+    return falta;
+  }
+
+  // El número que se dice es la POSICIÓN QUE SE VE en la pantalla (el
+  // formulario numera las filas por su índice), no la posición entre las filas
+  // que tienen datos: mandar a mirar "el envío 2" y que sea el tercero de la
+  // lista es peor que no decir nada.
+  const malos: Array<{ numero: number; campos: string[] }> = [];
+  estado.items.forEach((item, idx) => {
+    if (!filaTieneDatos(item)) return;
+    const campos = CAMPOS_DE_ENVIO
+      .filter(([campo]) => errores.has(claveCampo(item, campo)))
+      .map(([, humano]) => humano);
+    if (
+      errores.has(claveCampo(item, "facturas-separator")) ||
+      errores.has(claveCampo(item, "facturas-format"))
+    ) {
+      campos.push("la factura bien escrita");
+    }
+    if (campos.length > 0) malos.push({ numero: idx + 1, campos });
+  });
+
+  if (malos.length === 1) {
+    const { numero, campos } = malos[0];
+    const soloUnEnvio = estado.items.filter(filaTieneDatos).length === 1;
+    falta.push(soloUnEnvio ? unirEnHumano(campos) : `${unirEnHumano(campos)} del envío ${numero}`);
+  } else if (malos.length > 1) {
+    falta.push(`los datos de los envíos ${unirEnHumano(malos.map((m) => String(m.numero)))}`);
+  }
+
+  return falta;
 }
