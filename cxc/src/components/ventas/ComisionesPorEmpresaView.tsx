@@ -15,7 +15,8 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings } from "lucide-react";
+import { Coins, Settings } from "lucide-react";
+import { Ayuda } from "@/components/shared/Ayuda";
 import type { ExcelApi } from "./ComisionesView";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
@@ -42,7 +43,10 @@ interface ComisionVendedor {
   base_cobro: number;
   tasa_cobro: number;
   comision_cobro: number;
+  /** NETO: el servidor ya le restó los descuentos fijos activos del mes. */
   comision_total: number;
+  /** Cuánto se le restó (informativo — ya está descontado del total). */
+  descuento?: number;
 }
 interface ComisionResp {
   empresa_key: string;
@@ -223,7 +227,17 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
                   className="cursor-pointer border-b border-gray-100 last:border-0 transition hover:bg-gray-50"
                   title="Ver reporte detallado"
                 >
-                  <td className="px-3 py-2.5 font-medium text-gray-900 underline-offset-2 hover:underline xl:px-4">{v.vendedor}</td>
+                  <td className="px-3 py-2.5 font-medium text-gray-900 xl:px-4">
+                    <span className="underline-offset-2 hover:underline">{v.vendedor}</span>
+                    {/* Crece HACIA ABAJO: una columna más habría ensanchado la
+                        tabla justo en el iPad acostado, que es el ancho que
+                        nadie mira. */}
+                    {(v.descuento ?? 0) > 0 && (
+                      <span className="block text-xs font-normal text-gray-500">
+                        − {fmtMoney(v.descuento ?? 0)} en descuentos
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-gray-700 xl:px-4">{fmtMoney(v.base)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-gray-600 xl:px-4">{fmtMoney(v.comision)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-gray-700 xl:px-4">{fmtMoney(v.base_cobro)}</td>
@@ -254,6 +268,16 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
           </Card>
         </>
       )}
+
+      {/* Mismo pie que la matriz de "Todas las empresas": las dos pestañas
+          muestran el MISMO neto, así que tienen que explicarlo igual. */}
+      <p className="flex items-center gap-1.5 text-xs text-gray-400">
+        <Coins className="h-3.5 w-3.5" />
+        Toca para ver el detalle
+        <Ayuda titulo="Cómo se calcula">
+          <p>Ya están descontados lo devuelto y los descuentos.</p>
+        </Ayuda>
+      </p>
 
       {canConfig && (
         <ComisionesConfigModal

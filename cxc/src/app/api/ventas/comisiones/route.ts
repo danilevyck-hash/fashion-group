@@ -1,6 +1,16 @@
 /**
- * Comisiones B2B por empresa + período. Lee el RPC comision_b2b_v5 (cache
- * switch_factura_utilidad + comision_tasas). Regla: facturas con utilidad>20%
+ * Comisiones B2B por empresa + período — con los DESCUENTOS FIJOS YA RESTADOS.
+ *
+ * 🩸 POR QUÉ SE RESTAN ACÁ (24-ago-2026). Esta ruta devolvía la RPC cruda, así
+ * que la pestaña "Por empresa" mostraba el SUBTOTAL mientras "Todas las
+ * empresas" y el detalle del vendedor sí restaban: Reinaldo en Fashion Shoes
+ * salía **$1.573,08 más alto** en una pestaña que en la otra, y el Excel de esa
+ * vista bajaba el número inflado. La resta vive en `lib/comisiones/descuentos`
+ * y la aplican los DOS endpoints — dos implementaciones serían dos totales
+ * posibles para el mismo mes.
+ *
+ * Lee el RPC comision_b2b_v5 (cache switch_factura_utilidad + comision_tasas),
+ * que NO se toca. Regla: facturas con utilidad>20%
  * menos NC, excluye intercompañía/internos. Desde v5 (jul-2026, retroactivo)
  * las VENTAS se atribuyen al VENDEDOR DE LA FACTURA (switch_facturas, la NC
  * usa su propio vendedor); los COBROS siguen por cartera (los recibos no
@@ -15,6 +25,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import {
+  leerDescuentosEfectivos,
+  totalPorVendedor,
+  netearComisiones,
+} from "@/lib/comisiones/descuentos";
 
 export const dynamic = "force-dynamic";
 
@@ -37,13 +52,30 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("comision_b2b_v5", {
-    p_empresa_key: empresa,
-    p_year: year,
-    p_mes: mes,
-  });
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Los descuentos fallan ABIERTO, igual que en el consolidado: si su lectura
+  // se cae, la tabla sale con descuentos en 0 en vez de quedar en blanco. Un
+  // error de las COMISIONES sí se propaga (500): una tabla vacía silenciosa se
+  // leería como "este mes no se vendió nada".
+  const [rpc, descuentos] = await Promise.all([
+    supabaseServer.rpc("comision_b2b_v5", {
+      p_empresa_key: empresa,
+      p_year: year,
+      p_mes: mes,
+    }),
+    leerDescuentosEfectivos([empresa], year, mes).catch(() => []),
+  ]);
+  if (rpc.error) {
+    return NextResponse.json({ error: rpc.error.message }, { status: 500 });
   }
-  return NextResponse.json(data);
+
+  const data = (rpc.data ?? {}) as Record<string, unknown> & {
+    vendedores?: { vendedor: string; comision_total?: number }[];
+  };
+  return NextResponse.json({
+    ...data,
+    vendedores: netearComisiones(
+      data.vendedores ?? [],
+      totalPorVendedor(descuentos, empresa),
+    ),
+  });
 }

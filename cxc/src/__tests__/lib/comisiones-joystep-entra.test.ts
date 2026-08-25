@@ -60,9 +60,11 @@ vi.mock("@/lib/supabase-server", () => ({
     },
   },
 }));
-vi.mock("@/lib/comisiones/descuentos", () => ({
+// Solo se dobla la LECTURA de descuentos (no hay base acá). La resta
+// (`netearComisiones`) es la REAL: doblarla escondería justo lo que importa.
+vi.mock("@/lib/comisiones/descuentos", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/comisiones/descuentos")>()),
   leerDescuentosEfectivos: async () => [],
-  totalPorVendedor: () => ({}),
 }));
 
 // ── Texto SIN comentarios: un comentario que nombra el filtro no es el filtro ─

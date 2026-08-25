@@ -99,3 +99,50 @@ export function totalPorVendedor(
   }
   return porVendedor;
 }
+
+/** Centinela "cliente sin dueño" que devuelve la RPC. NO es una persona, así
+ *  que no se le resta ningún descuento (la matriz lo dibuja como "Sin asignar"). */
+export const DEFAULT_VENDEDOR = "DEFAULT";
+
+/** Los montos vienen de dos fuentes; sin esto la resta arrastra centavos. */
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export interface VendedorComision {
+  vendedor: string;
+  comision_total?: number | null;
+}
+
+/**
+ * 🔴 LA RESTA DE LOS DESCUENTOS, UNA SOLA VEZ EN TODO EL SISTEMA.
+ *
+ * 🩸 POR QUÉ (24-ago-2026). La pestaña "Por empresa" mostraba el SUBTOTAL
+ * mientras "Todas las empresas" y el detalle del vendedor sí restaban:
+ * **Reinaldo en Fashion Shoes salía $1.573,08 más alto en una pestaña que en la
+ * otra** ($2.859,65 contra $1.286,57 en julio-2026), la misma persona y el
+ * mismo mes en la misma pantalla — y el Excel de esa vista bajaba el número
+ * inflado. Daniel ya lo había reclamado una vez (*"me sale en el web el total,
+ * y no me resta el descuento"*) y se arregló en UNA pestaña y no en la otra.
+ *
+ * Por eso la resta vive ACÁ y la aplican los DOS endpoints antes de responder:
+ * las vistas solo dibujan `comision_total`. Una segunda implementación —aunque
+ * copie esta línea por línea— es la forma conocida de que los dos totales se
+ * vuelvan a separar, que es exactamente el bug que esto vino a cerrar.
+ *
+ * Devuelve el `comision_total` YA NETO y el `descuento` aplicado, para que la
+ * pantalla pueda decir por qué el total no es la suma de sus dos comisiones.
+ */
+export function netearComisiones<T extends VendedorComision>(
+  vendedores: readonly T[],
+  porVendedor: Record<string, number>,
+): (T & { descuento: number; comision_total: number })[] {
+  return (vendedores ?? []).map((v) => {
+    const bruto = Number(v.comision_total ?? 0);
+    const descuento =
+      v.vendedor === DEFAULT_VENDEDOR ? 0 : Number(porVendedor[v.vendedor] ?? 0);
+    return {
+      ...v,
+      descuento,
+      comision_total: descuento ? round2(bruto - descuento) : bruto,
+    };
+  });
+}

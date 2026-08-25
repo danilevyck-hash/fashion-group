@@ -30,13 +30,24 @@
  * Las 5 RPC siguen siendo 5 — lo que se elimina son los 5 viajes de red del
  * navegador y las 8 consultas de descuentos de más.
  *
- * GET ?year=&mes= → { empresas: [{ empresa_key, vendedores[], porVendedor }] }
+ * ⚠️ LOS DESCUENTOS SE RESTAN ACÁ, no en la vista (24-ago-2026). Antes la resta
+ * vivía dentro del pivot de `ComisionesConsolidadoView` y la pestaña "Por
+ * empresa" no la tenía: Reinaldo salía $1.573,08 más alto en una que en la
+ * otra. Hoy las dos pestañas piden un `comision_total` que YA viene neto de la
+ * MISMA función (`netearComisiones`), así que no pueden separarse.
+ *
+ * GET ?year=&mes= → { empresas: [{ empresa_key, vendedores[] }] }
+ *   vendedores[].comision_total = NETO · vendedores[].descuento = lo restado
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
-import { leerDescuentosEfectivos, totalPorVendedor } from "@/lib/comisiones/descuentos";
+import {
+  leerDescuentosEfectivos,
+  totalPorVendedor,
+  netearComisiones,
+} from "@/lib/comisiones/descuentos";
 
 export const dynamic = "force-dynamic";
 
@@ -98,8 +109,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     empresas: porEmpresa.map(({ empresa, empresa_key, vendedores }) => ({
       empresa_key,
-      vendedores,
-      porVendedor: totalPorVendedor(descuentos, empresa),
+      // El descuento es por (empresa, vendedor) y se resta del total de ESA
+      // empresa — que es la celda que Daniel mira.
+      vendedores: netearComisiones(vendedores, totalPorVendedor(descuentos, empresa)),
     })),
   });
 }

@@ -57,18 +57,36 @@ describe("🔴 el neto: los números reales de julio 2026", () => {
   });
 });
 
-describe("🔴 la vista aplica el descuento donde se ve", () => {
-  it("resta de la CELDA de la empresa, no solo del total", () => {
-    expect(vista).toContain("target.porEmpresa[r.empresa_key] = round2(");
-    expect(vista).toContain("target.total = round2(target.total - monto)");
+describe("🔴 el descuento se resta donde se ve — y AHORA en el servidor", () => {
+  // 🩸 ESTE BLOQUE CAMBIÓ DE DIRECCIÓN EL 24-ago-2026, y el candado viejo era
+  // parte del problema: exigía que la resta viviera DENTRO del pivot de la
+  // vista (`target.porEmpresa[...] = round2(...)`). Mientras estuvo ahí, la
+  // pestaña "Por empresa" —que pide OTRO endpoint— no la tenía: Reinaldo en
+  // Fashion Shoes salía $1.573,08 más alto en una pestaña que en la otra.
+  // Hoy la resta la hace `netearComisiones` en el servidor y las dos vistas
+  // solo dibujan `comision_total`. Lo que este candado siempre quiso decir es
+  // que el descuento se descuenta de LA CELDA de su empresa, y eso se sostiene
+  // por construcción: se aplica por (empresa, vendedor) antes de responder.
+  it("la resta la hace el servidor, con la MISMA función en las dos rutas", () => {
+    const unaEmpresa = leer("src/app/api/ventas/comisiones/route.ts");
+    for (const [nombre, src] of [
+      ["consolidado/route", consolidado],
+      ["comisiones/route", unaEmpresa],
+    ] as const) {
+      expect(src, nombre).toContain("netearComisiones(");
+      // Por (empresa, vendedor): el descuento cae en la celda de SU empresa.
+      expect(src, nombre).toContain("totalPorVendedor(descuentos, empresa)");
+    }
   });
 
   it("redondea a 2 decimales (los montos vienen de dos fuentes)", () => {
-    expect(vista).toContain("const round2 =");
+    expect(lib).toContain("const round2 =");
+    expect(lib).toContain("round2(bruto - descuento)");
   });
 
-  it("un descuento de alguien sin comisión este mes no crea una fila fantasma", () => {
-    expect(vista).toContain("if (!target) continue;");
+  it("la vista ya NO resta: una segunda resta son dos totales posibles", () => {
+    expect(vista).not.toContain("target.total = round2(target.total - monto)");
+    expect(vista).not.toContain("porVendedor");
   });
 
   it("si la consulta de descuentos falla, la tabla NO se cae", () => {
