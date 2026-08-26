@@ -83,7 +83,7 @@ export function ReportePorMarcaView() {
             onChange={(e) =>
               setAnio(e.target.value === "todos" ? "todos" : parseInt(e.target.value, 10))
             }
-            className="ml-2 px-3 py-1.5 rounded-md border border-gray-200 text-sm bg-white"
+            className="ml-2 min-h-[44px] px-3 py-1.5 rounded-md border border-gray-200 text-sm bg-white"
           >
             <option value="todos">Todos</option>
             {ANIOS.map((y) => (
@@ -97,7 +97,7 @@ export function ReportePorMarcaView() {
         <button
           onClick={exportar}
           disabled={loading || items.length === 0}
-          className="ml-auto px-3 py-1.5 rounded-md text-sm font-medium border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50"
+          className="ml-auto inline-flex min-h-[44px] items-center px-3 py-1.5 rounded-md text-sm font-medium border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50"
         >
           Exportar Excel
         </button>

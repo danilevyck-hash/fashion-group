@@ -122,6 +122,21 @@ const SONDA = `(() => {
     if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) return false;
     const cs = getComputedStyle(el);
     if (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) <= 0.05) return false;
+    // 🩸 Y EL ÚLTIMO ESCONDITE: un ancestro con overflow hidden y alto 0. El
+    // hijo computa display:block, opacity:1, pasa checkVisibility Y devuelve un
+    // rect normal — el asistente de Reclamos guarda así los 3 pasos que no
+    // tocan, y por eso "+ Agregar fila" parecía encimado con "Guardar Reclamo"
+    // en una pantalla que en la captura está impecable. Si el rect del hijo no
+    // toca el de su recorte, no está en pantalla.
+    const r = el.getBoundingClientRect();
+    for (let q = el.parentElement; q && q !== document.body; q = q.parentElement) {
+      const qs = getComputedStyle(q);
+      const recorta = qs.overflowX === "hidden" || qs.overflowX === "clip" || qs.overflowY === "hidden" || qs.overflowY === "clip";
+      if (!recorta) continue;
+      const qr = q.getBoundingClientRect();
+      if (qr.height <= 1 || qr.width <= 1) return false;
+      if (r.bottom <= qr.top || r.top >= qr.bottom) return false;
+    }
     return true;
   };
   const tocable = (el) => {
@@ -180,6 +195,40 @@ const SONDA = `(() => {
       texto: t.slice(0, 50), visiblePx: Math.round(el.clientWidth), necesitaPx: Math.round(el.scrollWidth),
       frac: Math.round(visibleFrac * 100), zona: donde(el), clase: cls(el),
     });
+  }
+  // 🩸 EL OTRO MODO DE PERDER TEXTO: que se vaya del viewport SIN que el cuerpo
+  // arrastre. Ahí no lo recorta la caja del propio elemento —así que el chequeo
+  // de arriba no lo ve— sino un overflow-hidden de más arriba, y el dato no
+  // se alcanza ni scrolleando. Solo cuenta si el cuerpo NO scrollea de lado:
+  // con arrastre, el texto está, hay que empujar la página.
+  const arrastreDelCuerpo = document.documentElement.scrollWidth - document.documentElement.clientWidth;
+  if (arrastreDelCuerpo <= 1) {
+    for (const el of todos) {
+      const propio = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 1);
+      if (!propio || !visibleAlto(el)) continue;
+      const cs = getComputedStyle(el);
+      if (el.closest(".sr-only") || cs.clip === "rect(0px, 0px, 0px, 0px)" || cs.clipPath === "inset(50%)") continue;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0) continue;
+      const seVa = Math.round(Math.max(r.right - VW, -r.left));
+      if (seVa <= 2) continue;
+      // Si cuelga de un contenedor que scrollea de lado, el dato SE ALCANZA:
+      // eso es una tira arrastrable (la barra de filtros de Cheques), no un
+      // recorte. Solo cuenta lo que ningún gesto puede traer a la pantalla.
+      let enScroller = false;
+      for (let q = el.parentElement; q && q !== document.body; q = q.parentElement) {
+        const ox = getComputedStyle(q).overflowX;
+        if (ox === "auto" || ox === "scroll") { enScroller = true; break; }
+      }
+      if (enScroller) continue;
+      const t = txt(el);
+      if (!t) continue;
+      cortados.push({
+        texto: t.slice(0, 50), visiblePx: Math.round(r.width - seVa), necesitaPx: Math.round(r.width),
+        frac: Math.max(0, Math.round(((r.width - seVa) / r.width) * 100)), zona: donde(el), clase: cls(el),
+        fueraDelViewport: seVa,
+      });
+    }
   }
   cortados.sort((a, b) => a.frac - b.frac);
 
@@ -263,6 +312,17 @@ const SONDA = `(() => {
       if (area / menor < 0.35) continue;
       const zona = donde(a.el);
       if (zona !== "contenido") continue;   // el cromo global (barra/cabecera) es otro lote
+      // 🩸 El hit-test del CENTRO de cada uno no alcanza: dos pasos ocultos del
+      // asistente de Reclamos pueden pasarlo cada uno por su lado. Lo que decide
+      // es el punto medio del SOLAPE: si ahí no está ninguno de los dos, lo que
+      // se ve pintado es otra cosa y no hay encimado que reportar.
+      const mx = (Math.max(a.r.left, b.r.left) + Math.min(a.r.right, b.r.right)) / 2;
+      const my = (Math.max(a.r.top, b.r.top) + Math.min(a.r.bottom, b.r.bottom)) / 2;
+      if (my >= 0 && my <= VH) {
+        const arriba = document.elementFromPoint(Math.min(Math.max(mx, 1), VW - 1), Math.min(Math.max(my, 1), VH - 1));
+        const deAlguno = arriba && [a.el, b.el].some((x) => x === arriba || x.contains(arriba) || arriba.contains(x));
+        if (!deAlguno) continue;
+      }
       encimados.push({ a: txt(a.el).slice(0,26), b: txt(b.el).slice(0,26), px: Math.round(area), zona });
       break;
     }

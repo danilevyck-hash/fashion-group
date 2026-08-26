@@ -267,7 +267,7 @@ export default function SyncNowButton({
             : "Actualizando…"
           : "Actualizar ahora"}
       </button>
-      {subtext && <span className="mt-0.5 text-[11px] text-gray-400">{subtext}</span>}
+      {subtext && <span className="mt-0.5 text-[12px] text-gray-400">{subtext}</span>}
 
       {esMenu && menuOpen && (
         <div

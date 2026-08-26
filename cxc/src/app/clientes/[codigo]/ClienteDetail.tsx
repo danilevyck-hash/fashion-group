@@ -158,7 +158,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
       <AppHeader module="Clientes" breadcrumbs={[{ label: cliente.codigo }]} />
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
         <div className="mb-2">
-          <Link href="/clientes" className="text-xs text-gray-500 hover:text-black transition">← Clientes</Link>
+          <Link href="/clientes" className="inline-flex min-h-[44px] items-center text-xs text-gray-500 hover:text-black transition">← Clientes</Link>
         </div>
 
         {/* Header */}
@@ -186,7 +186,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             {canEdit && !editing && (
               <button
                 onClick={() => setEditing(true)}
-                className="bg-black text-white text-sm rounded-md px-4 py-2 active:scale-[0.97] transition"
+                className="inline-flex min-h-[44px] items-center justify-center bg-black text-white text-sm rounded-md px-4 py-2 active:scale-[0.97] transition"
               >
                 Editar contacto
               </button>
@@ -228,7 +228,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 <button
                   onClick={save}
                   disabled={saving}
-                  className="bg-black text-white text-sm rounded-md px-4 py-2 active:scale-[0.97] transition disabled:opacity-50"
+                  className="inline-flex min-h-[44px] items-center justify-center bg-black text-white text-sm rounded-md px-4 py-2 active:scale-[0.97] transition disabled:opacity-50"
                 >
                   {saving ? "Guardando..." : "Guardar"}
                 </button>
@@ -294,7 +294,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               )}
               <Link
                 href={verEnCxcHref}
-                className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                className="relative text-xs text-blue-600 hover:underline whitespace-nowrap after:absolute after:-inset-y-[13px] after:inset-x-0 after:content-['']"
               >
                 Ver en Cuentas por Cobrar →
               </Link>
@@ -336,7 +336,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                   <td colSpan={5} className="py-1">
                     <button
                       onClick={() => setShowInactivas(v => !v)}
-                      className="text-xs text-gray-400 hover:text-gray-600 transition"
+                      className="inline-flex min-h-[44px] items-center text-xs text-gray-400 hover:text-gray-600 transition"
                     >
                       {showInactivas ? "▾" : "▸"} {empresasInactivas.length}{" "}
                       {empresasInactivas.length === 1 ? "empresa sin actividad" : "empresas sin actividad"}
@@ -415,7 +415,7 @@ function Field({ label, value, tabularNums, fullWidth, href }: { label: string; 
       <div className="text-xs uppercase tracking-[0.05em] text-gray-400">{label}</div>
       <div className={`text-sm mt-0.5 ${tabularNums ? "tabular-nums" : ""} ${value ? "text-gray-900" : "text-gray-400"}`}>
         {value && href ? (
-          <a href={href} className="text-blue-600 hover:underline">{value}</a>
+          <a href={href} className="relative text-blue-600 hover:underline after:absolute after:-inset-y-[14px] after:inset-x-0 after:content-['']">{value}</a>
         ) : (value || "—")}
       </div>
     </div>

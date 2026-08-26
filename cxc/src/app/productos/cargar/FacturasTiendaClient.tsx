@@ -451,7 +451,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
       {(!result || result.sinFecha) && (
         <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-stone-200 bg-white p-4">
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+            <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-stone-500">
               Mes de la factura (temporada)
             </label>
             <select
@@ -463,7 +463,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500">Año</label>
+            <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-stone-500">Año</label>
             <input
               type="number" min={2020} max={2099} value={anio}
               onChange={(e) => { setAnio(e.target.value); reprocess({ anio: e.target.value }); }}
@@ -517,7 +517,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
 
           {/* Barra de acciones */}
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Salida</span>
+            <span className="text-[12px] font-semibold uppercase tracking-wide text-stone-500">Salida</span>
             <span className="flex-1 text-[13px] text-stone-600">
               {archivos === 1
                 ? "1 archivo (hoja “upload”)"
@@ -582,7 +582,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
                 <thead>
                   <tr>
                     {["Marca en esta factura", "Estado", "Divisor", "Extra $", "Redondeo", ""].map((h, i) => (
-                      <th key={i} className="border-b-[1.5px] border-stone-300 px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
+                      <th key={i} className="border-b-[1.5px] border-stone-300 px-2.5 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -595,8 +595,8 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
                         <td className="border-b border-stone-100 px-2.5 py-2 font-semibold text-stone-900">{label}</td>
                         <td className="border-b border-stone-100 px-2.5 py-2">
                           {saved
-                            ? <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Guardada</span>
-                            : <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Sin guardar</span>}
+                            ? <span className="rounded bg-emerald-50 px-2 py-0.5 text-[12px] font-semibold text-emerald-700">Guardada</span>
+                            : <span className="rounded bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-700">Sin guardar</span>}
                         </td>
                         <td className="border-b border-stone-100 px-2.5 py-2">
                           <input
@@ -668,13 +668,13 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
                     const amber = d.revisar !== null;
                     return (
                       <tr key={ri} className={amber ? "bg-amber-50/60 hover:bg-amber-50" : "hover:bg-teal-50"} title={d.revisar ?? undefined}>
-                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px]">{String(d.cols["Código *"])}</td>
-                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px] break-all">{String(d.cols["Código Barra *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[12px]">{String(d.cols["Código *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[12px] break-all">{String(d.cols["Código Barra *"])}</td>
                         <td className="border-b border-stone-100 px-2 py-2">
                           {String(d.cols["Descripción *"])}
-                          {amber && <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800" title={d.revisar ?? ""}>revisar</span>}
+                          {amber && <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[12px] font-semibold text-amber-800" title={d.revisar ?? ""}>revisar</span>}
                         </td>
-                        <td className="w-px whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right font-mono text-[11px] text-stone-400">
+                        <td className="w-px whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right font-mono text-[12px] text-stone-400">
                           {calcCell(ri, d)}
                         </td>
                         <td className="whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right">
@@ -725,7 +725,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
 
 // ── Estilos ──────────────────────────────────────────────────────────────────
 const inputCls =
-  "w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "w-full min-h-[44px] rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 const miniInputCls =
   "h-8 w-20 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 const miniSelectCls =
@@ -733,7 +733,7 @@ const miniSelectCls =
 
 function Th({ children, narrow }: { children: React.ReactNode; narrow?: boolean }) {
   return (
-    <th className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"}`}>
+    <th className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-stone-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"}`}>
       {children}
     </th>
   );

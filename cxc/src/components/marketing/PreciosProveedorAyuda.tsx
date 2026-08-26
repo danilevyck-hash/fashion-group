@@ -552,7 +552,7 @@ export default function PreciosProveedorAyuda() {
       >
         <span
           aria-hidden
-          className="inline-flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border border-current text-[10px] font-bold leading-none"
+          className="inline-flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border border-current text-[12px] font-bold leading-none"
         >
           ?
         </span>

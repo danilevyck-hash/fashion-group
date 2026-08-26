@@ -92,7 +92,8 @@ function Chip({
       <span
         className="caja-mono"
         style={{
-          fontSize: 11,
+          // 12 y no 11: por debajo no se lee en un teléfono (barrido 26-ago).
+          fontSize: 12,
           color: active ? "rgba(255,255,255,0.7)" : "var(--caja-fg-muted)",
           fontWeight: 400,
         }}

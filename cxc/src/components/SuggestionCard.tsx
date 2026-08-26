@@ -16,7 +16,7 @@ export default function SuggestionCard({ suggestion, onDismiss }: Props) {
         {suggestion.actionLabel && suggestion.onAction && (
           <button
             onClick={suggestion.onAction}
-            className="mt-2 text-xs bg-black text-white px-4 py-1.5 rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all"
+            className="mt-2 inline-flex min-h-[44px] items-center justify-center text-xs bg-black text-white px-4 py-1.5 rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all"
           >
             {suggestion.actionLabel}
           </button>
@@ -24,7 +24,7 @@ export default function SuggestionCard({ suggestion, onDismiss }: Props) {
       </div>
       <button
         onClick={() => onDismiss(suggestion.id)}
-        className="text-gray-300 hover:text-gray-500 transition flex-shrink-0 mt-0.5"
+        className="relative text-gray-300 hover:text-gray-500 transition flex-shrink-0 mt-0.5 after:absolute after:-inset-[15px] after:content-['']"
         aria-label="Cerrar sugerencia"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

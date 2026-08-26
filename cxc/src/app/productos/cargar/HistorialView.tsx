@@ -77,16 +77,16 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
                     <div className="text-[13px] font-medium text-stone-900 truncate">
                       {r.marca || "—"}
                     </div>
-                    <div className="text-[11px] text-stone-500 truncate">
+                    <div className="text-[12px] text-stone-500 truncate">
                       {r.empresa || "—"} · {r.usuario}
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="text-[13px] font-medium tabular-nums text-stone-900">${fmtMoney(r.total_costo)}</div>
-                    <div className="text-[11px] text-stone-500">{fmtFecha(r.created_at)}</div>
+                    <div className="text-[12px] text-stone-500">{fmtFecha(r.created_at)}</div>
                   </div>
                 </div>
-                <div className="mt-1.5 flex gap-4 text-[11px] text-stone-500">
+                <div className="mt-1.5 flex gap-4 text-[12px] text-stone-500">
                   <span>Estilos <span className="tabular-nums text-stone-700">{r.cantidad_estilos.toLocaleString()}</span></span>
                   <span>Unidades <span className="tabular-nums text-stone-700">{r.total_unidades.toLocaleString()}</span></span>
                 </div>
@@ -101,7 +101,7 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
                   {["Fecha", "Usuario", "Empresa", "Marca", "Estilos", "Unidades", "Total costo"].map((h, i) => (
                     <th
                       key={h}
-                      className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-1.5 xl:px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-600 ${
+                      className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-1.5 xl:px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-stone-600 ${
                         i >= 4 ? "text-right" : "text-left"
                       }`}
                     >

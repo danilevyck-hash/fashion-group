@@ -358,7 +358,7 @@ function ChipPill({ active, onClick, children }: { active: boolean; onClick: () 
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-medium transition",
+        "inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-medium transition",
         active ? "border-teal-700 bg-teal-700 text-white" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
       )}
     >
