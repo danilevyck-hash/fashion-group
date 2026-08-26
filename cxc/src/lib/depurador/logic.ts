@@ -61,6 +61,19 @@ export interface ProcessResult {
   /** true si el archivo NO trae columna de CANTIDAD: no se filtró nada, porque sin
    *  esa columna TODO daría 0 y el Excel saldría vacío. */
   sinColumnaCantidad: boolean;
+  /** Marcas del archivo que el catálogo NO conoce. `reclassMarca` las manda a
+   *  "Otros", y "Otros" no tiene fórmula de precio → esos productos salen SIN
+   *  PRECIO. Antes eso pasaba EN SILENCIO: nadie se enteraba hasta abrir el
+   *  Excel. Ahora se dice en pantalla, con el conteo de productos afectados.
+   *
+   *  ⚠️ NO frena la carga: el producto sigue saliendo, igual que hoy. Lo único
+   *  que cambia es que se dice. Los SERVICIOS (Ajuste de Precio, Mercancía
+   *  Defectuosa…) no cuentan: su marca "Otros" es a propósito.
+   *
+   *  La marca va CRUDA, tal cual la escribió el proveedor — es el dato que hay
+   *  que buscar en el archivo o darle de alta en MARCAS_CATALOGO.
+   *  Ordenadas de más productos a menos. */
+  marcasDesconocidas: { marca: string; productos: number }[];
 }
 
 /* ============ CONFIG / CONSTANTES ============ */
@@ -398,6 +411,9 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
   // vaciaría la plantilla entera. Sin columna, no se filtra nada.
   const hayColumnaCantidad = col.cant !== -1;
   let omitidosSinCantidad = 0;
+  // Marcas que el catálogo no conoce → el producto sale sin precio. Se cuentan
+  // DESPUÉS del filtro de "sin cantidad": lo que no entra al Excel no se avisa.
+  const desconocidas = new Map<string, { marca: string; productos: number }>();
 
   const out: ProcessedRow[] = [];
   for (const [ref, items] of groups) {
@@ -445,6 +461,17 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
     if (hayColumnaCantidad && !servicio && qtyTotal === 0) {
       omitidosSinCantidad++;
       continue;
+    }
+
+    // Marca fuera del catálogo: cae a "Otros" y sale SIN PRECIO. Se anota para
+    // decirlo en pantalla (no frena nada). El servicio no cuenta: su "Otros" es
+    // intencional. Va la marca CRUDA del proveedor, que es lo accionable.
+    if (!servicio && marcaOut === "Otros") {
+      const cruda = String(first.marca ?? "").trim() || "(sin marca)";
+      const k = marcaKey(cruda);
+      const e = desconocidas.get(k) ?? { marca: cruda, productos: 0 };
+      e.productos++;
+      desconocidas.set(k, e);
     }
 
     // Código de barra obligatorio: si no hay, usar el código del producto (Tarea 3.8).
@@ -495,7 +522,15 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
     throw new Error(`Ninguno de los ${omitidosSinCantidad} artículos del archivo trae cantidad, ` +
       "así que la plantilla saldría vacía. Revisa que la columna CANTIDAD tenga números.");
   }
-  return { rows: out, warnings, omitidosSinCantidad, sinColumnaCantidad: !hayColumnaCantidad };
+  return {
+    rows: out,
+    warnings,
+    omitidosSinCantidad,
+    sinColumnaCantidad: !hayColumnaCantidad,
+    marcasDesconocidas: [...desconocidas.values()].sort(
+      (a, b) => b.productos - a.productos || a.marca.localeCompare(b.marca)
+    ),
+  };
 }
 
 /** Reescribe el EAN de una fila a la talla elegida en el dropdown (inmutable). */
@@ -636,6 +671,27 @@ function empresaDeMarcaCatalogo(marca: string): string {
 // Lista FIJA de las marcas del catálogo (CK/TH/KL). Es lógica de negocio y se
 // queda en código (las descripciones de cada marca viven en la tabla
 // depurador_descripciones). Ampliar aquí si el proveedor agrega marcas.
+//
+// ── 26-ago-2026: entran 7 líneas que el proveedor ya factura y el sistema no
+// conocía. Una marca que no está acá cae a "Otros" en reclassMarca, y "Otros"
+// no tiene fórmula de precio: el producto salía SIN PRECIO. Karl Lagerfeld se
+// agregó después que CK y TH y nunca se le completó el juego — de sus 9 líneas
+// el sistema conocía 4. Evidencia (reporte del proveedor
+// FASHION_WEAR_Y_VISTANA_EN_DETALLES, hoja FACTURACION 2022-2026 + hojas de
+// pedidos pendientes, y ventas reales en switch_factura_lineas):
+//
+//   KL Jeans           facturado $844.80 (2026)
+//   KL Legwear         6 pedidos pendientes · 96 unidades
+//   KL Other           facturado $112.00 (2026) · 18 pedidos · 50 unidades
+//   KL Underwear       17 pedidos pendientes · 96 unidades
+//   KL Display & Promo facturado $27.00 (2024)
+//   TH License         facturado $158,464.45 (2022-2026)
+//   TH Display & Promo 47 líneas de venta en Switch · 2 filas en un archivo
+//                      real del proveedor (la ÚNICA marca fuera de catálogo
+//                      que aparece en los archivos _TXT que come el Depurador)
+//
+// Dar de alta la marca NO le pone precio: le abre la fila en Configuración para
+// que se le cargue la fórmula. Sin fórmula el precio sigue vacío, a propósito.
 const MARCAS_CATALOGO: string[] = [
   "CK Accessories",
   "CK Display & Promo",
@@ -650,13 +706,20 @@ const MARCAS_CATALOGO: string[] = [
   "CK Underwear",
   "CK Womenswear",
   "KL Accessories",
+  "KL Display & Promo",
   "KL Footwear",
+  "KL Jeans",
+  "KL Legwear",
   "KL Menswear",
+  "KL Other",
+  "KL Underwear",
   "KL Womenswear",
   "TH Accessories",
+  "TH Display & Promo",
   "TH Footwear",
   "TH Kids",
   "TH Legwear",
+  "TH License",
   "TH Menswear",
   "TH Other",
   "TH Swimwear",
