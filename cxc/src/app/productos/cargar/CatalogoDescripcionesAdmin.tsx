@@ -142,7 +142,7 @@ export default function CatalogoDescripcionesAdmin() {
             <div key={g.marca} className="mb-4 overflow-hidden rounded-lg border border-stone-200 bg-white">
               <div className="border-b border-stone-200 bg-stone-50 px-3.5 py-2 text-[13px] font-bold text-stone-900">
                 {g.marca}
-                <span className="ml-2 text-[11px] font-normal text-stone-400">
+                <span className="ml-2 text-[12px] font-normal text-stone-400">
                   ({g.items.filter((r) => r.activa).length} activas de {g.items.length})
                 </span>
               </div>
@@ -156,13 +156,13 @@ export default function CatalogoDescripcionesAdmin() {
                       {r.descripcion}
                     </span>
                     {r.origen === "aprobada" ? (
-                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[12px] font-semibold text-amber-700">
                         Aprobada
                         {r.aprobada_por ? ` por ${r.aprobada_por}` : ""}
                         {r.aprobada_at ? ` · ${fmtDate(r.aprobada_at.slice(0, 10))}` : ""}
                       </span>
                     ) : (
-                      <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-500">
+                      <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[12px] font-semibold text-stone-500">
                         Catálogo original
                       </span>
                     )}

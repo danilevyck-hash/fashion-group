@@ -322,7 +322,7 @@ function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }:
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs font-medium text-stone-500">{label}</span>
         {tags.map((t) => (
-          <span key={t} className="text-[10px] font-medium text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded-full">{t}</span>
+          <span key={t} className="text-[12px] font-medium text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded-full">{t}</span>
         ))}
       </div>
       <div className={`text-2xl font-bold tabular-nums mt-1 ${valueClass ?? "text-stone-900"}`}>{value}</div>
@@ -377,7 +377,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
           ) : (
             data.cxc.topClientes.map((c) => (
               <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/admin" className={FILA_ALERTA}>
-                <span className={`${NOMBRE_ALERTA} truncate`}>{c.nombre}<span className="text-stone-400 text-[11px]"> · {c.empresa}</span></span>
+                <span className={`${NOMBRE_ALERTA} truncate`}>{c.nombre}<span className="text-stone-400 text-[12px]"> · {c.empresa}</span></span>
                 <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(c.saldo)}</span>
               </Link>
             ))
@@ -391,7 +391,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
           ) : (
             data.cxp.topProveedores.map((p) => (
               <Link key={`${p.empresa}-${p.nombre}`} href="/proveedores" className={FILA_ALERTA}>
-                <span className={`${NOMBRE_ALERTA} truncate`}>{p.nombre}<span className="text-stone-400 text-[11px]"> · {p.empresa}</span></span>
+                <span className={`${NOMBRE_ALERTA} truncate`}>{p.nombre}<span className="text-stone-400 text-[12px]"> · {p.empresa}</span></span>
                 <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(p.saldo)}</span>
               </Link>
             ))
@@ -405,7 +405,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
           ) : (
             data.reclamos.antiguos.map((r) => (
               <Link key={r.id} href={`/reclamos?id=${r.id}`} className={FILA_ALERTA}>
-                <span className={`${NOMBRE_ALERTA} truncate`}>{r.nro}<span className="text-stone-400 text-[11px]"> · {r.empresa}</span></span>
+                <span className={`${NOMBRE_ALERTA} truncate`}>{r.nro}<span className="text-stone-400 text-[12px]"> · {r.empresa}</span></span>
                 <span className="text-sm font-semibold text-amber-600 tabular-nums shrink-0">{r.dias}d</span>
               </Link>
             ))
@@ -421,7 +421,7 @@ function AlertCard({ title, href, linkLabel, count, children }: { title: string;
     <div className="rounded-[14px] border border-stone-200 bg-white p-4 flex flex-col">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-semibold text-stone-700">{title}</h3>
-        {count > 0 && <span className="text-[11px] font-bold text-white bg-stone-900 rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center">{count}</span>}
+        {count > 0 && <span className="text-[12px] font-bold text-white bg-stone-900 rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center">{count}</span>}
       </div>
       <div className="flex-1">{children}</div>
       {/* "Ir a CXC →" medía 18px de alto. self-start + min-h-[44px] lo lleva a

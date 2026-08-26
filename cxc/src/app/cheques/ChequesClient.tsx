@@ -129,7 +129,7 @@ function ChequeCalendarioPill({
           usado (y el globo de detalle lo muestra entero). */}
       <button ref={pillRef} onClick={onAbrir}
         title={`N° ${cheque.numero_cheque} · $${fmt(cheque.monto)} · ${cheque.cliente}`}
-        className={`w-full text-left text-xs px-1.5 py-0.5 rounded ${pillColor(ve)}`}>
+        className={`flex min-h-[44px] w-full flex-col justify-center text-left text-xs px-1.5 py-0.5 rounded ${pillColor(ve)}`}>
         <span className="flex items-center gap-1 min-w-0">
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ve === "depositado" ? "bg-gray-400" : ve === "pendiente" ? "bg-emerald-500" : "bg-red-500"}`} />
           <span className="truncate">{cheque.cliente}</span>

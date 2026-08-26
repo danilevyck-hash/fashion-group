@@ -180,7 +180,7 @@ export function ReportePorProyectoView() {
         {hayFiltros && (
           <button
             onClick={limpiarFiltros}
-            className="px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-50"
+            className="inline-flex min-h-[44px] items-center px-3 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-50"
           >
             Limpiar
           </button>
@@ -189,7 +189,7 @@ export function ReportePorProyectoView() {
         <button
           onClick={exportar}
           disabled={loading || items.length === 0}
-          className="ml-auto px-3 py-1.5 rounded-md text-sm font-medium border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50"
+          className="ml-auto inline-flex min-h-[44px] items-center px-3 py-1.5 rounded-md text-sm font-medium border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50"
         >
           Exportar Excel
         </button>

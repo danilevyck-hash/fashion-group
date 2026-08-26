@@ -76,9 +76,9 @@ export default function ReglasView() {
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">Caso</th>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">Cómo se detecta</th>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">Talla elegida</th>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Caso</th>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Cómo se detecta</th>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Talla elegida</th>
               </tr>
             </thead>
             <tbody>
@@ -112,15 +112,15 @@ export default function ReglasView() {
           <h3 className="text-[13px] font-bold uppercase tracking-wide text-teal-800">Reglas de normalización ({normEntries.length})</h3>
           <input
             value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…"
-            className="w-48 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+            className="w-48 min-h-[44px] rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
           />
         </div>
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">Texto sucio</th>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">Texto limpio</th>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Texto sucio</th>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Texto limpio</th>
               </tr>
             </thead>
             <tbody>
@@ -165,7 +165,7 @@ export default function ReglasView() {
                 const ds = descripcionesDeMarca(catalogo, c.marca);
                 return (
                   <div key={c.marca} className="rounded-lg border border-stone-200 bg-white px-3 py-2">
-                    <div className="text-[13px] font-semibold text-stone-900">{c.marca} <span className="text-[11px] font-normal text-stone-400">({ds.length})</span></div>
+                    <div className="text-[13px] font-semibold text-stone-900">{c.marca} <span className="text-[12px] font-normal text-stone-400">({ds.length})</span></div>
                     <div className="mt-1 text-[12px] leading-snug text-stone-500">{ds.join(" · ")}</div>
                   </div>
                 );

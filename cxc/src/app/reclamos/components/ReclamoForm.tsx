@@ -166,7 +166,7 @@ export default function ReclamoForm({
         <div className="max-w-xs">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">Empresa *</label>
-            <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} onBlur={() => handleBlur("empresa")} className={`border-b ${fieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none bg-transparent`}>
+            <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} onBlur={() => handleBlur("empresa")} className={`border-b ${fieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none bg-transparent`}>
               <option value="">Seleccionar...</option>
               {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
             </select>
@@ -183,18 +183,18 @@ export default function ReclamoForm({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-gray-500">N° Factura *</label>
-              <input type="text" value={fFactura} onChange={(e) => setFFactura(e.target.value)} onBlur={() => handleBlur("factura")} placeholder="Ej. 3000012593" className={`border-b ${fieldError("factura", fFactura) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
+              <input type="text" value={fFactura} onChange={(e) => setFFactura(e.target.value)} onBlur={() => handleBlur("factura")} placeholder="Ej. 3000012593" className={`border-b ${fieldError("factura", fFactura) ? "border-red-400" : "border-gray-200"} py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none`} />
               {fieldError("factura", fFactura) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs text-gray-500">Fecha *</label>
-              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleBlur("fecha")} className={`border-b ${fieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
+              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleBlur("fecha")} className={`border-b ${fieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none`} />
               {fieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             {!esActiveShoes(fEmpresa) && (
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-500">N° Pedido *</label>
-                <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} onBlur={() => handleBlur("pedido")} placeholder="Ej. PO-2026-001" className={`border-b ${fieldError("pedido", fPedido) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
+                <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} onBlur={() => handleBlur("pedido")} placeholder="Ej. PO-2026-001" className={`border-b ${fieldError("pedido", fPedido) ? "border-red-400" : "border-gray-200"} py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none`} />
                 {fieldError("pedido", fPedido) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
               </div>
             )}
@@ -247,40 +247,40 @@ export default function ReclamoForm({
             <tbody>
               {fItems.map((item, idx) => (
                 <tr key={idx} className="border-b border-gray-200">
-                  <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
-                  <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
+                  <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none" /></td>
+                  <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none" /></td>
                   <td className="py-2 pr-1">
                     {(!TALLAS.includes(item.talla) && item.talla !== "") ? (
                       <div className="flex items-center gap-1">
-                        <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 py-1 text-sm outline-none" style={{ minWidth: 50 }} />
+                        <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none" style={{ minWidth: 50 }} />
                         <button onClick={() => updateItem(idx, "talla", "")} className="text-gray-300 hover:text-black text-xs">×</button>
                       </div>
                     ) : (
-                      <select value={item.talla} onChange={(e) => { if (e.target.value === "Otros") updateItem(idx, "talla", " "); else updateItem(idx, "talla", e.target.value); }} className="border-b border-gray-200 py-1 text-sm outline-none bg-transparent" style={{ minWidth: 60 }}>
+                      <select value={item.talla} onChange={(e) => { if (e.target.value === "Otros") updateItem(idx, "talla", " "); else updateItem(idx, "talla", e.target.value); }} className="border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none bg-transparent" style={{ minWidth: 60 }}>
                         <option value="">—</option>
                         {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                     )}
                   </td>
                   <td className="py-2 pr-1">
-                    <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b py-1 text-sm outline-none bg-transparent ${item.genero ? "border-gray-200 text-black" : "border-gray-200 text-gray-400"}`} style={{ minWidth: 80 }}>
+                    <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b min-h-[44px] xl:min-h-0 py-1 text-sm outline-none bg-transparent ${item.genero ? "border-gray-200 text-black" : "border-gray-200 text-gray-400"}`} style={{ minWidth: 80 }}>
                       <option value="">Género…</option>
                       {/* value = lo que se GUARDA (inglés, lo exige el CHECK de la base); el texto = lo que se LEE. */}
                       {GENEROS.map((g) => <option key={g} value={g}>{generoLabel(g)}</option>)}
                     </select>
                   </td>
-                  <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
-                  <td className="py-2 pr-1"><input type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
+                  <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full min-w-[44px] border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none text-right" /></td>
+                  <td className="py-2 pr-1"><input type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full min-w-[44px] border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none text-right" /></td>
                   <td className="py-2 pr-1">
                     {addingMotivo === idx ? (
                       <div className="flex items-center gap-1">
-                        <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-1 text-sm outline-none" autoFocus
+                        <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none" autoFocus
                           onKeyDown={(e) => { if (e.key === "Enter" && newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateItem(idx, "motivo", newMotivoText.trim()); setNewMotivoText(""); setAddingMotivo(null); } }} />
                         <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-400 hover:text-black">OK</button>
                         <button onClick={() => { setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-300 hover:text-black">x</button>
                       </div>
                     ) : (
-                      <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingMotivo(idx); setNewMotivoText(""); } else updateItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">
+                      <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingMotivo(idx); setNewMotivoText(""); } else updateItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none bg-transparent">
                         <option value="">--</option>
                         {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
                         <option value="__add__">+ Agregar motivo</option>
@@ -392,7 +392,7 @@ export default function ReclamoForm({
         <div className="mb-10">
           <div className="text-sm font-semibold text-gray-900 mb-4">Notas</div>
           <div className="max-w-2xl">
-            <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} placeholder="Notas adicionales sobre el reclamo..." className="w-full border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none resize-none" />
+            <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} placeholder="Notas adicionales sobre el reclamo..." className="w-full border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none resize-none" />
           </div>
         </div>
       </AccordionContent>

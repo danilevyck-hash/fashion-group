@@ -33,7 +33,7 @@ export function ReportesTabs() {
           <button
             key={t.value}
             onClick={() => setTab(t.value)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`inline-flex min-h-[44px] items-center px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t.value
                 ? "border-fuchsia-500 text-fuchsia-700"
                 : "border-transparent text-gray-500 hover:text-gray-800"

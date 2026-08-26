@@ -94,7 +94,7 @@
 /* Eyebrow / section label */
 .skin-caja .caja-eyebrow {
   font-family: var(--caja-font-sans);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.12em;

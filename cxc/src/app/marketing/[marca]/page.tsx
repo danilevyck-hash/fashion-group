@@ -245,7 +245,7 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
                           }
                           disabled={bajando === zipClave}
                           title={`Bajar el ZIP de ${etiqueta}`}
-                          className="rounded-md border border-gray-200 bg-white px-2.5 min-h-[44px] inline-flex items-center justify-center text-xs text-gray-600 hover:text-gray-900 hover:border-gray-400 active:scale-[0.97] transition disabled:opacity-40"
+                          className="rounded-md border border-gray-200 bg-white px-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-xs text-gray-600 hover:text-gray-900 hover:border-gray-400 active:scale-[0.97] transition disabled:opacity-40"
                         >
                           {bajando === zipClave ? "Armando…" : "ZIP"}
                         </button>
