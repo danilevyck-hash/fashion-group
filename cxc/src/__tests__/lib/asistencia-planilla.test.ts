@@ -372,21 +372,23 @@ describe("🔴 La frontera de las 18:00 es UNA sola y decide las tres cosas", ()
     expect(c.excedenteMin).toBe(0);           // ⬅️ la condición (b) no se cumple
   });
 
-  it("con las dos condiciones sí: 4 h extra, y lo que pasa de 3 cae de noche", () => {
+  it("🔴 4 h extra con 3 de noche: TODO lo nocturno va al 1,50 y el excedente queda en 0", () => {
     // 17:00 → 21:00. Diurno 17:00-18:00 = 60. Nocturno = 180.
-    // Pasa del tope de 3 h por 60 minutos, y esos 60 son nocturnos.
+    // Antes se apartaban 60 al 2,625 por pasar el tope de 3 h. Ya no: la
+    // contadora manda esos minutos al 1,50. Ver `clasificarDia`.
     const c = dia(["08:00", "12:00", "12:30", "21:00"]);
     expect(c.extraDiurnoMin).toBe(60);
-    expect(c.extraNocturnoMin).toBe(120);
-    expect(c.excedenteMin).toBe(60);
+    expect(c.extraNocturnoMin).toBe(180);
+    expect(c.excedenteMin).toBe(0);
     expect(c.extraDiurnoMin + c.extraNocturnoMin + c.excedenteMin).toBe(240);
   });
 
-  it("el tope del excedente sale de las reglas, no del código", () => {
+  it("🔴 mover el tope del excedente en Configuración YA NO mueve un solo minuto", () => {
+    // El parámetro sigue guardado y validado, pero no calcula nada: con el tope
+    // en 1 hora el reparto tiene que salir IDÉNTICO al de arriba.
     const c = dia(["08:00", "12:00", "12:30", "21:00"], { ...R, excedenteHorasDia: 1 });
-    // Pasa del tope por 180 min, pero solo 180 son nocturnos.
-    expect(c.excedenteMin).toBe(180);
-    expect(c.extraNocturnoMin).toBe(0);
+    expect(c.excedenteMin).toBe(0);
+    expect(c.extraNocturnoMin).toBe(180);
     expect(c.extraDiurnoMin).toBe(60);
   });
 

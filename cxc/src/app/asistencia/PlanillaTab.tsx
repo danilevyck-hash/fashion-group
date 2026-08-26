@@ -813,7 +813,7 @@ function Tarjeta({
           {linea("Salario quincenal", d.salarioQuincenal)}
           {linea(`Horas extra 1.25 (${aHoras(h.extraDiurnoMin)} h)`, d.extraDiurno)}
           {linea(`Horas extra 1.50 (${aHoras(h.extraNocturnoMin)} h)`, d.extraNocturno)}
-          {linea(`Excedente 2.625 (${aHoras(h.excedenteMin)} h)`, d.excedente)}
+          {linea(`Excedente (${aHoras(h.excedenteMin)} h — no se usa, va al 1.50)`, d.excedente)}
           {linea(`Domingos (${aHoras(h.domingoMin)} h)`, d.domingos)}
           {linea(`Feriados (${aHoras(h.feriadoMin)} h)`, d.feriados)}
           {/* 🔴 LAS DOS ETIQUETAS SALEN DE `planilla.ts`, y no se arman acá.

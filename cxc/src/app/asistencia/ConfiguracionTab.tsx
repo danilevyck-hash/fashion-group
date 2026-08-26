@@ -1256,7 +1256,7 @@ export default function ConfiguracionTab() {
 
                 <Bloque
                   titulo="Excedente en jornada nocturna o mixta"
-                  nota="Se guarda, pero TODAVÍA NO SE USA para calcular nada. Aplica a partir de la cuarta hora extra del día y solo pasada la hora de corte de arriba — las dos condiciones a la vez. La hora es la MISMA de arriba, por eso no se pide otra vez. Ojo: no es lo mismo que la columna &quot;Exedente de 9 horas&quot; del Excel viejo."
+                  nota="Se guarda, pero NO SE USA para calcular: la contadora paga esos minutos × 1.50, junto con el resto de la hora extra de noche, y deja su columna en $0.00. Los dos campos quedan acá por si algún día se vuelve a usar; hoy cambiarlos no mueve un centavo."
                 >
                   <Campo label="Desde cuántas horas extra al día" ayuda="3 quiere decir que aplica desde la cuarta hora extra."
                     sufijo="horas" valor={form.excedenteHorasDia}

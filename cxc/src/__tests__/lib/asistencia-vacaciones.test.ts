@@ -268,10 +268,13 @@ describe("🔴 EL INTERRUPTOR, EN DÓLARES", () => {
     expect(conVac.dinero!.ausencias).toBe(0);
   });
 
-  it("🩸 y SIN la vacación ese mismo jueves sería una AUSENCIA de $39,27", () => {
+  it("🩸 y SIN la vacación ese mismo jueves sería una AUSENCIA de $36,96", () => {
     // Es lo que prueba que el cero de arriba lo produce la vacación. Sin este
     // caso, un motor que no descuenta nada nunca pasaría en verde.
-    expect(lineaDe().dinero!.ausencias).toBe(39.27);
+    // 🔑 8 h × 4,62 = 36,96. Eran $39,27 cuando la ausencia se valuaba con la
+    // jornada del horario (8,5 h); desde el 25-ago-2026 son 8 h fijas para
+    // todos, que es lo que descuenta la contadora. Ver `MIN_DIA_AUSENCIA`.
+    expect(lineaDe().dinero!.ausencias).toBe(36.96);
   });
 
   it("SIN MARCAR se paga TAMBIÉN si la persona marcó ese día — las marcas no la penalizan", () => {
