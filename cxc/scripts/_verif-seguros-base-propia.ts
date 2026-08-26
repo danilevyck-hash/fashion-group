@@ -101,9 +101,18 @@ async function cuadro(claveQ: string, esc: Escenario) {
       servicioProfesional:
         esRodrigo && esc.enPlanilla ? false : servicioProfesionalDeFila(f),
       pagaSeguros: pagaSegurosDeFila(f),
-      // 🔑 EN MEMORIA. Sin `conBase` sale lo que dice la base de verdad (hoy:
-      // nadie tiene base, porque la columna ni existe todavía).
-      baseSeguros: esRodrigo && esc.conBase ? RODRIGO.base : baseSegurosDeFila(f),
+      // 🔑 EN MEMORIA, Y EN LOS DOS SENTIDOS. Para Rodrigo el escenario MANDA:
+      // con `conBase` se le pone la base, y SIN `conBase` se le fuerza a `null`
+      // aunque la fila ya la tenga guardada.
+      //
+      // 🩸 Ese `null` forzado no es un detalle: desde que la base está cargada
+      // en producción (26-ago-2026), leerla de la fila haría que el "antes" y
+      // el "después" fueran el MISMO cuadro y el script informara alegremente
+      // que no se movió nada. Un instrumento que compara algo contra sí mismo
+      // siempre da verde, y es la peor forma de fallar.
+      baseSeguros: esRodrigo
+        ? (esc.conBase ? RODRIGO.base : null)
+        : baseSegurosDeFila(f),
       noMarcaReloj: noMarcaRelojDeFila(f),
     });
   }
