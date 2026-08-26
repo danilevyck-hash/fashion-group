@@ -7,7 +7,7 @@
 // Planilla no pueden contradecirse en cuántos minutos llegó tarde alguien.
 
 import { NextRequest, NextResponse } from "next/server";
-import { asistenciaRoles } from "@/lib/asistencia/roles";
+import { asistenciaRoles, aprobacionesRoles } from "@/lib/asistencia/roles";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
@@ -79,6 +79,15 @@ import {
   guardarManuales,
   leerManuales,
 } from "@/lib/asistencia/planilla-server";
+import {
+  armarFilasAprobacion,
+  avisoMigracionAprobaciones,
+  estaAprobado,
+  extrasNoAprobadas,
+  indexarAprobaciones,
+  textoExtraNoAprobada,
+} from "@/lib/asistencia/aprobaciones";
+import { leerAprobaciones } from "@/lib/asistencia/aprobaciones-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -167,7 +176,7 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, correcciones, manualesLeidos, hRes, jRes, vRes, fRes] = await Promise.all([
+    const [{ reglas }, personasDb, correcciones, manualesLeidos, aprRes, hRes, jRes, vRes, fRes] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       // 🔴 ACÁ ES DONDE LA CORRECCIÓN LLEGA AL PAGO. Si no llegara, corregir una
@@ -178,6 +187,12 @@ export async function GET(req: NextRequest) {
       // ⚠️ En un rango libre NO hay montos manuales: se guardan por quincena y
       // repartir un ISR por días sería inventar plata. Se avisa en la respuesta.
       q.claveManuales ? leerManuales(q.claveManuales) : Promise.resolve({ porCodigo: new Map(), faltaMigracion: false }),
+      // 🔴 QUIÉN TIENE LAS HORAS EXTRA AUTORIZADAS. Contadora, textual: *«Sólo
+      // se pagan las horas extras autorizadas y las reportadas por Julio
+      // Garay»*. Sin la tabla corrida devuelve cero filas Y `faltaTabla: true`,
+      // y entonces NO se exige aprobación: se paga todo lo que midió el reloj,
+      // hasta el centavo igual que hasta hoy. Se avisa en `avisos`.
+      leerAprobaciones(q.desde, q.hasta),
       supabaseServer
         .from("asistencia_horarios")
         .select("empleado_codigo, entrada, salida, almuerzo_minutos"),
@@ -336,6 +351,17 @@ export async function GET(req: NextRequest) {
       vacaciones: vRes.filas,
     });
 
+    // ── 🔴 LA APROBACIÓN DE LAS HORAS EXTRA ──────────────────────────────────
+    //
+    // `exigir` es lo único que decide si el candado está puesto, y depende de
+    // que la TABLA exista — no de que haya filas. Con la tabla corrida y sin
+    // nadie aprobado, nadie cobra extras (que es la regla de la contadora y se
+    // dice en ámbar); sin la tabla, se paga todo como hasta hoy.
+    const aprobaciones = indexarAprobaciones(aprRes.filas);
+    const exigirAprobacionExtra = !aprRes.faltaTabla;
+    const extrasAprobadas = new Set<string>();
+    for (const [cod, a] of aprobaciones) if (estaAprobado(a)) extrasAprobadas.add(cod);
+
     const todasLasLineas = armarPlanilla({
       personas: personasVigentes,
       fichas,
@@ -343,6 +369,8 @@ export async function GET(req: NextRequest) {
       jornadaDiariaMin: jornadaDeCodigo,
       reglas,
       empresa,
+      exigirAprobacionExtra,
+      extrasAprobadas,
       // 🔴 Lo que prorratea el sueldo. 1 cuando el período es una quincena.
       factorBase: q.factorBase,
       decidirAMano,
@@ -393,6 +421,31 @@ export async function GET(req: NextRequest) {
         monto: l.dinero!.vacacionesYaPagadas,
       }));
 
+    // ── 🔴 LO QUE NO SE PAGÓ POR FALTA DE APROBACIÓN ─────────────────────────
+    //
+    // Misma forma que `vacacionesNoPagadas`, y por la misma regla de Daniel:
+    // *«lo que un guard rechaza se DICE en pantalla»*. Con nombre y cantidad —
+    // un «hay horas sin aprobar» sin decir de quién obliga a abrir otra
+    // pantalla para saber qué pasó, y eso es lo que hace que un aviso no se lea.
+    const extraSinAprobar = extrasNoAprobadas(lineas);
+
+    // ── LA LISTA DE LA PESTAÑA «APROBACIONES» ────────────────────────────────
+    //
+    // 🔑 SALE DE ACÁ Y NO DE UNA SEGUNDA RUTA. Los minutos ya están calculados
+    // en este mismo request —mismas marcaciones, mismas correcciones, mismo
+    // `clasificarDia`—, así que la pantalla que aprueba y la que paga no pueden
+    // decir números distintos. Rearmarlos aparte es el bug que ya pasó con el
+    // mapa de «por qué no marcó».
+    //
+    // ⚠️ Solo para quien puede aprobar, y solo si se pide: es trabajo de más
+    // para los otros usos de esta ruta.
+    const pidenAprobaciones = sp.get("aprobaciones") === "1";
+    const puedeAprobar = aprobacionesRoles().includes(auth.role) || auth.role === "admin";
+    const filasAprobacion =
+      pidenAprobaciones && puedeAprobar
+        ? armarFilasAprobacion({ lineas, personas: personasVigentes, reglas, aprobaciones })
+        : null;
+
     return NextResponse.json({
       // `quincena` se mantiene con el mismo nombre y forma para no romper a
       // nadie que ya lo lea; `periodo` es lo que la pantalla usa ahora.
@@ -403,6 +456,11 @@ export async function GET(req: NextRequest) {
       lineas,
       totales: totalizar(lineas),
       reglas,
+      // La lista de la pestaña Aprobaciones. `null` para quien no puede aprobar
+      // o cuando no se pidió: no se manda una lista de nombres y horas a quien
+      // no va a hacer nada con ella.
+      aprobaciones: filasAprobacion,
+      puedeAprobar,
       // Los avisos que la pantalla tiene que poder pintar ANTES de que alguien
       // le descuente plata a nadie.
       avisos: {
@@ -457,6 +515,14 @@ export async function GET(req: NextRequest) {
         // nombre, rango y monto: nada se descarta en silencio.
         vacacionesNoPagadas,
         avisoVacacionesNoPagadas: textoVacacionesNoPagadas(vacacionesNoPagadas),
+        // 🔴 Las horas extra que este cuadro NO pagó porque nadie las aprobó.
+        // Con nombre y cantidad: rechazar sí, esconder no.
+        extraSinAprobar,
+        avisoExtraSinAprobar: textoExtraNoAprobada(extraSinAprobar),
+        // Sin la tabla corrida NO se exige aprobación —o sea, se paga todo,
+        // como hasta hoy— pero se dice: quien ya aprobó en su cabeza va a
+        // esperar que lo no aprobado no se pague.
+        faltaMigracionAprobaciones: aprRes.faltaTabla ? avisoMigracionAprobaciones() : null,
         // Sin la tabla corrida NADIE está de vacaciones —o sea, la planilla de
         // siempre— pero se dice: quien ya cargó una en su cabeza va a esperar
         // verla acá.

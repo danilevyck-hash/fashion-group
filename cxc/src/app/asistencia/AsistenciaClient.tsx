@@ -21,7 +21,7 @@
 // `asistencia-una-sola-entrada.test.ts`. Si alguien reintroduce una segunda vía
 // con otro `dispositivo`, el build se pone en rojo.
 
-// ── 🩸 POR QUÉ SON 5 PESTAÑAS Y NO 7 (6-ago-2026 · +Vacaciones el 25-ago) ────
+// ── 🩸 POR QUÉ SON 6 Y NO 7 (6-ago · +Vacaciones 25-ago · +Aprobaciones 26-ago)
 //
 // Eran Reporte · Planilla · Configuración · Horarios · Justificaciones ·
 // Feriados · Cómo funciona. Siete pestañas ya no son una herramienta: son un
@@ -47,9 +47,15 @@
 // días), y meterlas en la misma lista es lo que hacía imposible distinguir
 // quién estuvo enfermo de quién estuvo de vacaciones.
 //
+// ⚠️ La sexta, APROBACIONES, tampoco lo contradice, y por otro motivo: es la
+// única pantalla del módulo donde alguien AUTORIZA algo en vez de cargar un
+// dato, y además **no la ve todo el mundo**. Meter «aprobar las horas extra»
+// adentro de la Planilla habría puesto un botón que mueve el pago de treinta
+// personas en la misma pantalla donde la contadora teclea montos.
+//
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import ReporteTab from "./ReporteTab";
@@ -57,6 +63,8 @@ import PlanillaTab from "./PlanillaTab";
 import ConfiguracionTab from "./ConfiguracionTab";
 import JustificacionesTab from "./JustificacionesTab";
 import VacacionesTab from "./VacacionesTab";
+import AprobacionesTab from "./AprobacionesTab";
+import { APROBACIONES_ROLES } from "@/lib/asistencia/roles";
 import ComoFuncionaTab from "./ComoFuncionaTab";
 
 const TABS = [
@@ -72,11 +80,32 @@ const TABS = [
   // propia cuenta de días—, así que no pueden vivir en la misma lista. Va al
   // lado porque las dos son «lo que pasa con la gente esta quincena».
   ["vacaciones", "Vacaciones"],
+  // 🔴 LA SEXTA, APROBACIONES (26-ago-2026). Se ganó el lugar por lo que se
+  // hace ahí y por QUIÉN lo hace: es la única pantalla del módulo donde una
+  // persona AUTORIZA algo en vez de cargar un dato. Contadora, textual: *«Sólo
+  // se pagan las horas extras autorizadas y las reportadas por Julio Garay»* —
+  // hasta hoy la planilla pagaba todos los minutos del reloj, y por eso nunca
+  // cuadró con ella. Va después de Vacaciones y antes de Configuración: es
+  // trabajo de la quincena, no un ajuste que se deja puesto.
+  //
+  // ⚠️ NO LA VE TODO EL MUNDO. Ver `soloAdmin` abajo y la nota de
+  // `APROBACIONES_ROLES`.
+  ["aprobaciones", "Aprobaciones"],
   // Personas · Horarios · Feriados · Reglas. Se llena una vez y se corrige poco.
   ["configuracion", "Configuración"],
 ] as const;
 
 type Tab = (typeof TABS)[number][0];
+
+/**
+ * Las pestañas que son solo de quien aprueba.
+ *
+ * 🔑 Esto es la NAVEGACIÓN, no el candado — misma división que ya explica
+ * `roles.ts`: esconder la pestaña no cierra nada, el freno de verdad está en
+ * `/api/asistencia/aprobaciones`, que exige el rol. Acá se esconde para que la
+ * contadora y las secretarias no vean un botón que no van a poder usar.
+ */
+const SOLO_APRUEBA: readonly Tab[] = ["aprobaciones"];
 
 export default function AsistenciaClient() {
   // useUrlState usa useSearchParams → necesita un límite de Suspense propio
@@ -94,8 +123,19 @@ function AsistenciaInner() {
   // navegador no cicla por pestañas (convención del sistema). Un valor
   // desconocido en la URL cae en la pestaña por defecto, nunca en blanco.
   const [tabRaw, setTab] = useUrlState<Tab>("tab", "planilla");
-  const tab: Tab = TABS.some(([k]) => k === tabRaw) ? tabRaw : "planilla";
   const [ayuda, setAyuda] = useState(false);
+
+  // 🔑 El rol sale de `sessionStorage`, igual que en `AppHeader` y `useAuth`.
+  // Arranca vacío y se llena en el efecto: en el primer render del servidor no
+  // hay sessionStorage, y pintar la pestaña para después sacarla sería peor que
+  // pintarla un tick tarde.
+  const [rol, setRol] = useState("");
+  useEffect(() => { setRol(sessionStorage.getItem("cxc_role") || ""); }, []);
+  const puedeAprobar = (APROBACIONES_ROLES as readonly string[]).includes(rol);
+
+  const visibles = TABS.filter(([k]) => puedeAprobar || !SOLO_APRUEBA.includes(k));
+  // Una pestaña que no se ve tampoco se abre por la URL: cae en la de siempre.
+  const tab: Tab = visibles.some(([k]) => k === tabRaw) ? tabRaw : "planilla";
 
   return (
     <>
@@ -114,7 +154,7 @@ function AsistenciaInner() {
           {/* El arrastre lateral vive SOLO en las pestañas: si el «?» quedara
               adentro, en el iPhone habría que arrastrar para encontrar la ayuda. */}
           <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
-            {TABS.map(([k, label]) => (
+            {visibles.map(([k, label]) => (
               <button key={k} type="button" onClick={() => { setTab(k); setAyuda(false); }}
                 className={`min-h-[44px] whitespace-nowrap px-3 text-sm transition ${
                   tab === k && !ayuda
@@ -164,6 +204,7 @@ function AsistenciaInner() {
               {tab === "reporte" && <ReporteTab />}
               {tab === "justificaciones" && <JustificacionesTab />}
               {tab === "vacaciones" && <VacacionesTab />}
+              {tab === "aprobaciones" && <AprobacionesTab />}
               {tab === "configuracion" && <ConfiguracionTab />}
             </>
           )}

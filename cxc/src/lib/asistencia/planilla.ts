@@ -965,6 +965,30 @@ export interface LineaPlanilla {
    * puedan diferir.
    */
   quincenalReferencia: number | null;
+  /**
+   * 🔴 LAS HORAS EXTRA QUE MIDIÓ EL RELOJ, SIEMPRE — estén aprobadas o no.
+   *
+   * ⚠️ NO ES LO MISMO QUE `horas.extraDiurnoMin + horas.extraNocturnoMin`, y
+   * ahí está todo el punto: cuando la aprobación no está, `horas` viene con los
+   * extras EN CERO (es lo que hace que no se paguen) y este campo conserva lo
+   * que de verdad marcó la persona. Sin él, lo que falta aprobar sería
+   * exactamente lo que no se puede ver — el descarte en silencio que este
+   * módulo viene sacando desde las vacaciones «ya se le pagó».
+   *
+   * `null` si esa persona no hizo horas extra en el período.
+   * `monto` es `null` cuando no se le pudo calcular pago (falta ficha, servicio
+   * profesional, decidilo vos): los minutos igual se dicen.
+   */
+  extraMedido: { minutos: number; diurnoMin: number; nocturnoMin: number; monto: number | null } | null;
+  /**
+   * ¿Se le pagaron esas horas extra?
+   *
+   * 🔑 `true` también cuando la aprobación NO SE EXIGE (sin la tabla corrida, o
+   * en un cálculo que no la pasa): es el comportamiento de siempre —se paga
+   * todo— y por eso el default es `true`. La pantalla usa este campo para el
+   * chip «sin aprobar», no para adivinarlo mirando si el monto dio cero.
+   */
+  extraAprobada: boolean;
   dinero: DineroLinea | null;
   manuales: ManualesLinea;
 }
@@ -1238,6 +1262,14 @@ export function armarLinea(
    * («entró el 10 de agosto», «Vacaciones del … al …»). `null` = se calcula.
    */
   decidirAMano: string | null = null,
+  /**
+   * La aprobación de las horas extra. Ver `aprobaciones.ts`.
+   *
+   * 🔑 OMITIRLO ES EL COMPORTAMIENTO DE SIEMPRE: sin este objeto no se exige
+   * nada y se paga todo, hasta el centavo igual que antes de que existiera. Es
+   * lo que hace que las llamadas viejas y los tests de la contable no se muevan.
+   */
+  extra: { exigirAprobacion?: boolean; aprobada?: boolean } = {},
 ): LineaPlanilla {
   const faltaConfigurar = faltantesDe(ficha, reglas);
   // 🔴 EL CANDADO DEL PAGO, Y ES ESTA LÍNEA. Quien está marcado como servicio
@@ -1271,9 +1303,30 @@ export function armarLinea(
   // saltear. La jornada diaria se conserva —es del horario, no del reloj— para
   // que la línea siga sabiendo cuánto dura su día.
   const noMarca = ficha.noMarcaReloj === true;
-  const horasEfectivas: HorasPersona = noMarca
+  const horasMedidas: HorasPersona = noMarca
     ? { ...HORAS_CERO, jornadaDiariaMin: horas.jornadaDiariaMin }
     : horas;
+
+  // ── 🔴 EL CUARTO CANDADO: SOLO SE PAGAN LAS HORAS EXTRA AUTORIZADAS ────────
+  //
+  // Contadora, textual: *«Sólo se pagan las horas extras autorizadas y las
+  // reportadas por Julio Garay»*. Hasta hoy este archivo pagaba TODOS los
+  // minutos que midió el reloj, y por eso la planilla nunca cuadró con ella: el
+  // reloj mide bien, pero no sabe qué fue autorizado.
+  //
+  // 🔑 SE CERAN LOS MINUTOS, NO SE GUARDA UN NÚMERO APROBADO. La aprobación es
+  // un permiso sobre (persona, período) y el reparto 1,25 / 1,50 lo sigue
+  // haciendo `clasificarDia` con la base de cálculo que esté vigente. Si mañana
+  // la salida pasa de las 17:00 a las 16:30, esto no cambia ni una línea.
+  //
+  // ⚠️ `exigirAprobacion` es FALSE por defecto — sin la tabla corrida se paga
+  // todo, como hasta ahora. Fail-closed acá sería dejar a treinta personas sin
+  // sus extras porque falta un archivo SQL. Se avisa, ver `aprobaciones.ts`.
+  const exigir = extra.exigirAprobacion === true;
+  const extraAprobada = !exigir || extra.aprobada === true;
+  const horasEfectivas: HorasPersona = extraAprobada
+    ? horasMedidas
+    : { ...horasMedidas, extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0 };
 
   const dinero =
     !fueraDePlanilla && !seAbstiene && faltaConfigurar.length === 0
@@ -1299,7 +1352,34 @@ export function armarLinea(
       ? centavos((salario / 2) * factorRef)
       : null;
 
+  // 🔴 LO QUE MIDIÓ EL RELOJ, PASE LO QUE PASE CON LA APROBACIÓN. Sale de
+  // `horasMedidas` —antes del candado— porque es justamente lo que el candado
+  // apaga, y sin esto lo que falta aprobar sería lo único que no se puede ver.
+  const extraMin = horasMedidas.extraDiurnoMin + horasMedidas.extraNocturnoMin;
+  // 🔑 El monto se valúa con la MISMA fórmula del pago (`h × recargo × rata`,
+  // a centavos por columna) y con la rata que la línea usa de verdad. No es una
+  // estimación: es exactamente lo que se pagaría al aprobar.
+  const rataDeLaLinea = dinero?.rataHora ?? null;
+  const montoExtra =
+    rataDeLaLinea === null
+      ? null
+      : centavos(
+        centavos((horasMedidas.extraDiurnoMin / 60) * reglas.recargoExtraDiurno * rataDeLaLinea)
+        + centavos((horasMedidas.extraNocturnoMin / 60) * reglas.recargoExtraNocturno * rataDeLaLinea),
+      );
+  const extraMedido =
+    extraMin > 0
+      ? {
+        minutos: extraMin,
+        diurnoMin: horasMedidas.extraDiurnoMin,
+        nocturnoMin: horasMedidas.extraNocturnoMin,
+        monto: montoExtra,
+      }
+      : null;
+
   return {
+    extraMedido,
+    extraAprobada,
     fueraDePlanilla,
     pagaSeguros: ficha.pagaSeguros !== false,
     // 🔑 Solo si de verdad se va a usar: con los seguros apagados el sello que
@@ -1368,6 +1448,19 @@ export interface OpcionesPlanilla {
    * casos le quitaría la quincena entera a quien sí vino.
    */
   justificados?: ReadonlyMap<string, string>;
+  /**
+   * 🔴 ¿SE EXIGE QUE LAS HORAS EXTRA ESTÉN APROBADAS?
+   *
+   * `false` por defecto y eso NO es un olvido: sin la tabla
+   * `asistencia_horas_extra_aprobadas` corrida, el cuadro es idéntico al de
+   * siempre y se paga todo lo que midió el reloj. Es la misma degradación que
+   * el resto del módulo (ver `planilla-server.ts`), y acá pesa más que en otros
+   * lados: cerrar por falta de un archivo SQL dejaría a treinta personas sin
+   * sus extras el día de pago.
+   */
+  exigirAprobacionExtra?: boolean;
+  /** Códigos con las horas extra de ESTE período aprobadas. */
+  extrasAprobadas?: ReadonlySet<string>;
 }
 
 /**
@@ -1430,6 +1523,10 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
 
     const linea = armarLinea(
       ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorBase, motivo,
+      {
+        exigirAprobacion: opts.exigirAprobacionExtra === true,
+        aprobada: opts.extrasAprobadas?.has(cod) === true,
+      },
     );
     // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
     // un motivo por el que NO SE PUDO PAGAR, y acá no hay nada que pagar. Si le
