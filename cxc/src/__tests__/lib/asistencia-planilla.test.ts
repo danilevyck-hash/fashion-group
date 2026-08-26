@@ -328,7 +328,7 @@ describe("🔴 La frontera de las 18:00 es UNA sola y decide las tres cosas", ()
       horarios: [horario], justificaciones: [], feriados: new Map(),
       desde: f, hasta: f, reglas, incluirNoHabiles: true,
     })[0];
-    return clasificarDia(p.dias[0], reglas, 8 * 60);
+    return clasificarDia(p.dias[0], reglas);
   };
 
   it("todo antes del corte va al 1.25", () => {
