@@ -386,7 +386,9 @@ describe("los nombres de los módulos no se confunden entre sí", () => {
       // Gastos estrenó su 2ª pestaña el 13-ago-2026. "Gastos" vs "Saldos de
       // banco" no comparten ni una palabra que distinga: no hay confusión.
       Gastos: ["Gastos", "Saldos de banco"],
-      Ventas: ["Resumen", "Clientes", "Productos", "Utilidad"],
+      // Ventas ganó "Comisiones" el 25-ago-2026. No choca con ninguna de las
+      // otras cuatro: no comparte ni una palabra que distinga.
+      Ventas: ["Resumen", "Clientes", "Productos", "Utilidad", "Comisiones"],
       Multifashion: ["Resumen", "Vendedoras", "Productos", "Clientes", "Caja"],
     };
     const choques: string[] = [];
@@ -414,6 +416,26 @@ describe("los nombres de los módulos no se confunden entre sí", () => {
       }
     }
     expect(choques, `la pestaña se confunde con un módulo:\n${choques.join("\n")}`).toEqual([]);
+  });
+
+  it("🔴 la pestaña «Comisiones» se llama IGUAL que su ficha, y está bien", () => {
+    // Es la ÚNICA excepción de la regla, y es la excepción sana: no son dos
+    // pantallas parecidas, es LA MISMA (`ComisionesView`) con dos puertas —la
+    // ficha del menú, que es por donde entra la secretaria, y la pestaña de
+    // Ventas, que es lo que pidió Daniel. Que se llamen igual es justamente lo
+    // que evita que alguien crea que son dos cosas distintas.
+    //
+    // Lo que sí tiene que seguir valiendo: «Comisiones» no puede parecerse a
+    // NINGUNA otra ficha, ni a las otras pestañas de Ventas.
+    const ficha = ALL_MODULES.find((m) => m.key === "comisiones")!;
+    expect(ficha.label).toBe("Comisiones");
+    for (const otro of ALL_MODULES) {
+      if (otro.key === "comisiones") continue;
+      expect(seConfunden("Comisiones", otro.label), `choca con "${otro.label}"`).toBe(false);
+    }
+    for (const hermana of ["Resumen", "Clientes", "Productos", "Utilidad"]) {
+      expect(seConfunden("Comisiones", hermana), `choca con la pestaña "${hermana}"`).toBe(false);
+    }
   });
 
   it("🔴 \"Asistencia y Planilla\" no choca con nada del catálogo", () => {

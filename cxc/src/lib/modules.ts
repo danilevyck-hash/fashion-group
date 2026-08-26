@@ -72,6 +72,37 @@ export const ALL_MODULES: AppModule[] = [
   // Ventas y clientes
   { key: "vista-general", label: "Vista General",      href: "/vista-general",    icon: LayoutDashboard,  roles: ["admin"],                                     group: "ventas-clientes" },
   { key: "ventas",        label: "Ventas",             href: "/ventas",           icon: TrendingUp,       roles: ["admin"],                                     group: "ventas-clientes" },
+  // 🔴 COMISIONES VIVE EN «VENTAS Y CLIENTES» (25-ago-2026).
+  //
+  // Daniel, textual: *"Comisiones debe de estar en ventas. Y también debe de
+  // verse empresa por empresa y todas las empresas."* Y al día siguiente,
+  // nombrando el grupo: *"comisiones debería de estar en ventas y clientes
+  // no?"*. Las dos cosas se hicieron y NO son la misma:
+  //   1. La FICHA se mudó de «Operación» a este grupo — es esta línea. Va
+  //      pegada a Ventas porque es su pariente más cercano: la comisión sale de
+  //      la venta (`subtotal_con_descuento` de las facturas con utilidad > 20%).
+  //   2. La PESTAÑA `/ventas?tab=comisiones` monta el MISMO `ComisionesView`.
+  //      Es una puerta más, no un cálculo nuevo.
+  //
+  // 🔴 LA FICHA NO SE RETIRA Y LA `key` NO CAMBIA — las dos cosas están
+  // MEDIDAS, no supuestas:
+  //   · `ventas` es `roles: ["admin"]` y `/ventas/page.tsx` manda a `/home` a
+  //     todo el que no sea admin. **`/comisiones` es la ÚNICA puerta de la
+  //     secretaria**, que sí tiene este módulo. Sacar la ficha —o redirigir
+  //     `/comisiones` a la pestaña, como se hizo con `/saldos-banco`— la
+  //     dejaría sin comisiones. Ahí la mudanza fue segura porque los dos
+  //     módulos tenían los MISMOS roles; acá no los tienen.
+  //   · La `key` `comisiones` está en `role_permissions` y en
+  //     `fg_users.modulos_override`: renombrarla rompe permisos sin comprar
+  //     nada. Mismo precedente que Cheques→Recordatorios y Asistencia→Planilla.
+  // Abrirle `/ventas` a la secretaria para darle la pestaña tampoco es una
+  // opción: el SSR de esa página trae Resumen y Clientes EN EL HTML, así que le
+  // entregaría datos que hoy no puede ver. Sería un permiso nuevo.
+  //
+  // ⚠️ Mover el GRUPO no mueve un centavo: `href`, `roles` e `icon` quedan
+  // iguales y el cálculo vive en `comision_b2b_v5`, que ni se enteró. Lo único
+  // que cambia es en qué caja del menú aparece la ficha.
+  { key: "comisiones",    label: "Comisiones",         href: "/comisiones",       icon: Coins,            roles: ["admin", "secretaria"],                       group: "ventas-clientes" },
   // Referencia con ruta propia (12-ago-2026). Daniel: *"habilita referencia
   // para los vendedores y bodega"*. Nació como 5ª pestaña de /ventas y ESTA es
   // ahora la única puerta: la pestaña se retiró el mismo día (*"dejar solo la
@@ -97,7 +128,6 @@ export const ALL_MODULES: AppModule[] = [
   { key: "asistencia",     label: "Asistencia y Planilla", href: "/asistencia",   icon: Clock,         roles: asistenciaRoles(),                       group: "operacion" },
   { key: "reclamos",       label: "Reclamos",          href: "/reclamos",         icon: AlertTriangle, roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "cargar",         label: "Depurador",         href: "/productos/cargar", icon: PackagePlus,   roles: ["admin", "secretaria"],                       group: "operacion" },
-  { key: "comisiones",     label: "Comisiones",        href: "/comisiones",       icon: Coins,         roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "caja",           label: "Caja Menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
   // "Gastos" a secas: es el ÚNICO módulo de gastos que queda, y desde el
