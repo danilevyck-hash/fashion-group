@@ -3,7 +3,6 @@ import {
   normalizarEspacios,
   veredictoDescripcion,
   esCasiIgual,
-  levenshtein,
 } from "../lib/depurador/veredicto";
 import type { CatalogoDescripciones } from "../lib/depurador/logic";
 
@@ -146,9 +145,11 @@ describe("veredicto — alerta por casi-gemela (lo que le da miedo a Daniel)", (
   });
 
   it("Boy vs Boys: una s de menos en la mitad izquierda", () => {
+    // La "s" está a mitad de la descripción completa, así que la gemela la
+    // encuentra la comparación de MITADES ("Boy" vs "Boys").
     const r = v("Boy-T-Shirts S/S");
     expect(r.veredicto).toBe("alerta");
-    expect(r.motivo).toBe("casi-igual");
+    expect(r.motivo).toBe("casi-igual-mitad");
     expect(r.gemela).toBe("Boys-T-Shirts S/S");
   });
 
@@ -161,22 +162,7 @@ describe("veredicto — alerta por casi-gemela (lo que le da miedo a Daniel)", (
   it("Mens vs Men: la mitad izquierda con una s de más", () => {
     const r = v("Mens-T-Shirts S/S");
     expect(r.veredicto).toBe("alerta");
-    // La gemela que se muestra es la MÁS parecida, no la primera del catálogo
-    // (también se parece a "Men-T-Shirts L/S", pero a dos letras en vez de una).
     expect(r.gemela).toBe("Men-T-Shirts S/S");
-  });
-
-  it("una letra cambiada: Men-Trank vs Men-Trunk", () => {
-    const r = v("Men-Trank");
-    expect(r.veredicto).toBe("alerta");
-    expect(r.gemela).toBe("Men-Trunk");
-  });
-
-  it("caso real de producción: Men-Shirts vs Men-T-Shirts", () => {
-    const r = v("Men-Shirts");
-    expect(r.veredicto).toBe("alerta");
-    expect(r.motivo).toBe("casi-igual");
-    expect(r.gemela).toBe("Men-T-Shirts");
   });
 
   it("la alerta trae SIEMPRE la gemela para mostrarla al lado", () => {
@@ -225,39 +211,69 @@ describe("veredicto — alerta por mitad nueva y por formato", () => {
   });
 });
 
-describe("esCasiIgual — los dos criterios", () => {
-  it("difiere solo por una s final (sin piso de largo)", () => {
+describe("esCasiIgual — un solo criterio: la «s» final", () => {
+  it("difiere solo por una s final, en cualquier palabra y sin piso de largo", () => {
     expect(esCasiIgual("t-shirt", "t-shirts")).toBe(true);
     expect(esCasiIgual("boy", "boys")).toBe(true);
     expect(esCasiIgual("men", "mens")).toBe(true);
     expect(esCasiIgual("short knit", "shorts knit")).toBe(true);
-  });
-
-  it("Levenshtein ≤ 2 con las dos de 6 letras o más", () => {
-    expect(esCasiIgual("men-trunk", "men-trank")).toBe(true);
     expect(esCasiIgual("denim pants", "denim pant")).toBe(true);
-  });
-
-  it("mitades cortas y sin relación NO son gemelas (piso de 6 letras)", () => {
-    expect(esCasiIgual("bras", "bags")).toBe(false);
-    expect(esCasiIgual("hats", "bags")).toBe(false);
-    expect(esCasiIgual("men", "kids")).toBe(false);
   });
 
   it("iguales no son casi-iguales", () => {
     expect(esCasiIgual("women-bags", "women-bags")).toBe(false);
   });
 
+  it("una letra cambiada DENTRO de una palabra ya NO es casi-gemela", () => {
+    // Levenshtein ≤2 se sacó: emparejaba prendas distintas, no typos.
+    expect(esCasiIgual("men-trunk", "men-trank")).toBe(false);
+    expect(esCasiIgual("shirts", "skirts")).toBe(false);
+  });
+
+  it("prendas legítimamente distintas NO se emparejan (el ruido que se sacó)", () => {
+    expect(esCasiIgual("men-shirts", "men-t-shirts")).toBe(false);   // camisa ≠ camiseta
+    expect(esCasiIgual("polos l/s", "polos s/s")).toBe(false);        // manga larga ≠ corta
+    expect(esCasiIgual("shirts l/s", "shirts woven l/s")).toBe(false);
+  });
+
+  it("mitades cortas y sin relación tampoco", () => {
+    expect(esCasiIgual("bras", "bags")).toBe(false);
+    expect(esCasiIgual("hats", "bags")).toBe(false);
+    expect(esCasiIgual("men", "kids")).toBe(false);
+  });
+
   it("lejanas no son casi-iguales", () => {
     expect(esCasiIgual("women-panties", "men-denim pants")).toBe(false);
   });
+});
 
-  it("levenshtein cuenta bien", () => {
-    expect(levenshtein("abc", "abc")).toBe(0);
-    expect(levenshtein("abc", "abd")).toBe(1);
-    expect(levenshtein("abc", "ab")).toBe(1);
-    expect(levenshtein("", "abc")).toBe(3);
-    expect(levenshtein("s/s", "l/s")).toBe(1);
+describe("prendas distintas: alertan, pero como MITAD NUEVA y nombrando la mitad", () => {
+  it("Men-Shirts: la mitad que falta es «Shirts», no es un typo de T-Shirts", () => {
+    const r = v("Men-Shirts");
+    expect(r.veredicto).toBe("alerta");
+    expect(r.motivo).toBe("mitad-nueva");
+    expect(r.texto).toBe("mitad nueva: «Shirts»");
+    expect(r.gemela).toBeUndefined();
+  });
+
+  it("Men-Polos L/S: manga larga es otra prenda, no un typo de S/S", () => {
+    const r = v("Men-Polos L/S");
+    expect(r.veredicto).toBe("alerta");
+    expect(r.motivo).toBe("mitad-nueva");
+    expect(r.texto).toBe("mitad nueva: «Polos L/S»");
+  });
+
+  it("Men-Trank: una letra cambiada cae en mitad nueva, y la nombra", () => {
+    const r = v("Men-Trank");
+    expect(r.veredicto).toBe("alerta");
+    expect(r.motivo).toBe("mitad-nueva");
+    expect(r.texto).toBe("mitad nueva: «Trank»");
+  });
+
+  it("la etiqueta nombra SOLO la mitad desconocida, no las dos", () => {
+    expect(v("Unisex-Bras").texto).toBe("mitad nueva: «Unisex»");
+    expect(v("Men-Watches").texto).toBe("mitad nueva: «Watches»");
+    expect(v("Perros-Collares").texto).toBe("mitades nuevas: «Perros» y «Collares»");
   });
 });
 
