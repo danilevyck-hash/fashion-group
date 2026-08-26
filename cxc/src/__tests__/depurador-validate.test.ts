@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   processRows, buildAoa, OUT_COLS, titleCase, proveedorParaEmpresa, outColsForEmpresa,
   esDescripcionCatalogada, descripcionesDeMarca, matchEmpresaFromDestino, precioDescripcion,
-  MARCA_CATALOGO,
+  MARCA_CATALOGO, normalizeDescripcion,
   type SheetRow, type MarcaRubroFormula, type CatalogoDescripciones,
 } from "../lib/depurador/logic";
 import { marcasQueContienen } from "../lib/depurador/tienda";
@@ -335,5 +335,19 @@ describe("Depurador — artículos sin cantidad (y servicios que sobreviven)", (
   it("si TODO queda afuera, corta con un mensaje en vez de entregar un Excel vacío", () => {
     expect(() => processRows([H, art("R1", "Men-Polos S/S", 0), art("R2", "Men-T-Shirts S/S", 0)] as SheetRow[], cfg))
       .toThrow(/saldría vacía/);
+  });
+});
+
+describe("normalización: el blazer masculino, gemelo del femenino que ya estaba", () => {
+  it("«Men-Blazers / Sports Jackets» se limpia a «Men-Blazers»", () => {
+    // Switch manda las dos formas: BLAZERS (232 u. vendidas) y
+    // BLAZERS - SPORTS JACKETS (28 u.). La larga es la sucia — se limpia acá,
+    // no se le abre fila en el catálogo. La regla para mujer ya existía.
+    expect(normalizeDescripcion("Men-Blazers / Sports Jackets")).toBe("Men-Blazers");
+    expect(normalizeDescripcion("Women-Blazers / Sports Jackets")).toBe("Women-Blazers");
+  });
+
+  it("no toca la forma limpia", () => {
+    expect(normalizeDescripcion("Men-Blazers")).toBe("Men-Blazers");
   });
 });

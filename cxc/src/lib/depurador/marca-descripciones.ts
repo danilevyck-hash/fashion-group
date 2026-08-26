@@ -23,6 +23,11 @@ export const NORMALIZACION: Record<string, string> = {
   "Men-Polos L/S OFERTA": "Men-Polos L/S",
   "Men-Small Leather Goods": "Men-Small Leather",
   "WOMEN-WATCHES": "Women-Watches",
+  // El gemelo masculino de "Women-Blazers / Sports Jackets", que ya estaba acá.
+  // Switch manda las dos formas: BLAZERS (232 u. vendidas) y BLAZERS - SPORTS
+  // JACKETS (28 u.). La segunda es la sucia — no es una categoría nueva, así que
+  // se limpia acá y NO se le abre fila en el catálogo.
+  "Men-Blazers / Sports Jackets": "Men-Blazers",
   "Women-Blazers / Sports Jackets": "Women-Blazers",
   "Women-Heavyweight Knits": "Women-Heavyweight",
   "Women-Panties C": "Women-Panties",
