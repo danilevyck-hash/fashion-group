@@ -739,14 +739,12 @@ export default function GuiasList({
                                                 (26-ago-2026): 197 coinciden letra por letra y 226
                                                 difieren — pero **ninguna de las 226 es otro
                                                 cliente**. Son la MISMA tienda escrita distinto:
-                                                163 son una variante que contiene a la otra
+                                                168 son una variante que contiene a la otra
                                                 ("City Mall" vs "City Mall David", el "S.A." de
-                                                más, un espacio); de las 63 restantes, 27 son el
+                                                más, un espacio); de las 58 restantes, 27 son el
                                                 alias de display de D-108, 21 "Sporting Shoes N4"
-                                                vs "N 4", 8 "Jerusalem Panama" vs "De Panama", 2
-                                                más de puntuación, y 5 son un error de datos real
-                                                (D-200, ver abajo) que un texto de más tampoco
-                                                arregla.
+                                                vs "N 4", 8 "Jerusalem Panama" vs "De Panama" y 2
+                                                más de puntuación.
 
                                                 O sea: mostrar los dos cuando difieren seguiría
                                                 dibujando DOS nombres en el 53% de los renglones
@@ -765,12 +763,13 @@ export default function GuiasList({
                                                 mismo vuelve a salir en cuanto NO hay chip que lo
                                                 reemplace: línea sin atar, o directorio no leído.
 
-                                                🔴 5 líneas atadas a D-200 dicen "City Mall" y el
-                                                chip dice "El Machetazo-Calidonia": GT-124 (x2),
-                                                GT-136 y GT-183 (x2). Es un código que el sync de
-                                                Switch reusó — son de City Mall Paso Canoas (D-25)
-                                                y City Mall David (D-24). Se corrige tocando el
-                                                chip, NO escondiendo el desacuerdo. */}
+                                                ✅ Las 5 que SÍ eran otro cliente —"City Mall"
+                                                escrito contra "El Machetazo-Calidonia" atado, un
+                                                código que el sync de Switch reusó— las corrigió
+                                                Daniel el 26-ago-2026: GT-124, GT-136 y GT-183
+                                                pasaron a D-25 Paso Canoas y D-24 David. Así se
+                                                arregla un desacuerdo: tocando el chip, NO
+                                                escondiéndolo detrás de un segundo texto. */}
                                             <td className="py-1.5 px-2">
                                               {/* El chip ya dice el nombre: repetirlo arriba es
                                                   el ruido que se vino a sacar. Sin chip con
@@ -783,9 +782,9 @@ export default function GuiasList({
                                                 {/* 🩸 El código YA PUESTO también se toca. Si el
                                                     chip fuera solo texto, una línea atada al
                                                     cliente equivocado no se podría corregir nunca
-                                                    desde la pantalla — y hay varias así en
-                                                    producción (las 5 de D-200: GT-124, GT-136 y
-                                                    GT-183). */}
+                                                    desde la pantalla — y las 5 de D-200 (GT-124,
+                                                    GT-136, GT-183) se arreglaron justamente así,
+                                                    el 26-ago-2026. */}
                                                 {item.cliente_codigo ? (
                                                   puedeAtarCliente && item.id ? (
                                                     <button
