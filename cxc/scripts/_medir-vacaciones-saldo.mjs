@@ -145,6 +145,9 @@ const LEER_SALDO = () => {
     eloyn: filas.find((f) => f.codigo === "29")?.valor ?? null,
     // El detalle auditable, cuando hay saldo.
     hayDetalle: /\d+ al \d+ \w+ \d{4}/.test(txt),
+    // 🔴 EL ENTERO NO SE ENSUCIA. Un «10.0 días» en la columna hace que el caso
+    // raro —el medio día— deje de saltar a la vista, que es para lo que está.
+    conCeroDecimal: filas.filter((f) => /\.0\b/.test(f.valor)).length,
   };
 };
 
@@ -169,6 +172,10 @@ const LEER_CONFIG = () => {
     editables: fechas.filter((i) => !i.disabled && !i.readOnly).length,
     haySaldo: !!saldo,
     saldoEditable: !!saldo && !saldo.disabled && !saldo.readOnly,
+    // 🔴 De a MEDIO día. Con `step=1` las flechitas nunca llegarían a un 12,5.
+    paso: saldo?.getAttribute("step") ?? null,
+    // En el iPhone `numeric` no trae el punto en el teclado.
+    teclado: saldo?.getAttribute("inputmode") ?? null,
     diceQueFaltaElDdl: (document.body.textContent ?? "")
       .includes("Todavía no se puede cargar el saldo"),
   };
@@ -189,10 +196,11 @@ const acusar = (m) => { hallazgos.push(m); console.log(`  🔴 ${m}`); };
 // el DDL esté corrido — ver `saldoDe` en `lib/asistencia/saldo-vacaciones.ts`.
 const CON_SALDO = {
   // ANGELA GARCIA: el ejemplo de la cabecera del módulo. 12 al corte, +8
-  // ganados, 10 tomados → 10 días.
+  // ganados, 10 tomados → 10 días. ENTERO: no puede verse «10.0».
   "7": { saldo: 10, saldoInicial: 12, corte: "2026-08-25", ganadosDesdeCorte: 8, tomados: 10, yaPagados: 0, falta: null },
-  // ELOYN MENDOZA, con días COBRADOS: restan igual y se nombran aparte.
-  "29": { saldo: 9, saldoInicial: 12, corte: "2026-08-25", ganadosDesdeCorte: 0, tomados: 0, yaPagados: 3, falta: null },
+  // ELOYN MENDOZA: días COBRADOS (restan igual, se nombran aparte) y MEDIO día,
+  // que es lo que este PR agrega. 12,5 − 3 = 9,5.
+  "29": { saldo: 9.5, saldoInicial: 12.5, corte: "2026-08-25", ganadosDesdeCorte: 0, tomados: 0, yaPagados: 3, falta: null },
 };
 
 async function interceptarConSaldo(ctx) {
@@ -296,6 +304,10 @@ for (const pasada of ["A-como-esta-hoy", "B-con-saldo-cargado"]) {
       if (!/\+8 ganados/.test(sd.angela ?? "")) acusar(`B/${a.nombre}: no dice lo ganado desde el corte → ${sd.angela}`);
       if (!/tomó 10/.test(sd.angela ?? "")) acusar(`B/${a.nombre}: no dice lo tomado → ${sd.angela}`);
       if (!/ya pagados 3/.test(sd.eloyn ?? "")) acusar(`B/${a.nombre}: los días cobrados no se nombran aparte → ${sd.eloyn}`);
+      // 🔴 EL MEDIO DÍA: se ve donde lo hay, y NO se inventa donde no.
+      if (!/9\.5 días/.test(sd.eloyn ?? "")) acusar(`B/${a.nombre}: el medio día no se ve → ${sd.eloyn}`);
+      if (!/12\.5 al 25 ago 2026/.test(sd.eloyn ?? "")) acusar(`B/${a.nombre}: el arranque de medio día no se ve → ${sd.eloyn}`);
+      if (sd.conCeroDecimal > 0) acusar(`B/${a.nombre}: ${sd.conCeroDecimal} renglones enteros muestran un «.0»`);
     }
 
     // Elegir una persona en el formulario dice su saldo ahí mismo.
@@ -318,15 +330,17 @@ for (const pasada of ["A-como-esta-hoy", "B-con-saldo-cargado"]) {
     });
     const c = await page.evaluate(LEER_CONFIG);
     console.log(`   configuración: «Empezó a trabajar» ${c.diceEmpezoATrabajar ? "SÍ" : "NO"} · ${c.editables}/${c.camposFecha} fechas editables`
-      + ` · campo del saldo ${c.haySaldo ? (c.saldoEditable ? "EDITABLE" : "deshabilitado") : "NO ESTÁ"}`);
+      + ` · campo del saldo ${c.haySaldo ? (c.saldoEditable ? "EDITABLE" : "deshabilitado") : "NO ESTÁ"} · paso ${c.paso} · teclado ${c.teclado}`);
     if (a.w === 1440) {
       if (!c.diceEmpezoATrabajar) acusar(`${pasada}/Configuración: no se encontró «Empezó a trabajar»`);
       if (c.editables === 0) acusar(`${pasada}/Configuración: la fecha de ingreso NO se puede editar`);
       if (!c.haySaldo) acusar(`${pasada}/Configuración: no está el campo del saldo`);
-      if (conSaldo && !c.saldoEditable) acusar(`B/Configuración: el saldo NO se puede editar`);
-      // Sin el DDL: deshabilitado, pero DICIÉNDOLO. Rechazar sí, esconder no.
-      if (!conSaldo && c.saldoEditable) acusar(`A/Configuración: el saldo se ofrece editable sin el DDL corrido`);
-      if (!conSaldo && !c.diceQueFaltaElDdl) acusar(`A/Configuración: no dice que falta correr el archivo`);
+      // ⚠️ La migración que CREA la columna ya está corrida en producción, así
+      // que el campo tiene que estar habilitado en las DOS pasadas. La que
+      // agrega los medios días va aparte y no cambia la pantalla.
+      if (!c.saldoEditable) acusar(`${pasada}/Configuración: el saldo NO se puede editar`);
+      if (c.paso !== "0.5") acusar(`${pasada}/Configuración: el campo no se mueve de a medio día (step=${c.paso})`);
+      if (c.teclado !== "decimal") acusar(`${pasada}/Configuración: el teclado del iPhone no trae el punto (inputmode=${c.teclado})`);
     }
 
     await page.close();

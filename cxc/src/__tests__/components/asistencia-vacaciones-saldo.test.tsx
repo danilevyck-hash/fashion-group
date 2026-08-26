@@ -31,10 +31,10 @@ const ANGELA = {
   saldo: 10, saldoInicial: 12, corte: "2026-08-25",
   ganadosDesdeCorte: 8, tomados: 10, yaPagados: 0, falta: null,
 };
-/** Con días COBRADOS: restan igual y se nombran aparte. */
+/** Con días COBRADOS: restan igual y se nombran aparte. Y con MEDIO día. */
 const ELOYN = {
   codigo: "29", etiqueta: "ELOYN MENDOZA",
-  saldo: 9, saldoInicial: 12, corte: "2026-08-25",
+  saldo: 9.5, saldoInicial: 12.5, corte: "2026-08-25",
   ganadosDesdeCorte: 0, tomados: 0, yaPagados: 3, falta: null,
 };
 /** Le falta la fecha de ingreso. */
@@ -114,8 +114,21 @@ describe("la columna de saldo", () => {
     servir(RESPUESTA);
     montar();
     await waitFor(() => expect(renglon("29")).toBeTruthy());
-    expect(renglon("29")!.textContent).toContain("9 días");
+    expect(renglon("29")!.textContent).toContain("9.5 días");
     expect(renglon("29")!.textContent).toContain("ya pagados 3");
+  });
+
+  it("🔴 el MEDIO día se ve, y el entero NO se ensucia con un «.0»", async () => {
+    servir(RESPUESTA);
+    montar();
+    await waitFor(() => expect(renglon("29")).toBeTruthy());
+    // ELOYN arrancó en 12.5 y le quedan 9.5.
+    expect(renglon("29")!.textContent).toContain("12.5 al 25 ago 2026");
+    // ANGELA arrancó en 12 y le quedan 10: ni un decimal a la vista.
+    const angela = renglon("7")!.textContent ?? "";
+    expect(angela).toContain("10 días");
+    expect(angela).toContain("12 al 25 ago 2026");
+    expect(angela).not.toContain(".0");
   });
 
   it("dice cuántas personas ya tienen saldo, sin hacerlo contar a nadie", async () => {

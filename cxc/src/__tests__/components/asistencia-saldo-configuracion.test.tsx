@@ -116,6 +116,39 @@ describe("el campo del saldo, en la ficha", () => {
   });
 });
 
+describe("🔴 medios días en el campo", () => {
+  it("el campo se mueve de a MEDIO día", async () => {
+    await abrirFicha();
+    expect(campoSaldo().step).toBe("0.5");
+  });
+
+  it("🔑 en el iPhone el teclado trae el punto: `inputMode=decimal`, no `numeric`", async () => {
+    await abrirFicha();
+    expect(campoSaldo().getAttribute("inputmode")).toBe("decimal");
+  });
+
+  it("un 12.5 escrito a mano VIAJA tal cual", async () => {
+    await abrirFicha();
+    const c = campoSaldo();
+    fireEvent.change(c, { target: { value: "12.5" } });
+    fireEvent.blur(c);
+    await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
+    expect(enviados[0].saldoVacacionesDias).toBe("12.5");
+  });
+
+  it("🔴 un saldo entero se ve «12», nunca «12.0»", async () => {
+    await abrirFicha();
+    expect(campoSaldo().value).toBe("12");
+  });
+
+  it("y uno de medio día se ve con su decimal", async () => {
+    await abrirFicha(datos({
+      personas: [{ ...ANGELA, saldoVacacionesDias: 12.5 }],
+    }));
+    expect(campoSaldo().value).toBe("12.5");
+  });
+});
+
 describe("🔴 lo que se escribe VIAJA en el PUT", () => {
   it("el número nuevo sale en el cuerpo del pedido", async () => {
     await abrirFicha();
