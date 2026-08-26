@@ -157,11 +157,89 @@ function ctrl(error: boolean, extra = ""): string {
   return `${CTRL_BASE} ${error ? "border-red-400" : "border-gray-200"} ${extra}`;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LO BLOQUEADO SE VE, Y SE VE BLOQUEADO (25-ago-2026)
+//
+// Daniel, textual: *«Editar guía despachada, debe de verse igual que al crear
+// una guía para mantener consistencia y uso fácil»* · *«que se vea desbloqueado
+// solo las editables así el usuario no adivina»*.
+//
+// 🩸 Lo que había: en una guía firmada, la dirección, la empresa y los bultos
+// salían como TEXTO suelto mientras su rótulo seguía llevando el asterisco rojo
+// de obligatorio — o sea que la pantalla decía «CLIENTE *, DIRECCIÓN *,
+// EMPRESA *, FACTURA(S) *, BULTOS *» como si los cinco se pudieran tocar, y
+// había que tocarlos para descubrir cuáles no. La cabecera era peor todavía:
+// otra grilla, otros rótulos, nada que se pareciera al formulario del alta.
+//
+// 🔑 AHORA LA CAJA ES LA MISMA (misma posición, mismo alto, mismo rótulo) y lo
+// que cambia es el ASPECTO: fondo apagado, subrayado punteado, texto gris y un
+// candado al lado del rótulo. Se lee de un vistazo qué se puede cambiar.
+//
+// 🔴 ESTO ES PRESENTACIÓN, NO PERMISOS. Lo que se puede ESCRIBIR no cambió ni
+// un campo: la lista sigue siendo `CAMPOS_DESPACHADA` en `campos-editables.ts`,
+// las tres correcciones siguen saliendo por columna (`PATCH …/item` y
+// `PATCH …/numero-transp`), el candado del PUT sigue intacto y el servidor
+// sigue rechazando ENTERO un cuerpo con un campo no permitido.
+//
+// 🩸 Y NO ES UN `<input disabled>`: es un elemento que NO SE PUEDE ESCRIBIR
+// porque no es un campo. Un input apagado sigue siendo un input —se enfoca con
+// el tabulador, algunos navegadores lo dejan pegar— y acá el punto es que no
+// haya ningún camino para escribir lo que el servidor va a rechazar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Un candado chiquito al lado del rótulo. Decorativo: el texto va en `sr-only`. */
+function Candado() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+      className="w-3 h-3 shrink-0 text-gray-400"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="4" y="10" width="16" height="10" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+/**
+ * La MISMA caja que `ctrl()` —mismo alto, mismo subrayado, misma densidad en
+ * escritorio— pero apagada: fondo gris, borde punteado y texto gris.
+ */
+const CAMPO_BLOQUEADO =
+  "w-full border-b border-dashed border-gray-300 bg-gray-50 rounded-t-sm " +
+  "text-base md:text-sm " +
+  "py-2.5 min-h-[44px] " +
+  "md:[@media(pointer:fine)]:py-1.5 md:[@media(pointer:fine)]:min-h-0 " +
+  "cursor-not-allowed select-text block";
+
+/** El valor de un campo que no se puede tocar. Ver el bloque de arriba. */
+function valorBloqueado(valor: string | number | null | undefined, alineado = false) {
+  const t = String(valor ?? "").trim();
+  return (
+    <span
+      data-bloqueado="1"
+      aria-disabled="true"
+      className={`${CAMPO_BLOQUEADO} px-2 ${alineado ? "text-right tabular-nums" : ""} ${
+        t ? "text-gray-500" : "text-gray-300"
+      }`}
+    >
+      {t || "—"}
+    </span>
+  );
+}
+
 const LABEL = "text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 flex items-center gap-1.5";
 
 function Campo({
   label,
   requerido = false,
+  bloqueado = false,
   nota,
   accion,
   htmlFor,
@@ -169,6 +247,12 @@ function Campo({
 }: {
   label: string;
   requerido?: boolean;
+  /**
+   * 🔴 Este campo NO se puede tocar en el estado en que está la guía.
+   * Pierde el asterisco de obligatorio —pedirle algo a quien no puede escribir
+   * es la mitad de la confusión que Daniel señaló— y gana un candado.
+   */
+  bloqueado?: boolean;
   nota?: string;
   accion?: ReactNode;
   htmlFor?: string;
@@ -179,10 +263,17 @@ function Campo({
       {/* `accion` va FUERA del <label>: un botón adentro de un label activa
           también el campo asociado (tocar "＋" abría el select). */}
       <div className={LABEL}>
-        <label htmlFor={htmlFor}>
+        <label htmlFor={bloqueado ? undefined : htmlFor}>
           {label}
-          {requerido && <span className="text-red-500"> *</span>}
+          {requerido && !bloqueado && <span className="text-red-500"> *</span>}
         </label>
+        {/* El candado es un dibujo; lo que se lee en voz alta es el `sr-only`. */}
+        {bloqueado && (
+          <>
+            <Candado />
+            <span className="sr-only">bloqueado, no se puede cambiar</span>
+          </>
+        )}
         {nota && <span className="text-gray-300 normal-case tracking-normal">{nota}</span>}
         {accion}
       </div>
@@ -200,16 +291,6 @@ function Campo({
 type Layout = "m" | "d";
 function idCampo(item: Pick<GuiaItem, "uid">, campo: string, layout: Layout): string {
   return `${campo}-${item.uid}-${layout}`;
-}
-
-/** Un dato de la guía firmada: se lee, no se escribe. */
-function DatoFijo({ etiqueta, valor }: { etiqueta: string; valor: string }) {
-  return (
-    <div className="min-w-0">
-      <span className="text-xs uppercase tracking-[0.05em] text-gray-400 block mb-1">{etiqueta}</span>
-      <span className="text-sm font-medium break-words whitespace-pre-wrap">{String(valor ?? "").trim() || "—"}</span>
-    </div>
-  );
 }
 
 function ErrorCampo({ children = "Campo obligatorio" }: { children?: ReactNode }) {
@@ -428,11 +509,18 @@ export default function GuiaForm({
   }
 
   /**
-   * El "Falta: …", donde se lo pueda leer. Va en LOS DOS lugares donde hay un
-   * botón de guardar: en la barra pegajosa —que en el celular es la única que
-   * se ve mientras se llena la guía— y al final, al lado del botón grande.
-   * Apagar el botón en un lado y explicarlo solo en el otro es la mitad del
-   * arreglo.
+   * 🔴 EL "Falta: …" SE DICE UNA SOLA VEZ, Y ES LA DE ABAJO (25-ago-2026).
+   *
+   * 🩸 Daniel lo vio en el iPhone sobre GT-230: *«Falta: el transportista»*
+   * salía DOS veces en la misma pantalla —una pegada al encabezado y otra junto
+   * a «Guardar Cambios»— y eligió cuál se queda: *«Dejá una sola, la de abajo,
+   * que es donde está el botón»*. El 23-ago se habían puesto las dos con el
+   * argumento de que apagar el botón en un lado y explicarlo en el otro era la
+   * mitad del arreglo; con las dos barras a la vista en la misma pantalla, ese
+   * argumento se vuelve el defecto contrario: el mismo aviso repetido.
+   *
+   * ⚠️ El botón de la barra pegajosa NO se quedó mudo: sigue apagado y lleva el
+   * mismo texto en su `title`.
    */
   function AvisoFalta({ className = "" }: { className?: string }) {
     if (puedeGuardar || saving) return null;
@@ -453,6 +541,19 @@ export default function GuiaForm({
    */
   const pideNumeroTransp = modoEntrega === "transportista";
 
+  /** El asterisco rojo del encabezado de la tabla — solo antes de despachar. */
+  const obligatorio = soloCorregible ? null : <span className="text-red-500"> *</span>;
+  /** El candado del encabezado de una columna que en esta guía no se toca. */
+  const candadoColumna = soloCorregible ? (
+    <>
+      {" "}
+      <span className="inline-flex align-middle">
+        <Candado />
+      </span>
+      <span className="sr-only">bloqueado, no se puede cambiar</span>
+    </>
+  ) : null;
+
   const transportistaError =
     validationErrors.has("transportista") ||
     (touched.has("transportista") && modoEntrega === "transportista" && !transportistaId);
@@ -460,22 +561,6 @@ export default function GuiaForm({
   // ── Campos de una fila de envío ────────────────────────────────────────────
   // Se definen UNA vez y los usan los dos layouts (tarjeta en móvil, tabla en
   // escritorio). Si se agrega un campo, aparece en los dos o en ninguno.
-
-  /**
-   * Lo que en una guía YA FIRMADA se MUESTRA pero no se escribe: dirección,
-   * empresa y bultos. Sale como texto, no como un campo apagado — un campo
-   * gris que no deja escribir invita a pelearse con él.
-   */
-  function soloTexto(valor: string | number | null | undefined, alineado = false) {
-    const t = String(valor ?? "").trim();
-    return (
-      <span
-        className={`block text-sm py-2.5 min-h-[44px] md:[@media(pointer:fine)]:py-1.5 md:[@media(pointer:fine)]:min-h-0 ${alineado ? "text-right tabular-nums" : ""} ${t ? "text-gray-700" : "text-gray-300"}`}
-      >
-        {t || "—"}
-      </span>
-    );
-  }
 
   function campoCliente(item: GuiaItem, idx: number, layout: Layout) {
     const clave = claveCampo(item, "cliente");
@@ -500,7 +585,7 @@ export default function GuiaForm({
   }
 
   function campoDireccion(item: GuiaItem, idx: number, layout: Layout) {
-    if (soloCorregible) return soloTexto(item.direccion);
+    if (soloCorregible) return valorBloqueado(item.direccion);
     const clave = claveCampo(item, "direccion");
     const err = hayError(clave, item.direccion);
     return (
@@ -520,7 +605,7 @@ export default function GuiaForm({
   }
 
   function campoEmpresa(item: GuiaItem, idx: number, layout: Layout) {
-    if (soloCorregible) return soloTexto(item.empresa);
+    if (soloCorregible) return valorBloqueado(item.empresa);
     const clave = claveCampo(item, "empresa");
     const err = hayError(clave, item.empresa);
     // Cerrado: las 8 del grupo. Si la guía traía un valor sucio, entra a la
@@ -571,7 +656,7 @@ export default function GuiaForm({
     // 🔴 LOS BULTOS DE UNA GUÍA DESPACHADA NO SE TOCAN. Daniel: *"es lo que el
     // transportista firmó"*. No están en la lista de tres de
     // `campos-editables.ts` y el servidor los rechaza igual.
-    if (soloCorregible) return soloTexto(item.bultos ?? 0, alineado);
+    if (soloCorregible) return valorBloqueado(item.bultos ?? 0, alineado);
     const clave = claveCampo(item, "bultos");
     const err = validationErrors.has(clave) || (touched.has(clave) && !item.bultos);
     return (
@@ -656,7 +741,6 @@ export default function GuiaForm({
         </div>
           <SaveButton size="small" />
         </div>
-        <AvisoFalta className="mt-1.5 text-xs" />
       </div>
 
       {/* 🔴 ESTE TÍTULO SE QUEDA, y es la ÚNICA excepción de la poda de los 23
@@ -681,18 +765,29 @@ export default function GuiaForm({
         {/* 🔴 EN UNA GUÍA QUE YA SALIÓ, ESTO SE LEE. La fecha, el modo, el
             transportista y quién despachó son lo que el chofer firmó: no están
             en la lista de tres que Daniel abrió (N° del transportista · cliente
-            · facturas) y el servidor los rechaza igual. Se muestran como TEXTO
-            y no como campos apagados: un campo gris que no deja escribir invita
-            a pelearse con él. */}
+            · facturas) y el servidor los rechaza igual.
+            ⚠️ Hasta el 25-ago-2026 salían como texto suelto, con el argumento
+            de que "un campo gris que no deja escribir invita a pelearse con
+            él". Daniel midió lo contrario en el iPhone: sin la forma del campo
+            la guía firmada no se parecía a la recién creada, y con el asterisco
+            todavía puesto tampoco se sabía cuál se podía tocar. Hoy conservan
+            la caja y se APAGAN — ver `valorBloqueado`. */}
         {soloCorregible ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <DatoFijo etiqueta="Fecha" valor={fecha} />
-            <DatoFijo etiqueta="Cómo salió" valor={ETIQUETA_TIPO_DESPACHO[modoEntrega === "transportista" ? "externo" : "directo"]} />
-            <DatoFijo
-              etiqueta="Transportista"
-              valor={transportistas.find((t) => t.id === transportistaId)?.nombre || ""}
-            />
-            <DatoFijo etiqueta="Despachado por" valor={nombreDespachadoPor(entregadoPor)} />
+          /* 🔴 LA MISMA GRILLA QUE AL CREAR (`sm:grid-cols-2`, mismos rótulos,
+             mismo orden), con las cajas apagadas y su candado. Antes era otra
+             grilla con otro aspecto, y eso es la mitad de lo que Daniel señaló:
+             la guía despachada no se parecía a la guía que se acababa de crear. */
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
+            <Campo label="Fecha" bloqueado>{valorBloqueado(fecha)}</Campo>
+            <Campo label="Modo de entrega" bloqueado>
+              {valorBloqueado(ETIQUETA_TIPO_DESPACHO[modoEntrega === "transportista" ? "externo" : "directo"])}
+            </Campo>
+            <Campo label="Transportista" bloqueado>
+              {valorBloqueado(transportistas.find((t) => t.id === transportistaId)?.nombre || "")}
+            </Campo>
+            <Campo label="Despachado por" bloqueado>
+              {valorBloqueado(nombreDespachadoPor(entregadoPor))}
+            </Campo>
           </div>
         ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
@@ -796,11 +891,13 @@ export default function GuiaForm({
       {/* Detalle de envío */}
       <div className="mb-8">
         <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.05em] text-gray-400">
+          <div className="text-xs uppercase tracking-[0.05em] text-gray-400">
+            {/* 🔴 EL "＋ Agregar destino" SE FUE DE ACÁ (25-ago-2026). Daniel lo
+                abrió en el iPhone y no entendió qué era: pegado al TÍTULO de la
+                sección, un "＋" pelado se lee como si fuera a renombrar la
+                sección. Textual: *«Sobre dirección. Muévelo»*. Ahora vive
+                DEBAJO de la lista de envíos, con su nombre a la vista. */}
             Detalle de Envío
-            {/* Una sola instancia para todo el formulario: antes vivía dentro
-                del <th> de la tabla, que en móvil no existe. */}
-            <AddNewInline placeholder="Ciudad" onAdd={onAddDireccion} etiqueta="Agregar destino" />
           </div>
           <StatusBadge />
         </div>
@@ -829,11 +926,14 @@ export default function GuiaForm({
                 {botonQuitar(idx, "m")}
               </div>
               <div className="space-y-4">
-                <Campo label="Cliente" requerido htmlFor={idCampo(item, "cliente", "m")}>{campoCliente(item, idx, "m")}</Campo>
-                <Campo label="Dirección" requerido htmlFor={idCampo(item, "direccion", "m")}>{campoDireccion(item, idx, "m")}</Campo>
-                <Campo label="Empresa" requerido htmlFor={idCampo(item, "empresa", "m")}>{campoEmpresa(item, idx, "m")}</Campo>
-                <Campo label="Factura(s)" requerido nota="ej: 10234, 10235" htmlFor={idCampo(item, "facturas", "m")}>{campoFacturas(item, idx, "m")}</Campo>
-                <Campo label="Bultos" requerido htmlFor={idCampo(item, "bultos", "m")}>{campoBultos(item, idx, "m")}</Campo>
+                {/* 🔴 EN UNA GUÍA FIRMADA NADA LLEVA ASTERISCO: los tres que se
+                    pueden tocar ya no son "obligatorios" (no se valida el alta) y
+                    los otros tres no se pueden escribir. El candado marca cuáles. */}
+                <Campo label="Cliente" requerido={!soloCorregible} htmlFor={idCampo(item, "cliente", "m")}>{campoCliente(item, idx, "m")}</Campo>
+                <Campo label="Dirección" requerido={!soloCorregible} bloqueado={soloCorregible} htmlFor={idCampo(item, "direccion", "m")}>{campoDireccion(item, idx, "m")}</Campo>
+                <Campo label="Empresa" requerido={!soloCorregible} bloqueado={soloCorregible} htmlFor={idCampo(item, "empresa", "m")}>{campoEmpresa(item, idx, "m")}</Campo>
+                <Campo label="Factura(s)" requerido={!soloCorregible} nota="ej: 10234, 10235" htmlFor={idCampo(item, "facturas", "m")}>{campoFacturas(item, idx, "m")}</Campo>
+                <Campo label="Bultos" requerido={!soloCorregible} bloqueado={soloCorregible} htmlFor={idCampo(item, "bultos", "m")}>{campoBultos(item, idx, "m")}</Campo>
                 {/* 🔴 EL N° DEL TRANSPORTISTA, PEGADO A LOS BULTOS. Van juntos
                     porque se leen juntos del papel que trae el chofer. */}
                 {pideNumeroTransp && (
@@ -856,14 +956,16 @@ export default function GuiaForm({
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
                   <th className="py-3 font-normal w-8 text-left">#</th>
-                  <th className="py-3 font-normal text-left">Cliente <span className="text-red-500">*</span></th>
-                  <th className="py-3 font-normal text-left">Dirección <span className="text-red-500">*</span></th>
-                  <th className="py-3 font-normal text-left">Empresa <span className="text-red-500">*</span></th>
+                  {/* Mismo criterio que en la tarjeta: sin asterisco en una guía
+                      firmada, y candado en las tres columnas que no se tocan. */}
+                  <th className="py-3 font-normal text-left">Cliente{obligatorio}</th>
+                  <th className="py-3 font-normal text-left">Dirección{obligatorio}{candadoColumna}</th>
+                  <th className="py-3 font-normal text-left">Empresa{obligatorio}{candadoColumna}</th>
                   <th className="py-3 font-normal text-left">
-                    Factura(s) <span className="text-red-500">*</span>
+                    Factura(s){obligatorio}
                     <div className="text-xs text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Ej: 10234, 10235</div>
                   </th>
-                  <th className="py-3 font-normal w-20 text-right">Bultos <span className="text-red-500">*</span></th>
+                  <th className="py-3 font-normal w-20 text-right">Bultos{obligatorio}{candadoColumna}</th>
                   {pideNumeroTransp && (
                     <th className="py-3 font-normal w-32 text-left">
                       N° transportista
@@ -891,6 +993,22 @@ export default function GuiaForm({
           </ScrollableTable>
         </div>
 
+        {/* 🔴 ACÁ, no en el título: es donde se acaba de escribir la dirección.
+            Alimenta el mismo `<datalist id="direcciones-list">` de siempre — lo
+            único que cambió es DÓNDE está y que ahora DICE qué hace.
+            ⚠️ No vuelve al <th> de la tabla: en móvil ese <th> no existe.
+            ⚠️ En una guía firmada no se ofrece: la dirección está bloqueada. */}
+        {!soloCorregible && (
+          <div className="mt-2">
+            <AddNewInline
+              placeholder="Ciudad"
+              onAdd={onAddDireccion}
+              etiqueta="Agregar destino a la lista de direcciones"
+              textoBoton="Agregar destino a la lista"
+            />
+          </div>
+        )}
+
         <div className="mt-1 flex items-center justify-between gap-4">
           {/* Botón de solo texto: medía 21 px de alto. -mx-2 lo deja alineado
               con el borde izquierdo de la tabla pese al padding nuevo. */}
@@ -907,11 +1025,11 @@ export default function GuiaForm({
       </div>
 
       {/* Observaciones — se escriben donde se carga el camión. En una guía ya
-          firmada se leen: tampoco están en la lista de tres. */}
+          firmada se leen: tampoco están en la lista de tres.
+          🔴 Se dibujan SIEMPRE, aunque estén vacías: es lo que hace que la guía
+          firmada tenga la misma forma que la recién creada. Vacía dice "—". */}
       {soloCorregible ? (
-        String(observaciones ?? "").trim() ? (
-          <DatoFijo etiqueta="Observaciones" valor={observaciones} />
-        ) : null
+        <Campo label="Observaciones" bloqueado>{valorBloqueado(observaciones)}</Campo>
       ) : (
         <Campo label="Observaciones" nota="(opcional)" htmlFor="guia-observaciones">
           <textarea

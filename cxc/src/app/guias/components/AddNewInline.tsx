@@ -14,9 +14,21 @@ interface AddNewInlineProps {
   placeholder: string;
   /** Qué agrega, en español simple. Va a aria-label: un "＋" solo no dice nada. */
   etiqueta?: string;
+  /**
+   * 🔴 El rótulo VISIBLE al lado del "＋" (25-ago-2026).
+   *
+   * 🩸 Daniel abrió este control en el iPhone y no entendió qué era: un "＋"
+   * pelado no dice nada, y el `aria-label` solo lo oye quien usa lector de
+   * pantalla. Donde el control no está pegado a un campo que lo explique, se
+   * pasa el texto y se lee.
+   *
+   * ⚠️ Sin este prop el botón sale EXACTAMENTE como siempre (el "＋" a secas
+   * que usa «Despachado por», que sí está pegado a su campo).
+   */
+  textoBoton?: string;
 }
 
-export default function AddNewInline({ onAdd, placeholder, etiqueta = "Agregar nuevo" }: AddNewInlineProps) {
+export default function AddNewInline({ onAdd, placeholder, etiqueta = "Agregar nuevo", textoBoton }: AddNewInlineProps) {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState("");
 
@@ -34,9 +46,14 @@ export default function AddNewInline({ onAdd, placeholder, etiqueta = "Agregar n
         onClick={() => setOpen(true)}
         aria-label={etiqueta}
         title={etiqueta}
-        className="text-gray-300 hover:text-gray-500 transition text-base inline-flex items-center justify-center min-w-[44px] min-h-[44px] -my-3"
+        className={`transition text-base inline-flex items-center justify-center min-w-[44px] min-h-[44px] -my-3 ${
+          textoBoton
+            ? "gap-1.5 px-2 -mx-2 text-gray-400 hover:text-black"
+            : "text-gray-300 hover:text-gray-500"
+        }`}
       >
         ＋
+        {textoBoton && <span className="text-sm">{textoBoton}</span>}
       </button>
     );
   }
