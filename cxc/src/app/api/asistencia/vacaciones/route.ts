@@ -16,13 +16,25 @@ import { TABLA_VACACIONES, esTablaFaltante } from "@/lib/asistencia/config";
 import {
   avisoMigracionVacaciones,
   leerPersonasDelModulo,
+  vigenciaDeFila,
+  type FilaPersonaDb,
 } from "@/lib/asistencia/config-server";
-import { esYaPagada } from "@/lib/asistencia/vacaciones";
+import { esYaPagada, type Vacacion } from "@/lib/asistencia/vacaciones";
+import { tieneBaja } from "@/lib/asistencia/vigencia";
+import {
+  avisoSinFechaIngreso,
+  DESDE_CUANDO_CUENTA,
+  saldoDe,
+  type SaldoVacaciones,
+} from "@/lib/asistencia/saldo-vacaciones";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const COLS = "id, empleado_codigo, desde, hasta, ya_pagadas, registrado_por, created_at";
+/** Tope de filas de la lista. El `count` de al lado dice si se quedó corta. */
+const TOPE_FILAS = 500;
 const ES_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -47,13 +59,17 @@ export async function GET(req: NextRequest) {
   // terminaría diciendo «15, 16, 17, 21…». Es la MISMA fuente que usa
   // Justificaciones — dos listas distintas para elegir a la misma persona es
   // como se termina cargando una vacación al código equivocado.
-  const [res, { personas, faltaMigracion }] = await Promise.all([
+  const [res, { personas, faltaMigracion, filas }] = await Promise.all([
     supabaseServer
       .from(TABLA_VACACIONES)
-      .select(COLS)
+      // 🔴 EL `count` NO ES DECORACIÓN: de estas filas sale el SALDO, y un corte
+      // silencioso a las 500 restaría de menos sin que nadie se entere. Con el
+      // total se puede comparar contra lo que llegó y DECIRLO. (PostgREST
+      // cortando en silencio ya costó bugs caros en este repo.)
+      .select(COLS, { count: "exact" })
       .eq("deleted", false)
       .order("desde", { ascending: false })
-      .limit(500),
+      .limit(TOPE_FILAS),
     leerPersonasDelModulo(),
   ]);
 
@@ -65,18 +81,94 @@ export async function GET(req: NextRequest) {
         faltaMigracion,
         puedeCargar: false,
         avisoMigracion: avisoMigracionVacaciones(),
+        // Sin la tabla no hay vacaciones que restar, así que un saldo sería
+        // «todo lo ganado y nada gastado»: un número inventado. No se manda
+        // ninguno — el aviso ámbar de arriba ya dice qué falta.
+        saldos: [],
+        avisoSaldo: null,
+        avisoSaldoIncompleto: null,
+        desdeCuandoCuenta: DESDE_CUANDO_CUENTA,
       });
     }
     return NextResponse.json({ error: res.error.message }, { status: 500 });
   }
 
+  const vacaciones = res.data ?? [];
+  const { saldos, avisoSaldo } = armarSaldos(vacaciones, personas, filas);
+
   return NextResponse.json({
-    vacaciones: res.data ?? [],
+    vacaciones,
     personas,
     faltaMigracion,
     puedeCargar: true,
     avisoMigracion: null,
+    saldos,
+    avisoSaldo,
+    // 🔴 Se DICE, no se esconde: si llegaron menos vacaciones de las que hay, el
+    // saldo está restando de menos y quien lo mire tiene que saberlo.
+    avisoSaldoIncompleto:
+      typeof res.count === "number" && res.count > vacaciones.length
+        ? `Se están mostrando ${vacaciones.length} de ${res.count} vacaciones: el saldo puede estar restando de menos.`
+        : null,
+    desdeCuandoCuenta: DESDE_CUANDO_CUENTA,
   });
+}
+
+/**
+ * El saldo de cada persona ACTIVA, en el orden que ya trae el directorio
+ * (nombre alfabético; los códigos sin ficha al final).
+ *
+ * ── 🔴 QUIEN NO TIENE FECHA DE INGRESO IGUAL APARECE ────────────────────────
+ *
+ * Con `saldo: null` y `faltaFechaIngreso: true`, que la pantalla pinta como
+ * «Falta la fecha de ingreso». Filtrarlo de la lista sería descartarlo en
+ * silencio: son 20 de las 36 personas activas (medido por la puerta de la app
+ * el 25-ago-2026) y es justamente el trabajo que contabilidad tiene por delante.
+ *
+ * ── ⚠️ QUIEN YA NO TRABAJA ACÁ NO ENTRA ─────────────────────────────────────
+ *
+ * Misma regla que el resumen de Configuración: el saldo es para decidir quién
+ * puede irse de vacaciones, y quien ya se fue de la empresa no. Su liquidación
+ * es otra cuenta —y otra pantalla— que hoy no existe.
+ */
+function armarSaldos(
+  vacacionesDb: readonly Record<string, unknown>[],
+  personas: readonly { codigo: string; etiqueta: string }[],
+  filas: readonly FilaPersonaDb[],
+): { saldos: SaldoVacaciones[]; avisoSaldo: string | null } {
+  const fichas = new Map(filas.map((f) => [String(f.empleado_codigo), f]));
+  const hoy = hoyPanama();
+
+  // Al tipo que entiende el módulo puro. `=== true` y no truthy: el default de
+  // la columna es `false` y un valor raro tiene que caer del lado del default.
+  const vacaciones: Vacacion[] = vacacionesDb.map((f) => ({
+    empleado_codigo: String(f.empleado_codigo ?? ""),
+    desde: String(f.desde ?? ""),
+    hasta: String(f.hasta ?? ""),
+    ya_pagadas: f.ya_pagadas === true,
+  }));
+
+  const saldos = personas
+    // Sin ficha NO hay baja posible: es un código que marca y nadie configuró
+    // todavía, o sea que sigue activo. Es el mismo criterio de Configuración.
+    .filter((p) => {
+      const f = fichas.get(p.codigo);
+      return !f || !tieneBaja(vigenciaDeFila(f));
+    })
+    .map((p) =>
+      saldoDe(
+        p.codigo,
+        p.etiqueta,
+        fichas.get(p.codigo)?.fecha_ingreso ?? null,
+        vacaciones,
+        hoy,
+      ),
+    );
+
+  return {
+    saldos,
+    avisoSaldo: avisoSinFechaIngreso(saldos.filter((s) => s.faltaFechaIngreso).length),
+  };
 }
 
 /** Lo que las tres escrituras validan igual. `null` = está bien. */
