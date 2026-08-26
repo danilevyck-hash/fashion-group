@@ -6,15 +6,71 @@
  * dependan del reloj de la máquina. Mismo criterio que `periodo.ts` y
  * `vigencia.ts`.
  *
- * ── LA CUENTA, ENTERA, EN UNA LÍNEA ──────────────────────────────────────────
+ * ── 🩸 POR QUÉ ESTO NO ES «GANADOS DESDE QUE ENTRÓ MENOS LO TOMADO» ─────────
  *
- *     días ganados  −  días tomados  −  días ya pagados  =  SALDO
+ * Lo fue, durante un PR (#626), y era aritméticamente correcto e INÚTIL. Las
+ * vacaciones solo existen en el sistema desde el 25-ago-2026 —medido por la
+ * puerta de la app: UNA cargada— pero los días ganados se cuentan desde el
+ * ingreso, y hay fichas de 2019. ANGELA GARCIA figuraba con **245 días
+ * disponibles**: cierto, y peligroso. Alguien puede pararse en esa pantalla y
+ * reclamar días que ya se tomó. Un número que no se puede usar para decidir es
+ * peor que no mostrar ninguno.
  *
- * ── 🔴 LA REGLA DE LOS DÍAS GANADOS, CON UN EJEMPLO A MANO ───────────────────
+ * ── 🔴 EL ARRANQUE ES EL SALDO A HOY, NO LOS DÍAS TOMADOS HISTÓRICOS ────────
+ *
+ * Contabilidad TIENE el número en sus registros —*"a Angela le quedan 12
+ * días"*— y ése lo escribe sin hacer cuentas. Pedirle *"¿cuántos días tomó
+ * desde 2019?"* sería pedirle que reconstruya siete años: no lo haría nadie, y
+ * la pantalla se quedaría vacía para siempre.
+ *
+ * ── 🔴 LA FECHA DE CORTE ES LA MITAD DEL DATO ───────────────────────────────
+ *
+ * "Le quedan 12" ¿a qué día? De la fecha depende QUÉ se resta después: las
+ * vacaciones anteriores al corte **YA ESTÁN ADENTRO de ese 12**, y volver a
+ * restarlas sería cobrarle dos veces los mismos días. El corte es la línea que
+ * separa «ya contado» de «por contar», y por eso viaja pegado al número —el
+ * CHECK de la base obliga a que vayan los dos o ninguno.
+ *
+ * ── LA CUENTA, ENTERA, EN UNA LÍNEA ─────────────────────────────────────────
+ *
+ *     saldo = saldo inicial
+ *           − vacaciones tomadas    DESPUÉS del corte
+ *           − vacaciones ya pagadas DESPUÉS del corte
+ *           + lo ganado entre el corte y hoy
+ *
+ * ── 🔴 EL EJEMPLO NUMÉRICO (se puede auditar sin leer la función) ───────────
+ *
+ * ANGELA GARCIA (código 7), ingresó el **16-feb-2019**.
+ * Contabilidad carga: **le quedan 12 días**, corte **25-ago-2026**.
+ *
+ *   Al 25-ago-2026, el mismo día del corte:
+ *     ganó desde el corte = 0        (no pasó ni un mes)
+ *     SALDO = 12 − 0 − 0 + 0 = 12    ← exactamente lo que ella escribió
+ *
+ *   Al 25-nov-2026, sin haberse tomado nada:
+ *     ganados al 25-nov = 253        93 meses: 8×30 + ⌊5 × 30/11⌋ = 240 + 13
+ *     ganados al corte  = 245        90 meses: 8×30 + ⌊2 × 30/11⌋ = 240 +  5
+ *     ganó desde el corte = 253 − 245 = 8
+ *     SALDO = 12 − 0 − 0 + 8 = 20
+ *
+ *   Al 25-nov-2026, si entre medio se tomó del 1 al 10 de octubre (10 días):
+ *     SALDO = 12 − 10 − 0 + 8 = 10
+ *
+ *   Y una vacación del 1 al 10 de AGOSTO (antes del corte) NO resta nada: ya
+ *   estaba adentro del 12.
+ *
+ * 🔑 EL INCREMENTO SE MIDE CONTRA EL INGRESO, no desde el corte. El ciclo de 11
+ * meses de la ley está anclado al aniversario de entrada, así que «lo ganado
+ * hasta hoy MENOS lo ganado hasta el corte» respeta ese calendario; contar 11
+ * meses desde el corte lo correría para siempre. Por eso hace falta la fecha de
+ * ingreso ADEMÁS del saldo, y por eso no hay dos fórmulas según qué dato haya:
+ * dos fórmulas son dos verdades, y el día que se separan nadie sabe cuál vale.
+ *
+ * ── 🔴 LA REGLA DE LOS DÍAS GANADOS ─────────────────────────────────────────
  *
  * Código de Trabajo de Panamá: **30 días por cada 11 MESES trabajados** (un mes
- * de vacaciones por cada once de trabajo). Once, no doce — y de ahí sale todo
- * lo demás, así que no es un typo que alguien deba "arreglar".
+ * de vacaciones por cada once de trabajo). Once, no doce — no es un typo que
+ * alguien deba "arreglar".
  *
  *   · Cada bloque de 11 meses CUMPLIDOS suma 30 días enteros.
  *   · El bloque EN CURSO suma 30 ÷ 11 = 2,7272… días por cada mes cumplido, y
@@ -22,19 +78,7 @@
  *
  * 🔑 SE TRUNCA HACIA ABAJO, y esa asimetría es a propósito: mostrar un día de
  * más es habilitar a alguien a irse un día que todavía no ganó, y eso después
- * se paga en plata. Mostrar un día de menos solo se corrige solo, al mes
- * siguiente.
- *
- * ── EL EJEMPLO NUMÉRICO (se puede auditar sin leer la función) ───────────────
- *
- * ANGELA GARCIA (código 7) entró el **16-feb-2019**; al **25-ago-2026**:
- *
- *     meses cumplidos = 90        16-feb-2019 → 16-ago-2026 son 90 meses,
- *                                 y el 25 ya pasó el 16, así que el mes cerró.
- *     bloques enteros = 90 ÷ 11 = 8   →  8 × 30      = 240 días
- *     resto           = 90 − 8×11 = 2 →  ⌊2 × 30/11⌋ = ⌊5,45⌋ = 5 días
- *     ───────────────────────────────────────────────────────────────
- *     GANADOS                                        = 245 días
+ * se paga en plata. Un día de menos se corrige solo, al mes siguiente.
  *
  * ── 🔴 LOS DÍAS SE CUENTAN DE CALENDARIO, FINES DE SEMANA Y FERIADOS ADENTRO ─
  *
@@ -49,31 +93,28 @@
  * días de derecho gastó?*, y el derecho viene medido en meses de calendario:
  * los 30 días de la ley son un MES corrido, con sus domingos adentro.
  * Descontar solo los hábiles contra un techo de días corridos sería comparar
- * dos unidades distintas y regalarle a cada persona ~8 días por mes de
- * vacaciones tomado.
+ * dos unidades distintas y regalarle a cada persona ~8 días por mes tomado.
  *
  * ── 🔴 LAS "YA PAGADAS" TAMBIÉN BAJAN DEL SALDO ─────────────────────────────
  *
  * La regla es de la contadora, textual: *"Si la persona había cobrado sus
  * vacaciones anteriormente en dinero y no se había ido esos tres días, yo se
- * los descuento porque ya se los pagué"*. O sea: el derecho se consumió igual
- * —se cobró en vez de disfrutarse—, así que baja del saldo exactamente como si
- * se hubiera ido. Se llevan en un contador APARTE del de los tomados por una
- * sola razón: quien mire el renglón tiene que poder distinguir los días que la
- * persona descansó de los que le pagaron. Los dos restan.
+ * los descuento porque ya se los pagué"*. El derecho se consumió igual —se
+ * cobró en vez de disfrutarse—, así que baja del saldo exactamente como si se
+ * hubiera ido. Se llevan en un contador APARTE por una sola razón: quien mire
+ * el renglón tiene que poder distinguir los días que descansó de los que le
+ * pagaron. Los dos restan.
  *
- * ── 🔴 SIN FECHA DE INGRESO NO HAY SALDO. NI CERO. ──────────────────────────
+ * ── 🔴 SIN LOS DOS DATOS NO HAY SALDO. NI CERO. NI UN NÚMERO GRANDE. ────────
  *
- * `ganados` y `saldo` son `number | null`, y el `null` no se puede confundir
- * con un `0` por accidente: **20 de las 36 personas activas no tienen
- * `fecha_ingreso` cargada** (medido por la puerta de la app el 25-ago-2026,
- * GET /api/asistencia/configuracion). Un cero ahí se leería como "no le queda
- * ni un día" y a alguien le negarían las vacaciones que sí ganó.
- *
- * Y NO se esconden de la lista: aparecen diciendo «Falta la fecha de ingreso»,
- * que además es la acción que hay que hacer. Nada se descarta en silencio.
+ * `saldo` es `number | null`, y el `null` no se puede confundir con un `0` por
+ * accidente. Quien no tiene fecha de ingreso, o no tiene saldo inicial cargado,
+ * **aparece en la lista** diciendo cuál de los dos le falta — que además es la
+ * acción que hay que hacer. Nada se descarta en silencio, y tampoco se muestra
+ * un número que engaña.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import type { Resultado } from "./config";
 import { esFechaValida } from "./vigencia";
 import { diasDeVacacion, type Vacacion } from "./vacaciones";
 
@@ -86,6 +127,9 @@ export const DIAS_POR_PERIODO = 30;
 
 /** Cuántos meses de trabajo cierran un período. ONCE, no doce. Ver la cabecera. */
 export const MESES_POR_PERIODO = 11;
+
+/** Tope de cordura del saldo inicial, el mismo que el CHECK de la base. */
+export const SALDO_INICIAL_MAX = 999;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MESES CUMPLIDOS
@@ -120,20 +164,20 @@ export function mesesCumplidos(desde: string, hasta: string): number {
 }
 
 /**
- * Los días de vacaciones GANADOS desde el ingreso hasta `hoy`.
+ * Los días de vacaciones GANADOS desde el ingreso hasta una fecha.
  *
  * `null` = no se puede saber: no hay fecha de ingreso (o no es una fecha).
  * 🔴 Nunca `0` por falta de dato — ver la cabecera.
  *
- * Con una fecha de ingreso FUTURA devuelve `0`, y ese cero sí es real: la
+ * Con una fecha de ingreso posterior devuelve `0`, y ese cero sí es real: la
  * persona todavía no empezó a trabajar y no ganó ningún día.
  */
 export function diasGanados(
   fechaIngreso: string | null | undefined,
-  hoy: string,
+  hasta: string,
 ): number | null {
-  if (!esFechaValida(fechaIngreso) || !esFechaValida(hoy)) return null;
-  const meses = mesesCumplidos(String(fechaIngreso).trim(), hoy);
+  if (!esFechaValida(fechaIngreso) || !esFechaValida(hasta)) return null;
+  const meses = mesesCumplidos(String(fechaIngreso).trim(), hasta);
   const bloques = Math.floor(meses / MESES_POR_PERIODO);
   const resto = meses - bloques * MESES_POR_PERIODO;
   // El bloque cerrado paga entero; el que está en curso, prorrateado y truncado.
@@ -141,37 +185,79 @@ export function diasGanados(
     + Math.floor((resto * DIAS_POR_PERIODO) / MESES_POR_PERIODO);
 }
 
+/**
+ * Lo que ganó ENTRE el corte y hoy: lo ganado hasta hoy menos lo ganado hasta
+ * el corte.
+ *
+ * 🔑 Se resta contra el MISMO calendario (el aniversario de ingreso) en vez de
+ * contar 11 meses desde el corte. Ver la cabecera: el corte es una foto, no un
+ * nuevo aniversario, y arrancar el ciclo ahí lo correría para siempre.
+ *
+ * Nunca negativo: un corte en el futuro no le puede quitar días a nadie.
+ */
+export function ganadosDesdeElCorte(
+  fechaIngreso: string | null | undefined,
+  corte: string | null | undefined,
+  hoy: string,
+): number | null {
+  if (!esFechaValida(corte)) return null;
+  const aHoy = diasGanados(fechaIngreso, hoy);
+  const alCorte = diasGanados(fechaIngreso, String(corte).trim());
+  if (aHoy === null || alCorte === null) return null;
+  return Math.max(0, aHoy - alCorte);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// LO GASTADO
+// LO GASTADO — SOLO LO QUE PASÓ DESPUÉS DEL CORTE
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Los días de esta vacación que caen DESPUÉS del corte.
+ *
+ * 🔴 Una vacación entera anterior al corte devuelve 0: esos días ya están
+ * adentro del saldo que cargó contabilidad, y restarlos otra vez sería
+ * cobrárselos dos veces.
+ *
+ * ⚠️ Y una vacación que CRUZA el corte se parte: se restan solo los días
+ * posteriores. Tirar la vacación entera —o contarla entera— por caer a caballo
+ * del corte inventaría o regalaría días sin decirlo.
+ */
+export function diasDespuesDelCorte(desde: string, hasta: string, corte: string): number {
+  const total = diasDeVacacion(desde, hasta);
+  if (total === 0 || !esFechaValida(corte)) return 0;
+  // Se comparan como TEXTO: en `YYYY-MM-DD` el orden alfabético ES el
+  // cronológico. El día del corte cuenta como YA absorbido.
+  if (hasta <= corte) return 0;
+  if (desde > corte) return total;
+  return total - diasDeVacacion(desde, corte);
+}
+
 export interface DiasGastados {
-  /** Días de vacaciones que la persona se tomó (sin marcar «ya se le pagó»). */
+  /** Días que la persona se tomó DESPUÉS del corte (sin marcar «ya se le pagó»). */
   tomados: number;
-  /** Días que cobró en efectivo y no disfrutó. **También restan.** */
+  /** Días que cobró en efectivo y no disfrutó, después del corte. **También restan.** */
   yaPagados: number;
 }
 
 /**
- * Los días que esta persona ya gastó, separados en los dos contadores.
+ * Los días que esta persona gastó después del corte, en los dos contadores.
  *
- * ⚠️ Recorre TODAS las vacaciones que se le pasen: el saldo es histórico, no
- * de una quincena. Quien llame tiene que darle la lista completa —filtrarla por
+ * ⚠️ Recorre TODAS las vacaciones que se le pasen y filtra por el corte acá
+ * adentro: quien llame tiene que darle la lista completa. Filtrarla antes por
  * un rango de fechas devolvería un saldo inflado sin decir por qué.
  */
 export function diasGastados(
   vacaciones: readonly Vacacion[],
   codigo: string,
+  corte: string,
 ): DiasGastados {
   const cod = String(codigo ?? "").trim();
   let tomados = 0;
   let yaPagados = 0;
   for (const v of vacaciones) {
     if (String(v?.empleado_codigo ?? "").trim() !== cod) continue;
-    // 🔑 El MISMO contador que muestra la pantalla al cargar la vacación
-    // (`diasDeVacacion`): días de calendario, los dos extremos incluidos. Ver
-    // la cabecera para por qué acá no entra el filtro de hábiles de la planilla.
-    const dias = diasDeVacacion(v.desde, v.hasta);
+    const dias = diasDespuesDelCorte(v.desde, v.hasta, corte);
+    if (dias === 0) continue;
     if (v.ya_pagadas) yaPagados += dias;
     else tomados += dias;
   }
@@ -182,18 +268,37 @@ export function diasGastados(
 // EL SALDO
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Qué dato falta para poder calcular. `null` = no falta ninguno. */
+export type FaltaDato = "fecha" | "saldo" | "ambos";
+
+/** Lo que la ficha aporta al cálculo. */
+export interface DatosSaldo {
+  /** Ancla del ciclo de 11 meses. Sin esto no se sabe cuánto gana. */
+  fechaIngreso: string | null;
+  /** Los días que le quedaban al corte, escritos por contabilidad. */
+  saldoInicial: number | null;
+  /** El día al que ese número es cierto. Va SIEMPRE junto con el anterior. */
+  corte: string | null;
+}
+
 export interface SaldoVacaciones {
   codigo: string;
   /** El nombre, o el código si todavía no tiene ficha. NUNCA vacío. */
   etiqueta: string;
-  /** `null` = falta la fecha de ingreso. NO es cero. */
-  ganados: number | null;
-  tomados: number;
-  yaPagados: number;
-  /** `null` = falta la fecha de ingreso. Puede ser NEGATIVO: ver abajo. */
+  /** `null` = falta un dato. NO es cero. */
   saldo: number | null;
-  /** `true` = no hay fecha de ingreso cargada y por eso no hay saldo. */
-  faltaFechaIngreso: boolean;
+  /** Lo que cargó contabilidad, tal cual. `null` si no lo cargó. */
+  saldoInicial: number | null;
+  /** El día del corte. `null` si no hay saldo inicial. */
+  corte: string | null;
+  /** Lo ganado ENTRE el corte y hoy. */
+  ganadosDesdeCorte: number;
+  /** Días tomados después del corte. */
+  tomados: number;
+  /** Días ya pagados después del corte. También restan. */
+  yaPagados: number;
+  /** Qué falta para poder calcular. `null` = no falta nada. */
+  falta: FaltaDato | null;
 }
 
 /**
@@ -206,22 +311,50 @@ export interface SaldoVacaciones {
 export function saldoDe(
   codigo: string,
   etiqueta: string,
-  fechaIngreso: string | null | undefined,
+  datos: DatosSaldo,
   vacaciones: readonly Vacacion[],
   hoy: string,
 ): SaldoVacaciones {
-  const { tomados, yaPagados } = diasGastados(vacaciones, codigo);
-  const ganados = diasGanados(fechaIngreso, hoy);
-  return {
+  const hayFecha = esFechaValida(datos.fechaIngreso);
+  // 🔑 Los dos juntos o ninguno, igual que el CHECK de la base. Un saldo sin
+  // corte es un saldo a un día que nadie sabe: no se puede usar para restar.
+  const haySaldo =
+    typeof datos.saldoInicial === "number"
+    && Number.isFinite(datos.saldoInicial)
+    && esFechaValida(datos.corte);
+
+  const base = {
     codigo: String(codigo ?? "").trim(),
     etiqueta,
-    ganados,
+    saldoInicial: haySaldo ? datos.saldoInicial : null,
+    corte: haySaldo ? String(datos.corte).trim() : null,
+  };
+
+  if (!hayFecha || !haySaldo) {
+    // 🔴 EL CANDADO: falta un dato, no sale un número. Ni cero, ni el saldo
+    // inicial pelado —que sin la fecha no se puede hacer crecer y se quedaría
+    // congelado mintiendo—.
+    return {
+      ...base,
+      saldo: null,
+      ganadosDesdeCorte: 0,
+      tomados: 0,
+      yaPagados: 0,
+      falta: !hayFecha && !haySaldo ? "ambos" : !hayFecha ? "fecha" : "saldo",
+    };
+  }
+
+  const corte = String(datos.corte).trim();
+  const { tomados, yaPagados } = diasGastados(vacaciones, codigo, corte);
+  const ganadosDesdeCorte = ganadosDesdeElCorte(datos.fechaIngreso, corte, hoy) ?? 0;
+
+  return {
+    ...base,
+    ganadosDesdeCorte,
     tomados,
     yaPagados,
-    // 🔴 El candado: sin `ganados` no sale un número, sale `null`. Un `?? 0` acá
-    // convertiría "no se sabe" en "no le queda nada".
-    saldo: ganados === null ? null : ganados - tomados - yaPagados,
-    faltaFechaIngreso: ganados === null,
+    saldo: (datos.saldoInicial as number) - tomados - yaPagados + ganadosDesdeCorte,
+    falta: null,
   };
 }
 
@@ -233,52 +366,171 @@ export function saldoDe(
 // segunda verdad. Mismo criterio que `vacaciones.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Lo que dice la columna cuando no hay fecha de ingreso. Es la ACCIÓN, no un guion. */
-export const SIN_FECHA_INGRESO = "Falta la fecha de ingreso";
+/** Cómo se llama el campo en la ficha. Corto y en español simple. */
+export const ETIQUETA_SALDO_INICIAL = "Días de vacaciones que le quedan hoy";
 
-/**
- * La columna de saldo, corta: «18 de 30» = le quedan 18 de los 30 que ganó.
- * Sin fecha de ingreso, la frase que dice qué falta hacer.
- */
-export function textoSaldo(s: SaldoVacaciones): string {
-  if (s.saldo === null || s.ganados === null) return SIN_FECHA_INGRESO;
-  return `${s.saldo} de ${s.ganados}`;
+/** Lo que dice la columna según qué dato falte. Es la ACCIÓN, no un guion. */
+export const TEXTO_FALTA: Record<FaltaDato, string> = {
+  fecha: "Falta la fecha de ingreso",
+  saldo: "Falta el saldo",
+  ambos: "Faltan la fecha de ingreso y el saldo",
+};
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** «2026-08-25» → «25 ago 2026». La misma forma que usa el resto del módulo. */
+export function fechaCortaSaldo(f: string): string {
+  const p = partes(f);
+  return p ? `${p.dia} ${MESES_CORTOS[p.mes - 1]} ${p.anio}` : "";
 }
 
 /**
- * El renglón chico de abajo: en qué se fueron los días. `null` cuando no gastó
- * ninguno — una línea que siempre dice «tomó 0» es una línea que se deja de leer.
+ * La columna de saldo, corta: «20 días». Sin el dato, la frase que dice qué
+ * falta hacer.
  */
-export function textoGastados(s: SaldoVacaciones): string | null {
-  const partes: string[] = [];
+export function textoSaldo(s: SaldoVacaciones): string {
+  if (s.saldo === null || s.falta !== null) return TEXTO_FALTA[s.falta ?? "saldo"];
+  return `${s.saldo} ${s.saldo === 1 || s.saldo === -1 ? "día" : "días"}`;
+}
+
+/**
+ * El renglón chico de abajo: DE DÓNDE salió ese número, para poder auditarlo
+ * sin abrir otra pantalla. `null` cuando no hay saldo que explicar.
+ *
+ * «12 al 25 ago 2026 · +8 ganados · tomó 10 · ya pagados 3»
+ */
+export function textoDetalle(s: SaldoVacaciones): string | null {
+  if (s.saldo === null || s.saldoInicial === null || s.corte === null) return null;
+  const partes = [`${s.saldoInicial} al ${fechaCortaSaldo(s.corte)}`];
+  if (s.ganadosDesdeCorte > 0) partes.push(`+${s.ganadosDesdeCorte} ganados`);
   if (s.tomados > 0) partes.push(`tomó ${s.tomados}`);
   // 🔴 Se NOMBRA aparte: son días que se cobraron, no que se descansaron, y
   // restan igual. Juntarlos con los tomados borraría esa diferencia.
   if (s.yaPagados > 0) partes.push(`ya pagados ${s.yaPagados}`);
-  return partes.length ? partes.join(" · ") : null;
+  return partes.join(" · ");
 }
 
 /**
- * La línea que dice cuánta gente se quedó SIN saldo por falta de fecha.
+ * La línea que dice cuánta gente se quedó SIN saldo y por qué.
  * `null` cuando no falta ninguna — un cartel permanente se deja de leer.
  *
  * 🔴 Lleva el DÓNDE, no solo el cuánto: sin eso es una queja, no una tarea.
+ *
+ * ⚠️ Los dos números son DISJUNTOS: `sinFecha` cuenta a quien le falta la fecha
+ * de ingreso (con o sin saldo) y `sinSaldo` a quien SÍ tiene la fecha y solo le
+ * falta el saldo. Solapados, la suma no daría el total y el aviso se leería
+ * como si hubiera más gente de la que hay.
  */
-export function avisoSinFechaIngreso(cuantas: number): string | null {
-  if (cuantas <= 0) return null;
-  const gente = cuantas === 1 ? "1 persona no tiene saldo" : `${cuantas} personas no tienen saldo`;
-  return `${gente}: les falta la fecha de ingreso. Se carga en Configuración, en «Empezó a trabajar».`;
+export function avisoSinSaldo(sinFecha: number, sinSaldo: number): string | null {
+  const f = Math.max(0, sinFecha);
+  const s = Math.max(0, sinSaldo);
+  const total = f + s;
+  if (total === 0) return null;
+  const gente = total === 1 ? "1 persona no tiene saldo" : `${total} personas no tienen saldo`;
+  const donde = "Se cargan en Configuración.";
+  if (f > 0 && s > 0) {
+    return `${gente}: a ${f} les falta la fecha de ingreso y a ${s} el saldo. ${donde}`;
+  }
+  if (f > 0) return `${gente}: les falta la fecha de ingreso. ${donde}`;
+  return `${gente}: falta cargárselo en «${ETIQUETA_SALDO_INICIAL}». ${donde}`;
 }
 
 /**
  * La línea que dice desde cuándo cuenta la resta. **No se puede sacar.**
  *
- * 🩸 Los días GANADOS se cuentan desde que la persona entró —hay fichas de
- * 2019—, pero las vacaciones solo existen en el sistema desde el 25-ago-2026,
- * cuando se creó la tabla: al medir por la puerta de la app ese día había UNA
- * cargada. O sea que a quien se fue de vacaciones en 2023 el saldo se las
- * cuenta como no tomadas. Decirlo es la diferencia entre un número que se
- * entiende y un número que se cree.
+ * 🔑 Es lo que hace que el número se entienda en vez de solo creerse: el saldo
+ * arranca del que escribió contabilidad, y de ahí en adelante el sistema suma
+ * lo que se gana y resta lo que se carga acá.
  */
 export const DESDE_CUANDO_CUENTA =
-  "El saldo resta solo las vacaciones cargadas acá. Las de antes no están en el sistema.";
+  "Arranca del saldo que carga contabilidad y desde esa fecha suma lo ganado y "
+  + "resta las vacaciones cargadas acá.";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VALIDACIÓN — el validador recibe `unknown` y convierte él
+//
+// Mismo criterio que `config.ts` y `seguros.ts`: con un `Number(x)` afuera, un
+// `null` llegaría como 0 y un saldo de cero entraría sin que nadie lo escribiera.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * El saldo inicial que viene en el cuerpo de un PUT.
+ *
+ * Vacío es un valor VÁLIDO y significa «todavía no se cargó» → `null`, que es
+ * como están las 39 fichas y lo que hace que la pantalla diga «Falta el saldo».
+ *
+ * 🔑 ENTERO. Todo el módulo cuenta días corridos enteros —el prorrateo se
+ * trunca— y un decimal suelto arrastraría coma por toda la cadena.
+ */
+export function validarSaldoInicial(body: unknown): Resultado<number | null> {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const v = b.saldoVacacionesDias;
+  if (v === undefined || v === null || (typeof v === "string" && v.trim() === "")) {
+    return { ok: true, valor: null };
+  }
+  const n = typeof v === "number" ? v : Number(String(v).trim());
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    return { ok: false, error: "Los días que le quedan tienen que ser un número entero." };
+  }
+  if (n < -SALDO_INICIAL_MAX || n > SALDO_INICIAL_MAX) {
+    return { ok: false, error: `Los días que le quedan tienen que estar entre -${SALDO_INICIAL_MAX} y ${SALDO_INICIAL_MAX}.` };
+  }
+  return { ok: true, valor: n };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ¿FALTA CORRER LA MIGRACIÓN?
+//
+// Mismo criterio que `seguros.ts` y `vigencia.ts`: en este proyecto los DDL los
+// corre Daniel a mano y varios se quedaron pendientes semanas. Sin las
+// columnas, TODO el módulo sigue funcionando —nadie tiene saldo inicial, o sea
+// que la pantalla dice «Falta el saldo» y no muestra ningún número— y
+// Configuración dice qué archivo falta en vez de romperse.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const MIGRACION_SALDO_VACACIONES =
+  "20260826040000_asistencia_saldo_vacaciones_inicial.sql";
+
+/** Las columnas nuevas. Se listan acá para que el `select` y la detección del
+ *  error no se puedan separar: si mañana se agrega una tercera, va en un lugar. */
+export const COLS_SALDO_VACACIONES = [
+  "saldo_vacaciones_dias",
+  "saldo_vacaciones_corte",
+] as const;
+
+interface ErrorPostgrest {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+}
+
+/**
+ * ¿Este error es «todavía no existen las columnas del saldo»?
+ *
+ * Hermano de `esColumnaPagaSegurosFaltante`: `42703` es "undefined_column" de
+ * Postgres (lo tira el `select`) y `PGRST204` el de PostgREST cuando la columna
+ * no está en su caché de esquema (lo tira el `upsert`).
+ *
+ * ⚠️ El error tiene que NOMBRAR una de las columnas. Tragarse cualquier error
+ * convertiría un problema real —permisos, red, RLS— en una pantalla que miente
+ * diciendo "falta la migración".
+ */
+export function esColumnaSaldoVacacionesFaltante(err: unknown): boolean {
+  if (!err) return false;
+  const e = err as ErrorPostgrest;
+  const texto = `${e.message ?? ""} ${e.details ?? ""} ${e.hint ?? ""}`;
+  if (!COLS_SALDO_VACACIONES.some((c) => texto.includes(c))) return false;
+
+  const code = String(e.code ?? "");
+  if (code === "42703" || code === "PGRST204") return true;
+  return /does not exist|no existe|schema cache|could not find/i.test(texto);
+}
+
+export function avisoMigracionSaldoVacaciones(): string {
+  return (
+    "Todavía no se puede cargar el saldo de vacaciones de nadie: falta preparar "
+    + `la base de datos. Pídele a Daniel que corra el archivo ${MIGRACION_SALDO_VACACIONES} `
+    + "en Supabase. Mientras tanto todo lo demás funciona igual."
+  );
+}

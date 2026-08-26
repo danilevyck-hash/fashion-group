@@ -23,19 +23,32 @@ import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/re
 
 import { ToastProvider } from "@/components/ToastSystem";
 import VacacionesTab from "@/app/asistencia/VacacionesTab";
-import { avisoSinFechaIngreso, DESDE_CUANDO_CUENTA } from "@/lib/asistencia/saldo-vacaciones";
+import { avisoSinSaldo, DESDE_CUANDO_CUENTA } from "@/lib/asistencia/saldo-vacaciones";
 
+/** Con saldo: 12 al corte, +8 ganados, 10 tomados → 10 días. */
+const ANGELA = {
+  codigo: "7", etiqueta: "ANGELA GARCIA",
+  saldo: 10, saldoInicial: 12, corte: "2026-08-25",
+  ganadosDesdeCorte: 8, tomados: 10, yaPagados: 0, falta: null,
+};
+/** Con días COBRADOS: restan igual y se nombran aparte. */
 const ELOYN = {
   codigo: "29", etiqueta: "ELOYN MENDOZA",
-  ganados: 100, tomados: 29, yaPagados: 0, saldo: 71, faltaFechaIngreso: false,
+  saldo: 9, saldoInicial: 12, corte: "2026-08-25",
+  ganadosDesdeCorte: 0, tomados: 0, yaPagados: 3, falta: null,
 };
+/** Le falta la fecha de ingreso. */
 const ALEJANDRA = {
   codigo: "22", etiqueta: "ALEJANDRA CAMAÑO",
-  ganados: null, tomados: 0, yaPagados: 0, saldo: null, faltaFechaIngreso: true,
+  saldo: null, saldoInicial: null, corte: null,
+  ganadosDesdeCorte: 0, tomados: 0, yaPagados: 0, falta: "fecha" as const,
 };
-const COBRADAS = {
-  codigo: "7", etiqueta: "ANGELA GARCIA",
-  ganados: 245, tomados: 0, yaPagados: 3, saldo: 242, faltaFechaIngreso: false,
+/** 🩸 Tiene fecha de ingreso de 2019 y NO tiene saldo cargado: es el caso que
+ *  mostraba 245 días disponibles. Ahora tiene que decir «Falta el saldo». */
+const SIN_SALDO = {
+  codigo: "11", etiqueta: "JULIO GARAY",
+  saldo: null, saldoInicial: null, corte: null,
+  ganadosDesdeCorte: 0, tomados: 0, yaPagados: 0, falta: "saldo" as const,
 };
 
 const RESPUESTA = {
@@ -47,12 +60,13 @@ const RESPUESTA = {
     { codigo: "29", nombre: "ELOYN MENDOZA", etiqueta: "ELOYN MENDOZA", configurado: true },
     { codigo: "22", nombre: "ALEJANDRA CAMAÑO", etiqueta: "ALEJANDRA CAMAÑO", configurado: true },
     { codigo: "7", nombre: "ANGELA GARCIA", etiqueta: "ANGELA GARCIA", configurado: true },
+    { codigo: "11", nombre: "JULIO GARAY", etiqueta: "JULIO GARAY", configurado: true },
   ],
   faltaMigracion: false,
   puedeCargar: true,
   avisoMigracion: null,
-  saldos: [ELOYN, ALEJANDRA, COBRADAS],
-  avisoSaldo: avisoSinFechaIngreso(20),
+  saldos: [ANGELA, ELOYN, ALEJANDRA, SIN_SALDO],
+  avisoSaldo: avisoSinSaldo(20, 16),
   avisoSaldoIncompleto: null,
   desdeCuandoCuenta: DESDE_CUANDO_CUENTA,
 };
@@ -79,25 +93,39 @@ describe("la columna de saldo", () => {
     ).toBeTruthy();
   });
 
-  it("dice «71 de 100» — corto, sin párrafos", async () => {
+  it("dice «10 días» — corto, sin párrafos", async () => {
     servir(RESPUESTA);
     montar();
-    await waitFor(() => expect(renglon("29")).toBeTruthy());
-    expect(renglon("29")!.textContent).toContain("71 de 100");
-    // Y el detalle de en qué se fueron los días, chiquito al lado.
-    expect(renglon("29")!.textContent).toContain("tomó 29");
+    await waitFor(() => expect(renglon("7")).toBeTruthy());
+    expect(renglon("7")!.textContent).toContain("10 días");
+  });
+
+  it("🔴 y DE DÓNDE salió: el arranque, la fecha de corte y el movimiento", async () => {
+    servir(RESPUESTA);
+    montar();
+    await waitFor(() => expect(renglon("7")).toBeTruthy());
+    const t = renglon("7")!.textContent ?? "";
+    expect(t).toContain("12 al 25 ago 2026");
+    expect(t).toContain("+8 ganados");
+    expect(t).toContain("tomó 10");
   });
 
   it("🔴 los días «ya pagados» se nombran aparte: se cobraron, no se descansaron", async () => {
     servir(RESPUESTA);
     montar();
-    await waitFor(() => expect(renglon("7")).toBeTruthy());
-    expect(renglon("7")!.textContent).toContain("242 de 245");
-    expect(renglon("7")!.textContent).toContain("ya pagados 3");
+    await waitFor(() => expect(renglon("29")).toBeTruthy());
+    expect(renglon("29")!.textContent).toContain("9 días");
+    expect(renglon("29")!.textContent).toContain("ya pagados 3");
+  });
+
+  it("dice cuántas personas ya tienen saldo, sin hacerlo contar a nadie", async () => {
+    servir(RESPUESTA);
+    montar();
+    expect(await screen.findByText((t) => t.includes("2 de 4 ya tienen saldo"))).toBeTruthy();
   });
 });
 
-describe("🔴 quien no tiene fecha de ingreso", () => {
+describe("🔴 a quien le falta un dato", () => {
   it("APARECE en la lista — no se lo esconde", async () => {
     servir(RESPUESTA);
     montar();
@@ -115,10 +143,22 @@ describe("🔴 quien no tiene fecha de ingreso", () => {
     expect(texto).not.toMatch(/\d/);
   });
 
-  it("la línea de arriba dice cuántas son y DÓNDE se arregla", async () => {
+  it("🩸 quien tiene fecha de 2019 pero no saldo NO muestra un número grande", async () => {
     servir(RESPUESTA);
     montar();
-    const aviso = await screen.findByText((t) => t.includes("20 personas no tienen saldo"));
+    await waitFor(() => expect(renglon("11")).toBeTruthy());
+    const texto = renglon("11")!.textContent ?? "";
+    expect(texto).toContain("Falta el saldo");
+    // Es el renglón que antes decía «245 de 245». Ni un dígito.
+    expect(texto.replace("JULIO GARAY", "")).not.toMatch(/\d/);
+  });
+
+  it("la línea de arriba dice cuántas son, por qué, y DÓNDE se arregla", async () => {
+    servir(RESPUESTA);
+    montar();
+    const aviso = await screen.findByText((t) => t.includes("36 personas no tienen saldo"));
+    expect(aviso.textContent).toContain("a 20 les falta la fecha de ingreso");
+    expect(aviso.textContent).toContain("a 16 el saldo");
     expect(aviso.textContent).toContain("Configuración");
   });
 });
@@ -129,16 +169,16 @@ describe("al elegir a la persona en el formulario", () => {
     montar();
     await screen.findByText("Saldo por persona");
     const select = document.querySelector("select") as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: "29" } });
+    fireEvent.change(select, { target: { value: "7" } });
     // 🔑 Se lee el PÁRRAFO entero: el número va en un <b> adentro, así que un
     // matcher de texto por elemento no lo vería y el test pasaría en falso.
     await waitFor(() => {
       const linea = select.parentElement!.querySelector("p");
-      expect(linea?.textContent ?? "").toContain("Le quedan 71 de 100 días");
+      expect(linea?.textContent ?? "").toContain("Le quedan 10 días");
     });
   });
 
-  it("y si le falta la fecha, lo dice en vez de inventar un número", async () => {
+  it("y si le falta un dato, lo dice en vez de inventar un número", async () => {
     servir(RESPUESTA);
     montar();
     await screen.findByText("Saldo por persona");
