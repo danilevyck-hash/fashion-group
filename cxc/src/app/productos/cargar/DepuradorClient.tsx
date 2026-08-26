@@ -89,6 +89,9 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   const [warnings, setWarnings] = useState<string[]>([]);
   // Artículos que el proveedor no pidió (cantidad 0) y por eso no van al Excel.
   const [omitidosSinCantidad, setOmitidosSinCantidad] = useState(0);
+  // Marcas del archivo que el catálogo NO conoce: caen a "Otros" y por eso el
+  // producto sale SIN PRECIO. Antes se perdían en silencio. No frenan la carga.
+  const [marcasDesconocidas, setMarcasDesconocidas] = useState<{ marca: string; productos: number }[]>([]);
   const [error, setError] = useState("");
   const [empresa, setEmpresa] = useState("");
   const [downloading, setDownloading] = useState(false);
@@ -148,10 +151,11 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         }));
         const best = pickBestSheet(sheets);
         if (!best) throw new Error("No encontré ninguna hoja con datos de productos.");
-        const { rows, warnings: w, omitidosSinCantidad } = processRows(best, cfg);
+        const { rows, warnings: w, omitidosSinCantidad, marcasDesconocidas } = processRows(best, cfg);
         setProcessed(rows);
         setWarnings(w);
         setOmitidosSinCantidad(omitidosSinCantidad);
+        setMarcasDesconocidas(marcasDesconocidas);
         setOrphanSeen(false); // re-evaluar alarma de descripción nueva con el archivo nuevo
         setPriceEdits({}); // el CIF pudo cambiar → recalcular precios desde cero
         setSelected(new Set());
@@ -700,6 +704,21 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
               </button>
             </p>
           )}
+
+          {/* Marca que el catálogo no conoce: el producto sale igual, pero SIN
+              PRECIO (la fórmula se elige por marca y "Otros" no tiene). Antes
+              esto pasaba en silencio. Una línea por marca, con el conteo, y NO
+              bloquea la descarga: se dice, no se esconde. */}
+          {marcasDesconocidas.map((m) => (
+            <p
+              key={m.marca}
+              data-marca-desconocida={m.marca}
+              className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-900"
+            >
+              Marca desconocida: <b className="font-semibold">«{m.marca}»</b> — {m.productos.toLocaleString()}{" "}
+              producto{m.productos === 1 ? "" : "s"} {m.productos === 1 ? "va" : "van"} a salir sin precio
+            </p>
+          ))}
 
           {/* Nada se descarta en silencio: las que no alertaron se dicen igual. */}
           {pasaronSolas > 0 && (

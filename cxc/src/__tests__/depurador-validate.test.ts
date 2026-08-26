@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   processRows, buildAoa, OUT_COLS, titleCase, proveedorParaEmpresa, outColsForEmpresa,
   esDescripcionCatalogada, descripcionesDeMarca, matchEmpresaFromDestino, precioDescripcion,
-  MARCA_CATALOGO, normalizeDescripcion,
+  MARCA_CATALOGO, normalizeDescripcion, reclassMarca,
   type SheetRow, type MarcaRubroFormula, type CatalogoDescripciones,
 } from "../lib/depurador/logic";
 import { marcasQueContienen } from "../lib/depurador/tienda";
@@ -139,17 +139,93 @@ describe("Depurador — catálogo de descripciones inyectado (tabla, no constant
     expect(esDescripcionCatalogada(CATALOGO_TEST, "TH Menswear", "MEN-POLOS S/S")).toBe(true);
     expect(esDescripcionCatalogada(CATALOGO_TEST, "TH Menswear", "Men-Boots")).toBe(false);
   });
-  it("MARCA_CATALOGO sigue en código con las 26 marcas CK/TH/KL", () => {
-    expect(MARCA_CATALOGO.length).toBe(26);
+  it("MARCA_CATALOGO sigue en código con las 33 marcas CK/TH/KL", () => {
+    expect(MARCA_CATALOGO.length).toBe(33);
     const marcas = MARCA_CATALOGO.map((c) => c.marca);
     expect(marcas).toContain("CK Menswear");
     expect(marcas).toContain("TH Footwear");
     expect(marcas).toContain("KL Accessories");
   });
+
+  // 26-ago-2026: Karl Lagerfeld tiene 9 líneas y el sistema conocía 4. Las que
+  // faltaban caían a "Otros" y salían SIN PRECIO. Evidencia: reporte del
+  // proveedor (hoja FACTURACION 2022-2026 + pedidos pendientes) y ventas reales.
+  it("las 9 líneas de KL, las 12 de CK y las 12 de TH están todas", () => {
+    const marcas = MARCA_CATALOGO.map((c) => c.marca);
+    const kl = marcas.filter((m) => m.startsWith("KL "));
+    expect(kl.sort()).toEqual([
+      "KL Accessories", "KL Display & Promo", "KL Footwear", "KL Jeans",
+      "KL Legwear", "KL Menswear", "KL Other", "KL Underwear", "KL Womenswear",
+    ]);
+    expect(marcas.filter((m) => m.startsWith("CK ")).length).toBe(12);
+    expect(marcas.filter((m) => m.startsWith("TH ")).length).toBe(12);
+    // Las 7 que entraron: ya no caen a "Otros".
+    for (const m of ["KL Jeans", "KL Legwear", "KL Other", "KL Underwear",
+                     "KL Display & Promo", "TH License", "TH Display & Promo"]) {
+      expect(reclassMarca(m, "")).toBe(m);
+    }
+  });
+
+  it("KL va a Active Wear, TH License y TH Display & Promo a Fashion Wear", () => {
+    const emp = (m: string) => MARCA_CATALOGO.find((c) => c.marca === m)?.empresa;
+    expect(emp("KL Jeans")).toBe("Active Wear");
+    expect(emp("KL Display & Promo")).toBe("Active Wear");
+    expect(emp("TH License")).toBe("Fashion Wear");
+    expect(emp("TH Display & Promo")).toBe("Fashion Wear");
+    expect(emp("TH Footwear")).toBe("Fashion Shoes"); // no se movió
+  });
   it("marcasQueContienen (Facturas Tienda) deriva la marca desde el catálogo inyectado", () => {
     expect(marcasQueContienen(CATALOGO_TEST, "active_wear", "Women-Sneakers")).toEqual(["KL Footwear"]);
     expect(marcasQueContienen(CATALOGO_TEST, "active_wear", "Women-Boots")).toEqual([]); // nueva → bloquea
     expect(marcasQueContienen(CATALOGO_TEST, "fashion_wear", "Men-Polos S/S")).toEqual(["TH Menswear"]);
+  });
+});
+
+// ── Marca desconocida: se DICE, no se esconde ────────────────────────────────
+// Antes, una marca fuera del catálogo caía a "Otros", el producto salía sin
+// precio y nadie se enteraba. Ahora processRows la devuelve con su conteo para
+// que la pantalla la muestre. NO frena la carga: la fila sale igual.
+describe("Depurador — marcas desconocidas (no caen en silencio)", () => {
+  const fila = (ref: string, marca: string, desc = "Men-Polos S/S") =>
+    [ref, "1", desc, "M", 10, 10, 20, marca, "x"] as SheetRow;
+
+  it("una marca fuera del catálogo se reporta con el conteo de productos", () => {
+    const r = processRows([H, fila("R1", "KL Sombreros"), fila("R2", "KL Sombreros"),
+      fila("R3", "TH Menswear")] as SheetRow[], cfg);
+    expect(r.marcasDesconocidas).toEqual([{ marca: "KL Sombreros", productos: 2 }]);
+  });
+
+  it("NO frena la carga: los productos de esa marca siguen saliendo", () => {
+    const r = processRows([H, fila("R1", "KL Sombreros")] as SheetRow[], cfg);
+    expect(r.rows.length).toBe(1);
+    expect(r.rows[0].cols["Marca *"]).toBe("Otros");
+  });
+
+  it("las 7 marcas que entraron ya NO se reportan como desconocidas", () => {
+    const nuevas = ["KL Jeans", "KL Legwear", "KL Other", "KL Underwear",
+      "KL Display & Promo", "TH License", "TH Display & Promo"];
+    const r = processRows([H, ...nuevas.map((m, i) => fila(`R${i}`, m))] as SheetRow[], cfg);
+    expect(r.marcasDesconocidas).toEqual([]);
+  });
+
+  it("un SERVICIO no se reporta: su marca 'Otros' es a propósito", () => {
+    const r = processRows([H, fila("S1", "Whatever", "AJUSTE DE PRECIO")] as SheetRow[], cfg);
+    expect(r.rows[0].cols["Marca *"]).toBe("Otros");
+    expect(r.marcasDesconocidas).toEqual([]);
+  });
+
+  it("la marca va CRUDA (lo que hay que buscar en el archivo) y ordenada por conteo", () => {
+    const r = processRows([H, fila("R1", "  kl sombreros  "), fila("R2", "kl sombreros"),
+      fila("R3", "KL Bufandas")] as SheetRow[], cfg);
+    expect(r.marcasDesconocidas).toEqual([
+      { marca: "kl sombreros", productos: 2 },
+      { marca: "KL Bufandas", productos: 1 },
+    ]);
+  });
+
+  it("un archivo sano no reporta ninguna", () => {
+    const r = processRows([H, fila("R1", "TH Menswear"), fila("R2", "CK Jeans")] as SheetRow[], cfg);
+    expect(r.marcasDesconocidas).toEqual([]);
   });
 });
 
