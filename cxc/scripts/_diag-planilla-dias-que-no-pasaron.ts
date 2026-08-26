@@ -18,6 +18,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { armarReporte } from "@/lib/asistencia/reporte";
+import { leerVacaciones } from "@/lib/asistencia/config-server";
 import { reglasDesdeFila } from "@/lib/asistencia/config";
 import {
   armarPlanilla,
@@ -77,6 +78,10 @@ async function main() {
       .order("ocurrio_en", { ascending: true }).order("id", { ascending: true }));
   const { data: just } = await db.from("asistencia_justificaciones")
     .select("empleado_codigo, desde, hasta, motivo").lte("desde", q.hasta).gte("hasta", q.desde);
+  // 🔴 Las VACACIONES. Este script lee PRODUCCIÓN y arma la planilla: sin
+  // ellas, un día de vacaciones vuelve a contarse como ausencia. Por la fuente
+  // única de lectura, nunca con un `select` copiado.
+  const { filas: vacs } = await leerVacaciones(q.desde, q.hasta);
   const { data: fer } = await db.from("asistencia_feriados")
     .select("fecha, nombre").gte("fecha", q.desde).lte("fecha", q.hasta);
   const feriados = new Map((fer ?? []).map((f: any) => [String(f.fecha), String(f.nombre)]));
@@ -122,7 +127,7 @@ async function main() {
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
 
   const base = {
-    marcaciones, horarios, justificaciones: (just ?? []) as any, feriados,
+    marcaciones, horarios, justificaciones: (just ?? []) as any, vacaciones: vacs, feriados,
     desde: q.desde, hasta: q.hasta, reglas, nombres, incluirNoHabiles: true,
   };
   // HOY: el motor tal como está en el repo (sin `diaEnCurso`).

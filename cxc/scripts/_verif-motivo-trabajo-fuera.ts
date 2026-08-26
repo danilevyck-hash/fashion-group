@@ -32,6 +32,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import * as NUEVO_PLANILLA from "@/lib/asistencia/planilla";
+import { leerVacaciones } from "@/lib/asistencia/config-server";
 import * as NUEVO_REPORTE from "@/lib/asistencia/reporte";
 import { reglasDesdeFila as reglasNuevo } from "@/lib/asistencia/config";
 import { MOTIVO_TRABAJO_FUERA } from "@/lib/asistencia/motivos";
@@ -121,6 +122,10 @@ async function main() {
         .order("ocurrio_en", { ascending: true }).order("id", { ascending: true }));
     const { data: justProd } = await db.from("asistencia_justificaciones")
       .select("empleado_codigo, desde, hasta, motivo").lte("desde", q.hasta).gte("hasta", q.desde);
+    // 🔴 Las VACACIONES. Este script lee PRODUCCIÓN y arma la planilla: sin
+    // ellas, un día de vacaciones vuelve a contarse como ausencia. Por la fuente
+    // única de lectura, nunca con un `select` copiado.
+    const { filas: vacs } = await leerVacaciones(q.desde, q.hasta);
     const { data: fer } = await db.from("asistencia_feriados")
       .select("fecha, nombre").gte("fecha", q.desde).lte("fecha", q.hasta);
     const feriados = new Map((fer ?? []).map((f: any) => [String(f.fecha), String(f.nombre)]));
@@ -169,7 +174,7 @@ async function main() {
 
       const base = { marcaciones, horarios, feriados, desde: q.desde, hasta: q.hasta, nombres, incluirNoHabiles: true };
       const armar = (M: any, justis: any[], reglas: any) =>
-        M.armarReporte({ ...base, justificaciones: justis, reglas } as any).filter((p: any) => !fuera.has(p.codigo));
+        M.armarReporte({ ...base, justificaciones: justis, vacaciones: vacs, reglas } as any).filter((p: any) => !fuera.has(p.codigo));
 
       const planillaDe = (P: any, personasRep: any[]) =>
         P.armarPlanilla({ personas: personasRep, fichas, manuales, jornadaDiariaMin: jornada, reglas: rNuevo, empresa } as any);

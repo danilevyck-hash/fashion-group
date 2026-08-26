@@ -33,7 +33,8 @@ import * as NUEVO_PLANILLA from "@/lib/asistencia/planilla";
 import * as NUEVO_REPORTE from "@/lib/asistencia/reporte";
 import { reglasDesdeFila as reglasNuevo, MINUTOS_TARDE_QUE_SON_AUSENCIA } from "@/lib/asistencia/config";
 import { motivoPeriodoParcial } from "@/lib/asistencia/vigencia";
-import { textoJustificacion } from "@/lib/asistencia/periodo";
+import { motivosDeQuienNoMarco } from "@/lib/asistencia/periodo";
+import { leerVacaciones } from "@/lib/asistencia/config-server";
 import { hoyPanama } from "@/lib/fecha-panama";
 
 const DIR_ANTES = path.join(process.cwd(), "src/lib/asistencia-antes");
@@ -118,6 +119,10 @@ async function main() {
         .order("ocurrio_en", { ascending: true }).order("id", { ascending: true }));
     const { data: just } = await db.from("asistencia_justificaciones")
       .select("empleado_codigo, desde, hasta, motivo").lte("desde", q.hasta).gte("hasta", q.desde);
+    // 🔴 Las VACACIONES, por la fuente única de lectura. Este script lee
+    // PRODUCCIÓN: sin ellas, un día de vacaciones vuelve a contarse como
+    // ausencia y quien está de vacaciones cae en «falta un dato».
+    const { filas: vacs } = await leerVacaciones(q.desde, q.hasta);
     const { data: fer } = await db.from("asistencia_feriados")
       .select("fecha, nombre").gte("fecha", q.desde).lte("fecha", q.hasta);
     const feriados = new Map((fer ?? []).map((f: any) => [String(f.fecha), String(f.nombre)]));
@@ -170,15 +175,13 @@ async function main() {
       const mo = motivoPeriodoParcial(v, q.desde, q.hasta);
       if (mo) decidirAMano.set(cod, mo);
     }
-    const justificados = new Map<string, string>();
-    for (const j of (just ?? []) as any[]) {
-      const cod = String(j.empleado_codigo);
-      const t = textoJustificacion(String(j.motivo), String(j.desde), String(j.hasta));
-      justificados.set(cod, justificados.has(cod) ? `${justificados.get(cod)} · ${t}` : t);
-    }
+    // 🔴 POR LA FUENTE ÚNICA (`motivosDeQuienNoMarco`). Armarlo a mano es el
+    // bug que ya costó una vez: cuando las vacaciones se mudaron de tabla, cada
+    // copia decidió por su cuenta y solo una se enteró.
+    const justificados = motivosDeQuienNoMarco({ justificaciones: (just ?? []) as any[], vacaciones: vacs });
 
     const personas = R.armarReporte({
-      marcaciones, horarios, justificaciones: (just ?? []) as any, feriados,
+      marcaciones, horarios, justificaciones: (just ?? []) as any, vacaciones: vacs, feriados,
       desde: q.desde, hasta: q.hasta, reglas, nombres, incluirNoHabiles: true,
       diaEnCurso: HOY,
     }).filter((p: any) => !fuera.has(p.codigo));

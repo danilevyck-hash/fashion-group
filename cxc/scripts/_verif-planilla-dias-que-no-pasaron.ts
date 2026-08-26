@@ -28,7 +28,8 @@ import * as NUEVO_PLANILLA from "@/lib/asistencia/planilla";
 import * as NUEVO_REPORTE from "@/lib/asistencia/reporte";
 import { reglasDesdeFila as reglasNuevo } from "@/lib/asistencia/config";
 import { motivoPeriodoParcial } from "@/lib/asistencia/vigencia";
-import { avisoPeriodoAbierto, textoCodigosSinFicha, textoJustificacion } from "@/lib/asistencia/periodo";
+import { avisoPeriodoAbierto, textoCodigosSinFicha, motivosDeQuienNoMarco } from "@/lib/asistencia/periodo";
+import { leerVacaciones } from "@/lib/asistencia/config-server";
 import { hoyPanama } from "@/lib/fecha-panama";
 
 const DIR_ANTES = path.join(process.cwd(), "src/lib/asistencia-antes");
@@ -113,6 +114,10 @@ async function main() {
         .order("ocurrio_en", { ascending: true }).order("id", { ascending: true }));
     const { data: just } = await db.from("asistencia_justificaciones")
       .select("empleado_codigo, desde, hasta, motivo").lte("desde", q.hasta).gte("hasta", q.desde);
+    // 🔴 Las VACACIONES, por la fuente única de lectura. Este script lee
+    // PRODUCCIÓN: sin ellas, un día de vacaciones vuelve a contarse como
+    // ausencia y quien está de vacaciones cae en «falta un dato».
+    const { filas: vacs } = await leerVacaciones(q.desde, q.hasta);
     const { data: fer } = await db.from("asistencia_feriados")
       .select("fecha, nombre").gte("fecha", q.desde).lte("fecha", q.hasta);
     const feriados = new Map((fer ?? []).map((f: any) => [String(f.fecha), String(f.nombre)]));
@@ -160,7 +165,7 @@ async function main() {
     for (const [cod, f] of fichas) if (f.nombre) nombres.set(cod, f.nombre);
 
     const personas = R.armarReporte({
-      marcaciones, horarios, justificaciones: (just ?? []) as any, feriados,
+      marcaciones, horarios, justificaciones: (just ?? []) as any, vacaciones: vacs, feriados,
       desde: q.desde, hasta: q.hasta, reglas, nombres, incluirNoHabiles: true,
       // 🔴 EL ARREGLO 1. La ruta vieja NO lo pasaba.
       ...(nuevo ? { diaEnCurso: HOY } : {}),
@@ -175,10 +180,9 @@ async function main() {
         const m = motivoPeriodoParcial(v, q.desde, q.hasta);
         if (m) decidirAMano.set(cod, m);
       }
-      for (const j of (just ?? []) as any[]) {
-        const cod = String(j.empleado_codigo);
-        const t = textoJustificacion(String(j.motivo), String(j.desde), String(j.hasta));
-        justificados.set(cod, justificados.has(cod) ? `${justificados.get(cod)} · ${t}` : t);
+      // 🔴 Por la FUENTE ÚNICA: ver `motivosDeQuienNoMarco`.
+      for (const [cod, t] of motivosDeQuienNoMarco({ justificaciones: (just ?? []) as any[], vacaciones: vacs })) {
+        justificados.set(cod, t);
       }
     }
 

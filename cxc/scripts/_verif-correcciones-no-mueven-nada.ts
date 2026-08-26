@@ -29,6 +29,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import * as NUEVO_PLANILLA from "@/lib/asistencia/planilla";
+import { leerVacaciones } from "@/lib/asistencia/config-server";
 import * as NUEVO_REPORTE from "@/lib/asistencia/reporte";
 import { reglasDesdeFila as reglasNuevo } from "@/lib/asistencia/config";
 import { aplicarCorrecciones, type Correccion } from "@/lib/asistencia/correcciones";
@@ -82,6 +83,7 @@ interface Contexto {
   q: any;
   marcaciones: any[];
   just: any[];
+  vacs: any[];
   feriados: Map<string, string>;
   manuales: Map<string, any>;
 }
@@ -96,6 +98,10 @@ async function contextoDe(clave: string): Promise<Contexto> {
       .order("id", { ascending: true }));
   const { data: just } = await db.from("asistencia_justificaciones")
     .select("empleado_codigo, desde, hasta, motivo").lte("desde", q.hasta).gte("hasta", q.desde);
+  // 🔴 Las VACACIONES. Este script lee PRODUCCIÓN y arma la planilla: sin
+  // ellas, un día de vacaciones vuelve a contarse como ausencia. Por la fuente
+  // única de lectura, nunca con un `select` copiado.
+  const { filas: vacs } = await leerVacaciones(q.desde, q.hasta);
   const { data: fer } = await db.from("asistencia_feriados")
     .select("fecha, nombre").gte("fecha", q.desde).lte("fecha", q.hasta);
   const manuales = new Map<string, any>();
@@ -113,6 +119,7 @@ async function contextoDe(clave: string): Promise<Contexto> {
     q,
     marcaciones,
     just: (just ?? []) as any[],
+    vacs,
     feriados: new Map((fer ?? []).map((f: any) => [String(f.fecha), String(f.nombre)])),
     manuales,
   };
@@ -186,7 +193,7 @@ async function main() {
     for (const [cod, f] of fichas) if (f.nombre) nombres.set(cod, f.nombre);
 
     const pers = motorRep.armarReporte({
-      marcaciones, horarios, justificaciones: ctx.just, feriados: ctx.feriados,
+      marcaciones, horarios, justificaciones: ctx.just, vacaciones: ctx.vacs, feriados: ctx.feriados,
       desde: ctx.q.desde, hasta: ctx.q.hasta, reglas, nombres, incluirNoHabiles: true,
       ...(correccionesPorDia ? { correccionesPorDia } : {}),
     }).filter((p: any) => !fuera.has(p.codigo));

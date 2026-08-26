@@ -18,11 +18,11 @@ import { armarReporte, type HorarioPersona, type Justificacion } from "@/lib/asi
 import { aplicarCorrecciones, type MarcacionConId } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
 import {
-  leerReglas, leerPersonas, vigenciasDeFilas,
+  leerReglas, leerPersonas, vigenciasDeFilas, leerVacaciones,
   servicioProfesionalDeFila, pagaSegurosDeFila,
 } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango, motivoPeriodoParcial } from "@/lib/asistencia/vigencia";
-import { textoJustificacion } from "@/lib/asistencia/periodo";
+import { motivosDeQuienNoMarco } from "@/lib/asistencia/periodo";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
   armarPlanilla, jornadaDiariaMin, periodoDeQuincena, quincenaDesdeClave,
@@ -58,11 +58,15 @@ async function cuadro(claveQ: string, aplicarLista: boolean) {
       .gte("ocurrio_en", inst(q.desde, false)).lte("ocurrio_en", inst(q.hasta, true))
       .order("ocurrio_en", { ascending: true }).order("id", { ascending: true }).range(f, t));
 
-  const [{ reglas }, pdb, corr, man, hR, jR, fR] = await Promise.all([
+  const [{ reglas }, pdb, corr, man, hR, jR, fR, vR] = await Promise.all([
     leerReglas(), leerPersonas(), leerCorrecciones(q.desde, q.hasta), leerManuales(q.claveManuales!),
     supabaseServer.from("asistencia_horarios").select("empleado_codigo, entrada, salida, almuerzo_minutos"),
     supabaseServer.from("asistencia_justificaciones").select("empleado_codigo, desde, hasta, motivo").lte("desde", q.hasta).gte("hasta", q.desde),
     supabaseServer.from("asistencia_feriados").select("fecha, nombre").gte("fecha", q.desde).lte("fecha", q.hasta),
+    // 🔴 Las VACACIONES, por la misma puerta que la ruta. Este script lee
+    // PRODUCCIÓN: sin ellas, un día de vacaciones vuelve a contarse como
+    // ausencia y quien está de vacaciones cae en «falta un dato».
+    leerVacaciones(q.desde, q.hasta),
   ]);
   const horarios = (hR.data ?? []).map((h: any) => ({ ...h, entrada: String(h.entrada).slice(0, 5), salida: String(h.salida).slice(0, 5) })) as HorarioPersona[];
   const vig = vigenciasDeFilas(pdb.filas);
@@ -93,6 +97,7 @@ async function cuadro(claveQ: string, aplicarLista: boolean) {
   const personas = armarReporte({
     marcaciones: ef.marcaciones, horarios,
     justificaciones: (jR.data ?? []) as Justificacion[],
+    vacaciones: vR.filas,
     feriados: new Map((fR.data ?? []).map((f: any) => [String(f.fecha), String(f.nombre)])),
     desde: q.desde, hasta: q.hasta, reglas, nombres, incluirNoHabiles: true,
     diaEnCurso: hoyPanama(), correccionesPorDia: ef.porDia,
@@ -100,12 +105,11 @@ async function cuadro(claveQ: string, aplicarLista: boolean) {
   const vigentes = personas.filter((p) => !fuera.has(p.codigo));
   const decidir = new Map<string, string>();
   for (const [c, v] of vig) { if (fuera.has(c)) continue; const mo = motivoPeriodoParcial(v, q.desde, q.hasta); if (mo) decidir.set(c, mo); }
-  const just = new Map<string, string>();
-  for (const j of (jR.data ?? []) as any[]) {
-    const c = String(j.empleado_codigo);
-    const t = textoJustificacion(String(j.motivo), String(j.desde), String(j.hasta));
-    just.set(c, just.get(c) ? `${just.get(c)} · ${t}` : t);
-  }
+  // 🔴 Por la FUENTE ÚNICA: armarlo a mano es el bug que ya costó una vez.
+  const just = motivosDeQuienNoMarco({
+    justificaciones: (jR.data ?? []) as any[],
+    vacaciones: vR.filas,
+  });
   const hd = new Map(horarios.map((h) => [h.empleado_codigo, h]));
 
   const out = new Map<string, { lineas: LineaPlanilla[]; neto: number; segSoc: number; segEdu: number }>();
