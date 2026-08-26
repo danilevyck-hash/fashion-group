@@ -154,7 +154,21 @@ export const MARCA_FIXES: Record<string, string> = {
   [marcaKey("CK ACCESORIES")]: "CK Accessories",       // mismo typo, línea CK
   [marcaKey("TH WOMEN")]: "TH Womenswear",
   [marcaKey("TH MEN")]: "TH Menswear",
+  // 27T3128HDS600 "Unisex-Home": es el juego de toallas Tommy. Sus hermanas
+  // (Unisex-Home, Unisex-Towels, Unisex-Home Towels) ya viven catalogadas bajo
+  // TH Other — va exactamente donde ya están.
+  [marcaKey("TH HOME")]: "TH Other",
+  // MW0MW26882-MBP y 78E9892-832, los dos "POLO BASICO P/H COLOR ... SLIM",
+  // rubro MEN. Un polo de hombre es menswear.
+  [marcaKey("TH SPORT MEN")]: "TH Menswear",
 };
+
+/* "TH" a secas queda AFUERA a propósito: sus dos artículos van a marcas
+ * distintas — 09TCR01-099 es "MENS T-SHIRT S-S" (sería TH Menswear) y
+ * 69J7605-410 es "WOMEN HANDBAGS" (sería TH Accessories). Una corrección de
+ * marca es una sola salida por entrada, así que no puede resolverlo: eso se
+ * arregla artículo por artículo en Switch. Son 2 artículos sin venta desde
+ * febrero de 2023. */
 
 /** Normaliza la marca corrigiendo typos conocidos (insensible a caja/espacios).
  *  Se aplica al procesar: corrige la marca ANTES de buscar su fórmula y de
