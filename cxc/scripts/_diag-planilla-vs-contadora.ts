@@ -30,7 +30,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { armarReporte, type HorarioPersona, type Justificacion } from "@/lib/asistencia/reporte";
 import { aplicarCorrecciones, contarCorrecciones, type MarcacionConId } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
-import { leerReglas, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, pagaSegurosDeFila, noMarcaRelojDeFila, leerJustificaciones, leerVacaciones } from "@/lib/asistencia/config-server";
+import { leerReglas, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, pagaSegurosDeFila, noMarcaRelojDeFila, baseSegurosDeFila, leerJustificaciones, leerVacaciones } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango, motivoPeriodoParcial } from "@/lib/asistencia/vigencia";
 import { motivosDeQuienNoMarco } from "@/lib/asistencia/periodo";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -68,7 +68,16 @@ async function main() {
     leerVacaciones(q.desde, q.hasta),
     supabaseServer.from("asistencia_feriados").select("fecha, nombre").gte("fecha", q.desde).lte("fecha", q.hasta),
   ]);
-  const horarios = (hRes.data ?? []).map((h: any) => ({ ...h, entrada: String(h.entrada).slice(0,5), salida: String(h.salida).slice(0,5) })) as HorarioPersona[];
+  // ── Salidas pisadas SOLO para medir, nunca para guardar ────────────────────
+  // `SALIDA_OVERRIDE=8:16:30,18:16:30` corre este mismo cuadro como si esos
+  // horarios ya estuvieran corregidos, para poder ver si el hueco contra la
+  // contadora BAJA antes de tocar la tabla. Vacío = la base tal cual está.
+  const OVERRIDE = new Map(
+    (process.env.SALIDA_OVERRIDE ?? "").split(",").filter(Boolean)
+      .map((x) => { const [c, h] = x.split(":"); return [c.trim(), `${h.trim()}:${x.split(":")[2].trim()}`] as const; }),
+  );
+  const horarios = (hRes.data ?? []).map((h: any) => ({ ...h, entrada: String(h.entrada).slice(0,5), salida: OVERRIDE.get(String(h.empleado_codigo)) ?? String(h.salida).slice(0,5) })) as HorarioPersona[];
+  if (OVERRIDE.size) console.log(`⚠️  SALIDA PISADA (solo para medir): ${[...OVERRIDE].map(([c, h]) => `${c}→${h}`).join(", ")}`);
   console.log(`marcaciones ${marcaciones.length} · fichas ${personasDb.filas.length} · horarios ${horarios.length} · feriados ${(fRes.data??[]).length} · correcciones ${contarCorrecciones(correcciones.correcciones as any) ?? "?"}`);
   console.log(`REGLAS: ${JSON.stringify(reglas)}`);
   console.log(`FERIADOS: ${JSON.stringify(fRes.data)}`);
@@ -92,6 +101,12 @@ async function main() {
       servicioProfesional: servicioProfesionalDeFila(f),
       pagaSeguros: pagaSegurosDeFila(f),
       noMarcaReloj: noMarcaRelojDeFila(f),
+      // 🩸 TERCERA VEZ que este script miente por quedarse viejo. Corre la MISMA
+      // lógica que /api/asistencia/planilla EN PARALELO, así que cada campo que
+      // el route le pasa a `armarPlanilla` hay que pasárselo también acá — si no,
+      // el instrumento con el que se audita un PAGO dice otra cosa que la pantalla.
+      // Ya pasó con las vacaciones de Eloyn y con la base de seguros de Rodrigo.
+      baseSeguros: baseSegurosDeFila(f),
     });
   }
   const nombres = new Map<string, string>();
