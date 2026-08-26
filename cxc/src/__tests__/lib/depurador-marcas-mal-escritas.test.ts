@@ -28,6 +28,11 @@ const CORRECCIONES: [malEscrita: string, canonica: string][] = [
   ["CK ACCESORIES", "CK Accessories"],
   ["TH WOMEN", "TH Womenswear"],
   ["TH MEN", "TH Menswear"],
+  // "Unisex-Home" = juego de toallas Tommy; sus hermanas (Unisex-Home,
+  // Unisex-Towels, Unisex-Home Towels) ya están catalogadas bajo TH Other.
+  ["TH HOME", "TH Other"],
+  // Los dos artículos son "POLO BASICO P/H COLOR ... SLIM", rubro MEN.
+  ["TH SPORT MEN", "TH Menswear"],
 ];
 
 describe("Marcas mal escritas en Switch — mapa congelado", () => {
@@ -76,9 +81,24 @@ describe("Marcas mal escritas — el caso al revés: lo que NO se toca", () => {
     }
   );
 
-  it("las marcas ambiguas quedan FUERA del mapa (las decide Daniel)", () => {
-    for (const m of ["TH HOME", "TH SPORT MEN", "TH", "TH LICENSE", "TH MEN LEATHERS", "TH DISPLAY & PROMO"]) {
+  it("\"TH\" a secas queda FUERA del mapa: sus 2 artículos van a marcas distintas", () => {
+    // 09TCR01-099 "MENS T-SHIRT S-S" iría a TH Menswear y 69J7605-410
+    // "WOMEN HANDBAGS" a TH Accessories. Una corrección es una sola salida por
+    // entrada, así que no puede resolverlo: se arregla en Switch, uno por uno.
+    expect(MARCA_FIXES[marcaKey("TH")]).toBeUndefined();
+  });
+
+  it("las marcas que YA están bien en el catálogo no necesitan corrección", () => {
+    for (const m of ["TH LICENSE", "TH DISPLAY & PROMO", "TH OTHER"]) {
       expect(MARCA_FIXES[marcaKey(m)]).toBeUndefined();
+      expect(reclassMarca(m, "")).not.toBe("Otros"); // entran por el catálogo, no por el mapa
+    }
+  });
+
+  it("marcas crudas sin destino claro siguen cayendo en Otros", () => {
+    for (const m of ["TH MEN LEATHERS", "WOMENPOLOS", "FA24", "MEN-T-SHIRTS S-S"]) {
+      expect(MARCA_FIXES[marcaKey(m)]).toBeUndefined();
+      expect(reclassMarca(m, "")).toBe("Otros");
     }
   });
 
@@ -105,14 +125,15 @@ describe("Marcas mal escritas — camino Depurador (processRows)", () => {
     ["CK ACCESORIES", "Women-Handbags", "CK Accessories"],
     ["TH WOMEN", "Women-T-Shirts S/S", "TH Womenswear"],
     ["TH MEN", "Men-Polos S/S", "TH Menswear"],
+    ["TH HOME", "Unisex-Home", "TH Other"],
+    ["TH SPORT MEN", "Men-Polos S/S", "TH Menswear"],
   ])("%s (%s) → %s", (marca, desc, esperada) => {
     expect(marcaDe(marca, desc)).toBe(esperada);
   });
 
-  it("las ambiguas siguen cayendo en Otros (no se inventó una marca)", () => {
-    expect(marcaDe("TH HOME", "Unisex-Home")).toBe("Otros");
-    expect(marcaDe("TH SPORT MEN", "Men-Polos S/S")).toBe("Otros");
+  it("\"TH\" a secas sigue cayendo en Otros (no se inventó una marca)", () => {
     expect(marcaDe("TH", "Men-T-Shirts S/S")).toBe("Otros");
+    expect(marcaDe("TH", "Women-Handbags")).toBe("Otros");
   });
 });
 
@@ -123,6 +144,7 @@ describe("Marcas mal escritas — camino Facturas Tienda (processFactura)", () =
     "CK Accessories": ["Women-Handbags"],
     "TH Womenswear": ["Women-T-Shirts S/S"],
     "TH Menswear": ["Men-Polos S/S"],
+    "TH Other": ["Unisex-Home"],
   };
   const HEAD = ["CODIGO", "CODIGO BARRA", "REFERENCIA", "DESCRIPCION", "MARCA", "RUBRO", "SUB RUBRO",
     "UNIDAD DE MEDIDA", "PROVEEDOR", "CANTIDAD", "PRECIO"];
@@ -141,6 +163,8 @@ describe("Marcas mal escritas — camino Facturas Tienda (processFactura)", () =
     ["CK ACCESORIES", "Women-Handbags", "CK ACCESSORIES"],
     ["TH WOMEN", "Women-T-Shirts S/S", "TH WOMENSWEAR"],
     ["TH MEN", "Men-Polos S/S", "TH MENSWEAR"],
+    ["TH HOME", "Unisex-Home", "TH OTHER"],
+    ["TH SPORT MEN", "Men-Polos S/S", "TH MENSWEAR"],
   ])("%s (%s) → %s", (marca, desc, esperada) => {
     expect(marcaDe(marca, desc)).toBe(esperada);
   });
