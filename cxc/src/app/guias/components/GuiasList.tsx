@@ -157,6 +157,25 @@ export default function GuiasList({
   // estado de la guía: una guía Completada sigue estando cerrada a edición y
   // esto no la edita — ver `api/guias/[id]/cliente/route.ts`.
   const puedeAtarCliente = Boolean(onAtarCliente) && !readOnly && DESPACHO_ROLES.includes(role || "");
+
+  /**
+   * El nombre que va a dibujar el chip de esta línea, o `""` si no va a dibujar
+   * ninguno. Es la MISMA cuenta que hace `ChipCliente`, y tiene que serlo: es lo
+   * que decide si el texto escrito a mano se muestra o sobra.
+   *
+   * Devuelve vacío en los dos casos en que el chip NO alcanza para leer la
+   * línea: sin código (nada que atar todavía) y con el directorio no leído (el
+   * chip degrada al `D-XXX` pelado). Ahí el texto escrito vuelve a salir, que es
+   * lo único que dice de quién se trata.
+   */
+  function nombreDelChip(item: GuiaItem): string {
+    // ⚠️ `|| ""` y no `?? ""`: hay un candado que busca la PRIMERA aparición de
+    // `item.cliente_codigo ?` para leer la celda del chip, y un `??` acá se la
+    // llevaría a este helper.
+    const cod = (item.cliente_codigo || "").trim().toUpperCase();
+    if (!cod) return "";
+    return nombresPorCodigo?.get(cod) ?? "";
+  }
   const [visibleCount, setVisibleCount] = useState(15);
   const [groupedView, setGroupedView] = useState(true);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -705,18 +724,68 @@ export default function GuiasList({
                                             <td className="py-1.5 px-2 text-gray-300">{idx + 1}</td>
                                             {/* El cliente y su código van APILADOS, no en dos
                                                 columnas: la tabla ya mide 600 px y en un iPhone
-                                                de 390 una columna más sería más arrastre. */}
+                                                de 390 una columna más sería más arrastre.
+
+                                                🔴 EL NOMBRE SE DICE UNA SOLA VEZ (26-ago-2026).
+                                                Daniel, textual: *"porque me salen dos veces
+                                                nombres de clientes, es ruido"*. Acá se pintaba el
+                                                texto escrito a mano Y el chip del cliente atado,
+                                                que dice el mismo nombre con su código al lado.
+
+                                                🩸 Se midió antes de podar, porque la hipótesis
+                                                razonable era que los dos textos avisaran de un
+                                                desacuerdo (escribiste una cosa, ataste otra).
+                                                Sobre las 423 líneas atadas de producción
+                                                (26-ago-2026): 197 coinciden letra por letra y 226
+                                                difieren — pero **ninguna de las 226 es otro
+                                                cliente**. Son la MISMA tienda escrita distinto:
+                                                163 son una variante que contiene a la otra
+                                                ("City Mall" vs "City Mall David", el "S.A." de
+                                                más, un espacio); de las 63 restantes, 27 son el
+                                                alias de display de D-108, 21 "Sporting Shoes N4"
+                                                vs "N 4", 8 "Jerusalem Panama" vs "De Panama", 2
+                                                más de puntuación, y 5 son un error de datos real
+                                                (D-200, ver abajo) que un texto de más tampoco
+                                                arregla.
+
+                                                O sea: mostrar los dos cuando difieren seguiría
+                                                dibujando DOS nombres en el 53% de los renglones
+                                                — no resuelve nada de lo que Daniel señaló. Y
+                                                decidir "son parecidos, muestro uno" pide un
+                                                pareo difuso, que en este módulo está prohibido
+                                                a propósito (ver `reglas-city-mall.ts`: "NADA por
+                                                parecido, ni por distancia de edición").
+
+                                                Así que manda el chip: NOMBRE + CÓDIGO, que es la
+                                                prueba de que la línea está amarrada a Switch. El
+                                                texto escrito NO se pierde — sigue en la base
+                                                intacto, lo imprime el papel (`PrintDocument`), lo
+                                                muestra la ficha de la guía (`ListaEnvios`) y lo
+                                                dice el modal de atar ("En la guía dice"). Y acá
+                                                mismo vuelve a salir en cuanto NO hay chip que lo
+                                                reemplace: línea sin atar, o directorio no leído.
+
+                                                🔴 5 líneas atadas a D-200 dicen "City Mall" y el
+                                                chip dice "El Machetazo-Calidonia": GT-124 (x2),
+                                                GT-136 y GT-183 (x2). Es un código que el sync de
+                                                Switch reusó — son de City Mall Paso Canoas (D-25)
+                                                y City Mall David (D-24). Se corrige tocando el
+                                                chip, NO escondiendo el desacuerdo. */}
                                             <td className="py-1.5 px-2">
-                                              <span className="block">{item.cliente}</span>
-                                              {/* La segunda línea SIEMPRE mide 44 px, esté atada
-                                                  o no, para que las filas no queden desparejas
-                                                  según el estado de cada una. */}
+                                              {/* El chip ya dice el nombre: repetirlo arriba es
+                                                  el ruido que se vino a sacar. Sin chip con
+                                                  nombre, el texto escrito es lo único que hay. */}
+                                              {!nombreDelChip(item) && <span className="block">{item.cliente}</span>}
+                                              {/* Esta línea SIEMPRE mide 44 px, esté atada o no,
+                                                  para que las filas no queden desparejas según el
+                                                  estado de cada una. */}
                                               <span className="flex items-center min-h-[44px]">
                                                 {/* 🩸 El código YA PUESTO también se toca. Si el
                                                     chip fuera solo texto, una línea atada al
                                                     cliente equivocado no se podría corregir nunca
-                                                    desde la pantalla — y hay una así en producción
-                                                    (GT-183, atada a `111380`, que es de Boston). */}
+                                                    desde la pantalla — y hay varias así en
+                                                    producción (las 5 de D-200: GT-124, GT-136 y
+                                                    GT-183). */}
                                                 {item.cliente_codigo ? (
                                                   puedeAtarCliente && item.id ? (
                                                     <button

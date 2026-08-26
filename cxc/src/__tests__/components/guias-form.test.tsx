@@ -213,7 +213,11 @@ describe("Cliente · cerrado contra la lista", () => {
     expect(screen.queryByText(/No está en la lista — escribir a mano/)).toBeNull();
   });
 
-  it("un cliente vinculado y uno a mano se ven DISTINTO", () => {
+  // 🩸 ACÁ SE EXIGÍA EL SELLO ÁMBAR «A mano» sobre el cliente escrito a mano.
+  // Daniel lo mandó sacar el 26-ago-2026 (*"ese sello también sobra"*): en el
+  // formulario de una guía hacía que el mismo cliente se leyera dos veces. La
+  // distinción SE QUEDA — la hace el CÓDIGO: amarrado lo tiene, a mano no.
+  it("un cliente vinculado dice su código; uno a mano no lleva ningún sello", () => {
     cleanup();
     render(<Harness itemsIniciales={[filaBase({ cliente: "City Mall", cliente_codigo: "D-101" })]} />);
     expect(screen.getAllByTitle(/Vinculado al directorio/).length).toBeGreaterThan(0);
@@ -221,11 +225,12 @@ describe("Cliente · cerrado contra la lista", () => {
 
     cleanup();
     render(<Harness itemsIniciales={[filaBase({ cliente: "Tienda del barrio", cliente_codigo: "" })]} />);
-    expect(screen.getAllByTitle(/Escrito a mano/).length).toBeGreaterThan(0);
-    // 🔴 El distintivo dice "A mano", nunca "Otro" a secas: "Otro" se lee como
-    // un cliente más del sistema, y ése es el accidente que se vino a cerrar.
-    expect(screen.getAllByText("A mano").length).toBeGreaterThan(0);
+    expect(screen.queryAllByTitle(/Escrito a mano/).length).toBe(0);
+    expect(screen.queryByText("A mano")).toBeNull();
+    // "Otro" tampoco vuelve: se leía como un cliente más del sistema.
     expect(screen.queryByText("Otro")).toBeNull();
+    // El nombre escrito a mano se sigue viendo UNA vez, que es el punto.
+    expect(screen.getAllByDisplayValue("Tienda del barrio").length).toBeGreaterThan(0);
   });
 
   it("cerrar sin elegir devuelve el campo al valor guardado", () => {

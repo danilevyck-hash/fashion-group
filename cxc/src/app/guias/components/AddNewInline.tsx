@@ -14,21 +14,18 @@ interface AddNewInlineProps {
   placeholder: string;
   /** Qué agrega, en español simple. Va a aria-label: un "＋" solo no dice nada. */
   etiqueta?: string;
-  /**
-   * 🔴 El rótulo VISIBLE al lado del "＋" (25-ago-2026).
-   *
-   * 🩸 Daniel abrió este control en el iPhone y no entendió qué era: un "＋"
-   * pelado no dice nada, y el `aria-label` solo lo oye quien usa lector de
-   * pantalla. Donde el control no está pegado a un campo que lo explique, se
-   * pasa el texto y se lee.
-   *
-   * ⚠️ Sin este prop el botón sale EXACTAMENTE como siempre (el "＋" a secas
-   * que usa «Despachado por», que sí está pegado a su campo).
-   */
-  textoBoton?: string;
 }
 
-export default function AddNewInline({ onAdd, placeholder, etiqueta = "Agregar nuevo", textoBoton }: AddNewInlineProps) {
+/**
+ * 🩸 ACÁ VIVÍA UN `textoBoton` — el rótulo VISIBLE al lado del "＋", agregado el
+ * 25-ago-2026 porque Daniel abrió el control en el iPhone y no entendió qué era.
+ * Murió el 26-ago-2026, con su único uso: el problema NO era que faltara texto,
+ * era que el "＋" estaba lejos del campo que lo explica. Pegado al campo de
+ * Dirección se entiende sin leer, y el rótulo pasaba a ser el ruido que Daniel
+ * fue a sacar (*"se ve ruidoso ahí"*). Si vuelve a hacer falta un texto acá, la
+ * pregunta correcta es dónde está el botón, no qué dice.
+ */
+export default function AddNewInline({ onAdd, placeholder, etiqueta = "Agregar nuevo" }: AddNewInlineProps) {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState("");
 
@@ -46,14 +43,9 @@ export default function AddNewInline({ onAdd, placeholder, etiqueta = "Agregar n
         onClick={() => setOpen(true)}
         aria-label={etiqueta}
         title={etiqueta}
-        className={`transition text-base inline-flex items-center justify-center min-w-[44px] min-h-[44px] -my-3 ${
-          textoBoton
-            ? "gap-1.5 px-2 -mx-2 text-gray-400 hover:text-black"
-            : "text-gray-300 hover:text-gray-500"
-        }`}
+        className="transition text-base inline-flex items-center justify-center min-w-[44px] min-h-[44px] -my-3 text-gray-300 hover:text-gray-500"
       >
         ＋
-        {textoBoton && <span className="text-sm">{textoBoton}</span>}
       </button>
     );
   }

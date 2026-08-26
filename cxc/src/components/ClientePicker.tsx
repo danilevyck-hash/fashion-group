@@ -21,8 +21,14 @@
 // 🩸 Decía **"Otro"**, y "Otro" se lee como UN CLIENTE MÁS de la lista: alguien
 // la tocó sin buscar primero y escribió a mano el nombre de un cliente que SÍ
 // estaba en el directorio. Ahora dice **"➕ No está en la lista — escribir a
-// mano"**, que es lo que es: la salida, no una opción equivalente. Y el
-// distintivo del campo dice **"A mano"** en vez de "Otro", por lo mismo.
+// mano"**, que es lo que es: la salida, no una opción equivalente.
+//
+// 🩸 Y ACÁ VIVIÓ UN SELLO **"A mano"** en ámbar, al lado del campo. Murió el
+// 26-ago-2026 (*"ese sello también sobra"*): repetía en un chip lo que el campo
+// ya decía —el cliente que no está amarrado no tiene código— y en el formulario
+// de una guía hacía que el mismo cliente se leyera dos veces. Lo que se fue es
+// el CHIP; distinguir un cliente amarrado de uno escrito a mano se sigue
+// pudiendo (por el código, y por el `sr-only` para quien no ve la pantalla).
 //
 // 🔴 Elegir cliente **NO es obligatorio** y esto no lo cambia (decisión escrita
 // de Daniel: 272 de los 441 renglones de guía —62%— van a destinos que hoy no
@@ -106,14 +112,14 @@ interface ClientePickerProps {
   /** Clientes más usados, para mostrar sin teclear nada. */
   topClientes?: ClienteHit[];
   /**
-   * Mostrar el distintivo de cómo quedó el cliente: el código D-XXX en verde
-   * (vinculado) o "A mano" en ámbar.
+   * Mostrar el código D-XXX en verde al lado del campo cuando el cliente quedó
+   * amarrado al directorio.
    *
    * Solo tiene sentido donde el código SE GUARDA. En Guías sí
    * (`guia_items.cliente_codigo`). En Cheques NO: la tabla `cheques` guarda el
    * nombre como texto y nada más, así que pintar un "D-126" verde prometería un
-   * vínculo que no existe en la base — y al reabrir el cheque el mismo cliente
-   * aparecería como "A mano". Ahí se apaga y el campo es, simplemente, el nombre.
+   * vínculo que no existe en la base. Ahí se apaga y el campo es, simplemente,
+   * el nombre.
    */
   mostrarVinculo?: boolean;
   /**
@@ -226,13 +232,14 @@ export default function ClientePicker({
   const { hits, cargando } = useBusquedaClientes(query, abierto);
 
   const vinculado = mostrarVinculo && Boolean(value.trim() && codigo.trim());
-  const aMano = mostrarVinculo && Boolean(value.trim() && !codigo.trim());
   const q = query.trim();
 
   // ── La red de seguridad ────────────────────────────────────────────────────
   // 🔑 Daniel vio una guía donde alguien escribió a mano el nombre de un cliente
   // que SÍ estaba en la lista. El directorio solo se pide cuando hay algo
   // escrito a mano: una fila vacía no toca la red.
+  // ⚠️ Desde el 26-ago-2026 este estado NO dibuja ningún sello: alimenta la red
+  // de seguridad y el `sr-only` del final, nada más.
   const escritoAMano = Boolean(value.trim()) && !codigo.trim();
   const directorioPropio = useClientesDelGrupo(escritoAMano && clientesDelGrupo === undefined);
   const directorio = clientesDelGrupo ?? directorioPropio;
@@ -293,25 +300,28 @@ export default function ClientePicker({
           }
         }}
         placeholder={value ? value : placeholderVacio}
-        className={`${inputClassName} ${vinculado || aMano ? "pr-16" : ""}`}
+        className={`${inputClassName} ${vinculado ? "pr-16" : ""}`}
       />
 
-      {/* Cómo quedó: vinculado al directorio vs escrito a mano. Tienen que
-          verse DISTINTO — es la señal de que el cliente no es de la lista. */}
+      {/* 🔴 SOLO SE DIBUJA EL CÓDIGO. El sello ámbar «A mano» se retiró
+          (26-ago-2026) — Daniel, textual: *"ese sello también sobra"*.
+
+          🔑 Y NO SE AFLOJÓ NINGÚN CANDADO DE NEGOCIO: la regla es que el campo
+          de cliente sea un picker contra `clientes_master` (D-XXX) y no texto
+          libre, y eso lo sostienen `permitirOtro` (apagado en Marketing) y el
+          rótulo *"No está en la lista — escribir a mano"*, que sigue siendo un
+          toque DELIBERADO. El sello no validaba nada: solo repetía en un chip
+          lo que el campo ya dice — sin código, no hay código. Quien no ve la
+          pantalla lo sigue sabiendo por el `sr-only` de abajo.
+
+          El chip del código SÍ se queda: es la prueba de que la línea está
+          amarrada a Switch, y es un dato que el nombre no dice. */}
       {!abierto && vinculado && (
         <span
           className="absolute right-0 top-1/2 -translate-y-1/2 text-xs px-1.5 py-0.5 rounded font-mono text-emerald-700 bg-emerald-50 pointer-events-none"
           title={`Vinculado al directorio (${codigo})`}
         >
           {codigo}
-        </span>
-      )}
-      {!abierto && aMano && (
-        <span
-          className="absolute right-0 top-1/2 -translate-y-1/2 text-xs px-1.5 py-0.5 rounded text-amber-700 bg-amber-50 pointer-events-none"
-          title="Escrito a mano — no está en el directorio"
-        >
-          A mano
         </span>
       )}
 
@@ -406,7 +416,11 @@ export default function ClientePicker({
       <span className="sr-only">
         {!mostrarVinculo
           ? value.trim() ? `Cliente: ${value}` : "Sin cliente"
-          : vinculado ? `Vinculado a ${codigo}` : aMano ? "Cliente escrito a mano" : "Sin cliente"}
+          : vinculado
+            ? `Vinculado a ${codigo}`
+            : escritoAMano
+              ? "Cliente escrito a mano"
+              : "Sin cliente"}
       </span>
       {hasError ? <span className="sr-only">Campo obligatorio</span> : null}
     </div>

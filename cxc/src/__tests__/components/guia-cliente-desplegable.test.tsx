@@ -189,16 +189,23 @@ describe("Elegir de la lista deja el cliente VINCULADO", () => {
     expect(screen.getByTitle("Vinculado al directorio (D-170)").className).toContain("emerald");
   });
 
-  it("la salida a mano guarda el texto con el chip ÁMBAR, y se llama con todas las letras", async () => {
+  // 🩸 ACÁ SE EXIGÍA EL CHIP ÁMBAR «A mano». Daniel lo mandó sacar el
+  // 26-ago-2026 (*"ese sello también sobra"*): repetía en un sello lo que el
+  // campo ya dice —sin código, no hay código— y en el formulario de una guía
+  // hacía que el mismo cliente se leyera dos veces. El candado cambió de
+  // dirección: lo que importa es que el texto SE GUARDE y que no quede ningún
+  // sello encima del campo.
+  it("la salida a mano guarda el texto, y NO deja ningún sello al lado", async () => {
     render(<EnLaTabla />);
     await escribir("Cliente nuevo");
     // 🔑 Se toca el RÓTULO NUEVO. Decía "Otro", y "Otro" se lee como un cliente
     // más de la lista: alguien la tocaba sin buscar primero.
     fireEvent.mouseDown(screen.getByText(/No está en la lista — escribir a mano/));
     expect(campo().value).toBe("Cliente nuevo");
-    const chip = screen.getByTitle("Escrito a mano — no está en el directorio");
-    expect(chip.textContent).toBe("A mano");
-    expect(chip.className).toContain("amber");
+    expect(screen.queryByText("A mano")).toBeNull();
+    expect(screen.queryByTitle("Escrito a mano — no está en el directorio")).toBeNull();
+    // Y quien no ve la pantalla lo sigue sabiendo.
+    expect(document.body.textContent).toContain("Cliente escrito a mano");
   });
 
   it("🔴 la salida a mano NO puede volver a llamarse solo \"Otro\"", async () => {
