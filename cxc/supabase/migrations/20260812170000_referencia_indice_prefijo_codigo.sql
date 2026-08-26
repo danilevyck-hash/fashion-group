@@ -108,6 +108,13 @@
 -- crece lineal. Eso solo puede pasar si cada prefijo es un rango del índice.
 -- (Antes del índice, `LIKE` escalaba igual que el control: +8 / +120 / +280 /
 -- +347 ms.) ⚠️ El control es CARO (8 s con 50): no repetirlo por gusto.
+--
+-- ── RE-VERIFICADO 25-ago-2026 (antes de mergear esta nota) ───────────────
+-- El índice sigue vivo en producción (`pg_indexes`) y sigue rindiendo: los
+-- mismos 50 códigos dieron 465 ms en la capa de base (eran 1.251 ms antes de
+-- correrla, 463 ms el 12-ago). La sonda LIKE-vs-igualdad quedó en ×1,0
+-- (198/196/191 ms contra 192/198/198 ms): buscar por PREFIJO ya cuesta lo
+-- mismo que buscar por código exacto, que es justo lo que este índice compra.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_sad_codigo_prefijo
