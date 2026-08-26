@@ -36,6 +36,7 @@ import {
 import {
   armarPlanilla,
   jornadaDiariaMin,
+  MIN_DIA_NO_TRABAJADO,
   textoAusencias,
   totalizar,
   type FichaPlanilla,
@@ -273,7 +274,7 @@ describe("🔴 EL INTERRUPTOR, EN DÓLARES", () => {
     // caso, un motor que no descuenta nada nunca pasaría en verde.
     // 🔑 8 h × 4,62 = 36,96. Eran $39,27 cuando la ausencia se valuaba con la
     // jornada del horario (8,5 h); desde el 25-ago-2026 son 8 h fijas para
-    // todos, que es lo que descuenta la contadora. Ver `MIN_DIA_AUSENCIA`.
+    // todos, que es lo que descuenta la contadora. Ver `MIN_DIA_NO_TRABAJADO`.
     expect(lineaDe().dinero!.ausencias).toBe(36.96);
   });
 
@@ -286,7 +287,7 @@ describe("🔴 EL INTERRUPTOR, EN DÓLARES", () => {
     expect(sinMarcar.dinero!.extraDiurno).toBe(0);
   });
 
-  it("🔴 MARCADO no se paga: se descuenta exactamente UNA jornada × la rata", () => {
+  it("🔴 MARCADO no se paga: se descuenta exactamente UN DÍA de 8 h × la rata", () => {
     const marcada = lineaDe({ vacaciones: [vacacion(true)] });
     const sinMarcar = lineaDe({ vacaciones: [vacacion(false)] });
     // La diferencia de neto es EXACTAMENTE el día que no se pagó.
@@ -294,13 +295,17 @@ describe("🔴 EL INTERRUPTOR, EN DÓLARES", () => {
       .toBeGreaterThan(0);
 
     const rata = marcada.dinero!.rataHora;
-    const jornadaHoras = marcada.horas.jornadaDiariaMin / 60;
-    const esperado = Math.round(jornadaHoras * rata * 100) / 100;
+    const esperado = Math.round((MIN_DIA_NO_TRABAJADO / 60) * rata * 100) / 100;
 
     expect(marcada.dinero!.vacacionesYaPagadas).toBe(esperado);
     expect(marcada.dinero!.netoPagar).toBeLessThan(sinMarcar.dinero!.netoPagar);
-    // Con salario $800 y jornada de 40 h, la rata es $4,62 y el día $38,96.
-    expect(marcada.dinero!.vacacionesYaPagadas).toBeGreaterThan(0);
+    // Con salario $800 y jornada de 40 h, la rata es $4,62 y el día $36,96.
+    expect(marcada.dinero!.vacacionesYaPagadas).toBe(36.96);
+    // 🔴 EL CANDADO: su horario dura 8,5 h y el descuento NO lo mira. Con la
+    // jornada del horario esto daría $39,27 y volvería a haber dos varas para
+    // el mismo hecho —un día que no se trabajó—.
+    expect(marcada.horas.jornadaDiariaMin).toBe(510);
+    expect(marcada.dinero!.vacacionesYaPagadas).not.toBe(39.27);
   });
 
   it("el descuento entra por la MISMA puerta que las ausencias — el bruto no gana un término", () => {

@@ -170,7 +170,7 @@ describe("🔴 EL REDONDEO DEL DINERO NO SE TOCÓ", () => {
       extraMin: 90.5, trabajadoMin: 600, revisar: false, ausente: false,
       justificado: null, feriado: null, habil: true,
     };
-    const c = clasificarDia(d, REGLAS_DEFAULT, 480);
+    const c = clasificarDia(d, REGLAS_DEFAULT);
     expect(c.extraNocturnoMin).toBeCloseTo(0.5, 10);
     expect(c.extraDiurnoMin).toBeCloseTo(90, 10);
   });

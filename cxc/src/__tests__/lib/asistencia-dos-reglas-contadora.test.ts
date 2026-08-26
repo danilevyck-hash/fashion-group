@@ -16,7 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   clasificarDia, calcularDinero, jornadaDiariaMin,
-  HORAS_CERO, MANUALES_CERO, MIN_DIA_AUSENCIA,
+  HORAS_CERO, MANUALES_CERO, MIN_DIA_NO_TRABAJADO,
   type HorasPersona,
 } from "@/lib/asistencia/planilla";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
@@ -41,7 +41,7 @@ function dia(marcas: string[], reglas = R) {
     horarios: [HORARIO_REAL], justificaciones: [], feriados: new Map(),
     desde: f, hasta: f, reglas, incluirNoHabiles: true,
   })[0];
-  return clasificarDia(p.dias[0], reglas, jornadaDiariaMin(HORARIO_REAL));
+  return clasificarDia(p.dias[0], reglas);
 }
 
 /**
@@ -58,7 +58,24 @@ function diaAusente(reglas = R) {
   })[0];
   const d = p.dias.find((x) => x.fecha === "2026-07-23")!;
   expect(d.ausente, "el 23 tiene que salir como ausente").toBe(true);
-  return clasificarDia(d, reglas, jornadaDiariaMin(HORARIO_REAL));
+  return clasificarDia(d, reglas);
+}
+
+/**
+ * Un día HÁBIL de vacaciones marcadas «ya se le pagó». Mismo hecho contable que
+ * la ausencia: un día que no se trabajó y se resta.
+ */
+function diaVacacionYaPagada(reglas = R) {
+  const p = armarReporte({
+    marcaciones: [marca("2026-07-22", "08:00"), marca("2026-07-22", "17:00")],
+    horarios: [HORARIO_REAL], justificaciones: [],
+    vacaciones: [{ empleado_codigo: "48", desde: "2026-07-23", hasta: "2026-07-23", ya_pagadas: true }],
+    feriados: new Map(),
+    desde: "2026-07-22", hasta: "2026-07-23", reglas, incluirNoHabiles: true,
+  })[0];
+  const d = p.dias.find((x) => x.fecha === "2026-07-23")!;
+  expect(d.vacacion?.yaPagadas, "el 23 tiene que salir como vacación ya pagada").toBe(true);
+  return clasificarDia(d, reglas);
 }
 
 const conHoras = (over: Partial<HorasPersona>): HorasPersona => ({ ...HORAS_CERO, ...over });
@@ -67,7 +84,7 @@ const conHoras = (over: Partial<HorasPersona>): HorasPersona => ({ ...HORAS_CERO
 describe("🔴 REGLA 2 — un día de ausencia vale 8 HORAS, no la jornada del horario", () => {
   it("el horario de la gente dura 8,5 h — si esto cambia, el resto del archivo miente", () => {
     expect(jornadaDiariaMin(HORARIO_REAL)).toBe(510);
-    expect(MIN_DIA_AUSENCIA).toBe(480);
+    expect(MIN_DIA_NO_TRABAJADO).toBe(480);
   });
 
   it("🩸 con jornada de 8,5 h, el día ausente descuenta 8 h y no 8,5", () => {
@@ -79,7 +96,7 @@ describe("🔴 REGLA 2 — un día de ausencia vale 8 HORAS, no la jornada del h
   it("ROXANA HERNÁNDEZ (cod 1) — el Excel dice «=8*4.04»: $32,32", () => {
     // Salario 700 / 40 h → rata 4,04. Un día ausente en la quincena 2026-07-2.
     // El módulo descontaba $34,34 (8,5 h) y ella descuenta $32,32.
-    const d = calcularDinero(700, 40, conHoras({ ausenciaMin: MIN_DIA_AUSENCIA }), MANUALES_CERO, R)!;
+    const d = calcularDinero(700, 40, conHoras({ ausenciaMin: MIN_DIA_NO_TRABAJADO }), MANUALES_CERO, R)!;
     expect(d.rataHora).toBe(4.04);
     expect(d.ausencias).toBe(32.32);
     expect(d.ausenciaDeDiaCompleto).toBe(32.32);
@@ -89,7 +106,7 @@ describe("🔴 REGLA 2 — un día de ausencia vale 8 HORAS, no la jornada del h
     // Salario 600 / 48 h → rata 2,88. La contadora le escribe `23.08` sin
     // fórmula (= 600 ÷ 26, el día calendario). Es el ÚNICO renglón que no sale
     // de «8 × rata» en las tres empresas.
-    const d = calcularDinero(600, 48, conHoras({ ausenciaMin: MIN_DIA_AUSENCIA }), MANUALES_CERO, R)!;
+    const d = calcularDinero(600, 48, conHoras({ ausenciaMin: MIN_DIA_NO_TRABAJADO }), MANUALES_CERO, R)!;
     expect(d.rataHora).toBe(2.88);
     expect(d.ausencias).toBe(23.04);
     // Se ACERCA: con 8,5 h daba 24,48, o sea $1,40 lejos de su cifra. Ahora 4 ¢.
@@ -97,8 +114,28 @@ describe("🔴 REGLA 2 — un día de ausencia vale 8 HORAS, no la jornada del h
     expect(Math.abs(24.48 - 23.08)).toBeGreaterThan(1);
   });
 
+  it("🔴 EL CANDADO DE LA UNA SOLA VARA: la vacación «ya pagada» descuenta lo MISMO", () => {
+    // 🩸 Son el mismo hecho —un día que no se trabajó— y se descuentan igual.
+    // Si alguien vuelve a atar uno de los dos al horario, este test se pone rojo
+    // sin importar por cuál de los dos caminos lo haga.
+    const ausente = diaAusente();
+    const vacacion = diaVacacionYaPagada();
+    expect(ausente.ausenciaMin).toBe(MIN_DIA_NO_TRABAJADO);
+    expect(vacacion.vacacionesYaPagadasMin).toBe(MIN_DIA_NO_TRABAJADO);
+    expect(vacacion.vacacionesYaPagadasMin).toBe(ausente.ausenciaMin);
+    // Y ninguno de los dos es la jornada de su horario, que dura 8,5 h.
+    expect(vacacion.vacacionesYaPagadasMin).not.toBe(jornadaDiariaMin(HORARIO_REAL));
+  });
+
+  it("🔑 `clasificarDia` ya ni recibe el horario — no hay por dónde colarlo", () => {
+    // Un solo lugar decide cuánto vale un día, y es la constante. La firma es
+    // la prueba: si el horario volviera a entrar, alguien podría volver a
+    // valuar con él sin que se note en ningún número de este archivo.
+    expect(clasificarDia.length).toBe(2);
+  });
+
   it("dos días ausentes son 16 h — el Excel de SAMIR POLO dice «=16*3.02»", () => {
-    const d = calcularDinero(523.47, 40, conHoras({ ausenciaMin: 2 * MIN_DIA_AUSENCIA }), MANUALES_CERO, R)!;
+    const d = calcularDinero(523.47, 40, conHoras({ ausenciaMin: 2 * MIN_DIA_NO_TRABAJADO }), MANUALES_CERO, R)!;
     expect(d.rataHora).toBe(3.02);
     expect(d.ausencias).toBe(48.32);      // 16 × 3,02
   });

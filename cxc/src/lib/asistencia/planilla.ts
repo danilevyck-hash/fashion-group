@@ -54,7 +54,8 @@
  *   · Excedente       = NO SE USA. La contadora manda esos minutos al 1,50 y
  *                       deja su columna en $0,00 (ver `clasificarDia`).
  *   · Domingo/feriado = horas trabajadas × 1,50.
- *   · Ausencia        = 8 horas × rata, SIEMPRE. SE RESTA (ver `MIN_DIA_AUSENCIA`).
+ *   · Día no trabajado (ausencia, o vacación «ya se le pagó») = 8 horas × rata,
+ *                       SIEMPRE. SE RESTA (ver `MIN_DIA_NO_TRABAJADO`).
  *   · Bruto  = quincenal + extras + domingos + feriados − ausencias − tardanzas.
  *   · Neto   = bruto − deducciones **+ otros servicios** (ver `calcularDinero`:
  *              otros servicios SUMA, es un pago extra y no un descuento).
@@ -416,7 +417,10 @@ export interface HorasPersona {
   diasARevisar: number;
   /** De `tardanzaMin`, cuántos vienen de días sin las 4 marcas. */
   tardanzaDeDiasARevisarMin: number;
-  /** Minutos de jornada de un día completo, según SU horario. */
+  /**
+   * Minutos de jornada de un día completo, según SU horario. **Solo para
+   * mostrar**: el descuento de un día no trabajado no sale de acá.
+   */
   jornadaDiariaMin: number;
 }
 
@@ -493,33 +497,31 @@ function hhmmAMin(hhmm: string): number {
 }
 
 /**
- * Cuánto vale un día de ausencia cuando la persona NO tiene horario confirmado:
- * OCHO HORAS.
+ * Cuánto dura el día de alguien SIN horario cargado: ocho horas.
  *
- * 🩸 Sale del Excel de la contable, de sus propias fórmulas de la columna de
- * ausencias — no de una suposición mía:
- *
- *     María Bethancourt   =8*2.88            → un día
- *     Samir Polo Arrieta  =16*3.02           → dos días
- *     Cristian Blanco     =(0*24.16)+(0*3.02)   ← 24,16 = 8 × 3,02, el "valor del día"
- *
- * Acá se calculaba `salida − entrada − almuerzo` sobre el horario POR DEFECTO
- * (08:00-17:00 menos 30) y daba **8,5 h**: un 6 % de más en cada día ausente, y
- * encima sobre un horario que nadie confirmó. Hoy solo UNA persona de las 32
- * tiene horario propio, así que ese 8,5 era lo que se le aplicaba a todo el
- * mundo.
- *
- * ⚠️ Con horario CONFIRMADO manda el suyo: es el mismo con el que se le mide la
- * tardanza y la hora extra, y usar otra base ahí haría que el mismo día valiera
- * dos cosas distintas. El 8 es el default, no un techo.
+ * ⚠️ ESTO NO VALÚA NADA. Es la duración del día que se MUESTRA (el renglón
+ * «jornadaDia» del cuadro y de las auditorías) para quien no tiene horario
+ * confirmado. El dinero de un día que no se trabajó sale de
+ * `MIN_DIA_NO_TRABAJADO`, que es otra constante y contesta otra pregunta —
+ * aunque hoy las dos den 8 horas. Si mañana alguien entra con jornada de 6 h,
+ * su día durará 6 y su ausencia seguirá costando 8: son cosas distintas.
  */
 export const JORNADA_DIARIA_DEFAULT_MIN = 8 * 60;
 
 /**
- * 🔴 LO QUE VALE UN DÍA DE AUSENCIA: **OCHO HORAS, SIEMPRE**. No es el default
- * de nada — es la regla, y no la mueve ningún horario.
+ * 🔴 LO QUE VALE UN DÍA QUE NO SE TRABAJÓ: **OCHO HORAS, SIEMPRE**. No es el
+ * default de nada — es la regla, y no la mueve ningún horario.
  *
  * Contadora, textual (25-ago-2026, por Daniel): *«Dia de ausencia 8 horas»*.
+ *
+ * 🔑 SE LLAMA «DÍA NO TRABAJADO» Y NO «DÍA DE AUSENCIA» A PROPÓSITO. Hay DOS
+ * hechos que descuentan un día entero —la ausencia sin justificar y la vacación
+ * marcada «ya se le pagó»— y son el mismo hecho contable: un día que no se
+ * trabajó y se resta. Valuarlos con dos varas (8 h uno, 8,5 h el otro) es una
+ * incoherencia que nadie va a poder explicar en seis meses, y con el nombre
+ * viejo el próximo que lea el archivo iba a creer que la palabra «ausencia»
+ * tiene multiplicador propio. **Los dos salen de esta constante y de ningún
+ * otro lado**: cuando Daniel cambie la regla, se cambia acá y nada más.
  *
  * 🩸 ANTES SE DESCONTABA LA JORNADA REAL Y ERA MÁS CARO. 22 de las 31 personas
  * tienen horario confirmado 08:00–17:00 con 30 de almuerzo = **8,5 h**, así que
@@ -543,9 +545,14 @@ export const JORNADA_DIARIA_DEFAULT_MIN = 8 * 60;
  * ⚠️ NO TOCA LA TARDANZA. Los minutos tarde se siguen valuando `minutos ×
  * valor minuto`, con la misma tolerancia y el mismo umbral de 30 minutos que
  * los manda a mostrarse en la columna «Ausencia». Esta constante solo valúa el
- * día ENTERO sin marcas, que es lo único que la regla nombra.
+ * día ENTERO, que es lo único que la regla nombra.
+ *
+ * ⚠️ Y NO ES `JORNADA_DIARIA_DEFAULT_MIN`, aunque hoy valgan lo mismo. Aquélla
+ * contesta *«¿cuánto dura el día de esta persona?»* —sale del horario y solo
+ * se muestra—; ésta contesta *«¿cuánto se le resta por no venir?»*. Juntarlas
+ * es volver a atar el descuento al horario, que es justo lo que se corrigió.
  */
-export const MIN_DIA_AUSENCIA = 8 * 60;
+export const MIN_DIA_NO_TRABAJADO = 8 * 60;
 
 /** El horario de una persona, con lo que hace falta para medirle el día. */
 export interface HorarioDia {
@@ -556,8 +563,10 @@ export interface HorarioDia {
 
 /**
  * Los minutos que dura el día de una persona. Sin horario propio, el default.
- * 🔑 Un horario guardado que dé 0 o menos no se usa: caería en una ausencia de
- * $0 —el cero silencioso otra vez, esta vez a favor de la empresa—.
+ * 🔑 Un horario guardado que dé 0 o menos no se usa: un «día de 0 minutos» en
+ * la pantalla es el cero silencioso otra vez.
+ * ⚠️ Desde el 26-ago-2026 esto **no toca el dinero**: los descuentos de día
+ * completo salen de `MIN_DIA_NO_TRABAJADO`.
  */
 export function jornadaDiariaMin(h: HorarioDia | null | undefined): number {
   if (!h) return JORNADA_DIARIA_DEFAULT_MIN;
@@ -620,7 +629,6 @@ function dow(fecha: string): number {
 export function clasificarDia(
   d: DiaReporte,
   reglas: ReglasAsistencia,
-  jornadaDiariaMin: number,
 ): Pick<
   HorasPersona,
   | "extraDiurnoMin" | "extraNocturnoMin" | "excedenteMin"
@@ -647,7 +655,9 @@ export function clasificarDia(
   // que pagar, y descontarlos sería cobrarle dos veces el mismo día.
   if (d.vacacion) {
     if (!d.vacacion.yaPagadas || d.feriado || !esHabil(d.fecha)) return cero;
-    return { ...cero, vacacionesYaPagadasMin: jornadaDiariaMin };
+    // 🔴 LA MISMA CONSTANTE QUE LA AUSENCIA, y por eso el horario ya no entra
+    // acá. Es el mismo hecho: un día que no se trabajó y se resta.
+    return { ...cero, vacacionesYaPagadasMin: MIN_DIA_NO_TRABAJADO };
   }
 
   // Feriado trabajado: TODO lo trabajado va al recargo de feriado. No se le
@@ -663,8 +673,8 @@ export function clasificarDia(
 
   // Día hábil sin marcas y sin justificación: ausencia, valuada en OCHO HORAS.
   // 🔴 No en la jornada de su horario: la contadora descuenta 8 h para todos y
-  // los horarios confirmados dan 8,5. Ver `MIN_DIA_AUSENCIA`.
-  if (d.ausente) return { ...cero, ausenciaMin: MIN_DIA_AUSENCIA };
+  // los horarios confirmados dan 8,5. Ver `MIN_DIA_NO_TRABAJADO`.
+  if (d.ausente) return { ...cero, ausenciaMin: MIN_DIA_NO_TRABAJADO };
   if (!d.marcas.length) return cero;
 
   const tardanzaMin = d.tardeMin;
@@ -698,9 +708,9 @@ export function clasificarDia(
  * Las horas de una persona en la quincena.
  *
  * `jornadaDiariaMin` es lo que dura SU día según su horario configurado
- * (salida − entrada − almuerzo). Se usa para valuar la ausencia.
- * 🩸 Es el mismo horario con el que se le mide la tardanza y la hora extra: si
- * la ausencia usara otra base, el mismo día valdría dos cosas distintas.
+ * (salida − entrada − almuerzo). **Viaja para MOSTRARSE y nada más**: ni la
+ * ausencia ni la vacación «ya se le pagó» se valúan con él —los dos salen de
+ * `MIN_DIA_NO_TRABAJADO`— y por eso `clasificarDia` ya ni lo recibe.
  */
 export function medirHoras(
   p: PersonaReporte,
@@ -709,7 +719,7 @@ export function medirHoras(
 ): HorasPersona {
   const h: HorasPersona = { ...HORAS_CERO, jornadaDiariaMin };
   for (const d of p.dias) {
-    const c = clasificarDia(d, reglas, jornadaDiariaMin);
+    const c = clasificarDia(d, reglas);
     h.extraDiurnoMin += c.extraDiurnoMin;
     h.extraNocturnoMin += c.extraNocturnoMin;
     h.excedenteMin += c.excedenteMin;
