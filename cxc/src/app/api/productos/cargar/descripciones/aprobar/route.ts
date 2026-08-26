@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer, HAS_SERVICE_ROLE } from "@/lib/supabase-server";
 import { requireAuth, getSession } from "@/lib/require-auth";
 import { MARCA_CATALOGO, marcaKey } from "@/lib/depurador/logic";
+import { normalizarEspacios } from "@/lib/depurador/veredicto";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +19,11 @@ const MISCONFIG = NextResponse.json(
  * con origen = 'aprobada' + auditoría de quién y cuándo.
  *
  * Body: { marca, descripcion }. La marca se valida contra MARCA_CATALOGO (y se
- * guarda con su forma canónica); la descripción se normaliza en espacios (NFKC,
- * colapsa múltiples, trim) pero conserva su caja original — la unicidad la da
- * el índice lower(marca), lower(descripcion). Idempotente: si ya existe,
- * responde ok sin error.
+ * guarda con su forma canónica); la descripción pasa por normalizarEspacios()
+ * — la ÚNICA normalización de espacios del catálogo, la misma que refuerza el
+ * CHECK de la base (migración 20260828120000) — pero conserva su caja original:
+ * la unicidad la da el índice lower(marca), lower(descripcion). Idempotente:
+ * si ya existe, responde ok sin error.
  */
 export async function POST(req: NextRequest) {
   const authError = requireAuth(req, ALLOWED);
@@ -39,8 +41,8 @@ export async function POST(req: NextRequest) {
   }
 
   const marcaRaw = String(body.marca ?? "").trim();
-  // Misma normalización de espacios que marcaKey, pero conservando la caja.
-  const descripcion = String(body.descripcion ?? "").normalize("NFKC").replace(/\s+/g, " ").trim();
+  // ÚNICO candado de espacios del catálogo (conserva la caja original).
+  const descripcion = normalizarEspacios(String(body.descripcion ?? ""));
 
   if (!marcaRaw) return NextResponse.json({ error: "La marca es obligatoria." }, { status: 400 });
   if (!descripcion) return NextResponse.json({ error: "La descripción es obligatoria." }, { status: 400 });

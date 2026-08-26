@@ -374,6 +374,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
   }, [rows]);
   const archivos = Math.ceil(rows.length / MAX_FILAS_SWITCH);
   const bloqueos = result?.bloqueos ?? [];
+  const pasaronSolas = result?.pasaronSolas ?? 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
@@ -383,6 +384,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
       {result && bloqueos.length > 0 && !orphanSeen && (
         <AlarmaDescripcionesNuevas
           items={bloqueos}
+          pasaronSolas={pasaronSolas}
           onAprobada={onDescripcionAprobada}
           onClose={() => setOrphanSeen(true)}
         />
@@ -546,6 +548,13 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
               >
                 Ver y aprobar
               </button>
+            </p>
+          )}
+
+          {/* Nada se descarta en silencio: las que no alertaron se dicen igual. */}
+          {pasaronSolas > 0 && (
+            <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+              {pasaronSolas} descripción(es) nueva(s) pasaron solas · las dos mitades ya existen
             </p>
           )}
 

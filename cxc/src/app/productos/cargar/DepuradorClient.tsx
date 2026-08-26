@@ -30,8 +30,9 @@ import {
   type MarcaFormula,
   type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
+import { veredictoDescripcion } from "@/lib/depurador/veredicto";
 import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
-import AlarmaDescripcionesNuevas from "./AlarmaDescripcionesNuevas";
+import AlarmaDescripcionesNuevas, { type DescripcionNueva } from "./AlarmaDescripcionesNuevas";
 
 const DIVISOR_HINTS = [0.70, 0.73, 0.75, 0.63];
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
@@ -489,10 +490,16 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   // tras aplicar normalización (Tarea 8). Las de marca "Otros"/desconocida NO cuentan
   // (son basura intencional). No rompen: se procesan con su marca, solo se alarma.
   // Depende del catálogo en memoria → al aprobar una descripción se re-evalúa en vivo.
-  const descsNuevas = useMemo(() => {
-    if (!processed || !catalogo) return [] as { marca: string; desc: string }[];
+  //
+  // De esas huérfanas, SOLO alertan las de veredicto "alerta" (casi-gemelas,
+  // mitad nueva, formato raro). Las que tienen las dos mitades ya conocidas
+  // pasan solas — se cuentan en `pasaronSolas` y se dicen en pantalla: nada se
+  // descarta en silencio.
+  const { descsNuevas, pasaronSolas } = useMemo(() => {
+    if (!processed || !catalogo) return { descsNuevas: [] as DescripcionNueva[], pasaronSolas: 0 };
     const seen = new Set<string>();
-    const out: { marca: string; desc: string }[] = [];
+    const out: DescripcionNueva[] = [];
+    let solas = 0;
     for (const r of processed) {
       const marca = String(r.cols["Marca *"] || "");
       const desc = String(r.cols["Descripción *"] || "");
@@ -501,9 +508,12 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
       const k = `${marcaKey(marca)}|||${marcaKey(desc)}`;
       if (seen.has(k)) continue;
       seen.add(k);
-      if (!esDescripcionCatalogada(catalogo, marca, desc)) out.push({ marca, desc });
+      if (esDescripcionCatalogada(catalogo, marca, desc)) continue;
+      const v = veredictoDescripcion(desc, catalogo);
+      if (v.veredicto !== "alerta") { solas++; continue; }
+      out.push({ marca, desc, motivo: v.texto, gemela: v.gemela });
     }
-    return out;
+    return { descsNuevas: out, pasaronSolas: solas };
   }, [processed, catalogo]);
 
   return (
@@ -514,6 +524,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
       {processed && descsNuevas.length > 0 && !orphanSeen && (
         <AlarmaDescripcionesNuevas
           items={descsNuevas}
+          pasaronSolas={pasaronSolas}
           onAprobada={(marca, desc) => { agregarDescripcion(marca, desc); }}
           onClose={() => setOrphanSeen(true)}
         />
@@ -687,6 +698,13 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
               >
                 Ver y aprobar
               </button>
+            </p>
+          )}
+
+          {/* Nada se descarta en silencio: las que no alertaron se dicen igual. */}
+          {pasaronSolas > 0 && (
+            <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+              {pasaronSolas} descripción(es) nueva(s) pasaron solas · las dos mitades ya existen
             </p>
           )}
 

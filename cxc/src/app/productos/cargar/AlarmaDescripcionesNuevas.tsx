@@ -5,10 +5,17 @@ import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useEscapeClose, useBackdropDismiss, useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { marcasCandidatasDeEmpresa } from "@/lib/depurador/tienda";
+import { normalizarEspacios } from "@/lib/depurador/veredicto";
 
-// Alarma bloqueante de descripciones NUEVAS (no catalogadas), compartida por el
-// Depurador y Facturas Tienda. Lista cada descripción con su marca y, para
-// admin/secretaria, permite aprobarla y agregarla al catálogo desde la app
+// Alarma bloqueante de descripciones NUEVAS, compartida por el Depurador y
+// Facturas Tienda. Solo llegan acá las de veredicto "alerta" (ver
+// lib/depurador/veredicto.ts): casi-gemelas, mitad nueva o formato raro. Las
+// que tienen las dos mitades ya conocidas pasan solas y se cuentan aparte en
+// `pasaronSolas` — se dicen en una línea, nunca se descartan en silencio.
+//
+// Cada fila muestra la descripción, el motivo en una línea corta y, cuando el
+// motivo es la casi-gemela, la existente al lado para ver la diferencia de un
+// vistazo. Admin/secretaria pueden aprobarla desde la app
 // (POST /api/productos/cargar/descripciones/aprobar). Para otros roles queda el
 // texto original de captura de pantalla.
 //
@@ -21,10 +28,17 @@ export interface DescripcionNueva {
   /** Presente cuando la marca no es exacta (Facturas Tienda, formatos B/C):
    *  la aprobación pide elegir una marca del catálogo de esa empresa. */
   empresaKey?: string;
+  /** Por qué alerta, en una línea corta ("casi igual a", "mitad nueva: …"). */
+  motivo?: string;
+  /** La gemela del catálogo, cuando el motivo es la casi-gemela. */
+  gemela?: string;
 }
 
 interface Props {
   items: DescripcionNueva[];
+  /** Cuántas descripciones nuevas pasaron solas (las dos mitades ya existen).
+   *  Se dice en una línea: nada se descarta en silencio. */
+  pasaronSolas?: number;
   /** Aprobación exitosa: el padre actualiza el catálogo en memoria (y en
    *  Facturas Tienda reprocesa) → la alarma se re-evalúa en vivo. */
   onAprobada: (marca: string, descripcion: string) => void;
@@ -40,7 +54,7 @@ interface ConfirmState {
   error: string;
 }
 
-export default function AlarmaDescripcionesNuevas({ items, onAprobada, onClose }: Props) {
+export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onAprobada, onClose }: Props) {
   useBodyScrollLock(true);
   const [mounted, setMounted] = useState(false);
   const [role, setRole] = useState("");
@@ -88,7 +102,7 @@ export default function AlarmaDescripcionesNuevas({ items, onAprobada, onClose }
       const res = await fetch("/api/productos/cargar/descripciones/aprobar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marca: confirm.marcaElegida, descripcion: confirm.item.desc }),
+        body: JSON.stringify({ marca: confirm.marcaElegida, descripcion: normalizarEspacios(confirm.item.desc) }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => null);
@@ -97,7 +111,7 @@ export default function AlarmaDescripcionesNuevas({ items, onAprobada, onClose }
       }
       const { marcaElegida, item } = confirm;
       setConfirm(null);
-      onAprobada(marcaElegida, item.desc);
+      onAprobada(marcaElegida, normalizarEspacios(item.desc));
     } catch {
       setConfirm((c) => (c ? { ...c, enviando: false, error: "No se pudo aprobar. Revisa tu conexión e intenta de nuevo." } : c));
     }
@@ -108,25 +122,31 @@ export default function AlarmaDescripcionesNuevas({ items, onAprobada, onClose }
       <div className="w-full max-w-lg rounded-2xl border-4 border-red-500 bg-white p-6">
         <div className="mb-2 text-center text-5xl">⚠️</div>
         <h2 className="text-center text-xl font-bold text-red-700">
-          {items.length} descripción(es) NUEVA(S) detectada(s)
+          {items.length} descripción(es) por revisar
         </h2>
-        {puedeAprobar ? (
-          <p className="mt-2 text-center text-sm text-stone-600">
-            Estas descripciones <b>NO están en el catálogo</b> de su marca y <b>bloquean la descarga</b>.
-            Puedes aprobarlas aquí mismo para agregarlas al catálogo — avísale a Daniel antes de aprobar.
-          </p>
-        ) : (
-          <p className="mt-2 text-center text-sm text-stone-600">
-            Estas descripciones <b>NO están en el catálogo</b> de su marca. <b>No se puede descargar</b> la
-            plantilla hasta que Daniel las apruebe y se agreguen al catálogo. Toma una captura de pantalla
-            y envíasela a Daniel.
+        <p className="mt-2 text-center text-sm text-stone-600">
+          {puedeAprobar
+            ? "Bloquean la descarga. Avísale a Daniel antes de aprobar."
+            : "Bloquean la descarga hasta que Daniel las apruebe. Mándale una captura."}
+        </p>
+        {pasaronSolas > 0 && (
+          <p className="mt-2 text-center text-[13px] text-stone-500">
+            {pasaronSolas} pasaron solas · las dos mitades ya existen
           </p>
         )}
         <div className="mt-4 max-h-64 overflow-auto rounded-lg border border-red-200 bg-red-50 p-3">
           {items.map((o, i) => (
-            <div key={i} className="flex items-center justify-between gap-3 py-1 text-[13px] text-stone-800">
+            <div key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 text-[13px] text-stone-800">
               <div className="min-w-0">
-                <span className="font-semibold text-red-800">{o.marca}</span> → {o.desc}
+                <div>
+                  <span className="font-semibold text-red-800">{o.marca}</span> → {o.desc}
+                </div>
+                {o.motivo && (
+                  <div className="mt-0.5 text-[12px] text-amber-800">
+                    ⚠ {o.motivo}
+                    {o.gemela && <b className="ml-1 font-semibold text-stone-900">{o.gemela}</b>}
+                  </div>
+                )}
               </div>
               {puedeAprobar && (
                 <button
