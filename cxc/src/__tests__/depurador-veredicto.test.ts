@@ -421,3 +421,44 @@ describe("segundo lote de categorías (26-ago-2026)", () => {
     expect(v2("REEBOK IDENTITY VECTOR T-SHIRT").veredicto).toBe("alerta");
   });
 });
+
+// El cierre (26-ago-2026): con "Men-Ties" en el catálogo, lo único que sigue
+// alertando es dato sucio de Switch — 7 descripciones sin género adelante y 4
+// de Reebok mal clasificadas bajo CK Jeans. Nada que se arregle desde acá.
+const CAT_CIERRE: CatalogoDescripciones = {
+  ...CAT_LOTE2,
+  "TH Menswear": ["Men-Ties"],
+  "CK Accessories": ["Men-Bags"],
+  "CK Legwear": ["Men-Socks Sport"],
+  "CK Menswear": [...CAT_CON_MITADES["CK Menswear"], "Men-Polos S/S"],
+};
+const v3 = (d: string) => veredictoDescripcion(d, CAT_CIERRE);
+
+describe("cierre: lo que sobrevive es de Switch, no del catálogo", () => {
+  it("la corbata deja de alertar y su mitad sirve para otros géneros", () => {
+    expect(v3("Men-Ties").veredicto).toBe("ya-existe");
+    expect(v3("Women-Ties").veredicto).toBe("pasa");
+    expect(v3("Boys-Ties").veredicto).toBe("pasa");
+  });
+
+  it("las 7 sin género siguen alertando por FORMATO — les falta el prefijo", () => {
+    const sinGenero = ["TE BOTTLE 7", "TE BOTTLE 750", "Cosmetiquera", "Bags", "Socks Sport", "Polos S/S", "Denim Pants"];
+    for (const d of sinGenero) {
+      expect(v3(d).veredicto).toBe("alerta");
+      expect(v3(d).motivo).toBe("formato");
+      expect(v3(d).texto).toBe("sin guion");
+    }
+    // Con el género adelante, las cuatro que el catálogo ya conoce pasan solas:
+    // la prenda no era nueva, era la fila la que venía mocha.
+    for (const d of ["Men-Bags", "Men-Socks Sport", "Men-Polos S/S", "Men-Denim Pants"]) {
+      expect(v3(d).veredicto).not.toBe("alerta");
+    }
+  });
+
+  it("las 4 de Reebok siguen alertando, con la etiqueta ridícula pero alertando", () => {
+    for (const d of ["REEBOK IDENTITY VECTOR T-SHIRT", "REEBOK LINEAR READ T-SHIRT", "TRAINING TECH T-SHIRT", "WORKOUT READY SPEEDWICK T-SHIRT"]) {
+      expect(v3(d).veredicto).toBe("alerta");
+      expect(v3(d).motivo).toBe("casi-igual-mitad");
+    }
+  });
+});

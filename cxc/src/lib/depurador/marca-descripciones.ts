@@ -22,6 +22,11 @@ export const NORMALIZACION: Record<string, string> = {
   "Men-Polo S/S": "Men-Polos S/S",
   "Men-Polos L/S OFERTA": "Men-Polos L/S",
   "Men-Small Leather Goods": "Men-Small Leather",
+  // Mismo patrón que los blazers: Switch manda la corbata con la cola
+  // " / Neckwear" pegada. La prenda es la corbata; la cola es sucia.
+  // 3 artículos MW0MW***** de American Sportswear (CIF 9 · precio 10), 8 u.
+  // ingresadas el 26-nov-2025 y 5 vendidas a Multi Fashion el 10-dic-2025.
+  "Men-Ties / Neckwear": "Men-Ties",
   "WOMEN-WATCHES": "Women-Watches",
   // El gemelo masculino de "Women-Blazers / Sports Jackets", que ya estaba acá.
   // Switch manda las dos formas: BLAZERS (232 u. vendidas) y BLAZERS - SPORTS
