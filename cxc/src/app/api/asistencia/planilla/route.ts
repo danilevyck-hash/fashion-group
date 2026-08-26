@@ -29,6 +29,7 @@ import {
   vigenciasDeFilas,
   servicioProfesionalDeFila,
   pagaSegurosDeFila,
+  noMarcaRelojDeFila,
   leerJustificaciones,
   leerVacaciones,
   avisoMigracionVacaciones,
@@ -232,6 +233,7 @@ export async function GET(req: NextRequest) {
         // seguros no llegaría al motor y la planilla se los seguiría cobrando a
         // todo el mundo, que es justo lo que este campo existe para cambiar.
         pagaSeguros: pagaSegurosDeFila(f),
+        noMarcaReloj: noMarcaRelojDeFila(f),
       });
     }
     const nombres = new Map<string, string>();

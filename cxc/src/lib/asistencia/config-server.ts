@@ -62,6 +62,11 @@ import {
   esColumnaPagaSegurosFaltante,
   pagaSeguros,
 } from "./seguros";
+import {
+  COLUMNA_NO_MARCA_RELOJ,
+  esColumnaNoMarcaRelojFaltante,
+  noMarcaReloj,
+} from "./sueldo-fijo";
 
 // Se re-exportan para que las rutas importen todo de un solo lugar. La
 // DETECCIÓN es pura y vive en `config.ts`; acá solo está el I/O.
@@ -117,6 +122,9 @@ export interface FilaPersonaDb {
   /** Opcional: no existe hasta que se corra `MIGRACION_SEGUROS`. Ausente o
    *  `null` = SÍ se le descuentan, que es como estaban las 38 fichas. */
   paga_seguros?: boolean | null;
+  /** Opcional: no existe hasta que se corra `MIGRACION_NO_MARCA_RELOJ`. Ausente
+   *  o `null` = SÍ marca el reloj, que es como estaban las 39 fichas. */
+  no_marca_reloj?: boolean | null;
   /** Opcionales: no existen hasta que se corra `MIGRACION_SALDO_VACACIONES`.
    *  Los DOS o NINGUNO (lo obliga un CHECK). `null` = todavía no se cargó el
    *  saldo, y entonces la pantalla dice «Falta el saldo» y NO muestra número. */
@@ -139,6 +147,9 @@ export interface PersonasLeidas {
   /** `true` = falta la columna de los seguros. A todo el mundo se le descuentan
    *  el social y el educativo, que es exactamente como estaba antes. */
   faltaColumnaPagaSeguros: boolean;
+  /** `true` = falta la columna del sueldo fijo. Todo el mundo se lee como que
+   *  marca el reloj, que es exactamente como estaba antes. */
+  faltaColumnaNoMarcaReloj: boolean;
   /** `true` = faltan las columnas del saldo de vacaciones. Nadie tiene saldo
    *  inicial, o sea que la pestaña Vacaciones dice «Falta el saldo» y no
    *  muestra ningún número — que es exactamente como estaba antes. */
@@ -162,6 +173,8 @@ const COLS_CON_SERVICIO = `${COLS_CON_BAJAS}, ${COLUMNA_SERVICIO_PROFESIONAL}`;
 const COLS_TODO = `${COLS_CON_SERVICIO}, ${COLUMNA_PAGA_SEGUROS}`;
 /** Todo, con el saldo de vacaciones. Salen de `saldo-vacaciones.ts`, por lo mismo. */
 const COLS_CON_SALDO = `${COLS_TODO}, ${COLS_SALDO_VACACIONES.join(", ")}`;
+/** Todo, con el sueldo fijo. Sale de `sueldo-fijo.ts`, por lo mismo. */
+const COLS_CON_RELOJ = `${COLS_CON_SALDO}, ${COLUMNA_NO_MARCA_RELOJ}`;
 
 /**
  * Las fichas guardadas.
@@ -175,10 +188,12 @@ const COLS_CON_SALDO = `${COLS_TODO}, ${COLS_SALDO_VACACIONES.join(", ")}`;
  * La escalera va de lo nuevo a lo viejo, y cada peldaño solo se baja cuando el
  * error NOMBRA la columna que ese peldaño quita:
  *   1. todo                      → lo normal;
- *   2. sin `paga_seguros`        → a todo el mundo se le cobran (como hoy);
- *   3. sin `servicio_profesional`→ nadie está fuera de planilla (como hoy);
- *   4. sin las columnas de baja  → todo el mundo activo (como estaba antes);
- *   5. sin la tabla              → lista vacía y la pantalla nombra el archivo.
+ *   2. sin `no_marca_reloj`      → todo el mundo marca el reloj (como hoy);
+ *   3. sin el saldo de vacaciones→ nadie tiene saldo inicial (como hoy);
+ *   4. sin `paga_seguros`        → a todo el mundo se le cobran (como hoy);
+ *   5. sin `servicio_profesional`→ nadie está fuera de planilla (como hoy);
+ *   6. sin las columnas de baja  → todo el mundo activo (como estaba antes);
+ *   7. sin la tabla              → lista vacía y la pantalla nombra el archivo.
  *
  * ⚠️ Releer ante CUALQUIER error convertiría un problema real —permisos, red,
  * RLS— en una lectura incompleta que nadie notaría.
@@ -197,15 +212,31 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
     faltaColumnaServicioProfesional: boolean;
     faltaColumnaPagaSeguros: boolean;
     faltaColumnasSaldoVacaciones: boolean;
+    faltaColumnaNoMarcaReloj: boolean;
     /** ¿Este error justifica bajar un peldaño? */
     reintentar: (err: unknown) => boolean;
   }> = [
+    {
+      cols: COLS_CON_RELOJ,
+      faltaColumnasBajas: false,
+      faltaColumnaServicioProfesional: false,
+      faltaColumnaPagaSeguros: false,
+      faltaColumnasSaldoVacaciones: false,
+      faltaColumnaNoMarcaReloj: false,
+      reintentar: (e) =>
+        esColumnaNoMarcaRelojFaltante(e)
+        || esColumnaSaldoVacacionesFaltante(e)
+        || esColumnaPagaSegurosFaltante(e)
+        || esColumnaServicioProfesionalFaltante(e)
+        || esColumnaDeBajaFaltante(e),
+    },
     {
       cols: COLS_CON_SALDO,
       faltaColumnasBajas: false,
       faltaColumnaServicioProfesional: false,
       faltaColumnaPagaSeguros: false,
       faltaColumnasSaldoVacaciones: false,
+      faltaColumnaNoMarcaReloj: true,
       reintentar: (e) =>
         esColumnaSaldoVacacionesFaltante(e)
         || esColumnaPagaSegurosFaltante(e)
@@ -218,6 +249,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaServicioProfesional: false,
       faltaColumnaPagaSeguros: false,
       faltaColumnasSaldoVacaciones: true,
+      faltaColumnaNoMarcaReloj: true,
       reintentar: (e) =>
         esColumnaPagaSegurosFaltante(e)
         || esColumnaServicioProfesionalFaltante(e)
@@ -229,6 +261,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaServicioProfesional: false,
       faltaColumnaPagaSeguros: true,
       faltaColumnasSaldoVacaciones: true,
+      faltaColumnaNoMarcaReloj: true,
       reintentar: (e) => esColumnaServicioProfesionalFaltante(e) || esColumnaDeBajaFaltante(e),
     },
     {
@@ -237,6 +270,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaServicioProfesional: true,
       faltaColumnaPagaSeguros: true,
       faltaColumnasSaldoVacaciones: true,
+      faltaColumnaNoMarcaReloj: true,
       reintentar: esColumnaDeBajaFaltante,
     },
     {
@@ -245,6 +279,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaServicioProfesional: true,
       faltaColumnaPagaSeguros: true,
       faltaColumnasSaldoVacaciones: true,
+      faltaColumnaNoMarcaReloj: true,
       reintentar: () => false,
     },
   ];
@@ -258,6 +293,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
         faltaColumnasBajas: intento.faltaColumnasBajas,
         faltaColumnaServicioProfesional: intento.faltaColumnaServicioProfesional,
         faltaColumnaPagaSeguros: intento.faltaColumnaPagaSeguros,
+        faltaColumnaNoMarcaReloj: intento.faltaColumnaNoMarcaReloj,
         faltaColumnasSaldoVacaciones: intento.faltaColumnasSaldoVacaciones,
       };
     }
@@ -270,6 +306,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
         faltaColumnaServicioProfesional: true,
         faltaColumnaPagaSeguros: true,
         faltaColumnasSaldoVacaciones: true,
+        faltaColumnaNoMarcaReloj: true,
       };
     }
     throw new Error(error.message);
@@ -284,6 +321,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
     faltaColumnaServicioProfesional: true,
     faltaColumnaPagaSeguros: true,
     faltaColumnasSaldoVacaciones: true,
+    faltaColumnaNoMarcaReloj: true,
   };
 }
 
@@ -308,6 +346,18 @@ export function servicioProfesionalDeFila(f: FilaPersonaDb): boolean {
  */
 export function pagaSegurosDeFila(f: FilaPersonaDb): boolean {
   return pagaSeguros(f.paga_seguros);
+}
+
+/**
+ * ¿Esta ficha cobra fijo sin pasar por el reloj?
+ *
+ * Sin la columna corrida —o con `null`— la respuesta es NO, que es como estaban
+ * las 39 fichas antes de este cambio: a todas se les medían las marcaciones.
+ * Ante la duda se mira el reloj; ver `sueldo-fijo.ts` para por qué la asimetría
+ * va para ese lado.
+ */
+export function noMarcaRelojDeFila(f: FilaPersonaDb): boolean {
+  return noMarcaReloj(f.no_marca_reloj);
 }
 
 /** La vigencia de una ficha leída. Sin las columnas —o con la migración sin

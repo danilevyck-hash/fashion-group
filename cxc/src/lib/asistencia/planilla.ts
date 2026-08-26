@@ -30,6 +30,14 @@
  *    `FALTA.sinMarcaciones`, con otra causa. NO HAY PRORRATEO AUTOMÁTICO ACÁ:
  *    la contadora saca lo suyo con el rango de fechas libre, que ya existe.
  *
+ * 1c. …PERO A QUIEN COBRA FIJO Y NO MARCA SÍ LE CALCULA, TODAS LAS QUINCENAS.
+ *    Es la excepción del punto 1, y es una bandera de la ficha (`noMarcaReloj`,
+ *    ver `sueldo-fijo.ts`), no una deducción. EDWIN GOMEZ vende en la calle: no
+ *    pasa por el aparato ni un día y cobra su quincena completa con seguros.
+ *    🩸 Y el reloj se le ignora SIEMPRE, no solo cuando no hay marcas: si mañana
+ *    alguien usa su código, no puede aparecerle una ausencia inventada que le
+ *    mueva el pago sin que nadie lo vea. Ver el tercer candado de `armarLinea`.
+ *
  * 2. NO TIENE UNA SOLA CIFRA DEL NEGOCIO ESCRITA ADENTRO. Los recargos, los
  *    divisores, la tolerancia, los porcentajes de seguro y la hora de corte
  *    entran por `reglas` y salen de `asistencia_reglas`. Lo único que hay acá
@@ -728,6 +736,16 @@ export interface FichaPlanilla {
    * hasta que una persona apague el interruptor a conciencia.
    */
   pagaSeguros?: boolean;
+  /**
+   * 🔴 `true` = COBRA FIJO Y NO PASA POR EL RELOJ. Ver `sueldo-fijo.ts`. Ausente
+   * o `false` = marca, que es como estaban las 39 fichas antes de que este campo
+   * existiera.
+   *
+   * Dos efectos, y los dos están en este archivo: no cae en
+   * `FALTA.sinMarcaciones` (produce su neto solo, todas las quincenas) y **el
+   * reloj se le ignora SIEMPRE**, marque o no marque.
+   */
+  noMarcaReloj?: boolean;
 }
 
 export interface DineroLinea {
@@ -808,6 +826,13 @@ export interface LineaPlanilla {
    * $0 también daría seguros en cero y no es lo mismo.
    */
   pagaSeguros: boolean;
+  /**
+   * ¿Cobra fijo sin pasar por el reloj? Es lo que se muestra —un chip «sueldo
+   * fijo»— para que los 0,00 de ausencias, tardanzas y extras no se lean como
+   * un error de cálculo. Sale de la ficha, no de mirar si las horas dieron
+   * cero: alguien que vino todos los días y no hizo extras también daría cero.
+   */
+  noMarcaReloj: boolean;
   /**
    * 🔴 EL SISTEMA SE ABSTUVO Y LO DECIDE UNA PERSONA. Trae el motivo escrito,
    * tal como se muestra: «entró el 10 de agosto de 2026», «Vacaciones del 16
@@ -1076,11 +1101,32 @@ export function armarLinea(
   // que este archivo ya hace en los otros dos casos que no puede saber.
   const seAbstiene = typeof decidirAMano === "string" && decidirAMano.trim() !== "";
   const motivoDecidir = seAbstiene ? decidirAMano!.trim() : null;
+
+  // 🔴 EL TERCER CANDADO, Y ES EL QUE PROTEGE UN SUELDO FIJO DE MOVERSE SOLO.
+  // Quien no marca el reloj cobra su quincenal y NADA MÁS: sin extras, sin
+  // domingos, sin ausencias y sin tardanzas.
+  //
+  // 🩸 SE APLICA SIEMPRE, NO SOLO CUANDO NO HAY MARCAS, y ahí está todo el
+  // punto. Si preguntara "¿marcó algo?", el día que alguien use su código —se
+  // lo prestan, se lo reasignan, el aparato lo emite por error— le aparecerían
+  // ausencias y horas extra INVENTADAS que le cambiarían el pago, y nadie lo
+  // vería hasta el día de cobro. Un sueldo fijo que se mueve solo es
+  // exactamente el error que este archivo existe para no cometer.
+  //
+  // 🔑 Se ceran las horas ACÁ y no en el llamador: `armarLinea` es lo único que
+  // decide dinero, así que es el único lugar donde el candado no se puede
+  // saltear. La jornada diaria se conserva —es del horario, no del reloj— para
+  // que la línea siga sabiendo cuánto dura su día.
+  const noMarca = ficha.noMarcaReloj === true;
+  const horasEfectivas: HorasPersona = noMarca
+    ? { ...HORAS_CERO, jornadaDiariaMin: horas.jornadaDiariaMin }
+    : horas;
+
   const dinero =
     !fueraDePlanilla && !seAbstiene && faltaConfigurar.length === 0
       ? calcularDinero(
         ficha.salarioMensual as number, ficha.jornadaSemanal as number,
-        horas, manuales, reglas, factorBase,
+        horasEfectivas, manuales, reglas, factorBase,
         // 🔑 `!== false`, no `=== true`: una ficha vieja sin el campo tiene que
         // seguir pagando seguros. Ver la nota de `FichaPlanilla.pagaSeguros`.
         ficha.pagaSeguros !== false,
@@ -1100,6 +1146,7 @@ export function armarLinea(
   return {
     fueraDePlanilla,
     pagaSeguros: ficha.pagaSeguros !== false,
+    noMarcaReloj: noMarca,
     decidirAMano: motivoDecidir,
     quincenalReferencia,
     codigo: ficha.codigo,
@@ -1109,7 +1156,7 @@ export function armarLinea(
     empresaEtiqueta: ficha.empresa ? etiquetaEmpresa(String(ficha.empresa)) : null,
     salarioMensual: ficha.salarioMensual ?? null,
     jornadaSemanal: ficha.jornadaSemanal ?? null,
-    horas,
+    horas: horasEfectivas,
     faltaConfigurar,
     // 🔑 Si `calcularDinero` devolvió `null` con la ficha completa, algo del
     // divisor no sirve. No se deja pasar como línea "buena y sin números".
@@ -1204,9 +1251,16 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
     // y la diferencia importa: la de vigencia manda SIEMPRE (Yeishka marcó seis
     // días y aun así no se le calcula), y la de la justificación solo cuando no
     // hay NI UNA marca en todo el período.
+    // 🔴 A QUIEN NO MARCA NO SE LE BUSCA JUSTIFICACIÓN. Que no haya marcas no
+    // es un hecho a explicar: es su forma de trabajar. Preguntarle a
+    // `justificados` lo mandaría a «Decidilo vos» —con un texto de vacaciones
+    // que además sería falso— justo el caso que esta bandera existe para sacar
+    // de ahí. La de vigencia SÍ sigue mandando: entrar o salir a mitad del
+    // período es otra cosa, no tiene nada que ver con el reloj.
+    const noMarca = ficha.noMarcaReloj === true;
     const motivo =
       opts.decidirAMano?.get(cod)
-      ?? (p ? null : opts.justificados?.get(cod))
+      ?? (p || noMarca ? null : opts.justificados?.get(cod))
       ?? null;
 
     const linea = armarLinea(
@@ -1215,7 +1269,15 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
     // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
     // un motivo por el que NO SE PUDO PAGAR, y acá no hay nada que pagar. Si le
     // faltan marcas, se ve en el reporte de asistencia, que es donde importa.
-    if (linea.fueraDePlanilla) {
+    //
+    // 🔴 Y A QUIEN NO MARCA EL RELOJ TAMPOCO, por el motivo opuesto: acá SÍ hay
+    // algo que pagar, y es justo lo que «no marcó ni un día» impediría. Sale con
+    // su dinero calculado y sin ser el pendiente de nadie.
+    //
+    // ⚠️ Lo que le falte de FICHA se conserva igual —si no tiene salario, sigue
+    // diciendo «falta el salario»—: esta bandera apaga el reloj, no la
+    // obligación de tener los datos completos.
+    if (linea.fueraDePlanilla || linea.noMarcaReloj) {
       lineas.push(linea);
       continue;
     }

@@ -40,6 +40,7 @@ import {
   vigenciaDeFila,
   servicioProfesionalDeFila,
   pagaSegurosDeFila,
+  noMarcaRelojDeFila,
 } from "@/lib/asistencia/config-server";
 import {
   avisoMigracionServicioProfesional,
@@ -53,6 +54,12 @@ import {
   esColumnaPagaSegurosFaltante,
   validarPagaSeguros,
 } from "@/lib/asistencia/seguros";
+import {
+  avisoMigracionNoMarcaReloj,
+  COLUMNA_NO_MARCA_RELOJ,
+  esColumnaNoMarcaRelojFaltante,
+  validarNoMarcaReloj,
+} from "@/lib/asistencia/sueldo-fijo";
 import {
   avisoMigracionSaldoMediosDias,
   avisoMigracionSaldoVacaciones,
@@ -121,6 +128,7 @@ export async function GET(req: NextRequest) {
         faltaColumnasBajas,
         faltaColumnaServicioProfesional,
         faltaColumnaPagaSeguros,
+        faltaColumnaNoMarcaReloj,
         faltaColumnasSaldoVacaciones,
       },
     ] = await Promise.all([leerReglas(), leerPersonas()]);
@@ -192,6 +200,9 @@ export async function GET(req: NextRequest) {
       // 🔑 Sin ficha, SÍ paga seguros: es el default de siempre y lo que hace
       // que un código todavía sin configurar no aparezca como una excepción.
       const pagaSeguros = f ? pagaSegurosDeFila(f) : true;
+      // 🔴 Sin ficha NO se puede cobrar fijo: la bandera vive en la ficha. Un
+      // código que marca y nadie configuró sigue siendo un pendiente.
+      const noMarcaReloj = f ? noMarcaRelojDeFila(f) : false;
       const ultimaMarca = v ? diaPanama(v.ultima) : null;
       const etiqueta = directorio.nombre(codigo) ?? v?.nombreReloj ?? `Código ${codigo}`;
       if (vig && marcoDespuesDeLaBaja(vig, ultimaMarca)) {
@@ -221,6 +232,9 @@ export async function GET(req: NextRequest) {
         // `seguros.ts`—. `true` mientras nadie diga lo contrario: es el
         // comportamiento que la planilla tenía para las 38 fichas.
         pagaSeguros,
+        // 🔴 Cobra fijo y no pasa por el reloj. Sigue en la planilla, con
+        // seguros y todo; lo que se le ignora son las marcaciones.
+        noMarcaReloj,
         // Falta el sueldo, pero la empresa ya está: se puede emitir la planilla
         // de las otras y saber a quién le falta el dato.
         //
@@ -295,6 +309,8 @@ export async function GET(req: NextRequest) {
         bajas: personas.length - activos.length,
         /** Marcan y no van en planilla. No son pendientes de nadie. */
         servicioProfesional: activos.filter((p) => p.servicioProfesional).length,
+        /** Cobran fijo y no pasan por el reloj. Tampoco son pendientes. */
+        noMarcaReloj: activos.filter((p) => p.noMarcaReloj).length,
       },
       faltaMigracion: faltaPersonas || faltaReglas,
       avisoMigracion: faltaPersonas || faltaReglas ? avisoMigracion() : null,
@@ -314,6 +330,11 @@ export async function GET(req: NextRequest) {
       avisoMigracionSeguros:
         !faltaPersonas && faltaColumnaPagaSeguros ? avisoMigracionSeguros() : null,
       puedeQuitarSeguros: !faltaPersonas && !faltaColumnaPagaSeguros,
+      // Un escalón más: sin la columna todo el mundo marca el reloj —o sea, como
+      // está hoy— y se dice de entrada, no al fallar el guardado.
+      avisoMigracionNoMarcaReloj:
+        !faltaPersonas && faltaColumnaNoMarcaReloj ? avisoMigracionNoMarcaReloj() : null,
+      puedeMarcarSueldoFijo: !faltaPersonas && !faltaColumnaNoMarcaReloj,
       // Un escalón más: sin las columnas nadie tiene saldo de vacaciones —o
       // sea, como está hoy— y se dice de entrada, no al fallar el guardado.
       avisoMigracionSaldoVacaciones:
@@ -367,6 +388,12 @@ export async function PUT(req: NextRequest) {
   const rseg = validarPagaSeguros(body);
   if (!rseg.ok) return NextResponse.json({ error: rseg.error }, { status: 400 });
   const pagaSeguros = rseg.valor;
+
+  // Y lo mismo con el reloj: es OTRA pregunta —si se le miden las marcaciones o
+  // cobra fijo— y no debería poder tumbar el guardado de un nombre.
+  const rrel = validarNoMarcaReloj(body);
+  if (!rrel.ok) return NextResponse.json({ error: rrel.error }, { status: 400 });
+  const noMarcaRelojValor = rrel.valor;
 
   // Y lo mismo con el saldo de vacaciones: es OTRA pregunta —cuántos días le
   // quedan— y no debería poder tumbar el guardado de un nombre.
@@ -445,10 +472,34 @@ export async function PUT(req: NextRequest) {
     saldo_vacaciones_dias: saldoVacacionesDias,
     saldo_vacaciones_corte: saldoVacacionesCorte,
   };
+  const conReloj = {
+    ...conSaldo,
+    [COLUMNA_NO_MARCA_RELOJ]: noMarcaRelojValor,
+  };
 
   let { error } = await supabaseServer
     .from(TABLA_PERSONAS)
-    .upsert(conSaldo, { onConflict: "empleado_codigo" });
+    .upsert(conReloj, { onConflict: "empleado_codigo" });
+
+  // 🩸 FALTA LA COLUMNA DEL SUELDO FIJO. Misma bifurcación que las cuatro de
+  // abajo, y por la misma razón:
+  //  · si NO se estaba marcando a nadie como sueldo fijo (`false`, el default),
+  //    se reintenta sin la columna y guardar un nombre o un salario sigue
+  //    funcionando igual que ayer;
+  //  · si SÍ se estaba marcando, NO se guarda a medias. Un "guardado" que se
+  //    traga la bandera dejaría a Edwin cayendo en «no marcó ni un día» todas
+  //    las quincenas —o sea, sin cobrar— y nadie sabría por qué.
+  if (error && esColumnaNoMarcaRelojFaltante(error)) {
+    if (noMarcaRelojValor) {
+      return NextResponse.json(
+        { error: avisoMigracionNoMarcaReloj(), faltaMigracionNoMarcaReloj: true },
+        { status: 503 },
+      );
+    }
+    ({ error } = await supabaseServer
+      .from(TABLA_PERSONAS)
+      .upsert(conSaldo, { onConflict: "empleado_codigo" }));
+  }
 
   // 🩸 FALTAN LAS COLUMNAS DEL SALDO. Misma bifurcación que las tres de abajo:
   //  · si NO se estaba cargando ningún saldo, se reintenta sin las columnas y
@@ -553,7 +604,7 @@ export async function PUT(req: NextRequest) {
       if (!reintento.error) {
         return NextResponse.json({
           ok: true,
-          persona: { ...p, ...v, servicioProfesional, pagaSeguros, saldoVacacionesDias, saldoVacacionesCorte },
+          persona: { ...p, ...v, servicioProfesional, pagaSeguros, noMarcaReloj: noMarcaRelojValor, saldoVacacionesDias, saldoVacacionesCorte },
           faltaMigracionBajas: true,
         });
       }
@@ -571,5 +622,5 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, saldoVacacionesDias, saldoVacacionesCorte } });
+  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, noMarcaReloj: noMarcaRelojValor, saldoVacacionesDias, saldoVacacionesCorte } });
 }
