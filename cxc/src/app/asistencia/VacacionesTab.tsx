@@ -24,6 +24,11 @@ import {
   diasDeVacacion,
   efectoDelInterruptor,
 } from "@/lib/asistencia/vacaciones";
+import {
+  textoGastados,
+  textoSaldo,
+  type SaldoVacaciones,
+} from "@/lib/asistencia/saldo-vacaciones";
 
 interface VacacionFila {
   id: string;
@@ -48,6 +53,14 @@ export default function VacacionesTab() {
   const [personas, setPersonas] = useState<PersonaListada[]>([]);
   const [puedeCargar, setPuedeCargar] = useState(true);
   const [aviso, setAviso] = useState<string | null>(null);
+  // ── EL SALDO ──────────────────────────────────────────────────────────────
+  // Llega CALCULADO del servidor: la cuenta vive en `saldo-vacaciones.ts` y la
+  // pantalla solo la pinta. Calcularla acá sería una segunda verdad, y el día
+  // que las dos se separen nadie sabría cuál es la buena.
+  const [saldos, setSaldos] = useState<SaldoVacaciones[]>([]);
+  const [avisoSaldo, setAvisoSaldo] = useState<string | null>(null);
+  const [avisoSaldoIncompleto, setAvisoSaldoIncompleto] = useState<string | null>(null);
+  const [desdeCuandoCuenta, setDesdeCuandoCuenta] = useState<string | null>(null);
 
   const [codigo, setCodigo] = useState("");
   const [desde, setDesde] = useState(hoyPanama());
@@ -64,6 +77,10 @@ export default function VacacionesTab() {
     // no al fallar el guardado.
     setPuedeCargar(d.puedeCargar !== false);
     setAviso(d.avisoMigracion ?? null);
+    setSaldos(d.saldos ?? []);
+    setAvisoSaldo(d.avisoSaldo ?? null);
+    setAvisoSaldoIncompleto(d.avisoSaldoIncompleto ?? null);
+    setDesdeCuandoCuenta(d.desdeCuandoCuenta ?? null);
   }, []);
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -72,6 +89,9 @@ export default function VacacionesTab() {
 
   const conNombre = personas.filter((p) => p.configurado);
   const sinNombre = personas.filter((p) => !p.configurado);
+
+  /** El saldo de la persona que está elegida en el formulario, o `null`. */
+  const saldoElegido = codigo ? (saldos.find((s) => s.codigo === codigo) ?? null) : null;
 
   async function agregar() {
     if (!codigo) return toast("Elige la persona", "error");
@@ -166,6 +186,26 @@ export default function VacacionesTab() {
                 </optgroup>
               )}
             </select>
+            {/* 🔴 EL SALDO, EN EL MOMENTO EN QUE SE DECIDE. Una línea, debajo
+                del nombre: es acá donde alguien se entera de que la persona ya
+                no tiene días — no en una tabla al final de la pantalla. Sin
+                fecha de ingreso dice qué falta, nunca un cero. */}
+            {saldoElegido && (
+              <p
+                className={`mt-1 text-[12px] ${
+                  saldoElegido.faltaFechaIngreso ? "text-amber-800" : "text-gray-500"
+                }`}
+              >
+                {saldoElegido.faltaFechaIngreso ? (
+                  textoSaldo(saldoElegido)
+                ) : (
+                  <>
+                    Le quedan <b className="tabular-nums">{textoSaldo(saldoElegido)}</b> días
+                    {textoGastados(saldoElegido) ? ` · ${textoGastados(saldoElegido)}` : ""}
+                  </>
+                )}
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Desde</label>
@@ -260,6 +300,68 @@ export default function VacacionesTab() {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* ── SALDO POR PERSONA ─────────────────────────────────────────────
+          days ganados − tomados − ya pagados. La cuenta entera vive en
+          `lib/asistencia/saldo-vacaciones.ts`, con el prorrateo y su ejemplo
+          numérico escritos ahí para que se pueda auditar sin leer la función.
+
+          🔴 ACÁ ESTÁN TODOS LOS ACTIVOS, tengan o no fecha de ingreso. Quien no
+          la tiene aparece diciendo «Falta la fecha de ingreso» — nunca con un
+          cero, y nunca escondido de la lista. */}
+      {saldos.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="mb-3">
+            <h2 className="text-sm font-medium text-gray-900">Saldo por persona</h2>
+            {/* Una línea y corta: 30 días al año, y desde cuándo cuenta la
+                resta. Lo segundo NO se puede sacar: los días ganados vienen
+                desde que la persona entró y las vacaciones solo existen en el
+                sistema desde que se creó la pestaña. */}
+            <p className="mt-0.5 text-[12px] text-gray-500">
+              30 días por cada 11 meses trabajados.{desdeCuandoCuenta ? ` ${desdeCuandoCuenta}` : ""}
+            </p>
+          </div>
+
+          {/* Ámbar, no rojo: no se rompió nada, falta cargar un dato. */}
+          {avisoSaldo && (
+            <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+              {avisoSaldo}
+            </p>
+          )}
+          {avisoSaldoIncompleto && (
+            <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+              {avisoSaldoIncompleto}
+            </p>
+          )}
+
+          <ul className="divide-y divide-gray-100">
+            {saldos.map((s) => (
+              <li
+                key={s.codigo}
+                data-saldo-codigo={s.codigo}
+                className="flex items-baseline justify-between gap-3 py-2"
+              >
+                {/* Sin `truncate`: el nombre BAJA DE LÍNEA. Cortarlo con
+                    puntos suspensivos esconde a quién le falta la fecha, que es
+                    justo lo que esta lista viene a decir. Crece hacia abajo. */}
+                <span className="min-w-0 break-words text-sm text-gray-900">{s.etiqueta}</span>
+                <span data-saldo-valor className="shrink-0 text-right">
+                  {s.faltaFechaIngreso ? (
+                    <span className="text-[13px] text-amber-800">{textoSaldo(s)}</span>
+                  ) : (
+                    <>
+                      <span className="text-sm tabular-nums text-gray-900">{textoSaldo(s)}</span>
+                      {textoGastados(s) && (
+                        <span className="ml-2 text-[12px] text-gray-500">{textoGastados(s)}</span>
+                      )}
+                    </>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

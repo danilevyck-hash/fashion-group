@@ -305,13 +305,22 @@ export interface DirectorioLeido {
   directorio: Directorio;
   /** `true` = la migración `20260806160000` no corrió; todo cae al código. */
   faltaMigracion: boolean;
+  /**
+   * Las fichas crudas con las que se armó el directorio.
+   *
+   * 🔑 Viajan de vuelta para que quien necesite OTRO campo de la ficha —la
+   * `fecha_ingreso` del saldo de vacaciones, por ejemplo— no tenga que volver a
+   * leer `asistencia_personas`. Dos lecturas de la misma tabla en la misma
+   * petición es la forma de que una traiga una columna que la otra no.
+   */
+  filas: FilaPersonaDb[];
 }
 
 /** El traductor código → nombre. Sin la migración corrida devuelve uno vacío,
  *  que responde el código para cualquier persona en vez de romper la pantalla. */
 export async function leerDirectorio(): Promise<DirectorioLeido> {
   const { filas, faltaMigracion } = await leerPersonas();
-  return { directorio: crearDirectorio(filas), faltaMigracion };
+  return { directorio: crearDirectorio(filas), faltaMigracion, filas };
 }
 
 /** Ventana de marcaciones para saber quién existe. Medio año cubre de sobra lo
@@ -352,6 +361,8 @@ export interface PersonasDelModulo {
   personas: PersonaListada[];
   directorio: Directorio;
   faltaMigracion: boolean;
+  /** Las fichas crudas. Ver `DirectorioLeido.filas`: es la MISMA lectura. */
+  filas: FilaPersonaDb[];
 }
 
 /**
@@ -364,11 +375,11 @@ export interface PersonasDelModulo {
 export async function leerPersonasDelModulo(
   dias = DIAS_VENTANA_PERSONAS,
 ): Promise<PersonasDelModulo> {
-  const [{ directorio, faltaMigracion }, codigos] = await Promise.all([
+  const [{ directorio, faltaMigracion, filas }, codigos] = await Promise.all([
     leerDirectorio(),
     leerCodigosConMarcaciones(dias),
   ]);
-  return { personas: armarPersonas(directorio, codigos), directorio, faltaMigracion };
+  return { personas: armarPersonas(directorio, codigos), directorio, faltaMigracion, filas };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
