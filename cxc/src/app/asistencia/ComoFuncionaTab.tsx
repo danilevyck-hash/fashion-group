@@ -104,9 +104,9 @@ export default function ComoFuncionaTab() {
         <ul className="mt-1 space-y-1.5 text-[13px] leading-relaxed text-gray-600">
           <li>· La quincena va del <b>1 al 15</b> y del <b>16 al fin de mes</b>. El día 31 no paga sueldo de más, pero si se falta ese día sí se descuenta.</li>
           <li>· La <b>rata por hora</b> es el salario del mes dividido entre {reglas.divisor40} para quien trabaja 40 horas por semana, y entre {reglas.divisor48} para quien trabaja 48.</li>
-          <li>· Las <b>horas extra</b> hasta las {reglas.horaCorteNocturno} se pagan × {reglas.recargoExtraDiurno}; desde el minuto siguiente × {reglas.recargoExtraNocturno}. Las que pasan de {reglas.excedenteHorasDia} horas en el día <b>y</b> caen después de esa hora van × {reglas.recargoExcedenteNocturnaMixta}.</li>
+          <li>· Las <b>horas extra</b> hasta las {reglas.horaCorteNocturno} se pagan × {reglas.recargoExtraDiurno}; desde el minuto siguiente × {reglas.recargoExtraNocturno}. <b>No hay un tercer escalón</b>: el «excedente de 9 horas» también va × {reglas.recargoExtraNocturno} y su columna queda en $0.00.</li>
           <li>· Los <b>domingos y feriados</b> trabajados se pagan × {reglas.recargoDomingoFeriado}.</li>
-          <li>· Se descuentan las <b>tardanzas</b> (minutos × el valor del minuto), las <b>ausencias</b> (horas × la rata), el seguro social ({reglas.seguroSocialPct} %) y el educativo ({reglas.seguroEducativoPct} %).</li>
+          <li>· Se descuentan las <b>tardanzas</b> (minutos × el valor del minuto), las <b>ausencias</b> (8 horas × la rata por cada día completo), el seguro social ({reglas.seguroSocialPct} %) y el educativo ({reglas.seguroEducativoPct} %).</li>
           <li>· El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios</b> no salen de ningún sistema: se escriben a mano en la planilla. Los cuatro primeros se restan; <b>«otros servicios» se SUMA</b>, porque es un pago extra y no un descuento.</li>
           <li>· 🔴 A quien le falte el salario, la jornada o la ficha <b>no se le calcula nada</b>: sale listado con lo que le falta y queda <b>fuera del total</b>. Nunca en $0.</li>
         </ul>

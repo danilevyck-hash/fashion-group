@@ -415,11 +415,14 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     for (const [titulo, texto] of casos) esperaDetrasDelInfo(titulo, texto);
   });
 
-  it("🔴 «se guarda pero TODAVÍA NO SE USA» sigue en pantalla y en ámbar — es una advertencia, no metodología", async () => {
+  it("🔴 «se guarda pero NO SE USA» sigue en pantalla y en ámbar — es una advertencia, no metodología", async () => {
     await abrirConfiguracion();
     fireEvent.click(screen.getByText("Reglas del cálculo"));
-    const nota = screen.getByText(/TODAVÍA NO SE USA/);
+    // 🔑 Desde el 25-ago-2026 el aviso además dice A DÓNDE van esos minutos:
+    // la contadora los paga × 1.50 y deja la columna del excedente en $0,00.
+    const nota = screen.getByText(/NO SE USA para calcular/);
     expect(nota.className).toContain("text-amber-800");
+    expect(nota.textContent).toMatch(/1\.50/);
   });
 
   it("las reglas que no se pueden cambiar siguen a la vista; solo el porqué pasó al ⓘ", async () => {

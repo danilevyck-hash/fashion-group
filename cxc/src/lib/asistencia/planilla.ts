@@ -51,9 +51,10 @@
  *   · Quincenal       = salario mensual ÷ 2.
  *   · Tardanza        = minutos pasada la tolerancia × valor minuto. SE RESTA.
  *   · Hora extra      = hasta las 18:00 × 1,25 · desde las 18:01 × 1,50.
- *   · Excedente       = × 2,625, con DOS condiciones a la vez (ver `medirHoras`).
+ *   · Excedente       = NO SE USA. La contadora manda esos minutos al 1,50 y
+ *                       deja su columna en $0,00 (ver `clasificarDia`).
  *   · Domingo/feriado = horas trabajadas × 1,50.
- *   · Ausencia        = horas del día × rata. SE RESTA.
+ *   · Ausencia        = 8 horas × rata, SIEMPRE. SE RESTA (ver `MIN_DIA_AUSENCIA`).
  *   · Bruto  = quincenal + extras + domingos + feriados − ausencias − tardanzas.
  *   · Neto   = bruto − deducciones **+ otros servicios** (ver `calcularDinero`:
  *              otros servicios SUMA, es un pago extra y no un descuento).
@@ -357,7 +358,10 @@ export interface HorasPersona {
   extraDiurnoMin: number;
   /** Hora extra pasada la hora de corte. Va al 1,50. */
   extraNocturnoMin: number;
-  /** Excedente: pasa el tope diario Y cae pasada la hora de corte. Va al 2,625. */
+  /**
+   * Excedente. **HOY SIEMPRE 0** — se conserva la columna porque el cuadro de
+   * la contadora también la conserva, y también en $0,00. Ver `clasificarDia`.
+   */
   excedenteMin: number;
   /** Domingo trabajado. Va al 1,50. */
   domingoMin: number;
@@ -511,6 +515,38 @@ function hhmmAMin(hhmm: string): number {
  */
 export const JORNADA_DIARIA_DEFAULT_MIN = 8 * 60;
 
+/**
+ * 🔴 LO QUE VALE UN DÍA DE AUSENCIA: **OCHO HORAS, SIEMPRE**. No es el default
+ * de nada — es la regla, y no la mueve ningún horario.
+ *
+ * Contadora, textual (25-ago-2026, por Daniel): *«Dia de ausencia 8 horas»*.
+ *
+ * 🩸 ANTES SE DESCONTABA LA JORNADA REAL Y ERA MÁS CARO. 22 de las 31 personas
+ * tienen horario confirmado 08:00–17:00 con 30 de almuerzo = **8,5 h**, así que
+ * a casi todo el mundo se le descontaba media hora de más por cada día ausente.
+ * Medido con `_diag-planilla-vs-contadora.ts` contra producción: en la quincena
+ * `2026-07-2` ese medio punto costaba **$20,88 de descuento de más** repartido
+ * entre seis personas, y en `2026-08-1` **$6,71** entre cuatro.
+ *
+ * La vara es su Excel de la II quincena de julio, columna «Ausencias», leída
+ * por FÓRMULA y no por valor:
+ *
+ *     Roxana Hernandez    =8*4.04     ← un día
+ *     Samir Polo Arrieta  =16*3.02    ← dos días
+ *     María Bethancourt   =8*2.88     ← un día
+ *     Cristian Blanco     =(0*24.16)+(0*3.02)   ← 24,16 = 8 × 3,02
+ *
+ * El único renglón que NO sale de esta fórmula es HÉCTOR PÉREZ, con `23.08`
+ * tecleado a mano (= 600 ÷ 26, el día calendario). Con 8 h × 2,88 dan $23,04:
+ * cuatro centavos. Con la jornada de 8,5 daban $24,48 — un dólar y medio.
+ *
+ * ⚠️ NO TOCA LA TARDANZA. Los minutos tarde se siguen valuando `minutos ×
+ * valor minuto`, con la misma tolerancia y el mismo umbral de 30 minutos que
+ * los manda a mostrarse en la columna «Ausencia». Esta constante solo valúa el
+ * día ENTERO sin marcas, que es lo único que la regla nombra.
+ */
+export const MIN_DIA_AUSENCIA = 8 * 60;
+
 /** El horario de una persona, con lo que hace falta para medirle el día. */
 export interface HorarioDia {
   entrada: string;
@@ -547,19 +583,39 @@ function dow(fecha: string): number {
  *
  *   · minutos de esa ventana hasta las 18:00 → 1,25
  *   · minutos desde las 18:01                → 1,50
- *   · de esos últimos, los que además pasen el tope diario → 2,625
  *
- * ── 🩸 EL EXCEDENTE LLEVA DOS CONDICIONES A LA VEZ ──────────────────────────
- * Contable, textual: *"eso después de 3 horas extras al día, cuando sea
- * prolongación de la jornada nocturna o mixta"*. O sea:
- *   (a) MÁS del tope de horas extra en el día, **Y**
- *   (b) que esos minutos caigan pasada la hora de corte.
- * Una jornada con 5 horas extra que termina a las 17:45 NO llega al 2,625 por
- * muchas horas que acumule — y hay un test que lo exige.
+ * ── 🔴 Y NO HAY UN TERCER ESCALÓN: EL EXCEDENTE NO SE USA ───────────────────
  *
- * ⚠️ La columna del Excel viejo dice "Exedente de 9 horas". ESA ETIQUETA NO ES
- * LA REGLA: habla de un total de horas del día y omite la condición nocturna.
- * Leerla literal le aplicaría el 2,625 a gente a la que no le toca.
+ * Acá los minutos que pasaban el tope diario Y caían de noche se apartaban a
+ * `excedenteMin` y se pagaban × 2,625. **Ya no.** Contadora, textual
+ * (25-ago-2026, por Daniel): *«Excedente de 9 horas es 1.5»*.
+ *
+ * 🩸 Y NO ES SOLO EL MULTIPLICADOR, ES LA COLUMNA. Su Excel de la II quincena
+ * de julio conserva «Exedente de 9 horas» con la fórmula del 2,625 escrita
+ * —`=0*1.5*1.75*3.46`— pero con CERO horas adentro, en las tres empresas y en
+ * todos los renglones. Los minutos están en la columna del 1,50. Se ve
+ * renglón por renglón, y cuadra al cuarto de hora:
+ *
+ *     CRISTIAN BLANCO  módulo 1,50 = 89,0 min + excedente 61,3 min = 2,51 h
+ *                      Excel  H12 = 2.5*1.5*3.02        ✅
+ *     RAMÓN MIRANDA    módulo 1,50 = 119,0 min + excedente 31,5 min = 2,51 h
+ *                      Excel  H15 = 2.5*1.5*3.27        ✅
+ *     KENER HERNÁNDEZ  módulo 1,50 = 119,0 min + excedente 31,6 min = 2,51 h
+ *                      Excel  H10 = 2.5*1.5*3.46        ✅
+ *
+ * Por eso el arreglo no era poner el parámetro en 1,5 —el dinero habría dado
+ * igual, pero la columna «Excedente» del cuadro habría seguido con plata
+ * adentro donde la de ella dice $0,00, y ahí empieza la desconfianza—. La
+ * columna se conserva y queda en cero, exactamente como la de ella.
+ *
+ * Medido contra producción en `2026-07-2`: el 2,625 se le aplicaba a ocho
+ * personas y les pagaba **$58,32 de más** en el bruto. En `2026-08-1` no hubo
+ * un solo minuto que cayera en la columna, así que esa quincena no se mueve.
+ *
+ * ⚠️ `excedenteHorasDia` y `recargoExcedenteNocturnaMixta` siguen guardados y
+ * validados en Configuración: el día que la contadora los pida de vuelta, el
+ * dato ya está y esto son tres líneas. Hoy NO calculan nada, y la pantalla lo
+ * dice — un parámetro que no mueve un centavo y no lo avisa es una mentira.
  */
 export function clasificarDia(
   d: DiaReporte,
@@ -605,9 +661,10 @@ export function clasificarDia(
       : { ...cero, sabadoMin: d.trabajadoMin };
   }
 
-  // Día hábil sin marcas y sin justificación: ausencia, valuada en la jornada
-  // que le tocaba trabajar.
-  if (d.ausente) return { ...cero, ausenciaMin: jornadaDiariaMin };
+  // Día hábil sin marcas y sin justificación: ausencia, valuada en OCHO HORAS.
+  // 🔴 No en la jornada de su horario: la contadora descuenta 8 h para todos y
+  // los horarios confirmados dan 8,5. Ver `MIN_DIA_AUSENCIA`.
+  if (d.ausente) return { ...cero, ausenciaMin: MIN_DIA_AUSENCIA };
   if (!d.marcas.length) return cero;
 
   const tardanzaMin = d.tardeMin;
@@ -625,19 +682,15 @@ export function clasificarDia(
   const diurno = Math.max(0, Math.min(extra, Math.min(fin, corte) - ini));
   const nocturno = extra - diurno;
 
-  // (a) lo que pasa del tope diario …
-  const tope = Math.max(0, reglas.excedenteHorasDia) * 60;
-  const sobrante = Math.max(0, extra - tope);
-  // … (b) y que además sea nocturno. Los minutos que pasan el tope son los
-  // ÚLTIMOS de la ventana, que son justamente los más tarde del día.
-  const excedenteMin = Math.min(nocturno, sobrante);
-
+  // 🔴 TODO LO NOCTURNO VA AL 1,50, sin apartar nada. `excedenteMin` queda en
+  // cero a propósito y por eso se escribe: la columna existe y vale $0,00,
+  // igual que la del Excel de la contadora.
   return {
     ...cero,
     tardanzaMin,
     extraDiurnoMin: diurno,
-    extraNocturnoMin: nocturno - excedenteMin,
-    excedenteMin,
+    extraNocturnoMin: nocturno,
+    excedenteMin: 0,
   };
 }
 

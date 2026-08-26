@@ -125,8 +125,9 @@ describe("🔴 EL PAGO — el motivo nuevo tiene que pagar EXACTAMENTE igual que
 
     // Sin justificación, ese día se descuenta como ausencia.
     expect(sin.horas.ausenciaMin).toBeGreaterThan(0);
-    // Con el motivo nuevo, no.
-    expect(fuera.horas.ausenciaMin).toBe(sin.horas.ausenciaMin - 510);
+    // Con el motivo nuevo, no. 🔑 Un día de ausencia vale 8 h fijas (480), no
+    // la jornada del horario — ver `MIN_DIA_AUSENCIA` en `planilla.ts`.
+    expect(fuera.horas.ausenciaMin).toBe(sin.horas.ausenciaMin - 480);
     expect(fuera.dinero!.ausencias).toBeLessThan(sin.dinero!.ausencias);
     expect(fuera.dinero!.netoPagar).toBeGreaterThan(sin.dinero!.netoPagar);
   });
