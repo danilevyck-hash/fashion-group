@@ -132,10 +132,28 @@ export function marcaKey(s: Cell): string {
   return String(s ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-/** Correcciones de marcas mal escritas del proveedor → marca correcta.
- *  Llave = marcaKey(mal escrita). Ampliar aquí en el futuro. */
+/** Correcciones de marcas mal escritas → marca correcta del catálogo.
+ *  Llave = marcaKey(mal escrita); valor = la marca canónica, tal cual figura en
+ *  MARCAS_CATALOGO. Insensible a caja y espacios en ambos lados, así que sirve
+ *  igual para "TH ACCESORIES" (como viene de Switch, en MAYÚSCULA) que para
+ *  "TH Accesories" (como viene del Excel del proveedor).
+ *
+ *  Estos nombres existen mal escritos DENTRO de Switch y no se pueden arreglar
+ *  por API (para artículos la API de Switch es solo lectura). Se corrigen acá,
+ *  al leerlos, para que el artículo caiga bajo su marca real en vez de "Otros".
+ *  Ojo: corregir el nombre NO le pone precio — sin fórmula cargada para esa
+ *  marca el producto sigue saliendo sin precio.
+ *
+ *  "OTROS" y "OTHERS" NO se corrigen: ésos son el cajón a propósito.
+ *  Ampliar aquí en el futuro. */
 export const MARCA_FIXES: Record<string, string> = {
-  [marcaKey("TH ACCESORIES")]: "TH ACCESSORIES", // typo del proveedor (una sola S)
+  [marcaKey("TH ACCESORIES")]: "TH Accessories",       // typo del proveedor (una sola S)
+  [marcaKey("TH OTHER ACCESORIES")]: "TH Accessories", // confirmado por Daniel: es TH Accessories
+  [marcaKey("TH ACCESORIOS")]: "TH Accessories",       // en español
+  [marcaKey("TH-ACCESORIOS")]: "TH Accessories",       // en español, con guion
+  [marcaKey("CK ACCESORIES")]: "CK Accessories",       // mismo typo, línea CK
+  [marcaKey("TH WOMEN")]: "TH Womenswear",
+  [marcaKey("TH MEN")]: "TH Menswear",
 };
 
 /** Normaliza la marca corrigiendo typos conocidos (insensible a caja/espacios).
