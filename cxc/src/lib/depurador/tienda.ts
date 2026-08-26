@@ -36,6 +36,7 @@ import {
   type SheetRow,
   type MarcaCatalogo,
 } from "./logic";
+import { veredictoDescripcion } from "./veredicto";
 
 export { OUT_COLS_SHOES };
 
@@ -325,7 +326,11 @@ export interface FacturaProcessResult {
    *  descripciones bajo una marca conocida (hay que aprobarlas al catálogo).
    *  `empresaKey` viene cuando la marca no es exacta (formatos B/C con
    *  candidatas 0): la aprobación debe elegir una marca de esa empresa. */
-  bloqueos: { marca: string; desc: string; empresaKey?: string }[];
+  bloqueos: { marca: string; desc: string; empresaKey?: string; motivo?: string; gemela?: string }[];
+  /** Cuántas descripciones nuevas pasaron solas (las dos mitades ya existen en
+   *  el catálogo, en cualquier marca) y por eso NO bloquean. Se dice en
+   *  pantalla: nada se descarta en silencio. */
+  pasaronSolas: number;
 }
 
 export interface FacturaConfig {
@@ -401,7 +406,22 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
   }
 
   const warnings: string[] = [];
-  const bloqueosSet = new Map<string, { marca: string; desc: string; empresaKey?: string }>();
+  const bloqueosSet = new Map<string, { marca: string; desc: string; empresaKey?: string; motivo?: string; gemela?: string }>();
+  // Descripciones nuevas que NO bloquean porque las dos mitades ya existen.
+  const pasaronSolasSet = new Set<string>();
+
+  /** Registra una descripción nueva: bloquea SOLO si el veredicto es "alerta"
+   *  (casi-gemela, mitad nueva, formato raro). Si pasa sola, se cuenta. */
+  const registrarNueva = (
+    clave: string,
+    marca: string,
+    desc: string,
+    empresaKey?: string
+  ) => {
+    const v = veredictoDescripcion(desc, cfg.catalogo);
+    if (v.veredicto !== "alerta") { pasaronSolasSet.add(clave); return; }
+    bloqueosSet.set(clave, { marca, desc, empresaKey, motivo: v.texto, gemela: v.gemela });
+  };
   const nInterno = formato === "A" ? nInternoDe(rows) : "";
 
   // Agrupar por CODIGO (misma pieza en varias líneas/facturas → suma cantidades).
@@ -513,7 +533,7 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
           // empresa → BLOQUEA la descarga hasta que Daniel la apruebe.
           marca = "Otros";
           const marcaLabel = `${empresa.label} (sin marca exacta)`;
-          bloqueosSet.set(`${marcaLabel}|||${marcaKey(descOut)}`, { marca: marcaLabel, desc: descOut, empresaKey: empresa.key });
+          registrarNueva(`${marcaLabel}|||${marcaKey(descOut)}`, marcaLabel, descOut, empresa.key);
         }
       } else {
         marca = "Otros";
@@ -528,7 +548,7 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
         descripcionesDeMarca(cfg.catalogo, canon).length > 0 &&
         !esDescripcionCatalogada(cfg.catalogo, canon, descOut)
       ) {
-        bloqueosSet.set(`${canon}|||${marcaKey(descOut)}`, { marca: canon, desc: descOut });
+        registrarNueva(`${canon}|||${marcaKey(descOut)}`, canon, descOut);
       }
     }
 
@@ -582,6 +602,7 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
     nInterno,
     sinFecha: formato === "A",
     bloqueos: [...bloqueosSet.values()],
+    pasaronSolas: [...pasaronSolasSet].filter((k) => !bloqueosSet.has(k)).length,
   };
 }
 

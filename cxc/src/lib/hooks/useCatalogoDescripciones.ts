@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import useSWR from "swr";
 import { marcaKey, type CatalogoDescripciones } from "@/lib/depurador/logic";
+import { normalizarEspacios } from "@/lib/depurador/veredicto";
 
 // Catálogo de descripciones por marca del Depurador. La fuente de verdad es la
 // tabla depurador_descripciones (SIN fallback al archivo TS: un solo dueño de
@@ -30,8 +31,12 @@ export function useCatalogoDescripciones() {
   /** Agrega una descripción recién aprobada al catálogo EN MEMORIA (sin refetch)
    *  y devuelve el catálogo actualizado, para re-evaluar alarmas en vivo. */
   const agregarDescripcion = useCallback(
-    (marca: string, descripcion: string): CatalogoDescripciones => {
+    (marca: string, descripcionRaw: string): CatalogoDescripciones => {
+      // Misma normalización de espacios que guarda el servidor: el catálogo en
+      // memoria y la tabla no pueden diferir ni en un espacio.
+      const descripcion = normalizarEspacios(descripcionRaw);
       const base = data?.catalogo ?? {};
+      if (!descripcion) return base;
       // La marca puede venir en otra caja → busca la key existente del catálogo.
       const marcaExistente = Object.keys(base).find((m) => marcaKey(m) === marcaKey(marca)) ?? marca;
       const lista = base[marcaExistente] ?? [];
