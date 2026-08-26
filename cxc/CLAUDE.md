@@ -1311,6 +1311,102 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - **`/guias/[id]/imprimir` sigue existiendo** con su vista previa y sus botones. Ya no se llega desde ninguna parte (los dos botones hacen la tarea de una), pero la ruta no se borró: un enlace guardado seguiría abriendo lo que abría. Retirarla es una poda aparte.
 > - **El «Corregir» retirado dejaba de rotar los ids**, y el formulario de una guía PENDIENTE sí los rota (usa el PUT). No se pierde nada —el formulario reenvía `cliente_codigo` y el N° de cada línea, y el borrador del despacho guarda los N° tecleados por posición— pero si algún día una guía pendiente llegara a tener otro dato atado por `guia_items.id`, esto habría que revisarlo.
 
+## 🔴 Guías — LA DESPACHADA SE VE COMO AL CREAR, Y LO BLOQUEADO SE VE BLOQUEADO (25-ago-2026)
+
+> Daniel probó el #610 en el iPhone y mandó dos capturas con tres pedidos, más uno que salió del mismo repaso. Textual: ***"Editar guía despachada, debe de verse igual que al crear una guía para mantener consistencia y uso fácil"*** · ***"que se vea desbloqueado solo las editables así el usuario no adivina"*** · ***"lo de poner transporte frecuente no le gusta, quita espacio, que sea solo al escribir primeras 2 o 3 letras que aparezca las opciones"*** · ***"Sobre dirección. Muévelo"***.
+>
+> 🔴 **TODO ESTE PR ES DE PRESENTACIÓN. LO QUE SE PUEDE ESCRIBIR NO CAMBIÓ NI UN CAMPO.** Siguen siendo los tres de siempre (**N° del transportista · cliente · facturas**), siguen saliendo **por columna** (`PATCH …/item` y `PATCH …/numero-transp`), **el candado del PUT sigue intacto**, los **bultos siguen cerrados** y el servidor sigue rechazando **entero** un cuerpo con un campo no permitido. `campos-editables.ts` no se tocó, y sus candados (`lib/guias-campos-editables.test.ts`, `api/guias-corregir-item-route.test.ts`) tampoco.
+>
+> ### 1 y 2 · 🩸 LOS CINCO ASTERISCOS DE UNA GUÍA FIRMADA
+>
+> Sobre **GT-229**, ya despachada, la pantalla decía `CLIENTE *` · `DIRECCIÓN *` · `EMPRESA *` · `FACTURA(S) *` · `BULTOS *` — **los cinco con el asterisco rojo de obligatorio, como si los cinco se pudieran tocar**, cuando solo tres se corrigen. Y los tres cerrados salían como **texto suelto**, con otra tipografía y sin la caja del campo: la guía firmada no se parecía a la que se acababa de crear. Había que TOCAR para descubrir cuál era cuál.
+>
+> ```
+> ANTES (GT-229)                          AHORA
+> FECHA          2026-08-24               FECHA 🔒        ┌────────────────┐
+> CÓMO SALIÓ     Transportista externo                    │ 2026-08-24     │  ← apagado
+> TRANSPORTISTA  Edwin                    MODO DE ENTREGA 🔒
+> DESPACHADO POR Julio                    …
+>
+> CLIENTE *      [Outlet Duty Free N3]    CLIENTE         [Outlet Duty Free N3]  ← blanco
+> DIRECCIÓN *    Paso Canoas              DIRECCIÓN 🔒    │ Paso Canoas    │  ← apagado
+> EMPRESA *      Fashion Shoes            EMPRESA 🔒      │ Fashion Shoes  │  ← apagado
+> FACTURA(S) *   [2520]                   FACTURA(S)      [2520]                 ← blanco
+> BULTOS *       128                      BULTOS 🔒       │ 128            │  ← apagado
+> ```
+>
+> - **La cabecera pasó a la MISMA grilla del alta** (`grid-cols-1 sm:grid-cols-2`, mismos rótulos, mismo orden) con las cajas apagadas. Antes era otra grilla con otro aspecto, y esa era la mitad de la queja.
+> - **En una guía firmada no queda UN SOLO asterisco** —ni en los tres que sí se tocan: ahí no se valida el alta, así que pedir algo "obligatorio" a quien no puede escribir era la otra mitad de la confusión— y **el asterisco NO desapareció del sistema**: al crear sigue exactamente igual. Hay candado en las dos direcciones.
+> - **Lo bloqueado se muestra, no se esconde**: misma caja, mismo alto, mismo rótulo, con **fondo apagado, subrayado punteado, texto gris y un candado al lado del rótulo**. Se lee de un vistazo qué se puede cambiar.
+> - 🩸 **Y NO ES UN `<input disabled>`**: es un elemento que **no es un campo**. Un input apagado sigue siendo un input —se enfoca con el tabulador, algunos navegadores dejan pegar— y acá el punto es que no haya ningún camino para escribir lo que el servidor va a rechazar. Hay candado que lee el `tagName`.
+> - **Quien no ve la pantalla también se entera**: el candado es un dibujo (`aria-hidden`) y al lado va un `sr-only` con *"bloqueado, no se puede cambiar"*. Medido: **17 veces** en GT-229.
+> - **Las observaciones se dibujan SIEMPRE**, bloqueadas, aunque estén vacías (dicen "—"). Antes desaparecían: es justo lo que hacía que la guía firmada tuviera otra forma.
+> - ⚠️ **ESTO REVIERTE UN CRITERIO PROPIO, y se dice de frente.** El 25-ago se había elegido texto suelto con el argumento de que *"un campo gris que no deja escribir invita a pelearse con él"*. Daniel midió lo contrario en el iPhone. El argumento no era falso: lo que faltaba era que el campo apagado **DIJERA** que está apagado, y eso es el candado.
+>
+> ### 3 · 🩸 «LOS QUE MÁS USA ESTE TRANSPORTISTA» SE COMÍA MEDIA PANTALLA
+>
+> Era un bloque **FIJO** con 3 tarjetas (`Álvaro ábrego · Aníbal Arauz · Walter Arauz`) siempre desplegado arriba de «Recibido por», en la única pantalla donde bodega despacha — todos los días, también cuando el chofer era uno nuevo y ninguna de las tres servía. **Ahora es un AUTOCOMPLETADO**: aparece al escribir **2 letras** en «Recibido por» y se esconde solo.
+>
+> 🔑 **NO SE PERDIÓ NADA DE LO QUE HACÍA, y son las dos cosas que valían:**
+> - **Tocar una opción llena LOS TRES campos de una vez** (recibido por · cédula · placa) y los tres quedan editables. Medido en el navegador, en los 4 anchos.
+> - 🔴 **EL ORDEN SIGUE SIENDO POR FRECUENCIA, NO POR FECHA.** `juegosQueCoinciden` **FILTRA y conserva el orden que recibe** — reordenar acá (por parecido, por fecha, alfabético) desharía lo medido el 14-ago sobre las 185 guías despachadas: **en los 6 transportistas el orden por frecuencia difiere del orden por fecha**, y en Boston el juego de **10 veces** no es el de la guía más reciente. Medido en pantalla con los juegos REALES de Edwin: `ar` → **`Anibal arauz · 4 veces`** y después **`Walter Arauz · 3 veces`**.
+> - **La identidad de un juego sigue siendo cédula + placa, no el nombre** (`juegosMasFrecuentes` no se tocó): acá solo se BUSCA por el nombre, que es lo que se teclea en ese campo.
+>
+> **Cómo pega:** por el principio del nombre entero (`joc` → `Jocsan murillo`) **o de cualquiera de sus palabras** (`mur` → `Jocsan murillo`, porque el mismo chofer se busca por el apellido). **No pega por el medio** (`osa` no trae a `Jocsan`): con dos letras eso abriría media lista, que es lo que se vino a sacar.
+> - ⚠️ **DOS LETRAS ES EL PISO** (`MIN_LETRAS_JUEGO`), y no es un número al azar: con una sola letra la lista de un transportista con muchos juegos se abre casi entera y vuelve a tapar la pantalla. **Con 0 y con 1 letra no se ofrece NADA**, y tampoco se abre al ENFOCAR el campo — solo al escribir.
+> - 🔑 **El desplegable es el de la casa** (`DesplegableFlotante`: portal a `<body>` + `fixed`), no un `absolute` colgado del campo. Este formulario vive dentro de contenedores con `overflow`, y ahí un panel absoluto lo recorta el primer ancestro que lo tenga — **subir el z-index NO lo arregla** (30-jul-2026). Cierra con click afuera y con Escape.
+> - **Se fue la línea** *"Tócalo y se llenan los tres campos. Puedes cambiarlos después."* — **y NO tenía candado que la exigiera en pantalla**: se buscó en `poda-textos-ayuda`, `marketing-reclamos-toques` y en todo `src/__tests__` antes de tocarla, y no aparece en ninguno. Lo que sí quedó fijado es lo contrario: hay candado que exige que ni ella ni el rótulo del bloque fijo vuelvan.
+>
+> ### 4 · El aviso que salía DOS VECES
+>
+> En **GT-230**, *«Falta: el transportista»* aparecía **dos veces en la misma pantalla**: una pegada al encabezado (la barra pegajosa) y otra junto a «Guardar Cambios». Daniel: *"Dejá una sola, la de abajo, que es donde está el botón"*.
+> - ⚠️ **ESTO TAMBIÉN REVIERTE UN CRITERIO PROPIO** (23-ago: *"apagar el botón en un lado y explicarlo solo en el otro es la mitad del arreglo"*). Con las dos barras a la vista al mismo tiempo, ese argumento se vuelve el defecto contrario.
+> - **El botón de la barra pegajosa NO quedó mudo**: sigue apagado y conserva el mismo texto en su `title`.
+> - 🔴 **El invariante del candado es que NINGÚN aviso se repita**, no que haya uno solo en pantalla: el *«Falta: placa, recibido por y cédula»* del bloque de DESPACHO es **otro** aviso, de otro botón, y **no se tocó**.
+>
+> ### 5 · «Agregar destino» salió del TÍTULO de la sección
+>
+> Daniel lo abrió en el iPhone y no entendió qué era: un **"＋" pelado pegado al título «Detalle de Envío»** se lee como si fuera a renombrar la sección. Textual: ***"Sobre dirección. Muévelo"***.
+> - Ahora vive **debajo de la lista de envíos** —donde se acaba de escribir la dirección— y **DICE qué hace**: `＋ Agregar destino a la lista`. `AddNewInline` ganó un prop OPCIONAL (`textoBoton`); **sin él sale exactamente como siempre**, que es el "＋" a secas de «Despachado por», donde el campo de al lado ya lo explica.
+> - ⚠️ **NO vuelve al `<th>` de la tabla** (en móvil ese `<th>` no existe — la razón por la que salió de ahí en su momento) y **sigue siendo UNA sola instancia** para todo el formulario. Alimenta el MISMO `<datalist id="direcciones-list">`; medido en el navegador que la ciudad tecleada aparece en las sugerencias.
+> - **En una guía firmada no se ofrece**: la dirección está bloqueada.
+>
+> ### 🔴 LO QUE **NO** SE TOCÓ
+>
+> El candado del PUT sobre una guía despachada · `PATCH …/cliente` y `PATCH …/numero-transp` siguen sin mirar el estado · **los bultos de una despachada siguen cerrados** y un cuerpo mixto se rechaza entero · no se agregan ni se quitan envíos de una guía firmada · **no autoguarda** · placa, receptor, cédula y las dos firmas siguen bloqueando el despacho y el N° del transportista **no** · la lista NO despacha · entrega directa sin placa ni transportista · el papel impreso · **nadie gana permisos**.
+>
+> ### Medición
+>
+> **Los 4 anchos, en el navegador contra el build de producción, con datos de producción y CONTRA `origin/main` corriendo EL MISMO ARCHIVO** (`BASE=… ETAPA=antes|despues node scripts/_medir-guias-consistencia-anchos.mjs`, solo lectura), en tres pantallas: la **pendiente REAL GT-230** con el formulario abierto · la **despachada REAL GT-229** (la de la captura) · `/guias/nueva`.
+>
+> | ALTO de la pantalla | 390 | 834 | 1024 | 1440 |
+> |---|---:|---:|---:|---:|
+> | pendiente editando · main | 2.649 | 2.376 | 1.669 | 1.557 |
+> | pendiente editando · **después** | **2.406** | **2.216** | **1.574** | **1.462** |
+> | | **−243 (−9,2%)** | −160 | −95 | −95 |
+> | despachada editando · main | 2.695 | 2.375 | 1.194 | 1.122 |
+> | despachada editando · **después** | **2.949** | **2.452** | **1.277** | **1.214** |
+> | | **+254** | +77 | +83 | +92 |
+> | `/guias/nueva` · main | 1.542 | 1.342 | 1.194 | 994 |
+> | `/guias/nueva` · **después** | 1.530 | 1.348 | 1.194 | 1.000 |
+>
+> - 🔴 **LA PENDIENTE SE ACORTÓ, que es el punto del encargo**: sacar el bloque fijo de frecuentes le quitó **243 px en el iPhone**. `/guias/nueva` no se movió (±6 px: el "＋" que se mudó de la fila del título a una fila propia).
+> - 🔴 **Y LA DESPACHADA CRECIÓ +254 px a 390, DICHO DE FRENTE.** Es el precio de lo que Daniel pidió: la cabecera pasó de 2 columnas compactas a la grilla de una sola columna del alta (4 rótulos + 4 cajas en vez de 4 pares apretados) y las observaciones se dibujan siempre. **Crece hacia ABAJO, que es lo único que una pantalla puede regalar** — arrastre 0 en los cuatro anchos.
+> - **0 px de arrastre de página · 0 textos <12 px · 0 asteriscos en la despachada · 14 cajas apagadas** (4 de cabecera + 3×3 de los tres envíos + observaciones) en los 4 anchos. Los **tocables <44 px son IDÉNTICOS a main** (0 · 9 · 9 · 9) y son los campos densos de `pointer:fine` que `GuiaForm` usa a propósito en escritorio. Los **recortados también son idénticos a main** (los `-mx-2` de `SignatureCanvas` y los `truncate` del `<select>` de empresa y del cliente a 1024).
+> - **EL AUTOCOMPLETADO, TOCADO DE VERDAD en los 4 anchos**: sin escribir nada → **0 opciones**; escribiendo `ar` → **2 opciones, `Anibal arauz · 4 veces` primero y `Walter Arauz · 3 veces` después**; al tocar la primera los tres campos quedan en `Anibal arauz` / `3-746-1142` / `DG3779` y **la lista se cierra**.
+> - 🔴 **NO SE TOCÓ NINGUNA GUÍA REAL.** El navegador **aborta todo pedido que no sea GET**; las únicas escrituras bloqueadas son **2 POST de Sentry**, idénticos en main. Nunca se apretó «Despachar» ni «Guardar Cambios».
+> - 🩸 **DOS GOTCHAS DE MEDICIÓN QUE DABAN VERDE (O ROJO) SIN HABER MIRADO NADA.** (a) El asterisco vive en **DOS sitios** —el `<label>` de la tarjeta (que manda bajo `lg`) y el `<th>` de la tabla (que manda desde `lg`)—: contar solo los `label` devolvía **0 asteriscos en escritorio** aunque la tabla los tuviera todos. (b) `innerText` **NO devuelve el texto de un `sr-only`** (está clipeado), así que preguntarle por el candado daba siempre 0 — un rojo del medidor sobre algo que sí estaba puesto; va por `textContent`.
+>
+> ### Candados
+>
+> De **CONDUCTA**: **`src/__tests__/components/guias-consistencia-despachada.test.tsx` (18) MONTA la página real** —qué rótulo lleva asterisco y qué caja se puede escribir no lo puede ver un barrido, y en este repo ya se cumplió CUATRO veces con el comentario que explicaba el cambio— y cuenta además **lo que sale por `fetch`**. Más `lib/guias-juegos-autocompletado.test.ts` (19, la regla sola con los juegos REALES de Boston) y `components/guias-direccion-y-juegos.test.tsx`, que **CAMBIÓ DE DIRECCIÓN**: exigía el bloque FIJO —o sea, fijaba lo que Daniel pidió sacar— y hoy exige que nada aparezca antes de las dos letras, que el orden siga siendo por frecuencia y que tocar una opción llene los tres campos.
+> - `lib/guias-juegos-despacho.test.ts` también cambió de dirección en un caso: exigía `{externo && juegos.length > 0 && onUsarJuego && (` (el bloque fijo) y hoy exige lo que siempre quiso decir — que en entrega directa no se ofrezca ningún juego.
+> - 🩸 **Y un candado de la casa habría dejado de vigilar en silencio:** `iphone-targets-guias.test.ts` buscaba los botones de `AddNewInline` con `className="…"` entre comillas dobles. El "＋" pasó a `className={\`…\`}` al ganar su rótulo, así que el barrido habría bajado de 3 botones a 2 **sin ponerse rojo** — dejando sin vigilar justo el botón que se acababa de tocar. Ahora mira las dos formas.
+> - **Verificado por mutación, 28 de 28 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-guias-consistencia.sh`): los bultos / la dirección / la empresa de una guía firmada vuelven a ser campos escribibles · la caja apagada vuelve a ser un input · vuelve el asterisco en la firmada · el asterisco desaparece también al crear · el candado de la fila desaparece · el candado se pone siempre · la cabecera pierde su candado · el candado deja de decirse para quien no ve la pantalla · las observaciones vuelven a esconderse vacías · el autocompletado se abre con 0 letras · y con 1 · el filtro pega por el medio · el filtro no ofrece nunca nada · tocar una opción ya no llena los tres campos · la lista queda abierta al elegir · la opción baja de 44 px · el desplegable no se abre jamás · el filtro reordena y pierde la frecuencia · el filtro se ordena alfabéticamente · **vuelve el «Falta: …» repetido** · el de abajo desaparece · el botón pierde su `title` · «Agregar destino» desaparece · vuelve a pegarse al TÍTULO · el "＋" vuelve a quedarse sin rótulo · el "＋" con rótulo baja de 44 px.
+> - 🩸 **El script trae una mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido con el comentario adentro. **Restaura por COPIA** (hay archivos NUEVOS y `git checkout` aborta el comando entero sin restaurar nada), **denuncia el patrón muerto**, **no usa perl** (así que no hay delimitador `|` que se des-escape y se coma el archivo) y **falla si vitest corrió 0 archivos** — de ahí que la lista vaya como ARRAY (`"${TESTS[@]}"`) y no como un string: en **zsh** una variable sin comillas NO se parte por espacios (`${=TESTS}` sería el equivalente), le llegaría a vitest como UN argumento, correría 0 archivos y todo saldría verde sin haber probado nada.
+> - 🩸 **DOS mutaciones fallaron en la primera corrida y las dos eran del SCRIPT, no del producto**: los backticks del nombre de una mutación, **dentro de comillas dobles, los ejecuta el shell** (`absolute: command not found`); y cambiar solo la etiqueta de apertura de `<span>` a `<input>` deja un `</span>` huérfano, el módulo no compila y la mutación prueba que un archivo roto rompe, no el candado.
+> - ⚠️ **Una mutación NO se puede hacer desde acá, y se dice:** *"el desplegable vuelve a ser un `absolute`"*. El barrido de `desplegables-flotan.test.ts` exime a todo archivo que MENCIONE `DesplegableFlotante`, así que la mutación fiel tiene que borrar el import **y** el uso — dos ediciones no contiguas, y el aplicador hace UNA literal por corrida a propósito.
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`

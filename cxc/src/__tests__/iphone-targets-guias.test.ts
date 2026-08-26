@@ -292,7 +292,15 @@ describe("Cliente · el desplegable, no solo el campo que lo abre", () => {
 
 describe("AddNewInline · el ＋ que se escapó de las dos vueltas", () => {
   it('el "＋", el "OK" y el "×" son 44×44', () => {
-    const botones = addNew.match(/className="[^"]*inline-flex items-center justify-center[^"]*"/g) ?? [];
+    // ⚠️ Las DOS formas de escribir el atributo. El "＋" pasó a `className={`…`}`
+    // cuando ganó su rótulo visible (25-ago-2026): un barrido que solo mirara
+    // las comillas dobles habría dejado de verlo y el candado habría bajado de
+    // 3 botones a 2 **sin ponerse rojo** — o sea, dejando de vigilar justo el
+    // botón que se acababa de tocar.
+    const botones = [
+      ...(addNew.match(/className="[^"]*inline-flex items-center justify-center[^"]*"/g) ?? []),
+      ...(addNew.match(/className=\{`[^`]*inline-flex items-center justify-center[^`]*`/g) ?? []),
+    ];
     expect(botones.length).toBeGreaterThanOrEqual(3);
     for (const b of botones) {
       expect(b).toContain("min-w-[44px]");

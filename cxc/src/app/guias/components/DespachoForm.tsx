@@ -9,7 +9,8 @@ import {
   type TipoDespacho,
 } from "@/lib/guias/falta-para-despachar";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
-import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
+import { juegosQueCoinciden, type JuegoDespacho } from "@/lib/guias/juegos-despacho";
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EL DESPACHO — ahora vive en la PÁGINA de la guía, no dentro de la lista.
@@ -39,6 +40,18 @@ import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 // contestaba con un toast por vez, que además se iba solo a los 3 segundos.
 // Las reglas de qué falta viven en `@/lib/guias/falta-para-despachar` — las
 // mismas que aplica el servidor.
+//
+// 🔴 LOS JUEGOS FRECUENTES SON UN AUTOCOMPLETADO, NO UN BLOQUE FIJO
+// (25-ago-2026). Daniel, textual: *«lo de poner transporte frecuente no le
+// gusta, quita espacio, que sea solo al escribir primeras 2 o 3 letras que
+// aparezca las opciones»*. Antes eran 3 tarjetas SIEMPRE desplegadas arriba de
+// «Recibido por»: media pantalla de iPhone en la única página donde bodega
+// despacha, todos los días, incluso cuando el chofer era uno nuevo. Ahora las
+// opciones salen al escribir 2 letras en ese campo y se esconden solas.
+// ⚠️ NO SE PERDIÓ NADA DE LO QUE HACÍA: tocar una sigue llenando LOS TRES
+// campos (recibido por · cédula · placa), los tres siguen editables después, y
+// el orden sigue siendo POR FRECUENCIA (la lista llega ya ordenada y el filtro
+// CONSERVA ese orden). Ver `@/lib/guias/juegos-despacho`.
 //
 // 🔴 EL MODO NO SE VUELVE A PREGUNTAR: SE MUESTRA, CON UN "CAMBIAR" AL LADO.
 // Ya se eligió al crear la guía. Preguntarlo de nuevo, con "Transportista
@@ -99,10 +112,18 @@ export default function DespachoForm({
   bSaving, onConfirmar,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
 }: DespachoFormProps) {
+  /** El ancla del desplegable de juegos. Ver `DesplegableFlotante`. */
+  const receptorRef = useRef<HTMLInputElement>(null);
   const canvas1Ref = useRef<HTMLCanvasElement>(null);
   const canvas2Ref = useRef<HTMLCanvasElement>(null);
   // El selector aparece solo si se toca "Cambiar". Ver la cabecera.
   const [cambiandoModo, setCambiandoModo] = useState(false);
+  /**
+   * ¿La lista de juegos está abierta? Se enciende **al ESCRIBIR** y con nada
+   * más — ni al enfocar el campo, ni al montar. Es lo que Daniel pidió: las
+   * opciones aparecen recién al teclear las primeras letras.
+   */
+  const [buscandoJuego, setBuscandoJuego] = useState(false);
 
   // Warn before leaving if user has filled any field
   const isDirty = useMemo(
@@ -147,6 +168,18 @@ export default function DespachoForm({
   }
 
   const externo = tipoDespacho === "externo";
+
+  /**
+   * Los juegos que empiezan por lo que se escribió, **en el orden en que
+   * llegaron** — o sea por FRECUENCIA. `juegosQueCoinciden` filtra y no
+   * reordena; reordenar acá (por parecido, por fecha) desharía lo medido en los
+   * 6 transportistas: en Boston el juego de 10 veces NO es el más reciente.
+   *
+   * ⚠️ En entrega directa no hay transportista ni placa: la lista ni se calcula.
+   */
+  const sugerenciasJuego =
+    externo && onUsarJuego ? juegosQueCoinciden(juegos, bReceptor) : [];
+  const mostrarJuegos = buscandoJuego && sugerenciasJuego.length > 0;
 
   return (
     <div className="space-y-4">
@@ -197,41 +230,8 @@ export default function DespachoForm({
 
       {/* Quién recibe y en qué se va */}
       <div className="rounded-lg border border-gray-200 bg-white p-4">
-        {/* 🔴 LOS QUE MÁS SE USAN CON ESTE TRANSPORTISTA, de un toque.
-            Daniel: *«normalmente mandamos con las mismas 3/4 compañías. Y los
-            que varían a veces son los choferes. Que tenga memoria guía para
-            mostrar los más frecuentes.»* — por FRECUENCIA, no por fecha: son
-            dos órdenes distintos, medido en los 6 transportistas.
-            Los tres campos de abajo se tecleaban en blanco cada vez, en un
-            teléfono, y el mismo dato terminaba guardado de varias formas.
-            ⚠️ Solo con transportista externo: en entrega directa no hay
-            transportista ni placa. Ver `@/lib/guias/juegos-despacho`. */}
-        {externo && juegos.length > 0 && onUsarJuego && (
-          <div className="mb-4">
-            <span className="text-xs uppercase tracking-wide text-gray-400 mb-2 block">
-              Los que más usa este transportista
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {juegos.map((j, i) => (
-                <button
-                  key={`${j.receptor}|${j.cedula}|${j.placa}|${i}`}
-                  type="button"
-                  onClick={() => onUsarJuego(j)}
-                  className="text-left text-sm rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50 hover:border-gray-300 active:scale-[0.99] transition min-h-[44px] max-w-full"
-                >
-                  <span className="font-medium break-words">{j.receptor}</span>
-                  <span className="block text-xs text-gray-500 break-words">
-                    {j.cedula} · {j.placa}
-                    {j.veces > 1 && ` · ${j.veces} veces`}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Tócalo y se llenan los tres campos. Puedes cambiarlos después.
-            </p>
-          </div>
-        )}
+        {/* 🔴 EL BLOQUE FIJO DE JUEGOS FRECUENTES SE FUE DE ACÁ: hoy es el
+            autocompletado del campo «Recibido por», más abajo. Ver la cabecera. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {/* ⚠️ La placa SOLO existe con transportista externo. Ver la cabecera. */}
           {externo && (
@@ -250,12 +250,64 @@ export default function DespachoForm({
                 onChange={(e) => setBChofer(e.target.value)} className={CAMPO} />
             </div>
           )}
+          {/* 🔴 «RECIBIDO POR» CON AUTOCOMPLETADO. Las opciones salen al
+              escribir 2 letras (`MIN_LETRAS_JUEGO`, en el módulo puro) y se esconden solas: al
+              elegir una, al salir del campo o con Escape. NO se abren al
+              enfocar — eso volvería a tapar la pantalla, que es lo que Daniel
+              pidió sacar. */}
           <div>
             <label htmlFor="despacho-receptor" className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">
               {externo ? "Recibido por" : "Cliente que recibe"}
             </label>
-            <input id="despacho-receptor" type="text" value={bReceptor}
-              onChange={(e) => setBReceptor(e.target.value)} className={CAMPO} />
+            <input
+              id="despacho-receptor"
+              ref={receptorRef}
+              type="text"
+              value={bReceptor}
+              autoComplete="off"
+              role={externo && onUsarJuego ? "combobox" : undefined}
+              aria-expanded={externo && onUsarJuego ? mostrarJuegos : undefined}
+              aria-controls={externo && onUsarJuego ? "despacho-receptor-opciones" : undefined}
+              onChange={(e) => { setBReceptor(e.target.value); setBuscandoJuego(true); }}
+              onKeyDown={(e) => { if (e.key === "Escape") setBuscandoJuego(false); }}
+              className={CAMPO}
+            />
+            {/* 🔑 EL DESPLEGABLE DE LA CASA, no un `absolute` colgado del campo.
+                Este formulario vive dentro de contenedores con `overflow`, y un
+                panel absoluto lo recorta el primer ancestro que lo tenga —
+                subir el z-index NO lo arregla (30-jul-2026). Portal a <body> +
+                `fixed`, y se cierra con click afuera y con Escape. */}
+            {onUsarJuego && (
+              <DesplegableFlotante
+                abierto={mostrarJuegos}
+                anclaRef={receptorRef}
+                onCerrar={() => setBuscandoJuego(false)}
+                id="despacho-receptor-opciones"
+                marca="juego-despacho"
+                role="listbox"
+                aria-label="Los que más usa este transportista"
+                className="bg-white border border-gray-200 rounded-lg shadow-lg"
+              >
+                <>
+                  {sugerenciasJuego.map((j, i) => (
+                    <button
+                      key={`${j.receptor}|${j.cedula}|${j.placa}|${i}`}
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      onClick={() => { onUsarJuego(j); setBuscandoJuego(false); }}
+                      className="w-full text-left px-3 py-2 min-h-[44px] hover:bg-gray-50 active:bg-gray-100 transition"
+                    >
+                      <span className="block text-sm font-medium break-words">{j.receptor}</span>
+                      <span className="block text-xs text-gray-500 break-words">
+                        {j.cedula} · {j.placa}
+                        {j.veces > 1 && ` · ${j.veces} veces`}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              </DesplegableFlotante>
+            )}
           </div>
           <div>
             <label htmlFor="despacho-cedula" className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Cédula</label>

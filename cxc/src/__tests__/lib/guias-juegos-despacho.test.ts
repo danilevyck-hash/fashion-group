@@ -254,9 +254,16 @@ describe("🔴 la ruta acota por transportista y falla ABIERTA", () => {
 });
 
 describe("⚠️ en entrega directa esto no aparece", () => {
-  it("el bloque solo se dibuja con transportista externo", () => {
+  /**
+   * ⚠️ CANDADO QUE CAMBIÓ DE DIRECCIÓN (25-ago-2026). Exigía el bloque FIJO
+   * (`{externo && juegos.length > 0 && onUsarJuego && (`), o sea que fijaba
+   * justo lo que Daniel pidió sacar. Hoy exige lo que siempre quiso decir: que
+   * en entrega directa no se ofrezca ningún juego. La lista se calcula solo
+   * cuando el modo es externo, así que en directa sale vacía por construcción.
+   */
+  it("los juegos solo se calculan con transportista externo", () => {
     const form = sinComentarios(leer("src/app/guias/components/DespachoForm.tsx"));
-    expect(form).toContain("{externo && juegos.length > 0 && onUsarJuego && (");
+    expect(form).toContain("externo && onUsarJuego ? juegosQueCoinciden(juegos, bReceptor) : []");
   });
 
   it("y el hook ni siquiera lo pide sin transportista", () => {

@@ -192,31 +192,72 @@ function Despacho({ tipo, juegos }: { tipo: "externo" | "directo"; juegos: Juego
   );
 }
 
-describe("🔴 un toque llena los TRES campos", () => {
+/**
+ * ⚠️ TODO ESTE BLOQUE CAMBIÓ DE DIRECCIÓN (25-ago-2026).
+ *
+ * Exigía el bloque FIJO de 3 tarjetas («Los que más usa este transportista»,
+ * siempre desplegado arriba de «Recibido por»), o sea que fijaba exactamente lo
+ * que Daniel pidió sacar: *«lo de poner transporte frecuente no le gusta, quita
+ * espacio, que sea solo al escribir primeras 2 o 3 letras que aparezca las
+ * opciones»*.
+ *
+ * 🔑 LO QUE SE SIGUE EXIGIENDO, palabra por palabra, es lo que NO podía
+ * perderse: que tocar una opción llene los TRES campos, que los tres queden
+ * editables, y que el orden sea POR FRECUENCIA y no por fecha.
+ */
+describe("🔴 el autocompletado de «Recibido por»", () => {
   const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
+  const escribir = (texto: string) =>
+    fireEvent.change(document.getElementById("despacho-receptor") as HTMLElement, {
+      target: { value: texto },
+    });
+  /** Las opciones del desplegable, en el orden en que se pintaron. */
+  const opciones = () => screen.queryAllByRole("option");
 
-  it("los que más usa ese transportista se ofrecen con los tres datos", () => {
+  it("🔴 CON LA PANTALLA RECIÉN ABIERTA NO SE OFRECE NADA — no quita espacio", () => {
     render(<Despacho tipo="externo" juegos={JUEGOS} />);
-    expect(screen.getByText(/Los que más usa este transportista/i)).toBeTruthy();
-    const boton = screen.getByRole("button", { name: /Eric/ });
-    expect(boton.textContent).toContain("8-930");
-    expect(boton.textContent).toContain("Ek0700");
+    expect(screen.queryByText(/Los que más usa este transportista/i)).toBeNull();
+    expect(opciones()).toHaveLength(0);
+    expect(screen.queryByRole("option", { name: /Eric/ })).toBeNull();
   });
 
-  it("🔴 el más usado va PRIMERO, y dice cuántas veces", () => {
+  it("🔴 CON UNA SOLA LETRA TAMPOCO: el piso son DOS", () => {
     render(<Despacho tipo="externo" juegos={JUEGOS} />);
-    const botones = screen.getAllByRole("button").filter((b) => /·/.test(b.textContent ?? ""));
-    expect(botones[0].textContent).toContain("Eric");
-    expect(botones[0].textContent).toContain("10 veces");
-    expect(botones[1].textContent).toContain("Jocsan murillo");
-    expect(botones[1].textContent).toContain("4 veces");
+    escribir("E");
+    expect(opciones()).toHaveLength(0);
+  });
+
+  it("al escribir 2 letras aparecen, con los tres datos", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    escribir("Er");
+    const lista = opciones();
+    expect(lista).toHaveLength(1);
+    expect(lista[0].textContent).toContain("Eric");
+    expect(lista[0].textContent).toContain("8-930");
+    expect(lista[0].textContent).toContain("Ek0700");
+  });
+
+  it("🔴 EL MÁS USADO VA PRIMERO, y dice cuántas veces — POR FRECUENCIA, no por fecha", () => {
+    // Los tres empiezan por una letra distinta, así que se busca por algo que
+    // los traiga a los tres: la "o" de Jocsan/Jose no sirve; se usa el hecho de
+    // que dos comparten "Jo".
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    escribir("Jo");
+    const lista = opciones();
+    expect(lista).toHaveLength(2);
+    // `JUEGOS` llega ordenado por frecuencia (4 veces antes que 1) y el filtro
+    // NO reordena. Si ordenara por fecha, `Jose castillo` iría primero.
+    expect(lista[0].textContent).toContain("Jocsan murillo");
+    expect(lista[0].textContent).toContain("4 veces");
+    expect(lista[1].textContent).toContain("Jose castillo");
     // Con una sola vez no se dice "1 veces".
-    expect(botones[2].textContent).not.toContain("veces");
+    expect(lista[1].textContent).not.toContain("veces");
   });
 
-  it("tocarlo llena recibido por + cédula + placa de una vez", () => {
+  it("tocar una opción llena recibido por + cédula + placa de una vez", () => {
     render(<Despacho tipo="externo" juegos={JUEGOS} />);
-    fireEvent.click(screen.getByRole("button", { name: /Eric/ }));
+    escribir("Er");
+    fireEvent.click(screen.getByRole("option", { name: /Eric/ }));
     expect(val("despacho-receptor")).toBe("Eric");
     expect(val("despacho-cedula")).toBe("8-930");
     expect(val("despacho-placa")).toBe("Ek0700");
@@ -224,16 +265,27 @@ describe("🔴 un toque llena los TRES campos", () => {
 
   it("…y los tres siguen siendo editables", () => {
     render(<Despacho tipo="externo" juegos={JUEGOS} />);
-    fireEvent.click(screen.getByRole("button", { name: /Eric/ }));
+    escribir("Er");
+    fireEvent.click(screen.getByRole("option", { name: /Eric/ }));
     fireEvent.change(document.getElementById("despacho-placa") as HTMLElement, { target: { value: "EL6433" } });
     expect(val("despacho-placa")).toBe("EL6433");
     expect(val("despacho-receptor")).toBe("Eric");
   });
 
+  it("al elegir, la lista SE CIERRA (no queda tapando los campos de abajo)", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    escribir("Er");
+    expect(opciones()).toHaveLength(1);
+    fireEvent.click(screen.getByRole("option", { name: /Eric/ }));
+    expect(opciones()).toHaveLength(0);
+  });
+
   it("se puede cambiar de juego: el segundo pisa al primero, entero", () => {
     render(<Despacho tipo="externo" juegos={JUEGOS} />);
-    fireEvent.click(screen.getByRole("button", { name: /Eric/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Jocsan murillo/ }));
+    escribir("Er");
+    fireEvent.click(screen.getByRole("option", { name: /Eric/ }));
+    escribir("Joc");
+    fireEvent.click(screen.getByRole("option", { name: /Jocsan murillo/ }));
     expect(val("despacho-receptor")).toBe("Jocsan murillo");
     expect(val("despacho-cedula")).toBe("8-918-246");
     expect(val("despacho-placa")).toBe("DG7115");
@@ -241,25 +293,38 @@ describe("🔴 un toque llena los TRES campos", () => {
 
   it("⚠️ EN ENTREGA DIRECTA NO APARECE: no hay transportista ni placa", () => {
     render(<Despacho tipo="directo" juegos={JUEGOS} />);
-    expect(screen.queryByText(/Los que más usa este transportista/i)).toBeNull();
-    expect(screen.queryByRole("button", { name: /Eric/ })).toBeNull();
+    escribir("Er");
+    expect(opciones()).toHaveLength(0);
+    expect(screen.queryByRole("option", { name: /Eric/ })).toBeNull();
   });
 
-  it("sin juegos guardados no se dibuja nada — la pantalla queda como siempre", () => {
+  it("sin juegos guardados no se ofrece nada, se escriba lo que se escriba", () => {
     render(<Despacho tipo="externo" juegos={[]} />);
-    expect(screen.queryByText(/Los que más usa este transportista/i)).toBeNull();
+    escribir("Eric");
+    expect(opciones()).toHaveLength(0);
     expect(val("despacho-placa")).toBe("");
   });
 
-  it("nada queda trabado: se puede despachar escribiendo a mano, sin tocar ningún juego", () => {
+  it("nada queda trabado: se puede despachar escribiendo a mano un nombre nuevo", () => {
     render(<Despacho tipo="externo" juegos={JUEGOS} />);
-    fireEvent.change(document.getElementById("despacho-receptor") as HTMLElement, { target: { value: "Alguien nuevo" } });
+    escribir("Alguien nuevo");
+    expect(opciones()).toHaveLength(0);
     expect(val("despacho-receptor")).toBe("Alguien nuevo");
   });
 
-  it("los juegos son tocables de verdad: 44 px de alto mínimo (se usa en el celular)", () => {
+  it("las opciones son tocables de verdad: 44 px de alto mínimo (se usa en el celular)", () => {
     render(<Despacho tipo="externo" juegos={JUEGOS} />);
-    const boton = screen.getByRole("button", { name: /Eric/ });
+    escribir("Er");
+    const boton = screen.getByRole("option", { name: /Eric/ });
     expect(boton.className).toContain("min-h-[44px]");
+  });
+
+  it("🔴 el bloque FIJO no vuelve: su rótulo no está en pantalla en ningún estado", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    expect(screen.queryByText(/Los que más usa este transportista/i)).toBeNull();
+    escribir("Er");
+    expect(screen.queryByText(/Los que más usa este transportista/i)).toBeNull();
+    // Y la línea de ayuda que lo acompañaba tampoco: el desplegable se explica solo.
+    expect(document.body.textContent).not.toMatch(/Tócalo y se llenan los tres campos/i);
   });
 });
