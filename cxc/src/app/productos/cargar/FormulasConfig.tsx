@@ -630,11 +630,6 @@ function FormulasAyuda({ scope }: { scope: FormulasScope }) {
               hacia arriba (al entero o a .50). El Costo CIF ya es costo × 1.1.
             </p>
           )}
-          <p>
-            Cada marca tiene su fórmula (siempre visible). Ábrela para dar fórmula propia a una descripción;
-            vacía = hereda la de la marca. Una descripción también puede tener <b className="text-amber-700">precio fijo</b>
-            {" "}(un monto en dólares directo) que gana a cualquier fórmula.
-          </p>
         </div>
       )}
     </div>

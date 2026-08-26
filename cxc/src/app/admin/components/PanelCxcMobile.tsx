@@ -1,6 +1,13 @@
 "use client";
 
-// Layout mobile-first del Panel CXC. Visible <md, gated por md:hidden.
+// Layout mobile-first del Panel CXC. Visible <lg, gated por lg:hidden.
+//
+// 🩸 EL CORTE ERA `md` (768) Y EL iPAD VERTICAL CAÍA DEL LADO DE LA GRILLA.
+// Medido a 834 con la barra lateral puesta (se lleva 224 px): la grilla de 12
+// columnas le dejaba al nombre del cliente 133 px de los 270 que pide, o sea
+// "GRUP MEL INTERNATIONAL SA(AGUAS)" al 49 %, y 11 controles por debajo de
+// 44 px. Es el mismo corte mal puesto que ya se corrigió en Guías y en
+// Reclamos: el ancho que decide no es el de la ventana, es el ÚTIL.
 // El layout desktop existente queda intacto detrás de hidden md:block en
 // page.tsx. State filters (riskFilter, search, companyFilter) viven en el
 // padre (AdminDashboardInner) y se pasan acá para que persistan al rotar
@@ -151,7 +158,7 @@ export default function PanelCxcMobile({
   ];
 
   return (
-    <div className="md:hidden bg-gray-50">
+    <div className="lg:hidden bg-gray-50">
       <div className="px-4 pt-4 pb-6 space-y-4">
         <MobileHeader
           canExport={canExport}

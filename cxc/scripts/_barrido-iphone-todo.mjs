@@ -87,7 +87,10 @@ const PANTALLAS = [
   { mod: "Depurador",     pant: "Historial",         url: "/productos/cargar?tab=historial" },
   { mod: "Depurador",     pant: "Tallas",            url: "/productos/cargar?tab=curvas" },
   { mod: "Depurador",     pant: "Fotos a mi Excel",  url: "/productos/cargar?tab=misfotos" },
-  { mod: "Referencia",    pant: "Panel",             url: "/referencia" },
+  // 🩸 Referencia arranca en un buscador vacío: medirla así es medir una caja
+  // de texto. Se escribe un código real y se busca (solo lectura) para que la
+  // tabla —que es lo que se puede romper— exista cuando se mide.
+  { mod: "Referencia",    pant: "Panel",             url: "/referencia", buscar: "GJ0136" },
   { mod: "Asistencia",    pant: "Panel",             url: "/asistencia" },
   { mod: "Gastos",        pant: "Contabilidad",      url: "/gastos-contabilidad" },
   { mod: "Marketing",     pant: "Proyectos",         url: "/marketing" },
@@ -163,6 +166,8 @@ const SONDA = `(() => {
     const exceso = el.scrollWidth - el.clientWidth;
     const t = txt(el);
     if (!t) continue;
+    // sr-only: 1 px a propósito, para el lector de pantalla. No es texto cortado.
+    if (el.closest(".sr-only") || cs.clip === "rect(0px, 0px, 0px, 0px)" || cs.clipPath === "inset(50%)") continue;
     // Caja de ancho 0 (o casi) con texto adentro: no hay "exceso" que medir
     // porque no hay caja. Es el caso más grave y se cuenta como 0 % visible.
     const nada = el.clientWidth <= 2;
@@ -304,6 +309,12 @@ for (const p of PANTALLAS) {
     await page.goto(BASE + p.url, { waitUntil: "networkidle", timeout: 90000 });
     await estabilizar(page);
     if (p.esperar) await page.waitForSelector(p.esperar, { timeout: 15000 }).catch(() => {});
+    if (p.buscar) {
+      const campo = page.locator("input[type=text], input:not([type])").first();
+      await campo.fill(p.buscar, { timeout: 10000 }).catch(() => {});
+      await page.getByRole("button", { name: /Buscar/i }).first().click({ timeout: 10000 }).catch(() => {});
+      await estabilizar(page);
+    }
     for (const ancho of ANCHOS) {
       await page.setViewportSize({ width: ancho, height: ancho === 390 ? 844 : ancho === 834 ? 1112 : 900 });
       await page.waitForTimeout(900);

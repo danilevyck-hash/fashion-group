@@ -507,7 +507,7 @@ function AdminDashboardInner() {
         avisoMontos={avisoMontos}
       />
 
-      <div className="hidden md:block max-w-6xl mx-auto px-6 py-8">
+      <div className="hidden lg:block max-w-6xl mx-auto px-6 py-8">
 
       {/* Sync status — MAX(synced_at) por empresa del cron switch-sync, con
           warning si alguna empresa lleva >26h sin actualizar. El botón
