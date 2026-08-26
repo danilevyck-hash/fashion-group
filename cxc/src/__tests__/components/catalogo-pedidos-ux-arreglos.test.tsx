@@ -396,7 +396,7 @@ describe("🔴 7. la fila y su botón «Editar» llevan al MISMO lado", () => {
   it("«Del link»: tocar la fila convierte y abre el detalle INTERNO (no la vista del cliente)", async () => {
     redAdmin();
     const { container } = render(
-      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
+      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar puedeEditar />,
     );
     await act(async () => { fireEvent.click(filaDe(container, "Nathalie")); });
     await waitFor(() => expect(PUSH).toHaveBeenCalledWith("/catalogo/reebok/pedido/o-nuevo"));
@@ -408,7 +408,7 @@ describe("🔴 7. la fila y su botón «Editar» llevan al MISMO lado", () => {
   it("la fila hace EXACTAMENTE lo mismo que el botón Editar de esa fila", async () => {
     redAdmin();
     const { container } = render(
-      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
+      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar puedeEditar />,
     );
     await act(async () => { fireEvent.click(filaDe(container, "Nathalie")); });
     await waitFor(() => expect(PUSH).toHaveBeenCalled());
@@ -419,7 +419,7 @@ describe("🔴 7. la fila y su botón «Editar» llevan al MISMO lado", () => {
     PUSH.mockClear();
     redAdmin();
     const r2 = render(
-      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
+      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar puedeEditar />,
     );
     const btn = within(filaDe(r2.container, "Nathalie")).getByRole("button", { name: "Editar" });
     await act(async () => { fireEvent.click(btn); });
@@ -431,7 +431,7 @@ describe("🔴 7. la fila y su botón «Editar» llevan al MISMO lado", () => {
   it("interno: la fila abre su detalle directo, sin pasar por convertir", async () => {
     redAdmin();
     const { container } = render(
-      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
+      <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar puedeEditar />,
     );
     await act(async () => { fireEvent.click(filaDe(container, "Sporting Shoes")); });
     expect(PUSH).toHaveBeenCalledWith("/catalogo/reebok/pedido/PED-021");

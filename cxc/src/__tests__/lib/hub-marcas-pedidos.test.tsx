@@ -8,25 +8,39 @@
 // el DOM. Nada de barridos de texto sobre el .tsx: un barrido se cumple con su
 // propio comentario, y este repo ya pagó ese defecto varias veces.
 //
-// Lo que fija, y las cuatro cosas se pueden romper sin darse cuenta:
+// 🔴 ESTE CANDADO CAMBIÓ DE DIRECCIÓN — BODEGA ENTRÓ (25-ago-2026)
+//
+// Daniel, textual: ***"Dale acceso a bodega a la lista de pedidos."***
+//
+// Hasta hoy este archivo exigía lo CONTRARIO: que bodega **no** viera el botón,
+// porque el feed le respondía 403 y mandarlo ahí era mandarlo a una pantalla en
+// ceros. Eso era verdad y ya no lo es. **No se borró ni se aflojó**: exige lo
+// mismo que siempre quiso decir —que el botón y el servidor digan LO MISMO— y
+// ahora los dos dicen que bodega entra.
+//
+// Lo que fija, y las cinco cosas se pueden romper sin darse cuenta:
 //   1. El botón EXISTE en las 4 marcas y apunta a `/catalogo/<marca>/pedidos`
 //      —la lista única del #611—, nunca a la ruta vieja del panel de admin.
-//   2. 🔴 NADIE GANA UN PERMISO: lo ven admin, secretaria y vendedor; **bodega
-//      no**, porque el feed de la lista le responde 403.
-//   3. «Administrar» sigue siendo de admin + secretaria, exactamente como antes.
-//   4. Las tres capas que nombran ese trío —la constante, el `VIEW_ROLES` del
-//      servidor y el gate del botón «Pedidos» del catálogo— dicen LO MISMO.
+//   2. 🔴 BODEGA LO VE, y es lo ÚNICO que ganó: el feed le responde 200.
+//   3. 🔴 «Administrar» sigue siendo de admin + secretaria, exactamente como
+//      antes — a bodega NO se le abrió `/catalogos/admin/**`.
+//   4. Las tres capas —la constante, el gate del servidor y el gate del botón
+//      «Pedidos» dentro del catálogo— salen de `COMPROBANTES_ROLES`, así que ya
+//      no pueden derivar: no hay copias que comparar.
+//   5. 🔴 VER ≠ TRABAJAR: `COMPROBANTES_EDITAR_ROLES` deja a bodega afuera, que
+//      es lo que evita ofrecerle «Editar» y «Duplicar» — dos botones que le
+//      mueren en 403.
 //
 // El punto 2 se prueba dos veces: en el DOM (lo que el rol ve) y en el SERVIDOR
-// con cookies firmadas (lo que el rol puede). Un botón escondido no es un
-// candado; el candado es el 403.
+// con cookies firmadas (lo que el rol puede). Un botón dibujado no es un
+// permiso; el permiso es lo que contesta el handler — y las escrituras rol por
+// rol y marca por marca viven en `src/__tests__/api/bodega-ve-pedidos.test.ts`.
 //
 // MEDIDO el 25-ago-2026 contra el handler real de `orders`, con cookies
-// firmadas y en las 4 marcas: admin/secretaria/vendedor → 200 con filas
-// (12/12), bodega → 403 «Sin permiso» (4/4). Y en el build de producción, los
-// 4 anchos: sin arrastre horizontal, los 3 botones a 44 px y 14 px de texto, y
-// la tarjeta CRECIENDO HACIA ABAJO en el iPhone (187 → 241 px) en vez de
-// desbordarse.
+// firmadas y en las 4 marcas: admin/secretaria/vendedor/bodega → 200 con filas
+// (16/16, bodega era 403); contabilidad y gerente_acs → 403 (8/8). Y en el
+// build de producción, los 4 anchos: sin arrastre horizontal, los botones a
+// 44 px y 14 px de texto, y la tarjeta CRECIENDO HACIA ABAJO en el iPhone.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
@@ -39,7 +53,9 @@ import {
   CATALOGO_ROLES,
   CATALOGO_ADMIN_ROLES,
   COMPROBANTES_ROLES,
+  COMPROBANTES_EDITAR_ROLES,
   comprobantesRoles,
+  comprobantesEditarRoles,
 } from "@/lib/catalogo/roles";
 import { MARCAS_UI, getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { signSession } from "@/lib/session-cookie";
@@ -147,7 +163,8 @@ describe("🔴 quién ve qué en la tarjeta — NADIE gana un permiso", () => {
     admin: ["Ver catálogo", "Pedidos", "Administrar"],
     secretaria: ["Ver catálogo", "Pedidos", "Administrar"],
     vendedor: ["Ver catálogo", "Pedidos"],
-    bodega: ["Ver catálogo"],
+    // 🔴 25-ago-2026: bodega ganó «Pedidos» y NADA más. Sigue sin «Administrar».
+    bodega: ["Ver catálogo", "Pedidos"],
   };
 
   for (const [rol, botones] of Object.entries(ESPERADO)) {
@@ -160,11 +177,16 @@ describe("🔴 quién ve qué en la tarjeta — NADIE gana un permiso", () => {
     });
   }
 
-  it("🩸 BODEGA NO VE «Pedidos» en ninguna de las 4 marcas", async () => {
+  it("🔴 BODEGA VE «Pedidos» en las 4 marcas — es lo que pidió Daniel", async () => {
     await montarComo("bodega");
-    expect(screen.queryAllByRole("link", { name: "Pedidos" })).toHaveLength(0);
-    // Y sigue viendo el catálogo: no se le quitó nada tampoco.
+    expect(screen.getAllByRole("link", { name: "Pedidos" })).toHaveLength(MARCAS_UI.length);
+    // Y sigue viendo el catálogo: no se le cambió nada de lo que ya tenía.
     expect(screen.getAllByRole("link", { name: /Ver catálogo/ })).toHaveLength(MARCAS_UI.length);
+  });
+
+  it("🩸 y NO ganó «Administrar»: el botón nuevo no le abrió el panel", async () => {
+    await montarComo("bodega");
+    expect(screen.queryAllByRole("link", { name: "Administrar" })).toHaveLength(0);
   });
 
   it("🩸 el VENDEDOR sigue SIN «Administrar» (el botón nuevo no se lo abrió)", async () => {
@@ -204,8 +226,20 @@ describe("🔴 el 403 es el candado, no el botón escondido", () => {
     });
   }
 
-  it("bodega NO pasa (403) — por eso no tiene botón", () => {
+  it("🔴 bodega SÍ pasa (25-ago-2026) — por eso ahora tiene botón", () => {
     const out = requireRole(reqComoRol("bodega"), comprobantesRoles());
+    expect(out).not.toBeInstanceOf(NextResponse);
+    expect((out as { role: string }).role).toBe("bodega");
+  });
+
+  it("🩸 pero NO pasa el guard de TRABAJAR el pedido (editar/duplicar)", () => {
+    const out = requireRole(reqComoRol("bodega"), comprobantesEditarRoles());
+    expect(out).toBeInstanceOf(NextResponse);
+    expect((out as NextResponse).status).toBe(403);
+  });
+
+  it("🩸 ni el de ADMINISTRAR la marca — `/catalogos/admin/**` sigue cerrado", () => {
+    const out = requireRole(reqComoRol("bodega"), [...CATALOGO_ADMIN_ROLES]);
     expect(out).toBeInstanceOf(NextResponse);
     expect((out as NextResponse).status).toBe(403);
   });
@@ -226,28 +260,37 @@ describe("🔴 el 403 es el candado, no el botón escondido", () => {
 // ── 4. Las tres capas dicen lo mismo, y las dos listas viejas no se movieron ─
 
 describe("🔴 la lista nueva no inventó un permiso", () => {
-  it("COMPROBANTES_ROLES = admin, secretaria, vendedor — congelada", () => {
-    expect([...COMPROBANTES_ROLES]).toEqual(["admin", "secretaria", "vendedor"]);
+  it("COMPROBANTES_ROLES = admin, secretaria, vendedor, bodega — congelada", () => {
+    expect([...COMPROBANTES_ROLES]).toEqual(["admin", "secretaria", "vendedor", "bodega"]);
   });
 
-  it("es EXACTAMENTE el `VIEW_ROLES` que ya tenía el GET de orders", () => {
+  it("🔴 el GET de orders NO tiene su propia copia: DERIVA de la constante", () => {
+    // Antes era un literal y este candado lo comparaba con una regex. Una copia
+    // que no existe no puede quedar vieja — que es lo que casi pasa hoy.
     const src = leer("src/app/api/catalogo/[marca]/orders/route.ts");
-    const m = src.match(/const VIEW_ROLES = (\[[^\]]*\])/);
-    expect(m, "no se encontró VIEW_ROLES en orders/route.ts").not.toBeNull();
-    expect(JSON.parse(m![1])).toEqual([...COMPROBANTES_ROLES]);
+    expect(src).toContain("comprobantesRoles()");
+    expect(src, "volvió a escribirse la lista a mano en la ruta").not.toMatch(
+      /const VIEW_ROLES\s*=\s*\[/,
+    );
   });
 
-  it("y el mismo trío que ya gateaba «Pedidos» dentro del catálogo", () => {
+  it("🔴 y «Pedidos» dentro del catálogo tampoco: sale de la MISMA constante", () => {
     const src = leer("src/components/catalogo/CatalogoVendedorPage.tsx");
-    for (const rol of COMPROBANTES_ROLES) {
-      expect(src, rol).toContain(`role === "${rol}"`);
-    }
-    expect(src).not.toContain('role === "bodega"');
+    expect(src).toContain("COMPROBANTES_ROLES");
+    expect(src, "volvieron los `role === \"…\"` a mano").not.toMatch(
+      /puedeVerPedidos\s*=\s*role\s*===/,
+    );
   });
 
-  it("🩸 bodega está en CATALOGO_ROLES pero NO en COMPROBANTES_ROLES", () => {
+  it("🔴 bodega está en las DOS listas de ver, y en NINGUNA de las de hacer", () => {
     expect(CATALOGO_ROLES as readonly string[]).toContain("bodega");
-    expect(COMPROBANTES_ROLES as readonly string[]).not.toContain("bodega");
+    expect(COMPROBANTES_ROLES as readonly string[]).toContain("bodega");
+    expect(COMPROBANTES_EDITAR_ROLES as readonly string[]).not.toContain("bodega");
+    expect(CATALOGO_ADMIN_ROLES as readonly string[]).not.toContain("bodega");
+  });
+
+  it("🩸 la lista que TRABAJA el pedido no ganó a nadie: el trío de siempre", () => {
+    expect([...COMPROBANTES_EDITAR_ROLES]).toEqual(["admin", "secretaria", "vendedor"]);
   });
 
   it("las dos listas de siempre quedaron intactas", () => {

@@ -82,7 +82,7 @@ const DEL_LINK = base({
 
 function pintar(pedidos: UnifiedPedido[], marca: MarcaUiKey = "reebok") {
   return render(
-    <ComprobantesPanel marca={marca} pedidos={pedidos} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
+    <ComprobantesPanel marca={marca} pedidos={pedidos} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar puedeEditar />,
   );
 }
 

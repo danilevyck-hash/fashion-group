@@ -37,6 +37,7 @@ import {
   groupByModel, getDisplaySection, type DisplaySection, SECTION_ORDER, SECTION_LABELS,
   type GroupedProduct, type JoybeesProduct,
 } from "./groupByModel";
+import { COMPROBANTES_ROLES } from "@/lib/catalogo/roles";
 import { precioTexto } from "@/lib/catalogo/precio";
 import { opcionesConDatos } from "@/lib/catalogo/filtros-derivados";
 import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
@@ -733,12 +734,18 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   // "Pedidos" — a la MISMA altura que Compartir (12-ago-2026). Los dos son
   // acciones del catálogo; tenerlos en dos filas distintas era el pedido de
-  // Daniel. Mismo gate de rol que tenía en la navbar (gestores; bodega y el
-  // 'cliente' legacy de Reebok no lo ven) y `role` ya vive en esta pantalla.
+  // Daniel.
+  //
+  // 🔴 EL GATE SALE DE `COMPROBANTES_ROLES` (25-ago-2026). Antes eran tres
+  // `role === "…"` escritos a mano y había un candado que los buscaba con una
+  // regex. Al entrar **bodega** (*"Dale acceso a bodega a la lista de
+  // pedidos."*) esa copia habría quedado vieja sin que nada se rompiera hasta
+  // que alguien lo notara. El 'cliente' legacy de Reebok sigue afuera: no está
+  // en la lista.
   //
   // NO se esconde en modo pedido: es la salida a la lista, no compite con
   // "Listo, volver al pedido" (que vive en la barra pegajosa de arriba).
-  const puedeVerPedidos = role === "admin" || role === "vendedor" || role === "secretaria";
+  const puedeVerPedidos = (COMPROBANTES_ROLES as readonly string[]).includes(role);
   const pedidosBtn = puedeVerPedidos ? (
     <Link href={theme.pedidosHref} className={theme.vendorShare.pedidosBtn}>Pedidos</Link>
   ) : null;

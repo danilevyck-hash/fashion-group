@@ -95,9 +95,15 @@ describe("GET /orders — lista", () => {
     expect((await jListGet(makeReq("/api/catalogo/joybees/orders"))).status).toBe(403);
   });
 
-  it("bodega no ve pedidos (403) — ambas marcas", async () => {
-    expect((await rListGet(makeReq("/x", { role: "bodega" }))).status).toBe(403);
-    expect((await jListGet(makeReq("/x", { role: "bodega" }))).status).toBe(403);
+  it("🔴 bodega SÍ ve la lista (25-ago-2026) — ambas marcas", async () => {
+    // Daniel: *"Dale acceso a bodega a la lista de pedidos."* Este candado
+    // exigía 403, o sea que fijaba el permiso VIEJO. Cambia de dirección, no se
+    // borra: hoy exige el 200 — y la paridad, que es lo que este archivo
+    // protege: lo que vale en Reebok vale en Joybees.
+    reebokDb.queue("reebok_orders", { data: [] });
+    joybeesDb.queue("joybees_orders", { data: [] });
+    expect((await rListGet(makeReq("/x", { role: "bodega" }))).status).toBe(200);
+    expect((await jListGet(makeReq("/x", { role: "bodega" }))).status).toBe(200);
   });
 
   it("reebok: 200 con total re-calculado por categoría e items colapsados a item_count", async () => {

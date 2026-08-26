@@ -201,9 +201,17 @@ describe("GET /orders — los pedidos del LINK entran a la lista del vendedor", 
     expect(filas.map((f) => f.order_number ?? f.id)).toEqual(["PED-030", "ab12cd34", "PED-001"]);
   });
 
-  it("🔴 BODEGA no ve la lista de pedidos (403), ni la del link ni la interna", async () => {
-    for (const get of [rOrders, jOrders]) {
-      expect((await get(makeReq("/x", { role: "bodega" }))).status).toBe(403);
-    }
+  it("🔴 BODEGA SÍ ve la lista (25-ago-2026), y ve las DOS fuentes", async () => {
+    // Daniel: *"Dale acceso a bodega a la lista de pedidos."* Este candado
+    // exigía 403 — fijaba el permiso viejo. Hoy exige lo que siempre quiso
+    // decir: que la lista que ve un rol traiga las dos fuentes, no una.
+    reebokDb.queue("reebok_orders", {
+      data: [ordenInterna("reebok_order_items", { id: "o-1", order_number: "PED-030" })],
+    });
+    mainDb.queue("reebok_pedidos_publicos", { data: [filaPublica()] });
+    const res = await rOrders(makeReq("/x", { role: "bodega" }));
+    expect(res.status).toBe(200);
+    const filas = (await res.json()) as Fila[];
+    expect(filas.map((f) => f.fuente).sort()).toEqual(["orders", "publicos"]);
   });
 });

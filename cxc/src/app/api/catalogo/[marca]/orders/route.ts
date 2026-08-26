@@ -51,6 +51,7 @@ import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
+import { comprobantesRoles } from "@/lib/catalogo/roles";
 import { esPedidoDelLink } from "@/lib/catalogo/cliente-elegido";
 import { avisoPedidoDeVendedor } from "@/lib/catalogo/telegram-pedido";
 import { enviarNegocio } from "@/lib/alertas/canal";
@@ -69,7 +70,18 @@ import {
   type VendedorDePedido,
 } from "@/lib/catalogo/vendedor-switch";
 
-const VIEW_ROLES = ["admin", "secretaria", "vendedor"];
+// 🔴 QUIÉN VE LA LISTA — SE DERIVA, NO SE ESCRIBE (25-ago-2026)
+//
+// Daniel, textual: ***"Dale acceso a bodega a la lista de pedidos."*** Antes
+// esta línea era un literal `["admin","secretaria","vendedor"]` y bodega comía
+// 403 acá; había un candado que lo comparaba contra `COMPROBANTES_ROLES` con
+// una expresión regular sobre este archivo. Ahora **es la misma constante**:
+// una copia escrita a mano no puede quedar vieja si no existe.
+//
+// ⚠️ Esto abre la LECTURA y nada más. El POST de abajo sigue mirando
+// `cfg.createRoles` —donde bodega NO está— y borrar / exportar / mandar a
+// Switch / editar viven en sus propias rutas, todas cerradas.
+const VIEW_ROLES = comprobantesRoles();
 
 export const dynamic = "force-dynamic";
 

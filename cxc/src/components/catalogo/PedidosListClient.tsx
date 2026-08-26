@@ -37,7 +37,7 @@ import Link from "next/link";
 import { useToast } from "@/components/ToastSystem";
 import ComprobantesPanel from "@/components/catalogo/ComprobantesPanel";
 import { filasDeOrders, type FilaComprobante, type FilaDeOrders } from "@/lib/catalogo/fila-comprobante";
-import { CATALOGO_ADMIN_ROLES } from "@/lib/catalogo/roles";
+import { CATALOGO_ADMIN_ROLES, COMPROBANTES_EDITAR_ROLES } from "@/lib/catalogo/roles";
 import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
@@ -69,6 +69,10 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
 
   // 🩸 Cosmética, no candado: el servidor ya responde 403 a quien no está acá.
   const puedeAdministrar = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(String(role ?? ""));
+  // 🔴 El segundo gate (25-ago-2026): quién TRABAJA el pedido, no quién lo
+  // administra. Bodega entró a la lista *"solo a mirar"* y sin esto vería
+  // «Editar» y «Duplicar», que le mueren en 403 en el servidor.
+  const puedeEditar = (COMPROBANTES_EDITAR_ROLES as readonly string[]).includes(String(role ?? ""));
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
@@ -86,6 +90,7 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
           onRefresh={load}
           showToast={(m, tono) => toast(m, tono)}
           puedeAdministrar={puedeAdministrar}
+          puedeEditar={puedeEditar}
         />
       )}
     </div>
