@@ -44,6 +44,12 @@ import {
   type TotalesPlanilla,
 } from "@/lib/asistencia/planilla";
 import { CHIP_NO_MARCA_RELOJ } from "@/lib/asistencia/sueldo-fijo";
+// 🔑 `baseSeguros` es EL MISMO LECTOR que usan el servidor y el motor. Acá hace
+// falta de verdad: una línea armada a mano —hay fixtures de tests que lo hacen,
+// y una respuesta vieja del servidor guardada en caché también— llega SIN el
+// campo, y un `!== null` pelado dejaría pasar el `undefined` y reventaría la
+// pantalla entera al formatearlo. Ante la duda: no hay sello, o sea lo de ayer.
+import { baseSeguros, chipBaseSeguros } from "@/lib/asistencia/seguros-base";
 import type { AvisoPeriodoAbierto, CodigoSinFicha } from "@/lib/asistencia/periodo";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
@@ -708,6 +714,8 @@ function Fila({
   l, onGuardar, manualesBloqueados,
 }: { l: LineaPlanilla; onGuardar: OnGuardar; manualesBloqueados?: boolean }) {
   const d = l.dinero!;
+  /** El monto sobre el que se calcularon los seguros, si no fue el bruto. */
+  const sobreQueBase = baseSeguros(d.baseSeguros);
   const num = (v: number, extra = "") => (
     <td className={`px-2 py-1.5 text-right tabular-nums ${extra}`}>
       {v === 0 ? <span className="text-gray-300">—</span> : $(v)}
@@ -723,6 +731,20 @@ function Fila({
         {l.noMarcaReloj && (
           <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">
             {CHIP_NO_MARCA_RELOJ}
+          </span>
+        )}
+        {/* 🔴 POR QUÉ SU SEGURO ES DISTINTO. Sin esto, quien mira la línea de
+            RODRIGO y ve $17,06 donde esperaba $39,38 no tiene forma de saber de
+            dónde sale sin preguntarle a alguien. El sello dice el monto sobre
+            el que se calculó, que es todo lo que hace falta para reconstruirlo.
+            Sale de `dinero.baseSeguros` —el que DE VERDAD se multiplicó, ya
+            repartido si el rango no es una quincena entera—, no de la ficha. */}
+        {sobreQueBase !== null && (
+          <span
+            className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500"
+            title={`Los seguros no salen de su total bruto: se calculan sobre ${$$(sobreQueBase)}.`}
+          >
+            {chipBaseSeguros(sobreQueBase)}
           </span>
         )}
       </td>
@@ -777,6 +799,10 @@ function Tarjeta({
 }) {
   const d = l.dinero!;
   const h = l.horas;
+  /** El monto sobre el que se calcularon los seguros, si no fue el bruto.
+   *  Por el MISMO lector que el escritorio: dos formas de decidir si se muestra
+   *  el sello es como una pantalla lo muestra y la otra no. */
+  const sobreQueBaseTarjeta = baseSeguros(d.baseSeguros);
   const linea = (k: string, v: number, rojo = false) =>
     v === 0 ? null : (
       <div key={k} className="flex justify-between py-0.5">
@@ -798,6 +824,9 @@ function Tarjeta({
           <span className="text-xs text-gray-400">
             {l.codigo} · bruto ${$(d.totalBruto)}
             {l.noMarcaReloj && ` · ${CHIP_NO_MARCA_RELOJ}`}
+            {/* El mismo sello que en el escritorio, y con las MISMAS palabras:
+                dos redacciones del mismo hecho es la forma de que se separen. */}
+            {sobreQueBaseTarjeta !== null && ` · ${chipBaseSeguros(sobreQueBaseTarjeta)}`}
           </span>
         </span>
         <span className="shrink-0 text-right">
@@ -831,6 +860,13 @@ function Tarjeta({
           <div className="mt-2">
             {linea("Seguro social", d.seguroSocial, true)}
             {linea("Seguro educativo", d.seguroEducativo, true)}
+            {/* Una línea gris, no un párrafo: dice sobre qué monto salieron los
+                dos de arriba cuando NO fue el bruto. */}
+            {sobreQueBaseTarjeta !== null && (
+              <p className="py-0.5 text-[12px] text-gray-500">
+                Los dos se calculan sobre {$$(sobreQueBaseTarjeta)}, no sobre el total bruto.
+              </p>
+            )}
           </div>
 
           {/* Sin rótulo de grupo: cada campo ya dice su nombre y para qué lado

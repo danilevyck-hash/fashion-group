@@ -29,12 +29,14 @@ import {
   vigenciasDeFilas,
   servicioProfesionalDeFila,
   pagaSegurosDeFila,
+  baseSegurosDeFila,
   noMarcaRelojDeFila,
   leerJustificaciones,
   leerVacaciones,
   avisoMigracionVacaciones,
 } from "@/lib/asistencia/config-server";
 import { avisoMigracionServicioProfesional } from "@/lib/asistencia/participacion";
+import { avisoMigracionBaseSeguros } from "@/lib/asistencia/seguros-base";
 import {
   avisoMigracionBajas,
   codigosFueraDeRango,
@@ -233,6 +235,10 @@ export async function GET(req: NextRequest) {
         // seguros no llegaría al motor y la planilla se los seguiría cobrando a
         // todo el mundo, que es justo lo que este campo existe para cambiar.
         pagaSeguros: pagaSegurosDeFila(f),
+        // 🔴 Y un escalón más: sin esto la base propia no llegaría al motor y a
+        // RODRIGO se le seguiría reteniendo el 9,75 % sobre su bruto ($39,38)
+        // en vez del que sale de sus $175 de base ($17,06). Ver `seguros-base.ts`.
+        baseSeguros: baseSegurosDeFila(f),
         noMarcaReloj: noMarcaRelojDeFila(f),
       });
     }
@@ -415,6 +421,13 @@ export async function GET(req: NextRequest) {
         faltaMigracionServicioProfesional:
           !personasDb.faltaMigracion && personasDb.faltaColumnaServicioProfesional
             ? avisoMigracionServicioProfesional()
+            : null,
+        // Sin la columna NADIE tiene base propia —los seguros salen del bruto,
+        // como hoy— pero se dice: quien ya le cargó los $175 a Rodrigo en su
+        // cabeza va a esperar ver $17,06 y no $39,38.
+        faltaMigracionBaseSeguros:
+          !personasDb.faltaMigracion && personasDb.faltaColumnaBaseSeguros
+            ? avisoMigracionBaseSeguros()
             : null,
         // Cuántas personas se quedaron afuera de ESTA quincena por su fecha de
         // salida (o porque todavía no habían entrado). Sirve para que un cuadro

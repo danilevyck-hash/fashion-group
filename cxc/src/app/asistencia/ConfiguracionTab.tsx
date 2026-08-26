@@ -66,6 +66,19 @@ import {
   PREGUNTA_MARCA_RELOJ,
 } from "@/lib/asistencia/sueldo-fijo";
 import {
+  AYUDA_BASE_SEGUROS,
+  // 🔑 EL MISMO LECTOR QUE USA EL SERVIDOR. Escribir acá un `Number(...)` sería
+  // una segunda regla de «qué es una base válida», y el día que se separen la
+  // pantalla mostraría un descuento distinto del que se guarda.
+  baseSeguros as baseSegurosNumero,
+  EXPLICACION_BASE_SEGUROS,
+  PLACEHOLDER_BASE_SEGUROS,
+  PREGUNTA_BASE_SEGUROS,
+} from "@/lib/asistencia/seguros-base";
+// 🔑 `centavos` es LA función con la que la planilla redondea de verdad. Una
+// copia acá enseñaría $17,07 donde el cuadro dice $17,06.
+import { centavos } from "@/lib/asistencia/planilla";
+import {
   fechaLegible,
   fraseBaja,
   marcoDespuesDeLaBaja,
@@ -91,6 +104,9 @@ interface Persona {
   /** `true` = se le descuentan el seguro social y el educativo. Los DOS juntos.
    *  `true` mientras nadie diga lo contrario: es lo que hacía la planilla. */
   pagaSeguros: boolean;
+  /** Sobre qué monto se le calculan los seguros, POR QUINCENA. `null` = sobre
+   *  el total bruto, como siempre. Ver `lib/asistencia/seguros-base.ts`. */
+  baseSeguros: number | null;
   /** `true` = cobra fijo y NO pasa por el reloj. `false` mientras nadie diga lo
    *  contrario: es lo que hacía la planilla con las 39 fichas. */
   noMarcaReloj: boolean;
@@ -137,6 +153,7 @@ interface Datos {
   puedeMarcarServicioProfesional: boolean;
   avisoMigracionSeguros: string | null;
   puedeQuitarSeguros: boolean;
+  puedeCargarBaseSeguros: boolean;
   avisoMigracionNoMarcaReloj: string | null;
   puedeMarcarSueldoFijo: boolean;
   avisoMigracionSaldoVacaciones: string | null;
@@ -166,6 +183,9 @@ interface Borrador {
   servicioProfesional: boolean;
   /** `true` = se le descuentan los seguros (social y educativo, juntos). */
   pagaSeguros: boolean;
+  /** El monto de UNA QUINCENA sobre el que se calculan los seguros, como texto.
+   *  "" = sobre el total bruto, que es el default de siempre. */
+  baseSeguros: string;
   /** `true` = cobra fijo y no pasa por el reloj. */
   noMarcaReloj: boolean;
   /** Los días de vacaciones que le quedan HOY, como texto. "" = no se cargó.
@@ -221,7 +241,7 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
 const firma = (b: Borrador) =>
   `${b.nombre.trim()}|${b.salario.trim()}|${b.jornada}|${b.empresa}`
   + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}|${b.servicioProfesional}`
-  + `|${b.pagaSeguros}|${b.noMarcaReloj}|${b.saldoVacaciones}`;
+  + `|${b.pagaSeguros}|${b.baseSeguros.trim()}|${b.noMarcaReloj}|${b.saldoVacaciones}`;
 
 /**
  * ¿La baja está completa? La fecha y el motivo VIAJAN JUNTOS: una baja sin
@@ -283,6 +303,7 @@ export default function ConfiguracionTab() {
       motivoSalida: p.motivoSalida ?? "",
       servicioProfesional: p.servicioProfesional,
       pagaSeguros: p.pagaSeguros,
+      baseSeguros: p.baseSeguros === null ? "" : String(p.baseSeguros),
       noMarcaReloj: p.noMarcaReloj,
       saldoVacaciones: p.saldoVacacionesDias === null ? "" : String(p.saldoVacacionesDias),
     };
@@ -341,6 +362,10 @@ export default function ConfiguracionTab() {
             motivoSalida: b.motivoSalida,
             servicioProfesional: b.servicioProfesional,
             pagaSeguros: b.pagaSeguros,
+            // El TEXTO tal cual, igual que el salario: el servidor decide qué
+            // es una base válida. Un `Number()` acá haría que un campo vacío
+            // viajara como 0, y un 0 apagaría los seguros por la puerta de atrás.
+            baseSeguros: b.baseSeguros,
             noMarcaReloj: b.noMarcaReloj,
             // Se manda el TEXTO tal cual, igual que el salario: el servidor
             // decide qué es un saldo válido y le pone la fecha de corte.
@@ -365,6 +390,7 @@ export default function ConfiguracionTab() {
               motivoSalida?: MotivoSalida | null;
               servicioProfesional?: boolean;
               pagaSeguros?: boolean;
+              baseSeguros?: number | null;
               noMarcaReloj?: boolean;
               saldoVacacionesDias?: number | null;
               saldoVacacionesCorte?: string | null;
@@ -383,6 +409,7 @@ export default function ConfiguracionTab() {
           motivoSalida: (b.motivoSalida || null) as MotivoSalida | null,
           servicioProfesional: b.servicioProfesional,
           pagaSeguros: b.pagaSeguros,
+          baseSeguros: null,
           noMarcaReloj: b.noMarcaReloj,
           saldoVacacionesDias: null,
           saldoVacacionesCorte: null,
@@ -410,6 +437,11 @@ export default function ConfiguracionTab() {
                   // sigue pagando seguros. Nunca al revés — apagar un descuento
                   // por un `undefined` es dejar de retener sin que nadie lo pida.
                   pagaSeguros: p.pagaSeguros !== false,
+                  // 🔑 `?? null`: si el servidor no la devolviera, la persona
+                  // queda SIN base propia y los seguros vuelven a salir del
+                  // bruto. Nunca al revés — inventar una base acá sería mostrar
+                  // un descuento que la base de datos no tiene.
+                  baseSeguros: p.baseSeguros ?? null,
                   // 🔑 `=== true`, al revés que los seguros: si el servidor no
                   // lo devolviera, la persona SIGUE marcando el reloj. Prender
                   // un sueldo fijo por un `undefined` sería regalarle la
@@ -508,6 +540,9 @@ export default function ConfiguracionTab() {
             // Y por lo mismo: sin esto, dar de baja le volvería a poner los
             // seguros a quien la contadora no se los descuenta.
             pagaSeguros: p.pagaSeguros,
+            // Y por lo mismo: sin esto, dar de baja le BORRARÍA la base propia
+            // y su liquidación se calcularía con el 9,75 % sobre el bruto.
+            baseSeguros: p.baseSeguros === null ? "" : String(p.baseSeguros),
             // Y por lo mismo: sin esto, dar de baja volvería a medirle el reloj
             // a quien cobra fijo, y su neto pasaría a depender de marcaciones
             // que no existen.
@@ -950,6 +985,82 @@ export default function ConfiguracionTab() {
                               {!datos.puedeQuitarSeguros && (
                                 <p className="mt-1 text-[12px] text-amber-800">
                                   Todavía no se le puede quitar el seguro a nadie: falta correr el
+                                  archivo de la base de datos.
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              {/* 🔴 SOBRE QUÉ MONTO. Va PEGADO al interruptor de
+                                  arriba porque son las dos mitades de la misma
+                                  pregunta: primero «¿se le cobran?» y después
+                                  «¿sobre cuánto?». La contadora, textual: *«su
+                                  base para el cálculo del seguro social y seguro
+                                  educativo es 175.00 […] él está en una planilla
+                                  doméstica»*. Sobre su bruto le salían $39,38 en
+                                  vez de $17,06: $25,18 de más por quincena.
+                                  ⚠️ NO ENCIENDE NADA: con los seguros apagados
+                                  las dos columnas siguen en $0,00. */}
+                              <Etiqueta
+                                texto={PREGUNTA_BASE_SEGUROS}
+                                ayuda={EXPLICACION_BASE_SEGUROS}
+                              />
+                              <input
+                                type="number"
+                                // 🔑 `decimal` y no `numeric`: en el iPhone el
+                                // teclado de `numeric` no trae el punto, y sin
+                                // punto no se puede escribir 175.50.
+                                inputMode="decimal"
+                                step={0.01}
+                                min={0}
+                                // 🔑 El <label> de `Etiqueta` no lleva `htmlFor`,
+                                // así que sin esto un lector de pantalla lee una
+                                // caja de número sin nombre — y un test tampoco
+                                // la encuentra por su etiqueta.
+                                aria-label={PREGUNTA_BASE_SEGUROS}
+                                placeholder={PLACEHOLDER_BASE_SEGUROS}
+                                value={borrador.baseSeguros}
+                                disabled={!datos.puedeCargarBaseSeguros}
+                                onChange={(e) =>
+                                  setBorrador({ ...borrador, baseSeguros: e.target.value })
+                                }
+                                onBlur={() => void guardar(p.codigo, borrador)}
+                                className={`${CAMPO} tabular-nums disabled:bg-gray-100 disabled:text-gray-400`}
+                              />
+                              {/* 🔴 LOS DOS MONTOS, CALCULADOS, DEBAJO DEL CAMPO.
+                                  Es lo que mata la única ambigüedad que tiene
+                                  esto —¿el monto es del mes o de la quincena?—:
+                                  quien escribe 175 ve $17,06 y $2,19 en el acto
+                                  y los coteja contra el Excel sin hacer una
+                                  cuenta. Con la fórmula de la planilla, no con
+                                  una copia: los porcentajes salen de `reglas`. */}
+                              {baseSegurosNumero(borrador.baseSeguros) !== null ? (
+                                <p className="mt-1 text-[12px] text-gray-500 tabular-nums">
+                                  Seguro social{" "}
+                                  {money(
+                                    centavos(
+                                      baseSegurosNumero(borrador.baseSeguros)!
+                                      * (datos.reglas.seguroSocialPct / 100),
+                                    ),
+                                  )}{" "}
+                                  y educativo{" "}
+                                  {money(
+                                    centavos(
+                                      baseSegurosNumero(borrador.baseSeguros)!
+                                      * (datos.reglas.seguroEducativoPct / 100),
+                                    ),
+                                  )}{" "}
+                                  por quincena.
+                                </p>
+                              ) : (
+                                <p className="mt-1 text-[12px] text-gray-500">
+                                  {AYUDA_BASE_SEGUROS}
+                                </p>
+                              )}
+                              {/* Igual que arriba: el aviso de que todavía no se
+                                  puede guardar se dice ANTES de tocar, no al fallar. */}
+                              {!datos.puedeCargarBaseSeguros && (
+                                <p className="mt-1 text-[12px] text-amber-800">
+                                  Todavía no se puede poner una base propia: falta correr el
                                   archivo de la base de datos.
                                 </p>
                               )}

@@ -40,6 +40,7 @@ import {
   vigenciaDeFila,
   servicioProfesionalDeFila,
   pagaSegurosDeFila,
+  baseSegurosDeFila,
   noMarcaRelojDeFila,
 } from "@/lib/asistencia/config-server";
 import {
@@ -60,6 +61,12 @@ import {
   esColumnaNoMarcaRelojFaltante,
   validarNoMarcaReloj,
 } from "@/lib/asistencia/sueldo-fijo";
+import {
+  avisoMigracionBaseSeguros,
+  COLUMNA_BASE_SEGUROS,
+  esColumnaBaseSegurosFaltante,
+  validarBaseSeguros,
+} from "@/lib/asistencia/seguros-base";
 import {
   avisoMigracionSaldoMediosDias,
   avisoMigracionSaldoVacaciones,
@@ -128,6 +135,7 @@ export async function GET(req: NextRequest) {
         faltaColumnasBajas,
         faltaColumnaServicioProfesional,
         faltaColumnaPagaSeguros,
+        faltaColumnaBaseSeguros,
         faltaColumnaNoMarcaReloj,
         faltaColumnasSaldoVacaciones,
       },
@@ -200,6 +208,9 @@ export async function GET(req: NextRequest) {
       // 🔑 Sin ficha, SÍ paga seguros: es el default de siempre y lo que hace
       // que un código todavía sin configurar no aparezca como una excepción.
       const pagaSeguros = f ? pagaSegurosDeFila(f) : true;
+      // 🔑 Sin ficha NO hay base propia: los seguros salen del bruto, que es el
+      // default de siempre. Es el monto de UNA QUINCENA — ver `seguros-base.ts`.
+      const baseSeguros = f ? baseSegurosDeFila(f) : null;
       // 🔴 Sin ficha NO se puede cobrar fijo: la bandera vive en la ficha. Un
       // código que marca y nadie configuró sigue siendo un pendiente.
       const noMarcaReloj = f ? noMarcaRelojDeFila(f) : false;
@@ -232,6 +243,10 @@ export async function GET(req: NextRequest) {
         // `seguros.ts`—. `true` mientras nadie diga lo contrario: es el
         // comportamiento que la planilla tenía para las 38 fichas.
         pagaSeguros,
+        // 🔴 Sobre QUÉ MONTO se le calculan, por quincena. `null` = sobre el
+        // bruto, como toda la vida. No enciende nada: con `pagaSeguros` en
+        // `false` las dos columnas siguen en $0,00 aunque haya base.
+        baseSeguros,
         // 🔴 Cobra fijo y no pasa por el reloj. Sigue en la planilla, con
         // seguros y todo; lo que se le ignora son las marcaciones.
         noMarcaReloj,
@@ -330,6 +345,11 @@ export async function GET(req: NextRequest) {
       avisoMigracionSeguros:
         !faltaPersonas && faltaColumnaPagaSeguros ? avisoMigracionSeguros() : null,
       puedeQuitarSeguros: !faltaPersonas && !faltaColumnaPagaSeguros,
+      // Un escalón más: sin la columna los seguros salen del bruto para todo el
+      // mundo —o sea, como está hoy— y se dice de entrada, no al fallar.
+      avisoMigracionBaseSeguros:
+        !faltaPersonas && faltaColumnaBaseSeguros ? avisoMigracionBaseSeguros() : null,
+      puedeCargarBaseSeguros: !faltaPersonas && !faltaColumnaBaseSeguros,
       // Un escalón más: sin la columna todo el mundo marca el reloj —o sea, como
       // está hoy— y se dice de entrada, no al fallar el guardado.
       avisoMigracionNoMarcaReloj:
@@ -388,6 +408,12 @@ export async function PUT(req: NextRequest) {
   const rseg = validarPagaSeguros(body);
   if (!rseg.ok) return NextResponse.json({ error: rseg.error }, { status: 400 });
   const pagaSeguros = rseg.valor;
+
+  // Y lo mismo con la base propia de los seguros: es OTRA pregunta —sobre qué
+  // monto se calculan— y no debería poder tumbar el guardado de un nombre.
+  const rbase = validarBaseSeguros(body);
+  if (!rbase.ok) return NextResponse.json({ error: rbase.error }, { status: 400 });
+  const baseSeguros = rbase.valor;
 
   // Y lo mismo con el reloj: es OTRA pregunta —si se le miden las marcaciones o
   // cobra fijo— y no debería poder tumbar el guardado de un nombre.
@@ -476,10 +502,34 @@ export async function PUT(req: NextRequest) {
     ...conSaldo,
     [COLUMNA_NO_MARCA_RELOJ]: noMarcaRelojValor,
   };
+  const conBaseSeguros = {
+    ...conReloj,
+    [COLUMNA_BASE_SEGUROS]: baseSeguros,
+  };
 
   let { error } = await supabaseServer
     .from(TABLA_PERSONAS)
-    .upsert(conReloj, { onConflict: "empleado_codigo" });
+    .upsert(conBaseSeguros, { onConflict: "empleado_codigo" });
+
+  // 🩸 FALTA LA COLUMNA DE LA BASE PROPIA. Misma bifurcación que las cinco de
+  // abajo, y por la misma razón:
+  //  · si NO se le estaba poniendo base a nadie (`null`, el default), se
+  //    reintenta sin la columna y guardar un nombre o un salario sigue
+  //    funcionando igual que ayer;
+  //  · si SÍ se le estaba poniendo, NO se guarda a medias. Un "guardado" que se
+  //    traga la base le seguiría reteniendo a Rodrigo $39,38 donde le tocan
+  //    $17,06 —$25,18 de más por quincena— y nadie sabría por qué.
+  if (error && esColumnaBaseSegurosFaltante(error)) {
+    if (baseSeguros !== null) {
+      return NextResponse.json(
+        { error: avisoMigracionBaseSeguros(), faltaMigracionBaseSeguros: true },
+        { status: 503 },
+      );
+    }
+    ({ error } = await supabaseServer
+      .from(TABLA_PERSONAS)
+      .upsert(conReloj, { onConflict: "empleado_codigo" }));
+  }
 
   // 🩸 FALTA LA COLUMNA DEL SUELDO FIJO. Misma bifurcación que las cuatro de
   // abajo, y por la misma razón:
@@ -604,7 +654,7 @@ export async function PUT(req: NextRequest) {
       if (!reintento.error) {
         return NextResponse.json({
           ok: true,
-          persona: { ...p, ...v, servicioProfesional, pagaSeguros, noMarcaReloj: noMarcaRelojValor, saldoVacacionesDias, saldoVacacionesCorte },
+          persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, saldoVacacionesDias, saldoVacacionesCorte },
           faltaMigracionBajas: true,
         });
       }
@@ -622,5 +672,5 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, noMarcaReloj: noMarcaRelojValor, saldoVacacionesDias, saldoVacacionesCorte } });
+  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, saldoVacacionesDias, saldoVacacionesCorte } });
 }
