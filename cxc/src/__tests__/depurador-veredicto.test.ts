@@ -293,3 +293,67 @@ describe("veredicto — la descripción que se guardaría siempre viene normaliz
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Las 5 mitades derechas que Daniel aprobó el 25-ago-2026 (Shirts · Shirts L/S ·
+// Shirts S/S · Polos L/S · Slippers). Entraron al catálogo como descripciones
+// COMPLETAS en las marcas donde hay artículos de verdad (migración
+// 20260826040000). Este bloque fija las dos mitades del trato:
+//   1. lo que tenía que dejar de alertar, dejó de alertar;
+//   2. lo que tenía que SEGUIR alertando —las 4 filas sucias de Reebok mal
+//      clasificadas bajo CK Jeans— sigue alertando. Solo les cambió la etiqueta.
+// ─────────────────────────────────────────────────────────────────────────────
+const CAT_CON_MITADES: CatalogoDescripciones = {
+  ...CAT,
+  "CK Menswear": ["Men-Shirts", "Men-Polos L/S", "Men-Shirts Woven L/S"],
+  "CK Kids": ["Boys-Shirts"],
+  "CK Footwear": ["Men-Slippers"],
+  "TH Womenswear": ["Women-Shirts L/S", "Women-Shirts S/S"],
+  "TH Footwear": ["Men-Slippers", "Women-Slippers", "Boys-Slippers"],
+  "TH Kids": [...CAT["TH Kids"], "Boys-Shirts L/S", "Girls-Shirts L/S", "Boys-Shirts S/S", "Boys-Polos L/S"],
+};
+const vm = (d: string) => veredictoDescripcion(d, CAT_CON_MITADES);
+
+describe("las 5 mitades derechas aprobadas (25-ago-2026)", () => {
+  it("antes de aprobarlas, la prenda pelada alertaba por mitad nueva", () => {
+    expect(v("Men-Shirts").veredicto).toBe("alerta");
+    expect(v("Men-Shirts").texto).toBe("mitad nueva: «Shirts»");
+    expect(v("Boys-Polos L/S").texto).toBe("mitad nueva: «Polos L/S»");
+    expect(v("Women-Slippers").texto).toBe("mitad nueva: «Slippers»");
+  });
+
+  it("con la mitad en el catálogo, la MISMA prenda en otra marca pasa sola", () => {
+    // La mitad se conoce en cualquier marca (regla 1 de Daniel): alcanza con que
+    // exista en una para que la hermana de otra marca no alarme.
+    expect(vm("Girls-Shirts").veredicto).toBe("pasa");
+    expect(vm("Women-Polos L/S").veredicto).toBe("pasa");
+    expect(vm("Girls-Slippers").veredicto).toBe("pasa");
+    expect(vm("Newborn-Shirts S/S").veredicto).toBe("pasa");
+  });
+
+  it("la casi-gemela sigue alertando: Shirt no se cuela por Shirts", () => {
+    expect(vm("Men-Shirt").veredicto).toBe("alerta");
+    // "Men-Shirt" es gemela de la descripción COMPLETA "Men-Shirts" → casi-igual.
+    expect(vm("Men-Shirt").motivo).toBe("casi-igual");
+    expect(vm("Men-Shirt").gemela).toBe("Men-Shirts");
+    expect(vm("Men-Polo L/S").veredicto).toBe("alerta");
+    expect(vm("Women-Slipper").veredicto).toBe("alerta");
+  });
+
+  it("las 4 filas sucias de Reebok bajo CK Jeans SIGUEN alertando (solo cambia la etiqueta)", () => {
+    const sucias = [
+      "REEBOK IDENTITY VECTOR T-SHIRT",
+      "REEBOK LINEAR READ T-SHIRT",
+      "TRAINING TECH T-SHIRT",
+      "WORKOUT READY SPEEDWICK T-SHIRT",
+    ];
+    for (const d of sucias) {
+      const antes = v(d);
+      const despues = vm(d);
+      expect(antes.veredicto).toBe("alerta");
+      expect(despues.veredicto).toBe("alerta");
+      expect(despues.motivo).toBe("casi-igual-mitad");
+    }
+    expect(vm("REEBOK IDENTITY VECTOR T-SHIRT").gemela).toBe("REEBOK IDENTITY VECTOR T-Shirts");
+  });
+});
