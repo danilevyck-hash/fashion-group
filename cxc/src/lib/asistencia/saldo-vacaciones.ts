@@ -80,6 +80,23 @@
  * más es habilitar a alguien a irse un día que todavía no ganó, y eso después
  * se paga en plata. Un día de menos se corrige solo, al mes siguiente.
  *
+ * ── 🔴 EL MEDIO DÍA ENTRA POR EL ARRANQUE, NO POR LO GANADO ─────────────────
+ *
+ * El saldo admite MEDIOS días (12,5) desde el 26-ago-2026: la contadora lleva
+ * la planilla a mano en Excel y que aparezcan medios días es más probable que
+ * lo contrario. Pero entra por UN solo lado —el número que escribe
+ * contabilidad— y de ahí se arrastra a la resta.
+ *
+ * ⚠️ LO GANADO SIGUE DANDO ENTEROS. El prorrateo se sigue truncando a día
+ * entero, y eso NO se toca: es una regla de plata ya medida, y medio día de más
+ * es medio día que alguien se va sin haberlo ganado. Los días tomados también
+ * son enteros —son días de calendario—, así que la única fuente de un `,5` en
+ * toda la cadena es el arranque.
+ *
+ * ⚠️ Y NO HAY CUARTOS. Solo múltiplos de 0,5, en el validador y en el CHECK de
+ * la base: un cuarto de día de vacaciones no existe en la práctica, así que un
+ * 12,3 no es un dato, es un error de tipeo — y el candado lo atrapa.
+ *
  * ── 🔴 LOS DÍAS SE CUENTAN DE CALENDARIO, FINES DE SEMANA Y FERIADOS ADENTRO ─
  *
  * Es el MISMO criterio que ya usa el motor de vacaciones (`diasDeVacacion` en
@@ -130,6 +147,51 @@ export const MESES_POR_PERIODO = 11;
 
 /** Tope de cordura del saldo inicial, el mismo que el CHECK de la base. */
 export const SALDO_INICIAL_MAX = 999;
+
+/**
+ * El escalón más chico del saldo: MEDIO día.
+ *
+ * 🔑 Es el mismo que exige el CHECK `asistencia_personas_saldo_vac_medio`. Está
+ * acá arriba y con nombre para que quien lo cambie tenga que ver, en la misma
+ * pantalla, que hay una regla de base que también hay que mover.
+ */
+export const PASO_SALDO = 0.5;
+
+/**
+ * Redondea al medio día más cercano.
+ *
+ * 🔑 Todos los sumandos del saldo son múltiplos de 0,5 y 0,5 es exacto en punto
+ * flotante, así que la cuenta ya sale bien sin esto. Se normaliza igual porque
+ * lo que protege no es la aritmética de hoy: es el día que alguien sume un
+ * tercer término y aparezca un 10,499999999999998 en la pantalla de la
+ * contadora.
+ */
+export function aMedioDia(n: number): number {
+  return Math.round(n / PASO_SALDO) * PASO_SALDO;
+}
+
+/**
+ * Los días que vienen de la BASE, sean lo que sean.
+ *
+ * 🩸 POSTGREST DEVUELVE LOS `numeric` COMO TEXTO. No es teoría: en este mismo
+ * módulo `salario_mensual` —que es `numeric(12,2)`— se lee con un `Number(...)`
+ * por exactamente eso. Desde que el saldo dejó de ser `integer` (26-ago-2026)
+ * empezó a llegar como `"12.5"`, y un `typeof === "number"` lo habría tirado a
+ * `null`: la pantalla diría «Falta el saldo» de alguien que SÍ lo tiene
+ * cargado, y nadie sabría por qué.
+ *
+ * ⚠️ La cadena vacía NO es cero: es «no hay dato». `Number("")` da 0 y ese cero
+ * se leería como «no le queda ni un día».
+ */
+export function numeroDeDias(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  if (t === "") return null;
+  const n = Number(t.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MESES CUMPLIDOS
@@ -353,7 +415,7 @@ export function saldoDe(
     ganadosDesdeCorte,
     tomados,
     yaPagados,
-    saldo: (datos.saldoInicial as number) - tomados - yaPagados + ganadosDesdeCorte,
+    saldo: aMedioDia((datos.saldoInicial as number) - tomados - yaPagados + ganadosDesdeCorte),
     falta: null,
   };
 }
@@ -376,6 +438,22 @@ export const TEXTO_FALTA: Record<FaltaDato, string> = {
   ambos: "Faltan la fecha de ingreso y el saldo",
 };
 
+/**
+ * Un número de días, como se escribe: `12` entero, `12.5` con medio día.
+ *
+ * 🔴 EL `12` NO SE VE `12.0`. Un decimal permanente ensucia una columna que se
+ * lee de un vistazo y hace que el caso raro —el medio día— deje de saltar a la
+ * vista, que es justo para lo que está.
+ *
+ * 🔑 El punto es el separador decimal de `es-PA` (`(12.5).toLocaleString(
+ * "es-PA")` → `"12.5"`), el MISMO que ya usa el resto del módulo para la plata
+ * (`$194.80`, `$3.02`). Una coma acá sería una segunda convención en la misma
+ * pantalla.
+ */
+export function textoDias(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 /** «2026-08-25» → «25 ago 2026». La misma forma que usa el resto del módulo. */
@@ -385,12 +463,16 @@ export function fechaCortaSaldo(f: string): string {
 }
 
 /**
- * La columna de saldo, corta: «20 días». Sin el dato, la frase que dice qué
- * falta hacer.
+ * La columna de saldo, corta: «20 días», «12.5 días». Sin el dato, la frase que
+ * dice qué falta hacer.
+ *
+ * ⚠️ El singular es SOLO para el 1 exacto: «0.5 días» y «1.5 días» van en
+ * plural, que es como se dice.
  */
 export function textoSaldo(s: SaldoVacaciones): string {
   if (s.saldo === null || s.falta !== null) return TEXTO_FALTA[s.falta ?? "saldo"];
-  return `${s.saldo} ${s.saldo === 1 || s.saldo === -1 ? "día" : "días"}`;
+  const uno = s.saldo === 1 || s.saldo === -1;
+  return `${textoDias(s.saldo)} ${uno ? "día" : "días"}`;
 }
 
 /**
@@ -401,7 +483,7 @@ export function textoSaldo(s: SaldoVacaciones): string {
  */
 export function textoDetalle(s: SaldoVacaciones): string | null {
   if (s.saldo === null || s.saldoInicial === null || s.corte === null) return null;
-  const partes = [`${s.saldoInicial} al ${fechaCortaSaldo(s.corte)}`];
+  const partes = [`${textoDias(s.saldoInicial)} al ${fechaCortaSaldo(s.corte)}`];
   if (s.ganadosDesdeCorte > 0) partes.push(`+${s.ganadosDesdeCorte} ganados`);
   if (s.tomados > 0) partes.push(`tomó ${s.tomados}`);
   // 🔴 Se NOMBRA aparte: son días que se cobraron, no que se descansaron, y
@@ -457,10 +539,17 @@ export const DESDE_CUANDO_CUENTA =
  * El saldo inicial que viene en el cuerpo de un PUT.
  *
  * Vacío es un valor VÁLIDO y significa «todavía no se cargó» → `null`, que es
- * como están las 39 fichas y lo que hace que la pantalla diga «Falta el saldo».
+ * como están las 38 fichas y lo que hace que la pantalla diga «Falta el saldo».
  *
- * 🔑 ENTERO. Todo el módulo cuenta días corridos enteros —el prorrateo se
- * trunca— y un decimal suelto arrastraría coma por toda la cadena.
+ * 🔑 MEDIOS DÍAS SÍ, CUARTOS NO. Se aceptan `12` y `12.5`; un `12.25` o un
+ * `12.3` se rechazan con un mensaje en español. Es el MISMO candado que el
+ * CHECK `asistencia_personas_saldo_vac_medio`: en la base porque cualquier
+ * camino tiene que respetarlo, y acá porque un error de la contadora se explica
+ * en su idioma y no con «violates check constraint».
+ *
+ * ⚠️ Se traga la COMA decimal («12,5»): es como se escribe un decimal en medio
+ * mundo, y es lo mismo que ya hace el campo del salario de esta pantalla.
+ * Rechazar un `12,5` por el separador sería rechazar un dato correcto.
  */
 export function validarSaldoInicial(body: unknown): Resultado<number | null> {
   const b = (body ?? {}) as Record<string, unknown>;
@@ -468,9 +557,18 @@ export function validarSaldoInicial(body: unknown): Resultado<number | null> {
   if (v === undefined || v === null || (typeof v === "string" && v.trim() === "")) {
     return { ok: true, valor: null };
   }
-  const n = typeof v === "number" ? v : Number(String(v).trim());
-  if (!Number.isFinite(n) || !Number.isInteger(n)) {
-    return { ok: false, error: "Los días que le quedan tienen que ser un número entero." };
+  const n = typeof v === "number" ? v : Number(String(v).trim().replace(",", "."));
+  if (!Number.isFinite(n)) {
+    return { ok: false, error: "Los días que le quedan tienen que ser un número." };
+  }
+  // 🔑 Se compara contra el valor ORIGINAL, no contra el redondeado: `aMedioDia`
+  // convertiría un 12,3 en 12,5 y lo guardaría como si nada — que es
+  // exactamente el error de tipeo que este candado viene a atrapar.
+  if (aMedioDia(n) !== n) {
+    return {
+      ok: false,
+      error: "Los días que le quedan van de medio en medio: 12 o 12.5, no 12.3.",
+    };
   }
   if (n < -SALDO_INICIAL_MAX || n > SALDO_INICIAL_MAX) {
     return { ok: false, error: `Los días que le quedan tienen que estar entre -${SALDO_INICIAL_MAX} y ${SALDO_INICIAL_MAX}.` };
@@ -490,6 +588,10 @@ export function validarSaldoInicial(body: unknown): Resultado<number | null> {
 
 export const MIGRACION_SALDO_VACACIONES =
   "20260826040000_asistencia_saldo_vacaciones_inicial.sql";
+
+/** La que le agrega los MEDIOS días. Va después de la de arriba. */
+export const MIGRACION_SALDO_MEDIOS_DIAS =
+  "20260826060000_asistencia_saldo_vacaciones_medios_dias.sql";
 
 /** Las columnas nuevas. Se listan acá para que el `select` y la detección del
  *  error no se puedan separar: si mañana se agrega una tercera, va en un lugar. */
@@ -525,6 +627,35 @@ export function esColumnaSaldoVacacionesFaltante(err: unknown): boolean {
   const code = String(e.code ?? "");
   if (code === "42703" || code === "PGRST204") return true;
   return /does not exist|no existe|schema cache|could not find/i.test(texto);
+}
+
+/**
+ * ¿Este error es «la columna todavía es `integer` y le mandaron medio día»?
+ *
+ * 🩸 EXISTE POR UNA VENTANA REAL. La migración del saldo (20260826040000) ya
+ * está corrida en producción y creó la columna como `integer`; la de los medios
+ * días (20260826060000) la corre Daniel aparte. En el medio, un `12.5` lo
+ * rechaza Postgres con `22P02: invalid input syntax for type integer` — un
+ * texto en inglés, con jerga de base, en la cara de la contadora.
+ *
+ * ⚠️ Quien llame TIENE que comprobar antes que el valor que se estaba guardando
+ * de verdad tenía medio día. El error no nombra la columna, así que sin esa
+ * condición cualquier `22P02` de la fila se leería como «falta esta migración».
+ */
+export function esSaldoTodaviaEntero(err: unknown): boolean {
+  if (!err) return false;
+  const e = err as ErrorPostgrest;
+  const texto = `${e.message ?? ""} ${e.details ?? ""} ${e.hint ?? ""}`;
+  if (String(e.code ?? "") === "22P02") return true;
+  return /invalid input syntax for type integer|sintaxis de entrada no v[áa]lida/i.test(texto);
+}
+
+export function avisoMigracionSaldoMediosDias(): string {
+  return (
+    "Todavía no se pueden cargar medios días: falta preparar la base de datos. "
+    + `Pídele a Daniel que corra el archivo ${MIGRACION_SALDO_MEDIOS_DIAS} en Supabase. `
+    + "Mientras tanto se puede cargar el saldo en días enteros."
+  );
 }
 
 export function avisoMigracionSaldoVacaciones(): string {

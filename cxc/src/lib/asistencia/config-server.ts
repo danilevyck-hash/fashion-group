@@ -50,6 +50,7 @@ import { COLS_PERMISO_HORAS, esColumnaPermisoHorasFaltante } from "./permiso-hor
 import {
   COLS_SALDO_VACACIONES,
   esColumnaSaldoVacacionesFaltante,
+  numeroDeDias,
   type DatosSaldo,
 } from "./saldo-vacaciones";
 import type { Justificacion } from "./reporte";
@@ -119,7 +120,10 @@ export interface FilaPersonaDb {
   /** Opcionales: no existen hasta que se corra `MIGRACION_SALDO_VACACIONES`.
    *  Los DOS o NINGUNO (lo obliga un CHECK). `null` = todavía no se cargó el
    *  saldo, y entonces la pantalla dice «Falta el saldo» y NO muestra número. */
-  saldo_vacaciones_dias?: number | null;
+  /** ⚠️ `numeric` en la base, y PostgREST lo manda como TEXTO. Ver
+   *  `numeroDeDias` — el mismo motivo por el que `salario_mensual` se lee con
+   *  un `Number(...)` unas líneas más arriba. */
+  saldo_vacaciones_dias?: number | string | null;
   saldo_vacaciones_corte?: string | null;
 }
 
@@ -327,10 +331,11 @@ export function vigenciaDeFila(f: FilaPersonaDb): Vigencia {
  * «Falta el saldo» en vez de mostrar un número que engaña.
  */
 export function datosSaldoDeFila(f: FilaPersonaDb): DatosSaldo {
-  const dias = f.saldo_vacaciones_dias;
   return {
     fechaIngreso: f.fecha_ingreso ?? null,
-    saldoInicial: typeof dias === "number" && Number.isFinite(dias) ? dias : null,
+    // 🩸 `numeroDeDias` y no un `typeof === "number"`: la columna es `numeric` y
+    // PostgREST la manda como TEXTO. Ver la nota de esa función.
+    saldoInicial: numeroDeDias(f.saldo_vacaciones_dias),
     corte: f.saldo_vacaciones_corte ?? null,
   };
 }

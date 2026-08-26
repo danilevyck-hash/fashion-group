@@ -19,6 +19,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  aMedioDia,
   avisoSinSaldo,
   diasDespuesDelCorte,
   diasGanados,
@@ -28,8 +29,12 @@ import {
   saldoDe,
   textoDetalle,
   textoSaldo,
+  esSaldoTodaviaEntero,
+  numeroDeDias,
+  textoDias,
   validarSaldoInicial,
   DIAS_POR_PERIODO,
+  PASO_SALDO,
   MESES_POR_PERIODO,
   SALDO_INICIAL_MAX,
   TEXTO_FALTA,
@@ -310,6 +315,131 @@ describe("el aviso de quién se quedó sin saldo", () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 MEDIOS DÍAS (26-ago-2026)
+//
+// El medio día entra por UN solo lado —el arranque que escribe contabilidad— y
+// se arrastra a la resta. Lo GANADO sigue truncando a día entero.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("🔴 medios días", () => {
+  it("el escalón es medio día, y es el mismo que exige el CHECK de la base", () => {
+    expect(PASO_SALDO).toBe(0.5);
+  });
+
+  it("un arranque de 12.5 llega entero al saldo", () => {
+    const s = saldoDe("7", "A", ANGELA({ saldoInicial: 12.5 }), [], "2026-08-25");
+    expect(s.saldo).toBe(12.5);
+    expect(textoSaldo(s)).toBe("12.5 días");
+  });
+
+  it("🔑 el medio día SOBREVIVE a la resta y a lo ganado", () => {
+    // 12,5 − 10 tomados + 8 ganados = 10,5.
+    const s = saldoDe("7", "A", ANGELA({ saldoInicial: 12.5 }), [vac("2026-10-01", "2026-10-10")], "2026-11-25");
+    expect(s.saldo).toBe(10.5);
+    expect(textoDetalle(s)).toBe("12.5 al 25 ago 2026 · +8 ganados · tomó 10");
+  });
+
+  it("⚠️ LO GANADO SIGUE SIENDO ENTERO: el prorrateo no aprendió medios días", () => {
+    // 10 meses → ⌊10 × 30/11⌋ = 27, no 27,5.
+    expect(diasGanados("2025-10-25", "2026-08-25")).toBe(27);
+    expect(Number.isInteger(ganadosDesdeElCorte("2019-02-16", "2026-08-25", "2026-11-25")!)).toBe(true);
+  });
+
+  it("y los días tomados también: son días de calendario", () => {
+    expect(Number.isInteger(diasGastados([vac("2026-10-01", "2026-10-10")], "7", "2026-08-25").tomados)).toBe(true);
+  });
+
+  it("un saldo de medio día negativo se muestra negativo", () => {
+    const s = saldoDe("7", "A", ANGELA({ saldoInicial: 0.5 }), [vac("2026-09-01", "2026-09-03")], "2026-09-03");
+    expect(s.saldo).toBe(-2.5);
+    expect(textoSaldo(s)).toBe("-2.5 días");
+  });
+
+  it("🩸 la cuenta no deja basura de punto flotante en la pantalla", () => {
+    const s = saldoDe("7", "A", ANGELA({ saldoInicial: 10.5 }), [vac("2026-09-01", "2026-09-01")], "2026-09-01");
+    expect(textoSaldo(s)).toBe("9.5 días");
+    expect(textoSaldo(s)).not.toMatch(/999|000/);
+  });
+
+  it("aMedioDia redondea al medio más cercano", () => {
+    expect(aMedioDia(12.3)).toBe(12.5);
+    expect(aMedioDia(12.2)).toBe(12);
+    expect(aMedioDia(-2.4)).toBe(-2.5);
+    expect(aMedioDia(12)).toBe(12);
+  });
+});
+
+describe("🔴 cómo se escribe un número de días", () => {
+  it("el entero NO lleva decimal: «12», nunca «12.0»", () => {
+    expect(textoDias(12)).toBe("12");
+    expect(textoDias(0)).toBe("0");
+    expect(textoDias(-3)).toBe("-3");
+  });
+
+  it("el medio día SÍ se ve: «12.5»", () => {
+    expect(textoDias(12.5)).toBe("12.5");
+    expect(textoDias(-2.5)).toBe("-2.5");
+    expect(textoDias(0.5)).toBe("0.5");
+  });
+
+  it("🔑 el punto es el separador de `es-PA`, el mismo que la plata del módulo", () => {
+    expect((12.5).toLocaleString("es-PA")).toBe("12.5");
+    expect(textoDias(12.5)).not.toContain(",");
+  });
+
+  it("el singular es solo para el 1 exacto", () => {
+    expect(textoSaldo(saldoDe("7", "A", ANGELA({ saldoInicial: 1 }), [], "2026-08-25"))).toBe("1 día");
+    expect(textoSaldo(saldoDe("7", "A", ANGELA({ saldoInicial: 0.5 }), [], "2026-08-25"))).toBe("0.5 días");
+    expect(textoSaldo(saldoDe("7", "A", ANGELA({ saldoInicial: 1.5 }), [], "2026-08-25"))).toBe("1.5 días");
+  });
+});
+
+describe("🩸 lo que devuelve la base: PostgREST manda los `numeric` como TEXTO", () => {
+  it("un «12.5» de texto se lee como 12,5 y no como «no hay dato»", () => {
+    expect(numeroDeDias("12.5")).toBe(12.5);
+    expect(numeroDeDias("12.0")).toBe(12);
+    expect(numeroDeDias(12.5)).toBe(12.5);
+  });
+
+  it("⚠️ la cadena vacía NO es cero: es «no hay dato»", () => {
+    expect(numeroDeDias("")).toBeNull();
+    expect(numeroDeDias("   ")).toBeNull();
+    expect(numeroDeDias(null)).toBeNull();
+    expect(numeroDeDias(undefined)).toBeNull();
+  });
+
+  it("🔑 el CERO de verdad sí entra", () => {
+    expect(numeroDeDias("0")).toBe(0);
+    expect(numeroDeDias(0)).toBe(0);
+  });
+
+  it("y un «12.0» de la base es IGUAL al 12 del formulario — de esto depende que la fecha de corte no se mueva sola", () => {
+    expect(numeroDeDias("12.0") === 12).toBe(true);
+  });
+
+  it("lo que no es un número se lee como «no hay dato», nunca como NaN", () => {
+    expect(numeroDeDias("doce")).toBeNull();
+    expect(numeroDeDias({})).toBeNull();
+  });
+});
+
+describe("🩸 la ventana en la que la columna todavía es `integer`", () => {
+  it("reconoce el error de Postgres por su código", () => {
+    expect(esSaldoTodaviaEntero({ code: "22P02", message: 'invalid input syntax for type integer: "12.5"' })).toBe(true);
+  });
+
+  it("y por el texto, aunque venga sin código", () => {
+    expect(esSaldoTodaviaEntero({ message: 'invalid input syntax for type integer: "12.5"' })).toBe(true);
+  });
+
+  it("⚠️ no se traga cualquier error: un permiso o un timeout NO son esto", () => {
+    expect(esSaldoTodaviaEntero({ code: "42501", message: "permission denied" })).toBe(false);
+    expect(esSaldoTodaviaEntero({ message: "fetch failed" })).toBe(false);
+    expect(esSaldoTodaviaEntero(null)).toBe(false);
+  });
+});
+
 describe("validar lo que llega del navegador", () => {
   it("vacío es válido y significa «todavía no se cargó»", () => {
     expect(validarSaldoInicial({ saldoVacacionesDias: "" })).toEqual({ ok: true, valor: null });
@@ -327,14 +457,46 @@ describe("validar lo que llega del navegador", () => {
     expect(validarSaldoInicial({ saldoVacacionesDias: 0 })).toEqual({ ok: true, valor: 0 });
   });
 
-  it("rechaza lo que no es un entero, y lo dice en español", () => {
+  it("🔴 el MEDIO día entra, escrito con punto o con coma", () => {
+    expect(validarSaldoInicial({ saldoVacacionesDias: 12.5 })).toEqual({ ok: true, valor: 12.5 });
+    expect(validarSaldoInicial({ saldoVacacionesDias: "12.5" })).toEqual({ ok: true, valor: 12.5 });
+    // Medio mundo escribe el decimal con coma, y el campo del salario ya la traga.
+    expect(validarSaldoInicial({ saldoVacacionesDias: "12,5" })).toEqual({ ok: true, valor: 12.5 });
+    expect(validarSaldoInicial({ saldoVacacionesDias: "-2.5" })).toEqual({ ok: true, valor: -2.5 });
+  });
+
+  it("🔴 el CUARTO de día NO entra, y NO se redondea a la callada", () => {
+    const cuarto = validarSaldoInicial({ saldoVacacionesDias: 12.25 });
+    expect(cuarto.ok).toBe(false);
+    // 🩸 Un `aMedioDia` sin este candado guardaría 12,5: el error de tipeo
+    // entraría convertido en un dato y nadie lo vería nunca.
+    expect(validarSaldoInicial({ saldoVacacionesDias: 12.3 }).ok).toBe(false);
+    expect(validarSaldoInicial({ saldoVacacionesDias: "12.7" }).ok).toBe(false);
+  });
+
+  it("el mensaje del medio día está en español y trae un ejemplo", () => {
+    const r = validarSaldoInicial({ saldoVacacionesDias: 12.3 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain("medio en medio");
+      expect(r.error).toContain("12.5");
+    }
+  });
+
+  it("rechaza lo que no es un número, y lo dice en español", () => {
     expect(validarSaldoInicial({ saldoVacacionesDias: "doce" }).ok).toBe(false);
-    expect(validarSaldoInicial({ saldoVacacionesDias: 12.5 }).ok).toBe(false);
   });
 
   it("rechaza el dedo pesado, igual que el CHECK de la base", () => {
     expect(validarSaldoInicial({ saldoVacacionesDias: SALDO_INICIAL_MAX + 1 }).ok).toBe(false);
     expect(validarSaldoInicial({ saldoVacacionesDias: -SALDO_INICIAL_MAX - 1 }).ok).toBe(false);
     expect(validarSaldoInicial({ saldoVacacionesDias: SALDO_INICIAL_MAX }).ok).toBe(true);
+  });
+
+  it("🔑 los candados VIEJOS siguen valiendo con el tipo nuevo", () => {
+    // Vacío sigue siendo «no se cargó», el cero sigue entrando y el negativo
+    // también. Cambiar el tipo no puede haber aflojado nada de eso.
+    expect(validarSaldoInicial({ saldoVacacionesDias: "" }).ok).toBe(true);
+    expect(validarSaldoInicial({ saldoVacacionesDias: -3 })).toEqual({ ok: true, valor: -3 });
   });
 });

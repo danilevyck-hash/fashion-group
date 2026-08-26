@@ -945,12 +945,18 @@ export default function ConfiguracionTab() {
                                   cuando el número cambia. */}
                               <Etiqueta
                                 texto={ETIQUETA_SALDO_INICIAL}
-                                ayuda="Los que le quedan hoy, de tus registros. De acá en adelante el sistema suma lo que gana y resta las vacaciones que se carguen."
+                                ayuda="Los que le quedan hoy, de tus registros. Puede llevar medio día (12.5). De acá en adelante el sistema suma lo que gana y resta las vacaciones que se carguen."
                               />
                               <input
                                 type="number"
-                                inputMode="numeric"
-                                step={1}
+                                // 🔑 `decimal` y no `numeric`: en el iPhone el
+                                // teclado de `numeric` no trae el punto, y sin
+                                // punto no se puede escribir un 12.5.
+                                inputMode="decimal"
+                                // Medios días. El CHECK de la base y el
+                                // validador exigen lo mismo; esto solo hace que
+                                // las flechitas se muevan de a medio.
+                                step={0.5}
                                 // 🔑 El <label> de `Etiqueta` no está asociado a
                                 // ningún campo (no lleva `htmlFor`), así que sin
                                 // esto un lector de pantalla lee una caja de

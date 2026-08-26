@@ -54,9 +54,12 @@ import {
   validarPagaSeguros,
 } from "@/lib/asistencia/seguros";
 import {
+  avisoMigracionSaldoMediosDias,
   avisoMigracionSaldoVacaciones,
+  esSaldoTodaviaEntero,
   COLS_SALDO_VACACIONES,
   esColumnaSaldoVacacionesFaltante,
+  numeroDeDias,
   validarSaldoInicial,
 } from "@/lib/asistencia/saldo-vacaciones";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -238,7 +241,11 @@ export async function GET(req: NextRequest) {
         // ninguno: un saldo sin fecha es un saldo a un día que nadie sabe, y de
         // esa fecha depende qué vacaciones se restan después. Ver
         // `lib/asistencia/saldo-vacaciones.ts`.
-        saldoVacacionesDias: f?.saldo_vacaciones_dias ?? null,
+        // 🩸 Normalizado a NÚMERO: la columna es `numeric` y PostgREST la manda
+        // como texto. Sin esto la pantalla recibiría `"12.5"` donde su tipo
+        // dice `number`, y cualquier comparación numérica de acá en adelante
+        // fallaría en silencio.
+        saldoVacacionesDias: numeroDeDias(f?.saldo_vacaciones_dias),
         saldoVacacionesCorte: f?.saldo_vacaciones_corte ?? null,
         fechaSalida: vig?.fechaSalida ?? null,
         motivoSalida: vig?.motivoSalida ?? null,
@@ -397,11 +404,17 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: prev.error.message }, { status: 500 });
     }
     const anterior = prev.data as unknown as {
-      saldo_vacaciones_dias: number | null;
+      saldo_vacaciones_dias: number | string | null;
       saldo_vacaciones_corte: string | null;
     } | null;
+    // 🩸 SE COMPARAN NÚMEROS, NO LO QUE VENGA. La columna es `numeric` y
+    // PostgREST la manda como texto: un `"12.0" === 12` da `false`, y con eso
+    // CADA guardado de la ficha movería la fecha de corte a hoy sin que nadie
+    // tocara el saldo — o sea, absorbería en silencio las vacaciones cargadas
+    // entre medio. Es el modo de fallo exacto que el corte existe para evitar.
     const mismoNumero =
-      anterior?.saldo_vacaciones_dias === saldoVacacionesDias && !!anterior?.saldo_vacaciones_corte;
+      numeroDeDias(anterior?.saldo_vacaciones_dias) === saldoVacacionesDias
+      && !!anterior?.saldo_vacaciones_corte;
     saldoVacacionesCorte = mismoNumero ? anterior!.saldo_vacaciones_corte : hoyPanama();
   }
 
@@ -443,6 +456,26 @@ export async function PUT(req: NextRequest) {
   //  · si SÍ se estaba cargando, ya se salió con un 503 más arriba (la relectura
   //    del corte lo detecta antes de escribir). Este `if` es el cinturón por si
   //    el error aparece recién en el `upsert`.
+  // 🩸 LA COLUMNA TODAVÍA ES `integer` Y LE MANDARON MEDIO DÍA. Ventana real:
+  // la migración que crea el saldo ya corrió y la que le agrega los medios días
+  // va aparte. Sin esto, la contadora que escribe «12.5» lee un
+  // «invalid input syntax for type integer» en inglés.
+  //
+  // 🔑 Se exige que el valor DE VERDAD tuviera medio día: el error no nombra la
+  // columna, así que sin esa condición cualquier dato mal tipeado de la fila se
+  // leería como «falta esta migración».
+  if (
+    error
+    && saldoVacacionesDias !== null
+    && !Number.isInteger(saldoVacacionesDias)
+    && esSaldoTodaviaEntero(error)
+  ) {
+    return NextResponse.json(
+      { error: avisoMigracionSaldoMediosDias(), faltaMigracionSaldoMediosDias: true },
+      { status: 503 },
+    );
+  }
+
   if (error && esColumnaSaldoVacacionesFaltante(error)) {
     if (saldoVacacionesDias !== null) {
       return NextResponse.json(
