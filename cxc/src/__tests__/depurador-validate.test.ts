@@ -351,3 +351,19 @@ describe("normalización: el blazer masculino, gemelo del femenino que ya estaba
     expect(normalizeDescripcion("Men-Blazers")).toBe("Men-Blazers");
   });
 });
+
+describe("normalización: la corbata, gemela del blazer", () => {
+  it("«Men-Ties / Neckwear» se limpia a «Men-Ties»", () => {
+    // Switch pega la cola " / Neckwear". La prenda es la corbata; la cola es
+    // sucia — se limpia acá y al catálogo entra "Men-Ties" (TH Menswear).
+    expect(normalizeDescripcion("Men-Ties / Neckwear")).toBe("Men-Ties");
+  });
+
+  it("no toca la forma limpia ni se lleva puesto nada que diga Ties", () => {
+    expect(normalizeDescripcion("Men-Ties")).toBe("Men-Ties");
+    // "Panties" contiene "ties": la regla es por descripción COMPLETA, no por
+    // pedazo — si fuera por substring se llevaría puesta la ropa interior.
+    expect(normalizeDescripcion("Women-Panties")).toBe("Women-Panties");
+    expect(normalizeDescripcion("Women-Panties 3PK")).toBe("Women-Panties 3PK");
+  });
+});

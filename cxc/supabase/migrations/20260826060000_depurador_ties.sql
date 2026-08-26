@@ -1,0 +1,56 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Catálogo del Depurador · CIERRE: la corbata, y por qué NO se retira la fila
+-- muerta 'Unisex-Home Towels'.
+--
+-- ── 1. Men-Ties ──────────────────────────────────────────────────────────────
+-- Criterio de Daniel, el mismo de Slippers (14 art.) y Kanine (10 art.): si el
+-- negocio lo vende, va al catálogo — chico no es lo mismo que sucio. Mirado de
+-- cerca antes de aprobar, el artículo es real:
+--
+--   3 códigos MW0MW299360G1 · MW0MW322390GZ · MW0MW405850KP (fashion_wear),
+--   ingresados el 26-nov-2025 de American Sportswear, S.A., 8 u., CIF 9 ·
+--   precio 10. Vendidas 5 u. a Multi Fashion Holding el 10-dic-2025 por $50.
+--   Quedan 3 u. vivas con precio de etiqueta 10.
+--
+-- La cola " / Neckwear" NO entra al catálogo: es la forma sucia, igual que
+-- "Men-Blazers / Sports Jackets". Se limpia en NORMALIZACION y acá entra la
+-- prenda: 'TH Menswear | Men-Ties'.
+--
+-- ── 2. 'TH Other | Unisex-Home Towels' NO se retira ──────────────────────────
+-- Se iba a desactivar por muerta (Switch no la manda: 0 líneas de factura,
+-- manda HOME y TOWELS por separado, ya dados de alta en 20260826050000).
+-- 🩸 NO se toca, porque le cuelga una fórmula de precio:
+--
+--   marca_rubro_formulas → TH Other · "Unisex-Home Towels" · precio_fijo 12.50
+--   (la puso `daniel` el 29-jun-2026)
+--
+-- FormulasConfig arma la lista con descripcionesDeMarca(), que solo devuelve
+-- las ACTIVAS: desactivar la fila esconde esa fórmula de la pantalla sin
+-- borrarla de la tabla. Quedaría un precio fijo invisible, listo para dispararse
+-- si Switch volviera a mandar ese nombre. Retirarla es un cambio de precio
+-- disfrazado de limpieza, y eso lo decide Daniel.
+--
+-- ⚠️ LO QUE SÍ HAY QUE DECIDIR (no se toca acá): ese 12,50 ya está huérfano.
+-- Switch manda 'Unisex-Home' y no hay fórmula para esa descripción; TH Other
+-- tampoco tiene fórmula de marca (divisor 0), así que hoy esas toallas salen
+-- del Depurador SIN PRECIO. El 12,50 hay que moverlo a 'Unisex-Home' — pero es
+-- un precio de producción y lo decide Daniel.
+--
+-- ── EFECTO MEDIDO EN PANTALLA ────────────────────────────────────────────────
+-- Excel del universo real (858 pares marca+descripción de producción):
+--     ANTES: 12 por revisar · DESPUÉS: 11 por revisar · 88 pasaron solas
+--
+-- Las 11 que quedan son TODAS de Switch y ninguna se arregla desde el catálogo:
+--   · 7 sin género adelante — Bags · Socks Sport · Polos S/S · Denim Pants
+--     (el catálogo YA conoce Men-Bags, Men-Socks Sport, Men-Polos S/S y
+--     Men-Denim Pants: a estos artículos Switch les perdió el prefijo), más
+--     Cosmetiquera · TE BOTTLE 7 · TE BOTTLE 750.
+--   · 4 de Reebok mal clasificadas bajo CK Jeans.
+--
+-- Aprobada por la pantalla (botón «Aprobar y agregar al catálogo», sesión real
+-- de `daniel`, origen='aprobada'). Migración ADITIVA e idempotente.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+insert into depurador_descripciones (marca, descripcion, origen) values
+  ('TH Menswear', 'Men-Ties', 'aprobada')
+on conflict do nothing;
