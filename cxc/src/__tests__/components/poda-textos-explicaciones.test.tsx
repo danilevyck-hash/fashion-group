@@ -22,9 +22,14 @@
  *     → `lib/poda-textos-cxc-multifashion.test.ts`
  *   · `caja/AvisoSaldoNegativo` "Considera solicitar reabastecimiento"
  *     → `lib/poda-textos-ayuda.test.ts`
- * y dos más quedaron fuera por decisión: el "El API de Switch no expone el
- * número de recibo" (candado propio en ventas-poda-textos) y el "Obligatorio —
- * sin paneles" de EntregaForm (candado propio en marketing-reclamos-toques).
+ * y uno más quedó fuera por decisión: el "El API de Switch no expone el
+ * número de recibo" (candado propio en ventas-poda-textos).
+ *
+ * ⛔ El "Obligatorio — sin paneles" de EntregaForm estaba en esta lista y YA NO
+ * EXISTE (23-ago-2026). No lo podó esta auditoría: se fue con su regla —paneles
+ * dejó de ser obligatorio para registrar una entrega— porque un aviso que
+ * sobrevive a la regla que anuncia es una mentira en pantalla. Su candado, en
+ * marketing-reclamos-toques, cambió de dirección y hoy exige lo contrario.
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";

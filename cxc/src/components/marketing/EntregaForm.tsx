@@ -8,7 +8,13 @@
 //
 // Flow:
 //   1) Nombre de la entrega (opcional) + marca(s) con %.
-//   2) Input destacado "Cantidad de paneles".
+//   2) Input destacado "Cantidad de paneles". ⛔ NO ES OBLIGATORIO desde el
+//      23-ago-2026 (Daniel: *"no tengo. No debe de ser obligatorio, no tiene
+//      sentido"*). Era el resto del kit auto-rellenable, donde paneles era el
+//      driver de la curva; la curva se fue el 12-ago y el requisito quedó
+//      huérfano. Está destacado porque es lo que más se manda, no porque haga
+//      falta. Lo que SÍ frena: la entrega necesita al menos un producto con
+//      cantidad (ver "Validación").
 //   3) Bloque "Accesorios": tablas, conjunto, norte, barra. 100% MANUALES.
 //      ⛔ El AUTORRELLENO por curva (3/3/1/3) SE ELIMINÓ (Daniel, 12-ago-2026)
 //      y no debe volver: los kits reales no siguen la curva y el autofill
@@ -484,13 +490,33 @@ export default function EntregaForm({
   };
 
   // ---- Validación ----
+  //
+  // ⛔ PANELES NO ES OBLIGATORIO (23-ago-2026). Daniel, textual: *"me sale
+  //   obligatorio poner paneles. Pero no tengo. No debe de ser obligatorio, no
+  //   tiene sentido"*. El `panelesOk` que estaba acá NO protegía nada: nació
+  //   en el commit del KIT AUTO-RELLENABLE (bb6be309, may-2026), donde paneles
+  //   era el DRIVER de la curva 3/3/1/3 — sin paneles no había con qué llenar
+  //   el resto y el form entero se quedaba en blanco. **Esa curva se eliminó
+  //   el 12-ago-2026** (los accesorios pasaron a 100% manuales) y el freno
+  //   quedó huérfano, exigiendo un número para un mecanismo que ya no existe.
+  //   Se ve en los datos: las 23 entregas que hay traen la firma de la curva
+  //   (paneles=N, tablas=3N, conjunto=3N, norte=N, barra=3N) — o sea que el
+  //   "todas llevan paneles" era la huella del autorrelleno, no una regla del
+  //   negocio. Una entrega de puras barras y colgadores es un envío real.
+  //
+  // 🔴 EL FRENO CORRECTO ES OTRO, Y SE QUEDA: una entrega tiene que llevar AL
+  //   MENOS UN PRODUCTO con cantidad. Sin eso quedaría guardada una entrega de
+  //   cero piezas —papel, total en $0 y nada que descontar—, que es basura.
+  //   `tieneAlMenosUno` ya lo hacía y ahora es el único freno de mercancía;
+  //   el servidor lo repite por su cuenta ("La entrega debe tener al menos un
+  //   item con cantidad" en `inventario.ts`), así que la puerta está cerrada
+  //   de los dos lados.
   const tieneAlMenosUno = filasParaResumen.length > 0;
-  const panelesOk = trunc(Number(panelesStr)) >= 1;
   const marcasOk =
     marcasSel.length >= 1 &&
     marcasSel.every((m) => (Number(m.porcentajeStr) || 0) > 0) &&
     Math.abs(sumPctSel - 100) < 0.01;
-  const puedeGuardar = panelesOk && marcasOk && tieneAlMenosUno && !guardando;
+  const puedeGuardar = marcasOk && tieneAlMenosUno && !guardando;
 
   // 🩸 Lo que falta, dicho con todas las letras. Antes el botón se apagaba y la
   // única explicación era un `title=` — un globito del mouse que en el iPhone
@@ -499,12 +525,11 @@ export default function EntregaForm({
   // que MetaFormModal y que Guías: "Falta: …".
   const falta = useMemo(() => {
     const f: string[] = [];
-    if (!panelesOk) f.push("la cantidad de paneles");
     if (marcasSel.length === 0) f.push("al menos una marca");
     else if (!marcasOk) f.push("que el % de las marcas sume 100");
-    if (!tieneAlMenosUno) f.push("al menos una cantidad");
+    if (!tieneAlMenosUno) f.push("al menos un producto con cantidad");
     return f;
-  }, [panelesOk, marcasOk, marcasSel.length, tieneAlMenosUno]);
+  }, [marcasOk, marcasSel.length, tieneAlMenosUno]);
 
   // Warnings de stock por producto (no bloqueantes).
   const warningsStock = useMemo(() => {
@@ -814,26 +839,28 @@ export default function EntregaForm({
                 >
                   Cantidad de paneles
                 </label>
-                {/* El campo bloquea el guardado si va en 0 y no lo decía en
-                    ningún lado. Ahora lo dice ACÁ, no sólo en el botón.
-                    ⚠️ VA FUERA del <label> a propósito: adentro se pegaría al
-                    nombre accesible del campo ("Cantidad de paneles Obligatorio
-                    — sin paneles…") y quien use lector de pantalla —o el
-                    candado de este form, que busca el campo por su etiqueta—
-                    dejaría de encontrarlo. */}
-                <p className="text-xs text-gray-500 -mt-1">
-                  <span className="text-red-500">*</span> Obligatorio — sin
-                  paneles no se puede registrar la entrega.
-                </p>
-                {/* Piezas (grande, es el driver del kit) + bultos (chico, es
-                    sólo cómo viajó). El bulto NUNCA modifica las piezas. */}
+                {/* ⛔ ACÁ DECÍA "* Obligatorio — sin paneles no se puede
+                    registrar la entrega", y se fue el 23-ago-2026 con la regla
+                    que anunciaba (Daniel: *"no tengo. No debe de ser
+                    obligatorio, no tiene sentido"*). No es una poda de texto:
+                    el texto era CIERTO mientras el freno existía. Se borra
+                    porque el freno se borró — un aviso que sobrevive a su
+                    regla es una mentira en pantalla. Lo que frena hoy —que la
+                    entrega lleve al menos un producto— sigue dicho con todas
+                    las letras abajo, en el "Falta: …" del botón.
+                    Paneles se queda destacado y primero: es lo que más se
+                    manda, sólo que ya no es un requisito. */}
+                {/* Piezas (grande, es lo que más se entrega) + bultos (chico,
+                    es sólo cómo viajó). El bulto NUNCA modifica las piezas. */}
                 <div className="flex items-end gap-2">
                   <div className="flex-1 min-w-0">
                     <input
                       id="entrega-paneles"
                       type="number"
                       inputMode="numeric"
-                      min={1}
+                      /* min 0: dejarlo en blanco o en cero es una entrega
+                         sin paneles, que ahora es válida. */
+                      min={0}
                       step={1}
                       value={panelesStr}
                       onChange={(e) => setPaneles(e.target.value)}

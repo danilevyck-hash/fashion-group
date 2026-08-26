@@ -261,3 +261,101 @@ describe("pantalla de éxito con la nota de envío", () => {
     expect(screen.queryByRole("button", { name: "Listo" })).toBeNull();
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// ⛔ PANELES DEJÓ DE SER OBLIGATORIO (23-ago-2026)
+//
+// Daniel, textual: *"me sale obligatorio poner paneles. Pero no tengo. No debe
+// de ser obligatorio, no tiene sentido"*. El requisito venía del kit
+// auto-rellenable (paneles era el driver de la curva 3/3/1/3); la curva se
+// eliminó el 12-ago-2026 y el freno quedó huérfano.
+//
+// Acá se mira lo que un test de "el botón se enciende" no ve: QUÉ SE MANDA.
+// Una entrega sin paneles tiene que salir con el renglón que se escribió y
+// **sin `paneles` de ningún modo** — ni un renglón en 0, ni el producto
+// colado.
+// ════════════════════════════════════════════════════════════════════════════
+describe("🔴 se puede registrar una entrega SIN paneles", () => {
+  function bodyDelPost() {
+    const post = arnes.llamadas.find(
+      (l) =>
+        l.url.includes("/api/marketing/inventario/entregas") &&
+        l.init?.method === "POST",
+    );
+    expect(post, "no salió ningún POST de entrega").toBeTruthy();
+    return JSON.parse(String(post!.init!.body)) as {
+      items: Array<{ productoId: string; cantidad: number; bultos: number | null }>;
+    };
+  }
+
+  it("con tablas y paneles en blanco, el botón se enciende", async () => {
+    abrir();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Piezas de Tablas")).toBeTruthy(),
+    );
+    const guardar = screen.getByRole("button", { name: "Registrar entrega" });
+    expect((guardar as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Piezas de Tablas"), {
+      target: { value: "24" },
+    });
+    await waitFor(() =>
+      expect((guardar as HTMLButtonElement).disabled).toBe(false),
+    );
+  });
+
+  it("lo que se GUARDA es sólo el renglón escrito: paneles no viaja", async () => {
+    abrir();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Piezas de Tablas")).toBeTruthy(),
+    );
+    fireEvent.change(screen.getByLabelText("Piezas de Tablas"), {
+      target: { value: "24" },
+    });
+    fireEvent.change(screen.getByLabelText("Bultos de Tablas"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Registrar entrega" }));
+    await waitFor(() => expect(bodyDelPost().items.length).toBe(1));
+    const { items } = bodyDelPost();
+    expect(items[0]).toEqual({
+      productoId: "prod-tab",
+      cantidad: 24, // PIEZAS — lo único que descuenta stock
+      bultos: 3, // transporte, informativo
+    });
+    // Ni rastro del panel: ni renglón, ni un 0.
+    expect(items.some((i) => i.productoId === "prod-pan")).toBe(false);
+  });
+
+  it("una entrega VACÍA sigue sin poder guardarse, y dice qué falta", async () => {
+    abrir();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Cantidad de paneles")).toBeTruthy(),
+    );
+    const guardar = screen.getByRole("button", { name: "Registrar entrega" });
+    expect((guardar as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      screen.getByText(/Falta:.*al menos un producto con cantidad/i),
+    ).toBeTruthy();
+    // Y si alguien fuerza el clic, no sale ningún POST.
+    fireEvent.click(guardar);
+    expect(
+      arnes.llamadas.some(
+        (l) =>
+          l.url.includes("/api/marketing/inventario/entregas") &&
+          l.init?.method === "POST",
+      ),
+    ).toBe(false);
+  });
+
+  it("el campo de paneles ya no se anuncia obligatorio ni exige min 1", async () => {
+    abrir();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Cantidad de paneles")).toBeTruthy(),
+    );
+    expect(document.body.textContent).not.toMatch(/Obligatorio — sin paneles/i);
+    const input = screen.getByLabelText(
+      "Cantidad de paneles",
+    ) as HTMLInputElement;
+    expect(input.getAttribute("min")).toBe("0");
+  });
+});
