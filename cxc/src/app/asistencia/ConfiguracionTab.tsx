@@ -60,6 +60,12 @@ import {
   PREGUNTA_SEGUROS,
 } from "@/lib/asistencia/seguros";
 import {
+  ETIQUETA_MARCA_RELOJ,
+  ETIQUETA_NO_MARCA_RELOJ,
+  EXPLICACION_NO_MARCA_RELOJ,
+  PREGUNTA_MARCA_RELOJ,
+} from "@/lib/asistencia/sueldo-fijo";
+import {
   fechaLegible,
   fraseBaja,
   marcoDespuesDeLaBaja,
@@ -85,6 +91,9 @@ interface Persona {
   /** `true` = se le descuentan el seguro social y el educativo. Los DOS juntos.
    *  `true` mientras nadie diga lo contrario: es lo que hacía la planilla. */
   pagaSeguros: boolean;
+  /** `true` = cobra fijo y NO pasa por el reloj. `false` mientras nadie diga lo
+   *  contrario: es lo que hacía la planilla con las 39 fichas. */
+  noMarcaReloj: boolean;
   marcaciones: number;
   ultimaMarca: string | null;
   rataHora: number | null;
@@ -112,6 +121,7 @@ interface Resumen {
   conMarcaciones: number;
   bajas: number;
   servicioProfesional: number;
+  noMarcaReloj: number;
 }
 
 interface Datos {
@@ -127,6 +137,8 @@ interface Datos {
   puedeMarcarServicioProfesional: boolean;
   avisoMigracionSeguros: string | null;
   puedeQuitarSeguros: boolean;
+  avisoMigracionNoMarcaReloj: string | null;
+  puedeMarcarSueldoFijo: boolean;
   avisoMigracionSaldoVacaciones: string | null;
   puedeCargarSaldoVacaciones: boolean;
 }
@@ -154,6 +166,8 @@ interface Borrador {
   servicioProfesional: boolean;
   /** `true` = se le descuentan los seguros (social y educativo, juntos). */
   pagaSeguros: boolean;
+  /** `true` = cobra fijo y no pasa por el reloj. */
+  noMarcaReloj: boolean;
   /** Los días de vacaciones que le quedan HOY, como texto. "" = no se cargó.
    *  🔑 La FECHA DE CORTE no está acá a propósito: la pone el servidor al
    *  guardar, y solo cuando el número cambia. Ver la nota del PUT. */
@@ -207,7 +221,7 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
 const firma = (b: Borrador) =>
   `${b.nombre.trim()}|${b.salario.trim()}|${b.jornada}|${b.empresa}`
   + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}|${b.servicioProfesional}`
-  + `|${b.pagaSeguros}|${b.saldoVacaciones}`;
+  + `|${b.pagaSeguros}|${b.noMarcaReloj}|${b.saldoVacaciones}`;
 
 /**
  * ¿La baja está completa? La fecha y el motivo VIAJAN JUNTOS: una baja sin
@@ -269,6 +283,7 @@ export default function ConfiguracionTab() {
       motivoSalida: p.motivoSalida ?? "",
       servicioProfesional: p.servicioProfesional,
       pagaSeguros: p.pagaSeguros,
+      noMarcaReloj: p.noMarcaReloj,
       saldoVacaciones: p.saldoVacacionesDias === null ? "" : String(p.saldoVacacionesDias),
     };
     setAbierta(p.codigo);
@@ -326,6 +341,7 @@ export default function ConfiguracionTab() {
             motivoSalida: b.motivoSalida,
             servicioProfesional: b.servicioProfesional,
             pagaSeguros: b.pagaSeguros,
+            noMarcaReloj: b.noMarcaReloj,
             // Se manda el TEXTO tal cual, igual que el salario: el servidor
             // decide qué es un saldo válido y le pone la fecha de corte.
             saldoVacacionesDias: b.saldoVacaciones,
@@ -349,6 +365,7 @@ export default function ConfiguracionTab() {
               motivoSalida?: MotivoSalida | null;
               servicioProfesional?: boolean;
               pagaSeguros?: boolean;
+              noMarcaReloj?: boolean;
               saldoVacacionesDias?: number | null;
               saldoVacacionesCorte?: string | null;
             }
@@ -366,6 +383,7 @@ export default function ConfiguracionTab() {
           motivoSalida: (b.motivoSalida || null) as MotivoSalida | null,
           servicioProfesional: b.servicioProfesional,
           pagaSeguros: b.pagaSeguros,
+          noMarcaReloj: b.noMarcaReloj,
           saldoVacacionesDias: null,
           saldoVacacionesCorte: null,
         };
@@ -392,6 +410,12 @@ export default function ConfiguracionTab() {
                   // sigue pagando seguros. Nunca al revés — apagar un descuento
                   // por un `undefined` es dejar de retener sin que nadie lo pida.
                   pagaSeguros: p.pagaSeguros !== false,
+                  // 🔑 `=== true`, al revés que los seguros: si el servidor no
+                  // lo devolviera, la persona SIGUE marcando el reloj. Prender
+                  // un sueldo fijo por un `undefined` sería regalarle la
+                  // quincena a alguien que faltó, y eso no se ve hasta que ya
+                  // se pagó.
+                  noMarcaReloj: p.noMarcaReloj === true,
                   // 🔑 Lo que quedó GUARDADO, con la fecha de corte que puso el
                   // servidor. Pintar el borrador dejaría la pantalla diciendo
                   // una fecha y la base otra.
@@ -425,6 +449,7 @@ export default function ConfiguracionTab() {
               sinConfigurar: personas.filter((x) => x.activo && !x.configurado).length,
               sinSalario: personas.filter((x) => x.activo && x.faltaSalario).length,
               servicioProfesional: personas.filter((x) => x.activo && x.servicioProfesional).length,
+              noMarcaReloj: personas.filter((x) => x.activo && x.noMarcaReloj).length,
             },
           };
         });
@@ -483,6 +508,10 @@ export default function ConfiguracionTab() {
             // Y por lo mismo: sin esto, dar de baja le volvería a poner los
             // seguros a quien la contadora no se los descuenta.
             pagaSeguros: p.pagaSeguros,
+            // Y por lo mismo: sin esto, dar de baja volvería a medirle el reloj
+            // a quien cobra fijo, y su neto pasaría a depender de marcaciones
+            // que no existen.
+            noMarcaReloj: p.noMarcaReloj,
             // 🔴 Y por lo mismo otra vez: sin esto, dar de baja le BORRARÍA el
             // saldo de vacaciones —y con él la fecha de corte, que es lo único
             // que impide volver a restar días ya contados—.
@@ -670,6 +699,15 @@ export default function ConfiguracionTab() {
             {datos.avisoMigracionServicioProfesional && (
               <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
                 {datos.avisoMigracionServicioProfesional}
+              </p>
+            )}
+
+            {/* 🔑 El archivo que falta se NOMBRA en pantalla. Mientras no se
+                corra, Edwin no se puede marcar como sueldo fijo y hay que poder
+                saber por qué sin abrir el código. */}
+            {datos.avisoMigracionNoMarcaReloj && (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+                {datos.avisoMigracionNoMarcaReloj}
               </p>
             )}
 
@@ -913,6 +951,45 @@ export default function ConfiguracionTab() {
                                 <p className="mt-1 text-[12px] text-amber-800">
                                   Todavía no se le puede quitar el seguro a nadie: falta correr el
                                   archivo de la base de datos.
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              {/* 🔴 QUIÉN COBRA FIJO Y NO PASA POR EL RELOJ.
+                                  Daniel, textual: *"Edwin → crearle ficha con
+                                  $700/mes marcado como no marca el reloj"*. Sin
+                                  esto, Edwin caía en «no marcó ni un día» TODAS
+                                  las quincenas y el riesgo real era que una
+                                  nadie lo mirara y no cobrara. */}
+                              <Etiqueta
+                                texto={PREGUNTA_MARCA_RELOJ}
+                                ayuda={EXPLICACION_NO_MARCA_RELOJ}
+                              />
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button"
+                                  onClick={() => cambiarYGuardar(p.codigo, { noMarcaReloj: false })}
+                                  className={`${PILL_BASE} ${!borrador.noMarcaReloj ? PILL_ON : PILL_OFF}`}>
+                                  {ETIQUETA_MARCA_RELOJ}
+                                </button>
+                                <button type="button"
+                                  disabled={!datos.puedeMarcarSueldoFijo}
+                                  onClick={() => cambiarYGuardar(p.codigo, { noMarcaReloj: true })}
+                                  className={`${PILL_BASE} ${borrador.noMarcaReloj ? PILL_ON : PILL_OFF} disabled:opacity-40`}>
+                                  {ETIQUETA_NO_MARCA_RELOJ}
+                                </button>
+                              </div>
+                              {borrador.noMarcaReloj && (
+                                <p className="mt-1 text-[12px] text-gray-500">
+                                  {EXPLICACION_NO_MARCA_RELOJ}
+                                </p>
+                              )}
+                              {/* Igual que los dos de arriba: el aviso de que
+                                  todavía no se puede guardar se dice ANTES de
+                                  tocar, no al fallar. */}
+                              {!datos.puedeMarcarSueldoFijo && (
+                                <p className="mt-1 text-[12px] text-amber-800">
+                                  Todavía no se puede marcar sueldo fijo: falta correr el archivo
+                                  de la base de datos.
                                 </p>
                               )}
                             </div>

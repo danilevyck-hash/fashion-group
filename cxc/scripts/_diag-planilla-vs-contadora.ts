@@ -30,7 +30,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { armarReporte, type HorarioPersona, type Justificacion } from "@/lib/asistencia/reporte";
 import { aplicarCorrecciones, contarCorrecciones, type MarcacionConId } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
-import { leerReglas, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, pagaSegurosDeFila, leerJustificaciones, leerVacaciones } from "@/lib/asistencia/config-server";
+import { leerReglas, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, pagaSegurosDeFila, noMarcaRelojDeFila, leerJustificaciones, leerVacaciones } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango, motivoPeriodoParcial } from "@/lib/asistencia/vigencia";
 import { motivosDeQuienNoMarco } from "@/lib/asistencia/periodo";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -91,6 +91,7 @@ async function main() {
       jornadaSemanal: (f as any).jornada_semanal ?? null, empresa: (f as any).empresa ?? null,
       servicioProfesional: servicioProfesionalDeFila(f),
       pagaSeguros: pagaSegurosDeFila(f),
+      noMarcaReloj: noMarcaRelojDeFila(f),
     });
   }
   const nombres = new Map<string, string>();

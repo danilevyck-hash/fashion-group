@@ -43,6 +43,7 @@ import {
   type Quincena,
   type TotalesPlanilla,
 } from "@/lib/asistencia/planilla";
+import { CHIP_NO_MARCA_RELOJ } from "@/lib/asistencia/sueldo-fijo";
 import type { AvisoPeriodoAbierto, CodigoSinFicha } from "@/lib/asistencia/periodo";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
@@ -717,6 +718,13 @@ function Fila({
       <td className="sticky left-0 z-10 bg-white px-3 py-1.5 text-gray-900 hover:bg-gray-50">
         {l.etiqueta}
         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
+        {/* 🔑 Sin esto, los ceros de ausencias, tardanzas y extras se leen como
+            un error de cálculo. El chip dice que están en cero A PROPÓSITO. */}
+        {l.noMarcaReloj && (
+          <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">
+            {CHIP_NO_MARCA_RELOJ}
+          </span>
+        )}
       </td>
       {num(d.salarioQuincenal)}
       {num(d.extraDiurno)}
@@ -789,6 +797,7 @@ function Tarjeta({
           <span className="block truncate font-medium text-gray-900">{l.etiqueta}</span>
           <span className="text-xs text-gray-400">
             {l.codigo} · bruto ${$(d.totalBruto)}
+            {l.noMarcaReloj && ` · ${CHIP_NO_MARCA_RELOJ}`}
           </span>
         </span>
         <span className="shrink-0 text-right">
