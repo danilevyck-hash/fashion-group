@@ -92,6 +92,25 @@ describe("1 · el N° del transportista NO se copia a todos los envíos", () => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * La hoja se lee como la ve quien la abre: por ENCABEZADO y por fila, no por
+ * una letra escrita a mano. Si mañana se reordenan las columnas, el candado
+ * sigue midiendo la que dice medir en vez de una vecina.
+ */
+type Hoja = ReturnType<typeof buildGuiasSheet>;
+const FILA_HEADERS = 4; // título, subtítulo, separador y recién ahí los headers
+const celdaCruda = (ws: Hoja, addr: string) =>
+  String((ws[addr] as { v?: unknown } | undefined)?.v ?? "");
+function columnaDe(ws: Hoja, header: string): string {
+  for (let i = 0; i < 26; i++) {
+    const letra = String.fromCharCode(65 + i);
+    if (celdaCruda(ws, `${letra}${FILA_HEADERS}`) === header) return letra;
+  }
+  throw new Error(`No hay columna «${header}» en la fila ${FILA_HEADERS}`);
+}
+const celda = (ws: Hoja, header: string, fila: number) =>
+  celdaCruda(ws, `${columnaDe(ws, header)}${fila}`);
+
 describe("3 · el N° anotado TARDE se ve en el Excel y se puede buscar", () => {
   it("los números salen de las LÍNEAS, no de la cabecera", () => {
     const g = guia({
@@ -137,19 +156,61 @@ describe("3 · el N° anotado TARDE se ve en el Excel y se puede buscar", () => 
     expect(celdas).not.toContain("—");
   });
 
-  it("con varios distintos, el Excel los lista TODOS", () => {
+  /**
+   * ⚠️ ESTE TEST CAMBIÓ DE DIRECCIÓN, el mismo día y a propósito.
+   *
+   * 🩸 QUÉ AFIRMABA ANTES: que «con varios distintos, el Excel los lista
+   * TODOS» **en una sola celda** (`"TR-4471, TR-9999"`). Era lo correcto
+   * mientras el reporte fue una fila por GUÍA: con varios números, poner uno
+   * solo habría sido elegir por el que lee.
+   *
+   * 🔴 POR QUÉ AHORA AFIRMA LO CONTRARIO: el Excel pasó a **una fila por
+   * ENVÍO**, así que cada número tiene dónde ir — la fila de SU envío, al lado
+   * de SU cliente y SU factura. Ese cruce es para lo que sirve el reporte
+   * (reclamarle al transportista), y amontonarlos lo rompe: con `725, 724, 726`
+   * en un cuadrito no se sabe cuál va con cuál. Lo que antes era la solución
+   * pasó a ser el defecto.
+   *
+   * 🔑 LO QUE EL TEST SIGUE PROTEGIENDO, que es por lo que existe: el número
+   * sale de los RENGLONES y no de la cabecera. Ése fue el bug del 25-ago-2026
+   * —`g.numero_guia_transp` mostraba «—» en guías que sí lo tenían anotado,
+   * porque anotarlo tarde escribe UNA columna de UNA línea—, y por eso la
+   * cabecera va VACÍA acá: ninguna celda puede salir de ella.
+   */
+  it("con varios distintos, cada envío lleva el SUYO — y nunca amontonados", () => {
     const g = guia({
-      numero_guia_transp: "",
+      numero_guia_transp: "", // el que se anota tarde NO toca la cabecera
       guia_items: [
-        envio({ id: "a", orden: 1, numero_guia_transp: "TR-4471" }),
-        envio({ id: "b", orden: 2, numero_guia_transp: "TR-9999" }),
+        envio({ id: "a", orden: 1, cliente: "America Clasic", facturas: "F-1", numero_guia_transp: "TR-4471" }),
+        envio({ id: "b", orden: 2, cliente: "Jerusalem", facturas: "F-2", numero_guia_transp: "TR-9999" }),
       ],
     });
     const ws = buildGuiasSheet([g]);
+
+    // Dos envíos → DOS filas, y cada número en la fila de su envío.
+    expect(celda(ws, "Envío", 5)).toBe("1 de 2");
+    expect(celda(ws, "Envío", 6)).toBe("2 de 2");
+    expect(celda(ws, "Cliente", 5)).toBe("America Clasic");
+    expect(celda(ws, "Cliente", 6)).toBe("Jerusalem");
+    expect(celda(ws, "N° Guía Transp.", 5)).toBe("TR-4471");
+    expect(celda(ws, "N° Guía Transp.", 6)).toBe("TR-9999");
+    // El cruce que hace útil el reporte: este número ↔ esta factura.
+    expect(celda(ws, "Facturas", 5)).toBe("F-1");
+    expect(celda(ws, "Facturas", 6)).toBe("F-2");
+
     const celdas = Object.keys(ws)
       .filter((k) => !k.startsWith("!"))
       .map((k) => String((ws[k] as { v?: unknown }).v ?? ""));
-    expect(celdas).toContain("TR-4471, TR-9999");
+    // 🩸 El formato viejo, prohibido: ni la cadena exacta ni ninguna celda que
+    // junte los dos de cualquier otra forma.
+    expect(celdas).not.toContain("TR-4471, TR-9999");
+    for (const v of celdas) {
+      const juntos = ["TR-4471", "TR-9999"].filter((n) => v.includes(n));
+      expect(juntos.length, `la celda «${v}» amontona ${juntos.join(" + ")}`).toBeLessThanOrEqual(1);
+    }
+    // Y ninguna celda dice «—»: si el Excel mirara la cabecera (vacía), las dos
+    // lo dirían. Ése era exactamente el bug.
+    expect(celdas).not.toContain("—");
   });
 
   it("sin ningún número, sigue diciendo «—»", () => {

@@ -23,21 +23,31 @@
 
 import { Toast } from "@/components/ui";
 import GuiaForm from "./GuiaForm";
+import type { Guia } from "./types";
 import { useGuiaFormState } from "./useGuiaFormState";
 
 interface Props {
   id: string;
+  /**
+   * 🔴 LA GUÍA QUE LA PANTALLA YA CARGÓ — para no pedirla dos veces.
+   *
+   * 🩸 Abrir «Editar» costaba **6 pedidos** y la guía viajaba DOS VECES: la
+   * pantalla la pide para el despacho y este formulario la volvía a pedir al
+   * montarse. Además de la red, ese segundo viaje es lo que hacía que el
+   * formulario apareciera un instante DESPUÉS que la pantalla — el parpadeo.
+   */
+  guia: Guia | null;
   /** Cerrar la edición sin guardar. Se sigue en la misma guía. */
   onSalir: () => void;
   /** Un guardado que el servidor ACEPTÓ. La guía de la pantalla se relee. */
   onGuardado: () => void;
 }
 
-export default function EdicionGuia({ id, onSalir, onGuardado }: Props) {
+export default function EdicionGuia({ id, guia, onSalir, onGuardado }: Props) {
   // 🔴 `alGuardar` es lo que evita que guardar te saque de la guía. Sin esto el
   // hook hace `router.push("/guias")` —lo correcto cuando el formulario ES la
   // pantalla entera— y quien estaba por despachar terminaba en el listado.
-  const s = useGuiaFormState({ editingId: id, alGuardar: onGuardado });
+  const s = useGuiaFormState({ editingId: id, alGuardar: onGuardado, guiaInicial: guia });
 
   if (!s.loaded) {
     return (
@@ -63,8 +73,6 @@ export default function EdicionGuia({ id, onSalir, onGuardado }: Props) {
         setEntregadoPor={s.setEntregadoPor}
         observaciones={s.observaciones}
         setObservaciones={s.setObservaciones}
-        numeroGuiaTransp={s.numeroGuiaTransp}
-        setNumeroGuiaTransp={s.setNumeroGuiaTransp}
         items={s.items}
         transportistas={s.transportistas}
         direcciones={s.direcciones}
@@ -82,6 +90,12 @@ export default function EdicionGuia({ id, onSalir, onGuardado }: Props) {
         onRestoreRow={s.restoreRow}
         onSave={s.saveGuia}
         onCancel={onSalir}
+        // 🔴 UNA GUÍA YA DESPACHADA SE ABRE IGUAL, con tres cosas editables:
+        // N° del transportista, cliente y facturas. Los bultos NO — es lo que
+        // el transportista firmó. La regla vive en `campos-editables.ts` y la
+        // aplican también el hook (que guarda por columna, no por PUT) y el
+        // servidor.
+        soloCorregible={s.despachada}
         // No lleva a "Guías": cierra la edición y deja a la persona en la guía.
         etiquetaVolver="← Cerrar la edición"
       />

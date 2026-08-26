@@ -181,12 +181,13 @@ describe("⚠️ lo que NO se tocó sigue en pie", () => {
       .map((b) => (b.textContent || "").trim())
       .filter(Boolean);
 
-  it("Pendiente Bodega → Editar + Despachar + Imprimir", () => {
+  it("Pendiente Bodega → Editar + Despachar + Imprimir + Compartir", () => {
     const { container } = lista({ estado: "Pendiente Bodega" });
     const t = botones(container);
     expect(t.some((x) => /^Editar$/i.test(x))).toBe(true);
     expect(t.some((x) => /^Despachar$/i.test(x))).toBe(true);
     expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
+    expect(t.some((x) => /^Compartir$/i.test(x))).toBe(true);
   });
 
   it("Confirmada (legacy, sin despachar) → Editar + Imprimir", () => {
@@ -196,13 +197,28 @@ describe("⚠️ lo que NO se tocó sigue en pie", () => {
     expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
   });
 
-  it("Completada → solo Imprimir (una guía despachada sigue cerrada a edición)", () => {
-    // ⚠️ Esto NO lo cambió el retiro del rechazo: una guía que ya salió y se
-    // firmó no se edita, y ese candado es anterior (ver `useDespachoGuia`).
+  it("🔴 Completada → Editar + Imprimir + Compartir, pero NUNCA Despachar", () => {
+    // 🩸 ESTE CANDADO CAMBIÓ DE DIRECCIÓN, y es una decisión escrita de Daniel.
+    //
+    // Antes exigía que una guía despachada NO ofreciera «Editar». El resultado
+    // medido: a `/guias/[id]` de una `Completada` **solo se llegaba escribiendo
+    // la URL a mano**, y ahí adentro vive el N° del transportista. O sea que el
+    // chip ámbar "Falta N° transportista" marcaba 143 guías que **nadie podía
+    // destildar desde la pantalla**.
+    //
+    // Punto 9, textual: *"Entrar a una despachada → se entra igual que a
+    // cualquier otra"*. Y punto 4: adentro se corrigen **tres** cosas (N° del
+    // transportista · cliente · facturas), no todo — eso lo protegen
+    // `campos-editables.ts` y el candado de la ruta.
+    //
+    // 🔴 LO QUE **NO** SE AFLOJÓ, y es lo que este test sigue cuidando:
+    // «Despachar» NO aparece en una guía que ya salió. Una guía se despacha una
+    // sola vez.
     const { container } = lista({ estado: "Completada" });
     const t = botones(container);
     expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
-    expect(t.some((x) => /^Editar$/i.test(x))).toBe(false);
+    expect(t.some((x) => /^Compartir$/i.test(x))).toBe(true);
+    expect(t.some((x) => /^Editar$/i.test(x))).toBe(true);
     expect(t.some((x) => /^Despachar$/i.test(x))).toBe(false);
   });
 });

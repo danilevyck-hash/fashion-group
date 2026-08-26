@@ -17,6 +17,8 @@ import {
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
+import { despachadaIncompleta, textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
+import { tieneRenglones } from "@/lib/guias/tiene-renglones";
 
 /**
  * 🔴 LA GUÍA QUE SALIÓ SIN EL N° DEL TRANSPORTISTA, DICHO EN LA LISTA.
@@ -29,6 +31,26 @@ function FaltaNumeroTransp() {
   return (
     <span className="inline-flex items-center rounded-md bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 text-xs whitespace-nowrap">
       Falta N° transportista
+    </span>
+  );
+}
+
+/**
+ * 🔴 LA GUÍA QUE SALIÓ SIN PLACA, SIN QUIÉN RECIBIÓ O SIN CÉDULA.
+ *
+ * Daniel, punto 13: *"Las 68 sin placa y 65 sin recibido → marcadas para
+ * completarlas"*. De las 207 despachadas, 190 (92%) tienen algún dato en
+ * blanco: se cerraron cuando nada bloqueaba. El bloqueo se puso el 10-ago-2026
+ * y desde entonces son 0 de 15.
+ *
+ * ⚠️ **MARCA, NO ABRE.** Esos tres campos NO están entre las tres cosas que se
+ * pueden corregir en una guía firmada (N° del transportista · cliente ·
+ * facturas) y siguen cerrados. Esto es para poder ENCONTRARLAS.
+ */
+function SalioIncompleta() {
+  return (
+    <span className="inline-flex items-center rounded-md bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 text-xs whitespace-nowrap">
+      Salió incompleta
     </span>
   );
 }
@@ -186,6 +208,43 @@ export default function GuiasList({
     } finally {
       setImprimiendo(false);
     }
+  }
+
+  /**
+   * Abrir el acordeón **y pedir el módulo del papel**.
+   *
+   * 🩸 En iOS, la hoja de compartir y el visor de PDF solo se abren DENTRO del
+   * gesto del toque. Si el módulo se bajara al apretar «Compartir», el `await`
+   * de red haría que el navegador dejara de contarlo como gesto y la hoja no
+   * se abriría — y con un `catch` silencioso, sin decir por qué. Pedirlo acá lo
+   * deja en memoria antes de que el botón exista en pantalla.
+   */
+  function abrirFila(id: string) {
+    void import("@/lib/guias/papel-de-la-guia");
+    onToggleExpand(id);
+  }
+
+  /**
+   * 🔴 EL PAPEL DE **UNA** GUÍA: imprimir o compartir, de un toque.
+   *
+   * ⚠️ La guía que llega acá es la EXPANDIDA (`/api/guias/[id]`), que sí trae
+   * sus renglones. El listado no los trae completos, y un papel sin envíos es
+   * peor que no imprimir — por eso se pregunta antes.
+   *
+   * ⚠️ El `await import` resuelve de memoria: el módulo se pide al abrir el
+   * acordeón. Si tuviera que bajarlo acá, en iOS el navegador dejaría de
+   * considerar esto parte del toque y bloquearía la hoja de compartir.
+   */
+  async function imprimirEsta(g: Guia) {
+    if (!tieneRenglones(g)) return;
+    const { imprimirGuia } = await import("@/lib/guias/papel-de-la-guia");
+    imprimirGuia(g);
+  }
+
+  async function compartirEsta(g: Guia) {
+    if (!tieneRenglones(g)) return;
+    const { compartirGuia } = await import("@/lib/guias/papel-de-la-guia");
+    await compartirGuia(g);
   }
 
   async function exportSelectedExcel() {
@@ -387,7 +446,7 @@ export default function GuiasList({
                         <div className={`border rounded-lg transition-all ${statusBorderClass} ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
                           {/* Row header — desktop: inline row, mobile: stacked card */}
                           <button
-                            onClick={() => selectionMode ? toggleSelect(g.id) : onToggleExpand(g.id)}
+                            onClick={() => selectionMode ? toggleSelect(g.id) : abrirFila(g.id)}
                             className="w-full text-left text-sm min-h-[44px]"
                           >
                             {/* Desktop layout (md+) */}
@@ -408,6 +467,9 @@ export default function GuiasList({
                               </span>
                               {guiaSinNumeroTransp(g) && (
                                 <span className="shrink-0"><FaltaNumeroTransp /></span>
+                              )}
+                              {despachadaIncompleta(g) && (
+                                <span className="shrink-0"><SalioIncompleta /></span>
                               )}
                               <span className="w-24 shrink-0">
                                 <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
@@ -446,8 +508,11 @@ export default function GuiasList({
                                   <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
                                 </span>
                               </div>
-                              {guiaSinNumeroTransp(g) && (
-                                <div className="mt-1.5"><FaltaNumeroTransp /></div>
+                              {(guiaSinNumeroTransp(g) || despachadaIncompleta(g)) && (
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  {guiaSinNumeroTransp(g) && <FaltaNumeroTransp />}
+                                  {despachadaIncompleta(g) && <SalioIncompleta />}
+                                </div>
                               )}
                               {/* Cliente + destino visibles sin expandir (bodega ve a quién va) */}
                               {(clientesSummary(g.guia_items || []) || destinosSummary(g.guia_items || [])) && (
@@ -468,16 +533,26 @@ export default function GuiasList({
                                 <div className="py-6 flex justify-center"><svg className="animate-spin h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
                               ) : expandedGuia ? (
                                 <>
-                                  {/* 🩸 QUÉ SE PUEDE TOCAR, DICHO EN LA CABECERA.
-                                      Una guía Completada está cerrada: bultos, facturas,
-                                      placa y firmas no se editan más (el candado del PUT
-                                      sigue intacto). Pero el chip del cliente SÍ se toca, y
-                                      eso, sin explicación, se lee como si el despacho entero
-                                      fuera editable. Va acá arriba y UNA vez por guía — no
-                                      por línea, que lo repetiría cinco veces. */}
-                                  {isDispatched && puedeAtarCliente && (
-                                    <p className="text-xs text-gray-500 pt-3">
-                                      Solo se puede cambiar el cliente
+                                  {/* 🔴 ACÁ VIVÍA EL TERCERO DE LOS TRES TEXTOS QUE
+                                      SE CONTRADECÍAN: *"Solo se puede cambiar el
+                                      cliente"*. La guía decía *"lo único que se
+                                      puede cambiar es el N° del transportista"* y
+                                      el renglón decía *"es lo único que se puede
+                                      cambiar de una guía ya despachada"*. Tres
+                                      frases, tres respuestas distintas, y desde el
+                                      punto 4 las tres son FALSAS: se corrigen el N°
+                                      del transportista, el cliente Y las facturas.
+                                      Los tres se fueron (Daniel, punto 14). */}
+
+                                  {/* 🔴 LO QUE FALTÓ AL DESPACHAR, DICHO CON NOMBRE.
+                                      El chip de la fila dice "Salió incompleta"; acá
+                                      adentro se dice QUÉ falta, que es lo que
+                                      alguien necesita para ir a buscarlo. Marca, no
+                                      abre: placa, quién recibió y cédula siguen
+                                      cerradas. */}
+                                  {textoFaltantesDespachada(expandedGuia) && (
+                                    <p className="text-xs text-amber-800 pt-3">
+                                      {textoFaltantesDespachada(expandedGuia)}.
                                     </p>
                                   )}
 
@@ -507,7 +582,25 @@ export default function GuiasList({
                                       edición (candado en
                                       `guias-sin-rechazo.test.tsx`). */}
                                   <div className="flex items-center justify-end gap-2 pt-3 flex-wrap">
-                                    {canEdit && !isDispatched && (
+                                    {/* 🔴 «EDITAR» TAMBIÉN EN UNA GUÍA YA DESPACHADA
+                                        (Daniel, punto 9: *"se entra igual que a
+                                        cualquier otra"*).
+
+                                        🩸 Hasta hoy la fila de una Completada no
+                                        tenía ningún botón para ENTRAR: `/guias/[id]`
+                                        de una despachada solo se abría escribiendo la
+                                        URL a mano. Y ahí adentro viven el N° del
+                                        transportista y el aviso de la guía que salió
+                                        sin él — el chip ámbar marcaba guías que nadie
+                                        podía destildar desde la pantalla.
+
+                                        ⚠️ Entrar no es poder tocar todo: en una guía
+                                        firmada el formulario abre TRES cosas (N° del
+                                        transportista, cliente y facturas) y muestra el
+                                        resto como texto. La regla vive en
+                                        `campos-editables.ts` y la aplica también el
+                                        servidor. El candado del PUT no se tocó. */}
+                                    {canEdit && (
                                       <button
                                         type="button"
                                         onClick={() => onEditar(expandedGuia.id)}
@@ -539,9 +632,29 @@ export default function GuiasList({
                                         Despachar
                                       </button>
                                     )}
+                                    {/* 🔴 DOS BOTONES, Y CADA UNO HACE LO SUYO DE UNA.
+                                        Daniel, puntos 10 y 11: *"Imprimir → un botón
+                                        que imprime directo"* · *"Compartir → otro
+                                        botón que manda el PDF"*.
+
+                                        🩸 Había UNO solo, y no hacía ninguna de las
+                                        dos cosas: abría una PESTAÑA con la vista
+                                        previa, y adentro había que buscar «Imprimir» o
+                                        «Compartir». Dos toques y un cambio de pantalla
+                                        para cada tarea.
+
+                                        🔑 El documento es el MISMO para las dos y es
+                                        el de siempre (`construirPdfGuia`). No hay dos
+                                        papeles.
+
+                                        ⚠️ El módulo se pide al ABRIR el acordeón, no
+                                        al tocar el botón: en iOS la hoja de compartir
+                                        y el visor tienen que abrirse DENTRO del toque,
+                                        y una descarga de red en el medio hace que el
+                                        navegador deje de contarlo como gesto. */}
                                     <button
                                       type="button"
-                                      onClick={() => window.open(`/guias/${expandedGuia.id}/imprimir`, '_blank')}
+                                      onClick={() => { void imprimirEsta(expandedGuia); }}
                                       /* Medía 85.5×36 — el min-h-[36px] anterior se quedaba corto. */
                                       className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3 rounded hover:bg-gray-100 min-h-[44px]"
                                     >
@@ -551,6 +664,18 @@ export default function GuiasList({
                                         <rect x="6" y="14" width="12" height="8" />
                                       </svg>
                                       Imprimir
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { void compartirEsta(expandedGuia); }}
+                                      className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3 rounded hover:bg-gray-100 min-h-[44px]"
+                                    >
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 16V4" />
+                                        <path d="m8 8 4-4 4 4" />
+                                        <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+                                      </svg>
+                                      Compartir
                                     </button>
                                     {(() => {
                                       const menuItems = [

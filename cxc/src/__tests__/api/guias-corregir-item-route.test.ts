@@ -121,21 +121,131 @@ describe("🔴 escribe UNA fila, y solo los campos que vinieron", () => {
   });
 
   it("un campo que no está en la lista se ignora — no se cuela por el body", async () => {
-    await pedir({ itemId: ITEM_ID, bultos: 2, orden: 99, numero_guia_transp: "TR-9", deleted: true });
+    // 🔑 LA LISTA NO SE COPIA ACÁ: se LEE de `campos-editables.ts`, la fuente
+    // única. Este test se puso rojo el día que la lista creció con
+    // `numero_guia_transp` porque tenía su propia copia escrita a mano — la
+    // lección es no volver a tenerla, no arreglar la copia.
+    const { CAMPOS_DE_RENGLON } = await import("@/lib/guias/campos-editables");
+    const inventados = ["orden", "estado", "placa", "deleted", "guia_id", "receptor_nombre"];
+    for (const c of inventados) {
+      expect(CAMPOS_DE_RENGLON as readonly string[], c).not.toContain(c);
+    }
+
+    await pedir({
+      itemId: ITEM_ID,
+      bultos: 2,
+      ...Object.fromEntries(inventados.map((c) => [c, "colado"])),
+    });
     const upd = escrituras.find((e) => e.op === "update")!;
     expect(upd.datos).toEqual({ bultos: 2 });
   });
+
+  it("⚠️ y lo que SÍ está en la lista se escribe — `numero_guia_transp` entró el 18-ago", async () => {
+    // Es la otra mitad del test de arriba: si la lista se recortara, este campo
+    // dejaría de escribirse en silencio y nadie se enteraría.
+    const { CAMPOS_DE_RENGLON } = await import("@/lib/guias/campos-editables");
+    expect(CAMPOS_DE_RENGLON as readonly string[]).toContain("numero_guia_transp");
+    const r = await pedir({ itemId: ITEM_ID, numero_guia_transp: "TR-9" });
+    expect(r.status).toBe(200);
+    expect(escrituras.find((e) => e.op === "update")!.datos).toEqual({ numero_guia_transp: "TR-9" });
+  });
 });
 
-describe("🔴 el candado de la guía YA DESPACHADA sigue en pie", () => {
-  it.each(["Completada", "Rechazada"])("una guía %s se rechaza y no se escribe nada", async (estado) => {
-    guiaFila = { ...guiaFila, estado };
-    const r = await pedir({ itemId: ITEM_ID, bultos: 9 });
-    expect(r.json.error).toBe("Guía ya despachada, no se puede editar");
-    expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
-  });
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 ESTE BLOQUE SE DIO VUELTA — QUÉ AFIRMABA ANTES, Y POR QUÉ CAMBIÓ.
+//
+// Hasta el 24-ago-2026 exigía que una guía `Completada` o `Rechazada` se
+// rechazara ENTERA, con el mismo mensaje del PUT ("Guía ya despachada, no se
+// puede editar"). Daniel aprobó punto por punto que una guía YA DESPACHADA se
+// pueda corregir en TRES cosas y sólo tres: el **N° del transportista**, el
+// **cliente** y las **facturas**. El papel que sale con la factura equivocada
+// existe igual, y la única forma de arreglarlo era no tener el papel.
+//
+// Así que el filtro dejó de ser POR GUÍA y pasó a ser POR CAMPO
+// (`camposEditablesDeRenglon`): lo permitido se escribe, lo prohibido contesta
+// 400 y no toca una sola fila.
+//
+// 🔴 LO QUE SIGUE CERRADO, y es la mitad de esto:
+//   · **`bultos` — es lo que el transportista FIRMÓ.** Daniel: *"los bultos de
+//     una despachada NO se tocan"*. Es lo más importante de este archivo.
+//   · `direccion` y `empresa`: describen un envío que ya se hizo.
+//   · Un cuerpo MIXTO se rechaza ENTERO — media escritura sería peor que
+//     ninguna: dejaría la guía diciendo una cosa y el papel firmado otra.
+//   · Placa, receptor, cédula y **las dos firmas** no se tocan desde acá ni
+//     desde ninguna parte, y **el candado del PUT de `/api/guias/[id]` sobre una
+//     guía despachada quedó exactamente igual de duro** (lo vigila
+//     `guias-numero-transp-tarde-route.test.ts`).
+// ─────────────────────────────────────────────────────────────────────────────
+describe.each(["Completada", "Rechazada"])(
+  "🔴 en una guía %s se corrigen TRES campos, y sólo tres",
+  (estado) => {
+    beforeEach(() => {
+      guiaFila = { ...guiaFila, estado };
+    });
 
-  it("⚠️ atar cliente sigue yendo por SU endpoint, que no mira el estado", async () => {
+    it("las FACTURAS sí se escriben", async () => {
+      const r = await pedir({ itemId: ITEM_ID, facturas: "F-2002" });
+      expect(r.status).toBe(200);
+      const upd = escrituras.filter((e) => e.op === "update");
+      expect(upd).toHaveLength(1);
+      expect(upd[0].tabla).toBe("guia_items");
+      expect(upd[0].datos).toEqual({ facturas: "F-2002" });
+      // Acotado a la línea Y a la guía: sin el segundo, el id de cualquier
+      // renglón del sistema serviría para escribirle encima desde acá.
+      expect(upd[0].filtros.id).toBe(ITEM_ID);
+      expect(upd[0].filtros.guia_id).toBe(GUIA_ID);
+    });
+
+    it("el CLIENTE sí se escribe (nombre y código van juntos: son el mismo dato)", async () => {
+      const r = await pedir({
+        itemId: ITEM_ID,
+        cliente: "City Mall Paso Canoa",
+        cliente_codigo: "D-25",
+      });
+      expect(r.status).toBe(200);
+      const upd = escrituras.filter((e) => e.op === "update");
+      expect(upd).toHaveLength(1);
+      expect(upd[0].datos).toEqual({ cliente: "City Mall Paso Canoa", cliente_codigo: "D-25" });
+    });
+
+    it("🔴 los BULTOS se rechazan y NO se escribe nada — es lo que el transportista firmó", async () => {
+      const r = await pedir({ itemId: ITEM_ID, bultos: 9 });
+      expect(r.status).toBe(400);
+      expect(r.json.error).toBe(
+        "Esta guía ya se despachó: de un envío solo se pueden corregir el cliente, las facturas y el N° del transportista.",
+      );
+      expect(r.json.campos).toEqual(["bultos"]);
+      expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
+    });
+
+    it("la DIRECCIÓN y la EMPRESA también se rechazan, y sin escribir", async () => {
+      for (const campo of ["direccion", "empresa"] as const) {
+        escrituras = [];
+        const r = await pedir({ itemId: ITEM_ID, [campo]: "Fashion Wear" });
+        expect(r.status, campo).toBe(400);
+        expect(r.json.campos, campo).toEqual([campo]);
+        expect(escrituras.filter((e) => e.op === "update"), campo).toHaveLength(0);
+      }
+    });
+
+    it("🔴 un cuerpo MIXTO se rechaza ENTERO: la parte permitida tampoco se escribe", async () => {
+      const r = await pedir({ itemId: ITEM_ID, facturas: "F-2002", bultos: 9 });
+      expect(r.status).toBe(400);
+      expect(r.json.campos).toEqual(["bultos"]);
+      expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
+    });
+
+    it("nunca borra ni inserta renglones — eso es lo que hace `items` en el PUT", async () => {
+      await pedir({ itemId: ITEM_ID, facturas: "F-2002" });
+      await pedir({ itemId: ITEM_ID, bultos: 9 });
+      expect(escrituras.some((e) => e.op === "delete" || e.op === "insert")).toBe(false);
+      expect(escrituras.some((e) => e.tabla === "guia_transporte")).toBe(false);
+    });
+  },
+);
+
+describe("⚠️ atar cliente sigue teniendo su propio camino", () => {
+  it("va por SU endpoint, que no mira el estado", async () => {
     // Son dos cosas distintas y siguen separadas: el 98% de las guías está
     // cerrada, y atarles el cliente tiene que seguir siendo posible.
     const { readFileSync } = await import("node:fs");

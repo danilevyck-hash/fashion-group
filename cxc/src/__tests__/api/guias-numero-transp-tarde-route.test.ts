@@ -189,10 +189,68 @@ describe("🔴 el candado de la guía despachada NO se aflojó por esta puerta",
     expect((guia.match(/Guía ya despachada, no se puede editar/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 
-  it("la corrección de bodega SÍ mira el estado (es lo contrario de este endpoint)", () => {
-    const item = leer("src/app/api/guias/[id]/item/route.ts");
-    expect(item).toContain('guia.estado === "Completada"');
-    expect(item).toContain("Guía ya despachada, no se puede editar");
+  // ───────────────────────────────────────────────────────────────────────────
+  // ⚠️ ESTE TEST SE DIO VUELTA. Antes afirmaba que la corrección de bodega
+  // (`PATCH …/item`) rechazaba TODA guía despachada — "es lo contrario de este
+  // endpoint". Ya no: desde el 24-ago-2026 los DOS escriben en una guía que ya
+  // salió. La diferencia real es CUÁLES COLUMNAS, y es lo que se afirma acá.
+  //
+  //   · `…/numero-transp` toca UNA sola (`numero_guia_transp`) y **ni consulta
+  //     el estado** — no lo trae ni en el `select` de la guía.
+  //   · `…/item` **sí lo consulta** y filtra POR CAMPO: el cliente, las facturas
+  //     y el N° pasan; los bultos, la dirección y la empresa se rechazan.
+  //
+  // Se llama a los dos handlers de verdad y se mira qué se escribió: un barrido
+  // de texto no puede distinguir "mira el estado" de "lo usa para decidir".
+  // ───────────────────────────────────────────────────────────────────────────
+  it("los DOS escriben en una guía despachada — lo que cambia es qué columnas", async () => {
+    const pedirItem = async (body: Record<string, unknown>) => {
+      const { PATCH } = await import("@/app/api/guias/[id]/item/route");
+      const req = { json: async () => body } as never;
+      const res = await PATCH(req, { params: { id: GUIA_ID } });
+      return { status: res.status, json: (await res.json()) as Record<string, unknown> };
+    };
+
+    // La guía está `Completada` (lo pone el beforeEach). Este endpoint escribe.
+    const propio = await pedir({ itemId: ITEM_ID, numero_guia_transp: "TR-4471" });
+    expect(propio.json.error).toBeUndefined();
+    expect(escrituras.filter((e) => e.op === "update")).toHaveLength(1);
+
+    // Y la corrección de bodega TAMBIÉN escribe sobre la misma guía cerrada,
+    // mientras el campo esté entre los tres que se pueden corregir.
+    escrituras = [];
+    itemFila = { ...itemFila!, facturas: "F-1001", bultos: 4, direccion: "Paso Canoas" };
+    const permitido = await pedirItem({ itemId: ITEM_ID, facturas: "F-2002" });
+    expect(permitido.status).toBe(200);
+    expect(escrituras.find((e) => e.op === "update")!.datos).toEqual({ facturas: "F-2002" });
+
+    // 🔴 Pero ahí SÍ se mira el estado: los bultos de una despachada no se
+    // tocan — es lo que el transportista firmó.
+    escrituras = [];
+    const prohibido = await pedirItem({ itemId: ITEM_ID, bultos: 9 });
+    expect(prohibido.status).toBe(400);
+    expect(prohibido.json.campos).toEqual(["bultos"]);
+    expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
+  });
+
+  it("este endpoint ni se trae el estado de la base; el de bodega sí lo necesita", () => {
+    // La prueba de que el estado "no es una condición acá" no es un comentario:
+    // es que la guía se lee SIN esa columna, así que no hay con qué decidir.
+    // ⚠️ Se BORRAN LOS COMENTARIOS PRIMERO: los dos archivos explican en prosa
+    // qué hacen con el estado, y un barrido que los lea se cumple a sí mismo.
+    // En este repo ya pasó cuatro veces.
+    const sinComentarios = (t: string) =>
+      t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+    const mio = sinComentarios(leer("src/app/api/guias/[id]/numero-transp/route.ts"));
+    const selectGuiaMio = mio.match(/from\("guia_transporte"\)\s*\.select\("([^"]*)"\)/)!;
+    expect(selectGuiaMio[1]).not.toContain("estado");
+
+    const item = sinComentarios(leer("src/app/api/guias/[id]/item/route.ts"));
+    const selectGuiaItem = item.match(/from\("guia_transporte"\)\s*\.select\("([^"]*)"\)/)!;
+    expect(selectGuiaItem[1]).toContain("estado");
+    // Y lo usa para filtrar POR CAMPO, con la lista de `campos-editables.ts`.
+    expect(item).toContain("camposEditablesDeRenglon(guia.estado)");
   });
 
   it("este endpoint solo nombra la columna del N° — ninguna otra", () => {

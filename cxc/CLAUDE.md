@@ -1142,11 +1142,174 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - **Verificado por mutación, 13 de 13 cazadas** (`bash scripts/_mutar-candados-guias-dos-botones.sh`): la fila vuelve a un solo botón (los dos sentidos) · «Despachar» llama a lo mismo que «Editar» · «Despachar» aparece en una guía que ya salió · una DESPACHADA vuelve a ofrecer los dos · «Editar» cae en la pantalla de despachar · la guía ignora `?editar=1` · vuelve el segundo control del modo · «Cómo sale» desaparece de la lectura · el acordeón vuelve a la cabecera · el acordeón muestra uno solo · las cajas del N° vuelven a nacer prellenadas · el N° de la cabecera deja de decirse.
 > - 🩸 **EL SCRIPT DENUNCIA EL PATRÓN QUE NO MUTA NADA**, en vez de cantarlo como "SOBREVIVIÓ" — un rojo inventado sobre un candado que nunca se puso a prueba. Ya pasó dos veces acá (un em-dash, un espacio fino) **y una tercera en este mismo PR**: con `perl -0pi -e 's|…|…|'`, el `||` del código real hacía que la mutación **se pegara al principio del archivo**. Por eso el reemplazo es **LITERAL** (`scripts/_mutar-guias-aplicar.py`) y exige que el texto viejo aparezca las veces que se le dicen. El script trae además **una mutación de control que no matchea a propósito**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido con el comentario adentro.
 >
+> ### ✅ Los tres «Abiertos» de este PR se CERRARON al día siguiente
+>
+> Los tres entraron en la tanda de 15 puntos que Daniel aprobó el 25-ago-2026 (ver la sección de abajo):
+> - **A una guía DESPACHADA no se llegaba desde la pantalla** → ahora la fila ofrece «Editar» (punto 9). El candado `guias-sin-rechazo` cambió de dirección: exige «Editar» y sigue prohibiendo «Despachar».
+> - **«Corregir» por renglón vs «Editar»** → se retiró el «Corregir» (punto 1). El endpoint por columna no se retiró: pasó a ser el único camino para escribir en una guía firmada.
+> - *"Es lo único que se puede cambiar de una guía ya despachada."* → podado, junto con los otros dos textos que se contradecían (punto 14).
+
+## 🔴 Guías — «QUE SE SIENTA COMO UN PAPEL»: UN SOLO FORMULARIO, DE PUNTA A PUNTA (25-ago-2026)
+
+> Daniel, textual: ***"la guía se que sentir como un papel al entrar… debe de ser un formulario al crearlo, al editarlo, etc."*** · ***"se debe de poder crear una guía, todos los usuarios pueden abrirla, editarla etc, y cuando se complete marcarla como despachada y ya listo."***
+>
+> 🩸 **EL DIAGNÓSTICO: el módulo recibió ~10 cambios en 15 días y cada uno dejó su puerta.** Para corregir un renglón había DOS caminos en la misma pantalla («Corregir» por línea y «Editar»); el N° del transportista se pedía arriba **y** por línea; una guía despachada no se podía abrir desde ningún lado; y **tres textos distintos** decían tres cosas incompatibles sobre qué se podía tocar. Las 15 decisiones de abajo las aprobó Daniel punto por punto.
+>
+> ### 1 · UNA SOLA FORMA DE EDITAR
+>
+> Se retiró el **«Corregir» por renglón** de `ListaEnvios`. Abría una cajita con cliente, dirección, empresa, bultos y facturas — **exactamente los mismos campos** que el formulario de «Editar», con su propio botón de guardar, su propia validación y su propio idioma. Queda el formulario: el MISMO `GuiaForm` al crear, al editar y al corregir una guía firmada.
+> - ⚠️ **Las cajas del N° del transportista de `ListaEnvios` SE QUEDAN** y no son una tercera forma de editar: son parte de **DESPACHAR**. Se llenan con el papel del chofer en la mano y se confirman con las firmas, en el mismo acto. Por eso solo aparecen en una guía pendiente y solo para quien puede despachar.
+> - El endpoint por columna (`PATCH /api/guias/[id]/item`) **no se retiró**: pasó a ser el único camino para escribir en una guía FIRMADA (punto 4).
+>
+> ### 2, 3 y 9 · EL FLUJO, Y QUE A UNA DESPACHADA SE ENTRA
+>
+> Crear → cualquiera de los tres (admin · secretaria · bodega) la abre y la edita → cuando está completa, se marca despachada. **Nadie gana permisos**: `EDICION_ROLES` es el mismo conjunto de siempre y **vendedor sigue mirando sin tocar**.
+> - 🩸 **A una guía DESPACHADA no se llegaba desde la pantalla**: `/guias/[id]` de una `Completada` **solo se abría escribiendo la URL a mano**, y ahí adentro vive el N° del transportista. O sea que el chip ámbar marcaba **143 guías que nadie podía destildar desde la interfaz**. Ahora la fila de una despachada ofrece «Editar» como cualquier otra.
+> - ⚠️ **«Despachar» NO aparece en una guía que ya salió.** Una guía se despacha una sola vez, y ese candado cambió de nombre pero no de fuerza (`guias-sin-rechazo.test.tsx`).
+>
+> ### 4, 5 y 6 · 🔴 LA GUÍA DESPACHADA: **TRES COSAS**, Y LOS BULTOS NO
+>
+> Daniel: *"Se puede corregir **N° del transportista · cliente · facturas**"* · *"los **bultos** de una despachada **NO se tocan** — es lo que el transportista firmó"* · *"la **firma** queda la vieja. No se vuelve a firmar"*.
+>
+> Se abre el MISMO formulario, con esas tres cosas como campos y **todo lo demás como TEXTO** — la fecha, el modo, el transportista, quién despachó, las observaciones, la dirección, la empresa y los bultos. Un campo que parece editable y no deja escribir es peor que no mostrarlo.
+> - 🔑 **La regla vive en UN módulo, `src/lib/guias/campos-editables.ts`, y la LEEN los tres lugares que la aplican**: el formulario (qué dibuja), el endpoint (qué acepta) y el candado. Con tres copias, el día que una cambiara la pantalla ofrecería un campo que el servidor rechaza — o peor, al revés.
+> - 🔴 **EL CANDADO DEL PUT NO SE TOCÓ.** Una guía `Completada` lo sigue rechazando entero. Las tres correcciones van por **escrituras POR COLUMNA**: `PATCH …/numero-transp` para el N° y `PATCH …/item` para cliente y facturas — el molde que ya existía **por exactamente esta razón**: `items` en el PUT es un reemplazo completo (borra e inserta con **ids nuevos**) y con eso se pierden el cliente atado y el N° anotado tarde. Corregir una factura no puede costar eso.
+> - **El endpoint filtra POR CAMPO, no por estado.** Un cuerpo con `bultos` sobre una guía firmada se rechaza con 400 **y no escribe nada**; un cuerpo MIXTO (`{facturas, bultos}`) se rechaza **entero** — media escritura sería peor que ninguna.
+> - **No se agregan ni se quitan envíos** de una guía que ya viajó: sería inventar (o borrar) mercancía.
+> - ⚠️ **Y NO AUTOGUARDA.** El autoguardado de 1,5 s vive para que bodega no pierda renglones en el celular; sobre un papel ya firmado sería una escritura que nadie pidió. Se tapa por los dos lados: el formulario no dispara el temporizador y el hook ignora los guardados silenciosos en ese modo.
+> - **Las escrituras que no cambian nada no se hacen**: abrir una guía firmada, mirarla y guardar no manda un solo pedido — el botón ni se enciende.
+>
+> ### 7 · 🔴 EL N° DEL TRANSPORTISTA, **POR LÍNEA Y AL LADO DE LOS BULTOS**
+>
+> El campo de CABECERA salió del formulario. El transportista arma VARIAS guías suyas por cada guía nuestra (*"nos hacen varias guias el transportista por guia"*, 10-ago-2026): preguntarlo una sola vez arriba era pedir el dato equivocado. Ahora se pide **renglón por renglón**, pegado a los bultos, en móvil y en escritorio — y sale así en el acordeón, el papel, el PDF y el Excel.
+> - 🩸 **Y ACÁ ESTABA LA TRAMPA: la columna `guia_transporte.numero_guia_transp` NO se retira.** La leen el buscador de la lista, el Excel, el chip ámbar y el encabezado del papel, y **las guías viejas heredan de ella**. Si el formulario dejara de mandarla, el PUT escribiría `null` y **le borraría el número a toda guía que alguien editara**. Se sigue escribiendo, **DERIVADA** de los renglones con la MISMA función que usa el despacho (`numeroCabeceraAlDespachar`): gana la línea si alguna trae número, y si ninguna trae **se conserva el que ya estaba**.
+> - 🩸 **Y ESO ABRÍA UN SEGUNDO AGUJERO, que costó un arreglo aparte: el formulario NACÍA SUCIO.** Desde el 18-ago el N° se puede anotar tarde, y eso escribe UNA columna de UNA línea **sin tocar la cabecera** — o sea que hay guías con la cabecera vacía y `725` en un renglón. Con el N° derivado, la referencia (`""`, lo guardado) y lo actual (`"725"`, lo derivado) diferían **apenas se abría la guía**: la pantalla decía *"Sin guardar"* sin que nadie tocara una tecla, y en una guía firmada eso además **encendía el botón de guardar**. Es exactamente lo que `cambios-form.ts` vino a matar: *cargar la guía no puede producir una diferencia contra sí misma*. La instantánea de referencia usa ahora la misma derivación (`instantaneaDeLoGuardado`).
+> - **El Excel pasó a UNA FILA POR ENVÍO.** Antes GT-229 salía en una fila con `725, 724, 726` amontonados en una celda, los clientes resumidos como *"America Clasic y 3 mas"* y las cuatro facturas pegadas con comas. Este reporte sirve justo para **reclamarle al transportista**, y para eso hay que poder cruzar **su** número con **esa** factura y **ese** cliente. Columnas: `N° Guía · Fecha · Transportista · Envío · Cliente · Destino · Empresa · Facturas · Bultos · N° Guía Transp. · Estado`; la columna «Envío» dice `"2 de 4"`. **Las columnas viejas están todas** y el total de bultos no se movió (se sigue sumando `total_bultos` por guía: una guía sin renglones conserva el suyo).
+> - ⚠️ **Y el listado tuvo que traer tres columnas más** (`direccion`, `empresa`, `orden`): el Excel se arma con lo que trae `/api/guias`, y sin ellas las columnas «Destino» y «Empresa» salían vacías — **«Empresa» ya salía vacía antes**, y nadie lo había notado porque el resumen por guía las juntaba en una celda.
+>
+> ### 8 · Nuestro N° (GT-230) sigue siendo general, por guía. No se tocó.
+>
+> ### 10 y 11 · IMPRIMIR IMPRIME, Y COMPARTIR MANDA EL PDF
+>
+> 🩸 Había **un** botón y no hacía ninguna de las dos cosas: abría una PESTAÑA con la vista previa y adentro había que buscar «Imprimir» o «Compartir». Ahora son dos botones, y cada uno hace lo suyo **de un toque**, en la fila de la lista y en la pantalla de la guía.
+> - 🔑 **El documento es el MISMO para las dos y es el de siempre** (`construirPdfGuia`): el papel impreso y el PDF que se manda por WhatsApp son el mismo archivo, salvo la orden de imprimirse que `autoPrint()` le agrega al que va a la impresora. **No hay dos papeles.**
+> - 🩸 **Y hay dos caminos porque hay dos mundos, no por gusto** (`src/lib/imprimir-pdf.ts`): en **escritorio** el PDF se carga en un `<iframe>` escondido y el propio documento pide imprimirse — el diálogo aparece encima de la guía, sin cambiar de pantalla; en **iPhone y iPad** Safari **no ejecuta esa orden dentro de un iframe**, así que se abre el visor del sistema, que trae su propio botón de AirPrint. Es un toque igual, y es el único camino que de verdad llega a la impresora. El iPad moderno se anuncia como "Macintosh": se lo distingue por `maxTouchPoints`.
+> - ⚠️ **El PDF se arma SIN un solo `await` en el medio.** Safari en iOS solo deja abrir la hoja de compartir (y una pestaña) DENTRO del gesto del toque. Por eso el módulo del papel **se pide al ABRIR el acordeón**, no al tocar el botón: una descarga de red en el medio hace que el navegador deje de contarlo como gesto y lo bloquee **con un `catch` silencioso**, sin decir por qué.
+>
+> ### 12 · GUARDAR UNA GUÍA NUEVA TE DEJA **EN LA GUÍA**
+>
+> 🩸 Se terminaba de cargar la guía, se apretaba «Guardar Guía» y la pantalla saltaba a `/guias` — justo cuando lo siguiente que hace la secretaria es **imprimirla para dársela al chofer**. Había que buscarla en la lista, abrir el acordeón y recién ahí imprimir. Ahora aterriza en `/guias/<id>`, con «Imprimir» y «Compartir» a la vista.
+> - ⚠️ Si el servidor no devolviera el id (no debería: el POST responde la guía insertada), se vuelve al listado como siempre. Quedarse quieto sin decir nada sería peor.
+>
+> ### 13 · LO QUE FALTÓ AL DESPACHAR, **MARCADO**
+>
+> Medido contra producción: de las **207 guías despachadas**, **143 sin N° de transportista · 68 sin placa · 65 sin «Recibido por» · 190 de 207 (92%) con al menos uno**. Se cerraron así porque durante meses nada bloqueaba: el bloqueo de placa/receptor/cédula se puso el 10-ago-2026 y desde entonces son **0 de 15** — es una deuda del pasado, no un agujero abierto.
+> - En la lista, un chip **«Salió incompleta»**; adentro, la frase con nombre: *"Salió sin la placa y la cédula"*.
+> - 🔴 **MARCA, NO ABRE.** Placa, quién recibió y cédula **NO** están entre las tres cosas que se pueden corregir, y el candado del PUT las rechaza igual. Hay un candado que lo prueba al revés: ninguno de los tres puede aparecer en `CAMPOS_DESPACHADA`. **Completarlas es otra decisión y no se tomó** — ver *Abiertos*.
+> - ⚠️ Solo se marca lo que **YA SALIÓ**: en una pendiente todavía se está llenando el dato, y acusarla sería ruido en la única pantalla donde bodega mira el trabajo del día. Y **a una entrega directa no se le pide placa**: es nuestro propio camión.
+> - ⚠️ Para esto el listado tuvo que traer `cedula` (un TEXT de 13 caracteres; las firmas base64 siguen fuera). Sin ella marcaría a TODAS las guías.
+>
+> ### 14 · 🔴 LOS TRES TEXTOS QUE SE CONTRADECÍAN, FUERA LOS TRES
+>
+> Sobre la MISMA guía despachada, tres frases decían tres cosas distintas:
+>
+> | Dónde | Qué decía |
+> |---|---|
+> | `/guias/[id]` | *"Esta guía ya se despachó: no se puede editar. Lo único que se puede cambiar es el **N° del transportista** de cada envío."* |
+> | El renglón (`ListaEnvios`) | *"Es lo único que se puede cambiar de una guía ya despachada."* |
+> | El acordeón (`GuiasList`) | *"Solo se puede cambiar **el cliente**"* |
+>
+> Y desde el punto 4 las tres son además **FALSAS**. **Lo que las reemplaza no es un cuarto texto: es que se VEA** — el formulario dibuja como campo solo lo que se puede tocar. El candado hace el barrido **sobre el código SIN comentarios** y además prohíbe que la promesa vuelva disfrazada (*"lo único que se puede…"*, *"solo se puede cambiar…"*), porque en este repo un barrido de texto ya se cumplió **cuatro veces** con el comentario que explicaba el cambio.
+>
+> ### 15 · 🔴 EL PARPADEO AL TOCAR «EDITAR»
+>
+> 🩸 **Tres causas, y hacían falta las tres:**
+> 1. La pantalla nacía en modo LECTURA (`useState(false)`) y un `useEffect` leía `?editar=1` **después del primer dibujo** → se pintaba la guía entera (datos, envíos, bloque de despacho) y un instante después se reemplazaba por el formulario. **Ahora se lee en el inicializador perezoso** (`abrirEnEdicion`, módulo puro y por eso probable sin navegador). En el servidor no hay `window`, y da igual: hasta que `authChecked` sea true la página devuelve `null`, así que el HTML del servidor y el primer dibujo del navegador son los dos vacíos — no hay hidratación que pueda diferir.
+> 2. `enEdicion` exigía **que la guía ya estuviera cargada** (`&& !!g`) → mientras viajaba, la pantalla caía en lectura y dibujaba SU esqueleto. Ahora el modo lo decide quien apretó el botón, y lo que se muestra mientras carga es **el esqueleto del formulario**.
+> 3. `<EdicionGuia>` **volvía a pedir la misma guía**. Eran **6 llamadas** para abrir «Editar», con la guía viajando **dos veces**. Ahora se le pasa ya cargada (`guia={g}`) y el hook no la vuelve a pedir (`yaSembrada`).
+>
+> 🩸 **Y al cerrar, la URL seguía diciendo `?editar=1`**: recargar, compartir el enlace o darle "atrás" reabría el formulario que la persona acababa de cerrar. `urlDeLaGuia` la limpia con `replace` (con `push`, el "atrás" reabriría el formulario) y **conserva los demás parámetros**.
+>
+> ### 🔴 LO QUE **NO** SE TOCÓ
+>
+> El **candado del PUT** sobre una guía despachada · `PATCH …/cliente` sigue sin mirar el estado · **placa, receptor, cédula y las DOS firmas siguen bloqueando el despacho** y el N° del transportista **no** · **la lista NO despacha** (ni por swipe ni desplegando nada) y «Despachar» sigue teniendo **una sola puerta** · **entrega directa** no lleva placa ni transportista y el `"0"` pelado se trata como vacío · el **papel impreso conserva su formato y su pie legal** · **nadie gana permisos**.
+>
+> ### Verificación
+>
+> **PDF y papel, generados de verdad y leídos con `pdftotext`** (`npx tsx scripts/_verif-guias-papel-pdf.ts`, **33 ✅ / 0 🔴**): con **varios N° distintos** el encabezado **no anuncia ninguno** y cada número sale en la fila de su envío; con **uno solo** el encabezado sí lo anuncia; la **herencia** funciona; el `"0"` pelado no se imprime; `__other__` no aparece nunca; el pie legal está completo y textual. `construirPdfGuias([g])` es **byte por byte** el mismo documento que `construirPdfGuia(g)` salvo `/CreationDate` y `/ID` (19.957 bytes los dos) y **sin hoja en blanco al principio**; con 3 guías, 3 páginas exactas.
+>
+> **Excel, escrito a disco y leído con DOS parsers** (`npx tsx scripts/_verif-guias-excel.ts`, **44 ✅ / 0 🔴**): `xlsx-js-style` y **openpyxl 3.1.5** dan `A1:K14`, 14×11, y la comparación **celda por celda da 154 celdas, 0 distintas**. Los dos confirman: 4 envíos = **4 filas** con su cliente/factura/N° cada una; **ninguna celda amontona dos N° distintos**; «Envío» dice `1 de 4 … 4 de 4`; bultos **numéricos**; totales `4 guías · 7 envíos · 36 bultos`; la guía **sin renglones sigue apareciendo**; el `"0"` pelado sale `«—»`.
+> - Los dos verificadores traen **controles de mutación en memoria** (5 de 5 y 6 de 6 cazadas) y un **guard anti-vacuo** que revienta si el lector no ve una guía — un verificador que no puede fallar no verifica nada.
+>
+> ### Medición
+>
+> **Los 3 anchos + el iPad acostado, en el navegador contra el build de producción y CONTRA `origin/main`** (`BASE=… ETAPA=antes|despues node scripts/_medir-guias-formulario-unico-anchos.mjs`, solo lectura), en **seis pantallas**: la lista con una **pendiente REAL** abierta (GT-230) · la lista con una **despachada REAL** (GT-227) · la guía pendiente en lectura · la misma con el formulario abierto · **la despachada con el formulario abierto** (la pantalla nueva) · `/guias/nueva`.
+>
+> | | main | después |
+> |---|---|---|
+> | arrastre de página (24 casos) | **0** | **0** |
+> | textos < 12 px (24 casos) | **0** | **0** |
+> | tocables < 44 px | 0 · 1 · 9 según pantalla | **idénticos**, salvo la despachada-editar (ver abajo) |
+> | recortados, lista (390·834·1024·1440) | 0 · 15 · 19 · 4 | **2** · 15 · 19 · 4 |
+> | recortados, pendiente editando | 3 · 3 · 4 · 3 | 3 · 3 · **5** · 3 |
+> | recortados, resto | 3 · 3 · 3 · 3 · 0 · 0 · 1 · 0 | **idénticos** |
+>
+> - 🔴 **LAS DOS DIFERENCIAS, DICHAS DE FRENTE:**
+>   - **La despachada con el formulario abierto pasa de 0 a 12 tocables bajo 44 px** a 834/1024/1440 (a 390 sigue en **0**). Son los campos densos de `pointer:fine` que `GuiaForm` usa a propósito en escritorio (`CTRL_BASE`) — **los mismos que main ya mide en `/guias/nueva` y en la guía pendiente editando (9)**. En main ese caso daba 0 porque **la pantalla no existía**: una guía despachada no se podía abrir. Es el formulario, no un defecto nuevo.
+>   - **La lista a 390 pasa de 0 a 2 recortados**, y son los dos resúmenes `«Cliente · Destino»` de la fila colapsada (`City Mall Paso Canoa y 3 más · Paso Canoas`). 🩸 **Es un texto que main NUNCA pudo mostrar**: `destinosSummary` lee `guia_items.direccion`, y el listado **no seleccionaba esa columna** — o sea que el destino estaba escrito en el código y salía **siempre vacío**. Ahora viaja (lo necesita el Excel por envío) y el `truncate` que lo corta **ya estaba escrito para eso**.
+>   - **+1 recortado a 1024 editando una pendiente** (4 → 5): el `<select>` de empresa y los campos de cliente del formulario, con puntos suspensivos. Los tres son `truncate`, no dato inalcanzable.
+> - **Crece hacia abajo, que es lo único que una pantalla puede regalar**: la despachada a 390 pasa de 1.294 px (lectura) a 3.152 px con el formulario abierto.
+> - 🔴 **NO SE TOCÓ NINGUNA GUÍA REAL.** El navegador **aborta todo pedido que no sea GET**; nunca se apretó «Despachar» ni «Guardar». Las únicas escrituras bloqueadas son los POST de Sentry, **idénticos en main**.
+>
+> **EL PARPADEO, y las llamadas** (`BASE=… ETAPA=antes|despues [MODO=clic] [FINO=1] node scripts/_medir-guias-parpadeo-editar.mjs`, capturas a 0 / 100 / 300 / 1000 ms **y un muestreo cada 40 ms** — cuatro instantes sueltos pueden caer justo en el hueco):
+>
+> | | main | después |
+> |---|---|---|
+> | por la URL (`?editar=1`, recarga) | vacío → esqueleto 372 ms → formulario **947 ms** | vacío → esqueleto 367 ms → formulario **595 ms** |
+> | por el CLIC de la fila (el camino real) | la fila no tenía «Editar» | lista → esqueleto **232 ms** → formulario **541 ms** |
+> | cuadros en modo LECTURA | ninguno | **ninguno** |
+> | llamadas para abrir «Editar» | **6** | **5** (4 entrando por el clic) |
+> | veces que viaja la guía | **2** | **1** |
+> | la URL al CERRAR la edición | sigue diciendo `?editar=1` | **`/guias/<id>` limpia** |
+>
+> - 🩸 **Y EL DEFECTO QUE LA MEDICIÓN CAZÓ, que ningún test de jsdom podía ver:** con solo el inicializador perezoso, **llegar por «Editar» DESDE LA LISTA aterrizaba en LECTURA y no abría nunca** — corregir un nombre costaba **3 toques en vez de 2**, y corregir una factura de una despachada era **imposible**. Recargando esa MISMA URL sí abría, que es lo que lo hacía invisible. La causa: `router.push` de Next actualiza `window.location` y renderiza la ruta nueva **sin garantizar el orden**, así que el inicializador leía la dirección VIEJA. En jsdom la URL ya está puesta antes de montar, así que el candado pasaba en verde. Se tapó con un `useLayoutEffect` —**antes del pintado**, no un `useEffect`— y **el script ahora muere con `exit≠0` si `?editar=1` no abre el formulario**: ese defecto no se puede volver a colar en silencio.
+>
+> **TOQUES POR TAREA** (`BASE=… node scripts/_medir-guias-toques-por-tarea.mjs`, tocando de verdad, no estimando):
+>
+> | Tarea | main | después |
+> |---|---|---|
+> | crear una guía | 1 | **1** |
+> | corregir un nombre (pendiente) | 3 | **2** |
+> | despachar | 2 | **2** |
+> | **imprimir** | **3** (2 hasta la pestaña + otro «Imprimir» adentro) | **2, y sale el papel** — 0 pestañas nuevas, 1 PDF armado, 1 iframe |
+> | **compartir** | **3** (no está en la fila: vive dentro de esa vista previa) | **2** desde la fila |
+> | **corregir una factura (despachada)** | ⛔ **imposible desde la pantalla** | **2** |
+>
+> **Y el peso, que no podía subir**: `/guias` **196 kB** y `/guias/[id]` **203 kB** de carga inicial — main mide **196** y **204**. 🩸 La primera versión los dejaba en **344 y 351 kB**: importar `papel-de-la-guia` de arriba arrastraba **jsPDF (~148 kB)** a las dos pantallas que bodega abre desde el celular todo el día. El generador se pide con `await import(…)` y **se precarga al abrir el acordeón / al entrar a la guía**, para que el toque no espere red — en iOS, un `await` de red en el medio hace que el navegador deje de contarlo como gesto y **no abra la hoja de compartir, en silencio**. La pregunta barata («¿esta guía trae renglones?») se mudó a `lib/guias/tiene-renglones.ts` justamente para que hacerla no cueste el PDF.
+>
+> ### Candados
+>
+> Casi todos de **CONDUCTA** — montan la pantalla real y tocan los botones. Un barrido de texto sobre el `.tsx` **no puede ver** lo único que importa acá (que los bultos de una guía firmada no se dejen escribir, que lo que se guarda salga por columna, que el papel salga de un toque), y en este repo ya se cumplió **cuatro veces** con el comentario que explicaba el cambio.
+>
+> | Archivo | Qué prueba |
+> |---|---|
+> | `components/guias-anotar-numero-tarde.test.tsx` (21) | 🔴 **el corazón**: una guía firmada abre los TRES campos y **NO** los bultos, la dirección, la empresa ni la cabecera; no se firma de nuevo; no se agregan envíos; lo que se corrige sale por `PATCH …/numero-transp` y `PATCH …/item` con su `itemId`; **NUNCA un PUT ni `items`**; solo se escribe el renglón que cambió; mirar y guardar no escribe; esperar no autoguarda; el error del servidor se ve en pantalla |
+> | `components/guias-papel-y-marcas.test.tsx` (11) | «Imprimir» imprime y **no abre una pestaña**; «Compartir» es OTRO botón y no imprime; la guía sin renglones no se imprime; el chip «Salió incompleta» y la frase con nombre; una pendiente **no** se marca; **marca, no abre**; y guardar una guía nueva **aterriza en la guía** |
+> | `components/guias-lista-unica-envios.test.tsx` (9) | el «Corregir» por renglón **ya no existe**; el camino que queda abre los 7 envíos editables; la lista de solo lectura no convive con el formulario; abrir y no tocar nada **no escribe** |
+> | `components/guias-editar-en-la-misma-pantalla.test.tsx` (21) | una despachada ofrece «Editar» y el formulario abre, pero **no** se le agregan envíos ni se le tocan los bultos ni se vuelve a despachar |
+> | `components/guias-sin-rechazo.test.tsx` (11) | `Completada` → Editar + Imprimir + Compartir, **nunca Despachar** |
+> | `lib/guias-campos-editables.test.ts` (22) | la regla sola: antes de salir todo, después las tres; nada del despacho se cuela; las escrituras que no cambian nada no se hacen |
+> | `lib/guias-abrir-en-edicion.test.ts` (10) | solo `?editar=1` abre; un query roto no tumba la pantalla; la URL se limpia al cerrar y conserva los demás parámetros |
+> | `lib/guias-faltantes-despacho.test.ts` (12) | qué se marca y **a quién no**; el `"0"` pelado no es placa; y —al revés— que ninguno de los tres marcados esté en `CAMPOS_DESPACHADA` |
+> | `api/guias-corregir-item-route.test.ts` | sobre una `Completada` y una `Rechazada`: facturas y cliente **SÍ**, bultos/dirección/empresa **400 sin escribir**, y un cuerpo MIXTO se rechaza **entero** |
+> | `lib/guias-chip-nombre-y-candado.test.ts` (10) | los tres textos se fueron **y no vuelven disfrazados** — el barrido va sobre el código **sin comentarios** |
+> | `excel-exports-operacion.test.ts` · `iphone-targets-guias.test.ts` · `lib/guias-numero-por-linea-y-papel.test.ts` | el Excel por envío, leído celda por celda; y que la tabla densa siga detrás de `lg:` y su ancho contenido por el `ScrollableTable` |
+>
 > ### ⚠️ Abiertos, para que los decida Daniel (no se construyeron)
 >
-> - 🔴 **A una guía DESPACHADA no se llega desde la pantalla.** La fila no tiene botón de entrar, así que `/guias/[id]` de una `Completada` **solo se abre escribiendo la URL** — y ahí viven *"Anotar el N°"* (la excepción del 18-ago) y el aviso *"Esta guía salió sin el N° del transportista"*. El chip ámbar de la lista marca guías que **nadie puede destildar desde la interfaz**. El arreglo sería un botón «Ver» en la fila; **no se hizo** porque el candado `guias-sin-rechazo` fija *"Completada → solo Imprimir"* y eso es decisión escrita.
-> - **«Corregir» por renglón vs «Editar»**: en la guía pendiente conviven dos caminos para arreglar cliente/dirección/empresa/bultos/facturas. `PATCH …/item` escribe UNA fila sin rotar ids; el PUT reemplaza los renglones. Retirar uno tiene costo real, así que queda anotado.
-> - *"Tócalo y se llenan los tres campos. Puedes cambiarlos después."* y *"Es lo único que se puede cambiar de una guía ya despachada."*: candidatos a poda, **no podados** — el primero quita miedo a tocar, el segundo aparece ARRIBA del bloque que dice lo mismo.
+> - 🔴 **Las 68 sin placa y las 65 sin «Recibido por» quedan MARCADAS, no completables.** Daniel escribió *"marcadas para completarlas"*, y marcar es lo que se construyó: **abrirlas contradiría el punto 4**, que nombra exactamente tres campos (N° del transportista · cliente · facturas) y no incluye placa ni receptor, y el punto 5 sobre lo que el transportista firmó. Si además quiere poder ESCRIBIRLAS en una guía cerrada, es una decisión nueva: son 133 documentos ya firmados y hay que decidir si se anota "lo que faltó" o se corrige "lo que dice el papel".
+> - **`/guias/[id]/imprimir` sigue existiendo** con su vista previa y sus botones. Ya no se llega desde ninguna parte (los dos botones hacen la tarea de una), pero la ruta no se borró: un enlace guardado seguiría abriendo lo que abría. Retirarla es una poda aparte.
+> - **El «Corregir» retirado dejaba de rotar los ids**, y el formulario de una guía PENDIENTE sí los rota (usa el PUT). No se pierde nada —el formulario reenvía `cliente_codigo` y el N° de cada línea, y el borrador del despacho guarda los N° tecleados por posición— pero si algún día una guía pendiente llegara a tener otro dato atado por `guia_items.id`, esto habría que revisarlo.
 
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)

@@ -84,31 +84,64 @@ describe("el chip dice el NOMBRE del cliente, no solo el código", () => {
   });
 });
 
-describe("en una guía despachada se dice qué se puede tocar", () => {
-  const RE_AVISO = /\{isDispatched && puedeAtarCliente && \(\s*<p/;
+describe("🔴 LOS TRES TEXTOS QUE SE CONTRADECÍAN, RETIRADOS (25-ago-2026)", () => {
+  // 🩸 QUÉ AFIRMABA ESTE BLOQUE ANTES, Y POR QUÉ SE DIO VUELTA.
+  //
+  // Hasta hoy exigía que el acordeón de una guía despachada dijera **"Solo se
+  // puede cambiar el cliente"**. Al mismo tiempo, y sobre la MISMA guía:
+  //   · `/guias/[id]` decía *"Lo único que se puede cambiar es el N° del
+  //     transportista de cada envío"*;
+  //   · el renglón decía *"Es lo único que se puede cambiar de una guía ya
+  //     despachada"*.
+  //
+  // Tres frases, tres respuestas distintas a la misma pregunta — y desde que
+  // Daniel abrió las correcciones de una guía firmada (punto 4: **N° del
+  // transportista · cliente · facturas**) las tres son además FALSAS. Punto 14,
+  // textual: *"Los 3 textos que se contradicen → fuera los tres"*.
+  //
+  // 🔑 LO QUE LOS REEMPLAZA NO ES UN CUARTO TEXTO: es que se VEA. En una guía
+  // firmada el formulario dibuja como campo **solo** lo que se puede tocar, y
+  // el resto como texto. La regla vive en `campos-editables.ts` y la aplican el
+  // formulario y el servidor — con candados de conducta propios.
+  //
+  // ⚠️ EL BARRIDO VA SOBRE EL CÓDIGO SIN COMENTARIOS. En este repo ya pasó
+  // cuatro veces que un candado de texto se cumpliera con el comentario que
+  // explicaba el cambio: acá arriba mismo las tres frases están escritas.
+  const sinComentarios = (src: string) =>
+    src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//"))
+      .join("\n");
 
-  it("🔴 dice exactamente el texto aprobado", () => {
-    expect(LISTA).toMatch(RE_AVISO);
-    const i = LISTA.search(RE_AVISO);
-    expect(LISTA.slice(i, i + 400)).toContain("Solo se puede cambiar el cliente");
+  const CODIGO = {
+    lista: sinComentarios(LISTA),
+    guia: sinComentarios(leer("src/app/guias/[id]/page.tsx")),
+    renglon: sinComentarios(leer("src/app/guias/components/ListaEnvios.tsx")),
+  };
+
+  it("🔴 los tres se fueron de los tres archivos", () => {
+    expect(CODIGO.lista).not.toContain("Solo se puede cambiar el cliente");
+    expect(CODIGO.guia).not.toContain("no se puede editar");
+    expect(CODIGO.renglon).not.toContain("Es lo único que se puede cambiar");
   });
 
-  it("🔴 va en la CABECERA y UNA vez por guía — nunca por línea", () => {
-    // Repetido por renglón saldría cinco veces en una guía como GT-189.
-    expect((LISTA.match(/Solo se puede cambiar el cliente/g) ?? []).length).toBe(1);
-    const iAviso = LISTA.search(RE_AVISO);
-    const iAcciones = LISTA.indexOf("{/* Acciones rápidas (header de la card expandida) */}");
-    const iTabla = LISTA.indexOf("{/* Items table */}");
-    expect(iAviso).toBeGreaterThan(-1);
-    expect(iAviso).toBeLessThan(iAcciones); // arriba de todo
-    expect(iAviso).toBeLessThan(iTabla);
-    // Y fuera del `.map` de los ítems.
-    expect(iAviso).toBeLessThan(LISTA.indexOf("(expandedGuia.guia_items || []).map("));
+  it("🔴 y no volvieron disfrazados: ninguno de los tres archivos promete «lo único»", () => {
+    // La forma del defecto era prometer exclusividad. Cualquier frase que
+    // vuelva a decirlo miente igual, aunque cambie las palabras.
+    for (const [donde, src] of Object.entries(CODIGO)) {
+      expect(src, donde).not.toMatch(/[Ll]o único que se puede/);
+      expect(src, donde).not.toMatch(/[Ss]olo se puede cambiar/);
+    }
   });
 
-  it("no promete editar el cliente a quien no puede hacerlo", () => {
-    const i = LISTA.search(RE_AVISO);
-    expect(LISTA.slice(i, i + 120)).toContain("puedeAtarCliente");
+  it("🔴 la verdad la dice la REGLA, y es una sola", () => {
+    // Con tres textos a mano cualquiera podía quedar viejo. Ahora hay UN módulo
+    // que decide qué se puede tocar, y lo leen el formulario y el servidor.
+    const regla = leer("src/lib/guias/campos-editables.ts");
+    expect(regla).toContain("CAMPOS_DESPACHADA");
+    expect(leer("src/app/guias/components/GuiaForm.tsx")).toContain("soloCorregible");
+    expect(leer("src/app/api/guias/[id]/item/route.ts")).toContain("camposEditablesDeRenglon");
   });
 
   it("🔴 y el candado del despacho sigue intacto: atar NO mira el estado", () => {

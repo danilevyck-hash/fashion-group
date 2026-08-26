@@ -59,7 +59,7 @@ import AddNewInline from "./AddNewInline";
 import ClientePicker from "@/components/ClientePicker";
 import { ScrollableTable } from "@/components/ui";
 import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, opcionesEmpresa } from "./guia-form-logic";
-import { ENTREGADO_POR_OTRO, entregadoPorElegido } from "@/lib/guias/despachado-por";
+import { ENTREGADO_POR_OTRO, entregadoPorElegido, nombreDespachadoPor } from "@/lib/guias/despachado-por";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 import { textoFalta } from "@/lib/guias/falta-para-despachar";
 import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
@@ -77,8 +77,6 @@ interface GuiaFormProps {
   setEntregadoPor: (v: string) => void;
   observaciones: string;
   setObservaciones: (v: string) => void;
-  numeroGuiaTransp: string;
-  setNumeroGuiaTransp: (v: string) => void;
   items: GuiaItem[];
   transportistas: Transportista[];
   direcciones: string[];
@@ -115,6 +113,22 @@ interface GuiaFormProps {
   instantanea?: string;
   /** Hora del último guardado que el servidor ACEPTÓ. */
   guardadoEn?: string | null;
+  /**
+   * 🔴 LA GUÍA YA SALIÓ: es el MISMO formulario, con tres cosas abiertas.
+   *
+   * Daniel: *"Guía despachada → se puede corregir **N° del transportista ·
+   * cliente · facturas**"*, y *"los **bultos** de una despachada **NO se
+   * tocan** — es lo que el transportista firmó"*.
+   *
+   * 🔑 NO ES UN SEGUNDO FORMULARIO. Es éste, con la cabecera y los campos del
+   * despacho mostrados como TEXTO en vez de como campos: un campo que parece
+   * editable y no deja escribir es peor que no mostrarlo. Un formulario
+   * "parecido" sería exactamente el *"algo diferente"* que Daniel pidió sacar.
+   *
+   * ⚠️ Y no autoguarda: corregir un papel que alguien ya firmó tiene que ser un
+   * acto deliberado, no algo que pase solo a los 1,5 s de haber mirado.
+   */
+  soloCorregible?: boolean;
 }
 
 // ── Primitivas del formulario ────────────────────────────────────────────────
@@ -188,6 +202,16 @@ function idCampo(item: Pick<GuiaItem, "uid">, campo: string, layout: Layout): st
   return `${campo}-${item.uid}-${layout}`;
 }
 
+/** Un dato de la guía firmada: se lee, no se escribe. */
+function DatoFijo({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <div className="min-w-0">
+      <span className="text-xs uppercase tracking-[0.05em] text-gray-400 block mb-1">{etiqueta}</span>
+      <span className="text-sm font-medium break-words whitespace-pre-wrap">{String(valor ?? "").trim() || "—"}</span>
+    </div>
+  );
+}
+
 function ErrorCampo({ children = "Campo obligatorio" }: { children?: ReactNode }) {
   return <p className="text-red-500 text-xs mt-0.5">{children}</p>;
 }
@@ -196,13 +220,13 @@ export default function GuiaForm({
   editingId, formNumero, fecha, setFecha,
   modoEntrega, setModoEntrega, transportistaId, setTransportistaId,
   entregadoPor, setEntregadoPor, observaciones, setObservaciones,
-  numeroGuiaTransp, setNumeroGuiaTransp,
   items, transportistas, direcciones,
   validationErrors, error, saving,
   onAddDireccion,
   onUpdateItem, onUpdateItemFields, onAddRow, onRemoveRow, onRestoreRow, onSave, onCancel,
   etiquetaVolver = "← Guías",
   hayCambios = false, instantanea = "", guardadoEn = null,
+  soloCorregible = false,
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
@@ -327,6 +351,13 @@ export default function GuiaForm({
   useEffect(() => {
     // `saving` es estado, no un ref: mientras el pedido viaja este efecto sale
     // por acá, y cuando vuelve a false React lo despierta solo.
+    // 🩸 ACÁ HABÍA UN `if (soloCorregible) return;` Y SE BORRÓ POR REDUNDANTE.
+    // Una guía firmada no se autoguarda —corregir un papel que el transportista
+    // ya firmó tiene que ser un acto deliberado— pero **quien lo impide es el
+    // hook**, que ignora los guardados silenciosos en ese modo. Con las dos
+    // capas, la mutación que sacaba ésta **SOBREVIVÍA**: el candado no la
+    // cazaba porque quitarla no cambiaba nada. Un guard que no sostiene la
+    // regla se lee como si la sostuviera, y esconde cuál es el que manda.
     if (!editingId || !hayCambios || saving) return;
     if (instantanea === ultimoIntento.current) return;
     const timer = setTimeout(() => {
@@ -368,8 +399,15 @@ export default function GuiaForm({
   //
   // 🔑 `faltaParaGuardar` LLAMA a `validarGuia`, la misma que rechaza el
   // guardado: el botón no puede estar en desacuerdo con lo que va a pasar.
-  const faltantes = faltaParaGuardar({ fecha, modoEntrega, transportistaId, entregadoPor, items });
-  const puedeGuardar = faltantes.length === 0;
+  // 🔴 EN UNA GUÍA FIRMADA NO SE VALIDA EL ALTA, y no es un atajo. De las 207
+  // despachadas, 190 (92%) tienen algún dato que hoy sería obligatorio —se
+  // cerraron cuando nada bloqueaba— así que exigirles las reglas del alta
+  // dejaría el botón apagado para siempre justo en las guías que hay que
+  // corregir. Acá lo único que decide es si algo CAMBIÓ.
+  const faltantes = soloCorregible
+    ? []
+    : faltaParaGuardar({ fecha, modoEntrega, transportistaId, entregadoPor, items });
+  const puedeGuardar = soloCorregible ? hayCambios : faltantes.length === 0;
   const avisoFalta = textoFalta(faltantes);
 
   function SaveButton({ size = "normal" }: { size?: "normal" | "small" }) {
@@ -408,6 +446,13 @@ export default function GuiaForm({
     return null;
   }
 
+  /**
+   * ¿Se pregunta el N° del transportista en los renglones? Solo cuando la guía
+   * sale con transportista externo. En entrega directa es nuestro camión: no
+   * hay a quién pedírselo, y un campo que nadie puede llenar es ruido.
+   */
+  const pideNumeroTransp = modoEntrega === "transportista";
+
   const transportistaError =
     validationErrors.has("transportista") ||
     (touched.has("transportista") && modoEntrega === "transportista" && !transportistaId);
@@ -415,6 +460,22 @@ export default function GuiaForm({
   // ── Campos de una fila de envío ────────────────────────────────────────────
   // Se definen UNA vez y los usan los dos layouts (tarjeta en móvil, tabla en
   // escritorio). Si se agrega un campo, aparece en los dos o en ninguno.
+
+  /**
+   * Lo que en una guía YA FIRMADA se MUESTRA pero no se escribe: dirección,
+   * empresa y bultos. Sale como texto, no como un campo apagado — un campo
+   * gris que no deja escribir invita a pelearse con él.
+   */
+  function soloTexto(valor: string | number | null | undefined, alineado = false) {
+    const t = String(valor ?? "").trim();
+    return (
+      <span
+        className={`block text-sm py-2.5 min-h-[44px] md:[@media(pointer:fine)]:py-1.5 md:[@media(pointer:fine)]:min-h-0 ${alineado ? "text-right tabular-nums" : ""} ${t ? "text-gray-700" : "text-gray-300"}`}
+      >
+        {t || "—"}
+      </span>
+    );
+  }
 
   function campoCliente(item: GuiaItem, idx: number, layout: Layout) {
     const clave = claveCampo(item, "cliente");
@@ -439,6 +500,7 @@ export default function GuiaForm({
   }
 
   function campoDireccion(item: GuiaItem, idx: number, layout: Layout) {
+    if (soloCorregible) return soloTexto(item.direccion);
     const clave = claveCampo(item, "direccion");
     const err = hayError(clave, item.direccion);
     return (
@@ -458,6 +520,7 @@ export default function GuiaForm({
   }
 
   function campoEmpresa(item: GuiaItem, idx: number, layout: Layout) {
+    if (soloCorregible) return soloTexto(item.empresa);
     const clave = claveCampo(item, "empresa");
     const err = hayError(clave, item.empresa);
     // Cerrado: las 8 del grupo. Si la guía traía un valor sucio, entra a la
@@ -505,6 +568,10 @@ export default function GuiaForm({
   }
 
   function campoBultos(item: GuiaItem, idx: number, layout: Layout, alineado = false) {
+    // 🔴 LOS BULTOS DE UNA GUÍA DESPACHADA NO SE TOCAN. Daniel: *"es lo que el
+    // transportista firmó"*. No están en la lista de tres de
+    // `campos-editables.ts` y el servidor los rechaza igual.
+    if (soloCorregible) return soloTexto(item.bultos ?? 0, alineado);
     const clave = claveCampo(item, "bultos");
     const err = validationErrors.has(clave) || (touched.has(clave) && !item.bultos);
     return (
@@ -524,7 +591,37 @@ export default function GuiaForm({
     );
   }
 
+  /**
+   * 🔴 EL N° DE GUÍA DEL TRANSPORTISTA, **POR LÍNEA Y AL LADO DE LOS BULTOS**.
+   *
+   * Daniel, punto 7: *"N° del transportista → POR LÍNEA, al lado de bultos —
+   * en crear, editar, acordeón, papel, PDF y Excel"*. El transportista arma
+   * VARIAS guías suyas por cada guía nuestra, así que el número es del renglón.
+   *
+   * ⚠️ **Opcional, siempre**: *"a veces el transportista lo da, a veces no"*.
+   * No bloquea guardar ni despachar, y no lo pinta de rojo nunca. Lo que falte
+   * queda MARCADO en la lista, no exigido acá.
+   *
+   * ⚠️ En entrega directa no se pide: sale en nuestro propio camión y no hay
+   * transportista a quien pedírselo.
+   */
+  function campoNumeroTransp(item: GuiaItem, idx: number, layout: Layout) {
+    return (
+      <input
+        id={idCampo(item, "numtransp", layout)}
+        type="text"
+        value={item.numero_guia_transp || ""}
+        placeholder="Si lo dio"
+        onChange={(e) => onUpdateItem(idx, "numero_guia_transp", e.target.value)}
+        className={ctrl(false)}
+      />
+    );
+  }
+
   function botonQuitar(idx: number, layout: Layout) {
+    // 🔴 A una guía que el transportista ya firmó no se le agregan ni se le
+    // quitan envíos: sería inventar (o borrar) mercancía que ya viajó.
+    if (soloCorregible) return null;
     if (items.length <= 1) return null;
     return (
       <button
@@ -581,6 +678,23 @@ export default function GuiaForm({
       {/* Header fields */}
       <div className="mb-8">
         <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
+        {/* 🔴 EN UNA GUÍA QUE YA SALIÓ, ESTO SE LEE. La fecha, el modo, el
+            transportista y quién despachó son lo que el chofer firmó: no están
+            en la lista de tres que Daniel abrió (N° del transportista · cliente
+            · facturas) y el servidor los rechaza igual. Se muestran como TEXTO
+            y no como campos apagados: un campo gris que no deja escribir invita
+            a pelearse con él. */}
+        {soloCorregible ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <DatoFijo etiqueta="Fecha" valor={fecha} />
+            <DatoFijo etiqueta="Cómo salió" valor={ETIQUETA_TIPO_DESPACHO[modoEntrega === "transportista" ? "externo" : "directo"]} />
+            <DatoFijo
+              etiqueta="Transportista"
+              valor={transportistas.find((t) => t.id === transportistaId)?.nombre || ""}
+            />
+            <DatoFijo etiqueta="Despachado por" valor={nombreDespachadoPor(entregadoPor)} />
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
           <Campo label="Fecha" requerido htmlFor="guia-fecha">
             <input
@@ -663,20 +777,20 @@ export default function GuiaForm({
             )}
           </Campo>
 
-          {/* N° guía del transportista — solo con transportista; opcional al
-              crear (obligatorio al despachar). En entrega directa no aplica. */}
-          {modoEntrega === "transportista" && (
-            <Campo label="N° guía del transportista" nota="(opcional)" htmlFor="guia-numero-transp">
-              <input
-                id="guia-numero-transp"
-                type="text"
-                value={numeroGuiaTransp}
-                onChange={e => setNumeroGuiaTransp(e.target.value)}
-                placeholder="Lo puedes poner ahora o al despachar"
-                className={ctrl(false)} />
-            </Campo>
-          )}
+          {/* 🔴 EL N° DEL TRANSPORTISTA SALIÓ DE ACÁ: AHORA VA POR LÍNEA, al
+              lado de los bultos (Daniel, punto 7). Acá se preguntaba UNA vez
+              para toda la guía, y el transportista arma VARIAS guías suyas por
+              cada guía nuestra — *"nos hacen varias guias el transportista por
+              guia"* (10-ago-2026). Preguntarlo arriba era pedir el dato
+              equivocado: se escribía uno y el papel lo repetía en las 7 filas.
+
+              ⚠️ La columna `guia_transporte.numero_guia_transp` NO se retiró:
+              la leen el buscador, el Excel, el chip ámbar y el encabezado del
+              papel, y las guías viejas heredan de ella. Se sigue escribiendo,
+              DERIVADA de los renglones — ver `numeroCabecera` en
+              `useGuiaFormState`. */}
         </div>
+        )}
       </div>
 
       {/* Detalle de envío */}
@@ -720,6 +834,13 @@ export default function GuiaForm({
                 <Campo label="Empresa" requerido htmlFor={idCampo(item, "empresa", "m")}>{campoEmpresa(item, idx, "m")}</Campo>
                 <Campo label="Factura(s)" requerido nota="ej: 10234, 10235" htmlFor={idCampo(item, "facturas", "m")}>{campoFacturas(item, idx, "m")}</Campo>
                 <Campo label="Bultos" requerido htmlFor={idCampo(item, "bultos", "m")}>{campoBultos(item, idx, "m")}</Campo>
+                {/* 🔴 EL N° DEL TRANSPORTISTA, PEGADO A LOS BULTOS. Van juntos
+                    porque se leen juntos del papel que trae el chofer. */}
+                {pideNumeroTransp && (
+                  <Campo label="N° guía del transportista" nota="(opcional)" htmlFor={idCampo(item, "numtransp", "m")}>
+                    {campoNumeroTransp(item, idx, "m")}
+                  </Campo>
+                )}
               </div>
             </div>
           ))}
@@ -727,7 +848,10 @@ export default function GuiaForm({
 
         {/* ── iPad horizontal y escritorio (lg+): la tabla de siempre ─────── */}
         <div data-layout="tabla" className="hidden lg:block">
-          <ScrollableTable minWidth={720}>
+          {/* Con la columna del N° la tabla necesita 100 px más. El arrastre lo
+              contiene `ScrollableTable`: el cuerpo de la página nunca scrollea
+              de lado. */}
+          <ScrollableTable minWidth={pideNumeroTransp ? 820 : 720}>
             <table className="w-full text-sm [&_th]:px-3.5 [&_td]:px-3.5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
@@ -740,6 +864,12 @@ export default function GuiaForm({
                     <div className="text-xs text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Ej: 10234, 10235</div>
                   </th>
                   <th className="py-3 font-normal w-20 text-right">Bultos <span className="text-red-500">*</span></th>
+                  {pideNumeroTransp && (
+                    <th className="py-3 font-normal w-32 text-left">
+                      N° transportista
+                      <div className="text-xs text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Si lo dio</div>
+                    </th>
+                  )}
                   <th className="py-3 w-12"></th>
                 </tr>
               </thead>
@@ -752,6 +882,7 @@ export default function GuiaForm({
                     <td className="py-2">{campoEmpresa(item, idx, "d")}</td>
                     <td className="py-2">{campoFacturas(item, idx, "d")}</td>
                     <td className="py-2">{campoBultos(item, idx, "d", true)}</td>
+                    {pideNumeroTransp && <td className="py-2">{campoNumeroTransp(item, idx, "d")}</td>}
                     <td className="py-2 text-center">{botonQuitar(idx, "d")}</td>
                   </tr>
                 ))}
@@ -763,7 +894,11 @@ export default function GuiaForm({
         <div className="mt-1 flex items-center justify-between gap-4">
           {/* Botón de solo texto: medía 21 px de alto. -mx-2 lo deja alineado
               con el borde izquierdo de la tabla pese al padding nuevo. */}
-          <button type="button" onClick={onAddRow} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar envío</button>
+          {soloCorregible ? (
+            <span />
+          ) : (
+            <button type="button" onClick={onAddRow} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar envío</button>
+          )}
           <div className="flex items-baseline gap-2">
             <span className="text-xs uppercase tracking-[0.05em] text-gray-400">Total de bultos:</span>
             <span className="text-lg font-semibold tabular-nums">{totalBultos}</span>
@@ -771,15 +906,22 @@ export default function GuiaForm({
         </div>
       </div>
 
-      {/* Observaciones */}
-      <Campo label="Observaciones" nota="(opcional)" htmlFor="guia-observaciones">
-        <textarea
-          id="guia-observaciones"
-          value={observaciones}
-          onChange={e => setObservaciones(e.target.value)}
-          rows={2}
-          className="w-full border-b border-gray-200 py-2 text-base md:text-sm outline-none focus:border-black transition resize-none" />
-      </Campo>
+      {/* Observaciones — se escriben donde se carga el camión. En una guía ya
+          firmada se leen: tampoco están en la lista de tres. */}
+      {soloCorregible ? (
+        String(observaciones ?? "").trim() ? (
+          <DatoFijo etiqueta="Observaciones" valor={observaciones} />
+        ) : null
+      ) : (
+        <Campo label="Observaciones" nota="(opcional)" htmlFor="guia-observaciones">
+          <textarea
+            id="guia-observaciones"
+            value={observaciones}
+            onChange={e => setObservaciones(e.target.value)}
+            rows={2}
+            className="w-full border-b border-gray-200 py-2 text-base md:text-sm outline-none focus:border-black transition resize-none" />
+        </Campo>
+      )}
 
       {error && <p className="text-red-500 text-sm mt-6 mb-4">{error}</p>}
       <div className="flex flex-wrap items-center gap-6 mt-8">

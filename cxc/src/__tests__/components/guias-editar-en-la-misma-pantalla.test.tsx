@@ -194,13 +194,18 @@ describe("la guía pendiente se edita ACÁ, con el formulario del alta", () => {
 
   it("mientras se edita, los envíos NO se dibujan dos veces", async () => {
     await abrirLaGuia();
-    // En modo lectura está el resumen con su "Corregir".
-    expect(screen.getByRole("button", { name: /^Corregir$/i })).toBeTruthy();
+    // 🩸 EN MODO LECTURA YA NO HAY «Corregir»: se retiró el 25-ago-2026 porque
+    // abría los mismos campos que el formulario de «Editar» (Daniel, punto 1:
+    // *"una sola forma de editar"*). Lo que este test protege sigue siendo lo
+    // mismo: que la lista de solo lectura y la del formulario NO convivan.
+    expect(screen.queryByRole("button", { name: /^Corregir$/i })).toBeNull();
+    // En lectura, las cajas del N° del despacho SÍ están (una por renglón).
+    expect(document.querySelectorAll('input[id^="transp-"]').length).toBeGreaterThan(0);
     await tocarEditar();
     // Con el formulario abierto, ese resumen se va: la lista del formulario ES
     // la lista. Dibujar las dos serían los mismos envíos dos veces, que es lo
     // que se sacó el 17-ago-2026.
-    expect(screen.queryByRole("button", { name: /^Corregir$/i })).toBeNull();
+    expect(document.querySelectorAll('input[id^="transp-"]')).toHaveLength(0);
   });
 
   it("guardar NO te saca de la guía: cierra la edición y se queda acá", async () => {
@@ -219,25 +224,94 @@ describe("la guía pendiente se edita ACÁ, con el formulario del alta", () => {
   });
 });
 
-describe("una guía YA DESPACHADA no se edita, y la pantalla lo dice", () => {
+describe("🔴 el N° del transportista de la CABECERA no se puede borrar sin querer", () => {
+  // 🩸 EL RIESGO QUE ESTE CANDADO CUIDA. El campo de cabecera salió del
+  // formulario (el N° pasó a ser POR LÍNEA, punto 7), pero la columna
+  // `guia_transporte.numero_guia_transp` **no se retiró**: la leen el buscador
+  // de la lista, el Excel, el chip ámbar y el encabezado del papel, y las guías
+  // viejas HEREDAN de ella. Si el formulario dejara de mandarla, el PUT
+  // escribiría `null` y **le borraría el número a toda guía que alguien
+  // editara** — la misma trampa que el 25-ago-2026 se tapó al despachar.
+  //
+  // La regla es la MISMA función del despacho (`numeroCabeceraAlDespachar`):
+  // gana la línea si alguna trae número, y si ninguna trae se conserva el que
+  // ya estaba.
+  beforeEach(() => {
+    guiaServida = { ...PENDIENTE, numero_guia_transp: "TR-900" };
+  });
+
+  it("🔴 sin números por línea, el PUT CONSERVA el de la cabecera", async () => {
+    await abrirLaGuia();
+    await tocarEditar();
+    const obs = visible("textarea") as HTMLTextAreaElement;
+    await act(async () => { fireEvent.change(obs, { target: { value: "va con hielo" } }); });
+    await act(async () => { fireEvent.click(screen.getAllByText(/Guardar Cambios/i)[0]); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+    expect(puts().length).toBeGreaterThan(0);
+    expect(puts()[0].cuerpo.numero_guia_transp).toBe("TR-900");
+  });
+
+  it("⚠️ y si una línea trae el suyo, gana la línea: es el dato más específico", async () => {
+    await abrirLaGuia();
+    await tocarEditar();
+    const caja = document.querySelector<HTMLInputElement>('input[id^="numtransp-"][id$="-m"]')!;
+    await act(async () => { fireEvent.change(caja, { target: { value: "TR-4471" } }); });
+    await act(async () => { fireEvent.click(screen.getAllByText(/Guardar Cambios/i)[0]); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+    expect(puts()[0].cuerpo.numero_guia_transp).toBe("TR-4471");
+  });
+});
+
+describe("🔴 una guía YA DESPACHADA se abre igual, con TRES cosas editables", () => {
+  // 🩸 ESTE BLOQUE CAMBIÓ DE DIRECCIÓN EL 25-ago-2026, y son dos decisiones
+  // escritas de Daniel:
+  //   · punto 9 — *"Entrar a una despachada → se entra igual que a cualquier
+  //     otra"*. Antes no había botón: `/guias/[id]` de una Completada solo se
+  //     abría escribiendo la URL a mano.
+  //   · punto 4 — adentro se corrigen **N° del transportista · cliente ·
+  //     facturas**; los bultos NO (punto 5), la firma queda la vieja (punto 6).
+  //
+  // ⚠️ Y el punto 14 se llevó el texto que decía *"Esta guía ya se despachó: no
+  // se puede editar…"*: era uno de los tres que se contradecían entre sí, y
+  // desde el punto 4 los tres son además falsos.
+  //
+  // El detalle campo por campo, y que lo que se guarda salga POR COLUMNA y
+  // nunca por el PUT, lo prueba `guias-anotar-numero-tarde.test.tsx`. Acá se
+  // protege lo de esta pantalla: que se pueda entrar y que NO se pueda
+  // despachar de nuevo.
   beforeEach(() => { guiaServida = DESPACHADA; });
 
-  it("no hay botón «Editar» ni formulario por ningún lado", async () => {
+  it("🔴 ofrece «Editar», y el formulario abre", async () => {
     await abrirLaGuia();
-    expect(screen.queryByRole("button", { name: /^Editar$/i })).toBeNull();
-    expect(screen.queryByText(/Editar Guía de Transporte/i)).toBeNull();
-    expect(screen.queryByText(/Guardar Cambios/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Editar$/i })).not.toBeNull();
+    await tocarEditar();
+    expect(screen.queryByText(/Editar Guía de Transporte/i)).not.toBeNull();
+  });
+
+  it("🔴 pero NO se le agregan envíos ni se le tocan los bultos", async () => {
+    await abrirLaGuia();
+    await tocarEditar();
     expect(screen.queryByText(/\+ Agregar envío/i)).toBeNull();
-    // Tampoco los campos del despacho ni el "Corregir" de bodega.
-    expect(screen.queryByRole("button", { name: /^Corregir$/i })).toBeNull();
     expect(document.querySelector('input[id^="bultos-"]')).toBeNull();
   });
 
-  it("la pantalla DICE que está bloqueada, en vez de mostrar campos muertos", async () => {
+  it("🔴 y no se vuelve a despachar: la guía sale una sola vez", async () => {
     await abrirLaGuia();
-    expect(document.body.textContent).toMatch(/ya se despachó: no se puede editar/i);
-    // Y dice cuál es la única excepción que sigue viva.
-    expect(document.body.textContent).toMatch(/N° del transportista de cada envío/i);
+    expect(screen.queryByRole("button", { name: /^Despachar$/i })).toBeNull();
+    expect(document.getElementById("transp-0")).toBeNull();
+    await tocarEditar();
+    expect(screen.queryByRole("button", { name: /Confirmar despacho/i })).toBeNull();
+  });
+
+  it("🔴 el texto que se contradecía con los otros dos ya no está", async () => {
+    await abrirLaGuia();
+    expect(document.body.textContent).not.toMatch(/no se puede editar/i);
+    expect(document.body.textContent).not.toMatch(/N° del transportista de cada envío/i);
+  });
+
+  it("tampoco vuelve el «Corregir» por renglón", async () => {
+    await abrirLaGuia();
+    expect(screen.queryByRole("button", { name: /^Corregir$/i })).toBeNull();
   });
 });
 

@@ -208,7 +208,6 @@ describe("🔴 en entrega directa la pantalla NO pide placa ni N° de transporti
         setNumeroTransp={() => {}}
         editable
         externo={false}
-        onCorregir={async () => null}
       />,
     );
     expect(document.getElementById("transp-0")).toBeNull();
@@ -224,7 +223,6 @@ describe("🔴 en entrega directa la pantalla NO pide placa ni N° de transporti
         setNumeroTransp={() => {}}
         editable
         externo
-        onCorregir={async () => null}
       />,
     );
     expect(document.getElementById("transp-0")).not.toBeNull();
@@ -282,8 +280,6 @@ describe("🔴 las MISMAS palabras al crear y al despachar", () => {
         setEntregadoPor={() => {}}
         observaciones=""
         setObservaciones={() => {}}
-        numeroGuiaTransp=""
-        setNumeroGuiaTransp={() => {}}
         items={ITEMS}
         transportistas={[]}
         direcciones={["David"]}
@@ -424,5 +420,72 @@ describe("🔴 el acordeón lee el N° de los RENGLONES, no el de la cabecera", 
     const { container } = despachadaCon([{ ...ITEMS[0], numero_guia_transp: "" }], "");
     expect(container.textContent).toMatch(/N° guía transp\./);
     expect(container.textContent).toContain("—");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 el N° del transportista se pide POR LÍNEA — y no en entrega directa", () => {
+  // Daniel, punto 7: *"N° del transportista → POR LÍNEA, al lado de bultos"*.
+  // ⚠️ Y en entrega directa NO se pide: sale en nuestro propio camión, no hay
+  // transportista a quien pedírselo, y un campo que nadie puede llenar es
+  // ruido. Es la misma razón por la que tampoco se pide la placa.
+  function form(modo: ModoEntrega) {
+    return render(
+      <GuiaForm
+        editingId={null}
+        formNumero={1}
+        fecha="2026-08-25"
+        setFecha={() => {}}
+        modoEntrega={modo}
+        setModoEntrega={() => {}}
+        transportistaId={modo === "transportista" ? "t1" : null}
+        setTransportistaId={() => {}}
+        entregadoPor="Julio"
+        setEntregadoPor={() => {}}
+        observaciones=""
+        setObservaciones={() => {}}
+        items={ITEMS}
+        transportistas={[{ id: "t1", nombre: "Transporte Sol", activo: true }]}
+        direcciones={["David"]}
+        validationErrors={new Set()}
+        error={null}
+        saving={false}
+        onAddDireccion={() => {}}
+        onUpdateItem={() => {}}
+        onUpdateItemFields={() => {}}
+        onAddRow={() => {}}
+        onRemoveRow={() => {}}
+        onRestoreRow={() => {}}
+        onSave={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+  }
+
+  /** El layout de TARJETA. Los dos se dibujan y el CSS esconde uno. */
+  const cajas = () =>
+    document.querySelectorAll('input[id^="numtransp-"][id$="-m"]');
+
+  it("con transportista externo: una caja por renglón, al lado de los bultos", () => {
+    form("transportista");
+    expect(cajas()).toHaveLength(ITEMS.length);
+    // Y va DESPUÉS de los bultos en el orden de lectura de la tarjeta.
+    const bultos = document.querySelector('input[id^="bultos-"][id$="-m"]')!;
+    const transp = cajas()[0];
+    expect(bultos.compareDocumentPosition(transp) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("🔴 en ENTREGA DIRECTA no se pregunta: no hay a quién pedírselo", () => {
+    form("entrega_directa");
+    expect(cajas()).toHaveLength(0);
+    expect(screen.queryByText(/N° guía del transportista/i)).toBeNull();
+  });
+
+  it("🩸 y el campo de CABECERA no vuelve: se preguntaba una vez para toda la guía", () => {
+    // El transportista arma VARIAS guías suyas por cada guía nuestra, así que
+    // preguntarlo arriba era pedir el dato equivocado — se escribía uno y el
+    // papel lo repetía en las 7 filas.
+    form("transportista");
+    expect(document.getElementById("guia-numero-transp")).toBeNull();
   });
 });
