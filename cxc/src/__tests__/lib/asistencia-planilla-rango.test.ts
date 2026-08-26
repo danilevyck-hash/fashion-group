@@ -377,10 +377,20 @@ describe("⚠️ décimo tercer mes y vacaciones: NO se provisionan", () => {
   // en dólares—. Existe únicamente para poder DECIRLO en pantalla con nombre,
   // rango y monto: nada se descarta en silencio. `totalBruto` no ganó ni un
   // término, y el test de abajo lo sigue exigiendo.
+  //
+  // ⚠️ 26-ago-2026: entró `baseSeguros`, y TAMPOCO es una provisión. No suma en
+  // ningún lado ni agrega un término al bruto: es el monto sobre el que se
+  // calcularon los dos seguros cuando NO fue el bruto —los $175,00 de RODRIGO,
+  // que la contadora aplica porque está inscrito en la Caja por una planilla
+  // doméstica—. Existe únicamente para poder DECIRLO en pantalla: sin él, un
+  // seguro social de $17,06 donde se esperaba $39,38 no se puede reconstruir
+  // sin preguntarle a alguien. `totalBruto` no ganó ni un término, y el test de
+  // abajo lo sigue exigiendo.
   it("el desglose del dinero tiene EXACTAMENTE estas columnas, sin provisiones", () => {
     const d = linea(ficha()).dinero!;
     expect(Object.keys(d).sort()).toEqual([
       "ausencias", "ausenciaDeDiaCompleto", "ausenciaPorTardanza",
+      "baseSeguros",
       "domingos", "excedente", "extraDiurno", "extraNocturno",
       "feriados", "isr", "mercancia", "netoPagar", "otrosServicios", "prestamo",
       "rataHora", "salarioQuincenal", "seguroEducativo", "seguroSocial",

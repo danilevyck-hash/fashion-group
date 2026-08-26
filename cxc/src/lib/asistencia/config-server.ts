@@ -67,6 +67,11 @@ import {
   esColumnaNoMarcaRelojFaltante,
   noMarcaReloj,
 } from "./sueldo-fijo";
+import {
+  COLUMNA_BASE_SEGUROS,
+  baseSeguros,
+  esColumnaBaseSegurosFaltante,
+} from "./seguros-base";
 
 // Se re-exportan para que las rutas importen todo de un solo lugar. La
 // DETECCIÓN es pura y vive en `config.ts`; acá solo está el I/O.
@@ -125,6 +130,11 @@ export interface FilaPersonaDb {
   /** Opcional: no existe hasta que se corra `MIGRACION_NO_MARCA_RELOJ`. Ausente
    *  o `null` = SÍ marca el reloj, que es como estaban las 39 fichas. */
   no_marca_reloj?: boolean | null;
+  /** Opcional: no existe hasta que se corra `MIGRACION_BASE_SEGUROS`. Ausente o
+   *  `null` = los seguros salen del TOTAL BRUTO, que es como estaban las 40
+   *  fichas. Es el monto de UNA QUINCENA — ver `seguros-base.ts`.
+   *  ⚠️ `numeric` en la base, y PostgREST lo manda como TEXTO. Ver `baseSeguros`. */
+  seguros_base_quincena?: number | string | null;
   /** Opcionales: no existen hasta que se corra `MIGRACION_SALDO_VACACIONES`.
    *  Los DOS o NINGUNO (lo obliga un CHECK). `null` = todavía no se cargó el
    *  saldo, y entonces la pantalla dice «Falta el saldo» y NO muestra número. */
@@ -150,6 +160,9 @@ export interface PersonasLeidas {
   /** `true` = falta la columna del sueldo fijo. Todo el mundo se lee como que
    *  marca el reloj, que es exactamente como estaba antes. */
   faltaColumnaNoMarcaReloj: boolean;
+  /** `true` = falta la columna de la base propia de seguros. A todo el mundo se
+   *  le calculan sobre el bruto, que es exactamente como estaba antes. */
+  faltaColumnaBaseSeguros: boolean;
   /** `true` = faltan las columnas del saldo de vacaciones. Nadie tiene saldo
    *  inicial, o sea que la pestaña Vacaciones dice «Falta el saldo» y no
    *  muestra ningún número — que es exactamente como estaba antes. */
@@ -175,6 +188,8 @@ const COLS_TODO = `${COLS_CON_SERVICIO}, ${COLUMNA_PAGA_SEGUROS}`;
 const COLS_CON_SALDO = `${COLS_TODO}, ${COLS_SALDO_VACACIONES.join(", ")}`;
 /** Todo, con el sueldo fijo. Sale de `sueldo-fijo.ts`, por lo mismo. */
 const COLS_CON_RELOJ = `${COLS_CON_SALDO}, ${COLUMNA_NO_MARCA_RELOJ}`;
+/** Todo, con la base propia de seguros. Sale de `seguros-base.ts`, por lo mismo. */
+const COLS_CON_BASE_SEGUROS = `${COLS_CON_RELOJ}, ${COLUMNA_BASE_SEGUROS}`;
 
 /**
  * Las fichas guardadas.
@@ -187,13 +202,14 @@ const COLS_CON_RELOJ = `${COLS_CON_SALDO}, ${COLUMNA_NO_MARCA_RELOJ}`;
  *
  * La escalera va de lo nuevo a lo viejo, y cada peldaño solo se baja cuando el
  * error NOMBRA la columna que ese peldaño quita:
- *   1. todo                      → lo normal;
- *   2. sin `no_marca_reloj`      → todo el mundo marca el reloj (como hoy);
- *   3. sin el saldo de vacaciones→ nadie tiene saldo inicial (como hoy);
- *   4. sin `paga_seguros`        → a todo el mundo se le cobran (como hoy);
- *   5. sin `servicio_profesional`→ nadie está fuera de planilla (como hoy);
- *   6. sin las columnas de baja  → todo el mundo activo (como estaba antes);
- *   7. sin la tabla              → lista vacía y la pantalla nombra el archivo.
+ *   1. todo                        → lo normal;
+ *   2. sin `seguros_base_quincena` → los seguros salen del bruto (como hoy);
+ *   3. sin `no_marca_reloj`        → todo el mundo marca el reloj (como hoy);
+ *   4. sin el saldo de vacaciones  → nadie tiene saldo inicial (como hoy);
+ *   5. sin `paga_seguros`          → a todo el mundo se le cobran (como hoy);
+ *   6. sin `servicio_profesional`  → nadie está fuera de planilla (como hoy);
+ *   7. sin las columnas de baja    → todo el mundo activo (como estaba antes);
+ *   8. sin la tabla                → lista vacía y la pantalla nombra el archivo.
  *
  * ⚠️ Releer ante CUALQUIER error convertiría un problema real —permisos, red,
  * RLS— en una lectura incompleta que nadie notaría.
@@ -213,9 +229,26 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
     faltaColumnaPagaSeguros: boolean;
     faltaColumnasSaldoVacaciones: boolean;
     faltaColumnaNoMarcaReloj: boolean;
+    faltaColumnaBaseSeguros: boolean;
     /** ¿Este error justifica bajar un peldaño? */
     reintentar: (err: unknown) => boolean;
   }> = [
+    {
+      cols: COLS_CON_BASE_SEGUROS,
+      faltaColumnasBajas: false,
+      faltaColumnaServicioProfesional: false,
+      faltaColumnaPagaSeguros: false,
+      faltaColumnasSaldoVacaciones: false,
+      faltaColumnaNoMarcaReloj: false,
+      faltaColumnaBaseSeguros: false,
+      reintentar: (e) =>
+        esColumnaBaseSegurosFaltante(e)
+        || esColumnaNoMarcaRelojFaltante(e)
+        || esColumnaSaldoVacacionesFaltante(e)
+        || esColumnaPagaSegurosFaltante(e)
+        || esColumnaServicioProfesionalFaltante(e)
+        || esColumnaDeBajaFaltante(e),
+    },
     {
       cols: COLS_CON_RELOJ,
       faltaColumnasBajas: false,
@@ -223,6 +256,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaPagaSeguros: false,
       faltaColumnasSaldoVacaciones: false,
       faltaColumnaNoMarcaReloj: false,
+      faltaColumnaBaseSeguros: true,
       reintentar: (e) =>
         esColumnaNoMarcaRelojFaltante(e)
         || esColumnaSaldoVacacionesFaltante(e)
@@ -237,6 +271,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaPagaSeguros: false,
       faltaColumnasSaldoVacaciones: false,
       faltaColumnaNoMarcaReloj: true,
+      faltaColumnaBaseSeguros: true,
       reintentar: (e) =>
         esColumnaSaldoVacacionesFaltante(e)
         || esColumnaPagaSegurosFaltante(e)
@@ -250,6 +285,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaPagaSeguros: false,
       faltaColumnasSaldoVacaciones: true,
       faltaColumnaNoMarcaReloj: true,
+      faltaColumnaBaseSeguros: true,
       reintentar: (e) =>
         esColumnaPagaSegurosFaltante(e)
         || esColumnaServicioProfesionalFaltante(e)
@@ -262,6 +298,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaPagaSeguros: true,
       faltaColumnasSaldoVacaciones: true,
       faltaColumnaNoMarcaReloj: true,
+      faltaColumnaBaseSeguros: true,
       reintentar: (e) => esColumnaServicioProfesionalFaltante(e) || esColumnaDeBajaFaltante(e),
     },
     {
@@ -271,6 +308,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaPagaSeguros: true,
       faltaColumnasSaldoVacaciones: true,
       faltaColumnaNoMarcaReloj: true,
+      faltaColumnaBaseSeguros: true,
       reintentar: esColumnaDeBajaFaltante,
     },
     {
@@ -280,6 +318,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnaPagaSeguros: true,
       faltaColumnasSaldoVacaciones: true,
       faltaColumnaNoMarcaReloj: true,
+      faltaColumnaBaseSeguros: true,
       reintentar: () => false,
     },
   ];
@@ -294,6 +333,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
         faltaColumnaServicioProfesional: intento.faltaColumnaServicioProfesional,
         faltaColumnaPagaSeguros: intento.faltaColumnaPagaSeguros,
         faltaColumnaNoMarcaReloj: intento.faltaColumnaNoMarcaReloj,
+        faltaColumnaBaseSeguros: intento.faltaColumnaBaseSeguros,
         faltaColumnasSaldoVacaciones: intento.faltaColumnasSaldoVacaciones,
       };
     }
@@ -307,6 +347,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
         faltaColumnaPagaSeguros: true,
         faltaColumnasSaldoVacaciones: true,
         faltaColumnaNoMarcaReloj: true,
+        faltaColumnaBaseSeguros: true,
       };
     }
     throw new Error(error.message);
@@ -322,6 +363,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
     faltaColumnaPagaSeguros: true,
     faltaColumnasSaldoVacaciones: true,
     faltaColumnaNoMarcaReloj: true,
+    faltaColumnaBaseSeguros: true,
   };
 }
 
@@ -358,6 +400,22 @@ export function pagaSegurosDeFila(f: FilaPersonaDb): boolean {
  */
 export function noMarcaRelojDeFila(f: FilaPersonaDb): boolean {
   return noMarcaReloj(f.no_marca_reloj);
+}
+
+/**
+ * ¿Sobre qué monto se le calculan los seguros? `null` = sobre el TOTAL BRUTO.
+ *
+ * Sin la columna corrida —o con `null`— la respuesta es «sobre el bruto», que
+ * es como estaban las 40 fichas antes de este cambio. Es el monto de UNA
+ * QUINCENA; ver `seguros-base.ts` para por qué la unidad es ésa y no la mensual.
+ *
+ * 🩸 `baseSeguros` y no un `Number(...)` pelado: la columna es `numeric` y
+ * PostgREST la manda como TEXTO. Es el mismo modo de fallo que ya costó una vez
+ * con el saldo de vacaciones — y acá la base perdida en silencio le devolvería
+ * a Rodrigo el 9,75 % sobre su bruto sin que nadie se entere.
+ */
+export function baseSegurosDeFila(f: FilaPersonaDb): number | null {
+  return baseSeguros(f.seguros_base_quincena);
 }
 
 /** La vigencia de una ficha leída. Sin las columnas —o con la migración sin

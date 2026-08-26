@@ -800,6 +800,26 @@ export interface FichaPlanilla {
    */
   pagaSeguros?: boolean;
   /**
+   * 🔴 SOBRE QUÉ MONTO se le calculan los seguros, POR QUINCENA. Ver
+   * `seguros-base.ts`. Ausente, `null` o 0 = sobre el TOTAL BRUTO, que es como
+   * estaban las 40 fichas antes de que este campo existiera.
+   *
+   * 🩸 RODRIGO MIRANDA. La contadora, textual: *«su base para el cálculo del
+   * seguro social y seguro educativo es 175.00 […] él está en una planilla
+   * doméstica y con un menor salario»*. `175 × 9,75 % = $17,06` y
+   * `175 × 1,25 % = $2,19`, que son los dos montos escritos a mano en su Excel.
+   * Sobre el bruto le salían $39,38 y $5,05: **$25,18 de más por quincena**.
+   *
+   * 🔴 NO ENCIENDE LOS SEGUROS DE NADIE. `pagaSeguros` manda: con los seguros
+   * apagados las dos columnas siguen en $0,00 aunque haya base cargada. Son dos
+   * preguntas —¿se le cobran? y ¿sobre cuánto?— y la primera va primero.
+   *
+   * ⚠️ ES EL MONTO DE **UNA QUINCENA**, la misma unidad que el bruto al que
+   * reemplaza (no el mensual dividido por dos, como el salario). En un rango
+   * libre se reparte con el MISMO `factorBase` que el sueldo quincenal.
+   */
+  baseSeguros?: number | null;
+  /**
    * 🔴 `true` = COBRA FIJO Y NO PASA POR EL RELOJ. Ver `sueldo-fijo.ts`. Ausente
    * o `false` = marca, que es como estaban las 39 fichas antes de que este campo
    * existiera.
@@ -847,6 +867,19 @@ export interface DineroLinea {
   vacacionesYaPagadas: number;
   tardanzas: number;
   totalBruto: number;
+  /**
+   * El monto sobre el que se calcularon los seguros, cuando NO fue el bruto.
+   * `null` = salieron del bruto, que es el caso de casi todo el mundo.
+   *
+   * 🔑 SOLO PARA MOSTRAR: no se suma en ningún lado. Existe para que un seguro
+   * social de $17,06 donde se esperaba $39,38 se explique sin preguntarle a
+   * nadie. Ya viene repartido por el `factorBase`, o sea que es exactamente el
+   * número que multiplicado por 9,75 % da la columna de al lado.
+   *
+   * ⚠️ Es `null` cuando los seguros están APAGADOS, aunque la ficha tenga base:
+   * ahí lo que hay que mostrar es «sin seguros», no una base que no se usó.
+   */
+  baseSeguros: number | null;
   seguroSocial: number;
   seguroEducativo: number;
   isr: number;
@@ -889,6 +922,18 @@ export interface LineaPlanilla {
    * $0 también daría seguros en cero y no es lo mismo.
    */
   pagaSeguros: boolean;
+  /**
+   * ¿Tiene una base propia para los seguros, y cuál? `null` = salen del bruto.
+   *
+   * Es lo que se muestra —un sello «seguros sobre $175,00»— para que un seguro
+   * social de $17,06 donde se esperaba $39,38 se entienda sin preguntarle a
+   * nadie. Sale de la FICHA, no de mirar si el número dio distinto.
+   *
+   * ⚠️ Es el monto de la ficha tal cual (por quincena). El que de verdad se
+   * multiplicó —ya repartido por el `factorBase` de un rango libre— viaja en
+   * `dinero.baseSeguros`, y en una quincena entera los dos son el mismo número.
+   */
+  baseSeguros: number | null;
   /**
    * ¿Cobra fijo sin pasar por el reloj? Es lo que se muestra —un chip «sueldo
    * fijo»— para que los 0,00 de ausencias, tardanzas y extras no se lean como
@@ -1021,6 +1066,13 @@ export function calcularDinero(
    * lo mismo que devolvía antes de que el parámetro existiera.
    */
   pagaSeguros = true,
+  /**
+   * Sobre qué monto se calculan los seguros, POR QUINCENA. **`null` por
+   * defecto**, o sea sobre el TOTAL BRUTO: sin pasarlo, esta función devuelve
+   * exactamente lo mismo que devolvía antes de que el parámetro existiera.
+   * Ver `seguros-base.ts`.
+   */
+  baseSegurosQuincena: number | null = null,
 ): DineroLinea | null {
   const divisor = divisorDe(jornadaSemanal, reglas);
   if (divisor === null || !(salarioMensual > 0)) return null;
@@ -1097,8 +1149,43 @@ export function calcularDinero(
   // ⚠️ El `!== false` no está de adorno: `undefined` tiene que caer del lado de
   // "sí se le cobra", que es lo que hacían las 38 fichas antes de esto.
   const conSeguros = pagaSeguros !== false;
-  const seguroSocial = conSeguros ? centavos(totalBruto * (reglas.seguroSocialPct / 100)) : 0;
-  const seguroEducativo = conSeguros ? centavos(totalBruto * (reglas.seguroEducativoPct / 100)) : 0;
+
+  // ── 🔴 LA BASE PROPIA REEMPLAZA AL BRUTO, Y NO ENCIENDE NADA ───────────────
+  //
+  // 🩸 RODRIGO MIRANDA. La contadora, textual: *«su base para el cálculo del
+  // seguro social y seguro educativo es 175.00 […] él está en una planilla
+  // doméstica y con un menor salario»*. Sobre el bruto se le retenían $39,38 +
+  // $5,05; sobre los $175 le tocan $17,06 + $2,19 — los dos montos que ella
+  // escribió A MANO en su Excel, sin fórmula. Eran **$25,18 de más** por
+  // quincena, a una persona de verdad. Ver `seguros-base.ts`.
+  //
+  // 🔴 EL ORDEN ES EL CANDADO, Y ES ESTE `conSeguros ?` QUE NO SE MUEVE. La
+  // base contesta *«¿sobre cuánto?»*, no *«¿se le cobran?»*: quien tiene los
+  // seguros apagados sigue con las dos columnas en $0,00 aunque tenga base
+  // cargada. Si la base pudiera encenderlos, un monto tecleado en el campo de
+  // al lado le empezaría a retener a alguien a quien la contadora no le
+  // retiene — y eso se descubre el día de cobro. Hay un test que lo exige.
+  //
+  // ⚠️ SE REPARTE CON EL MISMO `factor` QUE EL QUINCENAL, y por la misma razón:
+  // si no, media quincena pagaría medio sueldo y el seguro ENTERO, o sea que la
+  // base sería el único renglón del cuadro que no se achica al achicar el
+  // rango. Una quincena de verdad tiene factor 1 y `× 1` no mueve un número
+  // IEEE-754: en toda planilla real la base es la que se escribió, clavada.
+  //
+  // ⚠️ El `> 0` no está de adorno: una base en 0 apagaría los seguros por un
+  // camino distinto al del interruptor —sin chip, sin aviso y sin que la
+  // pantalla diga nada—. Un 0 se lee como «no tiene base», igual que un `null`.
+  const basePropia =
+    typeof baseSegurosQuincena === "number"
+    && Number.isFinite(baseSegurosQuincena)
+    && baseSegurosQuincena > 0
+      ? centavos(baseSegurosQuincena * factor)
+      : null;
+  const baseDeSeguros = basePropia ?? totalBruto;
+  const seguroSocial = conSeguros ? centavos(baseDeSeguros * (reglas.seguroSocialPct / 100)) : 0;
+  const seguroEducativo = conSeguros
+    ? centavos(baseDeSeguros * (reglas.seguroEducativoPct / 100))
+    : 0;
 
   const totalDeducciones = centavos(
     seguroSocial + seguroEducativo + manuales.isr + manuales.prestamo
@@ -1128,6 +1215,9 @@ export function calcularDinero(
     extraDiurno, extraNocturno, excedente, domingos, feriados,
     ausencias, ausenciaPorTardanza, ausenciaDeDiaCompleto, vacacionesYaPagadas,
     tardanzas, totalBruto,
+    // 🔑 `null` con los seguros apagados aunque haya base: ahí lo que hay que
+    // mostrar es «sin seguros», no una base que no se usó para nada.
+    baseSeguros: conSeguros ? basePropia : null,
     seguroSocial, seguroEducativo,
     isr: manuales.isr, prestamo: manuales.prestamo,
     terceros: manuales.terceros, mercancia: manuales.mercancia,
@@ -1193,6 +1283,9 @@ export function armarLinea(
         // 🔑 `!== false`, no `=== true`: una ficha vieja sin el campo tiene que
         // seguir pagando seguros. Ver la nota de `FichaPlanilla.pagaSeguros`.
         ficha.pagaSeguros !== false,
+        // 🔑 `?? null`: una ficha vieja sin el campo calcula los seguros sobre
+        // el bruto, como siempre. Ver `FichaPlanilla.baseSeguros`.
+        ficha.baseSeguros ?? null,
       )
       : null;
 
@@ -1209,6 +1302,15 @@ export function armarLinea(
   return {
     fueraDePlanilla,
     pagaSeguros: ficha.pagaSeguros !== false,
+    // 🔑 Solo si de verdad se va a usar: con los seguros apagados el sello que
+    // corresponde es «sin seguros», no una base que no se aplicó.
+    baseSeguros:
+      ficha.pagaSeguros !== false
+      && typeof ficha.baseSeguros === "number"
+      && Number.isFinite(ficha.baseSeguros)
+      && ficha.baseSeguros > 0
+        ? ficha.baseSeguros
+        : null,
     noMarcaReloj: noMarca,
     decidirAMano: motivoDecidir,
     quincenalReferencia,
@@ -1366,7 +1468,14 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
 // LOS TOTALES
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type TotalesPlanilla = Omit<DineroLinea, "rataHora" | "valorMinuto"> & {
+/**
+ * ⚠️ `baseSeguros` SE QUEDA AFUERA a propósito, igual que la rata y el valor del
+ * minuto: es el monto de UNA persona, no algo que se sume entre varias. Un
+ * «total de bases» de $175 al pie de un cuadro de 19 personas sería un número
+ * sin significado que alguien terminaría cotejando contra algo.
+ */
+export type TotalesPlanilla =
+  Omit<DineroLinea, "rataHora" | "valorMinuto" | "baseSeguros"> & {
   /** Cuántas líneas SÍ entraron. */
   personas: number;
   /** Cuántas quedaron afuera por falta de configuración. */
