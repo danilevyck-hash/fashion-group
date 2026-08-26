@@ -18,6 +18,14 @@
 // Y el enlace viejo: `/ventas?tab=referencia` REDIRIGE a /referencia. Sin eso,
 // un favorito guardado caía en una pestaña que ya no existe y Radix, con un
 // `value` sin trigger, no dibuja NADA: pantalla en blanco, sin error.
+//
+// ⚠️ 25-ago-2026 — HAY OTRA VEZ UNA 5ª PESTAÑA, Y NO ES ÉSTA. Ventas ganó
+// **Comisiones** (Daniel: *"Comisiones debe de estar en Ventas"*). Este archivo
+// NO se aflojó: sigue exigiendo que Referencia no vuelva y que /referencia siga
+// viva; lo que cambió es que la tira ahora tiene cinco pestañas nombradas una
+// por una. El caso de Comisiones —que además NO se lleva la ficha del menú,
+// porque /ventas es admin-only y la secretaria entra por /comisiones— vive en
+// `src/__tests__/lib/comisiones-en-ventas.test.tsx`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
@@ -44,10 +52,12 @@ describe("la pestaña Referencia NO vuelve a /ventas", () => {
     // viejo — eso es documentación, no una pestaña montada.)
   });
 
-  it("la tira tiene EXACTAMENTE 4 pestañas, y son las cuatro de siempre", () => {
+  it("la tira tiene EXACTAMENTE 5 pestañas, nombradas una por una", () => {
+    // Una lista literal y no un `toContain`: si mañana aparece una sexta sin que
+    // nadie la haya decidido, el build se pone rojo. Y "referencia" no está.
     const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
     const valores = [...tira.matchAll(/<TabsTrigger value="([a-z]+)"/g)].map((m) => m[1]);
-    expect(valores).toEqual(["resumen", "clientes", "productos", "utilidad"]);
+    expect(valores).toEqual(["resumen", "clientes", "productos", "utilidad", "comisiones"]);
 
     // Un <TabsContent> huérfano (contenido sin pestaña que lo abra) es código
     // muerto que nadie puede ver: los dos lados tienen que coincidir.
@@ -59,7 +69,7 @@ describe("la pestaña Referencia NO vuelve a /ventas", () => {
     const m = /const TABS = \[([^\]]+)\]/.exec(shell);
     expect(m).not.toBeNull();
     const declarados = [...m![1].matchAll(/"([a-z]+)"/g)].map((x) => x[1]);
-    expect(declarados).toEqual(["resumen", "clientes", "productos", "utilidad"]);
+    expect(declarados).toEqual(["resumen", "clientes", "productos", "utilidad", "comisiones"]);
   });
 
   it("un ?tab= desconocido cae en la pestaña por defecto, nunca en blanco", () => {
@@ -71,23 +81,27 @@ describe("la pestaña Referencia NO vuelve a /ventas", () => {
     expect(shell).not.toMatch(/\[tab(?:Raw)?, setTab\] = useState/);
   });
 
-  it("con 4 pestañas se revirtió lo que se PUDO del apretujamiento de la 5ª", () => {
+  it("con 5 pestañas la tira sigue entrando en 390 sin arrastrar nada", () => {
     const clase = /const TAB_TRIGGER_CLASS =\s*\n?\s*"([^"]+)"/.exec(shell);
     expect(clase).not.toBeNull();
-    // La letra vuelve al text-sm del sistema (la 5ª la había bajado a 13 px) y
-    // el relleno de celular al px-2.5 medido en #375.
-    expect(clase![1]).toContain("px-2.5");
-    expect(clase![1]).not.toContain("text-[13px]");
-    expect(clase![1]).not.toContain("sm:text-sm");
+    // 🩸 «Comisiones» tiene las MISMAS 10 letras que tenía «Referencia», así que
+    // devolvió el apriete tal cual: con `text-sm` + `px-2.5` las cinco piden más
+    // de 390 y la PÁGINA se va para el costado. Vuelve —solo bajo `sm`— lo que
+    // ya estaba medido para una tira de cinco. Desde `sm` no cambia un píxel.
+    expect(clase![1]).toContain("px-2 ");
+    expect(clase![1]).toContain("sm:px-4");
+    expect(clase![1]).toContain("text-[13px]");
+    expect(clase![1]).toContain("sm:text-sm");
 
     const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
     // 🔴 EL ICONO SIGUE ESCONDIDO BAJO `sm`, Y NO ES UN OLVIDO. Medido a 390 px
-    // con las cuatro pestañas: con icono suman 395 px y la tira arrastra 6; sin
-    // icono, 315 y arrastra 0. Cada icono cuesta 20 px (80 en total) y ningún
-    // relleno los devuelve — px-1.5 recupera 32 y encima aprieta. Es decorativo:
-    // el texto de la pestaña dice exactamente lo mismo.
-    expect(tira.match(/hidden h-3\.5 w-3\.5 sm:block/g)?.length ?? 0).toBe(4);
+    // con cuatro pestañas: con icono suman 395 px y la tira arrastra 6; sin
+    // icono, 315 y arrastra 0. Cada icono cuesta 20 px (100 con la quinta) y
+    // ningún relleno los devuelve. Es decorativo: el texto dice lo mismo.
+    expect(tira.match(/hidden h-3\.5 w-3\.5 sm:block/g)?.length ?? 0).toBe(5);
     // Y lo que NO puede volver: la tira no scrollea a lo ancho (54 px de #375).
+    // El objetivo sigue siendo que no haya NADA que arrastrar — ni la página ni
+    // la tira—, no mover el arrastre de lugar.
     expect(tira).not.toContain("overflow-x-auto");
   });
 });

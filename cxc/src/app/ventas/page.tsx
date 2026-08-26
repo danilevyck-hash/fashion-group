@@ -36,7 +36,7 @@ export default async function VentasPage() {
   // ~380 ms a una pantalla que ya es la más pesada del sistema. Es UNA consulta
   // acotada (corridas exitosas con rechazo, 7 días) sobre una tabla de 7.680
   // filas — y falla al silencio, así que nunca puede tumbar la página.
-  const [resumen, clientes, multi, availableYears, avisoMontos] = await Promise.all([
+  const [resumen, clientes, multi, availableYears, avisoMontos, avisoRecibos] = await Promise.all([
     fetchVentasResumen({ year }).catch(err => {
       console.error("[ventas] resumen error", err);
       return null;
@@ -56,6 +56,12 @@ export default async function VentasPage() {
     // Las 4 familias del guard que alimentan este módulo. Sin `empresas`: acá se
     // miran las 8, que es justo lo que la pantalla suma.
     lineaDeRechazos({ familias: ["factura", "utilidad", "costo_diario", "articulo_diario"] }),
+    // La familia de COMISIONES, aparte (25-ago-2026). La comisión sobre cobro
+    // lee `switch_recibos`, que NO está en las 4 de arriba — es lo mismo que
+    // pedía `/comisiones` y viaja SOLO al tab Comisiones. Va en el MISMO
+    // Promise.all: en serie le sumaría una consulta a la pantalla más pesada
+    // del sistema. Falla al silencio, como las otras.
+    lineaDeRechazos({ familias: ["recibo"] }),
   ]);
 
   return (
@@ -69,6 +75,7 @@ export default async function VentasPage() {
         clientes={clientes}
         multi={multi}
         avisoMontos={avisoMontos}
+        avisoRecibos={avisoRecibos}
       />
     </Suspense>
   );

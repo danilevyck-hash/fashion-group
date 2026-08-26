@@ -6,7 +6,7 @@ import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, TrendingUp, Contact, Package, Percent } from "lucide-react";
+import { Download, TrendingUp, Contact, Package, Percent, Coins } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import dynamic from "next/dynamic";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
@@ -41,6 +41,20 @@ const ProductosView = dynamic(
 );
 const UtilidadView = dynamic(
   () => import("@/components/ventas/UtilidadView").then((m) => m.UtilidadView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
+// Comisiones (25-ago-2026). Daniel, textual: *"Comisiones debe de estar en
+// Ventas. Y también debe de verse empresa por empresa y todas las empresas."*
+//
+// 🔑 ES EL MISMO COMPONENTE QUE YA SERVÍA `/comisiones`, no una copia. Sus DOS
+// vistas —«Todas las empresas» (matriz vendedor × empresa) y «Por empresa»— ya
+// vivían adentro de `ComisionesView` con memoria en localStorage; la segunda
+// mitad del pedido de Daniel ya estaba construida y lo único que había que
+// garantizar es que sigue funcionando acá adentro. Ningún número, ningún
+// endpoint y ninguna resta cambiaron: esto es una PUERTA nueva, no un cálculo
+// nuevo.
+const ComisionesView = dynamic(
+  () => import("@/components/ventas/ComisionesView").then((m) => m.ComisionesView),
   { ssr: false, loading: () => <TabSkeleton /> },
 );
 
@@ -96,6 +110,14 @@ interface VentasShellProps {
    * es "qué está mal en Switch ahora", no "qué pasó en 2024".
    */
   avisoMontos?: string | null;
+  /**
+   * Lo mismo, pero de la familia `recibo`, y va SOLO al tab Comisiones: la
+   * comisión sobre cobro lee `switch_recibos`. Es OTRA familia que la de
+   * arriba —factura/utilidad/costo/artículo— y por eso viaja en su propio
+   * prop: mostrarle a Comisiones el aviso de Ventas (o al revés) diría que
+   * quedó afuera plata que no es la suya.
+   */
+  avisoRecibos?: string | null;
 }
 
 export function VentasShell({
@@ -105,6 +127,7 @@ export function VentasShell({
   clientes: initialClientes,
   multi: initialMulti,
   avisoMontos,
+  avisoRecibos,
 }: VentasShellProps) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(initialYear);
@@ -228,8 +251,15 @@ export function VentasShell({
               página sin encabezado. El subtítulo se QUEDA: dice qué universo y
               qué meses se están mirando, que no está en ningún otro lado. */}
           <h1 className="sr-only">Ventas</h1>
+          {/* 🔴 «8 empresas» es de Ventas, NO de Comisiones: la matriz de
+              comisiones son las SEIS de Fashion Group (`EMPRESAS_COMISIONAN` =
+              `B2B_EMPRESA_KEYS`) — Confecciones Boston y American Classic no
+              comisionan acá (Multifashion es OTRO módulo, con OTRA base). Un
+              subtítulo que diga 8 arriba de una tabla de 6 hace buscar las dos
+              que faltan. Y el período tampoco es el de Ventas: Comisiones lo
+              elige adentro, mes por mes. */}
           <p className="text-xs text-gray-500">
-            8 empresas · {mesesLabel}
+            {tab === "comisiones" ? "6 empresas · mayoreo B2B" : `8 empresas · ${mesesLabel}`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -238,6 +268,12 @@ export function VentasShell({
           {/* iPhone: el trigger medía 88×36 — por debajo de los 44 de alto de la
               regla táctil. h-11 = 44px exactos. En desktop solo crece 8px y
               queda alineado con el botón Excel (que también va a 44). */}
+          {/* 🔴 En Comisiones NO se dibuja: esa pantalla trae su propio control
+              de período (`ComisionesPeriodo`, que es mes + año en UNA caja) y
+              el de acá NO lo maneja. Dos selectores de año, uno inerte, es
+              exactamente cómo se lee la comisión de julio creyendo que es la de
+              agosto. */}
+          {tab !== "comisiones" && (
           <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
             <SelectTrigger className="h-11 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
               <SelectValue />
@@ -250,9 +286,11 @@ export function VentasShell({
               ))}
             </SelectContent>
           </Select>
-          {/* Excel global = export del Resumen. En el tab Productos se oculta
-              porque ese tab trae su propio export (por empresa + período). */}
-          {tab !== "productos" && tab !== "utilidad" && (
+          )}
+          {/* Excel global = export del Resumen. En Productos, Utilidad y
+              Comisiones se oculta porque esos tabs traen su propio export (y el
+              de Comisiones baja OTRA hoja: la de la vista activa). */}
+          {!TABS_CON_CONTROLES_PROPIOS.some((t) => t === tab) && (
             /* iPhone: medía 79×32. size="sm" fija h-8; el min-h-[44px] gana
                sobre `height` en CSS (min-height siempre manda) sin tocar el
                tamaño de letra ni el padding horizontal. */
@@ -266,7 +304,10 @@ export function VentasShell({
       {/* Qué se quedó AFUERA de los números de este módulo. Va ARRIBA de las
           pestañas y no adentro de una: el mismo documento corrupto envenena la
           venta, el margen y la comisión, así que se dice UNA vez para las
-          cuatro. Sin rechazos no se dibuja nada. */}
+          CINCO. Sin rechazos no se dibuja nada.
+          ⚠️ Es la familia factura/utilidad/costo/artículo. Los COBROS son otra
+          familia (`recibo`) y tienen su propio aviso DENTRO de Comisiones — no
+          se fusionan: la comisión sobre cobro lee `switch_recibos`. */}
       <AvisoRechazosSwitch texto={avisoMontos} className="mb-4" />
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
@@ -301,6 +342,9 @@ export function VentasShell({
           </TabsTrigger>
           <TabsTrigger value="utilidad" className={TAB_TRIGGER_CLASS}>
             <Percent className="hidden h-3.5 w-3.5 sm:block" /> Utilidad
+          </TabsTrigger>
+          <TabsTrigger value="comisiones" className={TAB_TRIGGER_CLASS}>
+            <Coins className="hidden h-3.5 w-3.5 sm:block" /> Comisiones
           </TabsTrigger>
         </TabsList>
 
@@ -347,6 +391,15 @@ export function VentasShell({
               al cambiar año para resetear search/sort. */}
           <UtilidadView key={selectedYear} selectedYear={selectedYear} />
         </TabsContent>
+        <TabsContent value="comisiones" className="mt-5">
+          {/* 🔴 SIN `key={selectedYear}`. Comisiones NO depende del año de la
+              barra de arriba —tiene su propio período (mes + año) adentro— así
+              que remontarla al cambiar ese selector le borraría el mes elegido
+              y el modo (Todas / Por empresa) sin que nadie lo haya pedido. Es
+              el mismo motivo por el que Productos tampoco lo lleva.
+              `availableYears` es el MISMO array que recibía `/comisiones`. */}
+          <ComisionesView availableYears={availableYears} avisoMontos={avisoRecibos} />
+        </TabsContent>
       </Tabs>
     </main>
     </PullToRefresh>
@@ -386,10 +439,32 @@ const MES_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep"
 
 // Las pestañas de Ventas, en el orden en que se ven. Es la lista contra la que
 // se valida el ?tab= de la URL: lo que no esté acá cae en "resumen".
-const TABS = ["resumen", "clientes", "productos", "utilidad"] as const;
+// «Comisiones» va ÚLTIMA a propósito: es la que se abre una vez al mes, y
+// ponerla antes correría de lugar las cuatro que se usan todos los días.
+const TABS = ["resumen", "clientes", "productos", "utilidad", "comisiones"] as const;
 
-// Clase compartida de las 4 pestañas. En celular el relleno lateral baja a
-// px-2.5 (devuelve 48 px y las cuatro entran en 390 sin arrastrar); desde `sm`
-// vuelve el de siempre. El icono se ve en todos los anchos.
+// Las pestañas que traen SU PROPIO Excel y SU PROPIO selector de período, así
+// que los de la barra de arriba no se dibujan: dos selectores de año en la
+// misma pantalla es la forma más barata de que alguien lea un número de un año
+// creyendo que es de otro.
+const TABS_CON_CONTROLES_PROPIOS = ["productos", "utilidad", "comisiones"] as const;
+
+// Clase compartida de las 5 pestañas.
+//
+// 🩸 LA QUINTA PESTAÑA VUELVE A APRETAR LA TIRA, Y ES EL MISMO APRIETE DE
+// SIEMPRE. Con CUATRO, la tira medía 315 px de texto + 32 de relleno = 347 en
+// una pantalla de 390: 43 px de aire, y por eso el 12-ago-2026 —cuando
+// Referencia se fue a su propio módulo— se revirtió la letra a `text-sm` y el
+// relleno a `px-2.5`. «Comisiones» tiene EXACTAMENTE las mismas 10 letras que
+// «Referencia», así que devuelve el problema tal cual: sin tocar nada, las
+// cinco no entran en 390 y la PÁGINA se va para el costado.
+//
+// Se restaura lo que ya estaba medido para una tira de cinco, y solo bajo `sm`:
+//   · `text-[13px] sm:text-sm` — 1 px de letra por pestaña.
+//   · `px-2 sm:px-4` — 1 px de relleno por lado.
+// Desde `sm` no cambia un píxel respecto de hoy. El icono SIGUE escondido bajo
+// `sm` (cuesta 20 px por pestaña, 100 en total, y es decorativo: el texto de la
+// pestaña dice lo mismo) y la tira SIGUE sin `overflow-x-auto`: el objetivo es
+// que no haya nada que arrastrar, ni la página ni la tira.
 const TAB_TRIGGER_CLASS =
-  "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-3 text-gray-500 sm:px-4 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
+  "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-[13px] text-gray-500 sm:px-4 sm:text-sm data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";

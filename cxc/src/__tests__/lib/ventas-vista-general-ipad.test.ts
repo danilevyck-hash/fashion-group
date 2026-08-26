@@ -215,22 +215,31 @@ describe("Vista General › Rentabilidad por empresa — tarjetas en iPhone, tab
   });
 });
 
-describe("la tira de pestañas de Ventas deja de arrastrarse (54 px en los 4 tabs)", () => {
+describe("la tira de pestañas de Ventas no se arrastra (54 px que costaban los tabs)", () => {
   it("el TabsList ya no scrollea a lo ancho", () => {
     const linea = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
     expect(linea).not.toContain("overflow-x-auto");
   });
 
-  it("las 4 pestañas siguen ahí con su nombre completo, y son SOLO cuatro", () => {
-    for (const t of ["Resumen", "Clientes", "Productos", "Utilidad"]) {
+  it("las 5 pestañas están con su nombre completo, y son SOLO cinco", () => {
+    for (const t of ["Resumen", "Clientes", "Productos", "Utilidad", "Comisiones"]) {
       expect(shell).toContain(`> ${t}\n`);
     }
     // Referencia fue la 5ª entre el 9 y el 12-ago-2026 y volvió a arrastrar el
     // celular (por eso se escondían los iconos y la letra bajaba a 13 px). Se
-    // mudó a su propio módulo, /referencia; el inventario completo de la tira y
-    // el redirect del enlace viejo viven en ventas-tab-referencia-fuera.test.ts.
+    // mudó a su propio módulo, /referencia.
+    //
+    // ⚠️ 25-ago-2026: la 5ª volvió, y es **Comisiones** (Daniel: *"Comisiones
+    // debe de estar en Ventas"*). Tiene las MISMAS 10 letras que «Referencia»,
+    // así que devolvió el mismo apriete y se restauró la misma solución medida
+    // —icono escondido bajo `sm`, letra 13 px y relleno px-2, todo solo bajo
+    // `sm`—. Lo que NO volvió es el `overflow-x-auto`: el test de arriba lo
+    // sigue prohibiendo, y la medición en el navegador dice 0 px de arrastre de
+    // página en los 4 anchos. El inventario completo de la tira vive en
+    // ventas-tab-referencia-fuera.test.ts y el caso de Comisiones en
+    // comisiones-en-ventas.test.tsx.
     const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
-    expect(tira.match(/<TabsTrigger /g)?.length ?? 0).toBe(4);
+    expect(tira.match(/<TabsTrigger /g)?.length ?? 0).toBe(5);
     expect(tira).not.toContain("Referencia");
   });
 });
