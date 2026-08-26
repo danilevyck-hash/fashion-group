@@ -83,23 +83,6 @@ export interface ResultadoVeredicto {
 
 /* ── Parecido ─────────────────────────────────────────────────────────────── */
 
-/** Distancia de edición (Levenshtein) entre dos cadenas ya en minúsculas. */
-export function levenshtein(a: string, b: string): number {
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    const fila = [i];
-    for (let j = 1; j <= b.length; j++) {
-      const costo = a[i - 1] === b[j - 1] ? 0 : 1;
-      fila[j] = Math.min(fila[j - 1] + 1, prev[j] + 1, prev[j - 1] + costo);
-    }
-    prev = fila;
-  }
-  return prev[b.length];
-}
-
 /** true si las dos difieren SOLO por una "s" final en una o más palabras
  *  ("T-Shirt"/"T-Shirts", "Boys"/"Boy", "Short Knit"/"Shorts Knit"). */
 function difiereSoloPorSFinal(a: string, b: string): boolean {
@@ -110,17 +93,27 @@ function difiereSoloPorSFinal(a: string, b: string): boolean {
   return pa.every((p, i) => p === pb[i] || `${p}s` === pb[i] || p === `${pb[i]}s`);
 }
 
-/** Casi-gemelas: lo que a Daniel le da miedo. Dos criterios, ambos sobre las
- *  claves ya normalizadas y en minúsculas:
- *   · difieren solo por una "s" final en alguna palabra (sin piso de largo:
- *     "Boy"/"Boys" tiene que alertar), o
- *   · Levenshtein ≤ 2 y AMBAS miden ≥ 6 caracteres (el piso evita que dos
- *     mitades cortas y sin relación se llamen gemelas). */
+/** Casi-gemelas: lo que a Daniel le da miedo, «que sea por ejemplo tshirts y
+ *  diga tshirt y lo deje pasar». UN solo criterio: las dos difieren SOLO por
+ *  una "s" final en alguna palabra. Sin piso de largo — "Boy"/"Boys" tiene que
+ *  alertar igual que "T-Shirt"/"T-Shirts".
+ *
+ *  ⛔ La distancia de edición (Levenshtein ≤ 2) se PROBÓ y se SACÓ el 26-ago.
+ *  Medida contra las 509 descripciones vivas de CK+TH+KL, disparó 9 veces y las
+ *  9 eran falsas: emparejaba prendas legítimamente distintas, no typos —
+ *  "Men-Shirts"→"Men-T-Shirts" (72 art.), "Men-Polos L/S"→"Men-Polos S/S"
+ *  (27 art.), "Boys-Shirts"→"Boys-Skirts" (4 art.). Una camisa no es una
+ *  camiseta y manga larga no es manga corta: la diferencia es una PRENDA, no
+ *  una letra comida.
+ *
+ *  Sacarla NO deja pasar nada: no cambia ni un veredicto (se verificó contra
+ *  las 509 reales + 4.000 mutaciones sintéticas del catálogo). El parecido solo
+ *  elige la ETIQUETA — cuando una mitad no existe, la alerta salta igual y
+ *  ahora dice la verdad: «mitad nueva: «Shirts»». NO reponer sin volver a
+ *  medir. */
 export function esCasiIgual(a: string, b: string): boolean {
   if (a === b) return false;
-  if (difiereSoloPorSFinal(a, b)) return true;
-  if (a.length >= 6 && b.length >= 6 && levenshtein(a, b) <= 2) return true;
-  return false;
+  return difiereSoloPorSFinal(a, b);
 }
 
 /* ── Índice del catálogo ──────────────────────────────────────────────────── */
@@ -158,21 +151,14 @@ export function indexarCatalogo(catalogo: CatalogoDescripciones): IndiceCatalogo
   return idx;
 }
 
-/** La gemela MÁS parecida a `k` dentro del mapa (null si ninguna lo es).
- *  Se busca la más cercana, no la primera: si "Mens-T-Shirts S/S" se parece a
- *  "Men-T-Shirts S/S" y a "Men-T-Shirts L/S", en pantalla tiene que salir la
- *  primera. Orden: primero las que difieren solo por una "s" final, después por
- *  distancia de edición. */
+/** La gemela de `k` dentro del mapa (null si ninguna lo es). Con un solo
+ *  criterio —la "s" final— no hay grados de parecido que desempatar: la
+ *  primera que cumple es la que se muestra. */
 function buscarGemela(k: string, mapa: Map<string, string>): string | null {
-  let mejor: string | null = null;
-  let mejorPuntaje = Infinity;
   for (const [ck, original] of mapa) {
-    if (!esCasiIgual(k, ck)) continue;
-    const puntaje = difiereSoloPorSFinal(k, ck) ? 0 : levenshtein(k, ck);
-    if (puntaje < mejorPuntaje) { mejor = original; mejorPuntaje = puntaje; }
-    if (mejorPuntaje === 0) break;
+    if (esCasiIgual(k, ck)) return original;
   }
-  return mejor;
+  return null;
 }
 
 /* ── El veredicto ─────────────────────────────────────────────────────────── */
