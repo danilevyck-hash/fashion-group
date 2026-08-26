@@ -64,7 +64,7 @@ import ConfiguracionTab from "./ConfiguracionTab";
 import JustificacionesTab from "./JustificacionesTab";
 import VacacionesTab from "./VacacionesTab";
 import AprobacionesTab from "./AprobacionesTab";
-import { APROBACIONES_ROLES } from "@/lib/asistencia/roles";
+import { APROBACIONES_ROLES, vePestana } from "@/lib/asistencia/roles";
 import ComoFuncionaTab from "./ComoFuncionaTab";
 
 const TABS = [
@@ -97,15 +97,7 @@ const TABS = [
 
 type Tab = (typeof TABS)[number][0];
 
-/**
- * Las pestañas que son solo de quien aprueba.
- *
- * 🔑 Esto es la NAVEGACIÓN, no el candado — misma división que ya explica
- * `roles.ts`: esconder la pestaña no cierra nada, el freno de verdad está en
- * `/api/asistencia/aprobaciones`, que exige el rol. Acá se esconde para que la
- * contadora y las secretarias no vean un botón que no van a poder usar.
- */
-const SOLO_APRUEBA: readonly Tab[] = ["aprobaciones"];
+// Qué pestañas ve cada rol vive en `lib/asistencia/roles.ts` (`vePestana`).
 
 export default function AsistenciaClient() {
   // useUrlState usa useSearchParams → necesita un límite de Suspense propio
@@ -133,9 +125,18 @@ function AsistenciaInner() {
   useEffect(() => { setRol(sessionStorage.getItem("cxc_role") || ""); }, []);
   const puedeAprobar = (APROBACIONES_ROLES as readonly string[]).includes(rol);
 
-  const visibles = TABS.filter(([k]) => puedeAprobar || !SOLO_APRUEBA.includes(k));
-  // Una pestaña que no se ve tampoco se abre por la URL: cae en la de siempre.
-  const tab: Tab = visibles.some(([k]) => k === tabRaw) ? tabRaw : "planilla";
+  // 🔴 La regla vive en `roles.ts` y acá solo se aplica (26-ago-2026). Antes
+  // bastaba con «¿puede aprobar?» porque el único que podía era `admin`, y
+  // admin ve todo. Desde que `bodega` aprueba —el usuario con el que trabaja
+  // Julio Garay— hay que preguntar las DOS cosas: él entra a Asistencia solo
+  // para autorizar horas extra, y la Planilla trae el sueldo de las 38.
+  const visibles = TABS.filter(([k]) => vePestana(rol, k));
+  // Una pestaña que no se ve tampoco se abre por la URL: cae en la primera que
+  // esta persona SÍ puede ver. 🔑 No en "planilla" a secas: quien solo aprueba
+  // aterrizaría en una pantalla que su propio rol no puede cargar, y vería un
+  // error en vez de su trabajo.
+  const porDefecto: Tab = (visibles[0]?.[0] ?? "planilla") as Tab;
+  const tab: Tab = visibles.some(([k]) => k === tabRaw) ? tabRaw : porDefecto;
 
   return (
     <>
