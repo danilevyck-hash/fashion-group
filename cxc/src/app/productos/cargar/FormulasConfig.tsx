@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   EMPRESAS_DESTINO, MARCA_CATALOGO, descripcionesDeMarca, norm, marcaKey, marcaRubroKey,
   type CatalogoDescripciones, type Redondeo, type MarcaFormula, type MarcaRubroFormula,
@@ -284,16 +284,10 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
         <div className="mb-6">
           <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-teal-800">Nuevas marcas</div>
           {nuevas.map((row) => (
-            <div key={row.id} className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
-              <input value={row.marca} onChange={(e) => patchMarca(row.id, { marca: e.target.value })} placeholder="Nombre de la marca"
-                className="min-h-[44px] w-40 rounded-md border border-stone-300 bg-white px-2 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20" />
-              <select value={row.empresa ?? ""} onChange={(e) => patchMarca(row.id, { empresa: e.target.value || null })} className={selCls}>
-                {cfg.grupos.filter((g) => g.label).map((g) => <option key={g.label} value={g.label}>{g.label}</option>)}
-                <option value="">Otras</option>
-              </select>
-              <MarcaInputs row={row} onPatch={patchMarca} />
-              <SaveBtn label={savingId === row.id ? "Guardando…" : "Guardar"} dirty onClick={() => saveMarca(row.id)} disabled={savingId === row.id} flashed={flashId === row.id} />
-            </div>
+            <NuevaMarcaRow
+              key={row.id} row={row} grupos={cfg.grupos} onPatch={patchMarca} onSave={saveMarca}
+              saving={savingId === row.id} flashed={flashId === row.id}
+            />
           ))}
         </div>
       )}
@@ -328,7 +322,104 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
   );
 }
 
+// ── Campos de una fórmula ────────────────────────────────────────────────────
+//
+// Divisor, extra y redondeo se dibujan en CUATRO lugares (la grilla de
+// escritorio, la tarjeta de móvil, la marca nueva y cada descripción). Van una
+// sola vez acá y cada lugar les pasa el ancho.
+const noPropagar = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
+function DivisorInput({ value, onChange, cls, aria }: { value: number; onChange: (n: number) => void; cls: string; aria?: string }) {
+  return (
+    <input type="number" step="0.01" inputMode="decimal" value={value || ""} placeholder="—" onClick={noPropagar}
+      onChange={(e) => onChange(Number(e.target.value) || 0)} className={`${numCls} ${cls}`} aria-label={aria} />
+  );
+}
+function ExtraSelect({ value, onChange, cls, aria = "Extra" }: { value: number; onChange: (n: number) => void; cls: string; aria?: string }) {
+  return (
+    <select value={value} onClick={noPropagar} onChange={(e) => onChange(parseInt(e.target.value))} className={`${selCls} ${cls}`} aria-label={aria}>
+      {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+    </select>
+  );
+}
+function RedondeoSelect({ value, onChange, cls, aria = "Redondeo" }: { value: Redondeo; onChange: (r: Redondeo) => void; cls: string; aria?: string }) {
+  return (
+    <select value={value} onClick={noPropagar} onChange={(e) => onChange(e.target.value as Redondeo)} className={`${selCls} ${cls}`} aria-label={aria}>
+      <option value="int">Entero</option>
+      <option value="half">.50</option>
+      <option value="par">Par</option>
+    </select>
+  );
+}
+
+// Etiqueta arriba, dato abajo. Solo en las tarjetas (<lg): en la grilla de
+// escritorio los rótulos son el encabezado de columnas.
+function Campo({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block min-w-0" onClick={noPropagar}>
+      <span className="mb-0.5 block text-[12px] font-medium uppercase tracking-wide text-stone-500">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+// ── Marca nueva (aún sin guardar) ────────────────────────────────────────────
+function NuevaMarcaRow({ row, grupos, onPatch, onSave, saving, flashed }: {
+  row: MarcaRow; grupos: { label: string; marca: string }[];
+  onPatch: (id: string, p: Partial<MarcaRow>) => void; onSave: (id: string) => void;
+  saving: boolean; flashed: boolean;
+}) {
+  const nombre = (cls: string) => (
+    <input value={row.marca} onChange={(e) => onPatch(row.id, { marca: e.target.value })} placeholder="Nombre de la marca"
+      aria-label="Nombre de la marca"
+      className={`min-h-[44px] rounded-md border border-stone-300 bg-white px-2 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20 ${cls}`} />
+  );
+  const empresa = (cls: string) => (
+    <select value={row.empresa ?? ""} onChange={(e) => onPatch(row.id, { empresa: e.target.value || null })} className={`${selCls} ${cls}`} aria-label="Empresa">
+      {grupos.filter((g) => g.label).map((g) => <option key={g.label} value={g.label}>{g.label}</option>)}
+      <option value="">Otras</option>
+    </select>
+  );
+  const divisor = (cls: string) => <DivisorInput value={row.divisor} onChange={(n) => onPatch(row.id, { divisor: n })} cls={cls} aria="Divisor" />;
+  const extra = (cls: string) => <ExtraSelect value={row.extra} onChange={(n) => onPatch(row.id, { extra: n })} cls={cls} />;
+  const redondeo = (cls: string) => <RedondeoSelect value={row.redondeo} onChange={(r) => onPatch(row.id, { redondeo: r })} cls={cls} />;
+  const guardar = <SaveBtn label={saving ? "Guardando…" : "Guardar"} dirty onClick={() => onSave(row.id)} disabled={saving} flashed={flashed} />;
+
+  return (
+    <div className="mb-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
+      {/* ── Móvil e iPad vertical (<lg): cada campo con su etiqueta ── */}
+      <div data-layout="tarjetas" className="space-y-2 lg:hidden">
+        <Campo label="Marca">{nombre("w-full")}</Campo>
+        <Campo label="Empresa">{empresa("w-full")}</Campo>
+        <div className="grid grid-cols-3 gap-2">
+          <Campo label="Divisor">{divisor("w-full")}</Campo>
+          <Campo label="Extra">{extra("w-full")}</Campo>
+          <Campo label="Redondeo">{redondeo("w-full")}</Campo>
+        </div>
+        <div className="flex justify-end">{guardar}</div>
+      </div>
+      {/* ── Escritorio (lg+): la fila de siempre ── */}
+      <div data-layout="fila" className="hidden flex-wrap items-center gap-2 lg:flex">
+        {nombre("w-40")}
+        {empresa("")}
+        {divisor("w-[56px]")}
+        {extra("w-[44px]")}
+        {redondeo("w-[90px]")}
+        {guardar}
+      </div>
+    </div>
+  );
+}
+
 // ── Tarjeta de marca ─────────────────────────────────────────────────────────
+//
+// 🩸 A 390 px la grilla de escritorio dejaba ~30 px para el nombre de la marca y
+// Reebok se leía «▸R». Las cuatro columnas fijas de
+// `grid-cols-[minmax(0,1fr)_64px_50px_90px_96px]` son 300 px, más 32 de gaps y
+// 28 de relleno = 360 de los 390 — y el `truncate` del nombre se comía el resto
+// sin pedir una sola fila de arrastre, así que ningún censo de arrastre lo veía.
+// Desde acá el corte es el mismo que en Guías: tarjeta hasta `lg`, la grilla de
+// siempre desde `lg` (a 834 la barra lateral deja ~562 px útiles: tampoco entra).
 function MarcaCard({
   row, catalogo, isOpen, onToggle, onPatchMarca, onSaveMarca, savingMarca, flashMarca,
   descRowFor, onPatchDesc, onSaveDesc, busyDesc, flashDesc, searchQ,
@@ -345,106 +436,153 @@ function MarcaCard({
   const heredan = descs.length - conFormula;
   const marcaLabel = savingMarca ? "Guardando…" : row.dirty ? "Guardar" : row.saved ? "Guardado" : "Guardar";
 
+  const badge = descs.length === 0 ? null : conFormula > 0
+    ? <span className="shrink-0 rounded bg-teal-50 px-1.5 py-0.5 text-[12px] font-semibold text-teal-700 lg:text-[10px]">{conFormula} propia · {heredan} heredan</span>
+    : <span className="shrink-0 text-[12px] text-stone-500 lg:text-[11px]">{descs.length} desc · todas heredan</span>;
+  const divisor = (cls: string) => <DivisorInput value={row.divisor} onChange={(n) => onPatchMarca(row.id, { divisor: n })} cls={cls} aria={`Divisor ${row.marca}`} />;
+  const extra = (cls: string) => <ExtraSelect value={row.extra} onChange={(n) => onPatchMarca(row.id, { extra: n })} cls={cls} />;
+  const redondeo = (cls: string) => <RedondeoSelect value={row.redondeo} onChange={(r) => onPatchMarca(row.id, { redondeo: r })} cls={cls} />;
+  const guardar = <SaveBtn label={marcaLabel} dirty={row.dirty || !row.saved} onClick={() => onSaveMarca(row.id)} disabled={savingMarca} flashed={flashMarca} />;
+
   return (
     <div className="mb-1.5 overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
-      {/* Header — toda el área expande/colapsa (salvo los inputs de fórmula de marca).
-          Misma grilla que las filas de descripción → todo alineado en columnas. */}
+      {/* Header — toda el área expande/colapsa (salvo los campos de la fórmula). */}
       <div onClick={onToggle} title={compactFormula(row)} className="cursor-pointer select-none">
-        <div className="grid grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 py-2">
+        {/* ── Móvil e iPad vertical (<lg): el nombre COMPLETO arriba, los campos con su etiqueta ── */}
+        <div data-layout="tarjetas" className="px-3.5 py-3 lg:hidden">
+          <div className="flex items-start justify-between gap-2">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <span aria-hidden className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
+              <span className="break-words text-[15px] font-bold text-stone-900">{row.marca}</span>
+              {badge}
+            </span>
+            {guardar}
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <Campo label="Divisor">{divisor("w-full")}</Campo>
+            <Campo label="Extra">{extra("w-full")}</Campo>
+            <Campo label="Redondeo">{redondeo("w-full")}</Campo>
+          </div>
+        </div>
+        {/* ── Escritorio (lg+): la misma grilla que las filas de descripción ── */}
+        <div data-layout="fila" className="hidden grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 py-2 lg:grid">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-2">
-              <span className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
+              <span aria-hidden className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
               <span className="truncate text-[14px] font-bold text-stone-900">{row.marca}</span>
-              {descs.length > 0 && (
-                conFormula > 0
-                  ? <span className="shrink-0 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">{conFormula} propia · {heredan} heredan</span>
-                  : <span className="shrink-0 text-[11px] text-stone-500">{descs.length} desc · todas heredan</span>
-              )}
+              {badge}
             </span>
             <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-stone-400">Marca:</span>
           </div>
-          <input type="number" step="0.01" inputMode="decimal" value={row.divisor || ""} placeholder="—" onClick={(e) => e.stopPropagation()}
-            onChange={(e) => onPatchMarca(row.id, { divisor: Number(e.target.value) || 0 })} className={`${numCls} w-full`} aria-label={`Divisor ${row.marca}`} />
-          <select value={row.extra} onClick={(e) => e.stopPropagation()} onChange={(e) => onPatchMarca(row.id, { extra: parseInt(e.target.value) })} className={`${selCls} w-full`} aria-label="Extra">
-            {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-          <select value={row.redondeo} onClick={(e) => e.stopPropagation()} onChange={(e) => onPatchMarca(row.id, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-full`} aria-label="Redondeo">
-            <option value="int">Entero</option>
-            <option value="half">.50</option>
-            <option value="par">Par</option>
-          </select>
-          <SaveBtn label={marcaLabel} dirty={row.dirty || !row.saved} onClick={() => onSaveMarca(row.id)} disabled={savingMarca} flashed={flashMarca} />
+          {divisor("w-full")}
+          {extra("w-full")}
+          {redondeo("w-full")}
+          {guardar}
         </div>
       </div>
 
-      {/* Cuerpo — al expandir (misma grilla y px que el header → columnas alineadas) */}
+      {/* Cuerpo — al expandir. */}
       {isOpen && descs.length > 0 && (
         <div className="border-t border-stone-200 py-1.5">
-          <div className="grid grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+          <div className="hidden grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400 lg:grid">
             <span>Descripción</span><span className="text-right">Divisor</span><span className="text-right">Extra</span><span>Redondeo</span><span></span>
           </div>
-          {descs.map((desc) => {
-            const r = descRowFor(row.marca, desc);
-            const hl = searchQ && norm(desc).includes(searchQ);
-            return (
-              <div key={desc} className={`grid grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 py-0.5 ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
-                <div className="flex min-w-0 items-center justify-between gap-2">
-                  <span className={`flex min-w-0 items-center gap-1.5 truncate text-[13px] ${r.fija ? "font-semibold text-amber-700" : r.propia ? "font-medium text-teal-700" : "text-stone-500"}`}>
-                    <span className="truncate">{desc}</span>
-                    {r.fija
-                      ? <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800">precio fijo</span>
-                      : r.propia && <span className="shrink-0 rounded bg-teal-50 px-1 py-0.5 text-[9px] font-semibold text-teal-700">propia</span>}
-                  </span>
-                  <select value={r.modo} onChange={(e) => onPatchDesc(row.marca, desc, { modo: e.target.value as DescModo })}
-                    className={`${selCls} shrink-0 w-[92px] ${r.modo === "fijo" ? "border-amber-300 text-amber-800" : ""}`} aria-label="Modo de precio">
-                    <option value="formula">Fórmula</option>
-                    <option value="fijo">Precio fijo</option>
-                  </select>
-                </div>
-                {r.modo === "fijo" ? (
-                  <div className="col-span-3 flex items-center gap-1">
-                    <span className="text-[13px] font-semibold text-amber-700">$</span>
-                    <input type="number" step="0.01" inputMode="decimal" value={r.precioFijo ?? ""} placeholder="precio fijo"
-                      onChange={(e) => onPatchDesc(row.marca, desc, { precioFijo: e.target.value === "" ? null : Number(e.target.value) })}
-                      className={`${numCls} w-full border-amber-300 text-left`} aria-label={`Precio fijo ${desc}`} />
-                  </div>
-                ) : (
-                  <>
-                    <input type="number" step="0.01" value={r.divisor || ""} placeholder="—"
-                      onChange={(e) => onPatchDesc(row.marca, desc, { divisor: Number(e.target.value) || 0 })} className={`${numCls} w-full`} />
-                    <select value={r.extra} onChange={(e) => onPatchDesc(row.marca, desc, { extra: parseInt(e.target.value) })} className={`${selCls} w-full`}>
-                      {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                    <select value={r.redondeo} onChange={(e) => onPatchDesc(row.marca, desc, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-full`}>
-                      <option value="int">Entero</option>
-                      <option value="half">.50</option>
-                      <option value="par">Par</option>
-                    </select>
-                  </>
-                )}
-                <SaveBtn label={busyDesc === r.key ? "…" : r.dirty ? "Guardar" : "✓"} dirty={r.dirty} onClick={() => onSaveDesc(row.marca, desc)} disabled={busyDesc === r.key} flashed={flashDesc === r.key} compact />
-              </div>
-            );
-          })}
+          {descs.map((desc) => (
+            <DescFila
+              key={desc} marca={row.marca} desc={desc} r={descRowFor(row.marca, desc)}
+              hl={!!searchQ && norm(desc).includes(searchQ)}
+              onPatch={onPatchDesc} onSave={onSaveDesc} busy={busyDesc} flash={flashDesc}
+            />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-function MarcaInputs({ row, onPatch }: { row: MarcaRow; onPatch: (id: string, p: Partial<MarcaRow>) => void }) {
+// ── Fila / tarjeta de una descripción ────────────────────────────────────────
+function DescFila({ marca, desc, r, hl, onPatch, onSave, busy, flash }: {
+  marca: string; desc: string; r: DescRowState; hl: boolean;
+  onPatch: (m: string, d: string, p: Partial<DescEdit>) => void;
+  onSave: (m: string, d: string) => void;
+  busy: string | null; flash: string | null;
+}) {
+  const chip = r.fija
+    ? <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[12px] font-semibold text-amber-800 lg:text-[9px]">precio fijo</span>
+    : r.propia
+      ? <span className="shrink-0 rounded bg-teal-50 px-1 py-0.5 text-[12px] font-semibold text-teal-700 lg:text-[9px]">propia</span>
+      : null;
+  const color = r.fija ? "font-semibold text-amber-700" : r.propia ? "font-medium text-teal-700" : "text-stone-500";
+  const modo = (cls: string) => (
+    <select value={r.modo} onChange={(e) => onPatch(marca, desc, { modo: e.target.value as DescModo })}
+      className={`${selCls} ${cls} ${r.modo === "fijo" ? "border-amber-300 text-amber-800" : ""}`} aria-label={`Modo de precio ${desc}`}>
+      <option value="formula">Fórmula</option>
+      <option value="fijo">Precio fijo</option>
+    </select>
+  );
+  const precioFijo = (cls: string) => (
+    <input type="number" step="0.01" inputMode="decimal" value={r.precioFijo ?? ""} placeholder="precio fijo"
+      onChange={(e) => onPatch(marca, desc, { precioFijo: e.target.value === "" ? null : Number(e.target.value) })}
+      className={`${numCls} ${cls} border-amber-300 text-left`} aria-label={`Precio fijo ${desc}`} />
+  );
+  const divisor = (cls: string) => <DivisorInput value={r.divisor} onChange={(n) => onPatch(marca, desc, { divisor: n })} cls={cls} aria={`Divisor ${desc}`} />;
+  const extra = (cls: string) => <ExtraSelect value={r.extra} onChange={(n) => onPatch(marca, desc, { extra: n })} cls={cls} aria={`Extra ${desc}`} />;
+  const redondeo = (cls: string) => <RedondeoSelect value={r.redondeo} onChange={(x) => onPatch(marca, desc, { redondeo: x })} cls={cls} aria={`Redondeo ${desc}`} />;
+  const guardar = <SaveBtn label={busy === r.key ? "…" : r.dirty ? "Guardar" : "✓"} dirty={r.dirty} onClick={() => onSave(marca, desc)} disabled={busy === r.key} flashed={flash === r.key} compact />;
+
   return (
     <>
-      <input type="number" step="0.01" value={row.divisor || ""} placeholder="div"
-        onChange={(e) => onPatch(row.id, { divisor: Number(e.target.value) || 0 })} className={`${numCls} w-[56px]`} aria-label="Divisor" />
-      <select value={row.extra} onChange={(e) => onPatch(row.id, { extra: parseInt(e.target.value) })} className={`${selCls} w-[44px]`} aria-label="Extra">
-        {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-      </select>
-      <select value={row.redondeo} onChange={(e) => onPatch(row.id, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-[90px]`} aria-label="Redondeo">
-        <option value="int">Entero</option>
-        <option value="half">.50</option>
-        <option value="par">Par</option>
-      </select>
+      {/* ── Móvil e iPad vertical (<lg): una tarjeta por descripción ── */}
+      <div data-layout="tarjetas" className={`border-t border-stone-200 px-3.5 py-2.5 lg:hidden ${hl ? "bg-teal-50" : ""}`}>
+        <div className="flex items-start justify-between gap-2">
+          <span className={`flex min-w-0 flex-wrap items-center gap-1.5 text-[14px] ${color}`}>
+            <span className="break-words">{desc}</span>
+            {chip}
+          </span>
+          {guardar}
+        </div>
+        <div className="mt-2 space-y-2">
+          {modo("w-full")}
+          {r.modo === "fijo" ? (
+            <Campo label="Precio fijo">
+              <div className="flex items-center gap-1">
+                <span className="text-[14px] font-semibold text-amber-700">$</span>
+                {precioFijo("w-full")}
+              </div>
+            </Campo>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              <Campo label="Divisor">{divisor("w-full")}</Campo>
+              <Campo label="Extra">{extra("w-full")}</Campo>
+              <Campo label="Redondeo">{redondeo("w-full")}</Campo>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Escritorio (lg+): la fila de siempre ── */}
+      <div data-layout="fila" className={`hidden grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 py-0.5 lg:grid ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <span className={`flex min-w-0 items-center gap-1.5 truncate text-[13px] ${color}`}>
+            <span className="truncate">{desc}</span>
+            {chip}
+          </span>
+          {modo("w-[92px] shrink-0")}
+        </div>
+        {r.modo === "fijo" ? (
+          <div className="col-span-3 flex items-center gap-1">
+            <span className="text-[13px] font-semibold text-amber-700">$</span>
+            {precioFijo("w-full")}
+          </div>
+        ) : (
+          <>
+            {divisor("w-full")}
+            {extra("w-full")}
+            {redondeo("w-full")}
+          </>
+        )}
+        {guardar}
+      </div>
     </>
   );
 }
