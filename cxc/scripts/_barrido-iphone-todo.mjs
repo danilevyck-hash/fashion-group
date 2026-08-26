@@ -109,11 +109,30 @@ const SONDA = `(() => {
   const VH = document.documentElement.clientHeight;
   const txt = (el) => (el.innerText || el.textContent || "").trim().replace(/\\s+/g," ");
   const cls = (el) => { const c = el.className; return (c && c.baseVal !== undefined ? c.baseVal : String(c||"")).slice(0,70); };
+  // 🩸 MIRAR SOLO EL ELEMENTO NO ALCANZA. El asistente de Reclamos deja los 4
+  // pasos en el DOM y apaga los que no tocan desde un ANCESTRO: el hijo computa
+  // display:block, opacity:1 y un rect normal, así que el barrido reportó 7
+  // "encimados" en una pantalla que en la captura se ve perfecta. checkVisibility
+  // camina la cadena; el hit-test remata (un ancestro con max-h-0 + overflow
+  // hidden no lo agarra ninguna propiedad computada).
+  const enPantalla = (el) => {
+    if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) return false;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) <= 0.05) return false;
+    return true;
+  };
+  const tocable = (el) => {
+    const r = el.getBoundingClientRect();
+    const x = Math.min(Math.max(r.left + r.width / 2, 1), VW - 1);
+    const y = Math.min(Math.max(r.top + r.height / 2, 1), VH - 1);
+    if (r.top > VH || r.bottom < 0) return true;   // fuera de la ventana: no se puede hit-testear
+    const en = document.elementFromPoint(x, y);
+    return !!en && (en === el || el.contains(en) || en.contains(el));
+  };
   const visible = (el) => {
     const r = el.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return false;
-    const cs = getComputedStyle(el);
-    return cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.05;
+    return enPantalla(el);
   };
   const donde = (el) => {
     if (el.closest("aside, nav")) return "barra";
@@ -132,8 +151,7 @@ const SONDA = `(() => {
   const visibleAlto = (el) => {
     const r = el.getBoundingClientRect();
     if (r.height <= 0) return false;
-    const cs = getComputedStyle(el);
-    return cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.05;
+    return enPantalla(el);
   };
   const cortados = [];
   for (const el of todos) {
@@ -220,6 +238,11 @@ const SONDA = `(() => {
     if (cs.position !== "static" && cs.position !== "relative") continue;
     const r = el.getBoundingClientRect();
     if (r.width < 8 || r.height < 8 || r.bottom < 0 || r.top > VH * 3) continue;
+    if (!tocable(el)) continue;
+    // Un inline que ENVUELVE a dos renglones tiene un rect que abarca las dos
+    // líneas enteras y "solapa" con lo que tenga al lado sin pisarlo ni un
+    // píxel. Es el falso positivo de Reglas y de Cheques.
+    if (el.getClientRects().length > 1) continue;
     hojas.push({ el, r });
   }
   const encimados = [];
@@ -254,6 +277,9 @@ const SONDA = `(() => {
     largoTexto: document.body.innerText.length,
     titulo: (document.querySelector("h1,h2")?.innerText||"").trim().slice(0,44),
     enLogin: !!document.querySelector('input[type=password]'),
+    // 🩸 Una pantalla que cargó el cascarón pero NO los datos mide 0 defectos y
+    // pasa por sana. El banner naranja de la PWA la delata.
+    sinConexion: /Sin conexi[oó]n/i.test(document.body.innerText),
   };
 })()`;
 
