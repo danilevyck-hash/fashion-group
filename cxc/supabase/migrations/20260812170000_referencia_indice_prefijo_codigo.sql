@@ -80,6 +80,41 @@
 --                         'active_shoes','active_wear','joystep')
 --     AND (codigo LIKE '4D5029G%' OR codigo LIKE '4D5077G%');
 --   -- Se espera "Bitmap Index Scan on idx_sad_codigo_prefijo", no "Seq Scan".
+--
+-- ── ✅ CORRIDA Y VERIFICADA EN PRODUCCIÓN (12-ago-2026) ─────────────────────
+--
+-- Daniel la corrió. Medido después con el MISMO método y los MISMOS códigos:
+--
+--                        ANTES      DESPUÉS
+--   1 código pegado      0,69 s     0,63 s
+--   10 códigos pegados   0,95 s     0,59 s
+--   50 códigos pegados   2,3 s      0,85 s     ← lo que Daniel pega de verdad
+--
+-- Respuestas byte-idénticas (801 / 3.662 / 102.102 bytes, mismos artículos):
+-- no cambió ni un número, solo el tiempo.
+--
+-- 🔑 CÓMO SE PROBÓ QUE EL PLANNER LO USA (y no que la base estaba "de buenas").
+-- Sin acceso a EXPLAIN desde acá, la prueba es el ESCALADO: se mide el costo
+-- contra el nº de prefijos, con `ILIKE` de control — `ILIKE` no puede usar
+-- `text_pattern_ops`, así que tiene que seguir barriendo.
+--
+--   prefijos    LIKE 'X%' (este índice)    ILIKE 'X%' (control, sin índice)
+--       1        183 ms  (−32 sobre el piso)      504 ms  (+289)
+--      10        237 ms  (+22)                  3.244 ms  (+3.029)
+--      25        202 ms  (−13)                  7.353 ms  (+7.138)
+--      50        217 ms  (+2)                   8.236 ms  (+8.021)
+--
+-- `LIKE` quedó PLANO en el piso de red con 1 y con 50 prefijos; el control
+-- crece lineal. Eso solo puede pasar si cada prefijo es un rango del índice.
+-- (Antes del índice, `LIKE` escalaba igual que el control: +8 / +120 / +280 /
+-- +347 ms.) ⚠️ El control es CARO (8 s con 50): no repetirlo por gusto.
+--
+-- ── RE-VERIFICADO 25-ago-2026 (antes de mergear esta nota) ───────────────
+-- El índice sigue vivo en producción (`pg_indexes`) y sigue rindiendo: los
+-- mismos 50 códigos dieron 465 ms en la capa de base (eran 1.251 ms antes de
+-- correrla, 463 ms el 12-ago). La sonda LIKE-vs-igualdad quedó en ×1,0
+-- (198/196/191 ms contra 192/198/198 ms): buscar por PREFIJO ya cuesta lo
+-- mismo que buscar por código exacto, que es justo lo que este índice compra.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_sad_codigo_prefijo
@@ -88,5 +123,5 @@ CREATE INDEX IF NOT EXISTS idx_sad_codigo_prefijo
 COMMENT ON INDEX idx_sad_codigo_prefijo IS
   'Busqueda por PREFIJO del tab Referencia (codigo LIKE ''X%''). El btree normal '
   '(empresa_key, codigo) no sirve para prefijos porque el collation no es C. '
-  'Medido 12-ago-2026: 50 prefijos costaban 768 ms vs 196 ms los mismos 50 '
-  'codigos por igualdad.';
+  'Corrido y verificado 12-ago-2026: 50 codigos pegados pasaron de 2,3 s a '
+  '0,85 s punta a punta, con el mismo resultado byte a byte.';
