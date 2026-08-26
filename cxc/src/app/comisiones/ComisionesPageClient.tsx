@@ -12,7 +12,12 @@ export function ComisionesPageClient({
   /** Lo que el guard dejó afuera de los cobros, ya redactado por el servidor. */
   avisoMontos?: string | null;
 }) {
-  const { authChecked } = useAuth({ moduleKey: "comisiones", allowedRoles: ["admin", "secretaria"] });
+  // 🔴 `contabilidad` va acá y no solo en `modules.ts` (25-ago-2026). MEDIDO:
+  // `hasModuleAccess` mira PRIMERO esta lista y recién después cae a
+  // `fg_modules` — y la lista guardada de contabilidad no trae `comisiones`,
+  // así que sin este renglón la pantalla la seguía rebotando a `/home` con
+  // "No tienes acceso a este modulo", ficha del menú o no.
+  const { authChecked } = useAuth({ moduleKey: "comisiones", allowedRoles: ["admin", "contabilidad", "secretaria"] });
   if (!authChecked) return null;
 
   return (

@@ -95,7 +95,11 @@ const NO_ADMIN_ESPERADO: Record<string, string[]> = {
   bodega: ["referencia", "catalogos", "guias", "packing-lists"],
   // `saldos-banco` salió el 13-ago-2026: dejó de ser módulo (es la 2ª pestaña
   // de "Gastos"). La puerta al dato sigue abierta por `gastos-contabilidad`.
-  contabilidad: ["proveedores", "asistencia", "gastos-contabilidad", "prestamos"],
+  // `comisiones` ENTRA el 25-ago-2026 — Daniel, textual: *"Q contabilidad vea
+  // comisiones"*. Cambio DELIBERADO, ajeno a esta mudanza: el candado hizo lo
+  // suyo y frenó el build hasta acá. El detalle (y las mediciones) están en
+  // `comisiones-contabilidad.test.tsx`.
+  contabilidad: ["proveedores", "asistencia", "gastos-contabilidad", "prestamos", "comisiones"],
   vendedor: ["referencia", "cxc", "directorio", "catalogos", "guias"],
   gerente_acs: ["multifashion"],
 };

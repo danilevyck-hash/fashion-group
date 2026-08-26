@@ -199,6 +199,12 @@ function CobrosPrintBlocks({ rows, n, colCap }: { rows: CobroDoc[]; n: number; c
   );
 }
 
+/** Quién puede APAGAR/PRENDER un descuento del mes. Espejo exacto del
+ *  `requireRole` de `POST /api/ventas/comisiones/descuentos`. Si esa lista se
+ *  mueve, esta se mueve con ella — un botón que el server rechaza es peor que
+ *  ningún botón. */
+export const ROLES_EDITAR_DESCUENTOS = ["admin", "secretaria"];
+
 interface Props {
   empresa: string;
   empresaNombre: string;
@@ -212,6 +218,17 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const [data, setData] = useState<ComisionDetalle | null>(null);
   const [descuentos, setDescuentos] = useState<ComisionDescuento[]>([]);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  // 🔴 ESPEJO DE `POST /api/ventas/comisiones/descuentos`, que es
+  // `["admin","secretaria"]` (25-ago-2026). Contabilidad entró al módulo para
+  // VER: MEDIDO, ese POST le contesta **403**, y el toggle es optimista —
+  // pintaba el cambio y lo revertía sin decir una palabra, así que el descuento
+  // se veía apagado un segundo y volvía solo. Sin toggle ve el MISMO número
+  // (el neto ya viene restado del servidor), sin un control que le miente.
+  const [puedeEditarDescuentos, setPuedeEditarDescuentos] = useState(false);
+  useEffect(() => {
+    const r = sessionStorage.getItem("cxc_role") || "";
+    setPuedeEditarDescuentos(ROLES_EDITAR_DESCUENTOS.includes(r));
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // El portal necesita `document`; en SSR no existe. Montamos en el cliente.
@@ -593,17 +610,21 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                         {descuentos.map((d) => (
                           <div key={d.id} className={`flex items-center justify-between ${d.activo ? "" : "print:hidden"}`}>
                             <dt className="flex items-center gap-2 text-gray-600">
-                              {/* Toggle: solo pantalla (secretaria/admin). No sale en print. */}
-                              <label className="print:hidden inline-flex cursor-pointer items-center" title={d.activo ? "Activo este mes — clic para desactivar" : "Desactivado este mes — clic para activar"}>
-                                <input
-                                  type="checkbox"
-                                  className="peer sr-only"
-                                  checked={d.activo}
-                                  disabled={togglingId === d.id}
-                                  onChange={(e) => toggleDescuento(d.id, e.target.checked)}
-                                />
-                                <span className="relative h-4 w-7 rounded-full bg-gray-300 transition peer-checked:bg-gray-900 after:absolute after:left-0.5 after:top-0.5 after:h-3 after:w-3 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-3" />
-                              </label>
+                              {/* Toggle: solo pantalla y solo quien puede escribirlo
+                                  (admin/secretaria). No sale en print. Contabilidad ve
+                                  el descuento y el neto, sin el control. */}
+                              {puedeEditarDescuentos && (
+                                <label className="print:hidden inline-flex cursor-pointer items-center" title={d.activo ? "Activo este mes — clic para desactivar" : "Desactivado este mes — clic para activar"}>
+                                  <input
+                                    type="checkbox"
+                                    className="peer sr-only"
+                                    checked={d.activo}
+                                    disabled={togglingId === d.id}
+                                    onChange={(e) => toggleDescuento(d.id, e.target.checked)}
+                                  />
+                                  <span className="relative h-4 w-7 rounded-full bg-gray-300 transition peer-checked:bg-gray-900 after:absolute after:left-0.5 after:top-0.5 after:h-3 after:w-3 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-3" />
+                                </label>
+                              )}
                               <span className={d.activo ? "" : "text-gray-400 line-through"}>{d.concepto}</span>
                             </dt>
                             <dd className={`tabular-nums ${d.activo ? "text-rose-600" : "text-gray-300"}`}>−{fmtMoney(d.monto)}</dd>

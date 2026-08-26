@@ -24,15 +24,13 @@
 //   · Abrirle `/ventas` a la secretaria tampoco es una opción: el SSR de esa
 //     página manda Resumen y Clientes EN EL HTML. Sería un permiso nuevo.
 //
-// 🩸 HALLAZGO PRE-EXISTENTE, MEDIDO Y NO TOCADO: `contabilidad` YA recibía
-// **200** de `/api/ventas/comisiones` y de `/consolidado` antes de esta rama
-// (`requireRole(req, ["admin","contabilidad","secretaria"])`). No tiene NINGUNA
-// puerta de UI —ni ficha (`getDefaultModulesForRole("contabilidad")` no trae
-// `comisiones`), ni `/ventas` (admin-only), ni `/comisiones` (su `useAuth` pide
-// admin+secretaria)— así que solo se alcanza a mano. Esta rama **no lo abrió ni
-// lo cerró**: cerrarlo es quitar un permiso, y eso lo decide Daniel. Lo que sí
-// hace este archivo es CONGELAR los códigos rol por rol, para que la mudanza no
-// pueda haberlos movido sin que el build se ponga rojo.
+// 🩸 EL HALLAZGO PRE-EXISTENTE QUE ESTE ARCHIVO DEJÓ ANOTADO YA SE RESOLVIÓ, y
+// lo resolvió Daniel el 25-ago-2026: ***"Q contabilidad vea comisiones"***.
+// `contabilidad` recibía **200** de las rutas de lectura desde antes de esta
+// rama y no tenía ninguna puerta de UI; hoy tiene la ficha y la página. El
+// detalle vive en `comisiones-contabilidad.test.tsx`, que congela el mapa rol →
+// acceso ENTERO. Acá se conserva lo que este archivo siempre miró: que la
+// mudanza a Ventas no mueva un código de la API sin que el build se ponga rojo.
 //
 // Los tests son de CONDUCTA donde se puede: se monta la vista REAL y se hace
 // clic, y se llama a los handlers REALES con cookies FIRMADAS. El barrido de
@@ -228,7 +226,8 @@ describe("la ficha del menú se queda, con la misma key y los mismos roles", () 
     expect(ficha!.label).toBe("Comisiones");
     expect(ficha!.href).toBe("/comisiones");
     expect(ficha!.group).toBe("ventas-clientes");
-    expect([...ficha!.roles]).toEqual(["admin", "secretaria"]);
+    // `contabilidad` se sumó el 25-ago-2026 (ver comisiones-contabilidad.test.tsx).
+    expect([...ficha!.roles]).toEqual(["admin", "contabilidad", "secretaria"]);
   });
 
   it("🔴 y ya NO está en «Operación» — la ficha se movió, no se duplicó", () => {
@@ -251,10 +250,10 @@ describe("la ficha del menú se queda, con la misma key y los mismos roles", () 
   it("🩸 y nadie ganó ni perdió el módulo al mudarlo de caja", () => {
     // El grupo es dónde se dibuja; los roles son quién entra. Mover una cosa no
     // puede mover la otra.
-    for (const rol of ["admin", "secretaria"]) {
+    for (const rol of ["admin", "secretaria", "contabilidad"]) {
       expect(getDefaultModulesForRole(rol), rol).toContain("comisiones");
     }
-    for (const rol of ["vendedor", "bodega", "contabilidad", "gerente_acs"]) {
+    for (const rol of ["vendedor", "bodega", "gerente_acs"]) {
       expect(getDefaultModulesForRole(rol), rol).not.toContain("comisiones");
     }
   });
@@ -267,7 +266,7 @@ describe("la ficha del menú se queda, con la misma key y los mismos roles", () 
     expect(existsSync(path.join(raiz, "src/app/comisiones/page.tsx"))).toBe(true);
     const cliente = plano(leer("src/app/comisiones/ComisionesPageClient.tsx"));
     expect(cliente).toContain('moduleKey: "comisiones"');
-    expect(cliente).toMatch(/allowedRoles:\s*\["admin",\s*"secretaria"\]/);
+    expect(cliente).toMatch(/allowedRoles:\s*\["admin",\s*"contabilidad",\s*"secretaria"\]/);
   });
 
   it("🔴 /comisiones NO se redirige a la pestaña", () => {
@@ -285,7 +284,11 @@ describe("la ficha del menú se queda, con la misma key y los mismos roles", () 
     for (const rol of ["contabilidad", "secretaria", "vendedor", "bodega", "gerente_acs"]) {
       expect(getDefaultModulesForRole(rol)).not.toContain("ventas");
     }
-    expect(getDefaultModulesForRole("contabilidad")).not.toContain("comisiones");
+    // 🔴 Y la distinción que importa: contabilidad SÍ tiene `comisiones` desde
+    // el 25-ago-2026, y eso NO le da `ventas`. La pestaña sigue siendo de
+    // admin; su puerta es `/comisiones`, la página.
+    expect(getDefaultModulesForRole("contabilidad")).toContain("comisiones");
+    expect(getDefaultModulesForRole("contabilidad")).not.toContain("ventas");
   });
 
   it("la `key` no se renombró en ningún lado del catálogo", () => {
