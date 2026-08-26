@@ -477,8 +477,12 @@ function SegCard({ icon, tone, valor, label, sub }: {
         </div>
         <div className="min-w-0">
           <p className="font-mono text-lg font-semibold leading-tight text-gray-950 tabular-nums">{valor}</p>
-          <p className="truncate text-xs font-medium text-gray-900">{label}</p>
-          <p className="truncate text-xs text-gray-400">{sub}</p>
+          {/* 🩸 Iban con `truncate`: a 834 (iPad vertical, la barra lateral se
+              lleva 224 px) "Nuevos del mes" quedaba en 62 px de 99 y
+              "registrados este mes" en 62 de 129 — la mitad del rótulo. Son
+              dos o tres palabras: envuelven. */}
+          <p className="text-xs font-medium text-gray-900">{label}</p>
+          <p className="text-xs text-gray-400">{sub}</p>
         </div>
       </div>
     </Card>

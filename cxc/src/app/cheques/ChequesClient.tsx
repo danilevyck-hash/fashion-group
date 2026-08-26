@@ -893,28 +893,34 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         const vencenSemanaKPI = pendientes.filter((c) => c.fecha_deposito >= today && c.fecha_deposito <= weekFromNow);
         const vencenSemanaMonto = vencenSemanaKPI.reduce((s, c) => s + (Number(c.monto) || 0), 0);
         const depositadosMonto = depositados.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+        // 🩸 EL ARRASTRE DE 15 PX DEL CUERPO SALÍA DE ACÁ. Con tres columnas
+        // desde `sm`, a 834 (iPad vertical, la barra lateral se lleva 224) cada
+        // casilla queda en ~178 px y "Depositados 13 $182,923.61" pide ~230:
+        // sin `min-w-0` los dos hijos del flex se niegan a encogerse y el monto
+        // se salía 15 px del viewport — la página entera se arrastraba de lado.
+        // Tres columnas recién en `lg`, y además el rótulo encoge y el monto no.
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-8">
             {/* Total a cobrar */}
             <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
-              <span className="text-xs uppercase tracking-wide text-gray-500">Total a cobrar</span>
-              <span className="flex items-baseline gap-1.5">
+              <span className="min-w-0 text-xs uppercase tracking-wide text-gray-500">Total a cobrar</span>
+              <span className="flex shrink-0 items-baseline gap-1.5">
                 <span className="font-mono text-sm font-semibold tabular-nums">$<AnimatedNumber value={totalPendiente} formatter={(n: number) => fmt(n)} /></span>
                 <span className="text-xs text-gray-400 tabular-nums">{pendientes.length} chq</span>
               </span>
             </div>
             {/* Vencen esta semana */}
             <div className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${vencenSemanaKPI.length > 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"}`}>
-              <span className="text-xs uppercase tracking-wide text-gray-500">Vencen esta semana</span>
-              <span className="flex items-baseline gap-1.5">
+              <span className="min-w-0 text-xs uppercase tracking-wide text-gray-500">Vencen esta semana</span>
+              <span className="flex shrink-0 items-baseline gap-1.5">
                 <span className={`font-mono text-sm font-semibold tabular-nums ${vencenSemanaKPI.length > 0 ? "text-amber-600" : ""}`}>{vencenSemanaKPI.length}</span>
                 <span className="text-xs text-gray-400 tabular-nums">${fmt(vencenSemanaMonto)}</span>
               </span>
             </div>
             {/* Depositados */}
             <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
-              <span className="text-xs uppercase tracking-wide text-gray-500">Depositados</span>
-              <span className="flex items-baseline gap-1.5">
+              <span className="min-w-0 text-xs uppercase tracking-wide text-gray-500">Depositados</span>
+              <span className="flex shrink-0 items-baseline gap-1.5">
                 <span className="font-mono text-sm font-semibold tabular-nums text-green-600">{depositados.length}</span>
                 <span className="text-xs text-gray-400 tabular-nums">${fmt(depositadosMonto)}</span>
               </span>

@@ -1233,8 +1233,12 @@ function Dato({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2 min-w-0">
+      {/* 🩸 El rótulo iba con `truncate` y en la grilla de 2 columnas del
+          iPhone le quedaban 74 px: los rótulos de marca ("$ TOMMY HILFIGER",
+          129 px) se leían al 57 %. El valor sigue con `shrink-0`, así que lo
+          único que cambia es que el rótulo baja de renglón en vez de cortarse. */}
       <dt
-        className={`text-xs uppercase tracking-wide truncate ${
+        className={`min-w-0 break-words text-xs uppercase tracking-wide ${
           oscuro ? "text-white/60" : "text-gray-500"
         }`}
       >
