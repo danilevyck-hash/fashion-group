@@ -15,6 +15,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { TABLA_VACACIONES, esTablaFaltante } from "@/lib/asistencia/config";
 import {
   avisoMigracionVacaciones,
+  datosSaldoDeFila,
   leerPersonasDelModulo,
   vigenciaDeFila,
   type FilaPersonaDb,
@@ -22,7 +23,7 @@ import {
 import { esYaPagada, type Vacacion } from "@/lib/asistencia/vacaciones";
 import { tieneBaja } from "@/lib/asistencia/vigencia";
 import {
-  avisoSinFechaIngreso,
+  avisoSinSaldo,
   DESDE_CUANDO_CUENTA,
   saldoDe,
   type SaldoVacaciones,
@@ -118,12 +119,16 @@ export async function GET(req: NextRequest) {
  * El saldo de cada persona ACTIVA, en el orden que ya trae el directorio
  * (nombre alfabético; los códigos sin ficha al final).
  *
- * ── 🔴 QUIEN NO TIENE FECHA DE INGRESO IGUAL APARECE ────────────────────────
+ * ── 🔴 A QUIEN LE FALTA UN DATO IGUAL APARECE ───────────────────────────────
  *
- * Con `saldo: null` y `faltaFechaIngreso: true`, que la pantalla pinta como
- * «Falta la fecha de ingreso». Filtrarlo de la lista sería descartarlo en
- * silencio: son 20 de las 36 personas activas (medido por la puerta de la app
- * el 25-ago-2026) y es justamente el trabajo que contabilidad tiene por delante.
+ * Con `saldo: null` y `falta` diciendo CUÁL de los dos, que la pantalla pinta
+ * como «Falta la fecha de ingreso» / «Falta el saldo». Filtrarlo de la lista
+ * sería descartarlo en silencio: hoy son las 36 personas activas (medido por la
+ * puerta de la app el 25-ago-2026) y es justamente el trabajo que contabilidad
+ * tiene por delante.
+ *
+ * 🔴 Y NUNCA sale un número grande sin respaldo: sin saldo inicial no hay
+ * saldo. Ver la cabecera de `saldo-vacaciones.ts` — los 245 días de ANGELA.
  *
  * ── ⚠️ QUIEN YA NO TRABAJA ACÁ NO ENTRA ─────────────────────────────────────
  *
@@ -155,19 +160,27 @@ function armarSaldos(
       const f = fichas.get(p.codigo);
       return !f || !tieneBaja(vigenciaDeFila(f));
     })
-    .map((p) =>
-      saldoDe(
+    .map((p) => {
+      const f = fichas.get(p.codigo);
+      return saldoDe(
         p.codigo,
         p.etiqueta,
-        fichas.get(p.codigo)?.fecha_ingreso ?? null,
+        // Sin ficha no hay ni fecha ni saldo: los dos faltan, y se dice.
+        f ? datosSaldoDeFila(f) : { fechaIngreso: null, saldoInicial: null, corte: null },
         vacaciones,
         hoy,
-      ),
-    );
+      );
+    });
 
   return {
     saldos,
-    avisoSaldo: avisoSinFechaIngreso(saldos.filter((s) => s.faltaFechaIngreso).length),
+    // ⚠️ Los dos baldes son DISJUNTOS y suman el total: a quien le falta la
+    // fecha se lo cuenta ahí aunque también le falte el saldo. Solapados, el
+    // aviso diría que hay más gente de la que hay.
+    avisoSaldo: avisoSinSaldo(
+      saldos.filter((s) => s.falta === "fecha" || s.falta === "ambos").length,
+      saldos.filter((s) => s.falta === "saldo").length,
+    ),
   };
 }
 

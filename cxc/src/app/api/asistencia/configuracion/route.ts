@@ -53,6 +53,13 @@ import {
   esColumnaPagaSegurosFaltante,
   validarPagaSeguros,
 } from "@/lib/asistencia/seguros";
+import {
+  avisoMigracionSaldoVacaciones,
+  COLS_SALDO_VACACIONES,
+  esColumnaSaldoVacacionesFaltante,
+  validarSaldoInicial,
+} from "@/lib/asistencia/saldo-vacaciones";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { crearDirectorio, compararPersonas } from "@/lib/asistencia/directorio";
 import {
   avisoMarcasPosteriores,
@@ -111,6 +118,7 @@ export async function GET(req: NextRequest) {
         faltaColumnasBajas,
         faltaColumnaServicioProfesional,
         faltaColumnaPagaSeguros,
+        faltaColumnasSaldoVacaciones,
       },
     ] = await Promise.all([leerReglas(), leerPersonas()]);
 
@@ -226,6 +234,12 @@ export async function GET(req: NextRequest) {
         // 🔑 `activo` es DERIVADO de la fecha, no un campo aparte: dos fuentes
         // para el mismo hecho es la forma de que se contradigan.
         fechaIngreso: vig?.fechaIngreso ?? null,
+        // 🔴 EL SALDO DE VACACIONES, y su FECHA DE CORTE. Los dos juntos o
+        // ninguno: un saldo sin fecha es un saldo a un día que nadie sabe, y de
+        // esa fecha depende qué vacaciones se restan después. Ver
+        // `lib/asistencia/saldo-vacaciones.ts`.
+        saldoVacacionesDias: f?.saldo_vacaciones_dias ?? null,
+        saldoVacacionesCorte: f?.saldo_vacaciones_corte ?? null,
         fechaSalida: vig?.fechaSalida ?? null,
         motivoSalida: vig?.motivoSalida ?? null,
         activo: !tieneBaja(vig),
@@ -293,6 +307,11 @@ export async function GET(req: NextRequest) {
       avisoMigracionSeguros:
         !faltaPersonas && faltaColumnaPagaSeguros ? avisoMigracionSeguros() : null,
       puedeQuitarSeguros: !faltaPersonas && !faltaColumnaPagaSeguros,
+      // Un escalón más: sin las columnas nadie tiene saldo de vacaciones —o
+      // sea, como está hoy— y se dice de entrada, no al fallar el guardado.
+      avisoMigracionSaldoVacaciones:
+        !faltaPersonas && faltaColumnasSaldoVacaciones ? avisoMigracionSaldoVacaciones() : null,
+      puedeCargarSaldoVacaciones: !faltaPersonas && !faltaColumnasSaldoVacaciones,
       // 🩸 El que no se puede esconder: dada de baja y sigue marcando.
       avisoBajas: avisoMarcasPosteriores(marcasPosteriores),
     });
@@ -342,6 +361,50 @@ export async function PUT(req: NextRequest) {
   if (!rseg.ok) return NextResponse.json({ error: rseg.error }, { status: 400 });
   const pagaSeguros = rseg.valor;
 
+  // Y lo mismo con el saldo de vacaciones: es OTRA pregunta —cuántos días le
+  // quedan— y no debería poder tumbar el guardado de un nombre.
+  const rsal = validarSaldoInicial(body);
+  if (!rsal.ok) return NextResponse.json({ error: rsal.error }, { status: 400 });
+  const saldoVacacionesDias = rsal.valor;
+
+  // ── 🔴 LA FECHA DE CORTE LA PONE EL SERVIDOR, NUNCA EL NAVEGADOR ──────────
+  //
+  // El campo que llena contabilidad dice «los días que le quedan HOY», así que
+  // el corte es hoy — pero SOLO cuando el número CAMBIA. Si vuelve a guardar la
+  // ficha sin tocar el saldo, el corte se queda donde estaba: moverlo
+  // absorbería en silencio las vacaciones cargadas entre medio y esos días
+  // dejarían de restar sin que nadie se entere.
+  //
+  // Por eso se relee la fila antes de escribir: el corte guardado es el único
+  // que protege de contar dos veces los mismos días, y creerle al cuerpo del
+  // pedido sería dejar esa protección en manos de quien la puede pisar.
+  let saldoVacacionesCorte: string | null = null;
+  if (saldoVacacionesDias !== null) {
+    const prev = await supabaseServer
+      .from(TABLA_PERSONAS)
+      .select(COLS_SALDO_VACACIONES.join(", "))
+      .eq("empleado_codigo", p.codigo)
+      .maybeSingle();
+    if (prev.error) {
+      // Sin las columnas NO se guarda a medias: un "guardado" que se traga el
+      // saldo dejaría a la persona sin número y nadie sabría por qué.
+      if (esColumnaSaldoVacacionesFaltante(prev.error)) {
+        return NextResponse.json(
+          { error: avisoMigracionSaldoVacaciones(), faltaMigracionSaldoVacaciones: true },
+          { status: 503 },
+        );
+      }
+      return NextResponse.json({ error: prev.error.message }, { status: 500 });
+    }
+    const anterior = prev.data as unknown as {
+      saldo_vacaciones_dias: number | null;
+      saldo_vacaciones_corte: string | null;
+    } | null;
+    const mismoNumero =
+      anterior?.saldo_vacaciones_dias === saldoVacacionesDias && !!anterior?.saldo_vacaciones_corte;
+    saldoVacacionesCorte = mismoNumero ? anterior!.saldo_vacaciones_corte : hoyPanama();
+  }
+
   const base = {
     empleado_codigo: p.codigo,
     nombre: p.nombre,
@@ -364,10 +427,33 @@ export async function PUT(req: NextRequest) {
     ...conServicio,
     [COLUMNA_PAGA_SEGUROS]: pagaSeguros,
   };
+  const conSaldo = {
+    ...conTodo,
+    saldo_vacaciones_dias: saldoVacacionesDias,
+    saldo_vacaciones_corte: saldoVacacionesCorte,
+  };
 
   let { error } = await supabaseServer
     .from(TABLA_PERSONAS)
-    .upsert(conTodo, { onConflict: "empleado_codigo" });
+    .upsert(conSaldo, { onConflict: "empleado_codigo" });
+
+  // 🩸 FALTAN LAS COLUMNAS DEL SALDO. Misma bifurcación que las tres de abajo:
+  //  · si NO se estaba cargando ningún saldo, se reintenta sin las columnas y
+  //    guardar un nombre o un salario sigue funcionando igual que ayer;
+  //  · si SÍ se estaba cargando, ya se salió con un 503 más arriba (la relectura
+  //    del corte lo detecta antes de escribir). Este `if` es el cinturón por si
+  //    el error aparece recién en el `upsert`.
+  if (error && esColumnaSaldoVacacionesFaltante(error)) {
+    if (saldoVacacionesDias !== null) {
+      return NextResponse.json(
+        { error: avisoMigracionSaldoVacaciones(), faltaMigracionSaldoVacaciones: true },
+        { status: 503 },
+      );
+    }
+    ({ error } = await supabaseServer
+      .from(TABLA_PERSONAS)
+      .upsert(conTodo, { onConflict: "empleado_codigo" }));
+  }
 
   // 🩸 FALTA LA COLUMNA DE LOS SEGUROS. Misma bifurcación que las dos de abajo:
   //  · si NO se le estaba quitando el seguro a nadie (`pagaSeguros` en `true`,
@@ -434,7 +520,7 @@ export async function PUT(req: NextRequest) {
       if (!reintento.error) {
         return NextResponse.json({
           ok: true,
-          persona: { ...p, ...v, servicioProfesional, pagaSeguros },
+          persona: { ...p, ...v, servicioProfesional, pagaSeguros, saldoVacacionesDias, saldoVacacionesCorte },
           faltaMigracionBajas: true,
         });
       }
@@ -452,5 +538,5 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros } });
+  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, saldoVacacionesDias, saldoVacacionesCorte } });
 }

@@ -25,7 +25,7 @@ import {
   efectoDelInterruptor,
 } from "@/lib/asistencia/vacaciones";
 import {
-  textoGastados,
+  textoDetalle,
   textoSaldo,
   type SaldoVacaciones,
 } from "@/lib/asistencia/saldo-vacaciones";
@@ -193,15 +193,15 @@ export default function VacacionesTab() {
             {saldoElegido && (
               <p
                 className={`mt-1 text-[12px] ${
-                  saldoElegido.faltaFechaIngreso ? "text-amber-800" : "text-gray-500"
+                  saldoElegido.falta ? "text-amber-800" : "text-gray-500"
                 }`}
               >
-                {saldoElegido.faltaFechaIngreso ? (
+                {saldoElegido.falta ? (
                   textoSaldo(saldoElegido)
                 ) : (
                   <>
-                    Le quedan <b className="tabular-nums">{textoSaldo(saldoElegido)}</b> días
-                    {textoGastados(saldoElegido) ? ` · ${textoGastados(saldoElegido)}` : ""}
+                    Le quedan <b className="tabular-nums">{textoSaldo(saldoElegido)}</b>
+                    {textoDetalle(saldoElegido) ? ` · ${textoDetalle(saldoElegido)}` : ""}
                   </>
                 )}
               </p>
@@ -321,6 +321,14 @@ export default function VacacionesTab() {
             <p className="mt-0.5 text-[12px] text-gray-500">
               30 días por cada 11 meses trabajados.{desdeCuandoCuenta ? ` ${desdeCuandoCuenta}` : ""}
             </p>
+            {/* 🔴 Un número por persona que no hay que ir a buscar: cuántas ya
+                tienen saldo de verdad. Sin esto, la lista de pendientes no
+                muestra el avance y se lee como si nada se hubiera hecho. */}
+            {saldos.some((x) => !x.falta) && (
+              <p className="mt-0.5 text-[12px] text-gray-500">
+                {saldos.filter((x) => !x.falta).length} de {saldos.length} ya tienen saldo.
+              </p>
+            )}
           </div>
 
           {/* Ámbar, no rojo: no se rompió nada, falta cargar un dato. */}
@@ -347,13 +355,16 @@ export default function VacacionesTab() {
                     justo lo que esta lista viene a decir. Crece hacia abajo. */}
                 <span className="min-w-0 break-words text-sm text-gray-900">{s.etiqueta}</span>
                 <span data-saldo-valor className="shrink-0 text-right">
-                  {s.faltaFechaIngreso ? (
+                  {s.falta ? (
                     <span className="text-[13px] text-amber-800">{textoSaldo(s)}</span>
                   ) : (
                     <>
                       <span className="text-sm tabular-nums text-gray-900">{textoSaldo(s)}</span>
-                      {textoGastados(s) && (
-                        <span className="ml-2 text-[12px] text-gray-500">{textoGastados(s)}</span>
+                      {/* De dónde salió el número, para poder auditarlo sin
+                          abrir otra pantalla: «12 al 25 ago 2026 · +8 ganados
+                          · tomó 10». */}
+                      {textoDetalle(s) && (
+                        <span className="ml-2 text-[12px] text-gray-500">{textoDetalle(s)}</span>
                       )}
                     </>
                   )}

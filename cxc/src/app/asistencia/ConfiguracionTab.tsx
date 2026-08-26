@@ -60,6 +60,7 @@ import {
   PREGUNTA_SEGUROS,
 } from "@/lib/asistencia/seguros";
 import {
+  fechaLegible,
   fraseBaja,
   marcoDespuesDeLaBaja,
   MOTIVOS_SALIDA,
@@ -67,6 +68,7 @@ import {
   tieneBaja,
   type MotivoSalida,
 } from "@/lib/asistencia/vigencia";
+import { ETIQUETA_SALDO_INICIAL } from "@/lib/asistencia/saldo-vacaciones";
 import HorariosTab from "./HorariosTab";
 import FeriadosTab from "./FeriadosTab";
 
@@ -91,6 +93,11 @@ interface Persona {
   fechaIngreso: string | null;
   fechaSalida: string | null;
   motivoSalida: MotivoSalida | null;
+  /** Los días de vacaciones que le quedaban al corte, cargados por
+   *  contabilidad. `null` = todavía no se cargó y NO hay saldo que mostrar. */
+  saldoVacacionesDias: number | null;
+  /** El día al que ese número es cierto. Lo pone el SERVIDOR, no la pantalla. */
+  saldoVacacionesCorte: string | null;
   /** Derivado de la fecha en el servidor, nunca un campo aparte. */
   activo: boolean;
   /** «Renunció el 12 de agosto de 2026». `null` si sigue trabajando. */
@@ -120,6 +127,8 @@ interface Datos {
   puedeMarcarServicioProfesional: boolean;
   avisoMigracionSeguros: string | null;
   puedeQuitarSeguros: boolean;
+  avisoMigracionSaldoVacaciones: string | null;
+  puedeCargarSaldoVacaciones: boolean;
 }
 
 /** El formulario guarda TEXTO: hay que poder borrar un campo para reescribirlo.
@@ -145,6 +154,10 @@ interface Borrador {
   servicioProfesional: boolean;
   /** `true` = se le descuentan los seguros (social y educativo, juntos). */
   pagaSeguros: boolean;
+  /** Los días de vacaciones que le quedan HOY, como texto. "" = no se cargó.
+   *  🔑 La FECHA DE CORTE no está acá a propósito: la pone el servidor al
+   *  guardar, y solo cuando el número cambia. Ver la nota del PUT. */
+  saldoVacaciones: string;
 }
 
 const CAMPO =
@@ -194,7 +207,7 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
 const firma = (b: Borrador) =>
   `${b.nombre.trim()}|${b.salario.trim()}|${b.jornada}|${b.empresa}`
   + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}|${b.servicioProfesional}`
-  + `|${b.pagaSeguros}`;
+  + `|${b.pagaSeguros}|${b.saldoVacaciones}`;
 
 /**
  * ¿La baja está completa? La fecha y el motivo VIAJAN JUNTOS: una baja sin
@@ -256,6 +269,7 @@ export default function ConfiguracionTab() {
       motivoSalida: p.motivoSalida ?? "",
       servicioProfesional: p.servicioProfesional,
       pagaSeguros: p.pagaSeguros,
+      saldoVacaciones: p.saldoVacacionesDias === null ? "" : String(p.saldoVacacionesDias),
     };
     setAbierta(p.codigo);
     setBorrador(b);
@@ -312,6 +326,9 @@ export default function ConfiguracionTab() {
             motivoSalida: b.motivoSalida,
             servicioProfesional: b.servicioProfesional,
             pagaSeguros: b.pagaSeguros,
+            // Se manda el TEXTO tal cual, igual que el salario: el servidor
+            // decide qué es un saldo válido y le pone la fecha de corte.
+            saldoVacacionesDias: b.saldoVacaciones,
           }),
         });
         const d = await res.json();
@@ -332,6 +349,8 @@ export default function ConfiguracionTab() {
               motivoSalida?: MotivoSalida | null;
               servicioProfesional?: boolean;
               pagaSeguros?: boolean;
+              saldoVacacionesDias?: number | null;
+              saldoVacacionesCorte?: string | null;
             }
           | undefined;
         const salarioTexto = b.salario.trim().replace(",", ".");
@@ -347,6 +366,8 @@ export default function ConfiguracionTab() {
           motivoSalida: (b.motivoSalida || null) as MotivoSalida | null,
           servicioProfesional: b.servicioProfesional,
           pagaSeguros: b.pagaSeguros,
+          saldoVacacionesDias: null,
+          saldoVacacionesCorte: null,
         };
         // La vigencia que quedó guardada, ya normalizada por el servidor.
         const vig = {
@@ -371,6 +392,11 @@ export default function ConfiguracionTab() {
                   // sigue pagando seguros. Nunca al revés — apagar un descuento
                   // por un `undefined` es dejar de retener sin que nadie lo pida.
                   pagaSeguros: p.pagaSeguros !== false,
+                  // 🔑 Lo que quedó GUARDADO, con la fecha de corte que puso el
+                  // servidor. Pintar el borrador dejaría la pantalla diciendo
+                  // una fecha y la base otra.
+                  saldoVacacionesDias: p.saldoVacacionesDias ?? null,
+                  saldoVacacionesCorte: p.saldoVacacionesCorte ?? null,
                   // 🔴 La MISMA regla del servidor: a quien no va en planilla no
                   // le falta el salario. Dos reglas distintas para lo mismo es
                   // una pantalla que se contradice al recargar.
@@ -457,6 +483,11 @@ export default function ConfiguracionTab() {
             // Y por lo mismo: sin esto, dar de baja le volvería a poner los
             // seguros a quien la contadora no se los descuenta.
             pagaSeguros: p.pagaSeguros,
+            // 🔴 Y por lo mismo otra vez: sin esto, dar de baja le BORRARÍA el
+            // saldo de vacaciones —y con él la fecha de corte, que es lo único
+            // que impide volver a restar días ya contados—.
+            saldoVacacionesDias:
+              p.saldoVacacionesDias === null ? "" : String(p.saldoVacacionesDias),
           }),
         });
         const d = await res.json();
@@ -903,6 +934,53 @@ export default function ConfiguracionTab() {
                                 onBlur={() => void guardar(p.codigo, borrador)}
                                 className={`${CAMPO} tabular-nums`}
                               />
+                            </div>
+                            <div>
+                              {/* 🔴 EL SALDO ES EL NÚMERO QUE CONTABILIDAD YA
+                                  TIENE, no los días tomados desde que entró.
+                                  Pedirle que reconstruya siete años sería pedirle
+                                  algo que nadie va a hacer, y la pantalla se
+                                  quedaría vacía para siempre. La FECHA DE CORTE
+                                  la pone el servidor: es hoy, y solo se mueve
+                                  cuando el número cambia. */}
+                              <Etiqueta
+                                texto={ETIQUETA_SALDO_INICIAL}
+                                ayuda="Los que le quedan hoy, de tus registros. De acá en adelante el sistema suma lo que gana y resta las vacaciones que se carguen."
+                              />
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                step={1}
+                                // 🔑 El <label> de `Etiqueta` no está asociado a
+                                // ningún campo (no lleva `htmlFor`), así que sin
+                                // esto un lector de pantalla lee una caja de
+                                // número sin nombre — y un test tampoco la
+                                // encuentra por su etiqueta.
+                                aria-label={ETIQUETA_SALDO_INICIAL}
+                                value={borrador.saldoVacaciones}
+                                disabled={!datos.puedeCargarSaldoVacaciones}
+                                onChange={(e) =>
+                                  setBorrador({ ...borrador, saldoVacaciones: e.target.value })
+                                }
+                                onBlur={() => void guardar(p.codigo, borrador)}
+                                className={`${CAMPO} tabular-nums disabled:bg-gray-100 disabled:text-gray-400`}
+                              />
+                              {/* La fecha a la que ese número quedó fijado. Sin
+                                  esto, «12» no dice a qué día — y de ese día
+                                  depende qué vacaciones se restan después. */}
+                              {p.saldoVacacionesCorte && (
+                                <p className="mt-1 text-[12px] text-gray-500">
+                                  Al {fechaLegible(p.saldoVacacionesCorte)}
+                                </p>
+                              )}
+                              {/* El aviso de que todavía no se puede guardar se
+                                  dice ANTES de tocar, no al fallar. */}
+                              {!datos.puedeCargarSaldoVacaciones && (
+                                <p className="mt-1 text-[12px] text-amber-800">
+                                  Todavía no se puede cargar el saldo: falta correr el archivo de
+                                  la base de datos.
+                                </p>
+                              )}
                             </div>
                           </div>
 

@@ -47,6 +47,11 @@ import {
   esServicioProfesional,
 } from "./participacion";
 import { COLS_PERMISO_HORAS, esColumnaPermisoHorasFaltante } from "./permiso-horas";
+import {
+  COLS_SALDO_VACACIONES,
+  esColumnaSaldoVacacionesFaltante,
+  type DatosSaldo,
+} from "./saldo-vacaciones";
 import type { Justificacion } from "./reporte";
 // 🔑 SOLO EL TIPO: `vacaciones.ts` es PURO y no puede importar de acá. Un
 // import de valor armaría el ciclo al revés y sin necesidad.
@@ -111,6 +116,11 @@ export interface FilaPersonaDb {
   /** Opcional: no existe hasta que se corra `MIGRACION_SEGUROS`. Ausente o
    *  `null` = SÍ se le descuentan, que es como estaban las 38 fichas. */
   paga_seguros?: boolean | null;
+  /** Opcionales: no existen hasta que se corra `MIGRACION_SALDO_VACACIONES`.
+   *  Los DOS o NINGUNO (lo obliga un CHECK). `null` = todavía no se cargó el
+   *  saldo, y entonces la pantalla dice «Falta el saldo» y NO muestra número. */
+  saldo_vacaciones_dias?: number | null;
+  saldo_vacaciones_corte?: string | null;
 }
 
 export interface PersonasLeidas {
@@ -125,6 +135,10 @@ export interface PersonasLeidas {
   /** `true` = falta la columna de los seguros. A todo el mundo se le descuentan
    *  el social y el educativo, que es exactamente como estaba antes. */
   faltaColumnaPagaSeguros: boolean;
+  /** `true` = faltan las columnas del saldo de vacaciones. Nadie tiene saldo
+   *  inicial, o sea que la pestaña Vacaciones dice «Falta el saldo» y no
+   *  muestra ningún número — que es exactamente como estaba antes. */
+  faltaColumnasSaldoVacaciones: boolean;
 }
 
 /** Lo que se pedía antes de que existieran las altas y bajas. */
@@ -142,6 +156,8 @@ const COLS_CON_BAJAS = `${COLS_BASE}, ${COLUMNAS_BAJAS.join(", ")}`;
 const COLS_CON_SERVICIO = `${COLS_CON_BAJAS}, ${COLUMNA_SERVICIO_PROFESIONAL}`;
 /** Todo, con el interruptor de los seguros. Sale de `seguros.ts` por lo mismo. */
 const COLS_TODO = `${COLS_CON_SERVICIO}, ${COLUMNA_PAGA_SEGUROS}`;
+/** Todo, con el saldo de vacaciones. Salen de `saldo-vacaciones.ts`, por lo mismo. */
+const COLS_CON_SALDO = `${COLS_TODO}, ${COLS_SALDO_VACACIONES.join(", ")}`;
 
 /**
  * Las fichas guardadas.
@@ -176,14 +192,28 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
     faltaColumnasBajas: boolean;
     faltaColumnaServicioProfesional: boolean;
     faltaColumnaPagaSeguros: boolean;
+    faltaColumnasSaldoVacaciones: boolean;
     /** ¿Este error justifica bajar un peldaño? */
     reintentar: (err: unknown) => boolean;
   }> = [
+    {
+      cols: COLS_CON_SALDO,
+      faltaColumnasBajas: false,
+      faltaColumnaServicioProfesional: false,
+      faltaColumnaPagaSeguros: false,
+      faltaColumnasSaldoVacaciones: false,
+      reintentar: (e) =>
+        esColumnaSaldoVacacionesFaltante(e)
+        || esColumnaPagaSegurosFaltante(e)
+        || esColumnaServicioProfesionalFaltante(e)
+        || esColumnaDeBajaFaltante(e),
+    },
     {
       cols: COLS_TODO,
       faltaColumnasBajas: false,
       faltaColumnaServicioProfesional: false,
       faltaColumnaPagaSeguros: false,
+      faltaColumnasSaldoVacaciones: true,
       reintentar: (e) =>
         esColumnaPagaSegurosFaltante(e)
         || esColumnaServicioProfesionalFaltante(e)
@@ -194,6 +224,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnasBajas: false,
       faltaColumnaServicioProfesional: false,
       faltaColumnaPagaSeguros: true,
+      faltaColumnasSaldoVacaciones: true,
       reintentar: (e) => esColumnaServicioProfesionalFaltante(e) || esColumnaDeBajaFaltante(e),
     },
     {
@@ -201,6 +232,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnasBajas: false,
       faltaColumnaServicioProfesional: true,
       faltaColumnaPagaSeguros: true,
+      faltaColumnasSaldoVacaciones: true,
       reintentar: esColumnaDeBajaFaltante,
     },
     {
@@ -208,6 +240,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
       faltaColumnasBajas: true,
       faltaColumnaServicioProfesional: true,
       faltaColumnaPagaSeguros: true,
+      faltaColumnasSaldoVacaciones: true,
       reintentar: () => false,
     },
   ];
@@ -221,6 +254,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
         faltaColumnasBajas: intento.faltaColumnasBajas,
         faltaColumnaServicioProfesional: intento.faltaColumnaServicioProfesional,
         faltaColumnaPagaSeguros: intento.faltaColumnaPagaSeguros,
+        faltaColumnasSaldoVacaciones: intento.faltaColumnasSaldoVacaciones,
       };
     }
     if (intento.reintentar(error)) continue;
@@ -231,6 +265,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
         faltaColumnasBajas: true,
         faltaColumnaServicioProfesional: true,
         faltaColumnaPagaSeguros: true,
+        faltaColumnasSaldoVacaciones: true,
       };
     }
     throw new Error(error.message);
@@ -244,6 +279,7 @@ export async function leerPersonas(): Promise<PersonasLeidas> {
     faltaColumnasBajas: true,
     faltaColumnaServicioProfesional: true,
     faltaColumnaPagaSeguros: true,
+    faltaColumnasSaldoVacaciones: true,
   };
 }
 
@@ -280,6 +316,22 @@ export function vigenciaDeFila(f: FilaPersonaDb): Vigencia {
     motivoSalida: (MOTIVOS_SALIDA as readonly string[]).includes(motivo)
       ? (motivo as MotivoSalida)
       : null,
+  };
+}
+
+/**
+ * Lo que la ficha aporta al saldo de vacaciones.
+ *
+ * Sin las columnas corridas —o con la migración pendiente— sale «no se cargó»,
+ * que es el estado real de las 39 fichas y lo que hace que la pantalla diga
+ * «Falta el saldo» en vez de mostrar un número que engaña.
+ */
+export function datosSaldoDeFila(f: FilaPersonaDb): DatosSaldo {
+  const dias = f.saldo_vacaciones_dias;
+  return {
+    fechaIngreso: f.fecha_ingreso ?? null,
+    saldoInicial: typeof dias === "number" && Number.isFinite(dias) ? dias : null,
+    corte: f.saldo_vacaciones_corte ?? null,
   };
 }
 
