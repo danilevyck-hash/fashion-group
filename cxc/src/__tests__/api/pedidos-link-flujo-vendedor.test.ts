@@ -14,7 +14,10 @@
 // antes; este archivo lo fija para que nadie se lo quite sin querer.
 //
 // 🔴 LO QUE **NO** SE ABRIÓ, y se prueba que sigue cerrado:
-//   · BODEGA: 403 en todas. Conserva ver el catálogo y nada más.
+//   · BODEGA: 403 en todas las que ESCRIBEN. ⚠️ El 25-ago-2026 ganó UNA sola
+//     —ver la lista (*"Dale acceso a bodega a la lista de pedidos."*)— y nada
+//     más: convertir, editar, asignar cliente y mandar a Switch le siguen
+//     contestando 403, y este archivo lo prueba paso por paso.
 //   · Borrar un pedido (orders DELETE) y borrar/editar la fila pública
 //     (pedidos-publicos DELETE/PUT) siguen siendo admin+secretaria: no son
 //     parte de este flujo y son destructivos.
@@ -75,8 +78,13 @@ const OID = "33333333-3333-4333-8333-333333333333";
 const SID = "ab12cd34";
 const MARCA = "reebok";
 
-/** Cada paso del flujo, con la llamada que le corresponde. */
-const PASOS: { nombre: string; llamar: (rol: string) => Promise<NextResponse> }[] = [
+/** Cada paso del flujo, con la llamada que le corresponde. `bodegaVe` marca el
+ *  único que bodega también puede cruzar (leer la lista, 25-ago-2026). */
+const PASOS: {
+  nombre: string;
+  llamar: (rol: string) => Promise<NextResponse>;
+  bodegaVe?: boolean;
+}[] = [
   {
     nombre: "convertir el pedido del link",
     llamar: (role) => convertirPost(makeReq("/x", { method: "POST", role }), { params: { marca: MARCA, short_id: SID } }),
@@ -84,6 +92,10 @@ const PASOS: { nombre: string; llamar: (rol: string) => Promise<NextResponse> }[
   {
     nombre: "ver la lista de pedidos",
     llamar: (role) => ordersGet(makeReq("/x", { role }), { params: { marca: MARCA } }),
+    // 🔴 25-ago-2026: la ÚNICA puerta de este flujo que bodega también cruza.
+    // Daniel: *"Dale acceso a bodega a la lista de pedidos."* Es LEER, y solo
+    // eso — los otros 7 pasos escriben y le siguen contestando 403.
+    bodegaVe: true,
   },
   {
     nombre: "editar el pedido (agregar/quitar líneas, precio)",
@@ -144,10 +156,17 @@ describe("el flujo del pedido del link, rol por rol", () => {
       expect([401, 403]).not.toContain(res.status);
     });
 
-    it(`🔴 BODEGA no puede: ${paso.nombre}`, async () => {
-      const res = await paso.llamar("bodega");
-      expect(res.status).toBe(403);
-    });
+    if (paso.bodegaVe) {
+      it(`🔴 BODEGA sí puede (solo mirar): ${paso.nombre}`, async () => {
+        const res = await paso.llamar("bodega");
+        expect([401, 403]).not.toContain(res.status);
+      });
+    } else {
+      it(`🔴 BODEGA no puede: ${paso.nombre}`, async () => {
+        const res = await paso.llamar("bodega");
+        expect(res.status).toBe(403);
+      });
+    }
 
     it(`sin sesión no se puede: ${paso.nombre}`, async () => {
       const res = await paso.llamar("");

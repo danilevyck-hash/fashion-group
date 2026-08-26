@@ -124,7 +124,7 @@ const TODAS = [PEDIDO, PEDIDO_2, COTIZACION, BORRADOR_EN_SWITCH, BORRADOR, CONFI
 
 function pintarTab(pedidos: UnifiedPedido[], marca: MarcaUiKey = "reebok") {
   return render(
-    <ComprobantesPanel marca={marca} pedidos={pedidos} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar />,
+    <ComprobantesPanel marca={marca} pedidos={pedidos} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar puedeEditar />,
   );
 }
 

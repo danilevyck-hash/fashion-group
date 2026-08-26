@@ -62,37 +62,64 @@ export function clienteSwitchRoles(createRoles: readonly string[]): string[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 QUIÉN VE LA LISTA DE COMPROBANTES (25-ago-2026)
+// 🔴 QUIÉN VE LA LISTA DE COMPROBANTES — BODEGA ENTRÓ (25-ago-2026)
 //
-// Daniel, textual: *"En el card donde están las marcas. Hay catálogo,
-// administrar, debe de estar también pedidos para acceso directo."*
+// Daniel, textual: ***"Dale acceso a bodega a la lista de pedidos."***
 //
-// El acceso directo del hub necesita saber a quién mostrárselo, y la respuesta
-// NO es ninguna de las dos listas de arriba:
-//   · `CATALOGO_ROLES` incluye a **bodega**, y bodega recibe **403** del feed
-//     de la lista (`GET /api/catalogo/<marca>/orders`, `VIEW_ROLES`). Ponerle
-//     el botón sería mandarlo a una pantalla en ceros.
-//   · `CATALOGO_ADMIN_ROLES` deja afuera al **vendedor**, que es justamente
-//     quien más entra a ver lo que acaba de armar (#611).
+// ### Este bloque CAMBIÓ DE DIRECCIÓN, no se borró
 //
-// Así que es su propia lista, y vale EXACTAMENTE lo que ya valía el servidor:
-// admin, secretaria y vendedor. Esto no abre un permiso nuevo — le pone nombre
-// al que ya existía en `orders/route.ts` y en el botón «Pedidos» del catálogo
-// (`CatalogoVendedorPage`), para que las tres capas no puedan derivar.
+// Hasta hoy decía lo contrario, y con razón: bodega recibía **403** del feed
+// (`GET /api/catalogo/<marca>/orders`), así que ponerle el botón «Pedidos»
+// habría sido mandarlo a una pantalla en ceros — y **abrirle la lista era un
+// permiso NUEVO, y eso lo decide Daniel**. Daniel lo decidió. Lo que se movió
+// es la decisión suya, no el mecanismo: la lista sigue siendo UNA, las tres
+// capas se siguen derivando de acá, y **ninguna acción de escritura cambió de
+// mano**.
 //
-// MEDIDO el 25-ago-2026 con cookies FIRMADAS, contra el handler real de
-// `orders` y en las 4 marcas: admin, secretaria y vendedor → HTTP 200 con
-// filas (12/12); bodega → HTTP 403 {"error":"Sin permiso"} (4/4). Abrirle la
-// lista a bodega sería un permiso NUEVO, y eso lo decide Daniel.
+// ### 🔴 BODEGA SOLO MIRA — y por eso hay DOS listas, no una
 //
-// El candado `src/__tests__/lib/hub-marcas-pedidos.test.tsx` compara esta lista
-// contra el literal `VIEW_ROLES` de la ruta y contra el gate del catálogo: si
-// una de las tres se mueve sola, el build se pone rojo.
+// `COMPROBANTES_ROLES`        → VER la lista.       admin · secretaria · vendedor · **bodega**
+// `COMPROBANTES_EDITAR_ROLES` → TRABAJAR el pedido. admin · secretaria · vendedor (bodega **no**)
+//
+// La segunda existe porque la pantalla ofrecía «Editar» y «Duplicar» en TODAS
+// las filas: para bodega serían **dos botones muertos** (`PUT /orders/<id>` →
+// `EDIT_ROLES`; `POST /pedidos-publicos/<id>/convertir` y `POST /orders` →
+// 403). Un botón que muere en 403 es peor que no tenerlo: hace creer que se
+// perdió el trabajo. A bodega la fila le dice **«Ver»** y la abre en el detalle
+// de SOLO LECTURA que `PedidoDetalleClient` ya sabía dibujar (`isEditorRole`,
+// que existe desde antes y no se tocó); si la fila es un pedido del LINK sin
+// convertir, se abre la vista pública —que es lo que esa fila ES— en vez de
+// llamar a `convertir`, que le respondería 403.
+//
+// ### Lo que sigue cerrado, y se midió que sigue cerrado
+//
+// Borrar (individual y masivo) · exportar a Excel · mandar a Switch · editar ·
+// duplicar · crear · `/catalogos/admin/**` (`CATALOGO_ADMIN_ROLES` NO se tocó:
+// sigue siendo admin + secretaria) · `pedidos-unificado`.
+//
+// **MEDIDO el 25-ago-2026 con cookies FIRMADAS, contra los handlers REALES y en
+// las 4 marcas:** bodega → **200 con filas** en el GET de `orders` (4/4, era
+// 403) y **403 en las 10 rutas de escritura** (40/40); admin/secretaria/
+// vendedor → 200 (12/12, sin cambio); sin cookie → 401. Los 403 prueban algo:
+// las mismas rutas dejan entrar a admin.
+//
+// El candado `src/__tests__/lib/hub-marcas-pedidos.test.tsx` compara estas
+// listas contra lo que hace el servidor y contra el gate del catálogo: si una
+// de las tres se mueve sola, el build se pone rojo.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Ven la lista de comprobantes de una marca (`/catalogo/<marca>/pedidos`).
- *  Mismo trío que `VIEW_ROLES` del GET de `orders`. 🔴 bodega NO está. */
-export const COMPROBANTES_ROLES = ["admin", "secretaria", "vendedor"] as const;
+ *  🔴 bodega SÍ está desde el 25-ago-2026 — **solo para mirar**. */
+export const COMPROBANTES_ROLES = ["admin", "secretaria", "vendedor", "bodega"] as const;
 
 /** Copia mutable para quien reciba `string[]`. */
 export const comprobantesRoles = (): string[] => [...COMPROBANTES_ROLES];
+
+/** TRABAJAN un comprobante desde la lista: «Editar» y «Duplicar». Es el mismo
+ *  trío que ya aceptaban `EDIT_ROLES` de `orders/[id]`, el `convertir` de un
+ *  pedido del link y el POST de `orders` — 🔴 bodega NO está, y su ausencia acá
+ *  es lo que evita ofrecerle un botón que muere en 403. */
+export const COMPROBANTES_EDITAR_ROLES = ["admin", "secretaria", "vendedor"] as const;
+
+/** Copia mutable para quien reciba `string[]`. */
+export const comprobantesEditarRoles = (): string[] => [...COMPROBANTES_EDITAR_ROLES];

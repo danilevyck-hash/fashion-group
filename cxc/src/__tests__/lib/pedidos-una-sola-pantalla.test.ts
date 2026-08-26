@@ -21,7 +21,12 @@ import { makeDb } from "../helpers/catalogo-mock-db";
 import { readFileSync } from "fs";
 import path from "path";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
-import { CATALOGO_ROLES, CATALOGO_ADMIN_ROLES } from "@/lib/catalogo/roles";
+import {
+  CATALOGO_ROLES,
+  CATALOGO_ADMIN_ROLES,
+  COMPROBANTES_ROLES,
+  COMPROBANTES_EDITAR_ROLES,
+} from "@/lib/catalogo/roles";
 import { filaDeOrders, filasDeOrders } from "@/lib/catalogo/fila-comprobante";
 import { tipoComprobante, contarComprobantes, estaEnSwitch } from "@/lib/catalogo/numeros-pedido";
 
@@ -210,9 +215,23 @@ describe("🔴 las listas de roles y los guards del servidor, intactos", () => {
     expect(pantalla).not.toContain("pedidos-unificado");
   });
 
-  it("🔴 VER la lista sigue siendo de admin+secretaria+vendedor", () => {
+  it("🔴 VER la lista: el trío + BODEGA (25-ago-2026), y sin copia a mano", () => {
+    // Daniel: *"Dale acceso a bodega a la lista de pedidos."* Este candado
+    // exigía el literal de tres roles — o sea que fijaba el permiso VIEJO.
+    // Cambia de dirección, no se borra: hoy exige que la ruta NO tenga lista
+    // propia y que la única lista, la constante, sea la de los cuatro.
     const src = soloCodigo(leer(RUTA_ORDERS));
-    expect(src).toMatch(/VIEW_ROLES\s*=\s*\["admin",\s*"secretaria",\s*"vendedor"\]/);
+    expect(src).toContain("comprobantesRoles()");
+    expect(src, "volvió una copia escrita a mano en la ruta").not.toMatch(
+      /VIEW_ROLES\s*=\s*\[/,
+    );
+    expect([...COMPROBANTES_ROLES]).toEqual(["admin", "secretaria", "vendedor", "bodega"]);
+  });
+
+  it("🔴 pero bodega NO entró a TRABAJAR el pedido: editar sigue sin ella", () => {
+    expect([...COMPROBANTES_EDITAR_ROLES]).toEqual(["admin", "secretaria", "vendedor"]);
+    const detalle = soloCodigo(leer("src/app/api/catalogo/[marca]/orders/[id]/route.ts"));
+    expect(detalle).toMatch(/EDIT_ROLES\s*=\s*\["admin",\s*"secretaria",\s*"vendedor"\]/);
   });
 
   it("🔴 BORRAR sigue siendo de admin+secretaria — EN EL SERVIDOR", () => {
@@ -231,6 +250,7 @@ describe("🔴 las listas de roles y los guards del servidor, intactos", () => {
   it("esconder un botón NO es el candado, y está dicho", () => {
     const panel = leer("src/components/catalogo/ComprobantesPanel.tsx");
     expect(panel).toContain("puedeAdministrar");
+    expect(panel).toContain("puedeEditar");
     expect(panel).toMatch(/NO ES EL CANDADO/);
   });
 });

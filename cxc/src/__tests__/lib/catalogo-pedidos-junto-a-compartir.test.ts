@@ -23,6 +23,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
 import { MARCAS_UI, getMarcaTheme } from "@/lib/catalogo/marcas-ui";
+import { COMPROBANTES_ROLES } from "@/lib/catalogo/roles";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
 
@@ -73,10 +74,18 @@ describe("🔴 el catálogo PÚBLICO no gana un control de sesión", () => {
 });
 
 describe("el gate de rol y el tamaño del blanco tocable", () => {
-  it("solo los roles gestores lo ven (el mismo criterio que tenía la navbar)", () => {
+  it("🔴 el gate SALE de `COMPROBANTES_ROLES` — no hay copia a mano", () => {
+    // Este candado exigía los tres `role === "…"` escritos a mano, o sea que
+    // fijaba el permiso VIEJO. Al entrar bodega (25-ago-2026, *"Dale acceso a
+    // bodega a la lista de pedidos."*) esa copia habría quedado vieja sin que
+    // nada se rompiera. Cambia de dirección: hoy exige que la lista sea UNA
+    // sola, la constante, y que la pantalla no la vuelva a escribir.
     const s = leer(VENDEDOR);
-    expect(s).toContain('role === "admin" || role === "vendedor" || role === "secretaria"');
+    expect(s).toContain("COMPROBANTES_ROLES");
+    expect(s, 'volvieron los `role === "…"` a mano').not.toMatch(/puedeVerPedidos\s*=\s*role\s*===/);
     expect(s).toContain("{pedidosBtn}");
+    // Y la constante es la de los CUATRO: el botón y el servidor dicen lo mismo.
+    expect([...COMPROBANTES_ROLES]).toEqual(["admin", "secretaria", "vendedor", "bodega"]);
   });
 
   it("las 4 marcas tienen Pedidos y Compartir con 44 px", () => {

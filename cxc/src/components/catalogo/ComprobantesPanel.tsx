@@ -22,6 +22,27 @@
 //
 // Lo que el vendedor SÍ puede, y sigue pudiendo: ver la lista, buscar, abrir,
 // editar, duplicar y convertir un pedido del link.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 Y BODEGA ENTRÓ — SOLO A MIRAR (25-ago-2026)
+//
+// Daniel, textual: ***"Dale acceso a bodega a la lista de pedidos."***
+//
+// Hacen falta DOS gates, no uno, y por eso llegó `puedeEditar`: «Editar» y
+// «Duplicar» se dibujaban en TODAS las filas, y para bodega serían **botones
+// muertos** —`PUT /orders/<id>` (`EDIT_ROLES`), `POST /pedidos-publicos/<id>/
+// convertir` y `POST /orders` le responden 403—. Un botón que muere en 403 hace
+// creer que se perdió el trabajo; es peor que no ofrecerlo.
+//
+// A bodega la fila le dice **«Ver»** y la abre en SOLO LECTURA:
+//   · fila interna (`orders`) → el detalle de siempre, que `PedidoDetalleClient`
+//     ya sabía dibujar sin editor (`isEditorRole`, anterior a esto, sin tocar);
+//   · fila del LINK sin convertir → la vista PÚBLICA, que es lo que esa fila ES.
+//     Llamar a `convertir` sería pedirle al servidor una escritura que le niega.
+//
+// 🩸 Sigue sin ser el candado: el 403 lo pone el SERVIDOR y ninguna acción
+// cambió de mano en este cambio. Medido con cookies firmadas en las 4 marcas:
+// bodega 200 en el GET de `orders`, 403 en las 10 rutas de escritura.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
@@ -198,6 +219,7 @@ export default function ComprobantesPanel({
   onRefresh,
   showToast,
   puedeAdministrar,
+  puedeEditar,
 }: {
   marca: MarcaUiKey;
   pedidos: FilaComprobante[];
@@ -206,6 +228,10 @@ export default function ComprobantesPanel({
   /** admin o secretaria. Esconde borrar/borrado masivo/exportar. NO es el
    *  candado: el servidor ya responde 403 a los demás (ver la cabecera). */
   puedeAdministrar: boolean;
+  /** admin, secretaria o vendedor (`COMPROBANTES_EDITAR_ROLES`). Con `false`
+   *  —hoy solo **bodega**— la fila dice «Ver» en vez de «Editar», no se ofrece
+   *  «Duplicar», y todo abre en SOLO LECTURA. Tampoco es el candado. */
+  puedeEditar: boolean;
 }) {
   const theme = getMarcaTheme(marca)!;
   const router = useRouter();
@@ -379,11 +405,19 @@ export default function ComprobantesPanel({
   //
   // Abrir el editor de un pedido. Del link (público sin convertir) → convierte y
   // redirige (handleEditLink); interno/orders → abre su detalle directo.
+  //
+  // 🔴 SIN PERMISO DE EDITAR (bodega) NO SE CONVIERTE NADA. `convertir` es un
+  // POST que le responde 403, así que tocar la fila terminaría en "no se pudo
+  // abrir" sin que nada estuviera roto. La fila del link se abre en la vista
+  // PÚBLICA —que es exactamente lo que esa fila es— y la interna en su detalle,
+  // que ya se dibuja sin editor para quien no lo tiene.
   function handleEdit(p: FilaComprobante) {
     if (isOrdersRow(p)) {
       router.push(`/catalogo/${marca}/pedido/${p.id_natural}`);
-    } else {
+    } else if (puedeEditar) {
       handleEditLink(p);
+    } else {
+      router.push(`${theme.pedidoPublicoBase}/${p.id_natural}`);
     }
   }
 
@@ -700,7 +734,10 @@ export default function ComprobantesPanel({
                         su detalle; público sin convertir → convierte y abre.
                         Duplicar solo en las INTERNAS: una del link sin convertir
                         todavía no existe como pedido, así que tocarlo pediría
-                        algo que no está. Eliminar es de admin/secretaria. */}
+                        algo que no está. Eliminar es de admin/secretaria.
+                        🔴 Sin permiso de editar (bodega) el botón dice «Ver» y
+                        no hay «Duplicar»: duplicar es un POST /orders que le
+                        responde 403. */}
                     <div className="inline-flex items-center gap-2">
                       <button
                         onClick={(e) => {
@@ -710,9 +747,11 @@ export default function ComprobantesPanel({
                         disabled={converting === pedido.id_natural}
                         className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
                       >
-                        {converting === pedido.id_natural ? "Abriendo..." : "Editar"}
+                        {converting === pedido.id_natural
+                          ? "Abriendo..."
+                          : puedeEditar ? "Editar" : "Ver"}
                       </button>
-                      {isOrdersRow(pedido) && (
+                      {puedeEditar && isOrdersRow(pedido) && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
