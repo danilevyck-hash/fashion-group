@@ -132,9 +132,14 @@ describe("el permiso prestado se retiró sin cerrarle la puerta a nadie", () => 
   it("la herencia es una lista CERRADA y ya no incluye `saldos-banco`", () => {
     // Que no se convierta en un cajón de sastre: cada entrada acá es un permiso
     // que alguien recibe sin que nadie lo haya escrito en la base.
-    expect(Object.keys(MODULO_HEREDA_PERMISO_DE).sort()).toEqual(["referencia"]);
+    // `comisiones → ventas` se suma el 25-ago-2026 (*"Q contabilidad vea
+    // comisiones"*): es el MISMO patrón que `referencia → catalogos` — un
+    // módulo que salió de otro y necesita la ficha encendida mientras su DDL
+    // (20260825120000) no corra. Entrada DELIBERADA, no un cajón de sastre.
+    expect(Object.keys(MODULO_HEREDA_PERMISO_DE).sort()).toEqual(["comisiones", "referencia"]);
     expect(MODULO_HEREDA_PERMISO_DE["saldos-banco"]).toBeUndefined();
     expect(MODULO_HEREDA_PERMISO_DE["referencia"]).toBe("catalogos");
+    expect(MODULO_HEREDA_PERMISO_DE["comisiones"]).toBe("ventas");
   });
 
   it("🔴 contabilidad SIGUE llegando al dato — con lo que tiene HOY en la base", () => {
@@ -154,8 +159,12 @@ describe("el permiso prestado se retiró sin cerrarle la puerta a nadie", () => 
     const visibles = getVisibleModules("contabilidad", CONTABILIDAD_EN_PRODUCCION).map((m) => m.key);
     expect(visibles).not.toContain("gastos-empresa");
     expect(visibles).not.toContain("saldos-banco");
+    // `comisiones` aparece sin estar en la fila de la base: es la herencia
+    // desde `ventas` del 25-ago-2026 (ver comisiones-contabilidad.test.tsx),
+    // que es justamente lo que hace que la ficha se encienda ANTES de que
+    // Daniel corra la DDL a mano. Deliberado.
     expect(visibles.sort()).toEqual(
-      ["asistencia", "gastos-contabilidad", "prestamos", "proveedores", "ventas"].sort(),
+      ["asistencia", "comisiones", "gastos-contabilidad", "prestamos", "proveedores", "ventas"].sort(),
     );
   });
 

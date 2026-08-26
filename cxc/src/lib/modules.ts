@@ -102,7 +102,24 @@ export const ALL_MODULES: AppModule[] = [
   // ⚠️ Mover el GRUPO no mueve un centavo: `href`, `roles` e `icon` quedan
   // iguales y el cálculo vive en `comision_b2b_v5`, que ni se enteró. Lo único
   // que cambia es en qué caja del menú aparece la ficha.
-  { key: "comisiones",    label: "Comisiones",         href: "/comisiones",       icon: Coins,            roles: ["admin", "secretaria"],                       group: "ventas-clientes" },
+  //
+  // 🔴 CONTABILIDAD ENTRA (25-ago-2026). Daniel, textual: ***"Q contabilidad
+  // vea comisiones"***. Esto NO abre un permiso de datos: MEDIDO contra
+  // `origin/main` (bf12fd05) con cookies FIRMADAS, contabilidad YA recibía
+  // **200** de las CUATRO rutas de lectura del módulo —`/api/ventas/comisiones`,
+  // `/consolidado`, `/detalle` y `GET /descuentos`— desde antes de esta rama.
+  // Lo único que le faltaba era la PUERTA.
+  //
+  // 🩸 Y le faltaba ENTERA, no solo la ficha: medido montando la pantalla real
+  // con `sessionStorage.cxc_role = "contabilidad"`, `/comisiones` la rebotaba a
+  // `/home` con "No tienes acceso a este modulo" (su `useAuth` pedía
+  // admin+secretaria). O sea que ni escribiendo la dirección a mano entraba.
+  // Por eso el cambio son DOS líneas y no una: este `roles[]` y el
+  // `allowedRoles` de `ComisionesPageClient`.
+  //
+  // Lo que NO gana, y está medido igual: `POST /descuentos` (el toggle del mes)
+  // y `/config` (las tasas) le siguen contestando **403**. Ver, no editar.
+  { key: "comisiones",    label: "Comisiones",         href: "/comisiones",       icon: Coins,            roles: ["admin", "contabilidad", "secretaria"],       group: "ventas-clientes" },
   // Referencia con ruta propia (12-ago-2026). Daniel: *"habilita referencia
   // para los vendedores y bodega"*. Nació como 5ª pestaña de /ventas y ESTA es
   // ahora la única puerta: la pestaña se retiró el mismo día (*"dejar solo la
@@ -239,6 +256,32 @@ export const MODULO_HEREDA_PERMISO_DE: Record<string, string> = {
   // `fgModulesIncluye`): secretaria también tiene catalogos y NO debe ver una
   // ficha que la página le rebota.
   "referencia": "catalogos",
+  // Comisiones para CONTABILIDAD (25-ago-2026): mientras la DDL
+  // 20260825120000 no corra, la ficha se enciende para quien ya tiene
+  // `ventas`.
+  //
+  // 🩸 POR QUÉ HACE FALTA, MEDIDO: `getVisibleModules` le da PRIORIDAD a
+  // `fg_modules` (la lista guardada en `role_permissions`) sobre el `roles[]`
+  // del catálogo. En producción esa lista es
+  //   ["asistencia","gastos-empresa","prestamos","proveedores","ventas",
+  //    "saldos-banco","gastos-contabilidad"]
+  // — sin `comisiones`. Así que agregarle el rol al módulo, SOLO, no le pinta
+  // nada en el menú: el día del deploy contabilidad seguiría sin la ficha y
+  // Daniel vería que "no se hizo". Este repo tiene DDLs pendientes de correr
+  // desde hace semanas; la pantalla tiene que funcionar ANTES, como el resto.
+  //
+  // `ventas` es el padre correcto y no una elección cómoda: Comisiones SALIÓ
+  // de /ventas (migración 20260604040000, "Comisiones como módulo propio") y
+  // hoy vuelve a ser además su pestaña. Es el mismo caso que
+  // `referencia → catalogos`.
+  //
+  // ⚠️ Esto NO le abre `/ventas` a nadie: la herencia va del padre AL HIJO. El
+  // recorte por `roles[]` (ver `fgModulesIncluye`) la acota a los roles que
+  // `comisiones` declara — así que un rol con `ventas` que no esté en esa
+  // lista sigue sin ver la ficha.
+  //
+  // Se retira cuando la DDL esté corrida (verificable en `role_permissions`).
+  "comisiones": "ventas",
 };
 
 /** ¿La lista de módulos guardada le da acceso a este módulo? Directo, o

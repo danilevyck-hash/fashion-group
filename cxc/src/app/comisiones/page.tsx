@@ -6,7 +6,9 @@ import { ComisionesPageClient } from "./ComisionesPageClient";
 export const dynamic = "force-dynamic";
 
 // Módulo propio de Comisiones (fuera de Ventas). Reusa ComisionesView.
-// Acceso: admin, secretaria (gateado en el cliente + en modules.ts).
+// Acceso: admin, contabilidad, secretaria (gateado en el cliente + en
+// modules.ts). Contabilidad entró el 25-ago-2026 — las 4 rutas de LECTURA ya
+// le contestaban 200 desde antes; lo que le faltaba era esta puerta.
 export default async function ComisionesPage() {
   const year = new Date().getFullYear();
   // En paralelo. La familia es `recibo`: la comisión sobre cobro lee

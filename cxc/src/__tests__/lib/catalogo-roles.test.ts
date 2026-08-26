@@ -252,7 +252,15 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // nada: entra por `gastos-contabilidad`, que ya tenía, y adentro toca la
   // pestaña. Pedir la key acá ya no probaría nada: no hay key que pedir.
   // Cambio DELIBERADO: el candado hizo lo suyo y frenó el build hasta acá.
+  // El 25-ago-2026 entra `comisiones`. Daniel, textual: ***"Q contabilidad vea
+  // comisiones"***. Cambio DELIBERADO — el candado hizo lo suyo y frenó el
+  // build hasta acá. NO es un permiso de datos nuevo: medido con cookies
+  // firmadas contra `origin/main` (bf12fd05), contabilidad YA recibía 200 de
+  // las 4 rutas de lectura del módulo. Lo que ganó es la PUERTA (ficha + la
+  // página, que hasta ese día la rebotaba a `/home`). `POST /descuentos` y
+  // `/config` le siguen contestando 403: ve, no edita.
   contabilidad: [
+    "comisiones",
     "proveedores",
     "gastos-contabilidad",
     "prestamos",
