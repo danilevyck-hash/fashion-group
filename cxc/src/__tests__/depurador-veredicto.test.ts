@@ -357,3 +357,67 @@ describe("las 5 mitades derechas aprobadas (25-ago-2026)", () => {
     expect(vm("REEBOK IDENTITY VECTOR T-SHIRT").gemela).toBe("REEBOK IDENTITY VECTOR T-Shirts");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Segundo lote (26-ago-2026): las categorías que el negocio vende y el catálogo
+// no conocía — Home · Towels · Kanine · Luggage · Watches · Boots · Pyjamas ·
+// Woven Bottoms · Bikini Bottoms · Tops · los packs (2PK/3PK/5PK/6PK/7PK) — más
+// la mitad IZQUIERDA "Toddler Girls", que era el espejo de "Toddler Boys".
+//
+// Se dieron de alta 23 descripciones completas (migración 20260826050000). Lo
+// que queda alertando NO es un tercer hueco del mismo tipo: es dato sucio
+// (descripciones sin género y Reebok mal clasificada bajo CK Jeans).
+// ─────────────────────────────────────────────────────────────────────────────
+const CAT_LOTE2: CatalogoDescripciones = {
+  ...CAT_CON_MITADES,
+  "TH Other": ["Unisex-Home", "Unisex-Towels", "Unisex-Kanine", "Unisex-Luggage", "Men-Watches"],
+  "TH Accessories": [...CAT["TH Accessories"], "Unisex-Luggage", "Women-Watches", "Men-Watches"],
+  "TH Kids": [...CAT["TH Kids"], "Toddler Girls-T-Shirts S/S", "Toddler Girls-Dresses"],
+  "TH Underwear": ["Men-Underwear Bottoms 3PK", "Men-Underwear Bottoms 2PK", "Women-Panties 3PK", "Girls-Panties 7PK", "Men-Pyjamas"],
+  "TH Legwear": ["Men-Socks Sport 6PK"],
+  "TH Footwear": ["Boys-Boots"],
+  "CK Swimwear": ["Men-Woven Bottoms", "Women-Bikini Bottoms", "Women-Tops"],
+};
+const v2 = (d: string) => veredictoDescripcion(d, CAT_LOTE2);
+
+describe("segundo lote de categorías (26-ago-2026)", () => {
+  it("«Toddler Girls» era una mitad IZQUIERDA nueva, no una derecha", () => {
+    // El catálogo ya tenía "Toddler Boys-T-Shirts S/S": faltaba la nena.
+    expect(v("Toddler Girls-T-Shirts S/S").texto).toBe("mitad nueva: «Toddler Girls»");
+    expect(v2("Toddler Girls-T-Shirts S/S").veredicto).toBe("ya-existe");
+    // Y con la izquierda conocida, la hermana con otra derecha pasa sola.
+    expect(v2("Toddler Girls-Polos S/S").veredicto).toBe("pasa");
+  });
+
+  it("las categorías nuevas pasan en cualquier marca una vez catalogadas", () => {
+    for (const d of ["Women-Home", "Men-Towels", "Women-Kanine", "Men-Luggage", "Boys-Watches", "Girls-Boots", "Women-Pyjamas"]) {
+      expect(v2(d).veredicto).toBe("pasa");
+    }
+  });
+
+  it("los packs no se comen la prenda suelta: 3PK y a secas son distintas", () => {
+    // "Panties" y "Panties 3PK" no son gemelas (no difieren por una "s"), así
+    // que la de 3 unidades no se cuela como si fuera la suelta.
+    expect(esCasiIgual("panties", "panties 3pk")).toBe(false);
+    expect(v2("Women-Panties 3PK").veredicto).toBe("ya-existe"); // está catalogada
+    expect(v2("Boys-Panties 3PK").veredicto).toBe("pasa");        // la mitad ya se conoce
+    expect(v2("Women-Panties").veredicto).toBe("ya-existe");
+  });
+
+  it("la casi-gemela del pack sigue alertando (3PK vs 3PKs no se cuela)", () => {
+    expect(v2("Women-Panties 3PKs").veredicto).toBe("alerta");
+    expect(v2("Men-Watch").veredicto).toBe("alerta");
+    expect(v2("Boys-Boot").veredicto).toBe("alerta");
+  });
+
+  it("lo que sigue alertando es dato sucio, no una categoría nueva", () => {
+    // Sin género adelante: el catálogo YA conoce Men-Bags, Men-Socks Sport,
+    // Men-Polos S/S y Men-Denim Pants. Lo que llega pelado es basura de Switch.
+    for (const d of ["Bags", "Socks Sport", "Polos S/S", "Denim Pants", "Cosmetiquera", "TE BOTTLE 750"]) {
+      expect(v2(d).veredicto).toBe("alerta");
+      expect(v2(d).motivo).toBe("formato");
+    }
+    // Reebok mal clasificada bajo CK Jeans: sigue alertando.
+    expect(v2("REEBOK IDENTITY VECTOR T-SHIRT").veredicto).toBe("alerta");
+  });
+});

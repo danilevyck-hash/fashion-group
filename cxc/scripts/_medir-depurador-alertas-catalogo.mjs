@@ -37,25 +37,17 @@ const MODO = process.env.MODO ?? "leer";
 const XLSX_PATH = process.env.XLSX ?? "/tmp/universo-depurador.xlsx";
 const COOKIE = readFileSync("/tmp/fg-cookie-cat.txt", "utf8").trim();
 
-// Una POR MITAD: es la única que se puede tocar con el botón. Al aprobar la
-// primera, la mitad derecha queda conocida y sus hermanas dejan de alertar en
-// el acto (pasan solas) — así que salen de la lista antes de poder tocarlas.
-const POR_BOTON = [
-  ["CK Menswear", "Men-Shirts"],
-  ["TH Womenswear", "Women-Shirts L/S"],
-  ["TH Womenswear", "Women-Shirts S/S"],
-  ["CK Menswear", "Men-Polos L/S"],
-  ["CK Footwear", "Men-Slippers"],
-];
-// Las hermanas: mismo endpoint de aprobación (el que dispara el botón), misma
-// sesión real. No hay otra puerta: el catálogo no tiene alta manual.
-const POR_ENDPOINT = [
-  ["CK Other", "Men-Shirts"], ["CK Kids", "Boys-Shirts"],
-  ["TH Kids", "Boys-Shirts L/S"], ["TH Kids", "Girls-Shirts L/S"],
-  ["TH Tommy Jeans", "Women-Shirts S/S"], ["TH Kids", "Boys-Shirts S/S"],
-  ["TH Menswear", "Men-Polos L/S"], ["CK Jeans", "Men-Polos L/S"], ["TH Kids", "Boys-Polos L/S"],
-  ["TH Footwear", "Men-Slippers"], ["TH Footwear", "Women-Slippers"], ["TH Footwear", "Boys-Slippers"],
-];
+// Las filas a aprobar. Se intenta SIEMPRE por el botón de la pantalla; si la
+// fila ya no está en la lista se cae al mismo endpoint que dispara el botón.
+//
+// 🩸 POR QUÉ HACE FALTA LA CAÍDA: al aprobar la primera fila de una mitad, la
+// mitad queda conocida y sus hermanas pasan solas EN VIVO — desaparecen de la
+// lista antes de que se las pueda tocar. Y el catálogo no tiene alta manual:
+// /api/.../descripciones/[id] solo tiene PATCH. Así que la hermana entra por
+// POST .../aprobar, que es exactamente lo que hace el botón por dentro.
+const OBJETIVO = JSON.parse(
+  readFileSync(process.env.OBJETIVO ?? "/tmp/objetivo-catalogo.json", "utf8"),
+);
 
 const LEER = `(() => {
   const h2 = [...document.querySelectorAll("h2")].find(e => /descripci..?n\\(es\\) por revisar/i.test(e.textContent||""));
@@ -91,24 +83,31 @@ async function main() {
   for (const f of antes.filas) console.log("   ·", f);
 
   if (MODO === "aprobar") {
-    for (const [marca, desc] of POR_BOTON) {
+    let porBoton = 0, porEndpoint = 0;
+    for (const [marca, desc] of OBJETIVO) {
       const fila = page.locator("div.max-h-64 > div").filter({ hasText: `${marca} \u2192 ${desc}` });
-      const n = await fila.count();
-      if (n !== 1) { console.log(`  \u26a0 ${marca} \u2192 ${desc}: ${n} filas, se salta`); continue; }
-      await fila.getByRole("button", { name: /Aprobar y agregar/ }).click();
-      await page.getByRole("heading", { name: "Aprobar descripci\u00f3n" }).waitFor({ timeout: 10000 });
-      await page.locator('label:has-text("Ya le avis\u00e9 a Daniel") input[type=checkbox]').check();
-      await page.getByRole("button", { name: /^Aprobar$/ }).click();
-      await page.getByRole("heading", { name: "Aprobar descripci\u00f3n" }).waitFor({ state: "detached", timeout: 20000 });
-      console.log(`  \u2713 bot\u00f3n    ${marca} | ${desc}`);
-    }
-    for (const [marca, descripcion] of POR_ENDPOINT) {
+      let n = 0;
+      try { n = await fila.count(); } catch { n = 0; }
+      // El filtro es por prefijo: "Men-Shirts" tambi\u00e9n casa con "Men-Shirts L/S".
+      // Con m\u00e1s de una candidata no se toca nada y se va por el endpoint.
+      if (n === 1) {
+        await fila.getByRole("button", { name: /Aprobar y agregar/ }).click();
+        await page.getByRole("heading", { name: "Aprobar descripci\u00f3n" }).waitFor({ timeout: 10000 });
+        await page.locator('label:has-text("Ya le avis\u00e9 a Daniel") input[type=checkbox]').check();
+        await page.getByRole("button", { name: /^Aprobar$/ }).click();
+        await page.getByRole("heading", { name: "Aprobar descripci\u00f3n" }).waitFor({ state: "detached", timeout: 20000 });
+        porBoton++;
+        console.log(`  \u2713 bot\u00f3n    ${marca} | ${desc}`);
+        continue;
+      }
       const r = await ctx.request.post(`${BASE}/api/productos/cargar/descripciones/aprobar`, {
-        data: { marca, descripcion },
+        data: { marca, descripcion: desc },
       });
       const body = await r.json().catch(() => null);
-      console.log(`  ${r.ok() ? "\u2713" : "\u2717"} endpoint  ${marca} | ${descripcion}  ${r.status()} ${JSON.stringify(body)}`);
+      if (r.ok()) porEndpoint++;
+      console.log(`  ${r.ok() ? "\u2713" : "\u2717"} endpoint  ${marca} | ${desc}  ${r.status()} ${JSON.stringify(body)}`);
     }
+    console.log(`\n  aprobadas: ${porBoton} por el bot\u00f3n \u00b7 ${porEndpoint} por el endpoint \u00b7 ${porBoton + porEndpoint} de ${OBJETIVO.length}`);
     const despues = await page.evaluate(LEER);
     console.log(`\n=== DESPUÉS en vivo (misma pantalla): ${despues.n} descripciones por revisar · ${despues.solas} pasaron solas`);
     for (const f of despues.filas) console.log("   ·", f);
