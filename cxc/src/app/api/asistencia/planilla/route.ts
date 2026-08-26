@@ -44,11 +44,10 @@ import {
 import {
   avisoPeriodoAbierto,
   textoCodigosSinFicha,
-  textoJustificacion,
+  motivosDeQuienNoMarco,
   type CodigoSinFicha,
 } from "@/lib/asistencia/periodo";
 import {
-  textoVacacion,
   textoVacacionesNoPagadas,
   type VacacionNoPagada,
 } from "@/lib/asistencia/vacaciones";
@@ -319,24 +318,15 @@ export async function GET(req: NextRequest) {
     // están cargadas y son correctas.
     // ⚠️ `armarPlanilla` solo mira este mapa cuando la persona no tiene UNA sola
     // marca en el período: quien se tomó dos días y trabajó trece cobra normal.
-    const justificados = new Map<string, string>();
-    for (const j of jRes.filas) {
-      const codigo = String(j.empleado_codigo);
-      const texto = textoJustificacion(String(j.motivo), String(j.desde), String(j.hasta));
-      const previo = justificados.get(codigo);
-      justificados.set(codigo, previo ? `${previo} · ${texto}` : texto);
-    }
-    // 🔴 Y LAS VACACIONES ENTRAN AL MISMO MAPA. Si no entraran, ELOYN MENDOZA
-    // —que no marca un solo día en el período— volvería a salir en ámbar
-    // diciendo «no marcó ni un día», que es EXACTAMENTE el ámbar que se sacó
-    // cuando su vacación era una justificación. Mudar la fila no puede
-    // devolverle un pendiente que no existe.
-    for (const v of vRes.filas) {
-      const codigo = String(v.empleado_codigo);
-      const texto = textoVacacion(v.desde, v.hasta, v.ya_pagadas === true);
-      const previo = justificados.get(codigo);
-      justificados.set(codigo, previo ? `${previo} · ${texto}` : texto);
-    }
+    // 🔴 POR LA FUENTE ÚNICA, no con un mapa armado acá. Ver
+    // `motivosDeQuienNoMarco`: este mapa se escribía a mano en esta ruta Y en
+    // el script de auditoría, y el día que las vacaciones se mudaron de tabla
+    // la ruta aprendió a leerlas y la copia no — con ELOYN MENDOZA saliendo
+    // como «no marcó ni un día» en el instrumento con el que se audita el pago.
+    const justificados = motivosDeQuienNoMarco({
+      justificaciones: jRes.filas,
+      vacaciones: vRes.filas,
+    });
 
     const todasLasLineas = armarPlanilla({
       personas: personasVigentes,

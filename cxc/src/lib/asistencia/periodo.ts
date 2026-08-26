@@ -150,3 +150,71 @@ export function textoCodigosSinFicha(codigos: readonly CodigoSinFicha[]): string
     : `${codigos.length} códigos marcaron ${total} veces y no tienen ficha (${cuales}). `
       + "Hasta saber quiénes son, no se les puede calcular pago.";
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 POR QUÉ ESTA PERSONA NO MARCÓ NI UN DÍA — FUENTE ÚNICA
+//
+// 🩸 ESTE BLOQUE EXISTE POR UN BUG QUE YA PASÓ, el 25-ago-2026, y el mecanismo
+// importa más que el síntoma.
+//
+// El mapa de «por qué no marcó» se armaba A MANO en dos lugares: la ruta
+// `/api/asistencia/planilla` y el script de auditoría que la contadora corre
+// para cotejar el cuadro (`_diag-planilla-vs-contadora.ts`). Cuando las
+// VACACIONES se mudaron de `asistencia_justificaciones` a su propia tabla, la
+// ruta aprendió a leerlas y **la copia no**. Resultado medido en producción:
+// ELOYN MENDOZA salía en el instrumento de auditoría como
+// «no marcó ni un día en esta quincena» —el cajón de «falta un dato», el mismo
+// texto de "nadie cargó nada"— cuando lo que pasaba es que estaba de
+// vacaciones. La pantalla decía la verdad y el instrumento mentía, que es la
+// peor combinación posible: es el instrumento el que se usa para decidir si
+// hay que arreglar algo.
+//
+// 🔑 Por eso ahora hay UNA función y nadie más arma ese mapa. El candado es
+// `asistencia-vacaciones-decidir.test.ts`, que barre `src/` y `scripts/` y
+// falla si alguien vuelve a escribirlo a mano.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { textoVacacion, type Vacacion } from "./vacaciones";
+
+/** Lo mínimo que hace falta de una justificación para escribir el motivo. */
+export interface JustificacionParaMotivo {
+  empleado_codigo: string;
+  desde: string;
+  hasta: string;
+  motivo: string;
+}
+
+/**
+ * Código → por qué esa persona no tiene marcas, ya escrito.
+ *
+ * Es lo que `armarPlanilla` recibe como `justificados`, y lo que hace que quien
+ * está justificado o de vacaciones caiga en **«Decidilo vos»** (gris, con el
+ * motivo al lado) y no en **«Falta un dato»** (ámbar, con el botón a
+ * Configuración). La diferencia no es cosmética: ámbar dice *«arreglame»*, y
+ * ahí no hay nada que arreglar.
+ *
+ * ⚠️ `armarPlanilla` solo mira este mapa cuando la persona no tiene UNA sola
+ * marca en el período: quien se tomó dos días y trabajó trece cobra normal.
+ *
+ * 🔑 Las VACACIONES entran acá igual que las justificaciones, y con su propio
+ * texto —«Vacaciones del 16 jul 2026 al 13 ago 2026», o «Vacaciones (ya
+ * pagadas) del …»—. Sin ellas, mudar la tabla le devolvía a Eloyn un pendiente
+ * que no existe.
+ */
+export function motivosDeQuienNoMarco(opts: {
+  justificaciones?: readonly JustificacionParaMotivo[];
+  vacaciones?: readonly Vacacion[];
+}): Map<string, string> {
+  const out = new Map<string, string>();
+  const sumar = (codigo: string, texto: string) => {
+    const previo = out.get(codigo);
+    out.set(codigo, previo ? `${previo} · ${texto}` : texto);
+  };
+  for (const j of opts.justificaciones ?? []) {
+    sumar(String(j.empleado_codigo), textoJustificacion(String(j.motivo), String(j.desde), String(j.hasta)));
+  }
+  for (const v of opts.vacaciones ?? []) {
+    sumar(String(v.empleado_codigo), textoVacacion(v.desde, v.hasta, v.ya_pagadas === true));
+  }
+  return out;
+}
