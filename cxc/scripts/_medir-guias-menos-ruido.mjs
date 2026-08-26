@@ -153,6 +153,25 @@ const MEDIR = () => {
       const enc = [...document.querySelectorAll("div")].find((d) => (d.textContent || "").trim() === "Detalle de Envío");
       return enc ? !!enc.querySelector("button") : null;
     })(),
+    // 🔴 ¿SACAR EL «(opcional)» DEJÓ UN HUECO? Se mide el bloque de
+    // Observaciones: el alto del rótulo, el hueco hasta el campo y el alto del
+    // conjunto. Si el texto se fue y algo de esto CRECE, el hueco existe.
+    observaciones: (() => {
+      const ta = document.getElementById("guia-observaciones");
+      if (!ta) return null;
+      const cont = ta.parentElement;
+      const lab = cont?.querySelector("div");
+      if (!lab) return null;
+      const rl = lab.getBoundingClientRect();
+      const rt = ta.getBoundingClientRect();
+      return {
+        rotulo: (lab.textContent || "").replace(/\s+/g, " ").trim(),
+        altoRotulo: Math.round(rl.height),
+        huecoRotuloCampo: Math.round(rt.top - rl.bottom),
+        altoBloque: Math.round(rt.bottom - rl.top),
+      };
+    })(),
+    diceOpcional: (txtCrudo.match(/\(opcional\)/gi) || []).length,
     // ── estado de la pantalla (para que el medidor no dé verde sin mirar) ────
     camposCliente: vis('input[id^="cliente-"]').length,
     camposDireccion: vis('input[id^="direccion-"]').length,
@@ -263,6 +282,12 @@ for (const ancho of ANCHOS) {
       if (m.selloAMano) problemas.push(`🔴 ${ancho} ${p}: volvió el sello «A mano» (${m.selloAMano})`);
     }
     if (!pendiente.ejemploFacturas) problemas.push(`🔴 ${ancho} pendiente-editar: se perdió el «Ej: 10234, 10235» de FACTURA(S)`);
+    for (const [p, m] of Object.entries(medidas)) {
+      if (m.diceOpcional) problemas.push(`🔴 ${ancho} ${p}: quedan ${m.diceOpcional} «(opcional)»`);
+    }
+    if (!pendiente.observaciones) problemas.push(`🔴 ${ancho} pendiente-editar: no se encontró el bloque de Observaciones`);
+    else if (pendiente.observaciones.rotulo !== "Observaciones")
+      problemas.push(`🔴 ${ancho} pendiente-editar: el rótulo dice «${pendiente.observaciones.rotulo}»`);
     if (!pendiente.diceEscritoAMano) notas.push(`ℹ️ ${ancho} pendiente-editar: ningún cliente escrito a mano en esta guía`);
     // 3 · «＋ Agregar destino», pegado al campo y sin rótulo
     if (!pendiente.botonesAgregarDestino) problemas.push(`🔴 ${ancho} pendiente-editar: se perdió «Agregar destino»`);
@@ -301,6 +326,13 @@ for (const p of PANTALLAS) {
       `${String(m.botonesAgregarDestino).padStart(9)} ${String(m.diceSiLoDio).padStart(12)} ${String(m.selloAMano).padStart(9)}`,
     );
   }
+}
+console.log("\n── Observaciones: ¿el «(opcional)» dejó hueco? ──");
+for (const a of ANCHOS) {
+  const o = informe[a]["pendiente-editar"].observaciones;
+  const n = informe[a]["nueva"].observaciones;
+  console.log(`  ${a}: pendiente ${JSON.stringify(o)}`);
+  console.log(`       nueva     ${JSON.stringify(n)}`);
 }
 console.log("\n── la columna CLIENTE del acordeón (GT-229) ──");
 for (const a of ANCHOS) {

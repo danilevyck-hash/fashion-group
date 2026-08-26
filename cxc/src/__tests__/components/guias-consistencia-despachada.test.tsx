@@ -364,6 +364,22 @@ describe("🔴 «Si lo dio» se fue de los DOS lugares", () => {
     await montarDespachada();
     expect(document.body.textContent).not.toContain("Si lo dio");
   });
+
+  // 🔴 EL BARRIDO COMPLETO (26-ago-2026). «Si lo dio» y «(opcional)» son el
+  // MISMO texto: le ponen palabras a algo que el asterisco ya dice. Daniel:
+  // *"esos textos te dije que no hay que estar poniéndolos, que es ruido
+  // visual"*. El último que quedaba era el de Observaciones.
+  it("🔴 no queda NI UN «(opcional)» en todo el formulario", async () => {
+    await montarPendiente();
+    expect(document.body.textContent).not.toMatch(/\(opcional\)/i);
+    // Y el campo sigue siendo opcional de verdad: su rótulo no lleva asterisco.
+    expect(rotulo("Observaciones").textContent).not.toContain("*");
+  });
+
+  it("…tampoco al CREAR ni en una guía firmada", async () => {
+    await montarDespachada();
+    expect(document.body.textContent).not.toMatch(/\(opcional\)/i);
+  });
 });
 
 /** Los campos de "agregar destino" que están ABIERTOS (el botón ya se tocó). */

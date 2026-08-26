@@ -1061,7 +1061,16 @@ export default function GuiaForm({
       {soloCorregible ? (
         <Campo label="Observaciones" bloqueado>{valorBloqueado(observaciones)}</Campo>
       ) : (
-        <Campo label="Observaciones" nota="(opcional)" htmlFor="guia-observaciones">
+        /* 🔴 SIN "(opcional)" (26-ago-2026). Era el último que quedaba en el
+           módulo, y es el mismo texto que el "Si lo dio" que se fue del N° del
+           transportista: un campo SIN asterisco rojo ya dice que es opcional.
+           Ésa es la señal, no la palabra. Daniel: *"esos textos te dije que no
+           hay que estar poniéndolos, que es ruido visual"*.
+           ⚠️ El `nota` NO se retiró del componente: lo sigue usando
+           "ej: 10234, 10235", que enseña un FORMATO que no se adivina. El
+           criterio es ése — un texto que explica lo obvio se va; uno que
+           muestra algo que no se adivina se queda. */
+        <Campo label="Observaciones" htmlFor="guia-observaciones">
           <textarea
             id="guia-observaciones"
             value={observaciones}

@@ -12,8 +12,13 @@
  *
  * Medido el 26-ago-2026 contra producción: **423 líneas atadas · 197 coinciden
  * · 226 difieren, y ninguna de las 226 es otro cliente** — son variantes del
- * mismo nombre (163), el alias de display de D-108 (27), tipeos y espacios
- * (31), y 5 de un código que Switch reusó (D-200, ver abajo).
+ * mismo nombre (168), el alias de display de D-108 (27) y tipeos y espacios
+ * (31: `Sporting Shoes N4` vs `N 4`, `Jerusalem Panama` vs `De Panama`).
+ *
+ * ✅ Las 5 líneas de D-200 («City Mall» escrito, «El Machetazo-Calidonia»
+ * atado) las corrigió Daniel el 26-ago-2026: GT-124, GT-136 y GT-183 pasaron a
+ * D-25 Paso Canoas y D-24 David, según la dirección de cada una. Desde
+ * entonces NO queda ni un par que apunte a otro cliente.
  *
  * ⚠️ El nombre del cliente atado se calcula con `nombreParaMostrar`, la MISMA
  * función que alimenta el chip: comparar contra `clientes_master.nombre` crudo
@@ -127,10 +132,11 @@ async function main() {
   const { count } = await supabaseServer.from("guia_items").select("id", { count: "exact", head: true });
   console.log(`\nTotal de líneas de guía en la base: ${count}`);
   console.log(
-    "\n⚠️ Al 26-ago-2026 los únicos pares que NO son el mismo cliente son las 5 de\n" +
-      "   D-200 («City Mall» escrito, «El Machetazo-Calidonia» atado): GT-124, GT-136\n" +
-      "   y GT-183. Es un código que el sync de Switch reusó; se corrige tocando el\n" +
-      "   chip en /guias (van a D-25 y D-24), NO escondiendo el desacuerdo.",
+    "\n✅ Al 26-ago-2026, después de que Daniel corrigiera las 5 líneas de D-200\n" +
+      "   (GT-124, GT-136 y GT-183 → D-25 Paso Canoas y D-24 David), NO queda ni un\n" +
+      "   par que apunte a OTRO cliente: todo lo que difiere es el mismo nombre\n" +
+      "   escrito distinto. Si esta lista vuelve a traer un par ajeno, se corrige\n" +
+      "   tocando el chip en /guias — NO escondiendo el desacuerdo en pantalla.",
   );
 }
 
