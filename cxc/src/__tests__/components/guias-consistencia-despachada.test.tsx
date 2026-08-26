@@ -331,8 +331,57 @@ describe('🔴 el «Falta: …» se dice UNA SOLA VEZ, y es la de abajo', () => 
   });
 });
 
-describe('🔴 «Agregar destino» salió del título de la sección', () => {
-  it("el encabezado «Detalle de Envío» ya no tiene ningún botón pegado", async () => {
+describe("🔴 «Si lo dio» se fue de los DOS lugares", () => {
+  // Daniel, textual: *"quita Si lo dio"*. Estaba debajo del encabezado de la
+  // columna N° TRANSPORTISTA **y** como placeholder de cada fila. Que el campo
+  // sea opcional YA se ve: es la única de las seis columnas sin asterisco.
+
+  it("ni el encabezado ni el placeholder lo dicen", async () => {
+    await montarPendiente();
+    expect(document.body.textContent).not.toContain("Si lo dio");
+    const cajas = Array.from(document.querySelectorAll<HTMLInputElement>("input[id^='numtransp-']"));
+    expect(cajas.length, "no se dibujó el campo del N° del transportista").toBeGreaterThan(0);
+    for (const c of cajas) expect(c.placeholder || "").toBe("");
+  });
+
+  it("la columna sigue llamándose «N° transportista» y sin asterisco", async () => {
+    await montarPendiente();
+    const th = Array.from(document.querySelectorAll("th")).find((t) =>
+      (t.textContent || "").includes("N° transportista"),
+    );
+    expect(th, "se perdió la columna").not.toBeUndefined();
+    expect(th!.textContent).toBe("N° transportista");
+  });
+
+  it("🔴 «Ej: 10234, 10235» SE QUEDA — enseña un formato que no se adivina", async () => {
+    await montarPendiente();
+    // En la tabla (encabezado) y en la tarjeta (nota del rótulo).
+    expect(document.body.textContent).toContain("Ej: 10234, 10235");
+    expect(document.body.textContent?.toLowerCase()).toContain("ej: 10234, 10235");
+  });
+
+  it("y tampoco vuelve en una guía firmada", async () => {
+    await montarDespachada();
+    expect(document.body.textContent).not.toContain("Si lo dio");
+  });
+});
+
+/** Los campos de "agregar destino" que están ABIERTOS (el botón ya se tocó). */
+const camposDestinoAbiertos = () =>
+  Array.from(
+    document.querySelectorAll<HTMLInputElement>(
+      "input[aria-label='Agregar destino a la lista de direcciones']",
+    ),
+  );
+
+describe('🔴 «Agregar destino» vive PEGADO AL CAMPO de Dirección', () => {
+  // 🩸 TERCERA MUDANZA. Vivió pegado al título «Detalle de Envío» (un "＋" al
+  // lado de un título se lee como si fuera a renombrar la sección) y después
+  // como una línea suelta debajo de la tabla — Daniel: *"se ve ruidoso ahí,
+  // nadie va a suponer que es para agregar uno nuevo, debería estar a la
+  // derecha del mismo campo cuando se cree"*. Ahora está donde dice.
+
+  it("el encabezado «Detalle de Envío» sigue sin ningún botón pegado", async () => {
     await montarPendiente();
     const enc = Array.from(document.querySelectorAll("div")).find(
       (d) => (d.textContent || "").trim() === "Detalle de Envío",
@@ -341,18 +390,59 @@ describe('🔴 «Agregar destino» salió del título de la sección', () => {
     expect(enc!.querySelector("button")).toBeNull();
   });
 
-  it("sigue existiendo, DEBAJO de la lista y diciendo qué hace", async () => {
+  it("🔴 el «＋» está DENTRO de la fila, al lado del campo de Dirección", async () => {
     await montarPendiente();
-    const boton = screen.getByRole("button", { name: /Agregar destino a la lista/i });
-    // El rótulo se LEE, no vive solo en el aria-label: un "＋" pelado no dice nada.
-    expect(boton.textContent).toContain("Agregar destino a la lista");
-    expect(boton.className).toContain("min-h-[44px]");
+    const botones = screen.getAllByRole("button", { name: /Agregar destino a la lista/i });
+    expect(botones.length, "el ＋ no se dibujó").toBeGreaterThan(0);
+    for (const b of botones) {
+      // El campo de Dirección tiene que ser HERMANO del botón: si estuviera en
+      // otra fila (o debajo de la tabla) esto no lo encontraría.
+      const fila = b.parentElement!;
+      const input = fila.querySelector<HTMLInputElement>("input[id^='direccion-']");
+      expect(input, "el ＋ no está pegado a un campo de Dirección").not.toBeNull();
+      // Y a la DERECHA: el campo va primero en el DOM.
+      expect(fila.firstElementChild).toBe(input);
+      expect(b.className).toContain("min-h-[44px]");
+    }
+  });
+
+  it("va PELADO: pegado a su campo se entiende sin leer, y el nombre queda en el aria-label", async () => {
+    await montarPendiente();
+    const b = screen.getAllByRole("button", { name: /Agregar destino a la lista/i })[0];
+    // Un rótulo visible al lado del campo es el ruido que Daniel fue a sacar.
+    expect((b.textContent || "").replace(/\s/g, "")).toBe("＋");
+    expect(b.getAttribute("aria-label")).toMatch(/Agregar destino a la lista/i);
+    expect(b.getAttribute("title")).toMatch(/Agregar destino a la lista/i);
+  });
+
+  it("hay UNO POR FILA en los dos layouts — en móvil no existe el <th>", async () => {
+    await montarPendiente();
+    const tarjetas = document.querySelector<HTMLElement>("[data-layout='tarjetas']")!;
+    const tabla = document.querySelector<HTMLElement>("[data-layout='tabla']")!;
+    const enTarjetas = tarjetas.querySelectorAll("input[id$='-m'][id^='direccion-']").length;
+    const enTabla = tabla.querySelectorAll("input[id$='-d'][id^='direccion-']").length;
+    expect(enTarjetas).toBeGreaterThan(0);
+    expect(enTarjetas).toBe(enTabla);
+    const botones = screen.getAllByRole("button", { name: /Agregar destino a la lista/i });
+    expect(botones.length).toBe(enTarjetas + enTabla);
+  });
+
+  it("abrir uno NO abre los demás", async () => {
+    await montarPendiente();
+    const botones = screen.getAllByRole("button", { name: /Agregar destino a la lista/i });
+    const cuantos = botones.length;
+    fireEvent.click(botones[0]);
+    // El que se abrió cambió de botón a campo; los otros siguen siendo botones.
+    expect(screen.getAllByRole("button", { name: /Agregar destino a la lista/i }).length).toBe(cuantos - 1);
+    // ⚠️ `getAllByLabelText` también matchea los BOTONES (llevan el mismo
+    // aria-label), así que se cuentan los campos abiertos, no las etiquetas.
+    expect(camposDestinoAbiertos().length).toBe(1);
   });
 
   it("y sigue agregando la ciudad a las sugerencias de dirección", async () => {
     await montarPendiente();
-    fireEvent.click(screen.getByRole("button", { name: /Agregar destino a la lista/i }));
-    const input = screen.getByLabelText(/Agregar destino a la lista/i);
+    fireEvent.click(screen.getAllByRole("button", { name: /Agregar destino a la lista/i })[0]);
+    const input = camposDestinoAbiertos()[0];
     fireEvent.change(input, { target: { value: "Aguadulce" } });
     fireEvent.click(screen.getByRole("button", { name: /^Guardar$/i }));
     await waitFor(() => {

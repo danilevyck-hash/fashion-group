@@ -345,9 +345,23 @@ describe("🔴 la salida a mano no puede volver a llamarse solo \"Otro\"", () =>
   it("el rótulo dice que es LA SALIDA, no un cliente más", () => {
     const codigo = sinComentarios(picker());
     expect(codigo).toContain("No está en la lista — escribir a mano");
-    // El distintivo del campo tampoco: "Otro" se leía como un cliente.
-    expect(codigo).toMatch(/>\s*A mano\s*</);
     expect(codigo).not.toMatch(/>\s*Otro\s*</);
+  });
+
+  // 🩸 ACÁ SE EXIGÍA EL SELLO ÁMBAR «A mano» AL LADO DEL CAMPO, y el 26-ago-2026
+  // Daniel lo mandó sacar (*"ese sello también sobra"*). El candado cambió de
+  // dirección: lo que protege no es el chip —repetía lo que el campo ya dice—
+  // sino que la salida siga siendo un toque DELIBERADO y que el campo de cliente
+  // siga amarrando donde tiene que amarrar. Eso lo sostienen el rótulo de arriba
+  // y `permitirOtro`, no un sello.
+  it("🔴 el sello «A mano» no vuelve — pero el CÓDIGO sí se sigue dibujando", () => {
+    const codigo = sinComentarios(picker());
+    expect(codigo).not.toMatch(/>\s*A mano\s*</);
+    expect(codigo).not.toContain("Escrito a mano — no está en el directorio");
+    // El chip del código es la prueba de que la línea está amarrada a Switch.
+    expect(codigo).toContain("Vinculado al directorio (${codigo})");
+    // Y quien no ve la pantalla sigue sabiendo cómo quedó.
+    expect(codigo).toContain("Cliente escrito a mano");
   });
 });
 

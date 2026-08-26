@@ -584,21 +584,58 @@ export default function GuiaForm({
     );
   }
 
+  /**
+   * 🔴 EL "＋" DE AGREGAR UN DESTINO VIVE ACÁ, PEGADO AL CAMPO (26-ago-2026).
+   *
+   * 🩸 TERCERA MUDANZA, y las dos anteriores fallaron por la misma razón: el
+   * control estaba lejos del campo que explica qué agrega.
+   *   1. Pegado al título «Detalle de Envío» → un "＋" al lado de un título se
+   *      lee como si fuera a renombrar la sección.
+   *   2. Debajo de la tabla, como línea suelta «＋ Agregar destino a la lista»
+   *      → Daniel: *"se ve ruidoso ahí, nadie va a suponer que es para agregar
+   *      uno nuevo, debería estar a la derecha del mismo campo cuando se cree"*.
+   *
+   * Ahora es lo que dice: **a la derecha del campo de Dirección, en la fila que
+   * se está escribiendo**. Pegado a su campo el "＋" se entiende SIN LEER —
+   * agregar una dirección— así que va pelado, sin rótulo visible: el nombre
+   * completo sigue en `aria-label`/`title` para quien usa lector de pantalla o
+   * pasa el mouse. Es el mismo trato que ya tenía el "＋" de «Despachado por»,
+   * que también está pegado a su campo.
+   *
+   * ⚠️ **UNA INSTANCIA POR FILA, en los dos layouts.** En móvil no hay `<th>`
+   * donde meterlo una sola vez —esa fue la razón por la que salió de la
+   * cabecera de la tabla en primer lugar— y en la tarjeta el campo de Dirección
+   * está por envío. Todas alimentan el MISMO `<datalist id="direcciones-list">`
+   * de siempre; abrir una no abre las otras.
+   *
+   * ⚠️ El `-my-3` del botón lo mete dentro del alto de 44 px del campo: la fila
+   * no crece ni un píxel por tenerlo al lado.
+   *
+   * ⚠️ En una guía firmada no se ofrece, porque la dirección no se puede tocar
+   * (se sale por el `soloCorregible` de arriba, antes de dibujar nada).
+   */
   function campoDireccion(item: GuiaItem, idx: number, layout: Layout) {
     if (soloCorregible) return valorBloqueado(item.direccion);
     const clave = claveCampo(item, "direccion");
     const err = hayError(clave, item.direccion);
     return (
       <>
-        <input
-          id={idCampo(item, "direccion", layout)}
-          list={idListaDirecciones(item.cliente_codigo)}
-          type="text"
-          value={item.direccion}
-          placeholder="Ciudad o destino"
-          onChange={(e) => { onUpdateItem(idx, "direccion", e.target.value); marcarTocado(clave); }}
-          className={ctrl(err)}
-        />
+        <div className="flex items-center gap-1">
+          <input
+            id={idCampo(item, "direccion", layout)}
+            list={idListaDirecciones(item.cliente_codigo)}
+            type="text"
+            value={item.direccion}
+            placeholder="Ciudad o destino"
+            onChange={(e) => { onUpdateItem(idx, "direccion", e.target.value); marcarTocado(clave); }}
+            className={ctrl(err)}
+          />
+          <AddNewInline
+            placeholder="Ciudad"
+            onAdd={onAddDireccion}
+            etiqueta="Agregar destino a la lista de direcciones"
+          />
+        </div>
         {err && <ErrorCampo />}
       </>
     );
@@ -696,7 +733,6 @@ export default function GuiaForm({
         id={idCampo(item, "numtransp", layout)}
         type="text"
         value={item.numero_guia_transp || ""}
-        placeholder="Si lo dio"
         onChange={(e) => onUpdateItem(idx, "numero_guia_transp", e.target.value)}
         className={ctrl(false)}
       />
@@ -895,8 +931,8 @@ export default function GuiaForm({
             {/* 🔴 EL "＋ Agregar destino" SE FUE DE ACÁ (25-ago-2026). Daniel lo
                 abrió en el iPhone y no entendió qué era: pegado al TÍTULO de la
                 sección, un "＋" pelado se lee como si fuera a renombrar la
-                sección. Textual: *«Sobre dirección. Muévelo»*. Ahora vive
-                DEBAJO de la lista de envíos, con su nombre a la vista. */}
+                sección. Textual: *«Sobre dirección. Muévelo»*. Hoy vive PEGADO
+                AL CAMPO de Dirección de cada fila — ver `campoDireccion`. */}
             Detalle de Envío
           </div>
           <StatusBadge />
@@ -937,7 +973,7 @@ export default function GuiaForm({
                 {/* 🔴 EL N° DEL TRANSPORTISTA, PEGADO A LOS BULTOS. Van juntos
                     porque se leen juntos del papel que trae el chofer. */}
                 {pideNumeroTransp && (
-                  <Campo label="N° guía del transportista" nota="(opcional)" htmlFor={idCampo(item, "numtransp", "m")}>
+                  <Campo label="N° guía del transportista" htmlFor={idCampo(item, "numtransp", "m")}>
                     {campoNumeroTransp(item, idx, "m")}
                   </Campo>
                 )}
@@ -950,7 +986,15 @@ export default function GuiaForm({
         <div data-layout="tabla" className="hidden lg:block">
           {/* Con la columna del N° la tabla necesita 100 px más. El arrastre lo
               contiene `ScrollableTable`: el cuerpo de la página nunca scrollea
-              de lado. */}
+              de lado.
+
+              ⚠️ EL PISO NO SUBIÓ AL METERLE EL "＋" A DIRECCIÓN, y es a
+              propósito: `minWidth` es un PISO, no el ancho de la tabla. Subirlo
+              a 772 dejaría la tabla angosta (entrega directa) SIN ENTRAR en el
+              iPad acostado —752 px útiles— y devolvería el arrastre que el #326
+              sacó. El "＋" mide 44 px pero comparte celda con un campo elástico:
+              medido en el navegador a 1024 y a 1440, el ancho real de la tabla
+              no se movió ni un píxel. */}
           <ScrollableTable minWidth={pideNumeroTransp ? 820 : 720}>
             <table className="w-full text-sm [&_th]:px-3.5 [&_td]:px-3.5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
               <thead className="sticky top-0 bg-white z-10">
@@ -966,11 +1010,13 @@ export default function GuiaForm({
                     <div className="text-xs text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Ej: 10234, 10235</div>
                   </th>
                   <th className="py-3 font-normal w-20 text-right">Bultos{obligatorio}{candadoColumna}</th>
+                  {/* 🔴 SIN "Si lo dio" DEBAJO, y sin placeholder adentro
+                      (26-ago-2026). Daniel: *"quita Si lo dio"* — la columna se
+                      llama "N° transportista" y con eso alcanza. Que sea
+                      opcional YA se ve: es la única de las seis que no lleva el
+                      asterisco rojo. Esa es la señal, no un texto. */}
                   {pideNumeroTransp && (
-                    <th className="py-3 font-normal w-32 text-left">
-                      N° transportista
-                      <div className="text-xs text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Si lo dio</div>
-                    </th>
+                    <th className="py-3 font-normal w-32 text-left">N° transportista</th>
                   )}
                   <th className="py-3 w-12"></th>
                 </tr>
@@ -992,22 +1038,6 @@ export default function GuiaForm({
             </table>
           </ScrollableTable>
         </div>
-
-        {/* 🔴 ACÁ, no en el título: es donde se acaba de escribir la dirección.
-            Alimenta el mismo `<datalist id="direcciones-list">` de siempre — lo
-            único que cambió es DÓNDE está y que ahora DICE qué hace.
-            ⚠️ No vuelve al <th> de la tabla: en móvil ese <th> no existe.
-            ⚠️ En una guía firmada no se ofrece: la dirección está bloqueada. */}
-        {!soloCorregible && (
-          <div className="mt-2">
-            <AddNewInline
-              placeholder="Ciudad"
-              onAdd={onAddDireccion}
-              etiqueta="Agregar destino a la lista de direcciones"
-              textoBoton="Agregar destino a la lista"
-            />
-          </div>
-        )}
 
         <div className="mt-1 flex items-center justify-between gap-4">
           {/* Botón de solo texto: medía 21 px de alto. -mx-2 lo deja alineado
