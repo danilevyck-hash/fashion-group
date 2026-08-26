@@ -21,7 +21,7 @@
 // `asistencia-una-sola-entrada.test.ts`. Si alguien reintroduce una segunda vía
 // con otro `dispositivo`, el build se pone en rojo.
 
-// ── 🩸 POR QUÉ SON 4 PESTAÑAS Y NO 7 (6-ago-2026) ────────────────────────────
+// ── 🩸 POR QUÉ SON 5 PESTAÑAS Y NO 7 (6-ago-2026 · +Vacaciones el 25-ago) ────
 //
 // Eran Reporte · Planilla · Configuración · Horarios · Justificaciones ·
 // Feriados · Cómo funciona. Siete pestañas ya no son una herramienta: son un
@@ -40,6 +40,13 @@
 // EL ORDEN también cambió: Planilla PRIMERA. La contable entra dos veces al mes
 // y entra a eso; el Reporte es el detalle que la sostiene, y va detrás.
 //
+// ⚠️ La quinta, VACACIONES, no contradice esto: se ganó el lugar por lo que se
+// hace ahí y no por la tabla que guarda. No es «una sección más de
+// Justificaciones» — es lo contrario, existe justamente porque una vacación NO
+// es una justificación (no se paga por asistencia y lleva su propia cuenta de
+// días), y meterlas en la misma lista es lo que hacía imposible distinguir
+// quién estuvo enfermo de quién estuvo de vacaciones.
+//
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
 import { Suspense, useState } from "react";
@@ -49,6 +56,7 @@ import ReporteTab from "./ReporteTab";
 import PlanillaTab from "./PlanillaTab";
 import ConfiguracionTab from "./ConfiguracionTab";
 import JustificacionesTab from "./JustificacionesTab";
+import VacacionesTab from "./VacacionesTab";
 import ComoFuncionaTab from "./ComoFuncionaTab";
 
 const TABS = [
@@ -59,6 +67,11 @@ const TABS = [
   ["reporte", "Reporte"],
   // Lo del día a día: lo único que se toca seguido.
   ["justificaciones", "Justificaciones"],
+  // 🔴 APARTE de Justificaciones, y es todo el punto (25-ago-2026): unas
+  // vacaciones no explican una falta —no se pagan por asistencia y llevan su
+  // propia cuenta de días—, así que no pueden vivir en la misma lista. Va al
+  // lado porque las dos son «lo que pasa con la gente esta quincena».
+  ["vacaciones", "Vacaciones"],
   // Personas · Horarios · Feriados · Reglas. Se llena una vez y se corrige poco.
   ["configuracion", "Configuración"],
 ] as const;
@@ -150,6 +163,7 @@ function AsistenciaInner() {
               {tab === "planilla" && <PlanillaTab />}
               {tab === "reporte" && <ReporteTab />}
               {tab === "justificaciones" && <JustificacionesTab />}
+              {tab === "vacaciones" && <VacacionesTab />}
               {tab === "configuracion" && <ConfiguracionTab />}
             </>
           )}

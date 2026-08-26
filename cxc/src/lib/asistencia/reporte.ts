@@ -86,6 +86,9 @@ import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./conf
 // motor lo necesita para NO contar esos días como ausencias justificadas.
 import { esTrabajoDeVendedor } from "./motivos";
 import { minutosPerdonados, textoPermiso, ventanaDe } from "./permiso-horas";
+// 🔴 UN DÍA DE VACACIONES NO SE CALCULA. Ver `vacaciones.ts`: aunque la persona
+// haya pasado por el reloj, ese día no genera horas, ni tardanza, ni ausencia.
+import { vacacionDe, type DiaVacacion, type Vacacion } from "./vacaciones";
 // 🔑 SOLO EL TIPO. `correcciones.ts` importa `diaPanama` de acá (un valor), así
 // que un import normal armaría un ciclo en tiempo de ejecución; `import type`
 // se borra al compilar y no queda ninguno.
@@ -191,6 +194,19 @@ export interface DiaReporte {
    */
   enCurso: boolean;
   ausente: boolean;
+  /**
+   * Este día está cubierto por unas VACACIONES. `null` = no lo está.
+   *
+   * 🔴 CUANDO ESTO NO ES `null`, TODO LO DE ARRIBA VA EN CERO Y `marcas` VA
+   * VACÍO — aunque la persona haya marcado. Es el punto entero de las
+   * vacaciones: no genera horas, ni tardanza, ni ausencia. Las horas que sí
+   * marcó viajan en `vacacion.marcasIgnoradas` para que la pantalla pueda
+   * mostrarlas: descartarlas está bien, esconderlas no.
+   *
+   * ⚠️ Es EXCLUYENTE con `justificado` y con `ausente`: una vacación gana. Un
+   * día de vacaciones no es una falta que haya que explicar.
+   */
+  vacacion: DiaVacacion | null;
   justificado: string | null;
   /**
    * El permiso de HORAS que cubre este día, ya escrito («Escolares — permiso de
@@ -257,6 +273,16 @@ export interface PersonaReporte {
      * oficina. No son ausencias y no se cuentan como tales.
      */
     diasTrabajandoFuera: number;
+    /**
+     * Días del rango cubiertos por unas VACACIONES. Van APARTE de las ausencias
+     * —justificadas o no— porque no son ausencias: la persona no faltó.
+     */
+    diasVacaciones: number;
+    /**
+     * De esos, los que están marcados «ya se le pagó». Son los únicos que la
+     * planilla deja de pagar, y por eso se cuentan solos.
+     */
+    diasVacacionesYaPagadas: number;
     vecesTarde: number;
     minutosTarde: number;
     /** De `minutosTarde`, cuántos salen de días mal marcados. Ver regla 5. */
@@ -413,6 +439,15 @@ export function armarReporte(opts: {
   marcaciones: readonly Marcacion[];
   horarios: readonly HorarioPersona[];
   justificaciones: readonly Justificacion[];
+  /**
+   * Las VACACIONES que tocan el rango.
+   *
+   * 🔴 SIN ESTO NADA CAMBIA. Es un arreglo opcional y vacío por defecto: el
+   * motor da EXACTAMENTE los mismos números que daba antes de que las
+   * vacaciones existieran, que es lo que hace que la tabla nueva pueda tardar
+   * en correrse sin mover un centavo.
+   */
+  vacaciones?: readonly Vacacion[];
   feriados: ReadonlyMap<string, string>;
   desde: string;
   hasta: string;
@@ -464,6 +499,7 @@ export function armarReporte(opts: {
   correccionesPorDia?: ReadonlyMap<string, readonly CorreccionVisible[]>;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
+  const vacaciones = opts.vacaciones ?? [];
 
   // 🔑 Nunca se toma un valor a medias: un `undefined` en `reglas` cae al
   // default, no a `NaN`. Con `NaN` de tolerancia toda comparación da `false` y
@@ -551,6 +587,47 @@ export function armarReporte(opts: {
       // Informativo: qué horas de este día se tocaron a mano. No entra en
       // ninguna cuenta — ver la nota de `correccionesPorDia`.
       const correcciones = [...(opts.correccionesPorDia?.get(`${codigo}|${fecha}`) ?? [])];
+
+      // ── 🔴 VACACIONES: ACÁ NO SE CALCULA NADA, Y VA PRIMERO ────────────────
+      //
+      // Antes de mirar las marcas, antes de la tardanza, antes de la ausencia.
+      // Daniel, textual: *"si alguien pasó por el reloj estando de vacaciones,
+      // no genera horas, ni tardanza, ni ausencia"*.
+      //
+      // 🩸 Y por eso el `return` está ACÁ y no en un `if` más abajo: cualquier
+      // cosa que se calcule antes es una cuenta que después hay que acordarse
+      // de anular, y basta con olvidarse de una para que un día de vacaciones
+      // aparezca con 47 minutos de tardanza el día de pago.
+      //
+      // ⚠️ Las marcas NO se pierden: viajan en `marcasIgnoradas` y la pantalla
+      // las muestra. Descartar un dato está bien; descartarlo en silencio no.
+      const vac = vacacionDe(vacaciones, codigo, fecha);
+      if (vac) {
+        const marcadas = (p.dias.get(fecha) ?? []).slice().sort((a, b) => a - b);
+        dias.push({
+          fecha, marcas: [], marcasIds: [], entrada: null, salida: null,
+          tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
+          revisar: false,
+          enCurso,
+          // 🔴 NUNCA una ausencia. Quien está de vacaciones no faltó.
+          ausente: false,
+          vacacion: {
+            yaPagadas: vac.ya_pagadas === true,
+            marcasIgnoradas: marcadas.map(
+              (seg) =>
+                `${p2(Math.floor(seg / 3600))}:${p2(Math.floor((seg % 3600) / 60))}:${p2(seg % 60)}`,
+            ),
+          },
+          // 🔑 `null` a propósito, aunque haya una justificación cargada encima:
+          // el renglón tiene que decir «Vacaciones» y una sola cosa. Dos
+          // etiquetas para el mismo día es la forma de que la pantalla y el
+          // papel terminen diciendo cosas distintas.
+          justificado: null, permiso: null, permisoPerdonaMin: 0,
+          feriado, habil,
+          correcciones,
+        });
+        continue;
+      }
       // Sin marcas: ausente, salvo que sea feriado, esté justificado… o
       // simplemente no sea día de trabajo. 🔑 Lo último solo puede pasar con
       // `incluirNoHabiles`, y sin el guard un domingo libre contaría como falta.
@@ -565,6 +642,7 @@ export function armarReporte(opts: {
           // "ausencias sin justificar" cada mañana — el mismo error que el de
           // los días mal marcados, con otro nombre.
           ausente: !enCurso && habil && !feriado && !justificado,
+          vacacion: null,
           justificado, permiso, permisoPerdonaMin: 0, feriado, habil,
           correcciones,
         });
@@ -633,7 +711,7 @@ export function armarReporte(opts: {
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
         tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
-        revisar, enCurso, ausente: false, justificado, permiso, permisoPerdonaMin, feriado, habil,
+        revisar, enCurso, ausente: false, vacacion: null, justificado, permiso, permisoPerdonaMin, feriado, habil,
         correcciones,
       });
     }
@@ -646,6 +724,12 @@ export function armarReporte(opts: {
         (d) => !d.marcas.length && d.justificado && !esTrabajoDeVendedor(d.justificado),
       ).length,
       diasTrabajandoFuera: dias.filter((d) => !d.marcas.length && esTrabajoDeVendedor(d.justificado)).length,
+      // 🔑 Los días de vacaciones NUNCA entran en las dos cuentas de arriba: en
+      // un día de vacaciones `justificado` es `null` a propósito, así que los
+      // filtros de ausencia no los ven. Se cuentan acá, solos, porque no son
+      // una ausencia de ningún tipo.
+      diasVacaciones: dias.filter((d) => d.vacacion !== null).length,
+      diasVacacionesYaPagadas: dias.filter((d) => d.vacacion?.yaPagadas === true).length,
       vecesTarde: conMarcas.filter((d) => d.tardeMin > 0).length,
       minutosTarde: conMarcas.reduce((a, d) => a + d.tardeMin, 0),
       minutosTardeDeDiasARevisar: conMarcas.filter((d) => d.revisar).reduce((a, d) => a + d.tardeMin, 0),

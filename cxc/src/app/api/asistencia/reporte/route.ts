@@ -23,6 +23,7 @@ import {
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
 import {
   leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas, leerJustificaciones,
+  leerVacaciones,
 } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -92,11 +93,15 @@ export async function GET(req: NextRequest) {
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
     );
 
-    const [hRes, jRes, fRes] = await Promise.all([
+    const [hRes, jRes, vRes, fRes] = await Promise.all([
       supabaseServer.from("asistencia_horarios").select("empleado_codigo, entrada, salida, almuerzo_minutos"),
       // 🔑 Por la fuente ÚNICA, no con un `select` copiado: es lo que hace que
       // el reporte y la planilla no puedan leer distinto la misma fila.
       leerJustificaciones(desde, hasta),
+      // 🔴 LAS VACACIONES, por la MISMA puerta que usa la planilla. Sin esto,
+      // un día de vacaciones se leería como ausencia acá y como vacación allá.
+      // Sin la tabla corrida devuelve CERO filas y el reporte es el de siempre.
+      leerVacaciones(desde, hasta),
       supabaseServer.from("asistencia_feriados").select("fecha, nombre").gte("fecha", desde).lte("fecha", hasta),
     ]);
     if (hRes.error) throw new Error(hRes.error.message);
@@ -169,6 +174,7 @@ export async function GET(req: NextRequest) {
         salida: String(h.salida).slice(0, 5),
       })) as HorarioPersona[],
       justificaciones: jRes.filas,
+      vacaciones: vRes.filas,
       feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
       desde,
       hasta,
