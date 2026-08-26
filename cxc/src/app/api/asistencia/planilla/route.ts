@@ -30,6 +30,8 @@ import {
   servicioProfesionalDeFila,
   pagaSegurosDeFila,
   leerJustificaciones,
+  leerVacaciones,
+  avisoMigracionVacaciones,
 } from "@/lib/asistencia/config-server";
 import { avisoMigracionServicioProfesional } from "@/lib/asistencia/participacion";
 import {
@@ -45,6 +47,11 @@ import {
   textoJustificacion,
   type CodigoSinFicha,
 } from "@/lib/asistencia/periodo";
+import {
+  textoVacacion,
+  textoVacacionesNoPagadas,
+  type VacacionNoPagada,
+} from "@/lib/asistencia/vacaciones";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
   avisoMigracion,
@@ -158,7 +165,7 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, correcciones, manualesLeidos, hRes, jRes, fRes] = await Promise.all([
+    const [{ reglas }, personasDb, correcciones, manualesLeidos, hRes, jRes, vRes, fRes] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       // 🔴 ACÁ ES DONDE LA CORRECCIÓN LLEGA AL PAGO. Si no llegara, corregir una
@@ -176,6 +183,9 @@ export async function GET(req: NextRequest) {
       // `leerJustificaciones`: leer distinto acá que en el reporte es la
       // diferencia entre «el día entero» y «un permiso de dos horas».
       leerJustificaciones(q.desde, q.hasta),
+      // 🔴 LAS VACACIONES, por la MISMA puerta que el reporte. Sin la tabla
+      // corrida devuelve CERO filas y la planilla paga exactamente lo de ayer.
+      leerVacaciones(q.desde, q.hasta),
       supabaseServer
         .from("asistencia_feriados")
         .select("fecha, nombre")
@@ -253,6 +263,7 @@ export async function GET(req: NextRequest) {
       marcaciones: efectivas.marcaciones,
       horarios,
       justificaciones: jRes.filas,
+      vacaciones: vRes.filas,
       feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
       desde: q.desde,
       hasta: q.hasta,
@@ -315,6 +326,17 @@ export async function GET(req: NextRequest) {
       const previo = justificados.get(codigo);
       justificados.set(codigo, previo ? `${previo} · ${texto}` : texto);
     }
+    // 🔴 Y LAS VACACIONES ENTRAN AL MISMO MAPA. Si no entraran, ELOYN MENDOZA
+    // —que no marca un solo día en el período— volvería a salir en ámbar
+    // diciendo «no marcó ni un día», que es EXACTAMENTE el ámbar que se sacó
+    // cuando su vacación era una justificación. Mudar la fila no puede
+    // devolverle un pendiente que no existe.
+    for (const v of vRes.filas) {
+      const codigo = String(v.empleado_codigo);
+      const texto = textoVacacion(v.desde, v.hasta, v.ya_pagadas === true);
+      const previo = justificados.get(codigo);
+      justificados.set(codigo, previo ? `${previo} · ${texto}` : texto);
+    }
 
     const todasLasLineas = armarPlanilla({
       personas: personasVigentes,
@@ -343,6 +365,35 @@ export async function GET(req: NextRequest) {
       codigo: l.codigo,
       marcaciones: marcasPorCodigo.get(l.codigo) ?? 0,
     }));
+
+    // ── 🔴 NADA SE DESCARTA EN SILENCIO ──────────────────────────────────────
+    //
+    // Regla firme de Daniel: si la planilla deja de pagar días por una vacación
+    // marcada «ya se le pagó», TIENE QUE DECIRLO en pantalla — con el nombre,
+    // el rango y el monto. Rechazar sí, esconder no.
+    //
+    // 🔑 Se arma sobre las líneas que SÍ produjeron dinero, que son las únicas
+    // donde la planilla de verdad descontó algo. A quien el sistema no le
+    // calculó pago (una vacación que cubre el período entero, sin una sola
+    // marca) no se le "dejó de pagar" nada: sale en «Decidilo vos» con su
+    // motivo escrito, que es otra cosa y ya se dice ahí.
+    const rangosMarcadosDe = new Map<string, Array<{ desde: string; hasta: string }>>();
+    for (const v of vRes.filas) {
+      if (v.ya_pagadas !== true) continue;
+      const cod = String(v.empleado_codigo);
+      const lista = rangosMarcadosDe.get(cod);
+      if (lista) lista.push({ desde: v.desde, hasta: v.hasta });
+      else rangosMarcadosDe.set(cod, [{ desde: v.desde, hasta: v.hasta }]);
+    }
+    const vacacionesNoPagadas: VacacionNoPagada[] = lineas
+      .filter((l) => (l.dinero?.vacacionesYaPagadas ?? 0) > 0)
+      .map((l) => ({
+        codigo: l.codigo,
+        etiqueta: l.etiqueta,
+        rangos: rangosMarcadosDe.get(l.codigo) ?? [],
+        dias: l.horas.vacacionesYaPagadasDias,
+        monto: l.dinero!.vacacionesYaPagadas,
+      }));
 
     return NextResponse.json({
       // `quincena` se mantiene con el mismo nombre y forma para no romper a
@@ -397,6 +448,14 @@ export async function GET(req: NextRequest) {
         // del cuadro de cada empresa.
         sinFicha: codigosSinFicha,
         avisoSinFicha: textoCodigosSinFicha(codigosSinFicha),
+        // 🔴 Lo que la planilla DEJÓ DE PAGAR por vacaciones marcadas. Va con
+        // nombre, rango y monto: nada se descarta en silencio.
+        vacacionesNoPagadas,
+        avisoVacacionesNoPagadas: textoVacacionesNoPagadas(vacacionesNoPagadas),
+        // Sin la tabla corrida NADIE está de vacaciones —o sea, la planilla de
+        // siempre— pero se dice: quien ya cargó una en su cabeza va a esperar
+        // verla acá.
+        faltaMigracionVacaciones: vRes.faltaTabla ? avisoMigracionVacaciones() : null,
         // 🔴 Lo que hay que saber ANTES de pagar por un rango libre.
         rangoLibre: !q.esQuincena,
         factorBase: q.factorBase,

@@ -623,6 +623,11 @@ export const MIGRACION_CONFIGURACION = "20260806160000_asistencia_configuracion.
 
 export const TABLA_PERSONAS = "asistencia_personas";
 export const TABLA_REGLAS = "asistencia_reglas";
+/**
+ * Las VACACIONES. Vive acá —y no en `vacaciones.ts`— porque `esTablaFaltante`
+ * la necesita, y ese archivo es puro: no puede saber de tablas ni de Supabase.
+ */
+export const TABLA_VACACIONES = "asistencia_vacaciones";
 
 interface ErrorPostgrest {
   code?: string | null;

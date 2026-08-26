@@ -26,7 +26,7 @@ import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx-js-style";
 import {
   MOTIVOS_JUSTIFICACION, MOTIVOS_RETIRADOS, MOTIVO_TRABAJO_VENDEDOR,
-  MOTIVO_TRABAJO_FUERA_ANTES, esTrabajoDeVendedor, textoDiaJustificado,
+  MOTIVO_TRABAJO_FUERA_ANTES, esTrabajoDeVendedor, textoDiaJustificado, motivoConocido,
 } from "@/lib/asistencia/motivos";
 import {
   armarReporte, type Marcacion, type HorarioPersona, type Justificacion,
@@ -253,14 +253,28 @@ describe("El motivo, la lista y el reconocedor", () => {
   });
 
   it("🔴 los retirados NO se ofrecen pero SIGUEN reconociéndose", () => {
-    // 🩸 Hay 5 justificaciones vivas en producción y una es de ELOYN MENDOZA
-    // con «Vacaciones» (16-jul → 13-ago). Si el módulo dejara de reconocer el
-    // motivo, su fila se volvería una ausencia sin justificar y le costaría la
+    // 🩸 Quedan 4 justificaciones vivas en producción (3 de Incapacidad y la de
+    // trabajo fuera, la de Rodrigo). Si el módulo dejara de reconocer un motivo
+    // retirado, esa fila se volvería una ausencia sin justificar y costaría una
     // quincena. Sacarlo de la lista OFRECIDA no borra la fila.
-    for (const m of ["Vacaciones", "Permiso", "Luto", "Otro", MOTIVO_TRABAJO_FUERA_ANTES]) {
+    for (const m of ["Permiso", "Luto", "Otro", MOTIVO_TRABAJO_FUERA_ANTES]) {
       expect(MOTIVOS_JUSTIFICACION as readonly string[]).not.toContain(m);
       expect(MOTIVOS_RETIRADOS as readonly string[]).toContain(m);
     }
+  });
+
+  // ⚠️ ESTE CANDADO CAMBIÓ DE DIRECCIÓN el 25-ago-2026, y estaba FIJANDO EL
+  // MUNDO VIEJO: exigía que «Vacaciones» siguiera en `MOTIVOS_RETIRADOS`, o
+  // sea que el módulo la siguiera leyendo como un motivo de justificación.
+  // Hoy exige lo contrario, y por eso vale la pena que sea un caso propio.
+  it("⛔ «Vacaciones» NO está en NINGUNA de las dos listas: se mudó a su pestaña", () => {
+    expect(MOTIVOS_JUSTIFICACION as readonly string[]).not.toContain("Vacaciones");
+    // 🔴 Volver a ponerla en los retirados haría que el desplegable la ofrezca
+    // por la puerta de atrás (`motivoConocido`) y que el mismo día pueda existir
+    // dos veces —como vacación y como «Ausencia justificada — Vacaciones»—, con
+    // dos etiquetas contradictorias en el renglón que decide un pago.
+    expect(MOTIVOS_RETIRADOS as readonly string[]).not.toContain("Vacaciones");
+    expect(motivoConocido("Vacaciones")).toBe(false);
   });
 
   it("🔴 EL NOMBRE VIEJO SIGUE VALIENDO — es la fila de Rodrigo en producción", () => {

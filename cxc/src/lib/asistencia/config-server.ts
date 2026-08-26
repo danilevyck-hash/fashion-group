@@ -25,6 +25,7 @@ import {
   esTablaFaltante,
   TABLA_PERSONAS,
   TABLA_REGLAS,
+  TABLA_VACACIONES,
   type ReglasAsistencia,
 } from "./config";
 import {
@@ -47,6 +48,9 @@ import {
 } from "./participacion";
 import { COLS_PERMISO_HORAS, esColumnaPermisoHorasFaltante } from "./permiso-horas";
 import type { Justificacion } from "./reporte";
+// 🔑 SOLO EL TIPO: `vacaciones.ts` es PURO y no puede importar de acá. Un
+// import de valor armaría el ciclo al revés y sin necesidad.
+import type { Vacacion } from "./vacaciones";
 import {
   COLUMNA_PAGA_SEGUROS,
   esColumnaPagaSegurosFaltante,
@@ -416,5 +420,72 @@ export async function leerJustificaciones(
   return {
     filas: (sinHoras.data ?? []) as unknown as Justificacion[],
     faltaColumnasHoras: true,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAS VACACIONES — en UN solo lugar, y sin asumir que el DDL corrió
+//
+// 🩸 Mismo criterio que `leerJustificaciones`, y por el mismo motivo: las leen
+// DOS rutas (`/reporte` y `/planilla`) más la pantalla de Vacaciones. Un
+// `select` copiado en cada una es el patrón que en este módulo ya costó dos
+// bugs caros — el día que una gane el interruptor y las otras no, el mismo día
+// se paga en una pantalla y se descuenta en la otra.
+//
+// ⚠️ LA TABLA PUEDE NO EXISTIR TODAVÍA: los DDL los corre Daniel a mano. Sin
+// ella se devuelven CERO vacaciones y `faltaTabla`, y TODO el módulo se
+// comporta EXACTAMENTE como antes de que las vacaciones existieran.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El archivo que Daniel tiene que correr para que exista la tabla. */
+export const MIGRACION_VACACIONES = "20260825160000_asistencia_vacaciones.sql";
+
+/** El mensaje que ve la gente cuando falta correr el SQL. Sin jerga de base. */
+export function avisoMigracionVacaciones(): string {
+  return `Todavía no se pueden cargar vacaciones acá. Pídele a Daniel que corra el archivo ${MIGRACION_VACACIONES} en Supabase.`;
+}
+
+export interface VacacionesLeidas {
+  filas: Vacacion[];
+  /** `true` = falta correr `MIGRACION_VACACIONES`. Nadie está de vacaciones. */
+  faltaTabla: boolean;
+}
+
+/**
+ * Las vacaciones que TOCAN el rango pedido.
+ *
+ * 🔑 Se SOLAPAN, no "están contenidas": unas vacaciones que arrancan antes del
+ * rango igual cubren días de adentro. Es el mismo criterio que ya usan las
+ * justificaciones, y el de Eloyn (16-jul → 13-ago) es justamente el caso.
+ */
+export async function leerVacaciones(
+  desde: string,
+  hasta: string,
+): Promise<VacacionesLeidas> {
+  const { data, error } = await supabaseServer
+    .from(TABLA_VACACIONES)
+    .select("empleado_codigo, desde, hasta, ya_pagadas")
+    .eq("deleted", false)
+    .lte("desde", hasta)
+    .gte("hasta", desde);
+
+  if (error) {
+    // ⚠️ Solo se degrada si el error NOMBRA la tabla. Tragarse cualquier error
+    // convertiría un permiso o un timeout en «nadie está de vacaciones», y esa
+    // mentira se paga: los días volverían a contarse como ausencia.
+    if (esTablaFaltante(error, TABLA_VACACIONES)) return { filas: [], faltaTabla: true };
+    throw new Error(error.message);
+  }
+
+  return {
+    filas: (data ?? []).map((f) => ({
+      empleado_codigo: String((f as { empleado_codigo: unknown }).empleado_codigo),
+      desde: String((f as { desde: unknown }).desde),
+      hasta: String((f as { hasta: unknown }).hasta),
+      // 🔑 `=== true`, no truthy: la columna nace en `false` y un valor raro
+      // tiene que caer del lado de «se paga», que es el default.
+      ya_pagadas: (f as { ya_pagadas: unknown }).ya_pagadas === true,
+    })),
+    faltaTabla: false,
   };
 }

@@ -9,15 +9,26 @@
 //
 // Los motivos son CUATRO: Incapacidad · Catástrofe · Escolares · Trabajo de
 // vendedor. Se fueron «Permiso», «Luto» y «Otro» (cajones sin forma, que en
-// tres meses no dicen nada) y «Vacaciones», que se muda a su propia pestaña
-// porque es OTRA COSA: no se paga, y se lleva su propia cuenta de días.
+// tres meses no dicen nada).
 //
-// 🔴 PERO LO QUE YA ESTÁ GUARDADO SIGUE VALIENDO. Hay 5 justificaciones vivas en
-// producción —3 de Incapacidad (48, 7, 43), 1 de trabajo fuera (13, Rodrigo) y
-// 1 de Vacaciones (29, Eloyn, 16-jul → 13-ago)— y ninguna se puede perder:
-// pagan una quincena. Sacar un motivo de la lista OFRECIDA no borra las filas
-// que lo usan; `MOTIVOS_RETIRADOS` existe para que el módulo sepa leerlas y la
-// pantalla las muestre tal cual, sin ofrecerlas para una nueva.
+// ✅ «VACACIONES» YA SE MUDÓ (25-ago-2026) y por eso NO está en ninguna de las
+// dos listas de acá. Vive en su propia pestaña y en su propia tabla
+// (`asistencia_vacaciones`, ver `vacaciones.ts`), porque es OTRA COSA: en un
+// día de vacaciones no se calcula nada del reloj, y llevan su propia cuenta de
+// días. La ÚNICA justificación viva con ese motivo —ELOYN MENDOZA, código 29,
+// 16-jul → 13-ago-2026— la migra
+// `20260825160000_asistencia_vacaciones.sql`, que la inserta SIN MARCAR (o
+// sea, pagándose igual que hoy) y recién después borra la fila vieja. Con la
+// migración corrida no queda una sola justificación de «Vacaciones» que leer;
+// mientras no corra, una fila así se lee como un motivo cualquiera y se
+// comporta EXACTAMENTE como se comportaba.
+//
+// 🔴 LO QUE YA ESTÁ GUARDADO SIGUE VALIENDO. Quedan 4 justificaciones vivas en
+// producción —3 de Incapacidad (48, 7, 43) y 1 de trabajo fuera (13, Rodrigo)—
+// y ninguna se puede perder: pagan una quincena. Sacar un motivo de la lista
+// OFRECIDA no borra las filas que lo usan; `MOTIVOS_RETIRADOS` existe para que
+// el módulo sepa leerlas y la pantalla las muestre tal cual, sin ofrecerlas
+// para una nueva.
 //
 // ── 🔴 «TRABAJO FUERA DE LA OFICINA» → «TRABAJO DE VENDEDOR» ─────────────────
 //
@@ -69,12 +80,14 @@ export const MOTIVOS_JUSTIFICACION = [
  * vieja con «Luto» tiene que seguir mostrándose y seguir sin descontar; lo que
  * cambia es que nadie puede crear una nueva.
  *
- * ⚠️ «Vacaciones» está en esta lista SOLO mientras la pestaña de Vacaciones no
- * exista. La justificación viva de ELOYN MENDOZA (29, 16-jul → 13-ago) la usa,
- * y hasta que se mude tiene que seguir comportándose exactamente igual que hoy.
+ * ⛔ «Vacaciones» NO ESTÁ ACÁ, y no es un olvido: se MUDÓ a su propia pestaña
+ * (25-ago-2026, ver la nota de arriba). Volver a ponerla haría que el
+ * desplegable la ofreciera de nuevo por la puerta de atrás y que el mismo día
+ * pudiera existir dos veces —una como vacación y otra como «Ausencia
+ * justificada — Vacaciones»—, con dos etiquetas contradictorias en el renglón
+ * que decide un pago.
  */
 export const MOTIVOS_RETIRADOS = [
-  "Vacaciones",
   "Permiso",
   "Luto",
   "Otro",

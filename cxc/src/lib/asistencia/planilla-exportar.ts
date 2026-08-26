@@ -63,6 +63,14 @@ export interface DatosPlanillaExport {
   periodoAbierto?: AvisoPeriodoAbierto | null;
   /** Los códigos que marcaron y no tienen ficha, dicho una sola vez. */
   avisoSinFicha?: string | null;
+  /**
+   * Lo que la planilla DEJÓ DE PAGAR por vacaciones marcadas «ya se le pagó».
+   *
+   * 🔴 VA IMPRESO. Es la regla de Daniel —nada se descarta en silencio— y el
+   * papel es el que se firma: quien lo revise dentro de seis meses tiene que
+   * poder ver de dónde salió ese descuento, con nombre, rango y monto.
+   */
+  avisoVacacionesNoPagadas?: string | null;
 }
 
 /** El subtítulo que llevan los dos archivos. */
@@ -288,6 +296,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Excedente", `× ${r.recargoExcedenteNocturnaMixta}. Solo las horas que pasan de ${r.excedenteHorasDia} en el día Y caen después de las ${r.horaCorteNocturno}. Las dos condiciones a la vez.`],
       ["Domingos y feriados", `Horas trabajadas × ${r.recargoDomingoFeriado}.`],
       ["Ausencias", "Horas del día que no se trabajó × rata por hora, sin recargo. Es el día completo: quien no marcó ni una vez."],
+      ["Vacaciones «ya se le pagó»", "Se muestran en la columna «Ausencias» pero NO son una ausencia: la persona no faltó. Son días de vacaciones que ya había cobrado en dinero antes, así que no se le pagan otra vez y se le descuentan como un día no trabajado. Una vacación SIN marcar se paga normal y no aparece en ninguna columna."],
       ["Llegar más de 30 minutos tarde", "Se muestra en la columna «Ausencias», no en «Tardanzas» — pero SE DESCUENTAN LOS MINUTOS, exactamente igual que una tardanza. La columna solo cambia de nombre: el total bruto y el neto son los mismos. Hasta 30 minutos va en «Tardanzas»."],
       ["Seguro social", `${r.seguroSocialPct} % del total bruto.`],
       ["Seguro educativo", `${r.seguroEducativoPct} % del total bruto.`],
@@ -304,8 +313,11 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
         ? `${d.periodoAbierto.texto} Un día que no pasó no cuenta como falta ni como presente: todavía no existe.`
         : "Este período ya terminó: todos sus días se contaron."],
       ...(d.avisoSinFicha ? [["Códigos sin ficha", d.avisoSinFicha]] : []),
+      ...(d.avisoVacacionesNoPagadas
+        ? [["Vacaciones que no se pagaron", d.avisoVacacionesNoPagadas]]
+        : []),
       ["Período", d.periodo && !d.periodo.esQuincena
-        ? `Del ${d.periodo.desde} al ${d.periodo.hasta} (${d.periodo.diasCalendario} días). NO es una quincena: el salario base se pagó al ${(d.periodo.factorBase * 100).toFixed(1)} % —la parte de quincena que cubren estas fechas— y los montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios) NO se aplicaron, porque se cargan por quincena.`
+        ? `Del ${d.periodo.desde} al ${d.periodo.hasta} (${d.periodo.diasCalendario} días). NO es una quincena: el salario base se pagó al ${(d.periodo.factorBase * 100).toFixed(1)} % —la parte de quincena que cubren estas fechas— y los montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios) NO se aplicaron, porque se cargan por quincena: para llenarlos hay que pedir el cuadro con las fechas exactas de una quincena.`
         : `Quincena del ${d.quincena.etiqueta}. Salario base completo (salario mensual ÷ 2).`],
       ["⚠ Sábados", "Si alguien trabajó un sábado, las horas se muestran en la hoja de horas pero NO se pagan en ninguna columna: el cuadro no tiene una para el sábado."],
     ] as ReportCell[][],
@@ -432,6 +444,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       const avisos = [
         d.periodoAbierto?.texto,
         d.avisoSinFicha,
+        d.avisoVacacionesNoPagadas,
         conAusenciaPorTardanza
           ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
           : null,

@@ -81,11 +81,16 @@ describe("🔴 El reporte lo distingue A LA VISTA", () => {
     expect(screen.queryByText(/Ausencia justificada — Trabajo fuera/)).toBeNull();
   });
 
-  it("un día de VACACIONES sigue diciendo «Ausencia justificada — Vacaciones»", async () => {
-    servir(conReporte(persona("Vacaciones", 0)));
+  // ⚠️ ESTE CASO CAMBIÓ DE MOTIVO el 25-ago-2026, no de intención. Probaba que
+  // «otro motivo cualquiera» siguiera usando el texto genérico y usaba
+  // «Vacaciones» para eso — pero las vacaciones se mudaron a su propia tabla y
+  // ya no pueden llegar acá como justificación. Se usa «Luto», que sí sigue
+  // siendo un motivo retirado que se lee de filas viejas.
+  it("otro motivo retirado sigue diciendo «Ausencia justificada — …»", async () => {
+    servir(conReporte(persona("Luto", 0)));
     montar(<ReporteTab />);
     fireEvent.click(await screen.findByText(/RODRIGO MIRANDA/));
-    expect(screen.getAllByText(/Ausencia justificada — Vacaciones/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Ausencia justificada — Luto/).length).toBeGreaterThan(0);
   });
 
   it("🔴 se ve SIN abrir nada: el chip «N días trabajando fuera» en la fila", async () => {
@@ -97,7 +102,7 @@ describe("🔴 El reporte lo distingue A LA VISTA", () => {
   });
 
   it("el chip NO aparece cuando no hay días de trabajo fuera", async () => {
-    servir(conReporte(persona("Vacaciones", 0)));
+    servir(conReporte(persona("Luto", 0)));
     montar(<ReporteTab />);
     await screen.findByText(/RODRIGO MIRANDA/);
     expect(screen.queryByText(/trabajando fuera/i)).toBeNull();

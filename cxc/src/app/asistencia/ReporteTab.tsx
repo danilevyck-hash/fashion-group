@@ -12,6 +12,7 @@ import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, type DiaReporte, type Persona
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { ALMUERZO_FIJO_MIN, MINUTOS_TARDE_QUE_SON_AUSENCIA } from "@/lib/asistencia/config";
 import { esTrabajoDeVendedor, textoDiaJustificado } from "@/lib/asistencia/motivos";
+import { textoDiaVacaciones } from "@/lib/asistencia/vacaciones";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas from "./RangoFechas";
@@ -526,7 +527,26 @@ function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
           </>
         ) : (
           <td colSpan={8} className="px-2 py-1.5 text-gray-500">
-            {d.feriado ? <>Feriado — {d.feriado}</>
+            {/* 🔴 VACACIONES VA PRIMERO, antes que el feriado. Un día de
+                vacaciones se lee «Vacaciones» y NUNCA «ausencia»: la persona no
+                faltó, está usando un derecho. Y si está marcada como ya pagada
+                se dice ahí mismo, porque es el único caso en que ese día no se
+                paga y quien mira el renglón tiene que poder saberlo. */}
+            {d.vacacion ? (
+              <span className="text-gray-700">
+                {textoDiaVacaciones(d.vacacion.yaPagadas)}
+                {/* 🔑 Las marcas de ese día NO se esconden. No cuentan para
+                    nada —ése es el punto de las vacaciones— pero descartar un
+                    dato EN SILENCIO es lo que hace que alguien lo busque y no
+                    lo encuentre. */}
+                {d.vacacion.marcasIgnoradas.length > 0 && (
+                  <span className="ml-1.5 text-[12px] text-gray-500">
+                    — marcó {d.vacacion.marcasIgnoradas.join(" · ")} (no cuenta)
+                  </span>
+                )}
+              </span>
+            )
+              : d.feriado ? <>Feriado — {d.feriado}</>
               : d.justificado ? (
                 // 🔴 «Trabajando fuera de la oficina», NO «Ausencia justificada
                 // — Trabajo fuera…». Quien trabajó afuera no estuvo ausente, y

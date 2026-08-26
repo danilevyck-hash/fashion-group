@@ -21,6 +21,7 @@ import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type DiaReporte, type PersonaReporte,
 import { ALMUERZO_FIJO_MIN } from "./config";
 import { etiquetaPersona } from "./directorio";
 import { MOTIVO_TRABAJO_VENDEDOR, textoDiaJustificado } from "./motivos";
+import { textoDiaVacaciones } from "./vacaciones";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -124,7 +125,10 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
       // 🔑 Un día con PERMISO de horas también entra: la persona vino, y sin
       // esta condición un día en que se le perdonaron 120 minutos saldría del
       // Excel sin explicación de por qué la tardanza no cuadra con el reloj.
-      if (!d.marcas.length && !d.ausente && !d.justificado && !d.permiso) continue;
+      // 🔑 Un día de VACACIONES entra aunque no tenga marcas ni justificación:
+      // el Excel es lo que se manda por correo, y una fila que falta se lee
+      // como un día que nadie miró.
+      if (!d.marcas.length && !d.ausente && !d.justificado && !d.permiso && !d.vacacion) continue;
       detalle.push([
         quien(p), p.codigo, fecha(d.fecha),
         d.marcas[0] ?? "", d.marcas[1] ?? "", d.marcas[2] ?? "",
@@ -135,7 +139,11 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
         // El MISMO texto que la pantalla (`textoDiaJustificado`): el Excel es lo
         // que se manda por correo, y no puede decir "ausencia" donde la
         // pantalla dice "trabajando fuera".
-        d.ausente ? "Sin justificar"
+        // 🔴 VACACIONES PRIMERO, y con las mismas palabras que la pantalla
+        // (`textoDiaVacaciones`): el papel no puede decir «ausencia» donde la
+        // pantalla dice «Vacaciones».
+        d.vacacion ? textoDiaVacaciones(d.vacacion.yaPagadas)
+          : d.ausente ? "Sin justificar"
           : d.justificado ? textoDiaJustificado(d.justificado)
           // 🔴 El permiso de HORAS es OTRA cosa que una justificación de día
           // entero, y el papel lo dice: perdonó N minutos y nada más.
@@ -167,6 +175,10 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     "Ausencias justificadas","Días trabajando fuera","Veces tarde","Minutos tarde","…de días a revisar",
     "Exceso almuerzo (min)","Salida temprana (min)","Tiempo no trabajado (min)",
     "Extras (min)","Días a revisar","Días corregidos a mano",
+    // 🔴 AL FINAL, no intercaladas: la columna «…de días a revisar» se pinta
+    // en rojo por POSICIÓN (índice 9) y meter algo en el medio teñiría los
+    // minutos tarde, que no son una advertencia. Ya pasó una vez.
+    "Días de vacaciones","…ya pagadas (no se pagan)",
   ]];
   for (const p of personas) {
     const r = p.resumen;
@@ -177,6 +189,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
       n0(r.vecesTarde), n0(r.minutosTarde), n0(r.minutosTardeDeDiasARevisar),
       n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin), n0(r.tiempoNoTrabajadoMin),
       n0(r.extraMin), n0(r.diasARevisar), n0(r.diasCorregidos),
+      n0(r.diasVacaciones), n0(r.diasVacacionesYaPagadas),
     ]);
   }
   const t = personas.reduce((a, p) => ({
@@ -193,14 +206,17 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     extra: a.extra + p.resumen.extraMin,
     rev: a.rev + p.resumen.diasARevisar,
     corr: a.corr + p.resumen.diasCorregidos,
-  }), { dias:0,aus:0,ausJ:0,fuera:0,veces:0,tarde:0,tardeRev:0,almz:0,temp:0,noTrab:0,extra:0,rev:0,corr:0 });
+    vac: a.vac + p.resumen.diasVacaciones,
+    vacPag: a.vacPag + p.resumen.diasVacacionesYaPagadas,
+  }), { dias:0,aus:0,ausJ:0,fuera:0,veces:0,tarde:0,tardeRev:0,almz:0,temp:0,noTrab:0,extra:0,rev:0,corr:0,vac:0,vacPag:0 });
   resumen.push([]);
   resumen.push(["TOTAL", "", "", t.dias, t.aus, t.ausJ, t.fuera, t.veces, t.tarde, t.tardeRev,
-                t.almz, t.temp, t.noTrab, t.extra, t.rev, t.corr]);
+                t.almz, t.temp, t.noTrab, t.extra, t.rev, t.corr, t.vac, t.vacPag]);
 
   const h2 = XLSX.utils.aoa_to_sheet(resumen);
   h2["!cols"] = [{wch:24},{wch:8},{wch:7},{wch:16},{wch:23},{wch:22},{wch:21},{wch:12},
-                 {wch:14},{wch:18},{wch:20},{wch:21},{wch:24},{wch:13},{wch:15},{wch:22}];
+                 {wch:14},{wch:18},{wch:20},{wch:21},{wch:24},{wch:13},{wch:15},{wch:22},
+                 {wch:19},{wch:26}];
   h2["!freeze"] = { xSplit: 0, ySplit: 1 };
   for (let c = 0; c < resumen[0].length; c++) {
     const ref = XLSX.utils.encode_cell({ r: 0, c });

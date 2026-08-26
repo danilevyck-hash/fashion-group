@@ -369,6 +369,14 @@ describe("⚠️ décimo tercer mes y vacaciones: NO se provisionan", () => {
   // número. Ninguna de las dos se suma en ningún lado —están adentro de
   // `ausencias`— y hay un test que lo prueba en dólares. La lista se amplía a
   // conciencia; el candado sigue cerrado para cualquier OTRA columna.
+  //
+  // ⚠️ 25-ago-2026 (noche): entró `vacacionesYaPagadas`, por el MISMO motivo y
+  // con la misma forma. Tampoco es una provisión: es lo que la planilla dejó
+  // de pagar porque esos días de vacaciones YA se habían cobrado en efectivo,
+  // y está ADENTRO de `ausencias` como los otros dos —hay un test que lo prueba
+  // en dólares—. Existe únicamente para poder DECIRLO en pantalla con nombre,
+  // rango y monto: nada se descarta en silencio. `totalBruto` no ganó ni un
+  // término, y el test de abajo lo sigue exigiendo.
   it("el desglose del dinero tiene EXACTAMENTE estas columnas, sin provisiones", () => {
     const d = linea(ficha()).dinero!;
     expect(Object.keys(d).sort()).toEqual([
@@ -377,6 +385,7 @@ describe("⚠️ décimo tercer mes y vacaciones: NO se provisionan", () => {
       "feriados", "isr", "mercancia", "netoPagar", "otrosServicios", "prestamo",
       "rataHora", "salarioQuincenal", "seguroEducativo", "seguroSocial",
       "tardanzas", "terceros", "totalBruto", "totalDeducciones", "valorMinuto",
+      "vacacionesYaPagadas",
     ].sort());
   });
 

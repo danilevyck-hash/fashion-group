@@ -44,6 +44,7 @@ import {
   type TotalesPlanilla,
 } from "@/lib/asistencia/planilla";
 import type { AvisoPeriodoAbierto, CodigoSinFicha } from "@/lib/asistencia/periodo";
+import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
 
 interface Respuesta {
@@ -78,6 +79,13 @@ interface Respuesta {
     rangoLibre: boolean;
     factorBase: number;
     diasCalendario: number;
+    /** Lo que la planilla DEJÓ DE PAGAR por vacaciones marcadas «ya se le pagó».
+     *  Nada se descarta en silencio: va con nombre, rango y monto. */
+    vacacionesNoPagadas: VacacionNoPagada[];
+    avisoVacacionesNoPagadas: string | null;
+    /** Falta correr el SQL de las vacaciones. Nadie está de vacaciones y la
+     *  planilla paga lo de siempre — pero se dice. */
+    faltaMigracionVacaciones: string | null;
   };
 }
 
@@ -109,14 +117,20 @@ export default function PlanillaTab() {
   // render haría que la lista de quincenas cambiara sola a la medianoche
   // mientras alguien está escribiendo montos.
   const hoy = useMemo(() => new Date(Date.now() - 5 * 3_600_000).toISOString().slice(0, 10), []);
-  const quincenas = useMemo(() => quincenasHasta(hoy, 12), [hoy]);
-
-  const [clave, setClave] = useState(quincenas[0].clave);
-  // 🔑 El rango libre es un SEGUNDO camino, no el principal: la quincena es lo
-  // que se mira el 95% de las veces y sigue siendo lo que abre la pantalla.
-  const [modo, setModo] = useState<"quincena" | "rango">("quincena");
-  const [desde, setDesde] = useState(quincenas[0].desde);
-  const [hasta, setHasta] = useState(quincenas[0].hasta);
+  // ⛔ EL MODO «QUINCENA» SE RETIRÓ (25-ago-2026). Daniel, textual: *"quita
+  // periodo quincena en planilla, eso no se usara asi. y sisi, que el usuario
+  // eliga el rango"*. Con un solo modo, el control segmentado sobraba: los dos
+  // campos de fecha se muestran directo.
+  //
+  // 🔴 PERO LA QUINCENA NO DESAPARECIÓ DEL CÁLCULO, y eso es lo que sostiene
+  // todo lo de abajo: `periodoDesdeRango` reconoce un rango que COINCIDE con
+  // una quincena y devuelve esa quincena —misma clave de montos manuales, mismo
+  // factor 1—, así que el caso normal sigue pagando exactamente lo de siempre.
+  // Por eso el rango arranca en la quincena en curso: el primer cuadro que se
+  // ve es el de siempre y de ahí se mueven las fechas.
+  const quincenaEnCurso = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
+  const [desde, setDesde] = useState(quincenaEnCurso.desde);
+  const [hasta, setHasta] = useState(quincenaEnCurso.hasta);
   const [empresa, setEmpresa] = useState<string>(EMPRESAS_ASISTENCIA[0]);
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -127,9 +141,7 @@ export default function PlanillaTab() {
     setCargando(true);
     setError(null);
     try {
-      const p = modo === "rango"
-        ? new URLSearchParams({ desde, hasta, empresa })
-        : new URLSearchParams({ quincena: clave, empresa });
+      const p = new URLSearchParams({ desde, hasta, empresa });
       const res = await fetch(`/api/asistencia/planilla?${p}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
@@ -140,7 +152,7 @@ export default function PlanillaTab() {
     } finally {
       setCargando(false);
     }
-  }, [clave, desde, empresa, hasta, modo]);
+  }, [desde, empresa, hasta]);
 
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -153,13 +165,26 @@ export default function PlanillaTab() {
       const n = Number(String(valor).replace(",", "."));
       const limpio = Number.isFinite(n) && n > 0 ? n : 0;
       if (limpio === linea.manuales[campo]) return; // no se escribió nada nuevo
+      // 🔴 SIN QUINCENA NO HAY DÓNDE GUARDARLO. El campo ya va deshabilitado en
+      // un rango libre, pero el freno tiene que vivir también del lado que
+      // escribe: `asistencia_planilla_manual` guarda por quincena y su CHECK no
+      // acepta otra clave, así que mandar el POST sin ella sería un 400 en la
+      // cara de quien acaba de escribir un monto.
+      if (!data.periodo.claveManuales) return;
 
       try {
         const res = await fetch("/api/asistencia/planilla", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            quincena: clave,
+            // 🔴 LA CLAVE SALE DE LA RESPUESTA, no de un estado propio. Es la
+            // quincena que el servidor reconoció en estas fechas
+            // (`periodo.claveManuales`), o sea la MISMA con la que ya estaban
+            // guardados: escribir una clave calculada acá sería una segunda
+            // definición de «a qué quincena pertenece este cuadro», y el día
+            // que difieran los montos se guardarían en una quincena y se
+            // leerían de otra.
+            quincena: data.periodo.claveManuales,
             codigo,
             ...linea.manuales,
             [campo]: limpio,
@@ -176,7 +201,7 @@ export default function PlanillaTab() {
         toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
       }
     },
-    [cargar, clave, data, toast],
+    [cargar, data, toast],
   );
 
   const exportables = useMemo(() => {
@@ -192,6 +217,10 @@ export default function PlanillaTab() {
       // papel sobrevive a la conversación donde se explicaron.
       periodoAbierto: data.avisos.periodoAbierto,
       avisoSinFicha: data.avisos.avisoSinFicha,
+      // 🔴 El descuento por vacaciones ya pagadas VIAJA AL PAPEL: si la
+      // pantalla lo avisa y el archivo no, el archivo es el que va a decidir un
+      // pago con menos información que la pantalla.
+      avisoVacacionesNoPagadas: data.avisos.avisoVacacionesNoPagadas,
     };
   }, [data]);
 
@@ -246,60 +275,24 @@ export default function PlanillaTab() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">Período</span>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Quincena / Rango de fechas. La quincena manda: es con lo que se
-                paga. El rango es para PREGUNTAR («¿cuánto trabajó del 25 al 10?»)
-                y la pantalla dice qué cambia cuando se usa. */}
-            <div className="flex overflow-hidden rounded-lg border border-gray-200">
-              {([["quincena", "Quincena"], ["rango", "Rango de fechas"]] as const).map(([k, t]) => (
-                <button
-                  key={k} type="button"
-                  onClick={() => {
-                    // Al pasar a rango se arranca con la quincena que estaba a
-                    // la vista: el primer cuadro que se ve es el MISMO, y de ahí
-                    // se mueven las fechas. Nadie empieza con la pantalla vacía.
-                    if (k === "rango" && modo === "quincena") {
-                      const q = quincenas.find((x) => x.clave === clave);
-                      if (q) { setDesde(q.desde); setHasta(q.hasta); }
-                    }
-                    setModo(k);
-                  }}
-                  className={`min-h-[44px] px-3 text-sm transition ${
-                    modo === k ? "bg-black text-white" : "bg-white text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {modo === "quincena" ? (
-              <select
-                value={clave}
-                onChange={(e) => setClave(e.target.value)}
-                className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
-              >
-                {quincenas.map((q) => (
-                  <option key={q.clave} value={q.clave}>{q.etiqueta}</option>
-                ))}
-              </select>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="date" value={desde} max={hasta}
-                  onChange={(e) => setDesde(e.target.value)}
-                  aria-label="Desde"
-                  className="min-h-[44px] rounded-lg border border-gray-200 px-2 text-base tabular-nums outline-none transition focus:border-black sm:text-sm"
-                />
-                <span className="text-xs text-gray-400">a</span>
-                <input
-                  type="date" value={hasta} min={desde}
-                  onChange={(e) => setHasta(e.target.value)}
-                  aria-label="Hasta"
-                  className="min-h-[44px] rounded-lg border border-gray-200 px-2 text-base tabular-nums outline-none transition focus:border-black sm:text-sm"
-                />
-              </div>
-            )}
+          {/* 🔴 UN SOLO MODO: el rango. Sin control segmentado que elegir —
+              con una sola opción, el segmentado no es una elección: es un
+              botón que no hace nada. Arranca en la quincena en curso, así que
+              el caso normal sigue siendo abrir y mirar. */}
+          <div className="flex items-center gap-2">
+            <input
+              type="date" value={desde} max={hasta}
+              onChange={(e) => setDesde(e.target.value)}
+              aria-label="Desde"
+              className="min-h-[44px] rounded-lg border border-gray-200 px-2 text-base tabular-nums outline-none transition focus:border-black sm:text-sm"
+            />
+            <span className="text-xs text-gray-400">a</span>
+            <input
+              type="date" value={hasta} min={desde}
+              onChange={(e) => setHasta(e.target.value)}
+              aria-label="Hasta"
+              className="min-h-[44px] rounded-lg border border-gray-200 px-2 text-base tabular-nums outline-none transition focus:border-black sm:text-sm"
+            />
           </div>
         </div>
 
@@ -345,6 +338,21 @@ export default function PlanillaTab() {
       {/* 🔴 El código que marca y no tiene ficha: UNA vez, arriba, fuera del
           cuadro de cada empresa. Antes salía tres veces —una por empresa— como
           si fueran tres personas distintas. */}
+      {/* 🔴 NADA SE DESCARTA EN SILENCIO. Si la planilla dejó de pagar días por
+          una vacación marcada, se dice acá: nombre, rango y monto. Va ARRIBA,
+          con los avisos de plata, no escondido en el detalle de una fila. */}
+      {data?.avisos.avisoVacacionesNoPagadas && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          {data.avisos.avisoVacacionesNoPagadas}
+        </p>
+      )}
+
+      {data?.avisos.faltaMigracionVacaciones && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          {data.avisos.faltaMigracionVacaciones}
+        </p>
+      )}
+
       {data?.avisos.avisoSinFicha && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           {data.avisos.avisoSinFicha}{" "}
@@ -355,24 +363,17 @@ export default function PlanillaTab() {
           en un rango que no es una quincena, el sueldo base se reparte y los
           montos escritos a mano no entran. Quien imprima este cuadro para pagar
           tiene que leer eso antes que cualquier otra cosa. */}
+      {/* 🔴 UNA LÍNEA, NO UN PÁRRAFO. Eran tres viñetas, escritas cuando el
+          rango era la excepción; hoy es el único modo y ese bloque saldría en
+          cada cuadro que no cuadre con una quincena. Se conserva lo único que
+          es PLATA —que el sueldo base se reparte, y en qué proporción—, porque
+          eso cambia el número y nada se descarta en silencio. Lo de los montos
+          a mano se dice donde están los campos, no acá. */}
       {data?.avisos.rangoLibre && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          <b>Este cuadro NO es una quincena.</b> Son {data.avisos.diasCalendario} días
-          ({data.periodo.etiqueta}).
-          <ul className="mt-1 space-y-0.5 text-amber-800">
-            <li>
-              · El <b>sueldo base se reparte</b>: se paga{" "}
-              <b>{(data.avisos.factorBase * 100).toFixed(1)} %</b> de un sueldo quincenal,
-              que es la parte de quincena que cubren estas fechas.
-            </li>
-            <li>
-              · El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios
-              NO entran</b>: se escriben por quincena y repartirlos por días sería inventar
-              plata. Para pagar, elige la quincena.
-            </li>
-            <li>· Las horas, las extras, las tardanzas y las ausencias sí son las de estas fechas.</li>
-          </ul>
-        </div>
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          <b>Estas fechas no son una quincena</b> ({data.avisos.diasCalendario} días): del sueldo
+          base se paga <b>{(data.avisos.factorBase * 100).toFixed(1)} %</b> de un quincenal.
+        </p>
       )}
       {data?.avisos.faltaMigracionConfiguracion && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-[13px] text-red-800">
@@ -437,12 +438,25 @@ export default function PlanillaTab() {
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {!cargando && !error && data?.lineas.length === 0 && (
         <p className="py-10 text-center text-sm text-gray-500">
-          No hay nadie en esta empresa para esta quincena. Revisa la pestaña <b>Configuración</b>.
+          No hay nadie en esta empresa para estas fechas. Revisa la pestaña <b>Configuración</b>.
         </p>
       )}
 
       {!cargando && !error && !!data?.lineas.length && (
         <>
+          {/* 🔴 UNA LÍNEA, Y VA DONDE ESTÁN LOS CAMPOS. Los cinco montos que se
+              escriben a mano viven por quincena (`asistencia_planilla_manual`,
+              con la clave «2026-08-1» y un CHECK que no acepta otra cosa), así
+              que en un rango que no es una quincena no hay dónde guardarlos y
+              quedan apagados. Enterarse DESPUÉS de escribir un ISR es el
+              problema; el porqué se dice acá, sin párrafo. */}
+          {data.avisos.rangoLibre && (
+            <p className="text-[13px] text-gray-500">
+              Los montos a mano se guardan por quincena — escribe las fechas exactas de una
+              quincena para poder llenarlos.
+            </p>
+          )}
+
           {/* ── ESCRITORIO: la tabla de 19 columnas ── */}
           <div className="hidden md:block">
             <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
@@ -871,6 +885,18 @@ function Tarjeta({
               <b>{h.tardanzaGraveDias}</b> {h.tardanzaGraveDias === 1 ? "día" : "días"} en que llegó más de{" "}
               {MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde. <b>Se descuentan los minutos, igual que una
               tardanza</b> — la columna solo cambia de nombre, el monto es el mismo.
+            </p>
+          )}
+          {/* 🔴 UN MONTO EN «AUSENCIAS» QUE SALE DE UNAS VACACIONES TAMPOCO
+              PUEDE QUEDAR SIN EXPLICACIÓN, y acá además hay que decir que NO
+              es una ausencia: la persona no faltó, se tomó vacaciones que ya
+              había cobrado. */}
+          {d.vacacionesYaPagadas > 0 && (
+            <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] text-amber-900">
+              De los <b>${$(d.ausencias)}</b>, <b>${$(d.vacacionesYaPagadas)}</b> son{" "}
+              <b>{h.vacacionesYaPagadasDias}</b>{" "}
+              {h.vacacionesYaPagadasDias === 1 ? "día" : "días"} de <b>vacaciones ya pagadas</b> —
+              no faltó: esos días ya se le habían pagado antes, así que no se le pagan otra vez.
             </p>
           )}
           {h.sabadoMin > 0 && (

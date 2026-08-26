@@ -3,7 +3,7 @@
 //
 // Tres cosas que costaron trabajo entender y que se rompen sin querer:
 //
-//  1. SON 4 PESTAÑAS Y EN ESTE ORDEN. Eran 7 — un menú, no una herramienta.
+//  1. SON 5 PESTAÑAS Y EN ESTE ORDEN. Eran 7 — un menú, no una herramienta.
 //     Horarios y Feriados pasaron a SECCIONES de Configuración (una pestaña se
 //     gana el lugar por lo que hacés ahí, no por la tabla que guarda) y "Cómo
 //     funciona" pasó a ser el botón «?». Nada se borró: cambió dónde vive, y
@@ -36,19 +36,35 @@ const CLIENTE = "app/asistencia/AsistenciaClient.tsx";
 const CONFIG = "app/asistencia/ConfiguracionTab.tsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("las 4 pestañas y su orden", () => {
+describe("las 5 pestañas y su orden", () => {
   const src = leer(CLIENTE);
 
   /** Los pares [clave, "Etiqueta"] del arreglo TABS, en el orden del archivo. */
   const tabs = [...src.matchAll(/\["(\w+)",\s*"([^"]+)"\]/g)].map((m) => [m[1], m[2]]);
 
-  it("son exactamente 4, en el orden Planilla · Reporte · Justificaciones · Configuración", () => {
+  // ⚠️ ESTE CANDADO SE AMPLIÓ A CONCIENCIA el 25-ago-2026, no se aflojó: entró
+  // VACACIONES, y se ganó el lugar por lo que se hace ahí, no por la tabla que
+  // guarda. Es lo CONTRARIO de una sección más de Justificaciones — existe
+  // justamente porque una vacación NO es una justificación (no se paga por
+  // asistencia y lleva su propia cuenta de días), y meterlas en la misma lista
+  // hacía imposible distinguir quién estuvo enfermo de quién estuvo de
+  // vacaciones. El candado sigue cerrado para cualquier OTRA pestaña.
+  it("son exactamente 5, en el orden Planilla · Reporte · Justificaciones · Vacaciones · Configuración", () => {
     expect(tabs).toEqual([
       ["planilla", "Planilla"],
       ["reporte", "Reporte"],
       ["justificaciones", "Justificaciones"],
+      ["vacaciones", "Vacaciones"],
       ["configuracion", "Configuración"],
     ]);
+  });
+
+  it("Vacaciones va APARTE de Justificaciones, con su propio componente", () => {
+    // 🔴 Si la pestaña montara `JustificacionesTab`, el rótulo diría una cosa y
+    // la pantalla haría otra — que es exactamente el enredo que este cambio
+    // vino a deshacer.
+    expect(src).toMatch(/from "\.\/VacacionesTab"/);
+    expect(src).toMatch(/tab === "vacaciones" && <VacacionesTab \/>/);
   });
 
   it("abre en Planilla — es a lo que viene la contable", () => {

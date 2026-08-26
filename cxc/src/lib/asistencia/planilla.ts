@@ -380,6 +380,21 @@ export interface HorasPersona {
   ausenciaDias: number;
   ausenciaJustificadaDias: number;
   /**
+   * Minutos de jornada de días de VACACIONES marcadas «ya se le pagó». SE RESTAN.
+   *
+   * 🔴 SON LOS ÚNICOS DÍAS DE VACACIONES QUE CUESTAN PLATA. Una vacación sin
+   * marcar no aporta un minuto acá: se paga, y el quincenal la cubre.
+   *
+   * ⚠️ NO ES UNA AUSENCIA y no se suma a `ausenciaMin`. Vive aparte porque en
+   * el renglón del día se lee «Vacaciones (ya pagadas)» y NUNCA «ausencia» — la
+   * persona no faltó, está usando un derecho que ya cobró.
+   */
+  vacacionesYaPagadasMin: number;
+  /** Cuántos días fueron. Es lo que se escribe en el aviso ámbar y en el papel. */
+  vacacionesYaPagadasDias: number;
+  /** Días del período cubiertos por vacaciones, marcadas o no. Solo para MOSTRAR. */
+  vacacionesDias: number;
+  /**
    * Sábado trabajado. ⚠️ NO ENTRA A NINGUNA COLUMNA: el cuadro de la contable
    * no tiene una para el sábado y acá no se inventa un recargo. Se mide y se
    * avisa, que es lo contrario de perderlo en silencio.
@@ -398,6 +413,7 @@ export const HORAS_CERO: HorasPersona = {
   domingoMin: 0, feriadoMin: 0, tardanzaMin: 0,
   tardanzaGraveMin: 0, tardanzaGraveDias: 0,
   ausenciaMin: 0, ausenciaDias: 0, ausenciaJustificadaDias: 0,
+  vacacionesYaPagadasMin: 0, vacacionesYaPagadasDias: 0, vacacionesDias: 0,
   sabadoMin: 0, diasTrabajados: 0, diasARevisar: 0,
   tardanzaDeDiasARevisarMin: 0, jornadaDiariaMin: 0,
 };
@@ -425,12 +441,18 @@ export function minutosTardanzaMostrados(h: HorasPersona): number {
 /** La etiqueta de «Ausencias», con lo que hay que saber para explicar el monto. */
 export function textoAusencias(h: HorasPersona): string {
   const base = `${h.ausenciaDias} días · ${aHoras(h.ausenciaMin)} h`;
+  const partes: string[] = [base];
   const dias = h.tardanzaGraveDias || 0;
-  if (!dias) return base;
   // 🔑 Se DICE que son minutos de llegar tarde, no se deja adivinar. Sin esto,
   // alguien que vino los 15 días aparece con «0 días · 0 h» de ausencia y un
   // monto al lado, y la contadora no tiene cómo saber de dónde salió.
-  return `${base} · ${dias} día(s) de más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} min tarde`;
+  if (dias) partes.push(`${dias} día(s) de más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} min tarde`);
+  // 🔴 Lo mismo con las vacaciones ya pagadas, y por el mismo motivo: el monto
+  // está adentro de esta columna y quien la lee tiene que poder explicarlo sin
+  // abrir otra pantalla. Se dice «vacaciones», nunca «ausencia».
+  const vac = h.vacacionesYaPagadasDias || 0;
+  if (vac) partes.push(`${vac} día(s) de vacaciones ya pagadas`);
+  return partes.join(" · ");
 }
 
 /**
@@ -539,11 +561,30 @@ export function clasificarDia(
   HorasPersona,
   | "extraDiurnoMin" | "extraNocturnoMin" | "excedenteMin"
   | "domingoMin" | "feriadoMin" | "tardanzaMin" | "ausenciaMin" | "sabadoMin"
+  | "vacacionesYaPagadasMin"
 > {
   const cero = {
     extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
     domingoMin: 0, feriadoMin: 0, tardanzaMin: 0, ausenciaMin: 0, sabadoMin: 0,
+    vacacionesYaPagadasMin: 0,
   };
+
+  // ── 🔴 VACACIONES: VA PRIMERO, ANTES QUE EL FERIADO Y QUE TODO ─────────────
+  //
+  // El motor del reporte ya dejó este día en cero y sin marcas (ver la nota de
+  // `DiaReporte.vacacion`), así que acá no hay nada que medir: lo único que se
+  // decide es si el día SE PAGA.
+  //
+  //   · sin marcar → todo en cero. El quincenal lo cubre, o sea que se paga.
+  //   · marcada    → se descuenta la jornada: esos días ya se cobraron antes.
+  //
+  // ⚠️ Solo se descuenta lo que la persona iba a trabajar: día HÁBIL y NO
+  // feriado. Un domingo o un 3 de noviembre adentro del rango no tenían jornada
+  // que pagar, y descontarlos sería cobrarle dos veces el mismo día.
+  if (d.vacacion) {
+    if (!d.vacacion.yaPagadas || d.feriado || !esHabil(d.fecha)) return cero;
+    return { ...cero, vacacionesYaPagadasMin: jornadaDiariaMin };
+  }
 
   // Feriado trabajado: TODO lo trabajado va al recargo de feriado. No se le
   // mide tardanza ni hora extra — ese día no tiene horario que cumplir.
@@ -625,6 +666,15 @@ export function medirHoras(
     }
     h.ausenciaMin += c.ausenciaMin;
     h.sabadoMin += c.sabadoMin;
+    // 🔴 APARTE DE LA AUSENCIA, SIEMPRE. Se valúa igual (jornada × rata, sin
+    // recargo) y se descuenta igual, pero se cuenta solo para poder DECIRLO:
+    // el aviso ámbar necesita el monto y los días, y el renglón del día nunca
+    // dice «ausencia» sobre unas vacaciones.
+    if (c.vacacionesYaPagadasMin > 0) {
+      h.vacacionesYaPagadasMin += c.vacacionesYaPagadasMin;
+      h.vacacionesYaPagadasDias += 1;
+    }
+    if (d.vacacion) h.vacacionesDias += 1;
     if (d.marcas.length) {
       h.diasTrabajados += 1;
       if (d.revisar) {
@@ -701,6 +751,19 @@ export interface DineroLinea {
   ausenciaPorTardanza: number;
   /** De `ausencias`, lo que viene de días SIN NINGUNA marca. Solo para mostrar. */
   ausenciaDeDiaCompleto: number;
+  /**
+   * De `ausencias`, lo que viene de VACACIONES marcadas «ya se le pagó».
+   *
+   * 🔴 ES EL MONTO QUE LA PLANILLA DEJÓ DE PAGAR, y por eso existe: la regla de
+   * Daniel es que eso **se dice en pantalla**, con el nombre, el rango y el
+   * monto. Sin este campo el descuento se perdería adentro de `ausencias` y no
+   * habría forma de escribir ese aviso.
+   *
+   * ⚠️ YA ESTÁ ADENTRO DE `ausencias` y no se suma en ningún lado — es un
+   * DESGLOSE, igual que `ausenciaPorTardanza`. Sumarlo sería descontar dos
+   * veces los mismos días.
+   */
+  vacacionesYaPagadas: number;
   tardanzas: number;
   totalBruto: number;
   seguroSocial: number;
@@ -917,7 +980,17 @@ export function calcularDinero(
   const tardanzaTotal = centavos(horas.tardanzaMin * valorMinuto);
   const ausenciaPorTardanza = centavos((horas.tardanzaGraveMin || 0) * valorMinuto);
   const tardanzas = centavos(tardanzaTotal - ausenciaPorTardanza);
-  const ausencias = centavos(ausenciaDeDiaCompleto + ausenciaPorTardanza);
+
+  // 🔴 LAS VACACIONES «YA PAGADAS» SE VALÚAN COMO UN DÍA NO TRABAJADO: jornada
+  // × rata, SIN recargo, exactamente igual que una ausencia de día completo. No
+  // es una fórmula nueva — es la misma, sobre otros minutos. Lo único distinto
+  // es que se cuentan aparte para poder DECIR cuánto no se pagó y a quién.
+  //
+  // ⚠️ `|| 0`: un `HorasPersona` armado a mano sin este campo (hay tests viejos
+  // que lo hacen) daría `NaN`, y `centavos(NaN)` es 0 — o sea un descuento que
+  // desaparece en silencio. Acá el cero es explícito.
+  const vacacionesYaPagadas = centavos(h(horas.vacacionesYaPagadasMin || 0) * rataHora);
+  const ausencias = centavos(ausenciaDeDiaCompleto + ausenciaPorTardanza + vacacionesYaPagadas);
 
   const totalBruto = centavos(
     salarioQuincenal + extraDiurno + extraNocturno + excedente + domingos + feriados
@@ -965,7 +1038,8 @@ export function calcularDinero(
   return {
     rataHora, valorMinuto, salarioQuincenal,
     extraDiurno, extraNocturno, excedente, domingos, feriados,
-    ausencias, ausenciaPorTardanza, ausenciaDeDiaCompleto, tardanzas, totalBruto,
+    ausencias, ausenciaPorTardanza, ausenciaDeDiaCompleto, vacacionesYaPagadas,
+    tardanzas, totalBruto,
     seguroSocial, seguroEducativo,
     isr: manuales.isr, prestamo: manuales.prestamo,
     terceros: manuales.terceros, mercancia: manuales.mercancia,
@@ -1191,7 +1265,7 @@ export type TotalesPlanilla = Omit<DineroLinea, "rataHora" | "valorMinuto"> & {
 export const TOTALES_CERO: TotalesPlanilla = {
   salarioQuincenal: 0, extraDiurno: 0, extraNocturno: 0, excedente: 0,
   domingos: 0, feriados: 0, ausencias: 0, ausenciaPorTardanza: 0,
-  ausenciaDeDiaCompleto: 0, tardanzas: 0, totalBruto: 0,
+  ausenciaDeDiaCompleto: 0, vacacionesYaPagadas: 0, tardanzas: 0, totalBruto: 0,
   seguroSocial: 0, seguroEducativo: 0, isr: 0, prestamo: 0, terceros: 0,
   mercancia: 0, totalDeducciones: 0, otrosServicios: 0, netoPagar: 0,
   personas: 0, sinConfigurar: 0, fueraDePlanilla: 0, decidirAMano: 0,
@@ -1233,6 +1307,9 @@ export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
     // No entran en ninguna otra cuenta: ya están adentro de `ausencias`.
     t.ausenciaPorTardanza = centavos(t.ausenciaPorTardanza + d.ausenciaPorTardanza);
     t.ausenciaDeDiaCompleto = centavos(t.ausenciaDeDiaCompleto + d.ausenciaDeDiaCompleto);
+    // 🔴 Lo que la planilla DEJÓ DE PAGAR por vacaciones marcadas. Ya está
+    // adentro de `ausencias`; se totaliza aparte para el aviso ámbar.
+    t.vacacionesYaPagadas = centavos(t.vacacionesYaPagadas + d.vacacionesYaPagadas);
     t.seguroSocial = centavos(t.seguroSocial + d.seguroSocial);
     t.seguroEducativo = centavos(t.seguroEducativo + d.seguroEducativo);
     t.isr = centavos(t.isr + d.isr);
