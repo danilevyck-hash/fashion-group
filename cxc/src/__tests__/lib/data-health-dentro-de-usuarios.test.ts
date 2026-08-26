@@ -92,7 +92,12 @@ describe("el catálogo: Data Health ya no es un módulo suelto", () => {
 const NO_ADMIN_ESPERADO: Record<string, string[]> = {
   secretaria: ["catalogos", "guias", "packing-lists", "asistencia", "reclamos", "cargar",
     "comisiones", "marketing", "caja", "cheques", "directorio"],
-  bodega: ["referencia", "catalogos", "guias", "packing-lists"],
+  // 🔴 `asistencia` desde el 26-ago-2026: Daniel, textual *«julio usa el
+  // usuario bodega, asi que ponlo ahi»* — para que Julio Garay apruebe las
+  // horas extra que él mismo reporta. Cambio DELIBERADO, ajeno a esta mudanza.
+  // ⚠️ Es la ficha, no la Planilla: ve UNA pestaña y la ruta le contesta sin un
+  // solo sueldo (`api/asistencia-bodega-solo-aprueba.test.ts`).
+  bodega: ["asistencia", "referencia", "catalogos", "guias", "packing-lists"],
   // `saldos-banco` salió el 13-ago-2026: dejó de ser módulo (es la 2ª pestaña
   // de "Gastos"). La puerta al dato sigue abierta por `gastos-contabilidad`.
   // `comisiones` ENTRA el 25-ago-2026 — Daniel, textual: *"Q contabilidad vea
@@ -144,10 +149,13 @@ describe("quién ve qué — antes y después, rol por rol", () => {
   });
 
   it("el auto-redirect de \"rol con un solo módulo\" no se mueve", () => {
-    // Cuenta MÓDULOS visibles, no grupos: bodega tiene 4 (no redirige) y
-    // gerente_acs sigue teniendo 1 (redirige a Multifashion). Ninguno de los dos
-    // toca Administración, así que esta mudanza no puede alterarlos.
-    expect(getVisibleModules("bodega").length).toBe(4);
+    // Cuenta MÓDULOS visibles, no grupos: bodega tiene 5 desde el 26-ago-2026
+    // (Asistencia, para que Julio Garay apruebe horas extra) y gerente_acs
+    // sigue teniendo 1 (redirige a Multifashion). Ninguno de los dos toca
+    // Administración, así que esta mudanza no puede alterarlos.
+    // 🔑 Lo que importa acá es que bodega siga SIN redirigir: ya tenía 4, así
+    // que sumar uno no puede encender el atajo de «rol con un solo módulo».
+    expect(getVisibleModules("bodega").length).toBe(5);
     expect(getVisibleModules("gerente_acs").map((m) => m.href)).toEqual(["/multifashion"]);
     // Y admin, que es el único con Administración, está exento por código.
     expect(plano(leer("src/app/home/page.tsx"))).toContain('if (role === "admin") return;');

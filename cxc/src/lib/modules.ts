@@ -36,7 +36,7 @@ import {
   ScanSearch,
   type LucideIcon,
 } from "lucide-react";
-import { asistenciaRoles } from "@/lib/asistencia/roles";
+import { asistenciaRoles, aprobacionesRoles } from "@/lib/asistencia/roles";
 
 export type ModuleGroup =
   | "ventas-clientes"
@@ -142,7 +142,7 @@ export const ALL_MODULES: AppModule[] = [
   // el nombre solo hablaba de las marcaciones. 🔴 La `key` NO cambia: está en
   // `role_permissions` y en `fg_users.modulos_override`, y renombrarla rompería
   // los permisos sin comprar nada.
-  { key: "asistencia",     label: "Asistencia y Planilla", href: "/asistencia",   icon: Clock,         roles: asistenciaRoles(),                       group: "operacion" },
+  { key: "asistencia",     label: "Asistencia y Planilla", href: "/asistencia",   icon: Clock,         roles: [...new Set([...asistenciaRoles(), ...aprobacionesRoles()])],                       group: "operacion" },
   { key: "reclamos",       label: "Reclamos",          href: "/reclamos",         icon: AlertTriangle, roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "cargar",         label: "Depurador",         href: "/productos/cargar", icon: PackagePlus,   roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: ["admin", "secretaria"],                       group: "operacion" },

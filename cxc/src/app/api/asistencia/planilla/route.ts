@@ -7,7 +7,7 @@
 // Planilla no pueden contradecirse en cuántos minutos llegó tarde alguien.
 
 import { NextRequest, NextResponse } from "next/server";
-import { asistenciaRoles, aprobacionesRoles } from "@/lib/asistencia/roles";
+import { asistenciaRoles, aprobacionesRoles, soloAprueba } from "@/lib/asistencia/roles";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
@@ -103,8 +103,20 @@ function instante(dia: string, fin: boolean): string {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  // 🔴 DOS PUERTAS, Y LA SEGUNDA ENTRA RECORTADA.
+  //
+  // A esta ruta entra Asistencia entera (la contadora arma la planilla acá) y
+  // también quien SOLO aprueba horas extra — el usuario `bodega`, que es con el
+  // que trabaja Julio Garay. La pestaña Aprobaciones necesita las HORAS de cada
+  // persona, y las horas se calculan acá; pero el mismo cuadro trae el SUELDO
+  // de las 38, y eso no le corresponde.
+  //
+  // 🔑 El recorte va en el SERVIDOR, no en la pantalla: esconder la columna
+  // dejaría el sueldo viajando en el JSON, a un «ver código fuente» de
+  // distancia. Ver `soloApruebaRoles()` en `lib/asistencia/roles.ts`.
+  const auth = requireRole(req, [...asistenciaRoles(), ...aprobacionesRoles()]);
   if (auth instanceof NextResponse) return auth;
+  const recortado = soloAprueba(auth.role);
 
   const sp = req.nextUrl.searchParams;
 
@@ -439,12 +451,34 @@ export async function GET(req: NextRequest) {
     //
     // ⚠️ Solo para quien puede aprobar, y solo si se pide: es trabajo de más
     // para los otros usos de esta ruta.
-    const pidenAprobaciones = sp.get("aprobaciones") === "1";
+    // Quien solo aprueba no tiene otro motivo para estar acá: se le arma
+    // siempre, pida lo que pida, para que nunca reciba un cuadro vacío.
+    const pidenAprobaciones = recortado || sp.get("aprobaciones") === "1";
     const puedeAprobar = aprobacionesRoles().includes(auth.role) || auth.role === "admin";
     const filasAprobacion =
       pidenAprobaciones && puedeAprobar
         ? armarFilasAprobacion({ lineas, personas: personasVigentes, reglas, aprobaciones })
         : null;
+
+    // 🔴 LA RESPUESTA ACOTADA. Ni `lineas`, ni `totales`, ni un solo campo de
+    // dinero: solo las horas de cada persona y si están aprobadas. Se devuelve
+    // ANTES de armar la de siempre, así que no hay forma de que un campo nuevo
+    // se cuele acá por olvido — lo que no se nombra, no viaja.
+    if (recortado) {
+      return NextResponse.json({
+        periodo: q,
+        // 🔴 Y TAMPOCO EL MONTO DE LAS EXTRAS. Parece inofensivo —son sus horas,
+        // no su sueldo— pero es una división: 5,5 h a 1,25 por $43,45 dice que
+        // la rata es $6,32, y de la rata sale el mensual. `null` es un valor que
+        // la fila ya admite («no se le pudo calcular pago»), así que la pantalla
+        // no necesita saber nada de esto: muestra las horas y aprueba.
+        aprobaciones: filasAprobacion?.map((f) => ({ ...f, monto: null })) ?? null,
+        puedeAprobar,
+        avisos: {
+          faltaMigracionAprobaciones: aprRes.faltaTabla ? avisoMigracionAprobaciones() : null,
+        },
+      });
+    }
 
     return NextResponse.json({
       // `quincena` se mantiene con el mismo nombre y forma para no romper a

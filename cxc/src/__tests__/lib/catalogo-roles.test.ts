@@ -233,7 +233,15 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // Referencia de Ventas con ruta propia (/referencia); el resto de Ventas
   // sigue solo-admin y el margen NO viaja para estos roles. Cambio DELIBERADO
   // — este candado hizo lo suyo y frenó el build hasta acá.
-  bodega: ["catalogos", "guias", "packing-lists", "referencia"],
+  // 🔴 `asistencia` se le abre el 26-ago-2026 por pedido de Daniel, textual:
+  //    *«julio usa el usuario bodega, asi que ponlo ahi»*. Julio Garay reporta
+  //    las horas extra y ésa es la cuenta con la que entra.
+  //    Cambio DELIBERADO — este candado hizo lo suyo y frenó el build hasta acá.
+  //    ⚠️ NO le abre la Planilla: `bodega` está en `APROBACIONES_ROLES` y NO en
+  //    `ASISTENCIA_ROLES`, así que ve UNA pestaña y la ruta le contesta sin un
+  //    solo número de sueldo. El candado de eso vive en
+  //    `src/__tests__/api/asistencia-bodega-solo-aprueba.test.ts`.
+  bodega: ["asistencia", "catalogos", "guias", "packing-lists", "referencia"],
   // `asistencia` se le abrió el 6-ago-2026 por pedido de Daniel: la planilla
   // quincenal la arma la contable a mano, y los minutos de tardanza, las horas
   // extra y las ausencias que necesita para llenarla salen de ese módulo.
