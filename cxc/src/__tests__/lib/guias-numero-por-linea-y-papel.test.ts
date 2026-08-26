@@ -16,6 +16,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { numerosTranspDeLaGuia } from "@/lib/guias/modo-despacho";
+import { coincideGuiaConBusqueda } from "@/lib/guias/buscar-guia";
 import { numeroCabeceraAlDespachar, numeroGuiaDeCabecera } from "@/lib/guias/falta-para-despachar";
 import {
   ENTREGADO_POR_OTRO,
@@ -221,11 +222,24 @@ describe("3 · el N° anotado TARDE se ve en el Excel y se puede buscar", () => 
     expect(celdas).toContain("—");
   });
 
+  // 🩸 ESTE CANDADO SE MUDÓ, NO SE AFLOJÓ (26-ago-2026). Miraba el literal
+  // `numerosTranspDeLaGuia(g).some(` DENTRO de `GuiasList`, y la regla de
+  // "coincide" salió de ahí: estaba escrita TRES veces (lista, Excel y
+  // "seleccionar todas") y las tres decían cosas distintas. Ahora vive en
+  // `@/lib/guias/buscar-guia` y las tres la llaman. Lo que importa —que el N°
+  // de una LÍNEA encuentre la guía— se prueba ahora por CONDUCTA, que además
+  // es más fuerte que buscar un literal.
   it("el buscador de la lista mira los números de las líneas", () => {
-    const LISTA = sinComentarios(leer("src/app/guias/components/GuiasList.tsx"));
-    expect(LISTA).toContain("numerosTranspDeLaGuia(g).some(");
-    // Y ya no se conforma con la cabecera sola.
-    expect(LISTA).not.toContain('(g.numero_guia_transp || "").toLowerCase().includes(q)');
+    const guia = {
+      numero: 77,
+      transportista: "Edwin",
+      // La cabecera NO tiene número: el que se anotó tarde vive en la línea.
+      numero_guia_transp: "",
+      guia_items: [{ cliente: "City Mall", facturas: "9001", numero_guia_transp: "88123" }],
+    };
+    expect(coincideGuiaConBusqueda(guia, "88123")).toBe(true);
+    // Y no encuentra cualquier cosa.
+    expect(coincideGuiaConBusqueda(guia, "99999")).toBe(false);
   });
 });
 

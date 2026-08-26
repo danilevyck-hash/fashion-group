@@ -17,6 +17,7 @@ import {
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
+import { coincideGuiaConBusqueda } from "@/lib/guias/buscar-guia";
 import { despachadaIncompleta, textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { tieneRenglones } from "@/lib/guias/tiene-renglones";
 
@@ -168,6 +169,23 @@ export default function GuiasList({
    * chip degrada al `D-XXX` pelado). Ahí el texto escrito vuelve a salir, que es
    * lo único que dice de quién se trata.
    */
+  /**
+   * 🔴 LO QUE SE VE FILTRADO Y LO QUE SE EXPORTA SON LA MISMA LISTA.
+   *
+   * 🩸 Esta regla estaba escrita TRES veces —la lista, el Excel y el
+   * "seleccionar todas"— y las tres no decían lo mismo: la lista matcheaba
+   * también el número y el N° del transportista, las otras dos no. Exportar
+   * "lo filtrado" exportaba otra cosa que la que estaba en pantalla.
+   *
+   * El "coincide" vive en `@/lib/guias/buscar-guia`; acá solo se le suma el
+   * filtro de "solo pendientes", que es de esta pantalla.
+   */
+  function filtrarGuias(lista: Guia[]): Guia[] {
+    return lista
+      .filter((g) => coincideGuiaConBusqueda(g, search, nombresPorCodigo))
+      .filter((g) => !showPending || g.estado === "Pendiente Bodega");
+  }
+
   function nombreDelChip(item: GuiaItem): string {
     // ⚠️ `|| ""` y no `?? ""`: hay un candado que busca la PRIMERA aparición de
     // `item.cliente_codigo ?` para leer la celda del chip, y un `??` acá se la
@@ -309,20 +327,11 @@ export default function GuiasList({
                     <button
                       onClick={async () => {
                         const { exportGuiasExcel } = await import("./excel-guias");
-                        const filtered = guias
-                          .filter((g) => {
-                            if (!search) return true;
-                            const q = search.toLowerCase();
-                            return (
-                              (g.transportista || "").toLowerCase().includes(q) ||
-                              (g.guia_items || []).some(
-                                (item: GuiaItem) =>
-                                  (item.facturas || "").toLowerCase().includes(q) ||
-                                  (item.cliente || "").toLowerCase().includes(q),
-                              )
-                            );
-                          })
-                          .filter((g) => !showPending || g.estado === "Pendiente Bodega");
+                        // 🔴 EL MISMO FILTRO QUE LA PANTALLA. Acá vivía una
+                        // copia MÁS POBRE (solo transportista, facturas y
+                        // cliente): el Excel de "lo filtrado" exportaba otra
+                        // cosa que la que se estaba viendo.
+                        const filtered = filtrarGuias(guias);
                         const subtitle = search
                           ? `Filtrado: "${search}"`
                           : showPending
@@ -386,7 +395,7 @@ export default function GuiasList({
               {selectionMode && (
                 // El label es el área de toque real del checkbox (12 px de lado).
                 <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer shrink-0 min-h-[44px] pr-2">
-                  <input type="checkbox" checked={(() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); return ids.length > 0 && ids.every(id => selectedIds.has(id)); })()} onChange={() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id)); if (allSel) { setSelectedIds(new Set()); } else { setSelectedIds(new Set(ids)); } }} className="accent-black" />
+                  <input type="checkbox" checked={(() => { const ids = filtrarGuias(guias).map(g => g.id); return ids.length > 0 && ids.every(id => selectedIds.has(id)); })()} onChange={() => { const ids = filtrarGuias(guias).map(g => g.id); const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id)); if (allSel) { setSelectedIds(new Set()); } else { setSelectedIds(new Set(ids)); } }} className="accent-black" />
                   Todas
                 </label>
               )}
@@ -406,29 +415,7 @@ export default function GuiasList({
 
             <div className="space-y-1">
               {(() => {
-                const filtered = guias
-                  .filter((g) => {
-                    if (!search) return true;
-                    const q = search.toLowerCase();
-                    return (
-                      // Número interno: matchea "45", "045" y "GT-045".
-                      String(g.numero).includes(q) ||
-                      `gt-${String(g.numero).padStart(3, "0")}`.includes(q) ||
-                      (g.transportista || "").toLowerCase().includes(q) ||
-                      // 🔴 Los N° del transportista de LAS LÍNEAS, no solo el
-                      // de la cabecera: el que se anota tarde escribe UNA
-                      // columna de UNA línea y no toca la cabecera, así que
-                      // esa guía no se podía encontrar nunca más. Misma fuente
-                      // que el papel y que el Excel.
-                      numerosTranspDeLaGuia(g).some((n) => n.toLowerCase().includes(q)) ||
-                      (g.guia_items || []).some(
-                        (item: GuiaItem) =>
-                          (item.facturas || "").toLowerCase().includes(q) ||
-                          (item.cliente || "").toLowerCase().includes(q),
-                      )
-                    );
-                  })
-                  .filter((g) => !showPending || g.estado === "Pendiente Bodega");
+                const filtered = filtrarGuias(guias);
 
                 if (filtered.length === 0) {
                   return <p className="text-sm text-gray-400 py-8 text-center">No hay guías</p>;
@@ -468,20 +455,60 @@ export default function GuiasList({
                             onClick={() => selectionMode ? toggleSelect(g.id) : abrirFila(g.id)}
                             className="w-full text-left text-sm min-h-[44px]"
                           >
-                            {/* Desktop layout (md+) */}
-                            <div className="hidden md:flex items-center gap-4 px-4 py-3">
+                            {/* ── Fila de escritorio (lg+) ─────────────────
+                                🔴 EL CORTE PASÓ DE `md:` (768) A `lg:` (1024)
+                                — 26-ago-2026.
+
+                                🩸 A 834 px (iPad vertical, «el ancho que nadie
+                                mira») esta fila dibujaba el TRANSPORTISTA EN
+                                0 px y el resumen de clientes en 5: «Edwin» y
+                                «Entrega directa» se veían como una sola letra.
+                                Medido en las 15 filas de la primera pantalla,
+                                las 15 rotas.
+
+                                🔑 LA CAUSA, la misma que `FormulasConfig`
+                                (#639): columnas de ANCHO FIJO que suman más
+                                que el hueco disponible, y la única elástica
+                                era `flex-1` = `flex:1 1 0%`. Con base 0 su
+                                tamaño sale del espacio SOBRANTE; cuando no
+                                sobra nada no se queda corta, se va a CERO. Y
+                                el `truncate` (que es `overflow-hidden`) le
+                                saca el piso de `min-width:auto` que la habría
+                                salvado. La aritmética a 834: 224 px de barra
+                                lateral + 48 de padding dejan 562, y las
+                                columnas fijas ya pedían 704.
+
+                                Con 6 columnas y hasta 250 px de chips ámbar,
+                                a 834 NO ENTRA de ninguna forma: ahí manda la
+                                TARJETA, que muestra lo mismo y más (suma el
+                                destino) sin aplastar nada. Es la misma
+                                decisión que ya tomó el formulario cuando el
+                                iPad vertical caía del lado de la tabla.
+
+                                ⚠️ Y de 1024 para arriba las dos columnas de
+                                texto dejaron de tener ancho fijo: reparten el
+                                sobrante 3:2, así que ninguna puede volver a
+                                valer 0 y el nombre largo del cliente entra
+                                donde antes se cortaba a los 160 px. */}
+                            <div className="hidden lg:flex items-center gap-3 xl:gap-4 px-4 py-3">
                               {selectionMode && (
                                 <span onClick={(e) => { e.stopPropagation(); toggleSelect(g.id); }} className="shrink-0">
                                   <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleSelect(g.id)} className="accent-black" />
                                 </span>
                               )}
                               <span className="font-medium w-16 shrink-0 font-mono text-xs">{fmtGuia(g.numero)}</span>
-                              <span className="text-gray-500 w-36 shrink-0 text-xs">{fmtDate(g.fecha)}</span>
-                              <span className="flex-1 truncate">{g.transportista}</span>
-                              <span className="text-gray-400 text-xs w-40 truncate">
+                              <span className="text-gray-500 w-28 xl:w-36 shrink-0 text-xs">{fmtDate(g.fecha)}</span>
+                              {/* 🔴 `flex-[3_1_0]` y `flex-[2_1_0]`, NO `flex-1`
+                                  + `w-40`: las dos se reparten TODO el sobrante
+                                  en proporción 3:2. Con `min-w-0` truncan en vez
+                                  de empujar la fila, y como las dos crecen
+                                  juntas, ninguna puede quedar en 0 mientras
+                                  sobre un píxel. */}
+                              <span className="flex-[3_1_0] min-w-0 truncate">{g.transportista}</span>
+                              <span className="text-gray-400 text-xs flex-[2_1_0] min-w-0 truncate">
                                 {clientesSummary(g.guia_items || [])}
                               </span>
-                              <span className="tabular-nums w-24 text-right shrink-0">
+                              <span className="tabular-nums w-20 xl:w-24 text-right shrink-0">
                                 {g.total_bultos} <span className="text-gray-400">bultos</span>
                               </span>
                               {guiaSinNumeroTransp(g) && (
@@ -501,8 +528,15 @@ export default function GuiasList({
                               </svg>
                             </div>
 
-                            {/* Mobile layout (< md): stacked card with key info visible */}
-                            <div className="md:hidden px-4 py-3">
+                            {/* ── Tarjeta (< lg): celular Y iPad vertical ────
+                                Dice TODO lo que dice la fila y además el
+                                destino, apilado, sin ninguna columna fija que
+                                aplaste a la de al lado. Desde el 26-ago-2026
+                                también manda a 834 px — ver la nota de arriba.
+                                ⚠️ El nombre del cliente sigue saliendo UNA
+                                sola vez (#638): acá abajo y en ningún otro
+                                lado de la tarjeta. */}
+                            <div className="lg:hidden px-4 py-3">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
                                   {selectionMode && (
