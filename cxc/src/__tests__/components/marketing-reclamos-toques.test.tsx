@@ -494,7 +494,26 @@ describe("🔴 el botón de entregar muebles dice POR QUÉ está apagado", () =>
     );
   }
 
-  it("sin paneles, lo dice EN LA PANTALLA (no en un globito del mouse)", async () => {
+  // ⚠️ ESTE CANDADO CAMBIÓ DE DIRECCIÓN EL 23-ago-2026, Y NO SE BORRÓ.
+  //
+  // Exigía dos cosas: que el botón dijera POR QUÉ está apagado (eso SIGUE, es
+  // lo que el describe protege) y, de paso, que el motivo fuera "la cantidad
+  // de paneles" y que el campo mostrara "Obligatorio — sin paneles no se puede
+  // registrar la entrega".
+  //
+  // Ese segundo pedazo estaba FIJANDO UN BUG. Daniel, textual: *"me sale
+  // obligatorio poner paneles. Pero no tengo. No debe de ser obligatorio, no
+  // tiene sentido"*. El requisito venía del KIT AUTO-RELLENABLE (may-2026),
+  // donde paneles era el driver de la curva 3/3/1/3; **la curva se eliminó el
+  // 12-ago-2026** y el freno quedó exigiendo un número para un mecanismo
+  // muerto. Una entrega de puras barras y colgadores es un envío real.
+  //
+  // La protección NO se aflojó, se INVIRTIÓ: en vez de "sin paneles no se
+  // guarda", ahora es *sin NINGÚN producto no se guarda, y el botón lo dice en
+  // la pantalla*. Es el mismo invariante que importaba (nadie se queda con un
+  // botón gris sin explicación, y no se guarda una entrega de cero piezas),
+  // pero atado a lo que de verdad hace falta y no a un producto en particular.
+  it("una entrega VACÍA no se guarda, y el botón lo dice EN LA PANTALLA", async () => {
     pintarEntrega();
     await waitFor(() =>
       expect(screen.getByLabelText("Cantidad de paneles")).toBeTruthy(),
@@ -503,15 +522,38 @@ describe("🔴 el botón de entregar muebles dice POR QUÉ está apagado", () =>
     expect((guardar as HTMLButtonElement).disabled).toBe(true);
     // 🩸 El `title=` NO cuenta: en el iPhone no existe.
     expect(guardar.getAttribute("title")).toBeNull();
-    expect(screen.getByText(/Falta:.*cantidad de paneles/i)).toBeTruthy();
+    expect(screen.getByText(/Falta:.*al menos un producto con cantidad/i))
+      .toBeTruthy();
   });
 
-  it("el campo avisa que es obligatorio", async () => {
+  it("⛔ el campo de paneles ya NO se anuncia como obligatorio", async () => {
     pintarEntrega();
     await waitFor(() =>
       expect(screen.getByLabelText("Cantidad de paneles")).toBeTruthy(),
     );
-    expect(screen.getByText(/Obligatorio — sin paneles/i)).toBeTruthy();
+    expect(screen.queryByText(/Obligatorio — sin paneles/i)).toBeNull();
+    // Ni el asterisco de "campo requerido" al lado del campo.
+    expect(document.body.textContent).not.toMatch(/sin paneles no se puede/i);
+  });
+
+  it("🔴 SIN PANELES pero con barras, la entrega SE PUEDE GUARDAR", async () => {
+    pintarEntrega();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Cantidad de paneles")).toBeTruthy(),
+    );
+    // Paneles queda en blanco a propósito: es el caso de Daniel.
+    fireEvent.change(screen.getByLabelText("Piezas de Barra plana"), {
+      target: { value: "12" },
+    });
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Registrar entrega" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    expect(screen.queryByText(/^Falta:/)).toBeNull();
+    expect((screen.getByLabelText("Cantidad de paneles") as HTMLInputElement).value)
+      .toBe("");
   });
 
   it("llenando paneles y cantidad, el aviso se va y el botón se enciende", async () => {

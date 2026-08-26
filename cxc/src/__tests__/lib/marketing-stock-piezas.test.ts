@@ -587,3 +587,105 @@ describe("BORRAR una entrega limpia sus sellos de período", () => {
     expect(stock(PROD_NORTE)).toBe(200);
   });
 });
+
+// ── 7. Una entrega SIN paneles ──────────────────────────────────────────────
+//
+// Paneles dejó de ser obligatorio el 23-ago-2026 (Daniel: *"me sale
+// obligatorio poner paneles. Pero no tengo. No debe de ser obligatorio, no
+// tiene sentido"*). El freno de pantalla se movió a "al menos un producto con
+// cantidad"; acá se verifica lo que de verdad importa del otro lado: qué se
+// ESCRIBE. Una entrega de puras barras y colgadores tiene que descontar lo
+// suyo y **no tocar `paneles` ni por un renglón fantasma ni por un 0**.
+
+describe("una entrega SIN paneles descuenta lo suyo y NO toca paneles", () => {
+  it("sólo el producto entregado se mueve; el panel queda intacto", async () => {
+    const antesPanel = stock(PROD_PANEL);
+    await createEntrega({
+      proyectoId: PROYECTO,
+      marcas,
+      items: [{ productoId: PROD_NORTE, cantidad: 12, bultos: 2 }],
+    });
+    expect(stock(PROD_NORTE)).toBe(188); // 200 − 12
+    expect(stock(PROD_PANEL)).toBe(antesPanel); // 50, sin tocar
+  });
+
+  it("no se guarda ningún renglón de paneles (ni con cantidad 0)", async () => {
+    await createEntrega({
+      proyectoId: PROYECTO,
+      marcas,
+      items: [{ productoId: PROD_NORTE, cantidad: 12, bultos: 2 }],
+    });
+    const items = estado.tablas.mk_entrega_items ?? [];
+    expect(items.length).toBe(1);
+    expect(items.some((i) => i.producto_id === PROD_PANEL)).toBe(false);
+  });
+
+  it("un item de paneles en CERO no crea renglón ni mueve el stock", async () => {
+    // Es la forma exacta que manda la pantalla si alguien escribe 0 y borra:
+    // el renglón ni siquiera se arma, pero si llegara, el servidor lo tira.
+    await createEntrega({
+      proyectoId: PROYECTO,
+      marcas,
+      items: [
+        { productoId: PROD_NORTE, cantidad: 12, bultos: 2 },
+        { productoId: PROD_PANEL, cantidad: 0, bultos: null },
+      ],
+    });
+    expect(stock(PROD_PANEL)).toBe(50);
+    expect(
+      (estado.tablas.mk_entrega_items ?? []).some(
+        (i) => i.producto_id === PROD_PANEL,
+      ),
+    ).toBe(false);
+  });
+
+  it("editarla y borrarla siguen devolviendo el stock (sin contar dos veces)", async () => {
+    const ent = await createEntrega({
+      proyectoId: PROYECTO,
+      marcas,
+      items: [{ productoId: PROD_NORTE, cantidad: 12, bultos: 2 }],
+    });
+    expect(stock(PROD_NORTE)).toBe(188);
+    // Bajar de 12 a 5 devuelve 7.
+    await updateEntrega(ent.id, {
+      marcas,
+      items: [{ productoId: PROD_NORTE, cantidad: 5, bultos: 1 }],
+    });
+    expect(stock(PROD_NORTE)).toBe(195);
+    // La misma edición dos veces no devuelve dos veces.
+    await updateEntrega(ent.id, {
+      marcas,
+      items: [{ productoId: PROD_NORTE, cantidad: 5, bultos: 1 }],
+    });
+    expect(stock(PROD_NORTE)).toBe(195);
+    // Borrar devuelve lo que quedaba, y el panel nunca se movió.
+    await deleteEntrega(ent.id);
+    expect(stock(PROD_NORTE)).toBe(200);
+    expect(stock(PROD_PANEL)).toBe(50);
+    await deleteEntrega(ent.id);
+    expect(stock(PROD_NORTE)).toBe(200);
+  });
+
+  it("una entrega VACÍA de verdad sigue siendo IMPOSIBLE en el servidor", async () => {
+    // El freno que reemplaza a "paneles obligatorio" no vive sólo en la
+    // pantalla: `createEntrega` lo repite por su cuenta.
+    // ⚠️ El mensaje se exige EXACTO (con `$`) a propósito. Hay DOS frenos en
+    // `createEntrega` y el segundo ("…al menos un item con cantidad") CONTIENE
+    // al primero: pidiendo sólo /al menos un item/, borrar el primero pasaría
+    // inadvertido porque el segundo lo taparía. Con el `$`, borrarlo se ve.
+    await expect(
+      createEntrega({ proyectoId: PROYECTO, marcas, items: [] }),
+    ).rejects.toThrow(/al menos un item$/i);
+    // Un renglón en 0 es lo MISMO que no mandarlo: `normalizarItems` lo tira
+    // antes, así que cae en el primer freno. Un bulto anotado no lo salva —
+    // sería exactamente el descuadre que la regla piezas/bultos prohíbe.
+    await expect(
+      createEntrega({
+        proyectoId: PROYECTO,
+        marcas,
+        items: [{ productoId: PROD_NORTE, cantidad: 0, bultos: 3 }],
+      }),
+    ).rejects.toThrow(/al menos un item$/i);
+    expect(stock(PROD_NORTE)).toBe(200);
+  });
+});
