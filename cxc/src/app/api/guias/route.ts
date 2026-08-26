@@ -36,6 +36,15 @@ export async function GET(req: NextRequest) {
   // el listado marcaría a TODAS las guías como si les faltara la cédula. Es un
   // TEXT de 13 caracteres; las firmas base64 siguen fuera.
   //
+  // ⚠️ `guia_items.cliente_codigo` viaja desde el 26-ago-2026, y tampoco es
+  // adorno: el BUSCADOR de la lista tiene que poder encontrar una guía por el
+  // nombre del cliente ATADO y por su código `D-XXX`, que es lo que la pantalla
+  // muestra desde #638. Sin esta columna el filtro solo veía el texto que
+  // tecleó bodega, así que teclear lo que se ve en pantalla NO encontraba la
+  // guía (medido: «Sporting Shoes N 4» dejaba fuera las 21 líneas escritas
+  // «Sporting Shoes N4», y «D-142» daba 0). Es un TEXT de 6 caracteres; las
+  // firmas base64 siguen fuera.
+  //
   // ⚠️ `guia_items.numero_guia_transp` SÍ viaja, y no es adorno: la marca
   // "Falta N° transportista" se calcula por LÍNEA. Sin él, el listado solo
   // podía mirar el de la cabecera —que NO se reescribe al anotar un número
@@ -43,7 +52,7 @@ export async function GET(req: NextRequest) {
   // tiene su número. Es un TEXT corto; las firmas base64 siguen fuera.
   const { data, error } = await supabaseServer
     .from("guia_transporte")
-    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, cedula, numero_guia_transp, created_at, deleted, guia_items(orden, bultos, facturas, cliente, direccion, empresa, numero_guia_transp)")
+    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, cedula, numero_guia_transp, created_at, deleted, guia_items(orden, bultos, facturas, cliente, cliente_codigo, direccion, empresa, numero_guia_transp)")
     .eq("deleted", false)
     .order("numero", { ascending: false });
 
