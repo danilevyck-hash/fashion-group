@@ -45,6 +45,7 @@ import {
 } from "@/lib/asistencia/planilla";
 import { CHIP_NO_MARCA_RELOJ } from "@/lib/asistencia/sueldo-fijo";
 import type { AvisoPeriodoAbierto, CodigoSinFicha } from "@/lib/asistencia/periodo";
+import type { ExtraNoAprobada } from "@/lib/asistencia/aprobaciones";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
 
@@ -87,6 +88,14 @@ interface Respuesta {
     /** Falta correr el SQL de las vacaciones. Nadie está de vacaciones y la
      *  planilla paga lo de siempre — pero se dice. */
     faltaMigracionVacaciones: string | null;
+    /** 🔴 Las horas extra que este cuadro NO pagó porque nadie las autorizó.
+     *  Contadora, textual: *«Sólo se pagan las horas extras autorizadas»*.
+     *  Nada se descarta en silencio: va con nombre y cantidad. */
+    extraSinAprobar: ExtraNoAprobada[];
+    avisoExtraSinAprobar: string | null;
+    /** Falta correr el SQL de las aprobaciones. NO se exige aprobación: se paga
+     *  todo lo que midió el reloj, como hasta hoy — pero se dice. */
+    faltaMigracionAprobaciones: string | null;
   };
 }
 
@@ -222,6 +231,10 @@ export default function PlanillaTab() {
       // pantalla lo avisa y el archivo no, el archivo es el que va a decidir un
       // pago con menos información que la pantalla.
       avisoVacacionesNoPagadas: data.avisos.avisoVacacionesNoPagadas,
+      // 🔴 Igual que el anterior: si la pantalla avisa que unas horas extra no
+      // se pagaron y el archivo no, el archivo es el que va a decidir un pago
+      // con menos información que la pantalla.
+      avisoExtraSinAprobar: data.avisos.avisoExtraSinAprobar,
     };
   }, [data]);
 
@@ -351,6 +364,22 @@ export default function PlanillaTab() {
       {data?.avisos.faltaMigracionVacaciones && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           {data.avisos.faltaMigracionVacaciones}
+        </p>
+      )}
+
+      {/* 🔴 LO MISMO CON LAS HORAS EXTRA SIN APROBAR. Contadora, textual: *«Sólo
+          se pagan las horas extras autorizadas y las reportadas por Julio
+          Garay»*. No se pagan — pero se DICEN, con nombre y cantidad, arriba y
+          en ámbar. Rechazar sí, esconder no. */}
+      {data?.avisos.avisoExtraSinAprobar && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          {data.avisos.avisoExtraSinAprobar}
+        </p>
+      )}
+
+      {data?.avisos.faltaMigracionAprobaciones && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          {data.avisos.faltaMigracionAprobaciones}
         </p>
       )}
 

@@ -3,7 +3,7 @@
 //
 // Tres cosas que costaron trabajo entender y que se rompen sin querer:
 //
-//  1. SON 5 PESTAÑAS Y EN ESTE ORDEN. Eran 7 — un menú, no una herramienta.
+//  1. SON 6 PESTAÑAS Y EN ESTE ORDEN. Eran 7 — un menú, no una herramienta.
 //     Horarios y Feriados pasaron a SECCIONES de Configuración (una pestaña se
 //     gana el lugar por lo que hacés ahí, no por la tabla que guarda) y "Cómo
 //     funciona" pasó a ser el botón «?». Nada se borró: cambió dónde vive, y
@@ -48,15 +48,35 @@ describe("las 5 pestañas y su orden", () => {
   // justamente porque una vacación NO es una justificación (no se paga por
   // asistencia y lleva su propia cuenta de días), y meterlas en la misma lista
   // hacía imposible distinguir quién estuvo enfermo de quién estuvo de
-  // vacaciones. El candado sigue cerrado para cualquier OTRA pestaña.
-  it("son exactamente 5, en el orden Planilla · Reporte · Justificaciones · Vacaciones · Configuración", () => {
+  // vacaciones.
+  //
+  // ⚠️ Y SE VOLVIÓ A AMPLIAR EL 26-AGO-2026, también a conciencia: entró
+  // APROBACIONES. Se gana el lugar por dos motivos que ninguna otra pestaña
+  // tiene: es la única donde alguien AUTORIZA algo en vez de cargar un dato, y
+  // NO LA VE TODO EL MUNDO. Meter «aprobar las horas extra» adentro de la
+  // Planilla habría puesto un botón que mueve el pago de treinta personas justo
+  // donde la contadora teclea montos.
+  //
+  // El candado sigue cerrado para cualquier OTRA pestaña.
+  it("son exactamente 6, en el orden Planilla · Reporte · Justificaciones · Vacaciones · Aprobaciones · Configuración", () => {
     expect(tabs).toEqual([
       ["planilla", "Planilla"],
       ["reporte", "Reporte"],
       ["justificaciones", "Justificaciones"],
       ["vacaciones", "Vacaciones"],
+      ["aprobaciones", "Aprobaciones"],
       ["configuracion", "Configuración"],
     ]);
+  });
+
+  it("Aprobaciones NO se le muestra a quien no puede aprobar", () => {
+    // 🔑 Esto es la NAVEGACIÓN, no el candado: el freno de verdad está en
+    // `/api/asistencia/aprobaciones`, que exige el rol. Pero si la pestaña se
+    // viera para todos, la contadora tendría a la vista un botón que le da 403.
+    expect(src).toMatch(/APROBACIONES_ROLES/);
+    expect(src).toMatch(/const visibles = TABS\.filter/);
+    // Y una pestaña que no se ve tampoco se abre escribiendo la URL.
+    expect(src).toMatch(/visibles\.some\(\(\[k\]\) => k === tabRaw\)/);
   });
 
   it("Vacaciones va APARTE de Justificaciones, con su propio componente", () => {

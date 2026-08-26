@@ -77,7 +77,12 @@ describe("Tabs principales con URL propia (sobreviven refresh, se comparten)", (
     // tampoco puede dejar a un vendedor parado ahí. Lo que la función devuelve,
     // caso por caso, lo prueba `cxc-boston-permiso.test.ts`.
     expect(leer("src/app/admin/page.tsx")).toContain("tabCxcPermitida(tabRaw, userRole)");
-    expect(leer("src/app/asistencia/AsistenciaClient.tsx")).toContain('TABS.some(([k]) => k === tabRaw)');
+    // ⚠️ Asistencia validaba contra `TABS` y desde el 26-ago-2026 valida contra
+    // `visibles` — el candado se ENDURECIÓ, no se aflojó: Aprobaciones solo la
+    // ve quien puede aprobar, así que un `?tab=aprobaciones` en manos de la
+    // contadora tampoco puede dejarla parada en una pestaña que no le toca.
+    // Es el MISMO movimiento que hizo el CXC con `tabCxcPermitida` y Boston.
+    expect(leer("src/app/asistencia/AsistenciaClient.tsx")).toContain('visibles.some(([k]) => k === tabRaw)');
     expect(leer("src/app/productos/cargar/page.tsx")).toContain("PESTANAS.some((p) => p.id === tabRaw)");
     // Ventas se sumó al retirar la pestaña Referencia (12-ago-2026): sin este
     // filtro, un favorito de `?tab=referencia` dejaba la pantalla EN BLANCO

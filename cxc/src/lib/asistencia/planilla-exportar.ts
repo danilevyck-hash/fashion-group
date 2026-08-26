@@ -71,6 +71,15 @@ export interface DatosPlanillaExport {
    * poder ver de dónde salió ese descuento, con nombre, rango y monto.
    */
   avisoVacacionesNoPagadas?: string | null;
+  /**
+   * Las horas extra que el cuadro NO pagó porque nadie las autorizó.
+   *
+   * 🔴 VA IMPRESO, por el mismo motivo que el de arriba. El papel es el que se
+   * firma, y una columna de extras en cero para alguien que sí se quedó tarde
+   * es exactamente el número que nadie va a poder explicar dentro de seis meses
+   * si el archivo no lo dice.
+   */
+  avisoExtraSinAprobar?: string | null;
 }
 
 /** El subtítulo que llevan los dos archivos. */
@@ -316,6 +325,9 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ...(d.avisoVacacionesNoPagadas
         ? [["Vacaciones que no se pagaron", d.avisoVacacionesNoPagadas]]
         : []),
+      ...(d.avisoExtraSinAprobar
+        ? [["Horas extra que no se pagaron", d.avisoExtraSinAprobar]]
+        : []),
       ["Período", d.periodo && !d.periodo.esQuincena
         ? `Del ${d.periodo.desde} al ${d.periodo.hasta} (${d.periodo.diasCalendario} días). NO es una quincena: el salario base se pagó al ${(d.periodo.factorBase * 100).toFixed(1)} % —la parte de quincena que cubren estas fechas— y los montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios) NO se aplicaron, porque se cargan por quincena: para llenarlos hay que pedir el cuadro con las fechas exactas de una quincena.`
         : `Quincena del ${d.quincena.etiqueta}. Salario base completo (salario mensual ÷ 2).`],
@@ -445,6 +457,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
         d.periodoAbierto?.texto,
         d.avisoSinFicha,
         d.avisoVacacionesNoPagadas,
+        d.avisoExtraSinAprobar,
         conAusenciaPorTardanza
           ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
           : null,
