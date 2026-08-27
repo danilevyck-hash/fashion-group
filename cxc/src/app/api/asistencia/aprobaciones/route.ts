@@ -20,9 +20,9 @@ import { aprobacionesRoles } from "@/lib/asistencia/roles";
 import { requireRole } from "@/lib/requireRole";
 import {
   avisoMigracionAprobaciones,
-  claveAprobacion,
+  claveDia,
 } from "@/lib/asistencia/aprobaciones";
-import { guardarAprobaciones } from "@/lib/asistencia/aprobaciones-server";
+import { guardarAprobaciones, type DiaAAprobar } from "@/lib/asistencia/aprobaciones-server";
 
 export const dynamic = "force-dynamic";
 
@@ -38,40 +38,41 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-    const desde = String(body?.desde ?? "").trim();
-    const hasta = String(body?.hasta ?? "").trim();
-    if (!ES_FECHA.test(desde) || !ES_FECHA.test(hasta) || hasta < desde) {
-      return NextResponse.json(
-        { error: "Período inválido. Se esperan dos fechas como 2026-07-16." },
-        { status: 400 },
-      );
-    }
-
     const aprobado = body?.aprobado !== false;
-    const crudas = Array.isArray(body?.personas) ? (body!.personas as unknown[]) : [];
+    const crudas = Array.isArray(body?.dias) ? (body!.dias as unknown[]) : [];
 
     // 🔑 `minutos` es el TESTIGO, no el pago. Nunca se multiplica por una rata:
     // lo que se paga lo vuelve a calcular el motor con la base vigente el día
     // del cuadro. Por eso aceptarlo de la pantalla es inofensivo — lo único que
     // podría salir mal es que el aviso «cambió desde que se aprobó» aparezca de
     // más, que es del lado seguro. Igual se normaliza: entero y nunca negativo.
-    const minutosPorCodigo = new Map<string, number>();
+    // 🔑 Se deduplica por (código, fecha): dos veces el mismo día en el mismo
+    // cuerpo tiene que producir UNA fila, no reventar el upsert de Postgres —
+    // que rechaza la sentencia entera si trae la misma llave dos veces.
+    const porClave = new Map<string, DiaAAprobar>();
     for (const c of crudas) {
       const o = c as Record<string, unknown> | null;
       const codigo = String(o?.codigo ?? "").trim();
-      if (!codigo) continue;
+      const fecha = String(o?.fecha ?? "").trim();
+      if (!codigo || !ES_FECHA.test(fecha)) continue;
       const n = Number(o?.minutos ?? 0);
-      minutosPorCodigo.set(codigo, Number.isFinite(n) && n > 0 ? Math.round(n) : 0);
+      porClave.set(claveDia(codigo, fecha), {
+        codigo,
+        fecha,
+        minutos: Number.isFinite(n) && n > 0 ? Math.round(n) : 0,
+      });
     }
+    const dias = [...porClave.values()];
 
-    if (minutosPorCodigo.size === 0) {
-      return NextResponse.json({ error: "No se indicó a quién aprobar." }, { status: 400 });
+    if (dias.length === 0) {
+      return NextResponse.json(
+        { error: "No se indicó qué día aprobar." },
+        { status: 400 },
+      );
     }
 
     const guardado = await guardarAprobaciones({
-      desde,
-      hasta,
-      minutosPorCodigo,
+      dias,
       aprobado,
       // Queda registro de QUIÉN. Lo pidió Daniel explícitamente.
       por: auth.userName || auth.role,
@@ -83,8 +84,8 @@ export async function POST(req: NextRequest) {
         ? {
           ok: true,
           aprobado,
-          personas: minutosPorCodigo.size,
-          claves: [...minutosPorCodigo.keys()].map((c) => claveAprobacion(c, desde, hasta)),
+          dias: dias.length,
+          claves: [...porClave.keys()],
         }
         : { ok: false, aviso: avisoMigracionAprobaciones() },
     );

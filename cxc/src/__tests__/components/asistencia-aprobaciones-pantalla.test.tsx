@@ -1,47 +1,23 @@
-/**
- * ─────────────────────────────────────────────────────────────────────────────
- * APROBAR HORAS EXTRA, EN LA PANTALLA DE VERDAD — Y CONTANDO LOS CLICS.
+/* ─────────────────────────────────────────────────────────────────────────────
+ * APROBACIONES POR DÍA — CONDUCTA: se monta la pantalla y se tocan las casillas.
  *
- * 🔴 POR QUÉ ESTE ARCHIVO EXISTE. Daniel puso UN requisito duro y es un número:
- * *«que en el usuario de julio y daniel haya un tab para aprobaciones, con un
- * clic se aprueba y ya, maximo 3 clics»*. Que `armarFilasAprobacion()` devuelva
- * la lista correcta no prueba NADA sobre eso: la pantalla podía pedir elegir el
- * período, después abrir la persona, después confirmar, y todos los tests de
- * función pura seguirían en verde.
+ * Daniel, 27-ago-2026: *«que el usuario entre y vea por dias quienes y cuantas
+ * horas, y pueda aprobar seleccionando todos o individualmente, por dia, por
+ * semana»*, y de antes: *«con un clic se aprueba y ya»*.
  *
- * Acá se monta el módulo entero (`AsistenciaClient`), se toca como se toca de
- * verdad y **se cuentan los clics uno por uno** — no se estiman leyendo el
- * código. `contarClics` envuelve `fireEvent.click` y el número que sale es el
- * que se reporta.
- *
- * Lo que se sostiene, renderizando y tocando:
- *   1. una persona se aprueba en 2 CLICS (pestaña + «Aprobar»);
- *   2. la quincena entera en 3 CLICS (pestaña + «Aprobar todas» + «Aprobar»);
- *   3. se puede DESAPROBAR en 2 clics — un clic de más no es irreversible;
- *   4. ver el detalle por día NO es un paso obligatorio;
- *   5. lo que se manda al servidor es (persona, período), NUNCA un número de
- *      horas para pagar;
- *   6. la planilla dice EN ÁMBAR lo que no pagó, con nombre y cantidad;
- *   7. quien no puede aprobar NO ve la pestaña.
- * ─────────────────────────────────────────────────────────────────────────────
- */
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+ * 🔴 POR QUÉ SE MONTA LA PANTALLA Y NO SE MIRA EL MÓDULO. Que
+ * `armarDiasAprobacion` agrupe bien no prueba NADA sobre lo que Julio ve ni
+ * sobre lo que sale por `fetch`. El riesgo de esta pantalla es que un toque
+ * mande la lista equivocada — aprobar a alguien que no era, o un día que no
+ * era. Eso solo se ve tocando.
+ * ─────────────────────────────────────────────────────────────────────────── */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { act } from "react";
 
 import { ToastProvider } from "@/components/ToastSystem";
-import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
-import {
-  HORAS_CERO,
-  TOTALES_CERO,
-  MANUALES_CERO,
-  quincena,
-  quincenasHasta,
-  periodoDeQuincena,
-  type LineaPlanilla,
-} from "@/lib/asistencia/planilla";
-import type { FilaAprobacion } from "@/lib/asistencia/aprobaciones";
-import AsistenciaClient from "@/app/asistencia/AsistenciaClient";
-import PlanillaTab from "@/app/asistencia/PlanillaTab";
+import AprobacionesTab from "@/app/asistencia/AprobacionesTab";
+import { claveDia, type DiaAprobacion } from "@/lib/asistencia/aprobaciones";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
@@ -49,377 +25,172 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EL CONTADOR DE CLICS. Es el instrumento de este archivo.
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Los días REALES del 24 al 26 de agosto, medidos en producción ────────────
+const gente = (xs: Array<[string, string, number, boolean]>) =>
+  xs.map(([codigo, etiqueta, minutos, aprobado]) => ({
+    codigo, etiqueta, empresa: "vistana", empresaEtiqueta: "Vistana",
+    salida: "18:11", minutos, diurnoMin: minutos, nocturnoMin: 0,
+    aprobado, por: aprobado ? "Julio" : null, cuando: null,
+    minutosVistos: aprobado ? minutos : null, cambio: false,
+  }));
 
-let clics = 0;
-/** Un clic de verdad sobre el DOM. Cada llamada suma UNO. */
-function clic(el: Element | null): void {
-  if (!el) throw new Error("no existe el elemento que se quiso tocar");
-  clics += 1;
-  fireEvent.click(el);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-const q = quincena(2026, 7, 2); // 16 al 31 de julio
-const periodo = periodoDeQuincena(q);
-
-const FILAS: FilaAprobacion[] = [
-  {
-    codigo: "8",
-    etiqueta: "BRICEIDA MONTERO",
-    empresa: "vistana",
-    empresaEtiqueta: "Vistana",
-    minutos: 333,
-    diurnoMin: 300,
-    nocturnoMin: 33,
-    monto: 21.5,
-    aprobado: false,
-    por: null,
-    cuando: null,
-    minutosVistos: null,
-    cambio: false,
-    dias: [
-      { fecha: "2026-07-20", etiqueta: "20 jul 2026", salida: "17:45", minutos: 45, diurnoMin: 45, nocturnoMin: 0 },
-      { fecha: "2026-07-21", etiqueta: "21 jul 2026", salida: "18:10", minutos: 70, diurnoMin: 60, nocturnoMin: 10 },
-    ],
-  },
-  {
-    codigo: "11",
-    etiqueta: "JULIO GARAY",
-    empresa: "vistana",
-    empresaEtiqueta: "Vistana",
-    minutos: 120,
-    diurnoMin: 120,
-    nocturnoMin: 0,
-    monto: 8.1,
-    aprobado: false,
-    por: null,
-    cuando: null,
-    minutosVistos: null,
-    cambio: false,
-    dias: [],
-  },
+const DIAS: DiaAprobacion[] = [
+  { fecha: "2026-08-24", etiqueta: "lun 24 ago", semana: "2026-08-24", minutos: 178,
+    gente: gente([["11", "JULIO GARAY", 107, false], ["6", "KEVIN LUBO", 71, false]]) },
+  { fecha: "2026-08-25", etiqueta: "mar 25 ago", semana: "2026-08-24", minutos: 55,
+    gente: gente([["9", "LUIS ARROYO", 55, false]]) },
+  { fecha: "2026-08-26", etiqueta: "mié 26 ago", semana: "2026-08-24", minutos: 104,
+    gente: gente([["7", "ANGELA GARCIA", 104, false]]) },
 ];
 
-const RESPUESTA_APROBACIONES = {
-  lineas: [],
-  totales: TOTALES_CERO,
-  reglas: REGLAS_DEFAULT,
-  quincena: q,
-  periodo,
-  aprobaciones: FILAS,
-  puedeAprobar: true,
-  avisos: {
-    faltaMigracionConfiguracion: null, faltaMigracionManual: null,
-    faltaMigracionBajas: null, faltaMigracionServicioProfesional: null,
-    fueraPorBaja: 0, marcoDespuesDeIrse: 0, sinHorario: 0, salidaAsumida: "17:00",
-    horasAusenciaDefault: 8, conSabado: 0, periodoAbierto: null,
-    sinFicha: [], avisoSinFicha: null, rangoLibre: false, factorBase: 1,
-    diasCalendario: 16, vacacionesNoPagadas: [], avisoVacacionesNoPagadas: null,
-    faltaMigracionVacaciones: null, correcciones: 0,
-    extraSinAprobar: [], avisoExtraSinAprobar: null,
-    faltaMigracionAprobaciones: null,
-  },
-};
+let enviados: Array<Record<string, unknown>> = [];
 
-/** Guarda lo que se le mandó al servidor para poder mirarlo después. */
-let enviados: Array<{ url: string; body: Record<string, unknown> | null }>;
-
-function servir(respuestas: Array<[string, unknown]>) {
-  enviados = [];
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (url: string, init?: RequestInit) => {
-      const u = String(url);
-      enviados.push({
-        url: u,
-        body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null,
-      });
-      const par = respuestas.find(([frag]) => u.includes(frag));
-      return { ok: true, json: async () => par?.[1] ?? {} } as Response;
-    }),
-  );
+function servidor(dias: DiaAprobacion[] = DIAS) {
+  return vi.fn(async (url: string, init?: RequestInit) => {
+    if (String(url).startsWith("/api/asistencia/aprobaciones")) {
+      enviados.push(JSON.parse(String(init?.body ?? "{}")));
+      return { ok: true, json: async () => ({ ok: true }) } as Response;
+    }
+    return {
+      ok: true,
+      json: async () => ({ aprobaciones: dias, puedeAprobar: true, avisos: {} }),
+    } as Response;
+  });
 }
 
-const montar = (ui: React.ReactElement) => render(<ToastProvider>{ui}</ToastProvider>);
-
-beforeEach(() => {
-  clics = 0;
-  vi.unstubAllGlobals();
-  sessionStorage.setItem("cxc_role", "admin");
-});
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-  sessionStorage.clear();
-});
-
-/** Entra a la pestaña. Es el PRIMER clic de todos los caminos. */
-async function entrarAAprobaciones() {
-  montar(<AsistenciaClient />);
-  const pestana = await screen.findByRole("button", { name: "Aprobaciones" });
-  clic(pestana);
-  await screen.findByText("BRICEIDA MONTERO");
+async function montar(dias: DiaAprobacion[] = DIAS) {
+  render(<ToastProvider><AprobacionesTab /></ToastProvider>);
+  await waitFor(() => expect(screen.getByText(/lun 24/)).toBeTruthy());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 el requisito duro: máximo 3 clics", () => {
-  it("una persona se aprueba en 2 CLICS — pestaña + «Aprobar»", async () => {
-    servir([
-      ["/api/asistencia/aprobaciones", { ok: true }],
-      ["/api/asistencia/planilla", RESPUESTA_APROBACIONES],
-    ]);
-    await entrarAAprobaciones();
+/** Un toque de verdad sobre el DOM. */
+async function toca(el: Element | null | undefined) {
+  if (!el) throw new Error("no existe el elemento que se quiso tocar");
+  await act(async () => { (el as HTMLElement).click(); });
+}
 
-    // La fila de Briceida trae su botón al lado. No hay que abrirla, ni elegir
-    // el período, ni confirmar nada.
-    const fila = screen.getByText("BRICEIDA MONTERO").closest("li")!;
-    clic(fila.querySelector("button:not([aria-expanded])")!.parentElement === null
-      ? null
-      : [...fila.querySelectorAll("button")].find((b) => b.textContent === "Aprobar")!);
+const casilla = (etiqueta: RegExp) =>
+  screen.getAllByRole("checkbox").find((c) => etiqueta.test(c.getAttribute("aria-label") ?? ""));
 
-    await waitFor(() =>
-      expect(enviados.some((e) => e.url.includes("/api/asistencia/aprobaciones"))).toBe(true),
-    );
-    expect(clics).toBe(2);
+beforeEach(() => { enviados = []; vi.stubGlobal("fetch", servidor()); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+describe("🔴 se ve POR DÍAS, que es lo que pidió Daniel", () => {
+  it("cada día es un renglón, con cuánta gente y cuántas horas", async () => {
+    await montar();
+    for (const t of ["lun 24", "mar 25", "mié 26"]) expect(screen.getByText(new RegExp(t))).toBeTruthy();
+    // 178 min = 2:58
+    expect(screen.getByText("2:58 h")).toBeTruthy();
   });
 
-  it("la quincena entera en 3 CLICS — pestaña + «Aprobar todas» + «Aprobar»", async () => {
-    servir([
-      ["/api/asistencia/aprobaciones", { ok: true }],
-      ["/api/asistencia/planilla", RESPUESTA_APROBACIONES],
-    ]);
-    await entrarAAprobaciones();
-
-    clic(screen.getByRole("button", { name: /Aprobar todas/ }));
-    // La ventana dice A CUÁNTAS PERSONAS y CUÁNTAS HORAS: no pregunta «¿estás
-    // seguro?», que no informa nada.
-    expect(screen.getByText(/2 personas · 7,55 h/)).toBeTruthy();
-    const enVentana = [...document.querySelectorAll("button")].filter((b) => b.textContent === "Aprobar");
-    clic(enVentana[enVentana.length - 1]);
-
-    const post = await waitFor(() => {
-      const e = enviados.find((x) => x.url.includes("/api/asistencia/aprobaciones"));
-      if (!e) throw new Error("todavía no");
-      return e;
-    });
-    expect(clics).toBe(3);
-    // Las DOS personas en un solo viaje.
-    expect((post.body!.personas as unknown[]).length).toBe(2);
+  it("los días arrancan CERRADOS — 28 personas abiertas serían siete pantallas", async () => {
+    await montar();
+    expect(screen.queryByText("JULIO GARAY")).toBeNull();
+    await toca(screen.getByText(/lun 24/).closest("button"));
+    expect(screen.getByText("JULIO GARAY")).toBeTruthy();
   });
 
-  it("desaprobar también son 2 CLICS — un clic de más no puede ser irreversible", async () => {
-    servir([
-      ["/api/asistencia/aprobaciones", { ok: true }],
-      ["/api/asistencia/planilla", {
-        ...RESPUESTA_APROBACIONES,
-        aprobaciones: [{
-          ...FILAS[0],
-          aprobado: true,
-          por: "daniel",
-          cuando: "2026-08-26T15:30:00.000Z",
-          minutosVistos: 333,
-        }],
-      }],
-    ]);
-    await entrarAAprobaciones();
+  it("la semana agrupa los tres días", async () => {
+    await montar();
+    expect(screen.getByText(/Semana del 24 – 26 ago/)).toBeTruthy();
+  });
 
-    // Queda registro de quién aprobó y cuándo — Daniel lo pidió explícitamente.
-    expect(screen.getByText(/Aprobada por daniel/)).toBeTruthy();
-
-    clic(screen.getByRole("button", { name: "Quitar" }));
-    const post = await waitFor(() => {
-      const e = enviados.find((x) => x.url.includes("/api/asistencia/aprobaciones"));
-      if (!e) throw new Error("todavía no");
-      return e;
-    });
-    expect(clics).toBe(2);
-    expect(post.body!.aprobado).toBe(false);
+  it("el contador dice cuántas faltan", async () => {
+    await montar();
+    // 2 + 1 + 1 persona-día. El número grande, no los conteos de cada fila.
+    const linea = screen.getByText(/sin aprobar/).parentElement!;
+    expect(linea.textContent).toMatch(/^4sin aprobar/);
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-describe("lo que viaja al servidor es un PERMISO, no un número para pagar", () => {
-  it("manda persona + período; los minutos van como testigo y nunca una plata", async () => {
-    servir([
-      ["/api/asistencia/aprobaciones", { ok: true }],
-      ["/api/asistencia/planilla", RESPUESTA_APROBACIONES],
-    ]);
-    await entrarAAprobaciones();
-    clic([...screen.getByText("JULIO GARAY").closest("li")!.querySelectorAll("button")]
-      .find((b) => b.textContent === "Aprobar")!);
-
-    const post = await waitFor(() => {
-      const e = enviados.find((x) => x.url.includes("/api/asistencia/aprobaciones"));
-      if (!e) throw new Error("todavía no");
-      return e;
-    });
-    // 🔑 EL PERÍODO QUE VIAJA ES EL QUE LA PANTALLA TIENE ELEGIDO, y arranca
-    // en la quincena en curso — el mismo con el que pidió la lista. Aprobar no
-    // puede escribirse sobre un período distinto del que se está mirando.
-    const enCurso = quincenasHasta(
-      new Date(Date.now() - 5 * 3_600_000).toISOString().slice(0, 10), 1,
-    )[0];
-    expect(post.body).toMatchObject({
-      desde: enCurso.desde,
-      hasta: enCurso.hasta,
-      aprobado: true,
-      personas: [{ codigo: "11", minutos: 120 }],
-    });
-    // Y es el MISMO que se usó para pedir la lista: no hay dos períodos.
-    const get = enviados.find((x) => x.url.includes("aprobaciones=1"))!;
-    expect(get.url).toContain(`desde=${enCurso.desde}`);
-    expect(get.url).toContain(`hasta=${enCurso.hasta}`);
-    // 🔴 NI UN MONTO. Lo que se paga lo recalcula el motor con la base vigente:
-    // si mañana la salida pasa de las 17:00 a las 16:30, esto no cambia.
-    expect(JSON.stringify(post.body)).not.toContain("monto");
-    expect(JSON.stringify(post.body)).not.toContain("8.1");
+describe("🔴 las CUATRO formas de aprobar mandan la lista correcta", () => {
+  it("UNA PERSONA: solo esa persona y solo ese día", async () => {
+    await montar();
+    await toca(screen.getByText(/lun 24/).closest("button"));
+    await toca(casilla(/Aprobar KEVIN LUBO/));
+    expect(enviados).toHaveLength(1);
+    expect(enviados[0].aprobado).toBe(true);
+    expect(enviados[0].dias).toEqual([{ codigo: "6", fecha: "2026-08-24", minutos: 71 }]);
   });
 
-  it("«cambió desde que se aprobó» se dice con los DOS números", async () => {
-    servir([["/api/asistencia/planilla", {
-      ...RESPUESTA_APROBACIONES,
-      aprobaciones: [{
-        ...FILAS[0], aprobado: true, por: "daniel",
-        cuando: "2026-08-26T15:30:00.000Z", minutosVistos: 330, cambio: true,
-      }],
-    }]]);
-    await entrarAAprobaciones();
-    // 330 min = 5,50 h aprobadas · 333 min = 5,55 h medidas hoy.
-    expect(screen.getByText(/se aprobaron 5,50 h y\s+hoy son 5,55 h/)).toBeTruthy();
+  it("UN DÍA: toda su gente, de ese día y de ningún otro", async () => {
+    await montar();
+    await toca(casilla(/Aprobar lun 24 ago/));
+    expect(enviados).toHaveLength(1);
+    const ds = enviados[0].dias as Array<Record<string, unknown>>;
+    expect(ds).toHaveLength(2);
+    expect(new Set(ds.map((d) => d.codigo))).toEqual(new Set(["11", "6"]));
+    expect(ds.every((d) => d.fecha === "2026-08-24")).toBe(true);
+  });
+
+  it("UNA SEMANA: los tres días completos", async () => {
+    await montar();
+    await toca(casilla(/Aprobar la semana/));
+    const ds = enviados[0].dias as Array<Record<string, unknown>>;
+    expect(ds).toHaveLength(4);
+    expect(new Set(ds.map((d) => d.fecha)))
+      .toEqual(new Set(["2026-08-24", "2026-08-25", "2026-08-26"]));
+  });
+
+  it("TODO: las cuatro de una", async () => {
+    await montar();
+    await toca(screen.getByRole("button", { name: "Aprobar todo" }));
+    expect((enviados[0].dias as unknown[]).length).toBe(4);
+    expect(enviados[0].aprobado).toBe(true);
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-describe("el detalle por día se ve, pero NO es un paso", () => {
-  it("la fila muestra el total sin abrir nada, y los días quedan detrás de un toque", async () => {
-    servir([["/api/asistencia/planilla", RESPUESTA_APROBACIONES]]);
-    await entrarAAprobaciones();
+describe("🔴 se puede DESAPROBAR — un toque de más no es irreversible", () => {
+  const CON_UNO_APROBADO: DiaAprobacion[] = [
+    { ...DIAS[0], gente: gente([["11", "JULIO GARAY", 107, true], ["6", "KEVIN LUBO", 71, false]]) },
+  ];
 
-    // El total está a la vista de entrada: 333 min = 5,55 h.
-    expect(screen.getByText("5,55 h")).toBeTruthy();
-    // Los días NO.
-    expect(screen.queryByText("20 jul 2026")).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: /ver 2 días/ }));
-    expect(screen.getByText("20 jul 2026")).toBeTruthy();
-    expect(screen.getByText("21 jul 2026")).toBeTruthy();
+  it("volver a tocar una casilla aprobada manda `aprobado: false`", async () => {
+    vi.stubGlobal("fetch", servidor(CON_UNO_APROBADO));
+    await montar(CON_UNO_APROBADO);
+    await toca(screen.getByText(/lun 24/).closest("button"));
+    await toca(casilla(/Aprobar JULIO GARAY/));
+    expect(enviados[0].aprobado).toBe(false);
+    expect(enviados[0].dias).toEqual([{ codigo: "11", fecha: "2026-08-24", minutos: 107 }]);
   });
 
-  it("quien no tiene días con extra no muestra el enlace de detalle", async () => {
-    servir([["/api/asistencia/planilla", RESPUESTA_APROBACIONES]]);
-    await entrarAAprobaciones();
-    const julio = screen.getByText("JULIO GARAY").closest("li")!;
-    expect([...julio.querySelectorAll("button")].some((b) => /ver \d+ día/.test(b.textContent ?? ""))).toBe(false);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 lo que no se aprueba NO se paga, pero SE DICE", () => {
-  const conAviso = {
-    ...RESPUESTA_APROBACIONES,
-    aprobaciones: null,
-    lineas: [] as LineaPlanilla[],
-    avisos: {
-      ...RESPUESTA_APROBACIONES.avisos,
-      extraSinAprobar: [
-        { codigo: "8", etiqueta: "BRICEIDA MONTERO", minutos: 333, monto: 21.5 },
-      ],
-      avisoExtraSinAprobar:
-        "1 persona tiene horas extra sin aprobar: NO se pagaron en este cuadro. "
-        + "Se aprueban en la pestaña Aprobaciones. BRICEIDA MONTERO · 5,55 h · $21.50",
-    },
-  };
-
-  it("la planilla lo dice ARRIBA, en ámbar, con nombre y cantidad", async () => {
-    servir([["/api/asistencia/planilla", conAviso]]);
-    montar(<PlanillaTab />);
-    const aviso = await screen.findByText(/horas extra sin aprobar/);
-    expect(aviso.textContent).toContain("BRICEIDA MONTERO");
-    expect(aviso.textContent).toContain("5,55 h");
-    expect(aviso.textContent).toContain("$21.50");
-    expect(aviso.className).toContain("amber");
-  });
-
-  it("sin nada pendiente NO hay cartel — un cartel permanente se deja de leer", async () => {
-    servir([["/api/asistencia/planilla", RESPUESTA_APROBACIONES]]);
-    montar(<PlanillaTab />);
-    await waitFor(() => expect(enviados.length).toBeGreaterThan(0));
-    expect(screen.queryByText(/horas extra sin aprobar/)).toBeNull();
-  });
-
-  it("sin la tabla corrida se paga todo, como hasta hoy — y se avisa", async () => {
-    servir([["/api/asistencia/planilla", {
-      ...RESPUESTA_APROBACIONES,
-      avisos: {
-        ...RESPUESTA_APROBACIONES.avisos,
-        faltaMigracionAprobaciones:
-          "Las horas extra todavía no se pueden aprobar: falta preparar la base. "
-          + "Mientras tanto la planilla paga todas las horas extra que midió el reloj, como hasta ahora.",
-      },
-    }]]);
-    montar(<PlanillaTab />);
-    expect((await screen.findByText(/falta preparar la base/)).textContent)
-      .toContain("paga todas las horas extra que midió el reloj");
+  it("el día a medias se ve a medias, no aprobado", async () => {
+    vi.stubGlobal("fetch", servidor(CON_UNO_APROBADO));
+    await montar(CON_UNO_APROBADO);
+    const cb = casilla(/Aprobar lun 24 ago/) as HTMLInputElement;
+    expect(cb.checked).toBe(false);
+    expect(cb.indeterminate).toBe(true);
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-describe("quién ve la pestaña", () => {
-  it("un admin la ve", async () => {
-    servir([["/api/asistencia/planilla", RESPUESTA_APROBACIONES]]);
-    montar(<AsistenciaClient />);
-    expect(await screen.findByRole("button", { name: "Aprobaciones" })).toBeTruthy();
-  });
-
-  it("🔴 la contadora NO la ve — pero sí ve el aviso de lo que no se pagó", async () => {
-    sessionStorage.setItem("cxc_role", "contabilidad");
-    servir([["/api/asistencia/planilla", RESPUESTA_APROBACIONES]]);
-    montar(<AsistenciaClient />);
-    await screen.findByRole("button", { name: "Planilla" });
-    expect(screen.queryByRole("button", { name: "Aprobaciones" })).toBeNull();
-    // Las otras cinco siguen ahí: esconder una pestaña no puede esconder el módulo.
-    for (const t of ["Planilla", "Reporte", "Justificaciones", "Vacaciones", "Configuración"]) {
-      expect(screen.getByRole("button", { name: t })).toBeTruthy();
+describe("🔴 lo que viaja es un PERMISO, nunca una plata", () => {
+  it("el cuerpo lleva código, fecha y minutos — y ni un monto", async () => {
+    await montar();
+    await toca(screen.getByRole("button", { name: "Aprobar todo" }));
+    const cuerpo = JSON.stringify(enviados[0]);
+    for (const prohibido of ["monto", "rata", "neto", "salario", "$"]) {
+      expect(cuerpo, `«${prohibido}» viajó`).not.toContain(prohibido);
+    }
+    for (const d of enviados[0].dias as Array<Record<string, unknown>>) {
+      expect(Object.keys(d).sort()).toEqual(["codigo", "fecha", "minutos"]);
     }
   });
 
-  it("una secretaria tampoco la ve", async () => {
-    sessionStorage.setItem("cxc_role", "secretaria");
-    servir([["/api/asistencia/planilla", RESPUESTA_APROBACIONES]]);
-    montar(<AsistenciaClient />);
-    await screen.findByRole("button", { name: "Planilla" });
-    expect(screen.queryByRole("button", { name: "Aprobaciones" })).toBeNull();
+  it("🔑 la llave que se manda es la del DÍA, no la del período", async () => {
+    await montar();
+    await toca(casilla(/Aprobar lun 24 ago/));
+    const ds = enviados[0].dias as Array<Record<string, unknown>>;
+    // Ni «desde» ni «hasta» en ningún lado: el corte de la quincena no entra.
+    expect(JSON.stringify(enviados[0])).not.toContain("desde");
+    expect(claveDia(String(ds[0].codigo), String(ds[0].fecha))).toMatch(/^\d+\|2026-08-24$/);
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-describe("los 3 anchos: nada se aplasta en 834", () => {
-  it("la lista NO es una tabla — es una lista que se reacomoda sola", async () => {
-    servir([["/api/asistencia/planilla", RESPUESTA_APROBACIONES]]);
-    await entrarAAprobaciones();
-    const fila = screen.getByText("BRICEIDA MONTERO").closest("li")!;
-    // Sin <table> no hay columnas que apretar en el ancho del medio.
-    expect(document.querySelectorAll("table").length).toBe(0);
-    // El bloque apila en celular y se pone en fila recién en sm.
-    expect(fila.querySelector(".flex-col.gap-2")).toBeTruthy();
-    expect(fila.innerHTML).toContain("sm:flex-row");
-  });
-
-  it("todo lo tocable llega a 44 px", async () => {
-    servir([["/api/asistencia/planilla", RESPUESTA_APROBACIONES]]);
-    await entrarAAprobaciones();
-    // 🩸 SIN EXCEPCIONES. La primera versión eximía al enlace de «ver N días»
-    // por ser "texto adentro de la fila", y la medición en el navegador lo
-    // encontró en 28 px: el dedo no le acierta. Crece con `-my-2` para no
-    // separar el enlace de la línea de las horas.
-    for (const b of [...document.querySelectorAll("button")]) {
-      const txt = (b.textContent ?? "").trim();
-      if (txt === "?") { expect(b.className).toContain("h-11"); continue; }
-      expect(b.className).toContain("min-h-[44px]");
-    }
+describe("sin nada que aprobar", () => {
+  it("lo dice y no ofrece el botón", async () => {
+    vi.stubGlobal("fetch", servidor([]));
+    render(<ToastProvider><AprobacionesTab /></ToastProvider>);
+    await waitFor(() => expect(screen.getByText(/Nadie hizo horas extra/)).toBeTruthy());
+    expect((screen.getByRole("button", { name: "Aprobar todo" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

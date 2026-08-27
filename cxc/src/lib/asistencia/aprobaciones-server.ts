@@ -16,8 +16,7 @@ import { TABLA_APROBACIONES, type Aprobacion } from "./aprobaciones";
 
 interface FilaAprobacionDb {
   empleado_codigo: string;
-  periodo_desde: string;
-  periodo_hasta: string;
+  fecha: string;
   aprobado: boolean | null;
   minutos_vistos: number | string | null;
   marcado_por: string | null;
@@ -27,8 +26,7 @@ interface FilaAprobacionDb {
 function aDominio(f: FilaAprobacionDb): Aprobacion {
   return {
     codigo: String(f.empleado_codigo).trim(),
-    desde: String(f.periodo_desde).slice(0, 10),
-    hasta: String(f.periodo_hasta).slice(0, 10),
+    fecha: String(f.fecha).slice(0, 10),
     aprobado: f.aprobado === true,
     minutosVistos: Number(f.minutos_vistos ?? 0) || 0,
     por: f.marcado_por ?? null,
@@ -58,9 +56,9 @@ export async function leerAprobaciones(
     .from(TABLA_APROBACIONES)
     // Select EXPLÍCITO, nunca `*`: si mañana la tabla gana una columna, esta
     // consulta sigue trayendo lo mismo.
-    .select("empleado_codigo, periodo_desde, periodo_hasta, aprobado, minutos_vistos, marcado_por, marcado_en")
-    .eq("periodo_desde", desde)
-    .eq("periodo_hasta", hasta);
+    .select("empleado_codigo, fecha, aprobado, minutos_vistos, marcado_por, marcado_en")
+    .gte("fecha", desde)
+    .lte("fecha", hasta);
 
   if (error) {
     if (esTablaFaltante(error, TABLA_APROBACIONES)) {
@@ -87,22 +85,26 @@ export async function leerAprobaciones(
  * Devuelve `false` si la tabla todavía no existe, para que la pantalla avise en
  * vez de decir "aprobado" sobre algo que no se guardó.
  */
+export interface DiaAAprobar {
+  codigo: string;
+  /** YYYY-MM-DD */
+  fecha: string;
+  /** Minutos medidos AHORA. Es el TESTIGO, no el pago. */
+  minutos: number;
+}
+
 export async function guardarAprobaciones(opts: {
-  desde: string;
-  hasta: string;
-  /** código → minutos medidos AHORA. */
-  minutosPorCodigo: ReadonlyMap<string, number>;
+  dias: readonly DiaAAprobar[];
   aprobado: boolean;
   por: string;
   /** Momento en ISO. Entra por parámetro: nada de `new Date()` escondido. */
   cuando: string;
 }): Promise<boolean> {
-  const filas = [...opts.minutosPorCodigo].map(([codigo, minutos]) => ({
-    empleado_codigo: String(codigo).trim(),
-    periodo_desde: opts.desde,
-    periodo_hasta: opts.hasta,
+  const filas = opts.dias.map((d) => ({
+    empleado_codigo: String(d.codigo).trim(),
+    fecha: d.fecha,
     aprobado: opts.aprobado,
-    minutos_vistos: Math.max(0, Math.round(Number(minutos) || 0)),
+    minutos_vistos: Math.max(0, Math.round(Number(d.minutos) || 0)),
     marcado_por: opts.por,
     marcado_en: opts.cuando,
   }));
@@ -110,7 +112,7 @@ export async function guardarAprobaciones(opts: {
 
   const { error } = await supabaseServer
     .from(TABLA_APROBACIONES)
-    .upsert(filas, { onConflict: "empleado_codigo,periodo_desde,periodo_hasta" });
+    .upsert(filas, { onConflict: "empleado_codigo,fecha" });
 
   if (error) {
     if (esTablaFaltante(error, TABLA_APROBACIONES)) return false;

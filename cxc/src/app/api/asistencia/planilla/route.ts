@@ -80,7 +80,7 @@ import {
   leerManuales,
 } from "@/lib/asistencia/planilla-server";
 import {
-  armarFilasAprobacion,
+  armarDiasAprobacion,
   avisoMigracionAprobaciones,
   estaAprobado,
   extrasNoAprobadas,
@@ -371,8 +371,11 @@ export async function GET(req: NextRequest) {
     // dice en ámbar); sin la tabla, se paga todo como hasta hoy.
     const aprobaciones = indexarAprobaciones(aprRes.filas);
     const exigirAprobacionExtra = !aprRes.faltaTabla;
-    const extrasAprobadas = new Set<string>();
-    for (const [cod, a] of aprobaciones) if (estaAprobado(a)) extrasAprobadas.add(cod);
+    // 🔑 `codigo|fecha` de cada DÍA autorizado. La aprobación es por día desde
+    // el 27-ago-2026: el corte de la quincena lo mueve la contadora, así que
+    // una llave por período volvía a preguntar todo con cada corrimiento.
+    const diasExtraAprobados = new Set<string>();
+    for (const [clave, a] of aprobaciones) if (estaAprobado(a)) diasExtraAprobados.add(clave);
 
     const todasLasLineas = armarPlanilla({
       personas: personasVigentes,
@@ -382,7 +385,7 @@ export async function GET(req: NextRequest) {
       reglas,
       empresa,
       exigirAprobacionExtra,
-      extrasAprobadas,
+      diasExtraAprobados,
       // 🔴 Lo que prorratea el sueldo. 1 cuando el período es una quincena.
       factorBase: q.factorBase,
       decidirAMano,
@@ -457,7 +460,7 @@ export async function GET(req: NextRequest) {
     const puedeAprobar = aprobacionesRoles().includes(auth.role) || auth.role === "admin";
     const filasAprobacion =
       pidenAprobaciones && puedeAprobar
-        ? armarFilasAprobacion({ lineas, personas: personasVigentes, reglas, aprobaciones })
+        ? armarDiasAprobacion({ lineas, personas: personasVigentes, reglas, aprobaciones })
         : null;
 
     // 🔴 LA RESPUESTA ACOTADA. Ni `lineas`, ni `totales`, ni un solo campo de
@@ -472,7 +475,7 @@ export async function GET(req: NextRequest) {
         // la rata es $6,32, y de la rata sale el mensual. `null` es un valor que
         // la fila ya admite («no se le pudo calcular pago»), así que la pantalla
         // no necesita saber nada de esto: muestra las horas y aprueba.
-        aprobaciones: filasAprobacion?.map((f) => ({ ...f, monto: null })) ?? null,
+        aprobaciones: filasAprobacion,
         puedeAprobar,
         avisos: {
           faltaMigracionAprobaciones: aprRes.faltaTabla ? avisoMigracionAprobaciones() : null,

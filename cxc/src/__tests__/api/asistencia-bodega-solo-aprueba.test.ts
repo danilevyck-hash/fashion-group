@@ -123,22 +123,33 @@ describe("🔴 bodega entra a Aprobaciones y NO recibe un solo número de sueldo
     }
   });
 
-  it("⛔ el MONTO de las horas extra tampoco — es una división que da el sueldo", async () => {
+  it("⛔ NINGÚN MONTO llega a la pantalla de aprobar — la plata no vive ahí", async () => {
+    // 🔑 Desde el 27-ago-2026 la unidad es el DÍA, y un día trae gente con sus
+    // MINUTOS. El monto de las extras salió del contrato entero: es una
+    // división que da el sueldo (5,5 h a 1,25 por $43,45 dice rata $6,32).
     const { GET } = await import("@/app/api/asistencia/planilla/route");
     const j = await (await GET(pedir("bodega"))).json();
     expect(Array.isArray(j.aprobaciones)).toBe(true);
     expect(j.aprobaciones.length).toBeGreaterThan(0);
-    for (const f of j.aprobaciones) expect(f.monto, `${f.etiqueta} vino con monto`).toBeNull();
+    for (const d of j.aprobaciones) {
+      for (const g of d.gente) {
+        expect(Object.keys(g), `${g.etiqueta} trae un campo de plata`).not.toContain("monto");
+      }
+    }
   });
 
-  it("✅ pero SÍ recibe lo que necesita para aprobar: la persona y sus minutos", async () => {
+  it("✅ pero SÍ recibe lo que necesita para aprobar: el día, la persona y sus minutos", async () => {
     const { GET } = await import("@/app/api/asistencia/planilla/route");
     const j = await (await GET(pedir("bodega"))).json();
-    const f = j.aprobaciones[0];
-    expect(f.codigo).toBe("11");
-    expect(f.etiqueta).toContain("JULIO");
-    expect(f.minutos).toBeGreaterThan(0);
-    expect(typeof f.aprobado).toBe("boolean");
+    const d = j.aprobaciones[0];
+    expect(d.fecha).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(d.etiqueta).toBeTruthy();
+    expect(d.semana).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const g = d.gente[0];
+    expect(g.codigo).toBe("11");
+    expect(g.etiqueta).toContain("JULIO");
+    expect(g.minutos).toBeGreaterThan(0);
+    expect(typeof g.aprobado).toBe("boolean");
     expect(j.puedeAprobar).toBe(true);
   });
 

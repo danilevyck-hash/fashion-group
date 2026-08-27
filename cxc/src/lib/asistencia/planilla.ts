@@ -360,6 +360,14 @@ export interface HorasPersona {
   /** Hora extra pasada la hora de corte. Va al 1,50. */
   extraNocturnoMin: number;
   /**
+   * 🔴 LOS MINUTOS DE HORA EXTRA QUE NO SE PAGARON POR FALTA DE AUTORIZACIÓN.
+   *
+   * Van APARTE de `extraDiurnoMin`/`extraNocturnoMin` —que ya vienen sin ellos,
+   * y es lo que hace que no se paguen— para poder DECIR cuánto quedó afuera.
+   * Sin este campo, lo que falta aprobar sería justo lo que no se puede ver.
+   */
+  extraNoAprobadaMin: number;
+  /**
    * Excedente. **HOY SIEMPRE 0** — se conserva la columna porque el cuadro de
    * la contadora también la conserva, y también en $0,00. Ver `clasificarDia`.
    */
@@ -425,7 +433,7 @@ export interface HorasPersona {
 }
 
 export const HORAS_CERO: HorasPersona = {
-  extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
+  extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0, extraNoAprobadaMin: 0,
   domingoMin: 0, feriadoMin: 0, tardanzaMin: 0,
   tardanzaGraveMin: 0, tardanzaGraveDias: 0,
   ausenciaMin: 0, ausenciaDias: 0, ausenciaJustificadaDias: 0,
@@ -712,19 +720,50 @@ export function clasificarDia(
  * ausencia ni la vacación «ya se le pagó» se valúan con él —los dos salen de
  * `MIN_DIA_NO_TRABAJADO`— y por eso `clasificarDia` ya ni lo recibe.
  */
+/**
+ * 🔴 QUÉ DÍAS TIENEN LA HORA EXTRA AUTORIZADA.
+ *
+ * Daniel, 27-ago-2026: la aprobación pasó de ser por período a ser **por día**,
+ * porque el corte de la quincena lo mueve la contadora y con una llave por
+ * período cada corrimiento volvía a preguntar todo desde cero.
+ *
+ * ⚠️ El filtro va ACÁ, al SUMAR, y no en `armarLinea`. La razón es que ahora la
+ * aprobación es parcial: se le pueden autorizar a alguien el martes y el jueves
+ * y no el miércoles. Un booleano al final de la línea solo sabe decir «todo o
+ * nada» — el detalle se pierde antes de llegar ahí.
+ */
+export interface DiasAprobados {
+  /** ¿Se exige aprobación? `false` sin la tabla corrida: se paga todo. */
+  exigir: boolean;
+  /** `codigo|fecha` de cada día autorizado. */
+  claves: ReadonlySet<string>;
+  codigo: string;
+}
+
 export function medirHoras(
   p: PersonaReporte,
   reglas: ReglasAsistencia,
   jornadaDiariaMin: number,
+  aprob?: DiasAprobados,
 ): HorasPersona {
   const h: HorasPersona = { ...HORAS_CERO, jornadaDiariaMin };
   for (const d of p.dias) {
     const c = clasificarDia(d, reglas);
-    h.extraDiurnoMin += c.extraDiurnoMin;
-    h.extraNocturnoMin += c.extraNocturnoMin;
-    h.excedenteMin += c.excedenteMin;
-    h.domingoMin += c.domingoMin;
-    h.feriadoMin += c.feriadoMin;
+    // 🔑 Solo los RECARGOS dependen de la autorización. La tardanza, la
+    // ausencia y los días trabajados se cuentan siempre: son lo que pasó, no
+    // algo que alguien conceda.
+    const pagaExtra =
+      !aprob?.exigir || aprob.claves.has(`${aprob.codigo}|${d.fecha}`);
+    if (pagaExtra) {
+      h.extraDiurnoMin += c.extraDiurnoMin;
+      h.extraNocturnoMin += c.extraNocturnoMin;
+      h.excedenteMin += c.excedenteMin;
+      h.domingoMin += c.domingoMin;
+      h.feriadoMin += c.feriadoMin;
+    } else {
+      // Lo que NO se pagó, para poder DECIRLO. Rechazar sí, esconder no.
+      h.extraNoAprobadaMin += c.extraDiurnoMin + c.extraNocturnoMin;
+    }
     h.tardanzaMin += c.tardanzaMin;
     // 🔴 EL RÓTULO, NO EL DINERO. Un día de más de 30 minutos tarde se sigue
     // sumando entero a `tardanzaMin` —que es lo que se valúa— y además se
@@ -1324,9 +1363,19 @@ export function armarLinea(
   // sus extras porque falta un archivo SQL. Se avisa, ver `aprobaciones.ts`.
   const exigir = extra.exigirAprobacion === true;
   const extraAprobada = !exigir || extra.aprobada === true;
-  const horasEfectivas: HorasPersona = extraAprobada
-    ? horasMedidas
-    : { ...horasMedidas, extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0 };
+
+  // 🔴 EL FILTRO VIVE EN `medirHoras`, Y ACÁ NO SE REPITE (27-ago-2026).
+  //
+  // Con la aprobación por DÍA, `horasMedidas` ya viene sin los recargos de los
+  // días que nadie autorizó — y con lo que quedó afuera apartado en
+  // `extraNoAprobadaMin`, para poder decirlo. Volver a poner los extras en cero
+  // acá borraría la aprobación PARCIAL: a quien tiene el martes aprobado y el
+  // miércoles no, se le pagaría CERO en vez del martes.
+  //
+  // 🩸 Ese era el bug, y lo cazó el candado: dos filtros para lo mismo, y el
+  // segundo se comía al primero. `extraAprobada` queda como RÓTULO — dice si le
+  // quedó algo sin aprobar— y no como interruptor.
+  const horasEfectivas: HorasPersona = horasMedidas;
 
   const dinero =
     !fueraDePlanilla && !seAbstiene && faltaConfigurar.length === 0
@@ -1459,8 +1508,19 @@ export interface OpcionesPlanilla {
    * sus extras el día de pago.
    */
   exigirAprobacionExtra?: boolean;
-  /** Códigos con las horas extra de ESTE período aprobadas. */
-  extrasAprobadas?: ReadonlySet<string>;
+  /**
+   * 🔴 `codigo|fecha` de cada DÍA con la hora extra autorizada (27-ago-2026).
+   *
+   * Antes era un set de CÓDIGOS: la aprobación cubría el período entero. Cambió
+   * porque el corte de la quincena lo mueve la contadora, y con una llave por
+   * período cada corrimiento volvía a preguntar todo desde cero. Un día es un
+   * hecho y no depende de dónde alguien corte.
+   *
+   * ⚠️ La aprobación ahora puede ser PARCIAL: martes y jueves sí, miércoles no.
+   * Por eso el filtro vive en `medirHoras`, al sumar, y no en un booleano al
+   * final de la línea — ahí el detalle ya se perdió.
+   */
+  diasExtraAprobados?: ReadonlySet<string>;
 }
 
 /**
@@ -1502,7 +1562,11 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
     };
     const p = reporteDe.get(cod);
     const h = p
-      ? medirHoras(p, reglas, jornadaDiariaMin(cod))
+      ? medirHoras(p, reglas, jornadaDiariaMin(cod), {
+          exigir: opts.exigirAprobacionExtra === true,
+          claves: opts.diasExtraAprobados ?? new Set<string>(),
+          codigo: cod,
+        })
       : { ...HORAS_CERO, jornadaDiariaMin: jornadaDiariaMin(cod) };
 
     // 🔴 EL MOTIVO POR EL QUE EL SISTEMA SE ABSTIENE. Son dos causas distintas
@@ -1525,7 +1589,10 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorBase, motivo,
       {
         exigirAprobacion: opts.exigirAprobacionExtra === true,
-        aprobada: opts.extrasAprobadas?.has(cod) === true,
+        // 🔑 Ya no es «este código está aprobado»: es «no le quedó ni un minuto
+        // afuera». Con la aprobación por día alguien puede tener el martes sí y
+        // el miércoles no, y `medirHoras` ya descontó lo que no se autorizó.
+        aprobada: h.extraNoAprobadaMin <= 0,
       },
     );
     // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
