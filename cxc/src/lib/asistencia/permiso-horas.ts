@@ -65,9 +65,6 @@ export function ventanaDe(
   const d = horaASegundos(horaDesde);
   const h = horaASegundos(horaHasta);
   if (d === null || h === null) return null;
-  // Una ventana al revés —o de duración cero— no perdona nada, y perdonar
-  // "hasta el final del día" por una hora tecleada al revés sería regalar
-  // una jornada. Ante la duda no se perdona nada.
   if (h <= d) return null;
   return { desdeSeg: d, hastaSeg: h };
 }
@@ -92,7 +89,27 @@ export function minutosPerdonados(
   if (!Number.isFinite(entradaSeg) || !Number.isFinite(marcaSeg)) return 0;
   if (marcaSeg <= entradaSeg) return 0;
   const desde = Math.max(ventana.desdeSeg, entradaSeg);
-  const hasta = Math.min(ventana.hastaSeg, marcaSeg);
+
+  // 🔴 SI LA MARCA CAE EN EL MISMO MINUTO QUE EL FINAL DEL PERMISO, SE PERDONA
+  // ENTERA (27-ago-2026).
+  //
+  // 🩸 EL CASO REAL. El lunes 17 de agosto llovió y llegaron tarde diez
+  // personas. A cada una le cargaron el permiso con el MINUTO de su marcación
+  // —08:10, 08:18, 08:44— y a NUEVE DE DIEZ les siguió descontando, porque el
+  // reloj mide al SEGUNDO y ellas habían entrado 08:10:24, 08:18:01, 08:44:06.
+  // A Ballesta le quedó UN segundo afuera.
+  //
+  // El permiso se teclea en minutos y la marcación se mide en segundos: nadie
+  // le va a acertar nunca. Y «hasta las 8:10» no significa «hasta el segundo 0
+  // de las 8:10».
+  //
+  // ⚠️ ACOTADO AL MISMO MINUTO, y por eso no vive en `ventanaDe`. Estirar la
+  // ventana 59 s a secas le regalaba casi un minuto a CUALQUIER permiso —un
+  // «de 8 a 10» pasaba a perdonar 120,98— y convertía una ventana de duración
+  // cero (dos horas iguales, que es un tipeo) en un permiso de 59 segundos.
+  // Los dos candados que ya existían lo cazaron.
+  const mismoMinuto = Math.floor(ventana.hastaSeg / 60) === Math.floor(marcaSeg / 60);
+  const hasta = mismoMinuto ? marcaSeg : Math.min(ventana.hastaSeg, marcaSeg);
   return Math.max(0, (hasta - desde) / 60);
 }
 

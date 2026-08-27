@@ -217,3 +217,78 @@ describe("las palabras y la migración", () => {
     expect(esColumnaPermisoHorasFaltante({ code: "42703", message: "column otra does not exist" })).toBe(false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 «HASTA LAS 8:10» CUBRE EL MINUTO 8:10 ENTERO (27-ago-2026)
+//
+// 🩸 EL CASO REAL. El lunes 17 de agosto llovió y llegaron tarde diez personas.
+// A cada una le cargaron el permiso con el MINUTO de su marcación, y a NUEVE DE
+// DIEZ les siguió descontando porque el reloj mide al SEGUNDO. Medido contra
+// producción, entrada real contra permiso:
+//
+//   ANDREA PEREZ      08:10:24  vs  08:10  →  24 s afuera  ← el que reportó Daniel
+//   LUIS BALLESTA     08:18:01  vs  08:18  →   1 s afuera
+//   MARIA BETHANCOURTH 08:44:06 vs  08:44  →   6 s afuera
+//   Roxana Hernandez  08:41:12  vs  08:41  →  12 s afuera
+//   ANDRES GONZALEZ   08:22:21  vs  08:22  →  21 s afuera
+//   JORMAN HERNANDEZ  08:49:23  vs  08:49  →  23 s afuera
+//   YERITZA SOLIS     08:13:24  vs  08:13  →  24 s afuera
+//   BRICEIDA MONTERO  08:12:32  vs  08:12  →  32 s afuera
+//   DOMINGO HENRIQUEZ 08:21:38  vs  08:21  →  38 s afuera
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 el permiso se teclea en minutos y el reloj mide en segundos", () => {
+  const H = (h: string) => {
+    const [a, b, c] = h.split(":").map(Number);
+    return a * 3600 + b * 60 + (c ?? 0);
+  };
+  /** Los nueve casos REALES del 17 de agosto. */
+  const CASOS: Array<[string, string, string]> = [
+    ["ANDREA PEREZ", "08:10:24", "08:10:00"],
+    ["LUIS BALLESTA", "08:18:01", "08:18:00"],
+    ["MARIA BETHANCOURTH", "08:44:06", "08:44:00"],
+    ["Roxana Hernandez", "08:41:12", "08:41:00"],
+    ["ANDRES GONZALEZ", "08:22:21", "08:22:00"],
+    ["JORMAN HERNANDEZ", "08:49:23", "08:49:00"],
+    ["YERITZA SOLIS", "08:13:24", "08:13:00"],
+    ["BRICEIDA MONTERO", "08:12:32", "08:12:00"],
+    ["DOMINGO HENRIQUEZ", "08:21:38", "08:21:00"],
+  ];
+
+  it("los NUEVE quedan perdonados enteros — ni un segundo se descuenta", () => {
+    for (const [quien, llego, hasta] of CASOS) {
+      const perdonado = minutosPerdonados(ventanaDe("08:00:00", hasta), H("08:00:00"), H(llego));
+      const atraso = (H(llego) - H("08:00:00")) / 60;
+      expect(perdonado, `${quien} quedó con atraso sin perdonar`).toBeCloseTo(atraso, 6);
+    }
+  });
+
+  it("⛔ y NO se regala el minuto siguiente: quien llegó 08:11:00 sigue tarde", () => {
+    const perdonado = minutosPerdonados(ventanaDe("08:00:00", "08:10:00"), H("08:00:00"), H("08:11:00"));
+    // 08:11:00 NO cae en el minuto 08:10, así que el permiso NO se estira:
+    // perdona sus 10 minutos exactos y el resto sigue siendo tardanza.
+    expect(perdonado).toBeCloseTo(10, 6);
+  });
+
+  it("🔑 la regla es EL MINUTO, y eso es todo: dentro del mismo minuto, entero", () => {
+    // Medido contra producción el 27-ago-2026: de los 13 permisos de horas que
+    // existen, **0 tienen segundos escritos** — la pantalla los pide en HH:MM.
+    // Así que la regla se queda en «el minuto» y no estrena una excepción para
+    // un caso que nadie cargó nunca: 08:10:30 y una marca 08:10:45 caen en el
+    // mismo minuto y se perdona hasta la marca.
+    expect(minutosPerdonados(ventanaDe("08:00:00", "08:10:30"), H("08:00:00"), H("08:10:45")))
+      .toBeCloseTo(10.75, 6);
+  });
+
+  it("⚠️ solo se estira el FINAL: el principio no se corre hacia atrás", () => {
+    // Un permiso de 08:05 a 08:10 no puede perdonar el atraso de 08:00 a 08:05.
+    const perdonado = minutosPerdonados(ventanaDe("08:05:00", "08:10:00"), H("08:00:00"), H("08:10:24"));
+    expect(perdonado).toBeCloseTo(5 + 24 / 60, 6);
+  });
+
+  it("una ventana al revés sigue sin perdonar nada", () => {
+    expect(ventanaDe("08:10:00", "08:00:00")).toBeNull();
+    // Y una de duración CERO tampoco: dos horas iguales son un tipeo, no un
+    // permiso de un minuto. Por eso el estiramiento no vive acá.
+    expect(ventanaDe("08:10:00", "08:10:00")).toBeNull();
+  });
+});
