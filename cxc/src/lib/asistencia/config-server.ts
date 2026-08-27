@@ -28,6 +28,7 @@ import {
   TABLA_VACACIONES,
   type ReglasAsistencia,
 } from "./config";
+import { TABLA_REPARTO, type FilaReparto } from "./reparto";
 import {
   crearDirectorio,
   armarPersonas,
@@ -664,4 +665,60 @@ export async function leerVacaciones(
     })),
     faltaTabla: false,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL REPARTO DE UN SUELDO ENTRE DOS EMPRESAS — ver `reparto.ts`
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface RepartosLeidos {
+  /** Todas las filas, sin validar. Vacío si la tabla todavía no existe. */
+  filas: FilaReparto[];
+  /**
+   * `true` = falta correr `MIGRACION_REPARTO`. Nadie tiene reparto, o sea la
+   * planilla de hoy hasta el centavo, y la pantalla dice qué archivo falta.
+   */
+  faltaTabla: boolean;
+}
+
+/**
+ * Los repartos guardados.
+ *
+ * ⚠️ Solo se degrada si el error NOMBRA la tabla. Tragarse cualquier error
+ * convertiría un permiso o un timeout en «nadie reparte su sueldo», y esa
+ * mentira se paga en el neto: JULIO volvería a pagar el 11 % de seguros sobre
+ * sus horas extra sin que nadie se entere.
+ *
+ * 🩸 SE PAGINA AUNQUE HOY SEAN DOS FILAS. `db-max-rows` = 1000 corta EN
+ * SILENCIO, y acá un truncado no da un error: da un reparto que **NO SUMA** el
+ * salario de la ficha, así que `validarReparto` lo rechaza y la persona vuelve
+ * a cobrar en una sola planilla. Se vería como «se deshizo solo».
+ */
+export async function leerRepartos(): Promise<RepartosLeidos> {
+  try {
+    const filas = await leerTodoPaginado<FilaReparto>(
+      TABLA_REPARTO,
+      (pedirCount, from, to) =>
+        supabaseServer
+          .from(TABLA_REPARTO)
+          .select(
+            "empleado_codigo, empresa, salario_mensual, paga_seguros, paga_horas_extra, orden",
+            pedirCount ? { count: "exact" } : {},
+          )
+          // 🔑 Orden TOTAL y estable: sin él, dos filas empatadas pueden
+          // repetirse o saltearse entre páginas. La llave es (código, empresa).
+          .order("empleado_codigo", { ascending: true })
+          .order("empresa", { ascending: true })
+          .range(from, to),
+    );
+    return { filas, faltaTabla: false };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // 🔑 `leerTodoPaginado` prefija su etiqueta pero CONSERVA el mensaje de
+    // PostgREST, así que la detección de «falta la tabla» sigue funcionando.
+    if (esTablaFaltante({ message: msg }, TABLA_REPARTO)) {
+      return { filas: [], faltaTabla: true };
+    }
+    throw e;
+  }
 }

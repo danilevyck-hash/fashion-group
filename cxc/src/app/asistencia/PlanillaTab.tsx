@@ -44,6 +44,7 @@ import {
   type TotalesPlanilla,
 } from "@/lib/asistencia/planilla";
 import { CHIP_NO_MARCA_RELOJ } from "@/lib/asistencia/sueldo-fijo";
+import { CHIP_REPARTIDO, type RepartoRechazado } from "@/lib/asistencia/reparto";
 // 🔑 `baseSeguros` es EL MISMO LECTOR que usan el servidor y el motor. Acá hace
 // falta de verdad: una línea armada a mano —hay fixtures de tests que lo hacen,
 // y una respuesta vieja del servidor guardada en caché también— llega SIN el
@@ -102,6 +103,14 @@ interface Respuesta {
     /** Falta correr el SQL de las aprobaciones. NO se exige aprobación: se paga
      *  todo lo que midió el reloj, como hasta hoy — pero se dice. */
     faltaMigracionAprobaciones: string | null;
+    /** Falta correr el SQL del reparto. Nadie reparte su sueldo entre dos
+     *  empresas y cada persona sale en una sola planilla, como hoy — pero se
+     *  dice: quien ya dio a Julio por repartido va a esperar verlo en las dos. */
+    faltaMigracionReparto: string | null;
+    /** 🔴 Los repartos que el guard NO aplicó, con nombre y motivo. Esa persona
+     *  cobró en UNA sola planilla, y sin este aviso nadie se enteraría. */
+    repartosRechazados: RepartoRechazado[];
+    avisoRepartoRechazado: string | null;
   };
 }
 
@@ -383,6 +392,19 @@ export default function PlanillaTab() {
         </p>
       )}
 
+      {/* 🔴 LO QUE EL GUARD RECHAZÓ SE DICE, con el nombre y el motivo. Sin
+          esto, la persona cobraría en una sola planilla y el reparto se vería
+          «deshecho solo». Ámbar y no rojo: no se rompió nada, está mal cargado. */}
+      {data?.avisos.avisoRepartoRechazado && (
+        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          {data.avisos.avisoRepartoRechazado}
+        </p>
+      )}
+      {data?.avisos.faltaMigracionReparto && (
+        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          {data.avisos.faltaMigracionReparto}
+        </p>
+      )}
       {data?.avisos.faltaMigracionAprobaciones && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           {data.avisos.faltaMigracionAprobaciones}
@@ -762,6 +784,19 @@ function Fila({
             {CHIP_NO_MARCA_RELOJ}
           </span>
         )}
+        {/* 🔴 SU SUELDO SE PAGA ENTRE DOS EMPRESAS, Y ESTA LÍNEA ES SOLO UNA
+            PARTE. Sin el chip, un quincenal de $400 donde la ficha dice $1.000
+            se lee como un error de carga. Dice cuánto paga ESTA empresa y si
+            acá caen las horas extra, que es lo que explica el resto. */}
+        {l.parte && (
+          <span
+            className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500"
+            title={`${l.empresaEtiqueta ?? l.parte.empresa} le paga ${$$(l.parte.salarioMensual)} al mes de un sueldo de ${$$(l.salarioMensual ?? 0)}.`
+              + (l.parte.llevaHorasExtra ? " Las horas extra se pagan acá." : " Las horas extra se pagan en la otra empresa.")}
+          >
+            {CHIP_REPARTIDO}
+          </span>
+        )}
         {/* 🔴 POR QUÉ SU SEGURO ES DISTINTO. Sin esto, quien mira la línea de
             RODRIGO y ve $17,06 donde esperaba $39,38 no tiene forma de saber de
             dónde sale sin preguntarle a alguien. El sello dice el monto sobre
@@ -853,6 +888,8 @@ function Tarjeta({
           <span className="text-xs text-gray-400">
             {l.codigo} · bruto ${$(d.totalBruto)}
             {l.noMarcaReloj && ` · ${CHIP_NO_MARCA_RELOJ}`}
+            {/* El mismo sello que en el escritorio, con las MISMAS palabras. */}
+            {l.parte && ` · ${CHIP_REPARTIDO}`}
             {/* El mismo sello que en el escritorio, y con las MISMAS palabras:
                 dos redacciones del mismo hecho es la forma de que se separen. */}
             {sobreQueBaseTarjeta !== null && ` · ${chipBaseSeguros(sobreQueBaseTarjeta)}`}

@@ -41,6 +41,16 @@ import {
 } from "@/lib/asistencia/config";
 import { rataPorHoraCalculo } from "@/lib/asistencia/rata";
 import {
+  comoFilas,
+  EXPLICACION_REPARTO,
+  MODO_PLANILLA,
+  MODO_SERVICIOS,
+  SELLO_HORAS_EXTRA,
+  TITULO_REPARTO,
+  validarReparto,
+} from "@/lib/asistencia/reparto";
+import type { ParteReparto } from "@/lib/asistencia/planilla";
+import {
   avisoPendientes,
   faltaEnPersona,
   fraseFalta,
@@ -110,6 +120,18 @@ interface Persona {
   /** `true` = cobra fijo y NO pasa por el reloj. `false` mientras nadie diga lo
    *  contrario: es lo que hacía la planilla con las 39 fichas. */
   noMarcaReloj: boolean;
+  /** 🔴 Su sueldo se paga entre DOS empresas. Vacío = cobra entero en la suya,
+   *  que es el caso de 36 de las 37 fichas. Ver `lib/asistencia/reparto.ts`.
+   *  Llega YA VALIDADO por el servidor: si el guard lo rechaza viene vacío.
+   *
+   *  ⚠️ OPCIONAL a propósito: un payload viejo —el del caché de SWR, o el de
+   *  una pestaña abierta desde antes del deploy— no lo trae, y una pantalla que
+   *  revienta con «Cannot read properties of undefined» es mucho peor que una
+   *  ficha sin la tarjeta del reparto. */
+  reparto?: ParteReparto[];
+  /** Por qué el reparto NO se aplicó, cuando hay filas cargadas y el guard las
+   *  rechazó. `null` = no hay nada que decir. Rechazar sí, esconder no. */
+  motivoReparto?: string | null;
   marcaciones: number;
   ultimaMarca: string | null;
   rataHora: number | null;
@@ -157,6 +179,9 @@ interface Datos {
   avisoMigracionNoMarcaReloj: string | null;
   puedeMarcarSueldoFijo: boolean;
   avisoMigracionSaldoVacaciones: string | null;
+  /** Falta correr el SQL del reparto. Nadie reparte su sueldo, o sea la ficha
+   *  de hoy — pero se dice qué archivo falta. */
+  avisoMigracionReparto: string | null;
   puedeCargarSaldoVacaciones: boolean;
 }
 
@@ -448,6 +473,19 @@ export default function ConfiguracionTab() {
                   // quincena a alguien que faltó, y eso no se ve hasta que ya
                   // se pagó.
                   noMarcaReloj: p.noMarcaReloj === true,
+                  // 🔴 EL REPARTO SE REVALIDA CONTRA EL SALARIO QUE ACABA DE
+                  // GUARDARSE. Acá mismo se puede cambiar el sueldo, y con $900
+                  // en vez de $1.000 las partes dejan de sumar: seguir
+                  // enseñando dos empresas sería prometer un pago que el motor
+                  // ya no hace. Es la MISMA función del servidor, con el MISMO
+                  // texto del motivo — una segunda copia de la regla de la suma
+                  // es la que se queda vieja.
+                  ...(() => {
+                    const r = validarReparto(p.salarioMensual, comoFilas(codigo, x.reparto ?? []));
+                    return r.ok
+                      ? { reparto: r.valor, motivoReparto: null }
+                      : { reparto: [], motivoReparto: r.error };
+                  })(),
                   // 🔑 Lo que quedó GUARDADO, con la fecha de corte que puso el
                   // servidor. Pintar el borrador dejaría la pantalla diciendo
                   // una fecha y la base otra.
@@ -746,6 +784,15 @@ export default function ConfiguracionTab() {
               </p>
             )}
 
+            {/* 🔑 Lo mismo un escalón más: mientras no se corra, JULIO cobra en
+                una sola planilla y hay que poder saber por qué sin abrir el
+                código. Ámbar, no rojo: no se rompió nada. */}
+            {datos.avisoMigracionReparto && (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+                {datos.avisoMigracionReparto}
+              </p>
+            )}
+
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setFiltro("todos")}
                 className={`${PILL_BASE} ${filtro === "todos" ? PILL_ON : PILL_OFF}`}>
@@ -838,6 +885,70 @@ export default function ConfiguracionTab() {
                           {falta.length > 0 && (
                             <p className="mb-3 text-[12px] text-amber-800">
                               Falta {fraseFalta(falta)}.
+                            </p>
+                          )}
+
+                          {/* 🔴 SU SUELDO SE PAGA ENTRE DOS EMPRESAS. Va ARRIBA
+                              del salario a propósito: sin esto, ver «$1.000» en
+                              la ficha y «$400» en la planilla de Vistana se lee
+                              como un error de cálculo.
+
+                              🔑 ES DE SOLO LECTURA. La regla la fija la
+                              contadora y los montos tienen que sumar el salario
+                              de la ficha; un campo editable acá sería la forma
+                              de dejarlo mal puesto —y un reparto que no suma se
+                              rechaza entero, o sea que la persona volvería a
+                              cobrar en una sola planilla sin que nadie lo
+                              busque. */}
+                          {(p.reparto ?? []).length > 0 && (
+                            <div className="mb-3 rounded-md border border-gray-200 bg-white">
+                              <p className="border-b border-gray-100 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                                {TITULO_REPARTO}
+                              </p>
+                              {(p.reparto ?? []).map((parte) => (
+                                <div
+                                  key={parte.empresa}
+                                  className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 last:border-b-0"
+                                >
+                                  <span className="w-28 shrink-0 text-[13px] font-medium text-gray-900">
+                                    {etiquetaEmpresa(parte.empresa)}
+                                  </span>
+                                  <span className="flex-1 text-[12px] text-gray-500">
+                                    {parte.pagaSeguros ? MODO_PLANILLA : MODO_SERVICIOS}
+                                  </span>
+                                  {parte.llevaHorasExtra && (
+                                    <span className="shrink-0 rounded-full border border-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                                      {SELLO_HORAS_EXTRA}
+                                    </span>
+                                  )}
+                                  <span className="shrink-0 text-[13px] font-semibold tabular-nums text-gray-900">
+                                    {money(parte.salarioMensual)}
+                                  </span>
+                                </div>
+                              ))}
+                              {/* 🔑 EL TOTAL SE SUMA, no se copia del salario de
+                                  la ficha: es lo que deja ver de un vistazo que
+                                  las partes cuadran. Si copiara el salario, un
+                                  reparto que no suma se vería perfecto. */}
+                              <div className="flex items-center gap-2 px-3 py-2 text-[12px] text-gray-500">
+                                <span>Total</span>
+                                <span className="ml-auto text-[13px] font-semibold tabular-nums text-gray-900">
+                                  {money((p.reparto ?? []).reduce((a, x) => a + x.salarioMensual, 0))}
+                                </span>
+                              </div>
+                              <p className="border-t border-gray-100 px-3 py-1.5 text-[12px] text-gray-500">
+                                {EXPLICACION_REPARTO}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* 🔴 LO QUE EL GUARD RECHAZÓ SE DICE, con el motivo:
+                              esa persona está cobrando en UNA sola planilla y
+                              sin esto nadie se enteraría. */}
+                          {p.motivoReparto && (
+                            <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                              El reparto de su sueldo entre dos empresas no se aplicó ({p.motivoReparto}):
+                              cobra en una sola planilla, como antes.
                             </p>
                           )}
 

@@ -868,6 +868,139 @@ export interface FichaPlanilla {
    * reloj se le ignora SIEMPRE**, marque o no marque.
    */
   noMarcaReloj?: boolean;
+  /**
+   * 🔴 SU SUELDO SE PAGA ENTRE DOS EMPRESAS Y SALE EN LAS DOS PLANILLAS. Ver
+   * `reparto.ts` y `ParteReparto` acá abajo. Ausente o vacío = una sola línea,
+   * que es como estaban las 37 fichas antes de que este campo existiera.
+   *
+   * ⚠️ Tiene que venir YA VALIDADO (`partesDe`, en `reparto.ts`). Igual no se
+   * confía: `partesUsables` vuelve a exigir las cuatro condiciones estructurales
+   * acá adentro, que es donde se decide la plata.
+   */
+  reparto?: readonly ParteReparto[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL REPARTO — una persona, dos empresas, dos líneas
+//
+// 🔴 LA RATA SALE DEL SUELDO COMPLETO, Y ES EL PUNTO ENTERO.
+//
+// La contadora, textual (27-ago-2026): *«En ambas empresas su rata por hora es
+// 5.77»*. `$1.000 × 12 ÷ 52 ÷ 40 = 5,769…` → **$5,77**, la misma en las dos,
+// porque es lo que vale la hora de esa persona. Si la rata de Fashion Wear
+// saliera de sus $200, su hora valdría $1,15 y sus horas extra —que se pagan
+// justamente ahí— se pagarían CINCO VECES MENOS.
+//
+// Por eso `calcularDinero` recibe DOS números: el mensual COMPLETO, que es de
+// donde sale la rata, y el de la PARTE, que es lo único que se prorratea a
+// quincenal.
+//
+// 🔴 CADA COLUMNA DEL RELOJ CAE EN UNA SOLA LÍNEA. Es lo que hace que el reparto
+// no invente ni pierda un centavo:
+//
+//   · las HORAS EXTRA (1,25 · 1,50 · excedente) van a la parte marcada
+//     «acá se pagan las horas extra», y a ninguna otra;
+//   · TODO EL RESTO DEL RELOJ —domingos, feriados, tardanzas, ausencias,
+//     vacaciones ya pagadas— y los montos escritos a mano van a la parte
+//     PRINCIPAL (la primera de la lista), y a ninguna otra.
+//
+// Sumando las partes se reconstruyen las horas originales columna por columna.
+// Hay un test que lo exige, y no es decorativo: una ausencia contada en las dos
+// líneas se descontaría dos veces, y una hora extra en ninguna desaparecería.
+//
+// ── ⚠️ POR QUÉ LOS DOMINGOS Y FERIADOS SE QUEDAN EN LA PLANILLA ──────────────
+//
+// La contadora dijo «horas extras», y en Panamá el recargo de domingo es otra
+// cosa. Ante la duda se quedan del lado que SÍ paga seguros: retener de más se
+// ve en el neto y se reclama el mismo día; no retener se descubre meses después
+// cuando la Caja pide lo que no se retuvo. Misma asimetría que `seguros.ts`.
+// 🔴 QUEDA PENDIENTE PREGUNTARLE: en la quincena del 16 al 31 de julio de 2026
+// son $27,05 de recargo de domingo, o sea plata de verdad.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Una parte del reparto, ya validada. Produce UNA línea de planilla. */
+export interface ParteReparto {
+  empresa: string;
+  /** Lo que ESTA empresa le paga al mes. ⚠️ NO es de donde sale la rata. */
+  salarioMensual: number;
+  /** ¿Esta parte descuenta seguro social y educativo? */
+  pagaSeguros: boolean;
+  /** 🔴 Acá se pagan las horas extra. Exactamente UNA parte la tiene. */
+  llevaHorasExtra: boolean;
+  /**
+   * 🔴 Acá cae TODO EL RESTO DEL RELOJ (domingos, feriados, tardanzas,
+   * ausencias, vacaciones ya pagadas) y los montos escritos a mano. Es la
+   * primera parte de la lista, y hay exactamente una.
+   */
+  llevaElReloj: boolean;
+}
+
+/** Las columnas de HORA EXTRA. Van a la parte marcada, y a ninguna otra. */
+const COLUMNAS_EXTRA = [
+  "extraDiurnoMin", "extraNocturnoMin", "excedenteMin", "extraNoAprobadaMin",
+] as const;
+
+/**
+ * Todo el resto del reloj. Va a la parte PRINCIPAL, y a ninguna otra.
+ *
+ * ⚠️ `jornadaDiariaMin` NO está en ninguna de las dos listas a propósito: no es
+ * algo que se reparta —es cuánto dura el día de esa persona— y se COPIA a todas
+ * las partes. Repartirlo dejaría a una línea creyendo que el día dura 0 minutos.
+ */
+const COLUMNAS_RELOJ = [
+  "domingoMin", "feriadoMin", "tardanzaMin", "tardanzaGraveMin", "tardanzaGraveDias",
+  "ausenciaMin", "ausenciaDias", "ausenciaJustificadaDias",
+  "vacacionesYaPagadasMin", "vacacionesYaPagadasDias", "vacacionesDias",
+  "sabadoMin", "diasTrabajados", "diasARevisar", "tardanzaDeDiasARevisarMin",
+] as const;
+
+/**
+ * Las horas que le tocan a UNA parte.
+ *
+ * 🔴 NO SE PARTE NINGÚN NÚMERO: cada columna se copia entera a la parte que le
+ * corresponde y se deja en CERO en las otras. Prorratear minutos entre dos
+ * empresas sería inventar decimales que no existen en el reloj, y además dos
+ * columnas redondeadas por separado no vuelven a sumar el original.
+ */
+export function repartirHoras(h: HorasPersona, parte: ParteReparto): HorasPersona {
+  const out: HorasPersona = { ...HORAS_CERO, jornadaDiariaMin: h.jornadaDiariaMin };
+  if (parte.llevaHorasExtra) for (const k of COLUMNAS_EXTRA) out[k] = h[k] || 0;
+  if (parte.llevaElReloj) for (const k of COLUMNAS_RELOJ) out[k] = h[k] || 0;
+  return out;
+}
+
+/**
+ * Las partes de una ficha que este motor va a usar. Lista VACÍA = una sola
+ * línea, como siempre.
+ *
+ * 🔴 VUELVE A EXIGIR LO ESTRUCTURAL AUNQUE `reparto.ts` YA LO HAYA HECHO, y no
+ * es desconfianza gratuita: acá es donde se decide la plata, y un llamador
+ * —un test, un script, una ruta nueva— puede armar la ficha a mano. Las cuatro
+ * condiciones son las que hacen que ninguna columna se pierda ni se duplique:
+ * dos partes o más, empresas sin repetir, exactamente una con las horas extra y
+ * exactamente una con el reloj. Cualquier otra cosa vuelve a UNA sola línea, que
+ * es lo que se pagaba ayer.
+ *
+ * ⚠️ La suma de los montos contra el salario de la ficha se exige en
+ * `validarReparto` (`reparto.ts`), donde se puede DECIR el motivo en pantalla.
+ * Acá también se rechaza, porque es la que sostiene que la rata sea honesta.
+ */
+export function partesUsables(f: FichaPlanilla): readonly ParteReparto[] {
+  const partes = f.reparto ?? [];
+  if (partes.length < 2) return [];
+  const empresas = new Set(partes.map((p) => p.empresa));
+  if (empresas.size !== partes.length) return [];
+  if (partes.filter((p) => p.llevaHorasExtra).length !== 1) return [];
+  if (partes.filter((p) => p.llevaElReloj).length !== 1) return [];
+  const salario = f.salarioMensual;
+  if (typeof salario !== "number" || !Number.isFinite(salario) || salario <= 0) return [];
+  let suma = 0;
+  for (const p of partes) {
+    if (!Number.isFinite(p.salarioMensual) || p.salarioMensual <= 0) return [];
+    suma = centavos(suma + centavos(p.salarioMensual));
+  }
+  if (suma !== centavos(salario)) return [];
+  return partes;
 }
 
 export interface DineroLinea {
@@ -980,6 +1113,20 @@ export interface LineaPlanilla {
    * cero: alguien que vino todos los días y no hizo extras también daría cero.
    */
   noMarcaReloj: boolean;
+  /**
+   * 🔴 ESTA LÍNEA ES **UNA PARTE** DE UN SUELDO REPARTIDO ENTRE DOS EMPRESAS.
+   * `null` = la persona cobra entero acá, que es el caso de 36 de las 37 fichas.
+   *
+   * 🔑 Trae el monto de ESTA empresa (`salarioMensual` de la parte) y si acá se
+   * pagan las horas extra, para que la pantalla pueda decir «$800,00 · Planilla»
+   * y «$200,00 · Servicios profesionales · Horas extra» sin recalcular nada.
+   *
+   * ⚠️ `LineaPlanilla.salarioMensual` sigue siendo el sueldo COMPLETO de la
+   * ficha, y eso es a propósito: es el número del que sale `dinero.rataHora`, y
+   * ponerle acá los $200 dejaría a la contadora viendo un salario con el que su
+   * rata no cuadra — el mismo pecado que `rata.ts` existe para no cometer.
+   */
+  parte: ParteReparto | null;
   /**
    * 🔴 EL SISTEMA SE ABSTUVO Y LO DECIDE UNA PERSONA. Trae el motivo escrito,
    * tal como se muestra: «entró el 10 de agosto de 2026», «Vacaciones del 16
@@ -1136,10 +1283,26 @@ export function calcularDinero(
    * Ver `seguros-base.ts`.
    */
   baseSegurosQuincena: number | null = null,
+  /**
+   * 🔴 CUÁNTO PAGA **ESTA** EMPRESA AL MES, cuando el sueldo está repartido
+   * entre dos. **`null` por defecto**, o sea que el quincenal sale del salario
+   * completo: sin pasarlo, esta función devuelve exactamente lo mismo que
+   * devolvía antes de que el parámetro existiera.
+   *
+   * 🔴 SOLO TOCA EL SUELDO QUINCENAL. La RATA sigue saliendo de
+   * `salarioMensual` —el sueldo COMPLETO— porque es lo que vale la hora de esa
+   * persona: la contadora, textual, *«en ambas empresas su rata por hora es
+   * 5.77»*. Con la rata sacada de los $200 de Fashion Wear su hora valdría
+   * $1,15 y sus horas extra —que se pagan justamente ahí— se pagarían cinco
+   * veces menos. Ver `reparto.ts`.
+   */
+  salarioDeLaParte: number | null = null,
 ): DineroLinea | null {
   const divisor = divisorDe(jornadaSemanal, reglas);
   if (divisor === null || !(salarioMensual > 0)) return null;
 
+  // 🔴 LA RATA, DEL SUELDO COMPLETO. Esta línea NO mira `salarioDeLaParte`, y
+  // ahí está todo el punto del reparto. Ver la nota del parámetro.
   const rataHora = centavos(salarioMensual / divisor);
   const valorMinuto = rataHora / 60;
   const h = (min: number) => min / 60;
@@ -1151,7 +1314,17 @@ export function calcularDinero(
   const factor = Number.isFinite(factorBase) && factorBase > 0 ? factorBase : 1;
   // 🔑 `× 1` no cambia un número IEEE-754: con el factor por defecto esto es
   // literalmente el `centavos(salarioMensual / 2)` de siempre.
-  const salarioQuincenal = centavos((salarioMensual / 2) * factor);
+  //
+  // 🔑 Y con `salarioDeLaParte` en `null` —que es el default— `base` ES
+  // `salarioMensual`, o sea la MISMA línea de siempre para las 36 fichas sin
+  // reparto. El `> 0` no está de adorno: un 0 o un `NaN` colado por un llamador
+  // pagaría una quincena de $0 en silencio, que es justo lo que esta pantalla
+  // existe para no hacer.
+  const baseMensual =
+    typeof salarioDeLaParte === "number" && Number.isFinite(salarioDeLaParte) && salarioDeLaParte > 0
+      ? salarioDeLaParte
+      : salarioMensual;
+  const salarioQuincenal = centavos((baseMensual / 2) * factor);
   const extraDiurno = centavos(h(horas.extraDiurnoMin) * reglas.recargoExtraDiurno * rataHora);
   const extraNocturno = centavos(h(horas.extraNocturnoMin) * reglas.recargoExtraNocturno * rataHora);
   const excedente = centavos(h(horas.excedenteMin) * reglas.recargoExcedenteNocturnaMixta * rataHora);
@@ -1309,6 +1482,13 @@ export function armarLinea(
    * lo que hace que las llamadas viejas y los tests de la contable no se muevan.
    */
   extra: { exigirAprobacion?: boolean; aprobada?: boolean } = {},
+  /**
+   * 🔴 LA PARTE DEL SUELDO QUE ESTA LÍNEA PAGA, cuando está repartido entre dos
+   * empresas. `null` —el default— es la línea entera de siempre: sin esto,
+   * `armarLinea` devuelve exactamente lo que devolvía antes de que el reparto
+   * existiera, hasta el centavo. Ver `ParteReparto` y `reparto.ts`.
+   */
+  parte: ParteReparto | null = null,
 ): LineaPlanilla {
   const faltaConfigurar = faltantesDe(ficha, reglas);
   // 🔴 EL CANDADO DEL PAGO, Y ES ESTA LÍNEA. Quien está marcado como servicio
@@ -1375,26 +1555,57 @@ export function armarLinea(
   // 🩸 Ese era el bug, y lo cazó el candado: dos filtros para lo mismo, y el
   // segundo se comía al primero. `extraAprobada` queda como RÓTULO — dice si le
   // quedó algo sin aprobar— y no como interruptor.
-  const horasEfectivas: HorasPersona = horasMedidas;
+  // ── 🔴 EL QUINTO CANDADO: CADA COLUMNA DEL RELOJ CAE EN UNA SOLA LÍNEA ─────
+  //
+  // Con el sueldo repartido entre dos empresas, esta línea se queda SOLO con lo
+  // que le toca: las horas extra si es la parte marcada, todo el resto del reloj
+  // si es la parte principal. Sin `parte` no se toca un minuto y `horasDeLaParte`
+  // ES `horasMedidas`, o sea la línea de siempre. Ver `repartirHoras`.
+  //
+  // 🩸 VA ACÁ Y NO EN EL LLAMADOR, igual que el candado del sueldo fijo:
+  // `armarLinea` es lo único que decide dinero, así que es el único lugar donde
+  // no se puede saltear. Repartido en el llamador, una ruta nueva pagaría las
+  // horas extra en las dos empresas y nadie lo vería hasta el día de cobro.
+  const horasEfectivas: HorasPersona = parte ? repartirHoras(horasMedidas, parte) : horasMedidas;
+
+  // 🔴 LOS MONTOS ESCRITOS A MANO VAN CON EL RELOJ, Y A UNA SOLA LÍNEA. El ISR,
+  // el préstamo, los terceros y la mercancía se cargan por PERSONA y quincena:
+  // aplicarlos en las dos empresas le descontaría dos veces lo mismo.
+  const manualesDeLaLinea: ManualesLinea =
+    parte && !parte.llevaElReloj ? MANUALES_CERO : manuales;
+
+  // 🔑 Los seguros: manda la ficha y después la parte. Un `false` en cualquiera
+  // de los dos apaga las dos columnas — el interruptor de la ficha sigue siendo
+  // el maestro, y la parte solo puede apagar, nunca encender.
+  const conSegurosLinea = ficha.pagaSeguros !== false && (parte ? parte.pagaSeguros : true);
 
   const dinero =
     !fueraDePlanilla && !seAbstiene && faltaConfigurar.length === 0
       ? calcularDinero(
         ficha.salarioMensual as number, ficha.jornadaSemanal as number,
-        horasEfectivas, manuales, reglas, factorBase,
+        horasEfectivas, manualesDeLaLinea, reglas, factorBase,
         // 🔑 `!== false`, no `=== true`: una ficha vieja sin el campo tiene que
         // seguir pagando seguros. Ver la nota de `FichaPlanilla.pagaSeguros`.
-        ficha.pagaSeguros !== false,
+        conSegurosLinea,
         // 🔑 `?? null`: una ficha vieja sin el campo calcula los seguros sobre
         // el bruto, como siempre. Ver `FichaPlanilla.baseSeguros`.
-        ficha.baseSeguros ?? null,
+        // ⚠️ La base propia va SOLO con el reloj: es un monto por QUINCENA y
+        // aplicarlo en las dos líneas le calcularía el seguro dos veces sobre
+        // los mismos $175. Ver `seguros-base.ts`.
+        parte && !parte.llevaElReloj ? null : (ficha.baseSeguros ?? null),
+        // 🔴 Lo que paga ESTA empresa al mes. La rata sigue saliendo del sueldo
+        // completo, que es el primer argumento. Ver `reparto.ts`.
+        parte ? parte.salarioMensual : null,
       )
       : null;
 
   // 🔑 Lo que le TOCARÍA de quincenal, solo para mostrárselo a quien decide.
   // Se calcula únicamente cuando no hubo dinero —así no hay dos cifras rivales
   // en la misma línea— y con la MISMA fórmula del quincenal de verdad.
-  const salario = ficha.salarioMensual;
+  // 🔑 Con el sueldo repartido, lo que le tocaría en ESTA empresa es el monto de
+  // ESTA parte: mostrarle el sueldo completo a quien decide una línea de $200 lo
+  // mandaría a pagar $500 donde van $100.
+  const salario = parte ? parte.salarioMensual : ficha.salarioMensual;
   const factorRef = Number.isFinite(factorBase) && factorBase > 0 ? factorBase : 1;
   const quincenalReferencia =
     dinero === null && typeof salario === "number" && Number.isFinite(salario) && salario > 0
@@ -1430,11 +1641,17 @@ export function armarLinea(
     extraMedido,
     extraAprobada,
     fueraDePlanilla,
-    pagaSeguros: ficha.pagaSeguros !== false,
+    parte,
+    // 🔑 Es el mismo booleano con el que se calculó, no una segunda lectura de
+    // la ficha: si la parte apagó los seguros, el chip «sin seguros» tiene que
+    // salir, y dos lecturas distintas del mismo hecho terminan contradiciéndose.
+    pagaSeguros: conSegurosLinea,
     // 🔑 Solo si de verdad se va a usar: con los seguros apagados el sello que
-    // corresponde es «sin seguros», no una base que no se aplicó.
+    // corresponde es «sin seguros», no una base que no se aplicó. Y solo en la
+    // línea que lleva el reloj, que es la única donde la base se aplicó.
     baseSeguros:
-      ficha.pagaSeguros !== false
+      conSegurosLinea
+      && (!parte || parte.llevaElReloj)
       && typeof ficha.baseSeguros === "number"
       && Number.isFinite(ficha.baseSeguros)
       && ficha.baseSeguros > 0
@@ -1446,8 +1663,17 @@ export function armarLinea(
     codigo: ficha.codigo,
     etiqueta: etiquetaPersona(ficha.codigo, ficha.nombre),
     nombre: ficha.nombre ?? null,
-    empresa: ficha.empresa ?? null,
-    empresaEtiqueta: ficha.empresa ? etiquetaEmpresa(String(ficha.empresa)) : null,
+    // 🔴 La empresa de la LÍNEA es la de la parte: es lo que decide en qué
+    // cuadro sale y qué dice el encabezado. La de la ficha queda como la
+    // «principal» de la persona y no se pierde — es la primera parte.
+    empresa: parte ? parte.empresa : (ficha.empresa ?? null),
+    empresaEtiqueta: parte
+      ? etiquetaEmpresa(parte.empresa)
+      : (ficha.empresa ? etiquetaEmpresa(String(ficha.empresa)) : null),
+    // ⚠️ EL SUELDO COMPLETO, también en una línea repartida. Es el número del
+    // que sale `dinero.rataHora` ($1.000 → $5,77) y ponerle los $200 de la parte
+    // dejaría a la contadora viendo un salario con el que su rata no cuadra. El
+    // monto de esta empresa viaja en `parte.salarioMensual`.
     salarioMensual: ficha.salarioMensual ?? null,
     jornadaSemanal: ficha.jornadaSemanal ?? null,
     horas: horasEfectivas,
@@ -1455,7 +1681,7 @@ export function armarLinea(
     // 🔑 Si `calcularDinero` devolvió `null` con la ficha completa, algo del
     // divisor no sirve. No se deja pasar como línea "buena y sin números".
     dinero: faltaConfigurar.length === 0 && dinero === null ? null : dinero,
-    manuales,
+    manuales: manualesDeLaLinea,
   };
 }
 
@@ -1545,14 +1771,24 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
   const factorBase = Number.isFinite(opts.factorBase) ? (opts.factorBase as number) : 1;
   const reporteDe = new Map(personas.map((p) => [p.codigo, p]));
 
+  // 🔴 EN QUÉ EMPRESAS SALE ESTA FICHA. Con el sueldo repartido son DOS, y por
+  // eso no se puede preguntar por `f.empresa` a secas: JULIO GARAY tiene que
+  // aparecer en el cuadro de Vistana Y en el de Fashion Wear. Sin reparto es la
+  // de siempre, una sola. Ver `reparto.ts`.
+  const empresasDe = (f: FichaPlanilla): string[] => {
+    const partes = partesUsables(f);
+    if (partes.length > 0) return partes.map((p) => p.empresa);
+    return f.empresa ? [String(f.empresa)] : [];
+  };
+
   const codigos = new Set<string>();
   for (const [cod, f] of fichas) {
-    if (!empresa || f.empresa === empresa) codigos.add(cod);
+    if (!empresa || empresasDe(f).includes(empresa)) codigos.add(cod);
   }
   for (const p of personas) {
     const f = fichas.get(p.codigo);
     // Sin ficha entra siempre; con ficha, solo si es de esta empresa.
-    if (!f || !empresa || f.empresa === empresa) codigos.add(p.codigo);
+    if (!f || !empresa || empresasDe(f).includes(empresa)) codigos.add(p.codigo);
   }
 
   const lineas: LineaPlanilla[] = [];
@@ -1585,44 +1821,62 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       ?? (p || noMarca ? null : opts.justificados?.get(cod))
       ?? null;
 
-    const linea = armarLinea(
-      ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorBase, motivo,
-      {
-        exigirAprobacion: opts.exigirAprobacionExtra === true,
-        // 🔑 Ya no es «este código está aprobado»: es «no le quedó ni un minuto
-        // afuera». Con la aprobación por día alguien puede tener el martes sí y
-        // el miércoles no, y `medirHoras` ya descontó lo que no se autorizó.
-        aprobada: h.extraNoAprobadaMin <= 0,
-      },
-    );
-    // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
-    // un motivo por el que NO SE PUDO PAGAR, y acá no hay nada que pagar. Si le
-    // faltan marcas, se ve en el reporte de asistencia, que es donde importa.
+    // 🔴 UNA LÍNEA POR PARTE. Sin reparto la lista es `[null]`, o sea UNA línea
+    // con `parte = null`: literalmente el cuadro de siempre para las 36 fichas
+    // que no reparten nada. Con reparto, JULIO GARAY sale en Vistana con sus
+    // $800 y en Fashion Wear con sus $200 y sus horas extra.
     //
-    // 🔴 Y A QUIEN NO MARCA EL RELOJ TAMPOCO, por el motivo opuesto: acá SÍ hay
-    // algo que pagar, y es justo lo que «no marcó ni un día» impediría. Sale con
-    // su dinero calculado y sin ser el pendiente de nadie.
-    //
-    // ⚠️ Lo que le falte de FICHA se conserva igual —si no tiene salario, sigue
-    // diciendo «falta el salario»—: esta bandera apaga el reloj, no la
-    // obligación de tener los datos completos.
-    if (linea.fueraDePlanilla || linea.noMarcaReloj) {
-      lineas.push(linea);
-      continue;
-    }
-    if (p) {
-      lineas.push(linea);
-    } else if (linea.faltaConfigurar.length > 0) {
-      lineas.push({ ...linea, faltaConfigurar: [...linea.faltaConfigurar, FALTA.sinMarcaciones] });
-    } else if (motivo) {
-      // 🔴 NO SE LE AGREGA «no marcó ni un día»: ya se sabe POR QUÉ no marcó, y
-      // está escrito al lado. Ese texto mandaba a arreglar algo en Configuración
-      // que no había nada que arreglar — es todo el punto del cambio.
-      lineas.push(linea);
-    } else {
-      // Con ficha completa, sin una sola marca y sin explicación: se lista. No
-      // se inventa ni una renuncia ni unas vacaciones.
-      lineas.push({ ...linea, faltaConfigurar: [FALTA.sinMarcaciones], dinero: null });
+    // 🔑 El filtro por empresa va acá y no en la lista de códigos: la ficha
+    // entra al cuadro por CUALQUIERA de sus partes, pero solo la parte de ESTA
+    // empresa produce una línea. Sin esto, pedir el cuadro de Vistana traería
+    // también la línea de Fashion Wear.
+    const partes = partesUsables(ficha);
+    const paraEstaEmpresa: Array<ParteReparto | null> =
+      partes.length === 0
+        ? [null]
+        : partes.filter((pt) => !empresa || pt.empresa === empresa);
+
+    for (const parte of paraEstaEmpresa) {
+      const linea = armarLinea(
+        ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorBase, motivo,
+        {
+          exigirAprobacion: opts.exigirAprobacionExtra === true,
+          // 🔑 Ya no es «este código está aprobado»: es «no le quedó ni un minuto
+          // afuera». Con la aprobación por día alguien puede tener el martes sí y
+          // el miércoles no, y `medirHoras` ya descontó lo que no se autorizó.
+          aprobada: h.extraNoAprobadaMin <= 0,
+        },
+        parte,
+      );
+      // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
+      // un motivo por el que NO SE PUDO PAGAR, y acá no hay nada que pagar. Si le
+      // faltan marcas, se ve en el reporte de asistencia, que es donde importa.
+      //
+      // 🔴 Y A QUIEN NO MARCA EL RELOJ TAMPOCO, por el motivo opuesto: acá SÍ hay
+      // algo que pagar, y es justo lo que «no marcó ni un día» impediría. Sale con
+      // su dinero calculado y sin ser el pendiente de nadie.
+      //
+      // ⚠️ Lo que le falte de FICHA se conserva igual —si no tiene salario, sigue
+      // diciendo «falta el salario»—: esta bandera apaga el reloj, no la
+      // obligación de tener los datos completos.
+      if (linea.fueraDePlanilla || linea.noMarcaReloj) {
+        lineas.push(linea);
+        continue;
+      }
+      if (p) {
+        lineas.push(linea);
+      } else if (linea.faltaConfigurar.length > 0) {
+        lineas.push({ ...linea, faltaConfigurar: [...linea.faltaConfigurar, FALTA.sinMarcaciones] });
+      } else if (motivo) {
+        // 🔴 NO SE LE AGREGA «no marcó ni un día»: ya se sabe POR QUÉ no marcó, y
+        // está escrito al lado. Ese texto mandaba a arreglar algo en Configuración
+        // que no había nada que arreglar — es todo el punto del cambio.
+        lineas.push(linea);
+      } else {
+        // Con ficha completa, sin una sola marca y sin explicación: se lista. No
+        // se inventa ni una renuncia ni unas vacaciones.
+        lineas.push({ ...linea, faltaConfigurar: [FALTA.sinMarcaciones], dinero: null });
+      }
     }
   }
   return ordenarLineas(lineas);

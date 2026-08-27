@@ -31,6 +31,13 @@ import {
 } from "@/lib/asistencia/config";
 import { rataPorHoraCalculo } from "@/lib/asistencia/rata";
 import {
+  agruparPorCodigo,
+  avisoMigracionReparto,
+  partesDe,
+  validarReparto,
+} from "@/lib/asistencia/reparto";
+import type { ParteReparto } from "@/lib/asistencia/planilla";
+import {
   leerReglas,
   leerPersonas,
   esTablaFaltante,
@@ -42,6 +49,7 @@ import {
   pagaSegurosDeFila,
   baseSegurosDeFila,
   noMarcaRelojDeFila,
+  leerRepartos,
 } from "@/lib/asistencia/config-server";
 import {
   avisoMigracionServicioProfesional,
@@ -139,7 +147,8 @@ export async function GET(req: NextRequest) {
         faltaColumnaNoMarcaReloj,
         faltaColumnasSaldoVacaciones,
       },
-    ] = await Promise.all([leerReglas(), leerPersonas()]);
+      repRes,
+    ] = await Promise.all([leerReglas(), leerPersonas(), leerRepartos()]);
 
     // El día de hoy en Panamá. Solo decide cómo se REDACTA la baja («Renunció»
     // vs «Renuncia» cuando la fecha es futura); no filtra ni calcula nada.
@@ -175,6 +184,11 @@ export async function GET(req: NextRequest) {
         if (!v.dispositivo) v.dispositivo = m.dispositivo;
       }
     }
+
+    // 🔴 QUIÉN REPARTE SU SUELDO ENTRE DOS EMPRESAS. Se valida con la MISMA
+    // función que usa la planilla: si la ficha enseñara un reparto que el motor
+    // rechaza, la pantalla estaría prometiendo un pago que no ocurre.
+    const repartoPorCodigo = agruparPorCodigo(repRes.filas);
 
     const fichas = new Map(filas.map((f) => [String(f.empleado_codigo), f]));
     // El MISMO traductor que usan Justificaciones, Horarios, el Reporte y los
@@ -214,6 +228,15 @@ export async function GET(req: NextRequest) {
       // 🔴 Sin ficha NO se puede cobrar fijo: la bandera vive en la ficha. Un
       // código que marca y nadie configuró sigue siendo un pendiente.
       const noMarcaReloj = f ? noMarcaRelojDeFila(f) : false;
+      // 🔴 EL REPARTO, ya validado. Vacío = cobra entero en su empresa, que es
+      // el caso de 36 de las 37 fichas. `motivoReparto` trae el porqué cuando
+      // hay filas cargadas y el guard las rechaza — rechazar sí, esconder no.
+      const filasReparto = repartoPorCodigo.get(codigo);
+      const reparto: ParteReparto[] = partesDe(salario, filasReparto);
+      const motivoReparto =
+        filasReparto && filasReparto.length > 0 && reparto.length === 0
+          ? (validarReparto(salario, filasReparto) as { ok: false; error: string }).error
+          : null;
       const ultimaMarca = v ? diaPanama(v.ultima) : null;
       const etiqueta = directorio.nombre(codigo) ?? v?.nombreReloj ?? `Código ${codigo}`;
       if (vig && marcoDespuesDeLaBaja(vig, ultimaMarca)) {
@@ -250,6 +273,11 @@ export async function GET(req: NextRequest) {
         // 🔴 Cobra fijo y no pasa por el reloj. Sigue en la planilla, con
         // seguros y todo; lo que se le ignora son las marcaciones.
         noMarcaReloj,
+        // 🔴 Su sueldo se paga entre dos empresas y sale en las dos planillas.
+        // Es de SOLO LECTURA en esta pantalla: la regla la fija la contadora y
+        // los montos tienen que sumar el salario de la ficha. Ver `reparto.ts`.
+        reparto,
+        motivoReparto,
         // Falta el sueldo, pero la empresa ya está: se puede emitir la planilla
         // de las otras y saber a quién le falta el dato.
         //
@@ -359,6 +387,10 @@ export async function GET(req: NextRequest) {
       // sea, como está hoy— y se dice de entrada, no al fallar el guardado.
       avisoMigracionSaldoVacaciones:
         !faltaPersonas && faltaColumnasSaldoVacaciones ? avisoMigracionSaldoVacaciones() : null,
+      // Sin la tabla NADIE reparte su sueldo —cada persona en una sola planilla,
+      // como hoy— pero se dice: quien ya dio a Julio por repartido en su cabeza
+      // va a esperar ver las dos empresas en su ficha.
+      avisoMigracionReparto: repRes.faltaTabla ? avisoMigracionReparto() : null,
       puedeCargarSaldoVacaciones: !faltaPersonas && !faltaColumnasSaldoVacaciones,
       // 🩸 El que no se puede esconder: dada de baja y sigue marcando.
       avisoBajas: avisoMarcasPosteriores(marcasPosteriores),
