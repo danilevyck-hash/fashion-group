@@ -35,9 +35,19 @@ import {
   noMarcaRelojDeFila,
   leerJustificaciones,
   leerVacaciones,
+  leerRepartos,
   avisoMigracionVacaciones,
 } from "@/lib/asistencia/config-server";
+import {
+  agruparPorCodigo,
+  avisoMigracionReparto,
+  partesDe,
+  textoRepartoRechazado,
+  validarReparto,
+  type RepartoRechazado,
+} from "@/lib/asistencia/reparto";
 import { avisoMigracionServicioProfesional } from "@/lib/asistencia/participacion";
+import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { avisoMigracionBaseSeguros } from "@/lib/asistencia/seguros-base";
 import {
   avisoMigracionBajas,
@@ -90,6 +100,21 @@ import {
   textoExtraNoAprobada,
 } from "@/lib/asistencia/aprobaciones";
 import { leerAprobaciones } from "@/lib/asistencia/aprobaciones-server";
+import {
+  avisoMigracionAmarrePrestamos,
+  avisoMigracionPrestamoAprobado,
+  prestamosSinAprobar,
+  prestamosSinAtar,
+  sugerirPrestamos,
+  textoPrestamoSinAprobar,
+  textoPrestamoSinAtar,
+  type FichaPrestamo,
+  type PersonaEnCuadro,
+} from "@/lib/asistencia/prestamos-planilla";
+import {
+  leerAprobacionesPrestamo,
+  leerPrestamosDeQuincena,
+} from "@/lib/asistencia/prestamos-planilla-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -208,7 +233,7 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, correcciones, manualesLeidos, aprRes, hRes, jRes, vRes, fRes] = await Promise.all([
+    const [{ reglas }, personasDb, correcciones, manualesLeidos, aprRes, repRes, hRes, jRes, vRes, fRes] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       // 🔴 ACÁ ES DONDE LA CORRECCIÓN LLEGA AL PAGO. Si no llegara, corregir una
@@ -225,6 +250,10 @@ export async function GET(req: NextRequest) {
       // y entonces NO se exige aprobación: se paga todo lo que midió el reloj,
       // hasta el centavo igual que hasta hoy. Se avisa en `avisos`.
       leerAprobaciones(q.desde, q.hasta),
+      // 🔴 QUIÉN REPARTE SU SUELDO ENTRE DOS EMPRESAS. Sin la tabla corrida
+      // devuelve cero filas Y `faltaTabla: true`: nadie reparte nada y el cuadro
+      // es el de siempre, hasta el centavo. Se avisa en `avisos`.
+      leerRepartos(),
       supabaseServer
         .from("asistencia_horarios")
         .select("empleado_codigo, entrada, salida, almuerzo_minutos"),
@@ -265,14 +294,35 @@ export async function GET(req: NextRequest) {
     const vigencias = vigenciasDeFilas(personasDb.filas);
     const fuera = codigosFueraDeRango(vigencias, q.desde, q.hasta);
 
+    // ── 🔴 EL REPARTO DEL SUELDO ENTRE DOS EMPRESAS ──────────────────────────
+    //
+    // Se valida ACÁ, una sola vez, para poder DECIR en pantalla el motivo del
+    // rechazo: la regla de Daniel es que lo que un guard descarta se dice, con
+    // el nombre y en ámbar. `partesDe` devuelve la lista vacía ante cualquier
+    // duda, y una lista vacía es exactamente la planilla de ayer.
+    const repartoPorCodigo = agruparPorCodigo(repRes.filas);
+    const repartosRechazados: RepartoRechazado[] = [];
+
     const fichas = new Map<string, FichaPlanilla>();
     for (const f of personasDb.filas) {
       const codigo = String(f.empleado_codigo);
       if (fuera.has(codigo)) continue;
+      const salario = f.salario_mensual === null ? null : Number(f.salario_mensual);
+      const filasReparto = repartoPorCodigo.get(codigo);
+      if (filasReparto && filasReparto.length > 0) {
+        const r = validarReparto(salario, filasReparto);
+        if (!r.ok) {
+          repartosRechazados.push({
+            codigo,
+            etiqueta: etiquetaPersona(codigo, f.nombre),
+            motivo: r.error,
+          });
+        }
+      }
       fichas.set(codigo, {
         codigo,
         nombre: f.nombre ?? null,
-        salarioMensual: f.salario_mensual === null ? null : Number(f.salario_mensual),
+        salarioMensual: salario,
         jornadaSemanal: f.jornada_semanal ?? null,
         empresa: f.empresa ?? null,
         // 🔴 Sin esto la bandera no llegaría al motor y a un servicio profesional
@@ -287,6 +337,10 @@ export async function GET(req: NextRequest) {
         // en vez del que sale de sus $175 de base ($17,06). Ver `seguros-base.ts`.
         baseSeguros: baseSegurosDeFila(f),
         noMarcaReloj: noMarcaRelojDeFila(f),
+        // 🔴 Sin esto el reparto no llegaría al motor y JULIO seguiría cobrando
+        // sus $1.000 en una sola planilla, con el 11 % de seguros encima de sus
+        // horas extra. Ver `reparto.ts`.
+        reparto: partesDe(salario, filasReparto),
       });
     }
     const nombres = new Map<string, string>();
@@ -513,6 +567,11 @@ export async function GET(req: NextRequest) {
     //
     // ⚠️ Las HORAS, las tardanzas, las ausencias y los avisos viajan enteros —
     // es la operación de Boston, que es justo lo que Daniel quiere que vea.
+    //
+    // 🔑 Y VA ANTES DEL BLOQUE DEL PRÉSTAMO DE ABAJO, por el MISMO motivo que
+    // ese bloque va después del `return` de `bodega`: lo que a David le
+    // descuentan —o no— a cada persona es plata, y lo que no se ejecuta acá
+    // abajo no puede colarse en esta respuesta ni consultarse por las dudas.
     if (sinPlata) {
       return NextResponse.json({
         quincena: q.quincena ?? q,
@@ -533,6 +592,54 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // ── 🔴 EL PRÉSTAMO, TRAÍDO DEL MÓDULO ────────────────────────────────────
+    //
+    // 🔑 VA DESPUÉS DEL `return` DE ARRIBA, a propósito: quien solo aprueba
+    // horas extra (el usuario `bodega`, con el que trabaja Julio) no tiene por
+    // qué recibir —ni que se le consulte— cuánto le están descontando a nadie.
+    // Lo que no se ejecuta acá abajo, no puede colarse en aquella respuesta.
+    //
+    // ⚠️ Y solo en una QUINCENA. Los montos manuales se guardan por quincena
+    // (`claveManuales`); en un rango libre no hay casilla que llenar y repartir
+    // una cuota por días sería inventar plata. Es la MISMA condición con la que
+    // ya se leen los montos manuales, unas líneas más arriba.
+    const claveQ = q.claveManuales;
+    const [presRes, aprPresRes] = claveQ
+      ? await Promise.all([
+        // 🔴 Sin la columna del amarre nadie queda atado —la casilla se sigue
+        // escribiendo a mano, como hoy— pero se dice en `avisos`.
+        leerPrestamosDeQuincena(q.desde, q.hasta),
+        // 🔴 Sin la tabla no se puede aprobar nada y la planilla da EXACTAMENTE
+        // lo de hoy hasta el centavo. También se dice.
+        leerAprobacionesPrestamo(claveQ),
+      ])
+      : [
+        { fichas: [] as FichaPrestamo[], faltaColumnaAmarre: false },
+        { porCodigo: new Map(), faltaTabla: false },
+      ];
+
+    // 🔑 La casilla de HOY sale de las MISMAS líneas del cuadro, no de una
+    // segunda lectura de `asistencia_planilla_manual`: lo que la pantalla dice
+    // que hay en la casilla y lo que la planilla suma no pueden separarse.
+    const enCuadro: PersonaEnCuadro[] = lineas.map((l) => ({
+      codigo: l.codigo,
+      etiqueta: l.etiqueta,
+      empresa: l.empresa,
+      empresaEtiqueta: l.empresaEtiqueta,
+      enCasilla: l.manuales.prestamo,
+    }));
+    const prestamos = sugerirPrestamos({
+      fichas: presRes.fichas,
+      personas: enCuadro,
+      aprobaciones: aprPresRes.porCodigo,
+    });
+    // 🔴 Lo que este cuadro NO descontó porque nadie lo aprobó, y los préstamos
+    // con saldo que no son de nadie. Los dos van con nombre y monto: es la
+    // misma regla de Daniel que ya cumplen las horas extra y las vacaciones ya
+    // pagadas — rechazar sí, esconder no.
+    const prestamoSinAprobar = prestamosSinAprobar(prestamos);
+    const prestamoSinAtar = prestamosSinAtar(presRes.fichas);
+
     return NextResponse.json({
       // `quincena` se mantiene con el mismo nombre y forma para no romper a
       // nadie que ya lo lea; `periodo` es lo que la pantalla usa ahora.
@@ -548,6 +655,11 @@ export async function GET(req: NextRequest) {
       // no va a hacer nada con ella.
       aprobaciones: filasAprobacion,
       puedeAprobar,
+      // 🔴 LO QUE EL MÓDULO DE PRÉSTAMOS DICE QUE HAY QUE DESCONTAR ESTA
+      // QUINCENA, persona por persona, con su cuota, su saldo y si ya está
+      // aprobado. La contadora, textual: *«El préstamo si debe ser por
+      // aprobarlo»*. Vacío en un rango libre.
+      prestamos,
       // Los avisos que la pantalla tiene que poder pintar ANTES de que alguien
       // le descuente plata a nadie.
       avisos: {
@@ -606,6 +718,25 @@ export async function GET(req: NextRequest) {
         // Con nombre y cantidad: rechazar sí, esconder no.
         extraSinAprobar,
         avisoExtraSinAprobar: textoExtraNoAprobada(extraSinAprobar),
+        // 🔴 Los descuentos de préstamo que este cuadro NO hizo porque nadie
+        // los aprobó. Misma regla, mismo formato.
+        prestamoSinAprobar,
+        avisoPrestamoSinAprobar: textoPrestamoSinAprobar(prestamoSinAprobar),
+        // 🔴 Y los préstamos CON SALDO que no están atados a nadie de la
+        // planilla. Es plata que no se le está descontando a ninguna persona:
+        // callarla es exactamente cómo se perdieron los $700 de LUIS ADRIAN
+        // ARROYO durante 22 días (#651).
+        prestamoSinAtar,
+        avisoPrestamoSinAtar: textoPrestamoSinAtar(prestamoSinAtar),
+        // Sin la columna del amarre NADIE queda atado —la casilla se sigue
+        // escribiendo a mano, como hoy— pero se dice: quien espera que se
+        // llene sola tiene que saber por qué no lo hace.
+        faltaMigracionAmarrePrestamos:
+          presRes.faltaColumnaAmarre ? avisoMigracionAmarrePrestamos() : null,
+        // Sin la tabla no se puede aprobar y la planilla da lo de hoy hasta el
+        // centavo. También se dice.
+        faltaMigracionPrestamoAprobado:
+          aprPresRes.faltaTabla ? avisoMigracionPrestamoAprobado() : null,
         // Sin la tabla corrida NO se exige aprobación —o sea, se paga todo,
         // como hasta hoy— pero se dice: quien ya aprobó en su cabeza va a
         // esperar que lo no aprobado no se pague.
@@ -614,6 +745,15 @@ export async function GET(req: NextRequest) {
         // siempre— pero se dice: quien ya cargó una en su cabeza va a esperar
         // verla acá.
         faltaMigracionVacaciones: vRes.faltaTabla ? avisoMigracionVacaciones() : null,
+        // Sin la tabla NADIE reparte su sueldo —cada persona sale en una sola
+        // planilla, como hoy— pero se dice: quien ya dio a Julio por repartido
+        // en su cabeza va a esperar verlo en las dos empresas.
+        faltaMigracionReparto: repRes.faltaTabla ? avisoMigracionReparto() : null,
+        // 🔴 Los repartos que el guard NO aplicó, con nombre y motivo. Rechazar
+        // sí, esconder no: si esto se callara, la persona cobraría en una sola
+        // planilla y nadie sabría que el reparto está mal cargado.
+        repartosRechazados,
+        avisoRepartoRechazado: textoRepartoRechazado(repartosRechazados),
         // 🔴 Lo que hay que saber ANTES de pagar por un rango libre.
         rangoLibre: !q.esQuincena,
         factorBase: q.factorBase,

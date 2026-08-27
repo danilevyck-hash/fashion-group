@@ -80,18 +80,46 @@ export interface DatosPlanillaExport {
    * si el archivo no lo dice.
    */
   avisoExtraSinAprobar?: string | null;
+  /**
+   * Los descuentos de préstamo que el cuadro NO hizo porque nadie los aprobó.
+   *
+   * 🔴 VA IMPRESO, por el mismo motivo que los dos de arriba. Contadora,
+   * textual: *«El préstamo si debe ser por aprobarlo»*. Una casilla de préstamo
+   * en cero para alguien que sí debe plata es exactamente el número que nadie
+   * va a poder explicar dentro de seis meses si el archivo no lo dice.
+   */
+  avisoPrestamoSinAprobar?: string | null;
+  /**
+   * Préstamos CON SALDO que no están atados a nadie de la planilla, o sea que
+   * no se le están descontando a ninguna persona. También va impreso: es la
+   * forma en que se perdieron $700 durante 22 días (ver #651).
+   */
+  avisoPrestamoSinAtar?: string | null;
 }
 
-/** El subtítulo que llevan los dos archivos. */
+/** El encabezado que lleva el PDF (el papel que se firma). */
 function subtitulo(d: DatosPlanillaExport): string {
   const emp = d.empresaEtiqueta ?? "Todas las empresas";
-  // 🔴 UN RANGO LIBRE SE ANUNCIA EN EL PAPEL, no solo en la pantalla: el archivo
-  // se manda por correo y sobrevive a la conversación en la que se explicó.
-  if (d.periodo && !d.periodo.esQuincena) {
-    return `${emp} · del ${d.periodo.etiqueta} · NO es una quincena: `
-      + `sueldo base al ${(d.periodo.factorBase * 100).toFixed(1)} % y SIN los montos escritos a mano`;
-  }
-  return `${emp} · quincena del ${d.quincena.etiqueta}`;
+  const aviso = avisoRangoLibre(d);
+  return aviso ? `${emp} · ${aviso}` : `${emp} · quincena del ${d.quincena.etiqueta}`;
+}
+
+/**
+ * 🔴 ESTE AVISO SE QUEDA — es orden de Daniel, textual: *"dejalo"*.
+ *
+ * No explica cómo se usa el Excel (eso se fue de todos los exports el
+ * 27-ago-2026, junto con la banda de título y el subtítulo): **avisa que este
+ * archivo no sirve para pagar.** Un rango libre se anuncia en el papel y no
+ * solo en la pantalla, porque el archivo se manda por correo y sobrevive a la
+ * conversación en la que se explicó.
+ *
+ * En el Excel va como `nota`, al pie y fuera del rango del filtro; en el PDF
+ * sigue yendo arriba, donde siempre estuvo.
+ */
+function avisoRangoLibre(d: DatosPlanillaExport): string | undefined {
+  if (!d.periodo || d.periodo.esQuincena) return undefined;
+  return `del ${d.periodo.etiqueta} · NO es una quincena: `
+    + `sueldo base al ${(d.periodo.factorBase * 100).toFixed(1)} % y SIN los montos escritos a mano`;
 }
 
 /** 0 se muestra vacío: una columna de ceros esconde lo que sí importa. */
@@ -215,11 +243,10 @@ function filaTotales(t: TotalesPlanilla): ReportCell[] {
 
 export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
   const hojaPlanilla = buildReportSheet({
-    title: "FASHION GROUP — Planilla quincenal",
-    subtitle: subtitulo(d),
     columns: COLUMNAS,
     rows: d.lineas.map(filaPlanilla),
     totals: filaTotales(d.totales),
+    nota: avisoRangoLibre(d),
   });
 
   // Hoja 2 — de dónde salió cada hora. Es la que se abre cuando alguien
@@ -251,8 +278,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
     { header: "Falta configurar", wch: 34 },
   ];
   const hojaHoras = buildReportSheet({
-    title: "FASHION GROUP — Planilla: de dónde salen las horas",
-    subtitle: subtitulo(d),
+    nota: avisoRangoLibre(d),
     columns: colsHoras,
     rows: d.lineas.map((l) => {
       const h = l.horas;
@@ -293,8 +319,6 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
     { header: "Con qué se calculó esta planilla", wch: 78 },
   ];
   const hojaReglas = buildReportSheet({
-    title: "FASHION GROUP — Cómo se calcula la planilla",
-    subtitle: subtitulo(d),
     columns: colsReglas,
     rows: [
       ["Rata por hora", `Salario mensual ÷ ${r.divisor40} si trabaja 40 h por semana, ÷ ${r.divisor48} si trabaja 48. Redondeada a centavos.`],
@@ -327,6 +351,12 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
         : []),
       ...(d.avisoExtraSinAprobar
         ? [["Horas extra que no se pagaron", d.avisoExtraSinAprobar]]
+        : []),
+      ...(d.avisoPrestamoSinAprobar
+        ? [["Préstamos que no se descontaron", d.avisoPrestamoSinAprobar]]
+        : []),
+      ...(d.avisoPrestamoSinAtar
+        ? [["Préstamos sin persona", d.avisoPrestamoSinAtar]]
         : []),
       ["Período", d.periodo && !d.periodo.esQuincena
         ? `Del ${d.periodo.desde} al ${d.periodo.hasta} (${d.periodo.diasCalendario} días). NO es una quincena: el salario base se pagó al ${(d.periodo.factorBase * 100).toFixed(1)} % —la parte de quincena que cubren estas fechas— y los montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios) NO se aplicaron, porque se cargan por quincena: para llenarlos hay que pedir el cuadro con las fechas exactas de una quincena.`
@@ -458,6 +488,8 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
         d.avisoSinFicha,
         d.avisoVacacionesNoPagadas,
         d.avisoExtraSinAprobar,
+        d.avisoPrestamoSinAprobar,
+        d.avisoPrestamoSinAtar,
         conAusenciaPorTardanza
           ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
           : null,

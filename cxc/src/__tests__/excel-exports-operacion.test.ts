@@ -85,7 +85,7 @@ describe("excel-guias — buildGuiasSheet", () => {
     },
   ];
 
-  const FILA_HEADERS = 4;
+  const FILA_HEADERS = 1; // los encabezados abren el archivo
   const PRIMERA_FILA = FILA_HEADERS + 1;
   // 3 + 1 + 2 + 1 = 7 filas: una por envío, más la de la guía sin renglones.
   const FILAS = 7;
@@ -113,9 +113,7 @@ describe("excel-guias — buildGuiasSheet", () => {
     Object.keys(ws).filter((k) => !k.startsWith("!")).map((k) => valor(ws, k));
 
   it("las 11 columnas, en su orden, con «Envío» entre Transportista y Cliente", () => {
-    const ws = roundTrip("Guías", buildGuiasSheet(guias, "Filtro de prueba"));
-    expect(ws.A1.v).toBe("FASHION GROUP — Guías de Transporte");
-    expect(ws.A2.v).toBe("Filtro de prueba");
+    const ws = roundTrip("Guías", buildGuiasSheet(guias));
     const headers = Array.from({ length: 11 }, (_, i) => valor(ws, `${letra(i)}${FILA_HEADERS}`));
     expect(headers).toEqual([
       "N° Guía", "Fecha", "Transportista", "Envío", "Cliente", "Destino",
@@ -216,10 +214,6 @@ describe("excel-guias — buildGuiasSheet", () => {
     expect(celda(ws, "Envío", FILA_TOTALES)).toBe("6 envíos");
   });
 
-  it("subtitle default = Todas las guías", () => {
-    const ws = roundTrip("Guías", buildGuiasSheet(guias));
-    expect(ws.A2.v).toBe("Todas las guías");
-  });
 });
 
 describe("excel-proveedores — buildProveedoresSheet", () => {
@@ -228,38 +222,32 @@ describe("excel-proveedores — buildProveedoresSheet", () => {
     { nombre: "Proveedor Dos", aging_current: 0, aging_watch: 0, aging_overdue: 75.25, saldo_total: 75.25, ultimo_pago_dias: null, empresas_count: 1 },
   ];
 
-  it("round-trip: hoja, título, headers y moneda como número", () => {
-    const ws = roundTrip("Proveedores", buildProveedoresSheet(rows, "Todo el grupo — 2 proveedores"));
+  it("round-trip: hoja, headers en la fila 1 y moneda como número", () => {
+    const ws = roundTrip("Proveedores", buildProveedoresSheet(rows));
 
-    expect(ws.A1.v).toBe("FASHION GROUP — Proveedores (Cuentas por Pagar)");
-    expect(ws.A2.v).toBe("Todo el grupo — 2 proveedores");
-    expect(ws.A4.v).toBe("Proveedor");
+    expect(ws.A1.v).toBe("Proveedor");
     // "Comprado YTD" ERA la columna B y se ELIMINÓ (27-jul-2026): el ledger de
     // Switch solo trae lo que todavía se debe. Ahora B es el primer tramo de aging.
-    expect(ws.B4.v).toBe("0-90d");
-    expect(ws.E4.v).toBe("Por pagar");
+    expect(ws.B1.v).toBe("0-90d");
+    expect(ws.E1.v).toBe("Por pagar");
     // Moneda: número real con numFmt, no string
-    expect(ws.B5.t).toBe("n");
-    expect(ws.B5.v).toBe(200);
-    expect(ws.B5.z).toBe("$#,##0.00");
+    expect(ws.B2.t).toBe("n");
+    expect(ws.B2.v).toBe(200);
+    expect(ws.B2.z).toBe("$#,##0.00");
     // Último pago: string; null → "—"
-    expect(ws.F5.v).toBe("hace 12d");
-    expect(ws.F6.v).toBe("—");
-    // Totales en fila 8 (headers 4 + 2 datos + espaciador)
-    expect(ws.A8.v).toBe("2 proveedores");
-    expect(ws.B8.t).toBe("n");
-    expect(ws.B8.v).toBeCloseTo(200, 2);
-    expect(ws.E8.v).toBeCloseTo(325.25, 2);
-    // Candado: ni un encabezado con "YTD" en toda la fila 4.
+    expect(ws.F2.v).toBe("hace 12d");
+    expect(ws.F3.v).toBe("—");
+    // Totales en fila 5 (headers 1 + 2 datos + espaciador)
+    expect(ws.A5.v).toBe("2 proveedores");
+    expect(ws.B5.t).toBe("n");
+    expect(ws.B5.v).toBeCloseTo(200, 2);
+    expect(ws.E5.v).toBeCloseTo(325.25, 2);
+    // Candado: ni un encabezado con "YTD" en toda la fila 1.
     for (const col of ["A", "B", "C", "D", "E", "F", "G"]) {
-      expect(String(ws[`${col}4`]?.v ?? "")).not.toMatch(/YTD/i);
+      expect(String(ws[`${col}1`]?.v ?? "")).not.toMatch(/YTD/i);
     }
   });
 
-  it("subtitle default = Todo el grupo", () => {
-    const ws = roundTrip("Proveedores", buildProveedoresSheet(rows));
-    expect(ws.A2.v).toBe("Todo el grupo");
-  });
 });
 
 describe("excel-cheques — buildChequesSheet", () => {
@@ -269,25 +257,22 @@ describe("excel-cheques — buildChequesSheet", () => {
     { cliente: "Cliente Z", numero_cheque: "1003", monto: 80.5, fecha_deposito: "2026-07-12", vendedor: "Luis" },
   ];
 
-  it("round-trip: nombre de hoja capitalizado, título, headers y monto numérico", () => {
+  it("round-trip: nombre de hoja capitalizado, headers en la fila 1 y monto numérico", () => {
     const built = buildChequesSheet(cheques, "vencen hoy");
     expect(built.sheetName).toBe("Vencen hoy");
     const ws = roundTrip(built.sheetName, built.ws);
 
-    expect(ws.A1.v).toBe("FASHION GROUP — Cheques");
-    // Subtítulo nuevo (banda MID): el filtro aplicado
-    expect(ws.A2.v).toBe("Vencen hoy");
-    expect(ws.A4.v).toBe("Cliente");
-    expect(ws.C4.v).toBe("Monto");
-    expect(ws.E4.v).toBe("Vendedor");
+    expect(ws.A1.v).toBe("Cliente");
+    expect(ws.C1.v).toBe("Monto");
+    expect(ws.E1.v).toBe("Vendedor");
     // Datos + moneda como número
-    expect(ws.A5.v).toBe("Cliente X");
-    expect(ws.C5.t).toBe("n");
-    expect(ws.C5.v).toBe(350.75);
-    expect(ws.C5.z).toBe("$#,##0.00");
-    // Totales en fila 9 (headers 4 + 3 datos + espaciador)
-    expect(ws.A9.v).toBe("3 cheques");
-    expect(ws.C9.t).toBe("n");
-    expect(ws.C9.v).toBeCloseTo(551.25, 2);
+    expect(ws.A2.v).toBe("Cliente X");
+    expect(ws.C2.t).toBe("n");
+    expect(ws.C2.v).toBe(350.75);
+    expect(ws.C2.z).toBe("$#,##0.00");
+    // Totales en fila 6 (headers 1 + 3 datos + espaciador)
+    expect(ws.A6.v).toBe("3 cheques");
+    expect(ws.C6.t).toBe("n");
+    expect(ws.C6.v).toBeCloseTo(551.25, 2);
   });
 });

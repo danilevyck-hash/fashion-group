@@ -253,16 +253,9 @@ export interface ComisionResumen {
   vendedores: ComisionResumenRow[];
 }
 
-// Misma nota que el banner del tab (regla visible).
-const REGLA_NOTA =
-  "Venta: facturas con utilidad >20% menos notas de crédito. Cobro: recibos del mes, " +
-  "excluyendo retenciones de ITBMS. Ambas excluyen intercompañía y clientes internos, " +
-  "y se asignan al vendedor dueño del cliente. Fuente: reportes de Switch.";
-
 /** Construcción pura del sheet (sin DOM) — testeable. */
 export async function buildComisionesResumenSheet(r: ComisionResumen): Promise<WorkSheet> {
   const { buildReportSheet, MONEY_FMT } = await import("@/lib/excel-export");
-  const periodo = `${MESES[r.mes - 1]} ${r.year}`;
 
   // Total = suma de las filas (no recálculo), consistente con el tab.
   const tot = r.vendedores.reduce(
@@ -277,8 +270,6 @@ export async function buildComisionesResumenSheet(r: ComisionResumen): Promise<W
   );
 
   return buildReportSheet({
-    title: `Comisiones — ${r.empresaNombre}`,
-    subtitle: `${periodo} · ${REGLA_NOTA}`,
     columns: [
       { header: "Vendedor", wch: 26 },
       { header: "Ventas", wch: 14, align: "right", fmt: MONEY_FMT },
@@ -323,7 +314,6 @@ export interface ComisionConsolidado {
 /** Construcción pura del sheet (sin DOM) — testeable. */
 export async function buildComisionesConsolidadoSheet(c: ComisionConsolidado): Promise<WorkSheet> {
   const { buildReportSheet, MONEY_FMT } = await import("@/lib/excel-export");
-  const periodo = `${MESES[c.mes - 1]} ${c.year}`;
 
   const rowFor = (r: ComisionConsolidadoRow) => [
     r.vendedor,
@@ -343,8 +333,6 @@ export async function buildComisionesConsolidadoSheet(c: ComisionConsolidado): P
   totals.push(allRows.reduce((a, r) => a + (r.total ?? 0), 0));
 
   return buildReportSheet({
-    title: "Comisiones — Todas las empresas",
-    subtitle: `${periodo} · ${REGLA_NOTA}`,
     columns: [
       { header: "Vendedor", wch: 26 },
       ...c.empresas.map(e => ({ header: e.nombre, wch: 15, align: "right" as const, fmt: MONEY_FMT })),

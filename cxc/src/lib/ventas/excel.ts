@@ -20,13 +20,6 @@ function parseIsoDate(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
-function formatFechaPA(iso: string): string {
-  const d = parseIsoDate(iso);
-  const weekday = new Intl.DateTimeFormat("es-PA", { weekday: "long" }).format(d);
-  const month = new Intl.DateTimeFormat("es-PA", { month: "long" }).format(d);
-  return `${weekday} ${d.getDate()} de ${month} ${d.getFullYear()}`;
-}
-
 // Etiqueta para el header de la columna prev YTD (refleja el corte aplicado).
 function prevYtdColumnLabel(data: VentasResumen, prevYear: number): string {
   if (!data.dia_corte_anio_anterior) return `YTD ${prevYear}`;
@@ -51,10 +44,6 @@ export async function buildResumenSheet(data: VentasResumen): Promise<WorkSheet>
   const periodLabels = monthsWithData.map(i => `${MONTHS[i]} ${data.year}`);
   const prevYtdLabel = prevYtdColumnLabel(data, prevYear);
   const deltaLabel = `Δ vs ${prevYear} %`;
-  const dataNote = data.fecha_corte
-    ? `Data actualizada al ${formatFechaPA(data.fecha_corte)}`
-    : "";
-
   // Filas de empresa — meses + Total + Margen% + prev YTD + Δ
   // `null` = celda VACÍA en el Excel (lo soporta ReportCell). Es lo que se usa
   // cuando no hay base comparable para el Δ%: una celda en blanco dice "no hay
@@ -89,8 +78,6 @@ export async function buildResumenSheet(data: VentasResumen): Promise<WorkSheet>
   const grandDelta = variacionPct(grandTotal, grandPrevYtd);
 
   return buildReportSheet({
-    title: `FASHION GROUP — Ventas ${data.year}`,
-    subtitle: dataNote || undefined,
     columns: [
       { header: "Empresa", wch: 24 },
       ...periodLabels.map(l => ({ header: l, wch: 14, align: "right" as const, fmt: MONEY_FMT })),

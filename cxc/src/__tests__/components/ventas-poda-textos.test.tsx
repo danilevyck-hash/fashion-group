@@ -352,8 +352,11 @@ describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
     expect(screen.getAllByText("960").length).toBeGreaterThan(0);
     expect(screen.getAllByText("615").length).toBeGreaterThan(0);
     expect(screen.getAllByText("345").length).toBeGreaterThan(0);
-    // Vendí dice qué parte de lo comprado es: 615 ÷ 960 = 64%.
-    expect(screen.getAllByText("el 64% de lo comprado").length).toBeGreaterThan(0);
+    // 🩸 Vendí dice qué parte de LO QUE HUBO es: 615 ÷ (615 + 345) = 64%.
+    // (Contra lo comprado daba el mismo 64% por casualidad; lo que cambió es
+    // el denominador, y con él la promesa de que el % no puede contradecir al
+    // Stock de al lado.)
+    expect(screen.getAllByText("el 64% de lo que hubo").length).toBeGreaterThan(0);
     // Stock viene de Switch y lo dice sin ceremonia.
     expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
     // Y el cuarto grande: 10 meses desde el ancla del agregado (oct-2025).
@@ -559,14 +562,15 @@ describe("Referencia · la frase de la última llegada (la bodega tocó 0)", () 
     const grandes = grandesDeLaFicha();
     // Daniel: *"mira que sigue diciendo compre 72 cuando enverdad son 36"*.
     expect(grandes).toEqual({ Compré: "36u", Vendí: "25u", Stock: "12u", Meses: "5" });
-    expect(screen.getAllByText("el 69% de esa llegada").length).toBeGreaterThan(0);
+    // 25 vendidas de las 37 que hubo (25 + 12 en bodega).
+    expect(screen.getAllByText("el 68% de lo que hubo").length).toBeGreaterThan(0);
     // El histórico NO se pierde: queda en chico, bajo la lista de compras.
     expect(screen.getAllByText("72 u en total · 61 vendidas").length).toBeGreaterThan(0);
     // 🩸 UNA sola cifra por concepto: el grande Stock (12, la existencia real)
     // y el par Vendí/Meses. De la frase se fueron el "me quedan 11 u" y el
     // "va el 69% en 5 meses" — los dos ya estaban arriba.
     expect(document.body.textContent ?? "").not.toContain("me quedan");
-    expect(document.body.textContent ?? "").not.toContain("va el 69% en 5 meses");
+    expect(document.body.textContent ?? "").not.toContain("va el 68% en 5 meses");
     // Y la unidad que sobra (12 en bodega contra 36 − 25 = 11) la explica el
     // aviso de siempre, bien escrito en singular.
     expect(

@@ -304,21 +304,20 @@ describe("exportarExcelReporte (reportes)", () => {
     return XLSX.read(new Uint8Array(await blob.arrayBuffer()), { type: "array" });
   }
 
-  it("por marca: banda de título casa + headers + gasto numérico", async () => {
+  it("por marca: headers en la fila 1 + gasto numérico", async () => {
     const blob = exportarExcelReporte("marca", [
       { marca, gasto: 123.45 },
     ]);
     const wb = await readBlob(blob);
     expect(wb.SheetNames).toEqual(["Por marca"]);
     const ws = wb.Sheets["Por marca"];
-    // buildReportSheet: r0 título, r1 separador, r2 headers, r3.. datos.
-    expect(String(cell(ws, "A1").v)).toContain("FASHION GROUP");
-    expect(cell(ws, "A3").v).toBe("Marca");
-    expect(cell(ws, "B3").v).toBe("Código");
-    expect(cell(ws, "C3").v).toBe("Gasto");
-    expect(cell(ws, "A4").v).toBe("Tommy Hilfiger");
-    expect(cell(ws, "C4").t).toBe("n");
-    expect(cell(ws, "C4").v).toBe(123.45);
+    // buildReportSheet: r0 ENCABEZADOS, r1.. datos. Nada arriba.
+    expect(cell(ws, "A1").v).toBe("Marca");
+    expect(cell(ws, "B1").v).toBe("Código");
+    expect(cell(ws, "C1").v).toBe("Gasto");
+    expect(cell(ws, "A2").v).toBe("Tommy Hilfiger");
+    expect(cell(ws, "C2").t).toBe("n");
+    expect(cell(ws, "C2").v).toBe(123.45);
   });
 
   it("por tienda: columnas dinámicas de marca conservadas", async () => {
@@ -326,11 +325,11 @@ describe("exportarExcelReporte (reportes)", () => {
       { tienda: "Tienda Centro", porMarca: { "Tommy Hilfiger": 200 }, total: 200 },
     ]);
     const ws = (await readBlob(blob)).Sheets["Por tienda"];
-    expect(cell(ws, "A3").v).toBe("Tienda");
-    expect(cell(ws, "B3").v).toBe("Tommy Hilfiger");
-    expect(cell(ws, "C3").v).toBe("Gasto");
-    expect(cell(ws, "B4").t).toBe("n");
-    expect(cell(ws, "B4").v).toBe(200);
+    expect(cell(ws, "A1").v).toBe("Tienda");
+    expect(cell(ws, "B1").v).toBe("Tommy Hilfiger");
+    expect(cell(ws, "C1").v).toBe("Gasto");
+    expect(cell(ws, "B2").t).toBe("n");
+    expect(cell(ws, "B2").v).toBe(200);
   });
 
   it("por proyecto: 5 columnas (sin Estado) y gasto numérico", async () => {
@@ -349,15 +348,15 @@ describe("exportarExcelReporte (reportes)", () => {
       },
     ]);
     const ws = (await readBlob(blob)).Sheets["Por proyecto"];
-    expect(cell(ws, "A3").v).toBe("Proyecto");
-    expect(cell(ws, "E3").v).toBe("Gasto real");
-    expect(cell(ws, "A4").v).toBe("Remodelación");
-    expect(cell(ws, "D4").v).toBe("Tommy Hilfiger");
-    expect(cell(ws, "E4").t).toBe("n");
-    expect(cell(ws, "E4").v).toBe(350.5);
+    expect(cell(ws, "A1").v).toBe("Proyecto");
+    expect(cell(ws, "E1").v).toBe("Gasto real");
+    expect(cell(ws, "A2").v).toBe("Remodelación");
+    expect(cell(ws, "D2").v).toBe("Tommy Hilfiger");
+    expect(cell(ws, "E2").t).toBe("n");
+    expect(cell(ws, "E2").v).toBe(350.5);
     // Ninguna celda del encabezado dice "Estado".
     for (const col of ["A", "B", "C", "D", "E", "F"]) {
-      const c = ws[`${col}3`];
+      const c = ws[`${col}1`];
       if (c) expect(c.v).not.toBe("Estado");
     }
   });

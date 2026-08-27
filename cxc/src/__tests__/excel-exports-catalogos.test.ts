@@ -52,18 +52,18 @@ const PEDIDOS: PedidoExportRow[] = [
   },
 ];
 
-// Layout estándar de buildReportSheet con subtítulo:
-// r0 título · r1 subtítulo · r2 sep · r3 headers · r4.. datos · spacer · totales
-const HDR_ROW = 3;
-const DATA_ROW = 4;
+// Layout estándar desde el 27-ago-2026: r0 ENCABEZADOS · r1.. datos · spacer
+// · totales. Nada arriba de los encabezados.
+const HDR_ROW = 0;
+const DATA_ROW = 1;
 
 describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
-  const wb = buildPedidosWorkbook({ marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true, pedidos: PEDIDOS });
+  const wb = buildPedidosWorkbook({ marca: "reebok", conOrigen: true, pedidos: PEDIDOS });
   const ws = wb.Sheets["Pedidos"];
 
-  it("hoja única 'Pedidos' con título en banda navy 1A2656", () => {
+  it("hoja única 'Pedidos', y A1 es el PRIMER ENCABEZADO (nada arriba)", () => {
     expect(wb.SheetNames).toEqual(["Pedidos"]);
-    expect(ws[A(0, 0)].v).toBe("REEBOK — Pedidos");
+    expect(ws[A(0, 0)].v).toBe("Origen");
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(NAVY);
   });
 
@@ -116,7 +116,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
 
   it("un pedido de verdad (documento='pedido') se nombra pedido", () => {
     const wb2 = buildPedidosWorkbook({
-      marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true,
+      marca: "reebok", conOrigen: true,
       pedidos: [{ ...PEDIDOS[1], switch_documento: "pedido" }],
     });
     expect(wb2.Sheets["Pedidos"][A(DATA_ROW, 7)].v).toBe("Pedido en Switch: 16-000000506");
@@ -126,7 +126,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
     // La DDL 20260824160000 puede no estar corrida: ausencia ⇒ pedido, que es
     // lo único que el sistema sabía crear.
     const wb2 = buildPedidosWorkbook({
-      marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true,
+      marca: "reebok", conOrigen: true,
       pedidos: [{ ...PEDIDOS[1], switch_documento: null }],
     });
     expect(wb2.Sheets["Pedidos"][A(DATA_ROW, 7)].v).toBe("Pedido en Switch: 16-000000506");
@@ -150,7 +150,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
     // El escalón por si la vista no diera `id_natural`/`fuente`: sin esos datos
     // escribir «No se ha mandado a Switch» en todas las filas sería MENTIRA.
     const wb2 = buildPedidosWorkbook({
-      marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true, conNumeros: false, pedidos: PEDIDOS,
+      marca: "reebok", conOrigen: true, conNumeros: false, pedidos: PEDIDOS,
     });
     const ws2 = wb2.Sheets["Pedidos"];
     expect(ws2[A(HDR_ROW, 5)].v).toBe("Fecha");
@@ -188,7 +188,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
     const rb = XLSX.read(buf, { type: "buffer" });
     expect(rb.SheetNames).toEqual(["Pedidos"]);
     const rws = rb.Sheets["Pedidos"];
-    expect(rws[A(0, 0)].v).toBe("REEBOK — Pedidos");
+    expect(rws[A(0, 0)].v).toBe("Origen");
     expect(rws[A(HDR_ROW, 1)].v).toBe("Cliente");
     expect(rws[A(DATA_ROW, 4)].t).toBe("n");
     expect(rws[A(DATA_ROW, 4)].v).toBeCloseTo(1234.56, 2);
@@ -199,11 +199,11 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
 
 describe("buildPedidosWorkbook — Joybees (sin Origen)", () => {
   const pedidos: PedidoExportRow[] = PEDIDOS.map(({ origen: _o, ...p }) => p);
-  const wb = buildPedidosWorkbook({ marca: "joybees", titulo: "JOYBEES — Pedidos", conOrigen: false, pedidos });
+  const wb = buildPedidosWorkbook({ marca: "joybees", conOrigen: false, pedidos });
   const ws = wb.Sheets["Pedidos"];
 
-  it("mismo layout compartido, título propio y 7 columnas (sin Origen)", () => {
-    expect(ws[A(0, 0)].v).toBe("JOYBEES — Pedidos");
+  it("mismo layout compartido, paleta propia y 7 columnas (sin Origen)", () => {
+    expect(ws[A(0, 0)].v).toBe("Cliente");
     // La banda es del GRIS de Joybees, no del navy de Reebok.
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(JOYBEES_PALETTE.pri);
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).not.toBe(NAVY);
@@ -230,11 +230,11 @@ describe("buildPedidosWorkbook — Joybees (sin Origen)", () => {
 
 describe("buildPedidosWorkbook — Tommy Hilfiger", () => {
   const pedidos: PedidoExportRow[] = PEDIDOS.map(({ origen: _o, ...p }) => p);
-  const wb = buildPedidosWorkbook({ marca: "tommy", titulo: "TOMMY HILFIGER — Pedidos", conOrigen: false, pedidos });
+  const wb = buildPedidosWorkbook({ marca: "tommy", conOrigen: false, pedidos });
   const ws = wb.Sheets["Pedidos"];
 
   it("misma estructura, banda con el navy de Tommy (no el de Reebok)", () => {
-    expect(ws[A(0, 0)].v).toBe("TOMMY HILFIGER — Pedidos");
+    expect(ws[A(0, 0)].v).toBe("Cliente");
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(TOMMY_PALETTE.pri);
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).not.toBe(NAVY);
     expect(ws[A(HDR_ROW, 0)].s.fill.fgColor.rgb).toBe(TOMMY_PALETTE.pri);
@@ -275,13 +275,13 @@ describe("buildReebokSinFotoWorkbook — export 'sin foto' del admin", () => {
   ]);
   const ws = wb.Sheets["Sin foto"];
 
-  it("hoja 'Sin foto' con estructura completa: título navy + headers navy", () => {
+  it("hoja 'Sin foto' con estructura completa: headers navy en la fila 1", () => {
     // Desde el 30-jul-2026 el archivo lleva DOS hojas: primero la réplica de la
     // plantilla del banco B2B (códigos en la columna B, ordenados A-Z) y después
     // este reporte de detalle, que NO se quitó. La forma de la hoja de la
     // plantilla la fija dash-busqueda-excel.test.ts.
     expect(wb.SheetNames).toEqual(["DASHBOARD DE BUSQUEDA", "Sin foto"]);
-    expect(ws[A(0, 0)].v).toBe("REEBOK — Productos sin foto");
+    expect(ws[A(0, 0)].v).toBe("Código");
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(NAVY);
     const headers = ["Código", "Descripción", "Categoría", "Disponible", "Existencia"];
     headers.forEach((h, c) => {
@@ -303,7 +303,7 @@ describe("buildReebokSinFotoWorkbook — export 'sin foto' del admin", () => {
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
     const rb = XLSX.read(buf, { type: "buffer" });
     const rws = rb.Sheets["Sin foto"];
-    expect(rws[A(0, 0)].v).toBe("REEBOK — Productos sin foto");
+    expect(rws[A(0, 0)].v).toBe("Código");
     expect(rws[A(DATA_ROW, 3)].t).toBe("n");
     expect(rws[A(DATA_ROW, 3)].v).toBe(24);
   });

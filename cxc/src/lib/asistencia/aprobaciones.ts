@@ -293,7 +293,17 @@ export interface OpcionesDias {
  * junto con el pago.
  */
 export function armarDiasAprobacion(opts: OpcionesDias): DiaAprobacion[] {
-  const lineaDe = new Map(opts.lineas.map((l) => [l.codigo, l]));
+  // 🔴 CON EL SUELDO REPARTIDO HAY DOS LÍNEAS POR CÓDIGO, Y ACÁ MANDA LA QUE
+  // PAGA LAS HORAS EXTRA. Un `new Map(...)` a secas se queda con la ÚLTIMA que
+  // pase, así que la pantalla de Aprobaciones diría «Vistana» de unas horas que
+  // se pagan en Fashion Wear — y quien aprueba tiene que ver dónde caen. No
+  // toca un centavo: de la línea solo se leen la etiqueta y la empresa.
+  const lineaDe = new Map<string, LineaPlanilla>();
+  for (const l of opts.lineas) {
+    const previa = lineaDe.get(l.codigo);
+    if (previa && previa.parte?.llevaHorasExtra === true) continue;
+    lineaDe.set(l.codigo, l);
+  }
   const porFecha = new Map<string, PersonaEnDia[]>();
 
   for (const p of opts.personas) {

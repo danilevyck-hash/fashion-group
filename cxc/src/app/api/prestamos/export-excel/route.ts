@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   const empleados = filterEmpleadosMovimientos(data) as EmpleadoRow[];
 
-  const wb = buildPrestamosWorkbook(empleados, empresaFilter);
+  const wb = buildPrestamosWorkbook(empleados);
   const buf = workbookBuffer(wb);
 
   const today = new Date();

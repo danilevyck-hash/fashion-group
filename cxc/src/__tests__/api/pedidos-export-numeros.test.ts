@@ -82,8 +82,8 @@ function filaVista(id: string, cliente: string, fuente: "orders" | "publicos" = 
 }
 
 const A = (r: number, c: number) => XLSX.utils.encode_cell({ r, c });
-const HDR_ROW = 3;
-const DATA_ROW = 4;
+const HDR_ROW = 0; // los encabezados abren el archivo (27-ago-2026)
+const DATA_ROW = 1;
 
 /**
  * 🔴 EL ARCHIVO DE VERDAD. Se toma el body de la respuesta, se abre como .xlsx

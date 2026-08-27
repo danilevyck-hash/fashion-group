@@ -120,19 +120,15 @@ describe("buildBulkReclamosExcel (Resumen + hojas por reclamo)", () => {
     expect(rt.SheetNames).toEqual(["Resumen", "R-001", "R-002"]);
     const resumen = rt.Sheets["Resumen"];
 
-    // Título y subtítulo estándar
-    expect(resumen.A1?.v).toBe("FASHION GROUP");
-    expect(resumen.A2?.v).toBe("Reclamos a Proveedor — Fashion Wear");
+    // Encabezados en la fila 1: nada arriba de ellos.
+    expect(resumen.A1?.v).toBe("N° Reclamo");
+    expect(resumen.K1?.v).toBe("Fotos");
 
-    // Encabezados en fila 4 (título/sub/separador arriba)
-    expect(resumen.A4?.v).toBe("N° Reclamo");
-    expect(resumen.K4?.v).toBe("Fotos");
-
-    // Fila de datos del rec1 (fila 5): subtotal 2×10.50 + 1×5 = 26, número real
-    expect(resumen.A5?.v).toBe("R-001");
-    expect(resumen.E5?.t).toBe("n");
-    expect(resumen.E5?.v).toBe(26);
-    expect(resumen.E5?.z).toBe(MONEY_FMT);
+    // Fila de datos del rec1 (fila 2): subtotal 2×10.50 + 1×5 = 26, número real
+    expect(resumen.A2?.v).toBe("R-001");
+    expect(resumen.E2?.t).toBe("n");
+    expect(resumen.E2?.v).toBe(26);
+    expect(resumen.E2?.z).toBe(MONEY_FMT);
 
     // Hipervínculos del Resumen: factura firmada (col J) + galería (col K)
     const targets = linkTargets(resumen);
@@ -140,8 +136,8 @@ describe("buildBulkReclamosExcel (Resumen + hojas por reclamo)", () => {
     expect(targets.some((t) => t.includes(`/reclamos/galeria/${rec1.id}`))).toBe(true);
 
     // rec2 sin factura ni fotos → "—" en ambas columnas de links
-    expect(resumen.J6?.v).toBe("—");
-    expect(resumen.K6?.v).toBe("—");
+    expect(resumen.J3?.v).toBe("—");
+    expect(resumen.K3?.v).toBe("—");
   });
 
   it("con 1 solo reclamo no genera hoja Resumen", async () => {
