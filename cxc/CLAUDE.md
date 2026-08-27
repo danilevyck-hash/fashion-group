@@ -1407,6 +1407,61 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - 🩸 **DOS mutaciones fallaron en la primera corrida y las dos eran del SCRIPT, no del producto**: los backticks del nombre de una mutación, **dentro de comillas dobles, los ejecuta el shell** (`absolute: command not found`); y cambiar solo la etiqueta de apertura de `<span>` a `<input>` deja un `</span>` huérfano, el módulo no compila y la mutación prueba que un archivo roto rompe, no el candado.
 > - ⚠️ **Una mutación NO se puede hacer desde acá, y se dice:** *"el desplegable vuelve a ser un `absolute`"*. El barrido de `desplegables-flotan.test.ts` exime a todo archivo que MENCIONE `DesplegableFlotante`, así que la mutación fiel tiene que borrar el import **y** el uso — dos ediciones no contiguas, y el aplicador hace UNA literal por corrida a propósito.
 
+## 🔴 Guías — BORRAR NO OBLIGA A ABRIR LA GUÍA: el «···» está en la FILA (27-ago-2026)
+
+> Daniel, textual: ***"y darle acceso a secretaria de poder eliminar guias"***.
+>
+> 🩸 **EL PERMISO YA LO TENÍA, Y ESTÁ MEDIDO.** `DELETE /api/guias/[id]` exige `["admin","secretaria"]` desde siempre y `DELETE_ROLES` de `GuiasList` dice lo mismo; `andrea` y `Angela` son secretaria. **Lo que faltaba era ENCONTRAR el botón**: «Eliminar guía» era el ÚNICO ítem del «···» de la guía **EXPANDIDA**, al lado de «Compartir» — o sea que había que abrir la guía primero.
+>
+> ### 🔴 SE MOVIÓ, NO SE DUPLICÓ — y «Eliminar» NO salió como botón suelto
+>
+> El «···» sube a la fila y el de adentro **se retiró en el mismo cambio**: era su único ítem, y dejarlo en los dos lados sería otra vez *«cada cambio deja su puerta»*, que es lo que este módulo viene podando desde el 25-ago. **No se pierde ninguna puerta**: al abrir la guía la fila no desaparece, así que el menú sigue a la vista en la misma pantalla (hay candado que lo prueba con la guía abierta).
+> - 🔴 **NO se sacó «Eliminar» a la fila como botón suelto.** La fila ya tiene Editar · Despachar · Imprimir · Compartir, y en un celular un botón de borrar al lado de «Imprimir» es un toque equivocado esperando pasar sobre un documento **firmado**. Queda detrás del menú y detrás de la ventana que exige escribir **ELIMINAR**.
+> - **Sigue siendo SOFT DELETE** (`deleted = true`) y la confirmación no se aflojó: el botón rojo nace apagado hasta que la palabra esté escrita.
+> - ⚠️ **Solo se dibuja para quien puede borrar** (`canDelete` = admin · secretaria, y **nunca** en `readOnly`): a bodega y a vendedor no les aparece ni el «···». Y **no aparece en modo selección**, que tiene su propia barra de acciones y donde borrar no es una acción de lote.
+> - **El rótulo lleva el N° de la guía** (`Más opciones de la guía GT-231`): hay un «···» por fila y *"Más opciones"* a secas no diría de cuál.
+> - 🩸 **El «···» va FUERA del `<button>` de la fila.** Un botón dentro de otro es HTML inválido y, peor, el toque abriría el acordeón además del menú — el atajo se convertiría en un toque MÁS. La fila pasó de `w-full` a `flex-1 min-w-0` dentro de un `flex items-stretch`.
+>
+> ### Toques, contados TOCANDO en el navegador (no estimados)
+>
+> | | main | esta rama |
+> |---|---:|---:|
+> | hasta la ventana de confirmación (secretaria) | **3** (abrir la guía · «···» · «Eliminar guía») | **2** |
+> | «···» visibles en la fila cerrada | 0 | **1 por fila (15 de 15)** |
+>
+> ### 🔴 LO QUE **NO** SE TOCÓ
+>
+> **La lista sigue sin despachar** (ni por swipe ni desplegando nada) y «Editar»/«Despachar» siguen siendo `router.push` — el candado de conducta que toca los dos y verifica que **no salió ni un `fetch`** sigue verde · una `Completada`/`Rechazada` **no muestra «Despachar»** (sí «Editar», desde el 25-ago) · el **candado del PUT** sobre una guía despachada y las **DOS excepciones** que no miran el estado (`PATCH …/cliente` y `PATCH …/numero-transp`) · **nadie gana permisos**: `DELETE_ROLES` es el conjunto de siempre.
+>
+> ### Medición
+>
+> **Los 3 anchos + el iPad acostado, en el navegador contra el build de producción, con datos de producción y CONTRA `origin/main` corriendo EL MISMO ARCHIVO** (`BASE=… ETAPA=antes|despues node scripts/_medir-guias-eliminar-fila.mjs`, solo lectura), en **dos roles** (secretaria y bodega) y con la lista **CERRADA**:
+>
+> | | main | esta rama |
+> |---|---|---|
+> | arrastre de página (16 casos) | **0** | **0** |
+> | textos <12 px | **0** | **0** |
+> | tocables <44 px · secretaria | 0 · 1 · 1 · 1 | **idéntico** (el `<input>` del buscador, 39 px, PRE-EXISTENTE) |
+> | tocables <44 px · bodega | 0 · 1 · 1 · 1 | **idéntico** |
+> | alto de la página | 2.142 · 2.102 · 1.337 · 1.337 | **idéntico** — el «···» no empuja nada hacia abajo |
+> | recortados · **bodega** | 2 · 0 · 11 · 0 | **idéntico** |
+> | recortados · secretaria | 2 · 0 · 11 · 0 | **4 · 0 · 12 · 2** |
+>
+> - 🔴 **LA ÚNICA DIFERENCIA, DICHA DE FRENTE: +2 recortes a 390, +1 a 1024 y +2 a 1440, y solo para quien VE el menú.** Son los 44 px que el «···» le quita a la fila, y **los recortados son todos `truncate`** — el resumen `«Cliente · Destino»` de la tarjeta (`Outlet Duty Free N3, S.A. y 1 más`, de 32 a 80 px de puntos suspensivos) y la columna de clientes del escritorio (`flex-[2_1_0] min-w-0 truncate`, 3 px a 1440). **Puntos suspensivos ES el mecanismo, no dato inalcanzable**, y la prueba de que el costo es exactamente el menú es que **bodega —que no lo ve— mide IDÉNTICO a main en los cuatro anchos**.
+> - **El «···» mide 44×44 px en los cuatro anchos.**
+> - 🔴 **NO SE TOCÓ NINGUNA GUÍA REAL.** El navegador **aborta cualquier pedido que no sea GET** (escrituras bloqueadas: 0), y el script nunca escribe la palabra ELIMINAR ni aprieta el botón rojo.
+> - 🩸 **La cookie hay que MINTEARLA** (`scripts/_cookie-medicion-rol.ts <rol>`): el middleware valida el `sessionToken` contra `user_sessions`, así que una cookie firmada a mano muere ahí y lo que se mediría sería la pantalla de LOGIN — verde sin haber mirado nada. Por eso el script **falla si no encuentra ninguna fila**, si la fila cerrada no trae su «···», si el rótulo no dice de qué guía es, si el menú no ofrece «Eliminar guía», si borrar no cuesta 2 toques, si la confirmación no aparece con su campo y su botón apagado, o si a bodega se le dibuja un menú.
+> - 🩸 **El acordeón recuerda la fila abierta en `sessionStorage`**: hay que limpiar `guias:expanded` antes de navegar o lo que se mide no es la lista cerrada.
+>
+> ### Candados
+>
+> **`src/__tests__/components/guias-eliminar-en-la-fila.test.tsx` (14) MONTA LA PÁGINA REAL de `/guias`**, toca el «···» de una fila **cerrada** y cuenta lo que sale por `fetch`. Un barrido de texto no puede ver lo único que importa —que el menú esté en la fila y no adentro— y en este repo ya se cumplió **cuatro veces** con el comentario que explicaba el cambio.
+> - 🩸 **EL MENÚ NO PINTA SUS ÍTEMS HASTA QUE SE ABRE** (`{open && …}` en `ui/OverflowMenu`) y salen por un **PORTAL**: hay que abrirlo y buscarlos en el documento, no en el container.
+> - **Verificado por mutación, 13 de 13 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-guias-eliminar-fila.sh`): el «···» se va de la fila · vuelve a quedar **ANIDADO** dentro del botón de la fila · se le dibuja a CUALQUIER rol · `DELETE_ROLES` se abre a bodega · **la SECRETARIA pierde el permiso** · el menú deja de mirar `readOnly` · se queda puesto en modo selección · el ítem apunta siempre a la PRIMERA guía · el rótulo deja de decir de qué guía es · **el menú BORRA DE UNA, sin la ventana** · la ventana acepta confirmar sin escribir la palabra · «Compartir» se cae de la guía abierta · la fila abierta pierde «Editar».
+> - 🩸 **UNA sobrevivió en la primera corrida y era un candado FLOJO: `closest()` ARRANCA EN EL PROPIO ELEMENTO**, así que `trigger.closest("button") === trigger` es cierto **con el menú anidado y sin él**. Hay que preguntarle a los PADRES (`trigger.parentElement?.closest("button")`).
+> - 🩸 **Y la mutación del anidado tuvo que MOVER el `</button>`, no borrarlo**: borrándolo el JSX queda desbalanceado, el módulo no compila y lo que se probaría es que un archivo roto rompe.
+> - 🩸 **El script restaura por COPIA, no con `git checkout`** (hay archivos NUEVOS y git aborta el comando entero sin restaurar nada), **denuncia el patrón muerto** en vez de cantarlo como "SOBREVIVIÓ", **no usa `perl`** (el `||` del código real se des-escapa dentro del patrón y se come el archivo) y trae **una mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido con el comentario adentro.
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`
