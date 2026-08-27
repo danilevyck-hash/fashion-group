@@ -302,10 +302,29 @@ describe("5 · 🔴 EL AVISO DE LA PLANILLA SE QUEDA — es orden de Daniel", ()
 // ── 6. barrido: nadie más se pone a explicar el Excel ───────────────────────
 
 describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
-  it("🔴 el único export que la usa es la planilla", () => {
+  it("🔴 solo DOS exports la usan, y las dos notas se ganaron el lugar", () => {
+    // Daniel las aprobó una por una:
+    //  · planilla — «NO es una quincena»: avisa que ese archivo no sirve para
+    //    pagar. Frena un error.
+    //  · referencia — de qué llegada son Compré/Vendí y que Stock es el total.
+    //    Sin eso, un «Compré 36» al lado de un «Stock 12» parece mal sumado.
+    // Una tercera pide su permiso: acá vuelve a estar la puerta, no abierta.
     const usos = archivosQueLlaman()
       .filter((f) => sinComentarios(leer(f)).includes("nota:"));
-    expect(usos).toEqual(["src/lib/asistencia/planilla-exportar.ts"]);
+    expect(usos.sort()).toEqual([
+      "src/lib/asistencia/planilla-exportar.ts",
+      "src/lib/ventas/referencia-excel.ts",
+    ]);
+  });
+
+  it("🔴 la de Referencia dice lo único que no se deduce mirando la tabla", async () => {
+    const { buildReferenciaSheet } = await import("@/lib/ventas/referencia-excel");
+    const ws = await buildReferenciaSheet([], true, "2026-08");
+    const nota = celdasDe(ws).filter((t) => t.includes("ÚLTIMA llegada"));
+    expect(nota, "la hoja Referencia perdió la aclaración").toHaveLength(1);
+    expect(nota[0]).toContain("Stock es siempre la existencia total");
+    // ⚠️ Y NO vuelve el manual de 900 caracteres que Daniel mandó sacar.
+    expect(nota[0].length).toBeLessThan(220);
   });
 
   it("los 24 lugares que arman una hoja siguen ahí (nada se perdió de camino)", () => {
