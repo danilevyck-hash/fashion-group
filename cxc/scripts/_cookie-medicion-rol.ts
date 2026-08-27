@@ -13,7 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 
 const ROL = process.argv[2];
-const ROLES = ["admin", "secretaria", "vendedor", "bodega", "contabilidad", "gerente_acs"];
+const ROLES = ["admin", "secretaria", "vendedor", "bodega", "contabilidad", "gerente_acs", "gerente_boston"];
 if (!ROL || !ROLES.includes(ROL)) {
   console.error(`uso: _cookie-medicion-rol.ts <${ROLES.join("|")}>`);
   process.exit(1);

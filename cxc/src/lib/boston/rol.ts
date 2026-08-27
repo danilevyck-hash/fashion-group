@@ -105,13 +105,24 @@ export function planillaSinDinero(rol: string | null | undefined): boolean {
 // La lista que Daniel aprobó: **CXC · Planilla · Préstamos (TODOS) · Inicio de
 // Boston · Ventas de Boston · Clientes · Catálogos**, sin guías.
 //
-// ⛔ **Catálogos NO está acá, y es una decisión, no un olvido.** Las cuatro
-// marcas de `/catalogos` (Reebok, Joybees, Tommy, Calvin) son de `active_shoes`,
-// `joystep`, `fashion_shoes` y `vistana` — o sea CUATRO EMPRESAS DE FASHION
-// GROUP. No hay un catálogo de Confecciones Boston que mostrar: darle esa ficha
-// sería darle un centro de marcas del grupo y una puerta hacia sus clientes y
-// sus pedidos, que es literalmente lo que la frase de Daniel prohíbe. Queda
-// para que él decida (ver el informe del PR).
+// ✅ **Catálogos SE ABRIÓ el 27-ago-2026, y NO como pestaña: como MÓDULO.**
+//
+// Daniel, textual: ***«catalogo para david si, solo eso»***. El #659 lo había
+// dejado afuera con un motivo bueno —las 4 marcas (Reebok, Joybees, Tommy,
+// Calvin) son de `active_shoes`, `joystep`, `fashion_shoes` y `vistana`, o sea
+// CUATRO EMPRESAS DE FASHION GROUP, y no existe un catálogo de Confecciones
+// Boston— y le pasó la decisión. **Él decidió que sí, sabiendo eso.**
+//
+// 🔴 **PERO SIGUE SIN SER UNA PESTAÑA DE `/boston`, y la lista de abajo no se
+// tocó.** Las 6 pestañas son de Confecciones Boston; el catálogo es del grupo.
+// Meterlo acá diría que es parte de su empresa, que es falso. Vive donde vive
+// para todo el mundo: su ficha en el menú (`modules.ts`) y `/catalogos/marcas`.
+//
+// 🔑 **Lo que se le abrió es SOLO VER** (`CATALOGO_ROLES` en
+// `lib/catalogo/roles.ts`, que DERIVA el rol de este archivo). NO administrar,
+// NO la lista de comprobantes y NO armar pedidos: los pedidos de esas 4 marcas
+// traen el cliente y el monto de cada venta del grupo. El detalle, ruta por
+// ruta, está en el encabezado de `roles.ts`.
 export const PESTANAS_BOSTON = [
   { key: "inicio", label: "Inicio" },
   { key: "cxc", label: "Por cobrar" },

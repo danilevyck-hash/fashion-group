@@ -32,7 +32,7 @@ const SECRET_PREV = process.env.SESSION_SECRET;
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-catalogo-roles"; });
 afterAll(() => { process.env.SESSION_SECRET = SECRET_PREV; });
 
-const OTROS_ROLES = ["bodega", "contabilidad", "vendedor", "gerente_acs"] as const;
+const OTROS_ROLES = ["bodega", "contabilidad", "vendedor", "gerente_acs", "gerente_boston"] as const;
 
 function reqComoRol(role: string): NextRequest {
   const cookie = signSession({ role, userId: "u1", userName: "test", sessionToken: "t1" });
@@ -48,8 +48,15 @@ function leer(rel: string): string {
 // ── 1. Las dos listas, congeladas ────────────────────────────────────────────
 
 describe("catálogos — listas de roles congeladas", () => {
-  it("ver el catálogo: admin, secretaria, vendedor, bodega", () => {
-    expect([...CATALOGO_ROLES]).toEqual(["admin", "secretaria", "vendedor", "bodega"]);
+  it("ver el catálogo: admin, secretaria, vendedor, bodega y gerente_boston", () => {
+    // 🔴 `gerente_boston` entró el 27-ago-2026. Daniel, textual: «catalogo para
+    // david si, solo eso». Cambio DELIBERADO — este candado hizo lo suyo y
+    // frenó el build hasta acá. Lo que gana es VER; las otras tres listas
+    // (administrar, comprobantes, createRoles) NO se movieron, y hay casos
+    // abajo que lo prueban una por una.
+    expect([...CATALOGO_ROLES]).toEqual([
+      "admin", "secretaria", "vendedor", "bodega", "gerente_boston",
+    ]);
   });
 
   it("ADMINISTRAR el catálogo: admin y secretaria — nadie más", () => {
@@ -87,7 +94,7 @@ describe("catálogos — guards de API, comportamiento real", () => {
     expect(requireAdmin(reqComoRol("secretaria"))).toBeNull();
   });
 
-  it("bodega, contabilidad, vendedor y gerente_acs NO pasan (403)", () => {
+  it("bodega, contabilidad, vendedor, gerente_acs y gerente_boston NO pasan (403)", () => {
     for (const rol of OTROS_ROLES) {
       const out = requireRole(reqComoRol(rol), catalogoAdminRoles());
       expect(out, `${rol} no debe administrar catálogos`).toBeInstanceOf(NextResponse);
@@ -102,8 +109,8 @@ describe("catálogos — guards de API, comportamiento real", () => {
     expect((out as NextResponse).status).toBe(401);
   });
 
-  it("vendedor y bodega SÍ pasan el guard de VER catálogo (no cambió)", () => {
-    for (const rol of ["vendedor", "bodega"]) {
+  it("vendedor, bodega y gerente_boston SÍ pasan el guard de VER catálogo", () => {
+    for (const rol of ["vendedor", "bodega", "gerente_boston"]) {
       const out = requireRole(reqComoRol(rol), catalogoRoles());
       expect(out, `${rol} debe seguir viendo el catálogo`).not.toBeInstanceOf(NextResponse);
     }
@@ -203,6 +210,17 @@ describe("catálogos — el gate de UI real es fg_modules, no allowedRoles", () 
     conSesion("gerente_acs", ["multifashion"]);
     expect(hasModuleAccess("catalogos", catalogoAdminRoles())).toBe(false);
   });
+
+  it("🔴 gerente_boston entra a VER, pero NO por tener el módulo: por la lista", async () => {
+    // Su fila de `role_permissions` dice ["boston"] hasta que corra la DDL, así
+    // que si el gate mirara solo `fg_modules` la pantalla lo rebotaría. Entra
+    // por `allowedRoles` = CATALOGO_ROLES, que es lo que usa el hub.
+    const { hasModuleAccess } = await import("@/lib/auth-check");
+    conSesion("gerente_boston", ["boston"]);
+    expect(hasModuleAccess("catalogos", catalogoRoles())).toBe(true);
+    // …y sigue SIN entrar al panel de administrar.
+    expect(hasModuleAccess("catalogos", catalogoAdminRoles())).toBe(false);
+  });
 });
 
 // ── 5. NADA más se movió: los otros roles, módulo por módulo ─────────────────
@@ -277,6 +295,10 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // `referencia` — mismo pedido del 12-ago-2026 de arriba (bodega).
   vendedor: ["cxc", "directorio", "catalogos", "guias", "referencia"],
   gerente_acs: ["multifashion"],
+  // 🔴 `catalogos` entra el 27-ago-2026 por pedido de Daniel («catalogo para
+  // david si, solo eso»). Cambio DELIBERADO — el candado hizo lo suyo. Boston
+  // sigue siendo su casa: `/home` lo aterriza ahí aunque tenga dos módulos.
+  gerente_boston: ["boston", "catalogos"],
 };
 
 describe("catálogos — los otros roles quedaron EXACTAMENTE igual", () => {

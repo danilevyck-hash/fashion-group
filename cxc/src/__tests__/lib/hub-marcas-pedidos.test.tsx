@@ -107,6 +107,9 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 // ── 1. El botón está, y lleva a la lista del #611 ────────────────────────────
 
+/** La lista de VER, congelada. gerente_boston entró el 27-ago-2026. */
+const NUEVA_VER = ["admin", "secretaria", "vendedor", "bodega", "gerente_boston"];
+
 describe("🔴 «Pedidos» en la tarjeta — las 4 marcas", () => {
   for (const marca of MARCAS_UI) {
     it(`${marca}: el botón existe y va a /catalogo/${marca}/pedidos`, async () => {
@@ -293,9 +296,19 @@ describe("🔴 la lista nueva no inventó un permiso", () => {
     expect([...COMPROBANTES_EDITAR_ROLES]).toEqual(["admin", "secretaria", "vendedor"]);
   });
 
-  it("las dos listas de siempre quedaron intactas", () => {
-    expect([...CATALOGO_ROLES]).toEqual(["admin", "secretaria", "vendedor", "bodega"]);
+  it("las dos listas de siempre: administrar intacta, ver suma gerente_boston", () => {
+    // 🔴 `gerente_boston` entró a VER el 27-ago-2026 («catalogo para david si,
+    // solo eso»). NO entró a COMPROBANTES_ROLES: los pedidos traen el cliente y
+    // el monto de cada venta del grupo. El caso de abajo lo prueba.
+    expect([...CATALOGO_ROLES]).toEqual(NUEVA_VER);
     expect([...CATALOGO_ADMIN_ROLES]).toEqual(["admin", "secretaria"]);
+  });
+
+  it("🔴 gerente_boston VE el catálogo y NO la lista de comprobantes", () => {
+    expect(CATALOGO_ROLES as readonly string[]).toContain("gerente_boston");
+    expect(COMPROBANTES_ROLES as readonly string[]).not.toContain("gerente_boston");
+    expect(COMPROBANTES_EDITAR_ROLES as readonly string[]).not.toContain("gerente_boston");
+    expect(CATALOGO_ADMIN_ROLES as readonly string[]).not.toContain("gerente_boston");
   });
 
   it("el hub gatea por las CONSTANTES, no por role === 'admin' a mano", () => {

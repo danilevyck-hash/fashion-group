@@ -136,7 +136,12 @@ describe("el permiso prestado se retiró sin cerrarle la puerta a nadie", () => 
     // comisiones"*): es el MISMO patrón que `referencia → catalogos` — un
     // módulo que salió de otro y necesita la ficha encendida mientras su DDL
     // (20260825120000) no corra. Entrada DELIBERADA, no un cajón de sastre.
-    expect(Object.keys(MODULO_HEREDA_PERMISO_DE).sort()).toEqual(["comisiones", "referencia"]);
+    // 🔴 `catalogos → boston` entra el 27-ago-2026: David gana Catálogos
+    // («catalogo para david si, solo eso») y su fila de `role_permissions` dice
+    // ["boston"] hasta que corra la DDL 20260902130000. Entrada DELIBERADA, con
+    // su fecha de retiro escrita, igual que las otras dos.
+    expect(Object.keys(MODULO_HEREDA_PERMISO_DE).sort()).toEqual(["catalogos", "comisiones", "referencia"]);
+    expect(MODULO_HEREDA_PERMISO_DE["catalogos"]).toBe("boston");
     expect(MODULO_HEREDA_PERMISO_DE["saldos-banco"]).toBeUndefined();
     expect(MODULO_HEREDA_PERMISO_DE["referencia"]).toBe("catalogos");
     expect(MODULO_HEREDA_PERMISO_DE["comisiones"]).toBe("ventas");
