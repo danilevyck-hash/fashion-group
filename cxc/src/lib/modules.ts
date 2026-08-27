@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { asistenciaRoles, aprobacionesRoles } from "@/lib/asistencia/roles";
 import { MODULO_BOSTON, ROL_BOSTON, ROLES_MODULO_BOSTON } from "@/lib/boston/rol";
+import { catalogoRoles } from "@/lib/catalogo/roles";
 
 export type ModuleGroup =
   | "ventas-clientes"
@@ -153,7 +154,12 @@ export const ALL_MODULES: AppModule[] = [
   { key: MODULO_BOSTON,   label: "Confecciones Boston", href: "/boston",         icon: Factory,          roles: [...ROLES_MODULO_BOSTON],                      group: "ventas-clientes" },
   { key: "directorio",    label: "Clientes",           href: "/clientes",         icon: Contact,          roles: ["admin", "secretaria", "vendedor"],           group: "ventas-clientes" },
   { key: "proveedores",   label: "Proveedores",        href: "/proveedores",      icon: Building2,        roles: ["admin", "contabilidad"],                     group: "ventas-clientes" },
-  { key: "catalogos",     label: "Catálogos",          href: "/catalogos/marcas", icon: BookOpen,         roles: ["admin", "secretaria", "vendedor", "bodega"], group: "ventas-clientes" },
+  // 🔑 `roles[]` sale de `catalogoRoles()` en vez de escribirse acá: es la MISMA
+  // lista que usan el hub y el GET de `/api/catalogo/[marca]/products`, y hay
+  // candado que exige que sean iguales (`comprobantes-nombre-y-tipo.test.ts`).
+  // Una copia a mano es la que un día queda vieja y le pinta a alguien una ficha
+  // que la API le rebota — el bug de `boston-roles.ts`, otra vez.
+  { key: "catalogos",     label: "Catálogos",          href: "/catalogos/marcas", icon: BookOpen,         roles: catalogoRoles(),                               group: "ventas-clientes" },
 
   // Operación
   { key: "guias",          label: "Guías de Despacho", href: "/guias",            icon: Truck,         roles: ["admin", "secretaria", "bodega", "vendedor"], group: "operacion" },
@@ -308,7 +314,56 @@ export const MODULO_HEREDA_PERMISO_DE: Record<string, string> = {
   //
   // Se retira cuando la DDL esté corrida (verificable en `role_permissions`).
   "comisiones": "ventas",
+  // 🔴 Catálogos para DAVID (27-ago-2026). Daniel, textual: «catalogo para
+  // david si, solo eso». Mientras la DDL 20260902130000 no corra, la ficha se
+  // enciende para quien ya tiene `boston`.
+  //
+  // 🩸 POR QUÉ HACE FALTA, MEDIDO: `getVisibleModules` le da PRIORIDAD a
+  // `fg_modules` (la lista guardada en `role_permissions`), y en producción esa
+  // lista es `["boston"]` — sin `catalogos`. Así que agregarle el rol al módulo,
+  // SOLO, no le pinta nada en el menú: el día del deploy David seguiría sin la
+  // ficha y Daniel vería que «no se hizo». Este repo tiene DDLs pendientes de
+  // correr desde hace semanas; la pantalla tiene que funcionar ANTES.
+  //
+  // `boston` es el padre correcto y no una elección cómoda: es el ÚNICO módulo
+  // que David tiene, o sea el único permiso del que puede heredar. Mismo caso
+  // que `referencia → catalogos` y `comisiones → ventas`.
+  //
+  // ⚠️ Esto NO le abre `/boston` a nadie: la herencia va del padre AL HIJO, y el
+  // recorte por `roles[]` (ver `fgModulesIncluye`) la acota a los roles que
+  // `catalogos` declara. Tampoco encadena: `referencia` hereda de `catalogos`,
+  // pero `fgModulesIncluye` mira UN solo nivel y `referencia.roles[]` no nombra
+  // a `gerente_boston`.
+  //
+  // Se retira cuando la DDL esté corrida (verificable en `role_permissions`).
+  "catalogos": MODULO_BOSTON,
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LA CASA DE UN ROL — a dónde aterriza aunque tenga MÁS de un módulo
+//
+// El auto-redirect de `/home` es «rol con UN solo módulo → llevalo ahí», y con
+// eso alcanzaba mientras David tenía únicamente `boston`. Al ganar Catálogos
+// pasa a tener DOS, el redirect se apaga y aterrizaría en el Inicio del GRUPO
+// — que es exactamente la fuga nº 2 que el #659 tapó.
+//
+// 🔑 Su casa NO cambió: sigue siendo Boston. Catálogos es una ficha más del
+// menú, alcanzable desde el sidebar y el drawer como cualquier otra.
+//
+// ⚠️ El destino se resuelve contra los módulos VISIBLES: si un día alguien le
+// quitara `boston` a mano, `/home` no lo mandaría a una pantalla que no puede
+// ver — se comportaría como cualquier otro rol.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Rol → la key del módulo donde aterriza al entrar, aunque tenga varios. */
+export const MODULO_CASA_POR_ROL: Record<string, string> = {
+  [ROL_BOSTON]: MODULO_BOSTON,
+};
+
+/** La casa de este rol, o `null` si no tiene una fijada. */
+export function moduloCasaDeRol(role: string): string | null {
+  return MODULO_CASA_POR_ROL[role] ?? null;
+}
 
 /** ¿La lista de módulos guardada le da acceso a este módulo? Directo, o
  *  heredado del módulo del que éste salió.
@@ -323,6 +378,16 @@ function fgModulesIncluye(fgModules: string[], modulo: AppModule, role: string):
   if (fgModules.includes(modulo.key)) return true;
   const heredaDe = MODULO_HEREDA_PERMISO_DE[modulo.key];
   return heredaDe ? fgModules.includes(heredaDe) && modulo.roles.includes(role) : false;
+}
+
+/** ¿La lista guardada en `fg_modules` le da acceso a este módulo — directo o
+ *  heredado? Es la MISMA regla que usa el menú, expuesta para los guards que
+ *  solo tienen la lista y la key (hoy: `CatalogoAuthGuard`). Sin esto, un
+ *  módulo prestado se pinta en el menú y la página lo rebota. */
+export function fgModulesDaAcceso(fgModules: string[], moduleKey: string, role: string): boolean {
+  const modulo = ALL_MODULES.find((m) => m.key === moduleKey);
+  if (!modulo) return false;
+  return fgModulesIncluye(fgModules, modulo, role);
 }
 
 /** Filtra módulos visibles para un rol. Si hay fgModules (permisos custom),

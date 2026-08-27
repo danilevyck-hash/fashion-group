@@ -3,7 +3,8 @@
 // Dos niveles, y solo dos:
 //
 //   CATALOGO_ROLES        → ver el catálogo interno (hub, catálogo por marca,
-//                           armar pedidos). admin, secretaria, vendedor, bodega.
+//                           armar pedidos). admin, secretaria, vendedor, bodega
+//                           y gerente_boston (27-ago-2026, ver abajo).
 //   CATALOGO_ADMIN_ROLES  → ADMINISTRAR el catálogo de una marca: subir/cambiar
 //                           fotos (incluido el ZIP del banco B2B y el selector
 //                           de variantes), etiquetas, ocultar productos del
@@ -25,9 +26,61 @@
 // Lo que NO se administra desde acá (a propósito): los PRECIOS los manda
 // Switch — la allow-list de campos editables a mano es image_url/badge (+name
 // solo en Tommy). Ver src/app/api/catalogo/[marca]/products/route.ts.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 DAVID (`gerente_boston`) VE EL CATÁLOGO — solo VER (27-ago-2026)
+//
+// Daniel, textual: ***«catalogo para david si, solo eso»***.
+//
+// ### Este bloque CAMBIÓ DE DIRECCIÓN, no se borró
+//
+// El #659 dejó Catálogos AFUERA del módulo de David y el motivo era bueno: las
+// 4 marcas (Reebok, Joybees, Tommy, Calvin) son de `active_shoes`, `joystep`,
+// `fashion_shoes` y `vistana` — **cuatro empresas de Fashion Group**—, y la
+// frase de Daniel era *«no quiero que vea info de fashion group»*. **No existe
+// un catálogo de Confecciones Boston.** Se paró en vez de construirlo y se le
+// pasó la decisión. **Daniel decidió que sí, sabiendo eso.** Lo que se movió es
+// su decisión, no el mecanismo: la lista sigue siendo UNA y las tres capas se
+// siguen derivando de acá.
+//
+// ### 🔴 «VER» ES **UNA** LISTA, Y LAS OTRAS TRES NO SE TOCARON
+//
+// `CATALOGO_ROLES`        → VER el catálogo.        + **gerente_boston**
+// `CATALOGO_ADMIN_ROLES`  → administrar la marca.   gerente_boston **NO**
+// `COMPROBANTES_ROLES`    → VER la lista de pedidos. gerente_boston **NO**
+// `cfg.createRoles`       → ARMAR pedidos.           gerente_boston **NO**
+//
+// 🔑 **Y por eso NO es «como bodega».** Bodega entró a `COMPROBANTES_ROLES` el
+// 25-ago; David no. Los pedidos de esas 4 marcas traen el **cliente** y el
+// **monto** de cada venta del grupo — o sea justo lo que la regla de Boston
+// protege. Ver ≠ ver los pedidos.
+//
+// ### Qué le abre EXACTAMENTE agregarlo acá, medido ruta por ruta
+//
+// Solo DOS superficies leen esta lista: el hub `/catalogos/marcas` y el
+// **GET** de `/api/catalogo/[marca]/products`. Todo lo demás del módulo deriva
+// de otra lista y le sigue contestando **403**: `orders` (comprobantesRoles),
+// `clientes-switch` y `vendedores-switch` (clienteSwitchRoles ← createRoles),
+// `clientes-search`, `sync-status`, `permiso-precio`, `send-order`,
+// `checkout`, `pedidos-export`, `pedidos-unificado`, `upload`, `products`
+// (PUT/POST), `variantes` y `pedidos-publicos`.
+//
+// 🔑 **El catálogo NO muestra costo ni margen, y no es una decisión de esta
+// lista: es la forma de la consulta.** `MARCAS_CONFIG[*].products.cols` enumera
+// las columnas que viajan y la única de plata es **`price`** (el precio de
+// VENTA, el mismo que ve el cliente en el catálogo público). No hay `costo`,
+// `cif`, `fob` ni `margen` en ninguna de las 4 marcas — y el margen del grupo
+// vive en OTRO módulo (Ventas › Referencia), que a él le sigue dando 403.
+// ─────────────────────────────────────────────────────────────────────────────
 
-/** Ven el catálogo interno (no necesariamente lo administran). */
-export const CATALOGO_ROLES = ["admin", "secretaria", "vendedor", "bodega"] as const;
+import { ROL_BOSTON } from "@/lib/boston/rol";
+
+/** Ven el catálogo interno (no necesariamente lo administran).
+ *  🔴 `ROL_BOSTON` está desde el 27-ago-2026 — **solo para mirar**. Se DERIVA
+ *  de `lib/boston/rol.ts` en vez de escribirse: el rol se dice UNA vez, y una
+ *  copia a mano es exactamente el bug que dejó a los 3 vendedores tocando una
+ *  pestaña que siempre les contestaba 403 (ver `boston-roles.ts`). */
+export const CATALOGO_ROLES = ["admin", "secretaria", "vendedor", "bodega", ROL_BOSTON] as const;
 
 /** Administran el catálogo de cualquier marca (fotos, etiquetas, ocultar,
  *  pedidos). Mismo par que `ADMIN_ROLES` de lib/api-auth, que es el que ya

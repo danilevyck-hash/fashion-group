@@ -199,7 +199,13 @@ describe("🔴 CONDUCTA — lo que el GET /orders manda de verdad", () => {
 
 describe("🔴 las listas de roles y los guards del servidor, intactos", () => {
   it("las dos listas siguen congeladas", () => {
-    expect([...CATALOGO_ROLES]).toEqual(["admin", "secretaria", "vendedor", "bodega"]);
+    // 🔴 gerente_boston entró a VER el 27-ago-2026 («catalogo para david si,
+    // solo eso»). NO entró a COMPROBANTES_ROLES — se verifica abajo.
+    expect([...CATALOGO_ROLES]).toEqual([
+      "admin", "secretaria", "vendedor", "bodega", "gerente_boston",
+    ]);
+    expect(CATALOGO_ROLES as readonly string[]).toContain("gerente_boston");
+    expect(COMPROBANTES_ROLES as readonly string[]).not.toContain("gerente_boston");
     expect([...CATALOGO_ADMIN_ROLES]).toEqual(["admin", "secretaria"]);
   });
 

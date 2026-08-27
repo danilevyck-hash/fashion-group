@@ -111,8 +111,16 @@ describe("david nace sin poder entrar", () => {
       const j = await res.json();
       expect(j.userName).toBe("david");
       expect(j.role).toBe("gerente_boston");
-      // 🔴 Y con UN solo módulo: es lo que dispara el auto-redirect a /boston.
-      expect(j.modules).toEqual(["boston"]);
+      // 🔴 Y con SUS módulos: `boston` + `catalogos`.
+      //
+      // ⚠️ CAMBIÓ DE DIRECCIÓN el 27-ago-2026. Exigía UN solo módulo —lo que
+      // disparaba el auto-redirect de «rol de módulo único»— y Daniel decidió
+      // después: «catalogo para david si, solo eso». Con dos módulos ese
+      // redirect ya no lo alcanza: lo que lo aterriza en /boston es su CASA
+      // (`moduloCasaDeRol`), y eso lo vigila `boston-acceso.test.ts`. Lo que NO
+      // se aflojó es el invariante: la lista sigue siendo EXACTA, así que un
+      // tercer módulo pone el build rojo.
+      expect([...j.modules].sort()).toEqual(["boston", "catalogos"]);
     } finally {
       USUARIOS[0].password = CENTINELA;
     }

@@ -206,7 +206,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | Contabilidad | `contabilidad` | prestamos, proveedores, ventas, búsqueda global (ventas+prestamos). En API directorio solo lectura (GET), no edición |
 | Vendedor | `vendedor` | catálogos (**solo ver** + armar pedidos), CXC, directorio, guías (solo lectura), búsqueda global (CXC+directorio) |
 | Gerente ACS | `gerente_acs` | SOLO Multifashion (/multifashion + /api/multifashion/*), y **el módulo COMPLETO** — todo el histórico, igual que admin (ver nota abajo). Auto-redirect a Multifashion desde home (único módulo). Módulos vía `role_permissions` |
-| Gerente Confecciones Boston | `gerente_boston` | SOLO Confecciones Boston (/boston + /api/boston/*), la cartera `/api/cxc/boston` y la planilla de Boston. Auto-redirect a /boston desde home (único módulo). **NO ve la búsqueda global, ni el CXC del grupo, ni Ventas, ni Comisiones, ni Catálogos, ni Guías.** Módulos vía `role_permissions` |
+| Gerente Confecciones Boston | `gerente_boston` | Confecciones Boston (/boston + /api/boston/*), la cartera `/api/cxc/boston`, la planilla de Boston, y **Catálogos solo para VER** (27-ago-2026). Aterriza en /boston desde home por su CASA (`MODULO_CASA_POR_ROL`), no por el auto-redirect de módulo único. **NO ve la búsqueda global, ni el CXC del grupo, ni Ventas, ni Comisiones, ni Guías, ni la lista de comprobantes, ni administrar catálogos.** Módulos vía `role_permissions` |
 
 > Roles reales del sistema = los 7 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
 
@@ -339,6 +339,84 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 > **`isHash()` en `src/app/api/auth/route.ts` saltea toda contraseña que no empiece con `$2a$`/`$2b$`, así que el login es IMPOSIBLE hasta que alguien le ponga una de verdad.** Fail-closed por construcción, y probado por CONDUCTA llamando al handler REAL: el centinela da 401, una contraseña bien hasheada da 200, y cuando David tenga la suya entra con `modules: ["boston"]` — o sea el único módulo que dispara el auto-redirect.
 >
 > 🔑 **DÓNDE SE LE PONE:** Daniel entra a **Usuarios** (`/admin/usuarios`), toca **david**, escribe la contraseña y guarda. Eso la hashea con bcrypt(10) y verifica que no choque con la de nadie más (mínimo 8 caracteres).
+
+> ## 🔴 DAVID VE EL CATÁLOGO — solo VER, y su casa sigue siendo Boston (27-ago-2026)
+>
+> Daniel, textual: ***«catalogo para david si, solo eso»***.
+>
+> ### Este bloque CAMBIÓ DE DIRECCIÓN, no se borró
+>
+> El #659 dejó Catálogos AFUERA a propósito y el motivo era bueno: las 4 marcas (Reebok, Joybees, Tommy, Calvin) son de `active_shoes`, `joystep`, `fashion_shoes` y `vistana` — **cuatro empresas de Fashion Group** —, no existe un catálogo de Confecciones Boston, y la frase de Daniel era *«no quiero que vea info de fashion group»*. **Se paró en vez de construirlo y se le pasó la decisión. Él decidió que sí, sabiendo eso.** Lo que se movió es su decisión, no el mecanismo.
+>
+> ### 🔴 QUÉ SE LE ABRIÓ, EXACTAMENTE — DOS superficies, medidas ruta por ruta
+>
+> `gerente_boston` entró a **UNA** lista, `CATALOGO_ROLES` (`lib/catalogo/roles.ts`), y solo dos cosas la leen: el **hub** `/catalogos/marcas` y el **GET** de `/api/catalogo/[marca]/products`. Todo lo demás del módulo deriva de otra lista y **le contesta 403**, medido con cookies FIRMADAS contra los handlers REALES en las **4 marcas**:
+>
+> | | |
+> |---|---|
+> | **VE** | el hub · el catálogo por marca (fotos, código, nombre, existencia, disponibilidad y el **precio de VENTA**) |
+> | **403** | la lista de comprobantes · el feed del panel de admin · crear un pedido · exportarlos a Excel · mandarlo por correo · el checkout · editar un producto · el directorio de **clientes de Switch** · los **vendedores de Switch** · la búsqueda del directorio · el estado del sync · el permiso de precio |
+>
+> 🔑 **Y por eso NO es «como bodega».** Bodega entró a `COMPROBANTES_ROLES` el 25-ago; **David no**. Los pedidos de esas 4 marcas traen el **cliente** y el **monto** de cada venta del grupo — justo lo que la regla de Boston protege. **Ver ≠ ver los pedidos.**
+>
+> 🔑 **EL CATÁLOGO NO MUESTRA COSTO NI MARGEN, y no es una decisión de la lista de roles: es la forma de la consulta.** `MARCAS_CONFIG[*].products.cols` enumera las columnas que viajan y la única de plata es **`price`** — el precio de VENTA, el mismo que ve el cliente final en el catálogo público. No hay `costo`, `cif`, `fob` ni `margen` en ninguna de las 4 marcas, y hay un caso que lo lee sobre la **respuesta REAL**, no sobre la constante. El margen del grupo vive en OTRO módulo (Ventas › Referencia) y ahí le sigue dando 403.
+>
+> ⚠️ **Lo que SÍ ve del grupo, dicho de frente:** el catálogo de venta de 4 marcas del grupo —fotos, códigos, existencias y precio de lista—, que es exactamente lo que Daniel pidió. **Es información del grupo.** No es plata (ni cartera, ni ventas, ni márgenes, ni clientes, ni pedidos), pero no es cero.
+>
+> ### 🔴 SIGUE SIN SER UNA PESTAÑA DE `/boston`
+>
+> Las 6 pestañas (`PESTANAS_BOSTON`) **no se tocaron**: son de Confecciones Boston, y el catálogo es del grupo. Meterlo ahí diría que es parte de su empresa, que es falso. Vive donde vive para todo el mundo: su ficha en el menú y `/catalogos/marcas`.
+>
+> ### 🔴 EL ATERRIZAJE — la fuga nº 2, que este cambio podía reabrir
+>
+> El auto-redirect de `/home` es «rol con UN solo módulo → llevalo ahí», y con dos módulos **deja de alcanzarlo**: sin reemplazo, David aterrizaría en el **Inicio del GRUPO**, que es exactamente la fuga que el #659 tapó.
+>
+> **`MODULO_CASA_POR_ROL` (`lib/modules.ts`): la CASA de un rol es el módulo donde aterriza aunque tenga varios.** La de David sigue siendo Boston.
+> - **El destino se resuelve contra los módulos VISIBLES**: si un día le quitaran `boston`, `/home` no lo mandaría a una pantalla que no puede ver.
+> - **`/home` NO nombra el rol** (`moduloCasaDeRol(role)`, no un `role === "…"`): el rol se dice UNA vez, en `lib/boston/rol.ts`. Y el candado que exige que `/home` no escriba `"gerente_boston"` sigue verde.
+> - **El auto-redirect de módulo único NO se retiró**: sigue mandando a bodega a Guías y a Jennifer a Multifashion.
+>
+> ### 🔴 LAS DOS FUGAS DEL #659, RE-MEDIDAS
+>
+> Agregar un módulo es justo el cambio que puede reabrirlas, así que se vuelven a medir con los handlers reales, no de palabra: **la búsqueda global le contesta 403** (y a admin no: el 403 prueba algo) y **el Inicio del grupo lo sigue esquivando**, ahora por su casa. El CXC del grupo, Ventas, Comisiones y las otras 14 rutas ajenas de `boston-acceso.test.ts` **siguen en 403 sin tocar una línea**.
+>
+> ### ⚠️ DDL ADITIVA — **YA CORRIDA** (27-ago-2026), y la app funcionaba ANTES
+>
+> `supabase/migrations/20260902130000_boston_catalogos.sql` le agrega `catalogos` a `role_permissions.gerente_boston` con `array_append` (no escribe la lista completa: eso le borraría un módulo futuro). Medido antes y después — **`gerente_boston: ["boston"] → ["boston","catalogos"]` y las otras 6 filas IDÉNTICAS**; corrida dos veces seguidas, sigue en dos.
+> - 🩸 **Y la app funcionaba antes, por DOS mecanismos y hacían falta los dos.** `MODULO_HEREDA_PERMISO_DE["catalogos"] = "boston"` enciende la ficha en el menú… **y no alcanzaba**: `CatalogoAuthGuard` mira `sessionStorage.fg_modules` con un `includes` a mano, así que la ficha se pintaba y la pantalla lo **rebotaba a `/`** — un botón que saca de la app se lee como que la app está rota. El guard pasa a preguntar con `fgModulesDaAcceso`, **la MISMA regla del menú**. Con dos reglas, el menú ofrece lo que la página rechaza.
+> - ⚠️ **La conducta de los demás NO cambia**: admin, secretaria, vendedor y bodega tienen `catalogos` DIRECTO, y el permiso directo sigue mandando sin mirar roles. Hay caso que lo prueba montando el guard.
+> - **La herencia se retira del código cuando la DDL esté verificada**, no antes. Ya lo está: queda como red mientras haya sesiones vivas con el `fg_modules` viejo (el login lo copia una sola vez).
+>
+> ### Medición
+>
+> **Los 3 anchos + el iPad ACOSTADO, en el navegador contra el build de PRODUCCIÓN, con datos de producción, en las 5 pantallas (hub + las 4 marcas) y CONTRA UN BASELINE** (`bash scripts/_medir-boston-catalogo.sh`, y `ROL=vendedor` para el baseline; solo lectura — el navegador **aborta todo pedido que no sea GET/HEAD**):
+>
+> | 390 · 834 · 1024 · 1440 × 5 pantallas = 20 casos | David | vendedor (baseline) |
+> |---|---:|---:|
+> | arrastre de página | **0 px** | **0 px** |
+> | recortados | 271 | **271** |
+> | táctiles < 44 px | 710 | **710** |
+> | textos < 12 px | 8.745 | **8.745** |
+> | **«Administrar»** | **0** | 0 |
+> | **«Pedidos»** | **0** | **32** |
+>
+> 🔴 **Los cuatro números de layout salen IDÉNTICOS a los del rol que YA tenía el catálogo: son PRE-EXISTENTES del catálogo**, que este cambio no toca — los `truncate` del nombre, el «Agregar» de 204×38 px, el «← Inicio» de 47×34 y los «Bulto de 12» a 10 px. Lo único que difiere es lo que tenía que diferir: los 32 botones «Pedidos» que el vendedor ve y David **no**.
+> - 🩸 **El baseline se mide con EL MISMO ARCHIVO** (`ROL=`): dos scripts distintos no comparan nada. Y el script **exige** que el vendedor SÍ vea «Pedidos» — si no, el medidor está roto y el «0» de David no probaría nada.
+> - 🩸 **A David se le siembra `fg_modules = ["boston"]` A PROPÓSITO**: es el caso PEOR (la DDL sin correr) y lo que prueba que la herencia y el guard hacen su trabajo. El script **falla si la pantalla lo rebota**, si el catálogo no dibuja productos o si aparece un botón prohibido.
+> - 🩸 **Antes de creerle a la medición hay que verificar que el servidor es el TUYO**: un `next start` que muere por EADDRINUSE deja al medidor midiendo el build de otro worktree (ya pasó en este repo). `scripts/_serve-medicion-3521.sh` se niega a arrancar si el puerto está tomado.
+>
+> ### Candados
+>
+> **`src/__tests__/api/boston-ve-catalogo.test.ts` (40)** — CONDUCTA: llama a los handlers REALES con cookies FIRMADAS, exige **200 con filas** en `products` (4 marcas), **403 en las 12 rutas ajenas** (4 marcas), que **admin entre a esas mismas rutas**, que la respuesta real no traiga costo ni margen, y **re-mide las dos fugas del #659**. Y **`src/__tests__/components/catalogo-guard-modulo-prestado.test.tsx` (7)**, que MONTA el guard y mira si el hijo llegó a la pantalla — que el archivo importe `fgModulesDaAcceso` no prueba que lo llame.
+> - **Candados que CAMBIARON DE DIRECCIÓN** (los cuatro estaban fijando lo viejo, y los cuatro hicieron su trabajo: frenaron el build hasta que la decisión quedó escrita): `boston-acceso.test.ts` exigía UN solo módulo · `catalogo-roles.test.ts` congelaba la lista de VER en cuatro roles · `boston-david-sin-contrasena.test.ts` exigía `modules: ["boston"]` en el login REAL · `saldos-banco-modulo.test.ts` congelaba la lista de herencias. **Ninguno se aflojó**: siguen siendo listas EXACTAS y un módulo de más pone el build rojo.
+> - **Verificado por mutación, 16 de 16 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-boston-catalogo.sh`): David pierde el catálogo · gana ADMINISTRAR · gana la LISTA DE COMPROBANTES · gana editar/duplicar · la ficha escribe su propia lista de roles · la ficha se abre a todos · **David pierde su CASA y cae en el Inicio del grupo** · `/home` deja de aterrizar al rol con casa · `/home` pierde el auto-redirect de módulo único · todos los roles caen en Boston · se cae la herencia (sin la DDL la ficha no se pinta) · la herencia deja de recortar por `roles[]` · **el guard vuelve al `includes` a mano y lo rebota** · el guard deja pasar a cualquiera · **Catálogos vuelve como pestaña de `/boston`** · el módulo Boston se le abre a otro rol.
+> - 🩸 **Tres sobrevivieron en la primera corrida y las tres eran huecos REALES, no falsos positivos**: `CatalogoAuthGuard` no tenía UN solo test (por eso existe el archivo nuevo) y una mutación estaba mal escrita. **Un verificador que da 13/16 y se publica igual es peor que no correrlo.**
+> - 🩸 El script restaura **por COPIA** (hay archivos NUEVOS y el checkout de git aborta el comando entero sin restaurar nada), el reemplazo es **LITERAL con python** (con `perl -0pi -e 's|…|…|'` el `||` del código real des-escapa el delimitador y **se come el archivo**, dejando un «SOBREVIVIÓ» falso), **denuncia el patrón que no muta**, **exige que vitest haya colectado tests** antes de creerle a un cero, y trae una **mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido vacío.
+>
+> ### ⚠️ Queda ABIERTO — decide Daniel
+>
+> - **La lista de comprobantes.** Hoy le da 403 a propósito: trae el cliente y el monto de cada venta de las 4 marcas del grupo. Si Daniel quiere que también la vea, es agregarlo a `COMPROBANTES_ROLES` — una decisión suya, no un refactor.
+> - **Administrar el catálogo** (fotos, badges, ocultar, mandar a Switch) sigue en admin + secretaria y no se tocó.
 
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):

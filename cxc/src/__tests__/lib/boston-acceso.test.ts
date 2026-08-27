@@ -29,10 +29,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { signSession } from "@/lib/session-cookie";
 import {
   ALL_MODULES,
+  MODULO_HEREDA_PERMISO_DE,
   SYSTEM_ROLE_KEYS,
+  fgModulesDaAcceso,
   getDefaultModulesForRole,
   getVisibleModules,
+  moduloCasaDeRol,
 } from "@/lib/modules";
+import {
+  CATALOGO_ADMIN_ROLES,
+  CATALOGO_ROLES,
+  COMPROBANTES_EDITAR_ROLES,
+  COMPROBANTES_ROLES,
+} from "@/lib/catalogo/roles";
+import { MARCAS_CONFIG, getMarcaConfig } from "@/lib/catalogo/marcas";
 import {
   EMPRESA_BOSTON,
   MODULO_BOSTON,
@@ -186,14 +196,21 @@ describe("candado estructural — /api/boston/**", () => {
 // 2. Boston es su ÚNICO módulo — rol por rol
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("gerente_boston — un solo módulo", () => {
-  it("sus módulos por defecto son exactamente ['boston']", () => {
-    expect(getDefaultModulesForRole(ROL)).toEqual([MODULO_BOSTON]);
+describe("gerente_boston — Boston y Catálogos, y NADA más", () => {
+  // 🔴 ESTE BLOQUE CAMBIÓ DE DIRECCIÓN el 27-ago-2026. Exigía UN solo módulo, y
+  // era correcto el día que se escribió. Daniel decidió después: «catalogo para
+  // david si, solo eso». Lo que NO se aflojó es el invariante: la lista sigue
+  // siendo EXACTA y cerrada, y un tercer módulo pone el build rojo. El candado
+  // hizo su trabajo — frenó hasta que la decisión quedó escrita.
+  const SUS_MODULOS = [MODULO_BOSTON, "catalogos"];
+
+  it("sus módulos por defecto son exactamente ['boston', 'catalogos']", () => {
+    expect(getDefaultModulesForRole(ROL).sort()).toEqual([...SUS_MODULOS].sort());
   });
 
   it("ningún OTRO módulo del catálogo lo nombra en su roles[]", () => {
-    const conElRol = ALL_MODULES.filter(m => m.roles.includes(ROL)).map(m => m.key);
-    expect(conElRol).toEqual([MODULO_BOSTON]);
+    const conElRol = ALL_MODULES.filter(m => m.roles.includes(ROL)).map(m => m.key).sort();
+    expect(conElRol).toEqual([...SUS_MODULOS].sort());
   });
 
   it("y el módulo que sí es suyo no se le abrió a nadie más de rebote", () => {
@@ -237,15 +254,51 @@ describe("gerente_boston — un solo módulo", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("gerente_boston — /home lo manda solo a Boston", () => {
-  it("con un único módulo visible, el destino es /boston", () => {
-    const visibles = getVisibleModules(ROL, [MODULO_BOSTON]);
-    expect(visibles).toHaveLength(1);
-    expect(visibles[0].href).toBe("/boston");
+  // 🔴 CON DOS MÓDULOS EL REDIRECT DE «MÓDULO ÚNICO» YA NO LO ALCANZA, y sin
+  // reemplazo caería en el Inicio del GRUPO — la fuga nº 2, de vuelta. Lo que
+  // lo aterriza es su CASA (`moduloCasaDeRol`), que sigue siendo Boston.
+  it("su casa es Boston, y ningún otro rol tiene casa fijada", () => {
+    expect(moduloCasaDeRol(ROL)).toBe(MODULO_BOSTON);
+    for (const rol of SYSTEM_ROLE_KEYS) {
+      if (rol === ROL) continue;
+      expect(moduloCasaDeRol(rol), `${rol} ganó una casa`).toBeNull();
+    }
   });
 
-  it("aunque `fg_modules` llegue vacío, el fallback da el mismo único módulo", () => {
+  it("con sus DOS módulos visibles, el destino sigue siendo /boston", () => {
+    const visibles = getVisibleModules(ROL, [MODULO_BOSTON, "catalogos"]);
+    expect(visibles.map(m => m.key).sort()).toEqual([MODULO_BOSTON, "catalogos"].sort());
+    const casa = visibles.find(m => m.key === moduloCasaDeRol(ROL));
+    expect(casa?.href).toBe("/boston");
+  });
+
+  it("y ANTES de que corra la DDL también: `catalogos` se hereda de `boston`", () => {
+    // En producción su fila dice ["boston"]. Sin la herencia, la ficha no se
+    // pinta el día del deploy y Daniel ve que «no se hizo».
+    expect(MODULO_HEREDA_PERMISO_DE["catalogos"]).toBe(MODULO_BOSTON);
+    const visibles = getVisibleModules(ROL, [MODULO_BOSTON]);
+    expect(visibles.map(m => m.key).sort()).toEqual([MODULO_BOSTON, "catalogos"].sort());
+    expect(visibles.find(m => m.key === moduloCasaDeRol(ROL))?.href).toBe("/boston");
+  });
+
+  it("🔴 la herencia NO le abre `boston` ni `referencia` a nadie más", () => {
+    // La herencia va del padre AL HIJO y se acota por el `roles[]` del hijo.
+    for (const rol of SYSTEM_ROLE_KEYS) {
+      if (rol === "admin") continue;
+      // nadie hereda Boston por tener catálogos
+      expect(fgModulesDaAcceso(["catalogos"], MODULO_BOSTON, rol), `${rol} heredó Boston`)
+        .toBe(rol === ROL ? fgModulesDaAcceso(["catalogos"], MODULO_BOSTON, rol) : false);
+    }
+    // `referencia` hereda de `catalogos`, pero no nombra a gerente_boston:
+    // la herencia mira UN solo nivel y además recorta por roles[].
+    expect(fgModulesDaAcceso([MODULO_BOSTON], "referencia", ROL)).toBe(false);
+    expect(fgModulesDaAcceso(["catalogos"], "referencia", ROL)).toBe(false);
+  });
+
+  it("aunque `fg_modules` llegue vacío, el fallback da sus dos módulos", () => {
     for (const fg of [null, undefined, [] as string[]]) {
-      expect(getVisibleModules(ROL, fg).map(m => m.key)).toEqual([MODULO_BOSTON]);
+      expect(getVisibleModules(ROL, fg).map(m => m.key).sort())
+        .toEqual([MODULO_BOSTON, "catalogos"].sort());
     }
   });
 
@@ -254,6 +307,12 @@ describe("gerente_boston — /home lo manda solo a Boston", () => {
     expect(src).toMatch(/getVisibleModules\(\s*role\s*,\s*fgModules\s*\)/);
     expect(src).toMatch(/visible\.length\s*===\s*1/);
     expect(src).toMatch(/router\.push\(\s*visible\[0\]\.href\s*\)/);
+  });
+
+  it("🔴 y el /home aterriza al rol con CASA aunque tenga varios módulos", () => {
+    const src = sinComentarios(leer("src/app/home/page.tsx"));
+    expect(src).toMatch(/moduloCasaDeRol\(\s*role\s*\)/);
+    expect(src).toMatch(/router\.push\(\s*casa\.href\s*\)/);
   });
 
   it("🔴 y el /home NO le dibuja la búsqueda global (fuga nº 1, lado pantalla)", () => {

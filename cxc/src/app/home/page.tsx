@@ -6,7 +6,7 @@ import Link from "next/link";
 import FGLogo from "@/components/FGLogo";
 import SearchBar from "@/components/SearchBar";
 import IconButton from "@/components/IconButton";
-import { getVisibleGroups, getVisibleModules, getModulesInGroup, type AppModule } from "@/lib/modules";
+import { getVisibleGroups, getVisibleModules, getModulesInGroup, moduloCasaDeRol, type AppModule } from "@/lib/modules";
 import { recordModuleClick, getFrequentModules } from "@/lib/module-frequents";
 import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -68,6 +68,13 @@ export default function HomePage() {
   }, [authChecked, role]);
 
   // Auto-redirect si user tiene 1 solo modulo (ej: Bodega → Guías)
+  //
+  // 🔴 Y el rol que tiene UNA CASA aterriza ahí aunque tenga varios módulos.
+  // El gerente de Confecciones Boston ganó Catálogos el 27-ago-2026 y con eso
+  // dejó de ser "rol de un solo módulo": sin esta segunda rama caería en el
+  // Inicio del GRUPO, que es justo la fuga que su módulo vino a tapar. La casa
+  // sale de `moduloCasaDeRol` y no de un `role === "…"` a mano — el rol se dice
+  // en UN solo lugar (`lib/boston/rol.ts`).
   useEffect(() => {
     if (!authChecked || !role) return;
     if (role === "admin") return;
@@ -75,7 +82,10 @@ export default function HomePage() {
     const visible = getVisibleModules(role, fgModules);
     if (visible.length === 1) {
       router.push(visible[0].href);
+      return;
     }
+    const casa = visible.find((m) => m.key === moduloCasaDeRol(role));
+    if (casa) router.push(casa.href);
   }, [authChecked, role, fgModules, router]);
 
   // Aviso proactivo de Data Health (solo admin): si hay checks critical/warning,
