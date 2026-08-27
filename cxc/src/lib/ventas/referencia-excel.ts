@@ -43,12 +43,14 @@
 //     existencia total de bodega.** NO se fuerza el cuadre entre los tres: la
 //     columna "Nota" explica los huecos.
 //   · **Vendido · Meses** son las celdas de `medirVendidoMeses` (las MISMAS del
-//     modo pedido): Vendido es SIEMPRE el % real (Vendí ÷ Compré — Daniel:
-//     *"como stock 0 y vendido 90%?"*); Meses es el TIEMPO DE VENTA — hasta la
-//     última venta si el artículo está AGOTADO (cerrado ahí: la cola de bodega
-//     no lo infla), o desde la llegada hasta hoy si sigue vivo. Sin regla del
-//     90%: Daniel la eliminó del módulo entero (12-ago-2026). Vacío = no
-//     afirmable.
+//     modo pedido): Vendido es lo vendido ÷ **lo que de verdad hubo** (Vendí +
+//     Stock), NUNCA sobre lo comprado — el sistema no lee los ajustes de
+//     inventario de Switch, así que `Compré − Vendí ≠ Stock` y el viejo
+//     Vendí÷Compré decía 100% con una unidad en bodega (25-ago-2026). Meses es
+//     el TIEMPO DE VENTA — hasta la última venta si el artículo está AGOTADO
+//     (cerrado ahí: la COLA de bodega, ≤ `umbralTandaCero`, no lo infla), o
+//     desde la llegada hasta hoy si sigue vivo. Sin regla del 90%: Daniel la
+//     eliminó del módulo entero (12-ago-2026). Vacío = no afirmable.
 //   · **Todo monto va a 2 decimales**, también en la hoja "Compras".
 //
 // 🔴 La hoja 2 ("Compras") SÍ conserva el FOB CRUDO de Switch con su columna
@@ -133,7 +135,7 @@ export async function buildReferenciaSheet(
       `"Compré" es lo que llegó y "Vendí" lo vendido neto con las NC restadas · ` +
       `si la bodega quedó en 0 y volvió a llegar mercancía, "Compré", "Vendí", "Vendido" y "Meses" son de la ÚLTIMA LLEGADA (la que llegó sobre bodega en 0), igual que en pantalla; si no, son de toda la historia registrada · ` +
       `"Stock" es SIEMPRE la existencia total de Switch, NUNCA deducida y nunca recortada a una llegada — si no cuadra con Compré − Vendí, la Nota lo explica · ` +
-      `"Vendido" es lo REAL: Vendí ÷ Compré · ` +
+      `"Vendido" es lo REAL: Vendí ÷ (Vendí + Stock), o sea sobre lo que de verdad hubo — por eso con Stock 0 da 100% y con Stock a la vista da menos · ` +
       `"Meses" es el tiempo de venta, en meses calendario desde la llegada: hasta la última venta si está agotado (la cola en bodega no cuenta), o hasta hoy si sigue vivo · ` +
       `vacío en Vendido/Meses = no se puede afirmar · ` +
       `"Precio prom" es la venta real ÷ unidades, con los descuentos adentro · ` +
@@ -148,9 +150,10 @@ export async function buildReferenciaSheet(
       { header: "Stock", wch: 11, align: "right", fmt: "#,##0" },
       // 🔴 "Vendido" · "Meses" son LAS MISMAS dos celdas del modo pedido
       // (`medirVendidoMeses`, una sola función para pantalla y Excel):
-      // Vendido = el % REAL (Vendí÷Compré, siempre); Meses = el tiempo de
-      // venta (hasta la última venta si está agotado — cerrado ahí — o hasta
-      // hoy si sigue vivo). Vacío = no se puede afirmar.
+      // Vendido = lo vendido ÷ LO QUE HUBO (Vendí + Stock), nunca sobre lo
+      // comprado; Meses = el tiempo de venta (hasta la última venta si está
+      // agotado — cerrado ahí — o hasta hoy si sigue vivo). Vacío = no se
+      // puede afirmar.
       { header: "Vendido", wch: 9, align: "right", fmt: "0%" },
       { header: "Meses", wch: 8, align: "right", fmt: "#,##0" },
       { header: "Última compra", wch: 14 },
