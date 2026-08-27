@@ -3190,6 +3190,229 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > `BASE=… node scripts/_medir-correcciones-anchos.mjs` (solo lectura), en **5 estados** — reporte cerrado, detalle abierto, ventana de corregir, de deshacer y de agregar: **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px NUEVOS** en los 20 casos. El único recorte es el `H1.sr-only` y los textos de 10,5/10/11 px son las etiquetas de columna y el chip «Revisar» que el módulo ya tenía — **medidos IDÉNTICOS con y sin correcciones**, o sea que este cambio no agregó ni un texto chico (la primera versión sí: el chip y los «Agregar hora» salieron a 11 px y se subieron a 12). Modal con el patrón de la casa: `createPortal` + `inset-0` + `useBodyScrollLock`, **sin `autoFocus`**.
 > - 🩸 **La tabla no existe todavía en producción, así que la medición INTERCEPTA la respuesta de `/api/asistencia/reporte`** y le inyecta UNA corrección con la forma exacta que va a tener. Los datos siguen siendo los de producción y el componente medido es el REAL; no se toca la base ni se aprieta ningún botón que guarde. Sin eso no habría nada que medir y el script pasaría en verde sin haber mirado nada — por eso **falla** si no encuentra el aviso, el chip, la línea con la hora del reloj o el botón de guardar apagado.
 
+## 🔴 Asistencia — LA CASILLA «PRÉSTAMO» SE LLENA SOLA, CON APROBACIÓN (27-ago-2026)
+
+> La contadora, textual: ***«El préstamo si debe ser por aprobarlo»***.
+>
+> La casilla `Préstamo` del cuadro quincenal la tecleaba una persona mirando el
+> módulo de Préstamos **en otra pantalla**. Ahora la llena el propio módulo —y
+> queda editable— pero **el descuento se APRUEBA, no se aplica solo**.
+>
+> ### 🩸 EL HUECO, MEDIDO CONTRA PRODUCCIÓN (quincena 1 al 15 de agosto)
+>
+> | | |
+> |---|---:|
+> | el módulo de Préstamos registró | **9 deducciones · $360,00** |
+> | la casilla de la planilla decía | **7 montos · $265,00** |
+>
+> - **KEVIN LUBO ($50) · LUIS PARAJON ($45) · YULICAR CORONA ($50)** tenían la
+>   deducción registrada en el módulo y **la casilla en CERO**.
+> - **LUIS ARROYO** tenía **$50 en la casilla y NINGÚN pago en el módulo** — su
+>   préstamo estuvo atrapado en `pendiente_aprobacion` hasta el #651, así que la
+>   plata se le descontó del sueldo y el saldo del módulo **nunca bajó**.
+>   ⚠️ **Eso NO se corrigió desde acá**: es plata en producción y lo decide
+>   Daniel. Queda escrito.
+> - GABRIELA, MARÍA y LUZ no tenían descuento **y era correcto**: sus préstamos
+>   nacieron el 17, 18 y 20 de agosto, o sea DESPUÉS de esa quincena.
+>
+> ### 🔴 EL AMARRE: por CÓDIGO, y los que no cruzan van A MANO
+>
+> `prestamos_empleados` guarda un **nombre tecleado a mano** y la planilla
+> conoce a la gente por el **código del reloj**. Medido: de las **30 fichas de
+> préstamo, 18 cruzan por igualdad EXACTA** de nombre (mayúsculas + espacios) y
+> 12 no.
+>
+> Columna nueva **`prestamos_empleados.empleado_codigo`**
+> (`20260902120000_prestamos_amarre_codigo.sql`), con **DOS pasos y ninguno
+> adivina**:
+> - **PASO 1** — igualdad EXACTA de nombre **y** de empresa, y **solo con un
+>   único candidato** en la planilla. La traducción de empresa es una lista
+>   CERRADA con `ELSE NULL`: una empresa desconocida no ata «de más».
+> - **PASO 2** — **tres renglones escritos a mano**, cada uno con el nombre que
+>   ese código tiene que tener en la planilla, y el UPDATE **lo EXIGE**:
+>   `GABRIELA A. JARAMILLO P.`→53 · `LUIS ADRIAN ARROYO`→9 ·
+>   `MARIA BETHANCOURTH`→49. Si mañana renombran al 53, la migración deja de
+>   escribir esa fila en vez de atar el préstamo de Gabriela a otra persona.
+>
+> 🔴 **NADA POR PARECIDO. NI CON UN CASO BARATO.** Es la lección de
+> `Outlet Duty Free N2` vs `N3` (ver § Guías): dos nombres parecidos pueden ser
+> DOS personas, y un descuento a la persona equivocada **no deja rastro**. En
+> esta misma tabla está el caso que lo prueba: **`LAURA CASIANI` (Préstamos)
+> contra `Laura Lismari Casiano Vega` (código 38)** — CASIAN**I** y CASIAN**O**
+> no son la misma palabra. **Se queda SIN atar**, aunque su saldo sea $0 y atarla
+> hoy no costaría nada.
+>
+> **Resultado: 21 de 30 atadas, y las 14 con saldo vivo están TODAS atadas.**
+> Las 9 sin atar están en $0,00: `LAURA CASIANI` · `LUZ LOPEZ` ×2 (fichas viejas;
+> la viva es **LUZ BOSQUEZ**, que la contadora ya renombró y **cruza sola**) ·
+> `STEFANY`/`STEPHANY MORALES` · `YANKATERY` · `YEISON LLORENTE` ·
+> `JOHANA VALLEJO` ×2.
+>
+> 🔴 **UN PRÉSTAMO CON SALDO QUE NO ES DE NADIE SE DICE, EN ROJO.** Callarlo es
+> exactamente cómo se perdieron los $700 de LUIS ADRIAN ARROYO durante 22 días.
+>
+> ### 🔴 DE DÓNDE SALE EL NÚMERO — dos casos, no uno
+>
+> `src/lib/asistencia/prestamos-planilla.ts` (módulo PURO). **Acá NO se vuelve a
+> calcular el saldo**: llega ya calculado por la MISMA cuenta del módulo
+> (`prestado − pagado` sobre los movimientos aprobados y no borrados, la de
+> `prestamos_aplicar_quincena`).
+>
+> 1. **Si el módulo YA registró el descuento de ESTA quincena**, la casilla dice
+>    EXACTAMENTE eso — es un hecho consumado, no una estimación.
+> 2. **Si no**, dice `min(cuota, saldo)`, la fórmula de la RPC.
+>
+> 🩸 **El orden importa y el caso es real.** Si la contadora aprieta «Aplicar
+> quincena» ANTES de armar el cuadro, el saldo YA bajó: **KEVIN LUBO** tenía
+> saldo $50 y cuota $50, y con la quincena aplicada `min(cuota, saldo)` daría
+> **$0 el mismo mes en que se le descontaron los $50**.
+>
+> - ⚠️ **`Abono extra` NO cuenta como descuento de planilla.** Es plata que la
+>   persona pagó de su bolsillo; descontársela otra vez del sueldo sería cobrarle
+>   dos veces. Sí baja el saldo, y el saldo ya viene con eso adentro.
+>   `Pago de responsabilidad` SÍ cuenta: medido, 59 movimientos y **35 con la
+>   nota «Deducción quincenal»**.
+> - ⚠️ **VENTANA EXACTA, sin la tolerancia de ±3 días de la RPC.** Los pagos caen
+>   el 15 y el 30, o sea justo en el borde: con tolerancia, un pago del 15
+>   entraría a la vez en la quincena 1-15 y en la 16-31. El mismo descuento
+>   contado dos veces.
+> - **La ficha ARCHIVADA no propone cuota nueva** (misma condición que la RPC).
+>   Por eso **BRICEIDA MONTERO no aparece**, con $100 de saldo vivo: su ficha
+>   está archivada en Préstamos.
+> - **Se agrupa por CÓDIGO, no por ficha.** `RAMON MIRANDA` tiene DOS fichas
+>   atadas al código 21 y la planilla tiene UNA casilla.
+>
+> ### 🔴 LA APROBACIÓN NO ESCONDE PLATA — la lección del #651
+>
+> Hace un día un préstamo de $700 nacía en `pendiente_aprobacion`, el saldo solo
+> suma lo aprobado, y **la pantalla lo mostraba en CERO durante 22 días**. Ese
+> freno se retiró (*«quita poder aprobar prestamos, todos deben de pasar»*), y
+> ésta es **otra aprobación**: no decide si la deuda existe, decide si el número
+> entra a la casilla. La forma es la de las horas extra (#649/#652):
+>
+> - **lo que está sin aprobar SE VE**, con nombre y monto, en ámbar, arriba del
+>   cuadro — *«N personas tienen préstamo por descontar sin aprobar: NO se
+>   descontó en este cuadro»*;
+> - **el saldo del módulo no depende de esta tabla**: un préstamo sin aprobar
+>   sigue apareciendo entero en Préstamos;
+> - **el aviso viaja al Excel y al PDF** que firma la contadora: si la pantalla
+>   avisa y el papel no, el papel decide un pago con menos información.
+>
+> ⚠️ **Y si la casilla YA tiene monto escrito a mano, NO se dice «no se
+> descontó»**: la planilla SÍ lo descontó, y decir lo contrario sería mentirle a
+> quien paga.
+>
+> ### 🔑 SE GUARDA LA DECISIÓN, NO UNA SEGUNDA CUENTA
+>
+> `asistencia_prestamo_aprobado` (quincena, código) guarda **aprobado + quién +
+> cuándo + `monto_visto`**. El MONTO sigue viviendo donde siempre:
+> **`asistencia_planilla_manual.prestamo`**, y sigue siendo editable. Aprobar lo
+> escribe ahí; `planilla.ts` **no se tocó**.
+> - **La llave es la QUINCENA** —y acá sí corresponde: un descuento de préstamo
+>   pertenece a un cuadro, igual que el ISR. Las horas extra se aprueban por DÍA
+>   porque la contadora mueve el corte del período (#652); esto no.
+> - **`monto_visto` es el TESTIGO**: si el módulo cambia o alguien corrige la
+>   casilla, la pantalla lo DICE con los dos números — no se corrige solo.
+>   *Una plata que se mueve sola es peor que una que se explica.*
+> - 🔴 **Retirar la aprobación NO borra un número que escribió una persona**: la
+>   casilla se vacía **solo si todavía dice exactamente lo que puso la aprobación
+>   anterior**. Si alguien la corrigió, se deja y **se dice**.
+> - **Quién aprueba: `asistenciaRoles()`, NO `aprobacionesRoles()`.** Son dos
+>   aprobaciones distintas: las horas extra las autoriza Julio con el usuario
+>   `bodega`, que a propósito **no ve un solo sueldo**. Un descuento de préstamo
+>   ES plata del sueldo. Por eso el bloque vive en la pestaña **Planilla** y no en
+>   Aprobaciones, y el candado de `asistencia-bodega-solo-aprueba.test.ts`
+>   —que congela los 4 campos de esa respuesta— sigue verde sin tocarlo.
+>
+> ### ⚠️ LAS DDL YA CORRIERON — y la app funcionaba ANTES
+>
+> Patrón `cols-opcionales`, verificado en las dos direcciones: sin la columna del
+> amarre nadie queda atado y la casilla se escribe a mano como hasta ayer; sin la
+> tabla no se puede aprobar y **la planilla da EXACTAMENTE lo de hoy hasta el
+> centavo**. Las dos ausencias se DICEN en pantalla, con el nombre del archivo.
+> - 🩸 **El escalón de lectura quita LO MÍNIMO.** Un fallback que releyera con las
+>   columnas base se llevaría puesto `nombre_manual`… — acá el reintento solo
+>   quita `empleado_codigo`, y **solo cuando el error NOMBRA esa columna**.
+>
+> ### Los números, antes y después
+>
+> | | antes | después |
+> |---|---|---|
+> | fichas de préstamo atadas | **0 de 30** | **21 de 30** · las 14 con saldo, todas |
+> | préstamos con saldo sin persona | 14 | **0** |
+> | casilla `prestamo` de la quincena 1-15 | $280,00 en 8 renglones | **$265,00 en 7** |
+> | casilla `mercancia` | $10,00 | **$25,00** |
+> | **total de descuentos manuales** | **$385,00** | **$385,00** |
+> | JOHANA VALLEJO activa en Préstamos | 1 ficha | **0** (archivada, 78 movimientos intactos) |
+> | movimientos de préstamo | 414 · $44.650,21 | **414 · $44.650,21** |
+>
+> **Saldo vivo hoy: $5.964,73 entre 13 fichas activas** (+ $100,00 de BRICEIDA,
+> archivada, = $6.064,73 en 14). ⚠️ El $5.264,73 con el que arrancó este trabajo
+> era correcto **para su momento**: creció exactamente $700 cuando el #651 liberó
+> el préstamo de LUIS ADRIAN ARROYO ese mismo día.
+>
+> **Lo que la pantalla va a proponer para la quincena 16-31 de agosto: 13
+> personas, $485,00** (`_verif-prestamo-planilla.ts`, solo lectura, corre los
+> MISMOS módulos que la pantalla) — **con las 6 que se habían quedado afuera**:
+> Kevin $50 · Gabriela $60 · Luis Parajón $45 · Yulicar $25 · María $25 · Luz $15.
+>
+> ### 🔴 NINGÚN NÚMERO DE PAGO SE MOVIÓ, y está EJECUTADO
+>
+> El argumento *«las dos columnas están en la misma suma, así que el neto no se
+> mueve»* es correcto **y no alcanza**.
+> `scripts/_verif-martha-mercancia-no-mueve-nada.ts` (solo lectura) llama a
+> **`calcularDinero`, la misma función que paga**, con los montos de antes y los
+> de después, sobre **LAS 12 PERSONAS** de la quincena, y compara los 20 campos
+> de dinero: **288 campos · 2 cambios (las dos casillas de Martha) · 0 cambios no
+> pedidos**, con `totalDeducciones`, `netoPagar` y `totalBruto` verificados por
+> su nombre. Y la tabla entera, campo por campo: **72 campos comparados, 2
+> distintos y los 2 son los pedidos**.
+>
+> ### ⚠️ QUEDA ABIERTO — decide Daniel
+>
+> - 🔴 **A LUIS ARROYO se le descontaron $50 en la quincena 1-15 que el módulo de
+>   Préstamos no registra.** Su saldo está $50 alto. Corregirlo es escribir un
+>   movimiento de plata en producción y no se hizo.
+> - **Aprobar NO registra el pago en el módulo.** La casilla se llena; el saldo lo
+>   sigue bajando «Aplicar quincena», como hasta hoy. Que la aprobación además
+>   escriba el `Pago` es una decisión de negocio (y el dedup de ±3 días del módulo
+>   ya evitaría el doble cobro), no un refactor.
+> - **`LAURA CASIANI` vs `Laura Lismari Casiano Vega`**: si son la misma persona,
+>   se ata a mano. El sistema **no lo va a adivinar nunca**.
+> - Las 6 fichas de saldo $0 sin ficha en la planilla (`STEFANY`/`STEPHANY
+>   MORALES`, `YANKATERY`, `YEISON LLORENTE`, `LUZ LOPEZ` ×2) quedan sin atar.
+>
+> ### Candados
+>
+> `src/__tests__/lib/asistencia-prestamo-planilla.test.ts` (22) y
+> `prestamos-amarre-migracion.test.ts` (13). El segundo **lee el SQL SIN
+> COMENTARIOS** —el archivo NOMBRA lo que prohíbe («nada de parecidos», «LAURA
+> CASIANI»), así que un barrido sobre el archivo entero se engañaría solo, cuarta
+> vez que este repo paga lo mismo— y prohíbe LIKE, similitud, `unaccent`,
+> distancia de edición, `substring`, `translate` y regex sobre el nombre; exige
+> la empresa, el único candidato, el `EXISTS` que valida el nombre del código, que
+> no haya un cuarto amarre a mano, y que el `SET` escriba **exactamente una
+> columna** (un `SET empleado_codigo = …, nombre = …` reescribiría el nombre que
+> tecleó una persona).
+> - **Verificado por mutación, 15 de 15 cazadas y 0 corridas muertas**
+>   (`bash scripts/_mutar-candados-prestamo-planilla.sh`): el hecho consumado deja
+>   de ganarle a la cuota · `min(cuota,saldo)` → cuota pelada · la ficha archivada
+>   propone cuota · el código sale de parecerse al nombre · el aviso de «préstamo
+>   sin persona» se calla · el aviso pierde el monto · «Abono extra» se vuelve
+>   descuento · dos fichas del mismo código no suman · la migración usa LIKE ·
+>   ignora la empresa · ata con dos candidatos · pierde el guard del nombre · pisa
+>   un amarre ya hecho · se cuela `LAURA CASIANI` · el backfill reescribe el
+>   nombre.
+> - 🩸 **El script NO usa `perl -0pi -e 's|…|…|'`**: con ese delimitador, un `||`
+>   del código real se des-escapa a una alternación con rama vacía, **se come el
+>   archivo entero**, vitest no colecta nada y el «0 fallos» se lee como
+>   «SOBREVIVIÓ». El reemplazo es LITERAL (`scripts/_mutar-aplicar.py`, textos por
+>   argv), **denuncia el patrón que no muta**, `probar()` **exige que la corrida
+>   haya colectado tests**, la restauración va **por COPIA** (hay archivos NUEVOS
+>   y `git checkout` aborta el comando entero) y hay una **mutación de CONTROL que
+>   a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los
+>   ✅ valen lo mismo que un barrido con el comentario adentro.
+
 ## 🔴 Asistencia — «TRABAJO FUERA DE LA OFICINA»: el motivo que NO es una ausencia (13-ago-2026)
 
 > El caso: **RODRIGO MIRANDA (código 13, vistana, $800/mes) no marca desde el 31 de julio porque está trabajando FUERA de la empresa.** Daniel, textual: *"rodrigo esta trabajando fuera de la empresa (justificado)"*. Los cinco motivos que había —`Vacaciones · Incapacidad · Permiso · Luto · Otro`— describen a alguien que **NO trabajó**. Rodrigo **sí trabajó**.

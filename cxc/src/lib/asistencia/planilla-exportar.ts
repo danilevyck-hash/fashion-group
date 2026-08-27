@@ -80,6 +80,21 @@ export interface DatosPlanillaExport {
    * si el archivo no lo dice.
    */
   avisoExtraSinAprobar?: string | null;
+  /**
+   * Los descuentos de préstamo que el cuadro NO hizo porque nadie los aprobó.
+   *
+   * 🔴 VA IMPRESO, por el mismo motivo que los dos de arriba. Contadora,
+   * textual: *«El préstamo si debe ser por aprobarlo»*. Una casilla de préstamo
+   * en cero para alguien que sí debe plata es exactamente el número que nadie
+   * va a poder explicar dentro de seis meses si el archivo no lo dice.
+   */
+  avisoPrestamoSinAprobar?: string | null;
+  /**
+   * Préstamos CON SALDO que no están atados a nadie de la planilla, o sea que
+   * no se le están descontando a ninguna persona. También va impreso: es la
+   * forma en que se perdieron $700 durante 22 días (ver #651).
+   */
+  avisoPrestamoSinAtar?: string | null;
 }
 
 /** El subtítulo que llevan los dos archivos. */
@@ -328,6 +343,12 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ...(d.avisoExtraSinAprobar
         ? [["Horas extra que no se pagaron", d.avisoExtraSinAprobar]]
         : []),
+      ...(d.avisoPrestamoSinAprobar
+        ? [["Préstamos que no se descontaron", d.avisoPrestamoSinAprobar]]
+        : []),
+      ...(d.avisoPrestamoSinAtar
+        ? [["Préstamos sin persona", d.avisoPrestamoSinAtar]]
+        : []),
       ["Período", d.periodo && !d.periodo.esQuincena
         ? `Del ${d.periodo.desde} al ${d.periodo.hasta} (${d.periodo.diasCalendario} días). NO es una quincena: el salario base se pagó al ${(d.periodo.factorBase * 100).toFixed(1)} % —la parte de quincena que cubren estas fechas— y los montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios) NO se aplicaron, porque se cargan por quincena: para llenarlos hay que pedir el cuadro con las fechas exactas de una quincena.`
         : `Quincena del ${d.quincena.etiqueta}. Salario base completo (salario mensual ÷ 2).`],
@@ -458,6 +479,8 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
         d.avisoSinFicha,
         d.avisoVacacionesNoPagadas,
         d.avisoExtraSinAprobar,
+        d.avisoPrestamoSinAprobar,
+        d.avisoPrestamoSinAtar,
         conAusenciaPorTardanza
           ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
           : null,
