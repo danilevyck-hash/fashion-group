@@ -1008,13 +1008,16 @@ describe("el Excel de Referencia", () => {
     expect(fila[enc.indexOf("Compré")]).toBe(36); // no 72
     expect(fila[enc.indexOf("Vendí")]).toBe(25); // no 61
     expect(fila[enc.indexOf("Stock")]).toBe(12); // la existencia, sin recortar
-    expect(fila[enc.indexOf("Vendido")]).toBeCloseTo(25 / 36, 10);
+    // 🩸 25 ÷ 37 (lo vendido + lo que queda), no 25 ÷ 36: el % del Excel es el
+    // MISMO que el de la pantalla y sale de las dos celdas de al lado.
+    expect(fila[enc.indexOf("Vendido")]).toBeCloseTo(25 / 37, 10);
     expect(fila[enc.indexOf("Meses")]).toBe(5);
     // ⚠️ LA LEYENDA QUE LO EXPLICABA SE FUE con el subtítulo (27-ago-2026):
     // eran ~900 caracteres de manual de uso arriba de los encabezados, y
     // Daniel los mandó sacar enteros. Lo que este caso sigue protegiendo —y es
     // lo que importa— son los NÚMEROS: que "Compré" y "Vendí" sean los de la
-    // última llegada y que "Stock" no se recorte. La fila 1 es el encabezado.
+    // última llegada, que "Stock" no se recorte y que el % salga de las dos
+    // celdas de al lado. La fila 1 es el encabezado.
     expect(filas[0]?.[0]).toBe("Referencia");
   });
 
@@ -1047,7 +1050,9 @@ describe("el Excel de Referencia", () => {
     const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
     const enc = filas.find((f) => f.includes("Referencia")) as string[];
     const fila = filas[filas.indexOf(enc) + 1];
-    expect(fila[enc.indexOf("Vendido")]).toBeCloseTo(276 / 280, 10);
+    // Stock 0: se vendió todo lo que hubo. Las 4 que faltan contra lo comprado
+    // las explica la Nota (ajuste de inventario), no el porcentaje.
+    expect(fila[enc.indexOf("Vendido")]).toBe(1);
     expect(fila[enc.indexOf("Meses")]).toBe(6);
   });
 
@@ -1096,7 +1101,8 @@ describe("el Excel de Referencia", () => {
     // La celda vacía ES el dato (misma convención que "CIF anterior").
     expect(filaSin[enc.indexOf("Vendido")] || null).toBeNull();
     expect(filaSin[enc.indexOf("Meses")] || null).toBeNull();
-    expect(filaTermo[enc.indexOf("Vendido")]).toBeCloseTo(150 / 100, 10);
+    // Vendió 150 de 100 y quedó en 0: lo que hubo son las 150 que salieron.
+    expect(filaTermo[enc.indexOf("Vendido")]).toBe(1);
     // Ancla extendida jul-2024 → última venta nov-2025, inclusive = 17. El
     // reloj NO sigue corriendo hasta hoy (eso daría 25).
     expect(filaTermo[enc.indexOf("Meses")]).toBe(17);

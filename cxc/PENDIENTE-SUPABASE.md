@@ -120,3 +120,19 @@ y las políticas viejas (`open`, `allow all for anon`) que
 `public_read` sobre `marca_formulas` y `carga_history`, y esas dos tablas se
 leen solo desde rutas de servidor con la service-role key. Correrla no arregla
 nada y abriría a lectura anónima las fórmulas de precio.
+
+---
+
+## Corridas DESPUÉS del censo (27-ago-2026) — el préstamo en la planilla
+
+Estas tres **ya están aplicadas** y no son pendientes. Se anotan para que el
+próximo censo no las vuelva a levantar:
+
+| Migración | Qué dejó en la base | Verificado |
+|---|---|---|
+| `20260902120000_prestamos_amarre_codigo.sql` | `prestamos_empleados.empleado_codigo` + su índice parcial, y el amarre corrido | 21 de 30 fichas atadas · **las 14 con saldo, atadas** · 9 sin atar, todas en $0,00 |
+| `20260902130000_planilla_prestamo_aprobado.sql` | tabla `asistencia_prestamo_aprobado` con RLS y su índice | los 3 candados frenan por CONDUCTA (quincena inválida, monto negativo y llave repetida rebotan) |
+| `20260902140000_martha_mercancia_y_johana_baja.sql` | los $15 de MARTHA pasan de `prestamo` a `mercancia`; JOHANA VALLEJO queda archivada | 72 campos de `asistencia_planilla_manual` comparados, **2 distintos y los 2 son los pedidos**; el total de descuentos queda en **$385,00 antes y después** |
+
+Las tres son **idempotentes**: se corrieron dos veces seguidas y la segunda no
+cambió un solo campo.

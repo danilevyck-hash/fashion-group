@@ -116,7 +116,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
 
   it("un pedido de verdad (documento='pedido') se nombra pedido", () => {
     const wb2 = buildPedidosWorkbook({
-      marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true,
+      marca: "reebok", conOrigen: true,
       pedidos: [{ ...PEDIDOS[1], switch_documento: "pedido" }],
     });
     expect(wb2.Sheets["Pedidos"][A(DATA_ROW, 7)].v).toBe("Pedido en Switch: 16-000000506");
@@ -126,7 +126,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
     // La DDL 20260824160000 puede no estar corrida: ausencia ⇒ pedido, que es
     // lo único que el sistema sabía crear.
     const wb2 = buildPedidosWorkbook({
-      marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true,
+      marca: "reebok", conOrigen: true,
       pedidos: [{ ...PEDIDOS[1], switch_documento: null }],
     });
     expect(wb2.Sheets["Pedidos"][A(DATA_ROW, 7)].v).toBe("Pedido en Switch: 16-000000506");
@@ -150,7 +150,7 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
     // El escalón por si la vista no diera `id_natural`/`fuente`: sin esos datos
     // escribir «No se ha mandado a Switch» en todas las filas sería MENTIRA.
     const wb2 = buildPedidosWorkbook({
-      marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true, conNumeros: false, pedidos: PEDIDOS,
+      marca: "reebok", conOrigen: true, conNumeros: false, pedidos: PEDIDOS,
     });
     const ws2 = wb2.Sheets["Pedidos"];
     expect(ws2[A(HDR_ROW, 5)].v).toBe("Fecha");

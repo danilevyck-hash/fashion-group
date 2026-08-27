@@ -184,7 +184,11 @@ describe("🔴 la lista de «solo aprueba» se DERIVA, no se escribe a mano", ()
       await import("@/lib/asistencia/roles");
     expect(APROBACIONES_ROLES).toContain("bodega");
     expect(ASISTENCIA_ROLES).not.toContain("bodega");
+    // 🔑 Solo bodega: contabilidad aprueba PERO ya tenía Asistencia, así que no
+    // se le recorta nada. Es el matiz que la derivación evita tener que recordar.
     expect(soloApruebaRoles()).toEqual(["bodega"]);
+    expect(APROBACIONES_ROLES).toContain("contabilidad");
+    expect(soloAprueba("contabilidad")).toBe(false);
     expect(soloAprueba("bodega")).toBe(true);
     // 🔑 admin aprueba PERO tiene Asistencia: no se le recorta nada.
     expect(soloAprueba("admin")).toBe(false);
@@ -207,12 +211,17 @@ describe("🔴 QUÉ PESTAÑAS VE CADA UNO — bodega entra a UNA, no a seis", ()
     expect(await ve("admin")).toEqual(TODAS);
   });
 
-  it("la contadora y la secretaria conservan las suyas y NO ganan Aprobaciones", async () => {
-    for (const rol of ["contabilidad", "secretaria"]) {
-      const suyas = await ve(rol);
-      expect(suyas, rol).toEqual(["planilla", "reporte", "justificaciones", "vacaciones", "configuracion"]);
-      expect(suyas, rol).not.toContain("aprobaciones");
-    }
+  it("la CONTADORA las ve todas — desde el 27-ago-2026 también aprueba", async () => {
+    // Daniel: «que contabilidad tambien pueda aprobar». Es quien arma la
+    // planilla y ya veía el aviso de lo que quedó sin aprobar; ahora puede
+    // destrabarlo sin buscar a nadie.
+    expect(await ve("contabilidad")).toEqual(TODAS);
+  });
+
+  it("⛔ la SECRETARIA no gana Aprobaciones — ella no arma la planilla", async () => {
+    const suyas = await ve("secretaria");
+    expect(suyas).toEqual(["planilla", "reporte", "justificaciones", "vacaciones", "configuracion"]);
+    expect(suyas).not.toContain("aprobaciones");
   });
 
   it("⛔ un rol ajeno no ve ninguna", async () => {

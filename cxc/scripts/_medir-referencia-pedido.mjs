@@ -15,7 +15,11 @@ import { chromium } from "playwright";
 import { readFileSync, mkdirSync } from "fs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
-const CODIGOS = process.env.CODIGOS ?? "CVM253CR02001 NB2570001 QD3958033 40HM265032 NB3705906";
+// 🩸 Los dos hermanos del 25-ago-2026 van PRIMERO: misma llegada, misma venta,
+// y lo único que los separaba era 1 unidad de ajuste en bodega.
+const CODIGOS =
+  process.env.CODIGOS ??
+  "4LD230G110 4LD230G001 CVM253CR02001 NB2570001 QD3958033 40HM265032 NB3705906";
 const ABRIR = process.env.ABRIR ?? "NB2570001";
 const ETIQUETA = process.env.ETIQUETA ?? "rama";
 const SALIDA = `/tmp/referencia-pedido-${ETIQUETA}`;
@@ -49,10 +53,20 @@ for (const ancho of ANCHOS) {
   await page.waitForSelector("tbody tr", { timeout: 20000 });
   await page.waitForTimeout(1500);
 
-  for (const estado of ["cerrada", "abierta"]) {
+  // 🔴 "ordenada" mide el estado NUEVO (25-ago-2026): con un encabezado tocado,
+  // la tabla no puede ensanchar nada ni perder la flecha. Va al final para que
+  // los dos estados de siempre se midan sobre el ORDEN PEGADO, como antes.
+  for (const estado of ["cerrada", "abierta", "ordenada"]) {
     if (estado === "abierta") {
       await page.locator(`tbody td:has-text("${ABRIR}")`).first().click();
       await page.waitForTimeout(800);
+    }
+    if (estado === "ordenada") {
+      // Se cierra el detalle y se ordena por Stock (el 1er toque = de mayor a menor).
+      await page.locator(`tbody td:has-text("${ABRIR}")`).first().click();
+      await page.waitForTimeout(400);
+      await page.locator('thead button:has-text("Stock")').first().click();
+      await page.waitForTimeout(500);
     }
 
     const m = await page.evaluate(() => {
@@ -101,27 +115,43 @@ for (const ancho of ANCHOS) {
       );
       const encabezados = [...document.querySelectorAll("thead th")].map((th) => th.textContent?.trim() ?? "");
       const detalle = document.querySelector("dl") ? "detalle abierto (tres grandes montados)" : null;
+      const ordenados = [...document.querySelectorAll("thead th")].filter(
+        (th) => th.getAttribute("aria-sort") !== "none",
+      ).length;
+      // Lo que la fila DICE, para poder cotejarlo contra la verificación.
+      const celdas = [...document.querySelectorAll("tbody tr")].map((tr) =>
+        [...tr.querySelectorAll("td")].slice(0, 6).map((td) => (td.textContent ?? "").trim()),
+      );
 
-      return { arrastre, hayTabla, hayTarjetasSueltas, filas, chicos, textos, recortados, orden, encabezados, detalle };
+      return {
+        arrastre, hayTabla, hayTarjetasSueltas, filas, chicos, textos, recortados,
+        orden, encabezados, detalle, ordenados, celdas,
+      };
     });
 
     const columnasOk =
       m.encabezados.includes("Vendido") && m.encabezados.includes("Meses") && !m.encabezados.includes("90% en");
+    // El encabezado tocado tiene que ANUNCIARSE como ordenado; si no, la flecha
+    // se perdió y el chequeo pasaría en verde sin haber mirado nada.
+    const ordenOk = estado !== "ordenada" || m.ordenados === 1;
     const ok =
       m.arrastre === 0 &&
       m.hayTabla &&
       columnasOk &&
+      ordenOk &&
       m.chicos.length === 0 &&
       m.textos.length === 0 &&
       m.recortados.length === 0;
     if (!ok) malas += 1;
     console.log(
       `${ok ? "🟢" : "🔴"} ${ancho} px · ${estado} · arrastre PÁGINA ${m.arrastre} px · tabla=${m.hayTabla} · ` +
-        `columnas VENDIDO·MESES=${columnasOk} · ${m.filas} filas · blancos <44: ${m.chicos.length} · ` +
+        `columnas VENDIDO·MESES=${columnasOk} · encabezado ordenado=${m.ordenados} · ${m.filas} filas · blancos <44: ${m.chicos.length} · ` +
         `textos <12: ${m.textos.length} · recortados: ${m.recortados.length}`,
     );
     if (estado === "cerrada") console.log(`   orden: ${m.orden.join(" · ")}`);
     if (estado === "cerrada") console.log(`   encabezados: ${m.encabezados.filter(Boolean).join(" · ")}`);
+    if (estado === "cerrada") for (const c of m.celdas.slice(0, 3)) console.log(`   fila: ${c.join(" | ")}`);
+    if (estado === "ordenada") console.log(`   orden por Stock: ${m.orden.join(" · ")}`);
     if (m.detalle) console.log(`   ${m.detalle}`);
     if (m.chicos.length) console.log("   chicos:", JSON.stringify(m.chicos));
     if (m.textos.length) console.log("   textos:", JSON.stringify(m.textos));

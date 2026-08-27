@@ -446,9 +446,40 @@ export default function GuiasList({
                       const cardContent = (
                         <div className={`border rounded-lg transition-all ${statusBorderClass} ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
                           {/* Row header — desktop: inline row, mobile: stacked card */}
+                          {/* 🔴 EL «···» VIVE EN LA FILA, SIN ABRIR LA GUÍA (27-ago-2026).
+                              Daniel pidió *"darle acceso a secretaria de poder
+                              eliminar guias"*, y el permiso ya lo tenía: el
+                              `DELETE` de la ruta acepta admin y secretaria desde
+                              siempre. Lo que faltaba era ENCONTRAR el botón:
+                              «Eliminar guía» vivía dentro del «···» de la guía
+                              EXPANDIDA, o sea que había que abrir la guía
+                              primero. Tres toques para algo que nadie hallaba.
+
+                              🔑 SE MOVIÓ, NO SE DUPLICÓ. El «···» de adentro se
+                              retiró en el mismo cambio: era el único ítem que
+                              tenía, y dejarlo en los dos lados sería otra vez
+                              «cada cambio deja su puerta», que es justo lo que
+                              este módulo vino podando. Al abrir la guía la fila
+                              NO desaparece, así que desde la guía abierta el
+                              menú sigue estando a la vista, en la misma pantalla.
+
+                              🔴 NO SE SACÓ «ELIMINAR» A LA FILA COMO BOTÓN
+                              SUELTO. La fila ya tiene Editar · Despachar ·
+                              Imprimir · Compartir, y en un celular un botón de
+                              borrar al lado de «Imprimir» es un toque
+                              equivocado esperando pasar sobre un documento
+                              firmado. Queda detrás del menú, y detrás de la
+                              ventana que exige escribir ELIMINAR.
+
+                              ⚠️ Solo se dibuja para quien puede borrar
+                              (`canDelete` = admin · secretaria, y nunca en
+                              `readOnly`): a bodega y a vendedor no les aparece
+                              ni el «···». Y no aparece en modo selección, que
+                              tiene su propia barra de acciones. */}
+                          <div className="flex items-stretch">
                           <button
                             onClick={() => selectionMode ? toggleSelect(g.id) : abrirFila(g.id)}
-                            className="w-full text-left text-sm min-h-[44px]"
+                            className="flex-1 min-w-0 text-left text-sm min-h-[44px]"
                           >
                             {/* ── Fila de escritorio (lg+) ─────────────────
                                 🔴 EL CORTE PASÓ DE `md:` (768) A `lg:` (1024)
@@ -573,6 +604,20 @@ export default function GuiasList({
                               )}
                             </div>
                           </button>
+                          {canDelete && !selectionMode && (
+                            <div className="shrink-0 flex items-center pr-1">
+                              {/* El rótulo lleva el N° de la guía: hay un «···»
+                                  por fila y "Más opciones" a secas no diría de
+                                  cuál. */}
+                              <OverflowMenu
+                                ariaLabel={`Más opciones de la guía ${fmtGuia(g.numero)}`}
+                                items={[
+                                  { label: "Eliminar guía", onClick: () => onDelete(g.id), destructive: true },
+                                ]}
+                              />
+                            </div>
+                          )}
+                          </div>
 
                           {/* Expanded content */}
                           <AccordionContent open={isExpanded}>
@@ -725,14 +770,15 @@ export default function GuiasList({
                                       </svg>
                                       Compartir
                                     </button>
-                                    {(() => {
-                                      const menuItems = [
-                                        ...(canDelete
-                                          ? [{ label: "Eliminar guía", onClick: () => onDelete(expandedGuia.id), destructive: true }]
-                                          : []),
-                                      ];
-                                      return menuItems.length > 0 ? <OverflowMenu items={menuItems} /> : null;
-                                    })()}
+                                    {/* 🔴 ACÁ VIVÍA EL «···» CON SU ÚNICO ÍTEM, y
+                                        por eso borrar costaba TRES toques:
+                                        abrir la guía, abrir el menú, elegir.
+                                        Subió a la FILA (27-ago-2026) y son
+                                        DOS. No se dejó una copia acá: el menú
+                                        de la fila está a la vista mientras la
+                                        guía está abierta, y dos puertas para
+                                        lo mismo es lo que este módulo viene
+                                        podando desde el 25-ago. */}
                                   </div>
                                   {/* Items table */}
                                   <ScrollableTable minWidth={600} className="mt-4">

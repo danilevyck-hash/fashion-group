@@ -36,3 +36,4 @@ scripts/agente-reloj/*.log.viejo
 
 # Copia temporal del motor viejo que arma scripts/_verif-planilla-no-se-movio.ts
 src/lib/asistencia-antes/
+.diag-cache/
