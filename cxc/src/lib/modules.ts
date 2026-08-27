@@ -34,9 +34,11 @@ import {
   Building2,
   LayoutDashboard,
   ScanSearch,
+  Factory,
   type LucideIcon,
 } from "lucide-react";
 import { asistenciaRoles, aprobacionesRoles } from "@/lib/asistencia/roles";
+import { MODULO_BOSTON, ROL_BOSTON, ROLES_MODULO_BOSTON } from "@/lib/boston/rol";
 
 export type ModuleGroup =
   | "ventas-clientes"
@@ -129,6 +131,26 @@ export const ALL_MODULES: AppModule[] = [
   { key: "referencia",    label: "Referencia",         href: "/referencia",       icon: ScanSearch,       roles: ["admin", "vendedor", "bodega"],               group: "ventas-clientes" },
   { key: "cxc",           label: "Cuentas por Cobrar", href: "/admin",            icon: CircleDollarSign, roles: ["admin", "vendedor"],                         group: "ventas-clientes" },
   { key: "multifashion",  label: "Multifashion",       href: "/multifashion",     icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                      group: "ventas-clientes" },
+  // 🔴 CONFECCIONES BOSTON — el módulo de David (27-ago-2026).
+  //
+  // Daniel, textual: *"si crea el usuario david, david debe de ver cxc boston…
+  // el es mi hermano y ve toda la operacion de confecciones boston, **no quiero
+  // que vea info de fashion group**"*.
+  //
+  // Va PEGADO a Multifashion porque es su hermano estructural, no por orden
+  // alfabético: los dos son "una empresa que no convive con el grupo, con su
+  // propio módulo y su propio gerente". `american_classic` y
+  // `confecciones_boston` son justamente las DOS que no son Fashion Group.
+  //
+  // ⚠️ La `key` es `boston` y no `cxc-boston`: el módulo trae SEIS pestañas
+  // (Inicio, CXC, Ventas, Clientes, Planilla y Préstamos), no solo la cartera.
+  // Nombrarlo por una de sus pestañas es como haber llamado `aging` al CXC.
+  //
+  // 🔑 `roles[]` sale de `ROLES_MODULO_BOSTON` en vez de escribirse acá: es la
+  // MISMA lista que usan las rutas de `/api/boston/**`. Una copia a mano en el
+  // catálogo es exactamente el bug que dejó a los 3 vendedores tocando la
+  // pestaña de Boston para recibir siempre un 403 (ver `boston-roles.ts`).
+  { key: MODULO_BOSTON,   label: "Confecciones Boston", href: "/boston",         icon: Factory,          roles: [...ROLES_MODULO_BOSTON],                      group: "ventas-clientes" },
   { key: "directorio",    label: "Clientes",           href: "/clientes",         icon: Contact,          roles: ["admin", "secretaria", "vendedor"],           group: "ventas-clientes" },
   { key: "proveedores",   label: "Proveedores",        href: "/proveedores",      icon: Building2,        roles: ["admin", "contabilidad"],                     group: "ventas-clientes" },
   { key: "catalogos",     label: "Catálogos",          href: "/catalogos/marcas", icon: BookOpen,         roles: ["admin", "secretaria", "vendedor", "bodega"], group: "ventas-clientes" },
@@ -203,6 +225,10 @@ export const SYSTEM_ROLES: { key: string; label: string }[] = [
   // role_permissions (fila gerente_acs) como los demás roles; el roles[] del
   // módulo arriba es el fallback si la tabla no responde.
   { key: "gerente_acs", label: "Gerente ACS" },
+  // Gerente de Confecciones Boston: SOLO el módulo Boston. Mismo molde que
+  // `gerente_acs` — sus módulos salen de role_permissions (fila gerente_boston)
+  // y el `roles[]` del módulo de arriba es el fallback si la tabla no responde.
+  { key: ROL_BOSTON, label: "Gerente Confecciones Boston" },
 ];
 
 /** Lista de keys de todos los roles del sistema. */

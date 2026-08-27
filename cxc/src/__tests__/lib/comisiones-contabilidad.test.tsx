@@ -143,6 +143,12 @@ const VE_COMISIONES: Record<string, boolean> = {
   vendedor: false,
   bodega: false,
   gerente_acs: false, // 🔴 SOLO Multifashion. No se toca ni de refilón.
+  // 🔴 SOLO Confecciones Boston (27-ago-2026). Las comisiones son de las SEIS
+  // empresas de Fashion Group (`comision_b2b_v5`), o sea justamente la info del
+  // grupo que Daniel dijo que David no ve: *"no quiero que vea info de fashion
+  // group"*. Boston además NO comisiona en este sistema (`utilidad: false` en
+  // `EMPRESA_SYNC_CAPABILITIES`), así que no hay ni una comisión suya que ver.
+  gerente_boston: false,
 };
 
 describe("el mapa rol → Comisiones queda congelado", () => {
