@@ -37,8 +37,11 @@ import {
   centavos,
   listaDeCompras,
   margenReal,
+  esColaDeBodega,
   medirRitmo,
+  pctVendido,
   medirVendidoMeses,
+  parteVendidaReal,
   mesesDeStock,
   leyendaLlegadas,
   medirAvance,
@@ -368,9 +371,15 @@ describe("los tres grandes", () => {
     expect(g.quedan).not.toBe(g.comprado! - g.vendido);
   });
 
-  it("Vendí dice qué parte de lo comprado es: 552 ÷ 935 = el 59%", () => {
+  // 🩸 CAMBIÓ DE DIRECCIÓN el 25-ago-2026: el % ya NO es Vendí ÷ Compré (daba
+  // 552 ÷ 935 = 59%) sino Vendí ÷ LO QUE HUBO. Acá se ve por qué importa: de
+  // las 935 compradas hay 38 que no están ni vendidas ni en bodega (ajustes
+  // que el sistema no lee), y el denominador viejo las contaba como si
+  // siguieran ahí sin venderse.
+  it("Vendí dice qué parte de LO QUE HUBO es: 552 ÷ (552 + 345) = el 62%", () => {
     const g = armarFicha(NB2570001(), HOY_MES).grandes;
-    expect(textoParteVendida(g.parteVendida)).toBe("el 59% de lo comprado");
+    expect(g.parteVendida).toBeCloseTo(552 / (552 + 345), 10);
+    expect(textoParteVendida(g.parteVendida)).toBe("el 62% de lo que hubo");
   });
 
   it("QD3958033: Compré 180 · Vendí 54 (el 30%) · Me quedan 126", () => {
@@ -378,7 +387,8 @@ describe("los tres grandes", () => {
     expect(g.comprado).toBe(180);
     expect(g.vendido).toBe(54);
     expect(g.quedan).toBe(126);
-    expect(textoParteVendida(g.parteVendida)).toBe("el 30% de lo comprado");
+    // Acá lo comprado y lo que hubo COINCIDEN (54 + 126 = 180): el % no se mueve.
+    expect(textoParteVendida(g.parteVendida)).toBe("el 30% de lo que hubo");
   });
 
   it("sin compra registrada Compré es null — no se inventa un 0 que parecería dato", () => {
@@ -392,7 +402,7 @@ describe("los tres grandes", () => {
     expect(g.parteVendida).toBeNull(); // sin compras no hay porcentaje honesto
   });
 
-  it("con vendido negativo (puras devoluciones) no hay porcentaje — '−5% de lo comprado' no es castellano", () => {
+  it("con vendido negativo (puras devoluciones) no hay porcentaje — '−5%' no es castellano", () => {
     const g = tresGrandes({
       cuadre: { comprado: 100, vendido: -5, existencia: 100, residuo: 5, ajusteConfiable: false },
       existencia: 100,
@@ -401,13 +411,49 @@ describe("los tres grandes", () => {
     expect(g.parteVendida).toBeNull();
   });
 
-  it("textoParteVendida — bordes: menos del 1%, y más del 100% se dice tal cual", () => {
-    expect(textoParteVendida(0.004)).toBe("menos del 1% de lo comprado");
-    expect(textoParteVendida(1)).toBe("el 100% de lo comprado");
-    // Vendió MÁS de lo comprado (vendidoDeMas): el número es verdad y el aviso
-    // de descuadre explica el hueco. No se recorta a 100.
-    expect(textoParteVendida(1.2)).toBe("el 120% de lo comprado");
+  it("textoParteVendida — bordes: menos del 1%, y el 100% se dice tal cual", () => {
+    expect(textoParteVendida(0.004)).toBe("menos del 1% de lo que hubo");
+    expect(textoParteVendida(1)).toBe("el 100% de lo que hubo");
+    // ⚠️ Un % por encima de 100 solo puede venir de la degradación documentada
+    // (Switch no tiene el código en el catálogo → no se sabe cuánto queda). El
+    // texto lo dice tal cual; no se recorta a 100.
+    expect(textoParteVendida(1.2)).toBe("el 120% de lo que hubo");
     expect(textoParteVendida(null)).toBeNull();
+  });
+
+  // 🔴 EL CANDADO DE ESTE CAMBIO: el % queda amarrado al Stock por
+  // construcción. Stock 0 ⇒ 100%, stock > 0 ⇒ menos de 100%, SIEMPRE.
+  it("🔴 el % nunca puede contradecir a la columna Stock de al lado", () => {
+    // El caso de Daniel: 4LD230G110 (compré 48, vendí 48, queda 1) decía 100%.
+    expect(parteVendidaReal(48, 1, 48)).toBeCloseTo(48 / 49, 10);
+    expect(textoParteVendida(parteVendidaReal(48, 1, 48))).toBe("el 98% de lo que hubo");
+    // Su hermano 4LD230G001 (compré 48, vendí 49, stock 0) decía 102%.
+    expect(parteVendidaReal(49, 0, 48)).toBe(1);
+    expect(textoParteVendida(parteVendidaReal(49, 0, 48))).toBe("el 100% de lo que hubo");
+    // Los tres casos que siguen sin poder dividirse.
+    expect(parteVendidaReal(40, 0, null)).toBeNull(); // sin compra registrada
+    expect(parteVendidaReal(40, 0, 0)).toBeNull(); // comprado 0
+    expect(parteVendidaReal(-5, 100, 100)).toBeNull(); // vendido negativo
+    expect(parteVendidaReal(0, 0, 10)).toBeNull(); // no quedó nada y no se vendió nada
+    // Existencia NEGATIVA (sobreventa registrada) no resta de lo que hubo.
+    expect(parteVendidaReal(50, -3, 48)).toBe(1);
+    // ⚠️ Sin catálogo (existencia desconocida) se cae a lo comprado, que es lo
+    // mejor que se sabe — y ahí sí puede pasar de 100%.
+    expect(parteVendidaReal(66, null, 64)).toBeCloseTo(66 / 64, 10);
+  });
+
+  // 🔴 El MISMO umbral que ya decidía cuándo una llegada se agotó.
+  it("🔴 esColaDeBodega: 1 u de 48 es cola; 2 u de 8 NO (le queda el 25%)", () => {
+    expect(esColaDeBodega(1, 48)).toBe(true);
+    expect(esColaDeBodega(2, 48)).toBe(true);
+    expect(esColaDeBodega(3, 48)).toBe(false);
+    expect(esColaDeBodega(0, 8)).toBe(true);
+    expect(esColaDeBodega(1, 8)).toBe(false); // umbral 0 en llegadas chicas
+    expect(esColaDeBodega(-2, 48)).toBe(true); // sobreventa: no queda nada
+    // Existencia desconocida NO es cola: sin la foto de bodega no se afirma.
+    expect(esColaDeBodega(null, 48)).toBe(false);
+    expect(esColaDeBodega(undefined, 48)).toBe(false);
+    expect(esColaDeBodega(1, null)).toBe(false);
   });
 
   it("una respuesta vieja cacheada (sin `cuadre`) degrada, no revienta", () => {
@@ -496,14 +542,15 @@ describe("la línea de venta", () => {
     );
     const f = armarFicha(art, HOY_MES);
     expect(f.grandes).toMatchObject({ comprado: 120, vendido: 96, quedan: 24 });
-    expect(textoParteVendida(f.grandes.parteVendida)).toBe("el 80% de lo comprado");
+    // Acá lo comprado y lo que hubo COINCIDEN (96 + 24 = 120): el % no se mueve.
+    expect(textoParteVendida(f.grandes.parteVendida)).toBe("el 80% de lo que hubo");
     expect(f.avance).toEqual({ tipo: "en-curso", meses: 10, parte: 0.8 });
     // 🔴 El ritmo va PRIMERO y sale DESDE LA LLEGADA (Daniel: *"¿cuántas
     // unidades vendo al mes desde que llegó?"*): 96 vendidas ÷ 10 meses en
     // bodega = 9.6 — no el promedio de la ventana de 12 meses (11).
     expect(f.ritmo).toEqual({ meses: 10, porMes: 9.6, base: "unica-viva", desdeMes: "2025-10" });
     expect(textoLineaVenta(f.avance, f.ritmo)).toBe(
-      "Vendo 9.6 u por mes · En 10 meses va el 80% de la compra",
+      "Vendo 9.6 u por mes · En 10 meses va el 80%",
     );
     expect(textoAvanceCorto(f.avance)).toBe("va el 80%");
   });
@@ -531,9 +578,12 @@ describe("la línea de venta", () => {
       HOY,
     );
     const f = armarFicha(art, HOY_MES);
-    expect(f.avance).toEqual({ tipo: "agotado", meses: 6, desdeMes: "2023-11", parte: 276 / 280 });
-    // Vendió el 99% (4 se perdieron): "todo" sería mentira y no se dice.
-    expect(textoAvance(f.avance)).toBe("Se vendió el 99% en 6 meses");
+    // 🩸 CAMBIÓ DE DIRECCIÓN el 25-ago-2026: antes el % era 276/280 = 99% y la
+    // línea decía "el 99%". El denominador ya no es lo COMPRADO sino lo que
+    // hubo (276 vendidas + 0 en bodega): se vendió TODO lo que llegó a existir,
+    // y las 4 que faltan las explica el aviso de descuadre, no el porcentaje.
+    expect(f.avance).toEqual({ tipo: "agotado", meses: 6, desdeMes: "2023-11", parte: 1 });
+    expect(textoAvance(f.avance)).toBe("Se vendió todo en 6 meses");
     // El ritmo es el de MIENTRAS se vendía: 276 ÷ 6 = 46 — no diluido por los
     // 27 meses de bodega vacía que vinieron después.
     expect(f.ritmo).toEqual({ meses: 6, porMes: 46, base: "agotado", desdeMes: "2023-11" });
@@ -558,7 +608,7 @@ describe("la línea de venta", () => {
     );
     const f = armarFicha(art, HOY_MES);
     expect(f.avance).toEqual({ tipo: "en-curso", meses: 5, parte: 0.5 });
-    expect(textoAvance(f.avance)).toBe("En 5 meses va el 50% de la compra");
+    expect(textoAvance(f.avance)).toBe("En 5 meses va el 50%");
   });
 
   it("🔴 con VARIAS compras VIVAS no se atribuye por tanda: agregado rotulado, anclado en la primera llegada de la ventana", () => {
@@ -664,7 +714,8 @@ describe("la línea de venta", () => {
     );
     const f2 = armarFicha(conStockVivo, HOY_MES);
     expect(f2.tandas).toBeNull(); // saldo 16 al llegar junio: se SUMA, no abre
-    expect(f2.avance).toEqual({ tipo: "agotado", meses: 3, desdeMes: "2026-01", parte: 84 / 110 });
+    // El % es sobre lo que hubo (84 vendidas + 0 en bodega): se vendió todo.
+    expect(f2.avance).toEqual({ tipo: "agotado", meses: 3, desdeMes: "2026-01", parte: 1 });
   });
 
   it("compra única viva SIN historia rara: QD3958033 va por el 30% a los 8 meses", () => {
@@ -674,7 +725,7 @@ describe("la línea de venta", () => {
     // de su vida en la ventana (7,7).
     expect(f.ritmo).toEqual({ meses: 8, porMes: 6.75, base: "unica-viva", desdeMes: "2025-12" });
     expect(textoLineaVenta(f.avance, f.ritmo)).toBe(
-      "Vendo 6.8 u por mes · En 8 meses va el 30% de la compra",
+      "Vendo 6.8 u por mes · En 8 meses va el 30%",
     );
   });
 
@@ -724,14 +775,16 @@ describe("la línea de venta", () => {
     expect(textoAvance({ tipo: "agotado", meses: 17, desdeMes: "2024-07", parte: null })).toBe(
       "Se vendió todo en 17 meses",
     );
+    // 🩸 "de la compra" se fue el 25-ago-2026: el % ya no se mide contra lo
+    // comprado, así que ese rótulo afirmaba algo falso al lado del pie de Vendí.
     expect(textoAvance({ tipo: "en-curso", meses: 0, parte: 0.12 })).toBe(
-      "En menos de 1 mes va el 12% de la compra",
+      "En menos de 1 mes va el 12%",
     );
     expect(textoAvance({ tipo: "en-curso", meses: 4, parte: 0 })).toBe(
-      "En 4 meses no se ha vendido nada de la compra",
+      "En 4 meses no se ha vendido nada",
     );
     expect(textoAvance({ tipo: "en-curso", meses: 4, parte: 0.004 })).toBe(
-      "En 4 meses va menos del 1% de la compra",
+      "En 4 meses va menos del 1%",
     );
     expect(textoVendoPorMes(0)).toBeNull(); // "Vendo 0 u por mes" no se dice
     // 🔴 El redondeo de Daniel: 1 decimal por debajo de 10, entero de ahí para
@@ -988,12 +1041,17 @@ describe("VENDIDO · MESES (medirVendidoMeses)", () => {
     );
     const f = armarFicha(art, HOY_MES);
     expect(f.grandes).toMatchObject({ comprado: 64, vendido: 66, quedan: 0 });
-    // La ficha: el 103%, sin tope. El aviso de descuadre explica las 2 de más.
-    expect(textoParteVendida(f.grandes.parteVendida)).toBe("el 103% de lo comprado");
+    // 🩸 CAMBIÓ DE DIRECCIÓN el 25-ago-2026: la ficha decía "el 103% de lo
+    // comprado" porque el denominador era lo COMPRADO. Con el denominador
+    // nuevo (66 vendidas + 0 en bodega) dice 100%, que es la verdad: se vendió
+    // todo lo que hubo. Las 2 unidades de más las sigue explicando el aviso de
+    // descuadre, que es su trabajo — no el del porcentaje.
+    expect(textoParteVendida(f.grandes.parteVendida)).toBe("el 100% de lo que hubo");
     expect(art.vendidoDeMas).toBe(2);
-    // Y la tabla dice EXACTAMENTE lo mismo.
+    // 🔴 Y LO QUE IMPORTA NO CAMBIÓ: la tabla dice EXACTAMENTE lo mismo que la
+    // ficha, que es el bug que Daniel cazó ("PORQUE NO SALE PORCENTAJE?").
     const { vm, vendido } = celdas(art);
-    expect(vendido).toBe("103%");
+    expect(vendido).toBe("100%");
     expect(vendido).not.toBe("—");
     expect(vm.parte).toBe(f.grandes.parteVendida); // el MISMO campo, no una copia
   });
@@ -1122,8 +1180,10 @@ describe("VENDIDO · MESES (medirVendidoMeses)", () => {
         HOY,
       ),
     );
-    expect(termo.vm).toEqual({ parte: 150 / 100, meses: 17, terminado: true });
-    expect(termo.vendido).toBe("150%");
+    // Vendió 150 de 100 compradas y quedó en 0: lo que hubo son las 150 que
+    // salieron, así que el % es 100 y el aviso de "vendidas de más" explica.
+    expect(termo.vm).toEqual({ parte: 1, meses: 17, terminado: true });
+    expect(termo.vendido).toBe("100%");
     expect(termo.meses).toBe("17");
   });
 
@@ -1135,6 +1195,27 @@ describe("VENDIDO · MESES (medirVendidoMeses)", () => {
     });
     expect(vm).toEqual({ parte: null, meses: 3, terminado: false });
     expect(textoVendidoCelda(vm)).toBe("—");
+  });
+
+  // 🩸 EL DEFECTO VOLVÍA POR LA PUERTA DEL REDONDEO (25-ago-2026): `344 ÷ 345`
+  // es 99,7% y redondeaba a 100% al lado de una columna Stock que decía 1 — la
+  // misma contradicción, con dos decimales menos. Medido en producción: 10
+  // códigos de vistana caían justo ahí.
+  it("🔴 con algo en bodega NUNCA se dice 100%, ni por redondeo", () => {
+    expect(pctVendido(344 / 345)).toBe(99);
+    expect(textoVendidoCelda({ parte: 344 / 345, meses: 17, terminado: true })).toBe("99%");
+    expect(textoParteVendida(344 / 345)).toBe("el 99% de lo que hubo");
+    expect(textoAvance({ tipo: "agotado", meses: 17, desdeMes: "2024-01", parte: 344 / 345 })).toBe(
+      "Se vendió el 99% en 17 meses",
+    );
+    // El 100% se dice cuando de verdad no queda nada, y solo entonces.
+    expect(pctVendido(1)).toBe(100);
+    expect(textoVendidoCelda({ parte: 1, meses: 2, terminado: true })).toBe("100%");
+    // ⚠️ El tope es de UN SOLO lado: 0,4% sigue redondeando a 0%, que es la
+    // convención de siempre de la celda.
+    expect(pctVendido(0.004)).toBe(0);
+    // Y el caso real de Daniel no necesita tope: 48 ÷ 49 ya da 98.
+    expect(pctVendido(48 / 49)).toBe(98);
   });
 
   it("los textos redondean a ENTERO y el borde no promete de más", () => {
@@ -1583,11 +1664,14 @@ describe("TANDAS — el caso de la captura (4G5004G001)", () => {
     expect(pieGrandeMeses(f.ritmo)).toBe("de venta · desde mar 2026");
   });
 
-  it("🔴 VENDIDO · MESES (tabla del pedido y Excel) = de la tanda actual: 69% · 5, viva (gris)", () => {
+  it("🔴 VENDIDO · MESES (tabla del pedido y Excel) = de la tanda actual: 68% · 5, viva (gris)", () => {
+    // 🩸 Era 69% (25 ÷ 36, contra lo que LLEGÓ). Desde el 25-ago-2026 el
+    // denominador es lo que hubo: 25 vendidas + 12 en bodega = 37 → 68%. Es el
+    // par que se lee en la MISMA fila (Vendí 25 · Stock 12), no otro número.
     const f = armarFicha(G4G5004G001(), HOY_MES);
     const vm = medirVendidoMeses(f);
-    expect(vm).toEqual({ parte: 25 / 36, meses: 5, terminado: false });
-    expect(textoVendidoCelda(vm)).toBe("69%");
+    expect(vm).toEqual({ parte: 25 / 37, meses: 5, terminado: false });
+    expect(textoVendidoCelda(vm)).toBe("68%");
     expect(textoMesesCelda(vm)).toBe("5");
   });
 
@@ -1629,7 +1713,7 @@ describe("TANDAS — el caso de la captura (4G5004G001)", () => {
     const frase = fraseLlegadaActual(f.tandas![1]);
     expect(frase).toBe("Llegaron 36 u en mar 2026");
     const linea = textoLineaVenta(f.avance, f.ritmo, f.tandas)!;
-    for (const repetido of ["me quedan", "69%", "5 meses", "se vendió"]) {
+    for (const repetido of ["me quedan", "68%", "5 meses", "se vendió"]) {
       expect(linea, `la línea repite "${repetido}"`).not.toContain(repetido);
     }
     // Lo que sí tiene que estar: cuándo llegó y a qué ritmo se vende.
@@ -1639,16 +1723,21 @@ describe("TANDAS — el caso de la captura (4G5004G001)", () => {
     expect(f.grandes.quedan).not.toBe(f.tandas![1].llegaron - f.tandas![1].vendidas); // 11
   });
 
-  it("🔴 LOS GRANDES son de la ÚLTIMA LLEGADA: Compré 36 · Vendí 25 (69%) · Stock 12 — *'que sea coherente'*", () => {
+  it("🔴 LOS GRANDES son de la ÚLTIMA LLEGADA: Compré 36 · Vendí 25 (68%) · Stock 12 — *'que sea coherente'*", () => {
     const f = armarFicha(G4G5004G001(), HOY_MES);
     const g = f.grandes;
     expect(g).toMatchObject({ comprado: 36, vendido: 25, quedan: 12, deLlegada: true });
     // La mutación que esto caza: dejar los grandes en el histórico (72 · 61).
     expect(g.comprado).not.toBe(72);
     expect(g.vendido).not.toBe(61);
-    expect(textoParteVendida(g.parteVendida, g.deLlegada)).toBe("el 69% de esa llegada");
+    // 🩸 El pie decía "el 69% de esa llegada" (25 ÷ 36). El % ya no se mide
+    // contra lo que llegó sino contra lo que hubo — 25 vendidas + 12 en
+    // bodega—, así que el pie y la columna Stock de al lado dejan de poder
+    // desmentirse. Por eso también se fue el "de esa llegada": la base es una
+    // sola en todo el módulo.
+    expect(textoParteVendida(g.parteVendida)).toBe("el 68% de lo que hubo");
     // Y las tres cifras dicen LO MISMO que la frase y que la tabla del pedido.
-    expect(textoVendidoCelda(medirVendidoMeses(f))).toBe("69%");
+    expect(textoVendidoCelda(medirVendidoMeses(f))).toBe("68%");
     expect(fraseLlegadaActual(f.tandas![1])).toContain("Llegaron 36 u");
   });
 
@@ -1784,13 +1873,14 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     // mismo número dos veces en la misma caja.
     expect(f30.grandes).toMatchObject({ comprado: 36, vendido: 36, quedan: 0, deLlegada: false, historico: null });
     expect(textoHistoricoTotal(f30.grandes.historico)).toBeNull();
-    expect(textoParteVendida(f30.grandes.parteVendida)).toBe("el 100% de lo comprado");
+    // 36 vendidas + 0 en bodega: lo comprado y lo que hubo coinciden.
+    expect(textoParteVendida(f30.grandes.parteVendida)).toBe("el 100% de lo que hubo");
     // QD3958033 (única compra viva): sin cambios.
     const fqd = armarFicha(QD3958033(), HOY_MES);
     expect(fqd.tandas).toBeNull();
     expect(fqd.avance).toEqual({ tipo: "en-curso", meses: 8, parte: 0.3 });
     expect(textoLineaVenta(fqd.avance, fqd.ritmo, fqd.tandas)).toBe(
-      "Vendo 6.8 u por mes · En 8 meses va el 30% de la compra",
+      "Vendo 6.8 u por mes · En 8 meses va el 30%",
     );
   });
 
@@ -1835,5 +1925,124 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     expect(fraseLlegadaActual(f.tandas![1])).not.toContain("me quedan");
     expect(fraseLlegadaActual(f.tandas![1])).not.toContain("se vendió");
     expect(pieGrandeMeses(f.ritmo)).toBe("en venderse");
+  });
+
+  it("🔴 la ÚLTIMA llegada cierra con la COLA en bodega, no solo con el cero exacto", () => {
+    // 100 u en ene, se vendieron TODAS en feb (bodega en 0) → 50 u más en abr,
+    // de las que se vendieron 49 y quedó UNA. Esa unidad es la cola
+    // (1 <= min(2, 10% de 50)) y NO puede dejar el reloj de la llegada
+    // corriendo: sin esto la celda diría 4 meses (hasta hoy) en vez de 3.
+    const art = mini(
+      [
+        ing("2026-01-10", 100, { codigo_articulo: "T1", n_interno: "A" }),
+        ing("2026-04-10", 50, { codigo_articulo: "T1", n_interno: "B" }),
+      ],
+      [
+        v("2026-02-15", "FA", 100, 1000),
+        v("2026-05-20", "FA", 30, 300),
+        v("2026-06-20", "FA", 19, 190),
+      ],
+      1,
+    );
+    const f = armarFicha(art, HOY_MES);
+    expect(f.tandas).toHaveLength(2);
+    expect(f.tandas![1]).toMatchObject({ desdeMes: "2026-04", llegaron: 50, vendidas: 49, cerrada: true, meses: 3 });
+    const vm = medirVendidoMeses(f);
+    expect(vm.terminado).toBe(true); // negro: el episodio se cerró
+    expect(textoMesesCelda(vm)).toBe("3");
+    expect(textoMesesCelda(vm)).not.toBe("4"); // la mutación que esto caza
+    // Y el % es sobre lo que hubo en ESA llegada: 49 vendidas + 1 en bodega.
+    expect(textoVendidoCelda(vm)).toBe("98%");
+  });
+
+  it("🔴 la línea de venta usa EL MISMO % que el pie de Vendí, no uno propio", () => {
+    // Compró 100, vendió 50 y en bodega hay 30: 20 se perdieron en un ajuste
+    // que el sistema no lee. El % es 50 ÷ 80 = 63%, no 50 ÷ 100 = 50%.
+    const art = mini(
+      [ing("2026-03-10", 100, { codigo_articulo: "T1" })],
+      [v("2026-04-15", "FA", 50, 500)],
+      30,
+    );
+    const f = armarFicha(art, HOY_MES);
+    expect(f.avance).toEqual({ tipo: "en-curso", meses: 5, parte: 50 / 80 });
+    expect(textoAvance(f.avance)).toBe("En 5 meses va el 63%");
+    // 🔴 LA LÍNEA Y EL PIE NO PUEDEN DISCREPAR: es el bug de 44D202G110 otra vez.
+    expect(textoParteVendida(f.grandes.parteVendida)).toBe("el 63% de lo que hubo");
+    expect((f.avance as { parte: number }).parte).toBe(f.grandes.parteVendida);
+    expect(textoVendidoCelda(medirVendidoMeses(f))).toBe("63%");
+  });
+});
+
+// ─── 🩸 LOS DOS HERMANOS (25-ago-2026) ───────────────────────────────────────
+//
+// El caso que Daniel reportó, con los datos REALES de vistana medidos contra
+// producción: MISMA llegada (5-ago-2025, 48 u, única compra), MISMA venta
+// (sep 1 · nov 32 · dic 15 = 48). Lo ÚNICO que los separa es que a uno le
+// quedó 1 unidad de un ajuste de inventario que el sistema no lee.
+//
+//   ANTES        4LD230G110 → 100% · 12 meses   (¡con 1 en bodega!)
+//                4LD230G001 → 102% ·  5 meses
+//   AHORA        4LD230G110 →  98% ·  5 meses
+//                4LD230G001 → 100% ·  5 meses
+function hermano(codigo: string, existencia: number, ventaDic: number) {
+  return armarArticulo(
+    {
+      empresa: "vistana",
+      codigo,
+      descripcion: "Men-T-Shirts S/S",
+      ingresos: [ing("2025-08-05", 48, { codigo_articulo: codigo, precio: 19, costo_cif: 14.08 })],
+      ventas: [
+        v("2025-09-15", "FA", 1, 19),
+        v("2025-11-15", "FA", 32, 608),
+        v("2025-12-15", "FA", ventaDic, ventaDic * 19),
+      ],
+      existencia,
+      precioEtiqueta: 19,
+      catalogoSyncedAt: null,
+    },
+    HOY,
+  );
+}
+
+describe("🩸 los dos hermanos: 1 unidad de ajuste no puede valer 7 meses ni 4 puntos", () => {
+  it("🔴 4LD230G110 (queda 1): el reloj se PARA en la última venta — 5 meses, no 12", () => {
+    const f = armarFicha(hermano("4LD230G110", 1, 15), HOY_MES);
+    expect(f.grandes).toMatchObject({ comprado: 48, vendido: 48, quedan: 1 });
+    // La cola (1 <= min(2, 10% de 48)) NO es stock: el episodio está cerrado.
+    expect(f.avance).toEqual({ tipo: "agotado", meses: 5, desdeMes: "2025-08", parte: 48 / 49 });
+    const vm = medirVendidoMeses(f);
+    expect(textoMesesCelda(vm)).toBe("5");
+    expect(textoMesesCelda(vm)).not.toBe("12"); // la mutación que esto caza
+    expect(vm.terminado).toBe(true); // negro, no gris
+    expect(textoVendidoCelda(vm)).toBe("98%");
+    expect(textoVendidoCelda(vm)).not.toBe("100%"); // con 1 en bodega, jamás
+    expect(pieGrandeMeses(f.ritmo)).toBe("en venderse");
+  });
+
+  it("🔴 4LD230G001 (stock 0, vendió 49 de 48): 100%, NUNCA 102%", () => {
+    const f = armarFicha(hermano("4LD230G001", 0, 16), HOY_MES);
+    expect(f.grandes).toMatchObject({ comprado: 48, vendido: 49, quedan: 0 });
+    const vm = medirVendidoMeses(f);
+    expect(textoVendidoCelda(vm)).toBe("100%");
+    expect(textoVendidoCelda(vm)).not.toBe("102%");
+    expect(textoMesesCelda(vm)).toBe("5");
+    // El descuadre lo sigue explicando el aviso de siempre, no el porcentaje.
+    expect(hermano("4LD230G001", 0, 16).vendidoDeMas).toBe(1);
+  });
+
+  it("🔴 LOS DOS DICEN LO MISMO donde tienen que decirlo: 5 meses los dos", () => {
+    const a = medirVendidoMeses(armarFicha(hermano("4LD230G110", 1, 15), HOY_MES));
+    const b = medirVendidoMeses(armarFicha(hermano("4LD230G001", 0, 16), HOY_MES));
+    expect(textoMesesCelda(a)).toBe(textoMesesCelda(b));
+    expect(a.terminado).toBe(b.terminado);
+    // Y el % SÍ difiere, porque a uno le queda una unidad y al otro no.
+    expect(textoVendidoCelda(a)).not.toBe(textoVendidoCelda(b));
+  });
+
+  it("⚠️ 3 en bodega ya NO es cola (pasa el umbral): el reloj sigue corriendo", () => {
+    const f = armarFicha(hermano("4LD230G110", 3, 15), HOY_MES);
+    expect(f.avance.tipo).toBe("en-curso");
+    expect(medirVendidoMeses(f).terminado).toBe(false);
+    expect(textoMesesCelda(medirVendidoMeses(f))).toBe("12");
   });
 });

@@ -42,7 +42,16 @@ export function asistenciaRoles(): string[] {
 // 🔑 Lo que NO está acá igual se ve: el aviso ámbar de las horas que no se
 // pagaron vive en la Planilla y lo lee cualquiera con Asistencia —incluida la
 // contadora—. Aprobar es lo restringido; enterarse, no.
-export const APROBACIONES_ROLES = ["admin", "bodega"] as const;
+// 🔑 `contabilidad` entra el 27-ago-2026 por pedido de Daniel: *«que
+// contabilidad tambien pueda aprobar»*. Es quien arma la planilla, así que ya
+// veía el aviso de lo que quedó sin aprobar — ahora además puede destrabarlo
+// sin tener que buscar a alguien.
+//
+// ⚠️ NO entra en `soloApruebaRoles()`: contabilidad YA está en
+// `ASISTENCIA_ROLES`, así que sigue viendo el módulo completo como siempre. La
+// lista de abajo se deriva justamente para que este matiz no haya que
+// acordárselo.
+export const APROBACIONES_ROLES = ["admin", "bodega", "contabilidad"] as const;
 
 export function aprobacionesRoles(): string[] {
   return [...APROBACIONES_ROLES];

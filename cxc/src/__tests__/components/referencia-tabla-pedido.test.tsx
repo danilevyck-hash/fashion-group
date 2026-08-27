@@ -194,7 +194,7 @@ describe("modo pedido — la tabla", () => {
     // El detalle es CuerpoArticulo: los cuatro grandes + la línea del ritmo + la plata.
     expect(screen.getAllByText("Compré").length).toBeGreaterThan(1); // th + dt
     expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Vendo 9.6 u por mes · En 10 meses va el 80% de la compra").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Vendo 9.6 u por mes · En 10 meses va el 80%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Precio prom").length).toBeGreaterThan(0);
     // Y las filas siguen todas, en el mismo orden.
     const codigos = [...document.querySelectorAll("tbody td:first-child")].map(
@@ -280,12 +280,12 @@ describe("modo pedido — la tabla", () => {
     expect(celdas()[1]).toBe("36"); // no 72
     expect(celdas()[2]).toBe("25"); // no 61
     expect(celdas()[3]).toBe("12"); // la existencia REAL, sin recortar
-    expect(celdas()[4]).toBe("69%");
+    expect(celdas()[4]).toBe("68%"); // 25 vendidas de las 37 que hubo (25 + 12)
     expect(celdas()[5]).toBe("5");
 
     // Y el detalle que se abre al tocar dice EXACTAMENTE lo mismo.
     fireEvent.click(fila());
-    expect(screen.getAllByText("el 69% de esa llegada").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("el 68% de lo que hubo").length).toBeGreaterThan(0);
     expect(screen.getAllByText("72 u en total · 61 vendidas").length).toBeGreaterThan(0);
     const dds = [...document.querySelectorAll("dd")].map((d) => (d.textContent ?? "").replace(/\s+/g, ""));
     expect(dds.slice(0, 4)).toEqual(["36u", "25u", "12u", "5"]);
@@ -331,13 +331,16 @@ describe("modo pedido — la tabla", () => {
     const celdas = () => [...fila().querySelectorAll("td")].map((td) => td.textContent);
     expect(celdas()[1]).toBe("64"); // Compré
     expect(celdas()[2]).toBe("66"); // Vendí
-    expect(celdas()[4]).toBe("103%"); // Vendido — antes decía "—"
+    // 🩸 Antes decía "—", después 103%, y desde el 25-ago-2026 dice 100%: el %
+    // se mide contra lo que hubo (66 vendidas + 0 en bodega). Lo que este
+    // candado protege no es el número: es que la tabla y la ficha NO discrepen.
+    expect(celdas()[4]).toBe("100%");
     expect(celdas()[4]).not.toBe("—");
 
     // Y la ficha que se abre al tocar dice EXACTAMENTE el mismo porcentaje,
     // con el aviso de descuadre explicando las 2 unidades de más.
     fireEvent.click(fila());
-    expect(screen.getAllByText("el 103% de lo comprado").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("el 100% de lo que hubo").length).toBeGreaterThan(0);
     expect(
       screen.getAllByText("Se vendieron 2 unidades más de las que llegaron según los ingresos registrados.")
         .length,
@@ -390,5 +393,154 @@ describe("ordenarComoPegado (puro)", () => {
 
   it("no distingue mayúsculas (el parseo normaliza a MAYÚSCULA)", () => {
     expect(ordenarComoPegado([{ codigo: "aaa", empresa: "v" }], ["AAA"]).map((a) => a.codigo)).toEqual(["aaa"]);
+  });
+});
+
+// ─── ORDENAR POR COLUMNA (25-ago-2026) ───────────────────────────────────────
+//
+// 🔴 EL RIESGO NO ES EL COMPARADOR (eso lo cubre `ventas-referencia-orden`):
+// es que el ORDEN PEGADO deje de ser el default, o que no se pueda volver a él.
+// Por eso acá se RENDERIZA la tabla real y se tocan los encabezados.
+describe("modo pedido — ordenar por columna", () => {
+  const codigosEnPantalla = () =>
+    [...document.querySelectorAll("tbody td:first-child")].map(
+      (td) => td.querySelector("span")?.textContent ?? "",
+    );
+  const encabezado = (titulo: string) =>
+    screen.getAllByRole("button", { name: new RegExp(`^${titulo}$`) })[0];
+
+  it("🔴 EL DEFAULT SIGUE SIENDO EL ORDEN PEGADO: sin tocar nada, nada se ordena", async () => {
+    await buscarPegado();
+    expect(codigosEnPantalla()).toEqual(["ZZZ999001", "AAA111001", "CVM253CR02001"]);
+    // Y ningún encabezado se anuncia como ordenado.
+    for (const th of document.querySelectorAll("thead th")) {
+      expect(th.getAttribute("aria-sort")).toBe("none");
+    }
+  });
+
+  it("🔴 el ciclo del encabezado: ordena → invierte → VUELVE AL ORDEN PEGADO", async () => {
+    await buscarPegado();
+    // 1er toque: el texto arranca de la A.
+    fireEvent.click(encabezado("Código"));
+    expect(codigosEnPantalla()).toEqual(["AAA111001", "CVM253CR02001", "ZZZ999001"]);
+    // 2do: se da vuelta.
+    fireEvent.click(encabezado("Código"));
+    expect(codigosEnPantalla()).toEqual(["ZZZ999001", "CVM253CR02001", "AAA111001"]);
+    // 3ro: se sale del override. Sin esto, un toque sin querer dejaría a Daniel
+    // sin el orden de su lista para siempre.
+    fireEvent.click(encabezado("Código"));
+    expect(codigosEnPantalla()).toEqual(["ZZZ999001", "AAA111001", "CVM253CR02001"]);
+  });
+
+  it("🔴 los NÚMEROS arrancan de mayor a menor, que es lo que se busca al tocar Stock", async () => {
+    await buscarPegado();
+    fireEvent.click(encabezado("Stock"));
+    // 24 · 24 · 0 — y el empate conserva el orden pegado (AAA antes que CVM).
+    expect(codigosEnPantalla()).toEqual(["AAA111001", "CVM253CR02001", "ZZZ999001"]);
+    const th = [...document.querySelectorAll("thead th")].find((t) =>
+      (t.textContent ?? "").includes("Stock"),
+    )!;
+    expect(th.getAttribute("aria-sort")).toBe("descending");
+    fireEvent.click(encabezado("Stock"));
+    expect(th.getAttribute("aria-sort")).toBe("ascending");
+  });
+
+  it("🔴 ordenar NO cambia un solo número: la fila dice lo mismo antes y después", async () => {
+    await buscarPegado();
+    const leer = (codigo: string) =>
+      [...screen.getAllByText(codigo)[0].closest("tr")!.querySelectorAll("td")].map((td) => td.textContent);
+    const antes = leer("ZZZ999001");
+    fireEvent.click(encabezado("Vendido"));
+    expect(leer("ZZZ999001")).toEqual(antes);
+    fireEvent.click(encabezado("Margen"));
+    expect(leer("ZZZ999001")).toEqual(antes);
+  });
+
+  it('🔴 los "—" van al FINAL en las dos direcciones: no son "el peor de la lista"', async () => {
+    const resp: ComprasApiResp = {
+      ...RESP,
+      articulos: [
+        articulo("AAA111001"),
+        articulo("RETENCION", {
+          compras: [],
+          sinCompraRegistrada: true,
+          existencia: null,
+          cuadre: { comprado: null, vendido: 40, existencia: null, residuo: null, ajusteConfiable: false },
+        }),
+      ],
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => resp }) as unknown as Response));
+    render(<ReferenciaView />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "RETENCION AAA111001" } });
+    fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
+    await screen.findAllByText("RETENCION");
+    fireEvent.click(encabezado("Meses"));
+    expect(codigosEnPantalla()[1]).toBe("RETENCION");
+    fireEvent.click(encabezado("Meses"));
+    expect(codigosEnPantalla()[1]).toBe("RETENCION");
+  });
+
+  it("🔴 el chevron NO es una columna ordenable", async () => {
+    await buscarPegado();
+    const ths = [...document.querySelectorAll("thead th")];
+    const ultimo = ths[ths.length - 1];
+    expect(ultimo.textContent).toBe("");
+    expect(ultimo.querySelector("button")).toBeNull();
+  });
+
+  it("🔴 el detalle abierto sigue abierto y en su fila después de ordenar", async () => {
+    await buscarPegado();
+    fireEvent.click(screen.getAllByText("AAA111001")[0].closest("tr")!);
+    expect(screen.getAllByText("Precio prom").length).toBeGreaterThan(0);
+    fireEvent.click(encabezado("Código"));
+    expect(screen.getAllByText("Precio prom").length).toBeGreaterThan(0);
+    expect(codigosEnPantalla()).toEqual(["AAA111001", "CVM253CR02001", "ZZZ999001"]);
+  });
+
+  it("⚠️ el Excel sigue bajando el ORDEN PEGADO aunque la tabla esté ordenada", async () => {
+    await buscarPegado();
+    fireEvent.click(encabezado("Código"));
+    fireEvent.click(screen.getAllByRole("button", { name: /Excel/ })[0]);
+    const lista = exportSpy.mock.calls[0][0] as { codigo: string }[];
+    expect(lista.map((a) => a.codigo)).toEqual(["ZZZ999001", "AAA111001", "CVM253CR02001"]);
+  });
+});
+
+// 🔴 EL SORT ORDENA POR LO QUE LA CELDA MUESTRA, NUNCA POR UNA SEGUNDA CUENTA.
+// Es el mismo defecto que produjo la contradicción de 44D202G110, con otro
+// disfraz: una columna que ordena por un número distinto del que pinta.
+describe("modo pedido — ordenar NO puede estrenar una segunda cuenta", () => {
+  it("🔴 'Vendido' ordena por el % que se ve (Vendí ÷ lo que hubo), no por Vendí ÷ Compré", async () => {
+    // DESC001: compró 100, vendió 50, quedan 30 → 20 se perdieron en un ajuste.
+    //   lo que se VE = 50 ÷ 80 = 63%   ·   la cuenta vieja = 50 ÷ 100 = 50%
+    // OTRO002: cuadra, así que las dos cuentas dan 55%.
+    // Ordenado por lo que se ve, DESC001 va PRIMERO; por la cuenta vieja, último.
+    const conAjuste = (codigo: string, vendido: number, existencia: number): ArticuloCompras => ({
+      ...articulo(codigo),
+      compras: [{ ...articulo(codigo).compras[0], unidades: 100 }],
+      serie: [{ mes: "2026-05", unidades: vendido, venta: vendido * 10 }],
+      cuadre: { comprado: 100, vendido, existencia, residuo: 100 - vendido - existencia, ajusteConfiable: false },
+      existencia,
+    });
+    const resp: ComprasApiResp = {
+      ...RESP,
+      articulos: [conAjuste("DESC001", 50, 30), conAjuste("OTRO002", 55, 45)],
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => resp }) as unknown as Response));
+    render(<ReferenciaView />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "OTRO002 DESC001" } });
+    fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
+    await screen.findAllByText("DESC001");
+    // Lo que se ve en la celda.
+    const celdaVendido = (codigo: string) =>
+      [...screen.getAllByText(codigo)[0].closest("tr")!.querySelectorAll("td")][4].textContent;
+    expect(celdaVendido("DESC001")).toBe("63%");
+    expect(celdaVendido("OTRO002")).toBe("55%");
+    // Y el orden respeta ESO.
+    fireEvent.click(screen.getAllByRole("button", { name: /^Vendido$/ })[0]);
+    const codigos = [...document.querySelectorAll("tbody td:first-child")].map(
+      (td) => td.querySelector("span")?.textContent ?? "",
+    );
+    expect(codigos).toEqual(["DESC001", "OTRO002"]);
   });
 });

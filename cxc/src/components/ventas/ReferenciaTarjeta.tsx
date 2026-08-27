@@ -293,9 +293,9 @@ function PieCompras({
   );
 }
 
-/** El subtítulo de Vendí: qué parte de lo comprado (o de esa llegada) es.
- *  Cuando no hay porcentaje honesto que decir, se dice OTRA verdad — nunca un
- *  número inventado.
+/** El subtítulo de Vendí: qué parte de LO QUE HUBO es (lo vendido + lo que
+ *  queda en bodega). Cuando no hay porcentaje honesto que decir, se dice OTRA
+ *  verdad — nunca un número inventado.
  *
  *  ⚠️ Mira el vendido de LOS GRANDES, no el del cuadre: con los grandes de la
  *  última llegada, "sin ventas registradas" tiene que hablar de ESA llegada
@@ -303,7 +303,7 @@ function PieCompras({
 function pieDeVendido(g: FichaArticulo["grandes"]): string {
   if (g.vendido < 0) return "más devoluciones que ventas";
   if (g.vendido === 0) return g.deLlegada ? "todavía sin ventas de esa llegada" : "sin ventas registradas";
-  const texto = textoParteVendida(g.parteVendida, g.deLlegada);
+  const texto = textoParteVendida(g.parteVendida);
   if (texto) return texto;
   // Vendió pero no hay compras contra las cuales comparar.
   return "neto, con devoluciones restadas";

@@ -98,6 +98,21 @@ import {
   textoExtraNoAprobada,
 } from "@/lib/asistencia/aprobaciones";
 import { leerAprobaciones } from "@/lib/asistencia/aprobaciones-server";
+import {
+  avisoMigracionAmarrePrestamos,
+  avisoMigracionPrestamoAprobado,
+  prestamosSinAprobar,
+  prestamosSinAtar,
+  sugerirPrestamos,
+  textoPrestamoSinAprobar,
+  textoPrestamoSinAtar,
+  type FichaPrestamo,
+  type PersonaEnCuadro,
+} from "@/lib/asistencia/prestamos-planilla";
+import {
+  leerAprobacionesPrestamo,
+  leerPrestamosDeQuincena,
+} from "@/lib/asistencia/prestamos-planilla-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -522,6 +537,54 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // ── 🔴 EL PRÉSTAMO, TRAÍDO DEL MÓDULO ────────────────────────────────────
+    //
+    // 🔑 VA DESPUÉS DEL `return` DE ARRIBA, a propósito: quien solo aprueba
+    // horas extra (el usuario `bodega`, con el que trabaja Julio) no tiene por
+    // qué recibir —ni que se le consulte— cuánto le están descontando a nadie.
+    // Lo que no se ejecuta acá abajo, no puede colarse en aquella respuesta.
+    //
+    // ⚠️ Y solo en una QUINCENA. Los montos manuales se guardan por quincena
+    // (`claveManuales`); en un rango libre no hay casilla que llenar y repartir
+    // una cuota por días sería inventar plata. Es la MISMA condición con la que
+    // ya se leen los montos manuales, unas líneas más arriba.
+    const claveQ = q.claveManuales;
+    const [presRes, aprPresRes] = claveQ
+      ? await Promise.all([
+        // 🔴 Sin la columna del amarre nadie queda atado —la casilla se sigue
+        // escribiendo a mano, como hoy— pero se dice en `avisos`.
+        leerPrestamosDeQuincena(q.desde, q.hasta),
+        // 🔴 Sin la tabla no se puede aprobar nada y la planilla da EXACTAMENTE
+        // lo de hoy hasta el centavo. También se dice.
+        leerAprobacionesPrestamo(claveQ),
+      ])
+      : [
+        { fichas: [] as FichaPrestamo[], faltaColumnaAmarre: false },
+        { porCodigo: new Map(), faltaTabla: false },
+      ];
+
+    // 🔑 La casilla de HOY sale de las MISMAS líneas del cuadro, no de una
+    // segunda lectura de `asistencia_planilla_manual`: lo que la pantalla dice
+    // que hay en la casilla y lo que la planilla suma no pueden separarse.
+    const enCuadro: PersonaEnCuadro[] = lineas.map((l) => ({
+      codigo: l.codigo,
+      etiqueta: l.etiqueta,
+      empresa: l.empresa,
+      empresaEtiqueta: l.empresaEtiqueta,
+      enCasilla: l.manuales.prestamo,
+    }));
+    const prestamos = sugerirPrestamos({
+      fichas: presRes.fichas,
+      personas: enCuadro,
+      aprobaciones: aprPresRes.porCodigo,
+    });
+    // 🔴 Lo que este cuadro NO descontó porque nadie lo aprobó, y los préstamos
+    // con saldo que no son de nadie. Los dos van con nombre y monto: es la
+    // misma regla de Daniel que ya cumplen las horas extra y las vacaciones ya
+    // pagadas — rechazar sí, esconder no.
+    const prestamoSinAprobar = prestamosSinAprobar(prestamos);
+    const prestamoSinAtar = prestamosSinAtar(presRes.fichas);
+
     return NextResponse.json({
       // `quincena` se mantiene con el mismo nombre y forma para no romper a
       // nadie que ya lo lea; `periodo` es lo que la pantalla usa ahora.
@@ -537,6 +600,11 @@ export async function GET(req: NextRequest) {
       // no va a hacer nada con ella.
       aprobaciones: filasAprobacion,
       puedeAprobar,
+      // 🔴 LO QUE EL MÓDULO DE PRÉSTAMOS DICE QUE HAY QUE DESCONTAR ESTA
+      // QUINCENA, persona por persona, con su cuota, su saldo y si ya está
+      // aprobado. La contadora, textual: *«El préstamo si debe ser por
+      // aprobarlo»*. Vacío en un rango libre.
+      prestamos,
       // Los avisos que la pantalla tiene que poder pintar ANTES de que alguien
       // le descuente plata a nadie.
       avisos: {
@@ -595,6 +663,25 @@ export async function GET(req: NextRequest) {
         // Con nombre y cantidad: rechazar sí, esconder no.
         extraSinAprobar,
         avisoExtraSinAprobar: textoExtraNoAprobada(extraSinAprobar),
+        // 🔴 Los descuentos de préstamo que este cuadro NO hizo porque nadie
+        // los aprobó. Misma regla, mismo formato.
+        prestamoSinAprobar,
+        avisoPrestamoSinAprobar: textoPrestamoSinAprobar(prestamoSinAprobar),
+        // 🔴 Y los préstamos CON SALDO que no están atados a nadie de la
+        // planilla. Es plata que no se le está descontando a ninguna persona:
+        // callarla es exactamente cómo se perdieron los $700 de LUIS ADRIAN
+        // ARROYO durante 22 días (#651).
+        prestamoSinAtar,
+        avisoPrestamoSinAtar: textoPrestamoSinAtar(prestamoSinAtar),
+        // Sin la columna del amarre NADIE queda atado —la casilla se sigue
+        // escribiendo a mano, como hoy— pero se dice: quien espera que se
+        // llene sola tiene que saber por qué no lo hace.
+        faltaMigracionAmarrePrestamos:
+          presRes.faltaColumnaAmarre ? avisoMigracionAmarrePrestamos() : null,
+        // Sin la tabla no se puede aprobar y la planilla da lo de hoy hasta el
+        // centavo. También se dice.
+        faltaMigracionPrestamoAprobado:
+          aprPresRes.faltaTabla ? avisoMigracionPrestamoAprobado() : null,
         // Sin la tabla corrida NO se exige aprobación —o sea, se paga todo,
         // como hasta hoy— pero se dice: quien ya aprobó en su cabeza va a
         // esperar que lo no aprobado no se pague.

@@ -11,6 +11,15 @@
 //
 //   Código · Compré · Vendí · Stock · Vendido · Meses · Margen · Últ. compra
 //
+// 🔴 TOCAR EL ENCABEZADO ORDENA (25-ago-2026), y es un OVERRIDE del orden
+// pegado, no un reemplazo: 1er toque ordena · 2do invierte · 3ro devuelve el
+// orden en que Daniel pegó los códigos, que es el default y el que le sirve
+// para leer la tabla con su Excel al lado. La regla vive en
+// `lib/ventas/referencia-orden.ts` y ordena por los valores que la fila YA
+// calculó — acá no se vuelve a medir nada.
+//   ⚠️ El "Bajar a Excel" sigue exportando el ORDEN PEGADO (`articulosOrdenados`
+//   en `ReferenciaView`): es una decisión anterior y no se cambió de paso.
+//
 // 🔴 TOCAR UNA FILA ABRE EL DETALLE AHÍ MISMO, sin navegar y sin perder el
 // orden de la lista. El detalle es el CUERPO REAL de la tarjeta
 // (`CuerpoArticulo`) — no un resumen aparte que pueda decir otra cosa.
@@ -40,7 +49,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Fragment, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { colorDe } from "@/lib/ventas/referencia";
+import {
+  ordenarFilas,
+  siguienteOrden,
+  type ColumnaPedido,
+  type OrdenPedido,
+  type ValoresOrden,
+} from "@/lib/ventas/referencia-orden";
 import type { ArticuloCompras } from "@/lib/ventas/compras";
 import {
   armarFicha,
@@ -56,16 +73,19 @@ import { CuerpoArticulo, etiquetaEmpresa, fmtInt, fmtPct } from "./ReferenciaTar
  *  "Stock" es la palabra de Daniel (*"¿por qué 'me quedan' en vez de
  *  stock?"*); la columna Margen NO existe para vendedor/bodega (*"quita
  *  margen, lo demas dejalo"*). */
-function colsPedido(mostrarMargen: boolean): { titulo: string; px: number; derecha?: boolean }[] {
+function colsPedido(
+  mostrarMargen: boolean,
+): { titulo: string; px: number; derecha?: boolean; col?: ColumnaPedido }[] {
   return [
-    { titulo: "Código", px: 210 },
-    { titulo: "Compré", px: 72, derecha: true },
-    { titulo: "Vendí", px: 72, derecha: true },
-    { titulo: "Stock", px: 72, derecha: true },
-    { titulo: "Vendido", px: 84, derecha: true },
-    { titulo: "Meses", px: 64, derecha: true },
-    ...(mostrarMargen ? [{ titulo: "Margen", px: 66, derecha: true }] : []),
-    { titulo: "Últ. compra", px: 92, derecha: true },
+    { titulo: "Código", px: 210, col: "codigo" },
+    { titulo: "Compré", px: 72, derecha: true, col: "compre" },
+    { titulo: "Vendí", px: 72, derecha: true, col: "vendi" },
+    { titulo: "Stock", px: 72, derecha: true, col: "stock" },
+    { titulo: "Vendido", px: 84, derecha: true, col: "vendido" },
+    { titulo: "Meses", px: 64, derecha: true, col: "meses" },
+    ...(mostrarMargen ? [{ titulo: "Margen", px: 66, derecha: true, col: "margen" as ColumnaPedido }] : []),
+    { titulo: "Últ. compra", px: 92, derecha: true, col: "ultima" },
+    // El chevron no es una columna: no se ordena por él.
     { titulo: "", px: 36 },
   ];
 }
@@ -87,6 +107,8 @@ interface FilaPedido {
   enCurso: boolean;
   margen: string;
   ultCompra: string;
+  /** Los números que la fila YA calculó, para ordenar sin volver a medir. */
+  valores: ValoresOrden;
 }
 
 function armarFila(art: ArticuloCompras, hoyMes: string): FilaPedido {
@@ -107,6 +129,17 @@ function armarFila(art: ArticuloCompras, hoyMes: string): FilaPedido {
     enCurso: !vm.terminado,
     margen: fmtPct(f.margen.margen),
     ultCompra: f.ultima ? fmtMesAnio(f.ultima.fecha.slice(0, 7)) : "—",
+    // 🔑 Los MISMOS valores que se acaban de pintar. Ordenar no vuelve a medir.
+    valores: {
+      codigo: art.codigo,
+      compre: f.grandes.comprado,
+      vendi: f.grandes.vendido,
+      stock: f.grandes.quedan,
+      vendido: vm.parte,
+      meses: vm.meses,
+      margen: f.margen.margen,
+      ultima: f.ultima?.fecha ?? null,
+    },
   };
 }
 
@@ -122,7 +155,13 @@ export function ReferenciaTablaPedido({
   // Una sola fila abierta a la vez (acordeón): el detalle es la tarjeta entera
   // y dos abiertas a la vez vuelven la tabla una pila de tarjetas otra vez.
   const [abierta, setAbierta] = useState<string | null>(null);
-  const filas = useMemo(() => articulos.map((a) => armarFila(a, hoyMes)), [articulos, hoyMes]);
+  // 🔴 `null` = el ORDEN PEGADO, el default de siempre. El sort es un override.
+  const [orden, setOrden] = useState<OrdenPedido>(null);
+  const filasSinOrdenar = useMemo(() => articulos.map((a) => armarFila(a, hoyMes)), [articulos, hoyMes]);
+  const filas = useMemo(
+    () => ordenarFilas(filasSinOrdenar, orden, (f) => f.valores),
+    [filasSinOrdenar, orden],
+  );
   const COLS = useMemo(() => colsPedido(mostrarMargen), [mostrarMargen]);
   const ANCHO_MIN = COLS.reduce((s, c) => s + c.px, 0);
 
@@ -157,10 +196,45 @@ export function ReferenciaTablaPedido({
                       {COLS.map((c) => (
                         <th
                           key={c.titulo || "chevron"}
+                          aria-sort={
+                            c.col == null || orden?.col !== c.col
+                              ? "none"
+                              : orden.dir === "asc"
+                                ? "ascending"
+                                : "descending"
+                          }
                           // text-xs y no menos: la letra no baja de 12 px (regla de la casa).
-                          className={`whitespace-nowrap px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-600 ${c.derecha ? "text-right" : "text-left"}`}
+                          className={`whitespace-nowrap p-0 text-xs font-semibold uppercase tracking-wide text-gray-600 ${c.derecha ? "text-right" : "text-left"}`}
                         >
-                          {c.titulo}
+                          {c.col ? (
+                            <button
+                              type="button"
+                              onClick={() => setOrden((o) => siguienteOrden(o, c.col!))}
+                              title={
+                                orden?.col === c.col
+                                  ? orden.dir === (c.col === "codigo" ? "asc" : "desc")
+                                    ? "Tocar de nuevo lo invierte"
+                                    : "Tocar de nuevo vuelve al orden en que los pegaste"
+                                  : `Ordenar por ${c.titulo}`
+                              }
+                              // min-h-[44px]: el encabezado acá no es un rótulo,
+                              // es el BOTÓN de ordenar, y esta tabla se usa en
+                              // el iPad con dedo.
+                              className={`flex min-h-[44px] w-full items-center gap-1 px-3 py-2.5 uppercase transition hover:text-gray-900 ${
+                                c.derecha ? "justify-end" : "justify-start"
+                              } ${orden?.col === c.col ? "text-gray-900" : ""}`}
+                            >
+                              {c.titulo}
+                              {orden?.col === c.col &&
+                                (orden.dir === "asc" ? (
+                                  <ArrowUp className="h-3 w-3" aria-hidden="true" />
+                                ) : (
+                                  <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                                ))}
+                            </button>
+                          ) : (
+                            <span className="block px-3 py-2.5">{c.titulo}</span>
+                          )}
                         </th>
                       ))}
                     </tr>

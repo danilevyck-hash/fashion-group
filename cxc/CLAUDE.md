@@ -1407,6 +1407,61 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - 🩸 **DOS mutaciones fallaron en la primera corrida y las dos eran del SCRIPT, no del producto**: los backticks del nombre de una mutación, **dentro de comillas dobles, los ejecuta el shell** (`absolute: command not found`); y cambiar solo la etiqueta de apertura de `<span>` a `<input>` deja un `</span>` huérfano, el módulo no compila y la mutación prueba que un archivo roto rompe, no el candado.
 > - ⚠️ **Una mutación NO se puede hacer desde acá, y se dice:** *"el desplegable vuelve a ser un `absolute`"*. El barrido de `desplegables-flotan.test.ts` exime a todo archivo que MENCIONE `DesplegableFlotante`, así que la mutación fiel tiene que borrar el import **y** el uso — dos ediciones no contiguas, y el aplicador hace UNA literal por corrida a propósito.
 
+## 🔴 Guías — BORRAR NO OBLIGA A ABRIR LA GUÍA: el «···» está en la FILA (27-ago-2026)
+
+> Daniel, textual: ***"y darle acceso a secretaria de poder eliminar guias"***.
+>
+> 🩸 **EL PERMISO YA LO TENÍA, Y ESTÁ MEDIDO.** `DELETE /api/guias/[id]` exige `["admin","secretaria"]` desde siempre y `DELETE_ROLES` de `GuiasList` dice lo mismo; `andrea` y `Angela` son secretaria. **Lo que faltaba era ENCONTRAR el botón**: «Eliminar guía» era el ÚNICO ítem del «···» de la guía **EXPANDIDA**, al lado de «Compartir» — o sea que había que abrir la guía primero.
+>
+> ### 🔴 SE MOVIÓ, NO SE DUPLICÓ — y «Eliminar» NO salió como botón suelto
+>
+> El «···» sube a la fila y el de adentro **se retiró en el mismo cambio**: era su único ítem, y dejarlo en los dos lados sería otra vez *«cada cambio deja su puerta»*, que es lo que este módulo viene podando desde el 25-ago. **No se pierde ninguna puerta**: al abrir la guía la fila no desaparece, así que el menú sigue a la vista en la misma pantalla (hay candado que lo prueba con la guía abierta).
+> - 🔴 **NO se sacó «Eliminar» a la fila como botón suelto.** La fila ya tiene Editar · Despachar · Imprimir · Compartir, y en un celular un botón de borrar al lado de «Imprimir» es un toque equivocado esperando pasar sobre un documento **firmado**. Queda detrás del menú y detrás de la ventana que exige escribir **ELIMINAR**.
+> - **Sigue siendo SOFT DELETE** (`deleted = true`) y la confirmación no se aflojó: el botón rojo nace apagado hasta que la palabra esté escrita.
+> - ⚠️ **Solo se dibuja para quien puede borrar** (`canDelete` = admin · secretaria, y **nunca** en `readOnly`): a bodega y a vendedor no les aparece ni el «···». Y **no aparece en modo selección**, que tiene su propia barra de acciones y donde borrar no es una acción de lote.
+> - **El rótulo lleva el N° de la guía** (`Más opciones de la guía GT-231`): hay un «···» por fila y *"Más opciones"* a secas no diría de cuál.
+> - 🩸 **El «···» va FUERA del `<button>` de la fila.** Un botón dentro de otro es HTML inválido y, peor, el toque abriría el acordeón además del menú — el atajo se convertiría en un toque MÁS. La fila pasó de `w-full` a `flex-1 min-w-0` dentro de un `flex items-stretch`.
+>
+> ### Toques, contados TOCANDO en el navegador (no estimados)
+>
+> | | main | esta rama |
+> |---|---:|---:|
+> | hasta la ventana de confirmación (secretaria) | **3** (abrir la guía · «···» · «Eliminar guía») | **2** |
+> | «···» visibles en la fila cerrada | 0 | **1 por fila (15 de 15)** |
+>
+> ### 🔴 LO QUE **NO** SE TOCÓ
+>
+> **La lista sigue sin despachar** (ni por swipe ni desplegando nada) y «Editar»/«Despachar» siguen siendo `router.push` — el candado de conducta que toca los dos y verifica que **no salió ni un `fetch`** sigue verde · una `Completada`/`Rechazada` **no muestra «Despachar»** (sí «Editar», desde el 25-ago) · el **candado del PUT** sobre una guía despachada y las **DOS excepciones** que no miran el estado (`PATCH …/cliente` y `PATCH …/numero-transp`) · **nadie gana permisos**: `DELETE_ROLES` es el conjunto de siempre.
+>
+> ### Medición
+>
+> **Los 3 anchos + el iPad acostado, en el navegador contra el build de producción, con datos de producción y CONTRA `origin/main` corriendo EL MISMO ARCHIVO** (`BASE=… ETAPA=antes|despues node scripts/_medir-guias-eliminar-fila.mjs`, solo lectura), en **dos roles** (secretaria y bodega) y con la lista **CERRADA**:
+>
+> | | main | esta rama |
+> |---|---|---|
+> | arrastre de página (16 casos) | **0** | **0** |
+> | textos <12 px | **0** | **0** |
+> | tocables <44 px · secretaria | 0 · 1 · 1 · 1 | **idéntico** (el `<input>` del buscador, 39 px, PRE-EXISTENTE) |
+> | tocables <44 px · bodega | 0 · 1 · 1 · 1 | **idéntico** |
+> | alto de la página | 2.142 · 2.102 · 1.337 · 1.337 | **idéntico** — el «···» no empuja nada hacia abajo |
+> | recortados · **bodega** | 2 · 0 · 11 · 0 | **idéntico** |
+> | recortados · secretaria | 2 · 0 · 11 · 0 | **4 · 0 · 12 · 2** |
+>
+> - 🔴 **LA ÚNICA DIFERENCIA, DICHA DE FRENTE: +2 recortes a 390, +1 a 1024 y +2 a 1440, y solo para quien VE el menú.** Son los 44 px que el «···» le quita a la fila, y **los recortados son todos `truncate`** — el resumen `«Cliente · Destino»` de la tarjeta (`Outlet Duty Free N3, S.A. y 1 más`, de 32 a 80 px de puntos suspensivos) y la columna de clientes del escritorio (`flex-[2_1_0] min-w-0 truncate`, 3 px a 1440). **Puntos suspensivos ES el mecanismo, no dato inalcanzable**, y la prueba de que el costo es exactamente el menú es que **bodega —que no lo ve— mide IDÉNTICO a main en los cuatro anchos**.
+> - **El «···» mide 44×44 px en los cuatro anchos.**
+> - 🔴 **NO SE TOCÓ NINGUNA GUÍA REAL.** El navegador **aborta cualquier pedido que no sea GET** (escrituras bloqueadas: 0), y el script nunca escribe la palabra ELIMINAR ni aprieta el botón rojo.
+> - 🩸 **La cookie hay que MINTEARLA** (`scripts/_cookie-medicion-rol.ts <rol>`): el middleware valida el `sessionToken` contra `user_sessions`, así que una cookie firmada a mano muere ahí y lo que se mediría sería la pantalla de LOGIN — verde sin haber mirado nada. Por eso el script **falla si no encuentra ninguna fila**, si la fila cerrada no trae su «···», si el rótulo no dice de qué guía es, si el menú no ofrece «Eliminar guía», si borrar no cuesta 2 toques, si la confirmación no aparece con su campo y su botón apagado, o si a bodega se le dibuja un menú.
+> - 🩸 **El acordeón recuerda la fila abierta en `sessionStorage`**: hay que limpiar `guias:expanded` antes de navegar o lo que se mide no es la lista cerrada.
+>
+> ### Candados
+>
+> **`src/__tests__/components/guias-eliminar-en-la-fila.test.tsx` (14) MONTA LA PÁGINA REAL de `/guias`**, toca el «···» de una fila **cerrada** y cuenta lo que sale por `fetch`. Un barrido de texto no puede ver lo único que importa —que el menú esté en la fila y no adentro— y en este repo ya se cumplió **cuatro veces** con el comentario que explicaba el cambio.
+> - 🩸 **EL MENÚ NO PINTA SUS ÍTEMS HASTA QUE SE ABRE** (`{open && …}` en `ui/OverflowMenu`) y salen por un **PORTAL**: hay que abrirlo y buscarlos en el documento, no en el container.
+> - **Verificado por mutación, 13 de 13 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-guias-eliminar-fila.sh`): el «···» se va de la fila · vuelve a quedar **ANIDADO** dentro del botón de la fila · se le dibuja a CUALQUIER rol · `DELETE_ROLES` se abre a bodega · **la SECRETARIA pierde el permiso** · el menú deja de mirar `readOnly` · se queda puesto en modo selección · el ítem apunta siempre a la PRIMERA guía · el rótulo deja de decir de qué guía es · **el menú BORRA DE UNA, sin la ventana** · la ventana acepta confirmar sin escribir la palabra · «Compartir» se cae de la guía abierta · la fila abierta pierde «Editar».
+> - 🩸 **UNA sobrevivió en la primera corrida y era un candado FLOJO: `closest()` ARRANCA EN EL PROPIO ELEMENTO**, así que `trigger.closest("button") === trigger` es cierto **con el menú anidado y sin él**. Hay que preguntarle a los PADRES (`trigger.parentElement?.closest("button")`).
+> - 🩸 **Y la mutación del anidado tuvo que MOVER el `</button>`, no borrarlo**: borrándolo el JSX queda desbalanceado, el módulo no compila y lo que se probaría es que un archivo roto rompe.
+> - 🩸 **El script restaura por COPIA, no con `git checkout`** (hay archivos NUEVOS y git aborta el comando entero sin restaurar nada), **denuncia el patrón muerto** en vez de cantarlo como "SOBREVIVIÓ", **no usa `perl`** (el `||` del código real se des-escapa dentro del patrón y se come el archivo) y trae **una mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido con el comentario adentro.
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`
@@ -3135,6 +3190,229 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > `BASE=… node scripts/_medir-correcciones-anchos.mjs` (solo lectura), en **5 estados** — reporte cerrado, detalle abierto, ventana de corregir, de deshacer y de agregar: **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px NUEVOS** en los 20 casos. El único recorte es el `H1.sr-only` y los textos de 10,5/10/11 px son las etiquetas de columna y el chip «Revisar» que el módulo ya tenía — **medidos IDÉNTICOS con y sin correcciones**, o sea que este cambio no agregó ni un texto chico (la primera versión sí: el chip y los «Agregar hora» salieron a 11 px y se subieron a 12). Modal con el patrón de la casa: `createPortal` + `inset-0` + `useBodyScrollLock`, **sin `autoFocus`**.
 > - 🩸 **La tabla no existe todavía en producción, así que la medición INTERCEPTA la respuesta de `/api/asistencia/reporte`** y le inyecta UNA corrección con la forma exacta que va a tener. Los datos siguen siendo los de producción y el componente medido es el REAL; no se toca la base ni se aprieta ningún botón que guarde. Sin eso no habría nada que medir y el script pasaría en verde sin haber mirado nada — por eso **falla** si no encuentra el aviso, el chip, la línea con la hora del reloj o el botón de guardar apagado.
 
+## 🔴 Asistencia — LA CASILLA «PRÉSTAMO» SE LLENA SOLA, CON APROBACIÓN (27-ago-2026)
+
+> La contadora, textual: ***«El préstamo si debe ser por aprobarlo»***.
+>
+> La casilla `Préstamo` del cuadro quincenal la tecleaba una persona mirando el
+> módulo de Préstamos **en otra pantalla**. Ahora la llena el propio módulo —y
+> queda editable— pero **el descuento se APRUEBA, no se aplica solo**.
+>
+> ### 🩸 EL HUECO, MEDIDO CONTRA PRODUCCIÓN (quincena 1 al 15 de agosto)
+>
+> | | |
+> |---|---:|
+> | el módulo de Préstamos registró | **9 deducciones · $360,00** |
+> | la casilla de la planilla decía | **7 montos · $265,00** |
+>
+> - **KEVIN LUBO ($50) · LUIS PARAJON ($45) · YULICAR CORONA ($50)** tenían la
+>   deducción registrada en el módulo y **la casilla en CERO**.
+> - **LUIS ARROYO** tenía **$50 en la casilla y NINGÚN pago en el módulo** — su
+>   préstamo estuvo atrapado en `pendiente_aprobacion` hasta el #651, así que la
+>   plata se le descontó del sueldo y el saldo del módulo **nunca bajó**.
+>   ⚠️ **Eso NO se corrigió desde acá**: es plata en producción y lo decide
+>   Daniel. Queda escrito.
+> - GABRIELA, MARÍA y LUZ no tenían descuento **y era correcto**: sus préstamos
+>   nacieron el 17, 18 y 20 de agosto, o sea DESPUÉS de esa quincena.
+>
+> ### 🔴 EL AMARRE: por CÓDIGO, y los que no cruzan van A MANO
+>
+> `prestamos_empleados` guarda un **nombre tecleado a mano** y la planilla
+> conoce a la gente por el **código del reloj**. Medido: de las **30 fichas de
+> préstamo, 18 cruzan por igualdad EXACTA** de nombre (mayúsculas + espacios) y
+> 12 no.
+>
+> Columna nueva **`prestamos_empleados.empleado_codigo`**
+> (`20260902120000_prestamos_amarre_codigo.sql`), con **DOS pasos y ninguno
+> adivina**:
+> - **PASO 1** — igualdad EXACTA de nombre **y** de empresa, y **solo con un
+>   único candidato** en la planilla. La traducción de empresa es una lista
+>   CERRADA con `ELSE NULL`: una empresa desconocida no ata «de más».
+> - **PASO 2** — **tres renglones escritos a mano**, cada uno con el nombre que
+>   ese código tiene que tener en la planilla, y el UPDATE **lo EXIGE**:
+>   `GABRIELA A. JARAMILLO P.`→53 · `LUIS ADRIAN ARROYO`→9 ·
+>   `MARIA BETHANCOURTH`→49. Si mañana renombran al 53, la migración deja de
+>   escribir esa fila en vez de atar el préstamo de Gabriela a otra persona.
+>
+> 🔴 **NADA POR PARECIDO. NI CON UN CASO BARATO.** Es la lección de
+> `Outlet Duty Free N2` vs `N3` (ver § Guías): dos nombres parecidos pueden ser
+> DOS personas, y un descuento a la persona equivocada **no deja rastro**. En
+> esta misma tabla está el caso que lo prueba: **`LAURA CASIANI` (Préstamos)
+> contra `Laura Lismari Casiano Vega` (código 38)** — CASIAN**I** y CASIAN**O**
+> no son la misma palabra. **Se queda SIN atar**, aunque su saldo sea $0 y atarla
+> hoy no costaría nada.
+>
+> **Resultado: 21 de 30 atadas, y las 14 con saldo vivo están TODAS atadas.**
+> Las 9 sin atar están en $0,00: `LAURA CASIANI` · `LUZ LOPEZ` ×2 (fichas viejas;
+> la viva es **LUZ BOSQUEZ**, que la contadora ya renombró y **cruza sola**) ·
+> `STEFANY`/`STEPHANY MORALES` · `YANKATERY` · `YEISON LLORENTE` ·
+> `JOHANA VALLEJO` ×2.
+>
+> 🔴 **UN PRÉSTAMO CON SALDO QUE NO ES DE NADIE SE DICE, EN ROJO.** Callarlo es
+> exactamente cómo se perdieron los $700 de LUIS ADRIAN ARROYO durante 22 días.
+>
+> ### 🔴 DE DÓNDE SALE EL NÚMERO — dos casos, no uno
+>
+> `src/lib/asistencia/prestamos-planilla.ts` (módulo PURO). **Acá NO se vuelve a
+> calcular el saldo**: llega ya calculado por la MISMA cuenta del módulo
+> (`prestado − pagado` sobre los movimientos aprobados y no borrados, la de
+> `prestamos_aplicar_quincena`).
+>
+> 1. **Si el módulo YA registró el descuento de ESTA quincena**, la casilla dice
+>    EXACTAMENTE eso — es un hecho consumado, no una estimación.
+> 2. **Si no**, dice `min(cuota, saldo)`, la fórmula de la RPC.
+>
+> 🩸 **El orden importa y el caso es real.** Si la contadora aprieta «Aplicar
+> quincena» ANTES de armar el cuadro, el saldo YA bajó: **KEVIN LUBO** tenía
+> saldo $50 y cuota $50, y con la quincena aplicada `min(cuota, saldo)` daría
+> **$0 el mismo mes en que se le descontaron los $50**.
+>
+> - ⚠️ **`Abono extra` NO cuenta como descuento de planilla.** Es plata que la
+>   persona pagó de su bolsillo; descontársela otra vez del sueldo sería cobrarle
+>   dos veces. Sí baja el saldo, y el saldo ya viene con eso adentro.
+>   `Pago de responsabilidad` SÍ cuenta: medido, 59 movimientos y **35 con la
+>   nota «Deducción quincenal»**.
+> - ⚠️ **VENTANA EXACTA, sin la tolerancia de ±3 días de la RPC.** Los pagos caen
+>   el 15 y el 30, o sea justo en el borde: con tolerancia, un pago del 15
+>   entraría a la vez en la quincena 1-15 y en la 16-31. El mismo descuento
+>   contado dos veces.
+> - **La ficha ARCHIVADA no propone cuota nueva** (misma condición que la RPC).
+>   Por eso **BRICEIDA MONTERO no aparece**, con $100 de saldo vivo: su ficha
+>   está archivada en Préstamos.
+> - **Se agrupa por CÓDIGO, no por ficha.** `RAMON MIRANDA` tiene DOS fichas
+>   atadas al código 21 y la planilla tiene UNA casilla.
+>
+> ### 🔴 LA APROBACIÓN NO ESCONDE PLATA — la lección del #651
+>
+> Hace un día un préstamo de $700 nacía en `pendiente_aprobacion`, el saldo solo
+> suma lo aprobado, y **la pantalla lo mostraba en CERO durante 22 días**. Ese
+> freno se retiró (*«quita poder aprobar prestamos, todos deben de pasar»*), y
+> ésta es **otra aprobación**: no decide si la deuda existe, decide si el número
+> entra a la casilla. La forma es la de las horas extra (#649/#652):
+>
+> - **lo que está sin aprobar SE VE**, con nombre y monto, en ámbar, arriba del
+>   cuadro — *«N personas tienen préstamo por descontar sin aprobar: NO se
+>   descontó en este cuadro»*;
+> - **el saldo del módulo no depende de esta tabla**: un préstamo sin aprobar
+>   sigue apareciendo entero en Préstamos;
+> - **el aviso viaja al Excel y al PDF** que firma la contadora: si la pantalla
+>   avisa y el papel no, el papel decide un pago con menos información.
+>
+> ⚠️ **Y si la casilla YA tiene monto escrito a mano, NO se dice «no se
+> descontó»**: la planilla SÍ lo descontó, y decir lo contrario sería mentirle a
+> quien paga.
+>
+> ### 🔑 SE GUARDA LA DECISIÓN, NO UNA SEGUNDA CUENTA
+>
+> `asistencia_prestamo_aprobado` (quincena, código) guarda **aprobado + quién +
+> cuándo + `monto_visto`**. El MONTO sigue viviendo donde siempre:
+> **`asistencia_planilla_manual.prestamo`**, y sigue siendo editable. Aprobar lo
+> escribe ahí; `planilla.ts` **no se tocó**.
+> - **La llave es la QUINCENA** —y acá sí corresponde: un descuento de préstamo
+>   pertenece a un cuadro, igual que el ISR. Las horas extra se aprueban por DÍA
+>   porque la contadora mueve el corte del período (#652); esto no.
+> - **`monto_visto` es el TESTIGO**: si el módulo cambia o alguien corrige la
+>   casilla, la pantalla lo DICE con los dos números — no se corrige solo.
+>   *Una plata que se mueve sola es peor que una que se explica.*
+> - 🔴 **Retirar la aprobación NO borra un número que escribió una persona**: la
+>   casilla se vacía **solo si todavía dice exactamente lo que puso la aprobación
+>   anterior**. Si alguien la corrigió, se deja y **se dice**.
+> - **Quién aprueba: `asistenciaRoles()`, NO `aprobacionesRoles()`.** Son dos
+>   aprobaciones distintas: las horas extra las autoriza Julio con el usuario
+>   `bodega`, que a propósito **no ve un solo sueldo**. Un descuento de préstamo
+>   ES plata del sueldo. Por eso el bloque vive en la pestaña **Planilla** y no en
+>   Aprobaciones, y el candado de `asistencia-bodega-solo-aprueba.test.ts`
+>   —que congela los 4 campos de esa respuesta— sigue verde sin tocarlo.
+>
+> ### ⚠️ LAS DDL YA CORRIERON — y la app funcionaba ANTES
+>
+> Patrón `cols-opcionales`, verificado en las dos direcciones: sin la columna del
+> amarre nadie queda atado y la casilla se escribe a mano como hasta ayer; sin la
+> tabla no se puede aprobar y **la planilla da EXACTAMENTE lo de hoy hasta el
+> centavo**. Las dos ausencias se DICEN en pantalla, con el nombre del archivo.
+> - 🩸 **El escalón de lectura quita LO MÍNIMO.** Un fallback que releyera con las
+>   columnas base se llevaría puesto `nombre_manual`… — acá el reintento solo
+>   quita `empleado_codigo`, y **solo cuando el error NOMBRA esa columna**.
+>
+> ### Los números, antes y después
+>
+> | | antes | después |
+> |---|---|---|
+> | fichas de préstamo atadas | **0 de 30** | **21 de 30** · las 14 con saldo, todas |
+> | préstamos con saldo sin persona | 14 | **0** |
+> | casilla `prestamo` de la quincena 1-15 | $280,00 en 8 renglones | **$265,00 en 7** |
+> | casilla `mercancia` | $10,00 | **$25,00** |
+> | **total de descuentos manuales** | **$385,00** | **$385,00** |
+> | JOHANA VALLEJO activa en Préstamos | 1 ficha | **0** (archivada, 78 movimientos intactos) |
+> | movimientos de préstamo | 414 · $44.650,21 | **414 · $44.650,21** |
+>
+> **Saldo vivo hoy: $5.964,73 entre 13 fichas activas** (+ $100,00 de BRICEIDA,
+> archivada, = $6.064,73 en 14). ⚠️ El $5.264,73 con el que arrancó este trabajo
+> era correcto **para su momento**: creció exactamente $700 cuando el #651 liberó
+> el préstamo de LUIS ADRIAN ARROYO ese mismo día.
+>
+> **Lo que la pantalla va a proponer para la quincena 16-31 de agosto: 13
+> personas, $485,00** (`_verif-prestamo-planilla.ts`, solo lectura, corre los
+> MISMOS módulos que la pantalla) — **con las 6 que se habían quedado afuera**:
+> Kevin $50 · Gabriela $60 · Luis Parajón $45 · Yulicar $25 · María $25 · Luz $15.
+>
+> ### 🔴 NINGÚN NÚMERO DE PAGO SE MOVIÓ, y está EJECUTADO
+>
+> El argumento *«las dos columnas están en la misma suma, así que el neto no se
+> mueve»* es correcto **y no alcanza**.
+> `scripts/_verif-martha-mercancia-no-mueve-nada.ts` (solo lectura) llama a
+> **`calcularDinero`, la misma función que paga**, con los montos de antes y los
+> de después, sobre **LAS 12 PERSONAS** de la quincena, y compara los 20 campos
+> de dinero: **288 campos · 2 cambios (las dos casillas de Martha) · 0 cambios no
+> pedidos**, con `totalDeducciones`, `netoPagar` y `totalBruto` verificados por
+> su nombre. Y la tabla entera, campo por campo: **72 campos comparados, 2
+> distintos y los 2 son los pedidos**.
+>
+> ### ⚠️ QUEDA ABIERTO — decide Daniel
+>
+> - 🔴 **A LUIS ARROYO se le descontaron $50 en la quincena 1-15 que el módulo de
+>   Préstamos no registra.** Su saldo está $50 alto. Corregirlo es escribir un
+>   movimiento de plata en producción y no se hizo.
+> - **Aprobar NO registra el pago en el módulo.** La casilla se llena; el saldo lo
+>   sigue bajando «Aplicar quincena», como hasta hoy. Que la aprobación además
+>   escriba el `Pago` es una decisión de negocio (y el dedup de ±3 días del módulo
+>   ya evitaría el doble cobro), no un refactor.
+> - **`LAURA CASIANI` vs `Laura Lismari Casiano Vega`**: si son la misma persona,
+>   se ata a mano. El sistema **no lo va a adivinar nunca**.
+> - Las 6 fichas de saldo $0 sin ficha en la planilla (`STEFANY`/`STEPHANY
+>   MORALES`, `YANKATERY`, `YEISON LLORENTE`, `LUZ LOPEZ` ×2) quedan sin atar.
+>
+> ### Candados
+>
+> `src/__tests__/lib/asistencia-prestamo-planilla.test.ts` (22) y
+> `prestamos-amarre-migracion.test.ts` (13). El segundo **lee el SQL SIN
+> COMENTARIOS** —el archivo NOMBRA lo que prohíbe («nada de parecidos», «LAURA
+> CASIANI»), así que un barrido sobre el archivo entero se engañaría solo, cuarta
+> vez que este repo paga lo mismo— y prohíbe LIKE, similitud, `unaccent`,
+> distancia de edición, `substring`, `translate` y regex sobre el nombre; exige
+> la empresa, el único candidato, el `EXISTS` que valida el nombre del código, que
+> no haya un cuarto amarre a mano, y que el `SET` escriba **exactamente una
+> columna** (un `SET empleado_codigo = …, nombre = …` reescribiría el nombre que
+> tecleó una persona).
+> - **Verificado por mutación, 15 de 15 cazadas y 0 corridas muertas**
+>   (`bash scripts/_mutar-candados-prestamo-planilla.sh`): el hecho consumado deja
+>   de ganarle a la cuota · `min(cuota,saldo)` → cuota pelada · la ficha archivada
+>   propone cuota · el código sale de parecerse al nombre · el aviso de «préstamo
+>   sin persona» se calla · el aviso pierde el monto · «Abono extra» se vuelve
+>   descuento · dos fichas del mismo código no suman · la migración usa LIKE ·
+>   ignora la empresa · ata con dos candidatos · pierde el guard del nombre · pisa
+>   un amarre ya hecho · se cuela `LAURA CASIANI` · el backfill reescribe el
+>   nombre.
+> - 🩸 **El script NO usa `perl -0pi -e 's|…|…|'`**: con ese delimitador, un `||`
+>   del código real se des-escapa a una alternación con rama vacía, **se come el
+>   archivo entero**, vitest no colecta nada y el «0 fallos» se lee como
+>   «SOBREVIVIÓ». El reemplazo es LITERAL (`scripts/_mutar-aplicar.py`, textos por
+>   argv), **denuncia el patrón que no muta**, `probar()` **exige que la corrida
+>   haya colectado tests**, la restauración va **por COPIA** (hay archivos NUEVOS
+>   y `git checkout` aborta el comando entero) y hay una **mutación de CONTROL que
+>   a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los
+>   ✅ valen lo mismo que un barrido con el comentario adentro.
+
 ## 🔴 Asistencia — «TRABAJO FUERA DE LA OFICINA»: el motivo que NO es una ausencia (13-ago-2026)
 
 > El caso: **RODRIGO MIRANDA (código 13, vistana, $800/mes) no marca desde el 31 de julio porque está trabajando FUERA de la empresa.** Daniel, textual: *"rodrigo esta trabajando fuera de la empresa (justificado)"*. Los cinco motivos que había —`Vacaciones · Incapacidad · Permiso · Luto · Otro`— describen a alguien que **NO trabajó**. Rodrigo **sí trabajó**.
@@ -4129,6 +4407,97 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > **Verificado en el navegador contra el build de producción y datos de producción** (`_medir-referencia-pedido.mjs`, 12 filas reales): **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 recortados, 0 blancos <44 px, 0 textos <12 px**, tabla cerrada y abierta. La celda más ancha posible sigue siendo de 4 caracteres (`207%` mide lo mismo que `100%`), así que **no se tocó ni un ancho**. Leída en pantalla, la fila dice `44D202G110 | 64 | 66 | 0 | 103% | 9` y al abrirla la ficha dice `el 103% de lo comprado` con su aviso de las 2 unidades.
 >
 > **Candado en la otra dirección** (el que caza ESTE bug, no el que lo fijaba): `ventas-resumen-articulo.test.ts` trae el fixture `44D202G110` EXACTO y un **barrido de coherencia** que recorre los fixtures de siempre —vivos, agotados, con devoluciones, sin compra, vendido de más y con 2 llegadas— y exige que `medirVendidoMeses().parte` sea **el mismo campo** que el pie de Vendí y que los textos no puedan discrepar. `referencia-tabla-pedido.test.tsx` renderiza la tabla real, lee la celda, abre la fila y compara contra el pie de la ficha. Verificado por mutación: devolver el guard `vendido <= comprado` rompe 4, volver a calcular el % dentro de `medirVendidoMeses` rompe 5 y topear el % en 100% rompe 4.
+
+### 🔴 Ventas › Referencia — UNA UNIDAD DE AJUSTE VALÍA 7 MESES Y 4 PUNTOS (25-ago-2026)
+
+> Daniel, sobre `4LD230G110` (vistana): llegó el **5-ago-2025** (48 u, única compra), vendió **sep 1 · nov 32 · dic 15 = 48**, y **quedó 1 unidad**. Su hermano `4LD230G001` tiene la MISMA llegada y la MISMA venta pero stock 0. La ficha decía:
+>
+> ```
+> ANTES                                   AHORA
+> 4LD230G110  48 · 48 · 1 · 100% · 12     4LD230G110  48 · 48 · 1 ·  98% · 5
+> 4LD230G001  48 · 49 · 0 · 102% ·  5     4LD230G001  48 · 49 · 0 · 100% · 5
+> ```
+>
+> **Dos artículos idénticos con 7 meses de diferencia por una unidad de ajuste** — y uno diciendo 100% con mercancía en bodega al lado de la columna que dice 1.
+>
+> ⚠️ **NO SE AGREGÓ NINGUNA NOTA, PUNTO ÁMBAR NI AVISO.** Daniel rechazó explícitamente una versión con *"Falta registrar 1 compra"*, que además era **FALSA**: esa unidad entró por un **ajuste de inventario que él mismo hizo** (se vio en el kardex de Switch). **El sistema NO lee los ajustes de Switch, y por eso `Compré − Vendí ≠ Stock`.** Con los números nuevos el dato deja de mentir y no hay nada que explicar.
+>
+> ### 1 · EL RELOJ SE PARA CUANDO QUEDA LA COLA, NO EN EL CERO EXACTO
+>
+> 🔑 **NO ES UN UMBRAL NUEVO: ES EL QUE YA DECIDÍA CUÁNDO UNA LLEGADA SE AGOTÓ.** `umbralTandaCero(llegaron)` = `min(2, 10% de lo llegado)` existe desde el #501 y ahora lo REUSA `esColaDeBodega(existencia, llegaron)` para cerrar el reloj de MESES. Dos definiciones de *"quedó en 0"* se separarían con el tiempo.
+> - El 10% protege a las llegadas chicas: **2 en bodega de una de 8 u NO es cola** (le queda el 25%); **1 de 48 sí** (98% vendido).
+> - ⚠️ **Existencia DESCONOCIDA (`null`, Switch no tiene el código en el catálogo) NO es cola**: sin la foto de bodega no se puede afirmar que se agotó. Son 30 de 8.199 códigos en vistana.
+> - **Existencia NEGATIVA (sobreventa registrada) SÍ es cola**: no queda nada.
+> - Se aplica en los DOS lugares que decidían el agote: el gate de `medirAvance` y el cierre de la ÚLTIMA llegada en `medirTandas`.
+>
+> Daniel eligió explícitamente **5** (el tiempo en bodega hasta agotarse) y **no 2** (los meses en que de verdad se vendió).
+>
+> ### 2 · EL % SALE DE LO QUE DE VERDAD HUBO
+>
+> **`parteVendidaReal(vendido, quedan, comprado)` = `Vendí ÷ (Vendí + Stock)`**, no `Vendí ÷ Compré`. El denominador viejo era **lo REGISTRADO como compra**, y lo registrado no es lo que hubo.
+> - 🔴 **CONSECUENCIA BUSCADA: el % queda amarrado al Stock POR CONSTRUCCIÓN.** Stock 0 ⇒ 100%; Stock > 0 ⇒ menos de 100%; y **el % ya no puede pasar de 100**. Medido en producción (vistana, 8.199 códigos): **394 códigos con más de 100% → 0**, y **43 que decían 100% con mercancía en bodega → 0**.
+> - ⚠️ **ESTO SUPERA la decisión del 12-ago-2026** (*"VENDIDO muestra el % real aunque pase de 100%"*): `44D202G110` pasa de **103% a 100%** y `TERMO` de **207% a 100%**. Lo aprobó Daniel con su propio ejemplo (`4LD230G001`: 102% → 100%). **El descuadre lo siguen diciendo las columnas Compré/Vendí y el aviso de siempre** (*"Se vendieron 2 unidades más de las que llegaron"*), que es su trabajo — no el del porcentaje. **Lo que NO se aflojó es el candado que nació de ese bug: la tabla y la ficha siguen leyendo EL MISMO campo** (`grandes.parteVendida`), así que no pueden discrepar.
+> - **El `"—"` queda para los tres casos de siempre**: sin compra registrada (`RETENCION`), comprado 0 y vendido negativo. Más uno nuevo: **`Vendí + Stock = 0`** (todo se fue en ajustes).
+> - ⚠️ **Sin catálogo (`quedan == null`) se cae a `Vendí ÷ Compré`** — degradación documentada, no una segunda cuenta: es lo mejor que se sabe, y son 30 códigos que **ni siquiera muestran Stock** en pantalla, o sea que no hay columna que contradecir. Es el único camino por el que un % puede pasar de 100%.
+>
+> 🩸 **Y EL DEFECTO VOLVÍA POR LA PUERTA DEL REDONDEO.** `344 ÷ 345` es **99,7% y redondeaba a 100%** al lado de una columna Stock que decía **1**: la misma contradicción con dos decimales menos, en **10 códigos** medidos. `pctVendido()` topea eso: **con algo en bodega nunca se dice 100%**. ⚠️ El tope es de **UN solo lado** — 0,4% sigue redondeando a 0%, que es la convención de siempre de la celda. El 100% es una AFIRMACIÓN ("no queda nada") y la única fuente que puede hacerla es el Stock.
+>
+> ### 🔴 EL % TIENE UNA SOLA BASE EN TODO EL MÓDULO, Y POR ESO CAMBIARON DOS TEXTOS
+>
+> - **El pie de Vendí** decía *"el 80% de lo comprado"* (y *"de esa llegada"* con 2+ llegadas). Con el denominador nuevo eso sería **falso en la misma caja**: `4LD230G110` compró 48 y vendió 48 — *"el 98% de lo comprado"* al lado de esos dos números se lee roto. Dice **"el 98% de lo que hubo"**, una sola redacción para los dos casos.
+> - **La línea de venta** decía *"En 10 meses va el 80% de la compra"* → **"En 10 meses va el 80%"**. Y `medirAvance` dejó de calcular su propio %: usa el MISMO `parteVendidaReal`. Con dos cuentas, la línea y el pie de la misma ficha podían discrepar — es el bug de `44D202G110` con otro disfraz.
+>
+> **Mockup aprobado:** https://claude.ai/code/artifact/94b52cea-95f1-4724-b79f-2472ee7693cd
+>
+> ### 3 · LA TABLA DEL MODO PEDIDO SE ORDENA POR COLUMNA
+>
+> Tocar el encabezado ordena. **`src/lib/ventas/referencia-orden.ts`** (módulo PURO), ciclo de TRES pasos:
+>
+> ```
+> 1er toque → ordena (texto de la A, números de mayor a menor)
+> 2do toque → invierte
+> 3er toque → VUELVE AL ORDEN PEGADO
+> ```
+>
+> 🔴 **EL DEFAULT SIGUE SIENDO `ordenarComoPegado`**, que existe para que Daniel lea la tabla con su Excel al lado. El sort es un **override**, y el tercer paso es lo que impide que un toque sin querer le deje el mapa perdido para siempre — el mismo criterio con el que la píldora de tramo del CXC se apaga al volver a tocarla.
+> - 🔑 **EL SORT NO MIDE NADA**: ordena por los valores que la fila YA calculó desde `armarFicha` (`vm.parte`, `grandes.*`). Si volviera a leer el artículo, una columna podría ordenar por un número distinto del que pinta — hay mutación para ese caso exacto.
+> - 🔴 **Los `"—"` van al FINAL en las DOS direcciones**: un artículo sin margen no es "el de margen más bajo", es uno del que no se puede decir.
+> - **El desempate es el ORDEN PEGADO y sale gratis**: `Array.sort` es estable, así que dos filas con el mismo valor conservan el orden con el que entraron.
+> - **El texto se compara CRUDO en mayúsculas, sin `localeCompare` con opciones** — el orden tiene que ser el mismo en el navegador, en Node y en el test (la misma decisión que ya rige `compararCodigos` y `ordenarCodigosAZ`).
+> - **El encabezado es un botón de 44 px** (`min-h-[44px]`): esta tabla se usa en el iPad, con dedo. El chevron **no** es una columna ordenable.
+> - ⚠️ **El "Bajar a Excel" sigue exportando el ORDEN PEGADO** (`articulosOrdenados` en `ReferenciaView`): es una decisión anterior y no se cambió de paso. Hay candado.
+>
+> ### Impacto medido contra producción
+>
+> `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-vendido-meses-referencia.ts vistana antes|despues` (solo lectura; **cachea las filas crudas en `.diag-cache/` para que la segunda corrida NO le pegue a Supabase** — una auditoría no es motivo para saturar una base en compute Micro). Corre los MISMOS módulos de la pantalla y compara fila por fila:
+>
+> | | vistana, 8.199 códigos |
+> |---|---|
+> | cambian de número | **2.367** (VENDIDO 2.204 · MESES 56 · los dos 100) |
+> | **no se mueven** | **5.832** |
+> | con % **mayor a 100%** | **394 → 0** |
+> | con **100% y mercancía en bodega** | **43 → 0** |
+>
+> **Y los dos hermanos** (`scripts/_verif-compras-referencia.ts`, que ahora los trae por defecto): `4LD230G110` → **48 · 48 · 1 · 98% · 5 meses (en venderse)**; `4LD230G001` → **48 · 49 · 0 · 100% · 5**. Los patrón de siempre: `4G5004G001` 36·25·12·**68%**·5 (era 69%: 25 de las 37 que hubo) · `4G5004G030` 36·36·0·100%·2 · `CVM253CR02001` 80%·10 · `NB2570001` **62%**·10 (era 59%: 552 de 897, no de 935) · `QD3958033` 30%·8 · `40HM265032` **100%**·23 (era 98%).
+>
+> ### Medición en el navegador
+>
+> **Los 3 anchos + el iPad acostado, contra el build de producción y con datos de producción** (`BASE=… node scripts/_medir-referencia-pedido.mjs` y `_medir-referencia-simple.mjs`, solo lectura): **390 · 834 · 1024 · 1440 → 0 px de arrastre de página, 0 recortados, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px**, en la ficha de los 6 códigos de siempre + los dos hermanos + el modelo `40HM265` con **43 tarjetas**, y en la tabla del modo pedido en **TRES** estados: cerrada, abierta y **ordenada**. En pantalla se lee `4LD230G110 | 48 | 48 | 1 | 98% | 5` justo encima de `4LD230G001 | 48 | 49 | 0 | 100% | 5`.
+> - El script del modo pedido **falla si el encabezado tocado no se anuncia como ordenado** (`aria-sort`): sin eso el chequeo pasaría en verde con la flecha perdida.
+> - 🩸 **GOTCHA DE MEDICIÓN QUE COSTÓ UNA VUELTA ENTERA, y es nuevo: MEDÍ EL BUILD DE OTRO AGENTE.** `next start -p 3479` falló con **EADDRINUSE** —otro worktree ya escuchaba ahí—, el proceso murió, y el medidor se conectó igual y midió la rama ajena: reportó `100% · 12` (los números VIEJOS) y "0 encabezados ordenados", o sea el bug intacto sobre código ya arreglado. **Antes de creerle a una medición hay que verificar que el servidor que contesta es el tuyo** (`lsof -nP -iTCP:<puerto> -sTCP:LISTEN` y el log del `next start`).
+> - 🩸 **Y la cookie de medición se vence**: la página valida el `sessionToken` contra `user_sessions` y una vieja redirige al login — el medidor mediría una pantalla vacía. `node scripts/_cookie-medicion.mjs` toma prestada, **solo leyendo**, una sesión de admin viva.
+>
+> ### Candados
+>
+> `src/__tests__/lib/ventas-resumen-articulo.test.ts` (**118**, con los dos hermanos como fixture EXACTO: mismos meses, % distinto, y el caso de 3 en bodega que ya NO es cola), `ventas-referencia-orden.test.ts` (**11**, el ciclo de tres pasos y los "—" al final), `ventas-compras.test.ts` (el Excel, leyendo las celdas del `.xlsx`), `components/referencia-tabla-pedido.test.tsx` (**24**, RENDERIZA la tabla y toca los encabezados) y `components/ventas-poda-textos.test.tsx` (**38**, compara la ficha carácter por carácter).
+> - **Varios candados CAMBIARON DE DIRECCIÓN porque fijaban lo viejo**: `40HM265032` exigía 99% (276÷280) · `TERMO` exigía 150% · `44D202G110` exigía "el 103% de lo comprado" · el pie de `4G5004G001` exigía "el 69% de esa llegada" · las tres frases con *"de la compra"*.
+> - **Verificado por mutación, 22 de 22 cazadas** (`python3 scripts/_mutar-candados-referencia-cola.py`): la cola vuelve al cero exacto (en `esColaDeBodega`, en `medirAvance` y en el cierre de la última llegada) · una existencia desconocida se lee como cola · el % vuelve a medirse contra lo comprado · una existencia negativa resta de lo que hubo · sin catálogo se devuelve null · los grandes de la llegada vuelven a `parteDeTanda` · el agotado vuelve al guard `vendido <= comprado` · la línea de venta vuelve a calcular su propio % · el pie vuelve a decir "de lo comprado" · el pie deja de dibujarse · el Excel deja de decir de qué sale el % · **el redondeo vuelve a prometer 100% con algo en bodega** · la celda se salta el tope · el tercer toque no vuelve al orden pegado · el orden pegado deja de ser el default · los "—" van primero · los números arrancan al revés · la tabla ignora el orden · el encabezado deja de ser botón · el sort vuelve a medir por su cuenta.
+> - 🩸 **TRES SOBREVIVIERON en la primera corrida y las tres eran huecos REALES, no falsos positivos**: no había un solo fixture con la ÚLTIMA llegada cerrada por cola (solo por cero exacto), ninguno con una compra viva donde `van ÷ comprado` difiriera del % nuevo, y en la tabla los tres artículos daban el mismo % por las dos cuentas. Se cerraron con casos nuevos, no aflojando la mutación.
+> - 🩸 **El script de mutación aplica el reemplazo LITERAL con python, no con `perl -0pi -e 's|…|…|'`**: el código real tiene `||`, y con ese delimitador el patrón se des-escapa en una alternación con rama vacía que **se come el archivo entero** y produce un "SOBREVIVIÓ" falso. Restaura **por COPIA** (hay archivos NUEVOS y `git checkout` aborta el comando entero sin restaurar nada), **denuncia el patrón que no muta** en vez de darlo por cazado, **no lee un cero de vitest como "sobrevivió"** si la corrida no colectó tests, y trae una **mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que nada.
+>
+> ### Lo que NO se tocó
+>
+> El motor de llegadas (`medirTandas`, los tres vetos del timeline, el ritmo sin los meses vacíos) · que los TRES GRANDES sean de la última llegada y **Stock siga siendo la existencia REAL de Switch, nunca deducida** · el histórico en chico · la frase de la llegada y su historia gris (`fraseLlegadaAnterior` sigue con `parteDeTanda`: habla de un episodio CERRADO, donde el stock de hoy no dice nada) · las barras · la fila de plata y el FOB calculado · los 13 encabezados del Excel (candado `TRECE`) · la hoja Compras · el buscador y el orden pegado.
 
 ### Directorio (April 10-11)
 - Chevron icons on expandable rows
