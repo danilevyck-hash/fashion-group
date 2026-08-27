@@ -33,9 +33,19 @@ import {
   noMarcaRelojDeFila,
   leerJustificaciones,
   leerVacaciones,
+  leerRepartos,
   avisoMigracionVacaciones,
 } from "@/lib/asistencia/config-server";
+import {
+  agruparPorCodigo,
+  avisoMigracionReparto,
+  partesDe,
+  textoRepartoRechazado,
+  validarReparto,
+  type RepartoRechazado,
+} from "@/lib/asistencia/reparto";
 import { avisoMigracionServicioProfesional } from "@/lib/asistencia/participacion";
+import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { avisoMigracionBaseSeguros } from "@/lib/asistencia/seguros-base";
 import {
   avisoMigracionBajas,
@@ -203,7 +213,7 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, correcciones, manualesLeidos, aprRes, hRes, jRes, vRes, fRes] = await Promise.all([
+    const [{ reglas }, personasDb, correcciones, manualesLeidos, aprRes, repRes, hRes, jRes, vRes, fRes] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       // 🔴 ACÁ ES DONDE LA CORRECCIÓN LLEGA AL PAGO. Si no llegara, corregir una
@@ -220,6 +230,10 @@ export async function GET(req: NextRequest) {
       // y entonces NO se exige aprobación: se paga todo lo que midió el reloj,
       // hasta el centavo igual que hasta hoy. Se avisa en `avisos`.
       leerAprobaciones(q.desde, q.hasta),
+      // 🔴 QUIÉN REPARTE SU SUELDO ENTRE DOS EMPRESAS. Sin la tabla corrida
+      // devuelve cero filas Y `faltaTabla: true`: nadie reparte nada y el cuadro
+      // es el de siempre, hasta el centavo. Se avisa en `avisos`.
+      leerRepartos(),
       supabaseServer
         .from("asistencia_horarios")
         .select("empleado_codigo, entrada, salida, almuerzo_minutos"),
@@ -260,14 +274,35 @@ export async function GET(req: NextRequest) {
     const vigencias = vigenciasDeFilas(personasDb.filas);
     const fuera = codigosFueraDeRango(vigencias, q.desde, q.hasta);
 
+    // ── 🔴 EL REPARTO DEL SUELDO ENTRE DOS EMPRESAS ──────────────────────────
+    //
+    // Se valida ACÁ, una sola vez, para poder DECIR en pantalla el motivo del
+    // rechazo: la regla de Daniel es que lo que un guard descarta se dice, con
+    // el nombre y en ámbar. `partesDe` devuelve la lista vacía ante cualquier
+    // duda, y una lista vacía es exactamente la planilla de ayer.
+    const repartoPorCodigo = agruparPorCodigo(repRes.filas);
+    const repartosRechazados: RepartoRechazado[] = [];
+
     const fichas = new Map<string, FichaPlanilla>();
     for (const f of personasDb.filas) {
       const codigo = String(f.empleado_codigo);
       if (fuera.has(codigo)) continue;
+      const salario = f.salario_mensual === null ? null : Number(f.salario_mensual);
+      const filasReparto = repartoPorCodigo.get(codigo);
+      if (filasReparto && filasReparto.length > 0) {
+        const r = validarReparto(salario, filasReparto);
+        if (!r.ok) {
+          repartosRechazados.push({
+            codigo,
+            etiqueta: etiquetaPersona(codigo, f.nombre),
+            motivo: r.error,
+          });
+        }
+      }
       fichas.set(codigo, {
         codigo,
         nombre: f.nombre ?? null,
-        salarioMensual: f.salario_mensual === null ? null : Number(f.salario_mensual),
+        salarioMensual: salario,
         jornadaSemanal: f.jornada_semanal ?? null,
         empresa: f.empresa ?? null,
         // 🔴 Sin esto la bandera no llegaría al motor y a un servicio profesional
@@ -282,6 +317,10 @@ export async function GET(req: NextRequest) {
         // en vez del que sale de sus $175 de base ($17,06). Ver `seguros-base.ts`.
         baseSeguros: baseSegurosDeFila(f),
         noMarcaReloj: noMarcaRelojDeFila(f),
+        // 🔴 Sin esto el reparto no llegaría al motor y JULIO seguiría cobrando
+        // sus $1.000 en una sola planilla, con el 11 % de seguros encima de sus
+        // horas extra. Ver `reparto.ts`.
+        reparto: partesDe(salario, filasReparto),
       });
     }
     const nombres = new Map<string, string>();
@@ -651,6 +690,15 @@ export async function GET(req: NextRequest) {
         // siempre— pero se dice: quien ya cargó una en su cabeza va a esperar
         // verla acá.
         faltaMigracionVacaciones: vRes.faltaTabla ? avisoMigracionVacaciones() : null,
+        // Sin la tabla NADIE reparte su sueldo —cada persona sale en una sola
+        // planilla, como hoy— pero se dice: quien ya dio a Julio por repartido
+        // en su cabeza va a esperar verlo en las dos empresas.
+        faltaMigracionReparto: repRes.faltaTabla ? avisoMigracionReparto() : null,
+        // 🔴 Los repartos que el guard NO aplicó, con nombre y motivo. Rechazar
+        // sí, esconder no: si esto se callara, la persona cobraría en una sola
+        // planilla y nadie sabría que el reparto está mal cargado.
+        repartosRechazados,
+        avisoRepartoRechazado: textoRepartoRechazado(repartosRechazados),
         // 🔴 Lo que hay que saber ANTES de pagar por un rango libre.
         rangoLibre: !q.esQuincena,
         factorBase: q.factorBase,

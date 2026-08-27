@@ -3464,6 +3464,90 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 >
 > Barrido completo (`supabase/migrations/` y `src/`): **no hay columna, ni tabla, ni cálculo** que lleve el saldo de vacaciones de nadie. `asistencia_personas` tiene nombre, salario, jornada, empresa, activo, fechas de ingreso/salida y `servicio_profesional` — nada de vacaciones. Lo único que existe es la justificación con motivo «Vacaciones» como un rango suelto: **nadie cuenta cuántos días se ganaron ni cuántos se gastaron.** Es una decisión de Daniel y no se construyó.
 
+## 🔴 Asistencia — JULIO GARAY COBRA EN DOS EMPRESAS, y la rata sale del sueldo COMPLETO (27-ago-2026)
+
+> La contadora, textual: *«El salario de Julio es 1000 y están divididos en dos empresas. 800 en Vistana, sobre los cuales se aplican seguro social y educativo. Los otros 200 están en Fashion Wear. Aquí es servicios profesionales y es aquí donde se le pagan las horas extras. **En ambas empresas su rata por hora es 5.77**»*.
+>
+> 🩸 **EL OBSTÁCULO, MEDIDO CONTRA PRODUCCIÓN:** `asistencia_personas` tiene `PRIMARY KEY (empleado_codigo)` y **una persona = una fila = UNA empresa** — `empresa`, `salario_mensual`, `servicio_profesional` y `paga_seguros` son todos POR PERSONA. Julio estaba entero en Vistana con $1.000, y sus horas extra pagaban el 11 % de seguros que en Fashion Wear no les corresponde.
+>
+> ### 🔴 NO SE TOCÓ LA LLAVE DE `asistencia_personas`
+>
+> Es LA tabla del módulo —40 fichas— y el motor entero (el directorio, las justificaciones, las vacaciones, las correcciones, las aprobaciones) asume **una ficha por código**. Partirla en dos filas rompería esa suposición en veinte lugares a la vez, y diecinueve no tienen nada que ver con el sueldo. **El reparto CUELGA de la ficha** (`asistencia_reparto_empresa`, una fila por empresa): la ficha sigue siendo UNA, y lo que se parte es el PAGO.
+>
+> ### 🔴 LA RATA SALE DEL SUELDO COMPLETO, Y ES TODO EL PUNTO
+>
+> `$1.000 × 12 ÷ 52 ÷ 40 = 5,769…` → **$5,77**, la misma en las dos. Por eso `asistencia_personas.salario_mensual` **SIGUE SIENDO EL TOTAL ($1.000)** y la tabla nueva dice lo que paga cada empresa. `calcularDinero` recibe DOS números: el mensual COMPLETO —de donde sale la rata— y `salarioDeLaParte`, que **solo** prorratea el quincenal. 🩸 Con la rata sacada de sus $200 su hora valdría **$1,15** y sus horas extra —que se pagan justamente ahí— se pagarían **CINCO VECES MENOS**. Hay mutación para eso.
+>
+> ### 🔴 CADA COLUMNA DEL RELOJ CAE EN UNA SOLA LÍNEA
+>
+> Es lo que hace que el reparto no invente ni pierda un centavo:
+> - las **HORAS EXTRA** (1,25 · 1,50 · excedente) van a la parte marcada `paga_horas_extra`, y a ninguna otra;
+> - **TODO EL RESTO DEL RELOJ** —domingos, feriados, tardanzas, ausencias, vacaciones ya pagadas—, los **montos escritos a mano** y la **base propia de seguros** van a la parte **PRINCIPAL** (la de `orden` más bajo), y a ninguna otra;
+> - el **sueldo quincenal** se parte según el monto de cada parte.
+>
+> Sumando las partes se reconstruye la medición original **columna por columna**, y hay test que lo exige sobre las horas REALES de producción: una ausencia contada en las dos líneas se descontaría dos veces, y una hora extra en ninguna desaparecería en silencio. **El BRUTO TOTAL no se mueve** ($596,97 antes y después) — lo único que cambia es que la parte de Fashion Wear deja de pagar el 11 %.
+>
+> ⚠️ **LOS DOMINGOS Y FERIADOS SE QUEDAN EN LA PLANILLA, y es una decisión que hay que confirmar.** La contadora dijo *«horas extras»*, y en Panamá el recargo de domingo es otra cosa. Ante la duda se quedan del lado que SÍ paga seguros —retener de más se ve en el neto y se reclama el mismo día; no retener se descubre meses después cuando la Caja pide lo que no se retuvo—, la misma asimetría de `seguros.ts`. 🔴 **En la quincena del 16 al 31 de julio son $27,05 de recargo de domingo, o sea plata de verdad**: si la contadora dice que también van a Fashion Wear, es cambiar `COLUMNAS_EXTRA`/`COLUMNAS_RELOJ` en `planilla.ts` y nada más.
+>
+> ### 🔴 UN REPARTO QUE NO CUADRA SE RECHAZA ENTERO — y rechazar es volver a HOY
+>
+> `validarReparto` (`src/lib/asistencia/reparto.ts`, módulo PURO) exige **cinco** cosas, y cada una tapa una forma distinta de perder plata: **(1)** al menos DOS partes · **(2)** empresas válidas y sin repetir · **(3)** cada monto > 0 · **(4) 🔴 los montos SUMAN el salario de la ficha, al centavo** —es la que sostiene que la rata sea honesta— · **(5)** exactamente UNA parte paga las horas extra (ninguna las perdería en silencio; dos las pagarían dos veces).
+> - **Ante cualquier duda se rechaza, y rechazar es la planilla de ayer**: UNA línea, con su sueldo entero y sus seguros.
+> - 🔴 **Y SE DICE EN PANTALLA**, con el nombre y el motivo (*«Un sueldo repartido no se aplicó y se pagó en una sola planilla, como antes: JULIO GARAY (las partes suman $900.00 y el salario de la ficha es $1000.00)»*). Rechazar sí, esconder no.
+> - **El motor NO se fía del llamador**: `partesUsables` (en `planilla.ts`, donde se decide la plata) vuelve a exigir lo estructural. Un test, un script o una ruta nueva que arme la ficha a mano no puede saltearlo.
+>
+> ### ⚠️ `paga_seguros = false` NO ES `servicio_profesional`
+>
+> La contadora llama *«servicios profesionales»* a lo de Fashion Wear, y lo único que eso significa acá es **sin los seguros**: esa parte **SÍ se paga** (es plata que Julio cobra). Marcar la ficha como `servicio_profesional` es otra cosa —deja a la persona SIN pago— y no se tocó. El interruptor de la FICHA sigue mandando: con `paga_seguros = false` en `asistencia_personas`, la parte **no puede encenderlos**.
+>
+> ### En pantalla
+>
+> - **Configuración › la ficha:** tarjeta **«Se reparte en»**, de SOLO LECTURA, con las dos empresas, su modo (*Planilla* / *Servicios profesionales*), el sello **Horas extra** y el **Total SUMADO** (no copiado del salario: es lo que deja ver de un vistazo que las partes cuadran). La regla la fija la contadora y un campo editable sería la forma de dejarlo mal puesto.
+> - **Planilla:** chip **«sueldo repartido»** en la línea (escritorio y celular), con el detalle en el `title`. Sin él, un quincenal de $400 donde la ficha dice $1.000 se lee como un error de carga.
+> - **Aprobaciones:** con dos líneas por código gana **la que paga las extras** — quien aprueba tiene que ver dónde caen. 🩸 Un `new Map(lineas.map(...))` a secas se queda con la última y en el orden natural eso coincide *por casualidad*; hay mutación con el orden INVERTIDO.
+>
+> ### ⚠️ DDL ADITIVA — **YA CORRIDA** (27-ago-2026), y la app funcionaba ANTES
+>
+> `supabase/migrations/20260901120000_asistencia_reparto_empresa.sql`. Patrón `cols-opcionales`: sin la tabla, `leerRepartos()` devuelve cero filas y `faltaTabla: true`, **nadie reparte nada, la planilla da lo de ayer hasta el centavo** y las dos pantallas dicen en ÁMBAR qué archivo falta. La degradación solo ocurre cuando el error **NOMBRA la tabla**.
+> - **Siembra las dos filas de Julio en la MISMA migración**, a propósito: con la tabla vacía correr el archivo se leería como «no pasó nada».
+> - **NO toca `asistencia_personas`** (el $1.000 se queda), ni `asistencia_planilla_manual`, ni una quincena vieja. Idempotente. **Para deshacerlo: borrar las 2 filas** y la planilla vuelve exactamente a lo de antes.
+> - **Índice único parcial** `asistencia_reparto_una_extra`: una sola parte con `paga_horas_extra` por persona. Es la única de las cinco reglas que la base puede sostener sola, y sostenerla ahí vale porque decide dónde cae la plata de las extras.
+> - **La lectura PAGINA** aunque hoy sean 2 filas: `db-max-rows` = 1000 corta EN SILENCIO, y acá un truncado no da error — da un reparto que **no suma**, así que el guard lo rechaza y la persona vuelve a una sola planilla. Se vería como «se deshizo solo».
+>
+> ### La medición contra producción
+>
+> `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-julio-dos-empresas.ts` (**solo lectura**; `EXIGIR=0` mide con las horas extra pagadas). Corre el motor **VIEJO** —sacado de `origin/main` AL EJECUTAR, con cierre transitivo de sus imports— y el NUEVO sobre los MISMOS datos, y lee el reparto **de la tabla de verdad**.
+>
+> | | PASADA 1 (sin reparto) | PASADA 2 (con reparto) | PASADA 3 |
+> |---|---|---|---|
+> | 4 quincenas × 3 empresas | **145 líneas · 3.516 cifras · 0 diferencias** | **5.940 cifras de OTRAS personas · 0 movidas** | **7 de 7 mutaciones del guard cazadas** |
+>
+> **JULIO, con las horas extra pagadas:**
+>
+> | quincena | ANTES (una línea) | Vistana | Fashion Wear | NETO |
+> |---|---:|---:|---:|---:|
+> | 1-15 jul | $559,43 | $356,00 | $228,58 | **$584,58** (+$25,15) |
+> | 16-31 jul | $597,30 | $373,90 | $251,02 | **$624,92** (+$27,62) |
+> | 1-15 ago | $521,31 | $346,00 | $196,97 | **$542,97** (+$21,66) |
+> | 16-31 ago | $406,71 | $246,41 | $180,11 | **$426,52** (+$19,81) |
+>
+> 🔴 **El 1-15 de agosto reproduce el mockup aprobado AL CENTAVO**: Vistana `$400,00 · — · $44,00 · $356,00` y Fashion Wear `$100,00 · $96,97 · — · $196,97`, con **$5,77 de rata en las dos**. La suma del mockup ($552,97) no incluye los **$10,00 de mercancía** escritos a mano de esa quincena, que la planilla sí descuenta (y **una sola vez**, del lado del reloj) → neto real **$542,97**.
+> - ⚠️ **El 16-31 de julio da $624,92 y el encargo decía $623,59.** La diferencia son **$1,33** y sale del **recargo de domingo ($27,05)**, que se quedó del lado que paga seguros (ver arriba). Ningún reparto de los que se probaron reproduce exactamente $623,59; el que reproduce el mockup aprobado es éste.
+> - ⚠️ **En producción HOY las horas extra están en $0** para todo el mundo: `asistencia_horas_extra_aprobadas` existe y está **vacía**, así que se exige aprobación y no hay ni un día aprobado. Con ese estado real la diferencia es **+$11,00 por quincena** (el 11 % de los $100 de Fashion Wear). Los números de la tabla de arriba son con `EXIGIR=0`.
+>
+> ### Candados
+>
+> `src/__tests__/lib/asistencia-reparto.test.ts` (**55**, con las horas REALES de producción) y **`src/__tests__/api/asistencia-reparto-route.test.ts` (12), que LLAMA a la ruta real** — el bug que ese archivo caza es el de la JUNTURA (que la ruta lea la tabla y le pase el reparto al motor), que es el modo de fallo que este módulo ya pagó con `diaEnCurso`, y ningún test del motor lo puede ver. Ninguno de los dos busca texto en un archivo.
+> - **Verificado por mutación, 28 de 28 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-reparto.sh`): la rata sale del monto de la parte · el quincenal ignora la parte · las horas no se reparten · las extras van al reloj · el resto del reloj se copia a las dos (ausencia doble) · los montos a mano se descuentan dos veces · la parte enciende los seguros que la ficha apagó · la base propia se aplica dos veces · la línea conserva la empresa de la ficha · el motor ignora el reparto · las dos líneas salen en TODOS los cuadros · el guard no exige la suma · deja pasar dos partes con extras · el quincenal de referencia muestra el sueldo completo · las cinco reglas del validador, una por una · el reloj lo lleva la última parte · el monto que llega como TEXTO se pierde · `partesDe` devuelve lo rechazado · lo rechazado se calla · la ruta no pasa el reparto · no dice lo rechazado · calla la migración faltante · Aprobaciones se queda con la última línea.
+> - 🩸 **Tres cosas del verificador que este repo ya pagó y acá no se repiten:** restaura **por COPIA** (hay archivos NUEVOS y `git checkout` aborta el comando entero sin restaurar nada), el reemplazo es **LITERAL con python** (con `perl -0pi -e 's|A|B|'` un `||` del código real se des-escapa y **se come el archivo**, dejando un «SOBREVIVIÓ» falso), y **denuncia el patrón que no muta** en vez de darlo por cazado. Trae una **mutación de CONTROL** que a propósito no matchea: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido con el comentario adentro.
+> - 🩸 **Cuatro mutaciones sobrevivieron en la primera corrida y las cuatro eran candados flojos, no producto sano:** la base propia solo se probaba con la parte que además tenía los seguros APAGADOS (así que su `null` salía por el otro camino), el reparto de una sola empresa se probaba con una parte que **también** violaba la regla 5, `quincenalReferencia` no lo miraba nadie, y el orden de Aprobaciones coincidía **por casualidad** con el `new Map` de última-gana.
+>
+> ### ⚠️ Lo que queda PENDIENTE
+>
+> - 🔴 **CONFIRMARLE A LA CONTADORA dónde van los DOMINGOS y FERIADOS.** Hoy se quedan en Vistana (con seguros). Son $27,05 en la quincena del 16 al 31 de julio.
+> - **El reparto NO se puede crear ni editar desde la pantalla**: se muestra y se siembra por SQL. La regla la fija la contadora y los montos tienen que sumar el salario de la ficha; un editor invita a dejarlo mal puesto —y un reparto que no suma se rechaza entero, o sea que la persona volvería a cobrar en una sola planilla sin que nadie lo busque. Si Daniel quiere editarlo, es una decisión suya y va aparte.
+> - **El Excel y el PDF de la planilla NO se tocaron**: salen por empresa, así que cada uno trae su parte con la empresa correcta, pero **no dicen que el sueldo está repartido**. Anotado, no construido.
+
 ## PWA (iOS)
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
 - `apple-mobile-web-app-status-bar-style: black`
