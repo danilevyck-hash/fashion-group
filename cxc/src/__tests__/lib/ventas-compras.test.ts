@@ -763,7 +763,14 @@ describe("el Excel de Referencia", () => {
         : await mod.buildComprasSheet([ART()], "2026-08");
     const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
     const encabezado = filas.find((f) => f.includes("Referencia")) as string[];
-    const cuerpo = filas.slice(filas.indexOf(encabezado) + 1);
+    // 🔑 La NOTA del pie (27-ago-2026) no es una fila de datos: ocupa UNA sola
+    // celda, va después de un espaciador y queda FUERA del filtro. Contarla
+    // como artículo hacía fallar el candado de «una fila por artículo» — y ese
+    // candado tenía razón en gritar: un lector que no la distingue dejaría
+    // pasar cualquier fila de más.
+    const cuerpo = filas
+      .slice(filas.indexOf(encabezado) + 1)
+      .filter((f) => f.filter((c) => c !== undefined && c !== "").length > 1);
     const porNombre = (f: unknown[]) =>
       Object.fromEntries(encabezado.map((h, i) => [h, f[i]])) as Record<string, unknown>;
     return { encabezado, cuerpo: cuerpo.map(porNombre) };
