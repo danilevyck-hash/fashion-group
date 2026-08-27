@@ -52,6 +52,10 @@ import { CHIP_NO_MARCA_RELOJ } from "@/lib/asistencia/sueldo-fijo";
 import { baseSeguros, chipBaseSeguros } from "@/lib/asistencia/seguros-base";
 import type { AvisoPeriodoAbierto, CodigoSinFicha } from "@/lib/asistencia/periodo";
 import type { ExtraNoAprobada } from "@/lib/asistencia/aprobaciones";
+import type {
+  PrestamoSinAtar,
+  SugerenciaPrestamo,
+} from "@/lib/asistencia/prestamos-planilla";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
 
@@ -63,6 +67,14 @@ interface Respuesta {
   lineas: LineaPlanilla[];
   totales: TotalesPlanilla;
   reglas: ReglasAsistencia;
+  /** 🔴 Lo que el módulo de Préstamos dice que hay que descontar esta quincena,
+   *  persona por persona. Vacío en un rango libre.
+   *
+   *  🩸 OPCIONAL A PROPÓSITO: una respuesta guardada por SWR de ANTES de este
+   *  cambio no lo trae, y esa respuesta se pinta antes de que llegue la nueva.
+   *  Declararlo obligatorio le mentiría al compilador sobre lo que de verdad
+   *  puede llegar, y el precio sería la planilla en blanco. */
+  prestamos?: SugerenciaPrestamo[];
   avisos: {
     faltaMigracionConfiguracion: string | null;
     faltaMigracionManual: string | null;
@@ -102,6 +114,22 @@ interface Respuesta {
     /** Falta correr el SQL de las aprobaciones. NO se exige aprobación: se paga
      *  todo lo que midió el reloj, como hasta hoy — pero se dice. */
     faltaMigracionAprobaciones: string | null;
+    /** 🔴 Los descuentos de préstamo que este cuadro NO hizo porque nadie los
+     *  aprobó. Contadora, textual: *«El préstamo si debe ser por aprobarlo»*.
+     *  Nada se descarta en silencio: va con nombre y monto.
+     *  🩸 Opcionales por el mismo motivo que `prestamos`: una respuesta vieja
+     *  guardada por SWR no los trae. */
+    prestamoSinAprobar?: SugerenciaPrestamo[];
+    avisoPrestamoSinAprobar?: string | null;
+    /** 🔴 Préstamos CON SALDO que no están atados a nadie de la planilla: no se
+     *  le descuentan a ninguna persona. */
+    prestamoSinAtar?: PrestamoSinAtar[];
+    avisoPrestamoSinAtar?: string | null;
+    /** Falta correr el SQL del amarre. La casilla se sigue escribiendo a mano,
+     *  como hasta hoy — pero se dice. */
+    faltaMigracionAmarrePrestamos?: string | null;
+    /** Falta correr el SQL de la aprobación del préstamo. Ídem. */
+    faltaMigracionPrestamoAprobado?: string | null;
   };
 }
 
@@ -220,6 +248,52 @@ export default function PlanillaTab() {
     [cargar, data, toast],
   );
 
+  // ── 🔴 APROBAR EL DESCUENTO DE PRÉSTAMO ────────────────────────────────────
+  //
+  // Contadora, textual: *«El préstamo si debe ser por aprobarlo»*. Aprobar
+  // ESCRIBE el monto en la casilla —que queda editable— y deja registro de
+  // quién lo hizo. Retirar la aprobación la vacía, salvo que alguien la haya
+  // corregido a mano: eso no se pisa, y el servidor lo devuelve en `noTocadas`.
+  const [aprobandoPrestamo, setAprobandoPrestamo] = useState(false);
+  const aprobarPrestamo = useCallback(
+    async (personas: Array<{ codigo: string; monto: number }>, aprobado: boolean) => {
+      if (!data || personas.length === 0) return;
+      // 🔴 LA CLAVE SALE DE LA RESPUESTA, no de un estado propio — mismo motivo
+      // que en `guardar`: una segunda definición de «a qué quincena pertenece
+      // este cuadro» terminaría guardando en una y leyendo de otra.
+      if (!data.periodo.claveManuales) return;
+      setAprobandoPrestamo(true);
+      try {
+        const res = await fetch("/api/asistencia/prestamos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quincena: data.periodo.claveManuales, aprobado, personas }),
+        });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error ?? "No se pudo guardar");
+        if (j.ok === false) {
+          toast(j.aviso ?? "No se pudo guardar", "error");
+        } else if (Array.isArray(j.noTocadas) && j.noTocadas.length > 0) {
+          // 🔴 Nada se descarta en silencio: si una casilla se dejó como estaba
+          // porque alguien la había corregido, se DICE.
+          toast(
+            `Se retiró la aprobación, pero ${j.noTocadas.length === 1 ? "1 casilla quedó" : `${j.noTocadas.length} casillas quedaron`} `
+            + "con el monto que alguien escribió a mano. Corrígelo en el cuadro si hace falta.",
+            "warning",
+          );
+        }
+        // Se recarga entero: el monto cambia el total de deducciones, el neto y
+        // los totales del pie.
+        await cargar();
+      } catch (e) {
+        toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
+      } finally {
+        setAprobandoPrestamo(false);
+      }
+    },
+    [cargar, data, toast],
+  );
+
   const exportables = useMemo(() => {
     if (!data) return null;
     return {
@@ -241,6 +315,11 @@ export default function PlanillaTab() {
       // se pagaron y el archivo no, el archivo es el que va a decidir un pago
       // con menos información que la pantalla.
       avisoExtraSinAprobar: data.avisos.avisoExtraSinAprobar,
+      // 🔴 Y lo mismo con el préstamo: si la pantalla dice que a alguien no se
+      // le descontó su cuota y el papel no, el papel es el que va a decidir un
+      // pago con menos información que la pantalla.
+      avisoPrestamoSinAprobar: data.avisos.avisoPrestamoSinAprobar ?? null,
+      avisoPrestamoSinAtar: data.avisos.avisoPrestamoSinAtar ?? null,
     };
   }, [data]);
 
@@ -389,6 +468,36 @@ export default function PlanillaTab() {
         </p>
       )}
 
+      {/* 🔴 Y LO MISMO CON EL PRÉSTAMO. Contadora, textual: *«El préstamo si
+          debe ser por aprobarlo»*. Lo que no se aprobó no se descontó — pero se
+          DICE, con nombre y monto. Es la lección del #651: un freno que esconde
+          plata es peor que no tener freno. */}
+      {data?.avisos.avisoPrestamoSinAprobar && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          {data.avisos.avisoPrestamoSinAprobar}
+        </p>
+      )}
+
+      {/* 🔴 Un préstamo con saldo que no es de nadie es plata que NUNCA se va a
+          descontar. Va en rojo: pide que una persona haga algo. */}
+      {data?.avisos.avisoPrestamoSinAtar && (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
+          {data.avisos.avisoPrestamoSinAtar}
+        </p>
+      )}
+
+      {data?.avisos.faltaMigracionAmarrePrestamos && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          {data.avisos.faltaMigracionAmarrePrestamos}
+        </p>
+      )}
+
+      {data?.avisos.faltaMigracionPrestamoAprobado && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          {data.avisos.faltaMigracionPrestamoAprobado}
+        </p>
+      )}
+
       {data?.avisos.avisoSinFicha && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           {data.avisos.avisoSinFicha}{" "}
@@ -492,6 +601,16 @@ export default function PlanillaTab() {
               quincena para poder llenarlos.
             </p>
           )}
+
+          {/* 🔴 EL PRÉSTAMO, TRAÍDO DEL MÓDULO Y CON APROBACIÓN. Va ACÁ ARRIBA
+              y no adentro de la fila de cada persona: es la decisión que hay
+              que tomar ANTES de mirar el cuadro, y tomarla treinta veces
+              abriendo treinta filas es lo que hacía que se tecleara mal. */}
+          <PrestamosPorDescontar
+            items={data.prestamos}
+            onAprobar={aprobarPrestamo}
+            trabajando={aprobandoPrestamo}
+          />
 
           {/* ── ESCRITORIO: la tabla de 19 columnas ── */}
           <div className="hidden md:block">
@@ -705,6 +824,133 @@ export default function PlanillaTab() {
           </p>
         </Ayuda>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL BLOQUE DE PRÉSTAMOS
+//
+// ── 🔴 POR QUÉ ESTÁ ACÁ Y NO EN LA PESTAÑA «APROBACIONES» ────────────────────
+//
+// Aquella pestaña la ve el usuario `bodega` —con el que trabaja Julio Garay—, y
+// a propósito NO le llega un solo sueldo: el servidor le recorta la respuesta
+// (ver `soloApruebaRoles()` en `roles.ts`). Un descuento de préstamo ES plata
+// del sueldo, así que vive donde vive la planilla y lo aprueba quien la arma.
+//
+// ── ⚠️ LO NO APROBADO NO SE ESCONDE ─────────────────────────────────────────
+//
+// Las ya aprobadas SIGUEN EN LA LISTA. Una lista de solo pendientes no deja
+// retirar nada, y un toque de más no puede ser irreversible. Es la misma forma
+// que la pantalla de horas extra.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type OnAprobarPrestamo = (
+  personas: Array<{ codigo: string; monto: number }>,
+  aprobado: boolean,
+) => void;
+
+function PrestamosPorDescontar({
+  items, onAprobar, trabajando,
+}: {
+  // 🩸 `undefined` A PROPÓSITO, y no es defensa de más: esta pantalla se
+  // rehidrata con la respuesta que SWR dejó guardada, y una respuesta anterior
+  // a este cambio no trae el campo. Un `items.length` pelado revienta la
+  // planilla ENTERA en el primer render después del deploy — la pantalla con la
+  // que se paga, en blanco, por un bloque que es un extra.
+  items: SugerenciaPrestamo[] | undefined;
+  onAprobar: OnAprobarPrestamo;
+  trabajando: boolean;
+}) {
+  // Sin nada que descontar no hay bloque. Un cartel permanente es un cartel que
+  // se deja de leer — misma regla que el resto del módulo.
+  if (!items?.length) return null;
+
+  const pendientes = items.filter((s) => !s.aprobado);
+  const totalPendiente = pendientes.reduce((a, s) => a + s.sugerido, 0);
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3 py-2.5">
+        <div className="text-sm font-semibold text-gray-800">
+          Préstamos por descontar
+          <span className="ml-2 font-normal text-gray-500">
+            {pendientes.length === 0
+              ? `${items.length} ${items.length === 1 ? "aprobado" : "aprobados"}`
+              : `${pendientes.length} sin aprobar · $${$(totalPendiente)}`}
+          </span>
+        </div>
+        {pendientes.length > 1 && (
+          <button
+            type="button"
+            disabled={trabajando}
+            onClick={() =>
+              onAprobar(pendientes.map((s) => ({ codigo: s.codigo, monto: s.sugerido })), true)}
+            className="min-h-[44px] rounded-md bg-gray-900 px-3 text-[13px] font-medium text-white disabled:opacity-50"
+          >
+            Aprobar {pendientes.length}
+          </button>
+        )}
+      </div>
+
+      <ul className="divide-y divide-gray-100">
+        {items.map((s) => (
+          <li key={s.codigo} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] font-medium text-gray-900">
+                {s.etiqueta}
+                {/* 🔴 EL NOMBRE DE PRÉSTAMOS VA A LA VISTA cuando NO es el
+                    mismo. El amarre lo hizo una migración con una lista
+                    explícita, y quien mira tiene que poder verlo: es la única
+                    forma de que un amarre equivocado se note. */}
+                {s.nombrePrestamos.toUpperCase() !== s.etiqueta.toUpperCase() && (
+                  <span className="ml-1.5 font-normal text-gray-400">
+                    (en Préstamos: {s.nombrePrestamos})
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-gray-500">
+                {s.origen === "descontado"
+                  // 🔑 Ya lo registró el módulo en esta quincena: no es una
+                  // estimación, es lo que de verdad se le descontó.
+                  ? <>Ya descontado en Préstamos esta quincena · saldo ${$(s.saldo)}</>
+                  : <>Cuota ${$(s.cuota)} · saldo ${$(s.saldo)}</>}
+                {s.aprobado && s.por && <> · aprobó {s.por}</>}
+              </div>
+              {/* 🔴 Aprobado, pero lo que hay ya no es lo que se aprobó. Se dice
+                  con los DOS números y no se corrige solo: una plata que se
+                  mueve sola es peor que una que se explica. */}
+              {s.cambio && (
+                <div className="text-xs text-amber-700">
+                  Se aprobó ${$(s.montoVisto ?? 0)}; hoy el módulo dice ${$(s.sugerido)} y la
+                  casilla dice ${$(s.enCasilla)}.
+                </div>
+              )}
+            </div>
+            <div className="tabular-nums text-[13px] font-semibold text-gray-900">
+              ${$(s.sugerido)}
+            </div>
+            <button
+              type="button"
+              disabled={trabajando}
+              onClick={() => onAprobar([{ codigo: s.codigo, monto: s.sugerido }], !s.aprobado)}
+              className={`min-h-[44px] rounded-md px-3 text-[13px] font-medium disabled:opacity-50 ${
+                s.aprobado
+                  ? "border border-gray-300 text-gray-700"
+                  : "bg-gray-900 text-white"
+              }`}
+            >
+              {s.aprobado ? "Quitar" : "Aprobar"}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <p className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
+        Aprobar escribe el monto en la casilla <b>Préstamo</b> del cuadro, y la casilla se
+        puede corregir a mano después. El saldo lo lleva el módulo de <b>Préstamos</b>: acá no
+        se cambia.
+      </p>
     </div>
   );
 }
