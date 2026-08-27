@@ -4046,6 +4046,97 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 >
 > **Candado en la otra dirección** (el que caza ESTE bug, no el que lo fijaba): `ventas-resumen-articulo.test.ts` trae el fixture `44D202G110` EXACTO y un **barrido de coherencia** que recorre los fixtures de siempre —vivos, agotados, con devoluciones, sin compra, vendido de más y con 2 llegadas— y exige que `medirVendidoMeses().parte` sea **el mismo campo** que el pie de Vendí y que los textos no puedan discrepar. `referencia-tabla-pedido.test.tsx` renderiza la tabla real, lee la celda, abre la fila y compara contra el pie de la ficha. Verificado por mutación: devolver el guard `vendido <= comprado` rompe 4, volver a calcular el % dentro de `medirVendidoMeses` rompe 5 y topear el % en 100% rompe 4.
 
+### 🔴 Ventas › Referencia — UNA UNIDAD DE AJUSTE VALÍA 7 MESES Y 4 PUNTOS (25-ago-2026)
+
+> Daniel, sobre `4LD230G110` (vistana): llegó el **5-ago-2025** (48 u, única compra), vendió **sep 1 · nov 32 · dic 15 = 48**, y **quedó 1 unidad**. Su hermano `4LD230G001` tiene la MISMA llegada y la MISMA venta pero stock 0. La ficha decía:
+>
+> ```
+> ANTES                                   AHORA
+> 4LD230G110  48 · 48 · 1 · 100% · 12     4LD230G110  48 · 48 · 1 ·  98% · 5
+> 4LD230G001  48 · 49 · 0 · 102% ·  5     4LD230G001  48 · 49 · 0 · 100% · 5
+> ```
+>
+> **Dos artículos idénticos con 7 meses de diferencia por una unidad de ajuste** — y uno diciendo 100% con mercancía en bodega al lado de la columna que dice 1.
+>
+> ⚠️ **NO SE AGREGÓ NINGUNA NOTA, PUNTO ÁMBAR NI AVISO.** Daniel rechazó explícitamente una versión con *"Falta registrar 1 compra"*, que además era **FALSA**: esa unidad entró por un **ajuste de inventario que él mismo hizo** (se vio en el kardex de Switch). **El sistema NO lee los ajustes de Switch, y por eso `Compré − Vendí ≠ Stock`.** Con los números nuevos el dato deja de mentir y no hay nada que explicar.
+>
+> ### 1 · EL RELOJ SE PARA CUANDO QUEDA LA COLA, NO EN EL CERO EXACTO
+>
+> 🔑 **NO ES UN UMBRAL NUEVO: ES EL QUE YA DECIDÍA CUÁNDO UNA LLEGADA SE AGOTÓ.** `umbralTandaCero(llegaron)` = `min(2, 10% de lo llegado)` existe desde el #501 y ahora lo REUSA `esColaDeBodega(existencia, llegaron)` para cerrar el reloj de MESES. Dos definiciones de *"quedó en 0"* se separarían con el tiempo.
+> - El 10% protege a las llegadas chicas: **2 en bodega de una de 8 u NO es cola** (le queda el 25%); **1 de 48 sí** (98% vendido).
+> - ⚠️ **Existencia DESCONOCIDA (`null`, Switch no tiene el código en el catálogo) NO es cola**: sin la foto de bodega no se puede afirmar que se agotó. Son 30 de 8.199 códigos en vistana.
+> - **Existencia NEGATIVA (sobreventa registrada) SÍ es cola**: no queda nada.
+> - Se aplica en los DOS lugares que decidían el agote: el gate de `medirAvance` y el cierre de la ÚLTIMA llegada en `medirTandas`.
+>
+> Daniel eligió explícitamente **5** (el tiempo en bodega hasta agotarse) y **no 2** (los meses en que de verdad se vendió).
+>
+> ### 2 · EL % SALE DE LO QUE DE VERDAD HUBO
+>
+> **`parteVendidaReal(vendido, quedan, comprado)` = `Vendí ÷ (Vendí + Stock)`**, no `Vendí ÷ Compré`. El denominador viejo era **lo REGISTRADO como compra**, y lo registrado no es lo que hubo.
+> - 🔴 **CONSECUENCIA BUSCADA: el % queda amarrado al Stock POR CONSTRUCCIÓN.** Stock 0 ⇒ 100%; Stock > 0 ⇒ menos de 100%; y **el % ya no puede pasar de 100**. Medido en producción (vistana, 8.199 códigos): **394 códigos con más de 100% → 0**, y **43 que decían 100% con mercancía en bodega → 0**.
+> - ⚠️ **ESTO SUPERA la decisión del 12-ago-2026** (*"VENDIDO muestra el % real aunque pase de 100%"*): `44D202G110` pasa de **103% a 100%** y `TERMO` de **207% a 100%**. Lo aprobó Daniel con su propio ejemplo (`4LD230G001`: 102% → 100%). **El descuadre lo siguen diciendo las columnas Compré/Vendí y el aviso de siempre** (*"Se vendieron 2 unidades más de las que llegaron"*), que es su trabajo — no el del porcentaje. **Lo que NO se aflojó es el candado que nació de ese bug: la tabla y la ficha siguen leyendo EL MISMO campo** (`grandes.parteVendida`), así que no pueden discrepar.
+> - **El `"—"` queda para los tres casos de siempre**: sin compra registrada (`RETENCION`), comprado 0 y vendido negativo. Más uno nuevo: **`Vendí + Stock = 0`** (todo se fue en ajustes).
+> - ⚠️ **Sin catálogo (`quedan == null`) se cae a `Vendí ÷ Compré`** — degradación documentada, no una segunda cuenta: es lo mejor que se sabe, y son 30 códigos que **ni siquiera muestran Stock** en pantalla, o sea que no hay columna que contradecir. Es el único camino por el que un % puede pasar de 100%.
+>
+> 🩸 **Y EL DEFECTO VOLVÍA POR LA PUERTA DEL REDONDEO.** `344 ÷ 345` es **99,7% y redondeaba a 100%** al lado de una columna Stock que decía **1**: la misma contradicción con dos decimales menos, en **10 códigos** medidos. `pctVendido()` topea eso: **con algo en bodega nunca se dice 100%**. ⚠️ El tope es de **UN solo lado** — 0,4% sigue redondeando a 0%, que es la convención de siempre de la celda. El 100% es una AFIRMACIÓN ("no queda nada") y la única fuente que puede hacerla es el Stock.
+>
+> ### 🔴 EL % TIENE UNA SOLA BASE EN TODO EL MÓDULO, Y POR ESO CAMBIARON DOS TEXTOS
+>
+> - **El pie de Vendí** decía *"el 80% de lo comprado"* (y *"de esa llegada"* con 2+ llegadas). Con el denominador nuevo eso sería **falso en la misma caja**: `4LD230G110` compró 48 y vendió 48 — *"el 98% de lo comprado"* al lado de esos dos números se lee roto. Dice **"el 98% de lo que hubo"**, una sola redacción para los dos casos.
+> - **La línea de venta** decía *"En 10 meses va el 80% de la compra"* → **"En 10 meses va el 80%"**. Y `medirAvance` dejó de calcular su propio %: usa el MISMO `parteVendidaReal`. Con dos cuentas, la línea y el pie de la misma ficha podían discrepar — es el bug de `44D202G110` con otro disfraz.
+>
+> **Mockup aprobado:** https://claude.ai/code/artifact/94b52cea-95f1-4724-b79f-2472ee7693cd
+>
+> ### 3 · LA TABLA DEL MODO PEDIDO SE ORDENA POR COLUMNA
+>
+> Tocar el encabezado ordena. **`src/lib/ventas/referencia-orden.ts`** (módulo PURO), ciclo de TRES pasos:
+>
+> ```
+> 1er toque → ordena (texto de la A, números de mayor a menor)
+> 2do toque → invierte
+> 3er toque → VUELVE AL ORDEN PEGADO
+> ```
+>
+> 🔴 **EL DEFAULT SIGUE SIENDO `ordenarComoPegado`**, que existe para que Daniel lea la tabla con su Excel al lado. El sort es un **override**, y el tercer paso es lo que impide que un toque sin querer le deje el mapa perdido para siempre — el mismo criterio con el que la píldora de tramo del CXC se apaga al volver a tocarla.
+> - 🔑 **EL SORT NO MIDE NADA**: ordena por los valores que la fila YA calculó desde `armarFicha` (`vm.parte`, `grandes.*`). Si volviera a leer el artículo, una columna podría ordenar por un número distinto del que pinta — hay mutación para ese caso exacto.
+> - 🔴 **Los `"—"` van al FINAL en las DOS direcciones**: un artículo sin margen no es "el de margen más bajo", es uno del que no se puede decir.
+> - **El desempate es el ORDEN PEGADO y sale gratis**: `Array.sort` es estable, así que dos filas con el mismo valor conservan el orden con el que entraron.
+> - **El texto se compara CRUDO en mayúsculas, sin `localeCompare` con opciones** — el orden tiene que ser el mismo en el navegador, en Node y en el test (la misma decisión que ya rige `compararCodigos` y `ordenarCodigosAZ`).
+> - **El encabezado es un botón de 44 px** (`min-h-[44px]`): esta tabla se usa en el iPad, con dedo. El chevron **no** es una columna ordenable.
+> - ⚠️ **El "Bajar a Excel" sigue exportando el ORDEN PEGADO** (`articulosOrdenados` en `ReferenciaView`): es una decisión anterior y no se cambió de paso. Hay candado.
+>
+> ### Impacto medido contra producción
+>
+> `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-vendido-meses-referencia.ts vistana antes|despues` (solo lectura; **cachea las filas crudas en `.diag-cache/` para que la segunda corrida NO le pegue a Supabase** — una auditoría no es motivo para saturar una base en compute Micro). Corre los MISMOS módulos de la pantalla y compara fila por fila:
+>
+> | | vistana, 8.199 códigos |
+> |---|---|
+> | cambian de número | **2.367** (VENDIDO 2.204 · MESES 56 · los dos 100) |
+> | **no se mueven** | **5.832** |
+> | con % **mayor a 100%** | **394 → 0** |
+> | con **100% y mercancía en bodega** | **43 → 0** |
+>
+> **Y los dos hermanos** (`scripts/_verif-compras-referencia.ts`, que ahora los trae por defecto): `4LD230G110` → **48 · 48 · 1 · 98% · 5 meses (en venderse)**; `4LD230G001` → **48 · 49 · 0 · 100% · 5**. Los patrón de siempre: `4G5004G001` 36·25·12·**68%**·5 (era 69%: 25 de las 37 que hubo) · `4G5004G030` 36·36·0·100%·2 · `CVM253CR02001` 80%·10 · `NB2570001` **62%**·10 (era 59%: 552 de 897, no de 935) · `QD3958033` 30%·8 · `40HM265032` **100%**·23 (era 98%).
+>
+> ### Medición en el navegador
+>
+> **Los 3 anchos + el iPad acostado, contra el build de producción y con datos de producción** (`BASE=… node scripts/_medir-referencia-pedido.mjs` y `_medir-referencia-simple.mjs`, solo lectura): **390 · 834 · 1024 · 1440 → 0 px de arrastre de página, 0 recortados, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px**, en la ficha de los 6 códigos de siempre + los dos hermanos + el modelo `40HM265` con **43 tarjetas**, y en la tabla del modo pedido en **TRES** estados: cerrada, abierta y **ordenada**. En pantalla se lee `4LD230G110 | 48 | 48 | 1 | 98% | 5` justo encima de `4LD230G001 | 48 | 49 | 0 | 100% | 5`.
+> - El script del modo pedido **falla si el encabezado tocado no se anuncia como ordenado** (`aria-sort`): sin eso el chequeo pasaría en verde con la flecha perdida.
+> - 🩸 **GOTCHA DE MEDICIÓN QUE COSTÓ UNA VUELTA ENTERA, y es nuevo: MEDÍ EL BUILD DE OTRO AGENTE.** `next start -p 3479` falló con **EADDRINUSE** —otro worktree ya escuchaba ahí—, el proceso murió, y el medidor se conectó igual y midió la rama ajena: reportó `100% · 12` (los números VIEJOS) y "0 encabezados ordenados", o sea el bug intacto sobre código ya arreglado. **Antes de creerle a una medición hay que verificar que el servidor que contesta es el tuyo** (`lsof -nP -iTCP:<puerto> -sTCP:LISTEN` y el log del `next start`).
+> - 🩸 **Y la cookie de medición se vence**: la página valida el `sessionToken` contra `user_sessions` y una vieja redirige al login — el medidor mediría una pantalla vacía. `node scripts/_cookie-medicion.mjs` toma prestada, **solo leyendo**, una sesión de admin viva.
+>
+> ### Candados
+>
+> `src/__tests__/lib/ventas-resumen-articulo.test.ts` (**118**, con los dos hermanos como fixture EXACTO: mismos meses, % distinto, y el caso de 3 en bodega que ya NO es cola), `ventas-referencia-orden.test.ts` (**11**, el ciclo de tres pasos y los "—" al final), `ventas-compras.test.ts` (el Excel, leyendo las celdas del `.xlsx`), `components/referencia-tabla-pedido.test.tsx` (**24**, RENDERIZA la tabla y toca los encabezados) y `components/ventas-poda-textos.test.tsx` (**38**, compara la ficha carácter por carácter).
+> - **Varios candados CAMBIARON DE DIRECCIÓN porque fijaban lo viejo**: `40HM265032` exigía 99% (276÷280) · `TERMO` exigía 150% · `44D202G110` exigía "el 103% de lo comprado" · el pie de `4G5004G001` exigía "el 69% de esa llegada" · las tres frases con *"de la compra"*.
+> - **Verificado por mutación, 22 de 22 cazadas** (`python3 scripts/_mutar-candados-referencia-cola.py`): la cola vuelve al cero exacto (en `esColaDeBodega`, en `medirAvance` y en el cierre de la última llegada) · una existencia desconocida se lee como cola · el % vuelve a medirse contra lo comprado · una existencia negativa resta de lo que hubo · sin catálogo se devuelve null · los grandes de la llegada vuelven a `parteDeTanda` · el agotado vuelve al guard `vendido <= comprado` · la línea de venta vuelve a calcular su propio % · el pie vuelve a decir "de lo comprado" · el pie deja de dibujarse · el Excel deja de decir de qué sale el % · **el redondeo vuelve a prometer 100% con algo en bodega** · la celda se salta el tope · el tercer toque no vuelve al orden pegado · el orden pegado deja de ser el default · los "—" van primero · los números arrancan al revés · la tabla ignora el orden · el encabezado deja de ser botón · el sort vuelve a medir por su cuenta.
+> - 🩸 **TRES SOBREVIVIERON en la primera corrida y las tres eran huecos REALES, no falsos positivos**: no había un solo fixture con la ÚLTIMA llegada cerrada por cola (solo por cero exacto), ninguno con una compra viva donde `van ÷ comprado` difiriera del % nuevo, y en la tabla los tres artículos daban el mismo % por las dos cuentas. Se cerraron con casos nuevos, no aflojando la mutación.
+> - 🩸 **El script de mutación aplica el reemplazo LITERAL con python, no con `perl -0pi -e 's|…|…|'`**: el código real tiene `||`, y con ese delimitador el patrón se des-escapa en una alternación con rama vacía que **se come el archivo entero** y produce un "SOBREVIVIÓ" falso. Restaura **por COPIA** (hay archivos NUEVOS y `git checkout` aborta el comando entero sin restaurar nada), **denuncia el patrón que no muta** en vez de darlo por cazado, **no lee un cero de vitest como "sobrevivió"** si la corrida no colectó tests, y trae una **mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que nada.
+>
+> ### Lo que NO se tocó
+>
+> El motor de llegadas (`medirTandas`, los tres vetos del timeline, el ritmo sin los meses vacíos) · que los TRES GRANDES sean de la última llegada y **Stock siga siendo la existencia REAL de Switch, nunca deducida** · el histórico en chico · la frase de la llegada y su historia gris (`fraseLlegadaAnterior` sigue con `parteDeTanda`: habla de un episodio CERRADO, donde el stock de hoy no dice nada) · las barras · la fila de plata y el FOB calculado · los 13 encabezados del Excel (candado `TRECE`) · la hoja Compras · el buscador y el orden pegado.
+
 ### Directorio (April 10-11)
 - Chevron icons on expandable rows
 

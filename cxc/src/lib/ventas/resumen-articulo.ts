@@ -245,6 +245,10 @@ export function mesesDeStock(existencia: number | null, porMes: number | null): 
 // Daniel: *"si hay menos es porq robaron"*), los avisos de descuadre que ya
 // existen lo explican. Acá cada número dice su verdad.
 //
+// 🔴 EL % DE VENDÍ SALE DE LO QUE HUBO — Vendí ÷ (Vendí + Stock), ver
+// `parteVendidaReal`. Stock 0 ⇒ 100%, stock > 0 ⇒ menos de 100%: el pie de
+// Vendí y la columna Stock de al lado ya no pueden desmentirse.
+//
 // 🔴 CON 2+ LLEGADAS SOBRE BODEGA EN 0, LOS GRANDES SON DE LA ÚLTIMA. Daniel,
 // sobre la ficha de `4G5004G001` (12-ago-2026), textual: *"mira que sigue
 // diciendo compre 72 cuando enverdad son 36"*, y eligió la salida: *"(a) Los
@@ -275,8 +279,9 @@ export interface TresGrandes {
    *  existencia REAL de bodega, también cuando los otros dos son de la última
    *  llegada. */
   quedan: number | null;
-  /** vendido ÷ comprado. `null` cuando no se puede decir (sin compras, o
-   *  vendido negativo — "el −5% de lo comprado" no es castellano). */
+  /** Lo vendido ÷ LO QUE HUBO (vendido + lo que queda en bodega), NUNCA sobre
+   *  lo comprado: ver `parteVendidaReal`. `null` cuando no se puede decir (sin
+   *  compras, comprado 0, o vendido negativo — "el −5%" no es castellano). */
   parteVendida: number | null;
   /** `true` = Compré y Vendí son de la ÚLTIMA LLEGADA, no del histórico. */
   deLlegada: boolean;
@@ -295,12 +300,11 @@ export function tresGrandes(
   // misma degradación honesta que `serie ?? []`.
   const comprado = art.sinCompraRegistrada || art.cuadre == null ? null : art.cuadre.comprado;
   const vendido = art.cuadre?.vendido ?? 0;
-  // ⚠️ SIN TOPE: vendido > comprado es un descuadre REAL (`44D202G110` vendió
-  // 66 de 64, TERMO 1.648 de 796) y "el 103% de lo comprado" es la verdad que
-  // hay que ver — el aviso de abajo dice cuántas unidades faltan por registrar.
-  // `null` SOLO cuando de verdad no se puede dividir: sin compras, o vendido
-  // negativo ("el −5% de lo comprado" no es castellano).
-  const parteDe = (c: number | null, v: number) => (c != null && c > 0 && v >= 0 ? v / c : null);
+  // 🔴 EL % SALE DE LO QUE DE VERDAD HUBO — `parteVendidaReal`, una sola
+  // definición para toda la ficha, la tabla del modo pedido y el Excel. El
+  // denominator es Vendí + Stock, no Compré: lo registrado como compra no es lo
+  // que hubo (el sistema no lee los ajustes de inventario de Switch), y el
+  // viejo Vendí÷Compré decía 100% con una unidad en bodega.
   const actual = tandas && tandas.tandas.length >= 2 ? tandas.tandas[tandas.tandas.length - 1] : null;
   if (actual) {
     return {
@@ -309,7 +313,9 @@ export function tresGrandes(
       // 🔴 La existencia REAL, sin recortar. La diferencia contra
       // (llegaron − vendidas) la explican los avisos de descuadre de siempre.
       quedan: art.existencia,
-      parteVendida: parteDeTanda(actual),
+      // El MISMO par que muestran los grandes: lo vendido de esa llegada sobre
+      // lo vendido + lo que hay en bodega.
+      parteVendida: parteVendidaReal(actual.vendidas, art.existencia, actual.llegaron),
       deLlegada: true,
       historico: { comprado, vendido },
     };
@@ -318,21 +324,43 @@ export function tresGrandes(
     comprado,
     vendido,
     quedan: art.existencia,
-    parteVendida: parteDe(comprado, vendido),
+    parteVendida: parteVendidaReal(vendido, art.existencia, comprado),
     deLlegada: false,
     historico: null,
   };
 }
 
-/** "el 80% de lo comprado" / "el 69% de esa llegada" — el subtítulo de Vendí.
- *  `null` = no hay porcentaje honesto que decir y el que llama pone su propio
- *  texto. */
-export function textoParteVendida(parte: number | null, deLlegada = false): string | null {
+/** "el 98% de lo que hubo" — el subtítulo de Vendí. `null` = no hay porcentaje
+ *  honesto que decir y el que llama pone su propio texto.
+ *
+ *  🩸 DECÍA "de lo comprado" (y "de esa llegada" con 2+ llegadas), y con el
+ *  denominador nuevo eso sería FALSO en la misma caja: `4LD230G110` compró 48 y
+ *  vendió 48 — "el 98% de lo comprado" al lado de esos dos números se lee roto.
+ *  La base ahora es una sola y se dice tal cual: lo que hubo = lo vendido + lo
+ *  que queda en bodega. */
+export function textoParteVendida(parte: number | null): string | null {
   if (parte == null || !Number.isFinite(parte)) return null;
-  const de = deLlegada ? "de esa llegada" : "de lo comprado";
+  const pct = pctVendido(parte);
+  if (pct < 1) return "menos del 1% de lo que hubo";
+  return `el ${pct}% de lo que hubo`;
+}
+
+/**
+ * El % vendido REDONDEADO como se muestra, con UN tope: mientras quede algo en
+ * bodega no se dice 100%.
+ *
+ * 🩸 Sin esto vuelve el defecto por la puerta del redondeo: `344 ÷ 345` es
+ * 99,7% y redondea a **100%** al lado de una columna Stock que dice **1** — la
+ * misma contradicción que Daniel reportó, con dos decimales menos. Medido en
+ * producción (vistana, 25-ago-2026): **10 códigos** caen justo ahí.
+ *
+ * ⚠️ EL 100% ES UNA AFIRMACIÓN ("no queda nada"), no un redondeo cualquiera, y
+ * la única fuente que puede afirmarlo es el Stock. Por eso el tope es de un
+ * solo lado: 0,4% sigue redondeando a 0% (la convención de siempre de la celda).
+ */
+export function pctVendido(parte: number): number {
   const pct = Math.round(parte * 100);
-  if (pct < 1) return `menos del 1% ${de}`;
-  return `el ${pct}% ${de}`;
+  return parte < 1 && pct >= 100 ? 99 : pct;
 }
 
 /** "72 u en total · 61 vendidas" — el histórico completo, en chico, cuando los
@@ -428,6 +456,82 @@ export function umbralTandaCero(llegaron: number): number {
 }
 
 /**
+ * ¿Lo que queda en bodega es la COLA de la mercancía, y no stock?
+ *
+ * 🩸 EL RELOJ DE "MESES" SE PARABA SOLO CON EL CERO EXACTO, Y UNA UNIDAD SUELTA
+ * LO DEJABA CORRIENDO PARA SIEMPRE (25-ago-2026). El caso de Daniel:
+ * `4LD230G110` (vistana) llegó el 5-ago-2025 (48 u, única compra), se vendió
+ * sep 1 · nov 32 · dic 15 = 48 y quedó **1 unidad** — la ficha decía **12
+ * meses** (seguía contando hasta hoy) mientras su hermano `4LD230G001`, misma
+ * llegada y misma venta pero con la bodega en 0, decía **5**. Dos artículos
+ * idénticos con 7 meses de diferencia por una unidad de ajuste.
+ *
+ * 🔴 ES EL MISMO UMBRAL DE SIEMPRE, NO UNO NUEVO: `umbralTandaCero` ya decidía
+ * desde el #501 cuándo una LLEGADA se había agotado (min(2, 10% de lo llegado):
+ * tolera la cola de 1-2 u en llegadas de tamaño real y exige el 0 exacto en las
+ * chicas, donde 2 u son un cuarto de la mercancía). Acá se REUSA para cerrar el
+ * reloj — dos definiciones de "quedó en 0" se separarían con el tiempo.
+ *
+ * ⚠️ Existencia desconocida (`null`: Switch no tiene el código en el catálogo)
+ * NO es cola: sin la foto de bodega no se puede afirmar que se agotó.
+ */
+export function esColaDeBodega(
+  existencia: number | null | undefined,
+  llegaron: number | null,
+  // Solo para MEDIR la sensibilidad del criterio en los diagnósticos, igual que
+  // en `medirTandas`. La pantalla usa SIEMPRE el default.
+  umbralDe: (llegaron: number) => number = umbralTandaCero,
+): boolean {
+  if (existencia == null || llegaron == null) return false;
+  return existencia <= umbralDe(llegaron);
+}
+
+/**
+ * EL % VENDIDO: lo vendido ÷ LO QUE DE VERDAD HUBO (vendido + lo que queda).
+ *
+ * 🩸 ERA `Vendí ÷ Compré`, Y SE CONTRADECÍA CON LA COLUMNA STOCK DE AL LADO
+ * (25-ago-2026). `4LD230G110`: compré 48, vendí 48, **queda 1** → decía
+ * **100%** con una unidad en bodega. `4LD230G001`: compré 48, vendí 49, stock 0
+ * → decía **102%**. Los dos números son el mismo defecto: el denominador era lo
+ * REGISTRADO como compra, y lo registrado no es lo que hubo — el sistema no lee
+ * los ajustes de inventario de Switch (esa unidad de `4LD230G110` entró por un
+ * ajuste que hizo Daniel, lo vimos en el kardex), así que `Compré − Vendí ≠
+ * Stock` y punto.
+ *
+ * Con el denominador nuevo los dos dicen la verdad —`4LD230G110` **98%** (48 de
+ * 49) y `4LD230G001` **100%** (49 de 49)— y el número deja de necesitar
+ * explicación: ⚠️ **NO se agrega ninguna nota, punto ámbar ni aviso**. Daniel
+ * rechazó explícitamente una versión con *"Falta registrar 1 compra"*, que
+ * además era FALSA.
+ *
+ * 🔴 CONSECUENCIA BUSCADA: el % ya no puede pasar de 100% y **queda amarrado al
+ * Stock por construcción** — stock 0 ⇒ 100%, stock > 0 ⇒ menos de 100%. Es
+ * exactamente lo que la pantalla tenía que dejar de desmentir.
+ *
+ * `null` = no hay porcentaje honesto que decir, y son los mismos tres casos de
+ * siempre: sin compra registrada (`RETENCION`), comprado 0, o vendido negativo
+ * ("el −5%" no es castellano).
+ *
+ * ⚠️ Existencia desconocida (`null`) es una DEGRADACIÓN documentada, no una
+ * segunda cuenta: sin la foto de bodega lo comprado es lo mejor que se sabe de
+ * "lo que hubo" (30 códigos de 8.199 en vistana, ninguno con Stock en pantalla
+ * que pueda contradecir).
+ */
+export function parteVendidaReal(
+  vendido: number,
+  quedan: number | null | undefined,
+  comprado: number | null,
+): number | null {
+  if (comprado == null || !(comprado > 0)) return null;
+  if (vendido < 0) return null;
+  if (quedan == null) return vendido / comprado;
+  // Existencia negativa (sobreventa registrada) no resta de lo que hubo.
+  const hubo = vendido + Math.max(0, quedan);
+  if (!(hubo > 0)) return null;
+  return vendido / hubo;
+}
+
+/**
  * Parte las compras y ventas del artículo en TANDAS (episodios entre ceros).
  *
  * Devuelve `null` cuando el timeline NO se puede afirmar (ver el encabezado):
@@ -492,9 +596,13 @@ export function medirTandas(
   const tandas: Tanda[] = acc.map((t, i) => {
     const esUltima = i === acc.length - 1;
     // Las tandas viejas están cerradas POR CONSTRUCCIÓN (la siguiente abrió
-    // porque el saldo tocó 0). La actual cierra solo si Switch dice bodega 0 —
-    // la misma foto que usa el agotado de siempre.
-    const cerrada = !esUltima || (art.existencia === 0 && t.vendidas > 0 && t.ultimaVentaMes != null);
+    // porque el saldo tocó 0). La actual cierra cuando lo que queda en bodega
+    // ya es la COLA (`esColaDeBodega`, el MISMO umbral que abre las tandas) —
+    // la misma foto de Switch que usa el agotado de siempre, con la cola de
+    // 1-2 u de ajuste que antes dejaba el reloj corriendo para siempre.
+    const cerrada =
+      !esUltima ||
+      (esColaDeBodega(art.existencia, t.llegaron, umbralDe) && t.vendidas > 0 && t.ultimaVentaMes != null);
     const meses =
       cerrada && t.ultimaVentaMes != null
         ? Math.max(1, diffMeses(t.ultimaVentaMes, t.desdeMes) + 1)
@@ -656,10 +764,14 @@ export function medirAvance(
 ): LineaAvance {
   const actual = tandas && tandas.tandas.length >= 2 ? tandas.tandas[tandas.tandas.length - 1] : null;
   if (actual) {
+    // 🔴 EL MISMO % QUE LOS GRANDES (`parteVendidaReal`): lo vendido de la
+    // llegada sobre lo vendido + lo que queda en bodega. Recalcularlo con otra
+    // base acá es lo que ya produjo una contradicción entre la tabla y la ficha.
+    const parte = parteVendidaReal(actual.vendidas, art.existencia, actual.llegaron);
     if (actual.cerrada) {
-      return { tipo: "agotado", meses: actual.meses, desdeMes: actual.desdeMes, parte: parteDeTanda(actual) };
+      return { tipo: "agotado", meses: actual.meses, desdeMes: actual.desdeMes, parte };
     }
-    return { tipo: "en-curso", meses: actual.meses, parte: parteDeTanda(actual) ?? 0 };
+    return { tipo: "en-curso", meses: actual.meses, parte: parte ?? 0 };
   }
   const todas = art.compras ?? [];
   const fuera = art.comprasFueraDeVentana ?? 0;
@@ -713,15 +825,14 @@ export function medirAvance(
   // cierra en la última venta: el tiempo de venta es de lo que SE VENDIÓ. Hay
   // un test con ese borde.
   const vendidoTotal = art.cuadre?.vendido ?? null;
-  if (art.existencia === 0 && vendidoTotal != null && vendidoTotal > 0) {
+  const compradoTotal = art.cuadre?.comprado ?? null;
+  if (esColaDeBodega(art.existencia, compradoTotal) && vendidoTotal != null && vendidoTotal > 0) {
     const ultimaVenta = serie
       .filter((m) => m.unidades > 0 && m.mes <= hoyMes)
       .reduce<string | null>((max, m) => (max == null || m.mes > max ? m.mes : max), null);
     if (ultimaVenta != null) {
-      const comprado = art.cuadre?.comprado ?? null;
-      // El % real. Vendido > comprado (el caso TERMO: faltan compras EN
-      // Switch) no es un % afirmable — la celda dice "—" y el aviso explica.
-      const parte = comprado != null && comprado > 0 && vendidoTotal <= comprado ? vendidoTotal / comprado : null;
+      // El MISMO % de los grandes: lo vendido sobre lo que hubo.
+      const parte = parteVendidaReal(vendidoTotal, art.existencia, compradoTotal);
       return {
         tipo: "agotado",
         // INCLUSIVE, y nunca menos de 1: oct → nov son 2 meses.
@@ -739,7 +850,9 @@ export function medirAvance(
     return {
       tipo: "en-curso",
       meses: diffMeses(hoyMes, mesAncla),
-      parte: van(mesAncla) / total,
+      // El MISMO % de los grandes (lo vendido ÷ lo que hubo), no una segunda
+      // cuenta: la línea de venta y el pie de Vendí viven en la misma caja.
+      parte: parteVendidaReal(vendidoTotal ?? van(mesAncla), art.existencia, total) ?? 0,
     };
   }
   return { tipo: "agregado", desdeMes: mesAncla, llegaron: llegaronDesde(mesAncla), van: van(mesAncla) };
@@ -751,7 +864,7 @@ export function textoAvance(n: LineaAvance): string | null {
   switch (n.tipo) {
     case "agotado": {
       const cuando = textoMeses(n.meses);
-      const pct = n.parte == null ? null : Math.round(n.parte * 100);
+      const pct = n.parte == null ? null : pctVendido(n.parte);
       // Con el % real por debajo de 100 no se dice "todo": el resto no se
       // vendió (ajustes, robo) y los avisos lo explican. Con TERMO (parte
       // null: vendió MÁS de lo comprado) todo lo que llegó sí se fue.
@@ -759,12 +872,14 @@ export function textoAvance(n: LineaAvance): string | null {
       return `Se vendió todo en ${cuando}`;
     }
     case "en-curso": {
+      // 🩸 Decía "de la compra", y el % ya NO se mide contra lo comprado sino
+      // contra lo que hubo (vendido + stock): con un ajuste de inventario de
+      // por medio, ese rótulo afirmaba algo falso al lado del pie de Vendí,
+      // que dice el MISMO número. El % tiene una sola base en todo el módulo.
       const cuando = `En ${textoMeses(n.meses)}`;
-      if (n.parte <= 0) return `${cuando} no se ha vendido nada de la compra`;
-      const pct = Math.round(n.parte * 100);
-      return pct < 1
-        ? `${cuando} va menos del 1% de la compra`
-        : `${cuando} va el ${pct}% de la compra`;
+      if (n.parte <= 0) return `${cuando} no se ha vendido nada`;
+      const pct = pctVendido(n.parte);
+      return pct < 1 ? `${cuando} va menos del 1%` : `${cuando} va el ${pct}%`;
     }
     case "agregado":
       return n.van < 0
@@ -783,7 +898,7 @@ export function textoAvanceCorto(n: LineaAvance): string {
       return textoMeses(n.meses);
     case "en-curso": {
       if (n.parte <= 0) return "va 0%";
-      const pct = Math.round(n.parte * 100);
+      const pct = pctVendido(n.parte);
       return pct < 1 ? "va <1%" : `va el ${pct}%`;
     }
     case "agregado":
@@ -880,7 +995,8 @@ export function medirVendidoMeses(
 /** "29%" / "0%" / "100%" / "—" — el texto de la celda VENDIDO. */
 export function textoVendidoCelda(v: VendidoMeses): string {
   if (v.parte == null) return "—";
-  return `${Math.round(v.parte * 100)}%`;
+  // 🔴 El MISMO redondeo que el pie de Vendí: con algo en bodega no dice 100%.
+  return `${pctVendido(v.parte)}%`;
 }
 
 /** "8" / "0" / "—" — el texto de la celda MESES. */

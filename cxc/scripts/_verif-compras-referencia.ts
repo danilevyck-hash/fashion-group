@@ -43,7 +43,19 @@ const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
 
 const CODIGOS = process.argv.slice(2).length
   ? process.argv.slice(2)
-  : ["4G5004G001", "4G5004G030", "CVM253CR02001", "NB2570001", "QD3958033", "40HM265032", "RETENCION"];
+  : [
+      // 🩸 Los dos hermanos del 25-ago-2026: MISMA llegada, MISMA venta, y lo
+      // único que los separaba era 1 unidad de ajuste en bodega.
+      "4LD230G110",
+      "4LD230G001",
+      "4G5004G001",
+      "4G5004G030",
+      "CVM253CR02001",
+      "NB2570001",
+      "QD3958033",
+      "40HM265032",
+      "RETENCION",
+    ];
 
 const HOY = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
 const HOY_MES = HOY.slice(0, 7);
@@ -110,7 +122,7 @@ async function main() {
       // 🔴 Con 2+ llegadas sobre bodega en 0, Compré y Vendí son de la ÚLTIMA
       // (Stock NO: es la existencia real). El histórico va abajo, en chico.
       const g = f.grandes;
-      const pieVendi = textoParteVendida(g.parteVendida, g.deLlegada) ?? "—";
+      const pieVendi = textoParteVendida(g.parteVendida) ?? "—";
       console.log(
         `   Compré ${g.comprado ?? "—"} u · Vendí ${g.vendido} u (${pieVendi}) · Stock ${g.quedan ?? "—"} u · Meses ${f.ritmo.meses ?? "—"} (${pieGrandeMeses(f.ritmo)})${g.deLlegada ? "   ← de la ÚLTIMA LLEGADA" : ""}`,
       );
