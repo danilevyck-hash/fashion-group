@@ -145,7 +145,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
       };
     });
 
-    const wb = buildPedidosWorkbook({ marca: cfg.marca, titulo: cfg.exportTitulo, conOrigen: true, conNumeros, pedidos });
+    const wb = buildPedidosWorkbook({ marca: cfg.marca, conOrigen: true, conNumeros, pedidos });
     const buf = workbookBuffer(wb);
 
     return new NextResponse(new Uint8Array(buf), {

@@ -10,7 +10,6 @@ import { unAnioAntes } from "@/lib/multifashion/productos-ranking";
 // importa, no se copia: este repo ya pagó dos veces por agrupar en UTC (el borde
 // de mes de Multifashion y el día de las marcaciones del reloj).
 import { hoyPanama } from "@/lib/fecha-panama";
-import { fmtDate } from "@/lib/format";
 
 // Las 7 empresas con switch_articulo_diario poblado (todo el grupo menos
 // Confecciones Boston, que no se backfilleó). Default Fashion Wear.
@@ -303,23 +302,10 @@ export async function buildProductosSheet(
   cliente?: string,
 ): Promise<import("xlsx-js-style").WorkSheet> {
   const { buildReportSheet, MONEY_FMT, PCT_FMT } = await import("@/lib/excel-export");
-  const nombre = empresaNombre(resp.empresa);
-  const periodo = periodoLabel(resp.year, resp.mes, resp.periodo ?? "ytd");
-
   const totalCant = resp.productos.reduce((s, p) => s + p.cantidad, 0);
   const totalPrecio = precioPromedio(resp.totales.venta, totalCant);
 
   return buildReportSheet({
-    // Las dos fechas van en el subtítulo: un Excel titulado "Últimos 12 meses"
-    // que se guarda y se abre en noviembre no dice qué 12 meses fueron.
-    title: `FASHION GROUP — Productos · ${nombre} · ${periodo}` + (cliente ? ` · ${cliente}` : ""),
-    // 🔴 LAS FECHAS VAN CON EL FORMATEADOR DE LA CASA (`fmtDate`, "1 mar 2026"),
-    // el MISMO que usa la pantalla. Este Excel Daniel lo manda por correo, y
-    // "Del 2026-03-01 al 2026-08-24" es formato de base de datos: la misma fecha
-    // se leía distinta en la pantalla y en el archivo que sale de ella.
-    subtitle:
-      `Del ${fmtDate(resp.desde)} al ${fmtDate(resp.hasta)} · Venta total ${fmtMoneyPlain(resp.totales.venta)}` +
-      ` · Margen ${resp.totales.margen != null ? (resp.totales.margen * 100).toFixed(1) + "%" : "—"}`,
     columns: [
       { header: "Descripción", wch: 34 },
       { header: "# Códigos", wch: 11, align: "right", fmt: "#,##0" },
@@ -362,8 +348,4 @@ export async function exportProductosToExcel(
       (cliente ? `-${cliente.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}` : "") +
       ".xlsx",
   );
-}
-
-function fmtMoneyPlain(n: number): string {
-  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

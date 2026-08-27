@@ -1092,12 +1092,10 @@ const JOYBEES: MarcaTheme = {
     },
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
-      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, JOYBEES_PALETTE } =
+      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, JOYBEES_PALETTE } =
         await import("@/lib/excel-export");
       const { buildDashBusquedaSheets } = await import("@/lib/catalogos/dash-busqueda-excel");
       const ws = buildReportSheet({
-        title: "JOYBEES — Productos sin foto",
-        subtitle: `${sin.length} producto${sin.length !== 1 ? "s" : ""} sin foto  ·  ${fmtFechaExcel(new Date().toISOString())}`,
         columns: [
           { header: "Código", wch: 18 },
           { header: "Descripción", wch: 40 },
@@ -1428,12 +1426,10 @@ const TOMMY: MarcaTheme = {
     },
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
-      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, TOMMY_PALETTE } =
+      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, TOMMY_PALETTE } =
         await import("@/lib/excel-export");
       const { buildDashBusquedaSheets } = await import("@/lib/catalogos/dash-busqueda-excel");
       const ws = buildReportSheet({
-        title: "TOMMY HILFIGER — Productos sin foto",
-        subtitle: `${sin.length} producto${sin.length !== 1 ? "s" : ""} sin foto  ·  ${fmtFechaExcel(new Date().toISOString())}`,
         columns: [
           { header: "Código", wch: 18 },
           { header: "Nombre", wch: 40 },
@@ -1771,12 +1767,10 @@ const CALVIN: MarcaTheme = {
     },
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
-      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, CALVIN_PALETTE } =
+      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, CALVIN_PALETTE } =
         await import("@/lib/excel-export");
       const { buildDashBusquedaSheets } = await import("@/lib/catalogos/dash-busqueda-excel");
       const ws = buildReportSheet({
-        title: "CALVIN KLEIN — Productos sin foto",
-        subtitle: `${sin.length} producto${sin.length !== 1 ? "s" : ""} sin foto  ·  ${fmtFechaExcel(new Date().toISOString())}`,
         columns: [
           { header: "Código", wch: 18 },
           { header: "Nombre", wch: 40 },

@@ -46,8 +46,6 @@ export function buildChequesSheet(data: ChequeExportRow[], label: string): { ws:
   const totalMonto = data.reduce((s, c) => s + (Number(c.monto) || 0), 0);
 
   const ws = buildReportSheet({
-    title: "FASHION GROUP — Cheques",
-    subtitle: sheetName,
     columns: COLUMNS,
     rows,
     totals: [`${data.length} cheques`, null, totalMonto, null, null],

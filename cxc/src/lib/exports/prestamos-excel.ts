@@ -50,8 +50,7 @@ function estadoLabel(estado: string) {
   return estado;
 }
 
-export function buildPrestamosWorkbook(empleados: EmpleadoRow[], empresaFilter: string | null): XLSX.WorkBook {
-  const titleSuffix = empresaFilter ? ` — ${empresaFilter}` : " — Todas las empresas";
+export function buildPrestamosWorkbook(empleados: EmpleadoRow[]): XLSX.WorkBook {
 
   // ─── Hoja 1: Resumen ───────────────────────────────────────────────────────
   let totPrestado = 0, totPagado = 0, totSaldo = 0;
@@ -70,8 +69,6 @@ export function buildPrestamosWorkbook(empleados: EmpleadoRow[], empresaFilter: 
   });
 
   const wsResumen = buildReportSheet({
-    title: "FASHION GROUP",
-    subtitle: `Historial de Préstamos${titleSuffix}`,
     columns: [
       { header: "Empleado", wch: 30 },
       { header: "Empresa", wch: 25 },
@@ -108,8 +105,6 @@ export function buildPrestamosWorkbook(empleados: EmpleadoRow[], empresaFilter: 
   }
 
   const wsMovs = buildReportSheet({
-    title: "FASHION GROUP",
-    subtitle: `Movimientos${titleSuffix}`,
     columns: [
       { header: "Empleado", wch: 30 },
       { header: "Empresa", wch: 25 },

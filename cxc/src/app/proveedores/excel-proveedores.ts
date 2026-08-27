@@ -36,7 +36,7 @@ const COLUMNS: ReportColumn[] = [
 ];
 
 /** Construcción pura de la hoja (sin DOM) — testeable. */
-export function buildProveedoresSheet(rows: ProveedorExportRow[], subtitle?: string): XLSX.WorkSheet {
+export function buildProveedoresSheet(rows: ProveedorExportRow[]): XLSX.WorkSheet {
   const data: ReportCell[][] = rows.map((p) => [
     { v: p.nombre, bold: p.saldo_total > 0 },
     p.aging_current,
@@ -58,16 +58,14 @@ export function buildProveedoresSheet(rows: ProveedorExportRow[], subtitle?: str
   );
 
   return buildReportSheet({
-    title: "FASHION GROUP — Proveedores (Cuentas por Pagar)",
-    subtitle: subtitle || "Todo el grupo",
     columns: COLUMNS,
     rows: data,
     totals: [`${rows.length} proveedores`, tot.current, tot.watch, tot.overdue, tot.saldo, null, null],
   });
 }
 
-export function exportProveedoresExcel(rows: ProveedorExportRow[], subtitle?: string, fileLabel?: string) {
-  const wb = workbookFromSheets([{ name: "Proveedores", ws: buildProveedoresSheet(rows, subtitle) }]);
+export function exportProveedoresExcel(rows: ProveedorExportRow[], fileLabel?: string) {
+  const wb = workbookFromSheets([{ name: "Proveedores", ws: buildProveedoresSheet(rows) }]);
   const date = new Date().toISOString().slice(0, 10);
   const suffix = fileLabel ? `_${fileLabel.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}` : "";
   downloadWorkbook(wb, `Proveedores${suffix}_${date}.xlsx`);

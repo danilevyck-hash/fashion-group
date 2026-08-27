@@ -105,7 +105,7 @@ function filaDeEnvio(
 }
 
 /** Construcción pura de la hoja (sin DOM) — testeable. */
-export function buildGuiasSheet(guias: Guia[], subtitle?: string): XLSX.WorkSheet {
+export function buildGuiasSheet(guias: Guia[]): XLSX.WorkSheet {
   const rows: ReportCell[][] = [];
   let envios = 0;
 
@@ -128,8 +128,6 @@ export function buildGuiasSheet(guias: Guia[], subtitle?: string): XLSX.WorkShee
   const totalBultos = guias.reduce((s, g) => s + (g.total_bultos || 0), 0);
 
   return buildReportSheet({
-    title: "FASHION GROUP — Guías de Transporte",
-    subtitle: subtitle || "Todas las guías",
     columns: COLUMNS,
     rows,
     totals: [
@@ -148,7 +146,7 @@ export function buildGuiasSheet(guias: Guia[], subtitle?: string): XLSX.WorkShee
   });
 }
 
-export function exportGuiasExcel(guias: Guia[], subtitle?: string) {
-  const wb = workbookFromSheets([{ name: "Guías", ws: buildGuiasSheet(guias, subtitle) }]);
+export function exportGuiasExcel(guias: Guia[]) {
+  const wb = workbookFromSheets([{ name: "Guías", ws: buildGuiasSheet(guias) }]);
   downloadWorkbook(wb, exportFilename("guias-transporte"));
 }

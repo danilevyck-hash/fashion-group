@@ -1,7 +1,7 @@
 // Tests de los exports Excel de la familia Ventas/Comisiones migrados al
 // estilo de la casa (buildReportSheet, hallazgo I11). Cada build* es puro
 // (sin DOM); aquí se construye el sheet con fixtures mínimos, se hace
-// write→read roundtrip y se verifica: título en A1, headers, celdas de
+// write→read roundtrip y se verifica: encabezados en la FILA 1, celdas de
 // moneda numéricas (t:"n" + MONEY_FMT) y fila de totales.
 
 import { describe, it, expect, vi } from "vitest";
@@ -26,7 +26,7 @@ import {
   type ComisionConsolidado,
 } from "@/lib/ventas/comisionExcel";
 import { buildUtilidadSheet, type UtilidadClienteResponse } from "@/lib/ventas/utilidad-cliente";
-import { buildProductosSheet, type ProductosResponse } from "@/lib/ventas/productos";
+import { buildProductosSheet, periodoSlug, type ProductosResponse } from "@/lib/ventas/productos";
 import type { VentasResumen } from "@/components/ventas/types";
 
 // write→read roundtrip: lo que asserteamos es lo que Excel realmente abre.
@@ -36,13 +36,13 @@ function roundtrip(sheets: { name: string; ws: XLSX.WorkSheet }[]): XLSX.WorkBoo
   return XLSX.read(buf, { type: "array", cellNF: true });
 }
 
-// Layout de buildReportSheet con subtítulo:
-// r0 título · r1 subtítulo · r2 separador · r3 headers · r4.. data ·
-// (spacer) · totales. Con N filas de data, totales = fila 4+N+1 (0-based).
-const HDR = 4; // fila 1-based de headers
-const DATA = 5; // primera fila 1-based de data
+// Layout de buildReportSheet desde el 27-ago-2026: los ENCABEZADOS van en la
+// FILA 1 y no hay NADA arriba de ellos — ni título, ni subtítulo, ni la franja
+// separadora de 4 puntos que se veía como una fila escondida.
+const HDR = 1; // fila 1-based de headers
+const DATA = 2; // primera fila 1-based de data
 function totalsRow(nDataRows: number): number {
-  return DATA + nDataRows + 1; // 1-based
+  return DATA + nDataRows + 1; // 1-based (hay una fila espaciadora antes)
 }
 
 describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
@@ -65,8 +65,6 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const wb = roundtrip([{ name: "Ventas", ws }]);
     const s = wb.Sheets["Ventas"];
 
-    expect(s["A1"].v).toBe("FASHION GROUP — Ventas 2026");
-    expect(String(s["A2"].v)).toContain("Data actualizada al");
     // headers: Empresa | Ene 2026 | Feb 2026 | Total | Margen% | YTD prev | Δ
     expect(s[`A${HDR}`].v).toBe("Empresa");
     expect(s[`B${HDR}`].v).toBe("Ene 2026");
@@ -266,9 +264,6 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const wb = roundtrip([{ name: "Comisiones", ws }]);
     const s = wb.Sheets["Comisiones"];
 
-    expect(s["A1"].v).toBe("Comisiones — Fashion Wear");
-    expect(String(s["A2"].v)).toContain("Junio 2026");
-    expect(String(s["A2"].v)).toContain("Venta: facturas con utilidad >20%");
     expect(s[`A${HDR}`].v).toBe("Vendedor");
     expect(s[`F${HDR}`].v).toBe("Com. Total");
     expect(s[`B${DATA}`].t).toBe("n");
@@ -296,7 +291,6 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const wb = roundtrip([{ name: "Consolidado", ws }]);
     const s = wb.Sheets["Consolidado"];
 
-    expect(s["A1"].v).toBe("Comisiones — Todas las empresas");
     expect(s[`A${HDR}`].v).toBe("Vendedor");
     expect(s[`B${HDR}`].v).toBe("Fashion Wear");
     expect(s[`D${HDR}`].v).toBe("Total");
@@ -330,8 +324,6 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const wb = roundtrip([{ name: "Utilidad por cliente", ws }]);
     const s = wb.Sheets["Utilidad por cliente"];
 
-    expect(s["A1"].v).toBe("FASHION GROUP — Utilidad por cliente · 2026 · 6 empresas B2B");
-    expect(String(s["A2"].v)).toContain("Margen 30.0%");
     expect(s[`A${HDR}`].v).toBe("Cliente");
     expect(s[`D${HDR}`].v).toBe("Ventas");
     expect(s[`D${DATA}`].t).toBe("n");
@@ -451,14 +443,6 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const wb = roundtrip([{ name: "Productos", ws }]);
     const s = wb.Sheets["Productos"];
 
-    expect(s["A1"].v).toBe("FASHION GROUP — Productos · Fashion Wear · Jun 2026");
-    expect(String(s["A2"].v)).toContain("Venta total $500.00");
-    // Las dos fechas: un Excel "Últimos 12 meses" guardado no dice cuáles fueron.
-    // Y van con el formateador de la casa (`fmtDate`), el MISMO de la pantalla:
-    // "Del 2026-06-01 al 2026-06-30" era formato de base de datos en el archivo
-    // que Daniel manda por correo.
-    expect(String(s["A2"].v)).toContain("Del 1 jun 2026 al 30 jun 2026");
-    expect(String(s["A2"].v)).not.toContain("2026-06-01");
     expect(s[`A${HDR}`].v).toBe("Descripción");
     expect(s[`D${HDR}`].v).toBe("Venta");
     expect(s[`D${DATA}`].t).toBe("n");
@@ -479,23 +463,13 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     expect(s[`E${tr}`].v).toBe(50); // 500 / 10
   });
 
-  it("productos · el título y el archivo dicen QUÉ período es", async () => {
-    const base: ProductosResponse = {
-      empresa: "fashion_wear",
-      year: 2026,
-      mes: null,
-      periodo: "12m",
-      desde: "2025-09-01",
-      hasta: "2026-08-24",
-      meses: [],
-      totales: { venta: 500, costo: 300, margen: 0.4 },
-      productos: [
-        { descripcion: "CAMISA POLO", num_codigos: 2, cantidad: 10, venta: 500, costo: 300, margen: 0.4 },
-      ],
-    };
-    const s = roundtrip([{ name: "Productos", ws: await buildProductosSheet(base) }]).Sheets["Productos"];
-    expect(s["A1"].v).toBe("FASHION GROUP — Productos · Fashion Wear · Últimos 12 meses");
-    expect(String(s["A2"].v)).toContain("Del 1 sept 2025 al 24 ago 2026");
-    expect(String(s["A2"].v)).not.toContain("2025-09-01");
+  // 🔴 EL PERÍODO LO DICE EL NOMBRE DEL ARCHIVO, y por eso el título se pudo
+  // ir: `productos-fashion_wear-12m-2026.xlsx` guardado en una carpeta sigue
+  // diciendo de qué es. Antes lo decían el título Y el archivo; se quedó el
+  // que sobrevive a que alguien copie el archivo a otro lado.
+  it("productos · el NOMBRE DEL ARCHIVO dice qué período es", () => {
+    expect(periodoSlug(null, "12m")).toBe("12m");   // productos-fashion_wear-12m-2026.xlsx
+    expect(periodoSlug(6, "ytd")).toBe("06");        // productos-fashion_wear-06-2026.xlsx
+    expect(periodoSlug(null, "ytd")).toBe("ytd");    // productos-fashion_wear-ytd-2026.xlsx
   });
 });

@@ -3,12 +3,11 @@
 // Lee desde Supabase y agrega por marca / tienda / proyecto.
 // Todos los totales excluyen registros con anulado_en != null.
 // ============================================================================
-import XLSX from "xlsx-js-style";
 import {
   buildReportSheet,
   workbookFromSheets,
+  workbookBlob,
   MONEY_FMT,
-  XLSX_MIME,
   type ReportCell,
   type ReportColumn,
 } from "@/lib/excel-export";
@@ -442,7 +441,6 @@ function esReporteProyectoItem(x: unknown): x is ReporteProyectoItem {
 // Calibri + moneda numérica). Mismas columnas y datos que antes.
 export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
   let hoja: string;
-  let title: string;
   let columns: ReportColumn[];
   let rows: ReportCell[][];
 
@@ -451,7 +449,6 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
       throw new Error("data inválida para reporte por marca");
     }
     hoja = "Por marca";
-    title = "FASHION GROUP — Marketing por Marca";
     columns = [
       { header: "Marca", wch: 20 },
       { header: "Código", wch: 10 },
@@ -463,7 +460,6 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
       throw new Error("data inválida para reporte por tienda");
     }
     hoja = "Por tienda";
-    title = "FASHION GROUP — Marketing por Tienda";
     const marcasUnicas = Array.from(
       new Set(data.flatMap((d) => Object.keys(d.porMarca)))
     ).sort((a, b) => a.localeCompare(b, "es"));
@@ -484,7 +480,6 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
       throw new Error("data inválida para reporte por proyecto");
     }
     hoja = "Por proyecto";
-    title = "FASHION GROUP — Marketing por Proyecto";
     // La columna "Estado" se retiró el 11-ago-2026 junto con "Cerrar
     // proyecto": sin escritor, solo podía decir "Abierto" para siempre.
     columns = [
@@ -503,8 +498,9 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
     ]);
   }
 
-  const ws = buildReportSheet({ title, columns, rows });
+  const ws = buildReportSheet({ columns, rows });
   const wb = workbookFromSheets([{ name: hoja, ws }]);
-  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
-  return new Blob([buf], { type: XLSX_MIME });
+  // `workbookBlob` y no `XLSX.write` a secas: es el que deja la fila de
+  // encabezados fija (la librería no sabe escribir paneles).
+  return workbookBlob(wb);
 }

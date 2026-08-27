@@ -99,7 +99,7 @@ describe("1 · el N° del transportista NO se copia a todos los envíos", () => 
  * sigue midiendo la que dice medir en vez de una vecina.
  */
 type Hoja = ReturnType<typeof buildGuiasSheet>;
-const FILA_HEADERS = 4; // título, subtítulo, separador y recién ahí los headers
+const FILA_HEADERS = 1; // los encabezados abren el archivo
 const celdaCruda = (ws: Hoja, addr: string) =>
   String((ws[addr] as { v?: unknown } | undefined)?.v ?? "");
 function columnaDe(ws: Hoja, header: string): string {
@@ -189,15 +189,15 @@ describe("3 · el N° anotado TARDE se ve en el Excel y se puede buscar", () => 
     const ws = buildGuiasSheet([g]);
 
     // Dos envíos → DOS filas, y cada número en la fila de su envío.
-    expect(celda(ws, "Envío", 5)).toBe("1 de 2");
-    expect(celda(ws, "Envío", 6)).toBe("2 de 2");
-    expect(celda(ws, "Cliente", 5)).toBe("America Clasic");
-    expect(celda(ws, "Cliente", 6)).toBe("Jerusalem");
-    expect(celda(ws, "N° Guía Transp.", 5)).toBe("TR-4471");
-    expect(celda(ws, "N° Guía Transp.", 6)).toBe("TR-9999");
+    expect(celda(ws, "Envío", 2)).toBe("1 de 2");
+    expect(celda(ws, "Envío", 3)).toBe("2 de 2");
+    expect(celda(ws, "Cliente", 2)).toBe("America Clasic");
+    expect(celda(ws, "Cliente", 3)).toBe("Jerusalem");
+    expect(celda(ws, "N° Guía Transp.", 2)).toBe("TR-4471");
+    expect(celda(ws, "N° Guía Transp.", 3)).toBe("TR-9999");
     // El cruce que hace útil el reporte: este número ↔ esta factura.
-    expect(celda(ws, "Facturas", 5)).toBe("F-1");
-    expect(celda(ws, "Facturas", 6)).toBe("F-2");
+    expect(celda(ws, "Facturas", 2)).toBe("F-1");
+    expect(celda(ws, "Facturas", 3)).toBe("F-2");
 
     const celdas = Object.keys(ws)
       .filter((k) => !k.startsWith("!"))

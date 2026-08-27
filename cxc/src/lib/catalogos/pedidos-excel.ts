@@ -43,8 +43,6 @@ export interface PedidoExportRow {
 export interface PedidosWorkbookOpts {
   /** Marca del catálogo — define la paleta del libro. */
   marca: string;
-  /** Banda de título, ej. "REEBOK — Pedidos". */
-  titulo: string;
   /** true = incluye la columna Origen (solo Reebok). */
   conOrigen: boolean;
   /**
@@ -70,7 +68,7 @@ export function fmtFechaPedido(iso: string): string {
 
 /** Construye el workbook de pedidos (hoja "Pedidos"). Función pura, testeable. */
 export function buildPedidosWorkbook(opts: PedidosWorkbookOpts): XLSX.WorkBook {
-  const { marca, titulo, conOrigen, pedidos, conNumeros = true } = opts;
+  const { marca, conOrigen, pedidos, conNumeros = true } = opts;
 
   // 🔴 LAS DOS COLUMNAS NUEVAS VAN AL FINAL, NO INTERCALADAS. Daniel puede
   // tener una planilla enganchada a este archivo: mover una columna existente
@@ -126,8 +124,6 @@ export function buildPedidosWorkbook(opts: PedidosWorkbookOpts): XLSX.WorkBook {
   ];
 
   const ws = buildReportSheet({
-    title: titulo,
-    subtitle: `${pedidos.length} pedido${pedidos.length !== 1 ? "s" : ""}  ·  ${fmtFechaPedido(new Date().toISOString())}`,
     columns,
     rows,
     totals,
