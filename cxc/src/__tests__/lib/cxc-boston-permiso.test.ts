@@ -49,8 +49,12 @@ const sinComentarios = (src: string) =>
 // ── 1. La lista, congelada ───────────────────────────────────────────────────
 
 describe("quién lee la cartera de Boston", () => {
-  it("admin y secretaria — nadie más", () => {
-    expect([...ROLES_BOSTON]).toEqual(["admin", "secretaria"]);
+  it("admin, secretaria y el gerente de Boston — nadie más", () => {
+    // 🔴 `gerente_boston` (David) entra el 27-ago-2026: la pestaña CXC de su
+    // módulo monta el MISMO `<BostonTab />` contra el MISMO `/api/cxc/boston`.
+    // Un segundo endpoint habría sido una segunda definición de "la cartera de
+    // Boston" — el defecto exacto que costó el bug de la MV.
+    expect([...ROLES_BOSTON]).toEqual(["admin", "secretaria", "gerente_boston"]);
   });
 
   it("todo rol de la lista es un rol REAL del sistema", () => {
@@ -77,7 +81,7 @@ describe("quién lee la cartera de Boston", () => {
 
   it("la copia mutable no contamina la fuente", () => {
     rolesBoston().push("vendedor");
-    expect([...ROLES_BOSTON]).toEqual(["admin", "secretaria"]);
+    expect([...ROLES_BOSTON]).toEqual(["admin", "secretaria", "gerente_boston"]);
   });
 });
 

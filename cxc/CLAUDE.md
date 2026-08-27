@@ -206,8 +206,9 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | Contabilidad | `contabilidad` | prestamos, proveedores, ventas, búsqueda global (ventas+prestamos). En API directorio solo lectura (GET), no edición |
 | Vendedor | `vendedor` | catálogos (**solo ver** + armar pedidos), CXC, directorio, guías (solo lectura), búsqueda global (CXC+directorio) |
 | Gerente ACS | `gerente_acs` | SOLO Multifashion (/multifashion + /api/multifashion/*), y **el módulo COMPLETO** — todo el histórico, igual que admin (ver nota abajo). Auto-redirect a Multifashion desde home (único módulo). Módulos vía `role_permissions` |
+| Gerente Confecciones Boston | `gerente_boston` | SOLO Confecciones Boston (/boston + /api/boston/*), la cartera `/api/cxc/boston` y la planilla de Boston. Auto-redirect a /boston desde home (único módulo). **NO ve la búsqueda global, ni el CXC del grupo, ni Ventas, ni Comisiones, ni Catálogos, ni Guías.** Módulos vía `role_permissions` |
 
-> Roles reales del sistema = los 6 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
+> Roles reales del sistema = los 7 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
 
 > ## 🔴 LA VENTANA DE `gerente_acs` SE LEVANTÓ — Multifashion COMPLETO (13-ago-2026)
 >
@@ -256,6 +257,88 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 > **Lo que NO cambió y no debe cambiar:** los **precios** los manda Switch — la allow-list editable a mano es `image_url`/`badge` (+`name` solo en Tommy, que marca `nombre_manual=true`). Y `createRoles` sigue incluyendo `vendedor` (y el `cliente` legacy en Reebok) para armar pedidos.
 >
 > Candado: `src/__tests__/lib/catalogo-roles.test.ts` congela **las dos listas**, prueba `requireRole`/`requireAdmin` con cookies firmadas rol por rol, verifica `upload.roles` en las 3 marcas y trae un **snapshot literal de los módulos de `bodega`, `contabilidad`, `vendedor` y `gerente_acs`**: si alguno gana un módulo sin querer, el build se pone rojo. Verificado por mutación (agregar `bodega` a `CATALOGO_ADMIN_ROLES` rompe 10 tests).
+
+> ## 🔴 EL MÓDULO CONFECCIONES BOSTON — el espejo de la regla de Boston (27-ago-2026)
+>
+> Daniel, textual: *"si crea el usuario david, david debe de ver cxc boston… el es mi hermano y ve toda la operacion de confecciones boston, **no quiero que vea info de fashion group**"*.
+>
+> 🔴 **SON DOS REGLAS OPUESTAS Y LAS DOS VALEN AL MISMO TIEMPO.** La de siempre (§ arriba, 12-ago) garantiza que **Boston no se mezcle con el grupo** y se cierra en `switch_estadocuenta_aging`. Ésta garantiza lo contrario: que **quien ve Boston no vea el grupo**. La primera protege la PLATA del grupo de las filas de Boston; ésta protege a David de VER la plata del grupo. **Un cambio que "arregle" una rompiendo la otra no es un arreglo.**
+>
+> ### El molde es `gerente_acs`, y se copió — no se inventó nada
+>
+> Jennifer ya había resuelto el mismo problema: un rol con UN solo módulo, auto-redirigido ahí desde `/home`, y con 403 en las rutas de todos los demás. `gerente_boston` usa el MISMO mecanismo, y su candado (`boston-acceso.test.ts`) es el gemelo de `multifashion-acceso.test.ts`.
+>
+> **Fuente única: `src/lib/boston/rol.ts`.** El rol, la empresa, la key del módulo, los roles que entran, las pestañas y la línea de los sueldos viven ahí y las leen la navegación, las rutas y la pantalla. Es la lección literal de `boston-roles.ts`: la lista que vivía adentro de un route y la copia que la UI no miraba dejaron a los 3 vendedores tocando una pestaña que siempre les contestaba 403.
+>
+> ### Las SEIS pestañas de `/boston`
+>
+> | Pestaña | De dónde sale | Acotada a Boston por |
+> |---|---|---|
+> | **Inicio** | `/api/boston/inicio` — cartera, ventas del mes/año, personas en planilla y con préstamo | `.eq()` en las 4 consultas |
+> | **Por cobrar** | el **MISMO** `<BostonTab />` contra el **MISMO** `/api/cxc/boston` | `switch_estadocuenta_aging_boston`, disjunta por construcción |
+> | **Ventas** | `/api/boston/ventas` ← `ventas_rollup_mensual_mv` | `.eq("empresa_key", EMPRESA_BOSTON)` |
+> | **Clientes** | `/api/boston/clientes` ← `switch_clientes` + la cartera de Boston | `.eq("empresa_key", EMPRESA_BOSTON)` |
+> | **Planilla** | el **MISMO** `/api/asistencia/planilla` y el MISMO motor | la empresa la **FUERZA el servidor** |
+> | **Préstamos** | `/api/boston/prestamos` — **TODOS**, la única excepción | ⚠️ ninguna, a pedido de Daniel |
+>
+> 🔑 **NINGUNA cuenta se reimplementó.** La cartera es la misma vista, la planilla es el mismo motor que la contadora cuadró al centavo contra su Excel, las ventas salen del mismo rollup que usa `/api/ventas/resumen-anual`, y el saldo de un préstamo sale de `calcularSaldoPrestamo` — la función que se **extrajo** de `PrestamosClient.tsx` para que las dos pantallas la compartan. Dos definiciones de "lo que debe" son dos números que un día no coinciden: es el error que ya costó la MV de la cartera.
+>
+> ### 🔴 LAS DOS FUGAS, tapadas
+>
+> **1 · LA BÚSQUEDA GLOBAL.** Cubre 8 módulos: si David teclea «City Mall» no puede recibir clientes, ventas ni cheques del GRUPO. Está cerrada por los DOS lados y **ninguno hizo falta agregarlo**: `/api/search` ya exige `["admin","secretaria","vendedor","bodega","contabilidad"]` (→ 403), y `/home` solo le dibuja la barra a admin y secretaria. Lo que se agregó es el **candado**, en las dos direcciones.
+>
+> **2 · EL INICIO DEL GRUPO.** David nunca llega a `/home`: su único módulo es `boston`, y el auto-redirect de "rol con un solo módulo" —el mismo que ya manda a Jennifer a `/multifashion`— lo lleva directo a `/boston`. El Inicio de Boston es lo que hace que ese destino tenga algo que mostrar.
+>
+> ⚠️ **Y el CXC del GRUPO también le contesta 403** (`/api/cxc/aging` ya exigía admin/secretaria/vendedor), que es la fuga que más importa después de esas dos.
+>
+> ### 🔴 LOS SUELDOS SON UNA LÍNEA — la pregunta que Daniel no contestó
+>
+> `VE_SUELDOS_DE_BOSTON = false` en `lib/boston/rol.ts`. **Por defecto David NO ve los sueldos de las 21 personas**: mostrar de más un sueldo no se puede deshacer. El día que Daniel diga que sí, el cambio es **esa línea y nada más**.
+>
+> 🔑 **El recorte va en el SERVIDOR, y eso es lo que hace que la línea alcance** — es el mismo mecanismo de `soloApruebaRoles()` (Julio Garay aprueba horas extra y la ruta le contesta sin el bloque de dinero). Esconder la columna en la pantalla dejaría el sueldo viajando en el JSON.
+> - **Se ENUMERA lo que viaja, nunca lo que se va** (`CAMPOS_SIN_DINERO`): un `delete linea.dinero` deja pasar cualquier campo de plata que alguien agregue mañana. Y no era solo `dinero`: la línea lleva **SEIS** campos con plata adentro (`salarioMensual`, `baseSeguros`, `quincenalReferencia`, `extraMedido.monto`, `dinero`, `manuales`).
+> - **Tampoco viaja el MONTO de las extras**: 5,5 h a 1,25 por $43,45 dice que la rata es $6,32, y de la rata sale el mensual. Las horas sí viajan enteras — es la operación de Boston, que es justo lo que él tiene que ver.
+> - **La EMPRESA la fuerza el servidor**, no se valida: un `?empresa=vistana` de un marcador viejo devuelve Boston, no un 400 que deje la pantalla en blanco.
+>
+> ### ⛔ LO QUE QUEDÓ AFUERA, y por qué
+>
+> - **CATÁLOGOS.** Las cuatro marcas (Reebok, Joybees, Tommy, Calvin) son de `active_shoes`, `joystep`, `fashion_shoes` y `vistana` — **cuatro empresas de Fashion Group**. No existe un catálogo de Confecciones Boston. Darle esa ficha sería darle un hub de marcas del grupo y una puerta hacia sus clientes (`clientes-switch`, `clientes-search`) y sus pedidos. **Es la única de la lista aprobada que contradice la frase de Daniel, y por eso se paró en vez de construirla.** Decisión suya.
+> - **GUÍAS**, que él mismo excluyó.
+> - **La UTILIDAD de las ventas de Boston.** El rollup trae `costo_total` y `utilidad`, pero Boston es **`utilidad: false`** en `EMPRESA_SYNC_CAPABILITIES`: ese reporte nunca se sincronizó ni se certificó, y los márgenes que salen oscilan entre 12% y 53% de un mes al otro. Publicar un margen que nadie cuadró es peor que no publicarlo — con eso se ponen precios. La pantalla lo DICE, y la bandera se **deriva** de `empresasConUtilidad()`: el día que Daniel encienda el sync, se entera sola.
+> - **PRÉSTAMOS: solo lectura.** El módulo de Contabilidad tiene 6 rutas con 9 verbos de escritura (y 3 ni siquiera pasan por `requireRole`). Sumarle el rol le habría abierto los nueve de una. `/api/boston/prestamos` tiene **UN solo verbo, GET**: no hay nada que gatear porque no hay nada que escribir, y la pantalla de la contadora no se tocó ni un carácter.
+>
+> ### 🩸 Las 6 pestañas NO entraban en el iPhone — medido, no supuesto
+>
+> La tira desbordaba **164 px a 390** y «Préstamos» —la última— quedaba fuera de la pantalla, alcanzable solo arrastrando. Es el MISMO defecto que Multifashion pagó al pasar de 5 a 6 sub-tabs. El arreglo es el suyo: `text-xs` + `px-1` por debajo de `lg`, el contenedor recupera su propio relleno, y **«Cuentas por Cobrar» pasó a «Por cobrar»** — que es exactamente lo que ya dice la tarjeta del Inicio que lleva ahí: la puerta y el destino se llaman igual. Medido: **164 px → 0**.
+> - ⚠️ **El rótulo más corto medía 41 px de ancho** (la altura ya cumplía los 44). Se le puso `min-w-[44px]` y se volvió a medir la tira: sigue en 0.
+> - 🔑 **Texto NUEVO va a 12 px, no a 11.** Los 11 px de los módulos viejos son PRE-EXISTENTES y se respetan donde están; un rótulo nuevo no nace bajo el piso. Los 7 que salieron a 11 px se subieron.
+>
+> ### Medición
+>
+> **Los 3 anchos + el iPad ACOSTADO, en el navegador contra el build de PRODUCCIÓN y con datos de producción** (`BASE=… TOKEN=<session_token vivo> node scripts/_medir-boston-anchos.mjs`, solo lectura — el navegador **aborta todo pedido que no sea GET/HEAD**): **390 · 834 · 1024 · 1440 × las 6 pestañas = 24 casos → 0 px de arrastre de página y 0 px de desborde de la tira, en los 24.**
+>
+> | | mis pantallas (inicio · ventas · clientes · planilla · préstamos) | pestaña CXC |
+> |---|---|---|
+> | táctiles < 44 px | **0** | 391 / 391 / 394 / 394 |
+> | textos < 12 px | **0** | 8 / 8 / 14 / 14 |
+>
+> 🔴 **Y los de la pestaña CXC son PRE-EXISTENTES, comprobado midiendo — no afirmado.** `scripts/_medir-boston-baseline-cxc.mjs` mide el MISMO `<BostonTab />` donde ya vive hoy (`/admin?tab=boston`, con sesión de admin) y lo compara contra `/boston?tab=cxc`: **IDÉNTICO en los cuatro anchos**, 391 filas en las dos. Los recortes que quedan son los `truncate` del nombre del cliente — puntos suspensivos, o sea el mecanismo, no un defecto.
+> - 🩸 **Gotchas de medición, todos ya documentados en este archivo y todos vigentes:** no alcanza con FIRMAR la cookie (el middleware valida el `sessionToken` contra `user_sessions`, así que se toma prestado —solo leyendo— un token vivo y se le firma encima el rol a medir); `useAuth` no mira el rol sino `sessionStorage`; y hay que matar el service worker antes de navegar. **El script FALLA si no encuentra las 6 pestañas o si una pantalla sale vacía**: medir cero y darlo por bueno es el peor resultado posible.
+>
+> ### Candados
+>
+> **`src/__tests__/lib/boston-acceso.test.ts` (57)** — el inventario de `/api/boston/**` congelado, que ninguna ruta lea la empresa de la URL, que Boston sea su ÚNICO módulo rol por rol, el auto-redirect, y **CONDUCTA: los handlers REALES de 14 rutas ajenas le contestan 403 con cookie FIRMADA** —búsqueda global, CXC del grupo, Ventas, Comisiones, Proveedores, Gastos, Marketing, Caja, Packing, Directorio, Multifashion y la escritura de Préstamos— **más que esas mismas rutas SÍ dejen entrar a `admin`**, sin lo cual el 403 no probaría nada. Y `boston-david-sin-contrasena.test.ts` (5), que llama al login REAL.
+> - **Verificado por mutación, 23 de 23 cazadas y 0 sobrevivientes** (`python3 scripts/_mutar-candados-boston.py`): el módulo se abre a otro rol · David gana un segundo módulo · el rol deja de existir · **la búsqueda global se le abre** · **/home le dibuja el buscador** · **/home pierde el auto-redirect** · **el CXC del grupo se le abre** · una ruta escribe su propia lista de roles · una ruta queda ABIERTA · una ruta lee la empresa de la URL · una ruta escribe la empresa a mano · **la planilla deja de recortar el dinero** · el recorte alcanza a todos · **la línea deja pasar el sueldo mensual** · **deja pasar el monto de las extras** · **la planilla deja de forzarle la empresa** · la planilla le contesta 403 · **la cartera de Boston se le cierra** · **los favoritos del grupo se le abren** · los de Boston se le cierran · Catálogos vuelve como pestaña · una pestaña inventada se acepta · aparece una ruta nueva sin que nadie la mire.
+> - 🩸 El script trae una **mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido vacío. Restaura **por COPIA** (hay archivos NUEVOS y `git checkout` aborta el comando entero), el reemplazo es **LITERAL** (el código real tiene `||` y `/`, y con `perl -0pi -e 's|A|B|'` el delimitador se des-escapa y se come el archivo), y **exige que vitest haya COLECTADO tests** antes de creerle a un cero.
+> - **Dos candados existentes CAMBIARON DE DIRECCIÓN, y los dos hicieron su trabajo:** `cxc-boston-permiso.test.ts` congelaba `ROLES_BOSTON = ["admin","secretaria"]`, y `comisiones-contabilidad.test.ts` exige que el mapa rol→Comisiones cubra TODOS los roles del sistema — o sea que **obligó a decidir por escrito** que David no ve Comisiones (son de las SEIS empresas del grupo, y Boston además no comisiona en este sistema).
+>
+> ### 🔴 LA CONTRASEÑA DE DAVID NO ESTÁ EN NINGÚN LADO DEL REPO
+>
+> El usuario se creó (`20260827120000_boston_rol_y_usuario_david.sql`, corrida y verificada) con `role = gerente_boston`, activo, y **un centinela en vez de una contraseña**. El login de este sistema es SOLO por contraseña, así que escribirla acá la dejaría en texto plano en el repo y en el historial de git, para siempre.
+>
+> **`isHash()` en `src/app/api/auth/route.ts` saltea toda contraseña que no empiece con `$2a$`/`$2b$`, así que el login es IMPOSIBLE hasta que alguien le ponga una de verdad.** Fail-closed por construcción, y probado por CONDUCTA llamando al handler REAL: el centinela da 401, una contraseña bien hasheada da 200, y cuando David tenga la suya entra con `modules: ["boston"]` — o sea el único módulo que dispara el auto-redirect.
+>
+> 🔑 **DÓNDE SE LE PONE:** Daniel entra a **Usuarios** (`/admin/usuarios`), toca **david**, escribe la contraseña y guarda. Eso la hashea con bcrypt(10) y verifica que no choque con la de nadie más (mínimo 8 caracteres).
 
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):

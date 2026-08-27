@@ -25,6 +25,7 @@
  * lista no lo nombrara, el dueño se quedaría sin la pestaña.
  */
 import type { Cartera } from "./cartera";
+import { ROL_BOSTON } from "@/lib/boston/rol";
 
 /**
  * Roles que pueden leer la cartera de Confecciones Boston.
@@ -32,8 +33,21 @@ import type { Cartera } from "./cartera";
  * Es el negocio de la familia, no el del grupo: la ven los mismos roles que el
  * CXC **menos `vendedor`** — los vendedores del grupo no cobran esta cartera ni
  * comisionan sobre ella.
+ *
+ * 🔴 Y `gerente_boston` (David), desde el 27-ago-2026. Es el rol que ve la
+ * operación de Boston ENTERA, así que su cartera es lo primero que necesita:
+ * la pestaña CXC de `/boston` monta el MISMO `<BostonTab />` que el panel del
+ * grupo, contra el MISMO `/api/cxc/boston`. No hay un segundo endpoint ni una
+ * segunda consulta — habría sido una segunda definición de "la cartera de
+ * Boston", que es exactamente el defecto que costó el bug de la MV.
+ *
+ * ⚠️ Entrar acá NO le abre el CXC del grupo: `/api/cxc/aging` y las demás
+ * rutas de la cartera del grupo tienen sus propias listas y le contestan 403.
+ * Y `/admin` (el panel del grupo, donde vive la otra pestaña) lo rebota antes,
+ * porque su único módulo es `boston`. Las dos cosas están probadas por CONDUCTA
+ * en `boston-acceso.test.ts`.
  */
-export const ROLES_BOSTON = ["admin", "secretaria"] as const;
+export const ROLES_BOSTON = ["admin", "secretaria", ROL_BOSTON] as const;
 
 /** Copia mutable para las APIs que reciben `string[]` (requireRole). */
 export const rolesBoston = (): string[] => [...ROLES_BOSTON];

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, SessionPayload } from "@/lib/requireRole";
 import { alternarFavorito, leerFavoritos } from "@/lib/cxc/anotaciones";
-import { carteraDeBody, carteraDeQuery, respuestaSiCarteraNoDisponible } from "@/lib/cxc/cartera-http";
+import { carteraDeBody, carteraDeQuery, respuestaSiCarteraAjena, respuestaSiCarteraNoDisponible } from "@/lib/cxc/cartera-http";
+import { rolesBoston } from "@/lib/cxc/boston-roles";
 
 /**
  * Favoritos (⭐) del CXC, por usuario **y por CARTERA**.
@@ -13,13 +14,15 @@ import { carteraDeBody, carteraDeQuery, respuestaSiCarteraNoDisponible } from "@
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, rolesBoston());
   if (auth instanceof NextResponse) return auth;
   const session = auth as SessionPayload;
   const userId = session.userId || session.userName || "default";
 
   const cartera = carteraDeQuery(req);
   if (cartera instanceof NextResponse) return cartera;
+  const ajena = respuestaSiCarteraAjena(session.role, cartera);
+  if (ajena) return ajena;
 
   try {
     return NextResponse.json({ favorites: await leerFavoritos(cartera, userId) });
@@ -33,7 +36,7 @@ export async function GET(req: NextRequest) {
 
 /** Toggle. Body: `{ clientName: string, cartera: "grupo" | "boston" }`. */
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, rolesBoston());
   if (auth instanceof NextResponse) return auth;
   const session = auth as SessionPayload;
   const userId = session.userId || session.userName || "default";
@@ -47,6 +50,8 @@ export async function POST(req: NextRequest) {
 
   const cartera = carteraDeBody(body);
   if (cartera instanceof NextResponse) return cartera;
+  const ajena = respuestaSiCarteraAjena(session.role, cartera);
+  if (ajena) return ajena;
 
   const clientName = body.clientName?.trim();
   if (!clientName) {

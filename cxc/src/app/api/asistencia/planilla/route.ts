@@ -8,6 +8,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles, aprobacionesRoles, soloAprueba } from "@/lib/asistencia/roles";
+import { EMPRESA_BOSTON, ROL_BOSTON, esGerenteBoston, planillaSinDinero } from "@/lib/boston/rol";
+import { lineasSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
@@ -114,9 +116,20 @@ export async function GET(req: NextRequest) {
   // 🔑 El recorte va en el SERVIDOR, no en la pantalla: esconder la columna
   // dejaría el sueldo viajando en el JSON, a un «ver código fuente» de
   // distancia. Ver `soloApruebaRoles()` en `lib/asistencia/roles.ts`.
-  const auth = requireRole(req, [...asistenciaRoles(), ...aprobacionesRoles()]);
+  //
+  // 🔴 TRES PUERTAS DESDE EL 27-ago-2026. La tercera es `gerente_boston`
+  // (David): la pestaña Planilla de su módulo muestra la planilla de las 21
+  // personas de Confecciones Boston, y sale de ACÁ y no de un cálculo nuevo.
+  // Reimplementar la planilla habría estrenado una SEGUNDA aritmética de
+  // sueldos al lado de la que la contadora ya cotejó al centavo contra su
+  // Excel — y su modo de fallo es que dos pantallas paguen distinto.
+  const auth = requireRole(req, [...asistenciaRoles(), ...aprobacionesRoles(), ROL_BOSTON]);
   if (auth instanceof NextResponse) return auth;
   const recortado = soloAprueba(auth.role);
+  // 🔴 David ve el cuadro ENTERO de Boston, pero por defecto SIN la plata. La
+  // línea que lo decide es `VE_SUELDOS_DE_BOSTON` en `lib/boston/rol.ts`, y es
+  // una sola: Daniel todavía no contestó si su hermano ve los sueldos.
+  const sinPlata = planillaSinDinero(auth.role);
 
   const sp = req.nextUrl.searchParams;
 
@@ -162,8 +175,15 @@ export async function GET(req: NextRequest) {
   }
   const q = periodo;
   const empresaRaw = (sp.get("empresa") ?? "").trim();
-  const empresa =
-    empresaRaw && (EMPRESAS_ASISTENCIA as readonly string[]).includes(empresaRaw)
+  // 🔴 A `gerente_boston` la empresa NO se la decide la URL: ES Boston. Mismo
+  // criterio que Multifashion, que ES `american_classic` y no acepta `?empresa=`
+  // en ninguna de sus 11 rutas — aceptarla por parámetro le abriría desde su
+  // único módulo las planillas de Vistana y Fashion Wear. Y se fuerza acá, no
+  // se valida: un `?empresa=vistana` de un marcador viejo tiene que devolver
+  // Boston, no un 400 que deje la pantalla en blanco.
+  const empresa = esGerenteBoston(auth.role)
+    ? EMPRESA_BOSTON
+    : empresaRaw && (EMPRESAS_ASISTENCIA as readonly string[]).includes(empresaRaw)
       ? empresaRaw
       : null;
 
@@ -479,6 +499,36 @@ export async function GET(req: NextRequest) {
         puedeAprobar,
         avisos: {
           faltaMigracionAprobaciones: aprRes.faltaTabla ? avisoMigracionAprobaciones() : null,
+        },
+      });
+    }
+
+    // 🔴 LA PLANILLA DE BOSTON SIN UN SOLO NÚMERO DE PLATA.
+    //
+    // Se devuelve ANTES de armar la de siempre —igual que el recorte de
+    // `bodega` de arriba— así que un campo de dinero que alguien agregue
+    // mañana a `LineaPlanilla` NO se cuela acá por olvido: `lineaSinDinero`
+    // ENUMERA lo que viaja. Y no hay `totales`: sumar 21 sueldos y publicar el
+    // total es el sueldo promedio a una división de distancia.
+    //
+    // ⚠️ Las HORAS, las tardanzas, las ausencias y los avisos viajan enteros —
+    // es la operación de Boston, que es justo lo que Daniel quiere que vea.
+    if (sinPlata) {
+      return NextResponse.json({
+        quincena: q.quincena ?? q,
+        periodo: q,
+        empresa,
+        empresaEtiqueta: empresa ? etiquetaEmpresa(empresa) : null,
+        lineas: lineasSinDinero(lineas as unknown as Record<string, unknown>[]),
+        sinSueldos: true,
+        reglas,
+        aprobaciones: null,
+        puedeAprobar: false,
+        avisos: {
+          faltaMigracionConfiguracion: personasDb.faltaMigracion ? avisoMigracion() : null,
+          periodoAbierto: avisoPeriodoAbierto(q.desde, q.hasta, hoy, q.esQuincena),
+          sinFicha: codigosSinFicha,
+          avisoSinFicha: textoCodigosSinFicha(codigosSinFicha),
         },
       });
     }

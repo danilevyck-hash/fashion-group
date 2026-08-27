@@ -12,6 +12,7 @@ import OverflowMenu from "@/components/ui/OverflowMenu";
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
+import { calcularSaldoPrestamo } from "@/lib/prestamos-saldo";
 
 // ── Types ──
 interface Movimiento {
@@ -40,13 +41,12 @@ export interface PrestamosInitialData {
 }
 
 // ── Helpers ──
+// 🔑 La cuenta se MUDÓ a `lib/prestamos-saldo.ts` (27-ago-2026) y no cambió ni
+// un signo: la pestaña Préstamos del módulo Boston la necesita desde el
+// servidor, y dos copias de "lo que debe" son dos números que un día no
+// coinciden. Esta pantalla sigue mostrando exactamente lo mismo que mostraba.
 function calcEmpleado(emp: Empleado) {
-  const movs = emp.prestamos_movimientos || [];
-  const prestado = movs.filter(m => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
-  const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
-  const saldo = prestado - pagado;
-  const pct = prestado > 0 ? (pagado / prestado) * 100 : 0;
-  return { prestado, pagado, saldo, pct };
+  return calcularSaldoPrestamo(emp.prestamos_movimientos || []);
 }
 
 function progressColor(pct: number) {
