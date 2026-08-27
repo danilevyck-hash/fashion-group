@@ -3259,6 +3259,71 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 - Moneda: `$#,##0.00` en Excel (números reales, no texto)
 - Nombres de archivo con fecha: `Pedido-RBK001-2026-04-05.pdf`
 
+## 🔴 LOS EXCELS DE TODO EL SISTEMA: los encabezados ABREN el archivo (27-ago-2026)
+
+> Daniel bajó `ventas-referencia-2026-08-27.xlsx` y fue textual: *"la tercera fila esta como escondido, no me deja filtrar desde los nombres importantes, y mucha informacion inecesaria… si asi se ve el modulo, asi mismo se debe de descargar y sin tantas palabras de info, se debe de suponer como funciona el excel"*. Y su regla permanente: ***"un erp profesional no tiene explicaciones, es intuitivo como apple"***.
+>
+> ```
+> ANTES                                   AHORA
+> fila 1  ▓ FASHION GROUP — Guías ▓        fila 1  Encabezados  ← con FILTRO y FIJOS
+> fila 2  ▓ Todas las guías ▓              fila 2  los datos
+> fila 3  ▓▓▓▓  ← 4 puntos de alto
+> fila 4  Encabezados                      (sin filtro · sin panel fijo)
+> ```
+>
+> **`buildReportSheet` (`src/lib/excel-export.ts`) lo arma así para los 24 exports del sistema**, y de una vez ganan lo que no tenían: **`!autofilter` desde A1** y **la fila de encabezados FIJA al bajar**. El título se fue porque **el nombre del archivo ya lo dice** (`ventas-referencia-2026-08-27.xlsx`, `historial_prestamos_fashion_wear_20260827.xlsx`, `CajaMenuda-Periodo7-…`, `productos-fashion_wear-12m-2026.xlsx`).
+>
+> ### ⚠️ `xlsx-js-style` SABE ESCRIBIR EL FILTRO, PERO NO EL PANEL FIJO
+>
+> Verificado escribiendo un libro con `ws["!freeze"]` y `ws["!panes"]` puestos y leyendo el XML que salió: `<sheetViews><sheetView workbookViewId="0"/>`, **sin un solo `<pane>`**. El filtro sí lo escribe (`<autoFilter ref>` + el `_xlnm._FilterDatabase` que Excel espera).
+>
+> 🔑 **El panel fijo se inyecta en el ZIP, con el MISMO truco que `depurador/fotos-xlsx.ts` usa para las fotos** (`src/lib/excel-panel-fijo.ts`): el libro lo sigue armando `xlsx-js-style` igual que siempre y después se le agrega al `xl/worksheets/sheetN.xml` la parte que le falta.
+> - **La diferencia con `fotos-xlsx.ts` es que ESTE camino es SÍNCRONO**, y tiene que serlo: `downloadWorkbook()` se llama desde botones y `workbookBuffer()` desde rutas que devuelven el Buffer de una — volverlas asíncronas por un `<pane/>` habría tocado los 24 exports. **Se puede porque SheetJS escribe el .xlsx SIN comprimir** (todas las entradas con método 0 STORED, verificado recorriendo los local headers): sin compresión, reescribir el ZIP es copiar bytes y recalcular un CRC32, sin deflate ni JSZip.
+> - 🔴 **SI ALGO NO CALZA, SALE EL ARCHIVO ORIGINAL.** Un Excel sin la fila fija es una molestia; uno corrupto no se abre. Entradas comprimidas, ZIP64 o un `<sheetView>` que no aparece ⇒ los bytes salen tal cual.
+> - 🔑 **Qué hoja se congela lo decide un marcador de CONDUCTA, no un índice**: solo las que YA tienen filtro desde A1, o sea exactamente las de `buildReportSheet`. Las de layout propio (las fichas de Reclamos, el detalle de Comisiones, la plantilla «DASHBOARD DE BUSQUEDA» del banco B2B) **no llevan filtro ni panel, y está bien**: ahí la fila 1 no son encabezados.
+> - **TODO export sale por `workbookBytes` / `workbookBuffer` / `workbookBlob`.** Escribir con `XLSX.write` a secas deja el archivo sin panel, y eso no se ve hasta que alguien baja por la hoja.
+>
+> ### 🔴 UN SOLO PÁRRAFO SE QUEDA, y es orden explícita de Daniel («dejalo»)
+>
+> El de la planilla bajada por un rango que **no** es quincena: *«NO es una quincena: sueldo base al 43,8 % y SIN los montos escritos a mano»*. **No explica cómo funciona el Excel: avisa que ese archivo no sirve para pagar.** Vive en `avisoRangoLibre()` (`asistencia/planilla-exportar.ts`) y viaja como la opción **`nota`** de `buildReportSheet`: una línea al PIE, **fuera del rango del filtro** para que filtrar no la esconda, en gris itálico y sin merge. Va en las hojas **Planilla** y **Horas**; la de «Cómo se calcula» ya lo dice entero en su fila «Período».
+> - **El PDF NO se tocó**: `subtitulo()` sigue armando su encabezado con la empresa y el aviso, byte por byte igual.
+> - ⚠️ **La EMPRESA salió del aviso** (la dice el nombre del archivo). Lo que queda es lo único que Daniel mandó conservar.
+> - 🔑 **`nota` es la EXCEPCIÓN, no la puerta de atrás**: hay candado que exige que el ÚNICO export que la use sea la planilla.
+>
+> ### Los demás subtítulos se fueron, y ninguno era el único lugar del dato
+>
+> | Dónde vivía | Adónde se fue |
+> |---|---|
+> | Guías «Todas las guías» · Proveedores «Todo el grupo» | el filtro ya se ve en pantalla; el archivo lo baja quien lo filtró |
+> | Cheques «Vencen hoy» | ya es el NOMBRE DE LA HOJA |
+> | Préstamos «Historial — Fashion Wear» | el nombre del archivo (`historial_prestamos_fashion_wear_…`) |
+> | Caja «Período N° 7 · Responsable · Fondo inicial» | el N° está en el archivo y el fondo, en el bloque de saldo que ya se dibujaba debajo |
+> | Comisiones «Junio 2026 · la regla» | la regla es el banner del tab; el período, el archivo |
+> | Ventas «Data actualizada al…» · Utilidad/Productos con sus totales | los totales están en la fila TOTAL; el período, en el archivo |
+> | Catálogos «N productos sin foto · fecha» | el conteo es la cantidad de filas |
+> | Reclamos «Reclamos a Proveedor — Fashion Wear» | el nombre del archivo |
+> | Referencia (~900 caracteres de manual de uso) | **se fue entero** |
+>
+> 🔴 **LO ÚNICO QUE SE PERDIÓ DE VERDAD, y es decisión de Daniel si vuelve:** la leyenda de la hoja **Referencia** que decía que `Compré` y `Vendí` son **de la ÚLTIMA LLEGADA** y que `Stock` es **SIEMPRE la existencia total**. Los NÚMEROS no cambiaron y su candado los sigue vigilando, pero el encabezado «Compré» ya no lleva su aclaración al lado. Si la quiere de vuelta, entra como `nota` al pie en una línea.
+>
+> ### Lo que NO cambió
+>
+> **Ni un dato, ni una columna, ni una fila, ni un valor** — solo dónde empiezan. Sigue igual: la paleta por marca (`paletaDeMarca`), la zebra, la banda PRI de los totales, la moneda como NÚMERO real con `numFmt`, `MONEY_FMT_GUION`, las fechas dd/mm/yyyy, los anchos `!cols`, los hipervínculos de Reclamos, el Excel de Pedidos con sus dos números y sus columnas AL FINAL, y el layout propio de las fichas (`makeCellStyles`).
+>
+> ### Verificación — el archivo se abre, con TRES lectores
+>
+> `npx tsx scripts/_verif-excel-panel-fijo.ts` escribe **11 .xlsx REALES** con los builders de verdad (caja, préstamos, pedidos ×4 marcas, sin foto, proveedores, cheques, guías, planilla) y los relee con **`xlsx-js-style`** y con **el XML CRUDO del zip vía `jszip`**; `python3 scripts/_verif-excel-panel-fijo-openpyxl.py <carpeta>` los abre con **`openpyxl`** — otro programa, otro lenguaje, el mismo con el que se leyó el Excel real de la contadora. Medido: **15/15 OK en los dos**, `freeze_panes A2` y `auto_filter A1:…` en las 13 hojas de reporte, la de layout propio sin ninguno de los dos, y el aviso de la planilla en la fila 7 con el filtro terminando en la 3.
+> - ⚠️ **NO se pudo abrir en Excel de escritorio, y se dice de frente.** Excel está instalado y responde a AppleScript, pero **no abre NINGÚN documento en esta sesión** —ni por AppleScript ni por LaunchServices— y las pantallas no se pueden ver (sin permiso de grabación). Lo que sí está probado: `unzip -t` (Info-ZIP, una CUARTA implementación de zip) da OK, el CRC32 se verifica con `checkCRC32`, y el `<pane>` es la forma verbatim del estándar OOXML **dentro** de un `<sheetView>` que se abre — que es de donde openpyxl deduce su `freeze_panes`, igual que Excel.
+> - **El re-empaquetado es FIEL, probado por diferencia**: escribiendo el MISMO libro con y sin el patcher, **9 de 10 entradas salen byte por byte iguales y en el mismo orden**; la única que cambia es `xl/worksheets/sheet1.xml`.
+>
+> ### Candados
+>
+> **`src/__tests__/lib/excel-encabezados-fila-1.test.ts` (24).** Escribe el .xlsx y lo vuelve a abrir con los dos lectores — mirar el objeto EN MEMORIA no prueba nada acá, porque el `<pane>` lo pone justo el re-empaquetado. Prueba además que la librería sola NO escribe paneles (si algún día aprendiera, ese caso se cae y el patcher se puede retirar), que una hoja sin encabezados no se congela, que los CRC quedan bien (`checkCRC32`: ni jszip ni SheetJS lo verifican al leer, así que un CRC viejo pasa los dos lectores y revienta recién en Excel), y **la planilla REAL de un rango libre por CONDUCTA**.
+> - 🩸 **El candado de la planilla NO puede ser un barrido de texto, y se midió por qué**: `nota: avisoRangoLibre(d)` aparece en DOS hojas (quitarla de una lo seguía cumpliendo), la frase «NO es una quincena» también vive en la fila «Período» de «Cómo se calcula» (vaciar el aviso tampoco lo rompía), y un `if (false)` que lo hiciera salir SIEMPRE es invisible para cualquier grep. Los pocos barridos que quedan **borran los comentarios primero** — este repo ya pagó CUATRO veces el candado que se cumple con su propia explicación, y estos archivos citan `title` y `subtitle` para contar que se fueron.
+> - **Verificado por mutación, 18 de 18 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-excel-fila-1.sh`): vuelve la banda de título · vuelve la franja de 4 puntos · el filtro desaparece · el filtro arranca en la fila 2 · el filtro se traga los totales · la nota no se dibuja · la nota cae DENTRO del filtro · el panel no se escribe · se congela la fila 2 · **el `<pane>` queda FUERA de `<sheetView>`** · se congela cualquier hoja · el tamaño de la entrada no se actualiza · el CRC no se recalcula · `workbookBytes` deja de congelar · la planilla pierde su aviso · el aviso sale también en una quincena · el aviso deja de decir que no es una quincena · deja de decir que faltan los montos a mano.
+> - 🩸 **La primera corrida dio 12/18 y las 6 sobrevivientes eran huecos REALES**, no falsos positivos: el `[^>]*` de un regex se tragaba la barra del auto-cierre (así que un `<pane>` colgando afuera pasaba), nadie verificaba el CRC ni el tamaño de las entradas, y las tres de la planilla se cumplían con texto que vive en otro lado del mismo archivo. **Un verificador que da 12/18 y se publica igual es peor que no correrlo.**
+> - 🩸 **El script restaura por COPIA, no con `git checkout`** (hay archivos NUEVOS y git aborta el comando entero), **denuncia el patrón que no muta** en vez de cantarlo como «sobrevivió», **exige que vitest haya colectado tests** antes de creerle a un cero, **el reemplazo es LITERAL por argv y lo hace `python3`** (con `perl -0pi -e 's|…|…|'` un `||` del código real se des-escapa en una alternación con rama vacía y se come el archivo), y trae una **mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido con el comentario adentro.
+
 ## Shared Components (src/components/)
 - **AppHeader** — sticky header con module color accent, user info, search, notifications, shortcuts
 - **SearchBar** — ⌘K + mobile full-screen + recientes + spotlight NLP

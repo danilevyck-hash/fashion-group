@@ -124,21 +124,6 @@ export async function buildReferenciaSheet(
   const fichas = articulos.map((a) => ({ art: a, f: armarFicha(a, hoyMes) }));
 
   return buildReportSheet({
-    title: conMargen
-      ? "FASHION GROUP — Referencia: cuánto vendo, cuánto me queda y a qué margen"
-      : "FASHION GROUP — Referencia: cuánto vendo y cuánto me queda",
-    // El subtítulo describe LO QUE HAY: las 13 columnas que quedaron.
-    subtitle:
-      `${articulos.length} referencias · corte ${hoyMes} · ` +
-      `"Compré" es lo que llegó y "Vendí" lo vendido neto con las NC restadas · ` +
-      `si la bodega quedó en 0 y volvió a llegar mercancía, "Compré", "Vendí", "Vendido" y "Meses" son de la ÚLTIMA LLEGADA (la que llegó sobre bodega en 0), igual que en pantalla; si no, son de toda la historia registrada · ` +
-      `"Stock" es SIEMPRE la existencia total de Switch, NUNCA deducida y nunca recortada a una llegada — si no cuadra con Compré − Vendí, la Nota lo explica · ` +
-      `"Vendido" es lo REAL: Vendí ÷ Compré · ` +
-      `"Meses" es el tiempo de venta, en meses calendario desde la llegada: hasta la última venta si está agotado (la cola en bodega no cuenta), o hasta hoy si sigue vivo · ` +
-      `vacío en Vendido/Meses = no se puede afirmar · ` +
-      `"Precio prom" es la venta real ÷ unidades, con los descuentos adentro · ` +
-      (conMargen ? `el margen se calcula contra el Costo CIF de la última compra · ` : ``) +
-      `las notas de crédito ya están restadas`,
     columns: [
       { header: "Referencia", wch: 18 },
       { header: "Descripción", wch: 26 },
@@ -227,12 +212,6 @@ export async function buildComprasSheet(
   const sinCompra = articulos.filter((a) => a.sinCompraRegistrada);
 
   return buildReportSheet({
-    title: "FASHION GROUP — Compras registradas, tal como llegaron",
-    subtitle:
-      `${articulos.length} referencias · ${filas.length} compras · corte ${hoyMes} · ` +
-      `fecha, cantidad y costos de cada ingreso de mercancía de los últimos 3 años · ` +
-      `acá el FOB es el CRUDO de Switch con su procedencia (en la hoja Referencia el Costo FOB es CALCULADO: CIF ÷ 1,10) · ` +
-      `NO se atribuyen ventas a una compra: con stock encima, de qué llegada salió cada venta no se sabe`,
     columns: [
       { header: "Referencia", wch: 18 },
       { header: "Descripción", wch: 26 },

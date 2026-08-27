@@ -39,10 +39,6 @@ const SALDO_NEGATIVO = { fg: "DC2626", bg: "FEF2F2" };
 export function buildCajaWorkbook(periodo: CajaPeriodo, gastos: CajaGasto[]): XLSX.WorkBook {
   const fondo = periodo?.fondo_inicial || 200;
 
-  // Responsable a nivel período (derivado de los gastos), no por gasto.
-  const responsables = [...new Set(gastos.map((g) => (g.responsable || "").trim()).filter(Boolean))];
-  const responsableLabel = responsables.length ? responsables.join(", ") : "—";
-
   let totalSub = 0, totalItbms = 0, totalTotal = 0;
   const rows: ReportCell[][] = gastos.map((g) => {
     totalSub += g.subtotal || 0;
@@ -62,8 +58,6 @@ export function buildCajaWorkbook(periodo: CajaPeriodo, gastos: CajaGasto[]): XL
 
   // ─── Hoja 1: Gastos ────────────────────────────────────────────────────────
   const ws = buildReportSheet({
-    title: "FASHION GROUP — CAJA MENUDA",
-    subtitle: `Período N° ${periodo?.numero || ""}  ·  Apertura: ${fmtFechaExcel(periodo?.fecha_apertura)}  ·  Responsable: ${responsableLabel}  ·  Fondo inicial: $${fondo.toFixed(2)}`,
     columns: [
       { header: "Fecha", wch: 11 },
       { header: "Descripción", wch: 26 },
@@ -90,8 +84,6 @@ export function buildCajaWorkbook(periodo: CajaPeriodo, gastos: CajaGasto[]): XL
   const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
 
   const ws2 = buildReportSheet({
-    title: "Resumen por Categoría",
-    subtitle: `Período N° ${periodo?.numero || ""}`,
     columns: [
       { header: "Categoría", wch: 22 },
       { header: "Total", wch: 14, align: "right", fmt: MONEY_FMT },

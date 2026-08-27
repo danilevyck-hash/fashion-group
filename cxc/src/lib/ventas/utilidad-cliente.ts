@@ -65,23 +65,17 @@ export function fmtMoneySigned(n: number): string {
 }
 
 // Export Excel — todas las filas (no solo las visibles). Estilo de la casa
-// (src/lib/excel-export.ts, hallazgo I11): título navy, subtítulo MID con los
-// totales, headers navy, zebra, fila TOTAL en banda PRI. Montos MONEY_FMT y
-// margen PCT_FMT como números reales.
+// (src/lib/excel-export.ts, hallazgo I11): encabezados navy en la fila 1 con
+// filtro, zebra, fila TOTAL en banda PRI. Montos MONEY_FMT y margen PCT_FMT
+// como números reales.
 
 /** Construcción pura del sheet (sin DOM) — testeable. */
 export async function buildUtilidadSheet(resp: UtilidadClienteResponse): Promise<import("xlsx-js-style").WorkSheet> {
   const { buildReportSheet, MONEY_FMT, PCT_FMT } = await import("@/lib/excel-export");
 
-  const subtitle =
-    `Ventas ${fmtMoneyPlain(resp.totales.ventas)} · Costo ${fmtMoneyPlain(resp.totales.costo)} · ` +
-    `Utilidad ${fmtMoneyPlain(resp.totales.utilidad)} · Margen ${resp.totales.margen != null ? (resp.totales.margen * 100).toFixed(1) + "%" : "—"}`;
-
   const totalDocs = resp.rows.reduce((s, r) => s + r.nDocs, 0);
 
   return buildReportSheet({
-    title: `FASHION GROUP — Utilidad por cliente · ${resp.year} · ${alcanceEmpresas(resp.empresas)}`,
-    subtitle,
     columns: [
       { header: "Cliente", wch: 34 },
       { header: "Empresa", wch: 20 },
@@ -108,9 +102,4 @@ export async function exportUtilidadToExcel(resp: UtilidadClienteResponse): Prom
     workbookFromSheets([{ name: "Utilidad por cliente", ws }]),
     `utilidad-por-cliente-${resp.year}.xlsx`,
   );
-}
-
-function fmtMoneyPlain(n: number): string {
-  const sign = n < 0 ? "-" : "";
-  return sign + "$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

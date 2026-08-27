@@ -288,7 +288,7 @@ export default function GuiasList({
     if (selectedIds.size === 0) return;
     const { exportGuiasExcel } = await import("./excel-guias");
     const selected = guias.filter(g => selectedIds.has(g.id));
-    exportGuiasExcel(selected, `${selected.length} guías seleccionadas`);
+    exportGuiasExcel(selected);
   }
   const canCreate = !readOnly && role && CREATE_ROLES.includes(role);
   const canDelete = !readOnly && role && DELETE_ROLES.includes(role);
@@ -332,12 +332,7 @@ export default function GuiasList({
                         // cliente): el Excel de "lo filtrado" exportaba otra
                         // cosa que la que se estaba viendo.
                         const filtered = filtrarGuias(guias);
-                        const subtitle = search
-                          ? `Filtrado: "${search}"`
-                          : showPending
-                            ? "Pendientes de bodega"
-                            : "Todas las gu\u00edas";
-                        exportGuiasExcel(filtered, subtitle);
+                        exportGuiasExcel(filtered);
                       }}
                       className="text-sm border border-gray-200 text-gray-600 px-4 py-3 rounded-md font-medium hover:border-gray-400 hover:text-black transition"
                     >

@@ -1,10 +1,10 @@
 // Helper estándar de exports Excel (xlsx-js-style) — hallazgo I11.
 //
-// "Estilo de la casa" extraído del patrón Guías/Proveedores: banda de título
-// navy PRI + subtítulo MID + separador SEP, encabezados navy, filas zebra
-// Calibri 10, fila de totales en banda PRI, moneda como NÚMERO real con
-// numFmt (nunca string "$1,234.56"), fechas dd/mm/yyyy, nombre de archivo
-// kebab-case con fecha ISO.
+// "Estilo de la casa": **encabezados navy en la FILA 1**, con filtro y con la
+// fila fija al bajar; filas zebra Calibri 10, fila de totales en banda PRI,
+// moneda como NÚMERO real con numFmt (nunca string "$1,234.56"), fechas
+// dd/mm/yyyy, nombre de archivo kebab-case con fecha ISO — que es el que dice
+// de qué es el archivo, para que la hoja no tenga que gastar filas diciéndolo.
 //
 // Todos los exports de reportes del sistema deben construirse con esto.
 // La paleta es parametrizable: los catálogos Reebok/Joybees usan su navy de
@@ -13,13 +13,15 @@
 // no reportes para humanos).
 //
 // Dos niveles de uso:
-//  - buildReportSheet(): el reporte tabular estándar (título/sub/headers/
-//    zebra/totales) — cubre la mayoría de los exports.
+//  - buildReportSheet(): el reporte tabular estándar (headers/zebra/totales)
+//    — cubre la mayoría de los exports.
 //  - makeCellStyles(): fábrica de celdas estilizadas (hdr/td/tdN/band...)
 //    para generadores con layout propio (fichas de Reclamos, multi-hoja)
 //    que quieren la misma paleta sin el layout tabular.
 
 import XLSX from "xlsx-js-style";
+
+import { congelarEncabezadosXlsx } from "./excel-panel-fijo";
 
 // ─── Paletas ─────────────────────────────────────────────────────────────────
 
@@ -235,38 +237,53 @@ export type ReportCell =
   | { v: string | number; fg?: string; bold?: boolean; sz?: number; fmt?: string };
 
 export interface ReportSheetOpts {
-  /** Título de la banda principal, ej. "FASHION GROUP — Guías de Transporte". */
-  title: string;
-  /** Subtítulo (filtros aplicados, período...). Banda MID. */
-  subtitle?: string;
   columns: ReportColumn[];
   rows: ReportCell[][];
   /** Fila de totales (banda PRI). Mismo largo que columns; null = celda vacía. */
   totals?: ReportCell[];
+  /**
+   * Una línea de aviso al PIE, debajo de todo y FUERA del rango del filtro.
+   *
+   * 🔴 NO ES PARA EXPLICAR EL EXCEL. *"Un ERP profesional no tiene
+   * explicaciones, es intuitivo como Apple"*: el contexto va en el nombre del
+   * archivo y las columnas se explican solas. Esto es para lo que un archivo
+   * tiene que DECIR de sí mismo aunque nadie pregunte — hoy, que la planilla
+   * bajada por un rango que no es quincena NO sirve para pagar.
+   */
+  nota?: string;
   palette?: ExcelPalette;
 }
 
+/**
+ * La hoja estándar: **los encabezados en la FILA 1 y nada arriba de ellos.**
+ *
+ * 🔴 ANTES había banda de título (fila 1), subtítulo (2) y una franja
+ * separadora de 4 puntos de alto (3) que en pantalla se veía como una fila
+ * escondida; los encabezados quedaban en la 4. Daniel, textual: *"la tercera
+ * fila esta como escondido, no me deja filtrar desde los nombres importantes,
+ * y mucha informacion inecesaria… si asi se ve el modulo, asi mismo se debe de
+ * descargar"*. El título se fue: el nombre del archivo ya lo dice
+ * (`ventas-referencia-2026-08-27.xlsx`).
+ *
+ * Y con los encabezados en la 1 se puede lo que antes no: `!autofilter` sobre
+ * `A1:…` (Excel filtra desde los nombres de columna) y la fila fija al bajar,
+ * que la pone `congelarEncabezadosXlsx` al escribir el archivo — la librería no
+ * sabe escribir paneles, ver `excel-panel-fijo.ts`.
+ */
 export function buildReportSheet(opts: ReportSheetOpts): XLSX.WorkSheet {
   const p = opts.palette || CASA_PALETTE;
-  const { hdr, td, tdN, tot, band, fillRow } = makeCellStyles(p);
+  const { hdr, td, tdN, tot } = makeCellStyles(p);
   const ws: XLSX.WorkSheet = {};
   const merges: XLSX.Range[] = [];
   const heights: number[] = [];
   const lastCol = opts.columns.length - 1;
   let r = 0;
 
-  band(ws, r, lastCol, merges, opts.title, p.pri, 14);
-  heights[r] = 30; r++;
-  if (opts.subtitle) {
-    band(ws, r, lastCol, merges, opts.subtitle, p.mid, 10);
-    heights[r] = 20; r++;
-  }
-  fillRow(ws, r, lastCol, p.sep);
-  merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
-  heights[r] = 4; r++;
-
   opts.columns.forEach((c, i) => { ws[addr(r, i)] = hdr(c.header, c.align || "left"); });
   heights[r] = 22; r++;
+  // El filtro cubre encabezados + datos y NADA más: la fila de totales y la
+  // nota quedan afuera a propósito, para que filtrar no las esconda.
+  const filtro = `A1:${addr(opts.rows.length, lastCol)}`;
 
   opts.rows.forEach((row, idx) => {
     const alt = idx % 2 === 0;
@@ -292,7 +309,19 @@ export function buildReportSheet(opts: ReportSheetOpts): XLSX.WorkSheet {
     heights[r] = 22; r++;
   }
 
+  if (opts.nota) {
+    heights[r] = 6; r++; // espaciador
+    // Sin relleno ni merge: el texto se derrama sobre las celdas vacías de la
+    // derecha, y sin merge no hay nada que estorbe si alguien ordena la tabla.
+    ws[addr(r, 0)] = {
+      v: opts.nota, t: "s",
+      s: { font: { sz: 10, italic: true, color: { rgb: "6B7280" }, name: "Calibri" } },
+    };
+    heights[r] = 18; r++;
+  }
+
   ws["!ref"] = `A1:${addr(r - 1, lastCol)}`;
+  ws["!autofilter"] = { ref: filtro };
   ws["!merges"] = merges;
   ws["!cols"] = opts.columns.map((c) => ({ wch: c.wch }));
   ws["!rows"] = heights.map((h) => ({ hpt: h || 16 }));
@@ -309,15 +338,34 @@ export function workbookFromSheets(sheets: { name: string; ws: XLSX.WorkSheet }[
 
 export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
+/**
+ * Los bytes del .xlsx, con la fila de encabezados ya fija.
+ *
+ * 🔴 TODO EXPORT SALE POR ACÁ. Escribir con `XLSX.write` a secas deja el
+ * archivo sin panel fijo —la librería no sabe escribirlo— y eso no se ve hasta
+ * que alguien baja por la hoja y pierde los nombres de las columnas.
+ */
+export function workbookBytes(wb: XLSX.WorkBook): Uint8Array {
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+  return congelarEncabezadosXlsx(new Uint8Array(buf));
+}
+
 /** Para API routes: buffer listo para NextResponse con Content-Disposition. */
 export function workbookBuffer(wb: XLSX.WorkBook): Buffer {
-  return XLSX.write(wb, { bookType: "xlsx", type: "buffer" }) as Buffer;
+  return Buffer.from(workbookBytes(wb));
+}
+
+/** El .xlsx como Blob, ya con la fila de encabezados fija. */
+export function workbookBlob(wb: XLSX.WorkBook): Blob {
+  const bytes = workbookBytes(wb);
+  const ab = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(ab).set(bytes);
+  return new Blob([ab], { type: XLSX_MIME });
 }
 
 /** Para client-side: dispara la descarga con Blob + anchor. */
 export function downloadWorkbook(wb: XLSX.WorkBook, filename: string) {
-  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  const blob = new Blob([buf], { type: XLSX_MIME });
+  const blob = workbookBlob(wb);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

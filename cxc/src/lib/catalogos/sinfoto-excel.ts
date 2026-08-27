@@ -14,7 +14,6 @@ import {
   buildReportSheet,
   workbookFromSheets,
   REEBOK_PALETTE,
-  fmtFechaExcel,
 } from "@/lib/excel-export";
 import { buildDashBusquedaSheets } from "@/lib/catalogos/dash-busqueda-excel";
 
@@ -29,8 +28,6 @@ export interface SinFotoRow {
 /** Construye el workbook de productos sin foto (hoja "Sin foto"). */
 export function buildReebokSinFotoWorkbook(rows: SinFotoRow[]): XLSX.WorkBook {
   const ws = buildReportSheet({
-    title: "REEBOK — Productos sin foto",
-    subtitle: `${rows.length} producto${rows.length !== 1 ? "s" : ""} sin foto  ·  ${fmtFechaExcel(new Date().toISOString())}`,
     columns: [
       { header: "Código", wch: 16 },
       { header: "Descripción", wch: 40 },

@@ -66,7 +66,7 @@ interface Contacto {
  * con un clic en el navegador, sin extraer ni permisos. buildReportSheet no
  * maneja hipervínculos → se parchean sobre las celdas ya estilizadas.
  */
-function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkSheet {
+function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
   let grandSub = 0;
   let grandImp = 0;
   let grandItbms = 0;
@@ -110,8 +110,6 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
   });
 
   const ws = buildReportSheet({
-    title: "FASHION GROUP",
-    subtitle: `Reclamos a Proveedor — ${empresa}`,
     columns: [
       { header: "N° Reclamo", wch: 16 },
       { header: "Factura", wch: 18 },
@@ -156,7 +154,10 @@ function safeSheetName(name: string, used: Set<string>): string {
 
 export async function buildBulkReclamosExcel(
   reclamos: ReclamoFull[],
-  empresa: string,
+  // La empresa ya NO se escribe adentro del libro (vivía en el subtítulo, y el
+  // nombre del archivo la dice). Se conserva en la firma porque la pasan las 3
+  // rutas que arman este Excel; sacarla del parámetro no compra nada.
+  _empresa: string,
   _contacto: Contacto | null,
 ): Promise<Buffer> {
   // Firma las facturas (1 año, lote) → cada reclamo lleva factura_pdf_url web.
@@ -167,7 +168,7 @@ export async function buildBulkReclamosExcel(
   // La hoja "Resumen" solo aporta con 2+ reclamos (es un consolidado). Con un
   // solo reclamo el Excel lleva únicamente la hoja de ese reclamo.
   if (recs.length >= 2) {
-    sheets.push({ name: safeSheetName("Resumen", used), ws: buildResumenSheet(recs, empresa) });
+    sheets.push({ name: safeSheetName("Resumen", used), ws: buildResumenSheet(recs) });
   }
 
   for (const rec of recs) {

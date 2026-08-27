@@ -115,12 +115,7 @@ function ProveedoresList() {
     setExportando(true);
     try {
       const { exportProveedoresExcel } = await import("./excel-proveedores");
-      const scope = empresa ? empresaLabel(empresa) : "Todo el grupo";
-      exportProveedoresExcel(
-        items,
-        `${scope}${q ? ` — búsqueda: ${q}` : ""} — ${items.length} proveedores`,
-        empresa ? empresaLabel(empresa) : undefined
-      );
+      exportProveedoresExcel(items, empresa ? empresaLabel(empresa) : undefined);
     } finally {
       setExportando(false);
     }

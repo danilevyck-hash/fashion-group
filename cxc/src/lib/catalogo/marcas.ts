@@ -182,7 +182,6 @@ export interface MarcaConfig {
   ordersSelectExtra: string;
   /** Select del POST /pedidos-export (col `total` vestigial solo en Reebok). */
   exportCols: string;
-  exportTitulo: string;
 
   // ── QUIRKS de negocio heredados (unificar con OK de Daniel) ──
   // (el flag `listaFiltraDeleted` se retiró el 25-ago-2026: valía `true` en 4 de
@@ -304,7 +303,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     itemsHasPreorder: true,
     ordersSelectExtra: ", origen_original, origen_short_id",
     exportCols: "origen, cliente, vendor, items, total, created_at",
-    exportTitulo: "REEBOK — Pedidos",
     createRoles: ["admin", "secretaria", "vendedor", "cliente"], // quirk heredado ('cliente' legacy)
     upload: { roles: catalogoAdminRoles(), storage: "marca", pathPrefix: STORAGE_PREFIX.reebok },
     telegramEmoji: "🛒",
@@ -387,7 +385,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     itemsHasPreorder: false,
     ordersSelectExtra: "",
     exportCols: "origen, cliente, vendor, items, created_at",
-    exportTitulo: "JOYBEES — Pedidos",
     createRoles: ["admin", "secretaria", "vendedor"],
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.joybees },
     telegramEmoji: "🐝",
@@ -472,7 +469,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     itemsHasPreorder: false,
     ordersSelectExtra: "",
     exportCols: "origen, cliente, vendor, items, created_at",
-    exportTitulo: "TOMMY HILFIGER — Pedidos",
     createRoles: ["admin", "secretaria", "vendedor"],
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.tommy },
     telegramEmoji: "🔵",
@@ -559,7 +555,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     itemsHasPreorder: false,
     ordersSelectExtra: "",
     exportCols: "origen, cliente, vendor, items, created_at",
-    exportTitulo: "CALVIN KLEIN — Pedidos",
     createRoles: ["admin", "secretaria", "vendedor"],
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.calvin },
     telegramEmoji: "⚫",

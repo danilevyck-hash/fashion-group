@@ -1010,10 +1010,12 @@ describe("el Excel de Referencia", () => {
     expect(fila[enc.indexOf("Stock")]).toBe(12); // la existencia, sin recortar
     expect(fila[enc.indexOf("Vendido")]).toBeCloseTo(25 / 36, 10);
     expect(fila[enc.indexOf("Meses")]).toBe(5);
-    // Y la leyenda lo DICE: el encabezado "Compré" no puede mentir en silencio.
-    const subtitulo = String((filas[1] ?? [])[0] ?? "");
-    expect(subtitulo).toContain("ÚLTIMA LLEGADA");
-    expect(subtitulo).toMatch(/"Stock" es SIEMPRE la existencia total/);
+    // ⚠️ LA LEYENDA QUE LO EXPLICABA SE FUE con el subtítulo (27-ago-2026):
+    // eran ~900 caracteres de manual de uso arriba de los encabezados, y
+    // Daniel los mandó sacar enteros. Lo que este caso sigue protegiendo —y es
+    // lo que importa— son los NÚMEROS: que "Compré" y "Vendí" sean los de la
+    // última llegada y que "Stock" no se recorte. La fila 1 es el encabezado.
+    expect(filas[0]?.[0]).toBe("Referencia");
   });
 
   it("🔴 AGOTADO: el Excel baja el % REAL y los meses hasta la ÚLTIMA VENTA, no los de bodega", async () => {
