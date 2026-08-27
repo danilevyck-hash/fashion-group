@@ -1,59 +1,52 @@
 "use client";
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * APROBACIONES — las horas extra que el reloj detectó y todavía nadie autorizó.
+ * APROBACIONES — las horas extra que el reloj midió y todavía nadie autorizó.
  *
- * ── 🔴 EL REQUISITO ES EL NÚMERO DE CLICS, Y MANDA SOBRE TODO LO DEMÁS ───────
+ * ── 🔴 LA UNIDAD ES EL DÍA (27-ago-2026) ────────────────────────────────────
  *
- * Daniel, textual: *«que en el usuario de julio y daniel haya un tab para
- * aprobaciones, con un clic se aprueba y ya, maximo 3 clics»*.
+ * Daniel, textual: *«debe de ser que el usuario entre y vea por dias quienes y
+ * cuantas horas, y pueda aprobar seleccionando todos o individualmente, por
+ * dia, por semana»*.
  *
- * Medido con el DOM de verdad en `asistencia-aprobaciones-pantalla.test.tsx`:
+ * Y no es una preferencia de pantalla: **el corte de la quincena lo mueve la
+ * contadora** (cuenta del 13 al 27, no del 16 al 31, y avisó que las fechas van
+ * a variar). Guardado por período, cada corrimiento del corte volvía a
+ * preguntar TODO desde cero. Un día es un hecho — «el martes 5 Kevin se quedó
+ * hasta las 7» — y el período que se arme después lo recoge, corte donde corte.
  *
- *   · una persona          → 2 clics  (pestaña «Aprobaciones» + «Aprobar»)
- *   · la quincena entera   → 3 clics  (pestaña + «Aprobar todas» + «Aprobar»)
- *   · desaprobar           → 2 clics  (pestaña + «Quitar»)
+ * ⚠️ Aprobar «por semana» o «todo» es cómo se SELECCIONA. Lo que se guarda es
+ * siempre una fila por persona y día.
  *
- * De ahí salen las tres decisiones de esta pantalla:
+ * ── 🔴 TOCAR LA CASILLA APRUEBA. NO HAY BOTÓN DE CONFIRMAR ──────────────────
  *
- *  1. LA UNIDAD ES LA PERSONA-Y-PERÍODO, no el día. Día por día, una quincena
- *     de doce días serían doce clics POR PERSONA. Y no se pierde nada del
- *     cálculo: el reparto 1,25 / 1,50 lo sigue haciendo `clasificarDia` día por
- *     día — la aprobación solo decide si esa persona cobra sus extras.
- *  2. EL DETALLE POR DÍA SE VE, PERO NO ES UN PASO. Está detrás del triangulito
- *     de la fila; mirar es opcional y no gasta ninguno de los tres clics.
- *  3. EL PERÍODO YA VIENE PUESTO en la quincena en curso. Si hubiera que
- *     elegirlo, aprobar arrancaría en 3 clics antes de tocar nada.
- *
- * ── 🔴 SE PUEDE DESAPROBAR ──────────────────────────────────────────────────
- *
- * Un clic de más no puede ser irreversible. «Quitar» devuelve la fila a
- * pendiente y la planilla deja de pagar esas horas en el mismo instante. Lo que
- * NO se borra es el registro: la fila guarda quién la tocó por última vez.
+ * Daniel: *«con un clic se aprueba y ya, maximo 3 clics»*. Un paso de
+ * confirmación duplicaría cada aprobación, y no protege nada: volver a tocar
+ * desaprueba, y la fila conserva quién la tocó por última vez.
  *
  * ── 🔴 SE APRUEBA UN PERMISO, NUNCA UN NÚMERO ───────────────────────────────
  *
- * Los minutos que se ven acá se vuelven a calcular en cada carga con la base de
- * cálculo vigente. Si mañana la salida pasa de las 17:00 a las 16:30 —o el
- * período se corre al 13-27, como lo tiene la contadora—, esta pantalla muestra
- * los números nuevos sola. Lo único que guarda un número es el TESTIGO, y
- * cuando el testigo y lo medido no coinciden la fila lo dice con los dos a la
- * vista. Ver la nota larga de `lib/asistencia/aprobaciones.ts`.
+ * Los minutos se recalculan en cada carga con la base vigente. Si mañana la
+ * salida pasa de 17:00 a 16:30, esta pantalla muestra los números nuevos sola.
+ * Lo único que se guarda de un número es el TESTIGO, y cuando el testigo y lo
+ * medido no coinciden la fila lo dice con los dos a la vista.
  * ────────────────────────────────────────────────────────────────────────── */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import RangoFechas from "./RangoFechas";
 import { quincenasHasta } from "@/lib/asistencia/planilla";
 import {
+  claveDia,
+  etiquetaDia,
   horasBonitas,
   resumenPendientes,
-  type FilaAprobacion,
+  type DiaAprobacion,
+  type PersonaEnDia,
 } from "@/lib/asistencia/aprobaciones";
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
 /** Panamá es UTC−5 fijo. En UTC pelado, de noche el día salta al siguiente. */
 function cuandoBonito(iso: string | null): string {
   if (!iso) return "";
@@ -63,12 +56,57 @@ function cuandoBonito(iso: string | null): string {
   const mm = String(d.getUTCMinutes()).padStart(2, "0");
   return `${d.getUTCDate()} ${MESES[d.getUTCMonth()]} ${hh}:${mm}`;
 }
-const money = (n: number) => `$${n.toFixed(2)}`;
+
+/** «Semana del 17 – 23 ago» */
+function etiquetaSemana(lunes: string, dias: readonly DiaAprobacion[]): string {
+  const a = dias[0]?.fecha ?? lunes;
+  const b = dias[dias.length - 1]?.fecha ?? lunes;
+  const dd = (f: string) => Number(f.slice(8, 10));
+  const mes = MESES[Number(b.slice(5, 7)) - 1];
+  return a === b
+    ? `Semana del ${dd(a)} ${mes}`
+    : `Semana del ${dd(a)} – ${dd(b)} ${mes}`;
+}
+
+/** Horas en «3:45». Es como se lee un rato, no como se lee un decimal. */
+function hm(minutos: number): string {
+  const m = Math.round(minutos);
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+}
 
 interface Respuesta {
-  aprobaciones: FilaAprobacion[] | null;
+  aprobaciones: DiaAprobacion[] | null;
   puedeAprobar: boolean;
   avisos: { faltaMigracionAprobaciones: string | null };
+}
+
+/** Una casilla que sabe estar a medias. */
+function Casilla({
+  estado,
+  onChange,
+  disabled,
+  label,
+}: {
+  estado: "no" | "si" | "medias";
+  onChange: () => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = estado === "medias";
+  }, [estado]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label={label}
+      checked={estado === "si"}
+      disabled={disabled}
+      onChange={onChange}
+      className="h-[19px] w-[19px] shrink-0 cursor-pointer accent-emerald-600 disabled:opacity-40"
+    />
+  );
 }
 
 export default function AprobacionesTab() {
@@ -78,37 +116,35 @@ export default function AprobacionesTab() {
     () => new Date(Date.now() - 5 * 3_600_000).toISOString().slice(0, 10),
     [],
   );
-  // El período arranca PUESTO en la quincena en curso: es lo que se aprueba el
-  // 95% de las veces, y elegirlo a mano sería un clic antes de empezar.
+  // El período arranca PUESTO en la quincena en curso: elegirlo a mano sería un
+  // toque antes de empezar.
   const quincenaEnCurso = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
   const [desde, setDesde] = useState(quincenaEnCurso.desde);
   const [hasta, setHasta] = useState(quincenaEnCurso.hasta);
 
-  const [filas, setFilas] = useState<FilaAprobacion[] | null>(null);
+  const [dias, setDias] = useState<DiaAprobacion[] | null>(null);
   const [puedeAprobar, setPuedeAprobar] = useState(true);
   const [avisoMigracion, setAvisoMigracion] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState<string | null>(null);
-  const [abierta, setAbierta] = useState<string | null>(null);
-  const [confirmarTodas, setConfirmarTodas] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [abierto, setAbierto] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
     setError(null);
     try {
-      // 🔑 SIN `empresa`: se aprueba a la persona, no a la empresa. Filtrar acá
-      // obligaría a repetir los tres clics por cada uno de los tres cuadros.
+      // 🔑 SIN `empresa`: se aprueba a la persona, no a la empresa.
       const p = new URLSearchParams({ desde, hasta, aprobaciones: "1" });
       const res = await fetch(`/api/asistencia/planilla?${p}`, { cache: "no-store" });
       const j = (await res.json()) as Respuesta & { error?: string };
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
-      setFilas(j.aprobaciones ?? []);
+      setDias(j.aprobaciones ?? []);
       setPuedeAprobar(j.puedeAprobar !== false);
       setAvisoMigracion(j.avisos?.faltaMigracionAprobaciones ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
-      setFilas(null);
+      setDias(null);
     } finally {
       setCargando(false);
     }
@@ -116,288 +152,241 @@ export default function AprobacionesTab() {
 
   useEffect(() => { void cargar(); }, [cargar]);
 
-  const pendientes = useMemo(() => resumenPendientes(filas ?? []), [filas]);
+  const pend = useMemo(() => resumenPendientes(dias ?? []), [dias]);
+
+  /** Las semanas, en orden, cada una con sus días. */
+  const semanas = useMemo(() => {
+    const m = new Map<string, DiaAprobacion[]>();
+    for (const d of dias ?? []) {
+      const arr = m.get(d.semana) ?? [];
+      arr.push(d);
+      m.set(d.semana, arr);
+    }
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [dias]);
 
   /**
-   * Aprueba o desaprueba. UNA función para los tres botones: el de la fila, el
-   * de «Quitar» y el de «Aprobar todas» mandan lo mismo con distinta lista.
+   * Aprueba o desaprueba. UNA función para las cuatro formas de tocar: la
+   * persona, el día, la semana y «Aprobar todo» mandan lo mismo con distinta
+   * lista.
    */
   const marcar = useCallback(
-    async (personas: Array<{ codigo: string; minutos: number }>, aprobado: boolean) => {
-      if (personas.length === 0) return;
-      setGuardando(personas.length === 1 ? personas[0].codigo : "todas");
+    async (items: Array<{ codigo: string; fecha: string; minutos: number }>, aprobado: boolean) => {
+      if (items.length === 0) return;
+      setGuardando(true);
       try {
         const res = await fetch("/api/asistencia/aprobaciones", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ desde, hasta, aprobado, personas }),
+          body: JSON.stringify({ aprobado, dias: items }),
         });
         const j = await res.json();
         if (!res.ok) throw new Error(j.error ?? "No se pudo guardar");
         if (j.ok === false) {
           toast(j.aviso ?? "No se pudo guardar", "error");
-        } else {
-          const cuantas = personas.length;
-          toast(
-            aprobado
-              ? `Listo: ${cuantas === 1 ? "1 persona aprobada" : `${cuantas} personas aprobadas`}`
-              : "Listo: quedó sin aprobar",
-            "success",
-          );
         }
-        // Se recarga entero: aprobar cambia el pago, y pintar solo la fila
+        // Se recarga entero: aprobar cambia el pago, y pintar solo la casilla
         // dejaría la pantalla diciendo una cosa y la planilla pagando otra.
         await cargar();
       } catch (e) {
         toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
       } finally {
-        setGuardando(null);
+        setGuardando(false);
       }
     },
-    [cargar, desde, hasta, toast],
+    [cargar, toast],
   );
 
-  const aprobarTodas = useCallback(async () => {
-    const lista = (filas ?? [])
-      .filter((f) => !f.aprobado)
-      .map((f) => ({ codigo: f.codigo, minutos: f.minutos }));
-    setConfirmarTodas(false);
-    await marcar(lista, true);
-  }, [filas, marcar]);
+  const deDia = (d: DiaAprobacion) =>
+    d.gente.map((g) => ({ codigo: g.codigo, fecha: d.fecha, minutos: g.minutos }));
+
+  const estadoDe = (gente: readonly PersonaEnDia[]): "no" | "si" | "medias" => {
+    const n = gente.filter((g) => g.aprobado).length;
+    if (n === 0) return "no";
+    return n === gente.length ? "si" : "medias";
+  };
+
+  const bloqueado = !puedeAprobar || guardando || avisoMigracion !== null;
 
   return (
-    <div className="space-y-4">
-      {/* ── El período ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-end gap-3">
-        <RangoFechas
-          desde={desde}
-          hasta={hasta}
-          onChange={(d, h) => { setDesde(d); setHasta(h); }}
-        />
-        {/* 🔴 «Aprobar todas» AL LADO del período y arriba de la lista: con él,
-            una quincena entera son 3 clics contando el de esta pestaña. */}
-        {pendientes.personas > 0 && puedeAprobar && (
-          <button
-            type="button"
-            onClick={() => setConfirmarTodas(true)}
-            disabled={guardando !== null}
-            className="min-h-[44px] rounded-lg bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:opacity-50"
-          >
-            Aprobar todas ({pendientes.personas})
-          </button>
-        )}
+    <div className="py-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <RangoFechas desde={desde} hasta={hasta} onChange={(d, h) => { setDesde(d); setHasta(h); }} />
+        <div className="flex-1" />
+        <button
+          type="button"
+          disabled={bloqueado || pend.pendientes === 0}
+          onClick={() => {
+            const todos = (dias ?? []).flatMap((d) =>
+              d.gente.filter((g) => !g.aprobado).map((g) => ({ codigo: g.codigo, fecha: d.fecha, minutos: g.minutos })),
+            );
+            void marcar(todos, true);
+          }}
+          className="min-h-[44px] rounded-md bg-black px-5 text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-30"
+        >
+          Aprobar todo
+        </button>
       </div>
 
       {avisoMigracion && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {avisoMigracion}
-        </p>
+        </div>
       )}
-
-      {!puedeAprobar && (
-        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
-          No tienes permiso para aprobar horas extra.
-        </p>
-      )}
-
       {error && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
+        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
-        </p>
+        </div>
       )}
 
-      {cargando && !filas && (
-        <p className="px-1 py-6 text-sm text-gray-500">Cargando…</p>
+      {!cargando && dias !== null && (
+        <div className="mb-4 flex items-baseline gap-2 tabular-nums">
+          {pend.pendientes === 0 ? (
+            <>
+              <span className="text-[30px] font-semibold leading-none text-emerald-700">✓</span>
+              <span className="text-sm text-gray-600">Todo aprobado</span>
+            </>
+          ) : (
+            <>
+              <span className="text-[30px] font-semibold leading-none tracking-tight">{pend.pendientes}</span>
+              <span className="text-sm text-gray-600">
+                sin aprobar · {Math.round(pend.minutos / 60)} h
+              </span>
+            </>
+          )}
+        </div>
       )}
 
-      {filas && filas.length === 0 && !cargando && (
-        <p className="rounded-lg border border-gray-200 px-3 py-6 text-center text-sm text-gray-500">
-          Nadie hizo horas extra en este período.
-        </p>
+      {cargando && <div className="py-8 text-center text-sm text-gray-500">Cargando…</div>}
+
+      {!cargando && dias !== null && dias.length === 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">
+          Nadie hizo horas extra en estas fechas.
+        </div>
       )}
 
-      {/* ── La lista ────────────────────────────────────────────────────────
-          🔑 NO ES UNA TABLA. En 834 (iPad) una tabla de seis columnas se
-          aplasta, y en este módulo ya pasó. Cada fila es un bloque que se
-          reacomoda solo: en celular el botón cae abajo y en escritorio va a la
-          derecha, sin una sola columna que apretar. */}
-      {filas && filas.length > 0 && (
-        <ul className="space-y-2">
-          {filas.map((f) => {
-            const abierto = abierta === f.codigo;
-            return (
-              <li
-                key={f.codigo}
-                className={`rounded-lg border px-3 py-2.5 ${
-                  f.aprobado ? "border-gray-200 bg-white" : "border-amber-200 bg-amber-50/60"
-                }`}
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <span className="truncate text-sm font-medium text-gray-900">
-                        {f.etiqueta}
+      {semanas.map(([lunes, delaSemana]) => {
+        const gente = delaSemana.flatMap((d) => d.gente);
+        const est = estadoDe(gente);
+        return (
+          <div key={lunes} className="mb-3.5">
+            <label className="flex cursor-pointer items-center gap-3 px-1 pb-2 pt-1.5">
+              <Casilla
+                estado={est}
+                disabled={bloqueado}
+                label={`Aprobar la semana del ${lunes}`}
+                onChange={() =>
+                  void marcar(delaSemana.flatMap(deDia), est !== "si")
+                }
+              />
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {etiquetaSemana(lunes, delaSemana)}
+              </span>
+              <span className="ml-auto text-xs tabular-nums text-gray-500">
+                <b className="font-semibold text-gray-700">{gente.length}</b>
+                {" · "}
+                {hm(gente.reduce((a, g) => a + g.minutos, 0))} h
+              </span>
+            </label>
+
+            {delaSemana.map((d) => {
+              const e = estadoDe(d.gente);
+              const abierta = abierto === d.fecha;
+              return (
+                <div
+                  key={d.fecha}
+                  className={`mb-1.5 overflow-hidden rounded-[10px] border ${
+                    e === "si" ? "border-emerald-200 bg-emerald-50/60" : "border-gray-200 bg-white"
+                  }`}
+                >
+                  <div className="flex min-h-[52px] items-center gap-3 px-3.5 tabular-nums">
+                    <label className="-ml-3.5 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center pl-3.5">
+                      <Casilla
+                        estado={e}
+                        disabled={bloqueado}
+                        label={`Aprobar ${etiquetaDia(d.fecha)}`}
+                        onChange={() => void marcar(deDia(d), e !== "si")}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setAbierto(abierta ? null : d.fecha)}
+                      className="flex min-h-[44px] flex-1 items-center gap-3 text-left"
+                      aria-expanded={abierta}
+                    >
+                      <span className="text-sm text-gray-600">
+                        <b className="font-semibold text-gray-900">{d.etiqueta.slice(0, d.etiqueta.lastIndexOf(" "))}</b>
+                        {d.etiqueta.slice(d.etiqueta.lastIndexOf(" "))}
                       </span>
-                      {f.empresaEtiqueta && (
-                        <span className="text-[12px] text-gray-400">{f.empresaEtiqueta}</span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[13px] tabular-nums text-gray-700">
-                      <span className="font-medium">{horasBonitas(f.minutos)}</span>
-                      {f.monto !== null && <span className="text-gray-500">{money(f.monto)}</span>}
-                      {f.dias.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setAbierta(abierto ? null : f.codigo)}
-                          aria-expanded={abierto}
-                          // 🩸 44 px de alto REALES con `-my-2` para que crecer
-                          // no separe el enlace de la línea de las horas.
-                          // Medido en el navegador: a 28 px el dedo no le
-                          // acierta, y es la misma regla que ya pagó la píldora
-                          // del calendario de Recordatorios.
-                          className="-my-2 min-h-[44px] text-[12px] text-gray-500 underline underline-offset-2 transition hover:text-gray-900"
-                        >
-                          {abierto ? "ocultar días" : `ver ${f.dias.length} ${f.dias.length === 1 ? "día" : "días"}`}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* 🔴 Quién aprobó y cuándo. Daniel lo pidió explícitamente. */}
-                    {f.aprobado && f.por && (
-                      <p className="mt-0.5 text-[12px] text-gray-500">
-                        Aprobada por {f.por}{f.cuando ? ` · ${cuandoBonito(f.cuando)}` : ""}
-                      </p>
-                    )}
-                    {/* 🔴 El testigo no coincide con lo medido hoy: se dice con
-                        los dos números. Puede ser una marcación corregida o un
-                        cambio en la base de cálculo. */}
-                    {f.cambio && f.minutosVistos !== null && (
-                      <p className="mt-0.5 text-[12px] text-amber-800">
-                        Cambió desde que se aprobó: se aprobaron {horasBonitas(f.minutosVistos)} y
-                        hoy son {horasBonitas(f.minutos)}.
-                      </p>
-                    )}
+                      <span className="ml-auto text-sm text-gray-500">{d.gente.length}</span>
+                      <span className="min-w-[58px] text-right text-sm font-semibold">{hm(d.minutos)} h</span>
+                      <svg
+                        viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        className={`shrink-0 text-gray-400 transition-transform ${abierta ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
                   </div>
 
-                  {puedeAprobar && (
-                    <div className="shrink-0">
-                      {f.aprobado ? (
-                        <button
-                          type="button"
-                          onClick={() => void marcar([{ codigo: f.codigo, minutos: f.minutos }], false)}
-                          disabled={guardando !== null}
-                          className="min-h-[44px] w-full rounded-lg border border-gray-300 px-4 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-50 sm:w-auto"
+                  {abierta && (
+                    <div className="border-t border-gray-100">
+                      {d.gente.map((g, i) => (
+                        <label
+                          key={g.codigo}
+                          className={`flex min-h-[44px] cursor-pointer items-center gap-3 border-b border-gray-100 px-3.5 tabular-nums last:border-b-0 ${
+                            e === "si" ? "" : i % 2 === 0 ? "bg-gray-50/60" : ""
+                          }`}
                         >
-                          Quitar
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => void marcar([{ codigo: f.codigo, minutos: f.minutos }], true)}
-                          disabled={guardando !== null}
-                          className="min-h-[44px] w-full rounded-lg bg-black px-5 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:opacity-50 sm:w-auto"
-                        >
-                          Aprobar
-                        </button>
+                          <Casilla
+                            estado={g.aprobado ? "si" : "no"}
+                            disabled={bloqueado}
+                            label={`Aprobar ${g.etiqueta} el ${d.etiqueta}`}
+                            onChange={() =>
+                              void marcar(
+                                [{ codigo: g.codigo, fecha: d.fecha, minutos: g.minutos }],
+                                !g.aprobado,
+                              )
+                            }
+                          />
+                          <span className="min-w-0 flex-1 truncate text-[13.5px]">{g.etiqueta}</span>
+                          <span className="hidden shrink-0 text-xs text-gray-500 sm:block">
+                            {g.empresaEtiqueta ?? ""}
+                          </span>
+                          {g.salida && (
+                            <span className="min-w-[44px] shrink-0 text-right text-xs text-gray-500">{g.salida}</span>
+                          )}
+                          <span className="min-w-[50px] shrink-0 text-right text-[13.5px] font-semibold">
+                            {hm(g.minutos)}
+                          </span>
+                        </label>
+                      ))}
+                      {d.gente.some((g) => g.cambio) && (
+                        <div className="border-t border-amber-200 bg-amber-50 px-3.5 py-2 text-xs text-amber-800">
+                          {d.gente
+                            .filter((g) => g.cambio)
+                            .map((g) => `${g.etiqueta}: se aprobaron ${horasBonitas(g.minutosVistos ?? 0)} y hoy son ${horasBonitas(g.minutos)}`)
+                            .join(" · ")}
+                        </div>
+                      )}
+                      {d.gente.some((g) => g.aprobado && g.por) && (
+                        <div className="border-t border-gray-100 px-3.5 py-2 text-xs text-gray-500">
+                          {(() => {
+                            const g = d.gente.find((x) => x.aprobado && x.por)!;
+                            return `Aprobado por ${g.por} · ${cuandoBonito(g.cuando)}`;
+                          })()}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
-
-                {/* El detalle por día. Mirarlo NO es un paso obligatorio. */}
-                {abierto && f.dias.length > 0 && (
-                  <ul className="mt-2 space-y-1 border-t border-gray-200 pt-2">
-                    {f.dias.map((d) => (
-                      <li
-                        key={d.fecha}
-                        className="flex flex-wrap items-baseline justify-between gap-x-3 text-[12px] tabular-nums text-gray-600"
-                      >
-                        <span>{d.etiqueta}</span>
-                        <span className="text-gray-400">
-                          {d.salida ? `salió ${d.salida}` : "sin salida"}
-                        </span>
-                        <span className="font-medium text-gray-800">{horasBonitas(d.minutos)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {confirmarTodas && (
-        <ConfirmarTodas
-          personas={pendientes.personas}
-          minutos={pendientes.minutos}
-          onCancelar={() => setConfirmarTodas(false)}
-          onAprobar={() => void aprobarTodas()}
-        />
-      )}
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
-  );
-}
-
-/**
- * La confirmación de «Aprobar todas».
- *
- * 🔴 POR QUÉ EXISTE UN PASO MÁS ACÁ Y NO EN LA FILA. Aprobar una persona es un
- * clic y se deshace con otro; aprobar la quincena entera mueve el pago de todo
- * el mundo de una vez, y un toque sin querer en el celular no puede hacer eso a
- * ciegas. La ventana no pregunta «¿estás seguro?» —eso no informa nada—: dice
- * A CUÁNTAS PERSONAS y CUÁNTAS HORAS, que es lo que hace falta para decidir.
- *
- * ⚠️ Y sigue entrando en el presupuesto: pestaña + «Aprobar todas» + «Aprobar»
- * son los 3 clics que pidió Daniel, ni uno más.
- *
- * Patrón de la casa para iOS: `createPortal` + `inset-0` + `useBodyScrollLock`,
- * y SIN `autoFocus`.
- */
-function ConfirmarTodas({
-  personas,
-  minutos,
-  onCancelar,
-  onAprobar,
-}: {
-  personas: number;
-  minutos: number;
-  onCancelar: () => void;
-  onAprobar: () => void;
-}) {
-  useBodyScrollLock(true);
-  const [montado, setMontado] = useState(false);
-  useEffect(() => setMontado(true), []);
-  if (!montado) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
-      <div className="w-full max-w-sm rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl">
-        <h2 className="text-base font-semibold text-gray-900">Aprobar todas</h2>
-        <p className="mt-1 text-sm text-gray-600">
-          {personas === 1 ? "1 persona" : `${personas} personas`} · {horasBonitas(minutos)}
-        </p>
-        <p className="mt-2 text-[13px] text-gray-500">
-          Se pagan en la planilla de este período. Se puede quitar después.
-        </p>
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={onCancelar}
-            className="min-h-[44px] flex-1 rounded-lg border border-gray-300 px-4 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={onAprobar}
-            className="min-h-[44px] flex-1 rounded-lg bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
-          >
-            Aprobar
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }

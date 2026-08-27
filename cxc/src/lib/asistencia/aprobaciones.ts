@@ -56,7 +56,7 @@ import type { PersonaReporte } from "./reporte";
 
 /** El archivo que Daniel tiene que correr. Se le muestra tal cual al usuario. */
 export const MIGRACION_APROBACIONES =
-  "20260829120000_asistencia_horas_extra_aprobadas.sql";
+  "20260901120000_aprobaciones_por_dia.sql";
 export const TABLA_APROBACIONES = "asistencia_horas_extra_aprobadas";
 
 /**
@@ -82,23 +82,24 @@ export function avisoMigracionAprobaciones(): string {
  * Persona + período EXACTO.
  *
  * 🔑 Las fechas van en la llave a propósito, y no la clave de quincena
- * («2026-07-2»). El período de horas extra de la contadora está CORRIDO respecto
- * de la quincena (13 al 27 vs. 16 al 31): si mañana el período se mueve, una
- * llave por quincena haría que una aprobación vieja cubriera días que nadie
- * miró. Con las fechas adentro, otro período es otra aprobación y se vuelve a
- * preguntar — que es lo correcto cuando cambió lo que se está aprobando.
+ * («2026-07-2»), ni el PERÍODO, que es como se guardaba hasta el 27-ago-2026.
+ *
+ * 🔴 EL CORTE DE LA QUINCENA LO MUEVE LA CONTADORA. Ella cuenta del 13 al 27, no
+ * del 16 al 31, y avisó que *«las fechas van a variar»*. Con la llave por
+ * período, cada corrimiento del corte volvía a preguntar TODO desde cero —
+ * Julio aprobaba dos veces lo mismo. Un DÍA, en cambio, es un hecho: «el martes
+ * 5 Kevin se quedó hasta las 7». El período que se arme después recoge los días
+ * que caen adentro, corte donde corte.
  */
-export function claveAprobacion(codigo: string, desde: string, hasta: string): string {
-  return `${String(codigo).trim()}|${desde}|${hasta}`;
+export function claveDia(codigo: string, fecha: string): string {
+  return `${String(codigo).trim()}|${fecha}`;
 }
 
 /** Una aprobación guardada, tal como la lee el módulo. */
 export interface Aprobacion {
   codigo: string;
-  /** YYYY-MM-DD */
-  desde: string;
-  /** YYYY-MM-DD */
-  hasta: string;
+  /** El DÍA aprobado. YYYY-MM-DD */
+  fecha: string;
   /** `false` = se desaprobó. La fila NO se borra: el registro se conserva. */
   aprobado: boolean;
   /**
@@ -112,17 +113,17 @@ export interface Aprobacion {
   cuando: string | null;
 }
 
-/** Código → su aprobación en ESTE período. */
+/** `codigo|fecha` → su aprobación. */
 export function indexarAprobaciones(
   filas: readonly Aprobacion[],
 ): Map<string, Aprobacion> {
   const out = new Map<string, Aprobacion>();
-  for (const a of filas) out.set(String(a.codigo).trim(), a);
+  for (const a of filas) out.set(claveDia(a.codigo, a.fecha), a);
   return out;
 }
 
 /**
- * ¿Se le pagan las horas extra a esta persona?
+ * ¿Se le pagan las horas extra de ESE DÍA?
  *
  * ⚠️ Sin fila es NO. El default es no pagar, que es exactamente lo que pidió la
  * contadora: se paga lo autorizado, y lo que nadie miró no está autorizado.
@@ -180,31 +181,71 @@ export function diasConExtra(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LA FILA DE LA PESTAÑA
+// LA PANTALLA: DÍAS, Y ADENTRO LA GENTE
 // ─────────────────────────────────────────────────────────────────────────────
 
+const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"] as const;
+const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"] as const;
+
+/** Los tres números de una fecha. Sin `new Date()`: el texto YA es el día. */
+function partes(fecha: string): { y: number; m: number; d: number } {
+  const [y, m, d] = fecha.split("-").map(Number);
+  return { y, m, d };
+}
+
 /**
- * Una persona con horas extra en el período.
+ * El día de la semana, contado con Zeller.
  *
- * 🔴 LA UNIDAD DE APROBACIÓN ES LA PERSONA-Y-PERÍODO, NO EL DÍA. Daniel fue
- * explícito: *«con un clic se aprueba y ya, maximo 3 clics»*. Día por día,
- * una quincena de doce días serían doce clics POR PERSONA. Y no se pierde nada
- * del cálculo: el reparto 1,25 / 1,50 lo sigue haciendo `clasificarDia` día por
- * día, exactamente igual — lo único que decide la aprobación es si esa persona
- * cobra sus extras de este período. El detalle por día viaja igual, en `dias`,
- * y se despliega si alguien quiere verlo: mirar NO es un clic obligatorio.
+ * 🔑 A propósito NO se usa `new Date(fecha)`: eso interpreta el texto como
+ * MEDIANOCHE UTC, y en Panamá (UTC−5) esa medianoche todavía es el día
+ * anterior. La pantalla diría «dom 16» sobre un lunes. La aritmética pura no
+ * tiene zona horaria y no puede equivocarse por eso.
  */
-export interface FilaAprobacion {
+export function diaDeLaSemana(fecha: string): number {
+  let { y, m, d } = partes(fecha);
+  if (m < 3) { m += 12; y -= 1; }
+  const k = y % 100, j = Math.floor(y / 100);
+  const h = (d + Math.floor((13 * (m + 1)) / 5) + k + Math.floor(k / 4) + Math.floor(j / 4) + 5 * j) % 7;
+  return (h + 6) % 7; // 0 = domingo
+}
+
+/** «lun 17 ago» */
+export function etiquetaDia(fecha: string): string {
+  const { m, d } = partes(fecha);
+  return `${DOW[diaDeLaSemana(fecha)]} ${d} ${MES[m - 1]}`;
+}
+
+/** El LUNES de esa semana, como YYYY-MM-DD. Es la llave para agrupar. */
+export function lunesDe(fecha: string): string {
+  const { y, m, d } = partes(fecha);
+  const dow = diaDeLaSemana(fecha);
+  const atras = (dow + 6) % 7; // lunes = 0 días atrás
+  // Aritmética de calendario a mano, por el mismo motivo que arriba.
+  let dd = d - atras, mm = m, yy = y;
+  while (dd < 1) {
+    mm -= 1;
+    if (mm < 1) { mm = 12; yy -= 1; }
+    dd += diasDelMes(yy, mm);
+  }
+  return `${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+}
+
+function diasDelMes(y: number, m: number): number {
+  if (m === 2) return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28;
+  return [4, 6, 9, 11].includes(m) ? 30 : 31;
+}
+
+/** Una persona dentro de un día. Es lo que se aprueba. */
+export interface PersonaEnDia {
   codigo: string;
   etiqueta: string;
   empresa: string | null;
   empresaEtiqueta: string | null;
-  /** Minutos de hora extra medidos HOY, con la base de cálculo vigente. */
+  /** Hora de salida marcada, «HH:MM». Es lo que Julio reconoce. */
+  salida: string | null;
   minutos: number;
   diurnoMin: number;
   nocturnoMin: number;
-  /** Lo que se pagaría. `null` si a esa persona no se le pudo calcular pago. */
-  monto: number | null;
   aprobado: boolean;
   por: string | null;
   cuando: string | null;
@@ -212,90 +253,114 @@ export interface FilaAprobacion {
   minutosVistos: number | null;
   /**
    * 🔴 Los minutos de HOY no son los que había cuando se aprobó. Pasa si se
-   * corrigió una marcación, o si cambió la base de cálculo (17:00 → 16:30). Se
+   * corrigió una marcación o si cambió la base de cálculo (17:00 → 16:30). Se
    * dice con los dos números; no se desaprueba solo, porque una plata que
    * desaparece sola es peor que una que se explica.
    */
   cambio: boolean;
-  dias: DiaExtra[];
 }
 
-/** Minutos → «5,5 h». Una sola forma de escribirlo en todo el módulo. */
+/** Un día con la gente que hizo horas extra. */
+export interface DiaAprobacion {
+  /** YYYY-MM-DD */
+  fecha: string;
+  /** «lun 17 ago» */
+  etiqueta: string;
+  /** El lunes de su semana: la llave para agrupar. */
+  semana: string;
+  minutos: number;
+  gente: PersonaEnDia[];
+}
+
+export interface OpcionesDias {
+  /** Las líneas de la planilla del período, ya calculadas. */
+  lineas: readonly LineaPlanilla[];
+  /** Lo que salió del motor del reporte: de ahí sale el detalle por día. */
+  personas: readonly PersonaReporte[];
+  reglas: ReglasAsistencia;
+  /** `codigo|fecha` → aprobación guardada. */
+  aprobaciones: ReadonlyMap<string, Aprobacion>;
+}
+
+/**
+ * Los días de la pantalla: TODO día con horas extra medidas, aprobado o no.
+ *
+ * ⚠️ Aparecen también los YA APROBADOS. Una lista que solo muestra pendientes
+ * no deja desaprobar nada, y un toque de más no puede ser irreversible.
+ *
+ * 🔴 EL DETALLE SALE DEL MISMO `clasificarDia` QUE PAGA (vía `diasConExtra`).
+ * No es una segunda cuenta: si la base de salida cambia, esta pantalla cambia
+ * junto con el pago.
+ */
+export function armarDiasAprobacion(opts: OpcionesDias): DiaAprobacion[] {
+  const lineaDe = new Map(opts.lineas.map((l) => [l.codigo, l]));
+  const porFecha = new Map<string, PersonaEnDia[]>();
+
+  for (const p of opts.personas) {
+    const l = lineaDe.get(p.codigo);
+    // Sin línea no hay a quién pagarle: alguien que marcó y no tiene ficha.
+    if (!l) continue;
+    for (const d of diasConExtra(p, opts.reglas)) {
+      const a = opts.aprobaciones.get(claveDia(p.codigo, d.fecha));
+      const arr = porFecha.get(d.fecha) ?? [];
+      arr.push({
+        codigo: p.codigo,
+        etiqueta: l.etiqueta,
+        empresa: l.empresa,
+        empresaEtiqueta: l.empresaEtiqueta,
+        salida: d.salida,
+        minutos: d.minutos,
+        diurnoMin: d.diurnoMin,
+        nocturnoMin: d.nocturnoMin,
+        aprobado: estaAprobado(a),
+        por: a?.por ?? null,
+        cuando: a?.cuando ?? null,
+        minutosVistos: a ? a.minutosVistos : null,
+        cambio: a != null && a.aprobado === true && a.minutosVistos !== d.minutos,
+      });
+      porFecha.set(d.fecha, arr);
+    }
+  }
+
+  return [...porFecha.entries()]
+    .map(([fecha, gente]) => ({
+      fecha,
+      etiqueta: etiquetaDia(fecha),
+      semana: lunesDe(fecha),
+      minutos: gente.reduce((a, g) => a + g.minutos, 0),
+      // Más horas arriba: si alguien mira una sola línea, que sea ésa.
+      gente: gente.sort((x, y) =>
+        x.minutos !== y.minutos ? y.minutos - x.minutos : x.etiqueta.localeCompare(y.etiqueta, "es"),
+      ),
+    }))
+    // En orden de calendario. La pantalla los agrupa por semana con `semana`.
+    .sort((x, y) => x.fecha.localeCompare(y.fecha));
+}
+
 export function horasBonitas(minutos: number): string {
   const h = Math.round((minutos / 60) * 100) / 100;
   return `${h.toFixed(2).replace(".", ",")} h`;
 }
 
-export interface OpcionesFilas {
-  /** Las líneas de la planilla del período, ya calculadas. */
-  lineas: readonly LineaPlanilla[];
-  /** Lo que salió del motor del reporte, para el detalle por día. */
-  personas: readonly PersonaReporte[];
-  reglas: ReglasAsistencia;
-  /** Código → aprobación guardada. */
-  aprobaciones: ReadonlyMap<string, Aprobacion>;
-}
-
-/**
- * Las filas de la pestaña: TODA persona con horas extra medidas en el período,
- * aprobada o no.
- *
- * ⚠️ Aparecen también las YA APROBADAS. Una lista que solo muestra pendientes
- * no deja desaprobar nada, y un clic de más no puede ser irreversible.
- */
-export function armarFilasAprobacion(opts: OpcionesFilas): FilaAprobacion[] {
-  const reporteDe = new Map(opts.personas.map((p) => [p.codigo, p]));
-  const filas: FilaAprobacion[] = [];
-
-  for (const l of opts.lineas) {
-    // 🔑 `extraMedido` es SIEMPRE lo que midió el reloj, esté aprobado o no.
-    // `l.horas` puede venir con los extras en cero justamente porque no estaban
-    // aprobados; leer de ahí haría desaparecer de esta lista a la gente que
-    // falta aprobar, que es toda la gente que esta pantalla existe para mostrar.
-    const medido = l.extraMedido;
-    if (!medido || medido.minutos <= 0) continue;
-
-    const a = opts.aprobaciones.get(l.codigo);
-    const p = reporteDe.get(l.codigo);
-    filas.push({
-      codigo: l.codigo,
-      etiqueta: l.etiqueta,
-      empresa: l.empresa,
-      empresaEtiqueta: l.empresaEtiqueta,
-      minutos: medido.minutos,
-      diurnoMin: medido.diurnoMin,
-      nocturnoMin: medido.nocturnoMin,
-      monto: medido.monto,
-      aprobado: estaAprobado(a),
-      por: a?.por ?? null,
-      cuando: a?.cuando ?? null,
-      minutosVistos: a ? a.minutosVistos : null,
-      cambio: a != null && a.aprobado === true && a.minutosVistos !== medido.minutos,
-      dias: p ? diasConExtra(p, opts.reglas) : [],
-    });
-  }
-
-  // Primero lo que falta aprobar —es a lo que se entra—, y adentro de cada
-  // grupo, más horas arriba: si alguien va a mirar una sola fila, que sea ésa.
-  return filas.sort((x, y) => {
-    if (x.aprobado !== y.aprobado) return x.aprobado ? 1 : -1;
-    if (x.minutos !== y.minutos) return y.minutos - x.minutos;
-    return x.etiqueta.localeCompare(y.etiqueta, "es");
-  });
-}
-
-/** Cuántas faltan y cuántas horas suman. Es lo que dice el botón «Aprobar todas». */
-export function resumenPendientes(filas: readonly FilaAprobacion[]): {
-  personas: number;
+/** Cuántas faltan y cuántas horas suman. Es lo que dice el contador de arriba. */
+export function resumenPendientes(dias: readonly DiaAprobacion[]): {
+  /** Cuántas aprobaciones faltan — persona-día, que es la unidad. */
+  pendientes: number;
   minutos: number;
-  codigos: string[];
+  /** `codigo|fecha` de cada una, para el botón «Aprobar todo». */
+  claves: string[];
 } {
-  const pend = filas.filter((f) => !f.aprobado);
-  return {
-    personas: pend.length,
-    minutos: pend.reduce((a, f) => a + f.minutos, 0),
-    codigos: pend.map((f) => f.codigo),
-  };
+  let pendientes = 0, minutos = 0;
+  const claves: string[] = [];
+  for (const d of dias) {
+    for (const g of d.gente) {
+      if (g.aprobado) continue;
+      pendientes += 1;
+      minutos += g.minutos;
+      claves.push(claveDia(g.codigo, d.fecha));
+    }
+  }
+  return { pendientes, minutos, claves };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
