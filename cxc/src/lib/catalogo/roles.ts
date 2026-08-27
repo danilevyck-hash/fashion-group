@@ -43,17 +43,27 @@
 // su decisión, no el mecanismo: la lista sigue siendo UNA y las tres capas se
 // siguen derivando de acá.
 //
-// ### 🔴 «VER» ES **UNA** LISTA, Y LAS OTRAS TRES NO SE TOCARON
+// ### 🔴 EL 27-ago-2026, MÁS TARDE: LAS CUATRO LISTAS
 //
-// `CATALOGO_ROLES`        → VER el catálogo.        + **gerente_boston**
-// `CATALOGO_ADMIN_ROLES`  → administrar la marca.   gerente_boston **NO**
-// `COMPROBANTES_ROLES`    → VER la lista de pedidos. gerente_boston **NO**
-// `cfg.createRoles`       → ARMAR pedidos.           gerente_boston **NO**
+// Se le abrió VER, y se le preguntó a Daniel si además quería la lista de
+// pedidos —que trae el **cliente** y el **monto** de cada venta del grupo—.
+// Contestó, textual: ***«Si. Abrele todo catalogo»***.
 //
-// 🔑 **Y por eso NO es «como bodega».** Bodega entró a `COMPROBANTES_ROLES` el
-// 25-ago; David no. Los pedidos de esas 4 marcas traen el **cliente** y el
-// **monto** de cada venta del grupo — o sea justo lo que la regla de Boston
-// protege. Ver ≠ ver los pedidos.
+// `CATALOGO_ROLES`        → VER el catálogo.         + **gerente_boston**
+// `CATALOGO_ADMIN_ROLES`  → administrar la marca.    + **gerente_boston**
+// `COMPROBANTES_ROLES`    → VER la lista de pedidos. + **gerente_boston**
+// `cfg.createRoles`       → ARMAR pedidos.           + **gerente_boston**
+//
+// ⚠️ **QUÉ INCLUYE LA TERCERA, dicho de frente porque es lo más fuerte que se
+// abrió en todo el día:** administrar deja **mandar pedidos a Switch** —o sea
+// crear documentos de verdad en el ERP de las empresas del GRUPO— y **borrar
+// pedidos**. No es leer: es escribir hacia afuera. Se construyó porque Daniel
+// lo pidió sabiendo lo que había adentro (se le dijo antes de tocarlo), y
+// **retirarlo es sacar `ROL_BOSTON` de estas listas**, nada más.
+//
+// 🔑 Lo que NO cambia: David sigue sin Ventas, Gastos, Marketing, Comisiones ni
+// el CXC del grupo, y su casa sigue siendo `/boston`. Las dos fugas del #659
+// —búsqueda global e Inicio del grupo— siguen tapadas y con candado.
 //
 // ### Qué le abre EXACTAMENTE agregarlo acá, medido ruta por ruta
 //
@@ -85,7 +95,7 @@ export const CATALOGO_ROLES = ["admin", "secretaria", "vendedor", "bodega", ROL_
 /** Administran el catálogo de cualquier marca (fotos, etiquetas, ocultar,
  *  pedidos). Mismo par que `ADMIN_ROLES` de lib/api-auth, que es el que ya
  *  protege products/variantes. */
-export const CATALOGO_ADMIN_ROLES = ["admin", "secretaria"] as const;
+export const CATALOGO_ADMIN_ROLES = ["admin", "secretaria", ROL_BOSTON] as const;
 
 /** Copias mutables para las APIs que reciben `string[]`. */
 export const catalogoRoles = (): string[] => [...CATALOGO_ROLES];
@@ -163,7 +173,7 @@ export function clienteSwitchRoles(createRoles: readonly string[]): string[] {
 
 /** Ven la lista de comprobantes de una marca (`/catalogo/<marca>/pedidos`).
  *  🔴 bodega SÍ está desde el 25-ago-2026 — **solo para mirar**. */
-export const COMPROBANTES_ROLES = ["admin", "secretaria", "vendedor", "bodega"] as const;
+export const COMPROBANTES_ROLES = ["admin", "secretaria", "vendedor", "bodega", ROL_BOSTON] as const;
 
 /** Copia mutable para quien reciba `string[]`. */
 export const comprobantesRoles = (): string[] => [...COMPROBANTES_ROLES];
