@@ -46,8 +46,7 @@ function calcEmpleado(emp: Empleado) {
   const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
   const saldo = prestado - pagado;
   const pct = prestado > 0 ? (pagado / prestado) * 100 : 0;
-  const pendientes = movs.filter(m => m.estado === "pendiente_aprobacion").length;
-  return { prestado, pagado, saldo, pct, pendientes };
+  return { prestado, pagado, saldo, pct };
 }
 
 function progressColor(pct: number) {
@@ -90,7 +89,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const [filterEmpresa, setFilterEmpresa] = useLastUsed("prestamos_empresa", "all");
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
-  const [filterPendientes, setFilterPendientes] = useState(false);
 
   // Confirm delete employee
   const [confirmDeleteEmp, setConfirmDeleteEmp] = useState<Empleado | null>(null);
@@ -129,11 +127,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const [confirmPagoQ, setConfirmPagoQ] = useState<Empleado | null>(null);
 
   // Batch approval state
-  const [selectedPending, setSelectedPending] = useState<Set<string>>(new Set());
-  const [confirmBatchApprove, setConfirmBatchApprove] = useState(false);
-  const [confirmBatchReject, setConfirmBatchReject] = useState(false);
-  const [batchProcessing, setBatchProcessing] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
   const [exportingExcel, setExportingExcel] = useState(false);
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
@@ -171,7 +164,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   // ── Computed ──
   const allCalcs = empleados.map(e => ({ emp: e, ...calcEmpleado(e) }));
   const totalSaldo = allCalcs.filter(c => c.emp.activo).reduce((s, c) => s + c.saldo, 0);
-  const totalPendientes = allCalcs.reduce((s, c) => s + c.pendientes, 0);
 
   const quincena = getQuincenaRange();
   const empleadosConDeduccion = allCalcs.filter(c => c.emp.activo && c.emp.deduccion_quincenal > 0);
@@ -191,7 +183,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const filtered = allCalcs.filter(c => {
     if (filterEmpresa !== "all" && c.emp.empresa !== filterEmpresa) return false;
     if (search && !c.emp.nombre.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filterPendientes && c.pendientes === 0) return false;
     return true;
   });
 
@@ -363,48 +354,9 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
     setExportingExcel(false);
   }
 
-  function togglePendingSelect(id: string) {
-    setSelectedPending(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
 
-  function doBatchAction(estado: "aprobado" | "rechazado") {
-    const ids = Array.from(selectedPending);
-    if (ids.length === 0) return;
-    setConfirmBatchApprove(false);
-    setConfirmBatchReject(false);
-    const count = ids.length;
-    const label = estado === "aprobado" ? "aprobado" : "rechazado";
-    const savedSelected = new Set(selectedPending);
 
-    scheduleAction({
-      id: `batch-${estado}-${Date.now()}`,
-      message: `${count} movimiento${count !== 1 ? "s" : ""} ${label}${count !== 1 ? "s" : ""}`,
-      onOptimistic: () => {
-        setSelectedPending(new Set());
-      },
-      onRevert: () => {
-        setSelectedPending(savedSelected);
-      },
-      execute: async () => {
-        setBatchProcessing(true);
-        let ok = 0;
-        for (const id of ids) {
-          try {
-            const res = await fetch(`/api/prestamos/movimientos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado }) });
-            if (res.ok) ok++;
-          } catch { /* continue */ }
-        }
-        showToast(`${ok} movimiento${ok !== 1 ? "s" : ""} ${label}${ok !== 1 ? "s" : ""}`);
-        setBatchProcessing(false);
-        loadEmpleados();
-      },
-    });
-  }
+
 
   return (
     <div className="min-h-screen bg-white">
@@ -436,90 +388,11 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           )}
         </div>
 
-        {/* Pending approval banner */}
-        {totalPendientes > 0 && (role === "admin") && (
-          <button
-            onClick={() => setFilterPendientes(!filterPendientes)}
-            className="w-full mb-6 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-left flex items-center justify-between hover:border-amber-400 transition"
-          >
-            <span className="text-sm text-amber-700">
-              Tienes <strong>{totalPendientes}</strong> préstamo{totalPendientes > 1 ? "s" : ""} pendiente{totalPendientes > 1 ? "s" : ""} de aprobación
-            </span>
-            <span className="text-xs font-medium text-amber-600">{filterPendientes ? "Ver todos los empleados" : "Ver pendientes de aprobar"} →</span>
-          </button>
-        )}
-
-        {/* Inline approval list when filtering pendientes */}
-        {filterPendientes && isAdmin && (() => {
-          const pendingMovs = allCalcs.flatMap(c => (c.emp.prestamos_movimientos || []).filter(m => m.estado === "pendiente_aprobacion").map(m => ({ ...m, empNombre: c.emp.nombre })));
-          if (pendingMovs.length === 0) return null;
-          const allPendingIds = pendingMovs.map(m => m.id);
-          const allPendingSelected = allPendingIds.length > 0 && allPendingIds.every(id => selectedPending.has(id));
-          return (
-            <div className="mb-6 border border-amber-200 rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between bg-amber-50 px-4 py-2">
-                <div className="flex items-center gap-3">
-                  {/* El cuadradito nativo mide 13×13. El target de 44 lo pone
-                      la <label> que lo envuelve, no el checkbox. */}
-                  <label className="-ml-2.5 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center px-2.5">
-                    <input type="checkbox" checked={allPendingSelected} onChange={() => { if (allPendingSelected) setSelectedPending(new Set()); else setSelectedPending(new Set(allPendingIds)); }} className="h-[18px] w-[18px] accent-black" />
-                    <span className="sr-only">Seleccionar todos</span>
-                  </label>
-                  {/* El banner que abre esta sección ya dice "pendientes de
-                      aprobación"; acá solo hace falta el conteo de seleccionados. */}
-                  {selectedPending.size > 0 && (
-                    <span className="text-xs text-amber-700 font-medium">
-                      {selectedPending.size} seleccionado{selectedPending.size !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedPending.size > 0 ? (
-                    <>
-                      <button onClick={() => setConfirmBatchApprove(true)} disabled={batchProcessing} className="inline-flex min-h-[44px] items-center justify-center text-xs bg-green-600 text-white px-4 rounded-md hover:bg-green-700 transition disabled:opacity-50">
-                        {batchProcessing ? "Procesando..." : `Aprobar ${selectedPending.size}`}
-                      </button>
-                      <button onClick={() => setConfirmBatchReject(true)} disabled={batchProcessing} className="inline-flex min-h-[44px] items-center justify-center text-xs text-red-500 hover:text-red-700 transition px-3 disabled:opacity-50">
-                        Rechazar {selectedPending.size}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => { setSelectedPending(new Set(allPendingIds)); setConfirmBatchApprove(true); }} className="inline-flex min-h-[44px] items-center justify-center text-xs bg-green-600 text-white px-4 rounded-md hover:bg-green-700 transition">Aprobar todos</button>
-                      <button onClick={() => { setSelectedPending(new Set(allPendingIds)); setConfirmBatchReject(true); }} className="inline-flex min-h-[44px] items-center justify-center text-xs text-red-500 hover:text-red-700 transition px-3">Rechazar todos</button>
-                    </>
-                  )}
-                </div>
-              </div>
-              {pendingMovs.map(m => (
-                <div key={m.id} className="flex items-center justify-between px-4 py-3 border-t border-amber-100 text-sm border-l-4 border-l-amber-400 bg-amber-50/20">
-                  <div className="flex items-center gap-3">
-                    <label className="-ml-2.5 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center px-2.5">
-                      <input type="checkbox" checked={selectedPending.has(m.id)} onChange={() => togglePendingSelect(m.id)} className="h-[18px] w-[18px] accent-black" />
-                      <span className="sr-only">Seleccionar {m.empNombre}</span>
-                    </label>
-                    <span className="text-amber-500 flex-shrink-0">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    </span>
-                    <div>
-                      <span className="font-medium">{m.empNombre}</span>
-                      <span className="text-gray-400 mx-2">·</span>
-                      <span className="text-gray-500">{m.concepto}</span>
-                      <span className="text-gray-400 mx-2">·</span>
-                      <span className="tabular-nums font-semibold">${fmt(m.monto)}</span>
-                      <span className="text-gray-400 mx-2">·</span>
-                      <span className="text-xs text-gray-400">{fmtDate(m.fecha)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); } finally { setProcessingId(null); } }} className="text-xs bg-green-600 text-white px-5 min-h-[44px] rounded-md hover:bg-green-700 transition disabled:opacity-50 font-medium">{processingId === m.id ? "Procesando..." : "Aprobar"}</button>
-                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); } finally { setProcessingId(null); } }} className="text-xs text-red-600 border border-red-200 hover:bg-red-50 transition px-5 min-h-[44px] rounded-md disabled:opacity-50 font-medium">{processingId === m.id ? "..." : "Rechazar"}</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-        })()}
+        {/* 🔴 La aprobación de préstamos se retiró (27-ago-2026). Daniel:
+            «quita poder aprobar prestamos, todos deben de pasar». El freno no
+            protegía: escondía — un préstamo sin aprobar no suma al saldo, así
+            que la pantalla lo mostraba en CERO. A Luis Arroyo le pasó con $700
+            durante 22 días. Ver `api/prestamos/movimientos/route.ts`. */}
 
         {/* Actions + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -564,7 +437,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           <EmptyState title="No se encontraron empleados" actionLabel="+ Nuevo empleado" onAction={openNewEmp} />
         ) : (
           <ul className="space-y-2">
-            {filtered.map(({ emp, prestado, saldo, pct, pendientes }) => {
+            {filtered.map(({ emp, prestado, saldo, pct }) => {
               const saldado = saldo <= 0 && prestado > 0;
               const deducida = emp.deduccion_quincenal > 0 && hasDeduccionEnQuincena(emp.prestamos_movimientos || [], quincena.start, quincena.end);
               const pendienteDed = emp.deduccion_quincenal > 0 && !deducida && saldo > 0;
@@ -578,7 +451,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               // pastel y el estado hay que poder leerlo). En desktop no cambia
               // nada: siguen en la línea 1 y en su columna de w-24.
               const badges = [
-                pendientes > 0 ? <span key="pend" className="shrink-0 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pend.</span> : null,
                 saldado ? <span key="saldado" className="shrink-0 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">Saldado</span> : null,
                 !emp.activo ? <span key="archivado" className="shrink-0 text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span> : null,
               ].filter(Boolean);
@@ -593,7 +465,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                   key={emp.id}
                   data-empleado-fila={emp.id}
                   onClick={() => handleRowClick(emp)}
-                  className={`flex items-center gap-2 sm:gap-4 rounded-lg border p-3 sm:px-4 cursor-pointer hover:bg-gray-50 active:bg-gray-50 transition-colors ${pendientes > 0 ? "border-l-4 border-l-amber-400" : "border-gray-200"} ${!emp.activo ? "opacity-50" : ""}`}
+                  className={`flex items-center gap-2 sm:gap-4 rounded-lg border p-3 sm:px-4 cursor-pointer hover:bg-gray-50 active:bg-gray-50 transition-colors border-gray-200 ${!emp.activo ? "opacity-50" : ""}`}
                 >
                   {/* 1 · Nombre + empresa (+ chips en mobile) */}
                   <div className="min-w-0 flex-1">
@@ -867,23 +739,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         )}
       </BottomSheet>
 
-      <ConfirmModal
-        open={confirmBatchApprove}
-        onClose={() => setConfirmBatchApprove(false)}
-        onConfirm={() => doBatchAction("aprobado")}
-        title="Aprobar movimientos"
-        message={`¿Aprobar ${selectedPending.size} movimiento${selectedPending.size !== 1 ? "s" : ""}?`}
-        confirmLabel="Aprobar"
-      />
-      <ConfirmModal
-        open={confirmBatchReject}
-        onClose={() => setConfirmBatchReject(false)}
-        onConfirm={() => doBatchAction("rechazado")}
-        title="Rechazar movimientos"
-        message={`¿Rechazar ${selectedPending.size} movimiento${selectedPending.size !== 1 ? "s" : ""}? Esta acción no se puede deshacer.`}
-        confirmLabel="Rechazar"
-        destructive
-      />
       <ConfirmModal
         open={confirmAplicarQ}
         onClose={() => setConfirmAplicarQ(false)}

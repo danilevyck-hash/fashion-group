@@ -96,17 +96,17 @@ describe("Préstamos · los 5 controles medidos por debajo de 44", () => {
 });
 
 describe("Préstamos · el barrido del resto del módulo", () => {
-  it("los checkboxes de la lista de aprobación van envueltos en un target de 44", () => {
-    const labels = lista.match(/<label className="-ml-2\.5 flex min-h-\[44px\] min-w-\[44px\] cursor-pointer items-center justify-center px-2\.5">/g) ?? [];
-    expect(labels.length).toBe(2); // "seleccionar todos" + el de cada fila
-    // ningún checkbox suelto con el estilo viejo de 13×13 (accent-black a secas)
-    expect(lista).not.toMatch(/type="checkbox"[^\n]*className="accent-black"/);
-  });
-
-  it("los botones de aprobación por lote llegan a 44 (medían ~29)", () => {
-    expect(lista).not.toMatch(/text-xs bg-green-600 text-white px-4 py-1\.5/);
-    expect(lista).not.toMatch(/text-red-500 hover:text-red-700 transition px-3 py-1\.5/);
-    expect((lista.match(/min-h-\[44px\][^"]*text-xs bg-green-600/g) ?? []).length).toBe(2);
+  // 🔴 Los dos casos de la LISTA DE APROBACIÓN se retiraron el 27-ago-2026 con
+  // la pantalla que vigilaban. Daniel: «quita poder aprobar prestamos, todos
+  // deben de pasar». Protegían los checkboxes y los botones «Aprobar» /
+  // «Aprobar todos» de esa lista; hoy no existe ninguno de los cinco.
+  //
+  // ⚠️ No se aflojó nada: lo que sigue vivo del módulo se mide igual, y el
+  // barrido de abajo pone el build ROJO si la lista vuelve sin sus 44 px.
+  it("⛔ la lista de aprobación no vuelve — y si vuelve, vuelve medida", () => {
+    for (const marca of ["pendiente_aprobacion", "Aprobar todos", "selectedPending"]) {
+      expect(lista, `«${marca}» reapareció en Préstamos`).not.toContain(marca);
+    }
   });
 
   it("detalle · Pago Quincenal y + Nuevo Movimiento llegan a 44 (medían 37)", () => {

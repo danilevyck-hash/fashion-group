@@ -92,11 +92,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Determine estado based on concepto and monto
-  let estado = "aprobado";
-  if ((concepto === "Préstamo" || concepto === "Responsabilidad por daño") && Number(monto) >= 500) {
-    estado = "pendiente_aprobacion";
-  }
+  // 🔴 TODO MOVIMIENTO ENTRA APROBADO — no hay aprobación de préstamos.
+  //
+  // Daniel, 27-ago-2026, textual: *«quita poder aprobar prestamos, todos deben
+  // de pasar»*. Hasta hoy, un Préstamo o una Responsabilidad por daño de $500 o
+  // más nacía en `pendiente_aprobacion` y no contaba para el saldo hasta que
+  // alguien lo aprobara en pantalla.
+  //
+  // 🩸 Y ESE FRENO NO PROTEGÍA: ESCONDÍA. El saldo solo suma los movimientos
+  // aprobados, así que un préstamo esperando aprobación es un préstamo que la
+  // pantalla muestra en CERO. Medido el 27-ago-2026 contra producción: LUIS
+  // ADRIAN ARROYO tenía $700 del 5-ago atrapados ahí, o sea que su saldo decía
+  // $0 y no se le estaba descontando nada. La contadora lo reportó como algo
+  // que «debe aprobar en sistema» — 22 días después.
+  //
+  // El estado se sigue GUARDANDO (la columna no se retira y las filas viejas no
+  // se tocan acá), pero ya nadie escribe `pendiente_aprobacion`.
+  const estado = "aprobado";
 
   const { data, error } = await supabaseServer
     .from("prestamos_movimientos")
