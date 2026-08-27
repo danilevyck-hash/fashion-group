@@ -126,6 +126,16 @@ export async function buildReferenciaSheet(
   const fichas = articulos.map((a) => ({ art: a, f: armarFicha(a, hoyMes) }));
 
   return buildReportSheet({
+    // 🔴 LA ÚNICA ACLARACIÓN QUE VUELVE (27-ago-2026). El subtítulo viejo eran
+    // ~900 caracteres de manual y Daniel lo mandó sacar entero; de todo eso,
+    // esto es lo que NO se puede deducir mirando la tabla — y sin ello un
+    // «Compré 36» al lado de un «Stock 12» parece un error de cuenta.
+    //
+    // Va al PIE y fuera del rango del filtro (`nota`), así que filtrar no la
+    // esconde y no se mete entre los encabezados y los datos.
+    nota:
+      "Cuando la bodega quedó en 0 y volvió a llegar mercancía, Compré · Vendí · "
+      + "Vendido · Meses son de la ÚLTIMA llegada. Stock es siempre la existencia total.",
     columns: [
       { header: "Referencia", wch: 18 },
       { header: "Descripción", wch: 26 },
