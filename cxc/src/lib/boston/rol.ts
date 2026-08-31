@@ -66,15 +66,30 @@ export function puedeVerModuloBoston(rol: string | null | undefined): boolean {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 🔴 LA PREGUNTA QUE DANIEL TODAVÍA NO CONTESTÓ — Y POR ESO ES UNA LÍNEA
+// ✅ DANIEL CONTESTÓ QUE SÍ (31-ago-2026) — Y FUE UNA LÍNEA
 // ═════════════════════════════════════════════════════════════════════════════
 //
-// ¿David ve los SUELDOS de las 21 personas de la planilla de Boston?
+// ¿David ve los SUELDOS de las 21 personas de la planilla de Boston? **Sí.**
 //
-// **Por defecto NO**, que es el default seguro: mostrar de más un sueldo no se
-// puede deshacer. El día que Daniel diga que sí, el cambio es ESTA LÍNEA y nada
-// más — no hay una segunda pantalla que tocar, ni un filtro repartido por las
-// consultas, ni una columna que esconder en el navegador.
+// Nació en `false` porque era el default seguro: mostrar de más un sueldo no se
+// puede deshacer, y la pregunta no estaba contestada. Se dejó de manera que el
+// día que se contestara el cambio fuera ESTA LÍNEA y nada más — sin una segunda
+// pantalla que tocar, sin un filtro repartido por las consultas y sin una
+// columna que esconder en el navegador. Fue exactamente eso.
+//
+// 🔴 LO QUE **NO** CAMBIA CON EL `true`, y es la mitad que importa:
+//   · la EMPRESA se la sigue FORZANDO el servidor (`esGerenteBoston(auth.role)
+//     ? EMPRESA_BOSTON`), así que un `?empresa=vistana` sigue devolviendo
+//     Boston — medido, no supuesto;
+//   · no gana una ruta, ni una pestaña, ni un módulo: es la MISMA planilla que
+//     ya abría, con el bloque `dinero` adentro;
+//   · `planillaSinDinero` y `lineaSinDinero` NO se borran. El mecanismo queda
+//     entero: es lo que hace que volver a `false` vuelva a ser una línea.
+//
+// ⚠️ Y lo que sí gana, dicho de frente: con el recorte apagado la ruta deja de
+// cortar temprano, así que además del sueldo le llegan los `totales` de la
+// planilla de Boston y el bloque de aprobación del préstamo de cada persona
+// —que vive DESPUÉS de ese `return`—. Son de las 21 personas de SU empresa.
 //
 // 🔑 EL RECORTE VA EN EL SERVIDOR, y eso es lo que hace que la línea alcance.
 // Es la misma decisión —y el mismo mecanismo— que ya tomó `soloApruebaRoles()`
@@ -85,7 +100,7 @@ export function puedeVerModuloBoston(rol: string | null | undefined): boolean {
 // ⚠️ Ver los sueldos NO es un módulo nuevo ni una pestaña nueva: David ve la
 // MISMA planilla de Boston con o sin la línea. Lo único que cambia es si el
 // bloque `dinero` de cada fila —y el cuadro `totales`— viajan o no.
-export const VE_SUELDOS_DE_BOSTON = false;
+export const VE_SUELDOS_DE_BOSTON = true;
 
 /**
  * ¿A este rol la planilla le contesta SIN el bloque de dinero?

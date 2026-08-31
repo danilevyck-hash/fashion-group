@@ -449,14 +449,26 @@ describe("gerente_boston — favoritos solo de la cartera de Boston", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("la planilla de Boston", () => {
-  it("por defecto David NO ve los sueldos (la pregunta que Daniel no contestó)", () => {
-    expect(VE_SUELDOS_DE_BOSTON).toBe(false);
-    expect(planillaSinDinero(ROL)).toBe(true);
+  // 🔴 CAMBIÓ DE DIRECCIÓN (31-ago-2026). Fijaba `false` con el motivo escrito
+  // —«la pregunta que Daniel no contestó»— y era correcto mientras no estuviera
+  // contestada. **La contestó: David ve los sueldos de SU planilla.** Lo que no
+  // se afloja es el resto: la empresa la sigue forzando el servidor, el recorte
+  // sigue existiendo como mecanismo, y nadie más cambia.
+  it("David ve los sueldos de su planilla (Daniel dijo que sí)", () => {
+    expect(VE_SUELDOS_DE_BOSTON).toBe(true);
+    expect(planillaSinDinero(ROL)).toBe(false);
   });
 
-  it("el recorte es SOLO para él: nadie más pierde el dinero", () => {
+  it("🔑 el MECANISMO no se borró: volver a esconderlos sigue siendo una línea", () => {
+    // `lineaSinDinero` sigue enumerando lo que viaja —lo prueba el caso de
+    // abajo— y `planillaSinDinero` sigue derivándose de la constante. Si algún
+    // día se apaga, el recorte vuelve entero sin tocar una ruta.
+    expect(typeof planillaSinDinero).toBe("function");
+    expect(planillaSinDinero("secretaria")).toBe(false);
+  });
+
+  it("ningún otro rol pierde el dinero — y ninguno lo gana por esto", () => {
     for (const rol of SYSTEM_ROLE_KEYS) {
-      if (rol === ROL) continue;
       expect(planillaSinDinero(rol), `${rol} perdió el bloque de dinero`).toBe(false);
     }
   });
