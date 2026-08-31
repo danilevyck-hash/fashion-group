@@ -27,10 +27,11 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):
-- **Ventas y clientes:** Vista General, Ventas, CXC (`/admin`), Multifashion, Clientes/Directorio (`/clientes`), Proveedores, Catálogos (Reebok, Joybees, Tommy Hilfiger — las 3 marcas ENCENDIDAS: tarjeta en el hub /catalogos/marcas, catálogo público compartible /catalogo-publico/tommy y pedido público /pedido-tommy/[id] accesibles sin sesión, cron tommy-catalogo bajo vigilancia estricta)
-- **Operación:** Guías de Despacho, Packing Lists, **Asistencia y Planilla**, Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos** (2 pestañas: *Gastos* —Egresos Varios, fuente ÚNICA desde el 13-ago-2026— y *Saldos de banco*), Préstamos, **Recordatorios** (era *Cheques*; la `key` sigue siendo `cheques` — ver abajo)
-
+- **Ventas y clientes:** Vista General, Ventas, CXC (`/admin`), Multifashion, **Confecciones Boston** (`/boston`, key `boston` — 27-ago-2026), Clientes/Directorio (`/clientes`), Proveedores, **Referencia** (`/referencia`, key `referencia` — 12-ago-2026), Catálogos (**CUATRO** marcas ENCENDIDAS: Reebok, Joybees, Tommy Hilfiger y **Calvin Klein**, cada una con su tarjeta en el hub /catalogos/marcas, su catálogo público compartible y su pedido público `/pedido-<marca>/[id]` accesibles sin sesión)
+- **Operación:** Guías de Despacho, Packing Lists, **Asistencia y Planilla** (`/asistencia`, key `asistencia` — 3-ago-2026), Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos** (`/gastos-contabilidad`, key `gastos-contabilidad` — 11-ago-2026; 2 pestañas: *Gastos* —Egresos Varios, fuente ÚNICA desde el 13-ago-2026— y *Saldos de banco*), Préstamos, **Recordatorios** (era *Cheques*; la `key` sigue siendo `cheques` — ver abajo)
 - **Administración:** Usuarios, Data Health
+
+> **Nacidos después del 5-jul-2026** (auditoría de estado, 31-ago): los cuatro módulos navegables `asistencia` · `gastos-contabilidad` · `referencia` · `boston`, más dos PÁGINAS públicas que **no son módulos** y por eso no tienen ficha ni entrada en `role_permissions`: `/pedido-tommy/[id]` (24-jul) y `/pedido-calvin/[id]` (12-ago). En el mismo período nacieron **89 rutas API** y 6 grupos nuevos (`api/asistencia`, `api/boston`, `api/gastos-contabilidad`, `api/saldos-banco`, `api/recordatorios`, `api/diag`).
 
 > Las fichas del home y del sidebar NO llevan subtítulo (auditoría de textos, #278): el campo `subtitle` se eliminó de `AppModule`.
 > Páginas de grupo: `/g/[grupo]` con los 3 slugs nuevos. Los slugs viejos redirigen en `next.config.js` (`/g/sistema` → `/g/administracion`; `/g/plata-entra`, `/g/plata-sale`, `/g/productos` → `/home`).
@@ -205,11 +206,11 @@ archivo enlazado, verbatim.
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-77 entradas configuradas (+8 el 13-ago-2026 al pasar los 4 catálogos de 2 a 4 pasadas diarias, todas dentro de la ventana de uso de Panamá — ver la nota abajo; 66 hasta ese mismo día, cuando se retiró `sync-mayor`; 53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul, −6 al bajar `db-salud` a 5, +3 al pasar `asistencia-vigia` de 1 pasada L-V a 4 diarias el 10-ago, −1 al quitarle la pasada de las 13:45 UTC ese mismo día — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
+79 entradas configuradas (+2 el 24-ago-2026: `sync-factura-lineas` (#577) y `sync-ingresos-mercancia` (#586), que entraron a `vercel.json` y nunca a esta tabla; +8 el 13-ago-2026 al pasar los 4 catálogos de 2 a 4 pasadas diarias, todas dentro de la ventana de uso de Panamá — ver la nota abajo; 66 hasta ese mismo día, cuando se retiró `sync-mayor`; 53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul, −6 al bajar `db-salud` a 5, +3 al pasar `asistencia-vigia` de 1 pasada L-V a 4 diarias el 10-ago, −1 al quitarle la pasada de las 13:45 UTC ese mismo día — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
 
 | Cron | Schedule (UTC) |
 |------|----------------|
-| /api/cron/db-salud | 01:45, 04:35, 07:25, 09:55, 12:25, 14:45, 16:45, 18:45, 20:25, 21:45, 22:45 (11 entradas — vigía de recursos, ver nota abajo) |
+| /api/cron/db-salud | **01:45, 07:25, 12:25, 16:45, 21:45** (5 entradas — vigía de recursos. ⚠️ Esta fila decía 11 horarios hasta el 31-ago-2026: bajaron a 5 el 30-jul con la poda de alertas y la tabla no se actualizó. Hueco máximo 5 h 40) |
 | /api/cron/cleanup-sessions | 02:30 (revoca sesiones inactivas — ver nota abajo) |
 | /api/cron/cleanup-packing-lists | 03:00 |
 | /api/cron/sync-articulo-info (3 grupos de 2 empresas FG) | 04:30 (vistana, active_wear), 04:40 (fashion_shoes, fashion_wear), 04:50 (active_shoes, joystep) — catálogo del tab Ventas › Referencia (existencia, precio de etiqueta, nombre real, CIF). 3 entradas y NO una de 6: vistana sola midió **155 s / 8.122 artículos** (10-ago-2026) y 6 así desbordan los 800 s (el caso Boston). La franja 00:30-05:15 es la única sin sesiones de Switch de estas 6; cada grupo queda a 60/55/50 min de SU par del bloque `all`. Boston y ACS EXCLUIDOS (decisión de Daniel, la misma del tab). El botón "Actualizar datos de Switch" del tab SE QUEDA para el dato del momento. Candado: `cron-sync-articulo-info.test.ts` |
@@ -219,7 +220,6 @@ archivo enlazado, verbatim.
 | /api/cron/backup | 06:00, 10:30, 18:30 (3 entradas — las 2ª/3ª son "segunda oportunidad": no-op si una anterior ya registró success hoy) |
 | /api/cron/backup?grupo=switch | 06:45, 11:15, **23:30** (3 entradas, mismo guard no-op) |
 | /api/cron/backup?grupo=storage | 04:00, 15:30 (2 entradas — réplica off-site de los buckets de Storage a Cloudflare R2) |
-
 | /api/cron/switch-sync tipo=all (american_classic, confecciones_boston) | 06:30 |
 | /api/cron/sync-utilidad | 07:00 |
 | /api/cron/sync-clientes-master | 07:00 |
@@ -240,6 +240,14 @@ archivo enlazado, verbatim.
 | /api/cron/grupo-resumen-mensual | 13:00 el día 3 de cada mes (`0 13 3 * *` — resumen mensual del grupo a Telegram; único cron NO diario, umbral propio en health-crons) |
 | /api/cron/switch-sync tipo=estadocuenta (3 pares B2B) | 16:00/16:05/16:10 y 21:10/21:15/21:20 (6 entradas — CXC intradía; ronda 1 con active_shoes,joystep PRIMERO, que hoy le da 70 min a reebok-catalogo 17:10) |
 | /api/cron/asistencia-vigia | 15:00, 20:00, 22:15 (3 entradas, TODOS los días = 10:00 a.m. / 3:00 p.m. / 5:15 p.m. Panamá — el reloj de asistencia lleva +6h sin reportar; ver nota abajo) |
+| /api/cron/sync-factura-lineas | 03:30 (renglón por renglón de cada factura; alimenta «qué le vendí a este cliente») |
+| /api/cron/boston-cartera | **08:10** — la cartera de Confecciones Boston, que NO baja por el estadocuenta del API (su universo son 4.912 clientes y no cabe en la función). Va por el reporte web `reportesmanager` con uuid. **Es lo que la regla 1 de alertas vigila desde el 24-ago-2026** |
+| /api/cron/sync-ingresos-mercancia | 09:05 (las llegadas de mercancía; alimentan «Compré» y la última llegada de Ventas › Referencia) |
+| /api/cron/sync-egresos-varios | 10:35 (la ÚNICA fuente de gasto desde que se retiró el mayor contable — ver `docs/historico/superado.md`) |
+| /api/cron/catalogos-fotos-resumen | **13:30 los LUNES** (`30 13 * * 1`) — el resumen semanal de fotos que faltan. ⚠️ Único cron semanal; el otro no-diario es `grupo-resumen-mensual` |
+| /api/cron/guias-pendientes | 14:30 (aviso de guías que quedaron sin despachar) |
+
+⚠️ **Las 6 filas de arriba corrían en producción SIN estar en esta tabla** hasta el 31-ago-2026 — incluida `boston-cartera`, que es de la que depende que la cartera de Boston no se congele. Se agregaron en la auditoría de estado; el candado que ya existía (`cron-registro.test.ts`, la biyección `vercel.json` ↔ registro de código) protege el CÓDIGO, no esta tabla.
 
 
 ## Alertas a Telegram — DOS canales (27-jul-2026)
