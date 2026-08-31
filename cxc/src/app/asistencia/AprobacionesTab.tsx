@@ -197,6 +197,24 @@ export default function AprobacionesTab() {
     [cargar, toast],
   );
 
+  // 🩸 La librería de Excel se baja al TOCAR el botón, no al abrir la pestaña:
+  // `xlsx-js-style` pesa y esta pantalla se abre para aprobar, no para exportar.
+  // Es el mismo patrón que ya usa el Excel del Reporte.
+  const bajarExcel = useCallback(async () => {
+    if (!dias || dias.length === 0) return;
+    try {
+      const { construirExcelAprobaciones, nombreArchivoAprobaciones } =
+        await import("@/lib/asistencia/aprobaciones-excel");
+      const { downloadWorkbook } = await import("@/lib/excel-export");
+      downloadWorkbook(
+        construirExcelAprobaciones({ dias, desde, hasta }),
+        nombreArchivoAprobaciones(desde, hasta),
+      );
+    } catch {
+      setError("No se pudo armar el Excel. Intenta de nuevo.");
+    }
+  }, [dias, desde, hasta]);
+
   const deDia = (d: DiaAprobacion) =>
     d.gente.map((g) => ({ codigo: g.codigo, fecha: d.fecha, minutos: g.minutos }));
 
@@ -213,6 +231,17 @@ export default function AprobacionesTab() {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <RangoFechas desde={desde} hasta={hasta} onChange={(d, h) => { setDesde(d); setHasta(h); }} />
         <div className="flex-1" />
+        {/* 🔴 EXPORTAR NO ES APROBAR: se puede bajar el archivo aunque no se
+            tenga permiso de aprobar y aunque no quede nada pendiente. Por eso
+            NO mira `bloqueado` — solo que haya algo que bajar. */}
+        <button
+          type="button"
+          disabled={!dias || dias.length === 0}
+          onClick={() => void bajarExcel()}
+          className="min-h-[44px] rounded-md border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:border-gray-400 active:scale-[0.97] disabled:opacity-30"
+        >
+          Excel
+        </button>
         <button
           type="button"
           disabled={bloqueado || pend.pendientes === 0}
