@@ -60,5 +60,13 @@
     "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.4"
+  },
+  "allowScripts": {
+    "esbuild@0.27.4": true,
+    "sharp@0.34.5": true,
+    "fsevents@2.3.3": true,
+    "fsevents@2.3.2": true,
+    "core-js@3.49.0": true,
+    "@sentry/cli@2.58.5": true
   }
 }
