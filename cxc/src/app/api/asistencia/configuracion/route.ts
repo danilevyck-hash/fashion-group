@@ -19,7 +19,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
-import { requireRole } from "@/lib/requireRole";
+import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { diaPanama } from "@/lib/asistencia/reporte";
@@ -112,7 +112,7 @@ interface FilaMarca {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -404,7 +404,7 @@ export async function GET(req: NextRequest) {
 
 /** Guarda la ficha de UNA persona. La validación entera vive en el servidor. */
 export async function PUT(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   let body: unknown;

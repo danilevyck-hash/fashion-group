@@ -24,7 +24,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
-import { requireRole } from "@/lib/requireRole";
+import { requireAsistencia } from "@/lib/asistencia/guard";
 import { centavos, quincenaDesdeClave } from "@/lib/asistencia/planilla";
 import {
   avisoMigracionPrestamoAprobado,
@@ -39,7 +39,7 @@ import { guardarManuales, leerManuales } from "@/lib/asistencia/planilla-server"
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   try {

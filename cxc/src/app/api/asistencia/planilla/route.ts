@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles, aprobacionesRoles, soloAprueba } from "@/lib/asistencia/roles";
 import { EMPRESA_BOSTON, ROL_BOSTON, esGerenteBoston, planillaSinDinero } from "@/lib/boston/rol";
 import { lineasSinDinero } from "@/lib/boston/planilla-sin-dinero";
-import { requireRole } from "@/lib/requireRole";
+import { requireAsistencia, MODULOS_PLANILLA } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
   // Reimplementar la planilla habría estrenado una SEGUNDA aritmética de
   // sueldos al lado de la que la contadora ya cotejó al centavo contra su
   // Excel — y su modo de fallo es que dos pantallas paguen distinto.
-  const auth = requireRole(req, [...asistenciaRoles(), ...aprobacionesRoles(), ROL_BOSTON]);
+  const auth = requireAsistencia(req, [...asistenciaRoles(), ...aprobacionesRoles(), ROL_BOSTON], MODULOS_PLANILLA);
   if (auth instanceof NextResponse) return auth;
   const recortado = soloAprueba(auth.role);
   // 🔴 David ve el cuadro ENTERO de Boston, pero por defecto SIN la plata. La
@@ -774,7 +774,7 @@ export async function GET(req: NextRequest) {
 
 /** Guardar los montos que se escriben a mano de UNA persona. */
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   try {

@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/requireRole";
+import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import {
@@ -45,7 +45,7 @@ async function leerRelojes(): Promise<{ filas: FilaDispositivo[]; error: string 
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   const { filas, error } = await leerRelojes();
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
  * vuelta siguiente del agente, no en este request.
  */
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   let dispositivo = DISPOSITIVO_FG;

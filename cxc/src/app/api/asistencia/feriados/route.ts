@@ -4,13 +4,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
-import { requireRole } from "@/lib/requireRole";
+import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
   const anio = (req.nextUrl.searchParams.get("anio") ?? "").trim();
   let q = supabaseServer.from("asistencia_feriados").select("fecha, nombre").order("fecha");
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
   let b: { fecha?: string; nombre?: string };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
   const fecha = (req.nextUrl.searchParams.get("fecha") ?? "").trim();
   if (!fecha) return NextResponse.json({ error: "Falta la fecha" }, { status: 400 });

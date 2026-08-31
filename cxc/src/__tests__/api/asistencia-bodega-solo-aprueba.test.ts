@@ -27,7 +27,10 @@ let ROL = "bodega";
 vi.mock("@/lib/requireRole", () => ({
   requireRole: (_r: unknown, roles: string[]) =>
     roles.includes(ROL)
-      ? { role: ROL, userName: "Bodega", userId: "9", sessionToken: "t" }
+      // `modules`: en producción la cookie SIEMPRE lo trae (lo escribe el
+      // login) y `requireAsistencia` lo exige. `bodega` tiene `asistencia` en
+      // `role_permissions` desde 20260830120000.
+      ? { role: ROL, userName: "Bodega", userId: "9", sessionToken: "t", modules: ["asistencia"] }
       : NextResponse.json({ error: "Sin permiso." }, { status: 403 }),
 }));
 

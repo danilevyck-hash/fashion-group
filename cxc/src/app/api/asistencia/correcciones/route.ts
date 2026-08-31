@@ -18,7 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
-import { requireRole } from "@/lib/requireRole";
+import { requireAsistencia } from "@/lib/asistencia/guard";
 import { diaPanama } from "@/lib/asistencia/reporte";
 import {
   avisoMigracionCorrecciones,
@@ -60,7 +60,7 @@ function respuestaEscritura(r: ResultadoEscritura): NextResponse {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
 
 /** Deshacer. La corrección se ANULA con firma; la fila queda. */
 export async function DELETE(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   const id = (req.nextUrl.searchParams.get("id") ?? "").trim();

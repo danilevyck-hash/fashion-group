@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
-import { requireRole } from "@/lib/requireRole";
+import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { salidaSugerida, minutosDelDia, diaPanama } from "@/lib/asistencia/reporte";
@@ -24,7 +24,7 @@ export const maxDuration = 60;
 interface FilaMarca { empleado_codigo: string | null; empleado_nombre: string | null; ocurrio_en: string }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   // ⚠️ `almuerzoMinutos` YA NO SE ACEPTA. Lo único que se guarda de acá es la

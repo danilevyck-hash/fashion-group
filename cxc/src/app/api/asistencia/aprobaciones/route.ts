@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { aprobacionesRoles } from "@/lib/asistencia/roles";
-import { requireRole } from "@/lib/requireRole";
+import { requireAsistencia } from "@/lib/asistencia/guard";
 import {
   avisoMigracionAprobaciones,
   claveDia,
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   // no puede aprobar no aprueba ni entrando por la URL. Ver la nota larga de
   // `APROBACIONES_ROLES`: hoy es solo `admin` porque Julio Garay todavía no
   // tiene usuario en el sistema y crearle uno lo decide Daniel.
-  const auth = requireRole(req, aprobacionesRoles());
+  const auth = requireAsistencia(req, aprobacionesRoles());
   if (auth instanceof NextResponse) return auth;
 
   try {

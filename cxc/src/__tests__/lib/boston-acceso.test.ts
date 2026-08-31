@@ -122,7 +122,10 @@ beforeAll(() => { process.env.SESSION_SECRET = "test-secret-boston-acceso"; });
 afterAll(() => { process.env.SESSION_SECRET = SECRET_PREV; });
 
 function req(url: string, role: string): NextRequest {
-  const cookie = signSession({ role, userId: "u1", userName: "david", sessionToken: "t1" });
+  // `modules`: en producción la cookie siempre los trae. Los de David son los
+  // reales (`role_permissions.gerente_boston`), sin `asistencia`.
+  const modules = role === ROL_BOSTON ? ["boston", "catalogos"] : ["asistencia"];
+  const cookie = signSession({ role, userId: "u1", userName: "david", sessionToken: "t1", modules });
   return new NextRequest(`https://fashiongr.com${url}`, { headers: { cookie: `cxc_session=${cookie}` } });
 }
 
@@ -506,7 +509,12 @@ describe("la planilla de Boston", () => {
     // Y el recorte se decide con el módulo, no con un `if` suelto.
     expect(src).toMatch(/planillaSinDinero\(\s*auth\.role\s*\)/);
     // El rol tiene que estar en la lista del guard, o la ruta le contestaría 403.
-    expect(src).toMatch(/requireRole\(\s*req\s*,\s*\[[^\]]*ROL_BOSTON[^\]]*\]\s*\)/);
+    // 🔴 CAMBIÓ DE DIRECCIÓN (31-ago-2026): el gate pasó de `requireRole` —que
+    // solo mira el ROL— a `requireAsistencia`, que además exige el MÓDULO. Y
+    // por eso la planilla le pasa `MODULOS_PLANILLA`: David NO tiene
+    // `asistencia`, su acceso lo habilita `boston`. Sin ese segundo argumento
+    // esta pantalla suya se caería con 403.
+    expect(src).toMatch(/requireAsistencia\(\s*req\s*,\s*\[[^\]]*ROL_BOSTON[^\]]*\]\s*,\s*MODULOS_PLANILLA\s*\)/);
   });
 });
 

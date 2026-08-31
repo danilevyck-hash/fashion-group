@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
-import { requireRole } from "@/lib/requireRole";
+import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
 import { TABLA_VACACIONES, esTablaFaltante } from "@/lib/asistencia/config";
 import {
@@ -52,7 +52,7 @@ function faltaLaTabla(error: unknown): boolean {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   // 🩸 La lista de personas sale del DIRECTORIO, no del reloj: el reloj manda
@@ -194,7 +194,7 @@ function revisarFechas(desde: string, hasta: string): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   let b: { codigo?: string; desde?: string; hasta?: string; yaPagadas?: unknown };
@@ -246,7 +246,7 @@ export async function POST(req: NextRequest) {
  * corrección de un renglón de guía.
  */
 export async function PATCH(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   let b: { id?: string; desde?: string; hasta?: string; yaPagadas?: unknown };
@@ -295,7 +295,7 @@ export async function PATCH(req: NextRequest) {
  * ya avisada al personal no se borra, se retira.
  */
 export async function DELETE(req: NextRequest) {
-  const auth = requireRole(req, asistenciaRoles());
+  const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   const id = (req.nextUrl.searchParams.get("id") ?? "").trim();

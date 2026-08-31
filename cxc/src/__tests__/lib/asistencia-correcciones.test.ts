@@ -481,7 +481,9 @@ vi.mock("@/lib/requireRole", async () => {
   const real = await vi.importActual<typeof import("@/lib/requireRole")>("@/lib/requireRole");
   return {
     ...real,
-    requireRole: () => ({ role: "contabilidad", userId: "u1", userName: "Angela", sessionToken: "t" }),
+    // `modules` va porque `requireAsistencia` lo exige: en producción la
+    // cookie siempre lo trae y contabilidad tiene `asistencia`.
+    requireRole: () => ({ role: "contabilidad", userId: "u1", userName: "Angela", sessionToken: "t", modules: ["asistencia"] }),
   };
 });
 
@@ -599,7 +601,10 @@ describe("quién puede corregir", () => {
     const codigo = sinComentarios(
       fs.readFileSync(path.join(RAIZ, "app/api/asistencia/correcciones/route.ts"), "utf8"),
     );
-    expect((codigo.match(/requireRole\(req, asistenciaRoles\(\)\)/g) ?? []).length).toBe(3);
+    // 🔴 CAMBIÓ DE DIRECCIÓN (31-ago-2026): antes exigía `requireRole`, que
+    // mira el ROL y no los MÓDULOS — justo el agujero por el que las dos
+    // secretarias entraban por URL. Ahora exige el guard que mira los dos.
+    expect((codigo.match(/requireAsistencia\(req, asistenciaRoles\(\)\)/g) ?? []).length).toBe(3);
   });
 });
 
