@@ -15,7 +15,7 @@ import { esTrabajoDeVendedor, textoDiaJustificado } from "@/lib/asistencia/motiv
 import { textoDiaVacaciones } from "@/lib/asistencia/vacaciones";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Ayuda } from "@/components/shared/Ayuda";
-import RangoFechas from "./RangoFechas";
+import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 import EstadoReloj from "./EstadoReloj";
 import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
 
@@ -45,6 +45,15 @@ export default function ReporteTab() {
   const hoy = hoyPanama();
   const [desde, setDesde] = useState(hoyPanama(new Date(Date.now() - 14 * 86_400_000)));
   const [hasta, setHasta] = useState(hoy);
+
+  // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
+  // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
+  // —si no, pisaría cada cambio del usuario con el valor guardado.
+  useEffect(() => {
+    const r = ultimoRango("asistencia_reporte");
+    if (r) { setDesde(r.desde); setHasta(r.hasta); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [q, setQ] = useState("");
   const [personas, setPersonas] = useState<PersonaReporte[] | null>(null);
   const [sinHorario, setSinHorario] = useState(0);
@@ -139,7 +148,7 @@ export default function ReporteTab() {
       <EstadoReloj onLlegaron={() => void cargar()} />
 
       <div className="flex flex-wrap items-end gap-3">
-        <RangoFechas desde={desde} hasta={hasta} onChange={(d, h) => { setDesde(d); setHasta(h); }} />
+        <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_reporte" onChange={(d, h) => { setDesde(d); setHasta(h); }} />
         <input
           type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar persona"
           className="min-h-[44px] flex-1 min-w-[160px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"

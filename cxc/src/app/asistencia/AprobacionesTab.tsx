@@ -34,7 +34,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import RangoFechas from "./RangoFechas";
+import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 import { quincenasHasta } from "@/lib/asistencia/planilla";
 import {
   claveDia,
@@ -121,6 +121,15 @@ export default function AprobacionesTab() {
   const quincenaEnCurso = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
   const [desde, setDesde] = useState(quincenaEnCurso.desde);
   const [hasta, setHasta] = useState(quincenaEnCurso.hasta);
+
+  // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
+  // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
+  // —si no, pisaría cada cambio del usuario con el valor guardado.
+  useEffect(() => {
+    const r = ultimoRango("asistencia_aprobaciones");
+    if (r) { setDesde(r.desde); setHasta(r.hasta); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [dias, setDias] = useState<DiaAprobacion[] | null>(null);
   const [puedeAprobar, setPuedeAprobar] = useState(true);
@@ -232,7 +241,7 @@ export default function AprobacionesTab() {
   return (
     <div className="py-4">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <RangoFechas desde={desde} hasta={hasta} onChange={(d, h) => { setDesde(d); setHasta(h); }} />
+        <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_aprobaciones" onChange={(d, h) => { setDesde(d); setHasta(h); }} />
         <div className="flex-1" />
         {/* 🔴 EXPORTAR NO ES APROBAR: se puede bajar el archivo aunque no se
             tenga permiso de aprobar y aunque no quede nada pendiente. Por eso

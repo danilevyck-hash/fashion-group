@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
+import RangoFechas from "@/components/ui/RangoFechas";
 import {
   diasDeVacacion,
   efectoDelInterruptor,
@@ -207,20 +208,9 @@ export default function VacacionesTab() {
               </p>
             )}
           </div>
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Desde</label>
-            <input
-              type="date" value={desde} className={campo}
-              onChange={(e) => {
-                setDesde(e.target.value);
-                if (hasta < e.target.value) setHasta(e.target.value);
-              }}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Hasta</label>
-            <input type="date" value={hasta} min={desde} className={campo}
-              onChange={(e) => setHasta(e.target.value)} />
+          <div className="sm:col-span-2">
+            <RangoFechas desde={desde} hasta={hasta} label="Días de vacaciones"
+              onChange={(d, h) => { setDesde(d); setHasta(h); }} />
           </div>
         </div>
 
@@ -278,16 +268,10 @@ export default function VacacionesTab() {
               {/* Editar en el lugar: las fechas y el interruptor. Se guarda al
                   cambiar — sin botón, sin ventana. */}
               <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                <label className="block">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Desde</span>
-                  <input type="date" defaultValue={v.desde} className={campo}
-                    onChange={(e) => void editar(v.id, { desde: e.target.value, hasta: v.hasta < e.target.value ? e.target.value : v.hasta })} />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Hasta</span>
-                  <input type="date" defaultValue={v.hasta} min={v.desde} className={campo}
-                    onChange={(e) => void editar(v.id, { desde: v.desde, hasta: e.target.value })} />
-                </label>
+                <div className="sm:col-span-2">
+                  <RangoFechas desde={v.desde} hasta={v.hasta} label="Días"
+                    onChange={(d, h) => void editar(v.id, { desde: d, hasta: h })} />
+                </div>
                 <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 self-end">
                   <input type="checkbox" checked={v.ya_pagadas} className="h-4 w-4 accent-black"
                     onChange={(e) => void editar(v.id, { yaPagadas: e.target.checked })} />

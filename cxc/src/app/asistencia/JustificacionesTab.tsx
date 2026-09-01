@@ -12,6 +12,7 @@ import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directori
 import { Ayuda } from "@/components/shared/Ayuda";
 import { textoPermiso, ventanaDe } from "@/lib/asistencia/permiso-horas";
 
+import RangoFechas from "@/components/ui/RangoFechas";
 interface Justificacion {
   id: string;
   empleado_codigo: string;
@@ -156,14 +157,9 @@ export default function JustificacionesTab() {
               {motivos.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Desde</label>
-            <input type="date" value={desde} className={campo}
-              onChange={(e) => { setDesde(e.target.value); if (hasta < e.target.value) setHasta(e.target.value); }} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Hasta</label>
-            <input type="date" value={hasta} min={desde} onChange={(e) => setHasta(e.target.value)} className={campo} />
+          <div className="sm:col-span-2">
+            <RangoFechas desde={desde} hasta={hasta} label="Días"
+              onChange={(d, h) => { setDesde(d); setHasta(h); }} />
           </div>
           {/* 🔴 EL PERMISO DE HORAS. Vacías = el día entero, que es lo de
               siempre y lo que hace que nada cambie hasta que alguien las use.

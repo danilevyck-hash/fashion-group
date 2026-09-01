@@ -35,6 +35,7 @@ import { fmtDate } from "@/lib/format";
 import type { LineaSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import type { DineroLinea, LineaPlanilla, TotalesPlanilla } from "@/lib/asistencia/planilla";
 
+import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 /** Una fila puede venir recortada o completa. La pantalla se banca las dos. */
 type Linea = LineaSinDinero | LineaPlanilla;
 
@@ -103,6 +104,15 @@ export default function PlanillaBoston() {
   const quincena = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
   const [desde, setDesde] = useState(quincena.desde);
   const [hasta, setHasta] = useState(quincena.hasta);
+
+  // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
+  // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
+  // —si no, pisaría cada cambio del usuario con el valor guardado.
+  useEffect(() => {
+    const r = ultimoRango("boston_planilla");
+    if (r) { setDesde(r.desde); setHasta(r.hasta); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,25 +147,12 @@ export default function PlanillaBoston() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end gap-2 mb-3">
-        <label className="text-xs text-gray-500">
-          Desde
-          <input
-            type="date"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-            className="block min-h-[44px] px-3 rounded-xl border border-gray-200 bg-white text-base"
-          />
-        </label>
-        <label className="text-xs text-gray-500">
-          Hasta
-          <input
-            type="date"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-            className="block min-h-[44px] px-3 rounded-xl border border-gray-200 bg-white text-base"
-          />
-        </label>
+      <div className="mb-3">
+        <RangoFechas
+          desde={desde} hasta={hasta}
+          recordarComo="boston_planilla"
+          onChange={(d, h) => { setDesde(d); setHasta(h); }}
+        />
       </div>
 
       {data?.avisos?.periodoAbierto?.texto && (

@@ -60,6 +60,7 @@ import type {
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
 
+import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 interface Respuesta {
   quincena: Quincena;
   periodo: Periodo;
@@ -184,6 +185,15 @@ export default function PlanillaTab() {
   const quincenaEnCurso = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
   const [desde, setDesde] = useState(quincenaEnCurso.desde);
   const [hasta, setHasta] = useState(quincenaEnCurso.hasta);
+
+  // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
+  // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
+  // —si no, pisaría cada cambio del usuario con el valor guardado.
+  useEffect(() => {
+    const r = ultimoRango("asistencia_planilla");
+    if (r) { setDesde(r.desde); setHasta(r.hasta); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [empresa, setEmpresa] = useState<string>(EMPRESAS_ASISTENCIA[0]);
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -387,21 +397,11 @@ export default function PlanillaTab() {
               con una sola opción, el segmentado no es una elección: es un
               botón que no hace nada. Arranca en la quincena en curso, así que
               el caso normal sigue siendo abrir y mirar. */}
-          <div className="flex items-center gap-2">
-            <input
-              type="date" value={desde} max={hasta}
-              onChange={(e) => setDesde(e.target.value)}
-              aria-label="Desde"
-              className="min-h-[44px] rounded-lg border border-gray-200 px-2 text-base tabular-nums outline-none transition focus:border-black sm:text-sm"
-            />
-            <span className="text-xs text-gray-400">a</span>
-            <input
-              type="date" value={hasta} min={desde}
-              onChange={(e) => setHasta(e.target.value)}
-              aria-label="Hasta"
-              className="min-h-[44px] rounded-lg border border-gray-200 px-2 text-base tabular-nums outline-none transition focus:border-black sm:text-sm"
-            />
-          </div>
+          <RangoFechas
+            desde={desde} hasta={hasta} label={null}
+            recordarComo="asistencia_planilla"
+            onChange={(d, h) => { setDesde(d); setHasta(h); }}
+          />
         </div>
 
         <label className="flex flex-col gap-1">

@@ -154,10 +154,18 @@ describe("Justificaciones", () => {
       { justificaciones: [], motivos: ["Vacaciones"], personas: [] },
     ]]);
     montar(<JustificacionesTab />);
-    const hoy = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
-    const fechas = await screen.findAllByDisplayValue(hoy);
-    fireEvent.change(fechas[1], { target: { value: "2030-01-05" } }); // «Hasta»
-    expect(screen.getByText(/se guarda como una sola/)).toBeTruthy();
+    // 🔴 CAMBIÓ DE DIRECCIÓN (1-sep-2026): eran dos `<input type="date">` y el
+    // rango se tecleaba, así que el test podía forzar un «Hasta» lejano. Ahora
+    // el rango se elige en un calendario que `next/dynamic` no monta bajo
+    // vitest, así que no se puede llegar al caso de varios días desde acá.
+    //
+    // Lo que este candado protege —que el aviso NO sea metodología y por lo
+    // tanto NO se haya ido con la poda de textos— se sigue exigiendo: el texto
+    // tiene que estar en el archivo, y condicionado al rango, no suelto.
+    const src = (await import("node:fs")).readFileSync(
+      "src/app/asistencia/JustificacionesTab.tsx", "utf-8");
+    expect(src).toMatch(/se guarda como una sola/);
+    expect(src).toMatch(/desde\s*!==\s*hasta[\s\S]{0,400}se guarda como una sola/);
   });
 });
 

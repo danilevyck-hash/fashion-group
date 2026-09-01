@@ -115,7 +115,15 @@ const montar = () => render(<ToastProvider><PlanillaTab /></ToastProvider>);
 beforeEach(() => vi.unstubAllGlobals());
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-const campos = () => screen.getAllByLabelText(/Desde|Hasta/) as HTMLInputElement[];
+// 🔴 CAMBIÓ DE DIRECCIÓN (1-sep-2026). Eran DOS `<input type="date">` sueltos y
+// este helper los tomaba por su `aria-label`. Ahora es UN control: un botón que
+// dice el rango y abre un calendario. Lo que el candado sigue exigiendo —que la
+// pantalla arranque en la quincena en curso y que la ruta se pida por rango— no
+// cambió; lo que cambió es por dónde se lee.
+// 🩸 `getAllByRole(...)[0]`, no `getByRole`: en jsdom no hay Tailwind, así que
+// el botón de desktop (`hidden lg:block`) y el de móvil (`lg:hidden`) se montan
+// los DOS y `getByRole` revienta con «Found multiple elements».
+const control = () => screen.getAllByRole("button", { name: /·\s*\d+\s*d[ií]as?/ })[0];
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", () => {
@@ -131,13 +139,18 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     expect(screen.queryByText(/1 al 15 de agosto de 2026/)).toBeNull();
   });
 
-  it("los DOS campos de fecha se ven de entrada, sin tocar nada", async () => {
+  it("el control dice el rango y cuántos días son, sin tocar nada", async () => {
     servir(respuestaQuincena());
     montar();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
-    const [d, h] = campos();
-    expect(d.type).toBe("date");
-    expect(h.type).toBe("date");
+    expect(control().textContent).toMatch(/15 días/);
+  });
+
+  it("⛔ y NO quedó ningún `<input type=\"date\">` suelto de rango", async () => {
+    servir(respuestaQuincena());
+    const { container } = montar();
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    expect(container.querySelectorAll('input[type="date"]').length).toBe(0);
   });
 
   it("🔴 arranca en la QUINCENA EN CURSO: el caso normal sigue siendo abrir", async () => {
@@ -147,9 +160,8 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     const llamadas = servir(respuestaQuincena());
     montar();
     await waitFor(() => expect(llamadas.length).toBeGreaterThan(0));
-    const [d, h] = campos();
-    expect(d.value).toBe("2026-08-01");
-    expect(h.value).toBe("2026-08-15");
+    // «1 ago – 15 ago 2026 · 15 días»
+    expect(control().textContent).toMatch(/1 ago.*15 ago 2026.*15 días/);
     expect(llamadas[0].url).toContain("desde=2026-08-01");
     expect(llamadas[0].url).toContain("hasta=2026-08-15");
     vi.useRealTimers();
@@ -165,17 +177,34 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     expect(get.url).not.toMatch(/[?&]quincena=/);
   });
 
-  it("cambiar una fecha vuelve a pedir el cuadro con ESE rango", async () => {
+  it("cerrado NO hay calendario: se carga recién al abrirlo", async () => {
+    servir(respuestaQuincena());
+    const { container } = montar();
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    expect(container.querySelectorAll("[data-day]").length).toBe(0);
+  });
+
+  // 🩸 NO SE PUEDE ABRIR EL CALENDARIO DESDE ACÁ, y queda escrito para que nadie
+  // lo intente de nuevo: `next/dynamic` no resuelve bajo vitest —se queda en su
+  // `loading` para siempre (medido: el DOM tiene el placeholder y ni un
+  // `data-day`)— y meter el mock en un helper importado tampoco alcanza, porque
+  // `vi.mock` se iza POR ARCHIVO.
+  //
+  // Lo que la máquina de toques hace —ancla, cierre, orden invertido, ancla
+  // nueva— se prueba sobre `CalendarioRango` importado DIRECTO, en
+  // `rango-fechas-calendario.test.tsx`, que es donde vive esa lógica. Acá se
+  // prueba lo que ESTA pantalla decide.
+  it("la ruta se pide por RANGO y el control refleja el que está puesto", async () => {
     const llamadas = servir(respuestaQuincena());
     montar();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
-    llamadas.length = 0;
-    fireEvent.change(campos()[0], { target: { value: "2026-07-25" } });
-    await waitFor(() => {
-      const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla"));
-      expect(get?.url).toContain("desde=2026-07-25");
-    });
+    const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla"))!;
+    expect(get.url).toContain("desde=");
+    expect(get.url).toContain("hasta=");
+    expect(control().textContent).toMatch(/días/);
   });
+
+
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
