@@ -46,6 +46,11 @@ const CalendarioRango = dynamic(() => import("./CalendarioRango"), {
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
+/** 7 columnas × 44 px = 308, × 2 meses + separación + padding del panel. */
+const ANCHO_DOS_MESES = 308 * 2 + 24 + 24;
+/** 6 semanas + encabezado + el título: alcanza sin scroll para cualquier mes. */
+const ALTO_CALENDARIO = 420;
+
 /** «28 oct – 10 nov 2026 · 14 días». El año se dice UNA vez si es el mismo. */
 export function etiquetaRango(desde: string, hasta: string): string {
   if (!desde || !hasta) return "Elegí el período";
@@ -65,9 +70,18 @@ interface Props {
   /** Se guarda el último rango bajo esta llave (`fg_last_<key>`). */
   recordarComo?: string;
   label?: string | null;
+  /**
+   * 🔴 `true` = todavía NADIE eligió, así que el botón NO muestra un rango.
+   *
+   * Lo usan las dos planillas. Daniel: *«la quincena se paga según el rango de
+   * fecha seleccionado»* — mostrar «1 sep – 15 sep» sin que nadie lo haya
+   * pedido es afirmar un período de pago. El calendario igual ABRE en ese mes,
+   * que es una ayuda; lo que no hace es decir que ya está elegido.
+   */
+  vacio?: boolean;
 }
 
-export default function RangoFechas({ desde, hasta, onChange, recordarComo, label = "Período" }: Props) {
+export default function RangoFechas({ desde, hasta, onChange, recordarComo, label = "Período", vacio = false }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [ancla, setAncla] = useState<string | null>(null);
   const [datos, setDatos] = useState<Set<string> | null>(null);
@@ -112,7 +126,9 @@ export default function RangoFechas({ desde, hasta, onChange, recordarComo, labe
 
   const titulo = ancla
     ? `${etiquetaRango(ancla, ancla).split(" · ")[0]} – elegí el fin`
-    : etiquetaRango(desde, hasta);
+    : vacio
+      ? "Elegí el período"
+      : etiquetaRango(desde, hasta);
 
   const cuerpo = (meses: 1 | 2) => (
     <CalendarioRango
@@ -129,7 +145,9 @@ export default function RangoFechas({ desde, hasta, onChange, recordarComo, labe
       className="flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-gray-200 px-3 text-left text-sm transition hover:border-gray-400"
     >
       <span aria-hidden className="text-base leading-none">📅</span>
-      <span className="text-gray-900">{etiquetaRango(desde, hasta)}</span>
+      <span className={vacio ? "text-gray-500" : "text-gray-900"}>
+        {vacio ? "Elegí el período" : etiquetaRango(desde, hasta)}
+      </span>
     </button>
   );
 
@@ -142,13 +160,25 @@ export default function RangoFechas({ desde, hasta, onChange, recordarComo, labe
       {/* DESKTOP: anclado al control, dos meses. */}
       <div className="hidden lg:block" ref={anclaRef}>
         {boton}
+        {/* 🩸 EL `ancho` NO ES OPCIONAL ACÁ, y no darlo fue un bug de verdad:
+            sin él `DesplegableFlotante` toma el ancho del ANCLA (~330 px, el del
+            botón). Un calendario son 7 columnas × 44 px = 308 px más el padding,
+            y dos meses ~660. Con 330 se cortaban SÁBADO y DOMINGO —la grilla
+            mostraba LU MA MI JU VI y nada más—, entraba un solo mes y el resto
+            quedaba detrás de un scroll. Se veía en la primera captura.
+            `altoDeseado` por el mismo motivo: sin él el panel se recorta a lo
+            alto y las últimas semanas quedan abajo del corte. */}
         <DesplegableFlotante
           abierto={abierto}
           anclaRef={anclaRef}
           onCerrar={() => { setAbierto(false); setAncla(null); }}
+          ancho={ANCHO_DOS_MESES}
+          altoDeseado={ALTO_CALENDARIO}
           className="rounded-xl border border-gray-200 bg-white p-3 shadow-lg"
         >
-          <p className="px-1 pb-2 text-sm font-medium text-gray-900">{titulo}</p>
+          {/* El título solo mientras se está eligiendo: cerrado, el botón ya lo
+              dice y repetirlo era ruido (se veía duplicado en la captura). */}
+          {ancla && <p className="px-1 pb-2 text-sm font-medium text-gray-900">{titulo}</p>}
           {cuerpo(2)}
         </DesplegableFlotante>
       </div>

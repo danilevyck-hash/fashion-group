@@ -35,7 +35,7 @@ import { fmtDate } from "@/lib/format";
 import type { LineaSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import type { DineroLinea, LineaPlanilla, TotalesPlanilla } from "@/lib/asistencia/planilla";
 
-import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
+import RangoFechas from "@/components/ui/RangoFechas";
 /** Una fila puede venir recortada o completa. La pantalla se banca las dos. */
 type Linea = LineaSinDinero | LineaPlanilla;
 
@@ -104,15 +104,10 @@ export default function PlanillaBoston() {
   const quincena = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
   const [desde, setDesde] = useState(quincena.desde);
   const [hasta, setHasta] = useState(quincena.hasta);
-
-  // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
-  // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
-  // —si no, pisaría cada cambio del usuario con el valor guardado.
-  useEffect(() => {
-    const r = ultimoRango("boston_planilla");
-    if (r) { setDesde(r.desde); setHasta(r.hasta); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // 🔴 IGUAL QUE LA PLANILLA DEL GRUPO: abre VACÍA. Daniel: *«la quincena se
+  // paga según el rango de fecha seleccionado»*. Y sin recordar el último, que
+  // al abrir la quincena siguiente mostraría la anterior ya cargada, con plata.
+  const [elegido, setElegido] = useState(false);
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,8 +132,8 @@ export default function PlanillaBoston() {
   }, [desde, hasta]);
 
   useEffect(() => {
-    void cargar();
-  }, [cargar]);
+    if (elegido) void cargar();
+  }, [cargar, elegido]);
 
   const lineas = data?.lineas ?? [];
   // 🔑 La tabla cambia de forma según lo que el SERVIDOR mandó, no según un flag
@@ -150,8 +145,8 @@ export default function PlanillaBoston() {
       <div className="mb-3">
         <RangoFechas
           desde={desde} hasta={hasta}
-          recordarComo="boston_planilla"
-          onChange={(d, h) => { setDesde(d); setHasta(h); }}
+          vacio={!elegido}
+          onChange={(d, h) => { setDesde(d); setHasta(h); setElegido(true); }}
         />
       </div>
 
@@ -166,6 +161,14 @@ export default function PlanillaBoston() {
         </p>
       )}
 
+      {!elegido && !cargando && (
+        <div className="rounded-xl border border-dashed border-gray-200 px-4 py-12 text-center">
+          <p className="text-sm font-medium text-gray-700">Elegí el período que vas a pagar</p>
+          <p className="mt-1 text-[13px] text-gray-500">
+            La quincena se calcula con las fechas que elijas arriba.
+          </p>
+        </div>
+      )}
       {error && <p className="text-sm text-red-600 py-8">{error}</p>}
       {cargando && !data && <p className="text-sm text-gray-500 py-8">Cargando…</p>}
 

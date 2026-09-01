@@ -41,6 +41,43 @@ import {
 } from "@/lib/asistencia/planilla";
 import PlanillaTab from "@/app/asistencia/PlanillaTab";
 
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOBLE DEL SELECTOR DE RANGO.
+//
+// 🩸 No es pereza: el control REAL carga el calendario con `dynamic()`, y bajo
+// vitest eso no resuelve —el módulo nunca monta y no hay un solo día que tocar
+// (medido: el diálogo abre, pero cero `data-day`)—. Meter el mock de
+// `next/dynamic` tampoco alcanza: su factoría se IZA por encima de los imports,
+// así que `React` todavía no existe cuando corre.
+//
+// 🔑 Lo que este archivo prueba es lo que decide LA PLANILLA: que no pida nada
+// hasta que hay período, y que pida ESE. Cómo se elige —ancla, cierre, orden
+// invertido, ancla nueva— se prueba sobre el componente real, importado
+// directo, en `rango-fechas-calendario.test.tsx` (14 casos).
+vi.mock("@/components/ui/RangoFechas", () => ({
+  __esModule: true,
+  default: ({ desde, hasta, vacio, onChange }: {
+    desde: string; hasta: string; vacio?: boolean;
+    onChange: (d: string, h: string) => void;
+  }) => (
+    <div>
+      <button type="button" onClick={() => onChange(desde, hasta)}>
+        {vacio
+          ? "Elegí el período"
+          : `${desde} – ${hasta} · ${
+              Math.round((Date.parse(hasta) - Date.parse(desde)) / 86400000) + 1
+            } días`}
+      </button>
+      <button type="button" data-testid="elegir-4-20" onClick={() => onChange("2026-08-04", "2026-08-20")}>
+        elegir 4-20
+      </button>
+    </div>
+  ),
+}));
+
 const Q = quincena(2026, 8, 1); // 1 → 15 de agosto de 2026
 
 const dinero = {
@@ -123,13 +160,29 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 // 🩸 `getAllByRole(...)[0]`, no `getByRole`: en jsdom no hay Tailwind, así que
 // el botón de desktop (`hidden lg:block`) y el de móvil (`lg:hidden`) se montan
 // los DOS y `getByRole` revienta con «Found multiple elements».
-const control = () => screen.getAllByRole("button", { name: /·\s*\d+\s*d[ií]as?/ })[0];
+/** 🔴 La planilla abre VACÍA: nada se pide hasta elegir el período. */
+async function elegirPeriodo(d?: string, h?: string) {
+  if (d === "2026-08-04" || h === "2026-08-20") {
+    fireEvent.click(screen.getByTestId("elegir-4-20"));
+  } else {
+    fireEvent.click(control());
+  }
+}
+
+// 🩸 `getAllByRole(...)[0]`, no `getByRole`: en jsdom no hay Tailwind, así que
+// el botón de desktop (`hidden lg:block`) y el de móvil (`lg:hidden`) se montan
+// los DOS y `getByRole` revienta con «Found multiple elements».
+// 🔑 Y matchea las DOS caras del control: «Elegí el período» antes de elegir, y
+// «1 ago – 15 ago 2026 · 15 días» después.
+const control = () =>
+  screen.getAllByRole("button", { name: /Elegí el período|·\s*\d+\s*d[ií]as?/ })[0];
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", () => {
   it("no hay control de modo — ni «Quincena» ni «Rango de fechas»", async () => {
     servir(respuestaQuincena());
     montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     // 🔑 Con una sola opción, un segmentado no es una elección: es un botón que
     // no hace nada.
@@ -139,37 +192,69 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     expect(screen.queryByText(/1 al 15 de agosto de 2026/)).toBeNull();
   });
 
-  it("el control dice el rango y cuántos días son, sin tocar nada", async () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN (1-sep-2026). Antes exigía que el control abriera
+  // mostrando la quincena en curso. Daniel: *«la quincena se paga según el
+  // rango de fecha seleccionado»* — un rango puesto solo AFIRMA un período de
+  // pago que nadie pidió. Ahora abre invitando a elegirlo.
+  it("🔴 abre SIN período puesto: dice «Elegí el período»", async () => {
     servir(respuestaQuincena());
     montar();
+    await waitFor(() => expect(control().textContent).toMatch(/Elegí el período/));
+    expect(control().textContent).not.toMatch(/días/);
+  });
+
+  it("y después de elegirlo, dice el rango y cuántos días son", async () => {
+    servir(respuestaQuincena());
+    montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
-    expect(control().textContent).toMatch(/15 días/);
+    // El FORMATO de la etiqueta («1 ago – 15 ago 2026 · 15 días») se prueba
+    // sobre el control real en `rango-fechas-calendario.test.tsx`. Acá alcanza
+    // con que el control DEJE de decir «Elegí el período» al haber elegido.
+    expect(control().textContent).not.toMatch(/Elegí el período/);
   });
 
   it("⛔ y NO quedó ningún `<input type=\"date\">` suelto de rango", async () => {
     servir(respuestaQuincena());
     const { container } = montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     expect(container.querySelectorAll('input[type="date"]').length).toBe(0);
   });
 
-  it("🔴 arranca en la QUINCENA EN CURSO: el caso normal sigue siendo abrir", async () => {
-    // Sin esto, la pantalla abriría vacía o en un rango cualquiera y el trabajo
-    // de todos los días costaría teclear dos fechas.
+  // 🔴 CAMBIÓ DE DIRECCIÓN (1-sep-2026). Exigía que la pantalla abriera en la
+  // quincena en curso y pidiera el cuadro sola, «porque el caso normal es abrir
+  // y mirar». Daniel: *«la quincena se paga según el rango de fecha
+  // seleccionado»* — abrir mostrando plata de un período que nadie eligió es
+  // justamente lo que no puede pasar, porque el corte real es variable.
+  it("🔴 NO pide el cuadro hasta que alguien elige el período", async () => {
     vi.setSystemTime(new Date("2026-08-10T15:00:00Z"));
     const llamadas = servir(respuestaQuincena());
     montar();
-    await waitFor(() => expect(llamadas.length).toBeGreaterThan(0));
-    // «1 ago – 15 ago 2026 · 15 días»
-    expect(control().textContent).toMatch(/1 ago.*15 ago 2026.*15 días/);
-    expect(llamadas[0].url).toContain("desde=2026-08-01");
-    expect(llamadas[0].url).toContain("hasta=2026-08-15");
+    await waitFor(() => expect(control().textContent).toMatch(/Elegí el período/));
+    // Ni una llamada a la planilla. (El calendario sí puede pedir sus días.)
+    expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla"))).toEqual([]);
+    expect(screen.getByText(/Elegí el período que vas a pagar/)).toBeTruthy();
+    vi.useRealTimers();
+  });
+
+  it("y al elegirlo, pide ESE rango", async () => {
+    vi.setSystemTime(new Date("2026-08-10T15:00:00Z"));
+    const llamadas = servir(respuestaQuincena());
+    montar();
+    await elegirPeriodo();
+    await waitFor(() => expect(llamadas.some((c) => c.url.includes("/api/asistencia/planilla"))).toBe(true));
+    const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla"))!;
+    expect(get.url).toContain("desde=2026-08-01");
+    expect(get.url).toContain("hasta=2026-08-15");
+    expect(control().textContent).not.toMatch(/Elegí el período/);
     vi.useRealTimers();
   });
 
   it("la ruta se pide SIEMPRE por rango — nunca más con `?quincena=`", async () => {
     const llamadas = servir(respuestaQuincena());
     montar();
+    await elegirPeriodo();
     await waitFor(() => expect(llamadas.length).toBeGreaterThan(0));
     const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla"))!;
     expect(get.url).toContain("desde=");
@@ -180,6 +265,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
   it("cerrado NO hay calendario: se carga recién al abrirlo", async () => {
     servir(respuestaQuincena());
     const { container } = montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     expect(container.querySelectorAll("[data-day]").length).toBe(0);
   });
@@ -197,11 +283,12 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
   it("la ruta se pide por RANGO y el control refleja el que está puesto", async () => {
     const llamadas = servir(respuestaQuincena());
     montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla"))!;
     expect(get.url).toContain("desde=");
     expect(get.url).toContain("hasta=");
-    expect(control().textContent).toMatch(/días/);
+    expect(control().textContent).not.toMatch(/Elegí el período/);
   });
 
 
@@ -212,6 +299,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
   it("un rango que ES una quincena exacta: se pueden escribir", async () => {
     servir(respuestaQuincena());
     montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     const isr = screen.getAllByDisplayValue("25.5")[0] as HTMLInputElement;
     expect(isr.disabled).toBe(false);
@@ -220,6 +308,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
   it("🔴 y se guardan CON LA CLAVE de esa quincena", async () => {
     const llamadas = servir(respuestaQuincena());
     montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     const isr = screen.getAllByDisplayValue("25.5")[0] as HTMLInputElement;
 
@@ -242,6 +331,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
   it("los manuales YA GUARDADOS se siguen viendo (los 12 de agosto en producción)", async () => {
     servir(respuestaQuincena());
     montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     expect(screen.getAllByDisplayValue("25.5").length).toBeGreaterThan(0);
   });
@@ -249,6 +339,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
   it("🔴 un rango que NO es una quincena: quedan BLOQUEADOS", async () => {
     servir(respuestaRangoLibre());
     montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     const apagados = screen.getAllByPlaceholderText("por quincena") as HTMLInputElement[];
     expect(apagados.length).toBeGreaterThan(0);
@@ -260,6 +351,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
     // escribe, porque la tabla no tiene dónde guardarlo.
     const llamadas = servir(respuestaRangoLibre());
     montar();
+    await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     const campo = screen.getAllByPlaceholderText("por quincena")[0] as HTMLInputElement;
     campo.disabled = false;
@@ -272,6 +364,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
   it("🔴 y lo DICE, en una línea, donde están los campos", async () => {
     servir(respuestaRangoLibre());
     montar();
+    await elegirPeriodo();
     const aviso = await screen.findByText(/Los montos a mano se guardan por quincena/);
     expect(aviso).toBeTruthy();
     // Nada se descarta en silencio, pero tampoco párrafos didácticos.
@@ -281,6 +374,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
   it("con una quincena exacta ese aviso NO aparece", async () => {
     servir(respuestaQuincena());
     montar();
+    await elegirPeriodo("2026-08-04", "2026-08-20");
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     expect(screen.queryByText(/Los montos a mano se guardan por quincena/)).toBeNull();
   });
@@ -291,6 +385,7 @@ describe("lo que el rango libre cambia en la PLATA se sigue diciendo", () => {
   it("dice que el sueldo base se reparte, y en qué proporción", async () => {
     servir(respuestaRangoLibre());
     montar();
+    await elegirPeriodo();
     // 🩸 El texto está partido en varios nodos (`<b>`), así que se lee el
     // PÁRRAFO entero: `findByText` devuelve el `<b>` que matcheó, no la línea.
     const aviso = (await screen.findByText(/no son una quincena/)).closest("p")!;
@@ -301,6 +396,7 @@ describe("lo que el rango libre cambia en la PLATA se sigue diciendo", () => {
   it("y con una quincena exacta no se dibuja nada de eso", async () => {
     servir(respuestaQuincena());
     montar();
+    await elegirPeriodo("2026-08-04", "2026-08-20");
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     expect(screen.queryByText(/no son una quincena/)).toBeNull();
   });

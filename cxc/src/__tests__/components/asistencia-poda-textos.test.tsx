@@ -39,6 +39,38 @@ import ReporteTab from "@/app/asistencia/ReporteTab";
 import PlanillaTab from "@/app/asistencia/PlanillaTab";
 import ConfiguracionTab from "@/app/asistencia/ConfiguracionTab";
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOBLE DEL SELECTOR DE RANGO.
+//
+// 🔴 Desde el 1-sep-2026 la planilla abre VACÍA: no pide nada hasta que alguien
+// elige el período (*«la quincena se paga según el rango de fecha
+// seleccionado»*). Estos casos necesitan datos, así que primero eligen.
+//
+// 🩸 Va un doble y no el control real porque el control carga el calendario con
+// `dynamic()`, y bajo vitest eso NO resuelve: el diálogo abre y no hay un solo
+// `data-day` que tocar. Su conducta —ancla, cierre, orden invertido— se prueba
+// sobre el componente real en `rango-fechas-calendario.test.tsx`.
+vi.mock("@/components/ui/RangoFechas", () => ({
+  __esModule: true,
+  default: ({ desde, hasta, vacio, onChange }: {
+    desde: string; hasta: string; vacio?: boolean;
+    onChange: (d: string, h: string) => void;
+  }) => (
+    <button type="button" onClick={() => onChange(desde, hasta)}>
+      {vacio ? "Elegí el período" : `${desde} – ${hasta}`}
+    </button>
+  ),
+  // 🩸 `ultimoRango` NO es del control: es del MISMO módulo, y `ReporteTab` lo
+  // importa con nombre (`import RangoFechas, { ultimoRango } from …`). Un
+  // `vi.mock` reemplaza el módulo ENTERO, así que si no se devuelve acá la
+  // pestaña revienta al montar con «No "ultimoRango" export is defined» —y el
+  // error sale del componente, no del test, así que cuesta encontrarlo.
+  // Devuelve `null` a propósito: sin rango guardado, el reporte abre en su
+  // rango por defecto y ningún caso depende de qué hay en el localStorage.
+  ultimoRango: () => null,
+}));
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Arnés: un `fetch` que responde por URL. Cada pestaña consulta al montarse.
 
@@ -60,6 +92,23 @@ function servir(respuestas: Respuestas) {
 
 function montar(ui: React.ReactElement) {
   return render(<ToastProvider>{ui}</ToastProvider>);
+}
+
+// 🔴 LA PLANILLA ABRE VACÍA (1-sep-2026): no pide nada hasta que alguien elige
+// el período. Daniel, textual: *«la quincena se paga según el rango de fecha
+// seleccionado»* — abrir mostrando plata de un período que nadie eligió es lo
+// que no puede pasar, porque su corte de quincena es variable (a veces del 28
+// al 10). Los casos de la Planilla necesitan el cuadro, así que hacen antes lo
+// que hace la persona: tocar el control y elegir.
+//
+// ⚠️ Solo la PLANILLA. Reporte, Horarios, Feriados, Justificaciones y
+// Configuración siguen cargando solas al montar: ahí no se paga nada.
+//
+// 🩸 `getAllByRole(...)[0]`, no `getByRole`: en jsdom no hay Tailwind, así que
+// las vistas `lg:hidden` y `hidden lg:block` se montan LAS DOS y `getByRole`
+// revienta con «Found multiple elements».
+function elegirPeriodo() {
+  fireEvent.click(screen.getAllByRole("button", { name: /Elegí el período/ })[0]);
 }
 
 /** Toca el ⓘ cuyo nombre accesible es `titulo`. */
@@ -271,6 +320,7 @@ describe("Planilla — la fórmula al ⓘ, los avisos de plata en pantalla", () 
   it("la fórmula del neto queda detrás del ⓘ, entera", async () => {
     servir([["/api/asistencia/planilla", respuesta]]);
     montar(<PlanillaTab />);
+    elegirPeriodo();
     await screen.findAllByText(/Ángela García/);
     // Se compara contra la CONSTANTE de `lib/asistencia/planilla.ts`: si algún
     // día la fórmula cambia, la que se enseña cambia con ella y no queda una
@@ -284,6 +334,7 @@ describe("Planilla — la fórmula al ⓘ, los avisos de plata en pantalla", () 
   it("🔴 los 5 avisos de plata siguen en pantalla, sin tocar nada", async () => {
     servir([["/api/asistencia/planilla", respuesta]]);
     montar(<PlanillaTab />);
+    elegirPeriodo();
     await screen.findAllByText(/Ángela García/);
     // migración pendiente (patrón cols-opcionales)
     expect(screen.getByText(/Falta correr el archivo de la base de datos/)).toBeTruthy();
@@ -300,6 +351,7 @@ describe("Planilla — la fórmula al ⓘ, los avisos de plata en pantalla", () 
   it("🔴 «N días sin las 4 marcas — míralos antes de descontar» se queda en la tarjeta", async () => {
     servir([["/api/asistencia/planilla", respuesta]]);
     montar(<PlanillaTab />);
+    elegirPeriodo();
     const tarjeta = await screen.findByRole("button", { name: /ver detalle/ });
     fireEvent.click(tarjeta);
     expect(screen.getByText(/Míralos antes de descontar/)).toBeTruthy();
@@ -308,6 +360,7 @@ describe("Planilla — la fórmula al ⓘ, los avisos de plata en pantalla", () 
   it("cada monto a mano sigue diciendo para qué lado va (suma / resta)", async () => {
     servir([["/api/asistencia/planilla", respuesta]]);
     montar(<PlanillaTab />);
+    elegirPeriodo();
     fireEvent.click(await screen.findByRole("button", { name: /ver detalle/ }));
     expect(screen.getAllByText("(resta)").length).toBe(4);
     expect(screen.getAllByText("(suma)").length).toBe(1);

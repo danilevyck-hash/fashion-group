@@ -37,6 +37,38 @@ import ReporteTab from "@/app/asistencia/ReporteTab";
 import PlanillaTab from "@/app/asistencia/PlanillaTab";
 import VacacionesTab from "@/app/asistencia/VacacionesTab";
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOBLE DEL SELECTOR DE RANGO.
+//
+// 🔴 Desde el 1-sep-2026 la planilla abre VACÍA: no pide nada hasta que alguien
+// elige el período (*«la quincena se paga según el rango de fecha
+// seleccionado»*). Estos casos necesitan datos, así que primero eligen.
+//
+// 🩸 Va un doble y no el control real porque el control carga el calendario con
+// `dynamic()`, y bajo vitest eso NO resuelve: el diálogo abre y no hay un solo
+// `data-day` que tocar. Su conducta —ancla, cierre, orden invertido— se prueba
+// sobre el componente real en `rango-fechas-calendario.test.tsx`.
+vi.mock("@/components/ui/RangoFechas", () => ({
+  __esModule: true,
+  default: ({ desde, hasta, vacio, onChange }: {
+    desde: string; hasta: string; vacio?: boolean;
+    onChange: (d: string, h: string) => void;
+  }) => (
+    <button type="button" onClick={() => onChange(desde, hasta)}>
+      {vacio ? "Elegí el período" : `${desde} – ${hasta}`}
+    </button>
+  ),
+  // 🩸 `ultimoRango` NO es del control: es del MISMO módulo, y `ReporteTab` lo
+  // importa con nombre (`import RangoFechas, { ultimoRango } from …`). Un
+  // `vi.mock` reemplaza el módulo ENTERO, así que si no se devuelve acá la
+  // pestaña revienta al montar con «No "ultimoRango" export is defined» —y el
+  // error sale del componente, no del test, así que cuesta encontrarlo.
+  // Devuelve `null` a propósito: sin rango guardado, el reporte abre en su
+  // rango por defecto y el caso no depende de qué hay en el localStorage.
+  ultimoRango: () => null,
+}));
+
 function servir(respuestas: Array<[string, unknown]>) {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     const u = String(url);
@@ -45,6 +77,23 @@ function servir(respuestas: Array<[string, unknown]>) {
   }));
 }
 const montar = (ui: React.ReactElement) => render(<ToastProvider>{ui}</ToastProvider>);
+
+// 🔴 LA PLANILLA ABRE VACÍA (1-sep-2026): no pide nada hasta que alguien elige
+// el período. Daniel, textual: *«la quincena se paga según el rango de fecha
+// seleccionado»* — abrir mostrando plata de un período que nadie eligió es lo
+// que no puede pasar, porque su corte de quincena es variable (a veces del 28
+// al 10). Los casos de abajo necesitan el cuadro, así que hacen antes lo que
+// hace la persona: tocar el control y elegir.
+//
+// ⚠️ Solo la PLANILLA. El reporte (`ReporteTab`) sigue cargando solo al montar:
+// ahí no se paga nada, se mira lo que el reloj registró.
+//
+// 🩸 `getAllByRole(...)[0]`, no `getByRole`: en jsdom no hay Tailwind, así que
+// las vistas `lg:hidden` y `hidden lg:block` se montan LAS DOS y `getByRole`
+// revienta con «Found multiple elements».
+function elegirPeriodo() {
+  fireEvent.click(screen.getAllByRole("button", { name: /Elegí el período/ })[0]);
+}
 
 beforeEach(() => vi.unstubAllGlobals());
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -180,6 +229,7 @@ describe("🔴 NADA SE DESCARTA EN SILENCIO — el aviso, en la pantalla", () =>
   it("se ve SIN abrir nada, y trae nombre, rango y monto", async () => {
     servir([["/api/asistencia/planilla", respuestaPlanilla()]]);
     montar(<PlanillaTab />);
+    elegirPeriodo();
 
     const aviso = await screen.findByText(/vacación marcada como «ya se le pagó»/);
     expect(aviso.textContent).toContain("ELOYN MENDOZA");
@@ -190,6 +240,7 @@ describe("🔴 NADA SE DESCARTA EN SILENCIO — el aviso, en la pantalla", () =>
   it("🔴 y se VE: nadie lo esconde con una clase", async () => {
     servir([["/api/asistencia/planilla", respuestaPlanilla()]]);
     montar(<PlanillaTab />);
+    elegirPeriodo();
     const aviso = await screen.findByText(/vacación marcada como «ya se le pagó»/);
     // jsdom no resuelve Tailwind, así que se recorre la cadena de clases hasta
     // la raíz — el mismo criterio del candado de la pestaña de Boston.
@@ -206,6 +257,7 @@ describe("🔴 NADA SE DESCARTA EN SILENCIO — el aviso, en la pantalla", () =>
   it("va en ÁMBAR, no en rojo: no se rompió nada, es una decisión que se tomó", async () => {
     servir([["/api/asistencia/planilla", respuestaPlanilla()]]);
     montar(<PlanillaTab />);
+    elegirPeriodo();
     const aviso = await screen.findByText(/vacación marcada como «ya se le pagó»/);
     expect(String(aviso.className)).toContain("amber");
     expect(String(aviso.className)).not.toContain("red");
@@ -217,6 +269,7 @@ describe("🔴 NADA SE DESCARTA EN SILENCIO — el aviso, en la pantalla", () =>
       respuestaPlanilla({ vacacionesNoPagadas: [], avisoVacacionesNoPagadas: null }),
     ]]);
     montar(<PlanillaTab />);
+    elegirPeriodo();
     await screen.findAllByText(/ELOYN MENDOZA/);
     expect(screen.queryByText(/ya se le pagó/)).toBeNull();
   });
@@ -230,6 +283,7 @@ describe("🔴 NADA SE DESCARTA EN SILENCIO — el aviso, en la pantalla", () =>
       }),
     ]]);
     montar(<PlanillaTab />);
+    elegirPeriodo();
     expect(await screen.findByText(/Todavía no se pueden cargar vacaciones acá/)).toBeTruthy();
   });
 });

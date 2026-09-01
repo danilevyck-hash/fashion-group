@@ -60,7 +60,7 @@ import type {
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
 
-import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
+import RangoFechas from "@/components/ui/RangoFechas";
 interface Respuesta {
   quincena: Quincena;
   periodo: Periodo;
@@ -182,18 +182,35 @@ export default function PlanillaTab() {
   // factor 1—, así que el caso normal sigue pagando exactamente lo de siempre.
   // Por eso el rango arranca en la quincena en curso: el primer cuadro que se
   // ve es el de siempre y de ahí se mueven las fechas.
+  // ═════════════════════════════════════════════════════════════════════════
+  // 🔴 LA PLANILLA ABRE VACÍA HASTA QUE ALGUIEN ELIJA EL PERÍODO (1-sep-2026)
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // Daniel, textual: *«la quincena se paga según el rango de fecha
+  // seleccionado»*. Ahí está todo: el rango NO es el filtro de una consulta, es
+  // **lo que define qué quincena se paga**.
+  //
+  // 🩸 Y POR ESO ARRANCAR CON UN RANGO PUESTO ERA PELIGROSO. Abría en «del 1 al
+  // 15» y mostraba una planilla completa —sueldos, deducciones, neto a pagar—
+  // de un período que en esta empresa muchas veces NO es el que se está por
+  // pagar: el corte real es variable (a veces del 28 al 10). Plata con cara de
+  // definitiva, de una quincena que nadie pidió. Es el mismo error que los
+  // cuatro presets retirados, pero peor: el preset había que tocarlo, esto
+  // salía solo.
+  //
+  // ⚠️ ESTO INVIERTE UNA DECISIÓN ANTERIOR, a propósito. Decía «arranca en la
+  // quincena en curso: el caso normal sigue siendo abrir y mirar», con el motivo
+  // de ahorrar teclear dos fechas. Ese motivo valía cuando el rango se tecleaba;
+  // ahora se elige en un calendario con dos toques.
+  //
+  // 🔴 Y TAMPOCO SE RECUERDA EL ÚLTIMO RANGO (tenía `ultimoRango`, se le quitó).
+  // Recordarlo es la misma trampa disfrazada: al abrir la quincena siguiente
+  // mostraría la ANTERIOR ya cargada, con su plata, como si fuera la de ahora.
   const quincenaEnCurso = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
   const [desde, setDesde] = useState(quincenaEnCurso.desde);
   const [hasta, setHasta] = useState(quincenaEnCurso.hasta);
-
-  // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
-  // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
-  // —si no, pisaría cada cambio del usuario con el valor guardado.
-  useEffect(() => {
-    const r = ultimoRango("asistencia_planilla");
-    if (r) { setDesde(r.desde); setHasta(r.hasta); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  /** `false` hasta que alguien elige un período. Sin esto no se pide nada. */
+  const [elegido, setElegido] = useState(false);
   const [empresa, setEmpresa] = useState<string>(EMPRESAS_ASISTENCIA[0]);
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -217,7 +234,9 @@ export default function PlanillaTab() {
     }
   }, [desde, empresa, hasta]);
 
-  useEffect(() => { void cargar(); }, [cargar]);
+  // 🔑 Nada se pide hasta que hay un período ELEGIDO. `cargar` sigue en las
+  // dependencias para que cambiar la empresa vuelva a pedir — pero solo después.
+  useEffect(() => { if (elegido) void cargar(); }, [cargar, elegido]);
 
   /** Guarda un monto escrito a mano y refresca los números de esa fila. */
   const guardar = useCallback(
@@ -395,12 +414,12 @@ export default function PlanillaTab() {
           <span className="text-xs text-gray-500">Período</span>
           {/* 🔴 UN SOLO MODO: el rango. Sin control segmentado que elegir —
               con una sola opción, el segmentado no es una elección: es un
-              botón que no hace nada. Arranca en la quincena en curso, así que
-              el caso normal sigue siendo abrir y mirar. */}
+              botón que no hace nada. Y NO arranca cargada: ver la nota de «la
+              planilla abre vacía» más arriba. */}
           <RangoFechas
             desde={desde} hasta={hasta} label={null}
-            recordarComo="asistencia_planilla"
-            onChange={(d, h) => { setDesde(d); setHasta(h); }}
+            vacio={!elegido}
+            onChange={(d, h) => { setDesde(d); setHasta(h); setElegido(true); }}
           />
         </div>
 
@@ -601,6 +620,16 @@ export default function PlanillaTab() {
         </p>
       )}
 
+      {/* 🔴 EL VACÍO ES EL ESTADO INICIAL, y dice qué hacer. No es un error ni
+          un «no hay datos»: es que nadie eligió todavía qué quincena pagar. */}
+      {!elegido && !cargando && (
+        <div className="rounded-lg border border-dashed border-gray-200 px-4 py-12 text-center">
+          <p className="text-sm font-medium text-gray-700">Elegí el período que vas a pagar</p>
+          <p className="mt-1 text-[13px] text-gray-500">
+            La quincena se calcula con las fechas que elijas arriba.
+          </p>
+        </div>
+      )}
       {cargando && <p className="py-8 text-center text-sm text-gray-400">Cargando…</p>}
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {!cargando && !error && data?.lineas.length === 0 && (
