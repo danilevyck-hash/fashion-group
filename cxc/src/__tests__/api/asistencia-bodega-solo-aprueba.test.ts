@@ -39,7 +39,14 @@ vi.mock("@/lib/supabase-server", () => ({
   HAS_SERVICE_ROLE: true,
   supabaseServer: {
     from: (t: string) => {
-      const res = t === "asistencia_horarios" ? HORARIOS : [];
+      // 🔑 El reparto por empresa (31-ago-2026): Julio entra con la cuenta
+      // `Bodega` y es de VISTANA, que es la empresa del código 11 de abajo. Sin
+      // estas filas el cuadro le sale VACÍO —fail-closed, que es lo correcto— y
+      // este archivo mediría cero en vez de medir el recorte del dinero.
+      const res =
+        t === "asistencia_horarios" ? HORARIOS
+        : t === "asistencia_aprobador_empresa" ? [{ usuario: "Bodega", empresa: "vistana" }]
+        : [];
       const q: Record<string, unknown> = {};
       for (const m of ["select", "eq", "gte", "lte", "order", "in"]) q[m] = () => q;
       // Se resuelve como promesa al await-earlo.

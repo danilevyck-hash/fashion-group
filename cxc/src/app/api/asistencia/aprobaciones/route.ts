@@ -23,6 +23,10 @@ import {
   claveDia,
 } from "@/lib/asistencia/aprobaciones";
 import { guardarAprobaciones, type DiaAAprobar } from "@/lib/asistencia/aprobaciones-server";
+import { MODULOS_PLANILLA } from "@/lib/asistencia/guard";
+import { puedeAprobarA } from "@/lib/asistencia/aprobador-empresa";
+import { leerAlcanceAprobador } from "@/lib/asistencia/aprobador-empresa-server";
+import { leerPersonas } from "@/lib/asistencia/config-server";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +37,10 @@ export async function POST(req: NextRequest) {
   // no puede aprobar no aprueba ni entrando por la URL. Ver la nota larga de
   // `APROBACIONES_ROLES`: hoy es solo `admin` porque Julio Garay todavía no
   // tiene usuario en el sistema y crearle uno lo decide Daniel.
-  const auth = requireAsistencia(req, aprobacionesRoles());
+  // ⚠️ `MODULOS_PLANILLA` = `asistencia` **o** `boston`. David aprueba desde su
+  // módulo: exigirle `asistencia` a secas lo dejaría afuera hasta que corra la
+  // DDL que le agrega la key, y aprobar es justo lo que se le abrió.
+  const auth = requireAsistencia(req, aprobacionesRoles(), MODULOS_PLANILLA);
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -69,6 +76,34 @@ export async function POST(req: NextRequest) {
         { error: "No se indicó qué día aprobar." },
         { status: 400 },
       );
+    }
+
+    // ── 🔴 ¿SON PERSONAS SUYAS? ────────────────────────────────────────────
+    //
+    // Hasta el 31-ago-2026 acá no se miraba NADA: llegaba `{codigo, fecha}` y se
+    // escribía. Medido en producción, Julio —empleado de Vistana, cuenta
+    // `Bodega`— había aprobado 57 días de Confecciones Boston.
+    //
+    // La empresa NO viene en el cuerpo y no podría: la manda el navegador. Sale
+    // de la FICHA de cada persona, que es la misma fuente con la que se arma el
+    // cuadro que se está aprobando.
+    const alcance = await leerAlcanceAprobador(auth.role, auth.userName);
+    if (alcance.empresas !== null) {
+      const fichas = await leerPersonas();
+      const empresaDe = new Map(fichas.filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
+      const veredicto = puedeAprobarA(
+        alcance,
+        dias.map((d) => ({ codigo: d.codigo, empresa: empresaDe.get(d.codigo) ?? null })),
+      );
+      if (!veredicto.ok) {
+        // 🔴 TODO O NADA, y con 403: se rechaza el pedido ENTERO sin escribir una
+        // fila. Aprobar «lo que sí puedo» dejaría a quien apretó el botón
+        // creyendo que aprobó las 12 filas que veía.
+        return NextResponse.json(
+          { error: veredicto.motivo, fuera: veredicto.fuera },
+          { status: 403 },
+        );
+      }
     }
 
     const guardado = await guardarAprobaciones({

@@ -298,7 +298,7 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // 🔴 `catalogos` entra el 27-ago-2026 por pedido de Daniel («catalogo para
   // david si, solo eso»). Cambio DELIBERADO — el candado hizo lo suyo. Boston
   // sigue siendo su casa: `/home` lo aterriza ahí aunque tenga dos módulos.
-  gerente_boston: ["boston", "catalogos"],
+  gerente_boston: ["boston", "catalogos", "asistencia"],
 };
 
 describe("catálogos — los otros roles quedaron EXACTAMENTE igual", () => {

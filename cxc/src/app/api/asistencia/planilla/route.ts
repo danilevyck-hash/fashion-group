@@ -11,6 +11,8 @@ import { asistenciaRoles, aprobacionesRoles, soloAprueba } from "@/lib/asistenci
 import { EMPRESA_BOSTON, ROL_BOSTON, esGerenteBoston, planillaSinDinero } from "@/lib/boston/rol";
 import { lineasSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import { requireAsistencia, MODULOS_PLANILLA } from "@/lib/asistencia/guard";
+import { alcanza } from "@/lib/asistencia/aprobador-empresa";
+import { leerAlcanceAprobador, avisoMigracionAprobador } from "@/lib/asistencia/aprobador-empresa-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
@@ -206,10 +208,20 @@ export async function GET(req: NextRequest) {
   // único módulo las planillas de Vistana y Fashion Wear. Y se fuerza acá, no
   // se valida: un `?empresa=vistana` de un marcador viejo tiene que devolver
   // Boston, no un 400 que deje la pantalla en blanco.
+  // 🔴 Y DESDE EL 31-ago-2026, LO MISMO PARA CUALQUIER APROBADOR ACOTADO. Su
+  // reparto vive en `asistencia_aprobador_empresa`; si el query pide una empresa
+  // que no le corresponde, se IGNORA (queda `null` = todas LAS SUYAS), igual que
+  // con David: se fuerza, no se valida. Un 400 dejaría la pantalla en blanco por
+  // un marcador viejo.
+  const alcance = await leerAlcanceAprobador(auth.role, auth.userName);
+  const pedida =
+    empresaRaw && (EMPRESAS_ASISTENCIA as readonly string[]).includes(empresaRaw)
+      ? empresaRaw
+      : null;
   const empresa = esGerenteBoston(auth.role)
     ? EMPRESA_BOSTON
-    : empresaRaw && (EMPRESAS_ASISTENCIA as readonly string[]).includes(empresaRaw)
-      ? empresaRaw
+    : pedida && alcanza(alcance, pedida)
+      ? pedida
       : null;
 
   try {
@@ -470,7 +482,18 @@ export async function GET(req: NextRequest) {
     // SOLA VEZ. Entra a las tres empresas a propósito —no se le puede adivinar
     // la suya— y por eso aparecía tres veces, como si fueran tres personas.
     // La intención de que NO DESAPAREZCA se conserva: viaja aparte, arriba.
-    const { lineas, sinFicha } = separarSinFicha(todasLasLineas);
+    // 🔴 EL RECORTE POR EMPRESA. `empresa` filtra UNA; esto acota al CONJUNTO de
+    // las suyas, que es lo que hace falta cuando alguien tiene dos (Julio:
+    // fashion_wear + vistana). Va acá, ANTES de los totales y de armar el cuadro
+    // de aprobación, para que no exista un camino que muestre una empresa ajena.
+    //
+    // ⚠️ Con `empresas === null` —admin, o la tabla sin correr— no filtra nada y
+    // la respuesta es EXACTAMENTE la de siempre.
+    const conAlcance =
+      alcance.empresas === null
+        ? todasLasLineas
+        : todasLasLineas.filter((l) => l.empresa == null || alcanza(alcance, l.empresa));
+    const { lineas, sinFicha } = separarSinFicha(conAlcance);
     const marcasPorCodigo = new Map<string, number>();
     for (const m of marcaciones) {
       const c = String(m.empleado_codigo ?? m.empleado_nombre ?? "").trim();
@@ -553,6 +576,7 @@ export async function GET(req: NextRequest) {
         puedeAprobar,
         avisos: {
           faltaMigracionAprobaciones: aprRes.faltaTabla ? avisoMigracionAprobaciones() : null,
+          faltaMigracionAprobador: alcance.faltaTabla ? avisoMigracionAprobador() : null,
         },
       });
     }
@@ -741,6 +765,7 @@ export async function GET(req: NextRequest) {
         // como hasta hoy— pero se dice: quien ya aprobó en su cabeza va a
         // esperar que lo no aprobado no se pague.
         faltaMigracionAprobaciones: aprRes.faltaTabla ? avisoMigracionAprobaciones() : null,
+          faltaMigracionAprobador: alcance.faltaTabla ? avisoMigracionAprobador() : null,
         // Sin la tabla corrida NADIE está de vacaciones —o sea, la planilla de
         // siempre— pero se dice: quien ya cargó una en su cabeza va a esperar
         // verla acá.

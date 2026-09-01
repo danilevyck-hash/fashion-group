@@ -16,6 +16,8 @@
 // test que lo exige.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ROL_BOSTON } from "@/lib/boston/rol";
+
 export const ASISTENCIA_ROLES = ["admin", "secretaria", "contabilidad"] as const;
 
 export function asistenciaRoles(): string[] {
@@ -51,7 +53,11 @@ export function asistenciaRoles(): string[] {
 // `ASISTENCIA_ROLES`, así que sigue viendo el módulo completo como siempre. La
 // lista de abajo se deriva justamente para que este matiz no haya que
 // acordárselo.
-export const APROBACIONES_ROLES = ["admin", "bodega", "contabilidad"] as const;
+// 🔑 `gerente_boston` entra el 31-ago-2026: David aprueba las horas extra de las
+// 21 personas de SU empresa, y de ninguna otra. El reparto por empresa vive en
+// `asistencia_aprobador_empresa`, no acá — esta lista dice QUIÉN puede aprobar;
+// la tabla, DE QUIÉN.
+export const APROBACIONES_ROLES = ["admin", "bodega", "contabilidad", ROL_BOSTON] as const;
 
 export function aprobacionesRoles(): string[] {
   return [...APROBACIONES_ROLES];
@@ -85,8 +91,19 @@ export function aprobacionesRoles(): string[] {
 // acordarse de tocar es exactamente el bug que `ASISTENCIA_ROLES` vino a matar.
 export function soloApruebaRoles(): string[] {
   const conAsistencia = new Set<string>(ASISTENCIA_ROLES);
-  return aprobacionesRoles().filter((r) => !conAsistencia.has(r));
+  return aprobacionesRoles().filter((r) => !conAsistencia.has(r) && r !== ROL_BOSTON);
 }
+
+// 🔴 POR QUÉ `gerente_boston` SE EXCLUYE DE ARRIBA, Y NO ES UN CASO ESPECIAL
+// GRATUITO. `soloApruebaRoles()` significa «entra a Asistencia SOLO para
+// aprobar, así que la planilla le contesta sin el bloque de dinero». Eso es
+// cierto de `bodega` —Julio no tiene otro motivo para estar ahí— y es FALSO de
+// David: él tiene su propia pantalla de planilla en /boston, con las 18 columnas
+// de plata que Daniel abrió el 31-ago. Sin esta línea, agregarlo a
+// `APROBACIONES_ROLES` le habría vaciado esa pantalla el mismo día.
+//
+// ⚠️ Lo que a él SÍ le recorta la ruta es otra cosa y sigue intacto:
+// `planillaSinDinero`, que deriva de `VE_SUELDOS_DE_BOSTON`.
 
 /** ¿Este rol entra a Asistencia SOLO para aprobar horas extra? */
 export function soloAprueba(rol: string): boolean {

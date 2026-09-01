@@ -58,8 +58,27 @@ import {
 } from "@/lib/boston/rol";
 import { CAMPOS_SIN_DINERO, lineaSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import { ROLES_BOSTON, puedeVerBoston } from "@/lib/cxc/boston-roles";
+import {
+  aprobacionesRoles,
+  asistenciaRoles,
+  soloAprueba,
+  soloApruebaRoles,
+  vePestana,
+} from "@/lib/asistencia/roles";
 
 const ROL = ROL_BOSTON;
+
+// 🔴 CAMBIÓ DE DIRECCIÓN OTRA VEZ (31-ago-2026): entra `asistencia`, y con un
+// alcance MUY chico. David aprueba las horas extra de las 21 personas de SU
+// empresa, así que necesita la puerta al módulo — pero NO el módulo: las otras
+// 11 rutas de `/api/asistencia/*` le siguen dando 403 (exigen
+// `asistenciaRoles()`, donde no está) y `vePestana` le muestra UNA pestaña.
+// Hay tres casos que lo exigen, así que la key no puede volverse un pasaporte
+// sin que el build se ponga rojo.
+//
+// ⚠️ El invariante NO se aflojó: la lista sigue siendo EXACTA y cerrada, y un
+// cuarto módulo la rompe.
+const SUS_MODULOS = [MODULO_BOSTON, "catalogos", "asistencia"];
 
 // ── Arnés: nada toca la base ni Switch ───────────────────────────────────────
 // Los handlers de otros módulos tienen que rebotar ANTES de leer nada; los de
@@ -205,7 +224,17 @@ describe("gerente_boston — Boston y Catálogos, y NADA más", () => {
   // david si, solo eso». Lo que NO se aflojó es el invariante: la lista sigue
   // siendo EXACTA y cerrada, y un tercer módulo pone el build rojo. El candado
   // hizo su trabajo — frenó hasta que la decisión quedó escrita.
-  const SUS_MODULOS = [MODULO_BOSTON, "catalogos"];
+  // 🔴 CAMBIÓ DE DIRECCIÓN OTRA VEZ (31-ago-2026): entra `asistencia`, y con un
+  // alcance MUY chico. David aprueba las horas extra de las 21 personas de SU
+  // empresa, así que necesita la puerta al módulo — pero NO el módulo: las otras
+  // 11 rutas de `/api/asistencia/*` le siguen dando 403 (exigen
+  // `asistenciaRoles()`, donde no está) y `vePestana` le muestra UNA pestaña.
+  // Los tres casos de abajo lo exigen, así que la key no puede volverse un
+  // pasaporte sin que el build se ponga rojo.
+  //
+  // ⚠️ El invariante NO se aflojó: la lista sigue siendo EXACTA y cerrada, y un
+  // cuarto módulo la rompe.
+
 
   it("sus módulos por defecto son exactamente ['boston', 'catalogos']", () => {
     expect(getDefaultModulesForRole(ROL).sort()).toEqual([...SUS_MODULOS].sort());
@@ -214,6 +243,28 @@ describe("gerente_boston — Boston y Catálogos, y NADA más", () => {
   it("ningún OTRO módulo del catálogo lo nombra en su roles[]", () => {
     const conElRol = ALL_MODULES.filter(m => m.roles.includes(ROL)).map(m => m.key).sort();
     expect(conElRol).toEqual([...SUS_MODULOS].sort());
+  });
+
+  it("🔴 `asistencia` le da la PUERTA, no el módulo: las otras rutas siguen en 403", () => {
+    // Es la mitad que hace que agregar la key sea seguro.
+    expect(asistenciaRoles()).not.toContain(ROL);
+    expect(aprobacionesRoles()).toContain(ROL);
+  });
+
+  it("🔴 y solo ve la pestaña Aprobaciones — ninguna otra", () => {
+    for (const tab of ["planilla", "reporte", "justificaciones", "vacaciones", "configuracion"]) {
+      expect(vePestana(ROL, tab), `${tab} no debería verla`).toBe(false);
+    }
+    expect(vePestana(ROL, "aprobaciones")).toBe(true);
+  });
+
+  it("🔴 NO cae en `soloApruebaRoles()`: su planilla de Boston conserva la plata", () => {
+    // Sin esto, agregarlo a APROBACIONES_ROLES le habría vaciado la pantalla que
+    // Daniel acababa de abrir: `recortado` devuelve 4 claves y NI UNA línea.
+    expect(soloApruebaRoles()).not.toContain(ROL);
+    expect(soloAprueba(ROL)).toBe(false);
+    // Y el `bodega` de Julio SÍ sigue recortado — no se aflojó de rebote.
+    expect(soloAprueba("bodega")).toBe(true);
   });
 
   it("y el módulo que sí es suyo no se le abrió a nadie más de rebote", () => {
@@ -298,11 +349,22 @@ describe("gerente_boston — /home lo manda solo a Boston", () => {
     expect(fgModulesDaAcceso(["catalogos"], "referencia", ROL)).toBe(false);
   });
 
-  it("aunque `fg_modules` llegue vacío, el fallback da sus dos módulos", () => {
+  it("aunque `fg_modules` llegue vacío, el fallback da sus módulos", () => {
     for (const fg of [null, undefined, [] as string[]]) {
       expect(getVisibleModules(ROL, fg).map(m => m.key).sort())
-        .toEqual([MODULO_BOSTON, "catalogos"].sort());
+        .toEqual([...SUS_MODULOS].sort());
     }
+  });
+
+  // ⚠️ Y ACÁ ESTÁ EL PRECIO DE DARLE `asistencia`, DICHO DE FRENTE: con tres
+  // módulos el auto-redirect de «rol con UN solo módulo» ya no lo alcanzaba
+  // desde hace tiempo (fue el catálogo el que lo rompió primero). Lo que lo
+  // aterriza es su CASA, y eso no cambió — se vuelve a exigir acá porque este
+  // commit le suma un módulo más y es justo el cambio que puede reabrir la
+  // fuga nº 2 del #659: que David caiga en el Inicio del GRUPO.
+  it("🔴 con TRES módulos, su casa lo sigue aterrizando en Boston", () => {
+    expect(moduloCasaDeRol(ROL)).toBe(MODULO_BOSTON);
+    expect(getVisibleModules(ROL, [...SUS_MODULOS]).length).toBeGreaterThan(1);
   });
 
   it("el /home sigue teniendo el auto-redirect de módulo único", () => {

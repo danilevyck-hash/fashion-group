@@ -327,12 +327,14 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     expect(nota[0].length).toBeLessThan(220);
   });
 
-  it("los 24 lugares que arman una hoja siguen ahí (nada se perdió de camino)", () => {
+  it("los 25 lugares que arman una hoja siguen ahí (nada se perdió de camino)", () => {
     const total = archivosQueLlaman().reduce(
       (n, f) => n + (sinComentarios(leer(f)).match(/buildReportSheet\(\{/g) ?? []).length,
       0,
     );
-    expect(total).toBe(24);
+    // 25 desde el 31-ago-2026: entra el Excel de Aprobaciones, el único que
+    // dice si la hora extra estaba autorizada.
+    expect(total).toBe(25);
   });
 });
 

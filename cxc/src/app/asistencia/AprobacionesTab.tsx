@@ -77,7 +77,7 @@ function hm(minutos: number): string {
 interface Respuesta {
   aprobaciones: DiaAprobacion[] | null;
   puedeAprobar: boolean;
-  avisos: { faltaMigracionAprobaciones: string | null };
+  avisos: { faltaMigracionAprobaciones: string | null; faltaMigracionAprobador?: string | null };
 }
 
 /** Una casilla que sabe estar a medias. */
@@ -125,6 +125,8 @@ export default function AprobacionesTab() {
   const [dias, setDias] = useState<DiaAprobacion[] | null>(null);
   const [puedeAprobar, setPuedeAprobar] = useState(true);
   const [avisoMigracion, setAvisoMigracion] = useState<string | null>(null);
+  /** Falta la tabla del reparto por empresa: nadie está segmentado todavía. */
+  const [avisoAprobador, setAvisoAprobador] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -142,6 +144,7 @@ export default function AprobacionesTab() {
       setDias(j.aprobaciones ?? []);
       setPuedeAprobar(j.puedeAprobar !== false);
       setAvisoMigracion(j.avisos?.faltaMigracionAprobaciones ?? null);
+      setAvisoAprobador(j.avisos?.faltaMigracionAprobador ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setDias(null);
@@ -260,6 +263,15 @@ export default function AprobacionesTab() {
       {avisoMigracion && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {avisoMigracion}
+        </div>
+      )}
+      {/* ⚠️ ÁMBAR, no rojo: nada se rompió. Lo que falta es el reparto por
+          empresa, y mientras tanto se aprueba como antes — que es exactamente
+          lo que hay que saber para no creer que ya está puesto. NO bloquea el
+          botón: bloquearlo dejaría a Julio sin aprobar por una DDL pendiente. */}
+      {avisoAprobador && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {avisoAprobador}
         </div>
       )}
       {error && (
