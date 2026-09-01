@@ -131,17 +131,26 @@ describe("⚠️ LA TOLERANCIA SIGUE SIENDO DE MINUTOS", () => {
     expect(veinte.tardeMin).toBe(20); // entero, como siempre
   });
 
-  it("el mínimo de hora extra se sigue midiendo contra 15 MINUTOS", () => {
-    // Quedarse 14 min 59 s no es hora extra; 15 en punto sí. El umbral es el
-    // mismo de siempre, comparado al segundo.
-    expect(dia(["08:00:00", "12:00:00", "12:30:00", "17:14:59"]).extraMin).toBe(0);
-    expect(dia(["08:00:00", "12:00:00", "12:30:00", "17:15:00"]).extraMin).toBe(15);
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 1-sep-2026: el umbral bajó de 15 a 10 minutos.
+  // Antes este caso decía «se sigue midiendo contra 15 MINUTOS» y probaba que
+  // 17:14:59 daba 0. Lo que NO cambió —y es lo que este archivo cuida— es que
+  // la comparación se hace AL SEGUNDO contra un umbral escrito en minutos.
+  it("el mínimo de hora extra se mide al segundo contra 10 MINUTOS", () => {
+    // Quedarse 9 min 59 s no es hora extra; 10 en punto sí. Si alguien volviera
+    // a comparar minutos redondeados contra minutos, 09:59 se convertiría en 10
+    // y pasaría la puerta.
+    expect(dia(["08:00:00", "12:00:00", "12:30:00", "17:09:59"]).extraMin).toBe(0);
+    expect(dia(["08:00:00", "12:00:00", "12:30:00", "17:10:00"]).extraMin).toBe(10);
   });
 
-  it("el atraso del mismo día se sigue descontando de la extra", () => {
-    // Llegó 20 tarde y se fue 20 tarde: RECUPERÓ, no hizo extra.
+  it("🔴 el atraso del mismo día YA NO se descuenta de la extra", () => {
+    // 🔄 Antes esto se llamaba «se sigue descontando» y esperaba 0: llegó 20
+    // tarde y se fue 20 tarde, o sea que había RECUPERADO. Daniel lo dio vuelta
+    // el 1-sep-2026, textual: *"No, van separadas"*. Hoy cobra los 20 de extra
+    // Y ADEMÁS carga los 20 de tardanza — cada regla por su lado.
     const d = dia(["08:20:00", "12:00:00", "12:30:00", "17:20:00"]);
-    expect(d.extraMin).toBe(0);
+    expect(d.extraMin).toBe(20);
+    expect(d.tardeMin).toBe(20);
   });
 });
 

@@ -30,10 +30,20 @@
 //    horario tienen 30), y quien todavía no tenga fila cae en el mismo 30.
 //    Ya no se puede elegir otro valor desde ninguna pantalla.
 //
-// 3. HORAS EXTRA: mínimo 15 minutos, y MENOS EL ATRASO DEL MISMO DÍA.
-//    🩸 Lo segundo es lo que evita pagar dos veces: el que llegó 20 minutos
-//    tarde y se va 20 tarde NO hizo horas extra, RECUPERÓ. El mínimo de 15
-//    evita pagarle a quien se quedó terminando algo.
+// 3. HORAS EXTRA: mínimo 10 minutos, y SE PAGAN BRUTAS (1-sep-2026).
+//    🔴 El mínimo es una PUERTA, no un descuento: pasado el umbral se paga
+//    TODO desde el primer minuto. Daniel, textual, preguntado «si se queda 25
+//    minutos, ¿cuántos le pagás?»: *"25 minutos"*.
+//    🔴 EL ATRASO DEL MISMO DÍA YA NO SE RESTA. Preguntado «llegó 20 tarde y
+//    se quedó 30 → cobra 10 de extra, ¿sigue así?»: *"No, van separadas"*.
+//    🩸 Hasta hoy se restaba, con el argumento de que el que llegó tarde y se
+//    fue tarde RECUPERÓ. El problema de esa resta es que hacía que el atraso se
+//    cobrara DOS veces —descontado por su lado y comido de la extra por el
+//    otro— y encima invisible: no había forma de ver cuánta extra se había
+//    perdido por llegar tarde. Ahora cada regla cobra sola. La tardanza se
+//    sigue descontando, en `tiempoNoTrabajadoMin`, que es donde se mira.
+//    ⚠️ No hay ninguna regla especial a los 60 minutos: *"nada especial: se
+//    paga el tiempo exacto"*. Nadie agregue un redondeo a horas.
 //    ⚠️ Acá solo se MIDEN. Que sean pagables lo decide una persona aprobándolas
 //    — si no, cualquiera se gana un extra quedándose a conversar.
 //
@@ -688,11 +698,29 @@ export function armarReporte(opts: {
       }
 
       const salidaTempranaMin = soloUna ? 0 : Math.max(0, (salidaProgSeg - sal) / 60);
-      // Regla 3. Mínimo 15 min y neto del atraso del mismo día. El mínimo se
-      // compara en segundos contra el umbral en minutos: quedarse 14:59 sigue
-      // sin ser hora extra, igual que antes.
+      // Regla 3. LA HORA EXTRA ES BRUTA: un mínimo que hay que pasar, y nada
+      // más. Dos decisiones de Daniel del 1-sep-2026, las dos textuales:
+      //
+      // 🔴 EL MÍNIMO ES UNA PUERTA, NO UN DESCUENTO. Preguntado «si se queda
+      //    25 minutos, ¿cuántos le pagás?»: *"25 minutos"*. Pasado el umbral se
+      //    paga TODO desde el primer minuto, no el excedente sobre el umbral.
+      //    El umbral bajó de 15 a 10 minutos y vive en `REGLAS_DEFAULT`; acá
+      //    solo se compara. Se compara en SEGUNDOS contra el umbral en minutos:
+      //    quedarse 09:59 no es hora extra, 10:00 en punto sí.
+      //
+      // 🔴 EL ATRASO YA NO SE RESTA DE LA EXTRA. Preguntado «llegó 20 tarde y
+      //    se quedó 30 → cobra 10 de extra, ¿sigue así?»: *"No, van
+      //    separadas"*. Hasta hoy esto decía `bruto − tardeMin` y llegar tarde
+      //    se pagaba con horas extra sin que apareciera en ningún lado: el
+      //    mismo minuto servía para dos cosas. Ahora cada regla cobra por su
+      //    lado — la tardanza SIGUE descontándose, en `tiempoNoTrabajadoMin`,
+      //    que es donde se ve.
+      //
+      // ⚠️ Y NO HAY NINGUNA REGLA ESPECIAL A LOS 60 MINUTOS. Preguntado si a
+      //    la hora cumplida pasaba algo: *"nada especial: se paga el tiempo
+      //    exacto"*. Nadie agregue acá un redondeo a horas.
       const brutoSeg = soloUna ? 0 : Math.max(0, sal - salidaProgSeg);
-      const extraMin = brutoSeg < extraMinimoSeg ? 0 : Math.max(0, brutoSeg / 60 - tardeMin);
+      const extraMin = brutoSeg < extraMinimoSeg ? 0 : brutoSeg / 60;
 
       const trabajadoMin = soloUna ? 0 : Math.max(0, (sal - ent - almuerzoTomado) / 60);
       // Regla 5. 4 marcas es lo normal; cualquier otra cosa se revisa —pero

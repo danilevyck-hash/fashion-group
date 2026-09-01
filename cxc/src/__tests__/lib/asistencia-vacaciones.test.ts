@@ -192,14 +192,17 @@ describe("🔴 UN DÍA DE VACACIONES NO CALCULA NADA DEL RELOJ", () => {
     expect(d.marcas).toEqual([]);
   });
 
-  it("🩸 esas marcas SÍ existirían sin la vacación: 47 min tarde y 43 de extra", () => {
+  it("🩸 esas marcas SÍ existirían sin la vacación: 47 min tarde y 90 de extra", () => {
     // Es lo que prueba que el cero de arriba lo produce la vacación y no que el
     // escenario sea inofensivo. Sin este caso, un motor roto pasaría en verde.
-    // ⚠️ 43 y no 90: la hora extra va NETA del atraso del mismo día (regla 3
-    // del motor — quien llegó tarde y se fue tarde RECUPERÓ, no hizo extra).
+    // 🔄 90 y no 43 (1-sep-2026): la hora extra dejó de ir NETA del atraso del
+    // mismo día. Daniel, textual: *"No, van separadas"*. El número subió justo
+    // en los 47 minutos de tardanza que antes se le comían — que es, de paso,
+    // la mejor forma de ver cuánta extra se estaba perdiendo en silencio.
     const d = diaDe(reporte({ marcoEnVacaciones: true }), DIA_VACACION);
     expect(d.tardeMin).toBe(47);
-    expect(d.extraMin).toBe(43);
+    // 18:30 − 17:00 = 90 brutos, y hoy se pagan enteros.
+    expect(d.extraMin).toBe(90);
   });
 
   it("🔴 las marcas NO se esconden: viajan para poder mostrarlas", () => {

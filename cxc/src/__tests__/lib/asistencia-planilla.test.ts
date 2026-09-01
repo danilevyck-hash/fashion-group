@@ -392,13 +392,25 @@ describe("🔴 La frontera de las 18:00 es UNA sola y decide las tres cosas", ()
     expect(c.extraDiurnoMin).toBe(60);
   });
 
-  it("la recuperación se come el ARRANQUE de la ventana, no el final", () => {
-    // Llega 8:40 (40 tarde) y sale 19:00 (120 de bruto) → 80 minutos de extra,
-    // y son los ÚLTIMOS: 17:40 → 19:00. Diurno 20, nocturno 60.
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 1-sep-2026. Antes se llamaba «la recuperación se
+  // come el ARRANQUE de la ventana, no el final» y esperaba 80 minutos de
+  // extra (120 brutos − 40 de tardanza), repartidos 20 diurnos + 60 nocturnos.
+  // Ya no hay recuperación que comer: la tardanza va por su lado (*"No, van
+  // separadas"*), así que la ventana arranca en la salida programada.
+  //
+  // Lo que este caso cuida NO cambió y es lo que hay que seguir mirando: la
+  // ventana de extra se ancla en la ÚLTIMA MARCA y se cuenta hacia atrás. Si
+  // alguien la anclara al principio, el reparto día/noche saldría al revés.
+  it("🔴 la ventana de extra termina en la salida real y se cuenta hacia atrás", () => {
+    // Llega 8:40 (40 tarde) y sale 19:00 → 120 de bruto, y hoy los 120 se
+    // pagan enteros. Son los últimos 120 minutos del día: 17:00 → 19:00.
+    // Diurno 17:00-18:00 = 60, nocturno 18:00-19:00 = 60.
     const c = dia(["08:40", "12:00", "12:30", "19:00"]);
     expect(c.tardanzaMin).toBe(40);
-    expect(c.extraDiurnoMin).toBe(20);
+    expect(c.extraDiurnoMin).toBe(60);
     expect(c.extraNocturnoMin).toBe(60);
+    // 🔴 Y la tardanza NO desapareció por eso: se cobra igual, aparte.
+    expect(c.extraDiurnoMin + c.extraNocturnoMin).toBe(120);
   });
 });
 

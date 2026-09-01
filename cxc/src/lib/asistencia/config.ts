@@ -57,7 +57,13 @@ export type Jornada = (typeof JORNADAS)[number];
 export interface ReglasAsistencia {
   /** Minutos de gracia a la entrada antes de contar tardanza. */
   toleranciaTardanzaMin: number;
-  /** Menos de esto no se cuenta como hora extra. */
+  /**
+   * Menos de esto no se cuenta como hora extra.
+   *
+   * 🔴 ES UNA PUERTA, NO UN DESCUENTO. Pasado el umbral se paga TODO desde el
+   * primer minuto, no el excedente. Daniel, textual (1-sep-2026), preguntado
+   * «si se queda 25 minutos, ¿cuántos le pagás?»: *"25 minutos"*.
+   */
   extraMinimoMin: number;
   /** Recargo de la hora extra hasta la hora de corte. */
   recargoExtraDiurno: number;
@@ -129,7 +135,15 @@ export interface ReglasAsistencia {
  */
 export const REGLAS_DEFAULT: ReglasAsistencia = {
   toleranciaTardanzaMin: 10,
-  extraMinimoMin: 15,
+  // 🔴 10, no 15 (1-sep-2026, decisión de Daniel). Quedarse un rato corto
+  // después de la salida programada no paga nada; pasado el umbral se paga
+  // TODO desde el primer minuto. La comparación no cambió: es `bruto <
+  // umbral → 0`, así que 09:59 de quedada no paga y 10:00 en punto paga 10.
+  //
+  // ⚠️ Que valga lo mismo que `toleranciaTardanzaMin` es COINCIDENCIA, no
+  // construcción: son dos reglas distintas, de dos puntas del día, y se
+  // configuran por separado. Nadie las una en una sola constante.
+  extraMinimoMin: 10,
   recargoExtraDiurno: 1.25,
   recargoExtraNocturno: 1.5,
   horaCorteNocturno: "18:00",
@@ -488,7 +502,7 @@ export function validarReglas(body: unknown): Resultado<ReglasAsistencia> {
 
   const pasos: Array<[keyof ReglasAsistencia, Resultado<number | string | null>]> = [
     ["toleranciaTardanzaMin", validarTolerancia(b.toleranciaTardanzaMin)],
-    ["extraMinimoMin", validarMinutos(b.extraMinimoMin, "El mínimo para contar hora extra", "15")],
+    ["extraMinimoMin", validarMinutos(b.extraMinimoMin, "El mínimo para contar hora extra", "10")],
     // ⛔ El almuerzo NO se valida acá porque ya no es un campo: es fijo en 30
     // minutos (`ALMUERZO_FIJO_MIN`). Si alguien manda `almuerzoDefaultMin` en el
     // cuerpo, se ignora — que es exactamente lo que tiene que pasar.

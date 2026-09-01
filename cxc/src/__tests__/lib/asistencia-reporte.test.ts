@@ -79,28 +79,69 @@ describe("🔴 Regla 2 — almuerzo: se mide con las 4 marcas", () => {
   });
 });
 
-describe("🔴 Regla 3 — extras: mínimo 15 min y NETAS del atraso del día", () => {
-  it("el mínimo es 15", () => expect(EXTRA_MINIMO_MIN).toBe(15));
+// 🔄 ESTE BLOQUE CAMBIÓ DE DIRECCIÓN EL 1-sep-2026, en sus DOS mitades. Antes
+// se llamaba «mínimo 15 min y NETAS del atraso del día» y probaba justo lo
+// contrario de lo que prueba ahora. Las dos son decisiones de Daniel, textuales:
+//
+//   · el mínimo bajó de 15 a 10 minutos;
+//   · el atraso del mismo día YA NO se resta de la hora extra — *"No, van
+//     separadas"*, preguntado por el caso «llegó 20 tarde y se quedó 30».
+//
+// Los casos viejos se conservan con los números dados vuelta en vez de
+// borrarse: son los que dicen QUÉ cambió, y el que venga después necesita ver
+// que el 120 de Kevin hoy es 132.
+describe("🔴 Regla 3 — extras: mínimo 10 min y BRUTAS (el atraso va aparte)", () => {
+  it("el mínimo es 10, no los 15 de antes", () => expect(EXTRA_MINIMO_MIN).toBe(10));
 
-  it("quedarse 10 minutos no es hora extra", () => {
-    expect(correr([marca("2026-07-13","08:00"), marca("2026-07-13","17:10")])[0].dias[0].extraMin).toBe(0);
+  it("quedarse 9 minutos no es hora extra; 10 en punto ya sí", () => {
+    // ⚠️ La frontera se movió: con el mínimo en 15, quedarse 10 daba 0. Hoy da
+    // 10 — y como el umbral es una PUERTA y no un descuento, da los 10
+    // enteros, no «10 menos el umbral».
+    expect(correr([marca("2026-07-13","08:00"), marca("2026-07-13","17:09")])[0].dias[0].extraMin).toBe(0);
+    expect(correr([marca("2026-07-13","08:00"), marca("2026-07-13","17:10")])[0].dias[0].extraMin).toBe(10);
+  });
+
+  it("🔴 el mínimo es una PUERTA, no un descuento: 25 minutos pagan 25", () => {
+    // Daniel, textual, preguntado «si se queda 25 minutos, ¿cuántos le pagás?»:
+    // *"25 minutos"*. Si alguna vez alguien lo convierte en `bruto − umbral`,
+    // acá saldría 15 y este test lo caza.
+    expect(correr([marca("2026-07-13","08:00"), marca("2026-07-13","17:25")])[0].dias[0].extraMin).toBe(25);
   });
 
   it("quedarse 40 minutos sí", () => {
     expect(correr([marca("2026-07-13","08:00"), marca("2026-07-13","17:40")])[0].dias[0].extraMin).toBe(40);
   });
 
-  it("⚠️ el que llegó tarde y se fue tarde RECUPERÓ, no hizo extra", () => {
+  it("🔴 el que llegó tarde y se fue tarde cobra la extra COMPLETA", () => {
+    // 🔄 Antes este caso se llamaba «RECUPERÓ, no hizo extra» y esperaba 120.
     // Kevin el 27-jul: entró 08:12 (12 tarde) y salió 19:12 (132 brutos).
-    // 132 - 12 = 120. Sin esta resta se le pagaría el atraso.
+    // Hasta el 1-sep-2026 el motor devolvía 132 − 12 = 120; hoy devuelve 132.
+    // El atraso NO se perdona: se sigue descontando por su lado, en
+    // `tiempoNoTrabajadoMin`, que es la línea donde la contadora lo mira.
     const r = correr([marca("2026-07-13","08:12"), marca("2026-07-13","19:12")]);
     expect(r[0].dias[0].tardeMin).toBe(12);
-    expect(r[0].dias[0].extraMin).toBe(120);
+    expect(r[0].dias[0].extraMin).toBe(132);
+    // Y el atraso sigue vivo en su propia cuenta — que las dos reglas vayan
+    // separadas NO significa que una haya desaparecido.
+    expect(r[0].resumen.minutosTarde).toBe(12);
+    expect(r[0].resumen.tiempoNoTrabajadoMin).toBe(12);
   });
 
-  it("si el atraso se come toda la extra, queda en 0 (nunca negativa)", () => {
-    const r = correr([marca("2026-07-13","09:00"), marca("2026-07-13","17:30")]);
-    expect(r[0].dias[0].extraMin).toBe(0);
+  it("🔴 el atraso ya NO se come la extra: 20 tarde + 30 quedado = 30, no 10", () => {
+    // 🔄 Antes esto se llamaba «si el atraso se come toda la extra, queda en 0».
+    // Es EL caso que Daniel decidió, con sus números: *"llegó 20 tarde y se
+    // quedó 30"*. Antes 10; hoy 30.
+    const r = correr([marca("2026-07-13","08:20"), marca("2026-07-13","17:30")]);
+    expect(r[0].dias[0].tardeMin).toBe(20);
+    expect(r[0].dias[0].extraMin).toBe(30);
+  });
+
+  it("una hora entera de extra paga 60, sin ningún redondeo especial", () => {
+    // ⚠️ Preguntado si a los 60 minutos pasaba algo: *"nada especial: se paga
+    // el tiempo exacto"*. Ni se redondea hacia arriba a la hora siguiente ni se
+    // paga por horas cumplidas.
+    expect(correr([marca("2026-07-13","08:00"), marca("2026-07-13","18:00")])[0].dias[0].extraMin).toBe(60);
+    expect(correr([marca("2026-07-13","08:00"), marca("2026-07-13","18:01")])[0].dias[0].extraMin).toBe(61);
   });
 
   it("la salida es POR PERSONA: el de 4:30 que sale 17:00 hizo 30", () => {
@@ -109,6 +150,12 @@ describe("🔴 Regla 3 — extras: mínimo 15 min y NETAS del atraso del día", 
       { horarios: [horario({ salida: "16:30" })] },
     );
     expect(r[0].dias[0].extraMin).toBe(30);
+  });
+
+  it("la extra nunca es negativa: irse ANTES no genera extra en contra", () => {
+    const r = correr([marca("2026-07-13","08:00"), marca("2026-07-13","16:00")]);
+    expect(r[0].dias[0].extraMin).toBe(0);
+    expect(r[0].dias[0].salidaTempranaMin).toBe(60);
   });
 });
 

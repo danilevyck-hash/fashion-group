@@ -55,7 +55,7 @@ const MIGRACION = `supabase/migrations/${MIGRACION_CONFIGURACION}`;
 /** Un cuerpo de reglas COMPLETO y válido, tal como lo manda el formulario. */
 const REGLAS_COMPLETAS: Record<string, unknown> = {
   toleranciaTardanzaMin: "10",
-  extraMinimoMin: "15",
+  extraMinimoMin: "10",
   recargoExtraDiurno: "1.25",
   recargoExtraNocturno: "1.5",
   horaCorteNocturno: "18:00",
@@ -90,7 +90,10 @@ describe("los valores por defecto son los que confirmó la contable", () => {
     expect(REGLAS_DEFAULT.divisor48).toBe(208);
     expect(REGLAS_DEFAULT.seguroSocialPct).toBe(9.75);
     expect(REGLAS_DEFAULT.seguroEducativoPct).toBe(1.25);
-    expect(REGLAS_DEFAULT.extraMinimoMin).toBe(15);
+    // 🔄 10, no 15 (1-sep-2026, decisión de Daniel). El umbral de la hora
+    // extra bajó: quedarse un rato corto sigue sin pagar, pero la puerta se
+    // abre antes. Y sigue siendo una PUERTA — pasado el umbral se paga todo.
+    expect(REGLAS_DEFAULT.extraMinimoMin).toBe(10);
   });
 
   it("el excedente: 3 horas y factor 2.625 (= 1.5 × 1.75)", () => {
@@ -500,7 +503,7 @@ describe("excedente diario", () => {
 describe("validarReglas — se guardan TODAS juntas", () => {
   const cuerpo: Record<string, unknown> = {
     toleranciaTardanzaMin: "10",
-    extraMinimoMin: "15",
+    extraMinimoMin: "10",
     recargoExtraDiurno: "1.25",
     recargoExtraNocturno: "1.50",
     horaCorteNocturno: "18:00",
@@ -738,10 +741,20 @@ describe("🔴 la tolerancia es CONFIGURABLE de punta a punta", () => {
         horarios: [horario], justificaciones: [], feriados: new Map(),
         desde: "2026-07-13", hasta: "2026-07-13", reglas,
       })[0].dias[0].extraMin;
-    expect(conExtra("17:10")).toBe(0);                                  // 10 < 15
+    // 🔄 La primera línea cambió de dirección el 1-sep-2026: con el mínimo en
+    // 15 quedarse 10 daba 0; con el mínimo en 10 da los 10 ENTEROS. Lo que este
+    // caso cuida sigue siendo lo mismo: que el umbral se LEA de las reglas y no
+    // esté escrito en el motor.
+    expect(conExtra("17:10")).toBe(10);                                 // 10 ≥ 10
+    expect(conExtra("17:09")).toBe(0);                                  //  9 < 10
+    expect(conExtra("17:10", { extraMinimoMin: 15 })).toBe(0);          // el viejo
     expect(conExtra("17:10", { extraMinimoMin: 5 })).toBe(10);
     expect(conExtra("17:20")).toBe(20);
     expect(conExtra("17:20", { extraMinimoMin: 30 })).toBe(0);
+    // 🔴 Y en NINGUNO de estos casos el umbral se resta: pasada la puerta se
+    // paga el bruto. Con `bruto − umbral` este último par daría 15 y 5.
+    expect(conExtra("17:20", { extraMinimoMin: 5 })).toBe(20);
+    expect(conExtra("17:20", { extraMinimoMin: 15 })).toBe(20);
   });
 
   // 🔴 EL ALMUERZO YA NO ES CONFIGURABLE (13-ago-2026). Era la única regla que
