@@ -600,8 +600,9 @@ export function titleCase(s: Cell): string {
 // FOB+CIF, SIN Composición pero CON Codigo CPBS (= número de factura del proveedor).
 export const OUT_COLS_DEFAULT = OUT_COLS.filter((c) => c !== "Composición");
 
-// Plantilla de Fashion Shoes (Tarea 5): 24 cols, UNA sola columna "Costo *" (=CIF),
-// e incluye Composición y Codigo CPBS (van VACÍAS pero la columna existe).
+// Plantilla de Fashion Shoes (Tarea 5): 24 cols, UNA sola columna "Costo *"
+// (= FOB desde el 1-sep-2026; era el CIF), e incluye Composición y Codigo CPBS
+// (van VACÍAS pero la columna existe).
 export const OUT_COLS_SHOES = [
   "Código *", "Referencia *", "Código Barra *", "Descripción *", "Precio *",
   "Tasa de Impuesto *", "Costo *", "rubro *", "subrubro", "Marca *", "Proveedor *",
@@ -618,13 +619,22 @@ export function outColsForEmpresa(empresaKey: string): string[] {
 
 /** AOA (array of arrays) para generar el Excel, con el set de columnas dado
  *  (default = OUT_COLS_DEFAULT). Aplica Title Case y, en subrubro, "/"→"-".
- *  La columna "Costo *" (plantilla Fashion Shoes) toma el Costo CIF. */
+ *  La columna "Costo *" (plantilla Fashion Shoes) toma el Costo FOB. */
 export function buildAoa(rows: ProcessedRow[], cols: string[] = OUT_COLS_DEFAULT): (string | number)[][] {
   const aoa: (string | number)[][] = [cols.slice()];
   for (const d of rows) {
     aoa.push(cols.map((c) => {
       if (c === "Costo *") {
-        const v = d.cols["Costo CIF *"] ?? d.cols["Costo FOB *"];
+        // 🔴 EL FOB, NO EL CIF (1-sep-2026). Daniel, textual: *"en fashion shoes,
+        // cuando me das el excel ya depurado, me das un solo costo… quiero que
+        // me des el fob en vez del cif ahí"*.
+        //
+        // 🔑 No lleva respaldo, y no es un olvido: el FOB es el costo que viene
+        // en el archivo del proveedor y el CIF se CALCULA de él
+        // (`cif = fob × factor`). Cuando no hay FOB tampoco hay CIF, así que un
+        // `?? CIF` nunca se dispararía — y si algún día se disparara estaría
+        // poniendo un costo con flete adentro en una columna que dice FOB.
+        const v = d.cols["Costo FOB *"];
         return v === null || v === undefined ? "" : v;
       }
       const v = d.cols[c];

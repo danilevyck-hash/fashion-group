@@ -231,16 +231,34 @@ describe("Depurador — marcas desconocidas (no caen en silencio)", () => {
 
 describe("Depurador — plantilla por empresa (Tarea 5)", () => {
   const rows = processRows([H, ["R1", "1", "Men-Sneakers", "M", 10, 10, 20, "TH Footwear", "x"]] as SheetRow[], cfg).rows;
-  it("Fashion Shoes: 24 cols, 'Costo *' único = CIF, con Composición/CPBS", () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN (1-sep-2026): «Costo *» pasó de CIF a FOB. Daniel,
+  // textual: *"en fashion shoes, cuando me das el excel ya depurado, me das un
+  // solo costo… quiero que me des el fob en vez del cif ahí"*. El costo de
+  // entrada es 10 y el factor 1,1: antes salía 11 (con flete), ahora 10.
+  it("Fashion Shoes: 24 cols, 'Costo *' único = FOB, con Composición/CPBS", () => {
     const aoa = buildAoa(rows, outColsForEmpresa("fashion_shoes"));
     const header = aoa[0] as string[];
     expect(header.length).toBe(24);
     expect(header).toContain("Costo *");
     expect(header).not.toContain("Costo FOB *");
+    expect(header).not.toContain("Costo CIF *");
     expect(header).toContain("Composición");
     expect(header).toContain("Codigo CPBS");
-    // Costo * = CIF (10 × 1.1 = 11)
-    expect(aoa[1][header.indexOf("Costo *")]).toBe(11);
+    // 🔑 Costo * = FOB (el costo del archivo, 10), NO el CIF (10 × 1,1 = 11).
+    expect(aoa[1][header.indexOf("Costo *")]).toBe(10);
+  });
+
+  it("⛔ y NO se cuela el flete: el valor con CIF ya no aparece en esa columna", () => {
+    const aoa = buildAoa(rows, outColsForEmpresa("fashion_shoes"));
+    const header = aoa[0] as string[];
+    expect(aoa[1][header.indexOf("Costo *")]).not.toBe(11);
+  });
+
+  it("⚠️ Vistana/Fashion Wear NO cambian: siguen con FOB y CIF por separado", () => {
+    const aoa = buildAoa(rows, outColsForEmpresa("vistana"));
+    const header = aoa[0] as string[];
+    expect(aoa[1][header.indexOf("Costo FOB *")]).toBe(10);
+    expect(aoa[1][header.indexOf("Costo CIF *")]).toBe(11);
   });
   it("Vistana/Fashion Wear: 24 cols con FOB+CIF (incluye Codigo CPBS)", () => {
     expect((buildAoa(rows, outColsForEmpresa("vistana"))[0] as string[]).length).toBe(24);
