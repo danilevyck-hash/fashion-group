@@ -17,6 +17,7 @@ import {
   normalizarEncabezado,
 } from "@/lib/egresos/parser";
 import { esGasto, duplicadosExactos } from "@/lib/egresos/reglas";
+import { codigoDeCuenta, CUENTA_RE } from "@/lib/contable/csv";
 
 const CSV = readFileSync(
   join(process.cwd(), "src/__tests__/fixtures/egresos-vistana-2026.csv"),
@@ -188,10 +189,21 @@ describe("filas que no se pueden leer se REPORTAN, no se cuentan como cero", () 
     expect(r.errores[0].motivo).toContain("Monto ilegible");
   });
 
-  it("una cuenta que no tiene 5 segmentos no entra", () => {
+  // ⚠️ TEST INVERTIDO EL 2-SEP-2026 — decía:
+  //     expect(r.errores[0].motivo).toContain("Código de cuenta inválido");
+  //
+  // Y ese texto era FALSO. Cuando Switch estrenó la celda con el nombre pegado
+  // («6.03.98.00.00 - GASTO DE TARJETA DE CREDITO»), el código estaba impecable:
+  // lo que había cambiado era que la celda traía DOS datos. Quien leyera ese
+  // mensaje se iba a Switch a buscar una cuenta mal creada y perdía la mañana.
+  // Lo que NO cambió: una celda sin 5 tramos numéricos al principio sigue siendo
+  // un error y el renglón sigue sin entrar.
+  it("una cuenta que no tiene 5 tramos no entra, y el mensaje no acusa a la cuenta", () => {
     const r = parsearEgresosCsv(`${cab}\n2026-01-02;120-1;6.02;PRINCIPAL;;X;10.00`);
     expect(r.lineas).toEqual([]);
-    expect(r.errores[0].motivo).toContain("Código de cuenta inválido");
+    expect(r.errores[0].motivo).toContain("No reconozco el código de cuenta");
+    expect(r.errores[0].motivo).toContain("no una cuenta mal creada");
+    expect(r.errores[0].motivo).not.toContain("Código de cuenta inválido");
   });
 
   it("un renglón sin N. INTERNO no entra: sin él no se puede auditar contra Switch", () => {
@@ -212,5 +224,137 @@ describe("filas que no se pueden leer se REPORTAN, no se cuentan como cero", () 
     );
     expect(r.lineas).toHaveLength(1);
     expect(r.errores).toHaveLength(1);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🩸 EL FORMATO NUEVO DE LA CELDA `CUENTA CONTABLE` (1-sep-2026)
+ *
+ * Switch empezó a mandar el nombre de la cuenta pegado al código y el sync murió
+ * el mismo día en las CINCO empresas que tienen gastos: cero de 378 renglones en
+ * Vistana, 135 en Fashion Wear, 123 en Fashion Shoes, 47 en Active Shoes, 26 en
+ * Active Wear (`switch_sync_log`, 31-ago verde → 1-sep en error).
+ *
+ * ⚠️ **DE DÓNDE SALE EL FIXTURE, Y CUÁNTA CONFIANZA MERECE.** El archivo crudo
+ * NO se llegó a ver: bajarlo exige abrir sesión web con `changesession="SI"`,
+ * que expulsa del panel a quien esté adentro, y la máquina donde se trabajó no
+ * tiene la URL del API de Switch ni el `CRON_SECRET` de la ruta de diagnóstico.
+ * Lo que SÍ está medido es la celda entera, verbatim, en el `error_message` de
+ * las corridas del 1 y 2 de septiembre de las cinco empresas.
+ *
+ * `egresos-vistana-2026-formato-nuevo.csv` es entonces un fixture **DERIVADO**:
+ * es el archivo real del 13-ago con el nombre REAL de cada cuenta —tomado del
+ * catálogo real de Vistana, `catalogo-cuentas-vistana.csv`— pegado detrás del
+ * código. Por eso el candado no se apoya en el separador: la lectura acepta el
+ * código seguido de CUALQUIER cosa (ver `codigoDeCuenta`), y eso se prueba
+ * aparte, abajo.
+ *
+ * 🔴 EL FIXTURE VIEJO NO SE TOCA. El formato pelado tiene que seguir leyéndose:
+ * lo que hay guardado en la base se leyó así, y una empresa puede volver a
+ * mandarlo. Los dos archivos tienen que dar EL MISMO NÚMERO.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const CSV_NUEVO = readFileSync(
+  join(process.cwd(), "src/__tests__/fixtures/egresos-vistana-2026-formato-nuevo.csv"),
+  "utf8",
+);
+
+describe("🩸 el mismo archivo con el nombre de la cuenta pegado al código", () => {
+  const viejo = parsearEgresosCsv(CSV);
+  const nuevo = parsearEgresosCsv(CSV_NUEVO);
+
+  it("el fixture nuevo TRAE el formato nuevo (si no, este candado no probaría nada)", () => {
+    expect(CSV_NUEVO).toContain("6.03.98.00.00 - GASTO DE TARJETA DE CREDITO");
+    // Y trae también un renglón con la cuenta PELADA: las dos formas conviven.
+    expect(CSV_NUEVO).toContain(";5.03.00.00.00;");
+  });
+
+  it("no descarta ni un renglón", () => {
+    expect(nuevo.errores).toEqual([]);
+  });
+
+  it("da los MISMOS 378 renglones por $243.342,48", () => {
+    expect(nuevo.lineas.length).toBe(378);
+    expect(usd(nuevo.lineas.reduce((a, l) => a + l.totalCent, 0))).toBe("243342.48");
+  });
+
+  it("renglón por renglón, es idéntico al formato viejo", () => {
+    expect(nuevo.lineas).toEqual(viejo.lineas);
+  });
+
+  it("🔴 se queda con el CÓDIGO, nunca con el nombre pegado", () => {
+    const conNombre = nuevo.lineas.filter((l) => l.cuenta.includes(" "));
+    expect(conNombre).toEqual([]);
+    for (const l of nuevo.lineas) expect(CUENTA_RE.test(l.cuenta)).toBe(true);
+  });
+
+  it("🔴 el nombre NO se guarda en ningún campo del renglón", () => {
+    // El nombre autoritativo vive en `cuentas_contables.nombre_switch`. Dos
+    // fuentes para el mismo nombre es la próxima discrepancia.
+    const serializado = JSON.stringify(nuevo.lineas);
+    expect(serializado).not.toContain("GASTO DE TARJETA DE CREDITO");
+  });
+
+  it("el gasto (grupo 6) sigue siendo el mismo, al centavo", () => {
+    const g = (ls: typeof nuevo.lineas) =>
+      usd(ls.filter((l) => esGasto(l.cuenta)).reduce((a, l) => a + l.totalCent, 0));
+    expect(g(nuevo.lineas)).toBe(g(viejo.lineas));
+  });
+
+  it("y el archivo se sigue reconociendo como el reporte de egresos", () => {
+    expect(pareceCsvDeEgresos(CSV_NUEVO)).toBe(true);
+  });
+});
+
+describe("codigoDeCuenta — el envoltorio se acepta ancho, el VALOR no se afloja", () => {
+  it("lee el código pelado, como siempre", () => {
+    expect(codigoDeCuenta("6.03.98.00.00")).toBe("6.03.98.00.00");
+    expect(codigoDeCuenta("  6.03.98.00.00  ")).toBe("6.03.98.00.00");
+  });
+
+  it("lee las celdas REALES que quedaron en el log de las 5 empresas rotas", () => {
+    // Verbatim de `switch_sync_log.error_message`, 1 y 2-sep-2026.
+    expect(codigoDeCuenta("6.03.98.00.00 - GASTO DE TARJETA DE CREDITO")).toBe("6.03.98.00.00");
+    expect(codigoDeCuenta("6.03.13.00.00 - REPARACION Y MANT. DE VEHICULO")).toBe("6.03.13.00.00");
+    expect(codigoDeCuenta("6.02.01.00.00 - SERVICIOS PROFESIONALES")).toBe("6.02.01.00.00");
+    expect(codigoDeCuenta("6.01.02.00.00 - COMISIONES")).toBe("6.01.02.00.00");
+  });
+
+  it("🔴 NO se calibra al separador ' - ', que nadie llegó a ver en el archivo crudo", () => {
+    for (const cola of ["-GASTO", " GASTO", ",GASTO", " | GASTO", "GASTO", " – GASTO", "\tGASTO"]) {
+      expect(codigoDeCuenta(`6.03.98.00.00${cola}`)).toBe("6.03.98.00.00");
+    }
+  });
+
+  it("🔴 un nombre con puntos adentro no corre el código", () => {
+    // "REPARACION Y MANT. DE VEHICULO" es real y trae un punto.
+    expect(codigoDeCuenta("6.03.13.00.00 - MANT. DE VEHICULO")).toBe("6.03.13.00.00");
+  });
+
+  it("🔴 sin 5 tramos al principio sigue siendo error", () => {
+    for (const malo of ["", "-", "6.02", "6.03.98.00", "GASTO - 6.03.98.00.00", "abc"]) {
+      expect(codigoDeCuenta(malo)).toBeNull();
+    }
+  });
+
+  it("🔴 SEIS tramos NO se recortan a cinco: sería cambiar de cuenta en silencio", () => {
+    // `esGasto` decide gasto/no-gasto con el primer tramo, y todo el módulo
+    // agrupa por `cuentaCorta` (los tres primeros). Un recorte silencioso
+    // reclasificaría plata sin que nada se queje.
+    expect(codigoDeCuenta("6.03.98.00.00.00")).toBeNull();
+  });
+
+  it("🔴 lo que devuelve SIEMPRE pasa el validador estricto", () => {
+    const celdas = [
+      "6.03.98.00.00",
+      "6.03.98.00.00 - GASTO DE TARJETA DE CREDITO",
+      "1.01.02.00.00-CAJA GENERAL",
+      "2.01.01.00.00 CUENTAS POR PAGAR",
+    ];
+    for (const c of celdas) {
+      const cod = codigoDeCuenta(c);
+      expect(cod).not.toBeNull();
+      expect(CUENTA_RE.test(cod as string)).toBe(true);
+    }
   });
 });

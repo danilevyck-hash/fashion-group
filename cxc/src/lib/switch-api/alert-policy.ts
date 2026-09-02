@@ -115,6 +115,13 @@ export function consecuenciaDeSyncType(syncType: string): string {
       return "en el tab Referencia de Ventas, la existencia y el precio de etiqueta pueden estar viejos.";
     case "proveedores":
       return "lo que debemos a proveedores puede estar viejo.";
+    // 🩸 FALTABA, y el default mandaba a Daniel a ninguna parte. El 1-sep-2026
+    // Switch cambió el formato del reporte y este sync falló cinco días seguidos
+    // en las cinco empresas que tienen gastos; el aviso decía "puede haber datos
+    // sin actualizar en la app", que no nombra una sola pantalla. Un aviso que no
+    // dice dónde mirar cuesta el mismo susto y no compra la acción.
+    case "egresos_varios":
+      return "en el módulo Gastos, lo que salió de caja y del banco puede estar viejo o incompleto.";
     case "ventas_tipos":
       return "hay ventas que el tablero está contando como CERO: Switch estrenó un tipo de comprobante que el sistema todavía no sabe leer.";
     case "catalogo_reebok":

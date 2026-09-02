@@ -44,12 +44,23 @@
  *     se guarda, porque es lo único con lo que se puede auditar un renglón
  *     contra el panel de Switch.
  *
+ *  6. 🩸 LA CELDA `CUENTA CONTABLE` TRAE EL NOMBRE PEGADO DESDE EL 1-SEP-2026.
+ *     Venía `6.03.98.00.00` y pasó a venir
+ *     `6.03.98.00.00 - GASTO DE TARJETA DE CREDITO`. El validador exigía el
+ *     código pelado y el sync murió ese mismo día en las CINCO empresas que
+ *     tienen gastos (vistana 378 · fashion_wear 135 · fashion_shoes 123 ·
+ *     active_shoes 47 · active_wear 26 renglones el 31-ago, cero el 1-sep). Es
+ *     la MISMA lección del punto 1, que ya estaba escrita y se había aplicado
+ *     solo a la fecha. Ahora se leen las dos formas — ver `codigoDeCuenta` en
+ *     `contable/csv.ts` — y del nombre no se toma nada: el autoritativo es
+ *     `cuentas_contables.nombre_switch`.
+ *
  * Todo el dinero se maneja en CENTAVOS ENTEROS. `montoACentavos` y
  * `normalizarTexto` se REUSAN del parser del mayor: dos parsers de plata en el
  * mismo repo son dos redondeos posibles para el mismo número.
  */
 
-import { montoACentavos, normalizarTexto, CUENTA_RE } from "@/lib/contable/csv";
+import { montoACentavos, normalizarTexto, codigoDeCuenta } from "@/lib/contable/csv";
 
 /** Un egreso ya parseado. Monto en centavos enteros. */
 export interface EgresoLinea {
@@ -78,6 +89,17 @@ export interface EgresoParseError {
   linea: number;
   motivo: string;
   crudo: string;
+  /**
+   * El N. INTERNO del documento, cuando esa celda sí se pudo leer.
+   *
+   * 🩸 ES LA LLAVE CON LA QUE EL DESCARTE SE PUEDE SEGUIR. El nº de línea no
+   * sirve: si mañana se corrige UN renglón, todos los de abajo se corren y el
+   * anti-loop del aviso creería que son descartes nuevos — la alerta que suena
+   * para siempre. El N. INTERNO es estable y además es lo único con lo que se
+   * puede buscar el documento en el panel de Switch. Va `undefined` cuando lo
+   * que falló fue justamente esa celda.
+   */
+  nInterno?: string;
 }
 
 export interface EgresoParseResult {
@@ -237,9 +259,18 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
     nLinea++;
 
     const campos = partirFila(cruda);
-    const err = (motivo: string) =>
-      errores.push({ linea: i + 1, motivo, crudo: normalizarTexto(cruda).slice(0, 200) });
     const campo = (idx: number) => (idx >= 0 ? normalizarTexto(campos[idx] ?? "") : "");
+    // El N. INTERNO se lee ANTES de validar nada para que TODO descarte viaje
+    // con la llave que lo identifica (ver `EgresoParseError.nInterno`). Se lee,
+    // no se valida: su propia validación sigue estando abajo, en su turno.
+    const nInternoCrudo = campo(iNum);
+    const err = (motivo: string) =>
+      errores.push({
+        linea: i + 1,
+        motivo,
+        crudo: normalizarTexto(cruda).slice(0, 200),
+        ...(nInternoCrudo === "" ? {} : { nInterno: nInternoCrudo }),
+      });
 
     // Se compara contra la última columna OBLIGATORIA, no contra el largo del
     // encabezado: una columna opcional ausente no puede invalidar la fila.
@@ -249,9 +280,23 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
       continue;
     }
 
-    const cuenta = campo(iCuenta);
-    if (!CUENTA_RE.test(cuenta)) {
-      err(`Código de cuenta inválido: "${cuenta}".`);
+    // La celda puede traer el código solo o el código con el nombre pegado
+    // detrás: las dos formas se leen, y del nombre no se toma nada (ver
+    // `codigoDeCuenta`).
+    const celdaCuenta = campo(iCuenta);
+    const cuenta = codigoDeCuenta(celdaCuenta);
+    if (cuenta === null) {
+      // 🩸 EL TEXTO DICE LA VERDAD, Y ESO ES LA MITAD DEL ARREGLO. Hasta el
+      // 2-sep-2026 decía «Código de cuenta inválido», que era falso: el código
+      // estaba impecable y lo que había cambiado era que la celda traía dos
+      // datos. Quien lo leía se iba a Switch a buscar una cuenta mal creada y
+      // perdía la mañana. Un mensaje que manda a mirar el lugar equivocado
+      // cuesta más que no decir nada.
+      err(
+        `No reconozco el código de cuenta en esta celda: "${celdaCuenta}". ` +
+          `Se esperan 5 tramos de números separados por puntos al principio ` +
+          `(y detrás puede venir el nombre). Es cómo lo manda Switch, no una cuenta mal creada.`,
+      );
       continue;
     }
 
@@ -267,7 +312,7 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
       continue;
     }
 
-    const nInterno = campo(iNum);
+    const nInterno = nInternoCrudo;
     if (nInterno === "") {
       err("El renglón no trae N. INTERNO.");
       continue;
