@@ -1,5 +1,36 @@
 # Fashion Group — fashiongr.com
 
+## Cómo trabajar con Daniel
+
+Tres reglas que valen para todo encargo en este repo. No están en la memoria de nadie: están aquí para que las herede cualquiera que abra el proyecto.
+
+### 1. Español latinoamericano neutro, tuteo. Nunca voseo.
+
+> «no soy argentino, ni a mí ni en el sistema pongas palabras argentinos, somos latinoamericanos normal… por ejemplo vi "elegi el periodo" es elige el periodo» — Daniel, 1-sep-2026
+
+Vale al hablarle a él **y** en todo texto del sistema: pantalla, PDF, Excel, Telegram, correo y comentarios de código.
+**elige · escribe · revisa · guarda · toca · mira · aquí · tienes · puedes · tú.**
+Nunca *elegí · escribí · revisá · guardá · tocá · mirá · acá · tenés · podés · vos*.
+Candado: `src/__tests__/lib/nada-de-voseo.test.ts` (barre `src/**` menos los tests, con los comentarios borrados). El encabezado de ese archivo explica qué se prohíbe y qué no.
+
+### 2. Resumido y simple. Daniel es el dueño, no programador.
+
+> «necesito que me hables lo más resumido posible siempre y de manera sencilla, que no soy experto ni programador»
+
+> «siempre háblame diciendo dónde está lo que estamos tocando y el ahora y después para aprobar»
+
+O sea: cada respuesta dice **qué módulo/pantalla se toca**, **cómo está hoy** y **cómo quedaría**. Sin nombres de tabla ni jerga cuando se puede decir con el nombre que él usa («Gastos», «la cartera de Boston», «la planilla»).
+
+### 3. 🔴 Mapear → definir juntos → ejecutar. Nunca al revés.
+
+> «mapea y recomienda. Cuando terminamos de definir de dónde sale cada cosa lo ejecutas. No antes. Porque a veces tú te equivocas porque no sabes lo que sé yo de mi negocio»
+
+> «¿Te parece así? mapear → definir juntos → ejecutar. Cuando es necesario mockup de ahora vs después, sencillo, sin tantas palabras.»
+
+- **Mapear** = medir contra producción antes de opinar, y contar lo que le importa al negocio, no lo que es fácil de contar. Ejemplo: artículos **con existencia** (5.040), no el catálogo histórico completo (16.619).
+- **Definir juntos** = él decide de dónde sale cada dato. Si hace falta ver la diferencia, va un **mockup de ahora vs después**: dos cuadros lado a lado, el número o el texto que cambia, y nada más. **Visual, no ensayo** — sin párrafos explicativos alrededor de cada cuadro. Y **solo cuando es necesario**: si una tabla de dos líneas alcanza, con eso basta.
+- **Ejecutar** = recién después. Escribir código antes de que él defina es el error, aunque el código esté bien.
+
 ## Stack
 - **Framework:** Next.js 14 (App Router)
 - **Database:** Supabase (project: rspocgqhtpveytgbtler), PostgreSQL
@@ -185,7 +216,7 @@ archivo enlazado, verbatim.
 - Forgot password: link en login → "Contacta al administrador"
 
 ## Base de datos
-- **Tablas grandes:** cxc_rows (~50K), switch_facturas (historia 2022+, fuente única de ventas), ventas_raw (~100K, congelada — solo la lee costo)
+- **Tablas grandes** (medidas 2-sep-2026): `switch_articulo_diario` 203.536 · `switch_factura_lineas` 163.559 · `switch_facturas` 54.296 (historia oct-2022+, fuente única de ventas) · `ventas_raw` 48.378 (congelada, **sin lectores en la app**) · `switch_recibos` 46.556 · `switch_ingresos_mercancia` 35.475 · `switch_articulo_info` 16.619 · `cxc_rows` 1.097 (legacy, sin lectores). Detalle por pregunta en **Dónde vive cada dato**.
 
 
 - **Soft delete (`deleted` boolean), por módulo:**
@@ -205,6 +236,129 @@ archivo enlazado, verbatim.
   - `cxc_favorites` — favoritos ⭐ por usuario (antes localStorage)
   - `reclamo_custom_motivos` — motivos personalizados de reclamos (antes localStorage)
   - `reebok_orders.client_email` — email del cliente capturado al crear pedido
+
+## Dónde vive cada dato
+
+Mapa por **pregunta**, no por tabla: *«necesito saber X de Y — ¿dónde está?»*.
+Filas medidas contra producción el **2-sep-2026** (PostgREST, `count=exact`). Las ⚠️ son la mitad del valor: dicen para qué **NO** sirve cada tabla.
+
+> ⚠️ Transversal: **`db-max-rows` = 1000 y corta EN SILENCIO.** Cualquier lectura de una tabla marcada 🔢 (más de 1.000 filas) que no use `leerTodoPaginado` devuelve 1.000 filas y parece completa. Ver [Crons, alertas e infraestructura](docs/postmortems/crons-alertas.md).
+> ⚠️ Transversal: las 8 empresas se nombran con `empresa_key`… **menos las vistas de aging, que usan `company_key`**. Y `switch_estadocuenta_aging_boston` además renombra el id del cliente a `cliente_switch_id`.
+
+### Artículos y catálogo
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| Qué **ES** un artículo de Switch: código, descripción, existencia, precio de etiqueta, costo | `switch_articulo_info` | 1 fila por (empresa, código) · **16.619**, de las cuales **5.040 con existencia > 0** 🔢 | Solo las **6 del grupo** (vistana 8.254 · fashion_wear 5.097 · active_shoes 1.763 · fashion_shoes 706 · active_wear 592 · joystep 207). **Boston y American Classic = 0 filas, a propósito.** 🩸 `rubro`/`subrubro`/`marca` los devuelve `/apiarticulos/info` y **hoy no están en la tabla** (los agrega la migración `20260902130000_clasificacion_catalogo.sql`, sin aplicar al 2-sep-2026; y solo se piden para `active_shoes`) (columnas reales: `empresa_key, articulo_id, codigo, descripcion, existencia, precio_etiqueta, costo_api, synced_at, updated_at`). `costo_api` es **CIF**, no FOB. |
+| De qué **género y categoría** es un producto del catálogo público | `products` (Reebok) · `tommy_products` · `calvin_products` · `joybees_products` — columnas `gender` y `category` | 1 fila por SKU · 391 · 546 · 81 · 83 | 🩸 **Aquí estaba el dato, y está lleno al 100% (cero nulos en las 4 marcas).** No hay que deducirlo del nombre ni buscarlo en las facturas. ⚠️ **El vocabulario NO es común entre marcas**: Reebok `male/female/women/unisex/kids` (mezcla `male` con `women`), Tommy `women/men/boys/girls`, Joybees `kids/women/unisex/adults_m/adults`, Calvin `women/men`. Nada de comparar géneros entre marcas sin normalizar. ⚠️ Reebok es el ORIGINAL y por eso **no lleva prefijo**: `products` + `inventory`, y viven en **otro proyecto Supabase** (`reebokServer`). 🩸 **Lleno no es lo mismo que cierto**: `products.gender` tenía `DEFAULT 'male'` y el sync nunca lo escribía — **173 de 173 altas desde el 24-jun-2026 quedaron `male`**, un valor válido mintiendo el 100% de las veces. Se corrige en `20260902130000_clasificacion_catalogo.sql`. |
+| De qué **marca** es un artículo | `switch_articulo_marca` | 1 fila por (empresa, articulo_id) · 8.631 | ⚠️ **Todas son `american_classic`.** Las 6 del grupo tienen CERO. Es el mapa marca+departamento de Multifashion, no un catálogo de marcas del grupo. |
+| Cuánto se movió un artículo **por día** | `switch_articulo_diario` | 1 fila por (empresa, fecha, artículo, tipo) · **203.536** 🔢 (la tabla más grande) | La escribe el cron `switch-articulos`; **no existe ninguna tabla llamada `switch_articulos`**. |
+| Tallas y existencia del catálogo Reebok | `inventory` | 1 fila por (product_id, talla) · 391 | Proyecto Supabase de Reebok. |
+
+### Ventas
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| Cuánto **vendí** (cabecera del comprobante) | `switch_facturas` | 1 fila por (empresa, `switch_factura_id`) · **54.296**, desde oct-2022 🔢 | Fuente única de ventas. Las **notas de crédito RESTAN** — ver [ventas-referencia](docs/postmortems/ventas-referencia.md). Incluye ACS (29.584) y Boston (9.145): filtrar por empresa siempre. |
+| Qué le vendí a un cliente **renglón por renglón** | `switch_factura_lineas` | 1 fila por (empresa, tipo, factura, línea) · **163.559** 🔢 | 🩸 **Solo tiene los artículos que se FACTURARON. No sirve para saber los atributos de un artículo.** Medido: en active_shoes hay 1.126 artículos distintos aquí contra 1.763 en el catálogo (36% nunca aparece); en joystep 113 contra 207 (45%). ⚠️ Y **no cubre Boston ni American Classic: 0 filas**. Sí trae `rubro`/`subrubro`/`marca`, pero solo de lo vendido — usarlos como catálogo es el error. |
+| Cuánta **utilidad** dejó una factura (`pct_utilidad`, base de comisiones) | `switch_factura_utilidad` | 1 fila por (empresa, secuencial, fecha) · 1.830 | ⚠️ **Solo desde el 3-ene-2026** y solo las 6 del grupo. Preguntar utilidad de 2025 por aquí devuelve vacío, no cero. |
+| Ventas por **mes** ya sumadas | `ventas_rollup_mensual_mv` (313) · `switch_ventas_unificado_vw` | 1 fila por (empresa, mes) | Materializada: hay que refrescarla (`rpc refresh_ventas_rollup_mensual_mv`). El `_vw` une Switch + legacy y resta NC, así que **no cuadra 1:1 con el rollup**. |
+| Ventas viejas del CSV | `ventas_raw` | 48.378 🔢 | **Congelada y sin un solo lector en la app** (solo la copia el backup). No re-derivable de Switch. |
+| Tickets de Multifashion | `multifashion_tickets` (15.819) · vista `_multifashion_sf_vw` (29.584) | 1 fila por ticket | Multifashion **ES `american_classic`** y todo lo demás sale por RPC (`multifashion_mensual_v7`, `multifashion_vendedoras_v3`…). Ver [multifashion](docs/postmortems/multifashion.md). |
+
+### CXC y cobros
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| Qué documentos me deben (detalle) | `switch_estadocuenta` | 1 fila por (empresa, `ccte_id`) · **2.737** | Boston 976 · fashion_wear 627 · vistana 501 · fashion_shoes 425 · active_shoes 91 · active_wear 90 · joystep 27 · **ACS 0**. 🔴 Toda lectura acota por `empresa_key` en la misma cadena. Tiene **dos escritores** (API y scraping web) sobre la misma llave. |
+| Cuánto me debe cada cliente, por antigüedad | `switch_estadocuenta_aging` (vista) y `switch_estadocuenta_aging_mv` (materializada) | 1 fila por (`company_key`, cliente) · 211 cada una | ⚠️ Columna **`company_key`**, no `empresa_key`. La MV **materializa la vista** (`SELECT v.* FROM …`), no copia su cuerpo. Buckets `d0_30 … mas_365`. La API cae a la vista en vivo si la MV falla. |
+| La cartera de **Boston** | `switch_estadocuenta_aging_boston` | 1 fila por (cliente Boston) · 388 | 🔴 Es una **tabla aparte a propósito**: Boston NUNCA se mezcla con el CXC del grupo. Buckets propios y distintos: `d0_90 / d91_120 / d121_plus`. La llena el cron `boston-cartera` (reporte web, no API). Ver [boston-cxc](docs/postmortems/boston-cxc.md). |
+| Quién me **pagó** | `switch_recibos` | 1 fila por recibo · **46.556** 🔢 (ACS 27.749 · Boston 7.657) | Se sincroniza por **delete + insert** en una ventana rodante de 3 meses, no por upsert. `es_retencion` separa las retenciones. |
+| CXC del CSV viejo | `cxc_rows` | 1.097 | **Sin lectores en la app**, solo backup. (La línea «~50K» de *Base de datos* quedó vieja.) |
+| Notas, favoritos y contactos por cliente de CXC | `cxc_client_overrides` · `cxc_favorites` · `cxc_contact_log` · `cxc_emails_enviados` | 1 fila por (cartera, cliente normalizado) | La **cartera va en la llave**: el mismo nombre en dos empresas son dos filas. |
+
+### Compras, llegadas y costo
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| Qué **llegó** de mercancía (alimenta «Compré» y la última llegada de Referencia) | `switch_ingresos_mercancia` | 1 fila por (empresa, `n_interno`, línea) · **35.475** 🔢 | Solo las 6 del grupo; Boston y ACS = 0. Viene por **scraping web**, no por API. `costo_fob` no es confiable de por sí — hay bandera `fob_confiable` y el FOB del sistema **se calcula** (`CIF ÷ 1,10`). |
+| Costo y utilidad del día | `switch_costo_diario` | 1 fila por (empresa, fecha) · 1.223 | — |
+| Cuánto le debo a un **proveedor** | `switch_proveedor_estadocuenta` | 1 fila por (empresa, proveedor) · 65 | Trae el aging armado desde Switch (`aging` jsonb). Única tabla `switch_*` con soft delete. |
+| Costo por mes | `switch_costo_unificado_vw` | vista (empresa, mes) | ⚠️ **Vista muerta: cero lecturas en `src/`.** Existe la migración, no la usa nadie. |
+
+### Gastos y banco
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| En qué **gastó** una empresa (fuente ÚNICA desde el 13-ago-2026) | `egresos_varios` | 1 renglón del reporte Egresos Varios: (empresa, mes, `n_interno`, `linea_nro`) · 709 | Se reemplaza **mes a mes** (`rpc egresos_reemplazar_mes`), no upsert: solo vive la ventana cargada. vistana 378 · fashion_wear 135 · fashion_shoes 123 · active_shoes 47 · active_wear 26 · **joystep 0** (0 es normal ahí). 🔴 Las 8 empresas se ven pero **sus gastos nunca se suman entre sí** en este módulo. |
+| Hasta cuándo cargó la contadora / si una corrida no trajo nada | `egresos_importaciones` | 1 fila por corrida · 137 | Se inserta **antes** de escribir, justo para distinguir «este mes no tuvo movimientos» de «no sabemos nada». |
+| Qué significa un código de cuenta | `cuentas_contables` | 1 fila por (empresa, cuenta) · 987 | La sincroniza el mismo cron de egresos. |
+| Saldo del banco | `bancos_saldos` | 1 fila por (empresa, `fecha_dato`) · 52, escrito a mano por contabilidad | Upsert por esa llave: repetir la fecha corrige ESE día. **Cero `DELETE`.** |
+| El mayor contable | `mayor_lineas` (135) · `mayor_importaciones` (16) | — | **Retirado.** No se borran y hay test que pone el build rojo si una migración las dropea. Una sola lectura viva en `src/lib/cuentas/leer.ts`. Ver [gastos-mayor-banco](docs/postmortems/gastos-mayor-banco.md). |
+
+### Asistencia y planilla
+
+Detalle de reglas en [asistencia-planilla](docs/postmortems/asistencia-planilla.md).
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| Qué marcó el reloj | `asistencia_marcaciones` | 1 fila por (dispositivo, `evento_id`) · 5.744 🔢 | 🔴 **Append-only: nunca se edita ni se borra** (barrido estático lo prohíbe). Duplicados se ignoran en el upsert. La hora está en `ocurrio_en` (UTC) y el JSON crudo del reloj en `raw`. |
+| La corrección de una marcación | `asistencia_correcciones` | 1 fila por corrección · 8 | Va **encima** de la marcación, con motivo y firma; deshacer = `anulada_en`. |
+| Quién es el empleado, cuánto gana, saldo de vacaciones | `asistencia_personas` | 1 fila por `empleado_codigo` · 40 (37 activos: Boston 21 · vistana 9 · fashion_wear 7) | `saldo_vacaciones_dias` y `saldo_vacaciones_corte` van **juntos o ninguno** (CHECK). `no_marca_reloj` y `servicio_profesional` cambian todo el cálculo. |
+| Su horario | `asistencia_horarios` | 1 fila por empleado · 40 | — |
+| Los parámetros del cálculo (tolerancia, recargos, divisores, seguros) | `asistencia_reglas` | **Una sola fila, `id = 1`. Es un singleton.** | ⚠️ **No tiene `empresa_key`**: las reglas son del grupo entero, no por empresa. |
+| Feriados | `asistencia_feriados` | 1 fila por fecha · 22 | — |
+| Justificaciones y vacaciones | `asistencia_justificaciones` (23) · `asistencia_vacaciones` (2) | 1 fila por período justificado / por rango de vacaciones | 🔴 **Una vacación NO es una justificación**: tablas y pestañas distintas, y «Vacaciones» no está en la lista de motivos. `ya_pagadas` es lo único que mueve plata. |
+| Aprobaciones y planilla | `asistencia_horas_extra_aprobadas` (521) · `asistencia_prestamo_aprobado` (13) · `asistencia_planilla_manual` (26) · `asistencia_planilla_guardada` + `_linea` (**0 y 0: todavía no se cerró ninguna quincena**) | 1 fila por (empleado, fecha) o (quincena, empleado) | — |
+| Sueldo repartido entre empresas · quién aprueba qué empresa | `asistencia_reparto_empresa` (2) · `asistencia_aprobador_empresa` (6) | 1 fila por (empleado, empresa) / (usuario, empresa) | El reparto tiene que sumar el salario de la ficha o se rechaza entero. |
+
+### Guías de despacho
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| La guía: transportista, placa, firmas, estado | `guia_transporte` | 1 fila por guía · 238 (**216 Completadas y 2 Pendientes vivas; 20 borradas**) | Estado en TEXT sin CHECK. Completada = bloqueada para edición, con dos excepciones puntuales. |
+| **El cliente** de cada renglón, sus facturas y bultos | `guia_items` | 1 fila por renglón · 562 | 🔴 **El cliente vive aquí, en `cliente_codigo`, uno por renglón.** `guia_transporte.receptor_nombre` es **quien FIRMA**, no el cliente. ⚠️ `guia_items` tiene **su propio `deleted`**, independiente del de la cabecera: filtrar solo la cabecera deja pasar renglones borrados. Ver [guias](docs/postmortems/guias.md). |
+
+### Clientes
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| El directorio **completo** de clientes | `clientes_master` | 1 fila por `codigo` · **5.064** 🔢 | Este es el directorio de verdad. El upsert del sync **no pisa** `telefono/celular/email/notas` — eso lo escribe la gente. |
+| El directorio **manual** del módulo Clientes | `directorio_clientes` | 1 fila por contacto · **33** | ⚠️ Son 33, no miles: es la libreta de contactos a mano, no el padrón. Confundirla con `clientes_master` hace parecer que «no hay clientes». |
+| El cliente tal como lo ve **una empresa** en Switch | `switch_clientes` | 1 fila por (empresa, `cliente_switch_id`) · 6.794 🔢 | El mismo cliente aparece una vez por empresa donde compra. |
+| Cuánto compró un cliente en 12 meses | `clientes_agregado_12m_vw` (114) · `clientes_empresa_12m_vw` (1.665) | 1 fila por cliente / por (cliente, empresa) | El agregado ya **excluye Boston**. Se refresca con `rpc refresh_clientes_empresa_12m_vw`. |
+
+### Catálogos públicos y pedidos
+
+Reglas en [catalogos-pedidos](docs/postmortems/catalogos-pedidos.md).
+
+| Marca | Productos | Pedido interno | Pedido público | Envío a Switch |
+|---|---|---|---|---|
+| Reebok (`active_shoes`) | **`products`** (391) + `inventory` (391) | `reebok_orders` (22) + `reebok_order_items` (266) | `reebok_pedidos_publicos` (18) | `reebok_switch_envios` (15) |
+| Joybees (`joystep`) | `joybees_products` (83) | `joybees_orders` (41) | `joybees_pedidos_publicos` | `joybees_switch_envios` |
+| Tommy (`fashion_shoes`) | `tommy_products` (546) | `tommy_orders` (32) | `tommy_pedidos_publicos` | `tommy_switch_envios` |
+| Calvin (`vistana`) | `calvin_products` (81) | `calvin_orders` (20) | `calvin_pedidos_publicos` | `calvin_switch_envios` |
+
+⚠️ **Reebok rompe el patrón dos veces**: sus productos no llevan prefijo (`products`/`inventory`) y viven en **otro proyecto Supabase**, mientras que `reebok_pedidos_publicos` vive en el principal. Buscar `reebok_products` no encuentra nada.
+⚠️ `<marca>_switch_envios` tiene índice parcial único `(order_id) WHERE estado <> 'error'` — el **at-most-once** del envío.
+
+### Alertas, sincronización y salud
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| **Cómo le fue a cada corrida de sync** (la tabla que se mira primero cuando algo dejó de llegar) | `switch_sync_log` | 1 fila por corrida: `empresa_key, sync_type, started_at, finished_at, status, range_from/to, records_inserted/updated/skipped, skip_details, error_message, triggered_by` · **9.119** 🔢 | El candado de «una corrida a la vez» es un **índice único parcial sobre `status='running'`** por par (empresa, tipo); se suelta solo a los 30 min. `skip_details` (4.612 filas lo tienen) es donde se registra lo descartado. Poda: `rpc podar_switch_sync_log`. |
+| Cuándo corrió bien por última vez cada cron | `cron_heartbeats` | 1 fila por cron · 75 | ⚠️ La columna es **`cron_name`**, no `job`. Solo tiene dos columnas: `cron_name` y `last_success_at`. |
+| Qué error de cron ya se avisó (anti-loop del correo) | `cron_email_errors` | 1 fila por error notificado | — |
+| Los chequeos de integridad | `data_integrity_checks` | 1 fila por (check, corrida) · 807 | Insert-only, nunca se borra; el dashboard filtra por `LIVE_CHECK_NAMES`. Skill `data-integrity`. |
+| Memoria/CPU de la base | **ninguna tabla** | — | ⚠️ `db_recursos` **no es una tabla**: es el nombre de un tipo de alerta. El dato se lee del endpoint Prometheus de Supabase, justamente porque la base puede ser la que está caída. |
+| Quién entró y qué hizo | `user_sessions` (1.058) · `activity_logs` (2.821) · `login_attempts` | 1 fila por sesión / por acción | `user_sessions` **no tiene `expires_at`** — la expiración vive solo en el cron. Ver *Auth*. |
+
+### Trampas transversales
+
+- **Soft delete, dos convenciones.** `deleted boolean` en casi todo; **`deleted_at` solo en `packing_lists`**. Y en préstamos `deleted` es NULLABLE, por eso se filtra `.or("deleted.is.null,deleted.eq.false")` — un `.eq("deleted", false)` ahí **pierde filas**. Ninguna tabla `switch_*` sincronizada tiene soft delete, salvo `switch_proveedor_estadocuenta`.
+- **Empresa vs empresa.** Ocho `empresa_key` existen, pero **cada tabla cubre un subconjunto distinto**: los catálogos y las llegadas solo las 6 del grupo; `switch_articulo_marca` solo ACS; `switch_factura_lineas` sin Boston ni ACS. Antes de decir «falta el dato», mirar si esa empresa alguna vez estuvo en esa tabla.
+- **Cero no es lo mismo que vacío.** `joystep` con 0 gastos y `american_classic` con 0 artículos son estados normales; una empresa que ayer tenía filas y hoy tiene 0 no lo es. Una empresa sin renglones dice «Todavía no hay gastos registrados», nunca `$0.00`.
+- **Antes de dar por perdido un dato**: mirar la lista de columnas real (`GET /rest/v1/` devuelve el OpenAPI con todas las tablas y sus columnas) en vez de copiar nombres del código. Ya pasó dos veces: `cron_heartbeats.job` era `cron_name`, y `asistencia_reglas.empresa_key` no existe.
 
 ## Switch Soft (ERP externo)
 - CSVs semicolon-delimited (`;`)
