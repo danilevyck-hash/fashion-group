@@ -30,6 +30,7 @@ import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
 import {
   clasificacionDeArticulo,
+  fichaLlego,
   type FichaSwitch,
 } from "../src/lib/reebok-clasificacion";
 import { getBultoSize } from "../src/lib/reebok-bulto";
@@ -73,17 +74,23 @@ async function fichas(): Promise<Map<string, FichaSwitch>> {
       const k = String(f.codigo).trim();
       const prev = ult.get(k);
       if (prev && prev.fecha > f.fecha) continue;
-      ult.set(k, { fecha: f.fecha, ficha: { rubro: f.rubro, subrubro: f.subrubro, marca: f.marca } });
+      // La fecha de la factura hace de `ficha_at`: es algo que Switch mandó, con
+      // fecha. Ver la nota gemela en `_verif-clasificacion-reebok.ts`.
+      ult.set(k, { fecha: f.fecha, ficha: { rubro: f.rubro, subrubro: f.subrubro, marca: f.marca, ficha_at: f.fecha } });
     }
     return new Map([...ult].map(([k, v]) => [k, v.ficha]));
   }
-  const filas = await leerTodo<{ codigo: string; rubro: string | null; subrubro: string | null; marca: string | null; empresa_key: string }>(
-    "switch_articulo_info", "codigo, rubro, subrubro, marca, empresa_key", "codigo");
+  const filas = await leerTodo<{ codigo: string; rubro: string | null; subrubro: string | null; marca: string | null; ficha_at: string | null; empresa_key: string }>(
+    "switch_articulo_info", "codigo, rubro, subrubro, marca, ficha_at, empresa_key", "codigo");
   const m = new Map<string, FichaSwitch>();
   for (const f of filas) {
     if (f.empresa_key !== EMPRESA || !f.codigo) continue;
-    if (!f.rubro && !f.subrubro && !f.marca) continue;
-    m.set(String(f.codigo).trim(), { rubro: f.rubro, subrubro: f.subrubro, marca: f.marca });
+    // 🩸 Sin `ficha_at` no hay ficha: es una fila del barrido de precios a la que
+    // nadie le pidió nada. Reclasificar con eso sería mandar al cajón neutro a
+    // productos que solo están esperando su turno en la cola.
+    const ficha: FichaSwitch = { rubro: f.rubro, subrubro: f.subrubro, marca: f.marca, ficha_at: f.ficha_at };
+    if (!fichaLlego(ficha)) continue;
+    m.set(String(f.codigo).trim(), ficha);
   }
   return m;
 }
@@ -126,7 +133,7 @@ async function main() {
   console.log(`foto del ANTES (fila por fila, para auditar o revertir): ${foto}`);
 
   if (!APLICAR) {
-    console.log(`\n(SIMULACIÓN — no se escribió nada. Agregá --aplicar para escribir.)\n`);
+    console.log(`\n(SIMULACIÓN — no se escribió nada. Agrega --aplicar para escribir.)\n`);
     return;
   }
 

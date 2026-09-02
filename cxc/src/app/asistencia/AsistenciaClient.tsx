@@ -77,11 +77,23 @@ import { APROBACIONES_ROLES, vePestana } from "@/lib/asistencia/roles";
 import ComoFuncionaTab from "./ComoFuncionaTab";
 
 const TABS = [
-  // A esto viene la contable: el cuadro quincenal, ya cargado en la quincena en
-  // curso. Es la primera y es la que abre por defecto.
-  ["planilla", "Planilla"],
-  // El detalle que SOSTIENE la planilla: de dónde salió cada minuto.
+  // 🔴 REPORTE PRIMERO, Y ES EL ORDEN DEL TRABAJO (2-sep-2026). Daniel:
+  // «primero va reporte, ¿por qué es el segundo tab?». Tenía razón y estaba
+  // al revés: primero se ORDENA la asistencia (corregir marcas, justificar,
+  // aprobar horas extra) y recién después se PAGA. Una planilla generada
+  // antes de eso paga números que todavía se van a mover.
+  //
+  // Antes abría en Planilla, con el argumento de que «a esto viene la
+  // contable». Pero el que abre primero el resultado y después el respaldo
+  // termina revisando al revés: la planilla no se cuestiona sola.
+  //
+  // ⚠️ El orden de esta lista DECIDE la pestaña que abre (ver `porDefecto`
+  // abajo, que toma la primera VISIBLE para cada rol). Moverla de lugar no es
+  // cosmético: cambia dónde aterriza todo el mundo.
   ["reporte", "Reporte"],
+  // El cuadro quincenal que sale de lo de arriba: cada minuto del Reporte,
+  // convertido en plata. Es lo que se firma.
+  ["planilla", "Planilla"],
   // Lo del día a día: lo único que se toca seguido.
   ["justificaciones", "Justificaciones"],
   // 🔴 APARTE de Justificaciones, y es todo el punto (25-ago-2026): unas
@@ -127,7 +139,7 @@ function AsistenciaInner() {
   // conservan la vista. Tab del MISMO nivel → replace (default): el Atrás del
   // navegador no cicla por pestañas (convención del sistema). Un valor
   // desconocido en la URL cae en la pestaña por defecto, nunca en blanco.
-  const [tabRaw, setTab] = useUrlState<Tab>("tab", "planilla");
+  const [tabRaw, setTab] = useUrlState<Tab>("tab", "reporte");
   const [ayuda, setAyuda] = useState(false);
 
   // 🔑 El rol sale de `sessionStorage`, igual que en `AppHeader` y `useAuth`.
@@ -148,7 +160,7 @@ function AsistenciaInner() {
   // esta persona SÍ puede ver. 🔑 No en "planilla" a secas: quien solo aprueba
   // aterrizaría en una pantalla que su propio rol no puede cargar, y vería un
   // error en vez de su trabajo.
-  const porDefecto: Tab = (visibles[0]?.[0] ?? "planilla") as Tab;
+  const porDefecto: Tab = (visibles[0]?.[0] ?? "reporte") as Tab;
   const tab: Tab = visibles.some(([k]) => k === tabRaw) ? tabRaw : porDefecto;
 
   return (

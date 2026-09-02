@@ -20,10 +20,16 @@ import {
   categoriaReebok,
   generoReebok,
   clasificacionDeArticulo,
+  fichaLlego,
   CATEGORIA_SIN_CLASIFICAR,
   GENERO_SIN_CLASIFICAR,
 } from "@/lib/reebok-clasificacion";
 import { getBultoSize } from "@/lib/reebok-bulto";
+
+/** Cuándo se le pidió la ficha a Switch. Fecha FIJA — en este repo un test no
+ *  usa `new Date()`. Lo único que importa es que NO sea null: eso es lo que
+ *  significa «la ficha llegó». */
+const FICHA_AT = "2026-09-02T04:50:00.000Z";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. CATEGORÍA — el vocabulario REAL de Switch para active_shoes
@@ -169,7 +175,7 @@ describe("🔴 EL NOMBRE **SOLO** DESEMPATA EL UNISEX", () => {
     expect(generoReebok("MALE", "WOMEN BIG LOGO TEE")).toBe("male");
     expect(generoReebok("MEN", "FOUND W 3P INVISBLE SOCK")).toBe("male");
     const c = clasificacionDeArticulo(
-      { rubro: "SHOES", subrubro: "MALE", marca: "FOOTWEAR" },
+      { rubro: "SHOES", subrubro: "MALE", marca: "FOOTWEAR", ficha_at: FICHA_AT },
       "WOMEN BIG LOGO TEE",
       { category: "footwear", gender: "women" },
     );
@@ -190,7 +196,7 @@ describe("🔴 EL NOMBRE **SOLO** DESEMPATA EL UNISEX", () => {
 
   it("el desempate llega hasta la clasificación completa, con la ficha real de los APPCL0xx", () => {
     const c = clasificacionDeArticulo(
-      { rubro: "APPAREL", subrubro: "UNISEX", marca: "APPAREL" },
+      { rubro: "APPAREL", subrubro: "UNISEX", marca: "APPAREL", ficha_at: FICHA_AT },
       "WOMEN BIG LOGO TEE",
       { category: "apparel", gender: "unisex" },
     );
@@ -217,7 +223,7 @@ describe("clasificacionDeArticulo — el cajón neutro", () => {
   });
 
   it("una ficha con valores desconocidos SÍ avisa, y nombra los tres campos que se miraron", () => {
-    const c = clasificacionDeArticulo({ rubro: "PROMO", subrubro: "GENERAL", marca: "GENERAL" }, null, {});
+    const c = clasificacionDeArticulo({ rubro: "PROMO", subrubro: "GENERAL", marca: "GENERAL", ficha_at: FICHA_AT }, null, {});
     expect(c.category).toBe(CATEGORIA_SIN_CLASIFICAR);
     expect(c.gender).toBe(GENERO_SIN_CLASIFICAR);
     expect(c.desconocidos).toEqual([
@@ -227,17 +233,142 @@ describe("clasificacionDeArticulo — el cajón neutro", () => {
     ]);
   });
 
-  it("una ficha VACÍA también avisa (es el caso de la columna renombrada)", () => {
-    const c = clasificacionDeArticulo({ rubro: null, subrubro: null, marca: null }, null, {});
+  it("una ficha TRAÍDA y vacía sí avisa: preguntamos y Switch contestó «nada»", () => {
+    // 🔑 Este test NO cambió de dirección con el arreglo de la falsa alarma, y
+    // por eso queda tal cual: lo que cambió es que ahora la ficha DICE cuándo
+    // llegó. Con `ficha_at` puesto, un campo vacío es un dato REAL sobre lo que
+    // hay cargado en Switch —el caso de la columna renombrada del Depurador— y
+    // pasa la regla 2 completa: es real, no se arregla solo (ningún cron llena
+    // un campo que Switch no tiene) y hay algo concreto que hacer.
+    const c = clasificacionDeArticulo({ rubro: null, subrubro: null, marca: null, ficha_at: FICHA_AT }, null, {});
     expect(c.desconocidos).toContainEqual({ campo: "rubro", valor: "(vacío)" });
     expect(c.desconocidos).toContainEqual({ campo: "subrubro", valor: "(vacío)" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3b. 🩸 LA FALSA ALARMA DE LAS 233 — 2-sep-2026, 2:52 PM
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// El aviso que salió a Telegram, textual:
+//
+//     🔧 SISTEMA · El catálogo de Reebok recibió una clasificación que no
+//     conoce — Active Shoes
+//     · rubro "(vacío)" — 233 producto(s) …
+//     · subrubro "(vacío)" — 233 producto(s) …
+//     Qué hacer: revisar esos artículos en Switch y ponerles el rubro y el
+//     subrubro que les corresponde.
+//
+// Era mentira. La migración acababa de crear las columnas y estaban en NULL
+// porque el cron de fichas todavía no había corrido: mandaba a Daniel a Switch a
+// arreglar 233 artículos que no tenían nada malo y que se arreglaron solos con
+// la primera corrida. De la regla 2 de SISTEMA —«es real · no se arregla solo ·
+// alguien tiene que hacer algo»— **fallaba las tres**.
+//
+// 🔑 La distinción, y es la única que hay que sostener:
+//     ficha_at = null  →  "todavía no pregunté"   →  CALLA
+//     ficha_at puesto  →  "pregunté y esto vino"  →  habla
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("🩸🔴 un artículo SIN ficha nunca puede disparar el aviso", () => {
+  /** La fila tal como la deja el barrido de PRECIOS: existe, y los tres campos
+   *  de la ficha están en NULL porque nadie se la pidió a Switch todavía. */
+  const FILA_SIN_FICHA = { rubro: null, subrubro: null, marca: null, ficha_at: null };
+
+  it("🔴 los 233: fila con los tres campos en NULL y sin ficha_at ⇒ CERO desconocidos", () => {
+    expect(clasificacionDeArticulo(FILA_SIN_FICHA, null, {}).desconocidos).toEqual([]);
+  });
+
+  it("🔴 tampoco avisa si el producto YA estaba clasificado (era el 100% de los 233)", () => {
+    const c = clasificacionDeArticulo(FILA_SIN_FICHA, "ZIG DYNAMICA 6", {
+      category: "footwear", gender: "male",
+    });
+    expect(c.desconocidos).toEqual([]);
+    // …y conserva lo suyo: no preguntar no puede degradar a nadie.
+    expect(c.category).toBe("footwear");
+    expect(c.gender).toBe("male");
+  });
+
+  it('un ficha_at en blanco o con espacios cuenta como "todavía no llegó"', () => {
+    for (const vacio of ["", "   "]) {
+      expect(fichaLlego({ ...FILA_SIN_FICHA, ficha_at: vacio })).toBe(false);
+      expect(clasificacionDeArticulo({ ...FILA_SIN_FICHA, ficha_at: vacio }, null, {}).desconocidos).toEqual([]);
+    }
+  });
+
+  it("un producto nuevo sin ficha entra al cajón neutro Y EN SILENCIO", () => {
+    const c = clasificacionDeArticulo(FILA_SIN_FICHA, "ALGO NUEVO", {});
+    expect(c.category).toBe(CATEGORIA_SIN_CLASIFICAR);
+    expect(c.gender).toBe(GENERO_SIN_CLASIFICAR);
+    expect(c.desconocidos).toEqual([]);
+  });
+
+  it("🔴 sin ficha tampoco CLASIFICA: los valores viejos de la fila no se miran", () => {
+    // El contrafáctico del bug: si `ficha_at` se ignorara, estos valores —que
+    // pueden ser de cualquier época— entrarían como si Switch los acabara de
+    // mandar. No se pregunta, no se decide.
+    const c = clasificacionDeArticulo(
+      { rubro: "SHOES", subrubro: "FEMALE", marca: "FOOTWEAR", ficha_at: null },
+      null,
+      { category: "apparel", gender: "male" },
+    );
+    expect(c.category).toBe("apparel");
+    expect(c.gender).toBe("male");
+    expect(c.desconocidos).toEqual([]);
+  });
+
+  it("🔑 y la MISMA fila, una vez traída, sí habla — es toda la diferencia", () => {
+    const traida = clasificacionDeArticulo({ ...FILA_SIN_FICHA, ficha_at: FICHA_AT }, null, {});
+    expect(traida.desconocidos).toContainEqual({ campo: "rubro", valor: "(vacío)" });
+    expect(traida.desconocidos).toContainEqual({ campo: "subrubro", valor: "(vacío)" });
+  });
+
+  it("fichaLlego separa las dos cosas, y nada más", () => {
+    expect(fichaLlego(null)).toBe(false);
+    expect(fichaLlego(undefined)).toBe(false);
+    expect(fichaLlego(FILA_SIN_FICHA)).toBe(false);
+    expect(fichaLlego({ ...FILA_SIN_FICHA, ficha_at: FICHA_AT })).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3c. HEADWEAR — las gorras, con las fichas REALES del 2-sep-2026
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("HEADWEAR: las gorras van a accesorios", () => {
+  it("🔴 y ya lo resolvía la MARCA: los 7 con existencia traen marca=HARDWARE", () => {
+    // Medido sobre las 400 fichas reales: rubro HEADWEAR = 7 artículos con
+    // existencia, y los 7 con marca HARDWARE. O sea que el camino primario
+    // —«manda la marca»— los manda a accesorios sin consultar el mapa de rubros.
+    expect(categoriaReebok("HEADWEAR", "HARDWARE")).toBe("accessories");
+    for (const sku of ["ACCC002", "ACCC006", "ACCC062", "ACCC113", "ACCC118", "ACCC121", "H36572"]) {
+      const c = clasificacionDeArticulo(
+        { rubro: "HEADWEAR", subrubro: "UNISEX", marca: "HARDWARE", ficha_at: FICHA_AT },
+        sku,
+        {},
+      );
+      expect(c.category, sku).toBe("accessories");
+      expect(c.desconocidos, sku).toEqual([]);
+    }
+  });
+
+  it("y el plan B lo cubre el día que la marca venga vacía", () => {
+    expect(categoriaReebok("HEADWEAR", null)).toBe("accessories");
+    expect(categoriaReebok("HEADWEAR", "")).toBe("accessories");
+  });
+
+  it("💸 una gorra es bulto 6, no 12 — no es calzado", () => {
+    const c = clasificacionDeArticulo(
+      { rubro: "HEADWEAR", subrubro: "UNISEX", marca: "HARDWARE", ficha_at: FICHA_AT }, "CAP", {},
+    );
+    expect(getBultoSize(c.category)).toBe(6);
   });
 });
 
 describe("💸 UN «NO SÉ» NUNCA PISA UNA CLASIFICACIÓN QUE YA EXISTE", () => {
   it("una zapatilla clasificada conserva footwear aunque Switch estrene un rubro", () => {
     const c = clasificacionDeArticulo(
-      { rubro: "RUBRO QUE NADIE VIO NUNCA", subrubro: "MALE", marca: "MARCA NUEVA" },
+      { rubro: "RUBRO QUE NADIE VIO NUNCA", subrubro: "MALE", marca: "MARCA NUEVA", ficha_at: FICHA_AT },
       null,
       { category: "footwear", gender: "male" },
     );
@@ -251,7 +382,7 @@ describe("💸 UN «NO SÉ» NUNCA PISA UNA CLASIFICACIÓN QUE YA EXISTE", () =>
     // 12 a bulto 6 y el sistema cobraría LA MITAD de lo que vende.
     const antes = getBultoSize("footwear");
     const c = clasificacionDeArticulo(
-      { rubro: "ALGO NUEVO", subrubro: "ALGO NUEVO", marca: "ALGO NUEVO" },
+      { rubro: "ALGO NUEVO", subrubro: "ALGO NUEVO", marca: "ALGO NUEVO", ficha_at: FICHA_AT },
       null,
       { category: "footwear", gender: "male" },
     );
@@ -261,7 +392,7 @@ describe("💸 UN «NO SÉ» NUNCA PISA UNA CLASIFICACIÓN QUE YA EXISTE", () =>
 
   it("el género conocido tampoco se pierde ante un subrubro nuevo", () => {
     const c = clasificacionDeArticulo(
-      { rubro: "SHOES", subrubro: "SUBRUBRO NUEVO", marca: "FOOTWEAR" },
+      { rubro: "SHOES", subrubro: "SUBRUBRO NUEVO", marca: "FOOTWEAR", ficha_at: FICHA_AT },
       null,
       { category: "footwear", gender: "female" },
     );
@@ -270,7 +401,7 @@ describe("💸 UN «NO SÉ» NUNCA PISA UNA CLASIFICACIÓN QUE YA EXISTE", () =>
 
   it('una columna guardada en "" cuenta como sin clasificar, no como dato', () => {
     const c = clasificacionDeArticulo(
-      { rubro: "NUEVO", subrubro: "NUEVO", marca: "NUEVO" },
+      { rubro: "NUEVO", subrubro: "NUEVO", marca: "NUEVO", ficha_at: FICHA_AT },
       null,
       { category: "", gender: "" },
     );
@@ -281,7 +412,7 @@ describe("💸 UN «NO SÉ» NUNCA PISA UNA CLASIFICACIÓN QUE YA EXISTE", () =>
   it("pero lo que Switch SÍ dice sí pisa lo guardado: la clasificación la manda Switch", () => {
     // Los 7 ACCS0xx: estaban en accessories y Switch dice SOCKS ⇒ apparel.
     const c = clasificacionDeArticulo(
-      { rubro: "SOCKS", subrubro: "UNISEX", marca: "APPAREL" },
+      { rubro: "SOCKS", subrubro: "UNISEX", marca: "APPAREL", ficha_at: FICHA_AT },
       "ACT CORE ANKLE SOCK 3P",
       { category: "accessories", gender: "unisex" },
     );

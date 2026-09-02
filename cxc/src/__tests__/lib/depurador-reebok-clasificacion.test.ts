@@ -159,4 +159,22 @@ describe("🔴 la lista del Depurador es ESPEJO del mapa del catálogo", () => {
     expect(REEBOK_CATEGORY_ESPERADAS as readonly string[]).toContain("SOCKS");
     expect(categoriaReebok("SOCKS", "APPAREL")).toBe("apparel");
   });
+
+  it("HEADWEAR está en la lista: las gorras son 7 artículos REALES con existencia", () => {
+    // 🩸 Sin esto, cada archivo de Reebok con gorras avisaba «valor inesperado»
+    // por un dato perfectamente bueno. Un centinela que se equivoca se vuelve
+    // ruido que se aprende a ignorar — el mismo defecto que la falsa alarma de
+    // las 233, en la otra punta del sistema.
+    expect(REEBOK_CATEGORY_ESPERADAS as readonly string[]).toContain("HEADWEAR");
+    expect(categoriaReebok("HEADWEAR", "HARDWARE")).toBe("accessories");
+  });
+
+  it("un archivo con gorras no dispara ningún aviso", () => {
+    const gorra: ReebokItem = {
+      po: "PO-1", newArticle: "ACCC002", sku: "EAN1", name: "CAP", department: "HARDWARE",
+      category: "HEADWEAR", ageGroup: "ADULT", colorName: "BLACK", gender: "UNISEX",
+      sellIn: "Q3", wholesale: 20, wholesaleOff: null, talla: "OS", piezas: 6,
+    };
+    expect(valoresInesperados([gorra])).toEqual([]);
+  });
 });

@@ -79,6 +79,12 @@ vi.mock("@/lib/supabase-server", () => ({
 
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 
+/** Cuándo se le pidió la ficha a Switch. Fecha FIJA. Lo único que importa es
+ *  que NO sea null: una fila de `switch_articulo_info` SIN `ficha_at` existe
+ *  desde el barrido de precios y no es una ficha — ver el bloque de la falsa
+ *  alarma más abajo. */
+const FICHA_AT = "2026-09-02T04:50:00.000Z";
+
 const ART = (over: Record<string, unknown> = {}) => ({
   id: 1, codigo: "SKU1", descripcion: "ZIG DYNAMICA 6", codigoBarraId: 111,
   costo: "20", disponible: "10", precio: "49.90", cantidadPorCaja: "0.0000",
@@ -116,7 +122,7 @@ describe("🔴 producto NUEVO: entra clasificado por Switch, no por un default",
   it("con ficha: category y gender salen del rubro y el subrubro", async () => {
     await correr({
       articulos: [ART()],
-      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "FEMALE", marca: "FOOTWEAR" }],
+      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "FEMALE", marca: "FOOTWEAR", ficha_at: FICHA_AT }],
     });
     const ins = escrituraA("products", "insert")!;
     expect(ins.category).toBe("footwear");
@@ -141,7 +147,7 @@ describe("🔴 producto NUEVO: entra clasificado por Switch, no por un default",
   it("UNISEX sin señal en el nombre entra como hombre (decisión de Daniel)", async () => {
     await correr({
       articulos: [ART({ descripcion: "BIG LOGO TEE" })],
-      fichas: [{ codigo: "SKU1", rubro: "APPAREL", subrubro: "UNISEX", marca: "APPAREL" }],
+      fichas: [{ codigo: "SKU1", rubro: "APPAREL", subrubro: "UNISEX", marca: "APPAREL", ficha_at: FICHA_AT }],
     });
     expect(escrituraA("products", "insert")!.gender).toBe("male");
   });
@@ -149,7 +155,7 @@ describe("🔴 producto NUEVO: entra clasificado por Switch, no por un default",
   it("🔴 UNISEX + el nombre dice WOMEN → mujer, y llega hasta el payload", async () => {
     await correr({
       articulos: [ART({ descripcion: "WOMEN BIG LOGO TEE" })],
-      fichas: [{ codigo: "SKU1", rubro: "APPAREL", subrubro: "UNISEX", marca: "APPAREL" }],
+      fichas: [{ codigo: "SKU1", rubro: "APPAREL", subrubro: "UNISEX", marca: "APPAREL", ficha_at: FICHA_AT }],
     });
     expect(escrituraA("products", "insert")!.gender).toBe("female");
   });
@@ -157,7 +163,7 @@ describe("🔴 producto NUEVO: entra clasificado por Switch, no por un default",
   it("🩸 …y la W de LOW no cuenta: REEBOK TERRAIN EDGE LOW sigue siendo hombre", async () => {
     await correr({
       articulos: [ART({ descripcion: "REEBOK TERRAIN EDGE LOW" })],
-      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "UNISEX", marca: "FOOTWEAR" }],
+      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "UNISEX", marca: "FOOTWEAR", ficha_at: FICHA_AT }],
     });
     expect(escrituraA("products", "insert")!.gender).toBe("male");
   });
@@ -165,7 +171,7 @@ describe("🔴 producto NUEVO: entra clasificado por Switch, no por un default",
   it("🔴 un MALE explícito de Switch NO lo contradice el nombre, ni en el payload real", async () => {
     await correr({
       articulos: [ART({ descripcion: "WOMEN BIG LOGO TEE" })],
-      fichas: [{ codigo: "SKU1", rubro: "APPAREL", subrubro: "MALE", marca: "APPAREL" }],
+      fichas: [{ codigo: "SKU1", rubro: "APPAREL", subrubro: "MALE", marca: "APPAREL", ficha_at: FICHA_AT }],
     });
     expect(escrituraA("products", "insert")!.gender).toBe("male");
   });
@@ -175,7 +181,7 @@ describe("🔴 producto NUEVO: entra clasificado por Switch, no por un default",
     // día que pase decide si una zapatilla se cobra de 12 o de 6.
     await correr({
       articulos: [ART()],
-      fichas: [{ codigo: "SKU1", rubro: "BAGS", subrubro: "MALE", marca: "FOOTWEAR" }],
+      fichas: [{ codigo: "SKU1", rubro: "BAGS", subrubro: "MALE", marca: "FOOTWEAR", ficha_at: FICHA_AT }],
     });
     expect(escrituraA("products", "insert")!.category).toBe("footwear");
   });
@@ -184,7 +190,7 @@ describe("🔴 producto NUEVO: entra clasificado por Switch, no por un default",
     // 274 renglones reales traen rubro="REEBOK CLASSICS CORE FTW MEN".
     await correr({
       articulos: [ART()],
-      fichas: [{ codigo: "SKU1", rubro: "REEBOK CLASSICS CORE FTW MEN", subrubro: "MALE", marca: "FOOTWEAR" }],
+      fichas: [{ codigo: "SKU1", rubro: "REEBOK CLASSICS CORE FTW MEN", subrubro: "MALE", marca: "FOOTWEAR", ficha_at: FICHA_AT }],
     });
     expect(escrituraA("products", "insert")!.category).toBe("footwear");
     // …y no avisa: la marca resolvió, no hay nada desconocido que reportar.
@@ -194,7 +200,7 @@ describe("🔴 producto NUEVO: entra clasificado por Switch, no por un default",
   it("medias: rubro SOCKS entra como ROPA, no como accesorio", async () => {
     await correr({
       articulos: [ART()],
-      fichas: [{ codigo: "SKU1", rubro: "SOCKS", subrubro: "UNISEX", marca: "APPAREL" }],
+      fichas: [{ codigo: "SKU1", rubro: "SOCKS", subrubro: "UNISEX", marca: "APPAREL", ficha_at: FICHA_AT }],
     });
     expect(escrituraA("products", "insert")!.category).toBe("apparel");
   });
@@ -212,7 +218,7 @@ describe("producto EXISTENTE: la clasificación se refresca desde Switch", () =>
     await correr({
       articulos: [ART()],
       productos: [GUARDADO],
-      fichas: [{ codigo: "SKU1", rubro: "SOCKS", subrubro: "UNISEX", marca: "APPAREL" }],
+      fichas: [{ codigo: "SKU1", rubro: "SOCKS", subrubro: "UNISEX", marca: "APPAREL", ficha_at: FICHA_AT }],
     });
     const upd = escrituraA("products", "update")!;
     expect(upd.category).toBe("apparel");
@@ -223,7 +229,7 @@ describe("producto EXISTENTE: la clasificación se refresca desde Switch", () =>
     await correr({
       articulos: [ART()],
       productos: [{ ...GUARDADO, category: "footwear", gender: "male" }],
-      fichas: [{ codigo: "SKU1", rubro: "RUBRO NUEVO", subrubro: "SUBRUBRO NUEVO", marca: "MARCA NUEVA" }],
+      fichas: [{ codigo: "SKU1", rubro: "RUBRO NUEVO", subrubro: "SUBRUBRO NUEVO", marca: "MARCA NUEVA", ficha_at: FICHA_AT }],
     });
     // No hay escritura, o si la hay conserva footwear: en ninguno de los dos
     // casos el producto pasa a bulto 6.
@@ -236,7 +242,7 @@ describe("producto EXISTENTE: la clasificación se refresca desde Switch", () =>
     await correr({
       articulos: [ART()],
       productos: [{ ...GUARDADO, category: "footwear", gender: "male" }],
-      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "MALE", marca: "FOOTWEAR" }],
+      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "MALE", marca: "FOOTWEAR", ficha_at: FICHA_AT }],
     });
     expect(escrituraA("products", "update")).toBeUndefined();
   });
@@ -257,7 +263,7 @@ describe("🔴 la consulta de productos NO filtra por categoría", () => {
     await correr({
       articulos: [ART()],
       productos: [{ id: "p1", sku: "SKU1", name: "ZIG", price: 49.9, active: true, image_url: null, badge: null, keep_visible: false, oculto_manual: false, category: "otros", gender: "sin_clasificar", existencia: 10, disponibilidad: 10, codigo_barra_id: 111 }],
-      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "MALE", marca: "FOOTWEAR" }],
+      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "MALE", marca: "FOOTWEAR", ficha_at: FICHA_AT }],
     });
     // Lo encontró: lo actualiza, no lo inserta de nuevo.
     expect(escrituraA("products", "insert")).toBeUndefined();
@@ -277,7 +283,7 @@ describe("🔴 lo desconocido AVISA por SISTEMA", () => {
   it("un rubro que Switch estrena dispara el aviso", async () => {
     await correr({
       articulos: [ART()],
-      fichas: [{ codigo: "SKU1", rubro: "RUBRO RECIEN INVENTADO", subrubro: "MALE", marca: "MARCA RARA" }],
+      fichas: [{ codigo: "SKU1", rubro: "RUBRO RECIEN INVENTADO", subrubro: "MALE", marca: "MARCA RARA", ficha_at: FICHA_AT }],
     });
     expect(espias.enviarSistema).toHaveBeenCalledTimes(1);
     expect(espias.enviarSistema.mock.calls[0][0]).toContain("RUBRO RECIEN INVENTADO");
@@ -286,7 +292,7 @@ describe("🔴 lo desconocido AVISA por SISTEMA", () => {
   it("un catálogo entero bien clasificado NO avisa nada", async () => {
     await correr({
       articulos: [ART()],
-      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "MALE", marca: "FOOTWEAR" }],
+      fichas: [{ codigo: "SKU1", rubro: "SHOES", subrubro: "MALE", marca: "FOOTWEAR", ficha_at: FICHA_AT }],
     });
     expect(espias.enviarSistema).not.toHaveBeenCalled();
   });
@@ -294,5 +300,59 @@ describe("🔴 lo desconocido AVISA por SISTEMA", () => {
   it("un producto SIN ficha todavía no avisa: no preguntamos ≠ Switch mandó algo raro", async () => {
     await correr({ articulos: [ART()], fichas: [] });
     expect(espias.enviarSistema).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 LA FALSA ALARMA DE LAS 233 — 2-sep-2026, 2:52 PM, y por qué este candado
+// es de CONDUCTA y está acá, en el sync REAL.
+//
+// El test de arriba («un producto SIN ficha todavía no avisa») pasaba en verde
+// mientras el aviso salía a Telegram, y no era un test mentiroso: su fixture era
+// `fichas: []` —el producto NO tenía fila—. Producción tenía la otra forma, que
+// nadie había escrito: **la fila EXISTE** (la crea el barrido de precios, mucho
+// antes de que nadie le pida la ficha a Switch) y sus tres campos están en NULL.
+// El sync la levantaba como si fuera una ficha vacía y avisaba por 233
+// artículos que no tenían absolutamente nada malo.
+//
+// 🔑 Por eso lo que se prueba acá es la fila que producción sí tenía, y se
+// prueba contra `enviarSistema` —el Telegram— y no contra la función pura.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("🩸🔴 una fila SIN ficha_at no es una ficha: no avisa nunca", () => {
+  /** La fila que produjo la falsa alarma: existe, sin ficha pedida. */
+  const FILA_SIN_FICHA = { codigo: "SKU1", rubro: null, subrubro: null, marca: null, ficha_at: null };
+
+  it("🔴 los 233: fila con los tres campos en NULL y sin ficha_at ⇒ CERO Telegram", async () => {
+    await correr({ articulos: [ART()], fichas: [FILA_SIN_FICHA] });
+    expect(espias.enviarSistema).not.toHaveBeenCalled();
+  });
+
+  it("🔴 tampoco avisa por un producto YA clasificado, que era el caso real", async () => {
+    await correr({
+      articulos: [ART()],
+      productos: [{
+        id: "p1", sku: "SKU1", name: "ZIG", price: 49.9, active: true, image_url: null,
+        badge: null, keep_visible: false, oculto_manual: false, existencia: 10,
+        disponibilidad: 10, codigo_barra_id: 111, category: "footwear", gender: "male",
+      }],
+      fichas: [FILA_SIN_FICHA],
+    });
+    expect(espias.enviarSistema).not.toHaveBeenCalled();
+    // …y no lo degrada: sin preguntar no se reclasifica a nadie.
+    const upd = escrituraA("products", "update");
+    if (upd) expect(upd.category).toBe("footwear");
+  });
+
+  it("🔑 la MISMA fila, ya traída de Switch, SÍ avisa — ésa es toda la diferencia", async () => {
+    await correr({ articulos: [ART()], fichas: [{ ...FILA_SIN_FICHA, ficha_at: FICHA_AT }] });
+    expect(espias.enviarSistema).toHaveBeenCalledTimes(1);
+    expect(espias.enviarSistema.mock.calls[0][0]).toContain("(vacío)");
+  });
+
+  it("🔴 el sync LEE ficha_at — sin esa columna la distinción no existe", async () => {
+    await correr({ articulos: [ART()], fichas: [FILA_SIN_FICHA] });
+    const sel = espias.selects.find((s) => s.startsWith("switch_articulo_info:"))!;
+    expect(sel).toContain("ficha_at");
   });
 });

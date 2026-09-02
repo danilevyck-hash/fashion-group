@@ -124,6 +124,20 @@ const CATEGORIA_POR_MARCA: Record<string, CategoriaReebok> = {
  * candado que los prueba usa valores LITERALES y no se apoya en que existan en
  * los datos de hoy — un test que solo mira lo que ya pasó no protege lo que va
  * a pasar.
+ *
+ * ⚠️ `HEADWEAR` (las gorras) entró el 2-sep-2026, con las primeras 400 fichas
+ * REALES de `switch_articulo_info`. **No cambia nada de lo que pasa hoy**, y eso
+ * está medido: los 7 artículos con existencia cuyo rubro es HEADWEAR traen los
+ * 7 `marca = HARDWARE`, así que el camino primario ya los manda a `accessories`
+ * sin consultar esta tabla. Está acá por las otras dos razones:
+ *   · es el plan B honesto del día que una gorra llegue con la marca vacía —
+ *     HARDWARE ya es `accessories`, así que decir otra cosa sería inventar; y
+ *   · el Depurador tiene la lista ESPEJO de ésta
+ *     (`REEBOK_CATEGORY_ESPERADAS`), y sin HEADWEAR ahí **cada archivo de
+ *     Reebok con gorras avisaba en pantalla «valor inesperado» por un valor
+ *     perfectamente normal**. Un aviso que grita sobre un dato bueno es el
+ *     mismo defecto que la falsa alarma de abajo, en la otra punta del sistema.
+ * El candado compara las dos listas y no deja agregar en una sin la otra.
  */
 const CATEGORIA_POR_RUBRO: Record<string, CategoriaReebok> = {
   SHOES: "footwear",
@@ -131,6 +145,7 @@ const CATEGORIA_POR_RUBRO: Record<string, CategoriaReebok> = {
   SHORTS: "apparel",
   SOCKS: "apparel",
   BAGS: "accessories",
+  HEADWEAR: "accessories",
 };
 
 /**
@@ -241,6 +256,66 @@ export interface FichaSwitch {
   rubro: string | null;
   subrubro: string | null;
   marca: string | null;
+  /**
+   * 🩸 **CUÁNDO SE LE PIDIÓ ESTA FICHA A SWITCH.** `null` = TODAVÍA NO SE PIDIÓ.
+   *
+   * Es OBLIGATORIA en el tipo a propósito, y no opcional: quien arme una ficha
+   * tiene que DECIR si llegó o no. Un campo opcional se olvida en silencio y el
+   * olvido se paga con un aviso falso — ver `fichaLlego`, justo abajo.
+   */
+  ficha_at: string | null;
+}
+
+/**
+ * ═══ 🩸 «TODAVÍA NO LLEGÓ» NO ES «LLEGÓ ALGO QUE NO ENTIENDO» ════════════════
+ *
+ * LA FALSA ALARMA DEL 2-SEP-2026, 2:52 PM. Textual, a Telegram:
+ *
+ *     🔧 SISTEMA · El catálogo de Reebok recibió una clasificación que no
+ *     conoce — Active Shoes
+ *     · rubro "(vacío)" — 233 producto(s) …
+ *     · subrubro "(vacío)" — 233 producto(s) …
+ *     Qué hacer: revisar esos artículos en Switch y ponerles el rubro y el
+ *     subrubro que les corresponde.
+ *
+ * **Era mentira, y las tres partes eran mentira.** Switch no había mandado nada
+ * raro: la migración acababa de crear `rubro`/`subrubro`/`marca` y estaban en
+ * `NULL` porque el cron de fichas todavía no había corrido. El aviso mandaba a
+ * Daniel a Switch a arreglar 233 artículos que no tenían absolutamente nada
+ * malo — y que a las pocas horas se arreglaron solos, con la primera corrida.
+ *
+ * 🔑 **De la regla 2 de las alertas de SISTEMA — «es real · no se arregla solo ·
+ * alguien tiene que hacer algo» — ese aviso fallaba las TRES.**
+ *
+ * La causa: el sync leía la FILA de `switch_articulo_info` (que existe desde el
+ * barrido de páginas, que trae el precio) y la trataba como una FICHA. Una fila
+ * con los tres campos en `NULL` no es una ficha vacía: es una ficha que todavía
+ * no se pidió. `ficha_at` es lo único que distingue las dos cosas, y por eso
+ * viaja hasta acá en vez de quedarse en la consulta.
+ *
+ * ⚠️ **LA DECISIÓN SE TOMA ACÁ Y EN UN SOLO LUGAR** — no en el `select`. Filtrar
+ * en la consulta (`.not("ficha_at","is",null)`) parece más barato y no lo es:
+ * son 2 páginas de PostgREST igual, y partiría la regla en dos lugares que se
+ * pueden desincronizar. Con la regla en el módulo puro, el candado la prueba sin
+ * base y CUALQUIER lector de fichas —el sync, el backfill, el verificador—
+ * hereda la protección sin acordarse de ella.
+ *
+ * Los TRES casos, separados:
+ *   · `ficha_at = null`            → **no avisa.** No es un hallazgo: es una
+ *     cola que todavía no se drenó, y se arregla sola en la próxima corrida.
+ *   · ficha traída, valor que el
+ *     mapa no traduce               → **avisa**, como siempre.
+ *   · ficha traída, campo VACÍO     → **avisa.** Preguntamos y Switch contestó
+ *     "nada": eso es un dato REAL sobre lo que hay cargado en Switch, no se
+ *     arregla solo (ningún cron llena un campo que Switch no tiene) y lo que hay
+ *     que hacer es exactamente lo que el mensaje dice. Medido el 2-sep-2026
+ *     sobre las 400 fichas ya traídas: **1 solo artículo** (ACCH001, con
+ *     existencia 39) tiene el subrubro vacío de verdad, y ni siquiera está en el
+ *     catálogo. O sea que con esta separación el aviso hoy queda MUDO: los 233
+ *     eran falsos, los 0 restantes son verdaderos.
+ */
+export function fichaLlego(ficha: FichaSwitch | null | undefined): ficha is FichaSwitch {
+  return !!ficha && String(ficha.ficha_at ?? "").trim() !== "";
 }
 
 /** Lo que el producto YA tiene guardado (para no pisarlo con un "no sé"). */
@@ -283,7 +358,12 @@ export function clasificacionDeArticulo(
   // Sin ficha no hay nada que decidir: se conserva lo que haya (y un producto
   // nuevo entra al cajón neutro). NO se avisa: "todavía no le pedí la ficha a
   // Switch" no es "Switch mandó algo que no entiendo".
-  if (!ficha) {
+  //
+  // 🩸 `fichaLlego` y no `!ficha`: una FILA de `switch_articulo_info` sin
+  // `ficha_at` existe (la escribe el barrido de precios) y tiene los tres campos
+  // en NULL. Tratarla como ficha es lo que produjo la falsa alarma de las 233
+  // — ver el bloque completo arriba de `fichaLlego`.
+  if (!fichaLlego(ficha)) {
     return {
       category: guardado.category || CATEGORIA_SIN_CLASIFICAR,
       gender: guardado.gender || GENERO_SIN_CLASIFICAR,

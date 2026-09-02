@@ -36,6 +36,7 @@
 import { createClient } from "@supabase/supabase-js";
 import {
   clasificacionDeArticulo,
+  fichaLlego,
   CATEGORIA_SIN_CLASIFICAR,
   GENERO_SIN_CLASIFICAR,
   type FichaSwitch,
@@ -77,9 +78,9 @@ interface Producto {
 }
 
 async function fichasDeArticuloInfo(): Promise<Map<string, FichaSwitch>> {
-  let filas: Array<{ codigo: string; rubro: string | null; subrubro: string | null; marca: string | null; empresa_key: string }>;
+  let filas: Array<{ codigo: string; rubro: string | null; subrubro: string | null; marca: string | null; ficha_at: string | null; empresa_key: string }>;
   try {
-    filas = await leerTodo("switch_articulo_info", "codigo, rubro, subrubro, marca, empresa_key", "codigo");
+    filas = await leerTodo("switch_articulo_info", "codigo, rubro, subrubro, marca, ficha_at, empresa_key", "codigo");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // Degradación limpia igual que el patrón `cols-opcionales`: si las columnas
@@ -99,11 +100,14 @@ async function fichasDeArticuloInfo(): Promise<Map<string, FichaSwitch>> {
   const m = new Map<string, FichaSwitch>();
   for (const f of filas) {
     if (f.empresa_key !== EMPRESA || !f.codigo) continue;
-    // Una fila sin ninguno de los tres NO es una ficha: es una fila a la que
-    // todavía no se le pidió. Contarla como ficha diría "Switch no sabe" cuando
-    // lo que pasa es que no preguntamos.
-    if (!f.rubro && !f.subrubro && !f.marca) continue;
-    m.set(String(f.codigo).trim(), { rubro: f.rubro, subrubro: f.subrubro, marca: f.marca });
+    // 🩸 Una fila sin `ficha_at` NO es una ficha: es una fila que dejó el barrido
+    // de PRECIOS y a la que todavía no se le pidió nada a Switch. Contarla como
+    // ficha diría "Switch no sabe" cuando lo que pasa es que no preguntamos — y
+    // eso es exactamente lo que mandó a Telegram la falsa alarma de las 233 el
+    // 2-sep-2026. Se descarta con `fichaLlego`, la MISMA función que usa el
+    // sync: una sola definición de "la ficha llegó" para todo el sistema.
+    if (!fichaLlego({ rubro: f.rubro, subrubro: f.subrubro, marca: f.marca, ficha_at: f.ficha_at })) continue;
+    m.set(String(f.codigo).trim(), { rubro: f.rubro, subrubro: f.subrubro, marca: f.marca, ficha_at: f.ficha_at });
   }
   return m;
 }
@@ -120,7 +124,10 @@ async function fichasDeFacturaLineas(): Promise<Map<string, FichaSwitch>> {
     const k = String(f.codigo).trim();
     const prev = ult.get(k);
     if (prev && prev.fecha > f.fecha) continue;
-    ult.set(k, { fecha: f.fecha, ficha: { rubro: f.rubro, subrubro: f.subrubro, marca: f.marca } });
+    // `ficha_at` = la FECHA DE LA FACTURA: un renglón de factura SÍ es algo que
+    // Switch mandó, con fecha. No es la ficha del maestro, pero tampoco es "no
+    // pregunté todavía", así que se declara cuándo se vio.
+    ult.set(k, { fecha: f.fecha, ficha: { rubro: f.rubro, subrubro: f.subrubro, marca: f.marca, ficha_at: f.fecha } });
   }
   return new Map([...ult].map(([k, v]) => [k, v.ficha]));
 }

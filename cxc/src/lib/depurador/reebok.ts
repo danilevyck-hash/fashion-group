@@ -177,8 +177,14 @@ export const REEBOK_DEPARTMENT_ESPERADOS = ["FOOTWEAR", "APPAREL", "HARDWARE"] a
 /** Los CATEGORY que el catálogo sabe traducir a una categoría (`rubro`), que es
  *  el plan B cuando la marca viene vacía. Espejo del mapa de lectura —
  *  `src/lib/reebok-clasificacion.ts`. Si acá se agrega uno, allá tiene que
- *  existir, y hay candado que compara las dos listas. */
-export const REEBOK_CATEGORY_ESPERADAS = ["SHOES", "APPAREL", "SHORTS", "SOCKS", "BAGS"] as const;
+ *  existir, y hay candado que compara las dos listas.
+ *
+ *  ⚠️ `HEADWEAR` (gorras) se agregó el 2-sep-2026, cuando llegaron las primeras
+ *  400 fichas REALES de Switch: son 7 artículos CON EXISTENCIA y sin él este
+ *  aviso gritaba «valor inesperado» sobre un dato perfectamente bueno cada vez
+ *  que Reebok mandaba gorras en el archivo. Un centinela que se equivoca deja de
+ *  ser un centinela: se vuelve ruido que se aprende a ignorar. */
+export const REEBOK_CATEGORY_ESPERADAS = ["SHOES", "APPAREL", "SHORTS", "SOCKS", "BAGS", "HEADWEAR"] as const;
 
 /** Los GENDER que el catálogo sabe traducir a un género (`subrubro`). Mismo
  *  espejo y mismo candado. */

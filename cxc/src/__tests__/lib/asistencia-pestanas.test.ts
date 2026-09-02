@@ -74,10 +74,20 @@ describe("las 6 pestañas y su orden", () => {
   // donde la contadora teclea montos.
   //
   // El candado sigue cerrado para cualquier OTRA pestaña.
-  it("son exactamente 6, en el orden Planilla · Reporte · Justificaciones · Vacaciones · Aprobaciones · Configuración", () => {
+  // 🩸 REPORTE Y PLANILLA SE DIERON VUELTA (2-sep-2026). Este test exigía
+  // «Planilla · Reporte», con el argumento de que a la Planilla viene la
+  // contable. Daniel: «primero va reporte, ¿por qué es el segundo tab?».
+  // Tenía razón y estaba al revés: primero se ORDENA la asistencia (corregir
+  // marcas, justificar, aprobar horas extra) y recién después se PAGA. Una
+  // planilla generada antes de eso paga números que todavía se van a mover, y
+  // el que abre primero el resultado no cuestiona el respaldo.
+  //
+  // ⚠️ El orden no es cosmético: `porDefecto` toma la PRIMERA visible, así que
+  // esta lista decide dónde aterriza cada rol. Por eso el candado la fija.
+  it("son exactamente 6, en el orden Reporte · Planilla · Justificaciones · Vacaciones · Aprobaciones · Configuración", () => {
     expect(tabs).toEqual([
-      ["planilla", "Planilla"],
       ["reporte", "Reporte"],
+      ["planilla", "Planilla"],
       ["justificaciones", "Justificaciones"],
       ["vacaciones", "Vacaciones"],
       ["aprobaciones", "Aprobaciones"],
@@ -103,10 +113,16 @@ describe("las 6 pestañas y su orden", () => {
     expect(src).toMatch(/tab === "vacaciones" && <VacacionesTab \/>/);
   });
 
-  it("abre en Planilla — es a lo que viene la contable", () => {
+  it("abre en Reporte — primero se ordena la asistencia, después se paga", () => {
     // Desde el 12-ago-2026 la pestaña vive en la URL (?tab=) para que el
-    // refresh no la pierda; el DEFAULT sigue siendo Planilla.
-    expect(src).toMatch(/useUrlState<Tab>\("tab", "planilla"\)/);
+    // refresh no la pierda.
+    //
+    // 🩸 El default era «planilla», con el argumento de que es a lo que viene
+    // la contable (2-sep-2026). Daniel lo dio vuelta: primero se CORRIGE el
+    // Reporte —marcas, justificaciones, horas extra aprobadas— y recién
+    // después se genera la Planilla, que lee de ahí. Abrir en el resultado
+    // hace que nadie mire el respaldo.
+    expect(src).toMatch(/useUrlState<Tab>\("tab", "reporte"\)/);
   });
 
   it("Horarios y Feriados YA NO son pestañas de primer nivel", () => {

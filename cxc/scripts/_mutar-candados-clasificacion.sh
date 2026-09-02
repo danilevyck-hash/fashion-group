@@ -259,6 +259,43 @@ open(p,"w").write(s)
 PY
 esperado_rojo "los nuevos de Joybees vuelven a entrar como hombre"
 
+# ── 16. 🩸 LA FALSA ALARMA VUELVE: sin ficha se trata como ficha ───────────
+echo "16. fichaLlego deja de mirar ficha_at (la falsa alarma de las 233)"
+py <<PY
+p="$CLAS"; s=open(p).read()
+s=s.replace('  return !!ficha && String(ficha.ficha_at ?? "").trim() !== "";', '  return !!ficha;')
+open(p,"w").write(s)
+PY
+esperado_rojo "🩸 una fila sin ficha_at vuelve a avisar (233 productos sanos a Telegram)"
+
+# ── 16b. El sync deja de leer ficha_at ⇒ la distinción no puede existir ────
+echo "16b. el sync no lee ficha_at"
+py <<PY
+p="$REEBOK"; s=open(p).read()
+s=s.replace('.select("codigo, rubro, subrubro, marca, ficha_at")', '.select("codigo, rubro, subrubro, marca")')
+s=s.replace("          ficha_at: r.ficha_at,", "          ficha_at: null,")
+open(p,"w").write(s)
+PY
+esperado_rojo "🩸 sin ficha_at en la consulta, «no pregunté» y «no entiendo» vuelven a ser lo mismo"
+
+# ── 17. HEADWEAR se cae del mapa del catálogo ────────────────────────
+echo "17. HEADWEAR se cae del mapa de rubros"
+py <<PY
+p="$CLAS"; s=open(p).read()
+s=s.replace('  HEADWEAR: "accessories",\n', '')
+open(p,"w").write(s)
+PY
+esperado_rojo "el Depurador espera un HEADWEAR que el catálogo ya no sabe traducir (las listas se separan)"
+
+# ── 17b. HEADWEAR se cae de la lista del Depurador ───────────────────
+echo "17b. HEADWEAR se cae de los valores esperados"
+py <<PY
+p="$DEP"; s=open(p).read()
+s=s.replace('"SOCKS", "BAGS", "HEADWEAR"]', '"SOCKS", "BAGS"]')
+open(p,"w").write(s)
+PY
+esperado_rojo "las gorras vuelven a avisar «valor inesperado» sobre un dato bueno"
+
 # ── CONTROL: un cambio inocuo NO puede poner rojo ──────────────────────────
 echo "── CONTROL (no debe dar rojo) ──"
 py <<PY

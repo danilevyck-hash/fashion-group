@@ -85,6 +85,16 @@ function isReebokArticulo(a: SwitchArticulo): boolean {
  * fichas, `clasificacionDeArticulo` conserva lo que cada producto ya tiene y los
  * nuevos entran al cajón neutro. Nunca reclasifica a ciegas. Cubre también el
  * período pre-DDL en el que las columnas todavía no existen.
+ *
+ * 🩸 **SE LEE `ficha_at` Y VIAJA HASTA EL MÓDULO PURO.** No se filtra acá con un
+ * `.not("ficha_at","is",null)`, y no es un descuido: la fila de
+ * `switch_articulo_info` la crea el barrido de PRECIOS, mucho antes de que
+ * alguien le pida la ficha a Switch, así que una fila con los tres campos en
+ * NULL existe y es NORMAL. Confundirla con "Switch mandó una ficha vacía" es lo
+ * que produjo la falsa alarma de las 233 del 2-sep-2026 (el bloque completo está
+ * en `reebok-clasificacion.ts`, arriba de `fichaLlego`). La distinción se hace
+ * en UN solo lugar —el módulo puro— para que el candado la pruebe sin base y
+ * para que ningún lector futuro de fichas se olvide de repetir el filtro.
  */
 export async function cargarFichas(empresaKey: string): Promise<Map<string, FichaSwitch>> {
   const fichas = new Map<string, FichaSwitch>();
@@ -100,7 +110,7 @@ export async function cargarFichas(empresaKey: string): Promise<Map<string, Fich
     for (let p = 0; p < 20; p++) {
       const { data, error } = await supabaseServer
         .from("switch_articulo_info")
-        .select("codigo, rubro, subrubro, marca")
+        .select("codigo, rubro, subrubro, marca, ficha_at")
         .eq("empresa_key", empresaKey)
         .order("codigo", { ascending: true })
         .range(p * 1000, p * 1000 + 999);
@@ -109,9 +119,14 @@ export async function cargarFichas(empresaKey: string): Promise<Map<string, Fich
         return new Map();
       }
       const lote = data ?? [];
-      for (const r of lote as unknown as Array<{ codigo: string; rubro: string | null; subrubro: string | null; marca: string | null }>) {
+      for (const r of lote as unknown as Array<{ codigo: string; rubro: string | null; subrubro: string | null; marca: string | null; ficha_at: string | null }>) {
         if (!r.codigo) continue;
-        fichas.set(String(r.codigo).trim(), { rubro: r.rubro, subrubro: r.subrubro, marca: r.marca });
+        fichas.set(String(r.codigo).trim(), {
+          rubro: r.rubro, subrubro: r.subrubro, marca: r.marca,
+          // 🔴 Sin esto, una fila a la que nunca se le pidió la ficha se lee como
+          // una ficha vacía y AVISA. Ver el encabezado de esta función.
+          ficha_at: r.ficha_at,
+        });
       }
       if (lote.length < 1000) break;
     }
