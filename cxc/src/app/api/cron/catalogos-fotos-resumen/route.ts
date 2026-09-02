@@ -21,7 +21,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { calcularFotosResumen } from "@/lib/catalogos/fotos-resumen";
 import { limpiarVariantesRetiradas } from "@/lib/catalogos/variantes-limpieza";
 import { lineaHousekeeping } from "@/lib/catalogos/variantes-housekeeping";
-import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { enviarNegocio } from "@/lib/alertas/canal";
 

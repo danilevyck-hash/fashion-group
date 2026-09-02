@@ -75,7 +75,7 @@ import {
 } from "@/lib/grupo-resumen-mensual";
 import { calcularFotosResumen } from "@/lib/catalogos/fotos-resumen";
 import { empresasConFacturas, empresasConEstadoCuentaEnCron } from "@/lib/switch-api/empresas";
-import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
+import { enviarNegocio, enviarNegocioPrivado, enviarSistema } from "@/lib/alertas/canal";
 import {
   recordCronHeartbeat,
   cronsStaleParaAlerta,
@@ -461,7 +461,17 @@ const COLATERAL_CRONS: ColateralCron[] = [
       // El prefijo va DENTRO del <pre> (buildMensajeHtml lo antepone al título)
       // y el envío en "HTML", igual que el run normal: concatenar por fuera
       // dejaría las etiquetas <pre> visibles como texto.
-      const sent = await enviarNegocio(buildMensajeHtml(resumen, "(recuperado) "), "HTML");
+      //
+      // 🔴 `enviarNegocioPrivado`, IGUAL que el run normal (2-sep-2026): la
+      // venta del día va al chat privado de Daniel, no al grupo de 📊 NEGOCIO
+      // donde está el celular de la empresa. Si esta línea se queda en
+      // `enviarNegocio`, el resumen RECUPERADO —el que sale justo cuando algo
+      // falló— sería el único que se filtra al grupo. Los otros dos resúmenes
+      // de este archivo (grupo-resumen-mensual y catalogos-fotos-resumen) SÍ
+      // siguen en `enviarNegocio`: sólo se mudó el de ACS. Candado que exige
+      // que este envío y el del route apunten al mismo destino:
+      // src/__tests__/lib/acs-resumen-canal-privado.test.ts
+      const sent = await enviarNegocioPrivado(buildMensajeHtml(resumen, "(recuperado) "), "HTML");
       return { ok: sent, detail: sent ? `resumen ${ayer} reenviado` : "Telegram no aceptó el mensaje" };
     },
   },

@@ -8,7 +8,6 @@
 // para no adelantarse al run normal de las 12:00 UTC.
 
 import { runAllChecks, persistCheckResults, summarize, type CheckResult } from "@/lib/integrity-checks";
-import { sendTelegramAlert } from "@/lib/telegram";
 import { enviarSistema } from "@/lib/alertas/canal";
 
 // Data Health pasó a ser la 2ª pestaña de Usuarios (13-ago-2026). El link de la

@@ -63,12 +63,51 @@
  *                    se ignora con warning y cae en el de siempre.
  *   - Ninguna      → el canal de siempre. Cero configuración.
  *
- * **Cómo quedó el 27-jul-2026:** el bot NUEVO (@fashiongr_sistema_bot, chat
- * privado 1367251585) lleva el **NEGOCIO**, y las alertas de SISTEMA se quedan
- * en el bot de siempre (@fashiongr_alertas_bot) sin tocar nada. Sí: el nombre
- * del bot dice "sistema" y lleva negocio. Es a propósito, lo decidió Daniel, y
- * el nombre se cambia desde Telegram cuando quiera. **No invertir el ruteo para
- * que haga juego con el nombre.**
+ * **Cómo quedó el 27-jul-2026:** el bot NUEVO (@fashiongr_sistema_bot) lleva el
+ * **NEGOCIO**, y las alertas de SISTEMA se quedan en el bot de siempre
+ * (@fashiongr_alertas_bot) sin tocar nada. Sí: el nombre del bot dice "sistema"
+ * y lleva negocio. Es a propósito, lo decidió Daniel, y el nombre se cambia
+ * desde Telegram cuando quiera. **No invertir el ruteo para que haga juego con
+ * el nombre.**
+ *
+ * ⚠️ **QUIÉN ESTÁ EN CADA CHAT — este comentario lo decía AL REVÉS hasta el
+ * 2-sep-2026.** Decía que NEGOCIO era el "chat privado 1367251585". No lo es.
+ * Daniel, textual: *"las ventas de acs me lleguen solo a mí o por el chat de
+ * alertas, ya que ahí no está el celular de la empresa que tiene telegram para
+ * ver lo de las fotos, guías, etc."*. O sea:
+ *
+ *   📊 NEGOCIO → un GRUPO de TRES: Daniel más el celular de la empresa, que
+ *                miran bodega y marketing (fotos, guías, cheques). NO es privado.
+ *   🔧 SISTEMA → el canal de siempre, que ES el privado de Daniel con
+ *                @fashiongr_alertas_bot (`TELEGRAM_CHAT_ID` = 1367251585).
+ *
+ * Verificado contra Vercel (Production) el 2-sep-2026: existen SOLO
+ * `TELEGRAM_BOT_TOKEN_NEGOCIO` y `TELEGRAM_CHAT_ID_NEGOCIO`; no hay ninguna
+ * variable `*_SISTEMA`, así que SISTEMA cae al canal de siempre por la última
+ * rama de `destinoDeCanal`. El VALOR del chat no se puede leer desde el código
+ * (las dos están marcadas "Sensitive" en Vercel): para verlo sin escribirle a
+ * nadie está `GET /api/diag/canales-telegram`.
+ *
+ * ── EL TERCER ENVÍO: NEGOCIO, PERO PRIVADO (2-sep-2026) ───────────────────────
+ * El resumen diario de ventas de ACS es NEGOCIO puro, pero Daniel no quiere que
+ * la venta del día la vea el grupo. Se muda al DESTINO de sistema —al chat, no
+ * al canal— y para eso existe `enviarNegocioPrivado`:
+ *
+ *   destino de SISTEMA ......... SÍ  (privacidad: es lo único que Daniel pidió)
+ *   prefijo "🔧 SISTEMA · " .... NO  (mentiría en la notificación del iPhone:
+ *                                    la venta del día no es una avería, y el
+ *                                    prefijo existe justamente para no mentir)
+ *   reglas anti-ruido .......... NO  (es negocio: se manda SIEMPRE)
+ *
+ * 🔴 **Por qué es una función propia y no `enviarSistema` a secas.** Hoy
+ * `enviarSistema` tampoco filtra nada por dentro: toda la anti-ruido vive en
+ * sus llamadores, uno por uno. Pero eso es CASUALIDAD, no diseño. El día que
+ * alguien agrupe, demore o silencie DENTRO de `enviarSistema` —que es su canal
+ * y tiene todo el derecho— el resumen de ventas se iría con la agrupación y
+ * dejaría de llegar sin que nadie se entere. La protección tiene que viajar CON
+ * el mensaje, no quedarse en el canal del que se fue. Por eso
+ * `enviarNegocioPrivado` comparte el cuerpo de `enviarNegocio` —una sola
+ * sentencia, cero condiciones— y el MISMO candado que le prohíbe tener perillas.
  *
  * ── EL FAIL-SAFE ──────────────────────────────────────────────────────────────
  * Si el envío al canal aparte FALLA, `sendTelegramAlert` lo reintenta solo en el
@@ -132,6 +171,34 @@ export async function enviarNegocio(
   parseMode?: "HTML" | "MarkdownV2",
 ): Promise<boolean> {
   return sendTelegramAlert(texto, parseMode, destinoNegocio());
+}
+
+/**
+ * INFO DEL NEGOCIO QUE NO PUEDE VER TODO EL MUNDO (2-sep-2026).
+ *
+ * Mismo trato que `enviarNegocio` —el texto sale TAL CUAL, sin prefijo y sin
+ * filtro alguno— pero al destino de SISTEMA, que es el chat privado de Daniel.
+ * Lo pidió por privacidad, no porque sea una alerta: el canal 📊 NEGOCIO es un
+ * grupo de tres donde está el celular de la empresa.
+ *
+ * 🔴 NO lleva el `PREFIJO_SISTEMA`: rotular la venta del día como una avería es
+ *    mentir en la notificación del celular, que es exactamente lo que ese
+ *    prefijo existe para no hacer.
+ * 🔴 NO acepta —ni va a aceptar— opción de silenciar, agrupar ni limitar. Es la
+ *    misma garantía de `enviarNegocio`, y se muda con el mensaje: el candado
+ *    «NEGOCIO no tiene perilla de silenciar» vigila las DOS funciones. Lo único
+ *    que se resuelve acá es A DÓNDE va — nunca SI va.
+ *
+ * ⚠️ Se pierde el fail-safe: `sendTelegramAlert` reintenta en el canal de
+ *    siempre cuando falla un destino APARTE, y este destino ES el de siempre —
+ *    no hay a quién reintentarle. Lo cubre la reconciliación, que reenvía el
+ *    resumen en sus 3 pasadas del día si el de la 01:00 no quedó registrado.
+ */
+export async function enviarNegocioPrivado(
+  texto: string,
+  parseMode?: "HTML" | "MarkdownV2",
+): Promise<boolean> {
+  return sendTelegramAlert(texto, parseMode, destinoSistema());
 }
 
 /**

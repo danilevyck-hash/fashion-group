@@ -11,13 +11,27 @@
 //
 // Solo lee la DB (_multifashion_sf_vw) — NO toca la API de Switch, no necesita
 // higiene de sesión. Semántica y validación: ver src/lib/acs-resumen-diario.ts.
+//
+// 🔴 CANAL: `enviarNegocioPrivado` — NEGOCIO en su trato (sale siempre, sin
+// prefijo, sin regla anti-ruido) pero al CHAT PRIVADO de Daniel, no al de 📊
+// NEGOCIO. Daniel, textual (2-sep-2026): *"solo me gustaría que las ventas de
+// acs me lleguen solo a mí o por el chat de alertas, ya que ahí no está el
+// celular de la empresa que tiene telegram para ver lo de las fotos, guías,
+// etc."*. El motivo es PRIVACIDAD, no que sea una alerta: por eso NO lleva el
+// prefijo "🔧 SISTEMA · " (rotular la venta del día como avería sería mentir en
+// la notificación del celular) y por eso el resto de 📊 NEGOCIO no se movió.
+//
+// ⚠️ SON DOS LUGARES: este route y la RECUPERACIÓN de switch-reconciliacion
+// (incidente 11-jul-2026, la invocación de la 01:00 se perdió). Si sólo se
+// cambia uno, el resumen recuperado sigue cayendo en el grupo. Candado que
+// exige que los dos apunten al mismo lado:
+// src/__tests__/lib/acs-resumen-canal-privado.test.ts
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import { calcularResumenDiario, buildMensajeHtml, hoyPanama, ventasAcsSyncFresco } from "@/lib/acs-resumen-diario";
-import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
-import { enviarNegocio } from "@/lib/alertas/canal";
+import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -50,7 +64,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // HTML (no texto plano): el mensaje es una tabla dentro de un <pre> y sin
     // monoespaciado las columnas no cuadran en el móvil.
     const mensaje = buildMensajeHtml(resumen);
-    const sent = await enviarNegocio(mensaje, "HTML");
+    // 🔴 CANAL PRIVADO, NO EL GRUPO (2-sep-2026). Ver la cabecera del archivo:
+    // esto va por `enviarNegocioPrivado` y el gemelo de la recuperación
+    // (switch-reconciliacion) tiene que apuntar al MISMO destino. Candado:
+    // src/__tests__/lib/acs-resumen-canal-privado.test.ts
+    const sent = await enviarNegocioPrivado(mensaje, "HTML");
     if (!sent) throw new Error("Telegram no aceptó el mensaje (ver logs)");
 
     await recordCronHeartbeat(CRON_NAME);

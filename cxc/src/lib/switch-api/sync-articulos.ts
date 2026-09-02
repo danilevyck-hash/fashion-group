@@ -10,7 +10,6 @@
 
 import { createSwitchClient } from "./client";
 import { supabaseServer } from "@/lib/supabase-server";
-import { sendTelegramAlert } from "@/lib/telegram";
 import { esCostoSospechoso } from "./costo-guard";
 import { particionarFilas } from "./monto-guard";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";

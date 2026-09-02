@@ -4,7 +4,6 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { transportistaLabel } from "@/lib/transportistaLabel";
-import { sendTelegramAlert } from "@/lib/telegram";
 import { enviarNegocio } from "@/lib/alertas/canal";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
 

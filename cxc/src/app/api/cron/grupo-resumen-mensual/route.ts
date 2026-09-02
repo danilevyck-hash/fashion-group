@@ -17,7 +17,6 @@ import {
   fmtMesLabel,
 } from "@/lib/grupo-resumen-mensual";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { enviarNegocio } from "@/lib/alertas/canal";
 

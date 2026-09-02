@@ -7,6 +7,74 @@
 
 ---
 
+> ## 🔒 EL RESUMEN DIARIO DE VENTAS DE ACS SE MUDÓ AL CHAT PRIVADO — sin el prefijo de sistema (2-sep-2026)
+>
+> Daniel, textual: ***"Solo me gustaría que las ventas de acs me lleguen solo a mí o por el chat de alertas, ya que ahí no está el celular de la empresa que tiene telegram para ver lo de las fotos, guías, etc."***
+>
+> Y sobre todo lo demás, textual: ***"De negocio que me llegue todo. Eso está bien."***
+>
+> ### El hallazgo: 📊 NEGOCIO no era el chat de Daniel, era un GRUPO DE TRES
+>
+> El comentario de `src/lib/alertas/canal.ts` decía, desde el 27-jul-2026, que el bot nuevo llevaba el NEGOCIO al **"chat privado 1367251585"**. **Era al revés.** El privado es el de siempre (`TELEGRAM_CHAT_ID`), que lleva las alertas de 🔧 SISTEMA; el de NEGOCIO es un grupo con **Daniel más el celular de la empresa**, desde donde bodega y marketing miran las fotos, las guías y los cheques.
+>
+> Verificado contra Vercel (Production, 2-sep-2026): existen **sólo cuatro** variables de Telegram — `TELEGRAM_BOT_TOKEN` · `TELEGRAM_CHAT_ID` · `TELEGRAM_BOT_TOKEN_NEGOCIO` · `TELEGRAM_CHAT_ID_NEGOCIO`. **No hay ninguna `*_SISTEMA`**, así que SISTEMA cae al canal de siempre por la última rama de `destinoDeCanal`. Los valores no se pueden leer desde el código (Vercel las marca *Sensitive*): para verlos sin escribirle a nadie está `GET /api/diag/canales-telegram`, que responde 401 sin `CRON_SECRET` ni sesión de admin.
+>
+> 🩸 **El comentario viejo es la clase de mentira que hace que el próximo cambio salga al chat equivocado.** Quedó corregido en `canal.ts` y en `cxc/CLAUDE.md`, con el reparto real escrito al lado.
+>
+> ### El motivo es PRIVACIDAD, no severidad
+>
+> La tentación era mandarlo por `enviarSistema` y listo. No: ese envío antepone `🔧 SISTEMA · `, que existe para que la notificación del iPhone se lea **sin abrirla**. La venta del día no es una avería — rotularla así es mentir justo donde ese prefijo existe para no mentir.
+>
+> Por eso nació un tercer envío, `enviarNegocioPrivado`:
+>
+> | | destino | prefijo | anti-ruido |
+> |---|---|---|---|
+> | `enviarNegocio` | grupo de negocio | no | **nunca** |
+> | `enviarNegocioPrivado` | **privado (el de sistema)** | **no** | **nunca** |
+> | `enviarSistema` | privado | `🔧 SISTEMA · ` | la de sus llamadores |
+>
+> ### 🔴 Por qué una función propia y no `enviarSistema`
+>
+> Hoy `enviarSistema` tampoco filtra nada por dentro: toda la anti-ruido vive en sus llamadores, uno por uno. **Pero eso es casualidad, no diseño.** El día que alguien meta agrupación, demora o un "esto ya lo avisamos" DENTRO de `enviarSistema` —que es su canal y tiene todo el derecho— el resumen de ventas se iría con la agrupación y **dejaría de llegar sin que nadie lo note**.
+>
+> La protección tiene que viajar **con el mensaje**, no quedarse en el canal del que se fue. `enviarNegocioPrivado` comparte el cuerpo de `enviarNegocio` —una sola sentencia, cero condiciones, cero `process.env`— y el candado *«NEGOCIO no tiene perilla de silenciar»* (`alertas-canal.test.ts`) se amplió para vigilar **las dos**. `enviarSistema` queda fuera de ese cedazo a propósito.
+>
+> ### 🔑 SON DOS LUGARES, NO UNO
+>
+> El resumen sale del cron de la 01:00 (`api/cron/acs-resumen-diario`) **y** de la recuperación de `api/cron/switch-reconciliacion` (incidente 11-jul-2026: la invocación de la 01:00 se perdió tras una promoción de deploy, cero rastro). Cambiar sólo el primero deja el resumen **recuperado** —el que sale justo cuando algo falló— cayendo en el grupo.
+>
+> El candado nuevo no compara contra un nombre fijo: **extrae qué función de envío usa cada lado y exige que sean la misma**. Así no pueden separarse aunque mañana el destino cambie otra vez. Las otras dos recuperaciones del mismo archivo (`grupo-resumen-mensual`, `catalogos-fotos-resumen`) siguen en `enviarNegocio`, y hay caso que lo exige.
+>
+> ### ⚠️ Lo que se pierde: el fail-safe de reintento
+>
+> `sendTelegramAlert` reintenta en el canal de siempre cuando falla un destino **aparte** (`telegram.ts:143`). El destino de sistema **es** el de siempre, así que no hay a quién reintentarle (`telegram.ts:150`). El resumen mudado pierde ese rescate.
+>
+> **No importa, y esto es lo que lo cubre:** el fail-safe protege contra una *configuración a medias* (token mal copiado, bot bloqueado, 403 porque nadie le habló al bot). El canal de siempre no tiene configuración nueva que equivocar — es el que ya funciona hace 88 días. Y si el envío falla igual, el cron no registra heartbeat y la **reconciliación lo reenvía en sus 3 pasadas del día** (10:00 / 14:00 / 18:00 UTC), que es exactamente el mecanismo que se escribió para el incidente del 11-jul. Es más red que la que tenía.
+>
+> ### Cabo suelto arreglado de paso: 6 importaciones muertas
+>
+> `acs-resumen-diario/route.ts` · `catalogos-fotos-resumen/route.ts` · `grupo-resumen-mensual/route.ts` · `guias/[id]/route.ts` · `integrity-check-run.ts` · `sync-articulos.ts` importaban `sendTelegramAlert` **sin usarlo**. No rompían la regla de «nadie lo llama directo», pero hacían que cualquier barrido los marcara como falsos positivos — y es justo por eso que la regla sólo tenía candados **por archivo** (`asistencia-vigia-hueco.test.ts`, `telegram-pedido-origen.test.ts`, `monto-guard-candado.test.ts`): tres puntos vigilados de un sistema con más de cien rutas.
+>
+> Borradas esas seis líneas, `src/lib/alertas/canal.ts` es el **único** archivo de `src/` que lo importa y lo llama — así que ahora hay **barrido GLOBAL** (recorre todo `src/`, saltea `__tests__`, y descarta comentarios antes de mirar).
+>
+> ### Candados
+>
+> - `src/__tests__/lib/acs-resumen-canal-privado.test.ts` — los dos lugares al mismo destino · sin prefijo · el resto de NEGOCIO intacto · ruteo en vivo · barrido global de `sendTelegramAlert`.
+> - `src/__tests__/lib/alertas-canal.test.ts` › «NEGOCIO no tiene perilla de silenciar» — ampliado a las **dos** funciones de negocio, con el nombre atado por el `(` para que `enviarNegocio` no tape a `enviarNegocioPrivado`.
+>
+> ### Verificado por mutación (2-sep-2026)
+>
+> | Mutación | Resultado |
+> |---|---|
+> | Devolver el route a `enviarNegocio` | 🔴 3 casos (mismo-destino, import, «ninguno quedó en enviarNegocio») |
+> | Dejar la recuperación en `enviarNegocio` | 🔴 2 casos (mismo-destino, «ninguno quedó en enviarNegocio») |
+> | Ponerle `🔧 SISTEMA ·` al mensaje del resumen | 🔴 1 caso («nada de prefijo») |
+> | Meter un `if` dentro de `enviarNegocioPrivado` | 🔴 1 caso («el cuerpo no tiene condición alguna») |
+> | Volver a importar `sendTelegramAlert` sin usarlo | 🔴 1 caso (barrido global) |
+> | **CONTROL:** reordenar los colaterales de la reconciliación sin cambiar envíos | 🟢 verde |
+
+---
+
 > ## 🔴 CHEQUES PASÓ A LLAMARSE «RECORDATORIOS» — y adentro conviven los cheques y los recordatorios sueltos (24-ago-2026)
 >
 > Daniel, textual: ***"en el módulo de cheques, quisiera cambiarlo a recordatorios, ya que quisiera poner ahí en el calendario «recordar cobrar» y pongo la fecha así telegram me recuerda"***.
