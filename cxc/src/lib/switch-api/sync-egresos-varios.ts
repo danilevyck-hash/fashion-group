@@ -51,6 +51,7 @@ import { createSwitchSyncLog, finishSwitchSyncLog } from "./sync-log";
 import { parsearEgresosCsv, type EgresoLinea } from "@/lib/egresos/parser";
 import { duplicadosExactos, claveIdentidad, esGasto } from "@/lib/egresos/reglas";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
+import { detallesDeIlegibles, avisarRenglonesIlegibles } from "./renglones-ilegibles";
 import { particionarFilas } from "./monto-guard";
 import { ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { empresasConEgresosEnCron } from "./empresas";
@@ -287,13 +288,28 @@ export async function syncEmpresaEgresos(
       if (delMes.length > 0) mesesEscritos.push(mes);
     }
 
+    // ── LO QUE NO ENTRÓ QUEDA ESCRITO, LAS DOS CLASES ──
+    //
+    // 🩸 `records_skipped` YA CONTABA LOS ERRORES DE PARSEO, PERO SIN DETALLE.
+    // Hasta el 2-sep-2026 `erroresParseo` viajaba solo en la respuesta HTTP del
+    // cron —que nadie lee— y `skipDetails` llevaba únicamente los montos
+    // imposibles. O sea: si Switch hubiera cambiado el formato en 3 renglones
+    // de 378 en vez de en los 378, esos tres gastos se caían EN SILENCIO y la
+    // corrida se anotaba `success`. Nos salvó que el cambio fue del 100% y el
+    // sync se cortó entero. Ahora el descarte se escribe con su documento y su
+    // motivo, y de ahí lo leen la pantalla y el aviso.
+    const skipDetails = [
+      ...(rechazadas.length > 0 ? detallesDeRechazo("egreso_vario", rechazadas, umbral) : []),
+      ...detallesDeIlegibles(parsed.errores),
+    ];
+
     await finishSwitchSyncLog(logId, "success", {
       inserted: lineas.length,
       skipped: parsed.errores.length + rechazadas.length,
-      skipDetails: rechazadas.length > 0 ? detallesDeRechazo("egreso_vario", rechazadas, umbral) : undefined,
+      skipDetails: skipDetails.length > 0 ? skipDetails : undefined,
     });
 
-    // El aviso nunca puede tumbar una corrida que ya escribió bien.
+    // Los avisos nunca pueden tumbar una corrida que ya escribió bien.
     if (rechazadas.length > 0) {
       try {
         await avisarMontosImposibles({
@@ -306,6 +322,22 @@ export async function syncEmpresaEgresos(
         });
       } catch (e) {
         console.error(`[sync-egresos ${empresaKey}] aviso de montos: ${String(e)}`);
+      }
+    }
+
+    if (parsed.errores.length > 0) {
+      try {
+        await avisarRenglonesIlegibles({
+          empresaKey,
+          syncType: "egresos_varios",
+          que: "lo que salió de caja y del banco",
+          donde: "Gastos",
+          ilegibles: parsed.errores,
+          entraron: lineas.length,
+          logId,
+        });
+      } catch (e) {
+        console.error(`[sync-egresos ${empresaKey}] aviso de renglones ilegibles: ${String(e)}`);
       }
     }
 

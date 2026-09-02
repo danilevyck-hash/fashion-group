@@ -48,6 +48,15 @@ export interface RespuestaEgresos {
   instalado: boolean;
   mes: string;
   empresas: EmpresaEgresosResumen[];
+  /**
+   * Renglones que Switch mandó y la app no supo leer, dicho en una línea — o
+   * `null`, que es el caso normal y entonces no se dibuja nada.
+   *
+   * 🩸 Existe desde el 2-sep-2026: hasta ese día un renglón descartado moría en
+   * la respuesta HTTP del cron y la pantalla mostraba el total corto sin decir
+   * que lo estaba. Ver `src/lib/switch-api/renglones-ilegibles.ts`.
+   */
+  avisoNoLeidos?: string | null;
 }
 
 // ── Meses ────────────────────────────────────────────────────────────────────

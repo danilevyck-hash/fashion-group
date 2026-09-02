@@ -134,9 +134,15 @@ export function detallesDeRechazo<T>(
  * Claves que YA se avisaron en la ventana reciente, leídas de las corridas
  * anteriores del mismo par (empresa, sync_type). Fail-open: si no se puede
  * leer, se avisa — perder un aviso es peor que repetirlo.
+ *
+ * ⚠️ TOMA EL `campo` EN VEZ DE LA FAMILIA porque no es exclusiva de los montos:
+ * el descarte de un renglón ILEGIBLE (`renglones-ilegibles.ts`) necesita el
+ * MISMO anti-loop sobre el MISMO `skip_details`. Dos lectores del mismo log,
+ * cada uno con su ventana, terminarían discrepando el día que alguien mueva una
+ * de las dos — y este repo ya pagó ese modo de fallo. Una sola lectura.
  */
-async function clavesYaAvisadas(
-  familia: FamiliaMonto,
+export async function clavesYaAvisadasPorCampo(
+  campo: string,
   empresaKey: string,
   syncType: string,
   logIdActual: string | null,
@@ -152,7 +158,6 @@ async function clavesYaAvisadas(
       .eq("sync_type", syncType)
       .gte("started_at", desde);
     if (error || !data) return [];
-    const campo = campoSkip(familia);
     for (const fila of data as unknown as Array<{ id: string; skip_details: unknown }>) {
       if (logIdActual && fila.id === logIdActual) continue; // la corrida en curso no cuenta
       if (!Array.isArray(fila.skip_details)) continue;
@@ -165,6 +170,15 @@ async function clavesYaAvisadas(
   }
   return claves;
 }
+
+/** La de arriba, para una familia de montos. */
+const clavesYaAvisadas = (
+  familia: FamiliaMonto,
+  empresaKey: string,
+  syncType: string,
+  logIdActual: string | null,
+): Promise<string[]> =>
+  clavesYaAvisadasPorCampo(campoSkip(familia), empresaKey, syncType, logIdActual);
 
 const MAX_EN_MENSAJE = 5;
 

@@ -159,6 +159,14 @@ describe("Los textos hablan de negocio, no de código", () => {
     expect(consecuenciaDeSyncType("estadocuenta")).toContain("Cuentas por Cobrar");
     expect(consecuenciaDeSyncType("facturas")).toContain("ventas");
     expect(consecuenciaDeSyncType("proveedores")).toContain("proveedores");
+    // 🩸 `egresos_varios` NO estaba en el switch y caía al default («puede haber
+    // datos sin actualizar en la app»), que no nombra una sola pantalla. Cuando
+    // Switch cambió el formato del reporte el 1-sep-2026 y este sync falló cinco
+    // días seguidos, el aviso no decía dónde mirar. Tiene que nombrar Gastos.
+    expect(consecuenciaDeSyncType("egresos_varios")).toContain("Gastos");
+    expect(consecuenciaDeSyncType("egresos_varios")).not.toBe(
+      consecuenciaDeSyncType("tipo_inventado"),
+    );
     // Un tipo nuevo no revienta ni filtra el identificador.
     expect(consecuenciaDeSyncType("tipo_inventado")).not.toContain("tipo_inventado");
   });
@@ -316,26 +324,57 @@ describe("FAIL-SAFE — un olvido de configuración NUNCA silencia un aviso", ()
 });
 
 describe("NEGOCIO no tiene perilla de silenciar — la garantía del #321", () => {
-  it("enviarNegocio recibe SOLO (texto, parseMode): no hay dónde meter un filtro", async () => {
-    const { enviarNegocio, enviarSistema } = await import("@/lib/alertas/canal");
-    expect(enviarNegocio.length).toBe(2);
-    expect(enviarSistema.length).toBe(2);
+  /**
+   * AMPLIADO EL 2-sep-2026. Antes este candado vigilaba UNA sola función,
+   * `enviarNegocio`. El resumen diario de ventas de ACS se mudó al chat privado
+   * de Daniel (por privacidad: 📊 NEGOCIO es un grupo de tres donde está el
+   * celular de la empresa) y sale por `enviarNegocioPrivado`, que comparte el
+   * DESTINO de sistema pero no su trato.
+   *
+   * 🔴 La protección tiene que viajar CON el mensaje. Hoy `enviarSistema`
+   * tampoco filtra nada por dentro, pero eso es casualidad: toda su anti-ruido
+   * vive en los llamadores. El día que alguien agrupe o demore DENTRO de
+   * `enviarSistema`, el resumen de ventas se iría con la agrupación y dejaría
+   * de llegar sin que nadie lo note. Por eso las DOS funciones de negocio pasan
+   * por el mismo cedazo, y `enviarSistema` NO — ese canal sí tiene derecho a
+   * filtrar algún día.
+   */
+  const DE_NEGOCIO = ["enviarNegocio", "enviarNegocioPrivado"] as const;
+
+  it("las funciones de negocio reciben SOLO (texto, parseMode): no hay dónde meter un filtro", async () => {
+    const mod = await import("@/lib/alertas/canal");
+    for (const nombre of DE_NEGOCIO) expect(mod[nombre].length, nombre).toBe(2);
+    expect(mod.enviarSistema.length).toBe(2);
   });
 
-  it("el cuerpo de enviarNegocio no tiene condición alguna: resuelve DESTINO, nunca SI se manda", async () => {
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const src = fs.readFileSync(path.join(process.cwd(), "src/lib/alertas/canal.ts"), "utf8");
-    const desde = src.indexOf("export async function enviarNegocio");
-    expect(desde).toBeGreaterThan(-1);
-    // Hasta la llave de cierre de la función (primera "}" en columna 0).
-    const cuerpo = src.slice(desde, src.indexOf("\n}", desde) + 2);
-    for (const perilla of ["if (", "return false", "return true", "silenc", "process.env"]) {
-      expect(cuerpo).not.toContain(perilla);
-    }
-    // Una sola sentencia: manda siempre, y sólo elige a dónde.
-    expect(cuerpo).toContain("return sendTelegramAlert(texto, parseMode, destinoNegocio());");
-  });
+  it.each(DE_NEGOCIO)(
+    "el cuerpo de %s no tiene condición alguna: resuelve DESTINO, nunca SI se manda",
+    async (nombre) => {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const src = fs.readFileSync(path.join(process.cwd(), "src/lib/alertas/canal.ts"), "utf8");
+      // El "(" del final ata el nombre EXACTO: sin él, buscar "enviarNegocio"
+      // encontraría también a "enviarNegocioPrivado" y una de las dos quedaría
+      // sin revisar.
+      const desde = src.indexOf(`export async function ${nombre}(`);
+      expect(desde, `no encontré ${nombre} en canal.ts`).toBeGreaterThan(-1);
+      // Hasta la llave de cierre de la función (primera "}" en columna 0).
+      const cuerpo = src.slice(desde, src.indexOf("\n}", desde) + 2);
+      for (const perilla of ["if (", "return false", "return true", "silenc", "process.env"]) {
+        expect(cuerpo, `${nombre} · perilla "${perilla}"`).not.toContain(perilla);
+      }
+      // Una sola sentencia: manda siempre, y sólo elige a dónde.
+      expect(cuerpo).toMatch(
+        /return sendTelegramAlert\(texto, parseMode, destino(?:Negocio|Sistema)\(\)\);/,
+      );
+      // Y el texto sale intacto: el prefijo es exclusivo de `enviarSistema`.
+      expect(cuerpo).not.toContain("PREFIJO_SISTEMA");
+    },
+  );
+
+  // (El ruteo en vivo de `enviarNegocioPrivado` —que cae en el chat privado y
+  // sale sin prefijo— se prueba en acs-resumen-canal-privado.test.ts, que sí
+  // arma las env vars de los dos canales antes de cada caso.)
 });
 
 /** Lo que Telegram recibiría: a qué bot (token de la URL) y a qué chat. */

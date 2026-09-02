@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/requireRole";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { leerEgresosMes } from "@/lib/egresos/leer";
+import { lineaDeNoLeidos } from "@/lib/rechazos-de-switch";
 import { mesEgresosValido } from "@/lib/egresos/reglas";
 import type { RespuestaEgresos } from "@/app/gastos-contabilidad/components/tipos";
 
@@ -40,8 +41,19 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const body: RespuestaEgresos = await leerEgresosMes(mes);
-    return NextResponse.json(body);
+    // Los dos en paralelo: el aviso es una consulta de 1 fila contra el log y no
+    // tiene por qué alargar la pantalla. Falla al silencio (ver
+    // `rechazos-de-switch.ts`), así que no puede romper el total.
+    //
+    // 🔴 SIN `empresas`: el módulo muestra las 8 y el aviso también las mira. Lo
+    // que NUNCA hace es juntarlas en un número — la línea cuenta los renglones
+    // de cada empresa por separado (`textoDeNoLeidos`).
+    const [body, avisoNoLeidos] = await Promise.all([
+      leerEgresosMes(mes),
+      lineaDeNoLeidos({ familias: ["egreso_vario"] }),
+    ]);
+    const respuesta: RespuestaEgresos = { ...body, avisoNoLeidos };
+    return NextResponse.json(respuesta);
   } catch (e) {
     // El truncado de PostgREST y la tabla ausente llegan acá como Error; sólo la
     // segunda es "todavía no instalado". Todo lo demás es un error de verdad.

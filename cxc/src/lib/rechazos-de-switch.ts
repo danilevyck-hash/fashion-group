@@ -1,6 +1,19 @@
 // ═══════════════════════════════════════════════════════════════════════════
-//   LO QUE EL GUARD DEJÓ AFUERA, DICHO EN PANTALLA — fuente ÚNICA del texto.
+//   LO QUE SWITCH MANDÓ Y NO ENTRÓ, DICHO EN PANTALLA — fuente ÚNICA del texto.
 // ═══════════════════════════════════════════════════════════════════════════
+//
+// Son DOS clases de descarte y las dos se dicen desde acá, porque las dos se
+// leen del MISMO `switch_sync_log.skip_details` y pueden caer en la MISMA
+// pantalla el mismo día:
+//
+//   · **el monto imposible** — la fila llegó, la cifra era absurda y el guard la
+//     frenó para que no envenenara los totales (lo de siempre, ver abajo);
+//   · **el renglón ilegible** — la fila llegó con un formato que la app no sabe
+//     leer, así que no llegó a existir (2-sep-2026, ver
+//     `switch-api/renglones-ilegibles.ts`).
+//
+// Un módulo por clase habría sido dos consultas al mismo log con dos ventanas
+// que algún día divergen, y dos carteles apilados diciendo casi lo mismo.
 //
 // 🩸 POR QUÉ EXISTE. El guard de montos (`switch-api/monto-guard.ts`) frena las
 // cifras imposibles que manda Switch para que no envenenen los totales, el
@@ -49,6 +62,8 @@ import {
   MONTO_DIAS_ENTRE_AVISOS,
   type FamiliaMonto,
 } from "@/lib/switch-api/monto-guard";
+import { CAMPO_ILEGIBLE } from "@/lib/switch-api/renglones-ilegibles";
+import { mapEmpresaName } from "@/lib/empresa-mapping";
 
 /** Un documento que Switch mandó con una cifra imposible y el guard dejó afuera. */
 export interface RechazoDeSwitch {
@@ -146,6 +161,47 @@ async function db() {
   return supabaseServer;
 }
 
+/** Una corrida que dejó algo afuera, tal como vive en el log. */
+interface CorridaConDescartes {
+  empresa_key: string;
+  started_at: string;
+  skip_details: unknown;
+}
+
+/**
+ * Las corridas EXITOSAS de la ventana reciente que dejaron algo afuera.
+ *
+ * 🔑 UNA SOLA LECTURA PARA LAS DOS CLASES DE DESCARTE. Las dos viven en el
+ * mismo `skip_details` y se distinguen por el `campo` de cada fila, no por otra
+ * consulta.
+ *
+ * **Fail-open al silencio**: si falla, se devuelve vacío y la pantalla no dibuja
+ * nada. Un error de lectura no puede inventar un aviso ni romper la pantalla que
+ * muestra el total — el total es lo que importa.
+ */
+async function corridasConDescartes(
+  tipos: readonly string[],
+  desde: string,
+  empresas?: readonly string[],
+): Promise<CorridaConDescartes[]> {
+  try {
+    const supabase = await db();
+    let q = supabase
+      .from("switch_sync_log")
+      .select("empresa_key,started_at,skip_details")
+      .eq("status", "success")
+      .gt("records_skipped", 0)
+      .gte("started_at", desde)
+      .in("sync_type", tipos);
+    if (empresas && empresas.length > 0) q = q.in("empresa_key", empresas);
+    const { data, error } = await q.order("started_at", { ascending: false }).limit(100);
+    if (error || !data) return [];
+    return data as unknown as CorridaConDescartes[];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Los rechazos vigentes de las familias que le importan a UNA pantalla.
  *
@@ -165,23 +221,7 @@ export async function rechazosDeSwitch(opts: {
   const campos = new Map(familias.map((f) => [campoSkip(f), f]));
   const desde = new Date(Date.now() - MONTO_DIAS_ENTRE_AVISOS * 86_400_000).toISOString();
 
-  let filas: Array<{ empresa_key: string; started_at: string; skip_details: unknown }>;
-  try {
-    const supabase = await db();
-    let q = supabase
-      .from("switch_sync_log")
-      .select("empresa_key,started_at,skip_details")
-      .eq("status", "success")
-      .gt("records_skipped", 0)
-      .gte("started_at", desde)
-      .in("sync_type", tipos);
-    if (empresas && empresas.length > 0) q = q.in("empresa_key", empresas);
-    const { data, error } = await q.order("started_at", { ascending: false }).limit(100);
-    if (error || !data) return [];
-    filas = data as unknown as typeof filas;
-  } catch {
-    return [];
-  }
+  const filas = await corridasConDescartes(tipos, desde, empresas);
 
   // Ordenadas de nueva a vieja: la primera vez que aparece un documento es la
   // detección más reciente, y es la que vale.
@@ -249,6 +289,117 @@ export async function lineaDeRechazos(opts: {
   empresas?: readonly string[];
 }): Promise<string | null> {
   return textoDeRechazos(await rechazosDeSwitch(opts));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//   LA SEGUNDA CLASE: EL RENGLÓN QUE NO SE PUDO LEER (2-sep-2026)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Mismo log, misma ventana de 7 días, misma regla de "si no hay nada, no se
+// dibuja nada". Lo único distinto es qué se dice, porque es otra cosa: acá no
+// hay un monto que mostrar — no se pudo leer, y ESE es el punto.
+
+/** Un renglón que Switch mandó y la app no supo leer. */
+export interface RenglonNoLeido {
+  empresaKey: string;
+  /** El N. INTERNO del documento, o `"línea 41"` si ni eso se pudo leer. */
+  clave: string;
+  motivo: string;
+  /** Cuándo se detectó (la corrida que lo descartó). */
+  cuando: string;
+}
+
+/**
+ * Los renglones ilegibles vigentes de las familias que le importan a UNA
+ * pantalla. Misma consulta y mismo fail-open al silencio que `rechazosDeSwitch`.
+ */
+export async function renglonesNoLeidos(opts: {
+  familias: readonly FamiliaMonto[];
+  empresas?: readonly string[];
+}): Promise<RenglonNoLeido[]> {
+  const { familias, empresas } = opts;
+  if (familias.length === 0) return [];
+
+  const tipos = [...new Set(familias.flatMap((f) => SYNC_TYPES[f]))];
+  const desde = new Date(Date.now() - MONTO_DIAS_ENTRE_AVISOS * 86_400_000).toISOString();
+  const filas = await corridasConDescartes(tipos, desde, empresas);
+
+  // De nueva a vieja: la primera vez que aparece una clave es la detección más
+  // reciente, y es la que vale.
+  const vistos = new Set<string>();
+  const salida: RenglonNoLeido[] = [];
+  for (const fila of filas) {
+    if (!Array.isArray(fila.skip_details)) continue;
+    for (const d of fila.skip_details as FilaSkip[]) {
+      if (d?.campo !== CAMPO_ILEGIBLE) continue;
+      const clave = typeof d.secuencial === "string" ? d.secuencial.trim() : "";
+      if (clave === "") continue;
+      const llave = `${fila.empresa_key}·${clave}`;
+      if (vistos.has(llave)) continue;
+      vistos.add(llave);
+      const motivo = (d.valorCrudo as { motivo?: unknown } | null)?.motivo;
+      salida.push({
+        empresaKey: fila.empresa_key,
+        clave,
+        motivo: typeof motivo === "string" ? motivo : "",
+        cuando: fila.started_at,
+      });
+    }
+  }
+  return salida;
+}
+
+/** Cuántas empresas se nombran antes de resumir. Más de tres no se leen. */
+const MAX_EMPRESAS_EN_LINEA = 3;
+
+/**
+ * LA LÍNEA. Una sola, sin párrafos, igual que `textoDeRechazos`.
+ *
+ *   Fashion Wear: 3 renglones no se pudieron leer (el 120-000001276 y 2 más).
+ *   No están sumados en el total.
+ *
+ * 🔴 SE CUENTA POR EMPRESA, NUNCA EN UN SOLO NÚMERO. En Gastos las empresas se
+ * ven todas pero sus números no se juntan jamás — y aunque acá se cuenten
+ * renglones y no dólares, un "5 renglones" que sale de sumar dos empresas es
+ * exactamente la forma de pensar que esa regla prohíbe. Además, un total mudo
+ * no diría dónde mirar.
+ *
+ * Devuelve `null` cuando no hay nada que decir, que es el caso normal.
+ */
+export function textoDeNoLeidos(
+  noLeidos: readonly RenglonNoLeido[],
+  nombreDeEmpresa: (key: string) => string,
+): string | null {
+  if (noLeidos.length === 0) return null;
+
+  const porEmpresa = new Map<string, RenglonNoLeido[]>();
+  for (const r of noLeidos) {
+    porEmpresa.set(r.empresaKey, [...(porEmpresa.get(r.empresaKey) ?? []), r]);
+  }
+
+  const partes = [...porEmpresa.entries()].map(([key, rs]) => {
+    const cuantos = rs.length === 1 ? "1 renglón" : `${rs.length} renglones`;
+    const verbo = rs.length === 1 ? "no se pudo leer" : "no se pudieron leer";
+    const resto = rs.length - 1;
+    const cuales = resto > 0 ? `el ${rs[0].clave} y ${resto} más` : `el ${rs[0].clave}`;
+    return `${nombreDeEmpresa(key)}: ${cuantos} ${verbo} (${cuales})`;
+  });
+
+  const visibles = partes.slice(0, MAX_EMPRESAS_EN_LINEA);
+  const ocultas = partes.length - visibles.length;
+  const cola = ocultas > 0 ? ` · y ${ocultas} empresa${ocultas === 1 ? "" : "s"} más` : "";
+  return `${visibles.join(" · ")}${cola}. No están sumados en el total.`;
+}
+
+/**
+ * Atajo para las pantallas: leer y redactar en un paso. Devuelve `null` cuando
+ * no hay nada que mostrar, que es el caso normal.
+ */
+export async function lineaDeNoLeidos(opts: {
+  familias: readonly FamiliaMonto[];
+  empresas?: readonly string[];
+}): Promise<string | null> {
+  return textoDeNoLeidos(await renglonesNoLeidos(opts), mapEmpresaName);
 }
 
 /** Las familias que existen, para que las pantallas no inventen nombres. */

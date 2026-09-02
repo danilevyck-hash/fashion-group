@@ -28,6 +28,7 @@ import {
   mesValido,
   type RespuestaEgresos,
 } from "./components/tipos";
+import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SelectorMes from "./components/SelectorMes";
 import ResumenEgresos from "./components/ResumenEgresos";
 import DetalleEgresos from "./components/DetalleEgresos";
@@ -194,7 +195,17 @@ function GastosContabilidadInner() {
                 </p>
               </div>
             ) : egresos.data ? (
-              <ResumenEgresos empresas={egresos.data.empresas} onAbrir={abrirEmpresa} />
+              <>
+                {/* 🩸 LO QUE NO SE PUDO LEER SE DICE, NO SE CALLA (2-sep-2026).
+                    El total de abajo sale corto cuando Switch manda un renglón
+                    con un formato que la app no reconoce. Hasta este día eso
+                    pasaba en silencio: el descarte moría en la respuesta HTTP
+                    del cron, que nadie lee. Mismo componente y mismo ámbar que
+                    el aviso de montos imposibles — no se rompió nada acá, el
+                    dato está mal del otro lado. Si no hay nada, no se dibuja. */}
+                <AvisoRechazosSwitch texto={egresos.data.avisoNoLeidos} className="mb-4" />
+                <ResumenEgresos empresas={egresos.data.empresas} onAbrir={abrirEmpresa} />
+              </>
             ) : null}
           </>
         )}
