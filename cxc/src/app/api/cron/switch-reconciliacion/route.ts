@@ -96,6 +96,7 @@ import {
   yaAvisoReciente,
   TIPO_DATO_VIEJO,
 } from "@/lib/datos-frescos";
+import { revisarSilencioDeDatos } from "@/lib/alertas/silencio-de-datos-io";
 import { barrerRunningAtascados } from "@/lib/switch-api/sync-log";
 import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
 import { enviarResumenCaidaSiAplica } from "@/lib/switch-api/outage-resumen";
@@ -795,6 +796,53 @@ async function checkDatosViejos(): Promise<string[]> {
   }
 }
 
+/**
+ * 🩸 EL SILENCIO NO CUENTA COMO QUE ESTÁ BIEN (2-sep-2026) — las dos alertas
+ * hermanas de `src/lib/alertas/silencio-de-datos.ts`:
+ *
+ *   A · un sync que venía trayendo cientos trajo CERO, con `status = success`.
+ *   B · una tabla de negocio dejó de recibir escrituras.
+ *
+ * ── POR QUÉ CUELGAN DE ACÁ Y NO DE UN CRON NUEVO ────────────────────────────
+ * Tres motivos, y los tres son de este archivo:
+ *
+ *   1. **Es el vigía que ya existe.** La regla 1 («un dato que mirás está
+ *      viejo») vive dos funciones más arriba, en esta misma pasada. Las tres
+ *      alertas de datos preguntan lo mismo con distinta lente y tienen que
+ *      mirar el mundo en el mismo instante; separarlas en dos crons sería
+ *      garantizar que algún día se contradigan.
+ *
+ *   2. **El ritmo de esta pasada ES el filtro de «se arregla solo».** Corre
+ *      10/14/18 UTC, y entre una pasada y la siguiente el sistema tuvo todas sus
+ *      segundas oportunidades. Mirar desde acá «la última corrida exitosa del
+ *      par» deja afuera, gratis y sin una sola condición, al catálogo que trajo
+ *      0 a las 14:30 y 127 a las 17:00.
+ *
+ *      Va junto a la regla 1 y ANTES de la recuperación de esta pasada, y es
+ *      indistinto: la reconciliación solo re-ejecuta pares SIN success del día,
+ *      así que un `success` que trajo cero no lo recupera nunca; y las dos
+ *      tablas que vigila B (`egresos_varios`, `switch_articulo_info`) no están
+ *      en `COLATERAL_CRONS`. Lo que sí importa es que las tres alertas de datos
+ *      midan el mismo instante.
+ *
+ *   3. **Cero entradas nuevas en vercel.json.** El proyecto tiene 79 de 100
+ *      cron jobs del plan Pro, y «una entrada = una ocurrencia al día» hace que
+ *      cualquier alerta nueva con cron propio cueste 3 slots. Este no cuesta
+ *      ninguno.
+ *
+ * No lanza: un fallo midiendo el silencio no puede tumbar la reconciliación.
+ */
+async function checkSilencioDeDatos(): Promise<string[]> {
+  try {
+    return await revisarSilencioDeDatos();
+  } catch (err) {
+    console.error(
+      `[silencio-de-datos] no pude revisarlo: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return [];
+  }
+}
+
 /** Nombre del cron que alerta switch-sync (dedup contra cron_email_errors). */
 const SWITCH_SYNC_CRON_NAME = "switch-sync";
 
@@ -923,6 +971,10 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const staleCrons = await checkStaleCrons();
   // 0b-bis. REGLA 1: la única alerta de datos — cartera/ventas con más de 24 h.
   const datosViejos = await checkDatosViejos();
+  // 0b-ter. Las dos alertas del SILENCIO: un sync que trajo cero donde siempre
+  //         trae cientos (A) y una tabla de negocio que dejó de recibir
+  //         escrituras (B). Van juntas y mandan UN mensaje por módulo.
+  const silencioDeDatos = await checkSilencioDeDatos();
   await recordCronHeartbeat(CRON_NAME);
 
   // 0c. Reporte de las ocurrencias que CORRIERON Y FALLARON (defecto 2). El
@@ -966,6 +1018,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       outageResumen: outage.resumen,
       staleCrons,
       datosViejos,
+      silencioDeDatos,
       slotsCubiertos,
       slotsDesatendidos,
     });
@@ -1146,6 +1199,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       outageResumen,
       staleCrons,
       datosViejos,
+      silencioDeDatos,
       slotsCubiertos,
       slotsDesatendidos,
       slotsSinAtender,

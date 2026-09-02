@@ -7,6 +7,155 @@
 
 ---
 
+> ## 🩸 EL SILENCIO NO CUENTA COMO QUE ESTÁ BIEN — dos alertas para cuando Switch no da error y simplemente no manda nada (2-sep-2026)
+>
+> ### Lo que pasó
+>
+> El módulo **Gastos estuvo dos días sin recibir datos** (1 y 2-sep-2026) y nos enteramos por el **segundo fallo del cron**, o sea por la regla 2 y de pura casualidad. Switch reescribió su motor de reportes por segunda vez en dos semanas —la primera rompió la cartera de Boston el 19-ago— y empezó a mandar `"6.03.98.00.00 - GASTO DE TARJETA DE CREDITO"` donde antes mandaba el código pelado. Falló el **100%** de los renglones, así que el sync se cortó entero y la corrida quedó en `error`; con dos `error` seguidos del mismo par, la regla 2 avisó. Lo arreglaron `76d30e18` y `b00415e2`.
+>
+> **Si hubiera fallado el 3% en vez del 100%, no habría sonado nada.** La corrida se anotaba `success` con los renglones que sí entraron y los otros desaparecían. Y si Switch hubiera devuelto un reporte **vacío** en vez de uno con formato nuevo, la corrida se anotaba `success` con **cero** renglones — indistinguible de un día tranquilo.
+>
+> Y la pantalla no ayudaba: Gastos siguió diciendo *«Cargado hasta julio 2026»* los dos días. **No mentía** —ése ES el último mes cargado— pero tampoco avisaba.
+>
+> ### Las dos alertas, y por qué son dos
+>
+> Daniel aprobó dos, para el punto 4 del criterio: **el silencio no cuenta como que está bien**.
+>
+> | | Qué mira | Qué ve que la otra no | Velocidad |
+> |---|---|---|---|
+> | **A** — «un sync trajo cero donde siempre trae cientos» | `switch_sync_log` | «corrió, dijo que todo bien, no trajo nada» | Horas (la pasada siguiente) |
+> | **B** — «un módulo dejó de recibir datos» | la TABLA de negocio | que el cron **no se haya invocado**, que lo hayan sacado de `vercel.json` sin querer, que su propia fila de log no se haya escrito | ~2 días |
+>
+> B es el de fondo: **si no hay corrida, no hay nada que A pueda evaluar**. A es el rápido.
+>
+> **Ninguna estrena una cuarta regla de SISTEMA.** A es la **regla 2** («algo se rompió y no se arregló solo») mirando el RESULTADO en vez del `status`; B es la **regla 1** («un dato que mirás está viejo», `datos-frescos.ts`) extendida a datos que esa regla no cubre. La lista sigue siendo de tres.
+>
+> ### 🔴 LA PARTE DIFÍCIL: hay ceros perfectamente legítimos, y son la mayoría
+>
+> Medidos sobre los **9.113 registros de `switch_sync_log`** que hay en producción (29-may → 2-sep-2026, 96 días):
+>
+> - `joystep` y `american_classic` figuran `success` con **0 renglones de `egresos_varios` todos los días** desde el 13-ago: no tienen egresos varios. Su éxito vacío es correcto.
+> - 🩸 **`utilidad` y `recibos` cargan el MES EN CURSO** (`mesesCronDiario`: el mes actual, más el anterior sólo los días 1-5). El **1-jul-2026** seis pares de `recibos` y cuatro de `utilidad` trajeron 0 **a la vez** — no se rompió nada: era el primero de mes y julio no tenía todavía un solo documento. Y `joystep|utilidad` trajo **0 ocho días seguidos** (6 al 13-ago) porque joystep no vendió nada esa quincena.
+> - `active_wear|facturas` trae 0 en **81 de 248** corridas y `joystep|facturas` en **98 de 244**: son empresas chicas y hay días sin facturar.
+> - `ventas_tipos` es un centinela: su normal **ES** cero, siempre (41 de 41).
+> - Un sync que corre 4 veces al día trae 0 en las pasadas donde no cambió nada.
+>
+> **El patrón detrás de todos, y es el hallazgo del trabajo:** el volumen de esos syncs es un número del **NEGOCIO** («cuántas novedades hubo»), no una señal de salud. Un sync de **escritura selectiva**, o de **período que empieza vacío**, tiene que poder traer cero sin que nadie se asuste.
+>
+> ### 🔴 EL FILTRO QUE HACE TODO EL TRABAJO: sólo syncs de UNIVERSO COMPLETO
+>
+> A y B sólo opinan sobre corridas que reescriben un **universo completo** —todo el catálogo, todos los saldos vivos, el mes de gastos ya cerrado—: ahí el cero no es «no pasó nada», es «no vino nada», que es otra cosa.
+>
+> La lista está **declarada** (`SYNCS_DE_UNIVERSO_COMPLETO`), una por una y con su motivo, en vez de inferida: `estadocuenta` · `costo` · `articulo_info` · `articulo_marca` · `cuentas_contables` · `egresos_varios` · `proveedores` · los cuatro `catalogo_*`. Quedan **afuera** `facturas`, `recibos`, `utilidad`, `articulos`, `factura_lineas`, `ingresos_mercancia` y `ventas_tipos`.
+>
+> **Medición del filtro:** con él puesto, el backtest de 96 días da **0 disparos**. Sin él, **14** — y los 14 son falsas alarmas.
+>
+> ### Los tres candados estadísticos, por si la lista se equivoca
+>
+> Se aplican **por PAR (empresa, sync_type)**, nunca por `sync_type` suelto:
+>
+> 1. **≥ 10 corridas exitosas previas.** No es un número redondo al azar: es exactamente lo que la poda de `switch_sync_log` garantiza conservar de cada par por viejo que sea (`podar_switch_sync_log`, migración `20260726210200`), así que la ventana nunca se queda sin piso por una limpieza.
+> 2. **Mediana ≥ 10.** Mediana y no promedio — la convención de la casa, la misma de «puede estar a medio cargar» en Gastos: un día raro no la mueve. Hoy este piso deja afuera `proveedores` de tres empresas (medianas 3, 5 y 5) y a nadie más.
+> 3. **Ni un cero en esa historia.** Es el más duro y el que caza lo que la lista no vio: `active_shoes|egresos_varios` tuvo **4 ceros legítimos** entre el 13 y el 16-ago (todavía no le habían cargado gastos), así que ese par NO se vigila por A — y lo agarra B igual.
+>
+> **Un par sin esa historia —o que nunca tuvo datos— no se vigila.** Ante la duda, callar: una alerta que grita por un cero legítimo se gana que Daniel la ignore, y entonces la que importa tampoco se lee.
+>
+> ### 🔑 DÓNDE SE MIRA ES LA REGLA 2, GRATIS
+>
+> A **no corre dentro del sync**: corre en la **reconciliación** (10/14/18 UTC) y mira la **última corrida exitosa** de cada par. Eso aplica el filtro de «se arregla solo» sin escribir una sola condición: un catálogo que corre 4 veces al día y trajo 0 a las 14:30 pero 127 a las 17:00 llega a la pasada de las 18:00 con su última corrida en 127 — no hay nada que avisar. Para un sync diario, en cambio, no hay segunda oportunidad en el día y el aviso sale esa misma tarde.
+>
+> ### 🔴 B: SE MIRA CUÁNDO SE ESCRIBIÓ, NUNCA LA FECHA DEL DATO
+>
+> El rezago es fuerte y es **normal**: el reporte de egresos viene con **más de un mes de atraso** porque así lo carga la contadora — el egreso más nuevo de Vistana hoy es del **31-jul**. Usar la fecha del dato como señal haría sonar esta alerta para siempre.
+>
+> Y se mira la tabla del **DATO**, no la del **MECANISMO**. Medido el 2-sep-2026, con el módulo muerto hacía dos días:
+>
+> | | máximo | antigüedad |
+> |---|---|---|
+> | `egresos_importaciones.created_at` (la fila del run) | 2026-09-02 10:36 | **4,9 h** |
+> | `egresos_varios.created_at` (los renglones) | 2026-08-31 10:36 | **52,9 h** |
+>
+> Una decía que todo estaba bien. La otra decía la verdad.
+>
+> ### Qué tablas vigila B, y por qué SÓLO ésas
+>
+> Tres requisitos, y los tres tienen que darse:
+>
+> 1. **La escritura es COMPLETA en cada corrida.** 🩸 Medido: `switch_recibos` de `active_wear` lleva **144 h** sin una escritura y `switch_factura_lineas` de `joystep` **132 h**, y las dos empresas están **perfectamente sanas** — sus syncs escriben sólo lo que cambió y no cambió nada. Vigilar la recencia de escritura de una tabla con escritura selectiva es garantizar el falso positivo eterno.
+> 2. **Nadie más la vigila.** La cartera (`switch_estadocuenta`) y las ventas ya son la regla 1; repetirlas sería el mensaje doble que esto evita.
+> 3. **No tiene segunda oportunidad.** Ni `sync-egresos-varios` ni `sync-articulo-info` están en `COLATERAL_CRONS`: la reconciliación **no los re-ejecuta**.
+>
+> Quedan dos: **`egresos_varios.created_at`** → módulo **Gastos**, y **`switch_articulo_info.synced_at`** → **Ventas › Referencia**.
+>
+> `switch_ingresos_mercancia` cumple 1 y 3 pero nació el 24-ago y sólo tiene 9 corridas de historia: entra cuando tenga. Ante la duda, callar.
+>
+> ### El umbral de B: 40 h, y de dónde sale
+>
+> Los dos crons son diarios y la reconciliación mira a las 10:00, 14:00 y 18:00 UTC:
+>
+> - **Sano**, en la pasada de las 10:00 —justo ANTES de la corrida del día— el dato ya tiene **23,5 h**. Cualquier umbral por debajo de ~24 h suena todos los días sin que pase nada.
+> - **Un día perdido**: a las 18:00 el dato lleva **31 h**. Eso **NO se avisa**: estos syncs reescriben todo, así que la corrida de mañana lo repara sola, y la regla 2 dice explícitamente que eso no es un incidente.
+> - **Dos días perdidos**: a las 10:00 del segundo día lleva **47 h**. Ahí sí.
+>
+> Sirve cualquier valor entre 32 y 47; **40 h** queda en el medio y aguanta el jitter del scheduler por los dos lados. Es la misma regla de «dos seguidas» de la política de sync, escrita del lado del dato.
+>
+> ### 🔴 UN MENSAJE POR MÓDULO — así no llegan dos por el mismo hecho
+>
+> Los hallazgos de A y los de B se **juntan antes** de mirar el anti-loop y se agrupan por **MÓDULO**, que es a la vez la unidad del mensaje y la clave del dedup (`silencio_de_datos:<módulo>` en `cron_email_errors`, el mismo truco de `switch-sync:<slot>`). Eso resuelve dos cosas de un saque:
+>
+> - un sync roto en cinco empresas manda **UN** mensaje con las cinco, no cinco;
+> - A y B disparando por el mismo hecho —que es exactamente lo de Gastos— **no pueden** mandar dos mensajes, porque comparten la clave.
+>
+> **Anti-loop: 7 días por módulo**, el mismo número y el mismo patrón que el guard de montos imposibles y el aviso de renglones ilegibles, y por el mismo motivo: un módulo que dejó de recibir datos sigue igual mañana, y repetirlo en cada pasada lo convierte en la alerta que suena para siempre y que nadie lee. El mensaje lo **dice**: «este aviso se repite una vez por semana, no todos los días».
+>
+> El registro en `cron_email_errors` va **ANTES** del envío: es la llave del dedup, y dejarla después haría que un fallo de Telegram provocara un segundo intento inmediato en la pasada siguiente. Mismo orden que la regla 1.
+>
+> ### 🔴 NO ESTRENA UN CRON
+>
+> Las dos cuelgan de `switch-reconciliacion` (10/14/18 UTC). Tres motivos:
+>
+> 1. **Es el vigía que ya existe.** La regla 1 vive en esa misma pasada, dos funciones más arriba. Las tres alertas de datos preguntan lo mismo con distinta lente y tienen que mirar el mundo en el **mismo instante**; separarlas en dos crons sería garantizar que algún día se contradigan.
+> 2. **Va DESPUÉS de la recuperación**, que es lo que hace válida la condición 2 del canal.
+> 3. **Cero entradas nuevas en `vercel.json`.** Hay 79 de los 100 cron jobs del plan Pro, y «una entrada = una ocurrencia al día» hace que cualquier alerta con cron propio cueste 3 slots. Ésta no cuesta ninguno.
+>
+> ### 🩸 LA LECTURA DEL LOG VA PAGINADA
+>
+> Medido: estos mismos `sync_type` dan **1.003 filas en 14 días**, ya por encima del `db-max-rows` = 1000 que PostgREST aplica **en silencio**. Una lectura plana habría devuelto 1.000 filas y habría dejado pares enteros sin evaluar sin que nadie se enterara — el mismo modo de fallo que esta alerta viene a cerrar. Va por `leerTodoPaginado` con `started_at` + `id` de desempate.
+>
+> ### Backtest sobre 96 días de producción
+>
+> Simulando las **290 pasadas** de la reconciliación (10/14/18 UTC, 29-may → 2-sep-2026) contra los 9.113 registros reales, con el anti-loop puesto:
+>
+> | Escenario | Mensajes | Falsas alarmas |
+> |---|---|---|
+> | **Producción tal cual pasó** | **1** | **0** |
+> | Contrafáctico: el parser devuelve 0 renglones sin reventar | **1** | **0** |
+> | Sin el filtro de universo completo (control) | 14 | 14 |
+>
+> El único mensaje de los 96 días es **el incidente**: `2026-09-02 10:00 UTC`, «Gastos dejó de recibir datos — 47 h sin escribir», nombrando las cinco empresas. Llegó **35 min antes** que la alerta de la regla 2 (que salió con el segundo `error`, a las 10:35).
+>
+> En el **contrafáctico** —el caso que Daniel pidió cubrir, donde Switch no da error— el mensaje sale el **1-sep a las 14:00 UTC**, 3 h 25 después de la corrida muerta y **20 horas antes**; y en ese mundo la regla 2 **no habría sonado nunca**, porque no habría habido un solo `error`.
+>
+> ### Candados
+>
+> `silencio-de-datos.test.ts` — 34 casos. Los ceros legítimos entran como **fixtures con su fecha de producción** (el 1-jul de `recibos`, los 8 días de `joystep|utilidad`, los 4 ceros de `active_shoes|egresos_varios`), no como series inventadas. Más los estructurales: el anti-loop se consulta **antes** de mandar y la llave se escribe **antes** del envío, la lectura va paginada con orden estable, `vercel.json` no gana una entrada, y el mensaje no lleva nombres de tabla, `sync_type`, códigos HTTP ni la `empresa_key` interna.
+>
+> ### Verificado por mutación (2-sep-2026)
+>
+> **18 mutaciones, 18 cazadas.** Que A no dispare nunca · que A opine sobre `utilidad` (el cero legítimo del mes en curso) · que baje el piso de la mediana a 1 · que opine sin historia · que exija tanta historia que nunca opine · que pierda el candado de «ni un cero en la historia» · que mire la anteúltima corrida e ignore que el par ya se recuperó · que B no dispare nunca · que dispare con **un** día perdido · que dispare con el dato sano de las 10:00 · que alerte por una empresa que nunca tuvo datos · que mire la **fecha del dato** en vez de cuándo se escribió · que vigile una tabla de escritura selectiva · que agrupe por empresa y mande dos mensajes por el mismo hecho · que ponga el anti-loop en cero · que el io pierda la consulta del anti-loop · que no escriba la llave del dedup · que la lectura del log deje de paginar.
+>
+> **Dos CONTROLES quedaron verdes**, como debían: subir la ventana de lectura de 20 a 25 corridas, y un retoque de redacción del mensaje.
+>
+> ⚠️ Dos mutaciones **sobrevivieron en la primera pasada** y el candado se arregló: el test escribía los conteos como `A_MIN_HISTORIA - 1`, así que se movían junto con la constante y no protegían nada (ahora van literales, más un `expect` que clava el 10 y el 10); y la comprobación del dedup buscaba el texto `await logCronError(` en cualquier lado, así que envolverlo en un `if (false)` la pasaba (ahora exige que la llamada **abra la sentencia**).
+>
+> ### Lo que estas dos alertas **NO** hacen
+>
+> - **No miran empresas que nunca tuvieron datos.** `joystep`, `american_classic` y `confecciones_boston` no tienen un renglón de `egresos_varios` y no lo van a tener.
+> - **No reemplazan a la regla 2.** Un sync que devuelve `error` dos veces seguidas sigue avisando por `alertSwitchCronErrors`, como siempre.
+> - **No tocan el canal 📊 NEGOCIO.** Salen por `enviarSistema`, con su prefijo y su regla de tres.
+
+---
+
 > ## 🔒 EL RESUMEN DIARIO DE VENTAS DE ACS SE MUDÓ AL CHAT PRIVADO — sin el prefijo de sistema (2-sep-2026)
 >
 > Daniel, textual: ***"Solo me gustaría que las ventas de acs me lleguen solo a mí o por el chat de alertas, ya que ahí no está el celular de la empresa que tiene telegram para ver lo de las fotos, guías, etc."***
