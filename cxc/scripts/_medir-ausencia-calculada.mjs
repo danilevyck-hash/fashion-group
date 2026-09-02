@@ -12,7 +12,7 @@
 //       – la línea azul que explica de dónde sale el monto de la ausencia;
 //       – que la etiqueta «Tardanzas (X min)» NO muestre el total viejo.
 //     (Y de paso, que los avisos que ya había sigan ahí: período abierto,
-//      código sin ficha una sola vez, y el grupo «Decidilo vos».)
+//      código sin ficha una sola vez, y el grupo «Tú decides».)
 //
 // 🔑 El ancho que decide es el ÚTIL: la barra lateral se lleva 224 px, así que
 // un iPad de 834 deja ~610 — más angosto que un iPhone acostado.
@@ -99,7 +99,7 @@ const LEER_CAMBIOS = new Function(`
     avisoSinFicha: cuenta(/no tiene ficha \\(código/g),
     // 🔴 Adentro del cuadro NO puede quedar ninguna fila «sin ficha».
     filaSinFichaEnElCuadro: cuenta(/sin ficha en Configuración/g),
-    grupoDecidir: /Decidilo vos:/.test(txt),
+    grupoDecidir: /Tú decides:/.test(txt),
     // ── Lo que trae ESTE PR ──────────────────────────────────────────────
     // 🔑 El ESCRITORIO y el CELULAR lo dicen por caminos distintos —la tabla
     // con un asterisco y su pie, la tarjeta con la etiqueta y la línea azul—,

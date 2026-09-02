@@ -209,7 +209,7 @@ export type FilaLineaGuardada = Record<string, unknown>;
  *
  * 🔴 EL BLOQUE DE DINERO VA EN `null` CUANDO NO HUBO PAGO, nunca en 0. Un 0
  * dice «se le pagó cero»; `null` dice «el sistema se abstuvo». Esa diferencia es
- * media pantalla de este módulo (servicio profesional, «decidilo vos», «falta un
+ * media pantalla de este módulo (servicio profesional, «Tú decides», «falta un
  * dato») y perderla al congelar sería tirar la parte que hay que explicar.
  */
 export function filaDeLinea(planillaId: string, empresa: string, l: LineaPlanilla): FilaLineaGuardada {
@@ -385,7 +385,7 @@ export function textoSolapamiento(solapadas: readonly CabeceraGuardada[]): strin
   return (
     `Estas fechas se pisan con ${plural}: ${cuales}. `
     + "Una persona no puede quedar pagada dos veces por el mismo día. "
-    + "Si hay que rehacerla, primero reabrí la que ya está cerrada."
+    + "Si hay que rehacerla, primero reabre la que ya está cerrada."
   );
 }
 
@@ -476,7 +476,7 @@ export function frenosParaCerrar(
       texto:
         `${extras.length === 1 ? "1 persona tiene" : `${extras.length} personas tienen`} horas extra sin aprobar `
         + `(${lista(extras.map((e) => `${e.etiqueta} · ${e.minutos.toFixed(2)} min`))}). `
-        + "Andá a la pestaña «Aprobaciones», aprobá o dejá sin aprobar esas horas, y volvé a cerrar. "
+        + "Ve a la pestaña «Aprobaciones», aprueba o deja sin aprobar esas horas, y vuelve a cerrar. "
         + "Si se cierra así, esas horas no se pagan y no hay forma de arreglarlo después sin reabrir.",
     });
   }
@@ -491,7 +491,7 @@ export function frenosParaCerrar(
       texto:
         `${pres.length === 1 ? "1 persona tiene" : `${pres.length} personas tienen`} un descuento de préstamo sin aprobar `
         + `(${lista(pres.map((p) => `${p.etiqueta} · ${plata(p.sugerido)}`))}). `
-        + "Aprobalo (o dejalo en cero) en el bloque «Préstamo por descontar» de esta misma pestaña, y volvé a cerrar.",
+        + "Apruébalo (o déjalo en cero) en el bloque «Préstamo por descontar» de esta misma pestaña, y vuelve a cerrar.",
     });
   }
 
@@ -522,7 +522,7 @@ export function validarGuardado(empresaRaw: unknown, desdeRaw: unknown, hastaRaw
   if (!(EMPRESAS_ASISTENCIA as readonly string[]).includes(empresa)) {
     // 🔴 La empresa NO es opcional. Sin ella el cuadro sería de las tres a la
     // vez —el reloj es uno solo— y ni el solapamiento ni el pago tendrían dueño.
-    return { ok: false, error: "Elegí una empresa para cerrar la quincena." };
+    return { ok: false, error: "Elige una empresa para cerrar la quincena." };
   }
   const desde = typeof desdeRaw === "string" ? desdeRaw.trim() : "";
   const hasta = typeof hastaRaw === "string" ? hastaRaw.trim() : "";

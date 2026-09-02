@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
     // «todos pueden» se vuelve «nadie sabe quién fue».
     const usuario = String(auth.userName ?? "").trim();
     if (!usuario) {
-      return NextResponse.json({ error: "La sesión no dice quién sos." }, { status: 400 });
+      return NextResponse.json({ error: "La sesión no dice quién eres." }, { status: 400 });
     }
 
     // ── EL FRENO DEL SOLAPAMIENTO, ANTES DE ESCRIBIR NADA ──────────────────
@@ -351,7 +351,7 @@ export async function PATCH(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "Falta cuál planilla reabrir." }, { status: 400 });
 
     const usuario = String(auth.userName ?? "").trim();
-    if (!usuario) return NextResponse.json({ error: "La sesión no dice quién sos." }, { status: 400 });
+    if (!usuario) return NextResponse.json({ error: "La sesión no dice quién eres." }, { status: 400 });
 
     const { cabecera, faltaTabla } = await leerCabecera(id);
     if (faltaTabla) {
@@ -375,7 +375,7 @@ export async function PATCH(req: NextRequest) {
     const motivo = motivoReaperturaValido(body?.motivo);
     if (!motivo) {
       return NextResponse.json(
-        { error: "Escribí por qué se reabre esta quincena. Queda registrado con tu nombre." },
+        { error: "Escribe por qué se reabre esta quincena. Queda registrado con tu nombre." },
         { status: 400 },
       );
     }

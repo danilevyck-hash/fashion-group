@@ -57,16 +57,22 @@ import PlanillaTab from "@/app/asistencia/PlanillaTab";
 // hasta que hay período, y que pida ESE. Cómo se elige —ancla, cierre, orden
 // invertido, ancla nueva— se prueba sobre el componente real, importado
 // directo, en `rango-fechas-calendario.test.tsx` (14 casos).
+//
+// 🔴 EL DOBLE DIBUJA `accion` (4-sep-2026). El control real, en modo `inline`,
+// pone en su pie el botón que le pasan —el «Generar» de la planilla—. Un doble
+// que lo tirara dejaría la pantalla sin forma de generar, y los casos de abajo
+// pasarían a probar una pantalla que no existe.
 vi.mock("@/components/ui/RangoFechas", () => ({
   __esModule: true,
-  default: ({ desde, hasta, vacio, onChange }: {
+  default: ({ desde, hasta, vacio, onChange, accion }: {
     desde: string; hasta: string; vacio?: boolean;
     onChange: (d: string, h: string) => void;
+    accion?: React.ReactNode;
   }) => (
     <div>
       <button type="button" onClick={() => onChange(desde, hasta)}>
         {vacio
-          ? "Elegí el período"
+          ? "Elige el período"
           : `${desde} – ${hasta} · ${
               Math.round((Date.parse(hasta) - Date.parse(desde)) / 86400000) + 1
             } días`}
@@ -74,6 +80,7 @@ vi.mock("@/components/ui/RangoFechas", () => ({
       <button type="button" data-testid="elegir-4-20" onClick={() => onChange("2026-08-04", "2026-08-20")}>
         elegir 4-20
       </button>
+      {accion}
     </div>
   ),
 }));
@@ -160,22 +167,32 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 // 🩸 `getAllByRole(...)[0]`, no `getByRole`: en jsdom no hay Tailwind, así que
 // el botón de desktop (`hidden lg:block`) y el de móvil (`lg:hidden`) se montan
 // los DOS y `getByRole` revienta con «Found multiple elements».
-/** 🔴 La planilla abre VACÍA: nada se pide hasta elegir el período. */
+/**
+ * 🔴 La planilla abre VACÍA: nada se pide hasta elegir el período **y tocar
+ * Generar** (4-sep-2026). Elegir ya no dispara la consulta sola: el flujo que
+ * aprobó Daniel es elegir → Generar → revisar → Cerrar.
+ */
 async function elegirPeriodo(d?: string, h?: string) {
   if (d === "2026-08-04" || h === "2026-08-20") {
     fireEvent.click(screen.getByTestId("elegir-4-20"));
   } else {
     fireEvent.click(control());
   }
+  generar();
+}
+
+/** El botón que de verdad pide el cuadro. */
+function generar() {
+  fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
 }
 
 // 🩸 `getAllByRole(...)[0]`, no `getByRole`: en jsdom no hay Tailwind, así que
 // el botón de desktop (`hidden lg:block`) y el de móvil (`lg:hidden`) se montan
 // los DOS y `getByRole` revienta con «Found multiple elements».
-// 🔑 Y matchea las DOS caras del control: «Elegí el período» antes de elegir, y
+// 🔑 Y matchea las DOS caras del control: «Elige el período» antes de elegir, y
 // «1 ago – 15 ago 2026 · 15 días» después.
 const control = () =>
-  screen.getAllByRole("button", { name: /Elegí el período|·\s*\d+\s*d[ií]as?/ })[0];
+  screen.getAllByRole("button", { name: /Elige el período|·\s*\d+\s*d[ií]as?/ })[0];
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", () => {
@@ -196,10 +213,10 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
   // mostrando la quincena en curso. Daniel: *«la quincena se paga según el
   // rango de fecha seleccionado»* — un rango puesto solo AFIRMA un período de
   // pago que nadie pidió. Ahora abre invitando a elegirlo.
-  it("🔴 abre SIN período puesto: dice «Elegí el período»", async () => {
+  it("🔴 abre SIN período puesto: dice «Elige el período»", async () => {
     servir(respuestaQuincena());
     montar();
-    await waitFor(() => expect(control().textContent).toMatch(/Elegí el período/));
+    await waitFor(() => expect(control().textContent).toMatch(/Elige el período/));
     expect(control().textContent).not.toMatch(/días/);
   });
 
@@ -210,8 +227,8 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
     // El FORMATO de la etiqueta («1 ago – 15 ago 2026 · 15 días») se prueba
     // sobre el control real en `rango-fechas-calendario.test.tsx`. Acá alcanza
-    // con que el control DEJE de decir «Elegí el período» al haber elegido.
-    expect(control().textContent).not.toMatch(/Elegí el período/);
+    // con que el control DEJE de decir «Elige el período» al haber elegido.
+    expect(control().textContent).not.toMatch(/Elige el período/);
   });
 
   it("⛔ y NO quedó ningún `<input type=\"date\">` suelto de rango", async () => {
@@ -231,10 +248,12 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     vi.setSystemTime(new Date("2026-08-10T15:00:00Z"));
     const llamadas = servir(respuestaQuincena());
     montar();
-    await waitFor(() => expect(control().textContent).toMatch(/Elegí el período/));
-    // Ni una llamada a la planilla. (El calendario sí puede pedir sus días.)
-    expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla"))).toEqual([]);
-    expect(screen.getByText(/Elegí el período que vas a pagar/)).toBeTruthy();
+    await waitFor(() => expect(control().textContent).toMatch(/Elige el período/));
+    // Ni una llamada al CUADRO. (El calendario sí puede pedir sus días, y la
+    // pantalla pregunta qué hay cerrado para recomendar por dónde empezar: esa
+    // URL también empieza con `/api/asistencia/planilla`, de ahí el `?`.)
+    expect(llamadas.filter((c) => c.url.includes("/api/asistencia/planilla?"))).toEqual([]);
+    expect(screen.getByText(/Elige el período que vas a pagar/)).toBeTruthy();
     vi.useRealTimers();
   });
 
@@ -244,10 +263,10 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     montar();
     await elegirPeriodo();
     await waitFor(() => expect(llamadas.some((c) => c.url.includes("/api/asistencia/planilla"))).toBe(true));
-    const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla"))!;
+    const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla?"))!;
     expect(get.url).toContain("desde=2026-08-01");
     expect(get.url).toContain("hasta=2026-08-15");
-    expect(control().textContent).not.toMatch(/Elegí el período/);
+    expect(control().textContent).not.toMatch(/Elige el período/);
     vi.useRealTimers();
   });
 
@@ -256,7 +275,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     montar();
     await elegirPeriodo();
     await waitFor(() => expect(llamadas.length).toBeGreaterThan(0));
-    const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla"))!;
+    const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla?"))!;
     expect(get.url).toContain("desde=");
     expect(get.url).toContain("hasta=");
     expect(get.url).not.toMatch(/[?&]quincena=/);
@@ -285,10 +304,10 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     montar();
     await elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
-    const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla"))!;
+    const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla?"))!;
     expect(get.url).toContain("desde=");
     expect(get.url).toContain("hasta=");
-    expect(control().textContent).not.toMatch(/Elegí el período/);
+    expect(control().textContent).not.toMatch(/Elige el período/);
   });
 
 

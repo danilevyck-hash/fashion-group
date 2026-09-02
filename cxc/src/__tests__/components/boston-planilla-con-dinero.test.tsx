@@ -31,6 +31,7 @@ import PlanillaBoston from "@/app/boston/tabs/PlanillaBoston";
 // `dynamic()`, y bajo vitest eso NO resuelve: el diálogo abre y no hay un solo
 // `data-day` que tocar. Su conducta —ancla, cierre, orden invertido— se prueba
 // sobre el componente real en `rango-fechas-calendario.test.tsx`.
+// 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
 vi.mock("@/components/ui/RangoFechas", () => ({
   __esModule: true,
   default: ({ desde, hasta, vacio, onChange }: {
@@ -38,7 +39,7 @@ vi.mock("@/components/ui/RangoFechas", () => ({
     onChange: (d: string, h: string) => void;
   }) => (
     <button type="button" onClick={() => onChange(desde, hasta)}>
-      {vacio ? "Elegí el período" : `${desde} – ${hasta}`}
+      {vacio ? "Elige el período" : `${desde} – ${hasta}`}
     </button>
   ),
 }));
@@ -101,7 +102,7 @@ function responder(cuerpo: Record<string, unknown>) {
 // las vistas `lg:hidden` y `hidden lg:block` se montan LAS DOS y `getByRole`
 // revienta con «Found multiple elements».
 function elegirPeriodo() {
-  fireEvent.click(screen.getAllByRole("button", { name: /Elegí el período/ })[0]);
+  fireEvent.click(screen.getAllByRole("button", { name: /Elige el período/ })[0]);
 }
 
 beforeEach(() => vi.useRealTimers());
@@ -132,15 +133,15 @@ describe("🔴 abre VACÍA: la plata no se muestra sin período elegido", () => 
     // Se espera a que la pantalla se asiente: si hubiera un efecto que carga
     // solo, ya habría corrido para cuando el control se puede leer.
     await waitFor(() =>
-      expect(screen.getAllByRole("button", { name: /Elegí el período/ }).length)
+      expect(screen.getAllByRole("button", { name: /Elige el período/ }).length)
         .toBeGreaterThan(0));
     expect(llamadas.filter((u) => u.includes("/api/asistencia/planilla"))).toEqual([]);
   });
 
-  it("🔴 y en vez del cuadro dice qué hacer: «Elegí el período que vas a pagar»", async () => {
+  it("🔴 y en vez del cuadro dice qué hacer: «Elige el período que vas a pagar»", async () => {
     responder(CON_DINERO);
     render(<PlanillaBoston />);
-    expect(await screen.findByText(/Elegí el período que vas a pagar/)).toBeTruthy();
+    expect(await screen.findByText(/Elige el período que vas a pagar/)).toBeTruthy();
     // Ni un símbolo de plata antes de elegir: el vacío no es «no hay datos», es
     // que todavía no se sabe QUÉ período se está pagando.
     expect(document.body.textContent ?? "").not.toMatch(/\$/);
@@ -156,7 +157,7 @@ describe("🔴 abre VACÍA: la plata no se muestra sin período elegido", () => 
     expect(pedido).toContain("desde=");
     expect(pedido).toContain("hasta=");
     // Y el cartel del vacío se fue: ya hay un período que mirar.
-    expect(screen.queryByText(/Elegí el período que vas a pagar/)).toBeNull();
+    expect(screen.queryByText(/Elige el período que vas a pagar/)).toBeNull();
   });
 });
 

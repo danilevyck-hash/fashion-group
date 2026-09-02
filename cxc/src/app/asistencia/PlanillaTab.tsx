@@ -16,8 +16,28 @@
 // Son 19 columnas: en escritorio es una tabla que se arrastra DENTRO de su caja
 // (la página nunca se mueve de lado) con la columna Persona pegada a la
 // izquierda; en celular son tarjetas. Mismo criterio que `PanelCxcMobile`.
+//
+// ── 🔴 EL FLUJO, TAL COMO LO APROBÓ DANIEL (4-sep-2026) ──────────────────────
+//
+//     elegir período → [Generar] → BORRADOR → revisar → [Cerrar quincena]
+//                                                   → CERRADA → [Reabrir]
+//
+// El calendario arranca A LA VISTA —dos meses, como el de Copa: *«que sea user
+// friendly como el de copa airlines… su fecha de salida sería la fecha que
+// termina la quincena»*— y recién al generar se pliega a la píldora de arriba,
+// porque las 18 columnas de plata necesitan el ancho entero.
+//
+// 🔴 NADA SE RECALCULA POR DEBAJO. Aprobar un préstamo o escribir un monto a
+// mano NO vuelve a pedir el cuadro: lo marca VIEJO y aparece «Regenerar». Que
+// los números se muevan solos mientras alguien los revisa es exactamente cómo
+// se termina cerrando una quincena distinta de la que se miró.
+//
+// 🔴 Y EL CIERRE ES DEL SERVIDOR, ENTERO. Esta pantalla NO manda un solo monto:
+// el POST recibe empresa y fechas, y la ruta vuelve a calcular y congela ESO
+// (ver `planilla-guardada.ts`). Acá solo se muestra el estado y se pide.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
 import {
@@ -32,6 +52,7 @@ import {
 import type { ReglasAsistencia } from "@/lib/asistencia/config";
 import {
   aHoras,
+  fechaCorta,
   FORMULA_NETO,
   grupoDeLinea,
   quincenasHasta,
@@ -59,6 +80,27 @@ import type {
 } from "@/lib/asistencia/prestamos-planilla";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
+// 🔴 QUIÉN CIERRA SALE DEL MISMO MÓDULO QUE EL CANDADO DEL SERVIDOR
+// (`cerrarPlanillaRoles()` = Asistencia menos secretaria). Escribir acá
+// `["admin","contabilidad"]` habría estrenado la cuarta lista de roles del
+// módulo, que es el bug que `roles.ts` vino a matar. Esconder el botón no cierra
+// nada —la ruta es el candado—, pero dibujarle a la secretaria un botón que le
+// va a contestar 403 es peor que no dibujarlo.
+//
+// ⚠️ Import de VALOR y no de tipo, así que pesa: son tres funciones puras y el
+// resto del módulo (los mapas de columnas, el I/O) se cae solo en el tree-shake.
+import {
+  etiquetaRango as etiquetaRangoGuardado,
+  motivoReaperturaValido,
+  puedeCerrar,
+  textoSolapamiento,
+  type CabeceraGuardada,
+  type FrenoCierre,
+} from "@/lib/asistencia/planilla-guardada";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+// 🔴 DEL MÓDULO PURO, NUNCA de `CalendarioRango`: ese archivo trae
+// `react-day-picker` y un import estático anularía el `dynamic()` del selector.
+import { aIso, deIso } from "@/components/ui/rango-fechas-iso";
 
 import RangoFechas from "@/components/ui/RangoFechas";
 interface Respuesta {
@@ -143,6 +185,65 @@ interface Respuesta {
   };
 }
 
+/** Lo que se PIDIÓ: la planilla que hay en pantalla es de estas tres cosas. */
+interface Pedido {
+  desde: string;
+  hasta: string;
+  empresa: string;
+}
+
+/** Lo que la base sabe de este período. `GET /api/asistencia/planilla-guardada`. */
+interface Cierre {
+  /**
+   * La cerrada que coincide EXACTO con el rango pedido.
+   *
+   * 🔑 El `estado` («borrador» / «cerrada») que la ruta también devuelve NO se
+   * guarda: lo que la pantalla pinta se deriva de estos dos campos, y tener
+   * además una palabra que diga lo mismo es la forma de que un día digan cosas
+   * distintas.
+   */
+  cerrada: CabeceraGuardada | null;
+  /** Las que PISAN el rango sin ser la misma: son las que impiden cerrar. */
+  solapadas: CabeceraGuardada[];
+  /** ⚠️ Falta correr la migración. NO es un error — ver la nota del aviso. */
+  aviso: string | null;
+}
+
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** El día de después. `deIso` cae a mediodía, así que no hay salto de huso. */
+function diaSiguiente(iso: string): string {
+  const d = deIso(iso);
+  d.setDate(d.getDate() + 1);
+  return aIso(d);
+}
+
+/** «3 sep 2026, 4:12 p.m.», en hora de Panamá (UTC−5 fijo, como todo el módulo). */
+function cuandoBonito(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  const d = new Date(t - 5 * 3_600_000);
+  const h24 = d.getUTCHours();
+  const h = h24 % 12 === 0 ? 12 : h24 % 12;
+  const min = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${d.getUTCDate()} ${MESES[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${h}:${min} ${h24 < 12 ? "a.m." : "p.m."}`;
+}
+
+/**
+ * Por qué una casilla de monto a mano está apagada. Son DOS motivos distintos y
+ * el texto de cada uno es la mitad del mensaje: uno se arregla eligiendo otras
+ * fechas, el otro reabriendo la quincena.
+ */
+const BLOQUEO_RANGO = {
+  placeholder: "por quincena",
+  title: "Se escribe por quincena, no por rango de fechas",
+};
+const BLOQUEO_CERRADA = {
+  placeholder: "cerrada",
+  title: "La quincena está cerrada. Para corregir un monto hay que reabrirla.",
+};
+type Bloqueo = typeof BLOQUEO_RANGO | null;
+
 const $ = (n: number | null | undefined): string =>
   n === null || n === undefined || n === 0
     ? "—"
@@ -217,26 +318,163 @@ export default function PlanillaTab() {
   const [error, setError] = useState<string | null>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
 
-  const cargar = useCallback(async () => {
+  // ── EL FLUJO: elegir → Generar → revisar → Cerrar ───────────────────────────
+  /** Lo que se pidió y está en pantalla. `null` = todavía no se generó nada. */
+  const [pedido, setPedido] = useState<Pedido | null>(null);
+  /** 🔴 Alguien tocó algo que mueve los números. NO se recalcula solo. */
+  const [desactualizada, setDesactualizada] = useState(false);
+  /** Lo que la base dice de este período: cerrada, borrador, o que se pisa. */
+  const [cierre, setCierre] = useState<Cierre | null>(null);
+  /** Lo que impidió cerrar la última vez (el 409 de los frenos). */
+  const [frenos, setFrenos] = useState<FrenoCierre[]>([]);
+  const [modal, setModal] = useState<"cerrar" | "reabrir" | null>(null);
+  const [trabajandoCierre, setTrabajandoCierre] = useState(false);
+  /**
+   * 🔴 El calendario arranca A LA VISTA y se pliega al generar. Daniel:
+   * *«no veo lo de poner las fechas, sigue igual pero no cortado»* — un
+   * desplegable que hay que descubrir no sirve para el PRIMER paso de la
+   * pantalla. Plegado, las 18 columnas de plata recuperan el ancho entero.
+   */
+  const [calendarioAbierto, setCalendarioAbierto] = useState(true);
+  // 🔑 El rol sale de `sessionStorage`, igual que en `AsistenciaClient` y
+  // `AppHeader`. Arranca vacío: en el primer render no hay sessionStorage, y
+  // dibujar el botón de cerrar para sacarlo un tick después es peor.
+  const [rol, setRol] = useState("");
+  useEffect(() => { setRol(sessionStorage.getItem("cxc_role") || ""); }, []);
+
+  // ── 🔴 EL INICIO RECOMENDADO: EL DÍA DESPUÉS DE LA ÚLTIMA CERRADA ──────────
+  //
+  // Daniel, textual: *«después de cerrar la primera quincena, el recomendado de
+  // inicio debe de ser el día siguiente que cerró la quincena pasada»*. Es lo
+  // que evita las dos formas de equivocarse: un hueco de días que nadie pagó, y
+  // un solapamiento que el servidor va a rechazar al cerrar.
+  //
+  // ⚠️ ES UNA SUGERENCIA, NO UNA IMPOSICIÓN. Se marca el día con un aro en el
+  // calendario y se dice en una línea; el primer toque sigue eligiendo el inicio
+  // donde la persona quiera. Elegir el período por ella sería el mismo error que
+  // los cuatro presets que se retiraron.
+  //
+  // 🔑 Sale del `historial` que ya devuelve la ruta del cierre — sin endpoint
+  // nuevo. Se pide SIN fechas: así contesta el historial de la empresa entera.
+  const [sugerido, setSugerido] = useState<{ inicio: string; ultimaHasta: string } | null>(null);
+  useEffect(() => {
+    // Ya se generó algo, o la persona ya eligió: lo que manda es su elección.
+    if (pedido || elegido) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const r = await fetch(
+          `/api/asistencia/planilla-guardada?empresa=${encodeURIComponent(empresa)}`,
+          { cache: "no-store" },
+        );
+        const j = await r.json();
+        // 🩸 `vivo` no es adorno: si la persona elige mientras esto viaja, el
+        // efecto se limpia y la respuesta vieja NO le pisa lo que eligió.
+        if (!r.ok || !vivo) return;
+        const historial = Array.isArray(j.historial) ? (j.historial as CabeceraGuardada[]) : [];
+        // Solo las CERRADAS: una reabierta no pagó nada todavía.
+        const cerradas = historial.filter((c) => c.estado === "cerrada");
+        if (cerradas.length === 0) { setSugerido(null); return; }
+        const ultima = cerradas.reduce((a, b) => (b.hasta > a.hasta ? b : a));
+        const inicio = diaSiguiente(ultima.hasta);
+        setSugerido({ inicio, ultimaHasta: ultima.hasta });
+        // El calendario abre en ese mes. No queda «elegido»: sigue en vacío
+        // hasta que alguien toque los dos días.
+        setDesde(inicio);
+        setHasta(inicio);
+      } catch { /* la sugerencia es una ayuda, no un requisito */ }
+    })();
+    return () => { vivo = false; };
+  }, [elegido, empresa, pedido]);
+
+  /**
+   * Qué hay CERRADO de este período. Va aparte del cuadro a propósito: que la
+   * tabla del cierre no se pueda leer —o que falte correr la migración— no
+   * puede dejar a nadie sin su planilla.
+   */
+  const pedirCierre = useCallback(async (p: Pedido) => {
+    // 🔴 Se limpia ANTES de preguntar: si la consulta falla, quedarse con el
+    // cierre del período anterior diría «esta quincena está cerrada» sobre otra.
+    setCierre(null);
+    try {
+      const q = new URLSearchParams({ empresa: p.empresa, desde: p.desde, hasta: p.hasta });
+      const res = await fetch(`/api/asistencia/planilla-guardada?${q}`, { cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok) return;
+      setCierre({
+        cerrada: (j.cerrada ?? null) as CabeceraGuardada | null,
+        solapadas: Array.isArray(j.solapadas) ? (j.solapadas as CabeceraGuardada[]) : [],
+        aviso: typeof j.aviso === "string" ? j.aviso : null,
+      });
+    } catch { /* el estado del cierre es información, no un requisito */ }
+  }, []);
+
+  const cargar = useCallback(async (p: Pedido) => {
     setCargando(true);
     setError(null);
+    // Un freno de la corrida anterior no puede sobrevivir a un cuadro nuevo:
+    // sería un cartel rojo hablando de una planilla que ya no está en pantalla.
+    setFrenos([]);
     try {
-      const p = new URLSearchParams({ desde, hasta, empresa });
-      const res = await fetch(`/api/asistencia/planilla?${p}`, { cache: "no-store" });
+      const q = new URLSearchParams({ desde: p.desde, hasta: p.hasta, empresa: p.empresa });
+      const res = await fetch(`/api/asistencia/planilla?${q}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
       setData(j as Respuesta);
+      setDesactualizada(false);
+      // Generado: el cuadro necesita el ancho. La píldora de arriba lo vuelve
+      // a abrir cuando haga falta.
+      setCalendarioAbierto(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setData(null);
     } finally {
       setCargando(false);
     }
-  }, [desde, empresa, hasta]);
+    await pedirCierre(p);
+  }, [pedirCierre]);
 
-  // 🔑 Nada se pide hasta que hay un período ELEGIDO. `cargar` sigue en las
-  // dependencias para que cambiar la empresa vuelva a pedir — pero solo después.
-  useEffect(() => { if (elegido) void cargar(); }, [cargar, elegido]);
+  // 🔴 Nada se pide solo: se pide lo que alguien GENERÓ. `pedido` es un objeto
+  // nuevo en cada toque, así que «Regenerar» con las mismas fechas también
+  // vuelve a pedir.
+  useEffect(() => { if (pedido) void cargar(pedido); }, [cargar, pedido]);
+
+  /** Generar / Regenerar: pedir el cuadro de lo que está elegido AHORA. */
+  const generar = useCallback(() => {
+    if (!elegido) return;
+    setPedido({ desde, hasta, empresa });
+  }, [desde, elegido, empresa, hasta]);
+
+  // ── LO QUE SE DERIVA DEL ESTADO ────────────────────────────────────────────
+  /** ¿El cuadro en pantalla es de lo que está elegido arriba? */
+  const coincide = !!pedido && pedido.desde === desde && pedido.hasta === hasta && pedido.empresa === empresa;
+  /** 🔴 Hay números en pantalla que ya no son los de lo que está elegido. */
+  const vieja = !!data && (!coincide || desactualizada);
+  const cerrada = cierre?.cerrada ?? null;
+  const solapadas = cierre?.solapadas ?? [];
+  /** ⚠️ Falta correr el SQL. La pantalla entera sigue andando; el cierre no. */
+  const faltaMigracionCierre = cierre?.aviso ?? null;
+  const puedeCerrarla = puedeCerrar(rol);
+  /** Se puede cerrar cuando hay un cuadro fresco, sin cerrar y sin pisar nada. */
+  const sePuedeCerrar =
+    !!data && !vieja && !cerrada && solapadas.length === 0 && !faltaMigracionCierre && !!data.lineas.length;
+  /**
+   * 🔴 POR QUÉ NO SE PUEDE ESCRIBIR UN MONTO A MANO. Son dos motivos y gana el
+   * de la quincena cerrada: escribir un ISR sobre un cuadro congelado no cambia
+   * un centavo de lo que se pagó, y quien lo escribe se va creyendo que corrigió
+   * el pago.
+   */
+  /**
+   * El día que se marca en el calendario. UNA sola definición para los dos
+   * sitios donde vive el control (la píldora y el calendario en línea): dos
+   * copias es cómo una se queda marcando después de que la persona eligió.
+   */
+  const diaSugerido = elegido ? null : sugerido?.inicio ?? null;
+  const bloqueoManuales: Bloqueo = cerrada
+    ? BLOQUEO_CERRADA
+    : data?.avisos.rangoLibre
+      ? BLOQUEO_RANGO
+      : null;
 
   /** Guarda un monto escrito a mano y refresca los números de esa fila. */
   const guardar = useCallback(
@@ -275,15 +513,17 @@ export default function PlanillaTab() {
         const j = await res.json();
         if (!res.ok) throw new Error(j.error ?? "No se pudo guardar");
         if (j.ok === false) toast(j.aviso ?? "No se pudo guardar", "error");
-        // Se recarga entero: el monto cambia el total de deducciones, el neto y
-        // los totales del pie. Pintar solo la celda dejaría un cuadro que no
-        // suma, que es peor que esperar medio segundo.
-        await cargar();
+        // 🔴 NO SE RECARGA SOLO (4-sep-2026). El monto cambia el total de
+        // deducciones, el neto y el pie — así que el cuadro queda VIEJO y lo
+        // dice, con «Regenerar» al lado. Antes se recargaba entero acá: los
+        // números se movían solos debajo de quien estaba revisando, que es cómo
+        // se termina cerrando una quincena distinta de la que se miró.
+        setDesactualizada(true);
       } catch (e) {
         toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
       }
     },
-    [cargar, data, toast],
+    [data, toast],
   );
 
   // ── 🔴 APROBAR EL DESCUENTO DE PRÉSTAMO ────────────────────────────────────
@@ -320,17 +560,108 @@ export default function PlanillaTab() {
             "warning",
           );
         }
-        // Se recarga entero: el monto cambia el total de deducciones, el neto y
-        // los totales del pie.
-        await cargar();
+        // 🔴 Mismo criterio que los montos a mano: aprobar mueve la plata, así
+        // que el cuadro queda VIEJO y se dice. No se recalcula por debajo.
+        setDesactualizada(true);
+        toast("Listo. Toca «Regenerar» para ver el cuadro con este cambio.", "success");
       } catch (e) {
         toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
       } finally {
         setAprobandoPrestamo(false);
       }
     },
-    [cargar, data, toast],
+    [data, toast],
   );
+
+  // ── 🔴 CERRAR LA QUINCENA ──────────────────────────────────────────────────
+  //
+  // Se manda EMPRESA Y FECHAS, y nada más. Ni un monto: la ruta vuelve a pedirle
+  // el cuadro al mismo handler que pinta esta pantalla y congela ESO. Mandar los
+  // números desde acá convertiría a cualquiera con el módulo en alguien que
+  // puede escribir el sueldo que quiera en el registro de lo que se pagó.
+  //
+  // Los tres «no» que puede contestar son distintos y se muestran distinto:
+  //   · 503 → falta correr la migración. NO es un error: es ámbar y con el
+  //           nombre del archivo. Todo lo demás de la pantalla sigue andando.
+  //   · 409 con `frenos` → horas extra o préstamos sin aprobar. Rojo, con el
+  //           texto que ya nombra la pestaña a la que hay que ir.
+  //   · 409 con `solapadas` → hay una cerrada que pisa estas fechas. Rojo, y
+  //           NOMBRA cuál, con un botón para ir a verla.
+  const cerrarQuincena = useCallback(async () => {
+    if (!pedido) return;
+    setTrabajandoCierre(true);
+    try {
+      const res = await fetch("/api/asistencia/planilla-guardada", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empresa: pedido.empresa, desde: pedido.desde, hasta: pedido.hasta }),
+      });
+      const j = await res.json();
+      setModal(null);
+      if (res.status === 503) {
+        setCierre((c) => ({
+          cerrada: c?.cerrada ?? null, solapadas: c?.solapadas ?? [],
+          aviso: typeof j.aviso === "string" ? j.aviso : "Falta preparar la base de datos.",
+        }));
+        toast("Todavía no se puede cerrar: falta preparar la base. Lee el aviso de arriba.", "warning");
+        return;
+      }
+      if (res.status === 409) {
+        if (Array.isArray(j.frenos) && j.frenos.length > 0) setFrenos(j.frenos as FrenoCierre[]);
+        if (Array.isArray(j.solapadas) && j.solapadas.length > 0) {
+          setCierre((c) => ({
+            cerrada: c?.cerrada ?? null,
+            solapadas: j.solapadas as CabeceraGuardada[], aviso: c?.aviso ?? null,
+          }));
+        }
+        // El texto largo va al cartel, no al toast: son tres renglones con
+        // nombres adentro y un toast se va antes de que se terminen de leer.
+        toast("No se pudo cerrar la quincena. Lee el aviso de arriba.", "error");
+        return;
+      }
+      if (!res.ok || j.ok === false) throw new Error(j.error ?? "No se pudo cerrar la quincena");
+      toast("Listo — la quincena quedó cerrada. Los números quedaron congelados.", "success");
+      await pedirCierre(pedido);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo cerrar la quincena", "error");
+    } finally {
+      setTrabajandoCierre(false);
+    }
+  }, [pedido, pedirCierre, toast]);
+
+  // ── 🔴 REABRIR — con MOTIVO obligatorio ────────────────────────────────────
+  //
+  // No borra nada: la versión que se cerró queda entera, con sus montos y su
+  // firma, y el próximo cierre nace como versión 2. El motivo es lo único que
+  // permite reconstruir dentro de un mes por qué los números cambiaron.
+  const reabrir = useCallback(async (motivo: string) => {
+    if (!cerrada || !pedido) return;
+    setTrabajandoCierre(true);
+    try {
+      const res = await fetch("/api/asistencia/planilla-guardada", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: cerrada.id, motivo }),
+      });
+      const j = await res.json();
+      if (!res.ok || j.ok === false) throw new Error(j.error ?? "No se pudo reabrir");
+      setModal(null);
+      toast("Listo — la quincena quedó abierta otra vez. Lo que se cerró se guardó igual.", "success");
+      await pedirCierre(pedido);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo reabrir", "error");
+    } finally {
+      setTrabajandoCierre(false);
+    }
+  }, [cerrada, pedido, pedirCierre, toast]);
+
+  /** Ir a mirar una quincena cerrada que pisa estas fechas: se genera ESA. */
+  const irACerrada = useCallback((c: CabeceraGuardada) => {
+    setDesde(c.desde);
+    setHasta(c.hasta);
+    setElegido(true);
+    setPedido({ desde: c.desde, hasta: c.hasta, empresa: c.empresa });
+  }, []);
 
   const exportables = useMemo(() => {
     if (!data) return null;
@@ -397,7 +728,7 @@ export default function PlanillaTab() {
   // Con la lista partida acá a mano, la pantalla y el papel podían discrepar
   // sobre en qué cajón cae una persona.
   //
-  // 🩸 «Falta un dato» y «Decidilo vos» eran UNA SOLA bolsa ámbar, y por eso
+  // 🩸 «Falta un dato» y «Tú decides» eran UNA SOLA bolsa ámbar, y por eso
   // RODRIGO MIRANDA (trabajo fuera de la oficina) y ELOYN MENDOZA (vacaciones)
   // salían pidiendo que los arreglaran en Configuración, donde no hay nada que
   // arreglarles. Ámbar dice "arreglame"; esto es una decisión, y va en gris.
@@ -406,22 +737,47 @@ export default function PlanillaTab() {
   const decidir = data?.lineas.filter((l) => grupoDeLinea(l) === "decidir") ?? [];
   const pendientes = data?.lineas.filter((l) => grupoDeLinea(l) === "falta") ?? [];
 
+  /**
+   * 🔴 UN SOLO BOTÓN, y cambia de nombre según lo que va a hacer: «Generar» la
+   * primera vez y cuando lo elegido no es lo que está en pantalla; «Regenerar»
+   * cuando es el mismo cuadro. Va en el pie del calendario mientras está a la
+   * vista y al lado de la píldora cuando se plegó — el MISMO elemento, no dos:
+   * dos botones que hacen lo mismo en la misma pantalla es cómo se toca el que
+   * no era.
+   */
+  const botonGenerar = (
+    <button
+      type="button"
+      onClick={generar}
+      disabled={!elegido || cargando}
+      className={`min-h-[44px] rounded-md px-4 text-sm font-medium transition active:scale-[0.97] disabled:opacity-40 ${
+        data && !vieja
+          ? "border border-gray-300 text-gray-700 hover:border-black hover:text-black"
+          : "bg-black text-white"
+      }`}
+    >
+      {cargando ? "Generando…" : data && coincide ? "Regenerar" : "Generar"}
+    </button>
+  );
+
   return (
     <div className="space-y-4">
-      {/* ── Filtros ── */}
+      {/* ── Elegir qué se va a pagar ── */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">Período</span>
-          {/* 🔴 UN SOLO MODO: el rango. Sin control segmentado que elegir —
-              con una sola opción, el segmentado no es una elección: es un
-              botón que no hace nada. Y NO arranca cargada: ver la nota de «la
-              planilla abre vacía» más arriba. */}
-          <RangoFechas
-            desde={desde} hasta={hasta} label={null}
-            vacio={!elegido}
-            onChange={(d, h) => { setDesde(d); setHasta(h); setElegido(true); }}
-          />
-        </div>
+        {/* 🔴 LA PÍLDORA, solo cuando el calendario está plegado. Tocarla vuelve
+            a abrirlo (el desplegable de siempre), sin quitarle el ancho a la
+            tabla de 18 columnas que quedó abajo. */}
+        {!calendarioAbierto && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500">Período</span>
+            <RangoFechas
+              desde={desde} hasta={hasta} label={null}
+              vacio={!elegido}
+              sugerido={diaSugerido}
+              onChange={(d, h) => { setDesde(d); setHasta(h); setElegido(true); }}
+            />
+          </div>
+        )}
 
         <label className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">Empresa</span>
@@ -435,6 +791,9 @@ export default function PlanillaTab() {
             ))}
           </select>
         </label>
+
+        {/* Plegado, el botón va acá; abierto, va en el pie del calendario. */}
+        {!calendarioAbierto && botonGenerar}
 
         <div className="flex gap-2">
           <button
@@ -451,6 +810,175 @@ export default function PlanillaTab() {
           </button>
         </div>
       </div>
+
+      {/* 🔴 DÓNDE CONVIENE EMPEZAR. La quincena pasada terminó un día, y la que
+          sigue empieza al otro: decirlo evita las dos formas de equivocarse —
+          dejar días sin pagar, o pisar una quincena que ya se pagó (que el
+          servidor rechaza al cerrar). Se dice y se marca; no se elige solo. */}
+      {sugerido && !pedido && (
+        <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
+          La última quincena cerrada de <b>{etiquetaEmpresa(empresa)}</b> terminó el{" "}
+          <b>{fechaCorta(sugerido.ultimaHasta)}</b>, así que esta empieza el{" "}
+          <b>{fechaCorta(sugerido.inicio)}</b> — está marcado en el calendario. Puedes elegir otro
+          día si hace falta.
+        </p>
+      )}
+
+      {/* ── 🔴 EL CALENDARIO, A LA VISTA HASTA QUE SE GENERA ──────────────────
+          Dos meses en escritorio, uno con scroll en el teléfono, y abajo el
+          resumen con el botón. Es el primer paso de la pantalla: esconderlo
+          detrás de un desplegable es lo que Daniel encontró mal. */}
+      {calendarioAbierto && (
+        <RangoFechas
+          desde={desde} hasta={hasta} label={null} inline accion={botonGenerar}
+          vacio={!elegido}
+          sugerido={diaSugerido}
+          onChange={(d, h) => { setDesde(d); setHasta(h); setElegido(true); }}
+        />
+      )}
+
+      {/* ═══ EL ESTADO DE ESTA QUINCENA ═════════════════════════════════════ */}
+
+      {/* ⚠️ FALTA CORRER LA MIGRACIÓN. No es un error y no rompe nada: la
+          planilla se calcula, se revisa y se imprime igual — lo único que no
+          hay todavía es dónde registrar el cierre. Por eso va en ÁMBAR y con el
+          nombre del archivo, que es lo que hay que correr. */}
+      {faltaMigracionCierre && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          {faltaMigracionCierre}
+        </p>
+      )}
+
+      {/* 🔴 EL CUADRO QUEDÓ VIEJO. Pasa por dos motivos y se dicen los dos: o
+          alguien cambió lo elegido arriba, o tocó algo que mueve la plata. En
+          ninguno de los dos se recalcula solo: el número se mueve cuando la
+          persona lo pide. */}
+      {vieja && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
+          <p className="text-sm font-medium text-amber-900">
+            Los números que ves son de antes
+          </p>
+          <p className="mt-0.5 text-[13px] text-amber-900">
+            {!coincide
+              ? "Cambiaste el período o la empresa, así que este cuadro ya no es el de lo que está elegido arriba."
+              : "Cambiaste algo que mueve la plata (un monto a mano, un préstamo aprobado) y el cuadro no se rehace solo."}
+            {" "}Toca <b>{data && coincide ? "Regenerar" : "Generar"}</b> para verlo con ese cambio.
+          </p>
+        </div>
+      )}
+
+      {/* 🔴 YA ESTÁ CERRADA. Dice quién y cuándo, y lo que quedó congelado. */}
+      {cerrada && (
+        <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-900">
+                Quincena cerrada{cerrada.version > 1 ? ` · versión ${cerrada.version}` : ""}
+              </p>
+              <p className="mt-0.5 text-[13px] text-gray-600">
+                La cerró <b>{cerrada.cerradaPor}</b> el {cuandoBonito(cerrada.cerradaEn)} —{" "}
+                {cerrada.personas} {cerrada.personas === 1 ? "persona" : "personas"}, neto{" "}
+                <b>${$(cerrada.totalNeto)}</b>. Esos números quedaron congelados: aunque después
+                alguien corrija una marcación, lo que se pagó no cambia.
+              </p>
+            </div>
+            {puedeCerrarla && (
+              <button
+                type="button"
+                onClick={() => setModal("reabrir")}
+                className="min-h-[44px] shrink-0 rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+              >
+                Reabrir
+              </button>
+            )}
+          </div>
+          {/* 🔴 LA DERIVA SE DENUNCIA. El cuadro de arriba se acaba de calcular
+              con los datos de HOY; el cerrado es de cuando se cerró. Si no dan
+              lo mismo, algo cambió después del pago y hay que saberlo — pero lo
+              que vale sigue siendo lo cerrado. */}
+          {!!data && Math.abs(data.totales.netoPagar - cerrada.totalNeto) > 0.005 && (
+            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] text-amber-900">
+              Ojo: el cuadro que ves ahora da <b>${$(data.totales.netoPagar)}</b> y lo que se cerró
+              fue <b>${$(cerrada.totalNeto)}</b>. Cambió algo después del cierre. Vale lo cerrado;
+              si hay que rehacerlo, hay que reabrir la quincena.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 🔴 SE PISA CON UNA CERRADA. Una persona no puede quedar pagada dos
+          veces por el mismo día: no se puede cerrar, y se NOMBRA cuál estorba
+          con un botón para ir a verla. */}
+      {!cerrada && solapadas.length > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+          <p className="text-[13px] text-red-800">{textoSolapamiento(solapadas)}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {solapadas.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => irACerrada(c)}
+                className="min-h-[44px] rounded-md border border-red-300 bg-white px-3 text-[13px] font-medium text-red-800 transition hover:border-red-500 active:scale-[0.97]"
+              >
+                Ver la del {c.etiqueta || etiquetaRangoGuardado(c)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 🔴 LOS FRENOS. No es un aviso: es un NO. Lo que quedó sin aprobar no se
+          paga, y una vez cerrada la quincena el aviso no le devuelve la plata a
+          nadie. El texto viene del servidor y ya nombra la pestaña. */}
+      {frenos.length > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+          <p className="text-sm font-medium text-red-900">No se puede cerrar la quincena todavía</p>
+          <ul className="mt-1 space-y-1.5">
+            {frenos.map((f) => (
+              <li key={f.tipo} className="text-[13px] text-red-800">
+                {f.texto}
+                {f.tipo === "horas-extra" && (
+                  <>
+                    {" "}
+                    <a
+                      href="/asistencia?tab=aprobaciones"
+                      className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
+                    >
+                      Ir a Aprobaciones
+                    </a>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 🔴 BORRADOR: todavía no se guardó nada. Va con el botón de cerrar al
+          lado, que es la única acción que hay que tomar acá. */}
+      {!!data && !vieja && !cerrada && !!data.lineas.length && (
+        <div className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-blue-900">Todavía no está cerrada</p>
+            <p className="mt-0.5 text-[13px] text-blue-900">
+              Esto es un borrador: se vuelve a calcular cada vez que lo generas y no queda
+              registrado en ningún lado. Al cerrar la quincena los números quedan congelados,
+              con tu nombre y la fecha.
+              {!puedeCerrarla && " La cierra contabilidad; aquí puedes generarla, revisarla e imprimirla."}
+            </p>
+          </div>
+          {puedeCerrarla && (
+            <button
+              type="button"
+              onClick={() => setModal("cerrar")}
+              disabled={!sePuedeCerrar}
+              className="min-h-[44px] shrink-0 rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
+            >
+              Cerrar quincena
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Avisos: todo lo que hay que saber ANTES de descontarle plata a nadie ── */}
       {/* 🔴 EL PERÍODO NO TERMINÓ. Va arriba de todo: los días que no pasaron
@@ -598,7 +1126,7 @@ export default function PlanillaTab() {
         <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
           <b>{data.avisos.fueraPorBaja}</b>{" "}
           {data.avisos.fueraPorBaja === 1 ? "persona no sale" : "personas no salen"} en esta
-          quincena: ya no trabajaban acá, o entraron después. Las quincenas en las que sí
+          quincena: ya no trabajaban aquí, o entraron después. Las quincenas en las que sí
           trabajaron siguen igual — se ven eligiendo esa quincena arriba.
         </p>
       )}
@@ -615,7 +1143,7 @@ export default function PlanillaTab() {
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           <b>{data.avisos.conSabado}</b>{" "}
           {data.avisos.conSabado === 1 ? "persona trabajó" : "personas trabajaron"} un sábado. El
-          cuadro no tiene columna para el sábado, así que esas horas <b>no se pagan acá</b>: las
+          cuadro no tiene columna para el sábado, así que esas horas <b>no se pagan aquí</b>: las
           ves en la hoja «Horas» del Excel.
         </p>
       )}
@@ -624,9 +1152,9 @@ export default function PlanillaTab() {
           un «no hay datos»: es que nadie eligió todavía qué quincena pagar. */}
       {!elegido && !cargando && (
         <div className="rounded-lg border border-dashed border-gray-200 px-4 py-12 text-center">
-          <p className="text-sm font-medium text-gray-700">Elegí el período que vas a pagar</p>
+          <p className="text-sm font-medium text-gray-700">Elige el período que vas a pagar</p>
           <p className="mt-1 text-[13px] text-gray-500">
-            La quincena se calcula con las fechas que elijas arriba.
+            Toca el primer día y el último en el calendario, y después <b>Generar</b>.
           </p>
         </div>
       )}
@@ -660,7 +1188,10 @@ export default function PlanillaTab() {
           <PrestamosPorDescontar
             items={data.prestamos}
             onAprobar={aprobarPrestamo}
-            trabajando={aprobandoPrestamo}
+            // 🔴 Con la quincena cerrada no se aprueba nada: el descuento ya
+            // está congelado y aprobarlo ahora no lo cambia. Para tocarlo hay
+            // que reabrir, que es una decisión con motivo y firma.
+            trabajando={aprobandoPrestamo || !!cerrada}
           />
 
           {/* ── ESCRITORIO: la tabla de 19 columnas ── */}
@@ -687,10 +1218,10 @@ export default function PlanillaTab() {
                   {buenas.map((l) => (
                     <Fila
                       key={l.codigo} l={l} onGuardar={guardar}
-                      // En un rango libre no hay dónde guardarlos (la tabla los
-                      // guarda por quincena): se muestran apagados, no se
-                      // esconden — su ausencia es parte de lo que hay que ver.
-                      manualesBloqueados={!!data.avisos.rangoLibre}
+                      // Apagados, no escondidos: su ausencia es parte de lo que
+                      // hay que ver. Y el motivo va escrito, porque son DOS y se
+                      // arreglan distinto — con otras fechas, o reabriendo.
+                      bloqueo={bloqueoManuales}
                     />
                   ))}
                   {/* Fuera de planilla a propósito: en GRIS, no en ámbar. El
@@ -780,7 +1311,7 @@ export default function PlanillaTab() {
                 abierta={abierta === l.codigo}
                 onToggle={() => setAbierta(abierta === l.codigo ? null : l.codigo)}
                 onGuardar={guardar}
-                manualesBloqueados={!!data.avisos.rangoLibre}
+                bloqueo={bloqueoManuales}
               />
             ))}
             {fueraDePlanilla.map((l) => (
@@ -839,16 +1370,19 @@ export default function PlanillaTab() {
             </p>
           )}
 
-          {/* 🔴 DOS listas con nombre propio, no una bolsa. «Decidilo vos» va en
-              GRIS y sin mandar a Configuración: ahí no hay nada que arreglar. */}
+          {/* 🔴 DOS listas con nombre propio, no una bolsa. «Tú decides» va en
+              GRIS y sin mandar a Configuración: ahí no hay nada que arreglar.
+              El rótulo se llamó «Decidilo vos» hasta el 1-sep-2026; se renombró
+              porque era voseo y este sistema habla tuteo neutro. Es el MISMO
+              grupo (`grupoDeLinea === "decidir"`), solo cambió cómo se lee. */}
           {!!decidir.length && (
             <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
-              <b>Decidilo vos:</b> {decidir.length}{" "}
+              <b>Tú decides:</b> {decidir.length}{" "}
               {decidir.length === 1 ? "persona quedó" : "personas quedaron"} fuera del total porque
               el sistema no puede saber cuánto le toca —está justificada, o entró o salió a mitad
               del período—. <b>No es un error y no hay nada que arreglar</b>: al lado de cada una
               está el motivo y lo que le daría la quincena completa. Para sacar lo suyo, usa{" "}
-              <b>Rango de fechas</b> acá arriba.
+              <b>Rango de fechas</b> aquí arriba.
             </p>
           )}
           {!!pendientes.length && (
@@ -865,17 +1399,164 @@ export default function PlanillaTab() {
       {/* La fórmula se aprende UNA vez y no cambia ninguna decisión al abrir la
           pantalla: va al ⓘ. Todo lo de arriba —los avisos de plata— se queda
           en pantalla. */}
+      {modal && data && (
+        <ModalCierre
+          modo={modal}
+          empresa={data.empresaEtiqueta ?? etiquetaEmpresa(empresa)}
+          rango={etiquetaRangoGuardado({ desde, hasta })}
+          totales={data.totales}
+          cerrada={cerrada}
+          trabajando={trabajandoCierre}
+          onConfirmar={(motivo) => { void (modal === "cerrar" ? cerrarQuincena() : reabrir(motivo)); }}
+          onCerrar={() => { if (!trabajandoCierre) setModal(null); }}
+        />
+      )}
+
       <div className="-ml-2">
         <Ayuda titulo="Cómo se calcula el neto" etiqueta="Cómo se calcula el neto">
           <p>{FORMULA_NETO}</p>
           <p className="mt-1.5">
             Los recargos, los porcentajes de seguro y la hora de corte se cambian en{" "}
             <b>Configuración</b>. El ISR, el préstamo, los terceros, la mercancía y los otros
-            servicios se escriben a mano acá: no salen de ningún sistema.
+            servicios se escriben a mano aquí: no salen de ningún sistema.
           </p>
         </Ayuda>
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA VENTANA DE CERRAR / REABRIR
+//
+// 🔴 CONFIRMAR SOLO LO IRREVERSIBLE, y cerrar una quincena lo es: firma un pago
+// y después hay que reabrir —con motivo y con nombre— para tocarlo. Generar no
+// pregunta nada: no escribe.
+//
+// 🔴 Y LA CONFIRMACIÓN DICE QUÉ SE VA A CERRAR, con números: empresa, fechas,
+// cuánta gente y el neto. Un «¿Estás seguro?» pelado no le da a nadie con qué
+// darse cuenta de que tiene la empresa equivocada elegida.
+//
+// Patrón de la casa para iOS: `createPortal` + `inset-0` + `useBodyScrollLock`,
+// y SIN `autoFocus` (en iPhone el teclado salta encima antes de que se lea).
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ModalCierre({
+  modo, empresa, rango, totales, cerrada, trabajando, onConfirmar, onCerrar,
+}: {
+  modo: "cerrar" | "reabrir";
+  empresa: string;
+  rango: string;
+  totales: TotalesPlanilla;
+  cerrada: CabeceraGuardada | null;
+  trabajando: boolean;
+  onConfirmar: (motivo: string) => void;
+  onCerrar: () => void;
+}) {
+  useBodyScrollLock(true);
+  const [motivo, setMotivo] = useState("");
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
+
+  const reabriendo = modo === "reabrir";
+  // 🔴 La MISMA regla que la ruta y que el CHECK de la base: en blanco no vale,
+  // y «   » tampoco. Tres capas, como el motivo de una corrección de marcación.
+  const listo = reabriendo ? motivoReaperturaValido(motivo) !== null : true;
+
+  if (!montado) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      onClick={onCerrar}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white sm:rounded-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <h2 className="text-base font-medium text-gray-900">
+              {reabriendo ? "Reabrir la quincena" : "Cerrar la quincena"}
+            </h2>
+            <p className="mt-0.5 text-[13px] text-gray-500">{empresa} · {rango}</p>
+          </div>
+          <button
+            type="button" onClick={onCerrar} aria-label="Cerrar"
+            className="-mr-2 -mt-1 min-h-[44px] min-w-[44px] text-2xl leading-none text-gray-400 transition hover:text-black"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          {reabriendo ? (
+            <>
+              <p className="text-[13px] text-gray-600">
+                {cerrada && (
+                  <>La cerró <b>{cerrada.cerradaPor}</b> el {cuandoBonito(cerrada.cerradaEn)}, con un
+                  neto de <b>${$(cerrada.totalNeto)}</b>. </>
+                )}
+                Reabrir <b>no borra nada</b>: ese cuadro se queda guardado con sus montos y su
+                firma, y si se vuelve a cerrar nace una versión nueva.
+              </p>
+              <label className="block">
+                <span className="text-[13px] font-medium text-gray-700">¿Por qué se reabre?</span>
+                <textarea
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  rows={3}
+                  placeholder="Faltó cargar la incapacidad de Briceida"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none transition focus:border-black sm:text-sm"
+                />
+                <span className="mt-1 block text-[12px] text-gray-500">
+                  Queda registrado con tu nombre. Es lo único que permite entender dentro de un mes
+                  por qué los números de esta quincena cambiaron.
+                </span>
+              </label>
+            </>
+          ) : (
+            <>
+              {/* Los cuatro números, en una línea: es lo que deja darse cuenta
+                  de que está elegida la empresa equivocada antes de firmar. */}
+              <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] tabular-nums text-gray-700">
+                Se congelan <b>{totales.personas} {totales.personas === 1 ? "persona" : "personas"}</b>,
+                con un <b>neto a pagar de ${$(totales.netoPagar)}</b> — bruto ${$(totales.totalBruto)},
+                deducciones ${$(totales.totalDeducciones)}.
+              </p>
+              <p className="text-[13px] text-gray-600">
+                Al cerrarla, <b>estos números quedan congelados</b>: aunque después alguien corrija
+                una marcación o cambie un horario, lo que se pagó no cambia. Queda guardado con tu
+                nombre y la fecha. Para corregirla hay que <b>reabrirla</b>, y reabrir pide un
+                motivo por escrito.
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
+          <button
+            type="button" onClick={onCerrar} disabled={trabajando}
+            className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
+          >
+            Mejor no
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirmar(motivo.trim())}
+            disabled={!listo || trabajando}
+            className="min-h-[44px] rounded-md bg-black px-4 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
+          >
+            {trabajando
+              ? "Un momento…"
+              : reabriendo ? "Reabrir la quincena" : "Cerrar quincena"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -999,7 +1680,7 @@ function PrestamosPorDescontar({
 
       <p className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
         Aprobar escribe el monto en la casilla <b>Préstamo</b> del cuadro, y la casilla se
-        puede corregir a mano después. El saldo lo lleva el módulo de <b>Préstamos</b>: acá no
+        puede corregir a mano después. El saldo lo lleva el módulo de <b>Préstamos</b>: aquí no
         se cambia.
       </p>
     </div>
@@ -1012,11 +1693,14 @@ type OnGuardar = (codigo: string, campo: keyof ManualesLinea, valor: string) => 
 
 /** Una celda de dinero que se escribe a mano. Guarda al salir del campo. */
 function CeldaManual({
-  codigo, campo, valor, onGuardar, ancho = "w-20", bloqueada,
+  codigo, campo, valor, onGuardar, ancho = "w-20", bloqueo,
 }: {
   codigo: string; campo: keyof ManualesLinea; valor: number; onGuardar: OnGuardar;
-  ancho?: string; bloqueada?: boolean;
+  ancho?: string;
+  /** 🔴 Por qué está apagada. `null` = se puede escribir. */
+  bloqueo?: Bloqueo;
 }) {
+  const bloqueada = !!bloqueo;
   // 🔑 Estado local mientras se escribe: si el valor viniera del padre en cada
   // tecla, el recargo de la fila pisaría lo que la persona está tecleando.
   const [texto, setTexto] = useState(valor ? String(valor) : "");
@@ -1025,9 +1709,9 @@ function CeldaManual({
   return (
     <input
       type="text" inputMode="decimal" value={bloqueada ? "" : texto}
-      placeholder={bloqueada ? "por quincena" : "—"}
+      placeholder={bloqueo ? bloqueo.placeholder : "—"}
       disabled={bloqueada}
-      title={bloqueada ? "Se escribe por quincena, no por rango de fechas" : undefined}
+      title={bloqueo ? bloqueo.title : undefined}
       onChange={(e) => setTexto(e.target.value)}
       onBlur={() => onGuardar(codigo, campo, texto)}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
@@ -1037,8 +1721,8 @@ function CeldaManual({
 }
 
 function Fila({
-  l, onGuardar, manualesBloqueados,
-}: { l: LineaPlanilla; onGuardar: OnGuardar; manualesBloqueados?: boolean }) {
+  l, onGuardar, bloqueo,
+}: { l: LineaPlanilla; onGuardar: OnGuardar; bloqueo?: Bloqueo }) {
   const d = l.dinero!;
   /** El monto sobre el que se calcularon los seguros, si no fue el bruto. */
   const sobreQueBase = baseSeguros(d.baseSeguros);
@@ -1067,7 +1751,7 @@ function Fila({
           <span
             className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500"
             title={`${l.empresaEtiqueta ?? l.parte.empresa} le paga ${$$(l.parte.salarioMensual)} al mes de un sueldo de ${$$(l.salarioMensual ?? 0)}.`
-              + (l.parte.llevaHorasExtra ? " Las horas extra se pagan acá." : " Las horas extra se pagan en la otra empresa.")}
+              + (l.parte.llevaHorasExtra ? " Las horas extra se pagan aquí." : " Las horas extra se pagan en la otra empresa.")}
           >
             {CHIP_REPARTIDO}
           </span>
@@ -1117,13 +1801,13 @@ function Fila({
       {MANUALES.slice(0, 4).map(([campo]) => (
         <td key={campo} className="px-1 py-1.5 text-right">
           <CeldaManual codigo={l.codigo} campo={campo} valor={l.manuales[campo]}
-            onGuardar={onGuardar} bloqueada={manualesBloqueados} />
+            onGuardar={onGuardar} bloqueo={bloqueo} />
         </td>
       ))}
       {num(d.totalDeducciones)}
       <td className="px-1 py-1.5 text-right">
         <CeldaManual codigo={l.codigo} campo="otrosServicios" valor={l.manuales.otrosServicios}
-          onGuardar={onGuardar} bloqueada={manualesBloqueados} />
+          onGuardar={onGuardar} bloqueo={bloqueo} />
       </td>
       {num(d.netoPagar, "font-semibold text-gray-900")}
     </tr>
@@ -1131,10 +1815,10 @@ function Fila({
 }
 
 function Tarjeta({
-  l, abierta, onToggle, onGuardar, manualesBloqueados,
+  l, abierta, onToggle, onGuardar, bloqueo,
 }: {
   l: LineaPlanilla; abierta: boolean; onToggle: () => void; onGuardar: OnGuardar;
-  manualesBloqueados?: boolean;
+  bloqueo?: Bloqueo;
 }) {
   const d = l.dinero!;
   const h = l.horas;
@@ -1227,7 +1911,7 @@ function Tarjeta({
                 </span>
                 <CeldaManual
                   codigo={l.codigo} campo={campo} valor={l.manuales[campo]}
-                  onGuardar={onGuardar} ancho="w-full" bloqueada={manualesBloqueados}
+                  onGuardar={onGuardar} ancho="w-full" bloqueo={bloqueo}
                 />
               </label>
             ))}
@@ -1288,7 +1972,7 @@ function Tarjeta({
           {h.sabadoMin > 0 && (
             <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">
               Trabajó <b>{aHoras(h.sabadoMin)} h</b> un sábado. No hay columna para el sábado en el
-              cuadro, así que esas horas no se pagan acá.
+              cuadro, así que esas horas no se pagan aquí.
             </p>
           )}
         </div>

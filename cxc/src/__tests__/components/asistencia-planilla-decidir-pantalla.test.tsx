@@ -10,7 +10,7 @@
  *
  * Lo que se sostiene:
  *   1. el aviso del período sin terminar se ve ARRIBA, sin abrir nada;
- *   2. RODRIGO y ELOYN salen en «Decidilo vos», con el motivo y el quincenal
+ *   2. RODRIGO y ELOYN salen en «Tú decides», con el motivo y el quincenal
  *      que les correspondería, y NO se les manda a Configuración;
  *   3. quien de verdad tiene un dato faltante SIGUE en ámbar y SIGUE mandando
  *      a Configuración — partir la bolsa no puede tapar los pendientes reales;
@@ -46,13 +46,20 @@ import PlanillaTab from "@/app/asistencia/PlanillaTab";
 // sobre el componente real en `rango-fechas-calendario.test.tsx`.
 vi.mock("@/components/ui/RangoFechas", () => ({
   __esModule: true,
-  default: ({ desde, hasta, vacio, onChange }: {
+  // 🔴 `accion` se DIBUJA: el control real, en modo `inline`, pone en su pie el
+  // botón que le pasan —el «Generar» de la planilla—. Un doble que lo tirara
+  // dejaría la pantalla sin forma de pedir el cuadro.
+  default: ({ desde, hasta, vacio, onChange, accion }: {
     desde: string; hasta: string; vacio?: boolean;
     onChange: (d: string, h: string) => void;
+    accion?: React.ReactNode;
   }) => (
-    <button type="button" onClick={() => onChange(desde, hasta)}>
-      {vacio ? "Elegí el período" : `${desde} – ${hasta}`}
-    </button>
+    <div>
+      <button type="button" onClick={() => onChange(desde, hasta)}>
+        {vacio ? "Elige el período" : `${desde} – ${hasta}`}
+      </button>
+      {accion}
+    </div>
   ),
 }));
 
@@ -136,7 +143,10 @@ const montar = () => render(<ToastProvider><PlanillaTab /></ToastProvider>);
 // las vistas `lg:hidden` y `hidden lg:block` se montan LAS DOS y `getByRole`
 // revienta con «Found multiple elements».
 function elegirPeriodo() {
-  fireEvent.click(screen.getAllByRole("button", { name: /Elegí el período/ })[0]);
+  fireEvent.click(screen.getAllByRole("button", { name: /Elige el período/ })[0]);
+  // 🔴 Y GENERAR (4-sep-2026): elegir el período ya no pide el cuadro solo. El
+  // flujo que aprobó Daniel es elegir → Generar → revisar → Cerrar.
+  fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
 }
 
 beforeEach(() => vi.unstubAllGlobals());
@@ -165,7 +175,8 @@ describe("🔴 arreglo 1 · el aviso del período sin terminar se ve arriba", ()
   });
 });
 
-describe("🔴 arreglo 2 y 3 · «Decidilo vos» es su propio grupo, en gris", () => {
+// El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
+describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", () => {
   it("RODRIGO sale con su motivo escrito y con el quincenal que le tocaría", async () => {
     servir(respuesta());
     montar();
@@ -189,12 +200,12 @@ describe("🔴 arreglo 2 y 3 · «Decidilo vos» es su propio grupo, en gris", (
     expect(fila.textContent).not.toContain("133");
   });
 
-  it("🔴 a los de «Decidilo vos» NO se les manda a Configuración", async () => {
+  it("🔴 a los de «Tú decides» NO se les manda a Configuración", async () => {
     servir(respuesta());
     montar();
     elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
-    const resumen = screen.getByText(/Decidilo vos:/).parentElement!;
+    const resumen = screen.getByText(/Tú decides:/).parentElement!;
     expect(resumen.textContent).toContain("no hay nada que arreglar");
     expect(resumen.textContent).not.toContain("Configuración");
     // El camino para pagarles sí se dice: el rango de fechas, que ya existe.
@@ -227,7 +238,7 @@ describe("🔴 arreglo 2 y 3 · «Decidilo vos» es su propio grupo, en gris", (
     montar();
     elegirPeriodo();
     await screen.findAllByText(/ALEJANDRA CAMAÑO/);
-    expect(screen.getByText(/Decidilo vos:/)).toBeTruthy();
+    expect(screen.getByText(/Tú decides:/)).toBeTruthy();
     expect(screen.getByText(/Falta un dato:/)).toBeTruthy();
   });
 });

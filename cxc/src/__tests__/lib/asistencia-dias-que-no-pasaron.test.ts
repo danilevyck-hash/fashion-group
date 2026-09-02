@@ -340,7 +340,8 @@ describe("🔴 arreglo 2 · el sistema se abstiene cuando no puede saber", () =>
 // ARREGLO 3 — LA BOLSA ÁMBAR SE PARTE EN DOS, Y EL SIN FICHA VA UNA SOLA VEZ
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("🔴 arreglo 3 · «falta un dato» y «decidilo vos» son dos cosas distintas", () => {
+// El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
+describe("🔴 arreglo 3 · «falta un dato» y «Tú decides» son dos cosas distintas", () => {
   it("🩸 RODRIGO (trabajo fuera) sale del cajón ámbar y con su motivo al lado", () => {
     const rodrigo = ficha({ codigo: "13", nombre: "RODRIGO MIRANDA", salarioMensual: 800, empresa: "vistana" });
     const texto = textoJustificacion("Trabajo fuera de la oficina", "2026-08-01", "2026-08-13");
@@ -450,7 +451,7 @@ describe("🔴 arreglo 3 · el código sin ficha se muestra UNA vez, no una por 
 // EL ORDEN DEL CUADRO
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("el orden del cuadro: pagadas, fuera de planilla, decidilo vos, falta un dato", () => {
+describe("el orden del cuadro: pagadas, fuera de planilla, tú decides, falta un dato", () => {
   it("los cuatro grupos salen en ese orden", () => {
     const marcaciones = HABILES.filter((d) => d < HOY).flatMap((d) => diaCompleto("22", d));
     const p = planilla({

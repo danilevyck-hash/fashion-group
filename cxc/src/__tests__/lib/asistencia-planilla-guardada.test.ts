@@ -115,7 +115,8 @@ describe("🔴 se congela TODO: las 24 cifras de dinero y las 20 del reloj", () 
 
   it("🔴 sin pago, el bloque de dinero va en NULL — nunca en 0", () => {
     // Un 0 dice «se le pagó cero»; `null` dice «el sistema se abstuvo». Es la
-    // diferencia entre servicio profesional / «decidilo vos» y una planilla real.
+    // El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
+    // diferencia entre servicio profesional / «Tú decides» y una planilla real.
     const f = filaDeLinea("p1", "vistana", linea({
       dinero: null, fueraDePlanilla: true, decidirAMano: null,
     }));

@@ -9,7 +9,7 @@
 //   · Y lo que este PR vino a cambiar, leído del DOM real:
 //       – el aviso «Esta quincena todavía no termina…» arriba del cuadro;
 //       – el aviso del código sin ficha, UNA sola vez;
-//       – las filas de «Decidilo vos» con su motivo y su quincenal;
+//       – las filas de «Tú decides» con su motivo y su quincenal;
 //       – que a esas filas NO se les diga «falta configurar».
 //
 // 🔑 El ancho que decide es el ÚTIL: la barra lateral se lleva 224 px, así que
@@ -97,7 +97,7 @@ const LEER_CAMBIOS = new Function(`
     avisoSinFicha: cuenta(/no tiene ficha \\(código/g),
     // 🔴 Adentro del cuadro NO puede quedar ninguna fila «sin ficha».
     filaSinFichaEnElCuadro: cuenta(/sin ficha en Configuración/g),
-    grupoDecidir: /Decidilo vos:/.test(txt),
+    grupoDecidir: /Tú decides:/.test(txt),
     grupoFalta: /Falta un dato:/.test(txt),
     motivosDecidir: cuenta(/(entró el \\d|salió el \\d|Vacaciones del |Trabajo fuera de la oficina del )/g),
     quincenaCompleta: cuenta(/la quincena completa le daría/g),
@@ -144,7 +144,7 @@ for (const [ancho, p] of Object.entries(resultados)) {
     if (!r.avisoPeriodoAbierto) problemas.push(`${q}: falta el aviso del período sin terminar`);
     if (r.avisoSinFicha !== 1) problemas.push(`${q}: el aviso del código sin ficha aparece ${r.avisoSinFicha} veces (tiene que ser 1)`);
     if (r.filaSinFichaEnElCuadro) problemas.push(`${q}: quedó una fila «sin ficha» DENTRO del cuadro`);
-    if (!r.grupoDecidir) problemas.push(`${q}: falta el grupo «Decidilo vos»`);
+    if (!r.grupoDecidir) problemas.push(`${q}: falta el grupo «Tú decides»`);
     if (!r.motivosDecidir) problemas.push(`${q}: ninguna fila trae el motivo escrito`);
     if (r.arrastre > 0) problemas.push(`${q}: ${r.arrastre} px de arrastre`);
     if (r.tactiles.length) problemas.push(`${q}: ${r.tactiles.length} blanco(s) táctil(es) bajo 44 px`);

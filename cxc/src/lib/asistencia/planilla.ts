@@ -1163,7 +1163,7 @@ export interface LineaPlanilla {
    *
    * `null` si esa persona no hizo horas extra en el período.
    * `monto` es `null` cuando no se le pudo calcular pago (falta ficha, servicio
-   * profesional, decidilo vos): los minutos igual se dicen.
+   * profesional, tú decides): los minutos igual se dicen.
    */
   extraMedido: { minutos: number; diurnoMin: number; nocturnoMin: number; monto: number | null } | null;
   /**
@@ -1811,7 +1811,7 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
     // hay NI UNA marca en todo el período.
     // 🔴 A QUIEN NO MARCA NO SE LE BUSCA JUSTIFICACIÓN. Que no haya marcas no
     // es un hecho a explicar: es su forma de trabajar. Preguntarle a
-    // `justificados` lo mandaría a «Decidilo vos» —con un texto de vacaciones
+    // `justificados` lo mandaría a «Tú decides» —con un texto de vacaciones
     // que además sería falso— justo el caso que esta bandera existe para sacar
     // de ahí. La de vigencia SÍ sigue mandando: entrar o salir a mitad del
     // período es otra cosa, no tiene nada que ver con el reloj.
@@ -1981,7 +1981,7 @@ export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
  *
  * 🔑 Cuatro cajones y no dos, y la diferencia entre los dos últimos es de la que
  * se queja la contadora: «falta un dato» es algo que ELLA tiene que arreglar en
- * Configuración; «decidilo vos» es algo que el sistema no puede saber y que
+ * Configuración; «Tú decides» es algo que el sistema no puede saber y que
  * decide una persona. Mezclarlos manda a buscar un arreglo que no existe.
  *
  * ⚠️ Si a alguien le falta un dato Y además hay que decidirlo, gana «falta»: sin

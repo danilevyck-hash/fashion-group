@@ -188,7 +188,7 @@ export interface JustificacionParaMotivo {
  * Código → por qué esa persona no tiene marcas, ya escrito.
  *
  * Es lo que `armarPlanilla` recibe como `justificados`, y lo que hace que quien
- * está justificado o de vacaciones caiga en **«Decidilo vos»** (gris, con el
+ * está justificado o de vacaciones caiga en **«Tú decides»** (gris, con el
  * motivo al lado) y no en **«Falta un dato»** (ámbar, con el botón a
  * Configuración). La diferencia no es cosmética: ámbar dice *«arreglame»*, y
  * ahí no hay nada que arreglar.
