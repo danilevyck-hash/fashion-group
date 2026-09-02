@@ -7,11 +7,25 @@
 // El cuadro decía «ITBMS (7%)» y el monto estaba calculado al 7.7%. En $1.000
 // el PDF que recibe el proveedor imprimía:  ITBMS (7%)  $77.00
 // El proveedor saca 7% de $1.000 = $70 y reclama los $7 de diferencia por cada
-// $1.000. 🔴 EL MONTO ESTÁ BIEN y NO SE TOCA (TASA_ITBMS = 0.077 es decisión de
-// negocio, documentada y con test propio en reclamos-tax.test.ts); lo único que
-// mentía era el rótulo. Ahora el rótulo se DERIVA de la misma constante que
-// hace la cuenta (itbmsLabel → reclamoTaxes().itbmsRate → TASA_ITBMS), así que
-// no puede volver a separarse del monto.
+// $1.000. 🔴 EL MONTO ESTÁ BIEN y NO SE TOCA; lo único que mentía era el
+// rótulo. Por eso el rótulo se DERIVA de la misma constante que hace la cuenta
+// (itbmsLabel → reclamoTaxes().itbmsRate → TASA_ITBMS) y no puede volver a
+// separarse del monto.
+//
+// 🩸 CAMBIO DE DIRECCIÓN (1-sep-2026) — este archivo esperaba «ITBMS 7.7%».
+// El primer arreglo ató el rótulo a la constante, pero la constante valía
+// 0.077 y el papel terminaba anunciando una tasa que en Panamá no existe. La
+// forma verdadera es 7% sobre el subtotal CON la importación adentro:
+// 1,10 × 0,07 = 0,077, EXACTAMENTE la misma plata. Se cambió la CUENTA, no el
+// monto, y el rótulo pasó solo de «7.7%» a «7%» porque sigue derivándose de la
+// tasa. Medido contra producción antes de tocarlo (47 reclamos vivos, 46 con
+// ITBMS, 142 renglones, 42 subtotales distintos): cero centavos de diferencia.
+// Los expects de abajo dicen «7%» donde decían «7.7%», y el barrido que
+// prohibía el rótulo viejo ahora prohíbe el 7.7%.
+//
+// 🔴 LO QUE SIGUE PROHIBIDO ES LO MISMO: escribir el porcentaje a mano. Que
+// hoy la constante y el texto coincidan en «7%» no autoriza a separarlos: si
+// se vuelven a escribir aparte, el próximo cambio de tasa reabre el bug.
 //
 // Eran CINCO lugares, no tres: ReclamoDetail, ReclamoForm, el PDF por
 // proveedor, el Excel por reclamo y el encabezado del CSV global.
@@ -67,6 +81,14 @@ import { buildReclamoSheet } from "@/lib/excel-reclamo";
 import EmpresaSelector from "@/app/reclamos/components/EmpresaSelector";
 
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-reclamos"; });
+
+// `pdftotext` (poppler) no viene con el repo ni con node_modules: en una
+// máquina sin él estos casos fallaban por la herramienta que falta, no por el
+// código, y un rojo permanente que nadie puede arreglar deja de avisar. Se
+// SALTAN limpio cuando no está — en CI, donde sí está, siguen corriendo.
+const HAY_PDFTOTEXT = (() => {
+  try { execFileSync("pdftotext", ["-v"], { stdio: "ignore" }); return true; } catch { return false; }
+})();
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 /** Un reclamo de $1.000 exactos: el ejemplo del bug (ITBMS = $77.00). */
@@ -99,22 +121,31 @@ describe("BUG 1 · el rótulo del ITBMS sale de la MISMA constante que el monto"
   });
 
   it("itbmsLabel/impLabel se derivan de reclamoTaxes, no de un texto a mano", () => {
-    expect(itbmsLabel("Fashion Wear")).toBe("7.7%");
+    // Decía "7.7%" mientras la cuenta era sub × 0.077. Hoy la cuenta es 7%
+    // sobre (sub + importación) — misma plata — y el rótulo la sigue.
+    expect(itbmsLabel("Fashion Wear")).toBe("7%");
     expect(itbmsLabel("Fashion Wear")).toBe(pctLabel(reclamoTaxes("Fashion Wear", 0).itbmsRate));
     expect(itbmsLabel("Fashion Wear")).toBe(pctLabel(TASA_ITBMS));
     expect(impLabel("Fashion Wear")).toBe("10%");
     expect(impLabel("Active Shoes")).toBe("15%");
   });
 
-  it("🩸 el rótulo NUNCA puede decir 7% mientras la cuenta use 7.7%", () => {
-    // Este es el bug entero en una línea: el número del rótulo, leído como
-    // porcentaje, tiene que reproducir el monto que se imprime al lado.
+  it("🩸 el rótulo, leído como porcentaje, reproduce el monto que se imprime al lado", () => {
+    // Este es el bug entero en una línea. Antes el rótulo se aplicaba al
+    // SUBTOTAL: decía 7% y al lado imprimía $77 sobre $1.000, que es 7.7%.
+    // Hoy la tasa es la de verdad (7%) y su base es el subtotal CON la
+    // importación adentro — los dos números están en el mismo papel, así que
+    // el proveedor puede rehacer la cuenta sin adivinar nada.
     const tx = reclamoTaxes("Fashion Wear", 1000);
-    const delRotulo = 1000 * (parseFloat(itbmsLabel("Fashion Wear")) / 100);
+    const base = 1000 + tx.importacion;                       // $1.100, impreso arriba
+    const delRotulo = base * (parseFloat(itbmsLabel("Fashion Wear")) / 100);
     expect(tx.itbms).toBeCloseTo(77, 6);
     expect(delRotulo).toBeCloseTo(tx.itbms, 6);
+    // 🔴 Y no puede volver a ser un porcentaje del subtotal pelado.
+    expect(1000 * (parseFloat(itbmsLabel("Fashion Wear")) / 100)).not.toBeCloseTo(tx.itbms, 2);
   });
 
+  // El monto es el mismo de siempre, con las dos formas de escribir la cuenta.
   it("el MONTO no se movió: $1.000 → imp $100 + ITBMS $77.00 = $1,177.00", () => {
     const tx = reclamoTaxes("Fashion Wear", 1000);
     expect(tx.importacion).toBeCloseTo(100, 6);
@@ -123,8 +154,8 @@ describe("BUG 1 · el rótulo del ITBMS sale de la MISMA constante que el monto"
   });
 });
 
-describe("BUG 1 · EL PAPEL: el PDF que recibe el proveedor, generado y leído", () => {
-  it("dice «ITBMS 7.7%» junto a los $77.00 — y ya no dice «ITBMS 7%»", async () => {
+describe.skipIf(!HAY_PDFTOTEXT)("BUG 1 · EL PAPEL: el PDF que recibe el proveedor, generado y leído", () => {
+  it("dice «ITBMS 7%» junto a los $77.00 — y ya no dice «ITBMS 7.7%»", async () => {
     const doc = await buildBulkReclamosPdf([RECLAMO_MIL as never], "Fashion Wear");
     const dir = mkdtempSync(path.join(tmpdir(), "reclamos-pdf-"));
     const pdfPath = path.join(dir, "reclamo.pdf");
@@ -135,24 +166,26 @@ describe("BUG 1 · EL PAPEL: el PDF que recibe el proveedor, generado y leído",
     const texto = readFileSync(path.join(dir, "reclamo.txt"), "utf8");
 
     // Lo que el proveedor lee, palabra por palabra (los cuadros van en versal).
-    expect(texto).toContain("ITBMS 7.7%");
+    expect(texto).toContain("ITBMS 7%");
     expect(texto).toContain("$77.00");
     expect(texto).toContain("IMPORTACIÓN 10%");
     expect(texto).toContain("$1,177.00");
 
-    // 🔴 el rótulo viejo NO puede sobrevivir en ninguna parte del papel.
-    expect(texto).not.toMatch(/ITBMS\s*\(?7%/i);
+    // 🔴 el rótulo viejo NO puede sobrevivir en ninguna parte del papel. Antes
+    // el prohibido era «7%» (que mentía sobre un monto al 7.7%); ahora el
+    // prohibido es «7.7%», la tasa que en Panamá no existe.
+    expect(texto).not.toMatch(/ITBMS\s*\(?7[.,]7\s*%/i);
 
     // Y el rótulo tiene que quedar SOBRE su propio monto: los cuadros ponen el
     // título en un renglón y la plata en el de abajo, así que un "7.7%" que
     // caiga encima de OTRA columna vuelve a mentir igual. Se compara la
     // posición de la columna en el texto con -layout (mismo cuadro = misma x).
     const lineas = texto.split("\n");
-    const iRotulo = lineas.findIndex((l) => l.includes("ITBMS 7.7%"));
+    const iRotulo = lineas.findIndex((l) => l.includes("ITBMS 7%"));
     expect(iRotulo).toBeGreaterThan(-1);
     const iMonto = lineas.findIndex((l, i) => i > iRotulo && l.includes("$77.00"));
     expect(iMonto).toBeGreaterThan(-1);
-    const xRotulo = lineas[iRotulo].indexOf("ITBMS 7.7%");
+    const xRotulo = lineas[iRotulo].indexOf("ITBMS 7%");
     const xMonto = lineas[iMonto].indexOf("$77.00");
     expect(Math.abs(xRotulo - xMonto)).toBeLessThanOrEqual(12);
   });
@@ -184,12 +217,13 @@ describe("BUG 1 · EL EXCEL por reclamo, armado y leído celda por celda", () =>
     return leido.Sheets["R"];
   }
 
-  it("la etiqueta dice «ITBMS (7.7%):» y la celda de al lado vale 77", () => {
+  it("la etiqueta dice «ITBMS (7%):» y la celda de al lado vale 77", () => {
     const ws = celdas("Fashion Wear", 1000);
     const todas = Object.keys(ws).filter((k) => !k.startsWith("!"));
     const etiqueta = todas.find((k) => typeof ws[k].v === "string" && String(ws[k].v).includes("ITBMS"));
     expect(etiqueta).toBeDefined();
-    expect(String(ws[etiqueta!].v)).toBe("ITBMS (7.7%):");
+    // Decía "ITBMS (7.7%):" cuando la cuenta iba sobre el subtotal pelado.
+    expect(String(ws[etiqueta!].v)).toBe("ITBMS (7%):");
 
     // El valor vive en la columna de al lado (labels col 6, valores col 7).
     const { r, c } = XLSX.utils.decode_cell(etiqueta!);
@@ -197,9 +231,9 @@ describe("BUG 1 · EL EXCEL por reclamo, armado y leído celda por celda", () =>
     expect(valor.t).toBe("n");
     expect(valor.v).toBeCloseTo(77, 6);
 
-    // Ninguna celda del Excel puede seguir diciendo el 7% viejo.
+    // Ninguna celda del Excel puede seguir diciendo la tasa vieja (7.7%).
     for (const k of todas) {
-      if (typeof ws[k].v === "string") expect(String(ws[k].v)).not.toMatch(/ITBMS\s*\(?7%/);
+      if (typeof ws[k].v === "string") expect(String(ws[k].v)).not.toMatch(/ITBMS\s*\(?7[.,]7\s*%/);
     }
   });
 });
@@ -212,6 +246,9 @@ describe("BUG 1 · NINGÚN archivo de Reclamos escribe el porcentaje a mano", ()
   // candado se cumpliría con su propia explicación. Cuarta vez que este repo
   // paga lo mismo — ver el revalidateOnFocus de Reclamos en CLAUDE.md.
   const ARCHIVOS = [
+    // La fuente única va PRIMERO: el rótulo se escribió a mano ahí dentro en
+    // la mutación del 1-sep-2026 y ningún candado se puso rojo. Ver abajo.
+    "src/lib/reclamos/tax.ts",
     "src/app/reclamos/components/ReclamoDetail.tsx",
     "src/app/reclamos/components/ReclamoForm.tsx",
     "src/app/reclamos/components/constants.ts",
@@ -237,6 +274,32 @@ describe("BUG 1 · NINGÚN archivo de Reclamos escribe el porcentaje a mano", ()
     }
   });
 
+  // 🩸 VERIFICADO POR MUTACIÓN (1-sep-2026). Se reemplazó el cuerpo de
+  // itbmsLabel por un "7%" escrito a mano y los 37 tests siguieron VERDES: la
+  // salida es idéntica mientras la tasa valga 0,07, así que ningún candado de
+  // comportamiento puede verlo — recién se rompe el día que cambie la tasa,
+  // que es exactamente el día en que el papel vuelve a mentirle al proveedor.
+  // Por eso este candado mira el CÓDIGO de las dos funciones de rótulo: tienen
+  // que delegar en pctLabel(reclamoTaxes(...)) y no pueden tener un % adentro.
+  it("🔴 impLabel/itbmsLabel DELEGAN: sin un solo % escrito en su cuerpo", () => {
+    const crudo = readFileSync(path.join(process.cwd(), "src/lib/reclamos/tax.ts"), "utf8");
+    const codigo = sinComentarios(crudo);
+    for (const fn of ["impLabel", "itbmsLabel"]) {
+      const i = codigo.indexOf(`export function ${fn}`);
+      expect(i, `${fn} no existe`).toBeGreaterThan(-1);
+      // Cuerpo de la función, contando llaves desde la primera.
+      const abre = codigo.indexOf("{", i);
+      let nivel = 0, fin = abre;
+      for (let k = abre; k < codigo.length; k++) {
+        if (codigo[k] === "{") nivel++;
+        else if (codigo[k] === "}" && --nivel === 0) { fin = k; break; }
+      }
+      const cuerpo = codigo.slice(abre, fin + 1);
+      expect(cuerpo, `${fn} tiene que derivar el rótulo de la tasa`).toMatch(/pctLabel\(\s*reclamoTaxes\(/);
+      expect(cuerpo, `${fn} no puede tener un porcentaje escrito`).not.toContain("%");
+    }
+  });
+
   it("las dos pantallas piden el rótulo a itbmsLabel, no a un texto", () => {
     for (const rel of ["src/app/reclamos/components/ReclamoDetail.tsx", "src/app/reclamos/components/ReclamoForm.tsx"]) {
       const codigo = sinComentarios(readFileSync(path.join(process.cwd(), rel), "utf8"));
@@ -254,6 +317,7 @@ describe("BUG 1 · el CSV global no promete un porcentaje que cambia por fila", 
     const codigo = crudo.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
     expect(codigo).toContain('"Importación", "ITBMS"');
     expect(codigo).not.toContain("ITBMS (7%)");
+    expect(codigo).not.toContain("ITBMS (7.7%)");
     expect(codigo).not.toContain("Importación (10%)");
   });
 });

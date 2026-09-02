@@ -155,7 +155,7 @@ export default function ReclamoDetail({
   // Totales: en modo edición se recalculan EN VIVO desde editItems mientras el
   // usuario cambia cantidades/precios; en modo ver, desde los ítems guardados.
   // La lógica fiscal sale de reclamoTaxes(empresa): Active Shoes = importación 15%
-  // sin ITBMS; el resto = importación 10% + ITBMS 7.7% (sin cambios).
+  // sin ITBMS; el resto = importación 10% + ITBMS 7% sobre (subtotal + importación).
   const totalsSub = editMode ? calcSub(editItems) : sub;
   // Empresa que rige los impuestos (en edición puede estar cambiándose).
   const totalsEmpresa = editMode ? editEmpresa : current.empresa;
