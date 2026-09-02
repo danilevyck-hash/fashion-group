@@ -22,6 +22,9 @@ import { ALMUERZO_FIJO_MIN } from "./config";
 import { etiquetaPersona } from "./directorio";
 import { MOTIVO_TRABAJO_VENDEDOR, textoDiaJustificado } from "./motivos";
 import { textoDiaVacaciones } from "./vacaciones";
+// 🔴 El pie se PARTE contra el ancho de la hoja. `doc.text` no envuelve solo:
+// ver el encabezado de `pdf-pie.ts` para los milímetros que se perdían.
+import { armarPie, dibujarPie } from "./pdf-pie";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -295,6 +298,28 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     fuera: a.fuera + p.resumen.diasTrabajandoFuera,
   }), { aus: 0, tarde: 0, noTrab: 0, extra: 0, rev: 0, corr: 0, fuera: 0 });
 
+  // El pie se arma ANTES de la tabla: de cuántas líneas ocupe sale el margen de
+  // abajo que hay que reservarle, y una tabla ya dibujada no se puede correr.
+  const PIE_PT = 7;
+  const PIE_MARGEN = 14;
+  const pie = armarPie(doc, [
+    `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${ALMUERZO_FIJO_MIN} min · `
+    // 🔴 Misma corrección que la hoja «Cómo se calcula»: la extra se paga
+    // completa y el atraso va aparte (1-sep-2026). El pie del papel firmado
+    // no puede decir una regla distinta de la que hizo los números.
+    + `extras desde ${g.extraMinimoMin} min y se pagan completas (el atraso se descuenta aparte) · `
+    + "\"A revisar\" = el día no tiene las 4 marcas (los minutos igual cuentan)",
+    t.corr > 0
+      ? `${t.corr} ${t.corr === 1 ? "día tiene" : "días tienen"} una hora corregida a mano (la del reloj se conserva; el detalle está en el Excel)`
+      : null,
+    // 🔴 Este papel es el que se firma, y en él la persona que trabajó
+    // afuera aparece con "Días 0". Sin esta línea, ese cero se lee como
+    // que no vino a trabajar.
+    t.fuera > 0
+      ? `${t.fuera} ${t.fuera === 1 ? "día es" : "días son"} de trabajo fuera de la oficina: la persona trabajó (no marcó porque no estaba aquí), no se descuenta y no genera extras`
+      : null,
+  ], PIE_PT, PIE_MARGEN);
+
   autoTable(doc, {
     startY: 27,
     // 🔴 «Corregidos» va en el papel QUE SE FIRMA. Este PDF es el que llega a
@@ -324,30 +349,11 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
       8: { halign: "right", fontStyle: "bold" }, 9: { halign: "right" }, 10: { halign: "right" },
       11: { halign: "right" },
     },
-    margin: { left: 14, right: 14 },
-    didDrawPage: () => {
-      const h = doc.internal.pageSize.getHeight();
-      doc.setFontSize(7); doc.setTextColor(156, 163, 175);
-      doc.text(
-        `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${ALMUERZO_FIJO_MIN} min · ` +
-        // 🔴 Misma corrección que la hoja «Cómo se calcula»: la extra se paga
-        // completa y el atraso va aparte (1-sep-2026). El pie del papel firmado
-        // no puede decir una regla distinta de la que hizo los números.
-        `extras desde ${g.extraMinimoMin} min y se pagan completas (el atraso se descuenta aparte) · ` +
-        "\"A revisar\" = el día no tiene las 4 marcas (los minutos igual cuentan)" +
-        (t.corr > 0
-          ? ` · ${t.corr} ${t.corr === 1 ? "día tiene" : "días tienen"} una hora corregida a mano (la del reloj se conserva; el detalle está en el Excel)`
-          : "") +
-        // 🔴 Este papel es el que se firma, y en él la persona que trabajó
-        // afuera aparece con "Días 0". Sin esta línea, ese cero se lee como
-        // que no vino a trabajar.
-        (t.fuera > 0
-          ? ` · ${t.fuera} ${t.fuera === 1 ? "día es" : "días son"} de trabajo fuera de la oficina: la persona trabajó (no marcó porque no estaba acá), no se descuenta y no genera extras`
-          : ""),
-        14, h - 8,
-      );
-      doc.text(`Página ${doc.getNumberOfPages()}`, w - 14, h - 8, { align: "right" });
-    },
+    // El margen de abajo lo manda el pie: si ocupa tres líneas, la tabla tiene
+    // que terminar tres líneas más arriba o el papel firmado sale con la última
+    // fila pisada por un aviso.
+    margin: { left: PIE_MARGEN, right: PIE_MARGEN, bottom: pie.reservaMm },
+    didDrawPage: () => dibujarPie(doc, pie, PIE_PT, PIE_MARGEN),
   });
 
   return doc;

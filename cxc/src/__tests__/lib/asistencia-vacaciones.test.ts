@@ -46,6 +46,7 @@ import { construirExcel } from "@/lib/asistencia/exportar";
 import {
   diasDeVacacion,
   efectoDelInterruptor,
+  PREGUNTA_YA_COBRADAS,
   esYaPagada,
   textoDiaVacaciones,
   textoRangos,
@@ -402,7 +403,10 @@ describe("🔴 NADA SE DESCARTA EN SILENCIO — el aviso ámbar", () => {
   it("trae las TRES cosas: nombre, rango y monto", () => {
     const t = textoVacacionesNoPagadas([item])!;
     expect(t).toContain(NOMBRE);
-    expect(t).toContain("16 jul 2026 → 13 ago 2026");
+    // 🩸 El rango decía «16 jul 2026 → 13 ago 2026». La flecha rompía el PDF de
+    // la Planilla —jsPDF pasaba la LÍNEA ENTERA a UTF-16 y salía ilegible—, así
+    // que ahora va « a ». Candado: `asistencia-pdf-solo-latin1.test.ts`.
+    expect(t).toContain("16 jul 2026 a 13 ago 2026");
     expect(t).toContain("$194.80");
     expect(t).toContain("5 días");
     // Y dice QUÉ pasó, no solo los datos.
@@ -425,7 +429,9 @@ describe("🔴 NADA SE DESCARTA EN SILENCIO — el aviso ámbar", () => {
       { desde: "2026-07-16", hasta: "2026-07-20" },
       { desde: "2026-08-10", hasta: "2026-08-13" },
     ]);
-    expect(t).toBe("16 jul 2026 → 20 jul 2026 y 10 ago 2026 → 13 ago 2026");
+    // 🩸 Antes decía «→» entre las dos fechas; ver arriba: la flecha volvía
+    // ilegible el renglón entero en el PDF que se firma.
+    expect(t).toBe("16 jul 2026 a 20 jul 2026 y 10 ago 2026 a 13 ago 2026");
   });
 
   it("habla en singular cuando es un solo día y una sola vacación", () => {
@@ -452,17 +458,31 @@ describe("cómo se lee un día de vacaciones", () => {
       .toBe("Vacaciones (ya pagadas) del 16 jul 2026 al 13 ago 2026");
   });
 
-  it("la única línea del interruptor dice el efecto, y es UNA sola", () => {
-    expect(efectoDelInterruptor(true)).toBe("No se le pagan estos días: ya se los pagaste antes.");
-    expect(efectoDelInterruptor(false)).toBe("Se le pagan estos días.");
+  // 🩸 CAMBIÓ DE DIRECCIÓN el 1-sep-2026, y el contrato con él.
+  //
+  // ANTES devolvía SIEMPRE una frase: `true` → «No se le pagan estos días: ya
+  // se los pagaste antes.», `false` → «Se le pagan estos días.». La pantalla la
+  // dibujaba debajo de un título que decía «Ya se le pagó», y desmarcadas las
+  // dos se leían como UNA sola frase que se contradice. Daniel, textual: *«me
+  // enrreda lo de Ya se le pagó / Se le pagan estos días»*.
+  //
+  // AHORA el título PREGUNTA (`PREGUNTA_YA_COBRADAS`) y esta línea contesta
+  // SOLO cuando se marcó — `null` si no—. Marcada es el caso raro (de las 2
+  // vacaciones en producción, ninguna) y el único que descuenta plata: es lo
+  // que merece una línea. La regla de negocio NO se tocó.
+  it("el interruptor solo habla cuando está marcado, y con UNA línea corta", () => {
+    expect(efectoDelInterruptor(true)).toBe("Sí → no se le pagan, ya los cobró.");
+    // 🔴 Sin marcar no dice nada: no se descuenta, no hay nada que avisar.
+    expect(efectoDelInterruptor(false)).toBeNull();
+    // 🔑 La pregunta es una pregunta, no un estado que haya que interpretar.
+    expect(PREGUNTA_YA_COBRADAS).toContain("?");
     // 🔑 Corta: Daniel odia los párrafos didácticos, en la UI y en las
     // respuestas. Si alguien le agrega media frase «para que se entienda
     // mejor», vuelve a ser lo que se sacó.
-    for (const yaPagadas of [true, false]) {
-      const linea = efectoDelInterruptor(yaPagadas);
-      expect(linea.split(/\s+/).length).toBeLessThanOrEqual(12);
-      expect(linea).not.toContain("\n");
-    }
+    const linea = efectoDelInterruptor(true)!;
+    expect(linea.split(/\s+/).length).toBeLessThanOrEqual(12);
+    expect(linea).not.toContain("\n");
+    expect(PREGUNTA_YA_COBRADAS.split(/\s+/).length).toBeLessThanOrEqual(8);
   });
 
   it("la columna «Ausencias» de la planilla DICE de dónde salió el monto", () => {

@@ -20,7 +20,11 @@
  * muestra—, pero no entran en ninguna cuenta. Es la diferencia entre descartar
  * un dato y descartarlo EN SILENCIO.
  *
- * ── 🔴 EL INTERRUPTOR: «YA SE LE PAGÓ» ──────────────────────────────────────
+ * ── 🔴 EL INTERRUPTOR: «¿YA COBRÓ ESTOS DÍAS ANTES?» ─────────────────────────
+ *
+ * (En la pantalla se lee así desde el 1-sep-2026; el resto del módulo —la
+ * columna del Excel, el aviso ámbar de la planilla— sigue nombrando el mismo
+ * hecho «ya se le pagó», que es como lo dice la contadora.)
  *
  * La regla es de la contadora de Daniel, textual: *"Si la persona había cobrado
  * sus vacaciones anteriormente en dinero y no se había ido esos tres días, yo se
@@ -120,7 +124,7 @@ export function textoDiaVacaciones(yaPagadas: boolean): string {
 }
 
 /**
- * El rango escrito, para la línea de «Decidilo vos» de la planilla.
+ * El rango escrito, para la línea de «Tú decides» de la planilla.
  * «Vacaciones del 16 jul 2026 al 13 ago 2026».
  */
 export function textoVacacion(desde: string, hasta: string, yaPagadas: boolean): string {
@@ -128,15 +132,39 @@ export function textoVacacion(desde: string, hasta: string, yaPagadas: boolean):
 }
 
 /**
- * La única línea que la pantalla escribe debajo del interruptor.
+ * Lo que el interruptor PREGUNTA. Una pregunta, no un estado.
  *
- * 🔑 UNA línea y corta. Daniel odia los párrafos didácticos, y acá el que carga
- * la vacación necesita saber una sola cosa: si esos días se pagan o no.
+ * 🩸 ANTES DECÍA «Ya se le pagó» Y ENREDABA. Daniel, con la pantalla delante:
+ * *«me enrreda lo de Ya se le pagó / Se le pagan estos días»* — y tenía razón.
+ * El título era el ESTADO y la línea de abajo la CONSECUENCIA, así que
+ * desmarcadas se leían como una sola frase que se contradice a sí misma.
+ * Un estado hay que interpretarlo; una pregunta se contesta.
+ *
+ * 🔑 Y contesta el otro malentendido, el de fondo: *«¿por qué alguien marcaría
+ * esa casilla, si vacaciones calcula siempre y cuando no hay marcaciones?»*.
+ * La vacación NO se detecta por la falta de marcas — se carga acá. Lo único que
+ * esta casilla decide es si la PLATA ya salió antes.
+ *
+ * ⚠️ Vive acá y no en el JSX porque la pantalla la escribe en DOS lugares (el
+ * formulario de carga y cada fila ya cargada), y dos copias de un texto que
+ * costó esto son dos copias que se separan.
  */
-export function efectoDelInterruptor(yaPagadas: boolean): string {
-  return yaPagadas
-    ? "No se le pagan estos días: ya se los pagaste antes."
-    : "Se le pagan estos días.";
+export const PREGUNTA_YA_COBRADAS = "¿Ya cobró estos días antes?";
+
+/**
+ * La línea que va debajo del interruptor, o `null` cuando no hay nada que
+ * decir.
+ *
+ * 🔴 SOLO HABLA CUANDO ESTÁ MARCADA, y ése es el arreglo. Marcada es el caso
+ * RARO —de las 2 vacaciones cargadas en producción no hay ninguna— y el ÚNICO
+ * que mueve plata: es lo que merece una línea. Sin marcar no se descuenta nada,
+ * y una línea diciendo «se le pagan» al lado de una casilla que pregunta si ya
+ * cobró es justo el ruido que hacía dudar de cuál de las dos mandaba.
+ *
+ * 🔑 UNA línea y corta. Daniel odia los párrafos didácticos.
+ */
+export function efectoDelInterruptor(yaPagadas: boolean): string | null {
+  return yaPagadas ? "Sí → no se le pagan, ya los cobró." : null;
 }
 
 /** Los días de calendario que cubre la vacación, `desde` y `hasta` incluidos. */
@@ -173,11 +201,19 @@ export interface VacacionNoPagada {
   monto: number;
 }
 
-/** «16 jul 2026 → 13 ago 2026», y con varios rangos los junta con « y ». */
+/** «16 jul 2026 a 13 ago 2026», y con varios rangos los junta con « y ». */
 export function textoRangos(
   rangos: ReadonlyArray<{ desde: string; hasta: string }>,
 ): string {
-  return rangos.map((r) => `${fechaCorta(r.desde)} → ${fechaCorta(r.hasta)}`).join(" y ");
+  // 🩸 ACÁ IBA UNA FLECHA «→» Y ROMPÍA EL PDF DE LA PLANILLA — el papel que se
+  // firma. jsPDF declara Helvetica con `WinAnsiEncoding`, que es de UN byte por
+  // letra; en cuanto la cadena trae un carácter que no entra ahí, cambia SOLA a
+  // UTF-16 sin avisar y sin fallar. La fuente sigue leyendo un byte por letra,
+  // así que no se pierde la flecha: se pierde LA LÍNEA ENTERA, ilegible. En
+  // pantalla y en el Excel se veía perfecta, y por eso nadie lo vio.
+  // «a» se lee natural en español («del 16 jul al 13 ago» es la misma frase) y
+  // es ASCII puro. El candado está en `asistencia-pdf-solo-latin1.test.ts`.
+  return rangos.map((r) => `${fechaCorta(r.desde)} a ${fechaCorta(r.hasta)}`).join(" y ");
 }
 
 /**

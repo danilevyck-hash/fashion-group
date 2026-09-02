@@ -46,6 +46,9 @@ import {
   type TotalesPlanilla,
 } from "./planilla";
 import type { AvisoPeriodoAbierto } from "./periodo";
+// 🔴 El pie se PARTE contra el ancho de la hoja. `doc.text` no envuelve solo:
+// la línea de avisos llegaba a 491 mm en una hoja de 335. Ver `pdf-pie.ts`.
+import { armarPie, dibujarPie } from "./pdf-pie";
 
 export interface DatosPlanillaExport {
   lineas: readonly LineaPlanilla[];
@@ -345,7 +348,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       [""],
       ["⚠ Quien aparece en rojo", "No tiene todo lo que hace falta para calcularle un número. NO vale $0: quedó fuera del total y hay que configurarlo en la pestaña Configuración."],
       ["Quien aparece en gris", `No va en planilla (${EXPLICACION_SERVICIO_PROFESIONAL} No es un pendiente: es como se le paga), o lo decide una persona: está justificada, o entró o salió a mitad del período. En ese caso el motivo va escrito en su fila, junto con lo que le daría la quincena completa; para pagarle lo suyo se usa el rango de fechas.`],
-      ["Quien entró o salió a mitad del período", "NO se le calcula pago, ni completo ni prorrateado. Pagarle la quincena entera sería regalarle los días en que no trabajaba acá; descontársela entera, inventarle una renuncia. Lo decide una persona y se saca con el rango de fechas."],
+      ["Quien entró o salió a mitad del período", "NO se le calcula pago, ni completo ni prorrateado. Pagarle la quincena entera sería regalarle los días en que no trabajaba aquí; descontársela entera, inventarle una renuncia. Lo decide una persona y se saca con el rango de fechas."],
       ["Días que todavía no pasaron", d.periodoAbierto
         ? `${d.periodoAbierto.texto} Un día que no pasó no cuenta como falta ni como presente: todavía no existe.`
         : "Este período ya terminó: todos sus días se contaron."],
@@ -398,6 +401,35 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
   doc.setFontSize(9);
   doc.setTextColor(107, 114, 128);
   doc.text(`Planilla — ${subtitulo(d)}`, w - 10, 15, { align: "right" });
+
+  // 🔴 EL PAPEL ES EL QUE SE FIRMA, y en él la columna «Ausencias» puede traer
+  // minutos de alguien que vino todos los días. Sin esta línea, quien lo revise
+  // dentro de seis meses no tiene forma de saberlo — y el aviso solo aparece
+  // cuando hay algo que avisar, que es lo que hace que se lea.
+  const conAusenciaPorTardanza = d.lineas.some((l) => (l.dinero?.ausenciaPorTardanza ?? 0) > 0);
+  // El pie se arma ANTES de la tabla: de cuántas líneas ocupe sale el margen de
+  // abajo que hay que reservarle, y una tabla ya dibujada no se puede correr.
+  const PIE_PT = 6.5;
+  const PIE_MARGEN = 10;
+  const pie = armarPie(doc, [
+    // Lo que no puede perderse al mandar el papel por correo. Va arriba de la
+    // fórmula porque es lo que cambia la lectura del cuadro entero. Cada aviso
+    // en su propio renglón: pegados en una sola línea, el primero que se salía
+    // de la hoja se llevaba a todos los que venían atrás.
+    d.periodoAbierto?.texto,
+    d.avisoSinFicha,
+    d.avisoVacacionesNoPagadas,
+    d.avisoExtraSinAprobar,
+    d.avisoPrestamoSinAprobar,
+    d.avisoPrestamoSinAtar,
+    conAusenciaPorTardanza
+      ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
+      : null,
+    FORMULA_NETO,
+    "En rojo: falta configurar a esa persona — no vale $0 y NO entra al total.  "
+    + "En gris: no se le calcula pago — o no va en planilla (servicio profesional), "
+    + "o lo decide una persona (justificada, o entró o salió a mitad del período).",
+  ], PIE_PT, PIE_MARGEN);
 
   const t = d.totales;
   autoTable(doc, {
@@ -475,39 +507,11 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
         g === "fuera" || g === "decidir" ? [107, 114, 128] : [163, 53, 42];
       if (data.column.index === 1) data.cell.styles.halign = "left";
     },
-    margin: { left: 10, right: 10 },
-    didDrawPage: () => {
-      const h = doc.internal.pageSize.getHeight();
-      doc.setFontSize(6.5);
-      doc.setTextColor(156, 163, 175);
-      // 🔴 Lo que no puede perderse al mandar el papel por correo. Va arriba de
-      // la fórmula porque es lo que cambia la lectura del cuadro entero.
-      // 🔴 EL PAPEL ES EL QUE SE FIRMA, y en él la columna «Ausencias» puede
-      // traer minutos de alguien que vino todos los días. Sin esta línea, quien
-      // lo revise dentro de seis meses no tiene forma de saberlo — y el aviso
-      // solo aparece cuando hay algo que avisar, que es lo que hace que se lea.
-      const conAusenciaPorTardanza = d.lineas.some((l) => (l.dinero?.ausenciaPorTardanza ?? 0) > 0);
-      const avisos = [
-        d.periodoAbierto?.texto,
-        d.avisoSinFicha,
-        d.avisoVacacionesNoPagadas,
-        d.avisoExtraSinAprobar,
-        d.avisoPrestamoSinAprobar,
-        d.avisoPrestamoSinAtar,
-        conAusenciaPorTardanza
-          ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
-          : null,
-      ].filter(Boolean).join("  ");
-      if (avisos) doc.text(avisos, 10, h - 11);
-      doc.text(FORMULA_NETO, 10, h - 8);
-      doc.text(
-        "En rojo: falta configurar a esa persona — no vale $0 y NO entra al total.  "
-        + "En gris: no se le calcula pago — o no va en planilla (servicio profesional), "
-        + "o lo decide una persona (justificada, o entró o salió a mitad del período).",
-        10, h - 5,
-      );
-      doc.text(`Página ${doc.getNumberOfPages()}`, w - 10, h - 8, { align: "right" });
-    },
+    // El margen de abajo lo manda el pie: con seis avisos encendidos ocupa
+    // varios renglones, y la tabla tiene que terminar más arriba o el cuadro
+    // firmado sale con la última fila pisada.
+    margin: { left: PIE_MARGEN, right: PIE_MARGEN, bottom: pie.reservaMm },
+    didDrawPage: () => dibujarPie(doc, pie, PIE_PT, PIE_MARGEN),
   });
 
   return doc;
