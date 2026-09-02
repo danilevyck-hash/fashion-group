@@ -161,7 +161,7 @@ export function MetasSubtab() {
           <Target className="mx-auto h-8 w-8 text-gray-300" />
           <p className="mt-2 text-sm font-medium text-gray-800">Todavía no hay ninguna meta</p>
           <p className="mt-1 text-xs text-gray-500">
-            Una meta es un monto a alcanzar entre dos fechas. Al crearla, acá se ve cuánto
+            Una meta es un monto a alcanzar entre dos fechas. Al crearla, aquí se ve cuánto
             llevan, cuánto falta y si el ritmo alcanza.
           </p>
           {puedeEditar && (

@@ -421,7 +421,7 @@ export function textoHuecoViejo(
   return [
     `El reloj de asistencia tiene marcaciones de hace más de ${dias} días sin traer (${dispositivo}).`,
     `Qué significa: el programa de la PC solo recupera hasta ${dias} días hacia atrás, así que esas marcaciones ya no van a entrar solas.`,
-    "Qué hacer: hay que ampliar la ventana de recuperación en la PC de la oficina — pedile los pasos a Claude.",
+    "Qué hacer: hay que ampliar la ventana de recuperación en la PC de la oficina — pídele los pasos a Claude.",
   ].join("\n");
 }
 

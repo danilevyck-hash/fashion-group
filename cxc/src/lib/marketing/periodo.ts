@@ -76,7 +76,7 @@ export function segundaQuincena(mes: string): Periodo {
  */
 export function validarPeriodo(desde: unknown, hasta: unknown): string | null {
   if (!esFechaISO(desde) || !esFechaISO(hasta)) {
-    return "Poné las dos fechas del período trabajado.";
+    return "Pon las dos fechas del período trabajado.";
   }
   if (hasta < desde) {
     return "La fecha final no puede ser anterior a la inicial.";

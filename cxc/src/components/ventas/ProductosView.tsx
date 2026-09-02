@@ -630,7 +630,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
           {anioNoAplica && (
             <p data-anio-no-aplica className="mb-3 text-xs text-gray-500">
               El año {selectedYear} de arriba no se aplica a este período: «{periodoLabel(selectedYear, null, periodo)}»
-              se cuenta desde hoy hacia atrás. Para mirar un año elegí «{periodoLabel(selectedYear, null, "ytd")}» o un mes.
+              se cuenta desde hoy hacia atrás. Para mirar un año elige «{periodoLabel(selectedYear, null, "ytd")}» o un mes.
             </p>
           )}
           {comparativo === "vacio" && data.comparativo && (
@@ -1121,7 +1121,7 @@ function DrillTabBtn({
  */
 function BloqueClientes({ clientes }: { clientes: ClienteDeProducto[] | null | undefined }) {
   if (clientes === null) {
-    return <div className="py-2 text-xs text-gray-500">No se pudo cargar quién lo compra. Cerrá y volvé a abrir la fila.</div>;
+    return <div className="py-2 text-xs text-gray-500">No se pudo cargar quién lo compra. Cierra y vuelve a abrir la fila.</div>;
   }
   if (!clientes) return <div className="py-2 text-xs text-gray-400">Cargando…</div>;
   if (clientes.length === 0) {

@@ -92,7 +92,7 @@ export default function ComoFuncionaTab() {
         <h3 className="text-sm font-medium text-gray-900">De dónde salen los datos</h3>
         <p className="mt-1 text-[13px] leading-relaxed text-gray-600">
           Del reloj de la entrada. Entran <b>solas</b>: un programita instalado en la PC de la
-          oficina le pregunta al reloj cada pocos minutos y las manda para acá. Si esa PC está
+          oficina le pregunta al reloj cada pocos minutos y las manda para aquí. Si esa PC está
           apagada no se pierde ninguna —el reloj las guarda— y entran todas juntas cuando se
           prenda. En el <b>Reporte</b>, arriba, siempre dice cómo va.
         </p>
@@ -114,12 +114,10 @@ export default function ComoFuncionaTab() {
           <li>· Las <b>horas extra</b> hasta las {reglas.horaCorteNocturno} se pagan × {reglas.recargoExtraDiurno}; desde el minuto siguiente × {reglas.recargoExtraNocturno}. <b>No hay un tercer escalón</b>: el «excedente de 9 horas» también va × {reglas.recargoExtraNocturno} y su columna queda en $0.00.</li>
           <li>· Los <b>domingos y feriados</b> trabajados se pagan × {reglas.recargoDomingoFeriado}.</li>
           <li>· Se descuentan las <b>tardanzas</b> (minutos × el valor del minuto), las <b>ausencias</b> (8 horas × la rata por cada día completo), el seguro social ({reglas.seguroSocialPct} %) y el educativo ({reglas.seguroEducativoPct} %).</li>
-          <li>· Las <b>vacaciones</b> se pagan: esos días entran en el sueldo de la quincena y no descuentan nada. Solo se descuentan si están marcadas <b>«ya se le pagó»</b> —porque se cobraron en efectivo antes—, y en ese caso la planilla dice a quién y cuánto no le pagó.</li>
-          {/* ⚠️ La pantalla para CARGAR vacaciones se apagó el 1-sep-2026
-              (`PESTANAS_OCULTAS` en lib/asistencia/roles.ts). El cálculo no
-              cambió, y decirlo acá evita que alguien busque una pestaña que no
-              está y suponga que sus vacaciones dejaron de valer. */}
-          <li>· ⚠️ La <b>pestaña para cargar vacaciones está oculta</b> desde el 1 de septiembre de 2026, mientras se trabaja la planilla. Las que ya estaban cargadas <b>siguen valiendo igual</b>: esos días se pagan y no cuentan como ausencia. Para cargar una nueva, pedísela a Daniel.</li>
+          {/* 🩸 Este renglón nombraba la casilla «ya se le pagó», y esa casilla
+              se renombró el 1-sep-2026 porque enredaba. Un cartel que
+              contradice a la pantalla es peor que no tener cartel. */}
+          <li>· Las <b>vacaciones</b> se pagan: esos días entran en el sueldo de la quincena y no descuentan nada. Solo se descuentan si al cargarlas se contestó que <b>la persona ya había cobrado esos días antes</b>, y en ese caso la planilla dice a quién y cuánto no le pagó.</li>
           <li>· El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios</b> no salen de ningún sistema: se escriben a mano en la planilla. Los cuatro primeros se restan; <b>«otros servicios» se SUMA</b>, porque es un pago extra y no un descuento.</li>
           <li>· 🔴 A quien le falte el salario, la jornada o la ficha <b>no se le calcula nada</b>: sale listado con lo que le falta y queda <b>fuera del total</b>. Nunca en $0.</li>
         </ul>

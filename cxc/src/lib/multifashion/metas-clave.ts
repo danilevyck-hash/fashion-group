@@ -206,7 +206,7 @@ export function textoAporteNoAsignado(fraccion: number): string | null {
   const pct = Math.round(Math.min(1, fraccion) * 100);
   return (
     `El ${pct}% que falta son ventas hechas con el código de alguien que no está en ` +
-    `esta lista — casi siempre, gente que ya no trabaja acá. Cuentan para la meta igual.`
+    `esta lista — casi siempre, gente que ya no trabaja aquí. Cuentan para la meta igual.`
   );
 }
 

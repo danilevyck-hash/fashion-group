@@ -441,7 +441,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
                 <p className="text-sm font-medium text-gray-900">Anónimos (mostrador)</p>
                 {/* Qué códigos de Switch caen en este bucket es composición: se
                     aprende una vez y no cambia con el período. */}
-                <Ayuda titulo="Qué entra acá">
+                <Ayuda titulo="Qué entra aquí">
                   Ventas de CONTADO / CONSUMIDOR FINAL, sin cliente identificado.
                 </Ayuda>
               </div>

@@ -37,12 +37,7 @@ import {
 } from "@/lib/asistencia/reporte";
 import { motivosDeQuienNoMarco } from "@/lib/asistencia/periodo";
 import type { Vacacion } from "@/lib/asistencia/vacaciones";
-import {
-  ASISTENCIA_ROLES,
-  APROBACIONES_ROLES,
-  PESTANAS_OCULTAS,
-  vePestana,
-} from "@/lib/asistencia/roles";
+import { ASISTENCIA_ROLES, vePestana } from "@/lib/asistencia/roles";
 import { rataPorHoraCalculo } from "@/lib/asistencia/rata";
 import {
   avisoPendientes,
@@ -57,7 +52,7 @@ const CLIENTE = "app/asistencia/AsistenciaClient.tsx";
 const CONFIG = "app/asistencia/ConfiguracionTab.tsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("las 5 pestañas y su orden", () => {
+describe("las 6 pestañas y su orden", () => {
   const src = leer(CLIENTE);
 
   /** Los pares [clave, "Etiqueta"] del arreglo TABS, en el orden del archivo. */
@@ -104,9 +99,6 @@ describe("las 5 pestañas y su orden", () => {
     // 🔴 Si la pestaña montara `JustificacionesTab`, el rótulo diría una cosa y
     // la pantalla haría otra — que es exactamente el enredo que este cambio
     // vino a deshacer.
-    //
-    // ⚠️ SIGUE VALIENDO CON LA PESTAÑA APAGADA (1-sep-2026), y es a propósito:
-    // se apagó la VISIBILIDAD, no el código. Ver el bloque de abajo.
     expect(src).toMatch(/from "\.\/VacacionesTab"/);
     expect(src).toMatch(/tab === "vacaciones" && <VacacionesTab \/>/);
   });
@@ -150,57 +142,56 @@ describe("las 5 pestañas y su orden", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 🔴 VACACIONES ESTÁ APAGADA (1-sep-2026) — y este candado CAMBIÓ DE DIRECCIÓN.
+// 🩸 VACACIONES SE APAGÓ Y SE VOLVIÓ A ENCENDER EL MISMO DÍA (1-sep-2026), y
+// ESTE CANDADO VOLVIÓ A CAMBIAR DE DIRECCIÓN.
 //
-// Daniel, textual: *«olvida lo de las vacaciones por ahora, quitalo del ERP
-// para no enrredar»*. Hasta ayer este archivo exigía que la pestaña se VIERA;
-// hoy exige que NO se vea. Lo que NO cambió —y es la mitad que importa— es que
-// la pestaña sigue DECLARADA, su componente sigue MONTADO y la ruta sigue
-// viva: se apagó una pantalla, no se borró un trabajo. Volver a encenderla es
-// borrar `"vacaciones"` de `PESTANAS_OCULTAS`, y estos casos vuelven a fallar
-// para avisarlo — que es exactamente lo que tiene que pasar.
+// Por la mañana: *«olvida lo de las vacaciones por ahora, quitalo del ERP para
+// no enrredar»* — y estos casos pasaron a exigir que la pestaña NO se viera.
+// Unas horas después: *«vacaciones quedamos que sí, dejalo, solo que haslo
+// bien»*. Lo que enredaba era el TEXTO del interruptor, no la pestaña, y eso se
+// arregló en `vacaciones.ts` en vez de esconder la pantalla.
+//
+// 🔑 Queda escrito porque es la lección, no la anécdota: apagar una pantalla
+// para tapar una redacción confusa se deshace en horas y deja atrás un
+// mecanismo («pestañas apagadas») que después alguien usa para lo mismo. Esa
+// lista se borró ENTERA.
 // ═════════════════════════════════════════════════════════════════════════════
-describe("🔴 la pestaña Vacaciones está apagada, no borrada", () => {
+describe("🔴 la pestaña Vacaciones se ve, y sin permiso propio", () => {
   const src = leer(CLIENTE);
   const tabs = [...src.matchAll(/\["(\w+)",\s*"([^"]+)"\]/g)].map((m) => [m[1], m[2]]);
-  const TODOS = [...new Set([...ASISTENCIA_ROLES, ...APROBACIONES_ROLES])];
 
-  it("nadie la ve — ni admin, que ve todo lo demás", () => {
-    for (const rol of TODOS) expect(`${rol}:${vePestana(rol, "vacaciones")}`).toBe(`${rol}:false`);
-    // 🩸 La vara: si `vePestana` devolviera `false` para TODO, esto también
-    // pasaría en verde. Las otras pestañas siguen abriéndose para admin.
-    for (const p of ["planilla", "reporte", "justificaciones", "configuracion", "aprobaciones"]) {
-      expect(`${p}:${vePestana("admin", p)}`).toBe(`${p}:true`);
+  it("la ve quien tiene Asistencia — no es una pestaña de aprobación", () => {
+    for (const rol of ASISTENCIA_ROLES) {
+      expect(`${rol}:${vePestana(rol, "vacaciones")}`).toBe(`${rol}:true`);
     }
+    // 🩸 La vara: si `vePestana` devolviera `true` para TODO, lo de arriba
+    // pasaría igual. Quien entra solo a aprobar no la ve.
+    expect(vePestana("bodega", "vacaciones")).toBe(false);
   });
 
-  it("la lista de apagadas dice exactamente cuál, y en un solo lugar", () => {
-    expect([...PESTANAS_OCULTAS]).toEqual(["vacaciones"]);
-    // La pantalla no reimplementa la regla: la pide.
-    expect(src).toMatch(/const visibles = TABS\.filter\(\(\[k\]\) => vePestana\(rol, k\)\)/);
+  it("⛔ NO quedó ningún mecanismo de «pestañas apagadas»", () => {
+    // 🔴 Una lista vacía es una puerta esperando que alguien la use para tapar
+    // un problema en vez de arreglarlo — que es exactamente lo que pasó.
+    const roles = leer("lib/asistencia/roles.ts");
+    expect(roles).not.toMatch(/export const PESTANAS_OCULTAS/);
+    expect(src).not.toMatch(/PESTANAS_OCULTAS/);
   });
 
-  it("⚠️ un `?tab=vacaciones` guardado cae en la pestaña por defecto, NO en blanco", () => {
-    // La pantalla resuelve la URL CONTRA `visibles`, y vacaciones ya no está
-    // ahí. Sin esta línea, el marcador de alguien abriría el módulo vacío.
-    expect(src).toMatch(/visibles\.some\(\(\[k\]\) => k === tabRaw\)/);
-    expect(src).toMatch(/const porDefecto: Tab = \(visibles\[0\]\?\.\[0\] \?\? "planilla"\)/);
-    // Y para el rol de la contable la primera visible sigue siendo Planilla.
-    const primeraVisible = tabs.find(([k]) => vePestana("contabilidad", k))![0];
-    expect(primeraVisible).toBe("planilla");
-  });
-
-  it("⛔ NO se borró: el componente sigue importado, montado y en el arreglo", () => {
-    // 🔴 Si alguien «limpia» esto borrando el import y el render, encenderla de
-    // nuevo deja de ser una línea y hay que rehacer el trabajo.
+  it("está declarada, importada y montada — y su ruta viva", () => {
     expect(src).toMatch(/import VacacionesTab from "\.\/VacacionesTab"/);
     expect(src).toMatch(/tab === "vacaciones" && <VacacionesTab \/>/);
     expect(tabs.map((t) => t[0])).toContain("vacaciones");
-  });
-
-  it("⛔ ni el archivo, ni su ruta de API", () => {
     expect(() => leer("app/asistencia/VacacionesTab.tsx")).not.toThrow();
     expect(() => leer("app/api/asistencia/vacaciones/route.ts")).not.toThrow();
+  });
+
+  it("🔴 y el interruptor PREGUNTA: la redacción que la había hecho apagar", () => {
+    // Daniel: *«me enrreda lo de Ya se le pagó / Se le pagan estos días»*. El
+    // texto vive en `vacaciones.ts` y la pantalla lo pide; acá se comprueba que
+    // no volvió a escribirse a mano el título viejo.
+    const tab = leer("app/asistencia/VacacionesTab.tsx");
+    expect(tab).toMatch(/PREGUNTA_YA_COBRADAS/);
+    expect(tab).not.toMatch(/>Ya se le pagó</);
   });
 });
 
@@ -371,9 +362,11 @@ describe("la pantalla de Configuración se ve editable y se lee en columnas", ()
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 🔴 LA PRUEBA DE QUE APAGAR LA PESTAÑA NO LE TOCÓ UN CENTAVO A ELOYN.
+// 🔴 LA PRUEBA DE QUE TOCAR ESTA PESTAÑA NO LE MUEVE UN CENTAVO A ELOYN.
 //
-// 🩸 EL RIESGO REAL DE ESTE CAMBIO, escrito antes de hacerlo: hay DOS vacaciones
+// 🩸 Nació el 1-sep-2026, el día que la pestaña se apagó unas horas, y SIGUE
+// TAL CUAL con la pestaña encendida: lo que vigila no es la pantalla, es el
+// motor. Hay DOS vacaciones
 // vivas en producción, las dos de ELOYN MENDOZA (código 29, fashion_wear) —
 // 16-jul → 13-ago-2026 y 14-ago-2026—, ninguna marcada «ya se le pagó». Ella no
 // marca el reloj esos días. Si «quitar las vacaciones del ERP» se hubiera
@@ -384,11 +377,9 @@ describe("la pantalla de Configuración se ve editable y se lee en columnas", ()
 //
 // Por eso este bloque no mira una pantalla: corre el MOTOR de verdad
 // —`armarReporte` + `armarPlanilla`, los mismos que arman el Excel y el PDF—
-// sobre el rango REAL de ella, y mira los DÓLARES. Y lo hace afirmando, en el
-// mismo archivo, que la pestaña está apagada: las dos cosas son ciertas a la vez
-// o este archivo se pone rojo.
+// sobre el rango REAL de ella, y mira los DÓLARES.
 // ═════════════════════════════════════════════════════════════════════════════
-describe("🔴 apagar la pestaña NO le movió la plata a ELOYN MENDOZA", () => {
+describe("🔴 la plata de ELOYN MENDOZA no depende de la pantalla", () => {
   const R = REGLAS_DEFAULT;
 
   // ── Las DOS filas REALES de producción ─────────────────────────────────────
@@ -448,13 +439,6 @@ describe("🔴 apagar la pestaña NO le movió la plata a ELOYN MENDOZA", () => 
       justificados: motivosDeQuienNoMarco({ vacaciones: opts.vacaciones }),
     }).find((l) => l.codigo === CODIGO)!;
   }
-
-  it("🔑 el escenario es el de HOY: la pestaña está apagada mientras se mide esto", () => {
-    // Si alguien vuelve a encender la pestaña, este caso falla y obliga a
-    // releer el bloque entero en vez de dejarlo mintiendo.
-    expect([...PESTANAS_OCULTAS]).toContain("vacaciones");
-    expect(vePestana("admin", "vacaciones")).toBe(false);
-  });
 
   it("🔴 con sus DOS vacaciones reales y cero marcas: no se le descuenta NADA", () => {
     const l = lineaDe({ vacaciones: VACACIONES_REALES });

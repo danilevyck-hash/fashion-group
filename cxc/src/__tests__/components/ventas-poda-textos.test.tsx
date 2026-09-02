@@ -483,7 +483,8 @@ describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
     render(<ReferenciaView />);
     expect(screen.queryByRole("button", { name: /Varias · pegar lista/ })).toBeNull();
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
-    expect(screen.getByText(/Podés pegar hasta \d+ códigos juntos/)).toBeTruthy();
+    // 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
+    expect(screen.getByText(/Puedes pegar hasta \d+ códigos juntos/)).toBeTruthy();
   });
 
   it("el aviso del ajuste QUEDA en pantalla — es plata que se fue, no metodología", async () => {

@@ -189,7 +189,7 @@ function GastosContabilidadInner() {
                   Esta parte todavía no está encendida.
                 </p>
                 <p className="mt-1 text-sm text-gray-600">
-                  Falta el último paso de instalación. Cuando esté listo, acá vas
+                  Falta el último paso de instalación. Cuando esté listo, aquí vas
                   a ver lo que salió de caja y del banco de cada empresa, mes por mes.
                 </p>
               </div>

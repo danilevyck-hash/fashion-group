@@ -90,7 +90,7 @@ export default function HorariosTab() {
       <div className="-ml-2 -mt-2">
         <Ayuda titulo="De dónde sale la hora sugerida" etiqueta="De dónde sale la sugerencia">
           <p>
-            Lo que fijes acá manda sobre lo que diga el reloj. Arranca con la hora a la que
+            Lo que fijes aquí manda sobre lo que diga el reloj. Arranca con la hora a la que
             <b> cada quien sale de verdad</b>, medida de sus marcaciones.
           </p>
           <p className="mt-1.5">
@@ -110,7 +110,7 @@ export default function HorariosTab() {
       {filas === null && <p className="py-8 text-center text-sm text-gray-400">Cargando…</p>}
       {filas?.length === 0 && (
         <p className="py-10 text-center text-sm text-gray-500">
-          Todavía no hay marcaciones. En cuanto el reloj mande las primeras, la gente aparece acá.
+          Todavía no hay marcaciones. En cuanto el reloj mande las primeras, la gente aparece aquí.
         </p>
       )}
 

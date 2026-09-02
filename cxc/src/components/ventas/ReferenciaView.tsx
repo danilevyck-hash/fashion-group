@@ -106,7 +106,7 @@ export function ReferenciaView() {
           <input
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
-            placeholder="Código, modelo o descripción — podés pegar varios"
+            placeholder="Código, modelo o descripción — puedes pegar varios"
             aria-label="Buscar referencia"
             className="min-h-[44px] flex-1 rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-gray-900"
           />
@@ -116,7 +116,7 @@ export function ReferenciaView() {
           </Button>
         </div>
         <p className="mt-2 text-xs text-gray-600">
-          Un código trae todos sus colores. Podés pegar hasta {MAX_CODIGOS_MULTI} códigos juntos, separados por
+          Un código trae todos sus colores. Puedes pegar hasta {MAX_CODIGOS_MULTI} códigos juntos, separados por
           espacios, comas o uno por línea — con varios sale una tabla para armar tu pedido.
         </p>
       </form>
@@ -216,7 +216,7 @@ function Coincidencias({
 }) {
   return (
     <div className="mt-4 rounded-xl border border-gray-200 bg-white p-3.5">
-      <p className="mb-2 text-sm text-gray-700">Elegí el modelo:</p>
+      <p className="mb-2 text-sm text-gray-700">Elige el modelo:</p>
       <div className="flex flex-col gap-1.5">
         {items.map((c) => (
           <button

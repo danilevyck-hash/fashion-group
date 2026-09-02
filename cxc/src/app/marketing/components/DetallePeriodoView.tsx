@@ -440,7 +440,7 @@ export default function DetallePeriodoView({
             <p className="text-sm text-gray-500 mb-4">
               Vas a eliminar &ldquo;{anularPendiente.nombre}&rdquo;. Deja de
               aparecer en Marketing y su gasto no se le reporta a nadie. Si te
-              equivocás, podés devolverlo enseguida desde el aviso que queda en
+              equivocas, puedes devolverlo enseguida desde el aviso que queda en
               la lista.
             </p>
             <label

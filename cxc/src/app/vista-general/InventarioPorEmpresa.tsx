@@ -84,7 +84,7 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
         <h3 className="text-xs font-semibold text-stone-700">Inventario</h3>
         <p className="mt-2 text-sm text-stone-500">
           {inv === null
-            ? "No se pudo leer el inventario en este momento. Volvé a intentar en unos segundos."
+            ? "No se pudo leer el inventario en este momento. Vuelve a intentar en unos segundos."
             : "El inventario todavía no está conectado — falta correr la migración en Supabase."}
         </p>
       </div>

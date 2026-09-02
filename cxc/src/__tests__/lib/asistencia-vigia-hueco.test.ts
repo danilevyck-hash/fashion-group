@@ -130,7 +130,8 @@ describe("los textos — español simple, sin jerga", () => {
     expect(t).toContain("Qué significa:");
     expect(t).toContain("Qué hacer:");
     expect(t).toContain("ampliar la ventana");
-    expect(t).toContain("pedile los pasos a Claude");
+    // 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
+    expect(t).toContain("pídele los pasos a Claude");
   });
 
   it("ni el aviso ni la recuperación nombran columnas ni tablas", () => {

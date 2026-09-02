@@ -1010,7 +1010,7 @@ function ColumnaMovimiento({
     <div className="px-4 py-3">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{titulo}</p>
       {filas.length === 0 ? (
-        <p className="mt-1 text-xs text-gray-400">Nada por acá.</p>
+        <p className="mt-1 text-xs text-gray-400">Nada por aquí.</p>
       ) : (
         <ul className="mt-1.5 space-y-2">
           {filas.map(m => (

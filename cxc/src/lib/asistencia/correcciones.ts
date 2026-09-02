@@ -40,7 +40,7 @@ export const MIGRACION_CORRECCIONES = "20260813150000_asistencia_correcciones.sq
 
 /** El mensaje que ve la gente cuando falta correr el SQL. Sin jerga de base. */
 export function avisoMigracionCorrecciones(): string {
-  return `Todavía no se puede corregir marcaciones acá. Pídele a Daniel que corra el archivo ${MIGRACION_CORRECCIONES} en Supabase.`;
+  return `Todavía no se puede corregir marcaciones aquí. Pídele a Daniel que corra el archivo ${MIGRACION_CORRECCIONES} en Supabase.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

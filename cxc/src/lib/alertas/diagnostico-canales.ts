@@ -139,7 +139,7 @@ export const consultarBotReal: ConsultarBot = async (token) => {
       return {
         verificado: false,
         error: sinToken(
-          `Telegram rechazó este token: ${detalle}. Revisá que esté completo y sin espacios.`,
+          `Telegram rechazó este token: ${detalle}. Revisa que esté completo y sin espacios.`,
           token,
         ),
       };
@@ -219,7 +219,7 @@ export async function diagnosticarCanales(
     }
     for (const [nombre, estado] of Object.entries(variables)) {
       if (estado === "vacía") {
-        acciones.push(`En Vercel, ${nombre} existe pero está VACÍA. Cargale el valor o borrala.`);
+        acciones.push(`En Vercel, ${nombre} existe pero está VACÍA. Cárgale el valor o bórrala.`);
       }
       if (estado === "ok (pero tiene espacios de más)") {
         acciones.push(
@@ -234,7 +234,7 @@ export async function diagnosticarCanales(
     if (bot && !bot.verificado) {
       acciones.push(
         `El bot del canal ${canal} no pasó la verificación con Telegram: ${bot.error}` +
-          (destino ? ` Revisá ${varToken(canal)} en Vercel.` : " Revisá TELEGRAM_BOT_TOKEN en Vercel."),
+          (destino ? ` Revisa ${varToken(canal)} en Vercel.` : " Revisa TELEGRAM_BOT_TOKEN en Vercel."),
       );
     }
 

@@ -264,7 +264,7 @@ export async function updateProyectoMarcas(
  * no un error de Postgres.
  */
 export const MSG_SIN_CLIENTE_SIN_DDL =
-  "Para registrar un gasto sin cliente falta correr la actualización de la base de datos. Mientras tanto, elegí un cliente.";
+  "Para registrar un gasto sin cliente falta correr la actualización de la base de datos. Mientras tanto, elige un cliente.";
 
 export async function createFactura(
   input: CreateFacturaInput

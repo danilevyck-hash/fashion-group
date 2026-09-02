@@ -222,7 +222,7 @@ export async function respuestaErrorEscritura(
           `Qué pasa: el sistema y la base de datos no coinciden en un campo, así que la pantalla ` +
           `devuelve un error cada vez que alguien intenta guardar.\n` +
           `Qué significa: esa función está caída para todos hasta que se corrija.\n` +
-          `Qué hacer: avisale a quien programa — código ${codigo}, tabla ${contexto.tabla}.\n\n` +
+          `Qué hacer: avísale a quien programa — código ${codigo}, tabla ${contexto.tabla}.\n\n` +
           `Detalle: ${detalle}`,
       );
     } catch (e) {

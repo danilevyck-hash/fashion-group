@@ -51,13 +51,20 @@ import VacacionesTab from "@/app/asistencia/VacacionesTab";
 // sobre el componente real en `rango-fechas-calendario.test.tsx`.
 vi.mock("@/components/ui/RangoFechas", () => ({
   __esModule: true,
-  default: ({ desde, hasta, vacio, onChange }: {
+  // 🔴 `accion` se DIBUJA: el control real, en modo `inline`, pone en su pie el
+  // botón que le pasan —el «Generar» de la planilla—. Un doble que lo tirara
+  // dejaría la pantalla sin forma de pedir el cuadro.
+  default: ({ desde, hasta, vacio, onChange, accion }: {
     desde: string; hasta: string; vacio?: boolean;
     onChange: (d: string, h: string) => void;
+    accion?: React.ReactNode;
   }) => (
-    <button type="button" onClick={() => onChange(desde, hasta)}>
-      {vacio ? "Elegí el período" : `${desde} – ${hasta}`}
-    </button>
+    <div>
+      <button type="button" onClick={() => onChange(desde, hasta)}>
+        {vacio ? "Elige el período" : `${desde} – ${hasta}`}
+      </button>
+      {accion}
+    </div>
   ),
   // 🩸 `ultimoRango` NO es del control: es del MISMO módulo, y `ReporteTab` lo
   // importa con nombre (`import RangoFechas, { ultimoRango } from …`). Un
@@ -92,7 +99,9 @@ const montar = (ui: React.ReactElement) => render(<ToastProvider>{ui}</ToastProv
 // las vistas `lg:hidden` y `hidden lg:block` se montan LAS DOS y `getByRole`
 // revienta con «Found multiple elements».
 function elegirPeriodo() {
-  fireEvent.click(screen.getAllByRole("button", { name: /Elegí el período/ })[0]);
+  fireEvent.click(screen.getAllByRole("button", { name: /Elige el período/ })[0]);
+  // 🔴 Y GENERAR (4-sep-2026): elegir el período ya no pide el cuadro solo.
+  fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
 }
 
 beforeEach(() => vi.unstubAllGlobals());
@@ -279,12 +288,13 @@ describe("🔴 NADA SE DESCARTA EN SILENCIO — el aviso, en la pantalla", () =>
       "/api/asistencia/planilla",
       respuestaPlanilla({
         vacacionesNoPagadas: [], avisoVacacionesNoPagadas: null,
-        faltaMigracionVacaciones: "Todavía no se pueden cargar vacaciones acá. Pídele a Daniel que corra el archivo X en Supabase.",
+        // 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
+        faltaMigracionVacaciones: "Todavía no se pueden cargar vacaciones aquí. Pídele a Daniel que corra el archivo X en Supabase.",
       }),
     ]]);
     montar(<PlanillaTab />);
     elegirPeriodo();
-    expect(await screen.findByText(/Todavía no se pueden cargar vacaciones acá/)).toBeTruthy();
+    expect(await screen.findByText(/Todavía no se pueden cargar vacaciones aquí/)).toBeTruthy();
   });
 });
 
@@ -302,33 +312,19 @@ const RESPUESTA_TAB = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ⚠️ DORMIDOS DESDE EL 1-SEP-2026 — Y NO SE BORRAN.
+// 🩸 ESTOS CASOS DURMIERON UNAS HORAS (1-sep-2026) Y VOLVIERON.
 //
-// La pestaña Vacaciones se APAGÓ (`PESTANAS_OCULTAS` en
-// `src/lib/asistencia/roles.ts`) a pedido de Daniel: *«olvida lo de las
-// vacaciones por ahora, quitalo del ERP para no enrredar»*. `VacacionesTab`
-// sigue entero en el repo, pero ya no hay forma de llegar a él desde la app, así
-// que estos cinco casos probarían una pantalla que nadie puede abrir.
+// La pestaña se apagó por la mañana —*«olvida lo de las vacaciones por ahora,
+// quitalo del ERP para no enrredar»*— y estos cinco pasaron a `describe.skip`
+// en vez de borrarse, que es por lo que hoy hay algo que despertar. Se retractó
+// el mismo día: *«vacaciones quedamos que sí, dejalo, solo que haslo bien»*.
 //
-// 🔴 POR QUÉ `describe.skip` Y NO BORRARLOS: son la definición escrita de qué
-// garantizaba esa pantalla —el rango con sus días, el interruptor que dice el
-// EFECTO, el guardado sin botón, el aviso de la migración y el «no pide nota ni
-// motivo»—. Borrados, el día que se reactive nadie sabe qué tenía que cumplir y
-// hay que deducirlo del JSX.
-//
-// PARA REACTIVARLOS: sacar `"vacaciones"` de `PESTANAS_OCULTAS` y cambiar este
-// `describe.skip` por `describe`. Nada más — no dependen de nada que se haya
-// tocado. ⚠️ Antes de eso hay que arreglar el texto del interruptor: está la
-// nota completa pegada a `PESTANAS_OCULTAS` («Ya se le pagó» / «Se le pagan
-// estos días» se contradicen leídos juntos), y cuando se arregle, los casos de
-// abajo que miran ESAS palabras hay que actualizarlos con el texto nuevo.
-//
-// 🔑 LOS OTROS DOS BLOQUES DE ESTE ARCHIVO SIGUEN CORRIENDO, y es a propósito:
-// prueban el REPORTE y la PLANILLA —dos pantallas que se siguen viendo— y son
-// justamente la prueba de que el MOTOR sigue honrando las vacaciones cargadas.
-// Apagar la pestaña no podía apagarlos.
+// ⚠️ EL «HASLO BIEN» ERA EL TEXTO DEL INTERRUPTOR, así que el caso que lo mira
+// CAMBIÓ DE DIRECCIÓN. Decía «Ya se le pagó» con «Se le pagan estos días»
+// debajo, y juntas se leían contradiciéndose. Ahora la casilla PREGUNTA
+// —«¿Ya cobró estos días antes?»— y la consecuencia aparece SOLO al marcarla.
 // ─────────────────────────────────────────────────────────────────────────────
-describe.skip("la pestaña: persona + desde + hasta + un interruptor, y nada más", () => {
+describe("la pestaña: persona + desde + hasta + un interruptor, y nada más", () => {
   it("la fila dice nombre, rango y cuántos días", async () => {
     servir([["/api/asistencia/vacaciones", RESPUESTA_TAB]]);
     montar(<VacacionesTab />);
@@ -338,7 +334,14 @@ describe.skip("la pestaña: persona + desde + hasta + un interruptor, y nada má
     expect(screen.getByText(/16 jul 2026 → 13 ago 2026/).textContent).toContain("29");
   });
 
-  it("🔴 el interruptor dice el EFECTO, y cambia al tocarlo", async () => {
+  it("🔴 el interruptor PREGUNTA, y solo habla cuando se contesta que sí", async () => {
+    // 🩸 CAMBIÓ DE DIRECCIÓN el 1-sep-2026. Antes exigía lo contrario: que la
+    // línea «Se le pagan estos días.» se viera SIEMPRE, debajo de un título que
+    // decía «Ya se le pagó». Daniel, con la pantalla delante: *«me enrreda lo
+    // de Ya se le pagó / Se le pagan estos días»* — y las dos frases juntas, con
+    // la casilla vacía, se leen contradiciéndose. Hoy la casilla pregunta y la
+    // consecuencia sale SOLO marcada, que es el caso raro y el único que
+    // descuenta plata.
     servir([["/api/asistencia/vacaciones", RESPUESTA_TAB]]);
     montar(<VacacionesTab />);
     // 🔑 Dos veces a propósito: en el desplegable de personas y en la fila.
@@ -348,11 +351,14 @@ describe.skip("la pestaña: persona + desde + hasta + un interruptor, y nada má
     // pagan, y ese default decide una quincena.
     const casillas = screen.getAllByRole("checkbox") as HTMLInputElement[];
     expect(casillas[0].checked).toBe(false);
-    expect(screen.getAllByText("Se le pagan estos días.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("¿Ya cobró estos días antes?").length).toBeGreaterThan(0);
+    // ⛔ Desmarcada NO dice nada: ni la frase vieja, ni una nueva.
+    expect(screen.queryByText(/Se le pagan estos días/)).toBeNull();
+    expect(screen.queryByText(/no se le pagan/i)).toBeNull();
 
     fireEvent.click(casillas[0]);
     await waitFor(() =>
-      expect(screen.getAllByText(/No se le pagan estos días/).length).toBeGreaterThan(0),
+      expect(screen.getAllByText("Sí → no se le pagan, ya los cobró.").length).toBeGreaterThan(0),
     );
   });
 
@@ -383,10 +389,10 @@ describe.skip("la pestaña: persona + desde + hasta + un interruptor, y nada má
       ...RESPUESTA_TAB,
       vacaciones: [],
       puedeCargar: false,
-      avisoMigracion: "Todavía no se pueden cargar vacaciones acá. Pídele a Daniel que corra el archivo X en Supabase.",
+      avisoMigracion: "Todavía no se pueden cargar vacaciones aquí. Pídele a Daniel que corra el archivo X en Supabase.",
     }]]);
     montar(<VacacionesTab />);
-    expect(await screen.findByText(/Todavía no se pueden cargar vacaciones acá/)).toBeTruthy();
+    expect(await screen.findByText(/Todavía no se pueden cargar vacaciones aquí/)).toBeTruthy();
     const boton = screen.getByRole("button", { name: /Agregar/ }) as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
   });

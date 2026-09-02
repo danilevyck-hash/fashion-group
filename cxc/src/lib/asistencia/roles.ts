@@ -130,75 +130,21 @@ export function soloAprueba(rol: string): boolean {
 export const PESTANAS_DE_APROBACION = ["aprobaciones"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 PESTAÑAS APAGADAS — 1-sep-2026, VACACIONES.
+// 🩸 ACÁ VIVIÓ UNA LISTA DE «PESTAÑAS APAGADAS», Y DURÓ UNAS HORAS (1-sep-2026).
 //
-// Daniel, textual: *«olvida lo de las vacaciones por ahora, quitalo del ERP
-// para no enrredar»*. Se está trabajando el flujo de generar y cerrar la
-// planilla, y una pestaña más en el medio es ruido mientras eso se decide.
+// Vacaciones se apagó por la mañana —*«olvida lo de las vacaciones por ahora,
+// quitalo del ERP para no enrredar»*— y se volvió a encender el mismo día:
+// *«vacaciones quedamos que sí, dejalo, solo que haslo bien»*. Lo que enredaba
+// no era la pestaña: era el TEXTO del interruptor, y eso se arregló en
+// `vacaciones.ts` (`efectoDelInterruptor`) en vez de esconder la pantalla.
 //
-// 🔴 «QUITAR» ES **SOLO LA PANTALLA**. EL MOTOR SIGUE HONRANDO LAS VACACIONES
-// QUE YA ESTÁN CARGADAS, y esto no es una sutileza: hay DOS filas vivas en
-// producción, las dos de ELOYN MENDOZA (código 29, fashion_wear) — 16-jul →
-// 13-ago-2026 y 14-ago-2026, ninguna marcada «ya se le pagó». Hoy esos días no
-// le cuestan un centavo porque el motor los reconoce y el quincenal los cubre.
-// El día que alguien deje de LEER `asistencia_vacaciones` en el cálculo, esos
-// mismos días pasan a contarse como AUSENCIA —ella no marcó— y la planilla le
-// come una quincena entera EN SILENCIO. Por eso acá no se tocó una sola línea
-// del motor: ni `reporte.ts`, ni `planilla.ts`, ni `vacaciones.ts`, ni la ruta
-// `/api/asistencia/planilla`. La tabla, los datos, las migraciones, la ruta
-// `/api/asistencia/vacaciones` y `VacacionesTab.tsx` quedan **enteros**.
-//
-// 🔑 POR QUÉ UNA CONSTANTE Y NO BORRAR LA PESTAÑA DEL ARREGLO `TABS`: volver a
-// encenderla tiene que ser **borrar una línea**, no reconstruir el import, el
-// render, el orden y los tests. La pestaña sigue declarada, su componente
-// sigue montado en el archivo y su API sigue viva: lo único que cambia es que
-// nadie la ve. Se apaga acá —y no en `AsistenciaClient`— porque éste es el
-// único lugar donde ya se contesta «¿esta persona ve esta pestaña?», y así el
-// `?tab=vacaciones` de un marcador cae solo en la pestaña por defecto (la
-// pantalla filtra por `vePestana` ANTES de resolver la URL).
-//
-// ⚠️ Es una lista y no un booleano a propósito: la próxima que haya que apagar
-// se agrega acá y no inventa un segundo mecanismo.
-// Candado: `src/__tests__/lib/asistencia-pestanas.test.ts`.
-//
-// ── 🔴 QUÉ HAY QUE ARREGLAR **ANTES** DE VOLVER A ENCENDERLA ─────────────────
-//
-// No la apagó una duda de negocio: la apagó un TEXTO que confunde. Daniel, con
-// la pantalla delante, textual: *«me enrreda lo de Ya se le pagó / Se le pagan
-// estos días»*. Y tiene razón — es un defecto de REDACCIÓN, no de lógica.
-// Desmarcada, el interruptor se lee así:
-//
-//     ☐ Ya se le pagó
-//       Se le pagan estos días.
-//
-// El título es el ESTADO y la línea de abajo es la CONSECUENCIA de cómo está la
-// casilla AHORA (`efectoDelInterruptor` sí cambia al marcarla, más abajo en
-// `vacaciones.ts`). Pero juntas y desmarcadas se leen como UNA sola frase que se
-// contradice: dice «ya se le pagó» y abajo «se le pagan». Quien carga la
-// vacación tiene que adivinar cuál de las dos manda — y de eso depende que a
-// alguien se le descuente media quincena.
-//
-// EL ARREGLO PROPUESTO, y que Daniel dejó anotado para cuando se reactive:
-//
-//     ☐ ¿Ya cobró estos días antes?
-//       Sí → no se le pagan, ya los cobró.
-//
-// …con la línea de abajo visible **SOLO cuando está marcada**, que es el caso
-// raro y el ÚNICO que mueve plata. Una pregunta se contesta; un estado hay que
-// interpretarlo.
-//
-// ⚠️ NO SE IMPLEMENTÓ, A PROPÓSITO. Se le ofrecieron las dos salidas —arreglar
-// el texto ahora, u ocultar la pestaña— y eligió ocultarla mientras se trabaja
-// la planilla. `efectoDelInterruptor` y el JSX de `VacacionesTab.tsx` quedaron
-// EXACTAMENTE como estaban: cambiar el texto de una pantalla que nadie ve sería
-// un cambio sin nadie que lo revise.
+// 🔴 LA LISTA SE BORRÓ ENTERA, no se dejó vacía. Un mecanismo de apagar
+// pestañas sin ninguna pestaña apagada es una puerta esperando que alguien la
+// use para tapar un problema en vez de arreglarlo — que es exactamente lo que
+// pasó acá. Si algún día hay que apagar una de verdad, se escribe de nuevo.
 // ─────────────────────────────────────────────────────────────────────────────
-export const PESTANAS_OCULTAS = ["vacaciones"] as const;
 
 export function vePestana(rol: string, pestana: string): boolean {
-  // Apagada para TODOS, admin incluido: no es un permiso, es una pantalla que
-  // por ahora no se muestra.
-  if ((PESTANAS_OCULTAS as readonly string[]).includes(pestana)) return false;
   const esDeAprobacion = (PESTANAS_DE_APROBACION as readonly string[]).includes(pestana);
   return esDeAprobacion
     ? aprobacionesRoles().includes(rol)

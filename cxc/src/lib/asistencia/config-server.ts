@@ -619,7 +619,7 @@ export const MIGRACION_VACACIONES = "20260825160000_asistencia_vacaciones.sql";
 
 /** El mensaje que ve la gente cuando falta correr el SQL. Sin jerga de base. */
 export function avisoMigracionVacaciones(): string {
-  return `Todavía no se pueden cargar vacaciones acá. Pídele a Daniel que corra el archivo ${MIGRACION_VACACIONES} en Supabase.`;
+  return `Todavía no se pueden cargar vacaciones aquí. Pídele a Daniel que corra el archivo ${MIGRACION_VACACIONES} en Supabase.`;
 }
 
 export interface VacacionesLeidas {

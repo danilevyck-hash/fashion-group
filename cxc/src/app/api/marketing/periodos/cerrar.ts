@@ -167,7 +167,7 @@ export async function cerrarPeriodoDeMarca(args: {
     );
     throw new ErrorDeCierre(
       500,
-      "El período se cerró pero quedó algo raro con el nuevo. Revisá la lista de períodos antes de seguir.",
+      "El período se cerró pero quedó algo raro con el nuevo. Revisa la lista de períodos antes de seguir.",
       { periodoCerrado: periodo.id, periodoNuevo: siguienteId, abiertos },
     );
   }
@@ -197,10 +197,10 @@ export async function cerrarPeriodoDeMarca(args: {
 export function validarNombreSiguiente(valor: unknown): string {
   const nombre = typeof valor === "string" ? valor.trim() : "";
   if (!nombre) {
-    throw new ErrorDeCierre(400, "Escribí cómo se va a llamar el próximo período.");
+    throw new ErrorDeCierre(400, "Escribe cómo se va a llamar el próximo período.");
   }
   if (nombre.length > 120) {
-    throw new ErrorDeCierre(400, "El nombre es muy largo. Usá menos de 120 letras.");
+    throw new ErrorDeCierre(400, "El nombre es muy largo. Usa menos de 120 letras.");
   }
   return nombre;
 }

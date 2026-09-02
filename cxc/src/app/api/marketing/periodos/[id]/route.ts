@@ -41,13 +41,13 @@ export async function PATCH(
   }
   if (!nombre) {
     return NextResponse.json(
-      { error: "Escribí un nombre para el período." },
+      { error: "Escribe un nombre para el período." },
       { status: 400 },
     );
   }
   if (nombre.length > 120) {
     return NextResponse.json(
-      { error: "El nombre es muy largo. Usá menos de 120 letras." },
+      { error: "El nombre es muy largo. Usa menos de 120 letras." },
       { status: 400 },
     );
   }

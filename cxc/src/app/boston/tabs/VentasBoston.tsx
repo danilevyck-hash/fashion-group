@@ -101,7 +101,7 @@ export default function VentasBoston() {
 
       {data && !data.utilidadDisponible && (
         <p className="text-xs text-gray-500 pt-1">
-          De Confecciones Boston no se trae el costo desde Switch, así que acá no hay utilidad ni
+          De Confecciones Boston no se trae el costo desde Switch, así que aquí no hay utilidad ni
           margen: solo lo vendido.
         </p>
       )}

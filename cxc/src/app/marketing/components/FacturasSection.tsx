@@ -871,7 +871,7 @@ export default function FacturasSection({
               Anular factura {anulando.numero_factura}
             </h3>
             <p className="text-sm text-gray-500 mb-4">
-              Deja de contar como gasto. Queda guardada acá abajo, en
+              Deja de contar como gasto. Queda guardada aquí abajo, en
               &ldquo;Facturas anuladas&rdquo;, por si hay que restaurarla.
             </p>
             <label

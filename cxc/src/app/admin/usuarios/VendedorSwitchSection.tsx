@@ -111,7 +111,7 @@ export default function VendedorSwitchSection({ userId, showToast }: { userId: s
           Vendedor en Switch <span className="normal-case font-normal text-gray-400">· para pedidos de catálogos</span>
         </div>
         <Ayuda titulo="Para qué sirve" className="-my-2 shrink-0">
-          <p>Cuando este usuario arma un pedido desde un catálogo, el pedido sale a Switch a nombre del vendedor que elijas acá, uno por marca.</p>
+          <p>Cuando este usuario arma un pedido desde un catálogo, el pedido sale a Switch a nombre del vendedor que elijas aquí, uno por marca.</p>
         </Ayuda>
       </div>
       {/* 🩸 AVISO, NO metodología: mientras esto aparezca, el vendedor NO se

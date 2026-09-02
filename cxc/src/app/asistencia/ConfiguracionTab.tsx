@@ -730,7 +730,7 @@ export default function ConfiguracionTab() {
             <div className="-ml-2 -mt-1">
               <Ayuda titulo="Cómo se llena esta lista" etiqueta="Cómo se llena">
                 <p>
-                  El reloj solo manda un número por persona. Acá le pones nombre, sueldo y
+                  El reloj solo manda un número por persona. Aquí le pones nombre, sueldo y
                   <b> a qué empresa pertenece</b> — eso último es lo que separa la planilla de
                   Boston, la de Vistana y la de Fashion Wear, que comparten el mismo reloj.
                   <b> Se guarda solo</b> apenas cambias algo.
@@ -1244,7 +1244,7 @@ export default function ConfiguracionTab() {
                                   cuando el número cambia. */}
                               <Etiqueta
                                 texto={ETIQUETA_SALDO_INICIAL}
-                                ayuda="Los que le quedan hoy, de tus registros. Puede llevar medio día (12.5). De acá en adelante el sistema suma lo que gana y resta las vacaciones que se carguen."
+                                ayuda="Los que le quedan hoy, de tus registros. Puede llevar medio día (12.5). De aquí en adelante el sistema suma lo que gana y resta las vacaciones que se carguen."
                               />
                               <input
                                 type="number"
@@ -1335,11 +1335,11 @@ export default function ConfiguracionTab() {
             {bajas.length > 0 && (
               <details className="rounded-lg border border-gray-200 bg-gray-50">
                 <summary className="flex min-h-[44px] cursor-pointer items-center px-3 py-2.5 text-sm text-gray-700">
-                  Ya no trabajan acá ({bajas.length})
+                  Ya no trabajan aquí ({bajas.length})
                 </summary>
                 <div className="border-t border-gray-200 bg-white">
                   <div className="px-1 py-0.5">
-                    <Ayuda titulo="Qué pasa con quien ya no trabaja acá" etiqueta="Qué pasa con sus quincenas">
+                    <Ayuda titulo="Qué pasa con quien ya no trabaja aquí" etiqueta="Qué pasa con sus quincenas">
                       <ExplicacionBaja />
                     </Ayuda>
                   </div>
@@ -1369,7 +1369,7 @@ export default function ConfiguracionTab() {
                         onClick={() => void guardarBaja(p, "", "")}
                         className={`${PILL_BASE} ${PILL_OFF} disabled:opacity-50`}
                       >
-                        Volvió a trabajar acá
+                        Volvió a trabajar aquí
                       </button>
                     </div>
                   ))}
@@ -1411,7 +1411,7 @@ export default function ConfiguracionTab() {
                   <Ayuda titulo="Para qué sirven estos números" etiqueta="Para qué sirven">
                     <p>
                       Todos los números con los que se calcula. Si la ley o un acuerdo cambia,
-                      se cambia acá y el reporte lo usa de inmediato — no hay que tocar el sistema.
+                      se cambia aquí y el reporte lo usa de inmediato — no hay que tocar el sistema.
                     </p>
                   </Ayuda>
                 </div>
@@ -1478,7 +1478,7 @@ export default function ConfiguracionTab() {
 
                 <Bloque
                   titulo="Excedente en jornada nocturna o mixta"
-                  nota="Se guarda, pero NO SE USA para calcular: la contadora paga esos minutos × 1.50, junto con el resto de la hora extra de noche, y deja su columna en $0.00. Los dos campos quedan acá por si algún día se vuelve a usar; hoy cambiarlos no mueve un centavo."
+                  nota="Se guarda, pero NO SE USA para calcular: la contadora paga esos minutos × 1.50, junto con el resto de la hora extra de noche, y deja su columna en $0.00. Los dos campos quedan aquí por si algún día se vuelve a usar; hoy cambiarlos no mueve un centavo."
                 >
                   <Campo label="Desde cuántas horas extra al día" ayuda="3 quiere decir que aplica desde la cuarta hora extra."
                     sufijo="horas" valor={form.excedenteHorasDia}
@@ -1492,7 +1492,7 @@ export default function ConfiguracionTab() {
                     la FORMA del cálculo, no números sueltos. Ver `config.ts`. */}
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                   <div className="flex flex-wrap items-center gap-1">
-                    <h3 className="text-sm font-medium text-gray-900">Esto no se cambia desde acá</h3>
+                    <h3 className="text-sm font-medium text-gray-900">Esto no se cambia desde aquí</h3>
                     {/* El POR QUÉ no son campos se lee una vez. Las tres reglas
                         siguen a la vista: son las que hay que conocer para
                         cuadrar contra el Excel de la contable. */}

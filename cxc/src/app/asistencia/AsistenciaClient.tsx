@@ -53,11 +53,14 @@
 // adentro de la Planilla habría puesto un botón que mueve el pago de treinta
 // personas en la misma pantalla donde la contadora teclea montos.
 //
-// ⚠️ DESDE EL 1-SEP-2026 SE VEN 5: Vacaciones está APAGADA (`PESTANAS_OCULTAS`
-// en `lib/asistencia/roles.ts`), a pedido de Daniel —*«olvida lo de las
-// vacaciones por ahora, quitalo del ERP para no enrredar»*— mientras se trabaja
-// el flujo de generar y cerrar la planilla. Está apagada, no borrada: el
-// componente, la ruta y el motor siguen enteros. Ver la nota de la constante.
+// 🩸 VACACIONES SE APAGÓ Y SE VOLVIÓ A ENCENDER EL MISMO DÍA (1-sep-2026), y
+// vuelven a ser 6. Daniel la mandó a apagar —*«olvida lo de las vacaciones por
+// ahora, quitalo del ERP para no enrredar»*— y unas horas después se retractó:
+// *«vacaciones quedamos que sí, dejalo, solo que haslo bien»*. Lo que enredaba
+// no era la pestaña: era el TEXTO del interruptor, que decía «Ya se le pagó»
+// con «Se le pagan estos días» debajo. Se arregló el texto —ahora la casilla
+// PREGUNTA y la consecuencia solo aparece al marcarla, `vacaciones.ts`— en vez
+// de esconder la pantalla. La lista de pestañas apagadas se borró entera.
 //
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
@@ -86,12 +89,9 @@ const TABS = [
   // propia cuenta de días—, así que no pueden vivir en la misma lista. Va al
   // lado porque las dos son «lo que pasa con la gente esta quincena».
   //
-  // ⚠️ APAGADA DESDE EL 1-SEP-2026 — sigue declarada acá A PROPÓSITO. Está en
-  // `PESTANAS_OCULTAS` (`lib/asistencia/roles.ts`), así que `vePestana` la deja
-  // fuera de `visibles` para todos y un `?tab=vacaciones` guardado cae en la
-  // pestaña por defecto. Volver a encenderla = borrar esa línea de la
-  // constante; no hay nada más que reconstruir. 🔴 El MOTOR sigue honrando las
-  // vacaciones ya cargadas: esconder la pantalla no cambió un centavo.
+  // 🩸 Estuvo apagada unas horas el 1-sep-2026 y volvió el mismo día: lo que
+  // enredaba era el texto del interruptor, no la pestaña. Ver la nota de
+  // arriba y `efectoDelInterruptor` en `lib/asistencia/vacaciones.ts`.
   ["vacaciones", "Vacaciones"],
   // 🔴 LA SEXTA, APROBACIONES (26-ago-2026). Se ganó el lugar por lo que se
   // hace ahí y por QUIÉN lo hace: es la única pantalla del módulo donde una

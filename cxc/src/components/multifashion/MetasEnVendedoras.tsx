@@ -105,7 +105,7 @@ export function MetasEnVendedoras() {
                 {fmtMoney(meta.avance.vendido)}
               </span>{" "}
               de {fmtMoney(meta.avance.objetivo)}. Esta meta cuenta toda la venta de la
-              tienda: acá se ve lo que puso cada una, no una meta personal.
+              tienda: aquí se ve lo que puso cada una, no una meta personal.
             </p>
           )}
 

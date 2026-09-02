@@ -53,13 +53,20 @@ import ConfiguracionTab from "@/app/asistencia/ConfiguracionTab";
 // sobre el componente real en `rango-fechas-calendario.test.tsx`.
 vi.mock("@/components/ui/RangoFechas", () => ({
   __esModule: true,
-  default: ({ desde, hasta, vacio, onChange }: {
+  // 🔴 `accion` se DIBUJA: el control real, en modo `inline`, pone en su pie el
+  // botón que le pasan —el «Generar» de la planilla—. Un doble que lo tirara
+  // dejaría la pantalla sin forma de pedir el cuadro.
+  default: ({ desde, hasta, vacio, onChange, accion }: {
     desde: string; hasta: string; vacio?: boolean;
     onChange: (d: string, h: string) => void;
+    accion?: React.ReactNode;
   }) => (
-    <button type="button" onClick={() => onChange(desde, hasta)}>
-      {vacio ? "Elegí el período" : `${desde} – ${hasta}`}
-    </button>
+    <div>
+      <button type="button" onClick={() => onChange(desde, hasta)}>
+        {vacio ? "Elige el período" : `${desde} – ${hasta}`}
+      </button>
+      {accion}
+    </div>
   ),
   // 🩸 `ultimoRango` NO es del control: es del MISMO módulo, y `ReporteTab` lo
   // importa con nombre (`import RangoFechas, { ultimoRango } from …`). Un
@@ -108,7 +115,10 @@ function montar(ui: React.ReactElement) {
 // las vistas `lg:hidden` y `hidden lg:block` se montan LAS DOS y `getByRole`
 // revienta con «Found multiple elements».
 function elegirPeriodo() {
-  fireEvent.click(screen.getAllByRole("button", { name: /Elegí el período/ })[0]);
+  fireEvent.click(screen.getAllByRole("button", { name: /Elige el período/ })[0]);
+  // 🔴 Y GENERAR (4-sep-2026): elegir el período ya no pide el cuadro solo. El
+  // flujo que aprobó Daniel es elegir → Generar → revisar → Cerrar.
+  fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
 }
 
 /** Toca el ⓘ cuyo nombre accesible es `titulo`. */
@@ -151,7 +161,8 @@ describe("Horarios — el porqué pasó al ⓘ; lo que hay que confirmar se qued
     await screen.findByText(/Ángela García/);
     esperaDetrasDelInfo(
       "De dónde sale la hora sugerida",
-      /Lo que fijes acá manda sobre lo que diga el reloj/,
+      // 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
+      /Lo que fijes aquí manda sobre lo que diga el reloj/,
     );
   });
 
@@ -351,7 +362,7 @@ describe("Planilla — la fórmula al ⓘ, los avisos de plata en pantalla", () 
     expect(document.body.textContent).not.toContain(FORMULA_NETO);
     abrirAyuda("Cómo se calcula el neto");
     expect(screen.getByRole("dialog").textContent).toContain(FORMULA_NETO);
-    expect(screen.getByText(/se escriben a mano acá/)).toBeTruthy();
+    expect(screen.getByText(/se escriben a mano aquí/)).toBeTruthy();
   });
 
   it("🔴 los 5 avisos de plata siguen en pantalla, sin tocar nada", async () => {
@@ -366,7 +377,7 @@ describe("Planilla — la fórmula al ⓘ, los avisos de plata en pantalla", () 
     // se asume la salida
     expect(screen.getByText(/su hora de/)).toBeTruthy();
     // sábado que no se paga acá
-    expect(screen.getByText(/no se pagan acá/)).toBeTruthy();
+    expect(screen.getByText(/no se pagan aquí/)).toBeTruthy();
     // quedó fuera del total, NO vale $0
     expect(screen.getByText(/fuera del total/)).toBeTruthy();
   });
@@ -526,13 +537,13 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     expect(screen.queryByText(/No hay nadie en este filtro/)).toBeNull();
   });
 
-  it("🔴 la lista de «ya no trabajan acá» conserva el nombre, el motivo y el botón de reactivar", async () => {
+  it("🔴 la lista de «ya no trabajan aquí» conserva el nombre, el motivo y el botón de reactivar", async () => {
     await abrirConfiguracion();
-    const detalle = screen.getByText(/Ya no trabajan acá/).closest("details")!;
+    const detalle = screen.getByText(/Ya no trabajan aquí/).closest("details")!;
     expect(within(detalle).getByText(/Renunció el 31 de julio de 2026/)).toBeTruthy();
-    expect(within(detalle).getByRole("button", { name: "Volvió a trabajar acá" })).toBeTruthy();
+    expect(within(detalle).getByRole("button", { name: "Volvió a trabajar aquí" })).toBeTruthy();
     esperaDetrasDelInfo(
-      "Qué pasa con quien ya no trabaja acá",
+      "Qué pasa con quien ya no trabaja aquí",
       /Sigue apareciendo entera en las quincenas en que trabajó/,
     );
   });

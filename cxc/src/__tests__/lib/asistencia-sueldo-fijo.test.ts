@@ -128,7 +128,7 @@ describe("🔴 EL CANDADO DE CONDUCTA — las tres, y ninguna prueba sola", () =
     expect(l.dinero!.seguroEducativo).toBe(4.38);
     expect(l.dinero!.netoPagar).toBe(311.49);
 
-    // Lo que ANTES pasaba y ya no: ni pendiente, ni «decidilo vos».
+    // Lo que ANTES pasaba y ya no: ni pendiente, ni «Tú decides».
     expect(l.faltaConfigurar).toEqual([]);
     expect(l.decidirAMano).toBeNull();
     expect(l.noMarcaReloj).toBe(true);
@@ -243,7 +243,8 @@ describe("lo que la bandera NO apaga", () => {
     expect(l.decidirAMano).toBe("entró el 10 de julio de 2026");
   });
 
-  it("🔴 pero una justificación NO lo manda a «decidilo vos»", () => {
+  // El rótulo decía «Decidilo vos» hasta el 1-sep-2026; se renombró a «Tú decides» porque era voseo y el sistema habla tuteo neutro (candado `nada-de-voseo`).
+  it("🔴 pero una justificación NO lo manda a «Tú decides»", () => {
     // Que no haya marcas no es un hecho a explicar: es su forma de trabajar.
     // Mirar `justificados` le pondría un texto de vacaciones que además es falso.
     const personas = armarReporte({

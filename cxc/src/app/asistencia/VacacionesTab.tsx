@@ -24,6 +24,7 @@ import RangoFechas from "@/components/ui/RangoFechas";
 import {
   diasDeVacacion,
   efectoDelInterruptor,
+  PREGUNTA_YA_COBRADAS,
 } from "@/lib/asistencia/vacaciones";
 import {
   textoDetalle,
@@ -215,8 +216,13 @@ export default function VacacionesTab() {
         </div>
 
         {/* 🔴 EL INTERRUPTOR VA ACÁ, EN LA MISMA FILA DE LAS FECHAS. No es otra
-            pantalla ni un paso 2: es parte de cargar la vacación. La etiqueta
-            dice lo que hace y la línea gris de abajo, el efecto — UNA sola. */}
+            pantalla ni un paso 2: es parte de cargar la vacación.
+
+            🩸 PREGUNTA, NO ESTADO. Decía «Ya se le pagó» con «Se le pagan estos
+            días» debajo, y juntas se leían contradiciéndose. Ahora la casilla
+            pregunta y la línea gris solo aparece si se contesta que sí — que es
+            el caso raro y el único que descuenta plata. El texto vive en
+            `lib/asistencia/vacaciones.ts`, no acá: se escribe en dos lugares. */}
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <label className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-2.5">
             <input
@@ -224,8 +230,10 @@ export default function VacacionesTab() {
               onChange={(e) => setYaPagadas(e.target.checked)}
             />
             <span>
-              <span className="block text-sm text-gray-900">Ya se le pagó</span>
-              <span className="block text-[12px] text-gray-500">{efectoDelInterruptor(yaPagadas)}</span>
+              <span className="block text-sm text-gray-900">{PREGUNTA_YA_COBRADAS}</span>
+              {efectoDelInterruptor(yaPagadas) && (
+                <span className="block text-[12px] text-gray-500">{efectoDelInterruptor(yaPagadas)}</span>
+              )}
             </span>
           </label>
           <button type="button" onClick={() => void agregar()} disabled={guardando || !puedeCargar}
@@ -276,8 +284,10 @@ export default function VacacionesTab() {
                   <input type="checkbox" checked={v.ya_pagadas} className="h-4 w-4 accent-black"
                     onChange={(e) => void editar(v.id, { yaPagadas: e.target.checked })} />
                   <span>
-                    <span className="block text-sm text-gray-900">Ya se le pagó</span>
-                    <span className="block text-[12px] text-gray-500">{efectoDelInterruptor(v.ya_pagadas)}</span>
+                    <span className="block text-sm text-gray-900">{PREGUNTA_YA_COBRADAS}</span>
+                    {efectoDelInterruptor(v.ya_pagadas) && (
+                      <span className="block text-[12px] text-gray-500">{efectoDelInterruptor(v.ya_pagadas)}</span>
+                    )}
                   </span>
                 </label>
               </div>

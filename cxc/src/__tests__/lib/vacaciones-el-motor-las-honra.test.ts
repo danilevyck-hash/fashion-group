@@ -1,19 +1,24 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 OCULTAR LA PESTAÑA NO PUEDE MOVER UN CENTAVO.
+// 🔴 EL MOTOR HONRA LAS VACACIONES CARGADAS, PASE LO QUE PASE CON LA PANTALLA.
 //
-// Daniel, 1-sep-2026: *«olvida lo de las vacaciones por ahora, quitalo del ERP
-// para no enrredar»*. Se apagó la PESTAÑA (`PESTANAS_OCULTAS`), NO el motor.
+// 🩸 SE LLAMABA `vacaciones-ocultas-no-mueven-plata` y nació el 1-sep-2026, el
+// día que la pestaña se apagó por unas horas: *«olvida lo de las vacaciones por
+// ahora, quitalo del ERP para no enrredar»*. Se volvió a encender el mismo día
+// —*«vacaciones quedamos que sí, dejalo, solo que haslo bien»*—, así que los
+// casos de la pestaña apagada están DADOS VUELTA. El nombre cambió porque el
+// viejo describía un estado que duró una tarde; lo que este archivo vigila de
+// verdad no cambió ni una línea.
 //
 // 🩸 Y LA DIFERENCIA ES UNA QUINCENA ENTERA DE UNA PERSONA REAL. En producción
 // hay 2 vacaciones cargadas, las dos de ELOYN MENDOZA (código 29, fashion_wear,
-// $566,52/mes): del 16-jul al 13-ago y el 14-ago, ninguna marcada «ya se le
-// pagó». Hoy esos días NO le cuestan nada: el motor los reconoce y el quincenal
-// los cubre.
+// $566,52/mes): del 16-jul al 13-ago y el 14-ago, ninguna con la casilla
+// marcada. Hoy esos días NO le cuestan nada: el motor los reconoce y el
+// quincenal los cubre.
 //
-// Si alguien, «ya que la pestaña no se ve», sacara `leerVacaciones` del camino
-// de cálculo, esos días pasarían a ser AUSENCIAS —porque ella no marcó— y la
-// planilla le descontaría el sueldo completo EN SILENCIO. Nadie lo vería hasta
-// el día de pago.
+// Si alguien sacara `leerVacaciones` del camino de cálculo —«total, es una
+// pantalla que casi no se usa»—, esos días pasarían a ser AUSENCIAS —porque
+// ella no marcó— y la planilla le descontaría el sueldo completo EN SILENCIO.
+// Nadie lo vería hasta el día de pago.
 //
 // Este archivo existe para que eso rompa el build.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,28 +27,36 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { clasificarDia } from "@/lib/asistencia/planilla";
-import { PESTANAS_OCULTAS, vePestana } from "@/lib/asistencia/roles";
+import { vePestana } from "@/lib/asistencia/roles";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf-8");
 /** Fuera comentarios: este archivo NOMBRA lo que vigila. */
 const sinComentarios = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^[ \t]*\/\/.*$/gm, "");
 
-describe("la pestaña está apagada", () => {
-  it("«vacaciones» está en la lista de ocultas", () => {
-    expect([...PESTANAS_OCULTAS]).toContain("vacaciones");
-  });
-
-  it("🔴 no la ve NADIE, admin incluido: no es un permiso, es una pantalla apagada", () => {
-    for (const rol of ["admin", "secretaria", "contabilidad", "bodega", "gerente_boston"]) {
-      expect(vePestana(rol, "vacaciones"), rol).toBe(false);
+// ⚠️ ESTOS TRES CASOS CAMBIARON DE DIRECCIÓN el 1-sep-2026. Exigían que la
+// pestaña NO se viera y que «vacaciones» estuviera en `PESTANAS_OCULTAS`; hoy
+// exigen que SÍ se vea. La constante ya no existe: se borró entera para que no
+// quede un mecanismo de apagar pantallas esperando que alguien lo use.
+describe("la pestaña se ve", () => {
+  it("la ve quien tiene Asistencia — es una pestaña más, sin permiso propio", () => {
+    for (const rol of ["admin", "secretaria", "contabilidad"]) {
+      expect(vePestana(rol, "vacaciones"), rol).toBe(true);
     }
   });
 
-  it("y las demás siguen viéndose — no se apagó de más", () => {
+  it("⛔ y NO la ve quien entra solo a aprobar horas extra", () => {
+    // 🩸 La vara: si `vePestana` devolviera `true` para todo, el caso de arriba
+    // pasaría igual. Bodega es Julio, que entra a autorizar y a nada más.
+    expect(vePestana("bodega", "vacaciones")).toBe(false);
+    expect(vePestana("vendedor", "vacaciones")).toBe(false);
+  });
+
+  it("y las demás siguen como estaban — no se encendió de más", () => {
     expect(vePestana("admin", "planilla")).toBe(true);
     expect(vePestana("contabilidad", "reporte")).toBe(true);
     expect(vePestana("bodega", "aprobaciones")).toBe(true);
+    expect(vePestana("bodega", "planilla")).toBe(false);
   });
 });
 
@@ -82,7 +95,7 @@ describe("🔴 EL MOTOR SIGUE HONRANDO LO CARGADO — la plata de ELOYN", () => 
     expect(r.extraDiurnoMin).toBe(0);
   });
 
-  it("⚠️ y con «ya se le pagó» SÍ descuenta — el interruptor sigue vivo", () => {
+  it("⚠️ y con la casilla marcada SÍ descuenta — el interruptor sigue vivo", () => {
     const yaPagada = {
       ...DIA_SIN_MARCAS,
       ausente: false,
@@ -115,7 +128,6 @@ describe("BARRIDO — nadie sacó las vacaciones del camino de cálculo", () => 
     expect(() => leer("src/lib/asistencia/vacaciones.ts")).not.toThrow();
     expect(() => leer("src/lib/asistencia/saldo-vacaciones.ts")).not.toThrow();
     expect(() => leer("src/app/api/asistencia/vacaciones/route.ts")).not.toThrow();
-    // Y la pantalla queda entera, muerta pero lista para reactivar.
     expect(() => leer("src/app/asistencia/VacacionesTab.tsx")).not.toThrow();
   });
 });

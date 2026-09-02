@@ -71,7 +71,7 @@ export default function FeriadosTab() {
         <Ayuda titulo="Para qué sirven los feriados" etiqueta="Para qué sirven">
           <p>
             Estos días <b>no cuentan como ausencia de nadie</b>. Los feriados de Panamá ya
-            están cargados; agrega acá tus cierres propios (inventario, capacitación).
+            están cargados; agrega aquí tus cierres propios (inventario, capacitación).
           </p>
         </Ayuda>
       </div>

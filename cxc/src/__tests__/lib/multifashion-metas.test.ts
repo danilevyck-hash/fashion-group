@@ -705,7 +705,8 @@ describe("la línea que explica por qué los aportes no suman 100%", () => {
     ]) {
       const src = readFileSync(path.join(process.cwd(), f), "utf-8");
       expect(src, `${f} no muestra la línea`).toContain("textoAporteNoAsignado");
-      expect(src, `${f} escribe la frase a mano`).not.toContain("que ya no trabajan acá.");
+      // 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
+      expect(src, `${f} escribe la frase a mano`).not.toContain("que ya no trabajan aquí.");
     }
   });
 });

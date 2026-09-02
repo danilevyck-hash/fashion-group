@@ -526,7 +526,7 @@ export function avisoSinSaldo(sinFecha: number, sinSaldo: number): string | null
  */
 export const DESDE_CUANDO_CUENTA =
   "Arranca del saldo que carga contabilidad y desde esa fecha suma lo ganado y "
-  + "resta las vacaciones cargadas acá.";
+  + "resta las vacaciones cargadas aquí.";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VALIDACIÓN — el validador recibe `unknown` y convierte él

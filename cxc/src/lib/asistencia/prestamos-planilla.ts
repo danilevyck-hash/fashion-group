@@ -373,7 +373,7 @@ export function textoPrestamoSinAprobar(
     items.length === 1
       ? "1 persona tiene préstamo por descontar sin aprobar: NO se descontó en este cuadro."
       : `${items.length} personas tienen préstamo por descontar sin aprobar: NO se descontó en este cuadro.`;
-  return `${cabeza} Se aprueba acá arriba, en «Préstamos por descontar». ${detalle}`;
+  return `${cabeza} Se aprueba aquí arriba, en «Préstamos por descontar». ${detalle}`;
 }
 
 /**

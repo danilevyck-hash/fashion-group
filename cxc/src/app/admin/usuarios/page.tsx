@@ -495,7 +495,7 @@ function UsuariosPageInner() {
                     </label>
                     <Ayuda titulo="Permisos personalizados" className="-my-2 shrink-0">
                       <p>Apagados, el usuario ve los módulos que le da su rol.</p>
-                      <p className="mt-1.5">Encendidos, ve <span className="font-medium text-gray-900">solo</span> los que marques acá: la lista reemplaza a la del rol, no se suma.</p>
+                      <p className="mt-1.5">Encendidos, ve <span className="font-medium text-gray-900">solo</span> los que marques aquí: la lista reemplaza a la del rol, no se suma.</p>
                     </Ayuda>
                   </div>
                   {customPerms && (

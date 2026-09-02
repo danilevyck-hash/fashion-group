@@ -176,7 +176,7 @@ export default function RegistrarPagoModal({
       } | null;
       if (foto && data?.fotoGuardada === false) {
         toast(
-          "Pago registrado, pero la foto no se pudo guardar. Volvé a subirla desde el gasto.",
+          "Pago registrado, pero la foto no se pudo guardar. Vuelve a subirla desde el gasto.",
           "warning",
         );
       } else {

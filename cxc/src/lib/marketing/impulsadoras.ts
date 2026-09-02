@@ -449,7 +449,7 @@ export async function registrarPagoImpulsadora(
   const choque = yaPagados.find((p) => seSolapan(p, periodo));
   if (choque) {
     throw new Error(
-      `Ya hay un pago registrado que cubre esos días (${etiquetaPeriodo(choque)}). Elegí otras fechas.`,
+      `Ya hay un pago registrado que cubre esos días (${etiquetaPeriodo(choque)}). Elige otras fechas.`,
     );
   }
 

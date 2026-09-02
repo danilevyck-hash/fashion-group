@@ -88,8 +88,8 @@ export default function SaldosBancarios({ bancos, historial, onGuardado, titulo 
               <p className="mt-1 text-xs text-amber-800">
                 {repetidas.map((k) => empresaNombre(k)).join(", ")} — el monto es
                 exactamente el mismo de la carga de antes. Puede estar bien, pero
-                suele pasar cuando se copia el saldo del mes pasado. Revisá y
-                corregí abajo si hace falta.
+                suele pasar cuando se copia el saldo del mes pasado. Revisa y
+                corrige abajo si hace falta.
               </p>
             </div>
           )}

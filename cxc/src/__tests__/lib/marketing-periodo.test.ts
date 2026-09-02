@@ -36,9 +36,10 @@ describe("validarPeriodo", () => {
   });
 
   it("rechaza fechas vacías o inválidas", () => {
-    expect(validarPeriodo("", "2026-07-15")).toBe("Poné las dos fechas del período trabajado.");
+    // 1-sep-2026: el texto de pantalla pasó a tuteo neutro (sin voseo) — candado en `nada-de-voseo.test.ts`.
+    expect(validarPeriodo("", "2026-07-15")).toBe("Pon las dos fechas del período trabajado.");
     expect(validarPeriodo("2026-02-30", "2026-03-01")).toBe(
-      "Poné las dos fechas del período trabajado.",
+      "Pon las dos fechas del período trabajado.",
     );
   });
 });

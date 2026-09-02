@@ -57,7 +57,7 @@ export function fraseAlDia(alDia: AlDia | undefined, descargaAutomatica: boolean
     case "mes_en_curso":
       return `Cargado hasta ${mesLargo(alDia.mes)}, que todavía va corriendo`;
     case "quizas_incompleto":
-      return `Cargado hasta ${mesLargo(alDia.mes)} · ese mes va en ${usd(alDia.gastoCent)} y lo habitual acá es ${usd(alDia.habitualCent)}: puede estar a medio cargar`;
+      return `Cargado hasta ${mesLargo(alDia.mes)} · ese mes va en ${usd(alDia.gastoCent)} y lo habitual aquí es ${usd(alDia.habitualCent)}: puede estar a medio cargar`;
   }
 }
 

@@ -908,7 +908,7 @@ export async function createEntrega(
     // escupirle un error de Postgres a la secretaria.
     if (!proyectoId && /not-null|null value/i.test(entErr?.message ?? "")) {
       throw new Error(
-        "Para registrar una entrega sin cliente falta correr la actualización de la base de datos. Mientras tanto, elegí un cliente.",
+        "Para registrar una entrega sin cliente falta correr la actualización de la base de datos. Mientras tanto, elige un cliente.",
       );
     }
     throw new Error(`createEntrega[entrega]: ${entErr?.message ?? "sin datos"}`);
