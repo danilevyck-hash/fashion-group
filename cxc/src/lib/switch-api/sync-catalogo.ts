@@ -39,7 +39,16 @@
 //
 // PARAMETRIZACIÓN: cada marca pasa su `CatalogoSyncConfig` (cliente Supabase,
 // tabla, scope de empresas, filtro de artículo, campos de stock e inserción). El
-// `image_url` y la `category` JAMÁS se sobreescriben en el UPDATE.
+// `image_url` JAMÁS se sobreescribe en el UPDATE.
+//
+// ⚠️ LA `category` TAMPOCO LA ESCRIBE EL MOTOR — pero una marca SÍ puede, por su
+// hook `derive`, y hoy lo hacen las cuatro. Tommy y Calvin desde el 5-ago-2026
+// (la categoría se DERIVA de la misma descripción que el nombre: refrescar una y
+// congelar la otra las dejaba contradiciéndose) y **Reebok desde el 2-sep-2026**,
+// cuando se descubrió que la suya no venía de ningún lado: el motor le ponía
+// `defaultCategory` en el INSERT y nadie la tocaba nunca más. La regla vigente es
+// la de Daniel: **la clasificación la manda Switch**; lo que se edita a mano y el
+// sync respeta es la FOTO y el NOMBRE (`foto_manual` / `nombre_manual`).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -382,6 +391,26 @@ export interface CatalogoSyncConfig {
     insertFields: (a: SwitchArticulo) => Record<string, unknown>;
     updateFields?: (a: SwitchArticulo, existing: Record<string, unknown>) => Record<string, unknown>;
   };
+  /**
+   * Cierre por-marca de UNA empresa, en el MISMO lugar y con las MISMAS
+   * garantías que el aviso de precios imposibles: corre con el `logId` de esta
+   * corrida todavía abierto y devuelve lo que quiera dejar en `skip_details`.
+   *
+   * 🔑 Corre ANTES de cerrar el log a propósito. Un aviso con anti-loop lee las
+   * corridas anteriores del mismo par (empresa, sync_type) y descarta la
+   * ACTUAL por su `logId`; si el hook corriera después del `finish`, su propio
+   * rastro ya estaría escrito, se contaría como "ya avisado" y el aviso no
+   * saldría NUNCA — un anti-loop que se calla a sí mismo.
+   *
+   * Nunca puede tumbar el sync: el motor lo envuelve en try/catch y la corrida
+   * sigue en `success` aunque el hook falle. Reebok lo usa para el centinela de
+   * clasificación; las demás marcas no lo pasan y no cambia nada.
+   */
+  alCerrarEmpresa?: (ctx: {
+    empresaKey: string;
+    logId: string | null;
+    dryRun: boolean;
+  }) => Promise<unknown[]>;
 }
 
 interface ExistingProduct {
@@ -718,7 +747,10 @@ export async function syncCatalogo(
             ...(config.derive?.updateFields
               ? config.derive.updateFields(art, p as unknown as Record<string, unknown>)
               : {}),
-            // image_url y category INTENCIONALMENTE ausentes — jamás se sobreescriben.
+            // image_url INTENCIONALMENTE ausente — jamás se sobreescribe.
+            // `category`/`gender` tampoco los pone el motor: los pone la marca
+            // por `derive.updateFields`, que corre arriba y ya los agregó si
+            // corresponde (ver la nota de la cabecera).
           };
           // ¿Este UPDATE guardaría exactamente lo que ya está? Se compara contra
           // la fila que el read-all-then-write YA tenía en memoria: comparar no
@@ -908,7 +940,19 @@ export async function syncCatalogo(
           `ningún producto cambió. Normal entre dos pasadas seguidas; sospechoso si se repite corrida tras corrida.`,
       );
     }
-    const detalles = dryRun ? undefined : [...(skipDetailsPrecio ?? []), detalleEscrituras(contadores)];
+    // Cierre por-marca (Reebok: el centinela de clasificación). Va acá y no
+    // después del `finish` — ver el comentario de `alCerrarEmpresa`.
+    let detallesDelCierre: unknown[] = [];
+    if (config.alCerrarEmpresa) {
+      try {
+        detallesDelCierre = await config.alCerrarEmpresa({ empresaKey: emp.empresaKey, logId, dryRun });
+      } catch (e) {
+        console.error(`[${config.syncLogType} ${emp.empresaKey}] el cierre de la marca falló: ${String(e)}`);
+      }
+    }
+    const detalles = dryRun
+      ? undefined
+      : [...(skipDetailsPrecio ?? []), ...detallesDelCierre, detalleEscrituras(contadores)];
     if (out.error) {
       await finishSwitchSyncLog(logId, "error", { errorMessage: out.error, skipDetails: detalles });
     } else {

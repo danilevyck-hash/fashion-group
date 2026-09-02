@@ -33,12 +33,13 @@
 //     anotarse `success` con medio catálogo.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { createSwitchClient } from "./client";
+import { createSwitchClient, type SwitchClient } from "./client";
 import { supabaseServer } from "@/lib/supabase-server";
 import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
 import { particionarFilas } from "./monto-guard";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { enParalelo } from "./en-paralelo";
 
 /** Paginación real del endpoint (manda ~50 aunque se pida más). */
 const PER_PAGE = 50;
@@ -63,6 +64,55 @@ const PISO_BARRIDO = 0.7;
  *  absurdo. */
 export const EXISTENCIA_MAX = 500_000;
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LA FICHA DEL ARTÍCULO (rubro / subrubro / marca) — 2-sep-2026
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 🩸 **`/apiarticulos/lista` NO TRAE ESTOS TRES CAMPOS, y está medido.** El
+ * encabezado de `getArticuloInfo` en `client.ts` lo dice desde el 6-ago-2026:
+ * sobre los 9.126 artículos de american_classic, `marcaId` viene en el 100% y
+ * el campo `marca` está **ausente en el 100%**; `rubro`/`subrubro` tampoco
+ * vienen. O sea: el barrido de páginas que este sync ya hace **no puede** dar
+ * la clasificación, por más que se le agreguen columnas. El único endpoint que
+ * la da es `/apiarticulos/info`, y va **de a UNO** por código de barra.
+ *
+ * Por eso la ficha se pide en una SEGUNDA fase, con tres frenos:
+ *   1. **Solo las empresas que la usan** (`EMPRESAS_CON_FICHA`). Pedirle la
+ *      ficha a los 8.254 artículos de vistana serían 8.254 requests para un
+ *      dato que nadie lee.
+ *   2. **Solo a quien todavía no la tiene** (`ficha_at IS NULL`), y primero a
+ *      los que tienen existencia — que son los que se ven en el catálogo. El
+ *      rubro de un artículo no cambia solo; el catálogo sí crece. En régimen
+ *      esta fase pide 0 fichas. Es la MISMA estrategia con la que
+ *      `sync-articulo-marca` traduce los marcaId nuevos (33 la primera vez, 0
+ *      después).
+ *   3. **Un presupuesto duro**, de cantidad y de reloj. La función tiene 800 s
+ *      y el barrido de páginas ya se come una parte; si la primera corrida no
+ *      alcanza a drenar la cola, drena la de mañana. Nunca al revés: preferimos
+ *      tardar dos noches en clasificar que tumbar el sync que trae el precio.
+ *
+ * ⚠️ Un `/info` que falla NO tumba el sync (misma decisión que
+ * `sync-articulo-marca`): ese artículo queda sin ficha y se reintenta mañana.
+ * Perder el snapshot entero de precios por una ficha sería peor.
+ */
+export const EMPRESAS_CON_FICHA: readonly string[] = ["active_shoes"];
+
+/** De a cuántas fichas en paralelo. Por debajo del 8 de `/stock`: esta fase
+ *  corre DESPUÉS del barrido de páginas dentro de la misma sesión, y la regla
+ *  de la casa con un ERP ajeno es quedarse por debajo del borde. */
+const FICHA_CONCURRENCIA = 4;
+
+/** Tope de fichas por corrida. 400 cubre de una vez el universo con existencia
+ *  de active_shoes (237 el 2-sep-2026) con aire, y frena en seco el día que
+ *  alguien agregue una empresa de 8.000 artículos a `EMPRESAS_CON_FICHA`. */
+const FICHA_MAX_POR_CORRIDA = 400;
+
+/** Reloj de pared para la fase de fichas. Se corta apenas se pasa y lo que
+ *  quedó se pide mañana. NO es un timeout por llamada: es el presupuesto del
+ *  bloque, que es lo que protege el techo de la función. */
+const FICHA_PRESUPUESTO_MS = 240_000;
+
 /** Un renglón del catálogo, con lo que este sync consume. */
 export interface ArticuloInfoCrudo {
   id: number;
@@ -72,6 +122,9 @@ export interface ArticuloInfoCrudo {
   disponible: string | null;
   precio: string | null;
   costo: string | null;
+  /** EAN — la llave de `/apiarticulos/info`, que va por código de barra y no
+   *  por id. Sin él no hay forma de pedir la ficha de ese artículo. */
+  codigoBarra?: string | null;
 }
 
 /** Fila lista para el upsert. PURO — testeable sin base. */
@@ -120,6 +173,164 @@ export function dedupePorCodigo(filas: readonly FilaArticuloInfo[]): FilaArticul
   return [...porCodigo.values()];
 }
 
+/** Fila de ficha lista para el upsert PARCIAL (solo estas columnas; el upsert
+ *  choca siempre contra la fila que el barrido acaba de escribir, así que no
+ *  toca ni la descripción, ni el precio, ni la existencia). */
+export interface FilaFicha {
+  empresa_key: string;
+  codigo: string;
+  rubro: string | null;
+  subrubro: string | null;
+  marca: string | null;
+  ficha_at: string;
+}
+
+/** Texto crudo de Switch, sin traducir. Vacío ⇒ null (no `""`: la clasificación
+ *  distingue "no vino" de "vino vacío" y las dos cosas caen igual, pero un `""`
+ *  guardado se ve como un dato y no lo es). */
+const texto = (v: unknown): string | null => {
+  const s = String(v ?? "").trim();
+  return s === "" ? null : s;
+};
+
+/**
+ * ¿La tabla ya tiene las columnas de la ficha? En este proyecto las DDL las
+ * corre Daniel a mano, así que entre el deploy y el SQL hay días. Sin esta
+ * sonda, la fase de fichas le pediría a Switch cientos de artículos para morir
+ * recién en el upsert: llamadas tiradas y una sesión abierta para nada.
+ *
+ * Es un SELECT real con `limit`, NUNCA un `head:true` (medido el 9-ago-2026: un
+ * HEAD contra algo que no existe devuelve 204 sin error — silencio total).
+ * Fail-CERRADO: cualquier error deja la fase apagada y el resto del sync
+ * intacto.
+ */
+export async function fichaColumnasListas(): Promise<boolean> {
+  const { error } = await supabaseServer
+    .from("switch_articulo_info")
+    .select("rubro, subrubro, marca, ficha_at")
+    .limit(1);
+  return !error;
+}
+
+/**
+ * A quién le falta la ficha, en el ORDEN en que conviene pedirla: primero los
+ * que tienen existencia (los que se ven en el catálogo), después el resto.
+ * PURA — recibe el universo y lo ya guardado, no lee nada.
+ */
+export function pendientesDeFicha(
+  universo: readonly { codigo: string; existencia: number | null; codigoBarra: string | null }[],
+  yaConFicha: ReadonlySet<string>,
+  tope: number,
+): Array<{ codigo: string; codigoBarra: string }> {
+  const faltan = universo.filter(
+    (a) => !yaConFicha.has(a.codigo) && !!a.codigoBarra,
+  );
+  const conExistencia = faltan.filter((a) => (a.existencia ?? 0) >= 1);
+  const resto = faltan.filter((a) => (a.existencia ?? 0) < 1);
+  return [...conExistencia, ...resto]
+    .slice(0, tope)
+    .map((a) => ({ codigo: a.codigo, codigoBarra: a.codigoBarra as string }));
+}
+
+/** Resultado de la fase de fichas (telemetría; va al resultado del sync). */
+export interface FichasResult {
+  /** false = las columnas todavía no existen; NO se le pidió nada a Switch. */
+  columnasListas: boolean;
+  pendientes: number;
+  pedidas: number;
+  escritas: number;
+  fallidas: number;
+  /** true = se cortó por presupuesto (de cantidad o de reloj) y quedó cola. */
+  cortadaPorPresupuesto: boolean;
+}
+
+/** Pide las fichas que falten y las guarda. NUNCA lanza: devuelve qué pasó. */
+export async function traerFichas(
+  empresaKey: string,
+  client: SwitchClient,
+  universo: readonly { codigo: string; existencia: number | null; codigoBarra: string | null }[],
+): Promise<FichasResult> {
+  const vacio: FichasResult = {
+    columnasListas: false, pendientes: 0, pedidas: 0, escritas: 0,
+    fallidas: 0, cortadaPorPresupuesto: false,
+  };
+  if (!EMPRESAS_CON_FICHA.includes(empresaKey)) return { ...vacio, columnasListas: true };
+  if (!(await fichaColumnasListas())) {
+    console.warn(
+      "[sync-articulo-info] switch_articulo_info todavía no tiene rubro/subrubro/marca — falta correr " +
+        "supabase/migrations/20260906120000_clasificacion_catalogo.sql. No se le pidió ninguna ficha a Switch.",
+    );
+    return vacio;
+  }
+
+  const { data, error } = await supabaseServer
+    .from("switch_articulo_info")
+    .select("codigo")
+    .eq("empresa_key", empresaKey)
+    .not("ficha_at", "is", null);
+  // No poder leer lo ya hecho NO es "no hay nada hecho": pedir todo de nuevo
+  // sería castigar a Switch por un error nuestro. Se salta la fase.
+  if (error) {
+    console.error(`[sync-articulo-info] ${empresaKey}: no pude leer qué fichas ya están: ${error.message}`);
+    return { ...vacio, columnasListas: true };
+  }
+  const yaConFicha = new Set((data ?? []).map((r) => String((r as { codigo: unknown }).codigo)));
+
+  const pendientesTodos = universo.filter((a) => !yaConFicha.has(a.codigo) && !!a.codigoBarra).length;
+  const aPedir = pendientesDeFicha(universo, yaConFicha, FICHA_MAX_POR_CORRIDA);
+  if (aPedir.length === 0) {
+    return { columnasListas: true, pendientes: pendientesTodos, pedidas: 0, escritas: 0, fallidas: 0, cortadaPorPresupuesto: false };
+  }
+
+  const limite = Date.now() + FICHA_PRESUPUESTO_MS;
+  let fallidas = 0;
+  let sinPresupuesto = false;
+  const ahoraIso = new Date().toISOString();
+
+  const fichas = await enParalelo(aPedir, FICHA_CONCURRENCIA, async (a) => {
+    if (Date.now() > limite) { sinPresupuesto = true; return null; }
+    try {
+      const info = await client.getArticuloInfo(a.codigoBarra);
+      const art = info?.articulo;
+      if (!art) { fallidas++; return null; }
+      return {
+        empresa_key: empresaKey,
+        codigo: a.codigo,
+        rubro: texto(art.rubro),
+        subrubro: texto(art.subrubro),
+        marca: texto(art.marca),
+        ficha_at: ahoraIso,
+      } as FilaFicha;
+    } catch {
+      // Una ficha que falla no tumba el sync: se reintenta mañana.
+      fallidas++;
+      return null;
+    }
+  });
+
+  const buenas = fichas.filter((f): f is FilaFicha => f !== null);
+  let escritas = 0;
+  for (let i = 0; i < buenas.length; i += UPSERT_BATCH) {
+    const { error: upErr } = await supabaseServer
+      .from("switch_articulo_info")
+      .upsert(buenas.slice(i, i + UPSERT_BATCH), { onConflict: "empresa_key,codigo" });
+    if (upErr) {
+      console.error(`[sync-articulo-info] ${empresaKey}: no pude guardar las fichas: ${upErr.message}`);
+      break;
+    }
+    escritas += buenas.slice(i, i + UPSERT_BATCH).length;
+  }
+
+  return {
+    columnasListas: true,
+    pendientes: pendientesTodos,
+    pedidas: aPedir.length,
+    escritas,
+    fallidas,
+    cortadaPorPresupuesto: sinPresupuesto || pendientesTodos > aPedir.length,
+  };
+}
+
 export interface ArticuloInfoSyncResult {
   empresaKey: string;
   /** `false` = la tabla todavía no existe (migración 20260810130000 pendiente)
@@ -130,6 +341,8 @@ export interface ArticuloInfoSyncResult {
   filasEscritas: number;
   rechazadasPorMonto: number;
   syncedAt: string | null;
+  /** Telemetría de la 2.ª fase (rubro/subrubro/marca). Ver `traerFichas`. */
+  fichas?: FichasResult;
 }
 
 /** Filas que la tabla YA tiene de esta empresa; null si la tabla no existe.
@@ -184,6 +397,10 @@ export async function syncArticuloInfo(
     const ahoraIso = new Date().toISOString();
 
     const crudas: FilaArticuloInfo[] = [];
+    // Universo para la 2.ª fase: el `codigoBarra` solo viene en la LISTA y es la
+    // única llave con la que se le puede pedir la ficha a Switch. Se junta acá
+    // para no volver a barrer las páginas.
+    const universo: Array<{ codigo: string; existencia: number | null; codigoBarra: string | null }> = [];
     let renglones = 0;
     for (let pagina = 1; pagina <= MAX_PAGES; pagina++) {
       const data = await client.getArticulos({ porPagina: PER_PAGE, paginaActual: pagina });
@@ -192,7 +409,10 @@ export async function syncArticuloInfo(
       renglones += lote.length;
       for (const a of lote) {
         const fila = filaDeArticulo(empresaKey, a, ahoraIso);
-        if (fila) crudas.push(fila);
+        if (fila) {
+          crudas.push(fila);
+          universo.push({ codigo: fila.codigo, existencia: fila.existencia, codigoBarra: a.codigoBarra ?? null });
+        }
       }
       if (pagina === MAX_PAGES) {
         throw new Error(
@@ -234,6 +454,18 @@ export async function syncArticuloInfo(
       if (error) throw new Error(`upsert switch_articulo_info ${empresaKey}: ${error.message}`);
     }
 
+    // ── 2.ª fase: la ficha de cada artículo (rubro/subrubro/marca). Va DESPUÉS
+    //    del upsert de la lista: si algo falla acá, el snapshot de precios y
+    //    existencias ya está guardado. NUNCA lanza.
+    const fichas = await traerFichas(empresaKey, client, universo);
+    if (fichas.pedidas > 0) {
+      console.warn(
+        `[sync-articulo-info] ${empresaKey}: fichas pedidas ${fichas.pedidas} · guardadas ${fichas.escritas} · ` +
+          `fallidas ${fichas.fallidas} · pendientes totales ${fichas.pendientes}` +
+          (fichas.cortadaPorPresupuesto ? " · quedó cola para la corrida siguiente" : ""),
+      );
+    }
+
     const skipDetails = rechazadas.length
       ? detallesDeRechazo("articulo_info", rechazadas, umbral)
       : undefined;
@@ -266,6 +498,7 @@ export async function syncArticuloInfo(
       filasEscritas: buenas.length,
       rechazadasPorMonto: rechazadas.length,
       syncedAt: ahoraIso,
+      fichas,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -22,6 +22,7 @@ import {
   type CatalogoRow,
   type SwitchRow,
   type MonthOption,
+  valoresInesperados,
   type PrecioAB,
   type PriceFormula,
 } from "@/lib/depurador/reebok";
@@ -241,6 +242,10 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
     [switchRowsTodo, filtrarSinPiezas],
   );
   const revisar = useMemo(() => switchRows.filter((r) => r.fallback).length, [switchRows]);
+
+  // Los CATEGORY/GENDER que el catálogo no va a saber traducir (ver el bloque
+  // ámbar más abajo). Se derivan de lo que ya está en memoria: sin releer nada.
+  const inesperados = useMemo(() => (items ? valoresInesperados(items) : []), [items]);
 
   // Contadores de la barra: SIEMPRE los de la salida elegida, para que lo que se lee en
   // pantalla sea exactamente lo que trae el Excel que se descarga (antes mostraba los
@@ -533,6 +538,34 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
                   {warnings.slice(0, 8).map((x, i) => <li key={i}>{x}</li>)}
                 </ul>
                 {warnings.length > 8 && <div className="mt-1">…y {warnings.length - 8} más.</div>}
+              </div>
+            </div>
+          )}
+
+          {/* 🩸 CATEGORY / GENDER que el catálogo NO va a saber traducir.
+              Se dice ACÁ, antes de subir el archivo a Switch, que es cuando
+              corregirlo cuesta un minuto. Después el error aparece del otro
+              lado —productos en el cajón equivocado y con el bulto equivocado—
+              y hay que corregirlo artículo por artículo en Switch.
+              AVISA, NO CORRIGE: el archivo sale con el valor del proveedor. */}
+          {inesperados.length > 0 && (
+            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <span aria-hidden>!</span>
+              <div>
+                <b className="font-semibold">
+                  {inesperados.length} valor(es) de Department/CATEGORY/GENDER que el catálogo no conoce.
+                </b>{" "}
+                Estos artículos van a quedar sin categoría o sin género en el catálogo, y un producto
+                sin categoría se cobra por bulto de 6 y no de 12. Revísalos antes de subir el archivo:
+                <ul className="ml-4 mt-1.5 list-disc">
+                  {inesperados.slice(0, 8).map((v, i) => (
+                    <li key={i}>
+                      <b>{v.columna}</b> «{v.valor}» — {v.articulos.length} artículo(s):{" "}
+                      {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}
+                    </li>
+                  ))}
+                </ul>
+                {inesperados.length > 8 && <div className="mt-1">…y {inesperados.length - 8} más.</div>}
               </div>
             </div>
           )}

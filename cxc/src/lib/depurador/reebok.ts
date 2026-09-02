@@ -131,6 +131,99 @@ export interface ReebokItem {
 
 export interface ParseResult { items: ReebokItem[]; headerRow: number; cols: ReebokCols; warnings: string[] }
 
+/* ============ LOS VALORES QUE SE ESPERAN EN CATEGORY Y GENDER ============ */
+// 🩸 ESTAS DOS COLUMNAS SON LAS QUE CLASIFICAN EL CATÁLOGO, Y EL DEPURADOR LAS
+// TRATABA COMO OPCIONALES (arreglado el 2-sep-2026).
+//
+// El Depurador escribe HACIA Switch: `CATEGORY` sale como `rubro *` y `GENDER`
+// como `subrubro` (ver buildSwitchRows). De ahí el catálogo las lee de vuelta y
+// arma la categoría y el género de cada producto. O sea que estas dos celdas
+// deciden bajo qué filtro se ve el producto y, vía la categoría, **de cuántas
+// piezas es el bulto que se le cobra al cliente** (calzado 12, todo lo demás 6).
+//
+// Y sin embargo solo eran obligatorias `New Article`, `SKU`, `WholesalePrice` y
+// `Department`. Si Reebok renombraba la columna en su Excel, `findCol` devolvía
+// −1, `val` devolvía `""`, y **el archivo entero subía a Switch con el rubro y
+// el subrubro EN BLANCO sin que nada avisara**. El error se descubría meses
+// después, del otro lado, con el catálogo mostrando todo en el cajón equivocado.
+//
+// Dos arreglos, los dos ANTES de subir el archivo — que es cuando corregirlo
+// sale barato:
+//   1. las dos columnas pasan a OBLIGATORIAS (abajo, en `parseReebok`);
+//   2. una lista de valores esperados que avisa en pantalla cuando aparece algo
+//      que el catálogo no va a saber traducir.
+//
+// El patrón #2 ya existía en el MISMO módulo, del lado CK/TH: `esGenero` en
+// `logic.ts` valida el rubro contra una lista de géneros conocidos y las marcas
+// desconocidas se cuentan y se dicen en pantalla. Esto es lo mismo para Reebok.
+//
+// 🔴 AVISA, NO CORRIGE. Nada se descarta ni se traduce: el archivo sale igual,
+// con el valor que puso el proveedor. Daniel: *«las cosas deben ser sencillas y
+// yo ordenarlas como se debe en Switch»*.
+
+/**
+ * 🔴 Los DEPARTMENT esperados. **Ésta es la columna que de verdad clasifica.**
+ *
+ * `Department` sale a Switch como `Marca *` (ver `buildSwitchRows`) y desde el
+ * 2-sep-2026 la MARCA es la fuente primaria de la categoría del catálogo:
+ * medido sobre los 609 artículos de `active_shoes`, FOOTWEAR↔SHOES 456/456,
+ * APPAREL↔APPAREL 10/10, HARDWARE↔BAGS 1/1, cero contradicciones — mientras que
+ * el rubro tiene 35 valores y casi todos son basura vieja.
+ *
+ * Department YA era obligatoria; lo que faltaba era mirar QUÉ dice.
+ */
+export const REEBOK_DEPARTMENT_ESPERADOS = ["FOOTWEAR", "APPAREL", "HARDWARE"] as const;
+
+/** Los CATEGORY que el catálogo sabe traducir a una categoría (`rubro`), que es
+ *  el plan B cuando la marca viene vacía. Espejo del mapa de lectura —
+ *  `src/lib/reebok-clasificacion.ts`. Si acá se agrega uno, allá tiene que
+ *  existir, y hay candado que compara las dos listas. */
+export const REEBOK_CATEGORY_ESPERADAS = ["SHOES", "APPAREL", "SHORTS", "SOCKS", "BAGS"] as const;
+
+/** Los GENDER que el catálogo sabe traducir a un género (`subrubro`). Mismo
+ *  espejo y mismo candado. */
+export const REEBOK_GENDER_ESPERADOS = ["MALE", "MEN", "FEMALE", "WOMEN", "KIDS", "UNISEX"] as const;
+
+export interface ValorInesperado {
+  columna: "CATEGORY" | "GENDER" | "Department";
+  valor: string;
+  /** Artículos del archivo con ese valor (para ir a buscarlos). */
+  articulos: string[];
+}
+
+/**
+ * Los CATEGORY/GENDER del archivo que el catálogo NO va a saber traducir. PURA.
+ *
+ * Una celda VACÍA también cuenta: es el caso más peligroso, porque es el que
+ * produce una columna renombrada, y en Switch se ve igual que un dato ausente.
+ */
+export function valoresInesperados(items: readonly ReebokItem[]): ValorInesperado[] {
+  const esperadas = new Set<string>(REEBOK_CATEGORY_ESPERADAS);
+  const esperados = new Set<string>(REEBOK_GENDER_ESPERADOS);
+  const departamentos = new Set<string>(REEBOK_DEPARTMENT_ESPERADOS);
+  const fuera = new Map<string, ValorInesperado>();
+  const anotar = (columna: ValorInesperado["columna"], crudo: string, articulo: string) => {
+    const valor = normH(crudo) || "(vacío)";
+    const k = `${columna}|${valor}`;
+    const e = fuera.get(k) ?? { columna, valor, articulos: [] };
+    const id = articulo || "(sin código)";
+    if (!e.articulos.includes(id)) e.articulos.push(id);
+    fuera.set(k, e);
+  };
+  for (const it of items) {
+    const id = it.newArticle || it.sku;
+    // Department primero: es la que decide la categoría del catálogo.
+    if (!departamentos.has(normH(it.department))) anotar("Department", it.department, id);
+    if (!esperadas.has(normH(it.category))) anotar("CATEGORY", it.category, id);
+    if (!esperados.has(normH(it.gender))) anotar("GENDER", it.gender, id);
+  }
+  // Primero lo que más artículos afecta; a igualdad, orden estable por clave.
+  return [...fuera.values()].sort(
+    (a, b) => b.articulos.length - a.articulos.length ||
+      `${a.columna}|${a.valor}`.localeCompare(`${b.columna}|${b.valor}`),
+  );
+}
+
 /** Parsea el Book4 crudo. `monthColIdx` = columna de piezas (autodetectada o elegida). */
 export function parseReebok(rows: SheetRow[], monthColIdx: number): ParseResult {
   const headerRow = findHeaderRow(rows);
@@ -144,6 +237,11 @@ export function parseReebok(rows: SheetRow[], monthColIdx: number): ParseResult 
   if (cols.sku === -1) missing.push("SKU");
   if (cols.wholesale === -1) missing.push("WholesalePrice");
   if (cols.department === -1) missing.push("Department");
+  // 🔴 CATEGORY y GENDER son OBLIGATORIAS desde el 2-sep-2026: son el rubro y el
+  // subrubro que van a Switch, y de ahí salen la categoría, el género y el
+  // BULTO del catálogo. Sin ellas el archivo entraba en blanco y en silencio.
+  if (cols.category === -1) missing.push("CATEGORY");
+  if (cols.gender === -1) missing.push("GENDER");
   if (missing.length) throw new Error("Faltan columnas en el archivo: " + missing.join(", ") + ".");
 
   const warnings: string[] = [];

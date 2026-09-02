@@ -240,7 +240,7 @@ export function tienePreciosDistintos(group: GroupedProduct): boolean {
   return new Set(group.variants.map(v => v.product.price)).size > 1;
 }
 
-export type DisplaySection = "mujer" | "hombre" | "adultos" | "kids" | "accesorios";
+export type DisplaySection = "mujer" | "hombre" | "adultos" | "kids" | "accesorios" | "otros";
 
 const SECTION_ORDER: Record<DisplaySection, number> = {
   mujer: 0,
@@ -248,6 +248,9 @@ const SECTION_ORDER: Record<DisplaySection, number> = {
   adultos: 2,
   kids: 3,
   accesorios: 4,
+  // 🔴 El cajón neutro va SIEMPRE al final. No tiene chip propio en
+  // `genderOptions`, así que se ve en «Todos» y bajo ningún filtro.
+  otros: 5,
 };
 
 const SECTION_LABELS: Record<DisplaySection, string> = {
@@ -256,11 +259,25 @@ const SECTION_LABELS: Record<DisplaySection, string> = {
   adultos: "Adultos",
   kids: "Kids",
   accesorios: "Accesorios",
+  otros: "Sin clasificar",
 };
 
 /**
- * Determines the display section for a grouped product based on the
- * gender field of its variants.
+ * La sección en la que se dibuja un modelo agrupado (Joybees), según el género
+ * de sus variantes.
+ *
+ * 🩸 **EL FALLBACK ERA "adultos", Y ERA UN CAJÓN POR DEFECTO CON VALOR DE
+ * NEGOCIO** (2-sep-2026). Un modelo cuyo género no se reconoce —el sentinel
+ * `sin_clasificar` de un producto nuevo, o un valor que Switch estrene— caía en
+ * "Adultos" sin que nadie lo hubiera dicho: exactamente el mismo defecto que el
+ * `male` por DEFAULT del sync de Reebok, en la pantalla en vez de en la base.
+ * Ahora cae en "Sin clasificar", que no tiene chip: se ve en «Todos» y bajo
+ * ningún filtro. La regla es la misma de siempre — **un cajón por defecto nunca
+ * puede ser el primero de la lista.**
+ *
+ * ⚠️ Lo que NO cambió: las combinaciones que el mapa SÍ reconoce siguen dando
+ * exactamente la misma sección que antes, incluido el par `adults_m` + `women`
+ * (que es cómo Joybees representa un modelo unisex) y el "si hay kids, es kids".
  */
 export function getDisplaySection(group: GroupedProduct): DisplaySection {
   const genders = new Set(group.variants.map(v => v.product.gender));
@@ -278,9 +295,14 @@ export function getDisplaySection(group: GroupedProduct): DisplaySection {
     if (g === "accessories") return "accesorios";
   }
 
-  // Fallback: if mixed kids/junior → kids, otherwise adultos
+  // Mezcla que incluye kids → kids (una talla de niño manda: es la sección
+  // donde el comprador la busca). Cualquier otra cosa NO se adivina.
   if (genders.has("kids")) return "kids";
-  return "adultos";
+  // Una mezcla de géneros REALES conocidos sigue siendo "adultos", que es lo que
+  // significa: dos géneros de adulto en el mismo modelo.
+  const reales = [...genders].filter(g => g === "women" || g === "adults_m" || g === "adults" || g === "unisex");
+  if (reales.length > 1) return "adultos";
+  return "otros";
 }
 
 export { SECTION_ORDER, SECTION_LABELS };

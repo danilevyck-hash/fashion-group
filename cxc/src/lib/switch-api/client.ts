@@ -757,13 +757,27 @@ export interface SwitchArticulosData {
 
 /** Ficha de /apiarticulos/info (data.articulo). Solo lo que se consume: el
  *  endpoint devuelve ~29 campos. `marca` es el nombre; `marcaId` el id que
- *  también trae `/apiarticulos/lista`. */
+ *  también trae `/apiarticulos/lista`.
+ *
+ *  🩸 `rubro` y `subrubro` ESTABAN ENTRE LOS ~24 CAMPOS QUE SE TIRABAN, y son
+ *  los dos que clasifican el catálogo de Reebok (rubro = categoría, subrubro =
+ *  género — ver `reebok-clasificacion.ts`). Este endpoint es el ÚNICO que los
+ *  trae: `/apiarticulos/lista` da el `marcaId` pero ni el nombre de la marca ni
+ *  el rubro (medido el 6-ago-2026 sobre los 9.126 artículos de
+ *  american_classic). Mientras el tipo los descartaba, el sync del catálogo no
+ *  tenía de dónde sacar la categoría ni el género y los inventaba. */
 export interface SwitchArticuloInfo {
   id: number;
   codigo: string;
   descripcion: string | null;
   marcaId: number | null;
   marca: string | null;
+  /** Nombre del rubro. En Reebok es la CATEGORÍA (SHOES / APPAREL / SOCKS /
+   *  BAGS); en Tommy/Calvin significa otra cosa — el mapa va POR MARCA. */
+  rubro: string | null;
+  /** Nombre del subrubro. En Reebok es el GÉNERO (MALE / FEMALE / KIDS /
+   *  UNISEX). Ver la advertencia de `rubro`. */
+  subrubro: string | null;
 }
 
 export interface SwitchArticuloInfoData {

@@ -13,11 +13,21 @@
 //     sigan funcionando sin tocarlos.
 //   - categories=[] → lee TODA la tabla y matchea por SKU (las categorías de Joybees
 //     son nombres de modelo libres, no fijas).
-//   - Nuevos: category="nuevo" + gender="adults_m" (ambas NOT NULL) — placeholders
-//     editables en el admin; el cron alerta los nuevos sin foto.
+//   - Nuevos: category="nuevo" + gender=SIN_CLASIFICAR (ambas NOT NULL) —
+//     placeholders editables en el admin; el cron alerta los nuevos sin foto.
+//
+// 🩸 EL GÉNERO DE LOS NUEVOS ERA "adults_m", O SEA HOMBRE (arreglado 2-sep-2026).
+// Era un placeholder escrito a mano que nadie volvía a mirar: cada producto que
+// entraba quedaba clasificado como de hombre sin que Switch lo hubiera dicho —
+// el mismo defecto que en Reebok, en su versión chica. Ahora entra al cajón
+// neutro: se ve en «Todos» y bajo NINGÚN chip, que es lo honesto cuando no se
+// sabe. Joybees no tiene mapa de clasificación propio (su `category` son nombres
+// de modelo libres), así que el género lo pone el admin a mano — pero ahora
+// arranca vacío y se nota, en vez de arrancar mintiendo.
 
 import { syncCatalogo, type CatalogoSyncResult } from "./sync-catalogo";
 import { joybeesServer } from "@/lib/joybees-supabase-server";
+import { GENERO_SIN_CLASIFICAR } from "@/lib/reebok-clasificacion";
 import type { SwitchArticulo } from "./client";
 
 const EMPRESAS = [
@@ -49,7 +59,9 @@ export function syncCatalogoJoybees(
     // Las columnas que el UPDATE escribe además de price/name/active, para poder
     // comparar antes de escribir (misma consulta, sin lecturas nuevas).
     columnasEscritas: ["existencia", "disponibilidad", "stock"],
-    insertExtras: { gender: "adults_m" }, // gender NOT NULL; editable en el admin
+    // gender es NOT NULL en joybees_products: por eso el cajón neutro es un
+    // STRING con nombre y no un `null` — un `null` acá tumbaría el INSERT.
+    insertExtras: { gender: GENERO_SIN_CLASIFICAR }, // editable en el admin
   }, opts);
 }
 
