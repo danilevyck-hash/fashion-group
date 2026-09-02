@@ -8,6 +8,13 @@
 
 import { useEffect, useState } from "react";
 import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
+import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
+
+/** Los motivos salen de la MISMA lista que ofrece el desplegable.
+ *  🩸 Este cartel nombraba «vacaciones» y «permiso»: las vacaciones se mudaron a
+ *  su propia pestaña el 25-ago-2026 y «permiso» se retiró ese mismo día. Un
+ *  cartel que manda a buscar una opción que ya no está hace perder el rato. */
+const MOTIVOS_EN_TEXTO = MOTIVOS_JUSTIFICACION.map((m) => m.toLowerCase()).join(", ");
 
 /** Los minutos de la tolerancia salen de la CONFIGURACIÓN, no de un texto fijo.
  *  🩸 Este cartel decía "8:05" con la tolerancia en 5; la contable la subió a 10
@@ -39,7 +46,7 @@ const reglasDe = (r: ReglasAsistencia): Array<{ t: string; d: string }> => {
   },
   {
     t: "Faltar sin marcar es ausencia",
-    d: "Salvo que sea feriado o que se haya registrado una justificación (vacaciones, incapacidad, permiso).",
+    d: `Salvo que sea feriado, que esté de vacaciones o que se haya registrado una justificación (${MOTIVOS_EN_TEXTO}).`,
   },
   {
     t: "Marcar mal es responsabilidad de cada uno",
@@ -107,6 +114,12 @@ export default function ComoFuncionaTab() {
           <li>· Las <b>horas extra</b> hasta las {reglas.horaCorteNocturno} se pagan × {reglas.recargoExtraDiurno}; desde el minuto siguiente × {reglas.recargoExtraNocturno}. <b>No hay un tercer escalón</b>: el «excedente de 9 horas» también va × {reglas.recargoExtraNocturno} y su columna queda en $0.00.</li>
           <li>· Los <b>domingos y feriados</b> trabajados se pagan × {reglas.recargoDomingoFeriado}.</li>
           <li>· Se descuentan las <b>tardanzas</b> (minutos × el valor del minuto), las <b>ausencias</b> (8 horas × la rata por cada día completo), el seguro social ({reglas.seguroSocialPct} %) y el educativo ({reglas.seguroEducativoPct} %).</li>
+          <li>· Las <b>vacaciones</b> se pagan: esos días entran en el sueldo de la quincena y no descuentan nada. Solo se descuentan si están marcadas <b>«ya se le pagó»</b> —porque se cobraron en efectivo antes—, y en ese caso la planilla dice a quién y cuánto no le pagó.</li>
+          {/* ⚠️ La pantalla para CARGAR vacaciones se apagó el 1-sep-2026
+              (`PESTANAS_OCULTAS` en lib/asistencia/roles.ts). El cálculo no
+              cambió, y decirlo acá evita que alguien busque una pestaña que no
+              está y suponga que sus vacaciones dejaron de valer. */}
+          <li>· ⚠️ La <b>pestaña para cargar vacaciones está oculta</b> desde el 1 de septiembre de 2026, mientras se trabaja la planilla. Las que ya estaban cargadas <b>siguen valiendo igual</b>: esos días se pagan y no cuentan como ausencia. Para cargar una nueva, pedísela a Daniel.</li>
           <li>· El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios</b> no salen de ningún sistema: se escriben a mano en la planilla. Los cuatro primeros se restan; <b>«otros servicios» se SUMA</b>, porque es un pago extra y no un descuento.</li>
           <li>· 🔴 A quien le falte el salario, la jornada o la ficha <b>no se le calcula nada</b>: sale listado con lo que le falta y queda <b>fuera del total</b>. Nunca en $0.</li>
         </ul>

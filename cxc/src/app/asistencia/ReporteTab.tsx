@@ -275,7 +275,13 @@ export default function ReporteTab() {
           <p>
             Todo en minutos. Entrada 8:00 con {reglas?.toleranciaTardanzaMin ?? TOLERANCIA_MIN} de
             tolerancia · almuerzo de {ALMUERZO_FIJO_MIN} minutos · extras desde{" "}
-            {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min, menos el atraso del día.{" "}
+            {/* 🔴 1-sep-2026: la extra YA NO se netea contra el atraso del día.
+                Daniel, textual: *"No, van separadas"*. El mínimo es una PUERTA
+                —pasada, se paga desde el primer minuto— y el atraso sigue
+                descontándose por su lado, en «Tiempo no trabajado». El número
+                sale de las reglas configurables; el texto NUNCA lo cablea. */}
+            {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min y se pagan completas: el atraso del
+            día se descuenta aparte, no se les resta.{" "}
             Los minutos <b className="text-red-700">en rojo</b> son de un día en que se llegó más de{" "}
             {MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde: en la planilla esos minutos se muestran
             en la columna <b>Ausencias</b> en vez de en Tardanzas. <b>Se descuentan igual</b> — la

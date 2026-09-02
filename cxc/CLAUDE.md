@@ -90,6 +90,11 @@ archivo enlazado, verbatim.
 - **Los días que no pasaron no se cuentan** (`fecha >= diaEnCurso`, con el día de Panamá).
 - 🔑 **Cuando el sistema no puede saber, se abstiene**: servicio profesional, ingreso o salida a mitad de período y justificación de período completo salen en «Decidilo vos» — sin número, fuera del total.
 - La **incapacidad justificada se paga**. «Trabajo fuera de la oficina» **no es una ausencia**: no descuenta y no genera extras.
+- 🔴 **Una vacación NO es una justificación**: tabla (`asistencia_vacaciones`) y pestaña propias, y «Vacaciones» **no está** en la lista de motivos —ni en la de retirados— para que el desplegable no la ofrezca por la puerta de atrás.
+- ⚠️ **La PESTAÑA Vacaciones está OCULTA desde el 1-sep-2026** (`PESTANAS_OCULTAS` en `asistencia/roles.ts`; se apagó la pantalla, no el código: componente, ruta y tabla siguen enteros). 🔴 **El motor sigue honrando las vacaciones ya cargadas** — dejar de leer `asistencia_vacaciones` en el cálculo convierte esos días en ausencias y come una quincena en silencio.
+- 🔴 **Un día de vacaciones no genera horas, ni tardanza, ni ausencia.** Las marcas de ese día se muestran, pero no entran en ninguna cuenta.
+- Una vacación **sin marcar no cuesta nada** — el quincenal la cubre. El interruptor **«ya se le pagó» es lo ÚNICO que mueve plata**: se valúa como una ausencia de día completo (8 h × rata), solo en días hábiles no feriados, y se dice en pantalla a quién y cuánto no se le pagó.
+- El **saldo de vacaciones arranca de dos datos que escribe contabilidad** (saldo + fecha de corte, juntos o ninguno por CHECK) y **sin los dos no hay saldo, ni cero**. Se gana 30 días por cada 11 meses, el período en curso se **trunca** a día entero y solo resta lo posterior al corte. **Medios días sí, cuartos no.**
 - Un sueldo **repartido en dos empresas** saca la rata del **sueldo COMPLETO**; las partes tienen que sumar el salario de la ficha o el reparto se rechaza entero (y se dice en pantalla).
 - El descuento de **préstamo se propone solo pero se APRUEBA**; lo que no está aprobado se ve en ámbar, con nombre y monto.
 - Panamá es **UTC−5 fijo**; los tests usan fechas fijas, nunca `new Date()`.

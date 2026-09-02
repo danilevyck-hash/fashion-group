@@ -527,7 +527,75 @@
 >
 > ### ❓ NO existe cuenta de días de vacaciones — y NO se construyó
 >
+> ⚠️ **SUPERADO el 25/26-ago-2026: las vacaciones tienen tabla, pestaña y SALDO propios** — ver *«LAS VACACIONES SE MUDAN DE MESA»*, la sección siguiente. Lo de abajo es de la tarde del 13-ago y se conserva como registro de qué había cuando nació el motivo de Rodrigo; **hoy no describe el sistema**: existen la tabla `asistencia_vacaciones`, las columnas `asistencia_personas.saldo_vacaciones_dias` / `saldo_vacaciones_corte` y `src/lib/asistencia/saldo-vacaciones.ts`, y la justificación con motivo «Vacaciones» **ya no existe** — la borró la migración de la mudanza.
+>
 > Barrido completo (`supabase/migrations/` y `src/`): **no hay columna, ni tabla, ni cálculo** que lleve el saldo de vacaciones de nadie. `asistencia_personas` tiene nombre, salario, jornada, empresa, activo, fechas de ingreso/salida y `servicio_profesional` — nada de vacaciones. Lo único que existe es la justificación con motivo «Vacaciones» como un rango suelto: **nadie cuenta cuántos días se ganaron ni cuántos se gastaron.** Es una decisión de Daniel y no se construyó.
+
+
+---
+
+## 🔴 Asistencia — LAS VACACIONES SE MUDAN DE MESA, y ahora SÍ llevan cuenta de días (25/26-ago-2026)
+
+> Es lo que la sección anterior daba por no construido. Tres migraciones aditivas: `20260825160000_asistencia_vacaciones.sql` (la tabla), `20260826040000_asistencia_saldo_vacaciones_inicial.sql` (el arranque del saldo) y `20260826060000_asistencia_saldo_vacaciones_medios_dias.sql` (el medio día).
+>
+> ### 🔴 UNA VACACIÓN NO ES UNA JUSTIFICACIÓN, Y POR ESO SE MUDÓ
+>
+> Una justificación explica por qué alguien **faltó** un día que tenía que trabajar; unas vacaciones son un **derecho que se gana, se gasta y lleva su propia cuenta de días**. Metidas en la misma lista, en tres meses nadie distingue quién estuvo enfermo de quién estuvo de vacaciones — y solo una de las dos se acumula. Una vacación es **persona + desde + hasta + un interruptor**, y nada más (`asistencia_vacaciones`, soft delete y RLS sin políticas, como el resto del módulo).
+>
+> - **La mudanza movió UNA fila y estaba contada ANTES de correr:** de las 5 justificaciones vivas, una sola tenía motivo «Vacaciones» — ELOYN MENDOZA (código 29, 16-jul → 13-ago-2026). El PASO 1 es una vista previa que no escribe y la corrida se para si el conteo no da 1. El orden es **INSERT y recién después DELETE**, y el DELETE borra **solo lo que ya quedó copiado** (`EXISTS` fila por fila): al revés, un INSERT que fallara habría convertido esos días en ausencias.
+> - 🔴 **Nació SIN MARCAR a propósito** (`ya_pagadas` en su default `false`): es exactamente como se comportaba siendo justificación. Un default en `true` le habría descontado una quincena entera sin que nadie tocara nada.
+> - 🔴 **«Vacaciones» NO está en `MOTIVOS_JUSTIFICACION` NI en `MOTIVOS_RETIRADOS`, y no es un olvido.** Ponerla en la segunda la devolvería al desplegable por la puerta de atrás, y el mismo día podría existir **dos veces** —una como vacación y otra como «Ausencia justificada — Vacaciones»—, con dos etiquetas contradictorias en el renglón que decide un pago.
+> - El cartel de **Cómo funciona** dejó de nombrar «vacaciones» y «permiso» entre las justificaciones: los motivos de ese texto salen de `MOTIVOS_JUSTIFICACION` y no de una lista escrita a mano. Es la misma lección que la tolerancia — un cartel que contradice a la pantalla es peor que no tener cartel.
+>
+> ### 🔴 EN UN DÍA DE VACACIONES NO SE CALCULA NADA DEL RELOJ
+>
+> Daniel, textual: *"si alguien pasó por el reloj estando de vacaciones, no genera horas, ni tardanza, ni ausencia"*. Las marcas de ese día **no se borran ni se esconden** —viajan en `marcasIgnoradas` y la pantalla las muestra—: descartar un dato es una cosa, descartarlo EN SILENCIO es otra. En `clasificarDia` la vacación se mira **PRIMERO**, antes que el feriado y que todo lo demás. Y el renglón nunca dice *ausencia*: dice «Vacaciones», o «Vacaciones (ya pagadas)».
+>
+> ### 🔴 EL INTERRUPTOR «YA SE LE PAGÓ» ES LO ÚNICO QUE MUEVE PLATA
+>
+> La regla es de la contadora, textual: *"Si la persona había cobrado sus vacaciones anteriormente en dinero y no se había ido esos tres días, yo se los descuento porque ya se los pagué; si la persona no ha cobrado sus vacaciones entonces se los pago."*
+>
+> - **SIN MARCAR (el default) no cuesta nada:** el quincenal (`salario ÷ 2`) ya cubre esos días y no se descuenta un centavo. Pagarlos no necesita ninguna cuenta.
+> - **MARCADA:** esos días se descuentan y se valúan **igual que una ausencia de día completo** — `MIN_DIA_NO_TRABAJADO` (8 h) × rata, la MISMA constante, **no** el horario de la persona. Van en columna propia (`vacacionesYaPagadasMin`) adentro de `ausencias`: el total no se mueve y el renglón igual puede decir de dónde sale.
+> - ⚠️ **Solo se descuentan los días que iba a trabajar: hábil (L-V) y no feriado.** Un domingo o un 3 de noviembre adentro del rango no tenía jornada que pagar, y descontarlo sería cobrarle dos veces el mismo día.
+> - 🔴 **Y SE DICE EN PANTALLA, con nombre, rango y monto** (`textoVacacionesNoPagadas`): rechazar sí, esconder no — la misma regla que el préstamo sin aprobar y el reparto que no cuadra. Sin el monto no se coteja contra nada; sin el rango no se sabe de qué vacación habla; sin el nombre no se sabe a quién reclamarle.
+>
+> ### 🩸 EL SALDO NO ES «GANADOS DESDE QUE ENTRÓ MENOS LO TOMADO»
+>
+> Lo fue durante un PR (#626), y era **aritméticamente correcto e INÚTIL**: las vacaciones existen en el sistema desde el 25-ago-2026 (medido por la puerta de la app: UNA cargada), pero los días ganados se cuentan desde el ingreso y hay fichas de 2019. **ANGELA GARCIA figuraba con 245 días disponibles** — cierto, y peligroso: alguien se para en esa pantalla y reclama días que ya se tomó. Un número que no se puede usar para decidir es peor que no mostrar ninguno.
+>
+> 🔴 **El arranque son DOS datos que escribe contabilidad y que el sistema no puede deducir:** el saldo a hoy (*"a Angela le quedan 12 días"*, que sale de sus registros sin hacer cuentas) y **la fecha de corte**. Van **juntos o ninguno** y lo obliga un CHECK: de la fecha depende qué se resta después — lo anterior al corte **ya está adentro** de ese 12, y volver a restarlo sería cobrarle dos veces los mismos días. Pedirle a contabilidad *"¿cuántos días tomó desde 2019?"* sería pedirle que reconstruya siete años: no lo haría nadie, y la pantalla quedaría vacía para siempre.
+>
+> ```
+> saldo = saldo inicial − tomadas DESPUÉS del corte − ya pagadas DESPUÉS del corte + lo ganado entre el corte y hoy
+> ```
+>
+> - **Lo ganado se mide contra el INGRESO, no contra el corte.** El ciclo de la ley está anclado al aniversario de entrada, así que *«lo ganado hasta hoy menos lo ganado hasta el corte»* respeta ese calendario; contar los 11 meses desde el corte lo correría para siempre. Por eso hace falta `fecha_ingreso` **además** del saldo, y por eso **no hay dos fórmulas** según qué dato haya: dos fórmulas son dos verdades, y el día que se separan nadie sabe cuál vale.
+> - **La ley: 30 días por cada 11 MESES trabajados** (once, no doce — no es un typo que alguien deba "arreglar"). El bloque en curso prorratea 30 ÷ 11 por mes cumplido y **se TRUNCA**: mostrar un día de más habilita a alguien a irse un día que todavía no ganó, y eso se paga en plata; un día de menos se corrige solo al mes siguiente.
+> - 🔴 **Las «ya pagadas» TAMBIÉN bajan del saldo.** El derecho se consumió igual: se cobró en vez de disfrutarse. Se llevan en un contador aparte por una sola razón —quien mire el renglón tiene que distinguir los días que descansó de los que le pagaron—, pero los dos restan.
+> - 🩸 **Los días del saldo se cuentan de CALENDARIO, con domingos y feriados adentro** (`diasDeVacacion`), y **NO** con el filtro de «hábil y no feriado» de la planilla. No es un descuido: ese filtro contesta *¿qué días había jornada que pagar?* —una regla de PLATA—, y acá la pregunta es *¿qué días de derecho gastó?*, medida en meses corridos como los 30 días de la ley. Descontar solo los hábiles contra un techo de días corridos regalaría ~8 días por cada mes tomado.
+> - **Medios sí, cuartos no.** `numeric(4,1)` más un CHECK de múltiplos de 0,5: la contadora lleva la planilla a mano en Excel y un 12,5 es más probable que lo contrario, pero un 12,3 no es un dato, es un dedo pesado. ⚠️ El medio día entra **solo por el arranque**: lo ganado sigue truncando a día entero y los días tomados son de calendario, así que la única fuente de una coma en toda la cadena es el número que escribe contabilidad. El tipo se cambió con la columna **VACÍA**, que es cuando sale gratis: con 36 fichas cargadas habría sido una migración sobre datos vivos de una planilla.
+> - 🔴 **Sin los dos datos NO HAY SALDO. Ni cero, ni un número grande.** `saldo` es `number | null` y ese `null` no se confunde con un `0`: a quien le falte la fecha de ingreso o el saldo inicial **aparece en la lista diciendo cuál de los dos le falta** — que además es la acción que hay que hacer.
+>
+> ### ⚠️ EL MECANISMO ESTÁ VIVO Y ESPERANDO A CONTABILIDAD
+>
+> Medido el 1-sep-2026: **2 vacaciones cargadas** (las dos de ELOYN MENDOZA) y **1 sola ficha de 40 con saldo**. No es que no funcione: el número de arranque lo tiene que escribir contabilidad ficha por ficha, y hasta que lo haga la pantalla dice «Falta el saldo» en vez de mostrar uno inventado. **Las tres migraciones son aditivas y la app funciona sin ninguna** (patrón `cols-opcionales`): sin la tabla, `leerVacaciones` devuelve cero filas y la pestaña lo dice en ámbar; sin las columnas, nadie tiene saldo y Configuración avisa qué archivo falta correr.
+>
+> ### Candados
+>
+> `asistencia-vacaciones.test.ts` · `asistencia-saldo-vacaciones.test.ts` · `asistencia-vacaciones-decidir.test.ts` · `asistencia-vacaciones-pantalla.test.tsx` · `asistencia-vacaciones-saldo.test.tsx`.
+
+> ### ⚠️ SUPERADO EN PARTE — la PESTAÑA se apagó el 1-sep-2026 (el motor, NO)
+>
+> Daniel, textual: *«olvida lo de las vacaciones por ahora, quitalo del ERP para no enrredar»*. Y el motivo, con la pantalla delante: *«me enrreda lo de Ya se le pagó / Se le pagan estos días»*.
+>
+> **Es un defecto de REDACCIÓN, no de lógica.** El título del interruptor es el ESTADO y la línea de abajo es la CONSECUENCIA de cómo está la casilla ahora (`efectoDelInterruptor` sí cambia al marcarla), pero desmarcadas las dos frases se leen como una sola que se contradice: *«Ya se le pagó / Se le pagan estos días»*. Se le ofrecieron las dos salidas —arreglar el texto ahora u ocultar la pestaña mientras se trabaja el flujo de generar y cerrar la planilla— y eligió **ocultarla**. El texto quedó **sin tocar**: cambiar la redacción de una pantalla que nadie ve es un cambio que nadie revisa. El arreglo propuesto (*«¿Ya cobró estos días antes?»* con la consecuencia visible SOLO al marcar) está escrito pegado a `PESTANAS_OCULTAS`, que es donde lo va a leer quien la reactive.
+>
+> - **Se apagó la PANTALLA, no el trabajo.** `PESTANAS_OCULTAS = ["vacaciones"]` en `src/lib/asistencia/roles.ts`; `vePestana` la deja fuera para todos, admin incluido. `VacacionesTab.tsx`, la ruta `/api/asistencia/vacaciones`, la tabla y las migraciones quedan **enteros**, y la pestaña sigue declarada y montada en `AsistenciaClient`. **Volver a encenderla es borrar una línea.**
+> - 🔴 **EL MOTOR SIGUE HONRANDO LAS VACACIONES CARGADAS, y ése era todo el riesgo.** Hay 2 filas vivas, las dos de ELOYN MENDOZA (29, fashion_wear): 16-jul→13-ago y 14-ago, ninguna «ya se le pagó». Entender «quitar» como *dejar de leer `asistencia_vacaciones`* le habría convertido esos días en AUSENCIA —ella no marca— y le habría comido una quincena entera **en silencio**. No se tocó una línea de `reporte.ts`, `planilla.ts`, `vacaciones.ts`, `saldo-vacaciones.ts` ni de `/api/asistencia/planilla`, y el barrido de `asistencia-vacaciones-decidir.test.ts` sigue exigiendo `leerVacaciones` en todo lo que arma la planilla contra producción.
+> - **Un `?tab=vacaciones` de un marcador cae en la pestaña por defecto**, no en blanco: la pantalla resuelve la URL contra `visibles`, que ya no la contiene.
+> - **Los tests de la pantalla apagada NO se borraron**: `describe.skip` con la nota de qué garantizaban y cómo reactivarlos (`asistencia-vacaciones-pantalla.test.tsx`, solo el bloque de `VacacionesTab` — los de Reporte y Planilla siguen corriendo, y son la prueba de que el motor no cambió; `asistencia-vacaciones-saldo.test.tsx`, entero). Borrarlos habría dejado sin definición escrita lo que esa pantalla tenía que cumplir.
+> - **Candado nuevo, en la dirección contraria:** `asistencia-pestanas.test.ts` ahora exige que **nadie** la vea, que el componente y la ruta **sigan existiendo**, y —lo que importa— corre el motor sobre el rango REAL de ELOYN y verifica **en dólares** que no se le descuenta nada: con la vacación viva `ausencias = $0.00` y neto idéntico a la quincena trabajada entera; sin ella, 9 ausencias de día completo. Medido por mutación (`const vacaciones = []` en `reporte.ts`): esos dos casos se ponen rojos.
 
 
 ---

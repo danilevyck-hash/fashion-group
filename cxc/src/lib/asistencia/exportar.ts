@@ -247,7 +247,11 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     ["Entrada", `8:00 a.m. con ${g.toleranciaTardanzaMin} minutos de tolerancia. Pasados los ${g.toleranciaTardanzaMin}, se cuenta desde las 8:00.`],
     // El almuerzo NO sale de `reglas`: es fijo para todos (ver ALMUERZO_FIJO_MIN).
     ["Almuerzo", `${ALMUERZO_FIJO_MIN} minutos, igual para todos. Se mide entre la 2ª y la 3ª marca del día.`],
-    ["Horas extra", `Mínimo ${g.extraMinimoMin} minutos, y se le resta el atraso del mismo día.`],
+    // 🔴 1-sep-2026: acá decía "y se le resta el atraso del mismo día". Ya no:
+    // *"No, van separadas"*. El mínimo es una PUERTA, no un descuento —pasada,
+    // se paga TODO desde el primer minuto— y el atraso se cobra por su lado.
+    // Este papel viaja por correo: si miente, la contadora paga otra cosa.
+    ["Horas extra", `Desde ${g.extraMinimoMin} minutos se pagan completas, desde el primer minuto. Menos de eso no cuenta. El atraso del mismo día se descuenta aparte: no se le resta a la hora extra.`],
     ["Ausencia", "Día hábil sin ninguna marca, que no sea feriado ni tenga justificación."],
     ["Trabajo de vendedor", `"${MOTIVO_TRABAJO_VENDEDOR}" NO es una ausencia: la persona trabajó, solo que en otro lado y sin un reloj donde marcar. No se le descuenta nada, no le consume vacaciones y no genera horas extra (sin marcas no hay horas que medir). Va en columna propia, aparte de las ausencias justificadas.`],
     ["Permiso de horas", "Una justificación puede traer un rango de HORAS (de X a X). Cuando lo trae, NO justifica el día entero: solo perdona los minutos de tardanza que caen adentro de esa ventana, y un día sin ninguna marca sigue contando como ausencia completa."],
@@ -326,7 +330,10 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
       doc.setFontSize(7); doc.setTextColor(156, 163, 175);
       doc.text(
         `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${ALMUERZO_FIJO_MIN} min · ` +
-        `extras desde ${g.extraMinimoMin} min, menos el atraso del día · ` +
+        // 🔴 Misma corrección que la hoja «Cómo se calcula»: la extra se paga
+        // completa y el atraso va aparte (1-sep-2026). El pie del papel firmado
+        // no puede decir una regla distinta de la que hizo los números.
+        `extras desde ${g.extraMinimoMin} min y se pagan completas (el atraso se descuenta aparte) · ` +
         "\"A revisar\" = el día no tiene las 4 marcas (los minutos igual cuentan)" +
         (t.corr > 0
           ? ` · ${t.corr} ${t.corr === 1 ? "día tiene" : "días tienen"} una hora corregida a mano (la del reloj se conserva; el detalle está en el Excel)`

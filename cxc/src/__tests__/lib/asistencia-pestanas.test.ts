@@ -21,7 +21,28 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
-import { calcularDinero } from "@/lib/asistencia/planilla";
+import {
+  armarPlanilla,
+  calcularDinero,
+  grupoDeLinea,
+  jornadaDiariaMin,
+  FALTA,
+  MIN_DIA_NO_TRABAJADO,
+  type FichaPlanilla,
+} from "@/lib/asistencia/planilla";
+import {
+  armarReporte,
+  type HorarioPersona,
+  type Marcacion,
+} from "@/lib/asistencia/reporte";
+import { motivosDeQuienNoMarco } from "@/lib/asistencia/periodo";
+import type { Vacacion } from "@/lib/asistencia/vacaciones";
+import {
+  ASISTENCIA_ROLES,
+  APROBACIONES_ROLES,
+  PESTANAS_OCULTAS,
+  vePestana,
+} from "@/lib/asistencia/roles";
 import { rataPorHoraCalculo } from "@/lib/asistencia/rata";
 import {
   avisoPendientes,
@@ -83,6 +104,9 @@ describe("las 5 pestañas y su orden", () => {
     // 🔴 Si la pestaña montara `JustificacionesTab`, el rótulo diría una cosa y
     // la pantalla haría otra — que es exactamente el enredo que este cambio
     // vino a deshacer.
+    //
+    // ⚠️ SIGUE VALIENDO CON LA PESTAÑA APAGADA (1-sep-2026), y es a propósito:
+    // se apagó la VISIBILIDAD, no el código. Ver el bloque de abajo.
     expect(src).toMatch(/from "\.\/VacacionesTab"/);
     expect(src).toMatch(/tab === "vacaciones" && <VacacionesTab \/>/);
   });
@@ -122,6 +146,61 @@ describe("las 5 pestañas y su orden", () => {
     // La regla de la casa: nada táctil por debajo de 44 px.
     expect(src).toMatch(/min-h-\[44px\]/);
     expect(src).toMatch(/h-11 w-11/); // el «?» es redondo: 44 × 44
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 🔴 VACACIONES ESTÁ APAGADA (1-sep-2026) — y este candado CAMBIÓ DE DIRECCIÓN.
+//
+// Daniel, textual: *«olvida lo de las vacaciones por ahora, quitalo del ERP
+// para no enrredar»*. Hasta ayer este archivo exigía que la pestaña se VIERA;
+// hoy exige que NO se vea. Lo que NO cambió —y es la mitad que importa— es que
+// la pestaña sigue DECLARADA, su componente sigue MONTADO y la ruta sigue
+// viva: se apagó una pantalla, no se borró un trabajo. Volver a encenderla es
+// borrar `"vacaciones"` de `PESTANAS_OCULTAS`, y estos casos vuelven a fallar
+// para avisarlo — que es exactamente lo que tiene que pasar.
+// ═════════════════════════════════════════════════════════════════════════════
+describe("🔴 la pestaña Vacaciones está apagada, no borrada", () => {
+  const src = leer(CLIENTE);
+  const tabs = [...src.matchAll(/\["(\w+)",\s*"([^"]+)"\]/g)].map((m) => [m[1], m[2]]);
+  const TODOS = [...new Set([...ASISTENCIA_ROLES, ...APROBACIONES_ROLES])];
+
+  it("nadie la ve — ni admin, que ve todo lo demás", () => {
+    for (const rol of TODOS) expect(`${rol}:${vePestana(rol, "vacaciones")}`).toBe(`${rol}:false`);
+    // 🩸 La vara: si `vePestana` devolviera `false` para TODO, esto también
+    // pasaría en verde. Las otras pestañas siguen abriéndose para admin.
+    for (const p of ["planilla", "reporte", "justificaciones", "configuracion", "aprobaciones"]) {
+      expect(`${p}:${vePestana("admin", p)}`).toBe(`${p}:true`);
+    }
+  });
+
+  it("la lista de apagadas dice exactamente cuál, y en un solo lugar", () => {
+    expect([...PESTANAS_OCULTAS]).toEqual(["vacaciones"]);
+    // La pantalla no reimplementa la regla: la pide.
+    expect(src).toMatch(/const visibles = TABS\.filter\(\(\[k\]\) => vePestana\(rol, k\)\)/);
+  });
+
+  it("⚠️ un `?tab=vacaciones` guardado cae en la pestaña por defecto, NO en blanco", () => {
+    // La pantalla resuelve la URL CONTRA `visibles`, y vacaciones ya no está
+    // ahí. Sin esta línea, el marcador de alguien abriría el módulo vacío.
+    expect(src).toMatch(/visibles\.some\(\(\[k\]\) => k === tabRaw\)/);
+    expect(src).toMatch(/const porDefecto: Tab = \(visibles\[0\]\?\.\[0\] \?\? "planilla"\)/);
+    // Y para el rol de la contable la primera visible sigue siendo Planilla.
+    const primeraVisible = tabs.find(([k]) => vePestana("contabilidad", k))![0];
+    expect(primeraVisible).toBe("planilla");
+  });
+
+  it("⛔ NO se borró: el componente sigue importado, montado y en el arreglo", () => {
+    // 🔴 Si alguien «limpia» esto borrando el import y el render, encenderla de
+    // nuevo deja de ser una línea y hay que rehacer el trabajo.
+    expect(src).toMatch(/import VacacionesTab from "\.\/VacacionesTab"/);
+    expect(src).toMatch(/tab === "vacaciones" && <VacacionesTab \/>/);
+    expect(tabs.map((t) => t[0])).toContain("vacaciones");
+  });
+
+  it("⛔ ni el archivo, ni su ruta de API", () => {
+    expect(() => leer("app/asistencia/VacacionesTab.tsx")).not.toThrow();
+    expect(() => leer("app/api/asistencia/vacaciones/route.ts")).not.toThrow();
   });
 });
 
@@ -288,5 +367,147 @@ describe("la pantalla de Configuración se ve editable y se lee en columnas", ()
 
   it("los números van en tabular-nums y alineados a la derecha", () => {
     expect(cfg).toMatch(/text-right text-\[13px\] tabular-nums/);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 🔴 LA PRUEBA DE QUE APAGAR LA PESTAÑA NO LE TOCÓ UN CENTAVO A ELOYN.
+//
+// 🩸 EL RIESGO REAL DE ESTE CAMBIO, escrito antes de hacerlo: hay DOS vacaciones
+// vivas en producción, las dos de ELOYN MENDOZA (código 29, fashion_wear) —
+// 16-jul → 13-ago-2026 y 14-ago-2026—, ninguna marcada «ya se le pagó». Ella no
+// marca el reloj esos días. Si «quitar las vacaciones del ERP» se hubiera
+// entendido como *dejar de leer `asistencia_vacaciones` en el cálculo*, esos
+// días pasaban a contarse como AUSENCIA y la planilla le comía una quincena
+// entera SIN DECIR NADA. Es la misma trampa que el módulo ya documenta: «un día
+// de vacaciones que aparece con 47 minutos de tardanza el día de pago».
+//
+// Por eso este bloque no mira una pantalla: corre el MOTOR de verdad
+// —`armarReporte` + `armarPlanilla`, los mismos que arman el Excel y el PDF—
+// sobre el rango REAL de ella, y mira los DÓLARES. Y lo hace afirmando, en el
+// mismo archivo, que la pestaña está apagada: las dos cosas son ciertas a la vez
+// o este archivo se pone rojo.
+// ═════════════════════════════════════════════════════════════════════════════
+describe("🔴 apagar la pestaña NO le movió la plata a ELOYN MENDOZA", () => {
+  const R = REGLAS_DEFAULT;
+
+  // ── Las DOS filas REALES de producción ─────────────────────────────────────
+  const CODIGO = "29";
+  const NOMBRE = "ELOYN MENDOZA";
+  /** 16-jul → 13-ago-2026 (29 días) y 14-ago-2026 (1 día). Ninguna «ya pagada». */
+  const VACACIONES_REALES: Vacacion[] = [
+    { empleado_codigo: CODIGO, desde: "2026-07-16", hasta: "2026-08-13", ya_pagadas: false },
+    { empleado_codigo: CODIGO, desde: "2026-08-14", hasta: "2026-08-14", ya_pagadas: false },
+  ];
+
+  // La quincena 1 → 15 de agosto de 2026, que las toca a las dos.
+  const Q_DESDE = "2026-08-01";
+  const Q_HASTA = "2026-08-15";
+  /** Los 10 hábiles de esa quincena. Del 3 al 13 los cubre la vacación larga. */
+  const HABILES = [
+    "2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06", "2026-08-07",
+    "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14",
+  ];
+  const VIERNES_14 = "2026-08-14";
+
+  const ficha: FichaPlanilla = {
+    codigo: CODIGO, nombre: NOMBRE,
+    salarioMensual: 566.52, jornadaSemanal: 40, empresa: "fashion_wear",
+  };
+  const horarios: HorarioPersona[] = [
+    { empleado_codigo: CODIGO, entrada: "08:00", salida: "17:00", almuerzo_minutos: 30 },
+  ];
+
+  /** Panamá es UTC−5 fijo. Nada de `new Date()`. */
+  const enPanama = (dia: string, hhmm: string) =>
+    new Date(Date.parse(`${dia}T${hhmm}:00-05:00`)).toISOString();
+  const marcasDe = (d: string): Marcacion[] =>
+    ["08:00", "12:00", "12:30", "17:00"].map((h) => ({
+      empleado_codigo: CODIGO, empleado_nombre: null, ocurrio_en: enPanama(d, h),
+    }));
+
+  /** La planilla como la arma la ruta: mismo motor, mismos argumentos. */
+  function lineaDe(opts: { vacaciones?: Vacacion[]; marca?: string[] }) {
+    const personas = armarReporte({
+      marcaciones: (opts.marca ?? []).flatMap(marcasDe),
+      horarios,
+      justificaciones: [],
+      vacaciones: opts.vacaciones,
+      feriados: new Map(),
+      desde: Q_DESDE, hasta: Q_HASTA, reglas: R,
+      nombres: new Map([[CODIGO, NOMBRE]]),
+      incluirNoHabiles: true,
+    });
+    const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
+    return armarPlanilla({
+      personas,
+      fichas: new Map([[CODIGO, ficha]]),
+      jornadaDiariaMin: (c) => jornadaDiariaMin(horarioDe.get(c)),
+      reglas: R,
+      empresa: "fashion_wear",
+      justificados: motivosDeQuienNoMarco({ vacaciones: opts.vacaciones }),
+    }).find((l) => l.codigo === CODIGO)!;
+  }
+
+  it("🔑 el escenario es el de HOY: la pestaña está apagada mientras se mide esto", () => {
+    // Si alguien vuelve a encender la pestaña, este caso falla y obliga a
+    // releer el bloque entero en vez de dejarlo mintiendo.
+    expect([...PESTANAS_OCULTAS]).toContain("vacaciones");
+    expect(vePestana("admin", "vacaciones")).toBe(false);
+  });
+
+  it("🔴 con sus DOS vacaciones reales y cero marcas: no se le descuenta NADA", () => {
+    const l = lineaDe({ vacaciones: VACACIONES_REALES });
+    // Sin número y fuera del total: la decide una persona. NO un descuento.
+    expect(l.dinero).toBeNull();
+    expect(l.faltaConfigurar).toEqual([]);
+    expect(grupoDeLinea(l)).toBe("decidir");
+    expect(l.decidirAMano).toContain("Vacaciones");
+    // Y el motor las reconoció como vacaciones, no como faltas.
+    expect(l.horas.ausenciaDias).toBe(0);
+    expect(l.horas.ausenciaMin).toBe(0);
+  });
+
+  it("🩸 LA VARA: si el motor dejara de leerlas, sería «no marcó ni un día» (ámbar)", () => {
+    // Es el caso que este trabajo NO podía producir. Sin él, un motor que no
+    // descuenta nada nunca pondría el archivo en rojo.
+    const l = lineaDe({});
+    expect(l.faltaConfigurar).toContain(FALTA.sinMarcaciones);
+    expect(grupoDeLinea(l)).toBe("falta");
+  });
+
+  it("🔴 EN DÓLARES: con la vacación viva cobra la quincena COMPLETA, ausencias $0.00", () => {
+    // Para que haya un número que mirar, la persona marca el viernes 14 —el
+    // día que la vacación larga ya no cubre—. Los 9 hábiles anteriores son
+    // vacaciones. La vara es la MISMA quincena trabajada entera.
+    const conVacacion = lineaDe({
+      vacaciones: [VACACIONES_REALES[0]], marca: [VIERNES_14],
+    });
+    const perfecta = lineaDe({ marca: HABILES });
+
+    expect(conVacacion.dinero).not.toBeNull();
+    expect(conVacacion.dinero!.ausencias).toBe(0);
+    expect(conVacacion.dinero!.vacacionesYaPagadas).toBe(0);
+    expect(conVacacion.dinero!.tardanzas).toBe(0);
+    // Campo por campo contra la quincena trabajada entera: si mañana entra una
+    // columna nueva, se compara sola.
+    for (const k of Object.keys(conVacacion.dinero!) as Array<keyof typeof conVacacion.dinero>) {
+      expect(`${String(k)}=${conVacacion.dinero![k]}`).toBe(`${String(k)}=${perfecta.dinero![k]}`);
+    }
+  });
+
+  it("🩸 y sin la vacación esos MISMOS días serían 9 ausencias de día completo", () => {
+    const sinVacacion = lineaDe({ marca: [VIERNES_14] });
+    const rata = sinVacacion.dinero!.rataHora;
+    // 9 hábiles × 8 h × la rata. `MIN_DIA_NO_TRABAJADO` es la constante de la
+    // casa: 8 h fijas, no el horario de la persona.
+    const esperado = Math.round(9 * (MIN_DIA_NO_TRABAJADO / 60) * rata * 100) / 100;
+    expect(sinVacacion.horas.ausenciaDias).toBe(9);
+    expect(sinVacacion.dinero!.ausencias).toBe(esperado);
+    expect(esperado).toBeGreaterThan(0);
+    // O sea: es exactamente la quincena que se le habría comido en silencio.
+    expect(sinVacacion.dinero!.netoPagar).toBeLessThan(
+      lineaDe({ vacaciones: [VACACIONES_REALES[0]], marca: [VIERNES_14] }).dinero!.netoPagar,
+    );
   });
 });

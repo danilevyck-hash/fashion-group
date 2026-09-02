@@ -207,7 +207,18 @@ describe("🔴 la lista de «solo aprueba» se DERIVA, no se escribe a mano", ()
 });
 
 describe("🔴 QUÉ PESTAÑAS VE CADA UNO — bodega entra a UNA, no a seis", () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN (1-sep-2026). «Vacaciones» sigue en el catálogo de
+  // pestañas pero está APAGADA para todos —admin incluido— por
+  // `PESTANAS_OCULTAS` en `lib/asistencia/roles.ts`. Daniel: *«olvida lo de las
+  // vacaciones por ahora, quitalo del ERP para no enrredar»*.
+  //
+  // 🔑 Se deja en esta lista A PROPÓSITO: es el universo de lo que se PREGUNTA,
+  // y que el resultado no la traiga es justamente lo que hay que comprobar. Si
+  // se sacara de acá, el día que se vuelva a encender nadie se enteraría de que
+  // este candado dejó de mirarla.
   const TODAS = ["planilla", "reporte", "justificaciones", "vacaciones", "aprobaciones", "configuracion"];
+  /** Lo que de verdad se ve hoy. Reactivar Vacaciones tiene que romper esto. */
+  const VISIBLES = TODAS.filter((t) => t !== "vacaciones");
   const ve = async (rol: string) => {
     const { vePestana } = await import("@/lib/asistencia/roles");
     return TODAS.filter((t) => vePestana(rol, t));
@@ -217,20 +228,20 @@ describe("🔴 QUÉ PESTAÑAS VE CADA UNO — bodega entra a UNA, no a seis", ()
     expect(await ve("bodega")).toEqual(["aprobaciones"]);
   });
 
-  it("admin las ve todas — es consecuencia de la regla, no un caso escrito a mano", async () => {
-    expect(await ve("admin")).toEqual(TODAS);
+  it("admin las ve todas MENOS la apagada — consecuencia de la regla, no un caso a mano", async () => {
+    expect(await ve("admin")).toEqual(VISIBLES);
   });
 
   it("la CONTADORA las ve todas — desde el 27-ago-2026 también aprueba", async () => {
     // Daniel: «que contabilidad tambien pueda aprobar». Es quien arma la
     // planilla y ya veía el aviso de lo que quedó sin aprobar; ahora puede
     // destrabarlo sin buscar a nadie.
-    expect(await ve("contabilidad")).toEqual(TODAS);
+    expect(await ve("contabilidad")).toEqual(VISIBLES);
   });
 
   it("⛔ la SECRETARIA no gana Aprobaciones — ella no arma la planilla", async () => {
     const suyas = await ve("secretaria");
-    expect(suyas).toEqual(["planilla", "reporte", "justificaciones", "vacaciones", "configuracion"]);
+    expect(suyas).toEqual(["planilla", "reporte", "justificaciones", "configuracion"]);
     expect(suyas).not.toContain("aprobaciones");
   });
 

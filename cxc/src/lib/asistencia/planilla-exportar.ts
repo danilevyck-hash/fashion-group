@@ -325,7 +325,11 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Valor del minuto", "Rata por hora ÷ 60."],
       ["Salario quincenal", "Salario mensual ÷ 2. El día 31 no paga base, pero si se falta ese día sí se descuenta."],
       ["Tardanza", `Tolerancia de ${r.toleranciaTardanzaMin} minutos. Pasada la tolerancia se cuenta desde la hora de entrada, y se descuenta minutos × valor del minuto.`],
-      ["Hora extra", `Mínimo ${r.extraMinimoMin} minutos y menos el atraso del mismo día. Hasta las ${r.horaCorteNocturno} × ${r.recargoExtraDiurno}; desde el minuto siguiente × ${r.recargoExtraNocturno}.`],
+      // 🔴 1-sep-2026: decía "y menos el atraso del mismo día". La tardanza y la
+      // hora extra van SEPARADAS —*"No, van separadas"*—: pasado el mínimo se
+      // paga desde el primer minuto, y el atraso se sigue descontando en su
+      // propia columna. Esta hoja es la que la contadora mira para cuadrar.
+      ["Hora extra", `Desde ${r.extraMinimoMin} minutos se paga completa, desde el primer minuto; el atraso del mismo día se descuenta aparte, no se le resta. Hasta las ${r.horaCorteNocturno} × ${r.recargoExtraDiurno}; desde el minuto siguiente × ${r.recargoExtraNocturno}.`],
       ["Excedente", `NO SE USA: esos minutos se pagan × ${r.recargoExtraNocturno} junto con el resto de la hora extra de noche. La columna queda en $0.00, igual que en el cuadro de la contadora.`],
       ["Domingos y feriados", `Horas trabajadas × ${r.recargoDomingoFeriado}.`],
       ["Ausencias", "8 horas × rata por hora, sin recargo, por cada día completo sin marcar. Son 8 fijas para todos: no las mueve el horario de cada quien."],

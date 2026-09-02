@@ -53,6 +53,12 @@
 // adentro de la Planilla habría puesto un botón que mueve el pago de treinta
 // personas en la misma pantalla donde la contadora teclea montos.
 //
+// ⚠️ DESDE EL 1-SEP-2026 SE VEN 5: Vacaciones está APAGADA (`PESTANAS_OCULTAS`
+// en `lib/asistencia/roles.ts`), a pedido de Daniel —*«olvida lo de las
+// vacaciones por ahora, quitalo del ERP para no enrredar»*— mientras se trabaja
+// el flujo de generar y cerrar la planilla. Está apagada, no borrada: el
+// componente, la ruta y el motor siguen enteros. Ver la nota de la constante.
+//
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
 import { Suspense, useEffect, useState } from "react";
@@ -79,6 +85,13 @@ const TABS = [
   // vacaciones no explican una falta —no se pagan por asistencia y llevan su
   // propia cuenta de días—, así que no pueden vivir en la misma lista. Va al
   // lado porque las dos son «lo que pasa con la gente esta quincena».
+  //
+  // ⚠️ APAGADA DESDE EL 1-SEP-2026 — sigue declarada acá A PROPÓSITO. Está en
+  // `PESTANAS_OCULTAS` (`lib/asistencia/roles.ts`), así que `vePestana` la deja
+  // fuera de `visibles` para todos y un `?tab=vacaciones` guardado cae en la
+  // pestaña por defecto. Volver a encenderla = borrar esa línea de la
+  // constante; no hay nada más que reconstruir. 🔴 El MOTOR sigue honrando las
+  // vacaciones ya cargadas: esconder la pantalla no cambió un centavo.
   ["vacaciones", "Vacaciones"],
   // 🔴 LA SEXTA, APROBACIONES (26-ago-2026). Se ganó el lugar por lo que se
   // hace ahí y por QUIÉN lo hace: es la única pantalla del módulo donde una

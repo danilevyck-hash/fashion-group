@@ -256,6 +256,29 @@ describe("Reporte — la metodología al ⓘ, el estado del reloj en pantalla", 
     expect(screen.getByText(/nunca entra ahí/)).toBeTruthy();
   });
 
+  /**
+   * 🔴 CAMBIO DE DIRECCIÓN (1-sep-2026). Este ⓘ decía «extras desde N min,
+   * menos el atraso del día», que era la regla vieja: la hora extra se pagaba
+   * NETA del atraso. Ya no. Daniel, textual: *«No, van separadas»* — el atraso
+   * se descuenta por su lado y la extra se paga completa desde el primer
+   * minuto pasado el mínimo.
+   *
+   * 🩸 El motor cambió solo (`extraMin = bruto`), pero la FRASE no: durante un
+   * rato el ⓘ, el Excel y el PDF explicaron una regla que el sistema ya no
+   * hacía. Un número que no cuadra se ve; una frase que miente, no.
+   */
+  it("🔴 el ⓘ dice que la extra se paga COMPLETA y el atraso va aparte", async () => {
+    servir(base);
+    montar(<ReporteTab />);
+    await screen.findByText(/Ángela García/);
+    abrirAyuda("Cómo se leen estos números");
+    expect(screen.getByText(/se pagan completas: el atraso del día se descuenta aparte/)).toBeTruthy();
+    // Y la regla vieja no puede quedar en ningún rincón del panel.
+    expect(screen.queryByText(/menos el atraso del día/)).toBeNull();
+    // El umbral sale de las reglas configurables, nunca cableado en el texto.
+    expect(screen.getByText(new RegExp(`extras desde\\s*${REGLAS_DEFAULT.extraMinimoMin} min`))).toBeTruthy();
+  });
+
   it("🔴 «se asume 5:00 p.m.» sigue en pantalla — es plata", async () => {
     servir(base);
     montar(<ReporteTab />);

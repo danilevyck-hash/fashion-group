@@ -83,7 +83,29 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const renglon = (codigo: string) =>
   document.querySelector(`li[data-saldo-codigo="${codigo}"]`) as HTMLElement | null;
 
-describe("la columna de saldo", () => {
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠️ TODO ESTE ARCHIVO ESTÁ DORMIDO DESDE EL 1-SEP-2026 — Y NO SE BORRA.
+//
+// Los 14 casos de acá RENDERIZAN `VacacionesTab`, y esa pestaña se APAGÓ
+// (`PESTANAS_OCULTAS` en `src/lib/asistencia/roles.ts`) a pedido de Daniel:
+// *«olvida lo de las vacaciones por ahora, quitalo del ERP para no enrredar»*.
+// El componente sigue entero en el repo, pero ya no hay forma de llegar a él
+// desde la app: estos casos prueban una pantalla inalcanzable.
+//
+// 🔴 POR QUÉ `describe.skip` Y NO BORRARLOS: son la definición escrita de lo que
+// esa pantalla garantizaba —que quien NO tiene fecha de ingreso aparezca igual
+// diciendo qué le falta en vez de mostrar un número inventado, que el medio día
+// se vea, que el saldo se diga en el momento en que se decide si alguien puede
+// irse—. Borrados, el día que se reactive hay que deducir todo eso del JSX.
+//
+// 🔑 EL CÁLCULO NO SE APAGÓ: `saldo-vacaciones.ts` y sus tests de función pura
+// (`src/__tests__/lib/asistencia-saldo-vacaciones.test.ts`) siguen corriendo.
+// Lo que duerme es la comprobación de la PANTALLA, no la de la regla.
+//
+// PARA REACTIVARLOS: sacar `"vacaciones"` de `PESTANAS_OCULTAS` y cambiar los
+// cuatro `describe.skip` de abajo por `describe`. Nada más.
+// ─────────────────────────────────────────────────────────────────────────────
+describe.skip("la columna de saldo", () => {
   it("se ve, con el título y la regla en UNA línea", async () => {
     servir(RESPUESTA);
     montar();
@@ -138,7 +160,7 @@ describe("la columna de saldo", () => {
   });
 });
 
-describe("🔴 a quien le falta un dato", () => {
+describe.skip("🔴 a quien le falta un dato", () => {
   it("APARECE en la lista — no se lo esconde", async () => {
     servir(RESPUESTA);
     montar();
@@ -176,7 +198,7 @@ describe("🔴 a quien le falta un dato", () => {
   });
 });
 
-describe("al elegir a la persona en el formulario", () => {
+describe.skip("al elegir a la persona en el formulario", () => {
   it("le dice el saldo ahí mismo, que es donde se decide", async () => {
     servir(RESPUESTA);
     montar();
@@ -205,7 +227,7 @@ describe("al elegir a la persona en el formulario", () => {
   });
 });
 
-describe("nada se descarta en silencio", () => {
+describe.skip("nada se descarta en silencio", () => {
   it("si llegaron menos vacaciones de las que hay, la pantalla LO DICE", async () => {
     servir({
       ...RESPUESTA,

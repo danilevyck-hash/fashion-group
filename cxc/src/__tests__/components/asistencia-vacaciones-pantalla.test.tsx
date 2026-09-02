@@ -301,7 +301,34 @@ const RESPUESTA_TAB = {
   avisoMigracion: null,
 };
 
-describe("la pestaña: persona + desde + hasta + un interruptor, y nada más", () => {
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠️ DORMIDOS DESDE EL 1-SEP-2026 — Y NO SE BORRAN.
+//
+// La pestaña Vacaciones se APAGÓ (`PESTANAS_OCULTAS` en
+// `src/lib/asistencia/roles.ts`) a pedido de Daniel: *«olvida lo de las
+// vacaciones por ahora, quitalo del ERP para no enrredar»*. `VacacionesTab`
+// sigue entero en el repo, pero ya no hay forma de llegar a él desde la app, así
+// que estos cinco casos probarían una pantalla que nadie puede abrir.
+//
+// 🔴 POR QUÉ `describe.skip` Y NO BORRARLOS: son la definición escrita de qué
+// garantizaba esa pantalla —el rango con sus días, el interruptor que dice el
+// EFECTO, el guardado sin botón, el aviso de la migración y el «no pide nota ni
+// motivo»—. Borrados, el día que se reactive nadie sabe qué tenía que cumplir y
+// hay que deducirlo del JSX.
+//
+// PARA REACTIVARLOS: sacar `"vacaciones"` de `PESTANAS_OCULTAS` y cambiar este
+// `describe.skip` por `describe`. Nada más — no dependen de nada que se haya
+// tocado. ⚠️ Antes de eso hay que arreglar el texto del interruptor: está la
+// nota completa pegada a `PESTANAS_OCULTAS` («Ya se le pagó» / «Se le pagan
+// estos días» se contradicen leídos juntos), y cuando se arregle, los casos de
+// abajo que miran ESAS palabras hay que actualizarlos con el texto nuevo.
+//
+// 🔑 LOS OTROS DOS BLOQUES DE ESTE ARCHIVO SIGUEN CORRIENDO, y es a propósito:
+// prueban el REPORTE y la PLANILLA —dos pantallas que se siguen viendo— y son
+// justamente la prueba de que el MOTOR sigue honrando las vacaciones cargadas.
+// Apagar la pestaña no podía apagarlos.
+// ─────────────────────────────────────────────────────────────────────────────
+describe.skip("la pestaña: persona + desde + hasta + un interruptor, y nada más", () => {
   it("la fila dice nombre, rango y cuántos días", async () => {
     servir([["/api/asistencia/vacaciones", RESPUESTA_TAB]]);
     montar(<VacacionesTab />);
