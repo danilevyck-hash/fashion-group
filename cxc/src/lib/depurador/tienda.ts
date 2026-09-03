@@ -1,9 +1,10 @@
 // Facturas Tienda · lógica pura (sin DOM, sin xlsx).
 //
 // Convierte las facturas que las 6 empresas del grupo le emiten a la tienda
-// retail (Multifashion/ACS) en la plantilla de importación de Switch (24
-// columnas, formato Fashion Shoes: UNA sola columna "Costo *"). Acepta 3
-// formatos de la MISMA factura exportada distinto desde Switch:
+// retail (Multifashion/ACS) en la plantilla de importación de Switch — las
+// MISMAS 25 columnas de OUT_COLS que el Depurador (3-sep-2026; hasta entonces
+// usaba una lista de 24 con una sola columna «Costo *» que Switch no tiene).
+// Acepta 3 formatos de la MISMA factura exportada distinto desde Switch:
 //   A) .xls  — header en fila 3 (índice 2), fila 1 trae "N. Interno: 11-XXXX".
 //              Columnas: CODIGO, CODIGO BARRA, REFERENCIA, DESCRIPCION, MARCA,
 //              RUBRO, SUB RUBRO, UNIDAD DE MEDIDA, PROVEEDOR, CANTIDAD, PRECIO…
@@ -14,10 +15,10 @@
 //
 // Reusa del Depurador: normalizeDescripcion (NORMALIZACION + applyPrinciples),
 // buildRubro/buildSubrubro, esGenero, reclassMarca, detectServicio, titleCase
-// y la plantilla OUT_COLS_SHOES. NO toca la lógica del Depurador.
+// y la plantilla OUT_COLS. NO toca la lógica del Depurador.
 
 import {
-  OUT_COLS_SHOES,
+  OUT_COLS,
   buildRubro,
   buildSubrubro,
   esGenero,
@@ -28,6 +29,7 @@ import {
   marcaKey,
   titleCase,
   norm,
+  tasaSwitch,
   MARCA_CATALOGO,
   descripcionesDeMarca,
   esDescripcionCatalogada,
@@ -38,7 +40,7 @@ import {
 } from "./logic";
 import { veredictoDescripcion } from "./veredicto";
 
-export { OUT_COLS_SHOES };
+export { OUT_COLS };
 
 /* ============ EMPRESAS DEL GRUPO (proveedor factura → proveedor TIENDA) ============ */
 // La columna "Proveedor *" de la plantilla SIEMPRE lleva la razón social completa
@@ -302,7 +304,7 @@ function resolveBarcode(rawBarcode: Cell, referencia: string, codigo: string): B
 
 /* ============ PROCESAMIENTO ============ */
 export interface FacturaRow {
-  /** Valores de las 24 columnas de salida (OUT_COLS_SHOES). "Precio *" queda
+  /** Valores de las 25 columnas de salida (OUT_COLS). "Precio *" queda
    *  null — lo calcula el cliente con las fórmulas de tienda. */
   cols: Record<string, string | number | null>;
   /** Marcas candidatas cuando la descripción matchea varias (formatos B/C).
@@ -464,9 +466,10 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
       ? (temporadaDeFecha(row[col.fecha]) || cfg.temporadaFallback)
       : cfg.temporadaFallback;
 
-    // Tasa: % IMPUESTO de la factura si viene; si no, 7.00.
+    // Tasa: % IMPUESTO de la factura si viene; si no, 7. Sale en el código de
+    // Switch («07», texto), no como «7.00».
     const tasaNum = col.impuesto !== -1 ? numDe(row[col.impuesto]) : null;
-    const tasa = (tasaNum ?? 7).toFixed(2);
+    const tasa = tasaSwitch(tasaNum ?? 7);
 
     // Unidad de medida: la de la factura (PIEZA / PAR); default PIEZA.
     const unidad = col.unidad !== -1 && clean(row[col.unidad]) ? clean(row[col.unidad]).toUpperCase() : "PIEZA";
@@ -570,7 +573,11 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
         "Descripción *": descOut,
         "Precio *": null, // lo calcula el cliente con las fórmulas de TIENDA
         "Tasa de Impuesto *": tasa,
-        "Costo *": costoOut,
+        // 🔴 FOB = CIF = el MISMO número: el precio que le factura la empresa del
+        // grupo a la tienda. No hay flete que sumar entre dos empresas de Panamá.
+        // Daniel, 3-sep-2026: «mismo número».
+        "Costo FOB *": costoOut,
+        "Costo CIF *": costoOut,
         "rubro *": rubro,
         "subrubro": sub,
         "Marca *": marcaOut,
@@ -612,12 +619,12 @@ export function setRowMarca(row: FacturaRow, marca: string): FacturaRow {
 }
 
 /* ============ SALIDA ============ */
-/** AOA de la plantilla (24 cols OUT_COLS_SHOES). SIN Title Case: el proveedor
+/** AOA de la plantilla (las 25 cols de OUT_COLS). SIN Title Case: el proveedor
  *  tienda y la marca van EXACTOS (razón social / mayúsculas). */
 export function buildTiendaAoa(rows: FacturaRow[]): (string | number)[][] {
-  const aoa: (string | number)[][] = [OUT_COLS_SHOES.slice()];
+  const aoa: (string | number)[][] = [OUT_COLS.slice()];
   for (const r of rows) {
-    aoa.push(OUT_COLS_SHOES.map((c) => {
+    aoa.push(OUT_COLS.map((c) => {
       const v = r.cols[c];
       return v === null || v === undefined ? "" : (v as string | number);
     }));

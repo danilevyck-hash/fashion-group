@@ -5,7 +5,7 @@ import {
   ceilPar, fobReebok, detectMonthCol, findHeaderRow, parseReebok,
   buildCatalogo, buildCatalogoAoa, buildSwitchRows, buildSwitchAoa,
   filtrarConPiezas, sinPiezasDelMes,
-  OUT_COLS_DEFAULT, REEBOK_FORMULA_A_DEFAULT, REEBOK_FORMULA_B_DEFAULT,
+  OUT_COLS, REEBOK_FORMULA_A_DEFAULT, REEBOK_FORMULA_B_DEFAULT,
 } from "../lib/depurador/reebok";
 import type { SheetRow } from "../lib/depurador/logic";
 import { marcaKey, type MarcaRubroFormula } from "../lib/depurador/logic";
@@ -94,9 +94,16 @@ describe("Reebok — Salida A (pedido cliente)", () => {
 });
 
 describe("Reebok — Salida B (Switch, fila por ARTÍCULO)", () => {
-  it("24 columnas OUT_COLS_DEFAULT (sin Composición)", () => {
-    expect(OUT_COLS_DEFAULT).toHaveLength(24);
-    expect(OUT_COLS_DEFAULT).not.toContain("Composición");
+  // 🔴 CAMBIÓ DE DIRECCIÓN (3-sep-2026): decía «24 columnas, sin Composición».
+  // La plantilla de Switch tiene 25 y Composición es la 21 (vacía). Reebok sale
+  // con la misma lista que todo el sistema; el fixture real la fija.
+  it("25 columnas OUT_COLS (con Composición vacía)", () => {
+    expect(OUT_COLS).toHaveLength(25);
+    expect(OUT_COLS[20]).toBe("Composición");
+    const { items } = parseReebok(rowsFemale(), MONTH);
+    const aoa = buildSwitchAoa(SW(items));
+    expect(aoa[0]).toEqual(OUT_COLS);
+    expect(aoa[1][20]).toBe("");
   });
   it("una fila por artículo con cantidad sumada y mapeo correcto", () => {
     const { items } = parseReebok(rowsFemale(), MONTH);
@@ -184,8 +191,8 @@ describe("Reebok — Salida B (Switch, fila por ARTÍCULO)", () => {
   it("buildSwitchAoa NO aplica Title Case", () => {
     const { items } = parseReebok(rowsFemale(), MONTH);
     const aoa = buildSwitchAoa(SW(items));
-    const marcaIdx = OUT_COLS_DEFAULT.indexOf("Marca *");
-    const provIdx = OUT_COLS_DEFAULT.indexOf("Proveedor *");
+    const marcaIdx = OUT_COLS.indexOf("Marca *");
+    const provIdx = OUT_COLS.indexOf("Proveedor *");
     expect(aoa[1][marcaIdx]).toBe("FOOTWEAR");
     expect(aoa[1][provIdx]).toBe("LATIN FITNESS GROUP");
   });

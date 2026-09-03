@@ -71,7 +71,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   // Plantilla Switch por defecto: es la que Daniel usa casi siempre (pedido suyo).
   const [salida, setSalida] = useState<Salida>("switch");
   const [precioAB, setPrecioAB] = useState<PrecioAB>("A");
-  const [tasa] = useState("7");
+  const [tasa] = useState("07"); // código de Switch para el 7% (texto)
 
   // Fórmulas editables Reebok (Precio A / Precio B), guardadas en marca_formulas.
   const [formulaA, setFormulaA] = useState<PriceFormula>(REEBOK_FORMULA_A_DEFAULT);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  processRows, buildAoa, OUT_COLS, titleCase, proveedorParaEmpresa, outColsForEmpresa,
+  processRows, buildAoa, OUT_COLS, titleCase, proveedorParaEmpresa,
   esDescripcionCatalogada, descripcionesDeMarca, matchEmpresaFromDestino, precioDescripcion,
   MARCA_CATALOGO, normalizeDescripcion, reclassMarca,
   type SheetRow, type MarcaRubroFormula, type CatalogoDescripciones,
@@ -84,12 +84,20 @@ describe("Depurador — formato de salida (Tarea 3)", () => {
     const r = processRows([H, ["REF123", "", "Men-Bras", "M", 10, 10, 20, "CK Menswear", "x"]] as SheetRow[], cfg).rows[0];
     expect(r.cols["Código Barra *"]).toBe("REF123");
   });
-  it("Header default sin Composición pero CON Codigo CPBS (24 cols)", () => {
-    const header = buildAoa(processRows([H, ["R1", "1", "Men-Bras", "M", 10, 10, 20, "CK Menswear", "x"]] as SheetRow[], cfg).rows)[0];
-    expect(header).not.toContain("Composición");
+  // 🔴 CAMBIÓ DE DIRECCIÓN (3-sep-2026). Este test decía «24 cols, sin
+  // Composición»: era el candado de un error. La plantilla de Switch tiene 25
+  // columnas y «Composición» es la 21 — bajada de las 8 empresas, MD5 idéntico.
+  // Daniel: «vuelve vacía, no la quiero». La lista exacta se compara contra el
+  // fixture real en depurador-plantilla-switch.test.ts.
+  it("Header = las 25 columnas de Switch, CON Composición (vacía) y CON Codigo CPBS", () => {
+    const aoa = buildAoa(processRows([H, ["R1", "1", "Men-Bras", "M", 10, 10, 20, "CK Menswear", "x"]] as SheetRow[], cfg).rows);
+    const header = aoa[0] as string[];
+    expect(header).toEqual(OUT_COLS);
+    expect(header.length).toBe(25);
+    expect(header[20]).toBe("Composición");
+    expect(aoa[1][20]).toBe("");
     expect(header).toContain("Codigo CPBS");
     expect(header).toContain("Codigo CPBS Abrev");
-    expect(header.length).toBe(24);
   });
 });
 
@@ -114,9 +122,10 @@ describe("Depurador — reclasificación de marcas (Tarea 6)", () => {
 
 describe("Depurador — Active Wear / Karl Lagerfeld (Tarea 4)", () => {
   const rows = processRows([H, ["R1", "1", "Women-T-Shirts S/S", "M", 10, 10, 20, "KL Womenswear", "x"]] as SheetRow[], cfg).rows;
-  it("Active Wear usa plantilla de Vistana (24 cols FOB+CIF), proveedor configurable", () => {
-    expect((buildAoa(rows, outColsForEmpresa("active_wear"))[0] as string[]).length).toBe(24);
-    expect(buildAoa(rows, outColsForEmpresa("active_wear"))[0]).toContain("Costo FOB *");
+  it("Active Wear usa LA plantilla (25 cols FOB+CIF, la misma que todas), proveedor configurable", () => {
+    expect((buildAoa(rows)[0] as string[]).length).toBe(25);
+    expect(buildAoa(rows)[0]).toContain("Costo FOB *");
+    expect(buildAoa(rows)[0]).toContain("Costo CIF *");
     expect(proveedorParaEmpresa("active_wear")).toBeNull(); // Daniel lo llena
   });
   it("matchEmpresaFromDestino reconoce KL/Active Wear/Multifashion", () => {
@@ -229,41 +238,38 @@ describe("Depurador — marcas desconocidas (no caen en silencio)", () => {
   });
 });
 
-describe("Depurador — plantilla por empresa (Tarea 5)", () => {
+describe("Depurador — UNA plantilla para las 4 empresas (3-sep-2026)", () => {
   const rows = processRows([H, ["R1", "1", "Men-Sneakers", "M", 10, 10, 20, "TH Footwear", "x"]] as SheetRow[], cfg).rows;
-  // 🔴 CAMBIÓ DE DIRECCIÓN (1-sep-2026): «Costo *» pasó de CIF a FOB. Daniel,
-  // textual: *"en fashion shoes, cuando me das el excel ya depurado, me das un
-  // solo costo… quiero que me des el fob en vez del cif ahí"*. El costo de
-  // entrada es 10 y el factor 1,1: antes salía 11 (con flete), ahora 10.
-  it("Fashion Shoes: 24 cols, 'Costo *' único = FOB, con Composición/CPBS", () => {
-    const aoa = buildAoa(rows, outColsForEmpresa("fashion_shoes"));
+  // 🔴 CAMBIÓ DE DIRECCIÓN POR SEGUNDA VEZ. Este bloque fijaba una plantilla
+  // propia de Fashion Shoes: 24 columnas y UNA sola «Costo *» (= CIF desde el
+  // 27-jun-2026, = FOB desde el 1-sep-2026). Esa columna no existe en Switch:
+  // la plantilla real —bajada de las 8 empresas el 3-sep-2026, MD5 idéntico—
+  // trae «Costo FOB *» Y «Costo CIF *», las dos obligatorias. Daniel, 3-sep:
+  // Fashion Shoes con FOB y CIF separados, CIF = FOB × 1,10 como Vistana → «sí».
+  // Ya no hay `outColsForEmpresa`: buildAoa no recibe empresa porque las
+  // columnas no dependen de ella.
+  it("Fashion Shoes: las MISMAS 25 columnas, FOB = 10 y CIF = 11 (FOB × 1,1)", () => {
+    const aoa = buildAoa(rows);
     const header = aoa[0] as string[];
-    expect(header.length).toBe(24);
-    expect(header).toContain("Costo *");
-    expect(header).not.toContain("Costo FOB *");
-    expect(header).not.toContain("Costo CIF *");
-    expect(header).toContain("Composición");
-    expect(header).toContain("Codigo CPBS");
-    // 🔑 Costo * = FOB (el costo del archivo, 10), NO el CIF (10 × 1,1 = 11).
-    expect(aoa[1][header.indexOf("Costo *")]).toBe(10);
+    expect(header).toEqual(OUT_COLS);
+    expect(header).not.toContain("Costo *");
+    expect(aoa[1][header.indexOf("Costo FOB *")]).toBe(10);
+    expect(aoa[1][header.indexOf("Costo CIF *")]).toBe(11);
+    expect(aoa[1][header.indexOf("Composición")]).toBe("");
   });
 
-  it("⛔ y NO se cuela el flete: el valor con CIF ya no aparece en esa columna", () => {
-    const aoa = buildAoa(rows, outColsForEmpresa("fashion_shoes"));
+  it("⛔ el CIF de Fashion Shoes NO es igual al FOB (eso es Multifashion, no acá)", () => {
+    const aoa = buildAoa(rows);
     const header = aoa[0] as string[];
-    expect(aoa[1][header.indexOf("Costo *")]).not.toBe(11);
+    expect(aoa[1][header.indexOf("Costo CIF *")]).not.toBe(aoa[1][header.indexOf("Costo FOB *")]);
   });
 
-  it("⚠️ Vistana/Fashion Wear NO cambian: siguen con FOB y CIF por separado", () => {
-    const aoa = buildAoa(rows, outColsForEmpresa("vistana"));
+  it("Vistana/Fashion Wear: igual que siempre, FOB y CIF por separado", () => {
+    const aoa = buildAoa(rows);
     const header = aoa[0] as string[];
     expect(aoa[1][header.indexOf("Costo FOB *")]).toBe(10);
     expect(aoa[1][header.indexOf("Costo CIF *")]).toBe(11);
-  });
-  it("Vistana/Fashion Wear: 24 cols con FOB+CIF (incluye Codigo CPBS)", () => {
-    expect((buildAoa(rows, outColsForEmpresa("vistana"))[0] as string[]).length).toBe(24);
-    expect(buildAoa(rows, outColsForEmpresa("fashion_wear"))[0]).toContain("Costo FOB *");
-    expect(buildAoa(rows, outColsForEmpresa("vistana"))[0]).toContain("Codigo CPBS");
+    expect(header).toContain("Codigo CPBS");
   });
 });
 
@@ -291,7 +297,7 @@ describe("Depurador — Codigo CPBS = número de factura (columna C)", () => {
   it("Fashion Shoes: CPBS lleva la factura detectada por header FACTURA (columna C)", () => {
     const Hf = ["REFERENCIA", "EAN", "FACTURA", "P_CATEGORY", "TALLA", "CANTIDAD", "COSTO", "PRECIO2", "MARCA", "PROVEEDOR"];
     const rows = processRows([Hf, ["R1", "1", "FAC-12345", "Men-Sneakers", "M", 10, 10, 20, "TH Footwear", "x"]] as SheetRow[], cfg).rows;
-    const aoa = buildAoa(rows, outColsForEmpresa("fashion_shoes"));
+    const aoa = buildAoa(rows);
     const header = aoa[0] as string[];
     expect(aoa[1][header.indexOf("Codigo CPBS")]).toBe("FAC-12345");
   });

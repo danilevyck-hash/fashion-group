@@ -9,7 +9,6 @@ import {
   processRows,
   setRowTalla,
   buildAoa,
-  outColsForEmpresa,
   outputFilename,
   matchEmpresaFromDestino,
   proveedorParaEmpresa,
@@ -97,10 +96,12 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   const [downloading, setDownloading] = useState(false);
   const [orphanSeen, setOrphanSeen] = useState(false); // alarma de descripción nueva (Tarea 8)
 
-  // Config (mismos defaults del HTML: mes/año actual, tasa 7, factor 1.1)
+  // Config (mismos defaults del HTML: mes/año actual, tasa 07, factor 1.1)
   const [mesIdx, setMesIdx] = useState(now.getMonth());
   const [anio, setAnio] = useState(String(now.getFullYear()));
-  const [tasa, setTasa] = useState("7");
+  // «07» = el código de Switch para el 7% (texto). Lo que se escriba acá pasa
+  // igual por tasaSwitch al procesar, así que «7» también sale como «07».
+  const [tasa, setTasa] = useState("07");
   const [factor, setFactor] = useState("1.1");
 
   // Catálogo de descripciones (tabla depurador_descripciones — fuente de verdad).
@@ -446,8 +447,8 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         if (provFijo) cols["Proveedor *"] = provFijo;
         return { ...r, cols };
       });
-      // Plantilla según la empresa destino (Fashion Shoes = 1 columna de costo) (Tarea 5).
-      const aoa = buildAoa(finalRows, outColsForEmpresa(empresa));
+      // Una sola plantilla de 25 columnas para las 4 empresas (la de Switch).
+      const aoa = buildAoa(finalRows);
       const ws = XLSX.utils.aoa_to_sheet(aoa);
 
       // Forzar formato texto en Código(0), Referencia(1), Código Barra(2)
@@ -594,7 +595,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         </label>
       )}
 
-      {/* Config (colapsable — casi nunca cambia: factor 1.1, tasa 7) */}
+      {/* Config (colapsable — casi nunca cambia: factor 1.1, tasa 07) */}
       <details className="mb-4 rounded-xl border border-stone-200 bg-white">
         <summary className="cursor-pointer list-none px-4 py-2 text-[12px] font-medium text-stone-500 [&::-webkit-details-marker]:hidden">
           <span className="text-stone-400">▸</span> Editar temporada y costos

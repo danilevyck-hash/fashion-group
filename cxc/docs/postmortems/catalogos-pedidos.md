@@ -7,6 +7,35 @@
 
 ---
 
+## 🔴 Depurador — LA PLANTILLA DE SWITCH ES UNA SOLA, TIENE 25 COLUMNAS, Y AHORA VIVE EN EL REPO (3-sep-2026)
+
+> **Lo que pasaba.** El Depurador (`/productos/cargar`) generaba DOS variantes de 24 columnas (`OUT_COLS_DEFAULT` para Vistana / Fashion Wear / Active Wear / Reebok, `OUT_COLS_SHOES` para Fashion Shoes y Facturas Tienda) y **ninguna coincidía con la plantilla que Switch entrega**, que tiene **25**: la «default» no traía «Composición» (col 21) y las cuatro últimas quedaban corridas; la «shoes» tenía una sola «Costo *» en vez de «Costo FOB *» + «Costo CIF *», así que le faltaba una **obligatoria** y 18 columnas quedaban corridas. Daniel bajó la plantilla de Fashion Shoes y de Multifashion: **idénticas byte a byte** (MD5 `b622f171713642a0393b3c95c7f30de7`, 10.305 bytes), guardadas desde `C:\xampp\htdocs\switch\public\plantillas\` — el archivo fijo de Switch.
+>
+> **De dónde salió el error — 🩸 los dos cambios se hicieron contra plantillas que hoy no están en el repo:**
+> - **27-jun-2026 (Tarea 3, `2a853d26`)**: se quitó «Composición» «a propósito» del header default.
+> - **27-jun-2026 (Tarea 5, `310e1d5c`)**: Fashion Shoes recibió su lista propia con la «Costo *» única (= CIF). Facturas Tienda (`0fa27542`) nació sobre esa misma lista.
+> - **1-sep-2026 (`f6cd1966`)**: esa columna única pasó de llevar el CIF a llevar el FOB — se cambió el CONTENIDO de una columna que Switch no tiene.
+>
+> **Las decisiones de Daniel (3-sep-2026), textuales:**
+> - *«¿Las otras 4 empresas también descargan este mismo archivo?»* → **«creo que sí, revisa»**. Verificado: se abrió UNA sesión web (Vistana, 22:20 UTC, ventana a ≥15 min de los crons) para sacar la ruta real del enlace «Descargar plantilla modelo» → `/plantillas/productosplantillaimportarpafob.xlsx`. Apache la sirve **sin login**, así que las otras 7 empresas se bajaron sin abrir sesión (cero expulsiones extra). **Las 8 dan el mismo MD5.** Script: `scripts/_bajar-plantilla-articulos-switch.ts`.
+> - Fashion Shoes con FOB y CIF separados, CIF = FOB × 1,10 como Vistana → **«sí»**.
+> - Multifashion (Facturas Tienda): FOB = CIF = el precio que le factura la empresa del grupo a la tienda → **«mismo número»**.
+> - Composición → **«vuelve vacía, no la quiero»**.
+> - Tasa de impuesto → **«pon el 0 adelante pues»**: `07` como TEXTO, como dice la guía de Switch (`Flujo_articulo_orden_de_compra_switchsoft2026.pdf`, p. 3). Antes el Depurador escribía `7` y Facturas Tienda `7.00`.
+>
+> **Lo que quedó:**
+> - **`OUT_COLS` (logic.ts) es LA plantilla**: 25 columnas, encabezados exactos (acentos, asteriscos, espacios). `OUT_COLS_DEFAULT`, `OUT_COLS_SHOES` y `outColsForEmpresa` **se retiraron**; `buildAoa` ya no recibe empresa porque las columnas no dependen de ella. Los tres generadores —Depurador CK/TH/KL, `buildTiendaAoa` y `buildSwitchAoa` (Reebok)— escriben la misma fila 1.
+> - **Lo que cambia por empresa es el CONTENIDO:** Fashion Shoes FOB 10 → CIF 11 (el cálculo de `processRows`, que nunca cambió); Multifashion FOB = CIF = 12,50; Reebok FOB → CIF × 1,1 como siempre. Composición `""` en los tres. `tasaSwitch()` convierte «7», «7.00», `7` → `"07"` (y `0` → `"0"`, exento); lo que no es número se deja tal cual.
+> - **`TEXT_COLS = [0, 1, 2]` no se movió**: es posicional y las tres primeras columnas de la plantilla (Código, Referencia, Código Barra) siguen donde estaban aunque Composición haya vuelto en la 21. Candado explícito.
+> - **La plantilla real está en el repo:** `src/__tests__/fixtures/plantilla-switch-articulos.xlsx`. `depurador-plantilla-switch.test.ts` la LEE y exige igualdad posición por posición contra `OUT_COLS` y contra la fila 1 de los tres generadores; si Switch cambia la plantilla, hay que cambiar el fixture a propósito y el test dice qué columna se movió. También fija FOB/CIF por empresa, Composición vacía y la tasa `"07"` (incluido el viaje de escritura+lectura del `.xlsx`: la celda queda `t: "s"`, `v: "07"`).
+> - Los candados viejos **cambiaron de dirección** con su nota (`depurador-validate.test.ts` — «24 cols, sin Composición» y el bloque «plantilla por empresa (Tarea 5)»; `reebok-depurador.test.ts` — «24 columnas OUT_COLS_DEFAULT»).
+> - **Verificado con Excel reales** (`scripts/_verif-plantilla-switch.ts`: escribe el archivo como la pantalla, lo relee y compara encabezado por encabezado): las 4 empresas del Depurador, Multifashion y Reebok → **25/25 iguales, ninguna distinta**.
+> - **Mutación** (`scripts/_mutar-plantilla-switch.sh`): quitar Composición · cambiar un encabezado (tilde) · perder un asterisco · volver a la «Costo *» única · CIF = FOB en Fashion Shoes · Multifashion con flete · Multifashion sin CIF · Composición con texto · tasa «7» · tasa numérica · tienda «7.00» · Reebok tasa cruda · Reebok CIF = FOB → **13 de 13 cazadas, control en verde**.
+>
+> ⚠️ **Lo que NO se tocó, a propósito:** la plantilla de Switch formatea las columnas 1–13 y 19 como Texto; el sistema sigue forzando a texto solo las 3 primeras y manda Precio/Costos como números — es lo que está «validado al centavo contra plantillas manuales reales» y Switch lo acepta. Cambiarlo es otra decisión.
+
+---
+
 ## 🔴 EL CLIENTE DE SWITCH TAMBIÉN SE ELIGE DE UN SOLO LUGAR (17-ago-2026)
 
 > El #567 dejó **una excepción anotada a propósito**: el checkout del carrito tenía su PROPIA lista de clientes sobre el MISMO universo de Switch que `ClienteSwitchPicker` —el control del detalle del pedido y de "Duplicar"—, con su propia ruta, su propio buscador y su propia forma de resolver el mostrador. Daniel, textual: ***"si unificalo"***.

@@ -2,7 +2,7 @@
 
 // Facturas Tienda: convierte las facturas que las empresas del grupo le emiten
 // a la tienda retail (Multifashion/ACS) en la plantilla de importación de
-// Switch (24 columnas). Acepta .xls (factura), .csv (';') y .xlsx del reporte.
+// Switch (las 25 columnas de la plantilla real). Acepta .xls (factura), .csv (';') y .xlsx del reporte.
 // La lógica pura vive en src/lib/depurador/tienda.ts; las fórmulas de precio
 // son el set SEPARADO de tienda (tienda_marca_formulas / tienda_rubro_formulas).
 
@@ -244,7 +244,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
 
   // ── Precio por fila: precio fijo > fórmula de la descripción > fórmula de marca ──
   const costoOf = (row: FacturaRow): number | null => {
-    const v = row.cols["Costo *"];
+    const v = row.cols["Costo FOB *"]; // = Costo CIF * (mismo número en tienda)
     if (v === null || v === undefined || v === "") return null;
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
@@ -349,7 +349,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
       if (onDownloaded) {
         const totalUnidades = finalRows.reduce((s, r) => s + (Number(r.cols["Stock Ideal"]) || 0), 0);
         const totalCosto = finalRows.reduce(
-          (s, r) => s + (Number(r.cols["Costo *"]) || 0) * (Number(r.cols["Stock Ideal"]) || 0),
+          (s, r) => s + (Number(r.cols["Costo FOB *"]) || 0) * (Number(r.cols["Stock Ideal"]) || 0),
           0
         );
         onDownloaded({

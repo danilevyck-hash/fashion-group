@@ -79,14 +79,60 @@ export interface ProcessResult {
 /* ============ CONFIG / CONSTANTES ============ */
 export const MESES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
 
-// Columnas de salida EXACTAS que espera Switch (orden fijo)
+// ── LA PLANTILLA DE SWITCH: 25 columnas, UNA para todo el sistema ─────────────
+//
+// Es la que el panel entrega en Stock › Artículos › Importar/Editar › «Descargar
+// plantilla modelo» (`/plantillas/productosplantillaimportarpafob.xlsx`). Es un
+// archivo FIJO de Switch, no depende de la empresa: el 3-sep-2026 se bajó de las
+// 8 empresas (Vistana, Fashion Wear, Fashion Shoes, Active Wear, Active Shoes,
+// Joystep, Boston y Multifashion) y las 8 dieron el MISMO MD5 (b622f171…).
+// Esa plantilla vive en el repo: `src/__tests__/fixtures/plantilla-switch-articulos.xlsx`,
+// y `depurador-plantilla-switch.test.ts` exige que esta lista sea IGUAL a sus
+// encabezados, uno por uno. Si Switch cambia la plantilla, se cambia el fixture
+// a propósito y el test dice qué columna se movió.
+//
+// 🩸 De dónde salió el error que esto cierra. El sistema llegó a tener DOS
+// variantes de 24 columnas, y NINGUNA coincidía con la plantilla:
+//   · 27-jun-2026 (Tarea 3): se quitó «Composición» «a propósito» → la plantilla
+//     «default» (Vistana / Fashion Wear / Active Wear / Reebok) quedó de 24 y las
+//     columnas 22–25 corridas un lugar.
+//   · 27-jun-2026 (Tarea 5): Fashion Shoes recibió una plantilla propia con UNA
+//     sola columna «Costo *» en vez de «Costo FOB *» + «Costo CIF *» — 24
+//     columnas, 18 corridas y sin el «Costo CIF *», que es OBLIGATORIA. Facturas
+//     Tienda (Multifashion) nació sobre esa misma lista. El 1-sep-2026 esa columna
+//     única pasó de llevar el CIF a llevar el FOB: se cambió el CONTENIDO de una
+//     columna que Switch no tiene.
+// Los dos cambios se hicieron contra plantillas que hoy no están en el repo. Esta
+// vez el fixture queda. Lo que cambia por empresa es el CONTENIDO (qué número va
+// en FOB y en CIF), nunca las columnas.
+//
+// 13 obligatorias (con `*`), Costo FOB y Costo CIF entre ellas. «Composición»
+// existe en la plantilla y va SIEMPRE vacía (Daniel: «vuelve vacía, no la quiero»).
 export const OUT_COLS = ["Código *", "Referencia *", "Código Barra *", "Descripción *", "Precio *",
   "Tasa de Impuesto *", "Costo FOB *", "Costo CIF *", "rubro *", "subrubro", "Marca *", "Proveedor *",
   "Mínimo Stock", "Código Tipo de Artículo *", "Unidad de medida *", "Origen", "Lote", "Serie",
   "Stock Ideal", "Temporada", "Composición", "Codigo CPBS", "Codigo CPBS Abrev", "Bonificación", "Cantidad por caja"];
 
-/** Columnas forzadas a TEXTO en el Excel descargado: Código(0), Referencia(1), Código Barra(2). */
+/** Columnas forzadas a TEXTO en el Excel descargado: Código(0), Referencia(1), Código Barra(2).
+ *  Es POSICIONAL sobre OUT_COLS: las tres primeras columnas de la plantilla de Switch,
+ *  que no se mueven aunque «Composición» (la 21) haya vuelto. Hay candado. */
 export const TEXT_COLS = [0, 1, 2];
+
+/** Tasa de impuesto en el CÓDIGO que espera la plantilla de Switch: `07` para el 7%
+ *  y `0` para exento (guía `Flujo_articulo_orden_de_compra_switchsoft2026.pdf`, p. 3).
+ *  Daniel: «pon el 0 adelante pues». Es TEXTO — como número el cero se pierde.
+ *  Acepta lo que escriba la persona («7», «7.00», «07») y lo que traiga la factura
+ *  (7 como número); lo que no sea un número se devuelve tal cual, sin inventar. */
+export function tasaSwitch(raw: Cell): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 0) return s;
+  if (n === 0) return "0";
+  const entero = Math.round(n);
+  const texto = Math.abs(n - entero) < 1e-9 ? String(entero) : String(n);
+  return texto.padStart(2, "0");
+}
 
 // Alias de columnas de entrada (el proveedor cambia los nombres entre archivos)
 const ALIAS: Record<string, string[]> = {
@@ -427,7 +473,8 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
   if (groups.size === 0) throw new Error("No se encontraron productos válidos (sin REFERENCIA).");
 
   const factor = num(config.factor) || 1.1;
-  const tasa = config.tasa.trim();
+  // La tasa va en el código de Switch («07»), no como la escribió la persona («7»).
+  const tasa = tasaSwitch(config.tasa);
   const mesIdx = config.mesIdx;
   const anio = String(config.anio);
   // Temporada en formato AAAA-MM (ej. 2026-06) (CAMBIO 3).
@@ -596,47 +643,19 @@ export function titleCase(s: Cell): string {
   }).join("");
 }
 
-// Columnas de salida por defecto (Vistana / Fashion Wear / Active Wear): 24 cols,
-// FOB+CIF, SIN Composición pero CON Codigo CPBS (= número de factura del proveedor).
-export const OUT_COLS_DEFAULT = OUT_COLS.filter((c) => c !== "Composición");
+// ── Una sola plantilla para las 4 empresas destino (3-sep-2026) ─────────────
+// Ya no hay «plantilla por empresa»: OUT_COLS_DEFAULT, OUT_COLS_SHOES y
+// outColsForEmpresa se retiraron. Fashion Shoes sale con «Costo FOB *» y
+// «Costo CIF *» separados como Vistana (Daniel: «sí»), con CIF = FOB × factor
+// (1,10 por defecto — el mismo cálculo de processRows, que nunca cambió). La
+// columna única «Costo *» del 27-jun/1-sep no existe en Switch: se fue.
 
-// Plantilla de Fashion Shoes (Tarea 5): 24 cols, UNA sola columna "Costo *"
-// (= FOB desde el 1-sep-2026; era el CIF), e incluye Composición y Codigo CPBS
-// (van VACÍAS pero la columna existe).
-export const OUT_COLS_SHOES = [
-  "Código *", "Referencia *", "Código Barra *", "Descripción *", "Precio *",
-  "Tasa de Impuesto *", "Costo *", "rubro *", "subrubro", "Marca *", "Proveedor *",
-  "Mínimo Stock", "Código Tipo de Artículo *", "Unidad de medida *", "Origen", "Lote",
-  "Serie", "Stock Ideal", "Temporada", "Composición", "Codigo CPBS", "Codigo CPBS Abrev",
-  "Bonificación", "Cantidad por caja",
-];
-
-/** Columnas de salida según la empresa destino (Tarea 5). Fashion Shoes usa la
- *  plantilla de 1 columna de costo; el resto usa FOB+CIF. */
-export function outColsForEmpresa(empresaKey: string): string[] {
-  return empresaKey === "fashion_shoes" ? OUT_COLS_SHOES : OUT_COLS_DEFAULT;
-}
-
-/** AOA (array of arrays) para generar el Excel, con el set de columnas dado
- *  (default = OUT_COLS_DEFAULT). Aplica Title Case y, en subrubro, "/"→"-".
- *  La columna "Costo *" (plantilla Fashion Shoes) toma el Costo FOB. */
-export function buildAoa(rows: ProcessedRow[], cols: string[] = OUT_COLS_DEFAULT): (string | number)[][] {
-  const aoa: (string | number)[][] = [cols.slice()];
+/** AOA (array of arrays) para generar el Excel, con las 25 columnas de la
+ *  plantilla de Switch (OUT_COLS). Aplica Title Case y, en subrubro, "/"→"-". */
+export function buildAoa(rows: ProcessedRow[]): (string | number)[][] {
+  const aoa: (string | number)[][] = [OUT_COLS.slice()];
   for (const d of rows) {
-    aoa.push(cols.map((c) => {
-      if (c === "Costo *") {
-        // 🔴 EL FOB, NO EL CIF (1-sep-2026). Daniel, textual: *"en fashion shoes,
-        // cuando me das el excel ya depurado, me das un solo costo… quiero que
-        // me des el fob en vez del cif ahí"*.
-        //
-        // 🔑 No lleva respaldo, y no es un olvido: el FOB es el costo que viene
-        // en el archivo del proveedor y el CIF se CALCULA de él
-        // (`cif = fob × factor`). Cuando no hay FOB tampoco hay CIF, así que un
-        // `?? CIF` nunca se dispararía — y si algún día se disparara estaría
-        // poniendo un costo con flete adentro en una columna que dice FOB.
-        const v = d.cols["Costo FOB *"];
-        return v === null || v === undefined ? "" : v;
-      }
+    aoa.push(OUT_COLS.map((c) => {
       const v = d.cols[c];
       if (v === null || v === undefined) return "";
       // subrubro: Title Case y luego "/"→"-" (ej. "T-Shirts S/S" → "T-Shirts S-S") (Tarea 3.1).
@@ -706,7 +725,7 @@ function empresaDeMarcaCatalogo(marca: string): string {
   const m = marca.toUpperCase();
   if (m.startsWith("KL")) return "Active Wear";
   if (m.startsWith("CK")) return "Vistana International";
-  if (m === "TH FOOTWEAR") return "Fashion Shoes"; // calzado Tommy → plantilla Costo único
+  if (m === "TH FOOTWEAR") return "Fashion Shoes"; // calzado Tommy (misma plantilla que todas)
   return "Fashion Wear"; // resto TH (apparel)
 }
 

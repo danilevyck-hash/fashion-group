@@ -3,16 +3,16 @@
 // SEPARADO del Depurador CK/TH: Reebok usa otro formato de Excel del proveedor
 // (Book4: headers en la 2.ª fila, columnas New Article / SKU / RRP / WholesalePrice
 // y una columna de mes con piezas por SKU) y otra lógica de precio. NO pasa por
-// processRows() del Depurador. Reusa el orden de columnas Switch (OUT_COLS_DEFAULT),
-// TEXT_COLS y el patrón xlsx-js-style del cliente. Dos salidas:
+// processRows() del Depurador. Reusa el orden de columnas Switch (OUT_COLS, las
+// 25 de la plantilla real), TEXT_COLS y el patrón xlsx-js-style del cliente. Dos salidas:
 //   A) Catálogo para clientes (una fila por PO NAME + New Article).
-//   B) Plantilla Switch (una fila por ARTÍCULO, 24 cols FOB, formato tipo Vistana).
+//   B) Plantilla Switch (una fila por ARTÍCULO, 25 cols FOB+CIF, la misma de todo el sistema).
 
-import { OUT_COLS_DEFAULT, TEXT_COLS, ceilPar, precioDescripcion, marcaKey } from "./logic";
+import { OUT_COLS, TEXT_COLS, ceilPar, precioDescripcion, marcaKey, tasaSwitch } from "./logic";
 import type { Cell, SheetRow, Redondeo, MarcaRubroFormula } from "./logic";
 import { COL_FOTO, TEXTO_SIN_FOTO } from "./fotos-excel";
 
-export { OUT_COLS_DEFAULT, TEXT_COLS, ceilPar };
+export { OUT_COLS, TEXT_COLS, ceilPar };
 
 /* ============ CONSTANTES ============ */
 export const REEBOK_PROVEEDOR = "LATIN FITNESS GROUP";
@@ -420,8 +420,8 @@ export function buildCatalogoAoa(
 
 /* ============ SALIDA B · PLANTILLA SWITCH ============ */
 // UNA fila por ARTÍCULO (New Article), igual que CK/TH. Cantidad = suma de todas las
-// tallas del mes. Código de barra = el de la talla-muestra (pickSample). 24 cols
-// (OUT_COLS_DEFAULT) = formato Vistana. SIN Title Case (Department/proveedor tal cual).
+// tallas del mes. Código de barra = el de la talla-muestra (pickSample). 25 cols
+// (OUT_COLS) = la plantilla de Switch. SIN Title Case (Department/proveedor tal cual).
 
 export type PrecioAB = "A" | "B";
 
@@ -433,7 +433,7 @@ export interface SwitchBuildConfig {
   excByName?: Map<string, MarcaRubroFormula>;
 }
 
-/** Fila Switch = las 24 columnas + metadatos de UI (talla-muestra, fallback). */
+/** Fila Switch = las 25 columnas + metadatos de UI (talla-muestra, fallback). */
 export interface SwitchRow {
   cols: Record<string, string | number | null>;
   talla: string;
@@ -471,7 +471,7 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
         "Código Barra *": sample.sku || first.newArticle,
         "Descripción *": first.name,
         "Precio *": precio,
-        "Tasa de Impuesto *": cfg.tasa,
+        "Tasa de Impuesto *": tasaSwitch(cfg.tasa), // «07», texto
         "Costo FOB *": fob,
         "Costo CIF *": cif,
         "rubro *": first.category,       // CATEGORY (SHOES / T-SHIRTS / SOCKS / BAGS…)
@@ -486,6 +486,7 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
         "Serie": "",
         "Stock Ideal": qty,
         "Temporada": cfg.temporada,
+        "Composición": "", // SIEMPRE vacía (la columna existe en Switch)
         "Codigo CPBS": "",
         "Codigo CPBS Abrev": "",
         "Bonificación": "",
@@ -530,9 +531,9 @@ export function filtrarConPiezas<T extends { piezas: number }>(rows: T[]): { row
 /** AOA de la plantilla Switch. Constructor propio SIN Title Case (a diferencia de
  *  buildAoa del Depurador): Department y proveedor van tal cual (mayúscula). */
 export function buildSwitchAoa(rows: SwitchRow[]): (string | number)[][] {
-  const aoa: (string | number)[][] = [OUT_COLS_DEFAULT.slice()];
+  const aoa: (string | number)[][] = [OUT_COLS.slice()];
   for (const r of rows) {
-    aoa.push(OUT_COLS_DEFAULT.map((c) => {
+    aoa.push(OUT_COLS.map((c) => {
       const v = r.cols[c];
       return v === null || v === undefined ? "" : v;
     }));
