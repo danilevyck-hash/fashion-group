@@ -75,6 +75,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -106,7 +107,19 @@ function redLista(deleteStatus: number | "red-caida") {
 const gets = () => llamadas.filter((l) => l.method === "GET" && l.url.includes("/orders"));
 const deletes = () => llamadas.filter((l) => l.method === "DELETE");
 
+// 🩸 El reloj se FIJA en agosto de 2026 (3-sep-2026). La pantalla abre solo el
+// grupo del mes en curso y deja los demás cerrados (`isMesOpen` en
+// `ComprobantesPanel`). PED-021 es del 1-ago-2026: mientras el test se escribió
+// (23-ago) agosto ERA el mes en curso y se veía; al cambiar el mes, «agosto de
+// 2026 (1 comprobante)» salió cerrado y los tres tests de borrado dejaron de
+// encontrar la fila. El producto nunca dejó de funcionar — el test dependía de
+// la fecha de la máquina. Se fija solo `Date`: los temporizadores siguen
+// reales porque ConfirmDeleteModal habilita el botón rojo con un setTimeout.
+const HOY_DEL_TEST = new Date("2026-08-20T12:00:00Z");
+
 async function abrirBorrado() {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(HOY_DEL_TEST);
   render(<PedidosListClient marca="reebok" />);
   // 🔴 Desde que hay UNA sola pantalla, el panel abre en el chip «Pedidos» y
   // PED-021 es `status='borrador'`: hay que tocar su chip para verlo. No es un
