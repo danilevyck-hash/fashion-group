@@ -40,6 +40,8 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import type { ExcelApi } from "./ComisionesView";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
+import { ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
+import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
@@ -53,7 +55,9 @@ const MESES = [
 // Las 6 empresas con CXC — joystep incluida desde el 14-ago-2026. La lista
 // vive en `lib/comisiones/empresas`, nunca se filtra acá.
 const EMPRESAS = EMPRESAS_COMISIONAN;
-const DEFAULT_VENDEDOR = "DEFAULT"; // centinela "cliente sin dueño"
+// El usuario DEFAULT de Switch (la oficina). Desde v6 cobra: sus recibos
+// comisionan y se muestran en su propia fila, rotulada ETIQUETA_DEFAULT.
+const DEFAULT_VENDEDOR = "DEFAULT";
 
 // Vendedores que NO se muestran en Comisiones. Daniel, 3-ago-2026: *"quita el
 // vendedor aguas, no lo quiero ver"*.
@@ -75,6 +79,8 @@ interface ApiVendedor {
   comision_total: number;
   /** Cuánto se le restó (informativo — ya está descontado del total). */
   descuento?: number;
+  /** false = se calcula y se muestra, pero NO entra al total a pagar (DEFAULT y Daniel). */
+  se_paga?: boolean;
 }
 interface ApiResp {
   empresa_key: string;
@@ -84,6 +90,8 @@ interface ApiResp {
 interface Row extends ComisionConsolidadoRow {
   sumBase: number;
   sumBaseCobro: number;
+  /** Lo dice el servidor (lib/comisiones/sin-pago); acá solo se pinta y se suma. */
+  se_paga: boolean;
 }
 
 interface Props {
@@ -97,6 +105,15 @@ interface Props {
 }
 
 const moneyClass = (n: number) => (n < 0 ? "text-rose-600" : "text-gray-700");
+
+/** La marca de «se calcula pero no se paga» — DEFAULT y Daniel. Misma en tabla y tarjetas. */
+export function MarcaNoSePaga() {
+  return (
+    <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 align-middle text-[11px] font-normal not-italic text-gray-500">
+      {ROTULO_NO_SE_PAGA}
+    </span>
+  );
+}
 
 export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }: Props) {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -133,14 +150,14 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
       const byName = new Map<string, Row>();
       let def: Row | null = null;
       const blank = (vendedor: string): Row => ({
-        vendedor, porEmpresa: {}, total: 0, sumBase: 0, sumBaseCobro: 0,
+        vendedor, porEmpresa: {}, total: 0, sumBase: 0, sumBaseCobro: 0, se_paga: true,
       });
 
       for (const r of resp) {
         for (const v of r.vendedores) {
           if (estaOculto(v.vendedor)) continue; // fuera de la tabla Y de los totales
           const target = v.vendedor === DEFAULT_VENDEDOR
-            ? (def ??= blank("Sin asignar"))
+            ? (def ??= blank(ETIQUETA_DEFAULT))
             : (byName.get(v.vendedor) ?? blank(v.vendedor));
           if (v.vendedor !== DEFAULT_VENDEDOR) byName.set(v.vendedor, target);
           // Una empresa puede repetir vendedor? No, pero sumamos por robustez.
@@ -148,6 +165,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
           target.total += v.comision_total ?? 0;
           target.sumBase += v.base ?? 0;
           target.sumBaseCobro += v.base_cobro ?? 0;
+          // La marca es por NOMBRE, así que todas las empresas de la fila
+          // dicen lo mismo; con que una diga «no» alcanza.
+          if (v.se_paga === false) target.se_paga = false;
         }
       }
 
@@ -171,13 +191,15 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
   const inactivos = useMemo(() => (rows ?? []).filter((r) => !hasActivity(r)), [rows]);
   const [showInactivos, setShowInactivos] = useState(false);
 
-  // Totales por columna (incluye "Sin asignar"; los inactivos suman 0).
+  // Totales por columna: SOLO lo pagable. La fila de la oficina y la de Daniel
+  // se ven con su número, pero no suman al pie («no me autopago»).
   const allShown = useMemo(
     () => [...(rows ?? []), ...(sinAsignar ? [sinAsignar] : [])],
     [rows, sinAsignar],
   );
-  const colTotal = (key: string) => allShown.reduce((a, r) => a + (r.porEmpresa[key] ?? 0), 0);
-  const grandTotal = allShown.reduce((a, r) => a + r.total, 0);
+  const colTotal = (key: string) => sumarPagable(allShown, (r) => r.porEmpresa[key] ?? 0);
+  const grandTotal = sumarPagable(allShown, (r) => r.total);
+  const haySinPago = allShown.some((r) => r.se_paga === false);
 
   const empty = !loading && !error && (rows ?? []).length === 0 && !sinAsignar;
 
@@ -187,9 +209,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
       year,
       mes,
       empresas: EMPRESAS.map((k) => ({ key: k, nombre: EMPRESA_KEY_TO_NAME[k] ?? k })),
-      vendedores: activos.map(({ vendedor, porEmpresa, total }) => ({ vendedor, porEmpresa, total })),
+      vendedores: activos.map(({ vendedor, porEmpresa, total, se_paga }) => ({ vendedor, porEmpresa, total, se_paga })),
       sinAsignar: sinAsignar
-        ? { vendedor: sinAsignar.vendedor, porEmpresa: sinAsignar.porEmpresa, total: sinAsignar.total }
+        ? { vendedor: sinAsignar.vendedor, porEmpresa: sinAsignar.porEmpresa, total: sinAsignar.total, se_paga: sinAsignar.se_paga }
         : null,
     });
   };
@@ -214,22 +236,22 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
         return (
           <td
             key={k}
-            onClick={(e) => { e.stopPropagation(); setDetalle({ empresa: k, vendedor: r.vendedor === "Sin asignar" ? DEFAULT_VENDEDOR : r.vendedor }); }}
-            className={`cursor-pointer px-2 py-2.5 text-right tabular-nums transition hover:bg-gray-100 hover:underline xl:px-3 ${moneyClass(val)}`}
+            onClick={(e) => { e.stopPropagation(); setDetalle({ empresa: k, vendedor: r.vendedor === ETIQUETA_DEFAULT ? DEFAULT_VENDEDOR : r.vendedor }); }}
+            className={`cursor-pointer px-2 py-2.5 text-right tabular-nums transition hover:bg-gray-100 hover:underline xl:px-3 ${r.se_paga ? moneyClass(val) : "text-gray-400"}`}
             title={`Ver detalle · ${EMPRESA_KEY_TO_NAME[k] ?? k}`}
           >
             {fmtMoney(val)}
           </td>
         );
       })}
-      <td className={`bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${r.total < 0 ? "text-rose-600" : "text-gray-900"} ${isTotalBold ? "" : ""}`}>
+      <td className={`bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${!r.se_paga ? "text-gray-400" : r.total < 0 ? "text-rose-600" : "text-gray-900"} ${isTotalBold ? "" : ""}`}>
         {fmtMoney(r.total)}
       </td>
     </>
   );
 
   const detalleDe = (empresa: string, vendedor: string) =>
-    setDetalle({ empresa, vendedor: vendedor === "Sin asignar" ? DEFAULT_VENDEDOR : vendedor });
+    setDetalle({ empresa, vendedor: vendedor === ETIQUETA_DEFAULT ? DEFAULT_VENDEDOR : vendedor });
 
   return (
     <div className="space-y-4">
@@ -286,14 +308,27 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
               </thead>
               <tbody>
                 {activos.map((r) => (
-                  <tr key={r.vendedor} className="border-b border-gray-100 last:border-0 transition hover:bg-gray-50">
-                    <td className="px-3 py-2.5 font-medium text-gray-900 xl:whitespace-nowrap xl:px-4">{r.vendedor}</td>
+                  <tr
+                    key={r.vendedor}
+                    data-se-paga={r.se_paga ? "si" : "no"}
+                    className={`border-b border-gray-100 last:border-0 transition hover:bg-gray-50 ${r.se_paga ? "" : "text-gray-400"}`}
+                  >
+                    <td className={`px-3 py-2.5 font-medium xl:whitespace-nowrap xl:px-4 ${r.se_paga ? "text-gray-900" : "text-gray-400"}`}>
+                      {r.vendedor}
+                      {!r.se_paga && <MarcaNoSePaga />}
+                    </td>
                     {renderCells(r, false)}
                   </tr>
                 ))}
                 {sinAsignar && (
-                  <tr className="border-b border-gray-100 bg-gray-50/50 last:border-0 transition hover:bg-gray-50">
-                    <td className="px-3 py-2.5 italic text-gray-500 xl:whitespace-nowrap xl:px-4">Sin asignar</td>
+                  <tr
+                    data-se-paga={sinAsignar.se_paga ? "si" : "no"}
+                    className="border-b border-gray-100 bg-gray-50/50 last:border-0 text-gray-400 transition hover:bg-gray-50"
+                  >
+                    <td className="px-3 py-2.5 italic text-gray-500 xl:whitespace-nowrap xl:px-4">
+                      {ETIQUETA_DEFAULT}
+                      {!sinAsignar.se_paga && <MarcaNoSePaga />}
+                    </td>
                     {renderCells(sinAsignar, false)}
                   </tr>
                 )}
@@ -321,7 +356,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
               </tbody>
               <tfoot>
                 <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">
-                  <td className="px-3 py-2.5 xl:px-4">Total</td>
+                  <td className="px-3 py-2.5 xl:px-4">{haySinPago ? "Total a pagar" : "Total"}</td>
                   {EMPRESAS.map((k) => {
                     const t = colTotal(k);
                     return <td key={k} className={`px-2 py-2.5 text-right tabular-nums xl:px-3 ${t < 0 ? "text-rose-600" : ""}`}>{fmtMoney(t)}</td>;

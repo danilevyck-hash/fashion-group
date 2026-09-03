@@ -286,6 +286,63 @@
 
 ---
 
+## 🔴 Comisiones — EL COBRO SE PAGA A QUIEN REGISTRÓ EL RECIBO, y DEFAULT y Daniel no se pagan (3-sep-2026)
+
+> Daniel, textual: ***«el que vende a veces no es el que cobra. Edwin puede vender 50k a City Mall y Daniel o DEFAULT cobrar esa plata. Los 50k en comisiones en venta va a Edwin y los 50k en cobros irían a DEFAULT por ejemplo»***. Y sobre esa plata que cae en la oficina o en él: ***«se queda sin pagar, pero qué importa? Acuérdate que si yo cobro no le pago a nadie porque no me autopago»***.
+>
+> ### Tres vendedores, tres papeles — para que no se vuelva a confundir
+>
+> | En el panel de Switch | En la base | Qué comisión alimenta |
+> |---|---|---|
+> | **Vendedor** (de la factura) | `switch_facturas.vendedor_nombre` | **VENTA** — como desde la v5 (jul-2026). No cambió. |
+> | **Vendedor Recibo** (quien registró el pago) | `switch_recibos.vendedor_registro` | **COBRO** — **el cambio** (`comision_b2b_v6`). |
+> | **Vendedor de cartera** (dueño del cliente en el maestro) | `switch_recibos.vendedor_cartera` | **Ninguna.** Hasta la v5 pagaba el cobro; ya no se lee. |
+>
+> La ayuda oficial de Switch lo dice con las mismas palabras (`docs/switch-referencia.md`, «El vendedor del recibo NO es el vendedor de la venta»): *«El vendedor del recibo es quien procesó el pago, mientras que la venta pudo haber sido realizada por otro vendedor»*. Hasta hoy el sistema pagaba el cobro al **dueño de la cartera** porque `vendedor_registro` se guardaba desde el 3-jun-2026 pero nadie lo usaba: el comentario de la v5 decía «los recibos no exponen a qué facturas se aplican», que era cierto y no venía al caso — la pregunta nunca fue *qué factura pagó el recibo*, sino *quién lo cobró*, y eso sí estaba en la tabla.
+>
+> ### Qué cambia y qué no (`20260911120000_comision_b2b_v6_cobro_quien_registro.sql`, pendiente de aplicar)
+>
+> - `comision_b2b_v6`: **función NUEVA**, idéntica a la v5 salvo el CTE `cobros`, que agrupa por `NULLIF(TRIM(vendedor_registro), '')`. El CTE `ventas` es **byte a byte el mismo** (candado que compara los dos textos). La v5 **no se dropea**: es la vara de comparación. Las dos rutas llaman `leerComision` (`lib/comisiones/rpc.ts`), que pide la v6 y **cae a la v5 mientras la DDL no corra**, diciendo `regla_cobro: "cartera"` — el fallback confiesa.
+> - `comision_b2b_detalle` v3, **en la misma DDL**: el modal lista los recibos que ESA persona registró. Resumen y detalle cambian de regla en la misma corrida, nunca uno solo.
+> - **TRIM**: joystep registra a `"DANIEL LEVY "` con espacio final (40 recibos en 2026). Sin recorte saldría como otro vendedor y no cruzaría con `comision_vendedor_tasa`.
+> - Retenciones, mostrador (`TCKCTA`) e intercompañía **siguen fuera**, en las dos funciones. `comision-cobro-sin-retenciones.test.ts` ya vigila la v6 en su lista explícita y en el barrido.
+> - `vendedor_registro` **nunca viene vacío** en 2026 (0 de 1.615); si un día viniera, ese recibo no comisiona a nadie (no se le adivina dueño).
+> - **La VENTA no cae a cartera en ningún documento de 2026**: 0 de 1.818 filas de utilidad quedan sin match en `switch_facturas`. El fallback `COALESCE(dv.vendedor_factura, f.vendedor)` de la v5 se conserva en la v6 pero no lo usa nadie.
+>
+> ### DEFAULT y Daniel: se calcula, se muestra, NO se paga
+>
+> `DEFAULT` es el usuario #1 de cada empresa en Switch — la oficina — y con la regla nueva junta cobro de verdad: **2.868,71 USD en ene–ago 2026** (119 recibos, 573.739,59 de base). Daniel, **2.333,15**. La decisión: la fila queda con su número (hay que poder cuadrar qué se cobró), pero **no entra al total**. La lista vive en **un solo lugar**, `VENDEDORES_SIN_PAGO` (`lib/comisiones/sin-pago.ts` = `DEFAULT · DANIEL LEVY`, comparación recortada y en mayúsculas); el servidor marca `se_paga` en las dos rutas —igual que `netearComisiones`— y las pantallas y el Excel solo leen la marca: fila gris con **«no se paga»**, pie **«Total a pagar»** que suma solo lo pagable, y en el Excel el rótulo va pegado al nombre para que sobreviva a cualquier filtro. La fila `DEFAULT` pasó de **«Sin asignar»** a **«Oficina (DEFAULT)»**: «sin asignar» era cierto cuando solo caían ventas de clientes sin dueño; ahora sí está asignado, a la oficina, y Daniel la llama por su nombre de Switch.
+>
+> ### La medición — con el SQL REAL, antes de aplicar
+>
+> `PGLITE_DIR=… node -r dotenv/config scripts/_medir-comision-cobro-v6.mjs` (solo lectura) baja recibos, utilidad, facturas, vendedores y tasas de 2026 de las 6 del grupo, los carga en un Postgres local (pglite) con las columnas reales y **corre los dos archivos `.sql` del repo sin editarlos**. Primero cuadra: la v5 local contra la RPC v5 de producción, **640 celdas, 0 distintas** — los datos son los de producción. La venta entre v5 y v6: **0 celdas movidas**.
+>
+> Comisión de **cobro**, ene–ago 2026, hoy (cartera) → nuevo (quien registró):
+>
+> | vendedor | hoy | nuevo | diferencia |
+> |---|---:|---:|---:|
+> | REINALDO ESPINOSA (+ su usuario «REYNALDO» en Active Wear) | 41.044,08 | 43.551,22 | **+2.507,14** |
+> | DANIEL LEVY | 389,29 | 2.333,15 | +1.943,86 |
+> | EDWIN | 7.126,38 | 4.485,88 | **−2.640,50** |
+> | DEFAULT (oficina) | 3.131,50 | 2.868,71 | −262,79 |
+> | Rodrigo | 252,19 | 0,00 | −252,19 |
+> | AGUAS | 67,27 | 24,98 | −42,29 |
+> | **GRUPO** | **52.012,43** | **53.266,01** | **+1.253,58** |
+>
+> Por empresa: Active Shoes +1.159,25 · Active Wear +579,81 · Fashion Shoes −75,64 · Fashion Wear −409,85 · Joystep +0,01 · Vistana 0,00 (todos al 0,5%: la plata cambia de mano, no de monto). El +1.253,58 del grupo es Reinaldo cobrando al **1%** recibos que antes se atribuían a la cartera de DEFAULT (0,5%). El centavo de joystep es el TRIM: «DANIEL LEVY » y «DANIEL LEVY» eran dos filas redondeadas por separado.
+>
+> **Lo que de verdad se paga** (sin DEFAULT ni Daniel): hoy **48.491,64** → nuevo **48.064,15** (**−427,49** para la empresa). Lo que se muestra pero no se paga: 3.520,79 → **5.201,86**.
+>
+> Recibos que comisionan: 727; **140 cambian de mano** (1.262.227,88 de base): Vistana 45 · Active Wear 38 · Active Shoes 23 · Fashion Wear 13 · Joystep 12 · Fashion Shoes 9. Rodrigo es dueño de cartera y nunca registra un recibo: pasa a 0.
+>
+> ### Candados
+>
+> `comision-cobro-quien-registro.test.ts` (21): el SQL sin comentarios (cobros por `vendedor_registro`, cero `vendedor_cartera` en la DDL, CTE ventas idéntico a v5, v5 intacta, los tres filtros), `leerComision` con supabase doblado (v6 primero, v5 solo si la función no existe y confesando `cartera`, un timeout NO cae), Boston y Multifashion nunca llegan a la RPC, y `se_paga` en las dos rutas. `comisiones-no-se-paga.test.tsx` (7) monta las DOS vistas reales y lee la celda, la marca, el pie y lo que recibe el Excel. Cuatro candados que fijaban «v5» o «Sin asignar» **cambiaron de dirección** con su nota (`comisiones-consolidado-neto` · `comisiones-descuentos-una-sola-resta` · `comisiones-joystep-entra` · `excel-exports-ventas`); ninguno se borró.
+> - **Verificado por mutación, 17 de 17 cazadas** (`scripts/_mutar-candados-comision-cobro-v6.sh`): el cobro vuelve a cartera en la v6 · el detalle vuelve a cartera · se pierde el TRIM · el CTE ventas cambia · se cae el filtro de retenciones · la DDL dropea la v5 · `rpc.ts` vuelve a la v5 · el fallback no confiesa · **Boston entra** · Daniel sale de la lista · `sumarPagable` suma todo · la ruta pierde la marca · DEFAULT se esconde · el gran total suma lo que no se paga (matriz) · ídem «Por empresa» · ídem Excel · la oficina vuelve a «Sin asignar». CONTROL verde (113).
+
+
+---
+
 ## 🔴 Comisiones — LOS DESCUENTOS SE RESTAN UNA SOLA VEZ, EN EL SERVIDOR (24-ago-2026)
 
 > 🩸 **LA MISMA PERSONA, EL MISMO MES, DOS NÚMEROS EN LA MISMA PANTALLA.** La pestaña **«Por empresa»** mostraba el SUBTOTAL —sin restar los descuentos fijos— mientras **«Todas las empresas»** y el detalle del vendedor sí los restaban. Medido contra producción, **REINALDO ESPINOSA en Fashion Shoes** (sus dos descuentos: `Descuento` $1.400,00 + `Descuento de adelanto` $173,08 = **$1.573,08**, los ÚNICOS dos descuentos vivos de todo el sistema):

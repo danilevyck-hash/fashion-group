@@ -284,8 +284,13 @@ describe("🔑 UNA sola resta: la regla vive en la librería, no en las vistas",
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("⚠️ la RPC del dinero no se toca", () => {
-  it("sigue siendo comision_b2b_v5, una por empresa, con los mismos argumentos", async () => {
+describe("⚠️ la RPC del dinero se llama en UN solo lugar", () => {
+  // CAMBIÓ DE DIRECCIÓN el 3-sep-2026: exigía el literal `rpc("comision_b2b_v5"`
+  // en las DOS rutas. Desde que el COBRO se paga a quien REGISTRÓ el recibo
+  // (Daniel: «el que vende a veces no es el que cobra») la RPC es la v6 y las
+  // dos rutas pasan por `leerComision` (`lib/comisiones/rpc`), que es el único
+  // sitio que la nombra. Sigue siendo una por empresa, mismos argumentos.
+  it("sigue siendo una RPC por empresa, y las dos rutas la piden por leerComision", async () => {
     await consolidado();
     expect(estado.rpcCalls.length).toBe(6);
     const consolidadoSrc = readFileSync(
@@ -297,8 +302,11 @@ describe("⚠️ la RPC del dinero no se toca", () => {
       "utf8",
     );
     for (const src of [consolidadoSrc, unaSrc]) {
-      expect(src).toContain('rpc("comision_b2b_v5"');
-      expect(src).toContain("p_empresa_key");
+      expect(src).toContain("leerComision(empresa, year, mes)");
+      expect(src).not.toMatch(/\.rpc\(/);
     }
+    const rpcSrc = readFileSync(path.join(process.cwd(), "src/lib/comisiones/rpc.ts"), "utf8");
+    expect(rpcSrc).toContain('"comision_b2b_v6"');
+    expect(rpcSrc).toContain("p_empresa_key");
   });
 });

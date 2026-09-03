@@ -8,8 +8,8 @@
 // el 57% del iPhone. Ahora es un botón ⓘ dentro de la fila de pestañas y el
 // texto sale en un popover: cerrado ocupa CERO alto propio.
 //
-// El texto de los criterios NO cambió (es la explicación de un cálculo de
-// plata). Lo que sí se sumó es la frescura del dato — la fecha de "Sincronizado
+// El texto de los criterios dice de dónde sale cada número (es la explicación
+// de un cálculo de plata) y cambia SOLO cuando cambia la regla. Lo que sí se sumó es la frescura del dato — la fecha de "Sincronizado
 // …" vive acá adentro (llega como children) porque en 390px no entra en la
 // barra sin robarle una línea entera a la tabla. Si alguna empresa está sin
 // actualizar, el ⓘ lleva un punto ámbar para que se note sin abrirlo.
@@ -70,11 +70,18 @@ export function ComisionesCriterios({ children, aviso, className }: Props) {
         className={`absolute right-0 top-full z-20 mt-1 w-[300px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-600 shadow-lg ${open ? "" : "hidden"}`}
       >
         <p className="mb-1.5 text-sm font-medium text-gray-900">Criterios</p>
+        {/* Dos personas distintas a propósito. Daniel, 3-sep-2026: «el que
+            vende a veces no es el que cobra. Edwin puede vender 50k a City Mall
+            y Daniel o DEFAULT cobrar esa plata». Hasta esa fecha decía «se
+            asignan al vendedor dueño del cliente», que ya no era cierto ni
+            para la venta (v5, jul-2026) ni para el cobro (v6). */}
         <p>
-          <b>Venta:</b> facturas con utilidad &gt;20% menos notas de crédito.{" "}
-          <b>Cobro:</b> recibos del mes, excluyendo retenciones de ITBMS. Ambas
-          excluyen intercompañía y clientes internos, y se asignan al vendedor
-          dueño del cliente. Fuente: reportes de Switch.
+          <b>Venta:</b> facturas con utilidad &gt;20% menos notas de crédito, y
+          se paga al vendedor de la factura.{" "}
+          <b>Cobro:</b> recibos del mes, excluyendo retenciones de ITBMS, y se
+          paga a quien registró el recibo en Switch (si lo registró la oficina,
+          queda en «Oficina (DEFAULT)»). Ambas excluyen intercompañía y clientes
+          internos. Fuente: reportes de Switch.
         </p>
         {children && <div className="mt-2.5 border-t border-gray-100 pt-2.5">{children}</div>}
       </div>

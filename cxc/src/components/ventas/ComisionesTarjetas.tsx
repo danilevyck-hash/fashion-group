@@ -34,6 +34,8 @@
 
 import { useState, type ReactNode } from "react";
 import { fmtMoney } from "@/lib/ventas/format";
+import { etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
+import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
 
 /** Rojo para lo negativo, igual que la tabla. */
 const claseMonto = (n: number) => (n < 0 ? "text-rose-600" : "text-gray-900");
@@ -61,7 +63,7 @@ function ListaTarjetas({ children }: { children: ReactNode }) {
  * se comería el encabezado de 193px que costó ganar
  * (`__tests__/iphone-comisiones-encabezado.test.ts`).
  */
-function TarjetaTotal({ total }: { total: number }) {
+function TarjetaTotal({ total, aPagar }: { total: number; aPagar?: boolean }) {
   return (
     <li>
       {/* data-comision-total: gancho de MEDICIÓN. Antes el verificador buscaba
@@ -73,7 +75,7 @@ function TarjetaTotal({ total }: { total: number }) {
         data-comision-total
         className="flex items-center justify-between gap-2 rounded-xl bg-gray-900 px-3 py-3"
       >
-        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">Total</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">{aPagar ? "Total a pagar" : "Total"}</span>
         <span className="font-mono text-base font-semibold tabular-nums text-white">
           {fmtMoney(total)}
         </span>
@@ -112,12 +114,23 @@ function LineaInactivos({
   );
 }
 
+/** «se calcula pero no se paga» — DEFAULT y Daniel. Lo decide el servidor (`se_paga`). */
+function MarcaNoSePaga() {
+  return (
+    <span className="ml-1.5 shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-normal not-italic text-gray-500">
+      {ROTULO_NO_SE_PAGA}
+    </span>
+  );
+}
+
 // ── Vista "Todas las empresas" — matriz vendedor × empresa ───────────────────
 
 export interface FilaConsolidado {
   vendedor: string;
   porEmpresa: Record<string, number>;
   total: number;
+  /** false = se muestra, pero no entra al total a pagar. */
+  se_paga?: boolean;
 }
 
 interface PropsConsolidado {
@@ -188,7 +201,10 @@ export function ComisionesTarjetasConsolidado({
           />
         ))}
 
-      <TarjetaTotal total={granTotal} />
+      <TarjetaTotal
+        total={granTotal}
+        aPagar={[...activos, ...(sinAsignar ? [sinAsignar] : [])].some((r) => r.se_paga === false)}
+      />
     </ListaTarjetas>
   );
 }
@@ -231,14 +247,15 @@ function TarjetaVendedorMatriz({
           aria-expanded={abierta}
           className="flex min-h-[44px] w-full items-center justify-between gap-2 px-3 py-2.5 text-left active:bg-gray-50"
         >
-          {/* pr-0.5: `truncate` recorta el vuelo de la ITÁLICA — "Sin asignar"
+          {/* pr-0.5: `truncate` recorta el vuelo de la ITÁLICA — «Oficina (DEFAULT)»
               se leía "Sin asignaı" aunque sobrara ancho. Medido en captura. */}
           <span
-            className={`truncate pr-0.5 text-[13px] leading-5 tracking-tight ${
-              italica ? "italic text-gray-500" : apagada ? "text-gray-400" : "font-medium text-gray-900"
+            className={`flex min-w-0 items-center truncate pr-0.5 text-[13px] leading-5 tracking-tight ${
+              italica ? "italic text-gray-500" : apagada || fila.se_paga === false ? "text-gray-400" : "font-medium text-gray-900"
             }`}
           >
-            {fila.vendedor}
+            <span className="truncate">{fila.vendedor}</span>
+            {fila.se_paga === false && <MarcaNoSePaga />}
           </span>
           <span
             className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${
@@ -298,6 +315,8 @@ export interface FilaPorEmpresa {
   comision_total: number;
   /** Cuánto se le restó (informativo — ya está descontado del total). */
   descuento?: number;
+  /** false = se muestra, pero no entra al total a pagar. */
+  se_paga?: boolean;
 }
 
 interface PropsPorEmpresa {
@@ -331,8 +350,9 @@ export function ComisionesTarjetasPorEmpresa({
               className="min-h-[44px] w-full px-3 py-2.5 text-left active:bg-gray-50"
             >
               <div className="flex min-h-[24px] items-baseline justify-between gap-2">
-                <span className="truncate text-[13px] font-medium leading-5 tracking-tight text-gray-900">
-                  {v.vendedor}
+                <span className={`flex min-w-0 items-center truncate text-[13px] font-medium leading-5 tracking-tight ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>
+                  <span className="truncate">{etiquetaVendedor(v.vendedor)}</span>
+                  {v.se_paga === false && <MarcaNoSePaga />}
                 </span>
                 <span
                   className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${claseMonto(
@@ -361,7 +381,7 @@ export function ComisionesTarjetasPorEmpresa({
 
       {inactivos.length > 0 && <LineaInactivos cantidad={inactivos.length} />}
 
-      <TarjetaTotal total={total} />
+      <TarjetaTotal total={total} aPagar={activos.some((v) => v.se_paga === false)} />
     </ListaTarjetas>
   );
 }

@@ -9,12 +9,14 @@
  * y la aplican los DOS endpoints — dos implementaciones serían dos totales
  * posibles para el mismo mes.
  *
- * Lee el RPC comision_b2b_v5 (cache switch_factura_utilidad + comision_tasas),
- * que NO se toca. Regla: facturas con utilidad>20%
- * menos NC, excluye intercompañía/internos. Desde v5 (jul-2026, retroactivo)
- * las VENTAS se atribuyen al VENDEDOR DE LA FACTURA (switch_facturas, la NC
- * usa su propio vendedor); los COBROS siguen por cartera (los recibos no
- * exponen a qué facturas se aplican).
+ * Lee la RPC de comisión por `lib/comisiones/rpc` (comision_b2b_v6, con red a
+ * la v5 mientras la DDL no corra). Regla: facturas con utilidad>20% menos NC,
+ * excluye intercompañía/internos. Desde v5 (jul-2026, retroactivo) las VENTAS
+ * se atribuyen al VENDEDOR DE LA FACTURA (switch_facturas, la NC usa su propio
+ * vendedor). Desde v6 (sep-2026) los COBROS se pagan a QUIEN REGISTRÓ EL
+ * RECIBO (switch_recibos.vendedor_registro), ya no al dueño de la cartera.
+ * 🩸 Daniel: «el que vende a veces no es el que cobra». La respuesta trae
+ * `regla_cobro` para que se sepa con cuál de las dos salió.
  *
  * COBROS $0 (switch_recibos.total = 0): son aplicaciones/cruces (saldo a favor
  * o NC aplicada contra facturas) o recibos anulados. Por decisión de negocio
@@ -23,13 +25,14 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { supabaseServer } from "@/lib/supabase-server";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import {
   leerDescuentosEfectivos,
   totalPorVendedor,
   netearComisiones,
 } from "@/lib/comisiones/descuentos";
+import { leerComision } from "@/lib/comisiones/rpc";
+import { marcarSePaga } from "@/lib/comisiones/sin-pago";
 
 export const dynamic = "force-dynamic";
 
@@ -57,25 +60,21 @@ export async function GET(req: NextRequest) {
   // error de las COMISIONES sí se propaga (500): una tabla vacía silenciosa se
   // leería como "este mes no se vendió nada".
   const [rpc, descuentos] = await Promise.all([
-    supabaseServer.rpc("comision_b2b_v5", {
-      p_empresa_key: empresa,
-      p_year: year,
-      p_mes: mes,
-    }),
+    leerComision(empresa, year, mes),
     leerDescuentosEfectivos([empresa], year, mes).catch(() => []),
   ]);
-  if (rpc.error) {
-    return NextResponse.json({ error: rpc.error.message }, { status: 500 });
+  if (rpc.error || !rpc.data) {
+    return NextResponse.json({ error: rpc.error?.message ?? "sin datos" }, { status: 500 });
   }
 
-  const data = (rpc.data ?? {}) as Record<string, unknown> & {
-    vendedores?: { vendedor: string; comision_total?: number }[];
-  };
+  const data = rpc.data;
+  // `se_paga` se marca ACÁ, después de netear, y la pantalla solo lo lee:
+  // DEFAULT y Daniel se calculan y se muestran, pero no entran al total a
+  // pagar («no me autopago»). Ver lib/comisiones/sin-pago.
   return NextResponse.json({
     ...data,
-    vendedores: netearComisiones(
-      data.vendedores ?? [],
-      totalPorVendedor(descuentos, empresa),
+    vendedores: marcarSePaga(
+      netearComisiones(data.vendedores, totalPorVendedor(descuentos, empresa)),
     ),
   });
 }

@@ -19,16 +19,17 @@
  * Acá el navegador hace **1 llamada** y la base recibe **7 consultas** (5 RPC +
  * 2 de descuentos).
  *
- * ⚠️ NINGÚN NÚMERO CAMBIA, y por construcción: se llama al MISMO
- * `comision_b2b_v5`, una vez por empresa y con los mismos argumentos, y los
- * descuentos salen de la MISMA función que usa el endpoint por empresa
+ * ⚠️ LAS DOS PESTAÑAS LLAMAN LA MISMA RPC, por construcción: `leerComision`
+ * (`lib/comisiones/rpc` → comision_b2b_v6, con red a la v5 mientras la DDL no
+ * corra), una vez por empresa y con los mismos argumentos, y los descuentos
+ * salen de la MISMA función que usa el endpoint por empresa
  * (`lib/comisiones/descuentos`). La respuesta trae, empresa por empresa,
- * exactamente la forma que el cliente ya armaba a mano.
+ * exactamente la forma que el cliente ya armaba a mano, más `regla_cobro`.
  *
- * ⚠️ NO se reemplaza `comision_b2b_v5` por una RPC nueva que agrupe las 5 en
- * una: eso pide una migración (que corre Daniel a mano) y es la ruta del dinero.
- * Las 5 RPC siguen siendo 5 — lo que se elimina son los 5 viajes de red del
- * navegador y las 8 consultas de descuentos de más.
+ * ⚠️ NO se reemplaza la RPC por una nueva que agrupe las 6 en una: eso pide
+ * una migración (que corre Daniel a mano) y es la ruta del dinero. Las 6 RPC
+ * siguen siendo 6 — lo que se elimina son los viajes de red del navegador y
+ * las consultas de descuentos de más.
  *
  * ⚠️ LOS DESCUENTOS SE RESTAN ACÁ, no en la vista (24-ago-2026). Antes la resta
  * vivía dentro del pivot de `ComisionesConsolidadoView` y la pestaña "Por
@@ -41,8 +42,9 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { supabaseServer } from "@/lib/supabase-server";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
+import { leerComision } from "@/lib/comisiones/rpc";
+import { marcarSePaga } from "@/lib/comisiones/sin-pago";
 import {
   leerDescuentosEfectivos,
   totalPorVendedor,
@@ -50,13 +52,6 @@ import {
 } from "@/lib/comisiones/descuentos";
 
 export const dynamic = "force-dynamic";
-
-interface ApiVendedor {
-  vendedor: string;
-  base: number;
-  base_cobro: number;
-  comision_total: number;
-}
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "contabilidad", "secretaria"]);
@@ -82,20 +77,16 @@ export async function GET(req: NextRequest) {
   const [porEmpresa, descuentos] = await Promise.all([
     Promise.all(
       EMPRESAS_COMISIONAN.map(async (empresa) => {
-        const { data, error } = await supabaseServer.rpc("comision_b2b_v5", {
-          p_empresa_key: empresa,
-          p_year: year,
-          p_mes: mes,
-        });
-        if (error) throw new Error(`${empresa}: ${error.message}`);
-        const resp = (data ?? {}) as { empresa_key?: string; vendedores?: ApiVendedor[] };
+        const { data, error } = await leerComision(empresa, year, mes);
+        if (error || !data) throw new Error(`${empresa}: ${error?.message ?? "sin datos"}`);
         return {
           // La key PEDIDA, no la que devuelve la RPC: es con la que se filtran
           // los descuentos y con la que la tabla arma sus columnas. Que sean la
           // misma no debe depender de dos fuentes.
           empresa: empresa as string,
-          empresa_key: resp.empresa_key ?? empresa,
-          vendedores: resp.vendedores ?? [],
+          empresa_key: data.empresa_key,
+          regla_cobro: data.regla_cobro,
+          vendedores: data.vendedores,
         };
       }),
     ).catch((e: unknown) => e instanceof Error ? e : new Error(String(e))),
@@ -107,11 +98,14 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    empresas: porEmpresa.map(({ empresa, empresa_key, vendedores }) => ({
+    empresas: porEmpresa.map(({ empresa, empresa_key, regla_cobro, vendedores }) => ({
       empresa_key,
+      regla_cobro,
       // El descuento es por (empresa, vendedor) y se resta del total de ESA
       // empresa — que es la celda que Daniel mira.
-      vendedores: netearComisiones(vendedores, totalPorVendedor(descuentos, empresa)),
+      // `se_paga`: DEFAULT y Daniel se calculan y se muestran, pero no entran
+      // al total a pagar. Misma marca que en /api/ventas/comisiones.
+      vendedores: marcarSePaga(netearComisiones(vendedores, totalPorVendedor(descuentos, empresa))),
     })),
   });
 }

@@ -19,6 +19,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+// `DEFAULT_VENDEDOR` vive en `vendedor-default.ts` (módulo puro, sin cliente de
+// servidor) para que las vistas lo puedan importar; acá se re-exporta porque
+// `netearComisiones` lo usa y los lectores viejos lo buscaban aquí.
+import { DEFAULT_VENDEDOR } from "./vendedor-default";
+export { DEFAULT_VENDEDOR } from "./vendedor-default";
 
 export interface DescuentoEfectivo {
   id: string;
@@ -99,10 +104,6 @@ export function totalPorVendedor(
   }
   return porVendedor;
 }
-
-/** Centinela "cliente sin dueño" que devuelve la RPC. NO es una persona, así
- *  que no se le resta ningún descuento (la matriz lo dibuja como "Sin asignar"). */
-export const DEFAULT_VENDEDOR = "DEFAULT";
 
 /** Los montos vienen de dos fuentes; sin esto la resta arrastra centavos. */
 const round2 = (n: number) => Math.round(n * 100) / 100;

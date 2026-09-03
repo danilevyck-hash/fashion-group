@@ -28,6 +28,8 @@ import { fmtDate } from "@/lib/format";
 import { exportComisionDetalle, tipoDocCorto, comisionLinea, type ComisionDetalle, type ComisionDescuento, type VentaDoc, type CobroDoc } from "@/lib/ventas/comisionExcel";
 import { ModalOverlay } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
+import { sePagaComision } from "@/lib/comisiones/sin-pago";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -443,8 +445,16 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
             manda el header compacto de una línea. */}
         <div className="flex items-start justify-between gap-3 border-b border-gray-200 p-4 print:hidden">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Comisión — {vendedor}</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Comisión — {etiquetaVendedor(vendedor)}</h2>
             <p className="text-xs text-gray-500">{empresaNombre} · {MESES[mes - 1]} {year}</p>
+            {/* DEFAULT y Daniel: el detalle se calcula igual (para cuadrar qué
+                se vendió y qué se cobró), pero esta plata no se paga. Daniel:
+                «si yo cobro no le pago a nadie porque no me autopago». */}
+            {!sePagaComision(vendedor) && (
+              <p className="mt-1 text-xs text-amber-700">
+                Se calcula para cuadrar, pero esta comisión no se paga.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button

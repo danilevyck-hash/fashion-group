@@ -297,7 +297,10 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     expect(s[`B${DATA}`].t).toBe("n");
     expect(s[`B${DATA}`].v).toBe(10);
     expect(s[`B${DATA}`].z).toBe(MONEY_FMT);
-    expect(s[`A${DATA + 1}`].v).toBe("Sin asignar");
+    // Decía «Sin asignar» hasta el 3-sep-2026. Desde que el cobro se paga a
+    // quien registró el recibo, la fila DEFAULT es la OFICINA (y se lista con
+    // su número, aunque no se pague — ver sin-pago.ts).
+    expect(s[`A${DATA + 1}`].v).toBe("Oficina (DEFAULT)");
     const tr = totalsRow(2);
     expect(s[`A${tr}`].v).toBe("Total");
     expect(s[`B${tr}`].v).toBe(12);

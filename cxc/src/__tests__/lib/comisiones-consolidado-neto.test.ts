@@ -189,9 +189,19 @@ describe("🔴 UNA llamada, no diez (12-ago-2026)", () => {
     }
   });
 
-  it("las RPC siguen siendo la MISMA comision_b2b_v5, sin tocar el cálculo", () => {
-    expect(consolidado).toContain('supabaseServer.rpc("comision_b2b_v5"');
-    expect(consolidado).toContain("p_empresa_key: empresa");
+  // CAMBIÓ DE DIRECCIÓN el 3-sep-2026. Exigía `supabaseServer.rpc("comision_b2b_v5"`
+  // escrito en la ruta. Desde que el COBRO se paga a QUIEN REGISTRÓ el recibo
+  // (Daniel: «el que vende a veces no es el que cobra») la RPC es la v6 y la
+  // llamada vive en UN solo lugar (`lib/comisiones/rpc` → `leerComision`), con
+  // red a la v5 mientras la DDL no corra. Lo que este candado siempre quiso
+  // decir —las dos pestañas llaman la MISMA RPC, una por empresa, mismos
+  // argumentos— se sigue exigiendo: por el módulo compartido, no por el literal.
+  it("las RPC siguen siendo la MISMA para las dos pestañas (leerComision → comision_b2b_v6)", () => {
+    expect(consolidado).toContain("leerComision(empresa, year, mes)");
+    expect(consolidado).not.toMatch(/rpc\("comision_b2b_v5"/);
+    const rpc = leer("src/lib/comisiones/rpc.ts");
+    expect(rpc).toContain('RPC_COMISION = "comision_b2b_v6"');
+    expect(rpc).toContain("p_empresa_key: empresa");
   });
 });
 

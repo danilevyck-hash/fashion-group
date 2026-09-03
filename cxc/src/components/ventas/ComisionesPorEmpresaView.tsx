@@ -4,11 +4,13 @@
 // El período (mes/año) lo controla el shell; aquí solo el selector de empresa,
 // que RECUERDA la última empresa usada (localStorage fg_last_comision_empresa).
 //
-// Regla (server, RPC comision_b2b_v5): base = facturas con utilidad>20% − todas
-// las NC, excluyendo intercompañía/clientes internos; comisión = base × tasa
-// del VENDEDOR DE LA FACTURA (v5 jul-2026, retroactivo; la NC usa su propio
-// vendedor; cobros siguen por cartera). Muestra a todos los vendedores activos
-// aunque base=$0; los sin actividad se colapsan a una línea al pie.
+// Regla (server, RPC comision_b2b_v6 vía lib/comisiones/rpc): base = facturas
+// con utilidad>20% − todas las NC, excluyendo intercompañía/clientes internos;
+// comisión = base × tasa del VENDEDOR DE LA FACTURA (v5 jul-2026, retroactivo;
+// la NC usa su propio vendedor). El COBRO se paga a QUIEN REGISTRÓ EL RECIBO
+// (v6 sep-2026 — Daniel: «el que vende a veces no es el que cobra»); la fila
+// DEFAULT es la oficina y se rotula ETIQUETA_DEFAULT. Muestra a todos los
+// vendedores activos aunque base=$0; los sin actividad se colapsan al pie.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
@@ -18,6 +20,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Coins, Settings } from "lucide-react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import type { ExcelApi } from "./ComisionesView";
+import { etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
+import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { fmtMoney } from "@/lib/ventas/format";
@@ -47,6 +51,8 @@ interface ComisionVendedor {
   comision_total: number;
   /** Cuánto se le restó (informativo — ya está descontado del total). */
   descuento?: number;
+  /** false = se calcula y se muestra, pero NO entra al total a pagar (DEFAULT y Daniel). */
+  se_paga?: boolean;
 }
 interface ComisionResp {
   empresa_key: string;
@@ -111,11 +117,14 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
   }, [load]);
 
   const vendedores = data?.vendedores ?? [];
-  const totalBase = vendedores.reduce((a, v) => a + (v.base ?? 0), 0);
-  const totalComision = vendedores.reduce((a, v) => a + (v.comision ?? 0), 0);
-  const totalCobroBase = vendedores.reduce((a, v) => a + (v.base_cobro ?? 0), 0);
-  const totalComisionCobro = vendedores.reduce((a, v) => a + (v.comision_cobro ?? 0), 0);
-  const totalGeneral = vendedores.reduce((a, v) => a + (v.comision_total ?? 0), 0);
+  // El pie suma SOLO lo pagable: DEFAULT y Daniel se ven con su número, pero
+  // no entran («no me autopago»). La marca la pone el servidor.
+  const totalBase = sumarPagable(vendedores, (v) => v.base ?? 0);
+  const totalComision = sumarPagable(vendedores, (v) => v.comision ?? 0);
+  const totalCobroBase = sumarPagable(vendedores, (v) => v.base_cobro ?? 0);
+  const totalComisionCobro = sumarPagable(vendedores, (v) => v.comision_cobro ?? 0);
+  const totalGeneral = sumarPagable(vendedores, (v) => v.comision_total ?? 0);
+  const haySinPago = vendedores.some((v) => v.se_paga === false);
 
   const isInactivo = (v: ComisionVendedor) =>
     (v.base ?? 0) === 0 && (v.base_cobro ?? 0) === 0 && (v.comision_total ?? 0) === 0;
@@ -223,12 +232,18 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
               {activos.map((v) => (
                 <tr
                   key={v.vendedor}
+                  data-se-paga={v.se_paga === false ? "no" : "si"}
                   onClick={() => setDetalleVendedor(v.vendedor)}
-                  className="cursor-pointer border-b border-gray-100 last:border-0 transition hover:bg-gray-50"
+                  className={`cursor-pointer border-b border-gray-100 last:border-0 transition hover:bg-gray-50 ${v.se_paga === false ? "text-gray-400" : ""}`}
                   title="Ver reporte detallado"
                 >
-                  <td className="px-3 py-2.5 font-medium text-gray-900 xl:px-4">
-                    <span className="underline-offset-2 hover:underline">{v.vendedor}</span>
+                  <td className={`px-3 py-2.5 font-medium xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>
+                    <span className="underline-offset-2 hover:underline">{etiquetaVendedor(v.vendedor)}</span>
+                    {v.se_paga === false && (
+                      <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 align-middle text-[11px] font-normal text-gray-500">
+                        {ROTULO_NO_SE_PAGA}
+                      </span>
+                    )}
                     {/* Crece HACIA ABAJO: una columna más habría ensanchado la
                         tabla justo en el iPad acostado, que es el ancho que
                         nadie mira. */}
@@ -238,11 +253,11 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-gray-700 xl:px-4">{fmtMoney(v.base)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-gray-600 xl:px-4">{fmtMoney(v.comision)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-gray-700 xl:px-4">{fmtMoney(v.base_cobro)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-gray-600 xl:px-4">{fmtMoney(v.comision_cobro)}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-gray-900 xl:px-4">{fmtMoney(v.comision_total)}</td>
+                  <td className={`px-3 py-2.5 text-right tabular-nums xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-700"}`}>{fmtMoney(v.base)}</td>
+                  <td className={`px-3 py-2.5 text-right tabular-nums xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-600"}`}>{fmtMoney(v.comision)}</td>
+                  <td className={`px-3 py-2.5 text-right tabular-nums xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-700"}`}>{fmtMoney(v.base_cobro)}</td>
+                  <td className={`px-3 py-2.5 text-right tabular-nums xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-600"}`}>{fmtMoney(v.comision_cobro)}</td>
+                  <td className={`px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>{fmtMoney(v.comision_total)}</td>
                 </tr>
               ))}
               {inactivos.length > 0 && (
@@ -255,7 +270,7 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
             </tbody>
             <tfoot>
               <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">
-                <td className="px-3 py-2.5 xl:px-4">Total</td>
+                <td className="px-3 py-2.5 xl:px-4">{haySinPago ? "Total a pagar" : "Total"}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums xl:px-4">{fmtMoney(totalBase)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums xl:px-4">{fmtMoney(totalComision)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums xl:px-4">{fmtMoney(totalCobroBase)}</td>

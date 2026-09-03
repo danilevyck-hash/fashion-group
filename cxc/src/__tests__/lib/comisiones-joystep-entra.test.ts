@@ -133,7 +133,10 @@ describe("🔴 nadie vuelve a restar joystep a mano", () => {
 describe("🔴 conducta: el endpoint consolidado pide la RPC de joystep", () => {
   beforeEach(() => { rpcCalls.length = 0; });
 
-  it("dispara comision_b2b_v5 para las 6 empresas, joystep incluida", async () => {
+  // Desde el 3-sep-2026 la RPC es `comision_b2b_v6` (el cobro se paga a quien
+  // registró el recibo); el candado cuenta la RPC VIGENTE, que vive en
+  // `lib/comisiones/rpc` — no un literal copiado acá.
+  it("dispara la RPC de comisión (v6) para las 6 empresas, joystep incluida", async () => {
     const { GET } = await import("@/app/api/ventas/comisiones/consolidado/route");
     const { NextRequest } = await import("next/server");
     const res = await GET(
@@ -141,8 +144,9 @@ describe("🔴 conducta: el endpoint consolidado pide la RPC de joystep", () => 
     );
     expect(res.status).toBe(200);
 
+    const { RPC_COMISION } = await import("@/lib/comisiones/rpc");
     const pedidas = rpcCalls
-      .filter((c) => c.fn === "comision_b2b_v5")
+      .filter((c) => c.fn === RPC_COMISION)
       .map((c) => c.args.p_empresa_key);
     expect(pedidas).toContain("joystep");
     expect([...pedidas].sort()).toEqual([...B2B_EMPRESA_KEYS].sort());
@@ -163,16 +167,23 @@ describe("🔴 conducta: el endpoint consolidado pide la RPC de joystep", () => 
   });
 });
 
-describe("🔴 el 0,5% sale del default de la RPC, no de escribir tasas", () => {
-  const rpc = readFileSync(
-    path.join(
-      process.cwd(),
-      "supabase/migrations/20260703120000_comision_b2b_v5_vendedor_factura.sql",
-    ),
-    "utf8",
-  );
+// Se revisan las DOS versiones: la v5 (cobro por cartera) sigue en la base como
+// red mientras la DDL de la v6 no corra, y la v6 (cobro a quien registró el
+// recibo, 3-sep-2026) es la vigente. Las reglas de joystep valen en ambas.
+describe.each([
+  ["comision_b2b_v5", "supabase/migrations/20260703120000_comision_b2b_v5_vendedor_factura.sql"],
+  ["comision_b2b_v6", "supabase/migrations/20260911120000_comision_b2b_v6_cobro_quien_registro.sql"],
+])("🔴 el 0,5% sale del default de %s, no de escribir tasas", (fn, archivo) => {
+  // Sin los comentarios `--`: la v6 EXPLICA en su cabecera que joystep manda
+  // «DANIEL LEVY » con espacio (por eso el TRIM), y ese texto no es un caso
+  // especial en el código. Lo que se prohíbe es que el SQL ejecutable conozca
+  // a una empresa.
+  const rpc = readFileSync(path.join(process.cwd(), archivo), "utf8")
+    .split("\n")
+    .map((l) => (l.indexOf("--") === -1 ? l : l.slice(0, l.indexOf("--"))))
+    .join("\n");
 
-  it("comision_b2b_v5 usa 0.0050 (0,5%) cuando el vendedor no tiene tasa propia", () => {
+  it(`${fn} usa 0.0050 (0,5%) cuando el vendedor no tiene tasa propia`, () => {
     // 0.005 = 0,5%. Un punto decimal de más acá multiplica la comisión por 100.
     expect(rpc).toContain("COALESCE(t.tasa_venta, 0.0050)");
     expect(rpc).toContain("COALESCE(t.tasa_cobro, 0.0050)");

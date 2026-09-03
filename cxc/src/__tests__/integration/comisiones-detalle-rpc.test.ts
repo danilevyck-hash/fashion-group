@@ -1,5 +1,5 @@
 /**
- * Comisiones — paridad RESUMEN (comision_b2b_v5) vs DETALLE (comision_b2b_detalle).
+ * Comisiones — paridad RESUMEN (comision_b2b_v6) vs DETALLE (comision_b2b_detalle v3).
  *
  * REGLA: el modal de detalle lista TODO lo que el resumen suma y su total cierra
  * EXACTAMENTE (al centavo) con la fila de la tabla. El bug original (jul-2026):
@@ -9,7 +9,7 @@
  * vez de 43,796.50/223.98.
  *
  * NO corren en `npm test` por defecto: pegan contra la DB de producción
- * (read-only) y requieren la DDL 20260724130000 aplicada. Para correrlos:
+ * (read-only) y requieren la DDL 20260911120000 aplicada (v6 + detalle v3). Para correrlos:
  *   RUN_DB_TESTS=1 npx vitest run src/__tests__/integration/comisiones-detalle-rpc.test.ts
  *
  * Requiere NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY en .env.local.
@@ -59,7 +59,12 @@ function loadEnv(): Record<string, string> {
   }
 }
 
-describe.skipIf(!RUN)("comisiones detalle ≡ resumen v5 (al centavo)", () => {
+// Desde el 3-sep-2026 el resumen es comision_b2b_v6 (cobro a quien REGISTRÓ el
+// recibo) y el detalle es la v3 de la misma DDL. La paridad se exige contra la
+// versión VIGENTE: correr esto contra una base donde la DDL 20260911120000 no
+// corrió falla en la primera RPC, y eso es lo correcto (no hay paridad que
+// verificar entre un resumen viejo y un detalle nuevo).
+describe.skipIf(!RUN)("comisiones detalle ≡ resumen v6 (al centavo)", () => {
   let sb: SupabaseClient;
 
   beforeAll(() => {
@@ -73,7 +78,7 @@ describe.skipIf(!RUN)("comisiones detalle ≡ resumen v5 (al centavo)", () => {
   // Paridad TOTAL: para CADA vendedor del resumen, el detalle devuelve las mismas
   // bases y comisiones, y la suma de los documentos listados cierra con la base.
   async function paridadEmpresaMes(empresa: string, year: number, mes: number) {
-    const { data: resumen, error: e1 } = await sb.rpc("comision_b2b_v5", {
+    const { data: resumen, error: e1 } = await sb.rpc("comision_b2b_v6", {
       p_empresa_key: empresa, p_year: year, p_mes: mes,
     });
     expect(e1).toBeNull();

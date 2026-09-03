@@ -7,6 +7,8 @@
 
 import type { WorkSheet, Range } from "xlsx-js-style";
 import { fmtDate } from "@/lib/format";
+import { ETIQUETA_DEFAULT, etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
+import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
 
 export interface VentaDoc {
   fecha: string;
@@ -244,6 +246,8 @@ export interface ComisionResumenRow {
   base_cobro: number;     // cobros
   comision_cobro: number; // com. cobro
   comision_total: number;
+  /** false = se lista con su número y «(no se paga)», y NO entra al Total. */
+  se_paga?: boolean;
 }
 export interface ComisionResumen {
   empresaKey: string;
@@ -253,21 +257,25 @@ export interface ComisionResumen {
   vendedores: ComisionResumenRow[];
 }
 
+/** Nombre de la fila en el Excel: la marca va PEGADA al nombre para que sobreviva
+ *  a cualquier filtro u orden que le hagan a la hoja. */
+const nombreEnExcel = (v: { vendedor: string; se_paga?: boolean }): string =>
+  v.se_paga === false ? `${etiquetaVendedor(v.vendedor)} (${ROTULO_NO_SE_PAGA})` : etiquetaVendedor(v.vendedor);
+
 /** Construcción pura del sheet (sin DOM) — testeable. */
 export async function buildComisionesResumenSheet(r: ComisionResumen): Promise<WorkSheet> {
   const { buildReportSheet, MONEY_FMT } = await import("@/lib/excel-export");
 
-  // Total = suma de las filas (no recálculo), consistente con el tab.
-  const tot = r.vendedores.reduce(
-    (a, v) => ({
-      base: a.base + (v.base ?? 0),
-      comision: a.comision + (v.comision ?? 0),
-      base_cobro: a.base_cobro + (v.base_cobro ?? 0),
-      comision_cobro: a.comision_cobro + (v.comision_cobro ?? 0),
-      comision_total: a.comision_total + (v.comision_total ?? 0),
-    }),
-    { base: 0, comision: 0, base_cobro: 0, comision_cobro: 0, comision_total: 0 },
-  );
+  // Total = suma de las filas PAGABLES (no recálculo), consistente con el tab:
+  // DEFAULT y Daniel se listan con su número pero no entran («no me autopago»).
+  const tot = {
+    base: sumarPagable(r.vendedores, (v) => v.base ?? 0),
+    comision: sumarPagable(r.vendedores, (v) => v.comision ?? 0),
+    base_cobro: sumarPagable(r.vendedores, (v) => v.base_cobro ?? 0),
+    comision_cobro: sumarPagable(r.vendedores, (v) => v.comision_cobro ?? 0),
+    comision_total: sumarPagable(r.vendedores, (v) => v.comision_total ?? 0),
+  };
+  const haySinPago = r.vendedores.some((v) => v.se_paga === false);
 
   return buildReportSheet({
     columns: [
@@ -279,9 +287,9 @@ export async function buildComisionesResumenSheet(r: ComisionResumen): Promise<W
       { header: "Com. Total", wch: 13, align: "right", fmt: MONEY_FMT },
     ],
     rows: r.vendedores.map(v => [
-      v.vendedor, v.base, v.comision, v.base_cobro, v.comision_cobro, v.comision_total,
+      nombreEnExcel(v), v.base, v.comision, v.base_cobro, v.comision_cobro, v.comision_total,
     ]),
-    totals: ["Total", tot.base, tot.comision, tot.base_cobro, tot.comision_cobro, tot.comision_total],
+    totals: [haySinPago ? "Total a pagar" : "Total", tot.base, tot.comision, tot.base_cobro, tot.comision_cobro, tot.comision_total],
   });
 }
 
@@ -302,6 +310,8 @@ export interface ComisionConsolidadoRow {
   vendedor: string;
   porEmpresa: Record<string, number>; // empresaKey -> comisión total de esa empresa
   total: number;
+  /** false = se lista con su número y «(no se paga)», y NO entra al Total. */
+  se_paga?: boolean;
 }
 export interface ComisionConsolidado {
   year: number;
@@ -316,21 +326,23 @@ export async function buildComisionesConsolidadoSheet(c: ComisionConsolidado): P
   const { buildReportSheet, MONEY_FMT } = await import("@/lib/excel-export");
 
   const rowFor = (r: ComisionConsolidadoRow) => [
-    r.vendedor,
+    nombreEnExcel(r),
     ...c.empresas.map((e) => r.porEmpresa[e.key] ?? 0),
     { v: r.total, bold: true }, // columna TOTAL destacada
   ];
 
   const rows = c.vendedores.map(rowFor);
-  if (c.sinAsignar) rows.push(rowFor({ ...c.sinAsignar, vendedor: "Sin asignar" }));
+  if (c.sinAsignar) rows.push(rowFor({ ...c.sinAsignar, vendedor: ETIQUETA_DEFAULT }));
 
-  // Total general = suma de TODAS las filas mostradas (vendedores + sin asignar).
+  // Total general = suma de las filas PAGABLES (la oficina y Daniel se listan,
+  // pero no entran — «no me autopago»).
   const allRows = [...c.vendedores, ...(c.sinAsignar ? [c.sinAsignar] : [])];
-  const totals: (string | number)[] = ["Total"];
+  const haySinPago = allRows.some((r) => r.se_paga === false);
+  const totals: (string | number)[] = [haySinPago ? "Total a pagar" : "Total"];
   for (const e of c.empresas) {
-    totals.push(allRows.reduce((a, r) => a + (r.porEmpresa[e.key] ?? 0), 0));
+    totals.push(sumarPagable(allRows, (r) => r.porEmpresa[e.key] ?? 0));
   }
-  totals.push(allRows.reduce((a, r) => a + (r.total ?? 0), 0));
+  totals.push(sumarPagable(allRows, (r) => r.total ?? 0));
 
   return buildReportSheet({
     columns: [
