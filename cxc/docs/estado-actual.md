@@ -251,12 +251,13 @@ Tampoco migran las píldoras relativas (Mes/3m/6m/12m): no son fechas, son venta
 | ¿Bulto? | **Calzado 12, todo lo demás 6.** |
 | ¿Boston en el directorio del grupo? | **Fuera.** ¿Sus ventas en Vista General? **Se quedan.** |
 | ¿El cliente se identifica por…? | **Código.** *«Todos los D-24 son de City Mall across mis 6 empresas.»* Medido: 138 de 147 códigos cuadran en las 6. |
+| ¿Usuario dedicado `sistema-api` en Switch por empresa? | **No.** (3-sep) Se confirmó midiendo que la sesión de Switch es por USUARIO y que cada cron expulsa a Daniel del panel; la solución era un usuario aparte por empresa. Daniel: *«no»*. El sistema sigue entrando como `daniel` y la regla de ≥15 min entre crons de la misma empresa se queda. **No volver a proponerlo.** |
+| ¿Los 4 reportes de Switch que sobrevivieron? | **Ninguno.** (3-sep) *«No me interesa saber qué factura pagó, solo ver sus últimos 3 pagos y fecha en CXC»* — eso se hizo. Ventas por renglón de ACS: *«solo quiero saber cuánto se vendió, y eso ya lo tengo al centavo»*. Ingresos varios e inventario a fecha: tampoco. Preguntas de inventario y análisis se las hace al asistente directo, no se construyen pantallas. |
+| ¿El documento de $266M en la cartera de Boston? | **Olvidarlo.** (3-sep) Daniel: *«quiero olvidar esto»*. No listar como pendiente. |
 | ¿Cómo trabajar? | **Mapear → definir juntos → ejecutar.** Nunca código antes de que él defina. Mockup de ahora/después solo cuando hace falta, visual, sin párrafos. |
 
 ## Pendientes vivos al 2-sep (los del 31-ago siguen salvo los marcados ✅)
 
-- 🔴 El documento de $266M en Switch (Boston) — tarea de Daniel.
 - ✅ **Ventas › Clientes «vs 2025» compara 8 meses contra 9** (cortaba el año anterior a fin de mes). Multi Fashion Holding decía +3% y es **+36%**; medido sobre los 115 del ranking, 37 cambiaban de número y 6 de signo. Arreglado el 3-sep con la regla de «mismos días»: **migración `20260909120000_clientes_vs_anio_anterior_mismos_dias.sql` pendiente de que Daniel la aplique** — hasta entonces la columna sigue como estaba.
 - **1.363 fichas de Reebok** sin traer (artículos sin existencia). Drenan solas a 400/día.
-- **4 reportes de Switch** que valdría la pena traer: cobros contra factura · renglones de Multifashion · ingresos varios · inventario a fecha. Ninguno urgente.
 - **Documentación oficial de Switch** (14 PDFs) en digestión → `docs/switch-referencia.md`.
