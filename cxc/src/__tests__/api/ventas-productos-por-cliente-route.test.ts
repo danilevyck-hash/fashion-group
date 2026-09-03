@@ -26,6 +26,8 @@ const estado = vi.hoisted(() => ({
   lecturas: [] as Record<string, unknown>[],
   lineas: [] as Record<string, unknown>[],
   diario: [] as Record<string, unknown>[],
+  /** Último día cargado de `switch_articulo_diario` que "devuelve" la base. */
+  ultimoDiaCargado: "2026-03-01" as string,
 }));
 
 vi.mock("@/lib/supabase-server", () => {
@@ -39,6 +41,13 @@ vi.mock("@/lib/supabase-server", () => {
       lt: (c: string, v: unknown) => { filtros[`lt:${c}`] = v; return q; },
       lte: (c: string, v: unknown) => { filtros[`lte:${c}`] = v; return q; },
       order: (c: string) => { filtros.order = c; return q; },
+      // `.limit(1)` es la consulta chica del CORTE (`ultimoDiaArticuloDiario`:
+      // MAX(fecha) de la ventana). Se anota aparte, con `corte: true`, para
+      // que los conteos de lecturas del mapa de códigos no la confundan.
+      limit: () => {
+        estado.lecturas.push({ ...filtros, corte: true });
+        return Promise.resolve({ data: [{ fecha: estado.ultimoDiaCargado }], error: null });
+      },
       range: () => {
         estado.lecturas.push({ ...filtros });
         const d = tabla === "switch_articulo_diario" ? estado.diario : estado.lineas;
@@ -109,9 +118,29 @@ describe("🔴 el rango lo resuelve el SERVIDOR, con la misma función que el ni
   it("ventana=previa usa productosRangoComparativo — la MISMA que la columna Δ", async () => {
     const res = await GET(req(`${BASE}&ventana=previa&cliente=12`));
     const body = await res.json();
-    const esperado = productosRangoComparativo("12m", 2026, null, new Date());
+    const esperado = productosRangoComparativo("12m", 2026, null, new Date(), estado.ultimoDiaCargado);
     expect(body.desde).toBe(esperado.desde);
     expect(body.hasta).toBe(esperado.hasta);
+  });
+
+  it("🩸 la ventana previa corta en el último día CARGADO de switch_articulo_diario, no en hoy", async () => {
+    // La tabla llega hasta ayer (se carga a las 03:40 de Panamá). Si la ventana
+    // previa cortara en hoy, «dejó de comprar» miraría un día que el nivel 1
+    // no mira. El corte se pide a la MISMA tabla que suma la columna Δ.
+    estado.ultimoDiaCargado = "2026-02-15";
+    const res = await GET(req(`${BASE}&ventana=previa&cliente=12`));
+    const body = await res.json();
+    expect(body.hasta).toBe("2025-02-15");
+    const corte = estado.lecturas.find(l => l.corte === true)!;
+    expect(corte.tabla).toBe("switch_articulo_diario");
+    expect(corte["eq:empresa_key"]).toBe("vistana");
+    expect(corte.order).toBe("fecha");
+    estado.ultimoDiaCargado = "2026-03-01";
+  });
+
+  it("ventana=actual NO pide el corte: no hay comparación que recortar", async () => {
+    await GET(req(`${BASE}&ventana=actual`));
+    expect(estado.lecturas.filter(l => l.corte === true)).toHaveLength(0);
   });
 
   it("las dos ventanas NO son la misma (si lo fueran, «dejó de comprar» saldría vacío siempre)", async () => {
@@ -161,13 +190,13 @@ describe("la ruta funciona SIN la RPC (la DDL la corre Daniel a mano)", () => {
     estado.modo = "revienta";
     const res = await GET(req(`${BASE}&ventana=actual`));
     expect(res.status).toBe(500);
-    expect(estado.lecturas).toHaveLength(0);
+    expect(estado.lecturas.filter(l => !l.corte)).toHaveLength(0);
   });
 
   it("🔑 con un cliente, el mapa de códigos se pide ACOTADO (2 viajes, no 22)", async () => {
     estado.modo = "no-existe";
     await GET(req(`${BASE}&ventana=previa&cliente=12`));
-    const diario = estado.lecturas.filter(l => l.tabla === "switch_articulo_diario");
+    const diario = estado.lecturas.filter(l => l.tabla === "switch_articulo_diario" && !l.corte);
     expect(diario).toHaveLength(1);
     expect(diario[0]["in:codigo"]).toEqual(["A-1"]);
   });
@@ -175,7 +204,7 @@ describe("la ruta funciona SIN la RPC (la DDL la corre Daniel a mano)", () => {
   it("sin cliente el mapa se pide ENTERO: hay que conocer toda la ventana", async () => {
     estado.modo = "no-existe";
     await GET(req(`${BASE}&ventana=actual`));
-    const diario = estado.lecturas.filter(l => l.tabla === "switch_articulo_diario");
+    const diario = estado.lecturas.filter(l => l.tabla === "switch_articulo_diario" && !l.corte);
     expect(diario).toHaveLength(1);
     expect(diario[0]["in:codigo"]).toBeUndefined();
   });

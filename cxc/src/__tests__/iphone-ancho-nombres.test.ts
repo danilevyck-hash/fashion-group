@@ -152,8 +152,14 @@ describe("Vista General — el subtítulo del KPI envuelve, no se corta", () => 
     expect(vistaGeneral).not.toContain('<div className="text-xs mt-1 tabular-nums truncate">');
   });
 
-  it("el texto del subtítulo de Ventas conserva el (parcial)", () => {
-    expect(vistaGeneral).toContain('{ventas.parcial ? " (parcial)" : ""}');
+  it("el texto del subtítulo de Ventas dice contra qué compara el mes en curso", () => {
+    // CAMBIÓ DE DIRECCIÓN el 3-sep-2026: «(parcial)» avisaba que la comparación
+    // era contra el mes ENTERO del año pasado. Ahora el mes en curso compara
+    // contra los MISMOS DÍAS y el subtítulo lo dice con las fechas
+    // («vs 1–3 sep 2025»); «(parcial)» queda solo para cuando esa lectura
+    // falló y no hay fechas que decir.
+    expect(vistaGeneral).toContain("ventas.parcial && ventas.prevHasta ? `1–${fechaCorta(ventas.prevHasta)}");
+    expect(vistaGeneral).toContain('{ventas.parcial && !ventas.prevHasta ? " (parcial)" : ""}');
   });
 
   it("min-h reserva 2 líneas solo en mobile (desktop queda como estaba)", () => {

@@ -91,7 +91,7 @@ mutar "$MIG" \
 
 echo "== TS: el espejo de la regla =="
 mutar "$TS" \
-  "const corte = ultimaVentaCargada && ultimaVentaCargada < hoy ? ultimaVentaCargada : hoy;" \
+  "const corte = ultimoDiaCargado && ultimoDiaCargado < hoy ? ultimoDiaCargado : hoy;" \
   "const corte = hoy;" \
   'espejo: el corte es hoy a secas'
 mutar "$TS" \

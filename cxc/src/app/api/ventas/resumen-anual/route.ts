@@ -6,6 +6,8 @@ import {
   EMPRESA_KEY_TO_VENTAS_ID,
   EMPRESA_KEY_TO_NAME,
 } from "@/lib/empresa-mapping";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { leerPrevSamePeriod, sumarPrevPorEmpresa } from "@/lib/ventas/prev-same-period";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,7 +16,24 @@ export const maxDuration = 60;
 // rollup mensual ventas_rollup_mensual_mv (misma fuente que el resto; cuadra al
 // centavo contra ventas_dashboard_summary / Switch). Agrega por año en JS (sin
 // crear tabla/vista nueva). Δ YoY: full-vs-full para años cerrados, same-period
-// (YTD vs YTD) para el año en curso, sin Δ para el primer año (sin previo).
+// para el año en curso, sin Δ para el primer año (sin previo).
+//
+// ── 🩸 «SAME-PERIOD» SON LOS MISMOS DÍAS, NO LOS MISMOS MESES (3-sep-2026) ──
+//
+// Hasta hoy el previo del año en curso era `mes <= maxMonthCurrent` sobre la MV:
+// 2026 hasta el 3-sep contra ene–SEPTIEMBRE ENTERO de 2025. Ocho meses y tres
+// días contra nueve meses. Medido contra producción: el grupo decía **−7,0%** y
+// crecía **+2,5%**; Fashion Wear −13,8% → −5,9%; Vistana +0,4% → +10,5%;
+// Fashion Shoes −6,1% → +7,2%; Boston −15,5% → −0,3%; ACS +3,8% → +13,9%.
+// Cinco de ocho cambiaban de signo. Y el día 1 de cada mes la comparación
+// saltaba un mes entero hacia atrás.
+//
+// Ahora el previo del año en curso sale de `ventas_dashboard_prev_same_period`
+// (`prev-same-period.ts`): los meses cerrados enteros + el mes en curso
+// recortado al mismo día de esa empresa (día de Panamá, último cargado, topado
+// en hoy). Es la MISMA lectura del KPI del Resumen y de Vista General — un solo
+// corte para las tres pantallas. Los años cerrados siguen saliendo de la MV.
+// Definición única del corte: `src/lib/ventas/clientes-corte-comparativo.ts`.
 
 type Vals = { ventas: number; costo: number; utilidad: number };
 const zero = (): Vals => ({ ventas: 0, costo: 0, utilidad: 0 });
@@ -70,6 +89,21 @@ export async function GET(req: NextRequest) {
     const earliest = years[0];
     const currentYear = years[years.length - 1];
 
+    // 🩸 El previo del AÑO EN CURSO, recortado a los mismos días (ver el
+    // encabezado). Solo si el último año de la MV es el año de HOY en Panamá:
+    // un año ya cerrado se compara entero contra entero desde la MV.
+    const anioHoy = Number(hoyPanama().slice(0, 4));
+    let prevMismosDias: Map<string, Vals> | null = null;
+    let corte: { fecha_corte: string | null; dia_corte_anio_anterior: string | null } | null = null;
+    if (currentYear === anioHoy) {
+      const prevRes = await leerPrevSamePeriod(currentYear);
+      if (prevRes.error || !prevRes.data) {
+        throw new Error(`ventas_dashboard_prev_same_period: ${prevRes.error?.message ?? "sin datos"}`);
+      }
+      prevMismosDias = sumarPrevPorEmpresa(prevRes.data.rows ?? []);
+      corte = { fecha_corte: prevRes.data.fecha_corte, dia_corte_anio_anterior: prevRes.data.dia_corte_anio_anterior };
+    }
+
     // Meses presentes (a nivel grupo) por año — para detectar el parcial y el
     // cutoff del año en curso.
     const groupMonths = new Map<number, Set<number>>();
@@ -80,9 +114,6 @@ export async function GET(req: NextRequest) {
         for (const m of mMap.keys()) s.add(m);
       }
     }
-    const monthsCurrent = Array.from(groupMonths.get(currentYear) ?? []).sort((a, b) => a - b);
-    const maxMonthCurrent = monthsCurrent.length ? monthsCurrent[monthsCurrent.length - 1] : 12;
-
     // El primer año es "parcial" si no tiene los 12 meses (switch_facturas arranca
     // 2022-10). Etiqueta tipo "oct–dic".
     let parcial: { year: number; label: string } | null = null;
@@ -99,28 +130,20 @@ export async function GET(req: NextRequest) {
       for (const v of mMap.values()) { t.ventas += v.ventas; t.costo += v.costo; t.utilidad += v.utilidad; }
       return t;
     };
-    // Suma de meses 1..maxMonth de una empresa-año (para same-period del año en curso).
-    const yearTotalUpTo = (mMap: Map<number, Vals> | undefined, maxMonth: number): Vals => {
-      const t = zero();
-      if (!mMap) return t;
-      for (const [m, v] of mMap) {
-        if (m <= maxMonth) { t.ventas += v.ventas; t.costo += v.costo; t.utilidad += v.utilidad; }
-      }
-      return t;
-    };
-
     // Previo comparable de la celda (emp, Y): null (sin Δ) si:
     //   - Y es el primer año (no hay previo), o
     //   - el año previo es el PARCIAL (comparar un año completo contra oct–dic es
     //     engañoso → mismo principio "datos insuf." que el resto del módulo).
-    // Si Y es el año en curso → same-period (YTD vs YTD). Si es cerrado → full year.
+    // Si Y es el año en curso → los MISMOS DÍAS del año anterior (la RPC, ver
+    // el encabezado). Si es cerrado → el año entero desde la MV.
     const partialYear = parcial ? parcial.year : null;
-    const prevBasis = (yMap: Map<number, Map<number, Vals>>, Y: number): Vals | null => {
+    const prevBasis = (empKey: string, yMap: Map<number, Map<number, Vals>>, Y: number): Vals | null => {
       if (Y === earliest) return null;
       if (partialYear !== null && Y - 1 === partialYear) return null;
       const prevM = yMap.get(Y - 1);
       if (!prevM) return null;
-      return Y === currentYear ? yearTotalUpTo(prevM, maxMonthCurrent) : yearTotal(prevM);
+      if (Y === currentYear && prevMismosDias) return prevMismosDias.get(empKey) ?? zero();
+      return yearTotal(prevM);
     };
 
     const empresas = ALL_EMPRESA_KEYS.filter((k) => byEmp.has(k)).map((empKey) => {
@@ -129,7 +152,7 @@ export async function GET(req: NextRequest) {
       const total = zero();
       for (const Y of years) {
         const t = yearTotal(yMap.get(Y));
-        byYear[Y] = { ...t, prev: prevBasis(yMap, Y) };
+        byYear[Y] = { ...t, prev: prevBasis(empKey, yMap, Y) };
         total.ventas += t.ventas; total.costo += t.costo; total.utilidad += t.utilidad;
       }
       return {
@@ -159,6 +182,9 @@ export async function GET(req: NextRequest) {
       years,
       currentYear,
       parcial,
+      // Hasta qué día se comparó el año en curso (día de Panamá) y hasta qué
+      // día se sumó el año anterior, para que la pantalla lo DIGA.
+      corte,
       empresas,
       totalGrupo: { byYear: totalByYear, total: totalAll },
     });

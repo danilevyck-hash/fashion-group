@@ -6,6 +6,7 @@ import {
   EMPRESA_KEY_TO_VENTAS_ID,
   EMPRESA_KEY_TO_NAME,
 } from "@/lib/empresa-mapping";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -26,8 +27,16 @@ export const maxDuration = 60;
 //     simplemente no tienen fila → la celda queda VACÍA (no 0).
 //   - Δ se calcula solo donde existe el mismo mes del año previo (oct-2022 es
 //     un mes completo, así que 2023-oct vs 2022-oct sí es comparable).
-//   - El mes en curso del año actual es parcial → se rotula y NO se calcula Δ
-//     (comparar un mes a medias contra el mes completo del año previo engaña).
+//   - El mes en curso del año actual es parcial → viaja con `prev: null` y el
+//     Δ de esa celda lo pone la PANTALLA con los MISMOS DÍAS del año anterior
+//     (`ventas_dashboard_prev_same_period`, que el Resumen ya tiene cargado —
+//     ver `ResumenMesAnio.tsx`). 🩸 Hasta el 3-sep-2026 la pantalla ignoraba
+//     este `prev` y leía `byMonth[m][y−1]`: el mes ENTERO del año pasado.
+//     Medido: Fashion Wear sep decía −99,4% (era −98,5%); Boston −93,5%
+//     cuando iba **+2,2%**.
+//   - «Mes en curso» es el de HOY EN PANAMÁ (UTC−5), no el del reloj UTC del
+//     servidor: entre las 7 p.m. y la medianoche el UTC ya está en mañana, y
+//     el 31 a la noche habría marcado parcial al mes siguiente.
 
 type Vals = { ventas: number; costo: number; utilidad: number };
 const zero = (): Vals => ({ ventas: 0, costo: 0, utilidad: 0 });
@@ -84,11 +93,13 @@ export async function GET(req: NextRequest) {
     const earliest = years[0];
     const currentYear = years[years.length - 1];
 
-    // El mes en curso (parcial) sale del calendario, no de la data: comparar el
-    // mes a medias contra el mes completo del año previo no es justo → sin Δ.
-    const now = new Date();
-    const partial = years.includes(now.getFullYear())
-      ? { year: now.getFullYear(), month: now.getMonth() + 1 }
+    // El mes en curso (parcial) sale del calendario DE PANAMÁ, no de la data:
+    // comparar el mes a medias contra el mes completo del año previo no es
+    // justo → `prev: null`, y la pantalla pone los mismos días.
+    const hoy = hoyPanama();
+    const anioHoy = Number(hoy.slice(0, 4));
+    const partial = years.includes(anioHoy)
+      ? { year: anioHoy, month: Number(hoy.slice(5, 7)) }
       : null;
 
     // Meses presentes (a nivel grupo) por año — para etiquetar el 2022 parcial.

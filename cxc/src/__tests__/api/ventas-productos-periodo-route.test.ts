@@ -18,8 +18,9 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vites
 import { NextRequest } from "next/server";
 import { signSession } from "@/lib/session-cookie";
 
-const { llamadas } = vi.hoisted(() => ({
+const { llamadas, estado } = vi.hoisted(() => ({
   llamadas: [] as { fn: string; args: Record<string, unknown> }[],
+  estado: { ultimoDiaCargado: null as string | null },
 }));
 
 vi.mock("@/lib/supabase-server", () => ({
@@ -35,6 +36,15 @@ vi.mock("@/lib/supabase-server", () => ({
         };
       }
       return { data: [{ mes: 3, venta: 100 }], error: null };
+    },
+    // El corte del comparativo (`ultimoDiaArticuloDiario`): la base "dice" que
+    // la tabla llegó hasta `ultimoDiaCargado` (por defecto, hasta hoy).
+    from: () => {
+      const q = {
+        select: () => q, eq: () => q, gte: () => q, lte: () => q, order: () => q,
+        limit: async () => ({ data: estado.ultimoDiaCargado ? [{ fecha: estado.ultimoDiaCargado }] : [], error: null }),
+      };
+      return q;
     },
   },
 }));
@@ -140,6 +150,30 @@ describe("cada período pide su propia ventana", () => {
   it("un período inventado se rechaza, no se cae en el default en silencio", async () => {
     const res = await GET(req("/api/ventas/productos?empresa=fashion_wear&year=2026&periodo=3m"));
     expect(res.status).toBe(400);
+  });
+
+  it("🩸 el comparativo corta donde llegó switch_articulo_diario, no en hoy (previo=1 pide hasta ahí)", async () => {
+    // La tabla se carga a las 03:40 de Panamá y llega hasta AYER: con el corte
+    // en hoy el año pasado llevaba un día de más, siempre. La ruta pide el
+    // MAX(fecha) y la ventana previa termina un año antes de ESE día.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-03T18:18:00Z")); // 13:18 en Panamá
+    try {
+      estado.ultimoDiaCargado = "2026-09-02";
+      const body = await (await GET(req("/api/ventas/productos?empresa=fashion_wear&year=2026&periodo=ytd"))).json();
+      expect(body.hasta).toBe("2026-09-03");
+      expect(body.comparativo).toEqual({ desde: "2025-01-01", hasta: "2025-09-02", corte: "2026-09-02", parcial: true });
+      llamadas.length = 0;
+      await GET(req("/api/ventas/productos?empresa=fashion_wear&year=2026&periodo=ytd&previo=1"));
+      expect(rangoPedido()).toEqual({ desde: "2025-01-01", hasta: "2025-09-02" });
+      // Sin nada cargado el corte es hoy (de Panamá), como antes.
+      estado.ultimoDiaCargado = null;
+      const sin = await (await GET(req("/api/ventas/productos?empresa=fashion_wear&year=2026&periodo=ytd"))).json();
+      expect(sin.comparativo.hasta).toBe("2025-09-03");
+    } finally {
+      estado.ultimoDiaCargado = null;
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -82,6 +82,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { ultimoDiaArticuloDiario } from "@/lib/ventas/ultimo-dia-cargado";
 // `agregarProductos` (agrupador por MARCA) sigue igual: su `FilaArticuloDiario`
 // es un subconjunto de la de acá (le sobra `costo_total`), así que la MISMA
 // lectura alimenta a los dos sin copiar filas ni pedirlas dos veces.
@@ -190,7 +191,18 @@ export async function GET(req: NextRequest) {
   //    apagarse para `gerente_acs` por caer fuera de su ventana; esa ventana ya
   //    no existe. Lo que sí sigue apagando la comparación es un fallo de esa
   //    lectura (ver el `catch` de abajo).
-  const compRango = rangoComparativo(periodo, { year, mes, desde, hasta }, now);
+  //    🩸 Y se recorta a lo CARGADO: la tabla se carga a las 03:40 de Panamá y
+  //    llega hasta ayer, así que el corte sale de su MAX(fecha) en el período y
+  //    no de hoy (`ultimoDiaArticuloDiario`, una consulta chica por índice).
+  //    Medido el 3-sep-2026: septiembre decía +4,2% y crecía +46,1%. Se
+  //    resuelve adentro del `try`, pegado a la lectura del comparativo: sin ese
+  //    dato no hay comparación honesta y se cae ABIERTO, no se inventa hoy.
+  const leerComparativo = async () => {
+    const ultimoDiaCargado = await ultimoDiaArticuloDiario(EMPRESA, desde, hasta);
+    const rango = rangoComparativo({ desde, hasta }, now, ultimoDiaCargado);
+    const lectura = await leerPeriodoRpc(rango.desde, rango.hasta);
+    return { rango, lectura };
+  };
 
   /** El período, agrupado por Postgres. UNA llamada — ver el punto 3. */
   const leerPeriodoRpc = async (d: string, h: string): Promise<LecturaPeriodo> => {
@@ -271,9 +283,9 @@ export async function GET(req: NextRequest) {
     let marcaDisponible = true;
     let marcaError: string | null = null;
 
-    const [periodo1, periodoComp, dicc] = await Promise.all([
+    const [periodo1, comparativoLeido, dicc] = await Promise.all([
       leerPeriodoRpc(desde, hasta),
-      leerPeriodoRpc(compRango.desde, compRango.hasta).catch(err => {
+      leerComparativo().catch(err => {
         fallo.comparativo = err instanceof Error ? err.message : "error inesperado";
         console.error("[multifashion/productos] comparativo no disponible", err);
         return null;
@@ -287,6 +299,8 @@ export async function GET(req: NextRequest) {
     ]);
 
     const filas = periodo1.filas;
+    const periodoComp = comparativoLeido?.lectura ?? null;
+    const compRango = comparativoLeido?.rango ?? null;
     const filasComp = periodoComp ? periodoComp.filas : null;
     const marcas: FilaMarca[] = dicc?.marcas ?? [];
     if (marcaDisponible) marcaDisponible = marcas.length > 0;
@@ -370,7 +384,7 @@ export async function GET(req: NextRequest) {
         codigos: porCodigo.filas,
       },
       comparativo:
-        compCategoria && compCodigo
+        compCategoria && compCodigo && compRango
           ? {
               desde: compRango.desde,
               hasta: compRango.hasta,

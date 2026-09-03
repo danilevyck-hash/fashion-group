@@ -26,7 +26,7 @@ interface EmpresaVentas { key: string; name: string; ventas: number; utilidad: n
 
 interface VistaGeneral {
   mes: string;
-  ventas: null | { total: number; prevYear: number | null; yoyPct: number | null; parcial: boolean; empresasCount: number; byEmpresa: EmpresaVentas[] };
+  ventas: null | { total: number; prevYear: number | null; yoyPct: number | null; parcial: boolean; prevHasta?: string | null; empresasCount: number; byEmpresa: EmpresaVentas[] };
   margen: null | { pct: number | null; utilidad: number };
   // 🔴 NO HAY `gastos.total`, y es a propósito. Daniel, textual (13-ago-2026):
   // "La tarjeta de Gastos de Vista General también por empresa". El número por
@@ -207,7 +207,9 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
             <span className="text-stone-400">sin dato del año pasado</span>
           ) : (
             <span className={ventas.parcial ? "text-stone-400" : ventas.yoyPct >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-              {ventas.yoyPct >= 0 ? "▲" : "▼"} {pct(Math.abs(ventas.yoyPct))} vs {mesPrevAnio}{ventas.parcial ? " (parcial)" : ""}
+              {/* Mes en curso: el año pasado va recortado a los MISMOS DÍAS
+                  ("vs 1–3 sep 2025"), no el mes entero (3-sep-2026). */}
+              {ventas.yoyPct >= 0 ? "▲" : "▼"} {pct(Math.abs(ventas.yoyPct))} vs {ventas.parcial && ventas.prevHasta ? `1–${fechaCorta(ventas.prevHasta)} ${ventas.prevHasta.slice(0, 4)}` : mesPrevAnio}{ventas.parcial && !ventas.prevHasta ? " (parcial)" : ""}
             </span>
           )
         }

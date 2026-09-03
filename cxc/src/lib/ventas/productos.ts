@@ -3,9 +3,10 @@
 // rutas API (nivel 1 + drill-down) y el componente ProductosView.
 
 import { MONTHS } from "./format";
-// El criterio de "la misma ventana un año antes" vive en UN solo lugar (ver la
-// nota de esa función). Acá se importa, no se copia.
-import { unAnioAntes } from "@/lib/multifashion/productos-ranking";
+// El criterio de "la misma ventana un año antes, recortada a los días
+// cargados" vive en UN solo lugar: `clientes-corte-comparativo.ts`, la
+// definición única del corte para todo el sistema. Acá se importa, no se copia.
+import { ventanaUnAnioAntes, type VentanaComparativa } from "@/lib/ventas/clientes-corte-comparativo";
 // El día de negocio en Panamá (UTC−5 fijo) también vive en UN solo lugar. Acá se
 // importa, no se copia: este repo ya pagó dos veces por agrupar en UTC (el borde
 // de mes de Multifashion y el día de las marcaciones del reloj).
@@ -68,7 +69,7 @@ export interface ProductosResponse {
   hasta: string;
   /** Ventana contra la que se mide el Δ. La devuelve el servidor para que la
    *  pantalla pueda DECIR contra qué compara, en vez de que Daniel lo adivine. */
-  comparativo?: { desde: string; hasta: string };
+  comparativo?: { desde: string; hasta: string; corte?: string; parcial?: boolean };
   /**
    * ⛔ YA NO SE MANDA. Quedan los meses sueltos que alimentaban el selector.
    *
@@ -191,43 +192,40 @@ export function productosRangoPeriodo(
  * meses enteros de 2025. El año pasado corría con cuatro meses de ventaja, así
  * que la Δ mostraba caídas que eran del calendario y no del negocio: en Fashion
  * Wear, *Women-T-Shirts S/S* daba **−38%** en «Año en curso» y **+29% / +15%**
- * en «Últimos 6 / 12 meses», en la MISMA pantalla y con las mismas ventas. Ahora
- * se compara 1-ene → el mismo día del año pasado.
+ * en «Últimos 6 / 12 meses», en la MISMA pantalla y con las mismas ventas.
  *
- * Es el criterio que este repo YA usa en `rangoComparativo` de Multifashion —
- * "un mes empezado se compara contra los MISMOS DÍAS del año pasado"— aplicado
- * al año en vez de al mes, y con su misma pieza: `unAnioAntes` (que hace caer el
- * 29-feb en el 28). No hay un tercer criterio dando vueltas.
+ * 🩸 Y «el mismo tramo» son los días CARGADOS, no «hasta hoy» (3-sep-2026).
+ * `switch_articulo_diario` se carga a las 03:40 de Panamá y llega hasta AYER:
+ * cortar el año pasado en hoy le regalaba un día, siempre. Medido en Fashion
+ * Wear: −6,0% en pantalla, −0,7% real. Por eso `ultimoDiaCargado` es un
+ * parámetro OBLIGATORIO — el MAX(fecha) de la tabla dentro del período actual
+ * (`ultimoDiaArticuloDiario`), que trae la ruta. `null` = nada cargado → hoy.
  *
- * · Año en curso → [1-ene del año anterior, `unAnioAntes(hasta del actual)`].
- *   El `hasta` sale del PERÍODO ACTUAL, no de un "hoy" recalculado acá: las dos
- *   puntas de la comparación nacen del mismo instante y no se pueden separar ni
- *   un día (Panamá es UTC−5 fijo, y un `new Date()` de más entre las 7 p.m. y la
- *   medianoche corre el día de una punta y no de la otra).
- *   Un año YA CERRADO cae solo en el año entero: su `hasta` es el 31-dic, y
- *   `unAnioAntes("2024-12-31")` es el 31-dic anterior. No hay caso especial.
+ * La regla vive en `ventanaUnAnioAntes` (`clientes-corte-comparativo.ts`), la
+ * misma que usan Multifashion › Productos, Clientes y el Resumen. Las cuatro
+ * ramas caen solas de ahí:
  *
- * · Mes suelto → `productosRange(year - 1, mes)`, INTACTO. Un mes cerrado ya se
- *   compara entero contra entero; no hay nada que recortar y su columna no se
- *   mueve.
+ * · Año en curso → [1-ene del año anterior, un año antes del corte]. El corte
+ *   sale del PERÍODO ACTUAL y de lo cargado, no de un "hoy" recalculado acá:
+ *   las dos puntas de la comparación nacen del mismo instante y no se pueden
+ *   separar ni un día (Panamá es UTC−5 fijo). Un año YA CERRADO cae solo en el
+ *   año entero: su `hasta` es el 31-dic y un año antes es el 31-dic anterior.
  *
- * · Períodos relativos → la MISMA ventana corrida 12 meses, punta a punta.
- *   Mismo largo y mismo corte de día, nada que recortar.
+ * · Mes suelto → el mismo mes un año antes. Un mes CERRADO se compara entero
+ *   contra entero (no hay nada que recortar y su columna no se mueve); el mes
+ *   EN CURSO se recorta a los mismos días, igual que el año.
+ *
+ * · Períodos relativos → la MISMA ventana corrida 12 meses, punta a punta,
+ *   con el mismo recorte a lo cargado en la punta de hoy.
  */
 export function productosRangoComparativo(
   periodo: ProductosPeriodo,
   year: number,
   mes: number | null,
   ahora: Date,
-): { desde: string; hasta: string } {
-  if (periodo === "ytd") {
-    const anterior = productosRange(year - 1, mes, ahora);
-    if (mes && mes >= 1 && mes <= 12) return anterior;
-    const actual = productosRange(year, mes, ahora);
-    return { desde: anterior.desde, hasta: unAnioAntes(actual.hasta) };
-  }
-  const r = productosRangoPeriodo(periodo, year, mes, ahora);
-  return { desde: unAnioAntes(r.desde), hasta: unAnioAntes(r.hasta) };
+  ultimoDiaCargado: string | null,
+): VentanaComparativa {
+  return ventanaUnAnioAntes(productosRangoPeriodo(periodo, year, mes, ahora), ultimoDiaCargado, ahora);
 }
 
 /** Nombre del período para el título del Excel y el rótulo de la pantalla. */

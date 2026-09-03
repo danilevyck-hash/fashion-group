@@ -61,6 +61,8 @@
 //    facturas de american_classic en 12 meses son mayoreo (0,05%).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ventanaUnAnioAntes } from "@/lib/ventas/clientes-corte-comparativo";
+
 /** Fila cruda de `switch_articulo_diario` — solo las columnas que se usan. */
 export interface FilaArticuloDiario {
   articulo_id: number;
@@ -384,31 +386,16 @@ function diaPanama(ahora: Date): string {
   return new Date(ahora.getTime() - PANAMA_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-/** Último día del mes (1..31). Aritmética en UTC, sin zona horaria local. */
-function ultimoDia(anio: number, mes: number): number {
-  return new Date(Date.UTC(anio, mes, 0)).getUTCDate();
-}
-
-const dd2 = (n: number): string => String(n).padStart(2, "0");
-
 /**
- * La misma fecha un año antes. El 29-feb cae en el 28 del año no bisiesto.
- *
- * EXPORTADA a propósito: es el criterio con el que TODA la app corre una ventana
- * un año hacia atrás para comparar contra ella. Ventas › Productos la importa
- * de acá en vez de copiarla — una segunda copia diverge (pasó con el % de
- * variación, y por eso existe `src/lib/variacion.ts`).
+ * La misma fecha un año antes (29-feb → 28-feb). VIVE en
+ * `src/lib/ventas/clientes-corte-comparativo.ts`, la definición única del
+ * corte; acá se re-exporta para que los importadores de siempre no cambien.
  */
-export function unAnioAntes(fecha: string): string {
-  const anio = Number(fecha.slice(0, 4)) - 1;
-  const mes = Number(fecha.slice(5, 7));
-  const dia = Math.min(Number(fecha.slice(8, 10)), ultimoDia(anio, mes));
-  return `${anio}-${dd2(mes)}-${dd2(dia)}`;
-}
+export { unAnioAntes } from "@/lib/ventas/clientes-corte-comparativo";
 
 export interface RangoComparativo extends RangoFechas {
   /** El período actual todavía no cerró, así que la comparación se recortó a
-   *  los MISMOS días del mes. Ver el punto 2 del bloque de abajo. */
+   *  los MISMOS días. Ver el punto 2 del bloque de abajo. */
   parcial: boolean;
 }
 
@@ -430,38 +417,26 @@ export interface RangoComparativo extends RangoFechas {
  *    período de COMPARACIÓN al mismo día del mes; nunca se infla el actual con
  *    una proyección. Un mes ya cerrado se compara entero contra entero.
  *
- * Para la ventana de 12 meses el corte ya es "el 1 del mes hasta hoy", así que
- * la comparación es esa misma ventana corrida 12 meses: mismo largo, mismo
- * corte de día, sin recorte que anunciar.
+ *    🩸 Y «los mismos días» son los días CARGADOS, no «hasta hoy».
+ *    `switch_articulo_diario` se carga a las 03:40 de Panamá y llega hasta
+ *    AYER; cortar el año pasado en hoy le regalaba un día, siempre. Medido el
+ *    3-sep-2026: septiembre decía +4,2% y crecía +46,1% (el Resumen de al
+ *    lado, que sí cortaba bien, decía lo segundo). Por eso `ultimoDiaCargado`
+ *    es un parámetro OBLIGATORIO: el MAX(fecha) de la tabla dentro del período
+ *    actual, que trae quien llama. `null` = no hay nada cargado, y entonces se
+ *    corta en hoy.
+ *
+ * La regla vive en UN solo lugar: `ventanaUnAnioAntes` de
+ * `src/lib/ventas/clientes-corte-comparativo.ts`. Esto es un envoltorio con la
+ * forma que esta pantalla ya usaba.
  *
  * PURO: `ahora` explícito, como todo lo que decide fechas en este módulo.
  */
 export function rangoComparativo(
-  periodo: "mes" | "12m",
-  actual: { year: number; mes: number; desde: string; hasta: string },
+  actual: RangoFechas,
   ahora: Date,
+  ultimoDiaCargado: string | null,
 ): RangoComparativo {
-  if (periodo === "12m") {
-    return {
-      desde: unAnioAntes(actual.desde),
-      hasta: unAnioAntes(actual.hasta),
-      parcial: false,
-    };
-  }
-
-  const hoy = diaPanama(ahora);
-  const finMes = ultimoDia(actual.year, actual.mes);
-  // Hasta dónde llega el período actual DE VERDAD: un mes en curso se corta hoy.
-  const finReal = actual.hasta < hoy ? actual.hasta : hoy;
-  // Un mes enteramente futuro (`hoy` antes del 1) no tiene días transcurridos:
-  // no hay nada que recortar y se compara contra el mes completo.
-  const diaCorte = finReal >= actual.desde ? Number(finReal.slice(8, 10)) : finMes;
-
-  const anioAnt = actual.year - 1;
-  const diaAnt = Math.min(diaCorte, ultimoDia(anioAnt, actual.mes));
-  return {
-    desde: `${anioAnt}-${dd2(actual.mes)}-01`,
-    hasta: `${anioAnt}-${dd2(actual.mes)}-${dd2(diaAnt)}`,
-    parcial: diaCorte < finMes,
-  };
+  const v = ventanaUnAnioAntes(actual, ultimoDiaCargado, ahora);
+  return { desde: v.desde, hasta: v.hasta, parcial: v.parcial };
 }

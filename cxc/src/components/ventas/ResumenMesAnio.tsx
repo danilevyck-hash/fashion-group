@@ -113,15 +113,28 @@ const METRIC_LABEL: Record<ViewMode, string> = {
 };
 
 // Totales same-period del AÑO EN CURSO (mismos números que la card YTD del
-// dashboard: ventas_dashboard_prev_same_period, día-prorrateado). Se usan SOLO
-// para el Δ del Total de la fila del año en curso → comparación justa de período
-// igual (ene–<mes> vs ene–<mes> del año previo), no año-completo.
+// dashboard: ventas_dashboard_prev_same_period, día-prorrateado). Se usan para
+// el Δ del Total de la fila del año en curso → comparación justa de período
+// igual (ene–<mes> vs ene–<mes> del año previo), no año-completo — y para la
+// CELDA del mes en curso (`mesEnCurso`).
+//
+// 🩸 LA CELDA DEL MES EN CURSO (3-sep-2026). El servidor manda `prev: null`
+// para esa celda a propósito (un mes a medias contra el mes ENTERO del año
+// pasado engaña), pero la pantalla lo ignoraba y leía `byMonth[m][y−1]`: el
+// mes entero. Medido contra producción: Fashion Wear sep decía −99,4% (era
+// −98,5%) y Boston −93,5% cuando iba **+2,2%**. Ahora esa celda compara contra
+// los MISMOS DÍAS del año pasado —lo que ya trae la RPC del Resumen, por
+// empresa— y lo rotula con las dos fechas. Definición única del corte:
+// `src/lib/ventas/clientes-corte-comparativo.ts`.
 export interface CurrentYtdSamePeriod {
   year: number;
   periodLabel: string;   // "ene–jun"
   ventas: number; ventasPrev: number;
   utilidad: number; utilidadPrev: number;
   margen: number; margenPrev: number;
+  /** El mes en curso: contra qué se compara su celda (los mismos días del año
+   *  anterior) y el rótulo con las fechas. null si la RPC no marcó mes parcial. */
+  mesEnCurso: { mes: number; prev: Vals; label: string } | null;
 }
 
 // Δ relativo same-period del Total del año en curso, según el modo activo.
@@ -336,6 +349,9 @@ function MatrizHorizontal({
             const totalOverride = isCurrent && currentYtd && currentYtd.year === y
               ? { ratio: samePeriodTotalDelta(currentYtd, viewMode), label: currentYtd.periodLabel }
               : null;
+            // La celda del mes en curso: los MISMOS DÍAS del año pasado, no el
+            // mes entero (ver `CurrentYtdSamePeriod`).
+            const mesEnCurso = isCurrent && currentYtd && currentYtd.year === y ? currentYtd.mesEnCurso : null;
             return (
               <tr key={y} className={cn(isCurrent && "bg-gray-50")}>
                 <th
@@ -347,15 +363,23 @@ function MatrizHorizontal({
                 >
                   {y}
                 </th>
-                {MONTHS.map((_, mi) => (
-                  <MatrizCell
-                    key={mi}
-                    cur={empresa.byMonth[mi + 1]?.[y] ?? null}
-                    prev={empresa.byMonth[mi + 1]?.[y - 1] ?? null}
-                    mode={viewMode}
-                    isCurrent={isCurrent}
-                  />
-                ))}
+                {MONTHS.map((_, mi) => {
+                  const cell = empresa.byMonth[mi + 1]?.[y] ?? null;
+                  const esMesEnCurso = mesEnCurso != null && mesEnCurso.mes === mi + 1 && cell != null;
+                  return (
+                    <MatrizCell
+                      key={mi}
+                      cur={cell}
+                      // 🔴 El previo lo manda el SERVIDOR (`cell.prev`): mes entero
+                      // contra mes entero, y null en el mes en curso. Leer
+                      // `byMonth[m][y − 1]` acá era el error.
+                      prev={esMesEnCurso ? mesEnCurso.prev : cell?.prev ?? null}
+                      mode={viewMode}
+                      isCurrent={isCurrent}
+                      deltaOverride={esMesEnCurso ? { ratio: relDelta(cell, mesEnCurso.prev, viewMode), label: mesEnCurso.label } : null}
+                    />
+                  );
+                })}
                 <MatrizCell
                   cur={empresa.totalByYear[y] ?? null}
                   prev={empresa.totalByYear[y - 1] ?? null}

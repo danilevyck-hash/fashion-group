@@ -113,7 +113,12 @@ async function mapa(desde: string, hasta: string, codigos: string[] | null) {
 async function main() {
   // ── 1. LA MATRIZ DEL PERÍODO ────────────────────────────────────────────────
   const actual = productosRangoPeriodo(PERIODO, AHORA.getUTCFullYear(), null, AHORA);
-  const previa = productosRangoComparativo(PERIODO, AHORA.getUTCFullYear(), null, AHORA);
+  // El corte sale del último día cargado de `switch_articulo_diario`, como en
+  // la ruta (regla del 3-sep-2026: mismos días, con lo cargado).
+  const { data: ultimo } = await db.from("switch_articulo_diario").select("fecha").eq("empresa_key", EMPRESA)
+    .gte("fecha", actual.desde).lte("fecha", actual.hasta).order("fecha", { ascending: false }).limit(1);
+  const ultimoDiaCargado = (ultimo?.[0] as { fecha: string } | undefined)?.fecha ?? null;
+  const previa = productosRangoComparativo(PERIODO, AHORA.getUTCFullYear(), null, AHORA, ultimoDiaCargado);
   console.log(`\n=== ${EMPRESA} · ${PERIODO} · ${actual.desde} → ${actual.hasta} ===`);
   console.log(`    ventana anterior: ${previa.desde} → ${previa.hasta}\n`);
 

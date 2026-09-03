@@ -11,6 +11,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { esEmpresaDelGrupo } from "@/lib/clientes/mundos";
 import { withDbRetry, isTransientDbError } from "@/lib/supabase-retry";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
+import { leerPrevSamePeriod, PREV_SAME_PERIOD_VACIO, RPC_PREV_SAME_PERIOD } from "@/lib/ventas/prev-same-period";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -84,26 +85,11 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // anterior, y los meses posteriores no se emiten. Si `year` no es el
     // año actual del calendario, devuelve full-mes-vs-full-mes (no
     // aplica recorte).
-    // v2: rama año-en-curso acotada por ventana de fechas (sargable) — misma
-    // matemática día-grano, ~Nx más rápido (Causa 4 del audit). Migración:
-    // 20260623120000_ventas_dashboard_prev_same_period_v2.sql. Fallback a la
-    // función vigente si la migración aún no se aplicó → deploy sin orden forzado
-    // (sin _v2 funciona igual que hoy; con _v2 va rápido).
-    (async () => {
-      const v2 = await withDbRetry(
-        () => supabaseServer.rpc("ventas_dashboard_prev_same_period_v2", { p_year: year }),
-        { label: "ventas_dashboard_prev_same_period_v2" },
-      );
-      if (!v2.error) return v2;
-      // El fallback existe SOLO para el caso "la migración de _v2 aún no corrió"
-      // (función inexistente). Si _v2 falló por timeout, la v1 es la MISMA
-      // consulta pero más lenta: reintentarla solo duplicaría la espera.
-      if (isTransientDbError(v2.error)) return v2;
-      return withDbRetry(
-        () => supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year }),
-        { label: "ventas_dashboard_prev_same_period" },
-      );
-    })(),
+    // 🩸 Desde el 3-sep-2026 el corte es en DÍA DE PANAMÁ (`_v3`; `_v2`
+    // cortaba en UTC y una factura después de las 7 p.m. corría el corte un
+    // día). La lectura, con su cadena de versiones, vive en
+    // `prev-same-period.ts` y la comparten el Anual y Vista General.
+    leerPrevSamePeriod(year),
     // 🔴 ACÁ VIVÍA `get_app_setting("multifashion_meta_anual_2026")`, UNA
     // CONSULTA POR CADA CARGA DE /ventas PARA UN NÚMERO QUE NO SE DIBUJA EN
     // NINGUNA PANTALLA. Viajaba como `kpis.metaAnualMultifashion` y nadie lo
@@ -142,23 +128,12 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   ]);
 
   if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
-  if (prevRes.error) throw new Error(`ventas_dashboard_prev_same_period_v2(${year}): ${prevRes.error.message}`);
+  if (prevRes.error) throw new Error(`${RPC_PREV_SAME_PERIOD}(${year}): ${prevRes.error.message}`);
 
   const cur = (curRes.data as DashboardSummaryRow[] | null) ?? [];
 
-  // El RPC nuevo devuelve { rows, es_periodo_parcial, fecha_corte, dia_corte_anio_anterior }
-  type PrevResp = {
-    rows: DashboardSummaryRow[];
-    es_periodo_parcial: boolean;
-    fecha_corte: string | null;
-    dia_corte_anio_anterior: string | null;
-  };
-  const prevPayload = (prevRes.data as PrevResp | null) ?? {
-    rows: [],
-    es_periodo_parcial: false,
-    fecha_corte: null,
-    dia_corte_anio_anterior: null,
-  };
+  // El RPC devuelve { rows, es_periodo_parcial, fecha_corte, dia_corte_anio_anterior }
+  const prevPayload = prevRes.data ?? PREV_SAME_PERIOD_VACIO;
   const prev = prevPayload.rows ?? [];
 
   // Build lookup: { [key]: number[12] }

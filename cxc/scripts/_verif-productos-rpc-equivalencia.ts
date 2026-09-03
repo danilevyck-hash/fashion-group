@@ -197,7 +197,9 @@ function reportar(titulo: string, difs: string[]) {
 async function main() {
   const ahora = new Date();
   const ventana = rango12Meses(ahora);
-  const comp = rangoComparativo("12m", { year: 0, mes: 0, ...ventana }, ahora);
+  // `null` = sin dato de último día cargado: corta en hoy, como antes del
+  // 3-sep-2026. Acá se verifica la equivalencia RPC/paginado, no el corte.
+  const comp = rangoComparativo(ventana, ahora, null);
   console.log(`período     ${ventana.desde} → ${ventana.hasta}`);
   console.log(`comparativo ${comp.desde} → ${comp.hasta}\n`);
 

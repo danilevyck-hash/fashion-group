@@ -15,9 +15,10 @@ import {
   fmtPrecioProm,
   esProductosPeriodo,
 } from "@/lib/ventas/productos";
-// El criterio de "la misma ventana un año antes" vive en Multifashion y se
-// REUSA; el test lo importa de ahí para no reescribirlo.
-import { unAnioAntes } from "@/lib/multifashion/productos-ranking";
+// El criterio de "la misma ventana un año antes" vive en UN solo lugar —
+// `clientes-corte-comparativo.ts`, la definición única del corte desde el
+// 3-sep-2026— y se REUSA; el test lo importa de ahí para no reescribirlo.
+import { unAnioAntes } from "@/lib/ventas/clientes-corte-comparativo";
 // El día de negocio en Panamá vive en `fecha-panama` y se REUSA. Si acá se
 // colara una tercera cuenta de fechas, este import dejaría de ser el que manda.
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -79,7 +80,7 @@ describe("🔴 el borde: entre las 7 p.m. y la medianoche de Panamá", () => {
       hasta: "2026-08-24",
     });
     expect(productosRangoPeriodo("12m", 2026, null, NOCHE).hasta).toBe("2026-08-24");
-    expect(productosRangoComparativo("ytd", 2026, null, NOCHE).hasta).toBe("2025-08-24");
+    expect(productosRangoComparativo("ytd", 2026, null, NOCHE, null).hasta).toBe("2025-08-24");
   });
 
   it("🩸 a las 19:30 de Panamá (00:30 UTC del 25) «Año en curso» NO termina un día que todavía no pasó", () => {
@@ -98,8 +99,8 @@ describe("🔴 el borde: entre las 7 p.m. y la medianoche de Panamá", () => {
     // Las dos puntas nacen del mismo `ahora`: si una se resolviera en UTC y la
     // otra en Panamá, se separarían un día justo en este borde.
     const act = productosRangoPeriodo("ytd", 2026, null, BORDE);
-    const cmp = productosRangoComparativo("ytd", 2026, null, BORDE);
-    expect(cmp).toEqual({ desde: "2025-01-01", hasta: "2025-08-24" });
+    const cmp = productosRangoComparativo("ytd", 2026, null, BORDE, null);
+    expect(cmp).toMatchObject({ desde: "2025-01-01", hasta: "2025-08-24" });
     expect(cmp.hasta).toBe(unAnioAntes(act.hasta));
   });
 
@@ -225,19 +226,23 @@ describe("los cuatro períodos que pidió Daniel", () => {
 
 describe("el Δ compara contra el MISMO período del año anterior", () => {
   it("mes suelto: el mismo mes, un año antes (lo que ya hacía la pantalla) — INTACTO", () => {
-    expect(productosRangoComparativo("ytd", 2026, 6, TARDE)).toEqual(productosRange(2025, 6, TARDE));
+    expect(productosRangoComparativo("ytd", 2026, 6, TARDE, null)).toMatchObject(productosRange(2025, 6, TARDE));
     // Un mes cerrado ya compara entero contra entero: acá no se recorta nada.
-    expect(productosRangoComparativo("ytd", 2026, 2, TARDE)).toEqual({
+    expect(productosRangoComparativo("ytd", 2026, 2, TARDE, null)).toMatchObject({
       desde: "2025-02-01",
       hasta: "2025-02-28",
     });
-    // 🩸 Febrero de 2029 (28 días) contra el de 2028 (BISIESTO, 29): el mes
-    // suelto va contra el mes ENTERO del año pasado, con sus 29 días. Si a este
-    // camino se le colara el recorte del año en curso, el 29 se perdería y el
-    // Δ de un mes cerrado —un período que este cambio NO toca— se movería.
-    expect(productosRangoComparativo("ytd", 2029, 2, TARDE)).toEqual({
+    // 🩸 Febrero de 2029 (28 días) contra el de 2028 (BISIESTO, 29): 1–28
+    // contra 1–28. CAMBIÓ DE DIRECCIÓN el 3-sep-2026: hasta entonces este
+    // camino devolvía el mes ENTERO de 2028 con sus 29 días, mientras
+    // Multifashion (`rangoComparativo`) ya cerraba el 28 — los dos criterios
+    // divergían justo en febrero, que es lo que el barrido de abajo prohíbe.
+    // Ahora los dos salen de `ventanaUnAnioAntes`: la misma fecha un año antes,
+    // y el 29-feb cae en el 28. Es el único mes donde «entero contra entero»
+    // y «los mismos días» no son lo mismo, y gana la regla única.
+    expect(productosRangoComparativo("ytd", 2029, 2, TARDE, null)).toMatchObject({
       desde: "2028-02-01",
-      hasta: "2028-02-29",
+      hasta: "2028-02-28",
     });
   });
 
@@ -245,7 +250,7 @@ describe("el Δ compara contra el MISMO período del año anterior", () => {
     // 8 meses de 2026 contra los 12 de 2025 daba caídas que eran del calendario:
     // Women-T-Shirts S/S salía −38% en «Año en curso» y +29% / +15% en los
     // períodos que sí comparan parejo, en la misma pantalla.
-    expect(productosRangoComparativo("ytd", 2026, null, TARDE)).toEqual({
+    expect(productosRangoComparativo("ytd", 2026, null, TARDE, null)).toMatchObject({
       desde: "2025-01-01",
       hasta: "2025-08-24",
     });
@@ -254,7 +259,7 @@ describe("el Δ compara contra el MISMO período del año anterior", () => {
   it("año en curso: el comparativo termina EXACTAMENTE donde termina el período, un año antes", () => {
     for (const ahora of [TARDE, new Date("2026-01-01T18:00:00Z"), new Date("2026-12-31T18:00:00Z")]) {
       const act = productosRangoPeriodo("ytd", 2026, null, ahora);
-      const cmp = productosRangoComparativo("ytd", 2026, null, ahora);
+      const cmp = productosRangoComparativo("ytd", 2026, null, ahora, null);
       expect(cmp.desde).toBe("2025-01-01");
       expect(cmp.hasta).toBe(unAnioAntes(act.hasta));
       // Mismo largo de ventana, con la tolerancia de 1 día del 29-feb.
@@ -265,7 +270,7 @@ describe("el Δ compara contra el MISMO período del año anterior", () => {
   it("un año YA CERRADO sigue comparándose entero contra entero", () => {
     // Sin caso especial: el `hasta` de 2024 es el 31-dic y un año antes es el
     // 31-dic de 2023. Es lo mismo que devolvía antes del arreglo.
-    expect(productosRangoComparativo("ytd", 2024, null, TARDE)).toEqual({
+    expect(productosRangoComparativo("ytd", 2024, null, TARDE, null)).toMatchObject({
       desde: "2023-01-01",
       hasta: "2023-12-31",
     });
@@ -273,22 +278,22 @@ describe("el Δ compara contra el MISMO período del año anterior", () => {
 
   it("el 29-feb del año en curso cae en el 28, no en el 1-mar", () => {
     const bisiesto = new Date("2028-02-29T18:00:00Z");
-    expect(productosRangoComparativo("ytd", 2028, null, bisiesto)).toEqual({
+    expect(productosRangoComparativo("ytd", 2028, null, bisiesto, null)).toMatchObject({
       desde: "2027-01-01",
       hasta: "2027-02-28",
     });
   });
 
   it("períodos relativos: la MISMA ventana corrida 12 meses, punta a punta", () => {
-    expect(productosRangoComparativo("12m", 2026, null, TARDE)).toEqual({
+    expect(productosRangoComparativo("12m", 2026, null, TARDE, null)).toMatchObject({
       desde: "2024-09-01",
       hasta: "2025-08-24",
     });
-    expect(productosRangoComparativo("6m", 2026, null, TARDE)).toEqual({
+    expect(productosRangoComparativo("6m", 2026, null, TARDE, null)).toMatchObject({
       desde: "2025-03-01",
       hasta: "2025-08-24",
     });
-    expect(productosRangoComparativo("anio_pasado", 2026, null, TARDE)).toEqual({
+    expect(productosRangoComparativo("anio_pasado", 2026, null, TARDE, null)).toMatchObject({
       desde: "2024-01-01",
       hasta: "2024-12-31",
     });
@@ -297,7 +302,7 @@ describe("el Δ compara contra el MISMO período del año anterior", () => {
   it("mismo LARGO de ventana: comparar 6 meses contra 12 es el error caro", () => {
     for (const p of ["6m", "12m", "anio_pasado"] as const) {
       const act = productosRangoPeriodo(p, 2026, null, TARDE);
-      const cmp = productosRangoComparativo(p, 2026, null, TARDE);
+      const cmp = productosRangoComparativo(p, 2026, null, TARDE, null);
       // Tolerancia de 1 día y ni uno más: es el 29-feb, no un corte flojo.
       // ("Año pasado" 2025 son 365 días y su comparativo 2024 son 366.)
       expect(Math.abs(dias(cmp.desde, cmp.hasta) - dias(act.desde, act.hasta))).toBeLessThanOrEqual(1);
@@ -308,7 +313,75 @@ describe("el Δ compara contra el MISMO período del año anterior", () => {
     // 29-feb-2028 (bisiesto) → la ventana de 6m termina ahí.
     const bisiesto = new Date("2028-02-29T18:00:00Z");
     expect(productosRangoPeriodo("6m", 2028, null, bisiesto).hasta).toBe("2028-02-29");
-    expect(productosRangoComparativo("6m", 2028, null, bisiesto).hasta).toBe("2027-02-28");
+    expect(productosRangoComparativo("6m", 2028, null, bisiesto, null).hasta).toBe("2027-02-28");
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 🩸 «LOS MISMOS DÍAS» SON LOS DÍAS CARGADOS, NO «HASTA HOY» (3-sep-2026).
+  //
+  // `switch_articulo_diario` se carga a las 03:40 de Panamá y llega hasta AYER.
+  // Cortar el año pasado en hoy le regalaba un día, siempre: el 3-sep-2026,
+  // Fashion Wear «Año en curso» decía −6,0% (1-ene → 3-sep-2025) y era −0,7%
+  // (1-ene → 2-sep-2025). El corte sale del MAX(fecha) de la tabla en el
+  // período, que trae la ruta (`ultimoDiaArticuloDiario`).
+  // ───────────────────────────────────────────────────────────────────────────
+  describe("🩸 el comparativo corta en el último día CARGADO, no en hoy", () => {
+    // 3-sep-2026 a las 13:18 de Panamá; la tabla llegó hasta el 2.
+    const MEDIODIA = new Date("2026-09-03T18:18:00Z");
+
+    it("año en curso: la tabla llega hasta ayer → el año pasado corta ayer también", () => {
+      const cmp = productosRangoComparativo("ytd", 2026, null, MEDIODIA, "2026-09-02");
+      expect(cmp).toEqual({ desde: "2025-01-01", hasta: "2025-09-02", corte: "2026-09-02", parcial: true });
+      // Con hoy como corte (lo que hacía antes) daba un día de más.
+      expect(productosRangoComparativo("ytd", 2026, null, MEDIODIA, null).hasta).toBe("2025-09-03");
+    });
+
+    it("los relativos también: «12 meses» corta donde llegaron los datos", () => {
+      const cmp = productosRangoComparativo("12m", 2026, null, MEDIODIA, "2026-09-02");
+      expect(cmp).toMatchObject({ desde: "2024-10-01", hasta: "2025-09-02", parcial: true });
+      expect(productosRangoComparativo("6m", 2026, null, MEDIODIA, "2026-09-02").hasta).toBe("2025-09-02");
+    });
+
+    it("un dato cargado del FUTURO no corre el corte: tope en hoy de Panamá", () => {
+      // Una fila con fecha adelantada no puede hacer que el año pasado sume
+      // días que este año todavía no vivió.
+      expect(productosRangoComparativo("ytd", 2026, null, MEDIODIA, "2026-09-10").hasta).toBe("2025-09-03");
+    });
+
+    it("día 1 del mes, a las 02:00 de Panamá, con los datos hasta el 31: el mes en curso todavía no tiene nada", () => {
+      // 1-sep-2026 07:00 UTC = 02:00 en Panamá. «Año en curso» llega al 1-sep y
+      // los datos al 31-ago: el año pasado corta el 31-ago, no el 1-sep.
+      const dia1 = new Date("2026-09-01T07:00:00Z");
+      expect(productosRangoComparativo("ytd", 2026, null, dia1, "2026-08-31")).toMatchObject({ hasta: "2025-08-31", parcial: true });
+      // Y el mes suelto de septiembre, sin nada cargado, se compara contra el
+      // mes ENTERO del año pasado (no hay días transcurridos que recortar).
+      expect(productosRangoComparativo("ytd", 2026, 9, dia1, null)).toMatchObject({ desde: "2025-09-01", hasta: "2025-09-01", parcial: true });
+    });
+
+    it("29-feb cargado: el año no bisiesto cierra el 28", () => {
+      const bis = new Date("2028-03-01T18:00:00Z");
+      expect(productosRangoComparativo("ytd", 2028, null, bis, "2028-02-29")).toMatchObject({ hasta: "2027-02-28", corte: "2028-02-29" });
+    });
+
+    it("9 p.m. de Panamá (02:00 UTC de mañana): el corte sigue siendo el de hoy en Panamá", () => {
+      const noche = new Date("2026-09-04T02:00:00Z"); // 3-sep 21:00 en Panamá
+      // Sin dato cargado el corte es HOY de Panamá (3-sep), no el 4 que dice UTC.
+      expect(productosRangoComparativo("ytd", 2026, null, noche, null)).toMatchObject({ hasta: "2025-09-03", corte: "2026-09-03" });
+      // Y con datos hasta el 3, igual.
+      expect(productosRangoComparativo("ytd", 2026, null, noche, "2026-09-03")).toMatchObject({ hasta: "2025-09-03", corte: "2026-09-03" });
+    });
+
+    it("el mes suelto EN CURSO también se recorta (un marcador con ?mes=9 no puede mentir)", () => {
+      expect(productosRangoComparativo("ytd", 2026, 9, MEDIODIA, "2026-09-02")).toEqual({
+        desde: "2025-09-01", hasta: "2025-09-02", corte: "2026-09-02", parcial: true,
+      });
+    });
+
+    it("un mes CERRADO con los datos completos no se mueve: entero contra entero", () => {
+      expect(productosRangoComparativo("ytd", 2026, 6, MEDIODIA, "2026-06-30")).toEqual({
+        desde: "2025-06-01", hasta: "2025-06-30", corte: "2026-06-30", parcial: false,
+      });
+    });
   });
 });
 
@@ -390,12 +463,20 @@ describe("el criterio de comparación vive en UN solo lugar", () => {
     return txt.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
   }
 
-  it("productos.ts IMPORTA unAnioAntes en vez de redefinirlo", async () => {
+  it("productos.ts IMPORTA la ventana comparativa de la definición única en vez de redefinirla", async () => {
     const fs = await import("node:fs");
     const codigo = sinComentarios(fs.readFileSync(SRC, "utf8"));
-    expect(codigo).toMatch(/import\s*\{[^}]*\bunAnioAntes\b[^}]*\}\s*from\s*"@\/lib\/multifashion\/productos-ranking"/);
+    // Desde el 3-sep-2026 el corte (último día cargado, topado en hoy de Panamá,
+    // un año antes) vive en `clientes-corte-comparativo.ts` y este módulo lo
+    // importa de ahí. Hasta entonces importaba `unAnioAntes` de Multifashion y
+    // recortaba por su cuenta — dos cuentas del mismo corte.
+    expect(codigo).toMatch(/import\s*\{[^}]*\bventanaUnAnioAntes\b[^}]*\}\s*from\s*"@\/lib\/ventas\/clientes-corte-comparativo"/);
     // Ni una definición propia: ni función, ni const, ni método.
-    expect(codigo).not.toMatch(/(function|const|let|var)\s+unAnioAntes\b/);
+    expect(codigo).not.toMatch(/(function|const|let|var)\s+(unAnioAntes|ventanaUnAnioAntes)\b/);
+    // Y el comparativo NO se arma acá: se delega entero.
+    const cuerpo = /export function productosRangoComparativo[\s\S]*?\n}/.exec(codigo)?.[0] ?? "";
+    expect(cuerpo).toMatch(/ventanaUnAnioAntes\(/);
+    expect(cuerpo).not.toMatch(/unAnioAntes\(/);
   });
 
   it("el comparativo no clava el 31-dic: sale del fin del período, no de una constante", async () => {

@@ -122,6 +122,9 @@ export function ResumenView({
           utilidadPrev: sumSlice(panelResumenEmpresa.utilidad2025, data.mesActual),
           margen:       panelResumenEmpresa.margenPct,
           margenPrev:   panelResumenEmpresa.margenPctPrev,
+          // La celda del mes en curso compara contra los MISMOS DÍAS del año
+          // pasado: es lo que la RPC ya devolvió para ese mes, por empresa.
+          mesEnCurso: mesEnCursoMismosDias(data, panelResumenEmpresa),
         }
       : null;
   const k = data.kpis;
@@ -993,6 +996,29 @@ const MES_FULL_RESUMEN = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
+
+/**
+ * El mes en curso para la matriz mes × año: el previo son los MISMOS DÍAS del
+ * año anterior (lo que `ventas_dashboard_prev_same_period` devolvió para ese
+ * mes y esa empresa) y el rótulo dice hasta qué día. null si el año no tiene
+ * mes parcial (año cerrado, o todavía sin ventas este mes).
+ */
+export function mesEnCursoMismosDias(
+  data: Pick<VentasResumen, "es_periodo_parcial" | "fecha_corte" | "dia_corte_anio_anterior">,
+  empresa: Pick<EmpresaMonthlySales, "ventas2025" | "utilidad2025">,
+): CurrentYtdSamePeriod["mesEnCurso"] {
+  if (!data.es_periodo_parcial || !data.fecha_corte || !data.dia_corte_anio_anterior) return null;
+  const cur = parseIsoDateResumen(data.fecha_corte);
+  const prev = parseIsoDateResumen(data.dia_corte_anio_anterior);
+  const mes = cur.getMonth() + 1;
+  const ventas = empresa.ventas2025[mes - 1] ?? 0;
+  const utilidad = empresa.utilidad2025[mes - 1] ?? 0;
+  return {
+    mes,
+    prev: { ventas, utilidad, costo: ventas - utilidad },
+    label: `vs 1–${prev.getDate()} ${MONTHS[prev.getMonth()].toLowerCase()} ${prev.getFullYear()}`,
+  };
+}
 
 // Parsea YYYY-MM-DD como fecha local (sin shift de UTC).
 function parseIsoDateResumen(iso: string): Date {

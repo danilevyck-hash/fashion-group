@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { leerPrevSamePeriod, sumarPrevPorEmpresa } from "@/lib/ventas/prev-same-period";
 import { variacionPct } from "@/lib/variacion";
 import { estadoSemaforo, rentabilidadEmpresa } from "@/lib/vista-general-calc";
 import { leerEgresosMes } from "@/lib/egresos/leer";
@@ -186,7 +187,11 @@ export async function GET(req: NextRequest) {
   const anioSel = parseInt(mesSelStr.slice(0, 4), 10);
   const mesSelNum = parseInt(mesSelStr.slice(5, 7), 10);
 
-  const [summaryRes, agingRes, cxpRes, reclamosRes, mvPrevRes, egresosRes, bancosRes, inventarioRes] = await Promise.all([
+  // El mes ACTUAL es PARCIAL (aún no termina) → el YoY no es comparable 1:1
+  // contra el mes entero: se compara contra los MISMOS DÍAS del año pasado.
+  const parcialSel = mesSelStr === mesActualPanama;
+
+  const [summaryRes, agingRes, cxpRes, reclamosRes, mvPrevRes, egresosRes, bancosRes, inventarioRes, prevMismosDiasRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: anioSel }),
     // CXC: vista base LIVE (igual que el módulo /admin), NO la MV diaria. La MV
     // (switch_estadocuenta_aging_mv) refresca 1×/día (06:30 UTC) y queda atrás de
@@ -227,6 +232,21 @@ export async function GET(req: NextRequest) {
       console.error("[vista-general] inventario:", e);
       return null;
     }),
+    // 🩸 El año pasado del MES EN CURSO, recortado a los MISMOS DÍAS (3-sep-2026).
+    // Hasta hoy la tarjeta comparaba lo que va del mes contra el mes ENTERO del
+    // año pasado desde la MV: el 3-sep el grupo decía −97,9% (era −92,8%), y
+    // Boston −93,5% cuando iba +2,2%. Es la MISMA lectura que el KPI del
+    // Resumen y el Anual (`prev-same-period.ts`, día de Panamá, último cargado,
+    // topado en hoy). Solo se pide en el mes en curso; un mes cerrado se compara
+    // entero contra entero desde la MV, como siempre. Falla ABIERTO: sin esa
+    // lectura la tarjeta dice que no pudo comparar, nunca compara contra el
+    // mes entero como si nada.
+    parcialSel
+      ? leerPrevSamePeriod(anioSel).catch((e: unknown) => {
+          console.error("[vista-general] prev_same_period:", e);
+          return { data: null, error: { message: e instanceof Error ? e.message : "error inesperado" } };
+        })
+      : Promise.resolve(null),
   ]);
 
   // ── VENTAS + MARGEN del MES SELECCIONADO (8 empresas) ──
@@ -272,16 +292,32 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.ventas - a.ventas);
   const ventasTotal = byEmpresa.reduce((s, e) => s + e.ventas, 0);
   const utilidadTotal = byEmpresa.reduce((s, e) => s + e.utilidad, 0);
-  // El mes ACTUAL es PARCIAL (aún no termina) → el YoY no es comparable 1:1;
-  // la UI lo marca y no lo pinta como alarma.
-  const parcialSel = mesSelStr === mesActualPanama;
-  const prevRowsMes = mvPrevRows.filter((r) => r.mes_num === mesSelNum);
-  const prevYear = prevRowsMes.length > 0
-    ? prevRowsMes.reduce((s, r) => s + num(r.ventas_netas), 0)
-    : null;
+  // El previo del mes seleccionado:
+  //   · mes cerrado → el mismo mes del año pasado ENTERO (MV);
+  //   · mes en curso → los MISMOS DÍAS del año pasado (RPC, ver arriba). Si esa
+  //     lectura falló, `null`: la tarjeta no muestra Δ en vez de mostrar uno
+  //     contra el mes entero.
+  let prevYear: number | null = null;
+  let prevHasta: string | null = null;
+  if (parcialSel) {
+    if (prevMismosDiasRes?.error) console.error("[vista-general] prev_same_period:", prevMismosDiasRes.error.message);
+    const filasPrev = prevMismosDiasRes?.data?.rows ?? null;
+    if (filasPrev && prevMismosDiasRes?.data?.es_periodo_parcial) {
+      const porEmpresa = sumarPrevPorEmpresa(filasPrev.filter((r) => r.mes === mesSelNum));
+      prevYear = ALL_EMPRESA_KEYS.reduce((s, k) => s + (porEmpresa.get(k)?.ventas ?? 0), 0);
+      prevHasta = prevMismosDiasRes?.data?.dia_corte_anio_anterior ?? null;
+    }
+  } else {
+    const prevRowsMes = mvPrevRows.filter((r) => r.mes_num === mesSelNum);
+    prevYear = prevRowsMes.length > 0
+      ? prevRowsMes.reduce((s, r) => s + num(r.ventas_netas), 0)
+      : null;
+  }
 
   let ventas = null as null | {
     total: number; prevYear: number | null; yoyPct: number | null; parcial: boolean;
+    /** Hasta qué día del año pasado se sumó el previo (YYYY-MM-DD) cuando el mes está en curso. */
+    prevHasta: string | null;
     empresasCount: number; byEmpresa: { key: string; name: string; ventas: number; utilidad: number }[];
   };
   let margen = null as null | { pct: number | null; utilidad: number };
@@ -291,6 +327,7 @@ export async function GET(req: NextRequest) {
       prevYear,
       yoyPct: variacionPct(ventasTotal, prevYear),
       parcial: parcialSel,
+      prevHasta,
       empresasCount: byEmpresa.length,
       byEmpresa,
     };

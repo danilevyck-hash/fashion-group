@@ -64,63 +64,71 @@ describe("rangoComparativo — el mismo período, un año antes", () => {
   // 7-ago-2026 18:00 UTC = 13:00 en Panamá. Mes en curso: agosto 2026, día 7.
   const AHORA = new Date("2026-08-07T18:00:00.000Z");
 
+  // El tercer argumento es el último día CARGADO de `switch_articulo_diario` en
+  // el período (lo trae la ruta). `null` = nada cargado → se corta en hoy.
+
   it("🩸 un mes EMPEZADO se compara contra los MISMOS DÍAS del año pasado", () => {
     // El bug que esto previene: 7 días contra los 31 de agosto-2025 daría una
     // caída de ~78% que nadie vivió. La comparación se RECORTA; el período
     // actual nunca se infla con una proyección.
-    const c = rangoComparativo(
-      "mes",
-      { year: 2026, mes: 8, desde: "2026-08-01", hasta: "2026-08-31" },
-      AHORA,
-    );
+    const c = rangoComparativo({ desde: "2026-08-01", hasta: "2026-08-31" }, AHORA, "2026-08-07");
     expect(c).toEqual({ desde: "2025-08-01", hasta: "2025-08-07", parcial: true });
   });
 
+  it("🩸 «los mismos días» son los CARGADOS: la tabla llega hasta ayer, el año pasado corta ayer", () => {
+    // `switch_articulo_diario` se carga a las 03:40 de Panamá y llega hasta
+    // AYER. Con el corte en hoy el año pasado llevaba un día de más, siempre:
+    // el 3-sep-2026 septiembre decía +4,2% y crecía +46,1%.
+    const c = rangoComparativo({ desde: "2026-08-01", hasta: "2026-08-31" }, AHORA, "2026-08-06");
+    expect(c).toEqual({ desde: "2025-08-01", hasta: "2025-08-06", parcial: true });
+    // Sin dato cargado (null) el corte es hoy — lo que hacía antes.
+    expect(rangoComparativo({ desde: "2026-08-01", hasta: "2026-08-31" }, AHORA, null).hasta).toBe("2025-08-07");
+    // Un dato del futuro no corre el corte más allá de hoy.
+    expect(rangoComparativo({ desde: "2026-08-01", hasta: "2026-08-31" }, AHORA, "2026-08-20").hasta).toBe("2025-08-07");
+  });
+
   it("un mes YA CERRADO se compara entero contra entero", () => {
-    const c = rangoComparativo(
-      "mes",
-      { year: 2025, mes: 12, desde: "2025-12-01", hasta: "2025-12-31" },
-      AHORA,
-    );
+    const c = rangoComparativo({ desde: "2025-12-01", hasta: "2025-12-31" }, AHORA, "2025-12-31");
     expect(c).toEqual({ desde: "2024-12-01", hasta: "2024-12-31", parcial: false });
+    // Aunque no se sepa el último día cargado: su fin es anterior a hoy.
+    expect(rangoComparativo({ desde: "2025-12-01", hasta: "2025-12-31" }, AHORA, null)).toEqual({ desde: "2024-12-01", hasta: "2024-12-31", parcial: false });
   });
 
   it("el borde de mes es UTC-5: el 1-ago 02:00 UTC en Panamá todavía es 31-jul", () => {
     // Calculado en UTC pelado, el corte del mes en curso saltaría un día antes
     // de tiempo y la comparación se recortaría de más.
-    const c = rangoComparativo(
-      "mes",
-      { year: 2026, mes: 7, desde: "2026-07-01", hasta: "2026-07-31" },
-      new Date("2026-08-01T02:00:00.000Z"),
-    );
+    const c = rangoComparativo({ desde: "2026-07-01", hasta: "2026-07-31" }, new Date("2026-08-01T02:00:00.000Z"), "2026-07-31");
     expect(c).toEqual({ desde: "2025-07-01", hasta: "2025-07-31", parcial: false });
   });
 
+  it("día 1 a las 02:00 de Panamá, con la tabla hasta el 31: el mes nuevo no tiene nada y se dice", () => {
+    // 1-ago-2026 07:00 UTC = 02:00 en Panamá; la carga de las 03:40 todavía no
+    // corrió. El mes en curso no tiene filas → null → corte en hoy (1-ago).
+    const c = rangoComparativo({ desde: "2026-08-01", hasta: "2026-08-31" }, new Date("2026-08-01T07:00:00.000Z"), null);
+    expect(c).toEqual({ desde: "2025-08-01", hasta: "2025-08-01", parcial: true });
+  });
+
   it("29 de febrero: el año no bisiesto cierra el 28, no un 29 que no existe", () => {
-    const c = rangoComparativo(
-      "mes",
-      { year: 2028, mes: 2, desde: "2028-02-01", hasta: "2028-02-29" },
-      new Date("2028-02-29T18:00:00.000Z"),
-    );
+    const c = rangoComparativo({ desde: "2028-02-01", hasta: "2028-02-29" }, new Date("2028-02-29T18:00:00.000Z"), "2028-02-29");
     expect(c).toEqual({ desde: "2027-02-01", hasta: "2027-02-28", parcial: false });
   });
 
+  it("9 p.m. de Panamá: el reloj UTC ya está en mañana y el corte no se mueve", () => {
+    // 7-ago-2026 21:00 en Panamá = 8-ago 02:00 UTC. Cortar en UTC diría 8.
+    const c = rangoComparativo({ desde: "2026-08-01", hasta: "2026-08-31" }, new Date("2026-08-08T02:00:00.000Z"), null);
+    expect(c).toEqual({ desde: "2025-08-01", hasta: "2025-08-07", parcial: true });
+  });
+
   it("un mes del futuro no tiene días transcurridos: se compara el mes completo", () => {
-    const c = rangoComparativo(
-      "mes",
-      { year: 2026, mes: 11, desde: "2026-11-01", hasta: "2026-11-30" },
-      AHORA,
-    );
+    const c = rangoComparativo({ desde: "2026-11-01", hasta: "2026-11-30" }, AHORA, null);
     expect(c).toEqual({ desde: "2025-11-01", hasta: "2025-11-30", parcial: false });
   });
 
   it("12 meses: la MISMA ventana corrida 12 meses (mismo largo, mismo corte)", () => {
-    const c = rangoComparativo(
-      "12m",
-      { year: 2026, mes: 8, desde: "2025-09-01", hasta: "2026-08-07" },
-      AHORA,
-    );
+    const c = rangoComparativo({ desde: "2025-09-01", hasta: "2026-08-07" }, AHORA, "2026-08-07");
     expect(c).toEqual({ desde: "2024-09-01", hasta: "2025-08-07", parcial: false });
+    // Y si la tabla llegó hasta ayer, la punta de hoy se recorta igual que en el mes.
+    expect(rangoComparativo({ desde: "2025-09-01", hasta: "2026-08-07" }, AHORA, "2026-08-06")).toEqual({ desde: "2024-09-01", hasta: "2025-08-06", parcial: true });
   });
 });
 

@@ -72,6 +72,7 @@ import {
   type ProductosResponse,
 } from "@/lib/ventas/productos";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
+import { ultimoDiaArticuloDiario } from "@/lib/ventas/ultimo-dia-cargado";
 
 export const dynamic = "force-dynamic";
 
@@ -102,10 +103,18 @@ export async function GET(req: NextRequest) {
   const previo = sp.get("previo") === "1";
 
   const ahora = new Date();
-  const { desde, hasta } = previo
-    ? productosRangoComparativo(periodo, year, mes, ahora)
-    : productosRangoPeriodo(periodo, year, mes, ahora);
-  const comparativo = productosRangoComparativo(periodo, year, mes, ahora);
+  const actual = productosRangoPeriodo(periodo, year, mes, ahora);
+  // 🩸 El corte de la comparación sale de lo CARGADO, no de hoy: la tabla llega
+  // hasta ayer (ver `ultimo-dia-cargado.ts`). Una consulta chica, por índice.
+  let ultimoDiaCargado: string | null;
+  try {
+    ultimoDiaCargado = await ultimoDiaArticuloDiario(empresa, actual.desde, actual.hasta);
+  } catch (e) {
+    console.error("[api/ventas/productos] último día cargado:", e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: "no se pudo leer" }, { status: 500 });
+  }
+  const comparativo = productosRangoComparativo(periodo, year, mes, ahora, ultimoDiaCargado);
+  const { desde, hasta } = previo ? comparativo : actual;
 
   const args = { p_empresa_key: empresa, p_desde: desde, p_hasta: hasta };
   const nivel1Res = await rpcConFallbackDeVersion<ProductoNivel1[]>(
@@ -145,7 +154,7 @@ export async function GET(req: NextRequest) {
     periodo,
     desde,
     hasta,
-    comparativo,
+    comparativo: { desde: comparativo.desde, hasta: comparativo.hasta, corte: comparativo.corte, parcial: comparativo.parcial },
     totales: { venta: ventaTotal, costo: costoTotal, margen: margenTotal },
     productos,
   };

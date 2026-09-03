@@ -36,6 +36,7 @@ import {
   productosRangoComparativo,
 } from "@/lib/ventas/productos";
 import { matrizPorCliente } from "@/lib/ventas/productos-por-cliente-server";
+import { ultimoDiaArticuloDiario } from "@/lib/ventas/ultimo-dia-cargado";
 
 export const dynamic = "force-dynamic";
 
@@ -85,11 +86,15 @@ export async function GET(req: NextRequest) {
   }
 
   const ahora = new Date();
-  const { desde, hasta } = ventana === "previa"
-    ? productosRangoComparativo(periodo, year, mes, ahora)
-    : productosRangoPeriodo(periodo, year, mes, ahora);
+  const actual = productosRangoPeriodo(periodo, year, mes, ahora);
 
   try {
+    // 🩸 La ventana previa corta donde corta la columna Δ del nivel 1: en el
+    // último día CARGADO de `switch_articulo_diario`, no en hoy. Mismo dato,
+    // misma función (`ultimoDiaArticuloDiario` + `productosRangoComparativo`).
+    const { desde, hasta } = ventana === "previa"
+      ? productosRangoComparativo(periodo, year, mes, ahora, await ultimoDiaArticuloDiario(empresa, actual.desde, actual.hasta))
+      : actual;
     const matriz = await matrizPorCliente(empresa, desde, hasta, cliente);
     return NextResponse.json({
       empresa,

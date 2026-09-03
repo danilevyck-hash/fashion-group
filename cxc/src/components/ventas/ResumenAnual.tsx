@@ -3,6 +3,7 @@
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { fmtMoneyCompact } from "@/lib/ventas/format";
+import { fmtDate } from "@/lib/format";
 import { formatDeltaRatio, type DeltaFormat } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { variacionPct } from "@/lib/variacion";
@@ -15,6 +16,9 @@ export interface AnualData {
   years: number[];
   currentYear: number | null;
   parcial: { year: number; label: string } | null;
+  /** Hasta qué día se comparó el año en curso y hasta qué día se sumó el año
+   *  anterior (día de Panamá). Ausente en respuestas viejas o en un año cerrado. */
+  corte?: { fecha_corte: string | null; dia_corte_anio_anterior: string | null } | null;
   empresas: { id: string; nombre: string; byYear: Record<number, Cell>; total: Vals }[];
   totalGrupo: { byYear: Record<number, Cell>; total: Vals };
 }
@@ -127,6 +131,11 @@ export function ResumenAnual({ data, error, viewMode }: {
 
   const { years, currentYear, parcial, empresas, totalGrupo } = data;
   const emptyCell: Cell = { ventas: 0, costo: 0, utilidad: 0, prev: null };
+  // 🩸 El Δ del año en curso compara los MISMOS DÍAS del año anterior (no el
+  // mes entero), y la pantalla lo dice con las dos fechas.
+  const notaCorte = data.corte?.fecha_corte && data.corte?.dia_corte_anio_anterior
+    ? `hasta el ${fmtDate(data.corte.fecha_corte)} · Δ contra 1 ene – ${fmtDate(data.corte.dia_corte_anio_anterior)}`
+    : null;
 
   return (
     <>
@@ -144,7 +153,7 @@ export function ResumenAnual({ data, error, viewMode }: {
                     {parcial && parcial.year === y ? (
                       <div className="text-xs font-normal normal-case tracking-normal text-gray-400">parcial ({parcial.label})</div>
                     ) : y === currentYear ? (
-                      <div className="text-xs font-normal normal-case tracking-normal text-gray-400">al día</div>
+                      <div className="text-xs font-normal normal-case tracking-normal text-gray-400">{notaCorte ?? "al día"}</div>
                     ) : null}
                   </th>
                 ))}
@@ -177,7 +186,7 @@ export function ResumenAnual({ data, error, viewMode }: {
         </div>
         {parcial && (
           <p className="border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500">
-            {parcial.year} es parcial (datos desde {parcial.label}); no se calcula Δ interanual. El año en curso{currentYear ? ` (${currentYear})` : ""} va al día y su Δ compara contra el mismo período del año anterior.
+            {parcial.year} es parcial (datos desde {parcial.label}); no se calcula Δ interanual. El año en curso{currentYear ? ` (${currentYear})` : ""} va al día y su Δ compara contra los mismos días del año anterior{notaCorte ? ` (${notaCorte.replace("hasta el ", "datos hasta el ")})` : ""}.
           </p>
         )}
       </Card>

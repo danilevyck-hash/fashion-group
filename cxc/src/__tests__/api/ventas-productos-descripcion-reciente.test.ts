@@ -55,17 +55,27 @@ vi.mock("@/lib/supabase-server", () => ({
       }
       return { data: [], error: null };
     },
-    // 🔴 NINGUNA TABLA. Se deja el espía puesto a propósito: si alguien repone
-    // la lectura de `depurador_descripciones`, `estado.tablas` deja de estar
-    // vacío y el candado se pone rojo.
+    // 🔴 UNA SOLA TABLA, y es la del CORTE. Desde el 3-sep-2026 la ruta pide
+    // MAX(fecha) de `switch_articulo_diario` en el período (una consulta chica
+    // por índice) para recortar el año pasado a los días CARGADOS, no a hoy. Se
+    // deja el espía puesto a propósito: si alguien repone la lectura de
+    // `depurador_descripciones`, `estado.tablas` deja de ser solo esa y el
+    // candado se pone rojo.
     from: (tabla: string) => {
       estado.tablas.push(tabla);
-      return { select: async () => ({ data: [], error: null }) };
+      const q = {
+        select: () => q, eq: () => q, gte: () => q, lte: () => q, order: () => q,
+        limit: async () => ({ data: [{ fecha: "2026-08-24" }], error: null }),
+      };
+      return q;
     },
   },
 }));
 
 const { GET } = await import("@/app/api/ventas/productos/route");
+
+/** La única tabla que la ruta lee: el último día cargado, para el corte. */
+const SOLO_EL_CORTE = "switch_articulo_diario";
 
 const SECRET_PREV = process.env.SESSION_SECRET;
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-reciente"; });
@@ -124,7 +134,7 @@ describe("SIN la migración la pantalla es la de ayer, y no se cae", () => {
     estado.sinMigracion = true;
     const body = await (await GET(req(URL_BASE))).json();
     expect(body.productos.every((p: { aviso?: unknown }) => p.aviso === undefined)).toBe(true);
-    expect(estado.tablas).toEqual([]);
+    expect(estado.tablas).toEqual([SOLO_EL_CORTE]);
   });
 
   it("los números llegan enteros igual", async () => {
@@ -152,17 +162,17 @@ describe("⚠️ INVERTIDO — el aviso de «mal clasificado» NO vuelve", () =>
 
   it("🔴 y NO se consulta `depurador_descripciones` — una consulta menos", async () => {
     await GET(req(URL_BASE));
-    expect(estado.tablas).toEqual([]);
+    expect(estado.tablas).toEqual([SOLO_EL_CORTE]);
   });
 
   it("tampoco en el comparativo (previo=1)", async () => {
     await GET(req(`${URL_BASE}&previo=1`));
-    expect(estado.tablas).toEqual([]);
+    expect(estado.tablas).toEqual([SOLO_EL_CORTE]);
   });
 
-  it("la ruta no lee NINGUNA tabla: sólo la RPC", async () => {
+  it("la ruta no lee NINGUNA tabla aparte del corte: la RPC y MAX(fecha), nada más", async () => {
     await GET(req(URL_BASE));
-    expect(estado.tablas).toEqual([]);
+    expect(estado.tablas).toEqual([SOLO_EL_CORTE]);
     expect(estado.rpc.map(r => r.fn)).toEqual(["switch_top_descripciones_reciente"]);
   });
 });

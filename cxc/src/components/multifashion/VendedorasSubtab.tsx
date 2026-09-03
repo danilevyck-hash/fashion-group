@@ -10,7 +10,11 @@
 // completa, incl. mayoreo). Sin tiles KPI de bono.
 //
 // Chips de período (controlan la tabla): en curso (default) · mes cerrado
-// anterior · YTD. La columna Δ es ÚNICA y rotulada "vs año pasado" (YoY).
+// anterior · YTD · últimos 3/6/12. La columna Δ es ÚNICA y su rótulo dice
+// CONTRA QUÉ compara: en los chips de mes la RPC compara contra el MES
+// ANTERIOR (`p_mes − 1`), así que dice «Δ vs julio 2026» y no «vs año pasado»
+// (decisión de Daniel, 3-sep-2026 — ver `vendedoras-rotulo.ts`); YTD y las
+// ventanas de N meses sí comparan contra el año pasado y lo dicen.
 //
 // Server-side: RPC multifashion_vendedoras (ranking por período) +
 // multifashion_bonos_v3 (bono del mes, vía BonosSection). Sin fórmulas nuevas.
@@ -32,6 +36,7 @@ import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { BonosSection } from "./BonosSection";
 import { MetasEnVendedoras } from "./MetasEnVendedoras";
+import { notaComparacionVendedoras, rotuloDeltaVendedoras, type ChipVendedoras } from "@/lib/multifashion/vendedoras-rotulo";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -46,7 +51,7 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
 
 type SortKey = "tickets" | "ventas" | "delta_ventas" | "comision";
 type SortDir = "asc" | "desc";
-type ChipKey = "en_curso" | "mes_anterior" | "ytd" | "ultimos_3" | "ultimos_6" | "ultimos_12";
+type ChipKey = ChipVendedoras;
 
 // Badge info por vendedora, derivado del RPC de bonos (sin fórmulas nuevas).
 interface BonoBadge { winner: boolean; gerenteBono: number }
@@ -154,6 +159,12 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
     else { setSortBy(col); setSortDir("desc"); }
   };
 
+  // Contra qué compara la Δ en el chip activo (ver el encabezado del archivo).
+  const rotuloDelta = rotuloDeltaVendedoras(chip, rpcMes, year);
+  const notaComparacion = resp
+    ? notaComparacionVendedoras(chip, rpcMes, year, resp.es_periodo_parcial, resp.dia_corte_periodo_anterior)
+    : null;
+
   const chipLabel: Record<ChipKey, string> = {
     en_curso: `${MES_FULL[enCursoMes - 1]} ${year} (en curso)`,
     mes_anterior: `${MES_FULL[mesAnteriorMes - 1]} ${year}`,
@@ -208,7 +219,10 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
             <span className="font-mono tabular-nums text-gray-700">{resp.tickets_total.toLocaleString()}</span> tickets
           </p>
         )}
-        <p className="mt-1 text-xs text-gray-400">Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo).</p>
+        <p className="mt-1 text-xs text-gray-400">
+          Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo).
+          {notaComparacion && <> {notaComparacion}</>}
+        </p>
       </div>
 
       {/* Tabla única */}
@@ -235,7 +249,7 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
                     <SortHeader col="tickets"      sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Tickets</SortHeader>
                     <SortHeader col="ventas"       sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Ventas</SortHeader>
                     <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Ticket prom.</th>
-                    <SortHeader col="delta_ventas" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs año pasado</SortHeader>
+                    <SortHeader col="delta_ventas" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>{rotuloDelta.columna}</SortHeader>
                     <SortHeader col="comision"     sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Comisión</SortHeader>
                   </tr>
                 </thead>
@@ -251,7 +265,7 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
           {/* Celular e iPad */}
           <div data-vista="tarjetas" className="space-y-2 lg:hidden">
             {sortedVendedoras.map((v, i) => (
-              <VendedoraCard key={v.nombre} v={v} rank={i + 1} badge={bonoBadges.get(v.nombre)} />
+              <VendedoraCard key={v.nombre} v={v} rank={i + 1} badge={bonoBadges.get(v.nombre)} rotuloDelta={rotuloDelta.corto} />
             ))}
           </div>
         </div>
@@ -319,7 +333,7 @@ function VendedoraRow({ v, rank, badge }: { v: VendedoraDetalle; rank: number; b
   );
 }
 
-function VendedoraCard({ v, rank, badge }: { v: VendedoraDetalle; rank: number; badge?: BonoBadge }) {
+function VendedoraCard({ v, rank, badge, rotuloDelta }: { v: VendedoraDetalle; rank: number; badge?: BonoBadge; rotuloDelta: string }) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   return (
     <div className={cn(
@@ -335,7 +349,7 @@ function VendedoraCard({ v, rank, badge }: { v: VendedoraDetalle; rank: number; 
         <span className="font-mono text-base font-medium tabular-nums text-gray-950">{fmtMoneyCompact(v.ventas)}</span>
         <span className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[dv.tone])}>
           {dv.arrow && <span className="mr-0.5">{dv.arrow}</span>}{dv.displayValue}
-          <span className="ml-1 text-gray-400">vs año pasado</span>
+          <span className="ml-1 text-gray-400">{rotuloDelta}</span>
         </span>
       </div>
       <div className="mt-1 text-xs text-gray-500">
