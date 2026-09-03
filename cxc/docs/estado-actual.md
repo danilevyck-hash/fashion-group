@@ -256,7 +256,7 @@ Tampoco migran las píldoras relativas (Mes/3m/6m/12m): no son fechas, son venta
 ## Pendientes vivos al 2-sep (los del 31-ago siguen salvo los marcados ✅)
 
 - 🔴 El documento de $266M en Switch (Boston) — tarea de Daniel.
-- **Ventas › Clientes «vs 2025» compara 8 meses contra 9** (corta el año anterior a fin de mes). Multi Fashion Holding dice +3% y es **+36%**. En arreglo el 3-sep.
+- ✅ **Ventas › Clientes «vs 2025» compara 8 meses contra 9** (cortaba el año anterior a fin de mes). Multi Fashion Holding decía +3% y es **+36%**; medido sobre los 115 del ranking, 37 cambiaban de número y 6 de signo. Arreglado el 3-sep con la regla de «mismos días»: **migración `20260909120000_clientes_vs_anio_anterior_mismos_dias.sql` pendiente de que Daniel la aplique** — hasta entonces la columna sigue como estaba.
 - **1.363 fichas de Reebok** sin traer (artículos sin existencia). Drenan solas a 400/día.
 - **4 reportes de Switch** que valdría la pena traer: cobros contra factura · renglones de Multifashion · ingresos varios · inventario a fecha. Ninguno urgente.
 - **Documentación oficial de Switch** (14 PDFs) en digestión → `docs/switch-referencia.md`.

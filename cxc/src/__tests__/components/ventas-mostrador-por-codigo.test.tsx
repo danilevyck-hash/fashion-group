@@ -189,8 +189,10 @@ describe("el SQL le deja llegar las seis a la pantalla", () => {
   // del ranking sacaba los genéricos POR NOMBRE ('CONTADO', 'VENTAS'), y de los
   // seis mostradores solo pasaba fashion_shoes — de casualidad, porque Switch
   // escribe 'VENTAS LOCA' y la lista dice 'VENTAS LOCALES'.
+  // Se lee la migración VIGENTE del ranking: 20260909120000 (el corte del año
+  // anterior por DÍA) es copia de 20260908120000 en todo lo que se mira aquí.
   const sql = fs.readFileSync(
-    path.join(process.cwd(), "supabase/migrations/20260908120000_mostrador_por_codigo.sql"),
+    path.join(process.cwd(), "supabase/migrations/20260909120000_clientes_vs_anio_anterior_mismos_dias.sql"),
     "utf8",
   );
   const ejecutable = sql

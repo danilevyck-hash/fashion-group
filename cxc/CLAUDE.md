@@ -186,7 +186,8 @@ archivo enlazado, verbatim.
 - 🔴 **Nadie une `clientes_master` por `nombre_normalized`, y NO hay fallback por nombre.** Un LEFT JOIN por nombre contra una tabla con homónimos **multiplica la factura** y el SUM la cuenta dos veces. Un fallback sería un camino muerto: medido, las 370 facturas (4,52%) que no cruzan el puente traen un `cliente_switch_id` **viejo**, valen $3.817,74 (0,07%) y caen a «Otros clientes» con fallback y sin él. Lo que se prohíbe es el JOIN, **no** los nombres repetidos —dos clientes pueden llamarse igual y eso no es un error—.
 - ⚠️ **`TCKCTA` es el único código que miente** (`CONTADO` / `VENTAS` / `VENTAS LOCA` según la empresa) y no es un cliente: es el mostrador. No junta seis mostradores en una fila porque **el grano de los rankings es (cliente, EMPRESA)**; se reconoce por CÓDIGO (`esMostrador`), nunca por nombre.
 - **Ventas › Clientes ofrece LAS SEIS** (`EMPRESA_PILLS` derivada de `B2B_EMPRESA_KEYS`), nunca una lista escrita a mano. Boston y Multifashion no están: sus clientes viven en su propio módulo.
-- Candados: `clientes-master-solo-del-grupo.test.ts` · `ventas-clientes-las-seis-empresas.test.ts`.
+- 🔴 **«vs 2025» compara contra los MISMOS DÍAS del año pasado** — la misma regla de Multifashion y del resumen de ACS, aplicada al año: el año anterior se corta en la misma fecha que el último día cargado del año en curso (nunca después de HOY en Panamá), y el 29-feb cae en el 28. Cortar por MES (`mes <= max_mes`) comparaba ocho meses contra nueve y a D-108 lo mostraba +3% cuando crecía +36% (3-sep-2026; 37 clientes cambiaban de número y 6 de signo). «Compras <año>» no se recorta. Migración `20260909120000` (**pendiente de aplicar**), espejo `clientes-corte-comparativo.ts`.
+- Candados: `clientes-master-solo-del-grupo.test.ts` · `ventas-clientes-las-seis-empresas.test.ts` · `clientes-vs-anio-anterior-mismos-dias.test.ts`.
 
 ### Multifashion — [docs/postmortems/multifashion.md](docs/postmortems/multifashion.md)
 
@@ -375,6 +376,7 @@ Reglas en [catalogos-pedidos](docs/postmortems/catalogos-pedidos.md).
 - **Antes de dar por perdido un dato**: mirar la lista de columnas real (`GET /rest/v1/` devuelve el OpenAPI con todas las tablas y sus columnas) en vez de copiar nombres del código. Ya pasó dos veces: `cron_heartbeats.job` era `cron_name`, y `asistencia_reglas.empresa_key` no existe.
 
 ## Switch Soft (ERP externo)
+- 📖 **Documentación oficial cruzada con el código: [`docs/switch-referencia.md`](docs/switch-referencia.md)** — los 52 métodos del API (cuáles usamos, qué campos tiramos, 7 endpoints que usamos sin documentar), lo que las 13 guías explican del sistema, y la lista de lo que la doc corrige del repo (sesión única es por USUARIO, `rubroId` en `/apiarticulos/lista`, `detalle[]` en `/apiingresomercancia/info`, precio por cliente). El manual del panel sigue en `docs/switch-panel.md`.
 - CSVs semicolon-delimited (`;`)
 - Encoding: **latin-1** para inventario Reebok, **UTF-8** para CXC y Ventas
 - Upload: 100% manual (drag-drop), no hay API/SFTP

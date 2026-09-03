@@ -167,6 +167,29 @@
 
 ---
 
+## 🔴 Ventas › Clientes — «vs 2025» comparaba OCHO meses contra NUEVE (3-sep-2026)
+
+> **Medido, no supuesto.** Multi Fashion Holding (D-108), «Todas», 2026: la pantalla decía **$238.486 · +3%**. La vista tenía `compras_ytd = 238.485,70` (1-ene → 2-sep-2026) y `compras_anio_anterior = 231.485,02`, que es exactamente Multi Fashion Holding del **1-ene al 30-sep-2025** — nueve meses completos contra ocho meses y dos días. Los mismos días de 2025 dan **$174.821,02 → +36,4%**.
+>
+> **Dónde estaba:** en `clientes_empresa_12m_vw` (y en `clientes_anio()` para el año en curso) el año anterior se cortaba por MES — `max_mes AS (SELECT MAX(k.mes) … WHERE k.anio = año_en_curso)` y `prev_year … WHERE k.mes <= max_mes`. No era `date_trunc + 1 month`: era `mes <= 9`, que es «hasta el 30 de septiembre». Cada día del mes la comparación se corregía sola un poco, el 30 por fin decía la verdad, y con la primera factura del mes siguiente volvía a saltar. Un cliente que crece de verdad se veía plano casi todo el mes. Venía así desde `20260510040000_fix_clientes_delta_same_period.sql`, que arregló «4 meses contra 12» y dejó «N meses contra N meses enteros».
+>
+> 🩸 **Es la misma clase de error que la casa ya pagó dos veces**, y la regla ya existía y esta vista no la cumplía: *«un mes empezado se compara contra los MISMOS DÍAS del año pasado»* (Multifashion, `rangoComparativo`); el resumen diario de ACS (`ventanasResumen`: 1..D contra 1..D, 29-feb → 28-feb — el 2-sep se revisó justamente su línea «Mes» del día 1 y se dejó: calendario contra calendario); Ventas › Productos (`productosRangoComparativo` con `unAnioAntes`).
+>
+> **La regla, ahora también aquí** (`20260909120000_clientes_vs_anio_anterior_mismos_dias.sql`, espejo TS en `src/lib/ventas/clientes-corte-comparativo.ts`):
+> - `corte` = el **último día con ventas cargadas** del año en curso, nunca después de **HOY en Panamá**; `corte_prev` = la misma fecha un año antes (`- INTERVAL '1 year'`, el 29-feb cae en el 28); año anterior = 1-ene → `corte_prev`.
+> - **«Último día cargado» y no «hoy» a secas** porque la vista es MATERIALIZADA y se refresca a las 02:35 de Panamá: a esa hora el año en curso llega hasta ayer, y cortar el año pasado en «hoy» le regalaría un día. Si el sync se atrasa, las dos ventanas se acortan JUNTAS. Es el criterio que Resumen ya usaba en la misma pantalla (`fecha_corte` = MAX(fecha) del mes en curso).
+> - **HOY es el de Panamá**: `(NOW() AT TIME ZONE 'America/Panama')::date` alimenta el año en curso, el piso de los 12 meses y el corte. Se fueron los `CURRENT_DATE` y `date_trunc('month', NOW())`, que son UTC.
+> - **«Compras 2026» no se mueve un centavo**: sigue siendo todo lo cargado del año. Lo único que cambia es hasta dónde se suma el año ANTERIOR.
+> - Un año cerrado no tiene caso especial: corte 31-dic, un año antes el 31-dic anterior.
+>
+> **El resto de la pantalla, auditado:** Resumen compara por día (`ventas_dashboard_prev_same_period_v2`) ✅ · Productos con `unAnioAntes` ✅ · Utilidad **no tiene columna «vs 2025»** (Ventas · Utilidad · Margen %) — nada que comparar ✅ · Clientes era la única que no. El texto *«El cambio compara contra el mismo período de 2025»* **no se tocó: después del arreglo es verdad.**
+>
+> **Efecto sobre TODOS los clientes** (`scripts/_diag-clientes-vs-2025-mismos-dias.ts`, solo lectura; primero reconstruye la ventana VIEJA y **cuadra al centavo 116 de 116** filas publicadas). Sobre los 115 del ranking, 82 con «vs 2025»: **37 cambian de número, 6 de signo** — 2 pasaban de «baja» a «sube» (D-142 Sporting Shoes N 4, $164.900: −0,2% → **+24,1%** · D-32 City Moda Los Andes: −7,4% → **+10,1%**) y 4 pierden el número porque hasta esa fecha 2025 da 0 o negativo (D-10 · D-49 · D-54 · D-23: «—» en vez de un % inventado). Las que más se mueven: D-156 Wolf Mall +105% → +964% · D-43 De Moda +26% → +355% · D-117 Outlet Duty Free N2 +862% → +1.065% · D-1 A-Amani −58% → −0,9% · D-108 +3% → +36,3%.
+>
+> Candado: `src/__tests__/lib/clientes-vs-anio-anterior-mismos-dias.test.ts` (16) — la regla con **fechas fijas** (2-sep a mitad de mes, el día 1 a las 02:35 y con la primera factura, 29-feb, 21:00 de Panamá con el UTC ya en mañana, sync atrasado) y el texto EJECUTABLE de las dos ramas del SQL. **Verificado por mutación, 13 de 13 cazadas** (`bash scripts/_mutar-clientes-mismos-dias.sh`, control 0): vuelve el corte a fin de mes · rompe el 29-feb (`make_date` con el día tal cual) · corta en UTC (`CURRENT_DATE`) · el corte es «hoy» a secas · «Compras 2026» se recorta · las tres en la función de años cerrados · el mostrador deja de reconocerse por código · y las cuatro del espejo TS. `clientes-ytd.test.ts` y `ventas-mostrador-por-codigo.test.tsx` ahora leen la migración vigente (20260909120000): lo del mostrador por código sigue ahí, palabra por palabra.
+
+---
+
 ## Ventas › Clientes — faltaba JOYSTEP en la tira de empresas (2-sep-2026)
 
 > Daniel, mirando la misma pantalla: ***"deberían estar solo las 6 de Fashion Group, que son las 5 de las fotos y joystep"***.

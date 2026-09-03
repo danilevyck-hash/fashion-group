@@ -230,8 +230,10 @@ describe("las empresas del grupo vuelven al ranking SIN mover los totales", () =
     // La migración en vigor deja pasar a `TCKCTA` para que la pantalla pueda
     // mostrarlo APARTE — sigue fuera del ranking, pero ahora llegan los seis.
     // Comparar por nombre volvió a ser lo que era: un colador.
+    // La vigente es la última que recrea el ranking. 20260909120000 (el corte
+    // del año anterior por DÍA) es copia de 20260908120000 en todo lo demás.
     const vigente = fs.readFileSync(
-      path.join(raiz, "..", "supabase/migrations/20260908120000_mostrador_por_codigo.sql"),
+      path.join(raiz, "..", "supabase/migrations/20260909120000_clientes_vs_anio_anterior_mismos_dias.sql"),
       "utf8");
     const ejecutable = vigente.split("\n").filter(l => !l.trim().startsWith("--")).join("\n");
     const filtros = [...ejecutable.matchAll(/filtered AS \(([\s\S]*?)\n\s*\),/g)].map(m => m[1]);
