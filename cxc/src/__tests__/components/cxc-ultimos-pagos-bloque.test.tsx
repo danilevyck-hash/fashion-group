@@ -7,12 +7,25 @@
 //
 //  1. El texto de cada línea (fecha con fmtDate + monto con fmt) y el de vacío.
 //  2. Que el bloque esté en las TRES superficies: CXC escritorio
-//     (ContactPanel), CXC celular (PanelCxcMobile) y la cartera de Boston
-//     (BostonTab) — y que cada cartera use SU hook.
-//  3. Que en escritorio se pida recién al expandir (`activo={isExpanded}`):
-//     el panel de los 211 clientes vive montado aunque esté cerrado.
+//     (ClientTable → UltimosPagosFila), CXC celular (PanelCxcMobile →
+//     UltimosPagosFila) y la cartera de Boston (BostonTab) — y que cada
+//     cartera use SU hook.
+//  3. Que en el grupo se pida recién al CLIC en el botón de la fila
+//     (`abierto`): la sub-fila de los 211 clientes vive montada aunque esté
+//     cerrada.
 //  4. Que el bloque se dibuje POR EMPRESA (el mapa de `visibleCompanies`),
 //     no como una lista única mezclada.
+//
+// ⚠️ CAMBIÓ DE DIRECCIÓN AL DÍA SIGUIENTE (4-sep-2026). El 3-sep el bloque
+// nació ADENTRO del panel expandido (`ContactPanel` en escritorio, la tarjeta
+// de cada empresa en `MobileClientExpanded` en celular) y este archivo lo
+// exigía ahí. Daniel lo vio y dijo, textual: *"lo quiero ahí mismo pero con un
+// botón para expandir, no solo al expandir el card, tendría que hacer dos
+// expandir para verlo"*. Un clic, no dos. Ahora el bloque vive en UN solo
+// lugar —la sub-fila que abre el botón «Últimos pagos ›» de la fila CERRADA,
+// el mismo patrón que Boston ya tenía— y salió del panel expandido. Ese
+// comportamiento (el botón, el clic único, el cliente que sigue cerrado) tiene
+// su propio candado: `cxc-ultimos-pagos-boton-fila.test.tsx`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, afterEach } from "vitest";
@@ -75,23 +88,28 @@ describe("el bloque dibujado", () => {
 });
 
 describe("las tres superficies lo montan, cada cartera con SU hook", () => {
-  it("CXC escritorio: ContactPanel, un bloque POR EMPRESA, y se pide recién al expandir", () => {
-    const panel = leer("src/app/admin/components/ContactPanel.tsx");
-    expect(panel).toContain('from "@/components/cxc/UltimosPagos"');
-    expect(panel).toContain("useUltimosPagosGrupo(codigo, activo)");
-    expect(panel).not.toContain("useUltimosPagosBoston");
+  it("CXC grupo: UltimosPagosFila, un bloque POR EMPRESA, y se pide recién al clic", () => {
+    const fila = leer("src/app/admin/components/UltimosPagosFila.tsx");
+    expect(fila).toContain('from "@/components/cxc/UltimosPagos"');
+    expect(fila).toContain("useUltimosPagosGrupo(codigo, abierto)");
+    expect(fila).not.toContain("useUltimosPagosBoston");
     // Por empresa: el bloque se dibuja dentro del map de las empresas visibles.
-    expect(panel).toMatch(/visibleCompanies\.map\(\(co\) => \(\s*<UltimosPagos/);
-    expect(panel).toContain("pagos={ultimosPagos.de(co.key)}");
-    const tabla = leer("src/app/admin/components/ClientTable.tsx");
-    expect(tabla).toContain("activo={isExpanded}");
+    expect(fila).toMatch(/visibleCompanies\.map\(\(co\) => \(\s*<UltimosPagos/);
+    expect(fila).toContain("pagos={ultimosPagos.de(co.key)}");
   });
 
-  it("CXC celular: PanelCxcMobile, adentro de la tarjeta de cada empresa", () => {
+  it("CXC escritorio: ClientTable la monta en la sub-fila del botón, abierta por `pagosOpen`", () => {
+    const tabla = leer("src/app/admin/components/ClientTable.tsx");
+    expect(tabla).toContain('from "./UltimosPagosFila"');
+    expect(tabla).toContain("abierto={pagosOpen}");
+    // Y ya NO adentro del panel expandido (ayer sí; hoy Daniel dijo un clic, no dos).
+    expect(leer("src/app/admin/components/ContactPanel.tsx")).not.toMatch(/<UltimosPagos|useUltimosPagosGrupo\(/);
+  });
+
+  it("CXC celular: PanelCxcMobile la monta en la tarjeta CERRADA, al toque del botón", () => {
     const movil = leer("src/app/admin/components/PanelCxcMobile.tsx");
-    expect(movil).toContain('from "@/components/cxc/UltimosPagos"');
-    expect(movil).toContain("useUltimosPagosGrupo(codigo, true)");
-    expect(movil).toContain("<UltimosPagos pagos={ultimosPagos.de(row.key)} compacto />");
+    expect(movil).toContain('from "./UltimosPagosFila"');
+    expect(movil).toContain("<UltimosPagosFila client={client} companyFilter=\"all\" roleCompanies={cxcCompanies} abierto apilado />");
     expect(movil).not.toContain("useUltimosPagosBoston");
   });
 

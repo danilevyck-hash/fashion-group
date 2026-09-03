@@ -23,7 +23,7 @@ import SyncStatus from "@/components/shared/SyncStatus";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 import UltimosPagos from "@/components/cxc/UltimosPagos";
-import { TITULO_ULTIMOS_PAGOS } from "@/lib/cxc/ultimos-pagos";
+import BotonUltimosPagos from "@/components/cxc/BotonUltimosPagos";
 import { useUltimosPagosBoston } from "@/components/cxc/useUltimosPagosBoston";
 import {
   ordenEfectivo,
@@ -133,23 +133,6 @@ function fechaCorta(iso: string | null) {
 function BostonUltimosPagos({ clienteSwitchId }: { clienteSwitchId: number | null }) {
   const pagos = useUltimosPagosBoston(clienteSwitchId);
   return <UltimosPagos pagos={pagos} compacto />;
-}
-
-/** El botón que abre/cierra ese bloque. Alto táctil de 44 px: la pestaña se
- *  usa desde el celular. */
-function BotonUltimosPagos({ abierto, onToggle, nombre }: { abierto: boolean; onToggle: () => void; nombre: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={abierto}
-      aria-label={`${TITULO_ULTIMOS_PAGOS} de ${nombre}`}
-      className="inline-flex min-h-[44px] items-center gap-1 text-xs font-medium text-blue-600 active:opacity-70"
-    >
-      {TITULO_ULTIMOS_PAGOS}
-      <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${abierto ? "rotate-90" : ""}`} fill="currentColor" aria-hidden><path d="M3 1l5 4-5 4V1z"/></svg>
-    </button>
-  );
 }
 
 /** Barrita de color de la fila: el tramo más viejo con deuda manda. */

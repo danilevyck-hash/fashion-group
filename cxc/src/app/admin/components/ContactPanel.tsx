@@ -6,8 +6,6 @@ import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt, fmtDate } from "@/lib/format";
 import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
-import UltimosPagos from "@/components/cxc/UltimosPagos";
-import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
 
 interface Props {
   client: ConsolidatedClient;
@@ -19,9 +17,6 @@ interface Props {
   companyFilter: string;
   roleCompanies: Company[];
   onOpenEstado?: (client: ConsolidatedClient) => void;
-  /** La fila está abierta. El panel vive montado aunque esté cerrado (el
-   *  acordeón solo lo esconde), así que los pagos se piden recién aquí. */
-  activo?: boolean;
 }
 
 export default function ContactPanel({
@@ -29,7 +24,6 @@ export default function ContactPanel({
   companyFilter,
   roleCompanies,
   onOpenEstado,
-  activo = true,
 }: Props) {
   const [desgloseOpen, setDesgloseOpen] = useState(true);
 
@@ -40,9 +34,15 @@ export default function ContactPanel({
   // Código del cliente para la ficha (mismo D-XXX en todas las empresas).
   const codigo = Object.values(client.companies).find((c) => c?.codigo)?.codigo ?? null;
 
-  // Últimos 3 pagos POR EMPRESA (fecha y monto). Es el detalle de la columna
-  // «Último pago» de arriba, que solo dice el más reciente y hace cuánto.
-  const ultimosPagos = useUltimosPagosGrupo(codigo, activo);
+  // 🔴 ACÁ VIVIÓ EL BLOQUE «ÚLTIMOS PAGOS» UN DÍA (3-sep-2026 → 4-sep-2026).
+  // Daniel lo vio adentro del panel y dijo, textual: *"lo quiero ahí mismo
+  // pero con un botón para expandir, no solo al expandir el card, tendría que
+  // hacer dos expandir para verlo"*. Ahora vive en UN solo lugar: la sub-fila
+  // que abre el botón «Últimos pagos ›» de la fila cerrada (`UltimosPagosFila`,
+  // montada por `ClientTable`). No se repite acá: dos lugares eran dos estados
+  // del mismo dato, y con los dos abiertos se veían los tres pagos dos veces.
+  // La columna «Último pago» de la tabla de abajo es el vistazo; el botón de
+  // arriba es el detalle.
 
   return (
     <div className="bg-gray-50/80 px-6 py-4 border-b border-gray-200 space-y-3">
@@ -131,22 +131,6 @@ export default function ContactPanel({
             </table>
             </div>
           )}
-        </div>
-      )}
-
-      {/* ── Últimos pagos, un bloque POR EMPRESA ─────────────────────
-          Daniel: "no me interesa saber qué factura pagó, solo ver sus últimos
-          3 pagos y fecha". No se mezclan en una sola lista: un cliente con
-          tres empresas ve tres bloques, cada uno con sus tres. ──────────── */}
-      {visibleCompanies.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {visibleCompanies.map((co) => (
-            <UltimosPagos
-              key={co.key}
-              empresa={roleCompanies.length > 1 ? co.name : undefined}
-              pagos={ultimosPagos.de(co.key)}
-            />
-          ))}
         </div>
       )}
 

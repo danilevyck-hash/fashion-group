@@ -20,9 +20,14 @@ interface Props {
   onRowContextMenu?: (e: React.MouseEvent) => void;
   /** Menú "···" con acciones de contacto — visible en la fila (touch-friendly). */
   actionsMenu?: React.ReactNode;
+  /** El botón «Últimos pagos ›» — abre su bloque SIN expandir el cliente.
+   *  Va en la fila CERRADA a propósito: Daniel, textual, *"un botón para
+   *  expandir, no solo al expandir el card, tendría que hacer dos expandir
+   *  para verlo"*. Un clic, no dos. */
+  pagosBoton?: React.ReactNode;
 }
 
-export default function ClientRow({ client, isExpanded, onToggle, userRole, isFavorite, onToggleFavorite, onRowContextMenu, actionsMenu }: Props) {
+export default function ClientRow({ client, isExpanded, onToggle, userRole, isFavorite, onToggleFavorite, onRowContextMenu, actionsMenu, pagosBoton }: Props) {
   const risk = riskInfo(client.total, client.current, client.watch, client.overdue);
 
   return (
@@ -53,6 +58,10 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
                 <path d="M3 1l5 4-5 4V1z"/>
               </svg>
               <span className="truncate" title={client.nombre_normalized}>{client.nombre_normalized}</span>
+              {/* `-my-3` porque el botón mide 44 px de alto táctil y la fila
+                  no tiene que crecer por él. El propio botón frena el clic
+                  para que no expanda la fila. */}
+              {pagosBoton && <span className="-my-3 shrink-0">{pagosBoton}</span>}
             </div>
             <div className="col-span-2 text-right tabular-nums text-emerald-700">{client.current === 0 ? <span className="text-gray-300">—</span> : fmt(client.current)}</div>
             <div className="col-span-2 text-right tabular-nums text-amber-600">{client.watch === 0 ? <span className="text-gray-300">—</span> : fmt(client.watch)}</div>

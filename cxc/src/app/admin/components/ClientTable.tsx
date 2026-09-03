@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import ClientRow from "./ClientRow";
 import ContactPanel from "./ContactPanel";
+import UltimosPagosFila from "./UltimosPagosFila";
+import BotonUltimosPagos from "@/components/cxc/BotonUltimosPagos";
 import { AccordionContent, useContextMenu } from "@/components/ui";
 import type { ContextMenuItem } from "@/components/ui";
 import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
@@ -54,6 +56,15 @@ export default function ClientTable({
 }: Props) {
   const [expanded, setExpanded] = usePersistedState<string | null>("cxc", "expanded", null);
   const { show: showContextMenu } = useContextMenu();
+
+  // Qué cliente tiene abierto su bloque «Últimos pagos» — INDEPENDIENTE de
+  // `expanded`: es el patrón de la pestaña de Boston. Uno a la vez y sin
+  // persistir: es un detalle que se mira y se cierra, no una segunda tabla.
+  // Daniel (4-sep-2026), textual: *"lo quiero ahí mismo pero con un botón para
+  // expandir, no solo al expandir el card, tendría que hacer dos expandir para
+  // verlo"*.
+  const [pagosAbiertos, setPagosAbiertos] = useState<string | null>(null);
+  const alternarPagos = (nombre: string) => setPagosAbiertos((a) => (a === nombre ? null : nombre));
 
   // Menú de CLICK DERECHO (solo escritorio) de una fila del CXC.
   //
@@ -125,6 +136,7 @@ export default function ClientTable({
 
   const renderClientRow = (client: ConsolidatedClient) => {
     const isExpanded = expanded === client.nombre_normalized;
+    const pagosOpen = pagosAbiertos === client.nombre_normalized;
     return (
       <div key={client.nombre_normalized}>
         <ClientRow
@@ -136,14 +148,27 @@ export default function ClientTable({
           onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
           onRowContextMenu={(e) => showContextMenu(e, buildClientContextMenu(client))}
           actionsMenu={<OverflowMenu items={buildRowMenuItems(client)} ariaLabel={`Acciones de ${client.nombre_normalized}`} />}
+          pagosBoton={<BotonUltimosPagos abierto={pagosOpen} onToggle={() => alternarPagos(client.nombre_normalized)} nombre={client.nombre_normalized} />}
         />
+        {/* Los últimos 3 pagos, por empresa, debajo de la fila y ANTES del
+            panel expandido: se ven igual con el cliente cerrado o abierto. Es
+            el ÚNICO lugar donde se dibujan en el grupo. */}
+        <AccordionContent open={pagosOpen}>
+          <div data-testid={`ultimos-pagos-${client.nombre_normalized}`} className="bg-gray-50/80 px-6 py-2.5 border-b border-gray-200">
+            <UltimosPagosFila
+              client={client}
+              companyFilter={companyFilter}
+              roleCompanies={roleCompanies}
+              abierto={pagosOpen}
+            />
+          </div>
+        </AccordionContent>
         <AccordionContent open={isExpanded}>
           <ContactPanel
             client={client}
             companyFilter={companyFilter}
             roleCompanies={roleCompanies}
             onOpenEstado={onOpenEstado}
-            activo={isExpanded}
           />
         </AccordionContent>
       </div>

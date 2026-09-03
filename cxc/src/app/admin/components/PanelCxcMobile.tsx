@@ -27,8 +27,8 @@ import SyncStatus from "@/components/shared/SyncStatus";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
-import UltimosPagos from "@/components/cxc/UltimosPagos";
-import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
+import UltimosPagosFila from "./UltimosPagosFila";
+import BotonUltimosPagos from "@/components/cxc/BotonUltimosPagos";
 import {
   CXC_GRUPO_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -146,6 +146,11 @@ export default function PanelCxcMobile({
   );
 
   const [expandedName, setExpandedName] = useState<string | null>(null);
+  // Qué cliente tiene abierto su bloque «Últimos pagos» — INDEPENDIENTE de la
+  // tarjeta expandida, uno a la vez, igual que el escritorio y que Boston.
+  // Daniel (4-sep-2026), textual: *"un botón para expandir, no solo al
+  // expandir el card, tendría que hacer dos expandir para verlo"*.
+  const [pagosAbiertos, setPagosAbiertos] = useState<string | null>(null);
 
   // Mismo menú "···" que la tabla del escritorio (ClientTable.buildRowMenuItems):
   // las MISMAS 4 opciones, con las MISMAS palabras y en el MISMO orden. Las dos
@@ -221,6 +226,8 @@ export default function PanelCxcMobile({
                     onToggleFavorite={() => onToggleFavorite(client.nombre_normalized)}
                     isExpanded={isExpanded}
                     onToggle={() => setExpandedName(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
+                    pagosAbiertos={pagosAbiertos === client.nombre_normalized}
+                    onTogglePagos={() => setPagosAbiertos(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
                     onOpenEstado={() => onOpenEstado(client)}
                     actionsMenu={<OverflowMenu items={buildRowMenuItems(client)} ariaLabel={`Acciones de ${client.nombre_normalized}`} />}
                   />
@@ -517,6 +524,8 @@ function MobileClientCard({
   onToggleFavorite,
   isExpanded,
   onToggle,
+  pagosAbiertos,
+  onTogglePagos,
   onOpenEstado,
   actionsMenu,
 }: {
@@ -526,6 +535,9 @@ function MobileClientCard({
   onToggleFavorite: () => void;
   isExpanded: boolean;
   onToggle: () => void;
+  /** El bloque «Últimos pagos» de ESTA tarjeta está abierto (sin expandirla). */
+  pagosAbiertos: boolean;
+  onTogglePagos: () => void;
   onOpenEstado: () => void;
   actionsMenu?: React.ReactNode;
 }) {
@@ -590,7 +602,24 @@ function MobileClientCard({
           <BucketChip variant="watch" value={client.watch} />
           <BucketChip variant="overdue" value={client.overdue} />
         </div>
+
+        {/* «Últimos pagos ›» en la tarjeta CERRADA, como en la de Boston: un
+            toque abre los 3 pagos por empresa SIN expandir el cliente. El
+            botón mide 44 px de alto táctil; `-mt-3 -mb-2` para que la tarjeta
+            no crezca 44 px por él. El propio botón frena el toque. */}
+        <div className="px-3 -mt-3 -mb-2">
+          <BotonUltimosPagos abierto={pagosAbiertos} onToggle={onTogglePagos} nombre={client.nombre_normalized} />
+        </div>
       </div>
+
+      {/* El ÚNICO lugar del celular donde se dibujan los últimos pagos. Va
+          ANTES del panel expandido para que se lea pegado a su botón. Se monta
+          solo abierto, así que la lectura se dispara recién al toque. */}
+      {pagosAbiertos && (
+        <div className="border-t border-gray-100 bg-gray-50 px-3 py-2.5">
+          <UltimosPagosFila client={client} companyFilter="all" roleCompanies={cxcCompanies} abierto apilado />
+        </div>
+      )}
 
       {isExpanded && <MobileClientExpanded client={client} cxcCompanies={cxcCompanies} onOpenEstado={onOpenEstado} />}
     </article>
@@ -673,9 +702,10 @@ function MobileClientExpanded({
     [client.companies],
   );
 
-  // Últimos 3 pagos por empresa. Este bloque se monta SOLO al expandir la
-  // tarjeta (el padre lo condiciona con `isExpanded`), así que ya está activo.
-  const ultimosPagos = useUltimosPagosGrupo(codigo, true);
+  // 🔴 ACÁ VIVIÓ EL BLOQUE «ÚLTIMOS PAGOS» UN DÍA (3-sep → 4-sep-2026), adentro
+  // de la tarjeta de cada empresa. Se mudó al botón de la tarjeta CERRADA
+  // (`UltimosPagosFila`, montada por `MobileClientCard`): Daniel no quería
+  // "dos expandir para verlo". Un solo lugar; acá no se repite.
 
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
@@ -709,10 +739,6 @@ function MobileClientExpanded({
             <p className={`mt-0.5 text-xs ${row.ultimaCompraFecha ? "text-gray-500" : "text-gray-400"}`}>
               {ultimaCompraLabel(row.ultimaCompraFecha, row.ultimaCompraMonto)}
             </p>
-            {/* Los últimos 3 pagos de ESTA empresa, con fecha. Es el detalle
-                de la línea «Último pago» de arriba, y va adentro de la misma
-                tarjeta para que no se mezcle con el de otra empresa. */}
-            <UltimosPagos pagos={ultimosPagos.de(row.key)} compacto />
           </li>
         ))}
       </ul>
