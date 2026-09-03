@@ -343,6 +343,54 @@
 
 ---
 
+## 🔴 Comisiones — CLIENTES QUE NO COMISIONAN para un vendedor, y la pestaña Configuración (3-sep-2026)
+
+> Daniel, textual: ***«crea configuración en comisiones para desactivar cálculos de clientes»***. Grano: ***«cliente vendedor»***. ¿Aplica a la venta también? ***«correcto, también venta»***. Sobre el nombre y el lugar: ***«lo de las exclusiones, no lo llames así y ponlo en Configuración»***, y después ***«¿por qué en card y no como tab en toda la pantalla normal?»***. Y de paso: ***«en comisiones me gusta que lo separes, pero cuando lo configures tú, pon a Reinaldo 1 y 1»***.
+>
+> ### Qué pidió, en una tabla
+>
+> | Empresa | Vendedor | Clientes que NO le comisionan |
+> |---|---|---|
+> | Active Shoes | REINALDO ESPINOSA | D-84 Kheriddine · D-103 Metro Shoes · D-145 Super Centro La Competencia · D-104 Millenium Sports · D-115 Novedades El Dollar |
+> | Active Wear | REINALDO ESPINOSA **y REYNALDO ESPINOSA** | D-156 Wolf Mall Center · D-49 El Punto Poderoso · D-98 Lutylui · D-42 De City Moda Del Norte · D-104 Millenium Sports · D-50 El Remate |
+>
+> Los 11 códigos se verificaron contra `switch_clientes` de cada empresa antes de cargarlos. En Active Wear Reinaldo tiene **dos usuarios de Switch** (medido 2026: 20+4 facturas, 25+28 recibos con cada grafía); **no hay tabla de alias** — la exclusión se carga una vez por grafía, así que son **17 filas para 11 pares**.
+>
+> ### Cómo se resta (`20260912120000_comision_exclusion_v7.sql`, pendiente de aplicar)
+>
+> - Tabla `comision_exclusion`: `empresa_key · cliente_codigo · vendedor` (los dos últimos guardados ya en `UPPER(TRIM())`, con CHECK), `activa`, quién y cuándo la creó y la quitó. **Soft delete firmado y nunca DELETE** (el GRANT no lo da; hay barrido sobre `src/` y sobre las migraciones). La unicidad es **solo entre activas**: excluir, quitar y volver a excluir son tres filas, una activa. Sin columna `motivo`: Daniel no la pidió. RLS solo `service_role`.
+> - `comision_b2b_v7`: **función NUEVA**, la v6 byte a byte (candado que compara los dos cuerpos sin las líneas de exclusión) más un `LEFT JOIN comision_exclusion ce … AND ce.activa = true` + `WHERE ce.id IS NULL` en el CTE `ventas` **y** en el CTE `cobros`. En la venta el código del cliente no está en `switch_factura_utilidad`: se resuelve por el puente de siempre `switch_facturas.cliente_switch_id → switch_clientes.codigo` (0 documentos de 2026 sin puente). El detalle (`comision_b2b_detalle` v4, misma DDL) excluye lo mismo, para que el modal cierre al centavo con la tabla.
+> - `leerComision` pide v7 → cae a v6 → cae a v5, y la respuesta dice `version`, `regla_cobro` y `exclusiones_aplicadas` — el fallback confiesa.
+> - La misma DDL deja escrito **Reinaldo 1 % venta / 1 % cobro** (las dos grafías). Medido antes de escribirlo: **ya estaba en 1 y 1 en producción desde el 26-ago** — el `UPDATE` es idempotente y hoy no toca ninguna fila.
+>
+> ### La medición — con el SQL REAL, antes de aplicar
+>
+> `PGLITE_DIR=… node -r dotenv/config scripts/_medir-comision-exclusiones-v7.mjs` (solo lectura): baja recibos, utilidad, facturas (con `cliente_switch_id`), clientes de Switch, vendedores y tasas de 2026, los carga en pglite y corre los tres `.sql` del repo sin editarlos. Cuadre v5 pglite vs v5 producción: **695 celdas, 0 distintas**.
+>
+> Comisión total ene–sep 2026, v6 → v7:
+>
+> | | v6 | v7 | diferencia |
+> |---|---:|---:|---:|
+> | Active Shoes · REINALDO ESPINOSA | 5.504,65 | 5.056,98 | **−447,67** (venta −150,96 · cobro −296,71) |
+> | Active Wear · REINALDO ESPINOSA | 465,91 | 345,73 | **−120,18** (solo cobro) |
+> | Active Wear · REYNALDO ESPINOSA | 333,34 | 302,33 | **−31,01** (solo cobro) |
+> | **GRUPO** | **90.789,79** | **90.190,93** | **−598,86** |
+>
+> **Nadie más se movió** (las otras 4 empresas y los demás vendedores: 0,00 en todas las celdas) y **nadie sube**. Lo que quedó fuera: en Active Shoes 4 documentos de venta (D-84 y D-145, 15.096 de base) y 9 recibos (29.671,20); en Active Wear 8 recibos (15.118,21). En Active Wear la venta no se movió porque **todas las facturas a esos clientes las hizo DEFAULT**, que sigue comisionando — es exactamente la regla «otro vendedor con el mismo cliente sí». Un recibo de D-49 registrado por DEFAULT en Active Wear sigue comisionando por la misma razón.
+>
+> Reinaldo al 1 % de venta (como está): 29.538,29 en ene–sep; al 0,5 % sería 14.769,15. Efecto del `UPDATE` de la migración sobre 2026: **0,00**.
+>
+> ### La pantalla: Comisiones › Configuración
+>
+> Era el modal «Configurar» de «Por empresa», con una sola tasa. Ahora es el **tercer chip** del módulo `/comisiones` (solo admin; la pestaña Comisiones de Ventas no lo lleva — *«es el módulo Comisiones aparte, no la pestaña de Ventas»*), a pantalla completa, con dos tarjetas con borde: **«Tasas por vendedor»** (Venta y Cobro por separado; DEFAULT y Daniel en gris con «no se paga» y sin cajas) y **«Clientes que no comisionan»** (Empresa · Cliente con nombre y código · Vendedor · Desde · ×; «+ Agregar» abre una fila inline Empresa → Cliente con `ClienteSwitchPicker`, el único selector permitido → Vendedor → Guardar; quitar pide confirmación con `ConfirmDeleteModal`). El vendedor se elige de los que **de verdad aparecen** en facturas y recibos del año de esa empresa (más el maestro y las tasas), así que «REYNALDO ESPINOSA» sale aunque el maestro no lo conozca. En las tablas de comisiones el vendedor lleva **«N clientes sin comisión»** con los nombres en el tooltip — informativo: quien resta es la RPC, y si la tabla no existe la marca no sale y la tabla sí (falla abierto). El botón «Configurar» de Por empresa lleva a la pestaña. Nunca se escribe «exclusión» en pantalla.
+>
+> ### Candados
+>
+> `comision-exclusion-v7.test.ts` (33): el SQL sin comentarios (tabla, unicidad parcial, RLS, GRANT sin DELETE, las 17 filas, Reinaldo 1 y 1, v7 = v6 sin las líneas de exclusión, JOIN en ventas y cobros y en el detalle), **la conducta con el SQL corriendo en pglite** (activa resta en venta y cobro; DEFAULT con el mismo cliente sigue; inactiva no resta; se puede volver a excluir; el detalle cierra; atrapa el nombre con espacio o en minúsculas) — ese bloque se omite si pglite no está instalado —, `leerComision` v7 → v6 → v5 confesando, validación fail-closed, la marca normalizando el nombre, las rutas (403 a todo rol menos admin, 401 sin cookie, POST valida, DELETE = UPDATE firmado y 404 al repetir) y el barrido anti-DELETE. `comisiones-configuracion-pantalla.test.tsx` (10): el chip solo admin y solo en `/comisiones`, la pestaña no dice «exclusión», Reinaldo 1.00/1.00, Daniel sin cajas, la lista sin Motivo, quitar con confirmación y sin DELETE hasta confirmar, «+ Agregar» con el selector compartido. Cuatro candados cambiaron de dirección con su nota (`comision-cobro-quien-registro` · `comisiones-consolidado-neto` · `comision-cobro-sin-retenciones` · `ventas-poda-textos`).
+> - **Verificado por mutación, 29 de 29 cazadas** (`scripts/_mutar-candados-comision-exclusiones-v7.sh`): inactiva sigue restando · la venta deja de excluir · el cobro deja de excluir · el cliente queda excluido para todos · el detalle no excluye · v7 deja de ser v6 · la DDL dropea la v6 · unicidad total · GRANT con DELETE · falta una de las 17 · Reinaldo no queda en 1 y 1 · vuelve `motivo` · rpc.ts vuelve a v6 · el fallback miente · quitar hace DELETE · la ruta se abre a secretaria · el directorio a contabilidad · pasa TCKCTA · pasa Boston · se pierde la normalización · se pierde la marca · el chip lo ve cualquiera · el chip en Ventas · vuelve «exclusión» · Daniel con cajas · vuelve Motivo · quitar sin confirmar · voseo · selector propio. CONTROL verde.
+
+---
+
 ## 🔴 Comisiones — LOS DESCUENTOS SE RESTAN UNA SOLA VEZ, EN EL SERVIDOR (24-ago-2026)
 
 > 🩸 **LA MISMA PERSONA, EL MISMO MES, DOS NÚMEROS EN LA MISMA PANTALLA.** La pestaña **«Por empresa»** mostraba el SUBTOTAL —sin restar los descuentos fijos— mientras **«Todas las empresas»** y el detalle del vendedor sí los restaban. Medido contra producción, **REINALDO ESPINOSA en Fashion Shoes** (sus dos descuentos: `Descuento` $1.400,00 + `Descuento de adelanto` $173,08 = **$1.573,08**, los ÚNICOS dos descuentos vivos de todo el sistema):

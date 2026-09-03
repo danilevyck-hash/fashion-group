@@ -1,10 +1,16 @@
 "use client";
 
 // Shell del módulo Comisiones (empresas B2B / mayoreo). Controla el modo de
-// vista (Todas las empresas / Por empresa, con memoria) y el período compartido
-// (mes/año, con meses futuros no navegables). Delega el render a:
-//  - ComisionesConsolidadoView (matriz vendedor × empresa, default)
-//  - ComisionesPorEmpresaView  (una empresa a la vez)
+// vista (Todas las empresas / Por empresa / Configuración, con memoria) y el
+// período compartido (mes/año, con meses futuros no navegables). Delega el
+// render a:
+//  - ComisionesConsolidadoView   (matriz vendedor × empresa, default)
+//  - ComisionesPorEmpresaView    (una empresa a la vez)
+//  - ComisionesConfiguracionView (SOLO admin: tasas por vendedor y clientes
+//    que no comisionan). Era un modal «Configurar»; Daniel, 3-sep-2026:
+//    «¿por qué en card y no como tab en toda la pantalla normal?». El período,
+//    «Actualizar ahora» y el Excel no aplican a la configuración, así que esa
+//    fila se esconde en ese modo.
 //
 // ─── Encabezado: 481px → 2 filas (jul-2026) ──────────────────────────────────
 // Medido con datos de producción en 390×844: del borde de arriba al primer
@@ -52,6 +58,10 @@ const ComisionesPorEmpresaView = dynamic(
   () => import("./ComisionesPorEmpresaView").then((m) => m.ComisionesPorEmpresaView),
   { ssr: false, loading: () => <ViewSkeleton /> },
 );
+const ComisionesConfiguracionView = dynamic(
+  () => import("./ComisionesConfiguracionView").then((m) => m.ComisionesConfiguracionView),
+  { ssr: false, loading: () => <ViewSkeleton /> },
+);
 
 // La CUARTA copia de la lista de empresas era esta línea, escrita a mano
 // (`B2B_EMPRESA_KEYS.filter(k => k !== "joystep")`) mientras las otras tres ya
@@ -61,7 +71,8 @@ const ComisionesPorEmpresaView = dynamic(
 const EMPRESAS = EMPRESAS_COMISIONAN;
 const MODE_KEY = "fg_comisiones_mode";
 
-type Mode = "todas" | "empresa";
+type Mode = "todas" | "empresa" | "config";
+const esMode = (v: unknown): v is Mode => v === "todas" || v === "empresa" || v === "config";
 
 /** Lo que una vista hija expone para que el Excel viva en la barra de arriba. */
 export interface ExcelApi {
@@ -73,14 +84,26 @@ interface ComisionesViewProps {
   availableYears: number[];
   /** Lo que el guard dejó afuera de los cobros, ya redactado por el servidor. */
   avisoMontos?: string | null;
+  /**
+   * Dibuja la pestaña «Configuración» (solo admin). La monta el MÓDULO
+   * Comisiones (/comisiones); la pestaña Comisiones de Ventas no la lleva —
+   * Daniel, 3-sep-2026: «es el módulo Comisiones aparte, no la pestaña de
+   * Ventas».
+   */
+  conConfiguracion?: boolean;
 }
 
-export function ComisionesView({ availableYears, avisoMontos }: ComisionesViewProps) {
+export function ComisionesView({ availableYears, avisoMontos, conConfiguracion = false }: ComisionesViewProps) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
   const [mode, setMode] = useState<Mode>("todas");
+  // «Configuración» es SOLO de admin y SOLO en el módulo /comisiones: el chip
+  // no se dibuja para nadie más, y un modo guardado que aquí no existe cae a
+  // «Todas las empresas».
+  const [esAdmin, setEsAdmin] = useState(false);
+  const hayConfig = esAdmin && conConfiguracion;
   // 🩸 Contador de recarga. "Actualizar ahora" sincroniza los RECIBOS, pero la
   // tabla los pidió al abrir la pantalla: sin esto, Daniel arreglaba el
   // vendedor en Switch, tocaba el botón y la tabla seguía diciendo DEFAULT con
@@ -102,9 +125,11 @@ export function ComisionesView({ availableYears, avisoMontos }: ComisionesViewPr
 
   // Recuerda el último modo de vista.
   useEffect(() => {
+    const admin = (sessionStorage.getItem("cxc_role") || "") === "admin";
+    setEsAdmin(admin);
     const saved = localStorage.getItem(MODE_KEY);
-    if (saved === "todas" || saved === "empresa") setMode(saved);
-  }, []);
+    if (esMode(saved) && (saved !== "config" || (admin && conConfiguracion))) setMode(saved);
+  }, [conConfiguracion]);
 
   const handleMode = (m: Mode) => {
     setMode(m);
@@ -121,7 +146,11 @@ export function ComisionesView({ availableYears, avisoMontos }: ComisionesViewPr
       {/* Fila 1 — modo de vista + ⓘ (criterios y frescura del dato).
           Mismo patrón que las pestañas de CXC: sin título grande arriba. */}
       <div className="flex items-center gap-1 border-b border-gray-200">
-        {([["todas", "Todas las empresas"], ["empresa", "Por empresa"]] as [Mode, string][]).map(([m, label]) => (
+        {([
+          ["todas", "Todas las empresas"],
+          ["empresa", "Por empresa"],
+          ...(hayConfig ? [["config", "Configuración"] as [Mode, string]] : []),
+        ] as [Mode, string][]).map(([m, label]) => (
           <button
             key={m}
             type="button"
@@ -154,6 +183,7 @@ export function ComisionesView({ availableYears, avisoMontos }: ComisionesViewPr
           líneas) y la fila con flex-wrap, que es el modo de fallar bueno —
           si algún día no entran, se bajan a otra línea en vez de sacar la
           página para el costado. */}
+      {mode !== "config" && (
       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         <ComisionesPeriodo
           mes={mes}
@@ -180,6 +210,7 @@ export function ComisionesView({ availableYears, avisoMontos }: ComisionesViewPr
           <FileSpreadsheet className="h-4 w-4 shrink-0" /> Excel
         </button>
       </div>
+      )}
 
       {/* Qué se quedó AFUERA de los cobros que alimentan estas comisiones.
           Va arriba de la tabla, en las dos pestañas: el mismo cobro corrupto
@@ -188,8 +219,16 @@ export function ComisionesView({ availableYears, avisoMontos }: ComisionesViewPr
 
       {mode === "todas" ? (
         <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} refreshKey={refreshKey} />
+      ) : mode === "config" && hayConfig ? (
+        <ComisionesConfiguracionView />
       ) : (
-        <ComisionesPorEmpresaView year={year} mes={mes} onExcel={registrarExcel} refreshKey={refreshKey} />
+        <ComisionesPorEmpresaView
+          year={year}
+          mes={mes}
+          onExcel={registrarExcel}
+          refreshKey={refreshKey}
+          onConfigurar={hayConfig ? () => handleMode("config") : undefined}
+        />
       )}
     </div>
   );

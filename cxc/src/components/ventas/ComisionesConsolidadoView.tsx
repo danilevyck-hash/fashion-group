@@ -42,6 +42,8 @@ import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
 import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
+import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
+import { MarcaClientesSinComision } from "./MarcaClientesSinComision";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
@@ -81,6 +83,8 @@ interface ApiVendedor {
   descuento?: number;
   /** false = se calcula y se muestra, pero NO entra al total a pagar (DEFAULT y Daniel). */
   se_paga?: boolean;
+  /** Clientes por los que este vendedor NO comisiona en esa empresa (ya restados por la RPC). */
+  clientes_sin_comision?: ClienteSinComision[];
 }
 interface ApiResp {
   empresa_key: string;
@@ -92,6 +96,8 @@ interface Row extends ComisionConsolidadoRow {
   sumBaseCobro: number;
   /** Lo dice el servidor (lib/comisiones/sin-pago); acá solo se pinta y se suma. */
   se_paga: boolean;
+  /** Clientes sin comisión de este vendedor, con la empresa de cada uno (para el tooltip). */
+  sinComision: (ClienteSinComision & { empresa: string })[];
 }
 
 interface Props {
@@ -150,7 +156,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
       const byName = new Map<string, Row>();
       let def: Row | null = null;
       const blank = (vendedor: string): Row => ({
-        vendedor, porEmpresa: {}, total: 0, sumBase: 0, sumBaseCobro: 0, se_paga: true,
+        vendedor, porEmpresa: {}, total: 0, sumBase: 0, sumBaseCobro: 0, se_paga: true, sinComision: [],
       });
 
       for (const r of resp) {
@@ -168,6 +174,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
           // La marca es por NOMBRE, así que todas las empresas de la fila
           // dicen lo mismo; con que una diga «no» alcanza.
           if (v.se_paga === false) target.se_paga = false;
+          for (const c of v.clientes_sin_comision ?? []) target.sinComision.push({ ...c, empresa: r.empresa_key });
         }
       }
 
@@ -316,6 +323,10 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
                     <td className={`px-3 py-2.5 font-medium xl:whitespace-nowrap xl:px-4 ${r.se_paga ? "text-gray-900" : "text-gray-400"}`}>
                       {r.vendedor}
                       {!r.se_paga && <MarcaNoSePaga />}
+                      <MarcaClientesSinComision
+                        clientes={r.sinComision}
+                        nombreEmpresa={(k) => EMPRESA_KEY_TO_NAME[k] ?? k}
+                      />
                     </td>
                     {renderCells(r, false)}
                   </tr>

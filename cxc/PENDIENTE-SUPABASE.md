@@ -136,3 +136,19 @@ próximo censo no las vuelva a levantar:
 
 Las tres son **idempotentes**: se corrieron dos veces seguidas y la segunda no
 cambió un solo campo.
+
+## Pendientes NUEVAS al 3-sep-2026 — Comisiones
+
+Dos DDL que el código ya sabe esperar (la pantalla cae sola a la versión
+anterior de la RPC y lo dice en la respuesta). Van en este orden:
+
+| Migración | Qué deja en la base | Cómo se ve mientras no corre |
+|---|---|---|
+| `20260911120000_comision_b2b_v6_cobro_quien_registro.sql` | `comision_b2b_v6` (el cobro a quien REGISTRÓ el recibo) + detalle v3 | Comisiones sigue con la v5 (cobro por cartera); `regla_cobro: "cartera"` |
+| `20260912120000_comision_exclusion_v7.sql` | tabla `comision_exclusion` con las 17 filas de Daniel (11 clientes, Active Wear con las dos grafías de Reinaldo) + `comision_b2b_v7` + detalle v4 + Reinaldo en 1 %/1 % (ya estaba) | Comisiones sigue con la v6; `exclusiones_aplicadas: false`; en Configuración › «Clientes que no comisionan» sale «Falta correr la migración de comision_exclusion» |
+
+Las dos son **idempotentes** (`IF NOT EXISTS`, `ON CONFLICT … DO NOTHING`, el
+`UPDATE` de la tasa solo escribe si difiere) y **ninguna dropea nada**: la v5
+y la v6 quedan para comparar. Medido antes de aplicar con el SQL real en
+pglite: `scripts/_medir-comision-cobro-v6.mjs` y
+`scripts/_medir-comision-exclusiones-v7.mjs`.

@@ -27,7 +27,9 @@ export function ComisionesPageClient({
           el breadcrumb (escritorio) — repetirlo costaba 44px de la primera
           pantalla del iPhone. Mismo criterio que el encabezado de CXC. */}
       <main className="mx-auto w-full max-w-[1280px] px-4 pb-8 pt-2 md:px-7 md:pt-3">
-        <ComisionesView availableYears={availableYears} avisoMontos={avisoMontos} />
+        {/* La pestaña Configuración (solo admin) vive AQUÍ, en el módulo
+            Comisiones, no en la pestaña Comisiones de Ventas. */}
+        <ComisionesView availableYears={availableYears} avisoMontos={avisoMontos} conConfiguracion />
       </main>
     </div>
   );

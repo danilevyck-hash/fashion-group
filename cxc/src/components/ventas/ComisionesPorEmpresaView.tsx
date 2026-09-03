@@ -26,9 +26,10 @@ import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
-import { ComisionesConfigModal } from "./ComisionesConfigModal";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { ComisionesTarjetasPorEmpresa } from "./ComisionesTarjetas";
+import { MarcaClientesSinComision } from "./MarcaClientesSinComision";
+import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -53,6 +54,8 @@ interface ComisionVendedor {
   descuento?: number;
   /** false = se calcula y se muestra, pero NO entra al total a pagar (DEFAULT y Daniel). */
   se_paga?: boolean;
+  /** Clientes por los que este vendedor NO comisiona en esta empresa (ya restados por la RPC). */
+  clientes_sin_comision?: ClienteSinComision[];
 }
 interface ComisionResp {
   empresa_key: string;
@@ -69,9 +72,11 @@ interface Props {
   onExcel?: (api: ExcelApi | null) => void;
   /** Cambia cuando "Actualizar ahora" termina: fuerza re-pedir los datos. */
   refreshKey?: number;
+  /** Lleva a la pestaña «Configuración» del shell (solo la recibe el admin). */
+  onConfigurar?: () => void;
 }
 
-export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }: Props) {
+export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0, onConfigurar }: Props) {
   // Filtro de empresa con memoria — hook centralizado useLastUsed (igual que
   // CXC, Préstamos y Packing). Key fg_last_comision_empresa (misma de antes).
   const [empresa, setEmpresa] = useLastUsed("comision_empresa", EMPRESAS[0]);
@@ -79,8 +84,6 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [canConfig, setCanConfig] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
-  const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [detalleVendedor, setDetalleVendedor] = useState<string | null>(null);
 
   useEffect(() => {
@@ -166,17 +169,17 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
           </SelectContent>
         </Select>
 
-        {canConfig && (
+        {/* «Configurar» ya no abre un modal: lleva a la pestaña Configuración
+            del shell (Daniel, 3-sep-2026: «¿por qué en card y no como tab?»). */}
+        {canConfig && onConfigurar && (
           <button
-            onClick={() => setConfigOpen(true)}
+            onClick={onConfigurar}
             className="ml-auto inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-md border border-gray-200 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
           >
             <Settings className="h-4 w-4 shrink-0" /> Configurar
           </button>
         )}
       </div>
-
-      {savedMsg && <p className="text-xs text-teal-700">{savedMsg}</p>}
 
       {loading ? (
         <Card className="overflow-hidden rounded-lg border border-gray-200">
@@ -244,6 +247,7 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
                         {ROTULO_NO_SE_PAGA}
                       </span>
                     )}
+                    <MarcaClientesSinComision clientes={v.clientes_sin_comision} />
                     {/* Crece HACIA ABAJO: una columna más habría ensanchado la
                         tabla justo en el iPad acostado, que es el ancho que
                         nadie mira. */}
@@ -293,18 +297,6 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
           <p>Ya están descontados lo devuelto y los descuentos.</p>
         </Ayuda>
       </p>
-
-      {canConfig && (
-        <ComisionesConfigModal
-          open={configOpen}
-          onClose={() => setConfigOpen(false)}
-          onSaved={(msg) => {
-            setSavedMsg(msg);
-            void load();
-            window.setTimeout(() => setSavedMsg(null), 3000);
-          }}
-        />
-      )}
 
       {detalleVendedor && (
         <ComisionesDetalleModal

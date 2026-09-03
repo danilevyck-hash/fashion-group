@@ -36,6 +36,7 @@ import { useState, type ReactNode } from "react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
 import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
+import { MarcaClientesSinComision, type ClienteSinComisionConEmpresa } from "./MarcaClientesSinComision";
 
 /** Rojo para lo negativo, igual que la tabla. */
 const claseMonto = (n: number) => (n < 0 ? "text-rose-600" : "text-gray-900");
@@ -131,6 +132,8 @@ export interface FilaConsolidado {
   total: number;
   /** false = se muestra, pero no entra al total a pagar. */
   se_paga?: boolean;
+  /** Clientes por los que no comisiona (con su empresa); ya restados por la RPC. */
+  sinComision?: ClienteSinComisionConEmpresa[];
 }
 
 interface PropsConsolidado {
@@ -256,6 +259,7 @@ function TarjetaVendedorMatriz({
           >
             <span className="truncate">{fila.vendedor}</span>
             {fila.se_paga === false && <MarcaNoSePaga />}
+            <MarcaClientesSinComision clientes={fila.sinComision} nombreEmpresa={nombreEmpresa} />
           </span>
           <span
             className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${
@@ -317,6 +321,8 @@ export interface FilaPorEmpresa {
   descuento?: number;
   /** false = se muestra, pero no entra al total a pagar. */
   se_paga?: boolean;
+  /** Clientes por los que no comisiona en esta empresa; ya restados por la RPC. */
+  clientes_sin_comision?: ClienteSinComisionConEmpresa[];
 }
 
 interface PropsPorEmpresa {
@@ -353,6 +359,7 @@ export function ComisionesTarjetasPorEmpresa({
                 <span className={`flex min-w-0 items-center truncate text-[13px] font-medium leading-5 tracking-tight ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>
                   <span className="truncate">{etiquetaVendedor(v.vendedor)}</span>
                   {v.se_paga === false && <MarcaNoSePaga />}
+                  <MarcaClientesSinComision clientes={v.clientes_sin_comision} />
                 </span>
                 <span
                   className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${claseMonto(

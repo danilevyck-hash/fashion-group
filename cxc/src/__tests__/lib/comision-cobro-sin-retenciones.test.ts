@@ -85,19 +85,29 @@ const FILTRO_MOSTRADOR = /'TCKCTA'/;
 // es parte del candado.
 const BASES_DE_COBRO: { archivo: string; funcion: string; nota: string }[] = [
   {
+    archivo: "20260912120000_comision_exclusion_v7.sql",
+    funcion: "comision_b2b_v7",
+    nota: "VIVA — la llaman las dos rutas de comisiones vía lib/comisiones/rpc (v6 + clientes que no comisionan, 3-sep-2026)",
+  },
+  {
+    archivo: "20260912120000_comision_exclusion_v7.sql",
+    funcion: "comision_b2b_detalle",
+    nota: "VIVA — v4 del detalle, en la misma DDL que la v7 (modal doc-por-doc, con la misma exclusión)",
+  },
+  {
     archivo: "20260911120000_comision_b2b_v6_cobro_quien_registro.sql",
     funcion: "comision_b2b_v6",
-    nota: "VIVA — la llaman las dos rutas de comisiones vía lib/comisiones/rpc (cobro a quien registró el recibo, 3-sep-2026)",
+    nota: "red de la v7 mientras su DDL no corra (cobro a quien registró el recibo); se conserva para comparar",
   },
   {
     archivo: "20260911120000_comision_b2b_v6_cobro_quien_registro.sql",
     funcion: "comision_b2b_detalle",
-    nota: "VIVA — v3 del detalle, en la misma DDL que la v6 (modal doc-por-doc)",
+    nota: "v3 del detalle; sigue siendo la definición viva si la DDL de 20260912120000 no corrió",
   },
   {
     archivo: "20260703120000_comision_b2b_v5_vendedor_factura.sql",
     funcion: "comision_b2b_v5",
-    nota: "red de la v6 mientras su DDL no corra (cobro por cartera); se conserva para comparar",
+    nota: "red de la v6 (que es red de la v7) mientras su DDL no corra (cobro por cartera); se conserva para comparar",
   },
   {
     archivo: "20260724130000_comision_b2b_detalle_v2_vendedor_factura.sql",

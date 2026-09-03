@@ -45,6 +45,8 @@ import { requireRole } from "@/lib/requireRole";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { leerComision } from "@/lib/comisiones/rpc";
 import { marcarSePaga } from "@/lib/comisiones/sin-pago";
+import { adjuntarClientesSinComision } from "@/lib/comisiones/exclusiones";
+import { leerExclusionesActivasOVacio } from "@/lib/comisiones/exclusiones-server";
 import {
   leerDescuentosEfectivos,
   totalPorVendedor,
@@ -74,7 +76,9 @@ export async function GET(req: NextRequest) {
   // Los descuentos fallan ABIERTO, igual que antes: si su lectura se cae, la
   // pantalla sale con descuentos en 0 en vez de quedar en blanco. Un total de
   // comisiones visible vale más que una pantalla vacía.
-  const [porEmpresa, descuentos] = await Promise.all([
+  // Las exclusiones (clientes que no comisionan) fallan ABIERTO igual: son la
+  // marca informativa pegada al nombre; quien resta es la RPC (v7).
+  const [porEmpresa, descuentos, exclusiones] = await Promise.all([
     Promise.all(
       EMPRESAS_COMISIONAN.map(async (empresa) => {
         const { data, error } = await leerComision(empresa, year, mes);
@@ -86,11 +90,14 @@ export async function GET(req: NextRequest) {
           empresa: empresa as string,
           empresa_key: data.empresa_key,
           regla_cobro: data.regla_cobro,
+          version: data.version,
+          exclusiones_aplicadas: data.exclusiones_aplicadas,
           vendedores: data.vendedores,
         };
       }),
     ).catch((e: unknown) => e instanceof Error ? e : new Error(String(e))),
     leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, mes).catch(() => []),
+    leerExclusionesActivasOVacio(EMPRESAS_COMISIONAN),
   ]);
 
   if (porEmpresa instanceof Error) {
@@ -98,14 +105,20 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    empresas: porEmpresa.map(({ empresa, empresa_key, regla_cobro, vendedores }) => ({
+    empresas: porEmpresa.map(({ empresa, empresa_key, regla_cobro, version, exclusiones_aplicadas, vendedores }) => ({
       empresa_key,
       regla_cobro,
+      version,
+      exclusiones_aplicadas,
       // El descuento es por (empresa, vendedor) y se resta del total de ESA
       // empresa — que es la celda que Daniel mira.
       // `se_paga`: DEFAULT y Daniel se calculan y se muestran, pero no entran
       // al total a pagar. Misma marca que en /api/ventas/comisiones.
-      vendedores: marcarSePaga(netearComisiones(vendedores, totalPorVendedor(descuentos, empresa))),
+      vendedores: adjuntarClientesSinComision(
+        marcarSePaga(netearComisiones(vendedores, totalPorVendedor(descuentos, empresa))),
+        exclusiones,
+        empresa,
+      ),
     })),
   });
 }

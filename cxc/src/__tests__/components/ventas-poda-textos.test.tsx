@@ -27,7 +27,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/re
 
 import { ReferenciaView } from "@/components/ventas/ReferenciaView";
 import { UtilidadView } from "@/components/ventas/UtilidadView";
-import { ComisionesConfigModal } from "@/components/ventas/ComisionesConfigModal";
+import { ComisionesConfiguracionView } from "@/components/ventas/ComisionesConfiguracionView";
 import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
 import { ComisionesDetalleModal } from "@/components/ventas/ComisionesDetalleModal";
 import type { Compra, ComprasApiResp } from "@/lib/ventas/compras";
@@ -743,16 +743,23 @@ describe("Comisiones consolidado · el ⓘ no se llevó la señal de que se pued
 });
 
 // ── Comisiones · configuración de tasas ──────────────────────────────────────
+// CAMBIÓ DE FORMA el 3-sep-2026: el modal «Configurar comisiones» pasó a ser la
+// pestaña «Configuración» (Daniel: «¿por qué en card y no como tab en toda la
+// pantalla normal?»). Lo que este candado vigila —que la tasa de entrada siga
+// a un toque, en el ⓘ y no como texto suelto— se exige igual sobre la tarjeta
+// «Tasas por vendedor» de esa pestaña.
 
 describe("Comisiones config · la tasa de entrada sigue alcanzable", () => {
   async function montar() {
     rutas.push((u) =>
       u.includes("/api/ventas/comisiones/config")
-        ? { vendedores: [{ vendedor_nombre: "REINALDO", tasa_venta: 0.005, activo: true, origen: ["vistana"] }] }
-        : undefined,
+        ? { vendedores: [{ vendedor_nombre: "REINALDO", tasa_venta: 0.005, tasa_cobro: 0.01, activo: true, origen: ["vistana"] }] }
+        : u.includes("/api/ventas/comisiones/exclusiones")
+          ? { exclusiones: [], vendedores: {} }
+          : undefined,
     );
-    render(<ComisionesConfigModal open onClose={() => {}} onSaved={() => {}} />);
-    await screen.findByText("Configurar comisiones");
+    render(<ComisionesConfiguracionView />);
+    await screen.findByText("Tasas por vendedor");
   }
 
   it("cerrado no ocupa lugar en el pie del modal", async () => {

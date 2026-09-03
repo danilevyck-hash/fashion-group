@@ -15,8 +15,12 @@
  * se atribuyen al VENDEDOR DE LA FACTURA (switch_facturas, la NC usa su propio
  * vendedor). Desde v6 (sep-2026) los COBROS se pagan a QUIEN REGISTRÓ EL
  * RECIBO (switch_recibos.vendedor_registro), ya no al dueño de la cartera.
- * 🩸 Daniel: «el que vende a veces no es el que cobra». La respuesta trae
- * `regla_cobro` para que se sepa con cuál de las dos salió.
+ * 🩸 Daniel: «el que vende a veces no es el que cobra». Desde v7 (sep-2026)
+ * hay CLIENTES QUE NO COMISIONAN para un vendedor concreto (tabla
+ * comision_exclusion, grano empresa + cliente + vendedor, venta y cobro).
+ * 🩸 Daniel: «crea configuración en comisiones para desactivar cálculos de
+ * clientes». La respuesta trae `version`, `regla_cobro` y
+ * `exclusiones_aplicadas` para que se sepa con cuál salió.
  *
  * COBROS $0 (switch_recibos.total = 0): son aplicaciones/cruces (saldo a favor
  * o NC aplicada contra facturas) o recibos anulados. Por decisión de negocio
@@ -33,6 +37,8 @@ import {
 } from "@/lib/comisiones/descuentos";
 import { leerComision } from "@/lib/comisiones/rpc";
 import { marcarSePaga } from "@/lib/comisiones/sin-pago";
+import { adjuntarClientesSinComision } from "@/lib/comisiones/exclusiones";
+import { leerExclusionesActivasOVacio } from "@/lib/comisiones/exclusiones-server";
 
 export const dynamic = "force-dynamic";
 
@@ -59,9 +65,14 @@ export async function GET(req: NextRequest) {
   // se cae, la tabla sale con descuentos en 0 en vez de quedar en blanco. Un
   // error de las COMISIONES sí se propaga (500): una tabla vacía silenciosa se
   // leería como "este mes no se vendió nada".
-  const [rpc, descuentos] = await Promise.all([
+  //
+  // Las exclusiones (clientes que no comisionan para un vendedor) también
+  // fallan ABIERTO: son la MARCA informativa pegada al nombre; quien resta es
+  // la RPC (comision_b2b_v7). Sin tabla o sin red, la tabla sale sin la marca.
+  const [rpc, descuentos, exclusiones] = await Promise.all([
     leerComision(empresa, year, mes),
     leerDescuentosEfectivos([empresa], year, mes).catch(() => []),
+    leerExclusionesActivasOVacio([empresa]),
   ]);
   if (rpc.error || !rpc.data) {
     return NextResponse.json({ error: rpc.error?.message ?? "sin datos" }, { status: 500 });
@@ -73,8 +84,10 @@ export async function GET(req: NextRequest) {
   // pagar («no me autopago»). Ver lib/comisiones/sin-pago.
   return NextResponse.json({
     ...data,
-    vendedores: marcarSePaga(
-      netearComisiones(data.vendedores, totalPorVendedor(descuentos, empresa)),
+    vendedores: adjuntarClientesSinComision(
+      marcarSePaga(netearComisiones(data.vendedores, totalPorVendedor(descuentos, empresa))),
+      exclusiones,
+      empresa,
     ),
   });
 }

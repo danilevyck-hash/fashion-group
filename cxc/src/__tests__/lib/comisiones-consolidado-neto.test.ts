@@ -196,11 +196,15 @@ describe("🔴 UNA llamada, no diez (12-ago-2026)", () => {
   // red a la v5 mientras la DDL no corra. Lo que este candado siempre quiso
   // decir —las dos pestañas llaman la MISMA RPC, una por empresa, mismos
   // argumentos— se sigue exigiendo: por el módulo compartido, no por el literal.
-  it("las RPC siguen siendo la MISMA para las dos pestañas (leerComision → comision_b2b_v6)", () => {
+  // Y el 3-sep-2026 (más tarde) la vigente pasó a la v7: v6 + clientes que no
+  // comisionan (Daniel: «crea configuración en comisiones para desactivar
+  // cálculos de clientes»). La cadena v7 → v6 → v5 vive en el mismo módulo.
+  it("las RPC siguen siendo la MISMA para las dos pestañas (leerComision → comision_b2b_v7)", () => {
     expect(consolidado).toContain("leerComision(empresa, year, mes)");
     expect(consolidado).not.toMatch(/rpc\("comision_b2b_v5"/);
     const rpc = leer("src/lib/comisiones/rpc.ts");
-    expect(rpc).toContain('RPC_COMISION = "comision_b2b_v6"');
+    expect(rpc).toContain('RPC_COMISION = "comision_b2b_v7"');
+    expect(rpc).toContain('RPC_COMISION_ANTERIOR = "comision_b2b_v6"');
     expect(rpc).toContain("p_empresa_key: empresa");
   });
 });
