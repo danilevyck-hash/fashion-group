@@ -35,6 +35,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { EMPRESAS_DEL_GRUPO } from "@/lib/clientes/mundos";
 import {
   elegirNombreCanonico,
   codigosAmbiguos,
@@ -103,18 +104,46 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
     codigos_ambiguos: [] as CodigoAmbiguo[],
   };
 
-  // 1. Traer todos los clientes del espejo de Switch, paginado.
-  //    - Excluye american_classic: son clientes retail ACS (la fidelización lee
+  // 1. Traer los clientes del espejo de Switch, paginado.
+  //
+  //    🔴 SOLO LAS 6 DEL GRUPO. `clientes_master` es el directorio del GRUPO, y
+  //    esto se pide por INCLUSIÓN (`EMPRESAS_DEL_GRUPO`), nunca excluyendo a las
+  //    dos que sobran: si mañana entra una empresa nueva al sistema, el default
+  //    seguro es que NO contamine el directorio hasta que alguien la agregue a
+  //    mano en `lib/clientes/mundos`. Es la misma regla que ya gobierna
+  //    `/clientes`, Guías y los selectores.
+  //
+  //    · american_classic: clientes retail ACS (la fidelización lee
   //      switch_clientes directo), NO directorio B2B — decisión Daniel 4-jul-2026.
   //      Además evita el O(N×M) del trigger trg_refresh_wholesale sobre ventas_raw.
+  //    · confecciones_boston: 🔴 EL INVARIANTE MÁS FUERTE DEL REPO
+  //      (`docs/postmortems/boston-cxc.md`) — *"Boston NUNCA se mezcla con el CXC
+  //      del grupo: ni una fila, ni un total, ni un export, ni un badge"*. Daniel,
+  //      textual (2-sep-2026): *"Boston es estricto para ver sus ventas y tiene
+  //      hasta su propio CXC, no quiero que se mezcle en mi grupo"*. Sus clientes
+  //      viven en `switch_clientes` (que sí es por empresa) y se leen por su
+  //      puerta propia: `/api/boston/clientes` y `/api/cxc/boston`. Ninguna
+  //      superficie de Boston lee `clientes_master` — está auditado.
+  //
+  //    🩸 ESTA EXCLUSIÓN FALTABA Y COSTÓ $2,55 MILLONES DE VENTA INVENTADA.
+  //    El 28-jul-2026 a las 07:01 UTC este sync metió 4.910 clientes de Boston en
+  //    `clientes_master`. La tabla NO tiene columna de empresa —una fila por
+  //    CÓDIGO, compartida por las 6— así que adentro un cliente de Boston es
+  //    indistinguible de uno del grupo. Las vistas del ranking de Ventas resuelven
+  //    el código POR NOMBRE, y 24 nombres quedaron repetidos entre los dos mundos
+  //    (`CITY MALL DAVID` = `D-24` del grupo y `83` de Boston): cada factura de
+  //    esos clientes se fue por las DOS filas y se contó DOS VECES. Medido el
+  //    2-sep-2026: el ranking publicaba $7.911.210,10 contra $5.357.597,39 reales.
+  //    El coletazo ya se había parchado DOS veces —Directorio (#387) y buscador
+  //    ⌘K (#388), el 30-jul— y nadie miró la tercera superficie. Por eso el
+  //    arreglo va acá, en la ÚNICA puerta de escritura, y no en cada pantalla.
   //
   //    🩸 SE PAGINA POR `id`, NO POR `synced_at` (8-ago-2026). Antes el orden era
   //    `synced_at DESC` — una columna que el sync de Switch REESCRIBE. Paginar
   //    por una llave que se mueve entre una página y la siguiente hace que filas
-  //    se salteen o se repitan, en silencio y sin error: `confecciones_boston`
-  //    son 4.915 de las 5.750 filas y su sync de las 06:30 puede solaparse con
-  //    este de las 07:00. `leerTodoPaginado` además VERIFICA contra un
-  //    `count: "exact"` y revienta si no cuadra, en vez de seguir con menos.
+  //    se salteen o se repitan, en silencio y sin error. `leerTodoPaginado`
+  //    además VERIFICA contra un `count: "exact"` y revienta si no cuadra, en
+  //    vez de seguir con menos.
   let rows: SwitchClienteRow[];
   try {
     rows = await leerTodoPaginado<SwitchClienteRow>(
@@ -126,7 +155,7 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
             "empresa_key, codigo, nombre, razonsocial, identificacion, raw_data, synced_at",
             pedirCount ? { count: "exact" } : {},
           )
-          .neq("empresa_key", "american_classic")
+          .in("empresa_key", [...EMPRESAS_DEL_GRUPO])
           .order("id", { ascending: true })
           .range(from, to),
     );

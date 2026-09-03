@@ -85,12 +85,29 @@ describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio
     expect(clientes).not.toContain("scrollSnapAlign");
   });
 
-  it("las 6 píldoras siguen estando y con su texto entero", () => {
+  // 🩸 ESTE TEST CAMBIÓ DE DIRECCIÓN (2-sep-2026), y antes ERA ÉL EL QUE FIJABA
+  // EL BUG. Se llamaba "las 6 píldoras" pero enumeraba CINCO empresas + "Todas":
+  // **joystep no estaba**, y el test exigía que la lista estuviera escrita a mano
+  // (`label: "Vistana International"`), que es justamente lo que dejó a joystep
+  // afuera. Daniel: *"deberían estar solo las 6 de Fashion Group, que son las 5
+  // de las fotos y joystep"*.
+  //
+  // Lo que este archivo SIEMPRE quiso decir es de ANCHO: que las píldoras no se
+  // abrevien para que entren en el iPad. Eso se conserva y se dice mejor — los
+  // rótulos salen de `EMPRESA_KEY_TO_NAME`, que trae el nombre entero. QUIÉNES
+  // son las píldoras lo vigila `ventas-clientes-las-seis-empresas.test.tsx`, que
+  // además las PINTA.
+  it("las píldoras se DERIVAN de las 6 y su rótulo es el nombre entero", () => {
+    expect(clientes).toContain("B2B_EMPRESA_KEYS.map");
+    expect(clientes).toContain("EMPRESA_KEY_TO_NAME[key]");
+    expect(clientes).toContain('{ id: "todas", label: "Todas" }');
+    // Ningún rótulo abreviado a mano: si alguien vuelve a escribirlos, vuelve a
+    // poder olvidarse de una empresa.
     for (const label of [
-      "Todas", "Vistana International", "Fashion Wear",
-      "Fashion Shoes", "Active Shoes", "Active Wear",
+      "Vistana International", "Fashion Wear",
+      "Fashion Shoes", "Active Shoes", "Active Wear", "Joystep",
     ]) {
-      expect(clientes).toContain(`label: "${label}"`);
+      expect(clientes, `"${label}" no puede estar escrito a mano`).not.toContain(`label: "${label}"`);
     }
   });
 

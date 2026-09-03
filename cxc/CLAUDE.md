@@ -85,6 +85,7 @@ archivo enlazado, verbatim.
 - Los **sueldos se recortan en el SERVIDOR** (`VE_SUELDOS_DE_BOSTON = false`); se ENUMERA lo que viaja (`CAMPOS_SIN_DINERO`), nunca se borra lo que se va.
 - El `ccte_id` de Boston lleva el AÑO adentro: `serie × 10.000.000 + (año − 2000) × 100.000 + correlativo`. Un documento sin fecha se **rechaza** y la corrida se corta sin escribir.
 - Orden obligatorio del sync: **upsert → reconcile**, nunca al revés (el reconcile pone `saldo = 0` a todo lo que no se reescribió).
+- 🩸 **Boston tampoco entra a `clientes_master`** (2-sep-2026). Estuvo adentro cinco semanas —4.910 filas del 28-jul— y el ranking de Ventas publicó **$2,55 millones de venta que no existió** por unir clientes por NOMBRE. Ver el bloque de Ventas.
 - Candados: `cxc-boston-fuera-de-toda-superficie.test.ts` · `boston-acceso.test.ts` · `boston-cartera-web.test.ts`.
 
 ### Guías — [docs/postmortems/guias.md](docs/postmortems/guias.md)
@@ -176,6 +177,10 @@ archivo enlazado, verbatim.
 - **Las 6 empresas del grupo comisionan igual** (`comision_b2b_v5`): 0,5% sobre la **VENTA** de las facturas con `pct_utilidad > 20`. La utilidad es el **criterio de entrada**, no la base. Retenciones y `TCKCTA` quedan fuera.
 - **Los descuentos se restan UNA sola vez, en el SERVIDOR** (`netearComisiones`); ninguna vista resta por su cuenta.
 - ⚠️ **Multifashion es OTRO módulo de comisiones y está bien como está — NO fusionar.**
+- 🔴 **`clientes_master` es el directorio del GRUPO y SOLO del grupo.** El sync pide por **INCLUSIÓN** (`.in("empresa_key", EMPRESAS_DEL_GRUPO)`), nunca excluyendo a las que sobran: la tabla **no tiene `empresa_key`** —una fila por CÓDIGO— así que adentro un cliente de Boston es indistinguible de uno del grupo.
+- 🔴 **Nadie une `clientes_master` por `nombre_normalized`.** Un LEFT JOIN por nombre contra una tabla con homónimos **multiplica la factura** y el SUM la cuenta dos veces. El fallback por nombre existe (las facturas traen nombre, no código) pero va contra **`clientes_master_por_nombre_unico_vw`**, 1-a-1 por construcción (`GROUP BY nombre_normalized HAVING COUNT(*) = 1`): ante un nombre ambiguo **se abstiene**. Lo que se prohíbe es el JOIN, **no** los nombres repetidos —dos clientes pueden llamarse igual y eso no es un error—.
+- **Ventas › Clientes ofrece LAS SEIS** (`EMPRESA_PILLS` derivada de `B2B_EMPRESA_KEYS`), nunca una lista escrita a mano. Boston y Multifashion no están: sus clientes viven en su propio módulo.
+- Candados: `clientes-master-solo-del-grupo.test.ts` · `ventas-clientes-las-seis-empresas.test.ts`.
 
 ### Multifashion — [docs/postmortems/multifashion.md](docs/postmortems/multifashion.md)
 
@@ -326,10 +331,10 @@ Detalle de reglas en [asistencia-planilla](docs/postmortems/asistencia-planilla.
 
 | Pregunta | Dónde | Grano · filas | ⚠️ |
 |---|---|---|---|
-| El directorio **completo** de clientes | `clientes_master` | 1 fila por `codigo` · **5.064** 🔢 | Este es el directorio de verdad. El upsert del sync **no pisa** `telefono/celular/email/notas` — eso lo escribe la gente. |
+| El directorio **completo** de clientes | `clientes_master` | 1 fila por `codigo` · **150 del grupo** (5.064 hasta que se limpien las 4.914 de Boston) 🔢 | 🔴 **SOLO las 6 del grupo.** No tiene `empresa_key`: adentro, un cliente de Boston es indistinguible de uno del grupo — por eso el sync pide por inclusión. El upsert **no pisa** `telefono/celular/email/notas` — eso lo escribe la gente. |
 | El directorio **manual** del módulo Clientes | `directorio_clientes` | 1 fila por contacto · **33** | ⚠️ Son 33, no miles: es la libreta de contactos a mano, no el padrón. Confundirla con `clientes_master` hace parecer que «no hay clientes». |
 | El cliente tal como lo ve **una empresa** en Switch | `switch_clientes` | 1 fila por (empresa, `cliente_switch_id`) · 6.794 🔢 | El mismo cliente aparece una vez por empresa donde compra. |
-| Cuánto compró un cliente en 12 meses | `clientes_agregado_12m_vw` (114) · `clientes_empresa_12m_vw` (1.665) | 1 fila por cliente / por (cliente, empresa) | El agregado ya **excluye Boston**. Se refresca con `rpc refresh_clientes_empresa_12m_vw`. |
+| Cuánto compró un cliente en 12 meses | `clientes_agregado_12m_vw` (114) · `clientes_empresa_12m_vw` (1.665; **255 del grupo**) | 1 fila por cliente / por (cliente, empresa) | El agregado ya **excluye Boston**. El código se resuelve por `switch_clientes` y, cuando falta, por `clientes_master_por_nombre_unico_vw` — **nunca** por un JOIN a `clientes_master` por nombre. Se refresca con `rpc refresh_clientes_empresa_12m_vw`. |
 
 ### Catálogos públicos y pedidos
 

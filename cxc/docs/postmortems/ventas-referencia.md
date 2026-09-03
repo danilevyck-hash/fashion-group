@@ -59,6 +59,92 @@
 
 ---
 
+## 🔴 Ventas › Clientes mostraba el DOBLE — y la causa era Boston adentro de `clientes_master` (2-sep-2026)
+
+> Daniel, contra Switch: **City Mall David · Vistana · 2026 → la app decía $227.872,28; Switch dice $113.936,14. Exactamente 2,000x.**
+>
+> Y cuando le contamos el mecanismo, señaló la causa raíz que se nos había pasado, textual: ***"¿por qué confundirías City de Boston si ya había dicho que Boston no puede tocar esos módulos? Boston es estricto para ver sus ventas y tiene hasta su propio CXC, no quiero que se mezcle en mi grupo"***.
+>
+> ### 🩸 EL DEFECTO REAL: LOS CLIENTES DE BOSTON NUNCA DEBIERON ENTRAR
+>
+> El **28-jul-2026 a las 07:01 UTC**, `sync-clientes-master` metió **4.910 clientes de Confecciones Boston** en `clientes_master`. El sync tenía `.neq("empresa_key", "american_classic")` — excluía ACS y **solo** ACS. Boston entraba por la puerta de al lado.
+>
+> 🔴 Eso viola el invariante más fuerte del repo (`boston-cxc.md`): *"Boston NUNCA se mezcla con el CXC del grupo — ni una fila, ni un total, ni un export, ni un badge"*. Y **`clientes_master` no tiene columna `empresa_key`**: es una fila por CÓDIGO, compartida por las 6 del grupo. Una vez adentro, **un cliente de Boston es indistinguible de uno del grupo**. Ese es el punto: no hay forma de arreglarlo aguas abajo.
+>
+> ### El mecanismo del ×2, y por qué HACEN FALTA LOS DOS ARREGLOS
+>
+> `clientes_empresa_12m_vw` y `clientes_anio()` resolvían el código del cliente **uniendo por NOMBRE**:
+> ```sql
+> LEFT JOIN clientes_master mc ON mc.nombre_normalized = a.cliente_norm
+> ```
+> Un LEFT JOIN contra una tabla que puede tener el mismo nombre en dos filas **no "elige una": devuelve LAS DOS**, y el `SUM` de más abajo cuenta la factura dos veces. Medido: **46 `nombre_normalized` repetidos entre filas vivas**, **24** mezclando un código del grupo con uno de Boston (`CITY MALL DAVID` = `D-24` del grupo y `83` de Boston; `CITY MALL PASO CANOA` = `D-25` y `84`; …). **42 de los 46 nacieron el 28-jul.**
+>
+> 🔴 **Y sacar a Boston NO alcanza, está medido:** quedan **3 nombres repetidos entre clientes del propio grupo** (`CITY MODA CHORRERA` D-30/D-26 · `METRO SHOES PANAMA SA` D-103/D-173 · `EL MACHETAZO SAN MIGUELITO` D-171/D-101 — códigos desfasados en el panel de Switch, los mismos que `mundos.ts` ya documentaba) que siguen valiendo **$13.426,00 de doble conteo**. Al revés tampoco: arreglar el join sin sacar a Boston deja clientes del grupo **rotulados con código de Boston** — `NIPMAR SA` y `CEPREDENAC`, ventas de fashion_shoes/vistana atribuidas a los códigos `390` y `154345` de Boston.
+>
+> ### ⚠️ «Unir por código» a secas PIERDE clientes — se midió antes de escribirlo
+>
+> La fuente del ranking es `switch_facturas`, que trae `cliente_switch_id` y `cliente_nombre` y **NO trae el código**. El código sale de `switch_clientes` por el par (empresa, id); cuando ese par no existe, el nombre es lo único que queda. Borrar el fallback tira a «Otros clientes» a **`AIDY SHOP NO2` (D-2)** y **`A-AMANI SA` (D-1)**, clientes del grupo presentes en las 6 empresas. **Perder un cliente del ranking es peor que mostrarlo doble.**
+>
+> **La solución es que el fallback sea 1-a-1 POR CONSTRUCCIÓN:** `clientes_master_por_nombre_unico_vw` = `GROUP BY nombre_normalized HAVING COUNT(*) = 1`. Como agrupa por la MISMA columna con la que se joinea, **no puede multiplicar**, y ante un nombre ambiguo **se abstiene** (el cliente cae a huérfano, que se ve). Un `DISTINCT ON` también sería 1-a-1, pero elegiría un dueño arbitrario para la plata de dos homónimos y se callaría: 🔑 *cuando el sistema no puede saber, se abstiene*.
+>
+> ### La medición, reproduciendo la aritmética de la vista sobre datos REALES
+>
+> | escenario | filas | suma 2026 YTD | City Mall David · vistana |
+> |---|---:|---:|---:|
+> | **hoy** (join por nombre, Boston adentro) | 255 | $7.911.210,10 | **$227.872,28** |
+> | solo sacando a Boston | 255 | $5.371.023,39 | $113.936,14 |
+> | solo el join 1-a-1 | 255 | $5.357.597,39 | $113.936,14 |
+> | **las DOS cosas** | **255** | **$5.357.597,39** | **$113.936,14** |
+>
+> El «hoy» reproduce **exacto** lo que publicaba la MV (255 filas / $7.909.875,00 en el refresh de las 07:35; la diferencia son las facturas que entraron después). **No se pierde ni una fila: 255 antes y 255 después.** El sobreconteo era **$2,55 millones, +47,7%**.
+>
+> **Los años cerrados también estaban duplicados hacia atrás**: `clientes_anio()` tiene el mismo join y lee el `clientes_master` de HOY. Verificado en 2025/vistana: City Mall Paso Canoa $1.118.329,60 contra $559.164,80 real.
+>
+> ### 🩸 SE PARCHÓ DOS VECES SIN MIRAR LA TERCERA SUPERFICIE
+>
+> El coletazo del 28-jul ya se había atendido en **Directorio (#387)** y en el **buscador ⌘K (#388)**, los dos el 30-jul. Las dos veces se arregló la pantalla que alguien notó. **Nadie miró el ranking de Ventas**, que llevaba cinco semanas publicando plata inventada. Por eso el arreglo de hoy va en la ÚNICA puerta de escritura (el sync) y el candado es un **barrido**, no una lista de superficies.
+>
+> ### Lo que NO se tocó (verificado, no supuesto)
+>
+> `ventas_dashboard_summary` (Resumen y totales de Ventas) **no menciona `clientes_master`** · `ventas_rollup_mensual_mv` tampoco · `comision_b2b_v5` tampoco · `switch_estadocuenta_aging` (CXC) joinea por `codigo`, que es único · la ficha `/clientes/[codigo]` usa `cliente_ficha_ventas`, que joinea por `codigo` y **ya daba el número correcto**. **Los totales de venta no se mueven: acá se listan CLIENTES.**
+>
+> Y **ninguna superficie de Boston lee `clientes_master`** — auditado: `/api/boston/clientes` y `/api/cxc/boston` leen `switch_clientes` y `switch_estadocuenta_aging_boston`, con un comentario que ya decía *"`clientes_master` NO SIRVE ACÁ… no tiene columna de empresa"*. Sacarlo no rompe nada suyo.
+>
+> ### El código de Boston tampoco se filtró a las otras tablas, y está medido
+>
+> Los backfills de 8-ago (`guia_items.cliente_codigo`, `cheques.cliente_codigo`, `directorio_clientes.cliente_codigo`, `mk_proyectos.tienda_codigo`) también parean por nombre normalizado y corrieron DESPUÉS de la carga de Boston — pero traían dos guardas: `codigo LIKE 'D-%'` y un `NOT EXISTS` de gemelo con el mismo nombre. Medido en producción: **0 códigos que no sean del grupo en las 4 tablas.**
+>
+> ⚠️ Ojo con la guarda de FORMA: se evaluó un `CHECK` sobre `clientes_master.codigo` (`D-<n>` o `TCKCTA`) y **NO SIRVE** — el grupo tiene el código **`12188`**, pelado y numérico. Habría rechazado a un cliente legítimo. Por eso la garantía estructural es la puerta de escritura + el barrido, no la forma del código.
+>
+> ### La limpieza de lo ya cargado
+>
+> `node scripts/_verif-clientes-master-boston.mjs` (**solo lectura**, no borra nada) aplica la MISMA regla de `soloClientesDelGrupo()` y reporta: **se quedan 150, se marcarían 4.914** (4.883 de Boston + 31 que Switch conoce en boston+ACS), de las cuales **4.910 entraron el 28-jul-2026**. Los **3 huérfanos se quedan** (`D-201`, `D-173`, `D-101`): Switch no conoce su código y `mundos.ts` ya explicó que esconderlos rompe el Directorio. Se recomienda **soft delete** (`deleted = true`) y no `DELETE`: la columna existe, todos los lectores del ranking, la ficha, el Directorio y el CXC filtran `deleted = false`, y es reversible con un `UPDATE`. **El script imprime el SQL pero no lo ejecuta.**
+>
+> ### Candados
+>
+> `src/__tests__/lib/clientes-master-solo-del-grupo.test.ts` (10) — dos BARRIDOS y una prueba de CONDUCTA. El barrido SQL arma la definición FINAL de cada VIEW/MV/FUNCTION del repo (mismo motor que `cxc-boston-fuera-de-toda-superficie`) y exige que ninguna una la TABLA `clientes_master` por `nombre_normalized`: **un objeto SQL nuevo nace vigilado**. Incluye un caso que prueba el DETECTOR contra el SQL roto, el sano y el correcto-por-código — un barrido que no distingue los tres no sirve. El de conducta llama al sync REAL con supabase doblado y **cuenta qué consulta salió**: que la lista contenga las 6 no prueba que la consulta las use.
+> - 🔑 **Se prohíbe el JOIN, NO los nombres repetidos**, y la razón es la medición de arriba: quedan 3 homónimos legítimos entre clientes del propio grupo. Un test de datos que fallara por ellos estaría rojo para siempre y terminaría silenciado; además falla o pasa por razones que ningún cambio de código causó, así que no protege ninguna ruta. El join es estructural, se caza en el build, y caza la PRÓXIMA superficie.
+> - **Verificado por mutación, 15 de 15 cazadas + 1 control en verde** (`bash scripts/_mutar-candados-clientes-master.sh`): el sync vuelve al `.neq` de ACS · alguien "agrega" Boston a la inclusión · el sync se olvida de joystep · el sync no acota nada · la MV vuelve a joinear la tabla por nombre · `clientes_anio()` también · la rama no-B2B también · el resolvedor pierde el `HAVING` · agrupa por (nombre, código) · deja de filtrar `deleted` · la ficha del ranking se resuelve por nombre · vuelve el filtro que escondía joystep · la lista de píldoras se escribe a mano · la PANTALLA esconde joystep al pintar · alguien agrega Boston a la tira. Control (no debe dar rojo): cambiar el tamaño del lote del upsert.
+
+---
+
+## Ventas › Clientes — faltaba JOYSTEP en la tira de empresas (2-sep-2026)
+
+> Daniel, mirando la misma pantalla: ***"deberían estar solo las 6 de Fashion Group, que son las 5 de las fotos y joystep"***.
+>
+> **Era una lista escrita a mano**, y el comentario que estaba al lado afirmaba que joystep se ocultaba por *"decisión visual"* — no lo era: se quedó en 5 cuando joystep entró al grupo. **Es la CUARTA vez que este repo paga una lista de empresas copiada a mano** (el precedente exacto: `ComisionesView.tsx` con su propio `.filter(k => k !== "joystep")` mientras las otras tres vistas ya leían la constante; y antes, joystep fuera de recibos y utilidad, **$15.262,00 de cobros invisibles**).
+>
+> 🔑 **Lo primero fue medir si faltaba PLATA o solo un botón**, porque llevan a arreglos distintos. **Faltaba solo el botón:** el modo «Todas» lee `clientes_agregado_12m_vw`, cuyo `b2b_only` incluye a joystep desde siempre — medido, joystep aporta **14 filas de cliente** al ranking y su venta ya estaba dentro del total del grupo. Lo que no se podía era **filtrar** por ella.
+>
+> Ahora `EMPRESA_PILLS` **se DERIVA de `B2B_EMPRESA_KEYS`** y el rótulo sale de `EMPRESA_KEY_TO_NAME`. Boston y Multifashion no aparecen porque no son del grupo: la lista nombra a las 6 que sí, no excluye a las 2 que no.
+>
+> **El criterio de empresas en las 5 pestañas de Ventas, auditado:** Comisiones deriva (`EMPRESAS_COMISIONAN` = `B2B_EMPRESA_KEYS`) ✅ · Utilidad deriva (`empresasConUtilidad()`, con `EMPRESAS_UTILIDAD_V1` solo como rótulo de respaldo mientras la migración de la v2 no corra) ✅ · Resumen muestra las 8 a propósito ✅ · Productos enumera **7** (`PRODUCTOS_EMPRESAS`: las 6 + Multifashion, sin Boston) — es OTRO conjunto a propósito, «las que tienen `switch_articulo_diario` poblado», y está completo ✅ · Clientes era la única incompleta.
+>
+> Candado: `src/__tests__/components/ventas-clientes-las-seis-empresas.test.tsx` (4). **RENDERIZA la vista real** y lee los botones: que la constante derive no prueba que la pantalla los pinte — un `.slice()`, un `hidden` o un `{cond && …}` dejarían el test verde con joystep invisible otra vez. Prueba las dos direcciones: que estén las 6 **y** que Boston/Multifashion no estén (el bug opuesto, y más caro).
+> - 🩸 **`ventas-vista-general-ipad.test.ts` CAMBIÓ DE DIRECCIÓN: era él el que fijaba el bug.** Su caso se llamaba *"las 6 píldoras siguen estando"* pero enumeraba CINCO empresas + «Todas», y exigía que los rótulos estuvieran **escritos a mano** (`label: "Vistana International"`). Hoy exige lo que ese archivo siempre quiso decir —que el rótulo no se abrevie, que es una regla de ANCHO para el iPad— y que la lista se DERIVE.
+
+---
+
 ## 🔴 Comisiones — FASHION GROUP SON SEIS EMPRESAS, y Multifashion es OTRO módulo (14-ago-2026)
 
 > Daniel, textual: ***"joystep sí debe de tener comisiones al 0.5%"***, y después, para cortar el enredo de raíz: ***"joystep mismo criterio que las otras de fashion group. multifashion es otro módulo de comisiones, ese ya está bien. me explico? no quiero que te enrredes aquí, ponlo en md."***

@@ -15,7 +15,7 @@ import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 import { ClienteSheet } from "./ClienteSheet";
 import { OtrosClientesDialog } from "./OtrosClientesDialog";
 import { SortSheet } from "./SortSheet";
-import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
@@ -34,16 +34,29 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
 // (SORT_LABELS se retiró con el subtítulo "ordenados por X": el encabezado de
 // columna activo ya muestra el criterio, y en celular lo dice el SortSheet.)
 
-// Pills visibles del filtro de empresa. Joystep, Confecciones Boston y
-// Multifashion se ocultan del filtro (decisión visual). Joystep sigue B2B y
-// permanece sumada en el agregado "Todas" — solo se quita su pill.
+// Pills del filtro de empresa: "Todas" + LAS SEIS DE FASHION GROUP.
+//
+// 🔴 SE DERIVA DE `B2B_EMPRESA_KEYS`, NO SE ENUMERA. Daniel, 2-sep-2026:
+// *"deberían estar solo las 6 de Fashion Group, que son las 5 de las fotos y
+// joystep"*. Boston y Multifashion no están porque no son del grupo — la lista
+// EXCLUYE por construcción (nombra a las 6 que sí), no por un `.filter`.
+//
+// 🩸 ACÁ FALTABA JOYSTEP, y el comentario que estaba en su lugar decía que era
+// "decisión visual". No lo era: era una lista escrita a mano que se quedó en 5
+// cuando joystep entró al grupo. Es la CUARTA vez que este repo paga una lista
+// de empresas copiada a mano — ver el post-mortem de Comisiones, donde
+// `ComisionesView.tsx` tenía su propio `.filter(k => k !== "joystep")` mientras
+// las otras tres vistas ya leían la constante.
+//
+// La PLATA nunca se perdió y está medido (2-sep-2026): el modo "Todas" lee
+// `clientes_agregado_12m_vw`, que incluye a joystep desde siempre. Lo que
+// faltaba era poder FILTRAR por ella: sus 14 clientes no se podían aislar.
 const EMPRESA_PILLS: { id: string; label: string }[] = [
-  { id: "todas",                label: "Todas" },
-  { id: "vistana",              label: "Vistana International" },
-  { id: "fashion_wear",         label: "Fashion Wear" },
-  { id: "fashion_shoes",        label: "Fashion Shoes" },
-  { id: "active_shoes",         label: "Active Shoes" },
-  { id: "active_wear",          label: "Active Wear" },
+  { id: "todas", label: "Todas" },
+  ...B2B_EMPRESA_KEYS.map((key) => ({
+    id: key,
+    label: EMPRESA_KEY_TO_NAME[key] ?? key,
+  })),
 ];
 
 // Pills donde la fila agregada "Otros clientes" NO se renderiza.
