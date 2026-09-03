@@ -220,7 +220,7 @@ Tampoco migran las píldoras relativas (Mes/3m/6m/12m): no son fechas, son venta
 ---
 ---
 
-# Lo que cambió después — 1 y 2 de septiembre de 2026
+# Lo que cambió después — 1, 2 y 3 de septiembre de 2026
 
 > Esta sección la mantiene el asistente al cierre de cada sesión. Lo de arriba es la foto del 31-ago tal cual la escribió Daniel; esto es el delta.
 
@@ -239,6 +239,13 @@ Tampoco migran las píldoras relativas (Mes/3m/6m/12m): no son fechas, son venta
 | **Ventas › Clientes** | Tres defectos. (1) **Boston estaba dentro de `clientes_master`** (4.914 de 5.064 filas) y el ranking unía por nombre: City Mall David decía $227.872 y son **$113.936**. Boston fuera (soft delete), y el ranking une por **código** vía `(empresa_key, cliente_switch_id)`. (2) **Faltaba Joystep** en los filtros de empresa. (3) **El mostrador** se buscaba por nombre y encontraba 1 de 6: decía $25.835 y son **$54.478**. Los tres con migración aplicada por Daniel. |
 | **Boston** | Sus **clientes** ya no se ven en ninguna superficie del grupo (ni por URL: `/api/clientes/<código>` contesta 404). Sus **ventas** siguen sumando en Vista General y Ventas › Resumen — decisión de Daniel: *«su plata suma, sus clientes no se ven»*. |
 | **Acceso a Switch** | Las 8 URLs del panel están en `.env.local` (gitignored). Verificado login en las 8. Ya se puede consultar cualquier empresa al momento sin depender de crons ni de Analítica. |
+| **Ventas — «vs año anterior», 7 lugares** (3-sep) | Clientes comparaba 8 meses contra 9 (+3% → **+36%** Multi Fashion Holding). Una auditoría medida encontró 6 más con el mismo error: Resumen › Anual (grupo −7,0% → **+2,5%**, 5 de 8 cambian de signo) · Resumen › mes×año (Boston −93,5% → **+2,2%**) · Vista General · Productos de Ventas y de Multifashion (un día de más al año pasado, siempre) · Vendedoras (decía «vs año pasado», comparaba vs mes anterior → **rótulo corregido**, decisión de Daniel) · la RPC del Resumen cortaba en UTC. Definición única en `clientes-corte-comparativo.ts`. **Migración `20260910120000` (corte en Panamá) pendiente de aplicar** — hasta entonces Resumen/Anual/Vista General comparan mismos días pero con corte UTC. |
+| **CXC — últimos 3 pagos** (3-sep) | Al lado del nombre, botón «Últimos pagos ›»: un clic, la fila sigue cerrada, sub-fila con los 3 últimos por empresa. Mismo patrón que Boston ya tenía. Celular igual. Boston con su consulta aparte. |
+| **Gastos** (3-sep) | Primera corrida verde con el arreglo: 10:35 UTC, 7 empresas, 0 descartados, Vistana de vuelta en 378. |
+| **Herramientas** (3-sep) | 5 skills (`supabase-postgres-best-practices`, `vercel-react-best-practices`, `numero-no-cuadra`, `traer-reporte-switch`, `cerrar-sesion`). `npm run migrar <archivo.sql>` aplica una migración desde la terminal con confirmación; necesita `SUPABASE_ACCESS_TOKEN` en `.env.local`. Las 8 URLs del panel de Switch en `.env.local`, login verificado en las 8. `docs/switch-referencia.md`: los 14 PDFs oficiales digeridos con 86 citas de página. |
+| **Verificado contra Switch** (3-sep) | El precio editado en un pedido **sí** llega a la factura (271 de 272 renglones; el parámetro 0072 está apagado en las 4 empresas — no encenderlo). La sesión única es **por USUARIO**: el sistema entra como `daniel` y por eso cada cron lo expulsa del panel. |
+| **Tests** (3-sep) | Suite en **cero rojos** por primera vez: los 3 de catálogo fallaban porque el test miraba el calendario real (pedido de agosto, lista abre el mes en curso). Fecha fija. |
+| **Análisis para Daniel** (3-sep) | Bolsas de ACS (censo de 14.462 tickets: 60% de 1 ítem; de los con calzado, 54% son un par y nada más). Inventario de ACS: $123K a costo, gira en 3,4 meses, compra el 84% de lo que vende (no acumula; el +36% de compras al grupo es normalización tras vaciar en 2025). $34,8K sin rotación en 90 días; lo peor son colores de cartera que no rotan mientras el color bueno se agotó, y 63 artículos que venden bien están en cero. Daniel confirmó ajuste de inventario de ~$68K y que ACS compra 100% al grupo. |
 | **Documentación** | `CLAUDE.md` ganó «Dónde vive cada dato» (mapa por pregunta, con advertencias de para qué NO sirve cada tabla) y «Cómo trabajar con Daniel». Skill nueva `switch-cambio-algo`. Este archivo. |
 
 ## Decisiones de Daniel del 1 y 2 de septiembre
@@ -254,10 +261,14 @@ Tampoco migran las píldoras relativas (Mes/3m/6m/12m): no son fechas, son venta
 | ¿Usuario dedicado `sistema-api` en Switch por empresa? | **No.** (3-sep) Se confirmó midiendo que la sesión de Switch es por USUARIO y que cada cron expulsa a Daniel del panel; la solución era un usuario aparte por empresa. Daniel: *«no»*. El sistema sigue entrando como `daniel` y la regla de ≥15 min entre crons de la misma empresa se queda. **No volver a proponerlo.** |
 | ¿Los 4 reportes de Switch que sobrevivieron? | **Ninguno.** (3-sep) *«No me interesa saber qué factura pagó, solo ver sus últimos 3 pagos y fecha en CXC»* — eso se hizo. Ventas por renglón de ACS: *«solo quiero saber cuánto se vendió, y eso ya lo tengo al centavo»*. Ingresos varios e inventario a fecha: tampoco. Preguntas de inventario y análisis se las hace al asistente directo, no se construyen pantallas. |
 | ¿El documento de $266M en la cartera de Boston? | **Olvidarlo.** (3-sep) Daniel: *«quiero olvidar esto»*. No listar como pendiente. |
+| ¿Vendedoras de Multifashion: arreglar la comparación o el rótulo? | **El rótulo.** (3-sep) *«el rótulo (que diga "vs mes anterior", que es lo que hace)»*. Ahora dice «Δ vs agosto 2026». |
+| ¿Tandas de fechas 2, 3 y 4 (unificar selectores de mes/año)? | **Eliminadas.** (3-sep) *«elimínalo»*. Cosmético, con riesgo, nadie se queja. |
+| ¿Analítica de Switch? | **No hace falta.** (3-sep) *«no necesitas Analítica para consultar, tienes el acceso a cada switch»*. Se entra por la web con usuario y contraseña. |
+| ¿Cómo mandarle comandos? | Con el prefijo `!` desde el chat, **siempre con ruta absoluta**, o directo en su terminal. Un `.sql` no se ejecuta: se copia con `pbcopy` o se aplica con `npm run migrar`. *«así es como me gusta»* (el `!`). |
 | ¿Cómo trabajar? | **Mapear → definir juntos → ejecutar.** Nunca código antes de que él defina. Mockup de ahora/después solo cuando hace falta, visual, sin párrafos. |
 
-## Pendientes vivos al 2-sep (los del 31-ago siguen salvo los marcados ✅)
+## Pendientes vivos al 3-sep (los del 31-ago siguen salvo los marcados ✅)
 
 - ✅ **Ventas › Clientes «vs 2025» compara 8 meses contra 9** (cortaba el año anterior a fin de mes). Multi Fashion Holding decía +3% y es **+36%**; medido sobre los 115 del ranking, 37 cambiaban de número y 6 de signo. Arreglado el 3-sep con la regla de «mismos días»: **migración `20260909120000_clientes_vs_anio_anterior_mismos_dias.sql` pendiente de que Daniel la aplique** — hasta entonces la columna sigue como estaba.
 - **1.363 fichas de Reebok** sin traer (artículos sin existencia). Drenan solas a 400/día.
-- **Documentación oficial de Switch** (14 PDFs) en digestión → `docs/switch-referencia.md`.
+- ✅ Documentación de Switch digerida → `docs/switch-referencia.md` (3-sep).
