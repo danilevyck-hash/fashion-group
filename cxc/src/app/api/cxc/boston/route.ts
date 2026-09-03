@@ -110,6 +110,10 @@ export async function GET(req: NextRequest) {
     return {
       tambien_en_grupo: enGrupo.has(String(r.nombre_normalized)),
       codigo: r.codigo as string,
+      // El id de Switch viaja para que la pestaña pueda pedir los últimos 3
+      // pagos de ESTE cliente a `/api/cxc/boston/ultimos-pagos` — los recibos
+      // de Boston se cruzan por id, no por código (ver esa ruta).
+      cliente_switch_id: r.cliente_switch_id == null ? null : Number(r.cliente_switch_id),
       nombre: (r.nombre as string) || (r.codigo as string),
       nombre_normalized: r.nombre_normalized as string,
       d0_90: Number(r.d0_90) || 0,

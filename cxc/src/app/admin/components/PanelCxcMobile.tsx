@@ -27,6 +27,8 @@ import SyncStatus from "@/components/shared/SyncStatus";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
+import UltimosPagos from "@/components/cxc/UltimosPagos";
+import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
 import {
   CXC_GRUPO_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -671,6 +673,10 @@ function MobileClientExpanded({
     [client.companies],
   );
 
+  // Últimos 3 pagos por empresa. Este bloque se monta SOLO al expandir la
+  // tarjeta (el padre lo condiciona con `isExpanded`), así que ya está activo.
+  const ultimosPagos = useUltimosPagosGrupo(codigo, true);
+
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
       <div className="mb-2 flex items-baseline justify-between gap-2">
@@ -703,6 +709,10 @@ function MobileClientExpanded({
             <p className={`mt-0.5 text-xs ${row.ultimaCompraFecha ? "text-gray-500" : "text-gray-400"}`}>
               {ultimaCompraLabel(row.ultimaCompraFecha, row.ultimaCompraMonto)}
             </p>
+            {/* Los últimos 3 pagos de ESTA empresa, con fecha. Es el detalle
+                de la línea «Último pago» de arriba, y va adentro de la misma
+                tarjeta para que no se mezcle con el de otra empresa. */}
+            <UltimosPagos pagos={ultimosPagos.de(row.key)} compacto />
           </li>
         ))}
       </ul>

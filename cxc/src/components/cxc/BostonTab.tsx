@@ -13,7 +13,7 @@
 // ese tramo. Los tramos de Boston (d0_90 / d91_120 / d121_plus) se mapean a los
 // nombres del módulo (current / watch / overdue) — son los MISMOS cortes.
 
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
 import { fmt } from "@/lib/format";
 import { CARTERA_BOSTON } from "@/lib/cxc/cartera";
@@ -22,6 +22,9 @@ import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncStatus from "@/components/shared/SyncStatus";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
+import UltimosPagos from "@/components/cxc/UltimosPagos";
+import { TITULO_ULTIMOS_PAGOS } from "@/lib/cxc/ultimos-pagos";
+import { useUltimosPagosBoston } from "@/components/cxc/useUltimosPagosBoston";
 import {
   ordenEfectivo,
   ordenAlTocarTitulo,
@@ -35,6 +38,8 @@ import {
 
 interface ClienteBoston {
   codigo: string;
+  /** Id de Switch: la llave con la que se piden sus últimos pagos. */
+  cliente_switch_id: number | null;
   nombre: string;
   nombre_normalized: string;
   d0_90: number;
@@ -123,6 +128,30 @@ function fechaCorta(iso: string | null) {
   return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** El bloque «Últimos pagos» de UN cliente de Boston. Se monta solo cuando el
+ *  usuario lo abre, y en ese momento pide los 3 pagos a la ruta de Boston. */
+function BostonUltimosPagos({ clienteSwitchId }: { clienteSwitchId: number | null }) {
+  const pagos = useUltimosPagosBoston(clienteSwitchId);
+  return <UltimosPagos pagos={pagos} compacto />;
+}
+
+/** El botón que abre/cierra ese bloque. Alto táctil de 44 px: la pestaña se
+ *  usa desde el celular. */
+function BotonUltimosPagos({ abierto, onToggle, nombre }: { abierto: boolean; onToggle: () => void; nombre: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={abierto}
+      aria-label={`${TITULO_ULTIMOS_PAGOS} de ${nombre}`}
+      className="inline-flex min-h-[44px] items-center gap-1 text-xs font-medium text-blue-600 active:opacity-70"
+    >
+      {TITULO_ULTIMOS_PAGOS}
+      <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${abierto ? "rotate-90" : ""}`} fill="currentColor" aria-hidden><path d="M3 1l5 4-5 4V1z"/></svg>
+    </button>
+  );
+}
+
 /** Barrita de color de la fila: el tramo más viejo con deuda manda. */
 function colorFila(c: ClienteBoston) {
   if (c.d121_plus > 0) return "bg-red-500";
@@ -176,6 +205,10 @@ export default function BostonTab() {
     [favoritos, mutarFavoritos],
   );
   const [search, setSearch] = useState("");
+  // Qué cliente tiene abierto su bloque «Últimos pagos» (por código). Uno a la
+  // vez: es un detalle que se mira y se cierra, no una segunda tabla.
+  const [pagosAbiertos, setPagosAbiertos] = useState<string | null>(null);
+  const alternarPagos = (codigo: string) => setPagosAbiertos((a) => (a === codigo ? null : codigo));
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [ordenOverride, setOrdenOverride] = useState<OrdenOverride | null>(null);
 
@@ -333,6 +366,9 @@ export default function BostonTab() {
                   {c.ultimo_pago_monto != null && ` · $${fmt(c.ultimo_pago_monto)}`}
                 </p>
               )}
+              {/* Los últimos 3 pagos, con fecha, SOLO de la cartera de Boston. */}
+              <BotonUltimosPagos abierto={pagosAbiertos === c.codigo} onToggle={() => alternarPagos(c.codigo)} nombre={c.nombre} />
+              {pagosAbiertos === c.codigo && <BostonUltimosPagos clienteSwitchId={c.cliente_switch_id} />}
             </div>
           </div>
         ))}
@@ -363,7 +399,8 @@ export default function BostonTab() {
           </thead>
           <tbody>
             {filtrados.map((c) => (
-              <tr key={c.codigo} className="border-b border-gray-50 last:border-0">
+              <Fragment key={c.codigo}>
+              <tr className="border-b border-gray-50 last:border-0">
                 <td className="px-4 py-3">
                   <span className="flex items-center gap-2">
                     <span className={`w-1 h-8 rounded-full shrink-0 ${colorFila(c)}`} aria-hidden />
@@ -378,6 +415,9 @@ export default function BostonTab() {
                         también en el grupo
                       </span>
                     )}
+                  </span>
+                  <span className="block pl-5 -mt-2 -mb-3">
+                    <BotonUltimosPagos abierto={pagosAbiertos === c.codigo} onToggle={() => alternarPagos(c.codigo)} nombre={c.nombre} />
                   </span>
                 </td>
                 <td className={`px-3 text-right tabular-nums ${c.d0_90 ? AGING.current.text : "text-gray-300"}`}>{c.d0_90 ? fmt(c.d0_90) : "—"}</td>
@@ -397,6 +437,14 @@ export default function BostonTab() {
                 </td>
                 <td className="px-4 text-right font-semibold tabular-nums">{fmt(c.total)}</td>
               </tr>
+              {pagosAbiertos === c.codigo && (
+                <tr className="border-b border-gray-50 bg-gray-50/80">
+                  <td colSpan={6} className="px-9 pb-3">
+                    <BostonUltimosPagos clienteSwitchId={c.cliente_switch_id} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -143,6 +143,7 @@ export default function ClientTable({
             companyFilter={companyFilter}
             roleCompanies={roleCompanies}
             onOpenEstado={onOpenEstado}
+            activo={isExpanded}
           />
         </AccordionContent>
       </div>

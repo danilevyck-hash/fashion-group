@@ -508,7 +508,7 @@ Los CHATS siguen siendo dos; lo que hay son **tres tratos**. `enviarNegocioPriva
 - **Draft auto-save:** formularios de reclamos, guías, cheques se guardan cada 5s en localStorage
 - **Time grouping:** cheques y guías agrupados por "Hoy/Esta semana/Vencidos"- **Contextual color:** tinte rojo/ámbar ambient cuando hay datos urgentes
 - **Inline previews:** último contacto, días para depósito, próxima deducción visibles sin expandir
-- **Hover preview:** cards ricas en CXC al hover 500ms sobre nombre de cliente
+- **Hover preview:** cards ricas al hover sobre el nombre de un cliente — vive en **Ventas › Clientes** (`ClienteHoverCard`), NO en Cuentas por Cobrar (verificado 3-sep-2026: el CXC no tiene hover; su detalle es la fila expandida, con desglose por empresa y «Últimos pagos»)
 - **URL state:** filtros persisten en URL (?risk=vencido&empresa=fashion_wear) — deep links y back/forward funcionan
 - **UI persistence:** filas expandidas y scroll position sobreviven navegación (sessionStorage)
 - **Offline:** banner "Sin conexión" (informativo) + botones deshabilitados sin red. NO hay lectura offline: el Modo Viaje (snapshots localStorage + cache de páginas del SW) se eliminó en jul 2026
