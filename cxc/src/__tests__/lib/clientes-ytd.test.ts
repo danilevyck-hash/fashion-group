@@ -19,6 +19,7 @@ import {
   sumarCentavos,
   TIPOS_QUE_SUMAN,
 } from "@/lib/clientes-ytd";
+import { esMostrador } from "@/lib/clientes/mostrador";
 
 describe("el año se corta en hora de PANAMÁ, no en UTC", () => {
   // Es el bug que esta casa ya pagó dos veces (Proveedores y el YTD que se
@@ -206,10 +207,39 @@ describe("las empresas del grupo vuelven al ranking SIN mover los totales", () =
     expect(filtro).not.toContain("CONFECCIONES BOSTON");
   });
 
-  it("deja excluidos los genéricos de mostrador, que no son un cliente", () => {
+  it("en su día dejó excluidos los genéricos de mostrador POR NOMBRE", () => {
+    // 🩸 ESTE TEST CAMBIÓ DE DIRECCIÓN EL 2-SEP-2026, Y NO SE BORRA: es la foto
+    // del criterio que costó plata. Esta migración (27-jul) sacaba al mostrador
+    // por su NOMBRE, y ese archivo es historia — se lee tal cual quedó.
+    //
+    // Lo que el criterio no podía saber es que el mostrador **se llama distinto
+    // en cada empresa**: `Contado` en joystep/active_wear/active_shoes, `VENTAS`
+    // en fashion_wear/vistana y `VENTAS LOCA` —truncado— en fashion_shoes. La
+    // lista mataba cinco de seis y dejaba pasar al sexto de casualidad, porque
+    // dice `VENTAS LOCALES` y Switch escribe `VENTAS LOCA`. La fila ámbar de
+    // Ventas › Clientes terminó mostrando $25.835,65 de $54.478,59.
+    //
+    // La regla vigente está abajo: se reconoce por CÓDIGO (`TCKCTA`).
     const filtro = migracion.slice(migracion.indexOf("filtered AS ("), migracion.indexOf("keyed AS ("));
     for (const generico of ["CONTADO", "VENTAS", "VENTAS LOCALES", "(Sin nombre)"]) {
       expect(filtro).toContain(generico);
+    }
+  });
+
+  it("🔴 HOY el mostrador se reconoce por CÓDIGO, y la última migración manda", () => {
+    // La migración en vigor deja pasar a `TCKCTA` para que la pantalla pueda
+    // mostrarlo APARTE — sigue fuera del ranking, pero ahora llegan los seis.
+    // Comparar por nombre volvió a ser lo que era: un colador.
+    const vigente = fs.readFileSync(
+      path.join(raiz, "..", "supabase/migrations/20260908120000_mostrador_por_codigo.sql"),
+      "utf8");
+    const ejecutable = vigente.split("\n").filter(l => !l.trim().startsWith("--")).join("\n");
+    const filtros = [...ejecutable.matchAll(/filtered AS \(([\s\S]*?)\n\s*\),/g)].map(m => m[1]);
+    expect(filtros.length, "las dos ramas del ranking tienen que decir lo mismo").toBe(2);
+    for (const f of filtros) expect(f).toContain("'TCKCTA'");
+    expect(esMostrador("TCKCTA")).toBe(true);
+    for (const nombre of ["Contado", "VENTAS", "VENTAS LOCA", "VENTAS LOCAL"]) {
+      expect(esMostrador(nombre), nombre).toBe(false);
     }
   });
 

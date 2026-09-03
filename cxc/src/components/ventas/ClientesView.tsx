@@ -17,6 +17,7 @@ import { OtrosClientesDialog } from "./OtrosClientesDialog";
 import { SortSheet } from "./SortSheet";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
+import { esMostrador } from "@/lib/clientes/mostrador";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 
@@ -79,10 +80,28 @@ const OTROS_CLIENTES_PISTA = "Tocar para ver el detalle";
 const textoComparativo = (anio: number) =>
   `El cambio compara contra el mismo período de ${anio}`;
 
-// "VENTAS LOCAL" es el cliente-mostrador (ventas de contado en tienda), no un
-// cliente real → se marca y se saca del ranking de clientes. (Distinto de
-// "VENTAS MAHER", que sí es cliente real.)
-const isVentasLocal = (nombre: string) => nombre.trim().toUpperCase() === "VENTAS LOCAL";
+// El mostrador (ventas de contado en tienda) no es un cliente real → se marca y
+// se saca del ranking. Se reconoce por su CÓDIGO, `esMostrador(c.id)`.
+//
+// 🩸 ACÁ DECÍA `nombre.trim().toUpperCase() === "VENTAS LOCAL"`, Y ESO ES LO QUE
+// HACÍA QUE LA FILA ÁMBAR MOSTRARA UNA EMPRESA DE SEIS: $25.835,65 cuando el
+// mostrador del grupo es $54.478,59 (medido el 2-sep-2026). **Identificar un
+// cliente por su nombre falla porque el nombre es de cada empresa; el código es
+// del grupo.** El mostrador es `TCKCTA` en las seis y se llama distinto en cada
+// una — "Contado" en joystep/active_wear/active_shoes, "VENTAS" en
+// fashion_wear/vistana, "VENTAS LOCA" (truncado) en fashion_shoes. **Ninguna se
+// llama "VENTAS LOCAL"**: ese texto salía de `clientes_master`, que tiene UNA
+// fila `TCKCTA` con el nombre canónico, y el join se lo pegaba encima a la única
+// fila que sobrevivía. Por eso a veces coincidía y casi siempre no.
+//
+// Es la MISMA regla que Daniel fijó esta mañana para todo el ranking (commit
+// 44be9b16, *"se debería de usar el código del cliente, ya que todos los D-24
+// son de City Mall across mis 6 empresas"*): el código es la identidad, el
+// nombre varía. El defecto seguía vivo un piso más arriba, acá y en el
+// `filtered` del SQL — ver `20260908120000_mostrador_por_codigo.sql`.
+//
+// `esMostrador` es la definición que ya usaban las RPC de comisión y el checkout
+// público. No se copia: se importa.
 
 interface ClientesViewProps {
   data: Clientes;
@@ -233,18 +252,45 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   // YTD strict o año cerrado.
   const vistaChipTone = is12mView ? "bg-teal-50 text-teal-700" : "bg-gray-100 text-gray-700";
 
-  // Universo según el PERÍODO (no el sort). VENTAS LOCAL queda fuera (se muestra
+  // Universo según el PERÍODO (no el sort). El mostrador queda fuera (se muestra
   // marcado aparte, fuera del ranking). Esto define qué huérfanos van a "Otros".
   const universe = useMemo(() => {
-    const base = data.rows.filter(c => !isVentasLocal(c.nombre));
+    const base = data.rows.filter(c => !esMostrador(c.id));
     return is12mView ? base : base.filter(c => c.ytd > 0);
   }, [data.rows, is12mView]);
 
-  // Fila-mostrador "VENTAS LOCAL" (si existe en el universo de datos cargado).
-  const ventasLocalRow = useMemo<Cliente | null>(
-    () => data.rows.find(c => isVentasLocal(c.nombre)) ?? null,
-    [data.rows],
-  );
+  // La fila-mostrador: SUMA de todas las filas de mostrador que llegaron.
+  //
+  // 🔑 NO ES UN `find`, Y ES LO QUE HACE QUE EL NÚMERO SEA EL CORRECTO. El grano
+  // del ranking es (cliente, EMPRESA), así que el mostrador llega como una fila
+  // POR EMPRESA; quedarse con la primera es mostrar una sexta parte y llamarla
+  // el total.
+  //
+  // 🔴 Y ES COHERENTE CON EL FILTRO POR CONSTRUCCIÓN: se suma lo que llegó, y lo
+  // que llega ya lo decidió el filtro de empresa en el servidor. Con "Todas" es
+  // el mostrador del grupo; con una empresa elegida, el de esa empresa. Acá no
+  // hay ninguna lista de empresas que se pueda desincronizar del filtro — la
+  // única forma de que esta fila sume una empresa que el usuario excluyó sería
+  // que el servidor se la mandara, y entonces el bug estaría allá.
+  const mostradorRow = useMemo<Cliente | null>(() => {
+    const filas = data.rows.filter(c => esMostrador(c.id));
+    if (filas.length === 0) return null;
+    const ytd = filas.reduce((s, f) => s + f.ytd, 0);
+    const ultimaIso = filas.map(f => f.ultimaIso).filter(Boolean).sort().pop() ?? "";
+    // El nombre solo se muestra si las filas están de acuerdo. Con la fila de
+    // `clientes_master` puesta llegan todas como "VENTAS LOCAL"; si algún día no
+    // estuviera, cada empresa traería el suyo y elegir uno sería rotular seis
+    // mostradores con el nombre de uno. La etiqueta ámbar y la pista de abajo ya
+    // dicen qué es esta fila.
+    const nombres = new Set(filas.map(f => f.nombre.trim()));
+    return {
+      ...filas[0],
+      nombre: nombres.size === 1 ? filas[0].nombre : "",
+      ytd,
+      ultimaIso,
+      ultima: filas.find(f => f.ultimaIso === ultimaIso)?.ultima ?? "",
+    };
+  }, [data.rows]);
 
   // Huérfanos del universo actual (cliente_id NULL en la materialized view).
   // Sólo aplica para pills B2B; Boston/Multi se manejan sin Otros row.
@@ -556,18 +602,22 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                   />
                 );
               })}
-              {ventasLocalRow && !search.trim() && (
-                <tr className="bg-amber-50/40">
+              {mostradorRow && !search.trim() && (
+                // `data-fila-mostrador` es el ancla ESTABLE que cruza fila y
+                // tarjeta en el candado, igual que `data-fila-cliente`. Buscar
+                // el monto por su texto encontraría los dos renders (la tabla y
+                // la tarjeta) y no distinguiría CUÁL de los dos está mal.
+                <tr data-fila-mostrador className="bg-amber-50/40">
                   <td className="border-b border-gray-200 px-2.5 py-3 text-right">
                     <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">Mostrador</span>
                   </td>
                   <td className="border-b border-gray-200 px-2.5 py-3 text-sm font-medium text-gray-700" colSpan={2}>
-                    {ventasLocalRow.nombre}
+                    {mostradorRow.nombre}
                     <span className="ml-2 text-xs font-normal text-gray-500">ventas de contado · fuera del ranking</span>
                   </td>
-                  <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-sm font-medium text-gray-700 tabular-nums">{fmtMoney(ventasLocalRow.ytd)}</td>
+                  <td data-col="ytd" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-sm font-medium text-gray-700 tabular-nums">{fmtMoney(mostradorRow.ytd)}</td>
                   <td className="border-b border-gray-200 px-2.5 py-3 text-right text-gray-400">—</td>
-                  <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{ventasLocalRow.ultima || "—"}</td>
+                  <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{mostradorRow.ultima || "—"}</td>
                 </tr>
               )}
               {filtered.length === 0 && (
@@ -601,15 +651,15 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
             />
           );
         })}
-        {ventasLocalRow && !search.trim() && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+        {mostradorRow && !search.trim() && (
+          <div data-fila-mostrador className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
             <div className="flex items-center gap-2">
               <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">Mostrador</span>
-              <span className="text-sm font-medium text-gray-700">{ventasLocalRow.nombre}</span>
+              <span className="text-sm font-medium text-gray-700">{mostradorRow.nombre}</span>
             </div>
             <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
               <span>ventas de contado · fuera del ranking</span>
-              <span className="font-mono tabular-nums text-gray-700">{fmtMoney(ventasLocalRow.ytd)}</span>
+              <span data-col="ytd" className="font-mono tabular-nums text-gray-700">{fmtMoney(mostradorRow.ytd)}</span>
             </div>
           </div>
         )}

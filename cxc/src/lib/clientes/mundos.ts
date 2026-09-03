@@ -118,13 +118,13 @@ export function esCodigoDeCliente(codigo: string | null | undefined): boolean {
  * fashion_wear/vistana y "VENTAS LOCA" en fashion_shoes (medido). Comparar por
  * nombre sería un colador — es la misma regla que ya aplican las RPC de
  * comisión y el checkout público.
+ *
+ * La definición se mudó a `./mostrador` —dos líneas puras, sin Supabase— para
+ * que una PANTALLA pueda usarla sin arrastrar el cliente de servidor que este
+ * archivo importa. Se re-exporta acá para que siga habiendo una sola puerta:
+ * quien ya lo importaba de `mundos` no cambia nada.
  */
-export const CODIGO_MOSTRADOR = "TCKCTA" as const;
-
-/** ¿Es el pseudo-cliente de mostrador y no una persona/empresa de verdad? */
-export function esMostrador(codigo: string | null | undefined): boolean {
-  return (codigo ?? "").trim().toUpperCase() === CODIGO_MOSTRADOR;
-}
+export { CODIGO_MOSTRADOR, esMostrador } from "./mostrador";
 
 /** Lo que hace falta para clasificar: qué códigos son del grupo y cuáles conoce
  *  Switch. Se leen JUNTOS porque salen de la misma tabla — dos consultas al
