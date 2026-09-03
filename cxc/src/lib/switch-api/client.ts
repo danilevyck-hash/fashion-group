@@ -398,15 +398,20 @@ async function authenticate(
  * Logins EN VUELO por empresa. Sin esto, N llamadas concurrentes que encuentran
  * el token vencido disparan N `/autenticacion` a la vez.
  *
- * 🩸 POR QUÉ IMPORTA ACÁ Y NO EN OTRO LADO: Switch admite **UNA SOLA SESIÓN por
- * empresa** — el segundo login invalida el token del primero (code 0006). O sea
- * que la estampida no sería "un login de más": sería la tanda entera quedándose
- * con tokens muertos y cayendo en cascada. Mientras TODO fue serial esto no
- * podía pasar (una llamada por vez, la primera renueva y las demás usan la
- * caché). Desde que el sync de catálogo pide `/stock` en paralelo, sí puede.
+ * 🩸 POR QUÉ IMPORTA ACÁ Y NO EN OTRO LADO: Switch admite **UN SOLO TOKEN
+ * válido por USUARIO** (PDF del API, p. 6: «Solo habrá un token válido a la vez
+ * por usuario») — el segundo login del mismo usuario invalida el token del
+ * primero (code 0006). Este comentario decía «por empresa» hasta el 3-sep-2026:
+ * coincidía porque cada empresa es su propia instancia de Switch (URL propia) y
+ * entra con UN solo usuario (`SWITCH_<EMPRESA>_API_USER`), así que «una sesión
+ * por usuario» y «una sesión por empresa» eran la misma cosa vista de dos lados.
+ * O sea que la estampida no sería "un login de más": sería la tanda entera
+ * quedándose con tokens muertos y cayendo en cascada. Mientras TODO fue serial
+ * esto no podía pasar (una llamada por vez, la primera renueva y las demás usan
+ * la caché). Desde que el sync de catálogo pide `/stock` en paralelo, sí puede.
  *
- * El de-dup es por empresa: dos empresas distintas son dos sesiones distintas y
- * deben poder autenticar a la vez.
+ * El de-dup es por empresa: dos empresas distintas son dos instancias con su
+ * propio usuario, o sea dos tokens distintos, y deben poder autenticar a la vez.
  */
 const loginEnVuelo = new Map<string, Promise<string>>();
 
@@ -571,7 +576,7 @@ export interface SwitchClient {
   getFactura(facturaId: number | string): Promise<SwitchFacturaDetalle>;
   /** Detalle de línea de una NOTA DE CRÉDITO (/apinotacredito/info).
    *
-   *  ⚠️ NO ESTÁ EN `docs/api-switch.pdf` — se descubrió probando el
+   *  ⚠️ NO ESTÁ EN `docs/switch/api-documentacion.pdf` — se descubrió probando el
    *  20-ago-2026, y es el cuarto endpoint sin documentar de este conector.
    *  Devuelve el mismo `data.detalle[]` que las facturas, con dos diferencias
    *  que importan: la CANTIDAD viene NEGATIVA, el monto POSITIVO, y la línea

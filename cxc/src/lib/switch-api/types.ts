@@ -159,8 +159,11 @@ export interface SwitchFacturaDetalle extends SwitchFactura {
  * condicionVenta ni clienteEmail. Montos como string con coma de miles.
  *
  * OJO signos: las NCs llegan con total NEGATIVO desde la API (ej. "-497.00").
- * En storage se guardan POSITIVO (ABS); el signo lo aplica el cálculo de ventas
- * netas en query time (switch_ventas_netas_vw).
+ * En storage se guardan POSITIVO (ABS); el signo se aplica en query time por
+ * `tipo_comprobante`: en TS lo dice `signoVenta()` (`src/lib/ventas/tipos-comprobante.ts`)
+ * y en SQL el CASE de `switch_ventas_unificado_vw` (Nota de Crédito = −subtotal).
+ * `switch_ventas_netas_vw`, que citaba este comentario, se borró el 26-jul-2026
+ * (`20260726210100_limpieza_tablas_y_vistas_muertas.sql`).
  */
 export interface SwitchNota {
   id: number;
@@ -256,9 +259,11 @@ export interface SwitchEstadoCuentaData {
  * (2026-05-30) probando la API real — el envelope de error es
  * { error: { code, message, http_code } }:
  *  - "0005" TOKEN EXPIRADO        (documentado)
- *  - "0006" SESIÓN ÚNICA: un 2do login a la misma empresa invalida el token del
- *           1ro. Switch es sesión única por empresa → cuando dos corridas pisan
- *           la misma empresa, la perdedora recibe 0006 y debe re-autenticar.
+ *  - "0006" TOKEN INVALIDO por sesión única: «Solo habrá un token válido a la
+ *           vez por USUARIO» (PDF del API, p. 6). Como cada empresa entra con un
+ *           único usuario de API, un 2do login a la misma empresa invalida el
+ *           token del 1ro → cuando dos corridas pisan la misma empresa, la
+ *           perdedora recibe 0006 y debe re-autenticar.
  *           (Confirmado 2026-06; corrige la auditoría 🟡-9 que lo creía inexistente
  *           para token.) El fix de raíz es serializar/consolidar los crons CXC
  *           para no solapar la misma empresa; tratarlo como token-error acá da

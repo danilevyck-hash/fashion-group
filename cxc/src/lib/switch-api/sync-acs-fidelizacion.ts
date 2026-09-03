@@ -13,9 +13,17 @@
  *      nueva a más vieja, tope MAX_DETALLE_POR_CORRIDA por corrida (~50
  *      nuevas/día → el excedente inicial es backfill que converge en días).
  *
- * SESIÓN ÚNICA Switch: la instancia MULTI mantiene 1 token por empresa. Este
- * sync corre en su propio cron (08:15 UTC), espaciado de multifashion-sync
- * (05:00) y de switch-sync american_classic (06:30) — nunca en paralelo.
+ * SESIÓN ÚNICA Switch: un solo token válido por USUARIO (PDF del API, p. 6), y
+ * la instancia MULTI entra con un único usuario de API → un login concurrente
+ * tumba al otro (code 0006). Este sync corre en su propio cron, 2 entradas al
+ * día: 11:30 UTC y 16:30 UTC (la 2ª es «segunda oportunidad», no-op si la 1ª ya
+ * registró success hoy). Están a ≥15 min (`SEPARACION_MINIMA_MIN`) de todo lo
+ * que toca american_classic: 11:30 va 20 min antes de las ventas de las 11:50 y
+ * 16:30 va 75 min después de los recibos de las 15:15 y 30 min antes de las
+ * ventas ACS de las 17:00 — nunca en paralelo. El cronograma vive en
+ * `SWITCH_CRON_ENTRADAS` (`src/lib/cron-telemetry.ts`) y `cron-calendario.test.ts`
+ * lo vigila. (Hasta el 3-sep-2026 este comentario citaba 08:15 UTC y un
+ * `multifashion-sync` de las 05:00 que se retiró el 26-jul-2026.)
  */
 
 import { createSwitchClient } from "./client";

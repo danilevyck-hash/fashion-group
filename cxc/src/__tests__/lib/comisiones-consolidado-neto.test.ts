@@ -199,12 +199,15 @@ describe("🔴 UNA llamada, no diez (12-ago-2026)", () => {
   // Y el 3-sep-2026 (más tarde) la vigente pasó a la v7: v6 + clientes que no
   // comisionan (Daniel: «crea configuración en comisiones para desactivar
   // cálculos de clientes»). La cadena v7 → v6 → v5 vive en el mismo módulo.
-  it("las RPC siguen siendo la MISMA para las dos pestañas (leerComision → comision_b2b_v7)", () => {
+  // CAMBIÓ DE DIRECCIÓN el 3-sep-2026 (noche): la vigente es la v8 (alias de
+  // vendedor + Venta/Cobro por separado) y la anterior la v7. Lo que se exige
+  // sigue igual: UNA función (`leerComision`) para las dos pestañas.
+  it("las RPC siguen siendo la MISMA para las dos pestañas (leerComision → comision_b2b_v8)", () => {
     expect(consolidado).toContain("leerComision(empresa, year, mes)");
     expect(consolidado).not.toMatch(/rpc\("comision_b2b_v5"/);
     const rpc = leer("src/lib/comisiones/rpc.ts");
-    expect(rpc).toContain('RPC_COMISION = "comision_b2b_v7"');
-    expect(rpc).toContain('RPC_COMISION_ANTERIOR = "comision_b2b_v6"');
+    expect(rpc).toContain('RPC_COMISION = "comision_b2b_v8"');
+    expect(rpc).toContain('RPC_COMISION_ANTERIOR = "comision_b2b_v7"');
     expect(rpc).toContain("p_empresa_key: empresa");
   });
 });

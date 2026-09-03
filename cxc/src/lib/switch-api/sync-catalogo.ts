@@ -103,7 +103,9 @@ const MAX_PAGES = 250;
  * único argumento entonces era el presupuesto del CRON (800 s) y ahí sobraba.
  *
  * ⚠️ **Requiere el de-dup de login de `client.ts` (`loginEnVuelo`).** Switch
- * admite UNA sesión por empresa; sin ese candado, N llamadas concurrentes que
+ * admite UN solo token válido por USUARIO (PDF del API, p. 6; es «una sesión por
+ * empresa» porque cada empresa entra con un único usuario de API); sin ese
+ * candado, N llamadas concurrentes que
  * encuentren el token vencido dispararían N `/autenticacion` y se matarían el
  * token entre sí (code 0006). Subir este número sin ese candado rompe el sync.
  * Candado: `catalogo-stock-paralelo.test.ts`.
@@ -319,7 +321,8 @@ const STOCK_CONCURRENCIA = 8;
  * límite de peticiones, y comprar 4 segundos apretando al proveedor no vale.
  *
  * ⚠️ Requiere el de-dup de login de `client.ts` (`loginEnVuelo`), igual que
- * `/stock`: Switch admite UNA sesión por empresa.
+ * `/stock`: Switch admite UN solo token válido por USUARIO (PDF del API, p. 6),
+ * y cada empresa entra con un único usuario de API.
  */
 const PAGINAS_CONCURRENCIA = 6;
 

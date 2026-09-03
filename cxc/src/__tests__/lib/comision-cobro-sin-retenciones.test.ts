@@ -85,14 +85,24 @@ const FILTRO_MOSTRADOR = /'TCKCTA'/;
 // es parte del candado.
 const BASES_DE_COBRO: { archivo: string; funcion: string; nota: string }[] = [
   {
+    archivo: "20260913120000_comision_vendedor_alias_v8.sql",
+    funcion: "comision_b2b_v8",
+    nota: "VIVA — la llaman las dos rutas de comisiones vía lib/comisiones/rpc (v7 + alias de vendedor + Venta/Cobro por separado, 3-sep-2026 noche)",
+  },
+  {
+    archivo: "20260913120000_comision_vendedor_alias_v8.sql",
+    funcion: "comision_b2b_detalle",
+    nota: "VIVA — v5 del detalle, en la misma DDL que la v8 (modal doc-por-doc, con el mismo alias y las mismas casillas)",
+  },
+  {
     archivo: "20260912120000_comision_exclusion_v7.sql",
     funcion: "comision_b2b_v7",
-    nota: "VIVA — la llaman las dos rutas de comisiones vía lib/comisiones/rpc (v6 + clientes que no comisionan, 3-sep-2026)",
+    nota: "red de la v8 mientras su DDL no corra (v6 + clientes que no comisionan, 3-sep-2026); se conserva para comparar",
   },
   {
     archivo: "20260912120000_comision_exclusion_v7.sql",
     funcion: "comision_b2b_detalle",
-    nota: "VIVA — v4 del detalle, en la misma DDL que la v7 (modal doc-por-doc, con la misma exclusión)",
+    nota: "v4 del detalle; sigue siendo la definición viva si la DDL de 20260913120000 no corrió",
   },
   {
     archivo: "20260911120000_comision_b2b_v6_cobro_quien_registro.sql",

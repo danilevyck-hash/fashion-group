@@ -29,8 +29,10 @@
 // la primera ya está hecha.
 //
 // Nota de identidad: el pivote es por nombre exacto (no hay vendedor_id en Switch).
-// Si un mismo vendedor está escrito distinto entre empresas, aparece partido en dos
-// filas hasta corregir el nombre en Switch — es dato, no estructura.
+// Desde la v8 (3-sep-2026) el SERVIDOR ya junta las grafías de una misma persona
+// por `comision_vendedor_alias` (REINALDO/REYNALDO/REINDALDO → REYNALDO ESPINOSA,
+// AGUAS → REY STOUTE AGUAS), así que acá llega una fila por persona. Una grafía
+// nueva que nadie cargó en el alias sí aparece partida — es dato, no estructura.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";

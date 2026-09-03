@@ -46,7 +46,8 @@
 //
 // Horario 02:30 UTC: vecinos a ≥30 min (acs-resumen-diario 01:00,
 //   cleanup-packing-lists 03:00). No toca el API de Switch, así que la regla de
-//   SEPARACION_MINIMA_MIN (sesión única por empresa) no aplica.
+//   SEPARACION_MINIMA_MIN (un solo token de Switch por usuario, y un usuario
+//   por empresa) no aplica.
 //
 // ── PASO 4 (jul-2026): poda de switch_sync_log ─────────────────────────────
 //   `switch_sync_log` crecía sin techo: 3.247 filas y nada que las borrara, a

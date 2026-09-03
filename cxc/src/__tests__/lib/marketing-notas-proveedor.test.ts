@@ -377,27 +377,29 @@ describe("7 · orden de la lista", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-describe("8 · la pantalla funciona ANTES de correr la migración", () => {
+// ⚠️ CAMBIÓ DE DIRECCIÓN el 3-sep-2026. Se llamaba "la pantalla funciona ANTES
+// de correr la migración" y exigía que 42P01/PGRST205 devolvieran lista vacía
+// con `ddlPendiente: true`. La tabla existe desde 20260808120000: hoy esos
+// códigos son un error de verdad y se propagan como cualquier otro.
+describe("8 · si la tabla no contesta, se ve — ya no se disfraza de 'falta la DDL'", () => {
   beforeEach(() => {
     respuesta.valor = { data: [], error: null };
   });
 
-  it("tabla ausente (42P01) → lista vacía + ddlPendiente, sin reventar", async () => {
+  it("tabla ausente (42P01) → LANZA (antes: lista vacía + ddlPendiente)", async () => {
     respuesta.valor = {
       data: null,
       error: { code: "42P01", message: 'relation "…" does not exist' },
     };
-    const r = await listNotasProveedor();
-    expect(r).toEqual({ notas: [], ddlPendiente: true });
+    await expect(listNotasProveedor()).rejects.toThrow(/does not exist/);
   });
 
-  it("tabla ausente para PostgREST (PGRST205) → lo mismo", async () => {
+  it("tabla ausente para PostgREST (PGRST205) → lo mismo, LANZA", async () => {
     respuesta.valor = {
       data: null,
       error: { code: "PGRST205", message: "Could not find the table" },
     };
-    const r = await listNotasProveedor();
-    expect(r.ddlPendiente).toBe(true);
+    await expect(listNotasProveedor()).rejects.toThrow(/Could not find the table/);
   });
 
   it("un error DE VERDAD sí se propaga (no se disfraza de 'falta la DDL')", async () => {

@@ -20,8 +20,11 @@
  * reusando el MISMO token (tokenCache es por-empresa, TTL 55min: 1 auth por
  * empresa cubre los 3 tipos). Es el modo que dispara el cron de producción.
  *
- * NOTA timing + sesión única (raíz del 401 / code 0006): Switch es SESIÓN ÚNICA
- * por empresa — un 2do login a la misma empresa mata el token del 1ro (0006) →
+ * NOTA timing + sesión única (raíz del 401 / code 0006): Switch admite UN SOLO
+ * token válido por USUARIO (PDF del API, p. 6: «Solo habrá un token válido a la
+ * vez por usuario»). Como cada empresa es su propia instancia y entra con un
+ * único usuario de API, en la práctica es una sesión por empresa — un 2do login
+ * a la misma empresa mata el token del 1ro (0006) →
  * 401. Antes los crons facturas (monolito), estadocuenta (x3) y costo corrían en
  * invocaciones separadas que Vercel agrupaba en un cluster, autenticando la MISMA
  * empresa concurrentemente → colisión. Fix: UN cron por GRUPO de empresas con

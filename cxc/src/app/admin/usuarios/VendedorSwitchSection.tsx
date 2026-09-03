@@ -21,7 +21,9 @@
 // arreglo. Derivarlo de `MARCAS_UI` hace que la cuarta marca aparezca sola.
 //
 // ⚠️ Cada empresa de la lista abre una sesión de Switch al abrir el modal
-// (secuencial, sesión única por empresa). No es nuevo —ya pasaba con las dos
+// (secuencial: Switch admite un solo token por USUARIO y cada empresa entra con
+// un único usuario de API, así que un login tumba al anterior de esa empresa).
+// No es nuevo —ya pasaba con las dos
 // anteriores— pero ahora son tres: abrir este modal justo en la ventana del
 // cron de esa empresa puede tumbarle el token. Es el riesgo aceptado de
 // siempre, anotado acá para que nadie lo redescubra.

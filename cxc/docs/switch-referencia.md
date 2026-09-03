@@ -4,7 +4,7 @@
 
 Fuentes (14 PDF que Switch le entregó a Daniel, 3-sep-2026):
 
-- **`API Documentación.pdf`** — «API - Switch, Documento Versión 1.0», 74 páginas, 52 métodos (§5.1 a §5.52; el índice salta el §5.36 y el §5.53 está vacío, p. 3, 49 y 74). Los ejemplos son de **2019-2020** (p. 14, 17, 23). ⚠️ **No está versionado en el repo**: `docs/switch-panel.md:8` y `src/lib/switch-api/client.ts:574` apuntan a `docs/api-switch.pdf`, que no existe. Vive en `~/Downloads/API Documentación.pdf`.
+- **`API Documentación.pdf`** — «API - Switch, Documento Versión 1.0», 74 páginas, 52 métodos (§5.1 a §5.52; el índice salta el §5.36 y el §5.53 está vacío, p. 3, 49 y 74). Los ejemplos son de **2019-2020** (p. 14, 17, 23). **Está versionado en el repo como `docs/switch/api-documentacion.pdf`** (commit `d648f4fd`), al lado de las 13 guías. (Hasta el 3-sep-2026 esta línea decía que no estaba y que vivía en `~/Downloads`; `switch-panel.md:8` y `client.ts:574` citaban una ruta `docs/api-switch.pdf` que nunca existió — ya corregidos.)
 - **Las 13 guías de usuario** — versionadas en `docs/switch/`. Su resumen completo, sección por sección, ya está en [`docs/switch-panel.md`](switch-panel.md) (§8-§23). **Aquí no se repite**: se extrae solo lo que explica un comportamiento que el sistema ve.
 
 Cómo se cita: `p. N` = página del PDF del API salvo que se nombre otra guía. Del lado nuestro, `archivo:línea` relativo a `cxc/`.
@@ -193,4 +193,4 @@ Ordenado por lo que importa. 🔴 = contradice o pide re-verificar; ⚠️ = pre
 
 15. ⚠️ **`CLAUDE.md:380` está viejo**: «Upload: 100% manual (drag-drop), no hay API/SFTP». Hay 52 métodos documentados, 25 en uso y 79 crons que viven de ellos. Esa sección describe el sistema de antes de jun-2026.
 
-16. ⚠️ **`docs/api-switch.pdf` no existe en el repo** aunque `switch-panel.md:8` y `client.ts:574` lo citan. Las 13 guías sí están en `docs/switch/`; el PDF del API debería estar al lado.
+16. ✅ **El PDF del API está en el repo: `docs/switch/api-documentacion.pdf`**, al lado de las 13 guías (commit `d648f4fd`). Este punto decía que faltaba porque `switch-panel.md:8` y `client.ts:574` citaban `docs/api-switch.pdf`, una ruta que nunca existió; las dos citas se corrigieron el 3-sep-2026.

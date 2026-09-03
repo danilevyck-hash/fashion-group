@@ -486,35 +486,40 @@ describe("el stock puede quedar NEGATIVO", () => {
   });
 });
 
-// ── cols-opcionales: sin la migración corrida ───────────────────────────────
+// ── la columna `bultos` no contesta ─────────────────────────────────────────
+//
+// ⚠️ CAMBIÓ DE DIRECCIÓN el 3-sep-2026. Se llamaba "sin la migración
+// 20260808160000 corrida" y exigía que ante PGRST204 la entrega se guardara
+// igual, SIN bultos. La columna existe desde esa migración: hoy PGRST204 es un
+// error de verdad (esquema o permiso) y guardar la entrega sin el dato que la
+// secretaria anotó sería esconderlo. Ahora la entrega NO se guarda, se deshace
+// la cabecera y el stock no se mueve.
 
-describe("sin la migración 20260808160000 corrida", () => {
+describe("si la columna `bultos` no contesta (PGRST204), la entrega falla visible", () => {
   beforeEach(() => sembrar(false));
 
-  it("la entrega se guarda igual y el stock se descuenta igual", async () => {
-    const e = await createEntrega({
-      proyectoId: PROYECTO,
-      marcas,
-      items: [{ productoId: PROD_NORTE, cantidad: 150, bultos: 5 }],
-    });
-    expect(e.items).toHaveLength(1);
-    expect(stock(PROD_NORTE)).toBe(50);
-    // Los bultos no se guardaron (no hay dónde), y eso se ve como "no anotado".
-    expect(e.items[0].bultos).toBeNull();
+  it("no se guarda a medias: rechaza, deshace la cabecera y el stock queda igual", async () => {
+    await expect(
+      createEntrega({
+        proyectoId: PROYECTO,
+        marcas,
+        items: [{ productoId: PROD_NORTE, cantidad: 150, bultos: 5 }],
+      }),
+    ).rejects.toThrow(/bultos/);
+    expect(estado.tablas.mk_entregas_muebles).toHaveLength(0);
+    expect(estado.tablas.mk_entrega_items ?? []).toHaveLength(0);
+    expect(stock(PROD_NORTE)).toBe(200);
   });
 
-  it("editar y borrar siguen devolviendo el stock", async () => {
-    const e = await createEntrega({
-      proyectoId: PROYECTO,
-      marcas,
-      items: [{ productoId: PROD_NORTE, cantidad: 150 }],
-    });
-    await updateEntrega(e.id, {
-      marcas,
-      items: [{ productoId: PROD_NORTE, cantidad: 100 }],
-    });
-    expect(stock(PROD_NORTE)).toBe(100);
-    await deleteEntrega(e.id);
+  it("tampoco se reintenta sin bultos cuando el renglón no los trae", async () => {
+    // `bultos: null` también viaja en el insert: la columna se escribe siempre.
+    await expect(
+      createEntrega({
+        proyectoId: PROYECTO,
+        marcas,
+        items: [{ productoId: PROD_NORTE, cantidad: 150 }],
+      }),
+    ).rejects.toThrow(/bultos/);
     expect(stock(PROD_NORTE)).toBe(200);
   });
 

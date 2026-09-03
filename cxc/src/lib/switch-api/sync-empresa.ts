@@ -92,7 +92,9 @@ const MAX_CLIENTES_PAGES = 2000;
  * barrido serial medido el mismo día.
  *
  * ⚠️ Requiere el de-dup de login de `client.ts` (`loginEnVuelo`): Switch admite
- * UNA sesión por empresa y N llamadas concurrentes que encuentren el token
+ * UN solo token válido por USUARIO (PDF del API, p. 6; «una sesión por empresa»
+ * en la práctica, porque cada empresa entra con un único usuario de API) y N
+ * llamadas concurrentes que encuentren el token
  * vencido dispararían N `/autenticacion` matándose el token entre sí (0006).
  */
 const ESTADOCUENTA_CONCURRENCIA = 6;
@@ -294,7 +296,10 @@ function mapFactura(empresaKey: string, f: SwitchFactura): FacturaMapResult {
  *   - tipo_comprobante se setea explícito (el endpoint no lo trae).
  *   - condicion_venta y cliente_email no vienen → null.
  *   - Montos se guardan en POSITIVO (ABS): las NCs llegan negativas del API.
- *     El signo contable lo aplica switch_ventas_netas_vw en query time.
+ *     El signo contable se aplica en query time por `tipo_comprobante`:
+ *     `signoVenta()` en `src/lib/ventas/tipos-comprobante.ts` (TS) y el CASE
+ *     de `switch_ventas_unificado_vw` (SQL). `switch_ventas_netas_vw` ya no
+ *     existe: se borró el 26-jul-2026 (`20260726210100`).
  */
 function mapNota(
   empresaKey: string,

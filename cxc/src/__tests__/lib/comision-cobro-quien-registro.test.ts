@@ -135,11 +135,13 @@ describe("🔴 comision_b2b_v6: el cobro se agrupa por quien REGISTRÓ el recibo
 // ═══ 2. El módulo que elige la RPC ═══════════════════════════════════════════
 // CAMBIÓ DE DIRECCIÓN el 3-sep-2026 (mismo día, más tarde): la vigente pasó a
 // ser la v7 (v6 + clientes que no comisionan, Daniel: «crea configuración en
-// comisiones para desactivar cálculos de clientes»). La cadena es v7 → v6 →
-// v5. Lo que este bloque siempre quiso decir —la v6 se pide ANTES que la v5 y
-// el fallback confiesa la regla— se sigue exigiendo; la v7 se dobla acá como
-// «no existe» para que la conducta v6/v5 se pruebe tal cual. La v7 tiene su
-// propio candado en comision-exclusion-v7.test.ts.
+// comisiones para desactivar cálculos de clientes»), y esa misma noche la v8
+// (alias de vendedor: «¿por qué hay 4 Reinaldo?», y Venta/Cobro por separado
+// en las exclusiones). La cadena es v8 → v7 → v6 → v5. Lo que este bloque
+// siempre quiso decir —la v6 se pide ANTES que la v5 y el fallback confiesa
+// la regla— se sigue exigiendo; la v8 y la v7 se doblan acá como «no existen»
+// para que la conducta v6/v5 se pruebe tal cual. La v7 tiene su candado en
+// comision-exclusion-v7.test.ts y la v8 en comision-alias-v8.test.ts.
 const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
 const sinFuncion = (fn: string) => ({
   data: null,
@@ -147,6 +149,8 @@ const sinFuncion = (fn: string) => ({
 });
 let respuestaV7: () => { data: unknown; error: { code?: string; message: string } | null } = () =>
   sinFuncion("comision_b2b_v7");
+// La v8 nunca existe en este arnés: se prueba la cadena de abajo.
+const respuestaV8 = () => sinFuncion("comision_b2b_v8");
 let respuestaV6: () => { data: unknown; error: { code?: string; message: string } | null } = () =>
   sinFuncion("comision_b2b_v6");
 
@@ -158,6 +162,7 @@ vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
     rpc: async (fn: string, args: Record<string, unknown>) => {
       rpcCalls.push({ fn, args });
+      if (fn === "comision_b2b_v8") return respuestaV8();
       if (fn === "comision_b2b_v7") return respuestaV7();
       if (fn === "comision_b2b_v6") return respuestaV6();
       if (fn === "comision_b2b_v5") {
@@ -196,9 +201,12 @@ describe("🔴 leerComision: v6 antes que v5, y se DICE con qué regla salió", 
   beforeEach(() => { rpcCalls.length = 0; respuestaV7 = () => sinFuncion("comision_b2b_v7"); });
 
   it("la v6 sigue en la cadena, justo antes de la v5", async () => {
-    const { RPC_COMISION_ANTERIOR, RPC_COMISION_V5 } = await import("@/lib/comisiones/rpc");
-    expect(RPC_COMISION_ANTERIOR).toBe("comision_b2b_v6");
+    // Desde la v8 la anterior es la v7; la v6 es la penúltima de la cadena.
+    const { RPC_COMISION_V6, RPC_COMISION_V5, CADENA_RPC_COMISION } = await import("@/lib/comisiones/rpc");
+    expect(RPC_COMISION_V6).toBe("comision_b2b_v6");
     expect(RPC_COMISION_V5).toBe("comision_b2b_v5");
+    const fns = CADENA_RPC_COMISION.map((c) => c.fn);
+    expect(fns.indexOf("comision_b2b_v6")).toBe(fns.indexOf("comision_b2b_v5") - 1);
   });
 
   it("con la DDL de v6 aplicada (y la v7 todavía no): llama la v6, no toca la v5, regla_cobro = quien_registro", async () => {
@@ -209,8 +217,8 @@ describe("🔴 leerComision: v6 antes que v5, y se DICE con qué regla salió", 
     expect(r.data?.regla_cobro).toBe("quien_registro");
     expect(r.data?.version).toBe("v6");
     expect(r.data?.exclusiones_aplicadas).toBe(false);
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v7", "comision_b2b_v6"]);
-    expect(rpcCalls[1].args).toEqual({ p_empresa_key: "vistana", p_year: 2026, p_mes: 7 });
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6"]);
+    expect(rpcCalls[2].args).toEqual({ p_empresa_key: "vistana", p_year: 2026, p_mes: 7 });
   });
 
   it("sin la DDL de v6: cae a la v5 y lo confiesa (regla_cobro = cartera) en vez de dejar la pantalla en blanco", async () => {
@@ -220,7 +228,7 @@ describe("🔴 leerComision: v6 antes que v5, y se DICE con qué regla salió", 
     expect(r.error).toBeNull();
     expect(r.data?.regla_cobro).toBe("cartera");
     expect(r.data?.version).toBe("v5");
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
   });
 
   it("un error TRANSITORIO de la v6 no cae a la v5 (sería repetir la misma consulta)", async () => {
@@ -228,7 +236,7 @@ describe("🔴 leerComision: v6 antes que v5, y se DICE con qué regla salió", 
     const { leerComision } = await import("@/lib/comisiones/rpc");
     const r = await leerComision("vistana", 2026, 7);
     expect(r.error?.code).toBe("57014");
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v7", "comision_b2b_v6"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6"]);
   });
 });
 

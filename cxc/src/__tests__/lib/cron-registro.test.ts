@@ -22,6 +22,13 @@
 //     un cron que de verdad dejó de correr. Se prueba con TODOS los nombres del
 //     registro, uno por uno, no con una muestra.
 //
+//  D. NINGUNA FILA DE cron_heartbeats SOBREVIVE A SU CRON (3-sep-2026). La
+//     mitad A hace que una fila huérfana no ALERTE; esta exige que no EXISTA.
+//     `sync-mayor` se retiró el 13-ago-2026 y su fila quedó tres semanas
+//     envejeciendo en silencio — nadie la barrió porque nada la denunciaba.
+//     Acá se fija el clasificador puro con la FOTO exacta de producción; la
+//     tabla real la mira src/__tests__/integration/cron-heartbeats-huerfanos.
+//
 //  C. EL REGISTRO Y vercel.json SON BIYECTIVOS. Acá está la resolución de la
 //     tensión con el fail-closed: la regla ingenua "si no está en vercel.json no
 //     alerto" sería PEOR que el bug, porque quien borrara una entrada por
@@ -48,10 +55,13 @@ import {
   HEARTBEATS_EXTERNOS,
   esCronRetirado,
   esHeartbeatNoVigilable,
+  esHeartbeatHuerfano,
+  heartbeatsHuerfanos,
   cronsStaleParaAlerta,
   cronStaleThresholdHours,
   slotHeartbeatName,
   slotRecuperadoName,
+  slotVistoName,
   SWITCH_SYNC_SLOTS,
   type HeartbeatRow,
 } from "@/lib/cron-telemetry";
@@ -227,5 +237,109 @@ describe("C. el registro y vercel.json son biyectivos", () => {
     expect(codigo, "cron-telemetry.ts no debe leer del filesystem").not.toMatch(
       /from ["'](node:)?(fs|path)["']|readFileSync|require\(/,
     );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("D. ninguna fila de cron_heartbeats sobrevive a su cron", () => {
+  const PROGRAMADOS = new Set(CRONS_EN_VERCEL);
+
+  // Las 75 filas REALES de cron_heartbeats, medidas el 3-sep-2026 23:10 UTC
+  // (solo lectura). Es la foto con la que se encontró el huérfano.
+  const FOTO_3_SEP_2026 = [
+    "acs-fidelizacion", "acs-resumen-diario", "asistencia-vigia", "backup", "backup-storage",
+    "backup-switch", "boston-cartera", "calvin-catalogo", "catalogos-fotos-nuevos:calvin",
+    "catalogos-fotos-nuevos:joybees", "catalogos-fotos-nuevos:reebok", "catalogos-fotos-nuevos:tommy",
+    "catalogos-fotos-resumen", "cheques-alert", "cleanup-packing-lists", "cleanup-sessions", "db-salud",
+    "grupo-resumen-mensual", "guias-pendientes", "integrity-check", "joybees-catalogo", "reebok-catalogo",
+    "refresh-clientes-views", "switch-articulos", "switch-reconciliacion", "switch-sync",
+    "switch-sync:all-0530", "switch-sync:all-0535", "switch-sync:all-0535#recuperado",
+    "switch-sync:all-0540", "switch-sync:all-0540#recuperado", "switch-sync:all-0630",
+    "switch-sync:all-0630#recuperado", "switch-sync:estadocuenta-1600", "switch-sync:estadocuenta-1605",
+    "switch-sync:estadocuenta-1610", "switch-sync:estadocuenta-2110",
+    "switch-sync:estadocuenta-2110#recuperado", "switch-sync:estadocuenta-2115",
+    "switch-sync:estadocuenta-2115#recuperado", "switch-sync:estadocuenta-2120",
+    "switch-sync:estadocuenta-2120#recuperado", "switch-sync:facturas-0015",
+    "switch-sync:facturas-0015#recuperado", "switch-sync:facturas-1150",
+    "switch-sync:facturas-1150#recuperado", "switch-sync:facturas-1150#visto", "switch-sync:facturas-1300",
+    "switch-sync:facturas-1300#recuperado", "switch-sync:facturas-1300#visto", "switch-sync:facturas-1500",
+    "switch-sync:facturas-1500#recuperado", "switch-sync:facturas-1700",
+    "switch-sync:facturas-1700#recuperado", "switch-sync:facturas-1700#visto", "switch-sync:facturas-1900",
+    "switch-sync:facturas-1900#recuperado", "switch-sync:facturas-1900#visto", "switch-sync:facturas-2100",
+    "switch-sync:facturas-2100#recuperado", "switch-sync:facturas-2100#visto", "switch-sync:facturas-2300",
+    "switch-sync:facturas-2300#recuperado", "switch-sync:facturas-2300#visto", "sync-articulo-info",
+    "sync-clientes-master", "sync-egresos-varios", "sync-factura-lineas", "sync-ingresos-mercancia",
+    "sync-mayor", "sync-proveedores", "sync-recibos", "sync-utilidad", "tommy-catalogo", "vigia-externo",
+  ];
+
+  it("la foto tiene las 75 filas medidas, sin repetidos", () => {
+    expect(FOTO_3_SEP_2026).toHaveLength(75);
+    expect(new Set(FOTO_3_SEP_2026).size).toBe(75);
+  });
+
+  it("en la foto del 3-sep-2026 el ÚNICO huérfano es sync-mayor", () => {
+    expect(heartbeatsHuerfanos(FOTO_3_SEP_2026, PROGRAMADOS)).toEqual(["sync-mayor"]);
+  });
+
+  it("después de la migración 20260914120000 no queda ninguno", () => {
+    const sinMayor = FOTO_3_SEP_2026.filter((n) => n !== "sync-mayor");
+    expect(heartbeatsHuerfanos(sinMayor, PROGRAMADOS)).toEqual([]);
+  });
+
+  it("CONTROL: cada cron de vercel.json tiene derecho a su fila", () => {
+    for (const cron of CRONS_EN_VERCEL) {
+      expect(esHeartbeatHuerfano(cron, PROGRAMADOS), `${cron} está en vercel.json`).toBe(false);
+    }
+  });
+
+  it("excepción 1 y 2: los slots VIVOS de switch-sync y sus marcas no son huérfanos", () => {
+    for (const s of SWITCH_SYNC_SLOTS) {
+      for (const n of [slotHeartbeatName(s.slot), slotRecuperadoName(s.slot), slotVistoName(s.slot)]) {
+        expect(esHeartbeatHuerfano(n, PROGRAMADOS), n).toBe(false);
+      }
+    }
+  });
+
+  it("excepción 3: los heartbeats MANUALES no son huérfanos (nadie los programa)", () => {
+    for (const n of HEARTBEATS_NO_CRON) {
+      expect(esHeartbeatHuerfano(n, PROGRAMADOS), n).toBe(false);
+      // Y la excepción no tapa un cron real: si alguno apareciera en vercel.json
+      // dejaría de ser manual y tendría que salir de HEARTBEATS_NO_CRON.
+      expect(CRONS_EN_VERCEL, `${n} está en vercel.json: no es manual`).not.toContain(n);
+    }
+  });
+
+  it("excepción 4: el vigía EXTERNO no es huérfano (no puede estar en vercel.json)", () => {
+    for (const n of HEARTBEATS_EXTERNOS) {
+      expect(esHeartbeatHuerfano(n, PROGRAMADOS), n).toBe(false);
+    }
+  });
+
+  it("un cron retirado, un slot retirado y sus marcas SÍ son huérfanos", () => {
+    // multifashion-sync: retirado el 26-jul-2026. facturas-2315: se movió a
+    // facturas-2300 el 26-jul-2026. Un nombre inventado: nunca existió.
+    for (const n of [
+      "multifashion-sync",
+      "sync-mayor",
+      "cron-que-no-existe",
+      slotHeartbeatName("facturas-2315"),
+      slotRecuperadoName("facturas-2315"),
+      slotVistoName("facturas-2315"),
+    ]) {
+      expect(esHeartbeatHuerfano(n, PROGRAMADOS), `${n} tendría que ser huérfano`).toBe(true);
+    }
+  });
+
+  it("las excepciones son una lista CERRADA: sin vercel.json todo lo demás es huérfano", () => {
+    // Con el conjunto de programados VACÍO solo sobreviven las 4 excepciones.
+    const vacio = new Set<string>();
+    const sobreviven = FOTO_3_SEP_2026.filter((n) => !esHeartbeatHuerfano(n, vacio)).sort();
+    // (`sync-now-refresh-vistas` es excepción pero hoy no tiene fila: nadie
+    // usó el botón todavía. Se mide sobre lo que SÍ está en la foto.)
+    const excepciones = new Set<string>([...HEARTBEATS_NO_CRON, ...HEARTBEATS_EXTERNOS]);
+    const esperadas = FOTO_3_SEP_2026.filter(
+      (n) => excepciones.has(n) || n.startsWith("switch-sync:"),
+    ).sort();
+    expect(sobreviven).toEqual(esperadas);
   });
 });

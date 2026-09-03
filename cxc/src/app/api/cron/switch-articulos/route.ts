@@ -1,8 +1,11 @@
 /**
  * Cron diario incremental: ventas por artículo/día → switch_articulo_diario.
  *
- * Schedule: 0 9 * * * UTC (después de switch-sync 5:30-6:30, utilidad 8:00,
- * recibos 8:30 — Switch es sesión única por empresa, no solapar).
+ * Schedule: 40 8 * * * UTC (espejo de vercel.json; después de switch-sync
+ * 05:30-06:30, sync-utilidad 07:00 y sync-recibos 07:50 — Switch admite un solo
+ * token válido por USUARIO y cada empresa entra con un único usuario de API, así
+ * que no solapar crons de la misma empresa: ≥15 min, `SEPARACION_MINIMA_MIN`).
+ * Hasta el 3-sep-2026 este comentario decía 09:00 / 8:00 / 8:30.
  *
  * Default (sin params): re-sincroniza los últimos 3 días (upsert) de todas las
  * empresas con facturas. Override manual: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD

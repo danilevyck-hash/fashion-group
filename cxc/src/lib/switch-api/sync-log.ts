@@ -61,8 +61,9 @@ export const FUNCTION_MAX_DURATION_S = 800;
 
 /** Margen sobre el techo antes de declarar muerta una fila 'running'. Generoso a
  *  propósito: liberar el candado de una corrida VIVA es peor que esperar de más
- *  (Switch admite UNA sola sesión por empresa; dos syncs simultáneos de la misma
- *  empresa se tumban el token entre sí, code 0006). */
+ *  (Switch admite UN solo token válido por USUARIO —PDF del API, p. 6— y cada
+ *  empresa entra con un único usuario de API, así que dos syncs simultáneos de
+ *  la misma empresa se tumban el token entre sí, code 0006). */
 const STALE_MARGIN_S = 1000;
 
 /** Ventana tras la cual una fila 'running' se considera huérfana. Se DERIVA del

@@ -4,7 +4,8 @@
 // las tablas y tarjetas de Comisiones cuando ese vendedor tiene clientes por
 // los que NO comisiona (configuración «Clientes que no comisionan», solo
 // admin). El tooltip dice cuáles. Es INFORMATIVA: quien resta es la RPC
-// (comision_b2b_v7); la lista la manda el servidor pegada a cada fila.
+// (comision_b2b_v8); la lista la manda el servidor pegada a cada fila. Si la
+// exclusión es solo de venta o solo de cobro, el tooltip lo dice.
 //
 // UNA sola pieza para las tres vistas (tabla por empresa, matriz, tarjetas):
 // el texto sale de lib/comisiones/exclusiones, nunca se escribe a mano aquí.

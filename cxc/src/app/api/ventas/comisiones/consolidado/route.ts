@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
   // pantalla sale con descuentos en 0 en vez de quedar en blanco. Un total de
   // comisiones visible vale más que una pantalla vacía.
   // Las exclusiones (clientes que no comisionan) fallan ABIERTO igual: son la
-  // marca informativa pegada al nombre; quien resta es la RPC (v7).
+  // marca informativa pegada al nombre; quien resta es la RPC (v8).
   const [porEmpresa, descuentos, exclusiones] = await Promise.all([
     Promise.all(
       EMPRESAS_COMISIONAN.map(async (empresa) => {
@@ -92,6 +92,7 @@ export async function GET(req: NextRequest) {
           regla_cobro: data.regla_cobro,
           version: data.version,
           exclusiones_aplicadas: data.exclusiones_aplicadas,
+          alias_aplicado: data.alias_aplicado,
           vendedores: data.vendedores,
         };
       }),
@@ -105,11 +106,12 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    empresas: porEmpresa.map(({ empresa, empresa_key, regla_cobro, version, exclusiones_aplicadas, vendedores }) => ({
+    empresas: porEmpresa.map(({ empresa, empresa_key, regla_cobro, version, exclusiones_aplicadas, alias_aplicado, vendedores }) => ({
       empresa_key,
       regla_cobro,
       version,
       exclusiones_aplicadas,
+      alias_aplicado,
       // El descuento es por (empresa, vendedor) y se resta del total de ESA
       // empresa — que es la celda que Daniel mira.
       // `se_paga`: DEFAULT y Daniel se calculan y se muestran, pero no entran

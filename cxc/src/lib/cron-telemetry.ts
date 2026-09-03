@@ -110,7 +110,9 @@ export const RECONCILIACION_PASS_HOURS = [10, 14, 18];
 
 // ─── El login WEB de Switch expulsa a quien esté trabajando ──────────────────
 //
-// Switch tiene dos puertas: la API JSON (token por empresa, `client.ts`) y la
+// Switch tiene dos puertas: la API JSON (`client.ts`; un solo token válido por
+// USUARIO según el PDF del API p. 6, que en la práctica es uno por empresa
+// porque cada empresa entra con un único usuario de API) y la
 // APP WEB del panel (`web-client.ts`). La segunda hace `POST /users/login` con
 // `changesession="SI"`, y ese "SI" **TOMA la sesión**: quien esté adentro del
 // panel de esa empresa queda expulsado en el acto. Peor: el usuario configurado
@@ -491,7 +493,8 @@ export const SEED_TOLERANT_CRONS = [
   // EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON). Seed-tolerante hasta que lleve días
   // sembrado; después se puede promover a CRONS_FAIL_CLOSED.
   "boston-cartera",
-  // Detalle de línea de facturas y NC (02:30 UTC = 9:30 p.m. Panamá).
+  // Detalle de línea de facturas y NC (03:30 UTC = 10:30 p.m. Panamá, espejo
+  // de vercel.json; este comentario decía 02:30 hasta el 3-sep-2026).
   // Desplegado el 24-ago-2026. Seed-tolerante DOBLE: además de la siembra
   // normal, mientras la DDL 20260824120000 no corra el cron no puede escribir y
   // no registra heartbeat — fila ausente = pendiente, no caído. Promover a
@@ -546,7 +549,9 @@ export const SEED_TOLERANT_CRONS = [
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
 // Espejo de vercel.json (SOLO las entradas que abren sesión en el Switch de
-// alguna empresa — sesión ÚNICA por empresa: un 2º login mata el token del 1º).
+// alguna empresa — Switch admite UN solo token válido por USUARIO (PDF del API,
+// p. 6) y cada empresa entra con un único usuario de API, así que en la práctica
+// es una sesión por empresa: un 2º login mata el token del 1º, code 0006).
 // Fuente única para el candado del sync manual (/api/admin/sync-now): si el
 // próximo cron que toca una empresa está a <40 min, el manual se rechaza con
 // 409 para no matarle la sesión. Al agregar/mover una entrada en vercel.json
@@ -752,8 +757,10 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
 
 /**
  * Separación MÍNIMA (minutos) entre dos entradas del cronograma que tocan la
- * MISMA empresa en Switch. Switch es sesión única por empresa: un 2º login mata
- * el token del 1º (code 0006). Un test recorre SWITCH_CRON_ENTRADAS y falla si
+ * MISMA empresa en Switch. Switch admite un solo token válido por USUARIO (PDF
+ * del API, p. 6), y como cada empresa entra con un único usuario de API, un 2º
+ * login a la misma empresa mata el token del 1º (code 0006) — por eso la
+ * separación se mide por empresa. Un test recorre SWITCH_CRON_ENTRADAS y falla si
  * alguien mete un choque — es la red que impide que un horario nuevo rompa las
  * sesiones en producción.
  *
@@ -1067,12 +1074,63 @@ export function esHeartbeatNoVigilable(cronName: string): boolean {
 }
 
 /**
+ * ¿Esta fila de cron_heartbeats es HUÉRFANA — sobrevive a un cron que ya no
+ * existe y nadie la va a volver a escribir?
+ *
+ * Es la pregunta INVERSA a `esCronRetirado`, y se hace en otro momento: aquella
+ * la contesta el watchdog en runtime para saber a quién ignorar; esta la
+ * contesta un TEST para exigir que la fila no exista. Una fila huérfana no
+ * alerta (el watchdog la salta), pero envejece para siempre y cada barrido de
+ * "crons atrasados" tiene que saltarla a mano. `multifashion-sync` (retirado el
+ * 26-jul-2026) y `sync-mayor` (13-ago-2026) quedaron así; el segundo se barre en
+ * la migración 20260914120000 y este clasificador es lo que impide que el
+ * PRÓXIMO retiro deje la suya.
+ *
+ * `cronsProgramados` son los nombres de heartbeat que salen de vercel.json —
+ * los calcula el test, porque este módulo NO puede leer vercel.json (ver
+ * `esCronRetirado`: el criterio de runtime tiene que ser una constante de
+ * código; acá no hay runtime, hay CI).
+ *
+ * EXCEPCIONES — filas legítimas que no son un cron programado, cada una con su
+ * motivo. Lista cerrada: todo lo demás que no esté en vercel.json es huérfano.
+ *   1. Un heartbeat de SLOT de switch-sync (`switch-sync:<tipo>-<hhmm>`) vivo
+ *      en el calendario. Lo escribe la entrada del cron, pero su nombre no es
+ *      el basename del path: sale de SWITCH_SYNC_SLOTS.
+ *   2. Una MARCA de la reconciliación (`#recuperado` / `#visto`) de un slot
+ *      VIVO. La escribe switch-reconciliacion, no un cron propio. La marca de
+ *      un slot retirado SÍ es huérfana: nadie la volverá a tocar.
+ *   3. HEARTBEATS_NO_CRON — acciones manuales y marcas de agua ("Actualizar
+ *      ahora", `catalogos-fotos-nuevos:<marca>`). Nadie las programa.
+ *   4. HEARTBEATS_EXTERNOS — el vigía de cron-job.org. Se vigila, pero por
+ *      definición no tiene entrada en vercel.json.
+ */
+export function esHeartbeatHuerfano(cronName: string, cronsProgramados: ReadonlySet<string>): boolean {
+  if (esMarcaDeSlot(cronName)) {
+    const sufijo = SLOT_MARCA_SUFFIXES.find((suf) => cronName.endsWith(suf))!;
+    return esSlotRetirado(cronName.slice(0, -sufijo.length));
+  }
+  if (cronName.startsWith(SWITCH_SYNC_SLOT_PREFIX)) return esSlotRetirado(cronName);
+  if ((HEARTBEATS_NO_CRON as readonly string[]).includes(cronName)) return false;
+  if ((HEARTBEATS_EXTERNOS as readonly string[]).includes(cronName)) return false;
+  return !cronsProgramados.has(cronName);
+}
+
+/** Los nombres huérfanos de una lista de filas de cron_heartbeats, ordenados. */
+export function heartbeatsHuerfanos(
+  nombres: readonly string[],
+  cronsProgramados: ReadonlySet<string>,
+): string[] {
+  return nombres.filter((n) => esHeartbeatHuerfano(n, cronsProgramados)).sort();
+}
+
+/**
  * Minutos tras la hora programada dentro de los cuales se considera que la
  * ENTRADA sí se invocó. Se usa para dos cosas:
  *   (a) decidir si la entrada llegó (`corrioEnVentana`): si llegó, el slot no se
  *       "cubre" nunca y un fallo suyo se reporta como `corrio-y-fallo`;
  *   (b) esperar antes de declarar `sin-invocacion` — re-ejecutar es caro (toca
- *       Switch, sesión única por empresa), no vale adelantarse a una entrada que
+ *       Switch, un solo token por usuario y un usuario por empresa), no vale
+ *       adelantarse a una entrada que
  *       todavía puede llegar tarde.
  *
  * 120 → 30 (26-jul-2026, cuenta en Vercel PRO).
@@ -1315,7 +1373,8 @@ export function slotsHuerfanos(args: {
  *      `cubiertos` más abajo, incidente 26-jul-2026).
  * Regla NUEVA, solo para `desatendidos`: la ventana de jitter
  * (SLOT_RUN_WINDOW_MIN) tiene que haber vencido. Re-ejecutar es CARO (toca
- * Switch, sesión única por empresa) → no adelantarse a una entrada que todavía
+ * Switch, un solo token por usuario y un usuario por empresa) → no adelantarse a
+ * una entrada que todavía
  * puede llegar tarde. Los `cubiertos` conservan su semántica exacta.
  */
 export function clasificarSlots(args: {
@@ -1400,8 +1459,10 @@ export function clasificarSlots(args: {
 
     if (pendientes.length > 0) {
       // Un run del mismo par TODAVÍA en curso (fila 'running' más joven que
-      // RUNNING_STALE_MIN) → no tocar: Switch es sesión única por empresa y el
-      // índice de 'running' es un mutex; re-ejecutar encima chocaría con la
+      // RUNNING_STALE_MIN) → no tocar: Switch admite un solo token por USUARIO
+      // (y cada empresa entra con un único usuario de API, así que dos corridas
+      // de la misma empresa se tumban el token) y el índice de 'running' es un
+      // mutex; re-ejecutar encima chocaría con la
       // corrida viva. Se evalúa en la pasada siguiente. Pasado ese umbral la
       // fila es un run MUERTO (el 25-jul fashion_wear quedó 'running' de 16:22 a
       // 21:16) y sí cuenta como fallo.

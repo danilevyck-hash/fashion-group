@@ -62,8 +62,12 @@ function chain(result: { data: unknown; error: unknown; count?: number }) {
   return self;
 }
 
-/** La tabla de caché de Caja "no existe" → la ruta va en modo directo. */
-const TABLA_AUSENTE = { code: "PGRST205", message: "could not find the table" };
+// ⤺ CAMBIÓ el 3-sep-2026. Acá el caché de Caja se doblaba como "la tabla no
+// existe" (PGRST205) porque la ruta lo toleraba y seguía en modo directo. La
+// tolerancia se retiró (la tabla existe desde 20260704210000), así que ahora un
+// error de lectura del caché es un 500 y taparía lo que ESTE archivo mide, que
+// es el ACCESO por rol. Se dobla como lo que realmente pasa en producción: la
+// tabla está y ese día no tiene fila cacheada.
 
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
@@ -77,7 +81,7 @@ vi.mock("@/lib/supabase-server", () => ({
     from: (tabla: string) =>
       chain(
         tabla === "multifashion_caja_diaria"
-          ? { data: null, error: TABLA_AUSENTE }
+          ? { data: null, error: null } // sin fila cacheada para esa fecha
           : { data: [], error: null, count: 0 },
       ),
   },

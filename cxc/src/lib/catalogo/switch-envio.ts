@@ -74,8 +74,10 @@ const DESCUENTO_LINEA = "0.00";
  * 🔴 4 es el número YA PROBADO en este repo (`STOCK_CONCURRENCIA` del sync de
  * catálogos, medido: 471 s → 114 s con 478 llamadas). **No subirlo sin medir.**
  * La concurrencia solo es segura porque `client.ts` deduplica los logins en
- * vuelo (`loginEnVuelo`): Switch admite UNA sesión por empresa y N logins
- * simultáneos se matarían el token entre sí (code 0006).
+ * vuelo (`loginEnVuelo`): Switch admite UN solo token válido por USUARIO (PDF
+ * del API, p. 6; «una sesión por empresa» en la práctica, porque cada empresa
+ * entra con un único usuario de API) y N logins simultáneos se matarían el
+ * token entre sí (code 0006).
  */
 const SKU_CONCURRENCIA = 4;
 

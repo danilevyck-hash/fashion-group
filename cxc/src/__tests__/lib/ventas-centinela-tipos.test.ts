@@ -229,6 +229,12 @@ describe("B. el centinela — las DOS direcciones", () => {
     // Los dos van en la MISMA llamada a alertSwitchCronErrors (lo verifica D).
   });
 
+  // ⤺ CAMBIÓ DE DIRECCIÓN el 3-sep-2026. Antes el motivo de un "no existe la
+  // vista" decía "todavía no existe (migración pendiente)". La migración
+  // 20260826140000_ventas_tipos_sin_clasificar.sql ya corrió, así que esa frase
+  // solo podía tapar un permiso o un cambio de esquema con una explicación
+  // tranquilizadora y FALSA. Ahora el motivo lleva el error crudo de Supabase.
+  // Lo que NO cambió, y no se toca: el centinela sigue sin avisar y sin lanzar.
   it("⛔ si NO puede medir, lo dice y NO avisa (no pude mirar ≠ está todo bien)", async () => {
     errorVentas = { message: 'relation "switch_facturas_tipos_sin_clasificar" does not exist', code: "42P01" };
     const errores = await correrCentinelaTipos(empresas);

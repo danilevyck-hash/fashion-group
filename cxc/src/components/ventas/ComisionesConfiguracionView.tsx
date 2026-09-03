@@ -9,18 +9,27 @@
 //
 //   1. «Tasas por vendedor» — lo que tenía el modal, más la tasa de COBRO al
 //      lado de la de VENTA (las dos existen en comision_vendedor_tasa y la
-//      RPC usa las dos; la de cobro solo se podía tocar en la base). Los que
-//      no se pagan (DEFAULT y Daniel, lib/comisiones/sin-pago) salen en gris
-//      con «no se paga» y sin cajas: no hay tasa que editar para quien no cobra.
+//      RPC usa las dos; la de cobro solo se podía tocar en la base). UNA FILA
+//      POR PERSONA (3-sep, noche — «¿por qué hay 4 Reinaldo?»): el servidor
+//      ya junta las grafías de Switch por el alias, y el nombre se muestra
+//      capitalizado («Reynaldo Espinosa», con Y: «llámalo Reynaldo y no
+//      Reinaldo»), sin nota de cuántos nombres tiene en Switch. Los que no se
+//      pagan (DEFAULT y Daniel) NO están en esta lista — Daniel: «quítalo» —;
+//      siguen en VENDEDORES_SIN_PAGO y en la tabla de comisiones, en gris.
 //   2. «Clientes que no comisionan» — Daniel: «crea configuración en
 //      comisiones para desactivar cálculos de clientes». Grano empresa +
-//      cliente + vendedor; aplica a venta y cobro. Sin «motivo»: Daniel no lo
-//      pidió. Lista + «+ Agregar» que abre una fila de formulario encima de la
-//      tabla (Empresa → Cliente → Vendedor → Guardar). Quitar = soft delete
-//      con confirmación. El cliente se elige con ClienteSwitchPicker, el
-//      ÚNICO selector de cliente de Switch del sistema.
+//      cliente + vendedor, y desde el 3-sep (noche) con VENTA y COBRO por
+//      separado: «poder quitar comisiones en ventas o comisiones sin que
+//      tengan que ser de los dos». Agrupado POR EMPRESA (encabezado con el
+//      nombre y un contador, y debajo su tabla Cliente · Vendedor · Venta ·
+//      Cobro · Desde · ×). Sin «motivo»: Daniel no lo pidió. «+ Agregar» abre
+//      una fila de formulario encima (Empresa → Cliente → Vendedor → las dos
+//      casillas MARCADAS → Guardar: «arranca con las dos marcadas pero yo
+//      deselecciono»); con las dos apagadas no se guarda y se dice. Quitar =
+//      soft delete con confirmación. El cliente se elige con
+//      ClienteSwitchPicker, el ÚNICO selector de cliente de Switch del sistema.
 //
-// Los números de las comisiones no viven aquí: quien resta es la RPC (v7).
+// Los números de las comisiones no viven aquí: quien resta es la RPC (v8).
 
 import { useCallback, useEffect, useState } from "react";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -29,8 +38,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ClienteSwitchPicker, { type ClienteSwitchOpcion } from "@/components/catalogo/ClienteSwitchPicker";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
-import { ROTULO_NO_SE_PAGA, sePagaComision } from "@/lib/comisiones/sin-pago";
-import { ROTULO_CLIENTES_SIN_COMISION, type ExclusionActiva } from "@/lib/comisiones/exclusiones";
+import { sePagaComision } from "@/lib/comisiones/sin-pago";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
+import { AVISO_NINGUNA_CASILLA, ROTULO_CLIENTES_SIN_COMISION, type ExclusionActiva } from "@/lib/comisiones/exclusiones";
 import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 
@@ -71,7 +81,9 @@ function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }) {
         throw new Error(b.error ?? `HTTP ${res.status}`);
       }
       const data = (await res.json()) as { vendedores: ConfigRow[] };
-      setRows(data.vendedores);
+      // El servidor ya los deja fuera; por si llega una respuesta vieja, aquí
+      // tampoco se dibuja a quien no se paga (Daniel: «quítalo»).
+      setRows(data.vendedores.filter((r) => sePagaComision(r.vendedor_nombre)));
       setPctVenta(Object.fromEntries(data.vendedores.map((r) => [r.vendedor_nombre, toPct(r.tasa_venta)])));
       setPctCobro(Object.fromEntries(data.vendedores.map((r) => [r.vendedor_nombre, toPct(r.tasa_cobro ?? r.tasa_venta)])));
     } catch (err) {
@@ -161,65 +173,55 @@ function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }) {
             </thead>
             <tbody>
               {rows.map((r) => {
-                const sePaga = sePagaComision(r.vendedor_nombre);
+                const nombre = nombreVendedorEnPantalla(r.vendedor_nombre);
                 return (
                   <tr
                     key={r.vendedor_nombre}
-                    data-se-paga={sePaga ? "si" : "no"}
-                    className={`border-b border-gray-100 last:border-0 ${sePaga ? "" : "text-gray-400"}`}
+                    data-vendedor={r.vendedor_nombre}
+                    className="border-b border-gray-100 last:border-0"
                   >
-                    <td className={`py-2.5 pr-3.5 ${sePaga ? "text-gray-900" : "text-gray-400"}`}>{r.vendedor_nombre}</td>
-                    {sePaga ? (
-                      <>
-                        <td className="px-3.5 py-2.5 text-right">
-                          <span className="inline-flex items-center gap-1">
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              step="0.05"
-                              min="0"
-                              max="20"
-                              aria-label={`Tasa de venta de ${r.vendedor_nombre}`}
-                              value={pctVenta[r.vendedor_nombre] ?? ""}
-                              onChange={(e) => setPctVenta((p) => ({ ...p, [r.vendedor_nombre]: e.target.value }))}
-                              className={CAJA_PCT}
-                            />
-                            <span className="text-gray-400">%</span>
-                          </span>
-                        </td>
-                        <td className="px-3.5 py-2.5 text-right">
-                          <span className="inline-flex items-center gap-1">
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              step="0.05"
-                              min="0"
-                              max="20"
-                              aria-label={`Tasa de cobro de ${r.vendedor_nombre}`}
-                              value={pctCobro[r.vendedor_nombre] ?? ""}
-                              onChange={(e) => setPctCobro((p) => ({ ...p, [r.vendedor_nombre]: e.target.value }))}
-                              className={CAJA_PCT}
-                            />
-                            <span className="text-gray-400">%</span>
-                          </span>
-                        </td>
-                        <td className="px-3.5 py-2.5 text-xs text-gray-500">
-                          {r.origen.length > 0 ? r.origen.join(", ") : "—"}
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="px-3.5 py-2.5 text-right text-gray-400">—</td>
-                        <td className="px-3.5 py-2.5 text-right text-gray-400">—</td>
-                        <td className="px-3.5 py-2.5 text-xs text-gray-400">{ROTULO_NO_SE_PAGA}</td>
-                      </>
-                    )}
+                    <td className="py-2.5 pr-3.5 text-gray-900">{nombre}</td>
+                    <td className="px-3.5 py-2.5 text-right">
+                      <span className="inline-flex items-center gap-1">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.05"
+                          min="0"
+                          max="20"
+                          aria-label={`Tasa de venta de ${nombre}`}
+                          value={pctVenta[r.vendedor_nombre] ?? ""}
+                          onChange={(e) => setPctVenta((p) => ({ ...p, [r.vendedor_nombre]: e.target.value }))}
+                          className={CAJA_PCT}
+                        />
+                        <span className="text-gray-400">%</span>
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2.5 text-right">
+                      <span className="inline-flex items-center gap-1">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.05"
+                          min="0"
+                          max="20"
+                          aria-label={`Tasa de cobro de ${nombre}`}
+                          value={pctCobro[r.vendedor_nombre] ?? ""}
+                          onChange={(e) => setPctCobro((p) => ({ ...p, [r.vendedor_nombre]: e.target.value }))}
+                          className={CAJA_PCT}
+                        />
+                        <span className="text-gray-400">%</span>
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2.5 text-xs text-gray-500">
+                      {r.origen.length > 0 ? r.origen.join(", ") : "—"}
+                    </td>
                     <td className="py-2.5 pl-3.5 text-right">
                       <button
                         type="button"
                         onClick={() => toggleActivo(r.vendedor_nombre)}
                         aria-pressed={r.activo}
-                        aria-label={`${r.activo ? "Desactivar" : "Activar"} a ${r.vendedor_nombre}`}
+                        aria-label={`${r.activo ? "Desactivar" : "Activar"} a ${nombre}`}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                           r.activo ? "bg-teal-600" : "bg-gray-300"
                         }`}
@@ -252,18 +254,45 @@ interface ListaExclusiones {
 
 const nombreEmpresa = (k: string) => EMPRESA_KEY_TO_NAME[k] ?? k;
 
+/** Una casilla de la lista (Venta / Cobro), con su nombre accesible. */
+function Casilla({
+  marcada, etiqueta, onChange, disabled,
+}: { marcada: boolean; etiqueta: string; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <input
+      type="checkbox"
+      checked={marcada}
+      disabled={disabled}
+      aria-label={etiqueta}
+      onChange={(e) => onChange(e.target.checked)}
+      className="h-5 w-5 cursor-pointer rounded border-gray-300 accent-black disabled:cursor-not-allowed disabled:opacity-50"
+    />
+  );
+}
+
+/** Qué vuelve a comisionar al quitar una fila, según sus casillas. */
+const queVuelve = (f: ExclusionActiva): string =>
+  f.excluye_venta && f.excluye_cobro ? "en venta y en cobro" : f.excluye_venta ? "en venta" : "en cobro";
+
 function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }) {
   const [datos, setDatos] = useState<ListaExclusiones | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fila de alta (encima de la tabla).
+  // Fila de alta (encima de las tablas).
   const [agregando, setAgregando] = useState(false);
   const [empresa, setEmpresa] = useState<string>(EMPRESAS_COMISIONAN[0]);
   const [cliente, setCliente] = useState<ClienteSwitchOpcion | undefined>(undefined);
   const [vendedor, setVendedor] = useState<string>("");
+  // «arranca con las dos marcadas pero yo deselecciono» — Daniel.
+  const [excluyeVenta, setExcluyeVenta] = useState(true);
+  const [excluyeCobro, setExcluyeCobro] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [errorAlta, setErrorAlta] = useState<string | null>(null);
+
+  // Cambiar las casillas de una fila que ya está: se manda al momento.
+  const [cambiando, setCambiando] = useState<number | null>(null);
+  const [avisoFila, setAvisoFila] = useState<{ id: number; texto: string } | null>(null);
 
   // Quitar (soft delete) con confirmación.
   const [aQuitar, setAQuitar] = useState<ExclusionActiva | null>(null);
@@ -300,12 +329,15 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
     setAgregando(false);
     setCliente(undefined);
     setVendedor("");
+    setExcluyeVenta(true);
+    setExcluyeCobro(true);
     setErrorAlta(null);
   };
 
   const vendedoresDeEmpresa = datos?.vendedores[empresa] ?? [];
   const clienteCodigo = cliente?.codigo?.trim().toUpperCase() ?? "";
-  const puedeGuardar = !!clienteCodigo && !!vendedor && !guardando;
+  const ningunaCasilla = !excluyeVenta && !excluyeCobro;
+  const puedeGuardar = !!clienteCodigo && !!vendedor && !ningunaCasilla && !guardando;
 
   async function guardar() {
     setGuardando(true);
@@ -314,7 +346,13 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
       const res = await fetch("/api/ventas/comisiones/exclusiones", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empresa_key: empresa, cliente_codigo: clienteCodigo, vendedor }),
+        body: JSON.stringify({
+          empresa_key: empresa,
+          cliente_codigo: clienteCodigo,
+          vendedor,
+          excluye_venta: excluyeVenta,
+          excluye_cobro: excluyeCobro,
+        }),
       });
       if (!res.ok) {
         const b = await res.json().catch(() => ({}));
@@ -327,6 +365,39 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
       setErrorAlta(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
     } finally {
       setGuardando(false);
+    }
+  }
+
+  /** Una casilla de una fila existente. Dejar las dos apagadas no se guarda: se avisa. */
+  async function cambiarCasilla(f: ExclusionActiva, cual: "venta" | "cobro", valor: boolean) {
+    const venta = cual === "venta" ? valor : f.excluye_venta;
+    const cobro = cual === "cobro" ? valor : f.excluye_cobro;
+    if (!venta && !cobro) {
+      setAvisoFila({ id: f.id, texto: AVISO_NINGUNA_CASILLA });
+      return;
+    }
+    setAvisoFila(null);
+    setCambiando(f.id);
+    try {
+      const res = await fetch(`/api/ventas/comisiones/exclusiones?id=${f.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ excluye_venta: venta, excluye_cobro: cobro }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error ?? `HTTP ${res.status}`);
+      }
+      // Optimista, pero solo después del OK: sin red no se dibuja una casilla que la base no tiene.
+      setDatos((prev) => prev && {
+        ...prev,
+        exclusiones: prev.exclusiones.map((e) => (e.id === f.id ? { ...e, excluye_venta: venta, excluye_cobro: cobro } : e)),
+      });
+      onSaved("Listo, guardado");
+    } catch (err) {
+      setAvisoFila({ id: f.id, texto: err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos." });
+    } finally {
+      setCambiando(null);
     }
   }
 
@@ -351,6 +422,10 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
   }
 
   const filas = datos?.exclusiones ?? [];
+  // Agrupado POR EMPRESA, en el orden de las 6: una empresa sin filas no se dibuja.
+  const grupos = EMPRESAS_COMISIONAN
+    .map((k) => ({ empresa: k, filas: filas.filter((f) => f.empresa_key === k) }))
+    .filter((g) => g.filas.length > 0);
 
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5" aria-labelledby="sin-comision-titulo">
@@ -358,7 +433,7 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
         <h3 id="sin-comision-titulo" className="flex items-center gap-1 text-sm font-medium text-gray-900">
           {ROTULO_CLIENTES_SIN_COMISION}
           <Ayuda titulo="Qué hace esta lista">
-            <p>Ese vendedor no cobra comisión por ese cliente en esa empresa: ni por lo que le vende ni por lo que le cobra.</p>
+            <p>Ese vendedor no cobra comisión por ese cliente en esa empresa. Con «Venta» marcada, no comisiona lo que le vende; con «Cobro», no comisiona los recibos que le registra.</p>
             <p>Si otro vendedor le vende o le cobra al mismo cliente, ese otro sí comisiona.</p>
           </Ayuda>
         </h3>
@@ -376,7 +451,7 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
 
       {agregando && (
         <div className="mb-3 rounded-md border border-gray-300 bg-gray-50 p-3" data-testid="alta-sin-comision">
-          <div className="grid gap-3 md:grid-cols-[1fr_1.8fr_1fr] md:items-start">
+          <div className="grid gap-3 md:grid-cols-[1fr_1.8fr_1fr_auto] md:items-start">
             <label className="block">
               <span className="mb-1 block text-[11px] uppercase tracking-wide text-gray-500">Empresa</span>
               <Select value={empresa} onValueChange={elegirEmpresa}>
@@ -412,12 +487,22 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
               >
                 <option value="">Elige el vendedor</option>
                 {vendedoresDeEmpresa.map((v) => (
-                  <option key={v} value={v}>{v}</option>
+                  <option key={v} value={v}>{nombreVendedorEnPantalla(v)}</option>
                 ))}
               </select>
             </label>
+            <div className="flex items-end gap-4 md:min-h-[44px] md:pt-5">
+              <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                <Casilla marcada={excluyeVenta} etiqueta="Venta" onChange={setExcluyeVenta} disabled={guardando} />
+                Venta
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                <Casilla marcada={excluyeCobro} etiqueta="Cobro" onChange={setExcluyeCobro} disabled={guardando} />
+                Cobro
+              </label>
+            </div>
           </div>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => void guardar()}
@@ -435,8 +520,8 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
               Cancelar
             </button>
             {!puedeGuardar && !guardando && (
-              <span className="text-xs text-gray-400">
-                {!clienteCodigo ? "Falta elegir el cliente" : "Falta elegir el vendedor"}
+              <span className={`text-xs ${ningunaCasilla ? "text-rose-600" : "text-gray-400"}`}>
+                {ningunaCasilla ? AVISO_NINGUNA_CASILLA : !clienteCodigo ? "Falta elegir el cliente" : "Falta elegir el vendedor"}
               </span>
             )}
           </div>
@@ -457,49 +542,84 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
             Reintentar
           </button>
         </div>
-      ) : filas.length === 0 ? (
+      ) : grupos.length === 0 ? (
         <div className="py-10 text-center text-sm text-gray-500">
           Todavía no hay clientes en esta lista: todos comisionan.
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
-                <th className="py-2 pr-3.5 font-medium">Empresa</th>
-                <th className="px-3.5 py-2 font-medium">Cliente</th>
-                <th className="px-3.5 py-2 font-medium">Vendedor</th>
-                <th className="px-3.5 py-2 font-medium">Desde</th>
-                <th className="py-2 pl-3.5"><span className="sr-only">Quitar</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map((f) => (
-                <tr key={f.id} className="border-b border-gray-100 last:border-0" data-exclusion-id={f.id}>
-                  <td className="py-2.5 pr-3.5 text-gray-500">{nombreEmpresa(f.empresa_key)}</td>
-                  <td className="px-3.5 py-2.5 text-gray-900">
-                    {f.cliente_nombre ?? f.cliente_codigo}
-                    {f.cliente_nombre && (
-                      <span className="ml-1 font-mono text-xs text-gray-400">{f.cliente_codigo}</span>
-                    )}
-                  </td>
-                  <td className="px-3.5 py-2.5 text-gray-900">{f.vendedor}</td>
-                  <td className="px-3.5 py-2.5 text-xs text-gray-500">{fmtDate(fechaPanamaDe(f.creado_en))}</td>
-                  <td className="py-2.5 pl-3.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setAQuitar(f)}
-                      aria-label={`Quitar a ${f.cliente_nombre ?? f.cliente_codigo} de la lista de ${f.vendedor}`}
-                      title="Quitar de la lista"
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-lg text-gray-300 transition hover:text-rose-600 active:scale-[0.97]"
-                    >
-                      ×
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-6">
+          {grupos.map((g) => (
+            <div key={g.empresa} data-grupo-empresa={g.empresa}>
+              <div className="mb-2 flex items-center gap-2">
+                <h4 className="text-sm font-medium text-gray-900">{nombreEmpresa(g.empresa)}</h4>
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500" aria-label={`${g.filas.length} en ${nombreEmpresa(g.empresa)}`}>
+                  {g.filas.length}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                      <th className="py-2 pr-3.5 font-medium">Cliente</th>
+                      <th className="px-3.5 py-2 font-medium">Vendedor</th>
+                      <th className="px-3.5 py-2 text-center font-medium">Venta</th>
+                      <th className="px-3.5 py-2 text-center font-medium">Cobro</th>
+                      <th className="px-3.5 py-2 font-medium">Desde</th>
+                      <th className="py-2 pl-3.5"><span className="sr-only">Quitar</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.filas.map((f) => {
+                      const nombreCliente = f.cliente_nombre ?? f.cliente_codigo;
+                      const nombreVendedor = nombreVendedorEnPantalla(f.vendedor);
+                      return (
+                        <tr key={f.id} className="border-b border-gray-100 last:border-0" data-exclusion-id={f.id}>
+                          <td className="py-2.5 pr-3.5 text-gray-900">
+                            {nombreCliente}
+                            {f.cliente_nombre && (
+                              <span className="ml-1 font-mono text-xs text-gray-400">{f.cliente_codigo}</span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-gray-900">{nombreVendedor}</td>
+                          <td className="px-3.5 py-2.5 text-center">
+                            <Casilla
+                              marcada={f.excluye_venta}
+                              etiqueta={`Venta de ${nombreCliente} para ${nombreVendedor}`}
+                              onChange={(v) => void cambiarCasilla(f, "venta", v)}
+                              disabled={cambiando === f.id}
+                            />
+                          </td>
+                          <td className="px-3.5 py-2.5 text-center">
+                            <Casilla
+                              marcada={f.excluye_cobro}
+                              etiqueta={`Cobro de ${nombreCliente} para ${nombreVendedor}`}
+                              onChange={(v) => void cambiarCasilla(f, "cobro", v)}
+                              disabled={cambiando === f.id}
+                            />
+                            {avisoFila?.id === f.id && (
+                              <span role="alert" className="mt-1 block whitespace-nowrap text-[11px] text-rose-600">{avisoFila.texto}</span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-xs text-gray-500">{fmtDate(fechaPanamaDe(f.creado_en))}</td>
+                          <td className="py-2.5 pl-3.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setAQuitar(f)}
+                              aria-label={`Quitar a ${nombreCliente} de la lista de ${nombreVendedor}`}
+                              title="Quitar de la lista"
+                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-lg text-gray-300 transition hover:text-rose-600 active:scale-[0.97]"
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -509,7 +629,7 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
         title="¿Quitar de la lista?"
         description={
           aQuitar
-            ? `${aQuitar.vendedor} vuelve a cobrar comisión por ${aQuitar.cliente_nombre ?? aQuitar.cliente_codigo} en ${nombreEmpresa(aQuitar.empresa_key)}, en venta y en cobro, desde el próximo cálculo.`
+            ? `${nombreVendedorEnPantalla(aQuitar.vendedor)} vuelve a cobrar comisión por ${aQuitar.cliente_nombre ?? aQuitar.cliente_codigo} en ${nombreEmpresa(aQuitar.empresa_key)}, ${queVuelve(aQuitar)}, desde el próximo cálculo.`
             : ""
         }
         confirmLabel="Quitar"

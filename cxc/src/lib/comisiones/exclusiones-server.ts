@@ -16,16 +16,43 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import type { ExclusionActiva, ExclusionNueva } from "@/lib/comisiones/exclusiones";
+import type { AliasVendedor } from "@/lib/comisiones/alias";
+import { claveAlias } from "@/lib/comisiones/alias";
 
 export const TABLA_EXCLUSION = "comision_exclusion";
+export const TABLA_ALIAS = "comision_vendedor_alias";
 
 interface FilaExclusion {
   id: number;
   empresa_key: string;
   cliente_codigo: string;
   vendedor: string;
+  /** Ausentes mientras la DDL 20260913120000 no corra: valen como true (las dos). */
+  excluye_venta?: boolean | null;
+  excluye_cobro?: boolean | null;
   creado_por: string;
   creado_en: string;
+}
+
+/**
+ * Las filas de `comision_vendedor_alias` (grafía → persona), FALLANDO ABIERTO:
+ * sin tabla (DDL pendiente) o sin red → lista vacía, y cada nombre queda como
+ * viene. Es el mismo trato que la marca informativa: el alias de verdad lo
+ * aplica la RPC v8; esto es para que lo que agrupa Node llegue al mismo nombre.
+ */
+export async function leerAliasOVacio(): Promise<AliasVendedor[]> {
+  try {
+    const { data, error } = await supabaseServer
+      .from(TABLA_ALIAS)
+      .select("nombre_switch, vendedor_canonico");
+    if (error) return [];
+    return ((data ?? []) as AliasVendedor[]).map((a) => ({
+      nombre_switch: claveAlias(a.nombre_switch),
+      vendedor_canonico: String(a.vendedor_canonico).trim(),
+    }));
+  } catch {
+    return [];
+  }
 }
 
 /** Nombre del cliente por (empresa, código), desde el directorio local de Switch. */
@@ -56,9 +83,12 @@ export async function leerExclusionesActivas(
   empresas: readonly string[],
 ): Promise<ExclusionActiva[]> {
   if (empresas.length === 0) return [];
+  // `*` y no la lista de columnas: `excluye_venta`/`excluye_cobro` nacen en
+  // la DDL 20260913120000 y hasta que corra la lista tiene que seguir saliendo
+  // (con las dos casillas marcadas, que es lo que valían todas).
   const { data, error } = await supabaseServer
     .from(TABLA_EXCLUSION)
-    .select("id, empresa_key, cliente_codigo, vendedor, creado_por, creado_en")
+    .select("*")
     .in("empresa_key", empresas)
     .eq("activa", true)
     .order("empresa_key", { ascending: true })
@@ -68,7 +98,14 @@ export async function leerExclusionesActivas(
   const filas = (data ?? []) as FilaExclusion[];
   const nombres = await nombresDeClientes(filas);
   return filas.map((f) => ({
-    ...f,
+    id: f.id,
+    empresa_key: f.empresa_key,
+    cliente_codigo: f.cliente_codigo,
+    vendedor: f.vendedor,
+    excluye_venta: f.excluye_venta ?? true,
+    excluye_cobro: f.excluye_cobro ?? true,
+    creado_por: f.creado_por,
+    creado_en: f.creado_en,
     cliente_nombre: nombres.get(`${f.empresa_key}|${f.cliente_codigo}`) ?? null,
   }));
 }
@@ -96,9 +133,14 @@ export async function agregarExclusion(
   valor: ExclusionNueva,
   creadoPor: string,
 ): Promise<ResultadoAlta> {
+  const { excluye_venta, excluye_cobro, ...resto } = valor;
+  // Las dos marcadas es el DEFAULT de la tabla: no se mandan, así el alta
+  // sigue funcionando mientras la DDL de las casillas no corra. Con una
+  // apagada sí viajan — y si la columna no existe, falla cerrado y lo dice.
+  const casillas = excluye_venta && excluye_cobro ? {} : { excluye_venta, excluye_cobro };
   const { data, error } = await supabaseServer
     .from(TABLA_EXCLUSION)
-    .insert({ ...valor, creado_por: creadoPor })
+    .insert({ ...resto, ...casillas, creado_por: creadoPor })
     .select("id")
     .single();
   if (error) {
@@ -107,6 +149,9 @@ export async function agregarExclusion(
     }
     if (error.code === "42P01" || /relation .* does not exist|PGRST205/i.test(error.message ?? "")) {
       return { ok: false, status: 503, error: "Falta correr la migración de comision_exclusion" };
+    }
+    if (error.code === "PGRST204" || error.code === "42703" || /column .* does not exist|excluye_/i.test(error.message ?? "")) {
+      return { ok: false, status: 503, error: "Falta correr la migración de Venta y Cobro por separado (20260913120000)" };
     }
     return { ok: false, status: 500, error: "No se pudo guardar. Intenta de nuevo en unos segundos." };
   }
@@ -130,6 +175,37 @@ export async function desactivarExclusion(
     .select("id");
   if (error) {
     return { ok: false, status: 500, error: "No se pudo quitar. Intenta de nuevo en unos segundos." };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, status: 404, error: "Esa fila ya no está en la lista" };
+  }
+  return { ok: true };
+}
+
+export type ResultadoCasillas =
+  | { ok: true }
+  | { ok: false; status: 404 | 500 | 503; error: string };
+
+/**
+ * Cambia las casillas (Venta / Cobro) de una fila ACTIVA. La validación (al
+ * menos una marcada) ya la hizo `validarCasillas`; el CHECK de la tabla es el
+ * segundo candado. Solo toca filas que siguen activas.
+ */
+export async function cambiarCasillasExclusion(
+  id: number,
+  casillas: { excluye_venta: boolean; excluye_cobro: boolean },
+): Promise<ResultadoCasillas> {
+  const { data, error } = await supabaseServer
+    .from(TABLA_EXCLUSION)
+    .update({ excluye_venta: casillas.excluye_venta, excluye_cobro: casillas.excluye_cobro })
+    .eq("id", id)
+    .eq("activa", true)
+    .select("id");
+  if (error) {
+    if (error.code === "PGRST204" || error.code === "42703" || /column .* does not exist/i.test(error.message ?? "")) {
+      return { ok: false, status: 503, error: "Falta correr la migración de Venta y Cobro por separado (20260913120000)" };
+    }
+    return { ok: false, status: 500, error: "No se pudo guardar. Intenta de nuevo en unos segundos." };
   }
   if (!data || data.length === 0) {
     return { ok: false, status: 404, error: "Esa fila ya no está en la lista" };

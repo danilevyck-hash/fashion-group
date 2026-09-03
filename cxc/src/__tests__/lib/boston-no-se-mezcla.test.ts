@@ -192,6 +192,24 @@ describe("la vista de aging del GRUPO deja a Boston afuera", () => {
     const credito = /'Nota de Crédito',\s*'Recibo',\s*'Recibo Saldo Anterior'/g;
     expect([...SQL.matchAll(credito)]).toHaveLength(2);
   });
+
+  it("un documento PAGADO (saldo 0) no entra en ninguna cartera — se filtra, no se borra", () => {
+    // El sync de Boston hace upsert → reconcile, y el reconcile pone saldo = 0
+    // a todo lo que el reporte ya no trae: un saldo 0 es un documento que SE
+    // PAGÓ entre una corrida y la siguiente. Medido el 3-sep-2026: 45 filas
+    // así en Boston (981 en total), todas con `synced_at` = el último día que
+    // vinieron con plata y `updated_at` = el día siguiente, cuando el reconcile
+    // las cerró; las 6 del grupo arrastran 835 por el mismo camino (API). Es
+    // el mecanismo funcionando, no basura: borrarlas a mano las traería de
+    // vuelta al día siguiente si Switch las volviera a mandar, y no aportan
+    // nada porque NADIE las cuenta. Este test fija ese "nadie": las dos vistas
+    // y el estado de cuenta filtran saldo <> 0 en la MISMA consulta.
+    const boston = SQL.slice(SQL.indexOf("switch_estadocuenta_aging_boston AS"));
+    expect(boston).toMatch(/WHERE\s+COALESCE\(s\.saldo,\s*0\)\s*<>\s*0/);
+    const grupo = SQL.slice(SQL.indexOf("switch_estadocuenta_aging AS"), SQL.indexOf("switch_estadocuenta_aging_boston AS"));
+    expect(grupo).toMatch(/WHERE\s+COALESCE\(s\.saldo,\s*0\)\s*<>\s*0/);
+    expect(leer("src/lib/cxc/estado-cuenta-data.ts")).toMatch(/\.neq\("saldo",\s*0\)/);
+  });
 });
 
 describe("el Cobrado YTD nunca suma una empresa fuera del grupo", () => {

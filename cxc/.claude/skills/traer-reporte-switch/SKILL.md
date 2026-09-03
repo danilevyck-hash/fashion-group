@@ -57,7 +57,7 @@ try {
 
 Después del login, cada reporte pide su propio `_token` (CSRF): `GET` a la página del reporte y sacarlo del HTML (`extraerToken` en `scripts/_bajar-acs-ventasarticulos.ts`). Los reportes DataTables responden a un `POST` con `start`/`length`/`draw` y devuelven `{ recordsTotal, data[] }`.
 
-🔴 **El HTML de excepción de Switch llega con HTTP 200.** El status no alcanza: revisar el cuerpo con `esError()` (`Exception - SWITCH SOFT | Whoops | Controller method not found`).
+🔴 **El HTML de excepción de Switch llega con HTTP 200.** El status no alcanza: hay que revisar el cuerpo. En `web-client.ts` eso lo hace `jsonDeSwitch()` (privada, `:405-425`): si el texto empieza con `<!DOCTYPE`/`<html` lanza `SwitchWebError` con un mensaje en cristiano en vez de reventar el parser. Los scripts sueltos, que no pasan por esa función, llevan una copia local `esError()` (`scripts/_bajar-acs-ventasarticulos.ts:39`, `_bajar-acs-inventario.ts:51`) que busca `Exception - SWITCH SOFT | Whoops | Controller method not found` en los primeros 4.000 caracteres — si escribes un script nuevo, copia esa línea; `esError` no se exporta de ningún lado.
 
 ---
 

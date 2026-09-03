@@ -196,6 +196,8 @@ describe("BARRIDO — la aritmética de stock de inventario.ts no toca bultos", 
   });
 
   it("`bultos` sí se persiste (si no, el dato se perdería)", () => {
-    expect(src).toContain("bultos: itemsUnidades[i].bultos");
+    // Literal actualizado el 3-sep-2026: al retirar el reintento "sin bultos"
+    // (tolerancia a DDL), el renglón se arma en un solo map con `it.bultos`.
+    expect(src).toContain("bultos: it.bultos");
   });
 });

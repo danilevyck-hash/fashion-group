@@ -10,7 +10,8 @@
 //    que no comisionan). Era un modal «Configurar»; Daniel, 3-sep-2026:
 //    «¿por qué en card y no como tab en toda la pantalla normal?». El período,
 //    «Actualizar ahora» y el Excel no aplican a la configuración, así que esa
-//    fila se esconde en ese modo.
+//    fila se esconde en ese modo. El chip es la ÚNICA entrada: el botón
+//    «Configurar» de Por empresa se quitó (Daniel: «configuración en dos lados»).
 //
 // ─── Encabezado: 481px → 2 filas (jul-2026) ──────────────────────────────────
 // Medido con datos de producción en 390×844: del borde de arriba al primer
@@ -227,7 +228,6 @@ export function ComisionesView({ availableYears, avisoMontos, conConfiguracion =
           mes={mes}
           onExcel={registrarExcel}
           refreshKey={refreshKey}
-          onConfigurar={hayConfig ? () => handleMode("config") : undefined}
         />
       )}
     </div>

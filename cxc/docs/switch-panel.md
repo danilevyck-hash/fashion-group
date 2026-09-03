@@ -5,7 +5,7 @@
 1. 🥇 **Las 13 guías oficiales en PDF** que Switch le entregó a Daniel (ago-2026), versionadas en **`docs/switch/`**. Son documentación de producto, fechada «Switch Soft © 2026». **Cuando una guía contradice al sitio web, gana la guía** — y en este documento queda dicho que había contradicción.
 2. 🥈 **https://ayuda.switch-soft.com/** — base de conocimiento pública, extraída el **2026-08-25**: 422 artículos, todos públicos, **sin login**. Mucho contenido es de 2021 y describe un sistema que ya cambió. Las **90 URLs citadas** se verificaron una por una: todas responden HTTP 200 al 2026-08-25.
 
-Complementa a `docs/api-switch.pdf` (que cubre la API, no el panel).
+Complementa a `docs/switch/api-documentacion.pdf` (que cubre la API, no el panel; su cruce con el código está en `docs/switch-referencia.md`).
 
 > **Cómo leer este documento**
 > - **[GUÍA]** = está escrito en uno de los 13 PDF oficiales. Se cita **archivo + página**. Es la fuente más fuerte que tenemos.
@@ -636,7 +636,13 @@ Ojo: el **Dashboard** (Reportes → Dashboard) también muestra "vendedores con 
 
 ---
 
-## 13. 🔴 Sesión única — NO está documentada (resultado negativo)
+## 13. 🔴 Sesión única — SÍ está documentada, en el PDF del API (p. 6), y es por USUARIO
+
+> **Corrección (3-sep-2026).** Este apartado decía «NO está documentada (resultado negativo)». Era verdad para el **sitio de ayuda** y para las **13 guías del panel** —los dos barridos de abajo se conservan porque siguen siendo ciertos—, pero la documentación oficial del **API** (`docs/switch/api-documentacion.pdf`, p. 6) sí lo dice, textual: *«Solo habrá un token válido a la vez por usuario, es decir al realizar una autenticación se tomará este token como el único token válido para este usuario, al realizar la petición con otro token se enviará una respuesta de la siguiente manera: `{ error: { code: 0006, http_code: 401, message: "TOKEN INVALIDO" } }`»*. La misma página explica el `0005` con `new_token` (renovación dentro de los 15 min tras caducar). Cruce completo con el código en `docs/switch-referencia.md` §1.1 y Parte 3, #1.
+>
+> La restricción es **por usuario**, no «por empresa» como decía el código hasta el 3-sep-2026: coincidía porque cada empresa es su propia instancia de Switch y el sistema entra con un único usuario de API por empresa (`daniel` en 7 de 8). Lo que el PDF **no** dice es si la sesión del **panel web** cuenta como «token» de ese mismo usuario; lo medido en producción (cada login del cron expulsa a Daniel del panel y viceversa) dice que sí. Con un usuario dedicado al API por empresa, según el PDF, serían dos tokens válidos a la vez — hay que medirlo antes de darlo por hecho.
+
+**Lo que sigue son los dos resultados negativos originales (sitio de ayuda y guías del panel), intactos:**
 
 Se buscó en los 422 artículos por: `sesión`, `sesion`, `concurrente`, `simultáne`, `misma cuenta`, `cierra la sesión`, `credencial`, `un solo usuario`, `una sola sesión`, `mismo usuario`, `dispositivo`, `token`, `expira`, `inicio de sesión`, `desconecta`, `otro equipo`, `otra computadora`, `licencia`.
 
@@ -652,7 +658,7 @@ Lo único adyacente:
 
 **[GUÍA — segundo resultado negativo]** Se buscó `sesión`, `sesion`, `login`, `iniciar sesión`, `conectado` y `simultáne` en el texto completo de las **13 guías oficiales**: **cero ocurrencias**. Las guías tampoco hablan de licenciamiento, dispositivos ni concurrencia. La única guía que menciona un login es la de toma de inventario, y solo para decir que en Switch App *"ingrese el dominio del sistema Switch, su usuario y contraseña"* (`docs/switch/Guía_toma_de_inventario.pdf`, p. 2) — **sin decir qué pasa si esa misma cuenta ya está abierta en la web**.
 
-**Conclusión (sin cambios, ahora con dos fuentes agotadas): el comportamiento de sesión única que observamos en la API no está documentado ni desmentido. Ni el sitio ni las guías dicen nada. Hay que preguntárselo a soporte.**
+**Conclusión (actualizada el 3-sep-2026): ni el sitio ni las guías del panel dicen nada, pero el PDF del API sí (p. 6): un token válido a la vez por usuario. Lo que sigue sin fuente es si el panel web y el API comparten ese cupo — lo observado dice que sí; para confirmarlo hay que medir con un usuario de API distinto o preguntarle a soporte.**
 
 ---
 

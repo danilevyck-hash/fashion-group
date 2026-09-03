@@ -47,7 +47,8 @@ import { clearStaleRunning, isRunningLockConflict } from "./sync-log";
 import type { Mes } from "./sync-utilidad";
 
 /**
- * Empresas con sync de recibos: las 6 B2B + Multifashion (american_classic).
+ * Empresas con sync de recibos: las 8 — las 6 B2B, Multifashion
+ * (american_classic) y Confecciones Boston (`recibos: true` desde el PR #347).
  *
  * DERIVADA de EMPRESA_SYNC_CAPABILITIES (`recibos: true`), no escrita a mano.
  * Cuando era un array literal decía 6 empresas y omitía `joystep`, mientras

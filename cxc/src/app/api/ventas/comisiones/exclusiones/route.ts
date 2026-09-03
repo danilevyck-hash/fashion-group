@@ -7,27 +7,34 @@
  *
  *   GET    → { exclusiones: ExclusionActiva[], vendedores: { [empresa]: string[] } }
  *            (las activas de las 6 empresas + los vendedores que se pueden elegir)
- *   POST   → { empresa_key, cliente_codigo, vendedor } → 201 { id }
+ *   POST   → { empresa_key, cliente_codigo, vendedor, excluye_venta?, excluye_cobro? } → 201 { id }
+ *            (las casillas ausentes valen true; las dos apagadas es 400)
+ *   PATCH  → ?id= { excluye_venta, excluye_cobro } → cambia las casillas de una fila activa
  *   DELETE → ?id= → soft delete (activa = false, firmado). NUNCA borra la fila.
  *
  * Fail-closed: cualquier cuerpo raro es 400 con texto para la pantalla; un
  * error de base es 5xx, nunca un «ok» a medias. Quien resta de verdad es la
- * RPC comision_b2b_v7 — esta ruta solo administra la lista.
+ * RPC comision_b2b_v8 — esta ruta solo administra la lista.
  *
  * Los vendedores que se ofrecen por empresa son los que DE VERDAD aparecen en
  * facturas y recibos del año (más el maestro y las tasas): una exclusión con
- * un nombre que no existe en Switch no atraparía nada. Así aparece también
- * «REYNALDO ESPINOSA», el segundo usuario de Reinaldo en Active Wear, que el
+ * un nombre que no existe en Switch no atraparía nada. Cada nombre pasa por el
+ * ALIAS (comision_vendedor_alias, 3-sep-2026 noche: «una persona, una fila»),
+ * así que las grafías REINALDO / REYNALDO / REINDALDO se ofrecen como UNA sola,
+ * «REYNALDO ESPINOSA». Antes de eso aparecía también
  * maestro `vendedores` no conoce.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
-import { normalizarVendedor, validarExclusionNueva } from "@/lib/comisiones/exclusiones";
+import { normalizarVendedor, validarCasillas, validarExclusionNueva } from "@/lib/comisiones/exclusiones";
+import { aplicarAlias, type AliasVendedor } from "@/lib/comisiones/alias";
 import {
   agregarExclusion,
+  cambiarCasillasExclusion,
   desactivarExclusion,
+  leerAliasOVacio,
   leerExclusionesActivas,
 } from "@/lib/comisiones/exclusiones-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
@@ -57,8 +64,9 @@ async function vistosEn(
   return filas.map((f) => ({ empresa_key: String(f.empresa_key), nombre: f[columna] ?? null }));
 }
 
-/** Los vendedores que se pueden elegir por empresa: maestro ∪ tasas ∪ vistos este año. */
-async function vendedoresPorEmpresa(): Promise<Record<string, string[]>> {
+/** Los vendedores que se pueden elegir por empresa: maestro ∪ tasas ∪ vistos este año,
+ *  cada nombre pasado por el alias (una persona, una opción). */
+async function vendedoresPorEmpresa(alias: readonly AliasVendedor[]): Promise<Record<string, string[]>> {
   const desde = `${hoyPanama().slice(0, 4)}-01-01`;
   const [maestro, tasas, enFacturas, enRecibos] = await Promise.all([
     supabaseServer.from("vendedores").select("empresa_key, nombre").eq("activo", true),
@@ -71,7 +79,7 @@ async function vendedoresPorEmpresa(): Promise<Record<string, string[]>> {
 
   const por = new Map<string, Set<string>>(EMPRESAS_COMISIONAN.map((e) => [e, new Set<string>()]));
   const meter = (empresa: string, nombre: string | null | undefined) => {
-    const n = normalizarVendedor(nombre ?? "");
+    const n = normalizarVendedor(aplicarAlias(nombre, alias));
     if (n) por.get(empresa)?.add(n);
   };
   for (const v of (maestro.data ?? []) as { empresa_key: string; nombre: string }[]) meter(v.empresa_key, v.nombre);
@@ -89,9 +97,10 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
+    const alias = await leerAliasOVacio();
     const [exclusiones, vendedores] = await Promise.all([
       leerExclusionesActivas(EMPRESAS_COMISIONAN),
-      vendedoresPorEmpresa(),
+      vendedoresPorEmpresa(alias),
     ]);
     return NextResponse.json({ exclusiones, vendedores });
   } catch (e) {
@@ -117,9 +126,37 @@ export async function POST(req: NextRequest) {
   const v = validarExclusionNueva(body);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
 
-  const r = await agregarExclusion(v.valor, auth.userName ?? auth.userId ?? "admin");
+  // El vendedor se guarda como PERSONA (alias), no como grafía: así una
+  // exclusión cargada con «REINALDO» atrapa también lo que Switch registre
+  // como «REYNALDO». La base lo vuelve a hacer con su trigger; esto es para
+  // que el 409 de «ya está» salga con el nombre correcto.
+  const alias = await leerAliasOVacio();
+  const valor = { ...v.valor, vendedor: normalizarVendedor(aplicarAlias(v.valor.vendedor, alias)) };
+  const r = await agregarExclusion(valor, auth.userName ?? auth.userId ?? "admin");
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
   return NextResponse.json({ ok: true, id: r.id }, { status: 201 });
+}
+
+export async function PATCH(req: NextRequest) {
+  const auth = requireRole(req, SOLO_ADMIN);
+  if (auth instanceof NextResponse) return auth;
+
+  const id = Number(req.nextUrl.searchParams.get("id"));
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Falta el id de la fila" }, { status: 400 });
+  }
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+  const v = validarCasillas(body);
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+
+  const r = await cambiarCasillasExclusion(id, v.valor);
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req: NextRequest) {

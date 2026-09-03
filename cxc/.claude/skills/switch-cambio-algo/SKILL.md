@@ -82,7 +82,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" \
   "https://www.fashiongr.com/api/diag/egresos-varios?empresas=vistana&desde=2026-08-01&hasta=2026-09-01"
 ```
 
-⚠️ **Esto expulsa a Daniel del panel de Switch.** El login web usa `changesession="SI"` (`src/lib/switch-api/web-client.ts:178`), y Switch admite **una sola sesión por empresa**: toma la sesión y saca a quien esté adentro. Además, los crons que tocan esa misma empresa van a **≥15 min** (`SEPARACION_MINIMA_MIN = 15`, `src/lib/cron-telemetry.ts:773`), y **aquí esa separación la tiene que respetar una persona: no hay cron que la haga cumplir**.
+⚠️ **Esto expulsa a Daniel del panel de Switch.** El login web usa `changesession="SI"` (`src/lib/switch-api/web-client.ts:178`), y Switch admite **un solo token válido por USUARIO** (PDF del API, p. 6) — como el sistema entra con el mismo usuario que Daniel en 7 de 8 empresas, en la práctica es una sola sesión por empresa: toma la sesión y saca a quien esté adentro. Además, los crons que tocan esa misma empresa van a **≥15 min** (`SEPARACION_MINIMA_MIN = 15`, `src/lib/cron-telemetry.ts:773`), y **aquí esa separación la tiene que respetar una persona: no hay cron que la haga cumplir**.
 
 Entonces, antes de correrlo: **elegir la empresa y la ventana horaria, decirlo, y esperar el visto bueno.** Madrugada de Panamá, una empresa a la vez, mirando el calendario de crons (`SWITCH_CRON_ENTRADAS`).
 

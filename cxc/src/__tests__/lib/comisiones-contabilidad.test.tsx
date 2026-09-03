@@ -470,11 +470,17 @@ describe("el toggle del descuento solo lo ve quien puede escribirlo", () => {
     expect(delServer).not.toContain("contabilidad");
   });
 
-  it("«Configurar» (las tasas) sigue siendo solo de admin", () => {
+  it("la configuración (las tasas) sigue siendo solo de admin", () => {
     // Ya lo era; el candado es para que abrirle el módulo a contabilidad no lo
     // arrastre. `GET /config` le contesta 403 (bloque 3).
-    const vista = plano(leer("src/components/ventas/ComisionesPorEmpresaView.tsx"));
-    expect(vista).toMatch(/setCanConfig\(r === "admin"\)/);
+    // CAMBIÓ DE DIRECCIÓN el 3-sep-2026 (noche): el botón «Configurar» de Por
+    // empresa se quitó (Daniel: «configuración en dos lados»); la única entrada
+    // es el chip «Configuración» del shell, que solo se dibuja al admin.
+    const porEmpresa = plano(leer("src/components/ventas/ComisionesPorEmpresaView.tsx"));
+    expect(porEmpresa).not.toMatch(/Configurar/);
+    const shell = plano(leer("src/components/ventas/ComisionesView.tsx"));
+    expect(shell).toMatch(/const hayConfig = esAdmin && conConfiguracion;/);
+    expect(shell).toMatch(/hayConfig \? \[\["config", "Configuración"\]/);
   });
 });
 

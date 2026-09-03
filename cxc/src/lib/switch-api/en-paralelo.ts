@@ -14,9 +14,11 @@
  * nunca se escribe con resultados a medias.
  *
  * ⚠️ NO es un pool genérico para cualquier cosa: quien lo use contra Switch
- * tiene que saber que Switch es de **sesión única por empresa** y que la
- * concurrencia solo es segura porque `client.ts` deduplica los logins en vuelo
- * (`loginEnVuelo`). Ver el comentario de `STOCK_CONCURRENCIA`.
+ * tiene que saber que Switch admite **un solo token válido por USUARIO** (PDF
+ * del API, p. 6; coincide con «una sesión por empresa» porque cada empresa entra
+ * con un único usuario de API) y que la concurrencia solo es segura porque
+ * `client.ts` deduplica los logins en vuelo (`loginEnVuelo`). Ver el comentario
+ * de `STOCK_CONCURRENCIA`.
  */
 export async function enParalelo<T, R>(
   items: readonly T[],

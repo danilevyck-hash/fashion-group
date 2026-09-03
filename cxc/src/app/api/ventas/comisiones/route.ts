@@ -19,8 +19,11 @@
  * hay CLIENTES QUE NO COMISIONAN para un vendedor concreto (tabla
  * comision_exclusion, grano empresa + cliente + vendedor, venta y cobro).
  * 🩸 Daniel: «crea configuración en comisiones para desactivar cálculos de
- * clientes». La respuesta trae `version`, `regla_cobro` y
- * `exclusiones_aplicadas` para que se sepa con cuál salió.
+ * clientes». Desde v8 (sep-2026, noche) el vendedor pasa por el ALIAS
+ * (comision_vendedor_alias: una persona, una fila — Daniel: «¿por qué hay 4
+ * Reinaldo?») y las exclusiones distinguen Venta de Cobro. La respuesta trae
+ * `version`, `regla_cobro`, `exclusiones_aplicadas` y `alias_aplicado` para que
+ * se sepa con cuál salió.
  *
  * COBROS $0 (switch_recibos.total = 0): son aplicaciones/cruces (saldo a favor
  * o NC aplicada contra facturas) o recibos anulados. Por decisión de negocio
@@ -68,7 +71,7 @@ export async function GET(req: NextRequest) {
   //
   // Las exclusiones (clientes que no comisionan para un vendedor) también
   // fallan ABIERTO: son la MARCA informativa pegada al nombre; quien resta es
-  // la RPC (comision_b2b_v7). Sin tabla o sin red, la tabla sale sin la marca.
+  // la RPC (comision_b2b_v8). Sin tabla o sin red, la tabla sale sin la marca.
   const [rpc, descuentos, exclusiones] = await Promise.all([
     leerComision(empresa, year, mes),
     leerDescuentosEfectivos([empresa], year, mes).catch(() => []),

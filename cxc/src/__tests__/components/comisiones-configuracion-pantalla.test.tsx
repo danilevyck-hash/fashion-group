@@ -7,20 +7,36 @@
 //   · «¿por qué en card y no como tab en toda la pantalla normal?»
 //   · «en comisiones me gusta que lo separes, pero cuando lo configures tú,
 //      pon a Reinaldo 1 y 1»
+//   Y esa misma noche, sobre la pestaña ya en producción:
+//   · «¿por qué hay 4 Reinaldo?» → una persona, una fila (alias en la base)
+//   · «llámalo Reynaldo y no Reinaldo» → con Y, y capitalizado en pantalla
+//   · Daniel Levy en la lista de tasas: «quítalo»
+//   · «poder quitar comisiones en ventas o comisiones sin que tengan que ser
+//      de los dos» → dos casillas, Venta y Cobro; al agregar «arranca con las
+//      dos marcadas pero yo deselecciono»
+//   · agrupado por empresa, y el botón «Configurar» de Por empresa se va:
+//     «configuración en dos lados»
 //
 // Lo que se vigila, montando las vistas REALES:
 //   1. El chip «Configuración» solo lo ve el admin, y solo en el MÓDULO
 //      /comisiones (conConfiguracion): en la pestaña Comisiones de Ventas no
-//      existe ni para el admin.
+//      existe ni para el admin. Y es la ÚNICA entrada: Por empresa ya no tiene
+//      botón «Configurar».
 //   2. La pantalla NUNCA dice «exclusión»/«excluir»: se llama «Clientes que
 //      no comisionan».
-//   3. Tasas por vendedor: Venta y Cobro por separado (Reinaldo 1.00 / 1.00);
-//      DANIEL LEVY en gris, «no se paga» y SIN cajas.
-//   4. La lista: Empresa · Cliente (nombre + código) · Vendedor · Desde · ×;
-//      sin columna Motivo. Quitar pide confirmación y manda DELETE ?id=.
+//   3. Tasas por vendedor: Venta y Cobro por separado; «Reynaldo Espinosa»
+//      (con Y, capitalizado, sin nota de «N nombres») 1.00 / 1.00; DANIEL
+//      LEVY NO está.
+//   4. La lista, agrupada POR EMPRESA (encabezado + contador) y sin columna
+//      Empresa adentro: Cliente (nombre + código) · Vendedor · Venta · Cobro ·
+//      Desde · ×; sin Motivo. Las casillas se cambian al momento (PATCH) y
+//      dejar las dos apagadas no manda nada y avisa. Quitar pide confirmación
+//      y manda DELETE ?id=.
 //   5. «+ Agregar» abre la fila inline con Empresa → Cliente (ClienteSwitchPicker
 //      contra /api/ventas/comisiones/exclusiones/<empresa>/clientes-switch) →
-//      Vendedor → Guardar (apagado hasta elegir cliente y vendedor).
+//      Vendedor → Venta ☑ Cobro ☑ → Guardar (apagado hasta elegir cliente y
+//      vendedor, y apagado con aviso si se desmarcan las dos). Las 4
+//      combinaciones viajan al POST tal cual.
 //   6. La marca «N clientes sin comisión» pegada al vendedor en la tabla.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -30,6 +46,7 @@ import { ComisionesConfiguracionView } from "@/components/ventas/ComisionesConfi
 import { ComisionesView } from "@/components/ventas/ComisionesView";
 import { ComisionesPorEmpresaView } from "@/components/ventas/ComisionesPorEmpresaView";
 import { fmtDate } from "@/lib/format";
+import { AVISO_NINGUNA_CASILLA } from "@/lib/comisiones/exclusiones";
 
 // 🩸 El jsdom de este repo expone localStorage/sessionStorage sin métodos (ver
 // comisiones-en-ventas.test.tsx): se reemplazan por un almacén real en memoria.
@@ -45,26 +62,31 @@ const almacenReal = (): Storage => {
   } as unknown as Storage;
 };
 
+// Lo que manda el servidor DESPUÉS del alias: una fila por persona, con el
+// nombre canónico (REYNALDO con Y). Daniel ya no viene (el servidor lo filtra),
+// pero se manda igual para probar que la pantalla tampoco lo dibuja.
 const CONFIG = {
   vendedores: [
     { vendedor_nombre: "EDWIN", tasa_venta: 0.005, tasa_cobro: 0.005, activo: true, origen: ["Vistana"] },
-    { vendedor_nombre: "REINALDO ESPINOSA", tasa_venta: 0.01, tasa_cobro: 0.01, activo: true, origen: ["Active Shoes", "Fashion Wear"] },
+    { vendedor_nombre: "REYNALDO ESPINOSA", tasa_venta: 0.01, tasa_cobro: 0.01, activo: true, origen: ["Active Shoes", "Active Wear", "Fashion Shoes", "Fashion Wear"] },
+    { vendedor_nombre: "REY STOUTE AGUAS", tasa_venta: 0.005, tasa_cobro: 0.005, activo: true, origen: ["Vistana"] },
     { vendedor_nombre: "DANIEL LEVY", tasa_venta: 0.005, tasa_cobro: 0.005, activo: true, origen: ["Vistana"] },
   ],
 };
 const EXCLUSIONES = {
   exclusiones: [
-    { id: 1, empresa_key: "active_shoes", cliente_codigo: "D-84", cliente_nombre: "Kheriddine", vendedor: "REINALDO ESPINOSA", creado_por: "daniel", creado_en: "2026-09-03T17:00:00Z" },
-    { id: 2, empresa_key: "active_wear", cliente_codigo: "D-50", cliente_nombre: "El Remate", vendedor: "REYNALDO ESPINOSA", creado_por: "daniel", creado_en: "2026-09-03T17:00:00Z" },
+    { id: 1, empresa_key: "active_shoes", cliente_codigo: "D-84", cliente_nombre: "Kheriddine", vendedor: "REYNALDO ESPINOSA", excluye_venta: true, excluye_cobro: true, creado_por: "daniel", creado_en: "2026-09-03T17:00:00Z" },
+    { id: 2, empresa_key: "active_shoes", cliente_codigo: "D-103", cliente_nombre: "Metro Shoes", vendedor: "REYNALDO ESPINOSA", excluye_venta: true, excluye_cobro: false, creado_por: "daniel", creado_en: "2026-09-03T17:00:00Z" },
+    { id: 3, empresa_key: "active_wear", cliente_codigo: "D-50", cliente_nombre: "El Remate", vendedor: "REYNALDO ESPINOSA", excluye_venta: true, excluye_cobro: true, creado_por: "daniel", creado_en: "2026-09-03T17:00:00Z" },
   ],
-  vendedores: { active_shoes: ["DEFAULT", "REINALDO ESPINOSA"], active_wear: ["DEFAULT", "REINALDO ESPINOSA", "REYNALDO ESPINOSA"], vistana: ["EDWIN"], fashion_wear: [], fashion_shoes: [], joystep: [] },
+  vendedores: { active_shoes: ["DEFAULT", "REYNALDO ESPINOSA"], active_wear: ["DEFAULT", "REYNALDO ESPINOSA"], vistana: ["EDWIN"], fashion_wear: [], fashion_shoes: [], joystep: [] },
 };
 const POR_EMPRESA = {
-  empresa_key: "active_shoes", year: 2026, mes: 8, version: "v7", regla_cobro: "quien_registro", exclusiones_aplicadas: true,
+  empresa_key: "active_shoes", year: 2026, mes: 8, version: "v8", regla_cobro: "quien_registro", exclusiones_aplicadas: true, alias_aplicado: true,
   vendedores: [
-    { vendedor: "REINALDO ESPINOSA", base: 1000, tasa: 0.01, comision: 10, base_cobro: 500, tasa_cobro: 0.01, comision_cobro: 5, comision_total: 15, descuento: 0, se_paga: true,
+    { vendedor: "REYNALDO ESPINOSA", base: 1000, tasa: 0.01, comision: 10, base_cobro: 500, tasa_cobro: 0.01, comision_cobro: 5, comision_total: 15, descuento: 0, se_paga: true,
       // Ya ordenados por código, como los manda el servidor.
-      clientes_sin_comision: [{ codigo: "D-103", nombre: "Metro Shoes" }, { codigo: "D-84", nombre: "Kheriddine" }] },
+      clientes_sin_comision: [{ codigo: "D-103", nombre: "Metro Shoes", excluye_venta: true, excluye_cobro: false }, { codigo: "D-84", nombre: "Kheriddine" }] },
     { vendedor: "DEFAULT", base: 0, tasa: 0.005, comision: 0, base_cobro: 200, tasa_cobro: 0.005, comision_cobro: 1, comision_total: 1, descuento: 0, se_paga: false },
   ],
 };
@@ -96,7 +118,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 // ═══ 1. El chip ══════════════════════════════════════════════════════════════
-describe("🔴 el chip «Configuración»: solo admin y solo en el módulo /comisiones", () => {
+describe("🔴 el chip «Configuración»: solo admin, solo en el módulo /comisiones, y la ÚNICA entrada", () => {
   it("admin en /comisiones lo ve y lo abre; ahí no hay período ni Excel", async () => {
     sessionStorage.setItem("cxc_role", "admin");
     render(<ComisionesView availableYears={[2026]} conConfiguracion />);
@@ -128,14 +150,22 @@ describe("🔴 el chip «Configuración»: solo admin y solo en el módulo /comi
     expect(todas.getAttribute("aria-current")).toBe("page");
   });
 
-  it("«Configurar» de Por empresa ya no abre un modal: lleva a la pestaña", async () => {
+  // CAMBIÓ DE DIRECCIÓN el 3-sep-2026 (noche): el botón «Configurar» de Por
+  // empresa llevaba a la pestaña; Daniel: «configuración en dos lados». Ya no
+  // existe — ni para el admin — y el chip de arriba es la única entrada.
+  it("🔴 Por empresa NO tiene botón «Configurar» (ni para el admin): el chip es la única entrada", async () => {
     sessionStorage.setItem("cxc_role", "admin");
     localStorage.setItem("fg_comisiones_mode", "empresa");
     render(<ComisionesView availableYears={[2026]} conConfiguracion />);
-    const btn = await screen.findByRole("button", { name: /Configurar$/ });
-    await act(async () => { fireEvent.click(btn); });
-    await screen.findByText("Tasas por vendedor");
-    expect(screen.queryByText("Configurar comisiones")).toBeNull();
+    await screen.findByRole("button", { name: "Por empresa", exact: true });
+    await screen.findByRole("table");
+    expect(screen.queryByRole("button", { name: /Configurar/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Configuración", exact: true })).toBeTruthy();
+    // Y la vista sola tampoco lo dibuja, reciba lo que reciba.
+    cleanup();
+    render(<ComisionesPorEmpresaView year={2026} mes={8} />);
+    await screen.findByRole("table");
+    expect(screen.queryByRole("button", { name: /Configurar/ })).toBeNull();
   });
 });
 
@@ -152,40 +182,79 @@ describe("🔴 la pestaña Configuración", () => {
     expect(document.body.textContent ?? "").not.toMatch(/exclu/i);
   });
 
-  it("Tasas por vendedor: Venta y Cobro por separado, Reinaldo 1.00 / 1.00; Daniel en gris, «no se paga» y sin cajas", async () => {
+  it("🔴 Tasas por vendedor: «Reynaldo Espinosa» con Y y capitalizado, UNA fila, 1.00 / 1.00, sin nota de «N nombres»; Daniel Levy NO está", async () => {
     render(<ComisionesConfiguracionView />);
     const tabla = (await screen.findByText("Tasas por vendedor")).closest("section")!;
     expect(within(tabla).getByRole("columnheader", { name: "Venta" })).toBeTruthy();
     expect(within(tabla).getByRole("columnheader", { name: "Cobro" })).toBeTruthy();
-    expect((within(tabla).getByLabelText("Tasa de venta de REINALDO ESPINOSA") as HTMLInputElement).value).toBe("1.00");
-    expect((within(tabla).getByLabelText("Tasa de cobro de REINALDO ESPINOSA") as HTMLInputElement).value).toBe("1.00");
-    expect((within(tabla).getByLabelText("Tasa de venta de EDWIN") as HTMLInputElement).value).toBe("0.50");
-    const daniel = within(tabla).getByText("DANIEL LEVY").closest("tr")!;
-    expect(daniel.getAttribute("data-se-paga")).toBe("no");
-    expect(within(daniel).getByText("no se paga")).toBeTruthy();
-    expect(within(daniel).queryByRole("spinbutton")).toBeNull();
-    // Guardar manda las DOS tasas.
+    // Con Y, capitalizado, una sola vez.
+    expect(within(tabla).getAllByText("Reynaldo Espinosa")).toHaveLength(1);
+    expect(within(tabla).queryByText(/REINALDO|Reinaldo|REYNALDO ESPINOSA/)).toBeNull();
+    expect(within(tabla).queryByText(/nombres en Switch/)).toBeNull();
+    expect((within(tabla).getByLabelText("Tasa de venta de Reynaldo Espinosa") as HTMLInputElement).value).toBe("1.00");
+    expect((within(tabla).getByLabelText("Tasa de cobro de Reynaldo Espinosa") as HTMLInputElement).value).toBe("1.00");
+    expect((within(tabla).getByLabelText("Tasa de venta de Edwin") as HTMLInputElement).value).toBe("0.50");
+    expect(within(tabla).getByText("Rey Stoute Aguas")).toBeTruthy();
+    // Daniel: «quítalo».
+    expect(within(tabla).queryByText(/DANIEL LEVY|Daniel Levy/)).toBeNull();
+    expect(within(tabla).queryByText("no se paga")).toBeNull();
+    // Guardar manda las DOS tasas con el nombre CANÓNICO (el que agrupa la RPC).
     await act(async () => { fireEvent.click(within(tabla).getByRole("button", { name: "Guardar tasas" })); });
     const put = llamadas.find((c) => c.method === "PUT")!;
     const upd = (put.body as { updates: { vendedor_nombre: string; tasa_venta: number; tasa_cobro: number }[] }).updates;
-    expect(upd.find((u) => u.vendedor_nombre === "REINALDO ESPINOSA")).toMatchObject({ tasa_venta: 0.01, tasa_cobro: 0.01 });
+    expect(upd.find((u) => u.vendedor_nombre === "REYNALDO ESPINOSA")).toMatchObject({ tasa_venta: 0.01, tasa_cobro: 0.01 });
+    expect(upd.some((u) => u.vendedor_nombre === "DANIEL LEVY")).toBe(false);
   });
 
-  it("la lista: Empresa · Cliente (nombre + código) · Vendedor · Desde · × — sin Motivo", async () => {
+  it("🔴 la lista va AGRUPADA POR EMPRESA (encabezado + contador) y cada tabla es Cliente · Vendedor · Venta · Cobro · Desde · × — sin Empresa ni Motivo", async () => {
     render(<ComisionesConfiguracionView />);
     const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
-    const encabezados = within(seccion).getAllByRole("columnheader").map((h) => h.textContent?.trim());
-    expect(encabezados).toEqual(["Empresa", "Cliente", "Vendedor", "Desde", "Quitar"]);
+    const grupos = [...seccion.querySelectorAll("[data-grupo-empresa]")].map((g) => g.getAttribute("data-grupo-empresa"));
+    expect(grupos).toEqual(["active_shoes", "active_wear"]);
+    const activeShoes = seccion.querySelector('[data-grupo-empresa="active_shoes"]') as HTMLElement;
+    expect(within(activeShoes).getByRole("heading", { name: "Active Shoes" })).toBeTruthy();
+    expect(within(activeShoes).getByLabelText("2 en Active Shoes").textContent).toBe("2");
+    const activeWear = seccion.querySelector('[data-grupo-empresa="active_wear"]') as HTMLElement;
+    expect(within(activeWear).getByLabelText("1 en Active Wear").textContent).toBe("1");
+    // Encabezados de la tabla del grupo: sin columna Empresa, sin Motivo.
+    const encabezados = within(activeShoes).getAllByRole("columnheader").map((h) => h.textContent?.trim());
+    expect(encabezados).toEqual(["Cliente", "Vendedor", "Venta", "Cobro", "Desde", "Quitar"]);
+    expect(encabezados).not.toContain("Empresa");
     expect(encabezados).not.toContain("Motivo");
-    const fila = within(seccion).getByText("Kheriddine").closest("tr")!;
+    const fila = within(activeShoes).getByText("Kheriddine").closest("tr")!;
     expect(within(fila).getByText("D-84")).toBeTruthy();
-    expect(within(fila).getByText("Active Shoes")).toBeTruthy();
-    expect(within(fila).getByText("REINALDO ESPINOSA")).toBeTruthy();
+    expect(within(fila).getByText("Reynaldo Espinosa")).toBeTruthy();
+    expect(within(fila).queryByText("Active Shoes")).toBeNull();
     // La fecha en Panamá, con el mismo formato que todo el sistema.
     expect(within(fila).getByText(fmtDate("2026-09-03"))).toBeTruthy();
+    // Las casillas dicen lo que trae cada fila: Kheriddine las dos; Metro Shoes solo venta.
+    expect((within(fila).getByLabelText("Venta de Kheriddine para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(true);
+    expect((within(fila).getByLabelText("Cobro de Kheriddine para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(true);
+    const metro = within(activeShoes).getByText("Metro Shoes").closest("tr")!;
+    expect((within(metro).getByLabelText("Venta de Metro Shoes para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(true);
+    expect((within(metro).getByLabelText("Cobro de Metro Shoes para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(false);
   });
 
-  it("quitar pide confirmación y manda DELETE ?id= (soft delete en el servidor)", async () => {
+  it("🔴 cambiar una casilla manda PATCH ?id= al momento; dejar las dos apagadas NO manda nada y avisa", async () => {
+    render(<ComisionesConfiguracionView />);
+    const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
+    // Kheriddine: apagar Cobro → PATCH con venta=true, cobro=false.
+    const cobroKher = within(seccion).getByLabelText("Cobro de Kheriddine para Reynaldo Espinosa");
+    await act(async () => { fireEvent.click(cobroKher); });
+    await waitFor(() => expect(llamadas.some((c) => c.method === "PATCH")).toBe(true));
+    const patch = llamadas.find((c) => c.method === "PATCH")!;
+    expect(patch.url).toContain("/api/ventas/comisiones/exclusiones?id=1");
+    expect(patch.body).toEqual({ excluye_venta: true, excluye_cobro: false });
+    // Metro Shoes ya tiene Cobro apagado: apagar Venta dejaría las dos apagadas → nada viaja, se avisa.
+    llamadas.length = 0;
+    const ventaMetro = within(seccion).getByLabelText("Venta de Metro Shoes para Reynaldo Espinosa");
+    await act(async () => { fireEvent.click(ventaMetro); });
+    expect((await screen.findByRole("alert")).textContent).toBe(AVISO_NINGUNA_CASILLA);
+    expect(llamadas.some((c) => c.method === "PATCH")).toBe(false);
+    expect((ventaMetro as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("quitar pide confirmación (diciendo qué vuelve) y manda DELETE ?id= (soft delete en el servidor)", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     render(<ComisionesConfiguracionView />);
     const seccion = (await screen.findByText("Clientes que no comisionan")).closest("section")!;
@@ -194,7 +263,7 @@ describe("🔴 la pestaña Configuración", () => {
     // Tocar × NO manda nada: sin confirmar no hay DELETE.
     await act(async () => { vi.advanceTimersByTime(50); });
     expect(llamadas.some((c) => c.method === "DELETE")).toBe(false);
-    expect(screen.getByText(/vuelve a cobrar comisión por Kheriddine en Active Shoes, en venta y en cobro/)).toBeTruthy();
+    expect(screen.getByText(/Reynaldo Espinosa vuelve a cobrar comisión por Kheriddine en Active Shoes, en venta y en cobro/)).toBeTruthy();
     // El botón rojo se habilita después de 1 s (ConfirmDeleteModal).
     await act(async () => { vi.advanceTimersByTime(1100); });
     const quitar = screen.getByRole("button", { name: "Quitar", exact: true });
@@ -204,7 +273,7 @@ describe("🔴 la pestaña Configuración", () => {
     vi.useRealTimers();
   });
 
-  it("«+ Agregar»: Empresa → Cliente (el selector compartido) → Vendedor → Guardar, apagado hasta elegir los dos", async () => {
+  it("🔴 «+ Agregar»: Empresa → Cliente (el selector compartido) → Vendedor → Venta ☑ Cobro ☑ → Guardar; arranca con las DOS marcadas", async () => {
     render(<ComisionesConfiguracionView />);
     await screen.findByText("Clientes que no comisionan");
     fireEvent.click(screen.getByRole("button", { name: "+ Agregar" }));
@@ -212,28 +281,83 @@ describe("🔴 la pestaña Configuración", () => {
     const guardar = within(alta).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
     expect(guardar.disabled).toBe(true);
     expect(within(alta).getByText("Falta elegir el cliente")).toBeTruthy();
+    // «arranca con las dos marcadas pero yo deselecciono».
+    const venta = within(alta).getByLabelText("Venta") as HTMLInputElement;
+    const cobro = within(alta).getByLabelText("Cobro") as HTMLInputElement;
+    expect(venta.checked).toBe(true);
+    expect(cobro.checked).toBe(true);
     // El selector compartido pide el directorio de la empresa elegida (la primera de las 6).
     await waitFor(() => expect(llamadas.some((c) => /\/exclusiones\/vistana\/clientes-switch\?q=/.test(c.url))).toBe(true));
     const kher = await within(alta).findByRole("button", { name: /Kheriddine/ });
     fireEvent.click(kher);
     expect(within(alta).getByText("Falta elegir el vendedor")).toBeTruthy();
-    fireEvent.change(within(alta).getByLabelText("Vendedor"), { target: { value: "EDWIN" } });
+    // El desplegable muestra el nombre bonito y manda el canónico.
+    const select = within(alta).getByLabelText("Vendedor") as HTMLSelectElement;
+    expect([...select.options].map((o) => o.textContent)).toContain("Edwin");
+    fireEvent.change(select, { target: { value: "EDWIN" } });
     expect(guardar.disabled).toBe(false);
     await act(async () => { fireEvent.click(guardar); });
     const post = llamadas.find((c) => c.method === "POST")!;
     expect(post.url).toContain("/api/ventas/comisiones/exclusiones");
-    expect(post.body).toEqual({ empresa_key: "vistana", cliente_codigo: "D-84", vendedor: "EDWIN" });
+    expect(post.body).toEqual({ empresa_key: "vistana", cliente_codigo: "D-84", vendedor: "EDWIN", excluye_venta: true, excluye_cobro: true });
     await screen.findByText("Listo, guardado");
+  });
+
+  it("🔴 las 4 combinaciones: solo Venta y solo Cobro viajan al POST; las dos apagadas no se guardan y se avisa", async () => {
+    render(<ComisionesConfiguracionView />);
+    await screen.findByText("Clientes que no comisionan");
+    fireEvent.click(screen.getByRole("button", { name: "+ Agregar" }));
+    const alta = await screen.findByTestId("alta-sin-comision");
+    const guardar = within(alta).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
+    fireEvent.click(await within(alta).findByRole("button", { name: /Kheriddine/ }));
+    fireEvent.change(within(alta).getByLabelText("Vendedor"), { target: { value: "EDWIN" } });
+    const venta = within(alta).getByLabelText("Venta") as HTMLInputElement;
+    const cobro = within(alta).getByLabelText("Cobro") as HTMLInputElement;
+
+    // Solo Venta.
+    fireEvent.click(cobro);
+    expect(guardar.disabled).toBe(false);
+    await act(async () => { fireEvent.click(guardar); });
+    let post = llamadas.filter((c) => c.method === "POST").at(-1)!;
+    expect(post.body).toMatchObject({ excluye_venta: true, excluye_cobro: false });
+    await screen.findByText("Listo, guardado");
+
+    // La fila se cierra al guardar: se vuelve a abrir, y arranca de nuevo con las dos marcadas.
+    fireEvent.click(screen.getByRole("button", { name: "+ Agregar" }));
+    const alta2 = await screen.findByTestId("alta-sin-comision");
+    const guardar2 = within(alta2).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
+    const venta2 = within(alta2).getByLabelText("Venta") as HTMLInputElement;
+    const cobro2 = within(alta2).getByLabelText("Cobro") as HTMLInputElement;
+    expect(venta2.checked && cobro2.checked).toBe(true);
+    fireEvent.click(await within(alta2).findByRole("button", { name: /Metro Shoes/ }));
+    fireEvent.change(within(alta2).getByLabelText("Vendedor"), { target: { value: "EDWIN" } });
+
+    // Solo Cobro.
+    fireEvent.click(venta2);
+    expect(guardar2.disabled).toBe(false);
+    // Las dos apagadas: Guardar se apaga y se dice por qué; nada viaja.
+    const antes = llamadas.filter((c) => c.method === "POST").length;
+    fireEvent.click(cobro2);
+    expect(guardar2.disabled).toBe(true);
+    expect(within(alta2).getByText(AVISO_NINGUNA_CASILLA)).toBeTruthy();
+    await act(async () => { fireEvent.click(guardar2); });
+    expect(llamadas.filter((c) => c.method === "POST").length).toBe(antes);
+    // Se vuelve a marcar Cobro → solo Cobro viaja.
+    fireEvent.click(cobro2);
+    expect(guardar2.disabled).toBe(false);
+    await act(async () => { fireEvent.click(guardar2); });
+    post = llamadas.filter((c) => c.method === "POST").at(-1)!;
+    expect(post.body).toMatchObject({ cliente_codigo: "D-103", excluye_venta: false, excluye_cobro: true });
   });
 });
 
 // ═══ 6. La marca en la tabla ═════════════════════════════════════════════════
 describe("🔴 «N clientes sin comisión» pegado al vendedor, con los nombres en el tooltip", () => {
-  it("Por empresa: Reinaldo lleva «2 clientes sin comisión»; DEFAULT no lleva nada", async () => {
+  it("Por empresa: Reynaldo lleva «2 clientes sin comisión» (y dice cuál es solo venta); DEFAULT no lleva nada", async () => {
     render(<ComisionesPorEmpresaView year={2026} mes={8} />);
     const tabla = await screen.findByRole("table");
     const marca = within(tabla).getByText("2 clientes sin comisión");
-    expect(marca.getAttribute("title")).toBe("D-103 Metro Shoes\nD-84 Kheriddine");
+    expect(marca.getAttribute("title")).toBe("D-103 Metro Shoes (solo venta)\nD-84 Kheriddine");
     const def = within(tabla).getByText("Oficina (DEFAULT)").closest("tr")!;
     expect(within(def).queryByText(/sin comisión/)).toBeNull();
   });

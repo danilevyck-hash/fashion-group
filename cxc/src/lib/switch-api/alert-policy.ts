@@ -73,8 +73,9 @@
  * momento; de no ser así, la corrida siguiente la habría avisado como racha.
  *
  * ── CONTEXTO DE SWITCH (lo de antes, sigue vigente) ──────────────────────────
- * Switch es sesión única por empresa (un login concurrente mata el token del
- * otro → 401 transitorio) y además su red se cae a ratos (ECONNREFUSED /
+ * Switch admite un solo token válido por USUARIO (PDF del API, p. 6) y cada
+ * empresa entra con un único usuario de API, o sea sesión única por empresa en
+ * la práctica (un login concurrente mata el token del otro → 401 transitorio) y además su red se cae a ratos (ECONNREFUSED /
  * CONNECT_TIMEOUT / 5xx, incidente 17-jul-2026: ~10 alertas de red que la
  * reconciliación de 10:00/14:00/18:00 recuperó sola a las 14:18).
  * `isSwitchSilenciable` sigue existiendo porque lo usan otros archivos

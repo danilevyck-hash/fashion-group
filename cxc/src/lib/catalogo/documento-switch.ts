@@ -7,7 +7,7 @@
 // no que una reemplace a la otra.
 //
 // El endpoint de la cotización (`POST /apicotizacion/terminar`) NO está en
-// `docs/api-switch.pdf` —el PDF solo documenta LEER cotizaciones (§5.31, §5.32)
+// `docs/switch/api-documentacion.pdf` —el PDF solo documenta LEER cotizaciones (§5.31, §5.32)
 // y mandarlas por correo (§5.33)— y se mapeó contra producción el 24-ago-2026
 // mandando un campo a la vez contra `active_shoes`, sin `articulos` (sin líneas
 // no puede crear nada: cada respuesta es solo una validación, y así se mapeó sin

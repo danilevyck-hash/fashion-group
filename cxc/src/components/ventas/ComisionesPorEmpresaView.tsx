@@ -4,12 +4,13 @@
 // El período (mes/año) lo controla el shell; aquí solo el selector de empresa,
 // que RECUERDA la última empresa usada (localStorage fg_last_comision_empresa).
 //
-// Regla (server, RPC comision_b2b_v6 vía lib/comisiones/rpc): base = facturas
+// Regla (server, RPC comision_b2b_v8 vía lib/comisiones/rpc): base = facturas
 // con utilidad>20% − todas las NC, excluyendo intercompañía/clientes internos;
 // comisión = base × tasa del VENDEDOR DE LA FACTURA (v5 jul-2026, retroactivo;
 // la NC usa su propio vendedor). El COBRO se paga a QUIEN REGISTRÓ EL RECIBO
 // (v6 sep-2026 — Daniel: «el que vende a veces no es el que cobra»); la fila
-// DEFAULT es la oficina y se rotula ETIQUETA_DEFAULT. Muestra a todos los
+// DEFAULT es la oficina y se rotula ETIQUETA_DEFAULT. Desde v8 las grafías de
+// Switch ya vienen colapsadas en una persona (alias). Muestra a todos los
 // vendedores activos aunque base=$0; los sin actividad se colapsan al pie.
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,7 +18,7 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Coins, Settings } from "lucide-react";
+import { Coins } from "lucide-react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import type { ExcelApi } from "./ComisionesView";
 import { etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
@@ -72,24 +73,16 @@ interface Props {
   onExcel?: (api: ExcelApi | null) => void;
   /** Cambia cuando "Actualizar ahora" termina: fuerza re-pedir los datos. */
   refreshKey?: number;
-  /** Lleva a la pestaña «Configuración» del shell (solo la recibe el admin). */
-  onConfigurar?: () => void;
 }
 
-export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0, onConfigurar }: Props) {
+export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }: Props) {
   // Filtro de empresa con memoria — hook centralizado useLastUsed (igual que
   // CXC, Préstamos y Packing). Key fg_last_comision_empresa (misma de antes).
   const [empresa, setEmpresa] = useLastUsed("comision_empresa", EMPRESAS[0]);
   const [data, setData] = useState<ComisionResp | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [canConfig, setCanConfig] = useState(false);
   const [detalleVendedor, setDetalleVendedor] = useState<string | null>(null);
-
-  useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role") || "";
-    setCanConfig(r === "admin");
-  }, []);
 
   // useLastUsed ya persiste en localStorage al setear.
   const handleEmpresa = (k: string) => setEmpresa(k);
@@ -156,8 +149,9 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0, o
   return (
     <div className="space-y-2">
       {/* Esta fila es SOLO del modo "Por empresa" (el Excel subió a la barra del
-          shell). Selector de empresa a la izquierda, Configurar —solo admin— a
-          la derecha. */}
+          shell): el selector de empresa y nada más. El botón «Configurar» que
+          vivía a la derecha SE FUE (Daniel, 3-sep-2026: «configuración en dos
+          lados»): la única entrada a la configuración es el chip de arriba. */}
       <div className="flex items-center gap-2">
         <Select value={empresa} onValueChange={handleEmpresa}>
           {/* min-h-[44px] pisa el h-9 (36 px) del SelectTrigger compartido. */}
@@ -168,17 +162,6 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0, o
             ))}
           </SelectContent>
         </Select>
-
-        {/* «Configurar» ya no abre un modal: lleva a la pestaña Configuración
-            del shell (Daniel, 3-sep-2026: «¿por qué en card y no como tab?»). */}
-        {canConfig && onConfigurar && (
-          <button
-            onClick={onConfigurar}
-            className="ml-auto inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-md border border-gray-200 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
-          >
-            <Settings className="h-4 w-4 shrink-0" /> Configurar
-          </button>
-        )}
       </div>
 
       {loading ? (

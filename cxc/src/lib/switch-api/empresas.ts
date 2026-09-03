@@ -283,8 +283,10 @@ export function empresasConCxp(): EmpresaKey[] {
   return ALL_KEYS.filter((k) => EMPRESA_SYNC_CAPABILITIES[k].cxp);
 }
 
-/** Empresas cuyos recibos (cobros) van a switch_recibos: las 6 B2B +
- *  Multifashion. Excluye Boston (su CXC se lleva fuera de este sistema).
+/** Empresas cuyos recibos (cobros) van a switch_recibos: las 8 — las 6 B2B,
+ *  Multifashion y Confecciones Boston (`recibos: true` desde el PR #347, cuando
+ *  su cartera entró al sistema en pestaña aparte; este comentario dijo «excluye
+ *  Boston» hasta el 3-sep-2026).
  *  Fuente de `RECIBOS_EMPRESA_KEYS` — no duplicar la lista. */
 export function empresasConRecibos(): EmpresaKey[] {
   return ALL_KEYS.filter((k) => EMPRESA_SYNC_CAPABILITIES[k].recibos);

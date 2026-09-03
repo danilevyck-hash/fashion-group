@@ -181,14 +181,33 @@ describe("/api/cxc/ultima-compra", () => {
     expect(primera.orden).toEqual(["empresa_key", "cliente_codigo"]);
   });
 
-  it("🔴 sin la DDL corrida devuelve [] y NO rompe el CXC", async () => {
+  // ⤺ CAMBIÓ DE DIRECCIÓN el 3-sep-2026. Hasta hoy este test exigía lo
+  // CONTRARIO: "sin la DDL corrida devuelve [] y NO rompe el CXC". Era correcto
+  // mientras la migración 20260813180000_ultima_compra_cliente.sql estuviera
+  // pendiente. Ya corrió (la vista existe en producción), así que un PGRST205
+  // que llegue hoy NO es "falta la DDL": es un permiso, un cambio de esquema o
+  // un timeout mal leído. Devolver [] lo pintaba como "este cliente nunca
+  // compró" y nadie se enteraba.
+  it("🔴 un PGRST205 YA NO se traga: la vista existe, así que es un error de verdad", async () => {
     responder = () => ({
       data: null,
       error: { code: "PGRST205", message: "Could not find the table 'public.switch_ultima_compra_cliente_v1' in the schema cache" },
     });
     const { status, body } = await getUltimaCompra();
-    expect(status).toBe(200);
-    expect(body).toEqual([]);
+    expect(status).toBe(500);
+    expect(body.error).toBeTruthy();
+    expect(body).not.toEqual([]);
+  });
+
+  it("🔴 tampoco un 42703 ni un 42P01 — ninguna forma de 'no existe' devuelve vacío", async () => {
+    for (const error of [
+      { code: "42P01", message: 'relation "switch_ultima_compra_cliente_v1" does not exist' },
+      { code: "42703", message: "column ultima_compra_monto does not exist" },
+    ]) {
+      responder = () => ({ data: null, error });
+      const { status } = await getUltimaCompra();
+      expect(status, JSON.stringify(error)).toBe(500);
+    }
   });
 
   it("🔴 un error DE VERDAD sigue siendo 500 — esconderlo sería agrandarlo", async () => {
@@ -315,9 +334,22 @@ describe("las DDL dicen la regla, no solo la explican", () => {
   });
 });
 
-describe("la app funciona SIN las DDL corridas", () => {
-  it("la ruta de última compra reconoce 'la vista no existe' con un criterio ESTRECHO", () => {
+// ⤺ CAMBIÓ DE DIRECCIÓN el 3-sep-2026 (antes: "la app funciona SIN las DDL
+// corridas"). La tolerancia era la correcta mientras la migración estaba
+// pendiente; hoy la vista existe y esa rama solo podía esconder errores reales.
+describe("la tolerancia a la DDL se RETIRÓ — la rama muerta no vuelve sola", () => {
+  it("la ruta de última compra ya no reconoce 'la vista no existe'", () => {
     const src = sinComentarios(leer("src/app/api/cxc/ultima-compra/route.ts"));
-    expect(src).toContain("esTablaAusente");
+    expect(src).not.toContain("esTablaAusente");
+    expect(src).not.toContain("PGRST205");
+  });
+
+  it("🔴 y no quedó ningún camino que responda vacío ante un error", () => {
+    const src = sinComentarios(leer("src/app/api/cxc/ultima-compra/route.ts"));
+    // Un `return NextResponse.json([])` dentro del `if (error)` sería el mismo
+    // silencio con otro nombre.
+    const dentroDelIf = src.slice(src.indexOf("if (error)"), src.indexOf("if (!data"));
+    expect(dentroDelIf).not.toMatch(/NextResponse\.json\(\[\]\)/);
+    expect(dentroDelIf).toContain("500");
   });
 });

@@ -391,6 +391,51 @@
 
 ---
 
+## 🔴 Comisiones — UNA PERSONA, UNA FILA, UNA TASA; y las exclusiones distinguen VENTA de COBRO (3-sep-2026, noche)
+
+> Daniel revisó la pestaña Configuración recién estrenada (la v7 ya estaba aplicada en producción: tabla, 17 filas y RPC respondiendo) y pidió cuatro cosas, textual: ***«¿por qué hay 4 Reinaldo?»*** · ***«llámalo Reynaldo y no Reinaldo»*** · sobre Daniel Levy en la lista de tasas, ***«quítalo»*** · ***«poder quitar comisiones en ventas o comisiones sin que tengan que ser de los dos»***, ***«las 11 que ya cargamos quedan con las dos marcadas»***, ***«arranca con las dos marcadas pero yo deselecciono»*** · y sobre el botón «Configurar» de Por empresa: ***«configuración en dos lados»***.
+>
+> ### Los 4 Reinaldo — medido contra producción
+>
+> `comision_vendedor_tasa` tenía **cuatro filas para la misma persona**, porque Switch manda el nombre distinto según la empresa y con errores de tipeo (medido el 3-sep sobre `switch_facturas` y `switch_recibos` de las 6 del grupo, todas las fechas):
+>
+> | grafía en Switch | dónde aparece | tasa venta / cobro |
+> |---|---|---:|
+> | `REINALDO ESPINOSA` | Fashion Shoes, Fashion Wear, Active Shoes, Active Wear (4 facturas 2026) | 1 % / 1 % |
+> | `REYNALDO ESPINOSA` | Active Wear (156 facturas, 154 recibos, 2024→) | 1 % / 1 % |
+> | `REINDALDO ESPINOSA` | solo en la tabla de tasas | 1 % / **0 %** ← error |
+> | `REINDALDO ESPINOSA ` (espacio final) | Active Wear, **solo 2023-2024** (93 facturas, 41 recibos) | 1 % / 1 % |
+>
+> Y `AGUAS` / `REY STOUTE AGUAS` (Vistana) son la misma persona. La fila con cobro 0 % era un error, pero **no le estaba cobrando 0 % a nadie en 2026**: la RPC recorta el nombre (`TRIM`) y la grafía con espacio solo tiene recibos de 2023 (23, $102.729,96) y 2024 (18, $32.778,77). Esos sí pagaban 0 %: con la v8 pasan a 1 % — **+1.017,31 en 2023 y +327,79 en 2024**, que solo se ven si alguien abre esos años.
+>
+> ### Cómo queda (`20260913120000_comision_vendedor_alias_v8.sql`, pendiente de aplicar)
+>
+> - **Tabla `comision_vendedor_alias`** (`nombre_switch → vendedor_canonico`, las dos en `UPPER(TRIM())` por CHECK, RLS `service_role`): REINALDO · REYNALDO · REINDALDO → **`REYNALDO ESPINOSA`** (con Y); AGUAS · REY STOUTE AGUAS → **`REY STOUTE AGUAS`**. La grafía con espacio cae en la misma fila porque la llave ya está recortada. Las filas identidad están a propósito: la tabla dice de un vistazo qué nombres son una sola persona.
+> - **Función `comision_vendedor_canonico(text)`**: con alias devuelve la persona; sin alias devuelve el nombre **solo recortado, no en mayúsculas** (así «Rodrigo» sigue cruzando con su fila de tasa y sus descuentos). Es el ÚNICO lugar donde se aplica el alias; todo lo demás la llama.
+> - **`comision_b2b_v8`**: función NUEVA (la v7 no se toca) = la v7 con el alias en `doc_vendedor`, `ventas`, `cobros` y `universo` — candado que deshace el alias a mano y exige que lo que queda sea la v7 byte a byte. **`comision_b2b_detalle` v5** hace lo mismo y canonicaliza `p_vendedor` al entrar (una grafía vieja devuelve lo mismo que el canónico). `leerComision` pide v8 → v7 → v6 → v5 y la respuesta dice `alias_aplicado`.
+> - **Tasas**: la migración deja UNA fila `REYNALDO ESPINOSA` en **1 % / 1 %** y borra las grafías (`DELETE` sobre `comision_vendedor_tasa`: es configuración, no historial de plata — la decisión vigente es la fila canónica). Trigger `BEFORE INSERT OR UPDATE` que canonicaliza lo que entre. Los descuentos fijos de Reinaldo (Fashion Shoes, $1.400 + $173,08) se renombran a REYNALDO — van por nombre y son plata.
+> - **Exclusiones**: dos columnas `excluye_venta` / `excluye_cobro` (`DEFAULT true`, CHECK «al menos una»); las 17 filas quedan con las dos marcadas. Las grafías se canonicalizan: las 5 de Active Shoes se renombran, y en Active Wear las 6 con grafía REINALDO quedan repetidas frente a las 6 de REYNALDO → **se apagan con soft delete firmado `migracion-alias-v8`** (nunca DELETE). Quedan **11 activas = los 11 pares** de Daniel. Trigger que canonicaliza lo que entre. La v8 mira `excluye_venta` en el JOIN de `ventas` y `excluye_cobro` en el de `cobros`.
+> - **Origen de las tasas y vendedores elegibles** (`config/route.ts`, `exclusiones/route.ts`) se juntan por persona del lado de Node con `aplicarAlias`, el espejo TS de la función SQL, leyendo la tabla de alias **fallando abierto** (sin DDL, cada nombre queda como viene). `PUT` de tasas escribe el canónico.
+>
+> ### La medición — con el SQL REAL, antes de aplicar
+>
+> `PGLITE_DIR=… node -r dotenv/config scripts/_medir-comision-alias-v8.mjs` (solo lectura): baja los datos de 2026 de las 6 (y los recibos 2023-2025 de Active Wear, donde vive la grafía con espacio), corre v5+v6+v7 en pglite, calcula la v7, **después** corre la v8 y calcula la v8. Cuadre v7 pglite vs v7 producción: **680 celdas, 0 distintas**.
+>
+> v7 → v8, ene–sep 2026, **por persona** (la v7 agrupada post-hoc con el mismo alias): **NINGUNA celda cambia** — 6 empresas, 14 personas, venta, cobro y total idénticos; grupo 90.190,93 → 90.190,93. Lo que cambia es la **forma**: 136 filas de vendedor en 54 (empresa, mes) → 123; en Active Wear `REYNALDO` + `REINALDO` → una fila, y en Vistana `AGUAS` + `REY STOUTE AGUAS` → una fila. Tasas: 9 filas → 5. Exclusiones: 17 activas → 11 (17 filas en total, nada se borró). La ÚNICA celda que se mueve está fuera de 2026: Active Wear **2023 +1.017,31** y **2024 +327,79** (la fila de cobro 0 % corregida).
+>
+> ⚠️ **Dos consecuencias visibles para decidir**: (1) la matriz «Todas las empresas» escondía a `AGUAS` por nombre desde el 3-ago (*«quita el vendedor aguas, no lo quiero ver»*); con el alias ya no existe ninguna fila llamada AGUAS, así que **Rey Stoute Aguas aparece en la matriz con todo lo suyo** ($49,83 en 2026) — el candado `VENDEDORES_OCULTOS` se dejó como estaba y sigue escondiendo a AGUAS si la RPC cae a la v7. (2) El nombre capitalizado («Reynaldo Espinosa») está en la pestaña Configuración, que es lo que Daniel revisó; las tablas de comisiones y el Excel siguen mostrando el canónico en mayúsculas (`REYNALDO ESPINOSA`, con Y).
+>
+> ### La pantalla
+>
+> «Tasas por vendedor»: una fila por persona, nombre capitalizado (`nombreVendedorEnPantalla`), **sin** la nota «N nombres en Switch» (Daniel la quitó), y **sin Daniel Levy** (sigue en `VENDEDORES_SIN_PAGO` y en la tabla de comisiones, gris; solo se va de las tasas). «Clientes que no comisionan»: **agrupado por empresa** (encabezado + contador) y debajo su tabla Cliente · Vendedor · **Venta ☑ · Cobro ☑** · Desde · ×. Las casillas de una fila se cambian al momento (`PATCH ?id=`); dejar las dos apagadas no manda nada y avisa («Marca al menos una: Venta o Cobro. Si no quieres ninguna, quita la fila»). «+ Agregar» arranca con las dos marcadas; con las dos apagadas Guardar se apaga con el mismo aviso; las 4 combinaciones viajan al POST tal cual (con las dos marcadas no viajan: es el default de la tabla, y así el alta sigue funcionando mientras la DDL no corra). El botón **«Configurar» de Por empresa se quitó**: el chip es la única entrada. El tooltip de «N clientes sin comisión» dice «(solo venta)» / «(solo cobro)» cuando aplica.
+>
+> ### Candados
+>
+> `comision-alias-v8.test.ts` (37): el SQL (alias con Y, función, colapso de tasas a 1/1, descuentos renombrados, casillas con default true y CHECK, soft delete de las repetidas, v8 = v7 sin alias ni casillas, JOIN con cada casilla, universo por alias, detalle con paridad, sin `$` suelto), **la conducta en pglite** (9 tasas → 5; 17 exclusiones → 11 activas / 6 apagadas firmadas; tres grafías + minúscula + espacio caen en UNA fila; las 4 combinaciones; el trigger; el detalle cierra y acepta la grafía vieja), `leerComision` v8 → v7 confesando `alias_aplicado`, la parte pura, las rutas (config sin Daniel y con origen por persona, PUT canónico, POST con las 4 combinaciones, PATCH solo admin y 400 con las dos apagadas) y los barridos. `comisiones-configuracion-pantalla.test.tsx` (12) reescrito para el mockup: Reynaldo con Y capitalizado una sola vez, sin nota, Daniel ausente, agrupado por empresa, casillas leídas y cambiadas, las 4 combinaciones en el alta, y **Por empresa sin botón Configurar**. Seis candados cambiaron de dirección con su nota (`comision-exclusion-v7` · `comision-cobro-quien-registro` · `comisiones-consolidado-neto` · `comision-cobro-sin-retenciones` · `comisiones-contabilidad` · la pantalla).
+> - **Verificado por mutación, 38 de 38 cazadas** (`scripts/_mutar-candados-comision-alias-v8.sh`): el canónico vuelve a REINALDO con I · REINDALDO deja de ser Reynaldo · AGUAS deja de ser Rey Stoute Aguas · la función pone a todos en mayúsculas · Reynaldo en 1 / 0,5 · las 4 filas de tasa se quedan · las repetidas se borran con DELETE · las activas no se renombran · `excluye_venta` nace apagada · se pierde el CHECK · la v8 ignora la casilla de Venta · ídem Cobro · el cobro deja de pasar por el alias · la venta ídem · se cae el filtro de retenciones · la DDL pisa la v7 · el detalle no canonicaliza · el detalle ignora la casilla · el trigger deja de canonicalizar · rpc.ts vuelve a v7 · el fallback miente · `aplicarAlias` no aplica · la pantalla vuelve a mayúsculas · las dos apagadas pasan (alta) · ídem (PATCH) · las casillas no viajan · Daniel Levy vuelve a la lista · el origen no pasa por el alias · el PUT escribe la grafía · los elegibles no pasan por el alias · el PATCH se abre a todos · vuelve el botón Configurar · la lista deja de agruparse · el alta arranca con Cobro apagado · una casilla puede dejar las dos apagadas · Daniel vuelve a dibujarse · vuelve la nota «N nombres» · voseo. CONTROL verde (153).
+
+---
+
 ## 🔴 Comisiones — LOS DESCUENTOS SE RESTAN UNA SOLA VEZ, EN EL SERVIDOR (24-ago-2026)
 
 > 🩸 **LA MISMA PERSONA, EL MISMO MES, DOS NÚMEROS EN LA MISMA PANTALLA.** La pestaña **«Por empresa»** mostraba el SUBTOTAL —sin restar los descuentos fijos— mientras **«Todas las empresas»** y el detalle del vendedor sí los restaban. Medido contra producción, **REINALDO ESPINOSA en Fashion Shoes** (sus dos descuentos: `Descuento` $1.400,00 + `Descuento de adelanto` $173,08 = **$1.573,08**, los ÚNICOS dos descuentos vivos de todo el sistema):

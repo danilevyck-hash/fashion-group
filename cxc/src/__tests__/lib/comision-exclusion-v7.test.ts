@@ -341,6 +341,9 @@ vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
     rpc: async (fn: string, args: Record<string, unknown>) => {
       rpcCalls.push({ fn, args });
+      // La v8 (alias, 3-sep-2026 noche) no existe en este arnés: acá se prueba
+      // la cadena v7 → v6 tal cual. La v8 tiene su candado en comision-alias-v8.
+      if (fn === "comision_b2b_v8") return sinFuncion("comision_b2b_v8");
       if (fn === "comision_b2b_v7") {
         // La empresa pedida vuelve en la respuesta, como en la RPC real.
         const r = respuestaV7();
@@ -396,23 +399,29 @@ const SECRET_PREV = process.env.SESSION_SECRET;
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-exclusiones-v7"; });
 afterAll(() => { process.env.SESSION_SECRET = SECRET_PREV; });
 
-describe("🔴 leerComision: v7 primero, y dice qué corrió", () => {
+// CAMBIÓ DE DIRECCIÓN el 3-sep-2026 (noche): la vigente es la v8 y la v7 pasó
+// a ser «la anterior». Lo que este bloque exige —la v7 antes que la v6, y el
+// fallback confesando `version` y `exclusiones_aplicadas`— se mantiene, con la
+// v8 doblada como inexistente (arriba).
+describe("🔴 leerComision: v7 después de la v8, y dice qué corrió", () => {
   beforeEach(() => { rpcCalls.length = 0; });
 
-  it("apunta a la v7; la anterior es la v6 y después la v5", async () => {
-    const { RPC_COMISION, RPC_COMISION_ANTERIOR, RPC_COMISION_V5 } = await import("@/lib/comisiones/rpc");
-    expect([RPC_COMISION, RPC_COMISION_ANTERIOR, RPC_COMISION_V5]).toEqual(["comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
+  it("la cadena es v8 → v7 → v6 → v5", async () => {
+    const { RPC_COMISION, RPC_COMISION_ANTERIOR, RPC_COMISION_V6, RPC_COMISION_V5, CADENA_RPC_COMISION } = await import("@/lib/comisiones/rpc");
+    expect([RPC_COMISION, RPC_COMISION_ANTERIOR, RPC_COMISION_V6, RPC_COMISION_V5]).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
+    expect(CADENA_RPC_COMISION.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
   });
 
-  it("con la DDL aplicada: solo la v7, version = v7, exclusiones_aplicadas = true", async () => {
+  it("con la DDL de v7 aplicada (y la v8 no): v8 → v7, version = v7, exclusiones_aplicadas = true", async () => {
     respuestaV7 = () => ({ data: { empresa_key: "active_shoes", year: 2026, mes: 7, regla_cobro: "quien_registro", exclusiones: "cliente_vendedor", vendedores: VENDEDORES }, error: null });
     const { leerComision } = await import("@/lib/comisiones/rpc");
     const r = await leerComision("active_shoes", 2026, 7);
     expect(r.error).toBeNull();
     expect(r.data?.version).toBe("v7");
     expect(r.data?.exclusiones_aplicadas).toBe(true);
+    expect(r.data?.alias_aplicado).toBe(false);
     expect(r.data?.regla_cobro).toBe("quien_registro");
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v7"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7"]);
   });
 
   it("sin la DDL: cae a la v6 y lo confiesa (version = v6, exclusiones_aplicadas = false)", async () => {
@@ -422,7 +431,7 @@ describe("🔴 leerComision: v7 primero, y dice qué corrió", () => {
     expect(r.error).toBeNull();
     expect(r.data?.version).toBe("v6");
     expect(r.data?.exclusiones_aplicadas).toBe(false);
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v7", "comision_b2b_v6"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6"]);
   });
 });
 
@@ -431,7 +440,9 @@ describe("🔴 validarExclusionNueva: fail-closed y normaliza", () => {
   it("acepta y normaliza (código y vendedor en mayúsculas, sin bordes)", async () => {
     const { validarExclusionNueva } = await import("@/lib/comisiones/exclusiones");
     const v = validarExclusionNueva({ empresa_key: "active_wear", cliente_codigo: " d-156 ", vendedor: " Reynaldo Espinosa " });
-    expect(v).toEqual({ ok: true, valor: { empresa_key: "active_wear", cliente_codigo: "D-156", vendedor: "REYNALDO ESPINOSA" } });
+    // Desde la v8 (3-sep-2026 noche) la fila lleva las dos casillas; sin
+    // mandarlas valen true (como al agregar: «arranca con las dos marcadas»).
+    expect(v).toEqual({ ok: true, valor: { empresa_key: "active_wear", cliente_codigo: "D-156", vendedor: "REYNALDO ESPINOSA", excluye_venta: true, excluye_cobro: true } });
   });
 
   it("rechaza: empresa fuera de las 6, Boston, sin cliente, mostrador, sin vendedor; ignora lo que sobra", async () => {

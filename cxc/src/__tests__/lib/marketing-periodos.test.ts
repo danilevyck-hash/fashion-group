@@ -16,8 +16,11 @@
 //      el proveedor tiene en la mano dejaría de coincidir con el sistema.
 //   2. Cerrar Tommy NO toca la parte de Reebok del mismo proyecto. Los
 //      proyectos no se cierran; se cierra la parte de UNA marca.
-//   3. SIN las tablas de período (la migración la corre Daniel a mano) sellar
-//      es un no-op silencioso y guardar una factura sigue funcionando igual.
+//   3. Si la tabla de períodos NO CONTESTA, sellar sigue sin ser fatal (la
+//      factura se guarda igual) pero el error SE LOGUEA. Hasta el 3-sep-2026
+//      "esa tabla no existe" era un no-op SILENCIOSO (la migración la corría
+//      Daniel a mano); la migración ya corrió y ese silencio escondía errores
+//      reales — la tolerancia se retiró y este punto cambió de dirección.
 //   4. Cerrar deja exactamente UN período abierto para esa marca. Ni dos (el
 //      documento nuevo no sabría en cuál entrar) ni cero (la marca se quedaría
 //      sin dónde registrar).
@@ -474,12 +477,17 @@ describe("el sello se pone al REGISTRAR, no por la fecha del documento", () => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────
-describe("sin la migración corrida, sellar es un no-op silencioso", () => {
+// ⚠️ CAMBIÓ DE DIRECCIÓN el 3-sep-2026. Este bloque se llamaba "sin la
+// migración corrida, sellar es un no-op silencioso" y exigía que 42P01 NO se
+// logueara y que `periodoAbiertoDe` devolviera null. Las tablas existen desde
+// 20260811160000: hoy "no existe la tabla" es un permiso, un timeout o un
+// cambio de esquema, y tiene que VERSE. Sellar sigue sin ser fatal (🩸).
+describe("si la tabla de períodos no contesta, sellar no es fatal pero SE VE", () => {
   beforeEach(() => {
     estado.hayTablasPeriodo = false;
   });
 
-  it("la factura se guarda igual y no se cae nada", async () => {
+  it("la factura se guarda igual, y el error del sello queda en el log", async () => {
     const errores = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const facturaId = await registrarFactura({
@@ -492,12 +500,13 @@ describe("sin la migración corrida, sellar es un no-op silencioso", () => {
     expect(facturaId).toBeTruthy();
     expect(estado.tablas.mk_facturas).toHaveLength(1);
     expect(estado.tablas.mk_factura_marcas).toHaveLength(1);
-    // "Falta la migración" NO es un error que haya que gritar.
-    expect(errores).not.toHaveBeenCalled();
+    // Antes: `not.toHaveBeenCalled()`. Ahora el tropiezo deja rastro.
+    expect(errores).toHaveBeenCalled();
+    expect(String(errores.mock.calls[0]?.[0])).toMatch(/sellarDocumento/);
   });
 
-  it("periodoAbiertoDe devuelve null en vez de reventar", async () => {
-    await expect(periodoAbiertoDe("pvh")).resolves.toBeNull();
+  it("periodoAbiertoDe LANZA en vez de disfrazar el error de 'no hay período'", async () => {
+    await expect(periodoAbiertoDe("pvh")).rejects.toThrow(/does not exist/);
   });
 
   it("cerrar responde 409 con un mensaje en español, nunca 500", async () => {
