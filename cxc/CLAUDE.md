@@ -1,5 +1,7 @@
 # Fashion Group — fashiongr.com
 
+> 🔴 **Estado del proyecto y pendientes vivos: [docs/estado-actual.md](docs/estado-actual.md) — léelo al empezar cualquier sesión.**
+
 ## Cómo trabajar con Daniel
 
 Tres reglas que valen para todo encargo en este repo. No están en la memoria de nadie: están aquí para que las herede cualquiera que abra el proyecto.
