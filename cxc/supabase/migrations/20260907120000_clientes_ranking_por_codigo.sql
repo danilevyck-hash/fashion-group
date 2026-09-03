@@ -1,143 +1,121 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Ventas › Clientes mostraba el DOBLE de la venta real (2-sep-2026)
+-- Ventas › Clientes mostraba el DOBLE — el cliente se identifica por CÓDIGO
+-- (2-sep-2026)
 --
 -- Daniel, contra Switch:  City Mall David · Vistana · 2026
 --     la app decía   $227.872,28
 --     Switch dice    $113.936,14      exactamente 2,000x
 --
--- ══ LA CAUSA RAÍZ NO ERA EL JOIN: ERA QUE BOSTON ESTABA ADENTRO ═════════════
+-- ══ LA IDENTIDAD DEL CLIENTE ES EL CÓDIGO ═══════════════════════════════════
 --
--- Daniel, textual: *"¿por qué confundirías City de Boston si ya había dicho que
--- Boston no puede tocar esos módulos? Boston es estricto para ver sus ventas y
--- tiene hasta su propio CXC, no quiero que se mezcle en mi grupo"*.
+-- Daniel, textual: ***"se debería de usar el código del cliente, ya que todos los
+-- D-24 por ejemplo son de City Mall across mis 6 empresas"***.
 --
--- El 28-jul-2026 a las 07:01 UTC, `sync-clientes-master` metió 4.910 clientes de
--- Confecciones Boston en `clientes_master`. Ese sync excluía `american_classic`
--- y SOLO a `american_classic` — Boston entraba. Y `clientes_master` **no tiene
--- columna `empresa_key`**: es una fila por CÓDIGO, compartida por las 6 del
--- grupo. Una vez adentro, un cliente de Boston es indistinguible de uno del
--- grupo. Eso viola el invariante 🔴 más fuerte del repo
--- (`docs/postmortems/boston-cxc.md`): *"Boston NUNCA se mezcla con el CXC del
--- grupo — ni una fila, ni un total, ni un export, ni un badge"*.
+-- Medido contra producción, y es exacto: de los **147 códigos** del grupo en
+-- `switch_clientes`, **138 aparecen en las 6 empresas con el MISMO nombre**, 2 en
+-- cinco y 7 en una sola (normal: no todo cliente le compra a todas). **Un solo
+-- código significa cosas distintas según la empresa, y no es un cliente: es
+-- `TCKCTA`, el mostrador** — ver el bloque de TCKCTA más abajo.
 --
--- Ese arreglo va en el CÓDIGO, no acá: `src/lib/switch-api/sync-clientes-master.ts`
--- ahora pide por INCLUSIÓN (`.in("empresa_key", EMPRESAS_DEL_GRUPO)`).
+-- ══ QUÉ ESTABA MAL ══════════════════════════════════════════════════════════
 --
--- ══ Y EL SEGUNDO DEFECTO, QUE ES EL QUE ARREGLA ESTA MIGRACIÓN ══════════════
---
--- Las vistas del ranking resolvían el código del cliente **uniendo por NOMBRE**:
+-- Las vistas del ranking resolvían el código **uniendo por NOMBRE**:
 --     LEFT JOIN clientes_master mc ON mc.nombre_normalized = a.cliente_norm
 -- Un LEFT JOIN contra una tabla que puede tener el mismo nombre en dos filas no
--- "elige una": devuelve LAS DOS. Cada factura de ese cliente se fue por los dos
--- caminos y el SUM la contó dos veces. Medido el 2-sep-2026: **46 nombres
--- repetidos entre filas vivas**, 24 de ellos mezclando un código del grupo con
--- uno de Boston (`CITY MALL DAVID` = `D-24` del grupo y `83` de Boston).
+-- "elige una": DEVUELVE LAS DOS, y el SUM de abajo cuenta la factura dos veces.
+-- El 28-jul-2026 entraron 4.910 clientes de Confecciones Boston a
+-- `clientes_master` (que no tiene columna de empresa), y con ellos **46 nombres
+-- repetidos entre filas vivas**, 24 mezclando un código del grupo con uno de
+-- Boston: `CITY MALL DAVID` = `D-24` del grupo y `83` de Boston.
 --
--- 🔴 **HACEN FALTA LAS DOS COSAS, Y ESTÁ MEDIDO.** Sacar a Boston sin arreglar
--- el join deja $13.426,00 de doble conteo vivo: quedan 3 nombres repetidos
--- ENTRE clientes del propio grupo (`CITY MODA CHORRERA` D-30/D-26,
--- `METRO SHOES PANAMA SA` D-103/D-173, `EL MACHETAZO SAN MIGUELITO` D-171/D-101),
--- que son códigos desfasados en el panel de Switch, no un error nuestro. Y
--- arreglar el join sin sacar a Boston deja clientes del grupo rotulados con
--- código de Boston. Un nombre repetido NO es un error; unir por él, sí.
+-- ══ EL CAMINO NUEVO — Y NO HACE FALTA NINGÚN NOMBRE ═════════════════════════
 --
--- ══ POR QUÉ NO SE PUEDE "UNIR POR CÓDIGO" A SECAS ═══════════════════════════
+--   switch_facturas (empresa_key, cliente_switch_id)
+--        └─→ switch_clientes (empresa_key, cliente_switch_id) → codigo
+--             └─→ clientes_master.codigo   (índice ÚNICO, 20260530000200)
 --
--- Se midió antes de escribirlo, que es lo que pidió Daniel. La fuente del
--- ranking es `switch_facturas`, que trae `cliente_switch_id` y `cliente_nombre`
--- — **NO trae el código**. El código sale de `switch_clientes` por el par
--- (empresa, id), y cuando ese par no existe el nombre es lo único que queda.
--- Borrar el fallback SÍ pierde clientes reales del ranking: medido, `AIDY SHOP
--- NO2` (D-2) y `A-AMANI SA` (D-1) —clientes del grupo en las 6 empresas— caían a
--- la fila «Otros clientes». Perder un cliente del ranking es peor que mostrarlo
--- doble.
+-- El par `(empresa_key, cliente_switch_id)` es **único por construcción**: este
+-- join no puede multiplicar una factura, ni hoy ni cuando dos clientes se
+-- llamen igual. Y mata de raíz los 3 homónimos que quedaban ENTRE clientes del
+-- propio grupo —`CITY MODA CHORRERA` (D-30/D-26), `METRO SHOES PANAMA SA`
+-- (D-103/D-173), `EL MACHETAZO SAN MIGUELITO` (D-171/D-101)—, que valían
+-- **$13.426,00** de doble conteo y que sacar a Boston NO arreglaba.
 --
--- LA SOLUCIÓN es que el fallback sea **1-a-1 POR CONSTRUCCIÓN**, no por suerte:
--- una vista que agrupa por nombre y se queda SOLO con los nombres que tienen una
--- única fila viva. Cuando el nombre es ambiguo **se abstiene** (devuelve nada) y
--- el cliente cae a huérfano — la misma regla que ya gobierna Asistencia:
--- 🔑 *cuando el sistema no puede saber, se abstiene*. Adivinar cuál de dos
--- clientes homónimos es el dueño de la plata sería inventar.
+-- 🔴 **NO SE DEJA FALLBACK POR NOMBRE, y la decisión está MEDIDA.** Un camino
+-- muerto es una trampa que alguien va a volver a usar. Los números:
+--   · De las 8.181 facturas del grupo que el ranking mira, **370 (4,52%)** traen
+--     un `cliente_switch_id` que no está en `switch_clientes` — son **ids VIEJOS**
+--     (p. ej. `AIDY SHOP NO2` factura con `vistana|3` cuando su par vivo es
+--     `vistana|139`), no clientes ausentes.
+--   · Esas 370 valen **$3.817,74 de 2026 (0,07%)**, y **caen a «Otros clientes»
+--     con fallback y sin fallback**: los 3 únicos con plata —`KAREN DUTY FREE SA`
+--     $2.382,00, `FERIA INT DE DAVID` $1.018,75, `MAZAR CITY SHOES` $417,00— **no
+--     están en `switch_clientes` NI en `clientes_master`**, así que ningún
+--     fallback puede darles un código. Ya eran huérfanos antes.
+--   · Lo ÚNICO que el fallback por nombre lograba de verdad era **rotular ventas
+--     del grupo con códigos de BOSTON**: `NIPMAR SA` → `390`, `CEPREDENAC` →
+--     `154345`, `BAZAR PALESTINA` → `113493`. Esas 3 filas desaparecen, y está
+--     bien que desaparezcan.
 --
--- ══ MEDIDO CONTRA PRODUCCIÓN (solo lectura, 2-sep-2026) ═════════════════════
+-- ══ TCKCTA — EL ÚNICO CASO DONDE EL CÓDIGO MIENTE ═══════════════════════════
 --
--- Reproduciendo la aritmética de la vista sobre los datos REALES:
---                                             filas      suma 2026 YTD    City Mall David
---   hoy (join por nombre, Boston adentro)      255      $7.911.210,10      $227.872,28
---   solo sacando a Boston                      255      $5.371.023,39      $113.936,14
---   ESTA MIGRACIÓN + Boston afuera             255      $5.357.597,39      $113.936,14
+-- `TCKCTA` es el pseudo-cliente de mostrador y se llama distinto en cada empresa:
+-- `CONTADO` en active_shoes/active_wear/joystep, `VENTAS` en fashion_wear/vistana
+-- y `VENTAS LOCA` en fashion_shoes. Es el único código del grupo que NO nombra al
+-- mismo cliente en las 6.
 --
--- El «hoy» reproduce EXACTO lo que publica la MV en producción (255 filas /
--- $7.909.875,00 en el refresh de las 07:35; la diferencia son las facturas que
--- entraron después). **No se pierde ni una fila: 255 antes y 255 después.**
+-- 🔑 **No puede juntar seis mostradores en una fila**, y no por suerte: **el grano
+-- de estas vistas es (cliente_key, EMPRESA)**, así que `TCKCTA` da como mucho una
+-- fila POR EMPRESA — nunca una sola sumando las seis. Medido después del cambio:
+-- **1 sola fila TCKCTA** en todo el payload (fashion_shoes, $25.835,65), la misma
+-- que hoy. El `filtered` de más abajo sigue sacando `CONTADO`/`VENTAS` por nombre.
 --
--- ══ QUÉ TOCA Y QUÉ NO ═══════════════════════════════════════════════════════
+-- ⚠️ **DEFECTO PRE-EXISTENTE QUE ESTA MIGRACIÓN NO TOCA, y que hay que decidir
+-- aparte:** el `filtered` excluye `'VENTAS LOCALES'` pero Switch escribe
+-- `VENTAS LOCA` (truncado), así que el mostrador de fashion_shoes se cuela. La
+-- pantalla lo saca del ranking y lo muestra aparte con la etiqueta ámbar
+-- «Mostrador» (`isVentasLocal` en `ClientesView.tsx`), o sea que **no se mezcla
+-- con clientes reales**; pero esa fila ámbar dice **$25.835,65** cuando el
+-- mostrador del grupo entero es **$54.478,59**. Es un número que Daniel LEE, así
+-- que no se cambia de paso: se reporta.
 --
---   TOCA:  clientes_master_por_nombre_unico_vw (NUEVA, el resolvedor 1-a-1)
---          clientes_empresa_12m_vw   (MV, Ventas › Clientes año en curso)
---          clientes_agregado_12m_vw  (modo «Todas»; se recrea por el CASCADE)
---          clientes_anio()           (Ventas › Clientes años CERRADOS — tenía el
---                                     mismo join y lee el clientes_master de HOY,
---                                     así que duplicaba la historia entera hacia
---                                     atrás: 2025/vistana City Mall Paso Canoa
---                                     $1.118.329,60 contra $559.164,80 real)
+-- ══ MEDIDO CONTRA PRODUCCIÓN (2-sep-2026) ══════════════════════════════════
 --
---   NO TOCA (verificado, no supuesto — no romperlo):
---          ventas_dashboard_summary   · no menciona clientes_master
---          ventas_rollup_mensual_mv   · idem
---          comision_b2b_v5            · idem
---          switch_estadocuenta_aging  · joinea por `codigo`, que es único
---          cliente_ficha_ventas       · joinea por `codigo` y ya daba bien
---   Los TOTALES de venta no se mueven: acá se listan CLIENTES. Si un total de
---   Ventas o de Vista General cambia, el cambio está mal.
+--                                                    filas   suma 2026 YTD   City Mall David
+--   antes de todo (nombre, Boston adentro)            255    $7.911.210,10    $227.872,28
+--   con Boston ya fuera de clientes_master  ← HOY     255    $5.371.023,39    $113.936,14
+--   ESTA MIGRACIÓN (join por código)                  258    $5.357.597,39    $113.936,14
 --
--- 🩸 ESTE MISMO BUG SE PARCHÓ DOS VECES SIN MIRAR LA TERCERA SUPERFICIE:
---    Directorio (#387) y buscador ⌘K (#388), los dos el 30-jul-2026. Las dos
---    veces se arregló la pantalla que alguien notó. El ranking de Ventas llevaba
---    cinco semanas publicando $2,55 millones de venta que no existió.
+-- **NO se pierde ningún cliente.** `AIDY SHOP NO2` (D-2) sigue con sus 2 filas
+-- (fashion_wear $1.549,00 · vistana $526,00) y `A-AMANI SA` (D-1) con las suyas
+-- (vistana $2.006,77 · fashion_wear −$90,00). Las 258 filas son 255 + 3 filas de
+-- **$0,00** de esos ids viejos, que caen a «Otros clientes» sin mover un centavo.
+-- El total de huérfanos NO cambia: $3.817,74 antes y después.
+--
+-- **«Filtré Vistana, no hace sentido que sume las de Boston si puse Vistana»** —
+-- queda cerrado por construcción: el grano es (cliente, EMPRESA) y el código sale
+-- del par (empresa, id). Medido: **67 filas de vistana, 0 con código ajeno.**
+--
+-- ══ QUÉ NO TOCA (verificado, no supuesto) ══════════════════════════════════
+--
+--   `ventas_dashboard_summary` · `ventas_rollup_mensual_mv` · `comision_b2b_v5`
+--   `switch_estadocuenta_aging` · `cliente_ficha_ventas`  → ninguna se toca.
+--
+-- 🔴 **LAS VENTAS DE BOSTON SIGUEN SUMANDO** en Ventas › Resumen y en Vista
+-- General ($463.147, el 7,4%). Daniel, textual: *"Boston también quiero verlos en
+-- ventas-resumen"* y *"solo se queda CXC de Boston en su tab, sin que toque ni se
+-- mezcle con los otros. Déjalo en Vista General"*. **Su plata suma; sus clientes
+-- no se ven.** Lo que sale de las superficies del grupo son sus CLIENTES, nunca
+-- su venta. Hay candado.
 --
 -- ADITIVO Y REVERSIBLE: recrea vistas y una función; NO borra ni modifica datos.
--- ⚠️ La limpieza de las 4.914 filas de Boston que ya están en `clientes_master`
---    va APARTE y NO se ejecuta acá — ver `scripts/_verif-clientes-master-boston.mjs`
---    (solo lectura), que reporta exactamente qué filas son antes de tocar nada.
---
 -- Aplicar manual en Supabase Dashboard → SQL Editor.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- PARTE 0 — EL RESOLVEDOR 1-A-1. Una sola definición, leída por los dos objetos.
---
--- 🔴 `HAVING COUNT(*) = 1` ES EL INVARIANTE, no una optimización. Es lo que hace
--- que un LEFT JOIN contra esta vista NO PUEDA multiplicar filas: el GROUP BY es
--- por la misma columna con la que se joinea, así que hay como máximo una fila por
--- `nombre_normalized`. `MIN(codigo)` no "elige" nada — con COUNT(*)=1 hay un solo
--- código posible.
---
--- Un `DISTINCT ON (nombre_normalized) … ORDER BY codigo` también sería 1-a-1,
--- pero elegiría un dueño ARBITRARIO para la plata de dos homónimos y se callaría.
--- Preferimos abstenernos: sin fila, el cliente cae a «Otros clientes», que es
--- visible y revisable.
--- ══════════════════════════════════════════════════════════════════════════════
-
-DROP VIEW IF EXISTS clientes_master_por_nombre_unico_vw CASCADE;
-
-CREATE VIEW clientes_master_por_nombre_unico_vw AS
-SELECT
-  m.nombre_normalized,
-  MIN(m.codigo) AS codigo
-FROM clientes_master m
-WHERE m.deleted = false
-  AND m.nombre_normalized IS NOT NULL
-GROUP BY m.nombre_normalized
-HAVING COUNT(*) = 1;
-
-GRANT SELECT ON clientes_master_por_nombre_unico_vw TO service_role;
-
-
--- ══════════════════════════════════════════════════════════════════════════════
 -- PARTE 1 — El ranking del año EN CURSO (MV + vista agregada).
--- Copia EXACTA de 20260727230000 salvo por los dos LEFT JOIN marcados con ⬇️.
+-- Copia EXACTA de 20260727230000 salvo por el camino del código.
 -- ══════════════════════════════════════════════════════════════════════════════
 
 DROP VIEW              IF EXISTS clientes_agregado_12m_vw CASCADE;
@@ -169,20 +147,16 @@ WITH
   src_a AS (
     SELECT
       a.empresa,
-      COALESCE(sc.codigo, mc.codigo) AS cliente_codigo,
+      sc.codigo AS cliente_codigo,
       a.cliente_norm,
       a.fecha, a.anio, a.mes, a.subtotal
     FROM a_raw a
+    -- ⬇️ EL PUENTE, Y NADA MÁS. `switch_clientes` es la ÚNICA fuente del código:
+    -- el par (empresa_key, cliente_switch_id) es único por construcción, así que
+    -- este JOIN no puede multiplicar una factura.
     LEFT JOIN switch_clientes sc
       ON sc.empresa_key = a.empresa_key
      AND sc.cliente_switch_id = a.cliente_switch_id
-    -- ⬇️ EL ARREGLO (ver el encabezado). Antes acá decía `clientes_master mc`
-    -- a secas: un LEFT JOIN contra una tabla que puede tener el mismo
-    -- `nombre_normalized` en dos filas MULTIPLICA la factura por la cantidad de
-    -- homónimos, y el SUM de más abajo la cuenta esas veces. Ahora resuelve
-    -- contra la vista 1-a-1, que por construcción devuelve como máximo una fila.
-    LEFT JOIN clientes_master_por_nombre_unico_vw mc
-      ON mc.nombre_normalized = a.cliente_norm
   ),
 
   src_b AS (
@@ -194,6 +168,7 @@ WITH
     FROM (
       SELECT
         sf.empresa_key AS empresa,
+        sf.cliente_switch_id,
         COALESCE(
           NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(UPPER(sf.cliente_nombre), '[.,]', '', 'g'), '\s+', ' ', 'g')), ''),
           '(Sin nombre)'
@@ -210,9 +185,12 @@ WITH
       WHERE sf.empresa_key NOT IN ('vistana', 'fashion_wear', 'fashion_shoes', 'active_shoes', 'active_wear', 'joystep')
         AND sf.cliente_nombre IS NOT NULL
     ) nb
-    -- Misma corrección que en la rama A, por el mismo motivo.
-    LEFT JOIN clientes_master_por_nombre_unico_vw m
-      ON m.nombre_normalized = nb.cliente_norm
+    -- La rama no-B2B ahora usa EL MISMO puente que la del grupo. Antes era la
+    -- única que resolvía SOLO por nombre, y es la que traía clientes de Boston
+    -- a la mesa del grupo.
+    LEFT JOIN switch_clientes m
+      ON m.empresa_key = nb.empresa
+     AND m.cliente_switch_id = nb.cliente_switch_id
   ),
 
   src AS (
@@ -394,7 +372,7 @@ GRANT SELECT ON clientes_agregado_12m_vw TO service_role;
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- PARTE 2 — El ranking de los años CERRADOS.
--- Copia EXACTA de 20260606050000 salvo por los dos LEFT JOIN marcados.
+-- Copia EXACTA de 20260606050000 salvo por el camino del código.
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE OR REPLACE FUNCTION clientes_anio(
@@ -460,16 +438,14 @@ BEGIN
     src_a AS (
       SELECT
         a.empresa,
-        COALESCE(sc.codigo, mc.codigo) AS cliente_codigo,
+        sc.codigo AS cliente_codigo,
         a.c_norm, a.fecha, a.anio, a.mes, a.subtotal
       FROM a_raw a
-      LEFT JOIN switch_clientes sc
-        ON sc.empresa_key = a.empresa_key AND sc.cliente_switch_id = a.cliente_switch_id
-      -- Mismo arreglo que en clientes_empresa_12m_vw: esta función lee el
+      -- ⬇️ Mismo arreglo que en clientes_empresa_12m_vw. Esta función lee el
       -- `clientes_master` de HOY, así que el fan-out por nombre duplicaba
       -- también TODOS los años cerrados, retroactivamente.
-      LEFT JOIN clientes_master_por_nombre_unico_vw mc
-        ON mc.nombre_normalized = a.c_norm
+      LEFT JOIN switch_clientes sc
+        ON sc.empresa_key = a.empresa_key AND sc.cliente_switch_id = a.cliente_switch_id
     ),
     -- ── Rama B: NO-B2B (boston, american_classic) switch por nombre ────────────
     src_b AS (
@@ -480,6 +456,7 @@ BEGIN
       FROM (
         SELECT
           sf.empresa_key AS empresa,
+          sf.cliente_switch_id,
           COALESCE(
             NULLIF(TRIM(REGEXP_REPLACE(REGEXP_REPLACE(UPPER(sf.cliente_nombre), '[.,]', '', 'g'), '\s+', ' ', 'g')), ''),
             '(Sin nombre)'
@@ -496,8 +473,8 @@ BEGIN
         WHERE sf.empresa_key NOT IN ('vistana', 'fashion_wear', 'fashion_shoes', 'active_shoes', 'active_wear', 'joystep')
           AND sf.cliente_nombre IS NOT NULL
       ) nb
-      LEFT JOIN clientes_master_por_nombre_unico_vw m
-        ON m.nombre_normalized = nb.c_norm
+      LEFT JOIN switch_clientes m
+        ON m.empresa_key = nb.empresa AND m.cliente_switch_id = nb.cliente_switch_id
     ),
     src AS (
       SELECT * FROM src_a

@@ -27,27 +27,41 @@
 //      no "elige una": DEVUELVE LAS DOS, y el SUM de abajo cuenta la factura dos
 //      veces. 46 nombres repetidos entre filas vivas, 24 mezclando grupo y Boston.
 //
-// ─── 🔑 POR QUÉ SE PROHÍBE EL JOIN Y NO LOS NOMBRES REPETIDOS ────────────────
+// ─── 🔑 LA IDENTIDAD DEL CLIENTE ES EL CÓDIGO ───────────────────────────────
 //
-// Es la pregunta que decide este archivo, y la respuesta está MEDIDA:
-// **un nombre repetido NO es un error; unir por él, sí.**
+// Daniel, textual: *"se debería de usar el código del cliente, ya que todos los
+// D-24 por ejemplo son de City Mall across mis 6 empresas"*. Medido: de los 147
+// códigos del grupo, **138 aparecen en las 6 empresas con el MISMO nombre**, 2 en
+// cinco y 7 en una sola. **Uno solo significa cosas distintas según la empresa, y
+// no es un cliente: `TCKCTA`, el mostrador** (ver su describe más abajo).
 //
-//   · Sacando a Boston quedan 3 nombres repetidos ENTRE clientes del propio
-//     grupo — `CITY MODA CHORRERA` (D-30/D-26), `METRO SHOES PANAMA SA`
-//     (D-103/D-173), `EL MACHETAZO SAN MIGUELITO` (D-171/D-101). Son códigos
-//     desfasados en el panel de Switch, un hecho del dato, no un bug nuestro.
-//     Un test que fallara por ellos estaría rojo hoy y para siempre, y terminaría
-//     silenciado — que es la peor clase de candado.
-//   · Un test de DATOS falla (o pasa) por razones que ningún cambio de código
-//     causó, así que no protege ninguna ruta de código.
-//   · El join, en cambio, es ESTRUCTURAL: se ve en el SQL, se caza en el build,
-//     y caza la PRÓXIMA superficie antes de que se publique. 🩸 Y hace falta que
-//     cace la próxima: este mismo bug se parchó DOS veces —Directorio (#387) y
-//     buscador ⌘K (#388), los dos el 30-jul-2026— y las dos veces se arregló la
-//     pantalla que alguien notó, sin mirar la tercera.
+// El camino, sin un solo nombre de por medio:
+//     switch_facturas (empresa_key, cliente_switch_id)
+//        └─→ switch_clientes (empresa_key, cliente_switch_id) → codigo
+//             └─→ clientes_master.codigo   (índice ÚNICO)
+// El par `(empresa_key, cliente_switch_id)` es único por construcción: **no puede
+// multiplicar una factura**, ni hoy ni cuando dos clientes se llamen igual.
 //
-// (Si Daniel quiere VER los nombres repetidos, el lugar es un check de
-//  `/admin/data-health`, que avisa sin poner el build rojo. No es este archivo.)
+// 🔴 **NO HAY FALLBACK POR NOMBRE, y la decisión está MEDIDA.** Un camino muerto
+// es una trampa. De las 8.181 facturas que el ranking mira, 370 (4,52%) traen un
+// `cliente_switch_id` viejo que no cruza el puente; valen $3.817,74 de 2026
+// (0,07%) y **caen a «Otros clientes» con fallback y sin él** — los 3 únicos con
+// plata no están en `switch_clientes` NI en `clientes_master`, así que ningún
+// fallback podía darles código. Lo único que el fallback lograba de verdad era
+// **rotular ventas del grupo con códigos de BOSTON** (`NIPMAR SA` → `390`).
+//
+// ─── Por qué se prohíbe el JOIN y no los nombres repetidos ──────────────────
+//
+// **Un nombre repetido NO es un error; unir por él, sí.** Quedan 3 homónimos
+// legítimos entre clientes del propio grupo (`CITY MODA CHORRERA` D-30/D-26,
+// `METRO SHOES PANAMA SA` D-103/D-173, `EL MACHETAZO SAN MIGUELITO` D-171/D-101):
+// son códigos desfasados en el panel de Switch, un hecho del dato. Un test que
+// fallara por ellos estaría rojo para siempre y terminaría silenciado — la peor
+// clase de candado. Además un test de DATOS falla o pasa por razones que ningún
+// cambio de código causó, así que no protege ninguna ruta. El join es
+// ESTRUCTURAL: se ve en el SQL, se caza en el build, y caza la PRÓXIMA superficie
+// 🩸 — que hace falta: este bug se parchó DOS veces (Directorio #387 y buscador
+// ⌘K #388, los dos el 30-jul-2026) arreglando la pantalla que alguien notó.
 //
 // ─── QUÉ VIGILA ─────────────────────────────────────────────────────────────
 //   BARRIDO 1 (SQL) — arma la definición FINAL de cada VIEW / MV / FUNCTION del
@@ -138,7 +152,7 @@ vi.mock("@/lib/supabase-paginado", () => ({
 }));
 
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
-import { EMPRESAS_DEL_GRUPO } from "@/lib/clientes/mundos";
+import { EMPRESAS_DEL_GRUPO, esMostrador, CODIGO_MOSTRADOR } from "@/lib/clientes/mundos";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 const RAIZ = path.resolve(__dirname, "../../..");
@@ -148,8 +162,8 @@ const SRC = path.join(RAIZ, "src");
 const TABLA = "clientes_master";
 const COLUMNA_NOMBRE = "nombre_normalized";
 
-/** La vista 1-a-1 que SÍ puede resolver por nombre: es el único resolvedor. */
-const RESOLVEDOR = "clientes_master_por_nombre_unico_vw";
+/** El puente: la ÚNICA fuente del código de un cliente. */
+const PUENTE = "switch_clientes";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lectura de migraciones (mismo motor que `cxc-boston-fuera-de-toda-superficie`)
@@ -244,18 +258,17 @@ describe("BARRIDO 1 (SQL) — ningún objeto vivo une clientes_master por nombre
     expect(objetos.has("clientes_empresa_12m_vw")).toBe(true);
     expect(objetos.has("clientes_agregado_12m_vw")).toBe(true);
     expect(objetos.has("clientes_anio")).toBe(true);
-    expect(objetos.has(RESOLVEDOR)).toBe(true);
   });
 
   it("el barrido sabe reconocer el defecto (si no, no está mirando el ON)", () => {
     // El propio detector, probado contra el SQL exacto que causó el bug y contra
     // el que lo arregla. Un barrido que no distingue los dos no sirve de nada.
     const roto = "FROM a LEFT JOIN clientes_master mc ON mc.nombre_normalized = a.cliente_norm AND mc.deleted = false";
-    const sano = `FROM a LEFT JOIN ${RESOLVEDOR} mc ON mc.nombre_normalized = a.cliente_norm`;
+    const puente = `FROM a LEFT JOIN ${PUENTE} sc ON sc.empresa_key = a.empresa_key AND sc.cliente_switch_id = a.cliente_switch_id`;
     const porCodigo = "FROM a LEFT JOIN clientes_master m ON m.codigo = a.cliente_codigo AND m.deleted = false";
 
     expect(condicionesDeJoinAClientesMaster(roto).join(" ")).toContain(COLUMNA_NOMBRE);
-    expect(condicionesDeJoinAClientesMaster(sano)).toHaveLength(0);
+    expect(condicionesDeJoinAClientesMaster(puente)).toHaveLength(0);
     expect(condicionesDeJoinAClientesMaster(porCodigo).join(" ")).not.toContain(COLUMNA_NOMBRE);
   });
 
@@ -271,34 +284,51 @@ describe("BARRIDO 1 (SQL) — ningún objeto vivo une clientes_master por nombre
     expect(
       culpables,
       `Estos objetos unen ${TABLA} por ${COLUMNA_NOMBRE}, que MULTIPLICA filas ` +
-        `cuando dos clientes se llaman igual. Resuelve por ${RESOLVEDOR}, que es ` +
-        `1-a-1 por construcción.\n  · ${culpables.join("\n  · ")}`,
+        `cuando dos clientes se llaman igual. El código sale del PUENTE ` +
+        `${PUENTE} por (empresa_key, cliente_switch_id), que es único.\n  · ${culpables.join("\n  · ")}`,
     ).toEqual([]);
   });
 
-  it("el resolvedor es 1-a-1 POR CONSTRUCCIÓN, no por suerte", () => {
-    // Es lo único que hace segura a la vista: agrupa por la MISMA columna con la
-    // que se joinea y descarta los nombres ambiguos. Sin el HAVING, la vista
-    // devolvería una fila por nombre igual — pero eligiendo un dueño arbitrario
-    // para la plata de dos homónimos.
-    const cuerpo = objetos.get(RESOLVEDOR)?.cuerpo ?? "";
-    expect(cuerpo).toMatch(new RegExp(`GROUP\\s+BY\\s+[a-z0-9_.]*${COLUMNA_NOMBRE}`, "i"));
-    expect(cuerpo).toMatch(/HAVING\s+COUNT\s*\(\s*\*\s*\)\s*=\s*1/i);
-    expect(cuerpo).toMatch(/deleted\s*=\s*false/i);
-  });
-
-  it("los dos rankings resuelven el nombre por el resolvedor, y el código por codigo", () => {
-    // Las dos mitades del arreglo, cada una en su lugar: el fallback por NOMBRE
-    // va contra la vista 1-a-1; la ficha del cliente (nombre, whatsapp, id) sale
-    // de `clientes_master` por CÓDIGO, que es único y nunca multiplicó nada.
+  it("los dos rankings sacan el código del PUENTE, por (empresa, id)", () => {
+    // El par (empresa_key, cliente_switch_id) es único por construcción: por eso
+    // este camino no puede multiplicar una factura. Se exige que las DOS ramas
+    // —la del grupo y la de Boston/Multifashion— lo usen: la rama no-B2B era la
+    // única que resolvía solo por nombre, y es la que traía clientes de Boston.
     for (const nombre of ["clientes_empresa_12m_vw", "clientes_anio"]) {
       const cuerpo = objetos.get(nombre)?.cuerpo ?? "";
-      expect(cuerpo, nombre).toContain(RESOLVEDOR);
-      expect(
-        condicionesDeJoinAClientesMaster(cuerpo).join(" "),
-        `${nombre}: el join a ${TABLA} tiene que ser por codigo`,
-      ).toContain("codigo");
+      const puentes = [
+        ...cuerpo.matchAll(
+          /JOIN\s+switch_clientes\s+(?:AS\s+)?[a-zA-Z0-9_]*\s*ON[\s\S]{0,220}?cliente_switch_id/gi,
+        ),
+      ];
+      expect(puentes.length, `${nombre}: faltan puentes por (empresa, id)`).toBeGreaterThanOrEqual(2);
+      for (const p of puentes) {
+        expect(p[0], `${nombre}: un puente sin empresa_key mezclaría empresas`).toContain("empresa_key");
+      }
     }
+  });
+
+  it("el único join a clientes_master es por `codigo`, que tiene índice único", () => {
+    // La ficha del cliente (nombre, whatsapp, id) sale de `clientes_master` por
+    // CÓDIGO. Es la parte que nunca multiplicó nada y la que se conserva.
+    for (const nombre of ["clientes_empresa_12m_vw", "clientes_anio"]) {
+      const cuerpo = objetos.get(nombre)?.cuerpo ?? "";
+      const ons = condicionesDeJoinAClientesMaster(cuerpo);
+      expect(ons.length, `${nombre}: no joinea clientes_master`).toBeGreaterThan(0);
+      for (const on of ons) expect(on, nombre).toContain("codigo");
+    }
+  });
+
+  it("no queda ningún camino por NOMBRE — ni el resolvedor 1-a-1 que se descartó", () => {
+    // 🩸 Hubo un diseño intermedio con una vista `..._por_nombre_unico_vw` que se
+    // ABSTENÍA ante un nombre ambiguo. Era un buen parche mientras el nombre era
+    // la única llave; con el código de por medio es DEUDA — un camino muerto que
+    // alguien va a volver a usar. No puede reaparecer.
+    for (const nombre of ["clientes_empresa_12m_vw", "clientes_anio"]) {
+      const cuerpo = objetos.get(nombre)?.cuerpo ?? "";
+      expect(cuerpo, `${nombre} volvió a mirar el nombre`).not.toContain(COLUMNA_NOMBRE);
+    }
+    expect(objetos.has("clientes_master_por_nombre_unico_vw")).toBe(false);
   });
 });
 
@@ -384,5 +414,124 @@ describe("CONDUCTA — el sync solo deja entrar a las 6 del grupo", () => {
     await syncClientesMaster();
     const nombres = upserts.flat().map((f) => f.nombre_normalized);
     expect(new Set(nombres).size).toBe(nombres.length);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+describe("🔴 LA PLATA DE BOSTON SUMA; SUS CLIENTES NO SE VEN", () => {
+  // Daniel, textual (2-sep-2026): *"solo se queda CXC de Boston en su tab, sin
+  // que toque ni se mezcle con los otros. Déjalo en Vista General"* y *"Boston
+  // también quiero verlos en ventas-resumen"*.
+  //
+  // 🔑 ES LA LÍNEA FINA DE TODO ESTE ASUNTO, y es fácil pasarse de largo:
+  // sacar a Boston del DIRECTORIO es correcto; sacarlo de los TOTALES sería
+  // borrarle $463.898,47 (el 7,4% de la venta de 2026) a la Vista General.
+  // Medido en producción DESPUÉS de la limpieza: sigue ahí.
+  const objetos = objetosSqlFinales();
+
+  it("los objetos que suman VENTA no excluyen a Boston", () => {
+    for (const nombre of ["ventas_dashboard_summary", "ventas_rollup_mensual_mv"]) {
+      const obj = objetos.get(nombre);
+      // Se EXIGE encontrarlo: un `continue` acá volvería el candado vacío el día
+      // que alguien renombre el objeto, y pasaría en verde sin mirar nada.
+      expect(obj, `${nombre} no aparece en las migraciones`).toBeDefined();
+      expect(
+        obj!.cuerpo,
+        `${nombre} empezó a excluir a Boston: eso le borra el 7,4% de la venta a Vista General`,
+      ).not.toMatch(/confecciones_boston/i);
+    }
+  });
+
+  it("los objetos que suman VENTA tampoco miran clientes_master", () => {
+    // Si un total empezara a depender del directorio, limpiarlo movería plata.
+    // Hoy no lo miran, y por eso la limpieza de 4.914 filas no movió un centavo.
+    for (const nombre of ["ventas_dashboard_summary", "ventas_rollup_mensual_mv"]) {
+      const obj = objetos.get(nombre);
+      expect(obj, `${nombre} no aparece en las migraciones`).toBeDefined();
+      expect(obj!.cuerpo, `${nombre} empezó a depender del directorio`).not.toContain(TABLA);
+    }
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+describe("TCKCTA — el único código que miente, y no puede juntar seis mostradores", () => {
+  // El mostrador se llama distinto en cada empresa: `CONTADO` en active_shoes/
+  // active_wear/joystep, `VENTAS` en fashion_wear/vistana y `VENTAS LOCA` en
+  // fashion_shoes. De los 147 códigos del grupo es el ÚNICO que no nombra al
+  // mismo cliente en las 6 — por eso el sistema lo identifica SIEMPRE por código
+  // (`esMostrador`), nunca por nombre.
+  const objetos = objetosSqlFinales();
+
+  it("el grano de los dos rankings es (cliente, EMPRESA), así que TCKCTA da como mucho una fila POR empresa", () => {
+    // 🔑 Esto es lo que impide que el join por código junte los seis mostradores
+    // en una fila sola que no es ningún cliente. No es suerte: es el GROUP BY.
+    // Medido después del cambio: 1 sola fila TCKCTA en todo el payload.
+    for (const nombre of ["clientes_empresa_12m_vw", "clientes_anio"]) {
+      const cuerpo = objetos.get(nombre)?.cuerpo ?? "";
+      // TODOS los GROUP BY que agrupan por cliente_key, no "alguno": basta que
+      // UNO se olvide de la empresa para que ESA cuenta junte los seis
+      // mostradores. Lo mismo vale para los DISTINCT que arman los pares.
+      const grupos = [...cuerpo.matchAll(/(?:GROUP\s+BY|SELECT\s+DISTINCT)\s+([^\n;]*cliente_key[^\n;]*)/gi)];
+      expect(grupos.length, `${nombre}: no se encontró ningún GROUP BY por cliente_key`)
+        .toBeGreaterThanOrEqual(3);
+      for (const g of grupos) {
+        expect(g[1], `${nombre}: este agrupamiento se olvidó de la empresa → "${g[1].trim()}"`)
+          .toMatch(/empresa/i);
+      }
+    }
+  });
+
+  it("el mostrador se reconoce por CÓDIGO en el código de la app, no por nombre", () => {
+    // `esMostrador` compara contra `CODIGO_MOSTRADOR`. Comparar por nombre sería
+    // un colador: son tres nombres distintos, y uno de ellos viene truncado.
+    expect(esMostrador("TCKCTA")).toBe(true);
+    expect(esMostrador("tckcta")).toBe(true);
+    expect(esMostrador("CONTADO")).toBe(false);
+    expect(esMostrador("VENTAS LOCA")).toBe(false);
+    expect(CODIGO_MOSTRADOR).toBe("TCKCTA");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+describe("LA FICHA POR DIRECCIÓN — /api/clientes/[codigo] es solo del grupo", () => {
+  // 🩸 Daniel: *"la ficha de cliente por dirección se va. El directorio por
+  // dentro se va."* El GET SERVÍA y el PATCH DEJABA EDITAR las 4.915 fichas de
+  // Boston: los dos miraban solo `deleted = false` y ninguno pasaba por la puerta
+  // de mundo — la única que filtraba era la página SSR. Marcar las filas como
+  // borradas cerró la puerta HOY; el guard la cierra SIEMPRE.
+  const RUTAS = [
+    "src/app/api/clientes/[codigo]/route.ts",
+    "src/app/api/clientes/[codigo]/historial-mensual/route.ts",
+  ];
+
+  it("las tres puertas (GET, PATCH e historial) preguntan por el mundo", () => {
+    const guards = RUTAS.flatMap((rel) => {
+      const src = fs.readFileSync(path.join(RAIZ, rel), "utf8").replace(/\/\/[^\n]*/g, "");
+      return [...src.matchAll(/esCodigoDelGrupo\(/g)].map(() => rel);
+    });
+    expect(guards.length, "falta un guard de mundo en la ficha").toBeGreaterThanOrEqual(3);
+    for (const rel of RUTAS) expect(guards, rel).toContain(rel);
+  });
+
+  it("un código ajeno contesta 404, no 403 — el 403 sería un oráculo", () => {
+    // Distinguir "no existe" de "existe pero es de Boston" confirmaría desde
+    // afuera qué códigos hay en la cartera de Boston. Las dos ramas dicen lo
+    // mismo, y eso se lee en el archivo.
+    const src = fs.readFileSync(path.join(RAIZ, RUTAS[0]), "utf8").replace(/\/\/[^\n]*/g, "");
+    const bloques = [...src.matchAll(/esCodigoDelGrupo\([\s\S]{0,220}?status:\s*(\d+)/g)];
+    expect(bloques.length).toBeGreaterThanOrEqual(2);
+    for (const b of bloques) expect(b[1]).toBe("404");
+  });
+
+  it("el guard falla ABIERTO: esconder de más es peor que mostrar de más", () => {
+    // Los tres defaults de `soloClientesDelGrupo`, que `esCodigoDelGrupo` copia:
+    // consulta caída, código vacío y código que Switch no conoce → se queda.
+    // Sin esto, un hipo de la base escondería el Directorio entero.
+    const src = fs.readFileSync(path.join(RAIZ, "src/lib/clientes/mundos.ts"), "utf8");
+    const fn = /export async function esCodigoDelGrupo[\s\S]*?\n}/.exec(src)?.[0] ?? "";
+    expect(fn, "no se encontró esCodigoDelGrupo").not.toBe("");
+    expect(fn).toMatch(/if\s*\(!cod\)\s*return true/);
+    expect(fn).toMatch(/if\s*\(error[\s\S]{0,20}\)\s*return true/);
+    expect(fn).toMatch(/length\s*===\s*0\)\s*return true/);
   });
 });

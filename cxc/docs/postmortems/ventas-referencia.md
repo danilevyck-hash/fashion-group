@@ -1,3 +1,13 @@
+> ### La limpieza — APLICADA el 2-sep-2026
+>
+> Daniel: *«la ficha de cliente por dirección se va. El directorio por dentro se va.»* Se marcaron **4.914 filas** con `deleted = true` (4.883 de Boston + 31 que Switch conoce en boston+ACS; **4.910 habían entrado el 28-jul**). Quedan **150**. Los **3 huérfanos se quedan** (`D-201`, `D-173`, `D-101`): Switch no conoce su código y `mundos.ts` ya explicó que esconderlos rompe el Directorio.
+>
+> **Soft delete y no `DELETE`**: la columna existe, todos los lectores del ranking, la ficha, el Directorio y el CXC filtran `deleted = false` (auditado), y es reversible con un `UPDATE`. `node scripts/_verif-clientes-master-boston.mjs` (solo lectura) reporta el estado y la regla.
+>
+> ### 🔴 Y LA FICHA POR DIRECCIÓN, que era la otra puerta abierta
+>
+> `/api/clientes/[codigo]` **servía y dejaba EDITAR** las 4.915 fichas de Boston: el GET y el PATCH miraban solo `deleted = false` y ninguno pasaba por la puerta de mundo — la única que filtraba era la página SSR. Igual `historial-mensual`, que devuelve el nombre y 25 meses de venta. Los tres preguntan ahora `esCodigoDelGrupo()` y contestan **404, el mismo que un código inexistente**: un 403 diferenciado sería un oráculo que confirmaría desde afuera qué códigos hay en la cartera de Boston. El guard **falla ABIERTO** en los tres casos de `soloClientesDelGrupo` (consulta caída · sin código · Switch no lo conoce), porque esconder de más es peor que mostrar de más.
+>
 # Post-mortems — Ventas, Referencia y Comisiones
 
 > Movido de `cxc/CLAUDE.md` el 31-ago-2026 para bajar lo que se inyecta en cada sesión.
@@ -81,22 +91,47 @@
 >
 > 🔴 **Y sacar a Boston NO alcanza, está medido:** quedan **3 nombres repetidos entre clientes del propio grupo** (`CITY MODA CHORRERA` D-30/D-26 · `METRO SHOES PANAMA SA` D-103/D-173 · `EL MACHETAZO SAN MIGUELITO` D-171/D-101 — códigos desfasados en el panel de Switch, los mismos que `mundos.ts` ya documentaba) que siguen valiendo **$13.426,00 de doble conteo**. Al revés tampoco: arreglar el join sin sacar a Boston deja clientes del grupo **rotulados con código de Boston** — `NIPMAR SA` y `CEPREDENAC`, ventas de fashion_shoes/vistana atribuidas a los códigos `390` y `154345` de Boston.
 >
-> ### ⚠️ «Unir por código» a secas PIERDE clientes — se midió antes de escribirlo
+> ### 🔴 LA IDENTIDAD DEL CLIENTE ES EL CÓDIGO — y el camino existe sin tocar un nombre
 >
-> La fuente del ranking es `switch_facturas`, que trae `cliente_switch_id` y `cliente_nombre` y **NO trae el código**. El código sale de `switch_clientes` por el par (empresa, id); cuando ese par no existe, el nombre es lo único que queda. Borrar el fallback tira a «Otros clientes» a **`AIDY SHOP NO2` (D-2)** y **`A-AMANI SA` (D-1)**, clientes del grupo presentes en las 6 empresas. **Perder un cliente del ranking es peor que mostrarlo doble.**
+> Daniel, después de que le contáramos el mecanismo: ***«se debería de usar el código del cliente, ya que todos los D-24 por ejemplo son de City Mall across mis 6 empresas»***. Medido y es exacto: de los **147 códigos** del grupo en `switch_clientes`, **138 aparecen en las 6 empresas con el MISMO nombre**, 2 en cinco y 7 en una sola (normal: no todo cliente le compra a todas).
 >
-> **La solución es que el fallback sea 1-a-1 POR CONSTRUCCIÓN:** `clientes_master_por_nombre_unico_vw` = `GROUP BY nombre_normalized HAVING COUNT(*) = 1`. Como agrupa por la MISMA columna con la que se joinea, **no puede multiplicar**, y ante un nombre ambiguo **se abstiene** (el cliente cae a huérfano, que se ve). Un `DISTINCT ON` también sería 1-a-1, pero elegiría un dueño arbitrario para la plata de dos homónimos y se callaría: 🔑 *cuando el sistema no puede saber, se abstiene*.
+> ```
+> switch_facturas (empresa_key, cliente_switch_id)
+>    └─→ switch_clientes (empresa_key, cliente_switch_id) → codigo
+>         └─→ clientes_master.codigo        (índice ÚNICO, 20260530000200)
+> ```
+> El par `(empresa_key, cliente_switch_id)` es **único por construcción**: este join **no puede multiplicar** una factura, ni hoy ni cuando dos clientes se llamen igual. Y mata los 3 homónimos internos que sacar a Boston NO arreglaba ($13.426,00).
+>
+> ⚠️ **La objeción que había —«`switch_facturas` no trae el código»— era cierta y estaba incompleta:** sí trae `cliente_switch_id`, y `switch_clientes` hace de puente. La rama del grupo YA lo usaba (`COALESCE(sc.codigo, mc.codigo)`); la rama de Boston/Multifashion era la única que resolvía **solo por nombre**, y es la que traía clientes de Boston a la mesa del grupo. Ahora las dos usan el puente.
+>
+> ### 🔑 NO SE DEJA FALLBACK POR NOMBRE — un camino muerto es una trampa
+>
+> Se midió antes de decidir, que es lo que pidió Daniel:
+> - De las **8.181** facturas del grupo que el ranking mira, **370 (4,52%)** traen un `cliente_switch_id` que no cruza el puente. **No son clientes ausentes: son ids VIEJOS** — `AIDY SHOP NO2` factura con `vistana|3` cuando su par vivo es `vistana|139`.
+> - Valen **$3.817,74 de 2026 (0,07%)** y **caen a «Otros clientes» con fallback y sin fallback**: los 3 únicos con plata —`KAREN DUTY FREE SA` $2.382,00 · `FERIA INT DE DAVID` $1.018,75 · `MAZAR CITY SHOES` $417,00— **no están en `switch_clientes` NI en `clientes_master`**, así que ningún fallback podía darles un código. Ya eran huérfanos. El total de huérfanos **no cambia: $3.817,74 antes y después.**
+> - Lo ÚNICO que el fallback lograba de verdad era **rotular ventas del grupo con códigos de BOSTON**: `NIPMAR SA` → `390`, `CEPREDENAC` → `154345`, `BAZAR PALESTINA` → `113493`. Esas filas desaparecen, y está bien que desaparezcan.
+>
+> **`AIDY SHOP NO2` (D-2) y `A-AMANI SA` (D-1) siguen en la lista**, que era la preocupación: 2 filas cada uno (fashion_wear $1.549,00 · vistana $526,00 · vistana $2.006,77 · fashion_wear −$90,00). Las 3 filas extra son de **$0,00**.
+>
+> 🩸 **Hubo un diseño intermedio que se descartó**: una vista `clientes_master_por_nombre_unico_vw` (`GROUP BY nombre_normalized HAVING COUNT(*) = 1`) que se abstenía ante un nombre ambiguo. Era un buen parche mientras el nombre era la única llave; con una llave de verdad es **deuda que alguien va a volver a tocar**. Hay candado de que no reaparezca.
+>
+> ### ⚠️ TCKCTA — el único código que miente
+>
+> El mostrador se llama `CONTADO` en active_shoes/active_wear/joystep, `VENTAS` en fashion_wear/vistana y `VENTAS LOCA` en fashion_shoes: es el único código del grupo que no nombra al mismo cliente en las 6. **No puede juntar seis mostradores en una fila, y no por suerte: el grano de estas vistas es (cliente_key, EMPRESA)**, así que da como mucho una fila POR empresa. Medido después del cambio: **1 sola fila TCKCTA** en todo el payload (fashion_shoes, $25.835,65), la misma que hoy.
+>
+> ⚠️ **Defecto PRE-EXISTENTE que se reporta y NO se toca:** el filtro excluye `'VENTAS LOCALES'` pero Switch escribe `VENTAS LOCA` (truncado), así que el mostrador de fashion_shoes se cuela. La pantalla lo saca del ranking y lo muestra aparte con la etiqueta ámbar «Mostrador» (`isVentasLocal`), o sea que **no se mezcla con clientes reales** — pero esa fila dice **$25.835,65** cuando el mostrador del grupo entero es **$54.478,59**. Es un número que Daniel LEE: es decisión suya, no se cambia de paso.
 >
 > ### La medición, reproduciendo la aritmética de la vista sobre datos REALES
 >
 > | escenario | filas | suma 2026 YTD | City Mall David · vistana |
 > |---|---:|---:|---:|
-> | **hoy** (join por nombre, Boston adentro) | 255 | $7.911.210,10 | **$227.872,28** |
-> | solo sacando a Boston | 255 | $5.371.023,39 | $113.936,14 |
-> | solo el join 1-a-1 | 255 | $5.357.597,39 | $113.936,14 |
-> | **las DOS cosas** | **255** | **$5.357.597,39** | **$113.936,14** |
+> | **antes de todo** (nombre, Boston adentro) | 255 | $7.911.210,10 | **$227.872,28** |
+> | con Boston fuera de `clientes_master` ← **YA APLICADO** | 255 | $5.371.023,39 | **$113.936,14** |
+> | + la migración (join por código) | **258** | **$5.357.597,39** | **$113.936,14** |
 >
-> El «hoy» reproduce **exacto** lo que publicaba la MV (255 filas / $7.909.875,00 en el refresh de las 07:35; la diferencia son las facturas que entraron después). **No se pierde ni una fila: 255 antes y 255 después.** El sobreconteo era **$2,55 millones, +47,7%**.
+> El «antes» reproduce **exacto** lo que publicaba la MV. **No se pierde ningún cliente**: las 258 son 255 + 3 filas de $0,00 de ids viejos. El sobreconteo era **$2,55 millones, +47,7%**.
+>
+> **«Filtré Vistana, no hace sentido que sume las de Boston si puse Vistana»** — queda cerrado por construcción: el grano es (cliente, EMPRESA) y el código sale del par (empresa, id). Medido: **67 filas de vistana, 0 con código ajeno.**
 >
 > **Los años cerrados también estaban duplicados hacia atrás**: `clientes_anio()` tiene el mismo join y lee el `clientes_master` de HOY. Verificado en 2025/vistana: City Mall Paso Canoa $1.118.329,60 contra $559.164,80 real.
 >
@@ -107,6 +142,8 @@
 > ### Lo que NO se tocó (verificado, no supuesto)
 >
 > `ventas_dashboard_summary` (Resumen y totales de Ventas) **no menciona `clientes_master`** · `ventas_rollup_mensual_mv` tampoco · `comision_b2b_v5` tampoco · `switch_estadocuenta_aging` (CXC) joinea por `codigo`, que es único · la ficha `/clientes/[codigo]` usa `cliente_ficha_ventas`, que joinea por `codigo` y **ya daba el número correcto**. **Los totales de venta no se mueven: acá se listan CLIENTES.**
+>
+> 🔴 **LAS VENTAS DE BOSTON SIGUEN SUMANDO, y es lo primero que había que no romper.** Daniel: *«solo se queda CXC de Boston en su tab, sin que toque ni se mezcle con los otros. **Déjalo en Vista General**»* y *«Boston también quiero verlos en ventas-resumen»*. Medido en producción DESPUÉS de la limpieza: **$463.898,47 = 7,4%** de la venta de 2026, intacto. **Su plata suma; sus clientes no se ven.** Hay candado en las dos direcciones — uno que exige que `ventas_dashboard_summary` y `ventas_rollup_mensual_mv` NO excluyan a Boston, y otro que exige que no miren `clientes_master` (si un total dependiera del directorio, limpiarlo movería plata).
 >
 > Y **ninguna superficie de Boston lee `clientes_master`** — auditado: `/api/boston/clientes` y `/api/cxc/boston` leen `switch_clientes` y `switch_estadocuenta_aging_boston`, con un comentario que ya decía *"`clientes_master` NO SIRVE ACÁ… no tiene columna de empresa"*. Sacarlo no rompe nada suyo.
 >
@@ -122,9 +159,11 @@
 >
 > ### Candados
 >
-> `src/__tests__/lib/clientes-master-solo-del-grupo.test.ts` (10) — dos BARRIDOS y una prueba de CONDUCTA. El barrido SQL arma la definición FINAL de cada VIEW/MV/FUNCTION del repo (mismo motor que `cxc-boston-fuera-de-toda-superficie`) y exige que ninguna una la TABLA `clientes_master` por `nombre_normalized`: **un objeto SQL nuevo nace vigilado**. Incluye un caso que prueba el DETECTOR contra el SQL roto, el sano y el correcto-por-código — un barrido que no distingue los tres no sirve. El de conducta llama al sync REAL con supabase doblado y **cuenta qué consulta salió**: que la lista contenga las 6 no prueba que la consulta las use.
+> `src/__tests__/lib/clientes-master-solo-del-grupo.test.ts` (18) — dos BARRIDOS, la conducta del sync, el mostrador `TCKCTA`, la puerta de la ficha y las ventas de Boston. El barrido SQL arma la definición FINAL de cada VIEW/MV/FUNCTION del repo (mismo motor que `cxc-boston-fuera-de-toda-superficie`) y exige que ninguna una la TABLA `clientes_master` por `nombre_normalized`: **un objeto SQL nuevo nace vigilado**. Incluye un caso que prueba el DETECTOR contra el SQL roto, el sano y el correcto-por-código — un barrido que no distingue los tres no sirve. El de conducta llama al sync REAL con supabase doblado y **cuenta qué consulta salió**: que la lista contenga las 6 no prueba que la consulta las use.
 > - 🔑 **Se prohíbe el JOIN, NO los nombres repetidos**, y la razón es la medición de arriba: quedan 3 homónimos legítimos entre clientes del propio grupo. Un test de datos que fallara por ellos estaría rojo para siempre y terminaría silenciado; además falla o pasa por razones que ningún cambio de código causó, así que no protege ninguna ruta. El join es estructural, se caza en el build, y caza la PRÓXIMA superficie.
-> - **Verificado por mutación, 15 de 15 cazadas + 1 control en verde** (`bash scripts/_mutar-candados-clientes-master.sh`): el sync vuelve al `.neq` de ACS · alguien "agrega" Boston a la inclusión · el sync se olvida de joystep · el sync no acota nada · la MV vuelve a joinear la tabla por nombre · `clientes_anio()` también · la rama no-B2B también · el resolvedor pierde el `HAVING` · agrupa por (nombre, código) · deja de filtrar `deleted` · la ficha del ranking se resuelve por nombre · vuelve el filtro que escondía joystep · la lista de píldoras se escribe a mano · la PANTALLA esconde joystep al pintar · alguien agrega Boston a la tira. Control (no debe dar rojo): cambiar el tamaño del lote del upsert.
+> - **Verificado por mutación, 21 de 21 cazadas + 1 control en verde** (`bash scripts/_mutar-candados-clientes-master.sh`): el sync vuelve al `.neq` de ACS · alguien "agrega" Boston a la inclusión · el sync se olvida de joystep · el sync no acota nada · la MV vuelve al fallback por nombre · la rama no-B2B también · `clientes_anio()` también · el puente pierde `empresa_key` · el puente se cambia por un pareo contra el nombre · la ficha del ranking se resuelve por nombre · **el grano pierde la EMPRESA (los seis mostradores caen en una fila)** · **alguien saca la VENTA de Boston de Vista General** · vuelve el filtro que escondía joystep · la lista de píldoras se escribe a mano · la PANTALLA esconde joystep al pintar · alguien agrega Boston a la tira · el GET de la ficha deja de preguntar · el PATCH deja de preguntar · el 404 se vuelve 403 · el guard falla CERRADO · los 3 huérfanos pierden su ficha. Control (no debe dar rojo): cambiar el tamaño del lote del upsert.
+> - 🩸 **DOS mutaciones SOBREVIVIERON en la primera corrida y las dos eran candados flojos**: el grano (el test pedía que *algún* `GROUP BY` llevara la empresa, y basta que UNO se olvide) y una mutación mal escrita que reintroducía el `COALESCE` sin el JOIN. Se cerraron pidiendo que **TODOS** los agrupamientos por `cliente_key` lleven la empresa.
+> - 🩸 **Y el CONTROL salió rojo por una razón que no era el control**: se mutó la migración de `ventas_dashboard_summary` **sin haberla puesto en `ARCHIVOS`**, así que la restauración no la tocó y la mutación quedó viva contaminando los casos siguientes. Es el mismo modo de fallo que el encabezado del script ya advertía. Ahora `mutar()` **verifica que el archivo esté respaldado antes de tocarlo** y aborta si no.
 
 ---
 

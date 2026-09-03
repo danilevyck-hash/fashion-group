@@ -8,6 +8,12 @@
 # archivos NUEVOS y git aborta el comando entero sin restaurar nada, así que las
 # mutaciones se apilarían y ninguna se probaría por separado.
 #
+# 🩸 Y TODO ARCHIVO QUE SE MUTE TIENE QUE ESTAR EN `ARCHIVOS`. Ya pasó en esta
+# misma corrida: se mutó la migración de `ventas_dashboard_summary` sin
+# respaldarla, no se restauró, y la mutación quedó viva — el CONTROL de más abajo
+# salió rojo culpando a un cambio inocente. Por eso ahora `probar()` verifica
+# ANTES de cada caso que el árbol esté limpio.
+#
 # 🩸 Y `probar()` EXIGE ENCONTRAR EL RESUMEN de vitest: si la corrida muere, un
 # "0 fallos" se leería como "sobrevivió". Un verificador que miente en verde es
 # peor que no tenerlo.
@@ -24,11 +30,14 @@ cd "$(dirname "$0")/.."
 TESTS="src/__tests__/lib/clientes-master-solo-del-grupo.test.ts \
 src/__tests__/components/ventas-clientes-las-seis-empresas.test.tsx"
 
-MIGRACION="supabase/migrations/20260907120000_clientes_master_join_1a1_por_nombre.sql"
+MIGRACION="supabase/migrations/20260907120000_clientes_ranking_por_codigo.sql"
 
 ARCHIVOS=(
   "src/lib/switch-api/sync-clientes-master.ts"
   "src/components/ventas/ClientesView.tsx"
+  "src/app/api/clientes/[codigo]/route.ts"
+  "src/lib/clientes/mundos.ts"
+  "supabase/migrations/20260725170100_ventas_dashboard_summary_mes_sargable.sql"
   "$MIGRACION"
 )
 
@@ -88,12 +97,21 @@ open(ruta, "w").write(s.replace(viejo, nuevo, 1))
 PY
 }
 
+# Todo archivo mutado tiene que estar respaldado; si no, la mutación sobrevive a
+# la restauración y contamina los casos siguientes.
+respaldado() {
+  for f in "${ARCHIVOS[@]}"; do [ "$f" = "$1" ] && return 0; done
+  echo "  ⛔ $1 NO está en ARCHIVOS: se mutaría sin poder restaurarlo"; return 1
+}
+
 mutar() { # $1 archivo, $2 viejo, $3 nuevo, $4 nombre
+  respaldado "$1" || { sobrevivientes=$((sobrevivientes + 1)); return; }
   aplicar "$1" "$2" "$3" || { sobrevivientes=$((sobrevivientes + 1)); return; }
   probar "$4"
 }
 
 control() { # $1 archivo, $2 viejo, $3 nuevo, $4 nombre
+  respaldado "$1" || { controles_mal=$((controles_mal + 1)); return; }
   aplicar "$1" "$2" "$3" || { controles_mal=$((controles_mal + 1)); return; }
   probar_control "$4"
 }
@@ -121,55 +139,75 @@ mutar src/lib/switch-api/sync-clientes-master.ts \
   '.order("id", { ascending: true })' \
   "el sync no acota nada y lee las 8 empresas"
 
-# ── 2. EL MÉTODO: que las vistas vuelvan a unir por nombre ───────────────────
+# ── 2. EL MÉTODO: que las vistas vuelvan a resolver por nombre ──────────────
 mutar "$MIGRACION" \
-  '    LEFT JOIN clientes_master_por_nombre_unico_vw mc
-      ON mc.nombre_normalized = a.cliente_norm' \
-  '    LEFT JOIN clientes_master mc
+  '    LEFT JOIN switch_clientes sc
+      ON sc.empresa_key = a.empresa_key
+     AND sc.cliente_switch_id = a.cliente_switch_id
+  ),' \
+  '    LEFT JOIN switch_clientes sc
+      ON sc.empresa_key = a.empresa_key
+     AND sc.cliente_switch_id = a.cliente_switch_id
+    LEFT JOIN clientes_master mc
       ON mc.nombre_normalized = a.cliente_norm
-     AND mc.deleted = false' \
-  "clientes_empresa_12m_vw vuelve a joinear la TABLA por nombre (el bug exacto)"
+     AND mc.deleted = false
+  ),' \
+  "clientes_empresa_12m_vw vuelve al fallback por nombre (el bug exacto)"
 
 mutar "$MIGRACION" \
-  '      LEFT JOIN clientes_master_por_nombre_unico_vw mc
-        ON mc.nombre_normalized = a.c_norm' \
-  '      LEFT JOIN clientes_master mc
-        ON mc.nombre_normalized = a.c_norm AND mc.deleted = false' \
-  "clientes_anio() vuelve a joinear por nombre (los años CERRADOS)"
-
-mutar "$MIGRACION" \
-  '    LEFT JOIN clientes_master_por_nombre_unico_vw m
-      ON m.nombre_normalized = nb.cliente_norm' \
+  '    LEFT JOIN switch_clientes m
+      ON m.empresa_key = nb.empresa
+     AND m.cliente_switch_id = nb.cliente_switch_id' \
   '    LEFT JOIN clientes_master m
       ON m.nombre_normalized = nb.cliente_norm
      AND m.deleted = false' \
-  "la rama no-B2B de la MV vuelve a joinear por nombre"
-
-# ── 3. El resolvedor deja de ser 1-a-1 ───────────────────────────────────────
-mutar "$MIGRACION" \
-  'HAVING COUNT(*) = 1;' \
-  ';' \
-  "el resolvedor pierde el HAVING (elige un dueño arbitrario y se calla)"
+  "la rama no-B2B de la MV vuelve a resolver por nombre"
 
 mutar "$MIGRACION" \
-  'GROUP BY m.nombre_normalized
-HAVING COUNT(*) = 1;' \
-  'GROUP BY m.nombre_normalized, m.codigo;' \
-  "el resolvedor agrupa por (nombre, codigo) → vuelve a poder devolver 2 filas"
+  '      LEFT JOIN switch_clientes m
+        ON m.empresa_key = nb.empresa AND m.cliente_switch_id = nb.cliente_switch_id' \
+  '      LEFT JOIN clientes_master m
+        ON m.nombre_normalized = nb.c_norm AND m.deleted = false' \
+  "clientes_anio() vuelve a resolver por nombre (los años CERRADOS)"
+
+# ── 3. Que el PUENTE deje de ser por (empresa, id) ──────────────────────────
+mutar "$MIGRACION" \
+  '    LEFT JOIN switch_clientes sc
+      ON sc.empresa_key = a.empresa_key
+     AND sc.cliente_switch_id = a.cliente_switch_id' \
+  '    LEFT JOIN switch_clientes sc
+      ON sc.cliente_switch_id = a.cliente_switch_id' \
+  "el puente pierde empresa_key → mezcla el id de una empresa con otra"
 
 mutar "$MIGRACION" \
-  'WHERE m.deleted = false
-  AND m.nombre_normalized IS NOT NULL' \
-  'WHERE m.nombre_normalized IS NOT NULL' \
-  "el resolvedor deja de filtrar las filas borradas"
+  '      LEFT JOIN switch_clientes sc
+        ON sc.empresa_key = a.empresa_key AND sc.cliente_switch_id = a.cliente_switch_id' \
+  '      LEFT JOIN switch_clientes sc
+        ON sc.empresa_key = a.empresa_key AND sc.codigo = a.cliente_norm' \
+  "clientes_anio() cambia el puente por un pareo contra el nombre"
 
-# ── 4. Que el ranking pierda el join por CÓDIGO (la otra mitad) ──────────────
+# ── 4. Que el ranking pierda el join por CÓDIGO, o el grano por EMPRESA ─────
 mutar "$MIGRACION" \
   'LEFT JOIN clientes_master m ON m.codigo = id2.cliente_codigo AND m.deleted = false' \
   'LEFT JOIN clientes_master m ON m.nombre_normalized = id2.cliente_norm AND m.deleted = false' \
   "la ficha del ranking se resuelve por nombre en vez de por código"
 
-# ── 5. La tira de empresas de Ventas › Clientes ──────────────────────────────
+mutar "$MIGRACION" \
+  '    FROM keyed k, current_year cy, max_mes mm
+    WHERE k.anio = cy.y AND k.mes <= mm.m
+    GROUP BY k.cliente_key, k.empresa' \
+  '    FROM keyed k, current_year cy, max_mes mm
+    WHERE k.anio = cy.y AND k.mes <= mm.m
+    GROUP BY k.cliente_key' \
+  "el grano pierde la EMPRESA → los seis mostradores TCKCTA caen en una fila"
+
+# ── 5. Que las ventas de Boston dejen de sumar (el bug OPUESTO) ─────────────
+mutar supabase/migrations/20260725170100_ventas_dashboard_summary_mes_sargable.sql \
+  'FROM switch_facturas f' \
+  "FROM switch_facturas f WHERE f.empresa_key <> 'confecciones_boston'" \
+  "alguien saca la VENTA de Boston de Vista General (Daniel dijo que se queda)"
+
+# ── 6. La tira de empresas de Ventas › Clientes ──────────────────────────────
 mutar src/components/ventas/ClientesView.tsx \
   '  ...B2B_EMPRESA_KEYS.map((key) => ({' \
   '  ...B2B_EMPRESA_KEYS.filter((k) => k !== "joystep").map((key) => ({' \
@@ -198,6 +236,50 @@ mutar src/components/ventas/ClientesView.tsx \
   '  { id: "todas", label: "Todas" },
   { id: "confecciones_boston", label: "Confecciones Boston" },' \
   "alguien agrega Boston a la tira (el bug OPUESTO, y más caro)"
+
+# ── 7. La ficha por dirección ───────────────────────────────────────────────
+mutar "src/app/api/clientes/[codigo]/route.ts" \
+  '  if (!(await esCodigoDelGrupo(codigo))) {
+    return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  }
+
+  // El año se corta en hora PANAMÁ' \
+  '  // El año se corta en hora PANAMÁ' \
+  "el GET de la ficha deja de preguntar por el mundo (servía Boston)"
+
+mutar "src/app/api/clientes/[codigo]/route.ts" \
+  '  if (!(await esCodigoDelGrupo(codigo))) {
+    return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  }
+
+  const { data, error } = await supabaseServer
+    .from("clientes_master")
+    .update(allowed)' \
+  '  const { data, error } = await supabaseServer
+    .from("clientes_master")
+    .update(allowed)' \
+  "el PATCH deja de preguntar (se podían EDITAR 4.915 fichas de Boston)"
+
+mutar "src/app/api/clientes/[codigo]/route.ts" \
+  'return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  }
+
+  // El año se corta en hora PANAMÁ' \
+  'return NextResponse.json({ error: "Es de Boston" }, { status: 403 });
+  }
+
+  // El año se corta en hora PANAMÁ' \
+  "el 404 se vuelve 403 y delata qué códigos existen en Boston"
+
+mutar src/lib/clientes/mundos.ts \
+  '  if (error || !data) return true;' \
+  '  if (error || !data) return false;' \
+  "el guard falla CERRADO (un hipo de la base esconde el Directorio entero)"
+
+mutar src/lib/clientes/mundos.ts \
+  '  if (data.length === 0) return true;' \
+  '  if (data.length === 0) return false;' \
+  "los 3 huérfanos del grupo (D-201, D-173, D-101) dejan de tener ficha"
 
 # ── CONTROL — NO debe dar rojo ───────────────────────────────────────────────
 echo "── control (no debe dar rojo) ───────────────────────────────────────────"

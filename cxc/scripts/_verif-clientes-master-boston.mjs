@@ -2,8 +2,12 @@
 // QUÉ FILAS DE BOSTON HAY QUE SACAR DE `clientes_master`, Y CUÁLES NO.
 //
 // 🔴 SOLO LECTURA. Este script NO borra, NO actualiza y NO escribe una sola
-// fila: hace GET contra PostgREST y reporta. El borrado lo aprueba Daniel y va
-// aparte, con el SQL que este mismo script imprime al final.
+// fila: hace GET contra PostgREST y reporta.
+//
+// ✅ EL BORRADO YA SE APLICÓ (2-sep-2026, aprobado por Daniel: *"el directorio
+// por dentro se va"*): 4.914 filas con `deleted = true`, quedan 150. Este script
+// queda como VERIFICADOR — vuelve a correr la regla y dice si algo se coló de
+// nuevo. Si `SE MARCARÍAN` vuelve a dar > 0, el sync se rompió.
 //
 // ── EL PROBLEMA ─────────────────────────────────────────────────────────────
 // El 28-jul-2026 a las 07:01 UTC, `sync-clientes-master` metió los clientes de
@@ -160,16 +164,18 @@ console.log(`  hoy                ${dupHoy.length}`);
 console.log(`  después de marcar  ${dupDespues.length}`);
 console.log(
   "\n  🔴 Los que SOBREVIVEN no son un error: son códigos desfasados en el panel\n" +
-    "     de Switch, y por eso el join 1-a-1 (que se ABSTIENE ante un nombre\n" +
-    "     ambiguo) hace falta IGUAL. Sacar a Boston no alcanza:",
+    "     de Switch. Con el ranking unido por CÓDIGO no se confunden aunque se\n" +
+    "     llamen igual — por eso hacían falta las dos cosas, no solo esta limpieza:",
 );
 for (const [nom, v] of dupDespues) {
   console.log(`     ${nom.padEnd(34)} ${v.map((r) => r.codigo).join(" · ")}`);
 }
 
 // ── El SQL, impreso pero NO ejecutado ────────────────────────────────────────
-console.log("\n═══ EL SQL, PARA QUE LO CORRA DANIEL (este script NO lo ejecuta) ═══\n");
-console.log(`-- Marca como borradas las ${fmt(sacar.length)} filas que no son del grupo.
+console.log(sacar.length === 0
+  ? "\n✅ NADA QUE MARCAR — el directorio está limpio y el sync lo está manteniendo así."
+  : "\n🔴 SE COLARON FILAS AJENAS. El SQL para marcarlas (este script NO lo ejecuta):\n");
+if (sacar.length > 0) console.log(`-- Marca como borradas las ${fmt(sacar.length)} filas que no son del grupo.
 -- Reversible: UPDATE clientes_master SET deleted = false WHERE deleted = true;
 UPDATE clientes_master m
 SET    deleted = true

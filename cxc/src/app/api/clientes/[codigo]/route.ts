@@ -13,6 +13,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { invalidarDirectorioServidor } from "@/lib/clientes/directorio-cache";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+// 🔴 LA FICHA ES SOLO PARA CLIENTES DEL GRUPO. Ver el 🩸 de `esCodigoDelGrupo`.
+import { esCodigoDelGrupo } from "@/lib/clientes/mundos";
 // La definición de "compras del año" vive en UN solo lugar y la comparten la
 // ficha y el listado — si divergieran, la misma pantalla diría dos números
 // distintos para el mismo cliente.
@@ -50,6 +52,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     return NextResponse.json({ error: cErr.message }, { status: 500 });
   }
   if (!cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+
+  // 🔴 LA PUERTA DE MUNDO, y va DESPUÉS del lookup a propósito: un código que no
+  // existe y uno de Boston tienen que contestar lo MISMO (404 "Cliente no
+  // encontrado"). Un 403 diferenciado sería un oráculo: confirmaría desde afuera
+  // qué códigos existen en la cartera de Boston.
+  if (!(await esCodigoDelGrupo(codigo))) {
+    return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  }
 
   // El año se corta en hora PANAMÁ. Antes era `new Date().getFullYear()`, que en
   // el servidor (UTC) ya salta al año siguiente a las 19:00 del 31-dic de
@@ -204,6 +214,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ codigo: s
 
   if (Object.keys(allowed).length === 0) {
     return NextResponse.json({ error: "Ningún campo editable provisto" }, { status: 400 });
+  }
+
+  // 🔴 Se pregunta ANTES de escribir. El GET esconde la ficha de Boston, pero un
+  // PATCH a mano no pasa por el GET: sin esto, la puerta de ESCRITURA seguía
+  // abierta sobre 4.915 fichas que no son del grupo.
+  if (!(await esCodigoDelGrupo(codigo))) {
+    return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   }
 
   const { data, error } = await supabaseServer

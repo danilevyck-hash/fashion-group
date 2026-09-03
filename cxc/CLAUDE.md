@@ -85,7 +85,9 @@ archivo enlazado, verbatim.
 - Los **sueldos se recortan en el SERVIDOR** (`VE_SUELDOS_DE_BOSTON = false`); se ENUMERA lo que viaja (`CAMPOS_SIN_DINERO`), nunca se borra lo que se va.
 - El `ccte_id` de Boston lleva el AÑO adentro: `serie × 10.000.000 + (año − 2000) × 100.000 + correlativo`. Un documento sin fecha se **rechaza** y la corrida se corta sin escribir.
 - Orden obligatorio del sync: **upsert → reconcile**, nunca al revés (el reconcile pone `saldo = 0` a todo lo que no se reescribió).
-- 🩸 **Boston tampoco entra a `clientes_master`** (2-sep-2026). Estuvo adentro cinco semanas —4.910 filas del 28-jul— y el ranking de Ventas publicó **$2,55 millones de venta que no existió** por unir clientes por NOMBRE. Ver el bloque de Ventas.
+- 🔴 **SU PLATA SUMA; SUS CLIENTES NO SE VEN.** Daniel, textual (2-sep-2026): *«solo se queda CXC de Boston en su tab, sin que toque ni se mezcle con los otros. **Déjalo en Vista General**»* y *«Boston también quiero verlos en ventas-resumen»*. Es la línea fina de todo: **la VENTA de Boston sigue sumando** en Ventas › Resumen y Vista General ($463.898,47 = 7,4% de 2026). Lo que sale de las superficies del grupo son sus **CLIENTES**, nunca su venta. Hay candado en las dos direcciones.
+- 🩸 **Boston tampoco entra a `clientes_master`** (2-sep-2026). Estuvo adentro cinco semanas —4.910 filas del 28-jul— y el ranking de Ventas publicó **$2,55 millones de venta que no existió** por unir clientes por NOMBRE. Se marcaron 4.914 filas como borradas; quedan **150**. Ver el bloque de Ventas.
+- La **ficha por dirección también se cierra**: `/api/clientes/[codigo]` (GET, PATCH e historial) pregunta `esCodigoDelGrupo()` y contesta **404**, el mismo que un código inexistente — un 403 sería un oráculo de qué clientes tiene Boston.
 - Candados: `cxc-boston-fuera-de-toda-superficie.test.ts` · `boston-acceso.test.ts` · `boston-cartera-web.test.ts`.
 
 ### Guías — [docs/postmortems/guias.md](docs/postmortems/guias.md)
@@ -178,7 +180,9 @@ archivo enlazado, verbatim.
 - **Los descuentos se restan UNA sola vez, en el SERVIDOR** (`netearComisiones`); ninguna vista resta por su cuenta.
 - ⚠️ **Multifashion es OTRO módulo de comisiones y está bien como está — NO fusionar.**
 - 🔴 **`clientes_master` es el directorio del GRUPO y SOLO del grupo.** El sync pide por **INCLUSIÓN** (`.in("empresa_key", EMPRESAS_DEL_GRUPO)`), nunca excluyendo a las que sobran: la tabla **no tiene `empresa_key`** —una fila por CÓDIGO— así que adentro un cliente de Boston es indistinguible de uno del grupo.
-- 🔴 **Nadie une `clientes_master` por `nombre_normalized`.** Un LEFT JOIN por nombre contra una tabla con homónimos **multiplica la factura** y el SUM la cuenta dos veces. El fallback por nombre existe (las facturas traen nombre, no código) pero va contra **`clientes_master_por_nombre_unico_vw`**, 1-a-1 por construcción (`GROUP BY nombre_normalized HAVING COUNT(*) = 1`): ante un nombre ambiguo **se abstiene**. Lo que se prohíbe es el JOIN, **no** los nombres repetidos —dos clientes pueden llamarse igual y eso no es un error—.
+- 🔴 **LA IDENTIDAD DEL CLIENTE ES EL CÓDIGO.** Daniel: *«se debería de usar el código del cliente, ya que todos los D-24 por ejemplo son de City Mall across mis 6 empresas»* — medido: **138 de los 147** códigos del grupo aparecen en las 6 empresas con el MISMO nombre. El camino es `switch_facturas (empresa_key, cliente_switch_id)` → `switch_clientes` → `codigo` → `clientes_master.codigo`. Ese par es **único por construcción**: no puede multiplicar una factura.
+- 🔴 **Nadie une `clientes_master` por `nombre_normalized`, y NO hay fallback por nombre.** Un LEFT JOIN por nombre contra una tabla con homónimos **multiplica la factura** y el SUM la cuenta dos veces. Un fallback sería un camino muerto: medido, las 370 facturas (4,52%) que no cruzan el puente traen un `cliente_switch_id` **viejo**, valen $3.817,74 (0,07%) y caen a «Otros clientes» con fallback y sin él. Lo que se prohíbe es el JOIN, **no** los nombres repetidos —dos clientes pueden llamarse igual y eso no es un error—.
+- ⚠️ **`TCKCTA` es el único código que miente** (`CONTADO` / `VENTAS` / `VENTAS LOCA` según la empresa) y no es un cliente: es el mostrador. No junta seis mostradores en una fila porque **el grano de los rankings es (cliente, EMPRESA)**; se reconoce por CÓDIGO (`esMostrador`), nunca por nombre.
 - **Ventas › Clientes ofrece LAS SEIS** (`EMPRESA_PILLS` derivada de `B2B_EMPRESA_KEYS`), nunca una lista escrita a mano. Boston y Multifashion no están: sus clientes viven en su propio módulo.
 - Candados: `clientes-master-solo-del-grupo.test.ts` · `ventas-clientes-las-seis-empresas.test.ts`.
 
@@ -331,10 +335,10 @@ Detalle de reglas en [asistencia-planilla](docs/postmortems/asistencia-planilla.
 
 | Pregunta | Dónde | Grano · filas | ⚠️ |
 |---|---|---|---|
-| El directorio **completo** de clientes | `clientes_master` | 1 fila por `codigo` · **150 del grupo** (5.064 hasta que se limpien las 4.914 de Boston) 🔢 | 🔴 **SOLO las 6 del grupo.** No tiene `empresa_key`: adentro, un cliente de Boston es indistinguible de uno del grupo — por eso el sync pide por inclusión. El upsert **no pisa** `telefono/celular/email/notas` — eso lo escribe la gente. |
+| El directorio **completo** de clientes | `clientes_master` | 1 fila por `codigo` · **150 vivas** (+4.914 marcadas `deleted`, las de Boston, el 2-sep-2026) 🔢 | 🔴 **SOLO las 6 del grupo.** No tiene `empresa_key`: adentro, un cliente de Boston es indistinguible de uno del grupo — por eso el sync pide por inclusión. El upsert **no pisa** `telefono/celular/email/notas` — eso lo escribe la gente. |
 | El directorio **manual** del módulo Clientes | `directorio_clientes` | 1 fila por contacto · **33** | ⚠️ Son 33, no miles: es la libreta de contactos a mano, no el padrón. Confundirla con `clientes_master` hace parecer que «no hay clientes». |
 | El cliente tal como lo ve **una empresa** en Switch | `switch_clientes` | 1 fila por (empresa, `cliente_switch_id`) · 6.794 🔢 | El mismo cliente aparece una vez por empresa donde compra. |
-| Cuánto compró un cliente en 12 meses | `clientes_agregado_12m_vw` (114) · `clientes_empresa_12m_vw` (1.665; **255 del grupo**) | 1 fila por cliente / por (cliente, empresa) | El agregado ya **excluye Boston**. El código se resuelve por `switch_clientes` y, cuando falta, por `clientes_master_por_nombre_unico_vw` — **nunca** por un JOIN a `clientes_master` por nombre. Se refresca con `rpc refresh_clientes_empresa_12m_vw`. |
+| Cuánto compró un cliente en 12 meses | `clientes_agregado_12m_vw` (114) · `clientes_empresa_12m_vw` (1.665; **255 del grupo**) | 1 fila por cliente / por (cliente, empresa) | El agregado ya **excluye Boston**. El código sale SIEMPRE del puente `switch_clientes (empresa_key, cliente_switch_id)` — **nunca** de un JOIN por nombre, y sin fallback. Se refresca con `rpc refresh_clientes_empresa_12m_vw`. |
 
 ### Catálogos públicos y pedidos
 

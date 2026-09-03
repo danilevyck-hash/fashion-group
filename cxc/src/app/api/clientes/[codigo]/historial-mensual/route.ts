@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { ALL_EMPRESA_KEYS, type EmpresaKey } from "@/lib/empresa-mapping";
+import { esCodigoDelGrupo } from "@/lib/clientes/mundos";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     return NextResponse.json({ error: cErr.message }, { status: 500 });
   }
   if (!cliente) {
+    return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  }
+
+  // 🔴 La MISMA puerta de mundo que la ficha: esta ruta devuelve el nombre del
+  // cliente y 25 meses de su venta, así que es otra "ficha por dirección".
+  // Mismo 404 que un código inexistente — ver `esCodigoDelGrupo`.
+  if (!(await esCodigoDelGrupo(codigo))) {
     return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   }
 

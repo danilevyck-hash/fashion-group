@@ -178,6 +178,39 @@ export async function mundosDeClientes(): Promise<MundosDeClientes | null> {
  * cuyo código no aparece en `switch_clientes` TAMBIÉN se queda: son los 4 del
  * comentario de arriba, 3 de los cuales son del grupo con el código viejo.
  */
+/**
+ * ¿ESTE código, uno solo, es de un cliente del grupo?
+ *
+ * La misma regla que `soloClientesDelGrupo`, pero para cuando ya se sabe el
+ * código y leer los 6.800 pares de `switch_clientes` para juzgar UNA ficha sería
+ * absurdo: acá va una consulta indexada por `codigo`.
+ *
+ * 🩸 POR QUÉ EXISTE (2-sep-2026). `/api/clientes/[codigo]` SERVÍA Y DEJABA
+ * EDITAR las 4.915 fichas de Boston que se habían colado en `clientes_master`:
+ * el GET y el PATCH solo miraban `deleted = false`, y ni uno ni otro pasaba por
+ * `soloClientesDelGrupo` — la única que filtraba era la página SSR. Daniel:
+ * *"la ficha de cliente por dirección se va. El directorio por dentro se va."*
+ * Marcar esas filas como borradas cerró la puerta HOY; esto la cierra SIEMPRE,
+ * incluso si mañana alguien las revive o un sync las vuelve a traer.
+ *
+ * Los tres defaults son los mismos de `soloClientesDelGrupo`, y los tres dicen
+ * "se queda" — **esconder de más es peor que mostrar de más**:
+ *   · la consulta falló  → se queda (fail-open)
+ *   · sin código         → se queda
+ *   · Switch no lo conoce → se queda (D-201, D-173, D-101)
+ */
+export async function esCodigoDelGrupo(codigo: string | null | undefined): Promise<boolean> {
+  const cod = (codigo ?? "").trim();
+  if (!cod) return true;
+  const { data, error } = await supabaseServer
+    .from("switch_clientes")
+    .select("empresa_key")
+    .eq("codigo", cod);
+  if (error || !data) return true;          // fail-open, igual que mundos === null
+  if (data.length === 0) return true;       // Switch no lo conoce: se queda
+  return data.some((f) => esEmpresaDelGrupo(f.empresa_key));
+}
+
 export function soloClientesDelGrupo<T extends { codigo: string | null }>(
   clientes: T[],
   mundos: MundosDeClientes | null
