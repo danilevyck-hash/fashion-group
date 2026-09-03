@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "migrar": "NODE_OPTIONS=--no-deprecation tsx scripts/migrar.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.81.0",

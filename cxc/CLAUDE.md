@@ -561,6 +561,7 @@ npx next build    # Build check — must pass before push
 ## Deploy
 ```bash
 git push origin main   # Auto-deploy via Vercel
+npm run migrar supabase/migrations/<archivo>.sql   # Aplica UNA migración a Supabase (muestra qué corre, pide «¿Aplicar? [s/N]», registra en schema_migrations). `-- --dry-run` solo muestra; `-- --forzar` repite una ya registrada. Token: SUPABASE_ACCESS_TOKEN en .env.local (https://supabase.com/dashboard/account/tokens)
 ```
 
 
