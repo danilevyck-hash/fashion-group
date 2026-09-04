@@ -38,7 +38,7 @@ import { useState, type ReactNode } from "react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
-import { MarcaClientesSinComision, type ClienteSinComisionConEmpresa } from "./MarcaClientesSinComision";
+import type { ClienteSinComisionConEmpresa } from "./MarcaClientesSinComision";
 
 /** Rojo para lo negativo, igual que la tabla. */
 const claseMonto = (n: number) => (n < 0 ? "text-rose-600" : "text-gray-900");
@@ -261,7 +261,6 @@ function TarjetaVendedorMatriz({
           >
             <span className="truncate">{nombreVendedorEnPantalla(fila.vendedor)}</span>
             {fila.se_paga === false && <MarcaNoSePaga />}
-            <MarcaClientesSinComision clientes={fila.sinComision} nombreEmpresa={nombreEmpresa} />
           </span>
           <span
             className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${
@@ -361,7 +360,6 @@ export function ComisionesTarjetasPorEmpresa({
                 <span className={`flex min-w-0 items-center truncate text-[13px] font-medium leading-5 tracking-tight ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>
                   <span className="truncate">{nombreVendedorEnPantalla(v.vendedor)}</span>
                   {v.se_paga === false && <MarcaNoSePaga />}
-                  <MarcaClientesSinComision clientes={v.clientes_sin_comision} />
                 </span>
                 <span
                   className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${claseMonto(

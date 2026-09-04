@@ -1,3 +1,11 @@
+// ⚠️ EL CHIP «N clientes sin comisión» SE QUITÓ DE LAS TABLAS (4-sep-2026).
+// Daniel, textual: *«quita el cuadro sin comisión»*. Nació el 3-sep cuando
+// Configuración todavía no era pestaña propia y el chip era la única puerta
+// para llegar a «Clientes que no comisionan»; hoy la pestaña está arriba y el
+// chip solo agregaba ruido al lado de cada nombre. El componente
+// `MarcaClientesSinComision` NO se borra: la lista sigue llegando del servidor
+// y la pestaña Configuración es donde se ve. Quien resta sigue siendo la RPC.
+//
 "use client";
 
 // «3 clientes sin comisión» — la marca que va pegada al nombre del vendedor en

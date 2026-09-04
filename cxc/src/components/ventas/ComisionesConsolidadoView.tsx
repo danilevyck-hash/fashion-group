@@ -47,7 +47,6 @@ import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
 import { estaRetirado } from "@/lib/comisiones/retirados";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
-import { MarcaClientesSinComision } from "./MarcaClientesSinComision";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
@@ -326,10 +325,6 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
                           nombre tal cual llega (mayúsculas). */}
                       {nombreVendedorEnPantalla(r.vendedor)}
                       {!r.se_paga && <MarcaNoSePaga />}
-                      <MarcaClientesSinComision
-                        clientes={r.sinComision}
-                        nombreEmpresa={(k) => EMPRESA_KEY_TO_NAME[k] ?? k}
-                      />
                     </td>
                     {renderCells(r, false)}
                   </tr>

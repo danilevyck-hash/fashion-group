@@ -354,12 +354,21 @@ describe("🔴 la pestaña Configuración", () => {
 });
 
 // ═══ 6. La marca en la tabla ═════════════════════════════════════════════════
-describe("🔴 «N clientes sin comisión» pegado al vendedor, con los nombres en el tooltip", () => {
-  it("Por empresa: Reynaldo lleva «2 clientes sin comisión» (y dice cuál es solo venta); DEFAULT no lleva nada", async () => {
+// ⚠️ CAMBIÓ DE DIRECCIÓN el 4-sep-2026. Este bloque exigía que el chip
+// «N clientes sin comisión» saliera pegado al nombre del vendedor. Daniel:
+// *«quita el cuadro sin comisión»*. Nació el 3-sep cuando Configuración no era
+// pestaña propia y el chip era la única puerta; hoy la pestaña está arriba y el
+// chip solo agregaba ruido. Ahora el candado exige lo CONTRARIO: que no salga.
+// La lista sigue viajando del servidor y se ve en Configuración — lo que se
+// quitó es la marca en las tablas, no el dato.
+describe("🔴 el chip «N clientes sin comisión» NO va en las tablas", () => {
+  it("Por empresa: Reynaldo NO lleva la marca, aunque el servidor mande sus 2 clientes", async () => {
     render(<ComisionesPorEmpresaView year={2026} mes={8} />);
     const tabla = await screen.findByRole("table");
-    const marca = within(tabla).getByText("2 clientes sin comisión");
-    expect(marca.getAttribute("title")).toBe("D-103 Metro Shoes (solo venta)\nD-84 Kheriddine");
+    expect(within(tabla).queryByText(/sin comisión/)).toBeNull();
+    expect(tabla.querySelector("[data-clientes-sin-comision]")).toBeNull();
+    // CONTROL: la tabla sí se pintó y Reynaldo está en ella.
+    expect(within(tabla).getByText("Reynaldo Espinosa")).toBeTruthy();
     const def = within(tabla).getByText("Oficina (DEFAULT)").closest("tr")!;
     expect(within(def).queryByText(/sin comisión/)).toBeNull();
   });

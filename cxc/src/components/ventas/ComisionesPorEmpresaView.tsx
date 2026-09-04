@@ -30,7 +30,6 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { ComisionesTarjetasPorEmpresa } from "./ComisionesTarjetas";
-import { MarcaClientesSinComision } from "./MarcaClientesSinComision";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
 
 const MESES = [
@@ -236,7 +235,6 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
                         {ROTULO_NO_SE_PAGA}
                       </span>
                     )}
-                    <MarcaClientesSinComision clientes={v.clientes_sin_comision} />
                     {/* Crece HACIA ABAJO: una columna más habría ensanchado la
                         tabla justo en el iPad acostado, que es el ancho que
                         nadie mira. */}
