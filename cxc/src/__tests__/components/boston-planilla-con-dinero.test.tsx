@@ -69,7 +69,7 @@ const fila = (extra: Record<string, unknown> = {}) => ({
   codigo: "1", etiqueta: "ALEJANDRA CAMAÑO", nombre: "ALEJANDRA", empresa: "confecciones_boston",
   empresaEtiqueta: "Confecciones Boston", jornadaSemanal: 48, horas,
   faltaConfigurar: [], fueraDePlanilla: false, noMarcaReloj: false,
-  decidirAMano: null, extraMedido: null, extraAprobada: true, ...extra,
+  decidirAMano: null, extraMedido: null, extraNoAprobada: null, extraAprobada: true, ...extra,
 });
 
 const TOTALES = {

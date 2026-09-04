@@ -65,6 +65,7 @@ function linea(over: Partial<LineaPlanilla> = {}): LineaPlanilla {
     faltaConfigurar: [], fueraDePlanilla: false, pagaSeguros: true, baseSeguros: null,
     noMarcaReloj: false, parte: null, decidirAMano: null, quincenalReferencia: null,
     extraMedido: { minutos: 40, diurnoMin: 40, nocturnoMin: 0, monto: 12.58 },
+    extraNoAprobada: null,
     extraAprobada: true, dinero: DINERO, manuales: { isr: 0, prestamo: 50, terceros: 0, mercancia: 10, otrosServicios: 0 },
     ...over,
   };
@@ -260,9 +261,12 @@ describe("🔴 quién puede cerrar", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 los frenos del cierre — sin aprobar NO se cierra", () => {
+  // 🔴 Lo que frena es `extraNoAprobada` —lo que quedó AFUERA—, no el rótulo.
+  // Con todo sin aprobar el motor deja `extraMedido` en null (3-sep-2026).
   const conExtra = linea({
     extraAprobada: false,
-    extraMedido: { minutos: 40, diurnoMin: 40, nocturnoMin: 0, monto: 12.58 },
+    extraMedido: null,
+    extraNoAprobada: { minutos: 40, diurnoMin: 40, nocturnoMin: 0, monto: 12.58 },
   });
   const prestamo = (over: Partial<SugerenciaPrestamo> = {}): SugerenciaPrestamo => ({
     codigo: "9", etiqueta: "LUIS ARROYO", empresa: "vistana", empresaEtiqueta: "Vistana",
@@ -299,7 +303,14 @@ describe("🔴 los frenos del cierre — sin aprobar NO se cierra", () => {
 
   it("una extra APROBADA no frena, y una de 0 minutos tampoco", () => {
     expect(frenosParaCerrar([linea({ extraAprobada: true })], [])).toEqual([]);
-    expect(frenosParaCerrar([linea({ extraAprobada: false, extraMedido: null })], [])).toEqual([]);
+    expect(frenosParaCerrar([linea({ extraAprobada: false, extraMedido: null, extraNoAprobada: null })], [])).toEqual([]);
+    // 🩸 El rótulo en `false` con `extraMedido` cargado era lo que el freno leía
+    // antes del 3-sep-2026, y era el número EQUIVOCADO: son las horas PAGADAS.
+    expect(frenosParaCerrar([linea({
+      extraAprobada: false,
+      extraMedido: { minutos: 40, diurnoMin: 40, nocturnoMin: 0, monto: 12.58 },
+      extraNoAprobada: null,
+    })], [])).toEqual([]);
   });
 
   it("los dos frenos a la vez salen los dos, en un solo mensaje", () => {

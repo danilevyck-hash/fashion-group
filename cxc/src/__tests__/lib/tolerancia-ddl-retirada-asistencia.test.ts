@@ -390,7 +390,7 @@ describe("5. planilla-guardada-server.ts — leer vacío ante un error abre el d
       codigo: JULIO, nombre: "JULIO GARAY", etiqueta: "JULIO GARAY", empresa: "vistana",
       empresaEtiqueta: "Vistana", salarioMensual: 1000, jornadaSemanal: 40, pagaSeguros: true,
       noMarcaReloj: false, fueraDePlanilla: false, faltaConfigurar: false, decidirAMano: null,
-      parte: null, quincenalReferencia: 500, extraMedido: null, extraAprobada: true,
+      parte: null, quincenalReferencia: 500, extraMedido: null, extraNoAprobada: null, extraAprobada: true,
       horas: {}, dinero: null,
     } as unknown as import("@/lib/asistencia/planilla").LineaPlanilla;
     await expect(cerrarPlanilla({

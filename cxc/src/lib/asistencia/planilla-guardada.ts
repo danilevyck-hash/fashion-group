@@ -177,8 +177,19 @@ export const COLUMNAS_DINERO: Record<keyof DineroLinea, string> = {
   netoPagar: "neto_pagar",
 };
 
-/** Las 20 columnas del reloj → su columna. Mismo candado de tipo. */
-export const COLUMNAS_HORAS: Record<keyof HorasPersona, string> = {
+/**
+ * Las 20 columnas del reloj → su columna. Mismo candado de tipo.
+ *
+ * ⚠️ `extraNoAprobadaDiurnoMin` / `extraNoAprobadaNocturnoMin` (3-sep-2026) se
+ * EXCLUYEN a propósito y por nombre: son el desglose de `extraNoAprobadaMin`
+ * —que sí se congela— y existen para VALUAR el aviso ámbar en el momento, no
+ * para leerse después. La tabla guardada sigue con sus 20 columnas. Si algún
+ * día se quieren congelar, es una migración y dos filas acá, no un `Partial`.
+ */
+export const COLUMNAS_HORAS: Record<
+  Exclude<keyof HorasPersona, "extraNoAprobadaDiurnoMin" | "extraNoAprobadaNocturnoMin">,
+  string
+> = {
   extraDiurnoMin: "extra_diurno_min",
   extraNocturnoMin: "extra_nocturno_min",
   extraNoAprobadaMin: "extra_no_aprobada_min",
@@ -232,11 +243,15 @@ export function filaDeLinea(planillaId: string, empresa: string, l: LineaPlanill
     parte_salario_mensual: l.parte ? l.parte.salarioMensual : null,
     parte_paga_horas_extra: l.parte ? l.parte.llevaHorasExtra : null,
     extra_medido_min: l.extraMedido ? l.extraMedido.minutos : null,
+    // 🔑 Lo que quedó SIN aprobar ya viaja en `extra_no_aprobada_min` (columna
+    // del reloj, abajo). El freno de `frenosParaCerrar` garantiza que un cuadro
+    // cerrado no tenga ni un minuto ahí — salvo que se haya cerrado antes del
+    // 3-sep-2026, cuando el freno leía el campo equivocado y nunca frenó.
     extra_aprobada: l.extraAprobada,
   };
 
   for (const [campo, col] of Object.entries(COLUMNAS_HORAS)) {
-    fila[col] = l.horas[campo as keyof HorasPersona];
+    fila[col] = l.horas[campo as keyof typeof COLUMNAS_HORAS];
   }
   for (const [campo, col] of Object.entries(COLUMNAS_DINERO)) {
     fila[col] = l.dinero ? l.dinero[campo as keyof DineroLinea] : null;

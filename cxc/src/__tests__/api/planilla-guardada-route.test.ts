@@ -121,6 +121,7 @@ const LINEA_CALCULADA = {
   faltaConfigurar: [], fueraDePlanilla: false, pagaSeguros: true, baseSeguros: null,
   noMarcaReloj: false, parte: null, decidirAMano: null, quincenalReferencia: null,
   extraMedido: { minutos: 40, diurnoMin: 40, nocturnoMin: 0, monto: 12.58 },
+  extraNoAprobada: null,
   extraAprobada: true,
   dinero: {
     rataHora: 3.02, valorMinuto: 0.05033333333333333, salarioQuincenal: 261.74,
@@ -623,7 +624,12 @@ describe("🔴 sin aprobar NO se cierra — es un freno, no un aviso", () => {
 
   it("🔴 horas extra sin aprobar: 409, con el nombre y la pestaña, y NADA escrito", async () => {
     const c = cuadroPorDefecto();
-    (c.lineas[0] as Record<string, unknown>).extraAprobada = false;
+    // 🔴 Lo que frena es lo que quedó AFUERA (`extraNoAprobada`), no el rótulo
+    // (3-sep-2026): con todo sin aprobar el motor deja `extraMedido` en null.
+    const l0 = c.lineas[0] as Record<string, unknown>;
+    l0.extraAprobada = false;
+    l0.extraMedido = null;
+    l0.extraNoAprobada = { minutos: 40, diurnoMin: 40, nocturnoMin: 0, monto: 12.58 };
     cuadro = c;
     const r = await POST(pedir("POST", "contabilidad", "Contabilidad", CUERPO));
     expect(r.status).toBe(409);

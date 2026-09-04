@@ -411,16 +411,31 @@ export function textoExtraNoAprobada(
   return `${cabeza} Se aprueban en la pestaña Aprobaciones. ${detalle}`;
 }
 
-/** Lo que se saca de las líneas para armar ese aviso. */
+/**
+ * Lo que se saca de las líneas para armar ese aviso — y el freno del cierre
+ * (`frenosParaCerrar`), que lee esta MISMA función.
+ *
+ * 🔴 LEE `extraNoAprobada`, NUNCA `extraMedido`. Arreglado el 3-sep-2026: el
+ * aviso leía las horas ya filtradas. `extraMedido` sale de lo que `medirHoras`
+ * dejó DESPUÉS de sacar los días sin aprobar, así que con todo sin aprobar era
+ * `null` —ni aviso ni freno: se podía cerrar la quincena con extras sin
+ * aprobar— y con aprobación parcial (martes sí, miércoles no) decía los minutos
+ * del MARTES como «sin aprobar». `extraNoAprobada` es lo que quedó afuera, con
+ * su monto valuado con la misma rata. `extraAprobada` sigue como rótulo de la
+ * línea y acá no decide nada: el dato manda, no la bandera.
+ */
 export function extrasNoAprobadas(
   lineas: readonly LineaPlanilla[],
 ): ExtraNoAprobada[] {
+  // ⚠️ `!= null` y no `!== null`: una línea armada a mano sin el campo (tests
+  // viejos, un script) no tiene nada sin aprobar, y no tiene por qué tumbar el
+  // cierre con un TypeError.
   return lineas
-    .filter((l) => l.extraMedido !== null && l.extraMedido.minutos > 0 && !l.extraAprobada)
+    .filter((l) => l.extraNoAprobada != null && l.extraNoAprobada.minutos > 0)
     .map((l) => ({
       codigo: l.codigo,
       etiqueta: l.etiqueta,
-      minutos: l.extraMedido!.minutos,
-      monto: l.extraMedido!.monto,
+      minutos: l.extraNoAprobada!.minutos,
+      monto: l.extraNoAprobada!.monto,
     }));
 }

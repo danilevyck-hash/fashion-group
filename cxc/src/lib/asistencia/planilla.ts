@@ -365,8 +365,27 @@ export interface HorasPersona {
    * Van APARTE de `extraDiurnoMin`/`extraNocturnoMin` —que ya vienen sin ellos,
    * y es lo que hace que no se paguen— para poder DECIR cuánto quedó afuera.
    * Sin este campo, lo que falta aprobar sería justo lo que no se puede ver.
+   *
+   * 🔴 ES EL TOTAL: `extraNoAprobadaDiurnoMin + extraNoAprobadaNocturnoMin`.
+   * Se conserva entero porque es lo que se congela (`extra_no_aprobada_min`) y
+   * lo que los candados viejos leen.
    */
   extraNoAprobadaMin: number;
+  /**
+   * De `extraNoAprobadaMin`, lo que era hora extra DIURNA (al 1,25) y lo que era
+   * NOCTURNA (al 1,50). Son un DESGLOSE del total, no se suman a nada.
+   *
+   * 🩸 Existen desde el 3-sep-2026: sin ellos, lo no aprobado solo se podía
+   * contar en minutos, nunca valuar —y el aviso ámbar «N personas tienen horas
+   * extra sin aprobar» leía `extraMedido`, que ya venía SIN esos minutos. El
+   * aviso nunca salió y el freno del cierre nunca frenó.
+   *
+   * ⚠️ NO SE CONGELAN: `COLUMNAS_HORAS` (`planilla-guardada.ts`) los excluye a
+   * propósito, porque la tabla guardada tiene las 20 columnas de siempre y el
+   * total sí viaja. Son para VALUAR en el momento, no para leer después.
+   */
+  extraNoAprobadaDiurnoMin: number;
+  extraNoAprobadaNocturnoMin: number;
   /**
    * Excedente. **HOY SIEMPRE 0** — se conserva la columna porque el cuadro de
    * la contadora también la conserva, y también en $0,00. Ver `clasificarDia`.
@@ -434,6 +453,7 @@ export interface HorasPersona {
 
 export const HORAS_CERO: HorasPersona = {
   extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0, extraNoAprobadaMin: 0,
+  extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0,
   domingoMin: 0, feriadoMin: 0, tardanzaMin: 0,
   tardanzaGraveMin: 0, tardanzaGraveDias: 0,
   ausenciaMin: 0, ausenciaDias: 0, ausenciaJustificadaDias: 0,
@@ -762,7 +782,14 @@ export function medirHoras(
       h.feriadoMin += c.feriadoMin;
     } else {
       // Lo que NO se pagó, para poder DECIRLO. Rechazar sí, esconder no.
+      //
+      // 🔴 SE APARTA CON SU RECARGO, no solo el total: es lo que permite que
+      // `armarLinea` lo valúe con la MISMA fórmula del pago (1,25 el diurno,
+      // 1,50 el nocturno) y el aviso diga cuánto se pagaría al aprobar. Sumar
+      // los dos en una sola cifra era perder el precio de cada minuto.
       h.extraNoAprobadaMin += c.extraDiurnoMin + c.extraNocturnoMin;
+      h.extraNoAprobadaDiurnoMin += c.extraDiurnoMin;
+      h.extraNoAprobadaNocturnoMin += c.extraNocturnoMin;
     }
     h.tardanzaMin += c.tardanzaMin;
     // 🔴 EL RÓTULO, NO EL DINERO. Un día de más de 30 minutos tarde se sigue
@@ -938,6 +965,9 @@ export interface ParteReparto {
 /** Las columnas de HORA EXTRA. Van a la parte marcada, y a ninguna otra. */
 const COLUMNAS_EXTRA = [
   "extraDiurnoMin", "extraNocturnoMin", "excedenteMin", "extraNoAprobadaMin",
+  // 🔑 El desglose de lo no aprobado va con su total, a la MISMA parte: es lo
+  // que hace que el aviso «sin aprobar» salga en la empresa que pagaría.
+  "extraNoAprobadaDiurnoMin", "extraNoAprobadaNocturnoMin",
 ] as const;
 
 /**
@@ -1166,6 +1196,29 @@ export interface LineaPlanilla {
    * profesional, tú decides): los minutos igual se dicen.
    */
   extraMedido: { minutos: number; diurnoMin: number; nocturnoMin: number; monto: number | null } | null;
+  /**
+   * 🔴 LAS HORAS EXTRA QUE EL RELOJ MIDIÓ Y ESTE CUADRO **NO PAGÓ** porque
+   * nadie las aprobó. `null` si no le quedó ni un minuto afuera.
+   *
+   * 🩸 Es el campo que el aviso ámbar y el freno del cierre leen desde el
+   * 3-sep-2026. Hasta ese día leían `extraMedido`, que sale de las horas que
+   * `medirHoras` YA dejó sin los días no aprobados: con todo sin aprobar era
+   * `null` (ni aviso ni freno, y se podía cerrar la quincena con extras sin
+   * aprobar) y con aprobación parcial decía los minutos APROBADOS como «sin
+   * aprobar». El dato existía en `horas.extraNoAprobadaMin`; no llegaba a
+   * donde se dice.
+   *
+   * `monto` = lo que se pagaría al aprobar, con la MISMA rata y los MISMOS
+   * recargos que `extraMedido.monto` (1,25 el diurno, 1,50 el nocturno, a
+   * centavos por columna). `null` cuando no se le pudo calcular pago (falta
+   * ficha, servicio profesional, tú decides): los minutos igual se dicen.
+   *
+   * ⚠️ Con el sueldo repartido en dos empresas sale SOLO en la línea que paga
+   * las horas extra (`parte.llevaHorasExtra`), que es la única que lo pagaría
+   * al aprobar; en la otra es `null`. Por eso se lee de `horasEfectivas` y no
+   * de `horasMedidas` como `extraMedido`: un aviso por persona, no por línea.
+   */
+  extraNoAprobada: { minutos: number; diurnoMin: number; nocturnoMin: number; monto: number | null } | null;
   /**
    * ¿Se le pagaron esas horas extra?
    *
@@ -1461,6 +1514,37 @@ export function calcularDinero(
   };
 }
 
+/**
+ * Minutos de hora extra → lo que valen, con los recargos vigentes y la rata de
+ * la línea. `null` si no hubo ni un minuto.
+ *
+ * 🔴 UNA SOLA FUNCIÓN PARA LAS DOS COLUMNAS —lo que se pagó (`extraMedido`) y
+ * lo que se dejó sin pagar por falta de aprobación (`extraNoAprobada`)—: así el
+ * monto del aviso ámbar es EXACTAMENTE lo que la planilla pagaría al aprobar,
+ * centavo por centavo, y no una segunda cuenta que pueda correrse. La fórmula
+ * es la de `calcularDinero`: `h × recargo × rata`, a centavos por columna.
+ *
+ * `rataHora` en `null` = no se le pudo calcular pago: los minutos igual viajan
+ * y el monto queda en `null`.
+ */
+export function resumenExtra(
+  diurnoMin: number,
+  nocturnoMin: number,
+  rataHora: number | null,
+  reglas: ReglasAsistencia,
+): { minutos: number; diurnoMin: number; nocturnoMin: number; monto: number | null } | null {
+  const minutos = diurnoMin + nocturnoMin;
+  if (!(minutos > 0)) return null;
+  const monto =
+    rataHora === null
+      ? null
+      : centavos(
+        centavos((diurnoMin / 60) * reglas.recargoExtraDiurno * rataHora)
+        + centavos((nocturnoMin / 60) * reglas.recargoExtraNocturno * rataHora),
+      );
+  return { minutos, diurnoMin, nocturnoMin, monto };
+}
+
 /** Una línea completa: la ficha + sus horas + su dinero (o lo que le falta). */
 export function armarLinea(
   ficha: FichaPlanilla,
@@ -1555,6 +1639,10 @@ export function armarLinea(
   // 🩸 Ese era el bug, y lo cazó el candado: dos filtros para lo mismo, y el
   // segundo se comía al primero. `extraAprobada` queda como RÓTULO — dice si le
   // quedó algo sin aprobar— y no como interruptor.
+  //
+  // 🩸 Arreglado el 3-sep-2026: el aviso leía las horas ya filtradas. Lo que
+  // quedó afuera viaja ahora en `extraNoAprobada` (abajo), valuado con la misma
+  // rata; `extraMedido` NO es «lo que falta aprobar», es lo que se PAGÓ.
   // ── 🔴 EL QUINTO CANDADO: CADA COLUMNA DEL RELOJ CAE EN UNA SOLA LÍNEA ─────
   //
   // Con el sueldo repartido entre dos empresas, esta línea se queda SOLO con lo
@@ -1612,33 +1700,35 @@ export function armarLinea(
       ? centavos((salario / 2) * factorRef)
       : null;
 
-  // 🔴 LO QUE MIDIÓ EL RELOJ, PASE LO QUE PASE CON LA APROBACIÓN. Sale de
-  // `horasMedidas` —antes del candado— porque es justamente lo que el candado
-  // apaga, y sin esto lo que falta aprobar sería lo único que no se puede ver.
-  const extraMin = horasMedidas.extraDiurnoMin + horasMedidas.extraNocturnoMin;
+  // 🔴 LAS HORAS EXTRA QUE ESTA LÍNEA PAGÓ. Sale de `horasMedidas` —antes del
+  // reparto— y ya viene SIN los días que nadie aprobó: `medirHoras` los apartó
+  // en `extraNoAprobadaMin` (con su desglose diurno/nocturno).
+  //
+  // 🩸 Hasta el 3-sep-2026 el comentario de acá decía «pase lo que pase con la
+  // aprobación», y el aviso ámbar de la planilla lo leía como si fuera lo que
+  // faltaba aprobar. No lo era: con todo sin aprobar esto es `null`, y el aviso
+  // nunca salió ni el freno del cierre frenó. Lo que falta aprobar va en
+  // `extraNoAprobada`, abajo, valuado con la MISMA función.
+  //
   // 🔑 El monto se valúa con la MISMA fórmula del pago (`h × recargo × rata`,
   // a centavos por columna) y con la rata que la línea usa de verdad. No es una
-  // estimación: es exactamente lo que se pagaría al aprobar.
+  // estimación: es exactamente lo que se paga —o lo que se pagaría al aprobar—.
   const rataDeLaLinea = dinero?.rataHora ?? null;
-  const montoExtra =
-    rataDeLaLinea === null
-      ? null
-      : centavos(
-        centavos((horasMedidas.extraDiurnoMin / 60) * reglas.recargoExtraDiurno * rataDeLaLinea)
-        + centavos((horasMedidas.extraNocturnoMin / 60) * reglas.recargoExtraNocturno * rataDeLaLinea),
-      );
-  const extraMedido =
-    extraMin > 0
-      ? {
-        minutos: extraMin,
-        diurnoMin: horasMedidas.extraDiurnoMin,
-        nocturnoMin: horasMedidas.extraNocturnoMin,
-        monto: montoExtra,
-      }
-      : null;
+  const extraMedido = resumenExtra(
+    horasMedidas.extraDiurnoMin, horasMedidas.extraNocturnoMin, rataDeLaLinea, reglas,
+  );
+  // 🔴 LO QUE NO SE PAGÓ, PARA PODER DECIRLO — de `horasEfectivas`, o sea de la
+  // parte que lo pagaría si se aprobara. Misma rata, mismos recargos.
+  const extraNoAprobada = resumenExtra(
+    horasEfectivas.extraNoAprobadaDiurnoMin || 0,
+    horasEfectivas.extraNoAprobadaNocturnoMin || 0,
+    rataDeLaLinea,
+    reglas,
+  );
 
   return {
     extraMedido,
+    extraNoAprobada,
     extraAprobada,
     fueraDePlanilla,
     parte,

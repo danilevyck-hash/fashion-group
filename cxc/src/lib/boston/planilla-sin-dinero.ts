@@ -20,9 +20,9 @@
 // que el bloque `recortado` del route ya escribió: *lo que no se nombra, no
 // viaja*.
 //
-// 🩸 Y NO ES SOLO `dinero`: la línea lleva SEIS campos con plata adentro
+// 🩸 Y NO ES SOLO `dinero`: la línea lleva SIETE campos con plata adentro
 // (`salarioMensual`, `baseSeguros`, `quincenalReferencia`, `extraMedido.monto`,
-// `dinero`, `manuales`). Quitar solo el obvio deja el sueldo mensual en el
+// `extraNoAprobada.monto`, `dinero`, `manuales`). Quitar solo el obvio deja el sueldo mensual en el
 // JSON, que es exactamente el dato que se está protegiendo.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -41,6 +41,8 @@ export interface LineaSinDinero {
   decidirAMano: string | null;
   /** Los MINUTOS de extra, nunca su monto: de la rata sale el mensual. */
   extraMedido: { minutos: number; diurnoMin: number; nocturnoMin: number } | null;
+  /** Lo que quedó SIN aprobar, en minutos. Su `monto` tampoco viaja. */
+  extraNoAprobada: { minutos: number; diurnoMin: number; nocturnoMin: number } | null;
   extraAprobada: boolean;
 }
 
@@ -78,6 +80,12 @@ export function lineaSinDinero(linea: Record<string, unknown>): LineaSinDinero {
   const em = linea.extraMedido as { minutos?: number; diurnoMin?: number; nocturnoMin?: number } | null;
   salida.extraMedido = em
     ? { minutos: em.minutos ?? 0, diurnoMin: em.diurnoMin ?? 0, nocturnoMin: em.nocturnoMin ?? 0 }
+    : null;
+  // 🔴 Y lo que quedó sin aprobar, por el MISMO motivo: su `monto` es lo que se
+  // pagaría al aprobar, o sea la misma división que devuelve la rata.
+  const en = linea.extraNoAprobada as { minutos?: number; diurnoMin?: number; nocturnoMin?: number } | null;
+  salida.extraNoAprobada = en
+    ? { minutos: en.minutos ?? 0, diurnoMin: en.diurnoMin ?? 0, nocturnoMin: en.nocturnoMin ?? 0 }
     : null;
 
   return salida as unknown as LineaSinDinero;

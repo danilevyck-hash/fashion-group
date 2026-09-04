@@ -543,6 +543,7 @@ describe("la planilla de Boston", () => {
       faltaConfigurar: [], fueraDePlanilla: false, pagaSeguros: true, baseSeguros: 500,
       noMarcaReloj: false, decidirAMano: null, quincenalReferencia: 500,
       extraMedido: { minutos: 60, diurnoMin: 60, nocturnoMin: 0, monto: 43.45 },
+      extraNoAprobada: { minutos: 30, diurnoMin: 30, nocturnoMin: 0, monto: 21.73 },
       extraAprobada: true,
       dinero: { netoPagar: 480, rataHora: 6.32, seguroSocial: 48.75 },
       manuales: { isr: 10, prestamo: 20 },
@@ -551,7 +552,7 @@ describe("la planilla de Boston", () => {
 
     // Lista EXACTA de claves, no un "no contiene": lo que no se nombra, no viaja.
     expect(Object.keys(recortada).sort()).toEqual(
-      [...CAMPOS_SIN_DINERO, "extraMedido"].sort(),
+      [...CAMPOS_SIN_DINERO, "extraMedido", "extraNoAprobada"].sort(),
     );
 
     for (const prohibida of [
@@ -565,6 +566,10 @@ describe("la planilla de Boston", () => {
     const em = recortada.extraMedido as Record<string, unknown>;
     expect(em.monto).toBeUndefined();
     expect(em.minutos).toBe(60);
+    // Y lo que quedó SIN aprobar (3-sep-2026): los minutos sí, el monto no.
+    const en = recortada.extraNoAprobada as Record<string, unknown>;
+    expect(en.monto).toBeUndefined();
+    expect(en.minutos).toBe(30);
 
     // Lo que SÍ recibe: las horas enteras.
     expect(recortada.horas).toEqual(linea.horas);
@@ -574,6 +579,7 @@ describe("la planilla de Boston", () => {
   it("`extraMedido` en null no revienta", () => {
     const r = lineaSinDinero({ extraMedido: null, faltaConfigurar: [] }) as unknown as Record<string, unknown>;
     expect(r.extraMedido).toBeNull();
+    expect(r.extraNoAprobada).toBeNull();
   });
 
   it("🔴 la RUTA le fuerza la empresa a Boston y no la lee de la URL", () => {

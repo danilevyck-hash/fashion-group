@@ -101,10 +101,10 @@ mutar "$PURO" \
 
 mutar "$PURO" \
   '  for (const [campo, col] of Object.entries(COLUMNAS_HORAS)) {
-    fila[col] = l.horas[campo as keyof HorasPersona];
+    fila[col] = l.horas[campo as keyof typeof COLUMNAS_HORAS];
   }' \
   '  for (const [campo, col] of Object.entries(COLUMNAS_HORAS)) {
-    if (campo === "x") fila[col] = l.horas[campo as keyof HorasPersona];
+    if (campo === "x") fila[col] = l.horas[campo as keyof typeof COLUMNAS_HORAS];
   }' \
   'las horas no se congelan (solo la plata)'
 
