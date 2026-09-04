@@ -29,15 +29,16 @@ import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 import type { GuiaItem } from "./types";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
-  FACTURAS_VISIBLES_INICIAL,
-  FACTURA_TRASLADO,
-  ORDEN_GRUPOS,
-  TITULO_GRUPO,
+  DIAS_CON_FACTURA_VISIBLES,
+  DIAS_POR_VER_MAS,
+  TEXTO_TRASLADO,
+  agruparPorDia,
   desmarcarFactura,
+  esDeHoy,
   facturaMarcada,
-  grupoDeFecha,
   marcarFactura,
   renglonDelCliente,
+  tituloDelDia,
   type FacturaDelCliente as Factura,
 } from "@/lib/guias/atajos-facturas";
 
@@ -61,17 +62,10 @@ function fmtMonto(n: number): string {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/** Hora si es de hoy; si no, la fecha corta. */
+/** La hora solo cuando es de hoy: el encabezado del día ya dice la fecha. */
 function rotuloFecha(fechaIso: string, hoy: string): string {
-  const d = new Date(fechaIso);
-  if (Number.isNaN(d.getTime())) return "";
-  const enPanama = new Intl.DateTimeFormat("es-PA", {
-    timeZone: "America/Panama",
-    ...(grupoDeFecha(fechaIso, hoy) === "hoy"
-      ? { hour: "numeric", minute: "2-digit" }
-      : { day: "numeric", month: "short" }),
-  });
-  return enPanama.format(d);
+  if (!esDeHoy(fechaIso, hoy)) return "";
+  return horaCorta(fechaIso);
 }
 
 function horaCorta(iso: string): string {
@@ -90,7 +84,10 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
   const [hasta, setHasta] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [sinLista, setSinLista] = useState(false);
-  const [verTodas, setVerTodas] = useState(false);
+  // 🔴 Los últimos 3 días CON factura (no de calendario); «Ver más días» trae
+  // 3 más cada vez. Medido: 77% de las facturas usadas en guías salen del
+  // último día facturado, 95% de los últimos 3.
+  const [diasVisibles, setDiasVisibles] = useState(DIAS_CON_FACTURA_VISIBLES);
   const [buscandoOtraVez, setBuscandoOtraVez] = useState(false);
 
   const hoy = hoyPanama();
@@ -144,13 +141,7 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
     onReemplazarItems(nuevos as GuiaItem[]);
   }
 
-  const visibles = facturas ? (verTodas ? facturas : facturas.slice(0, FACTURAS_VISIBLES_INICIAL)) : [];
-  const ocultas = facturas ? facturas.length - visibles.length : 0;
-
-  const grupos = ORDEN_GRUPOS.map((g) => ({
-    grupo: g,
-    facturas: visibles.filter((f) => grupoDeFecha(f.fecha, hoy) === g),
-  })).filter((g) => g.facturas.length > 0);
+  const { grupos, diasOcultos } = agruparPorDia(facturas ?? [], diasVisibles);
 
   return (
     <div data-testid="facturas-del-cliente" className="mb-8">
@@ -169,7 +160,7 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
             // abajo, exactamente como hoy.
             permitirOtro={false}
             onChange={(nombre, codigo) => {
-              setVerTodas(false);
+              setDiasVisibles(DIAS_CON_FACTURA_VISIBLES);
               setCliente(codigo ? { nombre, codigo } : null);
               if (!codigo) setFacturas(null);
             }}
@@ -194,10 +185,12 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
 
             {!cargando && facturas && facturas.length > 0 && (
               <div className="space-y-4">
-                {grupos.map(({ grupo, facturas: fs }) => (
-                  <div key={grupo}>
+                {/* 🔴 Los últimos días CON FACTURA, el más reciente arriba,
+                    cada día con su encabezado en palabras («Miércoles 3 sep»). */}
+                {grupos.map(({ dia, facturas: fs }) => (
+                  <div key={dia}>
                     <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1">
-                      {TITULO_GRUPO[grupo]}
+                      {tituloDelDia(dia)}
                     </div>
                     <ul>
                       {fs.map((f) => {
@@ -233,15 +226,34 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                   </div>
                 ))}
 
-                {ocultas > 0 && (
+                {diasOcultos > 0 && (
                   <button
                     type="button"
-                    onClick={() => setVerTodas(true)}
+                    onClick={() => setDiasVisibles((v) => v + DIAS_POR_VER_MAS)}
                     className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2"
                   >
-                    Ver más ({ocultas})
+                    Ver más días
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* 🔴 EL OTRO CAMINO: Traslado. Son DOS y nada más — factura o
+                Traslado (Daniel descartó «Factura pendiente» y «Sin factura»).
+                Es del ENVÍO, no del cliente; escribe el texto «Traslado» en el
+                campo facturas y la EMPRESA se elige a mano en el renglón. */}
+            {!cargando && (
+              <div className="mt-3 flex items-center gap-3">
+                <span className="text-xs text-gray-400">o</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onReemplazarItems(renglonDelCliente(items, cliente, TEXTO_TRASLADO, destinoAuto) as GuiaItem[])
+                  }
+                  className="text-sm border border-gray-200 rounded-md px-3 text-gray-600 hover:text-black hover:border-gray-300 transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1.5"
+                >
+                  Traslado
+                </button>
               </div>
             )}
 
@@ -259,22 +271,14 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                   {buscandoOtraVez ? "Buscando…" : "Buscar otra vez"}
                 </button>
                 <span className="flex-1" />
-                {/* Los dos caminos de siempre, con el cliente ya puesto. */}
+                {/* La salida a mano de siempre, con el cliente ya puesto: un
+                    renglón vacío en facturas para escribir el número. */}
                 <button
                   type="button"
                   onClick={() => onReemplazarItems(renglonDelCliente(items, cliente, "", destinoAuto) as GuiaItem[])}
                   className="text-xs text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2"
                 >
-                  No está en la lista
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onReemplazarItems(renglonDelCliente(items, cliente, FACTURA_TRASLADO, destinoAuto) as GuiaItem[])
-                  }
-                  className="text-xs text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2"
-                >
-                  Traslado sin factura
+                  Escribir el número
                 </button>
               </div>
             )}

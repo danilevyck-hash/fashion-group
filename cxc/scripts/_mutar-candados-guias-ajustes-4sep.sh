@@ -141,16 +141,13 @@ mutacion "desmarcar trata la dirección autollenada como trabajo de la persona (
 # ── la tabla de Daniel ───────────────────────────────────────────────────────
 
 mutacion "D-87 vuelve al histórico (Changuinola) — «hazme caso»" "$PURO" \
-  '  "D-87": ["Guabito"],' \
-  '  "D-87": ["Changuinola"],' \
+  '  "D-87": [{ destino: "Guabito", elDeSiempre: true }],' \
+  '  "D-87": [{ destino: "Changuinola", elDeSiempre: true }],' \
   1 "$T_DEST_LIB"
 
 mutacion "City Moda recupera el campo tienda" "$PURO" \
-  '  "D-142": {
-    Westland: ["5", "6", "14", "Mas Flow"],' \
-  '  "D-26": { "Entrega en SportCorner": ["Albrook 2"] },
-  "D-142": {
-    Westland: ["5", "6", "14", "Mas Flow"],' \
+  '  "D-27": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],' \
+  '  "D-27": [{ destino: "Sport Corner Calidonia", elDeSiempre: true, tiendas: ["Albrook 2"] }],' \
   1 "$T_DEST_LIB"
 
 # ── el canal privado y el día 1 ──────────────────────────────────────────────

@@ -602,11 +602,10 @@ export default function GuiaForm({
           hasError={err}
           onChange={(nombre, codigo) => {
             const cambios: Partial<GuiaItem> = { cliente: nombre, cliente_codigo: codigo };
-            // 🔴 El destino ÚNICO se autollena al ELEGIR el cliente
-            // (4-sep-2026, Daniel: «quita esa regla. Que se autollene…») —
-            // regla y porqués en `destinoParaAutollenar`. Solo con el campo
-            // vacío (lo escrito no se pisa), nunca en una guía firmada ni
-            // con el interruptor apagado; con varios destinos, botones.
+            // 🔴 El destino se autollena al ELEGIR el cliente (4-sep-2026):
+            // manda «EL DE SIEMPRE», o el destino único de la historia —
+            // regla en `destinoParaAutollenar`. Solo con el campo vacío,
+            // nunca en una guía firmada ni con el interruptor apagado.
             if (GUIAS_ATAJOS_NUEVOS && !soloCorregible && !item.direccion.trim()) {
               const destino = destinoParaAutollenar(
                 codigo,
@@ -683,10 +682,10 @@ export default function GuiaForm({
             encima. Cuelga del MISMO interruptor que el panel de facturas: en
             `false` no se dibuja nada y la pantalla es la de hoy. Sin código de
             cliente, o sin historia ni definición, el componente devuelve null.
-            Con UN solo destino el campo ya se autollenó al ELEGIR el cliente
-            (`destinoParaAutollenar`, arriba); los botones existen para los
-            clientes con VARIOS, y ahí NUNCA se aplican solos: elegir entre
-            varios es de la persona. En una guía Completada no aparece:
+            Con «el de siempre» (o el destino único de la historia) el campo
+            ya se autollenó al ELEGIR el cliente (`destinoParaAutollenar`,
+            arriba); los botones NUNCA se aplican solos: elegir entre varios
+            es de la persona. En una guía Completada no aparece:
             `campoDireccion` ya salió por `soloCorregible` arriba. */}
         {GUIAS_ATAJOS_NUEVOS && (
           <DestinosDelCliente
@@ -998,8 +997,9 @@ export default function GuiaForm({
           clientesTop={clientesTop}
           // El destino que se autollena al marcar la primera factura del
           // cliente (4-sep-2026): el MISMO cálculo que usa el selector de
-          // cliente de cada renglón — UN solo destino, definido o único en la
-          // historia agrupada; con varios, nada.
+          // cliente de cada renglón — «el de siempre» del cliente, o el
+          // destino único de su historia agrupada; sin marca y con varios,
+          // nada.
           destinoAutollenadoDe={(codigo) =>
             destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [], definidosPorCliente)
           }

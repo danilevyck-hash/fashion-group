@@ -31,7 +31,6 @@ import { describe, it, expect } from "vitest";
 import {
   DESTINOS_DEFINIDOS,
   MAX_BOTONES_DESTINO,
-  TIENDAS_POR_CLIENTE,
   baseDeDestino,
   botonesDeDestino,
   claveDestino,
@@ -60,31 +59,39 @@ function envio(guia_id: string, cliente_codigo: string, direccion: string, delet
 
 // ─── 1 · los 9 definidos por Daniel ──────────────────────────────────────────
 
-describe("los 9 definidos por Daniel devuelven exactamente su tabla", () => {
+describe("los definidos por Daniel devuelven exactamente su tabla (mockup final: «dale aprobado»)", () => {
   const tabla: Array<[string, string[]]> = [
     ["D-81", ["Paso Canoas"]],
+    ["D-80", ["Paso Canoas"]],
     ["D-156", ["Changuinola"]],
     ["D-117", ["Guabito"]],
     ["D-87", ["Guabito"]],
     ["D-25", ["Paso Canoas"]],
-    // ⚠️ Corregido el 4-sep-2026 — Daniel, textual: «city shoes → Calle 19
-    // Central, al lado de la joyería Super Oro. Y Nine Sport en Calle 19
-    // Central.» (antes decía «Calle 19 Central» a secas; y D-112 entró nuevo).
     ["D-35", ["Calle 19 Central, al lado de la joyería Super Oro"]],
     ["D-112", ["Calle 19 Central"]],
     ["D-144", ["Albrook"]],
-    // ⚠️ La familia City Moda (4-sep-2026): son ONCE clientes con su propio
-    // código. Las «X (ENTREGA EN SPORTCORNER)» del histórico de D-26 eran
-    // envíos cargados al cliente equivocado (iban a los otros códigos) y se
-    // IGNORAN; el único destino propio de D-26 es «5 de Mayo».
-    ["D-26", ["5 de Mayo"]],
+    ["D-141", ["Los Andes"]],
+    // Las cinco correcciones de escritura — Daniel: «pon lo que recomendaste
+    // en ¿es esto?, así mismo».
+    ["D-99", ["Westland"]],
+    ["D-147", ["Changuinola"]],
+    ["D-7", ["Penonomé"]],
+    ["D-43", ["Las Tablas"]],
+    ["D-86", ["Albrook"]],
+    // La familia City Moda — «todos los City Moda en Sport Corner Calidonia,
+    // y a veces solo City Moda Chorrera en Chorrera». D-26 lleva DOS botones
+    // (el «5 de Mayo» de la primera versión se quitó); D-33 y D-78 quedan
+    // definidos aunque no tuvieran guías; D-30 no se define (Switch lo borró).
+    ["D-26", ["Sport Corner Calidonia", "Chorrera"]],
     ["D-27", ["Sport Corner Calidonia"]],
     ["D-28", ["Sport Corner Calidonia"]],
     ["D-29", ["Sport Corner Calidonia"]],
     ["D-31", ["Sport Corner Calidonia"]],
     ["D-32", ["Sport Corner Calidonia"]],
+    ["D-33", ["Sport Corner Calidonia"]],
     ["D-34", ["Sport Corner Calidonia"]],
     ["D-42", ["Sport Corner Calidonia"]],
+    ["D-78", ["Sport Corner Calidonia"]],
     ["D-142", ["Westland", "Albrook", "Los Andes", "Santiago", "Penonomé", "Metromall", "Megamall", "Outlet Vía España"]],
   ];
 
@@ -103,19 +110,31 @@ describe("los 9 definidos por Daniel devuelven exactamente su tabla", () => {
       ...Array<string>(4).fill("Guabito"),
     ];
     expect(botonesDeDestino("D-87", historicoReal)).toEqual(["Guabito"]);
-    expect(DESTINOS_DEFINIDOS["D-87"]).toEqual(["Guabito"]);
+    expect(DESTINOS_DEFINIDOS["D-87"]).toEqual([{ destino: "Guabito", elDeSiempre: true }]);
   });
 
-  it("la tabla tiene los 17 y solo los 17 (los 9 de Daniel + la familia City Moda del 4-sep + Nine Sports del 4-sep)", () => {
+  it("los 5 corregidos dan el TEXTO NUEVO — el typo del histórico no vuelve", () => {
+    // Daniel: «pon lo que recomendaste en ¿es esto?, así mismo». El histórico
+    // real traía «Wesland», «Changinola», «Penonome», «las tablas», «albrok».
+    expect(botonesDeDestino("D-99", ["Wesland"])).toEqual(["Westland"]);
+    expect(botonesDeDestino("D-147", ["Changinola"])).toEqual(["Changuinola"]);
+    expect(botonesDeDestino("D-7", ["Penonome"])).toEqual(["Penonomé"]);
+    expect(botonesDeDestino("D-43", ["las tablas"])).toEqual(["Las Tablas"]);
+    expect(botonesDeDestino("D-86", ["albrok"])).toEqual(["Albrook"]);
+    // Y los cinco autollenan: todos son «el de siempre».
+    expect(destinoParaAutollenar("D-99", ["Wesland"])).toBe("Westland");
+    expect(destinoParaAutollenar("D-86", ["albrok"])).toBe("Albrook");
+  });
+
+  it("la tabla tiene los 26 y solo los 26 (los definidos + las 5 correcciones + la familia City Moda cerrada)", () => {
     expect(Object.keys(DESTINOS_DEFINIDOS).sort()).toEqual(
       [
         "D-117", "D-142", "D-144", "D-156", "D-25", "D-26", "D-35", "D-81", "D-87",
-        // La familia City Moda con guías propias. D-30, D-33 y D-78 no tienen
-        // guías todavía y por eso NO tienen destino definido.
-        "D-27", "D-28", "D-29", "D-31", "D-32", "D-34", "D-42",
-        // Nine Sports 9, S.A. — Daniel, 4-sep-2026: «Y Nine Sport en Calle 19
-        // Central.»
-        "D-112",
+        "D-80", "D-141", "D-112",
+        // Las cinco correcciones de escritura.
+        "D-99", "D-147", "D-7", "D-43", "D-86",
+        // La familia City Moda entera menos D-30 (Switch lo borró).
+        "D-27", "D-28", "D-29", "D-31", "D-32", "D-33", "D-34", "D-42", "D-78",
       ].sort(),
     );
   });
@@ -237,12 +256,10 @@ describe("D-142: la tienda opcional y el separador en UN solo lugar", () => {
     expect(componerDestino("Westland", "  ")).toBe("Westland");
   });
   it("las tiendas ya usadas son las de la tabla de Daniel", () => {
-    expect(TIENDAS_POR_CLIENTE["D-142"]).toEqual({
-      Westland: ["5", "6", "14", "Mas Flow"],
-      Albrook: ["7", "8", "9"],
-      "Los Andes": ["3", "4"],
-      Metromall: ["10"],
-    });
+    expect(tiendasDelDestino("D-142", "Westland")).toEqual(["5", "6", "14", "Mas Flow"]);
+    expect(tiendasDelDestino("D-142", "Albrook")).toEqual(["7", "8", "9"]);
+    expect(tiendasDelDestino("D-142", "Los Andes")).toEqual(["3", "4"]);
+    expect(tiendasDelDestino("D-142", "Metromall")).toEqual(["10"]);
   });
   it("tiendasDelDestino mira la BASE del campo: con «Westland · tienda 6» siguen siendo las de Westland", () => {
     expect(tiendasDelDestino("D-142", "Westland")).toEqual(["5", "6", "14", "Mas Flow"]);
@@ -259,38 +276,52 @@ describe("D-142: la tienda opcional y el separador en UN solo lugar", () => {
 // ─── 6b · City Moda NO lleva tienda: cada «tienda» es OTRO cliente ───────────
 
 describe("City Moda (4-sep-2026): once códigos, cero tiendas", () => {
-  it("TIENDAS_POR_CLIENTE solo tiene a D-142 — D-26 no ofrece tiendas", () => {
-    expect(Object.keys(TIENDAS_POR_CLIENTE)).toEqual(["D-142"]);
-    expect(tiendasDelDestino("D-26", "5 de Mayo")).toEqual([]);
+  it("solo D-142 lleva tiendas en los definidos — City Moda no ofrece ninguna", () => {
+    const conTiendas = Object.entries(DESTINOS_DEFINIDOS)
+      .filter(([, destinos]) => destinos.some((d) => (d.tiendas ?? []).length > 0))
+      .map(([codigo]) => codigo);
+    expect(conTiendas).toEqual(["D-142"]);
+    expect(tiendasDelDestino("D-26", "Sport Corner Calidonia")).toEqual([]);
+    expect(tiendasDelDestino("D-26", "Chorrera")).toEqual([]);
     expect(tiendasDelDestino("D-27", "Sport Corner Calidonia")).toEqual([]);
   });
 });
 
 // ─── 6c · el destino que SÍ se llena solo (4-sep-2026) ───────────────────────
 
-describe("🔴 destinoParaAutollenar: UN solo destino — definido o único en la historia", () => {
+describe("🔴 destinoParaAutollenar: manda «EL DE SIEMPRE», y sin definición el destino único de la historia", () => {
   // Daniel, textual (4-sep-2026): «sí quiero que se llene sola, ¿ese no era el
-  // propósito de todo esto? ¿Cómo que no pre-llenaste la dirección?» y, sobre
-  // la regla del 14-ago: «"la dirección no se escribe sola" me refería a que
-  // el usuario no lo haga para no escribirlo mal como lo vimos, quita esa
-  // regla. Que se autollene como lo discutimos antes.» Medido: 40 de 48
-  // clientes con guías usan siempre el mismo destino.
-  it("un definido con UN destino lo devuelve (incluida la familia City Moda)", () => {
+  // propósito de todo esto?» y, en el mockup final: «sí correcto, con entrega
+  // Sport Corner como default, que elija si quiere el otro sino». Medido: 40
+  // de 48 clientes con guías usan siempre el mismo destino.
+  it("un definido con su «el de siempre» lo devuelve (incluida la familia City Moda)", () => {
     expect(destinoParaAutollenar("D-81", [])).toBe("Paso Canoas");
+    expect(destinoParaAutollenar("D-80", [])).toBe("Paso Canoas");
     expect(destinoParaAutollenar("D-87", [])).toBe("Guabito");
     expect(destinoParaAutollenar("D-156", [])).toBe("Changuinola");
-    expect(destinoParaAutollenar("D-26", [])).toBe("5 de Mayo");
     expect(destinoParaAutollenar("D-27", [])).toBe("Sport Corner Calidonia");
+    expect(destinoParaAutollenar("D-141", [])).toBe("Los Andes");
     // Y la definición gana aunque el histórico diga otra cosa (D-87 real:
     // más veces «Changinola» que «Guabito»).
     expect(destinoParaAutollenar("D-87", ["Changinola"])).toBe("Guabito");
   });
+  it("🔴 «el de siempre» autollena AUNQUE el cliente tenga varios destinos — D-26: Sport Corner Calidonia, y «Chorrera» queda de botón", () => {
+    // Daniel: «todos los City Moda en Sport Corner Calidonia, y a veces solo
+    // City Moda Chorrera en Chorrera». Es la regla que REEMPLAZA a «solo
+    // autollena si hay UNO».
+    expect(destinoParaAutollenar("D-26", [])).toBe("Sport Corner Calidonia");
+    expect(botonesDeDestino("D-26", [])).toEqual(["Sport Corner Calidonia", "Chorrera"]);
+  });
+  it("🔴 un definido SIN «el de siempre» no llena nada: Sporting Shoes (D-142) elige la persona", () => {
+    expect(destinoParaAutollenar("D-142", [])).toBeNull(); // 8 definidos, ninguno marcado
+  });
   it("un cliente FUERA de la tabla con UN solo destino histórico también autollena — Bouti, S.A. (D-14) → David", () => {
     // El ejemplo que preguntó Daniel: D-14 tiene 4 guías, siempre a «David».
+    // Daniel: «no quiero definir cliente por cliente, ya tú debes de saberlo
+    // con las guías que hemos hecho».
     expect(destinoParaAutollenar("D-14", ["David"])).toBe("David");
   });
-  it("🔴 con VARIOS destinos no se llena nada: salen los botones y elige la persona", () => {
-    expect(destinoParaAutollenar("D-142", [])).toBeNull(); // 8 definidos
+  it("🔴 sin definición y con VARIOS destinos históricos no se llena nada", () => {
     expect(destinoParaAutollenar("D-999", ["David", "Santiago"])).toBeNull();
   });
   it("sin código o sin historia, nada", () => {

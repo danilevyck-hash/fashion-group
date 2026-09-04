@@ -270,6 +270,22 @@ describe("🔁 el destino ÚNICO se llena solo al ELEGIR el cliente (4-sep-2026)
     expect(itemsCapturados[0].direccion).toBe("Otra bodega");
   });
 
+  it("🔴 «EL DE SIEMPRE» autollena AUNQUE el cliente tenga varios destinos — D-26 llena «Sport Corner Calidonia» y «Chorrera» queda de botón", async () => {
+    // Daniel (mockup final, «dale aprobado»): «sí correcto, con entrega Sport
+    // Corner como default, que elija si quiere el otro sino». Reemplaza la
+    // regla anterior de «solo autollena si hay UNO».
+    render(<Harness itemsIniciales={[fila()]} />);
+    await asentar();
+    await elegirCliente("City Moda");
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-26");
+    expect(campoDireccion().value).toBe("Sport Corner Calidonia");
+    // Los destinos salen como botones: el otro se elige con un toque.
+    const zona = tarjetas().getByTestId("destinos-del-cliente");
+    expect(within(zona).getByRole("button", { name: "Chorrera" })).toBeTruthy();
+    fireEvent.click(within(zona).getByRole("button", { name: "Chorrera" }));
+    expect(itemsCapturados[0].direccion).toBe("Chorrera");
+  });
+
   it("un cliente con UN único destino en su HISTORIA agrupada también llena: Bouti, S.A. (D-14) → «David»", async () => {
     // El ejemplo real que preguntó Daniel: 4 guías, siempre a David.
     render(<Harness itemsIniciales={[fila()]} />);

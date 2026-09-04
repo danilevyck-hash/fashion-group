@@ -119,13 +119,22 @@ describe("🔴 la precedencia es tabla → constante → histórico, en UNA func
     expect(destinoParaAutollenar("D-999", [], {})).toBeNull();
   });
 
-  it("el autollenado sigue la misma precedencia: la tabla con DOS destinos apaga el autollenado aunque la constante tenga uno", () => {
+  it("el autollenado sigue la misma precedencia, y manda «EL DE SIEMPRE» de la tabla", () => {
+    // Dos filas de la tabla SIN marca: nada se llena, aunque la constante
+    // tenga su «el de siempre» — la tabla es la foto completa del cliente.
     const deTabla: DefinidosPorCliente = {
       "D-35": [{ destino: "Calle 19 Central" }, { destino: "Albrook" }],
     };
     expect(destinoParaAutollenar("D-35", [], deTabla)).toBeNull();
-    // Y con UNA fila en la tabla, autollena ESA.
-    expect(destinoParaAutollenar("D-35", [], { "D-35": [{ destino: "Vía España" }] })).toBe("Vía España");
+    // Con la marca puesta en la tabla, autollena ESA — aunque haya varias.
+    expect(
+      destinoParaAutollenar("D-35", [], {
+        "D-35": [{ destino: "Calle 19 Central" }, { destino: "Vía España", elDeSiempre: true }],
+      }),
+    ).toBe("Vía España");
+    // 🔴 Y una sola fila SIN la marca tampoco llena: «sin ninguno marcado, no
+    // se llena nada» — la regla nueva reemplaza a «solo autollena si hay UNO».
+    expect(destinoParaAutollenar("D-35", [], { "D-35": [{ destino: "Vía España" }] })).toBeNull();
   });
 
   it("las tiendas también salen de la tabla cuando la tabla manda", () => {
@@ -145,12 +154,14 @@ describe("🔴 la precedencia es tabla → constante → histórico, en UNA func
 
 describe("🔴 las correcciones del 4-sep-2026 — «city shoes → Calle 19 Central, al lado de la joyería Super Oro. Y Nine Sport en Calle 19 Central.»", () => {
   it("D-35 City Shoes dice el texto EXACTO de Daniel", () => {
-    expect(DESTINOS_DEFINIDOS["D-35"]).toEqual(["Calle 19 Central, al lado de la joyería Super Oro"]);
+    expect(DESTINOS_DEFINIDOS["D-35"]).toEqual([
+      { destino: "Calle 19 Central, al lado de la joyería Super Oro", elDeSiempre: true },
+    ]);
     expect(destinoParaAutollenar("D-35", [])).toBe("Calle 19 Central, al lado de la joyería Super Oro");
   });
 
   it("D-112 Nine Sports dice «Calle 19 Central» — la definición gana sobre su histórico («Calle 19»)", () => {
-    expect(DESTINOS_DEFINIDOS["D-112"]).toEqual(["Calle 19 Central"]);
+    expect(DESTINOS_DEFINIDOS["D-112"]).toEqual([{ destino: "Calle 19 Central", elDeSiempre: true }]);
     // El histórico real de D-112 (2 guías) decía «Calle 19»: la definición gana.
     expect(botonesDeDestino("D-112", ["Calle 19"])).toEqual(["Calle 19 Central"]);
     expect(destinoParaAutollenar("D-112", ["Calle 19"])).toBe("Calle 19 Central");
@@ -182,17 +193,21 @@ describe("🩸 con la tabla ausente (PGRST205) se cae a la constante y la pantal
   it("🔴 y con la tabla PRESENTE, la ruta manda los definidos DE VERDAD (calcularlos y tirarlos dejaría la pantalla en la constante para siempre)", async () => {
     tablaDestinos = {
       data: [
-        { id: 1, cliente_codigo: "D-35", destino: "Calle 19 Central, al lado de la joyería Super Oro", tiendas: [], orden: 1, creado_por: "daniel", creado_en: "2026-09-04" },
-        { id: 2, cliente_codigo: "D-142", destino: "Westland", tiendas: ["5", "6"], orden: 1, creado_por: "daniel", creado_en: "2026-09-04" },
+        { id: 1, cliente_codigo: "D-35", destino: "Calle 19 Central, al lado de la joyería Super Oro", tiendas: [], orden: 1, el_de_siempre: true, creado_por: "daniel", creado_en: "2026-09-04" },
+        { id: 2, cliente_codigo: "D-142", destino: "Westland", tiendas: ["5", "6"], orden: 1, el_de_siempre: false, creado_por: "daniel", creado_en: "2026-09-04" },
       ],
       error: null,
     };
     const { GET } = await import("@/app/api/guias/frecuencias/route");
     const res = await GET({ cookies: { get: () => undefined } } as never);
-    const json = (await res.json()) as { definidos: Record<string, { destino: string; tiendas: string[] }[]> };
+    const json = (await res.json()) as {
+      definidos: Record<string, { destino: string; tiendas: string[]; elDeSiempre: boolean }[]>;
+    };
+    // Con la marca «el de siempre» viajando: sin ella, la pantalla no sabría
+    // qué llenar solo.
     expect(json.definidos["D-35"]).toEqual([
-      { destino: "Calle 19 Central, al lado de la joyería Super Oro", tiendas: [] },
+      { destino: "Calle 19 Central, al lado de la joyería Super Oro", tiendas: [], elDeSiempre: true },
     ]);
-    expect(json.definidos["D-142"]).toEqual([{ destino: "Westland", tiendas: ["5", "6"] }]);
+    expect(json.definidos["D-142"]).toEqual([{ destino: "Westland", tiendas: ["5", "6"], elDeSiempre: false }]);
   });
 });

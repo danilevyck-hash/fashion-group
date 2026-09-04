@@ -120,6 +120,25 @@ mutacion "el separador deja de ser el formato de hoy («2535; 2536»)" "$PURO" \
   'return { ...r, facturas: previas ? `${previas}, ${sec}` : sec };' \
   'return { ...r, facturas: previas ? `${previas}; ${sec}` : sec };'
 
+# ── la agrupación por día y el Traslado (mockup final, 4-sep-2026) ───────────
+
+mutacion "se agrupan por días de CALENDARIO en vez de días con factura" "$PURO" \
+  '  const visibles = dias.slice(0, Math.max(0, diasVisibles));' \
+  '  const corte = new Date(new Date(`${dias[0] ?? "1970-01-01"}T00:00:00Z`).getTime() - diasVisibles * 86400000).toISOString().slice(0, 10);
+  const visibles = dias.filter((d) => d > corte);'
+
+mutacion "se abren 2 días en vez de 3" "$PURO" \
+  'export const DIAS_CON_FACTURA_VISIBLES = 3;' \
+  'export const DIAS_CON_FACTURA_VISIBLES = 2;'
+
+mutacion "«Ver más días» trae 2 en vez de 3" "$PURO" \
+  'export const DIAS_POR_VER_MAS = 3;' \
+  'export const DIAS_POR_VER_MAS = 2;'
+
+mutacion "«Traslado» vuelve a escribir el «0000» viejo" "$PURO" \
+  'export const TEXTO_TRASLADO = "Traslado";' \
+  'export const TEXTO_TRASLADO = "0000";'
+
 # ── el atajo nunca es candado ────────────────────────────────────────────────
 
 mutacion "elegir cliente se vuelve OBLIGATORIO (el atajo se hace candado)" "$LOGICA" \

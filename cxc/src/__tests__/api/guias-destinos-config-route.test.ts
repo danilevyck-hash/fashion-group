@@ -74,7 +74,8 @@ function cadena(tabla: string) {
         const tocadas = filas.filter(
           (f) =>
             (filtros.id === undefined || f.id === filtros.id) &&
-            (filtros.activo === undefined || f.activo === filtros.activo),
+            (filtros.activo === undefined || f.activo === filtros.activo) &&
+            (filtros.cliente_codigo === undefined || f.cliente_codigo === filtros.cliente_codigo),
         );
         return { data: tocadas.map((f) => ({ id: f.id })), error: null };
       }
@@ -82,6 +83,16 @@ function cadena(tabla: string) {
     }
     if (errorLectura) return { data: null, error: errorLectura, count: null };
     if (head) return { data: null, error: null, count: filas.length };
+    if (single) {
+      const f = filas.find(
+        (x) =>
+          (filtros.id === undefined || x.id === filtros.id) &&
+          (filtros.activo === undefined || x.activo === filtros.activo),
+      );
+      return f
+        ? { data: f, error: null }
+        : { data: null, error: { code: "PGRST116", message: "0 rows" } };
+    }
     return { data: filas, error: null, count: filas.length };
   };
 
@@ -261,6 +272,64 @@ describe("editar es UPDATE de una fila ACTIVA; quitar es SOFT DELETE firmado", (
   it("DELETE sin id → 400, sin escribir", async () => {
     const { DELETE } = await ruta();
     expect((await DELETE(req())).status).toBe(400);
+    expect(escrituras).toHaveLength(0);
+  });
+});
+
+// ─── 3b · la marca «el de siempre» ───────────────────────────────────────────
+
+describe("🔴 PATCH elDeSiempre: a lo sumo UNO por cliente, y nunca un DELETE", () => {
+  beforeEach(() => {
+    filas.push({
+      id: 2,
+      cliente_codigo: "D-35",
+      destino: "Albrook",
+      tiendas: [],
+      orden: 2,
+      activo: true,
+      creado_por: "daniel",
+      creado_en: "2026-09-04T12:00:00-05:00",
+    });
+  });
+
+  it("marcar una fila APAGA primero los demás destinos del cliente y después enciende ésta — dos UPDATE, cero DELETE", async () => {
+    const { PATCH } = await ruta();
+    const res = await PATCH(req({ elDeSiempre: true }, "2"));
+    expect(res.status).toBe(200);
+
+    expect(escrituras.filter((e) => e.op === "delete")).toHaveLength(0);
+    const updates = escrituras.filter((e) => e.op === "update");
+    expect(updates).toHaveLength(2);
+    // Primero se apagan TODOS los del cliente (el índice parcial único
+    // rechazaría dos encendidos a la vez)…
+    expect(updates[0].datos).toEqual({ el_de_siempre: false });
+    expect(updates[0].filtros).toMatchObject({ cliente_codigo: "D-35", activo: true });
+    // …y después se enciende SOLO la fila tocada.
+    expect(updates[1].datos).toEqual({ el_de_siempre: true });
+    expect(updates[1].filtros).toMatchObject({ id: 2, activo: true });
+  });
+
+  it("desmarcar solo apaga ESA fila — un UPDATE, sin tocar a los hermanos", async () => {
+    const { PATCH } = await ruta();
+    const res = await PATCH(req({ elDeSiempre: false }, "1"));
+    expect(res.status).toBe(200);
+    const updates = escrituras.filter((e) => e.op === "update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0].datos).toEqual({ el_de_siempre: false });
+    expect(updates[0].filtros).toMatchObject({ id: 1, activo: true });
+  });
+
+  it("sobre una fila que ya no está → 404, sin escribir la marca", async () => {
+    const { PATCH } = await ruta();
+    const res = await PATCH(req({ elDeSiempre: true }, "777"));
+    expect(res.status).toBe(404);
+    expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
+  });
+
+  it("una marca que no es booleana → 400 con texto para la pantalla", async () => {
+    const { PATCH } = await ruta();
+    const res = await PATCH(req({ elDeSiempre: "sí" }, "1"));
+    expect(res.status).toBe(400);
     expect(escrituras).toHaveLength(0);
   });
 });

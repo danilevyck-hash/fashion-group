@@ -11,10 +11,11 @@
 //
 // 🔴 EL BOTÓN SE TOCA, NUNCA SE APLICA SOLO. Este componente dibuja; el que
 // escribe es siempre un toque de la persona. ⚠️ Desde el 4-sep-2026 el destino
-// ÚNICO se autollena — pero eso pasa al ELEGIR el cliente y vive en GuiaForm /
-// `destinoParaAutollenar` (Daniel quitó su regla del 14-ago: «quita esa regla.
-// Que se autollene como lo discutimos antes.»). Acá, con VARIOS destinos,
-// nada se aplica solo: elegir entre varios es de la persona.
+// marcado «EL DE SIEMPRE» (o el único de la historia agrupada) se autollena —
+// pero eso pasa al ELEGIR el cliente y vive en GuiaForm /
+// `destinoParaAutollenar` (Daniel: «sí correcto, con entrega Sport Corner
+// como default, que elija si quiere el otro sino»). Acá los botones nunca se
+// aplican solos: elegir entre varios es de la persona.
 //
 // D-142 (Sporting Shoes N 4) además ofrece un renglón de TIENDA opcional con
 // los números ya usados y «+ otra»: tocar «6» sobre «Westland» deja

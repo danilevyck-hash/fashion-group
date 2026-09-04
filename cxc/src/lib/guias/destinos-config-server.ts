@@ -29,6 +29,7 @@ interface FilaDestino {
   destino: string;
   tiendas: string[] | null;
   orden: number;
+  el_de_siempre: boolean | null;
   creado_por: string;
   creado_en: string;
 }
@@ -43,7 +44,7 @@ const esTablaAusente = (code: string | undefined, message: string | undefined): 
 async function leerFilasActivas(): Promise<FilaDestino[]> {
   const { data, error } = await supabaseServer
     .from(TABLA_DESTINOS)
-    .select("id, cliente_codigo, destino, tiendas, orden, creado_por, creado_en")
+    .select("id, cliente_codigo, destino, tiendas, orden, el_de_siempre, creado_por, creado_en")
     .eq("activo", true)
     .order("cliente_codigo", { ascending: true })
     .order("orden", { ascending: true })
@@ -68,7 +69,7 @@ export async function leerDefinidosOVacio(): Promise<DefinidosPorCliente> {
     const out: Record<string, DestinoDefinido[]> = {};
     for (const f of filas) {
       const lista = out[f.cliente_codigo] ?? (out[f.cliente_codigo] = []);
-      lista.push({ destino: f.destino, tiendas: f.tiendas ?? [] });
+      lista.push({ destino: f.destino, tiendas: f.tiendas ?? [], elDeSiempre: f.el_de_siempre === true });
     }
     return out;
   } catch {
@@ -93,6 +94,7 @@ export async function leerDestinosConfigurados(): Promise<DestinoConfigurado[]> 
     destino: f.destino,
     tiendas: f.tiendas ?? [],
     orden: f.orden,
+    el_de_siempre: f.el_de_siempre === true,
     creado_por: f.creado_por,
     creado_en: f.creado_en,
   }));
@@ -165,6 +167,54 @@ export async function editarDestino(
     if (error.code === "23505") {
       return { ok: false, status: 409, error: "Ese destino ya está definido para ese cliente" };
     }
+    return { ok: false, status: 500, error: "No se pudo guardar. Intenta de nuevo en unos segundos." };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, status: 404, error: "Ese destino ya no está en la lista" };
+  }
+  return { ok: true };
+}
+
+/**
+ * 🔴 Marca (o desmarca) «el de siempre» de UNA fila activa (4-sep-2026,
+ * Daniel: *«sí correcto, con entrega Sport Corner como default, que elija si
+ * quiere el otro sino»*). A lo sumo UNO por cliente: al marcar, primero se
+ * APAGAN los demás destinos activos de ese cliente y después se enciende éste
+ * — en ese orden, porque el índice parcial único de la tabla rechazaría dos
+ * encendidos a la vez.
+ */
+export async function marcarElDeSiempre(
+  id: number,
+  valor: boolean,
+): Promise<ResultadoCambioDestino> {
+  const { data: fila, error: errFila } = await supabaseServer
+    .from(TABLA_DESTINOS)
+    .select("id, cliente_codigo")
+    .eq("id", id)
+    .eq("activo", true)
+    .single();
+  if (errFila || !fila) {
+    return { ok: false, status: 404, error: "Ese destino ya no está en la lista" };
+  }
+
+  if (valor) {
+    const { error: errLimpiar } = await supabaseServer
+      .from(TABLA_DESTINOS)
+      .update({ el_de_siempre: false })
+      .eq("cliente_codigo", (fila as { cliente_codigo: string }).cliente_codigo)
+      .eq("activo", true);
+    if (errLimpiar) {
+      return { ok: false, status: 500, error: "No se pudo guardar. Intenta de nuevo en unos segundos." };
+    }
+  }
+
+  const { data, error } = await supabaseServer
+    .from(TABLA_DESTINOS)
+    .update({ el_de_siempre: valor })
+    .eq("id", id)
+    .eq("activo", true)
+    .select("id");
+  if (error) {
     return { ok: false, status: 500, error: "No se pudo guardar. Intenta de nuevo en unos segundos." };
   }
   if (!data || data.length === 0) {

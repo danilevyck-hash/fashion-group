@@ -49,6 +49,8 @@ export interface DestinoConfigurado {
   destino: string;
   tiendas: string[];
   orden: number;
+  /** 🔴 «El de siempre»: se llena solo al elegir el cliente. A lo sumo uno por cliente. */
+  el_de_siempre: boolean;
   creado_por: string;
   creado_en: string;
 }
@@ -99,16 +101,16 @@ export function validarDestinoNuevo(body: unknown): ValidacionDestino {
 }
 
 export type ValidacionEdicion =
-  | { ok: true; valor: { destino?: string; tiendas?: string[] } }
+  | { ok: true; valor: { destino?: string; tiendas?: string[]; elDeSiempre?: boolean } }
   | { ok: false; error: string };
 
 /**
- * Valida lo que llega por PATCH (editar el texto de un destino y/o sus
- * tiendas). Al menos uno de los dos tiene que venir.
+ * Valida lo que llega por PATCH: editar el texto de un destino, sus tiendas
+ * y/o la marca «el de siempre». Al menos uno tiene que venir.
  */
 export function validarDestinoEdicion(body: unknown): ValidacionEdicion {
   const b = (body ?? {}) as Record<string, unknown>;
-  const valor: { destino?: string; tiendas?: string[] } = {};
+  const valor: { destino?: string; tiendas?: string[]; elDeSiempre?: boolean } = {};
   if (b.destino !== undefined) {
     const destino = validarTextoDestino(b.destino);
     if (!destino) return { ok: false, error: "Escribe el destino tal como debe salir en la guía" };
@@ -119,21 +121,33 @@ export function validarDestinoEdicion(body: unknown): ValidacionEdicion {
     if (tiendas === null) return { ok: false, error: "Las tiendas no son válidas" };
     valor.tiendas = tiendas;
   }
-  if (valor.destino === undefined && valor.tiendas === undefined) {
+  if (b.elDeSiempre !== undefined) {
+    if (typeof b.elDeSiempre !== "boolean") {
+      return { ok: false, error: "La marca «el de siempre» no es válida" };
+    }
+    valor.elDeSiempre = b.elDeSiempre;
+  }
+  if (valor.destino === undefined && valor.tiendas === undefined && valor.elDeSiempre === undefined) {
     return { ok: false, error: "No hay nada que cambiar" };
   }
   return { ok: true, valor };
 }
 
 /**
- * Qué le pasa al formulario de guías con N destinos definidos — el texto que
- * la pantalla de configuración le dice a quien administra:
- *   · 1  → el campo Dirección se llena solo al elegir el cliente;
- *   · 2+ → se ofrecen como botones y la persona elige.
+ * Qué le pasa al formulario de guías con esta definición — el texto que la
+ * pantalla de configuración le dice a quien administra (4-sep-2026, la regla
+ * de «el de siempre»):
+ *   · con uno marcado «el de siempre» → ese se llena solo; los demás, botones;
+ *   · sin ninguno marcado → solo botones, no se llena nada.
  */
-export function comoSeUsa(n: number): string {
+export function comoSeUsa(n: number, conElDeSiempre: boolean): string {
+  if (conElDeSiempre) {
+    return n === 1
+      ? "Se llena solo al elegir el cliente."
+      : "El de siempre se llena solo al elegir el cliente; los demás salen como botones.";
+  }
   return n === 1
-    ? "Se llena solo al elegir el cliente."
+    ? "Se ofrece como botón y la persona elige. Marca «el de siempre» para que se llene solo."
     : "Se ofrecen como botones y la persona elige.";
 }
 

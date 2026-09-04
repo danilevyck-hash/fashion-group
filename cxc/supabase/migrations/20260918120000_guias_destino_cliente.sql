@@ -44,6 +44,12 @@ CREATE TABLE IF NOT EXISTS guias_destino_cliente (
   tiendas          text[] NOT NULL DEFAULT '{}',
   -- Orden de los botones (el más usado primero). Se asigna al crear.
   orden            integer NOT NULL DEFAULT 1,
+  -- 🔴 «EL DE SIEMPRE» (4-sep-2026) — Daniel: «sí correcto, con entrega Sport
+  -- Corner como default, que elija si quiere el otro sino». El destino marcado
+  -- se llena SOLO al elegir el cliente, aunque el cliente tenga varios; los
+  -- demás salen como botones. Sin ninguno marcado, no se llena nada. A lo sumo
+  -- UNO por cliente entre las filas activas (índice parcial de abajo).
+  el_de_siempre    boolean NOT NULL DEFAULT false,
   -- Soft delete. false = ya no se ofrece; la fila se queda como historial.
   activo           boolean NOT NULL DEFAULT true,
   creado_por       text NOT NULL,
@@ -65,6 +71,13 @@ CREATE TABLE IF NOT EXISTS guias_destino_cliente (
 CREATE UNIQUE INDEX IF NOT EXISTS guias_destino_cliente_activo_unico
   ON guias_destino_cliente (cliente_codigo, destino)
   WHERE activo;
+
+-- 🔴 A lo sumo UN «el de siempre» activo por cliente: dos destinos que se
+-- llenan solos a la vez no significan nada. El servidor apaga los demás antes
+-- de marcar uno; este índice es la red si alguien escribe por otro camino.
+CREATE UNIQUE INDEX IF NOT EXISTS guias_destino_cliente_siempre_unico
+  ON guias_destino_cliente (cliente_codigo)
+  WHERE activo AND el_de_siempre;
 
 ALTER TABLE guias_destino_cliente ENABLE ROW LEVEL SECURITY;
 
@@ -92,45 +105,67 @@ COMMENT ON COLUMN guias_destino_cliente.destino IS
 COMMENT ON COLUMN guias_destino_cliente.tiendas IS
   'Tiendas del destino (Sporting Shoes: Westland 5/6/14/Mas Flow…). Columna y '
   'no tabla hermana: un solo cliente las usa y el soft delete las arrastra.';
+COMMENT ON COLUMN guias_destino_cliente.el_de_siempre IS
+  'El destino que se llena solo al elegir el cliente (a lo sumo uno activo por '
+  'cliente). Sin ninguno marcado, no se llena nada — los destinos salen como '
+  'botones y la persona elige.';
 
--- ─── 2) La carga inicial: los definidos de HOY ───────────────────────────────
--- Es EXACTAMENTE lo que la constante DESTINOS_DEFINIDOS + TIENDAS_POR_CLIENTE
--- ya hacen en producción (incluidas las dos correcciones de Daniel del
--- 4-sep-2026, que también entraron a la constante como red): encender la
--- pantalla no cambia ni un comportamiento.
-INSERT INTO guias_destino_cliente (cliente_codigo, destino, tiendas, orden, creado_por, creado_en)
+-- ─── 2) La carga inicial: los definidos que Daniel cerró el 4-sep-2026 ───────
+-- Es EXACTAMENTE lo que la constante DESTINOS_DEFINIDOS ya hace en producción
+-- (el mockup final aprobado: «dale aprobado», con «el de siempre» por cliente,
+-- las cinco correcciones de escritura y la familia City Moda cerrada):
+-- encender la pantalla no cambia ni un comportamiento.
+INSERT INTO guias_destino_cliente (cliente_codigo, destino, tiendas, orden, el_de_siempre, creado_por, creado_en)
 VALUES
-  -- Los definidos por Daniel el 4-sep-2026 (tabla textual en destinos-clientes.ts)
-  ('D-81',  'Paso Canoas',              '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-156', 'Changuinola',              '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-117', 'Guabito',                  '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-87',  'Guabito',                  '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-25',  'Paso Canoas',              '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-144', 'Albrook',                  '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  -- D-26 quedó con su único destino propio; la familia City Moda entrega en
-  -- Sport Corner Calidonia (cada «tienda» de City Moda es OTRO cliente).
-  ('D-26',  '5 de Mayo',                '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-27',  'Sport Corner Calidonia',   '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-28',  'Sport Corner Calidonia',   '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-29',  'Sport Corner Calidonia',   '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-31',  'Sport Corner Calidonia',   '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-32',  'Sport Corner Calidonia',   '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-34',  'Sport Corner Calidonia',   '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-42',  'Sport Corner Calidonia',   '{}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  -- Sporting Shoes N 4: 8 destinos, con sus tiendas ya usadas (verificadas
-  -- contra el histórico el 4-sep-2026).
-  ('D-142', 'Westland',          '{5,6,14,"Mas Flow"}', 1, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-142', 'Albrook',           '{7,8,9}',             2, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-142', 'Los Andes',         '{3,4}',               3, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-142', 'Santiago',          '{}',                  4, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-142', 'Penonomé',          '{}',                  5, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-142', 'Metromall',         '{10}',                6, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-142', 'Megamall',          '{}',                  7, 'daniel', '2026-09-04 12:00:00-05'),
-  ('D-142', 'Outlet Vía España', '{}',                  8, 'daniel', '2026-09-04 12:00:00-05'),
-  -- Las dos correcciones de Daniel (4-sep-2026), textual: «city shoes → Calle
-  -- 19 Central, al lado de la joyería Super Oro. Y Nine Sport en Calle 19
-  -- Central.» D-112 (Nine Sports 9, S.A.) hoy autollena «Calle 19» por su
-  -- histórico de 2 guías; la definición de Daniel gana.
-  ('D-35',  'Calle 19 Central, al lado de la joyería Super Oro', '{}', 1, 'daniel', '2026-09-04 18:00:00-05'),
-  ('D-112', 'Calle 19 Central',        '{}', 1, 'daniel', '2026-09-04 18:00:00-05')
+  -- Los definidos por Daniel (tabla textual en destinos-clientes.ts), todos
+  -- «el de siempre»: se llenan solos al elegir el cliente.
+  ('D-81',  'Paso Canoas',              '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-80',  'Paso Canoas',              '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-156', 'Changuinola',              '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-117', 'Guabito',                  '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  -- Daniel: «en Frontera Duty Free es Guabito, hazme caso.» (su histórico dice
+  -- Changinola ×7; la definición gana)
+  ('D-87',  'Guabito',                  '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-25',  'Paso Canoas',              '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-144', 'Albrook',                  '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-141', 'Los Andes',                '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  -- Las cinco correcciones de escritura — Daniel: «pon lo que recomendaste en
+  -- ¿es esto?, así mismo» (el histórico traía el typo).
+  ('D-99',  'Westland',                 '{}', 1, true, 'daniel', '2026-09-04 20:00:00-05'),
+  ('D-147', 'Changuinola',              '{}', 1, true, 'daniel', '2026-09-04 20:00:00-05'),
+  ('D-7',   'Penonomé',                 '{}', 1, true, 'daniel', '2026-09-04 20:00:00-05'),
+  ('D-43',  'Las Tablas',               '{}', 1, true, 'daniel', '2026-09-04 20:00:00-05'),
+  ('D-86',  'Albrook',                  '{}', 1, true, 'daniel', '2026-09-04 20:00:00-05'),
+  -- La familia City Moda — Daniel: «todos los City Moda en Sport Corner
+  -- Calidonia, y a veces solo City Moda Chorrera en Chorrera». Cada «tienda»
+  -- de City Moda es OTRO cliente, por eso van sin tiendas. D-26 lleva DOS
+  -- destinos: el de siempre y «Chorrera» como botón (el «5 de Mayo» de la
+  -- primera versión se quitó). D-30 no se define (Switch lo borró).
+  ('D-26',  'Sport Corner Calidonia',   '{}', 1, true,  'daniel', '2026-09-04 20:00:00-05'),
+  ('D-26',  'Chorrera',                 '{}', 2, false, 'daniel', '2026-09-04 20:00:00-05'),
+  ('D-27',  'Sport Corner Calidonia',   '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-28',  'Sport Corner Calidonia',   '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-29',  'Sport Corner Calidonia',   '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-31',  'Sport Corner Calidonia',   '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-32',  'Sport Corner Calidonia',   '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-33',  'Sport Corner Calidonia',   '{}', 1, true, 'daniel', '2026-09-04 20:00:00-05'),
+  ('D-34',  'Sport Corner Calidonia',   '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-42',  'Sport Corner Calidonia',   '{}', 1, true, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-78',  'Sport Corner Calidonia',   '{}', 1, true, 'daniel', '2026-09-04 20:00:00-05'),
+  -- Sporting Shoes N 4: SIN «el de siempre» — 8 destinos como botones, con
+  -- sus tiendas ya usadas (verificadas contra el histórico el 4-sep-2026).
+  ('D-142', 'Westland',          '{5,6,14,"Mas Flow"}', 1, false, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-142', 'Albrook',           '{7,8,9}',             2, false, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-142', 'Los Andes',         '{3,4}',               3, false, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-142', 'Santiago',          '{}',                  4, false, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-142', 'Penonomé',          '{}',                  5, false, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-142', 'Metromall',         '{10}',                6, false, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-142', 'Megamall',          '{}',                  7, false, 'daniel', '2026-09-04 12:00:00-05'),
+  ('D-142', 'Outlet Vía España', '{}',                  8, false, 'daniel', '2026-09-04 12:00:00-05'),
+  -- Las dos correcciones de Daniel, textual: «city shoes → Calle 19 Central,
+  -- al lado de la joyería Super Oro. Y Nine Sport en Calle 19 Central.»
+  -- D-112 (Nine Sports 9, S.A.) autollenaba «Calle 19» por su histórico de 2
+  -- guías; la definición de Daniel gana.
+  ('D-35',  'Calle 19 Central, al lado de la joyería Super Oro', '{}', 1, true, 'daniel', '2026-09-04 18:00:00-05'),
+  ('D-112', 'Calle 19 Central',        '{}', 1, true, 'daniel', '2026-09-04 18:00:00-05')
 ON CONFLICT DO NOTHING;

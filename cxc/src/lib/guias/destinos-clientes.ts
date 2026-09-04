@@ -14,17 +14,18 @@
 // cliente ya recibió. Se toca uno y se llena. 🔴 SIGUE SIENDO TEXTO LIBRE: los
 // botones son atajo, jamás candado — quien quiera escribe lo que sea, como hoy.
 //
-// 🔴 EL AUTOLLENADO (4-sep-2026): con UN solo destino, el campo se llena solo
-// al elegir el cliente — `destinoParaAutollenar`. Daniel, textual: *«"la
-// dirección no se escribe sola" me refería a que el usuario no lo haga para
-// no escribirlo mal como lo vimos, quita esa regla. Que se autollene como lo
-// discutimos antes.»* La decisión del 14-ago-2026 la tomó él pensando en que
-// la PERSONA no tuviera que teclear el destino (justo para evitar
-// «Pasocanoas» / «Wesland» / «PENONOME»), no en prohibir que el sistema lo
-// llene — y él mismo la corrigió. Medido: 40 de 48 clientes con guías usan
-// SIEMPRE el mismo destino; ahí no hay ambigüedad que resolver.
+// 🔴 EL AUTOLLENADO (4-sep-2026): manda «EL DE SIEMPRE» — cada cliente puede
+// tener UN destino marcado así y ESE se llena solo al elegir el cliente,
+// aunque tenga varios; los demás salen como botones (Daniel: *«sí correcto,
+// con entrega Sport Corner como default, que elija si quiere el otro sino»*).
+// Sin ninguno marcado, no se llena nada. Un cliente SIN definición sale de su
+// historia agrupada y con UN solo destino histórico también autollena
+// (Daniel, sobre la regla del 14-ago que él mismo quitó: *«"la dirección no
+// se escribe sola" me refería a que el usuario no lo haga para no escribirlo
+// mal como lo vimos, quita esa regla. Que se autollene como lo discutimos
+// antes.»*). Medido: 40 de 48 clientes con guías usan SIEMPRE el mismo
+// destino; ahí no hay ambigüedad que resolver.
 //
-// Con VARIOS destinos no se llena nada: salen los botones y elige la persona.
 // Lo autollenado se borra y se escribe encima como cualquier texto, y un
 // campo que ya tiene algo NO se pisa.
 //
@@ -46,138 +47,134 @@
 import type { EnvioParaDireccion, GuiaParaDireccion } from "./direccion-sugerida";
 
 /**
- * 🔴 LOS DESTINOS DEFINIDOS POR DANIEL (4-sep-2026) — fuente de verdad para
- * estos clientes: sus botones salen de ACÁ, no del histórico. Su tabla,
- * textual:
- *
- *   | D-81  | Jerusalem Duty Free   | Paso Canoas |
- *   | D-156 | Wolf Mall Center Int  | Changuinola |
- *   | D-117 | Outlet Duty Free N2   | Guabito |
- *   | D-87  | La Frontera Duty Free | Guabito |
- *   | D-25  | City Mall Paso Canoa  | Paso Canoas |
- *   | D-35  | City Shoes            | Calle 19 Central | ← corregido el
- *     4-sep-2026, ver abajo.
- *   | D-144 | Star Shoes, S.A.      | Albrook |
- *   | D-26  | City Moda Chorrera    | Entrega en SportCorner | ← superado el
- *     mismo 4-sep: ver «LA FAMILIA CITY MODA» abajo (D-26 quedó en «5 de
- *     Mayo» y las «entregas en SportCorner» son de los OTROS códigos).
- *
- * Y **D-142 Sporting Shoes N 4** es el único con varios, porque tiene varias
- * tiendas en el mismo lugar: «Westland · Albrook · Los Andes · Santiago ·
- * Penonomé · Metromall · Megamall · Outlet Vía España».
- *
- * ⚠️ La definición GANA sobre el histórico a propósito: medido, el histórico
- * de D-87 dice más veces «Changinola» (7) que «Guabito» (4), y el de D-117
- * está partido — es exactamente el desorden que Daniel vino a cerrar.
- * Daniel, textual (4-sep-2026): *«en Frontera Duty Free es Guabito, hazme
- * caso.»* — hay candado que exige que D-87 diga Guabito mire lo que mire su
- * histórico real.
- *
- * ⚠️ **LA FAMILIA CITY MODA (4-sep-2026).** Daniel preguntó *«¿hay varios
- * city moda no?»* — y sí: son ONCE clientes distintos, cada uno con su código
- * (D-26 Chorrera · D-27 Calidonia · D-28 Albrook 2 · D-29 Central · D-30
- * Chorrera · D-31 Del Este · D-32 Los Andes · D-33 Santa Ana · D-34 Westland
- * · D-42 Del Norte · D-78 Ismora). Las 8 direcciones raras del histórico de
- * D-26 («ALBROOK 2 (ENTREGA EN SPORTCORNER)», «CALIDONIA (…)», «Z15 (…)»…)
- * son **envíos cargados al cliente EQUIVOCADO**: iban a esos otros códigos y
- * quien hizo la guía eligió D-26. No es un dato que preservar — es el error
- * que este cambio viene a evitar — y por eso se IGNORAN: la definición gana
- * sobre el histórico. El destino de la familia es **«Sport Corner Calidonia»**
- * (la grafía mayoritaria de sus propias guías: D-27, D-28, D-29, D-31, D-32,
- * D-34 y D-42 ya apuntan ahí), y el único destino PROPIO de D-26 es
- * **«5 de Mayo»**. D-30, D-33 y D-78 no tienen guías todavía y por eso no
- * tienen destino definido.
- *
- * 🔴 **LAS DOS CORRECCIONES DEL 4-SEP-2026.** Daniel, textual: *«city shoes →
- * Calle 19 Central, al lado de la joyería Super Oro. Y Nine Sport en Calle 19
- * Central.»*
- *   · **D-35 City Shoes** pasa de «Calle 19 Central» al texto completo con la
- *     referencia de la joyería.
- *   · **D-112 Nine Sports 9, S.A.** entra a los definidos con «Calle 19
- *     Central» — hoy autollenaba «Calle 19» por su histórico de 2 guías, y la
- *     definición de Daniel gana.
- * Van acá (la constante) además de en la migración `20260918120000`, para que
- * no dependan de que la migración corra: la constante es la RED del orden de
- * precedencia (ver `destinosDefinidosPara`).
- *
- * ⚠️ **Desde el 4-sep-2026 esta constante es la SEGUNDA fuente, no la primera**:
- * los destinos definidos viven en la tabla `guias_destino_cliente` y se
- * administran en Guías › Configuración (admin y secretaria) sin desplegar.
- * La constante queda como red mientras la migración no corra — el mismo
- * patrón que las RPC con caída.
+ * Un destino definido — de la tabla `guias_destino_cliente` (migración
+ * `20260918120000`, se administra en Guías › Configuración) o de la constante
+ * `DESTINOS_DEFINIDOS` (la red mientras la migración no corra).
  */
-export const DESTINOS_DEFINIDOS: Readonly<Record<string, readonly string[]>> = {
-  "D-81": ["Paso Canoas"],
-  "D-156": ["Changuinola"],
-  "D-117": ["Guabito"],
-  "D-87": ["Guabito"],
-  "D-25": ["Paso Canoas"],
-  // Daniel, 4-sep-2026: «city shoes → Calle 19 Central, al lado de la joyería
-  // Super Oro.»
-  "D-35": ["Calle 19 Central, al lado de la joyería Super Oro"],
-  // Daniel, 4-sep-2026: «Y Nine Sport en Calle 19 Central.» (Nine Sports 9,
-  // S.A. — su histórico decía «Calle 19»; la definición gana.)
-  "D-112": ["Calle 19 Central"],
-  "D-144": ["Albrook"],
-  "D-26": ["5 de Mayo"],
-  // La familia City Moda: todas entregan en Sport Corner Calidonia (ver el
-  // bloque de arriba). D-30, D-33 y D-78 quedan fuera: sin guías todavía.
-  "D-27": ["Sport Corner Calidonia"],
-  "D-28": ["Sport Corner Calidonia"],
-  "D-29": ["Sport Corner Calidonia"],
-  "D-31": ["Sport Corner Calidonia"],
-  "D-32": ["Sport Corner Calidonia"],
-  "D-34": ["Sport Corner Calidonia"],
-  "D-42": ["Sport Corner Calidonia"],
-  "D-142": [
-    "Westland",
-    "Albrook",
-    "Los Andes",
-    "Santiago",
-    "Penonomé",
-    "Metromall",
-    "Megamall",
-    "Outlet Vía España",
-  ],
-};
+export interface DestinoDefinido {
+  destino: string;
+  /** Las tiendas de ese destino (solo Sporting Shoes las usa hoy). */
+  tiendas?: readonly string[];
+  /**
+   * 🔴 «EL DE SIEMPRE» (4-sep-2026). Daniel, textual: *«sí correcto, con
+   * entrega Sport Corner como default, que elija si quiere el otro sino»* —
+   * cada cliente puede tener UN destino marcado así, y ESE se llena solo al
+   * elegir el cliente, aunque el cliente tenga varios. Los demás salen como
+   * botones. Sin ninguno marcado, no se llena nada.
+   */
+  elDeSiempre?: boolean;
+}
 
 /**
- * Las tiendas ya usadas por destino (solo D-142 las tiene). Verificado contra
- * producción el 4-sep-2026: el histórico trae «WESTLAND - TIENDA 6», «TIENDA 5
- * WESTALAND», «MAS FLOW - WESTLAND», «ALBROOK - TIENDA 7», «TIENDA 8/9
- * ALBROOK», «TIENDA 3/4 LOS ANDES», «METROMALL - TIENDA 10» — exactamente los
- * números de la tabla de Daniel. El campo tienda es OPCIONAL, y «+ otra» deja
- * escribir uno nuevo.
+ * 🔴 LOS DESTINOS DEFINIDOS POR DANIEL (4-sep-2026, cerrados en el mockup
+ * final: «dale aprobado») — fuente de verdad para estos clientes: sus botones
+ * salen de ACÁ, no del histórico. Su tabla, textual:
  *
- * ⚠️ City Moda NO lleva tienda: cada «tienda» de City Moda es OTRO CLIENTE
- * con su propio código (D-27 Calidonia, D-28 Albrook 2, …) — ver el bloque de
- * DESTINOS_DEFINIDOS.
+ *   | D-81  | Jerusalem Duty Free    | Paso Canoas       | el de siempre |
+ *   | D-80  | Jerusalem De Panamá    | Paso Canoas       | el de siempre |
+ *   | D-156 | Wolf Mall Center Int   | Changuinola       | el de siempre |
+ *   | D-117 | Outlet Duty Free N2    | Guabito           | el de siempre |
+ *   | D-87  | La Frontera Duty Free  | Guabito           | el de siempre (gana sobre su histórico, que dice Changinola ×7) |
+ *   | D-25  | City Mall Paso Canoa   | Paso Canoas       | el de siempre |
+ *   | D-35  | City Shoes             | Calle 19 Central, al lado de la joyería Super Oro | el de siempre |
+ *   | D-112 | Nine Sports 9, S.A.    | Calle 19 Central  | el de siempre |
+ *   | D-144 | Star Shoes, S.A.       | Albrook           | el de siempre |
+ *   | D-141 | Sport Fashion          | Los Andes         | el de siempre |
+ *
+ * **Las correcciones de escritura** (Daniel: *«pon lo que recomendaste en
+ * ¿es esto?, así mismo»*): D-99 Mas Flow 21 Oeste → Westland · D-147 Top Shop
+ * Store → Changuinola · D-7 Almacén Flash → Penonomé · D-43 De Moda → Las
+ * Tablas · D-86 Kings Sport → Albrook. Todos «el de siempre».
+ *
+ * **La familia City Moda** (Daniel: *«todos los City Moda en Sport Corner
+ * Calidonia, y a veces solo City Moda Chorrera en Chorrera»*): D-27 · D-28 ·
+ * D-29 · D-31 · D-32 · D-33 · D-34 · D-42 · D-78 → «Sport Corner Calidonia»,
+ * el de siempre. **D-26 City Moda Chorrera** lleva DOS destinos: «Sport
+ * Corner Calidonia» (el de siempre) y «Chorrera» (botón) — el «5 de Mayo» de
+ * la primera versión se quitó. D-33 y D-78 no tenían guías y ahora quedan
+ * definidos igual; **D-30 no se define** (Switch lo borró; lo cubre el sync
+ * de clientes). Son ONCE clientes distintos, cada uno con su código: las 8
+ * direcciones raras del histórico de D-26 («ALBROOK 2 (ENTREGA EN
+ * SPORTCORNER)», «Z15 (…)»…) eran envíos cargados al cliente EQUIVOCADO y se
+ * IGNORAN — no llevan campo tienda porque cada «tienda» es OTRO cliente.
+ *
+ * Y **D-142 Sporting Shoes N 4** es el único SIN «el de siempre»: 8 destinos
+ * como botones (Westland · Albrook · Los Andes · Santiago · Penonomé ·
+ * Metromall · Megamall · Outlet Vía España), con el renglón de tienda
+ * opcional. Si no eligen nada el campo queda vacío y la guía no se guarda —
+ * la dirección es obligatoria, igual que hoy.
+ *
+ * ⚠️ La definición GANA sobre el histórico a propósito: medido, el histórico
+ * de D-87 dice más veces «Changinola» (7) que «Guabito» (4) — Daniel,
+ * textual: *«en Frontera Duty Free es Guabito, hazme caso.»* Hay candado.
+ *
+ * ⚠️ Las tiendas de D-142 se verificaron contra producción el 4-sep-2026: el
+ * histórico trae «WESTLAND - TIENDA 6», «TIENDA 5 WESTALAND», «MAS FLOW -
+ * WESTLAND», «ALBROOK - TIENDA 7», «TIENDA 8/9 ALBROOK», «TIENDA 3/4 LOS
+ * ANDES», «METROMALL - TIENDA 10». El campo tienda es OPCIONAL y «+ otra»
+ * deja escribir uno nuevo.
+ *
+ * ⚠️ **Esta constante es la SEGUNDA fuente, no la primera**: los definidos
+ * viven en la tabla `guias_destino_cliente` y se administran en Guías ›
+ * Configuración (admin y secretaria) sin desplegar. La constante queda como
+ * red mientras la migración `20260918120000` no corra — el mismo patrón que
+ * las RPC con caída — y la carga inicial de esa migración es EXACTAMENTE esta
+ * tabla.
  */
-export const TIENDAS_POR_CLIENTE: Readonly<
-  Record<string, Readonly<Record<string, readonly string[]>>>
-> = {
-  "D-142": {
-    Westland: ["5", "6", "14", "Mas Flow"],
-    Albrook: ["7", "8", "9"],
-    "Los Andes": ["3", "4"],
-    Metromall: ["10"],
-  },
+export const DESTINOS_DEFINIDOS: Readonly<Record<string, readonly DestinoDefinido[]>> = {
+  "D-81": [{ destino: "Paso Canoas", elDeSiempre: true }],
+  "D-80": [{ destino: "Paso Canoas", elDeSiempre: true }],
+  "D-156": [{ destino: "Changuinola", elDeSiempre: true }],
+  "D-117": [{ destino: "Guabito", elDeSiempre: true }],
+  // Daniel, 4-sep-2026: «en Frontera Duty Free es Guabito, hazme caso.»
+  "D-87": [{ destino: "Guabito", elDeSiempre: true }],
+  "D-25": [{ destino: "Paso Canoas", elDeSiempre: true }],
+  // Daniel, 4-sep-2026: «city shoes → Calle 19 Central, al lado de la joyería
+  // Super Oro.»
+  "D-35": [{ destino: "Calle 19 Central, al lado de la joyería Super Oro", elDeSiempre: true }],
+  // Daniel, 4-sep-2026: «Y Nine Sport en Calle 19 Central.»
+  "D-112": [{ destino: "Calle 19 Central", elDeSiempre: true }],
+  "D-144": [{ destino: "Albrook", elDeSiempre: true }],
+  "D-141": [{ destino: "Los Andes", elDeSiempre: true }],
+  // Las cinco correcciones de escritura — Daniel: «pon lo que recomendaste en
+  // ¿es esto?, así mismo» (su histórico traía el typo: «Wesland», «Changinola»,
+  // «Penonome», «las tablas», «albrok»).
+  "D-99": [{ destino: "Westland", elDeSiempre: true }],
+  "D-147": [{ destino: "Changuinola", elDeSiempre: true }],
+  "D-7": [{ destino: "Penonomé", elDeSiempre: true }],
+  "D-43": [{ destino: "Las Tablas", elDeSiempre: true }],
+  "D-86": [{ destino: "Albrook", elDeSiempre: true }],
+  // La familia City Moda — «todos los City Moda en Sport Corner Calidonia, y a
+  // veces solo City Moda Chorrera en Chorrera». D-26 lleva DOS: el de siempre
+  // y «Chorrera» como botón. D-30 no se define (Switch lo borró).
+  "D-26": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }, { destino: "Chorrera" }],
+  "D-27": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],
+  "D-28": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],
+  "D-29": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],
+  "D-31": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],
+  "D-32": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],
+  "D-33": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],
+  "D-34": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],
+  "D-42": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],
+  "D-78": [{ destino: "Sport Corner Calidonia", elDeSiempre: true }],
+  // Sporting Shoes N 4 — SIN «el de siempre»: sus 8 destinos como botones,
+  // con las tiendas ya usadas.
+  "D-142": [
+    { destino: "Westland", tiendas: ["5", "6", "14", "Mas Flow"] },
+    { destino: "Albrook", tiendas: ["7", "8", "9"] },
+    { destino: "Los Andes", tiendas: ["3", "4"] },
+    { destino: "Santiago" },
+    { destino: "Penonomé" },
+    { destino: "Metromall", tiendas: ["10"] },
+    { destino: "Megamall" },
+    { destino: "Outlet Vía España" },
+  ],
 };
 
 /** Máximo de botones por cliente (los definidos de D-142 son 8 y van enteros). */
 export const MAX_BOTONES_DESTINO = 6;
 
 // ─── La tabla `guias_destino_cliente` y el orden de precedencia ──────────────
-
-/**
- * Un destino definido tal como sale de la tabla `guias_destino_cliente`
- * (migración `20260918120000`, se administra en Guías › Configuración).
- */
-export interface DestinoDefinido {
-  destino: string;
-  /** Las tiendas de ese destino (solo Sporting Shoes las usa hoy). */
-  tiendas?: readonly string[];
-}
 
 /** Código de cliente → sus destinos definidos EN LA TABLA (activos, en orden). */
 export type DefinidosPorCliente = Readonly<Record<string, readonly DestinoDefinido[]>>;
@@ -204,7 +201,7 @@ export function destinosDefinidosPara(
   const filas = deTabla?.[c];
   if (filas && filas.length > 0) return filas;
   const constante = DESTINOS_DEFINIDOS[c];
-  if (constante) return constante.map((d) => ({ destino: d, tiendas: TIENDAS_POR_CLIENTE[c]?.[d] }));
+  if (constante && constante.length > 0) return constante;
   return null;
 }
 
@@ -424,12 +421,20 @@ export function botonesDeDestino(
  * él para que la PERSONA no tecleara el destino (y no naciera otro
  * «Pasocanoas»); no prohíbe que el sistema lo llene.
  *
- * La regla nueva: **con UN solo destino — definido en su tabla O único en su
- * historia agrupada — el campo se llena solo al elegir el cliente.** Medido:
- * 40 de 48 clientes con guías usan siempre el mismo destino (Bouti, S.A.
- * D-14 → «David», 4 guías, siempre igual); ahí no hay ambigüedad que
- * resolver. Con VARIOS destinos (Sporting Shoes D-142 y los pocos así) no se
- * llena nada: salen los botones y elige la persona.
+ * 🔴 LA REGLA DE «EL DE SIEMPRE» (4-sep-2026, mockup final: «dale aprobado»).
+ * Daniel, textual: *«sí correcto, con entrega Sport Corner como default, que
+ * elija si quiere el otro sino»*:
+ *
+ *   · Cliente con destinos DEFINIDOS (tabla o constante): se llena SOLO el
+ *     marcado como «el de siempre», aunque el cliente tenga varios (D-26
+ *     autollena «Sport Corner Calidonia» y ofrece «Chorrera» como botón).
+ *     **Sin ninguno marcado, no se llena nada** (Sporting Shoes D-142) —
+ *     esto REEMPLAZA la regla anterior de «solo autollena si hay UNO».
+ *   · Cliente SIN definición (los ~40 restantes — Daniel: *«no quiero definir
+ *     cliente por cliente, ya tú debes de saberlo con las guías que hemos
+ *     hecho»*): sale de su historia agrupada, y con UN solo destino en toda
+ *     su historia también se autollena (Bouti, S.A. D-14 → «David», 4 guías,
+ *     siempre igual). Con varios, botones y elige la persona.
  *
  * 🔴 Lo que sigue prohibido es el pareo POR PARECIDO — la historia entra ya
  * agrupada por `claveDestino` (regla exacta), nunca por distancia de edición.
@@ -443,6 +448,13 @@ export function destinoParaAutollenar(
   historicos: readonly string[] | null | undefined,
   deTabla?: DefinidosPorCliente | null,
 ): string | null {
-  const botones = botonesDeDestino(codigo, historicos, deTabla);
+  const c = String(codigo ?? "").trim();
+  if (!c) return null;
+  const definidos = destinosDefinidosPara(c, deTabla);
+  if (definidos) {
+    const elDeSiempre = definidos.find((d) => d.elDeSiempre === true);
+    return elDeSiempre ? elDeSiempre.destino : null;
+  }
+  const botones = (historicos ?? []).slice(0, MAX_BOTONES_DESTINO);
   return botones.length === 1 ? botones[0] : null;
 }

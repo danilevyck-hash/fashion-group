@@ -248,6 +248,34 @@ export default function GuiasConfiguracionView() {
     }
   }
 
+  /**
+   * 🔴 «El de siempre» (4-sep-2026, Daniel: «sí correcto, con entrega Sport
+   * Corner como default, que elija si quiere el otro sino»): una marca por
+   * fila. El servidor garantiza a lo sumo UNA por cliente (marcar una apaga
+   * las demás), por eso acá solo se manda el PATCH y se relee la lista.
+   */
+  const [marcandoId, setMarcandoId] = useState<number | null>(null);
+  async function marcarSiempre(f: DestinoConfigurado, valor: boolean) {
+    setMarcandoId(f.id);
+    try {
+      const res = await fetch(`/api/guias/destinos-config?id=${f.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ elDeSiempre: valor }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error ?? "No se pudo guardar. Intenta de nuevo en unos segundos.");
+      }
+      setToast("Listo, guardado");
+      void cargar();
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo en unos segundos.");
+    } finally {
+      setMarcandoId(null);
+    }
+  }
+
   async function confirmarQuitar() {
     if (!aQuitar) return;
     setQuitando(true);
@@ -279,7 +307,7 @@ export default function GuiasConfiguracionView() {
           <h2 id="destinos-config-titulo" className="flex items-center gap-1 text-sm font-medium text-gray-900">
             Destinos por cliente
             <Ayuda titulo="Qué hace esta lista">
-              <p>Al hacer una guía, el destino definido aquí se llena solo (si el cliente tiene uno) o sale como botón (si tiene varios).</p>
+              <p>Al hacer una guía, el destino marcado como «el de siempre» se llena solo al elegir el cliente; los demás salen como botones. Sin ninguno marcado, no se llena nada.</p>
               <p>El campo Dirección sigue siendo libre: quien quiera puede escribir otra cosa.</p>
               <p>Quitar un destino no borra nada: queda guardado como historial.</p>
             </Ayuda>
@@ -417,6 +445,8 @@ export default function GuiasConfiguracionView() {
                 onCancelarEdicion={() => setEditandoId(null)}
                 onQuitar={setAQuitar}
                 onPromover={promover}
+                marcandoId={marcandoId}
+                onMarcarSiempre={marcarSiempre}
               />
             ))}
           </div>
@@ -449,6 +479,8 @@ function GrupoDeCliente({
   onCancelarEdicion,
   onQuitar,
   onPromover,
+  marcandoId,
+  onMarcarSiempre,
 }: {
   grupo: GrupoConfig;
   editandoId: number | null;
@@ -464,6 +496,8 @@ function GrupoDeCliente({
   onCancelarEdicion: () => void;
   onQuitar: (f: DestinoConfigurado) => void;
   onPromover: (codigo: string, destino: string) => void;
+  marcandoId: number | null;
+  onMarcarSiempre: (f: DestinoConfigurado, valor: boolean) => void;
 }) {
   const n = g.filas.length;
   return (
@@ -479,7 +513,11 @@ function GrupoDeCliente({
       </div>
 
       {/* Qué hace el formulario con esta definición: se dice acá, no se adivina. */}
-      {n > 0 && <p className="px-3 pt-2 text-xs text-gray-500">{comoSeUsa(n)}</p>}
+      {n > 0 && (
+        <p className="px-3 pt-2 text-xs text-gray-500">
+          {comoSeUsa(n, g.filas.some((f) => f.el_de_siempre))}
+        </p>
+      )}
 
       <div className="px-3 py-2 space-y-1.5">
         {g.filas.map((f) =>
@@ -527,7 +565,21 @@ function GrupoDeCliente({
                   <span className="block text-xs text-gray-400">Tiendas: {f.tiendas.join(" · ")}</span>
                 )}
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 items-center gap-1">
+                {/* 🔴 Una marca por fila: «el de siempre». Marcarla apaga la
+                    de los demás destinos del cliente (lo garantiza el
+                    servidor); sin ninguna marcada, nada se llena solo. */}
+                <label className="inline-flex items-center gap-1.5 text-xs text-gray-500 min-h-[44px] md:[@media(pointer:fine)]:min-h-0 px-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={f.el_de_siempre}
+                    disabled={marcandoId !== null}
+                    onChange={() => onMarcarSiempre(f, !f.el_de_siempre)}
+                    aria-label={`El de siempre: «${f.destino}» de ${g.nombre ?? g.codigo}`}
+                    className="w-4 h-4 accent-black"
+                  />
+                  el de siempre
+                </label>
                 <button
                   type="button"
                   onClick={() => onEditar(f)}

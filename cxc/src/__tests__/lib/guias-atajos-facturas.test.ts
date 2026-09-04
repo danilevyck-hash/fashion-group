@@ -24,19 +24,23 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  FACTURAS_VISIBLES_INICIAL,
-  FACTURA_TRASLADO,
+  DIAS_CON_FACTURA_VISIBLES,
+  DIAS_POR_VER_MAS,
   GUIAS_ATAJOS_NUEVOS,
+  TEXTO_TRASLADO,
   TIPO_FACTURA,
+  agruparPorDia,
   desmarcarFactura,
+  esTraslado,
   facturaMarcada,
-  grupoDeFecha,
   indiceYaSalio,
   marcarFactura,
   normalizarNumeroFactura,
   numerosDeFacturas,
   renglonDelCliente,
+  tituloDelDia,
   yaSalioEn,
+  type FacturaDelCliente,
   type RenglonDeGuia,
 } from "@/lib/guias/atajos-facturas";
 import { instantaneaRenglones } from "@/lib/guias/cambios-form";
@@ -68,8 +72,9 @@ describe("el interruptor y el tipo", () => {
     expect(TIPOS_VENTA_SUMAN).toContain(TIPO_FACTURA);
   });
 
-  it("se muestran 20 antes del «Ver más» (un cliente típico tiene 13 en 90 días)", () => {
-    expect(FACTURAS_VISIBLES_INICIAL).toBe(20);
+  it("🔴 se abren los últimos 3 días CON factura, y «Ver más días» trae 3 más — medido: 77% del último día, 95% de los últimos 3", () => {
+    expect(DIAS_CON_FACTURA_VISIBLES).toBe(3);
+    expect(DIAS_POR_VER_MAS).toBe(3);
   });
 });
 
@@ -91,15 +96,53 @@ describe("normalización exacta, nunca por parecido", () => {
   });
 });
 
-describe("Hoy · Esta semana · Antes (fechas fijas, borde Panamá)", () => {
-  const HOY = "2026-09-04";
-  it("una factura de la noche (03:00 UTC = 22:00 Panamá del día anterior) NO es de hoy", () => {
-    expect(grupoDeFecha("2026-09-04T03:00:00Z", HOY)).toBe("semana");
+describe("🔴 la agrupación es POR DÍA CON FACTURA, no por días de calendario (fechas fijas, borde Panamá)", () => {
+  const F = (fecha: string, secuencial = "1", empresa = "Vistana International"): FacturaDelCliente => ({
+    empresa_key: "vistana",
+    empresa,
+    secuencial,
+    fecha,
+    total: 10,
+    yaSalioEn: null,
   });
-  it("hoy · semana · antes", () => {
-    expect(grupoDeFecha("2026-09-04T15:00:00Z", HOY)).toBe("hoy");
-    expect(grupoDeFecha("2026-08-30T15:00:00Z", HOY)).toBe("semana");
-    expect(grupoDeFecha("2026-08-28T15:00:00Z", HOY)).toBe("antes");
+
+  it("🔴 3 días con factura que abarcan 3 SEMANAS → los 3 grupos, el más reciente arriba", () => {
+    // Un corte por calendario dejaría un solo día: el cliente que menos compra
+    // es justo para quien Daniel pidió esto (77% / 92% / 95% medido).
+    const facturas = [
+      F("2026-08-18T15:00:00Z", "100"),
+      F("2026-09-04T15:00:00Z", "300"),
+      F("2026-08-25T15:00:00Z", "200"),
+      F("2026-08-25T18:00:00Z", "201"),
+    ];
+    const { grupos, diasOcultos } = agruparPorDia(facturas, DIAS_CON_FACTURA_VISIBLES);
+    expect(grupos.map((g) => g.dia)).toEqual(["2026-09-04", "2026-08-25", "2026-08-18"]);
+    expect(diasOcultos).toBe(0);
+    // Dentro del día, la más reciente primero.
+    expect(grupos[1].facturas.map((f) => f.secuencial)).toEqual(["201", "200"]);
+  });
+
+  it("con más días que los visibles, se recorta a los N MÁS RECIENTES y se dice cuántos días quedan", () => {
+    const facturas = ["2026-08-14", "2026-08-18", "2026-08-25", "2026-08-30", "2026-09-03", "2026-09-04"]
+      .map((d, i) => F(`${d}T15:00:00Z`, String(i)));
+    const tres = agruparPorDia(facturas, 3);
+    expect(tres.grupos.map((g) => g.dia)).toEqual(["2026-09-04", "2026-09-03", "2026-08-30"]);
+    expect(tres.diasOcultos).toBe(3);
+    // «Ver más días» = pedir 3 más: aparecen TODOS los días con factura.
+    const seis = agruparPorDia(facturas, 3 + DIAS_POR_VER_MAS);
+    expect(seis.grupos).toHaveLength(6);
+    expect(seis.diasOcultos).toBe(0);
+  });
+
+  it("el día es el de PANAMÁ: una factura de las 03:00 UTC es del día anterior (22:00 en Panamá)", () => {
+    const { grupos } = agruparPorDia([F("2026-09-04T03:00:00Z")], 3);
+    expect(grupos.map((g) => g.dia)).toEqual(["2026-09-03"]);
+  });
+
+  it("el encabezado del día va en palabras: «Viernes 4 sep», «Martes 25 ago»", () => {
+    expect(tituloDelDia("2026-09-04")).toBe("Viernes 4 sep");
+    expect(tituloDelDia("2026-08-25")).toBe("Martes 25 ago");
+    expect(tituloDelDia("2026-09-03")).toBe("Jueves 3 sep");
   });
 });
 
@@ -195,12 +238,24 @@ describe("marcar facturas LLENA los renglones de siempre — uno por EMPRESA", (
     expect(facturaMarcada(items, CLIENTE, F("Fashion Wear", "2535"))).toBe(false);
   });
 
-  it("«No está en la lista» y «Traslado sin factura»: el renglón del cliente, como hoy", () => {
+  it("«Escribir el número»: el renglón del cliente con facturas vacío, como hoy", () => {
     const manual = renglonDelCliente([vacia()], CLIENTE, "");
     expect(manual[0].cliente_codigo).toBe("D-24");
     expect(manual[0].facturas).toBe("");
-    const traslado = renglonDelCliente([vacia()], CLIENTE, FACTURA_TRASLADO);
-    expect(traslado[0].facturas).toBe("0000");
+  });
+
+  it("🔴 «Traslado» escribe el TEXTO `Traslado` en facturas — nunca «0000» (los 58 renglones viejos no se tocan)", () => {
+    // Daniel: «que en factura salga traslado». El texto va HARDCODEADO acá a
+    // propósito: si la constante volviera a «0000», este caso se pone rojo.
+    const traslado = renglonDelCliente([vacia()], CLIENTE, TEXTO_TRASLADO);
+    expect(traslado[0].facturas).toBe("Traslado");
+    expect(traslado[0].cliente_codigo).toBe("D-24");
+    // 🔴 La EMPRESA se elige a mano: no hay factura que la diga.
+    expect(traslado[0].empresa).toBe("");
+    expect(esTraslado("Traslado")).toBe(true);
+    expect(esTraslado(" traslado ")).toBe(true);
+    expect(esTraslado("0000")).toBe(false);
+    expect(esTraslado("Traslado 2")).toBe(false);
   });
 });
 
@@ -215,7 +270,7 @@ describe("el destino autollenado al marcar", () => {
   it("marcar la primera factura escribe la dirección autollenada en el renglón que nace", () => {
     const items = marcarFactura([vacia()], CLIENTE, F("Vistana International", "2535"), "David");
     expect(items[0].direccion).toBe("David");
-    // Y «No está en la lista» / «Traslado» igual: también nacen de elegir.
+    // Y «Escribir el número» / «Traslado» igual: también nacen de elegir.
     expect(renglonDelCliente([vacia()], CLIENTE, "", "David")[0].direccion).toBe("David");
   });
 
@@ -248,6 +303,25 @@ describe("el destino autollenado al marcar", () => {
     items = desmarcarFactura(items, CLIENTE, F("Joystep", "88"), "David");
     expect(items).toHaveLength(1);
     expect(items[0].direccion).toBe("David, frente al parque");
+  });
+});
+
+describe("🔴 «Traslado» y la validación del formulario", () => {
+  it("un renglón con facturas = «Traslado» es VÁLIDO, y la empresa se sigue pidiendo", async () => {
+    const { validarGuia, claveCampo } = await import("@/app/guias/components/guia-form-logic");
+    const item = {
+      uid: "t1", orden: 1, cliente: "Multi Fashion Holding", cliente_codigo: "D-108",
+      direccion: "Albrook", empresa: "", facturas: "Traslado", bultos: 3, numero_guia_transp: "",
+    };
+    const base = { fecha: "2026-09-04", modoEntrega: "entrega_directa" as const, transportistaId: null, entregadoPor: "Julio" };
+    // Sin empresa: falta LA EMPRESA (se elige a mano — no hay factura que la
+    // diga), pero «Traslado» NO dispara el error de formato de factura.
+    const sinEmpresa = validarGuia({ ...base, items: [item] });
+    expect(sinEmpresa.has(claveCampo(item, "empresa"))).toBe(true);
+    expect(sinEmpresa.has(claveCampo(item, "facturas-format"))).toBe(false);
+    // Con la empresa elegida, el renglón queda limpio.
+    const completo = validarGuia({ ...base, items: [{ ...item, empresa: "Vistana International" }] });
+    expect(completo.size).toBe(0);
   });
 });
 

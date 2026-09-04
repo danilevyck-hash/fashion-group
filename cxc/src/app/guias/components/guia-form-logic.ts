@@ -11,6 +11,9 @@ import { unirEnHumano } from "@/lib/guias/falta-para-despachar";
 // 🔑 El centinela de «Otro…» vive en `lib/` porque los DOS papeles lo
 // necesitan: acá se REUSA, no se redefine.
 import { entregadoPorElegido } from "@/lib/guias/despachado-por";
+// «Traslado» como valor válido de FACTURA(S) — vive con el resto del atajo y
+// cuelga del mismo interruptor.
+import { GUIAS_ATAJOS_NUEVOS, esTraslado } from "@/lib/guias/atajos-facturas";
 import type { GuiaItem, ModoEntrega } from "./types";
 
 /**
@@ -128,7 +131,11 @@ export function validarGuia(estado: EstadoGuia): Set<string> {
         errores.add(claveCampo(item, "facturas-separator"));
       }
       const partes = item.facturas.split(",").map((s) => s.trim()).filter(Boolean);
-      if (partes.some((p) => p.replace(/\D/g, "").length < 4)) {
+      // 🔴 «Traslado» es un valor VÁLIDO del campo (4-sep-2026, Daniel: «que
+      // en factura salga traslado»): el envío sin factura se guarda con ese
+      // texto y se imprime así. Solo con el interruptor encendido — apagado,
+      // la validación es EXACTAMENTE la de antes de 115f90ed.
+      if (partes.some((p) => p.replace(/\D/g, "").length < 4 && !(GUIAS_ATAJOS_NUEVOS && esTraslado(p)))) {
         errores.add(claveCampo(item, "facturas-format"));
       }
     }

@@ -88,8 +88,8 @@ mutacion "la TABLA deja de ganar: la constante pisa lo corregido en la pantalla"
   'if (false && filas && filas.length > 0) return filas;'
 
 mutacion "la CONSTANTE deja de ser la red: el histórico pisa la definición" "$PURO" \
-  'if (constante) return constante.map((d) => ({ destino: d, tiendas: TIENDAS_POR_CLIENTE[c]?.[d] }));' \
-  'if (false && constante) return constante.map((d) => ({ destino: d, tiendas: TIENDAS_POR_CLIENTE[c]?.[d] }));'
+  'if (constante && constante.length > 0) return constante;' \
+  'if (false && constante && constante.length > 0) return constante;'
 
 # ── el soft delete ───────────────────────────────────────────────────────────
 
@@ -122,6 +122,16 @@ mutacion "un histórico se promueve SOLO al dibujarse (sin toque)" "$VISTA" \
 mutacion "el campo Dirección deja de ser editable" "$FORM" \
   'onChange={(e) => { onUpdateItem(idx, "direccion", e.target.value); marcarTocado(clave); }}' \
   'readOnly onChange={() => {}}'
+
+# ── la marca «el de siempre» ─────────────────────────────────────────────────
+
+mutacion "marcar «el de siempre» deja de apagar a los hermanos (dos encendidos a la vez)" "$SERVER" \
+  '  if (valor) {' \
+  '  if (false) {'
+
+mutacion "la marca de la pantalla deja de escribir (tocar no manda nada)" "$VISTA" \
+  'onChange={() => onMarcarSiempre(f, !f.el_de_siempre)}' \
+  'onChange={() => {}}'
 
 # ── la ruta de frecuencias ───────────────────────────────────────────────────
 

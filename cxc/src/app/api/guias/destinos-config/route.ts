@@ -12,7 +12,8 @@
  *
  *   GET    → { destinos: DestinoConfigurado[] } (activos, con nombre resuelto)
  *   POST   → { cliente_codigo, destino, tiendas? } → 201 { id }
- *   PATCH  → ?id= { destino?, tiendas? } → edita una fila activa
+ *   PATCH  → ?id= { destino?, tiendas?, elDeSiempre? } → edita una fila activa
+ *            (marcar «el de siempre» apaga los demás del cliente: a lo sumo uno)
  *   DELETE → ?id= → SOFT DELETE (activo = false, firmado). NUNCA borra la fila.
  *
  * 🔴 Esta ruta NO toca `guia_items`: el histórico es lo que el transportista
@@ -29,6 +30,7 @@ import {
   desactivarDestino,
   editarDestino,
   leerDestinosConfigurados,
+  marcarElDeSiempre,
 } from "@/lib/guias/destinos-config-server";
 
 export const dynamic = "force-dynamic";
@@ -107,8 +109,17 @@ export async function PATCH(req: NextRequest) {
   const v = validarDestinoEdicion(body);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
 
-  const r = await editarDestino(id, v.valor);
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  const { elDeSiempre, ...cambiosTexto } = v.valor;
+  if (cambiosTexto.destino !== undefined || cambiosTexto.tiendas !== undefined) {
+    const r = await editarDestino(id, cambiosTexto);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  }
+  // 🔴 «El de siempre» (4-sep-2026): el servidor garantiza a lo sumo UNO por
+  // cliente — al marcar, apaga los demás destinos activos de ese cliente.
+  if (elDeSiempre !== undefined) {
+    const r = await marcarElDeSiempre(id, elDeSiempre);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  }
   return NextResponse.json({ ok: true });
 }
 

@@ -41,12 +41,16 @@ vi.mock("@/lib/guias/atajos-facturas", async (importOriginal) => {
 
 import GuiasPage from "@/app/guias/page";
 
-/** Las filas definidas que sirve /api/guias/destinos-config. */
+/** Las filas definidas que sirve /api/guias/destinos-config. D-35 y D-87 con
+ *  su «el de siempre»; D-142 sin ninguno (elige la persona); D-26 con DOS
+ *  destinos y uno marcado — el caso que cerró Daniel. */
 const FILAS = [
-  { id: 1, cliente_codigo: "D-35", cliente_nombre: "City Shoes", destino: "Calle 19 Central, al lado de la joyería Super Oro", tiendas: [], orden: 1, creado_por: "daniel", creado_en: "2026-09-04" },
-  { id: 2, cliente_codigo: "D-87", cliente_nombre: "La Frontera Duty Free", destino: "Guabito", tiendas: [], orden: 1, creado_por: "daniel", creado_en: "2026-09-04" },
-  { id: 3, cliente_codigo: "D-142", cliente_nombre: "Sporting Shoes N 4", destino: "Westland", tiendas: ["5", "6", "14", "Mas Flow"], orden: 1, creado_por: "daniel", creado_en: "2026-09-04" },
-  { id: 4, cliente_codigo: "D-142", cliente_nombre: "Sporting Shoes N 4", destino: "Albrook", tiendas: ["7", "8", "9"], orden: 2, creado_por: "daniel", creado_en: "2026-09-04" },
+  { id: 1, cliente_codigo: "D-35", cliente_nombre: "City Shoes", destino: "Calle 19 Central, al lado de la joyería Super Oro", tiendas: [], orden: 1, el_de_siempre: true, creado_por: "daniel", creado_en: "2026-09-04" },
+  { id: 2, cliente_codigo: "D-87", cliente_nombre: "La Frontera Duty Free", destino: "Guabito", tiendas: [], orden: 1, el_de_siempre: true, creado_por: "daniel", creado_en: "2026-09-04" },
+  { id: 3, cliente_codigo: "D-142", cliente_nombre: "Sporting Shoes N 4", destino: "Westland", tiendas: ["5", "6", "14", "Mas Flow"], orden: 1, el_de_siempre: false, creado_por: "daniel", creado_en: "2026-09-04" },
+  { id: 4, cliente_codigo: "D-142", cliente_nombre: "Sporting Shoes N 4", destino: "Albrook", tiendas: ["7", "8", "9"], orden: 2, el_de_siempre: false, creado_por: "daniel", creado_en: "2026-09-04" },
+  { id: 5, cliente_codigo: "D-26", cliente_nombre: "City Moda Chorrera", destino: "Sport Corner Calidonia", tiendas: [], orden: 1, el_de_siempre: true, creado_por: "daniel", creado_en: "2026-09-04" },
+  { id: 6, cliente_codigo: "D-26", cliente_nombre: "City Moda Chorrera", destino: "Chorrera", tiendas: [], orden: 2, el_de_siempre: false, creado_por: "daniel", creado_en: "2026-09-04" },
 ];
 
 /** El histórico (frecuencias): D-87 usó «Changinola» y no está definido. */
@@ -162,12 +166,43 @@ describe("la lista va agrupada por cliente y DICE si autollena", () => {
     expect(texto).toContain("Tiendas: 5 · 6 · 14 · Mas Flow");
   });
 
-  it("con UN destino dice que se llena solo; con varios, que salen botones", async () => {
+  it("con «el de siempre» dice que se llena solo; sin ninguno marcado, que salen botones", async () => {
     const { container } = await abrirConfiguracion("admin");
     const grupoUno = container.querySelector('[data-testid="grupo-D-35"]');
     const grupoVarios = container.querySelector('[data-testid="grupo-D-142"]');
+    const grupoMixto = container.querySelector('[data-testid="grupo-D-26"]');
     expect(grupoUno?.textContent).toContain("Se llena solo al elegir el cliente.");
+    // D-142: dos destinos y NINGUNO marcado — nada se llena solo.
     expect(grupoVarios?.textContent).toContain("Se ofrecen como botones y la persona elige.");
+    // D-26: varios destinos y UNO marcado — el de siempre se llena solo.
+    expect(grupoMixto?.textContent).toContain(
+      "El de siempre se llena solo al elegir el cliente; los demás salen como botones.",
+    );
+  });
+
+  it("🔴 cada fila lleva su marca «el de siempre», y tocarla manda un PATCH con el id", async () => {
+    const { container } = await abrirConfiguracion("secretaria");
+    const grupoMixto = container.querySelector('[data-testid="grupo-D-26"]') as HTMLElement;
+    const marcas = Array.from(
+      grupoMixto.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+    );
+    expect(marcas).toHaveLength(2);
+    // El estado refleja la base: Sport Corner marcado, Chorrera no.
+    const deChorrera = marcas.find((m) =>
+      (m.getAttribute("aria-label") || "").includes("«Chorrera»"),
+    ) as HTMLInputElement;
+    const deSportCorner = marcas.find((m) =>
+      (m.getAttribute("aria-label") || "").includes("«Sport Corner Calidonia»"),
+    ) as HTMLInputElement;
+    expect(deSportCorner.checked).toBe(true);
+    expect(deChorrera.checked).toBe(false);
+
+    fireEvent.click(deChorrera);
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    const patches = pedidos.filter((pd) => pd.metodo === "PATCH" && pd.url.includes("destinos-config"));
+    expect(patches).toHaveLength(1);
+    expect(patches[0].url).toContain("id=6");
+    expect(patches[0].body).toEqual({ elDeSiempre: true });
   });
 
   it("el buscador filtra por nombre o código", async () => {

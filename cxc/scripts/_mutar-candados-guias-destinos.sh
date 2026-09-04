@@ -110,6 +110,16 @@ mutacion "el orden deja de ser por frecuencia" "$PURO" \
   '        b.total - a.total ||' \
   '        0 ||'
 
+# ── «el de siempre» (4-sep-2026, mockup final) ───────────────────────────────
+
+mutacion "la marca «el de siempre» SE IGNORA (nada se autollena para los definidos)" "$PURO" \
+  '    const elDeSiempre = definidos.find((d) => d.elDeSiempre === true);' \
+  '    const elDeSiempre = definidos.find(() => false);'
+
+mutacion "se autollena el PRIMER definido aunque nadie lo haya marcado" "$PURO" \
+  '    return elDeSiempre ? elDeSiempre.destino : null;' \
+  '    return definidos[0].destino;'
+
 # ── la tienda y su separador ─────────────────────────────────────────────────
 
 mutacion "el separador de la tienda cambia (deja de decidirse en UN lugar)" "$PURO" \

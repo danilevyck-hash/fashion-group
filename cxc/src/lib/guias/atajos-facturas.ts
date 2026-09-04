@@ -46,8 +46,19 @@ export const GUIAS_ATAJOS_NUEVOS = true;
  */
 export const TIPO_FACTURA = "Factura" satisfies (typeof TIPOS_VENTA_SUMAN)[number];
 
-/** Cuántas facturas se muestran antes del «Ver más» (un cliente típico tiene 13 en 90 días). */
-export const FACTURAS_VISIBLES_INICIAL = 20;
+/**
+ * 🔴 LA LISTA ABRE CON LOS ÚLTIMOS 3 DÍAS **CON FACTURA** — no días de
+ * calendario (4-sep-2026, mockup final aprobado: «dale aprobado»).
+ *
+ * Medido contra producción, y es por lo que Daniel lo pidió: de 471 facturas
+ * usadas en guías este año, el **77% salen del ÚLTIMO día facturado**, el 92%
+ * de los últimos 2 y el **95% de los últimos 3**. Si el último día con
+ * factura fue hace dos semanas, ESE día es el primer grupo — un corte por
+ * calendario dejaría el panel vacío justo para el cliente que menos compra.
+ * «Ver más días» trae 3 días más cada vez.
+ */
+export const DIAS_CON_FACTURA_VISIBLES = 3;
+export const DIAS_POR_VER_MAS = 3;
 
 /** Una factura del cliente, tal como la sirve `/api/guias/facturas-cliente`. */
 export interface FacturaDelCliente {
@@ -116,29 +127,66 @@ export function normalizarEmpresaGuia(v: string | null | undefined): string {
   return (v ?? "").trim().toLowerCase();
 }
 
-// ─── Agrupar por fecha: Hoy · Esta semana · Antes ────────────────────────────
+// ─── Agrupar POR DÍA: los últimos N días con factura ─────────────────────────
+//
+// (4-sep-2026) Reemplaza el agrupado «Hoy · Esta semana · Antes»: Daniel
+// aprobó el mockup final con los últimos 3 días EN QUE ESE CLIENTE TUVO
+// FACTURA, el más reciente arriba, cada día con su encabezado en palabras
+// («Miércoles 3 sep»). El día es el de PANAMÁ (`fechaPanamaDe`) — una factura
+// de las 22:00 de Panamá no puede caer en el día siguiente por estar en UTC.
 
-export type GrupoFecha = "hoy" | "semana" | "antes";
-
-export const TITULO_GRUPO: Record<GrupoFecha, string> = {
-  hoy: "Hoy",
-  semana: "Esta semana",
-  antes: "Antes",
-};
-
-export const ORDEN_GRUPOS: readonly GrupoFecha[] = ["hoy", "semana", "antes"];
+/** Un día con sus facturas, la más reciente primero. `dia` es YYYY-MM-DD (Panamá). */
+export interface GrupoDia {
+  dia: string;
+  facturas: FacturaDelCliente[];
+}
 
 /**
- * En qué grupo cae una factura. `hoy` viene de afuera (YYYY-MM-DD en Panamá):
- * este módulo no mira el reloj — los tests usan fechas fijas, nunca `new Date()`.
- * «Esta semana» = los 6 días anteriores a hoy.
+ * Agrupa las facturas por día de Panamá y devuelve los `diasVisibles` días MÁS
+ * RECIENTES con factura (no de calendario), cada uno con sus facturas en orden
+ * de fecha descendente. `diasOcultos` = cuántos días con factura quedan sin
+ * mostrar (alimenta el «Ver más días»).
  */
-export function grupoDeFecha(fechaIso: string, hoy: string): GrupoFecha {
-  const dia = fechaPanamaDe(fechaIso);
-  if (dia >= hoy) return "hoy";
-  const corte = new Date(`${hoy}T00:00:00-05:00`).getTime() - 6 * 24 * 3600_000;
-  const diaMs = new Date(`${dia}T00:00:00-05:00`).getTime();
-  return diaMs >= corte ? "semana" : "antes";
+export function agruparPorDia(
+  facturas: readonly FacturaDelCliente[],
+  diasVisibles: number,
+): { grupos: GrupoDia[]; diasOcultos: number } {
+  const porDia = new Map<string, FacturaDelCliente[]>();
+  for (const f of facturas) {
+    const dia = fechaPanamaDe(f.fecha);
+    const lista = porDia.get(dia);
+    if (lista) lista.push(f);
+    else porDia.set(dia, [f]);
+  }
+  // 🔴 Días CON factura, el más reciente arriba — nunca un rango de calendario.
+  const dias = [...porDia.keys()].sort().reverse();
+  const visibles = dias.slice(0, Math.max(0, diasVisibles));
+  const grupos = visibles.map((dia) => ({
+    dia,
+    facturas: [...(porDia.get(dia) as FacturaDelCliente[])].sort((a, b) =>
+      a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0,
+    ),
+  }));
+  return { grupos, diasOcultos: dias.length - visibles.length };
+}
+
+const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/**
+ * El encabezado del día, en palabras: «Miércoles 3 sep». Puro y sin reloj: el
+ * día de la semana de una fecha calendario no depende de la zona horaria.
+ */
+export function tituloDelDia(dia: string): string {
+  const [y, m, d] = String(dia ?? "").split("-").map(Number);
+  if (!y || !m || m < 1 || m > 12 || !d) return String(dia ?? "");
+  const diaSemana = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${DIAS_SEMANA[diaSemana]} ${d} ${MESES_CORTOS[m - 1]}`;
+}
+
+/** ¿La factura es del día `hoy` (YYYY-MM-DD en Panamá)? Para mostrar la hora. */
+export function esDeHoy(fechaIso: string, hoy: string): boolean {
+  return fechaPanamaDe(fechaIso) === hoy;
 }
 
 // ─── El aviso «ya salió en otra guía» ────────────────────────────────────────
@@ -324,10 +372,10 @@ export function desmarcarFactura(
 }
 
 /**
- * «No está en la lista» / «Traslado sin factura»: un renglón del cliente con lo
- * que se le pase en `facturas` ("" = escribir el número a mano, como hoy;
- * "0000" = el traslado de siempre — 30 renglones así desde julio). Llena la
- * primera fila vacía o agrega una al final. Nunca es obligatorio pasar por acá.
+ * «Escribir el número» / «Traslado»: un renglón del cliente con lo que se le
+ * pase en `facturas` ("" = escribir el número a mano, como hoy; `Traslado` =
+ * el envío sin factura). Llena la primera fila vacía o agrega una al final.
+ * Nunca es obligatorio pasar por acá.
  */
 export function renglonDelCliente(
   items: readonly RenglonDeGuia[],
@@ -350,5 +398,30 @@ export function renglonDelCliente(
   return [...items, relleno(renglonNuevo(items.length + 1))];
 }
 
-/** El texto de «traslado sin factura», el mismo que hoy se teclea a mano. */
-export const FACTURA_TRASLADO = "0000";
+/**
+ * 🔴 EL TRASLADO ES DEL ENVÍO, NO DEL CLIENTE (4-sep-2026). Daniel, textual:
+ * *«tiene que haber la factura normal, y opción traslado por si a no solo
+ * Multifashion pero también otra tienda se le mandan cosas, que en factura
+ * salga traslado»*.
+ *
+ * Se guarda el texto `Traslado` en el MISMO campo `facturas`, y así sale
+ * impreso en la columna FACTURA(S) del papel (`PrintDocument`), en el PDF y
+ * en el Excel. Sirve para CUALQUIER cliente — medido: 31 de los 58 renglones
+ * viejos con «0000» son Multi Fashion y American Classics, pero Nova Lux,
+ * City Mall David y Plaza Los Ángeles también tienen — y el mismo cliente
+ * unas veces lleva factura y otras no.
+ *
+ * 🔴 Son DOS caminos y nada más: factura o Traslado. Daniel descartó
+ * explícitamente «Factura pendiente» y «Sin factura». Con Traslado no se pide
+ * factura, y la EMPRESA SÍ se elige a mano (no hay factura que la diga).
+ *
+ * ⚠️ Los 58 renglones viejos con «0000» NO se tocan: es lo que el
+ * transportista firmó. Cero migración que limpie el histórico.
+ */
+export const TEXTO_TRASLADO = "Traslado";
+
+/** ¿Este texto (una parte del campo `facturas`) es el Traslado? Exacto y
+ *  normalizado (bordes + mayúsculas), nunca por parecido. */
+export function esTraslado(v: string | null | undefined): boolean {
+  return (v ?? "").trim().toLowerCase() === TEXTO_TRASLADO.toLowerCase();
+}

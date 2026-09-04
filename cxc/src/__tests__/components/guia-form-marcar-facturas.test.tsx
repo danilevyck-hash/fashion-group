@@ -41,12 +41,15 @@ vi.mock("@/lib/guias/atajos-facturas", async (importOriginal) => {
 
 const CLIENTE = { codigo: "D-24", nombre: "City Mall David" };
 
-/** 4 facturas de 3 empresas — la de Joystep ya salió en una guía viva. */
+/** 4 facturas de 3 empresas en 3 días — la de Joystep ya salió en una guía
+ *  viva. Y una QUINTA en un cuarto día, que solo aparece con «Ver más días»
+ *  (los últimos 3 días CON factura abren; el cuarto queda oculto). */
 const FACTURAS = [
-  { empresa_key: "vistana", empresa: "Vistana International", secuencial: "2535", fecha: "2026-06-01T15:00:00Z", total: 100, yaSalioEn: null },
-  { empresa_key: "vistana", empresa: "Vistana International", secuencial: "2536", fecha: "2026-06-01T16:00:00Z", total: 200, yaSalioEn: null },
+  { empresa_key: "vistana", empresa: "Vistana International", secuencial: "2535", fecha: "2026-06-01T16:00:00Z", total: 100, yaSalioEn: null },
+  { empresa_key: "vistana", empresa: "Vistana International", secuencial: "2536", fecha: "2026-06-01T15:00:00Z", total: 200, yaSalioEn: null },
   { empresa_key: "fashion_wear", empresa: "Fashion Wear", secuencial: "7001", fecha: "2026-05-30T15:00:00Z", total: 300, yaSalioEn: null },
   { empresa_key: "joystep", empresa: "Joystep", secuencial: "88", fecha: "2026-05-29T15:00:00Z", total: 50, yaSalioEn: 204 },
+  { empresa_key: "fashion_wear", empresa: "Fashion Wear", secuencial: "7055", fecha: "2026-05-15T15:00:00Z", total: 75, yaSalioEn: null },
 ];
 
 let pedidosHoy: number;
@@ -174,6 +177,8 @@ describe("el atajo encendido, al crear", () => {
   });
 
   it("marcar 4 facturas de 3 empresas produce 3 renglones con las facturas agrupadas y bultos por empresa", async () => {
+    // Las 4 visibles son las de los últimos 3 días con factura; la quinta
+    // (del cuarto día) queda detrás de «Ver más días» y no se toca acá.
     render(<Harness itemsIniciales={[filaVacia()]} />);
     await asentar();
     await elegirCliente();
@@ -224,14 +229,56 @@ describe("el atajo encendido, al crear", () => {
     expect(itemsCapturados.some((r) => r.empresa === "Joystep" && r.facturas === "88")).toBe(true);
   });
 
-  it("«No está en la lista» y «Traslado sin factura» siguen ahí, con el cliente ya puesto", async () => {
+  it("🔴 «Traslado» va debajo de la lista, separado por un «o», y escribe el TEXTO `Traslado` — la empresa se pide a mano", async () => {
     render(<Harness itemsIniciales={[filaVacia()]} />);
     await asentar();
     await elegirCliente();
 
-    fireEvent.click(screen.getByText("Traslado sin factura"));
+    // Son DOS caminos y nada más: factura o Traslado. Los rótulos que Daniel
+    // descartó no existen.
+    expect(screen.queryByText(/Factura pendiente/)).toBeNull();
+    expect(screen.queryByText(/Sin factura/)).toBeNull();
+    expect(screen.queryByText("Traslado sin factura")).toBeNull();
+    expect(screen.getByText("o")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Traslado" }));
     expect(itemsCapturados[0].cliente_codigo).toBe("D-24");
-    expect(itemsCapturados[0].facturas).toBe("0000");
+    // 🔴 El texto va HARDCODEADO: si la constante volviera a «0000», rojo.
+    expect(itemsCapturados[0].facturas).toBe("Traslado");
+    // La EMPRESA se elige a mano: no hay factura que la diga.
+    expect(itemsCapturados[0].empresa).toBe("");
+  });
+
+  it("«Escribir el número» sigue ahí, con el cliente ya puesto y facturas vacío", async () => {
+    render(<Harness itemsIniciales={[filaVacia()]} />);
+    await asentar();
+    await elegirCliente();
+
+    fireEvent.click(screen.getByText("Escribir el número"));
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-24");
+    expect(itemsCapturados[0].facturas).toBe("");
+  });
+
+  it("🔴 los días van con su encabezado en PALABRAS, y «Ver más días» trae los siguientes 3", async () => {
+    render(<Harness itemsIniciales={[filaVacia()]} />);
+    await asentar();
+    await elegirCliente();
+
+    // Los últimos 3 días CON factura, el más reciente arriba.
+    expect(screen.getByText("Lunes 1 jun")).toBeTruthy();
+    expect(screen.getByText("Sábado 30 may")).toBeTruthy();
+    expect(screen.getByText("Viernes 29 may")).toBeTruthy();
+    // Los rótulos viejos no existen más.
+    expect(screen.queryByText("Hoy")).toBeNull();
+    expect(screen.queryByText("Esta semana")).toBeNull();
+    expect(screen.queryByText("Antes")).toBeNull();
+    // El cuarto día queda oculto hasta pedir más.
+    expect(screen.queryByText("7055")).toBeNull();
+
+    fireEvent.click(screen.getByText("Ver más días"));
+    expect(screen.getByText("Viernes 15 may")).toBeTruthy();
+    expect(screen.getByText("7055")).toBeTruthy();
+    expect(screen.queryByText("Ver más días")).toBeNull();
   });
 
   it("«Buscar otra vez» dispara la lectura corta de HOY y vuelve a pedir la lista", async () => {
@@ -286,7 +333,8 @@ describe("🔴 CONTROL — la constante apagada deja la pantalla EXACTAMENTE com
     await asentar();
     expect(panel()).toBeNull();
     expect(screen.queryByText("Facturas del cliente")).toBeNull();
-    expect(screen.queryByText("Traslado sin factura")).toBeNull();
+    expect(screen.queryByText("Traslado")).toBeNull();
+    expect(screen.queryByText("Escribir el número")).toBeNull();
     expect(screen.queryByText("Buscar otra vez")).toBeNull();
   });
 
@@ -301,5 +349,47 @@ describe("🔴 CONTROL — la constante apagada deja la pantalla EXACTAMENTE com
     expect(itemsCapturados[0].direccion).toBe("Paso Canoas");
     // y sin pedirle nada a la ruta nueva
     expect(pedidosHoy).toBe(0);
+  });
+});
+
+// ─── el Traslado SALE IMPRESO como «Traslado» — papel y Excel ────────────────
+// Daniel: «que en factura salga traslado». El campo facturas es texto y los
+// dos reportes lo imprimen tal cual; estos casos fijan que un filtro «solo
+// números» no se lo coma nunca.
+
+describe("🔴 «Traslado» se imprime en la columna FACTURA(S) del papel y en el Excel", () => {
+  const ITEM_TRASLADO = {
+    id: "it-t", orden: 1, cliente: "Multi Fashion Holding", cliente_codigo: "D-108",
+    direccion: "Albrook", empresa: "Vistana International", facturas: "Traslado",
+    bultos: 3, numero_guia_transp: "",
+  };
+  const GUIA_TRASLADO = {
+    id: "g-t", numero: 240, fecha: "2026-09-04",
+    transportista: "Transporte Sol", modo_entrega: "transportista", transportista_id: "t-1",
+    placa: "EK0700", observaciones: "", total_bultos: 3, item_count: 1, monto_total: 0,
+    estado: "Pendiente Bodega", tipo_despacho: "externo",
+    entregado_por: "Julio", numero_guia_transp: "",
+    guia_items: [ITEM_TRASLADO],
+  };
+
+  it("PrintDocument imprime «Traslado» en la celda de FACTURA(S)", async () => {
+    const { default: PrintDocument } = await import("@/app/guias/components/PrintDocument");
+    const { container } = render(<PrintDocument guia={GUIA_TRASLADO as never} />);
+    const celdas = Array.from(container.querySelectorAll("td")).map((td) => (td.textContent || "").trim());
+    expect(celdas).toContain("Traslado");
+    // Y el encabezado de la columna sigue siendo el de siempre.
+    expect(container.textContent).toContain("FACTURA(S)");
+  });
+
+  it("el Excel dice «Traslado» en la columna Facturas del envío", async () => {
+    const { buildGuiasSheet } = await import("@/app/guias/components/excel-guias");
+    const ws = buildGuiasSheet([GUIA_TRASLADO as never]);
+    const celdas: string[] = [];
+    for (const [addr, cell] of Object.entries(ws as Record<string, unknown>)) {
+      if (addr.startsWith("!")) continue;
+      const v = (cell as { v?: unknown }).v;
+      if (v !== undefined) celdas.push(String(v));
+    }
+    expect(celdas).toContain("Traslado");
   });
 });
