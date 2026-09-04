@@ -421,30 +421,47 @@ describe("🔴 reabrir NO borra", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("SIN la migración corrida (patrón cols-opcionales)", () => {
-  it("🔴 guardar contesta 503 con el NOMBRE del archivo, y nadie cree que guardó", async () => {
+// ⚠️ CAMBIÓ DE DIRECCIÓN EL 3-SEP-2026 (tolerancia a la DDL retirada). Hasta
+// ese día este bloque se llamaba «SIN la migración corrida (patrón
+// cols-opcionales)»: con PGRST205 guardar contestaba 503 con el nombre del
+// archivo, leer contestaba 200 vacío con el aviso, y reabrir 503. Las dos
+// tablas existen desde 20260904120000; hoy ese código es un error como
+// cualquier otro y las tres puertas contestan 500 con el mensaje — leer
+// «vacío» ante un error dejaría pasar el freno del solapamiento (doble pago).
+describe("🔴 un PGRST205 ya no es «falta la migración»: es un error, y se ve", () => {
+  it("guardar contesta 500 con el mensaje, sin aviso tranquilizador, y nadie cree que guardó", async () => {
     faltaTabla = true;
     const r = await POST(pedir("POST", "admin", "daniel", { empresa: "vistana", desde: "2026-08-01", hasta: "2026-08-15" }));
-    expect(r.status).toBe(503);
+    expect(r.status).toBe(500);
     const j = await r.json();
-    expect(j.ok).toBe(false);
-    expect(j.aviso).toContain("20260904120000_asistencia_planilla_guardada.sql");
+    expect(j.ok).toBeUndefined();
+    expect(j.aviso).toBeUndefined();
+    expect(j.error).toContain("asistencia_planilla_guardada");
     expect(db.cabeceras.length).toBe(0);
   });
 
-  it("leer no revienta: contesta vacío con el aviso", async () => {
+  it("🔴 leer TAMBIÉN revienta: «no hay nada cerrado» ante un error abre el doble pago", async () => {
     faltaTabla = true;
     const r = await GET(leer("admin", "daniel", "empresa=vistana&desde=2026-08-01&hasta=2026-08-15"));
-    expect(r.status).toBe(200);
+    expect(r.status).toBe(500);
     const j = await r.json();
-    expect(j.cerrada).toBeNull();
-    expect(j.aviso).toContain("20260904120000");
+    expect(j.cerrada).toBeUndefined();
+    expect(j.aviso).toBeUndefined();
+    expect(j.error).toContain("asistencia_planilla_guardada");
   });
 
-  it("reabrir también avisa en vez de romperse", async () => {
+  it("y leer UNA por id, lo mismo", async () => {
+    faltaTabla = true;
+    const r = await GET(leer("admin", "daniel", "id=vieja-1"));
+    expect(r.status).toBe(500);
+    expect((await r.json()).aviso).toBeUndefined();
+  });
+
+  it("reabrir revienta en vez de avisar", async () => {
     faltaTabla = true;
     const r = await PATCH(pedir("PATCH", "admin", "daniel", { id: "vieja-1", motivo: "x" }));
-    expect(r.status).toBe(503);
+    expect(r.status).toBe(500);
+    expect((await r.json()).aviso).toBeUndefined();
   });
 
   // 🩸 EL CASO QUE ESTE REPO YA PAGÓ: tragarse CUALQUIER error como «falta la
@@ -461,7 +478,8 @@ describe("SIN la migración corrida (patrón cols-opcionales)", () => {
   // atrapa antes, así que el `esTablaFaltante` de la ESCRITURA se podía cambiar
   // por `true` sin que nada se cayera. Ahí el modo de fallo es el peor: un RLS
   // que rechaza el INSERT se leería como «falta correr el archivo», Daniel lo
-  // correría, y la planilla seguiría sin guardarse.
+  // correría, y la planilla seguiría sin guardarse. (Desde el 3-sep-2026 ya no
+  // hay `esTablaFaltante` en la escritura; el test se queda como candado.)
   it("🔴 tampoco degrada cuando el error es de la ESCRITURA, no de la lectura", async () => {
     errorAlEscribir = { code: "42501", message: "permission denied for table asistencia_planilla_guardada" };
     const r = await POST(pedir("POST", "admin", "daniel", { empresa: "vistana", desde: "2026-08-01", hasta: "2026-08-15" }));

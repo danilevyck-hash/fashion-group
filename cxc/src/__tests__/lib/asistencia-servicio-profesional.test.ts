@@ -322,30 +322,34 @@ describe("guardar la decisión: la ruta", () => {
     expect(upserts[0][COLUMNA_SERVICIO_PROFESIONAL]).toBe(false);
   });
 
-  it("🩸 SIN la columna corrida, marcar a alguien NO se guarda a medias: avisa", async () => {
+  // ⚠️ CAMBIARON DE DIRECCIÓN EL 3-SEP-2026 (tolerancia a la DDL retirada).
+  // Hasta ese día, con PGRST204 nombrando la columna: marcar a alguien daba 503
+  // con el nombre del archivo, y poner un nombre se REINTENTABA sin la columna
+  // (200, dos upserts). La columna existe desde 20260813120000; hoy ese código
+  // es un error como cualquier otro: 500, UN solo upsert, sin reintento —
+  // reintentar guardaría la ficha SIN la bandera, y la persona seguiría en la
+  // planilla sin que nadie sepa por qué.
+  it("🔴 con PGRST204 marcar a alguien es 500, sin «falta la migración», y NO se guarda a medias", async () => {
     respuestas = [{ error: { code: "PGRST204", message: "Could not find the 'servicio_profesional' column of 'asistencia_personas'" } }];
     const res = await putPersona(pedido({
       codigo: "26", nombre: "YULISSA JUAREZ", salarioMensual: "",
       jornadaSemanal: 48, empresa: "vistana", servicioProfesional: true,
     }));
-    // Un "guardado" que se traga la bandera dejaría a la persona en la planilla
-    // y nadie sabría por qué.
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(500);
     const j = await res.json();
-    expect(j.faltaMigracionServicioProfesional).toBe(true);
-    expect(String(j.error)).toContain("20260813120000_asistencia_servicio_profesional.sql");
+    expect(j.faltaMigracionServicioProfesional).toBeUndefined();
+    expect(String(j.error)).not.toContain("20260813120000");
     expect(upserts).toHaveLength(1); // no reintentó a espaldas de nadie
   });
 
-  it("⚠️ …pero poner un nombre o un salario sigue funcionando igual que ayer", async () => {
+  it("🔴 y poner un nombre TAMPOCO se reintenta sin la columna: 500 y un solo upsert", async () => {
     respuestas = [{ error: { code: "PGRST204", message: "Could not find the 'servicio_profesional' column of 'asistencia_personas'" } }];
     const res = await putPersona(pedido({
       codigo: "6", nombre: "Ángela", salarioMensual: "600",
       jornadaSemanal: 48, empresa: "vistana",
     }));
-    expect(res.status).toBe(200);
-    expect(upserts).toHaveLength(2); // reintentó sin la columna
-    expect(COLUMNA_SERVICIO_PROFESIONAL in upserts[1]).toBe(false);
-    expect(upserts[1].nombre).toBe("Ángela");
+    expect(res.status).toBe(500);
+    expect(upserts).toHaveLength(1);
+    expect(COLUMNA_SERVICIO_PROFESIONAL in upserts[0]).toBe(true);
   });
 });

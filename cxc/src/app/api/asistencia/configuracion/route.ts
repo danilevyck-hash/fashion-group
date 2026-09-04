@@ -13,8 +13,15 @@
 // esta pantalla es el único lugar donde el código 6 se vuelve una persona con
 // sueldo y empresa.
 //
-// ⚠️ Todo lo que se lee acá aguanta que la migración NO esté corrida: en vez de
-// romperse, devuelve la lista del reloj sin fichas y avisa qué archivo falta.
+// Historia (ago-2026): todo lo que se leía acá AGUANTABA que la migración no
+// estuviera corrida — devolvía la lista del reloj sin fichas y avisaba qué
+// archivo faltaba; y el PUT reintentaba el guardado sin cada columna que el
+// error nombrara. 🔴 Tolerancia retirada el 3-sep-2026: las siete migraciones
+// de `asistencia_personas` existen en producción (lista en el encabezado de
+// `config-server.ts`). Hoy un error de la base es un 500 con el mensaje; los
+// campos `avisoMigracion*`/`puede*` de la respuesta quedan CONSTANTES (nunca
+// hay aviso, siempre se puede) y se conservan porque `ConfiguracionTab` los
+// lee.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -30,18 +37,11 @@ import {
   type Jornada,
 } from "@/lib/asistencia/config";
 import { rataPorHoraCalculo } from "@/lib/asistencia/rata";
-import {
-  agruparPorCodigo,
-  avisoMigracionReparto,
-  partesDe,
-  validarReparto,
-} from "@/lib/asistencia/reparto";
+import { agruparPorCodigo, partesDe, validarReparto } from "@/lib/asistencia/reparto";
 import type { ParteReparto } from "@/lib/asistencia/planilla";
 import {
   leerReglas,
   leerPersonas,
-  esTablaFaltante,
-  avisoMigracion,
   TABLA_PERSONAS,
   DIAS_VENTANA_PERSONAS,
   vigenciaDeFila,
@@ -52,35 +52,14 @@ import {
   leerRepartos,
 } from "@/lib/asistencia/config-server";
 import {
-  avisoMigracionServicioProfesional,
   COLUMNA_SERVICIO_PROFESIONAL,
-  esColumnaServicioProfesionalFaltante,
   validarServicioProfesional,
 } from "@/lib/asistencia/participacion";
+import { COLUMNA_PAGA_SEGUROS, validarPagaSeguros } from "@/lib/asistencia/seguros";
+import { COLUMNA_NO_MARCA_RELOJ, validarNoMarcaReloj } from "@/lib/asistencia/sueldo-fijo";
+import { COLUMNA_BASE_SEGUROS, validarBaseSeguros } from "@/lib/asistencia/seguros-base";
 import {
-  avisoMigracionSeguros,
-  COLUMNA_PAGA_SEGUROS,
-  esColumnaPagaSegurosFaltante,
-  validarPagaSeguros,
-} from "@/lib/asistencia/seguros";
-import {
-  avisoMigracionNoMarcaReloj,
-  COLUMNA_NO_MARCA_RELOJ,
-  esColumnaNoMarcaRelojFaltante,
-  validarNoMarcaReloj,
-} from "@/lib/asistencia/sueldo-fijo";
-import {
-  avisoMigracionBaseSeguros,
-  COLUMNA_BASE_SEGUROS,
-  esColumnaBaseSegurosFaltante,
-  validarBaseSeguros,
-} from "@/lib/asistencia/seguros-base";
-import {
-  avisoMigracionSaldoMediosDias,
-  avisoMigracionSaldoVacaciones,
-  esSaldoTodaviaEntero,
   COLS_SALDO_VACACIONES,
-  esColumnaSaldoVacacionesFaltante,
   numeroDeDias,
   validarSaldoInicial,
 } from "@/lib/asistencia/saldo-vacaciones";
@@ -88,8 +67,6 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { crearDirectorio, compararPersonas } from "@/lib/asistencia/directorio";
 import {
   avisoMarcasPosteriores,
-  avisoMigracionBajas,
-  esColumnaDeBajaFaltante,
   fraseBaja,
   marcoDespuesDeLaBaja,
   tieneBaja,
@@ -135,20 +112,13 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [
-      { reglas, faltaMigracion: faltaReglas },
-      {
-        filas,
-        faltaMigracion: faltaPersonas,
-        faltaColumnasBajas,
-        faltaColumnaServicioProfesional,
-        faltaColumnaPagaSeguros,
-        faltaColumnaBaseSeguros,
-        faltaColumnaNoMarcaReloj,
-        faltaColumnasSaldoVacaciones,
-      },
-      repRes,
-    ] = await Promise.all([leerReglas(), leerPersonas(), leerRepartos()]);
+    // Si cualquiera de las tres lecturas falla, se sale por el `catch` con un
+    // 500 y el mensaje (tolerancia a la DDL retirada el 3-sep-2026).
+    const [{ reglas }, { filas }, repRes] = await Promise.all([
+      leerReglas(),
+      leerPersonas(),
+      leerRepartos(),
+    ]);
 
     // El día de hoy en Panamá. Solo decide cómo se REDACTA la baja («Renunció»
     // vs «Renuncia» cuando la fecha es futura); no filtra ni calcula nada.
@@ -213,8 +183,7 @@ export async function GET(req: NextRequest) {
           : Number(f.salario_mensual);
       const jornada = (Number(f?.jornada_semanal) === 40 ? 40 : 48) as Jornada;
 
-      // La baja de esta persona, si la tiene. Sin las columnas corridas sale
-      // vacía y todo el mundo queda activo — que es como está hoy.
+      // La baja de esta persona, si la tiene.
       const vig = f ? vigenciaDeFila(f) : null;
       // 🔴 Sin ficha NO se puede estar fuera de planilla: la bandera vive en la
       // ficha. Un código que marca y nadie configuró sigue siendo un pendiente.
@@ -355,43 +324,27 @@ export async function GET(req: NextRequest) {
         /** Cobran fijo y no pasan por el reloj. Tampoco son pendientes. */
         noMarcaReloj: activos.filter((p) => p.noMarcaReloj).length,
       },
-      faltaMigracion: faltaPersonas || faltaReglas,
-      avisoMigracion: faltaPersonas || faltaReglas ? avisoMigracion() : null,
-      // Sin las columnas de la baja la pantalla funciona igual, pero el botón
-      // de dar de baja no puede guardar: se dice de entrada y no al fallar.
-      avisoMigracionBajas: !faltaPersonas && faltaColumnasBajas ? avisoMigracionBajas() : null,
-      puedeDarDeBaja: !faltaPersonas && !faltaColumnasBajas,
-      // Igual que arriba, un escalón más abajo: sin la columna todo el mundo
-      // aparece en la planilla y se dice de entrada, no al fallar el guardado.
-      avisoMigracionServicioProfesional:
-        !faltaPersonas && faltaColumnaServicioProfesional
-          ? avisoMigracionServicioProfesional()
-          : null,
-      puedeMarcarServicioProfesional: !faltaPersonas && !faltaColumnaServicioProfesional,
-      // Un escalón más: sin la columna a todo el mundo se le cobran los seguros
-      // —o sea, como está hoy— y se dice de entrada, no al fallar el guardado.
-      avisoMigracionSeguros:
-        !faltaPersonas && faltaColumnaPagaSeguros ? avisoMigracionSeguros() : null,
-      puedeQuitarSeguros: !faltaPersonas && !faltaColumnaPagaSeguros,
-      // Un escalón más: sin la columna los seguros salen del bruto para todo el
-      // mundo —o sea, como está hoy— y se dice de entrada, no al fallar.
-      avisoMigracionBaseSeguros:
-        !faltaPersonas && faltaColumnaBaseSeguros ? avisoMigracionBaseSeguros() : null,
-      puedeCargarBaseSeguros: !faltaPersonas && !faltaColumnaBaseSeguros,
-      // Un escalón más: sin la columna todo el mundo marca el reloj —o sea, como
-      // está hoy— y se dice de entrada, no al fallar el guardado.
-      avisoMigracionNoMarcaReloj:
-        !faltaPersonas && faltaColumnaNoMarcaReloj ? avisoMigracionNoMarcaReloj() : null,
-      puedeMarcarSueldoFijo: !faltaPersonas && !faltaColumnaNoMarcaReloj,
-      // Un escalón más: sin las columnas nadie tiene saldo de vacaciones —o
-      // sea, como está hoy— y se dice de entrada, no al fallar el guardado.
-      avisoMigracionSaldoVacaciones:
-        !faltaPersonas && faltaColumnasSaldoVacaciones ? avisoMigracionSaldoVacaciones() : null,
-      // Sin la tabla NADIE reparte su sueldo —cada persona en una sola planilla,
-      // como hoy— pero se dice: quien ya dio a Julio por repartido en su cabeza
-      // va a esperar ver las dos empresas en su ficha.
-      avisoMigracionReparto: repRes.faltaTabla ? avisoMigracionReparto() : null,
-      puedeCargarSaldoVacaciones: !faltaPersonas && !faltaColumnasSaldoVacaciones,
+      // ── CONSTANTES desde el 3-sep-2026 (tolerancia a la DDL retirada) ─────
+      // Historia: cada par `avisoMigracion*`/`puede*` decía de entrada qué
+      // migración faltaba y apagaba el control correspondiente, en vez de
+      // dejar fallar el guardado. Las siete migraciones existen; si una lectura
+      // falla hoy, esta respuesta no se arma (500 más abajo). Se conservan
+      // con su valor «todo bien» porque `ConfiguracionTab` los lee.
+      faltaMigracion: false,
+      avisoMigracion: null,
+      avisoMigracionBajas: null,
+      puedeDarDeBaja: true,
+      avisoMigracionServicioProfesional: null,
+      puedeMarcarServicioProfesional: true,
+      avisoMigracionSeguros: null,
+      puedeQuitarSeguros: true,
+      avisoMigracionBaseSeguros: null,
+      puedeCargarBaseSeguros: true,
+      avisoMigracionNoMarcaReloj: null,
+      puedeMarcarSueldoFijo: true,
+      avisoMigracionSaldoVacaciones: null,
+      avisoMigracionReparto: null,
+      puedeCargarSaldoVacaciones: true,
       // 🩸 El que no se puede esconder: dada de baja y sigue marcando.
       avisoBajas: avisoMarcasPosteriores(marcasPosteriores),
     });
@@ -478,14 +431,9 @@ export async function PUT(req: NextRequest) {
       .eq("empleado_codigo", p.codigo)
       .maybeSingle();
     if (prev.error) {
-      // Sin las columnas NO se guarda a medias: un "guardado" que se traga el
-      // saldo dejaría a la persona sin número y nadie sabría por qué.
-      if (esColumnaSaldoVacacionesFaltante(prev.error)) {
-        return NextResponse.json(
-          { error: avisoMigracionSaldoVacaciones(), faltaMigracionSaldoVacaciones: true },
-          { status: 503 },
-        );
-      }
+      // Un error acá es un error (tolerancia a la DDL retirada el 3-sep-2026):
+      // NO se guarda a medias — un "guardado" que se traga el saldo dejaría a
+      // la persona sin número y nadie sabría por qué.
       return NextResponse.json({ error: prev.error.message }, { status: 500 });
     }
     const anterior = prev.data as unknown as {
@@ -539,167 +487,28 @@ export async function PUT(req: NextRequest) {
     [COLUMNA_BASE_SEGUROS]: baseSeguros,
   };
 
-  let { error } = await supabaseServer
+  // ── UN solo upsert, con TODAS las columnas ──────────────────────────────────
+  //
+  // Historia (ago-2026): acá había una CASCADA de seis reintentos, uno por
+  // migración pendiente (base de seguros → sueldo fijo → saldo de vacaciones →
+  // seguros → servicio profesional → bajas → tabla). Cada uno, si el error
+  // NOMBRABA su columna, bifurcaba: si el dato nuevo era el default se
+  // reintentaba SIN la columna para que guardar un nombre siguiera funcionando;
+  // si el dato nuevo venía cargado, 503 con el nombre del archivo, porque un
+  // "guardado" que se traga la bandera es peor que un error (Edwin sin cobrar,
+  // Rodrigo con $25,18 de más por quincena, una baja que no saca a nadie de la
+  // planilla). Había también un 22P02 «la columna todavía es integer y le
+  // mandaron medio día» para la ventana entre 20260826040000 y 20260826060000.
+  //
+  // 🔴 Tolerancia retirada el 3-sep-2026: las siete columnas existen y el saldo
+  // ya es `numeric` (verificado por PostgREST: acepta `12.5`). Hoy un error de
+  // la base es un 500 con el mensaje — reintentar sin una columna guardaría la
+  // ficha SIN el dato que la contadora tecleó, en silencio.
+  const { error } = await supabaseServer
     .from(TABLA_PERSONAS)
     .upsert(conBaseSeguros, { onConflict: "empleado_codigo" });
 
-  // 🩸 FALTA LA COLUMNA DE LA BASE PROPIA. Misma bifurcación que las cinco de
-  // abajo, y por la misma razón:
-  //  · si NO se le estaba poniendo base a nadie (`null`, el default), se
-  //    reintenta sin la columna y guardar un nombre o un salario sigue
-  //    funcionando igual que ayer;
-  //  · si SÍ se le estaba poniendo, NO se guarda a medias. Un "guardado" que se
-  //    traga la base le seguiría reteniendo a Rodrigo $39,38 donde le tocan
-  //    $17,06 —$25,18 de más por quincena— y nadie sabría por qué.
-  if (error && esColumnaBaseSegurosFaltante(error)) {
-    if (baseSeguros !== null) {
-      return NextResponse.json(
-        { error: avisoMigracionBaseSeguros(), faltaMigracionBaseSeguros: true },
-        { status: 503 },
-      );
-    }
-    ({ error } = await supabaseServer
-      .from(TABLA_PERSONAS)
-      .upsert(conReloj, { onConflict: "empleado_codigo" }));
-  }
-
-  // 🩸 FALTA LA COLUMNA DEL SUELDO FIJO. Misma bifurcación que las cuatro de
-  // abajo, y por la misma razón:
-  //  · si NO se estaba marcando a nadie como sueldo fijo (`false`, el default),
-  //    se reintenta sin la columna y guardar un nombre o un salario sigue
-  //    funcionando igual que ayer;
-  //  · si SÍ se estaba marcando, NO se guarda a medias. Un "guardado" que se
-  //    traga la bandera dejaría a Edwin cayendo en «no marcó ni un día» todas
-  //    las quincenas —o sea, sin cobrar— y nadie sabría por qué.
-  if (error && esColumnaNoMarcaRelojFaltante(error)) {
-    if (noMarcaRelojValor) {
-      return NextResponse.json(
-        { error: avisoMigracionNoMarcaReloj(), faltaMigracionNoMarcaReloj: true },
-        { status: 503 },
-      );
-    }
-    ({ error } = await supabaseServer
-      .from(TABLA_PERSONAS)
-      .upsert(conSaldo, { onConflict: "empleado_codigo" }));
-  }
-
-  // 🩸 FALTAN LAS COLUMNAS DEL SALDO. Misma bifurcación que las tres de abajo:
-  //  · si NO se estaba cargando ningún saldo, se reintenta sin las columnas y
-  //    guardar un nombre o un salario sigue funcionando igual que ayer;
-  //  · si SÍ se estaba cargando, ya se salió con un 503 más arriba (la relectura
-  //    del corte lo detecta antes de escribir). Este `if` es el cinturón por si
-  //    el error aparece recién en el `upsert`.
-  // 🩸 LA COLUMNA TODAVÍA ES `integer` Y LE MANDARON MEDIO DÍA. Ventana real:
-  // la migración que crea el saldo ya corrió y la que le agrega los medios días
-  // va aparte. Sin esto, la contadora que escribe «12.5» lee un
-  // «invalid input syntax for type integer» en inglés.
-  //
-  // 🔑 Se exige que el valor DE VERDAD tuviera medio día: el error no nombra la
-  // columna, así que sin esa condición cualquier dato mal tipeado de la fila se
-  // leería como «falta esta migración».
-  if (
-    error
-    && saldoVacacionesDias !== null
-    && !Number.isInteger(saldoVacacionesDias)
-    && esSaldoTodaviaEntero(error)
-  ) {
-    return NextResponse.json(
-      { error: avisoMigracionSaldoMediosDias(), faltaMigracionSaldoMediosDias: true },
-      { status: 503 },
-    );
-  }
-
-  if (error && esColumnaSaldoVacacionesFaltante(error)) {
-    if (saldoVacacionesDias !== null) {
-      return NextResponse.json(
-        { error: avisoMigracionSaldoVacaciones(), faltaMigracionSaldoVacaciones: true },
-        { status: 503 },
-      );
-    }
-    ({ error } = await supabaseServer
-      .from(TABLA_PERSONAS)
-      .upsert(conTodo, { onConflict: "empleado_codigo" }));
-  }
-
-  // 🩸 FALTA LA COLUMNA DE LOS SEGUROS. Misma bifurcación que las dos de abajo:
-  //  · si NO se le estaba quitando el seguro a nadie (`pagaSeguros` en `true`,
-  //    que es el default), se reintenta sin la columna y guardar un nombre o un
-  //    salario sigue funcionando igual que ayer;
-  //  · si SÍ se le estaba quitando, NO se guarda a medias. Un "guardado" que se
-  //    traga la bandera le seguiría descontando el 11 % a alguien que la
-  //    contadora no le descuenta, y nadie sabría por qué.
-  if (error && esColumnaPagaSegurosFaltante(error)) {
-    if (!pagaSeguros) {
-      return NextResponse.json(
-        { error: avisoMigracionSeguros(), faltaMigracionSeguros: true },
-        { status: 503 },
-      );
-    }
-    ({ error } = await supabaseServer
-      .from(TABLA_PERSONAS)
-      .upsert(conServicio, { onConflict: "empleado_codigo" }));
-  }
-
-  // 🩸 FALTA LA COLUMNA DE SERVICIO PROFESIONAL. Misma bifurcación que la baja,
-  // y por la misma razón:
-  //  · si NO se estaba marcando a nadie como servicio profesional, se reintenta
-  //    sin la columna para que poner un nombre o un salario siga funcionando;
-  //  · si SÍ se estaba marcando, NO se guarda a medias y se dice qué falta. Un
-  //    "guardado" que se traga la bandera dejaría a la persona en la planilla y
-  //    nadie sabría por qué.
-  if (error && esColumnaServicioProfesionalFaltante(error)) {
-    if (servicioProfesional) {
-      return NextResponse.json(
-        { error: avisoMigracionServicioProfesional(), faltaMigracionServicioProfesional: true },
-        { status: 503 },
-      );
-    }
-    ({ error } = await supabaseServer
-      .from(TABLA_PERSONAS)
-      .upsert(conVigencia, { onConflict: "empleado_codigo" }));
-  }
-
   if (error) {
-    // 🔴 LA COLUMNA SE PREGUNTA ANTES QUE LA TABLA, y no es un detalle de estilo:
-    // PostgREST dice «Could not find the 'fecha_salida' column of
-    // 'asistencia_personas' in the schema cache» — ese texto nombra la tabla y
-    // trae "could not find", así que `esTablaFaltante` lo daría por bueno y el
-    // usuario leería «falta crear la tabla» cuando lo que falta son tres
-    // columnas. Lo específico primero. (Ver el mismo orden en `leerPersonas`.)
-    //
-    // 🩸 FALTAN LAS COLUMNAS DE LA BAJA. Acá se bifurca a propósito:
-    //  · si NO se estaba dando de baja a nadie, se reintenta sin esas columnas
-    //    para que poner un nombre o un salario siga funcionando igual que ayer;
-    //  · si SÍ se estaba dando de baja, NO se guarda a medias y se dice qué
-    //    falta. Un "guardado" que se traga la fecha de salida es peor que un
-    //    error: la persona seguiría saliendo en la planilla y nadie sabría por qué.
-    if (esColumnaDeBajaFaltante(error)) {
-      if (v.fechaSalida !== null || v.fechaIngreso !== null) {
-        return NextResponse.json(
-          { error: avisoMigracionBajas(), faltaMigracionBajas: true },
-          { status: 503 },
-        );
-      }
-      const reintento = await supabaseServer
-        .from(TABLA_PERSONAS)
-        .upsert(base, { onConflict: "empleado_codigo" });
-      if (!reintento.error) {
-        return NextResponse.json({
-          ok: true,
-          persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, saldoVacacionesDias, saldoVacacionesCorte },
-          faltaMigracionBajas: true,
-        });
-      }
-      console.error("[asistencia/configuracion PUT]", reintento.error.message);
-      return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
-    }
-
-    // Sin la migración corrida esto no es un error del usuario: es un paso que
-    // falta. Se dice cuál, con el nombre del archivo.
-    if (esTablaFaltante(error, TABLA_PERSONAS)) {
-      return NextResponse.json({ error: avisoMigracion(), faltaMigracion: true }, { status: 503 });
-    }
-
     console.error("[asistencia/configuracion PUT]", error.message);
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }

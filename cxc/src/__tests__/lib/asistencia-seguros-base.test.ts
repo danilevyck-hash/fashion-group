@@ -402,7 +402,14 @@ describe("🔴 CONDUCTA — el PUT real, mirando la fila que se escribe", () => 
     expect(upserts[0][COLUMNA_BASE_SEGUROS]).toBeNull();
   });
 
-  it("🩸 SIN LA COLUMNA CORRIDA: guardar un nombre sigue funcionando", async () => {
+  // ⚠️ CAMBIARON DE DIRECCIÓN EL 3-SEP-2026 (tolerancia a la DDL retirada).
+  // Hasta ese día, con PGRST204 nombrando la columna: guardar un nombre se
+  // REINTENTABA sin la columna (200, dos upserts) y cargarle la base a alguien
+  // contestaba 503 con el nombre del archivo. La columna existe desde
+  // 20260826120000; hoy ese código es un error como cualquier otro: 500, UN
+  // solo upsert, y nada de reintento — reintentar le seguiría reteniendo a
+  // Rodrigo $39,38 donde le tocan $17,06, en silencio.
+  it("🔴 con PGRST204 guardar un nombre YA NO se reintenta sin la columna: 500 y un solo upsert", async () => {
     respuestas = [{
       error: {
         code: "PGRST204",
@@ -410,14 +417,12 @@ describe("🔴 CONDUCTA — el PUT real, mirando la fila que se escribe", () => 
       },
     }];
     const res = await putPersona(pedido(cuerpo()));
-    expect(res.status).toBe(200);
-    // Se reintentó SIN la columna, y el nombre quedó guardado igual que ayer.
-    expect(upserts).toHaveLength(2);
-    expect(COLUMNA_BASE_SEGUROS in upserts[1]).toBe(false);
-    expect(upserts[1].nombre).toBe("RODRIGO MIRANDA");
+    expect(res.status).toBe(500);
+    expect(upserts).toHaveLength(1);
+    expect(COLUMNA_BASE_SEGUROS in upserts[0]).toBe(true);
   });
 
-  it("🔴 SIN LA COLUMNA CORRIDA: cargarle la base a alguien NO se guarda a medias", async () => {
+  it("🔴 y cargarle la base a alguien tampoco se guarda a medias: 500, sin «falta la migración»", async () => {
     respuestas = [{
       error: {
         code: "PGRST204",
@@ -425,13 +430,10 @@ describe("🔴 CONDUCTA — el PUT real, mirando la fila que se escribe", () => 
       },
     }];
     const res = await putPersona(pedido(cuerpo({ baseSeguros: "175" })));
-    // 🩸 Un "guardado" que se traga la base le seguiría reteniendo a Rodrigo
-    // $39,38 donde le tocan $17,06, y nadie sabría por qué.
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(500);
     const d = await res.json();
-    expect(d.faltaMigracionBaseSeguros).toBe(true);
-    expect(d.error).toContain(MIGRACION_BASE_SEGUROS);
-    // Y NO se reintentó: una sola escritura, la que falló.
+    expect(d.faltaMigracionBaseSeguros).toBeUndefined();
+    expect(d.error).not.toContain(MIGRACION_BASE_SEGUROS);
     expect(upserts).toHaveLength(1);
   });
 

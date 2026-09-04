@@ -1,28 +1,45 @@
 /* ─────────────────────────────────────────────────────────────────────────────
- * Leer la configuración de asistencia SIN ASUMIR QUE LA MIGRACIÓN YA CORRIÓ.
+ * Leer la configuración de asistencia — el I/O de fichas, reglas,
+ * justificaciones, vacaciones y repartos, en UN solo lugar.
  *
- * 🩸 En este proyecto los DDL los corre Daniel a mano, y varios se quedaron
- * "PENDIENTES" durante semanas (hay media docena anotados así en CLAUDE.md). Si
- * la pantalla de Configuración se cayera hasta que alguien corra el SQL, el
- * síntoma sería "Asistencia está rota" — nadie deduce de un 500 que falta un
- * `CREATE TABLE`. Por eso acá se DEGRADA con un aviso concreto: se muestra el
- * nombre del archivo que hay que correr.
+ * Historia (ago-2026): esto se escribió para leer SIN ASUMIR QUE LA MIGRACIÓN
+ * YA CORRIÓ. En este proyecto los DDL los corre Daniel a mano, y varios se
+ * quedaron "PENDIENTES" durante semanas. Si la pantalla de Configuración se
+ * cayera hasta que alguien corriera el SQL, el síntoma sería "Asistencia está
+ * rota" — nadie deduce de un 500 que falta un `CREATE TABLE`. Por eso acá se
+ * DEGRADABA con un aviso concreto (el nombre del archivo que había que correr),
+ * y solo cuando el error NOMBRABA la tabla o la columna. Era el criterio de
+ * `catalogo/cols-opcionales.ts`, un escalón más arriba.
  *
- * Es el mismo criterio de `catalogo/cols-opcionales.ts`, un escalón más arriba:
- * allá falta una columna, acá falta la tabla entera.
- *
- * ⚠️ Igual que allá, la degradación solo ocurre cuando el error NOMBRA la tabla
- * (o trae el código de Postgres/PostgREST de "no existe"). Tragarse cualquier
- * error convertiría un problema real —permisos, red, RLS— en una pantalla que
- * miente diciendo "falta la migración".
+ * 🔴 TOLERANCIA RETIRADA EL 3-SEP-2026. Las tablas y columnas que este archivo
+ * toleraba existen todas en producción (verificado por PostgREST ese día):
+ *   · `asistencia_reglas` y `asistencia_personas` — 20260806160000
+ *   · fecha_ingreso / fecha_salida / motivo_salida   — 20260807120000
+ *   · servicio_profesional                            — 20260813120000
+ *   · paga_seguros                                    — 20260825120000
+ *   · hora_desde / hora_hasta (justificaciones)       — 20260825140000
+ *   · `asistencia_vacaciones`                         — 20260825160000
+ *   · saldo_vacaciones_dias / _corte                  — 20260826040000
+ *   · no_marca_reloj                                  — 20260826080000
+ *   · seguros_base_quincena                           — 20260826120000
+ *   · `asistencia_reparto_empresa`                    — 20260901120000
+ * Con todas corridas, ese camino era RAMA MUERTA que solo podía esconder
+ * errores reales: un permiso denegado, un timeout o un cambio de esquema que
+ * devuelva el mismo código (`42P01`, `PGRST205`, `42703`, `PGRST204`) se leían
+ * como «todavía no está instalado» y la planilla salía con TODOS activos, nadie
+ * de vacaciones, nadie fuera de planilla, seguros sobre el bruto — o sea, con
+ * plata mal pagada y una pantalla tranquila. Hoy cualquier error de la base se
+ * PROPAGA y la ruta contesta 500 con el mensaje. Los campos `faltaMigracion`
+ * que quedan en las respuestas están SIEMPRE en `false` y se conservan solo
+ * porque los leen rutas de otra tanda (`reglas`, `justificaciones`,
+ * `vacaciones`); los detectores (`esTablaFaltante`, `esColumna*Faltante`)
+ * siguen vivos en sus módulos puros porque los usan otros archivos.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   reglasDesdeFila,
-  REGLAS_DEFAULT,
-  esTablaFaltante,
   TABLA_PERSONAS,
   TABLA_REGLAS,
   TABLA_VACACIONES,
@@ -37,42 +54,20 @@ import {
 } from "./directorio";
 import {
   COLUMNAS_BAJAS,
-  esColumnaDeBajaFaltante,
   MOTIVOS_SALIDA,
   type MotivoSalida,
   type Vigencia,
 } from "./vigencia";
-import {
-  COLUMNA_SERVICIO_PROFESIONAL,
-  esColumnaServicioProfesionalFaltante,
-  esServicioProfesional,
-} from "./participacion";
-import { COLS_PERMISO_HORAS, esColumnaPermisoHorasFaltante } from "./permiso-horas";
-import {
-  COLS_SALDO_VACACIONES,
-  esColumnaSaldoVacacionesFaltante,
-  numeroDeDias,
-  type DatosSaldo,
-} from "./saldo-vacaciones";
+import { COLUMNA_SERVICIO_PROFESIONAL, esServicioProfesional } from "./participacion";
+import { COLS_PERMISO_HORAS } from "./permiso-horas";
+import { COLS_SALDO_VACACIONES, numeroDeDias, type DatosSaldo } from "./saldo-vacaciones";
 import type { Justificacion } from "./reporte";
 // 🔑 SOLO EL TIPO: `vacaciones.ts` es PURO y no puede importar de acá. Un
 // import de valor armaría el ciclo al revés y sin necesidad.
 import type { Vacacion } from "./vacaciones";
-import {
-  COLUMNA_PAGA_SEGUROS,
-  esColumnaPagaSegurosFaltante,
-  pagaSeguros,
-} from "./seguros";
-import {
-  COLUMNA_NO_MARCA_RELOJ,
-  esColumnaNoMarcaRelojFaltante,
-  noMarcaReloj,
-} from "./sueldo-fijo";
-import {
-  COLUMNA_BASE_SEGUROS,
-  baseSeguros,
-  esColumnaBaseSegurosFaltante,
-} from "./seguros-base";
+import { COLUMNA_PAGA_SEGUROS, pagaSeguros } from "./seguros";
+import { COLUMNA_NO_MARCA_RELOJ, noMarcaReloj } from "./sueldo-fijo";
+import { COLUMNA_BASE_SEGUROS, baseSeguros } from "./seguros-base";
 
 // Se re-exportan para que las rutas importen todo de un solo lugar. La
 // DETECCIÓN es pura y vive en `config.ts`; acá solo está el I/O.
@@ -86,14 +81,25 @@ export {
 
 export interface ReglasLeidas {
   reglas: ReglasAsistencia;
-  /** `true` = la tabla no existe todavía; se están usando los valores por defecto. */
+  /**
+   * SIEMPRE `false` desde el 3-sep-2026 (tolerancia a la DDL retirada: la
+   * tabla existe desde 20260806160000). Se conserva porque lo leen
+   * `configuracion/reglas/route.ts` y las rutas que pasan por
+   * `leerPersonasDelModulo`; hoy un error de la base se propaga, no se
+   * disfraza de «falta la migración».
+   */
   faltaMigracion: boolean;
 }
 
 /**
- * Las reglas del cálculo. Sin la migración corrida devuelve los valores por
- * defecto (que son los que confirmó la contable), así que el reporte sigue
- * saliendo igual que antes en vez de romperse.
+ * Las reglas del cálculo.
+ *
+ * Historia: sin la migración corrida devolvía los valores por defecto (los que
+ * confirmó la contable) para que el reporte siguiera saliendo. Tolerancia
+ * retirada el 3-sep-2026: la tabla existe desde
+ * 20260806160000_asistencia_configuracion.sql. Un error acá es un error —
+ * seguir con los defaults pagaría con una tolerancia o una rata que la
+ * contadora tal vez cambió, sin que nadie lo vea.
  */
 export async function leerReglas(): Promise<ReglasLeidas> {
   const { data, error } = await supabaseServer
@@ -103,10 +109,7 @@ export async function leerReglas(): Promise<ReglasLeidas> {
     .maybeSingle();
 
   if (error) {
-    if (esTablaFaltante(error, TABLA_REGLAS)) {
-      return { reglas: { ...REGLAS_DEFAULT }, faltaMigracion: true };
-    }
-    throw new Error(error.message);
+    throw new Error(`No se pudieron leer las reglas de asistencia: ${error.message}`);
   }
   // Sin fila (tabla recién creada y el INSERT no corrió) tampoco es un error:
   // los defaults del código son los mismos que los de la tabla.
@@ -119,26 +122,29 @@ export interface FilaPersonaDb {
   salario_mensual: number | string | null;
   jornada_semanal: number | null;
   empresa: string | null;
-  /** Opcionales: no existen hasta que se corra `MIGRACION_BAJAS`. */
+  // Los campos de abajo siguen OPCIONALES en el tipo aunque el `select` los pida
+  // siempre: los tests y los callers arman fichas parciales, y `null` sigue
+  // siendo el valor normal de una ficha que no tiene el dato cargado.
+  /** La baja (20260807120000). `null` = sigue trabajando. */
   fecha_ingreso?: string | null;
   fecha_salida?: string | null;
   motivo_salida?: string | null;
-  /** Opcional: no existe hasta que se corra `MIGRACION_SERVICIO_PROFESIONAL`. */
+  /** Servicio profesional (20260813120000). `null` = va en planilla. */
   servicio_profesional?: boolean | null;
-  /** Opcional: no existe hasta que se corra `MIGRACION_SEGUROS`. Ausente o
-   *  `null` = SÍ se le descuentan, que es como estaban las 38 fichas. */
+  /** Seguros (20260825120000). `null` = SÍ se le descuentan, que es como
+   *  estaban las 38 fichas. */
   paga_seguros?: boolean | null;
-  /** Opcional: no existe hasta que se corra `MIGRACION_NO_MARCA_RELOJ`. Ausente
-   *  o `null` = SÍ marca el reloj, que es como estaban las 39 fichas. */
+  /** Sueldo fijo (20260826080000). `null` = SÍ marca el reloj, que es como
+   *  estaban las 39 fichas. */
   no_marca_reloj?: boolean | null;
-  /** Opcional: no existe hasta que se corra `MIGRACION_BASE_SEGUROS`. Ausente o
-   *  `null` = los seguros salen del TOTAL BRUTO, que es como estaban las 40
-   *  fichas. Es el monto de UNA QUINCENA — ver `seguros-base.ts`.
+  /** Base propia de seguros (20260826120000). `null` = los seguros salen del
+   *  TOTAL BRUTO, que es como estaban las 40 fichas. Es el monto de UNA
+   *  QUINCENA — ver `seguros-base.ts`.
    *  ⚠️ `numeric` en la base, y PostgREST lo manda como TEXTO. Ver `baseSeguros`. */
   seguros_base_quincena?: number | string | null;
-  /** Opcionales: no existen hasta que se corra `MIGRACION_SALDO_VACACIONES`.
-   *  Los DOS o NINGUNO (lo obliga un CHECK). `null` = todavía no se cargó el
-   *  saldo, y entonces la pantalla dice «Falta el saldo» y NO muestra número. */
+  /** El saldo de vacaciones (20260826040000). Los DOS o NINGUNO (lo obliga un
+   *  CHECK). `null` = todavía no se cargó el saldo, y entonces la pantalla dice
+   *  «Falta el saldo» y NO muestra número. */
   /** ⚠️ `numeric` en la base, y PostgREST lo manda como TEXTO. Ver
    *  `numeroDeDias` — el mismo motivo por el que `salario_mensual` se lee con
    *  un `Number(...)` unas líneas más arriba. */
@@ -148,32 +154,23 @@ export interface FilaPersonaDb {
 
 export interface PersonasLeidas {
   filas: FilaPersonaDb[];
+  /**
+   * SIEMPRE `false` desde el 3-sep-2026 (tolerancia a la DDL retirada). Se
+   * conserva porque viaja por `leerDirectorio` → `leerPersonasDelModulo` hasta
+   * rutas de otra tanda (`justificaciones`, `vacaciones`). Hoy un error de la
+   * base se propaga, no se disfraza de «falta la migración».
+   *
+   * Historia: hasta ese día acá venían además seis banderas `faltaColumna*`
+   * (bajas, servicio profesional, seguros, sueldo fijo, base de seguros, saldo
+   * de vacaciones), una por migración pendiente. Se quitaron con la escalera.
+   */
   faltaMigracion: boolean;
-  /** `true` = la tabla existe pero le faltan las columnas de la baja. Todas las
-   *  personas se leen como activas, que es exactamente como estaban antes. */
-  faltaColumnasBajas: boolean;
-  /** `true` = falta la columna de servicio profesional. Todo el mundo se lee
-   *  como "va en planilla", que es exactamente como estaba antes. */
-  faltaColumnaServicioProfesional: boolean;
-  /** `true` = falta la columna de los seguros. A todo el mundo se le descuentan
-   *  el social y el educativo, que es exactamente como estaba antes. */
-  faltaColumnaPagaSeguros: boolean;
-  /** `true` = falta la columna del sueldo fijo. Todo el mundo se lee como que
-   *  marca el reloj, que es exactamente como estaba antes. */
-  faltaColumnaNoMarcaReloj: boolean;
-  /** `true` = falta la columna de la base propia de seguros. A todo el mundo se
-   *  le calculan sobre el bruto, que es exactamente como estaba antes. */
-  faltaColumnaBaseSeguros: boolean;
-  /** `true` = faltan las columnas del saldo de vacaciones. Nadie tiene saldo
-   *  inicial, o sea que la pestaña Vacaciones dice «Falta el saldo» y no
-   *  muestra ningún número — que es exactamente como estaba antes. */
-  faltaColumnasSaldoVacaciones: boolean;
 }
 
 /** Lo que se pedía antes de que existieran las altas y bajas. */
 const COLS_BASE = "empleado_codigo, nombre, salario_mensual, jornada_semanal, empresa";
-/** Con las columnas de la baja. Salen de `vigencia.ts` para que el `select` y la
- *  detección del error no se puedan separar. */
+/** Con las columnas de la baja. Salen de `vigencia.ts`: el `select` y el módulo
+ *  que sabe leerlas no se pueden separar. */
 const COLS_CON_BAJAS = `${COLS_BASE}, ${COLUMNAS_BAJAS.join(", ")}`;
 /** Todo. La columna nueva sale de `participacion.ts`, por lo mismo.
  *
@@ -189,182 +186,38 @@ const COLS_TODO = `${COLS_CON_SERVICIO}, ${COLUMNA_PAGA_SEGUROS}`;
 const COLS_CON_SALDO = `${COLS_TODO}, ${COLS_SALDO_VACACIONES.join(", ")}`;
 /** Todo, con el sueldo fijo. Sale de `sueldo-fijo.ts`, por lo mismo. */
 const COLS_CON_RELOJ = `${COLS_CON_SALDO}, ${COLUMNA_NO_MARCA_RELOJ}`;
-/** Todo, con la base propia de seguros. Sale de `seguros-base.ts`, por lo mismo. */
+/** Todo, con la base propia de seguros. Sale de `seguros-base.ts`, por lo mismo.
+ *  Es LA lista que se pide: las de arriba solo documentan de dónde sale cada
+ *  columna. */
 const COLS_CON_BASE_SEGUROS = `${COLS_CON_RELOJ}, ${COLUMNA_BASE_SEGUROS}`;
 
 /**
- * Las fichas guardadas.
+ * Las fichas guardadas — UN solo `select`, con todas las columnas.
  *
- * 🩸 AGUANTA CADA MIGRACIÓN PENDIENTE POR SEPARADO, y no es teoría: en este
- * proyecto los DDL los corre Daniel a mano y varios se quedaron pendientes
- * semanas. Una lista explícita de columnas hace que PostgREST rechace el select
- * ENTERO, así que sin esta escalera Asistencia no cargaría NI UNA ficha hasta
- * que alguien corriera el SQL — y el síntoma sería "Asistencia está rota".
+ * Historia (ago-2026): esto era una ESCALERA de siete peldaños que aguantaba
+ * cada migración pendiente por separado (sin `seguros_base_quincena` → los
+ * seguros del bruto; sin `no_marca_reloj` → todos marcan; sin el saldo → nadie
+ * tiene; sin `paga_seguros` → a todos se les cobra; sin `servicio_profesional`
+ * → nadie fuera de planilla; sin las columnas de baja → todos activos; sin la
+ * tabla → lista vacía con aviso). Cada peldaño solo se bajaba cuando el error
+ * NOMBRABA la columna, y lo específico se preguntaba antes que lo general
+ * (7-ago-2026: preguntar primero por la tabla escondió 32 fichas reales).
  *
- * La escalera va de lo nuevo a lo viejo, y cada peldaño solo se baja cuando el
- * error NOMBRA la columna que ese peldaño quita:
- *   1. todo                        → lo normal;
- *   2. sin `seguros_base_quincena` → los seguros salen del bruto (como hoy);
- *   3. sin `no_marca_reloj`        → todo el mundo marca el reloj (como hoy);
- *   4. sin el saldo de vacaciones  → nadie tiene saldo inicial (como hoy);
- *   5. sin `paga_seguros`          → a todo el mundo se le cobran (como hoy);
- *   6. sin `servicio_profesional`  → nadie está fuera de planilla (como hoy);
- *   7. sin las columnas de baja    → todo el mundo activo (como estaba antes);
- *   8. sin la tabla                → lista vacía y la pantalla nombra el archivo.
- *
- * ⚠️ Releer ante CUALQUIER error convertiría un problema real —permisos, red,
- * RLS— en una lectura incompleta que nadie notaría.
+ * 🔴 Tolerancia retirada el 3-sep-2026: las siete migraciones existen en
+ * producción (lista en el encabezado). Bajar un peldaño hoy no sería tolerar
+ * una DDL pendiente: sería leer una planilla con TODOS activos, nadie de
+ * vacaciones y seguros sobre el bruto porque un permiso o un timeout devolvió
+ * el mismo código — plata mal pagada con la pantalla tranquila. Cualquier
+ * error se propaga.
  */
 export async function leerPersonas(): Promise<PersonasLeidas> {
-  // 🔴 EL ORDEN DE LAS PREGUNTAS NO ES ESTÉTICO, Y COSTÓ UNA VERIFICACIÓN EN EL
-  // NAVEGADOR (7-ago-2026). Postgres dice «column asistencia_personas.
-  // fecha_ingreso does not exist»: ese texto NOMBRA la tabla y trae "does not
-  // exist", así que `esTablaFaltante` lo daría por bueno. Preguntando primero
-  // por la tabla, faltar unas columnas se leía como «falta la tabla entera» y la
-  // pantalla escondía las 32 fichas reales detrás de un aviso equivocado.
-  // Lo específico se pregunta antes que lo general.
-  const intentos: Array<{
-    cols: string;
-    faltaColumnasBajas: boolean;
-    faltaColumnaServicioProfesional: boolean;
-    faltaColumnaPagaSeguros: boolean;
-    faltaColumnasSaldoVacaciones: boolean;
-    faltaColumnaNoMarcaReloj: boolean;
-    faltaColumnaBaseSeguros: boolean;
-    /** ¿Este error justifica bajar un peldaño? */
-    reintentar: (err: unknown) => boolean;
-  }> = [
-    {
-      cols: COLS_CON_BASE_SEGUROS,
-      faltaColumnasBajas: false,
-      faltaColumnaServicioProfesional: false,
-      faltaColumnaPagaSeguros: false,
-      faltaColumnasSaldoVacaciones: false,
-      faltaColumnaNoMarcaReloj: false,
-      faltaColumnaBaseSeguros: false,
-      reintentar: (e) =>
-        esColumnaBaseSegurosFaltante(e)
-        || esColumnaNoMarcaRelojFaltante(e)
-        || esColumnaSaldoVacacionesFaltante(e)
-        || esColumnaPagaSegurosFaltante(e)
-        || esColumnaServicioProfesionalFaltante(e)
-        || esColumnaDeBajaFaltante(e),
-    },
-    {
-      cols: COLS_CON_RELOJ,
-      faltaColumnasBajas: false,
-      faltaColumnaServicioProfesional: false,
-      faltaColumnaPagaSeguros: false,
-      faltaColumnasSaldoVacaciones: false,
-      faltaColumnaNoMarcaReloj: false,
-      faltaColumnaBaseSeguros: true,
-      reintentar: (e) =>
-        esColumnaNoMarcaRelojFaltante(e)
-        || esColumnaSaldoVacacionesFaltante(e)
-        || esColumnaPagaSegurosFaltante(e)
-        || esColumnaServicioProfesionalFaltante(e)
-        || esColumnaDeBajaFaltante(e),
-    },
-    {
-      cols: COLS_CON_SALDO,
-      faltaColumnasBajas: false,
-      faltaColumnaServicioProfesional: false,
-      faltaColumnaPagaSeguros: false,
-      faltaColumnasSaldoVacaciones: false,
-      faltaColumnaNoMarcaReloj: true,
-      faltaColumnaBaseSeguros: true,
-      reintentar: (e) =>
-        esColumnaSaldoVacacionesFaltante(e)
-        || esColumnaPagaSegurosFaltante(e)
-        || esColumnaServicioProfesionalFaltante(e)
-        || esColumnaDeBajaFaltante(e),
-    },
-    {
-      cols: COLS_TODO,
-      faltaColumnasBajas: false,
-      faltaColumnaServicioProfesional: false,
-      faltaColumnaPagaSeguros: false,
-      faltaColumnasSaldoVacaciones: true,
-      faltaColumnaNoMarcaReloj: true,
-      faltaColumnaBaseSeguros: true,
-      reintentar: (e) =>
-        esColumnaPagaSegurosFaltante(e)
-        || esColumnaServicioProfesionalFaltante(e)
-        || esColumnaDeBajaFaltante(e),
-    },
-    {
-      cols: COLS_CON_SERVICIO,
-      faltaColumnasBajas: false,
-      faltaColumnaServicioProfesional: false,
-      faltaColumnaPagaSeguros: true,
-      faltaColumnasSaldoVacaciones: true,
-      faltaColumnaNoMarcaReloj: true,
-      faltaColumnaBaseSeguros: true,
-      reintentar: (e) => esColumnaServicioProfesionalFaltante(e) || esColumnaDeBajaFaltante(e),
-    },
-    {
-      cols: COLS_CON_BAJAS,
-      faltaColumnasBajas: false,
-      faltaColumnaServicioProfesional: true,
-      faltaColumnaPagaSeguros: true,
-      faltaColumnasSaldoVacaciones: true,
-      faltaColumnaNoMarcaReloj: true,
-      faltaColumnaBaseSeguros: true,
-      reintentar: esColumnaDeBajaFaltante,
-    },
-    {
-      cols: COLS_BASE,
-      faltaColumnasBajas: true,
-      faltaColumnaServicioProfesional: true,
-      faltaColumnaPagaSeguros: true,
-      faltaColumnasSaldoVacaciones: true,
-      faltaColumnaNoMarcaReloj: true,
-      faltaColumnaBaseSeguros: true,
-      reintentar: () => false,
-    },
-  ];
-
-  for (const intento of intentos) {
-    const { data, error } = await supabaseServer.from(TABLA_PERSONAS).select(intento.cols);
-    if (!error) {
-      return {
-        filas: (data ?? []) as unknown as FilaPersonaDb[],
-        faltaMigracion: false,
-        faltaColumnasBajas: intento.faltaColumnasBajas,
-        faltaColumnaServicioProfesional: intento.faltaColumnaServicioProfesional,
-        faltaColumnaPagaSeguros: intento.faltaColumnaPagaSeguros,
-        faltaColumnaNoMarcaReloj: intento.faltaColumnaNoMarcaReloj,
-        faltaColumnaBaseSeguros: intento.faltaColumnaBaseSeguros,
-        faltaColumnasSaldoVacaciones: intento.faltaColumnasSaldoVacaciones,
-      };
-    }
-    if (intento.reintentar(error)) continue;
-    if (esTablaFaltante(error, TABLA_PERSONAS)) {
-      return {
-        filas: [],
-        faltaMigracion: true,
-        faltaColumnasBajas: true,
-        faltaColumnaServicioProfesional: true,
-        faltaColumnaPagaSeguros: true,
-        faltaColumnasSaldoVacaciones: true,
-        faltaColumnaNoMarcaReloj: true,
-        faltaColumnaBaseSeguros: true,
-      };
-    }
-    throw new Error(error.message);
+  const { data, error } = await supabaseServer.from(TABLA_PERSONAS).select(COLS_CON_BASE_SEGUROS);
+  if (error) {
+    throw new Error(`No se pudieron leer las fichas de asistencia: ${error.message}`);
   }
-
-  // Inalcanzable: el último intento nunca reintenta. Está para que el tipo
-  // cierre sin un `!` que después se lea como una promesa que no se cumple.
   return {
-    filas: [],
-    faltaMigracion: true,
-    faltaColumnasBajas: true,
-    faltaColumnaServicioProfesional: true,
-    faltaColumnaPagaSeguros: true,
-    faltaColumnasSaldoVacaciones: true,
-    faltaColumnaNoMarcaReloj: true,
-    faltaColumnaBaseSeguros: true,
+    filas: (data ?? []) as unknown as FilaPersonaDb[],
+    faltaMigracion: false,
   };
 }
 
@@ -469,7 +322,7 @@ export function vigenciasDeFilas(filas: readonly FilaPersonaDb[]): Map<string, V
 
 export interface DirectorioLeido {
   directorio: Directorio;
-  /** `true` = la migración `20260806160000` no corrió; todo cae al código. */
+  /** SIEMPRE `false` desde el 3-sep-2026 — ver `PersonasLeidas.faltaMigracion`. */
   faltaMigracion: boolean;
   /**
    * Las fichas crudas con las que se armó el directorio.
@@ -482,8 +335,8 @@ export interface DirectorioLeido {
   filas: FilaPersonaDb[];
 }
 
-/** El traductor código → nombre. Sin la migración corrida devuelve uno vacío,
- *  que responde el código para cualquier persona en vez de romper la pantalla. */
+/** El traductor código → nombre. Sale de las MISMAS fichas que `leerPersonas`:
+ *  si esa lectura falla, esto falla (tolerancia a la DDL retirada el 3-sep-2026). */
 export async function leerDirectorio(): Promise<DirectorioLeido> {
   const { filas, faltaMigracion } = await leerPersonas();
   return { directorio: crearDirectorio(filas), faltaMigracion, filas };
@@ -549,7 +402,7 @@ export async function leerPersonasDelModulo(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LAS JUSTIFICACIONES — en UN solo lugar, y sin asumir que el DDL corrió
+// LAS JUSTIFICACIONES — en UN solo lugar
 //
 // 🩸 Las leían TRES rutas con su propio `select` copiado (`/reporte`,
 // `/planilla` y `/justificaciones`), que es exactamente el patrón que en este
@@ -557,13 +410,16 @@ export async function leerPersonasDelModulo(
 // no, la misma justificación vale distinto según por dónde se la mire — y acá
 // eso es la diferencia entre «el día entero» y «un permiso de dos horas», o sea
 // ocho horas de sueldo.
+//
+// Historia: hasta el 3-sep-2026 esto releía SIN `hora_desde`/`hora_hasta` cuando
+// el error nombraba esas columnas (`faltaColumnasHoras: true` → todas de día
+// entero). Tolerancia retirada: las columnas existen desde
+// 20260825140000_asistencia_permiso_horas.sql. Releer hoy convertiría un
+// permiso de dos horas en un día entero justificado por un timeout.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface JustificacionesLeidas {
   filas: Justificacion[];
-  /** `true` = falta `MIGRACION_PERMISO_HORAS`. Todas se leen como de DÍA
-   *  ENTERO, que es exactamente como se comportan hoy. */
-  faltaColumnasHoras: boolean;
 }
 
 /** Las justificaciones que TOCAN el rango pedido (se solapan, no "están
@@ -572,36 +428,20 @@ export async function leerJustificaciones(
   desde: string,
   hasta: string,
 ): Promise<JustificacionesLeidas> {
-  const BASE = "empleado_codigo, desde, hasta, motivo";
-  const pedir = (cols: string) =>
-    supabaseServer
-      .from("asistencia_justificaciones")
-      .select(cols)
-      .lte("desde", hasta)
-      .gte("hasta", desde);
+  const { data, error } = await supabaseServer
+    .from("asistencia_justificaciones")
+    .select(`empleado_codigo, desde, hasta, motivo, ${COLS_PERMISO_HORAS.join(", ")}`)
+    .lte("desde", hasta)
+    .gte("hasta", desde);
 
-  const conHoras = await pedir(`${BASE}, ${COLS_PERMISO_HORAS.join(", ")}`);
-  if (!conHoras.error) {
-    return {
-      filas: (conHoras.data ?? []) as unknown as Justificacion[],
-      faltaColumnasHoras: false,
-    };
+  if (error) {
+    throw new Error(`No se pudieron leer las justificaciones: ${error.message}`);
   }
-  // ⚠️ Solo se relee si el error NOMBRA las columnas. Tragarse cualquier error
-  // convertiría un problema real —permisos, red, RLS— en una lectura incompleta
-  // que nadie notaría, y con ella una justificación que deja de justificar.
-  if (!esColumnaPermisoHorasFaltante(conHoras.error)) throw new Error(conHoras.error.message);
-
-  const sinHoras = await pedir(BASE);
-  if (sinHoras.error) throw new Error(sinHoras.error.message);
-  return {
-    filas: (sinHoras.data ?? []) as unknown as Justificacion[],
-    faltaColumnasHoras: true,
-  };
+  return { filas: (data ?? []) as unknown as Justificacion[] };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LAS VACACIONES — en UN solo lugar, y sin asumir que el DDL corrió
+// LAS VACACIONES — en UN solo lugar
 //
 // 🩸 Mismo criterio que `leerJustificaciones`, y por el mismo motivo: las leen
 // DOS rutas (`/reporte` y `/planilla`) más la pantalla de Vacaciones. Un
@@ -609,23 +449,26 @@ export async function leerJustificaciones(
 // bugs caros — el día que una gane el interruptor y las otras no, el mismo día
 // se paga en una pantalla y se descuenta en la otra.
 //
-// ⚠️ LA TABLA PUEDE NO EXISTIR TODAVÍA: los DDL los corre Daniel a mano. Sin
-// ella se devuelven CERO vacaciones y `faltaTabla`, y TODO el módulo se
-// comporta EXACTAMENTE como antes de que las vacaciones existieran.
+// Historia: hasta el 3-sep-2026 «la tabla puede no existir todavía» y sin ella
+// se devolvían CERO vacaciones con `faltaTabla: true`. Tolerancia retirada: la
+// tabla existe desde 20260825160000. 🔴 Es la lectura que el motor honra pase
+// lo que pase (`vacaciones-el-motor-las-honra.test.ts`): devolver vacío ante
+// un error de la base convertiría los días de vacaciones en ausencias y
+// comería una quincena en silencio. Hoy el error se propaga.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** El archivo que Daniel tiene que correr para que exista la tabla. */
+/** El archivo que creó la tabla. Se conserva para el aviso de la ruta
+ *  `vacaciones` (otra tanda), que sigue nombrándolo. */
 export const MIGRACION_VACACIONES = "20260825160000_asistencia_vacaciones.sql";
 
-/** El mensaje que ve la gente cuando falta correr el SQL. Sin jerga de base. */
+/** El mensaje de la ruta `vacaciones` cuando su escritura detecta la tabla
+ *  ausente. Sin jerga de base. Acá ya no se usa (3-sep-2026). */
 export function avisoMigracionVacaciones(): string {
   return `Todavía no se pueden cargar vacaciones aquí. Pídele a Daniel que corra el archivo ${MIGRACION_VACACIONES} en Supabase.`;
 }
 
 export interface VacacionesLeidas {
   filas: Vacacion[];
-  /** `true` = falta correr `MIGRACION_VACACIONES`. Nadie está de vacaciones. */
-  faltaTabla: boolean;
 }
 
 /**
@@ -647,11 +490,9 @@ export async function leerVacaciones(
     .gte("hasta", desde);
 
   if (error) {
-    // ⚠️ Solo se degrada si el error NOMBRA la tabla. Tragarse cualquier error
-    // convertiría un permiso o un timeout en «nadie está de vacaciones», y esa
-    // mentira se paga: los días volverían a contarse como ausencia.
-    if (esTablaFaltante(error, TABLA_VACACIONES)) return { filas: [], faltaTabla: true };
-    throw new Error(error.message);
+    // 🔴 Nada de degradar a «nadie está de vacaciones»: esa mentira se paga —
+    // los días volverían a contarse como ausencia.
+    throw new Error(`No se pudieron leer las vacaciones: ${error.message}`);
   }
 
   return {
@@ -663,7 +504,6 @@ export async function leerVacaciones(
       // tiene que caer del lado de «se paga», que es el default.
       ya_pagadas: (f as { ya_pagadas: unknown }).ya_pagadas === true,
     })),
-    faltaTabla: false,
   };
 }
 
@@ -672,22 +512,20 @@ export async function leerVacaciones(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface RepartosLeidos {
-  /** Todas las filas, sin validar. Vacío si la tabla todavía no existe. */
+  /** Todas las filas, sin validar. */
   filas: FilaReparto[];
-  /**
-   * `true` = falta correr `MIGRACION_REPARTO`. Nadie tiene reparto, o sea la
-   * planilla de hoy hasta el centavo, y la pantalla dice qué archivo falta.
-   */
-  faltaTabla: boolean;
 }
 
 /**
  * Los repartos guardados.
  *
- * ⚠️ Solo se degrada si el error NOMBRA la tabla. Tragarse cualquier error
- * convertiría un permiso o un timeout en «nadie reparte su sueldo», y esa
- * mentira se paga en el neto: JULIO volvería a pagar el 11 % de seguros sobre
- * sus horas extra sin que nadie se entere.
+ * Historia: hasta el 3-sep-2026, si el error NOMBRABA la tabla se devolvía
+ * vacío con `faltaTabla: true` («nadie reparte, la planilla de hoy hasta el
+ * centavo»). Tolerancia retirada: la tabla existe desde
+ * 20260901120000_asistencia_reparto_empresa.sql. Degradar hoy convertiría un
+ * permiso o un timeout en «nadie reparte su sueldo», y esa mentira se paga en
+ * el neto: JULIO volvería a pagar el 11 % de seguros sobre sus horas extra sin
+ * que nadie se entere. El error se propaga.
  *
  * 🩸 SE PAGINA AUNQUE HOY SEAN DOS FILAS. `db-max-rows` = 1000 corta EN
  * SILENCIO, y acá un truncado no da un error: da un reparto que **NO SUMA** el
@@ -695,30 +533,20 @@ export interface RepartosLeidos {
  * a cobrar en una sola planilla. Se vería como «se deshizo solo».
  */
 export async function leerRepartos(): Promise<RepartosLeidos> {
-  try {
-    const filas = await leerTodoPaginado<FilaReparto>(
-      TABLA_REPARTO,
-      (pedirCount, from, to) =>
-        supabaseServer
-          .from(TABLA_REPARTO)
-          .select(
-            "empleado_codigo, empresa, salario_mensual, paga_seguros, paga_horas_extra, orden",
-            pedirCount ? { count: "exact" } : {},
-          )
-          // 🔑 Orden TOTAL y estable: sin él, dos filas empatadas pueden
-          // repetirse o saltearse entre páginas. La llave es (código, empresa).
-          .order("empleado_codigo", { ascending: true })
-          .order("empresa", { ascending: true })
-          .range(from, to),
-    );
-    return { filas, faltaTabla: false };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    // 🔑 `leerTodoPaginado` prefija su etiqueta pero CONSERVA el mensaje de
-    // PostgREST, así que la detección de «falta la tabla» sigue funcionando.
-    if (esTablaFaltante({ message: msg }, TABLA_REPARTO)) {
-      return { filas: [], faltaTabla: true };
-    }
-    throw e;
-  }
+  const filas = await leerTodoPaginado<FilaReparto>(
+    TABLA_REPARTO,
+    (pedirCount, from, to) =>
+      supabaseServer
+        .from(TABLA_REPARTO)
+        .select(
+          "empleado_codigo, empresa, salario_mensual, paga_seguros, paga_horas_extra, orden",
+          pedirCount ? { count: "exact" } : {},
+        )
+        // 🔑 Orden TOTAL y estable: sin él, dos filas empatadas pueden
+        // repetirse o saltearse entre páginas. La llave es (código, empresa).
+        .order("empleado_codigo", { ascending: true })
+        .order("empresa", { ascending: true })
+        .range(from, to),
+  );
+  return { filas };
 }

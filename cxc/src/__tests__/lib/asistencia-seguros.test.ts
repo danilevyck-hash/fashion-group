@@ -272,7 +272,14 @@ describe("🔴 CONDUCTA — el PUT real, mirando la fila que se escribe", () => 
     expect(upserts[0][COLUMNA_PAGA_SEGUROS]).toBe(true);
   });
 
-  it("🩸 SIN LA COLUMNA CORRIDA: guardar un nombre sigue funcionando", async () => {
+  // ⚠️ CAMBIARON DE DIRECCIÓN EL 3-SEP-2026 (tolerancia a la DDL retirada).
+  // Hasta ese día, con PGRST204 nombrando la columna: guardar un nombre se
+  // REINTENTABA sin la columna (200, dos upserts) y quitarle el seguro a alguien
+  // contestaba 503 con el nombre del archivo. La columna existe desde
+  // 20260825120000; hoy ese código es un error como cualquier otro: 500, UN
+  // solo upsert, y nada de reintento — reintentar guardaría la ficha SIN la
+  // bandera que la contadora tecleó, en silencio.
+  it("🔴 con PGRST204 guardar un nombre YA NO se reintenta sin la columna: 500 y un solo upsert", async () => {
     respuestas = [{
       error: { code: "PGRST204", message: `Could not find the '${COLUMNA_PAGA_SEGUROS}' column of 'asistencia_personas'` },
     }];
@@ -280,14 +287,12 @@ describe("🔴 CONDUCTA — el PUT real, mirando la fila que se escribe", () => 
       codigo: "8", nombre: "BRICEIDA MONTERO", salarioMensual: 566.52,
       jornadaSemanal: 40, empresa: "confecciones_boston", pagaSeguros: true,
     }));
-    expect(res.status).toBe(200);
-    // Se reintentó SIN la columna, y el nombre quedó guardado igual que ayer.
-    expect(upserts).toHaveLength(2);
-    expect(COLUMNA_PAGA_SEGUROS in upserts[1]).toBe(false);
-    expect(upserts[1].nombre).toBe("BRICEIDA MONTERO");
+    expect(res.status).toBe(500);
+    expect(upserts).toHaveLength(1);
+    expect(COLUMNA_PAGA_SEGUROS in upserts[0]).toBe(true);
   });
 
-  it("🔴 SIN LA COLUMNA CORRIDA: quitarle el seguro a alguien NO se guarda a medias", async () => {
+  it("🔴 y quitarle el seguro a alguien tampoco se guarda a medias: 500, sin «falta la migración»", async () => {
     respuestas = [{
       error: { code: "PGRST204", message: `Could not find the '${COLUMNA_PAGA_SEGUROS}' column of 'asistencia_personas'` },
     }];
@@ -295,13 +300,10 @@ describe("🔴 CONDUCTA — el PUT real, mirando la fila que se escribe", () => 
       codigo: "8", nombre: "BRICEIDA MONTERO", salarioMensual: 566.52,
       jornadaSemanal: 40, empresa: "confecciones_boston", pagaSeguros: false,
     }));
-    // 🩸 Un "guardado" que se traga la bandera le seguiría descontando el 11 %
-    // a alguien a quien la contadora no se lo descuenta, y nadie sabría por qué.
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(500);
     const d = await res.json();
-    expect(d.faltaMigracionSeguros).toBe(true);
-    expect(d.error).toContain("20260825120000_asistencia_paga_seguros.sql");
-    // Y NO se reintentó: una sola escritura, la que falló.
+    expect(d.faltaMigracionSeguros).toBeUndefined();
+    expect(d.error).not.toContain("20260825120000");
     expect(upserts).toHaveLength(1);
   });
 

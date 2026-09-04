@@ -297,27 +297,30 @@ describe("el PUT y la migración pendiente", () => {
     expect(upserts[0][COLUMNA_NO_MARCA_RELOJ]).toBe(true);
   });
 
-  it("🩸 falta la columna Y se estaba prendiendo: 503, y NO se guarda a medias", async () => {
+  // ⚠️ CAMBIARON DE DIRECCIÓN EL 3-SEP-2026 (tolerancia a la DDL retirada).
+  // Hasta ese día, con PGRST204 nombrando la columna: prender el sueldo fijo
+  // daba 503 con el nombre del archivo, y con la bandera apagada se REINTENTABA
+  // sin la columna (200, dos upserts). La columna existe desde 20260826080000;
+  // hoy ese código es un error como cualquier otro: 500, UN solo upsert, sin
+  // reintento — reintentar dejaría a Edwin cayendo en «no marcó ni un día»
+  // todas las quincenas, y nadie sabría por qué.
+  it("🔴 PGRST204 con la bandera prendida: 500, sin «falta la migración», y NO se guarda a medias", async () => {
     respuestas = [{ error: errorColumna }];
     const res = await putPersona(pedido(cuerpo({ noMarcaReloj: true })));
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(500);
     const d = await res.json();
-    expect(d.faltaMigracionNoMarcaReloj).toBe(true);
-    expect(d.error).toContain("20260826080000_asistencia_no_marca_reloj.sql");
-    // Un solo intento: no se reintentó sin la columna. Un "guardado" que se
-    // traga la bandera dejaría a Edwin sin cobrar y nadie sabría por qué.
+    expect(d.faltaMigracionNoMarcaReloj).toBeUndefined();
+    expect(d.error).not.toContain("20260826080000");
     expect(upserts).toHaveLength(1);
   });
 
-  it("falta la columna y NO se estaba prendiendo: se reintenta y guarda igual", async () => {
+  it("🔴 PGRST204 con la bandera apagada: TAMPOCO se reintenta — 500 y un solo upsert", async () => {
     respuestas = [{ error: errorColumna }, { error: null }];
     const res = await putPersona(pedido(cuerpo({ noMarcaReloj: false })));
-    expect(res.status).toBe(200);
-    expect(upserts).toHaveLength(2);
-    // El reintento va SIN la columna, pero con todo lo demás intacto.
-    expect(upserts[1]).not.toHaveProperty(COLUMNA_NO_MARCA_RELOJ);
-    expect(upserts[1].nombre).toBe("EDWIN GOMEZ");
-    expect(upserts[1].salario_mensual).toBe(700);
+    expect(res.status).toBe(500);
+    expect(upserts).toHaveLength(1);
+    // La única escritura fue la completa, con la columna adentro.
+    expect(upserts[0]).toHaveProperty(COLUMNA_NO_MARCA_RELOJ);
   });
 
   it("⚠️ el error tiene que NOMBRAR la columna, o no es esta migración", () => {

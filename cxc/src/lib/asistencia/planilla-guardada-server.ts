@@ -2,25 +2,26 @@
  * El I/O de la planilla congelada. La regla vive en `planilla-guardada.ts`, que
  * es puro; acá solo se junta y se escribe el dato.
  *
- * 🩸 IGUAL QUE `planilla-server.ts`, `config-server.ts` Y
- * `aprobador-empresa-server.ts`: si la migración todavía no corrió, esto NO
- * revienta. La planilla se sigue calculando EXACTAMENTE como hoy, lo único que
- * no se puede es guardarla, y se dice en pantalla con el nombre del archivo. En
- * este repo los DDL los corre Daniel a mano y varios se quedaron pendientes
- * semanas: que la pantalla entera se caiga por eso sería cambiar un aviso por
- * «Asistencia está rota».
+ * Historia (sep-2026): IGUAL QUE `planilla-server.ts`, `config-server.ts` Y
+ * `aprobador-empresa-server.ts`, si la migración todavía no había corrido esto
+ * NO reventaba: leer devolvía vacío con `faltaTabla: true` (la planilla se
+ * seguía calculando, solo no se podía guardar) y escribir devolvía
+ * `{ ok: false, faltaTabla: true }` para que la ruta contestara 503 con el
+ * nombre del archivo — y solo cuando el error NOMBRABA la tabla.
  *
- * ⚠️ La degradación solo ocurre cuando el error NOMBRA la tabla. Tragarse
- * cualquier error convertiría un permiso, un timeout o un RLS en «todavía no se
- * puede guardar» — y acá eso es peor que en otros lados: la contadora leería
- * «falta correr el archivo», Daniel lo correría, y el problema real (que nadie
- * miró) seguiría ahí mientras la planilla no se guarda.
+ * 🔴 TOLERANCIA RETIRADA EL 3-SEP-2026: las dos tablas existen desde
+ * 20260904120000_asistencia_planilla_guardada.sql (verificado por PostgREST en
+ * producción). Degradar hoy es peor acá que en otros lados: un permiso, un
+ * timeout o un RLS que devuelva el mismo código se leería como «todavía no se
+ * puede guardar», la contadora leería «falta correr el archivo», Daniel lo
+ * correría, y el problema real seguiría ahí. Y en la LECTURA sería peor
+ * todavía: «no hay nada cerrado» ante un error deja pasar el freno del
+ * solapamiento, o sea un doble pago. El error se propaga.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { randomUUID } from "node:crypto";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { esTablaFaltante } from "./config";
 import type { LineaPlanilla } from "./planilla";
 import {
   etiquetaRango,
@@ -95,7 +96,6 @@ function cabeceraDeFila(f: FilaCabecera): CabeceraGuardada {
 
 export interface CabecerasLeidas {
   cabeceras: CabeceraGuardada[];
-  faltaTabla: boolean;
 }
 
 /**
@@ -107,44 +107,37 @@ export interface CabecerasLeidas {
  * justo cuando ya hay historia suficiente para que importe.
  */
 export async function leerCabeceras(empresa: string): Promise<CabecerasLeidas> {
-  try {
-    const filas = await leerTodoPaginado<FilaCabecera>(
-      `${TABLA_GUARDADA} (${empresa})`,
-      (pedirCount, desde, hasta) =>
-        supabaseServer
-          .from(TABLA_GUARDADA)
-          .select(COLS_CABECERA, pedirCount ? { count: "exact" } : {})
-          .eq("empresa", empresa)
-          // Orden de NEGOCIO (la más nueva primero) + la columna única como
-          // DESEMPATE, que es lo que hace la paginación estable.
-          .order("desde", { ascending: false })
-          .order("id", { ascending: true })
-          .range(desde, hasta),
-    );
-    return { cabeceras: filas.map(cabeceraDeFila), faltaTabla: false };
-  } catch (e) {
-    // `leerTodoPaginado` envuelve el error de PostgREST en un `Error`, así que
-    // acá se mira el TEXTO — y se sigue exigiendo que NOMBRE la tabla.
-    if (esTablaFaltante({ message: e instanceof Error ? e.message : String(e) }, TABLA_GUARDADA)) {
-      return { cabeceras: [], faltaTabla: true };
-    }
-    throw e;
-  }
+  // Sin `try/catch` (tolerancia a la DDL retirada el 3-sep-2026): un error de
+  // `leerTodoPaginado` sube tal cual. Devolver «no hay nada cerrado» ante un
+  // error dejaría pasar el freno del solapamiento.
+  const filas = await leerTodoPaginado<FilaCabecera>(
+    `${TABLA_GUARDADA} (${empresa})`,
+    (pedirCount, desde, hasta) =>
+      supabaseServer
+        .from(TABLA_GUARDADA)
+        .select(COLS_CABECERA, pedirCount ? { count: "exact" } : {})
+        .eq("empresa", empresa)
+        // Orden de NEGOCIO (la más nueva primero) + la columna única como
+        // DESEMPATE, que es lo que hace la paginación estable.
+        .order("desde", { ascending: false })
+        .order("id", { ascending: true })
+        .range(desde, hasta),
+  );
+  return { cabeceras: filas.map(cabeceraDeFila) };
 }
 
 /** Una cabecera por id. `null` = no existe. */
-export async function leerCabecera(id: string): Promise<{ cabecera: CabeceraGuardada | null; faltaTabla: boolean }> {
+export async function leerCabecera(id: string): Promise<{ cabecera: CabeceraGuardada | null }> {
   const { data, error } = await supabaseServer
     .from(TABLA_GUARDADA)
     .select(COLS_CABECERA)
     .eq("id", id);
 
   if (error) {
-    if (esTablaFaltante(error, TABLA_GUARDADA)) return { cabecera: null, faltaTabla: true };
     throw new Error(`No se pudo leer ${TABLA_GUARDADA}: ${error.message}`);
   }
   const filas = (data ?? []) as unknown as FilaCabecera[];
-  return { cabecera: filas.length ? cabeceraDeFila(filas[0]) : null, faltaTabla: false };
+  return { cabecera: filas.length ? cabeceraDeFila(filas[0]) : null };
 }
 
 /** Los renglones congelados de un cuadro, tal cual quedaron escritos. */
@@ -163,8 +156,6 @@ export async function leerLineasGuardadas(id: string): Promise<Record<string, un
 
 export interface ResultadoGuardado {
   ok: boolean;
-  /** `true` = la migración no corrió. La pantalla avisa y NADIE creyó que guardó. */
-  faltaTabla?: boolean;
   /** `true` = alguien más guardó un rango que se pisa mientras tanto (409). */
   choque?: boolean;
   id?: string;
@@ -226,7 +217,6 @@ export async function cerrarPlanilla(opts: {
     total_neto: totales.totalNeto,
   });
   if (errCab) {
-    if (esTablaFaltante(errCab, TABLA_GUARDADA)) return { ok: false, faltaTabla: true };
     if (esChoqueDeRango(errCab)) return { ok: false, choque: true };
     throw new Error(`No se pudo guardar en ${TABLA_GUARDADA}: ${errCab.message}`);
   }
@@ -239,7 +229,6 @@ export async function cerrarPlanilla(opts: {
       .from(TABLA_GUARDADA_LINEA)
       .insert(filas.slice(i, i + 500));
     if (error) {
-      if (esTablaFaltante(error, TABLA_GUARDADA_LINEA)) return { ok: false, faltaTabla: true };
       throw new Error(`No se pudo guardar en ${TABLA_GUARDADA_LINEA}: ${error.message}`);
     }
   }
@@ -275,7 +264,7 @@ export async function reabrirPlanilla(
   id: string,
   usuario: string,
   motivo: string,
-): Promise<{ ok: boolean; faltaTabla?: boolean; yaReabierta?: boolean }> {
+): Promise<{ ok: boolean; yaReabierta?: boolean }> {
   const { data, error } = await supabaseServer
     .from(TABLA_GUARDADA)
     .update({
@@ -293,7 +282,6 @@ export async function reabrirPlanilla(
     .select("id");
 
   if (error) {
-    if (esTablaFaltante(error, TABLA_GUARDADA)) return { ok: false, faltaTabla: true };
     throw new Error(`No se pudo reabrir en ${TABLA_GUARDADA}: ${error.message}`);
   }
   const tocadas = ((data ?? []) as unknown[]).length;

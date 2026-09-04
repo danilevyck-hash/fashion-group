@@ -5,6 +5,21 @@
 // (puro) y los minutos salen del MISMO motor que el Reporte
 // (`lib/asistencia/reporte.ts`), así que la pantalla de Asistencia y la de
 // Planilla no pueden contradecirse en cuántos minutos llegó tarde alguien.
+//
+// ── SIN TOLERANCIA A LA DDL (3-sep-2026) ─────────────────────────────────────
+//
+// Historia: cada lectura de esta ruta AGUANTABA su migración pendiente
+// (fichas, vacaciones, reparto, aprobaciones de extras, aprobador por empresa,
+// amarre y aprobación de préstamos) devolviendo vacío con `faltaTabla`, y el
+// cuadro salía «como ayer, hasta el centavo» con un aviso en ámbar. Tolerancia
+// retirada: todas esas tablas y columnas existen en producción. Hoy si una
+// lectura falla, la PLANILLA NO SALE (500 con el mensaje) — un cuadro armado
+// con «nadie de vacaciones», «nadie aprobado» o «nadie atado» porque un
+// permiso o un timeout devolvió el mismo código es plata mal pagada con la
+// pantalla tranquila. Los `avisos.faltaMigracion*` que quedan en la respuesta
+// son CONSTANTES `null`; se conservan porque `PlanillaTab` y `AprobacionesTab`
+// los leen. Los dos que NO son de esta tanda —`faltaMigracionManual`
+// (`planilla-server.ts`) y las correcciones— siguen como estaban.
 
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles, aprobacionesRoles, soloAprueba } from "@/lib/asistencia/roles";
@@ -12,7 +27,7 @@ import { EMPRESA_BOSTON, ROL_BOSTON, esGerenteBoston, planillaSinDinero } from "
 import { lineasSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import { requireAsistencia, MODULOS_PLANILLA } from "@/lib/asistencia/guard";
 import { alcanza } from "@/lib/asistencia/aprobador-empresa";
-import { leerAlcanceAprobador, avisoMigracionAprobador } from "@/lib/asistencia/aprobador-empresa-server";
+import { leerAlcanceAprobador } from "@/lib/asistencia/aprobador-empresa-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
@@ -38,21 +53,16 @@ import {
   leerJustificaciones,
   leerVacaciones,
   leerRepartos,
-  avisoMigracionVacaciones,
 } from "@/lib/asistencia/config-server";
 import {
   agruparPorCodigo,
-  avisoMigracionReparto,
   partesDe,
   textoRepartoRechazado,
   validarReparto,
   type RepartoRechazado,
 } from "@/lib/asistencia/reparto";
-import { avisoMigracionServicioProfesional } from "@/lib/asistencia/participacion";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
-import { avisoMigracionBaseSeguros } from "@/lib/asistencia/seguros-base";
 import {
-  avisoMigracionBajas,
   codigosFueraDeRango,
   marcoDespuesDeLaBaja,
   motivoPeriodoParcial,
@@ -69,11 +79,7 @@ import {
   type VacacionNoPagada,
 } from "@/lib/asistencia/vacaciones";
 import { hoyPanama } from "@/lib/fecha-panama";
-import {
-  avisoMigracion,
-  EMPRESAS_ASISTENCIA,
-  etiquetaEmpresa,
-} from "@/lib/asistencia/config";
+import { EMPRESAS_ASISTENCIA, etiquetaEmpresa } from "@/lib/asistencia/config";
 import {
   armarPlanilla,
   jornadaDiariaMin,
@@ -95,7 +101,6 @@ import {
 } from "@/lib/asistencia/planilla-server";
 import {
   armarDiasAprobacion,
-  avisoMigracionAprobaciones,
   estaAprobado,
   extrasNoAprobadas,
   indexarAprobaciones,
@@ -103,8 +108,6 @@ import {
 } from "@/lib/asistencia/aprobaciones";
 import { leerAprobaciones } from "@/lib/asistencia/aprobaciones-server";
 import {
-  avisoMigracionAmarrePrestamos,
-  avisoMigracionPrestamoAprobado,
   prestamosSinAprobar,
   prestamosSinAtar,
   sugerirPrestamos,
@@ -258,13 +261,11 @@ export async function GET(req: NextRequest) {
       q.claveManuales ? leerManuales(q.claveManuales) : Promise.resolve({ porCodigo: new Map(), faltaMigracion: false }),
       // 🔴 QUIÉN TIENE LAS HORAS EXTRA AUTORIZADAS. Contadora, textual: *«Sólo
       // se pagan las horas extras autorizadas y las reportadas por Julio
-      // Garay»*. Sin la tabla corrida devuelve cero filas Y `faltaTabla: true`,
-      // y entonces NO se exige aprobación: se paga todo lo que midió el reloj,
-      // hasta el centavo igual que hasta hoy. Se avisa en `avisos`.
+      // Garay»*. Si no se puede leer, la planilla no sale: «cero aprobadas»
+      // ante un error soltaría el candado y pagaría todas.
       leerAprobaciones(q.desde, q.hasta),
-      // 🔴 QUIÉN REPARTE SU SUELDO ENTRE DOS EMPRESAS. Sin la tabla corrida
-      // devuelve cero filas Y `faltaTabla: true`: nadie reparte nada y el cuadro
-      // es el de siempre, hasta el centavo. Se avisa en `avisos`.
+      // 🔴 QUIÉN REPARTE SU SUELDO ENTRE DOS EMPRESAS. Si no se puede leer, la
+      // planilla no sale.
       leerRepartos(),
       supabaseServer
         .from("asistencia_horarios")
@@ -273,8 +274,8 @@ export async function GET(req: NextRequest) {
       // `leerJustificaciones`: leer distinto acá que en el reporte es la
       // diferencia entre «el día entero» y «un permiso de dos horas».
       leerJustificaciones(q.desde, q.hasta),
-      // 🔴 LAS VACACIONES, por la MISMA puerta que el reporte. Sin la tabla
-      // corrida devuelve CERO filas y la planilla paga exactamente lo de ayer.
+      // 🔴 LAS VACACIONES, por la MISMA puerta que el reporte. El motor las
+      // honra pase lo que pase: si no se pueden leer, la planilla no sale.
       leerVacaciones(q.desde, q.hasta),
       supabaseServer
         .from("asistencia_feriados")
@@ -451,12 +452,13 @@ export async function GET(req: NextRequest) {
 
     // ── 🔴 LA APROBACIÓN DE LAS HORAS EXTRA ──────────────────────────────────
     //
-    // `exigir` es lo único que decide si el candado está puesto, y depende de
-    // que la TABLA exista — no de que haya filas. Con la tabla corrida y sin
-    // nadie aprobado, nadie cobra extras (que es la regla de la contadora y se
-    // dice en ámbar); sin la tabla, se paga todo como hasta hoy.
+    // El candado está SIEMPRE puesto: sin nadie aprobado, nadie cobra extras
+    // (la regla de la contadora, y se dice en ámbar). Historia: hasta el
+    // 3-sep-2026 `exigir` valía `!aprRes.faltaTabla` — sin la tabla se pagaba
+    // todo como antes. Tolerancia retirada: la tabla existe desde
+    // 20260829120000, y si no se puede leer la planilla no sale.
     const aprobaciones = indexarAprobaciones(aprRes.filas);
-    const exigirAprobacionExtra = !aprRes.faltaTabla;
+    const exigirAprobacionExtra = true;
     // 🔑 `codigo|fecha` de cada DÍA autorizado. La aprobación es por día desde
     // el 27-ago-2026: el corte de la quincena lo mueve la contadora, así que
     // una llave por período volvía a preguntar todo con cada corrimiento.
@@ -574,9 +576,11 @@ export async function GET(req: NextRequest) {
         // no necesita saber nada de esto: muestra las horas y aprueba.
         aprobaciones: filasAprobacion,
         puedeAprobar,
+        // Constantes desde el 3-sep-2026 (tolerancia a la DDL retirada); se
+        // conservan porque `AprobacionesTab` los lee.
         avisos: {
-          faltaMigracionAprobaciones: aprRes.faltaTabla ? avisoMigracionAprobaciones() : null,
-          faltaMigracionAprobador: alcance.faltaTabla ? avisoMigracionAprobador() : null,
+          faltaMigracionAprobaciones: null,
+          faltaMigracionAprobador: null,
         },
       });
     }
@@ -608,7 +612,8 @@ export async function GET(req: NextRequest) {
         aprobaciones: null,
         puedeAprobar: false,
         avisos: {
-          faltaMigracionConfiguracion: personasDb.faltaMigracion ? avisoMigracion() : null,
+          // Constante desde el 3-sep-2026 (tolerancia a la DDL retirada).
+          faltaMigracionConfiguracion: null,
           periodoAbierto: avisoPeriodoAbierto(q.desde, q.hasta, hoy, q.esQuincena),
           sinFicha: codigosSinFicha,
           avisoSinFicha: textoCodigosSinFicha(codigosSinFicha),
@@ -630,16 +635,16 @@ export async function GET(req: NextRequest) {
     const claveQ = q.claveManuales;
     const [presRes, aprPresRes] = claveQ
       ? await Promise.all([
-        // 🔴 Sin la columna del amarre nadie queda atado —la casilla se sigue
-        // escribiendo a mano, como hoy— pero se dice en `avisos`.
+        // 🔴 Las fichas de préstamo con su amarre. Si no se pueden leer, la
+        // planilla no sale: «nadie atado» ante un error es exactamente cómo
+        // se perdieron los $700 de LUIS ADRIAN ARROYO (#651).
         leerPrestamosDeQuincena(q.desde, q.hasta),
-        // 🔴 Sin la tabla no se puede aprobar nada y la planilla da EXACTAMENTE
-        // lo de hoy hasta el centavo. También se dice.
+        // 🔴 Qué descuentos están aprobados. Lo mismo.
         leerAprobacionesPrestamo(claveQ),
       ])
       : [
-        { fichas: [] as FichaPrestamo[], faltaColumnaAmarre: false },
-        { porCodigo: new Map(), faltaTabla: false },
+        { fichas: [] as FichaPrestamo[] },
+        { porCodigo: new Map() },
       ];
 
     // 🔑 La casilla de HOY sale de las MISMAS líneas del cuadro, no de una
@@ -687,29 +692,17 @@ export async function GET(req: NextRequest) {
       // Los avisos que la pantalla tiene que poder pintar ANTES de que alguien
       // le descuente plata a nadie.
       avisos: {
-        faltaMigracionConfiguracion: personasDb.faltaMigracion ? avisoMigracion() : null,
+        // ── CONSTANTES desde el 3-sep-2026 (tolerancia a la DDL retirada) ───
+        // Historia: cada uno avisaba en ámbar qué migración faltaba mientras el
+        // cuadro salía «como ayer». Hoy, si esa lectura falla, este JSON no se
+        // arma. Se conservan en `null` porque `PlanillaTab` los lee.
+        faltaMigracionConfiguracion: null,
+        faltaMigracionBajas: null,
+        faltaMigracionServicioProfesional: null,
+        faltaMigracionBaseSeguros: null,
+        // ⚠️ Este NO es de esta tanda: `planilla-server.ts` sigue tolerando su
+        // migración (20260806220000). Se queda como estaba.
         faltaMigracionManual: manualesLeidos.faltaMigracion ? avisoMigracionPlanilla() : null,
-        // Sin las columnas de la baja NADIE queda afuera —todos activos, como
-        // hoy— pero se dice, porque si alguien ya dio de baja a una persona en
-        // su cabeza va a esperar no verla en el cuadro.
-        faltaMigracionBajas:
-          !personasDb.faltaMigracion && personasDb.faltaColumnasBajas
-            ? avisoMigracionBajas()
-            : null,
-        // Sin la columna nadie puede estar fuera de planilla —todos entran al
-        // cuadro, como hoy— pero se dice: quien ya marcó a alguien como servicio
-        // profesional en su cabeza va a esperar no verlo acá.
-        faltaMigracionServicioProfesional:
-          !personasDb.faltaMigracion && personasDb.faltaColumnaServicioProfesional
-            ? avisoMigracionServicioProfesional()
-            : null,
-        // Sin la columna NADIE tiene base propia —los seguros salen del bruto,
-        // como hoy— pero se dice: quien ya le cargó los $175 a Rodrigo en su
-        // cabeza va a esperar ver $17,06 y no $39,38.
-        faltaMigracionBaseSeguros:
-          !personasDb.faltaMigracion && personasDb.faltaColumnaBaseSeguros
-            ? avisoMigracionBaseSeguros()
-            : null,
         // Cuántas personas se quedaron afuera de ESTA quincena por su fecha de
         // salida (o porque todavía no habían entrado). Sirve para que un cuadro
         // con menos gente que el mes pasado tenga una explicación a la vista.
@@ -752,28 +745,13 @@ export async function GET(req: NextRequest) {
         // ARROYO durante 22 días (#651).
         prestamoSinAtar,
         avisoPrestamoSinAtar: textoPrestamoSinAtar(prestamoSinAtar),
-        // Sin la columna del amarre NADIE queda atado —la casilla se sigue
-        // escribiendo a mano, como hoy— pero se dice: quien espera que se
-        // llene sola tiene que saber por qué no lo hace.
-        faltaMigracionAmarrePrestamos:
-          presRes.faltaColumnaAmarre ? avisoMigracionAmarrePrestamos() : null,
-        // Sin la tabla no se puede aprobar y la planilla da lo de hoy hasta el
-        // centavo. También se dice.
-        faltaMigracionPrestamoAprobado:
-          aprPresRes.faltaTabla ? avisoMigracionPrestamoAprobado() : null,
-        // Sin la tabla corrida NO se exige aprobación —o sea, se paga todo,
-        // como hasta hoy— pero se dice: quien ya aprobó en su cabeza va a
-        // esperar que lo no aprobado no se pague.
-        faltaMigracionAprobaciones: aprRes.faltaTabla ? avisoMigracionAprobaciones() : null,
-          faltaMigracionAprobador: alcance.faltaTabla ? avisoMigracionAprobador() : null,
-        // Sin la tabla corrida NADIE está de vacaciones —o sea, la planilla de
-        // siempre— pero se dice: quien ya cargó una en su cabeza va a esperar
-        // verla acá.
-        faltaMigracionVacaciones: vRes.faltaTabla ? avisoMigracionVacaciones() : null,
-        // Sin la tabla NADIE reparte su sueldo —cada persona sale en una sola
-        // planilla, como hoy— pero se dice: quien ya dio a Julio por repartido
-        // en su cabeza va a esperar verlo en las dos empresas.
-        faltaMigracionReparto: repRes.faltaTabla ? avisoMigracionReparto() : null,
+        // Constantes desde el 3-sep-2026 — ver arriba.
+        faltaMigracionAmarrePrestamos: null,
+        faltaMigracionPrestamoAprobado: null,
+        faltaMigracionAprobaciones: null,
+        faltaMigracionAprobador: null,
+        faltaMigracionVacaciones: null,
+        faltaMigracionReparto: null,
         // 🔴 Los repartos que el guard NO aplicó, con nombre y motivo. Rechazar
         // sí, esconder no: si esto se callara, la persona cobraría en una sola
         // planilla y nadie sabría que el reparto está mal cargado.

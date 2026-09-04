@@ -668,24 +668,31 @@ describe("🔴 la migración NO está corrida — la pantalla avisa, no se rompe
     expect(fs.existsSync(path.join(process.cwd(), MIGRACION))).toBe(true);
   });
 
-  it("las rutas devuelven 503 (falta un paso), no 500 (algo se rompió)", () => {
-    for (const rel of [
-      "src/app/api/asistencia/configuracion/route.ts",
-      "src/app/api/asistencia/configuracion/reglas/route.ts",
-    ]) {
-      const src = leer(rel);
-      expect(src, `${rel} no contempla la tabla faltante`).toContain("esTablaFaltante");
-      expect(src, `${rel} no responde 503`).toContain("status: 503");
-    }
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 3-SEP-2026 (tolerancia a la DDL retirada) para
+  // `configuracion/route.ts`: la tabla existe desde 20260806160000 y esa ruta
+  // ya NO contesta 503 «falta un paso» — un error de la base es 500. La ruta
+  // de reglas es de OTRA tanda y conserva su tolerancia (y su 503) por ahora.
+  it("configuracion/route.ts ya no contempla «la tabla faltante»: ni detector ni 503", () => {
+    const src = leer("src/app/api/asistencia/configuracion/route.ts");
+    expect(src).not.toContain("esTablaFaltante");
+    expect(src).not.toContain("status: 503");
   });
 
-  it("el reporte sigue saliendo sin la migración: lee las reglas con fallback", () => {
+  it("reglas/route.ts (otra tanda) sigue devolviendo 503 mientras no se le retire", () => {
+    const src = leer("src/app/api/asistencia/configuracion/reglas/route.ts");
+    expect(src).toContain("esTablaFaltante");
+    expect(src).toContain("status: 503");
+  });
+
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 3-SEP-2026: `leerReglas` ya NO degrada a los
+  // valores por defecto — un error de la base se propaga. Seguir con los
+  // defaults pagaría con una tolerancia que la contadora tal vez cambió.
+  it("el reporte lee las reglas por `leerReglas`, y `leerReglas` ya no cae a los defaults", () => {
     const src = leer("src/app/api/asistencia/reporte/route.ts");
     expect(src).toContain("leerReglas");
-    // Y `leerReglas` degrada a los valores por defecto en vez de tirar.
     const io = leer("src/lib/asistencia/config-server.ts");
-    expect(io).toContain("REGLAS_DEFAULT");
-    expect(io).toContain("faltaMigracion: true");
+    expect(io).not.toContain("faltaMigracion: true");
+    expect(io).not.toContain("REGLAS_DEFAULT");
   });
 });
 

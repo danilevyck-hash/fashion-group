@@ -2,17 +2,24 @@
  * El I/O del préstamo de la planilla. La regla vive en `prestamos-planilla.ts`,
  * que es puro; acá solo se junta el dato.
  *
- * 🩸 IGUAL QUE `planilla-server.ts` Y `aprobaciones-server.ts`: si las
- * migraciones todavía no corrieron, esto NO revienta. Devuelve cero préstamos y
- * avisa; la casilla sigue siendo el número tecleado a mano de hoy y la planilla
- * da EXACTAMENTE lo mismo hasta el centavo. En este proyecto los DDL los corre
- * Daniel a mano y varios se quedaron pendientes semanas; que la planilla entera
- * se caiga por eso sería cambiar un aviso por un "Asistencia está rota".
+ * Historia (2-sep-2026): IGUAL QUE `planilla-server.ts` Y
+ * `aprobaciones-server.ts`, si las migraciones todavía no habían corrido esto
+ * NO reventaba: sin la columna del amarre releía SIN ella (nadie atado, la
+ * casilla a mano como hoy) y sin la tabla de aprobaciones devolvía cero con
+ * `faltaTabla: true`. En este proyecto los DDL los corre Daniel a mano y varios
+ * se quedaron pendientes semanas.
+ *
+ * 🔴 TOLERANCIA RETIRADA EL 3-SEP-2026: `prestamos_empleados.empleado_codigo`
+ * existe desde 20260902120000_prestamos_amarre_codigo.sql y
+ * `asistencia_prestamo_aprobado` desde 20260902130000_planilla_prestamo_aprobado.sql
+ * (verificado por PostgREST en producción). Degradar hoy sería exactamente
+ * cómo se perdieron los $700 de LUIS ADRIAN ARROYO durante 22 días (#651): un
+ * permiso o un timeout que devuelva el mismo código se leería como «nadie está
+ * atado» y la planilla dejaría de descontar en silencio. El error se propaga.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { esTablaFaltante } from "./config";
 import {
   CONCEPTOS_DESCUENTO,
   CONCEPTOS_DEUDA,
@@ -22,8 +29,7 @@ import {
   type FichaPrestamo,
 } from "./prestamos-planilla";
 
-/** La columna del amarre. Sale de acá para que el `select` y la detección del
- *  error no se puedan separar. */
+/** La columna del amarre (20260902120000). */
 export const COLUMNA_AMARRE = "empleado_codigo";
 
 // 🔑 Las tres listas de conceptos viven en el módulo PURO (`prestamos-planilla`)
@@ -49,24 +55,11 @@ interface FilaMovimiento {
 
 export interface PrestamosLeidos {
   fichas: FichaPrestamo[];
-  /** `true` = la columna del amarre todavía no existe → nadie está atado. */
-  faltaColumnaAmarre: boolean;
 }
 
 function num(n: unknown): number {
   const x = Number(n);
   return Number.isFinite(x) ? x : 0;
-}
-
-/** ¿El error de PostgREST se queja de ESTA columna? */
-function esColumnaFaltante(err: unknown, columna: string): boolean {
-  if (!err) return false;
-  const e = err as { message?: string; details?: string; hint?: string; code?: string };
-  const texto = `${e.message ?? ""} ${e.details ?? ""} ${e.hint ?? ""}`;
-  // 🔑 El error tiene que NOMBRAR la columna. El código solo no alcanza.
-  if (!texto.includes(columna)) return false;
-  return String(e.code ?? "") === "42703"
-    || /does not exist|no existe|could not find/i.test(texto);
 }
 
 /**
@@ -86,34 +79,21 @@ export async function leerPrestamosDeQuincena(
   hasta: string,
 ): Promise<PrestamosLeidos> {
   const COLS_CON_AMARRE = `id, nombre, activo, deduccion_quincenal, ${COLUMNA_AMARRE}`;
-  const COLS_SIN_AMARRE = "id, nombre, activo, deduccion_quincenal";
 
-  let faltaColumnaAmarre = false;
-  let empleados: FilaEmpleado[] = [];
-
-  const pedir = (cols: string) =>
-    leerTodoPaginado<FilaEmpleado>("prestamos_empleados (planilla)", (pedirCount, from, to) =>
+  // Sin reintento «sin amarre» (tolerancia a la DDL retirada el 3-sep-2026):
+  // si esto falla, la planilla no sale. Ver el encabezado.
+  const empleados = await leerTodoPaginado<FilaEmpleado>(
+    "prestamos_empleados (planilla)",
+    (pedirCount, from, to) =>
       supabaseServer
         .from("prestamos_empleados")
         // Select EXPLÍCITO, nunca `*`: si mañana la tabla gana una columna,
         // esta consulta sigue trayendo lo mismo.
-        .select(cols, pedirCount ? { count: "exact" } : {})
+        .select(COLS_CON_AMARRE, pedirCount ? { count: "exact" } : {})
         .eq("deleted", false)
         .order("id", { ascending: true })
         .range(from, to),
-    );
-
-  try {
-    empleados = await pedir(COLS_CON_AMARRE);
-  } catch (e) {
-    // 🩸 Sin la columna del amarre NADIE queda atado —o sea, la casilla se
-    // sigue escribiendo a mano, como hoy— pero se dice en pantalla.
-    if (!esColumnaFaltante({ message: e instanceof Error ? e.message : String(e) }, COLUMNA_AMARRE)) {
-      throw e;
-    }
-    faltaColumnaAmarre = true;
-    empleados = await pedir(COLS_SIN_AMARRE);
-  }
+  );
 
   const movimientos = await leerTodoPaginado<FilaMovimiento>(
     "prestamos_movimientos (planilla)",
@@ -155,7 +135,7 @@ export async function leerPrestamosDeQuincena(
 
   const fichas: FichaPrestamo[] = empleados.map((e) => ({
     id: String(e.id),
-    codigo: faltaColumnaAmarre ? null : (e.empleado_codigo ?? null),
+    codigo: e.empleado_codigo ?? null,
     nombre: String(e.nombre ?? "").trim(),
     // La ficha sin bandera se lee como activa, igual que hace la RPC
     // (`coalesce(activo, true) = true`).
@@ -165,7 +145,7 @@ export async function leerPrestamosDeQuincena(
     yaDescontado: descontadoDe.get(String(e.id)) ?? 0,
   }));
 
-  return { fichas, faltaColumnaAmarre };
+  return { fichas };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,8 +163,6 @@ interface FilaAprobacionDb {
 export interface AprobacionesPrestamoLeidas {
   /** código → decisión. */
   porCodigo: Map<string, AprobacionPrestamo>;
-  /** `true` = la tabla todavía no existe → no se puede aprobar nada. */
-  faltaTabla: boolean;
 }
 
 export async function leerAprobacionesPrestamo(
@@ -196,10 +174,7 @@ export async function leerAprobacionesPrestamo(
     .eq("quincena", quincenaClave);
 
   if (error) {
-    if (esTablaFaltante(error, TABLA_PRESTAMO_APROBADO)) {
-      return { porCodigo: new Map(), faltaTabla: true };
-    }
-    throw new Error(error.message);
+    throw new Error(`No se pudieron leer las aprobaciones de préstamo: ${error.message}`);
   }
 
   const porCodigo = new Map<string, AprobacionPrestamo>();
@@ -213,7 +188,7 @@ export async function leerAprobacionesPrestamo(
       cuando: f.marcado_en ?? null,
     });
   }
-  return { porCodigo, faltaTabla: false };
+  return { porCodigo };
 }
 
 export interface PrestamoAAprobar {
@@ -255,9 +230,11 @@ export async function guardarAprobacionesPrestamo(opts: {
     .from(TABLA_PRESTAMO_APROBADO)
     .upsert(filas, { onConflict: "quincena,empleado_codigo" });
 
+  // Devuelve `true` cuando escribió. Historia: `false` = la tabla no existía
+  // (tolerancia retirada el 3-sep-2026). El `boolean` se conserva porque
+  // `prestamos/route.ts` (otra tanda) lo lee; ya solo vale `true`.
   if (error) {
-    if (esTablaFaltante(error, TABLA_PRESTAMO_APROBADO)) return false;
-    throw new Error(error.message);
+    throw new Error(`No se pudieron guardar las aprobaciones de préstamo: ${error.message}`);
   }
   return true;
 }

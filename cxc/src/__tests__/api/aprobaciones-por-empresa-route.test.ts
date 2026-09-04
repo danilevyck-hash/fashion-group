@@ -19,7 +19,7 @@ afterAll(() => { process.env.SESSION_SECRET = SECRET_PREV; });
 
 /** Lo que la ruta habría escrito. Vacío = no se tocó una fila. */
 const escrito: unknown[][] = [];
-/** `true` = la tabla del reparto «no existe» (DDL sin correr). */
+/** `true` = la base contesta PGRST205 («esa tabla no existe») al leer el reparto. */
 let faltaTabla = false;
 /** Un error que NO es «falta la tabla»: permiso, timeout, RLS. */
 let errorAjeno: { code: string; message: string } | null = null;
@@ -42,10 +42,7 @@ vi.mock("@/lib/asistencia/config-server", async () => {
   );
   return {
     ...real,
-    leerPersonas: async () => ({
-      filas: FICHAS, faltaMigracion: false, faltaColumnasBajas: false,
-      faltaColumnaServicioProfesional: false, faltaColumnaBaseSeguros: false,
-    }),
+    leerPersonas: async () => ({ filas: FICHAS, faltaMigracion: false }),
   };
 });
 
@@ -140,11 +137,16 @@ describe("admin y los bordes", () => {
     expect(escrito.length).toBe(0);
   });
 
-  it("SIN la tabla (DDL sin correr) se aprueba como antes — Julio no se traba", async () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 3-SEP-2026 (tolerancia a la DDL retirada). Hasta
+  // ese día un PGRST205 abría el reparto («se aprueba como antes, Julio no se
+  // traba»). La tabla existe desde 20260903120000; hoy ese código es un error
+  // como cualquier otro, y con el reparto ilegible NO se aprueba nada — abrirlo
+  // sería reabrir el agujero de los 57 días de Boston por un timeout.
+  it("🔴 un PGRST205 al leer el reparto NO abre la puerta: 500 y no se escribe", async () => {
     faltaTabla = true;
     const r = await POST(pedir("bodega", "Bodega", [{ codigo: "40", fecha: "2026-08-03" }]));
-    expect(r.status).toBe(200);
-    expect(escrito.length).toBe(1);
+    expect(r.status).toBe(500);
+    expect(escrito.length).toBe(0);
   });
 
   // 🩸 ESTE CASO FALTABA, y lo destapó el verificador de mutaciones: cambiar

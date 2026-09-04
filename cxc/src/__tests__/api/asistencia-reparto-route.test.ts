@@ -24,7 +24,9 @@ import { MIGRACION_REPARTO, type FilaReparto } from "@/lib/asistencia/reparto";
 const JULIO = "11";
 
 /** Lo que `leerRepartos()` va a contestar en cada caso. */
-let REPARTO: { filas: FilaReparto[]; faltaTabla: boolean } = { filas: [], faltaTabla: false };
+let REPARTO: { filas: FilaReparto[] } = { filas: [] };
+/** Si está puesto, `leerRepartos()` LANZA con este mensaje (la base falló). */
+let REPARTO_ERROR: string | null = null;
 
 const BUENO: FilaReparto[] = [
   { empleado_codigo: JULIO, empresa: "vistana", salario_mensual: "800.00", paga_seguros: true, paga_horas_extra: false, orden: 0 },
@@ -68,9 +70,14 @@ vi.mock("@/lib/asistencia/correcciones-server", () => ({
   leerCorrecciones: async () => ({ correcciones: [], porDia: new Map(), faltaTabla: true }),
 }));
 vi.mock("@/lib/asistencia/aprobaciones-server", () => ({
-  // 🔑 `faltaTabla: true` → NO se exige aprobación y se paga todo lo que midió
-  // el reloj. Es el estado en el que se midieron los números de la contadora.
-  leerAprobaciones: async () => ({ filas: [], faltaTabla: true }),
+  // 🔑 El día de Julio viene APROBADO, así que sus extras se pagan — que es el
+  // estado en el que se midieron los números de la contadora. Historia: hasta
+  // el 3-sep-2026 esto contestaba `faltaTabla: true` y con eso NO se exigía
+  // aprobación; la tolerancia se retiró y el candado está siempre puesto, así
+  // que ahora el doble aprueba el día en vez de apagar el candado.
+  leerAprobaciones: async () => ({
+    filas: [{ codigo: JULIO, fecha: "2026-08-03", aprobado: true, minutosVistos: 60, por: "Contabilidad", cuando: "2026-08-04T12:00:00.000Z" }],
+  }),
 }));
 vi.mock("@/lib/asistencia/planilla-server", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
@@ -100,9 +107,12 @@ vi.mock("@/lib/asistencia/config-server", async (orig) => ({
     faltaColumnaNoMarcaReloj: false, faltaColumnaBaseSeguros: false,
     faltaColumnasSaldoVacaciones: false,
   }),
-  leerJustificaciones: async () => ({ filas: [], faltaTabla: false }),
-  leerVacaciones: async () => ({ filas: [], faltaTabla: false }),
-  leerRepartos: async () => REPARTO,
+  leerJustificaciones: async () => ({ filas: [] }),
+  leerVacaciones: async () => ({ filas: [] }),
+  leerRepartos: async () => {
+    if (REPARTO_ERROR) throw new Error(REPARTO_ERROR);
+    return REPARTO;
+  },
 }));
 
 const pedir = (empresa: string | null, extra = "") =>
@@ -135,10 +145,10 @@ async function cuadro(empresa: string | null, extra = "") {
 
 const deJulio = (ls: Linea[]) => ls.filter((l) => l.codigo === JULIO);
 
-beforeEach(() => { REPARTO = { filas: [], faltaTabla: false }; });
+beforeEach(() => { REPARTO = { filas: [] }; REPARTO_ERROR = null; });
 
 describe("🔴 con el reparto cargado, JULIO sale en las DOS empresas", () => {
-  beforeEach(() => { REPARTO = { filas: BUENO, faltaTabla: false }; });
+  beforeEach(() => { REPARTO = { filas: BUENO }; });
 
   it("Vistana: $400,00 de sueldo, SIN extras, con seguros", async () => {
     const j = await cuadro("vistana");
@@ -188,7 +198,7 @@ describe("🔴 con el reparto cargado, JULIO sale en las DOS empresas", () => {
       deJulio((await cuadro("vistana")).lineas)[0],
       deJulio((await cuadro("fashion_wear")).lineas)[0],
     ];
-    REPARTO = { filas: [], faltaTabla: false };
+    REPARTO = { filas: [] };
     const entero = deJulio((await cuadro("vistana")).lineas)[0];
     const suma = Math.round((conReparto[0].dinero!.totalBruto + conReparto[1].dinero!.totalBruto) * 100) / 100;
     expect(suma).toBe(entero.dinero!.totalBruto);
@@ -196,7 +206,7 @@ describe("🔴 con el reparto cargado, JULIO sale en las DOS empresas", () => {
 
   it("⛔ NADIE MÁS se mueve un centavo", async () => {
     const conReparto = (await cuadro("vistana")).lineas.find((l) => l.codigo === "7")!;
-    REPARTO = { filas: [], faltaTabla: false };
+    REPARTO = { filas: [] };
     const sin = (await cuadro("vistana")).lineas.find((l) => l.codigo === "7")!;
     expect(JSON.stringify(conReparto)).toBe(JSON.stringify(sin));
   });
@@ -219,7 +229,6 @@ describe("🔴 un reparto que NO cuadra se rechaza ENTERO, y se DICE", () => {
   it("vuelve a UNA sola línea, con el sueldo entero y sus seguros", async () => {
     REPARTO = {
       filas: [BUENO[0], { ...BUENO[1], salario_mensual: "100.00" }],
-      faltaTabla: false,
     };
     const v = await cuadro("vistana");
     const ls = deJulio(v.lineas);
@@ -233,7 +242,6 @@ describe("🔴 un reparto que NO cuadra se rechaza ENTERO, y se DICE", () => {
   it("🔴 el aviso NOMBRA a la persona y el motivo — rechazar sí, esconder no", async () => {
     REPARTO = {
       filas: [BUENO[0], { ...BUENO[1], salario_mensual: "100.00" }],
-      faltaTabla: false,
     };
     const j = await cuadro("vistana");
     expect(j.avisos.avisoRepartoRechazado).toContain("JULIO GARAY");
@@ -242,27 +250,34 @@ describe("🔴 un reparto que NO cuadra se rechaza ENTERO, y se DICE", () => {
   });
 
   it("con el reparto bueno NO se avisa nada", async () => {
-    REPARTO = { filas: BUENO, faltaTabla: false };
+    REPARTO = { filas: BUENO };
     const j = await cuadro("vistana");
     expect(j.avisos.avisoRepartoRechazado).toBeNull();
     expect(j.avisos.repartosRechazados).toHaveLength(0);
   });
 });
 
-describe("🔴 SIN LA MIGRACIÓN CORRIDA la planilla es la de siempre — y lo dice", () => {
-  it("una sola línea, el sueldo entero, y el aviso NOMBRA el archivo", async () => {
-    REPARTO = { filas: [], faltaTabla: true };
-    const j = await cuadro("vistana");
-    const ls = deJulio(j.lineas);
-    expect(ls).toHaveLength(1);
-    expect(ls[0].parte).toBeNull();
-    expect(ls[0].dinero!.salarioQuincenal).toBe(500);
-    expect(j.avisos.faltaMigracionReparto).toContain(MIGRACION_REPARTO);
+// ⚠️ CAMBIÓ DE DIRECCIÓN EL 3-SEP-2026 (tolerancia a la DDL retirada). Hasta
+// ese día, «sin la migración corrida» la planilla salía con Julio en UNA sola
+// línea, el sueldo entero, y el aviso nombraba el archivo. La tabla existe
+// desde 20260901120000; hoy si el reparto no se puede leer, la PLANILLA NO
+// SALE — un cuadro que pague a Julio entero en Vistana porque un timeout
+// devolvió el mismo código es plata mal pagada con la pantalla tranquila.
+describe("🔴 SI EL REPARTO NO SE PUEDE LEER, la planilla NO sale", () => {
+  it("un error de la base es 500 con el mensaje, no «la planilla de siempre»", async () => {
+    REPARTO_ERROR = "Could not find the table 'public.asistencia_reparto_empresa' in the schema cache";
+    const { GET } = await import("@/app/api/asistencia/planilla/route");
+    const res = await GET(pedir("vistana"));
+    expect(res.status).toBe(500);
+    const j = (await res.json()) as { error?: string; lineas?: unknown };
+    expect(j.error).toContain("asistencia_reparto_empresa");
+    expect(j.lineas).toBeUndefined();
   });
 
-  it("con la tabla ya corrida el aviso NO aparece", async () => {
-    REPARTO = { filas: BUENO, faltaTabla: false };
+  it("con la tabla leída el aviso (que ya es constante) es null", async () => {
+    REPARTO = { filas: BUENO };
     const j = await cuadro("vistana");
     expect(j.avisos.faltaMigracionReparto).toBeNull();
+    expect(MIGRACION_REPARTO).toContain("20260901120000");
   });
 });

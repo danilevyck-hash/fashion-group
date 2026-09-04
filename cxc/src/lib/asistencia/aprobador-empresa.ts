@@ -21,7 +21,12 @@ export interface AsignacionAprobador {
 export interface AlcanceAprobador {
   /** `null` = las tres. Un Set = exactamente esas. Vacío = ninguna. */
   empresas: ReadonlySet<string> | null;
-  /** `true` cuando la tabla todavía no existe: nadie queda segmentado. */
+  /**
+   * SIEMPRE `false` desde el 3-sep-2026. Historia: era `true` cuando la tabla
+   * todavía no existía y con eso nadie quedaba segmentado. Tolerancia retirada:
+   * la tabla existe desde 20260903120000_asistencia_aprobador_empresa.sql. Se
+   * conserva en el tipo porque las rutas lo leen para el aviso.
+   */
   faltaTabla: boolean;
 }
 
@@ -39,14 +44,13 @@ export function alcanceDe(
   rol: string,
   usuario: string | undefined,
   filas: readonly AsignacionAprobador[],
-  faltaTabla: boolean,
 ): AlcanceAprobador {
-  if (rol === "admin") return { empresas: null, faltaTabla };
-  // 🔴 SIN LA TABLA, NADIE QUEDA SEGMENTADO — se comporta como el día anterior.
-  // Fail-closed acá dejaría a Julio y a Contabilidad sin poder aprobar el día
-  // del deploy, por una migración que en este repo tarda días en correrse. La
-  // pantalla lo dice en ámbar con el nombre del archivo.
-  if (faltaTabla) return { empresas: null, faltaTabla: true };
+  if (rol === "admin") return { empresas: null, faltaTabla: false };
+  // Historia: había un cuarto parámetro `faltaTabla` y con él en `true` NADIE
+  // quedaba segmentado (fail-open el día del deploy, por una migración que en
+  // este repo tardaba días). Tolerancia retirada el 3-sep-2026: la tabla existe
+  // desde 20260903120000. Hoy no hay forma de pedirle a esta función que abra
+  // el reparto: sin filas propias, ninguna empresa.
 
   const mias = new Set<string>();
   const yo = clave(usuario ?? "");

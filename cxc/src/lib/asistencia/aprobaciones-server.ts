@@ -2,16 +2,23 @@
  * El I/O de las aprobaciones de horas extra. La regla vive en `aprobaciones.ts`,
  * que es puro; acá solo se junta el dato.
  *
- * 🩸 IGUAL QUE `planilla-server.ts` Y `config-server.ts`: si la migración
- * todavía no corrió, esto NO revienta. Devuelve cero aprobaciones y avisa que
- * NO SE ESTÁ EXIGIENDO ninguna — o sea, la planilla de siempre. En este
+ * Historia (ago-2026): IGUAL QUE `planilla-server.ts` Y `config-server.ts`, si
+ * la migración todavía no había corrido esto NO reventaba: devolvía cero
+ * aprobaciones con `faltaTabla: true`, y con eso la planilla NO EXIGÍA
+ * aprobación — pagaba todas las extras que midió el reloj, como antes. En este
  * proyecto los DDL los corre Daniel a mano y varios se quedaron pendientes
- * semanas; que la planilla entera se caiga por eso sería cambiar un aviso por
- * un "Asistencia está rota".
+ * semanas.
+ *
+ * 🔴 TOLERANCIA RETIRADA EL 3-SEP-2026: la tabla existe desde
+ * 20260829120000_asistencia_horas_extra_aprobadas.sql (verificado por PostgREST
+ * en producción). Degradar hoy sería lo peor que puede pasar acá: un permiso o
+ * un timeout que devuelva el mismo código soltaría el candado de la contadora
+ * (*«Sólo se pagan las horas extras autorizadas»*) y se pagarían TODAS las
+ * extras sin que nadie las apruebe, con la pantalla tranquila. El error se
+ * propaga y la planilla no sale.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { esTablaFaltante } from "./config";
 import { TABLA_APROBACIONES, type Aprobacion } from "./aprobaciones";
 
 interface FilaAprobacionDb {
@@ -36,8 +43,6 @@ function aDominio(f: FilaAprobacionDb): Aprobacion {
 
 export interface AprobacionesLeidas {
   filas: Aprobacion[];
-  /** `true` = la tabla todavía no existe → NO se exige aprobación, se paga todo. */
-  faltaTabla: boolean;
 }
 
 /**
@@ -61,12 +66,11 @@ export async function leerAprobaciones(
     .lte("fecha", hasta);
 
   if (error) {
-    if (esTablaFaltante(error, TABLA_APROBACIONES)) {
-      return { filas: [], faltaTabla: true };
-    }
-    throw new Error(error.message);
+    // 🔴 Nada de «cero filas» ante un error: eso soltaría el candado de las
+    // horas extra (ver el encabezado).
+    throw new Error(`No se pudieron leer las aprobaciones de horas extra: ${error.message}`);
   }
-  return { filas: (data ?? []).map((f) => aDominio(f as FilaAprobacionDb)), faltaTabla: false };
+  return { filas: (data ?? []).map((f) => aDominio(f as FilaAprobacionDb)) };
 }
 
 /**
@@ -82,8 +86,12 @@ export async function leerAprobaciones(
  * pueda decir «aprobaste 5,50 h y hoy son 6,20 h» el día que se corrija una
  * marcación o cambie la base de cálculo.
  *
- * Devuelve `false` si la tabla todavía no existe, para que la pantalla avise en
- * vez de decir "aprobado" sobre algo que no se guardó.
+ * Devuelve `true` cuando escribió. Historia: devolvía `false` si la tabla
+ * todavía no existía, para que la pantalla avisara en vez de decir "aprobado"
+ * sobre algo que no se guardó. Tolerancia retirada el 3-sep-2026 (la tabla
+ * existe desde 20260829120000): hoy cualquier error se propaga. El `boolean`
+ * se conserva porque `aprobaciones/route.ts` (otra tanda) lo lee; ya solo
+ * vale `true`.
  */
 export interface DiaAAprobar {
   codigo: string;
@@ -115,8 +123,7 @@ export async function guardarAprobaciones(opts: {
     .upsert(filas, { onConflict: "empleado_codigo,fecha" });
 
   if (error) {
-    if (esTablaFaltante(error, TABLA_APROBACIONES)) return false;
-    throw new Error(error.message);
+    throw new Error(`No se pudieron guardar las aprobaciones de horas extra: ${error.message}`);
   }
   return true;
 }

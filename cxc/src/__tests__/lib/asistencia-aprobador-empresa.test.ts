@@ -44,7 +44,7 @@ const REPARTO: AsignacionAprobador[] = [
   { usuario: "Contabilidad", empresa: "vistana" },
 ];
 
-const de = (rol: string, usuario?: string) => alcanceDe(rol, usuario, REPARTO, false);
+const de = (rol: string, usuario?: string) => alcanceDe(rol, usuario, REPARTO);
 
 /** Las personas del caso real: una de cada empresa. */
 const KEVIN = { codigo: "40", empresa: "confecciones_boston" };
@@ -68,7 +68,7 @@ describe("🔴 el reparto de Daniel, persona por persona", () => {
   });
 
   it("admin alcanza las tres, y NO necesita filas", () => {
-    const a = alcanceDe("admin", "daniel", [], false);
+    const a = alcanceDe("admin", "daniel", []);
     expect(a.empresas).toBeNull();
     for (const e of EMPRESAS_ASISTENCIA) expect(alcanza(a, e)).toBe(true);
   });
@@ -121,34 +121,38 @@ describe("🔴 el veredicto del POST: TODO O NADA", () => {
   });
 
   it("admin nunca queda fuera", () => {
-    const a = alcanceDe("admin", "daniel", [], false);
+    const a = alcanceDe("admin", "daniel", []);
     expect(puedeAprobarA(a, [KEVIN, JULIO, RODRIGO]).ok).toBe(true);
   });
 });
 
-describe("⚠️ SIN la tabla, nadie queda segmentado (la app funciona antes del DDL)", () => {
-  it("el alcance es «todas» y lo dice", () => {
-    const a = alcanceDe("bodega", "Bodega", [], true);
-    expect(a.empresas).toBeNull();
-    expect(a.faltaTabla).toBe(true);
+// ⚠️ CAMBIÓ DE DIRECCIÓN EL 3-SEP-2026 (tolerancia a la DDL retirada). Hasta
+// ese día `alcanceDe` tenía un cuarto parámetro `faltaTabla` y con él en `true`
+// el alcance era «todas»: la app funcionaba antes del DDL y Julio no se quedaba
+// trabado el día del deploy. La tabla existe desde 20260903120000; hoy NO HAY
+// forma de pedirle a esta función que abra el reparto — la única puerta a
+// «todas» es ser admin.
+describe("🔴 ya no existe la puerta «sin la tabla, nadie queda segmentado»", () => {
+  it("`faltaTabla` sale SIEMPRE en false, aunque no haya filas", () => {
+    const a = alcanceDe("bodega", "Bodega", []);
+    expect(a.faltaTabla).toBe(false);
   });
 
-  it("y por lo tanto aprueba como el día anterior — Julio no se queda trabado", () => {
-    const a = alcanceDe("bodega", "Bodega", [], true);
-    expect(puedeAprobarA(a, [KEVIN, JULIO, RODRIGO]).ok).toBe(true);
-  });
-
-  it("🔴 pero CON la tabla y sin filas, NO: la ausencia de tabla y la de filas son distintas", () => {
-    const a = alcanceDe("bodega", "Bodega", [], false);
+  it("sin filas propias el alcance es VACÍO, no «todas» — Julio no aprueba a nadie", () => {
+    const a = alcanceDe("bodega", "Bodega", []);
     expect(a.empresas).not.toBeNull();
-    expect(puedeAprobarA(a, [JULIO]).ok).toBe(false);
+    expect(puedeAprobarA(a, [KEVIN, JULIO, RODRIGO]).ok).toBe(false);
+  });
+
+  it("y la firma ya no acepta el cuarto parámetro: nadie puede volver a colarlo", () => {
+    expect(alcanceDe.length).toBe(3);
   });
 });
 
 describe("una empresa que no existe no entra por la puerta de atrás", () => {
   it("una fila con una empresa inventada se ignora", () => {
     const a = alcanceDe("bodega", "Bodega",
-      [{ usuario: "Bodega", empresa: "american_classic" }], false);
+      [{ usuario: "Bodega", empresa: "american_classic" }]);
     expect([...(a.empresas ?? [])]).toEqual([]);
     expect(alcanza(a, "american_classic")).toBe(false);
   });

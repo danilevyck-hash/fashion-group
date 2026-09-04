@@ -54,6 +54,16 @@
 // dinero a propósito, y David lo recibe sin sueldos por `VE_SUELDOS_DE_BOSTON`.
 // Dejarlos leer la tabla congelada sería devolverles por la ventana los sueldos
 // que la otra ruta les recorta en el servidor.
+//
+// ── SIN TOLERANCIA A LA DDL (3-sep-2026) ─────────────────────────────────────
+//
+// Historia: esta ruta contestaba `{ ok: true, aviso }` vacío al leer y 503 con
+// el nombre del archivo al cerrar/reabrir cuando `planilla-guardada-server`
+// devolvía `faltaTabla: true`. Tolerancia retirada: las dos tablas existen
+// desde 20260904120000_asistencia_planilla_guardada.sql. Hoy un error de la
+// base sale por el `catch` como 500 con el mensaje — y al LEER es lo único
+// aceptable: «no hay nada cerrado» ante un error dejaría pasar el freno del
+// solapamiento, o sea un doble pago.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -77,7 +87,6 @@ import {
   textoFrenos,
   motivoReaperturaValido,
   cerrarPlanillaRoles,
-  avisoMigracionPlanillaGuardada,
 } from "@/lib/asistencia/planilla-guardada";
 import type { SugerenciaPrestamo } from "@/lib/asistencia/prestamos-planilla";
 import {
@@ -111,10 +120,7 @@ export async function GET(req: NextRequest) {
 
   try {
     if (id) {
-      const { cabecera, faltaTabla } = await leerCabecera(id);
-      if (faltaTabla) {
-        return NextResponse.json({ ok: true, cabecera: null, lineas: [], aviso: avisoMigracionPlanillaGuardada() });
-      }
+      const { cabecera } = await leerCabecera(id);
       if (!cabecera) {
         return NextResponse.json({ error: "Esa planilla guardada no existe." }, { status: 404 });
       }
@@ -129,13 +135,7 @@ export async function GET(req: NextRequest) {
     if (!empresa) {
       return NextResponse.json({ error: "Falta la empresa." }, { status: 400 });
     }
-    const { cabeceras, faltaTabla } = await leerCabeceras(empresa);
-    if (faltaTabla) {
-      return NextResponse.json({
-        ok: true, empresa, estado: "borrador", cerrada: null, solapadas: [], historial: [],
-        aviso: avisoMigracionPlanillaGuardada(),
-      });
-    }
+    const { cabeceras } = await leerCabeceras(empresa);
 
     const desde = (sp.get("desde") ?? "").trim();
     const hasta = (sp.get("hasta") ?? "").trim();
@@ -207,15 +207,10 @@ export async function POST(req: NextRequest) {
     }
 
     // ── EL FRENO DEL SOLAPAMIENTO, ANTES DE ESCRIBIR NADA ──────────────────
-    const { cabeceras, faltaTabla } = await leerCabeceras(empresa);
-    if (faltaTabla) {
-      // 503 y NO 200: decir «listo, cerrada» sobre algo que no se escribió es el
-      // único desenlace inaceptable acá.
-      return NextResponse.json(
-        { ok: false, faltaTabla: true, aviso: avisoMigracionPlanillaGuardada() },
-        { status: 503 },
-      );
-    }
+    // Si esta lectura falla, se sale por el `catch` con 500 y NO se cierra
+    // nada: decir «listo, cerrada» sobre algo que no se escribió es el único
+    // desenlace inaceptable acá.
+    const { cabeceras } = await leerCabeceras(empresa);
     const solapadas = solapadasDe(empresa, { desde, hasta }, cabeceras);
     if (solapadas.length > 0) {
       return NextResponse.json(
@@ -299,12 +294,6 @@ export async function POST(req: NextRequest) {
       // y no se vuelve a consultar la base para contar.
       yaGuardadas: cabeceras,
     });
-    if (r.faltaTabla) {
-      return NextResponse.json(
-        { ok: false, faltaTabla: true, aviso: avisoMigracionPlanillaGuardada() },
-        { status: 503 },
-      );
-    }
     if (r.choque) {
       // El EXCLUDE de la base. Se llega acá cuando dos personas cierran rangos
       // que se pisan casi al mismo tiempo: el chequeo de arriba no alcanza y la
@@ -353,13 +342,7 @@ export async function PATCH(req: NextRequest) {
     const usuario = String(auth.userName ?? "").trim();
     if (!usuario) return NextResponse.json({ error: "La sesión no dice quién eres." }, { status: 400 });
 
-    const { cabecera, faltaTabla } = await leerCabecera(id);
-    if (faltaTabla) {
-      return NextResponse.json(
-        { ok: false, faltaTabla: true, aviso: avisoMigracionPlanillaGuardada() },
-        { status: 503 },
-      );
-    }
+    const { cabecera } = await leerCabecera(id);
     if (!cabecera) return NextResponse.json({ error: "Esa planilla guardada no existe." }, { status: 404 });
     if (!esCerrada(cabecera.estado)) {
       return NextResponse.json(
@@ -380,12 +363,6 @@ export async function PATCH(req: NextRequest) {
       );
     }
     const r = await reabrirPlanilla(id, usuario, motivo);
-    if (r.faltaTabla) {
-      return NextResponse.json(
-        { ok: false, faltaTabla: true, aviso: avisoMigracionPlanillaGuardada() },
-        { status: 503 },
-      );
-    }
     if (!r.ok) {
       return NextResponse.json({ ok: false, error: "Esa quincena ya estaba reabierta." }, { status: 409 });
     }
