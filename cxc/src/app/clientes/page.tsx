@@ -68,7 +68,10 @@ export default async function ClientesPage() {
   // los que no son del grupo se quitan DESPUÉS de leer, así que un
   // `count` de la base contaría miles que no se van a mostrar y la paginación
   // prometería páginas vacías.
-  const visiblesCache: FilaCliente[] = await leerClientesDelGrupo("").catch(() => []);
+  // CON AUSENTES: esta pantalla es el directorio completo — el cliente que
+  // Switch ya no manda se ve, con su rótulo, y su ficha sigue abriendo. Los
+  // que NO lo ofrecen son los selectores (default de `leerClientesDelGrupo`).
+  const visiblesCache: FilaCliente[] = await leerClientesDelGrupo("", { incluirAusentes: true }).catch(() => []);
 
   // ⚠️ `.slice()` OBLIGATORIO: `visiblesCache` es el MISMO array que guarda el
   // caché en memoria, y `sort` ordena EN EL LUGAR. Sin la copia, esta pantalla

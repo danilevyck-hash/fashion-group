@@ -32,6 +32,10 @@ interface Cliente {
   last_synced_at: string | null;
   updated_at: string | null;
   created_at: string | null;
+  /** Puesto = Switch ya no lo manda en ninguna de las 6 empresas. La ficha lo
+   *  dice con fecha; los selectores no lo ofrecen. `undefined` mientras la
+   *  migración 20260919120000 no corra → no se muestra nada. */
+  ausente_desde?: string | null;
 }
 
 interface EmpresaTotals {
@@ -168,6 +172,14 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             <h1 className="text-2xl font-semibold tracking-tight">{cliente.nombre}</h1>
             {cliente.razon_social && cliente.razon_social !== cliente.nombre && (
               <div className="text-sm text-gray-500 mt-0.5">{cliente.razon_social}</div>
+            )}
+            {/* Ausente de Switch (4-sep-2026): la ficha lo dice con fecha. El
+                cliente NO se borra —sus guías y facturas viejas lo siguen
+                mostrando normal— pero los selectores ya no lo ofrecen. */}
+            {cliente.ausente_desde && (
+              <div className="mt-2 inline-flex items-center rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                Ya no está en Switch desde el {fmtDate(cliente.ausente_desde.slice(0, 10))} — se conserva por sus guías y facturas viejas.
+              </div>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">

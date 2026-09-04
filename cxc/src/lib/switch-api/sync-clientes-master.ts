@@ -37,6 +37,11 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { EMPRESAS_DEL_GRUPO } from "@/lib/clientes/mundos";
 import {
+  esCodigoAusente,
+  fechaAusenteDesde,
+  MAX_FRACCION_AUSENTES,
+} from "@/lib/clientes/ausentes";
+import {
   elegirNombreCanonico,
   codigosAmbiguos,
   type CandidatoNombre,
@@ -60,6 +65,11 @@ interface SwitchClienteRow {
   identificacion: string | null;
   raw_data: Record<string, unknown> | null;
   synced_at: string | null;
+  /** false = Switch ya no lo manda en esa empresa (lo escribe sync-empresa con
+   *  guard de lista completa). Ausente del select de respaldo si la DDL
+   *  20260723110000 no corrió — y entonces NO se marca a nadie. */
+  activo?: boolean | null;
+  ausente_desde?: string | null;
 }
 
 interface MasterUpsertRow {
@@ -85,6 +95,20 @@ export interface ClientesMasterResult {
    * el sync elegía uno y se callaba; ahora se ven.
    */
   codigos_ambiguos: CodigoAmbiguo[];
+  /**
+   * Códigos que NINGUNA de las 6 empresas del grupo manda ya (todas sus filas
+   * de switch_clientes con activo=false). Se marcan con `ausente_desde` en
+   * clientes_master para que dejen de ofrecerse en los selectores — la fila NO
+   * se borra: guías y facturas viejas siguen mostrando su nombre.
+   */
+  ausentes: string[];
+  /** Cuántos de esos quedaron marcados en esta corrida (0 si ya lo estaban). */
+  ausentes_marcados: number;
+  /** Cuántos volvieron a la vida (Switch los mandó de nuevo → marca en null). */
+  revividos: number;
+  /** Presente si la pasada de ausentes NO corrió, con el porqué. El resto del
+   *  sync (upsert fiscal) no se ve afectado. */
+  marca_ausentes_omitida?: string;
   /** Presente solo si ok=false. */
   error?: string;
 }
@@ -102,6 +126,9 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
     skipped_sin_nombre: 0,
     synced_at: now,
     codigos_ambiguos: [] as CodigoAmbiguo[],
+    ausentes: [] as string[],
+    ausentes_marcados: 0,
+    revividos: 0,
   };
 
   // 1. Traer los clientes del espejo de Switch, paginado.
@@ -144,23 +171,38 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
   //    se salteen o se repitan, en silencio y sin error. `leerTodoPaginado`
   //    además VERIFICA contra un `count: "exact"` y revienta si no cuadra, en
   //    vez de seguir con menos.
-  let rows: SwitchClienteRow[];
-  try {
-    rows = await leerTodoPaginado<SwitchClienteRow>(
+  //    Se piden también `activo` y `ausente_desde` (los escribe sync-empresa
+  //    cuando Switch deja de mandar un cliente) para la pasada de AUSENTES de
+  //    más abajo. Si esa DDL (20260723110000) no corrió en este entorno, el
+  //    select de respaldo va sin las dos columnas y la pasada se OMITE — el
+  //    refresco fiscal no depende de ellas.
+  const leerEspejo = (conAusencia: boolean) =>
+    leerTodoPaginado<SwitchClienteRow>(
       "switch_clientes (maestro de clientes)",
       (pedirCount, from, to) =>
         supabaseServer
           .from("switch_clientes")
           .select(
-            "empresa_key, codigo, nombre, razonsocial, identificacion, raw_data, synced_at",
+            "empresa_key, codigo, nombre, razonsocial, identificacion, raw_data, synced_at" +
+              (conAusencia ? ", activo, ausente_desde" : ""),
             pedirCount ? { count: "exact" } : {},
           )
           .in("empresa_key", [...EMPRESAS_DEL_GRUPO])
           .order("id", { ascending: true })
           .range(from, to),
     );
-  } catch (e) {
-    return { ok: false, ...empty, error: e instanceof Error ? e.message : String(e) };
+
+  let rows: SwitchClienteRow[];
+  try {
+    rows = await leerEspejo(true);
+  } catch {
+    // Columna `activo`/`ausente_desde` pendiente u otro rechazo del select
+    // largo: el refresco fiscal tiene que seguir andando igual que siempre.
+    try {
+      rows = await leerEspejo(false);
+    } catch (e) {
+      return { ok: false, ...empty, error: e instanceof Error ? e.message : String(e) };
+    }
   }
 
   // 2. Agrupar por codigo: switch_clientes tiene una fila por (empresa, cliente).
@@ -241,17 +283,40 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
     if (upErr) {
       return {
         ok: false,
+        ...empty,
         source_rows: sourceRows,
         distinct_codigos: byCodigo.size,
         upserted,
         skipped_sin_nombre: skippedSinNombre,
-        synced_at: now,
         codigos_ambiguos: ambiguos,
         error: upErr.message,
       };
     }
     upserted += slice.length;
   }
+
+  // 5. AUSENTES DE SWITCH (4-sep-2026, aprobado por Daniel). Un cliente que
+  //    NINGUNA de las 6 empresas manda ya se marca con `ausente_desde` para que
+  //    deje de ofrecerse en los selectores; si Switch lo vuelve a mandar, se
+  //    desmarca solo. La fila NUNCA se borra.
+  //
+  //    🔴 LA PROTECCIÓN, en capas — un fallo de Switch no puede vaciar el
+  //    directorio:
+  //      · `activo=false` solo lo escribe sync-empresa con una lista de Switch
+  //        COMPLETA y no vacía, de una llamada que salió bien (su guard
+  //        `listaCompleta`). Una corrida fallida o a medias no cambia `activo`.
+  //      · Si la lectura de `switch_clientes` de arriba falló, ya devolvimos
+  //        ok:false SIN llegar acá: no se marca a nadie.
+  //      · Sin datos de `activo` (DDL pendiente, select de respaldo) la pasada
+  //        entera se OMITE — marcar o desmarcar desde la ignorancia es peor
+  //        que no hacer nada.
+  //      · Y el freno de MAX_FRACCION_AUSENTES: si "ausente" saliera masivo,
+  //        eso es un dato roto aguas arriba, no una purga real de clientes.
+  //
+  //    Cualquier error al escribir la marca NO tumba el sync (la migración
+  //    20260919120000 puede no haber corrido): se reporta y el refresco fiscal
+  //    queda igual que siempre.
+  const resultadoAusentes = await marcarAusentesEnMaster(byCodigo, now);
 
   return {
     ok: true,
@@ -261,5 +326,115 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
     skipped_sin_nombre: skippedSinNombre,
     synced_at: now,
     codigos_ambiguos: ambiguos,
+    ...resultadoAusentes,
   };
+}
+
+interface ResultadoAusentes {
+  ausentes: string[];
+  ausentes_marcados: number;
+  revividos: number;
+  marca_ausentes_omitida?: string;
+}
+
+/**
+ * Marca en `clientes_master.ausente_desde` los códigos que TODAS sus filas de
+ * `switch_clientes` (entre las 6 del grupo) declaran `activo = false`, y
+ * desmarca los que volvieron. Ver el bloque 5 de `syncClientesMaster` para las
+ * capas de protección. Nunca lanza: reporta.
+ */
+async function marcarAusentesEnMaster(
+  byCodigo: ReadonlyMap<string, SwitchClienteRow[]>,
+  now: string,
+): Promise<ResultadoAusentes> {
+  // Sin ni UNA fila con `activo` boolean no sabemos nada: ni marcar ni revivir.
+  let hayDatoDeActivo = false;
+  for (const filas of byCodigo.values()) {
+    if (filas.some((f) => typeof f.activo === "boolean")) {
+      hayDatoDeActivo = true;
+      break;
+    }
+  }
+  if (!hayDatoDeActivo) {
+    return {
+      ausentes: [],
+      ausentes_marcados: 0,
+      revividos: 0,
+      marca_ausentes_omitida: "switch_clientes sin datos de activo (¿DDL 20260723110000 pendiente?)",
+    };
+  }
+
+  const ausentes: string[] = [];
+  const vivos: string[] = [];
+  const fechaPorCodigo = new Map<string, string>();
+  for (const [codigo, filas] of byCodigo) {
+    if (esCodigoAusente(filas)) {
+      ausentes.push(codigo);
+      fechaPorCodigo.set(codigo, fechaAusenteDesde(filas) ?? now);
+    } else {
+      vivos.push(codigo);
+    }
+  }
+
+  // 🔴 El freno: una pasada que marcaría a media lista no marca a NADIE.
+  if (ausentes.length > byCodigo.size * MAX_FRACCION_AUSENTES) {
+    const msg = `freno: ${ausentes.length} de ${byCodigo.size} códigos saldrían ausentes (>${Math.round(MAX_FRACCION_AUSENTES * 100)}%) — dato sospechoso aguas arriba, no se marca a nadie`;
+    console.error(`[sync clientes_master] WARNING ausentes: ${msg}`);
+    return { ausentes, ausentes_marcados: 0, revividos: 0, marca_ausentes_omitida: msg };
+  }
+
+  let marcados = 0;
+  let revividos = 0;
+
+  // Marcar — solo filas todavía sin marca (`ausente_desde IS NULL`): una marca
+  // ya puesta no se pisa, así la fecha que ve la ficha es estable. Se agrupa
+  // por fecha para hacer una escritura por valor (en la práctica, 1 o 2).
+  const porFecha = new Map<string, string[]>();
+  for (const codigo of ausentes) {
+    const fecha = fechaPorCodigo.get(codigo) ?? now;
+    const lista = porFecha.get(fecha);
+    if (lista) lista.push(codigo);
+    else porFecha.set(fecha, [codigo]);
+  }
+  for (const [fecha, codigos] of porFecha) {
+    const { data, error } = await supabaseServer
+      .from("clientes_master")
+      .update({ ausente_desde: fecha })
+      .in("codigo", codigos)
+      .is("ausente_desde", null)
+      .select("codigo");
+    if (error) {
+      console.error(`[sync clientes_master] WARNING marcar ausentes (¿DDL 20260919120000 pendiente?): ${error.message}`);
+      return {
+        ausentes,
+        ausentes_marcados: marcados,
+        revividos,
+        marca_ausentes_omitida: error.message,
+      };
+    }
+    marcados += data?.length ?? 0;
+  }
+
+  // Revivir — Switch lo mandó de nuevo (alguna empresa lo declara vivo): la
+  // marca se quita sola, sin que nadie haga nada.
+  if (vivos.length > 0) {
+    const { data, error } = await supabaseServer
+      .from("clientes_master")
+      .update({ ausente_desde: null })
+      .in("codigo", vivos)
+      .not("ausente_desde", "is", null)
+      .select("codigo");
+    if (error) {
+      console.error(`[sync clientes_master] WARNING revivir presentes (¿DDL 20260919120000 pendiente?): ${error.message}`);
+      return {
+        ausentes,
+        ausentes_marcados: marcados,
+        revividos,
+        marca_ausentes_omitida: error.message,
+      };
+    }
+    revividos = data?.length ?? 0;
+  }
+
+  return { ausentes, ausentes_marcados: marcados, revividos };
 }

@@ -22,6 +22,10 @@ export interface Cliente {
   celular: string | null;
   email: string | null;
   provincia: string | null;
+  /** Puesto = Switch ya no lo manda en ninguna de las 6 empresas: se muestra
+   *  con rótulo (la ficha dice desde cuándo), pero los selectores no lo
+   *  ofrecen. `null`/`undefined` = vivo. */
+  ausente_desde?: string | null;
 }
 
 interface YtdResp {
@@ -282,6 +286,12 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
                           <Link href={`/clientes/${encodeURIComponent(c.codigo)}`} className="hover:underline">
                             {c.nombre}
                           </Link>
+                          {/* Ausente de Switch: se ve (con su ficha), no se ofrece. */}
+                          {c.ausente_desde && (
+                            <span className="ml-2 align-middle rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-normal text-amber-800">
+                              Ya no está en Switch
+                            </span>
+                          )}
                         </td>
                         {/* Compras del año. "…" mientras carga; $0.00 en gris
                             cuando de verdad no compró — un cliente en cero es
@@ -322,7 +332,14 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
                     className="border-b border-gray-100 px-1 py-3 active:bg-gray-50 cursor-pointer"
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-medium truncate">{c.nombre}</span>
+                      <span className="min-w-0 truncate font-medium">
+                        {c.nombre}
+                        {c.ausente_desde && (
+                          <span className="ml-2 align-middle rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-normal text-amber-800">
+                            Ya no está en Switch
+                          </span>
+                        )}
+                      </span>
                       <span className="shrink-0 text-xs tabular-nums text-gray-400">{c.codigo}</span>
                     </div>
                     {/* Llamar es LA acción del módulo en el celular y el link

@@ -66,11 +66,18 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
 
   // Selector: lista desde la tabla LOCAL (la llena el sync).
   // Sanitizar q: coma/paréntesis rompen la sintaxis de .or() de PostgREST.
+  //
+  // 🔴 SOLO CLIENTES QUE SWITCH TODAVÍA MANDA (4-sep-2026, aprobado por
+  // Daniel): un cliente borrado allá (`activo = false`, lo marca el sync de
+  // CXC con guard de lista completa) deja de OFRECERSE — igual que en el
+  // selector del directorio. Los pedidos viejos que lo tengan asignado siguen
+  // resolviendo su nombre por el camino de `orderId`, que no filtra.
   const q = (sp.get("q") || "").trim().replace(/[,()%]/g, " ").trim();
   let query = supabaseServer
     .from("switch_clientes")
     .select("cliente_switch_id, codigo, nombre")
     .eq("empresa_key", cfg.empresaKey)
+    .eq("activo", true)
     .order("nombre", { ascending: true })
     .limit(20);
   if (q.length > 0) {

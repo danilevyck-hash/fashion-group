@@ -64,9 +64,16 @@ export async function GET(req: NextRequest) {
   // pestaña de CXC y los de Multifashion en su módulo. La regla y su porqué
   // viven en UN solo lugar — `lib/clientes/mundos` — no acá.
   // Va antes de la búsqueda y del conteo, así que `total` ya sale correcto.
+  //
+  // ⚠️ CON AUSENTES A PROPÓSITO. Este endpoint es el DIRECTORIO, no un
+  // selector: lo leen la lista de /clientes (donde el ausente se muestra con
+  // su rótulo) y el mapa código→nombre que pone el nombre en las guías viejas.
+  // Cada fila viaja con su `ausente_desde` y quien OFRECE (el ClientePicker,
+  // vía `lib/clientes/ausentes`) filtra en su lado. Quitar los ausentes acá
+  // dejaría a las guías viejas mostrando el código pelado.
   let visibles: FilaCliente[];
   try {
-    visibles = await leerClientesDelGrupo(provincia);
+    visibles = await leerClientesDelGrupo(provincia, { incluirAusentes: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[api/clientes] list error:", msg);
