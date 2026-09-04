@@ -56,6 +56,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
+import DestinosDelCliente from "./DestinosDelCliente";
 import FacturasDelCliente from "./FacturasDelCliente";
 import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
@@ -367,6 +368,11 @@ export default function GuiaForm({
   // `@/lib/guias/direccion-sugerida`. Best-effort: sin esto, la lista de
   // direcciones es la de siempre.
   const [direccionPorCliente, setDireccionPorCliente] = useState<Record<string, string>>({});
+  // Código de cliente → sus DESTINOS históricos (variantes agrupadas, la grafía
+  // más usada, máx. 6). Alimenta los botones bajo el campo Dirección
+  // (`DestinosDelCliente`, 4-sep-2026). Best-effort: sin esto, los 9 clientes
+  // definidos por Daniel muestran sus botones igual (viven en el módulo).
+  const [destinosPorCliente, setDestinosPorCliente] = useState<Record<string, string[]>>({});
   useEffect(() => {
     let cancel = false;
     fetch("/api/guias/frecuencias", { cache: "no-store" })
@@ -376,6 +382,7 @@ export default function GuiaForm({
         if (Array.isArray(d.clientes)) setClientesTop(d.clientes);
         if (Array.isArray(d.empresas)) setEmpresaOptions(d.empresas);
         if (d.direcciones && typeof d.direcciones === "object") setDireccionPorCliente(d.direcciones);
+        if (d.destinos && typeof d.destinos === "object") setDestinosPorCliente(d.destinos);
       })
       .catch(() => { /* offline: cae a las 8 canónicas en su orden de siempre */ });
     return () => { cancel = true; };
@@ -649,6 +656,23 @@ export default function GuiaForm({
           />
         </div>
         {err && <ErrorCampo />}
+        {/* 🔴 LOS DESTINOS DEL CLIENTE, COMO BOTONES (4-sep-2026). Se toca uno
+            y se llena el campo; el campo SIGUE siendo texto libre y se escribe
+            encima. Cuelga del MISMO interruptor que el panel de facturas: en
+            `false` no se dibuja nada y la pantalla es la de hoy. Sin código de
+            cliente, o sin historia ni definición, el componente devuelve null.
+            🔴 NUNCA se aplica solo — ni con un único destino: la dirección
+            «NO se escribe sola en el campo» (14-ago-2026, y el invariante de
+            que las sugerencias nunca atan solas). En una guía Completada no
+            aparece: `campoDireccion` ya salió por `soloCorregible` arriba. */}
+        {GUIAS_ATAJOS_NUEVOS && (
+          <DestinosDelCliente
+            codigo={item.cliente_codigo || ""}
+            direccion={item.direccion}
+            historicos={destinosPorCliente[(item.cliente_codigo || "").trim()] ?? []}
+            onElegir={(v) => { onUpdateItem(idx, "direccion", v); marcarTocado(clave); }}
+          />
+        )}
       </>
     );
   }

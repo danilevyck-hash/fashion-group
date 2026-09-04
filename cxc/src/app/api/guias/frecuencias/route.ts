@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { ultimaDireccionPorCliente } from "@/lib/guias/direccion-sugerida";
+import { destinosHistoricos } from "@/lib/guias/destinos-clientes";
+import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -132,7 +134,15 @@ export async function GET(req: NextRequest) {
     // ── Dirección: código de cliente → la última a la que se le despachó ──
     const direcciones = ultimaDireccionPorCliente(rows, guias);
 
-    return NextResponse.json({ clientes, empresas, direcciones });
+    // ── Destinos por cliente: los botones bajo el campo Dirección ──
+    // (4-sep-2026) Variantes agrupadas por clave exacta, grafía más usada,
+    // máx. 6 por cliente. Cuelga del MISMO interruptor que el panel de
+    // facturas: apagado, la respuesta vuelve a ser la de hoy y el formulario
+    // no dibuja nada nuevo. Solo renglones vivos de guías vivas (los dos
+    // `deleted` son independientes) — lo filtra el módulo.
+    const destinos = GUIAS_ATAJOS_NUEVOS ? destinosHistoricos(rows, guias) : {};
+
+    return NextResponse.json({ clientes, empresas, direcciones, destinos });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error interno";
     console.error("[api/guias/frecuencias] GET:", message);

@@ -104,6 +104,7 @@ archivo enlazado, verbatim.
 - Las sugerencias de cliente **NUNCA atan solas**, ni con un único candidato. El pareo es **exacto y normalizado, nunca por parecido**: `Outlet Duty Free N2` y `N3` son tiendas distintas.
 - El formulario **no guarda si nada cambió** (`cambios-form.ts`): cargar la guía no puede producir una diferencia contra sí misma.
 - **Al crear, el cliente se elige UNA vez y se MARCAN sus facturas** (4-sep-2026, «va»): puente por CÓDIGO (`switch_clientes`, nunca por nombre), solo las 6 del grupo por inclusión, solo tipo `Factura`; «ya salió en otra guía» es **aviso, nunca bloqueo**; elegir cliente **sigue sin ser obligatorio** y el payload que se guarda **no cambia**. Todo cuelga de **`GUIAS_ATAJOS_NUEVOS`** (`src/lib/guias/atajos-facturas.ts`): en `false`, la pantalla es exactamente la de antes.
+- **La dirección de un renglón es el DESTINO del envío, no la dirección del cliente** (4-sep-2026): `clientes_master` no tiene esa columna y el campo sigue siendo **texto libre**. Bajo el campo hay **botones con los destinos de ese cliente** — 9 clientes con destino **definido por Daniel** (`src/lib/guias/destinos-clientes.ts`, fuente de verdad; D-142 Sporting Shoes con 8 y tienda opcional «Westland · tienda 6»), el resto por historia (agrupado **exacto**, grafía más usada, máx. 6). **El botón se toca, nunca se aplica solo** — ni con un único destino. Cuelga del MISMO `GUIAS_ATAJOS_NUEVOS` y no cambia lo que se guarda.
 
 ### Catálogos, pedidos y cotización — [docs/postmortems/catalogos-pedidos.md](docs/postmortems/catalogos-pedidos.md)
 

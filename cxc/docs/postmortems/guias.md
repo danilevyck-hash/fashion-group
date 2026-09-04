@@ -975,3 +975,56 @@
 > `src/__tests__/api/guias-facturas-del-cliente.test.ts` (11, **llama al handler real con la base doblada, y el doble APLICA los filtros capturados** — cambiar el puente cambia el resultado), `src/__tests__/components/guia-form-marcar-facturas.test.tsx` (11, **monta GuiaForm de verdad y toca las casillas**, con el interruptor controlable por test y una sección CONTROL con la constante APAGADA) y `src/__tests__/lib/guias-atajos-facturas.test.ts` (19, el módulo puro con fechas fijas — nunca `new Date()` — y la igualdad de payload de los dos caminos).
 > - **Verificado por mutación, 12 de 12 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-guias-facturas.sh`): el puente une por NOMBRE · Boston entra al puente · se ofrecen todos los comprobantes · el OR deja de ser de tuplas · el server esconde la factura que ya salió · el «ya salió» pierde la empresa · la casilla de una que ya salió deja de marcar · las facturas se agrupan sin mirar la empresa · el separador deja de ser el de hoy · elegir cliente se vuelve obligatorio · el panel ignora el interruptor · el panel aparece también al editar. Con la mutación de CONTROL que a propósito no matchea (⛔) y restauración por COPIA, como los demás scripts del módulo.
 > - 🩸 **Una salió PATRÓN MUERTO en la primera corrida y era del SCRIPT, no del producto**: el `.in("empresa_key", [...B2B_EMPRESA_KEYS])` aparece DOS veces en la ruta (el puente y la frescura) y el aplicador exige el conteo exacto — se declaró `veces=2` y la mutación pasó a atacar los dos.
+
+
+---
+
+## 🔴 Guías — LA DIRECCIÓN ES EL DESTINO, y los destinos de cada cliente son BOTONES (4-sep-2026)
+
+> Mismo encargo y mismo interruptor que «el cliente se elige una vez» (arriba): Daniel aprobó el mockup con un **«va»** y fijó la salida — *«te aviso si quiero revertir todo después de probarlo en producción con mi secretaria estas semanas»*. Angela y Andrea lo prueban; `GUIAS_ATAJOS_NUEVOS` en `false` y la pantalla vuelve a ser la de hoy.
+>
+> ### El problema, medido contra producción (3/4-sep-2026, 529 renglones vivos)
+>
+> La dirección de un renglón es el **destino del envío**, no la dirección del cliente: `clientes_master` **no tiene esa columna** (solo `provincia`, y 51 de 150 la tienen). Se escribe a mano cada vez, y el mismo lugar entra de varias formas: **«Paso Canoas»×208 · «Pasocanoas»×1 · «Paso Canoa»×1** · «Penonome / PENONOME / Penonomé» · «Wesland / Westaland / WESTLAND - TIENDA 6». De **48 clientes** con guías y dirección, **40 usan siempre el mismo destino** (agrupando variantes); solo 8 usan más de uno.
+>
+> **Ahora:** debajo del campo Dirección aparecen **botones con los destinos que ese cliente ya recibió**. Se toca uno y se llena. **Sigue siendo texto libre**: los botones son atajo, jamás candado.
+>
+> ### 🔴 Los 9 definidos por Daniel son la FUENTE DE VERDAD (su tabla, textual)
+>
+> | Código | Cliente | Destino |
+> |---|---|---|
+> | D-81 | Jerusalem Duty Free | Paso Canoas |
+> | D-156 | Wolf Mall Center Int | Changuinola |
+> | D-117 | Outlet Duty Free N2 | Guabito |
+> | D-87 | La Frontera Duty Free | Guabito |
+> | D-25 | City Mall Paso Canoa | Paso Canoas |
+> | D-35 | City Shoes | Calle 19 Central |
+> | D-144 | Star Shoes, S.A. | Albrook |
+> | D-26 | City Moda Chorrera | Entrega en SportCorner |
+> | D-142 | Sporting Shoes N 4 | Westland · Albrook · Los Andes · Santiago · Penonomé · Metromall · Megamall · Outlet Vía España |
+>
+> Viven en **`src/lib/guias/destinos-clientes.ts`** y **ganan sobre el histórico a propósito**: medido, el histórico de **D-87 dice más veces «Changinola» (7) que «Guabito» (4)**, el de D-117 está partido mitad y mitad, y el de D-26 es un catálogo de «X (ENTREGA EN SPORTCORNER)» — exactamente el desorden que la tabla vino a cerrar. **D-142** además ofrece un renglón de **tienda opcional** con los números ya usados (verificado en el histórico: Westland 5·6·14 y «Mas Flow» · Albrook 7·8·9 · Los Andes 3·4 · Metromall 10) más **«+ otra»**; tocar «6» sobre «Westland» compone **`Westland · tienda 6`**.
+>
+> - 🔴 **El separador se decidió mirando dónde se imprime la dirección ANTES de elegirlo**, y vive en UN solo lugar (`componerDestino`): en el papel (`PrintDocument`), el PDF (`pdf-guia.ts`) y el Excel (`excel-guias.ts`) la dirección sale en su **propia celda/columna**, así que ningún separador choca con nada; el único « · » vecino es el del resumen del acordeón («Cliente · Destino»), donde sigue leyéndose de corrido. Se guarda el del ejemplo del mockup aprobado. Con una tienda que no es número no se antepone «tienda»: `Westland · Mas Flow`.
+>
+> ### Los demás clientes: su historia, agrupada por regla EXACTA
+>
+> Los botones salen de `guia_items` — **solo renglones vivos de guías vivas** (los dos `deleted` son independientes: filtrar solo la cabecera deja pasar renglones borrados) y **solo por `cliente_codigo`**, nunca por nombre a mano (la razón medida de `direccion-sugerida.ts`). Variantes agrupadas por `claveDestino`: minúsculas, sin acentos, sin espacios ni puntuación, **una «s» final ignorada** (la regla de plural que junta las tres grafías reales 208/1/1 — completa y total, no un umbral) — y 🔴 **los DÍGITOS se comparan tal cual sobre el texto crudo, aparte de las letras** (la lección de `nombre-normalizado.ts`): «Outlet Duty Free N2» y «N3» jamás se juntan, «tienda 5» no es «tienda 6». **Nada de distancia de edición**: «Wesland» (typo) NO se junta con «Westland». Se ofrece la **grafía más usada** (desempata la más reciente; nunca la normalizada — la lección de los juegos de despacho), por frecuencia, **máximo 6**. Cliente sin historia: **cero botones**, campo vacío como hoy. Viajan en `/api/guias/frecuencias` (campo `destinos`), sin consulta nueva.
+>
+> ### 🔴 El botón se toca, NUNCA se aplica solo — y el pre-marcado NO se construyó
+>
+> El encargo contemplaba dejar **pre-marcado** el destino de un cliente definido con UNO solo («es una definición de Daniel, no un parecido»), con la instrucción explícita de no hacerlo si chocaba con el postmortem. **Choca**, y por eso no se hizo: la decisión del 14-ago-2026 sobre este MISMO campo dice que la dirección **«NO se escribe sola en el campo»** — `direccion-sugerida.ts` devuelve una LISTA y no expone ningún «elegido» del que alguien pueda deducir un auto-completado — y el invariante general manda que **las sugerencias nunca aten solas, ni con un único candidato**. Pre-llenar el campo como efecto de elegir el cliente es exactamente «escribirse sola», venga de una tabla o de un parecido. El costo es UN toque para 8 clientes; si Daniel quiere el pre-marcado igual, es una decisión suya y está a una línea de distancia — queda anotado, no construido.
+>
+> ### 🔴 Reversible en un solo lugar, y nada cambia lo que se GUARDA
+>
+> - Todo cuelga del **MISMO `GUIAS_ATAJOS_NUEVOS`** del panel de facturas (`atajos-facturas.ts`) — **no se creó un segundo interruptor**. En `false`: la ruta deja de mandar `destinos`, el formulario no dibuja ni un botón y la pantalla es EXACTAMENTE la de hoy (candado CONTROL en los dos estados).
+> - Tocar un botón escribe por el **MISMO camino que teclear** (`onUpdateItem("direccion", …)`): el payload, `guia_items`, el papel y el Excel son idénticos por los dos caminos — candado con `instantaneaRenglones`. Apagar el interruptor no deja datos raros atrás.
+> - **Una guía Completada no muestra nada de esto** (la dirección no está entre los 3 campos corregibles: `campoDireccion` sale por `soloCorregible` antes de dibujar). Y **no se tocó ni una fila de `guia_items`**: cero migraciones, el histórico es lo que el transportista firmó.
+> - La integración con el panel de facturas es **automática**: marcar una factura escribe `cliente_codigo` en el renglón, y los botones de destino de ESE renglón son los de ese cliente. Cero acople entre los dos componentes.
+>
+> ### Medición y candados
+>
+> **Diagnóstico read-only contra producción, con el motor REAL** (`DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-guias-destinos-cliente.ts`): 563 renglones leídos · 48 clientes con historia · 40 con un solo destino agrupado · los 9 definidos imprimen su tabla al lado de su histórico (D-87 y D-26 son la prueba de por qué la definición gana).
+>
+> **Candados:** `src/__tests__/lib/guias-destinos-cliente.test.ts` (28 — los 9 exactos, frecuencia, el trío de Paso Canoas = 1, N2 ≠ N3, lo borrado no cuenta por los DOS `deleted`, sin historia cero botones, la tienda y su separador, la igualdad de payload) · `src/__tests__/components/guia-form-destinos.test.tsx` (10, **monta GuiaForm de verdad y toca los botones**, con el interruptor controlable y las secciones CONTROL: el botón nunca se aplica solo, se escribe encima, la Completada no muestra nada, apagado = la pantalla de hoy) · un caso nuevo en `guias-frecuencias-ruta.test.ts` (la ruta que calcula los destinos y los tira se pone roja).
+> - **Verificado por mutación, 13 de 13 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-guias-destinos.sh`): los dígitos se caen de la clave (N2 y N3 se juntan) · un renglón borrado vuelve a contar · el de la guía borrada también · el histórico pisa la tabla de Daniel · el tope de 6 se cae · se ofrece la grafía menos usada · el orden deja de ser por frecuencia · el separador cambia · las tiendas aparecen sin destino elegido · **el botón se aplica solo** · el campo deja de ser editable · los botones ignoran el interruptor · la ruta tira los destinos. Con la mutación de CONTROL que a propósito no matchea (⛔) y restauración por COPIA, como los demás scripts del módulo.

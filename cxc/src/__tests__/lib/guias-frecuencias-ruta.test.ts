@@ -66,6 +66,7 @@ async function pedirGet() {
     clientes: { codigo: string; nombre: string }[];
     empresas: string[];
     direcciones: Record<string, string>;
+    destinos: Record<string, string[]>;
   };
 }
 
@@ -75,6 +76,17 @@ describe("GET /api/guias/frecuencias", () => {
       expect(json.direcciones).toBeTruthy();
       expect(json.direcciones["D-25"]).toBe("Paso Canoas"); // la guía más reciente
       expect(json.direcciones["D-24"]).toBe("David");
+    });
+  });
+
+  it("🔴 devuelve los DESTINOS de cada cliente (los botones del campo Dirección, 4-sep-2026)", () => {
+    // El mismo agujero que este archivo documenta arriba: calcular
+    // `destinosHistoricos` y tirarlo a la basura dejaría los botones vacíos EN
+    // SILENCIO. Con empate de frecuencia gana el de la guía más reciente.
+    return pedirGet().then((json) => {
+      expect(json.destinos).toBeTruthy();
+      expect(json.destinos["D-25"]).toEqual(["Paso Canoas", "David"]);
+      expect(json.destinos["D-24"]).toEqual(["David"]);
     });
   });
 
