@@ -1,6 +1,8 @@
 # Fashion Group — fashiongr.com
 
 > 🔴 **Estado del proyecto y pendientes vivos: [docs/estado-actual.md](docs/estado-actual.md) — léelo al empezar cualquier sesión.**
+>
+> 🗺️ **El sistema módulo por módulo — qué es, quién lo usa, cuánto se usa y qué se puede mejorar: [docs/eficiencia/README.md](docs/eficiencia/README.md)** (4-sep-2026, medido contra producción). Cuatro archivos con el mapa interno de los 22 módulos; el README trae lo urgente y las decisiones que solo puede tomar Daniel.
 
 ## Cómo trabajar con Daniel
 
@@ -84,7 +86,7 @@ archivo enlazado, verbatim.
 - **Fashion Group son SEIS empresas:** `vistana · fashion_wear · fashion_shoes · active_wear · active_shoes · joystep` (= `B2B_EMPRESA_KEYS` = `empresasConCxc()`). `confecciones_boston` y `american_classic` NO lo son. La vista **EXCLUYE**, no enumera.
 - Toda lectura de `switch_estadocuenta` acota por `empresa_key` en la misma cadena.
 - `gerente_boston` (David): módulos `boston` + `catalogos` (**solo VER**), casa `/boston` vía `MODULO_CASA_POR_ROL`. No ve búsqueda global, CXC del grupo, Ventas, Comisiones, Guías, la lista de comprobantes ni administrar catálogos.
-- Los **sueldos se recortan en el SERVIDOR** (`VE_SUELDOS_DE_BOSTON = false`); se ENUMERA lo que viaja (`CAMPOS_SIN_DINERO`), nunca se borra lo que se va.
+- Los **sueldos se recortan en el SERVIDOR** (`VE_SUELDOS_DE_BOSTON`, hoy en **`true`** desde el 3-sep-2026 — David SÍ ve los sueldos de su planilla; el mecanismo de recorte se conserva intacto); se ENUMERA lo que viaja (`CAMPOS_SIN_DINERO`), nunca se borra lo que se va.
 - El `ccte_id` de Boston lleva el AÑO adentro: `serie × 10.000.000 + (año − 2000) × 100.000 + correlativo`. Un documento sin fecha se **rechaza** y la corrida se corta sin escribir.
 - Orden obligatorio del sync: **upsert → reconcile**, nunca al revés (el reconcile pone `saldo = 0` a todo lo que no se reescribió).
 - 🔴 **SU PLATA SUMA; SUS CLIENTES NO SE VEN.** Daniel, textual (2-sep-2026): *«solo se queda CXC de Boston en su tab, sin que toque ni se mezcle con los otros. **Déjalo en Vista General**»* y *«Boston también quiero verlos en ventas-resumen»*. Es la línea fina de todo: **la VENTA de Boston sigue sumando** en Ventas › Resumen y Vista General ($463.898,47 = 7,4% de 2026). Lo que sale de las superficies del grupo son sus **CLIENTES**, nunca su venta. Hay candado en las dos direcciones.
@@ -374,7 +376,7 @@ Reglas en [catalogos-pedidos](docs/postmortems/catalogos-pedidos.md).
 | Tommy (`fashion_shoes`) | `tommy_products` (546) | `tommy_orders` (32) | `tommy_pedidos_publicos` | `tommy_switch_envios` |
 | Calvin (`vistana`) | `calvin_products` (81) | `calvin_orders` (20) | `calvin_pedidos_publicos` | `calvin_switch_envios` |
 
-⚠️ **Reebok rompe el patrón dos veces**: sus productos no llevan prefijo (`products`/`inventory`) y viven en **otro proyecto Supabase**, mientras que `reebok_pedidos_publicos` vive en el principal. Buscar `reebok_products` no encuentra nada.
+⚠️ **Reebok rompe el patrón**: sus productos no llevan prefijo (`products`/`inventory`). Buscar `reebok_products` no encuentra nada. ⚠️ Aquí decía que viven «en otro proyecto Supabase» y **al 4-sep-2026 es FALSO**: `NEXT_PUBLIC_REEBOK_SUPABASE_URL` apunta al proyecto principal (verificado en el env de Vercel) y `products`/`inventory` están en la misma base que todo lo demás. El cliente `reebokServer` sigue existiendo, pero hoy apunta al mismo lugar.
 ⚠️ `<marca>_switch_envios` tiene índice parcial único `(order_id) WHERE estado <> 'error'` — el **at-most-once** del envío.
 
 ### Alertas, sincronización y salud
