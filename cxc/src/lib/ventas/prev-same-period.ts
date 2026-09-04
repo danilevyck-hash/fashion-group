@@ -2,7 +2,7 @@
 // EL AÑO ANTERIOR, RECORTADO A LOS MISMOS DÍAS — una sola lectura para las
 // tres pantallas que lo necesitan.
 //
-// `ventas_dashboard_prev_same_period_v3(p_year)` devuelve, por empresa × mes, el
+// `ventas_dashboard_prev_same_period_v4(p_year)` devuelve, por empresa × mes, el
 // año anterior con el mes en curso CORTADO en el mismo día que este año (día de
 // Panamá, último día cargado, topado en hoy — la definición única de
 // `clientes-corte-comparativo.ts`, en SQL). Los meses ya cerrados van enteros.
@@ -17,8 +17,9 @@
 // crecía +2,5%, y Vista General −93,5% para Boston, que iba +2,2%.
 //
 // Cadena de versiones (las DDL las corre Daniel a mano, el deploy no exige
-// orden): `_v3` (corte en Panamá) → `_v2` (corte en UTC, misma matemática) →
-// `_v1` (sin acotar, lenta). Un error TRANSITORIO no cae a la anterior: sería
+// orden): `_v4` (costo del año anterior con notas de débito, nunca desde
+// `switch_costo_diario`) → `_v3` (corte en Panamá) → `_v2` (corte en UTC, misma
+// matemática) → `_v1` (sin acotar, lenta). Un error TRANSITORIO no cae a la anterior: sería
 // repetir la misma consulta más lenta (`rpcConFallbackDeVersion`).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,13 @@ export interface PrevSamePeriodPayload {
   dia_corte_anio_anterior: string | null;
 }
 
-export const RPC_PREV_SAME_PERIOD = "ventas_dashboard_prev_same_period_v3";
+// 🩸 `_v4` (3-sep-2026): el CTE `dia_costo` del año anterior leía
+// `switch_costo_diario`, cuyo último día de cada mes vale $0 para siempre. Hoy
+// devolvía vacío (esa tabla arranca 2026-05 y el año anterior es 2025), pero
+// el 1-ene-2027 despertaba y corría el «costo vs año anterior». Ahora lee la
+// misma fuente que el resto del Resumen (artículo diario + ND de utilidad).
+// Migración `20260915120000`; cae a `_v3` → `_v2` → `_v1` mientras no corra.
+export const RPC_PREV_SAME_PERIOD = "ventas_dashboard_prev_same_period_v4";
 
 export const PREV_SAME_PERIOD_VACIO: PrevSamePeriodPayload = {
   rows: [],
@@ -66,9 +73,14 @@ export function leerPrevSamePeriod(year: number): Promise<SupabaseLikeResult<Pre
     () => llamar(RPC_PREV_SAME_PERIOD),
     () =>
       rpcConFallbackDeVersion<PrevSamePeriodPayload>(
-        () => llamar("ventas_dashboard_prev_same_period_v2"),
-        () => llamar("ventas_dashboard_prev_same_period"),
-        { label: "ventas_dashboard_prev_same_period_v2" },
+        () => llamar("ventas_dashboard_prev_same_period_v3"),
+        () =>
+          rpcConFallbackDeVersion<PrevSamePeriodPayload>(
+            () => llamar("ventas_dashboard_prev_same_period_v2"),
+            () => llamar("ventas_dashboard_prev_same_period"),
+            { label: "ventas_dashboard_prev_same_period_v2" },
+          ),
+        { label: "ventas_dashboard_prev_same_period_v3" },
       ),
     { label: RPC_PREV_SAME_PERIOD },
   );

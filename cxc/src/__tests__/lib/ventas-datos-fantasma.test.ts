@@ -105,10 +105,12 @@ describe("la consulta fantasma se dejó de hacer", () => {
     await resumen();
     // Las tres que alimentan lo que se dibuja: el año, el comparativo y la
     // proyección de cierre. Si alguna se fuera, la pantalla quedaría vacía.
-    expect(rpcCalls).toContain("ventas_dashboard_summary");
-    // Desde el 3-sep-2026 el comparativo sale de `_v3` (corte en día de
-    // Panamá); `_v2` queda como respaldo mientras la DDL no corra.
-    expect(rpcCalls).toContain("ventas_dashboard_prev_same_period_v3");
+    // Desde el 3-sep-2026 el resumen sale de `_v2` (el costo incluye las
+    // notas de débito) y el comparativo de `_v4` (mismo costo para el año
+    // anterior, nunca desde `switch_costo_diario`); las versiones anteriores
+    // quedan como respaldo mientras las DDL no corran.
+    expect(rpcCalls).toContain("ventas_dashboard_summary_v2");
+    expect(rpcCalls).toContain("ventas_dashboard_prev_same_period_v4");
     expect(rpcCalls.some(f => f.startsWith("ventas_proyeccion_cierre"))).toBe(true);
     expect(tablasLeidas).toContain("switch_facturas");
   });

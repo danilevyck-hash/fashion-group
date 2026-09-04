@@ -27,7 +27,7 @@ import { corteVsAnioAnterior, unAnioAntes, ventanaUnAnioAntes } from "@/lib/vent
 const estado = vi.hoisted(() => ({
   rpc: [] as { fn: string; args: Record<string, unknown> }[],
   /** Qué versiones de la RPC "existen" en la base. */
-  versiones: new Set(["ventas_dashboard_prev_same_period_v3", "ventas_dashboard_prev_same_period_v2"]),
+  versiones: new Set(["ventas_dashboard_prev_same_period_v4", "ventas_dashboard_prev_same_period_v3", "ventas_dashboard_prev_same_period_v2"]),
   mv: [] as Record<string, unknown>[],
   prev: { rows: [] as Record<string, unknown>[], es_periodo_parcial: true, fecha_corte: "2026-09-03", dia_corte_anio_anterior: "2025-09-03" },
 }));
@@ -48,7 +48,7 @@ vi.mock("@/lib/supabase-server", () => {
           if (!estado.versiones.has(fn)) return { data: null, error: { code: "PGRST202", message: `Could not find the function public.${fn}` } };
           return { data: estado.prev, error: null };
         }
-        if (fn === "ventas_dashboard_summary") return { data: [], error: null };
+        if (fn === "ventas_dashboard_summary_v2" || fn === "ventas_dashboard_summary") return { data: [], error: null };
         return { data: null, error: null };
       },
     },
@@ -172,18 +172,23 @@ describe("#1 Resumen › Anual — el año en curso contra los MISMOS DÍAS, no 
     expect(fw.byYear[2025].prev.ventas).toBe(600);
   });
 
-  it("pide la RPC v3 (Panamá) y cae a v2 solo si v3 no existe", async () => {
+  it("pide la RPC v4 (costo con ND) y cae a v3 → v2 solo si la anterior no existe", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(MEDIODIA);
     armar();
     const { GET } = await import("@/app/api/ventas/resumen-anual/route");
     await GET(req("/api/ventas/resumen-anual"));
-    expect(estado.rpc.map(r => r.fn)).toEqual(["ventas_dashboard_prev_same_period_v3"]);
+    expect(estado.rpc.map(r => r.fn)).toEqual(["ventas_dashboard_prev_same_period_v4"]);
+    estado.rpc.length = 0;
+    estado.versiones.delete("ventas_dashboard_prev_same_period_v4");
+    await GET(req("/api/ventas/resumen-anual"));
+    expect(estado.rpc.map(r => r.fn)).toEqual(["ventas_dashboard_prev_same_period_v4", "ventas_dashboard_prev_same_period_v3"]);
     estado.rpc.length = 0;
     estado.versiones.delete("ventas_dashboard_prev_same_period_v3");
     const body = await (await GET(req("/api/ventas/resumen-anual"))).json();
-    expect(estado.rpc.map(r => r.fn)).toEqual(["ventas_dashboard_prev_same_period_v3", "ventas_dashboard_prev_same_period_v2"]);
+    expect(estado.rpc.map(r => r.fn)).toEqual(["ventas_dashboard_prev_same_period_v4", "ventas_dashboard_prev_same_period_v3", "ventas_dashboard_prev_same_period_v2"]);
     expect(body.empresas[0].byYear[2026].prev.ventas).toBe(812);
+    estado.versiones.add("ventas_dashboard_prev_same_period_v4");
     estado.versiones.add("ventas_dashboard_prev_same_period_v3");
   });
 
@@ -195,7 +200,7 @@ describe("#1 Resumen › Anual — el año en curso contra los MISMOS DÍAS, no 
     armar();
     const { GET } = await import("@/app/api/ventas/resumen-anual/route");
     const body = await (await GET(req("/api/ventas/resumen-anual"))).json();
-    expect(estado.rpc.map(r => r.fn)).toContain("ventas_dashboard_prev_same_period_v3");
+    expect(estado.rpc.map(r => r.fn)).toContain("ventas_dashboard_prev_same_period_v4");
     expect(body.empresas[0].byYear[2026].prev.ventas).toBe(812);
   });
 });
@@ -266,7 +271,7 @@ describe("#3 Vista General — el mes en curso contra los mismos días, un mes c
     expect(body.ventas.parcial).toBe(true);
     expect(body.ventas.prevYear).toBeCloseTo(5739.7, 2);
     expect(body.ventas.prevHasta).toBe("2025-09-03");
-    expect(estado.rpc.map(r => r.fn)).toContain("ventas_dashboard_prev_same_period_v3");
+    expect(estado.rpc.map(r => r.fn)).toContain("ventas_dashboard_prev_same_period_v4");
   });
 
   it("un mes CERRADO sigue contra el mes entero de la MV y no pide la RPC", async () => {
@@ -292,6 +297,7 @@ describe("#3 Vista General — el mes en curso contra los mismos días, un mes c
       expect(body.ventas.prevYear).toBeNull();
       expect(body.ventas.yoyPct).toBeNull();
     } finally {
+      estado.versiones.add("ventas_dashboard_prev_same_period_v4");
       estado.versiones.add("ventas_dashboard_prev_same_period_v3");
       estado.versiones.add("ventas_dashboard_prev_same_period_v2");
     }
@@ -365,19 +371,22 @@ describe("#6 ventas_dashboard_prev_same_period_v3 — el corte en el día de Pan
     expect(ramaV3).toBe(ramaV2);
   });
 
-  it("el código pide _v3 primero y cae a _v2 → _v1 mientras la DDL no corra", async () => {
+  it("el código pide _v4 primero y cae a _v3 → _v2 → _v1 mientras las DDL no corran", async () => {
     const { leerPrevSamePeriod, RPC_PREV_SAME_PERIOD } = await import("@/lib/ventas/prev-same-period");
-    expect(RPC_PREV_SAME_PERIOD).toBe("ventas_dashboard_prev_same_period_v3");
+    expect(RPC_PREV_SAME_PERIOD).toBe("ventas_dashboard_prev_same_period_v4");
+    estado.versiones.delete("ventas_dashboard_prev_same_period_v4");
     estado.versiones.delete("ventas_dashboard_prev_same_period_v3");
     estado.versiones.delete("ventas_dashboard_prev_same_period_v2");
     estado.versiones.add("ventas_dashboard_prev_same_period");
     const r = await leerPrevSamePeriod(2026);
     expect(r.error).toBeNull();
     expect(estado.rpc.map(x => x.fn)).toEqual([
+      "ventas_dashboard_prev_same_period_v4",
       "ventas_dashboard_prev_same_period_v3",
       "ventas_dashboard_prev_same_period_v2",
       "ventas_dashboard_prev_same_period",
     ]);
+    estado.versiones.add("ventas_dashboard_prev_same_period_v4");
     estado.versiones.add("ventas_dashboard_prev_same_period_v3");
     estado.versiones.add("ventas_dashboard_prev_same_period_v2");
   });

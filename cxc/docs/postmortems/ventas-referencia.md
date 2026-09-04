@@ -190,6 +190,47 @@
 
 ---
 
+## 🔴 Ventas › Resumen — EL COSTO EXCLUÍA LAS NOTAS DE DÉBITO, y Active Wear agosto salió NEGATIVO (3-sep-2026)
+
+> **Medido, no supuesto.** Ventas › Resumen, Active Wear, agosto 2026: costo **−$44.483,03** y utilidad mayor que la venta. El 27-ago se anuló una nota de crédito de $74.166 con una **nota de débito de $73.752**. La fuente de costo del Resumen era `switch_costo_unificado_vw` → `switch_articulo_diario`, que baja de `/apireporte/ventasucursal`, y **ese reporte no trae notas de débito** (medido: en toda la tabla hay `FA · NC · CNF`, cero `ND`). Restó la NC, nunca sumó la ND. Cuando se armó esa vista (`20260606080000`) se aceptó como «~0,1 % del costo, documentado en el gate»; en agosto fueron **$50.041,20 de costo en un solo mes-empresa** (fashion_wear mayo: $531 · vistana agosto: $495 · fashion_shoes junio: $556).
+>
+> **Y el número bueno estaba en la base desde mayo, sin lector.** `switch_costo_diario` (`/apireporte/totalventas?tipo=03`, el reporte «Total de ventas» del panel, validado al centavo el 29-may) decía **$5.558,17** para Active Wear agosto. Nadie la leía: la vista que la usaba se rearmó sobre `switch_articulo_diario` el 6-jun y `CLAUDE.md` la tenía como «nadie la lee» (y como «4×/día», que también era falso: se escribe **1×/empresa/día**, dentro de `switch-sync tipo=all`).
+>
+> **Las tres opciones, medidas contra el panel de Switch** (`totalventas?tipo=04`, el año por mes con costo — `scripts/_diag-costo-nd-panel.ts`, 8 empresas; ⚠️ abre sesión de API con el usuario del panel y expulsa a quien esté):
+> - **(a) Traer las ND por artículo:** no hay endpoint. El API solo da costo agregado (`totalventas`, `ventasucursal`); `/apinotadebito/info` es el hermano no documentado de `/apinotacredito/info`, que trae líneas **sin costo** (`docs/switch-referencia.md` §1.8).
+> - **(b) Sumar las ND desde `switch_facturas`:** la cabecera tiene `total` y `subtotal_descuento` pero **no costo**.
+> - **(c) Usar `switch_costo_diario` para meses cerrados:** cuadra al centavo… menos el último día de cada mes, que **vale $0 para siempre** (se lee a las 00:30 de Panamá y el día 1 el reporte ya es del mes nuevo — vistana 31-ago: $13.606,69 reales, $0 en la tabla; ~$40 K sin escribir en los últimos días de may–ago), y menos los días que Switch manda corruptos, que se quedan con la última foto parcial (Boston 30-jul: $40 contra $1.649,64). Completarla con el artículo diario del último día mezcla dos fuentes y pierde una ND que caiga justo ese día.
+> - **(d) La elegida — sumar el costo de las ND desde `switch_factura_utilidad`**: el reporte web «Listado de comprobantes» (`sync-utilidad`, 07:00 UTC) trae costo **por documento** para las 6 del grupo desde ene-2026, con `tipo_comprobante = 'Nota de Débito'`. Para Active Wear agosto: FA 5.885,27 − NC 50.368,30 + **ND 50.041,20 = 5.558,17**, el número exacto del panel. Y FA − NC de utilidad coincide al centavo con el artículo diario, así que las dos fuentes hablan del mismo universo.
+>
+> **Antes / después / panel, 8 empresas × may–ago 2026** (costo del mes; `d` = nuevo − panel):
+>
+> | Empresa | Mes | Panel | Hoy (vista `_vw`) | Nuevo (`_v2`) | d |
+> |---|---|---:|---:|---:|---:|
+> | Active Wear | ago | 5.558,17 | **−44.483,03** | **5.558,17** | 0,00 |
+> | Fashion Wear | may | 449.268,46 | 448.737,06 | 449.268,54 | +0,08 |
+> | Fashion Wear | jun | 112.572,69 | 112.047,46 | 112.572,66 | −0,03 |
+> | Fashion Shoes | jun | 66.549,52 | 65.993,59 | 66.549,49 | −0,03 |
+> | Vistana | may | 272.480,41 | 272.046,07 | 272.480,35 | −0,06 |
+> | Vistana | ago | 92.672,54 | 92.177,57 | 92.672,57 | +0,03 |
+> | Fashion Wear | jul · ago | 136.026,04 · 167.460,53 | 135.976,07 · 167.441,57 | 136.026,07 · 167.460,57 | +0,03 · +0,04 |
+> | Fashion Shoes | may · jul · ago | 196.308,93 · 90.092,86 · 175.078,42 | 196.304,89 · 90.039,04 · 175.075,44 | 196.308,89 · 90.092,84 · 175.078,44 | −0,04 · −0,02 · +0,02 |
+> | Active Shoes | may · jun | 6.571,29 · 121.942,91 | 6.570,29 · 121.941,89 | 6.571,29 · 121.942,89 | 0,00 · −0,02 |
+> | *las otras 18 celdas* (Active Shoes jul-ago, Active Wear may-jul, Joystep ×4, ACS ×4, Boston may-jun, Vistana jun-jul) | | | | **no se mueven** | ≤ ±0,08 |
+> | Boston | jul | 900.063.178,39 (el panel de Switch está corrupto: la fila del 14-jul de $1.000 M que ya cazó el guard) | 63.188,40 | 63.188,40 | — |
+> | Boston | ago | 22.017,93 | 21.857,91 | 21.857,91 | −160,02 (no es una ND: dos artículos con costo sospechoso que `sync-articulos` guarda en 0; Boston no tiene `sync-utilidad`) |
+>
+> Los ±$0,08 son redondeo por artículo contra por documento. **Solo se movieron las 13 celdas con ND**, exactamente las que tenían que moverse.
+>
+> **Qué cambió** (`20260915120000_costo_con_notas_de_debito.sql`; nada in-place, lo anterior queda): `switch_costo_unificado_v2` (artículo diario firmado por tipo **sin el código `ND`** — si `ventasucursal` lo estrenara se contaría dos veces; la ND tiene UNA fuente — + ND de utilidad) · `ventas_rollup_mensual_mv` recreada sobre la v2 (DROP + CREATE, mismo nombre, mismos índices; los lectores no cambian; rollback = `20260609120000`) · `ventas_dashboard_summary_v2` (el mes en curso, con las ND) · `ventas_dashboard_prev_same_period_v4` (ver abajo) · `cuadre_costo_mensual_v1`. Lectura compartida `src/lib/ventas/dashboard-summary.ts` (`_v2` → `_v1`) para Resumen, Vista General y `/api/ventas/v2`; `grupo-resumen-mensual.ts` sigue en `_v1` a propósito (solo lee ventas).
+>
+> **El lector dormido.** `ventas_dashboard_prev_same_period` v1–v3 leían `switch_costo_diario` en su CTE `dia_costo` para el AÑO ANTERIOR. Hoy devolvía vacío (rango `fecha >= 2026-05-01` contra un año anterior que es 2025), pero el **1-ene-2027 despertaba** y el «costo vs 2026» del Resumen habría salido con los últimos días de cada mes en $0. `_v4` lee la misma fuente que el resto (artículo diario sin `ND` + ND de utilidad) y de paso deja de usar `ventas_raw.costo` para 2025: el «vs 2025» pasa a decir lo que el Resumen muestra al abrir 2025 (Δ ene–sep 2025 por empresa entre 0,00 % y −2,32 %, active_shoes la mayor; ventas idénticas fila por fila; rama ELSE byte-idéntica a `_v3`). Verificado contra producción con las funciones armadas en `pg_temp` (mueren con la sesión, producción intacta).
+>
+> **`switch_costo_diario` se sigue escribiendo y por fin tiene lector: el cuadre mensual** (`src/lib/alertas/cuadre-costo.ts` + `-io.ts`, colgado de la reconciliación 10/14/18 UTC como el silencio de datos, cero crons nuevos). Por (empresa, mes cerrado), los últimos 3 meses cerrados, contra la fuente del Resumen, sumando **solo los días comparables**: nunca el último del mes, ni los sin fila (el guard los rechazó), ni los leídos antes de cerrar el día en Panamá (`synced_at >= fecha+1 00:00 Panamá`). Dispara con **>2 % Y >$100** (joystep junio costó $29,43: $1 ya es 3,4 %) y ≥10 días comparables; anti-loop **7 días por (empresa, mes)**, un mensaje por pasada. 🔴 **Telegram 🔧 SISTEMA, no Data Health** — Daniel, textual: «yo no uso Data Health, nunca lo veo». Cumple la regla de tres: es real (plata), no se arregla solo (un mes cerrado no cambia), alguien tiene que mirar qué documento falta. Medido sobre los 32 pares: **0 disparos, peor 0,75 %** (Boston ago); sin el filtro de días, Boston jul daba 2,7 % por la foto parcial del 30-jul — una falsa alarma sobre un mes cuyo Resumen está bien.
+>
+> **Lo que queda fuera, dicho:** ACS y Boston no tienen `sync-utilidad`, sus ND siguen fuera del costo (medido: ninguna en may–ago 2026; la última de Boston es de feb-2026 por $453 y la de ACS de ago-2025 por $33) — el cuadre las vigila. Antes de ene-2026 no hay `switch_factura_utilidad`: las ND de 2025 hacia atrás siguen fuera, como hasta hoy.
+>
+> **Candados:** `costo-con-notas-de-debito.test.ts` (26: lee el SQL y el código — la v2 suma ND y excluye `ND`, la MV va sobre la v2, `_v4` no menciona `switch_costo_diario` ni `ventas_raw`, el cuadre deja fuera el último día y los días con foto parcial, el I/O va por SISTEMA con anti-loop y no toca Data Health) · `cuadre-costo.test.ts` (17: 2,00 % calla, 2,01 % dispara, el piso, la ventana de meses cerrados, el texto sin voseo) · `mismos-dias-todas-las-comparaciones.test.ts` y `ventas-datos-fantasma.test.ts` actualizados a la cadena `_v4` / `_v2`. **24 mutaciones, 24 cazadas** (`scripts/_mutar-costo-notas-de-debito.sh`).
+
 ## Los mismos días, en TODAS las comparaciones — seis lugares más (3-sep-2026)
 
 > Arreglado Clientes, una auditoría medida contra producción (`scripts/_diag-mismos-dias-6-lugares.ts`, solo lectura) buscó la misma clase de error en el resto del sistema y encontró **seis lugares**. Daniel aprobó arreglarlos todos, con una excepción textual: en Vendedoras, *«el rótulo (que diga "vs mes anterior", que es lo que hace)»*.

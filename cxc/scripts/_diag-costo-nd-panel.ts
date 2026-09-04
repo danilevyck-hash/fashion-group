@@ -17,7 +17,13 @@
 // quien esté en el panel de esa empresa. Correrlo fuera del horario de oficina
 // y lejos de los crons de Switch (ver la tabla de CLAUDE.md).
 //
-//   npx tsx scripts/_diag-costo-nd-panel.ts
+//   npx tsx scripts/_diag-costo-nd-panel.ts            # las 8
+//   EMPRESAS=active_wear npx tsx scripts/_diag-costo-nd-panel.ts
+//
+// Credenciales: las del API (`SWITCH_<X>_API_USER/PASSWORD`) viven en Vercel
+// marcadas como sensibles (no se bajan con `vercel env pull`); el API entra con
+// el MISMO usuario que el panel, así que se usan las `WEB_USER/WEB_PASSWORD`
+// de `.env.local` (probado el 3-sep-2026 en las 8). `ENV_FILE=` cambia el archivo.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { readFileSync } from "node:fs";
