@@ -56,7 +56,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
+import FacturasDelCliente from "./FacturasDelCliente";
 import ClientePicker from "@/components/ClientePicker";
+import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { ScrollableTable } from "@/components/ui";
 import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, opcionesEmpresa } from "./guia-form-logic";
 import { ENTREGADO_POR_OTRO, entregadoPorElegido, nombreDespachadoPor } from "@/lib/guias/despachado-por";
@@ -129,6 +131,15 @@ interface GuiaFormProps {
    * acto deliberado, no algo que pase solo a los 1,5 s de haber mirado.
    */
   soloCorregible?: boolean;
+  /**
+   * 🔴 EL ATAJO DE FACTURAS (4-sep-2026, Daniel: «va»). Reemplaza los renglones
+   * ENTEROS de una vez — lo necesita el panel «Facturas del cliente», que al
+   * marcar una factura agrega/quita números en el renglón de SU empresa.
+   * Opcional y detrás de `GUIAS_ATAJOS_NUEVOS`: sin él (o con la constante en
+   * `false`) el formulario es EXACTAMENTE el de hoy. Solo al CREAR: en edición
+   * (y en una guía Completada) nada de esto aparece.
+   */
+  onReemplazarItems?: (items: GuiaItem[]) => void;
 }
 
 // ── Primitivas del formulario ────────────────────────────────────────────────
@@ -308,6 +319,7 @@ export default function GuiaForm({
   etiquetaVolver = "← Guías",
   hayCambios = false, instantanea = "", guardadoEn = null,
   soloCorregible = false,
+  onReemplazarItems,
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
@@ -923,6 +935,21 @@ export default function GuiaForm({
         </div>
         )}
       </div>
+
+      {/* 🔴 FACTURAS DEL CLIENTE — el atajo aprobado por Daniel («va»,
+          3-sep-2026): el cliente se elige UNA vez y se marcan sus facturas; la
+          empresa y el número los pone la factura. Cuelga ENTERO de
+          `GUIAS_ATAJOS_NUEVOS` (src/lib/guias/atajos-facturas.ts): en `false`
+          la pantalla es EXACTAMENTE la de hoy. Solo al CREAR — en edición y en
+          una guía Completada no aparece — y siempre es atajo, jamás candado:
+          los renglones de abajo se siguen escribiendo a mano igual que hoy. */}
+      {GUIAS_ATAJOS_NUEVOS && !editingId && !soloCorregible && onReemplazarItems && (
+        <FacturasDelCliente
+          items={items}
+          onReemplazarItems={onReemplazarItems}
+          clientesTop={clientesTop}
+        />
+      )}
 
       {/* Detalle de envío */}
       <div className="mb-8">

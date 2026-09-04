@@ -103,6 +103,7 @@ archivo enlazado, verbatim.
 - **La lista NO despacha** — ni por swipe ni desplegando un formulario. Sus botones solo navegan; editar y despachar viven en `/guias/[id]`.
 - Las sugerencias de cliente **NUNCA atan solas**, ni con un único candidato. El pareo es **exacto y normalizado, nunca por parecido**: `Outlet Duty Free N2` y `N3` son tiendas distintas.
 - El formulario **no guarda si nada cambió** (`cambios-form.ts`): cargar la guía no puede producir una diferencia contra sí misma.
+- **Al crear, el cliente se elige UNA vez y se MARCAN sus facturas** (4-sep-2026, «va»): puente por CÓDIGO (`switch_clientes`, nunca por nombre), solo las 6 del grupo por inclusión, solo tipo `Factura`; «ya salió en otra guía» es **aviso, nunca bloqueo**; elegir cliente **sigue sin ser obligatorio** y el payload que se guarda **no cambia**. Todo cuelga de **`GUIAS_ATAJOS_NUEVOS`** (`src/lib/guias/atajos-facturas.ts`): en `false`, la pantalla es exactamente la de antes.
 
 ### Catálogos, pedidos y cotización — [docs/postmortems/catalogos-pedidos.md](docs/postmortems/catalogos-pedidos.md)
 

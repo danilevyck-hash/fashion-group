@@ -935,3 +935,43 @@
 > - 🩸 **UNA sobrevivió en la primera corrida y era un candado FLOJO: `closest()` ARRANCA EN EL PROPIO ELEMENTO**, así que `trigger.closest("button") === trigger` es cierto **con el menú anidado y sin él**. Hay que preguntarle a los PADRES (`trigger.parentElement?.closest("button")`).
 > - 🩸 **Y la mutación del anidado tuvo que MOVER el `</button>`, no borrarlo**: borrándolo el JSX queda desbalanceado, el módulo no compila y lo que se probaría es que un archivo roto rompe.
 > - 🩸 **El script restaura por COPIA, no con `git checkout`** (hay archivos NUEVOS y git aborta el comando entero sin restaurar nada), **denuncia el patrón muerto** en vez de cantarlo como "SOBREVIVIÓ", **no usa `perl`** (el `||` del código real se des-escapa dentro del patrón y se come el archivo) y trae **una mutación de CONTROL que a propósito no matchea**: si no sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrido con el comentario adentro.
+
+
+---
+
+## 🔴 Guías — EL CLIENTE SE ELIGE UNA VEZ Y SE MARCAN SUS FACTURAS (4-sep-2026)
+
+> Daniel aprobó el mockup con un **«va»**, y fijó la salida antes de empezar: ***"te aviso si quiero revertir todo después de probarlo en producción con mi secretaria estas semanas"***. Esto lo prueban Angela y Andrea, y tiene que poder apagarse SIN drama.
+>
+> ### El problema, medido
+>
+> En **Guías › Nueva guía**, cada envío pedía a mano Cliente · Dirección · Empresa · Factura(s) · Bultos. Un cliente que compró en 3 empresas eran 3 envíos con el cliente y la dirección escritos 3 veces. Medido contra producción (3-sep-2026): **Angela 57 guías y Andrea 41 en 2 meses** · **68 de 563 renglones llevan 2+ facturas (hasta 5)** · **el 92% de las facturas que se escriben en una guía YA EXISTÍAN en `switch_facturas` al momento de crearla, y el 58% eran del MISMO día** · las **285 facturas de los últimos 30 días cruzan el puente por código al 100%**.
+>
+> **Ahora:** se elige el **cliente UNA vez** (con `ClientePicker`, el único selector del sistema) y aparecen **sus facturas de las 6 empresas juntas**, agrupadas **Hoy · Esta semana · Antes** (20 más recientes + «Ver más»; cada una con número, empresa, monto y hora/fecha). Marcar una factura llena el renglón de SU empresa; 4 facturas de 3 empresas = **3 envíos**, con las facturas separadas por coma (el formato de hoy: `"2535, 2536"`) y los **bultos POR EMPRESA**. Al guardar salen los mismos `guia_items` de siempre.
+>
+> ### 🔴 REVERSIBLE EN UN SOLO LUGAR — y nada de esto cambia lo que se GUARDA
+>
+> - Todo lo nuevo cuelga de **`GUIAS_ATAJOS_NUEVOS`** (`src/lib/guias/atajos-facturas.ts`, con la cita y la fecha en la cabecera). En `false`, el formulario queda **EXACTAMENTE** como antes: mismos campos, mismo orden, mismos textos, sin panel ni botones nuevos. El candado de conducta cubre **los dos estados** (encendido y CONTROL apagado).
+> - 🔴 **El payload, `guia_items`, la guía impresa y el Excel son idénticos** con la constante encendida o apagada: marcar facturas solo LLENA los mismos renglones que hoy se escriben a mano. Hay candado que exige que la misma guía armada por los dos caminos produzca el mismo payload (`instantaneaRenglones`, que es exactamente lo que el PUT escribe). Por eso apagar el interruptor no deja datos raros atrás, ni hay nada que migrar de vuelta.
+>
+> ### De dónde salen las facturas
+>
+> - **Nuestra base primero, sin límite de días**: `GET /api/guias/facturas-cliente?codigo=D-XXX`, el MISMO puente por CÓDIGO de `ultimas-facturas` — `switch_clientes.(empresa_key, cliente_switch_id)` → `switch_facturas`, con OR de TUPLAS (el mismo `cliente_switch_id` puede ser otro cliente en otra empresa). 🔴 **Jamás por nombre** (el invariante de `clientes_master`), 🔴 **solo las 6 del grupo por INCLUSIÓN** (`.in(empresa_key, B2B_EMPRESA_KEYS)`: un código que también exista en Boston no trae las facturas de Boston), y solo `tipo_comprobante = 'Factura'` — la constante `TIPO_FACTURA` va amarrada con `satisfies` al vocabulario de `tipos-comprobante.ts`.
+> - **A Switch en vivo, SOLO lo de hoy**: el sync programado va 6:50/10:00/14:00/18:00 Panamá, así que una factura de las 11:00 no estaba hasta las 14:00. `POST /api/guias/facturas-hoy` corre `syncEmpresaFacturas` con ventana de UN día para las 6, EN SERIE, **fail-open** (una empresa caída no frena a las demás ni a la pantalla), con el lock de `switch_sync_log`, el cooldown de 10 min de sync-now y `logoutAllSwitchSessions()` en el `finally`. La pantalla dice **«hasta las HH:MM»** (el sync exitoso más VIEJO entre las 6 — lo único que se puede prometer) y tiene **«Buscar otra vez»**.
+> - ⚠️ **El disparo automático NO va en la lista de `/guias`, y es a propósito.** El encargo decía "al entrar al módulo", pero el candado `guias-eliminar-en-la-fila` exige que **abrir la lista no mande un solo pedido que no sea GET** (es la mitad de "la lista no despacha") — y se puso ROJO al probarlo. Aflojarlo para colar un POST sería debilitar justo lo que vigila. El disparo vive en **`/guias/nueva`** (donde las facturas se usan), con acelerador de sessionStorage de 10 min además del cooldown del server.
+> - ⚠️ **La sesión única de Switch es por USUARIO**: este disparo puede chocar con un cron de la misma empresa. Es el MISMO trade-off que Daniel ya aceptó para «Actualizar ahora» (sync-now, jul-2026): el que pierda falla limpio y la reconciliación lo recupera. Se acota con la ventana de un día, el cooldown y el logout del `finally`.
+>
+> ### 🔴 Las reglas duras, y dónde viven
+>
+> - **Elegir cliente NO es obligatorio y sigue sin serlo**: todo esto es atajo, jamás candado. Escribir cliente, empresa y facturas a mano funciona EXACTAMENTE como hoy (los renglones de abajo no cambiaron), y hay mutación que vuelve el cliente obligatorio y muere en rojo.
+> - **Marcar una factura SÍ rellena cliente y empresa** — es una ELECCIÓN del usuario (tocó la casilla), no una sugerencia que ata sola. Elegir el cliente en el panel **no escribe ningún renglón**: marcar es la elección.
+> - 🔴 **«Ya salió en otra guía» es AVISO, nunca bloqueo** (chip ámbar «Ya salió en GT-204»; la casilla se marca igual). El pareo es **exacto y normalizado POR (EMPRESA, NÚMERO)**: los secuenciales de Switch se repiten entre empresas — "2535" existe en Vistana Y en Fashion Wear, y heredar el aviso entre empresas acusaría facturas sanas. Y el sistema puede afirmar «ya salió», pero **NO lo contrario**: hay facturas sin guía que son mostrador o retiro (Multi Fashion Holding tiene 135 así). El índice lee renglones VIVOS de guías VIVAS (⚠️ `guia_items.deleted` es independiente del de la cabecera) con `leerTodoPaginado` — `db-max-rows` corta en 1000 en silencio.
+> - **Los botones que se conservan**: «No está en la lista» (escribe el número a mano, como hoy, con el cliente ya puesto) y «Traslado sin factura» (el `"0000"` de siempre: 30 renglones desde julio).
+> - **Solo al CREAR**: en edición de una guía —y en una Completada— el panel no aparece. El candado del PUT y las reglas de `campos-editables.ts` no se tocaron.
+> - Lo que la persona ya escribió **se conserva**: marcar AGREGA el número al final del campo; desmarcar quita SOLO ese número, y una fila con bultos o dirección escritos a mano no se borra nunca.
+>
+> ### Candados
+>
+> `src/__tests__/api/guias-facturas-del-cliente.test.ts` (11, **llama al handler real con la base doblada, y el doble APLICA los filtros capturados** — cambiar el puente cambia el resultado), `src/__tests__/components/guia-form-marcar-facturas.test.tsx` (11, **monta GuiaForm de verdad y toca las casillas**, con el interruptor controlable por test y una sección CONTROL con la constante APAGADA) y `src/__tests__/lib/guias-atajos-facturas.test.ts` (19, el módulo puro con fechas fijas — nunca `new Date()` — y la igualdad de payload de los dos caminos).
+> - **Verificado por mutación, 12 de 12 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-guias-facturas.sh`): el puente une por NOMBRE · Boston entra al puente · se ofrecen todos los comprobantes · el OR deja de ser de tuplas · el server esconde la factura que ya salió · el «ya salió» pierde la empresa · la casilla de una que ya salió deja de marcar · las facturas se agrupan sin mirar la empresa · el separador deja de ser el de hoy · elegir cliente se vuelve obligatorio · el panel ignora el interruptor · el panel aparece también al editar. Con la mutación de CONTROL que a propósito no matchea (⛔) y restauración por COPIA, como los demás scripts del módulo.
+> - 🩸 **Una salió PATRÓN MUERTO en la primera corrida y era del SCRIPT, no del producto**: el `.in("empresa_key", [...B2B_EMPRESA_KEYS])` aparece DOS veces en la ruta (el puente y la frescura) y el aplicador exige el conteo exacto — se declaró `veces=2` y la mutación pasó a atacar los dos.

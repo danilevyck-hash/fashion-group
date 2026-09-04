@@ -388,6 +388,17 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
   }
 
   /**
+   * Reemplaza los renglones ENTEROS de una vez — el panel «Facturas del
+   * cliente» (`GUIAS_ATAJOS_NUEVOS`, 4-sep-2026) marca/desmarca facturas y
+   * devuelve la lista nueva. Se renumera `orden` y se asigna `uid` a las filas
+   * que nacen acá; las que ya existían conservan el suyo (identidad estable).
+   * Es estado del formulario, igual que updateItem: lo que se GUARDA no cambia.
+   */
+  function reemplazarItems(next: GuiaItem[]) {
+    setItems(next.map((item, i) => ({ ...item, orden: i + 1, uid: item.uid ?? nuevoUid() })));
+  }
+
+  /**
    * 🔴 EL AUTOGUARDADO NO PINTA ERRORES. `pintar: false` valida igual —y frena
    * el guardado igual— pero se calla.
    *
@@ -653,7 +664,7 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
     hayCambios,
     instantanea: instantanea.todo,
     guardadoEn,
-    updateItem, updateItemFields, addRow, removeRow, restoreRow,
+    updateItem, updateItemFields, reemplazarItems, addRow, removeRow, restoreRow,
     saveGuia,
     // draft: banner de restaurar en /guias/nueva + limpieza al guardar
     hasGuiaDraft, guiaDraftTimeAgo, restoreGuiaDraft, clearGuiaDraft,
