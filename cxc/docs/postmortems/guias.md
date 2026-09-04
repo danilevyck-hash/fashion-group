@@ -1084,3 +1084,55 @@
 > `guias-eliminar-en-la-fila.test.tsx` (17 — el candado redirigido + los tres «no dispara») · `guia-form-destinos.test.tsx` (15, elige clientes DE VERDAD por el selector) · `guias-destinos-cliente.test.ts` (41) · `guias-atajos-facturas.test.ts` (24, el autollenado del panel) · `acs-resumen-canal-privado.test.ts` (13, extendido al mensual) · `grupo-resumen-mensual-dia-1.test.ts` (8, el día 1 + la guardia con la base doblada).
 > - **Verificado por mutación, 17 de 17 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-guias-ajustes-4sep.sh`): la lista deja de disparar el refresco · dispara para cualquier rol · ignora el solo lectura · el refresco ignora el interruptor · se cuela una segunda salida al abrir la lista · se autollena con varios destinos · el autollenado pisa lo escrito · ignora el interruptor · el renglón del panel nace sin su destino · desmarcar deja la fila zombi · D-87 vuelve al histórico · City Moda recupera el campo tienda · el route mensual vuelve a enviarNegocio · la recuperación también · el cron vuelve al día 3 · la recuperación a los días 3-4 · la guardia del cierre se quita. Con la mutación de CONTROL (⛔) y restauración por COPIA, como los demás scripts del módulo.
 > - Los DOS scripts de mutación anteriores del módulo siguen verdes (`_mutar-candados-guias-destinos.sh` 13/13 · `_mutar-candados-guias-facturas.sh` 12/12), re-corridos tras estos cambios.
+
+---
+
+## 🔴 Guías — LOS DESTINOS DEFINIDOS SE CORRIGEN DESDE LA PANTALLA, no con un despliegue (4-sep-2026)
+
+> Daniel mandó dos correcciones, textual: ***«city shoes → Calle 19 Central, al lado de la joyería Super Oro. Y Nine Sport en Calle 19 Central.»*** Y sobre quién administra: ***«configuraciones también deja a secretaria»***.
+>
+> 🩸 **EL PROBLEMA NO ERAN LAS DOS CORRECCIONES: era que CADA corrección costaba un despliegue.** Los destinos definidos vivían en una constante de código (`DESTINOS_DEFINIDOS`, `src/lib/guias/destinos-clientes.ts`), así que «City Shoes ahora dice tal cosa» pasaba por editar un archivo, correr los tests y pushear. Son Angela y Andrea quienes hacen las guías todos los días — y quienes notan un destino mal escrito — y no tenían dónde tocarlo.
+>
+> ### 1 · Las dos correcciones van SÍ O SÍ, y en dos lugares a propósito
+>
+> - **D-35 City Shoes** → `Calle 19 Central, al lado de la joyería Super Oro` (antes «Calle 19 Central» a secas).
+> - **D-112 Nine Sports 9, S.A.** → `Calle 19 Central` — entró NUEVO a los definidos. Hoy autollenaba «Calle 19» por su histórico de 2 guías; la definición de Daniel gana.
+>
+> Van en la **constante** (para que no dependan de que la migración corra) **y** en la carga inicial de la **tabla nueva** (para que al encenderla nada cambie). Candado con el texto EXACTO en `guias-destinos-precedencia.test.ts` y en `guias-destinos-cliente.test.ts` (que pasó de 16 a 17 llaves, con la cita).
+>
+> ### 2 · La tabla: `guias_destino_cliente` (migración `20260918120000`, ⚠️ la corre Daniel)
+>
+> - **Grano (cliente_codigo, destino)** — Sporting Shoes tiene 8 filas. **Las TIENDAS van como COLUMNA (`tiendas text[]`) del mismo grano, no como tabla hermana**: solo UN cliente las usa (D-142), una tabla aparte obligaría a un segundo CRUD y a un JOIN por un solo caso, y el soft delete del destino se lleva sus tiendas con él — no pueden quedar tiendas huérfanas de un destino quitado. Es también lo que hace la pantalla más simple: una fila por destino, con su campo «Tiendas (opcional, separadas por coma)».
+> - 🔴 **Soft delete FIRMADO, NUNCA DELETE** (el patrón de `comision_exclusion`): quitar = `activo = false` + quién y cuándo, con CHECK que exige la firma. Única solo entre ACTIVAS (se puede quitar y volver a definir). RLS service_role. Candado de conducta (el DELETE de la ruta escribe un UPDATE y la fila sigue) + barrido sin comentarios que prohíbe `.delete(` en la capa de base.
+> - **La carga inicial es EXACTAMENTE lo que la constante ya hace en producción** (los definidos del 4-sep + la familia City Moda + las dos correcciones, 24 filas): encender la pantalla no cambia ni un comportamiento.
+>
+> ### 3 · 🔴 El orden de precedencia: UNA función, UN lugar
+>
+> **`destinosDefinidosPara` (`destinos-clientes.ts`): tabla (si hay filas activas para ese cliente) → constante estática → histórico agrupado de `guia_items`.** La constante queda como RED mientras la migración no corra — el mismo patrón que las RPC con caída. Y si la tabla tiene filas para un cliente, la constante **no se mezcla**: la tabla es la foto completa de ese cliente, o quitar un destino en la pantalla lo reviviría desde el código.
+> - `botonesDeDestino`, `tiendasDelDestino` y `destinoParaAutollenar` pasan TODOS por ahí: los botones, las tiendas y el autollenado no pueden discrepar.
+> - 🩸 **Con la tabla AUSENTE (PGRST205, la migración sin correr) la lectura devuelve `{}` SIN lanzar** (`leerDefinidosOVacio`, fail-open) y todo cae a la constante — el formulario de guías no puede romperse por una migración pendiente. La pantalla de configuración, en cambio, falla CERRADO y lo dice: *«Falta correr la migración de guias_destino_cliente (20260918120000)»*, con la aclaración de que las guías siguen funcionando igual.
+> - Los definidos viajan en `/api/guias/frecuencias` (campo `definidos`), la MISMA lectura que ya alimentaba el formulario — cero pedidos nuevos. Hay candado que ejecuta la ruta real: calcularlos y tirarlos dejaría la pantalla en la constante para siempre (el agujero de `/api/saldos-banco`).
+>
+> ### 4 · La pantalla: Guías › Configuración
+>
+> El molde es **Comisiones › Configuración** (Daniel: *«crea configuración para modificar cualquier cosa así como se hizo en comisiones»*): pestaña a pantalla completa dentro de `/guias`, tarjeta con borde, lista agrupada, soft delete con confirmación.
+> - 🔴 **La ven y la editan admin Y SECRETARIA** — la corrección de Daniel sobre el encargo original (que decía solo admin): *«configuraciones también deja a secretaria»*. Tiene sentido medido: Angela (57 guías) y Andrea (41) son quienes cargan; un destino mal definido no mueve plata y todo queda firmado. **Bodega y vendedor: ni la pestaña ni la ruta** (403) — bodega despacha, vendedor solo lee. La fila de pestañas ni se dibuja para ellos: su pantalla es la de siempre.
+> - Lista **agrupada por cliente** (nombre + código + contador), con buscador por nombre o código. Cada grupo **DICE qué hace el formulario**: con UN destino, *«Se llena solo al elegir el cliente.»*; con varios, *«Se ofrecen como botones y la persona elige.»* — la palabra de la casa, nada de «override»/«default»/«fallback».
+> - **Agregar** = `ClientePicker` (el ÚNICO selector del sistema, sin salida a mano: un destino se define para un cliente del directorio; el código pasa además por la puerta única del servidor — un D-XXX inventado o un código de Boston se rechazan) + el destino como texto + tiendas opcionales.
+> - **Editar el texto** de un destino existente en la fila — es LO QUE PIDIÓ Daniel: corregir «Calle 19» → el texto con la joyería sin desplegar.
+> - **Quitar** pide confirmación EN PALABRAS (*«La Frontera Duty Free dejará de ofrecer «Guabito» en las guías.»*) y aclara que nada se borra.
+> - **El histórico como ayuda**: los destinos que el cliente YA usó en guías y no están definidos salen como chips con «Definir» — **promover es UN toque, y NUNCA pasa solo** (hay mutación que hace que se promueva al dibujarse y muere en rojo). El pareo definido↔histórico es por `claveDestino` (exacto): «Paso Canoas» definido tapa el «Pasocanoas» histórico, pero «Wesland» (typo) sigue apareciendo como no definido.
+>
+> ### 🔴 Lo que NO cambió, y es la mitad de esto
+>
+> - **El campo Dirección de la guía SIGUE siendo texto libre.** Botones y autollenado son atajo, jamás candado; hay mutación que lo vuelve `readOnly` y muere en rojo.
+> - **No se toca ni una fila de `guia_items`**: cero migración que «limpie» el histórico — es lo que el transportista firmó. Esta pantalla solo escribe en la tabla nueva.
+> - **El pareo por parecido sigue prohibido**: `claveDestino` es exacta y normalizada (`N2` ≠ `N3`, «Wesland» ≠ «Westland»).
+> - **Todo sigue bajo `GUIAS_ATAJOS_NUEVOS`**: apagado, ni la pestaña ni los botones existen y el formulario queda como antes de `115f90ed`. Una guía **Completada** no muestra nada de esto.
+> - El autollenado del destino único y los botones para varios (4-sep) quedan EXACTAMENTE como estaban — solo cambió de dónde sale la definición.
+>
+> ### Candados y mutaciones
+>
+> `src/__tests__/lib/guias-destinos-precedencia.test.ts` (11 — el orden tabla→constante→histórico, las dos correcciones textuales, PGRST205 contra la ruta real) · `src/__tests__/api/guias-destinos-config-route.test.ts` (15 — llama a los handlers con la base doblada: secretaria 200 con la cita, bodega/vendedor 403, la puerta única, el 409 de única-entre-activas, el soft delete mirando QUÉ se escribió, el 503 de la migración, el barrido sin comentarios) · `src/__tests__/components/guias-configuracion-pantalla.test.tsx` (13 — monta la página REAL de `/guias`, toca la pestaña y cuenta lo que sale por fetch: quién la ve, agrupada, `ClientePicker`, dice si autollena, promover requiere tocar, quitar confirma antes de escribir, CONTROL con el interruptor apagado).
+> - **Verificado por mutación, 9 de 9 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-guias-destinos-config.sh`): la tabla deja de ganar · la constante deja de ser la red · quitar BORRA la fila · bodega gana permiso · la secretaria lo pierde · la pestaña se dibuja para cualquier rol · un histórico se promueve solo al dibujarse · el campo Dirección deja de ser editable · la ruta de frecuencias tira los definidos. Con la mutación de CONTROL (⛔) y restauración por COPIA, como los demás scripts del módulo.
+> - Los TRES scripts anteriores del módulo se re-corrieron en verde tras el cambio: `_mutar-candados-guias-destinos.sh` **13/13** (dos patrones se actualizaron a la firma nueva de `botonesDeDestino`/`tiendasDelDestino` — el aplicador los DENUNCIÓ como muertos en vez de cantarlos cazados, que es exactamente para lo que existe), `_mutar-candados-guias-facturas.sh` **12/12**, `_mutar-candados-guias-ajustes-4sep.sh` **17/17**.

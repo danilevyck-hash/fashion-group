@@ -7,9 +7,21 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, PullToRefresh } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
+import dynamic from "next/dynamic";
 import GuiasList, { CREATE_ROLES } from "./components/GuiasList";
 import AtarClienteModal from "./components/AtarClienteModal";
 import { refrescarFacturasDelDia } from "./components/refrescarFacturasHoy";
+import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
+import { CONFIG_GUIAS_ROLES } from "@/lib/guias/destinos-config";
+
+// LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
+// celular y la configuración es de admin/secretaria — su JS solo se descarga
+// al tocar la pestaña. (Medido: importarla de arriba subía la carga inicial
+// de /guias de 196 a 202 kB.)
+const GuiasConfiguracionView = dynamic(() => import("./components/GuiasConfiguracionView"), {
+  ssr: false,
+  loading: () => <div className="py-10 text-center text-sm text-gray-500">Cargando…</div>,
+});
 import {
   useClientesDelGrupo,
   useNombresDeClientes,
@@ -99,6 +111,33 @@ export default function GuiasPage() {
     if (sessionStorage.getItem("fg_guias_readonly") === "1") setGuiasReadonly(true);
   }, []);
 
+  // ── La pestaña «Configuración» (4-sep-2026): los destinos definidos ──
+  // La ven y la editan admin Y secretaria — Daniel: «configuraciones también
+  // deja a secretaria». Bodega y vendedor no ven ni la pestaña (y la ruta les
+  // contesta 403). Cuelga de GUIAS_ATAJOS_NUEVOS como todo lo nuevo de Guías:
+  // apagado, la pestaña no existe y la pantalla es la de siempre.
+  // ⚠️ Tab del MISMO nivel → `replace` sobre window.location, no
+  // useSearchParams: ese hook obliga a envolver la página en <Suspense> (la
+  // misma razón por la que `pendientes` ya se lee así abajo).
+  const [vista, setVista] = useState<"guias" | "config">("guias");
+  const hayConfig =
+    GUIAS_ATAJOS_NUEVOS && !!role && (CONFIG_GUIAS_ROLES as readonly string[]).includes(role);
+  useEffect(() => {
+    if (!authChecked) return;
+    const v = new URLSearchParams(window.location.search).get("vista");
+    if (v === "config") setVista("config");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked]);
+  function cambiarVista(v: "guias" | "config") {
+    setVista(v);
+    const params = new URLSearchParams(window.location.search);
+    if (v === "config") params.set("vista", "config");
+    else params.delete("vista");
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+  }
+  const enConfig = hayConfig && vista === "config";
+
   // Al TOCAR Guías se dispara, en segundo plano, la lectura corta de las
   // facturas de HOY para el panel «Facturas del cliente». Daniel, textual
   // (4-sep-2026): «¿por qué no se puede hacer al apretar guías? Prefiero eso.»
@@ -152,6 +191,37 @@ export default function GuiasPage() {
     <PullToRefresh onRefresh={s.loadGuias}>
       <div>
         <AppHeader module="Guías de Despacho" />
+        {/* La fila de pestañas solo existe para quien puede configurar
+            (admin y secretaria): para bodega y vendedor la pantalla es
+            exactamente la de siempre, sin una fila extra. */}
+        {hayConfig && (
+          <div className="max-w-3xl mx-auto px-4 pt-3">
+            <div className="flex items-center gap-1 border-b border-gray-200">
+              {([
+                ["guias", "Guías"],
+                ["config", "Configuración"],
+              ] as ["guias" | "config", string][]).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => cambiarVista(v)}
+                  aria-current={vista === v ? "page" : undefined}
+                  className={`-mb-px min-h-[44px] whitespace-nowrap border-b-2 px-2.5 text-sm transition active:scale-[0.97] ${
+                    vista === v
+                      ? "border-gray-900 font-medium text-gray-900"
+                      : "border-transparent text-gray-400 hover:text-gray-600"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {enConfig ? (
+          <GuiasConfiguracionView />
+        ) : (
+        <>
         {/* 🔴 LOS DOS BOTONES DE LA FILA NAVEGAN — ninguno despacha ni guarda.
             «Editar» abre la guía con el formulario ya abierto (`?editar=1`, el
             mismo query por el que entra el camino viejo `/guias/[id]/editar`) y
@@ -201,6 +271,8 @@ export default function GuiasPage() {
           onConfirm={s.confirmDeleteGuia}
         />
         <Toast message={s.toast} />
+        </>
+        )}
       </div>
     </PullToRefresh>
   );

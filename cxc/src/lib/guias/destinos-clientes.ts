@@ -55,7 +55,8 @@ import type { EnvioParaDireccion, GuiaParaDireccion } from "./direccion-sugerida
  *   | D-117 | Outlet Duty Free N2   | Guabito |
  *   | D-87  | La Frontera Duty Free | Guabito |
  *   | D-25  | City Mall Paso Canoa  | Paso Canoas |
- *   | D-35  | City Shoes            | Calle 19 Central |
+ *   | D-35  | City Shoes            | Calle 19 Central | ← corregido el
+ *     4-sep-2026, ver abajo.
  *   | D-144 | Star Shoes, S.A.      | Albrook |
  *   | D-26  | City Moda Chorrera    | Entrega en SportCorner | ← superado el
  *     mismo 4-sep: ver «LA FAMILIA CITY MODA» abajo (D-26 quedó en «5 de
@@ -86,6 +87,24 @@ import type { EnvioParaDireccion, GuiaParaDireccion } from "./direccion-sugerida
  * D-34 y D-42 ya apuntan ahí), y el único destino PROPIO de D-26 es
  * **«5 de Mayo»**. D-30, D-33 y D-78 no tienen guías todavía y por eso no
  * tienen destino definido.
+ *
+ * 🔴 **LAS DOS CORRECCIONES DEL 4-SEP-2026.** Daniel, textual: *«city shoes →
+ * Calle 19 Central, al lado de la joyería Super Oro. Y Nine Sport en Calle 19
+ * Central.»*
+ *   · **D-35 City Shoes** pasa de «Calle 19 Central» al texto completo con la
+ *     referencia de la joyería.
+ *   · **D-112 Nine Sports 9, S.A.** entra a los definidos con «Calle 19
+ *     Central» — hoy autollenaba «Calle 19» por su histórico de 2 guías, y la
+ *     definición de Daniel gana.
+ * Van acá (la constante) además de en la migración `20260918120000`, para que
+ * no dependan de que la migración corra: la constante es la RED del orden de
+ * precedencia (ver `destinosDefinidosPara`).
+ *
+ * ⚠️ **Desde el 4-sep-2026 esta constante es la SEGUNDA fuente, no la primera**:
+ * los destinos definidos viven en la tabla `guias_destino_cliente` y se
+ * administran en Guías › Configuración (admin y secretaria) sin desplegar.
+ * La constante queda como red mientras la migración no corra — el mismo
+ * patrón que las RPC con caída.
  */
 export const DESTINOS_DEFINIDOS: Readonly<Record<string, readonly string[]>> = {
   "D-81": ["Paso Canoas"],
@@ -93,7 +112,12 @@ export const DESTINOS_DEFINIDOS: Readonly<Record<string, readonly string[]>> = {
   "D-117": ["Guabito"],
   "D-87": ["Guabito"],
   "D-25": ["Paso Canoas"],
-  "D-35": ["Calle 19 Central"],
+  // Daniel, 4-sep-2026: «city shoes → Calle 19 Central, al lado de la joyería
+  // Super Oro.»
+  "D-35": ["Calle 19 Central, al lado de la joyería Super Oro"],
+  // Daniel, 4-sep-2026: «Y Nine Sport en Calle 19 Central.» (Nine Sports 9,
+  // S.A. — su histórico decía «Calle 19»; la definición gana.)
+  "D-112": ["Calle 19 Central"],
   "D-144": ["Albrook"],
   "D-26": ["5 de Mayo"],
   // La familia City Moda: todas entregan en Sport Corner Calidonia (ver el
@@ -142,6 +166,47 @@ export const TIENDAS_POR_CLIENTE: Readonly<
 
 /** Máximo de botones por cliente (los definidos de D-142 son 8 y van enteros). */
 export const MAX_BOTONES_DESTINO = 6;
+
+// ─── La tabla `guias_destino_cliente` y el orden de precedencia ──────────────
+
+/**
+ * Un destino definido tal como sale de la tabla `guias_destino_cliente`
+ * (migración `20260918120000`, se administra en Guías › Configuración).
+ */
+export interface DestinoDefinido {
+  destino: string;
+  /** Las tiendas de ese destino (solo Sporting Shoes las usa hoy). */
+  tiendas?: readonly string[];
+}
+
+/** Código de cliente → sus destinos definidos EN LA TABLA (activos, en orden). */
+export type DefinidosPorCliente = Readonly<Record<string, readonly DestinoDefinido[]>>;
+
+/**
+ * 🔴 EL ORDEN DE PRECEDENCIA VIVE ACÁ Y EN NINGÚN OTRO LADO (4-sep-2026):
+ *
+ *   1. la TABLA `guias_destino_cliente` (si hay filas activas para ese
+ *      cliente) — lo que se corrige desde Guías › Configuración sin desplegar;
+ *   2. la CONSTANTE `DESTINOS_DEFINIDOS` — la red mientras la migración no
+ *      corra (el mismo patrón que las RPC con caída);
+ *   3. `null` → el que llama cae al HISTÓRICO agrupado de `guia_items`.
+ *
+ * Si la tabla tiene filas para el cliente, la constante NO se mezcla: la
+ * tabla es la foto completa de ese cliente (quitar un destino en la pantalla
+ * tiene que quitarlo de verdad, no revivirlo desde el código).
+ */
+export function destinosDefinidosPara(
+  codigo: string | null | undefined,
+  deTabla?: DefinidosPorCliente | null,
+): readonly DestinoDefinido[] | null {
+  const c = String(codigo ?? "").trim();
+  if (!c) return null;
+  const filas = deTabla?.[c];
+  if (filas && filas.length > 0) return filas;
+  const constante = DESTINOS_DEFINIDOS[c];
+  if (constante) return constante.map((d) => ({ destino: d, tiendas: TIENDAS_POR_CLIENTE[c]?.[d] }));
+  return null;
+}
 
 // ─── Normalización: exacta y por regla, nunca por parecido ───────────────────
 
@@ -206,17 +271,21 @@ export function baseDeDestino(direccion: string | null | undefined): string {
  * Las tiendas ya usadas para lo que el campo dice AHORA (por su base): con
  * «Westland» o «Westland · tienda 6» devuelve las de Westland; con «Santiago»
  * (sin tiendas) o con otro cliente, nada.
+ *
+ * Con la tabla presente (`deTabla`), las tiendas salen de la fila del destino
+ * — mismo orden de precedencia que los botones (`destinosDefinidosPara`).
  */
 export function tiendasDelDestino(
   codigo: string | null | undefined,
   direccion: string | null | undefined,
+  deTabla?: DefinidosPorCliente | null,
 ): readonly string[] {
-  const mapa = TIENDAS_POR_CLIENTE[String(codigo ?? "").trim()];
-  if (!mapa) return [];
+  const definidos = destinosDefinidosPara(codigo, deTabla);
+  if (!definidos) return [];
   const base = claveDestino(baseDeDestino(direccion));
   if (base === "#") return [];
-  for (const [destino, tiendas] of Object.entries(mapa)) {
-    if (claveDestino(destino) === base) return tiendas;
+  for (const d of definidos) {
+    if (claveDestino(d.destino) === base) return d.tiendas ?? [];
   }
   return [];
 }
@@ -326,19 +395,21 @@ export function destinosHistoricos(
 }
 
 /**
- * Los botones que ve una fila del formulario: si el cliente es uno de los
- * definidos por Daniel, EXACTAMENTE su lista (fuente de verdad, sin mezclar el
- * histórico); si no, su histórico agrupado; sin código o sin historia, NADA —
- * el campo queda vacío, como hoy.
+ * Los botones que ve una fila del formulario: si el cliente tiene destinos
+ * DEFINIDOS —en la tabla `guias_destino_cliente` primero, en la constante como
+ * red—, EXACTAMENTE esa lista (fuente de verdad, sin mezclar el histórico); si
+ * no, su histórico agrupado; sin código o sin historia, NADA — el campo queda
+ * vacío, como hoy. La precedencia vive en `destinosDefinidosPara`.
  */
 export function botonesDeDestino(
   codigo: string | null | undefined,
   historicos: readonly string[] | null | undefined,
+  deTabla?: DefinidosPorCliente | null,
 ): string[] {
   const c = String(codigo ?? "").trim();
   if (!c) return [];
-  const definidos = DESTINOS_DEFINIDOS[c];
-  if (definidos) return [...definidos];
+  const definidos = destinosDefinidosPara(c, deTabla);
+  if (definidos) return definidos.map((d) => d.destino);
   return (historicos ?? []).slice(0, MAX_BOTONES_DESTINO);
 }
 
@@ -370,7 +441,8 @@ export function botonesDeDestino(
 export function destinoParaAutollenar(
   codigo: string | null | undefined,
   historicos: readonly string[] | null | undefined,
+  deTabla?: DefinidosPorCliente | null,
 ): string | null {
-  const botones = botonesDeDestino(codigo, historicos);
+  const botones = botonesDeDestino(codigo, historicos, deTabla);
   return botones.length === 1 ? botones[0] : null;
 }

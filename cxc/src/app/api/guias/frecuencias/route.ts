@@ -5,6 +5,7 @@ import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { ultimaDireccionPorCliente } from "@/lib/guias/direccion-sugerida";
 import { destinosHistoricos } from "@/lib/guias/destinos-clientes";
+import { leerDefinidosOVacio } from "@/lib/guias/destinos-config-server";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import {
   ALL_EMPRESA_KEYS,
@@ -142,7 +143,14 @@ export async function GET(req: NextRequest) {
     // `deleted` son independientes) — lo filtra el módulo.
     const destinos = GUIAS_ATAJOS_NUEVOS ? destinosHistoricos(rows, guias) : {};
 
-    return NextResponse.json({ clientes, empresas, direcciones, destinos });
+    // ── Destinos DEFINIDOS: la tabla `guias_destino_cliente` ──
+    // (4-sep-2026) Primera fuente del orden de precedencia (tabla → constante
+    // → histórico, ver `destinosDefinidosPara`). FALLA ABIERTO: con la
+    // migración 20260918120000 sin correr devuelve {} y los botones caen a la
+    // constante — la pantalla de guías no se rompe.
+    const definidos = GUIAS_ATAJOS_NUEVOS ? await leerDefinidosOVacio() : {};
+
+    return NextResponse.json({ clientes, empresas, direcciones, destinos, definidos });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error interno";
     console.error("[api/guias/frecuencias] GET:", message);

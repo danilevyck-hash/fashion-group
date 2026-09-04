@@ -95,8 +95,8 @@ mutacion "un renglón de una GUÍA borrada vuelve a contar (el otro deleted)" "$
 # ── la tabla de Daniel y el histórico ────────────────────────────────────────
 
 mutacion "el histórico PISA la tabla de Daniel (la definición deja de ganar)" "$PURO" \
-  'if (definidos) return [...definidos];' \
-  'if (definidos && (historicos ?? []).length === 0) return [...definidos];'
+  'if (definidos) return definidos.map((d) => d.destino);' \
+  'if (definidos && (historicos ?? []).length === 0) return definidos.map((d) => d.destino);'
 
 mutacion "el tope de 6 botones se cae" "$PURO" \
   'salida[codigo] = ordenados.slice(0, MAX_BOTONES_DESTINO).map((g) => {' \
@@ -123,8 +123,8 @@ mutacion "las tiendas aparecen SIN destino elegido" "$COMP" \
 # ── el botón se toca, no se aplica solo — y el campo sigue libre ─────────────
 
 mutacion "el botón SE APLICA SOLO (el destino se escribe sin tocarlo)" "$COMP" \
-  'const tiendas = tiendasDelDestino(codigo, direccion);' \
-  'const tiendas = tiendasDelDestino(codigo, direccion);
+  'const tiendas = tiendasDelDestino(codigo, direccion, definidos);' \
+  'const tiendas = tiendasDelDestino(codigo, direccion, definidos);
   if (base === "" && botones.length >= 1) onElegir(botones[0]);'
 
 mutacion "el campo Dirección deja de ser editable" "$FORM" \

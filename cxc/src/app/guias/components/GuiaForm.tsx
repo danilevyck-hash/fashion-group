@@ -57,7 +57,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
 import DestinosDelCliente from "./DestinosDelCliente";
-import { destinoParaAutollenar } from "@/lib/guias/destinos-clientes";
+import { destinoParaAutollenar, type DefinidosPorCliente } from "@/lib/guias/destinos-clientes";
 import FacturasDelCliente from "./FacturasDelCliente";
 import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
@@ -374,6 +374,12 @@ export default function GuiaForm({
   // (`DestinosDelCliente`, 4-sep-2026). Best-effort: sin esto, los 9 clientes
   // definidos por Daniel muestran sus botones igual (viven en el módulo).
   const [destinosPorCliente, setDestinosPorCliente] = useState<Record<string, string[]>>({});
+  // Código de cliente → sus destinos DEFINIDOS en la tabla
+  // `guias_destino_cliente` (Guías › Configuración, 4-sep-2026). Primera
+  // fuente del orden de precedencia (tabla → constante → histórico,
+  // `destinosDefinidosPara`). Best-effort: sin esto —migración pendiente,
+  // offline— la constante del módulo sigue mandando.
+  const [definidosPorCliente, setDefinidosPorCliente] = useState<DefinidosPorCliente>({});
   useEffect(() => {
     let cancel = false;
     fetch("/api/guias/frecuencias", { cache: "no-store" })
@@ -384,6 +390,7 @@ export default function GuiaForm({
         if (Array.isArray(d.empresas)) setEmpresaOptions(d.empresas);
         if (d.direcciones && typeof d.direcciones === "object") setDireccionPorCliente(d.direcciones);
         if (d.destinos && typeof d.destinos === "object") setDestinosPorCliente(d.destinos);
+        if (d.definidos && typeof d.definidos === "object") setDefinidosPorCliente(d.definidos);
       })
       .catch(() => { /* offline: cae a las 8 canónicas en su orden de siempre */ });
     return () => { cancel = true; };
@@ -604,6 +611,7 @@ export default function GuiaForm({
               const destino = destinoParaAutollenar(
                 codigo,
                 destinosPorCliente[(codigo || "").trim()] ?? [],
+                definidosPorCliente,
               );
               if (destino) cambios.direccion = destino;
             }
@@ -685,6 +693,7 @@ export default function GuiaForm({
             codigo={item.cliente_codigo || ""}
             direccion={item.direccion}
             historicos={destinosPorCliente[(item.cliente_codigo || "").trim()] ?? []}
+            definidos={definidosPorCliente}
             onElegir={(v) => { onUpdateItem(idx, "direccion", v); marcarTocado(clave); }}
           />
         )}
@@ -992,7 +1001,7 @@ export default function GuiaForm({
           // cliente de cada renglón — UN solo destino, definido o único en la
           // historia agrupada; con varios, nada.
           destinoAutollenadoDe={(codigo) =>
-            destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [])
+            destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [], definidosPorCliente)
           }
         />
       )}

@@ -33,6 +33,7 @@ import {
   claveDestino,
   componerDestino,
   tiendasDelDestino,
+  type DefinidosPorCliente,
 } from "@/lib/guias/destinos-clientes";
 
 interface Props {
@@ -42,6 +43,12 @@ interface Props {
   direccion: string;
   /** Destinos históricos de ese cliente (de `/api/guias/frecuencias`). */
   historicos: readonly string[];
+  /**
+   * Los destinos DEFINIDOS en la tabla `guias_destino_cliente` (Guías ›
+   * Configuración, 4-sep-2026) — la primera fuente de la precedencia. Sin
+   * ellos (migración pendiente, offline) manda la constante del módulo.
+   */
+  definidos?: DefinidosPorCliente;
   /** Escribe el campo — el MISMO camino que teclear. Solo corre al tocar. */
   onElegir: (v: string) => void;
 }
@@ -52,17 +59,17 @@ const CHIP =
   "text-xs border rounded-md px-2.5 inline-flex items-center transition " +
   "min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1";
 
-export default function DestinosDelCliente({ codigo, direccion, historicos, onElegir }: Props) {
+export default function DestinosDelCliente({ codigo, direccion, historicos, definidos, onElegir }: Props) {
   const [otraAbierta, setOtraAbierta] = useState(false);
   const [otra, setOtra] = useState("");
 
-  const botones = botonesDeDestino(codigo, historicos);
+  const botones = botonesDeDestino(codigo, historicos, definidos);
   // Cliente sin historia (y sin definición): CERO botones — como hoy.
   if (botones.length === 0) return null;
 
   const base = baseDeDestino(direccion);
   const claveActual = claveDestino(base);
-  const tiendas = tiendasDelDestino(codigo, direccion);
+  const tiendas = tiendasDelDestino(codigo, direccion, definidos);
 
   function elegirTienda(t: string) {
     onElegir(componerDestino(base, t));

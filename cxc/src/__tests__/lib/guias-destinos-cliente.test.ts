@@ -67,7 +67,11 @@ describe("los 9 definidos por Daniel devuelven exactamente su tabla", () => {
     ["D-117", ["Guabito"]],
     ["D-87", ["Guabito"]],
     ["D-25", ["Paso Canoas"]],
-    ["D-35", ["Calle 19 Central"]],
+    // ⚠️ Corregido el 4-sep-2026 — Daniel, textual: «city shoes → Calle 19
+    // Central, al lado de la joyería Super Oro. Y Nine Sport en Calle 19
+    // Central.» (antes decía «Calle 19 Central» a secas; y D-112 entró nuevo).
+    ["D-35", ["Calle 19 Central, al lado de la joyería Super Oro"]],
+    ["D-112", ["Calle 19 Central"]],
     ["D-144", ["Albrook"]],
     // ⚠️ La familia City Moda (4-sep-2026): son ONCE clientes con su propio
     // código. Las «X (ENTREGA EN SPORTCORNER)» del histórico de D-26 eran
@@ -102,13 +106,16 @@ describe("los 9 definidos por Daniel devuelven exactamente su tabla", () => {
     expect(DESTINOS_DEFINIDOS["D-87"]).toEqual(["Guabito"]);
   });
 
-  it("la tabla tiene los 16 y solo los 16 (los 9 de Daniel + la familia City Moda del 4-sep)", () => {
+  it("la tabla tiene los 17 y solo los 17 (los 9 de Daniel + la familia City Moda del 4-sep + Nine Sports del 4-sep)", () => {
     expect(Object.keys(DESTINOS_DEFINIDOS).sort()).toEqual(
       [
         "D-117", "D-142", "D-144", "D-156", "D-25", "D-26", "D-35", "D-81", "D-87",
         // La familia City Moda con guías propias. D-30, D-33 y D-78 no tienen
         // guías todavía y por eso NO tienen destino definido.
         "D-27", "D-28", "D-29", "D-31", "D-32", "D-34", "D-42",
+        // Nine Sports 9, S.A. — Daniel, 4-sep-2026: «Y Nine Sport en Calle 19
+        // Central.»
+        "D-112",
       ].sort(),
     );
   });
