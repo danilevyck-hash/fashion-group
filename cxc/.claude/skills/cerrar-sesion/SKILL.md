@@ -56,7 +56,7 @@ La cita va **verbatim, entre comillas y en cursiva**, con sus palabras exactas �
 ### 2c · Lista «Pendientes vivos» — quitar, marcar, agregar
 
 - **Quitar** los que se cerraron hoy… o mejor, **marcar ✅** con una línea de qué lo cerró (commit o quién lo hizo) y dejarlos una sesión más para que se vea que se cerraron. En la siguiente sesión se quitan.
-- **Agregar** los nuevos, con dueño implícito: los de Daniel dicen «tarea de Daniel» (el documento de $266M en Switch, aplicar una migración); los del asistente dicen qué falta hacer y por qué no se hizo hoy.
+- **Agregar** los nuevos, con dueño implícito: los de Daniel dicen «tarea de Daniel» (aplicar una migración, un dato que solo él puede corregir en Switch); los del asistente dicen qué falta hacer y por qué no se hizo hoy.
 - **Mantener** el resto tal cual, sin reescribirlos «mejor».
 
 🔴 **Nunca listar como pendiente algo que Daniel ya dijo que quiere olvidar.** Si él cerró un tema («eso déjalo», «no lo quiero», «se queda como está»), no vuelve a la lista bajo otro nombre, ni como «idea», ni como «mejora posible». Se anota, si acaso, en la tabla de decisiones con su cita, y ahí muere. Ejemplos ya cerrados así: el Modo Viaje offline (eliminado, nunca se usó), los presets de quincena (*«el corte es variable»*), fusionar Multifashion con Comisiones (*NO fusionar*).
@@ -90,7 +90,7 @@ HECHO
 
 PENDIENTE TUYO
 · Aplicar la migración «vs 2025 mismos días» — hasta entonces Multi Fashion Holding sigue en +3%.
-· El documento de $266M en la cartera de Boston, en Switch.
+· Configurar el reloj de ACS (no hay reloj ahí todavía).
 
 PENDIENTE MÍO
 · Bajar «Recibos por comprobantes» de Switch para cobros contra factura (sin urgencia, cuando me des la ventana).
