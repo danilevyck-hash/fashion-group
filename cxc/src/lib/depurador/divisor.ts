@@ -108,3 +108,29 @@ export function validarDivisor(valor: unknown): ResultadoDivisor {
 
   return { ok: true, divisor };
 }
+
+/* ── El mismo guard, pero EN LA PANTALLA (4-sep-2026) ────────────────────────
+ * Hasta hoy validarDivisor solo corría en las 4 rutas API al GUARDAR fórmulas.
+ * Los inputs de divisor del Depurador no validaban nada: teclear 70 en vez de
+ * 0.70 calculaba y descargaba un Excel con los costos 100× mal — y ese Excel
+ * se sube a Switch (50-60 corridas/mes). Este wrapper REUSA validarDivisor
+ * (no es otra copia de la regla) y devuelve el mensaje de pantalla.
+ * La pantalla bloquea la DESCARGA, nunca el tecleo. */
+
+/** Mensaje de pantalla para un divisor tecleado. null = válido.
+ *  Vacío o 0 = sin fórmula (el precio se pone a mano) → válido.
+ *  Fuera de rango → «Debe estar entre 0.10 y 1.00.» y, cuando el valor ÷ 100
+ *  cae en rango (el error clásico: 70 por 0.70), agrega la sugerencia
+ *  «¿Quisiste poner 0.70?». */
+export function mensajeDivisorEnPantalla(raw: string | number): string | null {
+  const texto = typeof raw === "number" ? String(raw) : raw.trim();
+  if (texto === "") return null; // vacío = sin fórmula (mismo trato que 0)
+  if (validarDivisor(texto).ok) return null;
+  const base = `Debe estar entre ${DIVISOR_MIN.toFixed(2)} y ${DIVISOR_MAX.toFixed(2)}.`;
+  const n = Number(texto);
+  const corregido = Number.isFinite(n) ? n / 100 : NaN;
+  if (Number.isFinite(corregido) && corregido >= DIVISOR_MIN && corregido <= DIVISOR_MAX) {
+    return `${base} ¿Quisiste poner ${corregido.toFixed(2)}?`;
+  }
+  return base;
+}

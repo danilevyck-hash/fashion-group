@@ -30,7 +30,9 @@ import {
   type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
 import { veredictoDescripcion } from "@/lib/depurador/veredicto";
+import { mensajeDivisorEnPantalla } from "@/lib/depurador/divisor";
 import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import AlarmaDescripcionesNuevas, { type DescripcionNueva } from "./AlarmaDescripcionesNuevas";
 
 const DIVISOR_HINTS = [0.70, 0.73, 0.75, 0.63];
@@ -92,17 +94,35 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   // producto sale SIN PRECIO. Antes se perdían en silencio. No frenan la carga.
   const [marcasDesconocidas, setMarcasDesconocidas] = useState<{ marca: string; productos: number }[]>([]);
   const [error, setError] = useState("");
-  const [empresa, setEmpresa] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [orphanSeen, setOrphanSeen] = useState(false); // alarma de descripción nueva (Tarea 8)
 
-  // Config (mismos defaults del HTML: mes/año actual, tasa 07, factor 1.1)
-  const [mesIdx, setMesIdx] = useState(now.getMonth());
-  const [anio, setAnio] = useState(String(now.getFullYear()));
-  // «07» = el código de Switch para el 7% (texto). Lo que se escriba acá pasa
-  // igual por tasaSwitch al procesar, así que «7» también sale como «07».
-  const [tasa, setTasa] = useState("07");
-  const [factor, setFactor] = useState("1.1");
+  // ── Config RECORDADA entre corridas (4-sep-2026) ───────────────────────────
+  // Empresa, mes, año, tasa, factor y modo de precio se re-elegían en cada una
+  // de las ~50-60 corridas del mes. Ahora la pantalla abre como quedó la última
+  // vez, con el patrón de la casa (useLastUsed → fg_last_* en localStorage).
+  // El ARCHIVO no se recuerda: ese siempre se elige.
+  // Defaults idénticos a los de siempre: mes/año actual, tasa 07, factor 1.1.
+  const [empresa, setEmpresa] = useLastUsed("depurador_empresa", "");
+  const [mesStr, setMesStr] = useLastUsed("depurador_mes", String(now.getMonth()));
+  const [anio, setAnio] = useLastUsed("depurador_anio", String(now.getFullYear()));
+  // «07» = el código de Switch para el 7% (texto) y «0» = exento. Daniel,
+  // textual: «solo existen esas dos» — la pantalla ofrece un select de dos
+  // opciones y nada más. tasaSwitch (que no se tocó) sigue traduciendo lo que
+  // traiga una factura en otros caminos.
+  const [tasaCruda, setTasaCruda] = useLastUsed("depurador_tasa", "07");
+  const [factor, setFactor] = useLastUsed("depurador_factor", "1.1");
+  const [modoStr, setModoStr] = useLastUsed("depurador_precio_modo", "marca");
+
+  // Derivados saneados de lo recordado (un localStorage viejo o tocado a mano
+  // no puede meter un valor que la pantalla no ofrece).
+  const mesIdx = (() => {
+    const n = parseInt(mesStr, 10);
+    return Number.isInteger(n) && n >= 0 && n <= 11 ? n : now.getMonth();
+  })();
+  const setMesIdx = (v: number) => setMesStr(String(v));
+  const tasa = tasaCruda === "0" ? "0" : "07";
+  const setTasa = (v: string) => setTasaCruda(v === "0" ? "0" : "07");
 
   // Catálogo de descripciones (tabla depurador_descripciones — fuente de verdad).
   // Sin catálogo NO se procesa ni se descarga nada (sin fallback al archivo TS).
@@ -116,7 +136,9 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 
   // ── Precio (Tarea 2) ───────────────────────────────────────────────────────
   // Default: cada marca toma su fórmula guardada. "global" sigue disponible.
-  const [priceMode, setPriceMode] = useState<"global" | "marca">("marca");
+  // El modo también se recuerda entre corridas (modoStr, arriba).
+  const priceMode: "global" | "marca" = modoStr === "global" ? "global" : "marca";
+  const setPriceMode = (m: "global" | "marca") => setModoStr(m);
   // Fórmula global: "draft" se edita en vivo; "applied" maneja el cálculo de las
   // filas (se confirma con "Aplicar a todo"). Defaults del mockup: 0.73 / 2 / int.
   const [draftDivisor, setDraftDivisor] = useState("0.73");
@@ -125,8 +147,43 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   const [applied, setApplied] = useState<{ divisor: number; extra: number; redondeo: Redondeo }>(
     { divisor: 0.73, extra: 2, redondeo: "int" }
   );
-  // Precios editados a mano (por índice de fila). No se sobrescriben al recalcular.
-  const [priceEdits, setPriceEdits] = useState<Record<number, string>>({});
+
+  // La fórmula global se recuerda COMO QUEDÓ APLICADA (no cada tecla del draft):
+  // lo que rige los precios de la última corrida es lo que la pantalla revive.
+  // Un divisor guardado inválido no se revive (defensa contra localStorage viejo).
+  const [formulaGlobalGuardada, setFormulaGlobalGuardada] = useLastUsed("depurador_formula_global", "");
+  const hidratoFormulaGlobal = useRef(false);
+  useEffect(() => {
+    if (hidratoFormulaGlobal.current || !formulaGlobalGuardada) return;
+    hidratoFormulaGlobal.current = true;
+    try {
+      const g = JSON.parse(formulaGlobalGuardada) as { divisor?: unknown; extra?: unknown; redondeo?: unknown };
+      const divisorTxt = typeof g.divisor === "string" ? g.divisor.trim() : "";
+      if (!divisorTxt || mensajeDivisorEnPantalla(divisorTxt) !== null) return;
+      const extra = typeof g.extra === "number" && Number.isInteger(g.extra) && g.extra >= 0 && g.extra <= 5 ? g.extra : 2;
+      const redondeo: Redondeo = g.redondeo === "half" ? "half" : "int";
+      setDraftDivisor(divisorTxt);
+      setDraftExtra(extra);
+      setDraftRedondeo(redondeo);
+      setApplied({ divisor: Number(divisorTxt) || 0, extra, redondeo });
+    } catch {
+      // JSON roto en localStorage: se quedan los defaults de siempre.
+    }
+  }, [formulaGlobalGuardada]);
+
+  // 🔴 Precios editados a mano, guardados por REFERENCIA del artículo (la llave
+  // estable de la fila: cols["Código *"]), NUNCA por índice: al re-procesar el
+  // archivo siguen pegados al artículo correcto aunque las filas se muevan, y
+  // un artículo que ya no está en el archivo nuevo conserva su precio por si
+  // vuelve. Daniel, textual: «y también consérvalos» (4-sep-2026).
+  const [priceEdits, setPriceEdits] = useState<Record<string, string>>({});
+  // Espejo para leer los edits desde runFile (useCallback sin deps) sin cerrarse
+  // sobre un estado viejo.
+  const priceEditsRef = useRef<Record<string, string>>({});
+  useEffect(() => { priceEditsRef.current = priceEdits; }, [priceEdits]);
+  // Cuántos precios a mano siguieron aplicados tras el último re-proceso (para
+  // decirlo en pantalla con la opción de borrarlos todos).
+  const [editsConservados, setEditsConservados] = useState(0);
   // Fórmulas guardadas (tabla marca_formulas) + fórmulas editables por marca presente.
   const [savedFormulas, setSavedFormulas] = useState<MarcaFormula[]>([]);
   const [marcaForms, setMarcaForms] = useState<Record<string, MarcaFormula>>({});
@@ -158,7 +215,16 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         setOmitidosSinCantidad(omitidosSinCantidad);
         setMarcasDesconocidas(marcasDesconocidas);
         setOrphanSeen(false); // re-evaluar alarma de descripción nueva con el archivo nuevo
-        setPriceEdits({}); // el CIF pudo cambiar → recalcular precios desde cero
+        // 🔴 Los precios escritos a mano NO se borran al re-procesar. Están
+        // guardados por referencia de artículo, así que se re-pegan solos a su
+        // fila; acá solo se cuenta cuántos siguen aplicados para decirlo en
+        // pantalla. Daniel, textual: «y también consérvalos».
+        {
+          const presentes = new Set(rows.map((r) => String(r.cols["Código *"] ?? "")));
+          setEditsConservados(
+            Object.keys(priceEditsRef.current).filter((k) => presentes.has(k)).length
+          );
+        }
         setSelected(new Set());
         setDescFilter("");
         setMassPrice("");
@@ -194,14 +260,54 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [injectedFile, catalogo]);
 
-  // Reprocesar al cambiar un parámetro si ya hay archivo cargado
-  const reprocess = useCallback(
-    (patch: Partial<{ mesIdx: number; anio: string; tasa: string; factor: string }>) => {
-      const cfg = { mesIdx, anio, tasa, factor, ...patch };
+  // ── Reprocesar al cambiar un parámetro si ya hay archivo cargado ──────────
+  // Los campos TECLEADOS (año, factor) ya no re-leen el Excel en cada tecla:
+  // esperan a que la persona termine de escribir (300 ms) o al blur. Los
+  // selects (mes, tasa) reprocesan al momento, como siempre. El RESULTADO no
+  // cambia en nada: es la misma corrida, disparada menos veces.
+  type ConfigReproceso = { mesIdx: number; anio: string; tasa: string; factor: string };
+  const REPROCESO_ESPERA_MS = 300;
+  const reprocesoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reprocesoPendiente = useRef<ConfigReproceso | null>(null);
+
+  const ejecutarReproceso = useCallback(
+    (cfg: ConfigReproceso) => {
+      reprocesoPendiente.current = null;
+      if (reprocesoTimer.current) { clearTimeout(reprocesoTimer.current); reprocesoTimer.current = null; }
       if (fileRef.current) runFile(fileRef.current, cfg);
     },
-    [runFile, mesIdx, anio, tasa, factor]
+    [runFile]
   );
+
+  const cfgConParche = useCallback(
+    (patch: Partial<ConfigReproceso>): ConfigReproceso =>
+      ({ mesIdx, anio, tasa, factor, ...(reprocesoPendiente.current ?? {}), ...patch }),
+    [mesIdx, anio, tasa, factor]
+  );
+
+  /** Reprocesa YA (selects: mes, tasa — un cambio discreto por interacción). */
+  const reprocesarYa = useCallback(
+    (patch: Partial<ConfigReproceso>) => { ejecutarReproceso(cfgConParche(patch)); },
+    [ejecutarReproceso, cfgConParche]
+  );
+
+  /** Reprocesa cuando la persona deja de teclear (año, factor). */
+  const reprocesarLuego = useCallback(
+    (patch: Partial<ConfigReproceso>) => {
+      const cfg = cfgConParche(patch);
+      reprocesoPendiente.current = cfg;
+      if (reprocesoTimer.current) clearTimeout(reprocesoTimer.current);
+      reprocesoTimer.current = setTimeout(() => { ejecutarReproceso(cfg); }, REPROCESO_ESPERA_MS);
+    },
+    [cfgConParche, ejecutarReproceso]
+  );
+
+  /** Al salir del campo (blur) no se espera: lo pendiente corre de una. */
+  const reprocesarAlSalir = useCallback(() => {
+    if (reprocesoPendiente.current) ejecutarReproceso(reprocesoPendiente.current);
+  }, [ejecutarReproceso]);
+
+  useEffect(() => () => { if (reprocesoTimer.current) clearTimeout(reprocesoTimer.current); }, []);
 
   const reset = () => {
     fileRef.current = null;
@@ -209,8 +315,10 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     setWarnings([]);
     setError("");
     setFileName("");
-    setEmpresa("");
-    setPriceEdits({});
+    // La empresa y los precios a mano NO se limpian: la empresa quedó recordada
+    // para la próxima corrida, y los precios (por referencia de artículo) se
+    // conservan por si el artículo vuelve en el archivo siguiente. Para
+    // borrarlos está el botón «Borrarlos todos».
     setSelected(new Set());
     setDescFilter("");
     setMassPrice("");
@@ -304,9 +412,14 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     return precioDescripcion(cifOf(row), excForRow(row), marcaForms[marcaKey(row.cols["Marca *"])] ?? null);
   };
 
+  /** Llave estable de una fila para los precios a mano: la referencia del
+   *  artículo (cols["Código *"] = REFERENCIA del proveedor, una fila por
+   *  referencia en processRows). */
+  const refDe = (row: ProcessedRow): string => String(row.cols["Código *"] ?? "");
+
   // Precio final de una fila: editado a mano si lo hay, si no el calculado.
-  const finalPrice = (i: number, row: ProcessedRow): number | null => {
-    const raw = priceEdits[i];
+  const finalPrice = (row: ProcessedRow): number | null => {
+    const raw = priceEdits[refDe(row)];
     if (raw !== undefined) {
       const t = raw.trim();
       if (t === "") return null;
@@ -316,8 +429,8 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     return autoPrice(row);
   };
 
-  const displayPrice = (i: number, row: ProcessedRow): string => {
-    const raw = priceEdits[i];
+  const displayPrice = (row: ProcessedRow): string => {
+    const raw = priceEdits[refDe(row)];
     if (raw !== undefined) return raw;
     const a = autoPrice(row);
     return a === null ? "" : String(a);
@@ -325,12 +438,12 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 
   // Texto de la columna "Cálculo": divisor (+extra) y margen REAL post-redondeo (A6).
   // Si el precio fue editado a mano, solo el margen (la fórmula ya no aplica).
-  const calcCell = (i: number, row: ProcessedRow): string => {
+  const calcCell = (row: ProcessedRow): string => {
     const cif = cifOf(row);
-    const fp = finalPrice(i, row);
+    const fp = finalPrice(row);
     const m = marginPct(cif, fp);
     const mTxt = m === null ? "" : `${m}%`;
-    if (priceEdits[i] !== undefined) return mTxt ? `· ${mTxt}` : "—"; // editado a mano
+    if (priceEdits[refDe(row)] !== undefined) return mTxt ? `· ${mTxt}` : "—"; // editado a mano
     const exc = excForRow(row);
     if (exc?.precio_fijo) return mTxt ? `fijo · ${mTxt}` : "fijo"; // precio fijo gana
     const f = formulaForRow(row);
@@ -339,11 +452,43 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     return mTxt ? `÷${f.divisor}${ex} · ${mTxt}` : `÷${f.divisor}${ex}`;
   };
 
-  const onPriceEdit = (i: number, value: string) =>
-    setPriceEdits((prev) => ({ ...prev, [i]: value }));
+  const onPriceEdit = (row: ProcessedRow, value: string) =>
+    setPriceEdits((prev) => ({ ...prev, [refDe(row)]: value }));
 
-  const applyGlobal = () =>
+  /** Borra TODOS los precios escritos a mano — un botón, nunca automático. */
+  const borrarPreciosAMano = () => {
+    setPriceEdits({});
+    setEditsConservados(0);
+  };
+
+  // ── Validación del divisor EN LA PANTALLA (4-sep-2026) ────────────────────
+  // El mismo guard de las 4 rutas API (validarDivisor, vía
+  // mensajeDivisorEnPantalla), ahora también donde se teclea. Fuera de rango:
+  // el campo se marca en rojo, se dice el mensaje y se apaga la DESCARGA —
+  // nunca el tecleo, para poder borrar y corregir sin pelear con el campo.
+  const draftDivisorMsg = mensajeDivisorEnPantalla(draftDivisor);
+  const marcasDivisorMsg = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const { key } of marcasPresentes) {
+      const f = marcaForms[key];
+      if (!f) continue;
+      const msg = mensajeDivisorEnPantalla(String(f.divisor));
+      if (msg) out[key] = msg;
+    }
+    return out;
+  }, [marcasPresentes, marcaForms]);
+  // Solo bloquean los divisores que DE VERDAD alimentan el Excel según el modo.
+  const divisorBloqueaDescarga =
+    priceMode === "global"
+      ? draftDivisorMsg !== null || mensajeDivisorEnPantalla(String(applied.divisor)) !== null
+      : Object.keys(marcasDivisorMsg).length > 0;
+
+  const applyGlobal = () => {
+    if (draftDivisorMsg !== null) return; // un divisor fuera de rango no se aplica
     setApplied({ divisor: Number(draftDivisor) || 0, extra: draftExtra, redondeo: draftRedondeo });
+    // Se recuerda la fórmula APLICADA para la próxima corrida.
+    setFormulaGlobalGuardada(JSON.stringify({ divisor: draftDivisor, extra: draftExtra, redondeo: draftRedondeo }));
+  };
 
   const onMarcaFormChange = (key: string, patch: Partial<MarcaFormula>) =>
     setMarcaForms((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
@@ -422,12 +567,16 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
       return n;
     });
 
-  // Aplica un precio a las filas seleccionadas (marca cada una como editada a mano).
+  // Aplica un precio a las filas seleccionadas (marca cada una como editada a
+  // mano, por referencia de artículo).
   const applyMassPrice = () => {
     if (selected.size === 0) return;
     setPriceEdits((prev) => {
       const n = { ...prev };
-      selected.forEach((i) => { n[i] = massPrice; });
+      selected.forEach((i) => {
+        const r = processed?.[i];
+        if (r) n[refDe(r)] = massPrice;
+      });
       return n;
     });
     setSelected(new Set());
@@ -436,14 +585,15 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   const download = async () => {
     if (!processed || downloading || !catalogo) return;
     if (descsNuevas.length > 0) return; // bloqueado: descripciones nuevas sin aprobar (Tarea 2)
+    if (divisorBloqueaDescarga) return; // 🔴 un divisor fuera de rango no baja un Excel 100× mal
     setDownloading(true);
     try {
       const XLSX = (await import("xlsx-js-style")).default;
       // El precio final (calculado o editado) va a la columna "Precio *".
       // Proveedor fijo según la empresa destino (CAMBIO 2); otras empresas dejan el del archivo.
       const provFijo = proveedorParaEmpresa(empresa);
-      const finalRows = processed.map((r, i) => {
-        const cols: Record<string, string | number | null> = { ...r.cols, "Precio *": finalPrice(i, r) };
+      const finalRows = processed.map((r) => {
+        const cols: Record<string, string | number | null> = { ...r.cols, "Precio *": finalPrice(r) };
         if (provFijo) cols["Proveedor *"] = provFijo;
         return { ...r, cols };
       });
@@ -604,7 +754,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         <Field label="Mes de entrada (temporada)" note="Se graba como fecha de ingreso del producto.">
           <select
             value={mesIdx}
-            onChange={(e) => { const v = parseInt(e.target.value); setMesIdx(v); reprocess({ mesIdx: v }); }}
+            onChange={(e) => { const v = parseInt(e.target.value); setMesIdx(v); reprocesarYa({ mesIdx: v }); }}
             className={selectCls}
           >
             {MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}
@@ -612,22 +762,29 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         </Field>
         <Field label="Año">
           <input
-            type="number" min={2020} max={2099} value={anio}
-            onChange={(e) => { setAnio(e.target.value); reprocess({ anio: e.target.value }); }}
+            type="number" min={2020} max={2099} value={anio} aria-label="Año"
+            onChange={(e) => { setAnio(e.target.value); reprocesarLuego({ anio: e.target.value }); }}
+            onBlur={reprocesarAlSalir}
             className={inputCls}
           />
         </Field>
+        {/* Daniel, textual: «solo existen esas dos» — 7% (código «07») y
+            Exento («0»). Ya no es texto libre: «abc» no puede llegar al Excel. */}
         <Field label="Tasa de impuesto">
-          <input
-            type="text" value={tasa}
-            onChange={(e) => { setTasa(e.target.value); reprocess({ tasa: e.target.value }); }}
-            className={inputCls}
-          />
+          <select
+            value={tasa} aria-label="Tasa de impuesto"
+            onChange={(e) => { setTasa(e.target.value); reprocesarYa({ tasa: e.target.value === "0" ? "0" : "07" }); }}
+            className={selectCls}
+          >
+            <option value="07">7%</option>
+            <option value="0">Exento (0%)</option>
+          </select>
         </Field>
         <Field label="Factor costo CIF" note="Costo FOB × este factor = CIF.">
           <input
-            type="number" step="0.01" value={factor}
-            onChange={(e) => { setFactor(e.target.value); reprocess({ factor: e.target.value }); }}
+            type="number" step="0.01" value={factor} aria-label="Factor costo CIF"
+            onChange={(e) => { setFactor(e.target.value); reprocesarLuego({ factor: e.target.value }); }}
+            onBlur={reprocesarAlSalir}
             className={inputCls}
           />
         </Field>
@@ -671,7 +828,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           {/* Barra compacta: empresa destino + acciones (Tarea 3 / A2) */}
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Destino</span>
-            <select value={empresa} onChange={(e) => setEmpresa(e.target.value)} className="min-w-[200px] flex-1 rounded-md border border-stone-300 bg-stone-50 px-2.5 py-1.5 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20">
+            <select value={empresa} aria-label="Empresa destino" onChange={(e) => setEmpresa(e.target.value)} className="min-w-[200px] flex-1 rounded-md border border-stone-300 bg-stone-50 px-2.5 py-1.5 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20">
               <option value="">Selecciona una empresa…</option>
               {EMPRESAS_DESTINO.map((e) => (
                 <option key={e.key} value={e.key}>{e.label} ({e.marca})</option>
@@ -679,7 +836,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             </select>
             <button
               onClick={download}
-              disabled={downloading || descsNuevas.length > 0 || !catalogo}
+              disabled={downloading || descsNuevas.length > 0 || !catalogo || divisorBloqueaDescarga}
               className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
             >
               {downloading ? "Generando…" : "Descargar plantilla"}
@@ -752,6 +909,24 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             </div>
           )}
 
+          {/* Los precios a mano sobrevivieron al re-proceso: se dice, y borrarlos
+              es un botón — nunca automático. Daniel: «y también consérvalos». */}
+          {editsConservados > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-2 px-1 text-[12px] text-stone-500">
+              <span>
+                {editsConservados} precio{editsConservados === 1 ? "" : "s"} escrito{editsConservados === 1 ? "" : "s"} a
+                mano se conserv{editsConservados === 1 ? "ó" : "aron"}.
+              </span>
+              <button
+                type="button"
+                onClick={borrarPreciosAMano}
+                className="font-semibold text-stone-600 underline decoration-stone-300 underline-offset-2 transition hover:text-stone-900"
+              >
+                Borrarlos todos
+              </button>
+            </div>
+          )}
+
           {/* Cálculo de precio (Tarea 2 / A2) */}
           <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
             <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
@@ -778,8 +953,12 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                   <div className="w-36">
                     <label className={priceLabelCls}>Divisor</label>
                     <input
-                      type="number" step="0.01" value={draftDivisor}
-                      onChange={(e) => setDraftDivisor(e.target.value)} className={priceFieldCls}
+                      type="number" step="0.01" value={draftDivisor} aria-label="Divisor"
+                      aria-invalid={draftDivisorMsg !== null}
+                      onChange={(e) => setDraftDivisor(e.target.value)}
+                      className={draftDivisorMsg !== null
+                        ? `${priceFieldCls} border-red-400 bg-red-50 text-red-900 focus:border-red-500 focus:ring-red-500/20`
+                        : priceFieldCls}
                     />
                   </div>
                   <div className="w-28">
@@ -796,12 +975,17 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                     </select>
                   </div>
                   <button
-                    type="button" onClick={applyGlobal}
-                    className="h-9 rounded-md bg-teal-600 px-5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]"
+                    type="button" onClick={applyGlobal} disabled={draftDivisorMsg !== null}
+                    className="h-9 rounded-md bg-teal-600 px-5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
                   >
                     Aplicar a todo
                   </button>
                 </div>
+                {/* Fuera de rango: se dice y se apaga la descarga — el tecleo no
+                    se traba, para borrar y corregir sin pelear con el campo. */}
+                {draftDivisorMsg !== null && (
+                  <p className="mt-1.5 text-[12px] font-semibold text-red-700">{draftDivisorMsg}</p>
+                )}
                 {/* Atajos de divisor, alineados a la izquierda bajo el campo Divisor */}
                 <div className="mt-2 flex gap-1.5">
                   {DIVISOR_HINTS.map((h) => (
@@ -836,6 +1020,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                       {marcasPresentes.map(({ key, label }) => {
                         const f = marcaForms[key] ?? { ...BLANK_FORMULA, marca: label };
                         const saved = savedByNorm.has(key);
+                        const divisorMsg = marcasDivisorMsg[key] ?? null;
                         return (
                           <tr key={key}>
                             <td className="border-b border-stone-100 px-2.5 py-2 font-semibold text-stone-900">{label}</td>
@@ -844,12 +1029,19 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                                 ? <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Guardada</span>
                                 : <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Sin guardar</span>}
                             </td>
-                            <td className="border-b border-stone-100 px-2.5 py-2">
+                            <td className="border-b border-stone-100 px-2.5 py-2 align-top">
                               <input
                                 type="number" step="0.01" value={f.divisor || ""}
+                                aria-label={`Divisor ${label}`}
+                                aria-invalid={divisorMsg !== null}
                                 onChange={(e) => onMarcaFormChange(key, { divisor: Number(e.target.value) || 0 })}
-                                className={miniInputCls}
+                                className={divisorMsg !== null
+                                  ? `${miniInputCls} border-red-400 bg-red-50 text-red-900 focus:border-red-500 focus:ring-red-500/20`
+                                  : miniInputCls}
                               />
+                              {divisorMsg !== null && (
+                                <div className="mt-1 max-w-[220px] text-[11px] font-semibold text-red-700">{divisorMsg}</div>
+                              )}
                             </td>
                             <td className="border-b border-stone-100 px-2.5 py-2">
                               <select value={f.extra} onChange={(e) => onMarcaFormChange(key, { extra: parseInt(e.target.value) })} className={miniSelectCls}>
@@ -864,7 +1056,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                             </td>
                             <td className="border-b border-stone-100 px-2.5 py-2">
                               <button
-                                type="button" onClick={() => saveMarca(key)} disabled={savingMarca === key}
+                                type="button" onClick={() => saveMarca(key)} disabled={savingMarca === key || divisorMsg !== null}
                                 className="text-[12px] font-semibold text-teal-700 transition hover:text-teal-900 disabled:opacity-50"
                               >
                                 {savingMarca === key ? "Guardando…" : saved ? "Guardar cambios" : "Guardar fórmula"}
@@ -988,17 +1180,18 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                           if (c === "__calc") {
                             return (
                               <td key="__calc" className="w-px whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right font-mono text-[11px] text-stone-400">
-                                {calcCell(ri, d)}
+                                {calcCell(d)}
                               </td>
                             );
                           }
                           if (c === "Precio *") {
-                            const priceEdited = priceEdits[ri] !== undefined;
+                            const priceEdited = priceEdits[refDe(d)] !== undefined;
                             return (
                               <td key={c} className="border-b border-stone-100 px-2 py-2 text-right">
                                 <input
-                                  value={displayPrice(ri, d)}
-                                  onChange={(e) => onPriceEdit(ri, e.target.value)}
+                                  value={displayPrice(d)}
+                                  aria-label={`Precio ${refDe(d)}`}
+                                  onChange={(e) => onPriceEdit(d, e.target.value)}
                                   className={`w-14 rounded-md border px-1 py-0.5 text-right font-mono text-xs ${
                                     priceEdited
                                       ? "border-amber-600 bg-amber-50 font-semibold text-amber-800"
