@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
+import { abrirPeriodo } from "@/lib/caja/abrir-periodo";
 
 const CAJA_ROLES = ["admin", "secretaria"];
 
@@ -15,8 +16,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const includeDeleted = req.nextUrl.searchParams.get("include_deleted") === "1";
 
   const { data, error } = await supabaseServer
-    .from("caja_periodos").select("*, caja_gastos(*)").eq("id", params.id).single();
+    .from("caja_periodos").select("*, caja_gastos(*)").eq("id", params.id).maybeSingle();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  // Un período eliminado no se consulta por id: mismo 404 que uno inexistente.
+  if (!data || data.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 404 });
 
   if (data?.caja_gastos) {
     type RawGasto = {
@@ -72,7 +75,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ ok: true });
   }
 
-  // Default action: close the period. Block if saldo != 0 (tolerance 0.005).
+  // Default action: close the period WITH the saldo it has. El cierre real es
+  // «queda poca plata» (criterio de la secretaria) y la reposición devuelve el
+  // fondo a $200 — exigir saldo 0 aquí producía gastos de centavos inventados
+  // para cuadrar (medido: $0.05 el 22-jul y $0.87 el 1-sep, creados y borrados
+  // el día del cierre). Un saldo negativo tampoco bloquea: es un hecho.
   const { data: periodo } = await supabaseServer
     .from("caja_periodos")
     .select("fondo_inicial, estado, deleted")
@@ -90,18 +97,38 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const fondo = Number(periodo.fondo_inicial) || 0;
   const saldo = Math.round((fondo - totalGastos) * 100) / 100;
 
-  if (Math.abs(saldo) > 0.005) {
-    const saldoStr = saldo >= 0 ? `$${saldo.toFixed(2)}` : `-$${Math.abs(saldo).toFixed(2)}`;
-    return NextResponse.json({
-      error: `No se puede cerrar con saldo ${saldoStr}. Reabastece o ajusta los gastos.`,
-    }, { status: 400 });
-  }
-
   const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await supabaseServer.from("caja_periodos").update({ estado: "cerrado", fecha_cierre: today }).eq("id", params.id).select().single();
+  // `saldo_cierre` congela la foto del cierre (DDL 20260920120000). Mientras
+  // esa migración no corra, la columna no existe: se cierra igual, sin la foto.
+  let { data, error } = await supabaseServer
+    .from("caja_periodos")
+    .update({ estado: "cerrado", fecha_cierre: today, saldo_cierre: saldo })
+    .eq("id", params.id)
+    .select()
+    .single();
+  if (error) {
+    ({ data, error } = await supabaseServer
+      .from("caja_periodos")
+      .update({ estado: "cerrado", fecha_cierre: today })
+      .eq("id", params.id)
+      .select()
+      .single());
+  }
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  await logActivity(session?.role || "unknown", "caja_periodo_close", "caja", { periodoId: params.id, fecha_cierre: today }, session?.userName);
-  return NextResponse.json(data);
+
+  // «Cerrar y abrir el N»: el fondo sigue vivo, así que el período siguiente
+  // abre de una, con el mismo fondo (hoy siempre $200). Mismo camino que el
+  // botón «+ Nuevo período».
+  const siguiente = await abrirPeriodo(fondo, auth.userId ?? null);
+
+  await logActivity(session?.role || "unknown", "caja_periodo_close", "caja", {
+    periodoId: params.id,
+    fecha_cierre: today,
+    saldo_cierre: saldo,
+    siguiente_id: siguiente?.id ?? null,
+    siguiente_numero: siguiente?.numero ?? null,
+  }, session?.userName);
+  return NextResponse.json({ ...data, saldo_cierre: saldo, siguiente });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

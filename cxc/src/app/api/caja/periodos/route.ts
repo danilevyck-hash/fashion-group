@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { abrirPeriodo } from "@/lib/caja/abrir-periodo";
 
 const CAJA_ROLES = ["admin", "secretaria"];
 
@@ -40,22 +41,7 @@ export async function POST(req: NextRequest) {
     }
   } catch { /* empty body = default fondo */ }
 
-  const { data: last } = await supabaseServer
-    .from("caja_periodos")
-    .select("numero")
-    .order("numero", { ascending: false })
-    .limit(1)
-    .single();
-
-  const numero = (last?.numero || 0) + 1;
-  const today = new Date().toISOString().slice(0, 10);
-
-  const { data, error } = await supabaseServer
-    .from("caja_periodos")
-    .insert({ numero, fecha_apertura: today, fondo_inicial: fondo, estado: "abierto", created_by: auth.userId })
-    .select()
-    .single();
-
-  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
+  const data = await abrirPeriodo(fondo, auth.userId);
+  if (!data) return NextResponse.json({ error: "Error interno" }, { status: 500 });
   return NextResponse.json(data);
 }

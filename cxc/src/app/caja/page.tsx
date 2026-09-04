@@ -7,6 +7,7 @@ import { Modal, ConfirmModal } from "@/components/ui";
 
 import { useCajaState } from "./hooks/useCajaState";
 import PeriodoList from "./components/PeriodoList";
+import CerrarPeriodoModal from "./components/CerrarPeriodoModal";
 import "./skin.css";
 
 export default function CajaPage() {
@@ -29,6 +30,14 @@ export default function CajaPage() {
   if (!authChecked) return null;
 
   const hasOpenPeriod = periodos.some((p) => p.estado === "abierto");
+
+  // Datos del período que se está por cerrar (para las cuatro líneas del
+  // modal). La lista viene ordenada por numero DESC → el siguiente es el
+  // primero + 1.
+  const periodoACerrar = periodos.find((p) => p.id === confirmClosePeriodo) || null;
+  const siguienteNumero = (periodos[0]?.numero || 0) + 1;
+  const recibosACerrar = (periodoACerrar?.caja_gastos || [])
+    .filter((g) => !(g as { deleted?: boolean }).deleted).length;
 
   async function handleConfirmCreate() {
     const newId = await confirmCreatePeriodo();
@@ -88,15 +97,17 @@ export default function CajaPage() {
         </div>
       </Modal>
 
-      <ConfirmModal
-        open={!!confirmClosePeriodo}
-        onClose={() => setConfirmClosePeriodo(null)}
-        onConfirm={doClosePeriodo}
-        title="Cerrar período"
-        message="¿Cerrar este período? No podrá agregar más gastos."
-        confirmLabel="Cerrar período"
-        destructive
-      />
+      {periodoACerrar && (
+        <CerrarPeriodoModal
+          open={!!confirmClosePeriodo}
+          onClose={() => setConfirmClosePeriodo(null)}
+          onConfirm={doClosePeriodo}
+          fondo={Number(periodoACerrar.fondo_inicial) || 0}
+          gastado={Number(periodoACerrar.total_gastado) || 0}
+          recibos={recibosACerrar}
+          siguienteNumero={siguienteNumero}
+        />
+      )}
       <ConfirmModal
         open={!!confirmDeletePeriodoId}
         onClose={() => setConfirmDeletePeriodoId(null)}

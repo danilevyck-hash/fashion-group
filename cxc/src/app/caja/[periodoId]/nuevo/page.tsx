@@ -1,5 +1,12 @@
 "use client";
 
+// ⚠️ RUTA HUÉRFANA (auditoría 4-sep-2026): nada en la UI enlaza a
+// /caja/[periodoId]/nuevo — el alta real es NuevoGastoDrawer desde el detalle.
+// Se escribió como destino de deep-links con prefill (?descripcion=&total=&
+// categoria=), pero hoy nadie genera esos links, no tiene smart defaults y al
+// guardar navega a /caja?view=detail&id=… (URL legacy que cae en la lista).
+// Se conserva a propósito (decisión del brief del 4-sep: anotar, no borrar).
+
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -127,7 +134,7 @@ function NuevoGastoPage() {
 
     setAddingGasto(true);
     setError(null);
-    const resolvedCategoria = normalizeStr(gCategoria) || "Otros";
+    const resolvedCategoria = normalizeStr(gCategoria) || "Varios";
 
     try {
       const res = await fetch("/api/caja/gastos", {

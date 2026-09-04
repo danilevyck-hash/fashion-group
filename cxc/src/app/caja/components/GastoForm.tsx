@@ -364,6 +364,13 @@ export default function GastoForm({
   // las keywords del concepto. Tras un cambio manual, dejamos de sugerir.
   const [categoriaTouched, setCategoriaTouched] = useState(false);
 
+  // El ITBMS arranca plegado: solo 9 de 77 gastos vivos lo tienen (medido
+  // 4-sep-2026) y sus tres campos ocupaban un tercio del formulario. Abre
+  // desplegado si el gasto que llega YA trae un porcentaje. La cuenta no
+  // cambia: plegado, itbms = 0 igual que hoy.
+  const [itbmsPedido, setItbmsPedido] = useState(false);
+  const itbmsAbierto = itbmsPedido || parseFloat(gItbmsPct) > 0;
+
   function handleDescripcionChange(v: string) {
     setGDescripcion(v);
     if (!categoriaTouched) {
@@ -594,7 +601,7 @@ export default function GastoForm({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
+            gridTemplateColumns: itbmsAbierto ? "1fr 1fr 1fr" : "1fr 1fr",
             gap: 16,
           }}
           className="caja-grid-montos"
@@ -628,53 +635,80 @@ export default function GastoForm({
             )}
           </div>
 
-          {/* ITBMS */}
-          <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--caja-fg-default)",
-                marginBottom: 6,
-              }}
-            >
-              ITBMS
-            </label>
-            <SelectInput value={gItbmsPct} onChange={setGItbmsPct}>
-              <option value="0">0%</option>
-              <option value="7">7%</option>
-            </SelectInput>
-            <div
-              className="text-xs mt-1.5 leading-snug"
-              style={{ color: "var(--caja-fg-muted)" }}
-            >
-              Calculado al {gItbmsPct}% del subtotal:{" "}
-              <span className="caja-mono">${itbmsAmount.toFixed(2)}</span>
-            </div>
-          </div>
+          {itbmsAbierto ? (
+            <>
+              {/* ITBMS */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "var(--caja-fg-default)",
+                    marginBottom: 6,
+                  }}
+                >
+                  ITBMS
+                </label>
+                <SelectInput value={gItbmsPct} onChange={setGItbmsPct}>
+                  <option value="0">0%</option>
+                  <option value="7">7%</option>
+                </SelectInput>
+                <div
+                  className="text-xs mt-1.5 leading-snug"
+                  style={{ color: "var(--caja-fg-muted)" }}
+                >
+                  Calculado al {gItbmsPct}% del subtotal:{" "}
+                  <span className="caja-mono">${itbmsAmount.toFixed(2)}</span>
+                </div>
+              </div>
 
-          {/* Total */}
-          <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--caja-fg-default)",
-                marginBottom: 6,
-              }}
-            >
-              Total
-            </label>
-            <MoneyInputFlat
-              value={totalNum > 0 ? totalNum.toFixed(2) : ""}
-              placeholder="0.00"
-              readOnly
-              highlight
-              ariaLabel="Total"
-            />
-          </div>
+              {/* Total */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "var(--caja-fg-default)",
+                    marginBottom: 6,
+                  }}
+                >
+                  Total
+                </label>
+                <MoneyInputFlat
+                  value={totalNum > 0 ? totalNum.toFixed(2) : ""}
+                  placeholder="0.00"
+                  readOnly
+                  highlight
+                  ariaLabel="Total"
+                />
+              </div>
+            </>
+          ) : (
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setItbmsPedido(true)}
+                className="inline-flex min-h-[44px] items-center gap-1 text-xs px-2 rounded transition-colors"
+                style={{
+                  color: "var(--caja-fg-muted)",
+                  border: "1px solid var(--caja-border-subtle)",
+                  background: "#fff",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "var(--caja-fg-strong)";
+                  e.currentTarget.style.borderColor = "var(--caja-border-default)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "var(--caja-fg-muted)";
+                  e.currentTarget.style.borderColor = "var(--caja-border-subtle)";
+                }}
+              >
+                ＋ Agregar ITBMS
+              </button>
+            </div>
+          )}
         </div>
       </Section>
 

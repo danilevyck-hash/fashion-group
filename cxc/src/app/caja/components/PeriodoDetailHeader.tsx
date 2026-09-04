@@ -18,9 +18,6 @@ interface Props {
   deletedCount?: number;
   /** When provided and deletedCount > 0, the menu entry appears. */
   onViewDeleted?: () => void;
-  /** Si la SuggestionCard de "cerrar período" está visible, ocultamos el texto
-   *  pasivo "N días abierto" para no duplicar el dato. Si se descarta, reaparece. */
-  suggestionVisible?: boolean;
 }
 
 function fmtRepuestoDate(iso: string | null): string {
@@ -165,7 +162,6 @@ export default function PeriodoDetailHeader({
   onAprobarReposicion,
   deletedCount,
   onViewDeleted,
-  suggestionVisible,
 }: Props) {
   const isOpen = current.estado === "abierto";
   const fondoInicial = current.fondo_inicial;
@@ -243,7 +239,7 @@ export default function PeriodoDetailHeader({
                 Responsable: <span style={{ color: "var(--caja-fg-default)", fontWeight: 500 }}>{responsableLabel}</span>
               </span>
             )}
-            {isOpen && daysSinceOpen > 30 && !suggestionVisible && (
+            {isOpen && daysSinceOpen > 30 && (
               <span
                 className="text-xs"
                 style={{

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -12,8 +12,7 @@ import PeriodoDetailHeader from "../components/PeriodoDetailHeader";
 import GastoTable from "../components/GastoTable";
 import DeletedGastosModal from "../components/DeletedGastosModal";
 import NuevoGastoDrawer from "../components/NuevoGastoDrawer";
-import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
-import SuggestionCard from "@/components/SuggestionCard";
+import CerrarPeriodoModal from "../components/CerrarPeriodoModal";
 import { useEscapeClose, useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 import { useState, useCallback } from "react";
 import "../skin.css";
@@ -57,48 +56,17 @@ export default function PeriodoDetailPage() {
     aprobarReposicion,
     requestDeleteGasto, saveEditGasto, quickUpdateCategoria, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
-    pendingRestoreGasto, requestRestoreGasto, doRestoreGasto, cancelRestoreGasto,
+    doRestoreGasto,
   } = useCajaState({ authReady: authChecked, onPeriodoDeleted: () => router.push("/caja") });
 
   useEffect(() => {
     if (authChecked && periodoId) loadDetail(periodoId);
   }, [authChecked, periodoId, loadDetail]);
 
-  const cajaSuggestions = useMemo<SmartSuggestion[]>(() => {
-    if (!current || current.estado !== "abierto") return [];
-    const apertura = new Date(current.fecha_apertura).getTime();
-    const now = Date.now();
-    const daysSinceOpen = Math.floor((now - apertura) / (24 * 60 * 60 * 1000));
-    if (daysSinceOpen <= 30) return [];
-    return [{
-      id: `caja-close-${current.id}`,
-      message: `Este período lleva ${daysSinceOpen} días abierto. ¿Cerrarlo y crear uno nuevo?`,
-      actionLabel: "Cerrar período",
-      onAction: () => requestClosePeriodo(current.id),
-    }];
-  }, [current, requestClosePeriodo]);
-
-  const { suggestion: cajaSuggestion, dismiss: dismissCaja } = useSmartSuggestions(cajaSuggestions);
-
   // Confirmaciones artesanales de gasto: Escape y clic fuera = Cancelar (nunca
   // confirman). Los hooks van antes de cualquier return condicional.
   useEscapeClose(!!pendingDeleteGasto, cancelDeleteGasto);
   const deleteBackdrop = useBackdropDismiss(pendingDeleteGasto ? cancelDeleteGasto : undefined);
-  const restoreBackdrop = useBackdropDismiss(pendingRestoreGasto ? cancelRestoreGasto : undefined);
-  // La confirmación de restaurar se abre ENCIMA de "Gastos eliminados", que
-  // escucha Escape en `window` (fase de burbuja). Para que Escape cierre solo la
-  // confirmación y deje abierta la lista, escuchamos en `document` en fase de
-  // CAPTURA y cortamos la propagación antes de que llegue a ese listener.
-  useEffect(() => {
-    if (!pendingRestoreGasto) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      cancelRestoreGasto();
-    };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [pendingRestoreGasto, cancelRestoreGasto]);
 
   if (!authChecked) return null;
 
@@ -139,12 +107,9 @@ export default function PeriodoDetailPage() {
           onAprobarReposicion={aprobarReposicion}
           deletedCount={(current.deleted_gastos || []).length}
           onViewDeleted={() => setShowDeletedModal(true)}
-          suggestionVisible={!!cajaSuggestion}
         />
 
         <div className="max-w-6xl mx-auto px-5 sm:px-9 pt-6 pb-14">
-          {cajaSuggestion && <SuggestionCard suggestion={cajaSuggestion} onDismiss={dismissCaja} />}
-
           {error && (
             <p
               className="text-sm mb-4 px-3 py-2 rounded-md"
@@ -194,17 +159,17 @@ export default function PeriodoDetailPage() {
         onClose={() => setShowDeletedModal(false)}
         deletedGastos={current.deleted_gastos || []}
         periodOpen={!!detailIsOpen}
-        onRestore={requestRestoreGasto}
+        onRestore={doRestoreGasto}
       />
 
-      <ConfirmModal
+      <CerrarPeriodoModal
         open={!!confirmClosePeriodo}
         onClose={() => setConfirmClosePeriodo(null)}
         onConfirm={doClosePeriodo}
-        title="Cerrar período"
-        message="¿Cerrar este período? No podrá agregar más gastos."
-        confirmLabel="Cerrar período"
-        destructive
+        fondo={detailFondoInicial}
+        gastado={detailTotalGastado}
+        recibos={detailGastos.length}
+        siguienteNumero={current.numero + 1}
       />
       <ConfirmModal
         open={!!confirmDeletePeriodoId}
@@ -236,31 +201,6 @@ export default function PeriodoDetailPage() {
               </button>
               <button
                 onClick={cancelDeleteGasto}
-                className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {pendingRestoreGasto && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" {...restoreBackdrop}>
-          {/* Ver nota del modal de eliminar: el fondo se encarga del cierre. */}
-          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
-            <h3 className="text-base font-medium mb-3">¿Restaurar este gasto?</h3>
-            <p className="text-sm text-gray-800 mb-6">
-              Gasto &ldquo;{pendingRestoreGasto.descripcion?.trim() || "Sin descripción"}&rdquo; · ${fmt(pendingRestoreGasto.total)} · {pendingRestoreGasto.categoria || "Sin categoría"} · {pendingRestoreGasto.responsable || "Sin responsable"} · {fmtDate(pendingRestoreGasto.fecha)}
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={doRestoreGasto}
-                className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-black text-white hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px]"
-              >
-                Sí, restaurar
-              </button>
-              <button
-                onClick={cancelRestoreGasto}
                 className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
               >
                 Cancelar

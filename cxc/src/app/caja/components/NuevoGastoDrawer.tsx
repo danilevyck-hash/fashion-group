@@ -27,9 +27,9 @@ interface Props {
 
 /**
  * Alta de gasto INLINE en un Drawer (reusa GastoForm). Carga su propio catálogo
- * de categorías/responsables al abrir. La ruta /caja/[id]/nuevo sigue viva para
- * deep-links (smart-suggestions con prefill); este Drawer es el camino normal
- * desde el detalle, sin navegación de página.
+ * de categorías/responsables al abrir. Este Drawer es el ÚNICO camino de alta
+ * desde la UI: la ruta /caja/[id]/nuevo quedó huérfana (nada enlaza a ella;
+ * ver la nota en su cabecera).
  */
 export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado, isOwner, onSaved }: Props) {
   const [categorias, setCategorias] = useState<string[]>([]);
@@ -88,15 +88,15 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
   }, [open]);
 
   function resetForm() {
-    setGFecha(new Date().toISOString().slice(0, 10));
     setGDescripcion("");
     setGProveedor("");
     setGNroFactura("");
     setGSubtotal("");
     setGItbmsPct("0");
-    // Categoría y responsable NO se resetean: "Guardar y nuevo" retiene lo
-    // recién usado (el caso real es cargar varios comprobantes seguidos del
-    // mismo responsable).
+    // Fecha, categoría y responsable NO se resetean: "Guardar y nuevo" retiene
+    // lo recién usado. El caso real es la tanda: la secretaria teclea ~38
+    // recibos de semanas atrás en una sentada, y devolver la fecha a hoy la
+    // obligaba a corregirla en cada gasto.
   }
 
   async function save(opts: { andNew: boolean; skipNegativeCheck?: boolean }) {
@@ -110,7 +110,9 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
 
     setAddingGasto(true);
     setError(null);
-    const resolvedCategoria = normalizeStr(gCategoria) || "Otros";
+    // Mismo respaldo que el servidor ("Varios"): antes aquí decía "Otros" y la
+    // misma falta de categoría producía dos valores basura distintos.
+    const resolvedCategoria = normalizeStr(gCategoria) || "Varios";
     try {
       const res = await fetch("/api/caja/gastos", {
         method: "POST",

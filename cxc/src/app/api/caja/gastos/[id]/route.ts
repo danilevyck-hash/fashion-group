@@ -4,7 +4,10 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 
-const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "responsable", "responsable_id", "metodo_pago", "numero_factura"];
+// Solo columnas REALES de caja_gastos. Aquí estuvieron "metodo_pago" y
+// "numero_factura", que no existen (la real es nro_factura): si un cliente las
+// mandaba, el update reventaba con 500.
+const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "responsable", "responsable_id", "nro_factura"];
 
 function normalizeStr(s: string): string {
   const t = s.trim();

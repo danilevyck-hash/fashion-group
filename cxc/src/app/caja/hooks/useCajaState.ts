@@ -44,7 +44,6 @@ export function useCajaState(opts?: UseCajaOptions) {
   const { mutate: globalMutate } = useSWRConfig();
 
   const [pendingDeleteGasto, setPendingDeleteGasto] = useState<CajaGasto | null>(null);
-  const [pendingRestoreGasto, setPendingRestoreGasto] = useState<CajaGasto | null>(null);
 
   // Errores de MUTACIÓN (escritura). Los errores de LECTURA salen de SWR y se
   // combinan abajo en `error`.
@@ -233,19 +232,12 @@ export function useCajaState(opts?: UseCajaOptions) {
     }
   }
 
-  function requestRestoreGasto(gasto: CajaGasto) {
-    setPendingRestoreGasto(gasto);
-  }
-
-  function cancelRestoreGasto() {
-    setPendingRestoreGasto(null);
-  }
-
-  async function doRestoreGasto() {
-    if (!current || !pendingRestoreGasto) return;
-    const gastoId = pendingRestoreGasto.id;
+  // Restaurar va directo, sin confirmación: no tiene consecuencia que proteger
+  // (deshace un borrado, y el borrado sí se confirma).
+  async function doRestoreGasto(gasto: CajaGasto) {
+    if (!current) return;
+    const gastoId = gasto.id;
     const periodoId = current.id;
-    setPendingRestoreGasto(null);
     try {
       const res = await fetch(`/api/caja/gastos/${gastoId}`, {
         method: "PATCH",
@@ -349,6 +341,6 @@ export function useCajaState(opts?: UseCajaOptions) {
     aprobarReposicion,
     requestDeleteGasto, saveEditGasto, quickUpdateCategoria, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
-    pendingRestoreGasto, requestRestoreGasto, doRestoreGasto, cancelRestoreGasto,
+    doRestoreGasto,
   };
 }
