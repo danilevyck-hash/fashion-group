@@ -234,6 +234,16 @@
 >
 > **Pestaña nueva: Multifashion › Metas** (6ª). El módulo pasa de 5 a 6 sub-tabs.
 >
+> ### 🎯 La meta también va en el Telegram de las 8pm (3-sep-2026)
+>
+> Daniel, textual: *«el mensaje de telegram igual que hoy en día solo que diciéndome si están qué porcentaje arriba o abajo para la meta, pero tienes que calcular bien cómo hacerlo para hacerlo accurate»* y, al confirmar la cuenta: *«es calcular 23% arriba del mismo día año anterior sumando todos los días pasados?»* → sí.
+>
+> Al resumen diario de ACS (`acs-resumen-diario`, canal NEGOCIO PRIVADO, los DOS lugares: el cron de la 01:00 y la recuperación de `switch-reconciliacion`) se le agrega **UNA línea al final** y nada más cambia: `🎯 Meta  ▲ +13% arriba del ritmo` / `🎯 Meta  ▼ -4% abajo del ritmo`, con su separador, dentro del mismo `<pre>`. **La cuenta** (`src/lib/multifashion/meta-ritmo.ts`, puro): `factor = objetivo ÷ venta del rango COMPLETO un año antes` (420.000 ÷ 340.698,55 = **1,2328**); `ritmo = venta del año pasado desde desde−1a hasta corte−1a × factor` (`unAnioAntes`, 29-feb → 28-feb); `% = vendido ÷ ritmo − 1`, con la misma flecha y redondeo de las filas Día/Mes/Año (`fmtVariacion`, **0 decimales** como el mockup que aprobó Daniel — la línea no está en la rejilla de columnas, no hay nada que alinear). Como el año pasado ya trae adentro que diciembre pesa el 58,8 %, este ritmo NO es la regla de tres por días que la pantalla rechaza: es la misma idea de temporada, día a día.
+>
+> **De dónde sale cada número** (`meta-ritmo-lectura.ts`): la meta es la fila ACTIVA de `multifashion_metas`, `tipo = 'grupal'`, no borrada, cuyo rango cubre el **`corte`** del resumen (el mismo que Mes/Año: si el día no sincronizó, ayer); con varias, la de `created_at` más reciente. El «vendido» sale de `leerVentasDelPeriodo` + `totalDe` —la MISMA lectura de la pestaña Metas (`multifashion_meta_ventas_v1`, con caída a la paginada)—, así que el Telegram y la pantalla no pueden decir dos «vendido» distintos. **Cuándo no sale la línea:** sin meta que cubra el día (en enero desaparece sola), sin venta del año pasado en el rango completo, ritmo bajo la base comparable ($100, `variacionPct`), o si la lectura falla — **falla abierto**, se loguea y el resumen sale igual.
+>
+> **Medido contra producción el 3-sep-2026** (`scripts/_medir-meta-ritmo-telegram.ts`, solo lectura, con la RPC real): vendido 1..3-sep **$4.599,07** · sep–dic 2025 **$340.698,55** · 1..3-sep-2025 **$3.294,33** → ritmo **$4.061,12** → **+13,25 % → «▲ +13% arriba del ritmo»**, exactamente el número del mockup. Candado `src/__tests__/lib/acs-resumen-meta-ritmo.test.ts` (33 casos: cuenta pura, mensaje completo con y sin meta y con ⏳, lectura con base simulada); **22 mutaciones, 22 cazadas** (`scripts/_mutar-candados-meta-ritmo-telegram.sh`). Los candados de siempre (`acs-resumen-diario`, `acs-resumen-canal-privado`, `multifashion-venta-hoy`) siguen verdes: la línea no cambia el prefijo ni el canal.
+>
 > ### 🔴 QUÉ ES "VENTA" PARA UNA META — la misma definición de siempre, sin una segunda
 >
 > `_multifashion_sf_vw` (american_classic), **`is_wholesale = false`**, y la suma del subtotal **FIRMADO** — con el descuento ya aplicado y las **notas de crédito RESTANDO**. Es exactamente lo que ya usaban `leerRetailRango` y el Resumen; no se escribió una segunda cuenta.

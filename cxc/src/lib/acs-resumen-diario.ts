@@ -47,6 +47,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { variacionPct } from "@/lib/variacion";
 import { sumRetail } from "@/lib/multifashion/retail-dia";
+import { leerRitmoMeta } from "@/lib/multifashion/meta-ritmo-lectura";
+import type { RitmoMeta } from "@/lib/multifashion/meta-ritmo";
 
 export { hoyPanama };
 
@@ -61,6 +63,11 @@ export interface AcsResumenDiario {
   mesPrev: number;        // acumulado 1..corte del año anterior (mismo D)
   anio: number;           // YTD: acumulado 1-ene..corte
   anioPrev: number;       // YTD del año anterior: 1-ene..cortePrev (calendario)
+  /** La línea «🎯 Meta» (3-sep-2026): arriba/abajo del ritmo de la meta grupal
+   *  vigente de Multifashion al mismo `corte`. `null`/ausente = sin meta que
+   *  cubra el día, sin comparable, o la lectura falló → la línea no sale.
+   *  Cuenta en `@/lib/multifashion/meta-ritmo`, lectura en `meta-ritmo-lectura`. */
+  meta?: RitmoMeta | null;
 }
 
 export function addDays(fecha: string, days: number): string {
@@ -139,13 +146,16 @@ export async function calcularResumenDiario(
   const corte = syncFresco ? fecha : addDays(fecha, -1);
   const v = ventanasResumen(corte);
 
-  const [hoy, hoyPrev, mes, mesPrev, anio, anioPrev] = await Promise.all([
+  const [hoy, hoyPrev, mes, mesPrev, anio, anioPrev, meta] = await Promise.all([
     syncFresco ? sumRetail(corte, corte) : Promise.resolve(0),
     syncFresco ? sumRetail(v.fechaComparable, v.fechaComparable) : Promise.resolve(0),
     sumRetail(v.inicioMes, corte),
     sumRetail(v.inicioMesPrev, v.cortePrev),
     sumRetail(v.inicioAnio, corte),
     sumRetail(v.inicioAnioPrev, v.cortePrev),
+    // Falla abierto adentro (devuelve null y loguea): el resumen nunca se cae
+    // por la meta. Mismo `corte` que Mes/Año, a propósito.
+    leerRitmoMeta(corte),
   ]);
 
   return {
@@ -153,6 +163,7 @@ export async function calcularResumenDiario(
     hoy, hoyPrev, fechaComparable: v.fechaComparable,
     mes, mesPrev,
     anio, anioPrev,
+    meta,
   };
 }
 
@@ -185,6 +196,13 @@ export async function calcularResumenDiario(
 //   Sin base comparable del año pasado (menos de $100): esa fila muestra
 //   "s/d año pasado" en vez de la flecha y NO aparece en el bloque de abajo.
 //   Si ninguna métrica tiene comparable, el bloque "Año pasado" se omite entero.
+//
+//   Con una meta grupal de Multifashion vigente (3-sep-2026, mockup aprobado
+//   por Daniel), UNA línea más al final y nada más cambia:
+//   ━━━━━━━━━━━━━━━━━━
+//   🎯 Meta  ▲ +13% arriba del ritmo        (o "▼ -4% abajo del ritmo")
+//   Sin meta que cubra el día, o sin comparable, la línea y su separador no
+//   salen. Ver fmtLineaMeta y src/lib/multifashion/meta-ritmo.ts.
 
 export function fmtMonto(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
@@ -215,6 +233,25 @@ export function fmtVariacion(cur: number, prev: number, decimales: number): stri
   const redondeado = Number(txt);
   if (redondeado === 0) return `= ${(0).toFixed(decimales)}%`; // cubre "-0" y "0.0"
   return `${redondeado > 0 ? `▲ +${txt}` : `▼ ${txt}`}%`;
+}
+
+/** Decimales de la línea de la meta: 0, como en el mockup que aprobó Daniel
+ *  ("▲ +13%"). No está en la rejilla de columnas, así que no hay nada que
+ *  alinear; y un decimal en un acumulado de temporada sería precisión de más. */
+export const DECIMALES_META = 0;
+
+/** "🎯 Meta  ▲ +13% arriba del ritmo" / "🎯 Meta  ▼ -4% abajo del ritmo" /
+ *  "🎯 Meta  = 0% en el ritmo". La flecha y el redondeo son los de
+ *  `fmtVariacion`, los mismos de las filas Día/Mes/Año: `ritmoMeta` ya
+ *  garantizó base comparable, así que acá nunca llega un "s/d". */
+export function fmtLineaMeta(m: RitmoMeta): string {
+  const variacion = fmtVariacion(m.vendido, m.ritmo, DECIMALES_META);
+  const sufijo = variacion.startsWith("▲")
+    ? "arriba del ritmo"
+    : variacion.startsWith("▼")
+      ? "abajo del ritmo"
+      : "en el ritmo";
+  return `🎯 Meta  ${variacion} ${sufijo}`;
 }
 
 /** "viernes 25 jul 2025" — el día comparable del año pasado (−364d). Lleva su
@@ -310,6 +347,8 @@ export function buildMensaje(r: AcsResumenDiario, prefijo = ""): string {
   lineas.push(...actual.map(fila));
   // Sin ninguna métrica comparable el bloque de abajo sobra, y con él su cierre.
   if (pasado.length > 0) lineas.push(SEPARADOR, "Año pasado", ...pasado.map(fila));
+  // La meta va AL FINAL, con su propio separador, y solo si hay algo que decir.
+  if (r.meta) lineas.push(SEPARADOR, fmtLineaMeta(r.meta));
   return lineas.join("\n");
 }
 
