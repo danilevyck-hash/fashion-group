@@ -13,6 +13,7 @@ import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { calcularSaldoPrestamo } from "@/lib/prestamos-saldo";
+import AplicarQuincenaModal from "./components/AplicarQuincenaModal";
 
 // ── Types ──
 interface Movimiento {
@@ -177,7 +178,19 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
     c => c.saldo > 0 && !hasDeduccionEnQuincena(c.emp.prestamos_movimientos || [], quincena.start, quincena.end),
   );
   const quincenaPendientesN = quincenaElegibles.length;
-  const quincenaTotalEstimado = quincenaElegibles.reduce((s, c) => s + Math.min(c.emp.deduccion_quincenal, c.saldo), 0);
+
+  // Lo que el diálogo de «Aplicar quincena» necesita para recalcular el
+  // resumen por la fecha ELEGIDA (no por hoy): deducción, saldo y las fechas
+  // de sus pagos aprobados. Los movimientos ya llegan sin borrados: el server
+  // los descarta en `filterEmpleadosMovimientos` (con `deleted` NULLABLE).
+  const personasQuincena = empleadosConDeduccion.map(c => ({
+    nombre: c.emp.nombre,
+    deduccion: c.emp.deduccion_quincenal,
+    saldo: c.saldo,
+    fechasPagos: (c.emp.prestamos_movimientos || [])
+      .filter(m => m.estado === "aprobado" && (m.concepto === "Pago" || m.concepto === "Abono extra"))
+      .map(m => m.fecha),
+  }));
 
   // Filtered
   const filtered = allCalcs.filter(c => {
@@ -311,10 +324,16 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         .slice(0, 5)
     : [];
 
-  async function aplicarQuincena() {
+  // La fecha de pago la elige contabilidad en el diálogo (registra 1–4 días
+  // después del pago); el servidor deriva la quincena del dedup de ESA fecha.
+  async function aplicarQuincena(fechaPago: string) {
     setAplicandoQ(true);
     try {
-      const res = await fetch("/api/prestamos/aplicar-quincena", { method: "POST" });
+      const res = await fetch("/api/prestamos/aplicar-quincena", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fecha: fechaPago }),
+      });
       const json = await res.json();
       if (res.ok) {
         const ok = json.count_aplicados ?? 0;
@@ -739,13 +758,16 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         )}
       </BottomSheet>
 
-      <ConfirmModal
+      {/* 🔴 El diálogo pregunta la FECHA DE PAGO (3-sep-2026): el botón viejo
+          escribía la fecha de hoy y por eso nadie lo usó en 90 días — el
+          movimiento caía en la quincena equivocada y contabilidad seguía a
+          mano (6 pasos × 13 personas, 15 min por quincena). */}
+      <AplicarQuincenaModal
         open={confirmAplicarQ}
         onClose={() => setConfirmAplicarQ(false)}
-        onConfirm={aplicarQuincena}
-        title="Aplicar deducción quincenal"
-        message={`Vas a registrar la deducción quincenal a ${quincenaPendientesN} empleado${quincenaPendientesN !== 1 ? "s" : ""} por un total de $${fmt(quincenaTotalEstimado)}. Los que ya tienen deducción esta quincena o saldo en $0 se omiten. La última cuota se ajusta al saldo automáticamente.`}
-        confirmLabel={aplicandoQ ? "Aplicando..." : "Aplicar a todos"}
+        onAplicar={aplicarQuincena}
+        aplicando={aplicandoQ}
+        personas={personasQuincena}
       />
 
       {pendingUndo && <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />}
