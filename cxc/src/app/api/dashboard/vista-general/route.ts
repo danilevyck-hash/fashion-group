@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerDashboardSummary, RPC_DASHBOARD_SUMMARY } from "@/lib/ventas/dashboard-summary";
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { leerPrevSamePeriod, sumarPrevPorEmpresa } from "@/lib/ventas/prev-same-period";
@@ -192,7 +193,9 @@ export async function GET(req: NextRequest) {
   const parcialSel = mesSelStr === mesActualPanama;
 
   const [summaryRes, agingRes, cxpRes, reclamosRes, mvPrevRes, egresosRes, bancosRes, inventarioRes, prevMismosDiasRes] = await Promise.all([
-    supabaseServer.rpc("ventas_dashboard_summary", { p_anio: anioSel }),
+    // 🩸 `_v2` desde el 3-sep-2026: el costo incluye las notas de débito (ver
+    // `dashboard-summary.ts`); cae a la `_v1` mientras la migración no corra.
+    leerDashboardSummary(anioSel),
     // CXC: vista base LIVE (igual que el módulo /admin), NO la MV diaria. La MV
     // (switch_estadocuenta_aging_mv) refresca 1×/día (06:30 UTC) y queda atrás de
     // los re-syncs de la reconciliación → divergía con /admin intradía. Leer la
@@ -254,7 +257,7 @@ export async function GET(req: NextRequest) {
   // vivo). YoY contra el mismo mes del año anterior (MV).
   const summaryRows = (summaryRes.data as SummaryRow[] | null) ?? [];
   const mvPrevRows = (mvPrevRes.data as MvRow[] | null) ?? [];
-  if (summaryRes.error) console.error("[vista-general] ventas_dashboard_summary:", summaryRes.error.message);
+  if (summaryRes.error) console.error(`[vista-general] ${RPC_DASHBOARD_SUMMARY}:`, summaryRes.error.message);
   if (mvPrevRes.error) console.error("[vista-general] ventas_rollup_mensual_mv:", mvPrevRes.error.message);
 
   // Ventas/utilidad POR EMPRESA de un mes dado: si el mes cae en el año

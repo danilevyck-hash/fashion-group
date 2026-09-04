@@ -40,14 +40,19 @@
 // facturas haya fallado —las facturas se escribieron bien—, así que el cron
 // sigue registrando su latido y no despierta al vigía de crones caídos.
 //
-// ═══ DEGRADACIÓN LIMPIA ══════════════════════════════════════════════════════
-// Si las vistas todavía no existen (la migración la corre Daniel a mano), el
-// centinela lo reconoce, lo dice en el log y NO avisa. Nunca lanza: un centinela
-// que puede tumbar el sync que vigila es peor que no tenerlo.
+// ═══ CUANDO NO PUEDE MIRAR ═══════════════════════════════════════════════════
+// El centinela NUNCA lanza —uno que puede tumbar el sync que vigila es peor que
+// no tenerlo—, pero SÍ dice qué le pasó, con el mensaje crudo de Supabase.
+//
+// Histórico: si las vistas todavía no existían (la migración la corría Daniel a
+// mano) el motivo decía "todavía no existe (migración pendiente)" y ahí moría.
+// Tolerancia retirada el 3-sep-2026: las dos vistas existen desde la migración
+// 20260826140000_ventas_tipos_sin_clasificar.sql, así que esa frase ya solo
+// podía tapar un problema real —un permiso, un cambio de esquema— con una
+// explicación tranquilizadora y falsa. Ahora el log dice el error de verdad.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { createSwitchSyncLog, finishSwitchSyncLog } from "@/lib/switch-api/sync-log";
 import type { CronSwitchError } from "@/lib/switch-api/alert-policy";
 import { TIPOS_VENTA_CONOCIDOS, CODIGOS_ARTICULO_CONOCIDOS } from "./tipos-comprobante";
@@ -86,9 +91,9 @@ const n = (v: unknown): number => {
 /**
  * Lee las dos vistas. NO decide nada: eso es de `hallazgosQueAvisan`.
  *
- * Devuelve `ok:false` cuando no pudo medir (vista ausente, permiso, red). "No
- * pude mirar" NO es "está todo bien" y tampoco es una alerta: se dice y se
- * sigue.
+ * Devuelve `ok:false` cuando no pudo medir (permiso, red, esquema cambiado),
+ * con el mensaje CRUDO de Supabase. "No pude mirar" NO es "está todo bien" y
+ * tampoco es una alerta: se dice y se sigue.
  */
 export async function medirTiposSinClasificar(): Promise<MedicionCentinela> {
   const hallazgos: TipoSinClasificar[] = [];
@@ -97,12 +102,7 @@ export async function medirTiposSinClasificar(): Promise<MedicionCentinela> {
       .from(VISTA_VENTAS)
       .select("empresa_key, tipo_comprobante, filas, filas_con_plata, suma_base");
     if (ventas.error) {
-      return {
-        ok: false,
-        motivo: esTablaAusente(ventas.error)
-          ? `la vista ${VISTA_VENTAS} todavía no existe (migración pendiente)`
-          : `no pude leer ${VISTA_VENTAS}: ${ventas.error.message}`,
-      };
+      return { ok: false, motivo: `no pude leer ${VISTA_VENTAS}: ${ventas.error.message}` };
     }
     for (const r of ventas.data ?? []) {
       const f = r as Record<string, unknown>;
@@ -120,12 +120,7 @@ export async function medirTiposSinClasificar(): Promise<MedicionCentinela> {
       .from(VISTA_ARTICULOS)
       .select("empresa_key, tipo, filas, filas_con_plata, suma_venta");
     if (arts.error) {
-      return {
-        ok: false,
-        motivo: esTablaAusente(arts.error)
-          ? `la vista ${VISTA_ARTICULOS} todavía no existe (migración pendiente)`
-          : `no pude leer ${VISTA_ARTICULOS}: ${arts.error.message}`,
-      };
+      return { ok: false, motivo: `no pude leer ${VISTA_ARTICULOS}: ${arts.error.message}` };
     }
     for (const r of arts.data ?? []) {
       const f = r as Record<string, unknown>;

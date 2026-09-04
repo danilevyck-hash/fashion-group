@@ -43,10 +43,17 @@ interface CurrentUser {
   associatedCompany: string | null;
 }
 
-// Lee el usuario que envía. El DDL (nombre_completo, email) puede NO estar
-// aplicado todavía cuando corre el build/deploy → si PostgREST devuelve 42703
-// ("column ... does not exist") caemos a leer solo `name` y usamos ese nombre,
-// omitiendo reply_to/cc. Fallback temporal hasta aplicar la migración.
+// Lee el usuario que envía: de acá salen la FIRMA del correo, el `cc` y el
+// `reply_to`.
+//
+// Histórico: el DDL (nombre_completo, email) podía NO estar aplicado cuando
+// corría el build/deploy, así que ante un 42703 ("column ... does not exist") se
+// releía solo `name` y se mandaba sin reply_to/cc.
+// Tolerancia retirada el 3-sep-2026: las dos columnas existen desde la migración
+// 20260709120000_cxc_email_estado_cuenta.sql. Ahora el error de PostgREST se
+// PROPAGA: un permiso denegado o un timeout leídos como "falta la columna"
+// mandarían el estado de cuenta firmado por nadie y sin copia al remitente, y
+// nadie se enteraría.
 async function getCurrentUser(userId: string | undefined): Promise<CurrentUser | null> {
   if (!userId) return null;
   const { data, error } = await supabaseServer
@@ -55,21 +62,8 @@ async function getCurrentUser(userId: string | undefined): Promise<CurrentUser |
     .eq("id", userId)
     .maybeSingle();
 
-  if (error) {
-    const missingCol = error.code === "42703" || /column .* does not exist/i.test(error.message);
-    if (!missingCol) {
-      console.error(`[cxc/enviar-email] fg_users: ${error.message}`);
-      return null;
-    }
-    // Fallback sin columnas nuevas.
-    const { data: d2 } = await supabaseServer
-      .from("fg_users")
-      .select("name, associated_company")
-      .eq("id", userId)
-      .maybeSingle();
-    if (!d2) return null;
-    return { name: d2.name, nombreCompleto: d2.name, email: null, associatedCompany: d2.associated_company ?? null };
-  }
+  if (error) throw new Error(`fg_users: ${error.message}`);
+  // Sin fila NO es un error: es un userId que ya no está. Firma genérica.
   if (!data) return null;
   return {
     name: data.name,
@@ -166,7 +160,16 @@ export async function GET(req: NextRequest) {
   const nombreNormalizado = (sp.get("nombreNormalizado") ?? "").trim();
   const empresaParam = sp.get("empresa") ?? "";
 
-  const user = await getCurrentUser(auth.userId);
+  let user: CurrentUser | null;
+  try {
+    user = await getCurrentUser(auth.userId);
+  } catch (e) {
+    console.error(`[cxc/enviar-email] preview: ${(e as Error).message}`);
+    return NextResponse.json(
+      { error: "No se pudo cargar. Intenta de nuevo en unos segundos." },
+      { status: 500 },
+    );
+  }
   const empresas = resolveEmpresas(auth, user, empresaParam);
   if (!empresas) return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
 
@@ -227,7 +230,17 @@ export async function POST(req: NextRequest) {
   }
   if (!asunto) return NextResponse.json({ error: "Asunto requerido" }, { status: 400 });
 
-  const user = await getCurrentUser(auth.userId);
+  // Antes del envío a propósito: si esta lectura falla, todavía no salió nada.
+  let user: CurrentUser | null;
+  try {
+    user = await getCurrentUser(auth.userId);
+  } catch (e) {
+    console.error(`[cxc/enviar-email] ${(e as Error).message}`);
+    return NextResponse.json(
+      { error: "No se pudo enviar el correo. Intenta de nuevo." },
+      { status: 500 },
+    );
+  }
   const empresas = resolveEmpresas(auth, user, empresaParam);
   if (!empresas) return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
 

@@ -12,6 +12,7 @@ import { esEmpresaDelGrupo } from "@/lib/clientes/mundos";
 import { withDbRetry, isTransientDbError } from "@/lib/supabase-retry";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
 import { leerPrevSamePeriod, PREV_SAME_PERIOD_VACIO, RPC_PREV_SAME_PERIOD } from "@/lib/ventas/prev-same-period";
+import { leerDashboardSummary, RPC_DASHBOARD_SUMMARY } from "@/lib/ventas/dashboard-summary";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -79,7 +80,10 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // withDbRetry: en caché fría estas RPC se pasan del statement_timeout y
     // Postgres las cancela; al segundo intento (caché caliente) pasan en <1s.
     // Ver src/lib/supabase-retry.ts para la medición.
-    withDbRetry(() => supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }), { label: "ventas_dashboard_summary" }),
+    // 🩸 Desde el 3-sep-2026 es la `_v2`: el costo del mes en curso incluye las
+    // notas de débito (Active Wear agosto salía con costo NEGATIVO). La lectura,
+    // con su cadena de versiones, vive en `dashboard-summary.ts`.
+    leerDashboardSummary(year),
     // Prev year usa same-period day-by-day: el mes que está en curso en
     // el calendario actual se recorta al mismo offset de días en el año
     // anterior, y los meses posteriores no se emiten. Si `year` no es el
@@ -127,7 +131,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // diario, sí confiable) sigue viva en su propio módulo.
   ]);
 
-  if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
+  if (curRes.error)  throw new Error(`${RPC_DASHBOARD_SUMMARY}(${year}): ${curRes.error.message}`);
   if (prevRes.error) throw new Error(`${RPC_PREV_SAME_PERIOD}(${year}): ${prevRes.error.message}`);
 
   const cur = (curRes.data as DashboardSummaryRow[] | null) ?? [];

@@ -97,6 +97,7 @@ import {
   TIPO_DATO_VIEJO,
 } from "@/lib/datos-frescos";
 import { revisarSilencioDeDatos } from "@/lib/alertas/silencio-de-datos-io";
+import { revisarCuadreCosto } from "@/lib/alertas/cuadre-costo-io";
 import { barrerRunningAtascados } from "@/lib/switch-api/sync-log";
 import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
 import { enviarResumenCaidaSiAplica } from "@/lib/switch-api/outage-resumen";
@@ -843,6 +844,33 @@ async function checkSilencioDeDatos(): Promise<string[]> {
   }
 }
 
+/**
+ * 🩸 EL CUADRE DE COSTO (3-sep-2026) — `src/lib/alertas/cuadre-costo.ts`.
+ *
+ * Por (empresa, mes cerrado), lo que el Resumen muestra de costo contra lo que
+ * dice `switch_costo_diario` (el reporte «Total de ventas» de Switch, que sí
+ * trae notas de débito y que durante tres meses nadie leyó). Más de 2 % y más
+ * de $100 → 🔧 SISTEMA, con anti-loop de 7 días por (empresa, mes).
+ *
+ * Cuelga de acá por los mismos tres motivos que el silencio de datos: es el
+ * vigía que ya existe, el ritmo de esta pasada ya filtra lo que se arregla solo
+ * (la ND que entra al día siguiente la trae `sync-utilidad` a las 07:00 y esta
+ * pasada la ve a las 10:00), y no cuesta una entrada de cron.
+ *
+ * No lanza: un fallo midiendo el cuadre no puede tumbar la reconciliación. Si
+ * la migración de la RPC no corrió, se omite y lo dice en el log.
+ */
+async function checkCuadreCosto(): Promise<string[]> {
+  try {
+    return await revisarCuadreCosto();
+  } catch (err) {
+    console.error(
+      `[cuadre-costo] no pude revisarlo: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return [];
+  }
+}
+
 /** Nombre del cron que alerta switch-sync (dedup contra cron_email_errors). */
 const SWITCH_SYNC_CRON_NAME = "switch-sync";
 
@@ -975,6 +1003,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   //         trae cientos (A) y una tabla de negocio que dejó de recibir
   //         escrituras (B). Van juntas y mandan UN mensaje por módulo.
   const silencioDeDatos = await checkSilencioDeDatos();
+  // 0b-quater. El cuadre de costo: lo que el Resumen muestra por mes cerrado
+  //            contra el total de ventas por día de Switch (que trae las ND).
+  const cuadreCosto = await checkCuadreCosto();
   await recordCronHeartbeat(CRON_NAME);
 
   // 0c. Reporte de las ocurrencias que CORRIERON Y FALLARON (defecto 2). El
@@ -1019,6 +1050,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       staleCrons,
       datosViejos,
       silencioDeDatos,
+      cuadreCosto,
       slotsCubiertos,
       slotsDesatendidos,
     });
@@ -1200,6 +1232,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       staleCrons,
       datosViejos,
       silencioDeDatos,
+      cuadreCosto,
       slotsCubiertos,
       slotsDesatendidos,
       slotsSinAtender,

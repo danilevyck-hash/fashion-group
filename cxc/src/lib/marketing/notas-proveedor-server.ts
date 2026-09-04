@@ -7,15 +7,15 @@
 // 🔴 Esta tabla NO participa de ningún cálculo del módulo. Ver el encabezado
 //    de ./notas-proveedor.ts. No agregar acá un `sumarNotas()`.
 //
-// 🟡 TOLERANTE A DDL PENDIENTE (patrón del repo, ver `variantes-server.ts` /
-//    `asistencia/config-server.ts`). La migración
-//    `20260808120000_mk_mobiliario_notas_proveedor.sql` la corre Daniel A MANO,
-//    y la pantalla tiene que funcionar ANTES de eso: mientras la tabla no
-//    exista, `listNotasProveedor()` devuelve la lista vacía con
-//    `ddlPendiente: true` y la pantalla lo dice con todas las letras en vez de
-//    reventar. Las escrituras SÍ fallan (con un mensaje que nombra el archivo
-//    de la migración): guardar en una tabla que no existe no se puede
-//    degradar, y decir "guardado" sin guardar sería peor que el error.
+// Historia (ago-2026): era TOLERANTE A DDL PENDIENTE (patrón del repo, ver
+//    `variantes-server.ts` / `asistencia/config-server.ts`). La migración
+//    `20260808120000_mk_mobiliario_notas_proveedor.sql` la corrió Daniel a
+//    mano, y mientras la tabla no existía `listNotasProveedor()` devolvía la
+//    lista vacía con `ddlPendiente: true` para que la pantalla lo dijera.
+//    Tolerancia retirada el 3-sep-2026: la tabla existe desde esa migración.
+//    Hoy 42P01/PGRST205 es un error de verdad (permiso, timeout, esquema) y se
+//    propaga como cualquier otro. `ddlPendiente` se conserva en la respuesta
+//    (siempre `false`) porque la ruta y `PreciosProveedorAyuda` lo leen.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
@@ -30,23 +30,17 @@ import {
 const TABLA = "mk_mobiliario_notas_proveedor";
 const COLUMNAS = "id, producto, precio, nota, foto_paths, orden, created_at";
 
-/** Nombre del archivo de migración, para poder decirlo en pantalla. */
+/** Nombre del archivo de migración que creó la tabla (histórico). */
 export const MIGRACION_NOTAS =
   "20260808120000_mk_mobiliario_notas_proveedor.sql";
 
-/**
- * "La tabla todavía no existe" — 42P01 es `undefined_table` de Postgres y
- * PGRST205 es el equivalente de PostgREST cuando no está en su schema cache.
- * Cualquier otro error es un error de verdad y se propaga.
- */
-function esTablaAusente(error: { code?: string | null } | null): boolean {
-  const code = error?.code ?? "";
-  return code === "42P01" || code === "PGRST205";
-}
-
 export interface NotasProveedorResultado {
   notas: NotaProveedorRenglon[];
-  /** true = falta correr la migración. La pantalla lo explica. */
+  /**
+   * Siempre `false` desde el 3-sep-2026 (la tabla existe). Se conserva porque
+   * la ruta y la pantalla lo leen; si la base falla, `listNotasProveedor`
+   * lanza y esto no se arma.
+   */
   ddlPendiente: boolean;
 }
 
@@ -96,7 +90,7 @@ async function firmarFotos(
   );
 }
 
-/** Lee la nota completa. Degrada limpio si falta la migración. */
+/** Lee la nota completa. Si la base no contesta, lanza — sin disfraz. */
 export async function listNotasProveedor(): Promise<NotasProveedorResultado> {
   const { data, error } = await supabaseServer
     .from(TABLA)
@@ -104,10 +98,7 @@ export async function listNotasProveedor(): Promise<NotasProveedorResultado> {
     .order("orden", { ascending: true })
     .order("created_at", { ascending: true });
 
-  if (error) {
-    if (esTablaAusente(error)) return { notas: [], ddlPendiente: true };
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   const notas = ordenarNotas(
     (data ?? []).map((r) => mapRow(r as Record<string, unknown>)),
@@ -119,11 +110,6 @@ function errorDeEscritura(error: {
   code?: string | null;
   message: string;
 }): Error {
-  if (esTablaAusente(error)) {
-    return new Error(
-      `Todavía no se puede guardar: falta correr la migración ${MIGRACION_NOTAS} en Supabase.`,
-    );
-  }
   return new Error(error.message);
 }
 
@@ -131,12 +117,7 @@ function errorDeEscritura(error: {
 export async function createNotaProveedor(
   input: NotaProveedorInput,
 ): Promise<NotaProveedorRenglon> {
-  const { notas, ddlPendiente } = await listNotasProveedor();
-  if (ddlPendiente) {
-    throw new Error(
-      `Todavía no se puede guardar: falta correr la migración ${MIGRACION_NOTAS} en Supabase.`,
-    );
-  }
+  const { notas } = await listNotasProveedor();
 
   const { data, error } = await supabaseServer
     .from(TABLA)

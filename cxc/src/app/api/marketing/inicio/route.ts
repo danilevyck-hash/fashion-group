@@ -8,7 +8,6 @@ import {
   type PeriodoRow,
   type SelloRow,
 } from "@/lib/marketing/resumen-bloques";
-import { esTablaAusente } from "@/lib/marketing/periodos-io";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,20 +19,17 @@ export const fetchCache = "force-no-store";
 // PERÍODO. La cuenta vive en el módulo PURO `resumen-bloques.ts`; acá solo se
 // lee la base y se arma el JSON.
 //
-// 🔴 DEGRADA LIMPIO SIN LA DDL, en las dos capas. Si `mk_periodos` /
-// `mk_periodo_documentos` no existen, PostgREST responde 42P01 y acá se trata
-// como "no hay períodos": el agregador cae al fallback `grupo_legacy`. Y si
-// existen pero la migración POR MARCA (20260811180000) todavía no corrió, los
-// sellos dicen 'pvh'/'reebok'/'joybees' y el agregador los reconoce igual
-// (`clavesDeSello`). En los dos casos la pantalla muestra EXACTAMENTE los
-// mismos números. Un error que NO sea "esa tabla no existe" sí se propaga:
-// esconderlo dejaría la pantalla mostrando el archivo ya reportado como si
-// fuera gasto abierto.
-
-// `esTablaAusente` vive en `lib/marketing/periodos-io.ts` — fuente ÚNICA, la
-// misma que usa el lado de escritura. Dos copias del criterio es una que se
-// corrige y otra que empieza a tratar "falta la migración" como un error de
-// verdad (o al revés, que es peor).
+// Historia (ago-2026): degradaba limpio sin la DDL. Si `mk_periodos` /
+// `mk_periodo_documentos` no existían, PostgREST respondía 42P01 y acá se
+// trataba como "no hay períodos": el agregador caía al fallback `grupo_legacy`.
+// Tolerancia retirada el 3-sep-2026: las tablas existen desde
+// 20260811160000_marketing_periodos_por_proveedor.sql. Hoy CUALQUIER error de
+// esas dos lecturas se propaga (500) — esconderlo dejaría la pantalla
+// mostrando el archivo ya reportado como si fuera gasto abierto, y con la
+// tabla puesta, "no existe" es un permiso, un timeout o un cambio de esquema.
+//
+// La capa que SÍ sigue viva es la de los sellos históricos: dicen
+// 'pvh'/'reebok'/'joybees' y el agregador los reconoce igual (`clavesDeSello`).
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
@@ -81,10 +77,8 @@ export async function GET(req: NextRequest) {
     if (proyRes.error) throw new Error(`proyectos: ${proyRes.error.message}`);
     if (marcasRes.error) throw new Error(`marcas: ${marcasRes.error.message}`);
     if (entregasRes.error) throw new Error(`entregas: ${entregasRes.error.message}`);
-    if (perRes.error && !esTablaAusente(perRes.error)) {
-      throw new Error(`periodos: ${perRes.error.message}`);
-    }
-    if (selloRes.error && !esTablaAusente(selloRes.error)) {
+    if (perRes.error) throw new Error(`periodos: ${perRes.error.message}`);
+    if (selloRes.error) {
       throw new Error(`periodo_documentos: ${selloRes.error.message}`);
     }
     // Las impulsadoras son solo el subtítulo de una tarjeta: si fallan, la
@@ -106,8 +100,8 @@ export async function GET(req: NextRequest) {
       marcas: (marcasRes.data ?? []) as never,
       proyectos,
       proyectosMultifashion,
-      periodos: (perRes.error ? [] : (perRes.data ?? [])) as PeriodoRow[],
-      sellos: (selloRes.error ? [] : (selloRes.data ?? [])) as SelloRow[],
+      periodos: (perRes.data ?? []) as PeriodoRow[],
+      sellos: (selloRes.data ?? []) as SelloRow[],
       adjuntos: (adjRes.error ? [] : (adjRes.data ?? [])) as AdjuntoResumen[],
     });
 

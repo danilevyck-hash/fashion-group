@@ -11,25 +11,30 @@
 // el reporte. Una factura vieja que llega tarde entra en el período ABIERTO y
 // se reporta en el próximo corte. Nada se pierde: se reporta después.
 //
-// 🔴 DEGRADACIÓN OBLIGATORIA, Y ACÁ TIENE DOS CAPAS.
+// 🔴 HISTORIA DE LA DEGRADACIÓN (ago-2026), en dos capas:
 //
-//  1. Sin las TABLAS (`mk_periodos` / `mk_periodo_documentos`), todo esto es un
-//     no-op silencioso: **sellar no puede hacer fallar el guardado de una
-//     factura ni de una entrega**.
+//  1. Sin las TABLAS (`mk_periodos` / `mk_periodo_documentos`), todo esto era
+//     un no-op silencioso: **sellar no podía hacer fallar el guardado de una
+//     factura ni de una entrega**, y "esa tabla no existe" ni se logueaba.
 //  2. Con las tablas pero SIN la migración por marca (20260811180000, que
-//     Daniel corre A MANO), los períodos abiertos que existen son los VIEJOS
+//     Daniel corrió A MANO), los períodos abiertos que existían eran los VIEJOS
 //     por proveedor ('pvh', 'reebok', 'joybees'). Por eso el período de una
 //     marca se busca con `clavesDeSello()`: primero su código, después la clave
-//     vieja — y **se sella con la clave que efectivamente se encontró**. Así,
-//     antes de la migración, Tommy y Calvin siguen cayendo en el mismo sello
-//     'pvh' que hoy (comportamiento idéntico), y después de la migración cada
-//     una cae en el suyo sin que nadie tenga que acordarse de apagar nada.
+//     vieja — y **se sella con la clave que efectivamente se encontró**. Esta
+//     capa SIGUE VIVA: los sellos históricos dicen 'pvh' y hay que leerlos.
 //
-// 🩸 SELLAR NUNCA ES FATAL, ni siquiera con las tablas ya creadas. Si el sello
-// falla se loguea con `console.error` y el documento se guarda igual. Un sello
-// que falta se ve como "gasto del período actual", que es el default correcto;
-// que no se pueda cargar una factura porque la tabla de períodos tuvo un
-// hipo sería muchísimo peor.
+// Tolerancia retirada el 3-sep-2026: las tablas existen desde
+// 20260811160000_marketing_periodos_por_proveedor.sql (y la clave por marca
+// desde 20260811180000). "Esa tabla no existe" ya no es "falta la migración":
+// es un permiso, un timeout o un cambio de esquema, y se trata como cualquier
+// otro error — se loguea SIEMPRE. Callarlo dejaba a la app sellando en el
+// vacío sin que nadie se entere.
+//
+// 🩸 SELLAR NUNCA ES FATAL — esto NO cambió. Si el sello falla se loguea con
+// `console.error` y el documento se guarda igual. Un sello que falta se ve
+// como "gasto del período actual", que es el default correcto; que no se
+// pueda cargar una factura porque la tabla de períodos tuvo un hipo sería
+// muchísimo peor. Lo que cambió es que el hipo ahora SE VE en el log.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
@@ -73,9 +78,14 @@ export interface PeriodoFila {
 /**
  * Códigos de PostgREST/Postgres para "esa tabla no existe todavía".
  *
- * Fuente ÚNICA — la usa este módulo y también `/api/marketing/inicio`. Dos
- * copias del mismo criterio es una que se corrige y otra que empieza a tratar
- * un error de verdad como "la migración no corrió".
+ * Fuente ÚNICA — era la que usaba este módulo, `/api/marketing/inicio`,
+ * `proyectos-lista`, `periodos` y `periodos-reporte`. Dos copias del mismo
+ * criterio es una que se corrige y otra que empieza a tratar un error de
+ * verdad como "la migración no corrió".
+ *
+ * ⚠️ Desde el 3-sep-2026 ESTE módulo ya no la usa (la tolerancia se retiró:
+ * las tablas existen). Queda exportada porque `periodos/[id]/cerrar/route.ts`
+ * y `periodos/[id]/route.ts` todavía la consumen vía `esFaltaDeTablas`.
  */
 export function esTablaAusente(
   err: { code?: string | null; message?: string } | null,
@@ -123,37 +133,30 @@ function avisar(donde: string, detalle: unknown): void {
  * Busca por el código de marca y, si no hay, por la clave vieja del proveedor
  * (ver la degradación del encabezado).
  *
- * `null` significa las tres cosas que se tratan igual: no existe la tabla, no
- * hay período abierto para esa marca, o no se pudo leer. En los tres casos el
- * que llama no tiene a dónde sellar y sigue de largo.
+ * `null` significa UNA sola cosa: no hay período abierto para esa marca. Si la
+ * base no contesta, se LANZA (con el `code` pegado) — hasta el 3-sep-2026
+ * "no existe la tabla" y "no se pudo leer" también caían en `null`, y eso
+ * escondía un permiso o un timeout como "no hay período".
  */
 export async function periodoAbiertoDe(
   marcaKey: string,
 ): Promise<PeriodoFila | null> {
   const claves = clavesDeBusqueda(marcaKey);
   if (claves.length === 0) return null;
-  try {
-    const { data, error } = await supabaseServer
-      .from("mk_periodos")
-      .select("id, proveedor_key, nombre, estado, abierto_en, cerrado_en, cerrado_por")
-      .eq("estado", "abierto")
-      .in("proveedor_key", claves);
-    if (error) {
-      if (!esTablaAusente(error)) avisar("periodoAbiertoDe", error.message);
-      return null;
-    }
-    const filas = (data ?? []) as PeriodoFila[];
-    // El ORDEN manda, no el que devuelva PostgREST primero: el código de marca
-    // le gana a la clave vieja. Después de la migración pueden convivir las dos.
-    for (const clave of claves) {
-      const p = filas.find((f) => String(f.proveedor_key) === clave);
-      if (p) return p;
-    }
-    return null;
-  } catch (err) {
-    if (!esFaltaDeTablas(err)) avisar("periodoAbiertoDe", err);
-    return null;
+  const { data, error } = await supabaseServer
+    .from("mk_periodos")
+    .select("id, proveedor_key, nombre, estado, abierto_en, cerrado_en, cerrado_por")
+    .eq("estado", "abierto")
+    .in("proveedor_key", claves);
+  if (error) throw comoError(error, "periodoAbiertoDe");
+  const filas = (data ?? []) as PeriodoFila[];
+  // El ORDEN manda, no el que devuelva PostgREST primero: el código de marca
+  // le gana a la clave vieja. Después de la migración pueden convivir las dos.
+  for (const clave of claves) {
+    const p = filas.find((f) => String(f.proveedor_key) === clave);
+    if (p) return p;
   }
+  return null;
 }
 
 /**
@@ -268,7 +271,9 @@ export async function sellarDocumento(input: SellarDocumentoInput): Promise<void
       .eq("estado", "abierto")
       .in("proveedor_key", claves);
     if (error) {
-      if (!esTablaAusente(error)) avisar("sellarDocumento[periodos]", error.message);
+      // Se avisa SIEMPRE (tolerancia a DDL retirada el 3-sep-2026): un sello
+      // que no se pudo escribir tiene que dejar rastro aunque no sea fatal.
+      avisar("sellarDocumento[periodos]", error.message);
       return;
     }
 
@@ -306,12 +311,10 @@ export async function sellarDocumento(input: SellarDocumentoInput): Promise<void
         onConflict: "tipo,documento_id,proveedor_key",
         ignoreDuplicates: true,
       });
-    if (upErr && !esTablaAusente(upErr)) {
-      avisar("sellarDocumento[upsert]", upErr.message);
-    }
+    if (upErr) avisar("sellarDocumento[upsert]", upErr.message);
   } catch (err) {
     // Ni siquiera un error inesperado puede tumbar el guardado del documento.
-    if (!esFaltaDeTablas(err)) avisar("sellarDocumento", err);
+    avisar("sellarDocumento", err);
   }
 }
 
@@ -344,7 +347,8 @@ export async function sellarDocumentoPorMarcas(
  *
  * 🩸 NUNCA lanza, igual que sellar: el documento ya se borró y el stock ya se
  * devolvió — un tropiezo acá no puede deshacer eso ni dejar la operación a
- * medias. Sin la DDL de períodos, no-op limpio.
+ * medias. Pero el tropiezo SE LOGUEA siempre (tolerancia retirada el
+ * 3-sep-2026: la tabla existe desde 20260811160000).
  *
  * ⚠️ NO usar para anulaciones (soft delete de facturas): ahí el documento
  * sigue existiendo y su sello dice a qué período se reportó.
@@ -360,11 +364,9 @@ export async function borrarSellosDeDocumento(
       .delete()
       .eq("tipo", tipo)
       .eq("documento_id", documentoId);
-    if (error && !esTablaAusente(error)) {
-      avisar("borrarSellosDeDocumento", error.message);
-    }
+    if (error) avisar("borrarSellosDeDocumento", error.message);
   } catch (err) {
-    if (!esFaltaDeTablas(err)) avisar("borrarSellosDeDocumento", err);
+    avisar("borrarSellosDeDocumento", err);
   }
 }
 

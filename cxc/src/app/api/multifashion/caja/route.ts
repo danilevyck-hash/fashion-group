@@ -6,7 +6,6 @@
 // (cada vista sin caché sería un login que puede matar el token de un cron):
 //   - día cerrado (fecha < hoy Panamá): cacheado para siempre (no cambia).
 //   - día en curso: TTL 10 min.
-//   - tabla ausente (DDL pendiente): modo directo sin caché — funciona igual.
 //   - Switch caído + hay caché viejo: sirve el caché con stale=true.
 // Tras cada llamada a Switch se cierra la sesión (logout best-effort).
 //
@@ -60,20 +59,27 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "La fecha no puede ser futura" }, { status: 400 });
   }
 
-  // 1. Caché (si la tabla existe). Día cerrado = permanente; hoy = TTL.
+  // 1. Caché. Día cerrado = permanente; hoy = TTL.
+  //
+  // Histórico: un PGRST205 ("la tabla no existe", DDL pendiente) pasaba a modo
+  // directo sin caché y la pantalla funcionaba igual.
+  // Tolerancia retirada el 3-sep-2026: la tabla existe desde la migración
+  // 20260704210000_multifashion_caja_diaria.sql. Hoy un error leyendo el caché
+  // es real, y seguir de largo tiene precio: el caché está para respetar la
+  // SESIÓN ÚNICA de Switch, así que "sin caché" son logins de más que pueden
+  // matar el token de un cron. Se dice y se corta.
   let cached: CacheRow | null = null;
-  let cacheDisponible = true;
   const { data: row, error: readErr } = await supabaseServer
     .from(CACHE_TABLE)
     .select("fecha, data, synced_at")
     .eq("fecha", fecha)
     .maybeSingle();
   if (readErr) {
-    // PGRST205 = tabla no existe (DDL pendiente) → modo directo sin caché.
-    cacheDisponible = false;
-    if (!/PGRST205|does not exist|could not find the table/i.test(`${readErr.code} ${readErr.message}`)) {
-      console.error(`[caja] lectura caché: ${readErr.message}`);
-    }
+    console.error(`[caja] lectura caché: ${readErr.message}`);
+    return NextResponse.json(
+      { error: "No se pudo cargar la caja. Intenta de nuevo en unos segundos." },
+      { status: 500 },
+    );
   } else if (row) {
     cached = row as CacheRow;
     const esHoy = fecha === hoy;
@@ -94,12 +100,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const caja = data.diarioDeVentas;
     const syncedAt = new Date().toISOString();
 
-    if (cacheDisponible) {
-      const { error: upErr } = await supabaseServer
-        .from(CACHE_TABLE)
-        .upsert({ fecha, data: caja, synced_at: syncedAt }, { onConflict: "fecha" });
-      if (upErr) console.error(`[caja] upsert caché: ${upErr.message}`);
-    }
+    // El upsert SÍ sigue siendo best-effort: el dato ya está en la mano y no
+    // guardarlo solo cuesta un viaje más a Switch la próxima vez.
+    const { error: upErr } = await supabaseServer
+      .from(CACHE_TABLE)
+      .upsert({ fecha, data: caja, synced_at: syncedAt }, { onConflict: "fecha" });
+    if (upErr) console.error(`[caja] upsert caché: ${upErr.message}`);
 
     return NextResponse.json({ fecha, caja, synced_at: syncedAt, cached: false });
   } catch (err) {

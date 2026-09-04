@@ -22,7 +22,6 @@ import {
   type PeriodoRow,
   type SelloRow,
 } from "@/lib/marketing/resumen-bloques";
-import { esTablaAusente } from "@/lib/marketing/periodos-io";
 import {
   SECCION_ABIERTO,
   armarGastoGeneral,
@@ -148,10 +147,12 @@ export async function GET(req: NextRequest) {
     if (fmRes.error) throw new Error(`factura_marcas: ${fmRes.error.message}`);
     if (entregasRes.error) throw new Error(`entregas: ${entregasRes.error.message}`);
     if (adjRes.error) throw new Error(`adjuntos: ${adjRes.error.message}`);
-    if (perRes.error && !esTablaAusente(perRes.error)) {
-      throw new Error(`periodos: ${perRes.error.message}`);
-    }
-    if (selloRes.error && !esTablaAusente(selloRes.error)) {
+    // Tolerancia a DDL retirada el 3-sep-2026: `mk_periodos` y
+    // `mk_periodo_documentos` existen desde 20260811160000. Un error acá es un
+    // error (permiso, timeout, esquema) y se propaga; tratarlo como "no hay
+    // períodos" mostraba el archivo ya reportado como gasto abierto.
+    if (perRes.error) throw new Error(`periodos: ${perRes.error.message}`);
+    if (selloRes.error) {
       throw new Error(`periodo_documentos: ${selloRes.error.message}`);
     }
 
@@ -186,8 +187,8 @@ export async function GET(req: NextRequest) {
     );
     const vivos = new Set(proyectos.map((p) => String(p.id)));
 
-    const periodos = (perRes.error ? [] : (perRes.data ?? [])) as PeriodoRow[];
-    const sellos = (selloRes.error ? [] : (selloRes.data ?? [])) as SelloRow[];
+    const periodos = (perRes.data ?? []) as PeriodoRow[];
+    const sellos = (selloRes.data ?? []) as SelloRow[];
     const adjuntos = (adjRes.data ?? []) as Array<{
       tipo: string;
       factura_id: string | null;

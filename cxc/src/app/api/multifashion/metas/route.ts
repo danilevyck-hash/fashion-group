@@ -21,7 +21,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import {
   puedeVerMetas,
   puedeEditarMetas,
@@ -38,6 +37,17 @@ import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 
+// ── Tolerancia a la DDL: retirada el 3-sep-2026 ─────────────────────────────
+// Hasta hoy, CUALQUIER error que se pareciera a "esa tabla no existe" —en el
+// GET, el POST, el PUT y el DELETE— se contestaba con este aviso. La DDL
+// 20260813170000_multifashion_metas.sql ya corrió (`multifashion_metas` y
+// `multifashion_meta_participantes` existen), así que ese camino era rama
+// muerta: un permiso denegado o un timeout se leían como "todavía no está
+// instalado" y la pantalla decía que faltaba correr un SQL que ya está corrido.
+// Ahora cada error se propaga con el mensaje que ya usaba cada verbo.
+//
+// ⚠️ El aviso NO se borra: `leerMetas()` (en `metas-lectura.ts`, fuera de esta
+// tanda) todavía devuelve `null` cuando la tabla falta, y el GET lo respeta.
 const NO_INSTALADO = {
   instalado: false as const,
   metas: [],
@@ -84,7 +94,6 @@ export async function GET(req: NextRequest) {
       vendedoras,
     });
   } catch (e) {
-    if (esTablaAusente(e)) return NextResponse.json(NO_INSTALADO);
     console.error("[multifashion/metas] GET", e);
     return NextResponse.json(
       { error: "No se pudieron cargar las metas. Intenta de nuevo en unos segundos." },
@@ -254,15 +263,11 @@ export async function POST(req: NextRequest) {
       .select("id")
       .single();
 
-    if (error) {
-      if (esTablaAusente(error)) return NextResponse.json(NO_INSTALADO, { status: 503 });
-      throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
 
     await guardarParticipantes(data.id as string, v.participantes);
     return NextResponse.json({ ok: true, id: data.id });
   } catch (e) {
-    if (esTablaAusente(e)) return NextResponse.json(NO_INSTALADO, { status: 503 });
     console.error("[multifashion/metas] POST", e);
     return NextResponse.json({ error: "No se pudo guardar la meta." }, { status: 500 });
   }
@@ -302,15 +307,11 @@ export async function PUT(req: NextRequest) {
       .eq("id", id)
       .eq("deleted", false);
 
-    if (error) {
-      if (esTablaAusente(error)) return NextResponse.json(NO_INSTALADO, { status: 503 });
-      throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
 
     await guardarParticipantes(id, v.participantes);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (esTablaAusente(e)) return NextResponse.json(NO_INSTALADO, { status: 503 });
     console.error("[multifashion/metas] PUT", e);
     return NextResponse.json({ error: "No se pudo guardar la meta." }, { status: 500 });
   }
@@ -338,13 +339,9 @@ export async function DELETE(req: NextRequest) {
       .update({ deleted: true, updated_at: new Date().toISOString() })
       .eq("id", id);
 
-    if (error) {
-      if (esTablaAusente(error)) return NextResponse.json(NO_INSTALADO, { status: 503 });
-      throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (esTablaAusente(e)) return NextResponse.json(NO_INSTALADO, { status: 503 });
     console.error("[multifashion/metas] DELETE", e);
     return NextResponse.json({ error: "No se pudo retirar la meta." }, { status: 500 });
   }

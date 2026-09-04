@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { esTablaAusente } from "@/lib/marketing/periodos-io";
 import {
   agregar,
   cargarDatosPeriodos,
@@ -24,8 +23,13 @@ export const fetchCache = "force-no-store";
 //     figura acá tiene que ser el mismo que dice el papel que la marca ya
 //     tiene en la mano.
 //
-// 🔴 Sin la migración corrida no hay períodos. La pantalla lo tiene que poder
-// decir con todas las letras en vez de mostrar una lista vacía sin explicación.
+// Historia (ago-2026): sin la migración corrida contestaba
+// `{ hayPeriodos: false, mensaje }` para que la pantalla lo dijera con todas
+// las letras. Tolerancia retirada el 3-sep-2026: `mk_periodos` existe desde
+// 20260811160000_marketing_periodos_por_proveedor.sql, así que "no existe la
+// tabla" hoy es un error de verdad (permiso, timeout, esquema) y sale como
+// 500 con el mismo mensaje humano que cualquier otro. `hayPeriodos` se sigue
+// mandando (siempre `true`) porque la pantalla lo lee.
 
 interface PeriodoConReporte {
   id: string;
@@ -57,19 +61,7 @@ export async function GET(req: NextRequest) {
       supabaseServer.from("mk_marcas").select("id, nombre, codigo"),
     ]);
 
-    if (perRes.error) {
-      if (esTablaAusente(perRes.error)) {
-        const res = NextResponse.json({
-          hayPeriodos: false,
-          mensaje:
-            "Todavía no se activaron los períodos. Falta correr la actualización en la base de datos.",
-          periodos: [],
-        });
-        res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
-        return res;
-      }
-      throw new Error(perRes.error.message);
-    }
+    if (perRes.error) throw new Error(perRes.error.message);
 
     const filas = (perRes.data ?? []) as PeriodoConReporte[];
     const marcas = (marcasRes.error ? [] : (marcasRes.data ?? [])) as Array<{

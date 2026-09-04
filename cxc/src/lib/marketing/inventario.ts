@@ -31,11 +31,14 @@
 //   esconderlo sería peor que mostrarlo. La entrega NO se bloquea; el aviso
 //   lo da la pantalla (EntregaForm).
 //
-// 🟡 TOLERANTE A DDL PENDIENTE (patrón `cols-opcionales`): `bultos` y
-//   `foto_path` los agrega la migración 20260808160000, que Daniel corre A
-//   MANO. Mientras no exista la columna, las escrituras se reintentan sin
-//   ella y todo lo demás se guarda igual — nunca se pierde una entrega ni un
-//   producto por una migración pendiente.
+// Historia (ago-2026): era TOLERANTE A DDL PENDIENTE (patrón `cols-opcionales`)
+//   — `bultos` y `foto_path` los agregó la migración 20260808160000, que Daniel
+//   corrió a mano, y mientras no existiera la columna las escrituras se
+//   reintentaban sin ella. Tolerancia retirada el 3-sep-2026: las columnas
+//   existen desde 20260808160000_mk_mobiliario_bultos_y_foto.sql. Hoy un
+//   42703/PGRST204 es un error de verdad (esquema o permiso) y se propaga como
+//   cualquier otro; reintentar sin la columna guardaría una entrega SIN sus
+//   bultos o un producto SIN su foto y nadie se enteraría.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
@@ -68,21 +71,6 @@ import type {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-/**
- * "Esa columna todavía no existe" — 42703 es `undefined_column` de Postgres y
- * PGRST204 es lo que devuelve PostgREST cuando la columna no está en su schema
- * cache. Cualquier otro error es un error de verdad y se propaga.
- *
- * Es el patrón `cols-opcionales` del repo: la migración la corre Daniel a mano
- * y la pantalla tiene que funcionar ANTES.
- */
-function esColumnaAusente(
-  error: { code?: string | null; message?: string } | null,
-): boolean {
-  const code = error?.code ?? "";
-  return code === "42703" || code === "PGRST204";
 }
 
 function mapProducto(row: Record<string, unknown>): MkInventarioProducto {
@@ -173,8 +161,7 @@ function mapItem(row: Record<string, unknown>): MkEntregaItem {
     producto_id: String(row.producto_id),
     reparto,
     cantidad_por_marca: cantidadPorMarca,
-    // Ausente mientras la migración 20260808160000 no esté corrida → null,
-    // que es exactamente lo que significa "no se anotó".
+    // `null` = "no se anotó" (bultos es opcional).
     bultos: normalizarBultos(row.bultos),
     precio_unitario: Number(row.precio_unitario ?? 0),
     created_at: String(row.created_at ?? ""),
@@ -247,24 +234,14 @@ export async function createProducto(
   const fotoPath = normalizarFotoPath(input.fotoPath);
 
   const base = { nombre, precio: round2(precio), stock_total: stock };
-  let { data, error } = await supabaseServer
+  // Sin reintento "sin foto" (tolerancia a DDL retirada el 3-sep-2026): si
+  // el insert con `foto_path` falla, falla — la columna existe desde
+  // 20260808160000 y guardar el producto sin su foto sería esconder el error.
+  const { data, error } = await supabaseServer
     .from("mk_inventario_productos")
     .insert(fotoPath ? { ...base, foto_path: fotoPath } : base)
     .select("*")
     .single();
-
-  // cols-opcionales: sin la migración corrida, el producto se crea igual —
-  // sin foto. Perder la foto es reversible (se vuelve a subir); perder el
-  // producto entero por una columna que falta, no.
-  if (error && fotoPath && esColumnaAusente(error)) {
-    const reintento = await supabaseServer
-      .from("mk_inventario_productos")
-      .insert(base)
-      .select("*")
-      .single();
-    data = reintento.data;
-    error = reintento.error;
-  }
 
   if (error || !data) {
     throw new Error(`createProducto: ${error?.message ?? "sin datos"}`);
@@ -303,31 +280,14 @@ export async function updateProducto(
   if (Object.keys(payload).length === 0) {
     throw new Error("updateProducto: nada que actualizar");
   }
-  let { data, error } = await supabaseServer
+  // Sin reintento "sin foto" (tolerancia a DDL retirada el 3-sep-2026): la
+  // columna existe desde 20260808160000; un error acá es un error.
+  const { data, error } = await supabaseServer
     .from("mk_inventario_productos")
     .update(payload)
     .eq("id", id)
     .select("*")
     .single();
-
-  // cols-opcionales: sin la migración, el resto del producto se guarda igual.
-  if (error && tocaFoto && esColumnaAusente(error)) {
-    const { foto_path: _descartada, ...sinFoto } = payload;
-    if (Object.keys(sinFoto).length > 0) {
-      const reintento = await supabaseServer
-        .from("mk_inventario_productos")
-        .update(sinFoto)
-        .eq("id", id)
-        .select("*")
-        .single();
-      data = reintento.data;
-      error = reintento.error;
-    } else {
-      throw new Error(
-        "Todavía no se puede guardar la foto: falta correr la migración 20260808160000_mk_mobiliario_bultos_y_foto.sql en Supabase.",
-      );
-    }
-  }
 
   if (error || !data) {
     throw new Error(`updateProducto: ${error?.message ?? "sin datos"}`);
@@ -791,12 +751,14 @@ function computeTotalesEntrega(
 }
 
 /**
- * Inserta los renglones de una entrega.
+ * Inserta los renglones de una entrega, CON sus bultos.
  *
- * cols-opcionales: `bultos` la agrega la migración 20260808160000. Mientras no
- * exista, los renglones se guardan SIN bultos en vez de perderse la entrega
- * entera — que es lo que pasaría si el insert fallara. Las piezas (que son las
- * que mueven el stock) van en `reparto` y no dependen de la migración.
+ * Historia: era cols-opcionales — `bultos` la agregó la migración
+ * 20260808160000 y mientras no existiera los renglones se reinsertaban SIN
+ * bultos. Tolerancia retirada el 3-sep-2026: la columna existe desde esa
+ * migración; si el insert falla, `createEntrega` lo ve, deshace la cabecera y
+ * lanza. Guardar la entrega sin sus bultos y seguir sería perder un dato que
+ * la secretaria sí anotó, en silencio.
  */
 async function insertarItemsEntrega(
   entregaId: string,
@@ -808,27 +770,17 @@ async function insertarItemsEntrega(
   primaryMarca: string,
   precios: Map<string, number>,
 ): Promise<{ data: unknown[] | null; error: { message: string } | null }> {
-  const base = itemsUnidades.map((it) => ({
+  const filas = itemsUnidades.map((it) => ({
     entrega_id: entregaId,
     producto_id: it.productoId,
     reparto: [
       { marca_id: primaryMarca, empresa: null, cantidad: it.cantidad },
     ] as RepartoItemEntry[],
     precio_unitario: precios.get(it.productoId) ?? 0,
-  }));
-  const conBultos = base.map((row, i) => ({
-    ...row,
-    bultos: itemsUnidades[i].bultos,
+    bultos: it.bultos,
   }));
 
-  const primero = await supabaseServer
-    .from("mk_entrega_items")
-    .insert(conBultos)
-    .select("*");
-  if (!primero.error) return primero;
-  if (!esColumnaAusente(primero.error)) return primero;
-
-  return supabaseServer.from("mk_entrega_items").insert(base).select("*");
+  return supabaseServer.from("mk_entrega_items").insert(filas).select("*");
 }
 
 export async function createEntrega(

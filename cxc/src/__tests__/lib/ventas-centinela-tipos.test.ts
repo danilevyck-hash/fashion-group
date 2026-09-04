@@ -243,7 +243,12 @@ describe("B. el centinela — las DOS direcciones", () => {
     expect(logs).toHaveLength(0);
     const m = await medirTiposSinClasificar();
     expect(m.ok).toBe(false);
-    if (!m.ok) expect(m.motivo).toMatch(/todavía no existe/);
+    if (!m.ok) {
+      // El error CRUDO, no la explicación de la migración pendiente.
+      expect(m.motivo).toContain("does not exist");
+      expect(m.motivo).toContain("switch_facturas_tipos_sin_clasificar");
+      expect(m.motivo).not.toMatch(/migración pendiente|todavía no existe/);
+    }
   });
 
   it("NUNCA lanza: un centinela que tumba el sync que vigila es peor que no tenerlo", async () => {

@@ -36,7 +36,6 @@ import {
   indiceBloquePorMarcaId,
   nombreDeBloque,
 } from "./bloques";
-import { esTablaAusente } from "./periodos-io";
 
 // ----------------------------------------------------------------------------
 // Forma del reporte guardado
@@ -167,15 +166,23 @@ export interface DatosPeriodos {
   adjuntos: AdjuntoFila[];
   periodos: PeriodoRow[];
   sellos: SelloRow[];
-  /** false = la migración de períodos todavía no corrió. */
+  /**
+   * Siempre `true` desde el 3-sep-2026. Decía `false` cuando la migración de
+   * períodos no había corrido; hoy, si las tablas no contestan, esta función
+   * LANZA y nunca llega a armar el objeto. Se conserva porque `cerrar.ts` lo
+   * lee (`if (!datos.hayTablas) → 409`).
+   */
   hayTablas: boolean;
 }
 
 /**
  * Todo lo que hace falta para agregar por proveedor y por período.
  *
- * Degrada igual que `/api/marketing/inicio`: sin las tablas de período,
- * `periodos` y `sellos` llegan vacíos y `hayTablas` va en false.
+ * Historia: degradaba igual que `/api/marketing/inicio` — sin las tablas de
+ * período, `periodos` y `sellos` llegaban vacíos y `hayTablas` iba en false.
+ * Tolerancia retirada el 3-sep-2026: las tablas existen desde
+ * 20260811160000_marketing_periodos_por_proveedor.sql. Un error en esas dos
+ * lecturas se propaga como cualquier otro.
  */
 export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
   const [factRes, fmRes, proyRes, marcasRes, entRes, adjRes, perRes, selloRes] =
@@ -214,10 +221,8 @@ export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
   // Los adjuntos solo alimentan los dos AVISOS (sin comprobante / sin foto). Si
   // fallan, el módulo tiene que seguir diciendo la plata: un aviso ausente es
   // molesto, una pantalla en blanco es peor.
-  if (perRes.error && !esTablaAusente(perRes.error)) {
-    throw new Error(`periodos: ${perRes.error.message}`);
-  }
-  if (selloRes.error && !esTablaAusente(selloRes.error)) {
+  if (perRes.error) throw new Error(`periodos: ${perRes.error.message}`);
+  if (selloRes.error) {
     throw new Error(`periodo_documentos: ${selloRes.error.message}`);
   }
 
@@ -228,9 +233,9 @@ export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
     marcas: (marcasRes.data ?? []) as MarcaFila[],
     entregas: (entRes.data ?? []) as EntregaFila[],
     adjuntos: (adjRes.error ? [] : (adjRes.data ?? [])) as AdjuntoFila[],
-    periodos: (perRes.error ? [] : (perRes.data ?? [])) as PeriodoRow[],
-    sellos: (selloRes.error ? [] : (selloRes.data ?? [])) as SelloRow[],
-    hayTablas: !perRes.error && !selloRes.error,
+    periodos: (perRes.data ?? []) as PeriodoRow[],
+    sellos: (selloRes.data ?? []) as SelloRow[],
+    hayTablas: true,
   };
 }
 

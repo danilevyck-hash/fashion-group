@@ -14,19 +14,27 @@
  * propaga: caerse a 17 consultas ante una base que está sufriendo sería
  * esconder el problema y agrandarlo.
  *
- * 🔴 Y NUNCA UN $0. Si la tabla no existe, `disponible:false` y la pantalla lo
- * dice. Un inventario en cero y un inventario sin medir se ven idénticos.
+ * 🔴 Y NUNCA UN $0. Un inventario en cero y un inventario sin medir se ven
+ * idénticos, así que esta lectura NUNCA devuelve ceros inventados: o trae los
+ * números, o revienta. Quien la llama (`/api/dashboard/vista-general`) la
+ * envuelve en un `.catch` y pinta "no se pudo medir".
+ *
+ * Histórico: si `switch_articulo_info` no existía todavía se devolvía
+ * `disponible:false` con `fuente:"no-instalado"`.
+ * Tolerancia retirada el 3-sep-2026: la tabla existe (y la RPC también, desde
+ * 20260813190000_inventario_valorizado.sql). Un "no existe esa tabla" que hoy
+ * llegue es un permiso, un cambio de esquema o un timeout mal leído, y
+ * disfrazarlo de "todavía no instalado" dejaba la tarjeta apagada para siempre
+ * sin que nadie se enterara.
  */
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { B2B_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { esFuncionAusente } from "@/lib/multifashion/productos-lectura";
-import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import {
   agregarInventario,
   armarInventario,
-  inventarioNoDisponible,
   num,
   type FilaArticuloInfo,
   type InventarioEmpresa,
@@ -44,7 +52,7 @@ export const RPC_INVENTARIO = "inventario_valorizado_v1";
 export const EMPRESAS_CON_INVENTARIO: readonly string[] = B2B_EMPRESA_KEYS;
 
 /** De dónde salió el número, para poder auditarlo desde la respuesta. */
-export type FuenteInventario = "rpc" | "paginado" | "no-instalado";
+export type FuenteInventario = "rpc" | "paginado";
 
 export interface LecturaInventario extends InventarioValorizado {
   fuente: FuenteInventario;
@@ -100,11 +108,8 @@ export async function leerInventarioValorizado(ahoraMs: number = Date.now()): Pr
       fuente: "rpc",
     };
   }
-  // La tabla no existe todavía → la pantalla lo dice, no inventa un cero.
-  if (esTablaAusente(error)) {
-    return { ...inventarioNoDisponible(EMPRESAS_CON_INVENTARIO), fuente: "no-instalado" };
-  }
   // ⚠️ ESTRECHO A PROPÓSITO: sólo "la función no existe" cae al camino largo.
+  // Todo lo demás —incluido un "no existe esa tabla"— se propaga.
   if (!esFuncionAusente(error)) throw new Error(`${RPC_INVENTARIO}: ${error.message}`);
   console.warn(
     `[inventario] ${RPC_INVENTARIO} no existe todavía (falta correr ` +
@@ -115,28 +120,20 @@ export async function leerInventarioValorizado(ahoraMs: number = Date.now()): Pr
   // ── Camino largo: paginado con verificación contra COUNT exacto ──
   // `leerTodoPaginado` revienta si lo leído no cuadra con el count: un truncado
   // silencioso acá se vería como "tengo menos mercancía", sin ningún error.
-  let filas: FilaArticuloInfo[];
-  try {
-    filas = await leerTodoPaginado<FilaArticuloInfo>(
-      "switch_articulo_info (inventario valorizado)",
-      (pedirCount, desde, hasta) =>
-        supabaseServer
-          .from("switch_articulo_info")
-          .select(
-            "empresa_key, existencia, costo_api, precio_etiqueta, synced_at",
-            pedirCount ? { count: "exact" } : {},
-          )
-          // Orden ESTABLE para paginar: la PK es (empresa_key, codigo).
-          .order("empresa_key", { ascending: true })
-          .order("codigo", { ascending: true })
-          .range(desde, hasta),
-    );
-  } catch (e) {
-    if (esTablaAusente(e)) {
-      return { ...inventarioNoDisponible(EMPRESAS_CON_INVENTARIO), fuente: "no-instalado" };
-    }
-    throw e;
-  }
+  const filas = await leerTodoPaginado<FilaArticuloInfo>(
+    "switch_articulo_info (inventario valorizado)",
+    (pedirCount, desde, hasta) =>
+      supabaseServer
+        .from("switch_articulo_info")
+        .select(
+          "empresa_key, existencia, costo_api, precio_etiqueta, synced_at",
+          pedirCount ? { count: "exact" } : {},
+        )
+        // Orden ESTABLE para paginar: la PK es (empresa_key, codigo).
+        .order("empresa_key", { ascending: true })
+        .order("codigo", { ascending: true })
+        .range(desde, hasta),
+  );
   return {
     ...agregarInventario(filas, EMPRESAS_CON_INVENTARIO, ahoraMs),
     fuente: "paginado",

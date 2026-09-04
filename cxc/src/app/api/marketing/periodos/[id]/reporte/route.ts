@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { esTablaAusente } from "@/lib/marketing/periodos-io";
 import { esMarcaCodigo } from "@/lib/marketing/bloques";
 import { XLSX_MIME } from "@/lib/excel-export";
 import {
@@ -75,18 +74,11 @@ export async function GET(
       .eq("id", params.id)
       .maybeSingle();
 
-    if (error) {
-      if (esTablaAusente(error)) {
-        return NextResponse.json(
-          {
-            error:
-              "Todavía no se activaron los períodos. Falta correr la actualización en la base de datos.",
-          },
-          { status: 409 },
-        );
-      }
-      throw new Error(error.message);
-    }
+    // Tolerancia a DDL retirada el 3-sep-2026 (contestaba 409 "falta correr
+    // la actualización" ante 42P01/PGRST205): `mk_periodos` existe desde
+    // 20260811160000. Hoy ese código es un error de verdad y cae al 500 de
+    // abajo, con el mismo mensaje humano.
+    if (error) throw new Error(error.message);
     if (!data) {
       return NextResponse.json({ error: "Ese período no existe." }, { status: 404 });
     }

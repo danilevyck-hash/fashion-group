@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { empresasConCxc } from "@/lib/switch-api/empresas";
-import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 
 // Última COMPRA por empresa+cliente — el espejo de /api/cxc/ultimo-pago.
 //
@@ -55,15 +54,14 @@ export async function GET(req: NextRequest) {
       .order("cliente_codigo", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) {
-      // La DDL 20260813180000 la corre Daniel A MANO, así que la vista puede no
-      // existir por días — y eso NO es un error: es el estado normal hasta que
-      // corra. Se responde [] y el CXC se dibuja EXACTAMENTE como antes, sin la
-      // columna. El reconocimiento es ESTRECHO: un timeout o un permiso denegado
-      // siguen siendo 500, porque esconderlos sería agrandarlos.
-      if (esTablaAusente(error)) {
-        console.warn("[cxc/ultima-compra] falta la vista (DDL 20260813180000 sin correr)");
-        return NextResponse.json([]);
-      }
+      // Histórico: la DDL 20260813180000 la corría Daniel A MANO, así que la
+      // vista podía no existir por días y eso NO era un error — se respondía []
+      // y el CXC se dibujaba sin la columna.
+      // Tolerancia retirada el 3-sep-2026: la vista existe desde la migración
+      // 20260813180000_ultima_compra_cliente.sql. Ahora CUALQUIER error es 500:
+      // un "no existe la tabla" que hoy llegue es un permiso, un cambio de
+      // esquema o un timeout, y leído como "este cliente nunca compró" sería
+      // exactamente la mentira callada que este módulo ya pagó dos veces.
       console.error(`[cxc/ultima-compra] ${error.message}`);
       return NextResponse.json({ error: "Error al leer últimas compras" }, { status: 500 });
     }

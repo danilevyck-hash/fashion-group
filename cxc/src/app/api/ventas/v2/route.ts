@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerDashboardSummary } from "@/lib/ventas/dashboard-summary";
 import { requireAuth } from "@/lib/require-auth";
 import { mapEmpresaName } from "@/lib/empresa-mapping";
 
@@ -59,8 +60,10 @@ export async function GET(req: NextRequest) {
   const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
 
   const [currentRes, prevRes, topRes, detalleRes] = await Promise.all([
-    supabaseServer.rpc("ventas_dashboard_summary", { p_anio: año }),
-    supabaseServer.rpc("ventas_dashboard_summary", { p_anio: año - 1 }),
+    // `_v2` desde el 3-sep-2026: el costo incluye las notas de débito
+    // (`dashboard-summary.ts`); cae a la `_v1` mientras la migración no corra.
+    leerDashboardSummary(año),
+    leerDashboardSummary(año - 1),
     supabaseServer.rpc("ventas_topclientes_summary", { p_anio: año, p_top: 10 }),
     supabaseServer.rpc("ventas_clientes_detalle_summary", {
       p_anio: año,
