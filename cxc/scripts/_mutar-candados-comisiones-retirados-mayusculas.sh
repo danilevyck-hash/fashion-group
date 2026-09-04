@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# ¿Los candados de «te dije que eliminaras Rey Stoute Aguas» y «capitaliza reynaldo» CAZAN de
-# verdad? Se rompe el código a propósito, una cosa por vez, y se exige que los
+# ¿Los candados de «te dije que eliminaras Rey Stoute Aguas», «quita colaborador»
+# y «capitaliza reynaldo» CAZAN de verdad? Se rompe el código a propósito, una cosa por vez, y se exige que los
 # tests se pongan ROJOS. CONTROL (sin mutar) tiene que quedar verde.
 #
 # 🩸 LA RESTAURACIÓN VA POR COPIA, NO CON `git checkout`: hay archivos NUEVOS
@@ -99,17 +99,23 @@ CFG="src/components/ventas/ComisionesConfiguracionView.tsx"
 
 # ── (a) Los retirados ──────────────────────────────────────────────────────────
 
+LISTA='["REY STOUTE AGUAS", "AGUAS", "COLABORADOR"]'
+
 # 1. Se quita REY STOUTE AGUAS del set (queda solo la grafía vieja): la fila vuelve.
-mutar "$OC" '["REY STOUTE AGUAS", "AGUAS"]' '["AGUAS"]' \
+mutar "$OC" "$LISTA" '["AGUAS", "COLABORADOR"]' \
   "retirados: se quita REY STOUTE AGUAS del set"
 
 # 2. Se quita AGUAS (la grafía vieja, por si el alias falla abierto).
-mutar "$OC" '["REY STOUTE AGUAS", "AGUAS"]' '["REY STOUTE AGUAS"]' \
+mutar "$OC" "$LISTA" '["REY STOUTE AGUAS", "COLABORADOR"]' \
   "retirados: se quita AGUAS (grafía vieja) del set"
 
 # 3. La lista queda vacía: nadie retirado.
-mutar "$OC" '["REY STOUTE AGUAS", "AGUAS"]' '[]' \
+mutar "$OC" "$LISTA" '[]' \
   "retirados: lista vacía"
+
+# 3b. Se quita COLABORADOR («quita colaborador», 3-sep-2026): la fila negativa vuelve y el total baja.
+mutar "$OC" "$LISTA" '["REY STOUTE AGUAS", "AGUAS"]' \
+  "retirados: se quita COLABORADOR de la lista"
 
 # 4. La comparación deja de pasar por el alias.
 mutar "$OC" 'const canonico = aplicarAlias(vendedor, alias);' 'const canonico = (vendedor ?? "").trim();' \

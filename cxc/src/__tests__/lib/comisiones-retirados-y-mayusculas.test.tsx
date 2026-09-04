@@ -4,7 +4,11 @@
 // 🩸 Daniel, 3-sep-2026, textual: «esconder rey stoute. si capitiliza reynaldo.»
 // Y al rato, corrigiendo la primera versión del cambio: «te dije que eliminaras
 // Rey Stoute Aguas.» No es «esconder la fila»: esa persona DESAPARECE de
-// Comisiones entera.
+// Comisiones entera. Y más tarde ese mismo día: «quita colaborador» —
+// «COLABORADOR» no es una persona, es el usuario genérico de Switch en Vistana
+// (mostrador, 2023-2025); en 2026 la RPC le arma una fila NEGATIVA (−$5,28),
+// así que retirarlo SUBE el total. Medido en
+// scripts/_medir-comisiones-colaborador-retirado.mjs.
 //
 // Lo que pasó: la lista vivía dentro de la matriz consolidada y comparaba
 // «AGUAS» a secas (3-ago-2026: «quita el vendedor aguas, no lo quiero ver»).
@@ -14,8 +18,9 @@
 // `lib/comisiones/retirados` y compara por el nombre CANÓNICO.
 //
 // Lo que se vigila, montando las vistas REALES:
-//   (a) «REY STOUTE AGUAS» y «AGUAS» están retirados — no existen en la tabla,
-//       en las tarjetas, en el Excel, en Configuración NI EN LOS TOTALES.
+//   (a) «REY STOUTE AGUAS», «AGUAS» y «COLABORADOR» están retirados — no existen
+//       en la tabla, en las tarjetas, en el Excel, en Configuración NI EN LOS
+//       TOTALES (ni sumando ni RESTANDO: la fila de COLABORADOR es negativa).
 //       CONTROL: Edwin no está retirado y sí suma. La migración que desactiva
 //       su tasa hace UPDATE por el canónico exacto y nunca DELETE. (Que el
 //       servidor rechace una tasa o una exclusión a su nombre se prueba en
@@ -70,6 +75,7 @@ import type { ExcelApi } from "@/components/ventas/ComisionesView";
 const CANONICO = "REYNALDO ESPINOSA";
 const BONITO = "Reynaldo Espinosa";
 const AGUAS = "REY STOUTE AGUAS";
+const COLABORADOR = "COLABORADOR";
 
 const fila = (vendedor: string, total: number, se_paga = true) => ({
   vendedor,
@@ -78,10 +84,11 @@ const fila = (vendedor: string, total: number, se_paga = true) => ({
   comision_total: total, descuento: 0, se_paga,
 });
 
-/** Vistana: Edwin 100 · Rey Stoute Aguas 49.83 (canónico, como lo manda la v8) · la oficina 40. */
+/** Vistana: Edwin 100 · Rey Stoute Aguas 49.83 (canónico, como lo manda la v8) ·
+ *  COLABORADOR −5.28 (negativa, como en producción) · la oficina 40. */
 const POR_EMPRESA = {
   empresa_key: "vistana", year: 2026, mes: 8, version: "v8", regla_cobro: "quien_registro", exclusiones_aplicadas: true, alias_aplicado: true,
-  vendedores: [fila("EDWIN", 100), fila(AGUAS, 49.83), fila(CANONICO, 300), fila("DEFAULT", 40, false)],
+  vendedores: [fila("EDWIN", 100), fila(AGUAS, 49.83), fila(COLABORADOR, -5.28), fila(CANONICO, 300), fila("DEFAULT", 40, false)],
 };
 /** Dos empresas: Reynaldo en las dos (una sola fila), Aguas canónico en una y
  *  con la grafía vieja («AGUAS», alias fallando abierto) en la otra. */
@@ -102,11 +109,12 @@ const CONFIG = {
     { vendedor_nombre: "EDWIN", tasa_venta: 0.005, tasa_cobro: 0.005, activo: true, origen: ["Vistana"] },
     { vendedor_nombre: CANONICO, tasa_venta: 0.01, tasa_cobro: 0.01, activo: true, origen: ["Active Shoes"] },
     { vendedor_nombre: AGUAS, tasa_venta: 0.005, tasa_cobro: 0.005, activo: true, origen: ["Vistana"] },
+    { vendedor_nombre: COLABORADOR, tasa_venta: 0.005, tasa_cobro: 0.005, activo: true, origen: ["Vistana"] },
   ],
 };
 const EXCLUSIONES = {
   exclusiones: [],
-  vendedores: { vistana: ["EDWIN", AGUAS, CANONICO], fashion_wear: [], fashion_shoes: [], active_shoes: [], active_wear: [], joystep: [] },
+  vendedores: { vistana: ["EDWIN", AGUAS, COLABORADOR, CANONICO], fashion_wear: [], fashion_shoes: [], active_shoes: [], active_wear: [], joystep: [] },
 };
 
 const almacenReal = (): Storage => {
@@ -160,13 +168,19 @@ describe("🔴 (a) la lista de retirados, en UN solo lugar y por el nombre canó
     { nombre_switch: "REINALDO ESPINOSA", vendedor_canonico: CANONICO },
   ];
 
-  it("REY STOUTE AGUAS y AGUAS están en la lista; se compara sin importar mayúsculas ni bordes", () => {
+  it("REY STOUTE AGUAS, AGUAS y COLABORADOR están en la lista; se compara sin importar mayúsculas ni bordes", () => {
     expect(VENDEDORES_RETIRADOS).toContain(AGUAS);
     expect(VENDEDORES_RETIRADOS).toContain("AGUAS");
+    expect(VENDEDORES_RETIRADOS).toContain(COLABORADOR);
     expect(estaRetirado(AGUAS)).toBe(true);
     expect(estaRetirado("AGUAS")).toBe(true);
     expect(estaRetirado("  rey stoute aguas ")).toBe(true);
     expect(estaRetirado(" aguas")).toBe(true);
+    expect(estaRetirado(COLABORADOR)).toBe(true);
+    expect(estaRetirado(" colaborador ")).toBe(true);
+    expect(estaRetirado("Colaborador")).toBe(true);
+    // Sin alias que lo conozca (no lo hay en producción): igual está retirado.
+    expect(estaRetirado(COLABORADOR, ALIAS)).toBe(true);
   });
 
   it("con la tabla de alias, la grafía pasa por el alias ANTES de comparar: una grafía que solo el alias conoce también está retirada", () => {
@@ -205,24 +219,29 @@ describe("🔴 (a) la lista de retirados, en UN solo lugar y por el nombre canó
     expect(estaRetirado(undefined)).toBe(false);
   });
 
-  it("sinRetirados quita solo a los retirados y no toca los montos de los demás", () => {
+  it("sinRetirados quita solo a los retirados (Aguas y COLABORADOR) y no toca los montos de los demás", () => {
     const out = sinRetirados(POR_EMPRESA.vendedores);
     expect(out.map((v) => v.vendedor)).toEqual(["EDWIN", CANONICO, "DEFAULT"]);
     expect(out.find((v) => v.vendedor === "EDWIN")?.comision_total).toBe(100);
   });
 });
 
-describe("🔴 (a) Por empresa: Aguas no existe en la tabla, ni en las tarjetas, ni en el total", () => {
-  it("la tabla no lo lista y «Total a pagar» = Edwin 100 + Reynaldo 300 = $400.00, no $449.83", async () => {
+describe("🔴 (a) Por empresa: ni Aguas ni COLABORADOR existen en la tabla, ni en las tarjetas, ni en el total", () => {
+  it("la tabla no los lista y «Total a pagar» = Edwin 100 + Reynaldo 300 = $400.00, no $449.83 ni $394.72 ni $444.55", async () => {
     render(<ComisionesPorEmpresaView year={2026} mes={8} />);
     const tabla = await screen.findByRole("table");
     expect(within(tabla).queryByText(/Aguas/i)).toBeNull();
-    expect(screen.queryByText(/Rey Stoute Aguas|REY STOUTE AGUAS/)).toBeNull();
+    expect(within(tabla).queryByText(/Colaborador/i)).toBeNull();
+    expect(screen.queryByText(/Rey Stoute Aguas|REY STOUTE AGUAS|COLABORADOR/)).toBeNull();
     // CONTROL: Edwin sí está y sí suma.
     expect(within(tabla).getByText("Edwin")).toBeTruthy();
     const pie = textoPie(tabla);
     expect(pie).toContain("$400.00");
     expect(pie).not.toContain("$449.83");
+    // COLABORADOR es negativo: si se colara, el total BAJARÍA a $394.72 (o $444.55 con Aguas).
+    expect(pie).not.toContain("$394.72");
+    expect(pie).not.toContain("$444.55");
+    expect(pie.some((c) => /-\$?5\.28/.test(c ?? ""))).toBe(false);
     // Ni «vendedor sin actividad»: no se colapsa, no existe.
     expect(within(tabla).queryByText(/sin actividad/)).toBeNull();
   });
@@ -233,6 +252,7 @@ describe("🔴 (a) Por empresa: Aguas no existe en la tabla, ni en las tarjetas,
     const tarjetas = [...container.querySelectorAll("[data-comision-card]")].map((c) => c.textContent ?? "");
     expect(tarjetas).toHaveLength(3);
     expect(tarjetas.some((t) => /Aguas/i.test(t))).toBe(false);
+    expect(tarjetas.some((t) => /Colaborador/i.test(t))).toBe(false);
     expect(container.querySelector("[data-comision-total]")?.textContent).toContain("$400.00");
   });
 
@@ -243,12 +263,13 @@ describe("🔴 (a) Por empresa: Aguas no existe en la tabla, ni en las tarjetas,
     api!.run();
     await vi.waitFor(() => expect(excelRecibido.resumen).toBeTruthy());
     expect(excelRecibido.resumen!.vendedores.map((v) => v.vendedor)).not.toContain(AGUAS);
+    expect(excelRecibido.resumen!.vendedores.map((v) => v.vendedor)).not.toContain(COLABORADOR);
     const ws = await buildComisionesResumenSheet({
       empresaKey: "vistana", empresaNombre: "Vistana", year: 2026, mes: 8,
       vendedores: excelRecibido.resumen!.vendedores as never,
     });
     const celdas = celdasDe(ws);
-    expect(celdas.some((c) => typeof c === "string" && /aguas/i.test(c))).toBe(false);
+    expect(celdas.some((c) => typeof c === "string" && /aguas|colaborador/i.test(c))).toBe(false);
     expect((ws[`F${filaTotalDe(ws)}`] as { v: number }).v).toBe(400);
   });
 });
@@ -258,6 +279,7 @@ describe("🔴 (a) Todas las empresas: ni el canónico ni la grafía vieja entra
     render(<ComisionesConsolidadoView year={2026} mes={8} />);
     const tabla = await screen.findByRole("table");
     expect(within(tabla).queryByText(/Aguas/i)).toBeNull();
+    expect(within(tabla).queryByText(/Colaborador/i)).toBeNull();
     const filas = within(tabla).getAllByRole("row").filter((r) => r.hasAttribute("data-se-paga"));
     expect(filas).toHaveLength(3);
     const pie = textoPie(tabla);
@@ -267,6 +289,9 @@ describe("🔴 (a) Todas las empresas: ni el canónico ni la grafía vieja entra
     expect(pie).not.toContain("$449.83");
     expect(pie).not.toContain("$210.00");
     expect(pie).not.toContain("$659.83");
+    // Con COLABORADOR (−5.28) colado: vistana $394.72 / total $594.72.
+    expect(pie).not.toContain("$394.72");
+    expect(pie).not.toContain("$594.72");
   });
 
   it("el Excel consolidado no lo lleva y su Total tampoco", async () => {
@@ -283,6 +308,7 @@ describe("🔴 (a) Todas las empresas: ni el canónico ni la grafía vieja entra
     expect(nombres).toHaveLength(2);
     expect(nombres).not.toContain(AGUAS);
     expect(nombres).not.toContain("AGUAS");
+    expect(nombres).not.toContain(COLABORADOR);
     const ws = await buildComisionesConsolidadoSheet({
       year: 2026, mes: 8,
       empresas: [{ key: "vistana", nombre: "Vistana" }, { key: "fashion_wear", nombre: "Fashion Wear" }],
@@ -292,12 +318,12 @@ describe("🔴 (a) Todas las empresas: ni el canónico ni la grafía vieja entra
     expect((ws[`D${filaTotalDe(ws)}`] as { v: number }).v).toBe(600);
   });
 
-  it("el constructor del Excel se defiende solo: si le llega Aguas, no lo lista ni lo suma (resumen y consolidado)", async () => {
+  it("el constructor del Excel se defiende solo: si le llega Aguas o COLABORADOR, no lo lista ni lo suma (resumen y consolidado)", async () => {
     const resumen = await buildComisionesResumenSheet({
       empresaKey: "vistana", empresaNombre: "Vistana", year: 2026, mes: 8,
-      vendedores: [fila("EDWIN", 100), fila(AGUAS, 49.83), fila("AGUAS", 10)],
+      vendedores: [fila("EDWIN", 100), fila(AGUAS, 49.83), fila("AGUAS", 10), fila(COLABORADOR, -5.28)],
     });
-    expect(celdasDe(resumen).some((c) => typeof c === "string" && /aguas/i.test(c))).toBe(false);
+    expect(celdasDe(resumen).some((c) => typeof c === "string" && /aguas|colaborador/i.test(c))).toBe(false);
     expect((resumen[`F${filaTotalDe(resumen)}`] as { v: number }).v).toBe(100);
 
     const consolidado = await buildComisionesConsolidadoSheet({
@@ -306,20 +332,22 @@ describe("🔴 (a) Todas las empresas: ni el canónico ni la grafía vieja entra
       vendedores: [
         { vendedor: "EDWIN", porEmpresa: { vistana: 100 }, total: 100, se_paga: true },
         { vendedor: AGUAS, porEmpresa: { vistana: 49.83 }, total: 49.83, se_paga: true },
+        { vendedor: COLABORADOR, porEmpresa: { vistana: -5.28 }, total: -5.28, se_paga: true },
       ],
     });
-    expect(celdasDe(consolidado).some((c) => typeof c === "string" && /aguas/i.test(c))).toBe(false);
+    expect(celdasDe(consolidado).some((c) => typeof c === "string" && /aguas|colaborador/i.test(c))).toBe(false);
     expect((consolidado[`C${filaTotalDe(consolidado)}`] as { v: number }).v).toBe(100);
   });
 });
 
-describe("🔴 (a) Configuración: Aguas no existe en «Tasas por vendedor» ni en el desplegable de vendedores", () => {
-  it("la tabla de tasas lo omite aunque el servidor lo mande; CONTROL: Edwin y Reynaldo sí", async () => {
+describe("🔴 (a) Configuración: ni Aguas ni COLABORADOR existen en «Tasas por vendedor» ni en el desplegable de vendedores", () => {
+  it("la tabla de tasas los omite aunque el servidor los mande; CONTROL: Edwin y Reynaldo sí", async () => {
     render(<ComisionesConfiguracionView />);
     const tasas = (await screen.findByText("Tasas por vendedor")).closest("section")!;
     await within(tasas).findByText("Edwin");
     expect(within(tasas).getByText(BONITO)).toBeTruthy();
     expect(within(tasas).queryByText(/Aguas/i)).toBeNull();
+    expect(within(tasas).queryByText(/Colaborador/i)).toBeNull();
   });
 
   it("al agregar un cliente que no comisiona, el desplegable no ofrece a Aguas", async () => {
@@ -331,8 +359,9 @@ describe("🔴 (a) Configuración: Aguas no existe en «Tasas por vendedor» ni 
     const opciones = [...select.options].map((o) => o.textContent ?? "");
     expect(opciones).toContain("Edwin");
     expect(opciones).toContain(BONITO);
-    expect(opciones.some((o) => /aguas/i.test(o))).toBe(false);
+    expect(opciones.some((o) => /aguas|colaborador/i.test(o))).toBe(false);
     expect([...select.options].map((o) => o.value)).not.toContain(AGUAS);
+    expect([...select.options].map((o) => o.value)).not.toContain(COLABORADOR);
   });
 });
 

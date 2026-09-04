@@ -4,6 +4,7 @@
 //   · 3-ago-2026: «quita el vendedor aguas, no lo quiero ver».
 //   · 3-sep-2026: «esconder rey stoute», y al rato, corrigiendo la primera
 //     versión de este cambio: «te dije que eliminaras Rey Stoute Aguas.»
+//   · 3-sep-2026 (más tarde): «quita colaborador».
 //
 // O sea: no es «esconder la fila». Esa persona DESAPARECE de Comisiones
 // entera: la matriz de todas las empresas, la tabla por empresa, las tarjetas
@@ -38,11 +39,20 @@
 // «AGUAS» a secas se conserva en la lista: `aplicarAlias` falla ABIERTO (si la
 // tabla de alias no se pudo leer, el nombre sale tal cual) y ese día la grafía
 // vieja tampoco tiene que aparecer.
+//
+// «COLABORADOR» no es una persona: es el usuario genérico de Switch en Vistana
+// con el que se facturó el mostrador («Ventas Locales») entre 2023 y 2025 —
+// 1.024 facturas y 827 recibos, todos en Vistana; el último documento es del
+// 23-mar-2026 —. En 2026 le quedan 2 movimientos (un cobro de $343,75 en enero
+// y una nota de crédito de $1.400 en marzo) y la RPC le arma una fila de
+// −$5,28: al retirarla el total pagable SUBE esos $5,28. No tiene tasa, ni
+// exclusión, ni alias, ni descuento fijo, así que no hace falta migración
+// (medido con `scripts/_medir-comisiones-colaborador-retirado.mjs`).
 
 import { aplicarAlias, claveAlias, type AliasVendedor } from "@/lib/comisiones/alias";
 
 /** Los retirados. Se comparan en mayúsculas y sin bordes, ya pasados por el alias. */
-export const VENDEDORES_RETIRADOS: readonly string[] = ["REY STOUTE AGUAS", "AGUAS"];
+export const VENDEDORES_RETIRADOS: readonly string[] = ["REY STOUTE AGUAS", "AGUAS", "COLABORADOR"];
 
 const RETIRADOS = new Set(VENDEDORES_RETIRADOS.map(claveAlias));
 
