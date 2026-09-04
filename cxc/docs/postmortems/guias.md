@@ -1136,3 +1136,63 @@
 > `src/__tests__/lib/guias-destinos-precedencia.test.ts` (11 — el orden tabla→constante→histórico, las dos correcciones textuales, PGRST205 contra la ruta real) · `src/__tests__/api/guias-destinos-config-route.test.ts` (15 — llama a los handlers con la base doblada: secretaria 200 con la cita, bodega/vendedor 403, la puerta única, el 409 de única-entre-activas, el soft delete mirando QUÉ se escribió, el 503 de la migración, el barrido sin comentarios) · `src/__tests__/components/guias-configuracion-pantalla.test.tsx` (13 — monta la página REAL de `/guias`, toca la pestaña y cuenta lo que sale por fetch: quién la ve, agrupada, `ClientePicker`, dice si autollena, promover requiere tocar, quitar confirma antes de escribir, CONTROL con el interruptor apagado).
 > - **Verificado por mutación, 9 de 9 cazadas y 0 sobrevivientes** (`bash scripts/_mutar-candados-guias-destinos-config.sh`): la tabla deja de ganar · la constante deja de ser la red · quitar BORRA la fila · bodega gana permiso · la secretaria lo pierde · la pestaña se dibuja para cualquier rol · un histórico se promueve solo al dibujarse · el campo Dirección deja de ser editable · la ruta de frecuencias tira los definidos. Con la mutación de CONTROL (⛔) y restauración por COPIA, como los demás scripts del módulo.
 > - Los TRES scripts anteriores del módulo se re-corrieron en verde tras el cambio: `_mutar-candados-guias-destinos.sh` **13/13** (dos patrones se actualizaron a la firma nueva de `botonesDeDestino`/`tiendasDelDestino` — el aplicador los DENUNCIÓ como muertos en vez de cantarlos cazados, que es exactamente para lo que existe), `_mutar-candados-guias-facturas.sh` **12/12**, `_mutar-candados-guias-ajustes-4sep.sh` **17/17**.
+
+---
+
+## 🔴 Guías — EL MOCKUP FINAL: días con factura, «Traslado» y «el de siempre» (4-sep-2026, noche)
+
+> Daniel aprobó el mockup final con un **«dale aprobado»**. Tres cosas, todas bajo el mismo interruptor `GUIAS_ATAJOS_NUEVOS` — apagado, la pantalla queda como antes de `115f90ed`.
+>
+> ### 1 · Las facturas se agrupan POR DÍA — los últimos 3 días CON factura
+>
+> El panel mostraba 15 días agrupados en Hoy · Esta semana · Antes. Ahora abre con **los últimos 3 días en que ese cliente tuvo factura**, el más reciente arriba, cada día con su encabezado en palabras («Miércoles 3 sep»), y un botón **«Ver más días»** que trae 3 días más cada vez.
+> - 🔴 **Son días CON FACTURA, no de calendario** — si el último día facturado fue hace dos semanas, ESE es el primer grupo. Un corte por calendario dejaría el panel vacío justo para el cliente que menos compra. Hay mutación que agrupa por calendario y muere en rojo.
+> - **Medido, y es por lo que Daniel lo pidió**: de 471 facturas usadas en guías este año, el **77% salen del ÚLTIMO día facturado**, el 92% de los últimos 2 y el **95% de los últimos 3**. El dato vive en el comentario de `DIAS_CON_FACTURA_VISIBLES` (`atajos-facturas.ts`).
+> - El día es el de **PANAMÁ** (`fechaPanamaDe`): una factura de las 03:00 UTC es del día anterior. El encabezado sale de `tituloDelDia` — puro, sin reloj: el día de la semana de una fecha calendario no depende de la zona.
+> - **Todo lo demás del panel se conserva**: la marca «ya salió en GT-XXX» (aviso, nunca bloqueo), «Escribir el número» a mano, el orden por fecha desc, el pareo por (empresa, número).
+>
+> ### 2 · 🔴 El botón «Traslado» — DOS caminos y nada más
+>
+> Daniel, textual: *«tiene que haber la factura normal, y opción traslado por si a no solo Multifashion pero también otra tienda se le mandan cosas, que en factura salga traslado»*.
+> - Debajo de la lista de facturas, separado por un «o», **un solo botón: «Traslado»**. Sirve para CUALQUIER cliente — medido: 31 de los 58 renglones con `0000` son Multi Fashion y American Classics, pero Nova Lux, City Mall David y Plaza Los Ángeles también tienen. **Es del ENVÍO, no del cliente**: el mismo cliente unas veces lleva factura y otras no.
+> - Se guarda el TEXTO **`Traslado`** en el mismo campo `facturas`, y así se imprime en la columna FACTURA(S) del papel (`PrintDocument`), en el PDF y en el Excel — hay candado que renderiza el papel y arma el Excel de verdad. La validación del formulario lo acepta (`esTraslado`, solo con el interruptor encendido: apagado, la validación es EXACTAMENTE la de antes).
+> - **No se pide factura, y la EMPRESA SÍ se elige a mano** — no hay factura que la diga. El renglón nace sin empresa y la guía no se guarda hasta elegirla, como cualquier renglón.
+> - 🔴 **Nada de «Factura pendiente» ni «Sin factura»**: Daniel los descartó explícitamente. Son DOS caminos: factura o Traslado. El botón viejo «Traslado sin factura» (que escribía `0000`) se retiró.
+> - ⚠️ **Los 58 renglones viejos con `0000` no se tocan** — es lo que el transportista firmó. Cero migración que limpie el histórico.
+>
+> ### 3 · 🔴 «EL DE SIEMPRE» — la regla que reemplaza a «solo autollena si hay UNO»
+>
+> Daniel, textual: *«sí correcto, con entrega Sport Corner como default, que elija si quiere el otro sino»*. Cada cliente puede tener **UN destino marcado como «el de siempre»** → ese se llena solo al elegir el cliente, **aunque el cliente tenga varios destinos**. Los demás salen como botones. **Sin ninguno marcado, no se llena nada.**
+> - La marca vive en la tabla (`guias_destino_cliente.el_de_siempre`, migración `20260918120000` — **pendiente de aplicar**, se editó en el lugar: columna nueva + índice parcial único «a lo sumo UNO activo por cliente») y en la constante (`DESTINOS_DEFINIDOS`, ahora con entradas `{ destino, tiendas?, elDeSiempre? }`; `TIENDAS_POR_CLIENTE` se plegó adentro). En **Guías › Configuración** hay una marca por fila («el de siempre»): marcarla apaga la de los demás destinos del cliente **en el servidor** (dos UPDATE, primero se apagan los hermanos — el índice rechazaría dos encendidos a la vez).
+> - **Los ~40 clientes restantes** siguen saliendo de su historia agrupada, y con UN solo destino histórico **también autollenan** — Daniel: *«no quiero definir cliente por cliente, ya tú debes de saberlo con las guías que hemos hecho»*. Lo que cambió es el lado de los DEFINIDOS: una fila creada en Configuración **no autollena hasta que alguien la marque**.
+>
+> **Los definidos, tal como los cerró Daniel** (en `DESTINOS_DEFINIDOS` y en la carga inicial de la migración — 34 filas):
+>
+> | Código | Cliente | Destino(s) | El de siempre |
+> |---|---|---|---|
+> | D-81 | Jerusalem Duty Free | Paso Canoas | sí |
+> | D-80 | Jerusalem De Panamá | Paso Canoas | sí |
+> | D-156 | Wolf Mall Center Int | Changuinola | sí |
+> | D-117 | Outlet Duty Free N2 | Guabito | sí |
+> | D-87 | La Frontera Duty Free | Guabito | sí (gana sobre su histórico, que dice Changinola ×7) |
+> | D-25 | City Mall Paso Canoa | Paso Canoas | sí |
+> | D-35 | City Shoes | Calle 19 Central, al lado de la joyería Super Oro | sí |
+> | D-112 | Nine Sports 9, S.A. | Calle 19 Central | sí |
+> | D-144 | Star Shoes, S.A. | Albrook | sí |
+> | D-141 | Sport Fashion | Los Andes | sí |
+>
+> - **Correcciones de escritura** (Daniel: *«pon lo que recomendaste en ¿es esto?, así mismo»*): D-99 Mas Flow 21 Oeste → **Westland** · D-147 Top Shop Store → **Changuinola** · D-7 Almacén Flash → **Penonomé** · D-43 De Moda → **Las Tablas** · D-86 Kings Sport → **Albrook**. Todos «el de siempre» — el typo del histórico («Wesland», «Changinola», «Penonome»…) no vuelve.
+> - **City Moda** (*«todos los City Moda en Sport Corner Calidonia, y a veces solo City Moda Chorrera en Chorrera»*): D-27 · D-28 · D-29 · D-31 · D-32 · D-33 · D-34 · D-42 · D-78 → **«Sport Corner Calidonia»**, el de siempre. **D-26 City Moda Chorrera** lleva DOS destinos: «Sport Corner Calidonia» (el de siempre) y «Chorrera» (botón) — el «5 de Mayo» de la primera versión **se quitó**. D-33 y D-78 no tenían guías: ahora quedan definidos igual. **D-30 no se define** (Switch lo borró; lo cubre el sync de clientes).
+> - **D-142 Sporting Shoes N 4** — el único SIN «el de siempre»: sus 8 destinos como botones (Westland · Albrook · Los Andes · Santiago · Penonomé · Metromall · Megamall · Outlet Vía España), con el campo tienda y el separador aprobado **`Westland · tienda 6`** (`componerDestino`, un solo lugar). Si no eligen nada el campo queda vacío y la guía no se guarda — la dirección es obligatoria, igual que hoy.
+>
+> ### 🔴 Las reglas duras, intactas
+>
+> - El campo Dirección sigue siendo **texto libre**; lo autollenado se borra y se escribe encima; un campo con algo escrito **no se pisa**.
+> - El pareo **por parecido** sigue prohibido (`N2` ≠ `N3`, «Wesland» ≠ «Westland»).
+> - **Cero cambio en lo que se GUARDA** salvo lo aprobado: el texto `Traslado` en `facturas` y el destino compuesto en `direccion`. Con el interruptor apagado la pantalla queda como antes de `115f90ed` (candados CONTROL en los dos estados; el payload por los dos caminos sigue comparándose con `instantaneaRenglones`).
+> - **Ni una fila de `guia_items` se toca.** Una guía **Completada** no muestra nada de esto.
+>
+> ### Candados y mutaciones
+>
+> Se EXTENDIERON los archivos que ya existían — sin duplicar: `guias-atajos-facturas.test.ts` (28 — la agrupación por día con fechas FIJAS, 3 días que abarcan 3 semanas, «Ver más días», el borde de Panamá, `tituloDelDia`, Traslado + la validación del formulario) · `guia-form-marcar-facturas.test.tsx` (15 — los encabezados en palabras, «Ver más días» tocado, «Traslado» con el «o», la empresa vacía, y el papel y el Excel GENERADOS con «Traslado» adentro) · `guias-destinos-cliente.test.ts` (54 — los 26 definidos exactos, los 5 corregidos con el texto nuevo, D-26 autollena con varios, D-142 no autollena) · `guia-form-destinos.test.tsx` (16 — D-26 en pantalla: llena Sport Corner Calidonia y «Chorrera» queda de botón) · `guias-destinos-precedencia.test.ts` (11 — la marca de la TABLA manda; una fila sin marca no llena) · `guias-destinos-config-route.test.ts` (19 — marcar apaga a los hermanos primero, dos UPDATE y cero DELETE) · `guias-configuracion-pantalla.test.tsx` (14 — la marca por fila, el PATCH con el id, el texto que dice qué se llena solo).
+> - **Verificado por mutación: 16/16 (`_mutar-candados-guias-facturas.sh`) · 15/15 (`_mutar-candados-guias-destinos.sh`) · 17/17 (`_mutar-candados-guias-ajustes-4sep.sh`) · 11/11 (`_mutar-candados-guias-destinos-config.sh`) — 59 de 59 cazadas, 0 sobrevivientes**, los cuatro scripts re-corridos ENTEROS tras el cambio y con su mutación de CONTROL saliendo ⛔. Las nuevas: agrupar por días de CALENDARIO muere en rojo · abrir 2 días en vez de 3 · «Ver más días» trayendo 2 · Traslado escribiendo `0000` · «el de siempre» ignorado · autollenar el primero sin marca · marcar sin apagar a los hermanos · la marca de la pantalla sin escribir. Y todas las previas siguen cazadas (D-87 vuelve al histórico, City Moda recupera la tienda, la tabla deja de ganar, el separador cambia…). ⚠️ Tres patrones de los scripts previos quedaron MUERTOS por la reestructura de `DESTINOS_DEFINIDOS` (D-87, la tienda de City Moda, la red de la constante) y se actualizaron a la firma nueva — el aplicador literal los habría denunciado (⛔) en vez de cantarlos cazados, que es exactamente para lo que existe.

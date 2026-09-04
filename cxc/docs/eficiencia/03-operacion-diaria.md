@@ -211,22 +211,18 @@ Parrilla · La Gran Parrila · la gran parrilada» (5 grafías) y «Market Fresh
 como «Market Fres».
 
 **Sugerencias.**
-1. **Modo tanda de verdad en «Guardar y nuevo»: conservar la fecha elegida y autocompletar el proveedor.** La fecha vuelve a hoy en cada gasto y ella está cargando recibos de hace semanas; el proveedor es texto libre sin memoria (31 proveedores distintos en 77 gastos, con typos que lo prueban).
-   · Hoy: ~7 toques por recibo con corrección de fecha. Después: ~4-5 (fecha se queda, proveedor se elige de una lista de los ya usados).
-   · Ahorra ~80-100 toques por tanda (~1 tanda/mes) y elimina las grafías. **Tamaño: chico.**
-2. **Que el cierre de período diga la verdad y ofrezca la reposición.** El modal dice «¿Cerrar este período?» y confirma… y el servidor rechaza si el saldo no es 0. La reposición no existe como pantalla antes del cierre. Resultado medido: gastos de centavos inventados y borrados para cuadrar.
-   · Hoy: confirmar → error → inventar/ajustar gastos → reintentar. Después: el modal muestra el saldo actual y, si no es 0, ofrece registrar la reposición ahí mismo.
-   · Ahorra la vuelta más frustrante del módulo (2 cierres/año hoy, pero cada uno con basura en los datos). **Tamaño: mediano.**
-3. **Adelgazar el formulario.** ITBMS (select 0/7% + línea calculada + total solo-lectura) ocupa un tercio del formulario para un dato casi siempre 0; `ruc/dv/empresa` viven en la tabla y nadie los llena.
-   · Plegar ITBMS bajo un «+ impuesto» y no mostrar lo que nadie usa. **Tamaño: chico.**
+1. ✅ **HECHO A MEDIAS (4-sep-2026): la fecha se conserva; la lista de proveedores NO va.** «Guardar y nuevo» conserva la fecha elegida (candado en `caja-formulario.test.tsx`). Daniel dijo *«no»* a la lista de proveedores ya usados: sigue texto libre sin sugerencias, con candado explícito que pone rojo si aparece una.
+   ~~La fecha vuelve a hoy en cada gasto y ella está cargando recibos de hace semanas; el proveedor es texto libre sin memoria (31 proveedores distintos en 77 gastos, con typos que lo prueban).~~
+2. ✅ **HECHO (4-sep-2026): el cierre ya no exige saldo 0.** Daniel: *«cierro cuando queda poca plata (criterio de la secretaria) y le doy la diferencia para llegar a los 200»*. El modal muestra Fondo · Gastado (N recibos) · Queda en caja · Reposición para volver a $200; el botón «Cerrar y abrir el N» cierra con el saldo que tenga (negativo avisa sin bloquear) y abre el siguiente en $200. El saldo se guarda en `saldo_cierre` (migración `20260920120000`, pendiente de aplicar). Candado `caja-cierre-con-saldo.test.ts`.
+3. ✅ **HECHO (4-sep-2026): el ITBMS quedó detrás de «＋ Agregar ITBMS»** (abre desplegado si el gasto ya lo trae; la cuenta no cambia). `ruc/dv/empresa` ya no se mostraban en el formulario real (solo viven en la tabla).
 
 **Lo raro que encontré.**
-- El PATCH de gasto acepta `metodo_pago` y `numero_factura`, columnas que **no existen** (la real es `nro_factura`): si un cliente las manda, 500 (`api/caja/gastos/[id]/route.ts:7`).
-- Hay un SEGUNDO formulario completo de alta (`/caja/[periodoId]/nuevo`, 403 líneas) sin entrada desde la UI, sin smart defaults, y que al guardar navega a una URL legacy (`/caja?view=detail&id=…`) que hoy cae en la lista, no en el detalle.
-- Dos valores basura distintos para la misma falta de categoría: el servidor pone «Varios», el cliente «Otros».
-- El GET de un período no filtra borrados: un período eliminado sigue siendo consultable por id.
-- La sugerencia 💡 «cerrar período +30 días» empuja a una acción que casi siempre va a fallar por la regla saldo = 0.
-- Confirmaciones que no protegen: «¿Eliminar este gasto?» (es restaurable y el modal lo dice) y «¿Restaurar?» (sin consecuencia).
+- ✅ ARREGLADO (4-sep-2026): el PATCH de gasto aceptaba `metodo_pago` y `numero_factura`, columnas que **no existen** (la real es `nro_factura`) → 500 si llegaban. La lista es de columnas reales e incluye `nro_factura` (el editar en línea lo mandaba y se descartaba en silencio).
+- Hay un SEGUNDO formulario completo de alta (`/caja/[periodoId]/nuevo`, 403 líneas) sin entrada desde la UI, sin smart defaults, y que al guardar navega a una URL legacy (`/caja?view=detail&id=…`) que hoy cae en la lista, no en el detalle. **NO se borró (decisión del 4-sep): quedó anotado en su cabecera.**
+- ✅ ARREGLADO (4-sep-2026): dos valores basura para la misma falta de categoría («Varios» el servidor, «Otros» el cliente) → uno solo, «Varios».
+- ✅ ARREGLADO (4-sep-2026): el GET de un período borrado contesta 404, el mismo que uno inexistente.
+- ✅ RETIRADA (4-sep-2026): la sugerencia 💡 «cerrar período +30 días» — el criterio de cierre es la plata que queda, no los días abiertos.
+- ✅ ARREGLADO (4-sep-2026): «¿Restaurar?» ya no pide confirmación (sin consecuencia); la de eliminar se queda — borrar es la acción destructiva de la casa.
 
 ---
 
@@ -255,16 +251,12 @@ Nada de esto se recuerda entre corridas (cero localStorage en el módulo), con
 ~50 corridas/mes.
 
 **Sugerencias.**
-1. **Validar el divisor EN LA PANTALLA.** `validarDivisor` (0 ó 0.10–1.00) solo corre en las rutas API al guardar fórmulas; los inputs de divisor de la pantalla no validan nada. Escribir `70` en vez de `0.70` en modo global calcula y **descarga un Excel con precios 100× mal** sin pasar por ningún candado — exactamente la clase de error que motivó el módulo, en el único punto donde el número llega al Excel.
-   · Quién lo sufre: Angela y andrea, 50-60 corridas/mes; el día que pase, el costo no es un toque sino una carga mala en Switch.
-   · **Tamaño: chico** (reusar `validarDivisor` en el input + bloquear la descarga). Es la sugerencia más urgente de todo este informe.
-2. **Recordar las elecciones entre corridas y no borrar el trabajo hecho.** Empresa, mes, tasa, factor, modo de precio y divisor se re-eligen en cada corrida; peor, cambiar CUALQUIER campo de configuración re-lee el Excel entero y **borra todos los precios tecleados a mano** (`DepuradorClient.tsx:155-204`, `setPriceEdits({})`), y el onChange de año/tasa/factor re-procesa en cada tecla.
-   · Hoy: re-elegir todo × 50 corridas/mes, y rehacer precios si tocaste la config después. Después: la pantalla abre como quedó la última vez y los precios manuales sobreviven a un cambio de tasa.
-   · Ahorra varios minutos por corrida y elimina el rehacer-precios. **Tamaño: mediano.**
+1. ✅ **HECHA (4-sep-2026) — Validar el divisor EN LA PANTALLA.** `validarDivisor` ahora también corre en los inputs (global y por marca, vía `mensajeDivisorEnPantalla`): `70` marca el campo en rojo, dice «Debe estar entre 0.10 y 1.00. ¿Quisiste poner 0.70?» y **apaga la descarga** (nunca el tecleo). Y la tasa dejó de ser texto libre: select de dos — «solo existen esas dos» — `07` / `0`, siempre TEXTO. Candado `depurador-validacion-pantalla.test.tsx`, 10 mutaciones cazadas. (Era: los inputs no validaban nada y el `70` bajaba un Excel con precios 100× mal directo a Switch.)
+2. ✅ **HECHA (4-sep-2026) — Recordar las elecciones entre corridas y no borrar el trabajo hecho.** Empresa, mes, año, tasa, factor, modo de precio y la fórmula global aplicada se recuerdan por usuario (`useLastUsed` / `fg_last_depurador_*`; el archivo no). Los precios a mano **sobreviven a todo cambio de configuración** — «y también consérvalos» — pegados por REFERENCIA de artículo (nunca por índice), con aviso en pantalla y botón «Borrarlos todos»; año/factor re-procesan a los 300 ms o al blur, no en cada tecla. (Era: `setPriceEdits({})` en cada re-proceso borraba todos los precios tecleados.)
 3. **Que Reebok también deje rastro en el historial.** Hoy `carga_history` solo registra CK/TH y Facturas Tienda; las corridas Reebok no existen para el historial, y el historial tampoco guarda con qué divisor/fórmula se bajó. Registrar la corrida Reebok igual que las demás. **Tamaño: chico.**
 
 **Lo raro que encontré.**
-- El campo «Tasa» es texto libre sin validación: `abc` llega tal cual a la columna «Tasa de Impuesto *» del Excel (`DepuradorClient.tsx:103`).
+- ~~El campo «Tasa» es texto libre sin validación: `abc` llega tal cual a la columna «Tasa de Impuesto *» del Excel~~ — cerrado el 4-sep-2026: ahora es un select de dos (7% → `07` · Exento → `0`).
 - La rama con dropzone propia de `DepuradorClient` es inalcanzable (siempre entra embebido por el dispatcher, `:565`); el bloque de error del dispatcher nunca puede pintarse (`DepuradorDispatcher.tsx:31-97`) y su `catch` cae en silencio a CK/TH.
 - Descargar sin elegir empresa está permitido: se pierde el proveedor fijo y la fila de historial queda sin empresa (hoy 0 filas así — la gente la elige, pero el hueco existe).
 - `DIVISOR_HINTS` hardcoded (`0.70/0.73/0.75/0.63`) mientras los divisores reales viven en `marca_formulas` (22 filas); `calcHint` exportada sin consumidores; el redondeo «par» existe en el tipo pero ningún select lo ofrece.
@@ -281,4 +273,4 @@ Nada de esto se recuerda entre corridas (cero localStorage en el módulo), con
 | Reclamos | 3-6 reclamos | Vivo, bajando | Correo enviado ⇒ estado «En proceso» |
 | Marketing | ~15 facturas, ~3 entregas | Vivo | «+ Entrada» de stock en Mobiliario |
 | Caja Menuda | 1 tanda (~38 recibos) | Vivo, 1 persona | Modo tanda + cierre honesto |
-| Depurador | 50-60 corridas | **El más usado** | Validar divisor en pantalla |
+| Depurador | 50-60 corridas | **El más usado** | ✅ Validar divisor en pantalla (hecha 4-sep) |
