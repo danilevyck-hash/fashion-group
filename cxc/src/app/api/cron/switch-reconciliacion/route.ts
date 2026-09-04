@@ -251,14 +251,14 @@ interface ColateralCron {
   // colateralDayStartIso en fecha-panama.ts.
   earlyUtcRun?: boolean;
   // Solo intentar recuperar si esta condición se cumple (default: siempre).
-  // Caso grupo-resumen-mensual: corre el día 3 del mes → solo recuperable los
-  // días 3-4; el resto del mes ni siquiera cuenta como "faltante".
+  // Caso grupo-resumen-mensual: corre el día 1 del mes → solo recuperable los
+  // días 1-2; el resto del mes ni siquiera cuenta como "faltante".
   recoverOnlyIf?: () => boolean;
   // Ventana propia de "ya corrió" (ISO). Default: inicio del día Panamá (o UTC
   // si earlyUtcRun). Dos casos:
-  //   - grupo-resumen-mensual: inicio del día 3 del mes — su heartbeat del día 3
-  //     debe contar como success también el día 4 (con la ventana diaria, el día
-  //     4 lo re-enviaría duplicado).
+  //   - grupo-resumen-mensual: inicio del día 1 del mes — su heartbeat del día 1
+  //     debe contar como success también el día 2 (con la ventana diaria, el día
+  //     2 lo re-enviaría duplicado).
   //   - catálogos: ventana RODANTE del ciclo de su propio horario
   //     (cicloCatalogo, ver CATALOGO_CRON_SLOTS_UTC en cron-telemetry.ts).
   successSinceIso?: () => string;
@@ -420,28 +420,41 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
-    // Resumen mensual del grupo a Telegram (corre el día 3 a las 13:00 UTC).
-    // Único cron NO diario: su recuperación solo aplica los días 3-4 del mes
-    // (recoverOnlyIf) y su ventana de "ya corrió" es el inicio del día 3
-    // (successSinceIso) — así el día 4 NO re-envía un resumen que sí salió el 3.
-    // Hora mínima 14 en el mapa compartido (su run normal es 13:00 → patrón
-    // cheques-alert, no adelantarse). Prefijo "(recuperado)" como el resumen
-    // ACS. Solo lee la DB (RPC sobre la MV), no toca Switch.
+    // Resumen mensual del grupo a Telegram (corre el día 1 a las 13:00 UTC —
+    // era el día 3 hasta el 4-sep-2026; el porqué del cambio vive en
+    // src/lib/grupo-resumen-mensual.ts). Su recuperación aplica los días 1-2
+    // del mes (recoverOnlyIf) y su ventana de "ya corrió" es el inicio del
+    // día 1 (successSinceIso) — así el día 2 NO re-envía un resumen que sí
+    // salió el 1. Ésta es la «segunda oportunidad» del resumen: si la guardia
+    // del cierre (o el propio cron) falló el día 1, las pasadas de 14:00 y
+    // 18:00 y las tres del día 2 lo reintentan. Hora mínima 14 en el mapa
+    // compartido (su run normal es 13:00 → patrón cheques-alert, no
+    // adelantarse). Prefijo "(recuperado)" como el resumen ACS. Solo lee la
+    // DB (RPC sobre la MV), no toca Switch.
+    //
+    // 🔒 `enviarNegocioPrivado` (4-sep-2026), IGUAL que su route. Daniel:
+    // «este mensaje también lo quiero en alertas de Telegram, no en negocio.»
+    // Si esta línea se queda en `enviarNegocio`, el resumen RECUPERADO sería
+    // el único que se filtra al grupo de tres. Candado que exige que este
+    // envío y el del route apunten al mismo destino:
+    // src/__tests__/lib/acs-resumen-canal-privado.test.ts.
     cronName: "grupo-resumen-mensual",
     label: "grupo-resumen-mensual",
     recoverOnlyIf: () => {
       const dia = Number(hoyPanama().slice(8, 10));
-      return dia === 3 || dia === 4;
+      return dia === 1 || dia === 2;
     },
-    successSinceIso: () => new Date(`${hoyPanama().slice(0, 7)}-03T00:00:00-05:00`).toISOString(),
+    successSinceIso: () => new Date(`${hoyPanama().slice(0, 7)}-01T00:00:00-05:00`).toISOString(),
     recover: async () => {
       const { anio, mes } = mesAnterior(hoyPanama());
+      // calcularResumenMensual trae sus DOS guardias adentro (cierre
+      // sincronizado de las 8 + total $0): si el mes no está entero, LANZA y
+      // esta pasada lo anota como fallo — la siguiente vuelve a intentar.
       const resumen = await calcularResumenMensual(anio, mes);
-      // Misma guardia anti-ruido que su route: $0 = MV sin el mes → fallo real.
       if (resumen.total === 0) {
         return { ok: false, detail: `sin data para ${fmtMesLabel(anio, mes)} — ¿ventas_rollup_mensual_mv sin refrescar?` };
       }
-      const sent = await enviarNegocio(`(recuperado) ${buildMensajeMensual(resumen)}`);
+      const sent = await enviarNegocioPrivado(`(recuperado) ${buildMensajeMensual(resumen)}`);
       return { ok: sent, detail: sent ? `resumen ${fmtMesLabel(anio, mes)} reenviado` : "Telegram no aceptó el mensaje" };
     },
   },
@@ -468,9 +481,10 @@ const COLATERAL_CRONS: ColateralCron[] = [
       // venta del día va al chat privado de Daniel, no al grupo de 📊 NEGOCIO
       // donde está el celular de la empresa. Si esta línea se queda en
       // `enviarNegocio`, el resumen RECUPERADO —el que sale justo cuando algo
-      // falló— sería el único que se filtra al grupo. Los otros dos resúmenes
-      // de este archivo (grupo-resumen-mensual y catalogos-fotos-resumen) SÍ
-      // siguen en `enviarNegocio`: sólo se mudó el de ACS. Candado que exige
+      // falló— sería el único que se filtra al grupo. Desde el 4-sep-2026 el
+      // resumen MENSUAL del grupo también va al privado (lo pidió Daniel);
+      // catalogos-fotos-resumen es el único resumen de este archivo que sigue
+      // en `enviarNegocio`. Candado que exige
       // que este envío y el del route apunten al mismo destino:
       // src/__tests__/lib/acs-resumen-canal-privado.test.ts
       const sent = await enviarNegocioPrivado(buildMensajeHtml(resumen, "(recuperado) "), "HTML");
@@ -480,7 +494,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
   {
     // Resumen SEMANAL de fotos faltantes de los catálogos (lunes 13:30 UTC).
     // Solo lee las DBs de los catálogos (sin Switch). Único cron SEMANAL: su
-    // recuperación solo aplica los LUNES (recoverOnlyIf, patrón día 3-4 del
+    // recuperación solo aplica los LUNES (recoverOnlyIf, patrón día 1-2 del
     // grupo-resumen-mensual) y su hora mínima es 14 en el mapa compartido (su
     // run normal es 13:30 → no adelantarse, patrón cheques-alert). Ventana de
     // "ya corrió" = día Panamá (default): el run normal cae el mismo lunes
@@ -659,7 +673,7 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralesF
     return { recuperables: [], omitidosLoginWeb: [] };
   }
   // Umbral por-cron: ventana propia (successSinceIso) si el colateral la define
-  // —los 3 catálogos usan el ciclo de su horario, grupo-resumen-mensual el día 3
+  // —los 3 catálogos usan el ciclo de su horario, grupo-resumen-mensual el día 1
   // del mes—; los earlyUtcRun (00:00-05:00 UTC) contra el inicio del día UTC; el
   // resto contra el inicio del día Panamá (dayStartIso).
   const earlyStartIso = colateralDayStartIso(true);

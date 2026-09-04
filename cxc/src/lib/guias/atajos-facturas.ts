@@ -244,6 +244,7 @@ export function marcarFactura(
   items: readonly RenglonDeGuia[],
   cliente: ClienteElegido,
   f: Pick<FacturaDelCliente, "empresa" | "secuencial">,
+  direccionAutollenada?: string | null,
 ): RenglonDeGuia[] {
   if (facturaMarcada(items, cliente, f)) return [...items];
   const sec = (f.secuencial ?? "").trim();
@@ -261,6 +262,14 @@ export function marcarFactura(
     ...r,
     cliente: cliente.nombre,
     cliente_codigo: cliente.codigo,
+    // 🔴 El destino se AUTOLLENA también acá (4-sep-2026, Daniel: «sí quiero
+    // que se llene sola, ¿ese no era el propósito de todo esto?»): marcar la
+    // primera factura de un cliente ES elegirlo. El valor lo calcula quien
+    // llama con `destinoParaAutollenar` (UN solo destino, definido o único en
+    // la historia agrupada); acá solo se escribe en una fila que nace vacía o
+    // nueva — lo escrito nunca se pisa, `filaVacia` garantiza que
+    // `r.direccion` está vacía en este punto.
+    direccion: r.direccion || (direccionAutollenada ?? ""),
     empresa: f.empresa,
     facturas: sec,
   });
@@ -279,6 +288,7 @@ export function desmarcarFactura(
   items: readonly RenglonDeGuia[],
   cliente: ClienteElegido,
   f: Pick<FacturaDelCliente, "empresa" | "secuencial">,
+  direccionAutollenada?: string | null,
 ): RenglonDeGuia[] {
   const numero = normalizarNumeroFactura(f.secuencial);
   const idx = items.findIndex(
@@ -293,7 +303,18 @@ export function desmarcarFactura(
     .filter((t) => t !== "" && normalizarNumeroFactura(t) !== numero);
   const facturas = quedan.join(", ");
 
-  const quedoSinNada = facturas === "" && !(r.direccion ?? "").trim() && !((r.bultos ?? 0) > 0);
+  // La dirección AUTOLLENADA (el destino único del cliente, tal cual) no
+  // cuenta como escrita a mano: si es exactamente ese valor, desmarcar la
+  // última factura puede retirar la fila sin perder trabajo de nadie. Cualquier
+  // edición encima la vuelve texto de la persona y la fila se conserva.
+  const direccionEsLaPrellenada =
+    (r.direccion ?? "").trim() !== "" &&
+    direccionAutollenada != null &&
+    (r.direccion ?? "") === direccionAutollenada;
+  const quedoSinNada =
+    facturas === "" &&
+    (!(r.direccion ?? "").trim() || direccionEsLaPrellenada) &&
+    !((r.bultos ?? 0) > 0);
   if (quedoSinNada) {
     const sinLaFila = items.filter((_, i) => i !== idx);
     // El formulario siempre tiene al menos una fila donde escribir.
@@ -312,11 +333,16 @@ export function renglonDelCliente(
   items: readonly RenglonDeGuia[],
   cliente: ClienteElegido,
   facturas: string,
+  direccionAutollenada?: string | null,
 ): RenglonDeGuia[] {
   const relleno = (r: RenglonDeGuia): RenglonDeGuia => ({
     ...r,
     cliente: cliente.nombre,
     cliente_codigo: cliente.codigo,
+    // El mismo autollenado que en `marcarFactura`: este renglón también nace
+    // de elegir al cliente, y la fila es vacía o nueva, así que no hay nada
+    // escrito que pisar.
+    direccion: r.direccion || (direccionAutollenada ?? ""),
     facturas,
   });
   const idxVacia = items.findIndex(filaVacia);

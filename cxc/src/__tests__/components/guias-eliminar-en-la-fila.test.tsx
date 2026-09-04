@@ -42,6 +42,20 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/components/AppHeader", () => ({ default: () => null }));
 
+// El interruptor de los atajos, controlable por test: el CONTROL de abajo
+// necesita probar que con GUIAS_ATAJOS_NUEVOS apagado la lista vuelve a ser
+// 100% lectura. El resto del módulo es el REAL.
+let atajosEncendidos = true;
+vi.mock("@/lib/guias/atajos-facturas", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/guias/atajos-facturas")>();
+  return {
+    ...real,
+    get GUIAS_ATAJOS_NUEVOS() {
+      return atajosEncendidos;
+    },
+  };
+});
+
 import GuiasPage from "@/app/guias/page";
 
 /** Dos guías: la que se va a borrar y una vecina, para que "la fila correcta"
@@ -86,6 +100,7 @@ function sembrarRol(rol: string) {
 
 beforeEach(() => {
   pedidos = [];
+  atajosEncendidos = true;
   ROUTER.push.mockClear();
   vi.stubGlobal("localStorage", memStorage());
   vi.stubGlobal("sessionStorage", memStorage());
@@ -254,7 +269,54 @@ describe("🔴 quien no puede borrar no ve ni el menú", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("⚠️ lo que NO se tocó", () => {
-  it("la lista sigue sin escribir: abrirla no manda un solo pedido que no sea GET", async () => {
+  /**
+   * 🔁 ESTE CANDADO CAMBIÓ DE DIRECCIÓN EL 4-sep-2026, y no se aflojó.
+   *
+   * Antes exigía que abrir la lista fuera 100% lectura, sin excepción. Su
+   * intención real siempre fue la invariante del módulo — LA LISTA NO DESPACHA
+   * NI EDITA GUÍAS: **la lista solo LEE, nunca escribe** una guía
+   * (docs/postmortems/guias.md) — no «la lista nunca habla con Switch».
+   * Daniel, textual: *«¿por qué no se puede hacer al apretar guías? Prefiero
+   * eso.»* — el refresco de las facturas de HOY (`/api/guias/facturas-hoy`,
+   * que solo dispara una lectura corta de Switch y no toca una sola guía)
+   * ahora se dispara al tocar Guías.
+   *
+   * Es la MISMA regla, no una excepción cómoda: lo que se prohíbe es ESCRIBIR
+   * SOBRE GUÍAS. Por eso acá se exige (a) que la ÚNICA salida que no es
+   * lectura sea EXACTAMENTE ese refresco — cualquier otra que alguien cuele
+   * mañana pone esto en rojo —, (b) que ninguna escritura (PUT/PATCH/DELETE)
+   * salga a ningún lado, y (c) que a `/api/guias/**` no le llegue nada que no
+   * sea lectura, salvo el refresco. Y quien no puede crear guías (vendedor),
+   * el modo solo lectura y el interruptor apagado siguen en 100% lectura.
+   */
+  it("🔁 la lista solo LEE, nunca escribe una guía: lo único que sale además de lecturas es el refresco de facturas de hoy", async () => {
+    await abrirLista("secretaria");
+    const noGet = pedidos.filter((p) => p.metodo !== "GET");
+    // EXACTAMENTE el refresco, y nada más — cualquier otra salida mañana = rojo.
+    expect(noGet.map((p) => `${p.metodo} ${p.url}`)).toEqual(["POST /api/guias/facturas-hoy"]);
+    // Ni una escritura de verdad, a ningún lado.
+    expect(pedidos.filter((p) => ["PUT", "PATCH", "DELETE"].includes(p.metodo))).toHaveLength(0);
+    // Y sobre /api/guias/** no entra nada que no sea lectura, salvo el refresco.
+    expect(
+      pedidos.filter((p) => p.metodo !== "GET" && p.url.startsWith("/api/guias") && p.url !== "/api/guias/facturas-hoy"),
+    ).toHaveLength(0);
+  });
+
+  it("🔁 el refresco NO dispara para quien no puede crear guías (vendedor): su lista es 100% lectura", async () => {
+    await abrirLista("vendedor");
+    expect(pedidos.filter((p) => p.metodo !== "GET")).toHaveLength(0);
+  });
+
+  it("🔁 en modo solo lectura no dispara, ni siendo admin", async () => {
+    sembrarRol("admin");
+    sessionStorage.setItem("fg_guias_readonly", "1");
+    render(<GuiasPage />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    expect(pedidos.filter((p) => p.metodo !== "GET")).toHaveLength(0);
+  });
+
+  it("🔁 CONTROL — con GUIAS_ATAJOS_NUEVOS apagado la lista vuelve a ser 100% lectura", async () => {
+    atajosEncendidos = false;
     await abrirLista("secretaria");
     expect(pedidos.filter((p) => p.metodo !== "GET")).toHaveLength(0);
   });

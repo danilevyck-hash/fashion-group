@@ -14,12 +14,24 @@
 // cliente ya recibió. Se toca uno y se llena. 🔴 SIGUE SIENDO TEXTO LIBRE: los
 // botones son atajo, jamás candado — quien quiera escribe lo que sea, como hoy.
 //
-// 🔴 EL BOTÓN SE TOCA, NUNCA SE APLICA SOLO — ni con un único candidato, ni
-// para los 9 definidos. Es el invariante de guías («las sugerencias nunca atan
-// solas») y la decisión del 14-ago-2026 sobre este MISMO campo: la dirección
-// «NO se escribe sola en el campo» (`direccion-sugerida.ts`). Por eso ninguna
-// función de aquí expone un «elegido» del que alguien pueda deducir un
-// auto-completado.
+// 🔴 EL AUTOLLENADO (4-sep-2026): con UN solo destino, el campo se llena solo
+// al elegir el cliente — `destinoParaAutollenar`. Daniel, textual: *«"la
+// dirección no se escribe sola" me refería a que el usuario no lo haga para
+// no escribirlo mal como lo vimos, quita esa regla. Que se autollene como lo
+// discutimos antes.»* La decisión del 14-ago-2026 la tomó él pensando en que
+// la PERSONA no tuviera que teclear el destino (justo para evitar
+// «Pasocanoas» / «Wesland» / «PENONOME»), no en prohibir que el sistema lo
+// llene — y él mismo la corrigió. Medido: 40 de 48 clientes con guías usan
+// SIEMPRE el mismo destino; ahí no hay ambigüedad que resolver.
+//
+// Con VARIOS destinos no se llena nada: salen los botones y elige la persona.
+// Lo autollenado se borra y se escribe encima como cualquier texto, y un
+// campo que ya tiene algo NO se pisa.
+//
+// 🔴 Lo que SÍ sigue prohibido — y no se toca — es el pareo POR PARECIDO:
+// «Outlet Duty Free N2» y «N3» son tiendas distintas, «Wesland» (typo) no es
+// «Westland». `claveDestino` agrupa por regla exacta, nunca por distancia de
+// edición.
 //
 // 🔴 Cuelga del MISMO interruptor que el panel de facturas
 // (`GUIAS_ATAJOS_NUEVOS`, `atajos-facturas.ts`): en `false` no se dibuja ni un
@@ -45,7 +57,9 @@ import type { EnvioParaDireccion, GuiaParaDireccion } from "./direccion-sugerida
  *   | D-25  | City Mall Paso Canoa  | Paso Canoas |
  *   | D-35  | City Shoes            | Calle 19 Central |
  *   | D-144 | Star Shoes, S.A.      | Albrook |
- *   | D-26  | City Moda Chorrera    | Entrega en SportCorner |
+ *   | D-26  | City Moda Chorrera    | Entrega en SportCorner | ← superado el
+ *     mismo 4-sep: ver «LA FAMILIA CITY MODA» abajo (D-26 quedó en «5 de
+ *     Mayo» y las «entregas en SportCorner» son de los OTROS códigos).
  *
  * Y **D-142 Sporting Shoes N 4** es el único con varios, porque tiene varias
  * tiendas en el mismo lugar: «Westland · Albrook · Los Andes · Santiago ·
@@ -54,6 +68,24 @@ import type { EnvioParaDireccion, GuiaParaDireccion } from "./direccion-sugerida
  * ⚠️ La definición GANA sobre el histórico a propósito: medido, el histórico
  * de D-87 dice más veces «Changinola» (7) que «Guabito» (4), y el de D-117
  * está partido — es exactamente el desorden que Daniel vino a cerrar.
+ * Daniel, textual (4-sep-2026): *«en Frontera Duty Free es Guabito, hazme
+ * caso.»* — hay candado que exige que D-87 diga Guabito mire lo que mire su
+ * histórico real.
+ *
+ * ⚠️ **LA FAMILIA CITY MODA (4-sep-2026).** Daniel preguntó *«¿hay varios
+ * city moda no?»* — y sí: son ONCE clientes distintos, cada uno con su código
+ * (D-26 Chorrera · D-27 Calidonia · D-28 Albrook 2 · D-29 Central · D-30
+ * Chorrera · D-31 Del Este · D-32 Los Andes · D-33 Santa Ana · D-34 Westland
+ * · D-42 Del Norte · D-78 Ismora). Las 8 direcciones raras del histórico de
+ * D-26 («ALBROOK 2 (ENTREGA EN SPORTCORNER)», «CALIDONIA (…)», «Z15 (…)»…)
+ * son **envíos cargados al cliente EQUIVOCADO**: iban a esos otros códigos y
+ * quien hizo la guía eligió D-26. No es un dato que preservar — es el error
+ * que este cambio viene a evitar — y por eso se IGNORAN: la definición gana
+ * sobre el histórico. El destino de la familia es **«Sport Corner Calidonia»**
+ * (la grafía mayoritaria de sus propias guías: D-27, D-28, D-29, D-31, D-32,
+ * D-34 y D-42 ya apuntan ahí), y el único destino PROPIO de D-26 es
+ * **«5 de Mayo»**. D-30, D-33 y D-78 no tienen guías todavía y por eso no
+ * tienen destino definido.
  */
 export const DESTINOS_DEFINIDOS: Readonly<Record<string, readonly string[]>> = {
   "D-81": ["Paso Canoas"],
@@ -63,7 +95,16 @@ export const DESTINOS_DEFINIDOS: Readonly<Record<string, readonly string[]>> = {
   "D-25": ["Paso Canoas"],
   "D-35": ["Calle 19 Central"],
   "D-144": ["Albrook"],
-  "D-26": ["Entrega en SportCorner"],
+  "D-26": ["5 de Mayo"],
+  // La familia City Moda: todas entregan en Sport Corner Calidonia (ver el
+  // bloque de arriba). D-30, D-33 y D-78 quedan fuera: sin guías todavía.
+  "D-27": ["Sport Corner Calidonia"],
+  "D-28": ["Sport Corner Calidonia"],
+  "D-29": ["Sport Corner Calidonia"],
+  "D-31": ["Sport Corner Calidonia"],
+  "D-32": ["Sport Corner Calidonia"],
+  "D-34": ["Sport Corner Calidonia"],
+  "D-42": ["Sport Corner Calidonia"],
   "D-142": [
     "Westland",
     "Albrook",
@@ -83,6 +124,10 @@ export const DESTINOS_DEFINIDOS: Readonly<Record<string, readonly string[]>> = {
  * ALBROOK», «TIENDA 3/4 LOS ANDES», «METROMALL - TIENDA 10» — exactamente los
  * números de la tabla de Daniel. El campo tienda es OPCIONAL, y «+ otra» deja
  * escribir uno nuevo.
+ *
+ * ⚠️ City Moda NO lleva tienda: cada «tienda» de City Moda es OTRO CLIENTE
+ * con su propio código (D-27 Calidonia, D-28 Albrook 2, …) — ver el bloque de
+ * DESTINOS_DEFINIDOS.
  */
 export const TIENDAS_POR_CLIENTE: Readonly<
   Record<string, Readonly<Record<string, readonly string[]>>>
@@ -295,4 +340,37 @@ export function botonesDeDestino(
   const definidos = DESTINOS_DEFINIDOS[c];
   if (definidos) return [...definidos];
   return (historicos ?? []).slice(0, MAX_BOTONES_DESTINO);
+}
+
+/**
+ * 🔴 EL DESTINO QUE SE LLENA SOLO AL ELEGIR EL CLIENTE (4-sep-2026).
+ *
+ * Daniel, textual: *«sí quiero que se llene sola, ¿ese no era el propósito de
+ * todo esto? ¿Cómo que no pre-llenaste la dirección?»* — y al preguntarle por
+ * la regla del 14-ago-2026: *«"la dirección no se escribe sola" me refería a
+ * que el usuario no lo haga para no escribirlo mal como lo vimos, quita esa
+ * regla. Que se autollene como lo discutimos antes.»* Aquella regla la tomó
+ * él para que la PERSONA no tecleara el destino (y no naciera otro
+ * «Pasocanoas»); no prohíbe que el sistema lo llene.
+ *
+ * La regla nueva: **con UN solo destino — definido en su tabla O único en su
+ * historia agrupada — el campo se llena solo al elegir el cliente.** Medido:
+ * 40 de 48 clientes con guías usan siempre el mismo destino (Bouti, S.A.
+ * D-14 → «David», 4 guías, siempre igual); ahí no hay ambigüedad que
+ * resolver. Con VARIOS destinos (Sporting Shoes D-142 y los pocos así) no se
+ * llena nada: salen los botones y elige la persona.
+ *
+ * 🔴 Lo que sigue prohibido es el pareo POR PARECIDO — la historia entra ya
+ * agrupada por `claveDestino` (regla exacta), nunca por distancia de edición.
+ *
+ * ⚠️ El que llama es responsable de NO PISAR un campo que ya tiene algo
+ * escrito, y de que lo puesto siga siendo texto libre (se borra y se escribe
+ * encima como cualquier valor).
+ */
+export function destinoParaAutollenar(
+  codigo: string | null | undefined,
+  historicos: readonly string[] | null | undefined,
+): string | null {
+  const botones = botonesDeDestino(codigo, historicos);
+  return botones.length === 1 ? botones[0] : null;
 }

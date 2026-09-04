@@ -9,11 +9,12 @@
 // Daniel: *«no quiero crear fricción al usuario que ya sabe cómo usarlo, solo
 // mejorarlo»*.
 //
-// 🔴 EL BOTÓN SE TOCA, NUNCA SE APLICA SOLO — ni con un único destino, ni para
-// los 9 clientes definidos. Es el invariante de guías y la decisión del
-// 14-ago-2026 sobre este mismo campo («NO se escribe sola en el campo»,
-// `direccion-sugerida.ts`). Elegir el cliente muestra los botones; escribir la
-// dirección es SIEMPRE un toque de la persona.
+// 🔴 EL BOTÓN SE TOCA, NUNCA SE APLICA SOLO. Este componente dibuja; el que
+// escribe es siempre un toque de la persona. ⚠️ Desde el 4-sep-2026 el destino
+// ÚNICO se autollena — pero eso pasa al ELEGIR el cliente y vive en GuiaForm /
+// `destinoParaAutollenar` (Daniel quitó su regla del 14-ago: «quita esa regla.
+// Que se autollene como lo discutimos antes.»). Acá, con VARIOS destinos,
+// nada se aplica solo: elegir entre varios es de la persona.
 //
 // D-142 (Sporting Shoes N 4) además ofrece un renglón de TIENDA opcional con
 // los números ya usados y «+ otra»: tocar «6» sobre «Westland» deja

@@ -192,7 +192,7 @@
 >
 > El resumen sale del cron de la 01:00 (`api/cron/acs-resumen-diario`) **y** de la recuperación de `api/cron/switch-reconciliacion` (incidente 11-jul-2026: la invocación de la 01:00 se perdió tras una promoción de deploy, cero rastro). Cambiar sólo el primero deja el resumen **recuperado** —el que sale justo cuando algo falló— cayendo en el grupo.
 >
-> El candado nuevo no compara contra un nombre fijo: **extrae qué función de envío usa cada lado y exige que sean la misma**. Así no pueden separarse aunque mañana el destino cambie otra vez. Las otras dos recuperaciones del mismo archivo (`grupo-resumen-mensual`, `catalogos-fotos-resumen`) siguen en `enviarNegocio`, y hay caso que lo exige.
+> El candado nuevo no compara contra un nombre fijo: **extrae qué función de envío usa cada lado y exige que sean la misma**. Así no pueden separarse aunque mañana el destino cambie otra vez. ~~Las otras dos recuperaciones del mismo archivo (`grupo-resumen-mensual`, `catalogos-fotos-resumen`) siguen en `enviarNegocio`, y hay caso que lo exige.~~ ⚠️ **Desde el 4-sep-2026 `grupo-resumen-mensual` también va por `enviarNegocioPrivado`** — Daniel: *«este mensaje también lo quiero en alertas de Telegram, no en negocio.»* — en sus DOS salidas (el cron del día 1 y la recuperación), con el mismo candado extendido; la única recuperación que sigue en `enviarNegocio` es `catalogos-fotos-resumen`. Y el cron pasó **del día 3 al día 1** con guardia de cierre (el porqué medido vive en `src/lib/grupo-resumen-mensual.ts` y en el postmortem de guías del 4-sep).
 >
 > ### ⚠️ Lo que se pierde: el fail-safe de reintento
 >

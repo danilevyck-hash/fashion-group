@@ -4,6 +4,12 @@
 // 6:50/10:00/14:00/18:00 Panamá: sin esto, una factura de las 11:00 no aparece
 // en «Facturas del cliente» hasta las 14:00.
 //
+// Desde el 4-sep-2026 lo llama la LISTA /guias (Daniel: «¿por qué no se puede
+// hacer al apretar guías? Prefiero eso.») además de /guias/nueva, que se queda
+// para quien entra directo por URL; el acelerador de abajo evita el doble
+// disparo. 🔴 Este POST no escribe sobre guías: la regla «la lista NO despacha
+// ni edita» sigue intacta y el candado de guias-eliminar-en-la-fila la exige.
+//
 // FAIL-OPEN Y SIN BLOQUEAR: nadie espera esta llamada; si falla, la pantalla
 // muestra lo que hay en la base («hasta las HH:MM») y hay «Buscar otra vez».
 // El acelerador de sessionStorage evita hasta el HTTP en las entradas

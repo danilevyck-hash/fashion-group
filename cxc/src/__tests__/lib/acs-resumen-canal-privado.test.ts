@@ -1,9 +1,13 @@
 /**
- * CANDADO — EL RESUMEN DIARIO DE VENTAS DE ACS VA AL CHAT PRIVADO (2-sep-2026).
+ * CANDADO — EL RESUMEN DIARIO DE VENTAS DE ACS VA AL CHAT PRIVADO (2-sep-2026)
+ * Y EL RESUMEN MENSUAL DEL GRUPO TAMBIÉN (4-sep-2026).
  *
- * Daniel, textual: *"Solo me gustaría que las ventas de acs me lleguen solo a
- * mí o por el chat de alertas, ya que ahí no está el celular de la empresa que
- * tiene telegram para ver lo de las fotos, guías, etc."*
+ * Daniel, textual sobre ACS: *"Solo me gustaría que las ventas de acs me
+ * lleguen solo a mí o por el chat de alertas, ya que ahí no está el celular de
+ * la empresa que tiene telegram para ver lo de las fotos, guías, etc."*
+ * Y sobre el resumen mensual del grupo: *"este mensaje también lo quiero en
+ * alertas de Telegram, no en negocio."* — el mismo motivo: 📊 NEGOCIO es un
+ * grupo de tres y ahí no van los números del grupo.
  *
  * El motivo es **privacidad, no que sea una alerta**. El canal 📊 NEGOCIO
  * resultó ser un GRUPO DE TRES (Daniel + el celular de la empresa, que miran
@@ -59,6 +63,7 @@ const leer = (rel: string) =>
 
 const ROUTE_ACS = "src/app/api/cron/acs-resumen-diario/route.ts";
 const ROUTE_RECON = "src/app/api/cron/switch-reconciliacion/route.ts";
+const ROUTE_MENSUAL = "src/app/api/cron/grupo-resumen-mensual/route.ts";
 
 /** Las tres puertas de salida a Telegram. Ninguna otra existe (ver el barrido). */
 const ENVIOS = /\benviar(?:NegocioPrivado|Negocio|Sistema)\s*\(/g;
@@ -69,16 +74,17 @@ function enviosUsados(codigo: string): string[] {
 }
 
 /**
- * El bloque de recuperación del resumen ACS dentro de switch-reconciliacion:
+ * El bloque de recuperación de UN colateral dentro de switch-reconciliacion:
  * desde su `cronName` hasta el `cronName` del colateral siguiente. Acotarlo
- * importa: ese archivo recupera OTROS dos resúmenes que SÍ siguen en el grupo.
+ * importa: ese archivo recupera también resúmenes que SÍ siguen en el grupo.
  */
-function bloqueRecuperacionAcs(src: string): string {
-  const desde = src.indexOf('cronName: "acs-resumen-diario"');
-  expect(desde, "no encontré el colateral acs-resumen-diario en la reconciliación").toBeGreaterThan(-1);
+function bloqueRecuperacion(src: string, cron: string): string {
+  const desde = src.indexOf(`cronName: "${cron}"`);
+  expect(desde, `no encontré el colateral ${cron} en la reconciliación`).toBeGreaterThan(-1);
   const hasta = src.indexOf("cronName:", desde + 10);
   return hasta > desde ? src.slice(desde, hasta) : src.slice(desde);
 }
+const bloqueRecuperacionAcs = (src: string) => bloqueRecuperacion(src, "acs-resumen-diario");
 
 describe("🔑 los DOS lugares que mandan el resumen ACS apuntan al MISMO destino", () => {
   it("el cron de la 01:00 y la recuperación usan la misma función de envío", () => {
@@ -106,16 +112,33 @@ describe("🔑 los DOS lugares que mandan el resumen ACS apuntan al MISMO destin
   });
 });
 
-describe("SÓLO se movió ACS — el resto de 📊 NEGOCIO se queda donde está", () => {
-  it("las otras dos recuperaciones de resúmenes siguen en enviarNegocio", () => {
-    const src = leer(ROUTE_RECON);
-    for (const cron of ["grupo-resumen-mensual", "catalogos-fotos-resumen"]) {
-      const desde = src.indexOf(`cronName: "${cron}"`);
-      expect(desde, `falta el colateral ${cron}`).toBeGreaterThan(-1);
-      const hasta = src.indexOf("cronName:", desde + 10);
-      const bloque = hasta > desde ? src.slice(desde, hasta) : src.slice(desde, desde + 2000);
-      expect(enviosUsados(bloque)).toEqual(["enviarNegocio"]);
+describe("🔒 el resumen MENSUAL del grupo también va al privado (4-sep-2026)", () => {
+  // Daniel: «este mensaje también lo quiero en alertas de Telegram, no en
+  // negocio.» Mutación: devolver route o recuperación a `enviarNegocio` → rojo.
+  it("el cron del día 1 y su recuperación usan la misma función de envío, y es la privada", () => {
+    const enRoute = enviosUsados(leer(ROUTE_MENSUAL));
+    const enRecuperacion = enviosUsados(bloqueRecuperacion(leer(ROUTE_RECON), "grupo-resumen-mensual"));
+    expect(enRoute).toHaveLength(1);
+    expect(enRecuperacion).toHaveLength(1);
+    expect(enRecuperacion).toEqual(enRoute);
+    expect(enRoute).toEqual(["enviarNegocioPrivado"]);
+  });
+
+  it("ninguno de los dos quedó en enviarNegocio (el grupo de tres) ni mete el prefijo de sistema", () => {
+    for (const codigo of [leer(ROUTE_MENSUAL), bloqueRecuperacion(leer(ROUTE_RECON), "grupo-resumen-mensual")]) {
+      expect(codigo).not.toMatch(/\benviarNegocio\s*\(/);
+      expect(codigo).not.toContain("PREFIJO_SISTEMA");
+      expect(codigo).not.toMatch(/🔧\s*SISTEMA/);
+      expect(codigo).not.toMatch(/\benviarSistema\s*\(/);
     }
+  });
+});
+
+describe("el resto de 📊 NEGOCIO se queda donde está", () => {
+  it("la recuperación del resumen de fotos sigue en enviarNegocio", () => {
+    expect(enviosUsados(bloqueRecuperacion(leer(ROUTE_RECON), "catalogos-fotos-resumen"))).toEqual([
+      "enviarNegocio",
+    ]);
   });
 
   it("los avisos de negocio de todos los días siguen en el canal del grupo", () => {
@@ -124,7 +147,6 @@ describe("SÓLO se movió ACS — el resto de 📊 NEGOCIO se queda donde está"
       "src/app/api/cron/guias-pendientes/route.ts",
       "src/app/api/cron/cheques-alert/route.ts",
       "src/app/api/cron/catalogos-fotos-resumen/route.ts",
-      "src/app/api/cron/grupo-resumen-mensual/route.ts",
     ]) {
       expect(enviosUsados(leer(archivo)), archivo).toEqual(["enviarNegocio"]);
     }

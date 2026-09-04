@@ -3,8 +3,15 @@
 //
 // Daniel, textual: *«Ponerla sola, pero sí como primera opción.»* — o sea que la
 // última dirección de ese cliente aparezca ARRIBA DE TODO en la lista de
-// sugerencias, lista para tomarla de un toque. **No se escribe sola en el
-// campo**, y el campo sigue siendo editable sin trabar nada.
+// sugerencias, lista para tomarla de un toque. ~~No se escribe sola en el
+// campo~~, y el campo sigue siendo editable sin trabar nada.
+//
+// ⚠️ La regla tachada la quitó DANIEL el 4-sep-2026: *«"la dirección no se
+// escribe sola" me refería a que el usuario no lo haga para no escribirlo mal
+// como lo vimos, quita esa regla. Que se autollene como lo discutimos
+// antes.»* El autollenado (UN solo destino → se llena al elegir el cliente)
+// vive en `destinoParaAutollenar` (`destinos-clientes.ts`); este módulo sigue
+// alimentando el datalist de sugerencias y no cambió.
 //
 // EL DATO, medido contra producción el 14-ago-2026 (491 envíos vivos, 200
 // guías desde el 25-mar):

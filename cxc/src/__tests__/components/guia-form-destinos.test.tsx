@@ -10,9 +10,15 @@
  *
  * Lo que se congela (4-sep-2026):
  *   1. Tocar un botón llena el campo Dirección; se puede escribir encima.
- *   2. 🔴 El botón NUNCA se aplica solo — ni para un cliente definido con UN
- *      solo destino: elegir el cliente muestra botones, no escribe nada
- *      (la dirección «NO se escribe sola en el campo», 14-ago-2026).
+ *   2. 🔁 CAMBIÓ DE DIRECCIÓN el 4-sep-2026 (mismo día, al probarlo Daniel):
+ *      con UN solo destino — DEFINIDO por Daniel o único en la historia
+ *      AGRUPADA — el campo SÍ se llena al ELEGIR el cliente. Daniel quitó su
+ *      propia regla del 14-ago: «"la dirección no se escribe sola" me refería
+ *      a que el usuario no lo haga para no escribirlo mal como lo vimos,
+ *      quita esa regla. Que se autollene como lo discutimos antes.» Lo que
+ *      sigue prohibido, y acá se exige: nada se llena en el RENDER de una
+ *      fila ya cargada, lo escrito no se pisa, con VARIOS destinos no se
+ *      llena nada, y el pareo por parecido no existe.
  *   3. Sporting Shoes (D-142) muestra sus 8 destinos; al tocar «Westland»
  *      aparecen las tiendas usadas (5 · 6 · 14 · Mas Flow · «+ otra») y tocar
  *      «6» compone «Westland · tienda 6».
@@ -27,6 +33,7 @@ import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, within } from "@testing-library/react";
 import GuiaForm from "@/app/guias/components/GuiaForm";
 import type { GuiaItem } from "@/app/guias/components/types";
+import { invalidarDirectorioClientes } from "@/lib/hooks/useBusquedaClientes";
 
 // 🔴 El MISMO interruptor del panel de facturas, controlable por test: el resto
 // del módulo es el REAL.
@@ -41,11 +48,23 @@ vi.mock("@/lib/guias/atajos-facturas", async (importOriginal) => {
   };
 });
 
-/** Historia de un cliente que NO está entre los 9 definidos. */
-const DESTINOS_HISTORICOS = { "D-77": ["David", "Santiago"] };
+/** Historia de clientes que NO están entre los definidos — D-14 (Bouti, S.A.)
+ *  tiene UN solo destino histórico: el caso real que preguntó Daniel, y desde
+ *  el 4-sep-2026 TAMBIÉN autollena. */
+const DESTINOS_HISTORICOS = { "D-77": ["David", "Santiago"], "D-14": ["David"] };
+
+/** El directorio que ve el selector, para ELEGIR clientes de verdad. */
+const DIRECTORIO = [
+  { codigo: "D-81", nombre: "Jerusalem Duty Free" },
+  { codigo: "D-142", nombre: "Sporting Shoes N 4" },
+  { codigo: "D-26", nombre: "City Moda Chorrera" },
+  { codigo: "D-14", nombre: "Bouti, S.A." },
+  { codigo: "D-77", nombre: "Otro Cliente" },
+];
 
 beforeEach(() => {
   atajosEncendidos = true;
+  invalidarDirectorioClientes();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
@@ -57,7 +76,7 @@ beforeEach(() => {
         };
       }
       if (u.startsWith("/api/clientes")) {
-        return { ok: true, json: async () => ({ clientes: [] }) };
+        return { ok: true, json: async () => ({ clientes: DIRECTORIO }) };
       }
       return { ok: false, json: async () => ({}) };
     }),
@@ -140,12 +159,19 @@ describe("el atajo encendido", () => {
     expect(itemsCapturados[0].direccion).toBe("Paso Canoas");
   });
 
-  it("🔴 el botón NUNCA se aplica solo: con el cliente elegido (UN solo destino definido) el campo sigue vacío", async () => {
+  it("🔁 el RENDER de una fila ya cargada no escribe nada — el pre-llenado vive en el acto de ELEGIR, no en dibujar", async () => {
+    // 🔁 Este caso cambió de dirección el 4-sep-2026: antes exigía que el
+    // destino definido único NUNCA se llenara solo; Daniel acotó esa decisión
+    // («sí quiero que se llene sola…») y hoy se llena AL ELEGIR el cliente
+    // (ver el describe de abajo). Lo que este caso sigue prohibiendo — y es
+    // la mitad que no se aflojó — es que DIBUJAR una fila que ya venía con su
+    // cliente (un borrador, una guía pendiente cargada) escriba la dirección:
+    // eso sí sería «escribirse sola», sin ninguna elección de la persona.
     render(<Harness itemsIniciales={[fila({ cliente: "Jerusalem Duty Free", cliente_codigo: "D-81" })]} />);
     await asentar();
     // El botón está a la vista…
     expect(tarjetas().getByRole("button", { name: "Paso Canoas" })).toBeTruthy();
-    // …y el campo sigue VACÍO hasta que alguien lo toque.
+    // …y el campo sigue VACÍO hasta que alguien elija o toque.
     expect(campoDireccion().value).toBe("");
     expect(itemsCapturados[0].direccion).toBe("");
   });
@@ -211,6 +237,78 @@ describe("el atajo encendido", () => {
     render(<Harness itemsIniciales={[fila({ cliente: "DUCASA" })]} />);
     await asentar();
     expect(tarjetas().queryByTestId("destinos-del-cliente")).toBeNull();
+  });
+});
+
+/** Elige un cliente DE VERDAD por el selector: teclear + Enter (el primer hit).
+ *  ⚠️ El `<select>` de empresa también es role="combobox": se toma el campo de
+ *  cliente por su id del layout de tarjetas. */
+async function elegirCliente(texto: string) {
+  const picker = document.getElementById("cliente-a-m") as HTMLInputElement;
+  fireEvent.focus(picker);
+  fireEvent.change(picker, { target: { value: texto } });
+  await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+  fireEvent.keyDown(picker, { key: "Enter" });
+}
+
+describe("🔁 el destino ÚNICO se llena solo al ELEGIR el cliente (4-sep-2026)", () => {
+  // Daniel, textual: «sí quiero que se llene sola, ¿ese no era el propósito de
+  // todo esto? ¿Cómo que no pre-llenaste la dirección?» y, sobre la regla del
+  // 14-ago: «"la dirección no se escribe sola" me refería a que el usuario no
+  // lo haga para no escribirlo mal como lo vimos, quita esa regla. Que se
+  // autollene como lo discutimos antes.» Con UN solo destino — definido o
+  // único en su historia agrupada — se llena al elegir; con varios, botones.
+  it("elegir Jerusalem Duty Free (D-81) llena Dirección con «Paso Canoas» — y sigue siendo texto libre", async () => {
+    render(<Harness itemsIniciales={[fila()]} />);
+    await asentar();
+    await elegirCliente("Jerusalem");
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-81");
+    expect(campoDireccion().value).toBe("Paso Canoas");
+    expect(itemsCapturados[0].direccion).toBe("Paso Canoas");
+    // Se borra y se escribe encima como cualquier texto.
+    fireEvent.change(campoDireccion(), { target: { value: "Otra bodega" } });
+    expect(itemsCapturados[0].direccion).toBe("Otra bodega");
+  });
+
+  it("un cliente con UN único destino en su HISTORIA agrupada también llena: Bouti, S.A. (D-14) → «David»", async () => {
+    // El ejemplo real que preguntó Daniel: 4 guías, siempre a David.
+    render(<Harness itemsIniciales={[fila()]} />);
+    await asentar();
+    await elegirCliente("Bouti");
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-14");
+    expect(campoDireccion().value).toBe("David");
+  });
+
+  it("🔴 con VARIOS destinos no se llena nada — ni definidos (Sporting Shoes) ni históricos (D-77)", async () => {
+    render(<Harness itemsIniciales={[fila()]} />);
+    await asentar();
+    await elegirCliente("Sporting");
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-142");
+    expect(campoDireccion().value).toBe("");
+
+    cleanup();
+    render(<Harness itemsIniciales={[fila()]} />);
+    await asentar();
+    await elegirCliente("Otro Cliente");
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-77");
+    expect(campoDireccion().value).toBe("");
+  });
+
+  it("🔴 si el campo ya tiene algo escrito, NO se pisa", async () => {
+    render(<Harness itemsIniciales={[fila({ direccion: "Bodega del cliente" })]} />);
+    await asentar();
+    await elegirCliente("Jerusalem");
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-81");
+    expect(itemsCapturados[0].direccion).toBe("Bodega del cliente");
+  });
+
+  it("🔴 CONTROL — con GUIAS_ATAJOS_NUEVOS apagado, elegir el cliente no llena nada (la pantalla de hoy)", async () => {
+    atajosEncendidos = false;
+    render(<Harness itemsIniciales={[fila()]} />);
+    await asentar();
+    await elegirCliente("Jerusalem");
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-81");
+    expect(campoDireccion().value).toBe("");
   });
 });
 

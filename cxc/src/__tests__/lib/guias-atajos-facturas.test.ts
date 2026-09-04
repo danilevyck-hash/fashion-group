@@ -204,6 +204,53 @@ describe("marcar facturas LLENA los renglones de siempre — uno por EMPRESA", (
   });
 });
 
+// ─── el destino AUTOLLENADO viaja con el renglón que nace (4-sep-2026) ────────
+// Daniel: «sí quiero que se llene sola, ¿ese no era el propósito de todo
+// esto?». El VALOR lo calcula el formulario con `destinoParaAutollenar` (UN
+// solo destino, definido o único en la historia agrupada); acá se congela que
+// entra SOLO en filas que nacen del atajo y que lo escrito jamás se pisa.
+
+describe("el destino autollenado al marcar", () => {
+  const F = (empresa: string, secuencial: string) => ({ empresa, secuencial });
+  it("marcar la primera factura escribe la dirección autollenada en el renglón que nace", () => {
+    const items = marcarFactura([vacia()], CLIENTE, F("Vistana International", "2535"), "David");
+    expect(items[0].direccion).toBe("David");
+    // Y «No está en la lista» / «Traslado» igual: también nacen de elegir.
+    expect(renglonDelCliente([vacia()], CLIENTE, "", "David")[0].direccion).toBe("David");
+  });
+
+  it("🔴 una dirección YA escrita no se pisa: marcar otra factura no toca el renglón existente", () => {
+    let items: RenglonDeGuia[] = [vacia()];
+    items = marcarFactura(items, CLIENTE, F("Vistana International", "2535"), "David");
+    items = items.map((r) => ({ ...r, direccion: "Bodega del cliente" }));
+    items = marcarFactura(items, CLIENTE, F("Vistana International", "2536"), "David");
+    expect(items[0].direccion).toBe("Bodega del cliente");
+  });
+
+  it("sin destino único (null) el renglón nace con la dirección vacía, como hoy", () => {
+    const items = marcarFactura([vacia()], CLIENTE, F("Joystep", "88"), null);
+    expect(items[0].direccion).toBe("");
+  });
+
+  it("desmarcar la última factura retira la fila si la dirección es EXACTAMENTE la autollenada — no era trabajo de nadie", () => {
+    let items: RenglonDeGuia[] = [vacia()];
+    items = marcarFactura(items, CLIENTE, F("Joystep", "88"), "David");
+    items = desmarcarFactura(items, CLIENTE, F("Joystep", "88"), "David");
+    expect(items).toHaveLength(1);
+    expect(items[0].cliente).toBe("");
+    expect(items[0].direccion).toBe("");
+  });
+
+  it("🔴 pero si la persona la EDITÓ, la fila se conserva: eso ya es texto suyo", () => {
+    let items: RenglonDeGuia[] = [vacia()];
+    items = marcarFactura(items, CLIENTE, F("Joystep", "88"), "David");
+    items = items.map((r) => ({ ...r, direccion: "David, frente al parque" }));
+    items = desmarcarFactura(items, CLIENTE, F("Joystep", "88"), "David");
+    expect(items).toHaveLength(1);
+    expect(items[0].direccion).toBe("David, frente al parque");
+  });
+});
+
 describe("🔴 el payload NO cambia: los dos caminos producen lo MISMO", () => {
   it("marcar facturas + bultos = escribir el renglón a mano, byte por byte (instantaneaRenglones)", () => {
     // Camino 1: el atajo — marcar dos facturas de Vistana y una de Fashion Wear.

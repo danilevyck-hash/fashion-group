@@ -57,6 +57,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
 import DestinosDelCliente from "./DestinosDelCliente";
+import { destinoParaAutollenar } from "@/lib/guias/destinos-clientes";
 import FacturasDelCliente from "./FacturasDelCliente";
 import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
@@ -593,7 +594,20 @@ export default function GuiaForm({
           topClientes={clientesTop}
           hasError={err}
           onChange={(nombre, codigo) => {
-            onUpdateItemFields(idx, { cliente: nombre, cliente_codigo: codigo });
+            const cambios: Partial<GuiaItem> = { cliente: nombre, cliente_codigo: codigo };
+            // 🔴 El destino ÚNICO se autollena al ELEGIR el cliente
+            // (4-sep-2026, Daniel: «quita esa regla. Que se autollene…») —
+            // regla y porqués en `destinoParaAutollenar`. Solo con el campo
+            // vacío (lo escrito no se pisa), nunca en una guía firmada ni
+            // con el interruptor apagado; con varios destinos, botones.
+            if (GUIAS_ATAJOS_NUEVOS && !soloCorregible && !item.direccion.trim()) {
+              const destino = destinoParaAutollenar(
+                codigo,
+                destinosPorCliente[(codigo || "").trim()] ?? [],
+              );
+              if (destino) cambios.direccion = destino;
+            }
+            onUpdateItemFields(idx, cambios);
             marcarTocado(clave);
           }}
           inputClassName={ctrl(err)}
@@ -661,10 +675,11 @@ export default function GuiaForm({
             encima. Cuelga del MISMO interruptor que el panel de facturas: en
             `false` no se dibuja nada y la pantalla es la de hoy. Sin código de
             cliente, o sin historia ni definición, el componente devuelve null.
-            🔴 NUNCA se aplica solo — ni con un único destino: la dirección
-            «NO se escribe sola en el campo» (14-ago-2026, y el invariante de
-            que las sugerencias nunca atan solas). En una guía Completada no
-            aparece: `campoDireccion` ya salió por `soloCorregible` arriba. */}
+            Con UN solo destino el campo ya se autollenó al ELEGIR el cliente
+            (`destinoParaAutollenar`, arriba); los botones existen para los
+            clientes con VARIOS, y ahí NUNCA se aplican solos: elegir entre
+            varios es de la persona. En una guía Completada no aparece:
+            `campoDireccion` ya salió por `soloCorregible` arriba. */}
         {GUIAS_ATAJOS_NUEVOS && (
           <DestinosDelCliente
             codigo={item.cliente_codigo || ""}
@@ -972,6 +987,13 @@ export default function GuiaForm({
           items={items}
           onReemplazarItems={onReemplazarItems}
           clientesTop={clientesTop}
+          // El destino que se autollena al marcar la primera factura del
+          // cliente (4-sep-2026): el MISMO cálculo que usa el selector de
+          // cliente de cada renglón — UN solo destino, definido o único en la
+          // historia agrupada; con varios, nada.
+          destinoAutollenadoDe={(codigo) =>
+            destinoParaAutollenar(codigo, destinosPorCliente[(codigo || "").trim()] ?? [])
+          }
         />
       )}
 

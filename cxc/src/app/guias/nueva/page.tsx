@@ -18,13 +18,13 @@ export default function GuiaNuevaPage() {
 
   const s = useGuiaFormState({ editingId: null });
 
-  // Al ABRIR una guía nueva se dispara, en segundo plano, la lectura corta de
-  // las facturas de HOY (para el panel «Facturas del cliente»). Fail-open,
-  // acelerada a 10 min. ⚠️ NO se dispara desde la LISTA de /guias a propósito:
-  // el candado «la lista no manda un solo pedido que no sea GET»
-  // (guias-eliminar-en-la-fila.test.tsx) protege que la lista no escriba, y
-  // aflojarlo para colar un POST sería debilitar justo lo que vigila. Acá es
-  // donde las facturas se usan; el «Buscar otra vez» del panel cubre el resto.
+  // La lectura corta de las facturas de HOY (para el panel «Facturas del
+  // cliente»). Desde el 4-sep-2026 el disparo principal vive en la LISTA de
+  // /guias — Daniel: «¿por qué no se puede hacer al apretar guías? Prefiero
+  // eso.» — y ACÁ SE QUEDA TAMBIÉN para quien entra directo por URL sin pasar
+  // por la lista. El acelerador de 10 min (sessionStorage) hace que venir de
+  // la lista no dispare dos veces. Fail-open; el «Buscar otra vez» del panel
+  // cubre el resto.
   useEffect(() => {
     if (authChecked && role !== "vendedor") refrescarFacturasDelDia();
   }, [authChecked, role]);

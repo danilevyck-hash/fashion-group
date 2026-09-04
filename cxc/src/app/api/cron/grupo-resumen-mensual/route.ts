@@ -1,12 +1,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cron/grupo-resumen-mensual — Resumen mensual del grupo a Telegram.
-// Corre el día 3 de cada mes a las 13:00 UTC (08:00 Panamá) y reporta el MES
-// ANTERIOR cerrado: total grupo + las 8 empresas, % vs mismo mes año pasado.
+// Corre el día 1 de cada mes a las 13:00 UTC (08:00 Panamá — desde el
+// 4-sep-2026; era el día 3 por un margen que resultó ser de OTRO sync, ver el
+// post-mortem en src/lib/grupo-resumen-mensual.ts) y reporta el MES ANTERIOR
+// cerrado: total grupo + las 8 empresas, % vs mismo mes año pasado.
+//
+// 🔒 Sale por `enviarNegocioPrivado` (4-sep-2026). Daniel, textual: «este
+// mensaje también lo quiero en alertas de Telegram, no en negocio.» — el
+// mismo motivo del resumen diario de ACS (2-sep): 📊 NEGOCIO es un GRUPO de
+// tres donde está el celular de la empresa, y ahí no van los números del
+// grupo. Destino de sistema, trato de negocio: SIN el prefijo «🔧 SISTEMA ·»
+// y sin regla anti-ruido. El texto del mensaje no cambió ni una coma.
+// Candado: src/__tests__/lib/acs-resumen-canal-privado.test.ts.
 //
 // Solo lee la DB (RPC ventas_dashboard_summary, la misma del tab Resumen de
 // /ventas → paridad al centavo por construcción) — NO toca la API de Switch,
-// no necesita higiene de sesión. Semántica y guardia: ver
-// src/lib/grupo-resumen-mensual.ts.
+// no necesita higiene de sesión. Semántica y guardias (cierre sincronizado de
+// las 8 + total $0): ver src/lib/grupo-resumen-mensual.ts.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,7 +28,7 @@ import {
 } from "@/lib/grupo-resumen-mensual";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
-import { enviarNegocio } from "@/lib/alertas/canal";
+import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -61,7 +71,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       throw new Error(`sin data para ${fmtMesLabel(anio, mes)} — ¿ventas_rollup_mensual_mv sin refrescar?`);
     }
     const mensaje = buildMensajeMensual(resumen);
-    const sent = await enviarNegocio(mensaje);
+    const sent = await enviarNegocioPrivado(mensaje);
     if (!sent) throw new Error("Telegram no aceptó el mensaje (ver logs)");
 
     await recordCronHeartbeat(CRON_NAME);

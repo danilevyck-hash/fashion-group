@@ -7,8 +7,9 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, PullToRefresh } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
-import GuiasList from "./components/GuiasList";
+import GuiasList, { CREATE_ROLES } from "./components/GuiasList";
 import AtarClienteModal from "./components/AtarClienteModal";
+import { refrescarFacturasDelDia } from "./components/refrescarFacturasHoy";
 import {
   useClientesDelGrupo,
   useNombresDeClientes,
@@ -97,6 +98,26 @@ export default function GuiasPage() {
   useEffect(() => {
     if (sessionStorage.getItem("fg_guias_readonly") === "1") setGuiasReadonly(true);
   }, []);
+
+  // Al TOCAR Guías se dispara, en segundo plano, la lectura corta de las
+  // facturas de HOY para el panel «Facturas del cliente». Daniel, textual
+  // (4-sep-2026): «¿por qué no se puede hacer al apretar guías? Prefiero eso.»
+  // — antes vivía solo en /guias/nueva. Fail-open, acelerada a 10 min
+  // (sessionStorage) + cooldown de 10 min del server + lock del sync;
+  // `logoutAllSwitchSessions()` va en el `finally` del route. NO dispara para
+  // quien no puede crear guías (vendedor) ni en modo solo lectura: para ellos
+  // el dato no se usa. Detrás de GUIAS_ATAJOS_NUEVOS (lo mira la función).
+  // 🔴 La lista SIGUE sin despachar ni editar guías: este POST no escribe
+  // sobre /api/guias/** — el candado de guias-eliminar-en-la-fila cambió de
+  // dirección para exigir exactamente eso.
+  useEffect(() => {
+    if (!authChecked || !role || !CREATE_ROLES.includes(role)) return;
+    let readonly = false;
+    try {
+      readonly = sessionStorage.getItem("fg_guias_readonly") === "1";
+    } catch { /* sin sessionStorage no hay modo lectura que respetar */ }
+    if (!readonly) refrescarFacturasDelDia();
+  }, [authChecked, role]);
 
   // Los clientes más usados EN GUÍAS, para que atar una línea vieja no obligue
   // a teclear. Se piden una sola vez y solo cuando hay sesión. Si falla, el

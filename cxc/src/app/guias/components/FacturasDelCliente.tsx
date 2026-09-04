@@ -47,6 +47,14 @@ interface Props {
   onReemplazarItems: (items: GuiaItem[]) => void;
   /** Clientes más usados en guías, para elegir sin teclear. */
   clientesTop?: ClienteHit[];
+  /**
+   * El destino que se AUTOLLENA al marcar la primera factura del cliente
+   * (4-sep-2026, Daniel: «sí quiero que se llene sola…»): lo calcula GuiaForm
+   * con `destinoParaAutollenar` — UN solo destino (definido o único en la
+   * historia agrupada) o null. Solo entra en filas que nacen acá; lo escrito
+   * a mano nunca se pisa.
+   */
+  destinoAutollenadoDe?: (codigo: string) => string | null;
 }
 
 function fmtMonto(n: number): string {
@@ -76,7 +84,7 @@ function horaCorta(iso: string): string {
   }).format(d);
 }
 
-export default function FacturasDelCliente({ items, onReemplazarItems, clientesTop }: Props) {
+export default function FacturasDelCliente({ items, onReemplazarItems, clientesTop, destinoAutollenadoDe }: Props) {
   const [cliente, setCliente] = useState<{ nombre: string; codigo: string } | null>(null);
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [hasta, setHasta] = useState<string | null>(null);
@@ -123,10 +131,16 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
     }
   }
 
+  /** El destino único del cliente elegido (o null): viaja a marcar, desmarcar
+   *  y a los dos botones de siempre, para que el renglón nazca con su destino. */
+  const destinoAuto = cliente ? (destinoAutollenadoDe?.(cliente.codigo) ?? null) : null;
+
   function toggle(f: Factura) {
     if (!cliente) return;
     const marcada = facturaMarcada(items, cliente, f);
-    const nuevos = marcada ? desmarcarFactura(items, cliente, f) : marcarFactura(items, cliente, f);
+    const nuevos = marcada
+      ? desmarcarFactura(items, cliente, f, destinoAuto)
+      : marcarFactura(items, cliente, f, destinoAuto);
     onReemplazarItems(nuevos as GuiaItem[]);
   }
 
@@ -248,7 +262,7 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                 {/* Los dos caminos de siempre, con el cliente ya puesto. */}
                 <button
                   type="button"
-                  onClick={() => onReemplazarItems(renglonDelCliente(items, cliente, "") as GuiaItem[])}
+                  onClick={() => onReemplazarItems(renglonDelCliente(items, cliente, "", destinoAuto) as GuiaItem[])}
                   className="text-xs text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2"
                 >
                   No está en la lista
@@ -256,7 +270,7 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                 <button
                   type="button"
                   onClick={() =>
-                    onReemplazarItems(renglonDelCliente(items, cliente, FACTURA_TRASLADO) as GuiaItem[])
+                    onReemplazarItems(renglonDelCliente(items, cliente, FACTURA_TRASLADO, destinoAuto) as GuiaItem[])
                   }
                   className="text-xs text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2"
                 >

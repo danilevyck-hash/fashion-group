@@ -34,7 +34,7 @@ import { enviarSistema } from "@/lib/alertas/canal";
 // Hay dos vigías de crons: health-crons (monitor externo, responde 200/503) y el
 // watchdog Telegram dentro de switch-reconciliacion. Antes cada uno tenía su
 // propia copia del umbral; el de switch-reconciliacion se quedó sin el mapa
-// mensual y alertaba falsamente que grupo-resumen-mensual (mensual, día 3)
+// mensual y alertaba falsamente que grupo-resumen-mensual (mensual)
 // estaba caído. Ambos importan estas constantes/helpers para no volver a divergir.
 
 /** Umbral por defecto (horas) sin success antes de marcar un cron como stale.
@@ -42,9 +42,10 @@ import { enviarSistema } from "@/lib/alertas/canal";
 export const CRON_STALE_HOURS_DEFAULT = 26;
 
 /** Umbrales propios por cron NO diario. El default de 26h marcaría un cron
- *  mensual como caído ~29 días/mes; grupo-resumen-mensual corre el día 3 → 33
- *  días cubren el gap más largo entre corridas aun con jitter. El resumen
- *  semanal de fotos corre los lunes → 8 días cubren el ciclo con margen. */
+ *  mensual como caído ~29 días/mes; grupo-resumen-mensual corre el día 1
+ *  (desde el 4-sep-2026; antes el 3) → el gap más largo entre corridas es 31
+ *  días y 33 lo cubren aun con jitter. El resumen semanal de fotos corre los
+ *  lunes → 8 días cubren el ciclo con margen. */
 export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   "grupo-resumen-mensual": 33 * 24,
   "catalogos-fotos-resumen": 8 * 24,
@@ -213,10 +214,11 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   // punto; el candado anti-duplicado lo hacía inofensivo, pero recuperar algo
   // que todavía no falló no es recuperar.
   "cheques-alert": 15,
-  // grupo-resumen-mensual: su run normal es el día 3 a las 13:00 UTC y su
-  // recuperación solo aplica los días 3-4 (recoverOnlyIf en la reconciliación).
-  // Sigue en NUNCA_SILENCIAR: los watchdogs jamás lo silencian por "recuperación
-  // en camino" (demasiado esporádico para asumirla).
+  // grupo-resumen-mensual: su run normal es el día 1 a las 13:00 UTC (desde
+  // el 4-sep-2026; antes el 3) y su recuperación solo aplica los días 1-2
+  // (recoverOnlyIf en la reconciliación). Sigue en NUNCA_SILENCIAR: los
+  // watchdogs jamás lo silencian por "recuperación en camino" (demasiado
+  // esporádico para asumirla).
   "grupo-resumen-mensual": 14,
   // Los CUATRO catálogos corren ahora dentro de la ventana de uso de Panamá
   // (14:30-22:10 UTC = 9:30 a.m. - 5:10 p.m.), así que su primer slot del día
@@ -405,7 +407,7 @@ export const EXTRA_ENTRY_HOURS_UTC: Record<string, number[]> = {
 /** Crons que JAMÁS se silencian por "recuperación en camino": la reconciliación
  *  es el propio recuperador (si está caída no hay red de seguridad) y los
  *  resúmenes mensual/semanal son demasiado esporádicos para asumir
- *  auto-recuperación (su recovery solo aplica el día 3-4 / los lunes). */
+ *  auto-recuperación (su recovery solo aplica el día 1-2 / los lunes). */
 export const NUNCA_SILENCIAR = new Set([
   "switch-reconciliacion",
   "grupo-resumen-mensual",

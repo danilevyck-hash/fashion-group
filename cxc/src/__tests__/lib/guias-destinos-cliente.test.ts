@@ -14,9 +14,15 @@
  *      del `deleted` de la cabecera: se filtran LOS DOS.
  *   5. Cliente sin historia (o sin código) → cero botones.
  *   6. La tienda de D-142: `componerDestino("Westland", "6")` =
- *      «Westland · tienda 6» — el separador vive en UN solo lugar.
+ *      «Westland · tienda 6» — el separador vive en UN solo lugar. City Moda
+ *      NO lleva tienda: cada «tienda» de City Moda es OTRO cliente con su
+ *      propio código (4-sep-2026).
  *   7. 🔴 El payload no cambia: el renglón armado tocando un botón es byte por
  *      byte el que se arma tecleando lo mismo (`instantaneaRenglones`).
+ *   8. 🔴 `destinoParaAutollenar` (4-sep-2026, Daniel: «sí quiero que se
+ *      llene sola…» / «quita esa regla. Que se autollene…»): con UN solo
+ *      destino — definido o único en la historia AGRUPADA — se llena solo;
+ *      con varios, nada. El pareo por parecido sigue prohibido.
  *
  * Fixtures con fechas FIJAS — nunca `new Date()`.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -30,6 +36,7 @@ import {
   botonesDeDestino,
   claveDestino,
   componerDestino,
+  destinoParaAutollenar,
   destinosHistoricos,
   tiendasDelDestino,
 } from "@/lib/guias/destinos-clientes";
@@ -62,7 +69,18 @@ describe("los 9 definidos por Daniel devuelven exactamente su tabla", () => {
     ["D-25", ["Paso Canoas"]],
     ["D-35", ["Calle 19 Central"]],
     ["D-144", ["Albrook"]],
-    ["D-26", ["Entrega en SportCorner"]],
+    // ⚠️ La familia City Moda (4-sep-2026): son ONCE clientes con su propio
+    // código. Las «X (ENTREGA EN SPORTCORNER)» del histórico de D-26 eran
+    // envíos cargados al cliente equivocado (iban a los otros códigos) y se
+    // IGNORAN; el único destino propio de D-26 es «5 de Mayo».
+    ["D-26", ["5 de Mayo"]],
+    ["D-27", ["Sport Corner Calidonia"]],
+    ["D-28", ["Sport Corner Calidonia"]],
+    ["D-29", ["Sport Corner Calidonia"]],
+    ["D-31", ["Sport Corner Calidonia"]],
+    ["D-32", ["Sport Corner Calidonia"]],
+    ["D-34", ["Sport Corner Calidonia"]],
+    ["D-42", ["Sport Corner Calidonia"]],
     ["D-142", ["Westland", "Albrook", "Los Andes", "Santiago", "Penonomé", "Metromall", "Megamall", "Outlet Vía España"]],
   ];
 
@@ -73,9 +91,25 @@ describe("los 9 definidos por Daniel devuelven exactamente su tabla", () => {
     expect(botonesDeDestino(codigo, historicos)).toEqual(esperado);
   });
 
-  it("la tabla tiene los 9 y solo los 9", () => {
+  it("🔴 D-87 La Frontera Duty Free dice GUABITO aunque su histórico real diga Changinola — Daniel: «en Frontera Duty Free es Guabito, hazme caso.»", () => {
+    // El histórico REAL medido el 4-sep-2026: «Changinola» 7 veces y
+    // «Guabito» 4. Por frecuencia ganaría Changinola; la definición gana.
+    const historicoReal = [
+      ...Array<string>(7).fill("Changinola"),
+      ...Array<string>(4).fill("Guabito"),
+    ];
+    expect(botonesDeDestino("D-87", historicoReal)).toEqual(["Guabito"]);
+    expect(DESTINOS_DEFINIDOS["D-87"]).toEqual(["Guabito"]);
+  });
+
+  it("la tabla tiene los 16 y solo los 16 (los 9 de Daniel + la familia City Moda del 4-sep)", () => {
     expect(Object.keys(DESTINOS_DEFINIDOS).sort()).toEqual(
-      ["D-117", "D-142", "D-144", "D-156", "D-25", "D-26", "D-35", "D-81", "D-87"].sort(),
+      [
+        "D-117", "D-142", "D-144", "D-156", "D-25", "D-26", "D-35", "D-81", "D-87",
+        // La familia City Moda con guías propias. D-30, D-33 y D-78 no tienen
+        // guías todavía y por eso NO tienen destino definido.
+        "D-27", "D-28", "D-29", "D-31", "D-32", "D-34", "D-42",
+      ].sort(),
     );
   });
 });
@@ -212,6 +246,50 @@ describe("D-142: la tienda opcional y el separador en UN solo lugar", () => {
     expect(tiendasDelDestino("D-142", "Santiago")).toEqual([]);
     expect(tiendasDelDestino("D-142", "")).toEqual([]);
     expect(tiendasDelDestino("D-25", "Westland")).toEqual([]);
+  });
+});
+
+// ─── 6b · City Moda NO lleva tienda: cada «tienda» es OTRO cliente ───────────
+
+describe("City Moda (4-sep-2026): once códigos, cero tiendas", () => {
+  it("TIENDAS_POR_CLIENTE solo tiene a D-142 — D-26 no ofrece tiendas", () => {
+    expect(Object.keys(TIENDAS_POR_CLIENTE)).toEqual(["D-142"]);
+    expect(tiendasDelDestino("D-26", "5 de Mayo")).toEqual([]);
+    expect(tiendasDelDestino("D-27", "Sport Corner Calidonia")).toEqual([]);
+  });
+});
+
+// ─── 6c · el destino que SÍ se llena solo (4-sep-2026) ───────────────────────
+
+describe("🔴 destinoParaAutollenar: UN solo destino — definido o único en la historia", () => {
+  // Daniel, textual (4-sep-2026): «sí quiero que se llene sola, ¿ese no era el
+  // propósito de todo esto? ¿Cómo que no pre-llenaste la dirección?» y, sobre
+  // la regla del 14-ago: «"la dirección no se escribe sola" me refería a que
+  // el usuario no lo haga para no escribirlo mal como lo vimos, quita esa
+  // regla. Que se autollene como lo discutimos antes.» Medido: 40 de 48
+  // clientes con guías usan siempre el mismo destino.
+  it("un definido con UN destino lo devuelve (incluida la familia City Moda)", () => {
+    expect(destinoParaAutollenar("D-81", [])).toBe("Paso Canoas");
+    expect(destinoParaAutollenar("D-87", [])).toBe("Guabito");
+    expect(destinoParaAutollenar("D-156", [])).toBe("Changuinola");
+    expect(destinoParaAutollenar("D-26", [])).toBe("5 de Mayo");
+    expect(destinoParaAutollenar("D-27", [])).toBe("Sport Corner Calidonia");
+    // Y la definición gana aunque el histórico diga otra cosa (D-87 real:
+    // más veces «Changinola» que «Guabito»).
+    expect(destinoParaAutollenar("D-87", ["Changinola"])).toBe("Guabito");
+  });
+  it("un cliente FUERA de la tabla con UN solo destino histórico también autollena — Bouti, S.A. (D-14) → David", () => {
+    // El ejemplo que preguntó Daniel: D-14 tiene 4 guías, siempre a «David».
+    expect(destinoParaAutollenar("D-14", ["David"])).toBe("David");
+  });
+  it("🔴 con VARIOS destinos no se llena nada: salen los botones y elige la persona", () => {
+    expect(destinoParaAutollenar("D-142", [])).toBeNull(); // 8 definidos
+    expect(destinoParaAutollenar("D-999", ["David", "Santiago"])).toBeNull();
+  });
+  it("sin código o sin historia, nada", () => {
+    expect(destinoParaAutollenar("D-999", [])).toBeNull();
+    expect(destinoParaAutollenar("", ["David"])).toBeNull();
+    expect(destinoParaAutollenar(null, ["David"])).toBeNull();
   });
 });
 

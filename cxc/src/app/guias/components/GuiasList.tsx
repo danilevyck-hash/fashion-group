@@ -142,7 +142,9 @@ function ChipCliente({
 }
 
 const DESPACHO_ROLES = ["admin", "secretaria", "bodega"];
-const CREATE_ROLES = ["admin", "secretaria", "bodega"];
+// Exportada: la página de la lista la usa para decidir a quién le dispara el
+// refresco de facturas de hoy (quien no puede crear guías no lo necesita).
+export const CREATE_ROLES = ["admin", "secretaria", "bodega"];
 const DELETE_ROLES = ["admin", "secretaria"];
 
 export default function GuiasList({
