@@ -291,8 +291,17 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
         l.jornadaSemanal ? `${l.jornadaSemanal} h` : "—",
         l.dinero?.rataHora ?? null,
         h.diasTrabajados,
-        c0(aHoras(h.extraDiurnoMin)), c0(aHoras(h.extraNocturnoMin)), c0(aHoras(h.excedenteMin)),
-        c0(aHoras(h.domingoMin)), c0(aHoras(h.feriadoMin)),
+        // 🔴 El servicio profesional NO tiene horas con recargo (3-sep-2026,
+        // Daniel: *«es solo para ver sus tardanzas y ausencias»*): las cinco
+        // columnas van con «—», no vacías ni en 0, para que no se lean como
+        // «no hizo extras» sino como «acá no se cuentan». Tardanza y ausencia,
+        // más abajo, siguen saliendo con su número.
+        ...(l.fueraDePlanilla
+          ? Array<ReportCell>(5).fill("—")
+          : [
+            c0(aHoras(h.extraDiurnoMin)), c0(aHoras(h.extraNocturnoMin)), c0(aHoras(h.excedenteMin)),
+            c0(aHoras(h.domingoMin)), c0(aHoras(h.feriadoMin)),
+          ]),
         // Minutos AL SEGUNDO: se redondean a 2 decimales solo para la celda.
         // 🔑 `minutosTardanzaMostrados` y no `h.tardanzaMin`: es el mismo número
         // que la pantalla, y el que de verdad valúa la columna «Tardanzas».

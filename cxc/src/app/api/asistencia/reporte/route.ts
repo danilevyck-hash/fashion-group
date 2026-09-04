@@ -22,7 +22,7 @@ import {
 } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
 import {
-  leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas, leerJustificaciones,
+  leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, leerJustificaciones,
   leerVacaciones,
 } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
@@ -194,8 +194,21 @@ export async function GET(req: NextRequest) {
       correccionesPorDia: efectivas.porDia,
     });
 
+    // 🔴 EL SERVICIO PROFESIONAL NO CUENTA HORAS EXTRA (3-sep-2026). Daniel:
+    // *«yulisa marca pero no deberia de calcular ya que es salario fijo, es
+    // solo para ver sus tardanzas y ausencias»*. La bandera sale de la FICHA
+    // —la misma fuente que la planilla— y viaja con la persona: la pantalla, el
+    // Excel y el PDF muestran «—» en esa columna y no la suman. El motor no se
+    // toca: sus tardanzas y ausencias siguen saliendo igual que las de todos.
+    const sinHorasExtra = new Set(
+      personasDb.filas.filter(servicioProfesionalDeFila).map((f) => String(f.empleado_codigo)),
+    );
+    const personasConBandera = personas.map((p) =>
+      sinHorasExtra.has(p.codigo) ? { ...p, servicioProfesional: true } : p,
+    );
+
     return NextResponse.json({
-      personas,
+      personas: personasConBandera,
       desde,
       hasta,
       // Lo que la pantalla necesita para que NADIE lea un total sin enterarse

@@ -73,7 +73,13 @@ import { CHIP_REPARTIDO, type RepartoRechazado } from "@/lib/asistencia/reparto"
 // pantalla entera al formatearlo. Ante la duda: no hay sello, o sea lo de ayer.
 import { baseSeguros, chipBaseSeguros } from "@/lib/asistencia/seguros-base";
 import type { AvisoPeriodoAbierto, CodigoSinFicha } from "@/lib/asistencia/periodo";
-import type { ExtraNoAprobada } from "@/lib/asistencia/aprobaciones";
+import Link from "next/link";
+import {
+  cabeceraExtraNoAprobada,
+  enlaceAprobaciones,
+  horasBonitas,
+  type ExtraNoAprobada,
+} from "@/lib/asistencia/aprobaciones";
 import type {
   PrestamoSinAtar,
   SugerenciaPrestamo,
@@ -937,16 +943,38 @@ export default function PlanillaTab() {
             {frenos.map((f) => (
               <li key={f.tipo} className="text-[13px] text-red-800">
                 {f.texto}
+                {/* 🔴 CADA NOMBRE LLEVA A LA PERSONA (3-sep-2026). Daniel: *«al
+                    hacer clic en el mensaje de aprobacion, que te lleve al
+                    colaborador para aprobar»*. Mismo nivel → `replace`. Un 409
+                    viejo sin `codigos` cae al enlace único de antes. */}
                 {f.tipo === "horas-extra" && (
-                  <>
-                    {" "}
-                    <a
-                      href="/asistencia?tab=aprobaciones"
-                      className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
-                    >
-                      Ir a Aprobaciones
-                    </a>
-                  </>
+                  f.codigos && f.codigos.length === f.quienes.length ? (
+                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                      {f.codigos.map((codigo, i) => (
+                        <Link
+                          key={codigo}
+                          href={enlaceAprobaciones(codigo, pedido ? { desde: pedido.desde, hasta: pedido.hasta } : null)}
+                          replace
+                          scroll={false}
+                          className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
+                        >
+                          {f.quienes[i]}
+                        </Link>
+                      ))}
+                    </span>
+                  ) : (
+                    <>
+                      {" "}
+                      <Link
+                        href="/asistencia?tab=aprobaciones"
+                        replace
+                        scroll={false}
+                        className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
+                      >
+                        Ir a Aprobaciones
+                      </Link>
+                    </>
+                  )
                 )}
               </li>
             ))}
@@ -1012,10 +1040,35 @@ export default function PlanillaTab() {
           se pagan las horas extras autorizadas y las reportadas por Julio
           Garay»*. No se pagan — pero se DICEN, con nombre y cantidad, arriba y
           en ámbar. Rechazar sí, esconder no. */}
-      {data?.avisos.avisoExtraSinAprobar && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          {data.avisos.avisoExtraSinAprobar}
-        </p>
+      {/* 🔴 Y CADA PERSONA ES UN ENLACE (3-sep-2026). Daniel, textual: *«al
+          hacer clic en el mensaje de aprobacion, que te lleve al colaborador
+          para aprobar»*. Lleva a la pestaña Aprobaciones con `persona=<código>`
+          y el MISMO rango que se está mirando; la pestaña abre el primer día
+          que esa persona tiene sin aprobar y la resalta. Mismo nivel del
+          breadcrumb → `replace`, el Atrás no cicla. `avisoExtraSinAprobar`
+          (el párrafo de antes) queda en la respuesta para el Excel/PDF y para
+          quien lo lea; acá se arma con la lista. */}
+      {!!data?.avisos.extraSinAprobar?.length && (
+        <div
+          data-testid="aviso-extra-sin-aprobar"
+          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900"
+        >
+          <p>{cabeceraExtraNoAprobada(data.avisos.extraSinAprobar.length)}</p>
+          <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+            {data.avisos.extraSinAprobar.map((e) => (
+              <li key={e.codigo}>
+                <Link
+                  href={enlaceAprobaciones(e.codigo, pedido ? { desde: pedido.desde, hasta: pedido.hasta } : null)}
+                  replace
+                  scroll={false}
+                  className="inline-flex min-h-[44px] items-center gap-1 font-medium tabular-nums underline underline-offset-2 hover:text-amber-950"
+                >
+                  {e.etiqueta} · {horasBonitas(e.minutos)}{e.monto === null ? "" : ` · $${e.monto.toFixed(2)}`}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {/* 🔴 LO QUE EL GUARD RECHAZÓ SE DICE, con el nombre y el motivo. Sin

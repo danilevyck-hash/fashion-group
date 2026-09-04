@@ -14,6 +14,10 @@ TESTS=(
   src/__tests__/lib/asistencia-aprobaciones.test.ts
   src/__tests__/lib/asistencia-planilla-guardada.test.ts
   src/__tests__/lib/boston-acceso.test.ts
+  # 3-sep-2026, servicio profesional sin horas extra (Daniel: «es solo para ver
+  # sus tardanzas y ausencias»): el motor, y la ruta que arma la lista de Aprobaciones.
+  src/__tests__/lib/asistencia-servicio-profesional.test.ts
+  src/__tests__/api/aprobaciones-no-lista-servicio-profesional.test.ts
 )
 ARCHIVOS=(
   src/lib/asistencia/planilla.ts
@@ -220,6 +224,41 @@ mutar "$BOSTON" \
     : null;' \
   '' \
   'lo no aprobado no viaja a Boston'
+
+echo "== SERVICIO PROFESIONAL: SIN HORAS EXTRA, CON TARDANZAS Y AUSENCIAS (3-sep-2026) =="
+mutar "$MOTOR" \
+  '    : fueraDePlanilla
+      ? sinHorasExtra(horas)
+      : horas;' \
+  '    : horas;' \
+  '🔴 se quita el `if` de servicio profesional (vuelve al aviso, al freno y a Aprobaciones)'
+
+mutar "$MOTOR" \
+  '    extraNoAprobadaMin: 0, extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0,
+    domingoMin: 0, feriadoMin: 0,
+  };' \
+  '    extraNoAprobadaMin: 0, extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0,
+    domingoMin: 0, feriadoMin: 0,
+    tardanzaMin: 0, tardanzaGraveMin: 0, tardanzaGraveDias: 0, ausenciaMin: 0, ausenciaDias: 0,
+  };' \
+  '🔴 también deja de contar tardanzas y ausencias (la mitad que Daniel quiere ver)'
+
+mutar "$MOTOR" \
+  '    domingoMin: 0, feriadoMin: 0,
+  };' \
+  '  };' \
+  'el domingo y el feriado del servicio profesional se siguen contando'
+
+mutar "$MOTOR" \
+  '  const extraAprobada = fueraDePlanilla || !exigir || extra.aprobada === true;' \
+  '  const extraAprobada = !exigir || extra.aprobada === true;' \
+  'el rótulo dice que al servicio profesional le quedó algo sin aprobar'
+
+mutar "$AVISO" \
+  '    if (l.fueraDePlanilla) continue;
+    for (const d of diasConExtra(p, opts.reglas)) {' \
+  '    for (const d of diasConExtra(p, opts.reglas)) {' \
+  '🔴 la pestaña Aprobaciones vuelve a ofrecer al servicio profesional'
 
 echo "== CONTROL (a propósito NO matchea) =="
 mutar "$MOTOR" 'ESTA_LINEA_NO_EXISTE_EN_NINGUN_LADO' 'nada' 'control: el denunciador tiene que gritar ⛔'

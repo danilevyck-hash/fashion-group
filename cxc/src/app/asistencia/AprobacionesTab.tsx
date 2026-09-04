@@ -33,13 +33,18 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
 import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
-import { quincenasHasta } from "@/lib/asistencia/planilla";
+import { useUrlState } from "@/lib/hooks/useUrlState";
+import { esFechaDeCalendario, quincenasHasta } from "@/lib/asistencia/planilla";
 import {
   claveDia,
   etiquetaDia,
+  etiquetaDePersona,
   horasBonitas,
+  PARAM_PERSONA,
+  primerDiaPendienteDe,
   resumenPendientes,
   type DiaAprobacion,
   type PersonaEnDia,
@@ -116,16 +121,39 @@ export default function AprobacionesTab() {
     () => new Date(Date.now() - 5 * 3_600_000).toISOString().slice(0, 10),
     [],
   );
+  // ── 🔴 SE LLEGA DESDE LA PLANILLA, A UNA PERSONA (3-sep-2026) ─────────────
+  //
+  // Daniel, textual: *«al hacer clic en el mensaje de aprobacion, que te lleve
+  // al colaborador para aprobar»*. El aviso ámbar de la planilla y el freno del
+  // cierre traen a esta pestaña con `?persona=<código>` y el rango que se
+  // estaba mirando (`desde`/`hasta`). Acá: el rango de la URL manda sobre el
+  // recordado, se abre el primer día que esa persona tiene sin aprobar, su
+  // fila se resalta y arriba un chip dice a quién se está mirando, con «ver a
+  // todos» para limpiarlo. ⚠️ NO SE FILTRA A LOS DEMÁS: se ve todo, con la
+  // persona resaltada — esconder al resto es cómo se aprueba a uno y se olvida
+  // a veinte. Mismo nivel del breadcrumb → `replace` (default de `useUrlState`).
+  const [persona, setPersona] = useUrlState(PARAM_PERSONA, "");
+  const sp = useSearchParams();
+  const rangoUrl = useMemo(() => {
+    const d = sp.get("desde") ?? "";
+    const h = sp.get("hasta") ?? "";
+    return esFechaDeCalendario(d) && esFechaDeCalendario(h) && d <= h ? { desde: d, hasta: h } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // El período arranca PUESTO en la quincena en curso: elegirlo a mano sería un
-  // toque antes de empezar.
+  // toque antes de empezar. Si la URL trae un rango (se llegó desde la
+  // planilla), manda ése: hay que aterrizar en la MISMA quincena.
   const quincenaEnCurso = useMemo(() => quincenasHasta(hoy, 1)[0], [hoy]);
-  const [desde, setDesde] = useState(quincenaEnCurso.desde);
-  const [hasta, setHasta] = useState(quincenaEnCurso.hasta);
+  const [desde, setDesde] = useState(rangoUrl?.desde ?? quincenaEnCurso.desde);
+  const [hasta, setHasta] = useState(rangoUrl?.hasta ?? quincenaEnCurso.hasta);
 
   // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
   // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
-  // —si no, pisaría cada cambio del usuario con el valor guardado.
+  // —si no, pisaría cada cambio del usuario con el valor guardado. Y NO pisa el
+  // rango que vino en la URL: ése es el de la planilla que se estaba mirando.
   useEffect(() => {
+    if (rangoUrl) return;
     const r = ultimoRango("asistencia_aprobaciones");
     if (r) { setDesde(r.desde); setHasta(r.hasta); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,6 +193,36 @@ export default function AprobacionesTab() {
   useEffect(() => { void cargar(); }, [cargar]);
 
   const pend = useMemo(() => resumenPendientes(dias ?? []), [dias]);
+
+  // ── La persona que trajo la URL ───────────────────────────────────────────
+  const personaCodigo = persona.trim();
+  const personaEtiqueta = useMemo(
+    () => (personaCodigo ? etiquetaDePersona(dias ?? [], personaCodigo) ?? personaCodigo : ""),
+    [dias, personaCodigo],
+  );
+  const primerDiaPendiente = useMemo(
+    () => (personaCodigo ? primerDiaPendienteDe(dias ?? [], personaCodigo) : null),
+    [dias, personaCodigo],
+  );
+  /** A quién ya se le abrió el día y se le hizo scroll: UNA vez por persona. */
+  const enfocada = useRef<string | null>(null);
+  const filaResaltada = useRef<HTMLLabelElement | null>(null);
+  useEffect(() => {
+    if (!personaCodigo || dias === null) return;
+    if (enfocada.current === personaCodigo) return;
+    enfocada.current = personaCodigo;
+    if (primerDiaPendiente) setAbierto(primerDiaPendiente);
+  }, [personaCodigo, dias, primerDiaPendiente]);
+  const scrolleada = useRef<string | null>(null);
+  useEffect(() => {
+    // El scroll va cuando la fila ya existe en el DOM (el día abierto), UNA
+    // vez por persona. jsdom no implementa `scrollIntoView`: se pregunta antes.
+    const el = filaResaltada.current;
+    if (!el || !personaCodigo || scrolleada.current === personaCodigo) return;
+    if (abierto !== primerDiaPendiente) return;
+    scrolleada.current = personaCodigo;
+    if (typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "center" });
+  }, [abierto, primerDiaPendiente, personaCodigo]);
 
   /** Las semanas, en orden, cada una con sus días. */
   const semanas = useMemo(() => {
@@ -289,6 +347,27 @@ export default function AprobacionesTab() {
         </div>
       )}
 
+      {/* 🔴 El chip de «a quién estoy mirando». Solo con `persona` en la URL. */}
+      {personaCodigo && !cargando && dias !== null && (
+        <div
+          data-testid="chip-persona"
+          className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900"
+        >
+          <span>
+            {primerDiaPendiente
+              ? <>Mostrando a <b>{personaEtiqueta}</b></>
+              : <><b>{personaEtiqueta}</b> no tiene horas extra pendientes en este período.</>}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPersona("")}
+            className="inline-flex min-h-[44px] items-center gap-1 font-medium underline underline-offset-2 hover:text-amber-950"
+          >
+            ver a todos <span aria-hidden="true">×</span>
+          </button>
+        </div>
+      )}
+
       {!cargando && dias !== null && (
         <div className="mb-4 flex items-baseline gap-2 tabular-nums">
           {pend.pendientes === 0 ? (
@@ -383,11 +462,18 @@ export default function AprobacionesTab() {
 
                   {abierta && (
                     <div className="border-t border-gray-100">
-                      {d.gente.map((g, i) => (
+                      {d.gente.map((g, i) => {
+                        // 🔴 La persona que trajo la URL, resaltada (3-sep-2026).
+                        const esLaBuscada = personaCodigo !== "" && g.codigo === personaCodigo;
+                        return (
                         <label
                           key={g.codigo}
+                          ref={esLaBuscada && d.fecha === primerDiaPendiente ? filaResaltada : undefined}
+                          aria-current={esLaBuscada ? "true" : undefined}
                           className={`flex min-h-[44px] cursor-pointer items-center gap-3 border-b border-gray-100 px-3.5 tabular-nums last:border-b-0 ${
-                            e === "si" ? "" : i % 2 === 0 ? "bg-gray-50/60" : ""
+                            esLaBuscada
+                              ? "bg-amber-100"
+                              : e === "si" ? "" : i % 2 === 0 ? "bg-gray-50/60" : ""
                           }`}
                         >
                           <Casilla
@@ -412,7 +498,8 @@ export default function AprobacionesTab() {
                             {hm(g.minutos)}
                           </span>
                         </label>
-                      ))}
+                        );
+                      })}
                       {d.gente.some((g) => g.cambio) && (
                         <div className="border-t border-amber-200 bg-amber-50 px-3.5 py-2 text-xs text-amber-800">
                           {d.gente

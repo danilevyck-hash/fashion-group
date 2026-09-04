@@ -10,7 +10,12 @@
  *    servicio profesional (`servicioProfesional`, ver `participacion.ts`) sale
  *    con `dinero: null` **aunque tenga salario cargado** y con
  *    `fueraDePlanilla: true`, que NO es lo mismo que "falta configurar": sus
- *    horas se miden igual y su fila no es un pendiente de nadie.
+ *    tardanzas y ausencias se miden igual y su fila no es un pendiente de nadie.
+ *    🔴 Y SIN HORAS EXTRA (3-sep-2026). Daniel, textual: *«yulisa marca pero no
+ *    deberia de calcular ya que es salario fijo, es solo para ver sus tardanzas
+ *    y ausencias»*. Sus columnas de extra, excedente, domingo y feriado salen
+ *    en CERO (`sinHorasExtra`), `extraMedido` y `extraNoAprobada` en `null`:
+ *    no entra al aviso ámbar, no frena el cierre y no aparece en Aprobaciones.
  *
  * 1. NO INVENTA UN NÚMERO CUANDO LE FALTA UN DATO. Una persona sin salario o
  *    sin jornada NO produce una línea de $0: produce una línea con
@@ -1545,6 +1550,31 @@ export function resumenExtra(
   return { minutos, diurnoMin, nocturnoMin, monto };
 }
 
+/**
+ * Las mismas horas SIN nada que se pague con recargo: extra diurna y nocturna,
+ * excedente, lo no aprobado (con su desglose), domingo y feriado. Tardanzas,
+ * ausencias, vacaciones, sábado y días trabajados quedan intactos.
+ *
+ * 🔴 ES LA MITAD QUE DANIEL DEFINIÓ PARA EL SERVICIO PROFESIONAL (3-sep-2026):
+ * *«yulisa marca pero no deberia de calcular ya que es salario fijo, es solo
+ * para ver sus tardanzas y ausencias»*. Hasta ese día sus horas extra viajaban
+ * enteras «para poder decirlas»: salía en el aviso ámbar de extras sin aprobar
+ * (0,72 h, medido el 3-sep), FRENABA el cierre de la quincena y la pestaña
+ * Aprobaciones la ofrecía para aprobar horas que nadie iba a pagar.
+ *
+ * 🔑 Se CERAN acá y no en `medirHoras`: `armarLinea` es lo único que decide
+ * dinero, y es el único lugar donde el candado no se puede saltear. El reporte
+ * de asistencia sigue midiendo su día entero; lo que se apaga es la PLANILLA.
+ */
+export function sinHorasExtra(h: HorasPersona): HorasPersona {
+  return {
+    ...h,
+    extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
+    extraNoAprobadaMin: 0, extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0,
+    domingoMin: 0, feriadoMin: 0,
+  };
+}
+
 /** Una línea completa: la ficha + sus horas + su dinero (o lo que le falta). */
 export function armarLinea(
   ficha: FichaPlanilla,
@@ -1579,8 +1609,9 @@ export function armarLinea(
   // profesional NO produce dinero **aunque tenga salario cargado**: el `if` no
   // pregunta por el sueldo, pregunta por la bandera. Si mañana alguien le
   // escribe un salario por error —o queda uno viejo de cuando sí iba en
-  // planilla—, sigue sin calculársele un centavo. Sus HORAS, en cambio, se
-  // miden y viajan igual: es la mitad que Daniel quiere conservar.
+  // planilla—, sigue sin calculársele un centavo. Sus TARDANZAS y AUSENCIAS,
+  // en cambio, se miden y viajan igual: es la mitad que Daniel quiere
+  // conservar. 🔴 Las HORAS EXTRA no (3-sep-2026): ver `sinHorasExtra`, abajo.
   const fueraDePlanilla = ficha.servicioProfesional === true;
   // 🔴 EL SEGUNDO CANDADO, Y ES EL QUE IMPIDE PAGARLE $300 A YEISHKA. Va en el
   // MISMO `if` que el de arriba a propósito: quien entró o salió a mitad del
@@ -1606,9 +1637,18 @@ export function armarLinea(
   // saltear. La jornada diaria se conserva —es del horario, no del reloj— para
   // que la línea siga sabiendo cuánto dura su día.
   const noMarca = ficha.noMarcaReloj === true;
+  // 🔴 Y EL SERVICIO PROFESIONAL SE QUEDA SIN LAS HORAS QUE SE PAGAN CON
+  // RECARGO (3-sep-2026). Daniel: *«yulisa marca pero no deberia de calcular
+  // ya que es salario fijo, es solo para ver sus tardanzas y ausencias»*. Va
+  // ANTES de `extraMedido` / `extraNoAprobada` a propósito: los dos salen de
+  // estas horas, así que con esto quedan en `null` sin una segunda condición
+  // que pueda olvidarse — y sin ellos no hay aviso, ni freno, ni fila en
+  // Aprobaciones. Tardanza y ausencia pasan intactas.
   const horasMedidas: HorasPersona = noMarca
     ? { ...HORAS_CERO, jornadaDiariaMin: horas.jornadaDiariaMin }
-    : horas;
+    : fueraDePlanilla
+      ? sinHorasExtra(horas)
+      : horas;
 
   // ── 🔴 EL CUARTO CANDADO: SOLO SE PAGAN LAS HORAS EXTRA AUTORIZADAS ────────
   //
@@ -1626,7 +1666,10 @@ export function armarLinea(
   // todo, como hasta ahora. Fail-closed acá sería dejar a treinta personas sin
   // sus extras porque falta un archivo SQL. Se avisa, ver `aprobaciones.ts`.
   const exigir = extra.exigirAprobacion === true;
-  const extraAprobada = !exigir || extra.aprobada === true;
+  // 🔑 El servicio profesional no tiene nada que aprobar: el rótulo dice
+  // «nada quedó afuera» aunque `armarPlanilla` haya visto minutos sin aprobar
+  // en `h` — esos minutos se cerraron arriba y no se van a pagar nunca.
+  const extraAprobada = fueraDePlanilla || !exigir || extra.aprobada === true;
 
   // 🔴 EL FILTRO VIVE EN `medirHoras`, Y ACÁ NO SE REPITE (27-ago-2026).
   //

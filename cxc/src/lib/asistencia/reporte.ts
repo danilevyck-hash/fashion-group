@@ -263,6 +263,17 @@ export interface PersonaReporte {
   nombre: string | null;
   salida: string;
   almuerzoMin: number;
+  /**
+   * 🔴 `true` = servicio profesional: se le miden tardanzas y ausencias, y NO
+   * se le cuentan las horas extra (3-sep-2026). Daniel, textual: *«yulisa
+   * marca pero no deberia de calcular ya que es salario fijo, es solo para ver
+   * sus tardanzas y ausencias»*. El motor sigue midiendo `extraMin` —es lo que
+   * marcó el reloj—; la bandera la pone la RUTA desde la ficha, y la pantalla,
+   * el Excel y el PDF muestran «—» en esa columna y no la suman al total.
+   * Opcional a propósito: sin ficha, o en cualquier llamada vieja, no cambia
+   * nada. Quien decida algo con esto pregunta por `cuentaHorasExtra`.
+   */
+  servicioProfesional?: boolean;
   dias: DiaReporte[];
   resumen: {
     diasTrabajados: number;
@@ -323,6 +334,21 @@ export interface PersonaReporte {
     /** Cuántas horas se tocaron a mano en total, en todo el rango. */
     correcciones: number;
   };
+}
+
+/**
+ * ¿Se le cuentan las horas extra a esta persona? Al servicio profesional no
+ * (3-sep-2026). Es la ÚNICA pregunta que hacen la pantalla, el Excel y el PDF
+ * del Reporte antes de mostrar o sumar `extraMin`: una sola definición, para
+ * que la columna y el total no puedan discrepar.
+ */
+export function cuentaHorasExtra(p: Pick<PersonaReporte, "servicioProfesional">): boolean {
+  return p.servicioProfesional !== true;
+}
+
+/** `extraMin` si se le cuenta; 0 si no. Para los totales. */
+export function extraQueCuenta(p: Pick<PersonaReporte, "servicioProfesional" | "resumen">): number {
+  return cuentaHorasExtra(p) ? p.resumen.extraMin : 0;
 }
 
 const p2 = (n: number) => String(n).padStart(2, "0");

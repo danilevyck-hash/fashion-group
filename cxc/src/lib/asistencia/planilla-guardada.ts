@@ -460,6 +460,14 @@ export interface FrenoCierre {
   personas: number;
   /** Los nombres, para que el freno se pueda actuar sin abrir nada. */
   quienes: string[];
+  /**
+   * Los códigos, en el MISMO orden que `quienes`. Es lo que hace que cada
+   * nombre del freno sea un enlace a la pestaña Aprobaciones con esa persona
+   * (3-sep-2026, Daniel: *«al hacer clic en el mensaje de aprobacion, que te
+   * lleve al colaborador para aprobar»*). ⚠️ Opcional: un 409 viejo guardado
+   * por la pantalla no lo trae, y ahí el freno lleva un solo enlace.
+   */
+  codigos?: string[];
   texto: string;
 }
 
@@ -488,6 +496,7 @@ export function frenosParaCerrar(
       tipo: "horas-extra",
       personas: extras.length,
       quienes,
+      codigos: extras.map((e) => e.codigo),
       texto:
         `${extras.length === 1 ? "1 persona tiene" : `${extras.length} personas tienen`} horas extra sin aprobar `
         + `(${lista(extras.map((e) => `${e.etiqueta} · ${e.minutos.toFixed(2)} min`))}). `
@@ -503,6 +512,7 @@ export function frenosParaCerrar(
       tipo: "prestamo",
       personas: pres.length,
       quienes,
+      codigos: pres.map((p) => p.codigo),
       texto:
         `${pres.length === 1 ? "1 persona tiene" : `${pres.length} personas tienen`} un descuento de préstamo sin aprobar `
         + `(${lista(pres.map((p) => `${p.etiqueta} · ${plata(p.sugerido)}`))}). `

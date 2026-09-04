@@ -8,7 +8,7 @@
 //   1. FUERA de todo cálculo de pago — y el caso que importa no es "no tiene
 //      salario": es que CON SALARIO CARGADO tampoco se le calcule un centavo.
 //      Ese es el error que este cambio existe para hacer imposible.
-//   2. DENTRO del control de asistencia — sus tardanzas, ausencias y horas se
+//   2. DENTRO del control de asistencia — sus tardanzas y ausencias se
 //      siguen midiendo. Si esto se rompiera, la solución sería idéntica a darla
 //      de baja, que es justo lo que Daniel NO quiere.
 //
@@ -153,9 +153,19 @@ describe("🔴 MITAD 1 — fuera de TODO cálculo de pago", () => {
     };
     const l = linea(fichaCompleta({ servicioProfesional: true }), horas);
     expect(l.dinero).toBeNull();
-    // …pero las horas VIAJAN IGUAL: son la mitad que sí se conserva.
-    expect(l.horas.extraDiurnoMin).toBe(120);
+    // …pero TARDANZAS y AUSENCIAS viajan igual: son la mitad que sí se conserva.
     expect(l.horas.tardanzaMin).toBe(45);
+    expect(l.horas.ausenciaMin).toBe(480);
+    expect(l.horas.diasTrabajados).toBe(10);
+    // 🔴 3-sep-2026 — Daniel precisó cuál mitad: *«yulisa marca pero no deberia
+    // de calcular ya que es salario fijo, es solo para ver sus tardanzas y
+    // ausencias»*. Las horas con recargo salen en CERO (antes viajaban enteras:
+    // 120 diurnas, 60 nocturnas, 480 de domingo).
+    expect(l.horas.extraDiurnoMin).toBe(0);
+    expect(l.horas.extraNocturnoMin).toBe(0);
+    expect(l.horas.domingoMin).toBe(0);
+    expect(l.extraMedido).toBeNull();
+    expect(l.extraNoAprobada).toBeNull();
   });
 
   it("no entra al total, y NO se cuenta como pendiente", () => {

@@ -17,7 +17,7 @@ import * as XLSX from "xlsx-js-style";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type DiaReporte, type PersonaReporte, type ReglasReporte } from "./reporte";
+import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "./reporte";
 import { ALMUERZO_FIJO_MIN } from "./config";
 import { etiquetaPersona } from "./directorio";
 import { MOTIVO_TRABAJO_VENDEDOR, textoDiaJustificado } from "./motivos";
@@ -136,7 +136,9 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
         quien(p), p.codigo, fecha(d.fecha),
         d.marcas[0] ?? "", d.marcas[1] ?? "", d.marcas[2] ?? "",
         d.marcas.length > 3 ? d.marcas[d.marcas.length - 1] : (d.marcas.length === 2 ? d.marcas[1] : ""),
-        n0(d.tardeMin), n0(d.excesoAlmuerzoMin), n0(d.salidaTempranaMin), n0(d.extraMin),
+        // 🔴 El servicio profesional no cuenta horas extra (3-sep-2026): «—».
+        n0(d.tardeMin), n0(d.excesoAlmuerzoMin), n0(d.salidaTempranaMin),
+        cuentaHorasExtra(p) ? n0(d.extraMin) : "—",
         n0(d.trabajadoMin),
         d.revisar ? "Revisar" : "",
         // El MISMO texto que la pantalla (`textoDiaJustificado`): el Excel es lo
@@ -191,7 +193,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
       n0(r.diasTrabajandoFuera),
       n0(r.vecesTarde), n0(r.minutosTarde), n0(r.minutosTardeDeDiasARevisar),
       n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin), n0(r.tiempoNoTrabajadoMin),
-      n0(r.extraMin), n0(r.diasARevisar), n0(r.diasCorregidos),
+      cuentaHorasExtra(p) ? n0(r.extraMin) : "—", n0(r.diasARevisar), n0(r.diasCorregidos),
       n0(r.diasVacaciones), n0(r.diasVacacionesYaPagadas),
     ]);
   }
@@ -206,7 +208,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     almz: a.almz + p.resumen.excesoAlmuerzoMin,
     temp: a.temp + p.resumen.salidaTempranaMin,
     noTrab: a.noTrab + p.resumen.tiempoNoTrabajadoMin,
-    extra: a.extra + p.resumen.extraMin,
+    extra: a.extra + extraQueCuenta(p),
     rev: a.rev + p.resumen.diasARevisar,
     corr: a.corr + p.resumen.diasCorregidos,
     vac: a.vac + p.resumen.diasVacaciones,
@@ -292,7 +294,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     aus: a.aus + p.resumen.ausenciasSinJustificar,
     tarde: a.tarde + p.resumen.minutosTarde,
     noTrab: a.noTrab + p.resumen.tiempoNoTrabajadoMin,
-    extra: a.extra + p.resumen.extraMin,
+    extra: a.extra + extraQueCuenta(p),
     rev: a.rev + p.resumen.diasARevisar,
     corr: a.corr + p.resumen.diasCorregidos,
     fuera: a.fuera + p.resumen.diasTrabajandoFuera,
@@ -333,7 +335,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
         quien(p), p.salida, r.diasTrabajados,
         r.ausenciasSinJustificar || "", r.vecesTarde || "", n0(r.minutosTarde),
         n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin),
-        n0(r.tiempoNoTrabajadoMin), n0(r.extraMin), r.diasARevisar || "",
+        n0(r.tiempoNoTrabajadoMin), cuentaHorasExtra(p) ? n0(r.extraMin) : "—", r.diasARevisar || "",
         r.diasCorregidos || "",
       ];
     }),

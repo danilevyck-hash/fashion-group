@@ -25,6 +25,12 @@
  *      —misma rata, mismos recargos 1,25 / 1,50—, centavo por centavo.
  *   f. con el sueldo repartido en dos empresas, el aviso sale UNA vez: en la
  *      línea que pagaría las extras.
+ *   g. 🔴 SERVICIO PROFESIONAL (3-sep-2026). Daniel: *«yulisa marca pero no
+ *      deberia de calcular ya que es salario fijo, es solo para ver sus
+ *      tardanzas y ausencias»*. Con extras sin aprobar → NO está en el aviso ni
+ *      en el freno, `extraMedido` y `extraNoAprobada` en null, las columnas con
+ *      recargo en cero; tardanza y ausencia INTACTAS; la pestaña Aprobaciones no
+ *      la ofrece. CONTROL: la misma persona sin la bandera sí sale.
  *
  * Las fechas son fijas (agosto 2026): nunca `new Date()`.
  * ─────────────────────────────────────────────────────────────────────────── */
@@ -40,8 +46,10 @@ import {
 } from "@/lib/asistencia/planilla";
 import type { PersonaReporte, DiaReporte } from "@/lib/asistencia/reporte";
 import {
+  armarDiasAprobacion,
   claveDia,
   extrasNoAprobadas,
+  indexarAprobaciones,
   textoExtraNoAprobada,
 } from "@/lib/asistencia/aprobaciones";
 import { frenosParaCerrar } from "@/lib/asistencia/planilla-guardada";
@@ -285,5 +293,126 @@ describe("f. sueldo repartido en dos empresas: el aviso sale UNA vez, donde se p
     const frenos = frenosParaCerrar(lineas, []);
     expect(frenos).toHaveLength(1);
     expect(frenos[0].personas).toBe(1);
+  });
+});
+
+describe("g. 🔴 SERVICIO PROFESIONAL: sin horas extra, con tardanzas y ausencias", () => {
+  // Llega 08:40 el martes: 40 min tarde (30 pasada la tolerancia de 10) y se
+  // queda hasta las 17:22. El miércoles no viene: ausencia. Sin aprobar nada.
+  const TARDE: DiaReporte = {
+    ...dia(MARTES, "17:22", 22),
+    marcas: ["08:40:00", "12:00:00", "12:30:00", "17:22:00"],
+    entrada: "08:40:00", tardeMin: 40,
+  } as unknown as DiaReporte;
+  const AUSENTE = {
+    fecha: MIERCOLES, marcas: [], marcasIds: [], entrada: null, salida: null,
+    tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
+    revisar: false, ausente: true,
+  } as unknown as DiaReporte;
+  const YULISSA = persona("26", [TARDE, AUSENTE]);
+  const FICHA_SP: FichaPlanilla = {
+    codigo: "26", nombre: "YULISSA JUAREZ", salarioMensual: null, jornadaSemanal: null,
+    empresa: "vistana", servicioProfesional: true,
+  };
+  const FICHA_NORMAL: FichaPlanilla = {
+    ...FICHA_SP, salarioMensual: 1000, jornadaSemanal: 40, servicioProfesional: false,
+  };
+
+  function cuadro(ficha: FichaPlanilla) {
+    const lineas = armarPlanilla({
+      personas: [YULISSA],
+      fichas: new Map([["26", ficha]]),
+      jornadaDiariaMin: () => 480,
+      reglas: R,
+      empresa: null,
+      exigirAprobacionExtra: true,
+      diasExtraAprobados: new Set<string>(),
+    });
+    return { lineas, l: lineas[0] };
+  }
+
+  it("CONTROL: la misma persona SIN la bandera sí sale en el aviso y frena", () => {
+    const { lineas, l } = cuadro(FICHA_NORMAL);
+    expect(l.fueraDePlanilla).toBe(false);
+    expect(l.extraNoAprobada!.minutos).toBeCloseTo(22, 6);
+    expect(extrasNoAprobadas(lineas).map((e) => e.codigo)).toEqual(["26"]);
+    expect(frenosParaCerrar(lineas, []).map((f) => f.tipo)).toEqual(["horas-extra"]);
+    const dias = armarDiasAprobacion({
+      lineas, personas: [YULISSA], reglas: R, aprobaciones: indexarAprobaciones([]),
+    });
+    expect(dias.flatMap((d) => d.gente.map((g) => g.codigo))).toEqual(["26"]);
+  });
+
+  it("🔴 con la bandera NO está en el aviso ni en el freno del cierre", () => {
+    const { lineas, l } = cuadro(FICHA_SP);
+    expect(l.fueraDePlanilla).toBe(true);
+    expect(extrasNoAprobadas(lineas)).toEqual([]);
+    expect(frenosParaCerrar(lineas, [])).toEqual([]);
+  });
+
+  it("🔴 `extraMedido` y `extraNoAprobada` en null; extras, excedente, domingo y feriado en cero", () => {
+    const { l } = cuadro(FICHA_SP);
+    expect(l.extraMedido).toBeNull();
+    expect(l.extraNoAprobada).toBeNull();
+    expect(l.extraAprobada).toBe(true);
+    for (const campo of [
+      "extraDiurnoMin", "extraNocturnoMin", "excedenteMin",
+      "extraNoAprobadaMin", "extraNoAprobadaDiurnoMin", "extraNoAprobadaNocturnoMin",
+      "domingoMin", "feriadoMin",
+    ] as const) {
+      expect(l.horas[campo], campo).toBe(0);
+    }
+  });
+
+  it("🔴 pero TARDANZA y AUSENCIA se siguen midiendo, idénticas a las de la persona sin la bandera", () => {
+    const sp = cuadro(FICHA_SP).l;
+    const normal = cuadro(FICHA_NORMAL).l;
+    // 40 min tarde con 10 de tolerancia → 30 contados desde las 8:00 (regla de siempre).
+    expect(normal.horas.tardanzaMin).toBeGreaterThan(0);
+    expect(sp.horas.tardanzaMin).toBe(normal.horas.tardanzaMin);
+    expect(normal.horas.ausenciaDias).toBeGreaterThan(0);
+    expect(sp.horas.ausenciaDias).toBe(normal.horas.ausenciaDias);
+    expect(sp.horas.ausenciaMin).toBe(normal.horas.ausenciaMin);
+    expect(sp.horas.diasTrabajados).toBe(normal.horas.diasTrabajados);
+    // Y sigue sin plata, como siempre.
+    expect(sp.dinero).toBeNull();
+  });
+
+  it("🔴 la lista de la pestaña Aprobaciones NO la ofrece — no hay nada que aprobar", () => {
+    const { lineas } = cuadro(FICHA_SP);
+    const dias = armarDiasAprobacion({
+      lineas, personas: [YULISSA], reglas: R, aprobaciones: indexarAprobaciones([]),
+    });
+    expect(dias).toEqual([]);
+  });
+
+  it("si alguien la había aprobado antes, esa fila se IGNORA (no cambia nada, no se borra)", () => {
+    const { lineas, l } = cuadro(FICHA_SP);
+    const aprobaciones = indexarAprobaciones([
+      { codigo: "26", fecha: MARTES, aprobado: true, minutosVistos: 22, por: "Julio", cuando: null },
+    ]);
+    const dias = armarDiasAprobacion({ lineas, personas: [YULISSA], reglas: R, aprobaciones });
+    expect(dias).toEqual([]);
+    expect(l.extraMedido).toBeNull();
+    expect(l.dinero).toBeNull();
+  });
+
+  it("junto a otra persona, la otra sale igual que siempre", () => {
+    const lineas = armarPlanilla({
+      personas: [P, YULISSA],
+      fichas: new Map([[COD, FICHA], ["26", FICHA_SP]]),
+      jornadaDiariaMin: () => 480,
+      reglas: R,
+      empresa: null,
+      exigirAprobacionExtra: true,
+      diasExtraAprobados: new Set<string>(),
+    });
+    expect(extrasNoAprobadas(lineas).map((e) => e.codigo)).toEqual([COD]);
+    expect(frenosParaCerrar(lineas, [])[0].quienes).toEqual(["KEVIN LUBO"]);
+    expect(frenosParaCerrar(lineas, [])[0].codigos).toEqual([COD]);
+    const dias = armarDiasAprobacion({
+      lineas, personas: [P, YULISSA], reglas: R, aprobaciones: indexarAprobaciones([]),
+    });
+    expect(new Set(dias.flatMap((d) => d.gente.map((g) => g.codigo)))).toEqual(new Set([COD]));
   });
 });

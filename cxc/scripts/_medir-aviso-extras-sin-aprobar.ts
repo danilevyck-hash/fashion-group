@@ -83,6 +83,9 @@ async function main() {
   }
   const nombres = new Map<string, string>();
   for (const [cod, f] of fichas) if (f.nombre) nombres.set(cod, f.nombre);
+  // 3-sep-2026: quién es servicio profesional hoy (no cuenta horas extra).
+  const sp = [...fichas.values()].filter((f) => f.servicioProfesional === true);
+  console.log(`servicio profesional: ${sp.length} → ${sp.map((f) => `${f.codigo} ${f.nombre ?? "(sin nombre)"} [${f.empresa ?? "?"}]`).join(" · ") || "(nadie)"}`);
 
   const efectivas = aplicarCorrecciones(marcaciones, correcciones.correcciones);
   const personas = armarReporte({

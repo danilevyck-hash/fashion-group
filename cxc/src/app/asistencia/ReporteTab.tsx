@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
+import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { ALMUERZO_FIJO_MIN, MINUTOS_TARDE_QUE_SON_AUSENCIA } from "@/lib/asistencia/config";
 import { esTrabajoDeVendedor, textoDiaJustificado } from "@/lib/asistencia/motivos";
@@ -35,6 +35,10 @@ function fechaCorta(iso: string): string {
  */
 const n = (v: number) =>
   v ? <span className="tabular-nums">{fmtMin(v)}</span> : <span className="text-gray-300">—</span>;
+
+/** La raya de «acá no se cuenta», con el motivo al pasar el cursor. */
+const SIN_EXTRA_TITULO = "Servicio profesional: no se le cuentan horas extra, solo tardanzas y ausencias.";
+const sinExtra = () => <span className="text-gray-300" title={SIN_EXTRA_TITULO}>—</span>;
 
 export default function ReporteTab() {
   const { toast } = useToast();
@@ -136,7 +140,8 @@ export default function ReporteTab() {
     aus: a.aus + p.resumen.ausenciasSinJustificar,
     tarde: a.tarde + p.resumen.minutosTarde,
     noTrab: a.noTrab + p.resumen.tiempoNoTrabajadoMin,
-    extra: a.extra + p.resumen.extraMin,
+    // 🔴 El servicio profesional no suma extras (3-sep-2026): `extraQueCuenta`.
+    extra: a.extra + extraQueCuenta(p),
     rev: a.rev + p.resumen.diasARevisar,
   }), { aus: 0, tarde: 0, noTrab: 0, extra: 0, rev: 0 });
 
@@ -358,7 +363,10 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir }: {
         <td className="px-2 py-2.5 text-right text-gray-700">{n(r.excesoAlmuerzoMin)}</td>
         <td className="px-2 py-2.5 text-right text-gray-700">{n(r.salidaTempranaMin)}</td>
         <td className="px-2 py-2.5 text-right font-semibold text-gray-900">{n(r.tiempoNoTrabajadoMin)}</td>
-        <td className="px-2 py-2.5 text-right text-gray-700">{n(r.extraMin)}</td>
+        {/* 🔴 El servicio profesional NO cuenta horas extra (3-sep-2026,
+            Daniel: *«es solo para ver sus tardanzas y ausencias»*): raya, no 0
+            ni el número que midió el reloj. Tardanza y ausencia, intactas. */}
+        <td className="px-2 py-2.5 text-right text-gray-700">{cuentaHorasExtra(p) ? n(r.extraMin) : sinExtra()}</td>
         <td className="px-2 py-2.5 text-right">{r.diasARevisar
           ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700">{r.diasARevisar}</span>
           : <span className="text-gray-300">—</span>}</td>
@@ -390,6 +398,7 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir }: {
               <tbody>
                 {p.dias.map((d) => (
                   <FilaDia key={d.fecha} d={d} codigo={p.codigo} persona={persona}
+                    conExtra={cuentaHorasExtra(p)}
                     puedeCorregir={puedeCorregir} onCorregir={onCorregir} />
                 ))}
               </tbody>
@@ -409,10 +418,12 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir }: {
  * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
  * cambió, por qué, quién y cuándo — sin abrir nada más.
  */
-function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
+function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir }: {
   d: DiaReporte;
   codigo: string;
   persona: string;
+  /** `false` = servicio profesional: la columna Extra va con raya. */
+  conExtra: boolean;
   puedeCorregir: boolean;
   onCorregir: (m: MarcaParaCorregir) => void;
 }) {
@@ -501,7 +512,7 @@ function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
               )
               : <span className="text-gray-300">—</span>}</td>
             <td className="px-2 py-1.5 text-right text-gray-600">{n(d.excesoAlmuerzoMin)}</td>
-            <td className="px-2 py-1.5 text-right text-gray-600">{n(d.extraMin)}</td>
+            <td className="px-2 py-1.5 text-right text-gray-600">{conExtra ? n(d.extraMin) : sinExtra()}</td>
             <td className="whitespace-nowrap px-2 py-1.5">
               {d.revisar && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">Revisar</span>

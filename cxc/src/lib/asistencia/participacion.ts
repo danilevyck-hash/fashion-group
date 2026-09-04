@@ -1,6 +1,12 @@
 /* ─────────────────────────────────────────────────────────────────────────────
  * QUIÉN MARCA PERO NO VA EN PLANILLA — "servicio profesional".
  *
+ * 🔴 3-sep-2026 — Daniel precisó CUÁL mitad se conserva: *«yulisa marca pero no
+ * deberia de calcular ya que es salario fijo, es solo para ver sus tardanzas y
+ * ausencias»*. Tardanzas y ausencias SÍ; horas extra (y domingo, feriado,
+ * excedente) NO: el motor las cierra en `sinHorasExtra` (`planilla.ts`), la
+ * pestaña Aprobaciones no la ofrece y el Reporte muestra «—» en su columna.
+ *
  * Módulo PURO: sin base, sin red. Acá vive el DATO y las palabras; el efecto
  * sobre el dinero lo aplica `planilla.ts` (que es donde se decide si una línea
  * produce un número o no) y el I/O, `config-server.ts`.
@@ -58,9 +64,9 @@ export const PREGUNTA_PARTICIPACION = "¿Se le paga por planilla?";
  * mismo hecho es la forma de que terminen contradiciéndose.
  */
 export const EXPLICACION_SERVICIO_PROFESIONAL =
-  "Marca en el reloj y se le mide la asistencia igual que a todos —tardanzas, "
-  + "ausencias y horas—, pero no se le calcula pago: no sale en la planilla y no "
-  + "se le pide salario.";
+  "Marca en el reloj y se le miden las tardanzas y las ausencias igual que a "
+  + "todos, pero no se le calcula pago ni se le cuentan horas extra: no sale en "
+  + "la planilla, no entra a Aprobaciones y no se le pide salario.";
 
 /** Lo que se muestra donde antes iba «falta configurar». No es un pendiente. */
 export const MOTIVO_FUERA_DE_PLANILLA = "no va en planilla — servicio profesional";

@@ -310,6 +310,14 @@ export function armarDiasAprobacion(opts: OpcionesDias): DiaAprobacion[] {
     const l = lineaDe.get(p.codigo);
     // Sin línea no hay a quién pagarle: alguien que marcó y no tiene ficha.
     if (!l) continue;
+    // 🔴 EL SERVICIO PROFESIONAL NO SE OFRECE (3-sep-2026). Daniel: *«yulisa
+    // marca pero no deberia de calcular ya que es salario fijo, es solo para
+    // ver sus tardanzas y ausencias»*. Sus horas extra no se pagan nunca —el
+    // motor las cierra en `sinHorasExtra`—, así que acá no hay nada que
+    // aprobar: ofrecerla es pedirle a Julio que autorice plata que no existe.
+    // Si alguien la aprobó antes de esta fecha, esas filas se IGNORAN, no se
+    // borran: el registro de quién tocó qué se conserva.
+    if (l.fueraDePlanilla) continue;
     for (const d of diasConExtra(p, opts.reglas)) {
       const a = opts.aprobaciones.get(claveDia(p.codigo, d.fecha));
       const arr = porFecha.get(d.fecha) ?? [];
@@ -371,6 +379,73 @@ export function resumenPendientes(dias: readonly DiaAprobacion[]): {
     }
   }
   return { pendientes, minutos, claves };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL AVISO LLEVA A LA PERSONA (3-sep-2026)
+//
+// Daniel, textual: *«si, no dejar cerrar hasta que se apruebe o se rechace, y
+// al hacer clic en el mensaje de aprobacion, que te lleve al colaborador para
+// aprobar»*. El aviso ámbar de la planilla y el freno del cierre nombran a cada
+// persona como un ENLACE a la pestaña Aprobaciones, con `persona=<código>` y el
+// mismo rango que se estaba mirando; la pestaña abre el primer día que esa
+// persona tiene sin aprobar y la resalta. Lo de acá es puro: arma la URL y
+// encuentra el día. Nada de esto toca lo que se paga.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El parámetro de la URL. Un solo nombre, para el enlace y para quien lo lee. */
+export const PARAM_PERSONA = "persona";
+
+/**
+ * `/asistencia?tab=aprobaciones&persona=<código>[&desde=…&hasta=…]`.
+ *
+ * 🔑 `desde`/`hasta` viajan solo cuando se conocen: la pestaña los toma como su
+ * rango, así se aterriza en la MISMA quincena que se estaba mirando y no en la
+ * que la pestaña tuviera recordada.
+ */
+export function enlaceAprobaciones(
+  codigo: string,
+  rango: { desde: string; hasta: string } | null = null,
+): string {
+  const p = new URLSearchParams({ tab: "aprobaciones", [PARAM_PERSONA]: String(codigo).trim() });
+  if (rango && rango.desde && rango.hasta) {
+    p.set("desde", rango.desde);
+    p.set("hasta", rango.hasta);
+  }
+  return `/asistencia?${p.toString()}`;
+}
+
+/** La cabecera del aviso, sin el detalle: el detalle va como enlaces. */
+export function cabeceraExtraNoAprobada(cantidad: number): string {
+  const quien = cantidad === 1 ? "1 persona tiene" : `${cantidad} personas tienen`;
+  return `${quien} horas extra sin aprobar: NO se pagaron en este cuadro. Se aprueban en la pestaña Aprobaciones.`;
+}
+
+/** El primer día (en orden de calendario) donde esa persona tiene extras SIN aprobar. */
+export function primerDiaPendienteDe(
+  dias: readonly DiaAprobacion[],
+  codigo: string,
+): string | null {
+  const cod = String(codigo).trim();
+  if (!cod) return null;
+  const orden = [...dias].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  for (const d of orden) {
+    if (d.gente.some((g) => g.codigo === cod && !g.aprobado)) return d.fecha;
+  }
+  return null;
+}
+
+/** Cómo se llama esa persona según la lista; `null` si no aparece en ningún día. */
+export function etiquetaDePersona(
+  dias: readonly DiaAprobacion[],
+  codigo: string,
+): string | null {
+  const cod = String(codigo).trim();
+  for (const d of dias) {
+    const g = d.gente.find((x) => x.codigo === cod);
+    if (g) return g.etiqueta;
+  }
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
