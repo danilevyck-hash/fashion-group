@@ -27,14 +27,16 @@
 //
 // **Ningún número cambia.** Se usa el MISMO `fmtMoney` que la tabla (no el
 // formato compacto: una comisión es plata que se le paga a alguien, así que van
-// los centavos). Lo único que cambia es la forma de mostrarlo.
+// los centavos). Lo único que cambia es la forma de mostrarlo. El nombre va
+// capitalizado («Reynaldo Espinosa», `nombreVendedorEnPantalla`) igual que en
+// la tabla; la `key` y el detalle siguen con el nombre tal cual llega.
 //
 // Escritorio e iPad (≥md) siguen viendo la tabla, intacta.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, type ReactNode } from "react";
 import { fmtMoney } from "@/lib/ventas/format";
-import { etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
 import { MarcaClientesSinComision, type ClienteSinComisionConEmpresa } from "./MarcaClientesSinComision";
 
@@ -257,7 +259,7 @@ function TarjetaVendedorMatriz({
               italica ? "italic text-gray-500" : apagada || fila.se_paga === false ? "text-gray-400" : "font-medium text-gray-900"
             }`}
           >
-            <span className="truncate">{fila.vendedor}</span>
+            <span className="truncate">{nombreVendedorEnPantalla(fila.vendedor)}</span>
             {fila.se_paga === false && <MarcaNoSePaga />}
             <MarcaClientesSinComision clientes={fila.sinComision} nombreEmpresa={nombreEmpresa} />
           </span>
@@ -357,7 +359,7 @@ export function ComisionesTarjetasPorEmpresa({
             >
               <div className="flex min-h-[24px] items-baseline justify-between gap-2">
                 <span className={`flex min-w-0 items-center truncate text-[13px] font-medium leading-5 tracking-tight ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>
-                  <span className="truncate">{etiquetaVendedor(v.vendedor)}</span>
+                  <span className="truncate">{nombreVendedorEnPantalla(v.vendedor)}</span>
                   {v.se_paga === false && <MarcaNoSePaga />}
                   <MarcaClientesSinComision clientes={v.clientes_sin_comision} />
                 </span>

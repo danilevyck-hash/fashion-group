@@ -27,6 +27,7 @@ vi.mock("@/lib/ventas/comisionExcel", () => ({
 import { ComisionesPorEmpresaView } from "@/components/ventas/ComisionesPorEmpresaView";
 import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
 import type { ExcelApi } from "@/components/ventas/ComisionesView";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 
 const REINALDO = "REINALDO ESPINOSA";
 
@@ -68,12 +69,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** La fila de la tabla de escritorio (en jsdom se montan los dos layouts). */
+/** La fila de la tabla de escritorio (en jsdom se montan los dos layouts).
+ *  El nombre se busca como se MUESTRA desde el 3-sep-2026: capitalizado
+ *  («Reinaldo Espinosa»), aunque el dato llegue en mayúsculas. */
 async function filaDe(vendedor: string) {
   const tabla = await screen.findByRole("table");
   const fila = within(tabla)
     .getAllByRole("row")
-    .find((r) => within(r).queryByText(vendedor));
+    .find((r) => within(r).queryByText(nombreVendedorEnPantalla(vendedor)));
   expect(fila, `no encontré la fila de ${vendedor}`).toBeTruthy();
   return within(fila!);
 }

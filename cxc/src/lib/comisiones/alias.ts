@@ -16,9 +16,14 @@
 //     vendedores elegibles por empresa) lleguen al MISMO nombre que la RPC.
 //   • `nombreVendedorEnPantalla(nombre)` — «REYNALDO ESPINOSA» se muestra
 //     «Reynaldo Espinosa» (Daniel: capitalizado, no en mayúsculas). DEFAULT
-//     sigue siendo «Oficina (DEFAULT)».
+//     sigue siendo «Oficina (DEFAULT)». Desde el 3-sep-2026 («si capitiliza
+//     reynaldo») lo usan TODAS las superficies de Comisiones —las dos tablas,
+//     las tarjetas, el modal de detalle y el Excel—, no solo Configuración.
+//     Solo cambia cómo se MUESTRA: la clave de agrupación, `VENDEDORES_SIN_PAGO`,
+//     los descuentos y los retirados siguen comparando por el nombre en
+//     mayúsculas, y ningún número se mueve.
 
-import { etiquetaVendedor, DEFAULT_VENDEDOR } from "@/lib/comisiones/vendedor-default";
+import { etiquetaVendedor, DEFAULT_VENDEDOR, ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
 
 /** Una fila de `comision_vendedor_alias`, ya normalizada. */
 export interface AliasVendedor {
@@ -45,12 +50,15 @@ export function aplicarAlias(nombre: string | null | undefined, alias: readonly 
 /**
  * «REYNALDO ESPINOSA» → «Reynaldo Espinosa». Cada palabra con su primera letra
  * en mayúscula y el resto en minúscula; el guion y el apóstrofo también
- * cortan palabra («O'Neil», «Jean-Paul»). DEFAULT pasa por `etiquetaVendedor`.
+ * cortan palabra («O'Neil», «Jean-Paul»). DEFAULT pasa por `etiquetaVendedor`,
+ * y la etiqueta ya puesta («Oficina (DEFAULT)», que es como viaja la fila de la
+ * oficina en la matriz consolidada) se respeta tal cual: nunca «Oficina (default)».
  */
 export function nombreVendedorEnPantalla(nombre: string): string {
   const v = (nombre ?? "").trim();
   if (!v) return "";
   if (v === DEFAULT_VENDEDOR) return etiquetaVendedor(v);
+  if (v === ETIQUETA_DEFAULT) return ETIQUETA_DEFAULT;
   return v
     .toLocaleLowerCase("es")
     .replace(/(^|[\s\-'])(\p{L})/gu, (_m, sep: string, letra: string) => sep + letra.toLocaleUpperCase("es"));

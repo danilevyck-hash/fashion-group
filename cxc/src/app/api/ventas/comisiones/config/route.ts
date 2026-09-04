@@ -25,6 +25,7 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
+import { estaRetirado, AVISO_VENDEDOR_RETIRADO } from "@/lib/comisiones/retirados";
 import { aplicarAlias } from "@/lib/comisiones/alias";
 import { leerAliasOVacio } from "@/lib/comisiones/exclusiones-server";
 
@@ -76,7 +77,10 @@ export async function GET(req: NextRequest) {
   const vendedores: ConfigRow[] = [];
   for (const t of tasasRes.data ?? []) {
     const nombre = aplicarAlias(String(t.vendedor_nombre), alias);
-    if (!nombre || vistos.has(nombre) || !sePagaComision(nombre)) continue;
+    // Tampoco los RETIRADOS de Comisiones (Aguas — Daniel: «te dije que
+    // eliminaras Rey Stoute Aguas»): no existe, así que no tiene tasa que
+    // editar. Lista en `lib/comisiones/retirados`, por el nombre canónico.
+    if (!nombre || vistos.has(nombre) || !sePagaComision(nombre) || estaRetirado(nombre, alias)) continue;
     vistos.add(nombre);
     vendedores.push({
       vendedor_nombre: nombre,
@@ -126,6 +130,12 @@ export async function PUT(req: NextRequest) {
     }
     // Quien no se paga no tiene tasa que guardar (no está en la lista).
     if (!sePagaComision(nombre)) continue;
+    // Un retirado (Aguas) no existe en Comisiones: cargarle una tasa se
+    // RECHAZA con mensaje, no se ignora en silencio. Se compara por el
+    // canónico, así que vale para cualquier grafía.
+    if (estaRetirado(nombre, alias)) {
+      return NextResponse.json({ error: AVISO_VENDEDOR_RETIRADO }, { status: 400 });
+    }
     // Dos grafías de la misma persona en el mismo PUT serían dos filas del
     // upsert con la MISMA llave: PostgREST lo rechaza. Se queda la primera.
     if (vistos.has(nombre)) continue;

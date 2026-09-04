@@ -44,6 +44,8 @@ import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
 import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
+import { estaRetirado } from "@/lib/comisiones/retirados";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
 import { MarcaClientesSinComision } from "./MarcaClientesSinComision";
 import { fmtMoney } from "@/lib/ventas/format";
@@ -63,17 +65,13 @@ const EMPRESAS = EMPRESAS_COMISIONAN;
 // comisionan y se muestran en su propia fila, rotulada ETIQUETA_DEFAULT.
 const DEFAULT_VENDEDOR = "DEFAULT";
 
-// Vendedores que NO se muestran en Comisiones. Daniel, 3-ago-2026: *"quita el
-// vendedor aguas, no lo quiero ver"*.
-//
-// ⚠️ Se excluye de la TABLA **y de los totales**. AGUAS es un vendedor real en
-// Switch (4 facturas de julio en Vistana por $1.148 → $34,66 de comisión), así
-// que esconder solo la fila dejaría un total que no cuadra con lo que se ve —
-// y un total que no cuadra es lo que hace que nadie vuelva a confiar en la
-// pantalla. Es una lista para que agregar otro sea una línea, no un rediseño.
-const VENDEDORES_OCULTOS = new Set(["AGUAS"]);
-
-const estaOculto = (v: string) => VENDEDORES_OCULTOS.has(v.trim().toUpperCase());
+// Vendedores RETIRADOS de Comisiones (Daniel, 3-ago-2026: *"quita el vendedor
+// aguas, no lo quiero ver"*; 3-sep-2026: *"esconder rey stoute"* y *"te dije que
+// eliminaras Rey Stoute Aguas."*). La lista vive en `lib/comisiones/retirados`
+// y compara por el nombre CANÓNICO: acá vivía como `new Set(["AGUAS"])` y,
+// cuando el alias de la v8 empezó a mandar «REY STOUTE AGUAS», la fila volvió a
+// aparecer. Se excluye de la tabla **y de los totales** — el porqué está en ese
+// archivo.
 
 interface ApiVendedor {
   vendedor: string;
@@ -163,7 +161,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
 
       for (const r of resp) {
         for (const v of r.vendedores) {
-          if (estaOculto(v.vendedor)) continue; // fuera de la tabla Y de los totales
+          if (estaRetirado(v.vendedor)) continue; // retirado: fuera de la tabla Y de los totales
           const target = v.vendedor === DEFAULT_VENDEDOR
             ? (def ??= blank(ETIQUETA_DEFAULT))
             : (byName.get(v.vendedor) ?? blank(v.vendedor));
@@ -323,7 +321,10 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
                     className={`border-b border-gray-100 last:border-0 transition hover:bg-gray-50 ${r.se_paga ? "" : "text-gray-400"}`}
                   >
                     <td className={`px-3 py-2.5 font-medium xl:whitespace-nowrap xl:px-4 ${r.se_paga ? "text-gray-900" : "text-gray-400"}`}>
-                      {r.vendedor}
+                      {/* Solo se MUESTRA capitalizado («Reynaldo Espinosa»); la
+                          clave de la fila, el pivote y el detalle siguen con el
+                          nombre tal cual llega (mayúsculas). */}
+                      {nombreVendedorEnPantalla(r.vendedor)}
                       {!r.se_paga && <MarcaNoSePaga />}
                       <MarcaClientesSinComision
                         clientes={r.sinComision}
@@ -362,7 +363,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
                 )}
                 {showInactivos && inactivos.map((r) => (
                   <tr key={r.vendedor} className="border-b border-gray-100 text-gray-400 last:border-0 transition hover:bg-gray-50">
-                    <td className="px-3 py-2.5 xl:whitespace-nowrap xl:px-4">{r.vendedor}</td>
+                    <td className="px-3 py-2.5 xl:whitespace-nowrap xl:px-4">{nombreVendedorEnPantalla(r.vendedor)}</td>
                     {renderCells(r, false)}
                   </tr>
                 ))}

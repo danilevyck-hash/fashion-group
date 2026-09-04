@@ -592,18 +592,21 @@ describe("🔴 /api/ventas/comisiones/config: una persona, una fila; sin Daniel 
     return r;
   };
 
-  it("GET: Reynaldo UNA vez con el origen de sus 3 empresas juntado por el alias; Daniel Levy NO está; Aguas es Rey Stoute Aguas", async () => {
+  it("GET: Reynaldo UNA vez con el origen de sus 3 empresas juntado por el alias; Daniel Levy NO está; Rey Stoute Aguas TAMPOCO (retirado)", async () => {
     const { GET } = await import("@/app/api/ventas/comisiones/config/route");
     const res = await GET(await req("admin", "/x"));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { vendedores: { vendedor_nombre: string; tasa_venta: number; tasa_cobro: number; origen: string[] }[] };
     const nombres = body.vendedores.map((v) => v.vendedor_nombre);
-    expect(nombres).toEqual(["EDWIN", "REY STOUTE AGUAS", "REYNALDO ESPINOSA", "Rodrigo"]);
+    // 3-sep-2026, Daniel: «te dije que eliminaras Rey Stoute Aguas». Está en
+    // la tabla de tasas (5 filas), pero un retirado no existe en Comisiones
+    // (`lib/comisiones/retirados`, por el nombre canónico).
+    expect(nombres).toEqual(["EDWIN", "REYNALDO ESPINOSA", "Rodrigo"]);
     expect(nombres).not.toContain("DANIEL LEVY");
+    expect(nombres).not.toContain("REY STOUTE AGUAS");
     const rey = body.vendedores.find((v) => v.vendedor_nombre === "REYNALDO ESPINOSA")!;
     expect(rey).toMatchObject({ tasa_venta: 0.01, tasa_cobro: 0.01 });
     expect(rey.origen).toEqual(["Active Shoes", "Active Wear", "Fashion Wear"]);
-    expect(body.vendedores.find((v) => v.vendedor_nombre === "REY STOUTE AGUAS")?.origen).toEqual(["Vistana International"]);
   });
 
   it("GET antes de la DDL (4 grafías en la tabla, alias vacío): se muestran como vienen, sin romper", async () => {
@@ -629,6 +632,20 @@ describe("🔴 /api/ventas/comisiones/config: una persona, una fila; sin Daniel 
     const up = fromCalls.find((c) => c.op === "upsert" && c.tabla === "comision_vendedor_tasa")!;
     const filas = up.args[0] as { vendedor_nombre: string }[];
     expect(filas.map((f) => f.vendedor_nombre)).toEqual(["REYNALDO ESPINOSA", "EDWIN"]);
+  });
+
+  it("🔴 PUT: una tasa para Rey Stoute Aguas (retirado) se RECHAZA con mensaje y no escribe nada — con el canónico o con la grafía «AGUAS»", async () => {
+    const { PUT } = await import("@/app/api/ventas/comisiones/config/route");
+    for (const nombre of ["REY STOUTE AGUAS", "AGUAS", " rey stoute aguas "]) {
+      fromCalls.length = 0;
+      const res = await PUT(await req("admin", "/x", { method: "PUT", body: { updates: [
+        { vendedor_nombre: "EDWIN", tasa_venta: 0.005, tasa_cobro: 0.005, activo: true },
+        { vendedor_nombre: nombre, tasa_venta: 0.005, tasa_cobro: 0.005, activo: true },
+      ] } }));
+      expect(res.status, nombre).toBe(400);
+      expect(((await res.json()) as { error: string }).error, nombre).toMatch(/ya no está en Comisiones/);
+      expect(fromCalls.some((c) => c.op === "upsert"), nombre).toBe(false);
+    }
   });
 
   it("GET/PUT: 403 para todo rol que no sea admin", async () => {
@@ -667,6 +684,8 @@ describe("🔴 /api/ventas/comisiones/exclusiones: casillas en POST y PATCH, ali
     for (const e of Object.keys(body.vendedores)) {
       expect(body.vendedores[e].filter((v) => /ALDO ESPINOSA/.test(v)), e).toEqual(["REYNALDO ESPINOSA"]);
       expect(body.vendedores[e], e).not.toContain("AGUAS");
+      // Y tampoco su nombre canónico: Aguas está retirado de Comisiones (3-sep-2026).
+      expect(body.vendedores[e], e).not.toContain("REY STOUTE AGUAS");
     }
   });
 
@@ -685,6 +704,17 @@ describe("🔴 /api/ventas/comisiones/exclusiones: casillas en POST y PATCH, ali
     expect(r.status).toBe(400);
     expect(((await r.json()) as { error: string }).error).toMatch(/Marca al menos una/);
     expect(fromCalls.some((c) => c.op === "insert")).toBe(false);
+  });
+
+  it("🔴 POST: una exclusión para Rey Stoute Aguas (retirado) es 400 con mensaje y no inserta — canónico o grafía", async () => {
+    const { POST } = await import("@/app/api/ventas/comisiones/exclusiones/route");
+    for (const vendedor of ["REY STOUTE AGUAS", "Aguas"]) {
+      fromCalls.length = 0;
+      const r = await POST(await req("admin", "/x", { body: { empresa_key: "vistana", cliente_codigo: "d-1", vendedor } }));
+      expect(r.status, vendedor).toBe(400);
+      expect(((await r.json()) as { error: string }).error, vendedor).toMatch(/ya no está en Comisiones/);
+      expect(fromCalls.some((c) => c.op === "insert"), vendedor).toBe(false);
+    }
   });
 
   it("🔴 PATCH ?id=: cambia las casillas de la fila ACTIVA con UPDATE (nunca DELETE); las dos apagadas es 400; solo admin", async () => {

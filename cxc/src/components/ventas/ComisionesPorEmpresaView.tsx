@@ -21,8 +21,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Coins } from "lucide-react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import type { ExcelApi } from "./ComisionesView";
-import { etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
+import { sinRetirados } from "@/lib/comisiones/retirados";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { fmtMoney } from "@/lib/ventas/format";
@@ -112,7 +113,10 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
     void load();
   }, [load]);
 
-  const vendedores = data?.vendedores ?? [];
+  // Los retirados (Aguas — Daniel: «te dije que eliminaras Rey Stoute Aguas»)
+  // salen ANTES de sumar: fuera de la tabla, de las tarjetas, del Excel y de
+  // los totales. Lista en `lib/comisiones/retirados`.
+  const vendedores = sinRetirados(data?.vendedores ?? []);
   // El pie suma SOLO lo pagable: DEFAULT y Daniel se ven con su número, pero
   // no entran («no me autopago»). La marca la pone el servidor.
   const totalBase = sumarPagable(vendedores, (v) => v.base ?? 0);
@@ -224,7 +228,9 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
                   title="Ver reporte detallado"
                 >
                   <td className={`px-3 py-2.5 font-medium xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>
-                    <span className="underline-offset-2 hover:underline">{etiquetaVendedor(v.vendedor)}</span>
+                    {/* Capitalizado solo para MOSTRAR («Reynaldo Espinosa»);
+                        la clave y el detalle van con el nombre tal cual llega. */}
+                    <span className="underline-offset-2 hover:underline">{nombreVendedorEnPantalla(v.vendedor)}</span>
                     {v.se_paga === false && (
                       <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 align-middle text-[11px] font-normal text-gray-500">
                         {ROTULO_NO_SE_PAGA}

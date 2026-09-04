@@ -28,7 +28,7 @@ import { fmtDate } from "@/lib/format";
 import { exportComisionDetalle, tipoDocCorto, comisionLinea, type ComisionDetalle, type ComisionDescuento, type VentaDoc, type CobroDoc } from "@/lib/ventas/comisionExcel";
 import { ModalOverlay } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
-import { etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -322,7 +322,8 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const totalPaginas = ventasPages.length + cobrosPages.length;
 
   // Header compacto (una línea) + pie con numeración, repetidos en cada hoja.
-  const headerLinea = `Comisión — ${vendedor.toUpperCase()} · ${empresaNombre} · ${MESES[mes - 1]} ${year}`;
+  // Capitalizado también en el papel (Daniel, 3-sep-2026: «si capitiliza reynaldo»).
+  const headerLinea = `Comisión — ${nombreVendedorEnPantalla(vendedor)} · ${empresaNombre} · ${MESES[mes - 1]} ${year}`;
   const PageChrome = ({ n, children }: { n: number; children: ReactNode }) => (
     <section className="cds-page">
       <div className="cds-print-header">
@@ -445,7 +446,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
             manda el header compacto de una línea. */}
         <div className="flex items-start justify-between gap-3 border-b border-gray-200 p-4 print:hidden">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Comisión — {etiquetaVendedor(vendedor)}</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Comisión — {nombreVendedorEnPantalla(vendedor)}</h2>
             <p className="text-xs text-gray-500">{empresaNombre} · {MESES[mes - 1]} {year}</p>
             {/* DEFAULT y Daniel: el detalle se calcula igual (para cuadrar qué
                 se vendió y qué se cobró), pero esta plata no se paga. Daniel:

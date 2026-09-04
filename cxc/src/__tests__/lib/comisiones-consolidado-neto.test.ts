@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // La tabla consolidada de Comisiones muestra el NETO (con descuentos restados)
-// y esconde a los vendedores ocultos.
+// y saca a los vendedores retirados.
 //
 // 🩸 POR QUÉ (3-ago-2026). Daniel, mirando Fashion Shoes: *"me sale en el web el
 // total, y no me resta de la pantalla el descuento, me lo debería de
@@ -105,17 +105,20 @@ describe("🔴 el descuento se resta donde se ve — y AHORA en el servidor", ()
   });
 });
 
-describe("🔴 vendedores ocultos", () => {
-  it("AGUAS está en la lista", () => {
-    expect(vista).toContain('VENDEDORES_OCULTOS = new Set(["AGUAS"])');
+describe("🔴 vendedores retirados", () => {
+  // 3-sep-2026 (Daniel: «te dije que eliminaras Rey Stoute Aguas»): la lista
+  // se mudó a `lib/comisiones/retirados` y compara por el nombre CANÓNICO (con
+  // el alias de la v8, «AGUAS» llega como «REY STOUTE AGUAS» y la fila había
+  // vuelto). La conducta completa está en
+  // `comisiones-retirados-y-mayusculas.test.tsx`; acá queda el candado de que
+  // la vista sigue leyendo esa lista y la aplica ANTES de sumar.
+  it("la vista lee la lista compartida, no una propia", () => {
+    expect(vista).toContain('import { estaRetirado } from "@/lib/comisiones/retirados"');
+    expect(vista).not.toMatch(/VENDEDORES_(OCULTOS|RETIRADOS)\s*=\s*new Set/);
   });
 
   it("se excluye ANTES de sumar, así que no entra en los totales", () => {
-    expect(vista).toContain("if (estaOculto(v.vendedor)) continue;");
-  });
-
-  it("la comparación no depende de mayúsculas ni espacios", () => {
-    expect(vista).toContain("v.trim().toUpperCase()");
+    expect(vista).toContain("if (estaRetirado(v.vendedor)) continue;");
   });
 });
 

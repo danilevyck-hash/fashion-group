@@ -104,7 +104,10 @@ describe("🔴 Por empresa: la fila se ve, dice «no se paga» y el pie no la su
     });
     const celdas = Object.entries(ws).filter(([k]) => !k.startsWith("!")).map(([, c]) => (c as { v: unknown }).v);
     expect(celdas).toContain("Oficina (DEFAULT) (no se paga)");
-    expect(celdas).toContain("DANIEL LEVY (no se paga)");
+    // Capitalizado desde el 3-sep-2026 («si capitiliza reynaldo»): la celda
+    // del nombre se muestra «Daniel Levy», la marca sigue pegada.
+    expect(celdas).toContain("Daniel Levy (no se paga)");
+    expect(celdas).not.toContain("DANIEL LEVY (no se paga)");
     expect(celdas).toContain("Total a pagar");
     // La fila de totales: Com. Total = 100 (no 165). Se busca la fila cuyo A es "Total a pagar".
     const filaTotal = Object.entries(ws).find(([k, c]) => /^A\d+$/.test(k) && (c as { v: unknown }).v === "Total a pagar")![0].slice(1);

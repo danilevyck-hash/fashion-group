@@ -30,6 +30,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { normalizarVendedor, validarCasillas, validarExclusionNueva } from "@/lib/comisiones/exclusiones";
 import { aplicarAlias, type AliasVendedor } from "@/lib/comisiones/alias";
+import { estaRetirado, AVISO_VENDEDOR_RETIRADO } from "@/lib/comisiones/retirados";
 import {
   agregarExclusion,
   cambiarCasillasExclusion,
@@ -80,7 +81,8 @@ async function vendedoresPorEmpresa(alias: readonly AliasVendedor[]): Promise<Re
   const por = new Map<string, Set<string>>(EMPRESAS_COMISIONAN.map((e) => [e, new Set<string>()]));
   const meter = (empresa: string, nombre: string | null | undefined) => {
     const n = normalizarVendedor(aplicarAlias(nombre, alias));
-    if (n) por.get(empresa)?.add(n);
+    // Los retirados de Comisiones (Aguas) no se ofrecen: no existen en ninguna tabla.
+    if (n && !estaRetirado(n)) por.get(empresa)?.add(n);
   };
   for (const v of (maestro.data ?? []) as { empresa_key: string; nombre: string }[]) meter(v.empresa_key, v.nombre);
   for (const e of EMPRESAS_COMISIONAN) {
@@ -132,6 +134,10 @@ export async function POST(req: NextRequest) {
   // que el 409 de «ya está» salga con el nombre correcto.
   const alias = await leerAliasOVacio();
   const valor = { ...v.valor, vendedor: normalizarVendedor(aplicarAlias(v.valor.vendedor, alias)) };
+  // Un retirado (Aguas) no existe en Comisiones: no se le carga una exclusión.
+  if (estaRetirado(valor.vendedor)) {
+    return NextResponse.json({ error: AVISO_VENDEDOR_RETIRADO }, { status: 400 });
+  }
   const r = await agregarExclusion(valor, auth.userName ?? auth.userId ?? "admin");
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
   return NextResponse.json({ ok: true, id: r.id }, { status: 201 });

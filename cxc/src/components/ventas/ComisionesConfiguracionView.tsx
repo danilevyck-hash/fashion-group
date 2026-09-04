@@ -40,6 +40,7 @@ import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
+import { estaRetirado } from "@/lib/comisiones/retirados";
 import { AVISO_NINGUNA_CASILLA, ROTULO_CLIENTES_SIN_COMISION, type ExclusionActiva } from "@/lib/comisiones/exclusiones";
 import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
@@ -82,8 +83,10 @@ function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }) {
       }
       const data = (await res.json()) as { vendedores: ConfigRow[] };
       // El servidor ya los deja fuera; por si llega una respuesta vieja, aquí
-      // tampoco se dibuja a quien no se paga (Daniel: «quítalo»).
-      setRows(data.vendedores.filter((r) => sePagaComision(r.vendedor_nombre)));
+      // tampoco se dibuja a quien no se paga (Daniel: «quítalo») ni a los
+      // retirados de Comisiones (Aguas — «te dije que eliminaras Rey Stoute
+      // Aguas», lista en `lib/comisiones/retirados`).
+      setRows(data.vendedores.filter((r) => sePagaComision(r.vendedor_nombre) && !estaRetirado(r.vendedor_nombre)));
       setPctVenta(Object.fromEntries(data.vendedores.map((r) => [r.vendedor_nombre, toPct(r.tasa_venta)])));
       setPctCobro(Object.fromEntries(data.vendedores.map((r) => [r.vendedor_nombre, toPct(r.tasa_cobro ?? r.tasa_venta)])));
     } catch (err) {
@@ -334,7 +337,8 @@ function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }
     setErrorAlta(null);
   };
 
-  const vendedoresDeEmpresa = datos?.vendedores[empresa] ?? [];
+  // Los retirados de Comisiones tampoco se ofrecen en el desplegable: no existen.
+  const vendedoresDeEmpresa = (datos?.vendedores[empresa] ?? []).filter((v) => !estaRetirado(v));
   const clienteCodigo = cliente?.codigo?.trim().toUpperCase() ?? "";
   const ningunaCasilla = !excluyeVenta && !excluyeCobro;
   const puedeGuardar = !!clienteCodigo && !!vendedor && !ningunaCasilla && !guardando;

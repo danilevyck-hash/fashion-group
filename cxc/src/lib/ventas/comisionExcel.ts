@@ -7,8 +7,10 @@
 
 import type { WorkSheet, Range } from "xlsx-js-style";
 import { fmtDate } from "@/lib/format";
-import { ETIQUETA_DEFAULT, etiquetaVendedor } from "@/lib/comisiones/vendedor-default";
+import { ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
+import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
+import { sinRetirados } from "@/lib/comisiones/retirados";
 
 export interface VentaDoc {
   fecha: string;
@@ -111,7 +113,8 @@ export async function buildComisionDetalleSheet(
   let r = 0;
 
   // Título + subtítulo (empresa · período) + separador — patrón de la casa.
-  band(ws, r, lastCol, merges, `Comisión — ${d.vendedor}`, CASA_PALETTE.pri, 14);
+  // Capitalizado («Reynaldo Espinosa»), igual que en pantalla (Daniel, 3-sep-2026).
+  band(ws, r, lastCol, merges, `Comisión — ${nombreVendedorEnPantalla(d.vendedor)}`, CASA_PALETTE.pri, 14);
   heights[r] = 30; r++;
   band(ws, r, lastCol, merges, `${empresaNombre} · ${periodo}`, CASA_PALETTE.mid, 10);
   heights[r] = 20; r++;
@@ -258,24 +261,35 @@ export interface ComisionResumen {
 }
 
 /** Nombre de la fila en el Excel: la marca va PEGADA al nombre para que sobreviva
- *  a cualquier filtro u orden que le hagan a la hoja. */
+ *  a cualquier filtro u orden que le hagan a la hoja. Capitalizado como en
+ *  pantalla («Reynaldo Espinosa», «Daniel Levy»; la oficina sigue siendo
+ *  «Oficina (DEFAULT)») — Daniel, 3-sep-2026: «si capitiliza reynaldo». Solo
+ *  cambia esta celda: los números salen tal cual. */
 const nombreEnExcel = (v: { vendedor: string; se_paga?: boolean }): string =>
-  v.se_paga === false ? `${etiquetaVendedor(v.vendedor)} (${ROTULO_NO_SE_PAGA})` : etiquetaVendedor(v.vendedor);
+  v.se_paga === false
+    ? `${nombreVendedorEnPantalla(v.vendedor)} (${ROTULO_NO_SE_PAGA})`
+    : nombreVendedorEnPantalla(v.vendedor);
 
 /** Construcción pura del sheet (sin DOM) — testeable. */
 export async function buildComisionesResumenSheet(r: ComisionResumen): Promise<WorkSheet> {
   const { buildReportSheet, MONEY_FMT } = await import("@/lib/excel-export");
 
+  // Los retirados (Aguas — Daniel: «te dije que eliminaras Rey Stoute Aguas»)
+  // no van ni en las filas ni en el total, igual que en la pantalla: la vista
+  // ya los quitó, y acá se vuelven a quitar por si el Excel se arma desde otro
+  // lado. Lista en `lib/comisiones/retirados`.
+  const vendedores = sinRetirados(r.vendedores);
+
   // Total = suma de las filas PAGABLES (no recálculo), consistente con el tab:
   // DEFAULT y Daniel se listan con su número pero no entran («no me autopago»).
   const tot = {
-    base: sumarPagable(r.vendedores, (v) => v.base ?? 0),
-    comision: sumarPagable(r.vendedores, (v) => v.comision ?? 0),
-    base_cobro: sumarPagable(r.vendedores, (v) => v.base_cobro ?? 0),
-    comision_cobro: sumarPagable(r.vendedores, (v) => v.comision_cobro ?? 0),
-    comision_total: sumarPagable(r.vendedores, (v) => v.comision_total ?? 0),
+    base: sumarPagable(vendedores, (v) => v.base ?? 0),
+    comision: sumarPagable(vendedores, (v) => v.comision ?? 0),
+    base_cobro: sumarPagable(vendedores, (v) => v.base_cobro ?? 0),
+    comision_cobro: sumarPagable(vendedores, (v) => v.comision_cobro ?? 0),
+    comision_total: sumarPagable(vendedores, (v) => v.comision_total ?? 0),
   };
-  const haySinPago = r.vendedores.some((v) => v.se_paga === false);
+  const haySinPago = vendedores.some((v) => v.se_paga === false);
 
   return buildReportSheet({
     columns: [
@@ -286,7 +300,7 @@ export async function buildComisionesResumenSheet(r: ComisionResumen): Promise<W
       { header: "Com. Cobro", wch: 13, align: "right", fmt: MONEY_FMT },
       { header: "Com. Total", wch: 13, align: "right", fmt: MONEY_FMT },
     ],
-    rows: r.vendedores.map(v => [
+    rows: vendedores.map(v => [
       nombreEnExcel(v), v.base, v.comision, v.base_cobro, v.comision_cobro, v.comision_total,
     ]),
     totals: [haySinPago ? "Total a pagar" : "Total", tot.base, tot.comision, tot.base_cobro, tot.comision_cobro, tot.comision_total],
@@ -331,12 +345,14 @@ export async function buildComisionesConsolidadoSheet(c: ComisionConsolidado): P
     { v: r.total, bold: true }, // columna TOTAL destacada
   ];
 
-  const rows = c.vendedores.map(rowFor);
+  // Sin los retirados (Aguas), igual que la matriz en pantalla: ni fila ni total.
+  const vendedores = sinRetirados(c.vendedores);
+  const rows = vendedores.map(rowFor);
   if (c.sinAsignar) rows.push(rowFor({ ...c.sinAsignar, vendedor: ETIQUETA_DEFAULT }));
 
   // Total general = suma de las filas PAGABLES (la oficina y Daniel se listan,
   // pero no entran — «no me autopago»).
-  const allRows = [...c.vendedores, ...(c.sinAsignar ? [c.sinAsignar] : [])];
+  const allRows = [...vendedores, ...(c.sinAsignar ? [c.sinAsignar] : [])];
   const haySinPago = allRows.some((r) => r.se_paga === false);
   const totals: (string | number)[] = [haySinPago ? "Total a pagar" : "Total"];
   for (const e of c.empresas) {

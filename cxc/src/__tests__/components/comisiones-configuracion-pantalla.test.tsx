@@ -194,7 +194,9 @@ describe("🔴 la pestaña Configuración", () => {
     expect((within(tabla).getByLabelText("Tasa de venta de Reynaldo Espinosa") as HTMLInputElement).value).toBe("1.00");
     expect((within(tabla).getByLabelText("Tasa de cobro de Reynaldo Espinosa") as HTMLInputElement).value).toBe("1.00");
     expect((within(tabla).getByLabelText("Tasa de venta de Edwin") as HTMLInputElement).value).toBe("0.50");
-    expect(within(tabla).getByText("Rey Stoute Aguas")).toBeTruthy();
+    // Daniel, 3-sep-2026: «esconder rey stoute» — aunque el servidor lo mande
+    // (respuesta vieja), la tabla no lo dibuja (`lib/comisiones/retirados`).
+    expect(within(tabla).queryByText(/Rey Stoute Aguas|REY STOUTE AGUAS|Aguas/)).toBeNull();
     // Daniel: «quítalo».
     expect(within(tabla).queryByText(/DANIEL LEVY|Daniel Levy/)).toBeNull();
     expect(within(tabla).queryByText("no se paga")).toBeNull();
