@@ -7,8 +7,8 @@ import { fmt } from "@/lib/format";
  * Confirmación de "este gasto deja el fondo en negativo".
  *
  * 🩸 ESTABA ESCRITO DOS VECES, palabra por palabra: en el Drawer inline
- * (`NuevoGastoDrawer`) y en la ruta suelta (`/caja/[periodoId]/nuevo`, viva
- * para los deep-links de las sugerencias). Los dos caminos guardan el MISMO
+ * (`NuevoGastoDrawer`) y en la ruta suelta (`/caja/[periodoId]/nuevo`, hoy
+ * huérfana — ver la nota en su cabecera). Los dos caminos guardan el MISMO
  * gasto contra el MISMO fondo, así que dos copias del aviso es una que se
  * corrige y otra que se queda vieja — y la que se queda vieja es un freno a una
  * acción que descuadra la caja.

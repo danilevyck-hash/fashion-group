@@ -30,12 +30,16 @@
 
 import { useEffect, useState } from "react";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
+import { esOfrecible, sinAusentesDeSwitch } from "@/lib/clientes/ausentes";
 import { camposDeBusquedaCliente, nombreParaMostrar } from "@/lib/clientes/nombre-display";
 
 export interface ClienteHit {
   codigo: string;
   nombre: string;
   razon_social?: string | null;
+  /** Puesto = Switch ya no lo manda en ninguna empresa: NO se ofrece al buscar
+   *  (su nombre sigue sirviendo para guías viejas). Ver `lib/clientes/ausentes`. */
+  ausente_desde?: string | null;
 }
 
 /** Tope que acepta el endpoint. El universo del grupo está muy por debajo. */
@@ -85,6 +89,10 @@ function obtenerDirectorio(): Promise<Directorio> {
 
 function filtrar(clientes: readonly ClienteHit[], q: string): ClienteHit[] {
   return clientes
+    // 🔴 Un cliente que Switch dejó de mandar NO se ofrece (4-sep-2026,
+    // aprobado por Daniel). Sigue en el caché a propósito: de ahí salen los
+    // nombres de las guías viejas (`useNombresDeClientes`, más abajo).
+    .filter(esOfrecible)
     .filter((c) => coincideBusqueda(q, camposDeBusquedaCliente(c)))
     .slice(0, MAX_SUGERENCIAS);
 }
@@ -114,6 +122,11 @@ export function useNombresDeClientes(activa: boolean): ReadonlyMap<string, strin
       try {
         const dir = await obtenerDirectorio();
         if (cancel || !dir.completo) return;
+        // ⚠️ CON los ausentes de Switch, a propósito: este mapa existe para
+        // ponerle nombre al código de una guía VIEJA, y una guía vieja puede
+        // apuntar a un cliente que Switch ya no manda. Quitar el ausente acá
+        // dejaría el chip diciendo "D-30" pelado — que es justo lo que este
+        // mapa vino a arreglar. El que NO ofrece es `filtrar`, arriba.
         const m = new Map<string, string>();
         for (const c of dir.clientes) {
           const cod = (c.codigo ?? "").trim();
@@ -157,7 +170,9 @@ export function useClientesDelGrupo(activa: boolean): ClienteHit[] {
       try {
         const dir = await obtenerDirectorio();
         if (cancel || !dir.completo) return;
-        setClientes(dir.clientes);
+        // Sin los ausentes de Switch: el "¿quisiste decir…?" tampoco puede
+        // proponer atar a un cliente que ya no existe allá.
+        setClientes(sinAusentesDeSwitch(dir.clientes));
       } catch {
         /* sin directorio: quien lo use se calla, no adivina */
       }
@@ -211,7 +226,11 @@ export function useBusquedaClientes(query: string, activa: boolean) {
         );
         if (!res.ok) throw new Error();
         const data = (await res.json()) as { clientes?: ClienteHit[] };
-        if (!cancel) setHits(Array.isArray(data.clientes) ? data.clientes : []);
+        // El endpoint devuelve el directorio ENTERO (con ausentes, para la
+        // lista y las fichas); ofrecer es cosa de este lado, igual que arriba.
+        if (!cancel) {
+          setHits(sinAusentesDeSwitch(Array.isArray(data.clientes) ? data.clientes : []));
+        }
       } catch {
         if (!cancel) setHits([]);
       } finally {
