@@ -26,9 +26,37 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const expired = searchParams.get("expired") === "1";
+  // Reanudar sesión (3-sep-2026): si la cookie de 7 días sigue viva, no se pide
+  // la contraseña otra vez. Mientras se verifica, NO se muestra el formulario
+  // (solo el logo); si el server dice que no hay sesión, aparece como hoy.
+  // Con ?expired=1 el middleware acaba de borrar la cookie: directo al formulario.
+  const [verificandoSesion, setVerificandoSesion] = useState(!expired);
 
   useEffect(() => {
     if (expired) setExpiredMsg(true);
+  }, [expired]);
+
+  useEffect(() => {
+    if (expired) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        // El middleware + el endpoint validan TODO fail-closed: firma HMAC,
+        // token vivo en user_sessions, mismo usuario, usuario activo. Cualquier
+        // cosa que no sea un 200 con rol → la contraseña, como hoy.
+        const res = await fetch("/api/auth/sesion", { credentials: "same-origin" });
+        if (!res.ok) throw new Error("sin sesión");
+        const data = await res.json();
+        if (!data?.role) throw new Error("sin rol");
+        if (cancelado) return;
+        storeSession(data);
+        router.replace(data.role === "cliente" ? "/catalogo/reebok" : "/home");
+      } catch {
+        if (!cancelado) setVerificandoSesion(false);
+      }
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expired]);
 
   function storeSession(data: { role: string; userId?: string; userName?: string; modules?: string[]; empresaFilter?: string; guiasReadonly?: boolean; isOwner?: boolean }) {
@@ -69,6 +97,17 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Mientras se verifica si hay una sesión vigente, solo el logo — el
+  // formulario de contraseña NO se muestra (evita el destello de pedirla
+  // cuando el usuario va a entrar directo).
+  if (verificandoSesion) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <FGLogo variant="full" theme="light" size={56} />
+      </div>
+    );
   }
 
   return (

@@ -188,8 +188,11 @@ export default function Sidebar() {
 
   const visibleGroups = getVisibleGroups(userRole, fgModules);
 
-  function handleLogout() {
-    fetch("/api/auth", { method: "DELETE" }).catch(() => {});
+  async function handleLogout() {
+    // Se ESPERA la revocación antes de navegar (3-sep-2026): la pantalla de
+    // login reanuda la sesión si la cookie sigue viva, así que un DELETE
+    // fire-and-forget podía perder la carrera y volver a meter al usuario.
+    try { await fetch("/api/auth", { method: "DELETE" }); } catch { /* sin red: igual se sale localmente */ }
     sessionStorage.clear();
     router.push("/");
   }

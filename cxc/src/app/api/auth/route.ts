@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
-import { getDefaultModulesForRole } from "@/lib/modules";
+import { armarPayloadSesion } from "@/lib/sesion-payload";
 import { signSession, verifySession } from "@/lib/session-cookie";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
@@ -86,51 +86,15 @@ export async function POST(req: NextRequest) {
       if (matches.length === 1) {
         const user = matches[0];
         {
-          // Módulos por rol — fuente única: role_permissions.
-          // Prioridad de módulos del usuario:
-          //   1) modulos_override (per-usuario) si está definido y no vacío
-          //   2) role_permissions del rol
-          //   3) defaults hardcoded por rol (fallback si la tabla no responde)
-          let modules: string[] = [];
-          if (Array.isArray(user.modulos_override) && user.modulos_override.length > 0) {
-            modules = user.modulos_override;
-          } else {
-            try {
-              const { data: rolePerm } = await supabaseServer
-                .from("role_permissions")
-                .select("modulos")
-                .eq("role", user.role)
-                .single();
-              if (rolePerm?.modulos) modules = rolePerm.modulos;
-            } catch { /* use defaults below if table missing */ }
-
-            if (modules.length === 0) {
-              modules = getDefaultModulesForRole(user.role);
-            }
-          }
-
-          // Per-user config (readonly flags). El filtro de empresa para CXC ya
-          // NO se hardcodea acá: viene de fg_users.associated_company (DB).
-          const USER_CONFIG: Record<string, { guiasReadonly?: boolean }> = {
-            edwin: { guiasReadonly: true },
-          };
-          const userConfig = USER_CONFIG[user.name.toLowerCase()] || {};
-
-          // Restricción de empresa para CXC (fuente: fg_users.associated_company).
-          // Vendedor con empresa asociada ve solo esa; sin asociada (null) ve todas.
-          // El server (API /api/cxc/aging) la re-aplica de forma autoritativa;
-          // esto solo alimenta el lock visual del selector de empresa.
-          const empresaFilter = user.associated_company || undefined;
+          // Módulos, filtro de empresa y flags — fuente única compartida con
+          // GET /api/auth/sesion (reanudar sesión con cookie vigente):
+          // src/lib/sesion-payload.ts. La lógica es la misma que vivía acá
+          // inline (modulos_override → role_permissions → defaults por rol).
+          const base = await armarPayloadSesion(user);
 
           const payload = {
             authenticated: true,
-            role: user.role,
-            userId: user.id,
-            userName: user.name,
-            modules,
-            isOwner: !!user.is_owner,
-            ...(empresaFilter && { empresaFilter }),
-            ...(userConfig.guiasReadonly && { guiasReadonly: true }),
+            ...base,
           };
 
           const sessionToken = randomUUID();
@@ -153,12 +117,7 @@ export async function POST(req: NextRequest) {
           } catch { /* table may not exist yet */ }
 
           const res = NextResponse.json(payload);
-          setSessionCookie(res, {
-            role: user.role, userId: user.id, userName: user.name, modules, sessionToken,
-            isOwner: !!user.is_owner,
-            ...(empresaFilter && { empresaFilter }),
-            ...(userConfig.guiasReadonly && { guiasReadonly: true }),
-          });
+          setSessionCookie(res, { ...base, sessionToken });
           await logActivity(user.role, "login", "auth", { userName: user.name }, user.name);
           // Login OK → limpiar el contador de fallos de esta IP.
           await clearLoginAttempts(ip);

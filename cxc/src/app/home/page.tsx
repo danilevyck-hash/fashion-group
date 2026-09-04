@@ -28,6 +28,16 @@ export default function HomePage() {
   const [dhDismissed, setDhDismissed] = useState(false);
   const [frequents, setFrequents] = useState<AppModule[]>([]);
 
+  // El botón de arriba a la derecha tiene que REVOCAR la sesión en el server
+  // (3-sep-2026): antes solo borraba sessionStorage y la cookie de 7 días
+  // quedaba viva — con la reanudación de sesión del login, eso ya no bastaría.
+  // Se espera el DELETE antes de navegar (sin carrera con la pantalla de login).
+  async function cerrarSesion() {
+    try { await fetch("/api/auth", { method: "DELETE" }); } catch { /* sin red: igual se sale localmente */ }
+    sessionStorage.clear();
+    router.push("/");
+  }
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role") || "";
@@ -166,7 +176,7 @@ export default function HomePage() {
               {darkMode ? "☀" : "◑"}
             </IconButton>
             <button
-              onClick={() => { sessionStorage.clear(); router.push("/"); }}
+              onClick={cerrarSesion}
               className="min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-gray-400 hover:text-black transition active:scale-[0.97]"
             >
               Salir
