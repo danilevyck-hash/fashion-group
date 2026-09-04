@@ -16,7 +16,9 @@
  *    criterio, una se actualizó y la otra no).
  * 2. BARRIDO por las 5 rutas que las exponen — todas exigen la cartera.
  * 3. COMPORTAMIENTO contra un doble EN MEMORIA de PostgREST, en los DOS
- *    estados de la base: con la columna `cartera` y sin ella.
+ *    estados de la base: con la columna `cartera` y sin ella. ⚠️ Desde el
+ *    3-sep-2026 el estado "sin columna" ya no degrada: la tolerancia a la DDL
+ *    se retiró (la columna existe desde 20260813120000) y TODO falla visible.
  * 4. La MIGRACIÓN — que las llaves únicas lleven la cartera adentro y que
  *    ninguna fila se pierda ni cambie de dueño.
  *
@@ -242,7 +244,15 @@ describe("una estrella de Boston NO aparece en el grupo (ni al revés)", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("la app funciona ANTES de que corra el DDL", () => {
+// ⚠️ Cambio de dirección (3-sep-2026). Este bloque se llamaba "la app funciona
+// ANTES de que corra el DDL" y fijaba la degradación: el grupo reintentaba SIN
+// la columna y Boston lanzaba `CarteraNoDisponibleError`. La tolerancia se
+// retiró — la columna `cartera` existe en las tres tablas (verificado en
+// producción) — y hoy un "no existe la columna" es un error de verdad que se
+// propaga con su `code`. Lo que NO cambió, y este bloque sigue midiendo, es lo
+// que importa: NADA se escribe sin cartera y Boston NUNCA recibe una fila del
+// grupo. El detector `esErrorSinColumnaCartera` sigue en `cartera.ts` (puro).
+describe("sin la columna `cartera` TODO falla visible (antes: el grupo degradaba)", () => {
   beforeEach(() => {
     estado.tieneCartera = false;
   });
@@ -262,36 +272,42 @@ describe("la app funciona ANTES de que corra el DDL", () => {
     expect(esErrorSinColumnaCartera(null)).toBe(false);
   });
 
-  it("el GRUPO lee y escribe como hoy (todas las filas de hoy son suyas)", async () => {
-    expect(await alternarFavorito(CARTERA_GRUPO, "daniel", COMPARTIDO)).toBe("added");
-    expect(await leerFavoritos(CARTERA_GRUPO, "daniel")).toEqual([COMPARTIDO]);
-    expect(estado.tablas.cxc_favorites[0]).not.toHaveProperty("cartera");
-
-    await guardarOverride(CARTERA_GRUPO, { nombre_normalized: COMPARTIDO, correo: "a@a.com" });
-    expect(await leerCorreoDeOverride(CARTERA_GRUPO, COMPARTIDO)).toBe("a@a.com");
-
-    await registrarContacto(CARTERA_GRUPO, COMPARTIDO, "llamada");
-    expect(await leerContactLog(CARTERA_GRUPO)).toHaveLength(1);
-  });
-
-  it("🔴 BOSTON no escribe en el namespace compartido: falla y lo dice", async () => {
-    // Escribir igual metería la nota de Boston donde el grupo la vería.
-    await expect(alternarFavorito(CARTERA_BOSTON, "daniel", COMPARTIDO)).rejects.toBeInstanceOf(CarteraNoDisponibleError);
-    await expect(guardarOverride(CARTERA_BOSTON, { nombre_normalized: COMPARTIDO })).rejects.toBeInstanceOf(CarteraNoDisponibleError);
-    await expect(registrarContacto(CARTERA_BOSTON, COMPARTIDO, "llamada")).rejects.toBeInstanceOf(CarteraNoDisponibleError);
+  it("🔴 el GRUPO ya NO reintenta sin la columna: falla con el `code` de PostgREST y no escribe nada", async () => {
+    // Antes: "added" y una fila sin `cartera`. Hoy: el error se propaga con su
+    // código intacto (es lo que `respuestaErrorEscritura` necesita) y la tabla
+    // queda como estaba. Una fila sin cartera es exactamente la que el #522 vino
+    // a prohibir.
+    await expect(alternarFavorito(CARTERA_GRUPO, "daniel", COMPARTIDO)).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42703" });
+    await expect(leerFavoritos(CARTERA_GRUPO, "daniel")).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42703" });
+    await expect(guardarOverride(CARTERA_GRUPO, { nombre_normalized: COMPARTIDO, correo: "a@a.com" })).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42P10" });
+    await expect(registrarContacto(CARTERA_GRUPO, COMPARTIDO, "llamada")).rejects.toMatchObject({ name: "ErrorAnotacion", code: "PGRST204" });
+    await expect(leerContactLog(CARTERA_GRUPO)).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42703" });
 
     for (const t of TABLAS) expect(estado.tablas[t] ?? []).toHaveLength(0);
   });
 
-  it("BOSTON lee VACÍO, nunca lo del grupo", async () => {
+  it("🔴 BOSTON no escribe en el namespace compartido: falla y lo dice (ahora con el error de la base)", async () => {
+    // Escribir igual metería la nota de Boston donde el grupo la vería.
+    await expect(alternarFavorito(CARTERA_BOSTON, "daniel", COMPARTIDO)).rejects.toMatchObject({ name: "ErrorAnotacion" });
+    await expect(guardarOverride(CARTERA_BOSTON, { nombre_normalized: COMPARTIDO })).rejects.toMatchObject({ name: "ErrorAnotacion" });
+    await expect(registrarContacto(CARTERA_BOSTON, COMPARTIDO, "llamada")).rejects.toMatchObject({ name: "ErrorAnotacion" });
+
+    for (const t of TABLAS) expect(estado.tablas[t] ?? []).toHaveLength(0);
+  });
+
+  it("BOSTON nunca recibe lo del grupo: con la columna rota, lee ERROR — no vacío, no ajeno", async () => {
+    // Se siembra el grupo CON la columna, y después se "rompe".
+    estado.tieneCartera = true;
     await alternarFavorito(CARTERA_GRUPO, "daniel", COMPARTIDO);
     await guardarOverride(CARTERA_GRUPO, { nombre_normalized: COMPARTIDO, correo: "grupo@x.com" });
     await registrarContacto(CARTERA_GRUPO, COMPARTIDO, "llamada");
+    estado.tieneCartera = false;
 
-    await expect(leerFavoritos(CARTERA_BOSTON, "daniel")).rejects.toBeInstanceOf(CarteraNoDisponibleError);
-    await expect(leerOverrides(CARTERA_BOSTON)).rejects.toBeInstanceOf(CarteraNoDisponibleError);
-    await expect(leerContactLog(CARTERA_BOSTON)).rejects.toBeInstanceOf(CarteraNoDisponibleError);
-    // Lo que NUNCA puede pasar: que Boston reciba la fila del grupo.
+    await expect(leerFavoritos(CARTERA_BOSTON, "daniel")).rejects.toMatchObject({ name: "ErrorAnotacion" });
+    await expect(leerOverrides(CARTERA_BOSTON)).rejects.toMatchObject({ name: "ErrorAnotacion" });
+    await expect(leerContactLog(CARTERA_BOSTON)).rejects.toMatchObject({ name: "ErrorAnotacion" });
+    // Lo que NUNCA puede pasar: que Boston reciba la fila del grupo. El correo
+    // es una sugerencia y no lanza: cae a null, jamás a "grupo@x.com".
     expect(await leerCorreoDeOverride(CARTERA_BOSTON, COMPARTIDO)).toBeNull();
   });
 

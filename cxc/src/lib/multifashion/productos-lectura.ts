@@ -74,9 +74,15 @@ export function esFuncionAusente(err: ErrorSupabase | null | undefined): boolean
   const code = String(err.code ?? "");
   if (code === "PGRST202" || code === "42883") return true;
   const msg = String(err.message ?? "").toLowerCase();
+  // 🩸 Hasta el 3-sep-2026 acá había un `msg.includes("does not exist")` pelado,
+  // que hacía que un `relation "x" does not exist` (la TABLA) o un
+  // `column x.y does not exist` se leyeran como "no existe la FUNCIÓN" y
+  // cayeran al camino lento. El texto tiene que NOMBRAR una función: es lo que
+  // dicen Postgres (`function foo(...) does not exist`) y PostgREST
+  // (`Could not find the function ...`).
   return (
     msg.includes("could not find the function") ||
-    msg.includes("does not exist") ||
+    /\bfunction\b[^\n]*does not exist/.test(msg) ||
     msg.includes("no existe la función")
   );
 }

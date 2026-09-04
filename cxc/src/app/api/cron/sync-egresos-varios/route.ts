@@ -35,12 +35,16 @@
  * sobra. Más frecuencia solo multiplicaría las veces que se le toma la sesión a
  * Daniel.
  *
- * ── 🔴 SI LA DDL NO CORRIÓ, NO SE TOCA SWITCH ──────────────────────────────
- * `20260813120000_egresos_varios.sql` la corre Daniel A MANO. Antes de abrir una
- * sola sesión se pregunta si la tabla existe: sin ese chequeo, el cron expulsaría
- * a quien esté en el panel de 8 empresas para tirar todo a la basura y anotarse 8
- * errores por día. Mismo patrón que `calvin-catalogo`: se omite LIMPIO, con 503 y
- * sin heartbeat — fila ausente = pendiente, no caído.
+ * ── 🔴 SI LA BASE NO CONTESTA, NO SE TOCA SWITCH ───────────────────────────
+ * Antes de abrir una sola sesión se hace una consulta de una fila contra
+ * `egresos_varios`: sin ese chequeo, el cron expulsaría a quien esté en el panel
+ * de 8 empresas para tirar todo a la basura y anotarse 8 errores por día. Si la
+ * sonda falla, 500 sin heartbeat — y la regla 2 de alertas lo ve.
+ *
+ * Historia (ago-2026): la sonda además reconocía "esa tabla no existe" y se
+ * omitía LIMPIO con 503 mientras `20260813120000_egresos_varios.sql` no
+ * corriera. Tolerancia retirada el 3-sep-2026: la tabla existe (verificado en
+ * producción); ver `verificarBaseDeEgresos`.
  *
  * Las empresas van SECUENCIALES, una sesión por empresa, cerrada al terminar.
  *
@@ -62,7 +66,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   syncAllEgresos,
-  egresosInstalado,
+  verificarBaseDeEgresos,
   EGRESOS_EMPRESA_KEYS,
   EGRESOS_EMPRESA_KEYS_CRON,
   type ResultadoEgresosEmpresa,
@@ -87,22 +91,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   // ANTES de tocar Switch. Ver el encabezado.
-  let instalado: boolean;
   try {
-    instalado = await egresosInstalado();
+    await verificarBaseDeEgresos();
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: `no se pudo consultar la base: ${e instanceof Error ? e.message : String(e)}` },
       { status: 500 },
-    );
-  }
-  if (!instalado) {
-    return NextResponse.json(
-      {
-        ok: false,
-        omitido: "la migración 20260813120000_egresos_varios.sql todavía no corrió",
-      },
-      { status: 503 },
     );
   }
 

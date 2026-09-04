@@ -35,7 +35,6 @@ import {
   catalogoUtilizable,
   MINIMO_CUENTAS,
 } from "@/lib/cuentas/catalogo";
-import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 
 /** Cuántas cuentas se mandan por sentencia. El catálogo de una empresa ronda las
  *  centenas; 500 es el mismo tamaño que usa el resto del repo. */
@@ -44,8 +43,6 @@ const LOTE = 500;
 export interface ResultadoCuentas {
   empresaKey: string;
   ok: boolean;
-  /** `true` cuando la DDL todavía no corrió: no es un fallo. */
-  omitido?: string;
   /** Cuentas escritas. */
   cuentas?: number;
   /** Nodos que vinieron y no se pudieron usar (sin nombre, código raro…). */
@@ -53,13 +50,15 @@ export interface ResultadoCuentas {
   error?: string;
 }
 
-/** ¿Ya corrió la DDL del catálogo? Se pregunta ANTES de tocar Switch. */
-export async function cuentasInstalado(): Promise<boolean> {
-  const { error } = await supabaseServer.from("cuentas_contables").select("cuenta").limit(1);
-  if (!error) return true;
-  if (esTablaAusente(error)) return false;
-  throw new Error(error.message);
-}
+// Historia (ago-2026): acá vivía `cuentasInstalado()`, una sonda que ANTES de
+// pedirle el catálogo a Switch preguntaba si `cuentas_contables` existía y, si
+// no, devolvía `{ ok: true, omitido: "la migración … todavía no corrió" }`.
+// Tolerancia retirada el 3-sep-2026: la tabla existe desde
+// 20260813180000_cuentas_contables.sql (verificado en producción). La sonda se
+// fue entera: la sesión ya está abierta (la comparte con egresos), el catálogo
+// cuesta UN GET, y si la base no contesta el upsert de abajo lo dice con
+// `ok:false` y su mensaje — sin disfrazar un permiso o un timeout de "todavía no
+// está instalado".
 
 /**
  * Trae y guarda el catálogo de UNA empresa, **reusando una sesión ya abierta**.
@@ -67,22 +66,6 @@ export async function cuentasInstalado(): Promise<boolean> {
  */
 export async function syncCuentasContables(session: WebSession): Promise<ResultadoCuentas> {
   const empresaKey = session.empresaKey;
-
-  // Antes de gastar un request contra Switch: si no hay dónde escribir, no se
-  // pide nada. Mismo patrón que el cron de egresos con su propia DDL.
-  let instalado: boolean;
-  try {
-    instalado = await cuentasInstalado();
-  } catch (e) {
-    return { empresaKey, ok: false, error: `no se pudo consultar la base: ${e instanceof Error ? e.message : String(e)}` };
-  }
-  if (!instalado) {
-    return {
-      empresaKey,
-      ok: true,
-      omitido: "la migración 20260813180000_cuentas_contables.sql todavía no corrió",
-    };
-  }
 
   const logId = await createSwitchSyncLog({ empresaKey, syncType: "cuentas_contables" });
 

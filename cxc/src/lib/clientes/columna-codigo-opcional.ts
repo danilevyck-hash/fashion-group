@@ -1,4 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
+// ⚠️ SIN USOS desde el 3-sep-2026. La columna `cliente_codigo` existe en las dos
+// tablas (20260808180000_directorio_clientes_codigo.sql y
+// 20260808190000_cheques_cliente_codigo.sql; verificado en producción), y las
+// cuatro rutas que llamaban `guardarTolerandoColumnaNueva` —directorio y
+// cheques, POST y PUT— escriben directo. Se deja el archivo porque es un helper
+// del repo y no se borran helpers en estas tandas; si otro DDL vuelve a
+// necesitar el patrón, está acá. Lo de abajo es el texto ORIGINAL.
+// ─────────────────────────────────────────────────────────────────────────────
+//
 // Escribir `cliente_codigo` MIENTRAS esa columna todavía no existe.
 //
 // La usan `directorio_clientes` y `cheques`: las dos estrenan la misma columna

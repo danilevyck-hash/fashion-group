@@ -3,7 +3,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { getCompany } from "@/lib/companies";
 import { construirFilaCheque } from "@/lib/cheques-fila";
-import { guardarTolerandoColumnaNueva } from "@/lib/clientes/columna-codigo-opcional";
 
 const CHEQUES_ROLES = ["admin", "secretaria"];
 
@@ -53,14 +52,18 @@ export async function POST(req: NextRequest) {
   // sin default y el formulario no lo captura — dejarlo fuera del INSERT es lo
   // que rompió el guardado durante 3 meses y medio (23502). Ver el encabezado
   // de ese archivo.
-  // `cliente_codigo` es la columna nueva y el DDL lo corre Daniel a mano: si
-  // todavía no existe se guarda el cheque SIN el vínculo en vez de fallar
-  // entero. Un cheque que no se puede guardar es plata que no queda registrada.
-  const { data, error, sinColumna } = await guardarTolerandoColumnaNueva(
-    construirFilaCheque({ cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor, cliente_codigo }),
-    (campos) => supabaseServer.from("cheques").insert(campos).select().single(),
-  );
+  // Historia (ago-2026): `cliente_codigo` era la columna nueva y, si el INSERT
+  // fallaba nombrándola (PGRST204/42703), se reintentaba SIN el vínculo y se
+  // avisaba con `_falta_migracion_codigo`. Tolerancia retirada el 3-sep-2026: la
+  // columna existe desde 20260808190000_cheques_cliente_codigo.sql (verificado en
+  // producción). Hoy un error es un error: guardar el cheque sin su cliente y
+  // seguir sería registrar plata a nombre de nadie sin que nadie se entere.
+  const { data, error } = await supabaseServer
+    .from("cheques")
+    .insert(construirFilaCheque({ cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor, cliente_codigo }))
+    .select()
+    .single();
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
-  return NextResponse.json(sinColumna ? { ...data, _falta_migracion_codigo: true } : data);
+  return NextResponse.json(data);
 }

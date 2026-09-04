@@ -45,30 +45,36 @@ async function fetchOrder(marca: string, orderId: string): Promise<OrderRow | nu
   const cfg = MARCAS_CONFIG[marca];
   const db = await cfg.db();
   const itemCols = `product_id, sku, name, quantity, unit_price${marca === "reebok" ? ", is_preorder" : ""}`;
-  // cliente/vendedor_switch_id pueden no existir aún (DDL 20260705120000
-  // pendiente) → reintentar sin esas columnas (modo legacy). `origen_short_id`
-  // existe en las 4 marcas, pero se pide en el MISMO escalón tolerante: si
-  // faltara, el pedido se lee igual y se trata como interno.
-  for (const withIds of [true, false]) {
-    const cols = `id, order_number, client_name, status${withIds ? ", cliente_switch_id, vendedor_switch_id, origen_short_id" : ""}, ${cfg.itemsRelation}(${itemCols})`;
-    const { data, error } = await db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
-    if (!error && data) {
-      const row = data as unknown as Record<string, unknown>;
-      return {
-        id: String(row.id),
-        order_number: String(row.order_number),
-        client_name: (row.client_name as string) ?? null,
-        status: String(row.status),
-        cliente_switch_id: (row.cliente_switch_id as number) ?? null,
-        vendedor_switch_id: (row.vendedor_switch_id as number) ?? null,
-        origen_original: (row.origen_original as string) ?? null,
-        origen_short_id: (row.origen_short_id as string) ?? null,
-        items: (row[cfg.itemsRelation] as EnvioItem[]) ?? [],
-      };
+  // Historia (jul-2026): `cliente_switch_id`/`vendedor_switch_id` podían no
+  // existir (DDL 20260705120000 pendiente) y se releía SIN esas columnas, en
+  // "modo legacy", ante cualquier error que mencionara una columna. Tolerancia
+  // retirada el 3-sep-2026: las tres columnas existen en las 4 marcas
+  // (20260705120000_orders_cliente_vendedor_switch.sql; verificado en
+  // producción). Hoy un error de lectura es un error: releer sin las columnas
+  // mandaría el pedido a Switch SIN su cliente ni su vendedor y nadie se
+  // enteraría — justo lo que "el cliente se elige, nunca viene puesto" prohíbe.
+  const cols = `id, order_number, client_name, status, cliente_switch_id, vendedor_switch_id, origen_short_id, ${cfg.itemsRelation}(${itemCols})`;
+  const { data, error } = await db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
+  if (error || !data) {
+    // PGRST116 = cero filas para `.single()`: ese sí es "no existe el pedido".
+    // Cualquier otro error se LANZA: un permiso o un timeout no es un 404.
+    if (error && error.code !== "PGRST116") {
+      throw new Error(`pedido ${orderId}: ${error.message}`);
     }
-    if (error && !/cliente_switch_id|vendedor_switch_id|origen_short_id|column/i.test(error.message)) return null;
+    return null;
   }
-  return null;
+  const row = data as unknown as Record<string, unknown>;
+  return {
+    id: String(row.id),
+    order_number: String(row.order_number),
+    client_name: (row.client_name as string) ?? null,
+    status: String(row.status),
+    cliente_switch_id: (row.cliente_switch_id as number) ?? null,
+    vendedor_switch_id: (row.vendedor_switch_id as number) ?? null,
+    origen_original: (row.origen_original as string) ?? null,
+    origen_short_id: (row.origen_short_id as string) ?? null,
+    items: (row[cfg.itemsRelation] as EnvioItem[]) ?? [],
+  };
 }
 
 export async function handleGetEnvio(req: NextRequest, marca: string, orderId: string): Promise<NextResponse> {
@@ -76,33 +82,23 @@ export async function handleGetEnvio(req: NextRequest, marca: string, orderId: s
   if (auth instanceof NextResponse) return auth;
   const cfg = MARCAS_CONFIG[marca];
   const db = await cfg.db();
-  // `documento` (pedido | cotización) puede no existir todavía — DDL
-  // 20260824120000. Se pide en un escalón tolerante, igual que
-  // cliente/vendedor_switch_id en fetchOrder: sin la columna el envío se lee
-  // igual y la pantalla lo trata como pedido, que es lo que era.
-  const columnasBase = "estado, pedido_switch_id, numero_interno, error_detalle, created_at, updated_at";
-  let leido = await db
+  // Historia (ago-2026): `documento` (pedido | cotización) podía no existir
+  // (DDL 20260824120000 pendiente) y se releía sin la columna; y si la tabla de
+  // envíos entera faltaba (Joybees estrenó la suya en 20260705110000) se
+  // respondía `{ envio: null, ddlPendiente: true }`. Tolerancia retirada el
+  // 3-sep-2026: las 4 tablas de envíos existen y todas tienen `documento`
+  // (20260824160000_switch_envios_documento.sql; verificado en producción).
+  // Hoy cualquier error de esta lectura es un 500: responder "sin envío" ante un
+  // permiso o un timeout le diría a la pantalla que el pedido nunca se mandó.
+  const { data, error } = await db
     .from(cfg.enviosTable)
-    .select(`${columnasBase}, documento`)
+    .select("estado, pedido_switch_id, numero_interno, error_detalle, created_at, updated_at, documento")
     .eq("order_id", orderId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (leido.error && /documento|column/i.test(leido.error.message || "")) {
-    leido = await db
-      .from(cfg.enviosTable)
-      .select(columnasBase)
-      .eq("order_id", orderId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-  }
-  const { data, error } = leido;
   if (error) {
-    // Tabla de envíos ausente (DDL pendiente en Joybees) → sin envío.
-    if (/PGRST205|does not exist|could not find the table/i.test(`${error.code} ${error.message}`)) {
-      return NextResponse.json({ envio: null, ddlPendiente: true });
-    }
+    console.error(`[enviar-switch ${marca}] envío de ${orderId}:`, error.message);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
   return NextResponse.json({ envio: data ?? null });
@@ -133,7 +129,13 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
     documento = normalizarDocumento(body?.documento);
   } catch { /* body vacío = envío real */ }
 
-  const order = await fetchOrder(marca, orderId);
+  let order: OrderRow | null;
+  try {
+    order = await fetchOrder(marca, orderId);
+  } catch (e) {
+    console.error(`[enviar-switch ${marca}]`, e);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
   if (!order) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
   if (order.status !== "confirmado") {
     return NextResponse.json({ error: "Solo se pueden enviar a Switch pedidos confirmados" }, { status: 400 });

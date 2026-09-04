@@ -159,6 +159,11 @@ describe("GET /api/cheques/frecuencias — los más usados salen de CHEQUES", ()
   });
 });
 
+// ⚠️ Cambio de dirección (3-sep-2026): la tolerancia a la DDL se retiró —
+// `cheque_vendedores` existe desde 20260727160000. El GET SIGUE devolviendo los
+// de siempre ante cualquier error (el vendedor es obligatorio y el formulario no
+// puede quedar sin poder guardar), pero ahora lo LOGUEA; el POST ya no distingue
+// "tabla ausente" y responde 500 como cualquier otro error.
 describe("GET/POST /api/cheques/vendedores — la lista compartida falla blanda", () => {
   const TABLA_AUSENTE = { code: "PGRST205", message: "Could not find the table 'public.cheque_vendedores' in the schema cache" };
 
@@ -170,15 +175,19 @@ describe("GET/POST /api/cheques/vendedores — la lista compartida falla blanda"
     expect(d).toEqual({ vendedores: ["Edwin", "Rey"], fuente: "db" });
   });
 
-  it("SIN el DDL corrido responde 200 con los de siempre, no un error", async () => {
+  it("con un error de la base (PGRST205 incluido) responde 200 con los de siempre — y lo LOGUEA", async () => {
     mockFrom.mockReturnValue({
       select: () => ({ eq: () => ({ order: async () => ({ data: null, error: TABLA_AUSENTE }) }) }),
     });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await getVendedores(req("/api/cheques/vendedores"));
     // Si esto fuera un 503, el desplegable quedaría vacío y el vendedor es
-    // obligatorio: no se podría guardar ningún cheque hasta correr el SQL.
+    // obligatorio: no se podría guardar ningún cheque. Pero el error ya no se
+    // traga en silencio como "todavía no corrió el SQL".
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ vendedores: VENDEDORES_POR_DEFECTO, fuente: "local" });
+    expect(err).toHaveBeenCalledWith(expect.stringContaining("[api/cheques/vendedores] GET"), expect.stringContaining("cheque_vendedores"));
+    err.mockRestore();
   });
 
   it("agrega un vendedor nuevo", async () => {
@@ -188,11 +197,18 @@ describe("GET/POST /api/cheques/vendedores — la lista compartida falla blanda"
     expect((await res.json()).nombre).toBe("Julio");
   });
 
-  it("agregar SIN el DDL corrido avisa que todavía es local (503), no un error feo", async () => {
+  it("agregar con PGRST205 es un 500 con mensaje (antes: 503 'todavía es local')", async () => {
+    // Con la tabla puesta, "no existe" es un permiso, un timeout o un cambio de
+    // esquema: decirle a la persona que "todavía no está activa" sería mentir.
     mockFrom.mockReturnValue({ insert: async () => ({ error: TABLA_AUSENTE }) });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await postVendedor(req("/api/cheques/vendedores", { method: "POST", body: { nombre: "Julio" } }));
-    expect(res.status).toBe(503);
-    expect((await res.json()).fuente).toBe("local");
+    expect(res.status).toBe(500);
+    const d = await res.json();
+    expect(d.error).toBe("No se pudo agregar. Intenta de nuevo.");
+    expect(d.fuente).toBeUndefined();
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
   });
 
   it("un vendedor repetido no es un error para el usuario", async () => {

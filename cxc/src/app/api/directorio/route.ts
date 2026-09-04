@@ -9,7 +9,6 @@ import {
   textoObligatorio,
   validarObligatorios,
 } from "@/lib/campos-obligatorios";
-import { guardarTolerandoColumnaNueva } from "@/lib/clientes/columna-codigo-opcional";
 
 const DIRECTORIO_ROLES = ["admin", "secretaria", "contabilidad", "vendedor"];
 
@@ -108,15 +107,22 @@ export async function POST(req: NextRequest) {
   // WhatsApp del formulario del catálogo era un control MUERTO — se escribía, se
   // mandaba, y no se guardaba nunca. Ahora entra como el resto.
   const { empresa, telefono, celular, correo, contacto, notas, whatsapp, cliente_codigo } = body;
-  const { data, error, sinColumna } = await guardarTolerandoColumnaNueva(
-    {
+  // Historia (ago-2026): si el INSERT fallaba nombrando `cliente_codigo`
+  // (PGRST204/42703) se reintentaba SIN el vínculo y se avisaba con
+  // `_falta_migracion_codigo`. Tolerancia retirada el 3-sep-2026: la columna
+  // existe desde 20260808180000_directorio_clientes_codigo.sql (verificado en
+  // producción). Hoy el error se propaga con su `code`, que es lo que
+  // `respuestaErrorEscritura` necesita para decir qué pasó.
+  const { data, error } = await supabaseServer
+    .from("directorio_clientes")
+    .insert({
       nombre: textoObligatorio(body.nombre),
       empresa, telefono, celular, correo, contacto, notas, whatsapp,
       cliente_codigo: cliente_codigo ?? null,
-    },
-    (campos) => supabaseServer.from("directorio_clientes").insert(campos).select().single(),
-  );
+    })
+    .select()
+    .single();
 
   if (error) return respuestaErrorEscritura(error, { tabla: "directorio_clientes", accion: "Clientes › crear cliente" });
-  return NextResponse.json(sinColumna ? { ...data, _falta_migracion_codigo: true } : data);
+  return NextResponse.json(data);
 }

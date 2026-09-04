@@ -4,7 +4,6 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { CAMPOS_OBLIGATORIOS, respuestaErrorEscritura, validarObligatorios } from "@/lib/campos-obligatorios";
-import { guardarTolerandoColumnaNueva } from "@/lib/clientes/columna-codigo-opcional";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,18 +41,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
   const nombre = cambios.nombre;
 
-  const { data, error, sinColumna } = await guardarTolerandoColumnaNueva(cambios, (campos) =>
-    supabaseServer.from("directorio_clientes").update(campos).eq("id", params.id).select().single(),
-  );
+  // Sin reintento "sin `cliente_codigo`" (tolerancia a DDL retirada el
+  // 3-sep-2026): la columna existe desde 20260808180000. Un error es un error.
+  const { data, error } = await supabaseServer
+    .from("directorio_clientes")
+    .update(cambios)
+    .eq("id", params.id)
+    .select()
+    .single();
   if (error) return respuestaErrorEscritura(error, { tabla: "directorio_clientes", accion: "Clientes › editar cliente" });
 
   const session = getSession(req);
   await logActivity(session?.role || "unknown", "directorio_update", "directorio", { clienteId: params.id, nombre }, session?.userName);
 
-  // `sinColumna` = se guardó todo lo demás pero el vínculo NO, porque la
-  // migración todavía no corrió. La pantalla lo dice con todas las letras en vez
-  // de mostrar un cliente vinculado que en la base no lo está.
-  return NextResponse.json(sinColumna ? { ...data, _falta_migracion_codigo: true } : data);
+  return NextResponse.json(data);
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

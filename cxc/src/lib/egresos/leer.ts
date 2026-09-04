@@ -4,10 +4,19 @@
  * dieran números distintos Daniel no dejaría de creerle a la que está mal —
  * dejaría de creerle a las dos.
  *
- * 🔴 DEGRADACIÓN LIMPIA. La migración `20260813120000_egresos_varios.sql` la
- * corre Daniel A MANO. Mientras las tablas no existan se devuelve
- * `{ instalado: false, empresas: [] }` — nunca un 500, y nunca un $0 (que es la
- * mentira que este módulo entero existe para no decir).
+ * 🔴 NUNCA UN $0 — es la mentira que este módulo entero existe para no decir.
+ * Esta lectura o trae los renglones, o revienta; quien la llama decide cómo
+ * decirlo.
+ *
+ * Historia (ago-2026): DEGRADABA LIMPIO — mientras la migración
+ * `20260813120000_egresos_varios.sql` no corriera, una sonda previa reconocía
+ * "esa tabla no existe" y devolvía `{ instalado: false, empresas: [] }`.
+ * Tolerancia retirada el 3-sep-2026: las tablas existen desde esa migración
+ * (verificado en producción). Hoy un "no existe" es un permiso, un timeout o un
+ * cambio de esquema, y se propaga como cualquier otro error: leerlo como
+ * "todavía no instalado" dejaba la pantalla de Gastos vacía y tranquila.
+ * `instalado` se conserva en la respuesta (siempre `true`) porque la pantalla y
+ * Vista General lo leen; retirarlo de ahí es cosa de otra tanda.
  *
  * 🔴 PAGINADO. `db-max-rows` de PostgREST es 1000 y corta EN SILENCIO. Vistana
  * sola hace ~380 egresos al año y las 8 empresas juntas pueden pasar las mil en
@@ -23,7 +32,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { montoACentavos } from "@/lib/contable/csv";
-import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { empresasConEgresosEnCron } from "@/lib/switch-api/empresas";
 import { leerNombresDeCuentas, type NombresPorEmpresa } from "@/lib/cuentas/leer";
 import type { EgresoLinea } from "./parser";
@@ -54,7 +62,8 @@ export interface EmpresaEgresos {
 }
 
 export interface LecturaEgresos {
-  /** `false` mientras la migración de egresos no haya corrido. */
+  /** Siempre `true` desde el 3-sep-2026 (ver el encabezado): se conserva
+   *  porque la pantalla y Vista General lo leen. */
   instalado: boolean;
   mes: string;
   empresas: EmpresaEgresos[];
@@ -107,16 +116,8 @@ function aEgresoLinea(r: EgresoRow): EgresoLinea {
  * vez de omitirla en silencio.
  */
 export async function leerEgresosMes(mes: string): Promise<LecturaEgresos> {
-  const vacio: LecturaEgresos = { instalado: false, mes, empresas: [] };
-
-  // Sonda barata ANTES de paginar nada: acá sí llega el `code` de PostgREST,
-  // que es la señal más precisa de "la migración todavía no corrió".
-  const sonda = await supabaseServer.from("egresos_varios").select("id").limit(1);
-  if (sonda.error) {
-    if (esTablaAusente(sonda.error)) return vacio;
-    throw new Error(sonda.error.message);
-  }
-
+  // Sin sonda previa (tolerancia a DDL retirada el 3-sep-2026): la primera
+  // lectura que falle revienta con el mensaje de PostgREST.
   const [importaciones, delMes, mesesConMovimiento] = await Promise.all([
     // Qué rangos se le pidieron a Switch. Es lo único que distingue "se pidió y
     // no hubo movimientos" de "nunca se trajo".

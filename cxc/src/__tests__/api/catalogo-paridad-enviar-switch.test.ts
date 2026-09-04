@@ -97,14 +97,22 @@ describe("GET enviar-switch — estado del envío", () => {
     expect(await res.json()).toEqual({ envio: null });
   });
 
-  it("tabla de envíos ausente (DDL pendiente) → {envio:null, ddlPendiente:true}", async () => {
+  // ⚠️ Cambio de dirección (3-sep-2026): antes un PGRST205 daba
+  // `{envio:null, ddlPendiente:true}`. La tolerancia se retiró — las 4 tablas de
+  // envíos existen (Joybees desde 20260705110000) — y hoy es un 500: decir "sin
+  // envío" ante un permiso o un timeout le diría a la pantalla que el pedido
+  // nunca se mandó.
+  it("tabla de envíos 'ausente' (PGRST205) → 500, no {envio:null, ddlPendiente:true}", async () => {
     joybeesDb.queue("joybees_switch_envios", {
       data: null,
       error: { code: "PGRST205", message: "could not find the table" },
     });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await jEnvioGet(makeReq("/x", { role: "admin" }), { params: { id: OID } });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ envio: null, ddlPendiente: true });
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Error interno" });
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
   });
 
   it("passthrough del último envío", async () => {
@@ -125,7 +133,9 @@ describe("GET enviar-switch — estado del envío", () => {
 
 describe("POST enviar-switch — validaciones previas al motor", () => {
   it("404 pedido inexistente", async () => {
-    reebokDb.queue("reebok_orders", { data: null, error: { message: "no rows" } });
+    // PGRST116 es lo que devuelve `.single()` con cero filas; cualquier OTRO
+    // error ya no es un 404 (ver el test siguiente).
+    reebokDb.queue("reebok_orders", { data: null, error: { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned" } });
     const res = await rEnvioPost(makeReq("/x", { method: "POST", role: "admin" }), {
       params: { id: OID },
     });
@@ -142,6 +152,21 @@ describe("POST enviar-switch — validaciones previas al motor", () => {
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toContain("confirmados");
+  });
+
+  it("un error REAL leyendo el pedido (PGRST205 incluido) es un 500, no un 404 (tolerancia a DDL retirada 3-sep-2026)", async () => {
+    // Antes: el `fetchOrder` releía "sin columnas" si el mensaje nombraba una
+    // columna, y devolvía null (→ 404) ante cualquier otro error. Hoy la única
+    // lectura va CON cliente/vendedor_switch_id, y un error se propaga.
+    reebokDb.queue("reebok_orders", { data: null, error: { code: "PGRST205", message: "Could not find the table 'public.reebok_orders' in the schema cache" } });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await rEnvioPost(makeReq("/x", { method: "POST", role: "admin" }), {
+      params: { id: OID },
+    });
+    expect(res.status).toBe(500);
+    expect(mockEnviar).not.toHaveBeenCalled();
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
   });
 
   it("400 si el pedido no tiene items", async () => {

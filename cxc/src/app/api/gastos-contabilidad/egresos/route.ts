@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { leerEgresosMes } from "@/lib/egresos/leer";
 import { lineaDeNoLeidos } from "@/lib/rechazos-de-switch";
 import { mesEgresosValido } from "@/lib/egresos/reglas";
@@ -22,10 +21,15 @@ export const dynamic = "force-dynamic";
  * la misma forma (no hay estado "cerrado", no hay ISR, y hay renglones que no
  * son gasto), así que forzarlas al mismo tipo perdería información.
  *
- * 🔴 DEGRADACIÓN LIMPIA: la migración `20260813120000_egresos_varios.sql` la
- * corre Daniel A MANO. Mientras las tablas no existan, esta ruta responde **200**
- * con `{ instalado: false, empresas: [] }`. Un 500 dejaría la pantalla rota; así
- * se ve entera, con su cartel.
+ * Historia (ago-2026): DEGRADABA LIMPIO — mientras la migración
+ * `20260813120000_egresos_varios.sql` no corriera, respondía **200** con
+ * `{ instalado: false, empresas: [] }` y la pantalla ponía su cartel. Tolerancia
+ * retirada el 3-sep-2026: las tablas existen desde esa migración (verificado en
+ * producción). Hoy un "no existe esa tabla" es un permiso, un timeout o un
+ * cambio de esquema, y CUALQUIER error sale como 500 con el mensaje humano del
+ * módulo — nunca como una pantalla vacía y tranquila que dice "todavía no está
+ * instalado" sobre un SQL que ya corrió. `instalado` sigue viajando (siempre
+ * `true`) porque la pantalla y Vista General lo leen.
  */
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "contabilidad"]);
@@ -55,12 +59,8 @@ export async function GET(req: NextRequest) {
     const respuesta: RespuestaEgresos = { ...body, avisoNoLeidos };
     return NextResponse.json(respuesta);
   } catch (e) {
-    // El truncado de PostgREST y la tabla ausente llegan acá como Error; sólo la
-    // segunda es "todavía no instalado". Todo lo demás es un error de verdad.
-    if (esTablaAusente(e)) {
-      const noInstalado: RespuestaEgresos = { instalado: false, mes, empresas: [] };
-      return NextResponse.json(noInstalado);
-    }
+    // El truncado de PostgREST y cualquier error de la base llegan acá como
+    // Error, y todos son errores de verdad (tolerancia a DDL retirada).
     console.error("[gastos-contabilidad/egresos]", e);
     return NextResponse.json(
       { error: "No se pudo cargar la información. Intenta de nuevo en unos segundos." },

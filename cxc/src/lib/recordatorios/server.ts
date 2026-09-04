@@ -2,16 +2,21 @@
  * RECORDATORIOS — el I/O. Todo lo que decide CUÁNDO toca uno vive en
  * `recordatorio.ts` (puro); acá solo está el viaje a la base.
  *
- * ⚠️ **DEGRADA SIN LA MIGRACIÓN CORRIDA**, igual que `asistencia/correcciones-
- * server.ts`: en este proyecto los DDL los corre Daniel a mano y varios se
- * quedaron pendientes semanas. Si la pantalla se cayera hasta que alguien corra
- * el SQL, el síntoma sería «Cheques está roto» — y encima sobre una pantalla que
- * hoy funciona perfectamente sin esta tabla. Sin la tabla: CERO recordatorios,
- * o sea la pantalla de cheques de siempre, con un aviso en ÁMBAR (no rojo: rojo
- * se lee como que algo se rompió) diciendo qué archivo falta.
+ * Historia (ago-2026): DEGRADABA SIN LA MIGRACIÓN CORRIDA, igual que
+ * `asistencia/correcciones-server.ts`: si el error NOMBRABA la tabla
+ * (`esTablaRecordatoriosFaltante`), la lectura devolvía CERO recordatorios con
+ * `faltaMigracion: true` y las escrituras `{ ok: false, faltaMigracion: true }`,
+ * para que Cheques siguiera funcionando con un aviso en ámbar.
  *
- * 🔴 Y la degradación solo ocurre cuando el error NOMBRA la tabla. Ver
- * `esTablaRecordatoriosFaltante`.
+ * Tolerancia retirada el 3-sep-2026: la tabla existe desde
+ * 20260824120000_recordatorios.sql (verificado en producción). Hoy CUALQUIER
+ * error de la base se propaga —la lectura LANZA, las escrituras devuelven
+ * `{ ok: false, error }`—: con la tabla puesta, un "no existe" es un permiso, un
+ * timeout o un cambio de esquema, y leerlo como "falta la migración" dejaba la
+ * pantalla de cheques normal y vacía mientras los avisos dejaban de sonar.
+ * `faltaMigracion` se conserva en la LECTURA (siempre `false`) porque
+ * `cheques/page.tsx`, `ChequesClient` y `cheques-alert.ts` lo leen; retirarlo
+ * de ahí es cosa de otra tanda. `recordatorio.ts` (puro) conserva el detector.
  */
 
 import { supabaseServer } from "@/lib/supabase-server";
@@ -19,7 +24,6 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   TABLA_RECORDATORIOS,
   esRepeticion,
-  esTablaRecordatoriosFaltante,
   type Recordatorio,
   type RecordatorioNuevo,
 } from "./recordatorio";
@@ -56,7 +60,8 @@ function aRecordatorio(f: Fila): Recordatorio {
 
 export interface RecordatoriosLeidos {
   recordatorios: Recordatorio[];
-  /** `true` = la tabla todavía no existe. Se sigue con CERO recordatorios. */
+  /** Siempre `false` desde el 3-sep-2026 (ver el encabezado). Se conserva
+   *  porque la pantalla de cheques y el aviso de Telegram lo leen. */
   faltaMigracion: boolean;
 }
 
@@ -72,45 +77,24 @@ export interface RecordatoriosLeidos {
  * o sea, un aviso que deja de sonar sin un solo error.
  */
 export async function leerRecordatorios(): Promise<RecordatoriosLeidos> {
-  try {
-    const filas = await leerTodoPaginado<Fila>(
-      `${TABLA_RECORDATORIOS} (todos)`,
-      (pedirCount, from, to) =>
-        supabaseServer
-          .from(TABLA_RECORDATORIOS)
-          .select(COLS, pedirCount ? { count: "exact" } : {})
-          .eq("deleted", false)
-          .order("fecha", { ascending: true })
-          .order("id", { ascending: true })
-          .range(from, to),
-    );
-    return { recordatorios: filas.map(aRecordatorio), faltaMigracion: false };
-  } catch (e) {
-    if (esTablaRecordatoriosFaltante(errorDeLectura(e))) {
-      return { recordatorios: [], faltaMigracion: true };
-    }
-    throw e;
-  }
-}
-
-/**
- * 🩸 `leerTodoPaginado` envuelve el error de PostgREST en un `Error` con su
- * etiqueta delante y pierde el `code`. **Se le quita la etiqueta PRIMERO**, y no
- * es cosmético: la etiqueta lleva el nombre de la tabla adentro, así que dejarla
- * haría que CUALQUIER error de esta lectura —una caída de red, un timeout—
- * pasara el «¿nombra la tabla?» y quedara a un paso de leerse como «falta la
- * migración». Quitándola, el nombre tiene que venir del mensaje de PostgREST,
- * que es quien sabe la verdad.
- */
-function errorDeLectura(e: unknown): { message: string } {
-  const crudo = e instanceof Error ? e.message : String(e);
-  return { message: crudo.replace(`${TABLA_RECORDATORIOS} (todos): `, "") };
+  // Sin `try/catch` (tolerancia a DDL retirada): un error de la lectura LANZA.
+  const filas = await leerTodoPaginado<Fila>(
+    `${TABLA_RECORDATORIOS} (todos)`,
+    (pedirCount, from, to) =>
+      supabaseServer
+        .from(TABLA_RECORDATORIOS)
+        .select(COLS, pedirCount ? { count: "exact" } : {})
+        .eq("deleted", false)
+        .order("fecha", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+  );
+  return { recordatorios: filas.map(aRecordatorio), faltaMigracion: false };
 }
 
 export type Escritura =
   | { ok: true; recordatorio: Recordatorio }
-  | { ok: false; faltaMigracion: true }
-  | { ok: false; faltaMigracion: false; error: string };
+  | { ok: false; error: string };
 
 export async function crearRecordatorio(
   nuevo: RecordatorioNuevo,
@@ -150,7 +134,7 @@ export async function actualizarRecordatorio(
     .select(COLS)
     .maybeSingle();
   if (error) return fallo(error);
-  if (!data) return { ok: false, faltaMigracion: false, error: "Ese recordatorio ya no existe." };
+  if (!data) return { ok: false, error: "Ese recordatorio ya no existe." };
   return { ok: true, recordatorio: aRecordatorio(data as unknown as Fila) };
 }
 
@@ -167,12 +151,11 @@ export async function borrarRecordatorio(id: string): Promise<Escritura | { ok: 
     .select("id")
     .maybeSingle();
   if (error) return fallo(error);
-  if (!data) return { ok: false, faltaMigracion: false, error: "Ese recordatorio ya no existe." };
+  if (!data) return { ok: false, error: "Ese recordatorio ya no existe." };
   return { ok: true };
 }
 
 function fallo(error: unknown): Escritura {
-  if (esTablaRecordatoriosFaltante(error)) return { ok: false, faltaMigracion: true };
   const e = error as { message?: string };
-  return { ok: false, faltaMigracion: false, error: e.message ?? "Error interno" };
+  return { ok: false, error: e.message ?? "Error interno" };
 }

@@ -271,6 +271,15 @@ describe("esFuncionAusente — estrecho a propósito", () => {
     expect(esFuncionAusente({ message: "fetch failed" })).toBe(false);
     expect(esFuncionAusente(null)).toBe(false);
   });
+
+  it("🩸 un 'does not exist' de TABLA no es 'no existe la función' (3-sep-2026)", () => {
+    // Hasta hoy este bloque nunca le pasó un error de tabla, y el helper
+    // matcheaba cualquier "does not exist": un `relation … does not exist`
+    // caía al camino paginado (48 consultas) en vez de propagarse.
+    expect(esFuncionAusente({ code: "42P01", message: 'relation "switch_articulo_info" does not exist' })).toBe(false);
+    expect(esFuncionAusente({ code: "PGRST205", message: "Could not find the table 'public.x' in the schema cache" })).toBe(false);
+    expect(esFuncionAusente({ code: "42703", message: "column x.y does not exist" })).toBe(false);
+  });
 });
 
 describe("los nombres de las RPC son los de la migración", () => {

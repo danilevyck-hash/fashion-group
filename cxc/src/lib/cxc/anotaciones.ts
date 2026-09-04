@@ -14,30 +14,24 @@
  * BARRIDO por `src/` que pone el build ROJO si cualquier otro archivo toca esas
  * tres tablas. Un camino nuevo nace vigilado.
  *
- * ─── LA DEGRADACIÓN, Y POR QUÉ NO ES SIMÉTRICA ──────────────────────────────
- * La columna `cartera` la agrega un DDL que corre Daniel A MANO, así que la app
- * tiene que funcionar ANTES. Sin la columna:
+ * ─── HISTORIA: LA DEGRADACIÓN QUE HUBO, Y POR QUÉ YA NO ────────────────────
+ * La columna `cartera` la agregó un DDL que corrió Daniel A MANO
+ * (20260813120000_cxc_anotaciones_por_cartera.sql), y mientras no existiera cada
+ * consulta se reintentaba SIN la columna: el grupo leía/escribía como antes
+ * (las 151 filas que había eran todas suyas) y Boston fallaba con un mensaje
+ * claro (`CarteraNoDisponibleError`) para no escribir en el namespace
+ * compartido.
  *
- *   · **grupo** → se lee/escribe como HOY (sin filtro, sin columna). Es exacto,
- *     no es una aproximación: medido en producción el 13-ago-2026, las 151
- *     filas que existen son TODAS del grupo — `cxc_favorites` está en 0 filas, y
- *     las 10 de overrides + 141 de contact_log se escribieron entre el 22-mar y
- *     el 16-abr-2026, meses ANTES de que existiera la pestaña de Boston
- *     (`BostonTab.tsx`, 28-jul-2026), que además nunca tuvo un camino de
- *     escritura (`/api/cxc/boston` solo exporta GET).
- *
- *   · **boston** → lee VACÍO y escribir FALLA con un mensaje claro. 🔴 Escribir
- *     igual metería la nota de Boston en el namespace compartido, o sea la haría
- *     aparecer en el grupo: exactamente lo que Daniel prohibió. Entre no guardar
- *     y guardar en la cartera equivocada, no se guarda.
+ * Tolerancia retirada el 3-sep-2026: la columna existe en las tres tablas
+ * (verificado en producción). Hoy TODA consulta lleva la cartera y un error
+ * —cualquiera— se propaga con su `code` intacto. Reintentar sin la columna, con
+ * la columna puesta, sería la puerta para que un permiso o un timeout metieran
+ * una nota del grupo sin cartera o leyeran la de Boston sin filtro: lo que
+ * Daniel prohibió. `cartera.ts` (puro) conserva el detector y el error por si
+ * otra tanda los necesita; acá ya no se usan.
  */
 import { supabaseServer } from "@/lib/supabase-server";
-import {
-  CARTERA_GRUPO,
-  CarteraNoDisponibleError,
-  esErrorSinColumnaCartera,
-  type Cartera,
-} from "./cartera";
+import type { Cartera } from "./cartera";
 
 export const TABLAS_ANOTACIONES = ["cxc_favorites", "cxc_client_overrides", "cxc_contact_log"] as const;
 
@@ -68,28 +62,8 @@ function comoError(err: ErrorPg | null, fallback: string): ErrorAnotacion {
   return new ErrorAnotacion(err?.message ?? fallback, err?.code);
 }
 
-/**
- * Corre `conCartera()`. Si falla porque la columna todavía no existe, corre
- * `sinCartera()` **solo para el grupo**; para cualquier otra cartera lanza
- * `CarteraNoDisponibleError`.
- */
+/** Lo que devuelve un builder de PostgREST (thenable, no promesa). */
 type Resultado<T> = { data: T | null; error: ErrorPg | null };
-
-/**
- * `PromiseLike` y no `Promise`: los builders de PostgREST son *thenables*, no
- * promesas. Pedir `Promise` obligaría a envolver cada consulta en un `await`
- * suelto, y ese envoltorio es donde se cuela un `.eq("cartera", …)` olvidado.
- */
-async function conDegradacion<T>(
-  cartera: Cartera,
-  conCartera: () => PromiseLike<Resultado<T>>,
-  sinCartera: () => PromiseLike<Resultado<T>>,
-): Promise<Resultado<T>> {
-  const primero = await conCartera();
-  if (!esErrorSinColumnaCartera(primero.error)) return primero;
-  if (cartera !== CARTERA_GRUPO) throw new CarteraNoDisponibleError(cartera);
-  return await sinCartera();
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FAVORITOS (la estrella ⭐, por usuario)
@@ -97,16 +71,11 @@ async function conDegradacion<T>(
 
 /** Nombres marcados como favoritos por `userId` EN ESA CARTERA. */
 export async function leerFavoritos(cartera: Cartera, userId: string): Promise<string[]> {
-  const { data, error } = await conDegradacion<{ nombre_normalized: string }[]>(
-    cartera,
-    () =>
-      supabaseServer
-        .from("cxc_favorites")
-        .select("nombre_normalized")
-        .eq("user_id", userId)
-        .eq("cartera", cartera),
-    () => supabaseServer.from("cxc_favorites").select("nombre_normalized").eq("user_id", userId),
-  );
+  const { data, error }: Resultado<{ nombre_normalized: string }[]> = await supabaseServer
+    .from("cxc_favorites")
+    .select("nombre_normalized")
+    .eq("user_id", userId)
+    .eq("cartera", cartera);
   if (error) throw comoError(error, "Error al leer favoritos");
   return (data ?? []).map((r) => r.nombre_normalized);
 }
@@ -117,24 +86,13 @@ export async function alternarFavorito(
   userId: string,
   nombre: string,
 ): Promise<"added" | "removed"> {
-  const { data: existente, error: errLeer } = await conDegradacion<{ id: string }[]>(
-    cartera,
-    () =>
-      supabaseServer
-        .from("cxc_favorites")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("nombre_normalized", nombre)
-        .eq("cartera", cartera)
-        .limit(1),
-    () =>
-      supabaseServer
-        .from("cxc_favorites")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("nombre_normalized", nombre)
-        .limit(1),
-  );
+  const { data: existente, error: errLeer }: Resultado<{ id: string }[]> = await supabaseServer
+    .from("cxc_favorites")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("nombre_normalized", nombre)
+    .eq("cartera", cartera)
+    .limit(1);
   if (errLeer) throw comoError(errLeer, "Error al leer favoritos");
 
   const fila = existente?.[0];
@@ -144,14 +102,9 @@ export async function alternarFavorito(
     return "removed";
   }
 
-  const { error } = await conDegradacion<null>(
-    cartera,
-    () =>
-      supabaseServer
-        .from("cxc_favorites")
-        .insert({ user_id: userId, nombre_normalized: nombre, cartera }),
-    () => supabaseServer.from("cxc_favorites").insert({ user_id: userId, nombre_normalized: nombre }),
-  );
+  const { error } = await supabaseServer
+    .from("cxc_favorites")
+    .insert({ user_id: userId, nombre_normalized: nombre, cartera });
   if (error) throw comoError(error, "Error al guardar favorito");
   return "added";
 }
@@ -173,11 +126,10 @@ export interface OverrideCliente {
 
 /** Todos los datos de contacto de esa cartera. */
 export async function leerOverrides(cartera: Cartera): Promise<Record<string, unknown>[]> {
-  const { data, error } = await conDegradacion<Record<string, unknown>[]>(
-    cartera,
-    () => supabaseServer.from("cxc_client_overrides").select("*").eq("cartera", cartera),
-    () => supabaseServer.from("cxc_client_overrides").select("*"),
-  );
+  const { data, error }: Resultado<Record<string, unknown>[]> = await supabaseServer
+    .from("cxc_client_overrides")
+    .select("*")
+    .eq("cartera", cartera);
   if (error) throw comoError(error, "Error al leer contactos");
   return data ?? [];
 }
@@ -188,22 +140,16 @@ export async function leerOverrides(cartera: Cartera): Promise<Record<string, un
  * Es una SUGERENCIA (el destinatario que propone el modal de estado de cuenta),
  * así que nunca lanza: "no lo pude leer" y "no hay ninguno cargado" llevan al
  * mismo lugar — caer al correo del directorio. Lo que sí está prohibido es
- * devolver el de la OTRA cartera, y eso lo cubre `conDegradacion`.
+ * devolver el de la OTRA cartera: la consulta SIEMPRE filtra por `cartera`.
  */
 export async function leerCorreoDeOverride(cartera: Cartera, nombre: string): Promise<string | null> {
   try {
-    const { data, error } = await conDegradacion<{ correo: string | null }[]>(
-      cartera,
-      () =>
-        supabaseServer
-          .from("cxc_client_overrides")
-          .select("correo")
-          .eq("nombre_normalized", nombre)
-          .eq("cartera", cartera)
-          .limit(1),
-      () =>
-        supabaseServer.from("cxc_client_overrides").select("correo").eq("nombre_normalized", nombre).limit(1),
-    );
+    const { data, error }: Resultado<{ correo: string | null }[]> = await supabaseServer
+      .from("cxc_client_overrides")
+      .select("correo")
+      .eq("nombre_normalized", nombre)
+      .eq("cartera", cartera)
+      .limit(1);
     if (error) return null;
     return data?.[0]?.correo?.trim() || null;
   } catch {
@@ -223,19 +169,10 @@ export async function guardarOverride(
   fila: OverrideCliente,
 ): Promise<Record<string, unknown> | null> {
   const base = { ...fila, updated_at: fila.updated_at ?? new Date().toISOString() };
-  const { data, error } = await conDegradacion<Record<string, unknown>[]>(
-    cartera,
-    () =>
-      supabaseServer
-        .from("cxc_client_overrides")
-        .upsert({ ...base, cartera }, { onConflict: "cartera,nombre_normalized" })
-        .select(),
-    () =>
-      supabaseServer
-        .from("cxc_client_overrides")
-        .upsert(base, { onConflict: "nombre_normalized" })
-        .select(),
-  );
+  const { data, error }: Resultado<Record<string, unknown>[]> = await supabaseServer
+    .from("cxc_client_overrides")
+    .upsert({ ...base, cartera }, { onConflict: "cartera,nombre_normalized" })
+    .select();
   if (error) throw comoError(error, "Error al guardar contacto");
   return data?.[0] ?? null;
 }
@@ -246,32 +183,20 @@ export async function guardarOverride(
 
 /** Los últimos `limite` contactos anotados EN ESA CARTERA, del más nuevo al más viejo. */
 export async function leerContactLog(cartera: Cartera, limite = 2000): Promise<Record<string, unknown>[]> {
-  const { data, error } = await conDegradacion<Record<string, unknown>[]>(
-    cartera,
-    () =>
-      supabaseServer
-        .from("cxc_contact_log")
-        .select("*")
-        .eq("cartera", cartera)
-        .order("contacted_at", { ascending: false })
-        .limit(limite),
-    () =>
-      supabaseServer
-        .from("cxc_contact_log")
-        .select("*")
-        .order("contacted_at", { ascending: false })
-        .limit(limite),
-  );
+  const { data, error }: Resultado<Record<string, unknown>[]> = await supabaseServer
+    .from("cxc_contact_log")
+    .select("*")
+    .eq("cartera", cartera)
+    .order("contacted_at", { ascending: false })
+    .limit(limite);
   if (error) throw comoError(error, "Error al leer contactos");
   return data ?? [];
 }
 
 /** Anota un contacto de cobro EN ESA CARTERA. */
 export async function registrarContacto(cartera: Cartera, nombre: string, method: string): Promise<void> {
-  const { error } = await conDegradacion<null>(
-    cartera,
-    () => supabaseServer.from("cxc_contact_log").insert({ nombre_normalized: nombre, method, cartera }),
-    () => supabaseServer.from("cxc_contact_log").insert({ nombre_normalized: nombre, method }),
-  );
+  const { error } = await supabaseServer
+    .from("cxc_contact_log")
+    .insert({ nombre_normalized: nombre, method, cartera });
   if (error) throw comoError(error, "Error al registrar contacto");
 }

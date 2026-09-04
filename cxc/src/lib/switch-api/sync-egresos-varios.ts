@@ -56,7 +56,6 @@ import { particionarFilas } from "./monto-guard";
 import { ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { empresasConEgresosEnCron } from "./empresas";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { syncCuentasContables, type ResultadoCuentas } from "./sync-cuentas-contables";
 
 /**
@@ -382,19 +381,22 @@ export async function syncAllEgresos(
 }
 
 /**
- * ¿Ya corrió la DDL de egresos varios?
+ * ¿La base puede recibir egresos? Lanza si no.
  *
- * 🔴 SE PREGUNTA ANTES DE TOCAR SWITCH. La migración la corre Daniel A MANO, y
- * hasta entonces este sync no tiene dónde escribir. Sin este chequeo, el cron
+ * 🔴 SE PREGUNTA ANTES DE TOCAR SWITCH. Si no hay dónde escribir, el cron
  * abriría 8 sesiones web —expulsando a quien esté en el panel— para tirar todo a
- * la basura y anotarse 8 errores por día. Mismo patrón que `calvin-catalogo`:
- * mientras la DDL no corra, el cron se omite LIMPIO.
+ * la basura y anotarse 8 errores por día. Una consulta de una fila lo evita.
+ *
+ * Historia (ago-2026): se llamaba `egresosInstalado()` y devolvía `false` ante
+ * "esa tabla no existe" para que el cron se omitiera LIMPIO (503, sin heartbeat)
+ * mientras la migración `20260813120000_egresos_varios.sql` no corriera.
+ * Tolerancia retirada el 3-sep-2026: la tabla existe desde esa migración
+ * (verificado en producción). Hoy CUALQUIER error de esta sonda —incluido un
+ * "no existe", que con la tabla puesta es un permiso, un timeout o un cambio de
+ * esquema— se propaga y el cron queda en `ok:false`, que es lo que la regla 2 de
+ * alertas vigila; leerlo como "todavía no instalado" lo apagaría en silencio.
  */
-export async function egresosInstalado(): Promise<boolean> {
+export async function verificarBaseDeEgresos(): Promise<void> {
   const { error } = await supabaseServer.from("egresos_varios").select("id").limit(1);
-  if (!error) return true;
-  if (esTablaAusente(error)) return false;
-  // Un error que NO es "la tabla no existe" (timeout, permisos) no puede leerse
-  // como "todavía no está instalado": eso apagaría el cron en silencio.
-  throw new Error(error.message);
+  if (error) throw new Error(error.message);
 }

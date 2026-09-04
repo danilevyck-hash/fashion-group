@@ -323,25 +323,36 @@ describe("E. 🔴 LAS DOS FUENTES NO SE SUMAN — enero está en las dos", () =>
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("F. sin la DDL corrida, NO se toca Switch", () => {
-  it("el route pregunta si está instalado ANTES de sincronizar", () => {
+// ⚠️ Cambio de dirección (3-sep-2026). Este bloque se llamaba "sin la DDL
+// corrida, NO se toca Switch" y fijaba que un "esa tabla no existe" omitiera el
+// cron LIMPIO (503, sin heartbeat). La tolerancia se retiró: la tabla existe
+// desde 20260813120000 (verificado en producción). Lo que SE CONSERVA es la
+// sonda ANTES de tocar Switch — si la base no contesta, no se abren 8 sesiones—
+// pero hoy CUALQUIER error de la sonda es un 500 sin heartbeat, y `omitido` /
+// `esTablaAusente` no existen más en este camino.
+describe("F. si la base no contesta, NO se toca Switch — y ya no hay 'no instalado'", () => {
+  it("el route sondea la base ANTES de sincronizar", () => {
     // Desde el handler: en los imports el orden no significa nada.
     const handler = ROUTE.slice(ROUTE.indexOf("export async function GET"));
-    const iChequeo = handler.indexOf("egresosInstalado");
+    const iChequeo = handler.indexOf("verificarBaseDeEgresos");
     const iSync = handler.indexOf("syncAllEgresos");
     expect(iChequeo).toBeGreaterThan(-1);
     expect(iChequeo).toBeLessThan(iSync);
   });
 
-  it("si no está instalado responde 503 y NO registra heartbeat", () => {
-    expect(ROUTE).toMatch(/if \(!instalado\)[\s\S]{0,400}status: 503/);
-    const bloque = ROUTE.slice(ROUTE.indexOf("if (!instalado)"), ROUTE.indexOf("const sp ="));
+  it("si la sonda falla responde 500 y NO registra heartbeat; el 503 'no instalado' se fue", () => {
+    const bloque = ROUTE.slice(ROUTE.indexOf("await verificarBaseDeEgresos()"), ROUTE.indexOf("const sp ="));
+    expect(bloque).toMatch(/status: 500/);
     expect(bloque).not.toMatch(/recordCronHeartbeat/);
+    expect(ROUTE).not.toMatch(/status: 503|omitido|instalado/);
   });
 
-  it("un error que NO es 'la tabla no existe' NO se lee como 'no instalado'", () => {
-    // Si un timeout se leyera así, el cron se apagaría en silencio para siempre.
-    expect(SYNC).toMatch(/esTablaAusente\(error\)[\s\S]{0,200}throw new Error/);
+  it("la sonda lanza ante CUALQUIER error — un 'no existe la tabla' ya no se lee como 'no instalado'", () => {
+    // Si un timeout (o un PGRST205, con la tabla puesta) se leyera como
+    // "todavía no corrió el SQL", el cron se apagaría en silencio para siempre.
+    expect(SYNC).not.toMatch(/esTablaAusente|egresosInstalado/);
+    const sonda = SYNC.slice(SYNC.indexOf("export async function verificarBaseDeEgresos"));
+    expect(sonda.slice(0, 300)).toMatch(/if \(error\) throw new Error\(error\.message\)/);
   });
 
   it("está en SEED_TOLERANT_CRONS, no en los fail-closed", async () => {

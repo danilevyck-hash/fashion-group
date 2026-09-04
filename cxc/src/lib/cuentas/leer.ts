@@ -2,11 +2,15 @@
  * Lectura de los NOMBRES de las cuentas contables. **Una sola implementación**,
  * igual que `mayor/leer.ts` y `egresos/leer.ts`.
  *
- * 🔴 DEGRADACIÓN LIMPIA. La migración `20260813180000_cuentas_contables.sql` la
- * corre Daniel A MANO. Mientras la tabla no exista se usa el único nombre que
- * hoy hay —el que el CSV del mayor trae pegado a cada línea— y la pantalla se
- * dibuja igual. Sin ninguno de los dos, los renglones muestran el código pelado,
- * que es exactamente como se veían antes: nunca un nombre inventado.
+ * Historia (ago-2026): DEGRADABA LIMPIO — mientras la migración
+ * `20260813180000_cuentas_contables.sql` no corriera, un "esa tabla no existe"
+ * se tragaba SIN loguear y se seguía con el nombre del CSV del mayor. Tolerancia
+ * retirada el 3-sep-2026: `cuentas_contables` existe desde esa migración y
+ * `mayor_lineas` no se dropea (verificado en producción). Hoy un "no existe" es
+ * un permiso, un timeout o un cambio de esquema, y se LOGUEA como cualquier
+ * otro error de estas lecturas. Sin ninguno de los dos nombres, los renglones
+ * muestran el código pelado, que es exactamente como se veían antes: nunca un
+ * nombre inventado.
  *
  * 🔴 SE PIDEN SÓLO LOS NOMBRES QUE EL MES USA. Con Supabase en compute Micro,
  * bajarse el catálogo entero de 8 empresas para pintar una pantalla es carga
@@ -22,7 +26,6 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { armarNombres, codigosCandidatos, type NombresDeCuentas } from "./catalogo";
 
 /** Nombres por empresa: `empresa_key` → (`cuenta` completa → nombre). */
@@ -101,8 +104,8 @@ function agrupar(filas: ReadonlyArray<{ empresa_key: string } & ParCuentaNombre>
 }
 
 /**
- * El catálogo de Switch. La tabla puede no existir todavía, y eso NO es un
- * error: es el estado normal hasta que Daniel corra la migración.
+ * El catálogo de Switch. Falla ABIERTO (ver el encabezado): un error acá deja
+ * los renglones con el código pelado, pero SIEMPRE queda en el log.
  *
  * No necesita paginar: se piden como mucho `CODIGOS_POR_TANDA` códigos por
  * tanda y la llave es `(empresa_key, cuenta)`, así que el techo de filas por
@@ -124,9 +127,7 @@ async function leerCatalogo(
       .in("cuenta", tanda);
 
     if (error) {
-      if (!esTablaAusente(error)) {
-        console.error("[cuentas/leer] cuentas_contables:", error.message);
-      }
+      console.error("[cuentas/leer] cuentas_contables:", error.message);
       return new Map();
     }
 
@@ -189,9 +190,9 @@ async function leerDelMayor(
       }
     }
   } catch (e) {
-    // Sin mayor (tabla ausente, lectura caída) se sigue sin respaldo: los
-    // renglones sin nombre muestran el código, que es como se veían antes.
-    if (!esTablaAusente(e)) console.error("[cuentas/leer] mayor_lineas:", e);
+    // Sin mayor (lectura caída) se sigue sin respaldo: los renglones sin nombre
+    // muestran el código, que es como se veían antes. Y queda en el log.
+    console.error("[cuentas/leer] mayor_lineas:", e);
     return new Map();
   }
 

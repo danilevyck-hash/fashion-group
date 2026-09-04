@@ -3,13 +3,17 @@
  *
  * Mismo permiso que el alta: **admin y secretaria**. Borrar es SOFT DELETE
  * (`deleted = true`), como el resto del módulo — la fila queda.
+ *
+ * Historia (ago-2026): si la escritura decía "falta la migración", se
+ * respondía 503 con el nombre del archivo SQL. Tolerancia retirada el
+ * 3-sep-2026: la tabla existe desde 20260824120000_recordatorios.sql; hoy un
+ * error de la base es un error, con su mensaje.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { RECORDATORIOS_ROLES } from "@/lib/recordatorios/roles";
 import {
-  avisoMigracionRecordatorios,
   faltaParaGuardar,
   leerCuerpo,
 } from "@/lib/recordatorios/recordatorio";
@@ -32,9 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const r = await actualizarRecordatorio(params.id, nuevo);
   if (!r.ok) {
-    if (r.faltaMigracion) {
-      return NextResponse.json({ error: avisoMigracionRecordatorios() }, { status: 503 });
-    }
+    console.error("[api/recordatorios] PUT:", r.error);
     return NextResponse.json({ error: r.error }, { status: 400 });
   }
   return NextResponse.json(r.recordatorio);
@@ -47,10 +49,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   const r = await borrarRecordatorio(params.id);
   if (!r.ok) {
-    if ("faltaMigracion" in r && r.faltaMigracion) {
-      return NextResponse.json({ error: avisoMigracionRecordatorios() }, { status: 503 });
-    }
-    return NextResponse.json({ error: "error" in r ? r.error : "Error interno" }, { status: 400 });
+    console.error("[api/recordatorios] DELETE:", r.error);
+    return NextResponse.json({ error: r.error }, { status: 400 });
   }
   return NextResponse.json({ ok: true });
 }

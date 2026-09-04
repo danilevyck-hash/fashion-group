@@ -4,7 +4,6 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { getCompany } from "@/lib/companies";
-import { guardarTolerandoColumnaNueva } from "@/lib/clientes/columna-codigo-opcional";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CHEQUES_ROLES = ["admin", "secretaria"];
@@ -33,11 +32,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: "Este cheque ya fue depositado" }, { status: 400 });
   }
 
-  // `cliente_codigo` es la columna nueva (DDL a mano): si todavía no existe se
-  // guarda todo lo demás en vez de fallar la edición entera.
-  const { data, error, sinColumna } = await guardarTolerandoColumnaNueva(update, (campos) =>
-    supabaseServer.from("cheques").update(campos).eq("id", params.id).select().single(),
-  );
+  // Sin reintento "sin `cliente_codigo`" (tolerancia a DDL retirada el
+  // 3-sep-2026): la columna existe desde 20260808190000. Un error es un error.
+  const { data, error } = await supabaseServer.from("cheques").update(update).eq("id", params.id).select().single();
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   const session = getSession(req);

@@ -222,20 +222,24 @@ describe("lo que la ruta ESCRIBE de verdad", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 SIN LA MIGRACIÓN CORRIDA, la pantalla de cheques NO se rompe", () => {
+// ⚠️ Cambio de dirección (3-sep-2026). Este bloque se llamaba "SIN LA MIGRACIÓN
+// CORRIDA, la pantalla de cheques NO se rompe" y fijaba que un PGRST205 diera
+// 200 + lista vacía + aviso en ámbar. La tolerancia se retiró: la tabla existe
+// desde 20260824120000 (verificado en producción), y hoy un "no existe" es un
+// permiso, un timeout o un cambio de esquema — o sea, un 500 como cualquiera.
+describe("🔴 UN ERROR DE LA BASE ES UN ERROR — también el que dice 'no existe la tabla'", () => {
   const ERROR_REAL = {
     code: "PGRST205",
     message: "Could not find the table 'public.recordatorios' in the schema cache",
   };
 
-  it("el GET responde 200 con la lista vacía y el aviso, no un 500", async () => {
+  it("el GET con PGRST205 responde 500 (antes: 200 vacío con aviso de migración)", async () => {
     filasRecordatorios.mockResolvedValue({ data: null, error: ERROR_REAL, count: null });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await GET_RECS(pedido("admin"));
-    expect(res.status).toBe(200);
-    const d = await res.json();
-    expect(d.recordatorios).toEqual([]);
-    expect(d.faltaMigracion).toBe(true);
-    expect(d.aviso).toContain("20260824120000_recordatorios.sql");
+    expect(res.status).toBe(500);
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
   });
 
   it("🔴 un error REAL de la base NO se disfraza de migración faltante", async () => {
@@ -333,7 +337,10 @@ describe("🔴 EL AVISO DE TELEGRAM — un solo mensaje, y los cheques primero",
 });
 
 describe("🔴 UN FALLO DE RECORDATORIOS NO SE LLEVA PUESTO EL AVISO DE LOS CHEQUES", () => {
-  it("sin la migración corrida, el aviso de cheques sale igual que siempre", async () => {
+  it("con PGRST205 el aviso de cheques sale igual, y el fallo queda anotado como FALLO (antes: 'falta el DDL')", async () => {
+    // Cambio de dirección (3-sep-2026): la lectura ya no reconoce "falta la
+    // migración"; el PGRST205 cae al `catch` de cheques-alert como cualquier
+    // otro error. Los cheques (la plata) se avisan igual.
     filasCheques.mockResolvedValue({ data: [cheque("XTREME SHOES", "2026-08-24", 5000)], error: null });
     filasRecordatorios.mockResolvedValue({
       data: null,
@@ -345,7 +352,8 @@ describe("🔴 UN FALLO DE RECORDATORIOS NO SE LLEVA PUESTO EL AVISO DE LOS CHEQ
 
     expect(r).toMatchObject({ ok: true, count: 1, recordatorios: 0, sent: true });
     expect(enviado.mock.calls[0][0]).toContain("XTREME SHOES");
-    expect(r.detail).toContain("falta el DDL"); // queda anotado, no escondido
+    expect(r.detail).toContain("recordatorios fallaron"); // queda anotado, no escondido
+    expect(r.detail).not.toContain("falta el DDL");
   });
 
   it("si la lectura de recordatorios REVIENTA, el cheque se avisa igual", async () => {

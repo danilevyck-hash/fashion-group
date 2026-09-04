@@ -2,6 +2,14 @@
 // empresa (tabla fg_user_switch_vendedor, DDL 20260705100000). Lo administra
 // Sistema → Usuarios; lo consume el checkout de catálogos (vendedor automático
 // por login). Admin-only.
+//
+// Historia (jul-2026): si PostgREST contestaba "esa tabla no existe" (PGRST205),
+// las tres operaciones respondían 503 "Falta correr el DDL". Tolerancia retirada
+// el 3-sep-2026: la tabla existe desde 20260705100000_fg_user_switch_vendedor.sql
+// (verificado en producción). Hoy un "no existe" es un permiso, un cambio de
+// esquema o un timeout mal leído, y disfrazarlo de "falta correr el SQL" mandaba
+// a Daniel a correr una migración que ya está corrida. Cualquier error → 500 con
+// el mensaje.
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
@@ -11,10 +19,6 @@ export const dynamic = "force-dynamic";
 
 const TABLE = "fg_user_switch_vendedor";
 
-function tablaAusente(err: { code?: string; message: string } | null): boolean {
-  return !!err && /PGRST205|does not exist|could not find the table/i.test(`${err.code} ${err.message}`);
-}
-
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const auth = requireRole(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
@@ -23,9 +27,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     .from(TABLE)
     .select("user_id, empresa_key, vendedor_id, vendedor_nombre");
   if (error) {
-    if (tablaAusente(error)) {
-      return NextResponse.json({ error: "Falta correr el DDL 20260705100000_fg_user_switch_vendedor.sql" }, { status: 503 });
-    }
+    console.error("[admin/vendedor-mapping] GET:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ mappings: data ?? [] });
@@ -46,7 +48,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   if (body.vendedor_id == null) {
     const { error } = await supabaseServer.from(TABLE).delete().eq("user_id", userId).eq("empresa_key", empresa);
     if (error) {
-      return NextResponse.json({ error: tablaAusente(error) ? "Falta correr el DDL 20260705100000" : error.message }, { status: tablaAusente(error) ? 503 : 500 });
+      console.error("[admin/vendedor-mapping] DELETE:", error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ ok: true, removed: true });
   }
@@ -63,7 +66,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     updated_at: new Date().toISOString(),
   }, { onConflict: "user_id,empresa_key" });
   if (error) {
-    return NextResponse.json({ error: tablaAusente(error) ? "Falta correr el DDL 20260705100000" : error.message }, { status: tablaAusente(error) ? 503 : 500 });
+    console.error("[admin/vendedor-mapping] PUT:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

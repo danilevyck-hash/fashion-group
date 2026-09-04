@@ -98,10 +98,12 @@ describe("la fila del cheque lleva el código, y el nombre se conserva", () => {
   });
 });
 
-describe("guardar un cheque NUNCA falla por la columna nueva", () => {
-  it("si el DDL no corrió, el cheque se guarda igual y se avisa", async () => {
-    // Un cheque que no se puede guardar es plata que no queda registrada: esto
-    // no puede depender de que alguien haya corrido una migración.
+// ⚠️ Cambio de dirección (3-sep-2026): la tolerancia a la DDL se retiró —
+// `cheques.cliente_codigo` existe desde 20260808190000. Un PGRST204 que nombre
+// la columna ya NO reintenta sin ella: guardar el cheque sin su cliente y
+// seguir sería registrar plata a nombre de nadie sin que nadie se entere.
+describe("guardar un cheque con un error de columna FALLA VISIBLE (antes: reintentaba sin el vínculo)", () => {
+  it("con PGRST204 responde 500, escribe UNA sola vez y NO devuelve `_falta_migracion_codigo`", async () => {
     let intentos = 0;
     mockFrom.mockImplementation(() => ({
       insert: (campos: Record<string, unknown>) => {
@@ -118,12 +120,14 @@ describe("guardar un cheque NUNCA falla por la columna nueva", () => {
         };
       },
     }));
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await POST(req({ ...CHEQUE_OK, cliente_codigo: "D-80" }));
-    expect(res.status).toBe(200);
-    expect(intentos).toBe(2);
-    expect(escrito).not.toHaveProperty("cliente_codigo");
-    expect(escrito).toHaveProperty("monto", 1000);          // el cheque SÍ se guardó
-    expect(await res.json()).toHaveProperty("_falta_migracion_codigo", true);
+    expect(res.status).toBe(500);
+    expect(intentos).toBe(1);                                 // sin reintento
+    expect(escrito).toHaveProperty("cliente_codigo", "D-80"); // se mandó CON el vínculo
+    expect(await res.json()).not.toHaveProperty("_falta_migracion_codigo");
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
   });
 });
 

@@ -13,9 +13,14 @@ import { verifySession } from "@/lib/session-cookie";
  * completo en el login solo lo arreglaría para quien vuelva a entrar. Esto lo
  * resuelve para todos sin tocar la cookie de sesión.
  *
- * La columna nombre_completo llegó con la DDL 20260709120000, que puede NO estar
- * aplicada: si PostgREST devuelve 42703 ("column does not exist") caemos a `name`
- * en vez de romper el saludo. Mismo patrón que /api/cxc/enviar-email.
+ * Historia (jul-2026): la columna `nombre_completo` llegó con la DDL
+ * 20260709120000 y, mientras no estuviera aplicada, un 42703 ("column does not
+ * exist") caía a `name` EN SILENCIO. Tolerancia retirada el 3-sep-2026: la
+ * columna existe desde 20260709120000_cxc_email_estado_cuenta.sql (verificado
+ * en producción). Lo que se conserva es la invariante del módulo —**el saludo
+ * NUNCA rompe el home**—, así que un error de la base sigue cayendo al usuario
+ * de login; lo que cambia es que ahora SE LOGUEA: un permiso, un timeout o un
+ * cambio de esquema ya no se confunden con "todavía no corrió el SQL".
  */
 export const dynamic = "force-dynamic";
 
@@ -34,8 +39,12 @@ export async function GET(req: NextRequest) {
     .eq("id", parsed.userId)
     .maybeSingle();
 
-  if (error || !data) {
-    // 42703 (columna ausente) o cualquier otro fallo: el saludo NUNCA debe romper.
+  if (error) {
+    // El saludo NUNCA rompe el home, pero el error tampoco se esconde.
+    console.error("[auth/perfil] fg_users:", error.message);
+    return NextResponse.json({ userName: fallback, displayName: fallback });
+  }
+  if (!data) {
     return NextResponse.json({ userName: fallback, displayName: fallback });
   }
 

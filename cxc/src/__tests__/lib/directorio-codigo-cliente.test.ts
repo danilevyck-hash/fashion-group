@@ -155,9 +155,11 @@ describe("el vínculo se guarda, y si el DDL no corrió se DICE", () => {
     expect(escrito).toEqual({ cliente_codigo: null });
   });
 
-  it("si la columna no existe, se guarda TODO LO DEMÁS y se avisa", async () => {
-    // Sin esto, guardar un teléfono fallaría entero por una columna que ni
-    // siquiera se está usando.
+  // ⚠️ Cambio de dirección (3-sep-2026): la tolerancia a la DDL se retiró —
+  // `directorio_clientes.cliente_codigo` existe desde 20260808180000. Un
+  // PGRST204 que nombre la columna ya NO reintenta sin ella: se propaga con su
+  // `code` a `respuestaErrorEscritura`, que es quien sabe decir qué pasó.
+  it("con PGRST204 la edición FALLA VISIBLE, escribe UNA sola vez y no dice 'se guardó lo demás'", async () => {
     let intento = 0;
     mockFrom.mockImplementation(() => ({
       update: (campos: Record<string, unknown>) => {
@@ -180,13 +182,15 @@ describe("el vínculo se guarda, y si el DDL no corrió se DICE", () => {
       req(`/api/directorio/${ID}`, { telefono: "6678-2633", cliente_codigo: "D-80" }),
       { params: { id: ID } },
     );
-    expect(res.status).toBe(200);
-    expect(intento).toBe(2);
-    expect(escrito).toEqual({ telefono: "6678-2633" });        // el teléfono SÍ se guardó
-    expect(await res.json()).toHaveProperty("_falta_migracion_codigo", true);
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(intento).toBe(1);                                            // sin reintento
+    expect(escrito).toEqual({ telefono: "6678-2633", cliente_codigo: "D-80" }); // se mandó CON el vínculo
+    expect(await res.json()).not.toHaveProperty("_falta_migracion_codigo");
   });
 });
 
+// El helper `columna-codigo-opcional.ts` quedó SIN usos (3-sep-2026); se
+// conserva como helper del repo y estas pruebas siguen midiéndolo tal cual.
 describe("el reintento sin la columna es ACOTADO", () => {
   it("reconoce PGRST204 y 42703 que NOMBRAN la columna", () => {
     expect(esColumnaFaltante({ code: "PGRST204", message: "…'cliente_codigo'…" })).toBe(true);
