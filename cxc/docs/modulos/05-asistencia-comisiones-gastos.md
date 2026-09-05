@@ -1,6 +1,12 @@
 # Asistencia y Planilla · Comisiones · Gastos
 
-> Referencia de los tres módulos, medida contra producción el **4-sep-2026**.
+> 🔴 **Medido contra producción el 5-sep-2026.** Cada cifra de este archivo se volvió a
+> consultar ese día contra la base real (Management API de Supabase,
+> `POST /v1/projects/rspocgqhtpveytgbtler/database/query`) y cada afirmación de «quién lee
+> o escribe esto» se comprobó buscando la llamada real en `src/`. Las consultas que
+> produjeron cada número están escritas al lado. Lo que cambió respecto de la medición del
+> 4-sep está listado al final, en **«Lo que estaba mal»**.
+>
 > No repite `cxc/CLAUDE.md`: apunta a él (§ Invariantes por módulo, § Dónde vive cada dato)
 > y escribe lo que le falta. El post-mortem largo de Asistencia vive en
 > `docs/postmortems/asistencia-planilla.md`; el de Gastos en `docs/postmortems/gastos-mayor-banco.md`;
@@ -8,6 +14,11 @@
 >
 > ⚠️ **No incluye Préstamos** (`/prestamos`) — está documentado aparte. Aquí solo aparece
 > por donde se toca con la planilla (la casilla «Préstamo»).
+>
+> ⚠️ **Asistencia y Planilla NO pasó por el rediseño módulo por módulo.** Daniel lo dijo el
+> 5-sep-2026: el módulo solo recibió **arreglos** (el candado de módulos del 31-ago, el aviso
+> de extras sin aprobar y el enlace a la persona del 3-sep, servicio profesional sin extras).
+> No está terminado ni revisado como los que sí pasaron por ahí, y no debe describirse así.
 
 ---
 ---
@@ -18,7 +29,9 @@
 
 El módulo que convierte lo que marcó el reloj biométrico de la entrada en **la planilla quincenal
 que firma la contadora**. Cubre las 3 empresas que comparten ese reloj —Confecciones Boston,
-Vistana y Fashion Wear— y hoy son **40 fichas** (`asistencia_personas`, medido). Nació el
+Vistana y Fashion Wear— y hoy son **40 fichas, 36 de gente que sigue trabajando**
+(`select count(*), count(*) filter (where fecha_salida is null) from asistencia_personas`
+→ 40 / 36, medido el 5-sep-2026). Nació el
 3-ago-2026 y es el módulo más grande de los nacidos después del 5-jul (45 commits, 15 rutas API,
 36 archivos en `src/lib/asistencia/`).
 
@@ -34,7 +47,7 @@ seguros, las deducciones y el neto — cotejado **al centavo** contra el Excel d
 | `contabilidad` (usuario `Contabilidad`) | todo, las 3 empresas; **aprueba** horas extra y **cierra** la quincena | entró el 6-ago-2026 (planilla) y el 27-ago (aprobar) |
 | `secretaria` (andrea, Angela) | el módulo entero **por rol**, pero **NO lo tienen**: su `modulos_override` no incluye `asistencia`, así que el guard les contesta 403 | ver abajo |
 | `bodega` (Julio Garay, cuenta COMPARTIDA) | **SOLO la pestaña Aprobaciones**, y `/api/asistencia/planilla` le contesta **sin el bloque de dinero** | `soloApruebaRoles()` |
-| `gerente_boston` (david) | no entra a `/asistencia`; usa `/boston` › Planilla, que llama a la MISMA ruta. Aprueba solo Boston | `MODULOS_PLANILLA = [asistencia, boston]` |
+| `gerente_boston` (david) | ⚠️ **SÍ entra a `/asistencia`, y solo ve la pestaña Aprobaciones**: `role_permissions.gerente_boston` = `["boston","catalogos","asistencia"]` (medido) y el módulo lo declara en su `roles[]` (`asistenciaRoles() ∪ aprobacionesRoles()`), así que el guard lo deja pasar. Las otras 11 rutas de `/api/asistencia/*` le contestan **403** porque exigen `asistenciaRoles()`, donde no está. Su camino de siempre —`/boston` › Planilla— llama a la MISMA ruta, con la empresa forzada a Boston por el servidor | `MODULOS_PLANILLA = [asistencia, boston]` · `vePestana()` |
 
 - **El candado NO es el rol, son los MÓDULOS EFECTIVOS** (`src/lib/asistencia/guard.ts`,
   `requireAsistencia`). Lee `modules` de la cookie HMAC-firmada — la misma lista que pinta el menú.
@@ -160,6 +173,24 @@ Grano y llave por tabla, medido el 4-sep-2026. Ninguna tabla del módulo usa `de
 
 ### `asistencia_marcaciones` — 6.081 filas 🔢
 Llave natural: `(dispositivo, evento_id)` (índice único, es el anti-duplicado).
+
+🔴 **Al 5-sep-2026 siguen siendo 6.081: el reloj no manda una marcación desde el viernes
+4-sep 16:53 de Panamá.** `select max(ocurrio_en), max(created_at) from asistencia_marcaciones`
+→ `2026-09-04 21:53:49+00` y `2026-09-04 21:56:05+00`; `asistencia_dispositivos.visto_en` =
+`2026-09-04 21:56:06+00`, o sea **18,9 h de silencio** a las 11:52 a.m. de Panamá del sábado.
+No hay marcas hoy porque **el sábado nadie marca**: de las 6.081 marcaciones de la historia,
+**cero caen en sábado** y solo 36 en domingo (lunes 1.130 · martes 1.128 · miércoles 1.280 ·
+jueves 1.278 · viernes 1.229). Pero el AGENTE tampoco reportó: la PC de la oficina está apagada
+desde el viernes por la tarde. El vigía lo cazó y **avisó hoy a las 15:00 UTC**
+(`asistencia_dispositivos.alertado_en = 2026-09-05 15:00:49`, `fallos_seguidos = 0`).
+⚠️ Esto **pasa todos los fines de semana** y es por diseño: el vigía corre los 7 días
+(*«Un domingo mudo es una PC apagada de verdad»*, `agente.ts`) y Daniel apaga la PC cada
+tarde, así que un sábado a las 10 a.m. siempre cruza las 6 h del umbral. Un aviso semanal
+previsible — ver «Lo que sobra o no cuadra».
+
+Marcas por día (últimos días hábiles, `select (ocurrio_en at time zone 'America/Panama')::date, count(*) … group by 1`):
+4-sep **104** (día cortado a las 16:53) · 3-sep 131 · 2-sep 136 · 1-sep 124 · 31-ago 134 ·
+28-ago 138. Lo normal es ~130-140.
 🔴 **Append-only**: barrido estático prohíbe `update`/`delete`/`upsert` sobre ella
 (`asistencia-correcciones.test.ts`). El ÚNICO upsert admitido es el del ingest, con
 `ignoreDuplicates: true`.
@@ -177,7 +208,12 @@ Llave natural: `(dispositivo, evento_id)` (índice único, es el anti-duplicado)
 | `created_at` | cuándo se guardó | default | nadie | 6.081 |
 
 ### `asistencia_personas` — 40 filas (llave `empleado_codigo`)
-confecciones_boston 22 (21 activos) · vistana 10 (9) · fashion_wear 8 (7).
+⚠️ **confecciones_boston 22 (20 activos) · vistana 10 (9) · fashion_wear 8 (7) = 36 activos**, no 37.
+`select empresa, count(*), count(*) filter (where fecha_salida is null) from asistencia_personas group by 1`.
+Las **4 bajas** (todas cargadas el 26-ago-2026, todas con fecha pasada): ERIC APARICIO (36, fashion_wear,
+despido 5-jun) · ROXANA RODRIGUEZ (27, Boston, renuncia 13-jul) · JENNIFER ARMAS (50, Boston, otro 3-ago) ·
+DANIEL LEVY (52, vistana, otro 7-ago). «Activo» = `fechaSalida` en `null`; no hay bandera `activo`
+(`src/lib/asistencia/vigencia.ts`, y ahí está escrito por qué es una fecha y no un booleano).
 
 | columna | medido |
 |---|---|
@@ -196,23 +232,48 @@ confecciones_boston 22 (21 activos) · vistana 10 (9) · fashion_wear 8 (7).
 
 | tabla | filas | grano / llave | quién escribe | notas medidas |
 |---|---|---|---|---|
-| `asistencia_horarios` | 40 | `empleado_codigo` | PUT de Horarios | **todas** entrada `08:00`, almuerzo `30`. Salida: `16:30` ×27 · `17:00` ×13. `empleado_nombre` se escribe pero no se lee |
-| `asistencia_feriados` | 22 | `fecha` | Configuración › Feriados | 2026-01-01 → 2027-12-25 |
-| `asistencia_reglas` | **1 (singleton, `id=1`)** | — | Configuración › Reglas | ⚠️ `hora_corte_nocturno` en producción es **18:01**, no el default 18:00. `almuerzo_default_min` = 30 y **nadie la lee** desde el 13-ago-2026 |
-| `asistencia_justificaciones` | 23 | `id` uuid | Justificaciones | motivos: Catástrofe 13 · Incapacidad 6 · Trabajo de vendedor 2 · Escolares 1 · **Trabajo fuera de la oficina 1** (nombre viejo, vivo). 19 con `hora_desde/hasta`. Registrado por: Contabilidad 22 · Daniel 1. **DELETE real** |
-| `asistencia_vacaciones` | 2 | `id` uuid, soft delete `deleted` | Vacaciones | las dos de ELOYN MENDOZA (código 29): 16-jul→13-ago y 14-ago. **`ya_pagadas = false` en las dos** |
-| `asistencia_correcciones` | 8 | `id` uuid | Reporte › ✎ | 3 son marcas **AGREGADAS** (`marcacion_id` null) · 2 anuladas (`anulada_en`) · **todas creadas por `Contabilidad`** |
-| `asistencia_horas_extra_aprobadas` | **521** | `(empleado_codigo, fecha)` | Aprobaciones | 389 aprobadas / 132 no. Rango **1-jul → 26-ago**: 🔴 **cero días aprobados en septiembre**. Por empresa: Boston 196 (111 apr) · vistana 171 (145) · fashion_wear 154 (133). `marcado_por`: `Bodega`, `Contabilidad`, `daniel` |
-| `asistencia_prestamo_aprobado` | 13 | `(quincena, empleado_codigo)` | Planilla › bloque Préstamo | todas de la quincena `2026-08-2`, todas por `Contabilidad`. `monto_visto` es el TESTIGO |
-| `asistencia_planilla_manual` | 26 | `(quincena, empleado_codigo)` | celdas de la Planilla | quincenas `2026-08-1` y `2026-08-2`. Suma de los 5 montos: **$898,86** |
-| `asistencia_reparto_empresa` | 2 | `(empleado_codigo, empresa)` | 🔴 **solo por SQL — no hay pantalla** | JULIO GARAY (11): vistana $800 · fashion_wear $200 con `paga_horas_extra`. Índice único parcial: una sola parte con extras |
-| `asistencia_aprobador_empresa` | 6 | `(usuario, empresa)` | 🔴 **solo por SQL** | ver «Quién entra» |
-| `asistencia_planilla_guardada` | **0** | `id` uuid | POST de cierre | 🔴 **nunca se ha cerrado una quincena**. Estados `cerrando → cerrada → reabierta` |
+| `asistencia_horarios` | 40 ✅ | `empleado_codigo` | PUT de Horarios | **las 40** con entrada `08:00` y almuerzo `30`. Salida: `16:30` ×27 · `17:00` ×13. `empleado_nombre` se escribe pero no se lee |
+| `asistencia_feriados` | 22 ✅ | `fecha` | Configuración › Feriados | 2026-01-01 → 2027-12-25 |
+| `asistencia_reglas` | **1 (singleton, `id=1`)** ✅ | — | Configuración › Reglas | 🔴 **NO tiene `empresa_key`** (verificado columna por columna en `information_schema`): las reglas son del grupo entero. ⚠️ `hora_corte_nocturno` en producción es **18:01**, confirmado, no el default 18:00. Valores vivos: tolerancia 10 · extra mínimo 10 · 1,25 / 1,50 · domingo-feriado 1,50 · divisores 173,33 / 208 · SS 9,75 % · SE 1,25 % · excedente 3 h al 2,625 (no se usa). `almuerzo_default_min` = 30 y **nadie la lee** desde el 13-ago-2026 |
+| `asistencia_justificaciones` | 23 ✅ | `id` uuid | Justificaciones | motivos: Catástrofe 13 · Incapacidad 6 · Trabajo de vendedor 2 · Escolares 1 · **Trabajo fuera de la oficina 1** (nombre viejo, vivo). 19 con `hora_desde/hasta`. Registrado por: Contabilidad 22 · Daniel 1. **Todas de agosto** (1-ago → 24-ago); nada de septiembre. **DELETE real** |
+| `asistencia_vacaciones` | 2 ✅ | `id` uuid, soft delete `deleted` | Vacaciones | las dos de ELOYN MENDOZA (código 29): 16-jul→13-ago (cargada por `Daniel`) y 14-ago (por `Contabilidad`). **`ya_pagadas = false` en las dos** → no mueven un dólar. Ninguna borrada |
+| `asistencia_correcciones` | 8 ✅ | `id` uuid | Reporte › ✎ | 3 son marcas **AGREGADAS** (`marcacion_id` null) · 2 anuladas (`anulada_en`) · **las 8 creadas por `Contabilidad`** |
+| `asistencia_horas_extra_aprobadas` | **521** ✅ | `(empleado_codigo, fecha)` | Aprobaciones | 389 aprobadas / 132 no (columna `aprobado`, **no** `aprobada`). Rango **1-jul → 26-ago**: 🔴 **sigue sin un solo día aprobado en septiembre al 5-sep**. Por empresa: Boston 196 (111 apr) · vistana 171 (145) · fashion_wear 154 (133). `marcado_por`: `daniel` 298 · `Contabilidad` 122 · `Bodega` 101 |
+| `asistencia_prestamo_aprobado` | 13 ✅ | `(quincena, empleado_codigo)` | Planilla › bloque Préstamo | las 13 de la quincena `2026-08-2`, las 13 `aprobado = true`, las 13 por `Contabilidad` el 27-ago. Suman **$495,00** de `monto_visto` (el TESTIGO). Columnas reales: `quincena, empleado_codigo, aprobado, monto_visto, marcado_por, marcado_en` |
+| `asistencia_planilla_manual` | 26 ✅ | `(quincena, empleado_codigo)` | celdas de la Planilla | `2026-08-1` 12 filas / $385,00 · `2026-08-2` 14 filas / $513,86 → **$898,86**. Nada de septiembre |
+| `asistencia_reparto_empresa` | 2 ✅ | `(empleado_codigo, empresa)` | 🔴 **solo por SQL — no hay pantalla** | JULIO GARAY (11): vistana $800 (`paga_seguros = true`, `paga_horas_extra = false`, orden 0) · fashion_wear $200 (`paga_seguros = false`, `paga_horas_extra = true`, orden 1). Suman los $1.000 de su ficha. Índice único parcial: una sola parte con extras |
+| `asistencia_aprobador_empresa` | 6 ✅ | `(usuario, empresa)` | 🔴 **solo por SQL** | las 6 creadas el 1-sep-2026 14:39: `Bodega` → fashion_wear + vistana · `Contabilidad` → las 3 · `david` → confecciones_boston. `admin` no tiene fila y pasa siempre |
+| `asistencia_planilla_guardada` | **0** ✅ | `id` uuid | POST de cierre | 🔴 **al 5-sep-2026 sigue sin cerrarse ni una quincena.** Estados `cerrando → cerrada → reabierta` |
 | `asistencia_planilla_guardada_linea` | **0** | `id` bigint, FK `planilla_id` | el cierre | **63 columnas**: las 24 de `DineroLinea` + las 20 de `HorasPersona` + identidad. Los mapas son `Record<keyof …>`: agregar un campo sin agregar la columna pone el **build rojo** |
-| `asistencia_dispositivos` | 1 | `dispositivo` | ingest + vigía | `reloj cboston`, agente **v1.1.0**, `fallos_seguidos = 0`, leído hasta hoy |
+| `asistencia_dispositivos` | 1 | `dispositivo` | ingest + vigía | `reloj cboston`, agente **v1.1.0**, `fallos_seguidos = 0`. ⚠️ Al 5-sep `leido_hasta` = **4-sep 21:53 UTC** (no «hoy»): la PC está apagada y el vigía ya alertó (`alertado_en = 2026-09-05 15:00:49`). El último «Traer ahora» lo pidió `Contabilidad` el 28-ago |
+
+### 🔴 La quincena en curso NO se puede cerrar hoy: 24 personas con horas extra sin aprobar
+
+Medido el **5-sep-2026** sobre la quincena `2026-09-1` (1 al 15 de septiembre; el reloj llegó
+hasta el 4). `asistencia_horas_extra_aprobadas` no tiene **ni una fila de septiembre**
+(`max(fecha) = 2026-08-26`), así que **todo lo que se trabajó de más en septiembre está sin
+aprobar**.
+
+Reconstruyendo la regla del motor en SQL —última marca del día contra la salida del horario,
+puerta de 10 minutos (`extraMin = brutoSeg < extraMinimoSeg ? 0 : brutoSeg/60`,
+`reporte.ts`), servicio profesional afuera (`sinHorasExtra`)—:
+
+**24 personas · 1.408 minutos (23,5 h) · ≈ $100,30** valuados a la rata de cada quien
+(1,25 antes de las 18:01 y 1,50 después, con `hora_corte_nocturno` real de la base).
+
+Las que más tienen: JULIO GARAY 123 min · ALEJANDRA CAMAÑO 108 · CARLOS NOE RUIZ 107 ·
+YERITZA SOLIS 102 · JHONNY FLORES 98 · KEVIN LUBO 93 · LUIS PARAJON 91 · SAMUEL GOMEZ 86.
+Por empresa: Boston 9 personas · fashion_wear 7 · vistana 8.
+
+⚠️ **No es solo un aviso ámbar: es un freno.** `frenosParaCerrar`
+(`src/lib/asistencia/planilla-guardada.ts:486`) llama a `extrasNoAprobadas` y devuelve **409**
+si hay alguna, así que hoy la quincena de septiembre **no se puede cerrar en ninguna de las 3
+empresas** hasta que Julio, Contabilidad, David o Daniel entren a Aprobaciones. La cifra es
+chica en plata; lo que traba es el cierre.
 
 **Códigos que marcan y no tienen ficha (hoy)**: **55** (7 marcas) y **39** (4 marcas), los dos desde
-el 1-sep-2026. Salen del cuadro (`separarSinFicha`) y se muestran UNA vez arriba.
+el 1-sep-2026 — y **ninguno de los dos volvió a marcar después del 2-sep**. Sin ficha no se les
+calcula un solo dólar. Salen del cuadro (`separarSinFicha`) y se muestran UNA vez arriba.
 **Fichas sin ninguna marca**: ERIC APARICIO (36, dado de baja) y EDWIN GOMEZ (`V-EG`, `no_marca_reloj`).
 
 ## De dónde vienen los datos
@@ -514,17 +575,17 @@ ventas_metas, mk_*, upload, calvin, reclamo, joybees, catalogo_reebok — ningun
 Tampoco hay forma de contar pantallas vistas. Lo que **sí** se puede medir son las filas que el
 módulo escribe, con su firma:
 
-| evidencia | medido el 4-sep-2026 |
+| evidencia | medido el 5-sep-2026 |
 |---|---|
-| marcaciones ingresadas | **6.081**, del 1-jul al día de hoy, de **40 códigos**, un solo reloj. El agente escribe cada **3 minutos** (última: hoy 21:53 UTC) |
-| aprobaciones de horas extra | **521** filas, del 1-jul al 26-ago. Quién: `Contabilidad`, `Bodega` (Julio) y `daniel`. 🔴 **Ninguna en septiembre** |
-| correcciones de marcación | **8** en 2 meses, **todas por `Contabilidad`** (3 agregadas, 2 anuladas) |
-| justificaciones | **23**: 22 por `Contabilidad`, 1 por `Daniel`. Todas de agosto |
-| vacaciones | **2** (una por `Contabilidad`, otra por `Daniel`) |
-| aprobaciones de préstamo | **13**, todas de la quincena `2026-08-2`, todas por `Contabilidad` |
-| montos escritos a mano | **26** filas en 2 quincenas (`2026-08-1`, `2026-08-2`), $898,86 en total |
+| marcaciones ingresadas | **6.081**, del 1-jul al **4-sep 16:53 de Panamá**, de **40 códigos**, un solo reloj. El agente escribe cada **3 minutos**, pero lleva **18,9 h callado** (PC apagada del fin de semana) |
+| aprobaciones de horas extra | **521** filas, del 1-jul al 26-ago. `daniel` 298 · `Contabilidad` 122 · `Bodega` (Julio) 101. 🔴 **Ninguna en septiembre — y hay 24 personas esperando** |
+| correcciones de marcación | **8** en 2 meses, **las 8 por `Contabilidad`** (3 agregadas, 2 anuladas) |
+| justificaciones | **23**: 22 por `Contabilidad`, 1 por `Daniel`. Todas de agosto (1 → 24) |
+| vacaciones | **2**, las dos de ELOYN MENDOZA (una por `Contabilidad`, otra por `Daniel`) |
+| aprobaciones de préstamo | **13**, todas de `2026-08-2`, todas por `Contabilidad`, $495,00 |
+| montos escritos a mano | **26** filas en 2 quincenas (`2026-08-1` $385,00 · `2026-08-2` $513,86) |
 | **cierres de quincena** | 🔴 **0**. La función existe desde el 4-sep y todavía no se usó ni una vez |
-| sesiones vivas de quien lo usa | `Contabilidad` 19 · `Bodega` 31 · `daniel` 40 · `david` 4 (`user_sessions` sin revocar) |
+| sesiones vivas de quien lo usa | `daniel` 40 · `Bodega` 32 · `andrea` 32 · `Angela` 21 · `Contabilidad` 19 · `david` 4 (`user_sessions` sin revocar). Contabilidad estuvo activa por última vez el **4-sep 21:57 UTC** |
 
 **Lectura**: el módulo lo usa a diario **Contabilidad** (correcciones, justificaciones, montos,
 aprobaciones de préstamo), **Bodega/Julio** solo para aprobar horas extra, y **Daniel** para revisar
@@ -628,8 +689,12 @@ columnas de extra, y **no** puede aparecer en Aprobaciones ni frenar el cierre.
   el SUELDO. La tabla de aprobadores es `asistencia_aprobador_empresa`. Las dos existen y se
   parecen.
 - **`avisoMigracion*` que siempre son `null`**: la respuesta de `/api/asistencia/planilla` conserva
-  9 campos (`faltaMigracionConfiguracion`, `faltaMigracionBajas`, `faltaMigracionAprobaciones`, …)
-  que son **constantes `null`** desde el 3-sep. Se conservan porque `PlanillaTab` y `AprobacionesTab`
+  **10 nombres** (`faltaMigracionConfiguracion`, `faltaMigracionBajas`, `faltaMigracionAprobaciones`,
+  `faltaMigracionAprobador`, `faltaMigracionBaseSeguros`, `faltaMigracionServicioProfesional`,
+  `faltaMigracionReparto`, `faltaMigracionVacaciones`, `faltaMigracionPrestamoAprobado`,
+  `faltaMigracionAmarrePrestamos`) escritos como **constantes `null`** en 13 lugares del archivo
+  desde el 3-sep (medido con `grep -o "faltaMigracion[A-Za-z]*: null"`). El único que todavía puede
+  traer texto es `faltaMigracionManual`. Se conservan porque `PlanillaTab` y `AprobacionesTab`
   los leen; el código muerto es de la pantalla, no de la ruta.
 - **`avisoMigracionAprobador()`** en `aprobador-empresa-server.ts` existe, se exporta y **ya no se
   emite** — el propio comentario lo dice.
@@ -643,13 +708,31 @@ columnas de extra, y **no** puede aparecer en Aprobaciones ni frenar el cierre.
   `a386c658` y `f52ea159` del 3-sep). El propio documento lo cuenta más abajo, en la tabla de
   decisiones — quedan las dos versiones.
 - **`CLAUDE.md` dice que las pestañas son 6 y que Vacaciones estuvo apagada**; hoy están las 6 con
-  Vacaciones encendida y `PESTANAS_OCULTAS` **borrado**. El texto de la sección de invariantes ya
-  lo refleja; el de `AsistenciaClient.tsx` cuenta la historia completa.
+  Vacaciones encendida y `PESTANAS_OCULTAS` **borrado** (verificado: la constante no existe en
+  `roles.ts`, solo el comentario que cuenta por qué se borró entera).
+- ⚠️ **El comentario de `src/lib/asistencia/guard.ts` está desactualizado**: dice que
+  `gerente_boston` tiene módulos `["boston","catalogos"]` y que **no puede** heredar `asistencia`
+  porque el módulo declara «admin/secretaria/contabilidad/bodega». Las dos cosas son falsas desde
+  el 31-ago-2026, cuando `gerente_boston` entró a `APROBACIONES_ROLES`: `role_permissions` le da
+  `["boston","catalogos","asistencia"]` (medido) y el módulo sí lo declara. El comportamiento es
+  el correcto —David solo ve Aprobaciones y la ruta le fuerza Boston—; lo que engaña es el texto.
 - **`asistencia_dispositivos` tiene 13 columnas para 1 fila.** `nombre` está vacía y no se lee.
-- ⚠️ **`CLAUDE.md` § Dónde vive cada dato dice `asistencia_marcaciones` 5.744 filas**; hoy son
-  **6.081** (medido). Las demás cifras del módulo que ese cuadro trae siguen exactas (40 fichas /
-  37 activos · 22 feriados · 23 justificaciones · 2 vacaciones · 521 aprobaciones · 13 préstamos
-  aprobados · 26 montos manuales · 2 repartos · 6 aprobadores · planilla guardada 0 y 0).
+- ⚠️ **`CLAUDE.md` § Dónde vive cada dato tiene DOS cifras mal** (verificado el 5-sep-2026):
+  dice `asistencia_marcaciones` **5.744** y hoy son **6.081**; y dice **37 activos (Boston 21)**
+  cuando son **36 (Boston 20)** — las 4 bajas están cargadas desde el 26-ago, así que el número ya
+  estaba mal el 4-sep. Las demás cifras de ese cuadro siguen exactas (40 fichas · 22 feriados ·
+  23 justificaciones · 2 vacaciones · 521 aprobaciones · 13 préstamos aprobados · 26 montos
+  manuales · 2 repartos · 6 aprobadores · planilla guardada 0 y 0).
+- ⚠️ **El vigía del reloj avisa TODOS los fines de semana, por diseño y sin que nadie lo llame
+  falsa alarma.** Daniel apaga la PC de la oficina cada tarde (así lo dice `agente.ts`), el vigía
+  corre los 7 días a las 15:00 UTC (10 a.m. de Panamá) y el umbral es de 6 h: un sábado a esa hora
+  siempre lleva ~17 h de silencio. Hoy 5-sep, sábado, sonó (`alertado_en = 15:00:49`). `alertado_en`
+  impide que se repita hasta que el agente vuelva, así que es **un** mensaje por fin de semana —
+  pero es un mensaje que no requiere ninguna acción, y esa es la clase de aviso que enseña a
+  ignorar el canal. Decisión pendiente de Daniel: dejarlo así o no correr el vigía sábado y domingo.
+- 🔴 **Los códigos 55 y 39 marcan sin ficha desde el 1-sep y nadie les creó una.** Dejaron de marcar
+  el 2-sep. Mientras no tengan ficha en Configuración no se les calcula ni un dólar y salen del
+  cuadro por `separarSinFicha`. La pantalla lo dice una vez arriba; no hay Telegram.
 
 ---
 ---
@@ -741,27 +824,40 @@ mes («Activo este mes — clic para desactivar»), y `Total a pagar`.
 
 ## Los datos
 
-### `comision_vendedor_tasa` — **5 filas** (llave `vendedor_nombre`)
+### `comision_vendedor_tasa` — **5 filas** ✅ (llave `vendedor_nombre`)
+Medido el 5-sep-2026 (`select vendedor_nombre, tasa_venta, tasa_cobro, activo from comision_vendedor_tasa`):
+
 | vendedor | tasa venta | tasa cobro | activo |
 |---|---|---|---|
 | REYNALDO ESPINOSA | 1,00 % | 1,00 % | sí |
 | EDWIN | 0,50 % | 0,50 % | sí |
 | DANIEL LEVY | 0,50 % | 0,50 % | sí |
 | Rodrigo | 0,50 % | 0,50 % | sí |
-| REY STOUTE AGUAS | 0,50 % | 0,50 % | **no** (desactivado por la migración `20260916120000`) |
+| REY STOUTE AGUAS | 0,50 % | 0,50 % | **no** (desactivado por la migración `20260916120000`, aplicada) |
+
+✅ **Los 4 Reinaldo sí se colapsaron en uno.** Hoy hay una sola fila por persona, con el canónico
+`REYNALDO ESPINOSA` y con Y, y ninguna con cobro 0 %.
 
 Es **global, no por empresa**. Quien no tiene fila cae en el `COALESCE(…, 0.0050)` de la RPC.
 Un **trigger** (`comision_vendedor_tasa_canonicalizar`) canonicaliza el nombre que entre.
-`activo` se escribe desde la pantalla y **la RPC no lo mira** — solo la pantalla lo usa para
-dibujar la casilla.
 
-### `comision_vendedor_alias` — **5 filas** (llave `nombre_switch`)
+⚠️ **`activo` SÍ lo mira la RPC, pero solo en un sitio y no donde importa.** Leído el cuerpo real
+de `comision_b2b_v8` en producción (`pg_get_functiondef`): el CTE `universo` hace
+`JOIN comision_vendedor_tasa t ON t.vendedor_nombre = comision_vendedor_canonico(v.nombre) AND
+t.activo = true` —o sea, `activo = false` solo impide que a esa persona se le arme una fila en
+CERO cuando no vendió ni cobró—, mientras que la búsqueda de la tasa al final es
+`LEFT JOIN comision_vendedor_tasa t ON t.vendedor_nombre = u.vendedor`, **sin filtro de `activo`**.
+Por eso Rey Stoute Aguas, con `activo = false`, igual sale calculado con su 0,5 %: medido hoy,
+**$3,55 en vistana agosto-2026** y **$49,83 en todo 2026**. Lo que lo saca de la pantalla es
+`VENDEDORES_RETIRADOS` de TypeScript, no la base.
+
+### `comision_vendedor_alias` — **5 filas** ✅ (llave `nombre_switch`)
 `AGUAS` → `REY STOUTE AGUAS` · `REY STOUTE AGUAS` → sí mismo · `REINALDO ESPINOSA`,
 `REINDALDO ESPINOSA` y `REYNALDO ESPINOSA` → **`REYNALDO ESPINOSA`**.
 Se aplica **solo** por `comision_vendedor_canonico(text)`; sin alias el nombre sale **recortado tal
 cual** (así «Rodrigo» sigue cruzando). **Sin pantalla: se carga por migración.**
 
-### `comision_exclusion` — **18 filas, 12 activas** (llave lógica: empresa + cliente + vendedor entre ACTIVAS)
+### `comision_exclusion` — **18 filas, 12 activas** ✅ (llave lógica: empresa + cliente + vendedor entre ACTIVAS)
 | columna | medido |
 |---|---|
 | `empresa_key` | active_shoes 5 · active_wear 12 (6 activas) · vistana 1 |
@@ -773,13 +869,30 @@ cual** (así «Rodrigo» sigue cruzando). **Sin pantalla: se carga por migració
 | `desactivado_por` / `desactivado_en` | solo en las 6 apagadas |
 
 🔴 **Soft delete, nunca DELETE** — es historial. Trigger `comision_exclusion_canonicalizar`.
-⚠️ CLAUDE.md dice «11 activas»; hoy son **12** (entró la de Edwin, la única con una sola casilla).
+⚠️ CLAUDE.md dice «11 activas»; **al 5-sep-2026 siguen siendo 12** (entró la de Edwin, la única con
+una sola casilla). `creado_en`: 17 filas el **3-sep** (las 11 de la migración `20260912120000` más
+las 6 grafías `REINALDO` que `20260913120000` apagó firmadas) y **1 el 4-sep** — la de
+`vistana / D-81 / EDWIN`, la única cargada desde la pantalla. `creado_por = daniel` en las 18.
 
 ### `comision_descuentos_fijos` — 2 filas · `comision_descuento_excepciones` — 2 filas
 Los dos descuentos son de **REYNALDO ESPINOSA en fashion_shoes**: «Descuento» $1.400,00 y
-«Descuento de adelanto» $173,08, los dos `activo = true`.
-Las dos excepciones apagan **los dos** para el mes `2026-07`.
-Llave de la excepción: `(descuento_id, mes)`, con el mes como **día 1**.
+«Descuento de adelanto» $173,08, los dos `activo = true`. Llave de la excepción:
+`(descuento_id, mes)`, con el mes como **día 1**.
+
+❌ **Aquí decía que «las dos excepciones apagan los dos para el mes 2026-07». Es falso.**
+Medido el 5-sep-2026: las dos filas de `comision_descuento_excepciones` son del mes `2026-07-01`
+y tienen **`activo = true`** (se apagaron en julio y se volvieron a encender el 3-ago-2026, que es
+lo que dice su `updated_at`). Y `leerDescuentosEfectivos` es explícita: *«excepción del mes si
+existe; si no, activo por defecto»* — con la excepción en `true`, **el descuento SÍ se aplica en
+julio**. La comprobación en dólares: `comision_b2b_v8('fashion_shoes', 2026, 7)` devuelve
+**$2.859,65** para Reynaldo y la pantalla muestra **$1.286,57**, exactamente $1.573,08 menos.
+El propio archivo ya traía ese par de números tres secciones más abajo, contradiciéndose.
+
+🔴 **El descuento se resta TODOS LOS MESES, no una vez.** `netearComisiones` hace
+`comision_total = bruto − descuento` sobre el mes que se está mirando, sin piso: los $1.573,08
+salen de la comisión de Reynaldo en Fashion Shoes en cada uno de los 9 meses de 2026
+(**$14.157,72 en el año**). No es un bug —así se pidió— pero es la diferencia entre los
+$81.931,70 «antes de descuentos» y los **$67.773,98** que realmente se pagan (ver «Cuánto se usa»).
 
 ### Lo que NO tiene tabla
 La comisión **no se guarda en ningún lado**: se calcula al vuelo con la RPC cada vez que alguien
@@ -869,7 +982,16 @@ Todo el insumo es de **Switch**, y ninguno lo trae este módulo: llega por los s
 11. **La cadena de RPC cae sola y lo DICE**: v8 → v7 → v6 → v5, y **solo** si la función no existe
     (un error transitorio NO cae). La respuesta trae `version`, `regla_cobro`,
     `exclusiones_aplicadas` y `alias_aplicado` — `rpcConFallbackDeVersion`.
-    Verificado el 4-sep: **las cuatro existen en producción** y `alias_aplicado` es `true`.
+    🔴 **Verificado el 5-sep-2026 contra `pg_proc`: la que está VIVA hoy es la v8.** Existen las
+    cuatro (`comision_b2b_v5/v6/v7/v8`) más `comision_b2b_detalle` y `comision_vendedor_canonico`;
+    `src/lib/comisiones/rpc.ts` pide `comision_b2b_v8` primero (`RPC_COMISION`) y las dos rutas
+    pasan por `leerComision`, la única que la nombra. Llamada real:
+    `comision_b2b_v8('vistana', 2026, 8)` devuelve `"alias":"canonico"`,
+    `"exclusiones":"cliente_vendedor"` y `"regla_cobro":"quien_registro"` → la v8 corriendo, no un
+    fallback. Las 4 migraciones que la sostienen (`20260911`, `20260912`, `20260913`, `20260916`)
+    están **aplicadas** (`supabase_migrations.schema_migrations`). El **detalle** también es la
+    versión nueva: su cuerpo en producción usa `comision_vendedor_canonico`, `excluye_venta`,
+    `excluye_cobro` y `vendedor_registro`.
 12. **Un solo selector de cliente en todo el sistema**: `ClienteSwitchPicker` para el directorio de
     Switch. Hay barrido que pone el build ROJO si aparece otro
     (`un-solo-selector-de-cliente.test.ts`).
@@ -949,13 +1071,31 @@ Todo el insumo es de **Switch**, y ninguno lo trae este módulo: llega por los s
 ⚠️ **`activity_logs` no registra nada de Comisiones** (verificado: no existe el `entity_type`).
 El módulo es de **solo lectura** salvo tres escrituras, y son las únicas medibles:
 
-| evidencia | medido |
+| evidencia | medido el 5-sep-2026 |
 |---|---|
-| tasas por vendedor | **5 filas**, la última escritura la hizo la migración del 3-sep |
-| clientes que no comisionan | **18 filas** (12 activas); 11 nacieron con la migración `20260912120000` del 3-sep, la de `EDWIN / D-81` es la única cargada **desde la pantalla** y es la única con una sola casilla |
-| descuentos fijos | **2**, los dos de Reinaldo en Fashion Shoes; **2 excepciones de mes**, las dos de julio-2026 |
-| quién puede entrar | `daniel` (admin), `Contabilidad`, `andrea` y `Angela` (secretaria). Solo `daniel` ve Configuración |
-| lo que la pantalla mostraría hoy (vistana, ago-2026, RPC real) | EDWIN $652,42 · DANIEL LEVY $470,23 (gris) · Rodrigo $234,49 · DEFAULT $201,90 (gris) · **Rey Stoute Aguas $3,55, que la pantalla NO muestra** |
+| tasas por vendedor | **5 filas** ✅, una por persona; la última escritura la hizo la migración del 3-sep |
+| clientes que no comisionan | **18 filas, 12 activas** ✅; 17 nacieron el 3-sep de las migraciones `20260912120000` + `20260913120000`, y la de `EDWIN / D-81` (4-sep) es la única cargada **desde la pantalla** y la única con una sola casilla |
+| descuentos fijos | **2**, los dos de **REYNALDO ESPINOSA** en Fashion Shoes; **2 excepciones de mes**, las dos de julio-2026 y las dos con `activo = true` (o sea, el descuento **sí** corre en julio) |
+| quién puede entrar | `daniel` y `alberto` (admin), `Contabilidad`, `andrea` y `Angela` (secretaria) — las dos secretarias con `comisiones` en su `modulos_override`, verificado. Solo `daniel` y `alberto` ven Configuración |
+| lo que la pantalla muestra hoy (vistana, ago-2026, RPC real `comision_b2b_v8`) | EDWIN $652,42 · DANIEL LEVY $470,23 (gris) · Rodrigo $234,49 · DEFAULT $201,90 (gris) · **Rey Stoute Aguas $3,55, que la pantalla NO muestra** ✅ idéntico a la medición del 4-sep |
+
+**El total de 2026, medido hoy** con la RPC real sobre las 6 empresas y los meses 1-9
+(`comision_b2b_v8(empresa, 2026, mes)` × 54, sumando `comision_total`):
+
+| corte | 2026 |
+|---|---|
+| todo lo que la RPC calcula | **$90.066,22** |
+| sin los retirados (Aguas $49,83 · Colaborador −$5,28) | **$90.021,67** |
+| **pagable** (sin retirados, sin DEFAULT y sin Daniel Levy), **antes** de descuentos | **$81.931,70** |
+| **pagable, con los descuentos fijos restados** ($1.573,08 × 9 meses = $14.157,72) | 🔴 **$67.773,98** |
+
+Por persona, ya neto: **REYNALDO ESPINOSA $58.544,09** · EDWIN $8.995,40 · Rodrigo $234,49.
+Se calculan y se muestran pero **no se pagan**: DEFAULT $5.200,90 y DANIEL LEVY $2.889,07.
+
+⚠️ Los $82.109,56 / $82.059,73 / $81.866,22 / $81.871,50 que anda citando `CLAUDE.md` son de la
+misma familia que los $81.931,70 de arriba —pagable **antes** de descuentos— y se mueven solos
+cada día que entra una factura. Sirven para comparar dos versiones de la RPC el mismo día, no
+como «lo que se le paga a la gente».
 
 **No medible**: cuántas veces al mes se abre la pantalla, ni cuántos Excel se bajan. Lo que sí se
 sabe es que el trabajo de configuración se hizo **todo el 3-sep-2026** (las 4 migraciones del día)
@@ -1028,14 +1168,17 @@ aparecer en ningún lado**, ni en los totales.
 - 🔴 **`docs/switch-flujo.md` línea 117 dice que los recibos alimentan «Comisiones sobre cobro (RPC
   `comision_cobro_v3`)»**. Esa RPC **no existe** en producción (las que existen son
   `comision_b2b_v5/v6/v7/v8`, `comision_b2b_detalle` y `comision_vendedor_canonico`). Documento viejo.
-- ⚠️ **`CLAUDE.md` dice que la migración `20260913120000` está «pendiente de aplicar»** y que las
-  exclusiones activas son **11**. Verificado el 4-sep: la migración **está aplicada** (existen
-  `comision_vendedor_alias`, `comision_vendedor_canonico()`, `comision_b2b_v8` y los dos triggers),
-  y hay **12 activas** — entró `vistana / D-81 / EDWIN`, la única con una sola casilla (`solo cobro`).
-- **`comision_vendedor_tasa.activo` no lo mira la RPC.** Rey Stoute Aguas está en `false` y su fila
-  **igual se calcula** (medido: $3,55 en vistana, agosto 2026). Lo que lo saca de la pantalla es la
-  lista `VENDEDORES_RETIRADOS` de TypeScript, no la base. Si alguien mira solo el SQL, ve una
-  comisión que la app no muestra.
+- ⚠️ **`CLAUDE.md` dice que las exclusiones activas son 11.** Al 5-sep-2026 son **12**: entró
+  `vistana / D-81 / EDWIN`, la única con una sola casilla (`solo cobro`). Las 4 migraciones de
+  Comisiones (`20260911120000`, `20260912120000`, `20260913120000`, `20260916120000`) están
+  **aplicadas**, confirmado contra `supabase_migrations.schema_migrations`.
+- ⚠️ **`comision_vendedor_tasa.activo` lo mira la RPC en un sitio y NO en el que decide la plata.**
+  Corregido el 5-sep tras leer el cuerpo real de `comision_b2b_v8`: el `JOIN … AND t.activo = true`
+  del CTE `universo` solo evita armarle una fila en cero a quien no vendió; el `LEFT JOIN` que
+  busca la tasa al final **no filtra `activo`**. Resultado medido: Rey Stoute Aguas, en `false`,
+  igual sale calculado con su 0,5 % — **$3,55 en vistana agosto-2026, $49,83 en todo 2026**. Lo que
+  lo saca de la pantalla es `VENDEDORES_RETIRADOS` de TypeScript, no la base. Si alguien mira solo
+  el SQL, ve una comisión que la app no muestra.
 - **`MarcaClientesSinComision` está vivo y nadie lo monta**: el chip se quitó de las tres vistas el
   4-sep. El componente, la lista que manda el servidor (`clientes_sin_comision`) y sus helpers
   (`rotuloClientesSinComision`, `etiquetaClienteSinComision`) siguen ahí. Su propio encabezado lo
@@ -1046,8 +1189,11 @@ aparecer en ningún lado**, ni en los totales.
   `netearComisiones` + `marcarSePaga` + `adjuntarClientesSinComision` en el mismo orden.
 - **La comisión no se guarda nunca.** No hay histórico: si la RPC cambia, el número de un mes ya
   pagado cambia con ella. La única traza de lo que se pagó son los Excel que alguien bajó.
-- **`ComisionesTarjetas` tiene un texto con un error de tipeo**: `"Sin asignaı"` (con `ı` sin punto)
-  — es una constante que hoy no se usa (la etiqueta viva es «Oficina (DEFAULT)»).
+- ⚠️ **El `"Sin asignaı"` de `ComisionesTarjetas` NO es una constante: es un COMENTARIO.** Barrido
+  el 5-sep sobre todo `src/`: la cadena aparece una sola vez, dentro de un `{/* … */}` de la línea
+  256, describiendo un recorte de ancho que ya se arregló. No hay ningún texto así en pantalla. El
+  «Sin asignar» que sí existe es otro y está en `admin/usuarios/VendedorSwitchSection.tsx`, que no
+  es de este módulo.
 - **`comision_descuento_excepciones.updated_at`** existe y su trigger la mantiene, pero nadie la lee.
 - El comentario de cabecera de `src/app/api/ventas/comisiones/route.ts` dice *«Lee la RPC … v6, con
   red a la v5»* en un párrafo y v8 en el siguiente. Está desactualizado a medias.
@@ -1125,7 +1271,7 @@ transacción), **no** upsert: solo vive la ventana cargada. **Sin soft delete.**
 | `id` bigint | secuencia | 709 |
 | `importacion_id` uuid | de qué corrida vino | **709 / 709** |
 | `empresa_key` | vistana 378 · fashion_wear 135 · fashion_shoes 123 · active_shoes 47 · active_wear 26 · **joystep 0** · confecciones_boston 0 · american_classic 0 | 709 |
-| `mes` date (día 1) | el bucket que se reemplaza | 709. Vistana, FS, AS, AW llegan a **2026-07**; **fashion_wear solo hasta 2026-05** |
+| `mes` date (día 1) | el bucket que se reemplaza | 709. Vistana, FS, AS, AW llegan a **2026-07**; **fashion_wear solo hasta 2026-05**. 🔴 **Agosto-2026 tiene CERO renglones en las 8 empresas** (medido: `2026-01` 144 · `02` 111 · `03` 117 · `04` 88 · `05` 99 · `06` 78 · `07` 72 · `08` **0**): la contadora todavía no lo cargó en Switch. No es una falla del sync |
 | `fecha` | fecha del pago | 709 |
 | `n_interno` | el documento | 709 |
 | `cuenta` | el código contable completo (5 segmentos) | 709. **Grupo 6 (gasto): 486 de 709** |
@@ -1136,31 +1282,67 @@ transacción), **no** upsert: solo vive la ventana cargada. **Sin soft delete.**
 | `linea_nro` | ordinal del renglón dentro del documento | 709 |
 | `created_at` | 🔴 **es lo que vigila la alerta B**: «cuándo reescribimos este mes» | 709 |
 
-Totales medidos por empresa: vistana $243.342,48 · fashion_shoes $362.193,60 ·
-fashion_wear $151.962,66 · active_wear $54.387,22 · active_shoes $16.048,75.
+Totales medidos el 5-sep-2026, **«salió» contra «gasto»** (grupo 6), con
+`select empresa_key, sum(total), sum(total) filter (where cuenta like '6.%') … group by 1`:
 
-### `egresos_importaciones` — **151 filas** · 1 fila por corrida
+| empresa | salió de caja y banco | de eso, gasto |
+|---|---|---|
+| fashion_shoes | $362.193,60 | $223.246,35 |
+| vistana | $243.342,48 | **$118.753,76** |
+| fashion_wear | $151.962,66 | $101.710,56 |
+| active_wear | $54.387,22 | $3.850,38 |
+| active_shoes | $16.048,75 | $14.677,15 |
+
+✅ Las cinco cifras de «salió» y el $118.753,76 de Vistana están confirmadas al centavo.
+Renglones del grupo 6: 486 de 709 ✅.
+
+### `egresos_importaciones` — **158 filas** ⚠️ (eran 151 el 4-sep) · 1 fila por corrida
 Se inserta **antes** de escribir los renglones. Es lo que permite distinguir «este mes no tuvo
-movimientos» de «no sabemos nada». `origen` = `cron` en las 151. `archivo_nombre` **vacío en las
-151** (era para la carga a mano, que ya no existe). `creado_por` lleno en las 151.
-Empresas: 7 (21–23 corridas cada una) — **confecciones_boston no tiene ninguna**.
+movimientos» de «no sabemos nada». `origen` = `cron` en las **158** y `archivo_nombre` **vacío en
+las 158** (era para la carga a mano, que ya no existe). Sube **+7 por día**, una por empresa.
+Empresas: 7 — american_classic y joystep 24 corridas, las otras cinco 22 —
+**confecciones_boston no tiene ninguna** ✅.
 
-### `cuentas_contables` — **987 filas** · grano `(empresa_key, cuenta)`
+### `cuentas_contables` — **987 filas** ✅ · grano `(empresa_key, cuenta)`
 La sincroniza el **mismo cron de egresos**, pegada a la sesión que ya abrió. 7 empresas
-(**sin confecciones_boston**). `nombre_switch` y `nivel` llenas en las 987.
+(**sin confecciones_boston**): vistana 151 · american_classic 146 · fashion_wear 141 ·
+active_wear 138 · fashion_shoes 138 · joystep 138 · active_shoes 135.
+`nombre_switch` y `nivel` llenas en las 987 ✅.
 🔴 **El nombre autoritativo es `nombre_switch`**, no el que Switch pega al código en el CSV desde el
 1-sep. Falla **abierta**: sin nombre se muestra el **código pelado**, nunca uno deducido
 (`6.02.01` parece «salarios» por vecindad con 6.01 y en realidad es **SERVICIOS PROFESIONALES**,
 el gasto más grande de Vistana).
 
-### `bancos_saldos` — **52 filas** · grano `(empresa_key, fecha_dato)`, UNIQUE
+### `bancos_saldos` — **52 filas** ✅ · grano `(empresa_key, fecha_dato)`, UNIQUE
+
+❌ **Aquí había 5 saldos falsos.** La lista que decía «último por empresa» era en realidad el
+**MÁXIMO histórico** de cada empresa. Solo coincidían fashion_wear y active_wear, donde el máximo
+resulta ser el último. Lo correcto, medido con
+`select distinct on (empresa_key) empresa_key, fecha_dato, saldo from bancos_saldos order by empresa_key, fecha_dato desc`:
+
+| empresa | ÚLTIMO saldo (lo que se ve) | su fecha | lo que decía este archivo (era el máximo) |
+|---|---|---|---|
+| fashion_wear | **$317.460,51** | 31-jul | $317.460,51 ✅ |
+| vistana | **$132.870,42** | 31-jul | ❌ $165.363,98 (era el de feb-28) |
+| fashion_shoes | **$74.336,02** | 10-ago | ❌ $115.703,52 (era el de jun-30) |
+| active_wear | **$60.678,97** | 10-ago | $60.678,97 ✅ |
+| active_shoes | **$27.647,97** | 10-ago | ❌ $150.620,36 (era el de mar-31) |
+| american_classic | **$8.661,49** | 31-jul | ❌ $40.943,09 (era el de mar-31) |
+| confecciones_boston | **$7.875,65** | 31-jul | ❌ $44.733,46 (era el de feb-28) |
+| joystep | **sin dato** | — | — |
+
+🔴 **Ésos son los números que Vista General muestra como «Disponibilidad»**, y suman
+**$629.531,03** con la fecha más vieja del conjunto en **31-jul-2026** y 7 cuentas
+(`/api/dashboard/vista-general/route.ts:229` y `:419` — lee `bancos_saldos` ordenada por
+`fecha_dato DESC` y se queda con la primera fila de cada empresa). La versión vieja de esta tabla
+sugería una disponibilidad de ~$885.000, **$255.000 de más**.
+
 | columna | medido |
 |---|---|
-| `empresa_key` | 7 empresas · **joystep no tiene ninguna fila** |
-| `saldo` numeric | último por empresa: fashion_wear $317.460,51 · vistana $165.363,98 · active_shoes $150.620,36 · fashion_shoes $115.703,52 · active_wear $60.678,97 · confecciones_boston $44.733,46 · american_classic $40.943,09 |
-| `fecha_dato` | de 2026-01-31 a 2026-08-10 (7 u 8 cargas por empresa, ~mensual) |
-| `created_by` | **`Contabilidad` en las 52** |
-| `created_at` | 52 |
+| `empresa_key` | 7 empresas · **joystep no tiene ninguna fila** ✅ |
+| `fecha_dato` | de 2026-01-31 a 2026-08-10; **8 cargas** en active_shoes, active_wear y fashion_shoes, **7** en las otras cuatro |
+| `created_by` | **`Contabilidad` en las 52** ✅ — ni una excepción |
+| `created_at` | 52; **la última escritura es del 10-ago-2026**, ni una carga desde entonces |
 
 **Cero `DELETE`.** No hay soft delete porque no hay borrado: repetir la fecha corrige ese día.
 
@@ -1215,6 +1397,11 @@ No viene de Switch: lo teclea **contabilidad** en la pestaña, empresa por empre
 1. 🔴 **Las 8 empresas se ven, pero sus gastos NUNCA se suman entre sí.** No existe un total de
    grupo en este módulo — ni al pie de una tabla, ni en un export. Candado
    `gastos-sin-totales-entre-empresas.test.tsx` pinta la lista y **exige que la suma no aparezca**.
+   ✅ **Comprobado el 5-sep-2026 en el código, no de palabra**: el candado existe en
+   `src/__tests__/components/`, y el módulo **no exporta nada** con qué sacar una suma — cero
+   `downloadWorkbook`, cero `XLSX`, cero `jsPDF` y cero `.save(` en `src/app/gastos-contabilidad/**`,
+   `src/app/api/gastos-contabilidad/**` y `src/app/api/saldos-banco/**`. Si el total no está en la
+   pantalla, no hay ninguna otra puerta por donde salga.
 2. 🔴 **«Salió» y «gasto» son dos números y se muestran separados.** Solo el grupo 6 es gasto
    (`esGasto`, `src/lib/contable/cuentas.ts`), el **mismo criterio** que usaba el mayor: dos
    definiciones de gasto en el mismo módulo serían dos totales para la misma pregunta.
@@ -1234,6 +1421,14 @@ No viene de Switch: lo teclea **contabilidad** en la pestaña, empresa por empre
    (`usd`, `centAUsd`). Sumar floats por el camino es cómo se pierde el centavo.
 8. **El nombre de la cuenta sale del CATÁLOGO, y cuando no se sabe va el código SOLO** — nunca un
    nombre deducido — `cuentas-catalogo.test.ts`.
+   ✅ **El lector por el PRINCIPIO sigue puesto y sigue tolerando el formato nuevo de Switch**
+   (releído el 5-sep-2026 en `src/lib/contable/csv.ts`): un solo `CUENTA_TRAMOS = \d+(?:\.\d+){4}`
+   del que salen las dos miradas — `CUENTA_RE = ^…$` **conserva su ancla `$` intacta para el VALOR**,
+   y `CELDA_CUENTA_RE = ^(…)(?![\d.])` acepta el código al principio **seguido de cualquier cosa**,
+   así que `"6.03.98.00.00 - GASTO DE TARJETA DE CREDITO"` se lee como `6.03.98.00.00`. El
+   `(?![\d.])` es lo que hace que seis tramos sigan siendo error en vez de recortarse en silencio.
+   `esGasto` es `startsWith("6.")` y vive en `src/lib/contable/cuentas.ts`, un solo lugar.
+   Y no está roto hoy: las 7 corridas del 5-sep terminaron en `success` con `records_skipped = 0`.
 9. **`bancos_saldos` se escribe con upsert `(empresa_key, fecha_dato)`. CERO `DELETE`.** Repetir la
    fecha corrige ESE día y no puede pisar otro. Fecha futura → 400. Saldos negativos permitidos —
    `saldos-banco-ruta.test.ts` · `saldos-banco-historial.ts`.
@@ -1253,6 +1448,10 @@ No viene de Switch: lo teclea **contabilidad** en la pestaña, empresa por empre
 14. 🔴 **El mayor contable se retiró y sus tablas NO se borran**: hay un test que recorre TODAS las
     migraciones y pone el build **rojo** si alguna intenta un `DROP TABLE` de `mayor_lineas` o
     `mayor_importaciones` — `vista-general-gasto-egresos.test.ts`.
+    ✅ **Verificado el 5-sep-2026**: las dos siguen en producción con **`mayor_lineas` 135 filas** y
+    **`mayor_importaciones` 16**, exactamente las mismas de siempre, y el candado existe en
+    `src/__tests__/lib/`. Su única lectura viva sigue siendo el respaldo de nombre de cuenta en
+    `src/lib/cuentas/leer.ts`, que nunca se activa porque `cuentas_contables` cubre todo.
 15. ⚠️ **Vista General SÍ suma gastos entre empresas** — es otro módulo, la suma es deliberada, y si
     la regla también vale ahí es **una decisión pendiente de Daniel**.
 
@@ -1314,13 +1513,15 @@ No viene de Switch: lo teclea **contabilidad** en la pestaña, empresa por empre
 ⚠️ **`activity_logs` no registra nada de Gastos ni de saldos de banco** (verificado). La pantalla es
 de lectura salvo el saldo, así que lo medible es:
 
-| evidencia | medido el 4-sep-2026 |
+| evidencia | medido el 5-sep-2026 |
 |---|---|
-| corridas del cron | **151** filas en `egresos_importaciones`, 21–23 por empresa, todas `origen = cron`, todas desde enero-2026 |
-| renglones vivos | **709** en `egresos_varios`, 5 empresas con dato (joystep 0 es normal, Boston 0 es por decisión) |
-| **saldos cargados a mano** | **52** filas, **todas por `Contabilidad`**, ~1 por empresa por mes, de 2026-01-31 a **2026-08-10** |
-| última carga de saldo | 10-ago-2026 (active_shoes, active_wear, fashion_shoes). Las otras cuatro, 31-jul |
-| quién puede entrar | `daniel`, `alberto` (admin) y `Contabilidad`. `Contabilidad` tiene 19 sesiones vivas y estuvo activa hoy |
+| corridas del cron | **158** filas en `egresos_importaciones` (+7 por día), 22–24 por empresa, todas `origen = cron`, todas desde enero-2026 |
+| **el cron corrió hoy** | 5-sep 10:35–10:36 UTC, las **7** empresas en `success`, `records_skipped = 0`, sin un solo `error_message` (`switch_sync_log` con `sync_type = 'egresos_varios'`). Escribió vistana 378 · fashion_wear 135 · fashion_shoes 123 · active_shoes 47 · active_wear 26 · american_classic 0 · joystep 0. Heartbeat `sync-egresos-varios` = 10:36:29 |
+| renglones vivos | **709** en `egresos_varios`, 5 empresas con dato (joystep 0 es normal, Boston 0 es por decisión, ACS 0 aunque el cron sí entra) |
+| frescura para la alerta B | `max(created_at)` de `egresos_varios` = **5-sep 10:36 UTC**, o sea **6,4 h**: muy por debajo del umbral de 40 h. Sano |
+| **saldos cargados a mano** | **52** filas, **las 52 por `Contabilidad`**, ~1 por empresa por mes, de 2026-01-31 a **2026-08-10** |
+| última carga de saldo | 10-ago-2026 (active_shoes, active_wear, fashion_shoes). Las otras cuatro, 31-jul. ⚠️ **26 días sin que nadie cargue un saldo** |
+| quién puede entrar | `daniel`, `alberto` (admin) y `Contabilidad` (`roles: ["admin","contabilidad"]` en `modules.ts:189`, el mismo array en el `useAuth` del cliente y en `requireRole` de las dos rutas API ✅). `Contabilidad` tiene 19 sesiones vivas; su última señal es del **4-sep 21:57 UTC** |
 
 **Lectura**: el cron trabaja todos los días; **la gente toca la pantalla ~una vez al mes**, cuando
 contabilidad carga los saldos. Los gastos son solo de mirar.
@@ -1422,5 +1623,117 @@ y las dos se descubrieron por accidente.**
   proveedores, recibos y egresos la segunda.
 - ⚠️ **Vista General suma gastos entre empresas** mientras este módulo lo prohíbe. Está anotado en
   `CLAUDE.md` como **decisión pendiente de Daniel** desde hace semanas.
-- ⚠️ **`CLAUDE.md` dice `egresos_importaciones` 137 filas**; hoy son **151** (medido). `egresos_varios`
-  709, `cuentas_contables` 987 y `bancos_saldos` 52 siguen exactas.
+- ⚠️ **`CLAUDE.md` dice `egresos_importaciones` 137 filas**; al 5-sep-2026 son **158**, y suben
+  +7 cada día. `egresos_varios` 709, `cuentas_contables` 987 y `bancos_saldos` 52 siguen exactas.
+- ⚠️ **`bancos_saldos` no se toca desde el 10-ago-2026**, 26 días. Cuatro de las siete empresas
+  siguen con el saldo del **31-jul**. Vista General muestra esos números como «Disponibilidad»
+  con la fecha del más viejo, así que se ve que están atrasados — pero **ninguna alerta lo eleva**:
+  `bancos_saldos` no está en `TABLAS_VIGILADAS` de la alerta B, y no podría estarlo con un umbral
+  de horas porque la carga es mensual y la escribe una persona.
+- **Dos vistas sin un solo lector en la app**: `egresos_varios_mensual_v` (271 filas) y
+  `mayor_gastos_mensual_v` (25). Solo aparecen clasificadas como `vista` en
+  `src/lib/backup/tablas.ts`; ningún `select` del repo las nombra (barrido sobre `src/`).
+- ⚠️ **La lectura de `bancos_saldos` de Vista General NO va por `leerTodoPaginado`** — es un
+  `select` plano ordenado por `fecha_dato DESC` (`vista-general/route.ts:229`). Con 52 filas no hay
+  problema, pero la regla 10 de arriba («paginado obligatorio») vale para las dos rutas de ESTE
+  módulo, no para esa. Al pasar de 1.000 filas (unos 12 años de cargas mensuales de 8 empresas)
+  cortaría en silencio.
+
+---
+---
+
+# Lo que estaba mal
+
+Revisión completa del archivo contra producción y contra el código, el **5-sep-2026**. Se
+recorrieron **~150 afirmaciones con número o con nombre de columna**. Abajo están **las 12 que
+había que corregir**; el resto quedó marcado ✅ donde se volvió a medir.
+
+Cómo se verificó cada cosa: las cifras, con la Management API de Supabase
+(`POST https://api.supabase.com/v1/projects/rspocgqhtpveytgbtler/database/query`, solo lectura);
+los nombres de columna, contra `information_schema.columns`; los cuerpos de las RPC, con
+`pg_get_functiondef` sobre `pg_proc`; las migraciones, contra
+`supabase_migrations.schema_migrations`; y todo lo de «quién lee o escribe esto», con `grep` sobre
+`src/` buscando la llamada real. **No se escribió ni una fila y no se tocó ni una línea de código.**
+
+## ❌ Falso — había que corregirlo
+
+| # | Qué decía | Qué es | Cómo se midió |
+|---|---|---|---|
+| 1 | **`bancos_saldos`: «último por empresa» = vistana $165.363,98 · active_shoes $150.620,36 · fashion_shoes $115.703,52 · boston $44.733,46 · ACS $40.943,09** | Eran el **MÁXIMO histórico** de cada empresa, no el último. Los últimos de verdad: vistana **$132.870,42** · active_shoes **$27.647,97** · fashion_shoes **$74.336,02** · boston **$7.875,65** · ACS **$8.661,49**. Solo fashion_wear y active_wear coincidían por casualidad. Es el número que Vista General muestra como **Disponibilidad**: **$629.531,03**, no ~$885.000 | `select distinct on (empresa_key) empresa_key, fecha_dato, saldo from bancos_saldos order by empresa_key, fecha_dato desc`, cotejado fila por fila contra las 52, y contra el código que lo lee (`vista-general/route.ts:229` y `:419`) |
+| 2 | **«Las dos excepciones apagan los dos descuentos para el mes 2026-07»** | Las dos filas de `comision_descuento_excepciones` tienen **`activo = true`**: el descuento **SÍ corre en julio**. Se apagaron en julio y se volvieron a encender el 3-ago (`updated_at`). El propio archivo se contradecía: tres secciones más abajo daba $2.859,65 → $1.286,57, que es el descuento **aplicado** | `select * from comision_descuento_excepciones` + la regla en `leerDescuentosEfectivos` (`descuentos.ts:78`) + `comision_b2b_v8('fashion_shoes',2026,7)` = $2.859,65 |
+| 3 | **`asistencia_personas`: «confecciones_boston 22 (21 activos)», 37 activos** | **20 activos en Boston, 36 en total.** Hay 4 fichas con `fecha_salida`, las cuatro cargadas el 26-ago-2026 — así que el número ya estaba mal el 4-sep. `CLAUDE.md` lo repite | `select empresa, count(*), count(*) filter (where fecha_salida is null) … group by 1`, más las 4 filas de baja una por una |
+| 4 | **`gerente_boston` (david) «no entra a `/asistencia`»** | **Sí entra**, y ve solo la pestaña Aprobaciones: `role_permissions.gerente_boston` = `["boston","catalogos","asistencia"]` y el módulo lo declara en su `roles[]` desde que entró a `APROBACIONES_ROLES` el 31-ago. El comentario de `guard.ts` dice lo contrario y también está viejo | `select role, modulos from role_permissions` + `roles.ts` (`APROBACIONES_ROLES`) + `vePestana()` |
+| 5 | **`comision_vendedor_tasa.activo` «la RPC no lo mira»** | La RPC **sí lo mira**, pero en el CTE `universo` (para no armar filas en cero), **no** en el `LEFT JOIN` que busca la tasa. Por eso Rey Stoute Aguas, en `false`, igual se calcula: $3,55 en vistana ago-2026 y **$49,83 en todo 2026** | `pg_get_functiondef` de `comision_b2b_v8`, leyendo el cuerpo entero |
+| 6 | **`egresos_importaciones` 151 filas, 21–23 por empresa** | **158**, 22–24 por empresa. Sube **+7 por día** (una corrida por empresa) | `select count(*) from egresos_importaciones` y el desglose por empresa |
+| 7 | **«`ComisionesTarjetas` tiene el texto `"Sin asignaı"` — es una constante que hoy no se usa»** | **No es una constante: es un comentario** en la línea 256 que describe un recorte de ancho ya arreglado. No existe ese texto en ninguna pantalla | `grep -rn "Sin asigna" src/` — una sola aparición, dentro de `{/* … */}` |
+| 8 | **«9 campos `avisoMigracion*` siempre `null`»** | Son **10 nombres**, escritos en **13 lugares** del archivo. El único que todavía puede traer texto es `faltaMigracionManual` | `grep -o "faltaMigracion[A-Za-z]*: null"` sobre `api/asistencia/planilla/route.ts` |
+| 9 | **`asistencia_dispositivos` «leído hasta hoy»** | Al 5-sep `leido_hasta` es del **4-sep 21:53 UTC**: 18,9 h de silencio, PC apagada del fin de semana, y el vigía ya alertó a las 15:00 UTC | `select * from asistencia_dispositivos` + `max(ocurrio_en)`/`max(created_at)` de `asistencia_marcaciones` |
+| 10 | **`asistencia_horas_extra_aprobadas`: columna `aprobada`** | La columna es **`aprobado`**, sin la `a`. Las cifras que colgaban de ella (521 / 389 / 132 y el desglose por empresa) resultaron **todas correctas** | error de Postgres al consultar, y `information_schema.columns` |
+| 11 | **`comision_descuentos_fijos`: «los dos descuentos son de Reinaldo»** | En la base el nombre ya es el canónico **`REYNALDO ESPINOSA`** (con Y), lo dejó el trigger el 3-sep | `select * from comision_descuentos_fijos` |
+| 12 | **`asistencia_prestamo_aprobado`: columna `aprobado_por`** | Es **`marcado_por`**. Las 13 filas son de `2026-08-2`, las 13 `aprobado = true`, las 13 por `Contabilidad`, y suman **$495,00** de `monto_visto` — dato que faltaba | `information_schema.columns` + `select quincena, marcado_por, count(*), sum(monto_visto) … group by` |
+
+## ✅ Confirmado tal cual — lo que más importa
+
+- **La marcación del reloj no se edita ni se borra.** Barrido a mano sobre `src/`: 6 lugares leen
+  `asistencia_marcaciones` y el **único** que escribe es el ingest, con
+  `.upsert(filas, { onConflict: "dispositivo,evento_id", ignoreDuplicates: true })`. Ni un
+  `.update(`, ni un `.delete(` en todo el repo. El candado estático existe y es real
+  (`asistencia-correcciones.test.ts`: recorre >200 archivos, exige encontrar la tabla —para que un
+  parser roto no pase en verde— y admite el upsert **solo** con `ignoreDuplicates: true`).
+- **`asistencia_reglas` NO tiene `empresa_key`.** Una sola fila, `id = 1`, columnas verificadas una
+  por una. Las reglas son del grupo entero. `hora_corte_nocturno` en producción es **18:01**.
+- **Yulissa no genera horas extra.** `YULISSA JUAREZ` (código 26, vistana) tiene
+  `servicio_profesional = true` y `sinHorasExtra` le pone extra, excedente, domingo y feriado en
+  cero. Los `servicio_profesional` son 2 y los dos están en vistana (el otro es la ficha de Daniel
+  Levy, dada de baja el 7-ago).
+- **`VE_SUELDOS_DE_BOSTON = true`** (`src/lib/boston/rol.ts:103`): David sí ve los sueldos, y el
+  mecanismo de recorte sigue entero (`planillaSinDinero` deriva de esa constante).
+- **Las dos secretarias no entran a Asistencia.** `andrea` y `Angela` tienen `modulos_override`
+  sin `asistencia` (y con `comisiones`), así que el guard les contesta 403 aunque su rol lo permita.
+- **`asistencia_planilla_guardada` y `_linea` siguen en 0 y 0**: no se ha cerrado ni una quincena.
+- **La RPC viva de comisiones es la `v8`.** Existen las cuatro (v5–v8), el código pide la v8
+  primero y la llamada real devuelve `alias: "canonico"` / `exclusiones: "cliente_vendedor"` /
+  `regla_cobro: "quien_registro"`. Las 4 migraciones que la sostienen están aplicadas.
+- **Los 4 Reinaldo se colapsaron en uno**: 5 filas de tasa, una por persona, `REYNALDO ESPINOSA`
+  al 1 %/1 %.
+- **Retirados**: `VENDEDORES_RETIRADOS = ["REY STOUTE AGUAS", "AGUAS", "COLABORADOR"]` y
+  `VENDEDORES_SIN_PAGO = ["DEFAULT", "DANIEL LEVY"]`, cada uno en un solo archivo.
+- **«Las 8 empresas se ven pero sus gastos nunca se suman»**: el candado existe y, además, el
+  módulo no tiene ningún export (cero Excel, cero PDF, cero correo) por donde pudiera salir un
+  total del grupo.
+- **`codigoDeCuenta` sigue leyendo por el PRINCIPIO** y `CUENTA_RE` conserva su `$` para el valor;
+  las 7 corridas del cron de hoy terminaron en `success` con 0 renglones descartados.
+- **`mayor_lineas` (135) y `mayor_importaciones` (16) siguen ahí**, retiradas y no borradas.
+- **`activity_logs` no registra nada de Asistencia, Comisiones ni Gastos**: los 21 `entity_type`
+  que existen no incluyen ninguno de los tres.
+
+## 🔴 Lo que hay que hacer algo al respecto
+
+1. **24 personas tienen horas extra sin aprobar en la quincena que corre** (1 al 4 de septiembre;
+   1.408 minutos, ≈ $100,30). No hay **ni una** aprobación de septiembre, y `frenosParaCerrar`
+   devuelve 409: **la quincena no se puede cerrar** en ninguna de las 3 empresas hasta que alguien
+   entre a Aprobaciones.
+2. **Los códigos 55 y 39 marcaron el 1 y 2 de septiembre sin tener ficha** y no volvieron a marcar.
+   Sin ficha no se les calcula un dólar.
+3. **El reloj lleva callado desde el viernes por la tarde** y el vigía avisó hoy sábado a las
+   10 a.m. de Panamá. Es la PC de la oficina, apagada — pasa **todos los fines de semana**, por
+   diseño. Decidir si el vigía debe correr sábado y domingo.
+4. **Nadie carga un saldo bancario desde el 10-ago** (26 días), y ninguna alerta lo eleva.
+5. **Agosto 2026 no está cargado en Gastos** en ninguna empresa: la contadora no lo subió a Switch.
+   La pantalla lo dice («Cargado hasta julio 2026»); no es una falla del sistema.
+6. **`fashion_wear` sigue dos meses atrás del resto** (cargada hasta mayo-2026).
+
+## ⚠️ Errores encontrados en otros documentos (no se tocaron)
+
+- **`CLAUDE.md` § Dónde vive cada dato**: `asistencia_marcaciones` **5.744** (son 6.081) y
+  **37 activos / Boston 21** (son 36 / 20). `egresos_importaciones` **137** (son 158).
+- **`CLAUDE.md` § Ventas**: `comision_exclusion` **«11 activas»** (son **12** desde el 4-sep).
+- **`CLAUDE.md` § Catálogos y § Guías y § Clientes**: dan por **«pendientes de aplicar»** las
+  migraciones `20260918120000` (guias_destino_cliente), `20260919120000` (clientes_master_ausente),
+  `20260921120000` (carga_history_archivo) y `20260924120000` (borrar_pedidos_de_prueba). **Las
+  cuatro están aplicadas** en `supabase_migrations.schema_migrations`. Fuera de este dominio, pero
+  es la misma clase de dato viejo.
+- **`src/lib/asistencia/guard.ts`**: el comentario dice que `gerente_boston` no tiene ni puede
+  tener `asistencia`. Las dos cosas son falsas desde el 31-ago-2026 (ver la fila 4 de arriba).
+- **`docs/switch-flujo.md` línea 117**: nombra la RPC `comision_cobro_v3`, que **no existe** en
+  producción (verificado contra `pg_proc`).

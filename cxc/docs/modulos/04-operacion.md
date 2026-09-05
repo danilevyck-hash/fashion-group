@@ -4,12 +4,25 @@
 > (`ver CLAUDE.md § X`) y escribe lo que le falta. Cero sugerencias de mejora — eso vive en
 > `docs/eficiencia/`. Aquí solo lo que HAY.
 >
-> Mediciones contra producción del **4-sep-2026** (API SQL de Supabase, proyecto `rspocgqhtpveytgbtler`).
+> ## Medido contra producción el 5-sep-2026
+>
+> Toda cifra de este archivo se **volvió a medir el 5-sep-2026** contra la base de producción
+> (`rspocgqhtpveytgbtler`, Management API, `POST /v1/projects/.../database/query`, solo lectura) y
+> toda afirmación sobre código se comprobó **abriendo el archivo**, no citando un comentario.
+> Cada cifra va con **la consulta que la produjo**, y todo lo que estaba mal está listado al final
+> del archivo, en **«Lo que estaba mal — correcciones del 5-sep-2026»**.
+>
+> Convención de conteo, para que no vuelva a pasar: **«llenas» = con CONTENIDO**
+> (`count(nullif(col,''))`), no «no-NULL». En este dominio hay columnas con decenas de filas en
+> cadena vacía que un `count(col)` cuenta como llenas — es el origen de tres de las cifras que
+> estaban mal.
+>
 > Cuando un dato no se pudo medir, dice «no medible» y por qué.
 
-Los cinco módulos de este archivo viven en el grupo **Operación** de `src/lib/modules.ts`
-(los otros cuatro del grupo —Asistencia y Planilla, Depurador, Gastos, Préstamos, Recordatorios—
-están en sus propios archivos).
+Los cinco módulos de este archivo viven en el grupo **Operación** de `src/lib/modules.ts`, que tiene
+**diez** (verificado el 5-sep-2026): los otros **cinco** —Asistencia y Planilla, Depurador, Gastos,
+Préstamos y Recordatorios— están en sus propios archivos. ⚠️ `CLAUDE.md § Módulos` lista además
+**Comisiones** dentro de Operación, y en el código está en el grupo **`ventas-clientes`**, no en este.
 
 | Módulo | `key` | `href` | `roles[]` del catálogo |
 |---|---|---|---|
@@ -31,6 +44,16 @@ al recibir y queda como el comprobante de que la mercancía salió. Es la pantal
 todo el sistema: **242 guías y 566 renglones desde el 25-mar-2026**, y **770 acciones registradas**
 en `activity_logs` — más que cualquier otro módulo salvo el login.
 
+```sql
+-- 5-sep-2026
+select (select count(*) from guia_transporte) tot,          -- 242
+       (select count(*) from guia_transporte where deleted) borradas,  -- 20
+       (select count(*) from guia_items) items,             -- 566
+       (select count(*) from activity_logs where entity_type='guias') acciones;  -- 770
+-- ranking de módulos: select entity_type, count(*) from activity_logs group by 1 order by 2 desc
+--   → auth 1.482 · guias 770 · prestamos 168 · reclamos 93 · ventas 82 · caja 39 · marketing 33
+```
+
 ⚠️ **Cambió mucho el 4-sep-2026** (cinco commits: `115f90ed` · `c5cc0502` · `f43eb4c0` · `7fa88bf6` ·
 `77cdc68a`). Todo lo nuevo cuelga de UN interruptor, `GUIAS_ATAJOS_NUEVOS`. Ver
 [§ El interruptor](#-el-interruptor-guias_atajos_nuevos) más abajo.
@@ -46,6 +69,12 @@ Invariantes vigentes resumidos: `CLAUDE.md § Invariantes por módulo › Guías
 | **secretaria** | Todo, incluida la pestaña **Configuración** (`CONFIG_GUIAS_ROLES = ["admin","secretaria"]`, `src/lib/guias/destinos-config.ts`) |
 | **bodega** | Crear, editar, despachar, borrar renglones — **pero NO la pestaña Configuración** (403 en `/api/guias/destinos-config`, y la fila de pestañas ni se dibuja). Auto-redirige a Guías desde `/home` por ser su único módulo |
 | **vendedor** | **Solo lectura.** `GUIAS_ROLES` (GET) lo incluye; `GUIAS_WRITE_ROLES = ["admin","secretaria","bodega"]` no. Todo POST/PUT/PATCH le contesta **403** |
+
+⚠️ **`GUIAS_ROLES` y `GUIAS_WRITE_ROLES` NO son una constante compartida: están escritas a mano en
+seis archivos de ruta** (`api/guias/route.ts`, `api/guias/[id]/route.ts`, `.../[id]/item/route.ts`,
+`.../[id]/numero-transp/route.ts`, `.../frecuencias/route.ts`, `.../despachos-frecuentes/route.ts`).
+La única que sí vive en un solo lugar es `CONFIG_GUIAS_ROLES` (`src/lib/guias/destinos-config.ts`).
+Verificado el 5-sep con `grep -rn "GUIAS_WRITE_ROLES\|GUIAS_ROLES" src/`.
 
 **Borrar una guía** es más estrecho todavía: `DELETE /api/guias/[id]` exige `["admin","secretaria"]` —
 bodega no borra.
@@ -180,6 +209,13 @@ frecuentes de ese transportista (`GET /api/guias/despachos-frecuentes`, `juegosM
 la propia guía (`PATCH /api/guias/[id]/numero-transp`). 🔴 **Medido: ese endpoint nunca se ha usado
 en producción** — `guia_item_numero_transp` tiene **0 filas** en `activity_logs`.
 
+```sql
+-- 5-sep-2026: las ÚNICAS acciones de guías que existen
+select action, count(*) from activity_logs where entity_type='guias' group by 1 order by 2 desc;
+--  guia_dispatch 549 · guia_create 204 · guia_item_cliente 7 · guia_delete 7 · guia_item_correccion 3
+--  → guia_item_numero_transp 0 · guia_patch 0 · guia_edit 0
+```
+
 ### 4 · `/guias/[id]/imprimir` y el PDF
 
 El papel (`PrintDocument.tsx` / `HojaEscalada.tsx` / `src/lib/guias/pdf-guia.ts`). Encabezado:
@@ -227,9 +263,20 @@ nunca «override» / «default» / «fallback» (`comoSeUsa`):
   NUNCA pasa solo** (hay mutación que lo hace pasar al dibujarse y muere en rojo).
 
 Si la migración no hubiera corrido, la pantalla **falla CERRADO** y lo dice:
-*«Falta correr la migración de guias_destino_cliente (20260918120000)»*. ✅ **Verificado el
-4-sep-2026: la migración SÍ está aplicada** (`supabase_migrations.schema_migrations` tiene
-`20260918120000 · guias_destino_cliente`, y la tabla trae 34 filas).
+*«Falta correr la migración de guias_destino_cliente (20260918120000)»*. ✅ **Re-verificado el
+5-sep-2026: la migración SÍ está aplicada.**
+
+```sql
+select version, name from supabase_migrations.schema_migrations
+where version in ('20260918120000','20260919120000','20260920120000',
+                  '20260921120000','20260922120000','20260924120000');
+-- LAS SEIS están aplicadas:
+--   20260918120000 guias_destino_cliente      20260921120000 carga_history_archivo
+--   20260919120000 clientes_master_ausente    20260922120000 reclamos_proveedor_codigo
+--   20260920120000 caja_reposicion            20260924120000 borrar_pedidos_de_prueba
+```
+⚠️ `CLAUDE.md` todavía da por **pendientes** `20260921120000`, `20260922120000` y `20260924120000`.
+Las tres corrieron. (`20260922120000` es de MI dominio — ver Reclamos.)
 
 ## Los datos
 
@@ -250,18 +297,19 @@ entrega_directa/directo 16.
 | `fecha` date | Fecha de la guía. La pone la persona | 242 |
 | `transportista` **text** | 🔴 **Columna LEGACY: nadie la lee.** El `select` del GET la excluye a propósito; el nombre sale del JOIN a `transportistas`. Quedó congelada | 94 |
 | `transportista_id` uuid | FK a `transportistas`. NULL en entrega directa | 173 |
-| `placa` text | Placa del vehículo. Bloquea el despacho salvo entrega directa | 160 |
-| `observaciones` text | Nota libre del envío. 🩸 Hace **tres trabajos** a la vez: qué va adentro, dónde entregar y quién retira | 154 |
+| `placa` text | Placa del vehículo. Bloquea el despacho salvo entrega directa | **144** (160 no-NULL, **16 en cadena vacía**; 3 dicen `"0"`) |
+| `observaciones` text | Nota libre del envío. 🩸 Hace **tres trabajos** a la vez: qué va adentro, dónde entregar y quién retira | **117** (154 no-NULL, **37 en cadena vacía**) |
 | `monto_total` numeric | 🔴 **NADIE LA LLENA con un valor útil: 242 filas, 0 distintas de cero.** El POST/PUT la escribe como `monto_total \|\| 0` y ninguna pantalla la pide | 242 (0 ≠ 0) |
 | `estado` text | Máquina de estados. **Sin CHECK constraint** — los valores válidos son convención de código. `DEFAULT 'Preparando'`, valor que **nunca se usa** (el POST escribe `'Pendiente Bodega'`) | 242 |
+| — | ⚠️ **`estado` es la única columna de esta tabla SIN candado en la base.** `guia_transporte` sí tiene **DOS CHECK**: `modo_entrega_valido` (`transportista` \| `entrega_directa`) y `modo_coherente` (`transportista` ⟺ `transportista_id IS NOT NULL`, y `entrega_directa` ⟺ `transportista_id IS NULL`). Medido: las 156 de transportista traen su FK y las 66 de entrega directa no traen ninguna — la base no deja otra cosa | — |
 | `firma_transportista` text | 🔴 **0 filas.** El POST la acepta y el PATCH la permite, pero nunca llegó una | **0** |
 | `nombre_entregador` text | 🔴 **0 filas.** El PATCH la permite; ninguna pantalla la manda | **0** |
 | `cedula_entregador` text | 🔴 **0 filas.** Idem | **0** |
-| `receptor_nombre` text | **Quien FIRMA el recibido, NO el cliente.** Son choferes; de 109 guías con receptor, **0 coinciden** con un nombre de cliente | 160 |
+| `receptor_nombre` text | **Quien FIRMA el recibido, NO el cliente.** Son choferes: 84 nombres distintos en 160 guías. ⚠️ **22 de esos 160 SÍ coinciden, letra por letra, con un nombre de `clientes_master`** (`ERIC` 17 · `ISMAEL` 2 · `CARLOS` 1 · `EDWIN` 1 · `EDWIN GONZALES` 1) — homónimos de pila. Ninguno coincide con el `cliente` de un renglón de su propia guía (0 de 160). Es la prueba, no la excepción, de por qué nadie puede deducir el cliente de aquí | 160 |
 | `cedula` text | Cédula de quien firma. También la lee la lista, para la marca «salió incompleta» | 160 |
 | `firma_base64` text | Firma del receptor (30-100 kB). **Excluida del `select` del listado** a propósito | 160 |
-| `entregado_por` text | Quién despacha de nuestro lado. Julio 186 · Rodrigo 33 · 3 sin dato | 237 |
-| `numero_guia_transp` text | N° del transportista de la CABECERA (herencia para las guías viejas) | 88 |
+| `entregado_por` text | Quién despacha de nuestro lado. Sobre las **222 vivas**: Julio 186 · Rodrigo 33 · 3 sin dato | 237 de 242 |
+| `numero_guia_transp` text | N° del transportista de la CABECERA (herencia para las guías viejas) | **66** (88 no-NULL, **22 en cadena vacía**; 9 de los 66 dicen `"0"`, que el papel imprime vacío → **57 útiles**) |
 | `firma_entregador_base64` text | Firma de quien entrega | 160 |
 | `deleted` bool | Soft delete | 242 |
 | `tipo_despacho` text | `externo` (DEFAULT) o `directo`. Con `directo` no se pide placa y sí chofer | 242 |
@@ -285,9 +333,9 @@ tabla **nunca se ha usado**, porque el PUT reemplaza los renglones con un DELETE
 | `cliente_codigo` text | 🔴 **La identidad del cliente.** `D-XXX` del directorio. **NO es obligatorio** — decisión de Daniel, no del código | **451 (79,7%)** |
 | `direccion` text | 🔴 **El DESTINO del envío, no la dirección del cliente** (`clientes_master` no tiene esa columna). Texto libre | 566 (100%) |
 | `empresa` text | Nombre de la empresa, en texto. Se valida contra las 8 | 566 (100%) |
-| `facturas` text | Números separados por `", "`. Desde el 4-sep también puede decir `Traslado`. Medido: 55 renglones con 2+ facturas; **67 con `0000`** (el antiguo «Traslado sin factura»); **0 con `Traslado` todavía** | 566 (100%) |
+| `facturas` text | Números separados por `", "`. Desde el 4-sep también puede decir `Traslado`. Medido el **5-sep**: 55 renglones con 2+ facturas; **67 con `0000`** (el antiguo «Traslado sin factura»); 🔴 **sigue habiendo 0 con `Traslado`** — el botón nuevo lleva un día en producción y **todavía no se ha usado ni una vez** | 566 (100%) |
 | `bultos` int | Cantidad. El POST rechaza total 0 | 566, **todos ≠ 0** |
-| `numero_guia_transp` text | El N° **POR LÍNEA** | 68 no vacías |
+| `numero_guia_transp` text | El N° **POR LÍNEA** | 68 con contenido, **19 de ellas un `"0"` pelado** → **49 útiles** |
 | `deleted` bool | Soft delete propio | 566, **0 en true** |
 
 ### `guias_destino_cliente` — los destinos definidos (migración `20260918120000`, **APLICADA**)
@@ -386,9 +434,11 @@ Cada regla con el archivo que la sostiene. Las que tocan plata o el papel firmad
 2. 🔴 **DOS excepciones que NO miran el estado**, cada una escribe UNA columna de UNA línea acotada
    con `.eq("guia_id", id)`: `PATCH /api/guias/[id]/cliente` y `PATCH /api/guias/[id]/numero-transp`.
    Candados: `guias-atar-cliente-route.test.ts` · `guias-numero-transp-tarde-route.test.ts`.
-3. 🔴 **En una guía despachada se corrigen TRES campos y nada más: cliente · cliente_codigo ·
-   facturas · N° del transportista. Los BULTOS NO** — es lo que el transportista firmó. Fuente única
-   `CAMPOS_DESPACHADA` en `src/lib/guias/campos-editables.ts`, leída por el formulario, por
+3. 🔴 **En una guía despachada se corrigen TRES cosas y nada más: el cliente, las facturas y el N°
+   del transportista. Los BULTOS NO** — es lo que el transportista firmó. En el código son **cuatro
+   entradas**, porque el cliente son dos columnas (`CAMPOS_DESPACHADA = ["cliente",
+   "cliente_codigo", "facturas", "numero_guia_transp"]`, verificado el 5-sep en
+   `src/lib/guias/campos-editables.ts:54-59`). Fuente única leída por el formulario, por
    `PATCH /api/guias/[id]/item` y por el candado `guias-campos-editables.test.ts`.
 4. 🔴 **El cliente vive en `guia_items.cliente_codigo`, uno por renglón.** `receptor_nombre` es quien
    FIRMA, no el cliente. Candado: `src/__tests__/api/guias.test.ts`.
@@ -399,8 +449,18 @@ Cada regla con el archivo que la sostiene. Las que tocan plata o el papel firmad
    **las dos firmas SÍ** bloquean. Candados: `guias-numero-transp-no-bloquea.test.ts` ·
    `guias-faltantes-despacho.test.ts`.
 7. 🔴 **Entrega directa = nuestro propio camión: no lleva placa ni transportista**, y un `"0"` pelado
-   se imprime como vacío (`sinCeroPelado`). 🩸 De 51 guías creadas como entrega directa, **50 quedaron
-   grabadas como transportista externo**. Candados: `guias-modo-despacho.test.ts` (17, con el PDF
+   se imprime como vacío (`sinCeroPelado`). 🩸 Medido el 5-sep: hay **66** guías vivas con
+   `modo_entrega = 'entrega_directa'` (no 51, como decía este archivo), y **50 de ellas siguen
+   grabadas con `tipo_despacho = 'externo'`** — el desajuste histórico entre las dos columnas. Las
+   66 tienen `transportista_id` en NULL, garantizado por el CHECK `modo_coherente` de la base.
+   ```sql
+   select modo_entrega, count(*), count(transportista_id) con_transp,
+          count(*) filter (where tipo_despacho='externo') externo,
+          count(*) filter (where tipo_despacho='directo')  directo
+   from guia_transporte where not deleted group by 1;
+   -- entrega_directa 66 · 0 · 50 · 16     |     transportista 156 · 156 · 156 · 0
+   ```
+   Candados: `guias-modo-despacho.test.ts` (17, con el PDF
    generado de verdad) · `guias-placa-entrega-directa.test.ts` ·
    `components/guias-entrega-directa.test.tsx`.
 8. 🔴 **La lista NO despacha** — ni por swipe ni desplegando un formulario. Sus botones solo navegan.
@@ -467,8 +527,11 @@ Cada regla con el archivo que la sostiene. Las que tocan plata o el papel firmad
 
 ### 🔴 El interruptor `GUIAS_ATAJOS_NUEVOS`
 
-Vive en **`src/lib/guias/atajos-facturas.ts`**, hoy en **`true`**. Daniel fijó la salida antes de
-empezar: *«te aviso si quiero revertir todo después de probarlo en producción con mi secretaria estas
+🔴 **Vive en `src/lib/guias/atajos-facturas.ts:39` y HOY ESTÁ EN `true`.** Sin ambigüedad: la línea
+es `export const GUIAS_ATAJOS_NUEVOS = true;`, verificada leyendo el archivo el **5-sep-2026** (el
+commit que la introdujo es `77cdc68a`). O sea: **el panel de facturas, el botón Traslado, los
+botones de destino, el autollenado y la pestaña Configuración están ENCENDIDOS en producción.**
+Daniel fijó la salida antes de empezar: *«te aviso si quiero revertir todo después de probarlo en producción con mi secretaria estas
 semanas»*.
 
 **Qué se apaga si se pone en `false`** (la pantalla vuelve a ser exactamente la de antes de
@@ -781,8 +844,10 @@ porque `facturas` es un sync de universo completo con historia suficiente.
    guía ha tenido jamás**, porque el POST siempre escribe `'Pendiente Bodega'`. Una fila insertada
    fuera de la app nacería en un estado que ninguna pantalla entiende.
 6. 🩸 **El soft delete de `guia_items` existe y nunca se usó (0 filas en `true`) — y el PUT hace
-   `DELETE` REAL.** Al reemplazar los renglones,
-   `supabaseServer.from("guia_items").delete().eq("guia_id", id).gte("orden", 0)` borra de verdad.
+   `DELETE` REAL, en TRES lugares** (verificado el 5-sep en `src/app/api/guias/[id]/route.ts`):
+   la línea 196 limpia el lote nuevo si el insert falla (`.lt("orden", 0)`), la **200** borra los
+   renglones viejos (`.gte("orden", 0)`) y la **227** borra **todos** los de la guía cuando el
+   payload trae la lista de envíos vacía (`.delete().eq("guia_id", id)`, sin filtro de orden).
    O sea: el módulo **tiene** una convención de soft delete que su propio camino principal no
    respeta. El código que filtra `!i.deleted` (el GET, el índice «ya salió», `destinosHistoricos`) es
    correcto pero hoy no filtra nada.
@@ -803,10 +868,25 @@ porque `facturas` es un sync de universo completo con historia suficiente.
     herencia para las guías viejas. 88 cabeceras y 68 renglones la tienen. La regla de qué se imprime
     está centralizada en `numerosTranspDeLaGuia` / `numeroTranspImpreso`, pero el dato sigue duplicado.
 11. **Datos sucios que el módulo decidió NO limpiar** (y lo dice): 67 renglones con `facturas =
-    '0000'` (el antiguo «Traslado sin factura»); las variantes de escritura de las direcciones
-    («Paso Canoas» ×208 / «Pasocanoas» ×1 / «Paso Canoa» ×1, «Wesland» / «Westland», «Penonome» /
-    «Penonomé»); y las 8 direcciones del histórico de D-26 que en realidad eran **envíos cargados al
-    cliente equivocado** (iban a los otros City Moda, que tienen código propio).
+    '0000'` (el antiguo «Traslado sin factura») y las variantes de escritura de las direcciones.
+    Re-medidas el **5-sep-2026** — son más de las que decía este archivo:
+    ```sql
+    select direccion, count(*) from guia_items
+    where direccion ilike '%canoa%' or direccion ilike '%wesland%'
+       or direccion ilike '%westland%' or direccion ilike '%penonom%'
+    group by 1 order by 2 desc;
+    ```
+    · **Paso Canoas: 5 grafías, 221 renglones** — `Paso Canoas` 215 · `Paso canoas` 3 ·
+      `Paso canoas ` 1 (espacio final) · `Paso Canoa ` 1 · `Pasocanoas` 1.
+    · **Penonomé: 3 grafías, 11 renglones — y NINGUNA está bien escrita**: `Penonome` 5 ·
+      `PENONOME` 4 · `Penonomé ` 2 (con espacio final). El acento sin espacio no existe en la tabla.
+    · **Westland: el typo `Wesland` aparece 5 veces** (`Wesland` 3 + `Wesland ` 2) y hay **8
+      grafías más** que le pegan la tienda al destino (`WESTLAND TIENDA 6`, `WESTLAND - TIENDA 6`,
+      `TIENDA 6 WESTLAND MALL`, `WESTLAND (TIENDA 5)`, `MAS FLOW - WESTLAND`,
+      `WESTLAND (ENTREGA EN SPORTCORNER)`…). Es exactamente lo que el campo `tiendas` de
+      `guias_destino_cliente` vino a ordenar, y por eso `claveDestino` compara los **dígitos aparte**.
+    · Y las 8 direcciones del histórico de D-26 que en realidad eran **envíos cargados al cliente
+      equivocado** (iban a los otros City Moda, que tienen código propio).
 12. **115 de 566 renglones (20,3%) no tienen `cliente_codigo`.** Es una decisión, no un bug — pero
     significa que un quinto de los envíos no cruza a la ficha del cliente ni alimenta los destinos.
 13. **`FacturasDelCliente.tsx` usa `"America/Panama"` como zona horaria** en un lugar
@@ -817,10 +897,22 @@ porque `facturas` es un sync de universo completo con historia suficiente.
 
 # Packing Lists (`/packing-lists`, key `packing-lists`)
 
-> 🔴 **DATO DE ENTRADA, VERIFICADO EL 4-SEP-2026: la tabla está VACÍA (0 filas en `packing_lists` y
-> 0 en `pl_items`) y nadie carga un PL desde el 22-abr-2026 — más de cuatro meses.** El módulo entero
-> sigue en pie, la pantalla funciona y el cron de limpieza corre todos los días sobre la nada
-> (`cron_heartbeats.cleanup-packing-lists.last_success_at = 2026-09-05 03:00:44 UTC`).
+> 🔴 **DATO DE ENTRADA, RE-VERIFICADO EL 5-SEP-2026: la tabla sigue VACÍA (0 filas en
+> `packing_lists` y 0 en `pl_items`) y nadie carga un PL desde el 22-abr-2026 — más de cuatro
+> meses.** El módulo entero sigue en pie, la pantalla funciona y el cron de limpieza corre todos los
+> días sobre la nada.
+>
+> ```sql
+> select (select count(*) from packing_lists) pl,           -- 0
+>        (select count(*) from pl_items) items;             -- 0
+> select cron_name, last_success_at from cron_heartbeats
+>  where cron_name='cleanup-packing-lists';
+> -- cleanup-packing-lists → 2026-09-05 03:00:44.645+00  (corrió esta madrugada, sobre 0 filas)
+> select action, count(*), min(created_at)::date, max(created_at)::date
+>   from activity_logs where entity_type='packing_lists' group by 1;
+> -- packing_lists_cleanup 24 (14-may → 6-jun) · packing_list_batch_create 7 (18 → 22-abr)
+> -- packing_list_delete 3 (todos el 18-abr)
+> ```
 
 ## Qué es
 
@@ -844,9 +936,11 @@ no habla con Switch, no genera ningún movimiento contable.**
   `["admin","secretaria"]`**.
 - **Todos los demás roles** (contabilidad, gerente_acs, gerente_boston): 403 / redirect.
 
-🔴 **Incoherencia medida entre el menú y la API:** `src/lib/modules.ts` declara
-`roles: ["admin","secretaria","bodega"]` — **sin vendedor**, así que un vendedor **no ve la ficha**
-en el home ni en el sidebar. Pero `hasModuleAccess()` (`src/lib/auth-check.ts`) acepta primero
+🔴 **Incoherencia medida entre el menú y la API, re-verificada el 5-sep-2026 leyendo los archivos:**
+`src/lib/modules.ts:166` declara `roles: ["admin","secretaria","bodega"]` — **sin vendedor**, así que
+un vendedor **no ve la ficha** en el home ni en el sidebar. Pero
+`src/app/api/packing-lists/route.ts:9` y `src/app/api/packing-lists/[id]/route.ts:9` declaran
+`READ_ROLES = ["admin","secretaria","bodega","vendedor"]`. Pero `hasModuleAccess()` (`src/lib/auth-check.ts`) acepta primero
 `allowedRoles.includes(role)`, y las tres pantallas y las dos rutas GET **sí nombran a `vendedor`**.
 Un vendedor que escriba la URL a mano **entra y lee el historial completo de las 8 empresas**. No
 puede subir, editar ni borrar. No hay plata ni clientes en esa tabla, pero es una discrepancia real
@@ -891,7 +985,9 @@ filtro por empresa y contador. Columnas: casilla · **PL #** · **Empresa** · *
 al detalle. Botones **«Descargar N seleccionados»** y **«Descargar todos (N)»**.
 
 ⚠️ Bajo el título «Historial» dice: **«Los PLs se eliminan automáticamente después de 7 días.»** —
-**ese texto miente hoy**; ver «Lo que sobra».
+**ese texto miente hoy**, y al 5-sep-2026 **sigue en pantalla**
+(`src/app/packing-lists/PackingListsClient.tsx:1112`, verificado por `grep`), mientras
+`RETENCION_DIAS = 90` en `src/lib/cleanup-packing-lists.ts:19`. Ver «Lo que sobra».
 
 Borrar pide confirmación: *«¿Eliminar PL \<numero\>? No se puede deshacer.»*
 
@@ -1173,10 +1269,21 @@ Fashion Group; aquí es plata que un PROVEEDOR le debe a Fashion Group.
   arma resultados de reclamos para los roles del módulo; a vendedor le devuelve `reclamos: []`
   explícitamente.
 
-**Quién lo usa de verdad** (medido en `activity_logs`, 27-mar a 26-ago-2026): casi todo es de **una
-sola persona, «andrea» (secretaria)** — 30 altas, 28 ediciones, 5 comprobantes, 5 «marcar Pagado»,
-4 borrados, 2 ediciones de ítems. **admin** aparece con 9 altas, 9 borrados y 1 edición (perfil de
-pruebas y limpieza, no de operación diaria).
+**Quién lo usa de verdad** (medido el 5-sep-2026): casi todo es de **una sola persona, «andrea»
+(secretaria)** — 30 altas, 28 ediciones, 5 comprobantes, 5 «marcar Pagado», 4 borrados, 2 ediciones
+de ítems. **admin** aparece con 9 altas, 9 borrados y 1 edición — pero **no son todas de Daniel**:
+`daniel` hizo 7 altas y 8 borrados, y **2 altas, 1 borrado y la única edición de ítems son de
+`PRUEBA-BOT`**, un usuario de pruebas. Perfil de limpieza y verificación, no de operación diaria.
+
+```sql
+select case when details ~ '^\s*[{]' then details::json->>'user_name' else '(no-JSON)' end u,
+       user_role, action, count(*)
+from activity_logs where entity_type in ('reclamos','reclamo') group by 1,2,3 order by 4 desc;
+-- ⚠️ `details` NO siempre es JSON en esta tabla: las 5 filas legacy `reclamo_creado`
+--    (user_role='system') traen texto pelado y revientan un cast directo a ::json.
+select user_role, count(*) from activity_logs
+ where entity_type='reclamos' and action='reclamo_delete' group by 1;  -- admin 9 · secretaria 4
+```
 
 ## Las pantallas
 
@@ -1270,13 +1377,44 @@ Pagado      → En proceso    (rollback)
   **congela `monto_reclamado_snapshot`**.
 - **No existe `Pagado → Creado`**: el rollback desde Pagado solo llega a «En proceso».
 
-🔴 **Medido: de 34 reclamos vivos, 29 están en «Creado» y 5 en «Pagado» — CERO en «En proceso»**, y
-en 5 meses de `activity_logs` la acción `reclamo_en_proceso` **nunca ocurrió**. El estado intermedio
-existe en el código y nadie lo usa: todo salta directo de Creado a Pagado.
+🔴 **Medido el 5-sep-2026: de 34 reclamos vivos, 29 están en «Creado» y 5 en «Pagado» — CERO en
+«En proceso»**, y en 5 meses de `activity_logs` la acción `reclamo_en_proceso` **nunca ocurrió**.
+El estado intermedio existe en el código y nadie lo usa: todo salta directo de Creado a Pagado.
+
+```sql
+select estado, count(*) from reclamos where not deleted group by 1;  -- Creado 29 · Pagado 5
+select action, count(*) from activity_logs where entity_type in ('reclamos','reclamo') group by 1;
+-- reclamo_create 39 · reclamo_edit 28 · reclamo_delete 13 · reclamo_creado 5 (legacy, user_role
+-- 'system') · reclamo_settle_pagado 5 · reclamo_comprobante 5 · reclamo_items_update 3
+-- → reclamo_en_proceso NO APARECE
+```
+
+🔑 **`reclamos.estado` SÍ tiene CHECK en la base** (a diferencia de `guia_transporte.estado`), y son
+exactamente los tres del código:
+```sql
+-- pg_constraint, contype='c'
+-- reclamos_estado_check → CHECK (estado = ANY (ARRAY['Creado','En proceso','Pagado']))
+```
+Eso tiene una consecuencia que no estaba escrita: el badge 🔔 excluye `Aplicado`, `Rechazado`,
+`Aplicada` y `Pagado` — y **la base no puede guardar los tres primeros**. Tres cuartas partes de esa
+lista de exclusión son código muerto desde que existe el CHECK. Ver «Lo que sobra».
 
 ## Los datos
 
-7 tablas propias + 1 compartida. Medido el 4-sep-2026.
+7 tablas propias + 1 compartida. Re-medido el **5-sep-2026** — cero filas nuevas desde el 4-sep:
+
+```sql
+select 'reclamos' t, count(*) from reclamos
+union all select 'reclamo_items',          count(*) from reclamo_items
+union all select 'reclamo_fotos',          count(*) from reclamo_fotos
+union all select 'reclamo_seguimiento',    count(*) from reclamo_seguimiento
+union all select 'reclamo_settlements',    count(*) from reclamo_settlements
+union all select 'reclamo_contactos',      count(*) from reclamo_contactos
+union all select 'reclamo_custom_motivos', count(*) from reclamo_custom_motivos
+union all select 'contactos_email',        count(*) from contactos_email;
+-- reclamos 47 · reclamo_items 143 · reclamo_fotos 18 · reclamo_seguimiento 47
+-- reclamo_settlements 5 · reclamo_contactos 5 · reclamo_custom_motivos 0 · contactos_email 0
+```
 
 ### `reclamos` — Grano: 1 fila por reclamo. Soft delete: `deleted boolean`.
 **47 totales, 34 vivas** (13 borradas). `created_at` del 1-abr al 26-ago-2026.
@@ -1288,7 +1426,65 @@ existe en el código y nadie lo usa: todo salta directo de Creado a Pagado.
 | `factura_pdf_path` | **4/34 (12%)** | La mayoría **no** usa el autocompletado por IA |
 | `comprobante_url` / `comprobante_path` | 5/34 | Solo los Pagados |
 | `comprobante_nota` | 🔴 **0/34** | Campo opcional que **se ofrece en pantalla** (`ComprobanteModal`, `SettlementModal`) y **nadie ha escrito jamás** |
-| `proveedor_codigo` | **34/34** tras la migración `20260922120000` (pendiente de aplicar) | 🔴 **La identidad del proveedor.** El par (`empresa`, `proveedor_codigo`) es lo que cruza con `switch_proveedor_estadocuenta`. NULL = el reclamo no se vincula a ningún proveedor |
+| `proveedor_codigo` | **34/34** | 🔴 **La identidad del proveedor.** El par (`empresa`, `proveedor_codigo`) es lo que cruza con `switch_proveedor_estadocuenta`. NULL = el reclamo no se vincula a ningún proveedor. ✅ **La migración `20260922120000` YA ESTÁ APLICADA** (5-sep-2026; este archivo y `CLAUDE.md` la daban por pendiente) y la columna está llena en los 34 vivos |
+
+#### 🔴 El cruce con Switch, medido de punta a punta (5-sep-2026)
+
+Es la afirmación que más importa del módulo y la que **nunca se había medido**. Se midió cruzando
+cada reclamo vivo contra `switch_proveedor_estadocuenta` por el par (`empresa_key`, `código`) del
+mapa `EMPRESAS_MAP`:
+
+```sql
+with m(empresa,ekey,cod) as (values
+  ('Vistana International','vistana','01'), ('Fashion Wear','fashion_wear','122'),
+  ('Fashion Shoes','fashion_shoes','112'),  ('Active Shoes','active_shoes','122'),
+  ('Active Wear','active_wear','126'),      ('Joystep','joystep','112'))
+select r.empresa, r.proveedor_codigo, count(*) reclamos,
+       count(*) filter (where sp.codigo is not null) cruzan, max(sp.nombre) nombre_en_switch
+from reclamos r join m on m.empresa = r.empresa
+left join switch_proveedor_estadocuenta sp
+       on sp.empresa_key = m.ekey and sp.codigo = r.proveedor_codigo
+where not r.deleted group by 1,2 order by 3 desc;
+```
+
+| Empresa | Código | Reclamos vivos | **Cruzan** | Nombre en Switch |
+|---|---|---|---|---|
+| Fashion Wear | `122` | 21 | **21** | American Fashion Wear, SA |
+| Vistana International | `01` | 7 | **7** | American Designer Fashion |
+| Fashion Shoes | `112` | 5 | **5** | American Fashion Wear, SA |
+| Active Shoes | `122` | 1 | **1** | LATIN FITNESS GROUP |
+| **Total** | | **34** | **34 (100%)** | |
+
+Y el contraste con el camino viejo, medido el mismo día:
+
+```sql
+-- ¿cuántos cruzarían HOY si la unión fuera por NOMBRE, como antes del 4-sep?
+select count(*) vivas,
+       count(*) filter (where exists (
+         select 1 from switch_proveedor_estadocuenta sp
+          where sp.empresa_key = m.ekey
+            and upper(trim(sp.nombre)) = upper(trim(r.proveedor)))) cruzarian_por_nombre
+from reclamos r join m on m.empresa = r.empresa where not r.deleted;
+-- vivas 34 · cruzarian_por_nombre 8
+```
+
+🔴 **Por código cruzan 34 de 34; por nombre cruzarían 8 de 34.** El arreglo funciona y esta es su
+prueba, no la memoria de nadie.
+
+🩸 **Y la colisión de códigos es PEOR de lo que dice el comentario del código.** `src/lib/reclamos/empresas.ts`
+dice que `112` está en dos empresas; medido, está en **TRES**:
+
+```sql
+select codigo, count(distinct empresa_key) empresas,
+       string_agg(distinct empresa_key||'='||nombre, ' | ') detalle
+from switch_proveedor_estadocuenta where codigo in ('01','112','122','126') group by 1;
+-- 112 → 3 empresas: american_classic=FASHION WEAR, INC | fashion_shoes=American Fashion Wear, SA
+--                   | joystep=JCBBRANDS
+-- 122 → 2 empresas: active_shoes=LATIN FITNESS GROUP | fashion_wear=American Fashion Wear, SA
+-- 01  → 1 (vistana)      126 → 1 (active_wear)
+```
+Tres proveedores distintos con el código `112`. El par (empresa, código) no es una preferencia de
+estilo: sin la empresa, `112` no identifica a nadie.
 
 **`estado`** (vivas): Creado 29 · Pagado 5.
 **`empresa`** (vivas): Fashion Wear 21 · Vistana International 7 · Fashion Shoes 5 · Active Shoes 1 ·
@@ -1307,16 +1503,36 @@ filtra `!i.deleted` defensivamente, pero esa rama nunca se activa.
 | `reclamo_id` · `referencia` · `descripcion` · `talla` · `cantidad` · `precio_unitario` · `motivo` · `nro_factura` · `nro_orden_compra` | 143/143 no-NULL (el default es `''`) | — |
 | `genero` | **29/143 (20%)** | 114 son NULL — el campo es de la migración `20260623120000` y las filas anteriores se quedaron sin él. El CHECK admite NULL a propósito |
 
-**Vacíos reales** (contenido `''`, no NULL): `descripcion` 29 · `talla` 3 · `referencia` 2 ·
+**Vacíos reales** (contenido `''`, no NULL, medido el 5-sep): `descripcion` 29 · **`talla` 2** ·
+`referencia` 2 ·
 🔴 **`nro_factura` 140/143 (98%)** y **`nro_orden_compra` 140/143 (98%)** — la factura por ítem (para
 reclamos multi-factura) casi no se usa: solo **3 ítems** en toda la historia llevan una propia.
 **`genero`**: Men 16 · Women 10 · Kids 3 · **Accessories 0**.
 
-🔴 **`motivo` tiene 14 valores distintos para lo que son pocos motivos reales:** `FALTANTE` (42)
-contra `Faltante de Mercancía` (16, el default) · `sobrante` (26, en minúscula, que no coincide con
-ningún default) · `Mercancía manchada` (7, el default) contra `MANCHADAS` (10), `MANCHADA` (4) y
-`MANCHADAS AMARILLAS` (3) · más `Mercancía dañada`, `Producto manchado`, `Cantidad incorrecta`,
-`destallado` (1 cada uno).
+🔴 **`motivo` tiene 14 valores distintos para lo que son pocos motivos reales**, y **10 de esos 14
+no están en `DEFAULT_MOTIVOS`** — son **105 de los 143 ítems (73%)**, no los 8 valores que decía
+este archivo. `DEFAULT_MOTIVOS` (`src/app/reclamos/components/constants.ts:41-48`) son solo seis:
+*Mercancía defectuosa · Producto no recibido · Error de facturación · Sobrante de mercancía ·
+Faltante de mercancía · Mercancía manchada*.
+
+```sql
+select motivo, count(*) from reclamo_items group by 1 order by 2 desc;
+```
+
+| Motivo | Ítems | ¿Está en `DEFAULT_MOTIVOS`? |
+|---|---|---|
+| `FALTANTE` | 42 | ❌ |
+| `sobrante` | 26 | ❌ (el default es «Sobrante de mercancía») |
+| `Mercancía defectuosa` | 18 | ✅ |
+| `Faltante de Mercancía` | 16 | ❌ — **el default es con `m` minúscula**; ni siquiera esta cruza |
+| `Error de facturación` | 11 | ✅ |
+| `MANCHADAS` | 10 | ❌ |
+| `Mercancía manchada` | 7 | ✅ |
+| `MANCHADA` | 4 | ❌ |
+| `MANCHADAS AMARILLAS` | 3 | ❌ |
+| `Producto no recibido` | 2 | ✅ |
+| `Cantidad incorrecta` · `destallado` · `Mercancía dañada` · `Producto manchado` | 1 c/u | ❌ |
+| **Fuera del catálogo** | **105 / 143 (73%)** | |
 
 ### `reclamo_fotos` — Grano: 1 foto. **18 filas. SIN soft delete** (hard delete real).
 🔴 `nombre_archivo`: **0/18** — la columna existe y `POST /api/reclamos/[id]/fotos` **nunca la llena**.
@@ -1339,8 +1555,9 @@ linkea»*) reservada para un enlace con Switch que **nunca se construyó**.
 `activo=true`, todas creadas el mismo instante (25-mar-2026). ⚠️ Desde el 4-sep-2026 `EMPRESAS_MAP`
 tiene **6** empresas: **Joystep no tiene contacto todavía** y su tarjeta se dibuja sin él.
 Sin soft delete: se apaga con `activo`.
-🔴 `whatsapp`: se captura en la columna pero **nunca se lee ni se muestra** en ninguna pantalla — el
-propio comentario del código lo dice (`contactos/route.ts`).
+🔴 `whatsapp`: **está lleno en las 5 filas** (Ester Serrato ×2 · Estela Rivera · Isaac Amar ×2) y
+**nunca se lee ni se muestra** en ninguna pantalla — el propio comentario del código lo dice
+(`contactos/route.ts`). Es dato bueno guardado que nadie usa, no una columna vacía.
 
 ### `reclamo_custom_motivos` — 🔴 **0 filas.**
 `saveCustomMotivo` (`constants.ts`) existe y se llama desde el formulario y el detalle, pero en
@@ -1645,7 +1862,7 @@ lo afecta. Su frontera externa son **Anthropic (Claude Sonnet 4.6), Resend y Sup
 | 🔴 **Storage falla al BORRAR una foto** | La fila de la base **se borra igual**; el archivo queda huérfano en el bucket. Solo un `console.warn` | **Nadie se entera nunca.** No hay alerta, no hay conteo, no hay limpieza |
 | **El bucket `reclamo-facturas` cambia de nombre o de política** | Los links firmados del Excel dejan de abrir | El proveedor lo reporta. No hay chequeo |
 | **`SESSION_SECRET` cambia** | Los tokens HMAC de las galerías ya enviadas **dejan de validar**: el proveedor ve «enlace inválido» | El proveedor lo reporta |
-| **`EMPRESAS_MAP` cambia un nombre** | 🔴 La ficha de **Proveedores** deja de encontrar sus reclamos **en silencio** (unión por nombre normalizado, en JS, sin candado) | **Nadie se entera**: la ficha muestra 0 reclamos y parece correcto |
+| **`EMPRESAS_MAP` cambia un `proveedor_codigo` o un `empresa_key`** | 🔴 La ficha de **Proveedores** deja de encontrar sus reclamos **en silencio**: la identidad es el par (empresa, código) | **Nadie se entera**: la ficha muestra 0 reclamos y parece correcto. ✅ Cambiar solo el **nombre** ya NO rompe nada (la migración `20260922120000` está aplicada; medido 34/34 cruzan por código) |
 | **Alguien cambia el literal `"Pagado"`** | Se rompen a la vez `esPendiente()`, el badge, el RPC del home y la condición del comprobante | Reclamos pagados volviendo a salir en el Excel del proveedor — **lo peor posible**, porque es cobrar dos veces |
 | **La migración del CHECK de `genero` se revierte** | Los ítems podrían guardar cualquier cosa en `genero` | Lo caza el candado del build, no producción |
 | **`db-max-rows` (1000)** | Con 34 reclamos vivos y 143 ítems está a dos órdenes de magnitud. Las exportaciones por empresa no paginan | No se notaría hasta llegar a 1.000 reclamos |
@@ -1670,8 +1887,11 @@ sistema lo dice**.
    (`export-zip/route.ts`: *«Excel pelado con links WEB… Ya no se arma ZIP con binarios»*), pero la
    ruta, el nombre interno del archivo y las variables se quedaron con el nombre viejo.
 3. 🔴 **El home y el badge NO cuentan lo mismo como «pendiente».** El badge
-   (`notification-badges/route.ts`) excluye 4 estados terminales/legacy
-   (`Aplicado, Rechazado, Aplicada, Pagado`), así que cuenta **Creado Y En proceso**. La migración del
+   (`notification-badges/route.ts:40`) excluye 4 estados terminales/legacy
+   (`Aplicado, Rechazado, Aplicada, Pagado`) — y 🩸 **tres de esos cuatro la base ya no los puede
+   guardar**: el CHECK `reclamos_estado_check` solo admite `Creado`, `En proceso` y `Pagado`. La
+   exclusión efectiva es una sola (`Pagado`); el resto es residuo. Así que cuenta **Creado Y En
+   proceso**. La migración del
    RPC del home (`20260812190000_home_lastupload_solo_grupo.sql`) filtra **solo `estado = 'Creado'`**.
    Un reclamo «En proceso» con más de 45 días **no aparecería** en `reclamosPendientes` /
    `reclamosViejos` de Vista General, aunque el módulo y el badge sí lo consideren abierto. Hoy no se
@@ -1691,8 +1911,9 @@ sistema lo dice**.
 7. **Columna que nadie deja en `true`:** `reclamo_items.deleted`. Existe, tiene un lector defensivo en
    `pdf-bulk.ts`, y el único flujo de edición hace **`DELETE` + `INSERT` real**.
 8. 🔴 **La función de «motivos personalizados» tiene la tabla vacía y los datos que la necesitarían.**
-   `reclamo_custom_motivos` = **0 filas**, pero `reclamo_items.motivo` trae **8 valores que no están
-   en `DEFAULT_MOTIVOS`** (`FALTANTE` 42 · `sobrante` 26 · las tres variantes de MANCHADA 17…). Esos
+   `reclamo_custom_motivos` = **0 filas**, pero `reclamo_items.motivo` trae **10 valores que no están
+   en `DEFAULT_MOTIVOS`, en 105 de los 143 ítems (73%)** (`FALTANTE` 42 · `sobrante` 26 ·
+   `Faltante de Mercancía` 16 · las tres variantes de MANCHADA 17…). Esos
    valores entraron por otro camino: una versión anterior del formulario, o el `upsert` de
    `saveCustomMotivo` falló en silencio y el navegador se quedó con el respaldo de `localStorage`, que
    nunca sincronizó.
@@ -1749,7 +1970,7 @@ Invariantes resumidos: `CLAUDE.md § Invariantes por módulo › Marketing › M
 | `DELETE /api/marketing/facturas/[id]` | 🔴 **Solo admin** |
 | `DELETE /api/marketing/proyectos/[id]` | 🔴 **Solo admin** |
 | `DELETE /api/marketing/inventario/productos/[id]` | 🔴 **Solo admin** |
-| `GET/PATCH/DELETE /api/marketing/mobiliario/notas-proveedor/**` y su `upload-url` | 🔴 **Solo admin** — son los **costos del proveedor**, secretaria nunca los ve |
+| **TODO** `/api/marketing/mobiliario/notas-proveedor/**` (GET, **POST**, PATCH, DELETE) y su `upload-url` | 🔴 **Solo admin** — son los **costos del proveedor**, secretaria nunca los ve. Verificado ruta por ruta el 5-sep: `requireRole(req, ["admin"])` en las cuatro |
 | `DELETE /api/marketing/impulsadoras/[id]` | admin o secretaria — **el SERVIDOR decide** si oculta (`activa=false`) o borra de verdad, según haya pagos. El front no elige |
 
 **Tres rutas públicas, sin sesión, con token HMAC propio** (exentas en el middleware; el token se
@@ -1764,10 +1985,18 @@ Sin token válido responden **403 / «enlace inválido»**, nunca 404 — un 404
 **Quién lo usa de verdad** (medido en `activity_logs`; ⚠️ **crear un proyecto o una factura NO se
 audita** — solo el PATCH/DELETE de proyecto y el DELETE de factura/adjunto):
 - `mk_proyectos` update 10 · `mk_proyectos` delete_definitivo 2 · `mk_facturas` delete_definitivo 5 ·
-  `mk_adjuntos` delete_definitivo 5. Por rol: **admin 19 · secretaria 3**.
-- Impulsadoras (esas **sí** se auditan una por una): `impulsadora_pago` 17 · `impulsadora_creada` 9 ·
-  `impulsadora_eliminada` 3 · `impulsadora_ocultada` 2. Por rol: **secretaria 22 · admin 9** —
-  🔑 **al revés que en proyectos y facturas**: en impulsadoras quien opera es la secretaria.
+  `mk_adjuntos` delete_definitivo 5 = **22**. Por rol: **admin 19 · secretaria 3**.
+- Bajo `entity_type = 'marketing'` hay **33** filas: `impulsadora_pago` 17 · `impulsadora_creada` 9 ·
+  `impulsadora_eliminada` 3 · `impulsadora_ocultada` 2 · **`factura_duplicada_permitida` 2** (esta
+  última faltaba en la cuenta de este archivo). Por rol: **secretaria 22 · admin 11** — 🔑 **al revés
+  que en proyectos y facturas**: en impulsadoras quien opera es la secretaria.
+
+```sql
+select entity_type, action, count(*), max(created_at)::date from activity_logs
+ where entity_type in ('marketing','mk_proyectos','mk_facturas','mk_adjuntos') group by 1,2;
+select user_role, count(*) from activity_logs where entity_type='marketing' group by 1;
+--  admin 11 · secretaria 22
+```
 
 ## Las pantallas
 
@@ -1855,7 +2084,65 @@ en el Excel de reporte (`zip-export.ts`) — nunca desde un botón dentro de la 
 
 ## Los datos
 
-**14 tablas `mk_*`.** Medido el 3/4-sep-2026.
+### 🩸 Antes que nada: **Marketing SÍ guarda el cliente, y lo guarda por CÓDIGO**
+
+El 5-sep-2026 le dije a Daniel que Marketing **no** guardaba el cliente. **Es falso.** Me equivoqué
+por mirar `mk_entregas_muebles` (que solo tiene `proyecto_id`) en vez de `mk_proyectos`, que es donde
+vive. Medido:
+
+```sql
+select count(*) tot,                      -- 25
+       count(nullif(tienda,'')) tienda,   -- 25  (el NOMBRE de la tienda, en texto)
+       count(nullif(tienda_codigo,'')) cod -- 19  (el CÓDIGO D-XXX del directorio)
+from mk_proyectos;
+```
+
+**19 de los 25 proyectos traen `tienda_codigo`; los 25 traen `tienda`.** Y los 19 códigos **resuelven
+todos** a un cliente vivo de `clientes_master` — ni uno huérfano, ni uno borrado, ni uno ausente:
+
+```sql
+select p.tienda_codigo, c.nombre, c.deleted, c.ausente_desde is not null ausente
+from mk_proyectos p left join clientes_master c on c.codigo = p.tienda_codigo
+where p.tienda_codigo is not null order by 1;
+-- 19 filas, 18 clientes distintos (D-25 y D-87 tienen dos proyectos cada uno),
+-- 0 con deleted, 0 ausentes. D-108 Multi Fashion Holding · D-117 Outlet Duty Free N2 ·
+-- D-118 Outlet Duty Free N3 · D-126 Plaza Los Angeles · D-14 Bouti · D-156 Wolf Mall Center Int ·
+-- D-166 Zona Sur Dutty Free · D-170 Nova Lux · D-24 City Mall David · D-25 City Mall Paso Canoa ·
+-- D-68 Grupo Hanna · D-71 Hanna Calzados · D-74 Boutique I-Fashion · D-80 Jerusalem De Panama ·
+-- D-84 Kheriddine · D-87 La Frontera Duty Free · D-88 La Nueva Reina Chorrera
+```
+
+🔑 **Y los 6 sin código NO son clientes**, así que no son un hueco: son gasto general.
+
+| Proyecto sin código | Qué es | Creado |
+|---|---|---|
+| `Viaticos Mensuales` ×2 | Gasto sin tienda | 2-jul-2026 |
+| `Muebles` | Gasto sin tienda | 12-jun-2026 |
+| `Remodelacion` | El único proyecto de tienda al que le falta el código | 31-jul-2026 |
+| `D` · `J` | Dos letras sueltas, creadas el mismo día — restos de prueba | 12-ago-2026 |
+
+O sea: **de los 20 proyectos que son de una tienda de verdad, 19 traen el código (95%)**. El único
+sin él es una `Remodelacion` del 31-jul. Esto es coherente con la regla del módulo — «el cliente se
+ELIGE del `ClientePicker`, nunca se tipea» — y con que `mk_proyectos` sea el ÚNICO lugar del módulo
+donde el cliente vive: `mk_facturas`, `mk_entregas_muebles` y `mk_adjuntos` llegan al cliente **a
+través de `proyecto_id`**, nunca por su cuenta.
+
+---
+
+**14 tablas `mk_*`.** Re-medido el **5-sep-2026** (`information_schema.tables` + `count(*)` real por
+tabla; cero filas nuevas desde el 4-sep):
+
+```sql
+select table_name,
+       (xpath('/row/c/text()', query_to_xml(
+          format('select count(*) c from %I.%I','public',table_name), false,true,'')))[1]::text::int filas
+from information_schema.tables
+where table_schema='public' and table_name like 'mk\_%' order by 1;
+```
+
+⚠️ **Existen 14, no 16.** `src/lib/backup/tablas.ts` nombra además `mk_cobranzas` y `mk_pagos`, y las
+declara explícitamente en `TABLAS_DE_MIGRACION_QUE_NO_EXISTEN` — migraciones que nunca llegaron a
+producción. Verificado: no están en `information_schema.tables`.
 **Soft delete, dos convenciones dentro del mismo módulo:** `mk_proyectos` y `mk_facturas` usan
 🔴 **`anulado_en` / `anulado_motivo`** (propio del módulo, distinto del `deleted boolean` del resto
 del sistema); las demás (`mk_adjuntos`, `mk_entrega_items`, `mk_impulsadora_marcas`,
@@ -1864,20 +2151,20 @@ sin columna de borrado**.
 
 | Tabla | Grano / llave | Filas | Columna por columna |
 |---|---|---|---|
-| `mk_proyectos` | 1 por proyecto (cliente) | **25 vivas** (0 anuladas) | `nombre` 25/25 · `tienda_codigo` 19/25 · `notas` **1/25** · 🔴 `fecha_cierre` **0/25**, `fecha_enviado` **0/25**, `fecha_cobrado` **0/25** (el workflow se retiró el 11-ago-2026: columnas muertas) · `estado` fijo en `'abierto'` en las 25 (ya no se escribe otra cosa; se lee legacy con `normalizarEstadoProyecto`). `created_at` 26-abr → 25-ago-2026 |
+| `mk_proyectos` | 1 por proyecto (cliente) | **25 vivas** (0 anuladas) | `nombre` 25/25 · **`tienda` (el nombre de la tienda) 25/25** · **`tienda_codigo` 19/25 — ver el bloque de arriba: los 6 sin código no son tiendas** · `fecha_inicio` 25/25 · `notas` **1/25** · 🔴 `fecha_cierre` **0/25**, `fecha_enviado` **0/25**, `fecha_cobrado` **0/25** (el workflow se retiró el 11-ago-2026: columnas muertas) · `estado` fijo en `'abierto'` en las 25 (ya no se escribe otra cosa; se lee legacy con `normalizarEstadoProyecto`). `created_at` 26-abr → 25-ago-2026 |
 | `mk_facturas` | 1 por factura | **102** (14 anuladas) | `proyecto_id` 85/102 · `impulsadora_id` 17/102 · `impulsadora_mes`/`periodo_desde`/`periodo_hasta` **17/17** donde aplica (100% de los pagos) · `tiene_importacion` (zona libre) 3/102 · `grupo_legacy` true en 81/102 · `estado_pago`: creado 85, pagado 17. ⚠️ **Fecha de factura del 25-feb-2024** al 25-ago-2026 (histórico retroactivo); `created_at` del 26-abr al 28-ago-2026 (el uso real) |
 | `mk_factura_marcas` | 1 por (factura, marca) | **102** — o sea **una marca por factura, ninguna repartida** | `empresa_pagadora_codigo` 61/102 — 🔴 **en extinción**: desde que se retiró el reparto 50/50, `setMarcasDeFactura` la escribe siempre `null`. Los 61 son filas viejas |
 | `mk_adjuntos` | 1 por archivo | **162** | Por `tipo`: `pdf_factura` **100** · `foto_proyecto` **60** · `foto_factura` 2 · 🔴 `foto_instalacion` **0**. `proyecto_id` 60/162 · `factura_id` 102/162 |
 | `mk_entregas_muebles` | 1 por entrega | **24** | `proyecto_id` **24/24** (cero pendientes hoy) · `notas` 2/24 · `numero` secuencial 1→25 **con un hueco** (una entrega se borró) · `total_por_marca` / `total_por_empresa_interna` según el reparto. 12-jun → 28-ago-2026 |
 | `mk_entrega_items` | 1 por renglón | **111** | 🔴 `bultos` **0/111** — la columna existe (migración corrida), hay módulo puro (`piezas-bultos.ts`), tests y PDF que la muestran, y **nadie ha anotado un bulto todavía** |
 | `mk_inventario_productos` | 1 por producto de bodega | **6** — Barra flauta, Barra plana, Conjunto soporte, Norte colgador, Paneles, Tablas | `foto_path` **6/6** (backfill completo). Precios $10–$130. `stock_total`: 🔴 **solo Barra plana con 18; las otras 5 en 0** (agotadas). Ninguna en negativo hoy (el postmortem citaba −95 y −16 en agosto; se repuso) |
-| `mk_mobiliario_notas_proveedor` | 1 por renglón del proveedor | **6** | `precio` 6/6 · `nota` 1/6 («el par completo», en Conjunto soporte tabla). Los precios del proveedor van **bien por debajo** de los de venta (Paneles $65 proveedor vs. $130 inventario) |
-| `mk_marcas` | 1 por marca, único por `codigo` | **6** | TH · CK · KL · RBK · J activas (externas salvo J = interna) + **OTR** («Otros», `activo=false`, **sin `empresa_codigo`**) |
+| `mk_mobiliario_notas_proveedor` | 1 por renglón del proveedor | **6** | `precio` 6/6 · `nota` 1/6 («el par completo», en *Conjunto soporte tabla*) · **`foto_paths` 6/6**. Los precios del proveedor van **bien por debajo** de los de venta: Paneles **$65 vs. $130** · Tablas **$10,50 vs. $21** · Norte colgador **$30 vs. $66** · Barra plana **$8,75 vs. $18** · Conjunto soporte **$6 vs. $14** · Flauta **$4,25 vs. $10**. 🔑 **Y los NOMBRES no coinciden entre las dos tablas** («Flauta» vs. «Barra flauta», «Conjunto soporte tabla» vs. «Conjunto soporte»): ni siquiera se podrían unir por nombre, que es una razón más de las que ya había para no fusionarlas |
+| `mk_marcas` | 1 por marca, único por `codigo` | **6** | TH→`fashion_wear` · CK→`vistana` · KL→`active_wear` · RBK→`active_shoes` · J→`joystep`, las 5 activas. La columna **`tipo`** dice `externa` en todas menos **J = `interna`** (Joybees es marca propia). Y **OTR** («Otros», `activo=false`, `tipo='externa'` pero **sin `empresa_codigo`**) |
 | `mk_impulsadoras` | 1 por persona | **2** — Ana Trejos y Cindy de Gracia, las dos activas, **$800/mes cada una** | — |
 | `mk_impulsadora_marcas` | 1 por (impulsadora, marca) | **2** | — |
-| `mk_periodos` | 1 por (marca, apertura) | **6** — CK · J · KL · RBK · TH **abiertos** («Período 2026») + **pvh cerrado** («mid 2026», cerrado el 12-ago-2026) | 🔴 `reporte` **NULL en las 6, incluido el cerrado** — el campo pensado para congelar el reporte al cerrar **nunca se llenó ni en el único período que ya cerró**. ✅ **La migración por marca YA CORRIÓ** (medido: hoy hay 5 períodos por código de marca, no solo `pvh` — el postmortem que dice «la corre Daniel a mano» quedó viejo) |
+| `mk_periodos` | 1 por (marca, apertura) | **6** — CK · J · KL · RBK · TH **abiertos** («Período 2026») + **pvh cerrado** («mid 2026») | 🔴 **Los 6 se abrieron el MISMO día (12-ago-2026) y el único cerrado lo cerró `cerrado_por = 'migracion'`, no una persona: el botón «Cerrar período» NUNCA se ha usado en producción.** | 🔴 `reporte` **NULL en las 6, incluido el cerrado** — el campo pensado para congelar el reporte al cerrar **nunca se llenó ni en el único período que ya cerró**. ✅ **La migración por marca YA CORRIÓ** (medido: hoy hay 5 períodos por código de marca, no solo `pvh` — el postmortem que dice «la corre Daniel a mano» quedó viejo) |
 | `mk_periodo_documentos` | 1 por (documento, marca sellada) | **191** | pvh/factura 73 · TH/factura 48 · CK/factura 45 · TH/entrega 12 · CK/entrega 11 · KL/factura 1 · J/entrega 1. Los sellos legacy (`pvh`) **conviven** con los de código nuevo, como predice `bloques.ts` |
-| `mk_proyecto_marcas` | 1 por (proyecto, marca) | **5** | 🔴 **Tabla legacy que ya casi nadie llena** — 5 filas para 25 proyectos. El reparto real vive en `mk_factura_marcas` (por FACTURA, no por proyecto) desde la Fase 2 |
+| `mk_proyecto_marcas` | 1 por (proyecto, marca) | **5** | 🔴 **Tabla legacy que ya casi nadie llena** — 5 filas repartidas en **3 proyectos de 25** (`count(distinct proyecto_id) = 3`): 22 proyectos no tienen ni una. El reparto real vive en `mk_factura_marcas` (por FACTURA, no por proyecto) desde la Fase 2 |
 
 ## De dónde vienen los datos
 
@@ -1901,9 +2188,15 @@ módulo (las fotos del catálogo público de Reebok/Joybees/Tommy).
    `bultos` entra en la aritmética de `inventario.ts`**.
 2. **Bultos es opcional**: `null` = «no se anotó» → se muestra **vacío, nunca `0`**
    (`src/lib/marketing/piezas-bultos.ts`).
-3. **Paneles NO es obligatorio para registrar una entrega** (desde el 23-ago-2026). El único freno es
-   `tieneAlMenosUno` (al menos un producto con cantidad), cerrado también en el servidor
-   (`createEntrega` lo repite). Candado: `marketing-reclamos-toques.test.tsx`.
+3. **Paneles NO es obligatorio para registrar una entrega** (desde el 23-ago-2026). ⚠️ Pero **no es
+   «el único freno»**, como decía este archivo: verificado el 5-sep, el botón exige
+   `puedeGuardar = marcasOk && tieneAlMenosUno && !guardando`
+   (`src/components/marketing/EntregaForm.tsx:514-519`), y **el servidor pone TRES frenos**, no uno
+   (`src/lib/marketing/inventario.ts`, iguales en `createEntrega` y `updateEntrega`):
+   *«La entrega debe tener al menos un item»* (790/921) · *«…al menos una marca»* (812/937) ·
+   *«…al menos un item con cantidad»* (831/954), más el rechazo si el proyecto está anulado (805).
+   Lo que dejó de ser obligatorio es **Paneles**, no la marca. Candado:
+   `marketing-reclamos-toques.test.tsx`.
 4. **El stock puede quedar negativo, a propósito**, con aviso en pantalla: **la entrega no se
    bloquea.** Decisión de Daniel: *«negativo»*.
 5. **Editar y borrar una entrega devuelven el stock por DELTA**; ejecutar dos veces no cuenta dos
@@ -1956,9 +2249,14 @@ módulo (las fotos del catálogo público de Reebok/Joybees/Tommy).
 - **`activity_logs`** — Marketing **escribe** ahí (`logAudit`, `logActivity`); no lee de nadie.
 
 ### Quién LEE lo suyo
-🔴 **Nadie. Las 14 tablas `mk_*` no tienen NI UN lector fuera de `src/app/api/marketing/**` y
-`src/lib/marketing/**`.** Verificado con
-`grep -rl "mk_facturas\|mk_proyectos" src/app/api | grep -v marketing` → sin resultados.
+🔴 **Ninguna PANTALLA ni ningún otro módulo. Las 14 tablas `mk_*` no tienen un solo lector de negocio
+fuera de `src/app/api/marketing/**` y `src/lib/marketing/**`.** Verificado el 5-sep-2026 con
+`grep -rl 'from("mk_' src/ | grep -v marketing | grep -v __tests__` → **sin resultados**.
+
+⚠️ **Con UNA excepción que este archivo se había saltado: el cron `backup` sí las lee.**
+`src/app/api/cron/backup/route.ts` copia **las 14** (`grep -o 'table: "mk_[a-z_]*"'` → 14 líneas), y
+`src/lib/backup/tablas.ts` las clasifica. Es la misma excepción que en Guías y en Caja, y es la que
+hace que el módulo esté respaldado.
 
 - **No** está en la búsqueda global (los 8 son CXC, Reclamos, Guías, Directorio, Cheques, Ventas,
   Préstamos, Caja).
@@ -2015,6 +2313,12 @@ frase suya que aparece es **«negativo»**, sobre el stock.
 | **`PORCENTAJE_MARCA_FIJO`** (`factura-marcas.ts`) | Marcado *«Legacy: se mantiene para importaciones antiguas»* — pero **no hay ningún importador** en todo `src/`. Export muerto | — |
 
 ## Cuánto se usa
+
+```sql
+-- 5-sep-2026
+select to_char(created_at,'YYYY-MM') mes, count(*) n, round(sum(total)::numeric,2) monto
+from mk_facturas where anulado_en is null group by 1 order by 1;
+```
 
 **Facturas de marketing por mes** (vivas, por `created_at` — o sea cuándo se cargaron, no la fecha del
 papel):
@@ -2404,7 +2708,7 @@ Soft delete: **`deleted boolean DEFAULT false`**. Medido: **3 filas, 0 borradas.
 | `fecha_apertura` date NOT NULL | Día en que se abrió | 3 |
 | `fecha_cierre` date | Día del cierre. La escribe el PATCH | 2 |
 | `fondo_inicial` numeric DEFAULT 200 | El fondo. El POST acepta otro valor en el body; el cierre hereda el mismo | 3 (los 3 en $200) |
-| `estado` text DEFAULT `'abierto'` | `abierto` / `cerrado`. **Sin CHECK** | 3 |
+| `estado` text DEFAULT `'abierto'` | `abierto` / `cerrado`. 🔴 **SÍ tiene CHECK** (`caja_periodos_estado_check`, `CHECK (estado = ANY (ARRAY['abierto','cerrado']))`) — este archivo decía lo contrario. **No es como `guia_transporte.estado`, que sí está suelta** | 3 |
 | `repuesto` bool DEFAULT false | Lo marca «Aprobar reposición». 🔴 **NUNCA se ha usado: 0 filas en `true`** | 3 (0 en true) |
 | `repuesto_at` timestamptz | Cuándo se aprobó. 🔴 **0 filas** | **0** |
 | `created_by` uuid | Quién abrió el período | 2 (el N°1 no lo tiene: es anterior al campo) |
@@ -2419,7 +2723,18 @@ deriva, y el hecho de que se repuso vive en `repuesto` / `repuesto_at`.
 
 Soft delete: **`deleted boolean DEFAULT false` + `deleted_by` (uuid) + `deleted_at`** — el patrón
 completo, el único módulo de este archivo que firma la baja de un renglón.
-Medido: **93 filas · 16 borradas · 77 vivas** · `fecha` del 5-mar-2026 al 2-sep-2026.
+Medido el 5-sep-2026: **93 filas · 16 borradas · 77 vivas** · `fecha` del 5-mar-2026 al 2-sep-2026.
+
+```sql
+select count(*) tot, count(*) filter (where deleted) borr,
+       count(nullif(proveedor,'')) prov, count(nullif(nro_factura,'')) nf,
+       count(nullif(responsable,'')) resp, count(responsable_id) rid,
+       count(*) filter (where coalesce(itbms,0) <> 0) itbms,
+       count(nullif(factura,'')) factura_legacy, count(nullif(ruc,'')) ruc, count(nullif(dv,'')) dv,
+       count(created_by) cb, count(deleted_by) db, count(deleted_at) da
+from caja_gastos;
+-- 93 · 16 · 92 · 51 · 92 · 90 · 9 · 2 · 2 · 0 · 73 · 14 · 14
+```
 
 | Columna | Para qué · quién escribe · quién lee | Llenas (no vacías / ≠ 0) |
 |---|---|---|
@@ -2571,12 +2886,16 @@ código (*«el ITBMS arranca plegado: solo 9 de 77 gastos vivos lo tienen»*, `G
 Promedio: **~13 gastos al mes, ~$80**. El pico de julio (26 recibos) es la «tanda» que motivó
 conservar la fecha en «Guardar y nuevo».
 
-**Quién:** el `responsable` de los 93 gastos es **Angela** en las tres grafías. En `activity_logs`
+**Quién:** el `responsable` de los **77 gastos vivos** es **Angela**, en tres grafías (59/17/1).
+Sobre las 93 filas totales hay dos valores más, los dos ya borrados: un `Daniel` y una cadena vacía.
+En `activity_logs`
 (39 filas del 17-abr al 2-sep-2026): `caja_gasto_update` 20 · `caja_gasto_delete` 16 ·
 `caja_periodo_close` 2 · `caja_gasto_restore_manual` 1.
 
 **Períodos:** **3 en 5 meses y medio** — el 1 duró del 25-mar al 8-jul (105 días), el 2 del 8-jul al
-2-sep (56 días), el 3 abrió el 2-sep y sigue abierto.
+2-sep (56 días), el 3 abrió el 2-sep y sigue abierto. 🔑 **Estado del período 3 al 5-sep-2026:
+26 recibos vivos · $163,28 gastado · $36,72 en caja.** Va a ser el **primero que cierre bajo la
+regla nueva** y, por lo tanto, el primero que escriba `saldo_cierre`.
 
 **Última actividad:** 2-sep-2026 18:25 UTC (un borrado de gasto). El último gasto cargado es del
 2-sep-2026.
@@ -2657,7 +2976,7 @@ romperlo.
 | **`caja_categorias` llega vacía** | El desplegable queda vacío; el servidor cae al respaldo `"Varios"` | El desplegable vacío |
 | **`fg_users` no responde** | El modal de eliminados muestra `deleted_by_name = null` | Se ve «—» en la columna «Borrado por» |
 | **Se borra la fila UNIQUE de `numero`** | `abrirPeriodo` calcularía mal el siguiente correlativo | Un período repetido en la lista |
-| **Alguien inserta un período fuera de la app con `estado` raro** | La columna **no tiene CHECK**: la pantalla lo trataría como cerrado (`estado !== 'abierto'` cierra la edición) | El período aparece pero no deja agregar gastos |
+| ~~**Alguien inserta un período fuera de la app con `estado` raro**~~ | ✅ **No puede pasar.** `caja_periodos_estado_check` solo admite `abierto` y `cerrado` (verificado en `pg_constraint` el 5-sep-2026). Este archivo decía que la columna no tenía CHECK, y era falso | — |
 | **`db-max-rows` (1000)** | Ninguna consulta del módulo pagina — pero con **93 gastos y 3 períodos** está a dos órdenes de magnitud del corte | No se notaría hasta llegar a 1.000 gastos en un período |
 
 🔴 **El riesgo real de este módulo no es técnico: es que nadie lo mire.** Es un registro de control
@@ -2678,16 +2997,46 @@ quede abierto meses no dispara nada — la 💡 de «+30 días» se retiró el 4
    (`PATCH … {action:"repuesto"}`) funciona.
 5. 🔴 **`saldo_cierre` está aplicada y vacía.** La migración corrió el 4-sep; los 2 períodos cerrados
    quedan en NULL a propósito.
-6. 🩸 **Los datos de los cierres viejos están forzados.** Los 2 períodos cerrados dan **$200.00
-   clavados**, y hay gastos de **$0.05 y $0.87 creados y borrados el día del cierre** para cuadrar el
-   saldo 0 que la regla vieja exigía. Ese es el hecho que motivó el cambio del 4-sep.
-7. 🔴 **`responsable` (texto) está sucio: la misma persona escrita de tres formas** — `Angela Garcia`
-   ×59 · `Angela garcia` ×17 · `Angela garciia` ×1. Es exactamente el problema que `responsable_id`
-   (90/93 filas) vino a resolver, pero **el texto viejo no se limpió** y el Excel, la impresión y el
-   modal de eliminados muestran `responsable`, no el nombre del catálogo.
-8. **`caja_responsables` tiene 8 filas activas y solo 1 se usa.** Las otras 7 nunca aparecen en un
-   gasto.
-9. **`caja_categorias` tiene 6 filas y solo 4 se usan** en gastos vivos.
+6. 🩸 **Los datos de los cierres viejos están forzados.** El hecho duro, re-medido el 5-sep:
+   ```sql
+   select p.numero, p.fondo_inicial, round(sum(g.total)::numeric,2) gastado,
+          round((p.fondo_inicial - sum(g.total))::numeric,2) saldo, count(g.id) n
+   from caja_periodos p left join caja_gastos g on g.periodo_id = p.id and not g.deleted
+   group by p.numero, p.fondo_inicial order by 1;
+   -- 1 → gastado 200.00 · saldo 0.00 · 25 recibos
+   -- 2 → gastado 200.00 · saldo 0.00 · 26 recibos
+   -- 3 → gastado 163.28 · saldo 36.72 · 26 recibos   ← el ABIERTO, ya con la regla nueva
+   ```
+   **Los dos cerrados dan $200.00 clavados** — la venta de que la regla vieja forzaba el dato.
+   ⚠️ Y una precisión que este archivo tenía torcida: los gastos de **$0,05 (22-jul, «Comida») y
+   $0,87 (1-sep, «Comida»)** no están en un período cerrado — **están en el período 3, el abierto**, y
+   se borraron el **2-sep-2026**, el mismo día en que se cerró el 2 y se abrió el 3. Borrados por
+   período: **1 → 5 gastos ($45,18) · 2 → CERO · 3 → 11 ($56,94)**.
+7. 🔴 **`responsable` (texto) está sucio.** Re-medido el 5-sep, y hay que separar las dos cuentas
+   porque este archivo las mezclaba:
+   ```sql
+   select responsable, count(*) filter (where not deleted) vivos, count(*) tot
+   from caja_gastos group by 1 order by 3 desc;
+   ```
+   | `responsable` | Vivos | Total |
+   |---|---|---|
+   | `Angela Garcia` | 59 | 70 |
+   | `Angela garcia` | 17 | 20 |
+   | `Angela garciia` | 1 | 1 |
+   | `Daniel` | **0** | 1 |
+   | *(cadena vacía)* | **0** | 1 |
+   | **Total** | **77** | **93** |
+
+   O sea: sobre los **77 vivos** sí es Angela en tres grafías; sobre los **93** hay **cinco valores**,
+   incluidos un `Daniel` y un vacío, los dos borrados. Es exactamente el problema que
+   `responsable_id` (90/93) vino a resolver, pero **el texto viejo no se limpió** y el Excel, la
+   impresión y el modal de eliminados muestran `responsable`, no el nombre del catálogo.
+8. **`caja_responsables` tiene 8 filas, las 8 activas** (`andrea` · `Angela Garcia` · `Daniel` ·
+   `Jennifer` · `Julio` · `Otro` · `Rey` · `Rodrigo`) **y solo una aparece en un gasto vivo**
+   (Angela Garcia). `Daniel` aparece en un gasto, pero borrado. Las otras seis, nunca.
+9. **`caja_categorias` tiene 6 filas y solo 4 se usan** en gastos vivos (Alimentación 47 · Otros 18 ·
+   Transporte 10 · Materiales 2). **Las dos que nadie ha usado nunca son `Mantenimiento` y
+   `Papelería`.**
 10. 🔴 **`/caja/[periodoId]/nuevo` es una ruta huérfana** (410 líneas): nada la enlaza, no tiene
     smart defaults y al guardar navega a una URL legacy. Conservada a propósito, con la nota en su
     cabecera.
@@ -2696,8 +3045,18 @@ quede abierto meses no dispara nada — la 💡 de «+30 días» se retiró el 4
 12. **El alta de un gasto no se registra en `activity_logs`**: hay 93 gastos y ni una acción
     `caja_gasto_create`. Se registran el update, el delete, el restore y el cierre, pero no el alta —
     así que el log no puede reconstruir quién cargó qué (eso solo vive en `created_by`).
-13. **`caja_periodos.estado` no tiene CHECK constraint.** Los valores `abierto`/`cerrado` son
-    convención de código, igual que en `guia_transporte.estado`.
+13. ✅ **CORREGIDO (5-sep-2026): `caja_periodos.estado` SÍ tiene CHECK constraint.** Este archivo
+    afirmaba que no, y era falso. Medido:
+    ```sql
+    select rel.relname, con.conname, pg_get_constraintdef(con.oid)
+    from pg_constraint con join pg_class rel on rel.oid = con.conrelid
+    join pg_namespace n on n.oid = rel.relnamespace
+    where n.nspname='public' and con.contype='c' and rel.relname='caja_periodos';
+    -- caja_periodos_estado_check → CHECK (estado = ANY (ARRAY['abierto','cerrado']))
+    ```
+    O sea que **la fila «Alguien inserta un período fuera de la app con `estado` raro» de la tabla
+    "Qué lo rompe" describía un fallo IMPOSIBLE**: la base lo rechaza. La que sí está suelta, sin
+    CHECK, es `guia_transporte.estado` — no esta.
 14. **Dos mecanismos para el mismo «hoy de Panamá»** dentro del módulo: las rutas de gastos calculan
     `new Date(Date.now() - 5*3600*1000)` a mano, mientras el resto del sistema usa `hoyPanama()` de
     `src/lib/fecha-panama.ts`. Dan lo mismo, pero son dos.
@@ -2705,3 +3064,99 @@ quede abierto meses no dispara nada — la 💡 de «+30 días» se retiró el 4
     el resto del sistema. Lo protege el conteo de uso, no un soft delete.
 
 ---
+
+# Lo que estaba mal — correcciones del 5-sep-2026
+
+> Daniel, el 5-sep-2026: *«mira como te equivocas sin tener contexto… quiero que te tomes dos horas
+> recopilando información para que estas cosas no vuelvan a suceder que me digas una info falsa, yo
+> confío en ti y debes estar al tanto hasta más que yo del sistema»*.
+>
+> Este archivo se recorrió entero contra producción y contra el código. Se revisaron **~190
+> afirmaciones factuales**: la gran mayoría se confirmó tal cual. Abajo está **lo que no**, con qué
+> decía, qué es, y cómo se midió. Lo que se confirmó no se lista: está en el cuerpo del archivo, cada
+> cifra con su consulta.
+
+## 🩸 Las dos que Daniel vio, y por qué pasaron
+
+| # | Qué le dije a Daniel | Qué es | Cómo se midió | Por qué me equivoqué |
+|---|---|---|---|---|
+| 1 | **«Marketing no guarda el cliente»** | ❌ **Falso.** Lo guarda en `mk_proyectos.tienda_codigo`: **19 de 25** proyectos traen el código, y **los 19 resuelven a un cliente vivo de `clientes_master`** (18 distintos). Los 6 sin código **no son tiendas**: `Viaticos Mensuales` ×2, `Muebles`, `D`, `J` y una `Remodelacion`. De los 20 proyectos que sí son de una tienda, **19 traen el código (95%)** | `select count(nullif(tienda_codigo,'')) from mk_proyectos` + LEFT JOIN a `clientes_master` (ver § Marketing › Los datos) | Miré **`mk_entregas_muebles`**, que solo tiene `proyecto_id`, y concluí de ahí. El cliente vive un nivel más arriba: en `mk_proyectos`. **Lección: antes de decir que un dato no existe, hay que mirar la tabla del PROPIO objeto, no la de sus hijos** |
+| 2 | **«Reclamos va por proveedor, no por cliente»** | ✅ **Cierto — pero lo dije de memoria, sin medirlo.** Ahora está medido: los **34** reclamos vivos cruzan **34/34** contra `switch_proveedor_estadocuenta` por el par (empresa, código). Y por el camino viejo, el del NOMBRE, hoy cruzarían **solo 8 de 34** | Las dos consultas del § Reclamos › «El cruce con Switch, medido de punta a punta» | Cierto por casualidad no es cierto. Una afirmación sin consulta al lado es una que no se puede defender |
+
+## Lo demás que estaba mal, por módulo
+
+### Guías
+
+| Qué decía | Qué es | Cómo se midió |
+|---|---|---|
+| `receptor_nombre`: *«de 109 guías con receptor, **0 coinciden** con un nombre de cliente»* | ❌ **Falso en las dos cifras.** Son **160** guías con receptor (84 nombres distintos), y **22 SÍ coinciden letra por letra** con un nombre de `clientes_master`: `ERIC` 17 · `ISMAEL` 2 · `CARLOS` 1 · `EDWIN` 1 · `EDWIN GONZALES` 1. Son homónimos de pila. Lo que sí da 0 es la coincidencia con el `cliente` de un renglón de su propia guía. **El invariante sale reforzado**: si alguien dedujera el cliente del receptor, 22 guías se atarían al cliente equivocado | `EXISTS` contra `clientes_master` por `upper(trim(...))` — § Guías › `guia_transporte` |
+| `placa` **160** llenas · `observaciones` **154** · `numero_guia_transp` (cabecera) **88** | ⚠️ Eran conteos de **no-NULL**, no de contenido. Con contenido real: **placa 144** (16 en cadena vacía) · **observaciones 117** (37 vacías) · **numero_guia_transp 66** (22 vacías, y 9 de los 66 dicen `"0"`, que el papel imprime en blanco → **57 útiles**) | `count(nullif(col,''))` contra `count(col)` |
+| Regla 7: *«De **51** guías creadas como entrega directa, 50 quedaron grabadas como transportista externo»* | ⚠️ Son **66** con `modo_entrega='entrega_directa'` (50 con `tipo_despacho='externo'` + 16 con `directo`). El desajuste sigue siendo de 50 filas, pero el universo era otro | `group by modo_entrega, tipo_despacho` sobre las vivas |
+| Regla 3: *«se corrigen **TRES** campos… cliente · cliente_codigo · facturas · N° del transportista»* | ⚠️ Se contradecía sola: dice tres y lista **cuatro**. En el código `CAMPOS_DESPACHADA` tiene **cuatro entradas**; son tres COSAS porque el cliente son dos columnas | `src/lib/guias/campos-editables.ts:54-59` |
+| Direcciones sucias: *«Paso Canoas ×208 / Pasocanoas ×1 / Paso Canoa ×1»* | ⚠️ Cortas. **Paso Canoas: 5 grafías, 221 renglones.** Penonomé: **3 grafías, 11 renglones, y ninguna bien escrita**. Westland: el typo `Wesland` ×5 más **8 grafías** que le pegan la tienda al destino | `group by direccion` con `ilike` — § Guías › Lo que sobra #11 |
+| *«el PUT hace `DELETE` REAL»* (un lugar) | ⚠️ Son **TRES** `.delete()` en `api/guias/[id]/route.ts`: líneas 196 (limpieza del lote), 200 (renglones viejos) y **227** (borra TODOS cuando el payload trae la lista vacía) | Lectura del archivo |
+| *«`guia_transporte.estado` no tiene CHECK»* | ✅ **Cierto**, pero faltaba decir que la tabla **sí tiene otros dos CHECK**: `modo_entrega_valido` y `modo_coherente` (transportista ⟺ FK presente). El modo está protegido; el estado no | `pg_constraint`, `contype='c'` |
+| `GUIAS_ROLES` / `GUIAS_WRITE_ROLES` presentados como constantes | ⚠️ **No son una constante compartida**: están escritas a mano en **seis** archivos de ruta. La única con un solo lugar es `CONFIG_GUIAS_ROLES` | `grep -rn` sobre `src/` |
+| *«`GUIAS_ATAJOS_NUEVOS` … hoy en `true`»* | ✅ **Confirmado sin ambigüedad**: `src/lib/guias/atajos-facturas.ts:39`, `export const GUIAS_ATAJOS_NUEVOS = true;`. Se reescribió para que no quede dudando quién lo lea | Lectura del archivo |
+| `guia_items.facturas` con `Traslado`: 0 | ✅ **Sigue en 0 un día después.** El botón lleva 24 h encendido y **no se ha usado ni una vez** | `count(*) filter (where facturas ilike '%traslado%')` |
+
+### Packing Lists
+Nada estaba mal. Se confirmó punto por punto: **0 filas** en `packing_lists` y `pl_items`, última
+carga real **22-abr-2026**, el cron corrió esta madrugada (`2026-09-05 03:00:44 UTC`) sobre la nada,
+`RETENCION_DIAS = 90` en el código y el texto **«se eliminan después de 7 días» sigue en pantalla**
+(`PackingListsClient.tsx:1112`). El acceso fantasma de `vendedor` también se confirmó leyendo
+`modules.ts:166` contra `api/packing-lists/route.ts:9`.
+
+### Reclamos
+
+| Qué decía | Qué es | Cómo se midió |
+|---|---|---|
+| *«`proveedor_codigo` 34/34 tras la migración `20260922120000` (**pendiente de aplicar**)»* | ⚠️ **La migración YA ESTÁ APLICADA.** Y con ella también `20260921120000` y `20260924120000`, que `CLAUDE.md` sigue dando por pendientes | `supabase_migrations.schema_migrations` |
+| *«`motivo` trae **8** valores que no están en `DEFAULT_MOTIVOS`»* | ⚠️ Son **10 valores, 105 de 143 ítems (73%)**. `DEFAULT_MOTIVOS` tiene seis entradas, y ni `Faltante de Mercancía` (16) cruza, porque el default lleva la `m` minúscula | `group by motivo` contra `constants.ts:41-48` |
+| `reclamo_items.talla` vacía: 3 | ⚠️ Son **2** | `count(*) filter (where talla='')` |
+| Badge: *«excluye 4 estados terminales/legacy»* | ⚠️ Faltaba la consecuencia: **`reclamos.estado` tiene CHECK** (`Creado`\|`En proceso`\|`Pagado`), así que tres de esos cuatro (`Aplicado`, `Rechazado`, `Aplicada`) **la base no los puede guardar**. Tres cuartos de esa lista de exclusión son código muerto | `pg_constraint` |
+| *«admin aparece con 9 altas, 9 borrados y 1 edición»* | ⚠️ Cierto en los totales, pero **no todas son de Daniel**: `daniel` 7 altas + 8 borrados; **`PRUEBA-BOT` 2 altas, 1 borrado y la única edición de ítems** | `activity_logs` agrupado por `details->>'user_name'` |
+| `reclamo_contactos.whatsapp` presentado como columna que «se captura» | ⚠️ **Está llena en las 5 filas** con teléfonos reales, y nadie la lee. Es dato bueno desperdiciado, no una columna vacía | `select whatsapp from reclamo_contactos` |
+| El comentario de `empresas.ts`: *«`112` en dos empresas»* | ⚠️ Está en **TRES** (`fashion_shoes`, `joystep` y **`american_classic` = FASHION WEAR, INC**). ⚠️ Es un error del **código**, no solo de este archivo | `group by codigo` sobre `switch_proveedor_estadocuenta` |
+| *«rol `"upload"` fantasma»* | ✅ **Confirmado**: `src/app/api/reclamos/route.ts:15` lo acepta y no está en `SYSTEM_ROLES` (`modules.ts:224-240`) | Lectura de los dos archivos |
+
+### Marketing
+
+| Qué decía | Qué es | Cómo se midió |
+|---|---|---|
+| *«Quién LEE lo suyo: **Nadie**»* | ⚠️ Cierto para pantallas y módulos, **falso en absoluto**: el **cron `backup` lee las 14** (`api/cron/backup/route.ts`) y `src/lib/backup/tablas.ts` las clasifica. Las secciones de Guías y Caja sí lo decían; esta se lo había saltado | `grep -o 'table: "mk_[a-z_]*"'` → 14 líneas |
+| Impulsadoras: *«secretaria 22 · **admin 9**»* | ⚠️ Son **admin 11**. Faltaban 2 filas de `factura_duplicada_permitida`, que también son de `entity_type='marketing'`. El total del `entity_type` es **33**, y así cuadra | `group by user_role` sobre `entity_type='marketing'` |
+| `mk_proyecto_marcas`: *«5 filas para 25 proyectos»* | ⚠️ Preciso: **5 filas repartidas en 3 proyectos**. 22 de 25 no tienen ninguna | `count(distinct proyecto_id)` |
+| `mk_periodos`: *«1 solo período cerrado… el 12-ago-2026»* | ⚠️ Faltaba lo importante: lo cerró **`cerrado_por = 'migracion'`**, y los 6 se abrieron el mismo día. **El botón «Cerrar período» nunca se ha usado en producción** | `select cerrado_por, abierto_en from mk_periodos` |
+| *«14 tablas `mk_*`»* | ✅ Correcto. Se agrega el porqué de la confusión: `backup/tablas.ts` nombra **16**, y declara `mk_cobranzas` y `mk_pagos` en `TABLAS_DE_MIGRACION_QUE_NO_EXISTEN` | `information_schema.tables` |
+| `mk_mobiliario_notas_proveedor` «separada del inventario» | ✅ Cierto, y ahora con una razón más medida: **los nombres de producto ni siquiera coinciden** entre las dos tablas («Flauta» vs. «Barra flauta»). No hay ni por dónde fusionarlas | Lectura de las 6+6 filas |
+| Regla 3: *«El **único** freno es `tieneAlMenosUno`»* | ⚠️ Son **cuatro**: el botón exige `marcasOk && tieneAlMenosUno` (`EntregaForm.tsx:514-519`) y el servidor rechaza sin ítems, **sin marca**, sin ítem con cantidad, y con el proyecto anulado (`inventario.ts` 790/812/831/805, repetidos en `updateEntrega`). Lo que dejó de ser obligatorio es **Paneles**, no la marca | Lectura de los dos archivos |
+| `mk_proyectos`: la columna `tienda` no figuraba | ⚠️ Existe y está **llena 25/25**: el módulo guarda el **nombre** de la tienda Y su **código** | `count(nullif(tienda,''))` |
+
+### Caja Menuda
+
+| Qué decía | Qué es | Cómo se midió |
+|---|---|---|
+| 🔴 *«`caja_periodos.estado` **no tiene CHECK constraint**»* (dicho **dos veces**, y con una fila entera de «Qué lo rompe» construida encima) | ❌ **Falso. SÍ tiene CHECK**: `caja_periodos_estado_check`, `CHECK (estado = ANY (ARRAY['abierto','cerrado']))`. El fallo que el archivo describía —«alguien inserta un período con estado raro»— **es imposible**. La que sí está suelta es `guia_transporte.estado` | `pg_constraint` con `contype='c'` |
+| *«el `responsable` de los **93** gastos es Angela en las tres grafías»* | ⚠️ Mezclaba dos universos. Sobre los **77 vivos** sí (59/17/1). Sobre las **93 filas** hay **cinco valores**: `Angela Garcia` 70 · `Angela garcia` 20 · `Angela garciia` 1 · **`Daniel` 1** · **vacío 1** (los dos últimos, borrados) | `count(*) filter (where not deleted)` vs. `count(*)` |
+| *«gastos de $0,05 y $0,87 creados y borrados el día del cierre»* (atribuidos a forzar un período cerrado) | ⚠️ Los dos están en el **período 3, el ABIERTO**, y se borraron el 2-sep — el día en que se cerró el 2 y se abrió el 3. Lo que sí prueba el forzado es que **los períodos 1 y 2 dan $200.00 exactos**. Borrados por período: 1 → 5 · **2 → CERO** · 3 → 11 | JOIN `caja_gastos` × `caja_periodos` |
+| *«`caja_responsables` … solo 1 se usa»* · *«`caja_categorias` … solo 4 se usan»* | ⚠️ Ciertos, pero sin decir **quiénes**. Ahora están nombrados: los 8 responsables, y las dos categorías nunca usadas son **`Mantenimiento` y `Papelería`** | `select nombre from caja_responsables / caja_categorias` |
+| Estado del período abierto | Faltaba. Al 5-sep-2026: **26 recibos · $163,28 gastado · $36,72 en caja**. Será el **primero que cierre con la regla nueva** y el primero que escriba `saldo_cierre` | JOIN por período |
+
+## Lo que hay que corregir FUERA de este archivo
+
+No lo toqué (no es mi archivo), pero queda anotado:
+
+1. 🔴 **`CLAUDE.md` da por pendientes tres migraciones que YA CORRIERON:** `20260921120000`
+   (`carga_history_archivo`, § Catálogos), `20260922120000` (`reclamos_proveedor_codigo`, § Reclamos)
+   y `20260924120000` (`borrar_pedidos_de_prueba`, § Catálogos). Verificado en
+   `supabase_migrations.schema_migrations` el 5-sep-2026.
+2. 🔴 **El comentario de `src/lib/reclamos/empresas.ts` dice que el código `112` está en dos
+   empresas; está en TRES** — falta `american_classic` = «FASHION WEAR, INC». Es un comentario, no
+   lógica: no cambia ningún resultado, pero es exactamente la clase de dato viejo que hace que el
+   próximo cambio se decida mal.
+3. ⚠️ **`CLAUDE.md § Módulos` pone Comisiones en el grupo «Operación»**; en `src/lib/modules.ts`
+   está en `group: "ventas-clientes"`. El grupo Operación tiene **diez** módulos, no once.
+4. ⚠️ **El texto de la pantalla de Packing Lists sigue mintiendo** («se eliminan después de 7 días»,
+   `PackingListsClient.tsx:1112`) cuando la retención real es de 90 días **desde el borrado manual**,
+   y un PL activo no se borra nunca. Es la única mentira de este dominio que un usuario puede leer.

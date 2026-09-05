@@ -1,6 +1,6 @@
 # Préstamos
 
-> Referencia del módulo, **medida contra producción el 4-sep-2026** (Management API,
+> Referencia del módulo, **medida contra producción el 5-sep-2026** (Management API,
 > `POST /v1/projects/rspocgqhtpveytgbtler/database/query`).
 > No repite `cxc/CLAUDE.md`: apunta a él (§ Roles, § Módulos, § Dónde vive cada dato,
 > § Trampas transversales) y escribe lo que le falta. Préstamos **no tiene postmortem propio**;
@@ -18,9 +18,24 @@
 > repo. El porqué de cada punto —con sus citas y sus mediciones— vive ahora en
 > **[`docs/postmortems/prestamos.md`](../postmortems/prestamos.md)**, que este archivo ya no repite.
 >
-> ⚠️ **Las migraciones `20260925120000_prestamos_dos_cuentas_y_tope.sql` está ESCRITA y NO APLICADA.**
-> Hasta que Daniel la corra, las columnas `deduccion_dano`, `cuenta` y `origen_pago` no existen y el
-> módulo no funciona: aquí no hay tolerancia a DDL pendiente, y es deliberado (ver § Qué lo rompe).
+> ✅ **La migración `20260925120000_prestamos_dos_cuentas_y_tope.sql` YA ESTÁ APLICADA.**
+> Verificado el 5-sep-2026 contra `supabase_migrations.schema_migrations` y contra
+> `information_schema.columns`: las tres columnas nuevas —`prestamos_empleados.deduccion_dano`,
+> `prestamos_movimientos.cuenta` y `prestamos_movimientos.origen_pago`— existen en producción, la
+> RPC `prestamos_aplicar_quincena` viva ya trae las dos cuentas y el dedup por origen, y la ficha
+> duplicada de RAMON MIRANDA quedó juntada. **Ya no hay nada pendiente de correr en este módulo.**
+>
+> ```sql
+> select version, name from supabase_migrations.schema_migrations where version = '20260925120000';
+> -- 20260925120000 | prestamos_dos_cuentas_y_tope
+> ```
+>
+> El texto de abajo describe el módulo **como está hoy**, no como iba a quedar. Lo que cambió entre
+> la versión escrita ayer de este archivo y lo medido hoy está al final, en § Lo que estaba mal.
+>
+> ⚠️ Lo que decía este bloque hasta hoy: *«está ESCRITA y NO APLICADA… las columnas no existen y el
+> módulo no funciona»*. Era cierto cuando se escribió y dejó de serlo el mismo día. La frase que sí
+> se queda es la otra: **aquí no hay tolerancia a DDL pendiente, y es deliberado** (§ Qué lo rompe).
 
 ---
 
@@ -45,10 +60,66 @@ Resuelve un problema chico y viejo: antes esto vivía en una hoja de la contador
 copiaba el descuento a mano de una pantalla a otra. Hoy el módulo lleva el saldo y la planilla de
 Asistencia le pide la cuota (§ Con qué conecta).
 
-**Tamaño real:** 32 fichas, 443 movimientos (432 vivos), **$5.062,01 de saldo vivo** en **14
-personas** — $4.962,01 en 13 más $100 de BRICEIDA MONTERO. Medido el 5-sep-2026; ese número es el
-que la reescritura tenía prohibido mover, y hay candado con las 14 personas una por una
-(`prestamos-dos-cuentas.test.ts`). Nació el **26-mar-2026**
+**Tamaño real:** **31 fichas vivas** (+1 borrada), 443 movimientos (432 vivos), **$5.062,01 de saldo
+vivo** en **14 personas**. Medido el 5-sep-2026 **después** de aplicar la migración; ese número es el
+que la reescritura tenía prohibido mover, y no se movió. Hay candado con las 14 personas una por una
+(`prestamos-dos-cuentas.test.ts`).
+
+🔴 **Hoy las 14 deben TODO en la cuenta «Préstamo»: la cuenta «Daño de mercancía» suma $0,00 en las
+14.** El corte no cambió ni un centavo de sitio. El único caso cruzado es **STEPHANY MORALES**
+(ficha sin código, neto **$0**): sus cargos de daño ($286,50) se pagaron con un `Pago` de $254,50
+registrado como préstamo, así que su cuenta Préstamo da **−$254,50** y su Daño **+$254,50**. **No se
+reasignó nada** — se respeta lo que alguien registró. Por eso son **15** las personas con alguna
+cuenta distinta de cero y **14** las que deben plata.
+
+```sql
+-- El saldo de hoy, con la MISMA derivación que usa la app (cuenta si está escrita, si no el concepto)
+with mv as (
+  select e.nombre,
+    case when coalesce(m.cuenta,'') in ('prestamo','dano') then m.cuenta
+         when m.concepto in ('Responsabilidad por daño','Pago de responsabilidad') then 'dano'
+         else 'prestamo' end as cuenta,
+    case when m.concepto in ('Préstamo','Responsabilidad por daño') then m.monto
+         when m.concepto in ('Pago','Abono extra','Pago de responsabilidad') then -m.monto
+         else 0 end as signo
+  from prestamos_empleados e
+  join prestamos_movimientos m on m.empleado_id = e.id
+  where coalesce(e.deleted,false)=false and coalesce(m.deleted,false)=false and m.estado='aprobado')
+select nombre,
+  round(sum(case when cuenta='prestamo' then signo else 0 end),2) as saldo_prestamo,
+  round(sum(case when cuenta='dano'     then signo else 0 end),2) as saldo_dano,
+  round(sum(signo),2) as total
+from mv group by 1 having round(sum(signo),2) <> 0 order by total desc;
+```
+
+| # | persona | empresa | Préstamo | Daño | **Debe** | cuota préstamo | cuota daño |
+|---|---|---|---|---|---|---|---|
+| 1 | ANGELA GARCIA | Vistana International | 1.798,05 | 0,00 | **1.798,05** | 50,00 | 0 |
+| 2 | ANDRES GONZALEZ | Confecciones Boston | 900,00 | 0,00 | **900,00** | 50,00 | 0 |
+| 3 | ANDREA PEREZ | Vistana International | 450,00 | 0,00 | **450,00** | 50,00 | 0 |
+| 4 | MARIA V. BETHANCOURTH G. | Confecciones Boston | 417,28 | 0,00 | **417,28** | 25,00 | 0 |
+| 5 | MARTHA ASUCENA CHAVARRIA Z. | Confecciones Boston | 300,00 | 0,00 | **300,00** | 50,00 | 0 |
+| 6 | GABRIELA JARAMILLO | Confecciones Boston | 300,00 | 0,00 | **300,00** | 60,00 | 0 |
+| 7 | YULICAR CORONA | Confecciones Boston | 266,68 | 0,00 | **266,68** | 25,00 | 0 |
+| 8 | RAMON MIRANDA | Confecciones Boston | 220,00 | 0,00 | **220,00** | 30,00 | 0 |
+| 9 | CRISTIAM BLANCO | Confecciones Boston | 125,00 | 0,00 | **125,00** | 25,00 | 0 |
+| 10 | **BRICEIDA MONTERO** | Confecciones Boston | 100,00 | 0,00 | **100,00** | 50,00 | 0 |
+| 11 | YERITZA YANETH SOLIS CASTRO | Confecciones Boston | 100,00 | 0,00 | **100,00** | 50,00 | 0 |
+| 12 | LUIS PARAJON | Fashion Wear | 40,00 | 0,00 | **40,00** | 45,00 | 0 |
+| 13 | LUZ BOSQUEZ | Confecciones Boston | 25,00 | 0,00 | **25,00** | 25,00 | 0 |
+| 14 | ALEJANDRA CAMAÑO | Confecciones Boston | 20,00 | 0,00 | **20,00** | 10,00 | 0 |
+| — | STEPHANY MORALES | Confecciones Boston | −254,50 | +254,50 | **0,00** | — | — |
+| | **TOTAL** | | **5.062,01** | **0,00** | **5.062,01** | | |
+
+⚠️ **Los $100 de BRICEIDA MONTERO son un PRÉSTAMO, no un daño de mercancía.** Sus movimientos son
+5 préstamos ($1.300 entre abril y junio de 2025) contra $1.200 de pagos: `1.300 − 1.200 = 100`. La
+versión anterior de este archivo la separaba del resto («$4.962,01 en 13 más $100 de BRICEIDA
+MONTERO»), lo que se leía como si su deuda fuera de otra clase. No lo es: es la décima de catorce
+filas iguales.
+
+⚠️ **Nadie tiene cuota de daño de mercancía todavía**: `deduccion_dano` está en **0 en las 31 fichas**.
+La segunda cuota existe y funciona, pero hasta que contabilidad le ponga un número a alguien, la
+planilla sigue proponiendo exactamente lo mismo que antes. Nació el **26-mar-2026**
 (commit `feat: módulo préstamos a colaboradores`), o sea que es de los módulos VIEJOS, anterior
 a la reescritura de julio.
 
@@ -189,10 +260,22 @@ en `true` o `false`. O sea que el `.eq(...)` que usan `prestamos-planilla-server
 módulo **hoy no pierde ninguna fila**, pero el día que un insert deje el campo en NULL sí la
 perdería, y sin ruido.
 
-### `prestamos_empleados` — 32 filas · grano: **una ficha de préstamo** (llave `id` uuid)
-Empresas realmente usadas: **Confecciones Boston 22 · Vistana International 5 · Fashion Wear 5**.
-Al aplicar `20260925120000` quedan **31 vivas**: la segunda ficha de RAMON MIRANDA se marca `deleted`
-y sus 2 movimientos se mudan a la viva ($220 + $0 = **$220**, no cambia ningún número).
+### `prestamos_empleados` — **31 filas vivas** (+1 borrada) · grano: **una ficha de préstamo** (llave `id` uuid)
+Empresas realmente usadas: **Confecciones Boston · Vistana International · Fashion Wear** (3 valores).
+✅ **La migración ya corrió**: la segunda ficha de RAMON MIRANDA está `deleted` y sus movimientos
+viven todos en la ficha buena — **36 movimientos, saldo $220,00**, exactamente el mismo número de
+antes.
+
+```sql
+select count(*) filter (where coalesce(deleted,false)=false) vivas,
+       count(*) filter (where deleted = true)                borradas,
+       count(*) filter (where coalesce(deleted,false)=false
+                          and empleado_codigo is not null
+                          and btrim(empleado_codigo) <> '')  con_codigo,
+       count(*) filter (where coalesce(deleted,false)=false and deduccion_dano > 0) con_cuota_dano
+from prestamos_empleados;
+-- vivas 31 | borradas 1 | con_codigo 23 | con_cuota_dano 0
+```
 
 | columna | para qué | quién la escribe | quién la lee | llenas |
 |---|---|---|---|---|
@@ -200,12 +283,12 @@ y sus 2 movimientos se mudan a la viva ($220 + $0 = **$220**, no cambia ningún 
 | `nombre` text NOT NULL | **la identidad real**, texto libre tecleado | POST y PUT `/empleados` | lista, ficha, Boston, buscador global, Excel, planilla | 32 |
 | `empresa` text | agrupar y filtrar. Guarda el **NOMBRE** («Confecciones Boston»), no la key | POST y PUT | filtro de la lista, `/api/boston/inicio` (`.eq("empresa","Confecciones Boston")`), pestaña de Boston, Excel | 32 · **3 valores** |
 | `deduccion_quincenal` numeric NOT NULL d.`0` | **la cuota**: lo que se le descuenta cada quincena | POST y PUT | RPC del lote, los 3 botones de pago quincenal, planilla de Asistencia, Excel | 32 · **todas ≠ 0** |
-| `deduccion_dano` numeric NOT NULL d.`0` | 🔴 **la cuota de la SEGUNDA cuenta** (daño de mercancía). La planilla propone la SUMA de las dos en una casilla | PUT `/empleados/[id]` | la RPC del lote, la ficha, la planilla, el Excel | **nueva (20260925120000)** |
+| `deduccion_dano` numeric NOT NULL d.`0` | 🔴 **la cuota de la SEGUNDA cuenta** (daño de mercancía). La planilla propone la SUMA de las dos en una casilla | PUT `/empleados/[id]` | la RPC del lote, la ficha, la planilla, el Excel | ✅ **existe en producción** · **0 de 31 con valor**: nadie tiene cuota de daño todavía |
 | `notas` text | — | PUT | 🔴 **NADIE** | 29 |
-| `activo` bool d.`true` | 🩸 **RETIRADA el 5-sep-2026: sin lectores ni escritores.** Nunca significó «trabaja acá» sino «tiene algo abierto» — a ESMER CRUZ le archivaron la ficha al terminar de pagar sus $600 y **sigue trabajando**. La columna **NO se borra** (patrón `mayor_lineas`): queda con su `COMMENT` y con un test que pone el build rojo si una migración la dropea **o si alguien vuelve a filtrar por ella** | 🔴 **NADIE** | 🔴 **NADIE** | 32 |
+| `activo` bool d.`true` | 🩸 **RETIRADA el 5-sep-2026: sin lectores ni escritores.** Nunca significó «trabaja aquí» sino «tiene algo abierto» — a ESMER CRUZ le archivaron la ficha al terminar de pagar sus $600 y **sigue trabajando**. La columna **NO se borra** (patrón `mayor_lineas`): queda con su `COMMENT` y con un test que pone el build rojo si una migración la dropea **o si alguien vuelve a filtrar por ella** | 🔴 **NADIE** | 🔴 **NADIE** | 31 |
 | `created_at` timestamptz d.`now()` | — | DB | 🔴 **NADIE** (no se muestra ni se ordena por ella) | 32 |
 | `deleted` bool d.`false` | soft delete | **solo** `DELETE /empleados/[id]` (admin) | 🔴 **solo `prestamos-planilla-server.ts`**. Ni la lista, ni la ficha, ni el Excel, ni el buscador, ni las 2 rutas de Boston lo filtran | 32 en `false` |
-| `empleado_codigo` text | 🔴 **el amarre con la planilla** — el código del reloj (`asistencia_personas.empleado_codigo`). De él salen ahora el NOMBRE, la EMPRESA, si TRABAJA y el SALARIO (el tope) | ✅ **el POST y el PUT de `/empleados`** desde el 5-sep-2026, eligiendo a la persona de una lista; más las migraciones `20260902120000` y `20260925120000` | `prestamos-planilla-server.ts`, `prestamos-lista-server.ts`, la RPC del lote, Asistencia (aviso de salida con deuda) | 22 de 32 → **24** al aplicar `20260925120000` (MARTHA 43 · YERITZA 51) |
+| `empleado_codigo` text | 🔴 **el amarre con la planilla** — el código del reloj (`asistencia_personas.empleado_codigo`). De él salen ahora el NOMBRE, la EMPRESA, si TRABAJA y el SALARIO (el tope) | ✅ **el POST y el PUT de `/empleados`** desde el 5-sep-2026, eligiendo a la persona de una lista; más las migraciones `20260902120000` y `20260925120000` | `prestamos-planilla-server.ts`, `prestamos-lista-server.ts`, la RPC del lote, Asistencia (aviso de salida con deuda) | ✅ **23 de 31** · 🔴 **las 14 que deben plata lo tienen, las 14** · las 8 sin código tienen saldo **$0** |
 
 🔴 **`notas` del empleado: nadie la lee.** Se escribe en dos formularios y solo se recupera dentro
 del propio formulario de edición (`PrestamosClient.tsx:212`, `useEmpleadoActions.ts:27`). No aparece
@@ -219,9 +302,31 @@ el aviso ámbar de la planilla decía, textual, que sí: *«Se atan en Préstamo
 la ficha»*. Las dos fichas creadas el 2 y el 4 de septiembre nacieron sin código — **$400 de deuda
 viva** que la planilla no podía descontar.
 
+🔴 **Las 8 fichas sin código son las 8 que no deben nada** — y ninguna cruza con Asistencia porque
+son gente que ya no está: `JOHANA VALLEJO` ×2 · `LUZ LOPEZ` ×2 (una sin movimientos) ·
+`STEFANY MORALES` · `STEPHANY MORALES` · `YANKATERY` · `YEISON LLORENTE`, las 8 de Confecciones
+Boston, las 8 con saldo `0.00` o sin movimientos. **El $400 sin atar que había ayer se cerró**: las
+fichas del 2 y el 4 de septiembre (MARTHA $300 y YERITZA $100) tienen hoy sus códigos `43` y `51`.
+
+```sql
+select e.nombre, e.empleado_codigo,
+  (select round(sum(case when m.concepto in ('Préstamo','Responsabilidad por daño') then m.monto
+                         when m.concepto in ('Pago','Abono extra','Pago de responsabilidad') then -m.monto
+                         else 0 end),2)
+     from prestamos_movimientos m
+    where m.empleado_id = e.id and coalesce(m.deleted,false)=false and m.estado='aprobado') as saldo
+from prestamos_empleados e
+where coalesce(e.deleted,false)=false and (e.empleado_codigo is null or btrim(e.empleado_codigo)='');
+-- 8 filas, todas con saldo 0.00 o NULL
+```
+
+✅ **Los 23 códigos cruzan los 23 con `asistencia_personas`. Cero huérfanos.** Y las 14 personas con
+deuda tienen las cuatro cosas que el módulo necesita de allá: nombre igual, empresa, `activo = true`
+y **salario cargado** (ninguna cae al piso de $500 del tope).
+
 ⚠️ El índice `prestamos_empleados_empleado_codigo_idx` **no es único**, y `RAMON MIRANDA` era el único
-caso (código `21` en dos fichas). La migración las junta, y el POST rechaza una segunda ficha para un
-código que ya tiene una. La planilla **sigue agrupando por código a propósito** (`sugerirPrestamos`):
+caso (código `21` en dos fichas). La migración ya las juntó, y el POST rechaza una segunda ficha para
+un código que ya tiene una. La planilla **sigue agrupando por código a propósito** (`sugerirPrestamos`):
 el invariante no depende de que no haya duplicados.
 
 ### `prestamos_movimientos` — 443 filas · grano: **un movimiento de plata** (llave `id` uuid)
@@ -234,11 +339,11 @@ Carga inicial: **243 filas creadas el 26 y 27 de marzo de 2026** (165 + 78); des
 | `empleado_id` uuid | a quién pertenece (FK lógica, sin constraint declarada) | POST | todo | 443 |
 | `fecha` date NOT NULL | la fecha del hecho | POST y PUT | saldo corriente, dedup, chips de quincena, «ya descontado» de la planilla | 443 |
 | `concepto` text NOT NULL | **el signo** de la plata | POST (**inmutable en el PUT**) | todo | 443 · **5 valores**. 🔴 Desde el 5-sep-2026 el formulario ofrece **TRES** (`Préstamo`, `Responsabilidad por daño` mostrado como «Daño de mercancía», `Pago`); `Abono extra` y `Pago de responsabilidad` **no se pueden crear** pero **se siguen contando igual**. Ningún valor se renombró: renombrarlo no revienta nada, **deja de contarse en silencio** |
-| `cuenta` text | 🔴 **a cuál de las dos cuentas pertenece**: `prestamo` \| `dano` (CHECK). Un `Pago` la trae SIEMPRE escrita — baja una sola cuenta y hay que saber cuál | POST y la RPC del lote | `cuentaDeMovimiento()` | **NULL en las 443 viejas, a propósito**: se DERIVA del concepto al leer, y así los números de ayer no se mueven. Un backfill sería una segunda definición de la misma regla |
-| `origen_pago` text | **de dónde salió la plata de un Pago**: `Quincena` \| `Décimo` \| `Vacaciones` \| `Liquidación` \| `Efectivo` (CHECK). 🔴 Es además **la llave del freno de duplicados** | POST, PUT y la RPC del lote | el dedup, la ficha, el Excel | **nueva**. NULL se lee como `Quincena` (lo conservador: en la duda se omite) |
+| `cuenta` text | 🔴 **a cuál de las dos cuentas pertenece**: `prestamo` \| `dano` (CHECK). Un `Pago` la trae SIEMPRE escrita — baja una sola cuenta y hay que saber cuál | POST y la RPC del lote | `cuentaDeMovimiento()` | ✅ **existe** · **0 de 443 escritas**, a propósito: se DERIVA del concepto al leer, y así los números de ayer no se mueven. Un backfill sería una segunda definición de la misma regla. La primera fila con `cuenta` escrita nacerá con el próximo movimiento |
+| `origen_pago` text | **de dónde salió la plata de un Pago**: `Quincena` \| `Décimo` \| `Vacaciones` \| `Liquidación` \| `Efectivo` (CHECK). 🔴 Es además **la llave del freno de duplicados** | POST, PUT y la RPC del lote | el dedup, la ficha, el Excel | ✅ **existe** · **0 de 443 escritas**. NULL se lee como `Quincena` (lo conservador: en la duda se omite), así que el freno **ya está protegiendo** las 443 viejas sin backfill |
 | `monto` numeric NOT NULL | la plata | POST y PUT | todo | 443 |
-| `notas` text | ver abajo. 🔴 **Ya NO es una llave**: es solo texto | POST y PUT, **opcional** desde el 5-sep-2026 | tabla de la ficha, Excel | 443 de 443 hasta hoy; de acá en adelante puede quedar vacía |
-| `estado` text NOT NULL d.`'aprobado'` | qué cuenta para el saldo | POST (`aprobado`, o **`pendiente_aprobacion` cuando el préstamo pasa el tope**) y `/api/prestamos/pendientes` (solo Daniel) | `calcularSaldoPrestamo` y `pendienteDeAprobacion` | 443 = `aprobado` al 5-sep-2026 |
+| `notas` text | ver abajo. 🔴 **Ya NO es una llave**: es solo texto | POST y PUT, **opcional** desde el 5-sep-2026 | tabla de la ficha, Excel | 443 de 443 hasta hoy; de aquí en adelante puede quedar vacía |
+| `estado` text NOT NULL d.`'aprobado'` | qué cuenta para el saldo | POST (`aprobado`, o **`pendiente_aprobacion` cuando el préstamo pasa el tope**) y `/api/prestamos/pendientes` (solo Daniel) | `calcularSaldoPrestamo` y `pendienteDeAprobacion` | **443 = `aprobado`** · 🔴 **0 esperando aprobación hoy** (medido 5-sep-2026) |
 | `aprobado_por` uuid | — | 🔴 **NADIE** (sigue en el `allowed[]` del PUT, nunca se manda) | 🔴 **NADIE** | **0** |
 | `created_by` uuid | — | 🔴 **NADIE** | 🔴 **NADIE** | **0** |
 | `created_at` timestamptz d.`now()` | desempate de orden cuando dos comparten fecha | DB | orden de la tabla, del Excel y del saldo corriente; ventana de 24 h para poder editar | 443 |
@@ -340,6 +445,19 @@ asistencia para que todo tenga coherencia»*), si **trabaja** (reemplaza a la ba
 
 ⚠️ Y **tiene un cron desde el 5-sep-2026**: `/api/cron/prestamos-caducan` (13:15 UTC), que borra los
 préstamos que llevan 7 días esperando aprobación. Solo DB, no toca Switch.
+
+✅ **Ya corrió, y correctamente en vacío.** Medido el 5-sep-2026:
+
+```sql
+select cron_name, last_success_at from cron_heartbeats where cron_name = 'prestamos-caducan';
+-- prestamos-caducan | 2026-09-05 13:15:26.832+00
+```
+
+Está en `vercel.json` (`"schedule": "15 13 * * *"`), registró su latido a las 13:15:26 UTC de hoy y
+**no mandó ningún Telegram porque no había nada que caducar** — que es exactamente la conducta
+esperada: una corrida vacía es una corrida exitosa. Al 5-sep-2026 hay **0 movimientos en
+`pendiente_aprobacion`**, así que el camino completo del tope (guardar pendiente → avisar → aprobar
+o caducar) **todavía no se ha ejercitado con un caso real en producción**.
 
 **El resto del dato lo teclea una persona** — `Contabilidad`, desde `/prestamos`. Es una de las pocas
 islas del sistema con esa propiedad, y por eso:
@@ -522,14 +640,14 @@ o el botón «Aplicar quincena».
 ## Por qué está así
 
 > Las decisiones del **5-sep-2026** están desarrolladas, con sus mediciones, en
-> [`docs/postmortems/prestamos.md`](../postmortems/prestamos.md). Acá va el resumen.
+> [`docs/postmortems/prestamos.md`](../postmortems/prestamos.md). Aquí va el resumen.
 
 | decisión | cita textual y fecha |
 |---|---|
 | **Dos cuentas por persona, con su propia cuota** | Daniel, **5-sep-2026**, con el mockup: `Préstamo $220 · Daño de mercancía $50 · Debe $270`. El total no cambió: 14 personas, **$5.062,01**, medido antes de partirlo |
 | **La planilla propone la SUMA de las dos en una casilla** | Daniel: ***«juntos»*** |
 | **El nombre sale de Asistencia** | Daniel: ***«deberías de usar el nombre de asistencia para que todo tenga coherencia»***. Cambian 5 fichas, ninguna mueve un centavo |
-| **La bandera `activo` se retira** | no significaba «trabaja acá» sino «tiene algo abierto»: a ESMER CRUZ le archivaron la ficha al terminar de pagar sus $600 y **sigue trabajando**; a KENNER igual tras pagar $3,13 |
+| **La bandera `activo` se retira** | no significaba «trabaja aquí» sino «tiene algo abierto»: a ESMER CRUZ le archivaron la ficha al terminar de pagar sus $600 y **sigue trabajando**; a KENNER igual tras pagar $3,13 |
 | **Vuelve la aprobación, pero para el TOPE y sin esconder** | el freno de $500 se retiró el 27-ago porque escondía plata ($700 de LUIS ARROYO, 22 días en cero). El tope de un sueldo es una decisión de negocio, y **lo que espera se ve en tres superficies y caduca a los 7 días** |
 | **Solo Daniel aprueba** | hay **dos** usuarios con rol `admin` (`daniel` y `alberto`): preguntar por el rol dejaría aprobar a quien no lo decide |
 | **El daño de mercancía nunca se frena por tope** | no es plata que se entrega: es plata que ya se perdió, y no anotarla no la devuelve |
@@ -558,7 +676,7 @@ o el botón «Aplicar quincena».
 
 | qué | cuándo | por qué |
 |---|---|---|
-| **La bandera `activo` y los botones «Archivar» / «Reactivar» / «Forzar Archivado»** | 5-sep-2026 | nunca significó «trabaja acá». La **columna no se borra**: queda sin lectores, con `COMMENT` y candado |
+| **La bandera `activo` y los botones «Archivar» / «Reactivar» / «Forzar Archivado»** | 5-sep-2026 | nunca significó «trabaja aquí». La **columna no se borra**: queda sin lectores, con `COMMENT` y candado |
 | **Las 3 pestañas de estado, el botón «Aprobar» viejo, `approveMov()`, el aviso de los $500, `estadoLabel()` y los dos `UndoToast`** | 5-sep-2026 | código muerto medido: 443 de 443 en `aprobado`, un aviso que era mentira desde el 27-ago, y un «Deshacer» que nunca se mostró |
 | **El hard delete de «Eliminar Todo el Historial»** | 5-sep-2026 | era el **único `.delete()` real del repo**, en la tabla de plata y sin `logActivity` |
 | **El panel deslizante del celular y el paso «Seleccionar Empleado»** | 5-sep-2026 | eran dos de los **cinco caminos** para registrar el mismo pago |
@@ -760,10 +878,57 @@ y la fila **TOTALES**; hoja «Movimientos» con `Cuenta` y `De dónde salió`, y
 9. **Se corrige mucho y no se sabe qué**: ~94 ediciones sobre ~200 movimientos tecleados, y el log
    siempre dice los mismos campos porque el modal manda todos.
 10. **11 movimientos cuya nota dice «Fashion Shoes»** — una empresa que ninguna ficha tiene puesta.
-11. ⚠️ **BRICEIDA MONTERO**: su ficha estaba archivada, pero en Asistencia está **activa** (Boston,
-    salario $566,52). Con la regla nueva vuelve a proponérsele el descuento de sus $100. **Lo decide
-    Daniel**: si de verdad se fue, la baja se marca en Asistencia — y ahí el sistema avisa de la deuda.
+11. 🔴 **BRICEIDA MONTERO está ACTIVA, y la documentación la daba por retirada. Confirmado hoy.**
+    Medido el 5-sep-2026 contra `asistencia_personas`:
+
+    ```sql
+    select empleado_codigo, nombre, empresa, salario_mensual, activo, fecha_salida
+    from asistencia_personas where nombre = 'BRICEIDA MONTERO';
+    -- 8 | BRICEIDA MONTERO | confecciones_boston | 566.52 | true | null
+    ```
+
+    **Código `8` · Confecciones Boston · salario $566,52 · `activo = true` · `fecha_salida` en NULL.**
+    Su ficha de préstamo estaba *archivada* con la vieja bandera `activo`, y esa bandera nunca
+    significó «se fue»: significaba «tiene algo abierto» (§ Por qué está así). Como la bandera se
+    retiró y **quien decide si alguien trabaja es Asistencia**, hoy BRICEIDA aparece en la lista, se
+    le vuelve a proponer el descuento de sus **$100** con su cuota de **$50**, y el tope la mide
+    contra sus $566,52 reales (no contra el piso de $500).
+    ⚠️ **Lo decide Daniel:** si de verdad ya no trabaja, la baja se marca **en Asistencia** —
+    poniéndole `fecha_salida`— y ahí mismo el sistema avisa *«Debe $100 — descuéntalo de la
+    liquidación»*. No hay que tocar nada en Préstamos.
 12. ⚠️ **STEPHANY MORALES** queda con préstamo −$254,50 / daño +$254,50 (neto $0), porque así se
     registró. **No se reasignó nada** a propósito.
 13. ⚠️ **`asistencia_prestamo_aprobado` se usó una sola vez**, en una sentada de 9 minutos el
     27-ago-2026. La quincena `2026-09-1` no tiene ni una fila.
+
+---
+
+## Lo que estaba mal
+
+Lo que la documentación (este archivo, `CLAUDE.md` y los postmortems) daba por cierto y **no lo era**,
+verificado contra producción el **5-sep-2026**. Está aquí para que no se vuelva a repetir el error de
+contestar de memoria.
+
+| decía | es | cómo se comprobó |
+|---|---|---|
+| 🔴 «La migración `20260925120000` está **ESCRITA y NO APLICADA**» | ✅ **Aplicada.** Las tres columnas existen, la RPC viva ya trae las dos cuentas y el dedup por origen, y la ficha duplicada de RAMON MIRANDA está juntada | `select version from supabase_migrations.schema_migrations where version='20260925120000'` → 1 fila; `information_schema.columns` → `deduccion_dano`, `cuenta`, `origen_pago` presentes |
+| 🔴 «**BRICEIDA MONTERO** está retirada / su ficha archivada» | **Trabaja.** `asistencia_personas`: código `8`, Confecciones Boston, salario **$566,52**, `activo = true`, **sin `fecha_salida`** | consulta directa a `asistencia_personas` |
+| «$5.062,01 = **$4.962,01 en 13 más $100 de BRICEIDA MONTERO**» | El total es correcto, la partición **se lee mal**. Sus $100 son un **Préstamo** como los otros 13, no una deuda de otra clase. Son 5 préstamos por $1.300 (abr-jun 2025) contra $1.200 de pagos | reconstrucción movimiento por movimiento de su ficha |
+| «14 personas, y con las dos cuentas queda **13 en Préstamo + 1 cruzada**» | **14 en Préstamo, $0,00 en Daño en las 14.** La persona cruzada (STEPHANY MORALES) tiene saldo **neto $0** y por eso no está entre las 14: son **15** las que tienen alguna cuenta ≠ 0 | la consulta de saldo por cuenta, arriba |
+| «**32 fichas**» | **31 vivas** + 1 borrada (la segunda de RAMON MIRANDA) | `count(*) filter (where coalesce(deleted,false)=false)` |
+| «`empleado_codigo`: **22 de 32 → 24** al aplicar» | **23 de 31** — y lo que importa: **las 14 que deben plata lo tienen, las 14**. Las 8 sin código tienen saldo $0 | join contra `asistencia_personas`, 0 huérfanos |
+| «Las 2 fichas sin atar — MARTHA $300 y YERITZA $100 — **$400 que la planilla no puede descontar**» | ✅ **Cerrado.** Códigos `43` y `51` puestos. No queda ninguna ficha con saldo sin código | la misma consulta |
+| «`deduccion_dano` / `cuenta` / `origen_pago`: **nuevas**» | Existen, y están **vacías**: `deduccion_dano` = 0 en las 31 fichas; `cuenta` y `origen_pago` en **NULL en los 443** movimientos. Es lo correcto (se derivan al leer), pero significa que **la segunda cuenta todavía no se usa** | `count(*) filter (where ... is not null)` |
+| «El tope: **3 fichas sin salario cargado**, que caen al piso de $500» | Ninguna de **las 14 que deben** cae al piso: las 14 tienen salario en Asistencia. El piso de $500 existe y hoy **no aplica a nadie con deuda** | join `prestamos_empleados` × `asistencia_personas` |
+| «El cron `prestamos-caducan` es nuevo» (sin decir si corrió) | ✅ **Corrió hoy**, 13:15:26 UTC, en vacío y sin mandar nada. Y **el camino del tope no se ha ejercitado nunca con un caso real**: 0 movimientos en `pendiente_aprobacion` desde que existe | `cron_heartbeats` + `count(*) where estado='pendiente_aprobacion'` |
+
+**Lo que sí estaba bien y se confirma**, para que quede dicho: el total **$5.062,01** no se movió ni un
+centavo con el corte en dos cuentas; los 443 movimientos y sus 5 conceptos siguen igual; RAMON MIRANDA
+quedó en **una** ficha con **36 movimientos y $220,00**; el freno de duplicados de la RPC viva mira
+`concepto + origen_pago + fecha` **por cuenta** y ya no la nota; y `deleted` sigue siendo NULLABLE en
+las dos tablas aunque hoy no haya ni un NULL — o sea que el `.or("deleted.is.null,deleted.eq.false")`
+sigue siendo obligatorio.
+
+> 🔑 La lección de las dos filas de arriba en rojo es la misma: **una migración escrita y una migración
+> aplicada no son lo mismo, y una bandera de un módulo no dice nada de otro módulo.** Las dos se
+> contestan con una consulta de dos segundos.

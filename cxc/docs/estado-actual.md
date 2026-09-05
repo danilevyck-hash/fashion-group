@@ -698,3 +698,76 @@ bloques del mensaje y el `destino` ilegible en la base). Se escribieron los cinc
 ⚠️ **Lo que NO se pudo verificar:** la migración no se ejecutó en ningún lado (no hay Postgres local y
 producción es de solo lectura). Sus CHECK están cubiertos por candados de texto que los comparan con
 las listas de TypeScript, pero **la primera corrida real es la de Daniel**.
+
+
+## 5-sep-2026 — La medición completa: trece agentes, todo verificado contra producción
+
+Daniel encontró que le di **información falsa sacada de la documentación sin volver a medir** (dije que Marketing no guarda el cliente, y que los pedidos de catálogo guardan el nombre en texto; las dos cosas eran falsas). Textual: *«mira como te equivocas sin tener contexto… quiero que te tomes dos horas con varios agentes recopilando información para que estas cosas no vuelvan a suceder que me digas una info falsa, yo confío en ti y debes estar al tanto hasta más que yo del sistema»*.
+
+Trece agentes en paralelo, **solo lectura de producción, cero cambios de código**. Se verificaron **~900 afirmaciones**; **más de 120 estaban mal**. Cada cifra quedó con la consulta que la produjo, y cada archivo con una sección «Lo que estaba mal».
+
+### Archivos nuevos
+
+| archivo | qué contesta |
+|---|---|
+| `docs/modulos/08-amarres.md` | con qué llave identifica cada módulo al cliente, proveedor y empleado |
+| `docs/negocio/estado-medido.md` | ventas, cartera, cobros, margen, inventario y clientes, medidos |
+| `docs/seguridad/permisos-medidos.md` | las 275 rutas, su guardia y qué alcanza cada rol de verdad |
+| `docs/deuda/inventario.md` | tablas sin lectores, rutas huérfanas, código que no se dibuja |
+| `docs/rendimiento/riesgos-silenciosos.md` | dónde un número puede salir cortado y verse completo |
+| `docs/diccionario.md` | dónde la misma cosa se llama distinto (paso 4 del plan) |
+
+### 🔴 Roto AHORA (pendiente de Daniel)
+
+1. **Recordatorios está caído**: la migración `20260925130000_recordatorios_rediseno.sql` no ha corrido; verificado que las 4 columnas no existen. La pantalla da 500, el aviso de cheque vencido no sale **y el cron se anota `ok: true`**. Un comando lo arregla.
+2. **No se puede cerrar la quincena**: 24 personas con horas extra sin aprobar del 1 al 4 de septiembre y **cero aprobaciones de septiembre**.
+3. **Dos personas marcaron el reloj sin ficha** (códigos 39 y 55, 11 marcaciones desde el 1-sep). Sin ficha no se les calcula un dólar.
+4. **Los gastos de Fashion Wear están a medio cargar desde marzo**: $3.841 en marzo, **$27,18** en abril, $257 en mayo, nada en junio ni julio, contra $62.688 y $85.148 en enero-febrero. Las demás van hasta julio. Cualquier rentabilidad de Fashion Wear que reste gastos está mal desde marzo.
+
+### 🔴 Roto y arreglable por nosotros
+
+5. **El sync de fichas de Reebok se rompió al cruzar las 1.000 filas.** Hay 1.408 fichas y la consulta devuelve 1.000: pide ~400 fichas por día que ya tiene y **los 355 que faltan no se clasifican nunca**. Vistana (8.273 artículos) espera el mismo destino.
+6. **Una unión por NOMBRE viva, en Proveedores.** Confecciones Boston aparece en 5 empresas con 4 grafías y el mismo RUC (`655-544-133465`): la pantalla dibuja 3 fichas de un proveedor que es uno. Y funde en una los 7 `GENERAL`. El RUC está lleno en 57 de 65 filas pero tampoco está limpio: **es decisión de Daniel** cómo se identifica un proveedor entre empresas.
+7. **Tres funciones que la documentación promete y no ocurren**: `useSessionCheck`, `useBadges` y `useKeyboardShortcuts` no tienen un solo importador. El chequeo de sesión no pasa, el 🔔 no cuenta, y **ningún atajo de teclado funciona** salvo ⌘K. 🩸 Uno de esos archivos **se editó hoy**: el cambio completo fue `/cheques` → `/recordatorios`.
+8. **26 «avisame» (voseo) en mensajes de Telegram.** El candado tiene `avisale` pero no `avisame`: le falta la familia imperativo + `me`.
+9. **Packing Lists le miente al usuario**: dice «se eliminan automáticamente después de 7 días» y la retención real son 90 días desde el borrado a mano.
+10. **`requireAdmin` deja pasar a `secretaria`** (`api-auth.ts`, `ADMIN_ROLES = ['admin','secretaria']`). Lo usan 10 rutas.
+
+### ⚠️ Decisiones que solo puede tomar Daniel
+
+- **¿Andrea debe cobrar?** No tiene el módulo `cxc` y alcanza 11 rutas de la cartera: manda correos de cobro y cobra en lote. Al revés, **Ángela no tiene `multifashion` y lo alcanza**. Causa: el guardia mira el rol, no los módulos — se tapó para Asistencia y quedó igual en las otras 224 rutas.
+- **¿Las secretarias deben ver la cartera de Boston?** Hoy la ven sin tener `cxc` ni `boston`.
+- **El login no pide usuario: la contraseña es la identidad.** 11 cuentas, 2 admin, sin distinguir mayúsculas.
+- **Cómo se identifica un proveedor** entre empresas (ver 6).
+- **`GENERAL`**: valor nuevo de Switch en 3 fichas de Reebok, el mapa no lo conoce y está avisando por Telegram.
+- **Las 10 palabras del diccionario** (`docs/diccionario.md`, sección final).
+
+### Lo que se verificó BUENO
+
+- **Nada sin copia de seguridad**: 136 tablas, 125 respaldadas, las 11 de afuera son a propósito. El catálogo de Reebok, las marcaciones del reloj y los saldos de banco **sí están**. ⚠️ Esa copia tiene **un solo día**: el respaldo ampliado estrenó hoy.
+- **Ningún cron muerto**: los 76 al día; 72 h sin una sola corrida de sync fallida (100 pares en `success`). `vercel.json` ↔ registro: biyección perfecta, 82 entradas.
+- **El aislamiento de Boston no tiene fugas**, medido en las dos direcciones: cartera del grupo 211 filas / 6 empresas / **0 de Boston**; la suya 390 / 1 / **0 del grupo**. Su venta sí suma: **$472.856,97 = 7,5% de 2026**. Los tramos finos aplicados hoy: **los 390 clientes cuadran**.
+- **Ninguna ruta desprotegida ni secreto escrito en el código** (275 rutas barridas). David y Jennifer, cerrados.
+- **Ningún total de plata en pantalla está cortado hoy** por el tope de 1.000 filas. El CXC es el más justo: 211 de 900.
+- Los tramos de la cartera (`cxc-aging.ts`) son **el modelo**: una sola fuente que leen escritorio, celular, PDF y Boston.
+
+### Correcciones de bulto en la documentación
+
+- **«Te deben 211 clientes» → son 100.** La vista guarda una fila por empresa; City Mall se contaba seis veces.
+- **Los saldos de banco estaban inflados ~$255.000**: la doc daba el saldo **más alto de la historia** como si fuera el último. Vistana $165.363,98 → **$132.870,42**; Active Shoes $150.620,36 → **$27.647,97**.
+- **El pagable de comisiones 2026 no son ~$82.000 sino $67.773,98**: un descuento que la doc daba por apagado corre todos los meses ($1.573,08 × 9).
+- **Personas activas: 36, no 37** (mal desde el 26-ago).
+- `06-recordatorios-usuarios-infra.md` tenía **431 líneas duplicadas**, y la copia vieja daba las marcaciones del reloj por **sin respaldo**.
+- Los pedidos de prueba **ya se borraron**: Calvin 21 → **5**, Joybees 41 → **4**. Las «alarmas rojas» sobre esas marcas eran un denominador podrido.
+- **Siete migraciones que `CLAUDE.md` da por pendientes ya están aplicadas.** La única pendiente es la de Recordatorios.
+
+### Datos de Switch que tenemos y no usamos
+
+- **La dirección del cliente**: la mandan **702 de 847** clientes del grupo y **no hay columna para ella**. Es justo lo que en Guías se arma a mano con botones del histórico.
+- **La fecha en que se abrió cada ficha**: 100 códigos nuevos en 2026, 90 en 2025.
+- **Crédito vs contado**, ya guardado y sin un solo lector: **1.144 facturas a crédito ($5.764.781,82) contra 53 al contado ($146.501,36)** en 2026. El 97,5% de la venta es a crédito.
+- Y al revés: el **límite de crédito vale $0,00 en los 847** — una pantalla de «clientes sobre su límite» sería trabajo perdido.
+
+### Cómo se repite esta medición
+
+Cada archivo trae la consulta debajo de cada cifra. La regla que nació hoy: **antes de afirmar que un dato no existe, mirar la tabla del propio objeto, no la de sus hijos** (el error de Marketing fue mirar las entregas en vez de los proyectos).

@@ -1,8 +1,19 @@
 # Multifashion y Confecciones Boston
 
-> Referencia viva de los dos módulos «de una empresa que no es Fashion Group». Escrito el
-> **4-sep-2026**; todas las cifras se midieron ese día contra producción (PostgREST y la API
-> de consultas de Supabase, solo lectura). Lo que no se pudo medir dice «no medible» y por qué.
+> Referencia viva de los dos módulos «de una empresa que no es Fashion Group».
+>
+> 🔬 **MEDIDO CONTRA PRODUCCIÓN EL 5-sep-2026.** Cada cifra de este archivo se volvió a
+> consultar ese día contra la base real (Management API de Supabase,
+> `POST /v1/projects/rspocgqhtpveytgbtler/database/query`, **solo lectura**) y contra el
+> código fuente en `src/`. Cada número trae la consulta que lo produjo. Al final está la
+> sección **[«Lo que estaba mal»](#lo-que-estaba-mal-verificación-del-5-sep-2026)**: qué
+> decía · qué es · cómo se midió. La escritura anterior es del 4-sep-2026.
+>
+> 🔴 **Titular de la verificación: el aislamiento de Boston NO tiene ninguna fuga** — se
+> comprobó en las dos direcciones, en la base y en el código. Lo que sí sigue roto es
+> **el directorio de clientes de Boston**: el cron que lo arregla está escrito y programado,
+> pero **todavía no ha corrido ni una vez** y las 4.915 filas siguen congeladas desde el
+> 30-jul. Ver el bloque de `switch_clientes` y «Lo que estaba mal» #1.
 >
 > No repite `cxc/CLAUDE.md`: apunta a él (§ Invariantes por módulo, § Dónde vive cada dato,
 > § Roles) y escribe lo que le falta. Los post-mortems verbatim viven en
@@ -43,10 +54,15 @@ con **metas configurables** y con una **caja diaria** traída de Switch a demand
 | `contabilidad` | no | **no** (`useAuth` la rebota a `/home`) | **solo 2**: `overview` y `venta-hoy` |
 | `vendedor`, `bodega`, `gerente_boston` | no | no | **403 en las 11** |
 
-**Medido el 4-sep-2026** (`role_permissions` + `fg_users.modulos_override`):
-`gerente_acs.modulos = ["multifashion"]`, y **`andrea` (secretaria) tiene
-`modulos_override = [..., "multifashion"]`** — o sea que hay **dos personas** con el módulo,
-no una. `hasModuleAccess` (`src/lib/auth-check.ts`) deja pasar a cualquiera cuyo `fg_modules`
+**✅ Re-medido el 5-sep-2026** (`select role, modulos from role_permissions` +
+`select name, role, active, modulos_override from fg_users`), sin cambios:
+`gerente_acs.modulos = ["multifashion"]`, y **`andrea` (secretaria) tiene `multifashion` dentro
+de sus 11 módulos de `modulos_override`** — o sea que hay **dos personas** con el módulo, no
+una. **`Angela` (la otra secretaria) NO lo tiene**; su override trae `cxc` en su lugar, que
+`role_permissions.secretaria` tampoco incluye. Los 11 usuarios activos son: `daniel` ·
+`alberto` (admin) · `Bodega` · `Contabilidad` · `jennifer` (gerente_acs) · `david`
+(gerente_boston) · `andrea` · `Angela` (secretaria) · `edwin` · `rey` · `rodrigo` (vendedor),
+**los 11 con contraseña bcrypt**. `hasModuleAccess` (`src/lib/auth-check.ts`) deja pasar a cualquiera cuyo `fg_modules`
 contenga la key, así que Andrea entra a la pantalla completa aunque el `roles[]` del módulo
 en `modules.ts` diga solo `["admin","gerente_acs"]`. **Esto no está en la tabla de Roles de
 `CLAUDE.md`.**
@@ -232,7 +248,9 @@ Grano, llave, filas medidas el 4-sep-2026.
 
 ### `_multifashion_sf_vw` — VISTA, la fuente de todo lo que es «venta» en el módulo
 
-Proyección de `switch_facturas WHERE empresa_key = 'american_classic'`. **29.708 filas.**
+Proyección de `switch_facturas WHERE empresa_key = 'american_classic'`. **29.708 filas** ✅
+(re-medido el 5-sep-2026: `select count(*) from _multifashion_sf_vw` = 29.708, exactamente
+las mismas que `switch_facturas` de ACS — la vista no filtra filas, solo proyecta columnas).
 Definición vigente en `supabase/migrations/20260623140000_multifashion_idx_fecha_panama.sql`.
 
 | Columna | Para qué sirve | Quién la lee |
@@ -253,25 +271,42 @@ Definición vigente en `supabase/migrations/20260623140000_multifashion_idx_fech
 🩸 **`subtotal` ≠ `subtotal` de `switch_facturas`.** El de la tabla es **antes** del descuento.
 Factura real: `354,10 − 221,01 = 133,09`. Usar el otro **infla la meta ~5%**.
 
-### `switch_articulo_diario` (filtrado a `american_classic`) — **46.100 filas**
+### `switch_articulo_diario` (filtrado a `american_classic`) — **46.187 filas** ⚠️
 
 Una fila por `(empresa_key, fecha, articulo_id, tipo)`. Guarda **magnitudes**; el signo lo pone
 la lectura (`signoDeTipo`, `TIPO_QUE_RESTA = "NC"`). Columnas que el módulo usa:
 `articulo_id, codigo, descripcion, tipo, cantidad_total, venta_total, costo_total`.
-**Llega hasta AYER** — medido: `max(fecha) = 2026-09-03` con el sistema en el 4-sep.
+**Llega hasta AYER** — re-medido el 5-sep-2026: `max(fecha) = 2026-09-04`
+(`select count(*), max(fecha) from switch_articulo_diario where empresa_key='american_classic'`
+→ 46.187 · 2026-09-04). Eran 46.100 el 4-sep.
 
-### `switch_articulo_marca` (`american_classic`) — **8.735 filas**
+⚠️ **Y esta tabla SÍ tiene a Confecciones Boston: 18.064 filas, también hasta el 4-sep**, con
+costo (`sum(costo_total)` de 2026 = **$470.421,08**, en magnitudes sin firmar). Importa porque
+la pestaña Ventas de Boston dice en pantalla que «no se trae el costo desde Switch» — ver la
+corrección #12 al final.
+
+### `switch_articulo_marca` (`american_classic`) — **8.736 filas** ⚠️
 
 `articulo_id → marca_id, marca_nombre`. ⚠️ **Todas son de ACS**: las 6 del grupo tienen CERO.
-Lo que Switch llama «marca» es **marca + departamento** (`TH MENSWEAR`, `CK JEANS`): 32 valores
-donde hay 5 marcas. El mapa prefijo → marca es explícito
+Lo que Switch llama «marca» es **marca + departamento** (`TH MENSWEAR`, `CK JEANS`):
+⚠️ **34 valores distintos** (no 32), donde hay **5 marcas**. Re-medido el 5-sep-2026
+(`select marca_nombre, count(*) from switch_articulo_marca where empresa_key='american_classic'
+group by 1`): los tres más grandes son `TH MENSWEAR` 1.301 · `TH ACCESSORIES` 1.223 ·
+`TH WOMENSWEAR` 824, y en la cola están las grafías malas que prueban por qué el mapa
+compara la primera palabra y junta AL MOSTRAR: **`TH ACCESORIES`** (una sola S, 117 filas)
+al lado de `TH ACCESSORIES`, **`TH OTHER`** (103) y **`TH OTHERS`** (6), **`CK WOMEN`** (3) y
+`CK WOMENSWEAR` (74). Los prefijos vivos son `TH · CK · KL · RBK · JOYBEES`; `OTROS` (11) y
+`FOOTWEAR` (7) caen solos en el cajón «Otros». El mapa prefijo → marca es explícito
 (`src/lib/multifashion/marcas-grupo.ts`), por **primera palabra completa** y nunca `startsWith`.
 
-### `switch_clientes` (`american_classic`) — **1.037 filas**
+### `switch_clientes` (`american_classic`) — **1.038 filas** ⚠️
 
 Directorio de la tienda. La escribe el cron `acs-fidelizacion`. Se leen
 `cliente_switch_id, nombre, telefono, celular, raw_data.fechaCreacion`.
 `cliente_switch_id = 1` es el mostrador y se excluye de todo.
+✅ **Se está escribiendo**: `max(synced_at) = 2026-09-05 11:30:29 UTC` (el cron
+`acs-fidelizacion` de las 11:30 corrió hoy). Es el contraste exacto contra Boston, que en la
+misma tabla lleva 37 días sin una escritura.
 
 ### `multifashion_metas` — **1 fila viva**
 
@@ -279,25 +314,32 @@ Directorio de la tienda. La escribe el cron `acs-fidelizacion`. Se leen
 premio text · premio_monto numeric · activa bool · creada_por text · created_at · updated_at ·
 deleted bool`.
 
-Contenido medido: **«Viaje playa» · 2026-09-01 → 2026-12-31 · $420.000 · grupal ·
-premio «Un viaje para todas» · `premio_monto = NULL` · activa · creada por `daniel` el
-14-ago-2026**. Soft delete `deleted` (una meta anunciada al personal no se borra, se retira).
+✅ **Re-medido el 5-sep-2026, sin un solo cambio**
+(`select nombre,desde,hasta,objetivo,tipo,premio,premio_monto,activa,creada_por,created_at,
+updated_at,deleted from multifashion_metas`): **«Viaje playa» · 2026-09-01 → 2026-12-31 ·
+$420.000,00 · grupal · premio «Un viaje para todas» · `premio_monto = NULL` · `activa = true` ·
+`deleted = false` · creada por `daniel` el 14-ago-2026 06:22:20 UTC, con `updated_at` idéntico
+al `created_at`** (nunca se editó). Soft delete `deleted` (una meta anunciada al personal no se borra, se retira).
 🔴 **`premio_monto` está vacío en la única fila que existe** — el formulario lo ofrece y nadie
 lo llenó.
 
 ### `multifashion_meta_participantes` — **4 filas**
 
 `id · meta_id (ON DELETE CASCADE) · vendedora_clave · vendedora_nombre · objetivo_individual ·
-created_at`. Contenido: JAILINE · MILAGROS TORRES · JENNIFER MIRANDA · SHEYNEE BATISTA, las
-cuatro con **`objetivo_individual = NULL`** (correcto: en una meta grupal no se reparte nada).
+created_at`. ✅ Re-medido el 5-sep-2026 (`select vendedora_clave, vendedora_nombre,
+objetivo_individual from multifashion_meta_participantes`): **JAILINE · JENNIFER MIRANDA ·
+MILAGROS TORRES · SHEYNEE BATISTA**, las cuatro con **`objetivo_individual = NULL`**
+(correcto: en una meta grupal no se reparte nada).
 Reemplazo completo al guardar (DELETE + INSERT acotado con `.eq("meta_id")`).
 
 ### `multifashion_caja_diaria` — **8 filas**
 
 `fecha date (llave) · data jsonb (la respuesta cruda de Switch) · synced_at`. Upsert por
 `fecha`. Día cerrado = caché permanente; día en curso = **TTL 10 min**.
-🔴 **Última escritura: 14-ago-2026.** O sea que **la pestaña Caja no se abre hace tres
-semanas** — es la única medición de uso por pantalla que este módulo permite.
+🔴 **Última escritura: 14-ago-2026 06:20:58 UTC**, re-verificada el 5-sep-2026
+(`select fecha, synced_at from multifashion_caja_diaria order by synced_at desc limit 3`
+→ 2026-08-14 · 2026-08-05 · 2026-08-03). O sea que **la pestaña Caja lleva 22 días sin
+abrirse** — es la única medición de uso por pantalla que este módulo permite.
 
 ### `multifashion_tickets` — **15.819 filas, CONGELADA**
 
@@ -318,7 +360,11 @@ alguien vuelve a escribirla.
 | `multifashion_meta_anual_2026` | `800000` | 🔴 **la lee `multifashion_mensual_v6/v7` y viaja como `Multifashion.metaAnual` — ninguna pantalla lo dibuja.** Y **no es la meta de Daniel** ($420.000 sep–dic): son dos números distintos y sin relación |
 | `multifashion_growth_target_pct` | `5` | alimenta `expectedTodayPct`, que **tampoco se dibuja** |
 
-### Las 18 RPC del módulo (verificadas en `pg_proc` el 4-sep-2026)
+### Las funciones del módulo — ⚠️ **son 21, no 18** (re-verificadas en `pg_proc` el 5-sep-2026)
+
+Consulta: `select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where
+n.nspname='public' and (p.proname like 'multifashion%' or p.proname like 'mf_%' or p.proname
+like 'proyeccion_%')`.
 
 `multifashion_mensual_v7` (con caída a `_v6`) · `multifashion_overview_serie_v1` ·
 `multifashion_proyeccion_cierre_v1` · `multifashion_detalle_mensual_v2` ·
@@ -328,12 +374,20 @@ alguien vuelve a escribirla.
 `multifashion_wholesale_clientes_v2` · `multifashion_retail_recurrentes_v2` ·
 `multifashion_articulo_diario_agrupado_v1` · `multifashion_articulo_marca_v1` ·
 `multifashion_meta_ventas_v1` · `multifashion_hoy_panama` · `mf_panama_date` ·
-`multifashion_tienda_vc_hibrido`.
+`multifashion_tienda_vc_hibrido` · **`proyeccion_mensual_mayorista_v1`** (la que faltaba).
 
-⚠️ **`multifashion_tienda_vc_hibrido` existe en producción y no la llama nadie desde `src/`.**
-⚠️ **`multifashion_dia_a_dia_v4` NO existe** (el comentario de `detalle-mensual/route.ts` dice
-que «sigue viva»; se dropeó). **`multifashion_bonos_v1` tampoco** — el encabezado de
-`bonos/route.ts` la nombra y el código llama a `_v3`.
+⚠️ **Falta una en la lista de arriba: `proyeccion_mensual_mayorista_v1`** — está instalada en
+producción y **no la llama nadie desde `src/`**. Lo único que la nombra es un comentario de
+`src/lib/ventas/queries.ts:126` que la da por retirada (dice que las dos «se quitaron»)… pero su hermana `proyeccion_mensual_retail_v1` **sí sigue
+viva y llamada** (`detalle-mensual/route.ts:103`), y la mayorista quedó huérfana en la base. Es la
+misma familia que las «metas fantasma».
+
+⚠️ **`multifashion_tienda_vc_hibrido` existe en producción y no la llama nadie desde `src/`**
+(re-verificado el 5-sep-2026: `grep -rl` sobre `src/` sin tests → 0 archivos).
+⚠️ **`multifashion_dia_a_dia_v4` NO existe** en `pg_proc` (el comentario de
+`detalle-mensual/route.ts:11` dice que «sigue viva»; se dropeó). **`multifashion_bonos_v1`
+tampoco** — y se la nombra en **TRES** lugares, no en uno: `bonos/route.ts:2`,
+`src/components/ventas/types.ts:306` y `types.ts:341`. El código llama a `_v3`.
 
 ## De dónde vienen los datos
 
@@ -375,7 +429,7 @@ chocar con un cron. Ese es todo el motivo por el que existe `multifashion_caja_d
 
 | Regla | Dónde está escrita | Candado |
 |---|---|---|
-| **Multifashion ES `american_classic`.** La empresa es una constante del servidor y **no se lee de la URL** en ninguna de las 11 rutas. | `productos/route.ts:const EMPRESA`, `caja/route.ts:const EMPRESA_KEY`, las RPC | `multifashion-acceso.test.ts` — «la empresa NUNCA viaja por query» |
+| ✅ **Multifashion ES `american_classic`.** La empresa es una constante del servidor y **no se lee de la URL** en ninguna de las 11 rutas. **Re-verificado el 5-sep-2026**: `find src/app/api/multifashion -name route.ts` da exactamente **11** rutas, y `grep -rn "searchParams.get(\"empresa\")"` sobre esas 11 (y sobre las 4 de `/api/boston`) devuelve **cero coincidencias**. | `productos/route.ts:const EMPRESA`, `caja/route.ts:const EMPRESA_KEY`, las RPC | `multifashion-acceso.test.ts` — «la empresa NUNCA viaja por query» |
 | **Ninguna ruta del módulo queda abierta**: las 11 exigen sesión y rol. Un archivo nuevo en el árbol rompe el build. | inventario congelado | `multifashion-acceso.test.ts` — «el inventario de rutas es el esperado» |
 | **La ventana acotada de `gerente_acs` se retiró ENTERA** (13-ago-2026). Ninguna ruta importa `ventana-gerente` (el módulo ya no existe). | — | `multifashion-acceso.test.ts` — «la ventana se retiró de VERDAD» |
 | **La validación de parámetros NO era la ventana y se queda**: `year` 2000–2100 · `mes` 1..12 · `trimestre` 1..4 · `periodo` en su lista cerrada · `n ∈ {3,6,12}` · `limit` 1..500 · formato `YYYY-MM-DD` · «la fecha no puede ser futura». | cada route | `multifashion-acceso.test.ts` — «los parámetros absurdos SIGUEN rechazándose» |
@@ -389,8 +443,8 @@ chocar con un cron. Ese es todo el motivo por el que existe `multifashion_caja_d
 | **Un mes empezado se compara contra los MISMOS DÍAS del año pasado**, y «los mismos días» son los **CARGADOS** en `switch_articulo_diario` (llega hasta ayer), no «hasta hoy». Medido el 3-sep-2026: septiembre decía +4,2% y crecía **+46,1%**. | `ultimoDiaArticuloDiario` es parámetro **obligatorio** de `rangoComparativo` | `api/multifashion-productos-corte-cargado.test.ts`, `mismos-dias-todas-las-comparaciones.test.ts` |
 | **Vendedoras es la EXCEPCIÓN a propósito**: en los chips de mes compara contra el **mes anterior** y el rótulo lo dice. | `vendedoras-rotulo.ts` | `multifashion-vendedoras-rotulo.test.ts` |
 | **El mes en curso corta en el último día COMPLETO de Panamá**, y el card y la tabla usan la MISMA definición. La regla es de **CALENDARIO, no de datos**. | migración + módulo | `multifashion-corte-dia-completo.test.ts` |
-| 🔴 **La proyección de una meta pesa por TEMPORADA, no por días.** `proyección = vendido ÷ (temporada transcurrida ÷ temporada total)`, con el peso de cada día sacado de lo que ESE MES vendió el año pasado. Diciembre es el **58,8%** de sep–dic. | `metas-avance.ts` | `multifashion-metas.test.ts` (92 casos) |
-| **Por debajo del 5% de temporada transcurrida NO se proyecta** y se dice. Sin año pasado se cae a los días **y la pantalla lo dice**. | `FRACCION_MINIMA_PARA_PROYECTAR` | ídem |
+| 🔴 **La proyección de una meta pesa por TEMPORADA, no por días.** `proyección = vendido ÷ (temporada transcurrida ÷ temporada total)`, con el peso de cada día sacado de lo que ESE MES vendió el año pasado. Diciembre es el **58,8%** de sep–dic. ✅ **Re-medido al centavo el 5-sep-2026** (`select extract(month from fecha), sum(subtotal) from _multifashion_sf_vw where not is_wholesale and fecha between '2025-09-01' and '2025-12-31' group by 1`): sep $36.430,41 (10,7%) · oct $46.429,63 (13,6%) · nov $57.580,78 (16,9%) · **dic $200.257,73 (58,8%)** sobre $340.698,55. | `metas-avance.ts` | `multifashion-metas.test.ts` (92 casos) |
+| ✅ **Por debajo del 5% de temporada transcurrida NO se proyecta** y se dice. Sin año pasado se cae a los días **y la pantalla lo dice**. Verificado en el código el 5-sep-2026: `FRACCION_MINIMA_PARA_PROYECTAR = 0.05` (`metas-avance.ts:51`). | `FRACCION_MINIMA_PARA_PROYECTAR` | ídem |
 | 🔴 **Una meta grupal mide TODA la venta de la tienda.** Los participantes solo definen a quién se le MUESTRA el aporte. Medido may–jul 2026: tienda $147.737,77, las 4 vendedoras $141.705,00 = **95,9%**; el 4,1% restante son ventas con códigos de gente que ya no trabaja ahí. **Y la pantalla lo dice.** | `avanceDeMeta` + `textoAporteNoAsignado` | `multifashion-metas.test.ts` + `components/multifashion-meta-aporte-tienda.test.tsx` (9 casos que RENDERIZAN las dos pantallas) |
 | 🔴 **Una meta grupal NO genera metas individuales.** Cero reparto automático, y **no hay `?? meta.objetivo`** de respaldo. | `metas-avance.ts` | barrido estático + conducta |
 | **Los nombres de vendedora se agrupan por igualdad EXACTA normalizada** (`claveVendedora`: mayúsculas, sin acentos, espacios colapsados). **Nada de parecido ni distancia de edición.** | `metas-clave.ts` | `multifashion-metas.test.ts` |
@@ -402,7 +456,7 @@ chocar con un cron. Ese es todo el motivo por el que existe `multifashion_caja_d
 | **`db-max-rows` = 1000 corta EN SILENCIO**: toda lectura que pueda pasarlo usa `leerTodoPaginado` con `.order()` estable y verificación contra `count: "exact"`. El camino paginado **no es decoración** — sin él se leerían 1.000 de 20.483 filas sin un solo error. | `retail-dia.ts`, `productos/route.ts`, `fidelizacion/route.ts`, `metas-lectura.ts` | `supabase-paginado.test.ts` |
 | **`multifashion_tickets` está congelada.** | — | `multifashion-tickets-congelada.test.ts` |
 | **La metodología va en el ⓘ, los AVISOS van afuera.** Esconder «las devoluciones ya están restadas» en un ⓘ es igual de malo que borrarlo. | — | `poda-textos-cxc-multifashion.test.ts` (15 casos) |
-| **Comisión = 0,5% sobre `subtotal_comision`** = solo las ventas de **CONTADO** (crédito no comisiona; las NC restan siempre). ⚠️ `CLAUDE.md` dice «`SUM(subtotal firmado) × 0,5%`, sin filtro de utilidad» y **le falta el matiz del contado**. | migración `20260603000000_multifashion_comision_solo_contado.sql`, y `multifashion_vendedoras_range` usa la misma base | — |
+| ✅ **Comisión = 0,5% sobre `subtotal_comision`** = solo las ventas de **CONTADO** (crédito no comisiona; las NC restan siempre). **Re-verificado el 5-sep-2026 leyendo la vista viva en producción** (`select pg_get_viewdef('_multifashion_sf_vw'::regclass, true)`): `subtotal_comision` = `subtotal_descuento` cuando `tipo_comprobante IN ('Factura','Tiquete','Transacción','Nota de Débito') **AND condicion_venta = 'Contado'**`, `−subtotal_descuento` para `Nota de Crédito`, y **0** para todo lo demás. La columna `subtotal` es la misma sin la condición de contado. ⚠️ `CLAUDE.md` sigue diciendo «`SUM(subtotal firmado) × 0,5%`, sin filtro de utilidad» y **le falta el matiz del contado**. | migración `20260603000000_multifashion_comision_solo_contado.sql`, y `multifashion_vendedoras_range` usa la misma base | — |
 
 ## Con qué conecta
 
@@ -424,7 +478,7 @@ chocar con un cron. Ese es todo el motivo por el que existe `multifashion_caja_d
 
 | Quién | Qué le lee | Cuidado |
 |---|---|---|
-| **Ventas › Resumen** (`ResumenView.tsx`) | una fila **«Multifashion»** = `american_classic` **COMPLETA (tienda + mayoreo)** | 🔴 **No es el mismo número que el módulo**, que muestra retail puro. La fila lo declara con un desglose al lado. Si alguien «cuadra» los dos, rompe uno |
+| **Ventas › Resumen** (`ResumenView.tsx`) | una fila **«Multifashion»** = `american_classic` **COMPLETA (tienda + mayoreo)** | 🔴 **No es el mismo número que el módulo**, que muestra retail puro. ✅ **Medido el 5-sep-2026**: 2026 completa **$394.154,96** (idéntico al `ventas_rollup_mensual_mv` de `american_classic`) contra **$365.789,06** de retail puro — la diferencia son **$28.365,90 de mayoreo**. La fila lo declara con un desglose al lado. Si alguien «cuadra» los dos, rompe uno |
 | **Ventas › Clientes** | **nada**: `EMPRESA_PILLS` deriva de `B2B_EMPRESA_KEYS` y ACS no está | los clientes de la tienda viven solo en su módulo (regla de Daniel) |
 | **Ventas › Productos** | comparte `switch_articulo_diario`, pero ACS **no** está en `PRODUCTOS_EMPRESA_KEYS` | — |
 | **Vista General** | la venta de ACS suma en los totales del grupo | *«sus ventas suman, pero sus clientes no se ven»* |
@@ -496,20 +550,26 @@ Medido el 4-sep-2026. ⚠️ `activity_logs` **solo registra logins y algunas es
 clics ni pantallas vistas. Para este módulo eso significa que **no hay forma de saber qué
 sub-tab se mira**, salvo la caja (que deja rastro al escribir su caché).
 
-- **Logins de `gerente_acs`**: jul-2026 **7** · ago-2026 **32** · sep-2026 (hasta el 4) **1**.
-  Total histórico **40**. Es el rol más activo de los dos de este archivo.
+- **Logins de `gerente_acs`**: total histórico **40**, ✅ re-medido el 5-sep-2026
+  (`select user_role, count(*) filter (where action='login'), count(*), min(created_at),
+  max(created_at), string_agg(distinct action, ', ') from activity_logs where user_role in
+  ('gerente_acs','gerente_boston') group by 1`): **40 filas, las 40 `login`**, la primera el
+  3-jul-2026 20:35 y la última el **3-sep-2026 19:50 UTC**. Jennifer **no entró el 4 ni el 5 de
+  septiembre.** Es el rol más activo de los dos de este archivo.
 - **Sesiones**: **42** registradas para `jennifer`; la última con `last_seen`
-  **3-sep-2026 19:56 UTC**.
+  **3-sep-2026 19:56 UTC** ✅ (sin cambios al 5-sep).
 - **Horario de Panamá** (los 40 logins): **11 a.m.** es la hora pico (10), después **6 p.m.** (8),
   **5 p.m.** (5), **9 a.m.** y **3 p.m.** (4 cada una). Nada antes de las 9 ni después de las 7.
-- **`multifashion_caja_diaria`**: 8 filas, la última del **14-ago-2026**. O sea que **la
-  pestaña Caja lleva 3 semanas sin abrirse** — es la medición de uso por pantalla más directa
-  que este módulo produce.
-- **`multifashion_metas`**: **1 fila**, creada por `daniel` el **14-ago-2026**; ninguna edición
-  posterior (`updated_at` = `created_at`). **4 participantes**, sin cambios.
+- **`multifashion_caja_diaria`**: 8 filas, la última del **14-ago-2026**. Al 5-sep son
+  **22 días** sin abrir la pestaña Caja — es la medición de uso por pantalla más directa que
+  este módulo produce.
+- **`multifashion_metas`**: **1 fila**, creada por `daniel` el **14-ago-2026 06:22:20 UTC**;
+  ninguna edición posterior (`updated_at` = `created_at`, verificado el 5-sep).
+  **4 participantes**, sin cambios.
 - **Escrituras que el módulo produce por día**: prácticamente **cero**. Salvo crear/editar una
   meta (admin) y el caché de caja, todo el módulo es **de solo lectura**. `activity_logs` de
-  `gerente_acs` tiene **45 filas y las 45 son `login`**.
+  `gerente_acs` tiene **40 filas y las 40 son `login`**; sumando las 5 de `gerente_boston` son
+  las **45** filas de los dos roles gerentes.
 - **Andrea (secretaria)**: tiene el módulo por override; no es medible cuánto lo usa —
   `activity_logs` no distingue persona dentro del rol `secretaria`.
 
@@ -546,9 +606,24 @@ Año    $263,407    1 ene al 24 jul 2025
   `⏳ Ventas del día aún sincronizando (al 23-jul)`.
 - Sin base comparable (< $100): esa fila dice `s/d año pasado` y no aparece abajo. Si ninguna
   métrica tiene comparable, el bloque «Año pasado» se omite entero.
-- La línea **🎯 Meta** sale solo si hay una meta grupal activa que cubra el corte. Medida
-  contra producción el 3-sep-2026: vendido $4.599,07 · sep–dic 2025 $340.698,55 ·
-  1–3 sep 2025 $3.294,33 → ritmo $4.061,12 → **+13,25% → «▲ +13% arriba del ritmo»**.
+- La línea **🎯 Meta** sale solo si hay una meta grupal activa que cubra el corte.
+  **Re-medida el 5-sep-2026 con la fórmula real de `meta-ritmo.ts` y los números de hoy**
+  (`select sum(subtotal) from _multifashion_sf_vw where not is_wholesale and fecha between …`):
+
+  | Pieza | Valor de hoy | De dónde sale |
+  |---|---:|---|
+  | corte | **2026-09-04** | `max(fecha)` de `_multifashion_sf_vw` (hoy 5-sep todavía no hay venta cargada) |
+  | vendido (1–4 sep 2026, retail) | **$7.502,90** | `fecha between '2026-09-01' and '2026-09-04'`, `is_wholesale = false` |
+  | rango completo un año antes (sep–dic 2025) | **$340.698,55** | `between '2025-09-01' and '2025-12-31'` |
+  | 1–4 sep 2025 | **$3.786,44** | `between '2025-09-01' and '2025-09-04'` |
+  | factor = 420.000 ÷ 340.698,55 | **1,2328** | — |
+  | ritmo = 3.786,44 × 1,2328 | **$4.667,78** | — |
+  | % = 7.502,90 ÷ 4.667,78 − 1 | **+60,7%** | → **«🎯 Meta  ▲ +61% arriba del ritmo»** |
+
+  ⚠️ El **+13%** que dice la escritura del 4-sep es del **3-sep** y sigue siendo correcto para
+  ese día (vendido $4.599,07 · 1–3 sep 2025 $3.294,33 → ritmo $4.061,12 → +13,25%). Saltó a
+  +61% porque **el 4-sep vendió $2.903,83 solo** y el 4-sep de 2025 había aportado $492,11.
+  El número se mueve todos los días: **no lo copies de aquí, vuelve a medirlo.**
 - El destinatario es **Daniel y nadie más**. Jennifer **no** lo recibe.
 
 ## Cómo probarlo a mano
@@ -617,18 +692,24 @@ Todo con una sesión de admin, sin tocar código.
 
 ## Lo que sobra o no cuadra
 
-1. 🔴 **Cuatro comentarios de rutas dicen «Multifashion es módulo admin-only por ahora (los
-   demás roles se definen después)»** y las cuatro aceptan `["admin","secretaria","gerente_acs"]`:
-   `vendedoras/route.ts:38`, `clientes-wholesale/route.ts:25`, `retail-recurrentes/route.ts:23`,
-   `detalle-mensual/route.ts:23`. El comentario es de antes de que existiera `gerente_acs`.
-2. 🔴 **`vendedoras/route.ts` dice «Mismos roles que /api/ventas/* (admin/director/contabilidad)»**
-   — y **el rol `director` no existe** en `SYSTEM_ROLES`, ni `contabilidad` entra a esa ruta.
-3. 🔴 **`bonos/route.ts` documenta `multifashion_bonos_v1` y llama a `multifashion_bonos_v3`.**
-   La `v1` **no existe** en `pg_proc` (verificado).
-4. 🔴 **`detalle-mensual/route.ts` dice que `multifashion_dia_a_dia_v4` «sigue viva»** — no
-   existe en `pg_proc`.
-5. 🔴 **`multifashion_tienda_vc_hibrido` está instalada en producción y no la llama nadie**
-   desde `src/` (misma familia que las «metas fantasma»).
+1. 🔴 **SIGUEN VIVOS (5-sep-2026): cuatro comentarios de rutas dicen «Multifashion es módulo
+   admin-only por ahora (los demás roles se definen después)»** y las cuatro aceptan
+   `["admin","secretaria","gerente_acs"]`. Líneas re-verificadas hoy:
+   `detalle-mensual/route.ts:26` · `vendedoras/route.ts:33` · `retail-recurrentes/route.ts:19` ·
+   `clientes-wholesale/route.ts:21`. El comentario es de antes de que existiera `gerente_acs`.
+2. 🔴 **SIGUE VIVO: `vendedoras/route.ts:10` dice «Mismos roles que /api/ventas/*
+   (admin/director/contabilidad)»** — y **el rol `director` no existe** en `SYSTEM_ROLES`, ni
+   `contabilidad` entra a esa ruta (la ruta pide `["admin","secretaria","gerente_acs"]`).
+3. 🔴 **SIGUE VIVO, y es peor de lo que decía: `multifashion_bonos_v1` se nombra en TRES
+   lugares** — `bonos/route.ts:2`, `src/components/ventas/types.ts:306` y `types.ts:341` — y
+   **no existe en `pg_proc`**. El código llama a `multifashion_bonos_v3`.
+4. 🔴 **SIGUE VIVO: `detalle-mensual/route.ts:11` dice que `multifashion_dia_a_dia_v4` «sigue
+   viva pero solo…»** — **no existe en `pg_proc`** (verificado hoy).
+5. 🔴 **DOS funciones instaladas en producción sin un solo llamador desde `src/`** (verificado
+   hoy con `grep -rl` sin tests): **`multifashion_tienda_vc_hibrido`** y —la que faltaba en esta
+   lista— **`proyeccion_mensual_mayorista_v1`**, que un comentario de `ventas/queries.ts:126` da
+   por retirada mientras su hermana `proyeccion_mensual_retail_v1` sí sigue viva y llamada.
+   Misma familia que las «metas fantasma».
 6. **Tres campos viajan en cada carga y ninguna pantalla los pinta**: `Multifashion.metaAnual`
    ($800.000, y encima cuesta una lectura de `app_settings` dentro de la RPC),
    `Multifashion.ubicacion` («Chiriquí») y `expectedTodayPct`. Ya está anotado en el
@@ -647,10 +728,15 @@ Todo con una sesión de admin, sin tocar código.
     «Multifashion es de Jennifer» es incompleto.
 12. **`contabilidad` entra a `overview` y `venta-hoy` por API** y a ninguna otra, y **no puede
     llegar a la pantalla**: es un permiso que no se puede ejercer.
-13. **La pestaña Caja lleva 3 semanas sin abrirse** (última fila de caché: 14-ago-2026). Es un
-    dato de uso, no un defecto.
-14. **`multifashion_margen_tienda_mensual` (v1) sigue instalada** como fallback de la `_v2`,
-    que ya corrió. Es red muerta, no dañina.
+13. **La pestaña Caja lleva 22 días sin abrirse** (última fila de caché: 14-ago-2026
+    06:20:58 UTC, re-verificado el 5-sep). Es un dato de uso, no un defecto.
+14. **`multifashion_margen_tienda_mensual` (v1) sigue instalada** ✅ (confirmado en `pg_proc` el
+    5-sep-2026) como fallback de la `_v2`, que ya corrió. Es red muerta, no dañina.
+
+15. ⚠️ **`switch_articulo_marca` tiene 34 valores distintos, no 32**, y entre ellos están las
+    grafías malas que el mapa junta al mostrar: `TH ACCESORIES` (una S) contra `TH ACCESSORIES`,
+    `TH OTHER` contra `TH OTHERS`, `CK WOMEN` contra `CK WOMENSWEAR`. Corregirlas es tarea de
+    Daniel en Switch; la pantalla no depende de eso.
 
 ---
 ---
@@ -689,8 +775,10 @@ les contestaba 403.
   **la cartera**. La secretaria la ve porque también la ve desde el CXC del grupo, en su
   pestaña «Confecciones Boston».
 
-**Los módulos de David, medidos el 4-sep-2026** (`role_permissions.gerente_boston`):
-**`["boston", "catalogos", "asistencia"]`**.
+**Los módulos de David** ✅ re-medidos el 5-sep-2026 (`select role, modulos from
+role_permissions order by role`): **`["boston", "catalogos", "asistencia"]`**, sin cambios.
+En la misma consulta, **`gerente_acs` = `["multifashion"]`** — sigue siendo el único módulo de
+Jennifer.
 - `boston` — el módulo entero.
 - `catalogos` — **solo VER** (Daniel, 27-ago-2026: *«catalogo para david si, solo eso»*).
   Entró a **UNA** lista, `CATALOGO_ROLES`, y solo dos cosas la leen: el hub `/catalogos/marcas`
@@ -726,8 +814,10 @@ admin/secretaria/vendedor). Y desde el 4-sep-2026 David **no tiene NINGUNA ruta 
 
 **La contraseña de David no está en el repo.** Se creó con un centinela; `isHash()` en
 `/api/auth` saltea toda contraseña que no empiece con `$2a$`/`$2b$`, así que el login era
-**imposible** hasta que Daniel se la puso desde Usuarios. Medido el 4-sep-2026: **ya entró**
-(5 logins, el último el 2-sep).
+**imposible** hasta que Daniel se la puso desde Usuarios. ✅ Re-medido el 5-sep-2026
+(`select name, role, active, (password like '$2%') from fg_users`): **su contraseña ES bcrypt**
+y **ya entró** — 5 logins, el último el **2-sep-2026 21:05 UTC**, con una sesión cuyo
+`last_seen` es del **4-sep 17:01 UTC**. No entró ni el 5.
 
 ## Las pantallas
 
@@ -759,23 +849,78 @@ contesta «cómo va Boston».
 
 ### Pestaña 2 · **Por cobrar** — `src/components/cxc/BostonTab.tsx` (el MISMO componente del CXC)
 
-- **No es un componente nuevo.** Es exactamente el `<BostonTab />` que ya vivía en
-  `/admin?tab=boston`, contra el **MISMO** `/api/cxc/boston`. Medido: idéntico en los cuatro
-  anchos, 391 filas en las dos puertas.
-- Arriba: `<SyncStatus>` (la fecha del dato) y, si el guard de montos descartó algo, el aviso
-  `<AvisoRechazosSwitch>` — *«qué se quedó AFUERA de los totales de abajo»*.
-- Buscador («Buscar cliente...») y **4 píldoras que FILTRAN**: **Total pendiente** (con el
-  número de clientes) · **0-90 días** · **91-120** · **121+**. Tocar una filtra **y** reordena
-  por ese tramo.
-- Lista: barrita de color por el tramo más viejo con deuda, nombre,
-  chip **«también en el grupo»** (marca visual: ese nombre existe en las dos carteras; **no
-  suma nada**), los tres tramos, **«Últ. pago \<fecha\> · $X»** y el botón que despliega los
-  **últimos 3 pagos**.
-- Corte **`lg`**: tarjetas por debajo, tabla arriba (`Cliente · 0-90 · 91-120 · 121+ ·
-  Último pago · Total`, todas ordenables).
-- 🩸 Aquí vivía una 5ª tarjeta, *«Cobrado julio · $35.392,49 · 126»*, **con el monto escrito a
-  mano en el código**. No filtraba nada y en octubre se habría leído como si fuera de octubre.
-  Daniel aprobó quitarla. **No reponerla.**
+⚠️ **SE REDISEÑÓ EL 5-sep-2026** (commit `e1ae7258`, «cxc: una hoja para cobrar, totales sobre
+su columna y el aviso de quien no paga»): el CXC del grupo se rehizo entero y **Boston recibió
+el mismo formato, siempre aparte**. Lo que sigue es cómo quedó, leído del archivo de hoy
+(460 líneas, 289 cambiadas).
+
+⚠️ **Y el CXC se mudó de dirección**: `/admin` pasó a **`/cxc`**. `/admin` redirige con **307**
+y **Next arrastra la query**, así que un marcador viejo `/admin?tab=boston` sigue llegando
+entero — pero la dirección canónica de la otra puerta a esta pestaña es hoy **`/cxc?tab=boston`**.
+(`next.config.js:89`; `/admin/usuarios` y `/admin/data-health` **no** se movieron.)
+
+- **No es un componente nuevo.** Es exactamente el `<BostonTab />` del CXC, contra el **MISMO**
+  `/api/cxc/boston`. Dos puertas, un solo componente.
+- Arriba, en este orden: `<SyncStatus>` (la fecha del dato, acotado a `empresasCarteraAparte()`
+  = solo Boston) → `<AvisoRechazosSwitch>` (lo que el guard de montos dejó afuera) → el buscador
+  («Buscar cliente...»).
+- 🆕 **La tira de totales se paró SOBRE SUS COLUMNAS.** En pantalla ancha los cuatro totales
+  viven en la **misma grilla de 12 columnas** que la tabla (4/2/2/2/2), pegados arriba de ella:
+  el conteo de clientes a la izquierda y después **0-90 · 91-120 · 121+ · Total · N**. Antes
+  eran cuatro tarjetas flotando sin relación visual con nada. **Los cuatro siguen FILTRANDO**
+  igual que antes, con el mismo toggle de `lib/cxc-orden`. En celular (`lg:hidden`) siguen
+  siendo las píldoras de siempre, 2+2.
+- 🆕 **Un botón «Cobrar» y otro «Documentos» por fila** (en la tabla, a la derecha del total;
+  en las tarjetas, dos botones de 44 px al pie).
+- 🆕 **Los tramos finos se ven al pasar el mouse** por encima de un monto (`title=`):
+  `0-30: $X · 31-60: $Y · 61-90: $Z` y `121-180 · 181-270 · 271-365 · +365`. Es para lo que
+  se hizo la migración de hoy. **Sin los tramos finos no inventa un desglose**: dice el nombre
+  del tramo y ya (`detalleFino()` devuelve `tramoLabel(k)` cuando `finos` es `null`).
+- ⚠️ **«Último pago» dejó de ser una columna**: vive debajo del nombre, en gris, y cuando no hay
+  dice **«Sin pagos registrados»**. La tabla quedó en `Cliente · 0-90 · 91-120 · 121+ · Total`,
+  todas ordenables.
+- 🩸 **Y el botón «Últimos pagos ›» con su bloque por empresa se retiró**: Boston es UNA empresa,
+  ese bloque mostraba tres pagos de la única empresa que hay. Ahora se va directo a los
+  documentos.
+- Lo que **no** cambió: la barrita de color por el tramo más viejo con deuda, el chip
+  **«también en el grupo»** (marca visual, **no suma nada**) y el corte **`lg`** con
+  `data-vista` fijo.
+
+**La hoja «Cobrar»** (`BostonHojaCobrar.tsx`) — **es SUYA, con sus propios datos**: los teléfonos
+salen de `switch_clientes` acotado a Boston (viajan dentro de `/api/cxc/boston`), nunca de
+`clientes_master`, donde Boston no está a propósito. Tiene **TRES salidas**:
+**WhatsApp** · **Copiar el mensaje** · **Ver los documentos**.
+
+🔴 **NO tiene «Correo» ni «PDF», y es una decisión medida, no un olvido.** El comentario del
+archivo lo dice y lo verifiqué contra producción el 5-sep-2026:
+
+```sql
+select count(*), count(*) filter (where coalesce(nullif(trim(sc.telefono),''), nullif(trim(sc.celular),'')) is not null),
+       count(*) filter (where nullif(trim(sc.email),'') is not null)
+  from switch_estadocuenta_aging_boston c
+  left join switch_clientes sc on sc.empresa_key='confecciones_boston' and sc.cliente_switch_id = c.cliente_switch_id
+```
+→ **390 clientes · 272 con teléfono · 113 con correo.** Con menos de un tercio con correo, y con
+el texto de cobro del sistema firmado por Fashion Group (Boston no está en esa lista de
+empresas), mandar correo desde aquí exige que Daniel decida quién firma y con qué texto.
+
+El mensaje que lee el cliente lo firma **«Confecciones Boston - Departamento de Cobros»** y
+🔴 **la palabra «vencido» está prohibida**: `dias` es la EDAD del documento desde su emisión,
+no días de mora, así que se rotula por ANTIGÜEDAD («Hasta 90 días», «De 91 a 120 días»,
+«Más de 120 días»).
+
+**El cajón «Documentos»** (`BostonDocumentosDrawer.tsx` → 🆕 `GET /api/cxc/boston/estado-cuenta`)
+es el estado de cuenta **documento por documento** de un cliente. 🔴 **Es una ruta aparte con su
+propia consulta a propósito**: no reusa `fetchEstadoCuentaData` —el helper del GRUPO— aunque
+haga casi lo mismo, porque ese helper recibe una LISTA de empresas y bastaría pasarle
+`["confecciones_boston"]` para mezclar los dos mundos por descuido. Usa el MISMO signo por tipo
+que la vista de aging, así que el total del cajón cuadra al centavo con el de la lista.
+
+🩸 Aquí vivía una 5ª tarjeta, *«Cobrado julio · $35.392,49 · 126»*, **con el monto escrito a
+mano en el código**. No filtraba nada y en octubre se habría leído como si fuera de octubre.
+Daniel aprobó quitarla. **No reponerla.** ⚠️ Pero el motivo que quedó escrito en el archivo
+(`BostonTab.tsx:224-225`, «`recibos: false` … su cartera va por Brand It») **es falso** — ver
+«Lo que sobra» #1.
 
 ### Pestaña 3 · **Ventas** — `tabs/VentasBoston.tsx`
 
@@ -849,7 +994,7 @@ empresa. La fuente es `switch_clientes` acotada con `.eq("empresa_key", EMPRESA_
 
 ## Los datos
 
-### `switch_estadocuenta` (filas de `confecciones_boston`) — **985 filas, 920 con saldo ≠ 0**
+### `switch_estadocuenta` (filas de `confecciones_boston`) — **990 filas, 919 con saldo ≠ 0** ⚠️
 
 Es **la misma tabla** que la cartera del grupo, con **dos escritores distintos** sobre la misma
 llave `(empresa_key, ccte_id)`: el sync por API (las 6 del grupo) y el reporte web (Boston).
@@ -867,20 +1012,65 @@ updated_at`.
   centavo contra los `totales` que publica Switch** antes de escribir.
 - **`abrev` y `numeroOrden` ya no llegan** en el formato nuevo del reporte (19-ago-2026); el
   adaptador `adaptarReporteConsola` traduce el resto al formato viejo.
-- **Filas con `saldo = 0`**: 65 medidas hoy. **No son basura**: son documentos que se pagaron
-  entre una corrida y la siguiente; el reconcile les puso el saldo en cero y `debito`/`credito`
-  conservan el monto original. **Nadie las cuenta** (la vista las filtra).
+- **Filas con `saldo = 0`**: **71** al 5-sep-2026 (eran 65 el 4-sep). **No son basura**: son
+  documentos que se pagaron entre una corrida y la siguiente; el reconcile les puso el saldo en
+  cero y `debito`/`credito` conservan el monto original. **Nadie las cuenta** (la vista las filtra).
 
-### `switch_estadocuenta_aging_boston` — **VISTA** (no tabla), **390 filas**
+✅ **La cartera se está refrescando todos los días.** Re-medido el 5-sep-2026
+(`select empresa_key, count(*), count(*) filter (where coalesce(saldo,0)<>0), max(synced_at)
+from switch_estadocuenta group by 1`): Boston **990 filas · 919 con saldo · última escritura
+2026-09-05 08:10:08 UTC**. Las otras 6 empresas escriben a las 16:00–16:11 UTC, por el otro
+camino. **Siete corridas `success` en los últimos 7 días**, cero fallos
+(`select sync_type, count(*), count(*) filter (where status='success') from switch_sync_log
+where empresa_key='confecciones_boston' and started_at >= now() - interval '7 days' group by 1`
+→ facturas 35/35 · ventas_tipos 35/35 · recibos 28/28 · articulos 7/7 · **estadocuenta 7/7** ·
+costo 7/7).
+
+### `switch_estadocuenta_aging_boston` — **VISTA** (no tabla), **390 filas** · ⚠️ **ganó 7 columnas el 5-sep-2026**
 
 🔴 Es una **vista aparte a propósito** (`20260728120000_aging_grupo_y_boston_aparte.sql:130`),
 disjunta por construcción de la del grupo. Una fila por cliente de Boston.
 
 `id uuid (md5 de empresa|codigo) · company_key · codigo · cliente_switch_id · nombre ·
-nombre_normalized · d0_90 · d91_120 · d121_plus · total`.
+nombre_normalized · d0_90 · d91_120 · d121_plus · total` **+ los 7 tramos finos nuevos**:
+`d0_30 · d31_60 · d61_90 · d121_180 · d181_270 · d271_365 · mas_365`.
 
-⚠️ **La columna de empresa se llama `company_key`, no `empresa_key`.** Y los buckets son
-**propios y distintos** de los del grupo (`d0_30 … mas_365`).
+🔴 **Migración `20260928120000_aging_boston_tramos_finos.sql`, APLICADA el 5-sep-2026.** Boston
+recibió los MISMOS cortes que el grupo, **sin que se moviera un centavo de lo que ya se veía**.
+Las columnas nuevas van AL FINAL (un `CREATE OR REPLACE VIEW` exige conservar nombre, tipo y
+orden de las que ya estaban), y el código deployado es tolerante a que no existan
+(`finos: r.d0_30 == null ? null : {…}` en `/api/cxc/boston/route.ts:159`).
+
+✅ **VERIFICADO FILA POR FILA que los tres tramos visibles no cambiaron** — no por confianza en
+el SQL, sino midiendo los 390 clientes uno por uno:
+
+```sql
+select count(*) filter (where round(d0_90,2)    <> round(d0_30+d31_60+d61_90,2))                    as d0_90_no_cuadra,
+       count(*) filter (where round(d121_plus,2)<> round(d121_180+d181_270+d271_365+mas_365,2))     as d121_no_cuadra,
+       count(*) filter (where round(total,2)    <> round(d0_90+d91_120+d121_plus,2))                as total_no_cuadra
+  from switch_estadocuenta_aging_boston
+```
+→ **0 · 0 · 0.** Ni una fila de las 390 se descuadra.
+
+| Tramo | Monto (5-sep-2026) |
+|---|---:|
+| `d0_30` | $49.217,07 |
+| `d31_60` | $5.754,48 |
+| `d61_90` | $3.640,77 |
+| **`d0_90` (visible)** | **$58.612,32** = la suma exacta de los tres |
+| **`d91_120` (visible)** | **$11.956,68** |
+| `d121_180` | $29.651,39 |
+| `d181_270` | $13.800,99 |
+| `d271_365` | $22.194,08 |
+| `mas_365` | $59.293,79 |
+| **`d121_plus` (visible)** | **$124.940,25** = la suma exacta de los cuatro |
+| **`total`** | **$195.509,25** |
+
+⚠️ **La columna de empresa se llama `company_key`, no `empresa_key`.**
+⚠️ Y ojo con el reverso, que la escritura del 4-sep tenía al revés: **la vista del GRUPO no
+tiene `d0_90` ni `d121_plus`** — solo los ocho finos (`d0_30 · d31_60 · d61_90 · d91_120 ·
+d121_180 · d181_270 · d271_365 · mas_365 · total`), y los tres tramos gordos los arma la
+pantalla. **La de Boston es hoy la única que trae las DOS familias.**
 
 **Cómo firma** (esto no está en `CLAUDE.md`): `Nota de Crédito`, `Recibo` y `Recibo Saldo
 Anterior` entran **negativos**; `Factura`, `Nota de Débito`, `Saldo Anterior`, `Transacción` y
@@ -888,18 +1078,84 @@ Anterior` entran **negativos**; `Factura`, `Nota de Débito`, `Saldo Anterior`, 
 `saldo ≠ 0`, y una fila se descarta si `|total| < 0,01`. Los buckets solo cuentan `dias ≥ 0`
 (hoy hay **0** documentos con `dias < 0`), pero el `total` los sumaría igual.
 
-**Medido el 4-sep-2026: 390 clientes · Total $190.399,07 · 0-90 $53.502,14 · 91-120 $11.906,68 ·
-121+ $124.990,25.** Contra el grupo (`switch_estadocuenta_aging`): **211 clientes ·
-$3.685.289,04 · 0 filas de Boston.**
+🔴 **EL AISLAMIENTO, MEDIDO EN LAS DOS DIRECCIONES EL 5-sep-2026.** Una sola consulta,
+las tres vistas a la vez:
 
-⚠️ **`TCKCTA` (el mostrador) aparece en la cartera de Boston** con **$25,15**. No es un cliente.
+```sql
+select 'aging_grupo' v, count(*), count(*) filter (where company_key='confecciones_boston'),
+       count(distinct company_key), round(sum(total),2) from switch_estadocuenta_aging
+union all select 'aging_boston', count(*), count(*) filter (where company_key<>'confecciones_boston'),
+       count(distinct company_key), round(sum(total),2) from switch_estadocuenta_aging_boston
+union all select 'aging_mv', count(*), count(*) filter (where company_key='confecciones_boston'),
+       count(distinct company_key), round(sum(total),2) from switch_estadocuenta_aging_mv
+```
+
+| Vista | Filas | Filas del OTRO lado | Empresas | Total |
+|---|---:|---:|---:|---:|
+| `switch_estadocuenta_aging` (grupo) | 211 | 🔴 **0 de Boston** | **6** | $3.676.935,55 |
+| `switch_estadocuenta_aging_boston` | 390 | 🔴 **0 del grupo** | **1** | $195.509,25 |
+| `switch_estadocuenta_aging_mv` (MV) | 211 | 🔴 **0 de Boston** | **6** | $3.676.935,55 |
+
+✅ **Las dos vistas son disjuntas y la MV es idéntica a la vista al centavo** (211 · 0 ·
+$3.676.935,55 en las dos). Y se comprobó por su definición, no solo por el conteo
+(`select definition from pg_matviews where matviewname='switch_estadocuenta_aging_mv'`): la MV
+**termina en `FROM switch_estadocuenta_aging v`** y **no nombra `switch_estadocuenta` ni una
+vez** — sigue materializando la VISTA, no una copia de su cuerpo. ⚠️ Detalle fino: enumera las
+columnas una por una y agrega `now() AS materializado_en`, no es un `SELECT v.*` literal; lo que
+importa —de dónde lee— sí es lo escrito.
+
+⚠️ **La exclusión es un `<>`, no un `NOT IN`** — leyendo la definición viva
+(`select pg_get_viewdef('switch_estadocuenta_aging'::regclass, true)`):
+`WHERE COALESCE(s.saldo,0) <> 0 AND s.empresa_key <> 'confecciones_boston'::text`.
+Este archivo y `cxc/CLAUDE.md` dicen «`NOT IN`». **Lo que importa se sostiene** —es una
+exclusión, no una enumeración, así que una empresa nueva entra sola y no se cae en silencio—
+pero el operador escrito no es el que corre.
+
+⚠️ **`TCKCTA` (el mostrador) sigue en la cartera de Boston** con **$25,15** ✅ (re-medido). No
+es un cliente.
 
 ### `switch_clientes` (`confecciones_boston`) — **4.915 filas, todas activas**
 
-🩸 **Estuvo 37 DÍAS CONGELADA, y se arregló el 5-sep-2026.** Las 4.915 filas tenían el MISMO
-`synced_at` —`2026-07-30 06:31:07 UTC`, al milisegundo— y ni una escritura desde entonces, así que
-un cliente que Switch dio de alta en agosto **no existía para esta pantalla**. Contraste medido el
-mismo día: `switch_clientes` de ACS, `synced_at` de hoy 11:31 UTC.
+🔴🔴 **AL 5-sep-2026 SIGUE CONGELADA. El arreglo está escrito y programado, pero TODAVÍA NO HA
+CORRIDO NI UNA VEZ.** Es la corrección más importante de esta verificación.
+
+Medido hoy (`select empresa_key, count(*), min(synced_at), max(synced_at), count(distinct
+synced_at) from switch_clientes group by 1`):
+
+| Empresa | Filas | `synced_at` distintos | Última escritura |
+|---|---:|---:|---|
+| **`confecciones_boston`** | **4.915** | **1** | 🔴 **2026-07-30 06:31:07.524 UTC** (37 días) |
+| `american_classic` | 1.038 | 3 | ✅ 2026-09-05 11:30:29 UTC (hoy) |
+| las 6 del grupo | 139–147 c/u | 2–3 | ✅ 2026-09-05 16:00–16:11 UTC (hoy) |
+
+Las 4.915 filas siguen con **el mismo `synced_at` al milisegundo**, así que un cliente que
+Switch dio de alta en agosto **todavía no existe para esta pantalla**.
+
+**Por qué todavía no corrió, y no es un fallo:** el cron es **semanal, domingos 07:10 UTC**
+(`vercel.json` → `{"path": "/api/cron/sync-clientes-boston", "schedule": "10 7 * * 0"}`,
+verificado hoy; el route existe y está commiteado en `9dcf9dd6`). **Hoy 5-sep-2026 es SÁBADO.**
+La primera corrida de su vida es **mañana, domingo 6-sep 07:10 UTC**. Confirmado por la otra
+punta: `select sync_type, count(*), max(started_at) from switch_sync_log where
+empresa_key='confecciones_boston' group by 1` devuelve `recibos · ventas_tipos · facturas ·
+articulos · estadocuenta · costo · mayor` — **no existe ni una corrida de tipo `clientes`**.
+
+✅ **Y la alerta B SÍ está funcionando y ya sonó.** Medido:
+`select tipo, count(*), max(created_at), max(error_message) from cron_email_errors where tipo
+like 'silencio%' group by 1` →
+**`silencio_de_datos:Confecciones Boston` · 1 aviso · 2026-09-05 10:00:28 UTC ·
+`confecciones_boston/switch_clientes:quieta`**. O sea: el hueco que antes no cubría nadie hoy
+lo cubre una alerta, y esa alerta está diciendo la verdad. Si la corrida del domingo falla,
+vuelve a sonar a los 7 días.
+
+🔑 **Cómo verificar el lunes que el arreglo funcionó** (dos consultas, sin tocar nada):
+`select max(synced_at) from switch_clientes where empresa_key='confecciones_boston'` tiene que
+decir **domingo 6-sep ~07:10 UTC**, y `select * from switch_sync_log where
+empresa_key='confecciones_boston' and sync_type='clientes'` tiene que traer una fila
+`status='success'`. Mientras esas dos digan otra cosa, **el directorio de Boston está viejo por
+más que la documentación diga que se arregló**.
+
+**Historia (por qué se congeló):** Las 4.915 filas tenían el MISMO `synced_at` al milisegundo y
+ni una escritura desde el 30-jul, y nadie lo vio porque ninguna alerta lo cubría.
 
 **La causa:** el único escritor del directorio vivía DENTRO del sync de estado de cuenta por API, y
 ese camino para Boston está vetado (4.912 llamadas HTTP, 54 min contra un techo de 800 s). El
@@ -909,7 +1165,7 @@ alcanzó a escribir el directorio y murió en el recorrido por cliente. **El dí
 ese cron es el día exacto en que su directorio se congeló.** Y nadie lo vio porque **ninguna alerta
 lo cubría**.
 
-**El arreglo (5-sep-2026):** `/api/cron/sync-clientes-boston`, **SEMANAL, domingos 07:10 UTC**
+**El arreglo, escrito el 5-sep-2026 y a estrenar el 6:** `/api/cron/sync-clientes-boston`, **SEMANAL, domingos 07:10 UTC**
 (domingo 2:10 a.m. de Panamá — Daniel: *«semanal»*). Pide solo `/apicliente/lista` (~99 páginas, no
 4.912 llamadas) y escribe con el MISMO código que las 6 del grupo
 (`src/lib/switch-api/clientes-directorio.ts`: un solo escritor, no dos implementaciones que se
@@ -927,60 +1183,118 @@ Una lista vacía no escribe ni marca: la corrida termina en `error`.
 (la misma tabla la escriben tres crons con tres ritmos), umbral **semanal de 165 h** — avisa a la
 primera corrida perdida, porque la siguiente oportunidad es dentro de siete días.
 
-**8 clientes con saldo en la cartera NO existen aquí** (medido),
-así que **aparecen en «Por cobrar» y NO en «Clientes»**: `165367 PRIVIVIENDA S,A. $323,68` ·
-`115339 ITALDECO $225,77` · `115323 MAKAYA $96,30` · `145413 Maria Valles $89,88` ·
+✅ **8 clientes con saldo en la cartera NO existen aquí** — re-medido el 5-sep-2026
+(`select a.codigo, a.nombre, a.total from switch_estadocuenta_aging_boston a left join
+switch_clientes sc on sc.empresa_key='confecciones_boston' and sc.cliente_switch_id =
+a.cliente_switch_id where sc.cliente_switch_id is null order by a.total desc`), **siguen siendo
+los mismos 8**, así que **aparecen en «Por cobrar» y NO en «Clientes»**:
+`165367 PRIVIVIENDA S,A. $323,68` · `115339 ITALDECO INTERNACIONAL S.A. $225,77` ·
+`115323 MAKAYA REAL ESTATE, S.A. $96,30` · `145413 Maria Valles $89,88` ·
 `145301 FENEDA $30,10` · `165329 Eduardo González $21,40` · `145407 SMILEART −$8,05` ·
-`135364 Gabriela Jaramillo −$30,00`. Suman **$748,68**. Nadie lo dice en pantalla.
+`135364 Gabriela Arlene Jaramillo −$30,00`. Suman **$749,08** ⚠️ (la escritura del 4-sep decía
+$748,68 — la suma correcta de esos mismos ocho números es 749,08). Nadie lo dice en pantalla.
 
-### `switch_recibos` (`confecciones_boston`) — **7.674 filas**
+⚠️ **Y el cruce da lo mismo por CÓDIGO que por `cliente_switch_id`: 382 de 390 en los dos
+casos.** No hay una llave que rescate a los 8.
+
+### `switch_recibos` (`confecciones_boston`) — **7.674 filas** ✅
 
 Los cobros. Alimentan la columna «Último pago» (vía `switch_ultimo_pago_cliente_v2`) y el
-bloque de los últimos 3 pagos. **266 recibos desde el 1-ago-2026.**
+cajón de documentos. **266 recibos desde el 1-ago-2026** ✅ (re-medido el 5-sep-2026).
 
-⚠️ **El cliente se cruza por `cliente_switch_id`, NO por código**: el `codigo` de la cartera de
-Boston (`1`, `3`, `9`…) no coincide con el `cliente_codigo` de los recibos (`115429`). Medido:
-de los 390 clientes de la cartera, solo **347** cruzan por código contra los 1.978 códigos
-distintos de recibos; por id cruzan **382**.
+❌ **CORREGIDO — la escritura del 4-sep decía que cruzar por `cliente_switch_id` rescataba
+clientes, y es FALSO.** Lo que se midió hoy:
+
+```sql
+select (select count(distinct cliente_codigo) from switch_recibos where empresa_key='confecciones_boston'),
+       (select count(*) from switch_estadocuenta_aging_boston a where exists (select 1 from switch_recibos r
+          where r.empresa_key='confecciones_boston' and r.cliente_codigo = a.codigo)),
+       (select count(*) from switch_estadocuenta_aging_boston a where exists (select 1 from switch_recibos r
+          where r.empresa_key='confecciones_boston' and r.cliente_switch_id = a.cliente_switch_id))
+```
+→ **1.978 códigos distintos de recibos · 346 cruzan por CÓDIGO · 346 cruzan por ID.**
+**El mismo número por las dos llaves.** El «382» que decía la escritura vieja es el cruce
+contra **`switch_clientes`** (el directorio), no contra los recibos: dos mediciones distintas
+que se mezclaron en una frase.
+
+Lo que **sí** es cierto y sigue vigente: el código de la ruta cruza por `cliente_switch_id`
+(`/api/cxc/boston/route.ts:81-84`, `.select("cliente_switch_id,ultimo_pago_fecha,
+ultimo_pago_monto").eq("empresa_key","confecciones_boston")`), y esa es la llave del
+`DISTINCT ON` de la vista, así que es la que hay que usar para paginar estable. Pero **no gana
+cobertura sobre el código**.
+
+`switch_ultimo_pago_cliente_v2` tiene hoy **1.940 filas** de Boston (eran 1.947 el 4-sep) y
+**339 de los 390 clientes de la cartera** terminan mostrando un último pago (los demás, o no
+tienen recibo, o el único que tienen es de $0,00 y la ruta lo descarta).
 
 🩸 **Un recibo de $0,00 NO es un pago** (es una aplicación, un cruce o un anulado) y las
 retenciones tampoco. Boston era la más afectada: **138 de los 166** clientes con un «último
 pago» que no era un pago eran suyos, algunos con fechas de 2024.
 
-### `switch_facturas` (`confecciones_boston`) — **9.165 filas**
+### `switch_facturas` (`confecciones_boston`) — **9.165 filas** ✅
 
-Alimentan `ventas_rollup_mensual_mv`. 🩸 **Boston tiene 1.210 notas de crédito guardadas en
-POSITIVO**: un `sum(total)` a mano habría dado **$87.661,61 en agosto contra los $34.560,85
-reales**. Por eso la pestaña lee `ventas_netas` del rollup, que **resta** las NC y va **sin
-ITBMS**.
+Alimentan `ventas_rollup_mensual_mv`. 🩸 **Boston tiene 1.216 notas de crédito guardadas en
+POSITIVO** ⚠️ (eran 1.210 el 4-sep). Re-medido el 5-sep-2026
+(`select tipo_comprobante, count(*), count(*) filter (where subtotal_descuento>0),
+count(*) filter (where subtotal_descuento<0) from switch_facturas where
+empresa_key='confecciones_boston' group by 1`): **Factura 7.742 · Nota de Crédito 1.216 ·
+Transacción 138 · Nota de Débito 57 · Tiquete 12 — y las 9.165 filas están guardadas en
+POSITIVO, sin una sola negativa.** El signo lo pone la lectura.
+
+⚠️ **Las cifras de agosto que citaba la escritura del 4-sep ya no son las de la base.**
+Re-medido hoy sobre agosto 2026 de Boston: sumar todo en crudo da **$94.822,50**, y lo neto
+(NC restadas, sin ITBMS) da **$45.153,10** — no los $87.661,61 / $34.560,85 de la escritura
+anterior. Agosto siguió recibiendo facturas después de esa medición: el `ventas_rollup_mensual_mv`
+de `(confecciones_boston, 2026, agosto)` dice hoy exactamente **$45.153,10**, o sea que la app y
+la consulta cruda cuadran al centavo. **La lección no cambia: sumar en crudo infla la venta de
+agosto en $49.669,40.** Por eso la pestaña lee `ventas_netas` del rollup.
 
 ### `ventas_rollup_mensual_mv` (`confecciones_boston`) — **48 filas**
 
-Una por `(empresa_key, anio, mes)`. Medido:
+Una por `(empresa_key, anio, mes)`. ⚠️ **`mes` es una `date` (el día 1 del mes), no un
+entero.** Re-medido el 5-sep-2026 (`select anio, count(*), round(sum(ventas_netas),2),
+round(sum(costo_total),2) from ventas_rollup_mensual_mv where
+empresa_key='confecciones_boston' group by 1 order by 1`):
 
-| Año | Meses | Ventas netas | Costo (no se muestra) |
+| Año | Meses | Ventas netas | Costo (existe, pero NO se muestra) |
 |---|---:|---:|---:|
 | 2022 | 3 | $74.942,17 | $50.968,03 |
 | 2023 | 12 | $694.693,70 | $468.161,47 |
 | 2024 | 12 | $628.530,15 | $436.875,27 |
 | 2025 | 12 | $687.474,79 | $410.339,27 |
-| 2026 | 9 | $465.785,97 | $297.915,43 |
+| **2026** | 9 | ⚠️ **$472.856,97** | **$298.739,11** |
 
-### `asistencia_personas` (`empresa = confecciones_boston`) — **22 fichas, 21 activas**
+(el 4-sep decía $465.785,97 / $297.915,43 — creció con las facturas que siguieron entrando).
+
+Mes a mes 2026: ene $33.783,31 · feb $62.027,45 · mar $90.168,82 · abr $36.714,11 ·
+may $62.891,47 · jun $55.387,61 · jul $71.908,55 · **ago $45.153,10** · sep (al 4) $14.822,55.
+
+### `asistencia_personas` (`empresa = confecciones_boston`) — **22 fichas, 21 activas** ✅ (re-medido el 5-sep-2026: `select empresa, count(*), count(*) filter (where activo) from asistencia_personas group by 1` → confecciones_boston 22/21 · vistana 10/9 · fashion_wear 8/7)
 
 Solo se lee el **conteo** en el Inicio. La planilla completa sale del motor de Asistencia.
 
-### `prestamos_empleados` + `prestamos_movimientos` — **15 activos de 32**
+### `prestamos_empleados` + `prestamos_movimientos` — **32 fichas** ⚠️
 
-Por empresa (la columna guarda el **NOMBRE**, no la key): **Confecciones Boston 22 fichas /
-10 activas · Vistana International 5 / 3 · Fashion Wear 5 / 2**. ⚠️ En préstamos `deleted` es
-**NULLABLE**: un `.eq("deleted", false)` pierde filas.
+Por empresa (la columna guarda el **NOMBRE**, no la key). Re-medido el 5-sep-2026
+(`select empresa, count(*), count(*) filter (where coalesce(deleted,false)=false) from
+prestamos_empleados group by 1`): **Confecciones Boston 22 fichas / 21 no borradas ·
+Vistana International 5 / 5 · Fashion Wear 5 / 5**.
+
+⚠️ **«Activas» ya no quiere decir nada**: la bandera `activo` de la ficha **se retiró** con el
+rediseño de Préstamos (commit `c4aee92d`) — nunca significó «esta persona trabaja en la empresa» sino «tiene algo
+abierto». El Inicio de Boston hoy **no la mira**: cuenta a quien DEBE, calculando el saldo con
+`calcularSaldoPrestamo` (`/api/boston/inicio/route.ts:124-143`, con el comentario que lo
+explica). El «15 activos de 32» de la escritura del 4-sep describe un mecanismo que ya no existe.
+
+⚠️ En préstamos `deleted` es **NULLABLE**: un `.eq("deleted", false)` pierde filas.
 
 ### `asistencia_aprobador_empresa` — **6 filas**
 
-`usuario · empresa · creado_en`. Contenido medido: **`david → confecciones_boston`** ·
-`Bodega → fashion_wear`, `vistana` · `Contabilidad → las tres`. **`admin` no tiene filas y pasa
-siempre.** Sin filas propias, un aprobador **no aprueba nada** (y lo ve, porque el cuadro le
+`usuario · empresa · creado_en`. ✅ Re-medido el 5-sep-2026 (`select usuario, empresa,
+creado_en from asistencia_aprobador_empresa order by 1,2`), **las 6 filas idénticas**, todas
+creadas el 1-sep-2026 14:39:32 UTC: **`david → confecciones_boston`** ·
+`Bodega → fashion_wear`, `vistana` · `Contabilidad → confecciones_boston`, `fashion_wear`,
+`vistana`. **`admin` no tiene filas y pasa siempre.** Sin filas propias, un aprobador **no aprueba nada** (y lo ve, porque el cuadro le
 sale vacío).
 
 ### `cxc_client_overrides` / `cxc_contact_log` (y `cxc_favorites`, ya sin lectores)
@@ -1000,7 +1314,7 @@ migración la dropee.
 | **La cartera** | 🔴 **panel web**: `GET /estadodecuenta` → `POST /reportesmanager/crearreporteconsola` (devuelve un **uuid**) → `GET /reportesmanager/buscarreporteconsola/<uuid>` cada 2 s hasta `TERMINADO`. Parámetros copiados del botón del panel: **`desde = hasta = hoy`, `claseReporte: '4'`, `tipoReporte: 'ESTADOCUENTACLIENTE'`** (sin `tipoReporte` contesta `{"error":"TIPO_REPORTE_REQUERIDO"}`) | **Panel con sesión** (`web-client.ts`, login con `changesession="SI"`) | **`boston-cartera` 08:10 UTC = 03:10 a.m. de Panamá** | `switch_estadocuenta` → vista `switch_estadocuenta_aging_boston` |
 | **Ventas** | `GET /apifactura/lista` + `GET /apinotacredito/lista` + `GET /apinotadebito/lista`, ventana 7 días. 🩸 **Las NC llegan negativas y se guardan en valor absoluto**; el signo lo pone la lectura | **API con token** | `switch-sync tipo=all` **06:30** (con ACS) + `tipo=facturas` **11:50 · 15:00 · 19:00 · 23:00** (las 8 empresas) | `switch_facturas` → `ventas_rollup_mensual_mv` |
 | **Cobros** | `GET /apireporte/recibos?desde&hasta&porPagina&paginaActual` (**no está en el PDF del API**, y no trae id ni secuencial de recibo: por eso la unidad de reemplazo es el **mes entero**), ventana de los últimos 3 meses | **API** | `sync-recibos` **07:50 · 15:15 · 19:15 · 23:15** | `switch_recibos` |
-| **Clientes** | `GET /apicliente/lista` | **API** | `sync-clientes-boston` — **SEMANAL, domingos 07:10 UTC** (5-sep-2026). Antes: ninguno, porque el directorio viajaba dentro del estado de cuenta por API, vetado por cron para Boston, y las 4.915 filas llevaban 37 días sin tocarse | `switch_clientes` (🔴 **nunca `clientes_master`**) |
+| **Clientes** | `GET /apicliente/lista` | **API** | `sync-clientes-boston` — **SEMANAL, domingos 07:10 UTC** (`"10 7 * * 0"` en `vercel.json`, verificado el 5-sep-2026). 🔴 **Todavía NO ha corrido ni una vez**: se programó un sábado y su primera oportunidad es el domingo 6-sep. Antes: ninguno, porque el directorio viajaba dentro del estado de cuenta por API, vetado por cron para Boston, y las 4.915 filas llevan **37 días** sin tocarse | `switch_clientes` (🔴 **nunca `clientes_master`** — verificado: `src/lib/switch-api/clientes-directorio.ts` no nombra esa tabla en una sola consulta) |
 | **Planilla y préstamos** | 🔴 **nada de Switch**: el reloj de asistencia y lo que carga Contabilidad a mano | — | `asistencia-vigia` 15:00 · 20:00 · 22:15 | `asistencia_*`, `prestamos_*` |
 | **Costo / utilidad** | 🔴 **no se trae** (`utilidad: false`) | — | — | — |
 | **Gastos** | 🔴 **fuera del cron a pedido de Daniel** | panel | ninguno (el manual `?empresas=confecciones_boston` lo acepta) | `egresos_varios` |
@@ -1041,7 +1355,7 @@ Por el mismo motivo, **los egresos de Boston no se bajan por cron**: Daniel, 13-
 
 | Regla | Candado |
 |---|---|
-| 🔴 **Boston NUNCA se mezcla con el CXC del grupo** — ni una fila, ni un total, ni un export, ni un badge. Se cierra en la vista `switch_estadocuenta_aging`, **UNA sola vez**, con un `NOT IN` que **EXCLUYE** (nunca enumera: enumerar dejó a joystep caerse en silencio y costó $15.262) | `cxc-boston-fuera-de-toda-superficie.test.ts` — **dos BARRIDOS sin listas de objetos**: el SQL recorre `supabase/migrations/` entera y arma la definición FINAL de cada VIEW/MV/FUNCTION; el TS recorre `src/` y exige que toda lectura de `switch_estadocuenta` acote `empresa_key` **en la misma cadena** |
+| 🔴 **Boston NUNCA se mezcla con el CXC del grupo** — ni una fila, ni un total, ni un export, ni un badge. Se cierra en la vista `switch_estadocuenta_aging`, **UNA sola vez**, con una condición que **EXCLUYE** (nunca enumera: enumerar dejó a joystep caerse en silencio y costó $15.262). ⚠️ **El operador real es `<>`, no un `NOT IN`** — leído de producción el 5-sep-2026: `WHERE COALESCE(s.saldo,0) <> 0 AND s.empresa_key <> 'confecciones_boston'::text`. Lo de fondo se sostiene (excluye, no enumera); el operador escrito aquí y en `CLAUDE.md` no es el que corre. ✅ **Medido: 211 filas del grupo, 0 de Boston, 6 empresas** | `cxc-boston-fuera-de-toda-superficie.test.ts` — **dos BARRIDOS sin listas de objetos**: el SQL recorre `supabase/migrations/` entera y arma la definición FINAL de cada VIEW/MV/FUNCTION; el TS recorre `src/` y exige que toda lectura de `switch_estadocuenta` acote `empresa_key` **en la misma cadena** |
 | 🔴 **El CXC del grupo SÍ convive con el resto del sistema.** Aislarlo de más también es un error | el mismo archivo, bloque «el CXC del grupo SÍ convive» |
 | **`switch_estadocuenta_aging_mv` MATERIALIZA la vista** (`SELECT v.* FROM switch_estadocuenta_aging v`), no copia su cuerpo | test aparte: «la MV NO lee la tabla base» |
 | 🔴 **Quien ve Boston no ve el grupo.** El rol, la empresa, la key, los roles y las pestañas viven **una sola vez** en `src/lib/boston/rol.ts` | `boston-acceso.test.ts` (57 casos) — CONDUCTA: los handlers REALES de 14 rutas ajenas contestan **403** con cookie firmada, **y esas mismas rutas dejan entrar a `admin`** |
@@ -1060,8 +1374,8 @@ Por el mismo motivo, **los egresos de Boston no se bajan por cron**: Daniel, 13-
 | **La pestaña dice DE CUÁNDO es su plata**, con el MISMO `<SyncStatus />` del grupo, derivado de `empresasCarteraAparte()` | `components/cxc-boston-fecha-del-dato.test.tsx` (8 casos) — incluido «ninguna empresa del grupo se pinta en la pestaña» |
 | **Ninguna cuenta se reimplementó**: la cartera es la misma vista, la planilla el mismo motor que la contadora cuadró al centavo, las ventas el mismo rollup de `/api/ventas/resumen-anual`, y el saldo de un préstamo sale de `calcularSaldoPrestamo` — **la función que se extrajo de `PrestamosClient.tsx`** para que las dos pantallas la compartan | — |
 | **La cartera y los últimos pagos NO comparten ni una función de consulta con las del grupo.** Un helper común `pagosDe(empresa, cliente)` sería un parámetro, y **un parámetro es una puerta** | `cxc-boston-ultimos-pagos-route.test.ts` (Boston no trae al grupo) + `cxc-ultimos-pagos-route.test.ts` (el grupo no trae a Boston) |
-| **Boston no entra a `clientes_master`** (el sync pide por INCLUSIÓN). Estuvo adentro 5 semanas y el ranking de Ventas publicó **$2,55 millones de venta que no existió** | `clientes-master-solo-del-grupo.test.ts` |
-| 🔴 **SU PLATA SUMA; SUS CLIENTES NO SE VEN.** La VENTA de Boston sigue sumando en Ventas › Resumen y Vista General ($465.785,97 en 2026, medido). Lo que sale de las superficies del grupo son sus **CLIENTES** | candado en las dos direcciones |
+| ✅ **Boston no entra a `clientes_master`** (el sync pide por INCLUSIÓN). Estuvo adentro 5 semanas y el ranking de Ventas publicó **$2,55 millones de venta que no existió**. **Re-medido el 5-sep-2026** (`select count(*), count(*) filter (where deleted), count(*) filter (where deleted is not true) from clientes_master`): **5.064 filas · 4.914 borradas · 150 vivas**. Y la prueba fina: de las 150 vivas, **una sola** comparte código con un cliente de Boston, y es **`TCKCTA` / «VENTAS LOCAL»** — el mostrador, que existe en las 8 empresas y que `CLAUDE.md` ya marca como «el único código que miente». **Ni un cliente real de Boston está vivo ahí.** | `clientes-master-solo-del-grupo.test.ts` |
+| 🔴 **SU PLATA SUMA; SUS CLIENTES NO SE VEN.** ✅ **Verificado en las DOS direcciones el 5-sep-2026.** (a) **La venta suma**: la RPC del Resumen (`ventas_dashboard_summary_v2`) hace `GROUP BY f.empresa_key` sobre `switch_facturas` **sin ningún filtro de empresa**, y `empresasConFacturas()` incluye a Boston (`facturas: true` en `EMPRESA_SYNC_CAPABILITIES`, `src/lib/switch-api/empresas.ts:138`). Medido: **$472.856,97 en 2026 = 7,5% de los $6.267.955,39 de las 8 empresas** — Boston es la **4ª** de las 8, por encima de Active Shoes y de la propia Multifashion. (b) **Los clientes no se ven**: `empresasConCxc()` la deja fuera (`cxc: false`), la vista del grupo la excluye con un `<>`, y `clientes_master` tiene sus 4.914 filas marcadas `deleted`. | candado en las dos direcciones |
 | **La ficha por dirección también se cierra**: `/api/clientes/[codigo]` contesta **404** (no 403 — un 403 sería un oráculo de qué clientes tiene Boston) | — |
 | **La contraseña de David no está en el repo.** `isHash()` saltea toda contraseña que no empiece con `$2a$`/`$2b$` | `api/boston-david-sin-contrasena.test.ts` (5 casos, llama al login REAL) |
 | **Los rótulos de las pestañas son CORTOS**: las 6 tienen que entrar en el iPhone, y «Cuentas por Cobrar» pasó a **«Por cobrar»** — que es lo que ya dice la tarjeta del Inicio que lleva ahí | `boston-acceso.test.ts` — «los rótulos son CORTOS» |
@@ -1094,7 +1408,7 @@ sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrid
 
 | Quién | Qué | Cuidado |
 |---|---|---|
-| **CXC del grupo** (`/admin?tab=boston`) | **la MISMA pestaña**, el mismo `<BostonTab />`, el mismo `/api/cxc/boston` — para admin y secretaria | son dos puertas al mismo componente, no dos implementaciones |
+| **CXC del grupo** (⚠️ **`/cxc?tab=boston`** desde el 5-sep-2026; `/admin?tab=boston` redirige 307 con la query) | **la MISMA pestaña**, el mismo `<BostonTab />`, el mismo `/api/cxc/boston` — para admin y secretaria | son dos puertas al mismo componente, no dos implementaciones |
 | **Ventas › Resumen** | una fila «Boston» con su venta | 🔴 **su venta SUMA**: $463.898,47 = 7,4% de 2026 (la cifra del post-mortem; el rollup mide hoy $465.785,97) |
 | **Vista General** | ídem | — |
 | **Asistencia** | David aparece como **aprobador de `confecciones_boston`**; su planilla sale del motor común | `asistencia_aprobador_empresa` |
@@ -1104,11 +1418,14 @@ sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrid
 
 ### Qué se rompería si se cambiara la forma de sus datos
 
-- **Tocar el `NOT IN` de `switch_estadocuenta_aging`** → las 390 filas de Boston entran al CXC
-  del grupo. Medido lo que eso significa: total $3.905.038,06 en vez de $3.718.004,16, **476
-  clientes en vez de 99**, y **5 clientes con las dos deudas SUMADAS en una sola fila**
-  (ALADDIN, LA FRONTERA DUTY FREE, WOLF MALL CENTER INT, CITY MALL PASO CANOA, VENTAS LOCAL) —
-  literalmente lo que Daniel prohibió.
+- **Tocar el `<> 'confecciones_boston'` de `switch_estadocuenta_aging`** → las **390** filas de
+  Boston entran al CXC del grupo. ⚠️ **Re-medido el 5-sep-2026**: el total del grupo pasaría de
+  **$3.676.935,55 a $3.872.444,80** (+$195.509,25) y las filas de 211 a 601. Y **5 clientes
+  quedarían con las dos deudas SUMADAS en una sola fila** — hoy son
+  **ALADDIN · LA FRONTERA DUTY FREE · CITY MALL DAVID · WOLF MALL CENTER INT. · CITY MALL PASO
+  CANOA** (la escritura del 4-sep decía «VENTAS LOCAL» en vez de «CITY MALL DAVID»). El peor es
+  LA FRONTERA DUTY FREE, que ya tiene deuda en **las 6** empresas del grupo. Literalmente lo que
+  Daniel prohibió.
 - **Que `switch_estadocuenta_aging_mv` vuelva a ser una copia del cuerpo de la vista** → el
   mismo bug del 12-ago-2026 (VIEW 211 filas / 0 de Boston · MV 593 / 382 de Boston), tapado
   solo por un `useMemo` de React.
@@ -1165,9 +1482,11 @@ Medido el 4-sep-2026. ⚠️ `activity_logs` solo registra **logins** para este 
 casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 filas de
 `activity_logs` de los dos roles gerentes son **todas `login`**.
 
-- **Logins de `gerente_boston`**: ago-2026 **3** · sep-2026 (hasta el 4) **2**. Total **5**.
-- **Sesiones**: 4 vivas, la última con `last_seen` del **4-sep-2026 17:01 UTC** — o sea que
-  **David estaba usando el sistema hoy**.
+- **Logins de `gerente_boston`**: total **5** ✅ re-medido el 5-sep-2026, **los 5 son `login`**,
+  el primero el **30-ago-2026 02:09 UTC** y el último el **2-sep-2026 21:05 UTC**.
+- **Sesiones**: **5** filas para `david`, la última con `last_seen` del **4-sep-2026 17:01 UTC**.
+  ⚠️ La escritura del 4-sep decía «4 vivas» y «David estaba usando el sistema hoy» — al 5-sep
+  son 5 filas y **no volvió a entrar**.
 - **Horario de Panamá** (5 logins): 12 h · 16 h · 17 h · 21 h ×2. Muestra chica; no hay patrón.
 - **Comparación honesta**: Jennifer lleva 40 logins y David 5. El módulo de David tiene **8
   días de vida útil** (su primer login fue el 30-ago) contra los dos meses de Multifashion.
@@ -1175,8 +1494,10 @@ casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 fil
   rutas de `/api/boston/**` son GET y la planilla es de solo lectura para él. Lo único que David
   podía escribir eran las estrellas de favoritos de su cartera — y los favoritos se retiraron.
 - Lo que sí se puede medir del **dato**, no del uso: la cartera se reescribe entera **una vez
-  al día** (`boston-cartera` 08:10) — 7 corridas `success` en los últimos 7 días, la última el
-  **4-sep 08:11 UTC**. Sus facturas: 35 corridas en 7 días. Sus recibos: 28.
+  al día** (`boston-cartera` 08:10) — ✅ **7 corridas `success` de 7 en los últimos 7 días**, la
+  última hoy **5-sep 08:10:09 → 08:10:24 UTC (15 segundos)**, con **919 filas insertadas, 6
+  actualizadas y 1 descartada**. Sus facturas: **35 de 35**. Sus recibos: **28 de 28**. Sus
+  artículos: 7 de 7. Su costo: 7 de 7. **Cero fallos en toda la semana.**
 
 ## Qué papeles y Excel produce
 
@@ -1184,11 +1505,17 @@ casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 fil
 
 - No hay Excel ni PDF en `/boston` ni en `/api/boston/**` (barrido: cero `workbook*`, cero
   `jsPDF`, cero botón de descarga).
-- **El estado de cuenta en PDF y por correo NO cubre a Boston.**
-  `/api/cxc/estado-cuenta/[codigo]` y `/api/cxc/enviar-email` están acotados a
-  **`CXC_GRUPO_EMPRESA_KEYS`** (las 6) y a `CXC_ROLES` — donde `gerente_boston` no está. O sea
-  que **desde este sistema no se le puede mandar su estado de cuenta a un cliente de Boston**,
-  ni imprimirlo. Se hace desde el panel de Switch.
+- ⚠️ **Matiz del 5-sep-2026: ahora SÍ hay estado de cuenta documento por documento, pero solo
+  EN PANTALLA.** El cajón «Documentos» de la pestaña (ruta nueva
+  `GET /api/cxc/boston/estado-cuenta`) lo muestra completo. Lo que sigue faltando es **el PDF y
+  el correo**: `/api/cxc/estado-cuenta/[codigo]` y `/api/cxc/enviar-email` están acotados a
+  **`CXC_GRUPO_EMPRESA_KEYS`** (las 6) y a `CXC_ROLES` — donde `gerente_boston` no está.
+  ✅ Verificado el 5-sep: las **dos rutas NUEVAS** del rediseño de hoy
+  (`/api/cxc/cobrar-lote` y `/api/cxc/envios`) también dejan a Boston afuera, y lo dicen en su
+  encabezado («Boston no entra por ningún lado», «ES SOLO EL CXC DEL GRUPO»). O sea que
+  **imprimir o mandar por correo el estado de cuenta de un cliente de Boston se sigue haciendo
+  desde el panel de Switch.** La hoja «Cobrar» ofrece WhatsApp y copiar el mensaje, que no es lo
+  mismo.
 - **La planilla no se exporta desde `/boston`.** El Excel y el PDF de planilla —los que firma
   la contadora— salen del módulo Asistencia, que exige `asistenciaRoles()`. David ve el cuadro
   en pantalla y no puede bajarlo.
@@ -1199,7 +1526,8 @@ casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 fil
 ## Cómo probarlo a mano
 
 **1 · La cartera cuadra con Switch**
-1. Entra como admin a `/boston?tab=cxc` (o a `/admin?tab=boston`: es la misma pestaña).
+1. Entra como admin a `/boston?tab=cxc` (o a **`/cxc?tab=boston`**: es la misma pestaña; el
+   viejo `/admin?tab=boston` sigue llegando por el redirect 307).
 2. Arriba dice de cuándo es el dato. Si es de hace más de 26 h, sale el ámbar — el número no
    está mal, está viejo.
 3. Anota **Total pendiente** y los tres tramos.
@@ -1212,13 +1540,21 @@ casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 fil
    `empresa_key = 'confecciones_boston'` y `sync_type = 'estadocuenta'`, `status = 'success'`,
    `finished_at` de esta madrugada.
 7. **Un documento que el guard rechazó** aparece en `skip_details` de esa fila **y en pantalla**,
-   en el aviso arriba de las píldoras. Hoy hay uno permanente de **$266.541.352** que está mal
-   **en Switch** — es un pendiente de Daniel, no un bug de la app.
+   en el aviso arriba de las píldoras. ✅ **Sigue ahí, todos los días** — re-verificado el
+   5-sep-2026 leyendo las 5 últimas corridas de `estadocuenta` de Boston: las 5 traen
+   `records_skipped = 1` con el MISMO renglón,
+   `{"campo": "monto_imposible_cxc", "secuencial": "155-000000129 · VENTAS", "valorCrudo":
+   {"umbral": 2000000, "columnas": [{"columna":"total","valor":266541352},
+   {"columna":"saldo","valor":266541352}, {"columna":"debito","valor":266541352}]}}`.
+   O sea **$266.541.352 contra un umbral de $2.000.000**. Está mal **en Switch** — es un
+   pendiente de Daniel, no un bug de la app, y el guard hace exactamente lo que debe: rechaza la
+   fila y conserva el último valor bueno.
 
 **2 · Que David solo ve lo suyo**
 1. Entra como `david`. Tiene que aterrizar en `/boston`, **no** en el Inicio del grupo.
 2. Arriba, en el menú, solo tres fichas: Confecciones Boston, Catálogos y Asistencia y Planilla.
-3. Escribe `/admin` a mano → tiene que rebotar. Escribe `/ventas` → rebota. Toca el buscador
+3. Escribe `/cxc` a mano (y `/admin`, que redirige ahí) → tiene que rebotar. Escribe `/ventas`
+   → rebota. Toca el buscador
    global → **no está dibujado**.
 4. En Catálogos: entra a una marca, ve fotos, código, nombre, existencia y **precio de venta**.
    **No** tiene que aparecer «Administrar» ni «Pedidos», ni costo ni margen.
@@ -1260,37 +1596,48 @@ casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 fil
 | **Alguien lee `switch_estadocuenta` sin acotar `empresa_key`** | las 985 filas de Boston se suman a las del grupo | BARRIDO 2 del candado |
 | **Alguien agrega una vista o una ruta nueva de cartera** | nace insegura | BARRIDO 1 y 2 (no son listas de objetos: recorren `supabase/migrations/` y `src/` enteros) |
 | **La migración de `asistencia_aprobador_empresa` no hubiera corrido** | ya no aplica: la tolerancia se retiró el 3-sep-2026 | hoy, **sin filas propias, un aprobador no aprueba nada** — y lo ve, porque el cuadro le sale vacío |
-| **`switch_clientes` de Boston se queda vieja** | la pestaña Clientes muestra nombres viejos y no conoce a nadie dado de alta después de la última corrida | ✅ Desde el 5-sep-2026 la refresca `sync-clientes-boston` (domingos 07:10 UTC) y la **alerta B avisa** si pasa una semana sin escritura (165 h). 🩸 Antes no había cron ni aviso: las 4.915 filas llevaban 37 días con `synced_at = 2026-07-30 06:31:07` exactamente, y era el hueco más silencioso del módulo — no un sync que falla, un sync que no existe |
+| **`switch_clientes` de Boston se queda vieja** | la pestaña Clientes muestra nombres viejos y no conoce a nadie dado de alta después de la última corrida | 🔴 **ES EL ESTADO DE HOY, 5-sep-2026**: las 4.915 filas siguen con `synced_at = 2026-07-30 06:31:07.524` y `switch_sync_log` no tiene una sola corrida de `clientes` para Boston. El cron `sync-clientes-boston` está escrito y programado (domingos 07:10 UTC) pero **estrena mañana**. ✅ Lo que ya funciona es el aviso: la **alerta B sonó hoy 10:00 UTC** (`cron_email_errors` → `silencio_de_datos:Confecciones Boston`, `confecciones_boston/switch_clientes:quieta`), umbral semanal de **165 h**. 🩸 El hueco original no era un sync que falla: era un sync **que no existía**, y por eso ninguna alerta lo cubría |
 | **`ventas_rollup_mensual_mv` no se refresca** | la pestaña Ventas y la tarjeta del Inicio se congelan | se refresca con `rpc refresh_ventas_rollup_mensual_mv` |
 | **Daniel entra al panel de Boston de madrugada** | el cron de las 08:10 recibe la sesión tomada | el login usa `changesession="SI"`: **quien entra después, gana** |
 | **`db-max-rows` = 1000** | las 4 rutas paginan a mano (`PAGE = 1000`); la cartera tiene 390 filas y `switch_ultimo_pago_cliente_v2` de Boston tenía **1.947** — sin paginar, 947 clientes se veían como «sin último pago» | ya arreglado el 13-ago-2026 |
 
 ## Lo que sobra o no cuadra
 
-1. 🔴 **`BostonTab.tsx` dice que Boston tiene `recibos: false` en `EMPRESA_SYNC_CAPABILITIES`
-   y que «sus cobros no entran a este sistema (su cartera va por Brand It)». Es FALSO.**
-   Medido: `confecciones_boston: { …, recibos: true, … }` (`empresas.ts:138`), **7.674 recibos
-   suyos** y 28 corridas `success` en los últimos 7 días. Ese comentario es el que justifica
-   por qué se quitó la tarjeta «Cobrado julio» — la decisión está bien, el motivo escrito ya no.
-2. 🔴 **`src/app/api/asistencia/planilla/route.ts:161` sigue diciendo «Daniel todavía no
-   contestó si su hermano ve los sueldos».** Contestó el 31-ago y `VE_SUELDOS_DE_BOSTON` está
-   en `true` desde el 3-sep.
-3. 🔴 **`src/lib/asistencia/guard.ts:65-70` dice que los módulos de David son
-   `["boston","catalogos"]` y que «no tiene `asistencia`, ni puede heredarlo».** Desde el
-   1-sep-2026 `role_permissions.gerente_boston = ["boston","catalogos","asistencia"]` (medido).
+1. 🔴 **SIGUE VIVO (5-sep-2026): `BostonTab.tsx:224-225` dice que Boston tiene `recibos: false`
+   en `EMPRESA_SYNC_CAPABILITIES` y que «su cartera va por Brand It». Es FALSO.**
+   Re-verificado hoy: `src/lib/switch-api/empresas.ts:138` dice
+   `confecciones_boston: { facturas: true, cxc: false, estadoCuenta: true, cxp: false,
+   recibos: true, utilidad: false }`, hay **7.674 recibos suyos** y **28 corridas `success` de
+   `recibos` en los últimos 7 días**. Ese comentario es el que justifica por qué se quitó la
+   tarjeta «Cobrado julio» — la decisión está bien, el motivo escrito ya no. El rediseño de hoy
+   **lo arrastró tal cual**.
+2. 🔴 **SIGUE VIVO: `src/app/api/asistencia/planilla/route.ts:160` dice «David ve el cuadro
+   ENTERO de Boston, pero por defecto SIN la plata … Daniel todavía no contestó si su hermano ve
+   los sueldos».** Contestó el 31-ago y **`VE_SUELDOS_DE_BOSTON = true`** desde el 3-sep
+   (verificado hoy en `src/lib/boston/rol.ts:103`). El comentario dice lo contrario de lo que
+   hace el código de al lado.
+3. 🔴 **SIGUE VIVO: `src/lib/asistencia/guard.ts:63-74` dice que los módulos de David son
+   `["boston", "catalogos"]` y que «no tiene `asistencia`, ni puede heredarlo».**
+   Re-medido el 5-sep: `role_permissions.gerente_boston = ["boston","catalogos","asistencia"]`.
    El mecanismo sigue funcionando (por eso no se rompió nada), pero el motivo escrito ya no es
    el vigente.
-4. 🔴 **El título del test dice una cosa y la aserción otra**:
-   `boston-acceso.test.ts:239` se llama *«sus módulos por defecto son exactamente
-   ['boston', 'catalogos']»* y compara contra `SUS_MODULOS = [MODULO_BOSTON, "catalogos",
-   "asistencia"]` (tres). El candado está bien; el rótulo quedó viejo.
+4. 🔴 **SIGUE VIVO: el título del test dice una cosa y la aserción otra.**
+   `boston-acceso.test.ts:241` se llama *«sus módulos por defecto son exactamente
+   ['boston', 'catalogos']»* y compara contra `SUS_MODULOS` (línea 81) `= [MODULO_BOSTON,
+   "catalogos", "asistencia"]` — **tres**. El candado está bien; el rótulo quedó viejo.
 5. **8 clientes con saldo abierto no aparecen en la pestaña Clientes** porque no tienen ficha
    en `switch_clientes` (medidos, $748,68 en total). La pantalla no lo dice.
 6. **`TCKCTA` —el mostrador, que no es un cliente— está en la cartera de Boston** con $25,15.
    `esMostrador()` existe y se usa en los rankings de Ventas; esta pestaña no lo aplica.
-7. ✅ **RESUELTO el 5-sep-2026 — `switch_clientes` de Boston llegó a estar 37 días congelada y
-   nada lo decía.** Hoy la refresca `/api/cron/sync-clientes-boston` (semanal, domingos 07:10 UTC)
-   y la vigila la alerta B con umbral semanal. Ver el bloque de esa tabla en *Los datos*.
+7. 🔴🔴 **NO RESUELTO TODAVÍA — `switch_clientes` de Boston lleva 37 días congelada, HOY.**
+   El arreglo está escrito, commiteado y programado (`/api/cron/sync-clientes-boston`, domingos
+   07:10 UTC) **pero no ha corrido ni una vez**: hoy 5-sep es sábado y la primera corrida de su
+   vida es mañana. Las 4.915 filas siguen con `synced_at = 2026-07-30 06:31:07.524`, y
+   `switch_sync_log` no tiene una sola fila de `sync_type='clientes'` para Boston.
+   ✅ Lo que **sí** funciona ya: la **alerta B sonó hoy a las 10:00 UTC**
+   (`cron_email_errors` → `silencio_de_datos:Confecciones Boston` ·
+   `confecciones_boston/switch_clientes:quieta`). **Marcar como resuelto el lunes, no antes**, y
+   con las dos consultas de verificación que están en el bloque de esa tabla.
 8. **La pestaña Clientes no muestra el email** aunque el endpoint lo devuelve (`email` viaja en
    el JSON y ningún layout lo pinta).
 9. **`/api/boston/clientes` no puede decir «hay más» en modo saldo**: `truncado` se calcula
@@ -1304,14 +1651,166 @@ casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 fil
     en ningún lado.
 12. **`cxc_client_overrides` y `cxc_contact_log` comparten `nombre_normalized` entre las dos
     carteras.** Ya está anotado en el post-mortem como pendiente de decisión de Daniel.
-13. **El comentario de `src/lib/cxc/boston-roles.ts` dice que la pantalla que lo lee es
-    `app/admin/components/TabsCartera.tsx`** — correcto, pero desde el 27-ago hay una segunda
-    lectora (`BostonShell` vía `rol.ts`), y el archivo no la menciona.
+13. ⚠️ **El comentario de `src/lib/cxc/boston-roles.ts` apunta a
+    `app/admin/components/TabsCartera.tsx`, y esa carpeta ya no existe**: el CXC se mudó a
+    `src/app/cxc/` el 5-sep-2026 (en `src/app/admin/` solo quedó `usuarios`). Y desde el 27-ago
+    hay una segunda lectora (`BostonShell` vía `rol.ts`) que el archivo tampoco menciona.
 14. **La pestaña Préstamos ordena por saldo y no distingue empresa en el orden**: los de
     Vistana y Fashion Wear se intercalan con los de Boston. Es lo que Daniel pidió (todos
     juntos), pero la única señal de empresa es la línea gris bajo el nombre.
-15. **`CXC_ROLES = ["admin","secretaria","vendedor"]` está escrito a mano en SIETE archivos**
-    (`overrides`, `ultimos-pagos`, `estado-cuenta/[codigo]`, `contact-log`, `ultima-compra`,
-    `enviar-email`, `ultimo-pago`). Es exactamente el patrón de lista duplicada que
-    `boston-roles.ts` vino a matar en su lado; en el del grupo sigue vivo. No es un bug hoy
-    —las siete dicen lo mismo— pero es lo que hace caro cualquier cambio de permisos del CXC.
+15. ⚠️ **`CXC_ROLES = ["admin","secretaria","vendedor"]` está escrito a mano en NUEVE archivos,
+    no en siete** (re-contado el 5-sep-2026 con `grep -rn "const CXC_ROLES" src/`):
+    `overrides` · `enviar-email` · `ultimos-pagos` · **`cobrar-lote`** · **`envios`** ·
+    `ultima-compra` · `contact-log` · `estado-cuenta/[codigo]` · `ultimo-pago`.
+    Las dos nuevas **nacieron hoy** con el rediseño del CXC — o sea que el patrón no solo sigue
+    vivo, **está creciendo**. Es exactamente la lista duplicada que `boston-roles.ts` vino a
+    matar en su lado. No es un bug hoy —las nueve dicen lo mismo— pero es lo que hace caro
+    cualquier cambio de permisos del CXC.
+
+16. ⚠️ **El texto de la pestaña Ventas es inexacto (5-sep-2026).** Dice *«De Confecciones Boston
+    no se trae el costo desde Switch»*, y el costo **sí llega**: `ventas_rollup_mensual_mv` tiene
+    **$298.739,11** de costo 2026 para Boston, y `switch_articulo_diario` tiene **18.064 filas
+    suyas** (hasta el 4-sep) que suman **$470.421,08** en 2026. Lo verdadero es lo otro que dice
+    el mismo comentario del archivo: **el reporte de utilidad nunca se sincronizó ni se
+    certificó** (`utilidad: false`), y las dos fuentes de costo que sí existen **no cuadran entre
+    sí** — justamente por eso no se publica. La decisión está bien; la frase de la pantalla dice
+    «no se trae» donde lo cierto es «no está certificado».
+
+17. ⚠️ **Los 5 clientes que están en las dos carteras cambiaron de lista.** Medidos hoy
+    (`join` por `nombre_normalized` entre las dos vistas de aging): **ALADDIN · LA FRONTERA DUTY
+    FREE · CITY MALL DAVID · WOLF MALL CENTER INT. · CITY MALL PASO CANOA**. La escritura del
+    4-sep nombraba «VENTAS LOCAL» en vez de «CITY MALL DAVID». Son los que llevan el chip
+    «también en el grupo» y los que comparten `nombre_normalized` en `cxc_client_overrides` /
+    `cxc_contact_log` (punto 12).
+
+---
+---
+
+# Lo que estaba mal — verificación del 5-sep-2026
+
+> Barrido completo del archivo contra **producción** (Management API de Supabase, solo lectura)
+> y contra el **código fuente**. Se revisaron **97 afirmaciones factuales**: **73 confirmadas
+> ✅**, **22 corregidas ⚠️** y **2 falsas ❌**. La escritura anterior es del 4-sep-2026, así que
+> buena parte de las correcciones son cifras que se movieron en un día; las que importan de
+> verdad están arriba de todo.
+>
+> 🔴 **Titular: el aislamiento de Boston NO tiene ninguna fuga.** Se midió en las dos
+> direcciones, en la base y en el código, y aguanta — incluido el rediseño del CXC de hoy, que
+> nació con Boston afuera de sus dos rutas nuevas.
+
+## Lo grave
+
+### 1. ❌ «El directorio de clientes de Boston se arregló el 5-sep-2026» — **todavía no**
+
+| | |
+|---|---|
+| **Qué decía** | «🩸 Estuvo 37 DÍAS CONGELADA, y **se arregló** el 5-sep-2026» · «**Hoy la refresca** `sync-clientes-boston`» · en «Lo que sobra»: «✅ **RESUELTO** el 5-sep-2026» |
+| **Qué es** | El cron está **escrito, commiteado y programado**, pero **no ha corrido ni una sola vez**. Las 4.915 filas siguen con `synced_at = 2026-07-30 06:31:07.524`, al milisegundo. Van **37 días**. |
+| **Por qué** | El cron es **semanal, domingos 07:10 UTC** (`"10 7 * * 0"`), y se escribió un **sábado**. Su primera corrida es **mañana, domingo 6-sep**. No es un fallo — es que la doc dio por hecho el resultado antes de que el mecanismo tuviera su turno. |
+| **Cómo se midió** | `select empresa_key, count(*), min(synced_at), max(synced_at), count(distinct synced_at) from switch_clientes group by 1` → Boston 4.915 filas, **1 solo `synced_at`**, del 30-jul. Contraste: ACS escribió hoy 11:30 UTC y las 6 del grupo hoy 16:00–16:11. Y `select sync_type, count(*), max(started_at) from switch_sync_log where empresa_key='confecciones_boston' group by 1` **no devuelve ninguna fila de tipo `clientes`**. |
+| **Lo bueno** | ✅ La **alerta B ya funciona y sonó hoy**: `select tipo, max(created_at), max(error_message) from cron_email_errors where tipo like 'silencio%'` → `silencio_de_datos:Confecciones Boston` · **2026-09-05 10:00:28 UTC** · `confecciones_boston/switch_clientes:quieta`. El hueco que antes no cubría nadie hoy avisa solo. |
+| **Qué hacer** | El **lunes 7-sep**, dos consultas: `max(synced_at)` de esa tabla tiene que decir domingo ~07:10, y `switch_sync_log` tiene que traer una fila `clientes` en `success`. Recién ahí se marca resuelto. |
+
+### 2. ❌ «Los clientes de la cartera de Boston cruzan mejor por `cliente_switch_id` que por código»
+
+| | |
+|---|---|
+| **Qué decía** | «de los 390 clientes de la cartera, solo **347** cruzan por código contra los 1.978 códigos distintos de recibos; **por id cruzan 382**» |
+| **Qué es** | **346 por código y 346 por id — el mismo número.** Cambiar de llave no rescata a nadie. El «382» es el cruce contra **`switch_clientes`** (el directorio), no contra los recibos: dos mediciones distintas mezcladas en una frase. |
+| **Cómo se midió** | Tres subconsultas en una: `count(distinct cliente_codigo)` de `switch_recibos` de Boston = **1.978**; `exists` por `cliente_codigo` = **346**; `exists` por `cliente_switch_id` = **346**. Y el 382 se reprodujo aparte contra `switch_clientes`, por las dos llaves, dando 382 en las dos. |
+| **Qué sí es cierto** | El código de la ruta **sí** cruza por `cliente_switch_id`, y hace bien: es la llave del `DISTINCT ON` de `switch_ultimo_pago_cliente_v2` y por eso pagina estable. Pero **no gana cobertura**. |
+
+## Lo que cambió porque el sistema cambió hoy
+
+| # | Qué decía | Qué es | Cómo se midió |
+|---|---|---|---|
+| 3 | La pestaña «Por cobrar» con 4 píldoras flotando, botón «Últimos pagos ›» y columna «Último pago» | ⚠️ **Se rediseñó hoy** (`e1ae7258`): tira de totales **parada sobre sus columnas** en la misma grilla de 12; botón **«Cobrar»** + **«Documentos»** por fila; los tramos finos en el `title`; «Último pago» bajo el nombre; el bloque de últimos pagos se retiró (Boston es una empresa sola). La hoja «Cobrar» tiene **tres salidas** (WhatsApp · Copiar · Documentos) y **no tiene correo ni PDF a propósito**. | Lectura de `src/components/cxc/BostonTab.tsx` (460 líneas, 289 cambiadas hoy) y `BostonHojaCobrar.tsx`; `git show --stat e1ae7258` |
+| 4 | El CXC vive en `/admin` | ⚠️ **Se mudó a `/cxc`** hoy. `/admin` redirige **307** y Next arrastra la query, así que `/admin?tab=boston` sigue llegando. `/admin/usuarios` y `/admin/data-health` **no** se movieron. | `next.config.js:89`; `ls src/app/admin/` → solo `usuarios` |
+| 5 | La vista de Boston trae `d0_90 · d91_120 · d121_plus · total` | ⚠️ **Ganó 7 columnas hoy** (migración `20260928120000`, aplicada): `d0_30 · d31_60 · d61_90 · d121_180 · d181_270 · d271_365 · mas_365`. ✅ **Los tres tramos visibles no se movieron, verificado fila por fila**. | `count(*) filter (where round(d0_90,2) <> round(d0_30+d31_60+d61_90,2))` → **0** de 390; ídem `d121_plus` → 0; ídem `total` → 0 |
+| 6 | `CXC_ROLES` escrito a mano en **SIETE** archivos | ⚠️ **NUEVE**. Las dos nuevas (`cobrar-lote`, `envios`) **nacieron hoy**: el patrón no solo sigue vivo, está creciendo. | `grep -rn "const CXC_ROLES" src/` |
+| 7 | La cartera de Boston no tiene estado de cuenta | ⚠️ **Ahora sí, documento por documento, EN PANTALLA** (ruta nueva `GET /api/cxc/boston/estado-cuenta`). Lo que sigue faltando es **PDF y correo**. | `src/app/api/cxc/boston/estado-cuenta/route.ts`, nacido en `e1ae7258` |
+| 8 | La bandera `activo` separa los préstamos vivos de los archivados | ⚠️ **Se retiró** con el rediseño de Préstamos (`c4aee92d`). El Inicio de Boston cuenta a **quien debe**, con `calcularSaldoPrestamo`. El «15 activos de 32» describe un mecanismo que ya no existe. | `/api/boston/inicio/route.ts:124-143` |
+
+## Cifras que se movieron
+
+| Dato | Decía (4-sep) | Es (5-sep) | Consulta |
+|---|---:|---:|---|
+| `switch_estadocuenta` de Boston | 985 / 920 con saldo / 65 en cero | **990 / 919 / 71** | `count(*)`, `filter (where coalesce(saldo,0)<>0)` |
+| Cartera de Boston · total | $190.399,07 | **$195.509,25** | `sum(total)` de `switch_estadocuenta_aging_boston` |
+| Cartera de Boston · tramos | 0-90 $53.502,14 · 91-120 $11.906,68 · 121+ $124.990,25 | **$58.612,32 · $11.956,68 · $124.940,25** | ídem, por columna |
+| Cartera del grupo | 211 filas · $3.685.289,04 | 211 filas · **$3.676.935,55** | `switch_estadocuenta_aging`; se re-sincronizó a las 16:00 UTC |
+| Notas de crédito de Boston | 1.210 | **1.216**, las 9.165 filas en POSITIVO | `group by tipo_comprobante` |
+| Boston 2026 (rollup) | $465.785,97 · costo $297.915,43 | **$472.856,97 · $298.739,11** | `ventas_rollup_mensual_mv` |
+| Boston, agosto 2026 | crudo $87.661,61 / neto $34.560,85 | **crudo $94.822,50 / neto $45.153,10** | `sum(subtotal_descuento)` crudo vs firmado; el rollup dice el mismo $45.153,10 |
+| Los 8 sin ficha en `switch_clientes` | $748,68 | **$749,08** (los mismos 8 nombres; la suma estaba mal) | `left join` + `is null` |
+| `switch_ultimo_pago_cliente_v2` de Boston | 1.947 | **1.940** (y 339 de los 390 muestran pago) | `count(*)` |
+| Clientes en las dos carteras | ALADDIN, LA FRONTERA, WOLF MALL, CITY MALL PASO CANOA, **VENTAS LOCAL** | los cuatro primeros + ⚠️ **CITY MALL DAVID** | `join` por `nombre_normalized` |
+| `_multifashion_sf_vw` | 29.708 | **29.708** ✅ | `count(*)` |
+| `switch_articulo_diario` de ACS | 46.100 · hasta 3-sep | **46.187 · hasta 4-sep** | `count(*), max(fecha)` |
+| `switch_articulo_marca` de ACS | 8.735 filas · **32** valores | **8.736 filas · 34 valores** | `count(*)`, `count(distinct marca_nombre)` |
+| `switch_clientes` de ACS | 1.037 | **1.038**, escrito hoy 11:30 UTC | `count(*), max(synced_at)` |
+| Funciones del módulo Multifashion | **18** | **21** — falta `proyeccion_mensual_mayorista_v1`, instalada y sin llamador | `pg_proc` con `like 'multifashion%' or 'mf_%' or 'proyeccion_%'` |
+| Línea 🎯 Meta del Telegram | +13% (3-sep) | **+61%** con el corte de hoy (4-sep) | vendido $7.502,90 ÷ ritmo $4.667,78 − 1 |
+| Caja de Multifashion sin abrir | 3 semanas | **22 días** (última fila 14-ago 06:20 UTC) | `max(synced_at)` de `multifashion_caja_diaria` |
+| Sesiones de David | «4 vivas, estaba usando el sistema hoy» | **5 filas**, `last_seen` 4-sep 17:01; **no entró el 5** | `user_sessions` |
+
+## Detalles de precisión
+
+| # | Qué decía | Qué es | Cómo se midió |
+|---|---|---|---|
+| 9 | La vista del grupo excluye a Boston «con un **`NOT IN`**» (aquí y en `cxc/CLAUDE.md`) | ⚠️ El operador real es **`<>`**: `WHERE COALESCE(s.saldo,0) <> 0 AND s.empresa_key <> 'confecciones_boston'::text`. **Lo de fondo se sostiene** — excluye, no enumera — pero el SQL escrito no es el que corre. | `select pg_get_viewdef('switch_estadocuenta_aging'::regclass, true)` |
+| 10 | Los buckets del grupo son «`d0_30 … mas_365`» y los de Boston «propios y distintos» | ⚠️ Al revés de como se lee: **la vista del grupo NO tiene `d0_90` ni `d121_plus`** (solo los 8 finos, y los tres gordos los arma la pantalla). **La de Boston es hoy la única con las dos familias.** | las dos `pg_get_viewdef` |
+| 11 | «Ninguna afirmación sobre en qué línea está cada comentario viejo» | ⚠️ Los cuatro comentarios stale **siguen vivos**, con líneas nuevas: `planilla/route.ts:160` · `guard.ts:63-74` · `boston-acceso.test.ts:241` · y los de Multifashion en `detalle-mensual:26`, `vendedoras:33` (y `:10` el del rol `director` inexistente), `retail-recurrentes:19`, `clientes-wholesale:21` | `grep -n` sobre cada archivo |
+| 12 | La pestaña Ventas de Boston: «no se trae el costo desde Switch» | ⚠️ **El costo SÍ llega**: `$298.739,11` en el rollup 2026, y `switch_articulo_diario` tiene **18.064 filas de Boston** (hasta el 4-sep) que suman $470.421,08. Lo verdadero es que **no está certificado** (`utilidad: false`) y que **las dos fuentes no cuadran entre sí**. La decisión está bien; la frase de la pantalla no. | `ventas_rollup_mensual_mv` + `sum(costo_total)` de `switch_articulo_diario` |
+| 13 | `multifashion_bonos_v1` se nombra en el encabezado de `bonos/route.ts` | ⚠️ Se nombra en **TRES** lugares: `bonos/route.ts:2`, `components/ventas/types.ts:306` y `:341`. Ninguna existe en `pg_proc`. | `grep -rn` sin tests |
+| 14 | `ventas_rollup_mensual_mv` tiene grano `(empresa_key, anio, mes)` | ⚠️ Cierto, pero **`mes` es una `date`** (el día 1), no un entero. Un `where mes = 8` no devuelve nada. | `select mes from ventas_rollup_mensual_mv limit 1` |
+| 15 | Boston no está en `clientes_master` | ✅ Confirmado, **con un matiz que vale la pena**: **5.064 filas · 4.914 borradas · 150 vivas**, y de las 150 vivas **una sola** comparte código con Boston: **`TCKCTA` / «VENTAS LOCAL»**, el mostrador que existe en las 8 empresas. **Ni un cliente real de Boston está vivo ahí.** | `count(*) filter (where deleted)` + `exists` contra `switch_clientes` de Boston |
+
+## Lo que se verificó y estaba bien (lo importante)
+
+- 🔴 **El aislamiento de Boston, en las DOS direcciones.** `switch_estadocuenta_aging`: 211
+  filas, **6 empresas, 0 de Boston**. `switch_estadocuenta_aging_boston`: 390 filas, **1
+  empresa, 0 del grupo**. `switch_estadocuenta_aging_mv`: **idéntica a la vista al centavo**
+  (211 · 0 · $3.676.935,55), o sea que sigue materializando la vista y no una copia de su
+  cuerpo. **Y su plata SÍ suma**: la RPC del Resumen agrupa por empresa **sin ningún filtro**,
+  y Boston es la **4ª de las 8** con **$472.856,97 = 7,5% de 2026**.
+- 🔴 **El rediseño del CXC de hoy nació con Boston afuera.** Las dos rutas nuevas
+  (`/api/cxc/cobrar-lote`, `/api/cxc/envios`) se acotan a `CXC_GRUPO_EMPRESA_KEYS` y lo dicen en
+  su encabezado. El cajón de documentos de Boston es **una ruta aparte con su propia consulta**,
+  a propósito, para que pasarle una lista de empresas no sea posible.
+- **Multifashion ES `american_classic` y nunca viaja por la URL**: 11 rutas, y
+  `grep searchParams.get("empresa")` sobre las 11 (+ las 4 de Boston) da **cero**.
+- **La comisión de Multifashion es 0,5% sobre CONTADO**, leído de la vista viva.
+  `cxc/CLAUDE.md` sigue sin ese matiz.
+- **Diciembre pesa el 58,8% de sep–dic**, al centavo ($200.257,73 de $340.698,55).
+- **La meta**: 1 fila, «Viaje playa», sep–dic 2026, $420.000, grupal, `premio_monto = NULL`,
+  4 participantes sin objetivo individual, nunca editada.
+- **Los roles**: `gerente_acs = ["multifashion"]` · `gerente_boston = ["boston","catalogos",
+  "asistencia"]` · `andrea` tiene Multifashion por override y `Angela` no · los 11 usuarios
+  activos con bcrypt · las 6 filas de `asistencia_aprobador_empresa` intactas.
+- **El documento imposible de Boston** (`155-000000129 · VENTAS`, **$266.541.352** contra un
+  umbral de $2.000.000) sigue rechazándose todos los días, y la cartera sigue entera.
+- **`boston-cartera` corrió hoy 08:10:09 → 08:10:24 UTC**: 919 insertadas, 6 actualizadas, 1
+  descartada. **7 de 7 corridas `success` en la semana**, cero fallos en los seis tipos de sync.
+- **Los 8 clientes con saldo sin ficha en `switch_clientes`** siguen siendo exactamente los
+  mismos 8, y **`TCKCTA` sigue en la cartera de Boston** con $25,15.
+- **`cxc_favorites` no tiene un solo lector ni escritor** — solo comentarios y la lista del
+  respaldo.
+
+## Un error en `cxc/CLAUDE.md` (no se editó, se reporta)
+
+- § *Boston y CXC*: «Se cierra en la vista `switch_estadocuenta_aging` … la vista **EXCLUYE**,
+  no enumera» — correcto de fondo, pero el archivo (y este) describen un **`NOT IN`** donde el
+  SQL real usa **`<>`**.
+- § *Multifashion*: «Comisiona con otra base … `SUM(subtotal firmado) × 0,5%`, sin filtro de
+  utilidad» — **le falta que solo comisiona el CONTADO** (`condicion_venta = 'Contado'` en
+  `subtotal_comision`, migración `20260603000000`).
+- § *Dónde vive cada dato*: `switch_estadocuenta_aging_boston` figura con **388 filas** y
+  `switch_estadocuenta` de Boston con **976**; hoy son **390** y **990**.
+- 🔴 § *Dónde vive cada dato* › cartera de Boston: dice que la migración `20260928120000` está
+  **«pendiente»**. **Ya se aplicó** — verificado hoy leyendo la vista en producción: las 7
+  columnas finas existen y suman exactamente los tres tramos visibles en las 390 filas.
+- § *Dónde vive cada dato* › `switch_clientes`: dice que el directorio de Boston «lo trae
+  `sync-clientes-boston`, domingos» — cierto como plan, pero **ese cron no ha corrido nunca** y
+  las filas siguen congeladas.
+- § *Módulos* y § *Roles*: el CXC figura como `/admin`; desde hoy es **`/cxc`**.

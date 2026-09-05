@@ -3,8 +3,24 @@
 > **Documento de REFERENCIA, no de sugerencias.** Aquí está lo que HAY: pantallas, campos,
 > tablas, endpoints, reglas fijadas y lo que no cuadra. Las mejoras viven en `docs/eficiencia/`.
 >
-> Medido contra producción el **4-sep-2026**. Donde algo no se pudo medir, lo dice.
+> **Medido contra producción el 5-sep-2026.** (Primera medición: 4-sep-2026; re-verificado
+> afirmación por afirmación el 5-sep contra la base y contra el código fuente.)
+> Donde algo no se pudo medir, lo dice.
 > Complementa —no repite— `cxc/CLAUDE.md` y los post-mortems de `docs/postmortems/`.
+>
+> **Cómo se verificó** (para que la próxima persona pueda repetirlo):
+> - **Base:** Management API de Supabase contra el proyecto `rspocgqhtpveytgbtler`
+>   (`POST /v1/projects/<ref>/database/query`, token `SUPABASE_ACCESS_TOKEN` de `.env.local`).
+>   Solo lecturas. Cada cifra importante lleva su consulta en un bloque de código.
+> - **Nombres de columna:** `information_schema.columns` ANTES de usarlos, nunca copiados del código.
+> - **Conteos:** siempre `count(*)` en SQL — `db-max-rows` = 1000 y corta en silencio por REST.
+> - **Código:** `grep` sobre `src/` buscando la llamada REAL, no el nombre en un comentario.
+> - **Migraciones:** `supabase_migrations.schema_migrations` (no `public.schema_migrations`, que **no existe**).
+>
+> 🔴 **Lo que cambió entre el 4 y el 5 de septiembre está en «Lo que estaba mal», al final
+> del archivo.** Lo grande: la migración que borra los pedidos de prueba **YA CORRIÓ** (Calvin
+> pasó de 21 pedidos a 5 y Joybees de 41 a 4), y las sugerencias de cliente del pedido de
+> catálogo **dejaron de leer `directorio_clientes`**.
 >
 > **Los tres módulos de este archivo:**
 >
@@ -44,10 +60,18 @@ panel **«Comprobantes»**.
 
 | Marca (label en pantalla) | key | Empresa de Switch | Prefijo del número | Tabla de productos | Proyecto Supabase |
 |---|---|---|---|---|---|
-| **Reebok** | `reebok` | `active_shoes` | `PED-` | `products` (+ `inventory`) | 🔴 **otro proyecto** (`reebokServer`) |
+| **Reebok** | `reebok` | `active_shoes` | `PED-` | `products` (+ `inventory`) | **principal** ⚠️ ver abajo |
 | **Joybees** | `joybees` | `joystep` | `JBP-` | `joybees_products` | principal |
 | **Tommy Hilfiger** | `tommy` | `fashion_shoes` | `TOM-` | `tommy_products` | principal |
 | **Calvin Klein** | `calvin` | `vistana` | `CKP-` | `calvin_products` | principal |
+
+⚠️ **Corregido el 5-sep-2026: en esta misma tabla decía que Reebok vive en «otro proyecto»
+(`reebokServer`), y es FALSO.** Las cuatro marcas viven en el proyecto principal. El cliente
+`reebokServer` existe, pero hoy apunta al mismo lugar. Ver «Corrección a `CLAUDE.md`» más abajo.
+
+✅ **Marca → empresa, verificado en el código el 5-sep-2026** (`src/lib/catalogo/marcas.ts`,
+`MARCAS_CONFIG`): `empresaKey` en las líneas 280 (`active_shoes`), 363 (`joystep`),
+447 (`fashion_shoes`) y 533 (`vistana`); `numeroPrefijo` `PED` / `JBP` / `TOM` / `CKP`.
 
 Toda la diferencia entre marcas vive en **dos catálogos de configuración**, no en cuatro
 copias del código:
@@ -217,7 +241,7 @@ más agresivo de la marca.
 | marca que no existe en `MARCA_THEME` | `notFound()` → 404 |
 ## Los datos
 
-**Medido contra producción el 4-sep-2026.** 21 objetos de base de datos.
+**Medido contra producción el 5-sep-2026.** 21 objetos de base de datos.
 
 ### Los productos — una tabla por marca
 
@@ -229,23 +253,57 @@ más agresivo de la marca.
 | `joybees_products` | **83** | 2 | 81 | — |
 | `inventory` (Reebok) | **391** | — | — | — |
 
-⚠️ `CLAUDE.md` dice Tommy 546 y Calvin 81: **los catálogos crecieron** (552 y 94 medidos hoy).
+```sql
+-- 5-sep-2026, ✅ IDÉNTICO al 4-sep: los cuatro catálogos no se movieron
+select 'products' t, count(*) filas,
+       count(*) filter (where image_url is null or image_url='') sin_foto,
+       count(*) filter (where active) activos,
+       count(*) filter (where oculto_manual) ocultos from products
+union all select 'tommy_products',  count(*), count(*) filter (where image_url is null or image_url=''), count(*) filter (where active), count(*) filter (where oculto_manual) from tommy_products
+union all select 'calvin_products', count(*), count(*) filter (where image_url is null or image_url=''), count(*) filter (where active), count(*) filter (where oculto_manual) from calvin_products
+union all select 'joybees_products',count(*), count(*) filter (where image_url is null or image_url=''), count(*) filter (where active), 0 from joybees_products
+union all select 'inventory', count(*), 0, 0, 0 from inventory;
+```
+
+⚠️ `CLAUDE.md` dice Tommy 546 y Calvin 81: **los catálogos crecieron** (552 y 94, medidos el
+4-sep y otra vez el 5-sep). `CLAUDE.md` sigue sin corregirse — lo tocan otros documentos.
+
+🔴 **Las cuatro tablas NO tienen las mismas columnas** (verificado el 5-sep-2026 contra
+`information_schema.columns`, no contra el código). Es una divergencia real y no está en
+ninguna otra parte de la documentación:
+
+| Columna | `products` (Reebok) | `tommy_products` | `calvin_products` | `joybees_products` |
+|---|---|---|---|---|
+| `stock` | 🔴 **NO existe** | sí | sí | sí |
+| `foto_manual` | sí | sí | 🔴 **NO existe** | sí |
+| `nombre_manual` | no | sí | sí | no |
+| `bulto_pzas` | no | sí | sí | no |
+| `updated_at` | no | sí | sí | no |
+| propias | `description`, `color`, `sub_category`, `on_sale`, `codigo_barra_id` | — | — | `popular`, `is_regalia` |
+
+```sql
+select table_name, string_agg(column_name, ', ' order by ordinal_position) cols
+from information_schema.columns
+where table_schema='public'
+  and table_name in ('products','tommy_products','calvin_products','joybees_products','inventory')
+group by table_name;
+```
 
 **Columna por columna, lo que importa:**
 
 | Columna | Quién la escribe | Quién la lee | Estado medido |
 |---|---|---|---|
-| `sku`, `name`, `price`, `existencia`, `disponibilidad`, `stock` | 🤖 **el cron** (`<marca>-catalogo`, de Switch) | catálogo, checkout, PDF, correo, envío | 100% llenas en las 4 |
-| `category` | 🤖 el cron | 💰 **decide el tamaño del BULTO** | Reebok: `footwear` 288 · `apparel` 66 · `accessories` 37 (los 3 valores estables). Tommy: `sneakers` 267 · `flip_flops` 189 · `sandals` 50 · `shoes` 32 · `slippers` 9 · `boots` 5. Calvin: `flip_flops` 57 · `sandals` 20 · `sneakers` 17. Joybees: `clogs` 81 + ⚠️ **`nuevo` 2** (valor accidental) |
-| `gender` | 🤖 el cron | filtros del catálogo | Reebok `male` 231 · `female` 137 · `unisex` 19 · `kids` 4. Tommy `women` 285 · `men` 172 · `boys` 57 · `girls` 38. Calvin `women` 61 · `men` 30 · `boys` 2 · `girls` 1. Joybees `kids` 29 · `women` 26 · `unisex` 11 · `adults_m` 10 · `adults` 7 |
-| `active` | 🤖 el cron, con `esVisibleEnCatalogo` | todo | Reebok 232/391 · Tommy 460/552 · Calvin 84/94 · Joybees 81/83 |
+| `sku`, `name`, `price`, `existencia`, `disponibilidad` (+ `stock` donde existe) | 🤖 **el cron** (`<marca>-catalogo`, de Switch) | catálogo, checkout, PDF, correo, envío | 100% llenas. ⚠️ **`stock` no existe en `products` (Reebok)** — corregido el 5-sep |
+| `category` | 🤖 el cron | 💰 **decide el tamaño del BULTO** | Reebok: `footwear` 288 · `apparel` 66 · `accessories` 37 (los 3 valores estables). Tommy: `sneakers` 267 · `flip_flops` 189 · `sandals` 50 · `shoes` 32 · `slippers` 9 · `boots` 5. Calvin: `flip_flops` 57 · `sandals` 20 · `sneakers` 17. Joybees: `clogs` 81 + ⚠️ **`nuevo` 2** (valor accidental). ✅ **Igual el 5-sep** |
+| `gender` | 🤖 el cron | filtros del catálogo | Reebok `male` **230** · `female` **138** · `unisex` 19 · `kids` 4 (el 4-sep eran 231/137: un producto cambió de género en el sync del 5). Tommy `women` 285 · `men` 172 · `boys` 57 · `girls` 38. Calvin `women` 61 · `men` 30 · `boys` 2 · `girls` 1. Joybees `kids` 29 · `women` 26 · `unisex` 11 · `adults_m` 10 · `adults` 7 |
+| `active` | 🤖 el cron, con `esVisibleEnCatalogo` | todo | Reebok 232/391 · Tommy 460/552 · Calvin 84/94 · Joybees 81/83. ✅ **Igual el 5-sep** |
 | `image_url` | 🧑 **la persona** (subir foto, ZIP, VariantePicker) | catálogo, PDF, correo | 🔴 el sync **NUNCA la toca** |
-| `foto_manual` | 🧑 la persona (`VariantePicker`) | el manifiesto del ZIP, para no pisar | Tommy `true` 30 · **Reebok `false` en las 391** |
+| `foto_manual` | 🧑 la persona (`VariantePicker`) | el manifiesto del ZIP, para no pisar | Tommy `true` 30 · **Reebok `false` en las 391** · Joybees 0 · 🔴 **Calvin NO TIENE la columna** (medido el 5-sep) |
 | `oculto_manual` | 🧑 la persona | `esVisibleEnCatalogo` | Tommy 16 · Calvin 6 · Reebok 1 |
 | `nombre_manual` | 🧑 la persona (solo Tommy y Calvin) | el sync, para no pisar el nombre | 🔴 **`false` en las 552 de Tommy y en las 94 de Calvin — nadie renombró nada nunca** |
-| `bulto_pzas` | 🧑 la persona (solo Tommy y Calvin) | 💰 el total del pedido | 🔴 Tommy: **51 de 552** llenas, todas con el valor **8**. Calvin: **0 de 94**. Joybees y Reebok **no tienen la columna** |
-| `badge` | 🧑 la persona | la etiqueta de la tarjeta | 🔴 **VACÍA EN LAS CUATRO MARCAS: 0 de 1.120 productos.** Nadie ha puesto nunca una etiqueta |
-| `keep_visible` | 🧑 la persona | `esVisibleEnCatalogo` | 🔴 **NULL en Tommy, Calvin y Joybees; `false` en las 391 de Reebok — nunca se encendió** |
+| `bulto_pzas` | 🧑 la persona (solo Tommy y Calvin) | 💰 el total del pedido | 🔴 Tommy: **51 de 552** llenas, todas con el valor **8**. Calvin: **0 de 94**. Joybees y Reebok **no tienen la columna**. ✅ **Igual el 5-sep** |
+| `badge` | 🧑 la persona | la etiqueta de la tarjeta | 🔴 **VACÍA EN LAS CUATRO MARCAS: 0 de 1.120 productos.** Nadie ha puesto nunca una etiqueta. ✅ **Re-medido el 5-sep: sigue en 0** |
+| `keep_visible` | 🧑 la persona | `esVisibleEnCatalogo` | 🔴 **NULL en Tommy (552), Calvin (94) y Joybees (83); `false` en las 391 de Reebok — nunca se encendió.** ✅ **Re-medido el 5-sep: cero `true` en las cuatro** |
 | `codigo_barra_id` | 🤖 el cron (solo Reebok) | el envío a Switch | ⚠️ **46 de 391 vacías**: esos productos no cruzan |
 | `sub_category` | 🤖 el cron (solo Reebok) | el PDF y el orden | ⚠️ **287 de 391 vacías** |
 | `description`, `color` (Reebok) | — | — | 🔴 **100% vacías** |
@@ -261,12 +319,38 @@ otras tres no tienen DELETE en absoluto.
 
 ### Los pedidos internos
 
-| Tabla | Filas | Vivas | Borradas | `confirmado` | `borrador` |
-|---|---:|---:|---:|---:|---:|
-| `reebok_orders` | 23 | 15 | 8 | 19 | 4 |
-| `tommy_orders` | 38 | 32 | 6 | 32 | 6 |
-| `calvin_orders` | 21 | **5** | **16** | 4 | 17 |
-| `joybees_orders` | 41 | **4** | **37** | 4 | 37 |
+🔴 **CAMBIÓ EL 5-SEP-2026: la migración `20260924120000_borrar_pedidos_de_prueba.sql` YA CORRIÓ.**
+Calvin bajó de 21 filas a **5** y Joybees de 41 a **4**; los renglones cayeron con ellos
+(`calvin_order_items` 52 → **36**, `joybees_order_items` 77 → **32**). Reebok y Tommy no se tocaron.
+
+| Tabla | Filas (5-sep) | Vivas | Borradas | `confirmado` | `borrador` | *(4-sep, antes de la migración)* |
+|---|---:|---:|---:|---:|---:|---|
+| `reebok_orders` | 23 | 15 | 8 | 19 | 4 | *sin cambio* |
+| `tommy_orders` | 38 | 32 | 6 | 32 | 6 | *sin cambio* |
+| `calvin_orders` | **5** | 5 | **0** | 4 | 1 | *21 filas · 5 vivas · 16 borradas* |
+| `joybees_orders` | **4** | 4 | **0** | 4 | 0 | *41 filas · 4 vivas · 37 borradas* |
+
+```sql
+-- cómo se comprobó que la migración corrió (5-sep-2026)
+select version, name from supabase_migrations.schema_migrations where version >= '20260918' order by version;
+--  → …, 20260924120000 / borrar_pedidos_de_prueba, …   (aplicada)
+
+select 'reebok' m, count(*) filas, count(*) filter (where deleted) borradas,
+       count(*) filter (where status='confirmado') confirmado,
+       count(*) filter (where status='borrador') borrador from reebok_orders
+union all select 'tommy',  count(*), count(*) filter (where deleted), count(*) filter (where status='confirmado'), count(*) filter (where status='borrador') from tommy_orders
+union all select 'calvin', count(*), count(*) filter (where deleted), count(*) filter (where status='confirmado'), count(*) filter (where status='borrador') from calvin_orders
+union all select 'joybees',count(*), count(*) filter (where deleted), count(*) filter (where status='confirmado'), count(*) filter (where status='borrador') from joybees_orders;
+```
+
+⚠️ **No existe `public.schema_migrations`** — el registro vive en el esquema
+`supabase_migrations`. Preguntarlo mal devuelve «relation does not exist» y hace parecer que
+no hay registro de migraciones.
+
+🔴 **Consecuencia que cambia la lectura de todo el bloque:** varias de las alarmas del 4-sep
+sobre Calvin y Joybees («solo 4 de 21 con cliente», «3 de 41 con `idempotency_key`») eran
+**artefactos de las filas de prueba**, no un defecto del módulo. Con la basura afuera, las dos
+marcas se leen sanas (ver la tabla de columnas de abajo).
 
 **Soft delete: `deleted boolean` + `deleted_at`**, la convención normal del sistema.
 
@@ -274,31 +358,63 @@ otras tres no tienen DELETE en absoluto.
 |---|---|---|
 | `order_number` | El número de la casa (`PED-018`, `TOM-027`, `CKP-020`, `JBP-041`). Lo asigna la RPC con advisory lock | 100% |
 | `client_name` | El nombre que sale en el papel | ⚠️ Reebok tiene **la misma tienda con dos grafías**: `CITY MALL PASO CANOA` (2) y `City Mall Paso Canoa` (2) |
-| `cliente_switch_id` | 💰 A nombre de quién sale en Switch | Reebok 15/23 · Tommy 31/38 · Joybees 14/41 · 🔴 **Calvin 4 de 21** |
-| `vendedor_switch_id` | 💰 A quién se le acredita la comisión | Reebok 15 · Tommy 28 · Calvin 17 · 🔴 **Joybees 3 de 41** |
-| `vendor_name` | Solo para mostrar | ⚠️ Sin formato: mezcla login (`daniel`, `andrea`) con nombre de Switch (`REINALDO ESPINOSA`, `DANIEL LEVY ` con espacio) y `DEFAULT` |
+| `cliente_switch_id` | 💰 A nombre de quién sale en Switch | ⚠️ **Re-medido el 5-sep, después de la migración:** Reebok 15/23 · Tommy 31/38 · **Calvin 4 de 5** · **Joybees 4 de 4**. *(El 4-sep decía «🔴 Calvin 4 de 21» y «Joybees 14 de 41»: el denominador era basura.)* |
+| `vendedor_switch_id` | 💰 A quién se le acredita la comisión | Reebok 15/23 · Tommy 28/38 · **Calvin 3 de 5** · **Joybees 3 de 4**. *(El 4-sep: «🔴 Joybees 3 de 41».)* |
+| `vendor_name` | Solo para mostrar | ⚠️ Sin formato: mezcla login (`daniel`, `andrea`, `rey`) con nombre de Switch (`REINALDO ESPINOSA`, `DANIEL LEVY ` con espacio) y `DEFAULT`. 🔴 **El valor `medicion` YA NO EXISTE** — se fue con la migración (era 16 de las 41 filas de Joybees) |
 | `origen_original` / `origen_short_id` | Si vino del link | 🔴 **Solo Reebok**: `link` 3, `mio` 20. Tommy: los 38 `mio`. |
-| `idempotency_key` | Evita el pedido doble por doble toque | Reebok 17/23 · Tommy 27/38 · 🔴 **Joybees 3 de 41** |
-| `reemplaza_a` | El original que este clon corrige | Reebok 1 · Calvin 8 · 🔴 **Tommy y Joybees 0** |
-| `client_email` | El correo del cliente | 🔴 **VACÍA EN LAS CUATRO** |
-| `comment` | Nota del pedido | 🔴 **VACÍA EN LAS CUATRO** |
+| `idempotency_key` | Evita el pedido doble por doble toque | Reebok 17/23 · Tommy 27/38 · **Calvin 3 de 5** · **Joybees 3 de 4**. *(El 4-sep: «🔴 Joybees 3 de 41».)* |
+| `reemplaza_a` | El original que este clon corrige | Reebok 1 · **Calvin 1** *(eran 8: 7 se fueron con la basura)* · 🔴 **Tommy y Joybees 0** |
+| `client_email` | El correo del cliente | 🔴 **VACÍA EN LAS CUATRO.** ✅ Re-medido el 5-sep |
+| `comment` | Nota del pedido | 🔴 **VACÍA EN LAS CUATRO.** ✅ Re-medido el 5-sep |
 | `total` | Se recalcula en cada lectura, pero se guarda | — |
 
-**Los renglones** (`<marca>_order_items`): `reebok` 316 · `tommy` 532 · `calvin` 52 ·
-`joybees` 77. Columnas `order_id, product_id, sku, name, image_url, quantity, unit_price`
-(+ `is_preorder` solo en Reebok). 🔴 **`is_preorder` es `false` en las 316 filas de Reebok: la
-preventa nunca se usó.** `image_url` falta en 4 de las 532 de Tommy y en **19 de las 52 de Calvin**.
+```sql
+-- 5-sep-2026: el llenado por columna, ya sin las filas de prueba
+select 'reebok' m, count(*) tot,
+       count(*) filter (where cliente_switch_id  is not null) cli,
+       count(*) filter (where vendedor_switch_id is not null) ven,
+       count(*) filter (where client_email is not null and client_email<>'') mail,
+       count(*) filter (where comment      is not null and comment<>'')      com,
+       count(*) filter (where idempotency_key is not null) idem,
+       count(*) filter (where reemplaza_a  is not null) reemp from reebok_orders
+union all select 'tommy',  … from tommy_orders    -- (mismo cuerpo por marca)
+union all select 'calvin', … from calvin_orders
+union all select 'joybees',… from joybees_orders;
+```
+
+**Los renglones** (`<marca>_order_items`, 5-sep-2026): `reebok` 316 · `tommy` 532 ·
+**`calvin` 36** *(eran 52)* · **`joybees` 32** *(eran 77)*. Columnas
+`order_id, product_id, sku, name, image_url, quantity, unit_price` (+ `is_preorder` solo en
+Reebok). 🔴 **`is_preorder` es `false` en las 316 filas de Reebok: la preventa nunca se usó**
+(✅ re-medido el 5-sep).
 
 ⚠️ **`quantity` está en BULTOS, no en piezas.** Tommy tiene 35 renglones con `quantity = 12`:
 eso son 12 **bultos**, no 12 piezas.
 
-⚠️ **Datos de prueba en producción — SE VAN por migración (4-sep-2026).** Calvin tiene **16 de 21**
-pedidos borrados y Joybees **37 de 41**, todos `borrador` y con nombres «PRUEBA … — BORRAR» /
-«PRUEBA-BOT» o vendedor `medicion`. Están marcados `deleted`, así que no se ven — pero están, y
-Daniel los pidió fuera: *«borro de verdad de la base»*. Los borra
-`supabase/migrations/20260924120000_borrar_pedidos_de_prueba.sql` (**pendiente de aplicar**), con
-lista explícita de ids y un filtro que salva a cualquiera que tenga un envío vivo a Switch (hoy:
-ninguno). Ver `docs/postmortems/catalogos-pedidos.md`.
+✅ **Datos de prueba en producción — CERRADO el 5-sep-2026: la migración corrió.**
+`20260924120000_borrar_pedidos_de_prueba.sql` está en `supabase_migrations.schema_migrations` y
+los 53 pedidos («PRUEBA … — BORRAR», «PRUEBA-BOT» y las 16 filas con vendedor `medicion`)
+**ya no están en la base**. Daniel: *«borro de verdad de la base»*.
+
+⚠️ **Pero NO se limpió todo, y es a propósito.** La migración solo nombra ids de **Calvin y
+Joybees**. Siguen en producción, todos `deleted = true` y en `borrador`, así que no se ven en
+ninguna pantalla:
+
+| Marca | Pedido | Cliente |
+|---|---|---|
+| Reebok | `PED-020` · `PED-021` | `PRUEBA-BOT` |
+| Tommy | `TOM-012` · `TOM-013` | `PRUEBA t160 (borrar)` · `PRUEBA t160 rebase (borrar)` |
+
+```sql
+select order_number, client_name, status, deleted from reebok_orders
+ where client_name ilike '%prueba%' or vendor_name = 'medicion';
+-- PED-020 / PED-021 · PRUEBA-BOT · borrador · deleted = true
+```
+
+Son **4 filas** que Daniel no pidió por su nombre; borrarlas sería pasarse del encargo, igual
+que las dos filas de `joybees_pedidos_publicos` que la migración dejó a propósito. Queda
+anotado para que la próxima medición no vuelva a «descubrirlo». Ver
+`docs/postmortems/catalogos-pedidos.md`.
 
 ### Los pedidos del link
 
@@ -309,6 +425,19 @@ ninguno). Ver `docs/postmortems/catalogos-pedidos.md`.
 | `calvin_pedidos_publicos` | 1 | 1 | 1 | 1 |
 | `tommy_pedidos_publicos` | **0** | — | — | — |
 
+✅ **Re-medido el 5-sep-2026: las cuatro idénticas.** La migración de limpieza **no tocó** estas
+tablas (dejó a propósito dos filas de Joybees ya borradas).
+
+```sql
+select 'reebok' m, count(*) filas, count(*) filter (where not deleted) vivas,
+       count(*) filter (where convertida) convertidas,
+       count(*) filter (where confirmado_cliente_at is not null) confirm
+from reebok_pedidos_publicos
+union all select 'joybees', … from joybees_pedidos_publicos
+union all select 'calvin',  … from calvin_pedidos_publicos
+union all select 'tommy',   … from tommy_pedidos_publicos;
+```
+
 Columnas: `short_id` (8 chars base36 con `randomInt` — **aleatoriedad criptográfica**, para que
 el token del link no sea adivinable) · `items` (jsonb) · `total` · `cliente_nombre` ·
 `convertida` + `convertida_at` + `ped_order_number` · `confirmado_cliente_at` +
@@ -316,7 +445,10 @@ el token del link no sea adivinable) · `items` (jsonb) · `total` · `cliente_n
 (la foto del stock al confirmar) · `ip_hash` (el del rate limit) · `deleted` + `deleted_at`.
 
 🔴 **`calvin_pedidos_publicos` es la única de las cuatro que NO tiene la columna
-`stock_confirmacion`.** 🔴 **`cliente_nombre` está vacío en 9 de las 18 de Reebok.**
+`stock_confirmacion`.** ✅ Verificado el 5-sep-2026 contra `information_schema.columns`
+(14 columnas contra 15 en las otras tres).
+🔴 **`cliente_nombre` está vacío en 9 de las 18 de Reebok** (✅ re-medido el 5-sep; Joybees y
+Calvin lo tienen lleno al 100%).
 
 ### Los envíos a Switch
 
@@ -331,6 +463,19 @@ el token del link no sea adivinable) · `items` (jsonb) · `total` · `cliente_n
 envío en producción, nunca.** `pedido_switch_id` y `numero_interno` llenos al 100%; los números
 llevan prefijo `16-` (`16-000002299`).
 
+✅ **Re-medido el 5-sep-2026: las mismas 52, los mismos estados, las mismas 3 cotizaciones.**
+La migración de limpieza no borró ni un envío (por diseño: sacaba de la lista a cualquier
+pedido con envío vivo, y ninguno de los 53 lo tenía).
+
+```sql
+select 'reebok' m, count(*) n, count(*) filter (where estado='verificado') verif,
+       count(*) filter (where documento='pedido') ped,
+       count(*) filter (where documento='cotizacion') cot,
+       count(*) filter (where error_detalle is not null and error_detalle<>'') conerr
+from reebok_switch_envios
+union all select 'tommy', … union all select 'calvin', … union all select 'joybees', …;
+```
+
 Las cuatro tienen **exactamente las mismas 10 columnas** y el índice que importa:
 
 ```
@@ -340,11 +485,22 @@ Las cuatro tienen **exactamente las mismas 10 columnas** y el índice que import
 🔴 **Ese índice parcial ES el at-most-once.** Está en las cuatro. Asimetría medida: Reebok tiene
 además un índice `btree(estado)` que las otras tres no tienen.
 
+✅ **Verificado el 5-sep-2026 contra el catálogo de Postgres**, no contra el código:
+
+```sql
+select indexname, tablename, indexdef from pg_indexes
+ where tablename like '%\_switch\_envios' order by tablename, indexname;
+-- <marca>_switch_envios_order_activo  UNIQUE btree (order_id) WHERE (estado <> 'error'::text)  ×4
+-- reebok_switch_envios_estado_idx     btree (estado)   ← solo Reebok
+```
+
 **Sin soft delete**: una fila de envío no se borra nunca.
 
 ### Las vistas unificadas
 
 `reebok_pedidos_unificado_vw` (20 filas) · `tommy_` (32) · `calvin_` (5) · `joybees_` (5).
+✅ **Re-medido el 5-sep-2026: las cuatro idénticas** — Calvin y Joybees no se movieron porque
+la vista ya solo contaba las filas vivas, y las que se borraron estaban todas `deleted`.
 Las cuatro son **byte a byte la misma definición** cambiando los tres nombres de tabla:
 9 columnas (`origen, id_natural, cliente, total, created_at, vendor, items (json), fuente,
 confirmado_cliente_at`), un `UNION ALL` de `<marca>_orders WHERE deleted = false` con
@@ -355,18 +511,36 @@ confirmado_cliente_at`), un `UNION ALL` de `<marca>_orders WHERE deleted = false
 
 | Tabla | Filas | Nota |
 |---|---:|---|
-| `fg_user_switch_vendedor` | 28 | La administra **Usuarios**, la lee Catálogos |
-| `fg_catalogo_publico_switch` | 🔴 **0** | El override de quién firma el pedido del link. **Ninguna pantalla la escribe** y está vacía |
-| `reebok_cart` | 🔴 **0** | No aparece en `CLAUDE.md` ni tiene lectores en el código vivo |
+| `fg_user_switch_vendedor` | 28 | La administra **Usuarios**, la lee Catálogos. ✅ igual el 5-sep |
+| `fg_catalogo_publico_switch` | 🔴 **0** | El override de quién firma el pedido del link. **Ninguna pantalla la escribe** y está vacía. ✅ igual el 5-sep |
+| `reebok_cart` | 🔴 **0** | No aparece en `CLAUDE.md` ni tiene lectores en el código vivo. ✅ igual el 5-sep |
 
 ### ⚠️ Corrección a `CLAUDE.md`: Reebok NO vive en otro proyecto Supabase
 
 `CLAUDE.md` dice dos veces que `products` e `inventory` de Reebok «viven en **otro proyecto
-Supabase** (`reebokServer`)». Medido el 4-sep-2026:
-- En `.env.local`, `NEXT_PUBLIC_REEBOK_SUPABASE_URL` apunta a **`rspocgqhtpveytgbtler`, el proyecto principal**.
-- `REEBOK_SERVICE_ROLE_KEY` **no existe** en `.env.local`, y `src/lib/reebok-supabase-server.ts` cae a `SUPABASE_SERVICE_ROLE_KEY`.
-- Las 391 filas de `products` que cita `CLAUDE.md` están **en el proyecto principal**.
-- Existe un segundo proyecto en la cuenta (`halqekrjfttpwoqtazjm`, «Apps Familia») con una copia **congelada y vieja** de `products`: 83 filas, todo `footwear`, todo `active`.
+Supabase** (`reebokServer`)». **Re-verificado el 5-sep-2026** (medido primero el 4-sep):
+
+```bash
+grep '^NEXT_PUBLIC_REEBOK_SUPABASE_URL' .env.local
+# NEXT_PUBLIC_REEBOK_SUPABASE_URL="https://rspocgqhtpveytgbtler.supabase.co"  ← el PRINCIPAL
+
+grep '^REEBOK_SERVICE_ROLE_KEY' .env.local     # (sin resultado: la variable NO existe)
+```
+
+- `NEXT_PUBLIC_REEBOK_SUPABASE_URL` apunta a **`rspocgqhtpveytgbtler`, el proyecto principal**.
+- `REEBOK_SERVICE_ROLE_KEY` **no existe**, y `src/lib/reebok-supabase-server.ts` cae explícitamente
+  a `SUPABASE_SERVICE_ROLE_KEY` (`process.env.REEBOK_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || …`).
+- Las 391 filas de `products` que cita `CLAUDE.md` están **en el proyecto principal** — se
+  cuentan con la misma consulta que las otras tres marcas.
+- Existe un segundo proyecto en la cuenta (`halqekrjfttpwoqtazjm`, «Apps Familia») con una copia
+  **congelada y vieja** de `products`: 83 filas, todo `footwear`, todo `active`. Es lo que
+  probablemente originó la frase.
+
+✅ **Y esto ya tuvo consecuencia práctica: `products` e `inventory` ENTRARON al respaldo.**
+Verificado el 5-sep-2026 en `src/app/api/cron/backup/route.ts:272-276` (`{ table: "products" }`,
+`{ table: "inventory" }`, más las tres tablas de las otras marcas) y en `src/lib/backup/tablas.ts`
+(líneas 95-98 y 253). Antes del 5-sep el catálogo de Reebok **no estaba respaldado** y la
+documentación decía que sí — es uno de los errores que originaron esta auditoría.
 
 ⚠️ **No medible:** las variables de entorno **de Vercel** (no se ejecutó `vercel env ls`). Si en
 producción `NEXT_PUBLIC_REEBOK_SUPABASE_URL` apuntara a otro lado, esto cambiaría. Lo que dice
@@ -397,6 +571,29 @@ header `Authorization: <token>` **sin `Bearer`**). Motor común `syncCatalogo`
 | **14:35 · 17:05 · 19:45 · 22:00** | Calvin | `vistana` | `marcaId === 8` (CK FOOTWEAR) | `catalogo_calvin` |
 | **14:40 · 17:10 · 19:50 · 22:05** | Reebok | `active_shoes` | proveedor `LATIN FITNESS GROUP`, excluye `KL*` | `catalogo_reebok` |
 | **14:45 · 17:15 · 19:55 · 22:10** | Joybees | `joystep` | proveedor `JCBBRANDS` | `catalogo_joybees` |
+
+✅ **Las 16 entradas verificadas en `vercel.json` el 5-sep-2026** (`grep -A2 catalogo vercel.json`,
+líneas 132-193): `30 14` · `0 17` · `40 19` · `55 21` para Tommy; `35 14` · `5 17` · `45 19` ·
+`0 22` para Calvin; `40 14` · `10 17` · `50 19` · `5 22` para Reebok; `45 14` · `15 17` ·
+`55 19` · `10 22` para Joybees. **Cuatro entradas separadas por marca**, nunca una lista de horas.
+
+✅ **Y las cuatro corrieron hoy**, en ese orden y con esa separación:
+
+```sql
+select sync_type, started_at, finished_at, records_updated,
+       extract(epoch from (finished_at - started_at))::int seg
+from switch_sync_log where sync_type like 'catalogo_%' and started_at > '2026-09-05'
+order by started_at;
+-- catalogo_tommy   14:30:15 → 14:32:08  462 productos  114 s
+-- catalogo_calvin  14:35:23 → 14:36:01   88 productos   38 s
+-- catalogo_reebok  14:40:21 → 14:42:08  233 productos  107 s
+-- catalogo_joybees 14:45:38 → 14:45:42   83 productos    4 s
+```
+
+✅ **Parámetros del barrido, verificados en `src/lib/switch-api/sync-catalogo.ts` el 5-sep:**
+`PER_PAGE = 50` (línea 71) · `MAX_PAGES = 250` (línea 80) · `STOCK_CONCURRENCIA = 8` (línea 193).
+Y `SKU_CONCURRENCIA = 4` en `src/lib/catalogo/switch-envio.ts:82` — o sea que la asimetría
+8 vs 4 del punto 6 de «Lo que sobra» **sigue vigente**.
 
 Las cuatro bandas caen **dentro de la ventana de uso de Panamá** (9:40 a. m. – 5:10 p. m.).
 El escalonamiento de 5 min entre las cuatro **no es por la sesión de Switch** (tocan empresas
@@ -600,10 +797,59 @@ productos · solo Reebok es **público** en `GET /products`.
 | **El vendedor de tu login** | `fg_user_switch_vendedor` (`user_id`, `empresa_key`, `vendedor_id`, `vendedor_nombre`) — la administra **Usuarios** (`/api/admin/vendedor-mapping`) | Precargar el vendedor del checkout. **28 filas para 7 usuarios**, medido 4-sep-2026: `fashion_shoes/REINALDO ESPINOSA` 7 · `joystep/DEFAULT` 6 · `active_shoes/DEFAULT` 5 · `vistana/DANIEL LEVY` 5 · `active_shoes/REINALDO ESPINOSA` 2 · `joystep/DANIEL LEVY ` (con espacio) 1 · `vistana/EDWIN` 1 · `vistana/Rodrigo` 1 |
 | **El DEFAULT de la empresa** | `vendedores` (`empresa_key`, `nombre = 'DEFAULT'`, `switch_id`) | Última red del vendedor cuando el pedido no trae ninguno |
 | **La manija del pedido público** | `fg_catalogo_publico_switch` (`empresa_key`, `cliente_switch_id`, `cliente_nombre`, `vendedor_id`, `vendedor_nombre`) | Override explícito de quién firma un pedido del link. 🔴 **Está VACÍA: 0 filas** (medido 4-sep-2026). Ninguna pantalla la escribe |
-| **El directorio manual** | `directorio_clientes` (`nombre`, `empresa`, `correo`, `whatsapp`/`celular`/`telefono`) — módulo **Clientes** | El `clientes-search` que sugiere el nombre al escribirlo. **No es específico de marca**: la marca de la URL solo valida la ruta |
+| **El directorio del grupo** | 🔴 **`clientes_master`** (`codigo`, `nombre`, `email`, `telefono`, `celular`) — módulo **Clientes** | El `clientes-search` que sugiere el nombre al escribirlo. **CAMBIÓ EL 5-SEP-2026** (commit `4a4a9605`): hasta ese día leía `directorio_clientes`, la libreta de 33 contactos escrita a mano. Ver el bloque de abajo |
 | **Los módulos del usuario** | `sessionStorage.fg_modules` + `role_permissions` | `CatalogoAuthGuard` y el hub |
 | **El estado del sync** | `switch_sync_log` (`empresa_key`, `sync_type = catalogo_<marca>`, `status`, `finished_at`) | El «última sincronización» del panel de admin (`/sync-status`) |
 | **El catálogo de Switch** | `switch_articulo_info` (`rubro`, `subrubro`, `marca`, `ficha_at`) — cron `sync-articulo-info`, **solo `active_shoes`** | La clasificación de Reebok (`src/lib/reebok-clasificacion.ts`) |
+
+#### 🔴 CAMBIÓ EL 5-SEP-2026 — las sugerencias de cliente van por `clientes_master`, por CÓDIGO
+
+Commit `4a4a9605` («clientes: se retira la libreta vieja; el directorio es uno y va por codigo»).
+Daniel: *«Supuestamente debe de haber uno y amarrado por codigo»* y *«si ningún módulo toca esa
+lista, bórralo»*.
+
+**Antes** (`GET /api/catalogo/[marca]/clientes-search`) leía `directorio_clientes`: **33
+contactos** escritos a mano, sin entrada nueva desde el 28-may, 8 sin código y con correos
+distintos a los reales. De los 10 clientes que más deben, **3 no existían ahí** (City Moda
+Chorrera, Internacional Belén, Grup M.E.L.), así que al armarles un pedido había que teclear el
+nombre. Era su **último lector**.
+
+**Ahora** lee `clientes_master`, los mismos que usan Guías, el CXC, Recordatorios y la ficha:
+
+```ts
+// src/app/api/catalogo/[marca]/clientes-search/route.ts (verificado el 5-sep-2026)
+.from("clientes_master")
+.select("codigo, nombre, email, telefono, celular")
+.eq("deleted", false)
+.is("ausente_desde", null)          // 🔴 los ausentes de Switch NO se ofrecen
+.or(`nombre.ilike.%${q}%,codigo.ilike.%${q}%`)   // busca por NOMBRE o por CÓDIGO
+.order("nombre").limit(5)
+```
+
+```sql
+-- cuántos clientes ofrece hoy (5-sep-2026)
+select count(*) total, count(*) filter (where deleted is not true) vivas,
+       count(*) filter (where deleted is not true and ausente_desde is null) ofrecibles,
+       count(*) filter (where deleted is not true and ausente_desde is not null) ausentes
+from clientes_master;
+--  total 5.064 · vivas 150 · ofrecibles 148 · ausentes 2   (las 4.914 borradas son las de Boston)
+```
+
+- **Roles del endpoint: `admin`, `secretaria`, `vendedor`** — sin cambio.
+- **La forma de la respuesta NO cambió**: `PedidoDetalleClient` sigue leyendo `nombre`. El campo
+  `empresa` viaja **vacío** (`""`), porque `clientes_master` es del grupo entero y no tiene empresa.
+- **La tabla `directorio_clientes` NO se dropeó**: 33 filas, clasificada `congelada`, sigue en el
+  respaldo (`src/lib/backup/tablas.ts:229`), **sin lectores ni escritores** (verificado con
+  `grep -rn directorio_clientes src` el 5-sep: solo comentarios fechados y la línea del backup).
+- **`/api/directorio` (3 rutas) se borró**: `ls src/app/api/directorio` → no existe.
+- ⚠️ **Ojo con no confundirlas**: `clientes_master` tiene **5.064 filas totales** y solo **150
+  vivas**. Contar sin `deleted is not true` da un número diez veces mayor y falso.
+
+⚠️ **Lo que este cambio NO tocó**: el `ClienteSwitchPicker` del checkout y del detalle, que sigue
+leyendo `switch_clientes` por empresa con `.eq("activo", true)`
+(`src/app/api/catalogo/[marca]/clientes-switch/route.ts:80`). Son dos cosas distintas: el
+*search* sugiere un NOMBRE mientras se escribe; el *picker* es el que elige el cliente que va a
+Switch. 🔴 **El que decide a nombre de quién sale el pedido sigue siendo el picker.**
 
 ### Quién lee lo de Catálogos
 
@@ -690,21 +936,38 @@ Cada línea es una decisión cerrada. Las citas son textuales; están verbatim e
 
 ## Cuánto se usa
 
-**Medido contra producción el 4-sep-2026.** ⚠️ `activity_logs` solo registra algunas
+**Medido contra producción el 5-sep-2026.** ⚠️ `activity_logs` solo registra algunas
 escrituras (no clics ni pantallas vistas), así que la medición fuerte son **las filas que el
 módulo escribe**.
 
 ### Pedidos internos creados, por mes
 
+🔴 **Esta tabla cambió el 5-sep**: con las filas de prueba borradas, Calvin y Joybees dejan de
+verse como marcas con decenas de pedidos. **Los números de abajo son los REALES.**
+
 | Marca | Total | Vivos (no borrados) | 2026-05 | 06 | 07 | 08 | 09 |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Reebok | 23 | 15 | 1 | 2 | 19 | — | 1 |
 | Tommy | 38 | 32 | — | — | — | 32 | 6 |
-| Calvin | 21 | 5 | — | — | — | 20 | 1 |
-| Joybees | 41 | 4 | — | — | 5 | 36 | — |
+| **Calvin** | **5** | **5** | — | — | — | **4** | 1 |
+| **Joybees** | **4** | **4** | — | — | **3** | **1** | — |
+| **Total** | **70** | **56** | 1 | 2 | 22 | 37 | 8 |
 
-**El módulo se mudó de marca en el tiempo**: julio fue de Reebok y Joybees, agosto de
-Tommy y Calvin. **Tommy es la única marca viva en septiembre.**
+```sql
+select 'reebok' m, to_char(created_at,'YYYY-MM') mes, count(*) n from reebok_orders group by 2
+union all select 'tommy',  to_char(created_at,'YYYY-MM'), count(*) from tommy_orders  group by 2
+union all select 'calvin', to_char(created_at,'YYYY-MM'), count(*) from calvin_orders group by 2
+union all select 'joybees',to_char(created_at,'YYYY-MM'), count(*) from joybees_orders group by 2
+order by 1,2;
+```
+
+*(El 4-sep esta tabla decía Calvin 21 con «20 en agosto» y Joybees 41 con «5 en julio y 36 en
+agosto». Eran las corridas de verificación, no ventas.)*
+
+**El módulo se mudó de marca en el tiempo**: julio fue de Reebok, agosto de Tommy. **Tommy es la
+única marca viva en septiembre** (6 pedidos), con 1 de Reebok y 1 de Calvin.
+🔴 **Y con la basura afuera queda más claro: el módulo es, en la práctica, REEBOK y TOMMY.**
+Calvin y Joybees suman **9 pedidos en toda su historia**.
 
 ### Pedidos del link público (los que hace el cliente sin login)
 
@@ -733,16 +996,25 @@ son todas de Tommy (agosto-septiembre 2026, desde que existe la función).
 
 ### Quién arma los pedidos (`vendor_name` de los últimos 200 por marca)
 
-- **Reebok**: REINALDO ESPINOSA 9 · DEFAULT 7 · daniel 2 · edwin 2 · (null) 3
-- **Tommy**: REINALDO ESPINOSA 28 · daniel 7 · rey 2 · andrea 1
-- **Calvin**: DANIEL LEVY 13 · EDWIN 3 · Angela 2 · daniel 1 · Rodrigo 1 · (null) 1
-- **Joybees**: daniel 19 · **medicion 16** · DANIEL LEVY (con espacio) 2 · DEFAULT 1 · (null) 3
+**Re-medido el 5-sep-2026, ya sin las filas de prueba:**
 
-⚠️ `vendor_name` **no tiene un formato**: mezcla el nombre de login (`daniel`, `andrea`,
-`rey`, `Angela`) con el nombre del vendedor de Switch en mayúsculas (`REINALDO ESPINOSA`,
-`DANIEL LEVY `) y con `DEFAULT`. Y **16 de las 41 filas de Joybees dicen `medicion`**: son
-filas de un script de medición que quedaron en producción (37 de las 41 de Joybees están
-marcadas como borradas).
+- **Reebok**: REINALDO ESPINOSA 9 · DEFAULT 7 · (null) 3 · daniel 2 · edwin 2
+- **Tommy**: REINALDO ESPINOSA 28 · daniel 7 · rey 2 · andrea 1
+- **Calvin**: DANIEL LEVY 3 · (null) 1 · daniel 1  *(el 4-sep: 13 · EDWIN 3 · Angela 2 · Rodrigo 1)*
+- **Joybees**: `DANIEL LEVY ` (con espacio) 2 · DEFAULT 1 · (null) 1  *(el 4-sep: daniel 19 · medicion 16)*
+
+```sql
+select 'reebok' m, coalesce(vendor_name,'(null)') v, count(*) n from reebok_orders group by 2
+union all select 'tommy', coalesce(vendor_name,'(null)'), count(*) from tommy_orders group by 2
+union all select 'calvin',coalesce(vendor_name,'(null)'), count(*) from calvin_orders group by 2
+union all select 'joybees',coalesce(vendor_name,'(null)'),count(*) from joybees_orders group by 2
+order by 1,3 desc;
+```
+
+⚠️ `vendor_name` **sigue sin tener un formato**: mezcla el nombre de login (`daniel`, `andrea`,
+`rey`) con el nombre del vendedor de Switch en mayúsculas (`REINALDO ESPINOSA`,
+`DANIEL LEVY ` **con espacio final**), con `DEFAULT` y con `null`.
+✅ **El valor `medicion` ya no existe en producción** — se fue con la migración del 5-sep.
 
 ### Actividad registrada (`activity_logs`, 17-abr → 2-sep-2026)
 
@@ -761,14 +1033,42 @@ marcadas como borradas).
 trabajo es de **Tommy** (50 de 59). ⚠️ Subir una foto (`upload`) y editar precio o etiqueta
 **no dejan rastro** en `activity_logs`, así que esto es un piso, no el total.
 
+✅ **Re-medido el 5-sep-2026: las 59 filas idénticas, ninguna nueva.** La última acción del
+módulo es del **2-sep** (`product_ocultar_catalogo` de Tommy, secretaria).
+
+```sql
+select action, entity_type, user_role, count(*) n, max(created_at) ultima
+from activity_logs
+where action like 'product%' or action like 'pedidos%' or action like 'descarga%'
+   or entity_type in ('depurador','tommy','calvin','joybees','reebok','catalogo_reebok','camisetas')
+group by 1,2,3 order by 4 desc;
+```
+
+✅ Las **24 filas huérfanas de «camisetas»** siguen ahí (21 `pedido_create` + 3 `pedido_update`,
+última el 24-abr-2026).
+
 ### Los crons, medidos en `switch_sync_log`
 
-| Sync | Corridas leídas | Éxito | Error | Manual | Última corrida (4-sep) |
+**Re-medido el 5-sep-2026 a las 14:50 UTC** (o sea con la primera pasada del día ya corrida):
+
+| Sync | Corridas leídas | Éxito | Error | Manual | Última corrida (5-sep) |
 |---|---:|---:|---:|---:|---|
-| `catalogo_reebok` | 186 (10-jul → 4-sep) | 184 | 2 | 8 | 22:05 · 233 productos · 51 s |
-| `catalogo_tommy` | 167 (26-jul → 4-sep) | 163 | 4 | **17** | 21:55 · 462 productos |
-| `catalogo_joybees` | 183 (10-jul → 4-sep) | 179 | 4 | 2 | 22:10 · 83 productos · 20 s |
-| `catalogo_calvin` | 124 (12-ago → 4-sep) | **124** | 0 | 6 | 22:03 · 88 productos |
+| `catalogo_reebok` | **187** (10-jul → 5-sep) | 185 | 2 | 8 | 14:42 · 233 productos · 107 s |
+| `catalogo_tommy` | **168** (26-jul → 5-sep) | 164 | 4 | **17** | 14:32 · 462 productos · 114 s |
+| `catalogo_joybees` | **184** (10-jul → 5-sep) | 180 | 4 | 2 | 14:45 · 83 productos · 4 s |
+| `catalogo_calvin` | **125** (12-ago → 5-sep) | **125** | 0 | 6 | 14:36 · 88 productos · 38 s |
+
+```sql
+select sync_type, count(*) corridas,
+       count(*) filter (where status='success') ok,
+       count(*) filter (where status='error')   err,
+       count(*) filter (where triggered_by <> 'cron') manual,
+       min(started_at) primera, max(finished_at) ultima
+from switch_sync_log where sync_type like 'catalogo_%' group by 1 order by 1;
+```
+
+🔴 **Cero errores nuevos entre el 4 y el 5 de septiembre**: los 10 errores históricos son los
+mismos. Calvin sigue con **cero errores desde que existe**.
 
 Los 10 errores son **de red o de sesión**, ninguno de datos: `ECONNREFUSED` /
 `UND_ERR_CONNECT_TIMEOUT` en `/autenticacion`, «Run previo atascado en 'running'» y un
@@ -906,31 +1206,46 @@ el número de Switch en la segunda. Los emoji por marca son 🛒 Reebok · 🐝 
    todos los SKU que no vengan en el archivo**.
 9. **`/api/catalogo/joybees/seed`, `/api/catalogo/reebok/stats`,
    `/api/catalogo/reebok/pedidos-publicos` y `/api/catalogo/reebok/inventory/bulk` no tienen ni
-   un llamador** en `src/app` ni en `src/components` (verificado por grep). Siguen protegidos
-   por rol y siguen vivos.
+   un llamador** en `src/app`, `src/components` ni `src/lib`. Siguen protegidos por rol y siguen
+   vivos. ✅ **Re-verificado el 5-sep-2026**, buscando la llamada real y no el nombre:
+
+   ```bash
+   for e in "joybees/seed" "reebok/stats" "reebok/pedidos-publicos" "reebok/inventory/bulk"; do
+     grep -rn "$e" src/app src/components src/lib --include="*.ts" --include="*.tsx" \
+       | grep -v "src/app/api/catalogo"
+   done
+   # (sin una sola línea de salida en los cuatro)
+   ```
 10. ⚠️ **`/api/catalogo/[marca]/pedidos-unificado` está retirado de las pantallas desde el
     25-ago-2026 pero sigue vivo, y CALCULA MAL EL TOTAL** (no le pasa las piezas por bulto del
     estilo). Medido en 5 pedidos de Tommy: TOM-024 $3.324 vs $3.100 · TOM-020 $11.088 vs
     $10.408 · TOM-018 $7.764 vs $7.548 · TOM-016 $1.080 vs $1.020 · TOM-001 $1.584 vs $1.472.
     Su propio encabezado dice: «ESTE ENDPOINT YA NO ALIMENTA NINGUNA PANTALLA… **NO LO READOPTES
     SIN LEER ESTO**». Se conserva porque sus candados son el cheque independiente de la vista de
-    la base, **pero `pedidos-export` sí lo sigue usando** — el Excel sale de ahí.
+    la base, **pero `pedidos-export` sí sigue usando la misma VISTA** — el Excel sale de ahí.
+    ✅ **Precisado el 5-sep-2026**: `pedidos-export` no llama al endpoint, lee directamente
+    `cfg.unificadoView` (`src/app/api/catalogo/[marca]/pedidos-export/route.ts:54,60`), que es
+    `<marca>_pedidos_unificado_vw`. Ninguna pantalla hace `fetch` a `/pedidos-unificado`
+    (verificado por grep sobre `src/app`, `src/components` y `src/lib`).
 11. **`fg_catalogo_publico_switch` está vacía (0 filas) y ninguna pantalla la escribe.** Es «la
     manija» del cliente y el vendedor del pedido público; hoy solo se lee.
 12. **`reebok_cart` existe con 0 filas** y no está en `CLAUDE.md`. El carrito real vive en
     `sessionStorage`.
 
 ### Datos sucios en producción
-13. ✅ **CERRADO el 4-sep-2026 — los datos de prueba se borran de verdad.** Calvin: **16 de 21**
-    pedidos («PRUEBA T173 / T169 — BORRAR»). Joybees: **37 de 41** («PRUEBA T143 / T173 — BORRAR»,
-    «PRUEBA-BOT» y 16 filas con `vendor_name = "medicion"`, de un script de medición). Estaban
-    marcadas `deleted`, así que no se veían — pero seguían en la base y en los backups. Daniel:
-    *«borro de verdad de la base»*. Migración `20260924120000_borrar_pedidos_de_prueba.sql`
-    (**pendiente de aplicar**, la corre Daniel).
+13. ✅✅ **CERRADO DE VERDAD el 5-sep-2026 — la migración YA CORRIÓ.** Calvin pasó de 21 filas a
+    **5** y Joybees de 41 a **4**; los renglones cayeron con ellos (52 → 36 y 77 → 32). El 4-sep
+    esta línea decía «**pendiente de aplicar**» y eso ya no es cierto:
+    `supabase_migrations.schema_migrations` trae `20260924120000 / borrar_pedidos_de_prueba`.
+    Daniel: *«borro de verdad de la base»*.
+    ⚠️ **Quedan 4 filas de prueba fuera del alcance de esa migración**, todas `deleted` y en
+    `borrador`, invisibles en pantalla: `PED-020` y `PED-021` («PRUEBA-BOT», Reebok) y `TOM-012`
+    y `TOM-013` («PRUEBA t160…», Tommy). La migración solo nombraba ids de Calvin y Joybees.
 14. ⚠️ **`vendor_name` de los pedidos no tiene formato.** Mezcla el nombre de login (`daniel`,
-    `andrea`, `rey`, `Angela`, `Rodrigo`), el nombre de Switch en mayúsculas
-    (`REINALDO ESPINOSA`, `DANIEL LEVY ` **con espacio final**), `DEFAULT` y `null`. Es el mismo
-    problema que en Comisiones se resolvió con `comision_vendedor_alias`, aquí sin resolver.
+    `andrea`, `rey`), el nombre de Switch en mayúsculas (`REINALDO ESPINOSA`, `DANIEL LEVY `
+    **con espacio final**), `DEFAULT` y `null`. Es el mismo problema que en Comisiones se
+    resolvió con `comision_vendedor_alias`, aquí sin resolver.
+    ✅ El valor `medicion` (16 filas de Joybees) **desapareció** con la migración del 5-sep.
 15. ⚠️ **La misma tienda con dos grafías** en `reebok_orders.client_name`:
     `CITY MALL PASO CANOA` (2) y `City Mall Paso Canoa` (2). Es el campo de texto libre; el
     `cliente_switch_id` es el que manda.
@@ -940,12 +1255,31 @@ el número de Switch en la segunda. Los emoji por marca son 🛒 Reebok · 🐝 
     filas (`Women-Flip Flops` 30, `Men-Flip Flops` 27, `Women-Sandals` 20, …). Es el **rubro de
     Switch**. Lo mismo en `tommy_order_items`: 219 productos distintos y **10 nombres**, uno de
     ellos literalmente **`x`**.
-18. ⚠️ **En `switch_articulo_info` de `active_shoes` hay 1.200 fichas y 1.199 subrubros**: **una
-    fila con `ficha_at` y `subrubro` vacío**. Es exactamente el caso que `fichaLlego` debe
-    avisar por 🔧 SISTEMA («llegó algo que no entiendo»).
-19. ⚠️ **Dos valores de `marca` fuera de los tres estables** en las fichas de `active_shoes`:
-    `CK DISPLAY & PROMO` (3) y `AT CRAZE 3` (1). Caen en el cajón neutro, que es lo correcto —
-    pero significan que el mapa no los conoce.
+18. ⚠️ **En `switch_articulo_info` de `active_shoes` hay ahora 1.408 fichas** (eran 1.200 el
+    4-sep: el cron sigue drenando ~200 por día) **y sigue habiendo UNA fila con `ficha_at` y
+    `subrubro` vacío**. Es exactamente el caso que `fichaLlego` debe avisar por 🔧 SISTEMA
+    («llegó algo que no entiendo»). El `rubro` y la `marca` están llenos en las 1.408.
+19. ⚠️ **TRES valores de `marca` fuera de los tres estables** en las fichas de `active_shoes`
+    (5-sep-2026): `CK DISPLAY & PROMO` (3) · **`GENERAL` (3, NUEVO desde el 4-sep)** ·
+    `AT CRAZE 3` (1). Caen en el cajón neutro, que es lo correcto — pero significan que el mapa
+    no los conoce. `GENERAL` **no está** en `CATEGORIA_POR_MARCA`
+    (`src/lib/reebok-clasificacion.ts:106-110`, que solo tiene FOOTWEAR / APPAREL / HARDWARE),
+    así que esos 3 artículos deben estar disparando el aviso de 🔧 SISTEMA.
+
+    ```sql
+    select marca, count(*) n from switch_articulo_info
+     where empresa_key='active_shoes' and ficha_at is not null group by 1 order by 2 desc;
+    -- FOOTWEAR 1307 · APPAREL 77 · HARDWARE 17 · GENERAL 3 · CK DISPLAY & PROMO 3 · AT CRAZE 3 1
+    ```
+
+    ✅ **El mapa de Reebok NO cambió** — verificado línea por línea el 5-sep-2026:
+    `CATEGORIA_POR_MARCA` = FOOTWEAR→footwear · APPAREL→apparel · HARDWARE→accessories;
+    `CATEGORIA_POR_RUBRO` (plan B, solo si la marca vino vacía) = SHOES · APPAREL · SHORTS ·
+    SOCKS · BAGS · HEADWEAR; `GENERO_POR_SUBRUBRO` = MALE · MEN · FEMALE · WOMEN · KIDS, con
+    `UNISEX` resuelto aparte. Cajones neutros `otros` / `sin_clasificar`.
+    ✅ **El ESPEJO del Depurador también sigue en pie**: `REEBOK_CATEGORY_ESPERADAS =
+    ["SHOES","APPAREL","SHORTS","SOCKS","BAGS","HEADWEAR"]` y `REEBOK_DEPARTMENT_ESPERADOS =
+    ["FOOTWEAR","APPAREL","HARDWARE"]` (`src/lib/depurador/reebok.ts:175,187`).
 
 ### Columnas que nadie llena o nadie lee
 20. 🔴 **`badge` está VACÍA en las cuatro marcas: 0 de 1.120 productos.** La pantalla ofrece
@@ -958,9 +1292,10 @@ el número de Switch en la segunda. Los emoji por marca son 🛒 Reebok · 🐝 
 23. 🔴 **`bulto_pzas` está llena en 51 de 552 en Tommy (todas con el valor 8) y en 0 de 94 en
     Calvin.** Es la columna de la que depende el total del pedido.
 24. 🔴 **`client_email` y `comment` están vacías en las cuatro tablas de pedidos.** `client_email`
-    se captura en el alta y se ofrece en «Enviar por email al cliente».
+    se captura en el alta y se ofrece en «Enviar por email al cliente». ✅ re-medido el 5-sep.
 25. 🔴 **`is_preorder` es `false` en las 316 filas de `reebok_order_items`.** El checkout tiene
     su bloqueo, la API su 422 y el correo su sección ámbar «Pre-orden»: **la preventa nunca se usó**.
+    ✅ re-medido el 5-sep.
 26. **`products.description` y `products.color` (Reebok) están 100% vacías.**
 27. **`products.sub_category` está vacía en 287 de 391.**
 28. ⚠️ **46 de 391 productos de Reebok no tienen `codigo_barra_id`** y **26 no tienen
@@ -968,7 +1303,10 @@ el número de Switch en la segunda. Los emoji por marca son 🛒 Reebok · 🐝 
     «SKU no tiene código de barra en Switch».
 29. **`origen_original` / `origen_short_id` solo se usan en Reebok.** Tommy tiene los 38 pedidos
     en `mio` y **nunca recibió uno por el link**.
-30. **`idempotency_key` está en 3 de 41 pedidos de Joybees** (contra 27 de 38 en Tommy).
+30. ⚠️ **CORREGIDO el 5-sep-2026.** El 4-sep esta línea decía «`idempotency_key` está en 3 de 41
+    pedidos de Joybees». El denominador era basura: hoy son **3 de 4** en Joybees y **3 de 5** en
+    Calvin. Los agujeros reales están en **Reebok (17 de 23)** y **Tommy (27 de 38)**, y son los
+    pedidos viejos, de antes de que existiera la clave.
 
 ### Huecos abiertos que la documentación de Switch describe y el código no mira
 31. 🔴 **La verificación post-escritura solo cuenta líneas.** `/apipedido/info` devuelve cantidad,
@@ -1036,8 +1374,28 @@ Nació como 5.ª pestaña de `/ventas` y desde el 12-ago-2026 **la pestaña ya n
 - El gate de página está en `src/app/referencia/page.tsx` y **lee la lista única** `REFERENCIA_ROLES` (`src/lib/ventas/referencia.ts` = `["admin","vendedor","bodega"]`, `redirect("/home")`). Desde el 4-sep-2026 esa MISMA lista la usan también `GET /api/ventas/referencia` y `POST /api/ventas/referencia/actualizar`: tres copias escritas a mano fue lo que dejó el botón en solo-admin. Candado: `referencia-boton-actualizar.test.ts`.
 - El gate del margen **NO está en la vista**: lo pone el servidor (`src/app/api/ventas/referencia/route.ts` → `margenVisible = auth.role === "admin"`). La vista solo lee `resp.margenVisible`.
   Daniel, textual: *«quita margen, lo demas dejalo»*.
-- Personas reales (medido en `fg_users`, 4-sep-2026): **daniel** y **alberto** (admin) · **rey**, **edwin**, **rodrigo** (vendedor) · **Bodega** (bodega). Ocho usuarios en total tienen la puerta.
-- Medido en `role_permissions` el 4-sep-2026: `vendedor.modulos` = `["catalogos","cxc","directorio","guias","referencia"]` y `bodega.modulos` = `["guias","packing-lists","catalogos","referencia","asistencia"]`. **La `key` `referencia` YA está en la tabla**, o sea que la migración `20260812120000` **ya corrió** — ver «Lo que sobra o no cuadra».
+- ⚠️ **Corregido el 5-sep-2026.** Personas reales (medido en `fg_users`): **daniel** y **alberto** (admin) · **rey**, **edwin**, **rodrigo** (vendedor) · **Bodega** (bodega) = **SEIS usuarios**, no ocho. *(El 4-sep esta línea decía «Ocho usuarios en total tienen la puerta»; la base tiene 11 usuarios en total y solo 6 con un rol de `REFERENCIA_ROLES`.)*
+
+  ```sql
+  select name, role, active from fg_users order by role, name;
+  -- admin: alberto, daniel · bodega: Bodega · contabilidad: Contabilidad
+  -- gerente_acs: jennifer · gerente_boston: david
+  -- secretaria: andrea, Angela · vendedor: edwin, rey, rodrigo   (11 filas, las 11 activas)
+  ```
+- ✅ **Re-medido en `role_permissions` el 5-sep-2026** (columna `role`, **no `rol`**): `vendedor` = `{catalogos,cxc,directorio,guias,referencia}` y `bodega` = `{guias,packing-lists,catalogos,referencia,asistencia}`. **La `key` `referencia` YA está en la tabla**, o sea que la migración `20260812120000` **ya corrió** — ver «Lo que sobra o no cuadra».
+
+  ```sql
+  select role, modulos::text, activo from role_permissions order by role;
+  -- admin           {asistencia,caja,cargar,catalogos,cheques,comisiones,cxc,directorio,guias,
+  --                  marketing,multifashion,packing-lists,prestamos,reclamos,usuarios,ventas,referencia}
+  -- bodega          {guias,packing-lists,catalogos,referencia,asistencia}
+  -- contabilidad    {asistencia,prestamos,proveedores,gastos-contabilidad,comisiones}
+  -- gerente_acs     {multifashion}
+  -- gerente_boston  {boston,catalogos,asistencia}
+  -- secretaria      {asistencia,caja,cargar,catalogos,cheques,comisiones,directorio,guias,
+  --                  marketing,packing-lists,reclamos}
+  -- vendedor        {catalogos,cxc,directorio,guias,referencia}
+  ```
 - **Nadie ha usado el módulo según `activity_logs`**: 0 filas con `action`/`entity_type` que contenga «referencia» (medido 4-sep-2026). El módulo no registra actividad, así que esto **no prueba que no se use** — prueba que no se instrumentó.
 
 ## Las pantallas
@@ -1098,14 +1456,16 @@ Respeta `margenVisible`: sin margen, la columna no se escribe. La nota del encab
 Referencia **no tiene ni una tabla propia**. Lee tres, todas escritas por crons:
 
 ### `switch_articulo_diario` — lo que se vendió
-Grano: 1 fila por `(empresa_key, fecha, artículo, tipo)`. **203.854 filas** (medido 4-sep-2026).
+Grano: 1 fila por `(empresa_key, fecha, artículo, tipo)`. **204.010 filas** (medido 5-sep-2026;
+eran 203.854 el 4-sep — crece ~150/día).
 Columnas que Referencia lee: `empresa_key, fecha, codigo, descripcion, tipo, cantidad_total, venta_total`.
 - `tipo` decide el signo (`signoTipo`): las notas de crédito RESTAN.
 - Se lee con `leerTodoPaginado` y `.order("id")` — sin eso, `db-max-rows = 1000` cortaría en silencio.
 - Filtro fijo `.in("empresa_key", REFERENCIA_EMPRESA_KEYS)` = `B2B_EMPRESA_KEYS` = **las 6 de Fashion Group**. Boston y American Classic nunca entran.
 
 ### `switch_ingresos_mercancia` — lo que llegó
-Grano: 1 fila por `(empresa, n_interno, línea)`. **35.519 filas** (medido 4-sep-2026).
+Grano: 1 fila por `(empresa, n_interno, línea)`. **35.572 filas** (medido 5-sep-2026;
+eran 35.519 el 4-sep).
 Columnas leídas: `empresa_key, fecha, n_interno, linea, proveedor, codigo_articulo, articulo, precio, cantidad, costo_fob, costo_cif` **+ `costo_sin_desglosar` y `fob_confiable` si existen**.
 🔴 Las dos últimas se piden en un **primer intento** y, si Postgres dice que la columna no
 existe, se reintenta con el juego base (`COLS_INGRESOS_COMPLETO` → `COLS_INGRESOS_BASE`).
@@ -1113,23 +1473,42 @@ Si tampoco existe la TABLA, la respuesta trae `comprasDisponibles: false` y la p
 lo dice — **nunca un cero**.
 
 ### `switch_articulo_info` — qué es el artículo hoy
-Grano: 1 fila por `(empresa_key, codigo)`. **16.633 filas** (medido 4-sep-2026), de las
-cuales **4.924 con `existencia > 0`**:
+Grano: 1 fila por `(empresa_key, codigo)`. **16.658 filas** (medido 5-sep-2026; eran 16.633 el
+4-sep), de las cuales **4.924 con `existencia > 0`**:
 
-| empresa_key | filas | con existencia > 0 | con `ficha_at` |
+| empresa_key | filas (5-sep) | con existencia > 0 | con `ficha_at` |
 |---|---:|---:|---:|
-| vistana | 8.254 | 1.537 | 0 |
-| fashion_wear | 5.111 | 2.637 | 0 |
-| active_shoes | 1.763 | 187 | **1.200** |
-| fashion_shoes | 706 | 457 | 0 |
+| vistana | **8.273** | 1.540 | 0 |
+| fashion_wear | 5.111 | 2.628 | 0 |
+| active_shoes | 1.763 | 187 | **1.408** *(eran 1.200)* |
+| fashion_shoes | **712** | 463 | 0 |
 | active_wear | 592 | 21 | 0 |
 | joystep | 207 | 85 | 0 |
+
+```sql
+select empresa_key, count(*) filas,
+       count(*) filter (where existencia > 0)   con_exist,
+       count(*) filter (where ficha_at is not null) con_ficha,
+       count(*) filter (where ficha_at is not null and (subrubro is null or subrubro='')) ficha_sin_sub
+from switch_articulo_info group by 1 order by 2 desc;
+```
+
+🔴 **La fase 2 sigue drenando: +208 fichas en 24 h.** Al ritmo medido (tope de 400 por corrida,
+una corrida diaria a las 04:50 UTC) las 355 que faltan en `active_shoes` se completan en ~2 días.
 
 Columnas que Referencia lee: `empresa_key, codigo, descripcion, existencia, precio_etiqueta, synced_at`.
 🔴 **`costo_api` NO lo lee esta ruta** (sí lo lee `infoParaCliente` en otros caminos y el
 inventario valorizado de Vista General). 🔴 **`rubro` / `subrubro` / `marca` / `ficha_at`
-tampoco los lee Referencia**: son de Catálogos. Medido: los 187 artículos de `active_shoes`
-con existencia > 0 tienen **los 187 su `ficha_at`** (0 sin ficha).
+tampoco los lee Referencia**: son de Catálogos. ✅ **Re-medido el 5-sep-2026**: los 187 artículos
+de `active_shoes` con existencia > 0 tienen **los 187 su `ficha_at`** (0 sin ficha).
+
+```sql
+select count(*) con_exist,
+       count(*) filter (where ficha_at is not null) con_ficha,
+       count(*) filter (where ficha_at is null)     sin_ficha
+from switch_articulo_info where empresa_key='active_shoes' and existencia > 0;
+--  187 · 187 · 0
+```
 
 **Ninguna de las tres tiene soft delete.** Todas se reconstruyen desde Switch.
 
@@ -1461,11 +1840,13 @@ Notas del Excel, fijadas por candado:
    *«la caja del buscador ya dice "Podés pegar hasta N códigos"»*. La pantalla real dice
    «puedes pegar» (correcto); el comentario quedó viejo. El candado `nada-de-voseo.test.ts`
    borra los comentarios antes de barrer, así que no lo caza.
-4. **El módulo no registra ni una acción en `activity_logs`** (0 filas, medido 4-sep-2026).
-   No se puede decir cuánto se usa. Contrasta con el Depurador, que sí instrumentó sus
-   descargas.
-5. **`switch_articulo_info.ficha_at` está lleno en UNA sola empresa** (1.200 de 1.763 de
-   `active_shoes`; **0** en las otras cinco). Es a propósito —solo `active_shoes` pide fichas—,
+   ✅ **Sigue ahí el 5-sep-2026** (`ReferenciaClient.tsx:18`).
+4. **El módulo no registra ni una acción en `activity_logs`** (0 filas, ✅ re-medido el
+   5-sep-2026). No se puede decir cuánto se usa. Contrasta con el Depurador, que sí instrumentó
+   sus descargas.
+5. **`switch_articulo_info.ficha_at` está lleno en UNA sola empresa** (**1.408** de 1.763 de
+   `active_shoes` al 5-sep-2026 — eran 1.200 el 4-sep; **0** en las otras cinco). Es a propósito
+   —solo `active_shoes` pide fichas—,
    pero significa que `rubro`/`subrubro`/`marca` son columnas **vacías en 15.433 de las 16.633 filas**.
    Referencia no las lee; quien las lea sobre otra empresa va a ver nulos que no son un error.
 ---
@@ -1505,11 +1886,15 @@ SOLO admin**: `GET /descripciones?admin=1` y `PATCH /descripciones/[id]`.
 
 **Bodega, vendedor, contabilidad, `gerente_acs` y `gerente_boston` no lo ven.**
 
-Medido en `role_permissions` el 4-sep-2026: `cargar` está en `admin` y en `secretaria`. Y en
+✅ **Re-medido en `role_permissions` el 5-sep-2026**: `cargar` está en `admin` y en `secretaria`,
+y **en ningún otro rol** (ver el volcado completo de la tabla en la sección de Referencia). Y en
 los overrides de las dos secretarias (`fg_users.modulos_override`), las dos lo tienen.
 
-**Personas reales:** daniel y alberto (admin), **andrea y Angela** (secretaria). Quienes de
-verdad lo usan son las dos secretarias — ver «Cuánto se usa».
+**Personas reales:** daniel y alberto (admin), **andrea y Angela** (secretaria) = **cuatro**.
+Quienes de verdad lo usan son las dos secretarias — ver «Cuánto se usa».
+✅ **Verificado el 5-sep-2026**: las dos secretarias tienen `cargar` en su `modulos_override`
+(`andrea` = `{cheques,comisiones,caja,marketing,directorio,guias,packing-lists,reclamos,catalogos,cargar,multifashion}` ·
+`Angela` = `{directorio,marketing,cheques,caja,comisiones,guias,packing-lists,reclamos,catalogos,cargar,cxc}`).
 
 Dentro del módulo, la única diferencia por rol es la vista **Configuración › Descripciones**
 (`soloAdmin: true`): a la secretaria se le cae a **Fórmulas**, incluso escribiendo
@@ -1526,6 +1911,10 @@ navegador no cicla por pestañas.
 | **Plantilla** | `plantilla` *(default)* | **Nuevo** *(default)* · **Historial** | `nuevo` · `historial` |
 | **Tallas y catálogo** | `tallas` | **Tallas por bulto** *(default)* · **Fotos a mi Excel** | `curvas` · `misfotos` |
 | **Configuración** | `config` | **Fórmulas** *(default)* · **Descripciones** 🔐 solo admin · **Reglas** | `formulas` · `descripciones` · `reglas` |
+
+✅ **Verificado el 5-sep-2026 en `src/app/productos/cargar/pestanas.ts`**: `PESTANAS` tiene las
+3 entradas con esos `label` exactos, `VISTAS_POR_TAB` las 7 vistas en ese orden con
+`soloAdmin: true` solo en `descripciones`, y `TAB_VIEJO_A_NUEVO` los 7 redirects.
 
 Hasta 1024 px (`lg`) las pestañas son un **desplegable** (`SelectorPestanas` →
 `DesplegableFlotante`, dibujado en `<body>`); desde ahí, una fila de píldoras. Las **vistas**
@@ -1688,13 +2077,13 @@ de Reebok, el mapa de normalización y el catálogo de marcas.
 
 | Tabla / bucket | Grano | Filas (4-sep-2026) | Columnas |
 |---|---|---:|---|
-| **`carga_history`** | 1 fila por descarga de plantilla Switch | **140** | `id uuid` · `usuario text` · `empresa text` · `marca text` · `cantidad_estilos int` · `total_unidades int` · `total_costo numeric` · `created_at timestamptz` · **`archivo_path text` (nueva, NULL)** · **`archivo_nombre text` (nueva, NULL)** |
-| **bucket `depurador-plantillas`** | 1 objeto por descarga, ruta `<id de la fila>/<nombre saneado>` | **0** | Privado (`public = false`), creado 5-sep-2026 01:41 UTC. Sin policies para anon/authenticated: 100% service role |
+| **`carga_history`** | 1 fila por descarga de plantilla Switch | **140** | `id uuid` · `usuario text` · `empresa text` · `marca text` · `cantidad_estilos int` · `total_unidades int` · `total_costo numeric` · `created_at timestamptz` · **`archivo_path text` (nueva, NULL en las 140)** · **`archivo_nombre text` (nueva, NULL en las 140)** |
+| **bucket `depurador-plantillas`** | 1 objeto por descarga, ruta `<id de la fila>/<nombre saneado>` | **0** | Privado (`public = false`), creado **5-sep-2026 01:41:13 UTC**. Sin policies para anon/authenticated: 100% service role |
 | **`marca_formulas`** | 1 por marca (case-insensitive) | **22** | `id · marca · empresa · divisor numeric · extra int · redondeo text · updated_at · updated_by` |
 | **`marca_rubro_formulas`** | 1 por marca + rubro/descripción | **18** | igual + `rubro text · precio_fijo numeric` |
 | **`tienda_marca_formulas`** | espejo de `marca_formulas` para Facturas Tienda | 🔴 **0** | igual |
 | **`tienda_rubro_formulas`** | espejo de `marca_rubro_formulas` | 🔴 **0** | igual |
-| **`depurador_descripciones`** | 1 por (marca, descripción) | **281** | `id · marca · descripcion · activa bool · origen text ('seed' / 'aprobada') · aprobada_por · aprobada_at · created_at` |
+| **`depurador_descripciones`** | 1 por (marca, descripción) | **281** (las 281 `activa`) | `id · marca · descripcion · activa bool · origen text ('seed' / 'aprobada') · aprobada_por · aprobada_at · created_at` |
 | `activity_logs` | 1 por acción | — | escribe `user_role · action · entity_type · details`. Acciones **nuevas**: `descarga_tallas` y `descarga_misfotos`, con `entity_type = "depurador"` |
 
 **Soft delete: ninguna tabla del módulo lo usa.** `depurador_descripciones` desactiva con
@@ -1704,9 +2093,29 @@ de Reebok, el mapa de normalización y el catálogo de marcas.
 Todas con RLS `to service_role`; las rutas fallan **ruidosamente con 503** si falta
 `SUPABASE_SERVICE_ROLE_KEY`, en vez de leer vacío en silencio.
 
+✅ **Todo lo de arriba re-medido el 5-sep-2026:**
+
+```sql
+select 'carga_history' t, count(*) n, count(*) filter (where archivo_path is not null) con_archivo from carga_history
+union all select 'marca_formulas',          count(*), 0 from marca_formulas
+union all select 'marca_rubro_formulas',    count(*), 0 from marca_rubro_formulas
+union all select 'tienda_marca_formulas',   count(*), 0 from tienda_marca_formulas
+union all select 'tienda_rubro_formulas',   count(*), 0 from tienda_rubro_formulas
+union all select 'depurador_descripciones', count(*), count(*) filter (where activa) from depurador_descripciones;
+-- carga_history 140 / 0 archivos · marca_formulas 22 · marca_rubro_formulas 18
+-- tienda_* 0 y 0 · depurador_descripciones 281 / 281 activas
+
+select id, name, public, created_at from storage.buckets order by created_at desc limit 3;
+-- depurador-plantillas · public=false · 2026-09-05 01:41:13 UTC
+
+select bucket_id, count(*) n from storage.objects group by 1 order by 2 desc;
+-- backups 1368 · product-images 1204 · marketing 266 · reclamo-fotos 33 · reclamo-facturas 26
+-- · joybees-photos 14   ← 🔴 `depurador-plantillas` NO APARECE: cero objetos
+```
+
 🔴 **Columnas que hoy nadie lee:**
 - **`carga_history.total_costo`** — se calcula (Σ CIF × unidades), se guarda y la ruta la devuelve, pero `HistorialView` **no la pinta** ni en tabla ni en tarjeta.
-- **`archivo_path` y `archivo_nombre` están en 0 de 140 filas**: la funcionalidad es de hoy, ninguna corrida posterior a la migración ha ocurrido todavía.
+- 🔴 **`archivo_path` y `archivo_nombre` siguen en 0 de 140 filas al 5-sep-2026, y el bucket sigue en 0 objetos.** La última descarga registrada es del **4-sep 17:27 UTC** — o sea que **desde que la función existe nadie ha bajado una plantilla**, y la ruta de guardado del historial **todavía no se ha ejercitado ni una vez en producción**. No es un defecto: es que todavía no ha pasado. **Es el primer dato a re-mirar la próxima vez.**
 
 **Unicidad de `depurador_descripciones`**: índice sobre `lower(marca), lower(descripcion)`. El
 `POST /aprobar` es **idempotente** (código `23505` → `{ok:true, yaExistia:true}`), la marca se
@@ -1769,6 +2178,17 @@ Regla vigente en `CLAUDE.md § Catálogos, pedidos y cotización` (los cuatro pu
   `Código * · Referencia * · Código Barra * · Descripción * · Precio * · Tasa de Impuesto * · Costo FOB * · Costo CIF * · rubro * · subrubro · Marca * · Proveedor * · Mínimo Stock · Código Tipo de Artículo * · Unidad de medida * · Origen · Lote · Serie · Stock Ideal · Temporada · Composición · Codigo CPBS · Codigo CPBS Abrev · Bonificación · Cantidad por caja`
   **13 obligatorias** (con `*`), **`Costo FOB *` y `Costo CIF *` entre ellas**. `"Costo *"` no existe.
   Candado: `depurador-plantilla-switch.test.ts` compara **posición por posición** contra el fixture real y dice qué columna se movió.
+
+  ✅ **Verificado el 5-sep-2026, columna por columna, en `src/lib/depurador/logic.ts:111-114`:
+  son 25 y están en ese orden exacto.** `TEXT_COLS = [0, 1, 2]` sigue posicional (línea 119).
+  ✅ **Y el fixture existe y no se movió:**
+
+  ```bash
+  ls -l  src/__tests__/fixtures/plantilla-switch-articulos.xlsx   # 10.305 bytes, 3-sep 17:21
+  md5    src/__tests__/fixtures/plantilla-switch-articulos.xlsx   # b622f171713642a0393b3c95c7f30de7
+  ```
+
+  Es **el mismo MD5** que dieron las 8 empresas al bajar la plantilla de Switch el 3-sep-2026.
 - 🔴 **Los TRES generadores escriben esa misma fila**, y cada fila de datos tiene **25 celdas**.
 - **`TEXT_COLS = [0, 1, 2]`** es posicional (Código, Referencia, Código Barra van forzadas a texto, `t:"s"`, `z:"@"`) y no se movió aunque «Composición» haya vuelto a la columna 21.
 - **«Composición» SIEMPRE vacía** en los tres. Daniel: *«vuelve vacía, no la quiero»*.
@@ -1788,6 +2208,9 @@ Detalle CK/TH: si `FOB` viene 0 o nulo y `CIF > 0`, se copia CIF a FOB.
 ### El precio
 - 💰 **Jerarquía**: `precio_fijo` GANA (ni siquiera necesita CIF) > fórmula propia de la descripción > fórmula de la marca. Un `precio_fijo` de 0 o negativo **no aplica**.
 - 💰 **El divisor vale 0 (sin fórmula) ó 0.10–1.00** (`validarDivisor`): es la **fracción del precio que representa el costo**, no un porcentaje.
+  ✅ **Verificado el 5-sep-2026 en `src/lib/depurador/divisor.ts`**: `DIVISOR_SIN_FORMULA = 0` ·
+  `DIVISOR_MIN = 0.1` · `DIVISOR_MAX = 1`. Módulo puro; el CHECK de la base
+  (`20260727190000_divisor_rango.sql`) repite el mismo rango, y el código funciona con o sin él.
 - 🔴 **Se valida en los TRES caminos** desde el 4-sep-2026. Hasta ese día solo el Depurador CK/TH validaba: un `70` en Reebok o en Facturas Tienda producía un Excel con los costos **100× mal**, que iba derecho a Switch. Candado: `depurador-divisor-tres-caminos.test.tsx`.
 - 🔴 **Los precios escritos a mano se conservan al re-procesar, pegados por REFERENCIA de artículo, nunca por índice de fila.** Con edits por índice, el precio de un artículo caería en el **artículo equivocado** cuando otro archivo lo corre de fila. Borrarlos es un botón, nunca automático.
 
@@ -1795,7 +2218,13 @@ Detalle CK/TH: si `FOB` viene 0 o nulo y `CIF > 0`, se copia CIF a FOB.
 - **Marca desconocida: se REPORTA con su conteo, cruda y ordenada — y NO frena la carga.** La fila sale con `Otros`. Daniel: *«Como está»*.
 - 💰 **Los artículos sin cantidad quedan fuera del Excel, pero los SERVICIOS sobreviven** (tipo `02`, Stock Ideal 0, costos 0): el criterio es la CANTIDAD del proveedor, no la celda. Se cuenta la **SUMA** del estilo. **Sin columna CANTIDAD no se filtra nada.** Si todo queda afuera, **corta con mensaje** en vez de entregar un Excel vacío.
 - **`MARCA_CATALOGO` = 33 marcas** (9 KL, 12 CK, 12 TH), cada una con su empresa destino.
-- **`MARCA_FIXES` es un mapa CONGELADO de 9 correcciones** medidas contra `switch_factura_lineas`. `"TH"` a secas queda **fuera** a propósito: sus 2 artículos van a marcas distintas y una corrección es una sola salida por entrada. Reebok y Joybees no pasan por el mapa.
+  ✅ **Contado el 5-sep-2026 sobre `MARCAS_CATALOGO` en `logic.ts`: 33 exactas** — CK 12
+  (Accessories · Display & Promo · Footwear · Jeans · Kids · Legwear · Menswear · Other ·
+  Performance · Swimwear · Underwear · Womenswear), KL 9, TH 12.
+- **`MARCA_FIXES` es un mapa CONGELADO de 9 correcciones** medidas contra `switch_factura_lineas`.
+  ✅ **Contadas el 5-sep-2026: son 9** (`TH ACCESORIES` · `TH OTHER ACCESORIES` · `TH ACCESORIOS` ·
+  `TH-ACCESORIOS` · `CK ACCESORIES` · `TH WOMEN` · `TH MEN` · `TH HOME` · `TH SPORT MEN`), y
+  `"TH"` a secas sigue **fuera** a propósito. `"TH"` a secas queda **fuera** a propósito: sus 2 artículos van a marcas distintas y una corrección es una sola salida por entrada. Reebok y Joybees no pasan por el mapa.
 - 🔴 **La lista de valores esperados de Reebok (`REEBOK_CATEGORY_ESPERADAS`) es ESPEJO del mapa del catálogo** (`src/lib/reebok-clasificacion.ts`) y hay candado que compara los dos: agregar un valor en uno sin el otro pone el build ROJO. `HEADWEAR` entró por ahí el 2-sep-2026 — sin él el Depurador gritaba «valor inesperado» sobre 7 gorras buenas.
 - 🩸 En Reebok, `CATEGORY` y `GENDER` son **obligatorias**: sin ellas se **rechaza el archivo nombrándolas**. Antes `findCol` daba −1 y todo subía a Switch con rubro y subrubro en blanco.
 - **El veredicto de una descripción nueva** es `ya-existe` / `pasa` / `alerta`. `esCasiIgual` tiene **UN solo criterio: la «s» final**; el Levenshtein ≤2 se sacó porque emparejaba prendas distintas (`men-shirts` ≠ `men-t-shirts`, `polos l/s` ≠ `polos s/s`).
@@ -1884,6 +2313,14 @@ otro módulo la protege. Por eso el fixture vive en el repo.
 ## Cuánto se usa
 
 **Medido en `carga_history`, 25-jun-2026 → 4-sep-2026, 140 corridas.**
+✅ **Re-medido el 5-sep-2026: las mismas 140.** No hubo ninguna corrida hoy (la última es del
+4-sep 17:27 UTC).
+
+```sql
+select usuario, count(*) n from carga_history group by 1 order by 2 desc;
+select to_char(created_at,'YYYY-MM') mes, count(*) n, max(created_at) ultima from carga_history group by 1 order by 1;
+select empresa, count(*) n, sum(total_unidades) unidades, sum(cantidad_estilos) estilos from carga_history group by 1 order by 2 desc;
+```
 
 | Quién | Corridas | Rol |
 |---|---:|---|
@@ -1901,12 +2338,12 @@ otro módulo la protege. Por eso el fixture vive en el repo.
 🔴 **Es un módulo de las secretarias, no de Daniel**: 123 de las 140 corridas (88%) son de
 Angela y andrea, y los 17 de daniel son **16 en junio** (el arranque) más 1 en agosto.
 
-| Compañía | Corridas |
-|---|---:|
-| Vistana International | 56 |
-| Fashion Wear | 55 |
-| Fashion Shoes | 28 |
-| Active Wear | 1 |
+| Compañía | Corridas | Unidades | Estilos |
+|---|---:|---:|---:|
+| Vistana International | 56 | 36.236 | 962 |
+| Fashion Wear | 55 | 40.984 | 849 |
+| Fashion Shoes | 28 | 39.476 | 203 |
+| Active Wear | 1 | 323 | 48 |
 
 🔴 **Ninguna corrida de Reebok ni de Facturas Tienda en 140.** Hasta el rediseño de hoy
 Reebok **no llamaba al historial** y Facturas Tienda **nunca dejó una fila**, así que esto no
@@ -1924,14 +2361,18 @@ una a las 23:00.
 **Volumen procesado:** **117.019 unidades** y **2.062 estilos** en total, o sea unas
 **836 unidades y 15 estilos por corrida**.
 
-**Última corrida: 4-sep-2026.** El módulo está vivo.
+**Última corrida: 4-sep-2026 a las 17:27 UTC.** El módulo está vivo.
 
-**Con archivo guardado: 0 de 140** — la función es de hoy.
+🔴 **Con archivo guardado: 0 de 140, todavía al 5-sep-2026.** La función existe desde el 4-sep
+y **nadie ha bajado una plantilla desde entonces**, así que el camino completo
+(descargar → guardar en el bucket → volver a bajar del Historial) **sigue sin ejercitarse en
+producción ni una vez**. El bucket tiene **0 objetos**.
 
 ⚠️ **Lo que NO se puede medir:** cuántas veces se usan **Tallas por bulto** y **Fotos a mi
-Excel**. Hasta el 4-sep-2026 no dejaban ningún rastro; desde hoy escriben `descarga_tallas` y
-`descarga_misfotos` en `activity_logs`. **Al 4-sep-2026 hay 0 filas** con esas acciones. Es
-exactamente el dato que Daniel quiere mirar en unas semanas para decidir si valen la pena.
+Excel**. Hasta el 4-sep-2026 no dejaban ningún rastro; desde entonces escriben `descarga_tallas`
+y `descarga_misfotos` en `activity_logs`. **Al 5-sep-2026 sigue habiendo 0 filas** con esas
+acciones. Es exactamente el dato que Daniel quiere mirar en unas semanas para decidir si valen
+la pena.
 
 ## Qué papeles y Excel produce
 
@@ -1998,7 +2439,7 @@ destinatario final del 60% de esos archivos es **Switch**, no una persona.
 | **Un valor nuevo en `Department` / `CATEGORY` / `GENDER` de Reebok** | El artículo conserva el valor del proveedor; el Depurador **avisa, no corrige** | *«N valor(es) de Department/CATEGORY/GENDER que el catálogo no conoce… un producto sin categoría se cobra por bulto de 6 y no de 12.»* 🩸 Si el valor nuevo también entra al catálogo de Reebok sin actualizar el espejo, **el build se pone rojo** — es la defensa |
 | **Una marca nueva del proveedor** | Sus productos **salen sin precio** | *«Marca desconocida: «X» — N productos van a salir sin precio»*, con la marca cruda. **No bloquea, por decisión de Daniel** |
 | **`SUPABASE_SERVICE_ROLE_KEY` sin configurar** | Las rutas del módulo responden **503** | Ruidoso a propósito, para no leer vacío en silencio |
-| **El cron `cleanup-depurador-archivos` no corre** | Los archivos de más de 90 días se quedan en el bucket | No se pierde nada. El watchdog de `cron_heartbeats` lo dice. ⚠️ Está en `SEED_TOLERANT_CRONS` hasta que siembre su primera fila — al 4-sep-2026 **todavía no la tiene** |
+| **El cron `cleanup-depurador-archivos` no corre** | Los archivos de más de 90 días se quedan en el bucket | No se pierde nada. El watchdog de `cron_heartbeats` lo dice. ✅ **CORREGIDO el 5-sep-2026: ya sembró su primera fila** — `cron_heartbeats` trae `cleanup-depurador-archivos / 2026-09-05 03:20:13 UTC`, o sea que corrió a su hora (`20 3 * * *`) y el watchdog ya lo vigila. *(El 4-sep esta celda decía «todavía no la tiene».)* Corrió sobre un bucket vacío, así que no borró nada |
 | **La columna `archivo_path` no existe** | El POST del historial registra la fila igual y **borra el objeto que acababa de subir**, para no dejar huérfanos que la limpieza nunca vería. El cron es un **no-op limpio** | La fila aparece sin botón. Ya no aplica: la migración **está corrida** |
 | **Se pierde `marca_formulas`** | Todas las marcas quedan «Sin guardar» | La columna Estado de la tabla de fórmulas. Se puede seguir con la fórmula global |
 | **Alguien mueve `TEXT_COLS`** | Código, Referencia y Código Barra bajan como **números**: los ceros a la izquierda se pierden y la notación científica come los códigos largos | El candado abre el .xlsx y exige `t: "s"` — se pone rojo |
@@ -2006,14 +2447,36 @@ destinatario final del 60% de esos archivos es **Switch**, no una persona.
 
 ## Lo que sobra o no cuadra
 
-1. 🔴 **La documentación dice que la migración está pendiente, y NO lo está.** `CLAUDE.md`,
-   `docs/estado-actual.md`, el mensaje del commit `190f5450` y el postmortem dicen que
-   `20260921120000_carga_history_archivo.sql` está **«pendiente de aplicar»**.
-   **Medido el 4-sep-2026**: `supabase_migrations.schema_migrations` tiene la fila
-   `20260921120000 / carga_history_archivo`, las columnas `archivo_path` y `archivo_nombre`
-   existen, y el bucket `depurador-plantillas` está creado (5-sep 01:41 UTC). **La migración
-   corrió minutos después del commit.** Es la clase de dato viejo que hace tomar la decisión
-   equivocada la próxima vez.
+1. 🔴 **La documentación dice que DOS migraciones están pendientes, y las DOS ya corrieron.**
+   **Re-medido el 5-sep-2026** contra `supabase_migrations.schema_migrations`:
+
+   | Migración | Qué dice la doc | Realidad |
+   |---|---|---|
+   | `20260921120000_carga_history_archivo` | «pendiente de aplicar» en `CLAUDE.md`, `docs/estado-actual.md`, el commit `190f5450` y el postmortem | ✅ **aplicada** (columnas `archivo_path` / `archivo_nombre` existen; bucket creado 5-sep 01:41 UTC) |
+   | `20260924120000_borrar_pedidos_de_prueba` | «pendiente de aplicar» en `CLAUDE.md` § Catálogos y en el postmortem | ✅ **aplicada** (Calvin 21→5, Joybees 41→4) |
+
+   ```sql
+   select version, name from supabase_migrations.schema_migrations
+    where version >= '20260918' order by version;
+   -- 20260918120000 guias_destino_cliente        ← también decía «pendiente» en CLAUDE.md
+   -- 20260919120000 clientes_master_ausente      ← ídem
+   -- 20260920120000 caja_reposicion
+   -- 20260921120000 carga_history_archivo        ✅
+   -- 20260922120000 reclamos_proveedor_codigo
+   -- 20260923120000 sync_log_clientes
+   -- 20260924120000 borrar_pedidos_de_prueba     ✅
+   -- 20260925120000 prestamos_dos_cuentas_y_tope
+   -- 20260925130000 recordatorios_rediseno
+   -- 20260926120000 clientes_master_contacto
+   -- 20260927120000 cxc_envios_canal
+   -- 20260928120000 aging_boston_tramos_finos
+   ```
+
+   🔑 **La lección operativa, para que no vuelva a pasar:** «pendiente de aplicar» en un commit
+   se vuelve mentira en cuanto Daniel corre `npm run migrar`, y **nada actualiza el texto**.
+   Antes de repetir esa frase hay que preguntarle a `supabase_migrations.schema_migrations` —
+   **no a `public.schema_migrations`, que no existe** y devuelve un error que se confunde con
+   «no hay registro».
 2. 🔴 **Trampa sin salida: un archivo que falla deja la pantalla trabada.** En los **tres**
    clientes el botón **«Otro archivo»** vive DENTRO del bloque de éxito
    (`{processed && …}` / `{items && …}` / `{result && …}`), y en modo dispatcher la dropzone
@@ -2033,6 +2496,8 @@ destinatario final del 60% de esos archivos es **Switch**, no una persona.
 5. **Dos exports muertos en `logic.ts`**: `calcHint()` (línea 1037) y `convertTemporada()`
    (línea 311) — **cero llamadores en todo `src/`, ni en tests**. `calcHint` lo reemplazó
    `calcCell` dentro de `DepuradorClient`.
+   ✅ **Re-verificado el 5-sep-2026**: `grep -rn 'calcHint\|convertTemporada' src` devuelve
+   **exactamente esas dos líneas de definición y nada más**.
 6. **`ProcessResult.sinColumnaCantidad` se calcula, se devuelve y nadie lo lee.**
    `DepuradorClient` desestructura `rows`, `warnings`, `omitidosSinCantidad` y
    `marcasDesconocidas`; ese campo se cae al piso. La consecuencia —«sin columna CANTIDAD no se
@@ -2062,13 +2527,232 @@ destinatario final del 60% de esos archivos es **Switch**, no una persona.
     bloque.
 12. **`tienda_marca_formulas` y `tienda_rubro_formulas` están vacías: 0 filas.** El scope
     «Tienda (facturas)» de Configuración › Fórmulas existe, funciona y **nunca se ha usado** —
-    todos los precios de Facturas Tienda salen sin fórmula.
+    todos los precios de Facturas Tienda salen sin fórmula. ✅ re-medido el 5-sep-2026.
 13. **El Historial nunca ha guardado una fila de Reebok ni de Facturas Tienda** (las 140 son
     Vistana 56 · Fashion Wear 55 · Fashion Shoes 28 · Active Wear 1). El
     `empresaCanonica("Facturas Tienda") → "Multifashion"` de `HistorialView` es defensa contra
-    un caso que **en producción no existe**.
+    un caso que **en producción no existe**. ✅ re-medido el 5-sep-2026: sigue sin una sola fila
+    de esas dos compañías.
+15. 🔴 **Y hay una tercera cosa sin ejercitar, más importante que las dos de arriba: el
+    HISTORIAL CON ARCHIVO.** `archivo_path` está en **0 de 140** filas y el bucket
+    `depurador-plantillas` tiene **0 objetos** al 5-sep-2026. La migración corrió, el bucket
+    existe, el código está, el cron de limpieza está en `vercel.json` (`20 3 * * *`) — pero
+    **nadie ha bajado una plantilla desde que la función se encendió**. Hasta que eso pase, ni
+    el guardado ni la re-descarga ni la limpieza de 90 días tienen una sola prueba en
+    producción; lo único que los cubre son los tests.
 14. **`GET /api/activity` no tiene lectores.** El POST se arregló con este commit (insertaba
     `user_name` y `module`, columnas que `activity_logs` **no tiene**, y fallaba en silencio;
     nadie lo notó porque `logActivityClient` no tenía llamadores). Pero **ninguna pantalla
     consume el GET**: el «rastro de uso» de Tallas y Fotos que Daniel quiere mirar en unas
     semanas hoy solo se lee consultando la base a mano.
+
+---
+
+# Lo que estaba mal
+
+**Auditoría del 5-sep-2026.** Se recorrió el archivo entero y se volvió a medir **toda
+afirmación factual** contra producción y contra el código fuente. Aquí está solo lo que
+CAMBIÓ: qué decía · qué es en realidad · cómo se midió.
+
+> 🔑 **La regla que sale de esta auditoría:** una cifra sin la consulta al lado no es un dato,
+> es un recuerdo. Por eso desde hoy cada número importante de este archivo lleva pegado el SQL
+> o el `grep` que lo produjo, para que el próximo que lo lea pueda desconfiar y comprobar en
+> treinta segundos en vez de creer.
+
+## 1. 🔴 «La migración de los pedidos de prueba está pendiente de aplicar» — YA CORRIÓ
+
+- **Decía:** *«Los borra `20260924120000_borrar_pedidos_de_prueba.sql` (**pendiente de
+  aplicar**, la corre Daniel)»*, y en consecuencia toda la sección de datos daba
+  `calvin_orders` = 21 filas y `joybees_orders` = 41.
+- **Es:** la migración **está aplicada**. `calvin_orders` tiene **5** filas y `joybees_orders`
+  **4**; los renglones cayeron con ellos (`calvin_order_items` 52 → **36**,
+  `joybees_order_items` 77 → **32**). Los 53 pedidos de prueba **ya no existen**.
+- **Cómo se midió:**
+  ```sql
+  select version, name from supabase_migrations.schema_migrations where version >= '20260918';
+  select count(*) from calvin_orders;   -- 5
+  select count(*) from joybees_orders;  -- 4
+  ```
+- **Por qué importa:** el 4-sep se dijo que la limpieza estaba pendiente y Daniel podía estar
+  esperando correrla. Ya está hecha. Y **cinco cifras más del archivo cambiaban con ella**
+  (pedidos por mes, `vendor_name`, `cliente_switch_id`, `idempotency_key`, `reemplaza_a`).
+- ⚠️ **`CLAUDE.md` sigue diciendo «pendiente de aplicar»** para esta migración *y* para
+  `20260921120000_carga_history_archivo`. No se toca aquí (lo tocan otros documentos), pero
+  queda anotado.
+
+## 2. 🔴 Varias «alarmas» de Calvin y Joybees eran BASURA DE PRUEBA, no defectos
+
+- **Decía:** *«🔴 Calvin 4 de 21 con `cliente_switch_id`»* · *«🔴 Joybees 3 de 41 con
+  `idempotency_key`»* · *«🔴 Joybees 3 de 41 con `vendedor_switch_id`»* · *«16 de las 41 filas
+  de Joybees dicen `medicion`»*.
+- **Es:** con la basura afuera, **Calvin 4 de 5** y **Joybees 4 de 4** con cliente; **3 de 5** y
+  **3 de 4** con `idempotency_key`. El valor `medicion` **ya no existe en producción**. Las dos
+  marcas se leen sanas.
+- **Cómo se midió:** los `count(*) filter (…)` por marca que están en «Los pedidos internos».
+- **Por qué importa:** era un diagnóstico con el denominador podrido. Poner en rojo un módulo
+  sano manda a arreglar lo que no está roto.
+
+## 3. 🔴 La tabla de marcas se contradecía a sí misma sobre el proyecto de Reebok
+
+- **Decía:** en la tabla de las 4 marcas, columna «Proyecto Supabase», Reebok = *«🔴 **otro
+  proyecto** (`reebokServer`)»*. Diez páginas más abajo, el mismo archivo demostraba que eso es
+  falso.
+- **Es:** las cuatro marcas viven en el proyecto **principal** (`rspocgqhtpveytgbtler`).
+- **Cómo se midió:**
+  ```bash
+  grep '^NEXT_PUBLIC_REEBOK_SUPABASE_URL' .env.local
+  # → https://rspocgqhtpveytgbtler.supabase.co
+  grep '^REEBOK_SERVICE_ROLE_KEY' .env.local   # (no existe)
+  ```
+- **Por qué importa:** es el error que hizo que el catálogo de Reebok **no estuviera en el
+  respaldo** creyendo que sí. La tabla se corrigió y se anotó que `products` e `inventory` **ya
+  entraron** al backup (`src/app/api/cron/backup/route.ts:272-276`).
+
+## 4. 🔴 Las sugerencias de cliente del pedido cambiaron de fuente
+
+- **Decía:** *«El directorio manual · `directorio_clientes` … el `clientes-search` que sugiere
+  el nombre al escribirlo»*.
+- **Es:** desde el commit `4a4a9605` (5-sep-2026) lee **`clientes_master`**, por CÓDIGO y sin
+  ofrecer ausentes: `.eq("deleted", false).is("ausente_desde", null)`. `directorio_clientes`
+  quedó **sin un solo lector** (33 filas, congelada, sigue en el respaldo). `/api/directorio`
+  se borró.
+- **Cómo se midió:** lectura completa de
+  `src/app/api/catalogo/[marca]/clientes-search/route.ts`, `git show 4a4a9605`,
+  `grep -rn directorio_clientes src`, `ls src/app/api/directorio` (no existe) y
+  `select count(*) … from clientes_master` (150 vivas · 148 ofrecibles · 2 ausentes).
+- **Por qué importa:** cambia **a quién le puede armar un pedido un vendedor**. Antes eran 33
+  contactos con 3 de los 10 mayores deudores ausentes; ahora son los 148 del grupo.
+
+## 5. ⚠️ Las cuatro tablas de productos NO tienen las mismas columnas
+
+- **Decía:** *«`sku`, `name`, `price`, `existencia`, `disponibilidad`, `stock` … 100% llenas en
+  las 4»*, y en `foto_manual` solo hablaba de Tommy y Reebok.
+- **Es:** `products` (Reebok) **no tiene `stock`**. `calvin_products` **no tiene `foto_manual`**.
+  Es una divergencia real entre marcas que no estaba escrita en ninguna parte.
+- **Cómo se midió:** `information_schema.columns` para las cinco tablas, no el código.
+- **Por qué importa:** un `select` que enumere `stock` contra Reebok, o `foto_manual` contra
+  Calvin, revienta. Y es exactamente la clase de suposición que la doc estaba induciendo.
+
+## 6. ⚠️ Cifras que se movieron solas entre el 4 y el 5 de septiembre
+
+| Dato | 4-sep | 5-sep | Consulta |
+|---|---:|---:|---|
+| Fichas de `active_shoes` con `ficha_at` | 1.200 | **1.408** | `count(*) filter (where ficha_at is not null)` |
+| `switch_articulo_info` (total) | 16.633 | **16.658** | `count(*)` |
+| `switch_articulo_diario` | 203.854 | **204.010** | `count(*)` |
+| `switch_ingresos_mercancia` | 35.519 | **35.572** | `count(*)` |
+| Corridas `catalogo_reebok` | 186 | **187** | `switch_sync_log` |
+| Corridas `catalogo_tommy` | 167 | **168** | ídem |
+| Corridas `catalogo_joybees` | 183 | **184** | ídem |
+| Corridas `catalogo_calvin` | 124 | **125** | ídem |
+| `products.gender` male / female | 231 / 137 | **230 / 138** | `group by gender` |
+| Valores de `marca` desconocidos en fichas Reebok | 2 | **3** (entró `GENERAL`, 3 artículos) | `group by marca` |
+
+Ninguna es un error de la doc: es que **el sistema se mueve todos los días**. Están anotadas
+para que la próxima medición sepa cuál es el ritmo normal y cuál sería una anomalía.
+
+## 7. ⚠️ Precisión sobre `pedidos-unificado`
+
+- **Decía:** *«`pedidos-export` sí lo sigue usando — el Excel sale de ahí»*, lo que se lee como
+  «una pantalla llama a ese endpoint».
+- **Es:** `pedidos-export` **no llama al endpoint**: lee directamente la misma **vista**
+  (`cfg.unificadoView` → `<marca>_pedidos_unificado_vw`) en su propio handler
+  (`pedidos-export/route.ts:54,60`). Ninguna pantalla hace `fetch` a `/pedidos-unificado`.
+- **Cómo se midió:** `grep -rn "pedidos-unificado" src/app src/components src/lib` y lectura
+  del handler.
+
+## 8. ⚠️ «Ocho usuarios tienen la puerta de Referencia» — son SEIS
+
+- **Decía:** *«Ocho usuarios en total tienen la puerta»*.
+- **Es:** **seis**. `fg_users` tiene **11** usuarios (los 11 activos), y solo 6 llevan un rol de
+  `REFERENCIA_ROLES`: daniel y alberto (admin), rey, edwin y rodrigo (vendedor), y Bodega.
+- **Cómo se midió:** `select name, role, active from fg_users order by role, name;`
+- **Por qué importa:** poco por sí solo, pero es exactamente el tipo de número que se escribe de
+  memoria y después se cita como medido.
+
+## 9. ⚠️ El cron de limpieza del Depurador YA sembró su heartbeat
+
+- **Decía:** *«Está en `SEED_TOLERANT_CRONS` hasta que siembre su primera fila — al 4-sep-2026
+  **todavía no la tiene**»*.
+- **Es:** ya la tiene. Corrió a su hora el 5-sep a las **03:20:13 UTC** (`20 3 * * *`), o sea
+  que el watchdog de crons ya lo vigila de verdad. Corrió sobre un bucket vacío, así que no
+  borró nada.
+- **Cómo se midió:**
+  ```sql
+  select cron_name, last_success_at from cron_heartbeats
+   where cron_name ilike '%depurador%' or cron_name ilike '%catalogo%' order by cron_name;
+  -- cleanup-depurador-archivos  2026-09-05 03:20:13 UTC
+  -- calvin/joybees/reebok/tommy-catalogo + catalogos-fotos-nuevos:*  todos del 5-sep
+  -- catalogos-fotos-resumen  31-ago (es SEMANAL, lunes: correcto)
+  ```
+
+## 10. ⚠️ Quedan 4 pedidos de prueba que la migración no alcanzó
+
+- **No lo decía nadie.** La migración solo lista ids de Calvin y Joybees.
+- **Es:** siguen en producción `PED-020` y `PED-021` (Reebok, «PRUEBA-BOT») y `TOM-012` y
+  `TOM-013` (Tommy, «PRUEBA t160…»). Los cuatro `deleted = true` y en `borrador`, o sea
+  **invisibles en toda pantalla** — pero están en la base y en el respaldo.
+- **Cómo se midió:**
+  ```sql
+  select order_number, client_name, status, deleted from reebok_orders
+   where client_name ilike '%prueba%' or vendor_name = 'medicion';
+  ```
+- **Qué hacer:** nada, salvo que Daniel lo pida. Queda escrito para que no se «descubra» otra vez.
+
+---
+
+## Lo que se comprobó y estaba BIEN
+
+Para que quede claro qué se verificó y no solo qué se corrigió. Todo esto se volvió a medir el
+5-sep-2026 y **coincide**:
+
+**Catálogos**
+- Las 4 marcas y su empresa de Switch (`marcas.ts`: `active_shoes` · `joystep` · `fashion_shoes`
+  · `vistana`) y sus prefijos (`PED` · `JBP` · `TOM` · `CKP`).
+- Los 4 catálogos: 391 · 552 · 94 · 83 productos, con los mismos activos, sin foto y ocultos.
+- Los **52 envíos a Switch, los 52 en `verificado`**, con las 3 cotizaciones de Tommy y
+  `error_detalle` vacío al 100%.
+- El **índice parcial único del at-most-once** en las 4 tablas (`pg_indexes`), con el
+  `btree(estado)` extra solo en Reebok.
+- `badge` 0 de 1.120 · `keep_visible` nunca `true` · `nombre_manual` 0 · `bulto_pzas` 51/552 en
+  Tommy y 0/94 en Calvin · `client_email` y `comment` vacías · `is_preorder` 0 de 316.
+- Los 23 pedidos del link (18 Reebok · 4 Joybees · 1 Calvin · **0 Tommy**), 9 sin nombre en Reebok.
+- `calvin_pedidos_publicos` es la única sin `stock_confirmacion` (14 columnas contra 15).
+- `fg_catalogo_publico_switch` 0 filas · `reebok_cart` 0 filas · `fg_user_switch_vendedor` 28.
+- `TCKCTA` con `cliente_switch_id = 1` en las 8 empresas, con los nombres documentados.
+- `inventory` con `size = 'UNICA'` en las 391 filas.
+- Las **16 entradas de cron** en `vercel.json`, hora por hora, y las 4 corridas de hoy.
+- `MAX_PAGES = 250` · `PER_PAGE = 50` · `STOCK_CONCURRENCIA = 8` · `SKU_CONCURRENCIA = 4`.
+- `sync-catalogo.ts` **no llama a `/apiarticulos/tallacolor`** — el único llamador es
+  `switch-envio.ts`. (O sea: los puntos 2 y 3 de «Contradice a la documentación» siguen vigentes.)
+- Las 4 listas de roles de `src/lib/catalogo/roles.ts`, palabra por palabra, y su reflejo en
+  `role_permissions`.
+- Los 4 endpoints sin llamadores (`joybees/seed`, `reebok/stats`, `reebok/pedidos-publicos`,
+  `reebok/inventory/bulk`).
+- `importarTab` en `true` **solo en Joybees** (`marcas-ui.tsx:1127`).
+- `DIAS_VENTANA_COMPROBANTES = 90`.
+- Las 59 filas de `activity_logs` del módulo y las 24 huérfanas de «camisetas».
+- Los heartbeats de los 4 crons de catálogo + los 4 de `catalogos-fotos-nuevos:*`, todos del
+  5-sep; `catalogos-fotos-resumen` del 31-ago (es semanal, los lunes: correcto).
+
+**Depurador**
+- `OUT_COLS` = **25 columnas**, en ese orden exacto, y `TEXT_COLS = [0,1,2]`.
+- El fixture `src/__tests__/fixtures/plantilla-switch-articulos.xlsx`: **existe**, 10.305 bytes,
+  MD5 `b622f171713642a0393b3c95c7f30de7` — el mismo de las 8 empresas.
+- Las **3 pestañas** y sus 7 vistas, con `descripciones` solo admin, y los 7 redirects viejos.
+- `MARCA_CATALOGO` = **33** marcas (12 CK · 12 TH · 9 KL) y `MARCA_FIXES` = **9** correcciones.
+- `validarDivisor`: 0 ó **0.10 – 1.00**.
+- `COMPANIAS_DEPURADOR` = las 6 (las 4 destino + Active Shoes + Multifashion).
+- Las tablas: `carga_history` 140 · `marca_formulas` 22 · `marca_rubro_formulas` 18 ·
+  `tienda_*` 0 y 0 · `depurador_descripciones` 281.
+- El uso: Angela 76 · andrea 47 · daniel 17.
+- `calcHint()` y `convertTemporada()` siguen **sin un solo llamador**.
+- El cron `cleanup-depurador-archivos` en `vercel.json` a las `20 3 * * *`.
+
+**Reebok — la clasificación**
+- `CATEGORIA_POR_MARCA` (FOOTWEAR · APPAREL · HARDWARE), `CATEGORIA_POR_RUBRO` (SHOES · APPAREL
+  · SHORTS · SOCKS · BAGS · **HEADWEAR**) y `GENERO_POR_SUBRUBRO` (MALE · MEN · FEMALE · WOMEN ·
+  KIDS), con `UNISEX` resuelto aparte y los cajones neutros `otros` / `sin_clasificar`.
+- El **ESPEJO** del Depurador: `REEBOK_CATEGORY_ESPERADAS` y `REEBOK_DEPARTMENT_ESPERADOS`
+  (`src/lib/depurador/reebok.ts:175,187`) siguen alineados con ese mapa.
+- Los 187 artículos de `active_shoes` con existencia > 0 tienen **los 187** su `ficha_at`.

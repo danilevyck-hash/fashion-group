@@ -1,9 +1,24 @@
 # Grupo «Ventas y clientes» — referencia por módulo
 
 > Documento de REFERENCIA, no de sugerencias (esas viven en `docs/eficiencia/01-ventas-y-clientes.md`).
-> Escrito el 4-sep-2026. Lo medido contra producción lleva la fecha; lo que no se pudo medir lo dice.
+> Escrito el 4-sep-2026. **Verificado y re-medido contra producción el 5-sep-2026**, afirmación por
+> afirmación: cada cifra importante lleva debajo la consulta que la produjo, para poder repetirla.
+> Lo que estaba mal está listado al final, en **«Lo que estaba mal»**.
 > Las reglas generales del sistema (roles, empresas, canales de Telegram, `db-max-rows`) están en
 > `CLAUDE.md`; aquí va lo que le falta.
+
+> 🔑 **Cómo se midió.** Todo lo de este documento sale de la Management API de Supabase contra el
+> proyecto `rspocgqhtpveytgbtler`, con `count(*)` en SQL (nunca contando filas devueltas: `db-max-rows`
+> = 1000 y corta en silencio). El molde:
+> ```bash
+> TOKEN=$(grep '^SUPABASE_ACCESS_TOKEN=' .env.local | cut -d= -f2)
+> curl -s -X POST "https://api.supabase.com/v1/projects/rspocgqhtpveytgbtler/database/query" \
+>   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+>   -d '{"query":"select count(*) from clientes_master where deleted is not true"}'
+> ```
+> Lo del CÓDIGO se verifica con `grep` sobre `src/` buscando la llamada real (`.from("tabla")`,
+> `fetch("/api/…")`), **nunca el nombre suelto en un comentario**: es exactamente así como esta
+> documentación acumuló las mentiras que se corrigieron hoy.
 
 Cubre cinco de los diez módulos del grupo **Ventas y clientes** (`src/lib/modules.ts`,
 `group: "ventas-clientes"`):
@@ -33,11 +48,19 @@ El middleware (`src/middleware.ts`) **no mira módulos ni roles**: solo valida q
 `cxc_session` esté firmada y que la fila de `user_sessions` no esté revocada. Todo el permiso por
 módulo vive en la página y en la ruta.
 
-⚠️ Dos números de `CLAUDE.md` que ya no cuadran y afectan a todos los módulos de abajo:
-`vercel.json` tiene **80 entradas de cron**, no 79 — la que falta en la tabla es
-`/api/cron/cleanup-depurador-archivos` (`"20 3 * * *"`, 03:20 UTC) —, y **las siete migraciones
-marcadas «pendiente de aplicar» ya corrieron** (medido el 4-sep-2026 contra
-`supabase_migrations.schema_migrations`), más otras seis posteriores que la tabla no lista.
+⚠️ Dos números que afectan a todos los módulos de abajo, re-medidos el **5-sep-2026**:
+`vercel.json` tiene **82 entradas de cron** (eran 80 el 4-sep; entraron `prestamos-caducan`
+`"15 13 * * *"` y `sync-clientes-boston` `"10 7 * * 0"`, la única entrada SEMANAL que toca Switch).
+Y **TODAS las migraciones del repo están aplicadas hasta `20260928120000` inclusive** — ninguna
+queda «pendiente», incluidas las tres de hoy: `20260926120000` (contacto en `clientes_master`),
+`20260927120000` (canal en `cxc_emails_enviados`) y `20260928120000` (tramos finos de Boston).
+
+```sql
+-- las 82 entradas: python3 -c "import json;print(len(json.load(open('vercel.json'))['crons']))"
+select version, name from supabase_migrations.schema_migrations where version >= '20260920' order by version;
+-- → …20260926120000 clientes_master_contacto · 20260927120000 cxc_envios_canal
+--   · 20260928120000 aging_boston_tramos_finos   (5-sep-2026)
+```
 
 ---
 
@@ -280,7 +303,9 @@ consuma, y sus enlaces salientes (`/ventas`, `/cxc`, `/proveedores`, `/referenci
   lee la tarjeta **Disponibilidad**.
 - 🔴 **«solo se queda CXC de Boston en su tab, sin que toque ni se mezcle con los otros. Déjalo en
   Vista General»** y **«Boston también quiero verlos en ventas-resumen»** (2-sep-2026) → **la PLATA
-  de Boston sigue sumando en este tablero** ($463.898,47 = 7,4 % de la venta 2026); lo que salió de
+  de Boston sigue sumando en este tablero** ($472.856,97 = 7,54 % de la venta 2026 al 5-sep; eran
+  $463.898,47 = 7,43 % al 2-sep, la cifra que citan `CLAUDE.md` y el post-mortem — se reprodujo
+  exacta con el corte de esa fecha, así que la cita es buena y solo estaba vieja); lo que salió de
   las superficies del grupo son sus **clientes**. «Sus ventas suman, pero sus clientes no se ven.»
 - **«no aparezca nunca»** (30-jul-2026, sobre encontrar por nombre el saldo de un cliente de Boston)
   → el buscador ⌘K filtra por inclusión a las 6 del grupo, **y los totales de Ventas y de Vista
@@ -366,8 +391,22 @@ y ese dato vive fuera de Supabase.
   `is_owner = true`) y **alberto**. `vista-general` **no está en ninguna fila de
   `role_permissions`**, y no hace falta: `getVisibleModules` devuelve todo para `admin` sin mirar la
   tabla.
-- **Logins en los últimos 30 días:** daniel **74** (267 en 90 días, último 3-sep-2026) · alberto
-  **1** (15 en 90 días, último 1-sep-2026). Sesiones vivas: daniel 40, alberto 1.
+- **Sesiones abiertas en los últimos 30 días** (re-medido el 5-sep-2026): daniel **110** (340 en 90
+  días, última el 3-sep-2026) · alberto **1** (15 en 90 días, última el 1-sep-2026). Sesiones vivas
+  (`revoked is not true`): daniel **40**, alberto **1**.
+  ⚠️ El «74» que decía este documento el 4-sep **no se reproduce**: con una ventana de 30 días que
+  avanzó un día el número tendría que BAJAR, no subir a 110. Se conserva la consulta para que la
+  próxima medición sea comparable:
+  ```sql
+  select user_name,
+    count(*) filter (where created_at >= now() - interval '30 days') d30,
+    count(*) filter (where created_at >= now() - interval '90 days') d90,
+    count(*) filter (where revoked is not true) vivas
+  from user_sessions group by 1 order by 2 desc;
+  ```
+  🔴 **`user_sessions` es lo único que hay: no mide aperturas de pantalla, mide inicios de sesión.**
+  Y `activity_logs` **no tiene columna de usuario** —solo `user_role`—, así que atribuir una fila de
+  esa tabla a una PERSONA es una inferencia, nunca una medición.
 - 🔴 **El módulo no escribe NADA.** `src/app/api/vista-general/` no existe y
   `/api/dashboard/vista-general` solo tiene `GET`. Cero filas en `activity_logs` con `entity_type` de
   vista general. **Cuántas veces se abre: no medible.**
@@ -396,12 +435,20 @@ recargar los números. La flecha `›` queda apagada en el mes en curso. Escribe
 Y `?mes=basura` tiene que dar el error «Mes inválido. Usa el formato YYYY-MM.».
 
 **2. Que el CXC cuadra al centavo con `/cxc`.** La tarjeta «Por cobrar (CXC)» tiene que dar
-**exactamente** el mismo total que el chip «Total» de la tira de `/cxc` con «Todas» puesto (al
-4-sep-2026: **$3.685.289,04**, 211 clientes). Esa igualdad es a propósito: las dos leen la **vista
-viva**, no la materializada.
+**exactamente** el mismo total que el chip «Total» de la tira de `/cxc` con «Todas» puesto.
+Al **5-sep-2026: $3.676.935,55 en 100 CLIENTES** (la vista trae 211 FILAS, una por empresa donde el
+cliente debe; la pantalla las consolida por `nombre_normalized`). Esa igualdad es a propósito: las
+dos leen la **vista viva**, no la materializada.
+
+```sql
+select count(*) filas, count(distinct codigo) clientes, round(sum(total),2) total
+from switch_estadocuenta_aging;
+-- → 211 | 100 | 3676935.55   (5-sep-2026)
+```
 
 **3. Que Proveedores cuadra.** «Por pagar (CXP)» tiene que dar lo mismo que «Por pagar · grupo» de
-`/proveedores` (**$5.104.077,19**). Si no cuadra, alguien filtró `saldo_total > 0` en algún lado: el
+`/proveedores` (**$5.199.705,82** al 5-sep-2026; eran $5.104.077,19 el 4-sep — este total se mueve
+todos los días con el sync de las 09:30). Si no cuadra, alguien filtró `saldo_total > 0`: el
 total incluye los saldos a favor a propósito.
 
 **4. Que una empresa sin gasto DICE por qué.** En «Gastos por empresa», las que no tienen número
@@ -969,12 +1016,15 @@ Misma advertencia: **no hay telemetría de pantallas**. Medido el 4-sep-2026:
 - **Quién puede entrar a `/comisiones`:** los 2 admin + **andrea** y **Angela** (las dos secretarias
   tienen `comisiones` en su `modulos_override`) + el usuario **`Contabilidad`** (lo tiene por rol
   desde el 26-ago-2026). Son **5 personas**.
-- **Logins en 30 días:** daniel 74 · Angela 49 · andrea 61 · Contabilidad 31 · alberto 1.
+- **Sesiones abiertas en 30 días** (re-medido el 5-sep-2026, `user_sessions`): daniel **110** ·
+  Bodega 79 · andrea **59** · Angela **48** · rey 32 · Contabilidad **31** · jennifer 26 · edwin 8 ·
+  david 5 · alberto **1**. (El «74» de daniel y el «49» de Angela del 4-sep no se reproducen; los
+  demás sí, al número.)
 - **Lo que el módulo escribió, y es lo ÚNICO vivo de los cinco módulos de este documento:**
 
 | Tabla | Filas | Última escritura | Quién |
 |---|---|---|---|
-| `comision_exclusion` | 18 (12 activas) | **4-sep-2026** | **`daniel`** las 18, todas en los últimos 2 días |
+| `comision_exclusion` | 18 (**12 activas**, 6 apagadas) | **4-sep-2026** | **`daniel`** las 18, todas en los últimos 3 días |
 | `comision_vendedor_tasa` | 5 | **4-sep-2026 00:45** (Reynaldo a 1 %/1 %) y **01:28** (Rey Stoute a `activo=false`) | sin columna de autor |
 | `comision_descuentos_fijos` | 2 | creadas el **8-jul-2026**; el `updated_at` del 4-sep es el trigger de canonicalización, no una edición | sin autor |
 | `comision_descuento_excepciones` | 2 | **14-jul-2026** | sin autor |
@@ -982,10 +1032,15 @@ Misma advertencia: **no hay telemetría de pantallas**. Medido el 4-sep-2026:
 
   O sea: **la pestaña Comisiones es lo único del módulo que deja rastro**, y ese rastro es de Daniel,
   de los últimos dos días.
-- **Que el dato llegue:** en 30 días, `facturas` **1.370 corridas (45,7/día, 8 empresas, 0 errores)** ·
-  `recibos` **964 (32,1/día, 1 error)** · `articulos` 248 · `costo` 242 · `utilidad` 180 ·
-  `articulo_info` 154 · `factura_lineas` 72. Última corrida buena al 5-sep 03:10 UTC: facturas hace
-  ~4 h, recibos hace ~4 h, utilidad hace 20 h, `articulo_info` hace ~22 h.
+- **Que el dato llegue** (re-medido el 5-sep-2026 16:30 UTC): en 30 días, `facturas` **1.376 corridas
+  (45,9/día, 8 empresas, 0 errores)** · `recibos` **963 (32,1/día, 1 error)** · `ventas_tipos` 491 ·
+  `articulos` 248 · `costo` 242 · `utilidad` 180 · `articulo_info` **160** · `factura_lineas` **78**.
+  Últimas corridas buenas: facturas 16:24 UTC de hoy, recibos 15:17, utilidad 07:02,
+  `articulo_info` 04:53.
+  ```sql
+  select sync_type, count(*) n, count(*) filter (where status='error') err, max(finished_at) ult
+  from switch_sync_log where started_at >= now() - interval '30 days' group by 1 order by 2 desc;
+  ```
 
 ## Qué papeles y Excel produce
 
@@ -1074,12 +1129,12 @@ entra por el **panel web con sesión**, y eso cambia el modo de fallar.
   ruta de `/api/ventas`**: los usan los syncs y `clientes-ytd`. No están muertos, pero no viven aquí.
 
 **Contradicciones medidas**
-- 🔴 **Las siete migraciones que `CLAUDE.md` marca «pendiente de aplicar» están TODAS aplicadas**
-  (medido el 4-sep-2026 contra `supabase_migrations.schema_migrations`): `20260906120000`,
-  `20260909120000`, `20260910120000`, `20260911120000`, `20260912120000`, `20260913120000` y
-  `20260915120000`. Y hay seis posteriores aplicadas que `CLAUDE.md` no menciona
-  (`20260914120000`, `20260916120000`, `20260918120000`, `20260919120000`, `20260920120000`,
-  `20260921120000`).
+- 🔴 **Ninguna migración del repo queda pendiente.** Re-medido el 5-sep-2026 contra
+  `supabase_migrations.schema_migrations`: están aplicadas **todas hasta `20260928120000`**, o sea
+  las siete que `CLAUDE.md` marca «pendiente» (`20260906`, `20260909`, `20260910`, `20260911`,
+  `20260912`, `20260913`, `20260915`), las seis posteriores que no menciona (`20260914`, `20260916`,
+  `20260918`, `20260919`, `20260920`, `20260921`) y las siete de estos dos días (`20260922` a
+  `20260928`). El sufijo de todas es `120000`.
 - ✅ **CERRADO el 4-sep-2026 — la píldora «Sincronizado» del Resumen vigilaba 3 empresas de 8, y se
   quitó.** `SWITCH_FACTURAS_EMPRESA_KEYS` era `["active_shoes","active_wear","american_classic"]`
   mientras el cron cubre **las 8**, así que Vistana, Fashion Wear, Fashion Shoes, Joystep o Boston
@@ -1091,10 +1146,15 @@ entra por el **panel web con sesión**, y eso cambia el modo de fallar.
 - 🔴 **`CLAUDE.md` dice que la fila de tasa de Rey Stoute Aguas es «decisión pendiente de Daniel».**
   Ya no: la migración `20260916120000_retirar_rey_stoute_aguas` corrió y la fila está con
   `activo = false` desde el 4-sep-2026.
-- **`CLAUDE.md` dice que hay 17 exclusiones activas (11 al aplicar la migración).** Medido el
-  4-sep-2026: **18 filas, 12 activas y 6 apagadas**. La nº 18 (creada ese día por `daniel`) es la
-  **primera exclusión asimétrica del sistema**: Edwin, cliente `D-81` de Vistana, `excluye_venta =
-  false` y `excluye_cobro = true`. La regla nueva ya está en uso.
+- **`CLAUDE.md` dice que hay 17 exclusiones activas (11 al aplicar la migración).** Re-medido el
+  5-sep-2026: **18 filas, 12 activas y 6 apagadas** (las 6 con `desactivado_por = 'migracion-alias-v8'`).
+  La nº 18 (creada el 4-sep por `daniel`) es la **primera exclusión asimétrica del sistema**: Edwin,
+  cliente `D-81` de Vistana, `excluye_venta = false` y `excluye_cobro = true`. La regla nueva ya está
+  en uso, así que el «11 activas» de `CLAUDE.md` quedó viejo el día después de escribirse.
+  ```sql
+  select empresa_key, cliente_codigo, vendedor, activa, excluye_venta, excluye_cobro
+  from comision_exclusion order by activa desc, empresa_key, cliente_codigo;
+  ```
 - **`CLAUDE.md` menciona una cuarta grafía `"REINDALDO "` con espacio final en
   `comision_vendedor_alias`.** No existe en la tabla (5 filas medidas): el `TRIM` de
   `comision_vendedor_canonico()` la resuelve sin fila propia.
@@ -1103,7 +1163,9 @@ entra por el **panel web con sesión**, y eso cambia el modo de fallar.
   (`src/lib/grupo-resumen-mensual.ts`). El mismo bloque de `CLAUDE.md` lo pone en 📊 NEGOCIO cuando
   hoy sale por `enviarNegocioPrivado`.
 - **El comentario de `src/lib/ventas/productos.ts:14-15` dice que Boston no se backfilleó en
-  `switch_articulo_diario`.** Medido: **18.016 filas de `confecciones_boston`, desde el 14-oct-2022**.
+  `switch_articulo_diario`.** Medido el 5-sep-2026: **18.064 filas de `confecciones_boston`, desde el
+  14-oct-2022 hasta el 4-sep-2026** (eran 18.016 el 4-sep — la tabla sigue creciendo, o sea que el
+  cron SÍ escribe Boston todos los días).
   Boston no está en el selector de Productos por otra razón (`PRODUCTOS_EMPRESA_KEYS` no lo incluye),
   no por falta de datos.
 - 🔴 **`docs/switch-flujo.md` está tres versiones atrás en Comisiones.** Su §3 dice
@@ -1128,14 +1190,27 @@ entra por el **panel web con sesión**, y eso cambia el modo de fallar.
 - `switch_facturas.sucursal_nombre` tiene **dos grafías del mismo valor**: `PRINCIPAL` (54.271) y
   `Principal` (195). Ninguna pantalla la usa hoy, pero cualquier agrupación futura las partiría.
 - `switch_costo_diario` tiene **200 filas de fechas FUTURAS** (6 a 30-sep-2026, 8 empresas × 25 días)
-  con venta y costo en 0 — el reporte de Switch devuelve el mes calendario entero. Y **732 de sus
-  1.223 filas (60 %) tienen `costo_total = 0`**. Esa tabla no alimenta ninguna pantalla; su único
-  lector es el cuadre mensual.
+  con venta y costo en 0 — el reporte de Switch devuelve el mes calendario entero (`max(fecha)` =
+  **30-sep-2026**). Y **726 de sus 1.223 filas (59 %) tienen `costo_total = 0`**. Esa tabla no
+  alimenta ninguna pantalla; su único lector es el cuadre mensual.
+  ```sql
+  select count(*) total, count(*) filter (where fecha > current_date) futuras,
+         count(*) filter (where costo_total = 0) costo_cero, max(fecha) from switch_costo_diario;
+  -- → 1223 | 200 | 726 | 2026-09-30   (5-sep-2026)
+  ```
 - `switch_recibos` **no tiene llave natural**: su único índice único es la PK `id`. Medido, 2.604
   grupos de `(empresa, fecha, cliente, monto, vendedor_registro)` tienen más de una fila. Es
   coherente con el sync de delete+insert, pero significa que no hay forma de deduplicar un recibo.
-- `switch_articulo_info`: al 4-sep-2026 hay **1.200 fichas traídas de las 1.763 de `active_shoes`**
-  (`CLAUDE.md` dice 400) y **4.924 artículos con existencia > 0** en total (`CLAUDE.md` dice 5.040).
+- `switch_articulo_info`: al **5-sep-2026** hay **1.408 fichas traídas de las 1.763 de `active_shoes`**
+  (`CLAUDE.md` dice 400; eran 1.200 ayer — drenan ~200/día, como estaba previsto) y **4.924 artículos
+  con existencia > 0** en total sobre 16.658 filas (`CLAUDE.md` dice 5.040 sobre 16.619).
+  🔑 **Las 1.408 fichas son TODAS de `active_shoes`**: ninguna otra empresa tiene una sola.
+  ```sql
+  select count(*) total, count(*) filter (where existencia > 0) con_existencia,
+         count(*) filter (where ficha_at is not null) fichas,
+         count(*) filter (where empresa_key='active_shoes' and ficha_at is not null) fichas_as
+  from switch_articulo_info;   -- → 16658 | 4924 | 1408 | 1408
+  ```
 
 **Dos caminos para lo mismo**
 - **El botón «Excel» de la barra sigue visible en la pestaña Clientes y baja el archivo del
@@ -1248,7 +1323,27 @@ De arriba abajo:
    la lista de cobro.
 
 **Solo con el filtro «sin pagar» encendido**, cada fila muestra al lado del nombre, en gris chico,
-«no paga hace 298 d» o «nunca ha pagado». En las 100 filas normales no se muestra.
+«no paga hace 298 d» o «nunca ha pagado». En la lista normal no se muestra.
+
+📏 **Cuánto es «N» hoy** (5-sep-2026): de los **94 clientes que deben plata**, **37 no pagan hace más
+de 90 días** —30 con un pago viejo y **7 que nunca pagaron**— y entre los 37 suman **$647.944,31**.
+El más viejo lleva **911 días** sin pagar. El umbral es `DIAS_SIN_PAGAR_UMBRAL = 90`
+(`src/lib/cxc/sin-pagar.ts`), y `avisaSinPagar` trata «nunca pagó» (`null`) como que SÍ avisa.
+
+```sql
+with cli as (select codigo, sum(total) total from switch_estadocuenta_aging group by 1 having sum(total) > 0),
+     p as (select cliente_codigo codigo, max(ultimo_pago_fecha) ult
+           from switch_ultimo_pago_cliente_v2
+           where empresa_key in ('vistana','fashion_wear','fashion_shoes','active_wear','active_shoes','joystep')
+           group by 1)
+select count(*) con_saldo,
+       count(*) filter (where p.ult is null) nunca_pago,
+       count(*) filter (where p.ult < current_date - 90) sin_pagar_90,
+       round(sum(cli.total) filter (where p.ult is null or p.ult < current_date - 90),2) monto,
+       max(current_date - p.ult) dias_max
+from cli left join p using (codigo);
+-- → 94 | 7 | 30 | 647944.31 | 911   (5-sep-2026)
+```
 
 **Al tocar la fila** se despliega `ContactPanel`:
 - **El desglose por empresa se quedó EXACTAMENTE como estaba** (Daniel lo eligió así): `Por vencer ·
@@ -1288,9 +1383,33 @@ textual: *«todo»*. La regla vive en el servidor.
 
 Casilla por fila + casilla en el encabezado. 🔴 **UN correo por DIRECCIÓN, no por cliente**: los que
 comparten dirección reciben **un solo correo con UN PDF** que trae una hoja por cliente y el total al
-final. Medido: de los 79 con correo, **31 comparten 9 direcciones → 57 correos**;
-`oficina@citymoda.store` lo comparten **13 clientes** ($402.376,67). Los que no tienen correo **no
-abortan el lote**: se manda a los que se puede y se dicen **por nombre** los que quedaron fuera.
+final. Los que no tienen correo **no abortan el lote**: se manda a los que se puede y se dicen **por
+nombre** los que quedaron fuera. La agrupación la hace el **servidor** (`/api/cxc/cobrar-lote`), no
+el navegador: la barra solo la muestra.
+
+📏 **Medido el 5-sep-2026 sobre los 100 clientes de la cartera** (el `coalesce` es el mismo orden que
+usa la ruta: override → `clientes_master.email` → correo de la vista):
+**21 no tienen correo · 79 sí · 31 de esos 79 comparten 9 direcciones → salen 57 correos, no 79.**
+`oficina@citymoda.store` lo comparten **13 clientes** que deben **$402.376,67** entre todos;
+`contabilidad@citymall.com.pa`, los dos City Mall ($480.784,76).
+
+```sql
+with cli as (
+  select a.codigo, sum(a.total) total,
+    lower(trim(coalesce(max(nullif(trim(cm.email),'')), max(nullif(trim(a.correo),''))))) mail
+  from switch_estadocuenta_aging a
+  left join clientes_master cm on cm.codigo = a.codigo and cm.deleted is not true
+  group by a.codigo),
+ g as (select mail, count(*) n from cli where mail is not null group by 1)
+select (select count(*) from cli) clientes,
+       (select count(*) from cli where mail is null) sin_correo,
+       (select count(*) from g) correos_a_enviar,
+       (select count(*) from g where n>1) direcciones_compartidas,
+       (select sum(n) from g where n>1) clientes_compartiendo;
+-- → 100 | 21 | 57 | 9 | 31   (5-sep-2026)
+```
+⚠️ Esta consulta agrupa **por `codigo`**. Corriéndola sobre las 211 FILAS da 180 con correo y los
+mismos 57 destinos, un número que no significa nada — es el error de grano que este documento tenía.
 
 ### El cajón «Estado de cuenta» (`Ver los documentos`)
 
@@ -1302,9 +1421,19 @@ esa sección). La tabla lleva **encabezados de columna** —`Documento` (número
 era cuál.
 
 🔴 **Lo chico se agrupa POR MONTO (< $50), nunca por tipo de documento**: se pliega en una línea
-«N documentos de menos de $50 · $X — ver», que se despliega. Medido: **36 de los 110 documentos de
-City Mall Paso Canoa** valen menos de $50 y suman **$227,20**. Agrupar por tipo escondería notas de
-débito reales de **$5.000**.
+«N documentos de menos de $50 · $X — ver», que se despliega. Verificado el 5-sep-2026: **36 de los
+110 documentos de City Mall Paso Canoa (D-25)** valen menos de $50 y suman **$227,20** — exacto.
+Agrupar por tipo escondería notas de débito reales de **$5.000**.
+
+```sql
+select cliente_codigo, count(*) docs,
+       count(*) filter (where abs(saldo) < 50) chicos,
+       round(sum(abs(saldo)) filter (where abs(saldo) < 50),2) suma_chicos
+from switch_estadocuenta
+where empresa_key in ('vistana','fashion_wear','fashion_shoes','active_wear','active_shoes','joystep')
+  and cliente_codigo = 'D-25' and saldo <> 0
+group by 1;   -- → D-25 | 110 | 36 | 227.20
+```
 
 **El pie dice «Cobrar»** (era «Compartir»/«Descargar PDF») y abre la misma hoja: hasta hoy, desde el
 papel no se podía mandar el papel.
@@ -1317,14 +1446,32 @@ desglose: tocar un cliente va **directo a sus documentos**, con los mismos encab
 agrupación de lo chico por monto; sus **3 últimos pagos** viven dentro de ese cajón.
 
 Los tres tramos que se ven son los mismos del grupo (`d0_90 / d91_120 / d121_plus`, sobre
-`switch_estadocuenta_aging_boston`); el **detalle fino** del `title` llega con la migración
-`20260928120000`. Un chip marca al cliente que **también existe en el grupo** — es solo una etiqueta:
-no se suma nada. La coletilla a la derecha dice «Confecciones Boston · se lleva aparte».
+`switch_estadocuenta_aging_boston`); el **detalle fino** del `title` ✅ **ya está**: la migración
+`20260928120000` corrió el 5-sep-2026 y la vista pasó de 10 a **17 columnas**, con los siete tramos
+finos (`d0_30 · d31_60 · d61_90 · d121_180 · d181_270 · d271_365 · mas_365`) **al lado** de los tres
+gruesos, no en vez de ellos. Un chip marca al cliente que **también existe en el grupo** — es solo una
+etiqueta: no se suma nada. La coletilla a la derecha dice «Confecciones Boston · se lleva aparte».
 
 ⚠️ **Su hoja «Cobrar» ofrece WhatsApp · Copiar · Ver los documentos, pero NO correo**, y es una
-decisión pendiente de Daniel, no un olvido: de sus 390 clientes con saldo, **272 tienen teléfono pero
-solo 113 correo**, y el texto de cobro del sistema lo firma **Fashion Group**, que no es Boston. El
-mensaje que sí sale lo firma **«Confecciones Boston - Departamento de Cobros»**.
+decisión pendiente de Daniel, no un olvido: de sus **390 clientes en la cartera** (279 con saldo
+positivo), **272 tienen teléfono o celular pero solo 113 correo**, y el texto de cobro del sistema lo
+firma **Fashion Group**, que no es Boston. El mensaje que sí sale lo firma **«Confecciones Boston -
+Departamento de Cobros»**.
+
+```sql
+select count(*) clientes,
+  count(*) filter (where nullif(trim(sc.telefono),'') is not null
+                      or nullif(trim(sc.celular),'') is not null) tel_o_cel,
+  count(nullif(trim(sc.email),'')) correo
+from switch_estadocuenta_aging_boston b
+left join switch_clientes sc
+  on sc.empresa_key='confecciones_boston' and sc.cliente_switch_id = b.cliente_switch_id;
+-- → 390 | 272 | 113   (5-sep-2026)
+```
+🩸 **Y ese contacto está congelado.** `switch_clientes` de Boston tiene sus 4.915 filas con
+`synced_at = 2026-07-30 06:31:07` — **37 días sin refrescarse**. El cron que lo arregla
+(`sync-clientes-boston`) nació hoy y corre **los domingos 07:10 UTC**, así que a la fecha de esta
+medición **todavía no ha corrido ni una vez**. Ver `docs/modulos/03-multifashion-y-boston.md`.
 
 🔴 **Y sigue APARTE**: su cajón tiene **su propia ruta** (`/api/cxc/boston/estado-cuenta`) y no reusa
 el lector del grupo; sus teléfonos y correos salen de `switch_clientes` acotado a Boston, **nunca de
@@ -1341,41 +1488,73 @@ CXC **lee** la cartera de Switch y **escribe** solo anotaciones. Medido el 4-sep
 
 | Fuente | Filas | Grano · llave | Notas |
 |---|---|---|---|
-| `switch_estadocuenta_aging_mv` (materializada) | **211** | `id = md5(company_key + codigo)`, índice único sobre `id` | La lee `/api/cxc/aging`. Trae `materializado_en` = **2026-09-04 21:21:46 UTC** (la frescura que muestra la pantalla) |
-| `switch_estadocuenta_aging` (vista viva) | **211** | mismo grano | El fallback de la ruta si la MV falla. **Medido: `EXCEPT` entre las dos = 0 filas de diferencia.** La usa Vista General a propósito |
-| `switch_estadocuenta` | **2.754** | `UNIQUE (empresa_key, ccte_id)` | La base. La lee `estado-cuenta-data.ts` para el drawer, el PDF y el correo |
-| `switch_estadocuenta_aging_boston` (vista) | **390** | 1 fila por cliente de Boston | Buckets `d0_90 / d91_120 / d121_plus`; Σ = **$190.399,07** |
+| `switch_estadocuenta_aging_mv` (materializada) | **211 filas = 100 clientes** | `id = md5(company_key + codigo)`, índice único sobre `id` | La lee `/api/cxc/aging`. Trae `materializado_en` = **2026-09-05 16:12:26 UTC** (la frescura que muestra la pantalla) |
+| `switch_estadocuenta_aging` (vista viva) | **211 filas = 100 clientes** | mismo grano | El fallback de la ruta si la MV falla. **Medido el 5-sep-2026: `EXCEPT` entre las dos, en las DOS direcciones = 0 filas.** La usa Vista General a propósito |
+| `switch_estadocuenta` | **2.759** | `UNIQUE (empresa_key, ccte_id)` | La base. La lee `estado-cuenta-data.ts` para el drawer, el PDF y el correo |
+| `switch_estadocuenta_aging_boston` (vista) | **390 filas = 390 clientes** (Boston es UNA empresa) | 1 fila por cliente de Boston | Buckets `d0_90 / d91_120 / d121_plus` **+ los siete finos** (`d0_30 … mas_365`) desde `20260928120000`; Σ = **$195.509,25**, 279 con saldo positivo |
 | `clientes_master` | 150 vivas | `UNIQUE (codigo)` | Solo tres columnas, **en vivo**: `email`, `telefono`, `celular` |
 | `switch_ultimo_pago_cliente_v2` (vista) | — | (empresa, cliente) | «Último pago» |
 | `switch_ultima_compra_cliente_v1` (vista) | — | (empresa, cliente) | «Última compra» |
 | `switch_recibos` | 46.717 | **sin llave natural** (solo la PK `id`) | Los últimos 3 pagos, una consulta **por empresa** |
 | `fg_users.associated_company` | 11 usuarios, 1 con empresa | — | El recorte del vendedor |
 
-**Reparto de `switch_estadocuenta` por empresa** (filas · con saldo ≠ 0 · Σ saldo):
-`confecciones_boston` 985 · 920 · $313.002,79 — `fashion_wear` 632 · 299 · $1.287.963,45 —
-`vistana` 504 · 271 · $873.314,59 — `fashion_shoes` 425 · 236 · $946.023,72 —
+🔴 **211 NO ES «211 CLIENTES»: es 211 FILAS, una por (empresa, cliente).** Los clientes DISTINTOS
+son **100**, y 100 es lo que se ve en la pantalla — `useAdminData` consolida por `nombre_normalized`
+antes de pintar. Decir «me deben 211 clientes» es contar seis veces a City Mall.
+De esos 100: **94 deben plata · 6 tienen saldo a favor** (−$1.316,35 entre los seis, en el bloque del
+pie). El mismo dato lo dice el propio código: `HojaCobrar.tsx` y `/api/cxc/cobrar-lote` miden «los
+100 clientes con saldo».
+
+```sql
+select count(*) filas, count(distinct codigo) clientes from switch_estadocuenta_aging;
+-- → 211 | 100   (5-sep-2026)
+with cli as (select codigo, sum(total) t from switch_estadocuenta_aging group by 1)
+select count(*) filter (where t>0) deben, count(*) filter (where t<0) a_favor,
+       round(sum(t),2) total from cli;   -- → 94 | 6 | 3676935.55
+```
+
+**Reparto de `switch_estadocuenta` por empresa, 5-sep-2026** (filas · con saldo ≠ 0 · Σ saldo):
+`confecciones_boston` 990 · 919 · $318.112,97 — `fashion_wear` 632 · 299 · $1.287.963,45 —
+`vistana` 504 · 269 · $864.961,10 — `fashion_shoes` 425 · 236 · $946.023,72 —
 `active_shoes` 91 · 68 · $432.477,13 — `active_wear` 90 · 40 · $323.869,16 —
-`joystep` 27 · 19 · $115.683,25. **`american_classic` = 0 filas.**
+`joystep` 27 · 19 · $115.683,25. **`american_classic` = 0 filas** (retail sin cartera).
 
-**La cartera del grupo, por empresa** (clientes · Σ total de `switch_estadocuenta_aging`):
-`fashion_wear` 49 · $1.199.871,71 — `fashion_shoes` 42 · $851.029,60 — `vistana` 64 · $845.899,35 —
+**La cartera del grupo, por empresa, 5-sep-2026** (filas · Σ total de `switch_estadocuenta_aging`):
+`fashion_wear` 49 · $1.199.871,71 — `fashion_shoes` 42 · $851.029,60 — `vistana` 64 · $837.545,86 —
 `active_shoes` 31 · $413.375,01 — `active_wear` 17 · $310.376,50 — `joystep` 8 · $64.736,87.
-**Total 211 clientes · $3.685.289,04.**
+**Total 211 filas · 100 clientes · $3.676.935,55.**
 
-**Columnas de `switch_estadocuenta` que llegan a medias** (de 2.754): `numero_fiscal` 2.282 (472
-vacías) · `abrev` 1.769 · `saldo_original` 1.769 · `total_original` 1.769. Las 985 que faltan en
-`abrev`/`*_original` son **exactamente las de Boston**, que entra por el reporte web y no por el API.
-`tipo_comprobante` (8 valores): Factura 1.953 · Recibo 369 · Nota de Débito 190 · Nota de Crédito 165
-· Transacción 44 · Saldo Anterior 27 · Tiquete 5 · Recibo Saldo Anterior 1.
+```sql
+select company_key, count(*) filas, round(sum(total),2) total,
+       round(sum(d91_120+d121_180+d181_270+d271_365+mas_365),2) vencido90
+from switch_estadocuenta_aging group by 1 order by 3 desc;
+```
 
-🔴 **Columnas de la vista de aging que NADIE llena** (0 de 211): `upload_id` (es un `NULL::uuid`
-literal en la definición de la vista, herencia del upload de CSV), **`contacto`**, **`distrito`** y
-**`corregimiento`**.
-✅ **`contacto` dejó de estar vacío el 5-sep-2026**: la vista lo sigue devolviendo `''::text`
-hardcodeado, pero `/api/cxc/aging` lo **relee en vivo** de `clientes_master.contacto` —la columna
-nueva de la ficha del cliente (migración `20260926120000`, pendiente)— junto con
-`email/telefono/celular`, y con la misma tolerancia: si la DDL no corrió, se lee sin ella y nada más
-cambia. **Los montos no se tocan**: siguen saliendo de la MV.
+**Columnas de `switch_estadocuenta` que llegan a medias** (de 2.759): `numero_fiscal` 2.287 (472
+vacías) · `abrev` 1.769 · `saldo_original` 1.769 · `total_original` 1.769. Las **990** que faltan en
+`abrev`/`*_original` son **exactamente las de Boston** (990 filas de Boston = 2.759 − 1.769), que
+entra por el reporte web y no por el API.
+`tipo_comprobante` (8 valores): Factura **1.958** · Recibo 369 · Nota de Débito 190 · Nota de Crédito
+165 · Transacción 44 · Saldo Anterior 27 · Tiquete 5 · Recibo Saldo Anterior 1.
+
+🔴 **Columnas de la vista de aging que NADIE llena** (0 de 211, verificado el 5-sep-2026):
+`upload_id` (es un `NULL::uuid` literal en la definición de la vista, herencia del upload de CSV),
+**`contacto`**, **`distrito`** y **`corregimiento`**. Lo que sí llega: `correo` 180 · `celular` 186 ·
+`telefono` 153 · `provincia` 126 · `cliente_id` 211.
+✅ **`contacto` dejó de estar vacío en PANTALLA el 5-sep-2026**: la vista lo sigue devolviendo
+`''::text` hardcodeado, pero `/api/cxc/aging` lo **relee en vivo** de `clientes_master.contacto` —la
+columna nueva de la ficha del cliente, **migración `20260926120000` APLICADA el 5-sep-2026**— junto
+con `email/telefono/celular`. Medido: **6 de los 150 clientes vivos tienen `contacto` cargado**
+(D-38 «Alberto levy», D-76 «emad», D-166 «Mohamed», D-170 «Victor Rodriguez», D-202 «Narimy», y D-103
+con un correo metido en el campo). **Los montos no se tocan**: siguen saliendo de la MV.
+
+```sql
+select count(*) n, count(upload_id) up, count(nullif(trim(contacto),'')) cont,
+       count(nullif(trim(distrito),'')) dist, count(nullif(trim(corregimiento),'')) corr,
+       count(nullif(trim(correo),'')) mail, count(nullif(trim(telefono),'')) tel,
+       count(nullif(trim(celular),'')) cel
+from switch_estadocuenta_aging;   -- → 211 | 0 | 0 | 0 | 0 | 180 | 153 | 186
+```
 
 ### Lo que escribe
 
@@ -1387,7 +1566,7 @@ cartera va en la llave** (`grupo` / `boston`): la misma estrella en dos carteras
 | `cxc_client_overrides` | **10** | `UNIQUE (cartera, nombre_normalized)` | 🔴 **ya nadie desde el CXC** — el formulario se mudó a `/clientes/[codigo]` el 24-ago-2026. Sí lo escribe `/api/overrides` desde **Cheques** | `useAdminData` (un override le gana al maestro) y `resolveDestinatario` del correo | no |
 | `cxc_favorites` | **0** | `UNIQUE (cartera, user_id, nombre_normalized)` | 🔴 **nadie** — la ⭐ se retiró el 4-sep-2026 | 🔴 **nadie** | no — se borraba la fila |
 | `cxc_contact_log` | **141** | solo PK | 🔴 **nadie** — las opciones «Ya contacté» se retiraron el 14-ago-2026 | 🔴 **nadie** | no |
-| `cxc_emails_enviados` | **19** | solo PK | `POST /api/cxc/enviar-email`, *best effort* (si falla, el correo sale igual y la respuesta dice `logged:false`) | 🔴 **nadie en la app** | no |
+| `cxc_emails_enviados` | **19** | solo PK | **TRES puertas desde el 5-sep-2026**: `POST /api/cxc/enviar-email` · `POST /api/cxc/cobrar-lote` (el envío a varios) · `POST /api/cxc/envios` (WhatsApp y «copiar»). Las tres *best effort*: si falla la fila, el correo sale igual | ✅ **`GET /api/cxc/envios`**, que `src/app/cxc/page.tsx:251` pide al abrir la pantalla | no |
 
 Detalle medido de esas cuatro:
 - `cxc_client_overrides`: las 10 son de cartera `grupo`. `celular` 10 · `telefono` 9 · `correo` 8 ·
@@ -1400,9 +1579,22 @@ Detalle medido de esas cuatro:
   pone el build rojo si una migración la dropea o si la estrella vuelve.
 - `cxc_contact_log`: 141 filas, **todas entre el 22-mar y el 16-abr-2026**, todas de rol `admin` y
   cartera `grupo`: whatsapp 117 · llamada 15 · email 9. La columna `note` está vacía en las 141.
-- `cxc_emails_enviados`: 19 envíos, **todos con `resultado = "ok"`**. `Angela` 14 (el último el
-  14-jul-2026) y `daniel` 5 (el 9-jul-2026). Por empresa: `fashion_wear` 11 · las 5 juntas 5 ·
-  `active_shoes` 2 · `vistana` 1.
+- `cxc_emails_enviados`: 19 envíos, **todos con `resultado = "ok"`**. `Angela` 14 (los 14 el
+  **14-jul-2026**) y `daniel` 5 (los 5 el **9-jul-2026**). Por empresa: `fashion_wear` 11 · las 5
+  juntas 5 · `active_shoes` 2 · `vistana` 1.
+  🔄 **La columna `canal` existe desde el 5-sep-2026** (migración `20260927120000`, aplicada) y el
+  backfill dejó las 19 en `'correo'`. Los otros dos valores posibles —`whatsapp` y `copia`
+  (`CANALES_ENVIO`, `src/lib/cxc/envios-registro.ts`)— **todavía tienen 0 filas**: se estrenaron hoy.
+  Esa columna es lo que hace posible la marca gris de la fila, con **ventana de 7 días**
+  (`VENTANA_MARCA_DIAS`) y dos frases distintas a propósito: «Le enviaste el estado de cuenta hace
+  N días» para correo y WhatsApp, «Copiaste el mensaje hace N días» para el copiado —copiar no le
+  llegó a nadie—.
+  ```sql
+  select coalesce(canal,'(null)') canal, resultado, enviado_por, count(*),
+         min(created_at)::date, max(created_at)::date
+  from cxc_emails_enviados group by 1,2,3 order by 4 desc;
+  -- → correo|ok|Angela|14|2026-07-14|2026-07-14 · correo|ok|daniel|5|2026-07-09|2026-07-09
+  ```
 - `cxc_rows` (1.097, el CSV viejo): **sin lectores en la app**; solo la copia el backup y la mira
   `integrity-check`. Rango 11-feb-2021 → 29-may-2026, 6 `upload_id` distintos, 6 empresas.
 
@@ -1437,7 +1629,7 @@ nuevo.» con botón Reintentar — o el dato viejo de la caché SWR si lo hay.
 | 🔴 El **teléfono se lee en vivo de `clientes_master`; la plata sigue saliendo de la MV** | `src/__tests__/api/cxc-telefono-en-vivo.test.ts` |
 | Tocar una píldora **filtra Y reordena** por ese tramo; el clic en el título de una columna es un override anclado al tramo, así que encabezado y píldora no pueden contradecirse | `src/__tests__/lib/cxc-orden.test.ts` |
 | El mismo tramo se llama **igual** en escritorio, celular y papel (`tramoLabel`) | `src/__tests__/components/cxc-tramos-un-solo-nombre.test.tsx` |
-| El menú «···» tiene **exactamente 4 opciones** y dice lo mismo que el de clic derecho | `src/__tests__/components/cxc-pestanas-y-menu.test.tsx` |
+| 🔄 **El menú «···» y el de clic derecho NO VUELVEN** (el candado cambió de dirección el 5-sep-2026: antes exigía que los dos menús tuvieran las mismas 4 opciones; hoy exige que no existan) | `src/__tests__/components/cxc-pestanas-y-menu.test.tsx` |
 | Los últimos pagos viven en **un solo lugar** y se piden recién al tocar | `src/__tests__/components/cxc-ultimos-pagos-bloque.test.tsx`, `…-boton-fila.test.tsx` |
 | «Última compra» se pinta en **las dos** pantallas (tabla y tarjeta) | `src/__tests__/components/cxc-ultima-compra-pantalla.test.tsx` |
 | Un botón, y el error se **ve** en el drawer de estado de cuenta | `src/__tests__/components/cxc-estado-cuenta-un-boton.test.tsx` |
@@ -1445,6 +1637,26 @@ nuevo.» con botón Reintentar — o el dato viejo de la caché SWR si lo hay.
 | El código muerto podado no vuelve (incluye que ya no se pidan `/api/vendors` ni `/api/upload`) | `src/__tests__/components/cxc-codigo-muerto-podado.test.tsx` |
 | Ningún monto se escribe a mano en la pestaña de Boston | `src/__tests__/lib/cxc-montos-escritos-a-mano.test.ts` |
 | La pestaña de Boston **dice de cuándo es su plata** | `src/__tests__/components/cxc-boston-fecha-del-dato.test.tsx` |
+
+**Y los diez candados que nacieron con el rediseño del 5-sep-2026** (verificado el 5-sep-2026: los
+diez archivos existen):
+
+| Regla | Candado |
+|---|---|
+| «Cobrar» es **UNA hoja con cuatro salidas** y las seis puertas viejas no vuelven; el envío manda **siempre las 6 empresas** (`empresasDelEnvio()` = `[...CXC_GRUPO_EMPRESA_KEYS]`) sin importar el filtro | `src/__tests__/lib/cxc-cobrar-una-hoja.test.ts` |
+| **Un correo por DIRECCIÓN**, no por cliente; el que no tiene correo no aborta el lote | `src/__tests__/lib/cxc-correos-por-direccion.test.ts` |
+| La tira de totales va **en la misma grilla de 12 columnas que la tabla**, cada total sobre su columna | `src/__tests__/components/cxc-tira-totales.test.tsx` |
+| El aviso **«N sin pagar hace +90 d»** filtra, es toggle y trata «nunca pagó» como que avisa | `src/__tests__/lib/cxc-sin-pagar.test.ts` |
+| El rastro de envío cubre los **tres canales** y los **últimos pagos van POR FECHA**, no por empresa | `src/__tests__/lib/cxc-envios-y-pagos-por-fecha.test.ts` |
+| El estado de cuenta lleva **encabezados de columna** y lo chico se agrupa **por MONTO (< $50)**, nunca por tipo de documento | `src/__tests__/lib/cxc-estado-cuenta-legible.test.ts` |
+| El **`contacto` de la ficha del cliente** llega a la fila del CXC en vivo | `src/__tests__/lib/cxc-contacto-del-cliente.test.ts` |
+| Boston usa el **mismo formato** que el grupo sin mezclar una sola cifra | `src/__tests__/lib/cxc-boston-mismo-formato.test.ts` |
+| Quién puede abrir la pestaña de Boston | `src/__tests__/lib/cxc-boston-permiso.test.ts` |
+| La ruta es `/cxc`, `/admin` redirige, y la pantalla de error **no publica el stack trace** | `src/__tests__/lib/cxc-ruta-y-error.test.ts` |
+
+⚠️ El encabezado de `src/app/cxc/components/HojaCobrar.tsx:20` cita un candado
+**`cxc-cobrar-manda-las-seis.test.ts` que no existe**. La regla SÍ está cerrada, pero en
+`cxc-cobrar-una-hoja.test.ts` (comprueba literalmente `return [...CXC_GRUPO_EMPRESA_KEYS]`).
 
 Y una que no es del CXC pero lo sostiene: **`db-max-rows` = 1000 corta en silencio**, así que la
 relectura de contacto va en lotes de 300 códigos con `leerTodoPaginado`, que verifica contra un
@@ -1641,9 +1853,9 @@ Lo que **sí** se pudo medir (4-sep-2026):
 (**rey**, **edwin**, **rodrigo**) y **Angela** por `modulos_override`. Son **6 personas**;
 **andrea** (la otra secretaria) NO lo tiene.
 
-**Quién entra de verdad.** Logins en los últimos 30 días: daniel 74 · Angela 49 · rey 32 · edwin 8 ·
-alberto 1. 🔴 **`rodrigo` (vendedor, dado de alta el 4-jul-2026) nunca ha entrado**: 0 sesiones, 0
-logins, 0 filas en `activity_logs`.
+**Quién entra de verdad.** Sesiones abiertas en los últimos 30 días (re-medido el 5-sep-2026):
+daniel **110** · Angela **48** · rey **32** · edwin **8** · alberto **1**. 🔴 **`rodrigo` (vendedor,
+dado de alta el 4-jul-2026) nunca ha entrado**: no aparece ni una vez en `user_sessions`.
 
 **Lo que el módulo escribió, por tabla:**
 
@@ -1653,17 +1865,23 @@ logins, 0 filas en `activity_logs`.
 | `cxc_contact_log` | 141 | **16-abr-2026** | `created_by = "admin"` en las 141 (es el default de la columna, no distingue persona) |
 | `cxc_client_overrides` | 10 | **22-mar-2026**, las 10 el mismo día | sin columna de autor |
 | `cxc_favorites` | 🔴 **0** | nunca (y desde el 4-sep-2026 tampoco tiene quién) | — |
-| `activity_logs` con `entity_type = "cxc"` | 38 (`cxc_upload`) | **1-jun-2026** | **andrea**, y son de la carga manual de CSV **ya retirada** |
+| `activity_logs` con `action = "cxc_upload"` | **38** = 27 con `entity_type='cxc'` + 11 con `entity_type='upload'` | **1-jun-2026** | ⚠️ **no se puede saber quién.** `activity_logs` **no tiene columna de usuario**, solo `user_role`: 32 de rol `secretaria` y 6 de `admin`. Son de la carga manual de CSV **ya retirada** |
 
-O sea: **desde el 14 de julio de 2026 el módulo no ha escrito ni una fila.** Eso no dice que no se
-use — es una pantalla de lectura y de cobro por fuera del sistema (Daniel, 14-ago-2026: *«llamo al
-cliente por fuera y ya»*) — pero es lo único que hay.
+O sea: **desde el 14 de julio de 2026 el módulo no había escrito ni una fila**, hasta el rediseño de
+hoy —que estrena dos escritores nuevos en `cxc_emails_enviados` (el lote y los canales WhatsApp/copia)
+y todavía tienen 0 filas—. Eso no dice que no se use: es una pantalla de lectura y de cobro por fuera
+del sistema (Daniel, 14-ago-2026: *«llamo al cliente por fuera y ya»*).
 
-**Que el dato le llegue sí es medible.** En 30 días: `estadocuenta` **582 corridas (19,4/día) con 7
-errores (1,2 %)**, todos del reporte web de Boston entre el 20 y el 25 de agosto
-(`cartera-fetch: respuesta no-JSON en la ronda 1 (status 200)`) más un `<!DOCTYPE html>` de vistana
-el 12-ago. Última corrida buena de cada par al 5-sep 03:10 UTC: las 6 del grupo hace ~6 h, Boston
-hace 19 h. `american_classic` lleva 99 días sin corrida de estadocuenta **y eso es correcto**: tiene
+Detalle de `cxc_client_overrides` (las 10, no vacías): `celular` 10 · `telefono` 9 · `correo` 8 ·
+`contacto` 3 · **`resultado_contacto` 0 · `proximo_seguimiento` 0** — verificado exacto el 5-sep-2026.
+⚠️ Contar con `count(columna)` da 10 en las seis: hay que usar `count(nullif(trim(col),''))`, porque
+lo que guardó el formulario viejo no fue `NULL` sino cadena vacía.
+
+**Que el dato le llegue sí es medible.** Re-medido el 5-sep-2026 16:30 UTC, en 30 días:
+`estadocuenta` **582 corridas (19,4/día) con 7 errores (1,2 %)**, todos del reporte web de Boston
+entre el 20 y el 25 de agosto (`cartera-fetch: respuesta no-JSON en la ronda 1 (status 200)`) más un
+`<!DOCTYPE html>` de vistana el 12-ago. La MV se refrescó por última vez a las **16:12:26 UTC de
+hoy**. `american_classic` lleva ~100 días sin corrida de estadocuenta **y eso es correcto**: tiene
 0 filas en la tabla porque es retail sin cartera.
 
 ## Qué papeles y Excel produce
@@ -1675,9 +1893,10 @@ Es el módulo que más papel manda **afuera** del grupo: su PDF y su correo los 
 | **CSV** | «Exportar → CSV (Excel)» | `CXC[_<filtro>]_<YYYY-MM-DD>.csv` | Fila de metadatos («Cuentas por Cobrar · Fashion Group — fecha — empresa — tramo — N registros») y luego `Cliente · 0-30d · 31-60d · 61-90d · 91-120d · 121d+ · Total · Estado · Correo · Telefono · Celular · Contacto`. **Estado** = «Vencido crítico» / «Vencido reciente» / «Por vencer» | Daniel, Angela |
 | **PDF Resumen** | «Exportar → PDF Resumen» | `CXC_Resumen_<YYYY-MM-DD>.pdf` | Logo Fashion Group, subtítulo con el filtro y «N clientes», cajas KPI y tabla `Cliente · Por vencer 0-90d · Vencido reciente 91-120d · Vencido crítico 121d+ · Total` | uso interno |
 | **PDF Detallado** | «Exportar → PDF Detallado» | `CXC_Detallado_<YYYY-MM-DD>.pdf` | Tabla `Cliente / Empresa · 0-30 · 31-60 · 61-90 · 91-120 · 121-180 · 181-270 · 271-365 · +365 · Total` | uso interno |
-| **PDF Estado de cuenta** | botón **«Compartir»/«Descargar PDF»** del drawer | `Estado-cuenta-<CÓDIGO>-<YYYY-MM-DD>.pdf` | Encabezado con nombre, código y (si es una sola) la empresa; por empresa una tabla `Documento · Tipo · Fecha · Días · Monto · Saldo` con su **Subtotal**; al pie la barra oscura con **«Total»** | 🔴 **el cliente** |
-| **Correo «Enviar estado de cuenta»** | modal, botón de envío | — (no baja archivo) | asunto y cuerpo editables; adjunta **un PDF POR EMPRESA** con el nombre `Estado de cuenta — <Empresa> — <Cliente> — <Mes>.pdf` | 🔴 **el cliente**, con **copia (cc) al usuario que lo manda** y `reply_to` a su correo. Sale desde `cobros@fashiongr.com` por Resend |
-| **Mensaje de WhatsApp / «Copiar mensaje»** | menú «···» | — (no baja archivo) | texto plano con el saldo por empresa y los tres tramos rotulados **«Hasta 90 días» · «De 91 a 120 días» · «Más de 120 días»** | 🔴 **el cliente** |
+| **PDF Estado de cuenta** | 🔄 fila **«Ver o bajar el PDF»** de la hoja «Cobrar» (era el botón «Compartir»/«Descargar PDF» del drawer, retirado el 5-sep-2026) | `Estado-cuenta-<CÓDIGO>-<YYYY-MM-DD>.pdf` | Encabezado con nombre, código y (si es una sola) la empresa; por empresa una tabla `Documento · Tipo · Fecha · Días · Monto · Saldo` con su **Subtotal**; al pie la barra oscura con **«Total»** | 🔴 **el cliente** |
+| **Correo del estado de cuenta** | 🔄 fila **«Correo»** de la hoja «Cobrar» — **un clic, con «Deshacer» de 5 s**; o «Escribirlo yo», que abre el modal editable de siempre | — (no baja archivo) | asunto y cuerpo editables; adjunta **un PDF POR EMPRESA** con el nombre `Estado de cuenta — <Empresa> — <Cliente> — <Mes>.pdf` | 🔴 **el cliente**, con **copia (cc) al usuario que lo manda** y `reply_to` a su correo. Sale desde `cobros@fashiongr.com` por Resend |
+| **Correo a VARIOS** (nuevo, 5-sep-2026) | «Cobrar a los N» de la barra de selección → `POST /api/cxc/cobrar-lote` | — | **un correo por DIRECCIÓN** con **UN PDF** que trae una hoja por cliente y el total al final | 🔴 **el cliente**. Medido: 100 clientes → **57 correos** |
+| **Mensaje de WhatsApp / «Copiar mensaje»** | 🔄 filas **«WhatsApp»** y **«Copiar el mensaje»** de la hoja «Cobrar» (era el menú «···», retirado) | — (no baja archivo) | texto plano con el saldo por empresa y los tres tramos rotulados **«Hasta 90 días» · «De 91 a 120 días» · «Más de 120 días»** | 🔴 **el cliente** |
 
 🔴 **En todo lo que ve el cliente está PROHIBIDA la palabra «vencido»** (candado
 `src/__tests__/lib/cxc-papel-vocabulario.test.ts`): `dias` es la **edad** del documento desde su
@@ -1703,7 +1922,8 @@ número de la columna «Total» de la fila. Si no cuadra, el sospechoso es el ma
 `src/lib/cxc/estado-cuenta-data.ts` (`Nota de Crédito`, `Recibo` y `Recibo Saldo Anterior` restan;
 un tipo que no esté en ninguna de las dos listas vale **0**, no infla).
 
-**4. Que el correo sale de verdad.** Abre «···» → «Enviar correo». Revisa el destinatario, manda.
+**4. Que el correo sale de verdad.** Abre la fila → **«Cobrar»** → **«Correo»**. Revisa el
+destinatario, manda (tienes **5 segundos para deshacer**; el envío real ocurre al vencer el plazo).
 Tiene que aparecer el aviso «Correo enviado» y **te tiene que llegar la copia a ti** (el sistema te
 pone en `cc`). En la base: una fila nueva en `cxc_emails_enviados` con tu nombre en `enviado_por` y
 `resultado = 'ok'`. Si dice «Correo enviado (no se pudo registrar en la bitácora)», el correo salió
@@ -1715,8 +1935,10 @@ ahí **sin esperar al cron**. Ese es el único dato de la pantalla que se lee en
 saliendo de la foto de la MV.
 
 **6. Que Boston no se mezcla.** Suma la columna «Total» de la pestaña del grupo y compárala con
-`select sum(total) from switch_estadocuenta_aging` (debe dar **$3.685.289,04** al 4-sep-2026, 211
-clientes). Ese número **no** incluye Boston, que tiene su propia pestaña y sus $190.399,07.
+`select round(sum(total),2) from switch_estadocuenta_aging` (al 5-sep-2026: **$3.676.935,55**, en
+**211 filas = 100 clientes**). Ese número **no** incluye Boston, que tiene su propia pestaña y sus
+**$195.509,25** en 390 clientes. 🔴 Si la pantalla del grupo dijera «211 clientes», está contando
+filas: la misma City Mall aparece una vez por empresa donde debe.
 
 ## Qué lo rompe
 
@@ -1747,28 +1969,44 @@ clientes). Ese número **no** incluye Boston, que tiene su propia pestaña y sus
 - **`cxc_client_overrides` no la escribe el CXC desde el 24-ago-2026** (la edición se mudó a la ficha
   del cliente): solo la **lee**. Quien la escribe hoy es **Cheques**, por `/api/overrides`.
   Sus columnas `resultado_contacto` y `proximo_seguimiento` están vacías en las 10 filas.
-- **`cxc_emails_enviados` no la lee ninguna pantalla.** Es una bitácora de solo escritura.
+- ✅ **CERRADO el 5-sep-2026: `cxc_emails_enviados` YA la lee una pantalla.** Era una bitácora de
+  solo escritura; hoy `GET /api/cxc/envios` la consulta al abrir `/cxc` (`page.tsx:251`) y de ahí
+  sale la marca gris de la fila («Le enviaste el estado de cuenta hace 3 días»). Con la columna
+  `canal` (migración `20260927120000`) también registra **WhatsApp y «copiar el mensaje»**, que hasta
+  hoy no dejaban rastro — y son, según Daniel, como se cobra de verdad.
 - **`cxc_rows`** (1.097 filas del CSV viejo): sin lectores en la app.
 - **`src/lib/cxc-fecha.ts`** (parseo de fechas de los uploads) **no lo importa ningún archivo de
   producción**: su único consumidor es su propio test. Murió con el upload de CSV.
 
-**Rutas vivas sin consumidor** (todas responden 200 a quien las escriba a mano):
-`GET /api/clients` (admin+secretaria) · `GET /api/cxc-rows` · `GET /api/cxc-summary` (admin) ·
-`GET`/`POST /api/cxc/contact-log` · `GET /api/vendors` · `POST /api/upload`. Las tres primeras leen
-la MISMA vista de aging que la pantalla, así que **cualquier cambio de forma en `switch_estadocuenta_aging`
-también las rompe**, sin que nadie se entere.
+**Rutas vivas sin consumidor**, verificado con `grep` sobre `src/` el 5-sep-2026 (todas responden
+200 a quien las escriba a mano): `GET /api/clients` (admin+secretaria) · `GET /api/cxc-summary`
+(admin) · `GET`/`POST /api/cxc/contact-log` · `GET /api/vendors` · `POST /api/upload`. Las dos
+primeras leen la MISMA vista de aging que la pantalla, así que **cualquier cambio de forma en
+`switch_estadocuenta_aging` también las rompe**, sin que nadie se entere.
+✅ **`GET /api/cxc-rows` ya no está en la lista: se BORRÓ el 5-sep-2026** (`src/app/api/cxc-rows/`
+no existe). La tabla `cxc_rows` sigue con sus 1.097 filas y sin lectores.
 
-**Columnas que nadie llena** (0 de 211 en la vista de aging): `upload_id` (es un `NULL::uuid`
-literal, herencia del upload), `contacto`, `distrito` y `corregimiento`. `contacto` sí se pinta en la
-pantalla y viaja en el CSV: sale vacío salvo override (3 de 10).
+**Columnas que nadie llena** (0 de 211 en la vista de aging, re-medido el 5-sep-2026): `upload_id`
+(es un `NULL::uuid` literal, herencia del upload), `contacto`, `distrito` y `corregimiento`.
+🔄 **`contacto` dejó de salir vacío en la pantalla**: desde hoy `/api/cxc/aging` lo relee de
+`clientes_master.contacto` (6 clientes lo tienen), además del override (3 de 10). Lo que sigue vacío
+es la COLUMNA de la vista, que devuelve `''::text` hardcodeado.
 
 **Incoherencias de permisos**
 - `secretaria` **no tiene `cxc` en `role_permissions`**, pero la pantalla y `/api/cxc/aging` sí la
   dejan pasar. Hoy solo **Angela** ve la ficha, y por `modulos_override`, no por rol.
-- Las listas de roles de las anotaciones **ya no son tres, son dos** (4-sep-2026, al irse
-  `favorites` con su `rolesBoston()`): `overrides` y `contact-log` usan
-  `["admin","secretaria","vendedor"]`, y `aging-por-cliente` usa
-  `["admin","contabilidad","secretaria","vendedor"]`.
+- 🔴 **`["admin","secretaria","vendedor"]` está escrito a mano NUEVE veces**, una por ruta, cada una
+  con su propia constante `CXC_ROLES` local (medido el 5-sep-2026): `overrides` · `contact-log` ·
+  `enviar-email` · `cobrar-lote` · `envios` · `ultimos-pagos` · `ultima-compra` · `ultimo-pago` ·
+  `estado-cuenta/[codigo]`. Hoy las nueve dicen lo mismo, pero **no hay nada que las obligue** — y es
+  exactamente el modo de fallo que dejó el `POST` de Referencia en solo-admin durante tres semanas
+  (tres copias a mano de la misma lista). `aging-por-cliente` usa otra lista a propósito
+  (`["admin","contabilidad","secretaria","vendedor"]`, con contabilidad, para el hover de Ventas), y
+  `/api/cxc/aging` no usa constante: compara los roles inline. La única lista con fuente única es la
+  de Boston (`ROLES_BOSTON`, `src/lib/cxc/boston-roles.ts` = `["admin","secretaria","gerente_boston"]`).
+  ```bash
+  grep -rn "CXC_ROLES =" src/ | grep -v __tests__   # → 9 archivos, 9 copias idénticas
+  ```
 - ✅ **RESUELTO el 5-sep-2026.** `src/app/admin/error.tsx` le mostraba al usuario el `error.message`
   Y el stack trace completo — la única pantalla del sistema que lo hacía, contra la regla de errores
   humanos de `CLAUDE.md § UX Principles`, y de paso publicaba nombres de tablas y rutas internas a
@@ -1797,7 +2035,7 @@ Ventas › Clientes). Es también el único lugar donde se **edita a mano** el c
 fila por CÓDIGO— así que adentro un cliente de Boston sería indistinguible de uno del grupo. Por eso
 el sync pide por **INCLUSIÓN** y la pantalla vuelve a filtrar con `soloClientesDelGrupo`.
 ⚠️ La `key` del módulo es `directorio` (historia: antes existía `/directorio`), pero la tabla
-`directorio_clientes` es **otra cosa**: 33 contactos cargados a mano que solo usa la búsqueda global.
+`directorio_clientes` es **otra cosa**. 🩸 **Y desde el 5-sep-2026 está RETIRADA**: ver abajo.
 
 ## Quién entra
 
@@ -1841,8 +2079,16 @@ por `/api/clientes`. Todo el estado va a la URL con `replace`: `?search=` (con *
   la tabla no espere por esa columna: mientras carga muestra «…», y un cliente que de verdad no
   compró muestra **$0.00 en gris**.
 - Un cliente que **Switch dejó de mandar** lleva la etiqueta ámbar **«Ya no está en Switch»**.
-  Medido: `clientes_master.ausente_desde` está **vacía en las 5.064 filas**, así que hoy esa etiqueta
-  no se ve nunca (`switch_clientes.ausente_desde` sí tiene 12).
+  🔄 **Re-medido el 5-sep-2026: `clientes_master.ausente_desde` YA NO está vacía — tiene 2 filas**,
+  las dos vivas: **`D-30` City Moda Chorrera** y **`D-135` Rey Store (Aguas)**, las dos marcadas el
+  **13-ago-2026**. O sea que la etiqueta SÍ se ve, en esos dos clientes, y el mecanismo que este
+  documento daba por roto («no llega a `clientes_master`») **funciona**. `switch_clientes.ausente_desde`
+  tiene 12 filas: los mismos 2 clientes × las 6 empresas del grupo.
+  ```sql
+  select codigo, nombre, ausente_desde from clientes_master
+  where deleted is not true and ausente_desde is not null order by codigo;
+  -- → D-135 Rey Store (Aguas) 2026-08-13 · D-30 City Moda Chorrera 2026-08-13
+  ```
 
 ### `/clientes/[codigo]` — la ficha
 Server-rendered; hace **cinco lecturas en paralelo** y luego una sexta para las guías.
@@ -1876,15 +2122,29 @@ contacto», poner el celular, Guardar.
 |---|---|---|---|---|---|
 | `clientes_master` | **5.064** (150 vivas · **4.914 borradas**) | `UNIQUE (codigo)` + índice parcial `WHERE deleted=false AND codigo IS NOT NULL` | cron `sync-clientes-master` (todo menos contacto) y el `PATCH` de la ficha (solo `telefono`, `celular`, `email`, `notas`) | esta pantalla, CXC (contacto en vivo), Ventas › Clientes, la búsqueda global, `ClientePicker`, Guías, Cheques, Marketing | 🔴 sí, `deleted boolean NOT NULL DEFAULT false` |
 | `switch_clientes` | **6.799** | `UNIQUE (empresa_key, cliente_switch_id)` | el sync de estadocuenta (paso 1b) y `acs-fidelizacion` | el puente id↔código de toda la app | no; el equivalente es `activo` (**6.787 activos / 12 inactivos**) |
-| `directorio_clientes` | **33** | `UNIQUE (nombre)` | `/api/directorio` (POST/PUT/DELETE) | 🔴 **solo la búsqueda global** — esta pantalla no la toca | sí, `deleted` NULLABLE (33 en `false`, 0 borradas, 0 nulos) |
+| `directorio_clientes` | **33** | `UNIQUE (nombre)` | 🔴 **NADIE desde el 5-sep-2026** — `/api/directorio` se borró | 🔴 **NADIE** — la búsqueda global y las sugerencias del catálogo pasaron a `clientes_master` | sí, `deleted` NULLABLE (33 en `false`, 0 borradas, 0 nulos) |
 
-**Llenado de `clientes_master`** (sobre las 5.064): `codigo`/`nombre`/`nombre_normalized`/`deleted`/
-`created_at`/`updated_at` 5.064 · `razon_social` 5.040 · `last_synced_at` 5.063 · `identificacion`
-2.092 · `dv` 1.760 · **`celular` 102 · `email` 100 · `telefono` 80 · `provincia` 51 · `notas` 2** ·
-🔴 **`ausente_desde` 0**.
-Sobre las **150 vivas**: 147 sincronizadas en las últimas 48 h, `last_synced_at` máximo
-**4-sep-2026 07:00:13**. Provincia: 99 vacías · Chiriquí 25 · Veraguas 7 · Bocas del Toro 4 ·
-Colón 3 · Panamá Oeste 3 · Coclé 3 · Los Santos 2 · Herrera 2 · Panamá 1 · Darién 1.
+**Llenado de `clientes_master`** (re-medido el 5-sep-2026 sobre las 5.064):
+`codigo`/`nombre`/`nombre_normalized`/`deleted`/`created_at`/`updated_at` 5.064 · `razon_social`
+5.040 · `last_synced_at` 5.063 · `identificacion` 2.092 · `dv` 1.760 · **`celular` 102 · `email` 100
+· `telefono` 80 · `provincia` 51 · `contacto` 6 (columna NUEVA, `20260926120000`) · `notas` 2** ·
+**`ausente_desde` 2** (D-30 y D-135).
+Sobre las **150 vivas** — los cuatro campos de contacto viven todos ahí, ninguno en las borradas:
+`last_synced_at` máximo **5-sep-2026 07:00:14**. Provincia: 99 vacías · Chiriquí 25 · Veraguas 7 ·
+Bocas del Toro 4 · Colon 3 · Panamá Oeste 3 · Coclé 3 · Los Santos 2 · Herrera 2 · Panamá 1 ·
+Darién 1. (En la base va **«Colon» sin tilde**; la pantalla lo muestra tal cual.)
+
+```sql
+select count(*) total, count(*) filter (where deleted is not true) vivas,
+  count(nullif(trim(celular),'')) cel, count(nullif(trim(email),'')) mail,
+  count(nullif(trim(telefono),'')) tel, count(nullif(trim(contacto),'')) contacto,
+  count(nullif(trim(notas),'')) notas, count(ausente_desde) ausentes, max(last_synced_at)
+from clientes_master;   -- → 5064 | 150 | 102 | 100 | 80 | 6 | 2 | 2 | 2026-09-05 07:00:14
+```
+⚠️ **Se cuenta con `count(nullif(trim(col),''))`, no con `count(col)`**: los formularios viejos
+guardaban cadena vacía, así que `count(col)` devuelve el total de filas y hace parecer llenas
+columnas que están vacías. Es el error que hacía ver `cxc_client_overrides` con 10 correos cuando
+tiene 8.
 
 Los cuatro campos de contacto son **lo único que escribe una persona**, y el sync **no los pisa**
 (`sync-clientes-master.ts:274`). De 150 clientes vivos: 80 con teléfono (53 %), 102 con celular
@@ -1894,10 +2154,23 @@ Los cuatro campos de contacto son **lo único que escribe una persona**, y el sy
 `telefono` 22 · y **cinco columnas 100 % vacías**: `empresa`, `celular`, `contacto`, `notas`,
 `whatsapp`.
 
-**Llenado de `switch_clientes`** (6.799): `razonsocial` 6.763 · `telefono` 4.274 ·
-`identificacion` 3.681 · `celular` 2.954 · `email` 1.894 · `ausente_desde` **12**.
-Por empresa: `confecciones_boston` 4.915 · `american_classic` 1.037 · `active_wear` 147 ·
-`vistana` 142 · `active_shoes` 140 · `joystep` 140 · `fashion_shoes` 139 · `fashion_wear` 139.
+**Llenado de `switch_clientes`** (**6.800** al 5-sep-2026): `ausente_desde` **12** (los 2 clientes
+ausentes × las 6 del grupo), `activo = false` en las mismas 12.
+Por empresa, con la fecha de su última escritura:
+`confecciones_boston` 4.915 (**`synced_at` = 30-jul-2026 06:31:07 en las 4.915**) ·
+`american_classic` **1.038** (hoy 11:30) · `active_wear` 147 (hoy 16:11) · `vistana` 142 (hoy 16:10) ·
+`joystep` 140 (hoy 16:01) · `active_shoes` 140 (hoy 16:00) · `fashion_shoes` 139 (hoy 16:05) ·
+`fashion_wear` 139 (hoy 16:05).
+
+🩸 **Boston lleva 37 días congelado y a la fecha de esta medición sigue congelado.** Su cron nuevo
+(`sync-clientes-boston`) es **SEMANAL, domingos 07:10 UTC**, y nació hoy: todavía no ha corrido. Eso
+NO afecta al directorio del grupo —`clientes_master` no toca Boston—, pero sí a los teléfonos y
+correos que muestra la pestaña de Boston del CXC.
+
+```sql
+select empresa_key, count(*) n, count(ausente_desde) ausentes, max(synced_at)
+from switch_clientes group by 1 order by 2 desc;
+```
 
 **Lo que la ficha lee además:** `switch_facturas` (ventas del año y última factura, vía la RPC
 `cliente_ficha_ventas`), `switch_estadocuenta_aging` (por `company_key`), `switch_recibos`
@@ -1952,7 +2225,7 @@ Switch no aparece y uno retirado tampoco se marca.
 |---|---|
 | **Cuentas por Cobrar** | el correo/teléfono/celular **en vivo** de cada fila, y el destinatario del correo de cobro |
 | **Ventas › Clientes** | el nombre y el código del ranking (por el puente `switch_clientes`, **nunca por nombre**) |
-| **La búsqueda global** (`/api/search`) | busca clientes ahí y en `directorio_clientes` |
+| **La búsqueda global** (`/api/search:99`) | busca clientes ahí. 🔄 **Ya NO mira `directorio_clientes`** (5-sep-2026): filtra `deleted = false` y `ausente_desde is null` |
 | **`ClientePicker`** (`useBusquedaClientes`) | el selector único de cliente que usan **Guías, Cheques y Marketing** |
 | **Guías** | `guia_items.cliente_codigo`, los destinos y las frecuencias |
 | **Cheques** | `/api/cheques/frecuencias` y el código del cliente |
@@ -2040,8 +2313,9 @@ Switch no aparece y uno retirado tampoco se marca.
 - **`/directorio`** — la pantalla vieja. La reemplazó `/clientes` (Sprint 1, Fase 4D), que lee
   `clientes_master` en vez de `directorio_clientes`. ⚠️ **La `key` del módulo siguió siendo
   `directorio`** porque está en `role_permissions` y renombrarla rompería permisos sin comprar nada.
-  La tabla `directorio_clientes` **no se retiró**: quedó como la libreta de 33 contactos a mano que
-  usa la búsqueda global.
+  🔄 **La tabla `directorio_clientes` se retiró el 5-sep-2026** (hasta ese día quedaba como libreta
+  de 33 contactos que alimentaba la búsqueda global). Hoy **el directorio es UNO solo y va por
+  CÓDIGO**: `clientes_master`. Sus rutas `/api/directorio*` se borraron del repo.
 - 🩸 **Una SEGUNDA copia de la lectura del directorio dentro de `/clientes/page.tsx`** — bajaba
   `clientes_master` entera (5.062 filas, 6 viajes paginados) más `switch_clientes` (6.634 filas, 7
   viajes): **11.700 filas y 13 idas a Supabase**, con `force-dynamic` y sin caché, **en cada apertura
@@ -2057,9 +2331,9 @@ Switch no aparece y uno retirado tampoco se marca.
   búsqueda 10 veces. Se mudaron a la URL con `replace` (24-ago-2026) reusando `useUrlState`, el hook
   del sistema; no se inventó otro mecanismo.
 - 🩸 **El formulario del directorio BORRABA lo que no mandaba** — teléfono, celular, contacto y notas
-  (22 de las 33 fichas los tenían), y el campo **WhatsApp era un control muerto**. Hoy `PUT
-  /api/directorio/[id]` copia **solo las claves presentes en el body** y sin ninguna devuelve
-  «No mandaste ningún cambio».
+  (22 de las 33 fichas los tenían), y el campo **WhatsApp era un control muerto**. Se arregló para que
+  `PUT /api/directorio/[id]` copiara solo las claves presentes en el body… y el **5-sep-2026 la ruta
+  entera desapareció** con el retiro de la libreta. El arreglo vivió tres días.
 - **El `?search=` como prefill de una sola vez** — se leía al montar y nada más. Hoy es el mismo
   parámetro que la pantalla escribe.
 - **La coletilla «· sincronizados de Switch»** del bloque de datos fiscales — se fue: cuatro renglones
@@ -2120,29 +2394,28 @@ Misma advertencia que en CXC: **no hay telemetría de pantallas**.
 
 - **Quién puede entrar:** 7 personas (2 admin + 2 secretarias + 3 vendedores). `bodega` puede abrir la
   pantalla por URL pero no tiene la ficha en el menú.
-- **`activity_logs` no registra NADA de este módulo**: cero filas con `entity_type` de clientes. El
-  `PATCH` de la ficha y el `POST` del directorio **no llaman a `logActivity`**, aunque
-  `/api/directorio/[id]` sí lo hace (`directorio_update`, `directorio_delete`) — y de esas tampoco hay
-  filas.
+- **`activity_logs` no registra NADA de este módulo**, verificado el 5-sep-2026: cero filas con
+  `entity_type` o `action` de clientes o directorio. (Las 7 filas que aparecen al buscar «cliente» son
+  de **Guías**, `action = 'guia_item_cliente'`.) El `PATCH` de la ficha **no llama a `logActivity`**,
+  y las de `/api/directorio/[id]` (`directorio_update`, `directorio_delete`) se fueron con la ruta.
 - **Lo que se escribió, medido:** `directorio_clientes` tiene **33 filas**, 31 dadas de alta el
-  27-mar-2026, una en abril y **la última el 28-may-2026** (99 días). Ediciones: **no medibles** — la
-  tabla no tiene `updated_at` ni `created_by`.
-- **Contacto escrito a mano en `clientes_master`:** 80 teléfonos, 102 celulares, 100 correos y **2
-  notas** sobre 150 clientes vivos. 🔴 **Cuándo fue la última edición a mano NO es medible**:
-  `updated_at` lo pisa el cron todos los días a las 07:00 (coincide al segundo con `last_synced_at`) y
-  no hay `updated_by` ni historial.
+  27-mar-2026, una en abril y **la última el 28-may-2026** (100 días). Ediciones: **no medibles** — la
+  tabla no tiene `updated_at` ni `created_by`. **Y desde hoy tampoco tiene quién la escriba.**
+- **Contacto escrito a mano en `clientes_master`** (5-sep-2026): **80 teléfonos · 102 celulares ·
+  100 correos · 6 contactos · 2 notas** sobre 150 clientes vivos. 🔴 **Cuándo fue la última edición a
+  mano NO es medible**: `updated_at` lo pisa el cron todos los días a las 07:00 (coincide al segundo
+  con `last_synced_at`) y no hay `updated_by` ni historial.
 - **Que el dato llegue sí se mide:** `sync-clientes-master` no deja fila en `switch_sync_log` (solo
-  `cron_heartbeats`); su última corrida buena es del **4-sep-2026 07:00:14**. El `estadocuenta` que
-  llena `switch_clientes` corrió 582 veces en 30 días con 7 errores.
+  `cron_heartbeats`); su última escritura medida es **5-sep-2026 07:00:14**
+  (`max(last_synced_at) from clientes_master`). El `estadocuenta` que llena `switch_clientes` corrió
+  582 veces en 30 días con 7 errores.
 
 ## Qué papeles y Excel produce
 
-🔴 **Ninguno desde la pantalla.** `/clientes` y `/clientes/[codigo]` no tienen botón de export, ni PDF,
-ni correo. Lo único que sale de este módulo es:
-
-| Salida | Desde | Contenido | Quién lo recibe |
-|---|---|---|---|
-| **`directorio_<YYYY-MM-DD>.csv`** | 🔴 **ningún botón** — solo escribiendo `GET /api/directorio?format=csv` a mano | encabezado `nombre,empresa,telefono,celular,correo,contacto,notas` sobre las 33 filas de `directorio_clientes`, con BOM | nadie hoy |
+🔴 **NINGUNO, y desde el 5-sep-2026 es literal.** `/clientes` y `/clientes/[codigo]` no tienen botón
+de export, ni PDF, ni correo. Hasta hoy quedaba una rendija —`GET /api/directorio?format=csv`, el
+`directorio_<YYYY-MM-DD>.csv` de las 33 filas de la libreta vieja, que no disparaba ningún botón y
+solo se alcanzaba escribiendo la URL—; **esa ruta se borró con el resto de `/api/directorio`.**
 
 Los datos de este módulo sí salen en papel, pero **impresos por otros**: el estado de cuenta que
 manda el CXC usa su correo y su teléfono; el nombre del cliente sale en la guía de despacho, en el
@@ -2151,8 +2424,9 @@ comprobante de Marketing y en los PDF de pedido de Catálogos.
 ## Cómo probarlo a mano
 
 **1. Que la lista es la del grupo.** Abre `/clientes` sin filtros. Arriba tiene que decir alrededor de
-**150 clientes** (medido: 150 vivos al 4-sep-2026). Si de golpe dice miles, alguien volvió a meter
-Boston en `clientes_master`: `select count(*) from clientes_master where deleted = false`.
+**150 clientes** (medido: **150 vivos al 5-sep-2026**, el mismo número que ayer). Si de golpe dice
+miles, alguien volvió a meter Boston en `clientes_master`:
+`select count(*) from clientes_master where deleted is not true` → 150.
 
 **2. Que editar el contacto se guarda y se ve en todos lados.** Abre una ficha → «Editar contacto» →
 cambia el celular → Guardar. Tiene que decir «Datos actualizados». Verifica en tres lugares:
@@ -2181,17 +2455,24 @@ en `/cxc`.
 | **El sync vuelve a pedir por EXCLUSIÓN** | la lista pasa de ~150 a miles y el ranking de Ventas se duplica | Pasó: 4.910 filas de Boston, cinco semanas, **$2,55 millones de venta que no existió**. Hoy lo impide el barrido de `clientes-master-solo-del-grupo.test.ts` |
 | **Switch deja de mandar un cliente** | la ficha lo dice con fecha; los selectores dejan de ofrecerlo | 🔴 **Una corrida fallida o que traiga menos del 90 % no marca a nadie** (`MAX_FRACCION_AUSENTES = 0.1`) |
 | **`db-max-rows` = 1000** | 🔴 nada: corta en silencio | `leerClientesDelGrupo` pagina y verifica contra un `count` exacto. Ya costó 64 clientes inofrecibles en el selector de Cheques |
-| **La migración `20260919120000` (`ausente_desde`)** | ninguna: `directorio-cache.ts` reintenta sin la columna | Medido: la migración **ya corrió** (la columna existe) pero está **vacía en las 5.064 filas**, así que la etiqueta «Ya no está en Switch» hoy no aparece nunca |
+| **La migración `20260919120000` (`ausente_desde`)** | ninguna: `directorio-cache.ts` reintenta sin la columna | Re-medido el 5-sep-2026: la migración corrió **y la columna ya tiene 2 filas** (D-30 y D-135, marcadas el 13-ago). La etiqueta «Ya no está en Switch» SÍ se ve, en esos dos clientes |
 | **Un `PGRST205`/`42P01`** | 500 visible | La tolerancia se retiró: ya no devuelve vacío |
 
 ## Lo que sobra o no cuadra
 
-- 🔴 **`GET /api/directorio?format=csv` no lo dispara ningún botón.** Es la única salida en papel del
-  módulo y solo se alcanza escribiendo la URL.
-- **`directorio_clientes` está muerta a medias**: 33 filas, la última alta el 28-may-2026, **cinco de
-  sus columnas 100 % vacías** (`empresa`, `celular`, `contacto`, `notas`, `whatsapp`) y su único
-  lector vivo es la búsqueda global. La pantalla `/clientes` **no la toca**, aunque la `key` del
-  módulo se llame `directorio`.
+- ✅ **CERRADO el 5-sep-2026: `GET /api/directorio?format=csv` ya no existe.** Era la única salida en
+  papel del módulo, no la disparaba ningún botón, y se fue con el resto de `/api/directorio`.
+  **Hoy el módulo Clientes no produce ni un archivo.**
+- ✅ **CERRADO el 5-sep-2026: `directorio_clientes` se RETIRÓ ENTERA.** Era «la libreta vieja»: 33
+  filas, la última alta el 28-may-2026, cinco columnas 100 % vacías (`empresa`, `celular`, `contacto`,
+  `notas`, `whatsapp`) y un solo lector, la búsqueda global. Hoy **no tiene ni un lector ni un
+  escritor**: `/api/directorio` (y `[id]`, y `sync`) **se borraron del repo**, la búsqueda global
+  (`/api/search:99`) y las sugerencias del catálogo (`/api/catalogo/[marca]/clientes-search:36`) leen
+  **`clientes_master`**, y el autocompletar de Recordatorios dejó de pedirla. **La tabla se queda**
+  —patrón `mayor_lineas`— con sus 33 filas y su fila en el respaldo. Candado:
+  `src/__tests__/lib/directorio-viejo-retirado.test.ts`, más `buscador-solo-grupo.test.ts`.
+  Verificación: `grep -rn "directorio_clientes" src --include="*.ts" --include="*.tsx" | grep -v __tests__`
+  → solo comentarios, `database.types.ts`, `backup/tablas.ts` y el `route.ts` del respaldo.
 - 🔴 **`/api/clientes/[codigo]/ultimas-facturas` no tiene la puerta de mundo.** Sus dos hermanas
   (`[codigo]` y `historial-mensual`) llaman `esCodigoDelGrupo` y devuelven 404; esta no. Hoy funciona
   por accidente: `switch_factura*` no tiene filas de Boston, así que devuelve `{facturas: []}`.
@@ -2201,18 +2482,21 @@ en `/cxc`.
 - **Cuatro lecturas de la ficha no paginan** (`switch_facturas` ×2, `switch_estadocuenta_aging`,
   `switch_recibos`): un cliente con más de 1.000 facturas en el año truncaría en silencio.
   Hoy nadie llega, pero la ficha no usa `leerTodoPaginado`.
-- **`/api/directorio` GET responde 403 incluso SIN sesión** (no 401), su `search` entra crudo al
-  `.or(...ilike...)` sin escapar `%` ni `,`, y su rama sin paginar trae la tabla entera.
-  `/api/directorio/[id]` y `/api/directorio/sync` son las únicas dos rutas del grupo **sin
-  `export const dynamic`**; `sync` además hace `await req.json()` **sin `try/catch`**.
-- **`/api/directorio/sync`** trae TODO el directorio y matchea en memoria con **su propia
-  normalización**, distinta de `nombre-normalizado.ts` y de `normProvName`.
+- ✅ **CERRADO el 5-sep-2026.** Todo lo que este documento anotaba de `/api/directorio` —el 403 sin
+  sesión en vez de 401, el `search` crudo dentro del `.or(...ilike...)` sin escapar `%` ni `,`, la
+  rama sin paginar que traía la tabla entera, las dos rutas sin `export const dynamic`, el
+  `await req.json()` sin `try/catch` de `sync`, y la normalización propia de `sync`— **desapareció con
+  las rutas**. Ya no hay nada que arreglar ahí.
 - **`src/lib/clientes/columna-codigo-opcional.ts` no lo importa nadie** desde el 3-sep-2026 (lo dice su
   propio encabezado).
 - **`clientes_master.notas` la usan 2 clientes de 150.** El campo existe en el formulario y en el
   `PATCH`.
-- **`ausente_desde` está vacía al 100 %** (0 de 5.064) aunque `switch_clientes.ausente_desde` tiene 12:
-  el mecanismo de marcado existe en `switch_clientes` y **no llega a `clientes_master`**.
+- ❌ **Esto era FALSO y se corrigió el 5-sep-2026.** Este documento decía: *«`ausente_desde` está
+  vacía al 100 % (0 de 5.064)… el mecanismo de marcado existe en `switch_clientes` y no llega a
+  `clientes_master`»*. **Sí llega**: `sync-clientes-master.ts` tiene la pasada `marcarAusentes` y hay
+  **2 filas marcadas** (D-30 y D-135, 13-ago-2026). Lo que pasa es que son pocas — 2 de 150 — y
+  contarlas mal (o mirar solo las 4.914 borradas de Boston, que nunca se marcan) hace parecer que el
+  mecanismo está muerto.
 - **`bodega` está en `allowedRoles` de la pantalla pero no en `roles[]` del módulo ni en su fila de
   `role_permissions`.** Entra por URL o por la búsqueda global; no tiene ficha ni botón de sync.
 ---
@@ -2293,23 +2577,38 @@ lista para ver desde cuándo se le debe.
 ⚠️ `CLAUDE.md § Dónde vive cada dato` ya lo corrigió, pero conviene repetirlo: **esta tabla no tiene
 `deleted`**, y era la que se citaba como «la única tabla `switch_*` con soft delete».
 
-**Llenado (de 65):** `empresa_key`, `proveedor_switch_id`, `codigo`, `nombre`, `saldo_total`,
-`aging`, `elements`, `num_facturas`, `num_pagos`, `synced_at`, `updated_at` = 65 ·
-`identificacion` 57 · `direccion` 50 · `telefono` 50 · `celular` 50 · `email` 50 ·
-`tipo_proveedor` 50 · `dv` 45 · `contacto` 24 · **`ultimo_pago_monto` / `ultimo_pago_fecha` /
-`ultimo_pago_dias` = 12 cada una**.
+**Llenado (de 65), re-medido el 5-sep-2026 y confirmado dato por dato:** `empresa_key`,
+`proveedor_switch_id`, `codigo`, `nombre`, `saldo_total`, `aging`, `elements`, `num_facturas`,
+`num_pagos`, `synced_at`, `updated_at` = 65 · `identificacion` 57 · `direccion` 50 · `telefono` 50 ·
+`celular` 50 · `email` 50 · `tipo_proveedor` 50 · `dv` 45 · `contacto` 24 ·
+**`ultimo_pago_monto` / `ultimo_pago_fecha` / `ultimo_pago_dias` = 12 cada una** ·
+🔴 **`comprado_ytd` y `pagado_ytd` = 0 en las 65, confirmado**.
 `tipo_proveedor` (3 valores): `Local` 49 · vacío 15 · `Internacional` 1.
+
+```sql
+select count(*) n, count(nullif(trim(identificacion),'')) ident, count(nullif(trim(contacto),'')) cont,
+  count(ultimo_pago_monto) up, count(*) filter (where comprado_ytd <> 0) cy,
+  count(*) filter (where pagado_ytd <> 0) py
+from switch_proveedor_estadocuenta;   -- → 65 | 57 | 24 | 12 | 0 | 0
+```
 
 🔴 **`comprado_ytd` y `pagado_ytd` valen 0 en las 65 filas.** Son columnas `NOT NULL DEFAULT 0` que
 **ya no se escriben ni se leen**: los dos indicadores se retiraron el 27-jul-2026 (ver «Lo que se
 intentó y se retiró»). El «Último pago» sí se recalcula **al leer**, desde el jsonb `elements`, porque
 el sync corre 1×/día y «hace N días» se congelaba.
 
-**Reparto por empresa** (proveedores · Σ `saldo_total`):
-`fashion_wear` 17 · $2.310.141,19 — `american_classic` 13 · $124.145,50 — `vistana` 12 · $973.397,86
-— `active_shoes` 10 · $261.113,57 — `active_wear` 5 · $111.506,97 — `joystep` 5 · $21.189,19 —
-`fashion_shoes` 3 · $1.302.582,91. **Total 65 proveedores · $5.104.077,19.**
+**Reparto por empresa, 5-sep-2026** (proveedores · Σ `saldo_total`):
+`fashion_wear` 17 · $2.334.502,27 — `fashion_shoes` 3 · $1.338.175,39 — `vistana` 12 · $1.008.781,89
+— `active_shoes` 10 · $261.113,57 — `american_classic` 13 · $124.436,54 — `active_wear` 5 ·
+$111.506,97 — `joystep` 5 · $21.189,19. **Total 65 proveedores · $5.199.705,82.**
 **`confecciones_boston` = 0 proveedores** (`cxp: false`).
+El REPARTO de proveedores por empresa (17 · 13 · 12 · 10 · 5 · 5 · 3) **no se movió** desde el 4-sep;
+lo que se movió es la plata.
+
+```sql
+select empresa_key, count(*) n, round(sum(saldo_total),2) suma
+from switch_proveedor_estadocuenta group by 1 order by 3 desc;
+```
 
 **Lo que la ficha lee además:** la tabla `reclamos` (`deleted = false`, ordenada por `fecha_reclamo`),
 **entera**, y cruza en memoria por el par **(`empresa_key`, `proveedor_codigo`)** contra las filas de
@@ -2472,14 +2771,17 @@ Y comparte con el CXC el vocabulario de tramos (`src/lib/cxc-aging.ts`).
 
 ## Cuánto se usa
 
-- **Quién puede entrar:** 3 personas (daniel, alberto y `Contabilidad`). Logins de `Contabilidad` en
-  los últimos 30 días: **31**; en 90 días: 68. Última sesión: 4-sep-2026 21:57 UTC.
+- **Quién puede entrar:** 3 personas (daniel, alberto y `Contabilidad`) — verificado contra
+  `role_permissions` y `fg_users` el 5-sep-2026: `proveedores` está **solo** en la fila de
+  `contabilidad`, y `admin` pasa sin mirar la tabla. Sesiones de `Contabilidad` en los últimos 30
+  días: **31**; en 90 días: **68**. Última: 2-sep-2026.
 - 🔴 **El uso del módulo es 100 % no medible.** No escribe ninguna fila en ninguna tabla, no llama a
   `logActivity` (0 filas con `entity_type` de proveedores) y no hay telemetría de pantallas. Lo único
   que se puede afirmar es que Contabilidad entra al sistema seguido y que este es **uno de sus cinco
   módulos** (`asistencia`, `prestamos`, `proveedores`, `gastos-contabilidad`, `comisiones`).
-- **Que el dato llegue sí se mide:** `sync-proveedores` corrió **210 veces en 30 días (7,0/día, las 7
-  empresas) con CERO errores**. Última corrida buena de las 7: **4-sep-2026 09:30–09:32 UTC**.
+- **Que el dato llegue sí se mide:** re-medido el 5-sep-2026, `sync-proveedores` corrió **210 veces
+  en 30 días (7,0/día, las 7 empresas) con CERO errores** — el mismo número que ayer. Última corrida
+  buena de las 7: **5-sep-2026 09:30–09:32 UTC** (`max(synced_at)` = 09:32:28).
 
 ## Qué papeles y Excel produce
 
@@ -2495,7 +2797,8 @@ incluidos los proveedores sin saldo, aunque en pantalla estén colapsados.
 
 **1. Que el total cuadra con Vista General.** Abre `/proveedores` con «Todas» y anota «Por pagar ·
 grupo». Abre `/vista-general` y mira la tarjeta «Por pagar (CXP)». **Tienen que ser el mismo número**
-(al 4-sep-2026: **$5.104.077,19**). Si no cuadran, el sospechoso es un filtro de `saldo_total > 0`:
+(al **5-sep-2026: $5.199.705,82**; el 4-sep eran $5.104.077,19 — este número se mueve todos los días
+con el sync de las 09:30). Si no cuadran, el sospechoso es un filtro de `saldo_total > 0`:
 el total incluye los saldos a favor a propósito.
 
 **2. Que «Actualizar ahora» trae datos.** Toca el botón de la lista y espera ~1 min (van las 7 en
@@ -2546,3 +2849,89 @@ escrito distinto en Reclamos no aparece — eso es dato sucio, no una falla del 
 - **`proveedores` no está en la fila de `admin` de `role_permissions`** (funciona porque
   `getVisibleModules` le devuelve todo a admin sin mirar la tabla) — igual que `vista-general`, que no
   está en **ninguna** fila.
+
+---
+
+# Lo que estaba mal
+
+**Verificación completa del 5-sep-2026.** Se recorrió el documento entero y se comprobó **una por
+una** cada afirmación factual: números, nombres de tabla/vista/columna/función/ruta, «quién lee» y
+«quién escribe» (con `grep` sobre `src/`, buscando la llamada real y no el nombre en un comentario),
+qué empresas cubre cada tabla, y que cada candado citado exista de verdad.
+
+**Resultado: ~215 afirmaciones verificadas · 12 estaban MAL · 9 quedaron viejas por el trabajo de
+hoy · el resto se confirmó, muchas al centavo.**
+
+Lo que se confirmó exacto vale tanto como lo que se corrigió, así que va primero un ejemplo: el
+`$463.898,47 = 7,4 %` de Boston se **reprodujo al centavo** poniéndole el corte del 2-sep, la fecha
+en que se midió. Igual los 36 documentos de menos de $50 de City Mall Paso Canoa ($227,20), los
+13 clientes de `oficina@citymoda.store` ($402.376,67), los 272/113 de contacto de Boston, el llenado
+entero de `switch_proveedor_estadocuenta`, el de `cxc_client_overrides` y los cinco tipos de
+comprobante vivos.
+
+## Lo que estaba mal
+
+| Qué decía | Qué es en realidad | Cómo se midió |
+|---|---|---|
+| 🔴 **«Total 211 clientes»** en la cartera del grupo (y «los 79 con correo» sobre esa base, y «0 de 211» en las columnas vacías) | **211 son FILAS, una por (empresa, cliente). Los clientes son 100**, y 100 es lo que pinta la pantalla (`useAdminData` consolida por `nombre_normalized`). De los 100: **94 deben · 6 tienen saldo a favor**. Decir «me deben 211 clientes» cuenta seis veces a City Mall | `select count(*), count(distinct codigo) from switch_estadocuenta_aging` → `211 | 100` |
+| 🔴 **«`clientes_master.ausente_desde` está vacía al 100 % (0 de 5.064)… el mecanismo no llega a `clientes_master`»** | **Tiene 2 filas y el mecanismo funciona**: `D-30` City Moda Chorrera y `D-135` Rey Store (Aguas), marcados el 13-ago-2026. La etiqueta «Ya no está en Switch» SÍ se ve | `select codigo, ausente_desde from clientes_master where ausente_desde is not null` |
+| 🔴 **«`cxc_emails_enviados` no la lee ninguna pantalla — bitácora de solo escritura»** | **`GET /api/cxc/envios` la lee**, y `src/app/cxc/page.tsx:251` la pide al abrir la pantalla: de ahí sale la marca «Le enviaste el estado de cuenta hace 3 días». Y ahora tiene **tres** escritores, no uno | `grep -rn "cxc_emails_enviados" src` |
+| **«`activity_logs` con `entity_type = "cxc"`: 38 filas … **andrea**»** | Son **38 con `action = 'cxc_upload'`** (27 con `entity_type='cxc'` + 11 con `'upload'`), pero **el nombre de la persona no se puede saber**: `activity_logs` **no tiene columna de usuario**, solo `user_role` (32 `secretaria`, 6 `admin`). Atribuirlo a andrea era inferencia, no medición | `select column_name from information_schema.columns where table_name='activity_logs'` |
+| **«Logins de daniel en 30 días: 74»** (y 49 de Angela) | **110** (340 en 90 días) y **48**. El 74 no se reproduce: con una ventana que avanzó un día tendría que bajar, no subir. Los demás (rey 32, edwin 8, alberto 1, Contabilidad 31) sí cuadran | `count(*) filter (where created_at >= now() - interval '30 days')` sobre `user_sessions` |
+| **«el detalle fino del `title` de Boston llega con la migración `20260928120000`»** (futuro) | **Ya llegó**: la migración corrió hoy y `switch_estadocuenta_aging_boston` pasó de 10 a **17 columnas**, con los siete tramos finos **al lado** de los tres gruesos | `pg_attribute` sobre esa vista |
+| **«migración `20260926120000`, pendiente»** (el `contacto` de la ficha) | **Aplicada**, y ya tiene **6 clientes** con contacto cargado | `supabase_migrations.schema_migrations` |
+| **«las siete migraciones marcadas pendiente ya corrieron, más otras seis»** | Se quedó corto: están aplicadas **todas hasta `20260928120000`**, o sea siete más | mismo lugar |
+| **«`vercel.json` tiene 80 entradas de cron»** | **82** (entraron `prestamos-caducan` y `sync-clientes-boston`) | `python3 -c "import json;print(len(json.load(open('vercel.json'))['crons']))"` |
+| **«`GET /api/cxc-rows` — ruta viva sin consumidor»** | **Se borró el 5-sep-2026.** `src/app/api/cxc-rows/` no existe | `ls src/app/api/cxc-rows` |
+| **«El menú «···» tiene exactamente 4 opciones» como regla vigente** | El menú **ya no existe**: el rediseño lo reemplazó por el botón «Cobrar». El candado sigue vivo pero **cambió de dirección** — hoy exige que NO vuelva | encabezado de `src/__tests__/components/cxc-pestanas-y-menu.test.tsx` |
+| **«`directorio_clientes`… su único lector vivo es la búsqueda global»** y las seis notas sobre `/api/directorio` | **Retirada entera hoy.** Cero lectores, cero escritores; `/api/directorio`, `[id]`, `sync` y `?format=csv` **borrados**. La búsqueda global y las sugerencias del catálogo leen `clientes_master` | `grep -rn "directorio_clientes" src` (solo comentarios y respaldo) |
+
+## Números que solo estaban viejos (el dato se mueve todos los días)
+
+| Dato | 4-sep-2026 | 5-sep-2026 |
+|---|---|---|
+| Cartera del grupo (`switch_estadocuenta_aging`) | $3.685.289,04 | **$3.676.935,55** (211 filas, 100 clientes) |
+| Cartera de Boston | $190.399,07 · 390 | **$195.509,25** · 390 (279 con saldo) |
+| Por pagar a proveedores | $5.104.077,19 | **$5.199.705,82** (65 proveedores, mismo reparto) |
+| `switch_estadocuenta` | 2.754 (Boston 985) | **2.759** (Boston **990**) |
+| `switch_facturas` | — | **54.466** (desde oct-2022) |
+| `switch_clientes` | 6.799 | **6.800** (ACS 1.038) |
+| Venta 2026 de Boston | $463.898,47 = 7,43 % | **$472.856,97 = 7,54 %** |
+| Fichas de `switch_articulo_info` en `active_shoes` | 1.200 de 1.763 | **1.408** de 1.763 |
+| `switch_articulo_diario` de Boston | 18.016 | **18.064** |
+| `switch_costo_diario` con `costo_total = 0` | 732 de 1.223 | **726** de 1.223 |
+
+## Lo que se midió nuevo y no estaba en ningún lado
+
+- **El aviso «N sin pagar hace +90 d» hoy dice 37, por $647.944,31.** De los 94 clientes que deben,
+  30 no pagan hace más de 90 días y **7 nunca pagaron**; el más viejo lleva **911 días**.
+- **`clientes_master.contacto` tiene 6 clientes cargados** (la columna nació hoy): D-38 «Alberto
+  levy», D-76 «emad», D-166 «Mohamed», D-170 «Victor Rodriguez», D-202 «Narimy» y D-103 con un correo
+  metido en el campo de contacto.
+- **La columna `canal` de `cxc_emails_enviados` quedó en `'correo'` en las 19 filas** por el backfill;
+  `whatsapp` y `copia` tienen **0 filas**: se estrenaron hoy.
+- **La 12ª exclusión de comisiones es la primera asimétrica del sistema** (Edwin / `D-81` / Vistana,
+  solo cobro). `CLAUDE.md` dice «11 activas» y quedó viejo al día siguiente de escribirse.
+- **`clientes_empresa_12m_vw` es una VISTA MATERIALIZADA, no una vista** (`relkind = 'm'`), pese al
+  sufijo `_vw`. La convención de `CLAUDE.md` («`_mv` = materializada, `_vw` = vista») **no se cumple
+  en ese objeto**, y refrescarla o no cambia lo que ve Ventas › Clientes. Filas: 1.685.
+- **Contar contacto con `count(columna)` miente.** Los formularios viejos guardaban cadena vacía, no
+  `NULL`: `count(correo)` sobre `cxc_client_overrides` da 10 y lo real son **8**. Hay que usar
+  `count(nullif(trim(col),''))`. Es la trampa que hace ver llenas columnas vacías.
+
+## Cosas del SISTEMA (no de la documentación) que quedaron abiertas
+
+1. 🩸 **El directorio de clientes de Boston lleva 37 días congelado y sigue congelado.** Las 4.915
+   filas de `switch_clientes` de `confecciones_boston` tienen `synced_at = 2026-07-30 06:31:07`. El
+   cron que lo arregla (`sync-clientes-boston`) nació hoy y es **semanal, domingos 07:10 UTC**: a la
+   fecha de esta medición **no ha corrido ni una vez**. Mientras tanto, los teléfonos y correos de la
+   pestaña de Boston del CXC son de hace más de un mes.
+2. ⚠️ **`/api/clientes/[codigo]/ultimas-facturas` sigue sin la puerta de mundo.** Sus dos hermanas
+   (`[codigo]` y `historial-mensual`) llaman `esCodigoDelGrupo` y devuelven 404 a un código ajeno;
+   esta no. Hoy no filtra nada porque `switch_facturas` no cruza para Boston, pero es la única de las
+   tres sin el candado.
+3. ⚠️ **`HojaCobrar.tsx:20` cita un candado que no existe** (`cxc-cobrar-manda-las-seis.test.ts`). La
+   regla de «siempre las 6 empresas» SÍ está cerrada, pero en `cxc-cobrar-una-hoja.test.ts`.
+4. 🔴 **`joystep` sigue sin una sola fila en `bancos_saldos`** (52 filas, 7 empresas). La tarjeta
+   «Disponibilidad» de Vista General suma el banco de siete de las ocho y no lo advierte. Y los
+   últimos saldos de vistana, fashion_wear, Boston y ACS son del **31-jul-2026**.
