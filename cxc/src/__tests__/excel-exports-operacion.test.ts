@@ -3,10 +3,10 @@ import XLSX from "xlsx-js-style";
 import { workbookFromSheets } from "@/lib/excel-export";
 import { buildGuiasSheet } from "@/app/guias/components/excel-guias";
 import { buildProveedoresSheet } from "@/app/proveedores/excel-proveedores";
-import { buildChequesSheet } from "@/app/cheques/excel-cheques";
 import type { Guia, GuiaItem } from "@/app/guias/components/types";
 import type { ProveedorExportRow } from "@/app/proveedores/excel-proveedores";
-import type { ChequeExportRow } from "@/app/cheques/excel-cheques";
+import fs from "fs";
+import path from "path";
 
 // Round-trip: construir la hoja → escribir a buffer → RE-leer con XLSX.read.
 // Valida que los builds puros (sin DOM) produzcan workbooks reales con el
@@ -250,29 +250,45 @@ describe("excel-proveedores — buildProveedoresSheet", () => {
 
 });
 
-describe("excel-cheques — buildChequesSheet", () => {
-  const cheques: ChequeExportRow[] = [
-    { cliente: "Cliente X", numero_cheque: "1001", monto: 350.75, fecha_deposito: "2026-07-10", vendedor: "Ana" },
-    { cliente: "Cliente Y", numero_cheque: "1002", monto: 120, fecha_deposito: "2026-07-11", vendedor: "" },
-    { cliente: "Cliente Z", numero_cheque: "1003", monto: 80.5, fecha_deposito: "2026-07-12", vendedor: "Luis" },
-  ];
+/**
+ * 🩸 ESTE BLOQUE CAMBIÓ DE DIRECCIÓN EL 5-SEP-2026.
+ *
+ * LO QUE MEDÍA ANTES: el round-trip del Excel de Cheques —hoja capitalizada,
+ * encabezados en la fila 1, el monto como número y la fila de totales.
+ *
+ * POR QUÉ YA NO: **el Excel de Cheques se retiró.** Daniel, al rediseñar el
+ * módulo Recordatorios: *«se va»*. Se borró `app/cheques/excel-cheques.ts` y su
+ * botón. Los datos siguen en la base; lo que se fue es la descarga.
+ *
+ * LO QUE MIDE AHORA: que no VUELVA por la ventana. Un `import` que ya no existe
+ * habría dejado el archivo sin poder compilar (que es un rojo honesto, pero se
+ * arregla borrando el bloque y ahí se pierde el rastro). Esto deja el rastro y
+ * además vigila: si mañana alguien repone un `excel-cheques`, se pone rojo y
+ * tiene que venir con la decisión de Daniel escrita al lado.
+ */
+describe("🔴 el Excel de Cheques se retiró y no vuelve", () => {
+  const RAIZ = process.cwd();
 
-  it("round-trip: nombre de hoja capitalizado, headers en la fila 1 y monto numérico", () => {
-    const built = buildChequesSheet(cheques, "vencen hoy");
-    expect(built.sheetName).toBe("Vencen hoy");
-    const ws = roundTrip(built.sheetName, built.ws);
+  it("no existe ningún archivo de Excel del módulo", () => {
+    for (const rel of [
+      "src/app/cheques/excel-cheques.ts",
+      "src/app/recordatorios/excel-cheques.ts",
+      "src/app/recordatorios/components/excel-cheques.ts",
+    ]) {
+      expect(fs.existsSync(path.join(RAIZ, rel)), `${rel} volvió`).toBe(false);
+    }
+  });
 
-    expect(ws.A1.v).toBe("Cliente");
-    expect(ws.C1.v).toBe("Monto");
-    expect(ws.E1.v).toBe("Vendedor");
-    // Datos + moneda como número
-    expect(ws.A2.v).toBe("Cliente X");
-    expect(ws.C2.t).toBe("n");
-    expect(ws.C2.v).toBe(350.75);
-    expect(ws.C2.z).toBe("$#,##0.00");
-    // Totales en fila 6 (headers 1 + 3 datos + espaciador)
-    expect(ws.A6.v).toBe("3 cheques");
-    expect(ws.C6.t).toBe("n");
-    expect(ws.C6.v).toBeCloseTo(551.25, 2);
+  it("y la pantalla no ofrece ninguna descarga", () => {
+    const src = fs.readFileSync(
+      path.join(RAIZ, "src/app/recordatorios/RecordatoriosClient.tsx"),
+      "utf8",
+    );
+    // Sin los comentarios: este archivo CUENTA que el Excel se fue, y un
+    // barrido de texto crudo se cumpliría con su propia explicación.
+    const codigo = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(codigo).not.toContain("exportChequesExcel");
+    expect(codigo).not.toContain("Exportar");
+    expect(codigo).not.toContain("downloadWorkbook");
   });
 });

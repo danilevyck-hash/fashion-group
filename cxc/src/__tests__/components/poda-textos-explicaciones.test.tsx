@@ -207,7 +207,7 @@ describe("Asistencia · el motivo sigue siendo OBLIGATORIO sin la frase que lo d
 // ───────────────────────────────────────────────────────────────────────────
 // Cheques › recordatorio
 // ───────────────────────────────────────────────────────────────────────────
-import RecordatorioFormModal, { recordatorioVacio } from "@/app/cheques/components/RecordatorioFormModal";
+import RecordatorioFormModal, { recordatorioVacio } from "@/app/recordatorios/components/RecordatorioFormModal";
 
 /** El arnés trae un `localStorage` pelado; el picker de clientes lo usa. */
 function almacenFalso(): Storage {

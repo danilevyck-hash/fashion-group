@@ -55,28 +55,56 @@ vi.mock("@/lib/supabase-server", () => ({
       }
       // El doble FILTRA de verdad (no solo registra): así un cheque depositado
       // o borrado se cae por el mismo camino que en producción.
+      //
+      // ⚠️ Desde el 5-sep-2026 el cron hace TRES consultas sobre `cheques` en la
+      // misma corrida (los que vencen · los VENCIDOS sin avisar · los
+      // depositados de más de 365 días) y dos escrituras. Por eso cada
+      // `from("cheques")` arma un builder NUEVO con su propio estado: con el
+      // estado compartido, el rango de la segunda consulta pisaba el de la
+      // primera y los candados de la ventana medían otra cosa.
+      const propios: Record<string, unknown> = {};
+      const miRango: { desde?: string; hasta?: string } = {};
+      let esVencidos = false;
       const ch = {
         select: () => ch,
         eq: (col: string, val: unknown) => {
+          propios[col] = val;
           filtros[col] = val;
           return ch;
         },
         gte: (_col: string, val: string) => {
+          miRango.desde = val;
           rango.desde = val;
           return ch;
         },
         lte: (_col: string, val: string) => {
-          rango.hasta = val;
+          // La retención también usa `.lte` sobre `fecha_deposito`, pero no
+          // llega a `order()`: se resuelve como un `await` del builder, que
+          // devuelve un objeto sin `data` y el código lo lee como "0 filas".
+          miRango.hasta = val;
+          if (!esVencidos) rango.hasta = val;
           return ch;
         },
+        // `.is("aviso_vencido_en", null)` es la firma de la consulta de VENCIDOS.
+        is: () => {
+          esVencidos = true;
+          return ch;
+        },
+        lt: (_col: string, val: string) => {
+          miRango.hasta = val;
+          return ch;
+        },
+        in: () => Promise.resolve({ data: null, error: null }),
+        update: () => ch,
         order: async () => {
+          if (esVencidos) return filasVencidos();
           const { data, error } = await filasCheques();
           if (error) return { data: null, error };
           const filtradas = (data ?? []).filter(
             (r: Record<string, unknown>) =>
-              Object.entries(filtros).every(([col, val]) => (r[col] ?? null) === val) &&
-              String(r.fecha_deposito) >= String(rango.desde) &&
-              String(r.fecha_deposito) <= String(rango.hasta),
+              Object.entries(propios).every(([col, val]) => (r[col] ?? null) === val) &&
+              String(r.fecha_deposito) >= String(miRango.desde) &&
+              String(r.fecha_deposito) <= String(miRango.hasta),
           );
           return { data: filtradas, error: null };
         },
@@ -86,10 +114,18 @@ vi.mock("@/lib/supabase-server", () => ({
   },
 }));
 
+/** Las filas de la consulta de VENCIDOS (el aviso único, 5-sep-2026). */
+const filasVencidos = vi.fn();
+
 const enviado = vi.fn();
+const enviadoPrivado = vi.fn();
 vi.mock("@/lib/alertas/canal", () => ({
   enviarNegocio: (texto: string) => {
     enviado(texto);
+    return Promise.resolve(true);
+  },
+  enviarNegocioPrivado: (texto: string) => {
+    enviadoPrivado(texto);
     return Promise.resolve(true);
   },
 }));
@@ -131,7 +167,10 @@ beforeEach(() => {
   // Por defecto: todavía no se avisó hoy.
   heartbeat.mockResolvedValue({ data: null, error: null });
   filasCheques.mockResolvedValue({ data: [], error: null });
+  filasVencidos.mockResolvedValue({ data: [], error: null });
   filasRecordatorios.mockResolvedValue({ data: [], error: null, count: 0 });
+  enviadoPrivado.mockReset();
+  filasVencidos.mockClear();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

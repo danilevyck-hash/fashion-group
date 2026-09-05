@@ -36,7 +36,12 @@
 
 import { getCompanyDisplay } from "@/lib/companies";
 
-const WA_NUMBERS = ["+50766745522", "+50766494096"];
+// 🩸 ACÁ VIVÍA `WA_NUMBERS` — dos celulares escritos a mano que se pegaban al
+// final de CADA aviso: "WhatsApp seguimiento: +50766745522, +50766494096".
+// Se retiró el 5-sep-2026. Daniel, textual: *«nada, es recordatorio nada más»*.
+// Un teléfono en el pie no era una acción: era una firma que nadie tocaba, y
+// además era el único dato del mensaje que envejecía sin que nada lo avisara.
+// El resto del texto de cheques NO se tocó, palabra por palabra.
 
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -141,7 +146,6 @@ export function construirMensaje(cheques: ChequePorVencer[], hoy: string): strin
 
   return (
     `⚠️ ${cheques.length} cheque${cheques.length > 1 ? "s" : ""} por vencer — ${money(total)}\n` +
-    `${lineas}\n` +
-    `WhatsApp seguimiento: ${WA_NUMBERS.join(", ")}`
+    `${lineas}`
   );
 }

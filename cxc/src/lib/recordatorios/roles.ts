@@ -12,5 +12,13 @@
  */
 export const RECORDATORIOS_ROLES: readonly string[] = ["admin", "secretaria"];
 
+/**
+ * Quién elige a QUIÉN le llega un recordatorio (5-sep-2026). Se re-exporta
+ * desde el módulo puro para que las pantallas y las rutas tengan UNA puerta de
+ * roles: la lista de verdad —y la función que la aplica— viven en
+ * `recordatorio.ts`, junto a la validación que la hace cumplir.
+ */
+export { ROLES_QUE_ELIGEN_DESTINO } from "./recordatorio";
+
 /** La `key` del módulo. NO cambia con el label — renombrarla rompe permisos. */
 export const RECORDATORIOS_MODULO_KEY = "cheques";

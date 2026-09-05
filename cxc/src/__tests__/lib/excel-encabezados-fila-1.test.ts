@@ -327,14 +327,21 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     expect(nota[0].length).toBeLessThan(220);
   });
 
-  it("los 25 lugares que arman una hoja siguen ahí (nada se perdió de camino)", () => {
+  it("los 24 lugares que arman una hoja siguen ahí (nada se perdió de camino)", () => {
     const total = archivosQueLlaman().reduce(
       (n, f) => n + (sinComentarios(leer(f)).match(/buildReportSheet\(\{/g) ?? []).length,
       0,
     );
-    // 25 desde el 31-ago-2026: entra el Excel de Aprobaciones, el único que
+    // 25 desde el 31-ago-2026: entró el Excel de Aprobaciones, el único que
     // dice si la hora extra estaba autorizada.
-    expect(total).toBe(25);
+    //
+    // 🩸 24 desde el 5-sep-2026: **el Excel de Cheques SE RETIRÓ.** Daniel, al
+    // rediseñar el módulo Recordatorios: *«se va»*. Se borró
+    // `app/cheques/excel-cheques.ts` con su botón; los datos siguen en la base,
+    // lo que se fue es la descarga. Este número baja A PROPÓSITO: es el candado
+    // que avisa si alguien pierde un Excel sin querer, y bajarlo sin nota sería
+    // exactamente el descuido que vino a cazar.
+    expect(total).toBe(24);
   });
 });
 

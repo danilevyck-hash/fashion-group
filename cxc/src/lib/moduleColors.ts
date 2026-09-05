@@ -39,7 +39,7 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
 export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/admin"))           return "cxc";
   if (pathname.startsWith("/guias"))           return "guias";
-  if (pathname.startsWith("/cheques"))         return "cheques";
+  if (pathname.startsWith("/recordatorios")) return "cheques"; // la key sigue siendo `cheques` (role_permissions)
   if (pathname.startsWith("/reclamos"))        return "reclamos";
   if (pathname.startsWith("/caja"))            return "caja";
   if (pathname.startsWith("/clientes"))        return "directorio";

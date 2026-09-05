@@ -241,7 +241,7 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/productos/cargar/FacturasTiendaClient.tsx", que: "Facturas Tienda · masthead 'Facturas Tienda' (la pestaña ya lo dice)", texto: "font-serif text-xl font-semibold tracking-tight text-stone-900" },
   { archivo: "app/asistencia/AsistenciaClient.tsx", que: "Asistencia · h1 grande 'Asistencia'", texto: 'text-xl font-semibold text-gray-900">Asistencia' },
   { archivo: "app/asistencia/AsistenciaClient.tsx", que: "Asistencia · el módulo iba en minúscula y ahora es lo único que nombra la pantalla", texto: 'module="asistencia"' },
-  { archivo: "app/cheques/ChequesClient.tsx", que: "Cheques · h1 grande 'Cheques'", texto: 'tracking-tight">Cheques' },
+  { archivo: "app/recordatorios/RecordatoriosClient.tsx", que: "Cheques · h1 grande 'Cheques'", texto: 'tracking-tight">Cheques' },
   { archivo: "app/caja/components/PeriodoList.tsx", que: "Caja Menuda · h1 grande 'Caja Menuda' (38 px de alto)", texto: "clamp(28px, 4vw, 38px)" },
   { archivo: "app/marketing/components/InicioMarketing.tsx", que: "Marketing · h1 grande 'Marketing'", texto: 'text-xl font-semibold text-gray-900">Marketing' },
   { archivo: "app/gastos-contabilidad/GastosContabilidadClient.tsx", que: "Gastos · h1 grande 'Gastos'", texto: 'text-xl font-semibold tracking-tight text-gray-900' },
@@ -413,7 +413,7 @@ const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   // El módulo pasó a llamarse "Recordatorios" el 24-ago-2026 (la key interna
   // sigue siendo `cheques`). El invariante NO se aflojó: sigue habiendo UN solo
   // h1 y sigue siendo `sr-only`; lo único que cambió es la palabra.
-  { archivo: "app/cheques/ChequesClient.tsx", nombre: "Recordatorios" },
+  { archivo: "app/recordatorios/RecordatoriosClient.tsx", nombre: "Recordatorios" },
   { archivo: "app/caja/components/PeriodoList.tsx", nombre: "Caja Menuda" },
   { archivo: "app/prestamos/PrestamosClient.tsx", nombre: "Préstamos" },
   { archivo: "app/marketing/components/InicioMarketing.tsx", nombre: "Marketing" },
@@ -442,7 +442,7 @@ describe("🔴 podar el título NO deja la pantalla sin encabezado", () => {
       "app/proveedores/ProveedoresListClient.tsx",
       "app/guias/components/GuiasList.tsx",
       "app/reclamos/components/EmpresaSelector.tsx",
-      "app/cheques/ChequesClient.tsx",
+      "app/recordatorios/RecordatoriosClient.tsx",
       "app/marketing/components/InicioMarketing.tsx",
     ];
     for (const archivo of filasQueQuedaronConUnSoloBoton) {

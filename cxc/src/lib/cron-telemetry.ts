@@ -212,11 +212,13 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "cleanup-packing-lists": 0,
   "acs-resumen-diario": 0,
   "integrity-check": 13, // su cron corre 12:00 UTC
-  // Su cron corre 14:15 UTC (9:15 a.m. Panamá) → hora mínima 15, o sea que solo
-  // la pasada de las 18:00 lo recupera. Con 14 la pasada de las 14:00 se
-  // ADELANTABA a su propio run por 15 min y mandaba el aviso a las 9:00 en
-  // punto; el candado anti-duplicado lo hacía inofensivo, pero recuperar algo
-  // que todavía no falló no es recuperar.
+  // Su cron corre **14:00 UTC (9:00 a.m. Panamá)** desde el 5-sep-2026 — antes
+  // 14:15 — → hora mínima 15, o sea que solo la pasada de las 18:00 lo recupera.
+  // El 15 NO cambió con el horario y es a propósito: con 14 la pasada de las
+  // 14:00 empataría con su propio run (y antes se le adelantaba 15 min), y
+  // recuperar algo que todavía no falló no es recuperar. El candado
+  // anti-duplicado (`yaAvisoHoy`) lo hacía inofensivo, pero el ruido en el log
+  // quedaba igual.
   "cheques-alert": 15,
   // grupo-resumen-mensual: su run normal es el día 1 a las 13:00 UTC (desde
   // el 4-sep-2026; antes el 3) y su recuperación solo aplica los días 1-2

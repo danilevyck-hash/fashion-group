@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { useState } from "react";
 import Drawer from "@/components/Drawer";
-import ChequeFormModal, { chequeFormVacio, type ChequeFormValues } from "@/app/cheques/components/ChequeFormModal";
+import ChequeFormModal, { chequeFormVacio, type ChequeFormValues } from "@/app/recordatorios/components/ChequeFormModal";
 import { primerCampoEnfocable } from "@/lib/hooks/useAutofocusPrimerCampo";
 
 vi.mock("next/navigation", () => ({

@@ -11,6 +11,16 @@
  * 20260824120000_recordatorios.sql (verificado en producción). Hoy cualquier
  * error de la base es un 500 con el mensaje humano de siempre. `faltaMigracion`
  * sigue viajando en el GET (siempre `false`) porque la pantalla lo lee.
+ *
+ * ── 🔴 DOS CANDADOS DEL REDISEÑO (5-sep-2026) ────────────────────────────────
+ *
+ * 1. **El DESTINO lo decide el ROL, no el cuerpo.** `leerCuerpo` recibe el rol
+ *    de la sesión y lo pasa por `destinoPermitido`: una secretaria no ve la
+ *    opción en pantalla, pero tampoco la puede mandar a mano. Esconder el
+ *    control es cortesía; esto es el candado.
+ * 2. **No se guarda para un día que ya pasó.** El aviso sale a las 9:00 a.m. de
+ *    Panamá, así que «hoy» ya pasó y el primero disponible es MAÑANA. La fecha
+ *    de hoy sale de PANAMÁ (`fechaPanama`), nunca del reloj del servidor.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -19,7 +29,9 @@ import { RECORDATORIOS_ROLES } from "@/lib/recordatorios/roles";
 import {
   faltaParaGuardar,
   leerCuerpo,
+  mensajeDeFalta,
 } from "@/lib/recordatorios/recordatorio";
+import { fechaPanama } from "@/lib/cheques-aviso-ventana";
 import { crearRecordatorio, leerRecordatorios } from "@/lib/recordatorios/server";
 
 export const dynamic = "force-dynamic";
@@ -43,10 +55,10 @@ export async function POST(req: NextRequest) {
   if (!s || !RECORDATORIOS_ROLES.includes(s.role)) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
-  const nuevo = leerCuerpo(await req.json().catch(() => ({})));
-  const falta = faltaParaGuardar(nuevo);
+  const nuevo = leerCuerpo(await req.json().catch(() => ({})), s.role);
+  const falta = faltaParaGuardar(nuevo, fechaPanama());
   if (falta.length) {
-    return NextResponse.json({ error: `Falta: ${falta.join(" y ")}` }, { status: 400 });
+    return NextResponse.json({ error: mensajeDeFalta(falta) }, { status: 400 });
   }
 
   const r = await crearRecordatorio(nuevo, s.userName || s.role);

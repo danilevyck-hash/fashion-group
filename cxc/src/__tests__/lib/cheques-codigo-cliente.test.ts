@@ -133,7 +133,7 @@ describe("guardar un cheque con un error de columna FALLA VISIBLE (antes: reinte
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("BARRIDO ESTÁTICO — el formulario y la migración", () => {
-  const MODAL = "src/app/cheques/components/ChequeFormModal.tsx";
+  const MODAL = "src/app/recordatorios/components/ChequeFormModal.tsx";
   const MIGRACION = "supabase/migrations/20260808190000_cheques_cliente_codigo.sql";
 
   /** El WHERE del UPDATE de backfill, SIN comentarios: es lo único que ejecuta. */

@@ -4,7 +4,7 @@
 > Este archivo cubre el gap jul→ago y el estado real medido contra producción hoy.
 > Léelos juntos: el maestro para arquitectura y decisiones, este para qué existe hoy y qué falta.
 >
-> ⚠️ **Al pie hay una sección «Lo que cambió después»** con el 1 al 4 de septiembre. Léela también.
+> ⚠️ **Al pie hay una sección «Lo que cambió después»** con el 1 al 5 de septiembre. Léela también — al final está el rediseño de **Recordatorios** (5-sep).
 
 ---
 
@@ -492,3 +492,75 @@ parecido.
 no hay Postgres local y producción es de solo lectura. Su lógica está cubierta por candados de texto
 (que compara la derivación del SQL con la de TypeScript) pero **la primera corrida real es la de
 Daniel**.
+
+---
+
+# Recordatorios — el rediseño del módulo (5-sep-2026)
+
+> Post-mortem completo, con las citas y las mediciones:
+> [`docs/postmortems/recordatorios.md`](postmortems/recordatorios.md).
+> Mapa de la pantalla: [`docs/modulos/06-recordatorios-usuarios-infra.md`](modulos/06-recordatorios-usuarios-infra.md) § 1.
+
+El módulo `cheques` se llamaba **Recordatorios** desde el 24-ago, pero por dentro seguía siendo la
+pantalla de cheques con una pestaña pegada. Esta tanda rediseñó lo de adentro.
+
+### Lo que se midió antes de tocar nada
+
+19 cheques vivos (17 depositados $257.174,34 + 2 pendientes $22.221,78), **0 borrados**, un solo
+cliente (Jerusalem de Panamá), último movimiento el 28-ago. **1** recordatorio (creado ese mismo
+día); antes, **cero en toda su historia**. La pantalla: **1.693 líneas** y **8 pestañas**.
+
+🔑 La lectura: el módulo SÍ se usa —la parte de cheques—, y la de recordatorios estaba vacía **no
+porque no hiciera falta sino porque costaba cuatro toques y una ventana**.
+
+### Lo que quedó
+
+- 🩸 **Un cheque que venció y nadie marcó NO se volvía a mencionar jamás.** El aviso solo miraba hoy y
+  el próximo día hábil. Estaba pasando: Vistana chq 018094, Edwin, **$18.393,32**, vencía el 31-ago y
+  seguía pendiente 5 días después. Ahora hay un bloque `🔴 N cheque(s) venció…` que sale **UNA SOLA
+  VEZ** y no se repite nunca más (`cheques.aviso_vencido_en`, escrito **después** de que Telegram
+  confirme). Un rebotado no avisa.
+- 🔑 **Las 8 pestañas se fueron.** Cuatro de ellas —vencido, vencen hoy, vencen mañana, vencen esta
+  semana— **nunca fueron estados: son CUÁNDO**. Ahora son grupos de UNA lista: **Vencido · Hoy · Esta
+  semana · Después · Se repiten**, con cheques y recordatorios juntos.
+- **Lo depositado sale de la lista pero se encuentra con la lupa** (por cliente o número de cheque);
+  el buscador es su única puerta.
+- 🔴 **Ningún total sumado, en ninguna parte.** Las tres tarjetas se fueron y **no se reemplazaron**.
+- **Escribir un recordatorio es UN RENGLÓN** siempre visible. **«Hoy» no existe** (todo sale a las
+  9:00 a.m., ya pasó) y **no hay selector de hora**. Entró `cada_dia` y un **«Hasta…»** opcional.
+- **«A quién le llega»**: al equipo o solo a Daniel. Lo eligen **solo los admin** y lo fuerza el
+  servidor. ⚠️ Hay UN solo chat privado y DOS admin: si Alberto marca «solo a mí», le llega a Daniel.
+- **Se quitó la línea de WhatsApp** del aviso de cheques; el resto del texto no se tocó.
+- **El Excel se retiró** («se va»). Los datos siguen en la base.
+- **A los 365 días un cheque depositado se retira solo**, con soft delete, dentro del mismo cron
+  (sin entrada nueva en `vercel.json`).
+- **El cron pasó de 14:15 a 14:00 UTC** (9:15 → 9:00 a.m. de Panamá).
+- **La dirección pasó de `/cheques` a `/recordatorios`** (redirect 307 del enlace viejo). 🔴 **La
+  `key` sigue siendo `cheques`**: está en `role_permissions`.
+- El archivo de 1.693 líneas quedó en **800**, repartido en seis piezas, con las decisiones en
+  módulos puros.
+
+### ⚠️ Pendiente de Daniel (5-sep)
+
+1. 🔴 **Correr `supabase/migrations/20260925130000_recordatorios_rediseno.sql`.** Está **ESCRITA Y NO
+   APLICADA**. Es aditiva (ni una fila cambia de valor): `recordatorios` gana `hasta` y `destino` y
+   su CHECK gana `cada_dia`; `cheques` gana `aviso_vencido_en` y `deleted_at`. ⚠️ **El código no
+   degrada sin ella** — la tolerancia a «falta el DDL» se retiró de este módulo el 3-sep-2026, a
+   propósito.
+2. **«Recordarme este cliente» desde la hoja Cobrar del CXC** quedó pendiente: toca archivos del
+   módulo CXC, que se estaba rediseñando en paralelo.
+
+### Verificación
+
+`tsc` limpio en `src/app`, `src/lib` y `src/components` · `npx next build` verde · suite completa
+verde (**11.100 tests, 550 archivos**) · **56 mutaciones, 56 cazadas**
+(`scripts/_mutar-candados-recordatorios.sh`), de las cuales **2 son controles** que se mutan a
+propósito y quedan verdes.
+
+🩸 **Cinco mutaciones sobrevivieron en la primera corrida y las cinco eran huecos reales** (el PUT sin
+mover la fecha, el destino mandado a mano, la marca antes de que Telegram confirme, el orden de los
+bloques del mensaje y el `destino` ilegible en la base). Se escribieron los cinco tests que faltaban.
+
+⚠️ **Lo que NO se pudo verificar:** la migración no se ejecutó en ningún lado (no hay Postgres local y
+producción es de solo lectura). Sus CHECK están cubiertos por candados de texto que los comparan con
+las listas de TypeScript, pero **la primera corrida real es la de Daniel**.

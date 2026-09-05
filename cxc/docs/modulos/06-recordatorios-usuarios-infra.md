@@ -6,7 +6,7 @@
 
 Contenido:
 
-1. [Recordatorios (`/cheques`, key `cheques`)](#1-recordatorios-cheques-key-cheques)
+1. [Recordatorios (`/recordatorios`, key `cheques`)](#1-recordatorios-recordatorios-key-cheques)
 2. [Usuarios (`/admin/usuarios`, key `usuarios`)](#2-usuarios-adminusuarios-key-usuarios)
 3. [Data Health (pestaña de Usuarios)](#3-data-health-adminusuariostabdata-health)
 4. [Entrar al sistema — login, sesión, roles, middleware](#4-entrar-al-sistema--login-sesión-roles-middleware)
@@ -21,481 +21,246 @@ Contenido:
 
 ---
 
-# 1. Recordatorios (`/cheques`, key `cheques`)
+# 1. Recordatorios (`/recordatorios`, key `cheques`)
+
+> 🔄 **Reescrito el 5-sep-2026 con el rediseño del módulo.** Lo que decía antes —ocho pestañas, tres
+> tarjetas de totales, el Excel, el «+ Recordatorio» que abría una ventana de cuatro campos— describe
+> un módulo que ya no existe. El post-mortem completo, con las citas de Daniel y las mediciones,
+> está en [`docs/postmortems/recordatorios.md`](../postmortems/recordatorios.md).
 
 ## Qué es
 
-Dos cosas conviviendo en una pantalla: los **cheques por depositar** que los clientes entregan
-(a quién, cuánto, para qué día, quién lo recibió) y los **recordatorios sueltos** que Daniel se
-pone en el calendario para que Telegram se los avise. El módulo se llamaba «Cheques» hasta el
-24-ago-2026; Daniel, textual: *«en el módulo de cheques, quisiera cambiarlo a recordatorios, ya que
-quisiera poner ahí en el calendario "recordar cobrar" y pongo la fecha así telegram me recuerda»*.
+Dos cosas conviviendo en **una sola lista**: los **cheques por depositar** que los clientes entregan
+(a quién, cuánto, para qué día, quién lo recibió) y los **recordatorios sueltos** que se escriben
+para que Telegram los avise. El módulo se llamaba «Cheques» hasta el 24-ago-2026; Daniel, textual:
+*«en el módulo de cheques, quisiera cambiarlo a recordatorios, ya que quisiera poner ahí en el
+calendario "recordar cobrar" y pongo la fecha así telegram me recuerda»*.
 
-🔴 **El label cambió; la `key` NO.** Sigue siendo `cheques` porque está escrita en
+🔴 **La DIRECCIÓN cambió el 5-sep-2026: `/cheques` → `/recordatorios`**, con redirect del enlace
+viejo en `next.config.js`. 🔴 **La `key` NO cambió.** Sigue siendo `cheques` porque está escrita en
 `role_permissions.modulos` y en `fg_users.modulos_override` — renombrarla rompe permisos y overrides
 sin comprar nada (`src/lib/recordatorios/roles.ts`, `RECORDATORIOS_MODULO_KEY`).
 
-⚠️ **La tabla `recordatorios` tiene 0 filas desde que existe.** Medido: `select count(*) from
-recordatorios` → **0**. La migración `20260824120000_recordatorios.sql` está aplicada (la tabla
-existe con sus 9 columnas), la pantalla, el formulario, el calendario y el bloque de Telegram están
-todos construidos y funcionando — nadie ha creado ni uno. La mitad «recordatorios» del módulo es,
-hoy, código vivo sin datos.
-
 ## Quién entra
 
-| Rol | Acceso |
+**Admin y secretaria, nadie más.** Daniel, a la pregunta de quién los ve: *«admin y secre»*. Hoy son
+4 personas: admin = daniel, alberto; secretaria = Angela, andrea. La lista vive en **un solo lugar**
+(`RECORDATORIOS_ROLES`) y la leen la ficha del módulo, la página SSR y las cuatro puertas del API.
+
+## Los números, medidos contra producción (5-sep-2026)
+
+| Qué | Cuánto |
 |---|---|
-| `admin` | Todo (cheques + recordatorios) |
-| `secretaria` | Todo (cheques + recordatorios) |
-| cualquier otro | La página redirige a `/`; las APIs responden **403 «Sin permiso»** |
-
-La lista es **una sola** y vive en `src/lib/recordatorios/roles.ts` (`RECORDATORIOS_ROLES =
-["admin","secretaria"]`). Daniel, a la pregunta de quién ve los recordatorios: ***«admin y secre»***.
-La leen `src/app/cheques/page.tsx`, `/api/recordatorios` y `/api/recordatorios/[id]`.
-⚠️ `/api/cheques/*` (las cuatro rutas) todavía la escriben a mano como
-`const CHEQUES_ROLES = ["admin","secretaria"]` — mismo valor, cinco copias.
-
-**Diferencia por rol dentro del módulo:** solo una. **«Eliminar Cheque» del menú ⋯ es de `admin`**
-(`ChequeMoreMenu`: `canDelete = role === "admin" && !isDep`). El `DELETE /api/cheques/[id]`, en
-cambio, admite `admin` y `secretaria` — el candado real de ese botón está solo en la pantalla.
-
-**Personas reales que lo usan (medido, `activity_logs`):** 17 acciones `cheque_update` en total,
-entre el 11-may y el 28-ago-2026. **Cero** `cheque_create` o `cheque_delete` registrados
-(esas acciones no se loguean: solo el PUT y el DELETE llaman `logActivity`).
-Usuarios con este módulo hoy: `daniel` y `alberto` (admin), `Angela` y `andrea` (secretaria,
-las dos con `cheques` en su `modulos_override`).
-
-## Las pantallas
-
-Una sola ruta, `/cheques` (SSR con auth gate propio en `page.tsx`, que además valida el
-`sessionToken` contra `user_sessions`). Dentro hay **dos vistas** y **cinco pestañas**.
-
-### Encabezado (siempre visible)
-
-- Título en pantalla: **«Recordatorios»** (`AppHeader module="Recordatorios"`). El `<h1>` es
-  `sr-only`.
-- Botones, de izquierda a derecha:
-  - **«↓ Exportar \<filtro\>»** — Excel de CHEQUES. **No se muestra en la pestaña Recordatorios**
-    (no hay cheques que exportar ahí).
-  - **«+ Recordatorio»** (azul).
-  - **«Nuevo Cheque»** (negro).
-- Tres avisos que son botones (llevan a su pestaña):
-  - 🔔 azul: «N recordatorios para hoy» — si es uno solo, agrega su texto.
-  - rojo: «N cheque(s) vence(n) hoy — $X total».
-  - ámbar: «N cheque(s) vence(n) esta semana» (no sale si ya salió el rojo de hoy).
-  - ámbar de migración: «Los recordatorios todavía no están activos…» — hoy **nunca aparece**
-    (`leerRecordatorios` devuelve `faltaMigracion: false` siempre desde el 3-sep-2026).
-- Tres chips de KPI: **«Total a cobrar»** (suma de pendientes + conteo «N chq»),
-  **«Vencen esta semana»** (conteo + monto), **«Depositados»** (conteo + monto).
-- Interruptor **Lista / Calendario** (píldora). Se guarda en la URL (`?view=calendario`).
-
-### Vista Lista
-
-Pestañas (`?filter=`), con su contador al lado:
-
-| Pestaña | Qué muestra | ¿Siempre visible? |
-|---|---|---|
-| **Pendientes** | `estado='pendiente'` y `fecha_deposito >= hoy` | Sí |
-| **Depositados** | `estado='depositado'` | Sí |
-| **Vencidos** | `estado='pendiente'` y `fecha_deposito < hoy` | Solo si hay |
-| **Rebotados** | `estado='rebotado'` | Solo si hay |
-| **Recordatorios** | los recordatorios, ordenados por su PRÓXIMA ocurrencia | Sí, aunque sean 0 |
-
-Más `vencen_hoy`, `vencen_manana` y `vencen_semana`, que **no son pestañas visibles**: solo se
-llega a ellas por los avisos de arriba o por un enlace del buscador (`?filter=vencen_hoy`).
-
-🔴 **«Vencido» no existe en la base.** Es un estado **calculado en pantalla**
-(`visualEstado`: `pendiente` + `fecha_deposito < hoy` → `"vencido"`). En `cheques.estado` solo
-viven `pendiente`, `depositado` y `rebotado` (el PUT valida contra ese set: `VALID_ESTADOS`).
-
-**Buscador** («Buscar cheque o cliente…»): al escribir cruza **TODOS** los cheques, no solo la
-pestaña activa, por `numero_cheque` o `cliente`. Lo dice debajo: «Mostrando coincidencias en todos
-los cheques (pendientes, depositados y vencidos)».
-
-**Tabla de cheques.** Columnas exactas: *(casilla)* · **Cliente** · **N° Cheque** (oculta bajo `lg`)
-· **Monto** · **Vence** · **Depositado** · **Estado** (se oculta en la pestaña Depositados) ·
-*(acciones)*. Borde izquierdo de color por urgencia (`urgencyBorder`). Filas agrupadas por período
-con `TimeGroupHeader`.
-
-Acciones por fila: **Depositar** · **Rebotado** (con el subtexto «Si el banco lo devolvió») ·
-**Re-depositar** (solo si está rebotado) · **Editar** · menú **⋯** con «Marcar como rebotado
-(devuelto)», «Re-depositar» y «Eliminar Cheque» (admin). También hay menú por clic derecho
-(`buildChequeContextMenu`) con atajos **D** depositar, **B** rebotado, **R** re-depositar,
-**Del** eliminar. Y selección múltiple → **«Depositar»** en lote.
-
-Toda acción destructiva o de estado pasa por **UndoToast** (5 s para deshacer) con UI optimista y
-rollback al snapshot si el servidor falla.
-
-**Lista de recordatorios** (pestaña propia): tarjetas azules con campanita, ordenadas por
-`proximaOcurrencia`. Los de una sola vez que ya pasaron van al final, en gris al 60% — **no se
-borran solos**. Vacía dice: «Todavía no hay recordatorios / Pon una fecha y qué hay que recordar.
-Ese día te llega el aviso por Telegram.» + botón **«+ Nuevo recordatorio»**.
-
-### Vista Calendario
-
-Un mes por pantalla. Cada casilla lleva píldoras: **cheques** (color por estado, nombre truncado +
-monto en renglón propio) y **recordatorios** (azules con 🔔, `line-clamp-2`). Tocar una píldora de
-cheque abre un globo flotante con cliente / N° / monto / estado y, si está pendiente o vencido,
-«Confirmar depósito» y «Rebotado». Tocar una de recordatorio abre su formulario de edición.
-Leyenda al pie: Pendiente · Vencido / Rebotado · Depositado · 🔔 Recordatorio.
-Un día con muchos cheques abre el modal «Cheques del \<fecha\>».
-
-### Modal «Nuevo cheque» / «Editar cheque» (`ChequeFormModal`)
-
-Campos, con su rótulo exacto. Los marcados con `*` rojo son obligatorios y el servidor los
-revalida:
-
-| Campo en pantalla | Obligatorio | Notas |
-|---|---|---|
-| **Cliente** | Sí | `ClientePicker` (el selector único del sistema, busca contra `clientes_master` por `/api/clientes`). Guarda nombre **y** `cliente_codigo`. |
-| **Empresa** | Sí | Desplegable con las 8 (`ALL_COMPANIES`). Se valida server-side con `getCompany()`. |
-| **N° Cheque** | Sí | Texto libre; se hace `trim()`. |
-| **Monto** | Sí | Debe ser > 0 (validado en pantalla y en el POST). |
-| **Fecha Depósito** | Sí | `<input type="date">`; el POST exige `YYYY-MM-DD` **y que la fecha exista** (`fechaValida` descarta `2026-02-31`). |
-| **Vendedor** | Sí | Desplegable desde `/api/cheques/vendedores` + botón para **agregar uno nuevo** ahí mismo. |
-| **Notas** | No | Texto libre. |
-
-Chips de **«más usados»**: los 12 clientes con más cheques, desde `/api/cheques/frecuencias`.
-Borrador auto-guardado (`useDraftAutoSave`, clave `cheque`) con banda «Restaurar / Descartar».
-
-⚠️ **`banco` no está en el formulario y no va a estarlo.** Daniel, PR #330: *«no, déjalo así»*.
-La fila se arma en `src/lib/cheques-fila.ts` y escribe `banco: ""` explícito.
-
-### Modal «Nuevo recordatorio» / «Editar recordatorio» (`RecordatorioFormModal`)
-
-| Campo en pantalla | Obligatorio | Notas |
-|---|---|---|
-| **Qué hay que recordar** | Sí | `textarea`, placeholder «Recordar cobrar». |
-| **Fecha** | Sí | `<input type="date">`, arranca en hoy (o el día que se tocó en el calendario). |
-| **Cliente — si aplica, no es obligatorio** | **No** | Mismo `ClientePicker`, mismos chips de `/api/cheques/frecuencias`. Daniel: *«sí, pero no debería de ser obligatorio»*. |
-| **¿Se repite?** | No | Tres botones: **Una sola vez** (default) · **Cada semana** · **Cada mes**. Al elegir uno distinto de «una sola vez» aparece la frase que explica qué pasa a fin de mes. |
-
-El botón **«Guardar recordatorio»** se apaga y DEBAJO dice **«Falta: la fecha y qué hay que
-recordar»** — el patrón de la casa; nunca un toast después del toque. En edición aparece
-**«Eliminar»**, que pide confirmar («Sí, eliminar»).
-
-### La tarea más frecuente, contada en pasos
-
-**Marcar un cheque como depositado (2 toques):**
-1. En la pestaña Pendientes (o desde el aviso rojo «vencen hoy»), tocar **Depositar** en la fila.
-2. Confirmar en el modal «Depositar cheque».
-→ La fila cambia al momento; hay 5 s de **Deshacer**. Detrás va un `PUT /api/cheques/[id]` con
-`{estado:"depositado", fecha_depositado: hoy}`.
-
-**Poner un recordatorio (4 pasos):** **+ Recordatorio** → escribir qué hay que recordar → elegir la
-fecha → **Guardar recordatorio**.
-
-## Los datos
-
-### `cheques` — 19 filas vivas, 0 borradas
-
-Grano: **una fila por cheque físico**. Llave: `id` (uuid). Soft delete: **`deleted boolean`**
-(default `false`), y todas las lecturas filtran `.eq("deleted", false)`.
-
-| Columna | Tipo | Para qué | Quién la escribe | Quién la lee | Llenas (de 19) |
-|---|---|---|---|---|---|
-| `id` | uuid PK | identidad | `gen_random_uuid()` | todo | 19 |
-| `cliente` | text NOT NULL | nombre visible del cliente | formulario | pantalla, Excel, `/api/search`, Telegram, `frecuencias` | 19 |
-| `cliente_codigo` | text | el vínculo real (D-XXX) | formulario (`ClientePicker`) | el formulario al editar | **19** |
-| `empresa` | text NOT NULL | a qué empresa entró | formulario | pantalla, Telegram, `/api/search` (`.in(EMPRESAS_DEL_GRUPO)`) | 19 |
-| `banco` | text, **nullable, default `''`** | — | `construirFilaCheque` escribe `""` | 🔴 **NADIE.** Está en la interfaz `Cheque` de `ChequesClient` y no se pinta en ninguna parte | 5 (todas `'Otro'`, del 14-abr-2026) |
-| `numero_cheque` | text NOT NULL | el número del papel | formulario | pantalla, Excel, buscador, mensajes de Undo | 19 |
-| `monto` | numeric NOT NULL | la plata | formulario | KPIs, Excel, Telegram, `data-health` | 19 |
-| `fecha_deposito` | date NOT NULL | cuándo se deposita | formulario | pestañas, calendario, aviso de Telegram, badge | 19 |
-| `notas` | text default `''` | texto libre | formulario y el re-depósito (le agrega «Re-depósito desde rebote (fecha)») | modal de detalle | **0** |
-| `estado` | text default `'pendiente'` | `pendiente` · `depositado` · `rebotado` | PUT | todo | 19 (17 depositado, 2 pendiente) |
-| `fecha_depositado` | date | cuándo se depositó de verdad | PUT al depositar | columna «Depositado» | 17 |
-| `motivo_rebote` | text | por qué lo devolvió el banco | modal «Marcar como Rebotado» | detalle, nota a CXC | **0** |
-| `vendedor` | text default `''` | quién ENTREGÓ el cheque | formulario | Excel, detalle, Telegram | 14 (Rey 10, Edwin 4) |
-| `deleted` | bool default `false` | soft delete | DELETE | todas las lecturas | 19 en `false` |
-| `created_at` | timestamptz | alta | base | desempate de `frecuencias` | 19 |
-| `whatsapp` | text | 🔴 **columna muerta** | nadie desde que existe el repo | 🔴 **nadie** | 5 |
-
-Reparto por empresa: vistana 9 · fashion_wear 4 · active_wear 2 · active_shoes 2 · fashion_shoes 2.
-Clientes: Jerusalem De Panama 12 · XTREME SHOES 2 (+1 «Xtreme Shoes» con otra grafía) ·
-PLAZA LOS ANGELES 2 · Grupo Hanna 1 · DOLLAR MALL 1.
-Altas por mes: **abril-2026: 5 · julio-2026: 14 · nada después.** Los 2 pendientes vencen el
-31-ago y el 11-sep-2026.
-
-### `recordatorios` — 0 filas
-
-Grano: **una fila por recordatorio**. Llave `id` (uuid). Soft delete `deleted boolean NOT NULL
-default false`.
-
-| Columna | Tipo | Para qué | Quién escribe | Quién lee | Llenas |
-|---|---|---|---|---|---|
-| `id` | uuid PK | identidad | base | pantalla | 0 |
-| `fecha` | date NOT NULL | el día elegido (el PRIMERO si se repite) | formulario | `ocurreEn`, calendario, Telegram | 0 |
-| `texto` | text NOT NULL | qué hay que recordar | formulario | pantalla y Telegram | 0 |
-| `cliente` | text | nombre visible, opcional | formulario | línea del aviso | 0 |
-| `cliente_codigo` | text | el vínculo D-XXX, opcional | formulario | el formulario al editar | 0 |
-| `repeticion` | text NOT NULL default `'una_vez'` | `una_vez` · `semanal` · `mensual` | formulario | `ocurreEn` | 0 |
-| `creado_por` | text | firma (`userName` o el rol) | POST | 🔴 **nadie lo muestra** | 0 |
-| `deleted` | bool NOT NULL | soft delete | DELETE | lecturas | 0 |
-| `created_at` | timestamptz | alta | base | 🔴 nadie | 0 |
-
-`leerRecordatorios` trae **todos** (sin filtro de fecha, a propósito: un mensual de enero tiene que
-poder sonar en agosto) y va **paginado con verificación contra el `count`**
-(`leerTodoPaginado`) porque `db-max-rows = 1000` corta en silencio.
-
-### `cheque_vendedores` — 2 filas
-
-Grano: una por nombre de vendedor. Columnas: `id`, `nombre` (NOT NULL, índice único sobre
-`upper(btrim(nombre))`), `activo` (default `true`), `created_at`.
-Filas: **Rey** y **Edwin**, las dos sembradas por la migración `20260727160000` el 27-jul-2026.
-Nadie ha agregado una desde la pantalla. La `activo=false` no tiene interfaz: solo el GET la
-filtra.
-
-### `activity_logs` (compartida)
-
-`entity_type='cheques'`, `action='cheque_update'` — 17 filas, del 11-may al 28-ago-2026. Es lo que
-lee `GET /api/cheques/[id]/historial` (por substring `"chequeId":"<uuid>"` en `details`, límite 50).
-⚠️ **Ninguna pantalla llama a ese endpoint.** Está construido y sin lector
-(`grep` de `/historial` en `src/app/cheques/**` → 0 resultados).
-
-## De dónde vienen los datos
-
-Todo lo escribe **la gente en la pantalla**. No hay cron que escriba `cheques` ni `recordatorios`,
-y ningún dato viene de Switch.
-
-Lo único automático es **la salida**:
-
-| Cron | Hora UTC | Qué hace | Si falla |
-|---|---|---|---|
-| `/api/cron/cheques-alert` | **14:15** (9:15 a.m. Panamá) | Un solo mensaje a 📊 NEGOCIO con los cheques `pendiente` que vencen en la ventana **y** los recordatorios que tocan en la MISMA ventana | Si falla la consulta de **cheques**: 500, sin heartbeat, se anota en `cron_email_errors` **sin Telegram** (la reconciliación lo re-ejecuta). Si falla la de **recordatorios**: se anota en `detail` y **el aviso de cheques sale igual** |
-
-Además la pantalla lee `/api/clientes` (a través de `ClientePicker`) y
-`/api/cheques/frecuencias`, que a su vez lee `clientes_master` por la puerta única
-`leerClientesDelGrupo()` (`src/lib/clientes/directorio-cache.ts`).
-
-## Las reglas que ya están fijadas
-
-- 🔴 **La ventana del aviso llega hasta el PRÓXIMO DÍA HÁBIL, no hasta mañana.** Daniel, textual:
-  *«QUIERO aviso de cuando se vence un cheque un dia antes, almenos q venca el lunes, avisame el
-  viernes.»* Corriendo un día hábil D, la ventana es `[D, N]` con N = el próximo hábil: el viernes
-  cubre sábado, domingo y lunes. **Sábado y domingo no se avisa nada.** Sin esto, un cheque que
-  vence el sábado no se avisaría jamás. `src/lib/cheques-aviso-ventana.ts` ·
-  candado `src/__tests__/lib/cheques-aviso-vencimiento.test.ts`.
-- ⚠️ **Feriados de Panamá: no los tenemos y NO se inventa un calendario.** Limitación conocida y
-  aceptada, escrita en el encabezado de `cheques-aviso-ventana.ts`.
-- 🔴 **Un recordatorio MENSUAL puesto el 31 cae en el ÚLTIMO día del mes que no tenga 31.** Sin esa
-  regla no sonaría 5 meses del año y nadie se enteraría. `ocurreEn()` en
-  `src/lib/recordatorios/recordatorio.ts` · candado
-  `src/__tests__/lib/recordatorios-cuando-tocan.test.ts` (un test por cada mes corto).
-- **Un recordatorio nunca suena ANTES de su fecha** (`if (ymd < rec.fecha) return false`).
-- 🔴 **Sin cheques y sin recordatorios NO se manda mensaje.** Un «hoy no hay nada» diario es ruido.
-- 🔴 **Los cheques van PRIMERO en el mensaje y su texto no se toca** — es la plata, y es lo que se
-  lee en la notificación del iPhone sin abrirla (`unirAviso`).
-- 🔴 **Un fallo de los recordatorios NO se lleva puesto el aviso de los cheques**
-  (`src/lib/cheques-alert.ts`).
-- **Anti-duplicado por heartbeat, fail-OPEN**: `yaAvisoHoy()` mira `cron_heartbeats.last_success_at`
-  contra el inicio del día Panamá. Si esa lectura falla, **el aviso sale igual** — un aviso repetido
-  es molesto, un cheque que se pasa cuesta plata.
-- 🔴 **La fila de `cheques` se arma en UN solo lugar** (`construirFilaCheque`,
-  `src/lib/cheques-fila.ts`) porque `banco` era `NOT NULL` sin default y dejarla fuera del INSERT
-  hizo que **durante 3 meses y medio no se pudiera guardar ni un cheque** (23502 tapado por un
-  «Error interno»). Candado: `src/__tests__/lib/cheques-fila.test.ts`, que además usa un doble de
-  Supabase que rechaza como la base de verdad.
-- 🔴 **Un cheque depositado no se puede volver a cambiar de estado ni eliminar**
-  (`PUT` → 400 «Este cheque ya fue depositado»; `DELETE` → 400 «No se puede eliminar un cheque
-  depositado»). Es data histórica.
-- **La fecha de depósito se valida en el SERVIDOR** con el mismo formato del `<input type="date">`
-  y comprobando que la fecha exista. Un cheque sin vencimiento sería invisible para el calendario,
-  para los avisos y para el cron.
-- **Rebotar un cheque escribe una nota en CXC** (`POST /api/overrides`, cartera `CARTERA_GRUPO`,
-  línea `⚠ Cheque rebotado <fecha>: N° X por $Y — motivo`). Es **secundaria**: si falla, el cheque
-  queda rebotado igual y solo se avisa por toast.
-- **El cliente y la repetición son opcionales en un recordatorio** — decisión explícita de Daniel
-  (`faltaParaGuardar` solo pide fecha y texto).
-- **`""` y `NULL` son el mismo estado** para `cliente_codigo`: se normaliza a `null` al leer y al
-  escribir, en los dos módulos.
-- **Borrar es soft delete** en las dos tablas. La fila queda.
-- **El Excel empieza en la fila 1** y sale por el helper de la casa (`buildReportSheet` /
-  `workbookFromSheets`, `src/app/cheques/excel-cheques.ts`). Columnas: Cliente · Nº Cheque · Monto ·
-  Fecha Depósito · Vendedor, con fila de totales.
-
-## Con qué conecta
-
-### Qué lee de otros módulos
-
-| Fuente | Para qué |
-|---|---|
-| `clientes_master` (vía `leerClientesDelGrupo()`, `/api/clientes`) | el selector de cliente y los chips de «más usados» de los dos formularios |
-| `getCompany()` / `ALL_COMPANIES` (`src/lib/companies.ts`) | el desplegable de Empresa y su validación en el POST/PUT |
-| `cron_heartbeats` | el anti-duplicado del aviso diario |
-| `cheque_vendedores` | la lista de «quién entregó el cheque» |
-
-### Quién lee lo suyo
-
-| Consumidor | Qué toma | Archivo |
-|---|---|---|
-| **Badge de notificaciones** | cuenta de `cheques` `pendiente` con `fecha_deposito` entre hoy y el fin de semana | `src/app/api/notification-badges/route.ts:27` |
-| **Dashboard del home** | `fecha_deposito, monto` de todos los `pendiente` | `src/app/api/home-stats/route.ts:51` |
-| **Búsqueda global (⌘K)** | `cheques` por `cliente`, acotado a `EMPRESAS_DEL_GRUPO` | `src/app/api/search/route.ts` |
-| **Spotlight del buscador** | 7 atajos que llevan a `/cheques?filter=…` | `src/components/SearchBar.tsx` |
-| **Data Health** | check `cheques_criticos_null` (monto o fecha nulos) | `src/lib/integrity-checks.ts` |
-| **Telegram 📊 NEGOCIO** | el aviso diario de las 14:15 UTC | `src/lib/cheques-alert.ts` |
-| **Backup diario** | la tabla `cheques` entera (grupo *core*) | `src/app/api/cron/backup/route.ts` |
-| **CXC (`/admin`)** | recibe la nota de rebote en `cxc_client_overrides.resultado_contacto` | `ChequesClient.marcarRebotado` |
-| **Reconciliación** | re-ejecuta `runChequesAlert` in-process si no vio un success | `src/app/api/cron/switch-reconciliacion/route.ts` |
-
-### Qué se rompería
-
-- Cambiar la **`key` `cheques`** → los usuarios con `modulos_override` (Angela y andrea, medido)
-  pierden el módulo, y `role_permissions` de `admin` y `secretaria` también.
-- Quitar o renombrar **`cheques.estado`** o sus tres valores → rompe el filtro del cron
-  (`.eq("estado","pendiente")`), el badge, `home-stats` y las cinco pestañas.
-- Quitar **`cheques.deleted`** → el cron avisaría de cheques borrados.
-- Cambiar **`recordatorios.repeticion`** a otros valores → `esRepeticion()` los degrada a
-  `una_vez` en silencio (`aRecordatorio`), y ese recordatorio deja de repetirse sin error.
-- Tocar el texto exacto del `detail` **«sin cheques por vencer»** → lo lee la recuperación de
-  `switch-reconciliacion` y hay candados que lo esperan tal cual.
-- ✅ **`recordatorios` entró al backup el 5-sep-2026.** Ver §9.
-
-## Por qué está así
-
-| Decisión | Cita / fecha |
-|---|---|
-| El módulo pasa a llamarse **Recordatorios** y adentro conviven cheques y recordatorios | Daniel, 24-ago-2026: *«en el módulo de cheques, quisiera cambiarlo a recordatorios, ya que quisiera poner ahí en el calendario "recordar cobrar" y pongo la fecha así telegram me recuerda»* |
-| El **cliente de un recordatorio es opcional** | Daniel, 24-ago-2026: *«sí, pero no debería de ser obligatorio»* |
-| La **repetición es opcional** y su default es «una sola vez» | Daniel, 24-ago-2026: *«puede ser, no siempre»* |
-| Los ven **admin y secretaria**, exactamente los mismos que ya entraban a Cheques | Daniel, 24-ago-2026: ***«admin y secre»*** |
-| El aviso sale **el día hábil anterior**, y el viernes cubre hasta el lunes | Daniel, 27-jul-2026: *«QUIERO aviso de cuando se vence un cheque un dia antes, almenos q venca el lunes, avisame el viernes.»* |
-| **`banco` no vuelve al formulario** aunque la columna exista | Daniel, PR #330: *«no, déjalo así»* |
-| Los recordatorios entran por el **cron de cheques** y no por uno nuevo | ese cron ya tenía resuelto lo difícil —la ventana del día hábil anterior, el anti-duplicado por heartbeat y el fail-open— y todo eso vale igual para un recordatorio. Un cron nuevo habría estrenado una segunda ventana, un segundo candado y una segunda entrada que mantener sincronizada en `vercel.json` (`src/lib/cheques-alert.ts`) |
-| La `key` sigue siendo `cheques` | está en `role_permissions` y en `fg_users.modulos_override`; renombrarla rompe permisos y overrides sin comprar nada. Mismo precedente que Asistencia → «Asistencia y Planilla» y que Cheques → Recordatorios |
-| El aviso de migración es **ámbar, no rojo** | rojo se lee como «algo se rompió», y no se rompió nada: los cheques funcionaban igual (comentario en `ChequesClient.tsx`) |
-| La pestaña **Recordatorios siempre se ve, aunque sean 0** | es la puerta para crear el primero; mezclarlos dentro de «Pendientes» habría hecho mentir a ese contador, que cuenta cheques por depositar |
-| El formulario **no lleva `autoFocus`** | en iPhone levantaría el teclado sobre un formulario recién abierto, y en el selector de cliente el foco lo convierte en un buscador vacío que hace ver el nombre guardado como BORRADO (`useAutofocusPrimerCampo`) |
-
-## Lo que se intentó y se retiró
-
-| Qué | Cuándo | Por qué se fue |
-|---|---|---|
-| **El campo «Banco» del formulario** | 14-abr-2026 (`47f1f30f`, «remove banco column from cheques UI») | Se quitó de la pantalla y **se dejó viva la columna `NOT NULL` en la base**. Resultado: 3 meses y medio en los que **no se pudo guardar ni un cheque** (23502 tapado por un «Error interno»). Los 5 cheques de abril son los últimos que alcanzaron a entrar antes de ese commit. Se arregló el 27-jul con `construirFilaCheque` |
-| **La lista de vendedores en `localStorage`** (`fg_cheque_vendedores`) | hasta el 27-jul-2026 | Era distinta en cada dispositivo y se perdía al limpiar el navegador. Se mudó a la tabla `cheque_vendedores`. La constante `LS_CHEQUE_VENDEDORES` sigue exportada en `src/lib/cheques-vendedores.ts` |
-| **`tablaAusente()`** (el reconocimiento de «todavía no corrió el DDL» de vendedores) | retirado el 3-sep-2026 | La tabla existe desde `20260727160000`, verificado en producción. Nadie más lo importaba |
-| **La tolerancia a DDL de recordatorios** (503 con el nombre del archivo SQL, lista vacía con `faltaMigracion: true`) | retirada el 3-sep-2026 | Con la tabla puesta, un «no existe» es un permiso, un timeout o un cambio de esquema — y leerlo como «falta la migración» dejaba la pantalla normal y vacía mientras los avisos dejaban de sonar |
-| **El reintento «sin `cliente_codigo`»** del POST y del PUT | retirado el 3-sep-2026 | La columna existe desde `20260808190000`. «Guardar el cheque sin su cliente y seguir sería registrar plata a nombre de nadie sin que nadie se entere» |
-| **El autocompletar viejo contra `directorio_clientes`** en `page.tsx` | jul-2026 | 33 nombres, sin código. El selector nuevo (`ClientePicker`) busca contra `clientes_master` (150 vivos). El `select` quedó sin lectores y se borró |
-| **El globo del calendario y el menú ⋯ posicionados con `absolute`** | 30-jul-2026 | Medido: el globo quedaba **138 px por debajo del borde de la pantalla** a 1440×900 (o sea, «Confirmar depósito» donde nadie lo podía tocar) y del menú ⋯ se recortaban **121 px**. Los dos pasaron a `DesplegableFlotante` (portal a `<body>` + `fixed`) |
-| **Un estado `vencido` en la base** | «bug #6 audit» | Se calcula en pantalla. `VALID_ESTADOS` solo admite `pendiente`, `depositado` y `rebotado` |
-| **El export inline en `ChequesClient`** | hallazgo I11 | Se movió a `src/app/cheques/excel-cheques.ts` con el helper estándar `buildReportSheet` |
-
-## Cuánto se usa
-
-Medido contra producción el 4-sep-2026. ⚠️ `activity_logs` **solo registra el PUT y el DELETE** de cheques: no hay evento de alta, ni de exportar Excel, ni de abrir el calendario, así que lo que sigue mide **escrituras**, no visitas.
-
-| Señal | Medida |
-|---|---|
-| Cheques creados, en total | **19** — 5 el 14-abr-2026 y 14 el 27-jul-2026 |
-| Cheques creados desde el 28-jul-2026 | **0** (39 días sin un alta) |
-| Ediciones/cambios de estado (`cheque_update`) | **17**, entre el 11-may y el **28-ago-2026**. Última hace 7 días |
-| Eliminaciones (`cheque_delete`) | **0**. La tabla no tiene ni una fila con `deleted = true` |
-| Recordatorios creados | **0** desde que existe la tabla (24-ago-2026) |
-| Vendedores agregados desde la pantalla | **0** (las 2 filas son la semilla de la migración del 27-jul) |
-| Cheques rebotados alguna vez | **0** (`motivo_rebote` vacío en las 19; ningún `estado = 'rebotado'`) |
-| Mensajes de Telegram que este módulo pudo mandar | no medible: `cheques-alert` no deja rastro de lo enviado en ninguna tabla, solo su `cron_heartbeats`. Lo que **sí** se puede afirmar: con 2 cheques pendientes (31-ago y 11-sep) y 0 recordatorios, la mayoría de las corridas no manda nada |
-| Quién podría usarlo | 4 personas: `daniel` y `alberto` (admin), `Angela` y `andrea` (secretaria, las dos con `cheques` en su override) |
-
-**Lectura llana:** el módulo está encendido y sano, y prácticamente no se toca. En cinco meses entraron 19 cheques por $279.396,12, de los cuales 17 ya se depositaron.
-
-## Qué papeles y Excel produce
-
-**Un solo archivo, y ningún PDF ni correo.**
-
-| Qué | Nombre del archivo | Desde qué botón | Quién lo recibe |
-|---|---|---|---|
-| Excel de cheques | `cheques-<filtro>-<fecha>.xlsx` — el filtro con guiones (`cheques-pendientes-…`, `cheques-vencen-hoy-…`) y la fecha del día (`exportFilename`) | **«↓ Exportar \<filtro\>»**, arriba a la derecha. **No aparece en la pestaña Recordatorios** | uso interno (Daniel o la secretaria). No se manda a nadie automáticamente |
-
-Columnas, en orden: **Cliente · Nº Cheque · Monto · Fecha Depósito · Vendedor**.
-Fila de totales al pie: `"N cheques"` en la primera celda y la **suma del monto** en la columna Monto, en banda navy. El monto va con formato de moneda real (`$#,##0.00`), no como texto. Empieza en la **fila 1**, con filtro desde A1 y la fila de encabezados fija — la regla de todos los Excel del sistema.
-Si el filtro activo no tiene cheques, el botón responde con un toast: **«No hay cheques para exportar»** y no baja nada. Con datos: **«Excel listo — revisa tu carpeta de descargas»**.
-
-**Telegram** (no es un papel, pero es lo que sale del módulo hacia afuera): un mensaje al canal 📊 NEGOCIO a las 14:15 UTC. Estructura: primero el bloque de cheques (encabezado con el conteo y el total, y una línea por cheque con cliente, empresa, monto y `HOY` · `MAÑANA` · `el lunes 3 ago`), línea en blanco, y después el bloque `🔔 N recordatorios` con una línea por ocurrencia (`• texto — cuándo · cliente · cada semana`). Lo recibe el **grupo de tres**: Daniel + el celular de la empresa.
-
-## Cómo probarlo a mano
-
-**A) Que se pueda guardar un cheque (el defecto que costó 3 meses y medio):**
-1. Entra como Daniel o como la secretaria y abre **Recordatorios** desde el menú.
-2. Toca **«Nuevo Cheque»**.
-3. Llena los seis campos con `*`: elige un cliente de la lista, una empresa, escribe un número, un monto mayor a 0, una fecha y elige un vendedor.
-4. Toca **«Guardar cheque»**.
-5. **Qué debería pasar:** el modal se cierra y aparece abajo **«Listo, cheque guardado»**. El cheque sale en la pestaña **Pendientes** y su chip «Total a cobrar» sube.
-6. **Dónde confirmar que quedó:** cambia a la vista **Calendario** y ve al mes de la fecha que pusiste: la píldora tiene que estar ahí con el nombre y el monto.
-7. ⚠️ Si sale **«Error interno»**, el defecto volvió: es la base rechazando una columna obligatoria que el formulario no manda.
-
-**B) Que el aviso de Telegram salga bien (sin esperar a mañana):**
-1. Pon un cheque con **fecha de hoy** o de mañana, en estado Pendiente.
-2. Abre en el navegador, con sesión de admin: `https://fashiongr.com/api/cron/cheques-alert`
-3. **Qué debería pasar:** llega un mensaje al grupo 📊 NEGOCIO con ese cheque, y la respuesta en pantalla dice `{"message":"Alerta enviada","count":1,...}`.
-4. ⚠️ **Solo sale una vez al día**: si el cron ya corrió a las 14:15 UTC, la respuesta dirá `«ya se avisó hoy»` y no mandará nada. Y **sábado y domingo nunca manda** («fin de semana — no se avisa»).
-5. Para probar solo la tubería de Telegram, sin datos reales: `…/api/cron/cheques-alert?test=true` manda un mensaje de PRUEBA claramente rotulado.
-
-**C) Que un recordatorio suene el día correcto:**
-1. **+ Recordatorio** → escribe «Recordar cobrar» → pon la fecha de **hoy** → **Guardar recordatorio**.
-2. **Qué debería pasar:** arriba de todo aparece la banda azul **«1 recordatorio para hoy — Recordar cobrar»**, y la pestaña **Recordatorios** pasa a decir 1.
-3. Corre el paso B.2 y el mensaje tiene que traer el bloque `🔔 1 recordatorio`.
-4. **El caso que más importa:** pon uno **mensual con fecha 31**. En la lista, «Próxima vez» tiene que decir el **último día** del próximo mes que no tenga 31 (30 de septiembre, 30 de noviembre, 28 de febrero). Si dice que no vuelve, la regla de fin de mes se rompió.
-
-**D) Que la plata no se pueda tocar dos veces:**
-1. Toca **Depositar** en un cheque y confirma.
-2. Abre su menú **⋯**: no debe ofrecer «Marcar como rebotado» ni «Eliminar Cheque».
-3. **Dónde confirmar:** la columna **Depositado** muestra la fecha de hoy y el chip «Depositados» subió.
-
-## Qué lo rompe
-
-| Qué falla | Qué pasa | Cómo se notaría |
-|---|---|---|
-| **El cron `cheques-alert` (14:15 UTC) no corre** | **Nadie se entera de un cheque que vence.** Es el único aviso del módulo | 🔴 **Nada en la pantalla cambia** — hay que mirarlo. El heartbeat `cheques-alert` envejece; a las 26 h el watchdog interno manda 🔧 SISTEMA y `health-crons` lo lista en `stale[]`. Está en `CRONS_FAIL_CLOSED`, así que la fila ausente cuenta como caído |
-| El cron falla por un error de la consulta | No manda nada, no registra heartbeat, se anota en `cron_email_errors` **sin** Telegram inmediato | La reconciliación (10/14/18 UTC) lo **re-ejecuta in-process**; si sigue caído, la regla de 2 fallos avisa |
-| **`clientes_master` llega vacía o el sync de clientes falla** | El selector de cliente no ofrece a nadie y los chips de «más usados» quedan vacíos | El formulario **sigue funcionando**: se puede escribir el cliente a mano con la opción «Otro». Se pierde el `cliente_codigo`, o sea el vínculo |
-| **La migración de `recordatorios` no se hubiera aplicado** | El GET lanza y la pantalla de cheques **revienta** (la tolerancia se retiró el 3-sep-2026) | Ya no aplica: la tabla existe. Pero si alguien la borrara, hoy el módulo entero cae, no solo la mitad de recordatorios |
-| **Alguien renombra `cheques.estado` o cambia sus valores** | El cron deja de encontrar pendientes → **el aviso enmudece en silencio** | No hay alarma. El cron responde `success` con `«sin cheques por vencer»` |
-| **`db-max-rows` (1000) con muchos recordatorios** | Ya está cubierto: `leerRecordatorios` pagina y verifica contra el `count`. Sin eso, un recordatorio truncado se vería como «no existe» — un aviso que deja de sonar sin un solo error | — |
-| **Switch cambia algo** | 🔴 **Nada.** Este módulo no toca Switch ni por API ni por panel. Su único dato externo es `clientes_master`, que sí viene de Switch (`sync-clientes-master`, 07:00 UTC) — y aun así, solo afecta al selector, nunca a un cheque ya guardado | — |
-| **La cuenta de Telegram falla** | `sendTelegramAlert` reintenta en el canal de siempre (este va por un canal APARTE, así que el fail-safe **sí** aplica). Si los dos fallan, el cron devuelve `sent: false` pero **igual registra heartbeat** — o sea que el watchdog no lo ve | Se pierde el aviso de ese día y nada lo dice. Es el punto ciego real del módulo |
-| **La nota de rebote a CXC falla** | El cheque queda rebotado igual; solo se pierde la línea en `cxc_client_overrides` | Toast: «Cheque rebotado, pero no se pudo registrar la nota en CXC» |
-
-## Lo que sobra o no cuadra
-
-1. 🔴 **`cheques.whatsapp` — columna muerta con datos.** 5 filas la tienen llena y **ningún archivo
-   de `src/` la menciona**. Sobrevivió a todos los rediseños.
-2. 🔴 **`cheques.banco` se escribe y nadie la lee.** `construirFilaCheque` le pone `""` en cada
-   INSERT y la interfaz `Cheque` (`ChequesClient.tsx:48`) la declara — pero no se pinta en ninguna
-   pantalla, export ni mensaje.
-3. **El comentario de `cheques-fila.ts` está viejo.** Dice *«`cheques.banco` es NOT NULL y NO tiene
-   default»* y *«la columna hoy no lo admite [null]»*. Medido hoy: `is_nullable = YES`,
-   `column_default = ''::text`. La migración `20260727180000_cheques_banco_default.sql` ya corrió.
-   El código sigue siendo correcto (manda `""` igual); lo que miente es la explicación.
-4. 🔴 **El comentario de `/api/cheques/frecuencias` se contradice con el código de al lado.** Dice
-   textualmente *«⚠️ `cheques` NO tiene columna `cliente_codigo` — guarda `cliente` como texto
-   suelto»* y por eso cuenta por nombre normalizado. La columna existe desde
-   `20260808190000_cheques_cliente_codigo.sql` y **las 19 filas la tienen llena**. Contar por código
-   sería exacto; hoy se cuenta por nombre y `XTREME SHOES` / `Xtreme Shoes` se unen solo porque el
-   normalizador los iguala.
-5. **`GET /api/cheques/[id]/historial` no tiene lector.** Endpoint completo, con validación de UUID
-   y `requireRole` — ninguna pantalla lo llama.
-6. **«Eliminar Cheque» tiene el candado solo en la pantalla.** El botón es admin-only
-   (`ChequeMoreMenu`), pero `DELETE /api/cheques/[id]` acepta `["admin","secretaria"]`. Una
-   secretaria con la URL puede borrar.
-7. **Cinco copias de la lista de roles.** `RECORDATORIOS_ROLES` existe justamente para que no pase,
-   y las cuatro rutas de `/api/cheques/*` siguen con su `const CHEQUES_ROLES = ["admin",
-   "secretaria"]` escrito a mano.
-8. **`faltaMigracion` viaja pero siempre vale `false`.** Se conserva en `leerRecordatorios`, en el
-   GET, en `ChequesInitialData`, en el estado del cliente, en el `disabled` de dos botones, en el
-   aviso ámbar y en `cheques-alert.ts` — siete lugares para un valor constante desde el 3-sep-2026.
-   El propio código lo dice: *«retirarlo de ahí es cosa de otra tanda»*.
-9. **La mitad recordatorios del módulo está vacía.** 0 filas, y el aviso de Telegram para
-   recordatorios nunca ha tenido nada que mandar.
-10. **`cheque_vendedores.activo` no tiene interfaz.** Se puede agregar un vendedor desde el
-    formulario; para desactivarlo hay que ir a la base.
-11. **Nadie ha guardado un cheque desde el 27-jul-2026** (última `created_at`). El módulo está
-    encendido y funcionando; el uso real son 19 cheques en cinco meses.
-12. **Los atajos del buscador siguen diciendo «cheques».** «Ir a cheques que vencen hoy», etc. —
-    el módulo se llama Recordatorios desde el 24-ago.
+| `cheques` vivos | **19** — 17 depositados ($257.174,34) + 2 pendientes ($22.221,78) |
+| Borrados | **0** en toda la historia |
+| Clientes con cheque | **1**: Jerusalem de Panamá |
+| Cómo se usan | en tandas (5 en abril, 14 en julio) y se van marcando depositados |
+| Último movimiento | **28-ago-2026** (17 `cheque_update` en `activity_logs` entre el 11-may y el 28-ago) |
+| `recordatorios` vivos | **1** (creado el 5-sep-2026). Antes: cero en toda su historia |
+| `cheque_vendedores` | 2 filas |
+
+🔴 **El módulo SÍ se usa** — la parte de cheques. La de recordatorios estaba vacía porque escribir
+uno costaba cuatro toques y una ventana; el rediseño ataca exactamente eso.
+
+🩸 **Y había un cheque vencido que el sistema nunca volvió a mencionar:** Vistana, chq 018094,
+Edwin, **$18.393,32**, vencía el **31-ago** y seguía «pendiente» cinco días después. Es lo que
+motivó el aviso de vencido (ver más abajo).
 
 ---
+
+## La pantalla, de arriba abajo
+
+### a) El renglón de escribir — siempre visible
+
+```
+¿Qué te recuerdo?   [ Cuándo ▾ ]  [ A quién ▾ ]  [ + Cliente ]  [ Guardar ]
+```
+
+`src/app/recordatorios/components/LineaNueva.tsx`. Antes eran cuatro toques (menú → «Nuevo
+recordatorio» → ventana de 4 campos → Guardar); ahora es una línea.
+
+- **Cuándo** — seis pastillas cerradas: `Mañana · Lunes · Elegir fecha · Cada día · Cada semana ·
+  Cada mes`, más un **«Hasta…» opcional** que solo aparece con las tres repeticiones.
+- 🔴 **«Hoy» NO existe.** Todo sale en un mensaje diario a las 9:00 a.m.; para cuando alguien
+  escribe, el de hoy ya salió. El primero disponible es mañana, y elegir un día pasado **apaga el
+  botón y dice por qué**, pegado al campo.
+- 🔴 **«Lunes» es el PRÓXIMO lunes.** Escrito un lunes, cae en el siguiente: si cayera en hoy sería
+  la opción «Hoy» que justamente no existe.
+- 🔴 **No hay selector de hora.** No existe la hora; existe el mensaje de las 9:00.
+- **A quién** — `Al equipo` / `Solo a mí`. **Solo los admin lo ven.** Lo de una secretaria va
+  siempre al equipo, y eso lo fuerza el **servidor** (`destinoPermitido`), no la pantalla.
+- **Cliente** — opcional y **escondido por defecto**; se abre con `+ Cliente`. Se siguen guardando
+  `cliente` y `cliente_codigo`.
+
+### b) Lista / Calendario — dos MODOS, no pestañas
+
+El control segmentado de siempre, con el modo en la URL (`?view=calendario`).
+
+### c) La lista única — sin pestañas, agrupada por CUÁNDO
+
+`src/app/recordatorios/components/AgendaLista.tsx`, decidida en el módulo puro
+`src/lib/recordatorios/agenda.ts`.
+
+| Grupo | Qué cae ahí |
+|---|---|
+| **Vencido** (rojo, arriba) | fecha anterior a hoy |
+| **Hoy** | fecha = hoy |
+| **Esta semana** | hasta el DOMINGO de la semana calendario |
+| **Después** | más adelante |
+| **Se repiten** | los recordatorios con repetición, **UNA fila cada uno** |
+
+🔑 **La idea del rediseño:** «vencido», «vencen hoy», «vencen mañana» y «vencen esta semana» nunca
+fueron estados — **son CUÁNDO**. Cuatro pestañas para decir cuatro veces lo que una fecha ya dice.
+
+- 🔴 **La lista muestra solo lo ABIERTO**: cheques sin depositar (vencidos incluidos), rebotados, y
+  recordatorios que todavía no se mandaron.
+- 🔴 **Lo depositado NO está en la lista, pero aparece al BUSCARLO** con la lupa (por cliente o por
+  número de cheque). El buscador mira TODO — es la única puerta a lo depositado.
+- 🔴 **Rebotado dejó de ser pestaña** (cero filas en toda la historia del módulo): es una marca roja
+  en la fila, y el cheque **se queda** hasta que se redeposite o se borre.
+- 🔴 **Ningún total sumado, en ninguna parte.** Las tres tarjetas de arriba se fueron y no se
+  reemplazaron por nada. Los montos POR FILA se quedan; el encabezado de grupo dice CUÁNTOS son.
+  `agenda.ts` no tiene una sola operación de suma, y hay candado que lo exige.
+- 🔴 **Un recordatorio que se repite es UNA fila** que dice cada cuánto y hasta cuándo. Con «Cada
+  día» sin fecha de fin, una fila por ocurrencia sería una lista infinita.
+- 🔴 **Un recordatorio NO se marca como hecho.** Daniel: *«No quiero tener que meterme para poner que
+  lo hice. Se supone que sí.»* Se manda y ya.
+- 🔴 **Un cheque que no se va a cobrar SE BORRA** (botón «Eliminar cheque» en su detalle). No se
+  agregó ningún estado tipo «no se cobró» — Daniel: *«no lo quiero marcar»*.
+
+### d) El calendario
+
+`src/app/recordatorios/components/CalendarioMes.tsx`. **No cambió**: los dos layouts (grilla de
+escritorio y lista de celular), el globo flotante de cada cheque y las píldoras siguen igual, con
+cheques y recordatorios juntos. Lo único que se le quitó fue el **total del mes** (ver «ningún total
+sumado»); sigue diciendo **cuántos**.
+
+### e) El Excel
+
+🔴 **Retirado.** Daniel: *«se va»*. Se borró `app/cheques/excel-cheques.ts` y su botón. Los datos
+siguen en la base; lo que se fue es la descarga. El candado de «los N lugares que arman una hoja»
+bajó de 25 a 24 **a propósito y con nota**.
+
+---
+
+## El aviso — UN mensaje diario a las 9:00 a.m.
+
+Cron **`/api/cron/cheques-alert`**, ahora a las **14:00 UTC** (9:00 a.m. de Panamá; era 14:15).
+Una entrada = una ocurrencia al día. Lógica en `src/lib/cheques-alert.ts`.
+
+A las 9:00 salen **hasta dos mensajes**:
+
+| Destino | Qué lleva |
+|---|---|
+| 📊 **Al grupo** (`enviarNegocio`) | cheques **por vencer** (texto de siempre) + cheques **VENCIDOS** (bloque nuevo) + recordatorios del **equipo** |
+| 🔒 **Al privado** (`enviarNegocioPrivado`) | los recordatorios marcados **«solo a mí»** |
+
+- El privado va **sin el prefijo `🔧 SISTEMA ·`**: es negocio, no una avería. Mismo patrón que el
+  resumen diario de ACS.
+- 🔴 **Se quitó la última línea del aviso de cheques** (`WhatsApp seguimiento: +50766745522,
+  +50766494096`). Daniel: *«nada, es recordatorio nada más»*. El resto del texto **no se tocó**.
+- **Si no hay nada, no se manda nada** (como siempre).
+- Los cheques siguen yendo **solo al grupo**.
+
+### 🔴 El aviso de cheque VENCIDO — una sola vez
+
+`src/lib/cheques-vencidos-aviso.ts`.
+
+El aviso de siempre mira **hoy y el próximo día hábil**: un cheque que venció y nadie marcó **no se
+volvía a mencionar jamás** (los $18.393,32 de arriba). Ahora sale un bloque:
+
+```
+🔴 1 cheque venció y sigue sin depositar
+• JERUSALEM DE PANAMA (Vistana International) $18,393.32 — vencía el lunes 31 ago · Edwin
+```
+
+- 🔴 **UNA SOLA VEZ**, y no se repite nunca más aunque siga sin depositarse. La memoria vive en la
+  columna **`cheques.aviso_vencido_en`** (NULL = todavía no se avisó).
+- ⚠️ **Se marca DESPUÉS de que Telegram confirme.** Marcarlo antes y que el envío falle quemaría el
+  único aviso que ese cheque va a tener.
+- 🔴 **Un cheque REBOTADO no avisa** — decisión de Daniel.
+- La pregunta es «vencido y sin avisar», no «venció ayer»: así cubre de una vez los que ya estaban
+  atrasados el día que esto se encendió, y de ahí en adelante se comporta igual.
+
+### 🔴 La retención — a los 365 días el depositado se va solo
+
+`src/lib/cheques-retencion.ts`, ejecutada **dentro de `cheques-alert`** (no hay cron nuevo: hoy son
+82 entradas de un tope de 100, y este cron ya toca la tabla).
+
+- **Soft delete** (`deleted = true` + `deleted_at`), **nunca un DELETE**.
+- **Solo los depositados.** Lo que todavía se debe se queda para siempre.
+- Se cuenta desde **cuándo se depositó** (`fecha_depositado`), no desde cuándo vencía; sin esa fecha
+  cae a `fecha_deposito`, nunca a «hoy».
+- ⚠️ Consecuencia escrita: `cheques-alert` no corre sábado ni domingo, así que la limpieza tampoco.
+  Con 365 días de umbral, de lunes a viernes alcanza y sobra.
+
+---
+
+## Dónde vive cada cosa
+
+| Pieza | Archivo |
+|---|---|
+| Pantalla (orquestador) | `src/app/recordatorios/RecordatoriosClient.tsx` |
+| El renglón de escribir | `src/app/recordatorios/components/LineaNueva.tsx` |
+| La lista única | `src/app/recordatorios/components/AgendaLista.tsx` |
+| El calendario | `src/app/recordatorios/components/CalendarioMes.tsx` |
+| Detalle · rebotado · «los del día» | `src/app/recordatorios/components/ChequeModales.tsx` |
+| Formularios | `components/ChequeFormModal.tsx` · `components/RecordatorioFormModal.tsx` |
+| Qué se ve y en qué grupo (PURO) | `src/lib/recordatorios/agenda.ts` |
+| Cuándo toca · destino · validación (PURO) | `src/lib/recordatorios/recordatorio.ts` |
+| Las pastillas de «Cuándo» (PURO) | `src/lib/recordatorios/cuando.ts` |
+| El aviso de vencido (PURO) | `src/lib/cheques-vencidos-aviso.ts` |
+| La retención (PURO) | `src/lib/cheques-retencion.ts` |
+| El I/O del aviso | `src/lib/cheques-alert.ts` |
+| Lectura/escritura de recordatorios | `src/lib/recordatorios/server.ts` |
+| API | `/api/cheques`, `/api/cheques/[id]`, `/api/recordatorios`, `/api/recordatorios/[id]` |
+
+🔴 **El archivo de la pantalla pasó de 1.693 líneas a 800** (el límite de la casa), repartido en seis
+piezas. Hay candado que recorre `src/app/recordatorios/**` y exige que ninguna pase de 800.
+
+## La base
+
+| Tabla | Columnas nuevas (5-sep-2026) |
+|---|---|
+| `recordatorios` | `hasta date` · `destino text NOT NULL DEFAULT 'equipo'` · el CHECK de `repeticion` gana `cada_dia` |
+| `cheques` | `aviso_vencido_en timestamptz` · `deleted_at timestamptz` |
+
+Migración: **`20260925130000_recordatorios_rediseno.sql`** — aditiva, ni una fila cambia de valor.
+⚠️ **El código NO degrada sin ella corrida** (la tolerancia a «falta el DDL» se retiró de este módulo
+el 3-sep-2026, a propósito). Correrla es parte del despliegue.
+
+## Los candados
+
+| Archivo | Qué cuida |
+|---|---|
+| `recordatorios-rediseno.test.ts` | la agenda, las pastillas, `cada_dia`/`hasta`, el destino, el aviso único, la retención, el mensaje, la migración, el cron y la dirección |
+| `recordatorios-pantalla.test.tsx` | **conducta**: monta la pantalla real, toca los botones |
+| `recordatorios-permiso-y-aviso.test.ts` | permisos rol por rol con cookies firmadas + los dos mensajes de Telegram |
+| `recordatorios-cuando-tocan.test.ts` | el motor de fechas (fin de mes, «no suena antes») |
+| `cheques-aviso-vencimiento.test.ts` | la ventana del día hábil |
+
+Verificación por mutación: `scripts/_mutar-candados-recordatorios.sh` — **56 mutaciones, 56 cazadas**
+(54 rupturas + 2 controles que quedan verdes).
+
+## Qué probar a mano
+
+1. Entra como Daniel y abre **Recordatorios** desde el menú (o escribe `/cheques`: tiene que
+   redirigir).
+2. Escribe «Llamar al banco» en el renglón de arriba y toca **Guardar**. Aparece en el grupo **Hoy**
+   o **Esta semana** según la fecha que proponga «Mañana».
+3. Toca **Elegir fecha** y pon una fecha de ayer: el botón se apaga y dice *«El aviso sale a las 9:00
+   de la mañana, así que hoy ya pasó…»*.
+4. Busca `246001` en la lupa: tiene que aparecer aunque el cheque esté depositado.
+5. Entra como secretaria: **no** tiene que verse la opción «Solo a mí».
+
+## Lo que queda pendiente
+
+| Qué | Estado |
+|---|---|
+| **Correr la migración `20260925130000_recordatorios_rediseno.sql`** | 🔴 pendiente — es Daniel quien la corre |
+| «Recordarme este cliente» desde la hoja **Cobrar** del CXC | pendiente; toca archivos del módulo CXC |
+| Un chat privado por admin | ⚠️ **no existe**: hay UNO solo (el de Daniel). Si Alberto marca «solo a mí», le llega a Daniel. Daniel lo sabe y lo aprobó así |
+
 
 # 2. Usuarios (`/admin/usuarios`, key `usuarios`)
 

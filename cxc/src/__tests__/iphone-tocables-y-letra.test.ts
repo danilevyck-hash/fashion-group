@@ -169,7 +169,9 @@ describe("La segunda pasada · lo que solo se ve midiendo otra vez", () => {
   });
 
   it("Cheques › las píldoras del calendario median 40 de alto", () => {
-    const src = leer("src/app/cheques/ChequesClient.tsx");
+    // 5-sep-2026: el calendario salió de `ChequesClient.tsx` (1.693 líneas) a su
+    // propio archivo, en `/recordatorios`. La píldora es la MISMA.
+    const src = leer("src/app/recordatorios/components/CalendarioMes.tsx");
     expect(src).toContain("flex min-h-[44px] w-full flex-col justify-center text-left text-xs");
   });
 });

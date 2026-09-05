@@ -81,6 +81,22 @@ const nextConfig = {
       // ni siquiera se descargue la pantalla equivocada. Temporal (307) como los
       // demás: no se quema en el caché del navegador.
       { source: "/saldos-banco", destination: "/gastos-contabilidad?tab=saldos-banco", permanent: false },
+      // El módulo se llama **Recordatorios** desde agosto, pero la dirección
+      // siguió siendo `/cheques` hasta el 5-sep-2026. Ahora la pantalla vive en
+      // `/recordatorios` y la vieja tiene que seguir llegando: está en
+      // marcadores, en la búsqueda global y en el atajo G+Q.
+      //
+      // ⚠️ La `key` del módulo **sigue siendo `cheques`** (vive en
+      // `role_permissions` y en `fg_users.modulos_override`): lo que cambió es
+      // la URL, no el permiso. Renombrar la key dejaría sin módulo a todo el
+      // mundo.
+      //
+      // Temporal (307) como los demás: un 308 se quema en el caché del
+      // navegador y ya no se puede volver atrás sin que la gente limpie datos.
+      // Las pestañas viejas (`?filter=vencen_hoy`, `?filter=pendiente`…) ya no
+      // existen — la lista es UNA sola — y Next arrastra la query al destino:
+      // es INERTE, esa pantalla no lee `filter`.
+      { source: "/cheques", destination: "/recordatorios", permanent: false },
     ];
   },
   experimental: {

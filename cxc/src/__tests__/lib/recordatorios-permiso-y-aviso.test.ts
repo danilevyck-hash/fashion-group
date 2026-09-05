@@ -21,6 +21,8 @@ const heartbeat = vi.fn();
 /** Lo último que se INSERTÓ o se ACTUALIZÓ en `recordatorios`. */
 let escrito: Record<string, unknown> | null = null;
 let filtrosRec: Record<string, unknown> = {};
+/** La fila que YA está guardada — la que el PUT lee antes de escribir. */
+let previa: Record<string, unknown> | null = null;
 
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
@@ -38,26 +40,58 @@ vi.mock("@/lib/supabase-server", () => ({
           insert: (campos: Record<string, unknown>) => { escrito = campos; return rec; },
           update: (campos: Record<string, unknown>) => { escrito = campos; return rec; },
           single: async () => ({ data: { id: "nuevo", ...(escrito ?? {}) }, error: null }),
-          maybeSingle: async () => ({ data: { id: "nuevo", ...(escrito ?? {}) }, error: null }),
+          // ⚠️ El PUT hace DOS `maybeSingle`: primero LEE la fila que ya está
+          // (para saber si la fecha cambió) y después escribe. Antes de escribir
+          // `escrito` es null, así que ese primer viaje devuelve `previa` — la
+          // fila guardada. Sin esta distinción, la lectura previa devolvía la
+          // escritura y la regla de «solo si la fecha cambió» no se podía probar.
+          maybeSingle: async () => ({
+            data: escrito ? { id: "nuevo", ...escrito } : previa,
+            error: null,
+          }),
         } as Record<string, unknown>;
         return rec;
       }
       // Cheques: filtra de verdad, igual que el doble de `cheques-aviso-*`.
+      // Desde el 5-sep-2026 el cron hace TRES consultas sobre esta tabla —los
+      // que vencen, los vencidos sin avisar y los depositados viejos— y dos
+      // escrituras, así que el doble entiende `.is`, `.lt`, `.in` y `.update`.
       const ch = {
         select: () => ch,
         eq: () => ch,
         gte: () => ch,
         lte: () => ch,
-        order: async () => filasCheques(),
+        lt: () => ch,
+        is: () => { chVencidos = true; return ch; },
+        // `.in(...)` cierra las DOS escrituras del cron sobre `cheques`: la
+        // marca del aviso único y la retención. Se guarda lo que se escribió
+        // para poder afirmar que NO se marca cuando Telegram falla.
+        in: (_col: string, ids: string[]) => {
+          escrituraCheques.push({ campos: ultimoUpdate, ids });
+          return Promise.resolve({ data: null, error: null });
+        },
+        update: (campos: Record<string, unknown>) => { ultimoUpdate = campos; return ch; },
+        order: async () => (chVencidos ? ((chVencidos = false), filasVencidos()) : filasCheques()),
       } as Record<string, unknown>;
       return ch;
     },
   },
 }));
 
+/** `true` mientras se está armando la consulta de VENCIDOS (la que usa `.is`). */
+let chVencidos = false;
+const filasVencidos = vi.fn();
+/** Lo que el cron ESCRIBIÓ sobre `cheques` (marca del aviso · retención). */
+let ultimoUpdate: Record<string, unknown> = {};
+let escrituraCheques: Array<{ campos: Record<string, unknown>; ids: string[] }> = [];
+
 const enviado = vi.fn();
+const enviadoPrivado = vi.fn();
+/** Se puede apagar para probar «Telegram falló». */
+let telegramResponde = true;
 vi.mock("@/lib/alertas/canal", () => ({
-  enviarNegocio: (texto: string) => { enviado(texto); return Promise.resolve(true); },
+  enviarNegocio: (texto: string) => { enviado(texto); return Promise.resolve(telegramResponde); },
+  enviarNegocioPrivado: (texto: string) => { enviadoPrivado(texto); return Promise.resolve(telegramResponde); },
 }));
 
 import { NextRequest } from "next/server";
@@ -90,6 +124,8 @@ const filaRec = (over: Record<string, unknown> = {}) => ({
   cliente: null,
   cliente_codigo: null,
   repeticion: "una_vez",
+  hasta: null,
+  destino: "equipo",
   creado_por: "Daniel",
   created_at: "2026-08-24T14:00:00.000Z",
   ...over,
@@ -99,12 +135,28 @@ const cheque = (cliente: string, fecha: string, monto = 1000) => ({
   cliente, empresa: "vistana", monto, fecha_deposito: fecha, vendedor: "",
 });
 
+// 🔴 EL RELOJ VA CLAVADO (5-sep-2026). Desde el rediseño, guardar un
+// recordatorio exige una fecha de MAÑANA en adelante —el aviso sale a las 9:00
+// a.m. y «hoy» ya pasó— y esa cuenta la hace el servidor con la fecha de
+// PANAMÁ. Sin clavar el reloj, `CUERPO_OK` (24-ago) empieza a dar 400 el 25 de
+// agosto a la medianoche, sin que nadie toque una línea. Es la regla de la casa:
+// fechas FIJAS, nunca `new Date()`.
+const AYER_DEL_FIXTURE = new Date("2026-08-23T15:00:00.000Z"); // 10:00 a.m. Panamá
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(AYER_DEL_FIXTURE);
   escrito = null;
   filtrosRec = {};
+  previa = filaRec();
+  chVencidos = false;
+  ultimoUpdate = {};
+  escrituraCheques = [];
+  telegramResponde = true;
   heartbeat.mockResolvedValue({ data: null, error: null });
   filasCheques.mockResolvedValue({ data: [], error: null });
+  filasVencidos.mockResolvedValue({ data: [], error: null });
   filasRecordatorios.mockResolvedValue({ data: [], error: null, count: 0 });
 });
 
@@ -179,6 +231,63 @@ describe("lo que la ruta ESCRIBE de verdad", () => {
   it("🔴 sin cliente se escribe NULL, no cadena vacía", async () => {
     await POST_REC(pedido("admin", "POST", CUERPO_OK));
     expect(escrito).toMatchObject({ cliente: null, cliente_codigo: null, repeticion: "una_vez" });
+  });
+
+  it("🔴 el DESTINO sale del ROL, nunca del cuerpo", async () => {
+    // Una secretaria no ve la opción en pantalla, pero un POST a mano sí podría
+    // mandarla. Esconder el control es cortesía; esto es el candado.
+    await POST_REC(pedido("secretaria", "POST", { ...CUERPO_OK, destino: "privado" }));
+    expect(escrito).toMatchObject({ destino: "equipo" });
+
+    escrito = null;
+    await POST_REC(pedido("admin", "POST", { ...CUERPO_OK, destino: "privado" }));
+    expect(escrito).toMatchObject({ destino: "privado" });
+  });
+
+  it("🔴 editar un recordatorio VIEJO no exige mover su fecha", async () => {
+    // Un semanal arrancado en junio tiene la `fecha` en el pasado. Si la regla
+    // «de mañana en adelante» le aplicara, no se le podría corregir el texto
+    // nunca más.
+    previa = filaRec({ fecha: "2026-06-01", repeticion: "semanal" });
+    const id = UUID;
+    const res = await PUT_REC(
+      pedido(
+        "admin",
+        "PUT",
+        { fecha: "2026-06-01", texto: "Texto corregido", repeticion: "semanal" },
+        `http://localhost/api/recordatorios/${id}`,
+      ),
+      { params: { id } },
+    );
+    expect(res.status).toBe(200);
+    expect(escrito).toMatchObject({ texto: "Texto corregido", fecha: "2026-06-01" });
+  });
+
+  it("🔴 pero MOVERLA a un día que ya pasó sí se rechaza, y se dice por qué", async () => {
+    previa = filaRec({ fecha: "2026-06-01", repeticion: "semanal" });
+    const id = UUID;
+    const res = await PUT_REC(
+      pedido(
+        "admin",
+        "PUT",
+        { fecha: "2026-06-15", texto: "x", repeticion: "semanal" },
+        `http://localhost/api/recordatorios/${id}`,
+      ),
+      { params: { id } },
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("9:00 de la mañana");
+  });
+
+  it("🔴 un `destino` ilegible en la base se lee como EQUIPO, nunca como privado", async () => {
+    // Caer en privado escondería del grupo un aviso que nadie pidió esconder.
+    filasRecordatorios.mockResolvedValue({
+      data: [filaRec({ destino: "vaya-uno-a-saber" })],
+      error: null,
+      count: 1,
+    });
+    const res = await GET_RECS(pedido("admin"));
+    expect((await res.json()).recordatorios[0].destino).toBe("equipo");
   });
 
   it("la firma sale de la SESIÓN, nunca del cuerpo", async () => {
@@ -273,6 +382,71 @@ describe("🔴 EL AVISO DE TELEGRAM — un solo mensaje, y los cheques primero",
     // El bloque de cheques va ANTES: es la plata y es lo que se lee en la
     // notificación del iPhone sin abrirla.
     expect(texto.indexOf("XTREME SHOES")).toBeLessThan(texto.indexOf("🔔"));
+  });
+
+  it("🔴 TRES bloques, en este orden: por vencer · VENCIDOS · recordatorios", async () => {
+    // El de «por vencer» va primero porque es lo que se lee en la notificación
+    // del iPhone sin abrirla; el de vencidos va pegado detrás (misma plata, más
+    // vieja) y la agenda al final.
+    filasCheques.mockResolvedValue({ data: [cheque("POR VENCER S.A.", "2026-08-24")], error: null });
+    filasVencidos.mockResolvedValue({
+      data: [{
+        id: "v1", cliente: "YA VENCIO S.A.", empresa: "vistana", monto: 18393.32,
+        fecha_deposito: "2026-08-20", vendedor: "Edwin",
+        estado: "pendiente", deleted: false, aviso_vencido_en: null,
+      }],
+      error: null,
+    });
+    filasRecordatorios.mockResolvedValue({ data: [filaRec()], error: null, count: 1 });
+
+    await runChequesAlert(nueveQuince("2026-08-24"));
+    const t = enviado.mock.calls[0][0] as string;
+    expect(t.indexOf("POR VENCER S.A.")).toBeLessThan(t.indexOf("YA VENCIO S.A."));
+    expect(t.indexOf("YA VENCIO S.A.")).toBeLessThan(t.indexOf("🔔"));
+    expect(t).toContain("🔴 1 cheque venció y sigue sin depositar");
+  });
+
+  it("🔴 el aviso de vencido se MARCA solo si Telegram confirmó", async () => {
+    filasVencidos.mockResolvedValue({
+      data: [{
+        id: "v1", cliente: "YA VENCIO S.A.", empresa: "vistana", monto: 100,
+        fecha_deposito: "2026-08-20", vendedor: "",
+        estado: "pendiente", deleted: false, aviso_vencido_en: null,
+      }],
+      error: null,
+    });
+
+    // Telegram OK → se marca, y el cheque no vuelve a avisar nunca.
+    await runChequesAlert(nueveQuince("2026-08-24"));
+    expect(escrituraCheques.some((e) => "aviso_vencido_en" in e.campos && e.ids.includes("v1"))).toBe(true);
+
+    // Telegram CAÍDO → NO se marca: marcar ahí quemaría el único aviso que ese
+    // cheque va a tener. Mañana se vuelve a intentar.
+    escrituraCheques = [];
+    telegramResponde = false;
+    heartbeat.mockResolvedValue({ data: null, error: null });
+    const r = await runChequesAlert(nueveQuince("2026-08-25"));
+    expect(r.vencidos).toBe(0);
+    expect(escrituraCheques.some((e) => "aviso_vencido_en" in e.campos)).toBe(false);
+  });
+
+  it("🔴 lo marcado «solo a mí» va al PRIVADO y no al grupo", async () => {
+    filasRecordatorios.mockResolvedValue({
+      data: [
+        filaRec({ id: "r1", texto: "Del equipo" }),
+        filaRec({ id: "r2", texto: "Secreto de Daniel", destino: "privado" }),
+      ],
+      error: null,
+      count: 2,
+    });
+
+    await runChequesAlert(nueveQuince("2026-08-24"));
+
+    expect(enviado.mock.calls[0][0]).toContain("Del equipo");
+    expect(enviado.mock.calls[0][0]).not.toContain("Secreto de Daniel");
+    expect(enviadoPrivado.mock.calls[0][0]).toContain("Secreto de Daniel");
+    // Y el privado NO lleva el prefijo de avería: es negocio, no un problema.
+    expect(enviadoPrivado.mock.calls[0][0]).not.toContain("SISTEMA");
   });
 
   it("🔴 SIN cheques pero CON recordatorio, el aviso SALE igual", async () => {

@@ -426,7 +426,9 @@ describe("BARRIDO 3 — los dos lados están cableados, cada uno con SU cartera"
   });
 
   it("Cheques escribe en la cartera del grupo (su CXC es el del grupo)", () => {
-    const ch = lee("app/cheques/ChequesClient.tsx");
+    // 5-sep-2026: la pantalla pasó a `/recordatorios`. La nota a CXC del cheque
+    // rebotado es la MISMA y sigue en el orquestador.
+    const ch = lee("app/recordatorios/RecordatoriosClient.tsx");
     expect(ch).toContain("CARTERA_GRUPO");
     expect(ch).not.toContain("CARTERA_BOSTON");
   });

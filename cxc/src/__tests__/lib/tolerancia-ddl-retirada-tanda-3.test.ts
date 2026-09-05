@@ -365,7 +365,19 @@ describe("lib/cxc/anotaciones — columna `cartera` (20260813120000)", () => {
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("lib/recordatorios/server + api/recordatorios — recordatorios (20260824120000)", () => {
-  const FILA = { id: "r-1", fecha: "2026-09-10", texto: "Pagar alquiler", cliente: null, cliente_codigo: null, repeticion: "mensual", creado_por: "daniel", created_at: "x" };
+  const FILA = { id: "r-1", fecha: "2026-09-10", texto: "Pagar alquiler", cliente: null, cliente_codigo: null, repeticion: "mensual", hasta: null, destino: "equipo", creado_por: "daniel", created_at: "x" };
+
+  // 🔴 EL RELOJ VA CLAVADO desde el 5-sep-2026: guardar un recordatorio exige
+  // una fecha de MAÑANA en adelante (el aviso sale a las 9:00 a.m. de Panamá).
+  // Con el reloj real, el `2026-09-10` de estos fixtures empezaría a dar 400 el
+  // 11 de septiembre a la medianoche, sin que nadie toque una línea.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-05T15:00:00.000Z")); // 10:00 a.m. Panamá
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("CONTROL: lee y escribe, con `faltaMigracion: false`", async () => {
     porTabla.recordatorios = { data: [FILA], error: null, count: 1 };
