@@ -42,10 +42,13 @@ export const dynamic = "force-dynamic";
 // se tocan: la plata de los tres mundos sigue sumando ahí.
 //
 // Lo que NO se filtra, y por qué:
-//   · `directorio_clientes` (33 contactos cargados a mano) no tiene columna de
-//     empresa — no hay con qué clasificarlo. Misma regla que en `mundos.ts`: si
-//     no se puede determinar el mundo, el cliente SE QUEDA. Ojo que esta tabla
-//     NO es el Directorio del módulo /clientes, que lee `clientes_master`.
+//   · el bloque «Directorio» lee `clientes_master`, que es SOLO del grupo por
+//     construcción (el sync pide por inclusión): no hay nada que filtrar.
+//     🩸 Hasta el 5-sep-2026 leía `directorio_clientes`, la libreta de 33
+//     contactos escrita a mano antes de que el directorio viniera de Switch —
+//     sin código en 8 de ellos, con correos distintos a los reales y sin una
+//     entrada nueva desde el 28-may. Daniel: *«si ningún módulo toca esa lista,
+//     bórralo»*. La tabla queda (congelada, respaldada), sin un solo lector.
 //   · guías, reclamos, préstamos y caja no buscan por nombre de cliente
 //     (transportista, nro de reclamo/factura, empleado y proveedor).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,11 +93,14 @@ export async function GET(req: NextRequest) {
       .order("numero", { ascending: false })
       .limit(5),
 
-    // Directorio: buscar por nombre o empresa
+    // Directorio: el de verdad (`clientes_master`, 150 del grupo, por CÓDIGO).
+    // Se busca por nombre o por código; los ausentes de Switch no se ofrecen.
     supabaseServer
-      .from("directorio_clientes")
-      .select("id, nombre, empresa, correo, celular")
-      .or(`nombre.ilike.${pattern},empresa.ilike.${pattern}`)
+      .from("clientes_master")
+      .select("id, nombre, codigo, email, celular")
+      .eq("deleted", false)
+      .is("ausente_desde", null)
+      .or(`nombre.ilike.${pattern},codigo.ilike.${pattern}`)
       .order("nombre")
       .limit(5),
 
@@ -251,7 +257,11 @@ export async function GET(req: NextRequest) {
     cxc: cxcDeduped,
     reclamos: reclamosRes.data || [],
     guias: guiasData,
-    directorio: dirRes.data || [],
+    // El consumidor (`SearchBar`) sigue leyendo {id, nombre, empresa, correo,
+    // celular}: el código va donde antes iba la «empresa» de la libreta.
+    directorio: (dirRes.data || []).map((d: { id: string; nombre: string; codigo: string | null; email: string | null; celular: string | null }) => ({
+      id: d.id, nombre: d.nombre, empresa: d.codigo ?? "", correo: d.email ?? "", celular: d.celular ?? "",
+    })),
     cheques: chequesRes.data || [],
     ventas: ventasDeduped,
     prestamos: prestamosData,

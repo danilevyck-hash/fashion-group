@@ -47,7 +47,6 @@ import {
   _resetAvisos,
 } from "@/lib/campos-obligatorios";
 import { POST as postResponsable } from "@/app/api/caja/responsables/route";
-import { POST as postDirectorio } from "@/app/api/directorio/route";
 import { POST as postVendor } from "@/app/api/vendors/route";
 import { POST as postContacto, PATCH as patchContacto } from "@/app/api/reclamos/contactos/route";
 import { POST as postPackingList } from "@/app/api/packing-lists/route";
@@ -157,22 +156,8 @@ describe("POST /api/caja/responsables — nombre es NOT NULL sin default", () =>
 });
 
 // ── 2. directorio_clientes.nombre ────────────────────────────────────────────
-
-describe("POST /api/directorio — nombre es NOT NULL sin default", () => {
-  it("sin nombre → 400 que dice qué falta", async () => {
-    tablaComoPostgres("directorio_clientes");
-    const res = await postDirectorio(req("/api/directorio", { empresa: "Vistana" }));
-    expect(res.status).toBe(400);
-    expect((await cuerpo(res)).error).toContain("nombre del cliente");
-  });
-
-  it("caso feliz: guarda con el resto de campos opcionales vacíos", async () => {
-    const recibido = tablaComoPostgres("directorio_clientes");
-    const res = await postDirectorio(req("/api/directorio", { nombre: "Xtreme Shoes", empresa: "Vistana" }));
-    expect(res.status).toBe(200);
-    expect(recibido[0].nombre).toBe("Xtreme Shoes");
-  });
-});
+// Retirado el 5-sep-2026: la libreta vieja ya no tiene ruta de escritura
+// (`/api/directorio` se fue con ella). Ver `directorio-viejo-retirado.test.ts`.
 
 // ── 3. vendor_assignments — sus TRES campos ──────────────────────────────────
 
@@ -481,7 +466,6 @@ describe("respuestaErrorEscritura — no queda muda, pero no filtra la base", ()
 describe("ninguna de las rutas arregladas vuelve al 500 mudo", () => {
   const RUTAS = [
     "src/app/api/caja/responsables/route.ts",
-    "src/app/api/directorio/route.ts",
     "src/app/api/vendors/route.ts",
     "src/app/api/reclamos/contactos/route.ts",
     "src/app/api/guias/route.ts",

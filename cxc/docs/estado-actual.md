@@ -615,3 +615,19 @@ muta un archivo que no respalda es peor que no tenerlo.
 `cxc-ultimos-pagos-boton-fila.test.tsx` · `cxc-ultimos-pagos-bloque.test.tsx` ·
 `cxc-tramos-un-solo-nombre.test.tsx` · `cxc-ultima-compra-pantalla.test.tsx` ·
 `cxc-codigo-muerto-podado.test.tsx`.
+
+
+## 5-sep-2026 — Clientes: la libreta vieja retirada
+
+Al empezar a mapear el módulo Clientes apareció **un segundo directorio**: `directorio_clientes`, 33 contactos escritos a mano antes de que el directorio viniera de Switch (jun-2026). Medido: la última entrada es del 28-may, 8 no tienen código, hay correos distintos a los reales (DE MODA: `Joseca28castillo@…` en la libreta, `josue24castillo@…` en Switch) y **3 de los 10 clientes que más deben no existían ahí** (City Moda Chorrera, Internacional Belén, Grup M.E.L.). Su único lector que quedaba era la sugerencia de nombre al abrir un pedido de catálogo; la búsqueda global la mezclaba con los resultados.
+
+| decisión | resultado |
+|---|---|
+| ¿Hay dos directorios? | *«Supuestamente debe de haber uno y amarrado por código»*. Lo hay: `clientes_master`. La libreta era un sobrante. |
+| ¿Se borra? | *«si sí y ningún módulo toca esa lista, bórralo»*. Se retiró de la app: `clientes-search` del catálogo y el bloque «Directorio» de la búsqueda global leen `clientes_master` (por código, sin ausentes); `/api/directorio` (3 rutas, cero llamadores) se borró. **La tabla no se dropea** —son datos que tecleó una persona— y queda `congelada` en el respaldo. |
+
+Candado: `directorio-viejo-retirado.test.ts` (6 casos); `buscador-solo-grupo` cambió de dirección con nota. 2 mutaciones, 2 cazadas, 1 control verde. Sin migración.
+
+**Clientes sigue en definición** (mockup enviado: la ficha con la plata primero y «Cobrar» ahí mismo; 99 de 150 sin provincia, que es el único filtro de la lista).
+
+⚠️ **Asistencia NO está terminada con el enfoque módulo por módulo.** Recibió arreglos el 1-3 de septiembre (planilla, aviso de horas extra, Yulissa, vacaciones), pero no la vuelta completa de mapear → preguntas → mockup → aprobar con la mirada de eficiencia. Daniel (5-sep): *«asistencia no se hizo con el enfoque que estamos teniendo con los otros modulos ya terminados»*. Queda en la lista de los que faltan. Terminados con ese enfoque: Guías · Depurador · Caja · Comisiones · Préstamos · Cuentas por Cobrar; en construcción: Recordatorios.

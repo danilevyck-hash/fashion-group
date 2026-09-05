@@ -132,7 +132,6 @@ export const TABLAS_PERSONAS = [
   "cxc_contact_log",
   "cxc_emails_enviados",
   "clientes_master",
-  "directorio_clientes",
 
   // ── Cheques / Recordatorios
   "cheques",
@@ -222,6 +221,12 @@ export const TABLAS_CONGELADAS = [
   // existe: sin copia, no vuelven.
   "mayor_lineas",
   "mayor_importaciones",
+  // La libreta de clientes escrita A MANO antes de que el directorio viniera de
+  // Switch (33 fichas, la última del 28-may-2026). Se retiró de la app el
+  // 5-sep-2026 —su último lector eran las sugerencias del pedido de catálogo—
+  // y Daniel dijo «bórralo», pero son datos que tecleó una persona: la tabla se
+  // queda, nadie la lee ni la escribe, y sigue en el respaldo.
+  "directorio_clientes",
 ] as const;
 
 // ─── `switch` — se puede volver a bajar ─────────────────────────────────────

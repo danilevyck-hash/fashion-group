@@ -120,7 +120,6 @@ import { GET as gastosEgresos } from "@/app/api/gastos-contabilidad/egresos/rout
 import { GET as marketingProyectos } from "@/app/api/marketing/proyectos/route";
 import { GET as cajaPeriodos } from "@/app/api/caja/periodos/route";
 import { GET as packingLists } from "@/app/api/packing-lists/route";
-import { GET as directorio } from "@/app/api/directorio/route";
 import { GET as asistenciaReporte } from "@/app/api/asistencia/reporte/route";
 
 // 13-ago-2026 18:00 UTC = 13:00 en Panamá.
@@ -297,7 +296,6 @@ const RUTAS_AJENAS: Array<[modulo: string, url: string, handler: Handler]> = [
   ["marketing",           "/api/marketing/proyectos",                     marketingProyectos as Handler],
   ["caja menuda",         "/api/caja/periodos",                           cajaPeriodos as Handler],
   ["packing lists",       "/api/packing-lists",                           packingLists as Handler],
-  ["directorio/clientes", "/api/directorio",                              directorio as Handler],
   ["asistencia",          "/api/asistencia/reporte?desde=2026-08-01&hasta=2026-08-13", asistenciaReporte as Handler],
 ];
 

@@ -57,9 +57,6 @@ export const CAMPOS_OBLIGATORIOS = {
   caja_responsables: [
     { columna: "nombre", etiqueta: "el nombre del responsable" },
   ],
-  directorio_clientes: [
-    { columna: "nombre", etiqueta: "el nombre del cliente" },
-  ],
   vendor_assignments: [
     { columna: "company_key", etiqueta: "la empresa" },
     { columna: "client_name", etiqueta: "el nombre del cliente" },

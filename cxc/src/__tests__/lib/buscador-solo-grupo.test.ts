@@ -119,15 +119,19 @@ describe("Lo que el ⌘K NO filtra, y está escrito por qué", () => {
     }
   });
 
-  it("`directorio_clientes` se queda: no tiene columna de empresa que mirar", () => {
-    // 33 contactos cargados a mano, sin `empresa_key` ni `company_key` — no hay
-    // con qué clasificarlos. Misma regla que en mundos.ts: si no se puede
-    // determinar el mundo, el cliente SE QUEDA (esconder de más es peor que
-    // mostrar de más). Ojo: NO es el Directorio del módulo /clientes, que lee
-    // `clientes_master` y se filtró aparte.
-    expect(route).toMatch(/no tiene columna de\s*\n\/\/\s*empresa/);
-    const i = route.indexOf('.from("directorio_clientes")');
+  // 🔁 CAMBIÓ DE DIRECCIÓN el 5-sep-2026. Hasta ese día este candado exigía que
+  // el bloque «Directorio» leyera `directorio_clientes` sin filtrar por empresa
+  // (la libreta de 33 no tenía columna con qué). La libreta se retiró de la app
+  // —Daniel: «si ningún módulo toca esa lista, bórralo»— y el bloque pasó a
+  // `clientes_master`, que es SOLO del grupo por construcción: no hay nada que
+  // filtrar y no se filtra. El candado ahora vigila justamente eso.
+  it("el bloque «Directorio» lee `clientes_master` y NO la libreta vieja", () => {
+    expect(route).not.toContain('.from("directorio_clientes")');
+    const i = route.indexOf('.from("clientes_master")');
     expect(i).toBeGreaterThan(-1);
-    expect(route.slice(i, i + 300)).not.toContain("EMPRESAS_DEL_GRUPO");
+    const bloque = route.slice(i, i + 400);
+    expect(bloque).toContain('.eq("deleted", false)');
+    expect(bloque).toContain('.is("ausente_desde", null)');
+    expect(bloque).not.toContain("EMPRESAS_DEL_GRUPO");
   });
 });
