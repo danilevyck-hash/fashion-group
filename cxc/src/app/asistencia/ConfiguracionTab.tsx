@@ -134,6 +134,11 @@ interface Persona {
   motivoReparto?: string | null;
   marcaciones: number;
   ultimaMarca: string | null;
+  /**
+   * 🔴 LO QUE DEBE EN PRÉSTAMOS. Se dice al dar de baja: es el momento en que se
+   * decide la liquidación, y el único en que ese número sirve. 0 = no debe.
+   */
+  deudaPrestamo?: number;
   rataHora: number | null;
   valorMinuto: number | null;
   // ── Altas y bajas ──────────────────────────────────────────────────────────
@@ -630,9 +635,13 @@ export default function ConfiguracionTab() {
         setAbierta(null);
         setBorrador(null);
         const quien = p.nombre ?? `el código ${p.codigo}`;
+        const debe = p.deudaPrestamo ?? 0;
         toast(
           fechaSalida
             ? `Listo. ${quien} no sale en las quincenas posteriores al ${fechaSalida}; las anteriores quedan igual.`
+              // 🔴 El recordatorio viaja también en el toast: la ficha se cierra
+              // al guardar y el aviso del formulario se va con ella.
+              + (debe > 0 ? ` Debe $${debe.toFixed(2)} en Préstamos — descuéntalo de la liquidación.` : "")
             : `Listo. ${quien} vuelve a salir en la planilla.`,
           "success",
         );
@@ -1621,6 +1630,16 @@ function BloqueBaja({
       {!puede && (
         <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">
           Todavía no se puede guardar una baja: falta correr el archivo de la base de datos.
+        </p>
+      )}
+
+      {/* 🔴 QUIEN SE VA DEBIENDO, SE DICE ACÁ. Daniel, 5-sep-2026: al marcar la
+          fecha de salida de alguien con deuda, avisar en ese momento — es
+          cuando se decide la liquidación. Después ya cobró y la plata se fue.
+          Sin Telegram: el aviso va donde se toma la decisión. */}
+      {(persona.deudaPrestamo ?? 0) > 0 && (
+        <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] font-medium text-amber-800">
+          Debe ${(persona.deudaPrestamo ?? 0).toFixed(2)} en Préstamos — descuéntalo de la liquidación.
         </p>
       )}
 

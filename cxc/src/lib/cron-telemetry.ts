@@ -569,6 +569,15 @@ export const SEED_TOLERANT_CRONS = [
   // estado de cuenta por API está vetado (EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON) y
   // el directorio viajaba adentro de ESE sync.
   "sync-clientes-boston",
+  // Caduca los préstamos que llevan 7 días esperando la aprobación de Daniel
+  // (13:15 UTC = 8:15 a.m. Panamá, antes de que la contadora empiece). Solo DB:
+  // no toca Switch. Desplegado el 5-sep-2026: seed-tolerante hasta que siembre
+  // su fila; promover a CRONS_FAIL_CLOSED cuando lleve días corriendo.
+  //
+  // 🩸 Existe porque un pendiente que espera para siempre es plata escondida:
+  // los $700 de LUIS ADRIAN ARROYO estuvieron 22 días en `pendiente_aprobacion`
+  // con el saldo mostrando $0.
+  "prestamos-caducan",
 ];
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────

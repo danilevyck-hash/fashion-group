@@ -28,6 +28,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerDeudaPorCodigo } from "@/lib/prestamos-lista-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { diaPanama } from "@/lib/asistencia/reporte";
 import {
@@ -114,10 +115,15 @@ export async function GET(req: NextRequest) {
 
     // Si cualquiera de las tres lecturas falla, se sale por el `catch` con un
     // 500 y el mensaje (tolerancia a la DDL retirada el 3-sep-2026).
-    const [{ reglas }, { filas }, repRes] = await Promise.all([
+    const [{ reglas }, { filas }, repRes, deudaDe] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       leerRepartos(),
+      // 🔴 Cuánto debe cada persona en Préstamos. Es lo que hace falta para
+      // avisar «Debe $100 — descuéntalo de la liquidación» EN EL MOMENTO en que
+      // se marca la fecha de salida, que es cuando se decide la liquidación.
+      // Nunca tumba esta pantalla: si Préstamos no contesta, el mapa viene vacío.
+      leerDeudaPorCodigo(),
     ]);
 
     // El día de hoy en Panamá. Solo decide cómo se REDACTA la baja («Renunció»
@@ -286,6 +292,10 @@ export async function GET(req: NextRequest) {
         // rata A CENTAVOS, que es la que multiplica de verdad en `planilla.ts`.
         // La segunda devuelve 4 decimales y la pantalla enseñaba `$3.0201` donde
         // la planilla de la contable dice `$3.02`. Ver `lib/asistencia/rata.ts`.
+        // 🔴 LO QUE DEBE EN PRÉSTAMOS. Se muestra al dar de baja, con nombre y
+        // monto: rechazar sí, esconder no — y acá ni siquiera se rechaza nada,
+        // solo se dice a tiempo. 0 = no debe.
+        deudaPrestamo: deudaDe.get(codigo) ?? 0,
         rataHora: rataPorHoraCalculo(salario, jornada, reglas),
         valorMinuto: valorMinuto(salario, jornada, reglas),
       };

@@ -49,7 +49,7 @@ interface EmpleadoFila {
   nombre: string;
   empresa: string | null;
   deduccion_quincenal: number | string | null;
-  activo: boolean | null;
+  deduccion_dano: number | string | null;
   prestamos_movimientos: (MovimientoParaSaldo & { fecha?: string | null })[] | null;
 }
 
@@ -61,8 +61,12 @@ export async function GET(req: NextRequest) {
     .from("prestamos_empleados")
     // Columnas explícitas: `select("*")` traería mañana una columna nueva sin
     // que nadie decida que David la puede ver.
-    .select("id, nombre, empresa, deduccion_quincenal, activo, prestamos_movimientos(concepto, monto, estado, deleted, fecha)")
-    .eq("activo", true)
+    .select("id, nombre, empresa, deduccion_quincenal, deduccion_dano, prestamos_movimientos(concepto, monto, estado, deleted, fecha, cuenta)")
+    // 🔴 Ya no se filtra por la bandera `activo`: se retiró el 5-sep-2026 porque
+    // nunca significó «trabaja acá» sino «tiene algo abierto» — y eso lo dice el
+    // saldo. Lo que David ve es QUIÉN DEBE, que es lo que él miraba igual.
+    // `deleted` es NULLABLE en préstamos: un `.eq("deleted", false)` pierde filas.
+    .or("deleted.is.null,deleted.eq.false")
     .order("nombre", { ascending: true });
 
   if (error) {
@@ -88,6 +92,10 @@ export async function GET(req: NextRequest) {
       // No se traduce acá: se muestra tal cual lo guardó Contabilidad.
       empresa: e.empresa ?? "Sin empresa",
       deduccionQuincenal: Number(e.deduccion_quincenal ?? 0),
+      // Las dos cuentas separadas (5-sep-2026). El total no cambia.
+      deduccionDano: Number(e.deduccion_dano ?? 0),
+      saldoPrestamo: round2(c.cuentas.prestamo.saldo),
+      saldoDano: round2(c.cuentas.dano.saldo),
       prestado: round2(c.prestado),
       pagado: round2(c.pagado),
       saldo: round2(c.saldo),
@@ -96,11 +104,13 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  // Solo quien debe: quien llega a cero sale solo de la pantalla de David, igual
+  // que de la de Contabilidad.
   const conSaldo = empleados.filter((e) => e.saldo > 0);
   return NextResponse.json({
-    empleados,
+    empleados: conSaldo,
     totales: {
-      personas: empleados.length,
+      personas: conSaldo.length,
       conSaldo: conSaldo.length,
       saldo: round2(conSaldo.reduce((s, e) => s + e.saldo, 0)),
     },

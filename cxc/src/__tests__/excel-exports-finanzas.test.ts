@@ -72,11 +72,16 @@ describe("buildPrestamosWorkbook", () => {
       nombre: "Juan Pérez",
       empresa: "Fashion Wear",
       deduccion_quincenal: 25,
-      activo: true,
+      deduccion_dano: 10,
       prestamos_movimientos: [
         { id: "m1", fecha: "2026-05-01", concepto: "Préstamo", monto: 500, notas: "Inicial", estado: "aprobado", created_at: "2026-05-01T10:00:00Z" },
-        { id: "m2", fecha: "2026-05-15", concepto: "Pago", monto: 100, notas: null, estado: "aprobado", created_at: "2026-05-15T10:00:00Z" },
-        { id: "m3", fecha: "2026-06-01", concepto: "Pago", monto: 50, notas: null, estado: "pendiente_aprobacion", created_at: "2026-06-01T10:00:00Z" },
+        { id: "m2", fecha: "2026-05-15", concepto: "Pago", monto: 100, notas: null, origen_pago: "Quincena", estado: "aprobado", created_at: "2026-05-15T10:00:00Z" },
+        // ⚠️ ESPERANDO APROBACIÓN: no es plata todavía. No cuenta para el saldo
+        // Y desde el 5-sep-2026 tampoco sale en la hoja de Movimientos: en un
+        // papel sin contexto se leería como si ya se hubiera entregado.
+        { id: "m3", fecha: "2026-06-01", concepto: "Préstamo", monto: 50, notas: null, estado: "pendiente_aprobacion", created_at: "2026-06-01T10:00:00Z" },
+        // Daño de mercancía: la SEGUNDA cuenta. El total no cambia por partirlo.
+        { id: "m4", fecha: "2026-05-20", concepto: "Responsabilidad por daño", monto: 60, notas: "Polo dañado", estado: "aprobado", created_at: "2026-05-20T10:00:00Z" },
       ],
     },
   ];
@@ -88,30 +93,47 @@ describe("buildPrestamosWorkbook", () => {
 
     const ws = wb.Sheets["Resumen"];
     expect(ws["A1"].v).toBe("Empleado");
-    expect(ws["G1"].v).toBe("% Progreso");
+    // 🔴 LAS DOS CUENTAS, cada una con su cuota y su saldo.
+    expect(ws["C1"].v).toBe("Cuota préstamo");
+    expect(ws["D1"].v).toBe("Cuota daño");
+    expect(ws["E1"].v).toBe("Debe de préstamo");
+    expect(ws["F1"].v).toBe("Debe de daño");
+    expect(ws["J1"].v).toBe("% Progreso");
 
-    // Fila de datos: solo movimientos aprobados cuentan (500 prestado, 100 pagado)
+    // Fila de datos: solo lo APROBADO cuenta (500 + 60 prestado, 100 pagado).
     expect(ws["A2"].v).toBe("Juan Pérez");
-    expect(ws["D2"].t).toBe("n");
-    expect(ws["D2"].v).toBe(500);
-    expect(ws["E2"].v).toBe(100);
-    expect(ws["F2"].v).toBe(400);
-    expect(ws["G2"].v).toBeCloseTo(0.2); // 20% progreso
+    expect(ws["E2"].v).toBe(400);   // préstamo: 500 − 100
+    expect(ws["F2"].v).toBe(60);    // daño
+    expect(ws["G2"].t).toBe("n");
+    expect(ws["G2"].v).toBe(560);   // prestado total
+    expect(ws["H2"].v).toBe(100);   // pagado
+    expect(ws["I2"].v).toBe(460);   // 🔴 el total sigue siendo prestado − pagado
+    expect(ws["I2"].v).toBe(ws["E2"].v + ws["F2"].v); // las dos cuentas suman el total
 
     // Totales (espaciador fila 3, totales fila 4)
     expect(ws["A4"].v).toBe("TOTALES");
-    expect(ws["D4"].t).toBe("n");
-    expect(ws["D4"].v).toBe(500);
-    expect(ws["F4"].v).toBe(400);
+    expect(ws["G4"].t).toBe("n");
+    expect(ws["G4"].v).toBe(560);
+    expect(ws["I4"].v).toBe(460);
 
     const wsM = wb.Sheets["Movimientos"];
     expect(wsM["A1"].v).toBe("Empleado");
-    expect(wsM["E1"].v).toBe("Monto");
-    // Movimientos orden fecha DESC → el pendiente de junio primero
-    expect(wsM["D2"].v).toBe("Pago");
-    expect(wsM["G2"].v).toBe("Pendiente de aprobación");
-    expect(wsM["E2"].t).toBe("n");
-    expect(wsM["E2"].v).toBe(50);
+    expect(wsM["E1"].v).toBe("Cuenta");
+    expect(wsM["F1"].v).toBe("Monto");
+    expect(wsM["G1"].v).toBe("De dónde salió");
+    // ⚠️ SE FUE la columna «Estado»: traducía dos valores que la pantalla no
+    // produce y en las 443 filas decía siempre «Aprobado».
+    expect(wsM["H1"].v).toBe("Notas");
+    // Orden fecha DESC dentro del empleado. El pendiente del 1-jun NO sale.
+    expect(wsM["C2"].v).toBe("20 may 2026");
+    expect(wsM["D2"].v).toBe("Daño de mercancía");
+    expect(wsM["E2"].v).toBe("Daño de mercancía");
+    const textos = Object.keys(wsM)
+      .filter((k) => /^D\d+$/.test(k))
+      .map((k) => wsM[k].v);
+    expect(textos).not.toContain("Responsabilidad por daño"); // se MUESTRA con su nombre nuevo
+    // 3 movimientos aprobados + encabezado = 4 filas; el pendiente quedó fuera.
+    expect(Object.keys(wsM).filter((k) => /^A\d+$/.test(k))).toHaveLength(4);
   });
 
   // 🔴 EL FILTRO DE EMPRESA LO DICE EL NOMBRE DEL ARCHIVO, no una fila adentro:

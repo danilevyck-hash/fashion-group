@@ -1,98 +1,120 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Empleado } from "./types";
 import { fmt } from "@/lib/format";
+import { CONCEPTO_PAGO, ORIGEN_POR_DEFECTO } from "@/lib/prestamos-conceptos";
+import { hoyPanamaYmd } from "@/lib/prestamos-quincena";
+import type { CuentaPrestamo } from "@/lib/prestamos-saldo";
+import type { Colaborador } from "@/lib/prestamos-lista-server";
 
 interface UseEmpleadoActionsProps {
   empleadoId: string;
   empleado: Empleado;
-  movs: { id: string }[];
   onSuccess: () => void;
   onDeleted: () => void;
   showToast: (msg: string) => void;
 }
 
-export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDeleted, showToast }: UseEmpleadoActionsProps) {
-  // ── Edit employee ──
+/**
+ * 🩸 SE FUERON `toggleArchive` Y `forceArchive`. La bandera `activo` se retiró
+ * el 5-sep-2026 (ver `prestamos-lista-server.ts`): nunca significó «trabaja
+ * acá». Quien llega a cero sale solo de la lista.
+ */
+export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted, showToast }: UseEmpleadoActionsProps) {
+  // ── Editar la ficha: las dos cuotas y la persona ──
   const [showEditModal, setShowEditModal] = useState(false);
-  const [fNombre, setFNombre] = useState("");
-  const [fEmpresa, setFEmpresa] = useState("");
-  const [fDeduccion, setFDeduccion] = useState("");
-  const [fNotas, setFNotas] = useState("");
+  const [fCuotaPrestamo, setFCuotaPrestamo] = useState("");
+  const [fCuotaDano, setFCuotaDano] = useState("");
+  const [fCodigo, setFCodigo] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+
+  // 🔴 La lista de personas sale de Asistencia: es lo que hace posible ATAR una
+  // ficha desde la pantalla. Hasta el 5-sep-2026 `empleado_codigo` no se podía
+  // poner desde ningún lado, y el aviso de la planilla decía que sí.
+  const cargarColaboradores = useCallback(async () => {
+    try {
+      const res = await fetch("/api/prestamos/empleados");
+      if (res.ok) {
+        const d = await res.json();
+        setColaboradores(d.colaboradores ?? []);
+      }
+    } catch { /* la ficha se sigue pudiendo editar sin la lista */ }
+  }, []);
+
+  useEffect(() => { if (showEditModal) void cargarColaboradores(); }, [showEditModal, cargarColaboradores]);
 
   function openEditModal() {
-    setFNombre(empleado.nombre); setFEmpresa(empleado.empresa || "");
-    setFDeduccion(String(empleado.deduccion_quincenal)); setFNotas(empleado.notas || "");
+    setFCuotaPrestamo(String(empleado.deduccion_quincenal ?? 0));
+    setFCuotaDano(String(empleado.deduccion_dano ?? 0));
+    setFCodigo(empleado.empleado_codigo ?? "");
     setShowEditModal(true);
   }
 
   async function saveEdit() {
-    if (!fNombre.trim()) { showToast("Nombre requerido"); return; }
     setSavingEdit(true);
     try {
+      const body: Record<string, unknown> = {
+        deduccion_quincenal: Number(fCuotaPrestamo) || 0,
+        deduccion_dano: Number(fCuotaDano) || 0,
+      };
+      if (fCodigo && fCodigo !== (empleado.empleado_codigo ?? "")) body.empleado_codigo = fCodigo;
       const res = await fetch(`/api/prestamos/empleados/${empleadoId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: fNombre.trim(), empresa: fEmpresa || null, deduccion_quincenal: Number(fDeduccion) || 0, notas: fNotas || null }),
+        body: JSON.stringify(body),
       });
-      if (res.ok) { showToast("Empleado actualizado"); setShowEditModal(false); onSuccess(); }
-      else { const err = await res.json(); showToast(err.error || "Error"); }
+      if (res.ok) { showToast("Ficha actualizada"); setShowEditModal(false); onSuccess(); }
+      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error"); }
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSavingEdit(false);
   }
 
-  // ── Archive / Reactivate ──
-  async function toggleArchive() {
-    const newState = !empleado.activo;
-    const res = await fetch(`/api/prestamos/empleados/${empleadoId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ activo: newState }),
-    });
-    if (res.ok) { showToast(newState ? "Empleado reactivado" : "Empleado archivado"); onSuccess(); }
-    else showToast("Error al actualizar");
-  }
-
   // ── Pago quincenal ──
-  const [showPagoConfirm, setShowPagoConfirm] = useState(false);
-
-  function pagoQuincenal() {
-    if (!empleado.deduccion_quincenal || empleado.deduccion_quincenal <= 0) {
-      showToast("Este empleado no tiene deducción quincenal configurada"); return;
-    }
-    setShowPagoConfirm(true);
-  }
-
-  async function confirmarPagoQuincenal() {
-    setShowPagoConfirm(false);
+  //
+  // ⚠️ Escribe la fecha de HOY (Panamá) sin preguntar, a propósito: es el atajo
+  // de UN toque. Cuando la fecha importa —contabilidad registra 1-4 días después
+  // del pago— se usa «Aplicar quincena», que SÍ la pregunta.
+  async function pagoQuincenal(cuota: number, cuenta: CuentaPrestamo | null) {
+    if (!cuota || cuota <= 0) { showToast("Esta persona no tiene cuota quincenal"); return; }
     try {
       const res = await fetch("/api/prestamos/movimientos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empleado_id: empleadoId, fecha: new Date().toISOString().slice(0, 10), concepto: "Pago", monto: empleado.deduccion_quincenal, notas: "Deducción quincenal" }),
+        body: JSON.stringify({
+          empleado_id: empleadoId,
+          fecha: hoyPanamaYmd(),
+          concepto: CONCEPTO_PAGO,
+          monto: cuota,
+          origen_pago: ORIGEN_POR_DEFECTO,
+          ...(cuenta ? { cuenta } : {}),
+        }),
       });
-      if (res.ok) { showToast(`Pago quincenal de $${fmt(empleado.deduccion_quincenal)} registrado`); onSuccess(); }
-      else { const err = await res.json(); showToast(err.error || "Error"); }
+      if (res.ok) { showToast(`Pago quincenal de $${fmt(cuota)} registrado`); onSuccess(); }
+      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error"); }
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
   }
 
-  // ── Danger zone ──
+  // ── Zona de acciones peligrosas ──
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearInput, setClearInput] = useState("");
-  const [showForceArchive, setShowForceArchive] = useState(false);
   const [clearProgress, setClearProgress] = useState("");
 
   async function deleteEmployee() {
     const res = await fetch(`/api/prestamos/empleados/${empleadoId}`, { method: "DELETE" });
-    if (res.ok) { showToast("Empleado eliminado"); onDeleted(); }
-    else { const err = await res.json(); showToast(err.error || "Error"); }
+    if (res.ok) { showToast("Ficha eliminada"); onDeleted(); }
+    else { const err = await res.json().catch(() => null); showToast(err?.error || "Error"); }
     setShowDeleteConfirm(false);
   }
 
+  /**
+   * 🩸 «Eliminar Todo el Historial» hacía un `.delete()` REAL de Postgres —el
+   * único hard delete del repo, en la tabla de plata, y sin una línea en
+   * `activity_logs`—. Ahora el servidor hace soft delete y lo registra.
+   */
   async function clearHistory() {
     setClearProgress("Borrando historial...");
     try {
@@ -101,12 +123,8 @@ export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDe
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ empleado_id: empleadoId }),
       });
-      if (res.ok) {
-        showToast("Historial borrado");
-      } else {
-        const err = await res.json();
-        showToast(err.error || "Error al borrar historial");
-      }
+      if (res.ok) showToast("Historial borrado");
+      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al borrar historial"); }
     } catch {
       showToast("Sin conexión. Verifica tu internet e intenta de nuevo.");
     }
@@ -115,38 +133,20 @@ export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDe
     onSuccess();
   }
 
-  async function forceArchive() {
-    const res = await fetch(`/api/prestamos/empleados/${empleadoId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ activo: false }),
-    });
-    if (res.ok) { showToast("Empleado archivado"); onSuccess(); }
-    else showToast("Error");
-    setShowForceArchive(false);
-  }
-
   return {
-    // edit employee
     showEditModal, setShowEditModal,
-    fNombre, setFNombre,
-    fEmpresa, setFEmpresa,
-    fDeduccion, setFDeduccion,
-    fNotas, setFNotas,
+    fCuotaPrestamo, setFCuotaPrestamo,
+    fCuotaDano, setFCuotaDano,
+    fCodigo, setFCodigo,
+    colaboradores,
     savingEdit,
     openEditModal, saveEdit,
-    // archive
-    toggleArchive,
-    // pago quincenal
-    showPagoConfirm, setShowPagoConfirm,
-    pagoQuincenal, confirmarPagoQuincenal,
-    // danger zone
+    pagoQuincenal,
     showDeleteConfirm, setShowDeleteConfirm,
     deleteInput, setDeleteInput,
     showClearConfirm, setShowClearConfirm,
     clearInput, setClearInput,
     clearProgress,
-    showForceArchive, setShowForceArchive,
-    deleteEmployee, clearHistory, forceArchive,
+    deleteEmployee, clearHistory,
   };
 }

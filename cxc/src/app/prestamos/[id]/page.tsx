@@ -1,27 +1,30 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ConfirmModal } from "@/components/ui";
-import UndoToast from "@/components/UndoToast";
+import { PRESTAMOS_ADMIN_ROLES, PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
+import {
+  calcularSaldoPrestamo,
+  cuentaMasVieja,
+  pendienteDeAprobacion,
+  ESTADO_PENDIENTE,
+} from "@/lib/prestamos-saldo";
+import { CONCEPTO_PAGO, ORIGEN_POR_DEFECTO, etiquetaConcepto } from "@/lib/prestamos-conceptos";
+import { getQuincenaRangePanama, hoyPanamaYmd } from "@/lib/prestamos-quincena";
 
-import { Empleado, getQuincenaRange, hasDeduccionEnQuincena } from "../components/types";
+import { Empleado } from "../components/types";
 import EmpleadoHeader from "../components/EmpleadoHeader";
 import SummaryCards from "../components/SummaryCards";
 import MovimientoTable from "../components/MovimientoTable";
 import DangerZone from "../components/DangerZone";
-import MovimientoModal from "../components/MovimientoModal";
+import NuevoMovimientoModal from "../components/NuevoMovimientoModal";
 import EditEmpleadoModal from "../components/EditEmpleadoModal";
 import EditMovimientoModal from "../components/EditMovimientoModal";
-import {
-  PagoQuincenalConfirm,
-  DeleteEmpleadoConfirm,
-  ClearHistoryConfirm,
-  ForceArchiveConfirm,
-} from "../components/ConfirmModals";
+import { DeleteEmpleadoConfirm, ClearHistoryConfirm } from "../components/ConfirmModals";
 import { useMovimientoForm, useEditMovimiento } from "../components/useMovimientoForm";
 import { useEmpleadoActions } from "../components/useEmpleadoActions";
 
@@ -30,11 +33,11 @@ export default function PrestamoDetallePage() {
   const params = useParams();
   const id = params.id as string;
 
-  const { authChecked, role } = useAuth({ moduleKey: "prestamos", allowedRoles: ["admin", "contabilidad"] });
+  const { authChecked, role } = useAuth({ moduleKey: "prestamos", allowedRoles: [...PRESTAMOS_ROLES] });
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
-  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [showNuevoMov, setShowNuevoMov] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -50,65 +53,57 @@ export default function PrestamoDetallePage() {
 
   useEffect(() => { if (authChecked) loadEmpleado(); }, [authChecked, loadEmpleado]);
 
-  // Hooks are called unconditionally — data is only used after the guard below
-  const movs = empleado?.prestamos_movimientos ?? [];
+  const movs = useMemo(() => empleado?.prestamos_movimientos ?? [], [empleado]);
 
-  const movForm = useMovimientoForm({
-    empleadoId: id,
-    deduccionQuincenal: empleado?.deduccion_quincenal ?? 0,
-    onSuccess: loadEmpleado,
-    showToast,
-  });
-
+  const movForm = useMovimientoForm({ onSuccess: loadEmpleado, showToast });
   const editMov = useEditMovimiento({ onSuccess: loadEmpleado, showToast });
-
   const actions = useEmpleadoActions({
     empleadoId: id,
     empleado: empleado ?? ({} as Empleado),
-    movs,
     onSuccess: loadEmpleado,
     onDeleted: () => router.push("/prestamos"),
     showToast,
   });
 
+  // 🔴 LA CUENTA SALE DE `calcularSaldoPrestamo` Y DE NINGÚN OTRO LADO.
+  // 🩸 Acá vivía una copia inline con arrays literales y un `console.warn` que
+  // decía, textual: «Saldo running ($X) no coincide con saldo backend ($Y)».
+  // Era la advertencia que `prestamos-saldo.ts` existe para evitar, escrita en
+  // el único archivo que no lo usaba.
+  const s = useMemo(() => calcularSaldoPrestamo(movs), [movs]);
+  const pend = useMemo(() => pendienteDeAprobacion(movs), [movs]);
+
   if (!authChecked || loading || !empleado) return null;
 
-  const isAdmin = role === "admin";
-  const canEdit = role === "admin" || role === "contabilidad";
-  const canDelete = role === "admin" || role === "contabilidad";
+  const canEdit = PRESTAMOS_ROLES.includes(role ?? "");
+  const canDelete = PRESTAMOS_ROLES.includes(role ?? "");
+  const isAdmin = PRESTAMOS_ADMIN_ROLES.includes(role ?? "");
+  const hoy = hoyPanamaYmd();
+
   const sortedMovs = [...movs].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at));
   const movToDelete = movForm.confirmDeleteMovId ? movs.find(m => m.id === movForm.confirmDeleteMovId) ?? null : null;
 
-  const PRESTAMO_CONCEPTOS = ["Préstamo", "Responsabilidad por daño"];
-  const prestado = movs.filter(m => PRESTAMO_CONCEPTOS.includes(m.concepto) && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
-  const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
-  const saldo = prestado - pagado;
-  const pct = prestado > 0 ? (pagado / prestado) * 100 : 0;
-
-  // Estado de la quincena vigente para el chip del header (mismo helper que la lista).
-  const quincena = getQuincenaRange();
-  const tieneDeduccion = empleado.deduccion_quincenal > 0;
-  const deducidaQ = tieneDeduccion && hasDeduccionEnQuincena(movs, quincena.start, quincena.end);
-  const quincenaEstado: "deducida" | "pendiente" | null =
-    !tieneDeduccion ? null : deducidaQ ? "deducida" : saldo > 0 ? "pendiente" : null;
-
-  // Saldo corriente por movimiento (solo aprobados afectan el balance)
+  // Saldo corriente por movimiento — solo los APROBADOS mueven el saldo, así que
+  // lo que espera queda fuera de la columna (y lo dice: «No suma»).
   const saldoByMov = new Map<string, number>();
   const ascAprobados = [...movs]
     .filter(m => m.estado === "aprobado")
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.created_at.localeCompare(b.created_at));
   let running = 0;
   for (const m of ascAprobados) {
-    if (PRESTAMO_CONCEPTOS.includes(m.concepto)) running += Number(m.monto);
-    else running -= Number(m.monto);
+    running += calcularSaldoPrestamo([m]).saldo;
     saldoByMov.set(m.id, running);
   }
-  if (ascAprobados.length > 0) {
-    const last = saldoByMov.get(ascAprobados[ascAprobados.length - 1].id) ?? 0;
-    if (Math.abs(last - saldo) > 0.01) {
-      console.warn(`[Préstamos] Saldo running ($${last.toFixed(2)}) no coincide con saldo backend ($${saldo.toFixed(2)}) para ${empleado.nombre}`);
-    }
-  }
+
+  const cuota = Number(empleado.deduccion_quincenal ?? 0) + Number(empleado.deduccion_dano ?? 0);
+  const q = getQuincenaRangePanama();
+  const deducidaQ = movs.some(
+    (m) => m.estado === "aprobado" && m.concepto === CONCEPTO_PAGO
+      && (!m.origen_pago || m.origen_pago === ORIGEN_POR_DEFECTO)
+      && m.fecha >= q.start && m.fecha <= q.end,
+  );
+  const quincenaEstado: "deducida" | "pendiente" | null =
+    cuota <= 0 || !empleado.trabaja ? null : deducidaQ ? "deducida" : s.saldo > 0 ? "pendiente" : null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -123,29 +118,33 @@ export default function PrestamoDetallePage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <EmpleadoHeader
           empleado={empleado}
-          saldo={saldo}
-          saldado={prestado > 0 && saldo <= 0}
           onEdit={actions.openEditModal}
-          onToggleArchive={() => {
-            // Archivar pide confirmación; reactivar (no destructivo) va directo.
-            if (empleado.activo) setConfirmArchive(true);
-            else actions.toggleArchive();
-          }}
           onBack={() => router.push("/prestamos")}
         />
 
-        <SummaryCards prestado={prestado} pagado={pagado} saldo={saldo} pct={pct} quincenaEstado={quincenaEstado} />
+        <SummaryCards
+          saldoPrestamo={s.cuentas.prestamo.saldo}
+          saldoDano={s.cuentas.dano.saldo}
+          cuotaPrestamo={Number(empleado.deduccion_quincenal ?? 0)}
+          cuotaDano={Number(empleado.deduccion_dano ?? 0)}
+          prestado={s.prestado}
+          pagado={s.pagado}
+          saldo={s.saldo}
+          pct={s.pct}
+          pendiente={pend.total}
+          quincenaEstado={quincenaEstado}
+        />
 
         <div className="flex flex-wrap gap-3 mb-6">
           <button
-            onClick={actions.pagoQuincenal}
-            disabled={saldo <= 0}
-            title={saldo <= 0 ? "Préstamo saldado — no hay saldo por deducir" : undefined}
+            onClick={() => actions.pagoQuincenal(cuota, cuentaMasVieja(s))}
+            disabled={s.saldo <= 0 || cuota <= 0}
+            title={s.saldo <= 0 ? "No debe nada — no hay saldo por deducir" : cuota <= 0 ? "Esta persona no tiene cuota quincenal" : undefined}
             className="inline-flex min-h-[44px] items-center justify-center bg-emerald-600 text-white px-5 rounded-md text-sm hover:bg-emerald-700 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Pago Quincenal · ${fmt(empleado.deduccion_quincenal)}
+            Pago Quincenal · ${fmt(cuota)}
           </button>
-          <button onClick={movForm.openMovModal} className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition">
+          <button onClick={() => setShowNuevoMov(true)} className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition">
             + Nuevo Movimiento
           </button>
         </div>
@@ -153,56 +152,53 @@ export default function PrestamoDetallePage() {
         <MovimientoTable
           sortedMovs={sortedMovs}
           saldoByMov={saldoByMov}
-          isAdmin={isAdmin}
+          hoy={hoy}
           canEdit={canEdit}
           canDelete={canDelete}
-          onApprove={movForm.approveMov}
           onEdit={editMov.openEditMov}
           onDelete={movForm.requestDeleteMov}
         />
 
         <DangerZone
           isAdmin={isAdmin}
-          activo={empleado.activo}
-          saldo={saldo}
           hasMovs={movs.length > 0}
-          role={role ?? ""}
           onDeleteEmployee={() => { actions.setDeleteInput(""); actions.setShowDeleteConfirm(true); }}
           onClearHistory={() => { actions.setClearInput(""); actions.setShowClearConfirm(true); }}
-          onForceArchive={() => actions.setShowForceArchive(true)}
         />
       </div>
 
-      <MovimientoModal
-        show={movForm.showMovModal}
-        step={movForm.movStep}
-        mLabel={movForm.mLabel}
-        mConcepto={movForm.mConcepto}
-        mFecha={movForm.mFecha}
-        mMonto={movForm.mMonto}
-        mNotas={movForm.mNotas}
-        saving={movForm.saving}
-        onClose={() => movForm.setShowMovModal(false)}
-        onSelectType={movForm.selectMovType}
-        onBack={() => movForm.setMovStep("type")}
-        onChangeFecha={movForm.setMFecha}
-        onChangeMonto={movForm.setMMonto}
-        onChangeNotas={movForm.setMNotas}
-        onSave={movForm.saveMov}
-      />
+      {showNuevoMov && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowNuevoMov(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <NuevoMovimientoModal
+              nombre={empleado.nombre}
+              empleadoId={id}
+              saldoPrestamo={s.cuentas.prestamo.saldo}
+              saldoDano={s.cuentas.dano.saldo}
+              cuentaMasVieja={cuentaMasVieja(s)}
+              salarioMensual={empleado.salario_mensual}
+              hoy={hoy}
+              onCancelar={() => setShowNuevoMov(false)}
+              onGuardar={async (payload) => {
+                const ok = await movForm.crear(payload);
+                if (ok) setShowNuevoMov(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <EditEmpleadoModal
         show={actions.showEditModal}
-        fNombre={actions.fNombre}
-        fEmpresa={actions.fEmpresa}
-        fDeduccion={actions.fDeduccion}
-        fNotas={actions.fNotas}
+        fCuotaPrestamo={actions.fCuotaPrestamo}
+        fCuotaDano={actions.fCuotaDano}
+        fCodigo={actions.fCodigo}
+        colaboradores={actions.colaboradores}
         saving={actions.savingEdit}
         onClose={() => actions.setShowEditModal(false)}
-        onChangeNombre={actions.setFNombre}
-        onChangeEmpresa={actions.setFEmpresa}
-        onChangeDeduccion={actions.setFDeduccion}
-        onChangeNotas={actions.setFNotas}
+        onChangeCuotaPrestamo={actions.setFCuotaPrestamo}
+        onChangeCuotaDano={actions.setFCuotaDano}
+        onChangeCodigo={actions.setFCodigo}
         onSave={actions.saveEdit}
       />
 
@@ -212,21 +208,15 @@ export default function PrestamoDetallePage() {
         emConcepto={editMov.emConcepto}
         emMonto={editMov.emMonto}
         emNotas={editMov.emNotas}
+        emOrigen={editMov.emOrigen}
+        hoy={hoy}
         saving={editMov.saving}
         onClose={() => editMov.setShowEditMovModal(false)}
         onChangeFecha={editMov.setEmFecha}
-        onChangeConcepto={editMov.setEmConcepto}
         onChangeMonto={editMov.setEmMonto}
         onChangeNotas={editMov.setEmNotas}
+        onChangeOrigen={editMov.setEmOrigen}
         onSave={editMov.saveEditMov}
-      />
-
-      <PagoQuincenalConfirm
-        show={actions.showPagoConfirm}
-        nombreEmpleado={empleado.nombre}
-        deduccionQuincenal={empleado.deduccion_quincenal}
-        onClose={() => actions.setShowPagoConfirm(false)}
-        onConfirm={actions.confirmarPagoQuincenal}
       />
 
       <DeleteEmpleadoConfirm
@@ -248,35 +238,17 @@ export default function PrestamoDetallePage() {
         onConfirm={actions.clearHistory}
       />
 
-      <ForceArchiveConfirm
-        show={actions.showForceArchive}
-        saldo={saldo}
-        onClose={() => actions.setShowForceArchive(false)}
-        onConfirm={actions.forceArchive}
-      />
-
       <ConfirmModal
         open={!!movToDelete}
         onClose={() => movForm.setConfirmDeleteMovId(null)}
         onConfirm={movForm.doDeleteMov}
         title="¿Eliminar movimiento?"
         message={movToDelete
-          ? `Vas a eliminar el ${movToDelete.concepto.toLowerCase()} de $${fmt(movToDelete.monto)} del ${fmtDate(movToDelete.fecha)} al préstamo de ${empleado.nombre}. Esta acción se registrará en el log de auditoría.`
+          ? `Vas a eliminar ${etiquetaConcepto(movToDelete.concepto).toLowerCase()} de $${fmt(movToDelete.monto)} del ${fmtDate(movToDelete.fecha)}${movToDelete.estado === ESTADO_PENDIENTE ? " (todavía esperaba aprobación)" : ""} de la cuenta de ${empleado.nombre}. Queda registrado en el log de auditoría.`
           : ""}
         confirmLabel="Eliminar"
         destructive
       />
-
-      <ConfirmModal
-        open={confirmArchive}
-        onClose={() => setConfirmArchive(false)}
-        onConfirm={() => { setConfirmArchive(false); actions.toggleArchive(); }}
-        title="¿Archivar colaborador?"
-        message={`${empleado.nombre} dejará de aparecer en la lista activa de préstamos. Podrás reactivarlo cuando quieras.`}
-        confirmLabel="Archivar"
-      />
-
-      {movForm.pendingUndoMov && <UndoToast message={movForm.pendingUndoMov.message} startedAt={movForm.pendingUndoMov.startedAt} onUndo={movForm.undoActionMov} />}
 
       <Toast message={toast} />
     </div>

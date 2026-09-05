@@ -2,10 +2,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/session-cookie";
-import { filterEmpleadosMovimientos } from "@/lib/prestamos-helpers";
-import PrestamosClient, { type Empleado } from "./PrestamosClient";
-
-const PRESTAMOS_ROLES = ["admin", "contabilidad"];
+import { PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
+import { leerDatosPrestamos } from "@/lib/prestamos-lista-server";
+import PrestamosClient from "./PrestamosClient";
 
 export const dynamic = "force-dynamic";
 
@@ -41,14 +40,9 @@ export default async function PrestamosPage() {
     redirect("/");
   }
 
-  // 2. Query inicial — replica /api/prestamos/empleados con archivados=0
-  const { data } = await supabaseServer
-    .from("prestamos_empleados")
-    .select("*, prestamos_movimientos(*)")
-    .eq("activo", true)
-    .order("nombre", { ascending: true });
+  // 2. La MISMA lectura que usa `/api/prestamos/empleados`. Antes eran dos
+  //    consultas escritas aparte, o sea dos formas de contestar «quién debe».
+  const datos = await leerDatosPrestamos();
 
-  const empleados = filterEmpleadosMovimientos(data) as Empleado[];
-
-  return <PrestamosClient initialData={{ empleados }} />;
+  return <PrestamosClient initialData={datos} />;
 }

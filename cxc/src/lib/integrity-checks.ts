@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { calcularSaldoPrestamo, type MovimientoParaSaldo } from "@/lib/prestamos-saldo";
 import { empresasConFacturas } from "@/lib/switch-api/empresas";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
@@ -65,37 +66,34 @@ async function checkChequesCriticosNull(): Promise<CheckResult> {
 
 // CHECK 5: Préstamos con saldo anómalo (más de $100 negativo). prestamos_empleados
 // no tiene columna saldo — se deriva de prestamos_movimientos aprobados.
-// Préstamo/Responsabilidad suman al saldo, Pago/Abono/Pago_responsabilidad restan.
 // Saldo < -100 = el empleado pagó más de lo prestado (margen $100 para redondeo).
-const PRESTAMO_CONCEPTOS = new Set(["Préstamo", "Responsabilidad por daño"]);
-const PAGO_CONCEPTOS = new Set(["Pago", "Abono extra", "Pago de responsabilidad"]);
-
+//
+// 🔴 La cuenta NO se rehace acá: sale de `calcularSaldoPrestamo`, la única del
+// módulo (era uno de los OCHO lugares que la escribían aparte hasta el
+// 5-sep-2026). Un check que mida con otra regla avisa —o calla— sobre un saldo
+// que no es el que ve nadie.
 async function checkPrestamosSaldoAnomalo(): Promise<CheckResult> {
   const { data, error } = await supabaseServer
     .from("prestamos_movimientos")
-    .select("empleado_id, concepto, monto, estado, deleted")
+    .select("empleado_id, concepto, monto, estado, deleted, cuenta")
     .eq("estado", "aprobado");
 
   if (error) {
     return checkError("prestamos_saldo_anomalo", "prestamos_movimientos", error.message);
   }
 
-  const saldoPorEmpleado = new Map<string, number>();
+  const porEmpleado = new Map<string, MovimientoParaSaldo[]>();
   for (const m of data ?? []) {
-    if (m.deleted === true) continue;
     const empId = m.empleado_id as string | null;
     if (!empId) continue;
-    const monto = Number(m.monto) || 0;
-    const prev = saldoPorEmpleado.get(empId) ?? 0;
-    if (PRESTAMO_CONCEPTOS.has(m.concepto)) {
-      saldoPorEmpleado.set(empId, prev + monto);
-    } else if (PAGO_CONCEPTOS.has(m.concepto)) {
-      saldoPorEmpleado.set(empId, prev - monto);
-    }
+    const lista = porEmpleado.get(empId);
+    if (lista) lista.push(m as MovimientoParaSaldo);
+    else porEmpleado.set(empId, [m as MovimientoParaSaldo]);
   }
 
   const anomalos: { empleado_id: string; saldo: number }[] = [];
-  for (const [empId, saldo] of saldoPorEmpleado) {
+  for (const [empId, movs] of porEmpleado) {
+    const saldo = calcularSaldoPrestamo(movs).saldo;
     if (saldo < -100) anomalos.push({ empleado_id: empId, saldo: Math.round(saldo * 100) / 100 });
   }
 

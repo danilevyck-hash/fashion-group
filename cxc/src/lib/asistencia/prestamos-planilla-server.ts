@@ -22,12 +22,14 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   CONCEPTOS_DESCUENTO,
-  CONCEPTOS_DEUDA,
-  CONCEPTOS_PAGO,
   TABLA_PRESTAMO_APROBADO,
   type AprobacionPrestamo,
   type FichaPrestamo,
 } from "./prestamos-planilla";
+import {
+  calcularSaldoPrestamo,
+  type MovimientoParaSaldo,
+} from "@/lib/prestamos-saldo";
 
 /** La columna del amarre (20260902120000). */
 export const COLUMNA_AMARRE = "empleado_codigo";
@@ -40,17 +42,17 @@ export const COLUMNA_AMARRE = "empleado_codigo";
 interface FilaEmpleado {
   id: string;
   nombre: string | null;
-  activo: boolean | null;
   deduccion_quincenal: number | string | null;
+  deduccion_dano: number | string | null;
   empleado_codigo?: string | null;
 }
 
-interface FilaMovimiento {
+interface FilaMovimiento extends MovimientoParaSaldo {
   id: string;
   empleado_id: string | null;
   fecha: string;
   concepto: string;
-  monto: number | string | null;
+  monto: number | string;
 }
 
 export interface PrestamosLeidos {
@@ -78,7 +80,7 @@ export async function leerPrestamosDeQuincena(
   desde: string,
   hasta: string,
 ): Promise<PrestamosLeidos> {
-  const COLS_CON_AMARRE = `id, nombre, activo, deduccion_quincenal, ${COLUMNA_AMARRE}`;
+  const COLS_CON_AMARRE = `id, nombre, deduccion_quincenal, deduccion_dano, ${COLUMNA_AMARRE}`;
 
   // Sin reintento «sin amarre» (tolerancia a la DDL retirada el 3-sep-2026):
   // si esto falla, la planilla no sale. Ver el encabezado.
@@ -90,7 +92,10 @@ export async function leerPrestamosDeQuincena(
         // Select EXPLÍCITO, nunca `*`: si mañana la tabla gana una columna,
         // esta consulta sigue trayendo lo mismo.
         .select(COLS_CON_AMARRE, pedirCount ? { count: "exact" } : {})
-        .eq("deleted", false)
+        // 🔑 `deleted` es NULLABLE en préstamos: un `.eq("deleted", false)`
+        // PIERDE las filas que quedaron en NULL, y perderlas acá es una casilla
+        // de descuento que no aparece y nadie reclama.
+        .or("deleted.is.null,deleted.eq.false")
         .order("id", { ascending: true })
         .range(from, to),
   );
@@ -100,50 +105,55 @@ export async function leerPrestamosDeQuincena(
     (pedirCount, from, to) =>
       supabaseServer
         .from("prestamos_movimientos")
-        .select("id, empleado_id, fecha, concepto, monto", pedirCount ? { count: "exact" } : {})
+        .select("id, empleado_id, fecha, concepto, monto, estado, deleted, cuenta", pedirCount ? { count: "exact" } : {})
         .eq("estado", "aprobado")
-        .eq("deleted", false)
+        .or("deleted.is.null,deleted.eq.false")
         .order("id", { ascending: true })
         .range(from, to),
   );
 
-  const saldoDe = new Map<string, number>();
+  // 🔴 EL SALDO SALE DE `calcularSaldoPrestamo`, LA ÚNICA CUENTA DEL MÓDULO.
+  // Acá vivía una copia de la aritmética —uno de los OCHO lugares que la
+  // escribían aparte hasta el 5-sep-2026—. Ahora también trae las dos cuentas
+  // separadas, que es lo que la casilla necesita para capear cada una a SU
+  // saldo antes de sumarlas.
+  const movsDe = new Map<string, FilaMovimiento[]>();
   const descontadoDe = new Map<string, number>();
   for (const m of movimientos) {
     const emp = String(m.empleado_id ?? "");
     if (!emp) continue;
-    const monto = num(m.monto);
-    const c = String(m.concepto);
-    if ((CONCEPTOS_DEUDA as readonly string[]).includes(c)) {
-      saldoDe.set(emp, (saldoDe.get(emp) ?? 0) + monto);
-    } else if ((CONCEPTOS_PAGO as readonly string[]).includes(c)) {
-      saldoDe.set(emp, (saldoDe.get(emp) ?? 0) - monto);
-    }
+    const lista = movsDe.get(emp);
+    if (lista) lista.push(m);
+    else movsDe.set(emp, [m]);
+
     // ── Lo YA descontado en esta quincena ────────────────────────────────────
     // 🔑 VENTANA EXACTA, sin la tolerancia de ±3 días que usa la RPC para no
     // deducir dos veces. Acá la tolerancia sería un error: los pagos caen en el
     // 15 y en el 30, o sea justo en el borde, y un pago del 15 entraría a la
     // vez en la quincena 1-15 (exacta) y en la 16-31 (15 ≥ 16−3). El mismo
     // descuento contado dos veces.
-    if ((CONCEPTOS_DESCUENTO as readonly string[]).includes(c)) {
+    if ((CONCEPTOS_DESCUENTO as readonly string[]).includes(String(m.concepto))) {
       const f = String(m.fecha).slice(0, 10);
       if (f >= desde && f <= hasta) {
-        descontadoDe.set(emp, (descontadoDe.get(emp) ?? 0) + monto);
+        descontadoDe.set(emp, (descontadoDe.get(emp) ?? 0) + num(m.monto));
       }
     }
   }
 
-  const fichas: FichaPrestamo[] = empleados.map((e) => ({
-    id: String(e.id),
-    codigo: e.empleado_codigo ?? null,
-    nombre: String(e.nombre ?? "").trim(),
-    // La ficha sin bandera se lee como activa, igual que hace la RPC
-    // (`coalesce(activo, true) = true`).
-    activo: e.activo !== false,
-    cuota: num(e.deduccion_quincenal),
-    saldo: saldoDe.get(String(e.id)) ?? 0,
-    yaDescontado: descontadoDe.get(String(e.id)) ?? 0,
-  }));
+  const fichas: FichaPrestamo[] = empleados.map((e) => {
+    const s = calcularSaldoPrestamo(movsDe.get(String(e.id)) ?? []);
+    return {
+      id: String(e.id),
+      codigo: e.empleado_codigo ?? null,
+      nombre: String(e.nombre ?? "").trim(),
+      cuota: num(e.deduccion_quincenal),
+      cuotaDano: num(e.deduccion_dano),
+      saldo: s.saldo,
+      saldoPrestamo: s.cuentas.prestamo.saldo,
+      saldoDano: s.cuentas.dano.saldo,
+      yaDescontado: descontadoDe.get(String(e.id)) ?? 0,
+    };
+  });
 
   return { fichas };
 }

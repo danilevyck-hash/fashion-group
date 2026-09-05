@@ -139,12 +139,22 @@ export interface FichaPrestamo {
   codigo: string | null;
   /** El nombre tal como está escrito en Préstamos (texto libre). */
   nombre: string;
-  /** `false` = ficha archivada en Préstamos. No se le sugiere cuota nueva. */
-  activo: boolean;
-  /** `deduccion_quincenal`. */
+  /** `deduccion_quincenal`: la cuota de la cuenta PRÉSTAMO. */
   cuota: number;
-  /** `prestado − pagado`, ya firmado por el módulo. */
+  /**
+   * `deduccion_dano`: la cuota de la cuenta DAÑO DE MERCANCÍA (5-sep-2026).
+   *
+   * 🔴 LA PLANILLA PROPONE LA SUMA DE LAS DOS EN UNA SOLA CASILLA. Daniel, al
+   * ver el mockup de las dos cuentas: *«juntos»*. La casilla «Préstamo» del
+   * cuadro es UNA y así se queda: $30 de préstamo + $10 de daño = $40.
+   */
+  cuotaDano: number;
+  /** `prestado − pagado` de las DOS cuentas, ya firmado por el módulo. */
   saldo: number;
+  /** Lo que debe de préstamo. */
+  saldoPrestamo: number;
+  /** Lo que debe de daño de mercancía. */
+  saldoDano: number;
   /**
    * Lo que el módulo YA registró como «Pago» DENTRO de esta quincena. Es un
    * hecho consumado: si hay algo acá, la casilla dice esto y no la cuota.
@@ -238,15 +248,25 @@ export function montoDeFicha(f: FichaPrestamo): { monto: number; origen: OrigenS
   const ya = centavos(Math.max(0, num(f.yaDescontado)));
   if (ya > 0) return { monto: ya, origen: "descontado" };
 
-  // ⚠️ La ficha archivada no genera cuota nueva. Es la MISMA condición que usa
-  // la RPC del módulo (`coalesce(activo, true) = true`): si el módulo no se lo
-  // descontaría, la planilla tampoco lo propone.
-  if (!f.activo) return { monto: 0, origen: "cuota" };
+  // ⚠️ Acá había un `if (!f.activo) return 0`. La bandera `activo` de la ficha
+  // se RETIRÓ el 5-sep-2026: nunca significó «trabaja acá» sino «tiene algo
+  // abierto», y una ficha marcada archivada por error dejaba a esa persona sin
+  // descuento en silencio. El filtro de verdad ya está puesto y es más fuerte:
+  // **solo entra quien está en el cuadro de esta quincena**, o sea quien cobra.
+  // Ver `sugerirPrestamos`.
 
-  const saldo = centavos(num(f.saldo));
-  const cuota = centavos(num(f.cuota));
-  if (saldo <= 0 || cuota <= 0) return { monto: 0, origen: "cuota" };
-  return { monto: centavos(Math.min(cuota, saldo)), origen: "cuota" };
+  // 🔴 CADA CUENTA SE CAPEA A SU PROPIO SALDO, y recién después se suman. Capear
+  // la suma contra el total dejaría cobrar de más en una cuenta lo que sobra en
+  // la otra — y son dos deudas distintas, con su propia cuota.
+  const saldoP = centavos(num(f.saldoPrestamo));
+  const saldoD = centavos(num(f.saldoDano));
+  const cuotaP = centavos(num(f.cuota));
+  const cuotaD = centavos(num(f.cuotaDano));
+  const deP = saldoP > 0 && cuotaP > 0 ? Math.min(cuotaP, saldoP) : 0;
+  const deD = saldoD > 0 && cuotaD > 0 ? Math.min(cuotaD, saldoD) : 0;
+  const monto = centavos(deP + deD);
+  if (monto <= 0) return { monto: 0, origen: "cuota" };
+  return { monto, origen: "cuota" };
 }
 
 export interface OpcionesSugerencia {
@@ -289,7 +309,9 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
     const prev = acumulado.get(cod);
     if (prev) {
       prev.monto = centavos(prev.monto + monto);
-      prev.cuota = centavos(prev.cuota + num(f.cuota));
+      // La cuota que se muestra es la SUMA de las dos cuentas: es lo que se le
+      // va a descontar, y la casilla es una sola.
+      prev.cuota = centavos(prev.cuota + num(f.cuota) + num(f.cuotaDano));
       prev.saldo = centavos(prev.saldo + num(f.saldo));
       // Con fichas mezcladas manda «descontado»: hay un hecho consumado adentro.
       if (origen === "descontado") prev.origen = "descontado";
@@ -297,7 +319,7 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
     } else {
       acumulado.set(cod, {
         monto,
-        cuota: centavos(num(f.cuota)),
+        cuota: centavos(num(f.cuota) + num(f.cuotaDano)),
         saldo: centavos(num(f.saldo)),
         origen,
         nombres: [f.nombre],
@@ -401,7 +423,10 @@ export function textoPrestamoSinAtar(
     items.length === 1
       ? "1 préstamo con saldo no está atado a nadie de la planilla, así que no se le descuenta a ninguna persona."
       : `${items.length} préstamos con saldo no están atados a nadie de la planilla, así que no se le descuentan a ninguna persona.`;
-  return `${cabeza} Se atan en Préstamos, eligiendo la persona de la ficha. ${detalle}`;
+  // ⚠️ Esta frase decía lo mismo desde el 2-sep-2026 y la acción NO EXISTÍA: no
+  // había forma de poner el código desde ninguna pantalla. Desde el 5-sep-2026
+  // sí la hay — se elige a la persona de Asistencia en la ficha del préstamo.
+  return `${cabeza} Se atan en Préstamos, eligiendo la persona en su ficha. ${detalle}`;
 }
 
 /** Cuántas faltan y cuánto suman. Es el contador del bloque. */

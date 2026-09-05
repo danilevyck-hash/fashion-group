@@ -41,13 +41,20 @@ import {
 
 // ── Andamiaje ───────────────────────────────────────────────────────────────
 function ficha(p: Partial<FichaPrestamo> & { nombre: string }): FichaPrestamo {
+  // 🔑 `saldo` sin desglose = todo en la cuenta PRÉSTAMO, que es como estaba el
+  // 100% de la deuda medida el 5-sep-2026 (13 de 14 personas, y la 14ª con
+  // saldo neto $0). Los casos de DAÑO pasan las dos cuentas explícitas.
+  const saldoP = p.saldoPrestamo ?? p.saldo ?? 0;
+  const saldoD = p.saldoDano ?? 0;
   return {
     id: p.id ?? p.nombre,
     codigo: p.codigo ?? null,
     nombre: p.nombre,
-    activo: p.activo ?? true,
     cuota: p.cuota ?? 0,
-    saldo: p.saldo ?? 0,
+    cuotaDano: p.cuotaDano ?? 0,
+    saldo: p.saldo ?? saldoP + saldoD,
+    saldoPrestamo: saldoP,
+    saldoDano: saldoD,
     yaDescontado: p.yaDescontado ?? 0,
   };
 }
@@ -79,14 +86,53 @@ describe("de dónde sale el monto de la casilla", () => {
     expect(montoDeFicha(ficha({ nombre: "C", codigo: "3", cuota: 50, saldo: 0 })).monto).toBe(0);
   });
 
-  it("🔴 la ficha ARCHIVADA no propone cuota nueva (misma condición que la RPC)", () => {
-    // BRICEIDA MONTERO: saldo $100 vivo pero la ficha está archivada en
-    // Préstamos. Si el módulo no se lo descontaría, la planilla no lo propone.
-    const b = ficha({ nombre: "BRICEIDA MONTERO", codigo: "8", cuota: 50, saldo: 100, activo: false });
-    expect(montoDeFicha(b).monto).toBe(0);
-    // ⚠️ Pero un descuento YA REGISTRADO se respeta igual: es un hecho, no una
-    // propuesta. Archivar a alguien no puede borrar lo que ya se le descontó.
+  it("🩸 la bandera `activo` de la ficha ya NO frena nada — se retiró el 5-sep-2026", () => {
+    // Este caso decía lo contrario: «la ficha ARCHIVADA no propone cuota nueva».
+    // 🩸 La bandera nunca significó «trabaja acá» sino «tiene algo abierto»:
+    // medido, a ESMER CRUZ le archivaron la ficha al terminar de pagar sus $600
+    // y sigue trabajando. Usarla como freno dejaba a BRICEIDA MONTERO —$100 vivos
+    // desde marzo, y ACTIVA en Asistencia— sin descuento, en silencio.
+    //
+    // El filtro de verdad es más fuerte y ya estaba puesto: solo entra quien
+    // está en el CUADRO de esta quincena, o sea quien cobra.
+    const b = ficha({ nombre: "BRICEIDA MONTERO", codigo: "8", cuota: 50, saldo: 100 });
+    expect(montoDeFicha(b).monto).toBe(50);
+    // ⚠️ Y un descuento YA REGISTRADO le sigue ganando a la propuesta.
     expect(montoDeFicha({ ...b, yaDescontado: 50 }).monto).toBe(50);
+  });
+
+  it("🔴 LAS DOS CUENTAS: cada una capeada a SU saldo, y después se suman", () => {
+    // El mockup que Daniel aprobó: $30 de préstamo + $10 de daño = $40 en UNA
+    // casilla. Daniel, textual: «juntos».
+    const f = ficha({
+      nombre: "CON DAÑO", codigo: "21",
+      cuota: 30, cuotaDano: 10,
+      saldoPrestamo: 220, saldoDano: 50, saldo: 270,
+    });
+    expect(montoDeFicha(f).monto).toBe(40);
+    // La ÚLTIMA cuota de cada cuenta se capea a SU saldo, no al total: con $5
+    // de daño solo entran $5, aunque de préstamo sobre de más.
+    expect(montoDeFicha({ ...f, saldoDano: 5, saldo: 225 }).monto).toBe(35);
+    // Y una cuenta sin saldo no aporta nada aunque tenga cuota.
+    expect(montoDeFicha({ ...f, saldoDano: 0, saldo: 220 }).monto).toBe(30);
+  });
+
+  it("🔴 y la CUOTA que se muestra también es la suma: la casilla es UNA", () => {
+    // Daniel, al ver el mockup de las dos cuentas: «juntos». Si la línea dijera
+    // «cuota $30» mientras descuenta $40, el número de la pantalla y el de la
+    // planilla serían dos.
+    const out = sugerirPrestamos({
+      fichas: [ficha({
+        nombre: "CON DAÑO", codigo: "21",
+        cuota: 30, cuotaDano: 10,
+        saldoPrestamo: 220, saldoDano: 50, saldo: 270,
+      })],
+      personas: [persona("21", "RAMON MIRANDA")],
+      aprobaciones: new Map(),
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].cuota).toBe(40);
+    expect(out[0].sugerido).toBe(40);
   });
 
   it("un préstamo sin cuota no propone nada — no se inventa una", () => {
@@ -137,7 +183,7 @@ describe("🔑 se agrupa por CÓDIGO, no por ficha", () => {
   // una sola aportando, agrupar mal y no agrupar dan el mismo número.
   const dosFichasDeRamon = [
     // La vieja, archivada, pero con un descuento YA registrado en la quincena.
-    ficha({ id: "vieja", nombre: "RAMON MIRANDA", codigo: "21", cuota: 10, saldo: 0, activo: false, yaDescontado: 3.13 }),
+    ficha({ id: "vieja", nombre: "RAMON MIRANDA", codigo: "21", cuota: 10, saldo: 0, yaDescontado: 3.13 }),
     // La viva.
     ficha({ id: "viva", nombre: "RAMON MIRANDA", codigo: "21", cuota: 30, saldo: 250 }),
   ];

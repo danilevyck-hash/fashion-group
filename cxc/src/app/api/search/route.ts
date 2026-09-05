@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { calcularSaldoPrestamo, type MovimientoParaSaldo } from "@/lib/prestamos-saldo";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 import { EMPRESAS_DEL_GRUPO } from "@/lib/clientes/mundos";
 
@@ -120,9 +121,11 @@ export async function GET(req: NextRequest) {
     // Préstamos: buscar por nombre en prestamos_empleados
     supabaseServer
       .from("prestamos_empleados")
-      .select("id, nombre, empresa, activo, prestamos_movimientos(monto, concepto, estado, deleted)")
+      .select("id, nombre, empresa, prestamos_movimientos(monto, concepto, estado, deleted, cuenta)")
       .ilike("nombre", pattern)
-      .eq("activo", true)
+      // La bandera `activo` se retiró el 5-sep-2026 (nunca significó «trabaja
+      // acá»). `deleted` es NULLABLE acá: un `.eq("deleted", false)` pierde filas.
+      .or("deleted.is.null,deleted.eq.false")
       .order("nombre")
       .limit(5),
 
@@ -232,21 +235,14 @@ export async function GET(req: NextRequest) {
     saldo: number;
   }
   const prestamosRaw = prestamosRes.data || [];
-  const prestamosData: PrestamoResult[] = prestamosRaw.map((emp: { id: string; nombre: string; empresa: string | null; prestamos_movimientos: { monto: number; concepto: string; estado: string; deleted?: boolean | null }[] }) => {
-    const movs = (emp.prestamos_movimientos || []).filter(m => m.deleted !== true);
-    const prestado = movs
-      .filter((m) => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado")
-      .reduce((s, m) => s + Number(m.monto), 0);
-    const pagado = movs
-      .filter((m) => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado")
-      .reduce((s, m) => s + Number(m.monto), 0);
-    return {
-      id: emp.id,
-      nombre: emp.nombre,
-      empresa: emp.empresa,
-      saldo: prestado - pagado,
-    };
-  });
+  // 🔴 La cuenta del saldo NO se rehace acá: `calcularSaldoPrestamo` es la única
+  // (era uno de los ocho lugares que la escribían aparte, hasta el 5-sep-2026).
+  const prestamosData: PrestamoResult[] = prestamosRaw.map((emp: { id: string; nombre: string; empresa: string | null; prestamos_movimientos: MovimientoParaSaldo[] }) => ({
+    id: emp.id,
+    nombre: emp.nombre,
+    empresa: emp.empresa,
+    saldo: calcularSaldoPrestamo(emp.prestamos_movimientos).saldo,
+  }));
 
   // Module-level permissions per role
   const role = auth.role;

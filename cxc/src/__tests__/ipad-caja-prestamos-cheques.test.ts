@@ -86,11 +86,16 @@ describe("El corte tarjetas/tabla queda POR ENCIMA del ancho que la barra latera
 });
 
 describe("Los mismos datos en las dos vistas, marcados con `data-` estables (no por clase de breakpoint)", () => {
-  it("Préstamos: fila + fecha/concepto/notas/monto/saldo/estado, en tarjeta Y en tabla", () => {
+  it("Préstamos: fila + fecha/concepto/notas/monto/saldo/espera, en tarjeta Y en tabla", () => {
     expect(veces(movimientos, /data-mov-fila=/g)).toBe(2);
-    for (const campo of ["fecha", "concepto", "notas", "monto", "saldo", "estado"]) {
+    // ⚠️ `estado` se fue el 5-sep-2026 con las 4 pestañas: con 443 filas de 443
+    // en `aprobado` la columna nunca se pintaba. Lo reemplaza `espera`, que es
+    // el dato que SÍ hay que ver — «Esperando a Daniel · hace N días» —, y por
+    // eso viaja en las DOS vistas igual que los demás.
+    for (const campo of ["fecha", "concepto", "notas", "monto", "saldo", "espera"]) {
       expect(veces(movimientos, new RegExp(`data-mov-campo="${campo}"`, "g"))).toBe(2);
     }
+    expect(veces(movimientos, /data-mov-campo="estado"/g)).toBe(0);
   });
 
   it("Caja › Períodos: fila + fondo/gastado/saldo, en tarjeta Y en tabla", () => {
@@ -123,8 +128,9 @@ describe("Textos que se cortaban", () => {
   it("La nota del movimiento se ENVUELVE — se cortaba en los 3 anchos (942 px a 1440)", () => {
     expect(movimientos).not.toContain('max-w-[200px] truncate');
     expect(movimientos).toContain('max-w-[200px] break-words');
-    // en la tarjeta va completa, en su propio renglón
-    expect(movimientos).toMatch(/data-mov-campo="notas"[^>]*>\s*\{m\.notas/);
+    // en la tarjeta va completa, en su propio renglón (con la cuenta y el
+    // origen del pago delante: siguen siendo texto que se envuelve, no columnas)
+    expect(movimientos).toMatch(/<p className="text-xs text-gray-500 mt-2 break-words" data-mov-campo="notas">/);
   });
 
   it("La píldora del calendario pone el MONTO en su propio renglón (perdía 121 px @834)", () => {
@@ -152,9 +158,25 @@ describe("Nada que se toque por debajo de 44 px", () => {
     expect(gastos).not.toContain("snap-x snap-mandatory");
   });
 
-  it("Las pestañas de estado de Préstamos se envuelven (perdían 89 px @390)", () => {
-    expect(movimientos).toMatch(/className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-0\.5 mb-4 max-w-md"/);
+  it("⛔ las 4 pestañas de estado de Préstamos NO vuelven — y si vuelven, vuelven medidas", () => {
+    // 🩸 Se fueron el 5-sep-2026 con el botón «Aprobar» que las acompañaba: con
+    // 443 filas de 443 en `aprobado` decían siempre `443 · 0 · 0`. Lo que
+    // espera aprobación va RESALTADO EN LA MISMA LISTA, no detrás de un filtro
+    // que nadie toca — que es exactamente cómo los $700 de Luis Arroyo pasaron
+    // 22 días invisibles.
+    //
+    // ⚠️ Este candado cambió de dirección, no se aflojó: si alguien devuelve
+    // las pestañas, tiene que devolverlas con `flex-wrap` (perdían 89 px @390)
+    // y sin `overflow-x-auto`.
+    // ⚠️ Se busca el MECANISMO, no la palabra: «Rechazados» aparece en el
+    // comentario que explica por qué se fueron, y un barrido sobre el texto
+    // entero se engañaría solo con su propia documentación.
+    expect(movimientos).not.toContain("FiltroEstado");
+    expect(movimientos).not.toContain("setFiltro");
     expect(movimientos).not.toContain("max-w-md overflow-x-auto");
+    if (movimientos.includes("bg-gray-100 rounded-lg p-0.5 mb-4 max-w-md")) {
+      expect(movimientos).toMatch(/className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-0\.5 mb-4 max-w-md"/);
+    }
   });
 
   it("Los 2 botones del calendario en celular llegan a 44 (medían 119×26 y 59×26)", () => {

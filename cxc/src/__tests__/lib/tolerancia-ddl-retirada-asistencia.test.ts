@@ -431,7 +431,10 @@ describe("6. prestamos-planilla-server.ts — «nadie atado» ante un error es c
       error: null,
     };
     porTabla["prestamos_movimientos"] = {
-      data: [{ id: "m-1", empleado_id: "p-1", fecha: "2026-07-01", concepto: "Préstamo", monto: "700.00" }],
+      // `estado` viaja en el select desde el 5-sep-2026: el saldo lo calcula
+      // `calcularSaldoPrestamo` (la única cuenta del módulo) y esa función
+      // descarta lo que no está aprobado, aunque la consulta ya lo filtre.
+      data: [{ id: "m-1", empleado_id: "p-1", fecha: "2026-07-01", concepto: "Préstamo", monto: "700.00", estado: "aprobado" }],
       error: null,
     };
     const { leerPrestamosDeQuincena } = await import("@/lib/asistencia/prestamos-planilla-server");

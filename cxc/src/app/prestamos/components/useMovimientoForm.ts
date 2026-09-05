@@ -1,58 +1,47 @@
 "use client";
 
 import { useState } from "react";
-import { Movimiento, MOV_TYPES } from "./types";
-import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import { Movimiento } from "./types";
+import { CONCEPTO_PAGO, ORIGEN_POR_DEFECTO } from "@/lib/prestamos-conceptos";
 
 interface UseMovimientoFormProps {
-  empleadoId: string;
-  deduccionQuincenal: number;
   onSuccess: () => void;
   showToast: (msg: string) => void;
 }
 
-export function useMovimientoForm({ empleadoId, deduccionQuincenal, onSuccess, showToast }: UseMovimientoFormProps) {
-  const [showMovModal, setShowMovModal] = useState(false);
-  const [movStep, setMovStep] = useState<"type" | "form">("type");
-  const [mConcepto, setMConcepto] = useState("Préstamo");
-  const [mLabel, setMLabel] = useState("");
-  const [mFecha, setMFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [mMonto, setMMonto] = useState("");
-  const [mNotas, setMNotas] = useState("");
-  const [saving, setSaving] = useState(false);
+/**
+ * 🩸 SE FUE `approveMov()`. Aprobaba un movimiento con un `PUT {estado}` y era
+ * inalcanzable desde la interfaz. La aprobación volvió el 5-sep-2026 —pero solo
+ * para el TOPE de un sueldo mensual, y por otra puerta: `/api/prestamos/pendientes`,
+ * que exige que sea Daniel. Dos puertas a la misma decisión es una de más.
+ *
+ * 🩸 Y se fue el `UndoToast`: se destructuraba `scheduleUndoMov` y NUNCA se
+ * llamaba, así que el «Deshacer» del módulo no se mostró jamás. Son registros
+ * financieros y no llevan deshacer (commit 101edb57).
+ */
+export function useMovimientoForm({ onSuccess, showToast }: UseMovimientoFormProps) {
   const [confirmDeleteMovId, setConfirmDeleteMovId] = useState<string | null>(null);
-  const { pendingUndo: pendingUndoMov, scheduleAction: scheduleUndoMov, undoAction: undoActionMov } = useUndoAction();
 
-  function openMovModal() { setMovStep("type"); setShowMovModal(true); }
-
-  function selectMovType(typeKey: string) {
-    const t = MOV_TYPES.find(x => x.key === typeKey);
-    if (!t) return;
-    setMConcepto(t.concepto);
-    setMLabel(t.label);
-    setMFecha(new Date().toISOString().slice(0, 10));
-    if (typeKey === "pago_quincenal") {
-      setMMonto(String(deduccionQuincenal || ""));
-      setMNotas("Deducción quincenal");
-    } else {
-      setMMonto(""); setMNotas("");
-    }
-    setMovStep("form");
-  }
-
-  async function saveMov() {
-    if (!mFecha || !mMonto || Number(mMonto) <= 0) { showToast("Completa todos los campos"); return; }
-    setSaving(true);
+  /** Devuelve `true` si quedó guardado. */
+  async function crear(payload: Record<string, unknown>): Promise<boolean> {
     try {
       const res = await fetch("/api/prestamos/movimientos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empleado_id: empleadoId, fecha: mFecha, concepto: mConcepto, monto: Number(mMonto), notas: mNotas }),
+        body: JSON.stringify(payload),
       });
-      if (res.ok) { showToast("Movimiento registrado"); setShowMovModal(false); onSuccess(); }
-      else { const err = await res.json(); showToast(err.error || "Error"); }
-    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
-    setSaving(false);
+      const json = await res.json().catch(() => null);
+      if (res.ok) {
+        showToast(json?.pendiente ? "Se mandó a aprobación de Daniel" : "Movimiento registrado");
+        onSuccess();
+        return true;
+      }
+      showToast(json?.error || "Error al guardar");
+      return false;
+    } catch {
+      showToast("Sin conexión. Verifica tu internet e intenta de nuevo.");
+      return false;
+    }
   }
 
   function requestDeleteMov(movId: string) {
@@ -70,28 +59,10 @@ export function useMovimientoForm({ empleadoId, deduccionQuincenal, onSuccess, s
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
   }
 
-  async function approveMov(movId: string) {
-    const res = await fetch(`/api/prestamos/movimientos/${movId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado: "aprobado" }),
-    });
-    if (res.ok) { showToast("Movimiento aprobado"); onSuccess(); }
-    else showToast("Error al aprobar");
-  }
-
   return {
-    showMovModal, setShowMovModal,
-    movStep, setMovStep,
-    mConcepto, mLabel, mFecha, setMFecha,
-    mMonto, setMMonto,
-    mNotas, setMNotas,
-    saving,
+    crear,
     confirmDeleteMovId, setConfirmDeleteMovId,
-    openMovModal, selectMovType, saveMov,
     requestDeleteMov, doDeleteMov,
-    pendingUndoMov, undoActionMov,
-    approveMov,
   };
 }
 
@@ -107,25 +78,32 @@ export function useEditMovimiento({ onSuccess, showToast }: UseEditMovimientoPro
   const [emConcepto, setEmConcepto] = useState("");
   const [emMonto, setEmMonto] = useState("");
   const [emNotas, setEmNotas] = useState("");
+  const [emOrigen, setEmOrigen] = useState<string>(ORIGEN_POR_DEFECTO);
   const [saving, setSaving] = useState(false);
 
   function openEditMov(m: Movimiento) {
     setEditMovId(m.id); setEmFecha(m.fecha); setEmConcepto(m.concepto);
     setEmMonto(String(m.monto)); setEmNotas(m.notas || "");
+    setEmOrigen(m.origen_pago || ORIGEN_POR_DEFECTO);
     setShowEditMovModal(true);
   }
 
   async function saveEditMov() {
-    if (!emFecha || !emMonto || Number(emMonto) <= 0) { showToast("Completa todos los campos"); return; }
+    if (!emFecha || !emMonto || Number(emMonto) <= 0) { showToast("Falta la fecha o el monto"); return; }
     setSaving(true);
     try {
       const res = await fetch(`/api/prestamos/movimientos/${editMovId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fecha: emFecha, concepto: emConcepto, monto: Number(emMonto), notas: emNotas || null }),
+        body: JSON.stringify({
+          fecha: emFecha,
+          monto: Number(emMonto),
+          notas: emNotas || null,
+          ...(emConcepto === CONCEPTO_PAGO ? { origen_pago: emOrigen } : {}),
+        }),
       });
       if (res.ok) { showToast("Movimiento actualizado"); setShowEditMovModal(false); onSuccess(); }
-      else { const err = await res.json(); showToast(err.error || "Error"); }
+      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error"); }
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSaving(false);
   }
@@ -136,6 +114,7 @@ export function useEditMovimiento({ onSuccess, showToast }: UseEditMovimientoPro
     emConcepto, setEmConcepto,
     emMonto, setEmMonto,
     emNotas, setEmNotas,
+    emOrigen, setEmOrigen,
     saving,
     openEditMov, saveEditMov,
   };

@@ -36,7 +36,11 @@ const detalle = read("app", "prestamos", "[id]", "page.tsx");
 const header = read("app", "prestamos", "components", "EmpleadoHeader.tsx");
 const tabla = read("app", "prestamos", "components", "MovimientoTable.tsx");
 const danger = read("app", "prestamos", "components", "DangerZone.tsx");
-const movModal = read("app", "prestamos", "components", "MovimientoModal.tsx");
+// `MovimientoModal.tsx` (las 6 tarjetas para 5 conceptos) se retiró el
+// 5-sep-2026: hay TRES conceptos y el formulario vive en NuevoMovimientoModal.
+const movModal = read("app", "prestamos", "components", "NuevoMovimientoModal.tsx");
+const elegirPersona = read("app", "prestamos", "components", "ElegirPersonaModal.tsx");
+const aprobaciones = read("app", "prestamos", "aprobaciones", "page.tsx");
 const editEmp = read("app", "prestamos", "components", "EditEmpleadoModal.tsx");
 const editMov = read("app", "prestamos", "components", "EditMovimientoModal.tsx");
 const confirms = read("app", "prestamos", "components", "ConfirmModals.tsx");
@@ -47,7 +51,9 @@ const TODOS: Record<string, string> = {
   "EmpleadoHeader.tsx": header,
   "MovimientoTable.tsx": tabla,
   "DangerZone.tsx": danger,
-  "MovimientoModal.tsx": movModal,
+  "NuevoMovimientoModal.tsx": movModal,
+  "ElegirPersonaModal.tsx": elegirPersona,
+  "aprobaciones/page.tsx": aprobaciones,
   "EditEmpleadoModal.tsx": editEmp,
   "EditMovimientoModal.tsx": editMov,
   "ConfirmModals.tsx": confirms,
@@ -82,16 +88,19 @@ describe("Préstamos · los 5 controles medidos por debajo de 44", () => {
     expect(lista.slice(i - 400, i)).toContain("min-h-[44px]");
   });
 
-  it('"Ver archivados": el target de 44 lo pone la etiqueta, no el cuadradito', () => {
-    // lastIndexOf: la primera aparición es el comentario que explica el patrón
-    const i = lista.lastIndexOf("Ver archivados");
-    expect(i).toBeGreaterThan(-1);
-    const bloque = lista.slice(i - 500, i);
-    // la <label> entera mide 44 de alto → tocar el texto activa el checkbox
-    expect(bloque).toMatch(/<label className="flex min-h-\[44px\] items-center gap-2/);
-    // y el checkbox NO se infló a 44: queda en 18, que se ve bien
-    expect(bloque).toMatch(/type="checkbox"[^/]*className="h-\[18px\] w-\[18px\] accent-black"/);
-    expect(bloque).not.toMatch(/type="checkbox"[^/]*className="accent-black"/);
+  it('⛔ "Ver archivados" no vuelve — la bandera `activo` se retiró', () => {
+    // 🩸 Este caso protegía el target de la casilla «Ver archivados». La casilla
+    // se fue el 5-sep-2026 con la bandera que filtraba: `activo` nunca significó
+    // «trabaja acá» sino «tiene algo abierto» —a ESMER CRUZ le archivaron la
+    // ficha al terminar de pagar sus $600 y sigue trabajando—, y el saldo ya
+    // dice eso. La lista muestra SOLO a quien debe.
+    //
+    // ⚠️ El candado cambia de dirección, no se afloja: si alguien devuelve la
+    // casilla, tiene que devolverla con la <label> de 44 px y el cuadradito en
+    // 18 (que es lo que se midió: medía 13×13).
+    expect(lista).not.toContain("Ver archivados");
+    expect(lista).not.toContain("showArchived");
+    expect(lista).not.toContain("archivados=");
   });
 });
 
@@ -103,10 +112,53 @@ describe("Préstamos · el barrido del resto del módulo", () => {
   //
   // ⚠️ No se aflojó nada: lo que sigue vivo del módulo se mide igual, y el
   // barrido de abajo pone el build ROJO si la lista vuelve sin sus 44 px.
-  it("⛔ la lista de aprobación no vuelve — y si vuelve, vuelve medida", () => {
-    for (const marca of ["pendiente_aprobacion", "Aprobar todos", "selectedPending"]) {
+  /**
+   * 🔴 EL CANDADO CAMBIA DE DIRECCIÓN, NO SE AFLOJA (5-sep-2026).
+   *
+   * Hasta hoy este caso decía: «`pendiente_aprobacion` no puede reaparecer».
+   * Era correcto para lo que existía —la lista de aprobación de préstamos por
+   * MONTO, retirada el 27-ago porque **escondía plata**: los $700 de LUIS
+   * ADRIAN ARROYO estuvieron 22 días con el saldo mostrando $0—.
+   *
+   * La aprobación volvió, pero para OTRA COSA: **el tope de un sueldo mensual**,
+   * que es una decisión de negocio de Daniel, no un umbral de monto. Y volvió
+   * con la condición que faltaba la primera vez: **lo que espera SE VE**.
+   *
+   * Por eso este caso ahora exige LAS DOS cosas a la vez, y sigue poniendo el
+   * build rojo si vuelve la lista de lote (que es lo que de verdad escondía):
+   *
+   *   1. la lista de aprobación por LOTE no vuelve («Aprobar todos», casillas);
+   *   2. lo pendiente NO suma al saldo (`calcularSaldoPrestamo` filtra por
+   *      `estado === "aprobado"`, y hay candado propio en prestamos-tope);
+   *   3. y SE VE: la ficha lo dice, la lista lo dice y hay pantalla propia.
+   */
+  it("⛔ la lista de aprobación por LOTE no vuelve", () => {
+    for (const marca of ["Aprobar todos", "selectedPending", "doBatchAction"]) {
       expect(lista, `«${marca}» reapareció en Préstamos`).not.toContain(marca);
     }
+  });
+
+  it("🔴 lo que ESPERA APROBACIÓN se ve en las tres superficies", () => {
+    // En la lista: el total, con su explicación de que no suma.
+    expect(lista).toContain("Esperando aprobación");
+    expect(lista).toContain("no suma al saldo hasta que Daniel lo apruebe");
+    // En la ficha: el movimiento resaltado, con desde cuándo espera — en las
+    // DOS vistas (tarjeta y tabla), como todo dato de esta pantalla desde el
+    // rediseño de iPad. Con una sola, el iPhone se queda sin saberlo.
+    // (3 apariciones: la tarjeta, la tabla y el comentario que explica por qué
+    // no vuelve a una pestaña.)
+    expect((tabla.match(/Esperando a Daniel/g) ?? []).length).toBe(3);
+    expect((tabla.match(/desdeCuandoEspera\(m\.fecha, hoy\)/g) ?? []).length).toBe(2);
+    // Y su pantalla propia, con los dos botones.
+    expect(aprobaciones).toContain("Aprobar");
+    expect(aprobaciones).toContain("Rechazar");
+  });
+
+  it("🔴 quien NO puede decidir lo ve igual, en gris — no se le esconde", () => {
+    expect(aprobaciones).toContain("puedeDecidir");
+    expect(aprobaciones).toContain("Esto lo aprueba Daniel. Aquí se ve, pero no se puede tocar.");
+    // Los botones se APAGAN, no desaparecen.
+    expect(aprobaciones).toMatch(/disabled=\{!puedeDecidir \|\| ocupado === p\.id\}/);
   });
 
   it("detalle · Pago Quincenal y + Nuevo Movimiento llegan a 44 (medían 37)", () => {
@@ -114,14 +166,20 @@ describe("Préstamos · el barrido del resto del módulo", () => {
     expect((detalle.match(/min-h-\[44px\]/g) ?? []).length).toBe(2);
   });
 
-  it("EmpleadoHeader · Editar / Archivar / Reactivar / ← Colaboradores llegan a 44 (medían 39)", () => {
+  it("EmpleadoHeader · Editar y ← Colaboradores llegan a 44 (medían 39)", () => {
+    // Eran 5 botones: Editar · Archivar (activo) · Archivar (apagado) ·
+    // Reactivar · ← Colaboradores. «Archivar»/«Reactivar» se fueron con la
+    // bandera `activo` el 5-sep-2026 y quedan 2. Los dos siguen midiendo 44.
     expect(header).not.toContain("px-4 py-2 rounded-md text-sm");
-    expect((header.match(/min-h-\[44px\]/g) ?? []).length).toBe(5);
+    expect((header.match(/min-h-\[44px\]/g) ?? []).length).toBe(2);
+    expect(header).not.toContain("Archivar");
+    expect(header).not.toContain("Reactivar");
   });
 
-  it("MovimientoTable · pestañas de estado, Aprobar e iconos llegan a 44", () => {
-    expect(tabla).toMatch(/flex min-h-\[44px\] items-center gap-1\.5 px-3 text-sm rounded-md/);
-    expect(tabla).toMatch(/min-h-\[44px\][^"]*text-xs bg-green-600 text-white px-3 rounded-md/);
+  it("MovimientoTable · los iconos de editar/eliminar llegan a 44", () => {
+    // ⚠️ Las pestañas de estado y el botón «Aprobar» se fueron el 5-sep-2026
+    // (ver `ipad-caja-prestamos-cheques.test.ts`). Lo que se sigue midiendo son
+    // los iconos, que son los que medían 26×26.
     // los iconos de editar/eliminar medían 26×26 con p-1.5
     expect(tabla).not.toContain('className="p-1.5 hover:bg-blue-50');
     expect(tabla).not.toContain('className="p-1.5 hover:bg-red-50');
@@ -131,15 +189,20 @@ describe("Préstamos · el barrido del resto del módulo", () => {
     expect((tabla.match(/inline-flex h-11 w-11 items-center justify-center/g) ?? []).length).toBe(4);
   });
 
-  it("DangerZone · el toggle (medía 18) y los 3 botones rojos llegan a 44", () => {
+  it("DangerZone · el toggle (medía 18) y los 2 botones rojos llegan a 44", () => {
+    // Eran 3: «Forzar Archivado» se fue con la bandera `activo` (5-sep-2026).
     expect(danger).toMatch(/flex min-h-\[44px\] items-center gap-2 text-xs text-gray-400/);
     expect(danger).not.toContain("px-4 py-2 bg-red-600");
-    expect((danger.match(/px-4 min-h-\[44px\] bg-red-600/g) ?? []).length).toBe(3);
+    expect((danger.match(/px-4 min-h-\[44px\] bg-red-600/g) ?? []).length).toBe(2);
+    expect(danger).not.toContain("Forzar Archivado");
   });
 
-  it('MovimientoModal · la flecha "atrás" deja de medir 16×16', () => {
+  it("NuevoMovimientoModal · los 3 conceptos y las píldoras llegan a 44", () => {
+    // 🩸 La flecha «atrás» de 16×16 se fue con el modal de dos pasos: el
+    // formulario es UNO solo (tres conceptos, no seis tarjetas para cinco).
     expect(movModal).not.toContain('className="text-gray-400 hover:text-black transition"');
-    expect(movModal).toMatch(/inline-flex h-11 w-11 shrink-0 items-center justify-center/);
+    // Los tres conceptos, las dos cuentas de «Baja de» y los cinco orígenes.
+    expect((movModal.match(/min-h-\[44px\]/g) ?? []).length).toBeGreaterThanOrEqual(6);
   });
 
   it("ningún modal del módulo conserva un Cancelar/Guardar de py-2 (medían 36-39)", () => {

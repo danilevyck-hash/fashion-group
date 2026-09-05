@@ -415,3 +415,80 @@ verde · candados de voseo y de selector único incluidos. **29 mutaciones, 29 c
 (`scripts/_mutar-limpieza-ventas.py`, con su mutación de CONTROL saliendo ⛔), más las 2 de
 `_mutar-candados-boston.py` que cubrían el tabique por cartera y que se re-apuntaron a las
 anotaciones que quedan.
+
+---
+
+## 5-sep-2026 — Préstamos, reescrito entero
+
+Daniel definió el módulo completo con mockups aprobados uno por uno. El porqué de cada punto, con sus
+citas y sus mediciones, está en **[`docs/postmortems/prestamos.md`](postmortems/prestamos.md)**; la
+referencia de qué hay, en **[`docs/modulos/07-prestamos.md`](modulos/07-prestamos.md)**.
+
+### 🔴 La regla que no se podía romper — y no se rompió
+
+**Cero cambio en el saldo de nadie.** Medido contra producción ANTES de tocar nada: **14 personas con
+saldo, $5.062,01** ($4.962,01 + $100 de BRICEIDA MONTERO). Las 14 quedaron congeladas una por una en
+`prestamos-dos-cuentas.test.ts`: si una migración mueve un centavo, el build se pone rojo **con el
+nombre de la persona**.
+
+### Qué cambió
+
+- **Dos cuentas por persona** (Préstamo · Daño de mercancía), cada una con su cuota. El total es la
+  suma. 🔴 **Ningún concepto se renombró**: «Daño de mercancía» es una ETIQUETA de `Responsabilidad
+  por daño` — renombrar el valor guardado no revienta nada, **lo deja de contar en silencio**.
+- **La persona sale de Asistencia**: nombre, empresa, si trabaja y salario. Una ficha nace con su
+  `empleado_codigo`, y ese código **ya se puede editar desde la pantalla** (hasta hoy no se podía
+  desde ningún lado, y el aviso de la planilla decía que sí — así nacieron **$400** de deuda que la
+  planilla no podía descontar).
+- **La bandera `activo` se retiró.** Nunca significó «trabaja acá» sino «tiene algo abierto»: a ESMER
+  CRUZ le archivaron la ficha al terminar de pagar sus $600 y sigue trabajando. La lista muestra
+  **solo a quien debe**; quien llega a cero sale solo; quien ya no trabaja y debe **sí aparece**,
+  marcado. **La columna no se borra** (patrón `mayor_lineas`).
+- **Tope de un sueldo mensual** sobre la deuda TOTAL, $500 sin sueldo cargado. Solo frena el
+  préstamo — **el daño se registra siempre**. Lo que pasa el tope se guarda **pendiente**, sale un
+  Telegram al chat privado de Daniel, y **solo él aprueba** (rol admin **y** que sea él: hay dos
+  admins). 🩸 A diferencia del freno de $500 que se retiró el 27-ago, **lo que espera se ve** en tres
+  superficies y **caduca a los 7 días** (cron nuevo `prestamos-caducan`, 13:15 UTC).
+- 🩸 **El freno de duplicados dejó de leer texto.** Miraba `notas ilike 'Deducción quincenal%'` y
+  `ilike` no ignora acentos: **18 filas vivas lo burlaban**. El candado estaba apagado y nadie lo
+  sabía. Ahora mira `concepto + origen_pago + fecha`, por cuenta. La nota es **opcional** (8 de cada
+  10 eran un eco del concepto).
+- **«De dónde salió» un pago**: Quincena · Décimo · Vacaciones · Liquidación · Efectivo. Medido: 9
+  pagos reales salieron de una liquidación, del décimo o de vacaciones.
+- **Al marcar la fecha de salida** de alguien con deuda, Asistencia lo dice ahí mismo: *«Debe $100 —
+  descuéntalo de la liquidación»*. Sin Telegram.
+- 🩸 **«Eliminar Todo el Historial» dejó de ser el único hard delete del repo**: soft delete con
+  `logActivity`.
+- **El saldo se calcula en UN solo lugar** (había ocho) y **`PRESTAMOS_ROLES` vive en uno** (estaba
+  en seis).
+- **El Excel pregunta «¿Solo los que deben o todos?»** y perdió la columna «Estado».
+
+### ⚠️ Pendiente de Daniel (5-sep)
+
+1. 🔴 **Correr `supabase/migrations/20260925120000_prestamos_dos_cuentas_y_tope.sql`.** Está
+   **ESCRITA Y NO APLICADA**. Sin ella faltan `deduccion_dano`, `cuenta` y `origen_pago`, y **el
+   módulo devuelve 500**: acá no hay tolerancia a DDL pendiente y es deliberado (degradar sería
+   «nadie está atado» otra vez). La migración también ata a MARTHA (43) y YERITZA (51), copia los
+   nombres de Asistencia, junta las dos fichas de RAMON MIRANDA ($220 + $0 = $220) y reemplaza la RPC
+   de la quincena.
+2. ⚠️ **BRICEIDA MONTERO**: el brief la daba por retirada, pero en `asistencia_personas` está
+   **activa** (Boston, salario $566,52, sin fecha de salida). Con la regla nueva —«quién trabaja lo
+   dice Asistencia»— su ficha **vuelve a proponer el descuento** de sus $100, que no se descuentan
+   desde marzo. Si de verdad ya no trabaja, **la baja se marca en Asistencia**.
+3. ⚠️ **STEPHANY MORALES** queda con préstamo −$254,50 / daño +$254,50 (neto $0), porque sus pagos de
+   daño se registraron como `Pago`. **No se reasignó nada**: si Daniel quiere que se reasigne, es una
+   migración aparte y a propósito.
+
+### Verificación
+
+`tsc` limpio en `src/app` y `src/lib` · `npx next build` verde · suite completa verde (**11.015
+tests**) · candados de voseo, de crons y de iPhone/iPad de Préstamos incluidos.
+**32 mutaciones, 32 cazadas** (`scripts/_mutar-candados-prestamos-dos-cuentas.sh`), con las seis que
+el brief exigía: que lo pendiente sume al saldo · que Contabilidad pueda aprobar · que el freno vuelva
+a leer la nota · que el tope mire solo el préstamo · que el daño se frene por tope · que se ate por
+parecido.
+
+⚠️ **Lo que NO se pudo verificar**: el cuerpo plpgsql de la RPC nueva no se ejecutó en ningún lado —
+no hay Postgres local y producción es de solo lectura. Su lógica está cubierta por candados de texto
+(que compara la derivación del SQL con la de TypeScript) pero **la primera corrida real es la de
+Daniel**.

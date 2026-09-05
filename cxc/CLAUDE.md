@@ -160,6 +160,51 @@ archivo enlazado, verbatim.
 - El descuento de **préstamo se propone solo pero se APRUEBA**; lo que no está aprobado se ve en ámbar, con nombre y monto.
 - Panamá es **UTC−5 fijo**; los tests usan fechas fijas, nunca `new Date()`.
 
+### Préstamos — [docs/postmortems/prestamos.md](docs/postmortems/prestamos.md)
+
+- 🔴 **Cada persona tiene DOS cuentas con su propia cuota: Préstamo y Daño de mercancía.** El total es
+  la suma de las dos y **no cambió**: medido antes de partirlo, 14 personas y **$5.062,01** ($4.962,01
+  + $100 de BRICEIDA MONTERO). Las 14 están congeladas una por una en `prestamos-dos-cuentas.test.ts`.
+- 🔴 **La pantalla ofrece TRES conceptos** (Préstamo · Daño de mercancía · Pago) pero **la base guarda
+  los CINCO de siempre**. `Responsabilidad por daño` NO se renombró: «Daño de mercancía» es una
+  ETIQUETA. Renombrar un concepto no revienta nada — **deja de contarse en silencio**.
+- Un **Pago baja UNA cuenta**; con las dos debiendo, «Baja de» viene puesto en la **más vieja** y se
+  puede cambiar. Sin fechas el desempate es **estable** (préstamo), nunca el orden del array.
+- 🔴 **El saldo se calcula en UN solo lugar** (`src/lib/prestamos-saldo.ts`). Había **ocho**, y el
+  único que no lo usaba era la ficha, con un `console.warn` admitiendo que podía no cuadrar.
+  `PRESTAMOS_ROLES` vive en `src/lib/prestamos-roles.ts`, no en seis archivos.
+- 🔴 **La bandera `activo` de la ficha se retiró**: nunca significó «trabaja acá» sino «tiene algo
+  abierto» (a ESMER le archivaron la ficha al terminar de pagar y sigue trabajando). **La columna NO
+  se borra** — queda sin lectores, con `COMMENT` y test que pone el build rojo si se dropea o si
+  alguien vuelve a filtrar por ella. La lista muestra **solo a quien debe**; quien llega a cero sale
+  solo; **quien ya no trabaja pero debe SÍ aparece**, marcado y sin descuento.
+- 🔴 **La persona sale de Asistencia**: el nombre, si trabaja y el salario. Una ficha nueva **nace con
+  su `empleado_codigo`**, elegido de las 37 personas activas — y ese código **ya se puede editar desde
+  la pantalla** (hasta el 5-sep-2026 no se podía desde ningún lado, y el aviso de la planilla decía que
+  sí; así nacieron **$400** de deuda que la planilla no podía descontar).
+- 🔴 **Nada se ata por parecido**, ni acá ni nunca: lista escrita a mano con el nombre que ese código
+  tiene que tener en Asistencia, y el UPDATE lo EXIGE. Barrido en `prestamos-amarre-migracion.test.ts`
+  sobre las **dos** migraciones del amarre.
+- 🔴 **El tope es UN SUELDO MENSUAL** sobre la deuda **TOTAL** (préstamo + daño). **Sin sueldo cargado,
+  $500.** Solo frena el **préstamo**: **el daño de mercancía se registra SIEMPRE** — ya se perdió, y no
+  anotarla no la devuelve.
+- 🩸 **Lo que espera aprobación NO suma al saldo, pero SE VE** en tres superficies (lista, ficha y
+  pantalla propia). Es la lección de los **$700 de LUIS ADRIAN ARROYO**, 22 días escondidos en
+  `pendiente_aprobacion` con el saldo en $0. Y **se acaba**: a los **7 días se elimina solo** (cron
+  `prestamos-caducan`), avisando con nombre y monto.
+- 🔴 **Solo Daniel aprueba** — rol admin **y** que sea él (hay dos admins). Contabilidad y David lo ven
+  en gris. Aprobar **entra al descuento de la quincena en curso** aunque ya haya empezado.
+- 🩸 **El freno de duplicados mira concepto + origen + fecha, NUNCA la nota.** Leía `notas ilike
+  'Deducción quincenal%'` y `ilike` no ignora acentos: **18 filas vivas lo burlaban**. `origen_pago`
+  en NULL se lee como Quincena — en la duda se omite, nunca se cobra dos veces. **La nota es opcional**
+  (8 de cada 10 eran un eco del concepto).
+- La planilla propone **la suma de las dos cuotas en UNA casilla** (Daniel: *«juntos»*), cada una
+  capeada a SU saldo antes de sumar.
+- 🩸 **«Eliminar Todo el Historial» dejó de ser el único hard delete del repo**: soft delete con
+  `logActivity`.
+- Al marcar la **fecha de salida** de alguien con deuda, Asistencia lo dice ahí mismo: *«Debe $100 —
+  descuéntalo de la liquidación»*. Sin Telegram.
+
 ### Gastos, mayor y banco — [docs/postmortems/gastos-mayor-banco.md](docs/postmortems/gastos-mayor-banco.md)
 
 - **Un solo módulo «Gastos»** (`gastos-contabilidad`) con dos pestañas: *Gastos* (Egresos Varios, **fuente ÚNICA** desde el 13-ago-2026) y *Saldos de banco*.
@@ -427,7 +472,7 @@ Reglas en [catalogos-pedidos](docs/postmortems/catalogos-pedidos.md).
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-81 entradas configuradas (+1 el 5-sep-2026: `sync-clientes-boston`, la ÚNICA entrada **semanal que toca Switch** — ver la fila y la nota de abajo; +1 el 4-sep-2026: `cleanup-depurador-archivos`, la limpieza de 90 días de los Excel del Historial del Depurador; +2 el 24-ago-2026: `sync-factura-lineas` (#577) y `sync-ingresos-mercancia` (#586), que entraron a `vercel.json` y nunca a esta tabla; +8 el 13-ago-2026 al pasar los 4 catálogos de 2 a 4 pasadas diarias, todas dentro de la ventana de uso de Panamá — ver la nota abajo; 66 hasta ese mismo día, cuando se retiró `sync-mayor`; 53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul, −6 al bajar `db-salud` a 5, +3 al pasar `asistencia-vigia` de 1 pasada L-V a 4 diarias el 10-ago, −1 al quitarle la pasada de las 13:45 UTC ese mismo día — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
+82 entradas configuradas (+1 el 5-sep-2026: `prestamos-caducan`, que borra los préstamos que llevan 7 días esperando aprobación — solo DB, no toca Switch; +1 el 5-sep-2026: `sync-clientes-boston`, la ÚNICA entrada **semanal que toca Switch** — ver la fila y la nota de abajo; +1 el 4-sep-2026: `cleanup-depurador-archivos`, la limpieza de 90 días de los Excel del Historial del Depurador; +2 el 24-ago-2026: `sync-factura-lineas` (#577) y `sync-ingresos-mercancia` (#586), que entraron a `vercel.json` y nunca a esta tabla; +8 el 13-ago-2026 al pasar los 4 catálogos de 2 a 4 pasadas diarias, todas dentro de la ventana de uso de Panamá — ver la nota abajo; 66 hasta ese mismo día, cuando se retiró `sync-mayor`; 53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul, −6 al bajar `db-salud` a 5, +3 al pasar `asistencia-vigia` de 1 pasada L-V a 4 diarias el 10-ago, −1 al quitarle la pasada de las 13:45 UTC ese mismo día — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -469,6 +514,7 @@ Reglas en [catalogos-pedidos](docs/postmortems/catalogos-pedidos.md).
 | /api/cron/sync-egresos-varios | 10:35 (la ÚNICA fuente de gasto desde que se retiró el mayor contable — ver `docs/historico/superado.md`) |
 | /api/cron/catalogos-fotos-resumen | **13:30 los LUNES** (`30 13 * * 1`) — el resumen semanal de fotos que faltan. ⚠️ Único cron semanal; el otro no-diario es `grupo-resumen-mensual` |
 | /api/cron/guias-pendientes | 14:30 (aviso de guías que quedaron sin despachar) |
+| /api/cron/prestamos-caducan | **13:15** (8:15 a.m. Panamá — borra los préstamos que llevan 7 días esperando la aprobación de Daniel, y lo dice por Telegram con nombre y monto. Solo DB, no toca Switch. Sin nada que caducar no manda nada y el heartbeat se registra igual) |
 
 ⚠️ **Las 6 filas de arriba corrían en producción SIN estar en esta tabla** hasta el 31-ago-2026 — incluida `boston-cartera`, que es de la que depende que la cartera de Boston no se congele. Se agregaron en la auditoría de estado; el candado que ya existía (`cron-registro.test.ts`, la biyección `vercel.json` ↔ registro de código) protege el CÓDIGO, no esta tabla.
 

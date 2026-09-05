@@ -31,7 +31,7 @@ const src = join(__dirname, "..");
 const read = (...p: string[]) => readFileSync(join(src, ...p), "utf8");
 
 const depurador = read("app", "productos", "cargar", "page.tsx");
-const prestamos = read("app", "prestamos", "PrestamosClient.tsx");
+const prestamos = read("app", "prestamos", "components", "ElegirPersonaModal.tsx");
 // NuevoProyectoModal se borró el 11-ago-2026: el paso de crear proyecto se
 // retiró (el proyecto se autocrea desde "Registrar gasto"), así que su modal
 // quedó sin caller y su chequeo de ✕ se fue con él.
@@ -72,8 +72,11 @@ describe("Depurador · la barra de pestañas no puede volver a desbordar la pág
 });
 
 describe("Modales · en iPhone no hay Escape, así que necesitan ✕", () => {
-  it('Préstamos · "Seleccionar Empleado" tiene un cerrar de 44×44', () => {
-    const i = prestamos.indexOf("Seleccionar Empleado");
+  // El modal se llama «¿A quién?» desde el 5-sep-2026 y se mudó a su propio
+  // archivo: elige a la persona de ASISTENCIA (37 activas) en vez de listar las
+  // 15 fichas que ya existían. La regla del ✕ de 44×44 no cambió.
+  it('Préstamos · el modal de elegir persona tiene un cerrar de 44×44', () => {
+    const i = prestamos.indexOf("¿A quién?");
     expect(i).toBeGreaterThan(-1);
     const bloque = prestamos.slice(i - 400, i + 700);
     expect(bloque).toMatch(/aria-label="Cerrar"/);

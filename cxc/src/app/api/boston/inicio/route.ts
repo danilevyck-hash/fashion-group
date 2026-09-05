@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { calcularSaldoPrestamo, type MovimientoParaSaldo } from "@/lib/prestamos-saldo";
 import { EMPRESA_BOSTON, rolesModuloBoston } from "@/lib/boston/rol";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
@@ -118,17 +119,28 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Préstamos DE BOSTON (ver la nota del encabezado) ──────────────────────
+  //
+  // 🔴 CUENTA A QUIÉN DEBE, no a quién tiene ficha (5-sep-2026). Contaba
+  // `activo = true`, y esa bandera nunca significó «trabaja acá» ni «debe algo»:
+  // significaba «tiene algo abierto», y se la ponían y quitaban a mano. La
+  // tarjeta de David decía un número que no era ninguna de las dos cosas.
   let prestamos = { personas: 0 };
   {
-    const { count, error } = await supabaseServer
+    const { data, error } = await supabaseServer
       .from("prestamos_empleados")
-      .select("id", { count: "exact", head: true })
       // Acá la columna guarda el NOMBRE, no la key. Sale de `EMPRESA_KEY_TO_NAME`
       // vía el import de arriba, para no escribir el string a mano.
+      .select("id, prestamos_movimientos(concepto, monto, estado, deleted)")
       .eq("empresa", NOMBRE_BOSTON)
-      .eq("activo", true);
+      // `deleted` es NULLABLE en préstamos: un `.eq("deleted", false)` pierde filas.
+      .or("deleted.is.null,deleted.eq.false");
     if (error) console.error(`[boston/inicio] prestamos: ${error.message}`);
-    prestamos = { personas: count ?? 0 };
+    const conSaldo = (data ?? []).filter(
+      (e) => calcularSaldoPrestamo(
+        (e as unknown as { prestamos_movimientos: MovimientoParaSaldo[] | null }).prestamos_movimientos,
+      ).saldo > 0,
+    );
+    prestamos = { personas: conSaldo.length };
   }
 
   return NextResponse.json({

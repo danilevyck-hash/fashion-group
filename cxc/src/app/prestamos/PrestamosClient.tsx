@@ -1,54 +1,43 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { fmt, fmtDate } from "@/lib/format";
-import { EMPRESAS } from "@/lib/companies";
+import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
-import { Toast, SkeletonTable, EmptyState, ConfirmModal, AnimatedNumber, BottomSheet } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, AnimatedNumber } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
-import UndoToast from "@/components/UndoToast";
-import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
-import { calcularSaldoPrestamo } from "@/lib/prestamos-saldo";
+import { PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
+import { hoyPanamaYmd, getQuincenaRangePanama } from "@/lib/prestamos-quincena";
+import type { Colaborador, DatosPrestamos, FilaPrestamo } from "@/lib/prestamos-lista-server";
 import AplicarQuincenaModal from "./components/AplicarQuincenaModal";
+import NuevoMovimientoModal from "./components/NuevoMovimientoModal";
+import ElegirPersonaModal from "./components/ElegirPersonaModal";
 
-// ── Types ──
-interface Movimiento {
-  id: string;
-  empleado_id: string;
-  fecha: string;
-  concepto: string;
-  monto: number;
-  notas: string;
-  estado: string;
-  created_at: string;
-}
-export interface Empleado {
-  id: string;
-  nombre: string;
-  empresa: string | null;
-  deduccion_quincenal: number;
-  notas: string | null;
-  activo: boolean;
-  created_at: string;
-  prestamos_movimientos: Movimiento[];
-}
+export type PrestamosInitialData = DatosPrestamos;
 
-export interface PrestamosInitialData {
-  empleados: Empleado[];
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// LA LISTA: SOLO QUIEN DEBE.
+//
+// 🩸 QUÉ SE FUE Y POR QUÉ. La bandera `activo` y los botones «Archivar» /
+// «Reactivar» desaparecieron el 5-sep-2026. Nunca significaron «trabaja acá»
+// sino «tiene algo abierto» — medido: a ESMER CRUZ le archivaron la ficha al
+// terminar de pagar sus $600 y **sigue trabajando**; a KENNER HERNANDEZ igual
+// tras pagar $3,13. El saldo ya dice lo que la bandera intentaba decir, así que
+// quien llega a cero sale solo y no hay nada que archivar.
+//
+// 🔴 Y QUIEN YA NO TRABAJA PERO DEBE **SÍ APARECE**, marcado. Sacarlo de la
+// lista sería perder la plata de vista, que es exactamente lo que este módulo
+// no puede hacer.
+//
+// El BUSCADOR de arriba encuentra a las 37 personas activas de Asistencia,
+// deban o no: es de donde se elige a alguien para prestarle, y es la única
+// forma de abrir la ficha de quien ya terminó de pagar.
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ── Helpers ──
-// 🔑 La cuenta se MUDÓ a `lib/prestamos-saldo.ts` (27-ago-2026) y no cambió ni
-// un signo: la pestaña Préstamos del módulo Boston la necesita desde el
-// servidor, y dos copias de "lo que debe" son dos números que un día no
-// coinciden. Esta pantalla sigue mostrando exactamente lo mismo que mostraba.
-function calcEmpleado(emp: Empleado) {
-  return calcularSaldoPrestamo(emp.prestamos_movimientos || []);
-}
+const MESES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 function progressColor(pct: number) {
   if (pct >= 75) return "bg-green-500";
@@ -56,276 +45,108 @@ function progressColor(pct: number) {
   return "bg-red-500";
 }
 
-function getQuincenaRange() {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
-  if (now.getDate() <= 15) {
-    return { start: new Date(y, m, 1), end: new Date(y, m, 15), label: `1 al 15 de ${MESES[m + 1]} ${y}` };
-  } else {
-    return { start: new Date(y, m, 16), end: new Date(y, m + 1, 0), label: `16 al ${new Date(y, m + 1, 0).getDate()} de ${MESES[m + 1]} ${y}` };
-  }
-}
-
-const MESES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-
-function hasDeduccionEnQuincena(movs: Movimiento[], qStart: Date, qEnd: Date): boolean {
-  const tolerance = 3 * 86400000; // 3 days in ms
-  return movs.some(m => {
-    if (m.estado !== "aprobado") return false;
-    if (m.concepto !== "Pago" && m.concepto !== "Abono extra") return false;
-    const fecha = new Date(m.fecha + "T12:00:00");
-    return fecha.getTime() >= qStart.getTime() - tolerance && fecha.getTime() <= qEnd.getTime() + tolerance;
-  });
+/** La quincena vigente, con la MISMA regla del servidor (UTC−5 fijo). */
+function quincenaVigente(hoy: string) {
+  const { start, end } = getQuincenaRangePanama();
+  const [, m] = hoy.split("-").map(Number);
+  const [y] = hoy.split("-").map(Number);
+  const dFin = Number(end.slice(8, 10));
+  const dIni = Number(start.slice(8, 10));
+  return { start, end, label: `${dIni} al ${dFin} de ${MESES[m]} ${y}` };
 }
 
 export default function PrestamosClient({ initialData }: { initialData: PrestamosInitialData }) {
   const router = useRouter();
-  const { authChecked, role } = useAuth({ moduleKey: "prestamos", allowedRoles: ["admin","contabilidad"] });
-  const [empleados, setEmpleados] = useState<Empleado[]>(initialData.empleados);
+  const { authChecked } = useAuth({ moduleKey: "prestamos", allowedRoles: [...PRESTAMOS_ROLES] });
+  const [datos, setDatos] = useState<DatosPrestamos>(initialData);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Filters
-  // Filtro de empresa con memoria (useLastUsed → fg_last_prestamos_empresa).
   const [filterEmpresa, setFilterEmpresa] = useLastUsed("prestamos_empresa", "all");
-  const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Confirm delete employee
-  const [confirmDeleteEmp, setConfirmDeleteEmp] = useState<Empleado | null>(null);
-
-  // Modal: new/edit employee
-  const [showEmpModal, setShowEmpModal] = useState(false);
-  const [editingEmp, setEditingEmp] = useState<Empleado | null>(null);
-  const [fNombre, setFNombre] = useState("");
-  const [fEmpresa, setFEmpresa] = useState("");
-  const [fDeduccion, setFDeduccion] = useState("");
-  const [fNotas, setFNotas] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  // Modal: new movement
+  const [showElegirPersona, setShowElegirPersona] = useState(false);
+  const [personaElegida, setPersonaElegida] = useState<Colaborador | null>(null);
   const [showMovModal, setShowMovModal] = useState(false);
-  const [mEmpleadoId, setMEmpleadoId] = useState("");
-  const [mFecha, setMFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [mConcepto, setMConcepto] = useState("Préstamo");
-  const [mMonto, setMMonto] = useState("");
-  const [mNotas, setMNotas] = useState("");
-  const [savingMov, setSavingMov] = useState(false);
-  const [movStep, setMovStep] = useState("form");
-
-  // Cierre por clic fuera + Escape. Los dos son formularios: si ya hay algo
-  // escrito sin guardar, el clic fuera no cierra (se sale con Cancelar).
-  const cerrarEmpModal = useCallback(() => setShowEmpModal(false), []);
-  const empModal = useFormModalDismiss(showEmpModal, cerrarEmpModal, !saving);
-  const cerrarMovModal = useCallback(() => setShowMovModal(false), []);
-  // El modal de movimiento tiene dos pasos (elegir empleado → formulario) y el
-  // contenido cambia entero, así que la foto se retoma al cambiar de paso.
-  const movModal = useFormModalDismiss(showMovModal, cerrarMovModal, !savingMov, movStep);
-
-  // Bottom sheet (mobile detail preview)
-  const [sheetEmp, setSheetEmp] = useState<Empleado | null>(null);
-  const [savingPagoQ, setSavingPagoQ] = useState(false);
-  const [confirmPagoQ, setConfirmPagoQ] = useState<Empleado | null>(null);
-
-  // Batch approval state
-  const [exportingExcel, setExportingExcel] = useState(false);
-  const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
-
-  // Aplicar quincena masiva (bulk): confirmación con resumen previo + toast de
-  // resultado (NO UndoToast — son registros financieros). La RPC es la fuente
-  // autoritativa; estos cómputos client-side solo arman el resumen del modal.
   const [confirmAplicarQ, setConfirmAplicarQ] = useState(false);
   const [aplicandoQ, setAplicandoQ] = useState(false);
+  const [preguntaExcel, setPreguntaExcel] = useState(false);
+  const [exportando, setExportando] = useState(false);
+
+  const cerrarMovModal = useCallback(() => setShowMovModal(false), []);
+  const movModal = useFormModalDismiss(showMovModal, cerrarMovModal, true);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
-  const loadEmpleados = useCallback(async () => {
+  const recargar = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/prestamos/empleados?archivados=${showArchived ? "1" : "0"}`);
-      if (res.ok) setEmpleados(await res.json());
+      const res = await fetch("/api/prestamos/empleados");
+      if (res.ok) setDatos(await res.json());
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setLoading(false);
-  }, [showArchived]);
+  }, []);
 
-  // Skipear primer mount (initialData ya pobló empleados via SSR).
-  // Refetch en mounts subsiguientes o cuando showArchived cambia.
   const initialLoadRef = useRef(true);
   useEffect(() => {
     if (!authChecked) return;
-    if (initialLoadRef.current) {
-      initialLoadRef.current = false;
-      return;
-    }
-    loadEmpleados();
-  }, [authChecked, loadEmpleados]);
+    if (initialLoadRef.current) { initialLoadRef.current = false; return; }
+    recargar();
+  }, [authChecked, recargar]);
 
-  if (!authChecked) return null;
+  const hoy = hoyPanamaYmd();
+  const quincena = useMemo(() => quincenaVigente(hoy), [hoy]);
 
-  // ── Computed ──
-  const allCalcs = empleados.map(e => ({ emp: e, ...calcEmpleado(e) }));
-  const totalSaldo = allCalcs.filter(c => c.emp.activo).reduce((s, c) => s + c.saldo, 0);
+  const filas = datos.filas;
+  const totalSaldo = filas.reduce((s, f) => s + f.saldo, 0);
+  const totalPendiente = filas.reduce((s, f) => s + f.pendiente, 0);
 
-  const quincena = getQuincenaRange();
-  const empleadosConDeduccion = allCalcs.filter(c => c.emp.activo && c.emp.deduccion_quincenal > 0);
-  const empleadosDeducidos = empleadosConDeduccion.filter(c => hasDeduccionEnQuincena(c.emp.prestamos_movimientos || [], quincena.start, quincena.end));
-  const deduccionesAplicadas = empleadosDeducidos.length;
-  const deduccionesTotal = empleadosConDeduccion.length;
+  // A quién le toca el descuento de esta quincena, y a quién ya se le hizo.
+  const conCuota = filas.filter((f) => f.trabaja && f.saldo > 0 && (f.cuotaPrestamo > 0 || f.cuotaDano > 0));
+  const deducidas = conCuota.filter((f) => f.deducidaQuincena);
+  const deduccionesAplicadas = deducidas.length;
+  const deduccionesTotal = conCuota.length;
   const deduccionesCompletas = deduccionesTotal > 0 && deduccionesAplicadas === deduccionesTotal;
+  const quincenaPendientesN = deduccionesTotal - deduccionesAplicadas;
 
-  // Elegibles para la quincena masiva: con deducción, saldo>0 y aún no deducidos.
-  const quincenaElegibles = empleadosConDeduccion.filter(
-    c => c.saldo > 0 && !hasDeduccionEnQuincena(c.emp.prestamos_movimientos || [], quincena.start, quincena.end),
-  );
-  const quincenaPendientesN = quincenaElegibles.length;
-
-  // Lo que el diálogo de «Aplicar quincena» necesita para recalcular el
-  // resumen por la fecha ELEGIDA (no por hoy): deducción, saldo y las fechas
-  // de sus pagos aprobados. Los movimientos ya llegan sin borrados: el server
-  // los descarta en `filterEmpleadosMovimientos` (con `deleted` NULLABLE).
-  const personasQuincena = empleadosConDeduccion.map(c => ({
-    nombre: c.emp.nombre,
-    deduccion: c.emp.deduccion_quincenal,
-    saldo: c.saldo,
-    fechasPagos: (c.emp.prestamos_movimientos || [])
-      .filter(m => m.estado === "aprobado" && (m.concepto === "Pago" || m.concepto === "Abono extra"))
-      .map(m => m.fecha),
+  const personasQuincena = conCuota.map((f) => ({
+    nombre: f.nombre,
+    deduccion: f.cuotaPrestamo + f.cuotaDano,
+    saldo: f.saldo,
+    fechasPagos: f.fechasPagosQuincena ?? [],
   }));
 
-  // Filtered
-  const filtered = allCalcs.filter(c => {
-    if (filterEmpresa !== "all" && c.emp.empresa !== filterEmpresa) return false;
-    if (search && !c.emp.nombre.toLowerCase().includes(search.toLowerCase())) return false;
+  const empresas = useMemo(
+    () => [...new Set(filas.map((f) => f.empresa ?? "Sin empresa"))].sort((a, b) => a.localeCompare(b, "es")),
+    [filas],
+  );
+
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  const filtered = filas.filter((f) => {
+    if (filterEmpresa !== "all" && (f.empresa ?? "Sin empresa") !== filterEmpresa) return false;
+    if (search && !norm(f.nombre).includes(norm(search))) return false;
     return true;
   });
 
-  // ── Employee modal handlers ──
-  function openNewEmp() {
-    setEditingEmp(null); setFNombre(""); setFEmpresa(""); setFDeduccion(""); setFNotas("");
-    setShowEmpModal(true);
-  }
-  function openEditEmp(emp: Empleado) {
-    setEditingEmp(emp);
-    setFNombre(emp.nombre);
-    setFEmpresa(emp.empresa || "");
-    setFDeduccion(String(emp.deduccion_quincenal));
-    setFNotas(emp.notas || "");
-    setShowEmpModal(true);
-  }
-  async function saveEmp() {
-    if (!fNombre.trim()) { showToast("El nombre es requerido"); return; }
-    setSaving(true);
-    try {
-      const body = { nombre: fNombre.trim(), empresa: fEmpresa || null, deduccion_quincenal: Number(fDeduccion) || 0, notas: fNotas || null };
-      const url = editingEmp ? `/api/prestamos/empleados/${editingEmp.id}` : "/api/prestamos/empleados";
-      const method = editingEmp ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (res.ok) {
-        showToast(editingEmp ? "Empleado actualizado" : "Empleado creado");
-        setShowEmpModal(false); loadEmpleados();
-      } else {
-        const err = await res.json(); showToast(err.error || "Error al guardar");
-      }
-    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
-    setSaving(false);
-  }
-  function requestDeleteEmp(emp: Empleado) {
-    setConfirmDeleteEmp(emp);
-  }
-
-  async function doDeleteEmp() {
-    if (!confirmDeleteEmp) return;
-    const emp = confirmDeleteEmp;
-    setConfirmDeleteEmp(null);
-    try {
-      const res = await fetch(`/api/prestamos/empleados/${emp.id}`, { method: "DELETE" });
-      if (res.ok) { showToast("Empleado eliminado"); loadEmpleados(); }
-      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al eliminar"); }
-    } catch { showToast("Error al eliminar"); }
-  }
-
-  // ── Movement modal handlers ──
-  function openNewMov() {
-    setMEmpleadoId(""); setMFecha(new Date().toISOString().slice(0, 10));
-    setMConcepto("Préstamo"); setMMonto(""); setMNotas("");
-    setMovStep("employee");
-    setShowMovModal(true);
-  }
-  async function saveMov() {
-    if (!mEmpleadoId || !mFecha || !mConcepto || !mMonto || Number(mMonto) <= 0) {
-      showToast("Completa todos los campos con un monto válido"); return;
-    }
-    setSavingMov(true);
-    try {
-      const res = await fetch("/api/prestamos/movimientos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empleado_id: mEmpleadoId, fecha: mFecha, concepto: mConcepto, monto: Number(mMonto), notas: mNotas }),
-      });
-      if (res.ok) {
-        showToast("Movimiento registrado");
-        setShowMovModal(false); loadEmpleados();
-      } else {
-        const err = await res.json(); showToast(err.error || "Error al guardar");
-      }
-    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
-    setSavingMov(false);
-  }
-
-  const isAdmin = role === "admin";
-
-  // Mobile detection for bottom sheet vs navigation
-  function isMobileViewport() {
-    return typeof window !== "undefined" && window.innerWidth < 640;
-  }
-
-  function handleRowClick(emp: Empleado) {
-    if (isMobileViewport()) {
-      setSheetEmp(emp);
-    } else {
-      router.push(`/prestamos/${emp.id}`);
-    }
-  }
-
-  // Pago quincenal from bottom sheet
-  async function handlePagoQuincenal(emp: Empleado) {
-    if (!emp.deduccion_quincenal || emp.deduccion_quincenal <= 0) return;
-    setSavingPagoQ(true);
-    try {
-      const res = await fetch("/api/prestamos/movimientos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          empleado_id: emp.id,
-          fecha: new Date().toISOString().slice(0, 10),
-          concepto: "Pago",
-          monto: emp.deduccion_quincenal,
-          notas: "Deducción quincenal",
-        }),
-      });
-      if (res.ok) {
-        showToast("Pago quincenal registrado");
-        setSheetEmp(null);
-        loadEmpleados();
-      } else {
-        const err = await res.json();
-        showToast(err.error || "Error al registrar pago");
-      }
-    } catch { showToast("Sin conexión. Intenta de nuevo."); }
-    setSavingPagoQ(false);
-  }
-
-  // Computed data for bottom sheet employee
-  const sheetCalc = sheetEmp ? calcEmpleado(sheetEmp) : null;
-  const sheetMovs = sheetEmp
-    ? (sheetEmp.prestamos_movimientos || [])
-        .filter(m => m.estado === "aprobado")
-        .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at))
-        .slice(0, 5)
+  // 🔴 El buscador también encuentra a quien NO debe: las 37 personas activas de
+  // Asistencia. Antes solo se podía llegar a la ficha de quien tenía saldo.
+  const otrosResultados: Colaborador[] = search.trim()
+    ? datos.colaboradores.filter(
+        (c) => norm(c.nombre).includes(norm(search)) && !filas.some((f) => f.empleadoCodigo === c.codigo),
+      )
     : [];
 
-  // La fecha de pago la elige contabilidad en el diálogo (registra 1–4 días
-  // después del pago); el servidor deriva la quincena del dedup de ESA fecha.
+  const porEmpresa = useMemo(() => {
+    const m = new Map<string, FilaPrestamo[]>();
+    for (const f of filtered) {
+      const k = f.empresa ?? "Sin empresa";
+      const l = m.get(k);
+      if (l) l.push(f); else m.set(k, [f]);
+    }
+    return [...m.entries()];
+  }, [filtered]);
+
   async function aplicarQuincena(fechaPago: string) {
     setAplicandoQ(true);
     try {
@@ -340,10 +161,10 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         const om = json.count_omitidos ?? 0;
         const total = json.total ?? 0;
         showToast(
-          `Aplicada${ok !== 1 ? "s" : ""} ${ok} deducción${ok !== 1 ? "es" : ""} ($${fmt(total)})` +
-          (om ? ` · ${om} omitida${om !== 1 ? "s" : ""}` : ""),
+          `Aplicada${ok !== 1 ? "s" : ""} ${ok} deducción${ok !== 1 ? "es" : ""} ($${fmt(total)})`
+          + (om ? ` · ${om} omitida${om !== 1 ? "s" : ""}` : ""),
         );
-        loadEmpleados();
+        recargar();
       } else {
         showToast(json.error || "Error al aplicar la quincena");
       }
@@ -352,42 +173,79 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
     setConfirmAplicarQ(false);
   }
 
-  async function descargarHistorial() {
-    setExportingExcel(true);
+  // 🔴 «¿Solo los que deben o todos?» — Daniel: «que esté la opción después de
+  // apretar descargar». La pregunta va DESPUÉS del clic, no antes: elegir un
+  // alcance que no se va a usar es un paso de más en la tarea habitual.
+  async function descargarHistorial(ambito: "deben" | "todos") {
+    setPreguntaExcel(false);
+    setExportando(true);
     try {
-      const qs = filterEmpresa && filterEmpresa !== "all" ? `?empresa=${encodeURIComponent(filterEmpresa)}` : "";
-      const res = await fetch(`/api/prestamos/export-excel${qs}`);
+      const emp = filterEmpresa && filterEmpresa !== "all" ? `&empresa=${encodeURIComponent(filterEmpresa)}` : "";
+      const res = await fetch(`/api/prestamos/export-excel?ambito=${ambito}${emp}`);
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        const today = new Date();
-        const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
-        const slug = filterEmpresa && filterEmpresa !== "all" ? filterEmpresa.toLowerCase().replace(/\s+/g, "_") : "todos";
-        link.download = `historial_prestamos_${slug}_${ymd}.xlsx`;
+        const ymd = hoy.replace(/-/g, "");
+        const slug = filterEmpresa && filterEmpresa !== "all"
+          ? filterEmpresa.toLowerCase().replace(/\s+/g, "_")
+          : "todas_las_empresas";
+        link.download = `historial_prestamos_${ambito}_${slug}_${ymd}.xlsx`;
         link.click();
         URL.revokeObjectURL(url);
       } else { showToast("Error al descargar"); }
     } catch { showToast("Error al descargar"); }
-    setExportingExcel(false);
+    setExportando(false);
   }
 
+  async function crearMovimiento(payload: Record<string, unknown>) {
+    const res = await fetch("/api/prestamos/movimientos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => null);
+    if (res.ok) {
+      showToast(json?.pendiente ? "Se mandó a aprobación de Daniel" : "Movimiento registrado");
+      setShowMovModal(false);
+      setPersonaElegida(null);
+      recargar();
+    } else {
+      showToast(json?.error || "Error al guardar");
+    }
+  }
 
+  /** Elegir a la persona crea (o encuentra) su ficha y abre el formulario. */
+  async function elegirPersona(c: Colaborador) {
+    setShowElegirPersona(false);
+    if (c.fichaId) {
+      setPersonaElegida({ ...c });
+      setShowMovModal(true);
+      return;
+    }
+    try {
+      const res = await fetch("/api/prestamos/empleados", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empleado_codigo: c.codigo }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) { showToast(json?.error || "No se pudo abrir la ficha"); return; }
+      setPersonaElegida({ ...c, fichaId: json.id });
+      setShowMovModal(true);
+    } catch { showToast("Sin conexión. Intenta de nuevo."); }
+  }
 
-
+  if (!authChecked) return null;
 
   return (
     <div className="min-h-screen bg-white">
       <AppHeader module="Préstamos" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {/* Esta pantalla nunca tuvo título grande —"Préstamos" ya lo dicen la
-            barra sticky (celular) y el breadcrumb (escritorio)— pero tampoco
-            tenía encabezado para lectores de pantalla. El sr-only cierra ese
-            hueco sin agregar un solo píxel. */}
         <h1 className="sr-only">Préstamos</h1>
-        {/* Resumen: 2 chips + acción de quincena masiva (confirmación con resumen) */}
+
         <div className="flex flex-wrap items-center gap-2 mb-5">
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2">
             <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo pendiente total</div>
@@ -407,20 +265,26 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           )}
         </div>
 
-        {/* 🔴 La aprobación de préstamos se retiró (27-ago-2026). Daniel:
-            «quita poder aprobar prestamos, todos deben de pasar». El freno no
-            protegía: escondía — un préstamo sin aprobar no suma al saldo, así
-            que la pantalla lo mostraba en CERO. A Luis Arroyo le pasó con $700
-            durante 22 días. Ver `api/prestamos/movimientos/route.ts`. */}
+        {/* 🔴 LO QUE ESPERA APROBACIÓN SE VE. No suma al saldo —no se entregó—
+            pero esconderlo es exactamente cómo se perdieron los $700 de Luis
+            Arroyo durante 22 días. */}
+        {totalPendiente > 0 && (
+          <button
+            onClick={() => router.push("/prestamos/aprobaciones")}
+            className="mb-5 flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3.5 text-left text-sm text-gray-600 transition hover:border-gray-400"
+          >
+            <span className="font-medium text-gray-900">Esperando aprobación ${fmt(totalPendiente)}</span>
+            <span className="text-gray-500">· no suma al saldo hasta que Daniel lo apruebe</span>
+          </button>
+        )}
 
-        {/* Actions + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          <button onClick={openNewMov} className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo préstamo</button>
+          <button onClick={() => setShowElegirPersona(true)} className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo préstamo</button>
           <OverflowMenu
             align="left"
             items={[
-              { label: "Nuevo empleado", onClick: openNewEmp },
-              { label: exportingExcel ? "Descargando…" : "Descargar historial", onClick: descargarHistorial, disabled: exportingExcel },
+              { label: exportando ? "Descargando…" : "Descargar historial", onClick: () => setPreguntaExcel(true), disabled: exportando },
+              { label: "Préstamos por aprobar", onClick: () => router.push("/prestamos/aprobaciones") },
             ]}
           />
 
@@ -438,330 +302,163 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             className="min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition"
           >
             <option value="all">Todas las empresas</option>
-            {EMPRESAS.map(e => <option key={e} value={e}>{e}</option>)}
+            {empresas.map(e => <option key={e} value={e}>{e}</option>)}
           </select>
-          {/* El target de 44 lo da la <label> entera — el texto "Ver archivados"
-              también activa el checkbox (nativo: el input está adentro). Un
-              cuadradito de 44px se vería mal; el nativo se queda en 18. */}
-          <label className="flex min-h-[44px] items-center gap-2 text-sm text-gray-500 cursor-pointer select-none">
-            <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-[18px] w-[18px] accent-black" />
-            Ver archivados
-          </label>
         </div>
 
-        {/* Lista de empleados — fila de 4 elementos: nombre/empresa · progreso · chip quincena · SALDO */}
         {loading ? (
           <SkeletonTable rows={5} cols={4} />
-        ) : filtered.length === 0 ? (
-          <EmptyState title="No se encontraron empleados" actionLabel="+ Nuevo empleado" onAction={openNewEmp} />
+        ) : filtered.length === 0 && otrosResultados.length === 0 ? (
+          <EmptyState title={search ? "No se encontró a nadie con ese nombre" : "Nadie debe nada ahora mismo"} actionLabel="+ Nuevo préstamo" onAction={() => setShowElegirPersona(true)} />
         ) : (
-          <ul className="space-y-2">
-            {filtered.map(({ emp, prestado, saldo, pct }) => {
-              const saldado = saldo <= 0 && prestado > 0;
-              const deducida = emp.deduccion_quincenal > 0 && hasDeduccionEnQuincena(emp.prestamos_movimientos || [], quincena.start, quincena.end);
-              const pendienteDed = emp.deduccion_quincenal > 0 && !deducida && saldo > 0;
+          <div className="space-y-6">
+            {porEmpresa.map(([empresa, items]) => (
+              <section key={empresa}>
+                <div className="mb-2 flex items-baseline justify-between">
+                  <h2 className="text-xs uppercase tracking-wide text-gray-400">{empresa}</h2>
+                  <span className="text-xs tabular-nums text-gray-400">
+                    {items.length} {items.length === 1 ? "persona" : "personas"} · ${fmt(items.reduce((s, f) => s + f.saldo, 0))}
+                  </span>
+                </div>
+                <ul className="space-y-2">
+                  {items.map((emp) => {
+                    const deducida = emp.deducidaQuincena;
+                    const pendienteDed = emp.trabaja && !deducida && emp.saldo > 0 && (emp.cuotaPrestamo + emp.cuotaDano) > 0;
+                    const cuota = emp.cuotaPrestamo + emp.cuotaDano;
 
-              // Chips de la fila. En iPhone (358px) NO caben en la línea del
-              // nombre: el saldo, el "···" y los gaps ya se llevan 149px, así
-              // que con el chip de quincena al lado el nombre se quedaba con
-              // 90px y ninguno de los 12 entraba. Bajan a la línea 2, junto a
-              // la empresa, y conservan su TEXTO COMPLETO ("⚠ Pendiente" vs
-              // "✓ Deducida" no se distinguen solo por color: ambos son chips
-              // pastel y el estado hay que poder leerlo). En desktop no cambia
-              // nada: siguen en la línea 1 y en su columna de w-24.
-              const badges = [
-                saldado ? <span key="saldado" className="shrink-0 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">Saldado</span> : null,
-                !emp.activo ? <span key="archivado" className="shrink-0 text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span> : null,
-              ].filter(Boolean);
+                    const badges = [
+                      !emp.trabaja ? <span key="notrabaja" className="shrink-0 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-md">Ya no trabaja · no se descuenta</span> : null,
+                      emp.pendiente > 0 ? <span key="pendiente" className="shrink-0 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md">Esperando ${fmt(emp.pendiente)}</span> : null,
+                    ].filter(Boolean);
 
-              const chipQuincena = emp.deduccion_quincenal <= 0 ? null
-                : deducida ? <span className="shrink-0 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
-                : pendienteDed ? <span className="shrink-0 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
-                : null;
+                    const chipQuincena = !emp.trabaja || cuota <= 0 ? null
+                      : deducida ? <span className="shrink-0 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
+                      : pendienteDed ? <span className="shrink-0 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
+                      : null;
 
-              return (
-                <li
-                  key={emp.id}
-                  data-empleado-fila={emp.id}
-                  onClick={() => handleRowClick(emp)}
-                  className={`flex items-center gap-2 sm:gap-4 rounded-lg border p-3 sm:px-4 cursor-pointer hover:bg-gray-50 active:bg-gray-50 transition-colors border-gray-200 ${!emp.activo ? "opacity-50" : ""}`}
-                >
-                  {/* 1 · Nombre + empresa (+ chips en mobile) */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span data-empleado-campo="nombre" className="font-medium truncate tracking-tight">{emp.nombre}</span>
-                      {badges.length > 0 && <div className="hidden shrink-0 items-center gap-2 lg:flex">{badges}</div>}
-                    </div>
-                    <div className="flex min-w-0 items-center gap-1.5 text-xs text-gray-500">
-                      <span className="truncate">{emp.empresa || "Sin empresa"}</span>
-                      {(badges.length > 0 || chipQuincena) && (
-                        <div className="flex shrink-0 items-center gap-1.5 lg:hidden">{badges}{chipQuincena}</div>
-                      )}
-                    </div>
-                  </div>
+                    return (
+                      <li
+                        key={emp.id}
+                        data-empleado-fila={emp.id}
+                        onClick={() => router.push(`/prestamos/${emp.id}`)}
+                        className="flex items-center gap-2 sm:gap-4 rounded-lg border p-3 sm:px-4 cursor-pointer hover:bg-gray-50 active:bg-gray-50 transition-colors border-gray-200"
+                      >
+                        {/* 1 · Nombre + cuenta/cuota (+ chips en mobile) */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span data-empleado-campo="nombre" className="font-medium truncate tracking-tight">{emp.nombre}</span>
+                            {badges.length > 0 && <div className="hidden shrink-0 items-center gap-2 lg:flex">{badges}</div>}
+                          </div>
+                          <div className="flex min-w-0 items-center gap-1.5 text-xs text-gray-500">
+                            <span className="truncate">
+                              {emp.saldoDano > 0
+                                ? `Préstamo $${fmt(emp.saldoPrestamo)} · Daño $${fmt(emp.saldoDano)}`
+                                : cuota > 0 ? `$${fmt(cuota)} por quincena` : "Sin cuota"}
+                            </span>
+                            {(badges.length > 0 || chipQuincena) && (
+                              <div className="flex shrink-0 items-center gap-1.5 lg:hidden">{badges}{chipQuincena}</div>
+                            )}
+                          </div>
+                        </div>
 
-                  {/* 2 · Progreso (fino) — desktop */}
-                  <div className="hidden lg:flex items-center gap-2 w-36 shrink-0">
-                    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                      <div className={`h-full ${progressColor(pct)} rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
-                    </div>
-                    <span className="text-xs text-gray-400 tabular-nums w-8 text-right">{pct.toFixed(0)}%</span>
-                  </div>
+                        {/* 2 · Progreso (fino) — desktop */}
+                        <div className="hidden lg:flex items-center gap-2 w-36 shrink-0">
+                          <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div className={`h-full ${progressColor(emp.pct)} rounded-full`} style={{ width: `${Math.min(emp.pct, 100)}%` }} />
+                          </div>
+                          <span className="text-xs text-gray-400 tabular-nums w-8 text-right">{emp.pct.toFixed(0)}%</span>
+                        </div>
 
-                  {/* 3 · Chip quincena — columna propia solo en desktop */}
-                  <div className="hidden shrink-0 text-center lg:block lg:w-24">
-                    {chipQuincena}
-                  </div>
+                        {/* 3 · Chip quincena — columna propia solo en desktop */}
+                        <div className="hidden shrink-0 text-center lg:block lg:w-24">
+                          {chipQuincena}
+                        </div>
 
-                  {/* 4 · SALDO héroe */}
-                  <div className="shrink-0 text-right min-w-[72px]">
-                    <div className={`text-base sm:text-lg font-semibold tabular-nums ${saldo > 0 ? "text-gray-900" : saldo < 0 ? "text-blue-600" : "text-gray-400"}`}>${fmt(Math.abs(saldo))}</div>
-                    {saldo < 0 && <div className="text-xs text-blue-500 -mt-0.5">a favor</div>}
-                  </div>
+                        {/* 4 · SALDO héroe */}
+                        <div className="shrink-0 text-right min-w-[72px]">
+                          <div className={`text-base sm:text-lg font-semibold tabular-nums ${emp.saldo > 0 ? "text-gray-900" : emp.saldo < 0 ? "text-blue-600" : "text-gray-400"}`}>${fmt(Math.abs(emp.saldo))}</div>
+                          {emp.saldo < 0 && <div className="text-xs text-blue-500 -mt-0.5">a favor</div>}
+                        </div>
 
-                  {/* Acciones */}
-                  <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <OverflowMenu
-                      items={[
-                        { label: "Editar", onClick: () => openEditEmp(emp) },
-                        ...(isAdmin ? [{ label: "Eliminar", onClick: () => requestDeleteEmp(emp), destructive: true }] : []),
-                      ]}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                        {/* Acciones */}
+                        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <OverflowMenu
+                            items={[
+                              { label: "Ver ficha", onClick: () => router.push(`/prestamos/${emp.id}`) },
+                            ]}
+                          />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+
+            {otrosResultados.length > 0 && (
+              <section>
+                <h2 className="mb-2 text-xs uppercase tracking-wide text-gray-400">No deben nada</h2>
+                <ul className="space-y-2">
+                  {otrosResultados.map((c) => (
+                    <li
+                      key={c.codigo}
+                      onClick={() => (c.fichaId ? router.push(`/prestamos/${c.fichaId}`) : elegirPersona(c))}
+                      className="flex min-h-[44px] items-center gap-3 rounded-lg border border-gray-200 p-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="min-w-0 flex-1 truncate font-medium">{c.nombre}</span>
+                      <span className="shrink-0 text-xs text-gray-400">{c.empresaNombre ?? "Sin empresa"}</span>
+                      <span className="shrink-0 tabular-nums text-gray-400">$0.00</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
         )}
       </div>
 
-      {/* ── Modal: New/Edit Employee ── */}
-      {showEmpModal && (
-        <div {...empModal.backdrop} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div ref={empModal.panelRef} className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="font-medium mb-4">{editingEmp ? "Editar Empleado" : "Nuevo Empleado"}</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Nombre *</label>
-                <input value={fNombre} onChange={e => setFNombre(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="Nombre completo" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Empresa</label>
-                <select value={fEmpresa} onChange={e => setFEmpresa(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-                  <option value="">Sin asignar</option>
-                  {EMPRESAS.map(e => <option key={e} value={e}>{e}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Deducción Quincenal ($)</label>
-                <input type="number" step="0.01" min="0" value={fDeduccion} onChange={e => setFDeduccion(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Notas</label>
-                <textarea value={fNotas} onChange={e => setFNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" placeholder="Notas opcionales..." />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowEmpModal(false)} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={saveEmp} disabled={saving} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
-                {saving ? "Guardando..." : editingEmp ? "Guardar Cambios" : "Crear Empleado"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ElegirPersonaModal
+        open={showElegirPersona}
+        colaboradores={datos.colaboradores}
+        onClose={() => setShowElegirPersona(false)}
+        onElegir={elegirPersona}
+      />
 
-      {/* ── Modal: New Movement ── */}
-      {showMovModal && (
+      {showMovModal && personaElegida?.fichaId && (
         <div {...movModal.backdrop} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div ref={movModal.panelRef} className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-            {movStep === "employee" && !mEmpleadoId ? (<>
-              {/* En iPhone no hay tecla Escape: sin esta ✕ el único modo de salir
-                  del modal era el botón "Cancelar" del fondo de la lista. */}
-              <div className="flex items-start justify-between mb-4 -mt-2 -mr-2">
-                <h2 className="font-medium mt-2">Seleccionar Empleado</h2>
-                <button
-                  type="button"
-                  onClick={() => setShowMovModal(false)}
-                  aria-label="Cerrar"
-                  className="shrink-0 w-11 h-11 flex items-center justify-center rounded-md text-gray-400 hover:text-black active:scale-[0.97] transition"
-                >
-                  <span aria-hidden="true" className="text-xl leading-none">&times;</span>
-                </button>
-              </div>
-              <div className="space-y-1 max-h-80 overflow-y-auto">
-                {empleados.filter(e => e.activo).map(emp => {
-                  const c = calcEmpleado(emp);
-                  return (
-                    <button key={emp.id} onClick={() => { setMEmpleadoId(emp.id); setMovStep("form"); }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium">{emp.nombre}</div>
-                        <div className="text-xs text-gray-400">{emp.empresa || "Sin empresa"}</div>
-                      </div>
-                      <div className="text-xs text-gray-500 tabular-nums">Saldo: ${fmt(c.saldo)}</div>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-4">
-                <button onClick={() => setShowMovModal(false)} className="w-full min-h-[44px] border rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-              </div>
-            </>) : (<>
-            <h2 className="font-medium mb-4">Nuevo Movimiento</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Empleado *</label>
-                <select value={mEmpleadoId} onChange={e => setMEmpleadoId(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-                  <option value="">Seleccionar...</option>
-                  {empleados.filter(e => e.activo).map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Fecha *</label>
-                <input type="date" value={mFecha} onChange={e => setMFecha(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Concepto *</label>
-                <select value={mConcepto} onChange={e => setMConcepto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-                  <option value="Préstamo">Préstamo</option>
-                  <option value="Pago">Pago</option>
-                  <option value="Abono extra">Abono extra</option>
-                  <option value="Responsabilidad por daño">Responsabilidad por daño</option>
-                  <option value="Pago de responsabilidad">Pago de responsabilidad</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
-                <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => setMMonto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
-              </div>
-              {(mConcepto === "Préstamo" || mConcepto === "Responsabilidad por daño") && Number(mMonto) >= 500 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
-                  ⚠ Este préstamo requiere aprobación por el monto (≥ $500)
-                </div>
-              )}
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Notas</label>
-                <textarea value={mNotas} onChange={e => setMNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" placeholder="Notas opcionales..." />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowMovModal(false)} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={saveMov} disabled={savingMov} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
-                {savingMov ? "Guardando..." : "Registrar"}
-              </button>
-            </div>
-            </>)}
+            <NuevoMovimientoModal
+              nombre={personaElegida.nombre}
+              empleadoId={personaElegida.fichaId}
+              saldoPrestamo={filas.find((f) => f.id === personaElegida.fichaId)?.saldoPrestamo ?? 0}
+              saldoDano={filas.find((f) => f.id === personaElegida.fichaId)?.saldoDano ?? 0}
+              cuentaMasVieja={filas.find((f) => f.id === personaElegida.fichaId)?.cuentaMasVieja ?? null}
+              salarioMensual={personaElegida.salarioMensual}
+              hoy={hoy}
+              onCancelar={() => { setShowMovModal(false); setPersonaElegida(null); }}
+              onGuardar={crearMovimiento}
+            />
           </div>
         </div>
       )}
 
-      <ConfirmModal
-        open={!!confirmDeleteEmp}
-        onClose={() => setConfirmDeleteEmp(null)}
-        onConfirm={doDeleteEmp}
-        title="Eliminar empleado"
-        message={`¿Eliminar a ${confirmDeleteEmp?.nombre}? Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
-        destructive
-      />
-
-      <ConfirmModal
-        open={!!confirmPagoQ}
-        onClose={() => setConfirmPagoQ(null)}
-        onConfirm={() => { const emp = confirmPagoQ; setConfirmPagoQ(null); if (emp) handlePagoQuincenal(emp); }}
-        title="Registrar pago quincenal"
-        message={`¿Registrar el pago quincenal de $${fmt(confirmPagoQ?.deduccion_quincenal || 0)} para ${confirmPagoQ?.nombre}? Se descuenta del saldo del préstamo.`}
-        confirmLabel="Registrar pago"
-      />
-
-      {/* ── Bottom Sheet: Mobile Employee Preview ── */}
-      <BottomSheet open={!!sheetEmp} onClose={() => setSheetEmp(null)}>
-        {sheetEmp && sheetCalc && (
-          <div>
-            {/* Employee name */}
-            <h2 className="text-lg font-semibold mb-1">{sheetEmp.nombre}</h2>
-            <p className="text-sm text-gray-400 mb-4">{sheetEmp.empresa || "Sin empresa"}</p>
-
-            {/* Summary cards */}
-            <div className="grid grid-cols-3 gap-2 mb-5">
-              <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
-                <div className="text-xs text-gray-400 uppercase tracking-wide">Prestado</div>
-                <div className="text-sm font-semibold tabular-nums mt-0.5">${fmt(sheetCalc.prestado)}</div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
-                <div className="text-xs text-gray-400 uppercase tracking-wide">Pagado</div>
-                <div className="text-sm font-semibold tabular-nums mt-0.5 text-green-600">${fmt(sheetCalc.pagado)}</div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
-                <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo</div>
-                <div className="text-sm font-semibold tabular-nums mt-0.5 text-red-600">${fmt(sheetCalc.saldo)}</div>
-              </div>
-            </div>
-
-            {/* Progress bar */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-400">Progreso</span>
-                <span className="text-xs font-medium tabular-nums">{sheetCalc.pct.toFixed(0)}%</span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className={`h-full ${progressColor(sheetCalc.pct)} rounded-full`} style={{ width: `${Math.min(sheetCalc.pct, 100)}%` }} />
-              </div>
-            </div>
-
-            {/* Recent movements */}
-            {sheetMovs.length > 0 && (
-              <div className="mb-5">
-                <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Últimos movimientos</div>
-                <div className="space-y-0 border border-gray-200 rounded-lg overflow-hidden">
-                  {sheetMovs.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 last:border-b-0">
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño"
-                            ? "text-red-600" : "text-green-600"
-                        }`}>{m.concepto}</span>
-                        <span className="text-xs text-gray-400 ml-2">{m.fecha}</span>
-                      </div>
-                      <span className={`text-sm font-medium tabular-nums ${
-                        m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño"
-                          ? "text-red-600" : "text-green-600"
-                      }`}>
-                        {m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño" ? "+" : "−"}${fmt(m.monto)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
+      {/* 🔴 «¿Solo los que deben o todos?» — Daniel: «que esté la opción después
+          de apretar descargar». Dos botones y ninguno por defecto: son dos
+          papeles distintos y elegir por él sería adivinar. */}
+      {preguntaExcel && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setPreguntaExcel(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-medium mb-1">¿Qué quieres bajar?</h2>
+            <p className="mb-5 text-sm text-gray-500">Solo quien debe algo, o todos los colaboradores con su historial completo.</p>
             <div className="space-y-2">
-              {sheetEmp.deduccion_quincenal > 0 && sheetCalc.saldo > 0 && (
-                <button
-                  onClick={() => setConfirmPagoQ(sheetEmp)}
-                  disabled={savingPagoQ}
-                  className="w-full bg-black text-white py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-all disabled:opacity-50"
-                >
-                  {savingPagoQ ? "Registrando..." : `Pago Quincenal — $${fmt(sheetEmp.deduccion_quincenal)}`}
-                </button>
-              )}
-              <button
-                onClick={() => { setSheetEmp(null); router.push(`/prestamos/${sheetEmp.id}`); }}
-                className="w-full border border-gray-200 text-gray-600 py-3 rounded-md text-sm font-medium hover:border-gray-400 active:bg-gray-50 transition-all"
-              >
-                Ver completo
-              </button>
+              <button onClick={() => descargarHistorial("deben")} className="w-full inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition">Solo los que deben</button>
+              <button onClick={() => descargarHistorial("todos")} className="w-full inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Todos</button>
+              <button onClick={() => setPreguntaExcel(false)} className="w-full inline-flex min-h-[44px] items-center justify-center text-sm text-gray-500 hover:text-black transition">Cancelar</button>
             </div>
           </div>
-        )}
-      </BottomSheet>
+        </div>
+      )}
 
-      {/* 🔴 El diálogo pregunta la FECHA DE PAGO (3-sep-2026): el botón viejo
-          escribía la fecha de hoy y por eso nadie lo usó en 90 días — el
-          movimiento caía en la quincena equivocada y contabilidad seguía a
-          mano (6 pasos × 13 personas, 15 min por quincena). */}
       <AplicarQuincenaModal
         open={confirmAplicarQ}
         onClose={() => setConfirmAplicarQ(false)}
@@ -770,7 +467,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         personas={personasQuincena}
       />
 
-      {pendingUndo && <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />}
       <Toast message={toast} />
     </div>
   );

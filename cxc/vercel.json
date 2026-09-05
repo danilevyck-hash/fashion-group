@@ -313,6 +313,10 @@
       "schedule": "30 14 * * *"
     },
     {
+      "path": "/api/cron/prestamos-caducan",
+      "schedule": "15 13 * * *"
+    },
+    {
       "path": "/api/cron/asistencia-vigia",
       "schedule": "0 15 * * *"
     },

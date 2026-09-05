@@ -20,10 +20,13 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
 import { getQuincenaRangePanama, quincenaDeFecha, esFechaISO } from "@/lib/prestamos-quincena";
+import { PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
 
 export const dynamic = "force-dynamic";
 
-const ROLES = ["admin", "contabilidad"];
+// La lista vive en `lib/prestamos-roles.ts` y en ningún otro lado: hasta el
+// 5-sep-2026 estaba tecleada a mano en seis archivos.
+const ROLES = PRESTAMOS_ROLES;
 
 interface AplicarSummary {
   aplicados: { empleado_id: string; nombre: string; monto: number; ajustado: boolean }[];
