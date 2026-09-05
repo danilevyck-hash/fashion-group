@@ -133,7 +133,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       if (gPressedRef.current) {
         const routes: Record<string, string> = {
           h: "/home",
-          c: "/admin",
+          c: "/cxc",
           g: "/guias",
           q: "/cheques",
           r: "/reclamos",

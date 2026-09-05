@@ -43,8 +43,10 @@ function activeGroupForPath(pathname: string): string | null {
   );
   if (direct) return direct.key;
   // Match vía el href del módulo, MÁS ESPECÍFICO (href más largo gana). Evita
-  // que /admin/usuarios o /admin/data-health (grupo "sistema") resalten CXC
-  // ("/admin", grupo "ventas") solo por compartir prefijo.
+  // que /admin/usuarios o /admin/data-health (grupo "administracion") resalten
+  // otro módulo solo por compartir prefijo. (CXC vive en "/cxc" desde el
+  // 5-sep-2026, así que ese par ya no colisiona; la regla se queda porque
+  // protege a cualquier módulo futuro que cuelgue de otro.)
   let group: string | null = null;
   let bestLen = -1;
   for (const m of ALL_MODULES) {

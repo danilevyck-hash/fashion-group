@@ -22,7 +22,7 @@ import path from "path";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), "src", rel), "utf-8");
 
-const panelCxc = leer("app/admin/components/PanelCxcMobile.tsx");
+const panelCxc = leer("app/cxc/components/PanelCxcMobile.tsx");
 const prestamos = leer("app/prestamos/PrestamosClient.tsx");
 const vistaGeneral = leer("app/vista-general/page.tsx");
 const syncNow = leer("components/shared/SyncNowButton.tsx");
@@ -52,16 +52,26 @@ describe("CXC mobile — el ancho sale de la derecha, no de la letra", () => {
     expect(panelCxc).toContain('role="button"');
   });
 
-  it("los gaps de la cabecera están al mínimo (gap-2 fuera, gap-1 dentro)", () => {
+  it("los gaps de la cabecera están al mínimo (gap-2 fuera)", () => {
     expect(panelCxc).toContain('<div className="flex items-start justify-between gap-2 px-3 py-3">');
-    expect(panelCxc).toContain('<div className="flex shrink-0 items-center gap-1">');
+    // 🔄 5-sep-2026: el contenedor de la derecha (`gap-1`) existía para separar
+    // el monto del menú "···". Sin el "···" a la derecha queda SOLO el monto,
+    // así que el contenedor y su gap sobran — y ese ancho vuelve al nombre,
+    // que es lo que este archivo protege.
+    expect(panelCxc).not.toContain('<div className="flex shrink-0 items-center gap-1">');
   });
 
-  it('el "···" conserva 44x44 y se mete en el padding con -mr-3', () => {
-    // Espejo del -ml-3 de la estrella: gana 12px SIN tocar el área de tap.
+  it('🔄 el "···" ya no está, y el nombre se quedó con sus 44px (5-sep-2026)', () => {
+    // Cambió de dirección con el rediseño. Este caso medía que el "···"
+    // conservara su área de tap metiéndose en el padding (`-mr-3`, espejo del
+    // `-ml-3` de la estrella). El menú se retiró: sus cuatro acciones viven en
+    // la hoja «Cobrar», que se abre con un botón VISIBLE debajo de la tarjeta.
+    // Hoy mide que NO vuelva — devolverlo le come el ancho al nombre, que es
+    // justo lo que este archivo existe para proteger.
     const cab = cabeceraCxc();
-    expect(cab).toContain('<span className="-mr-3" onClick={e => e.stopPropagation()}>{actionsMenu}</span>');
-    // El botón real vive en OverflowMenu y no se tocó.
+    expect(cab).not.toContain("actionsMenu");
+    expect(panelCxc).not.toContain("OverflowMenu");
+    // CONTROL: el botón sigue existiendo para el resto de la app, con sus 44x44.
     const overflow = leer("components/ui/OverflowMenu.tsx");
     expect(overflow).toContain("min-h-[44px] min-w-[44px]");
   });
@@ -79,11 +89,20 @@ describe("CXC mobile — el ancho sale de la derecha, no de la letra", () => {
     expect(cabeceraCxc()).toContain("{client.nombre_normalized}");
   });
 
-  it("el nombre gana con tracking-tight, no bajando de 12px", () => {
-    expect(panelCxc).toContain("text-[12px] font-medium leading-5 tracking-tight");
-    // Piso duro: ningún text-[Npx] por debajo de 12 en el nombre.
-    const px = [...panelCxc.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].map((m) => parseFloat(m[1]));
-    expect(px.filter((p) => p < 12)).toHaveLength(0);
+  it("🔄 el nombre gana con tracking-tight, y SUBIÓ a 14px (5-sep-2026)", () => {
+    // 🩸 Estaba en 12 —el PISO del sistema— porque la estrella ⭐ y el "···" le
+    // comían el ancho a la derecha. Los dos se fueron (4 y 5-sep-2026) y ese
+    // ancho volvió al nombre: la letra pudo subir SIN cortar más nombres.
+    expect(panelCxc).toContain("text-[14px] font-medium leading-5 tracking-tight");
+    expect(panelCxc).not.toContain("text-[12px] font-medium leading-5 tracking-tight");
+
+    // Piso duro para EL NOMBRE. Los `text-[11px]` que hay son decoración —el
+    // rótulo de cada chip de tramo dentro de la tarjeta negra, el «no paga hace
+    // N d» y la marca de «le enviaste…»— y van debajo o al lado del dato, nunca
+    // en lugar de él.
+    const nombre = panelCxc.match(/className="block truncate text-\[(\d+)px\] font-medium leading-5 tracking-tight/);
+    expect(nombre, "no se encontró el nombre del cliente").toBeTruthy();
+    expect(parseFloat(nombre![1])).toBeGreaterThanOrEqual(12);
   });
 });
 

@@ -29,7 +29,7 @@ const src = join(__dirname, "..");
 const read = (...p: string[]) => readFileSync(join(src, ...p), "utf8");
 
 const overflowMenu = read("components", "ui", "OverflowMenu.tsx");
-const panelCxc = read("app", "admin", "components", "PanelCxcMobile.tsx");
+const panelCxc = read("app", "cxc", "components", "PanelCxcMobile.tsx");
 const searchBar = read("components", "SearchBar.tsx");
 const productCard = read("components", "catalogo", "CatalogoProductCard.tsx");
 const groupedCard = read("components", "catalogo", "CatalogoGroupedCard.tsx");
@@ -53,9 +53,12 @@ describe("OverflowMenu · el desplegable, no solo el botón que lo abre", () => 
 });
 
 describe("CXC · lo que aparece al expandir la fila", () => {
-  it('"Ver facturas pendientes" pide 44 de alto (medía 163×18)', () => {
-    // lastIndexOf: el nombre también aparece en el comentario de cabecera.
-    const i = panelCxc.lastIndexOf("Ver facturas pendientes");
+  it('el enlace a la ficha pide 44 de alto (medía 163×18)', () => {
+    // 🔄 5-sep-2026: el enlace se llama «Ficha» desde el rediseño —la tarjeta
+    // abierta terminaba en tres botones cortos, [Cobrar] [Documentos] [Ficha],
+    // y «Ver facturas pendientes» no entraba al lado de los otros dos—. El alto
+    // táctil, que es lo que este candado mide, no cambió.
+    const i = panelCxc.lastIndexOf(">\n            Ficha");
     expect(i).toBeGreaterThan(0);
     const enlace = panelCxc.slice(panelCxc.lastIndexOf("<Link", i), i);
     expect(enlace).toContain("min-h-[44px]");

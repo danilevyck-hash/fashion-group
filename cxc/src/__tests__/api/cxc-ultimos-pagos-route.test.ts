@@ -160,10 +160,22 @@ describe("son 3 por EMPRESA, y solo pagos de verdad", () => {
     expect(body.porEmpresa.vistana).toEqual([{ fecha: "2026-04-02", monto: 500 }]);
   });
 
-  it("el límite de 3 lo pone el SERVIDOR con .limit(3) en cada lectura", async () => {
+  it("🔄 el límite lo pone el SERVIDOR en cada lectura, y ya no son 3 (5-sep-2026)", async () => {
+    // El bloque pasó a agruparse POR FECHA —las 3 últimas fechas en que el
+    // cliente pagó, con el total del día y en qué empresas— y para eso hay que
+    // juntar los recibos de las 6 antes de agrupar. Con `.limit(3)` por empresa
+    // eso puede MENTIR: un cliente con 3 recibos del MISMO día en Vistana
+    // taparía con esa única fecha las otras dos que sí existen.
+    //
+    // ⚠️ Lo que este caso protege NO cambió: el corte lo hace el SERVIDOR, no
+    // el navegador — nunca se traen todos los recibos del cliente para recortar
+    // después. 30 por empresa son 180 filas, muy por debajo del tope de 1.000
+    // que corta EN SILENCIO, y cubren con cinco veces de margen al cliente con
+    // más recibos en un día (D-25, con 6).
     await GET(req("/api/cxc/ultimos-pagos?codigo=D-25"));
     for (const l of lecturasRecibos()) {
-      expect(l.limit).toBe(3);
+      expect(l.limit).toBe(30);
+      expect(l.limit).toBeLessThan(1000);
       expect(l.order).toBe("fecha_creacion");
     }
   });

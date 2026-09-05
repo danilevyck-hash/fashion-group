@@ -37,7 +37,7 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
 
 /** Map pathname to module key */
 export function getModuleKeyFromPath(pathname: string): string | null {
-  if (pathname.startsWith("/admin"))           return "cxc";
+  if (pathname.startsWith("/cxc"))             return "cxc";
   if (pathname.startsWith("/guias"))           return "guias";
   if (pathname.startsWith("/cheques"))         return "cheques";
   if (pathname.startsWith("/reclamos"))        return "reclamos";

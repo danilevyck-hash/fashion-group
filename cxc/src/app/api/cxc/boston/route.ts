@@ -28,7 +28,13 @@ export const fetchCache = "force-no-store";
 import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 
-const COLS = "codigo,cliente_switch_id,nombre,nombre_normalized,d0_90,d91_120,d121_plus,total";
+// ⚠️ `select("*")` a propósito desde el 5-sep-2026: la vista ganó los tramos
+// FINOS (d0_30 · d31_60 · d61_90 · d121_180 · d181_270 · d271_365 · mas_365,
+// migración `20260928120000`) y con una lista escrita a mano la pestaña se
+// queda sin ellos el día que la DDL corra, sin que nada avise. Con `*`, cuando
+// la migración corre el detalle aparece solo; mientras no corra, las columnas
+// llegan `undefined` y la pestaña se ve exactamente como hoy.
+const COLS = "*";
 const PAGE = 1000;
 
 export async function GET(req: NextRequest) {
@@ -93,6 +99,34 @@ export async function GET(req: NextRequest) {
     if (up.length < PAGE) break;
   }
 
+  // Teléfono/celular/correo de los clientes de Boston. 🔴 Salen de
+  // `switch_clientes` con `.eq("empresa_key", "confecciones_boston")` EN LA
+  // MISMA CADENA: `clientes_master` es el directorio del GRUPO y Boston no
+  // está ahí a propósito. Medido el 5-sep-2026: de los 390 clientes con saldo,
+  // 272 tienen teléfono y 113 correo. Falla abierto: sin esta lectura la
+  // pestaña se dibuja igual, sin los botones de contacto.
+  const contactos = new Map<string, { telefono: string; celular: string; email: string }>();
+  for (let from = 0; ; from += PAGE) {
+    const { data: cs, error: csErr } = await supabaseServer
+      .from("switch_clientes")
+      .select("codigo,telefono,celular,email")
+      .eq("empresa_key", "confecciones_boston")
+      .order("codigo", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (csErr) { console.error(`[cxc/boston] contactos: ${csErr.message}`); break; }
+    if (!cs || cs.length === 0) break;
+    for (const c of cs) {
+      const cod = (c.codigo as string | null) ?? "";
+      if (!cod) continue;
+      contactos.set(cod, {
+        telefono: ((c.telefono as string | null) ?? "").trim(),
+        celular: ((c.celular as string | null) ?? "").trim(),
+        email: ((c.email as string | null) ?? "").trim(),
+      });
+    }
+    if (cs.length < PAGE) break;
+  }
+
   // Chip "también en el grupo". Es SOLO una marca visual: dice que ese nombre
   // existe en las dos carteras, para que quien cobre sepa que hay otra relación
   // abierta. NO se suma nada — los dos saldos siguen viviendo cada uno en su
@@ -120,6 +154,22 @@ export async function GET(req: NextRequest) {
       d91_120: Number(r.d91_120) || 0,
       d121_plus: Number(r.d121_plus) || 0,
       total: Number(r.total) || 0,
+      // Los tramos finos, para el detalle al pasar el mouse — los MISMOS
+      // cortes que el grupo. `null` mientras la DDL 20260928120000 no corra.
+      finos: r.d0_30 == null ? null : {
+        d0_30: Number(r.d0_30) || 0,
+        d31_60: Number(r.d31_60) || 0,
+        d61_90: Number(r.d61_90) || 0,
+        d121_180: Number(r.d121_180) || 0,
+        d181_270: Number(r.d181_270) || 0,
+        d271_365: Number(r.d271_365) || 0,
+        mas_365: Number(r.mas_365) || 0,
+      },
+      // Teléfono y correo de ESTA cartera: salen de `switch_clientes` acotado a
+      // Boston, nunca de `clientes_master` (donde Boston no está, a propósito).
+      telefono: contactos.get(String(r.codigo))?.telefono ?? "",
+      celular: contactos.get(String(r.codigo))?.celular ?? "",
+      correo: contactos.get(String(r.codigo))?.email ?? "",
       ultimo_pago_fecha: pago?.fecha ?? null,
       ultimo_pago_monto: pago?.monto ?? null,
     };

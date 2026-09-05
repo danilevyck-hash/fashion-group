@@ -51,7 +51,7 @@ function bloquesAyuda(fuente: string): string[] {
 
 const A_LA_AYUDA: { archivo: string; que: string; texto: string }[] = [
   {
-    archivo: "app/admin/components/EnviarEmailModal.tsx",
+    archivo: "app/cxc/components/EnviarEmailModal.tsx",
     que: "CXC · qué se adjunta al correo de estado de cuenta",
     texto: "La tabla de saldos se arma automáticamente y no se edita. Se adjunta un PDF por empresa.",
   },
@@ -142,9 +142,9 @@ describe("lo que pasó al ⓘ sigue siendo ALCANZABLE", () => {
 
 const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   // El mismo número que ya está arriba de la tabla.
-  { archivo: "app/admin/page.tsx", que: "CXC · conteo repetido en el menú de exportar", texto: "Se exportaran" },
-  { archivo: "app/admin/components/ClientTable.tsx", que: "CXC · segunda línea del vacío", texto: "termino de busqueda" },
-  { archivo: "app/admin/components/PanelCxcMobile.tsx", que: "CXC móvil · conteo repetido en el hero", texto: "clientCount" },
+  { archivo: "app/cxc/page.tsx", que: "CXC · conteo repetido en el menú de exportar", texto: "Se exportaran" },
+  { archivo: "app/cxc/components/ClientTable.tsx", que: "CXC · segunda línea del vacío", texto: "termino de busqueda" },
+  { archivo: "app/cxc/components/PanelCxcMobile.tsx", que: "CXC móvil · conteo repetido en el hero", texto: "clientCount" },
   { archivo: "components/multifashion/ProductosSubtab.tsx", que: "Productos · 'Sin comparación' suelto en cada celda", texto: "Sin comparación</p>" },
   { archivo: "components/multifashion/ProductosSubtab.tsx", que: "Productos · instructivo del selector de marcas", texto: "Tocá una marca" },
   { archivo: "components/multifashion/MultifashionResumenView.tsx", que: "Resumen · vacío del gráfico en dos líneas", texto: "No hay datos para este período" },
@@ -225,7 +225,7 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/vista-general/page.tsx", que: "Vista General · h1 grande 'Vista General'", texto: "sm:text-3xl" },
   { archivo: "app/referencia/ReferenciaClient.tsx", que: "Referencia · h1 grande 'Referencia'", texto: 'text-gray-900">Referencia' },
   { archivo: "app/multifashion/MultifashionShell.tsx", que: "Multifashion · h1 grande 'Multifashion'", texto: 'md:text-4xl"> Multifashion' },
-  { archivo: "app/admin/components/PanelCxcMobile.tsx", que: "CXC celular · h1 grande 'Cuentas por Cobrar' (el de escritorio ya se había ido)", texto: "text-[22px] font-medium leading-tight" },
+  { archivo: "app/cxc/components/PanelCxcMobile.tsx", que: "CXC celular · h1 grande 'Cuentas por Cobrar' (el de escritorio ya se había ido)", texto: "text-[22px] font-medium leading-tight" },
   { archivo: "app/clientes/ClientesListClient.tsx", que: "Clientes · h1 grande 'Clientes'", texto: 'tracking-tight">Clientes' },
   { archivo: "app/proveedores/ProveedoresListClient.tsx", que: "Proveedores · h1 grande 'Proveedores'", texto: 'tracking-tight">Proveedores' },
   // Data Health pasó a ser la 2ª pestaña de Usuarios (13-ago-2026): el archivo
@@ -280,7 +280,7 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/caja/components/PeriodoDetailHeader.tsx", que: "Caja · 'Disponible' bajo el saldo", texto: 'sub="Disponible"' },
   { archivo: "app/caja/[periodoId]/nuevo/page.tsx", que: "Caja · el período del que se viene, repetido en el formulario", texto: "Período Nº" },
   { archivo: "app/caja/[periodoId]/nuevo/page.tsx", que: "Caja · instructivo del formulario con los * ya a la vista", texto: "Los campos con * son obligatorios" },
-  { archivo: "app/admin/page.tsx", que: "CXC · '6 empresas' al lado de la pestaña 'Grupo · 6 empresas'", texto: ': "6 empresas"' },
+  { archivo: "app/cxc/page.tsx", que: "CXC · '6 empresas' al lado de la pestaña 'Grupo · 6 empresas'", texto: ': "6 empresas"' },
   { archivo: "app/clientes/[codigo]/ClienteDetail.tsx", que: "Clientes · coletilla del encabezado (abajo dice 'Última sincronización')", texto: "Datos fiscales · sincronizados de Switch" },
   { archivo: "components/ventas/ClientesView.tsx", que: "Ventas › Clientes · el prefijo 'Vista:' del chip", texto: "Vista: {vistaChipLong}" },
   { archivo: "components/ventas/ClientesView.tsx", que: "Ventas › Clientes · rótulo del globo que se abre desde 'N empresas'", texto: "Desglose por empresa" },
@@ -395,7 +395,7 @@ const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   { archivo: "app/vista-general/page.tsx", nombre: "Vista General" },
   { archivo: "app/referencia/ReferenciaClient.tsx", nombre: "Referencia" },
   { archivo: "app/multifashion/MultifashionShell.tsx", nombre: "Multifashion" },
-  { archivo: "app/admin/components/PanelCxcMobile.tsx", nombre: "Cuentas por Cobrar" },
+  { archivo: "app/cxc/components/PanelCxcMobile.tsx", nombre: "Cuentas por Cobrar" },
   { archivo: "app/clientes/ClientesListClient.tsx", nombre: "Clientes" },
   { archivo: "app/proveedores/ProveedoresListClient.tsx", nombre: "Proveedores" },
   // Data Health dejó de ser una PÁGINA el 13-ago-2026: es la 2ª pestaña de
@@ -558,12 +558,12 @@ const EN_PANTALLA: { archivo: string; por_que: string; texto: string }[] = [
     texto: "El nombre del archivo debe ser el código (SKU).",
   },
   {
-    archivo: "app/admin/components/EstadoCuentaDrawer.tsx",
+    archivo: "app/cxc/components/EstadoCuentaDrawer.tsx",
     por_que: "un panel vacío sin explicación se lee como un error de la app",
     texto: "no tiene documentos con saldo pendiente",
   },
   {
-    archivo: "app/admin/components/EnviarEmailModal.tsx",
+    archivo: "app/cxc/components/EnviarEmailModal.tsx",
     por_que: "el correo repetido en muchos clientes frena un envío equivocado",
     texto: "clientes distintos. Verifica que sea el destinatario correcto.",
   },

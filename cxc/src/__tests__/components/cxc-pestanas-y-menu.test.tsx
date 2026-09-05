@@ -26,6 +26,23 @@
  * menú que queda con 5 opciones, o que dice otra palabra, se ve normal en el
  * código y está mal en la mano de quien cobra. Acá se abren los menús y se leen
  * las opciones.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 🔄 LA PARTE DE LOS MENÚS CAMBIÓ DE DIRECCIÓN EL 5-sep-2026, y no se borró.
+ *
+ * El problema que este candado describe —«tres listas de acciones en tres
+ * archivos, y ninguna se ve hasta tocar algo»— se resolvió de raíz en el
+ * rediseño de Cuentas por Cobrar: **los dos menús se eliminaron**. Las cuatro
+ * acciones viven ahora en UNA hoja, «Cobrar», que se abre con un botón VISIBLE
+ * en cada fila (y en cada tarjeta del celular). Con eso desaparece la
+ * posibilidad de que dos menús digan cosas distintas: ya no hay dos.
+ *
+ * Lo que este archivo defiende ahora es que NO VUELVAN: ni el «···», ni el clic
+ * derecho, ni una tercera lista. Lo que se ofrece y con qué palabras se
+ * verifica en `cxc-cobrar-una-hoja.test.ts`.
+ *
+ * La parte 1 —la pestaña de Boston solo para quien la puede leer— NO cambió.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
@@ -38,9 +55,9 @@ import type { Company } from "@/lib/companies";
 vi.mock("@/components/shared/SyncStatus", () => ({ default: () => null }));
 vi.mock("@/components/shared/SyncNowButton", () => ({ default: () => null }));
 
-import TabsCartera from "@/app/admin/components/TabsCartera";
-import ClientTable from "@/app/admin/components/ClientTable";
-import PanelCxcMobile from "@/app/admin/components/PanelCxcMobile";
+import TabsCartera from "@/app/cxc/components/TabsCartera";
+import ClientTable from "@/app/cxc/components/ClientTable";
+import PanelCxcMobile from "@/app/cxc/components/PanelCxcMobile";
 import { ContextMenuProvider } from "@/components/ui";
 import { ROLES_BOSTON } from "@/lib/cxc/boston-roles";
 
@@ -98,7 +115,7 @@ describe("TabsCartera — la pestaña de Boston solo para quien la puede leer", 
   });
 });
 
-// ─────────────────────────── 2. EL MENÚ "···" ───────────────────────────
+// ─────────── 2. LOS DOS MENÚS SE FUERON, Y NO PUEDEN VOLVER ───────────
 
 const EMPRESAS: Company[] = [{ key: "fashion_wear", name: "Fashion Wear" }] as Company[];
 const vacio = { d0_30: 0, d31_60: 0, d61_90: 0, d91_120: 0, d121_180: 0, d181_270: 0, d271_365: 0, mas_365: 0 };
@@ -120,67 +137,30 @@ const CLIENTE: ConsolidatedClient = {
 } as unknown as ConsolidatedClient;
 
 const noop = () => {};
+const sinAviso = () => null;
 
-/** Abre el "···" de la fila y devuelve las etiquetas de sus opciones. */
-function opcionesDelMenu(): string[] {
-  fireEvent.click(screen.getByLabelText(`Acciones de ${CLIENTE.nombre_normalized}`));
-  return screen.getAllByRole("menuitem").map((b) => b.textContent!);
-}
-
-/**
- * Hace CLICK DERECHO sobre la fila y devuelve las etiquetas del menú que sale.
- *
- * El asidero es `data-menu="contexto"`, no una clase de Tailwind: buscar por
- * clase devuelve vacío en cuanto alguien toca el estilo, el test compararía
- * CERO opciones y pasaría en verde sin haber mirado nada. Devuelve `null`
- * cuando NO se abrió ningún menú — que es un resultado distinto de "se abrió
- * vacío" y hay un caso que lo mira.
- */
-function opcionesClickDerecho(nombre = CLIENTE.nombre_normalized): string[] | null {
-  // ⚠️ Se hace click derecho en TODAS las coincidencias del nombre, no en la
-  // primera. Hasta el 24-ago-2026 `ClientRow` lo pintaba DOS veces —una tarjeta
-  // de celular que nunca se dibujaba y la grilla de escritorio— y el
-  // `onContextMenu` vivía SOLO en la segunda: quedarse con la primera medía la
-  // muerta, el menú no abría nunca y el test se caía por el motivo equivocado.
-  // La tarjeta muerta se retiró, pero el barrido se queda igual: si mañana
-  // vuelve a haber dos, el candado sigue midiendo la que importa.
-  const filas = document.querySelectorAll(`[title="${nombre}"]`);
-  expect(filas.length).toBeGreaterThan(0); // se pintó una fila de verdad
-  for (const fila of filas) fireEvent.contextMenu(fila);
-  const menu = document.querySelector('[data-menu="contexto"]');
-  if (!menu) return null;
-  // `data-label` es el texto que se lee: sin el ícono ni el atajo de teclado.
-  return [...menu.querySelectorAll("[data-label]")].map((s) => s.textContent!.trim());
-}
-
-function pintarEscritorio() {
+function pintarEscritorio(onCobrar: (c: ConsolidatedClient) => void = noop) {
   return render(
     <ContextMenuProvider>
       <ClientTable
         filtered={[CLIENTE]}
         roleCompanies={EMPRESAS}
-        roleClients={[CLIENTE]}
         companyFilter="all"
-        setCompanyFilter={noop}
-        riskFilter="all"
-        setRiskFilter={noop}
-        search=""
-        setSearch={noop}
-        sortKey="total"
-        sortDir="desc"
         toggleSort={noop}
         sortArrow={() => ""}
-        userRole="admin"
-        onOpenEmail={noop}
-        onWhatsApp={noop}
-        onCopyMessage={noop}
+        onCobrar={onCobrar}
         onOpenEstado={noop}
+        seleccion={new Set()}
+        onSeleccionar={noop}
+        onSeleccionarTodos={noop}
+        avisoSinPagarDe={sinAviso}
+        marcaEnvioDe={sinAviso}
       />
     </ContextMenuProvider>,
   );
 }
 
-function pintarCelular() {
+function pintarCelular(onCobrar: (c: ConsolidatedClient) => void = noop) {
   return render(
     <PanelCxcMobile
       filtered={[CLIENTE]}
@@ -192,12 +172,13 @@ function pintarCelular() {
       setRiskFilter={noop}
       companyFilter="all"
       setCompanyFilter={noop}
-      favorites={new Set()}
-      onToggleFavorite={noop}
-      onOpenEmail={noop}
-      onWhatsApp={noop}
-      onCopyMessage={noop}
       onOpenEstado={noop}
+      onCobrar={onCobrar}
+      sinPagar={null}
+      sinPagarActivo={false}
+      onToggleSinPagar={noop}
+      avisoSinPagarDe={sinAviso}
+      marcaEnvioDe={sinAviso}
       canExport={false}
       onExportarCsv={noop}
       empresaRestriction={null}
@@ -208,135 +189,53 @@ function pintarCelular() {
 describe.each([
   ["escritorio (ClientTable)", pintarEscritorio],
   ["celular (PanelCxcMobile)", pintarCelular],
-])("el menú ··· de %s", (_nombre, pintar) => {
-  it("🔴 tiene EXACTAMENTE 4 opciones, y son éstas", () => {
+])("la fila de %s", (_nombre, pintar) => {
+  it("🔴 NO tiene menú «···» — sus acciones están a la vista", () => {
     pintar();
-    expect(opcionesDelMenu()).toEqual(MENU_ESPERADO);
+    expect(screen.queryByLabelText(`Acciones de ${CLIENTE.nombre_normalized}`)).toBeNull();
+    expect(screen.queryAllByRole("menuitem")).toHaveLength(0);
+  });
+
+  it("🔴 tiene el botón «Cobrar», visible sin abrir nada", () => {
+    pintar();
+    expect(screen.getAllByText("Cobrar").length).toBeGreaterThan(0);
+  });
+
+  it("tocar «Cobrar» avisa con ESE cliente", () => {
+    const llamados: string[] = [];
+    pintar((c) => llamados.push(c.nombre_normalized));
+    fireEvent.click(screen.getAllByText("Cobrar")[0]);
+    expect(llamados).toEqual([CLIENTE.nombre_normalized]);
   });
 
   it("🔴 no quedó ni un rastro del seguimiento de cobro", () => {
-    pintar();
-    const items = opcionesDelMenu();
-    for (const retirada of RETIRADAS) expect(items).not.toContain(retirada);
-    expect(items.some((i) => /contact|seguimiento|directorio/i.test(i))).toBe(false);
+    const { container } = pintar();
+    const texto = container.textContent ?? "";
+    for (const retirada of RETIRADAS) expect(texto).not.toContain(retirada);
+    expect(texto).not.toMatch(/seguimiento/i);
   });
 
-  it("🔑 dice 'Enviar correo' — la palabra 'email' no se le muestra a nadie", () => {
-    pintar();
-    const items = opcionesDelMenu();
-    expect(items).toContain("Enviar correo");
-    for (const item of items) expect(item).not.toMatch(PALABRA_PROHIBIDA);
+  it("🔑 la palabra 'email' no se le muestra a nadie", () => {
+    const { container } = pintar();
+    expect(container.textContent ?? "").not.toMatch(PALABRA_PROHIBIDA);
   });
 });
 
-describe("las dos pantallas ofrecen lo MISMO", () => {
-  it("mismo menú, mismo orden, en escritorio y en celular", () => {
-    const escritorioRender = pintarEscritorio();
-    const escritorio = opcionesDelMenu();
-    expect(escritorio).toHaveLength(4); // se leyó algo real, no una lista vacía
-    escritorioRender.unmount();
-
-    pintarCelular();
-    expect(opcionesDelMenu()).toEqual(escritorio);
-  });
-});
-
-// ──────────────── 2b. EL MENÚ DE CLICK DERECHO (solo escritorio) ────────────────
-
-describe("el menú de CLICK DERECHO de una fila", () => {
-  it("🔴 ofrece EXACTAMENTE esto, y 'Ver en directorio' YA NO está", () => {
+describe("el menú de CLICK DERECHO", () => {
+  it("🔴 ya no existe: la fila no abre ningún menú propio", () => {
     pintarEscritorio();
-    const items = opcionesClickDerecho();
-    expect(items).toEqual(CONTEXTO_ESPERADO);
-    for (const retirada of RETIRADAS) expect(items).not.toContain(retirada);
-    expect(items!.some((i) => /directorio|contact|seguimiento/i.test(i))).toBe(false);
+    const filas = document.querySelectorAll(`[title="${CLIENTE.nombre_normalized}"]`);
+    expect(filas.length).toBeGreaterThan(0); // se pintó una fila de verdad
+    for (const fila of filas) fireEvent.contextMenu(fila);
+    expect(document.querySelector('[data-menu="contexto"]')).toBeNull();
   });
 
-  it("🔑 usa las MISMAS palabras que el menú '···' — ni una opción de su propia cosecha", () => {
-    pintarEscritorio();
-    const contexto = opcionesClickDerecho();
-    expect(contexto!.length).toBeGreaterThan(0); // se leyó algo real
-    // Cada opción del click derecho tiene que existir, TAL CUAL, en el "···".
-    for (const item of contexto!) expect(MENU_ESPERADO).toContain(item);
-    for (const item of contexto!) expect(item).not.toMatch(PALABRA_PROHIBIDA);
-  });
-
-  it("🩸 sale igual cuando el cliente NO tiene correo registrado (el modal lo pide)", () => {
-    // Con una sola opción escondida, el click derecho no abriría NADA — mientras
-    // el "···" de esa misma fila sí ofrece la acción. Dos juegos de opciones
-    // para la misma fila es justo lo que este candado impide.
-    expect(CLIENTE.correo).toBe("");
-    pintarEscritorio();
-    expect(opcionesClickDerecho()).toEqual(CONTEXTO_ESPERADO);
-  });
-
-  it("la opción llama a onOpenEmail (abre el modal, no un mailto)", () => {
-    const llamados: string[] = [];
-    render(
-      <ContextMenuProvider>
-        <ClientTable
-          filtered={[CLIENTE]}
-          roleCompanies={EMPRESAS}
-          roleClients={[CLIENTE]}
-          companyFilter="all"
-          setCompanyFilter={noop}
-          riskFilter="all"
-          setRiskFilter={noop}
-          search=""
-          setSearch={noop}
-          sortKey="total"
-          sortDir="desc"
-          toggleSort={noop}
-          sortArrow={() => ""}
-          userRole="admin"
-          onOpenEmail={() => llamados.push("email")}
-          onWhatsApp={noop}
-          onCopyMessage={noop}
-          onOpenEstado={noop}
-        />
-      </ContextMenuProvider>,
-    );
-    expect(opcionesClickDerecho()).toEqual(CONTEXTO_ESPERADO);
-    const menu = document.querySelector('[data-menu="contexto"]')!;
-    fireEvent.click(menu.querySelectorAll("button")[0]);
-    expect(llamados).toEqual(["email"]);
-  });
-});
-
-// ─────────────────────────── 3. LO QUE NO SE TOCÓ ───────────────────────────
-
-describe("las acciones que quedan siguen funcionando", () => {
-  it("cada opción llama a SU handler", () => {
-    const llamados: string[] = [];
-    render(
-      <ContextMenuProvider>
-        <ClientTable
-          filtered={[CLIENTE]}
-          roleCompanies={EMPRESAS}
-          roleClients={[CLIENTE]}
-          companyFilter="all"
-          setCompanyFilter={noop}
-          riskFilter="all"
-          setRiskFilter={noop}
-          search=""
-          setSearch={noop}
-          sortKey="total"
-          sortDir="desc"
-          toggleSort={noop}
-          sortArrow={() => ""}
-          userRole="admin"
-          onOpenEmail={() => llamados.push("email")}
-          onWhatsApp={() => llamados.push("whatsapp")}
-          onCopyMessage={() => llamados.push("copiar")}
-          onOpenEstado={() => llamados.push("estado")}
-        />
-      </ContextMenuProvider>,
-    );
-
-    for (const label of MENU_ESPERADO) {
-      fireEvent.click(screen.getByLabelText(`Acciones de ${CLIENTE.nombre_normalized}`));
-      fireEvent.click(screen.getByRole("menuitem", { name: label }));
-    }
-    expect(llamados).toEqual(["estado", "whatsapp", "email", "copiar"]);
+  it("🩸 y con eso se acabó el problema que este candado vino a arreglar", () => {
+    // Dos menús para la MISMA fila no pueden decir cosas distintas si hay UNO
+    // solo, y ése está a la vista. `MENU_ESPERADO`/`CONTEXTO_ESPERADO` quedan
+    // como historia de lo que se ofrecía; lo que se ofrece HOY se verifica en
+    // `cxc-cobrar-una-hoja.test.ts`.
+    expect(MENU_ESPERADO).toEqual(["Estado de cuenta", "WhatsApp", "Enviar correo", "Copiar mensaje"]);
+    expect(CONTEXTO_ESPERADO).toEqual(["Enviar correo"]);
   });
 });

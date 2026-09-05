@@ -31,8 +31,8 @@ import path from "path";
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
 
 describe("CXC › Panel — el corte tarjeta/tabla sube de md (768) a lg (1024)", () => {
-  const movil = leer("src/app/admin/components/PanelCxcMobile.tsx");
-  const pagina = leer("src/app/admin/page.tsx");
+  const movil = leer("src/app/cxc/components/PanelCxcMobile.tsx");
+  const pagina = leer("src/app/cxc/page.tsx");
 
   it("la vista de tarjetas llega hasta lg, no hasta md", () => {
     expect(movil).toContain('<div className="lg:hidden bg-gray-50">');
@@ -53,7 +53,7 @@ describe("CXC › Panel — el corte tarjeta/tabla sube de md (768) a lg (1024)"
     const columnaNombre = Math.round((util * 4) / 12);
     expect(columnaNombre).toBeLessThan(270); // "GRUP MEL INTERNATIONAL SA(AGUAS)" mide 270
     // Y la celda del nombre sigue siendo col-span-4 (si cambia, este número miente).
-    expect(leer("src/app/admin/components/ClientRow.tsx")).toContain('className="col-span-4 font-medium truncate');
+    expect(leer("src/app/cxc/components/ClientRow.tsx")).toContain('className="col-span-4 font-medium truncate');
   });
 });
 

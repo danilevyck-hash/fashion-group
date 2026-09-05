@@ -99,7 +99,7 @@ function buildWarning(
 // igual se MONTA, así que las dos piden `/api/sync-status` con la MISMA URL, en
 // el mismo instante. Medido contra el build de producción: `/api/sync-status`
 // ×2 por visita a /ventas, 733 ms sumados. Le pasa lo mismo al CXC
-// (`admin/page.tsx` + `PanelCxcMobile`).
+// (`cxc/page.tsx` + `PanelCxcMobile`).
 //
 // Se comparte la petición EN VUELO por URL: dos montajes en el mismo tick
 // esperan la MISMA respuesta. **No hay TTL ni caché de resultado** a propósito —

@@ -13,17 +13,16 @@
 // ese tramo. Los tramos de Boston (d0_90 / d91_120 / d121_plus) se mapean a los
 // nombres del módulo (current / watch / overdue) — son los MISMOS cortes.
 
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { fmt } from "@/lib/format";
-import { AGING } from "@/lib/cxc-aging";
+import { AGING, AGING_ORDER, tramoLabel } from "@/lib/cxc-aging";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncStatus from "@/components/shared/SyncStatus";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
-import UltimosPagos from "@/components/cxc/UltimosPagos";
-import BotonUltimosPagos from "@/components/cxc/BotonUltimosPagos";
-import { useUltimosPagosBoston } from "@/components/cxc/useUltimosPagosBoston";
+import BostonDocumentosDrawer from "@/components/cxc/BostonDocumentosDrawer";
+import BostonHojaCobrar from "@/components/cxc/BostonHojaCobrar";
 import {
   ordenEfectivo,
   ordenAlTocarTitulo,
@@ -45,6 +44,16 @@ interface ClienteBoston {
   d91_120: number;
   d121_plus: number;
   total: number;
+  /** Los tramos finos, los MISMOS cortes del grupo. `null` mientras la
+   *  migración `20260928120000` no corra: el dato POR DÍA sí existe (985
+   *  documentos, todos con `dias`), lo que faltaba era calcularlo en la vista. */
+  finos: {
+    d0_30: number; d31_60: number; d61_90: number;
+    d121_180: number; d181_270: number; d271_365: number; mas_365: number;
+  } | null;
+  telefono: string;
+  celular: string;
+  correo: string;
   ultimo_pago_fecha: string | null;
   ultimo_pago_monto: number | null;
   tambien_en_grupo: boolean;
@@ -78,7 +87,7 @@ function ordenable(c: ClienteBoston) {
 // número viejo presentado como actual es peor que no tener número.
 //
 // No es un aviso nuevo ni una alerta nueva: es el MISMO `<SyncStatus />` que el
-// panel del grupo ya monta (`admin/page.tsx` y `PanelCxcMobile.tsx`), con la
+// panel del grupo ya monta (`cxc/page.tsx` y `PanelCxcMobile.tsx`), con la
 // misma tabla, el mismo umbral y el mismo ámbar. Lo único que cambia es a qué
 // empresa le pregunta.
 //
@@ -109,11 +118,14 @@ function fechaCorta(iso: string | null) {
   return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** El bloque «Últimos pagos» de UN cliente de Boston. Se monta solo cuando el
- *  usuario lo abre, y en ese momento pide los 3 pagos a la ruta de Boston. */
-function BostonUltimosPagos({ clienteSwitchId }: { clienteSwitchId: number | null }) {
-  const pagos = useUltimosPagosBoston(clienteSwitchId);
-  return <UltimosPagos pagos={pagos} compacto />;
+/** El detalle fino de un tramo, para el `title`. Sin los tramos finos (la DDL
+ *  todavía no corrió) no se dice nada, en vez de inventar un desglose. */
+function detalleFino(c: ClienteBoston, k: "current" | "watch" | "overdue"): string {
+  if (!c.finos) return tramoLabel(k);
+  const f = c.finos;
+  if (k === "current") return `0-30: $${fmt(f.d0_30)} · 31-60: $${fmt(f.d31_60)} · 61-90: $${fmt(f.d61_90)}`;
+  if (k === "watch") return "91-120 días";
+  return `121-180: $${fmt(f.d121_180)} · 181-270: $${fmt(f.d181_270)} · 271-365: $${fmt(f.d271_365)} · +365: $${fmt(f.mas_365)}`;
 }
 
 /** Barrita de color de la fila: el tramo más viejo con deuda manda. */
@@ -129,10 +141,15 @@ export default function BostonTab() {
   });
 
   const [search, setSearch] = useState("");
-  // Qué cliente tiene abierto su bloque «Últimos pagos» (por código). Uno a la
-  // vez: es un detalle que se mira y se cierra, no una segunda tabla.
-  const [pagosAbiertos, setPagosAbiertos] = useState<string | null>(null);
-  const alternarPagos = (codigo: string) => setPagosAbiertos((a) => (a === codigo ? null : codigo));
+  // 🩸 Acá vivía el botón «Últimos pagos ›» con su bloque por empresa. Boston es
+  // UNA empresa: ese bloque decía tres pagos de la única empresa que hay, en
+  // una sub-fila aparte. Ahora tocar un cliente lleva DIRECTO a sus documentos
+  // —que es lo que se mira para cobrar— y la columna «Último pago» de la tabla
+  // sigue dando el vistazo.
+  /** El cliente cuyo cajón de documentos está abierto. */
+  const [documentosDe, setDocumentosDe] = useState<ClienteBoston | null>(null);
+  /** El cliente cuya hoja «Cobrar» está abierta. */
+  const [cobrarA, setCobrarA] = useState<ClienteBoston | null>(null);
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [ordenOverride, setOrdenOverride] = useState<OrdenOverride | null>(null);
 
@@ -195,18 +212,64 @@ export default function BostonTab() {
                    focus:outline-none focus:ring-2 focus:ring-gray-900/10"
       />
 
-      {/* 4 píldoras, todas FILTRAN: 2+2 en iPhone, una sola línea desde iPad.
+      {/* ── LA TIRA DE TOTALES, PEGADA A LA TABLA Y SOBRE SUS COLUMNAS ──────
+          El MISMO formato que el CXC del grupo desde el 5-sep-2026: en pantalla
+          ancha los cuatro totales viven en la misma grilla que la tabla, así que
+          cada uno queda parado sobre su columna. Los cuatro FILTRAN igual que
+          antes, con el mismo toggle de `lib/cxc-orden`.
+
           🩸 Acá vivía una 5ª tarjeta, "Cobrado julio · $35,392.49 · 126", con el
           monto y la cuenta ESCRITOS A MANO en el código. No filtraba nada y no
           se podía calcular: los cobros de Boston no entran a este sistema
           (`recibos: false` en EMPRESA_SYNC_CAPABILITIES — su cartera va por
-          Brand It, ver la nota de arriba de este archivo y cxc/CLAUDE.md). O
-          sea que iba a decir "julio" para siempre, al lado de cuatro cifras que
-          sí se actualizan solas: en octubre se leía como si fuera de octubre.
-          Daniel aprobó quitarla. NO reponerla con otro mes escrito a mano ni
-          encender el sync de recibos de Boston para "poder calcularla" — eso es
-          una decisión de negocio, no un arreglo. */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          Brand It). O sea que iba a decir "julio" para siempre, al lado de
+          cuatro cifras que sí se actualizan solas. Daniel aprobó quitarla. NO
+          reponerla con otro mes escrito a mano. */}
+      <div className="hidden lg:grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 border border-b-0 border-gray-200 rounded-t-xl">
+        <div className="col-span-4 flex items-center">
+          <span className="text-xs text-gray-500 px-2">
+            {isLoading ? "Cargando…" : `${filtrados.length} ${filtrados.length === 1 ? "cliente" : "clientes"}`}
+          </span>
+        </div>
+        {AGING_ORDER.map((k) => {
+          const valor = k === "current" ? t?.d0_90 ?? 0 : k === "watch" ? t?.d91_120 ?? 0 : t?.d121_plus ?? 0;
+          const activa = riskFilter === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => tocarPildora(k)}
+              aria-pressed={activa}
+              title={`${tramoLabel(k)}: $${fmt(valor)}`}
+              className={`col-span-2 flex flex-col items-end justify-center rounded-md px-2 py-1 min-h-[44px] transition active:scale-[0.97] ${
+                activa ? "border-2 border-gray-900 bg-white" : "border border-transparent hover:bg-white hover:border-gray-300"
+              }`}
+            >
+              <span className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-gray-500">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full ${AGING[k].dot}`} />
+                {AGING[k].colLabel}
+              </span>
+              <span className={`text-sm font-semibold tabular-nums ${AGING[k].text}`}>${fmt(valor)}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => tocarPildora("all")}
+          aria-pressed={riskFilter === "all"}
+          title={`Total pendiente: $${fmt(t?.total ?? 0)} · ${t?.clientes ?? 0} clientes`}
+          className={`col-span-2 flex flex-col items-end justify-center rounded-md px-2 py-1 min-h-[44px] transition active:scale-[0.97] ${
+            riskFilter === "all" ? "border-2 border-gray-900 bg-white" : "border border-transparent hover:bg-white hover:border-gray-300"
+          }`}
+        >
+          <span className="text-[11px] uppercase tracking-wide text-gray-500">Total · {t?.clientes ?? 0}</span>
+          <span className="text-sm font-semibold tabular-nums text-gray-900">${fmt(t?.total ?? 0)}</span>
+        </button>
+      </div>
+
+      {/* En celular la tira no entra en una grilla de 12: van las cuatro
+          píldoras de siempre, 2+2. */}
+      <div className="grid grid-cols-2 gap-2 mb-4 lg:hidden">
         {pills.map((p) => {
           const activa = riskFilter === p.key;
           return (
@@ -231,7 +294,7 @@ export default function BostonTab() {
         })}
       </div>
 
-      <p className="text-sm text-gray-500 mb-3">
+      <p className="text-sm text-gray-500 mb-3 lg:hidden">
         {isLoading ? "Cargando..." : `${filtrados.length} ${filtrados.length === 1 ? "cliente" : "clientes"}`}
       </p>
 
@@ -278,84 +341,120 @@ export default function BostonTab() {
                   {c.ultimo_pago_monto != null && ` · $${fmt(c.ultimo_pago_monto)}`}
                 </p>
               )}
-              {/* Los últimos 3 pagos, con fecha, SOLO de la cartera de Boston. */}
-              <BotonUltimosPagos abierto={pagosAbiertos === c.codigo} onToggle={() => alternarPagos(c.codigo)} nombre={c.nombre} />
-              {pagosAbiertos === c.codigo && <BostonUltimosPagos clienteSwitchId={c.cliente_switch_id} />}
+              {/* Boston no tiene desglose por empresa —es UNA— así que no hay
+                  panel intermedio: se cobra o se ven los documentos. */}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCobrarA(c)}
+                  className="flex-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
+                >
+                  Cobrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocumentosDe(c)}
+                  className="flex-1 inline-flex min-h-[44px] items-center justify-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 active:scale-[0.97]"
+                >
+                  Documentos
+                </button>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── iPad ACOSTADO y escritorio: tabla (entra sin arrastre) ─────── */}
-      <div data-vista="tabla" className="hidden lg:block rounded-xl border border-gray-200 bg-white overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-[11px] uppercase tracking-wide text-gray-500 border-b border-gray-100">
-              <th className="text-left font-normal px-4 py-3">
-                <button type="button" onClick={() => tocarTitulo("name")} className="min-h-[44px]">Cliente{flecha("name")}</button>
-              </th>
-              <th className="text-right font-normal px-3">
-                <button type="button" onClick={() => tocarTitulo("current")} className="min-h-[44px]">{AGING.current.colLabel}{flecha("current")}</button>
-              </th>
-              <th className="text-right font-normal px-3">
-                <button type="button" onClick={() => tocarTitulo("watch")} className="min-h-[44px]">{AGING.watch.colLabel}{flecha("watch")}</button>
-              </th>
-              <th className="text-right font-normal px-3">
-                <button type="button" onClick={() => tocarTitulo("overdue")} className="min-h-[44px]">{AGING.overdue.colLabel}{flecha("overdue")}</button>
-              </th>
-              <th className="text-right font-normal px-3">Último pago</th>
-              <th className="text-right font-normal px-4">
-                <button type="button" onClick={() => tocarTitulo("total")} className="min-h-[44px]">Total{flecha("total")}</button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtrados.map((c) => (
-              <Fragment key={c.codigo}>
-              <tr className="border-b border-gray-50 last:border-0">
-                <td className="px-4 py-3">
-                  <span className="flex items-center gap-2">
-                    <span className={`w-1 h-8 rounded-full shrink-0 ${colorFila(c)}`} aria-hidden />
-                    <span className="text-gray-900">{c.nombre}</span>
-                    {c.tambien_en_grupo && (
-                      <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-600 whitespace-nowrap">
-                        también en el grupo
-                      </span>
-                    )}
-                  </span>
-                  <span className="block pl-5 -mt-2 -mb-3">
-                    <BotonUltimosPagos abierto={pagosAbiertos === c.codigo} onToggle={() => alternarPagos(c.codigo)} nombre={c.nombre} />
-                  </span>
-                </td>
-                <td className={`px-3 text-right tabular-nums ${c.d0_90 ? AGING.current.text : "text-gray-300"}`}>{c.d0_90 ? fmt(c.d0_90) : "—"}</td>
-                <td className={`px-3 text-right tabular-nums ${c.d91_120 ? AGING.watch.text : "text-gray-300"}`}>{c.d91_120 ? fmt(c.d91_120) : "—"}</td>
-                <td className={`px-3 text-right tabular-nums ${c.d121_plus ? AGING.overdue.text : "text-gray-300"}`}>{c.d121_plus ? fmt(c.d121_plus) : "—"}</td>
-                <td className="px-3 text-right whitespace-nowrap">
-                  {c.ultimo_pago_fecha ? (
-                    <>
-                      <span className="block text-gray-700">{fechaCorta(c.ultimo_pago_fecha)}</span>
-                      {c.ultimo_pago_monto != null && (
-                        <span className="block text-xs text-gray-400 tabular-nums">${fmt(c.ultimo_pago_monto)}</span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-gray-300">—</span>
+      {/* ── iPad ACOSTADO y escritorio: la MISMA grilla de 12 columnas que el
+          CXC del grupo (4/2/2/2/2), para que la tira de totales de arriba quede
+          parada sobre sus columnas. Antes era una `<table>` de 6 columnas y los
+          totales flotaban aparte, sin relación visual con nada.
+          «Último pago» dejó de ser una columna: vive debajo del nombre, que es
+          donde no compite con la plata. ─────────────────────────────────── */}
+      <div data-vista="tabla" className="hidden lg:block rounded-b-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
+          <div className="col-span-4 cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("name")}>
+            Cliente{flecha("name")}
+          </div>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("current")}>
+            {AGING.current.colLabel}{flecha("current")}
+          </div>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("watch")}>
+            {AGING.watch.colLabel}{flecha("watch")}
+          </div>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("overdue")}>
+            {AGING.overdue.colLabel}{flecha("overdue")}
+          </div>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("total")}>
+            Total{flecha("total")}
+          </div>
+        </div>
+
+        {filtrados.map((c) => (
+          <div key={c.codigo} className="border-b border-gray-50 last:border-0">
+            <div className="grid grid-cols-12 gap-2 px-4 py-3 text-sm items-center">
+              <div className="col-span-4 min-w-0">
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className={`w-1 h-8 rounded-full shrink-0 ${colorFila(c)}`} aria-hidden />
+                  <span className="truncate text-gray-900" title={c.nombre}>{c.nombre}</span>
+                  {c.tambien_en_grupo && (
+                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-600 whitespace-nowrap">
+                      también en el grupo
+                    </span>
                   )}
-                </td>
-                <td className="px-4 text-right font-semibold tabular-nums">{fmt(c.total)}</td>
-              </tr>
-              {pagosAbiertos === c.codigo && (
-                <tr className="border-b border-gray-50 bg-gray-50/80">
-                  <td colSpan={6} className="px-9 pb-3">
-                    <BostonUltimosPagos clienteSwitchId={c.cliente_switch_id} />
-                  </td>
-                </tr>
-              )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+                </span>
+                <span className="block pl-3 text-xs text-gray-400">
+                  {c.ultimo_pago_fecha
+                    ? `Últ. pago ${fechaCorta(c.ultimo_pago_fecha)}${c.ultimo_pago_monto != null ? ` · $${fmt(c.ultimo_pago_monto)}` : ""}`
+                    : "Sin pagos registrados"}
+                </span>
+              </div>
+              <div className={`col-span-2 text-right tabular-nums cursor-help ${c.d0_90 ? AGING.current.text : "text-gray-300"}`} title={detalleFino(c, "current")}>
+                {c.d0_90 ? fmt(c.d0_90) : "—"}
+              </div>
+              <div className={`col-span-2 text-right tabular-nums cursor-help ${c.d91_120 ? AGING.watch.text : "text-gray-300"}`} title={detalleFino(c, "watch")}>
+                {c.d91_120 ? fmt(c.d91_120) : "—"}
+              </div>
+              <div className={`col-span-2 text-right tabular-nums cursor-help ${c.d121_plus ? AGING.overdue.text : "text-gray-300"}`} title={detalleFino(c, "overdue")}>
+                {c.d121_plus ? fmt(c.d121_plus) : "—"}
+              </div>
+              <div className="col-span-2 text-right tabular-nums font-semibold flex items-center justify-end gap-2">
+                <span>{fmt(c.total)}</span>
+                <button
+                  type="button"
+                  onClick={() => setCobrarA(c)}
+                  className="shrink-0 rounded-md bg-black px-2.5 py-1 text-xs font-medium text-white transition active:scale-[0.97] hover:bg-gray-800"
+                >
+                  Cobrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocumentosDe(c)}
+                  className="shrink-0 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 transition active:scale-[0.97]"
+                >
+                  Documentos
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
+
+      <BostonDocumentosDrawer
+        codigo={documentosDe?.codigo ?? null}
+        nombre={documentosDe?.nombre ?? ""}
+        clienteSwitchId={documentosDe?.cliente_switch_id ?? null}
+        onClose={() => setDocumentosDe(null)}
+      />
+
+      <BostonHojaCobrar
+        cliente={cobrarA}
+        onClose={() => setCobrarA(null)}
+        onVerDocumentos={(c) => {
+          setCobrarA(null);
+          setDocumentosDe(filtrados.find((f) => f.codigo === c.codigo) ?? null);
+        }}
+      />
+
     </div>
   );
 }

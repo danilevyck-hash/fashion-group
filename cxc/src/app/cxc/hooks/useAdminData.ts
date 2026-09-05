@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import useSWR from "swr";
 import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
+import { ultimoPagoPorCodigo } from "@/lib/cxc/sin-pagar";
 import type { CxcRow, ConsolidatedClient } from "@/lib/types";
 
 // Clave de caché SWR del módulo CXC. La caché vive a nivel de la app
@@ -12,6 +13,22 @@ const SWR_KEY = "cxc-admin-data";
 interface AdminData {
   clients: ConsolidatedClient[];
   ts: number;
+  /**
+   * Código del cliente → fecha (`YYYY-MM-DD`) de su ÚLTIMO PAGO REAL en
+   * CUALQUIERA de las 6 empresas del grupo. Alimenta el aviso «sin pagar hace
+   * +90 d».
+   *
+   * 🔴 SALE DE LA MISMA LECTURA QUE YA SE HACÍA (`/api/cxc/ultimo-pago`, la
+   * vista `switch_ultimo_pago_cliente_v2`): CERO peticiones nuevas. Esa vista
+   * ya excluye retenciones y recibos en cero y la ruta acota a las empresas con
+   * CXC, así que Boston no entra ni por asomo.
+   *
+   * ⚠️ Se arma con TODAS las filas que devuelve la ruta, no solo con las
+   * empresas donde el cliente tiene deuda: el que terminó de pagarle a Vistana
+   * la semana pasada NO puede salir como «no paga hace 300 días» porque su
+   * saldo vivo esté en otra empresa.
+   */
+  ultimoPago: Record<string, string>;
   /**
    * Lo que el guard de montos dejó AFUERA de esta cartera, ya redactado por el
    * servidor y acotado a las 6 del grupo. `null` = no hay nada que decir.
@@ -39,7 +56,7 @@ async function fetchAdminData(): Promise<AdminData> {
   // 🔴 Y OTRAS DOS SE RETIRARON EL 24-ago-2026, por lo mismo: `/api/vendors` y
   // `/api/upload`. La primera llenaba el objeto global `VENDOR_MAP`, que NINGUNA
   // pantalla lee; la segunda armaba `uploads` (la frescura por carga de archivo),
-  // que llegaba hasta `admin/page.tsx`, se desestructuraba y no se usaba en una
+  // que llegaba hasta `cxc/page.tsx`, se desestructuraba y no se usaba en una
   // sola línea — la frescura que SÍ se muestra sale de `refreshedAt` del aging y
   // del componente `SyncStatus`, que la pide por su cuenta.
   //
@@ -166,6 +183,16 @@ async function fetchAdminData(): Promise<AdminData> {
   // endpoint /api/cxc/aging devuelve refreshedAt (materializado_en de
   // switch_estadocuenta_aging_mv); si cayó al fallback de la view en vivo (sin MV
   // todavía), refreshedAt es null → Date.now().
+  // Código → última fecha de pago, mirando las 6 empresas juntas.
+  const ultimoPago = Object.fromEntries(
+    ultimoPagoPorCodigo(
+      (Array.isArray(pagos) ? pagos : []).map((p) => ({
+        codigo: (p as { cliente_codigo?: string | null }).cliente_codigo,
+        fecha: (p as { ultimo_pago_fecha?: string | null }).ultimo_pago_fecha,
+      })),
+    ),
+  );
+
   const refreshTs = agingJson?.refreshedAt
     ? new Date(agingJson.refreshedAt as string).getTime()
     : Date.now();
@@ -173,6 +200,7 @@ async function fetchAdminData(): Promise<AdminData> {
   return {
     clients: clientsArr,
     ts: refreshTs,
+    ultimoPago,
     avisoMontos: (agingJson?.avisoMontos as string | null | undefined) ?? null,
   };
 }
@@ -203,6 +231,7 @@ export default function useAdminData(authReady: boolean = true) {
 
   return {
     clients: data?.clients ?? [],
+    ultimoPago: data?.ultimoPago ?? {},
     // Solo "cargando" cuando no hay nada que mostrar todavía (primer arranque).
     // Al volver, data ya está en la caché SWR en memoria → sin spinner.
     loading: isLoading && !data,

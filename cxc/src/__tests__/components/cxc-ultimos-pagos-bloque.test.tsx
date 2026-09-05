@@ -26,6 +26,24 @@
 // el mismo patrón que Boston ya tenía— y salió del panel expandido. Ese
 // comportamiento (el botón, el clic único, el cliente que sigue cerrado) tiene
 // su propio candado: `cxc-ultimos-pagos-boton-fila.test.tsx`.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔄 Y VOLVIÓ A CAMBIAR DE DIRECCIÓN EL 5-sep-2026, con el rediseño del módulo.
+//
+// El corte POR EMPRESA se retiró del CXC del grupo. Medido: los clientes
+// grandes le pagan a varias empresas EL MISMO DÍA —el 29-jun-2026 D-25 pagó
+// $241.857,77 repartido en las SEIS—, así que «3 pagos por empresa» eran **18
+// líneas para decir lo que dicen 3**, y ninguna decía cuánto entró ese día. El
+// bloque del grupo se agrupa ahora POR FECHA (`UltimosPagosPorFecha`) y vive
+// dentro del panel expandido, junto al desglose por empresa que Daniel eligió
+// conservar. Con él se fueron el botón «Últimos pagos ›» y `UltimosPagosFila`.
+//
+// En BOSTON el bloque por-empresa NO tenía sentido desde el principio —es UNA
+// empresa— así que sus 3 pagos se mudaron adentro de su cajón de documentos,
+// junto a lo que se está cobrando. Sigue usando SU hook y SU ruta.
+//
+// Lo que este archivo defiende y NO cambió: el TEXTO de una línea, que son
+// tres, y que cada cartera lee por su propio camino.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, afterEach } from "vitest";
@@ -87,38 +105,48 @@ describe("el bloque dibujado", () => {
   });
 });
 
-describe("las tres superficies lo montan, cada cartera con SU hook", () => {
-  it("CXC grupo: UltimosPagosFila, un bloque POR EMPRESA, y se pide recién al clic", () => {
-    const fila = leer("src/app/admin/components/UltimosPagosFila.tsx");
-    expect(fila).toContain('from "@/components/cxc/UltimosPagos"');
-    expect(fila).toContain("useUltimosPagosGrupo(codigo, abierto)");
-    expect(fila).not.toContain("useUltimosPagosBoston");
-    // Por empresa: el bloque se dibuja dentro del map de las empresas visibles.
-    expect(fila).toMatch(/visibleCompanies\.map\(\(co\) => \(\s*<UltimosPagos/);
-    expect(fila).toContain("pagos={ultimosPagos.de(co.key)}");
+describe("🔄 dónde vive el bloque hoy, y cada cartera con SU hook", () => {
+  it("CXC del grupo: POR FECHA, dentro del panel expandido, y se pide al abrirlo", () => {
+    const bloque = leer("src/app/cxc/components/UltimosPagosPorFecha.tsx");
+    expect(bloque).toContain('from "@/lib/cxc/pagos-por-fecha"');
+    expect(bloque).toContain("TITULO_ULTIMOS_PAGOS");
+    expect(bloque).toContain("SIN_PAGOS");
+    expect(bloque).not.toContain("useUltimosPagosBoston");
+
+    const panel = leer("src/app/cxc/components/ContactPanel.tsx");
+    expect(panel).toContain("<UltimosPagosPorFecha");
+    // Se pide recién con el panel ABIERTO: en escritorio el panel de los 100
+    // clientes vive montado aunque esté cerrado.
+    expect(panel).toContain("useUltimosPagosGrupo(codigo, abierto)");
   });
 
-  it("CXC escritorio: ClientTable la monta en la sub-fila del botón, abierta por `pagosOpen`", () => {
-    const tabla = leer("src/app/admin/components/ClientTable.tsx");
-    expect(tabla).toContain('from "./UltimosPagosFila"');
-    expect(tabla).toContain("abierto={pagosOpen}");
-    // Y ya NO adentro del panel expandido (ayer sí; hoy Daniel dijo un clic, no dos).
-    expect(leer("src/app/admin/components/ContactPanel.tsx")).not.toMatch(/<UltimosPagos|useUltimosPagosGrupo\(/);
+  it("🩸 el corte por empresa y su botón ya no existen en el grupo", () => {
+    expect(fs.existsSync(path.join(RAIZ, "src/app/cxc/components/UltimosPagosFila.tsx"))).toBe(false);
+    expect(fs.existsSync(path.join(RAIZ, "src/components/cxc/BotonUltimosPagos.tsx"))).toBe(false);
+    for (const rel of [
+      "src/app/cxc/components/ClientTable.tsx",
+      "src/app/cxc/components/PanelCxcMobile.tsx",
+    ]) {
+      expect(leer(rel), rel).not.toContain("UltimosPagosFila");
+      expect(leer(rel), rel).not.toContain("BotonUltimosPagos");
+    }
   });
 
-  it("CXC celular: PanelCxcMobile la monta en la tarjeta CERRADA, al toque del botón", () => {
-    const movil = leer("src/app/admin/components/PanelCxcMobile.tsx");
-    expect(movil).toContain('from "./UltimosPagosFila"');
-    expect(movil).toContain("<UltimosPagosFila client={client} companyFilter=\"all\" roleCompanies={cxcCompanies} abierto apilado />");
+  it("CXC celular: el MISMO bloque por fecha, dentro de la tarjeta abierta", () => {
+    const movil = leer("src/app/cxc/components/PanelCxcMobile.tsx");
+    expect(movil).toContain("<UltimosPagosPorFecha");
+    expect(movil).toContain("useUltimosPagosGrupo(codigo, true)");
     expect(movil).not.toContain("useUltimosPagosBoston");
   });
 
-  it("Boston: BostonTab usa el hook de Boston y NO el del grupo", () => {
-    const boston = leer("src/components/cxc/BostonTab.tsx");
-    expect(boston).toContain("useUltimosPagosBoston(clienteSwitchId)");
-    expect(boston).not.toContain("useUltimosPagosGrupo");
-    expect(boston).not.toContain("/api/cxc/ultimos-pagos");
+  it("Boston: sus 3 pagos viven en SU cajón, con SU hook y NO el del grupo", () => {
+    const cajon = leer("src/components/cxc/BostonDocumentosDrawer.tsx");
+    expect(cajon).toContain("useUltimosPagosBoston");
+    expect(cajon).toContain('from "@/components/cxc/UltimosPagos"');
+    expect(cajon).not.toContain("useUltimosPagosGrupo");
+    expect(cajon).not.toContain("/api/cxc/ultimos-pagos");
     // La cartera le manda el id de Switch con el que se piden los pagos.
     expect(leer("src/app/api/cxc/boston/route.ts")).toContain("cliente_switch_id: r.cliente_switch_id == null ? null : Number(r.cliente_switch_id)");
+    expect(leer("src/components/cxc/BostonTab.tsx")).toContain("clienteSwitchId={documentosDe?.cliente_switch_id ?? null}");
   });
 });

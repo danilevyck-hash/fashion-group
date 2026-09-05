@@ -151,7 +151,7 @@ describe("las pestañas del CXC", () => {
 
 describe("BARRIDO — el permiso no está escrito dos veces", () => {
   const ROUTE = "src/app/api/cxc/boston/route.ts";
-  const TABS = "src/app/admin/components/TabsCartera.tsx";
+  const TABS = "src/app/cxc/components/TabsCartera.tsx";
 
   it("el endpoint deriva del módulo y no declara su propia lista", () => {
     const src = sinComentarios(leer(ROUTE));
@@ -172,7 +172,7 @@ describe("BARRIDO — el permiso no está escrito dos veces", () => {
   });
 
   it("el panel resuelve la pestaña activa con el permiso, no con un ===", () => {
-    const src = sinComentarios(leer("src/app/admin/page.tsx"));
+    const src = sinComentarios(leer("src/app/cxc/page.tsx"));
     expect(src).toMatch(/tabCxcPermitida\(\s*tabRaw\s*,\s*userRole\s*\)/);
     // El `tabRaw === "boston" ? "boston" : "grupo"` de antes ignoraba el rol.
     expect(src).not.toMatch(/tabRaw\s*===\s*["']boston["']/);
@@ -181,7 +181,7 @@ describe("BARRIDO — el permiso no está escrito dos veces", () => {
   it("nadie más escribe la lista de roles de Boston a mano", () => {
     // El módulo es el único lugar donde puede aparecer el nombre.
     const FUENTE = "src/lib/cxc/boston-roles.ts";
-    for (const rel of [ROUTE, TABS, "src/app/admin/page.tsx", "src/components/cxc/BostonTab.tsx"]) {
+    for (const rel of [ROUTE, TABS, "src/app/cxc/page.tsx", "src/components/cxc/BostonTab.tsx"]) {
       expect(sinComentarios(leer(rel)), rel).not.toMatch(/ROLES_BOSTON\s*=/);
     }
     expect(sinComentarios(leer(FUENTE))).toMatch(/export const ROLES_BOSTON\s*=/);

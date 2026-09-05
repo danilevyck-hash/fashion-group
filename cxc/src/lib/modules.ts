@@ -130,7 +130,7 @@ export const ALL_MODULES: AppModule[] = [
   // redirige acá. Vendedor/bodega NO ven el margen (*"quita margen, lo demas
   // dejalo"* — gate en /api/ventas/referencia, no en la vista).
   { key: "referencia",    label: "Referencia",         href: "/referencia",       icon: ScanSearch,       roles: ["admin", "vendedor", "bodega"],               group: "ventas-clientes" },
-  { key: "cxc",           label: "Cuentas por Cobrar", href: "/admin",            icon: CircleDollarSign, roles: ["admin", "vendedor"],                         group: "ventas-clientes" },
+  { key: "cxc",           label: "Cuentas por Cobrar", href: "/cxc",            icon: CircleDollarSign, roles: ["admin", "vendedor"],                         group: "ventas-clientes" },
   { key: "multifashion",  label: "Multifashion",       href: "/multifashion",     icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                      group: "ventas-clientes" },
   // 🔴 CONFECCIONES BOSTON — el módulo de David (27-ago-2026).
   //

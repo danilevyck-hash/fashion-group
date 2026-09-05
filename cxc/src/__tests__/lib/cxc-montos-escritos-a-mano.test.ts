@@ -38,16 +38,16 @@ const RAIZ = process.cwd();
 /** La pestaña y sus vecinas de la misma pantalla: todo lo que pinta plata del CXC. */
 const SUPERFICIE_CXC = [
   "src/components/cxc/BostonTab.tsx",
-  "src/app/admin/page.tsx",
-  "src/app/admin/components/KpiCards.tsx",
-  "src/app/admin/components/PanelCxcMobile.tsx",
-  "src/app/admin/components/ClientTable.tsx",
-  "src/app/admin/components/ClientRow.tsx",
+  "src/app/cxc/page.tsx",
+  "src/app/cxc/components/TiraTotales.tsx",
+  "src/app/cxc/components/PanelCxcMobile.tsx",
+  "src/app/cxc/components/ClientTable.tsx",
+  "src/app/cxc/components/ClientRow.tsx",
   // `CompanySummary.tsx` se BORRÓ el 24-ago-2026: era una vista entera de deuda
   // por empresa que no se montaba en ninguna pantalla (cero importadores fuera
   // de esta lista). No se repone.
-  "src/app/admin/components/ContactPanel.tsx",
-  "src/app/admin/components/EstadoCuentaDrawer.tsx",
+  "src/app/cxc/components/ContactPanel.tsx",
+  "src/app/cxc/components/EstadoCuentaDrawer.tsx",
 ];
 
 const LA_PESTANA = "src/components/cxc/BostonTab.tsx";
@@ -159,20 +159,22 @@ describe("la cuadrícula de píldoras no queda con un hueco", () => {
     const cuantas = (bloque![1].match(/\bkey:/g) ?? []).length;
     expect(cuantas).toBeGreaterThan(0);
 
-    const clases = pestana.codigo.match(
-      /className="grid grid-cols-(\d+) sm:grid-cols-(\d+)/,
-    );
-    expect(clases, "no encontré la cuadrícula de píldoras").toBeTruthy();
-    const [celular, ipad] = [Number(clases![1]), Number(clases![2])];
-
-    expect(
-      ipad,
-      `Desde iPad las ${cuantas} píldoras van en UNA línea: sm:grid-cols-${cuantas}.`,
-    ).toBe(cuantas);
+    // 🔄 5-sep-2026: desde iPad acostado y en escritorio las píldoras se
+    // convirtieron en una TIRA en la misma grilla de 12 columnas que la tabla
+    // (cada total parado sobre su columna, igual que el CXC del grupo). En
+    // celular siguen siendo píldoras, ahora en 2 columnas fijas — lo que este
+    // caso protege es que no quede un HUECO, y 4 en 2 columnas reparte exacto.
+    const clases = pestana.codigo.match(/className="grid grid-cols-(\d+) gap-2 mb-4 lg:hidden"/);
+    expect(clases, "no encontré la cuadrícula de píldoras del celular").toBeTruthy();
+    const celular = Number(clases![1]);
     expect(
       cuantas % celular,
       `En celular ${cuantas} píldoras en ${celular} columnas dejan ${celular - (cuantas % celular)} celda(s) vacía(s) en la última fila.`,
     ).toBe(0);
+
+    // Y en la tira de escritorio: 4 columnas para el rótulo + 3 tramos de 2 +
+    // el total de 2 = 12 exactas, sin hueco.
+    expect(pestana.codigo).toContain("lg:grid grid-cols-12");
   });
 
   /**
@@ -182,7 +184,7 @@ describe("la cuadrícula de píldoras no queda con un hueco", () => {
   it("todo lo que está en la fila es un botón que filtra", () => {
     // La fila se dibuja SOLO con el map de `pills`; nada suelto al lado.
     const fila = pestana.codigo.match(
-      /className="grid grid-cols-\d+ sm:grid-cols-\d+[^"]*">([\s\S]*?)\n      <\/div>/,
+      /className="grid grid-cols-\d+ gap-2 mb-4 lg:hidden">([\s\S]*?)\n      <\/div>/,
     );
     expect(fila, "no encontré el cuerpo de la fila de píldoras").toBeTruthy();
     const cuerpo = fila![1];

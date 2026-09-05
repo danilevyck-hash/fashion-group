@@ -1,12 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Estado de cuenta CXC — envío real por correo (Resend) + preview.
 //
-//   GET  ?codigo=D-XXX&empresa={key|todas}&nombre=...&nombreNormalizado=...
+//   GET  ?codigo=D-XXX&nombre=...&nombreNormalizado=...
 //        → datos para el modal: destinatario sugerido, asunto/cuerpo default,
 //          firma, tabla HTML (la que se envía), sharedCount y mes.
-//   POST { codigo, nombre, nombreNormalizado, empresa, destinatario, asunto,
-//          cuerpo } → genera N PDFs (uno por empresa, incluyendo saldo a favor)
-//          y envía el correo. Registra en cxc_emails_enviados (best-effort).
+//   POST { codigo, nombre, nombreNormalizado, destinatario, asunto, cuerpo }
+//          → genera N PDFs (uno por empresa, incluyendo saldo a favor) y envía
+//          el correo. Registra en cxc_emails_enviados (best-effort).
+//
+// 🔴 Lo que sale son SIEMPRE las 6 empresas del grupo: el parámetro `empresa`
+// se dejó de leer el 5-sep-2026. Ver `empresasDelEnvio` más abajo.
 //
 // Los números cuadran AL CENTAVO con la pantalla/PDF porque el signo + la
 // agrupación salen del helper compartido fetchEstadoCuentaData.
@@ -14,7 +17,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { requireRole, type SessionPayload } from "@/lib/requireRole";
+import { requireRole } from "@/lib/requireRole";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
 import { leerCorreoDeOverride } from "@/lib/cxc/anotaciones";
@@ -29,7 +32,7 @@ import {
   sanitizeFilenamePart,
 } from "@/lib/cxc/estado-cuenta-email";
 import { buildEstadoCuentaPDF } from "@/lib/pdf-estado-cuenta";
-import type { EstadoCuenta } from "@/app/admin/components/EstadoCuentaDrawer";
+import type { EstadoCuenta } from "@/app/cxc/components/EstadoCuentaDrawer";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -73,17 +76,31 @@ async function getCurrentUser(userId: string | undefined): Promise<CurrentUser |
   };
 }
 
-// Resolución de empresas idéntica al GET de estado-cuenta: vendedor forzado a su
-// empresa asociada (DB, no cookie); "todas" → las 6 B2B; una key válida → esa.
-function resolveEmpresas(auth: SessionPayload, user: CurrentUser | null, empresaParam: string): string[] | null {
-  const isTodas = !empresaParam || empresaParam === "todas" || empresaParam === "all";
-  if (auth.role === "vendedor") {
-    const asociada = user?.associatedCompany ?? null;
-    return asociada ? [asociada] : [...CXC_GRUPO_EMPRESA_KEYS];
-  }
-  if (isTodas) return [...CXC_GRUPO_EMPRESA_KEYS];
-  if (!(CXC_GRUPO_EMPRESA_KEYS as readonly string[]).includes(empresaParam)) return null;
-  return [empresaParam];
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LO QUE SE MANDA ES SIEMPRE EL ESTADO DE CUENTA COMPLETO — LAS 6 EMPRESAS.
+// Daniel (5-sep-2026), textual, preguntado si el filtro de empresa tenía que
+// recortar el correo: *«todo»*.
+//
+// 🩸 QUÉ PASABA. `EnviarEmailModal` le pasaba a esta ruta el filtro de la
+// pantalla como `empresa`, así que con «Vistana» seleccionado el CLIENTE
+// recibía un estado de cuenta de Vistana solamente —creyendo que ése es todo
+// lo que debe— y el resto quedaba sin cobrar. Peor: un vendedor con empresa
+// asociada (Edwin tiene Vistana fija por `fg_empresa_filter`) NO PODÍA mandar
+// el completo ni queriendo, porque la ruta le forzaba su empresa.
+//
+// El filtro de empresa es una herramienta para MIRAR la pantalla. Lo que sale
+// hacia afuera —el correo, el WhatsApp, el PDF adjunto— es la deuda entera, que
+// es la única cifra que el cliente puede reconocer.
+//
+// ⚠️ Esto NO afecta a `/api/cxc/estado-cuenta/[codigo]`, que es lo que se MIRA
+// en el cajón de documentos: ahí el filtro sigue mandando y el vendedor sigue
+// viendo solo su empresa. Lo que cambia es lo que se ENVÍA.
+//
+// ⚠️ Boston no entra por ningún lado: `CXC_GRUPO_EMPRESA_KEYS` son las 6.
+// Candado: `cxc-cobrar-manda-las-seis.test.ts`.
+// ─────────────────────────────────────────────────────────────────────────────
+function empresasDelEnvio(): string[] {
+  return [...CXC_GRUPO_EMPRESA_KEYS];
 }
 
 // Destinatario sugerido: override de contacto (por nombre) > email del directorio
@@ -91,7 +108,7 @@ function resolveEmpresas(auth: SessionPayload, user: CurrentUser | null, empresa
 async function resolveDestinatario(nombreNormalizado: string, codigo: string): Promise<string> {
   if (nombreNormalizado) {
     // 🔴 Esta ruta manda el estado de cuenta del GRUPO (acota por
-    // CXC_GRUPO_EMPRESA_KEYS, ver `empresasDelParametro` arriba), así que el
+    // CXC_GRUPO_EMPRESA_KEYS, ver `empresasDelEnvio` arriba), así que el
     // correo que puede pisar el del directorio es el de la cartera del GRUPO.
     // Sin la cartera, un correo cargado en Boston para un nombre que existe en
     // las dos —`CITY MALL PASO CANOA`— desviaría el estado de cuenta del grupo.
@@ -117,6 +134,22 @@ async function resolveDestinatario(nombreNormalizado: string, codigo: string): P
     .limit(1);
   const correo = (cm?.[0]?.email as string | null)?.trim();
   return correo || "";
+}
+
+/**
+ * El NOMBRE DE CONTACTO del cliente (la casilla nueva de la ficha), para el
+ * saludo del correo. Falla abierto: sin la columna —la migración
+ * `20260926120000` la corre Daniel a mano— o sin valor, se saluda como siempre.
+ */
+async function leerContacto(codigo: string): Promise<string> {
+  const { data, error } = await supabaseServer
+    .from("clientes_master")
+    .select("contacto")
+    .eq("codigo", codigo)
+    .eq("deleted", false)
+    .limit(1);
+  if (error) return "";
+  return ((data?.[0] as { contacto?: string | null } | undefined)?.contacto ?? "").trim();
 }
 
 // Cuántos clientes DISTINTOS (cliente_codigo) comparten ese email en el
@@ -158,7 +191,6 @@ export async function GET(req: NextRequest) {
   if (!codigo) return NextResponse.json({ error: "codigo requerido" }, { status: 400 });
   const nombre = (sp.get("nombre") ?? "").trim() || codigo;
   const nombreNormalizado = (sp.get("nombreNormalizado") ?? "").trim();
-  const empresaParam = sp.get("empresa") ?? "";
 
   let user: CurrentUser | null;
   try {
@@ -170,8 +202,7 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-  const empresas = resolveEmpresas(auth, user, empresaParam);
-  if (!empresas) return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
+  const empresas = empresasDelEnvio();
 
   let result: EstadoCuentaResult;
   try {
@@ -184,13 +215,14 @@ export async function GET(req: NextRequest) {
   const { empresasNombres, resumenHtml, mes } = armarPaquete(result, nombre);
   const destinatario = await resolveDestinatario(nombreNormalizado, codigo);
   const compartidoPor = await sharedCount(destinatario);
+  const contacto = await leerContacto(codigo);
   const firma = buildFirma(user?.nombreCompleto ?? "Fashion Group");
   const totalDocs = result.empresas.reduce((n, e) => n + e.documentos.length, 0);
 
   return NextResponse.json({
     destinatario,
     asunto: defaultAsunto(empresasNombres, mes),
-    cuerpo: defaultCuerpo(mes),
+    cuerpo: defaultCuerpo(mes, contacto),
     firma,
     resumenHtml,
     empresasNombres,
@@ -198,6 +230,12 @@ export async function GET(req: NextRequest) {
     mes,
     totalDocs,
     remitenteEmail: user?.email ?? null,
+    // El estado de cuenta COMPLETO, tal cual va a salir. Viaja para que la hoja
+    // «Cobrar» pueda escribir su encabezado ("al <fecha> · N empresas · $total")
+    // y armar el PDF SIN una segunda consulta: es exactamente el mismo `result`
+    // que esta ruta ya calculó para el resumen y los adjuntos, así que no puede
+    // discrepar de lo que se manda ni por un centavo.
+    estadoCuenta: result,
   });
 }
 
@@ -219,7 +257,6 @@ export async function POST(req: NextRequest) {
   const codigo = str(body.codigo);
   const nombre = str(body.nombre) || codigo;
   const nombreNormalizado = str(body.nombreNormalizado);
-  const empresaParam = str(body.empresa);
   const destinatario = str(body.destinatario);
   const asunto = str(body.asunto);
   const cuerpo = typeof body.cuerpo === "string" ? body.cuerpo : "";
@@ -241,8 +278,7 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-  const empresas = resolveEmpresas(auth, user, empresaParam);
-  if (!empresas) return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
+  const empresas = empresasDelEnvio();
 
   let result: EstadoCuentaResult;
   try {
@@ -320,7 +356,7 @@ export async function POST(req: NextRequest) {
   // 500, solo logueamos y avisamos con un flag.
   let logged = true;
   try {
-    const { error: logErr } = await supabaseServer.from("cxc_emails_enviados").insert({
+    const fila = {
       cliente_codigo: codigo,
       empresas: result.empresas.map((e) => e.empresa_key),
       destinatario,
@@ -328,7 +364,15 @@ export async function POST(req: NextRequest) {
       asunto,
       enviado_por: user?.name ?? auth.userName ?? auth.userId ?? "desconocido",
       resultado,
-    });
+    };
+    // `canal` distingue el correo del WhatsApp y del copiar, que desde el
+    // 5-sep-2026 también dejan rastro (ver `/api/cxc/envios`). Si la DDL
+    // 20260927120000 todavía no corrió, se guarda igual SIN canal: perder la
+    // anotación de un correo que ya salió sería peor que perder la marca gris.
+    let logErr = (await supabaseServer.from("cxc_emails_enviados").insert({ ...fila, canal: "correo" })).error;
+    if (logErr && /\bcanal\b/i.test(logErr.message ?? "")) {
+      logErr = (await supabaseServer.from("cxc_emails_enviados").insert(fila)).error;
+    }
     if (logErr) {
       logged = false;
       console.error(`[cxc/enviar-email] bitácora: ${logErr.message}`);

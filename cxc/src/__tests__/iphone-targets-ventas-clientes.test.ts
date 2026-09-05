@@ -26,7 +26,7 @@ const leer = (rel: string) => readFileSync(path.join(process.cwd(), "src", rel),
 // contrato táctil no cambió: es el mismo marcado, movido de archivo.
 const dataHealth = leer("app/admin/usuarios/DataHealthTab.tsx");
 const usuarios = leer("app/admin/usuarios/page.tsx");
-const panelCxc = leer("app/admin/components/PanelCxcMobile.tsx");
+const panelCxc = leer("app/cxc/components/PanelCxcMobile.tsx");
 const clientes = leer("app/clientes/ClientesListClient.tsx");
 const vistaGeneral = leer("app/vista-general/page.tsx");
 const proveedores = leer("app/proveedores/ProveedoresListClient.tsx");
@@ -135,11 +135,16 @@ describe("CXC mobile — la card tiene UN solo control táctil", () => {
 });
 
 describe("Nombres cortados — letra más chica, nunca por debajo de 12px", () => {
-  it("CXC mobile: el nombre del cliente baja a 12px", () => {
+  it("🔄 CXC mobile: el nombre del cliente SUBE a 14px (5-sep-2026)", () => {
     // El `tracking-tight` lo agregó el PR de ancho (ver
     // iphone-ancho-nombres.test.ts): aprieta el interletrado, NO el cuerpo de
     // la letra — los 12px siguen intactos.
-    expect(panelCxc).toContain('className="truncate text-[12px] font-medium leading-5 tracking-tight text-gray-900"');
+    // 🩸 Estaba en 12 —el PISO del sistema— porque la estrella ⭐ y el menú
+    // "···" le comían el ancho a la derecha. La estrella se fue el 4-sep y el
+    // "···" el 5 (sus acciones viven en la hoja «Cobrar»): ese ancho volvió al
+    // nombre y la letra pudo subir. `tracking-tight` se queda.
+    expect(panelCxc).toContain('className="block truncate text-[14px] font-medium leading-5 tracking-tight text-gray-900"');
+    expect(panelCxc).not.toContain("text-[12px] font-medium leading-5 tracking-tight");
     expect(panelCxc).not.toContain('className="truncate text-sm font-medium text-gray-900"');
   });
 
@@ -165,8 +170,14 @@ describe("Nombres cortados — letra más chica, nunca por debajo de 12px", () =
         }
       }
     }
-    // El dato principal de cada lista nunca baja de 12px.
-    expect(tamanosArbitrarios(panelCxc).filter((p) => p < PISO_PX)).toHaveLength(0);
+    // El dato principal de cada lista nunca baja de 12px. En el CXC eso es el
+    // NOMBRE del cliente, que desde el 5-sep-2026 está en 14 (ver arriba); los
+    // `text-[11px]` que aparecen son decoración: el rótulo de cada chip de
+    // tramo dentro de la tarjeta negra, el «no paga hace N d» y la marca de
+    // «le enviaste…», todos debajo o al lado del dato, nunca EN LUGAR de él.
+    const nombre = panelCxc.match(/className="block truncate text-\[(\d+)px\] font-medium leading-5 tracking-tight/);
+    expect(nombre, "no se encontró el nombre del cliente en la tarjeta").toBeTruthy();
+    expect(Number(nombre![1])).toBeGreaterThanOrEqual(PISO_PX);
   });
 });
 

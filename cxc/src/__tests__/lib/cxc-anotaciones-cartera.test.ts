@@ -400,14 +400,14 @@ describe("BARRIDO 3 — los dos lados están cableados, cada uno con SU cartera"
     //  · 24-ago-2026 — `handleSaveEdit`, el POST a `/api/cxc/overrides` que ya
     //    no llamaba nadie (la edición de contacto se mudó a `/clientes/[codigo]`).
     //  · 4-sep-2026 — los favoritos ⭐ enteros, con su GET y su POST. Con eso
-    //    `admin/page.tsx` se quedó SIN una sola llamada de anotación, y la
+    //    `cxc/page.tsx` se quedó SIN una sola llamada de anotación, y la
     //    única que le queda al panel vive en su hook.
     // Las tablas y sus filas quedan; lo que bajó es la cuenta de llamadas.
-    const panel = lee("app/admin/page.tsx");
+    const panel = lee("app/cxc/page.tsx");
     expect(panel).not.toContain("CARTERA_BOSTON");
     // overrides (GET) vive en el hook; el GET de contact-log se retiró el
     // 14-ago (nadie pintaba el resultado: llegaba como prop y no se leía).
-    const hook = lee("app/admin/hooks/useAdminData.ts");
+    const hook = lee("app/cxc/hooks/useAdminData.ts");
     expect(hook).toContain("cartera=${CARTERA_GRUPO}");
     expect(hook.match(/CARTERA_GRUPO/g)!.length).toBeGreaterThanOrEqual(2);
     // Y lo que NO puede pasar: que el panel del grupo pida otra cartera.

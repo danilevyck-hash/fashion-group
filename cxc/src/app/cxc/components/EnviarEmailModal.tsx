@@ -30,17 +30,20 @@ interface PreviewData {
 
 interface Props {
   client: ConsolidatedClient | null;
-  companyFilter: string;
+  // 🔴 `companyFilter` se RETIRÓ (5-sep-2026). Este modal se lo pasaba a la ruta
+  // como `empresa`, así que con «Vistana» seleccionado en la pantalla el CLIENTE
+  // recibía un estado de cuenta de Vistana solamente. Lo que sale son SIEMPRE
+  // las 6 empresas del grupo y eso lo decide el SERVIDOR (`empresasDelEnvio()`
+  // en `/api/cxc/enviar-email`). Daniel, textual: *«todo»*.
   onClose: () => void;
   onSent: (msg: string) => void;
 }
 
-export default function EnviarEmailModal({ client, companyFilter, onClose, onSent }: Props) {
+export default function EnviarEmailModal({ client, onClose, onSent }: Props) {
   const open = !!client;
   const codigo = client ? codigoDe(client) : null;
   const nombre = client ? nombreDe(client) : "";
   const nombreNormalizado = client?.nombre_normalized ?? "";
-  const empresaScope = companyFilter === "all" ? "todas" : companyFilter;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,12 +64,7 @@ export default function EnviarEmailModal({ client, companyFilter, onClose, onSen
     setLoading(true);
     setError(null);
     setPreview(null);
-    const params = new URLSearchParams({
-      codigo,
-      empresa: empresaScope,
-      nombre,
-      nombreNormalizado,
-    });
+    const params = new URLSearchParams({ codigo, nombre, nombreNormalizado });
     fetch(`/api/cxc/enviar-email?${params.toString()}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("http"))))
       .then((d: PreviewData) => {
@@ -79,7 +77,7 @@ export default function EnviarEmailModal({ client, companyFilter, onClose, onSen
       .catch(() => { if (!cancel) setError("No se pudo preparar el correo. Intenta de nuevo."); })
       .finally(() => { if (!cancel) setLoading(false); });
     return () => { cancel = true; };
-  }, [open, codigo, empresaScope, nombre, nombreNormalizado]);
+  }, [open, codigo, nombre, nombreNormalizado]);
 
   async function handleSend() {
     if (!client || !codigo || !preview) return;
@@ -94,7 +92,6 @@ export default function EnviarEmailModal({ client, companyFilter, onClose, onSen
           codigo,
           nombre,
           nombreNormalizado,
-          empresa: empresaScope,
           destinatario: destinatario.trim(),
           asunto: asunto.trim(),
           cuerpo,
@@ -166,7 +163,7 @@ export default function EnviarEmailModal({ client, companyFilter, onClose, onSen
             <>
               {preview.totalDocs === 0 && (
                 <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                  Este cliente no tiene documentos con saldo en el alcance seleccionado.
+                  Este cliente no tiene documentos con saldo.
                 </p>
               )}
 

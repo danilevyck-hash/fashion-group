@@ -20,7 +20,7 @@
 //        ninguna manera. Peor que el scroll: invisible y sin aviso.
 //
 // Daniel ya pidió lo mismo en todo el sistema: en el celular, tabla ancha →
-// TARJETAS. El patrón de referencia es `app/admin/components/PanelCxcMobile.tsx`
+// TARJETAS. El patrón de referencia es `app/cxc/components/PanelCxcMobile.tsx`
 // (las tarjetas de CXC) y esto lo sigue: `<article>` redondeada con borde, el
 // nombre truncado a una línea, el número en `font-mono tabular-nums`, targets
 // de 44px y el detalle a un toque.

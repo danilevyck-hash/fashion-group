@@ -13,7 +13,7 @@
  * permiso vive UNA vez —acá— y lo leen los dos lados:
  *
  *   · el endpoint  → `app/api/cxc/boston/route.ts`      (requireRole)
- *   · la pantalla  → `app/admin/components/TabsCartera.tsx` (qué pestañas dibuja)
+ *   · la pantalla  → `app/cxc/components/TabsCartera.tsx` (qué pestañas dibuja)
  *
  * ⚠️ ESTO NO MUEVE LA SEPARACIÓN DE BOSTON (#522), LA REFUERZA. Las dos
  * carteras siguen siendo dos vistas disjuntas y dos endpoints distintos; lo

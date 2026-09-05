@@ -27,9 +27,9 @@ import { render, renderHook, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import fs from "node:fs";
 import path from "node:path";
-import ClientTable from "@/app/admin/components/ClientTable";
+import ClientTable from "@/app/cxc/components/ClientTable";
 import { ContextMenuProvider } from "@/components/ui";
-import useAdminData from "@/app/admin/hooks/useAdminData";
+import useAdminData from "@/app/cxc/hooks/useAdminData";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 
@@ -68,20 +68,16 @@ function pintarTabla() {
     <ClientTable
       filtered={[CLIENTE]}
       roleCompanies={EMPRESAS}
-      roleClients={[CLIENTE]}
       companyFilter="all"
-      setCompanyFilter={noop}
-      riskFilter="all"
-      search=""
-      sortKey="total"
-      sortDir="desc"
       toggleSort={noop}
       sortArrow={() => ""}
-      userRole="admin"
-      onOpenEmail={noop}
-      onWhatsApp={noop}
-      onCopyMessage={noop}
+      onCobrar={noop}
       onOpenEstado={noop}
+      seleccion={new Set()}
+      onSeleccionar={noop}
+      onSeleccionarTodos={noop}
+      avisoSinPagarDe={() => null}
+      marcaEnvioDe={() => null}
     />
     </ContextMenuProvider>,
   );
@@ -102,15 +98,18 @@ describe("🔴 la tabla del CXC no tiene un segundo juego de filtros", () => {
   it("no dibuja el botón «Filtros» ni su ventana", () => {
     const { container } = pintarTabla();
     expect(container.textContent).not.toMatch(/Filtros/);
-    // Las píldoras de tramo son de `KpiCards`, no de acá.
+    // Las píldoras de tramo son de `TiraTotales`, no de acá.
     expect(container.textContent).not.toMatch(/Vencido reciente \(91-120/);
   });
 
-  it("el filtro de EMPRESA sí se dibuja — eso no era código muerto", () => {
+  it("🔄 el filtro de EMPRESA se mudó a la línea de filtros de la página (5-sep-2026)", () => {
+    // Hasta el rediseño lo dibujaba esta tabla. Ahora vive arriba, en la ÚNICA
+    // línea de filtros, junto al buscador y la frescura — que es donde se usa.
+    // Sigue siendo UNO solo: lo que este candado impide es que haya DOS.
     pintarTabla();
-    const select = document.querySelector("select")!;
-    expect(select).toBeTruthy();
-    expect(select.textContent).toMatch(/Todas mis empresas/);
+    expect(document.querySelector("select")).toBeNull();
+    const pagina = leer("src/app/cxc/page.tsx");
+    expect((pagina.match(/Todas mis empresas/g) ?? []).length).toBe(1);
   });
 
   it("la fila pinta el nombre del cliente UNA sola vez", () => {
@@ -147,16 +146,16 @@ describe("🔴 la tabla del CXC no tiene un segundo juego de filtros", () => {
 describe("🔴 el CXC ya no tiene un camino de escritura de contacto sin puerta", () => {
   it("`onSaveEdit` no existe en ninguna de las tres piezas", () => {
     for (const rel of [
-      "src/app/admin/page.tsx",
-      "src/app/admin/components/ClientTable.tsx",
-      "src/app/admin/components/ContactPanel.tsx",
+      "src/app/cxc/page.tsx",
+      "src/app/cxc/components/ClientTable.tsx",
+      "src/app/cxc/components/ContactPanel.tsx",
     ]) {
       expect(leer(rel), `${rel} volvió a tener onSaveEdit`).not.toMatch(/onSaveEdit/);
     }
   });
 
   it("el panel del grupo no escribe overrides ni sincroniza el directorio", () => {
-    const src = leer("src/app/admin/page.tsx");
+    const src = leer("src/app/cxc/page.tsx");
     expect(src).not.toMatch(/handleSaveEdit/);
     expect(src).not.toMatch(/\/api\/directorio\/sync/);
   });
@@ -164,7 +163,7 @@ describe("🔴 el CXC ya no tiene un camino de escritura de contacto sin puerta"
   it("⚠️ pero SIGUE LEYENDO los overrides guardados (no se perdió nada)", () => {
     // La tabla `cxc_client_overrides` y sus filas QUEDAN: un contacto guardado
     // antes le sigue ganando al maestro. Lo que se retiró es la escritura.
-    const hook = leer("src/app/admin/hooks/useAdminData.ts");
+    const hook = leer("src/app/cxc/hooks/useAdminData.ts");
     expect(hook).toMatch(/\/api\/cxc\/overrides/);
     expect(hook).toMatch(/overrideMap/);
   });
@@ -227,7 +226,7 @@ describe("🔴 el CXC deja de pedir lo que nadie lee", () => {
 
 describe("🔴 `CompanySummary` se borró y no vuelve", () => {
   it("el archivo ya no existe", () => {
-    expect(fs.existsSync(path.join(RAIZ, "src/app/admin/components/CompanySummary.tsx"))).toBe(false);
+    expect(fs.existsSync(path.join(RAIZ, "src/app/cxc/components/CompanySummary.tsx"))).toBe(false);
   });
 
   it("nadie en `src/` lo importa", () => {

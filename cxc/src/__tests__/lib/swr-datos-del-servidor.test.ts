@@ -113,7 +113,7 @@ describe("🔁 la MISMA pantalla no pregunta lo mismo dos veces", () => {
   // Ventas monta `ResumenView` y `ResumenViewMobile` a la vez —una escondida con
   // CSS, pero montada— y las dos traen un `<SyncStatus>` con la MISMA URL.
   // Medido: `/api/sync-status` ×2 por visita, 733 ms sumados. Al CXC le pasa lo
-  // mismo (`admin/page.tsx` + `PanelCxcMobile`).
+  // mismo (`cxc/page.tsx` + `PanelCxcMobile`).
   const sync = leer("src/components/shared/SyncStatus.tsx");
   const syncCodigo = codigoDe("src/components/shared/SyncStatus.tsx");
 

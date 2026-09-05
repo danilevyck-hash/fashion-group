@@ -25,6 +25,10 @@ interface Cliente {
   identificacion: string | null;
   dv: string | null;
   provincia: string | null;
+  /** Nombre de la persona con quien se habla en este cliente. Lo escribe la
+   *  gente desde acá; el sync de Switch no lo pisa. `undefined` mientras la
+   *  migración 20260926120000 no corra → la casilla no se dibuja. */
+  contacto?: string | null;
   telefono: string | null;
   celular: string | null;
   email: string | null;
@@ -83,6 +87,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
   }, [initialData.cliente]);
 
   const [form, setForm] = useState({
+    contacto: cliente.contacto ?? "",
     telefono: cliente.telefono ?? "",
     celular:  cliente.celular  ?? "",
     email:    cliente.email    ?? "",
@@ -115,7 +120,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
   // (3) Pill de antigüedad del grupo (cuando hay vencido +90d).
   const cxcVencido = initialData.total_grupo.cxc_vencido ?? 0;
   const cxcCritico = initialData.total_grupo.cxc_critico ?? 0;
-  const verEnCxcHref = `/admin?search=${encodeURIComponent(cliente.nombre)}`;
+  const verEnCxcHref = `/cxc?search=${encodeURIComponent(cliente.nombre)}`;
 
   async function save() {
     setSaving(true);
@@ -137,7 +142,13 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
         // recargar, así que ese caché sobreviviría a esta edición y seguiría
         // mostrando el nombre viejo. Se invalida acá.
         invalidarDirectorioClientes();
-        setToast("Datos actualizados");
+        // La migración del contacto la corre Daniel a mano: si todavía no
+        // corrió, lo demás SÍ se guardó y hay que decir qué no.
+        setToast(
+          json.contactoGuardado === false && form.contacto.trim() !== ""
+            ? "Datos actualizados — el contacto todavía no se puede guardar"
+            : "Datos actualizados",
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de red");
@@ -148,6 +159,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
   function cancel() {
     setForm({
+      contacto: cliente.contacto ?? "",
       telefono: cliente.telefono ?? "",
       celular:  cliente.celular  ?? "",
       email:    cliente.email    ?? "",
@@ -231,6 +243,12 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Contacto</h2>
           {editing ? (
             <div className="space-y-3">
+              {/* 🔴 «Contacto» va ARRIBA de Correo (5-sep-2026): es lo primero
+                  que se pregunta al llamar a cobrar («¿con quién hablo?»), y
+                  hasta hoy vivía escrito a mano en las notas del CXC (3
+                  clientes) o en un campo de Switch que nadie llena (3 de 847
+                  filas). */}
+              <FormRow label="Contacto" value={form.contacto} onChange={(v) => setForm({ ...form, contacto: v })} />
               <FormRow label="Teléfono" value={form.telefono} onChange={(v) => setForm({ ...form, telefono: v })} />
               <FormRow label="Celular"  value={form.celular}  onChange={(v) => setForm({ ...form, celular: v })} />
               <FormRow label="Email"    value={form.email}    onChange={(v) => setForm({ ...form, email: v })} type="email" />
@@ -255,6 +273,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
+              <Field label="Contacto" value={cliente.contacto ?? null} />
               <Field label="Teléfono" value={cliente.telefono} href={telHref(cliente.telefono)} />
               {/* Si celular == teléfono, no repetir la misma línea. */}
               {!telDuplicado && (

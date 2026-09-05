@@ -283,7 +283,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
 
       {/* CXC */}
       <KpiCard
-        href="/admin"
+        href="/cxc"
         label="Por cobrar (CXC)"
         hoverLabel="Ir a CXC"
         value={moneyK(cxc.total)}
@@ -373,12 +373,12 @@ function Atencion({ data }: { data: VistaGeneral }) {
           escritorio no cambia. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* CXC +90d */}
-        <AlertCard title="Clientes con saldo +90 días" href="/admin" linkLabel="Ir a CXC" count={data.cxc.topClientes.length}>
+        <AlertCard title="Clientes con saldo +90 días" href="/cxc" linkLabel="Ir a CXC" count={data.cxc.topClientes.length}>
           {data.cxc.topClientes.length === 0 ? (
             <Empty>Nada vencido a +90 días.</Empty>
           ) : (
             data.cxc.topClientes.map((c) => (
-              <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/admin" className={FILA_ALERTA}>
+              <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/cxc" className={FILA_ALERTA}>
                 <span className={`${NOMBRE_ALERTA} truncate`}>{c.nombre}<span className="text-stone-400 text-[12px]"> · {c.empresa}</span></span>
                 <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(c.saldo)}</span>
               </Link>

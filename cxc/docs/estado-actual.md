@@ -4,7 +4,7 @@
 > Este archivo cubre el gap jul→ago y el estado real medido contra producción hoy.
 > Léelos juntos: el maestro para arquitectura y decisiones, este para qué existe hoy y qué falta.
 >
-> ⚠️ **Al pie hay una sección «Lo que cambió después»** con el 1 al 4 de septiembre. Léela también.
+> ⚠️ **Al pie hay una sección «Lo que cambió después»** con el 1 al 5 de septiembre. Léela también.
 
 ---
 
@@ -492,3 +492,126 @@ parecido.
 no hay Postgres local y producción es de solo lectura. Su lógica está cubierta por candados de texto
 (que compara la derivación del SQL con la de TypeScript) pero **la primera corrida real es la de
 Daniel**.
+
+---
+
+## 5-sep-2026 (tarde) — Cuentas por Cobrar, rediseñado entero
+
+Daniel definió el módulo completo tras una sesión larga de mapeo contra producción. El porqué de cada
+punto, con sus citas y sus mediciones, está en
+**[`docs/postmortems/boston-cxc.md`](postmortems/boston-cxc.md)** (sección «Cuentas por Cobrar,
+rediseñado entero»); la referencia de qué hay, en
+**[`docs/modulos/01-ventas-y-clientes.md`](modulos/01-ventas-y-clientes.md)**.
+
+### 🔴 La regla que no se podía romper — y no se rompió
+
+**Ni un centavo se movió.** Medido contra producción ANTES y DESPUÉS, sobre
+`switch_estadocuenta_aging_mv` (que es lo que lee la pantalla):
+
+| | antes | después |
+|---|---|---|
+| Total de la cartera del grupo | **$3.685.289,04** | **$3.685.289,04** |
+| Clientes | **100** | **100** |
+| 0-90d · 91-120d · 121d+ | $1.538.790,86 · $876.667,94 · $1.269.830,24 | idénticos |
+
+Este rediseño no toca una sola consulta de plata de la cartera.
+
+### Cerrado
+
+| Qué | Detalle |
+|---|---|
+| **«Cobrar», una hoja, cuatro salidas** | Correo (un clic, **Deshacer 5 s**) · WhatsApp · Copiar · Ver o bajar el PDF, más «Escribirlo yo». Reemplaza a **SEIS puertas**: el menú «···» (4 opciones), el botón del panel y el menú de **clic derecho**. Los dos menús se retiraron y hay candado que impide que vuelvan. Cobra todo el que ve el módulo |
+| **Siempre las 6 empresas** | 🩸 El modal le pasaba el filtro de la pantalla a la ruta: con Vistana seleccionado el CLIENTE recibía un estado de cuenta **de Vistana solamente**, y Edwin (Vistana fija) no podía mandar el completo ni queriendo. La regla vive en el SERVIDOR |
+| **Aviso «sin pagar hace +90 d»** | El único dato nuevo. Días desde el último pago REAL en las 6, por CÓDIGO, **sin retenciones ni recibos en cero**. El que **nunca pagó también avisa**. Cero peticiones nuevas. Filtra al tocarlo. Medido: **37 clientes · $647.944,31** |
+| **Mandar a varios** | **UN correo por DIRECCIÓN**, con UN PDF de una hoja por cliente. Medido: 31 de 79 comparten 9 direcciones → **57 correos, no 79**. Los sin correo **no abortan el lote**: se dicen por nombre |
+| **Estado de cuenta legible** | Total grande arriba, pastillas por empresa, **encabezados de columna**, `Original` separado de `Saldo`. **Lo chico se agrupa por MONTO (< $50), nunca por tipo**. El pie dice **«Cobrar»** |
+| **«Últimos pagos» por FECHA** | Las 3 últimas fechas con el total del día y las empresas. 🩸 Por empresa eran **18 líneas para decir lo que dicen 3** |
+| **Rastro de envíos** | Se anotan los tres canales (correo · whatsapp · copia) y la fila lo dice 7 días. Si lo último fue un **copiar**, la frase cambia |
+| **Casilla «Contacto»** | En la ficha del cliente, arriba de Correo. **El sync nunca la pisa.** El saludo del correo y del WhatsApp la usa |
+| **La pantalla** | De **SEIS bloques a DOS**: una línea de filtros + la tira de totales **en la misma grilla de 12 columnas que la tabla**. En celular los tramos entran en la tarjeta negra y **el nombre sube de 12 px a 14** |
+| **Boston, mismo formato** | Tira alineada, «Cobrar» y «Documentos» por fila, cajón con encabezados. **Sigue aparte**: su propia ruta, y sus contactos salen de `switch_clientes` acotado, nunca de `clientes_master` |
+| **`/admin` → `/cxc`** | El rótulo no cambió. Redirección de `/admin` **exacto** (307, con la query intacta): `/admin/usuarios` y `/admin/data-health` **no se movieron**. Todos los enlaces internos apuntan al nuevo, con barrido que lo exige |
+| **La pantalla de error** | 🩸 Mostraba el `error.message` y el **stack trace completo** — la única del sistema. Hoy dice qué pasó, qué significa y qué hacer |
+| **`/api/cxc-rows` retirada** | Cero llamadas desde `src/`. La tabla `cxc_rows` **no se borra** (patrón `mayor_lineas`) |
+
+### Decisiones de Daniel
+
+- **«todo»** — preguntado si el filtro de empresa tenía que recortar el estado de cuenta que se le
+  manda al cliente. Es la que más plata cambia: hasta hoy, con «Vistana» puesto, el cliente recibía
+  un pedazo de su saldo creyendo que era todo.
+- Sobre el aviso nuevo, eligió **«sin pagar hace +90 d»** como la mejora más valiosa del rediseño.
+- Sobre el rastro de envíos, fue explícito en que **«copiar» y «enviar» no digan lo mismo** en la
+  marca de la fila.
+- El **desglose por empresa del panel se queda exactamente como está**, con sus columnas «Último
+  pago» y «Última compra».
+- **No** se usa el plazo de crédito para redefinir los tramos (se quedan por antigüedad), **no** se
+  saca del CXC a `ACTIVE SHOES, S.A.` (lo habla con contabilidad), **no** vuelve el seguimiento de
+  cobro, **no** vuelven los favoritos, y **no** cambia el texto del correo más allá del saludo.
+
+### ⚠️ Pendiente de Daniel (5-sep, tarde)
+
+1. 🔴 **Correr las TRES migraciones.** Están **escritas y NO aplicadas**. Las tres son **tolerantes**:
+   sin ellas el módulo funciona igual y solo faltan las tres cosas nuevas.
+   - `supabase/migrations/20260926120000_clientes_master_contacto.sql` — la casilla **Contacto**.
+     Agrega la columna y rescata los 5 que ya existían (3 de las notas del CXC + D-170 y D-202 de
+     Switch), **sin pisar** lo que alguien escriba. Sin ella la casilla no se dibuja y el PATCH la
+     ignora (lo demás sí se guarda, y el aviso lo dice).
+   - `supabase/migrations/20260927120000_cxc_envios_canal.sql` — la columna **`canal`** de
+     `cxc_emails_enviados` (correo · whatsapp · copia) + su índice. Sin ella los envíos **se
+     registran igual, sin canal**, y la marca gris de la fila no se dibuja.
+   - `supabase/migrations/20260928120000_aging_boston_tramos_finos.sql` — los **cortes finos** de la
+     vista de Boston, iguales a los del grupo. Sin ella el detalle del `title` no se dibuja y la
+     pestaña se ve como hoy. ⚠️ Los tres tramos que se VEN **no cambian**: verificado contra
+     producción, `d0_90 = d0_30+d31_60+d61_90` y `d121_plus = d121_180+…+mas_365` en los 390
+     clientes, **0 discrepancias**.
+2. ⚠️ **La hoja «Cobrar» de Boston no manda correos, y hace falta una decisión.** Medido: de sus 390
+   clientes con saldo, **272 tienen teléfono pero solo 113 correo**, y el texto de cobro del sistema
+   está escrito y firmado por **Fashion Group**, que no es Boston. Mandar un correo desde ahí exige
+   decidir **quién lo firma y con qué texto**. Las tres salidas que sí se pueden dar con el dato que
+   hay (WhatsApp · Copiar · Ver los documentos) están todas.
+3. ⚠️ **`src/app/cxc/page.tsx` quedó en 905 líneas** y el tope de la casa son 800. No se partió ahora
+   a propósito —partir la pantalla en el mismo cambio que la rediseña es cómo se pierde el hilo de
+   qué se rompió—, pero queda anotado.
+4. ⚠️ **`/api/cxc/contact-log` y `/api/cxc-summary` tienen CERO lectores y NO se retiraron**, porque
+   dos candados de Boston (`boston-acceso.test.ts` y `cxc-boston-fuera-de-toda-superficie.test.ts`)
+   las nombran por su ruta y esos candados no se tocan. Retirarlas es una decisión aparte.
+
+### 🩸 Lo que no cuadraba
+
+**Un número del encargo estaba mal medido, y valía la pena mirarlo.** El brief traía «30 clientes,
+$591.271,75» para el aviso de +90 días. Reproducida la consulta, esos 30 son los que tienen un pago
+viejo: la medición se hizo con un join que **dejaba afuera a los 7 que nunca pagaron** — entre ellos
+**ACTIVE SHOES, S.A. con $43.806,10**, que el mismo brief pedía como caso de control. La DEFINICIÓN
+escrita («sin ningún recibo → nunca ha pagado») y la MEDICIÓN no coincidían. Se implementó la
+definición: **37 clientes y $647.944,31**. Los cinco casos de control dan exactos, y la cifra de 180
+días del brief ($408.414,81) reproduce **al centavo** la de los 24 que sí tienen pago — que es lo que
+confirma de dónde salió la diferencia.
+
+### Verificación
+
+`tsc` limpio en `src/app`, `src/lib` y `src/components` · `npx next build` verde · suite completa
+verde (**11.184 tests**, 558 archivos) · candados de voseo, de Boston y de iPhone/iPad incluidos.
+**61 mutaciones, 61 cazadas** (`bash scripts/_mutar-candados-cxc-rediseno.sh`), con **3 CONTROL en
+verde**.
+
+🩸 **Siete mutaciones sobrevivieron en la primera corrida y las siete eran huecos REALES del
+candado**, todas del mismo tipo: la aserción miraba el **import** o la **desestructuración** y no la
+**llamada** (`expect(src).toContain("hoyPanama")` pasa aunque `const hoy = new Date()`). Se
+ajustaron a mirar el uso real.
+
+🩸 **Y los tres CONTROL salieron ROJOS en la primera corrida**, que era un hallazgo aparte: el script
+mutaba `src/lib/cxc/estado-cuenta-email.ts` **sin tenerlo en su lista de respaldo**, así que esa
+mutación nunca se restauraba y contaminaba todo lo que corriera después. Un script de mutación que
+muta un archivo que no respalda es peor que no tenerlo.
+
+**Candados nuevos (9)**: `cxc-sin-pagar.test.ts` · `cxc-correos-por-direccion.test.ts` ·
+`cxc-estado-cuenta-legible.test.ts` · `cxc-cobrar-una-hoja.test.ts` ·
+`cxc-envios-y-pagos-por-fecha.test.ts` · `cxc-ruta-y-error.test.ts` ·
+`cxc-contacto-del-cliente.test.ts` · `cxc-boston-mismo-formato.test.ts` ·
+`components/cxc-tira-totales.test.tsx`.
+
+**Candados cambiados de dirección (7), ninguno borrado, todos con nota fechada**:
+`cxc-pestanas-y-menu.test.tsx` · `cxc-estado-cuenta-un-boton.test.tsx` ·
+`cxc-ultimos-pagos-boton-fila.test.tsx` · `cxc-ultimos-pagos-bloque.test.tsx` ·
+`cxc-tramos-un-solo-nombre.test.tsx` · `cxc-ultima-compra-pantalla.test.tsx` ·
+`cxc-codigo-muerto-podado.test.tsx`.

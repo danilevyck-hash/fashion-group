@@ -81,10 +81,10 @@ describe("la estrella no vuelve por ninguna de sus cuatro puertas", () => {
 
   it("la fila del escritorio y la card de celular no dibujan ⭐", () => {
     for (const rel of [
-      "app/admin/components/ClientRow.tsx",
-      "app/admin/components/ClientTable.tsx",
-      "app/admin/components/PanelCxcMobile.tsx",
-      "app/admin/page.tsx",
+      "app/cxc/components/ClientRow.tsx",
+      "app/cxc/components/ClientTable.tsx",
+      "app/cxc/components/PanelCxcMobile.tsx",
+      "app/cxc/page.tsx",
       "components/cxc/BostonTab.tsx",
     ]) {
       const src = codigo(rel);
@@ -97,7 +97,7 @@ describe("la estrella no vuelve por ninguna de sus cuatro puertas", () => {
   it("nadie guarda favoritos en el navegador tampoco", () => {
     // El estado vivía además en `localStorage` con esa llave; volver a
     // escribirla sería devolver la estrella por la puerta de atrás.
-    expect(codigo("app/admin/page.tsx")).not.toContain('"cxc_favorites"');
+    expect(codigo("app/cxc/page.tsx")).not.toContain('"cxc_favorites"');
   });
 });
 
@@ -119,14 +119,18 @@ describe("el orden del CXC ya no pone a nadie arriba", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("CONTROL — el CXC se sigue dibujando", () => {
   it("la fila del escritorio conserva el nombre, los tramos y el total", () => {
-    const fila = codigo("app/admin/components/ClientRow.tsx");
+    const fila = codigo("app/cxc/components/ClientRow.tsx");
     expect(fila).toContain("client.nombre_normalized");
     expect(fila).toContain("fmt(client.total)");
-    expect(fila).toContain("{actionsMenu}");
+    // 5-sep-2026: el menú "···" de la fila (`actionsMenu`) se retiró con el
+    // rediseño — sus cuatro acciones viven en la hoja «Cobrar», que ahora es un
+    // botón VISIBLE en la fila. El CONTROL sigue siendo el mismo (la fila se
+    // dibuja entera), solo cambia qué botón se mira.
+    expect(fila).toContain("onCobrar");
   });
 
   it("la card de celular conserva el nombre y el orden por tramo", () => {
-    const movil = codigo("app/admin/components/PanelCxcMobile.tsx");
+    const movil = codigo("app/cxc/components/PanelCxcMobile.tsx");
     expect(movil).toContain("ordenarClientes(filtered, { orden })");
     expect(movil).toContain("{client.nombre_normalized}");
   });

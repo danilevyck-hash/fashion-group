@@ -48,7 +48,7 @@ describe("Marketing: el drill-down APILA historial", () => {
 describe("Tabs principales con URL propia (sobreviven refresh, se comparten)", () => {
   const casos: Array<[string, string]> = [
     // [archivo, firma que prueba que el tab vive en la URL]
-    ["src/app/admin/page.tsx", 'useUrlState<"grupo" | "boston">("tab"'],
+    ["src/app/cxc/page.tsx", 'useUrlState<"grupo" | "boston">("tab"'],
     ["src/app/asistencia/AsistenciaClient.tsx", 'useUrlState<Tab>("tab"'],
     ["src/app/productos/cargar/page.tsx", 'useUrlState<Tab>("tab"'],
     ["src/app/ventas/VentasShell.tsx", 'useUrlState("tab"'],
@@ -76,7 +76,7 @@ describe("Tabs principales con URL propia (sobreviven refresh, se comparten)", (
     // solo la puede leer admin/secretaria, así que un link con `?tab=boston`
     // tampoco puede dejar a un vendedor parado ahí. Lo que la función devuelve,
     // caso por caso, lo prueba `cxc-boston-permiso.test.ts`.
-    expect(leer("src/app/admin/page.tsx")).toContain("tabCxcPermitida(tabRaw, userRole)");
+    expect(leer("src/app/cxc/page.tsx")).toContain("tabCxcPermitida(tabRaw, userRole)");
     // ⚠️ Asistencia validaba contra `TABS` y desde el 26-ago-2026 valida contra
     // `visibles` — el candado se ENDURECIÓ, no se aflojó: Aprobaciones solo la
     // ve quien puede aprobar, así que un `?tab=aprobaciones` en manos de la

@@ -47,12 +47,31 @@ export const dynamic = "force-dynamic";
 // cartera que no carga.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Los tres campos que la vista de aging toma de `clientes_master`. */
+/** Lo que la vista de aging toma de `clientes_master`.
+ *
+ * 🔴 `contacto` (el NOMBRE de la persona con quien se habla) se agregó el
+ * 5-sep-2026 y viene de acá, no de la vista: la vista lo devuelve
+ * `''::text` HARDCODEADO porque hasta hoy no había dónde guardarlo. Es una
+ * columna nueva (migración `20260926120000_clientes_master_contacto.sql`) y
+ * la lectura es TOLERANTE: si la DDL todavía no corrió se relee sin ella y no
+ * cambia nada más de la pantalla. */
 interface ContactoMaestro {
   codigo: string;
   email: string | null;
   telefono: string | null;
   celular: string | null;
+  contacto?: string | null;
+}
+
+/** Columnas del maestro, con y sin la columna nueva. */
+const COLS_CON_CONTACTO = "codigo, email, telefono, celular, contacto";
+const COLS_SIN_CONTACTO = "codigo, email, telefono, celular";
+
+/** ¿El error de PostgREST es «todavía no existe la columna `contacto`»? */
+function faltaColumnaContacto(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e ?? "");
+  return /\bcontacto\b/i.test(msg) &&
+    /does not exist|schema cache|could not find|42703|PGRST204/i.test(msg);
 }
 
 /** Tope por lote del `.in()`. Muy por debajo de `db-max-rows` (1000). */
@@ -60,19 +79,30 @@ const LOTE_CODIGOS = 300;
 
 async function contactoEnVivo(codigos: string[]): Promise<Map<string, ContactoMaestro>> {
   const mapa = new Map<string, ContactoMaestro>();
-  for (let i = 0; i < codigos.length; i += LOTE_CODIGOS) {
-    const lote = codigos.slice(i, i + LOTE_CODIGOS);
-    const filas = await leerTodoPaginado<ContactoMaestro>(
+  const leerLote = (cols: string, lote: string[]) =>
+    leerTodoPaginado<ContactoMaestro>(
       "clientes_master (contacto del CXC)",
       (pedirCount, desde, hasta) =>
         supabaseServer
           .from("clientes_master")
-          .select("codigo, email, telefono, celular", pedirCount ? { count: "exact" } : {})
+          .select(cols, pedirCount ? { count: "exact" } : {})
           .in("codigo", lote)
           .eq("deleted", false)
           .order("codigo", { ascending: true })
           .range(desde, hasta),
     );
+  for (let i = 0; i < codigos.length; i += LOTE_CODIGOS) {
+    const lote = codigos.slice(i, i + LOTE_CODIGOS);
+    let filas: ContactoMaestro[];
+    try {
+      filas = await leerLote(COLS_CON_CONTACTO, lote);
+    } catch (e) {
+      // La DDL todavía no corrió: se relee sin la columna nueva. Solo se
+      // reintenta cuando el error NOMBRA la columna — ante un permiso denegado
+      // o un timeout se propaga, que es lo que corresponde.
+      if (!faltaColumnaContacto(e)) throw e;
+      filas = await leerLote(COLS_SIN_CONTACTO, lote);
+    }
     for (const f of filas) if (f.codigo) mapa.set(f.codigo, f);
   }
   return mapa;
@@ -91,13 +121,16 @@ async function refrescarContacto(rows: unknown[]): Promise<boolean> {
 
   const mapa = await contactoEnVivo(codigos);
   for (const r of rows) {
-    const fila = r as { codigo?: string | null; correo: string; telefono: string; celular: string };
+    const fila = r as { codigo?: string | null; correo: string; telefono: string; celular: string; contacto: string };
     const m = fila.codigo ? mapa.get(fila.codigo) : undefined;
     // Sin fila en el maestro no se pisa nada: se conserva lo que trajo la MV.
     if (!m) continue;
     fila.correo = m.email ?? "";
     fila.telefono = m.telefono ?? "";
     fila.celular = m.celular ?? "";
+    // La vista devuelve `contacto` vacío por construcción; el valor real (si
+    // existe) sale de acá.
+    if (m.contacto != null) fila.contacto = m.contacto;
   }
   return true;
 }

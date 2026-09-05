@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { fmtDate } from "@/lib/format";
-import type { EstadoCuenta } from "@/app/admin/components/EstadoCuentaDrawer";
+import type { EstadoCuenta } from "@/app/cxc/components/EstadoCuentaDrawer";
 
 // Estado de cuenta del cliente — PDF estilo de la casa (mismo header/footer y
 // paleta que pdf-cxc.ts). Es el documento que se le manda al cliente.
@@ -185,5 +185,145 @@ export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc:
 
   const iso = new Date().toISOString().slice(0, 10);
   const filename = `Estado-cuenta-${data.codigo}-${iso}.pdf`;
+  return { doc, filename };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL PDF DE UN CORREO COMPARTIDO — UNA HOJA POR CLIENTE Y UN TOTAL AL FINAL.
+//
+// 🔴 POR QUÉ EXISTE (5-sep-2026). Trece clientes distintos comparten
+// `oficina@citymoda.store` y deben $402.376,67 entre todos; los dos City Mall
+// comparten `contabilidad@citymall.com.pa` con $480.784,72. Mandar un correo
+// por CLIENTE le pone trece mensajes en la bandeja a la misma persona el mismo
+// minuto, cada uno con un pedazo del saldo y ninguno con la cuenta completa.
+//
+// Lo que sale es UN correo por DIRECCIÓN con UN PDF: cada cliente arranca en su
+// propia hoja (encabezado con su nombre y su código, sus documentos, su
+// subtotal) y al final va el TOTAL de todos.
+//
+// ⚠️ Los números salen de `fetchEstadoCuentaData`, exactamente los mismos que
+// el PDF de un cliente solo: acá no se recalcula nada, solo se ordena en hojas.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ClienteDelLote {
+  data: EstadoCuenta;
+  nombre: string;
+}
+
+export function buildEstadoCuentaLotePDF(
+  clientes: ClienteDelLote[],
+): { doc: jsPDF; filename: string } {
+  const doc = new jsPDF({ unit: "mm", format: "letter" });
+  const w = doc.internal.pageSize.getWidth();
+  let total = 0;
+
+  clientes.forEach((cliente, i) => {
+    // Cada cliente empieza en su propia hoja: quien recibe el correo tiene que
+    // poder arrancarle la página a uno sin cortar a otro por la mitad.
+    if (i > 0) doc.addPage();
+    const { data, nombre } = cliente;
+    total += data.total;
+    const multi = data.empresas.length > 1;
+    let y = addHeader(doc, nombre, data.codigo, multi ? null : (data.empresas[0]?.empresa_nombre ?? null));
+
+    for (const emp of data.empresas) {
+      if (multi) {
+        if (y + 12 > doc.internal.pageSize.getHeight() - FOOTER_RESERVA_MM) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(17, 24, 39);
+        doc.text(emp.empresa_nombre, 19, y);
+        doc.setTextColor(107, 114, 128);
+        doc.text(money(emp.subtotal), w - 19, y, { align: "right" });
+        y += 2;
+      }
+
+      autoTable(doc, {
+        startY: y,
+        margin: { left: 19, right: 19 },
+        head: [["Documento", "Tipo", "Fecha", "Días", "Monto", "Saldo"]],
+        body: emp.documentos.map((d) => [
+          d.numero,
+          d.tipo,
+          d.fecha ? fmtDate(d.fecha) : "—",
+          d.dias != null ? String(d.dias) : "—",
+          money(d.monto),
+          money(d.saldo),
+        ]),
+        foot: [["", "", "", "", "Subtotal", money(emp.subtotal)]],
+        styles: { font: "helvetica", fontSize: 8, cellPadding: 2, textColor: [17, 24, 39] },
+        headStyles: { fillColor: [249, 250, 251], textColor: [107, 114, 128], fontStyle: "bold", fontSize: 7 },
+        footStyles: { fillColor: [255, 255, 255], textColor: [17, 24, 39], fontStyle: "bold", fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: "auto" },
+          1: { cellWidth: 26 },
+          2: { cellWidth: 24 },
+          3: { halign: "right", cellWidth: 14 },
+          4: { halign: "right", cellWidth: 26 },
+          5: { halign: "right", cellWidth: 26, fontStyle: "bold" },
+        },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+      });
+
+      // @ts-expect-error lastAutoTable es agregado por el plugin en runtime
+      y = doc.lastAutoTable.finalY + 6;
+    }
+
+    // Total DE ESE CLIENTE.
+    y = yParaTotal(doc, y);
+    doc.setFillColor(55, 65, 81);
+    doc.rect(19, y, w - 38, TOTAL_BAR_H, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`Total ${nombre}`, 23, y + 6);
+    doc.text(money(data.total), w - 23, y + 6, { align: "right" });
+  });
+
+  // El TOTAL DE TODOS, solo si hay más de uno: con un cliente sería el mismo
+  // número dos veces seguidas.
+  if (clientes.length > 1) {
+    doc.addPage();
+    let y = 20;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(17, 24, 39);
+    doc.text("Resumen", 19, y);
+    y += 6;
+    autoTable(doc, {
+      startY: y,
+      margin: { left: 19, right: 19 },
+      head: [["Cliente", "Código", "Total"]],
+      body: clientes.map((c) => [c.nombre, c.data.codigo, money(c.data.total)]),
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, textColor: [17, 24, 39] },
+      headStyles: { fillColor: [249, 250, 251], textColor: [107, 114, 128], fontStyle: "bold", fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: "auto" },
+        1: { cellWidth: 26 },
+        2: { halign: "right", cellWidth: 30, fontStyle: "bold" },
+      },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+    });
+    // @ts-expect-error lastAutoTable es agregado por el plugin en runtime
+    y = doc.lastAutoTable.finalY + 6;
+    y = yParaTotal(doc, y);
+    doc.setFillColor(17, 24, 39);
+    doc.rect(19, y, w - 38, TOTAL_BAR_H, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Total", 23, y + 6);
+    doc.text(money(Math.round(total * 100) / 100), w - 23, y + 6, { align: "right" });
+  }
+
+  addFooter(doc);
+
+  const iso = new Date().toISOString().slice(0, 10);
+  const filename = clientes.length === 1
+    ? `Estado-cuenta-${clientes[0].data.codigo}-${iso}.pdf`
+    : `Estado-cuenta-${clientes.length}-clientes-${iso}.pdf`;
   return { doc, filename };
 }

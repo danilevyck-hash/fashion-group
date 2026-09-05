@@ -26,9 +26,8 @@ import type { Company } from "@/lib/companies";
 import SyncStatus from "@/components/shared/SyncStatus";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
-import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
-import UltimosPagosFila from "./UltimosPagosFila";
-import BotonUltimosPagos from "@/components/cxc/BotonUltimosPagos";
+import UltimosPagosPorFecha from "./UltimosPagosPorFecha";
+import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
 import {
   CXC_GRUPO_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -38,35 +37,15 @@ import { fmt } from "@/lib/format";
 import {
   ordenParaRiskFilter,
   ordenarClientes,
-  etiquetaOrden,
   type RiskFilter,
 } from "@/lib/cxc-orden";
+import { rotuloSinPagar } from "@/lib/cxc/sin-pagar";
 import { AGING, tramoLabel } from "@/lib/cxc-aging";
 
-// "hoy" / "ayer" / "hace N días" — la forma relativa que ya usaba esta pantalla.
-function haceCuanto(fecha: string): string {
-  const d = new Date(fecha + "T00:00:00");
-  const days = Math.floor((new Date().getTime() - d.getTime()) / 86400000);
-  return days <= 0 ? "hoy" : days === 1 ? "ayer" : `hace ${days} días`;
-}
-
-// "Último pago $X · hace N días" por empresa, o "Sin pagos registrados".
-// Sin pago NO se muestra $0.00: un recibo de $0 es una aplicación/cruce, no un
-// pago, y decir "$0.00 hace 15 días" es justo el bug que Daniel cazó.
-function ultimoPagoLabel(fecha: string | null, monto: number | null): string {
-  if (!fecha) return "Sin pagos registrados";
-  const rel = haceCuanto(fecha);
-  return monto != null ? `Último pago $${fmt(monto)} · ${rel}` : `Último pago · ${rel}`;
-}
-
-// "Última compra $X · hace N días" — la última FACTURA, en el MISMO formato que
-// el último pago. Sin factura registrada se dice, no se muestra $0 ni una fecha
-// vacía.
-function ultimaCompraLabel(fecha: string | null, monto: number | null): string {
-  if (!fecha) return "Sin compras registradas";
-  const rel = haceCuanto(fecha);
-  return monto != null ? `Última compra $${fmt(monto)} · ${rel}` : `Última compra · ${rel}`;
-}
+// 🩸 Acá vivían `haceCuanto`, `ultimoPagoLabel` y `ultimaCompraLabel`: las tres
+// líneas de texto que llevaba CADA empresa dentro de la tarjeta abierta. Con
+// seis empresas eran 12 renglones de prosa. Esa información se dice ahora en el
+// bloque «Últimos pagos» agrupado POR FECHA, que la resume en 3 líneas.
 
 interface PanelCxcMobileProps {
   filtered: ConsolidatedClient[];
@@ -78,10 +57,17 @@ interface PanelCxcMobileProps {
   setRiskFilter: (v: RiskFilter) => void;
   companyFilter: string;
   setCompanyFilter: (v: string) => void;
-  onOpenEmail: (client: ConsolidatedClient) => void;
-  onWhatsApp: (client: ConsolidatedClient) => void;
-  onCopyMessage: (client: ConsolidatedClient) => void;
   onOpenEstado: (client: ConsolidatedClient) => void;
+  /** Abre la hoja «Cobrar» — en celular sube desde abajo (BottomSheet). */
+  onCobrar: (client: ConsolidatedClient) => void;
+  /** El aviso «N sin pagar hace +90 d», dentro de la tarjeta negra. */
+  sinPagar: { cuantos: number; monto: number } | null;
+  sinPagarActivo: boolean;
+  onToggleSinPagar: () => void;
+  /** «no paga hace 298 d» de una tarjeta — solo con el filtro encendido. */
+  avisoSinPagarDe: (client: ConsolidatedClient) => string | null;
+  /** «Le enviaste el estado de cuenta hace 3 días», o `null`. */
+  marcaEnvioDe: (client: ConsolidatedClient) => string | null;
   canExport: boolean;
   onExportarCsv: () => void;
   empresaRestriction: string | null;
@@ -101,10 +87,13 @@ export default function PanelCxcMobile({
   setRiskFilter,
   companyFilter,
   setCompanyFilter,
-  onOpenEmail,
-  onWhatsApp,
-  onCopyMessage,
   onOpenEstado,
+  onCobrar,
+  sinPagar,
+  sinPagarActivo,
+  onToggleSinPagar,
+  avisoSinPagarDe,
+  marcaEnvioDe,
   canExport,
   onExportarCsv,
   empresaRestriction,
@@ -139,23 +128,15 @@ export default function PanelCxcMobile({
   const sortedMobile = useMemo(() => ordenarClientes(filtered, { orden }), [filtered, orden]);
 
   const [expandedName, setExpandedName] = useState<string | null>(null);
-  // Qué cliente tiene abierto su bloque «Últimos pagos» — INDEPENDIENTE de la
-  // tarjeta expandida, uno a la vez, igual que el escritorio y que Boston.
-  // Daniel (4-sep-2026), textual: *"un botón para expandir, no solo al
-  // expandir el card, tendría que hacer dos expandir para verlo"*.
-  const [pagosAbiertos, setPagosAbiertos] = useState<string | null>(null);
 
-  // Mismo menú "···" que la tabla del escritorio (ClientTable.buildRowMenuItems):
-  // las MISMAS 4 opciones, con las MISMAS palabras y en el MISMO orden. Las dos
-  // "Ya contacté" se retiraron el 14-ago-2026 junto con el seguimiento de cobro,
-  // y "Enviar email" pasó a "Enviar correo" el mismo día — ver el comentario
-  // largo en ClientTable.
-  const buildRowMenuItems = (client: ConsolidatedClient): OverflowMenuItem[] => [
-    { label: "Estado de cuenta", onClick: () => onOpenEstado(client) },
-    { label: "WhatsApp", onClick: () => onWhatsApp(client) },
-    { label: "Enviar correo", onClick: () => onOpenEmail(client) },
-    { label: "Copiar mensaje", onClick: () => onCopyMessage(client) },
-  ];
+  // 🩸 ACÁ VIVÍAN EL MENÚ "···" DE CADA TARJETA Y EL BOTÓN «Últimos pagos ›»
+  // (5-sep-2026). El "···" repetía las mismas 4 acciones que el escritorio
+  // —dos listas escritas a mano que había que mantener iguales— y le comía
+  // ancho al nombre del cliente, que estaba en 12 px, el piso de legibilidad
+  // del sistema. Las cuatro salidas viven ahora en la hoja «Cobrar», que en
+  // celular sube desde abajo; el nombre se queda con ese ancho y sube a 14 px.
+  // El botón de últimos pagos se fue con su bloque por empresa: los pagos ahora
+  // se agrupan POR FECHA dentro de la tarjeta abierta.
 
   return (
     <div className="lg:hidden bg-gray-50">
@@ -172,27 +153,39 @@ export default function PanelCxcMobile({
             eso importa el doble: es lo único que se ve sin bajar. */}
         <AvisoRechazosSwitch texto={avisoMontos} />
 
-        <MobileHero total={totals.total} />
-
-        <MobileAgingChips
+        {/* 🔴 LOS TRAMOS ENTRAN DENTRO DE LA TARJETA NEGRA (5-sep-2026): eran
+            tres tarjetas grandes de cuatro renglones cada una debajo del total,
+            y entre el total y el primer cliente había que pasar por ellas. Ahora
+            son tres chips adentro de la misma tarjeta, con el rango corto, el
+            monto compacto y el conteo. Siguen FILTRANDO al tocarlos, con el
+            mismo toggle de siempre. Y el aviso «sin pagar hace +90 d» es una
+            línea más de esa tarjeta, también tocable. */}
+        <MobileHero
+          total={totals.total}
           totals={{ current: totals.current, watch: totals.watch, overdue: totals.overdue }}
           counts={{ current: totals.cCount, watch: totals.wCount, overdue: totals.oCount }}
           active={riskFilter}
           onChange={setRiskFilter}
+          sinPagar={sinPagar}
+          sinPagarActivo={sinPagarActivo}
+          onToggleSinPagar={onToggleSinPagar}
         />
 
-        <MobileSearch value={search} onChange={setSearch} />
-
-        <MobileEmpresaSelect
-          value={companyFilter}
-          onChange={setCompanyFilter}
-          options={cxcCompanies}
-          disabled={!!empresaRestriction}
-        />
-
-        <p className="text-xs text-gray-500">
-          {sortedMobile.length} {sortedMobile.length === 1 ? "cliente" : "clientes"} · ordenados por {etiquetaOrden(orden.key)}
-        </p>
+        {/* Buscador y empresa en UNA fila: eran dos renglones enteros para dos
+            controles que se usan juntos. */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <MobileSearch value={search} onChange={setSearch} />
+          </div>
+          <div className="w-[9.5rem] shrink-0">
+            <MobileEmpresaSelect
+              value={companyFilter}
+              onChange={setCompanyFilter}
+              options={cxcCompanies}
+              disabled={!!empresaRestriction}
+            />
+          </div>
+        </div>
 
         {sortedMobile.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center">
@@ -217,10 +210,10 @@ export default function PanelCxcMobile({
                     cxcCompanies={cxcCompanies}
                     isExpanded={isExpanded}
                     onToggle={() => setExpandedName(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
-                    pagosAbiertos={pagosAbiertos === client.nombre_normalized}
-                    onTogglePagos={() => setPagosAbiertos(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
                     onOpenEstado={() => onOpenEstado(client)}
-                    actionsMenu={<OverflowMenu items={buildRowMenuItems(client)} ariaLabel={`Acciones de ${client.nombre_normalized}`} />}
+                    onCobrar={() => onCobrar(client)}
+                    avisoSinPagar={avisoSinPagarDe(client)}
+                    marcaEnvio={marcaEnvioDe(client)}
                   />
                 </li>
               );
@@ -328,113 +321,131 @@ function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
 // Hero — total pendiente Stone-900
 // ─────────────────────────────────────────────────────────────────────────────
 
-// El conteo de clientes NO vive acá: unos centímetros más abajo, arriba de la
-// lista, está el MISMO número y encima sabe de los filtros. Verlo dos veces era
-// leerlo dos veces y creerle a uno de los dos.
-function MobileHero({ total }: { total: number }) {
-  return (
-    <section className="rounded-xl bg-gray-900 px-5 py-4 text-white shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-        Total pendiente
-      </p>
-      <p className="mt-1 font-mono text-[36px] font-medium leading-none tracking-tight tabular-nums">
-        {formatCompactCurrency(total)}
-      </p>
-    </section>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Aging chips filtros — los MISMOS tres tramos, con el MISMO nombre que el
-// escritorio y el papel (3 buckets de presentación; los 8 buckets de cxc_aging
-// se siguen agregando abajo en el detalle del cliente y la barra muestra el
-// wedge granular).
+// Los colores del celular. Son propios de esta pantalla (hexadecimales, no las
+// clases de Tailwind del escritorio); los NOMBRES y los RANGOS salen de
+// `cxc-aging`, que es la única lista — acá vivió una copia escrita a mano y era
+// el mismo botón con dos nombres.
 //
-// 🩸 ACÁ VIVÍA UNA SEGUNDA LISTA DE NOMBRES ("Por vencer" / "Vencido reciente"
-// / "Vencido crítico") escrita a mano, mientras el escritorio rotulaba las
-// MISMAS píldoras con el rango a secas ("0-90d"). Era el mismo botón con dos
-// nombres, y dos listas que nadie podía mantener iguales. Los nombres ahora
-// salen de `cxc-aging`; lo único propio del celular son sus colores, que sí son
-// de esta pantalla (hexadecimales, no las clases de Tailwind del escritorio).
+// `punto` y `chipActivo` son los del chip DENTRO de la tarjeta negra (fondo
+// oscuro): sobre negro, un `bg-emerald-50` no se ve.
 // ─────────────────────────────────────────────────────────────────────────────
-
 const AGING_THEME = {
   current: {
     border: "border-[#0F6E56]",
     text: "text-[#0F6E56]",
     bgActive: "bg-[#0F6E56]/10",
     borderActive: "border-[#0F6E56]",
+    punto: "bg-emerald-400",
+    chipActivo: "bg-emerald-500/25",
   },
   watch: {
     border: "border-[#B45309]",
     text: "text-[#B45309]",
     bgActive: "bg-[#B45309]/10",
     borderActive: "border-[#B45309]",
+    punto: "bg-amber-400",
+    chipActivo: "bg-amber-500/25",
   },
   overdue: {
     border: "border-[#A32D2D]",
     text: "text-[#A32D2D]",
     bgActive: "bg-[#A32D2D]/10",
     borderActive: "border-[#A32D2D]",
+    punto: "bg-red-400",
+    chipActivo: "bg-red-500/25",
   },
 } as const;
 
-function MobileAgingChips({
+// La tarjeta negra: el total, los tres tramos y el aviso de los que no pagan.
+// Los tres chips FILTRAN igual que antes (y con el mismo toggle del padre); lo
+// que cambió es dónde viven — adentro del total, no en tres tarjetas grandes
+// debajo de él.
+function MobileHero({
+  total,
   totals,
   counts,
   active,
   onChange,
+  sinPagar,
+  sinPagarActivo,
+  onToggleSinPagar,
 }: {
+  total: number;
   totals: { current: number; watch: number; overdue: number };
   counts: { current: number; watch: number; overdue: number };
   active: RiskFilter;
   onChange: (v: RiskFilter) => void;
+  sinPagar: { cuantos: number; monto: number } | null;
+  sinPagarActivo: boolean;
+  onToggleSinPagar: () => void;
 }) {
   const items: { key: Exclude<RiskFilter, "all">; value: number; count: number }[] = [
     { key: "current", value: totals.current, count: counts.current },
     { key: "watch", value: totals.watch, count: counts.watch },
     { key: "overdue", value: totals.overdue, count: counts.overdue },
   ];
+  const hayAviso = !!sinPagar && sinPagar.cuantos > 0;
 
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {items.map(({ key, value, count }) => {
-        const theme = AGING_THEME[key];
-        const isActive = active === key;
-        // Una sola acción: filtra a los clientes de ese tramo Y los ordena por lo
-        // que deben ahí. El apagar/prender lo resuelve el padre (cxc-orden).
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onChange(key)}
-            aria-pressed={isActive}
-            className={[
-              "rounded-xl border-2 px-2.5 py-2.5 text-left transition min-h-[44px] active:scale-[0.97]",
-              isActive ? `${theme.borderActive} ${theme.bgActive}` : "border-gray-300 bg-white",
-            ].join(" ")}
-          >
-            {/* Nombre y rango en dos renglones. A 390 px cada tarjeta mide
-                ~118 px: "Vencido reciente 91-120d" en una línea no entra, y
-                partir el rango a la mitad sería peor que no ponerlo. El
-                `title` lleva el nombre completo, el mismo que dicen el
-                escritorio y el papel. */}
-            <p className={`text-xs font-semibold uppercase tracking-wide ${theme.text}`} title={tramoLabel(key)}>
-              {AGING[key].label}
-            </p>
-            <p className="mt-0.5 font-mono text-xs tabular-nums text-gray-500">
-              {AGING[key].colLabel}
-            </p>
-            <p className={`mt-0.5 font-mono text-sm font-medium tabular-nums ${isActive ? theme.text : "text-gray-900"}`}>
-              {formatCompactCurrency(value)}
-            </p>
-            <p className="mt-0.5 text-xs text-gray-500 tabular-nums">
-              {count} {count === 1 ? "cliente" : "clientes"}
-            </p>
-          </button>
-        );
-      })}
-    </div>
+    <section className="rounded-xl bg-gray-900 px-4 py-4 text-white shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+        Total pendiente
+      </p>
+      <p className="mt-1 font-mono text-[36px] font-medium leading-none tracking-tight tabular-nums">
+        {formatCompactCurrency(total)}
+      </p>
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {items.map(({ key, value, count }) => {
+          const theme = AGING_THEME[key];
+          const activo = active === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onChange(key)}
+              aria-pressed={activo}
+              title={tramoLabel(key)}
+              className={[
+                "rounded-lg px-2 py-2 text-left transition min-h-[44px] active:scale-[0.97] border",
+                activo ? `${theme.chipActivo} border-white/60` : "border-white/15 bg-white/5",
+              ].join(" ")}
+            >
+              <span className="flex items-center gap-1 font-mono text-[11px] tabular-nums text-gray-300">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full ${theme.punto}`} />
+                {AGING[key].colLabel}
+              </span>
+              <span className="mt-0.5 block font-mono text-sm font-medium tabular-nums text-white">
+                {formatCompactCurrency(value)}
+              </span>
+              <span className="block text-[11px] tabular-nums text-gray-400">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* El aviso «sin pagar hace +90 d» es UNA línea más de esta tarjeta, no
+          un bloque aparte. Toca y filtra, igual que los tres chips. */}
+      {hayAviso && sinPagar && (
+        <button
+          type="button"
+          onClick={onToggleSinPagar}
+          aria-pressed={sinPagarActivo}
+          className={[
+            "mt-2 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 min-h-[44px] text-left transition active:scale-[0.97] border",
+            sinPagarActivo ? "border-red-300 bg-red-500/25" : "border-white/15 bg-white/5",
+          ].join(" ")}
+        >
+          <span className="text-xs font-medium text-red-200">
+            {rotuloSinPagar(sinPagar.cuantos)}
+          </span>
+          <span className="font-mono text-xs font-semibold tabular-nums text-red-100">
+            {formatCompactCurrency(sinPagar.monto)}
+          </span>
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -513,20 +524,21 @@ function MobileClientCard({
   cxcCompanies,
   isExpanded,
   onToggle,
-  pagosAbiertos,
-  onTogglePagos,
   onOpenEstado,
-  actionsMenu,
+  onCobrar,
+  avisoSinPagar,
+  marcaEnvio,
 }: {
   client: ConsolidatedClient;
   cxcCompanies: Company[];
   isExpanded: boolean;
   onToggle: () => void;
-  /** El bloque «Últimos pagos» de ESTA tarjeta está abierto (sin expandirla). */
-  pagosAbiertos: boolean;
-  onTogglePagos: () => void;
   onOpenEstado: () => void;
-  actionsMenu?: React.ReactNode;
+  onCobrar: () => void;
+  /** «no paga hace 298 d» — solo con el filtro encendido. */
+  avisoSinPagar: string | null;
+  /** «Le enviaste el estado de cuenta hace 3 días», o `null`. */
+  marcaEnvio: string | null;
 }) {
   const borderLeft = worstBucketBorder(client);
 
@@ -544,59 +556,63 @@ function MobileClientCard({
       >
         <div className="flex items-start justify-between gap-2 px-3 py-3">
           <div className="min-w-0 flex-1">
-            {/* 🩸 Acá vivía la estrella ⭐ (44x44, con su `-ml-3` para que no
-                le comiera ancho al nombre). Se fue el 4-sep-2026 con el resto de
-                los favoritos: `cxc_favorites` nunca tuvo una fila. El nombre se
-                queda con esos 44 px. */}
-            <div className="flex items-center gap-0">
-              {/* 12px es el PISO de legibilidad y no se baja de ahí. Lo que
-                  faltaba para que los nombres largos entren se sacó de la
-                  DERECHA (chevron fuera, gaps al mínimo, "···" metido en el
-                  padding) y de `tracking-tight`, que aprieta el interletrado
-                  sin tocar el cuerpo de la letra. */}
-              <span className="truncate text-[12px] font-medium leading-5 tracking-tight text-gray-900">
-                {client.nombre_normalized}
-              </span>
-            </div>
+            {/* 🔴 EL NOMBRE SUBE DE 12 A 14 px (5-sep-2026). Estaba en 12, el
+                PISO de legibilidad del sistema, porque el "···" y el monto le
+                comían el ancho: la estrella se fue el 4-sep y el "···" el 5, y
+                ese ancho vuelve donde tiene que estar. `tracking-tight` se
+                queda: aprieta el interletrado sin achicar la letra. */}
+            <span className="block truncate text-[14px] font-medium leading-5 tracking-tight text-gray-900">
+              {client.nombre_normalized}
+            </span>
+            {avisoSinPagar && (
+              <span className="block text-[11px] text-gray-500">{avisoSinPagar}</span>
+            )}
+            {marcaEnvio && (
+              <span className="block text-[11px] text-gray-400">{marcaEnvio}</span>
+            )}
           </div>
           {/* El chevron se eliminó: TODA la fila abre/cierra la card, así que la
-              flecha no era una acción sino un adorno — y costaba 22px (14 del
-              ícono + 8 del gap) del ancho del nombre. El estado abierto ya se ve
-              por el panel desplegado. El "···" conserva sus 44x44 y se mete en
-              el padding con `-mr-3`, espejo del `-ml-3` de la estrella. */}
-          <div className="flex shrink-0 items-center gap-1">
-            <span className="font-mono text-base font-semibold tabular-nums text-gray-900">
-              {formatCompactCurrency(client.total)}
-            </span>
-            {actionsMenu && <span className="-mr-3" onClick={e => e.stopPropagation()}>{actionsMenu}</span>}
-          </div>
+              flecha no era una acción sino un adorno — y costaba 22px del ancho
+              del nombre. El estado abierto ya se ve por el panel desplegado. */}
+          <span className="shrink-0 font-mono text-base font-semibold tabular-nums text-gray-900">
+            {formatCompactCurrency(client.total)}
+          </span>
         </div>
 
-        <div className="flex gap-1.5 px-3 pb-3">
+        <div className="flex gap-1.5 px-3 pb-2">
           <BucketChip variant="current" value={client.current} />
           <BucketChip variant="watch" value={client.watch} />
           <BucketChip variant="overdue" value={client.overdue} />
         </div>
-
-        {/* «Últimos pagos ›» en la tarjeta CERRADA, como en la de Boston: un
-            toque abre los 3 pagos por empresa SIN expandir el cliente. El
-            botón mide 44 px de alto táctil; `-mt-3 -mb-2` para que la tarjeta
-            no crezca 44 px por él. El propio botón frena el toque. */}
-        <div className="px-3 -mt-3 -mb-2">
-          <BotonUltimosPagos abierto={pagosAbiertos} onToggle={onTogglePagos} nombre={client.nombre_normalized} />
-        </div>
       </div>
 
-      {/* El ÚNICO lugar del celular donde se dibujan los últimos pagos. Va
-          ANTES del panel expandido para que se lea pegado a su botón. Se monta
-          solo abierto, así que la lectura se dispara recién al toque. */}
-      {pagosAbiertos && (
-        <div className="border-t border-gray-100 bg-gray-50 px-3 py-2.5">
-          <UltimosPagosFila client={client} companyFilter="all" roleCompanies={cxcCompanies} abierto apilado />
-        </div>
-      )}
+      {/* Tarjeta CERRADA: los dos botones que se usan. «Cobrar» abre la hoja de
+          las cuatro salidas; «Ver detalle» expande la tarjeta. */}
+      <div className="flex gap-2 px-3 pb-3">
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onCobrar(); }}
+          className="flex-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
+        >
+          Cobrar
+        </button>
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onToggle(); }}
+          className="flex-1 inline-flex min-h-[44px] items-center justify-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 active:scale-[0.97]"
+        >
+          {isExpanded ? "Ocultar detalle" : "Ver detalle"}
+        </button>
+      </div>
 
-      {isExpanded && <MobileClientExpanded client={client} cxcCompanies={cxcCompanies} onOpenEstado={onOpenEstado} />}
+      {isExpanded && (
+        <MobileClientExpanded
+          client={client}
+          cxcCompanies={cxcCompanies}
+          onOpenEstado={onOpenEstado}
+          onCobrar={onCobrar}
+        />
+      )}
     </article>
   );
 }
@@ -638,10 +654,12 @@ function MobileClientExpanded({
   client,
   cxcCompanies,
   onOpenEstado,
+  onCobrar,
 }: {
   client: ConsolidatedClient;
   cxcCompanies: Company[];
   onOpenEstado: () => void;
+  onCobrar: () => void;
 }) {
   // `companies[key].nombre` es el nombre del cliente registrado en esa
   // empresa (variante por empresa), NO el nombre de la empresa. El nombre
@@ -663,24 +681,16 @@ function MobileClientExpanded({
         current: d.d0_30 + d.d31_60 + d.d61_90,
         watch: d.d91_120,
         overdue: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
-        ultimoPagoFecha: d.ultimoPagoFecha ?? null,
-        ultimoPagoMonto: d.ultimoPagoMonto ?? null,
-        ultimaCompraFecha: d.ultimaCompraFecha ?? null,
-        ultimaCompraMonto: d.ultimaCompraMonto ?? null,
       }))
       .sort((a, b) => b.total - a.total);
   }, [client.companies, nameByKey]);
 
-  // Código del cliente para enlazar a su ficha (misma fuente que el desktop).
+  // Código del cliente para la ficha y para pedir sus pagos.
   const codigo = useMemo(
     () => Object.values(client.companies).find(c => c?.codigo)?.codigo ?? null,
     [client.companies],
   );
-
-  // 🔴 ACÁ VIVIÓ EL BLOQUE «ÚLTIMOS PAGOS» UN DÍA (3-sep → 4-sep-2026), adentro
-  // de la tarjeta de cada empresa. Se mudó al botón de la tarjeta CERRADA
-  // (`UltimosPagosFila`, montada por `MobileClientCard`): Daniel no quería
-  // "dos expandir para verlo". Un solo lugar; acá no se repite.
+  const pagos = useUltimosPagosGrupo(codigo, true);
 
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
@@ -692,6 +702,11 @@ function MobileClientExpanded({
           ${fmt(client.total)}
         </span>
       </div>
+      {/* 🩸 Cada empresa llevaba DOS renglones de texto más («Último pago $X ·
+          hace N días» y «Última compra …»): con seis empresas eran 24 líneas de
+          desglose, y encima los últimos pagos vivían en OTRO botón con 18 líneas
+          más. Esa información está ahora en el bloque «Últimos pagos» de acá
+          abajo, agrupada POR FECHA: 3 líneas para lo que ocupaba 42. */}
       <ul className="divide-y divide-gray-200/70 overflow-hidden rounded-md bg-white">
         {rows.map(row => (
           <li key={row.key} className="px-3 py-2.5">
@@ -706,37 +721,35 @@ function MobileClientExpanded({
               <EmpresaBucketMini variant="watch" value={row.watch} />
               <EmpresaBucketMini variant="overdue" value={row.overdue} />
             </div>
-            <p className={`mt-1.5 text-xs ${row.ultimoPagoFecha ? "text-gray-500" : "text-gray-400"}`}>
-              {ultimoPagoLabel(row.ultimoPagoFecha, row.ultimoPagoMonto)}
-            </p>
-            {/* Crece hacia ABAJO, no a lo ancho: en 390 px una segunda columna
-                empujaría la tarjeta y traería arrastre horizontal. */}
-            <p className={`mt-0.5 text-xs ${row.ultimaCompraFecha ? "text-gray-500" : "text-gray-400"}`}>
-              {ultimaCompraLabel(row.ultimaCompraFecha, row.ultimaCompraMonto)}
-            </p>
           </li>
         ))}
       </ul>
-      <div className="mt-3 flex items-center gap-3">
+
+      <div className="mt-3">
+        <UltimosPagosPorFecha pagos={pagos} />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onCobrar}
+          className="inline-flex min-h-[44px] items-center rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
+        >
+          Cobrar
+        </button>
         <button
           type="button"
           onClick={onOpenEstado}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
+          className="inline-flex min-h-[44px] items-center rounded-md border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 active:scale-[0.97]"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
-          </svg>
-          Estado de cuenta
+          Documentos
         </button>
         {codigo && (
           <Link
             href={`/clientes/${encodeURIComponent(codigo)}`}
-            // 163×18 medidos: el enlace está DENTRO de la fila expandida, que la
-            // primera vuelta no abrió. `-my-3` devuelve el aire que suma el alto
-            // táctil para que no separe el bloque de botones de arriba.
-            className="inline-flex items-center gap-1 min-h-[44px] -my-3 text-xs font-medium text-blue-600 active:opacity-70"
+            className="inline-flex items-center gap-1 min-h-[44px] text-xs font-medium text-blue-600 active:opacity-70"
           >
-            Ver facturas pendientes
+            Ficha
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
             </svg>

@@ -7,8 +7,10 @@
 // número de recibo ni la factura: la pantalla no los pide y no tiene por qué
 // recibirlos.
 //
-// Alimenta el bloque «Últimos pagos» de la fila expandida en Cuentas por Cobrar
-// (escritorio y celular). La columna «Último pago · hace N días» que ya existía
+// Alimenta el bloque «Últimos pagos» del panel expandido de Cuentas por Cobrar
+// (escritorio y celular), que desde el 5-sep-2026 se agrupa POR FECHA — las 3
+// últimas fechas en que pagó, con el total del día y en qué empresas (campo
+// `porFecha`). La columna «Último pago · hace N días» que ya existía
 // sigue saliendo de la vista `switch_ultimo_pago_cliente_v2`; esta ruta lee la
 // TABLA (`switch_recibos`) porque la vista colapsa a UNA fila por cliente por
 // construcción (DISTINCT ON) y no puede dar tres.
@@ -22,10 +24,10 @@
 // ese filtro un cliente que exista en los dos lados vería la plata de Boston
 // mezclada con la del grupo. Candado: `cxc-ultimos-pagos-route.test.ts`.
 //
-// ⚠️ `db-max-rows` = 1000 corta EN SILENCIO. Aquí no hay riesgo porque se piden
-// 3 por empresa con `.limit(3)` en el servidor — no se traen todos los recibos
-// del cliente para recortar después. Seis consultas chicas contra el índice
+// ⚠️ `db-max-rows` = 1000 corta EN SILENCIO. Aquí no hay riesgo porque el
+// `.limit()` va en el SERVIDOR — seis consultas chicas contra el índice
 // (empresa_key, cliente_codigo) en vez de una grande que habría que repartir.
+// Cuántas filas y por qué: ver `RECIBOS_PARA_FECHAS` más abajo.
 //
 // Por qué una consulta POR EMPRESA y no una sola con `.in(...)` + `.limit(18)`:
 // un cliente con 18 pagos en Fashion Wear dejaría a Vistana sin ninguno. El
@@ -37,12 +39,33 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { PAGOS_POR_EMPRESA, type PagoReciente } from "@/lib/cxc/ultimos-pagos";
+import { agruparPagosPorFecha, type PagoDeEmpresa } from "@/lib/cxc/pagos-por-fecha";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 // Los mismos roles que ven el CXC del grupo (`/api/cxc/ultimo-pago`).
 const CXC_ROLES = ["admin", "secretaria", "vendedor"];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CUÁNTOS RECIBOS SE LEEN POR EMPRESA — y por qué NO son 3 (5-sep-2026).
+//
+// El bloque «Últimos pagos» del panel pasó a agruparse POR FECHA, no por
+// empresa: las 3 últimas FECHAS en que el cliente pagó, con lo que entró ese
+// día y en qué empresas. Para armar esas 3 fechas hay que juntar los recibos de
+// las 6 y recién ahí agrupar.
+//
+// Con `.limit(3)` por empresa eso puede MENTIR: un cliente con 3 recibos del
+// mismo día en Vistana taparía con esa única fecha las otras dos que sí
+// existen. Se leen 30 por empresa —seis lecturas de 30 = 180 filas, muy por
+// debajo del tope de 1.000 que corta EN SILENCIO— y el corte a 3 fechas se hace
+// después de agrupar. Medido: el cliente con más recibos del grupo (D-25) tiene
+// 6 pagos en un solo día, así que 30 cubre con cinco veces de margen.
+//
+// ⚠️ `porEmpresa` se conserva tal cual (3 por empresa): es contrato de esta
+// ruta, no cuesta ninguna consulta extra y quitarlo solo habría sido una
+// segunda cosa que romper el mismo día.
+const RECIBOS_PARA_FECHAS = 30;
 
 /** Últimos N pagos REALES de un cliente en UNA empresa del grupo. La empresa
  *  va en la cadena, no en una proyección posterior: es el filtro que separa
@@ -62,7 +85,7 @@ async function pagosDe(empresa: string, codigo: string): Promise<PagoReciente[] 
     .not("fecha", "is", null)
     // `fecha_creacion` trae la hora: desempata dos pagos del mismo día.
     .order("fecha_creacion", { ascending: false, nullsFirst: false })
-    .limit(PAGOS_POR_EMPRESA);
+    .limit(RECIBOS_PARA_FECHAS);
   if (error) {
     console.error(`[cxc/ultimos-pagos] ${empresa}/${codigo}: ${error.message}`);
     return null;
@@ -105,9 +128,18 @@ export async function GET(req: NextRequest) {
   // Solo las empresas donde el cliente tiene al menos un pago: la pantalla
   // dice «Sin pagos registrados» para las que falten.
   const porEmpresa: Record<string, PagoReciente[]> = {};
+  const todos: PagoDeEmpresa[] = [];
   empresas.forEach((e, i) => {
     const pagos = resultados[i] as PagoReciente[];
-    if (pagos.length > 0) porEmpresa[e] = pagos;
+    if (pagos.length > 0) porEmpresa[e] = pagos.slice(0, PAGOS_POR_EMPRESA);
+    for (const p of pagos) todos.push({ fecha: p.fecha, monto: p.monto, empresa: e });
   });
-  return NextResponse.json({ codigo, porEmpresa });
+
+  // 🔴 LAS 3 ÚLTIMAS FECHAS, no los 3 últimos pagos de cada empresa. Los
+  // clientes grandes le pagan a varias empresas el MISMO día (el 29-jun-2026,
+  // D-25 pagó $241.857,77 en las SEIS): por empresa eran 18 líneas para decir
+  // lo que dicen 3, y ninguna decía cuánto entró ese día.
+  const porFecha = agruparPagosPorFecha(todos);
+
+  return NextResponse.json({ codigo, porEmpresa, porFecha });
 }

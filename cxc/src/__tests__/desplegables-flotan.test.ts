@@ -94,7 +94,7 @@ const EXCEPCIONES: Record<string, string> = {
   // Cuando se pueda abrir /admin:
   //   1. `node scripts/_medir-desplegables.mjs` con SOLO=cxc-
   //   2. si sale ROTO → pasarlo a <DesplegableFlotante> y borrar la excepción.
-  "app/admin/components/PanelCxcMobile.tsx":
+  "app/cxc/components/PanelCxcMobile.tsx":
     "menú Acciones de CXC móvil — sin medir, /admin caído el día del barrido",
 
   // ✅ MEDIDOS en el navegador el 30-jul-2026 (build de producción, datos de
@@ -184,7 +184,7 @@ describe("Las excepciones siguen siendo las que se decidieron", () => {
     // mete un desplegable nuevo, el barrido lo caza; para silenciarlo tiene que
     // venir acá y explicarse.
     expect(Object.keys(EXCEPCIONES).sort()).toEqual([
-      "app/admin/components/PanelCxcMobile.tsx",
+      "app/cxc/components/PanelCxcMobile.tsx",
       "components/shared/SyncNowButton.tsx",
       "components/ui.tsx",
       "components/ventas/ComisionesCriterios.tsx",

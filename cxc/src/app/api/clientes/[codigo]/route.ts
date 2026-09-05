@@ -3,7 +3,7 @@
 // PATCH  /api/clientes/[codigo]
 //
 // GET devuelve cliente + ventas YTD por empresa + CXC actual por empresa
-//   + última factura. PATCH solo permite editar telefono/celular/email/notas.
+//   + última factura. PATCH solo permite editar contacto/telefono/celular/email/notas.
 //   Los campos fiscales (nombre, razon_social, identificacion, dv, provincia,
 //   codigo) NUNCA se editan acá — sync semanal de Switch los pisa.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,10 +185,21 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
 }
 
 interface PatchBody {
+  /** Nombre de la persona con quien se habla. Columna nueva (5-sep-2026). */
+  contacto?: string | null;
   telefono?: string | null;
   celular?: string | null;
   email?: string | null;
   notas?: string | null;
+}
+
+/** ¿El error de PostgREST es «todavía no existe la columna `contacto`»? */
+function faltaColumnaContacto(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  const msg = err.message ?? "";
+  if (!/\bcontacto\b/i.test(msg)) return false;
+  return /does not exist|schema cache|could not find/i.test(msg) ||
+    err.code === "42703" || err.code === "PGRST204";
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ codigo: string }> }) {
@@ -207,6 +218,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ codigo: s
 
   // Whitelist estricta — el sync semanal del Sprint 4 pisa los demás campos.
   const allowed: PatchBody = {};
+  // 🔴 `contacto` entra a la MISMA familia que teléfono/celular/email/notas: lo
+  // escribe la gente y el sync de Switch no lo pisa nunca.
+  if ("contacto" in body) allowed.contacto = (body.contacto ?? "").toString().trim() || null;
   if ("telefono" in body) allowed.telefono = (body.telefono ?? "").toString().trim() || null;
   if ("celular"  in body) allowed.celular  = (body.celular  ?? "").toString().trim() || null;
   if ("email"    in body) allowed.email    = (body.email    ?? "").toString().trim() || null;
@@ -223,13 +237,34 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ codigo: s
     return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   }
 
-  const { data, error } = await supabaseServer
-    .from("clientes_master")
-    .update(allowed)
-    .eq("codigo", codigo)
-    .eq("deleted", false)
-    .select()
-    .maybeSingle();
+  const escribir = (campos: PatchBody) =>
+    supabaseServer
+      .from("clientes_master")
+      .update(campos)
+      .eq("codigo", codigo)
+      .eq("deleted", false)
+      .select()
+      .maybeSingle();
+
+  let { data, error } = await escribir(allowed);
+
+  // La migración `20260926120000_clientes_master_contacto.sql` todavía no
+  // corrió: se guarda lo demás y se avisa que el contacto no se pudo guardar.
+  // Fallar entero dejaría sin guardar un teléfono corregido por una columna que
+  // no existe.
+  let contactoGuardado = "contacto" in allowed;
+  if (faltaColumnaContacto(error)) {
+    contactoGuardado = false;
+    const { contacto: _sinColumna, ...resto } = allowed;
+    void _sinColumna;
+    if (Object.keys(resto).length === 0) {
+      return NextResponse.json(
+        { error: "Todavía no se puede guardar el contacto. Falta un ajuste en la base de datos." },
+        { status: 503 },
+      );
+    }
+    ({ data, error } = await escribir(resto));
+  }
 
   if (error) {
     console.error("[api/clientes/codigo] patch error:", error.message);
@@ -242,5 +277,5 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ codigo: s
   // instancia: en serverless otra puede seguir sirviendo lo viejo hasta que
   // venza el TTL — por eso el TTL es corto y no se depende solo de acá.
   invalidarDirectorioServidor();
-  return NextResponse.json({ ok: true, cliente: data });
+  return NextResponse.json({ ok: true, cliente: data, contactoGuardado });
 }

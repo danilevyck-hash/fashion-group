@@ -32,7 +32,7 @@ import { join } from "path";
 import { AGING } from "@/lib/cxc-aging";
 import { buildEstadoCuentaPDF } from "@/lib/pdf-estado-cuenta";
 import { buildResumenHtml } from "@/lib/cxc/estado-cuenta-email";
-import type { EstadoCuenta } from "@/app/admin/components/EstadoCuentaDrawer";
+import type { EstadoCuenta } from "@/app/cxc/components/EstadoCuentaDrawer";
 
 const raiz = join(__dirname, "..", "..");
 
@@ -104,7 +104,7 @@ describe("🔴 la palabra 'vencido' no llega a lo que ve el cliente", () => {
   it("🩸 el mensaje de 'Copiar mensaje'/WhatsApp — decía VENCIDO CRITICO en mayúsculas", () => {
     // Es texto que Daniel pega y el cliente lee. Se rotula por antigüedad,
     // igual que la columna del correo aprobado.
-    const fuente = plano(leer("app/admin/page.tsx"));
+    const fuente = plano(leer("app/cxc/page.tsx"));
     const cuerpo = fuente.slice(fuente.indexOf("function buildEmailBody"), fuente.indexOf("function exportCSV"));
     expect(cuerpo, "el mensaje al cliente volvió a decir 'vencido'").not.toMatch(PROHIBIDO);
     expect(cuerpo).toContain("Hasta 90 días");
@@ -113,7 +113,7 @@ describe("🔴 la palabra 'vencido' no llega a lo que ve el cliente", () => {
   });
 
   it("…y las tres líneas siguen saliendo de current / watch / overdue (ningún tramo se movió)", () => {
-    const cuerpo = plano(leer("app/admin/page.tsx"));
+    const cuerpo = plano(leer("app/cxc/page.tsx"));
     expect(cuerpo).toContain("if (client.current > 0) lines.push(`Hasta 90 días: $${fmt(client.current)}`)");
     expect(cuerpo).toContain("if (client.watch > 0) lines.push(`De 91 a 120 días: $${fmt(client.watch)}`)");
     expect(cuerpo).toContain("if (client.overdue > 0) lines.push(`Más de 120 días: $${fmt(client.overdue)}`)");
@@ -133,7 +133,7 @@ describe("el PDF del cliente y la pantalla nombran igual al mismo número", () =
   });
 
   it("el pie del drawer, que es la referencia, sigue diciendo 'Total'", () => {
-    expect(plano(leer("app/admin/components/EstadoCuentaDrawer.tsx"))).toContain(">Total<");
+    expect(plano(leer("app/cxc/components/EstadoCuentaDrawer.tsx"))).toContain(">Total<");
   });
 
   it("la fila de total del correo, que viaja con ese PDF, también dice 'Total'", () => {
@@ -187,7 +187,7 @@ describe("los reportes de Exportar no se escriben sus propios rótulos", () => {
 
   it("'aging' no vuelve al menú que describe estos papeles", () => {
     // Jerga en inglés en la pantalla de una secretaria panameña.
-    const fuente = plano(leer("app/admin/page.tsx"));
+    const fuente = plano(leer("app/cxc/page.tsx"));
     expect(fuente).not.toMatch(/>[^<]*\baging\b[^<]*</i);
   });
 });

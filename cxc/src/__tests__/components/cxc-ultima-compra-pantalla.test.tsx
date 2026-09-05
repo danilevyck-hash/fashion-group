@@ -25,8 +25,8 @@ vi.mock("@/components/shared/SyncNowButton", () => ({ default: () => null }));
 // el join del hook, no el mapa de vendedores.
 vi.mock("@/lib/vendors", () => ({ VENDOR_MAP: {} }));
 
-import ContactPanel from "@/app/admin/components/ContactPanel";
-import PanelCxcMobile from "@/app/admin/components/PanelCxcMobile";
+import ContactPanel from "@/app/cxc/components/ContactPanel";
+import PanelCxcMobile from "@/app/cxc/components/PanelCxcMobile";
 
 const EMPRESAS: Company[] = [
   { key: "fashion_wear", name: "Fashion Wear" },
@@ -108,6 +108,12 @@ function pintarCelular() {
   const noop = () => {};
   render(
     <PanelCxcMobile
+      onCobrar={noop}
+      sinPagar={null}
+      sinPagarActivo={false}
+      onToggleSinPagar={noop}
+      avisoSinPagarDe={() => null}
+      marcaEnvioDe={() => null}
       filtered={[CLIENTE]}
       roleClients={[CLIENTE]}
       cxcCompanies={EMPRESAS}
@@ -132,41 +138,42 @@ function pintarCelular() {
   fireEvent.click(screen.getByText("CITY MALL PASO CANOA"));
 }
 
-describe("PanelCxcMobile (celular) — la tarjeta desplegada", () => {
-  it("🔴 dice la última compra debajo del último pago", () => {
+describe("🔄 PanelCxcMobile (celular) — el desglose se acortó (5-sep-2026)", () => {
+  // Cada empresa llevaba DOS renglones de prosa más («Último pago $X · hace N
+  // días» y «Última compra …»): con seis empresas eran 12 líneas de texto en
+  // una tarjeta de 390 px, y encima los últimos pagos vivían en OTRO botón con
+  // 18 líneas más. Con el rediseño, esa información se dice en el bloque
+  // «Últimos pagos» agrupado POR FECHA —3 líneas para lo que ocupaba 42— y el
+  // desglose por empresa quedó en nombre + total + los tres tramos.
+  //
+  // ⚠️ La columna «Última compra» del ESCRITORIO no se tocó: sigue arriba, con
+  // su tooltip, y sus tests siguen verdes. Lo que se acortó es el celular.
+  it("la tarjeta abierta ya no repite dos renglones de texto por empresa", () => {
     pintarCelular();
-    expect(screen.getByText(/Último pago \$187,651\.51/)).toBeTruthy();
-    expect(screen.getByText(/Última compra \$6,968\.38/)).toBeTruthy();
+    expect(screen.queryByText(/Último pago \$187,651\.51/)).toBeNull();
+    expect(screen.queryByText(/Última compra \$6,968\.38/)).toBeNull();
   });
 
-  it("🔴 sin compras registradas lo DICE, no muestra $0", () => {
+  it("🔴 y nunca dice $0.00 — ni antes ni ahora", () => {
     pintarCelular();
-    expect(screen.getByText("Sin compras registradas")).toBeTruthy();
-    expect(screen.getByText("Sin pagos registrados")).toBeTruthy();
     expect(document.body.textContent).not.toContain("Última compra $0.00");
     expect(document.body.textContent).not.toContain("Último pago $0.00");
   });
 
-  it("las dos líneas crecen HACIA ABAJO (no una columna nueva que empuje a 390 px)", () => {
+  it("🔴 el dato NO se perdió: lo dice el bloque «Últimos pagos», por fecha", () => {
+    const movil = require("node:fs").readFileSync(
+      require("node:path").join(process.cwd(), "src/app/cxc/components/PanelCxcMobile.tsx"), "utf8");
+    expect(movil).toContain("<UltimosPagosPorFecha");
+    expect(movil).toContain("useUltimosPagosGrupo");
+  });
+
+  it("el desglose por empresa conserva el nombre, el total y los tres tramos", () => {
     pintarCelular();
-    const pago = screen.getByText(/Último pago \$187,651\.51/);
-    const compra = screen.getByText(/Última compra \$6,968\.38/);
-    expect(compra.tagName).toBe("P");
-    expect(pago.parentElement).toBe(compra.parentElement);
-    // Hermanas consecutivas: una debajo de la otra, en el flujo del bloque.
-    expect(pago.nextElementSibling).toBe(compra);
+    expect(screen.getAllByText("Fashion Wear").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Desglose por empresa/)).toBeTruthy();
   });
 });
 
-// ─────────────────────── EL EMPALME (useAdminData) ───────────────────────
-
-/**
- * 🩸 ESTE BLOQUE EXISTE POR UNA MUTACIÓN QUE NADIE CAZÓ. Con la ruta probada y
- * las dos pantallas probadas, cambiar `ultimaCompraFecha: compra?.fecha` por
- * `null` en el hook dejaba TODO en verde: el dato llegaba del servidor, las
- * pantallas sabían dibujarlo, y el empalme lo tiraba a la basura en silencio.
- * El join por `empresa_key|cliente_codigo` es la pieza que nadie miraba.
- */
 describe("useAdminData — el join de la última compra con la cartera", () => {
   const AGING = {
     rows: [{
@@ -198,7 +205,7 @@ describe("useAdminData — el join de la última compra con la cartera", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   async function clienteDelHook() {
-    const { default: useAdminData } = await import("@/app/admin/hooks/useAdminData");
+    const { default: useAdminData } = await import("@/app/cxc/hooks/useAdminData");
     // `provider` nuevo: sin él la caché de SWR se comparte entre tests.
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       React.createElement(SWRConfig, { value: { provider: () => new Map(), dedupingInterval: 0 } }, children);

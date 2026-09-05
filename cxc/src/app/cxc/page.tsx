@@ -13,8 +13,10 @@ import { normalizeName } from "@/lib/normalize";
 import AppHeader from "@/components/AppHeader";
 import { Toast, PullToRefresh } from "@/components/ui";
 import BostonTab from "@/components/cxc/BostonTab";
-import KpiCards from "./components/KpiCards";
+import TiraTotales from "./components/TiraTotales";
 import ClientTable from "./components/ClientTable";
+import HojaCobrar, { type CorreoProgramado } from "./components/HojaCobrar";
+import BarraSeleccion from "./components/BarraSeleccion";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
@@ -32,6 +34,19 @@ import {
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import UndoToast from "@/components/UndoToast";
+import { hoyPanama } from "@/lib/fecha-panama";
+import {
+  diasSinPagar,
+  avisaSinPagar,
+  textoSinPagar,
+} from "@/lib/cxc/sin-pagar";
+import {
+  textoUltimoEnvio,
+  diasDesdeEnvio,
+  type CanalEnvio,
+} from "@/lib/cxc/envios-registro";
 import {
   ordenEfectivo,
   ordenAlTocarTitulo,
@@ -50,8 +65,15 @@ function buildEmailSubject(client: ConsolidatedClient) {
 }
 
 function buildEmailBody(client: ConsolidatedClient) {
+  // 🔴 EL SALUDO USA EL NOMBRE DEL CONTACTO CUANDO HAY UNO (5-sep-2026).
+  // `contacto` es la casilla nueva de la ficha del cliente. Sin contacto el
+  // texto es EXACTAMENTE el de siempre — no se inventa un nombre ni se saluda
+  // con la razón social, que es lo que dice la factura y no cómo se llama la
+  // persona. El resto del mensaje NO se tocó: sigue rigiendo la regla de que
+  // la palabra «vencido» está prohibida hacia el cliente.
+  const contacto = (client.contacto ?? "").trim();
   const lines = [
-    `Estimado/a cliente,`,
+    contacto ? `Estimado/a ${contacto},` : `Estimado/a cliente,`,
     ``,
     `Le escribimos de Fashion Group para informarle sobre su estado de cuenta actualizado.`,
     ``,
@@ -140,7 +162,7 @@ function AdminDashboardInner() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "vendedor"] });
   // `uploads` (la lista de cargas de archivo) se dejó de pedir: se desestructuraba
   // acá y no lo leía ninguna línea de la pantalla. Ver `useAdminData`.
-  const { clients, loading, loadError, loadData, avisoMontos } = useAdminData(authChecked);
+  const { clients, loading, loadError, loadData, avisoMontos, ultimoPago } = useAdminData(authChecked);
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   // Pestaña activa. Las dos carteras NUNCA se ven juntas: son dos consultas a
@@ -194,6 +216,79 @@ function AdminDashboardInner() {
   const [estadoClient, setEstadoClient] = useState<ConsolidatedClient | null>(null);
   const openEstadoCuenta = useCallback((client: ConsolidatedClient) => setEstadoClient(client), []);
   const [emailClient, setEmailClient] = useState<ConsolidatedClient | null>(null);
+  // La hoja «Cobrar» — el único camino de cobro de una fila.
+  const [cobrarClient, setCobrarClient] = useState<ConsolidatedClient | null>(null);
+  const abrirCobrar = useCallback((client: ConsolidatedClient) => setCobrarClient(client), []);
+
+  // 🔴 EL AVISO «SIN PAGAR HACE +90 D» ES UN FILTRO MÁS, y vive en la URL como
+  // los otros (`?sinpagar=1`), con `replace`: es un filtro del MISMO nivel, así
+  // que el Atrás del navegador no tiene que ciclar por él.
+  const [sinPagarRaw, setSinPagar] = useUrlState("sinpagar", "");
+  const sinPagarActivo = sinPagarRaw === "1";
+  const toggleSinPagar = useCallback(() => {
+    setSinPagar(sinPagarActivo ? "" : "1");
+  }, [sinPagarActivo, setSinPagar]);
+
+  // Hoy en hora PANAMÁ (UTC-5 fijo). Nunca la fecha del servidor en UTC: entre
+  // las 19:00 y la medianoche de Panamá el día UTC ya es el siguiente y todos
+  // los "días sin pagar" saldrían con un día de más.
+  const hoy = hoyPanama();
+
+  /** Días sin pagar de un cliente. `null` = nunca pagó. */
+  const diasSinPagarDe = useCallback(
+    (c: ConsolidatedClient): number | null => {
+      const codigo = Object.values(c.companies).find((x) => x?.codigo)?.codigo ?? null;
+      return diasSinPagar(codigo ? ultimoPago[codigo] ?? null : null, hoy);
+    },
+    [ultimoPago, hoy],
+  );
+
+  // Qué se le mandó a cada cliente y por dónde (correo · whatsapp · copia),
+  // dentro de la ventana de 7 días. Falla abierto: sin el dato no se dibuja la
+  // marca y nada más cambia.
+  const [envios, setEnvios] = useState<Record<string, { canal: CanalEnvio; fecha: string }>>({});
+  const recargarEnvios = useCallback(() => {
+    fetch("/api/cxc/envios", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { porCodigo: {} }))
+      .then((d) => setEnvios(d?.porCodigo ?? {}))
+      .catch(() => { /* la marca es una ayuda, no un número de plata */ });
+  }, []);
+  useEffect(() => { if (authChecked) recargarEnvios(); }, [authChecked, recargarEnvios]);
+
+  const marcaEnvioDe = useCallback(
+    (c: ConsolidatedClient): string | null => {
+      const codigo = Object.values(c.companies).find((x) => x?.codigo)?.codigo ?? null;
+      const envio = codigo ? envios[codigo] : undefined;
+      if (!envio) return null;
+      return textoUltimoEnvio(envio.canal, diasDesdeEnvio(envio.fecha, hoy));
+    },
+    [envios, hoy],
+  );
+
+  // Anota un WhatsApp o un copiar. El CORREO no pasa por acá: lo anota
+  // `/api/cxc/enviar-email` cuando Resend confirma que salió.
+  const anotarEnvio = useCallback(
+    (client: ConsolidatedClient, canal: Exclude<CanalEnvio, "correo">) => {
+      const codigo = Object.values(client.companies).find((x) => x?.codigo)?.codigo ?? null;
+      if (!codigo) return;
+      fetch("/api/cxc/envios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo, canal, destinatario: canal === "whatsapp" ? (client.celular || client.telefono || "") : "" }),
+      })
+        .then(() => recargarEnvios())
+        .catch(() => { /* no se le rompe el cobro a nadie por una anotación */ });
+    },
+    [recargarEnvios],
+  );
+
+  // Selección para mandar a varios. La llave es el CÓDIGO, nunca el nombre.
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  const [enviandoLote, setEnviandoLote] = useState(false);
+
+  // El correo de a uno sale con DESHACER de 5 segundos: el POST real ocurre al
+  // vencer el plazo (patrón `useUndoAction`/`UndoToast` del sistema).
+  const { scheduleAction, undoAction, pendingUndo } = useUndoAction();
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   const [showExport, setShowExport] = useState(false);
@@ -259,6 +354,11 @@ function AdminDashboardInner() {
 
     if (riskFilter !== "all") result = result.filter((c) => pasaFiltroRiesgo(c, riskFilter));
 
+    // 🔴 EL AVISO «SIN PAGAR HACE +90 D» TAMBIÉN FILTRA. Se aplica acá, con los
+    // otros: es un filtro más de la misma lista, no una pantalla aparte. La
+    // regla (y qué pasa con el que nunca pagó) vive en `lib/cxc/sin-pagar.ts`.
+    if (sinPagarActivo) result = result.filter((c) => avisaSinPagar(diasSinPagarDe(c)));
+
     if (search) {
       const q = normalizeName(search);
       const qLower = search.toLowerCase();
@@ -276,7 +376,7 @@ function AdminDashboardInner() {
     }));
 
     return result;
-  }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir]);
+  }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir, sinPagarActivo, diasSinPagarDe]);
 
   // ── Role-filtered clients ──
   const roleClients = useMemo(() => {
@@ -320,6 +420,29 @@ function AdminDashboardInner() {
       .filter((c) => c.total !== 0);
   }, [roleClients, companyFilter]);
 
+  // ── El aviso «N sin pagar hace +90 d» de la tira de totales ──────────────
+  //
+  // Se cuenta sobre `kpiClients` —el universo accesible con el filtro de empresa
+  // puesto, sin el filtro de riesgo ni la búsqueda—, igual que los otros tres
+  // chips: los cuatro dicen "qué hay", no "qué estás mirando".
+  //
+  // 🔴 SOLO LOS QUE DEBEN. Un cliente con saldo a favor no es alguien a quien
+  // haya que cobrarle por no pagar hace rato.
+  const avisoSinPagar = useMemo(() => {
+    const deudores = kpiClients.filter((c) => c.total > 0 && avisaSinPagar(diasSinPagarDe(c)));
+    return {
+      cuantos: deudores.length,
+      monto: Math.round(deudores.reduce((s, c) => s + c.total, 0) * 100) / 100,
+    };
+  }, [kpiClients, diasSinPagarDe]);
+
+  /** El «no paga hace N d» de una fila — SOLO con el filtro encendido. */
+  const avisoSinPagarDe = useCallback(
+    (c: ConsolidatedClient): string | null =>
+      sinPagarActivo ? textoSinPagar(diasSinPagarDe(c)) : null,
+    [sinPagarActivo, diasSinPagarDe],
+  );
+
   useEffect(() => {
     if (!authChecked) return;
     // El fetch inicial lo dispara SWR al activarse su clave (authChecked); aquí
@@ -358,15 +481,98 @@ function AdminDashboardInner() {
   // prellenado. Los usuarios cobran por WhatsApp — mailto: solo no alcanza.
   function openWhatsApp(client: ConsolidatedClient) {
     const href = waHref(client.celular || client.telefono, buildEmailBody(client));
-    if (!href) { showToast("Este cliente no tiene teléfono registrado. Edite el contacto primero."); return; }
+    if (!href) { showToast("Este cliente no tiene teléfono — cárgalo en su ficha."); return; }
     window.open(href, "_blank");
+    anotarEnvio(client, "whatsapp");
   }
 
   // Copia el mensaje de cobro al portapapeles (para pegar donde sea).
   function copyMessage(client: ConsolidatedClient) {
     navigator.clipboard.writeText(`${buildEmailSubject(client)}\n\n${buildEmailBody(client)}`)
-      .then(() => showToast("Mensaje copiado — pégalo en WhatsApp o correo"))
+      .then(() => { showToast("Mensaje copiado — pégalo en WhatsApp o correo"); anotarEnvio(client, "copia"); })
       .catch(() => showToast("No se pudo copiar. Intenta de nuevo."));
+  }
+
+  // ── «Cobrar» ────────────────────────────────────────────────
+  //
+  // 🔴 EL CORREO SE MANDA CON UN CLIC Y SE PUEDE DESHACER 5 SEGUNDOS. El POST
+  // real ocurre recién al vencer el plazo, así que «Deshacer» no cancela un
+  // correo que ya salió: impide que salga. Es el patrón `useUndoAction` del
+  // sistema, el mismo de depositar y de eliminar.
+  function programarCorreo(datos: CorreoProgramado) {
+    scheduleAction({
+      id: `cxc-correo-${datos.codigo}`,
+      message: `Correo enviado a ${datos.destinatario}`,
+      execute: async () => {
+        const res = await fetch("/api/cxc/enviar-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(datos),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          showToast(d?.error || "No se pudo enviar el correo. Intenta de nuevo.");
+          return;
+        }
+        recargarEnvios();
+      },
+    });
+  }
+
+  // ── Mandar a varios ─────────────────────────────────────────
+  const codigoDe = (c: ConsolidatedClient) =>
+    Object.values(c.companies).find((x) => x?.codigo)?.codigo ?? c.nombre_normalized;
+
+  function alternarSeleccion(client: ConsolidatedClient) {
+    const codigo = codigoDe(client);
+    setSeleccion((previa) => {
+      const siguiente = new Set(previa);
+      if (siguiente.has(codigo)) siguiente.delete(codigo);
+      else siguiente.add(codigo);
+      return siguiente;
+    });
+  }
+
+  /** La casilla del encabezado selecciona LO FILTRADO, no el universo entero. */
+  function alternarSeleccionTodos() {
+    setSeleccion((previa) => {
+      const todos = filtered.map(codigoDe);
+      const yaEstaban = todos.length > 0 && todos.every((c) => previa.has(c));
+      return yaEstaban ? new Set<string>() : new Set(todos);
+    });
+  }
+
+  async function cobrarALosSeleccionados() {
+    const elegidos = filtered.filter((c) => seleccion.has(codigoDe(c)));
+    if (elegidos.length === 0) return;
+    setEnviandoLote(true);
+    try {
+      const res = await fetch("/api/cxc/cobrar-lote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientes: elegidos.map((c) => ({
+            codigo: codigoDe(c),
+            nombre: Object.values(c.companies).find((x) => x?.nombre)?.nombre ?? c.nombre_normalized,
+            nombreNormalizado: c.nombre_normalized,
+          })),
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { showToast(d?.error || "No se pudo mandar el lote. Intenta de nuevo."); return; }
+      // 🔴 Los que quedaron fuera se dicen POR NOMBRE, no como un número.
+      const fuera = Array.isArray(d?.sinCorreo) && d.sinCorreo.length > 0
+        ? ` · sin correo: ${d.sinCorreo.join(", ")}`
+        : "";
+      const fallidos = d?.correosFallidos > 0 ? ` · ${d.correosFallidos} no salieron` : "";
+      showToast(`${d?.correosEnviados ?? 0} correos enviados${fallidos}${fuera}`);
+      setSeleccion(new Set());
+      recargarEnvios();
+    } catch {
+      showToast("No se pudo mandar el lote. Intenta de nuevo.");
+    } finally {
+      setEnviandoLote(false);
+    }
   }
 
   // 🔴 EL SEGUIMIENTO DE COBRO NO EXISTE EN ESTE MÓDULO (Daniel, 14-ago-2026,
@@ -456,10 +662,13 @@ function AdminDashboardInner() {
         setRiskFilter={handleRiskFilterChange}
         companyFilter={companyFilter}
         setCompanyFilter={setCompanyFilter}
-        onOpenEmail={openEmail}
-        onWhatsApp={openWhatsApp}
-        onCopyMessage={copyMessage}
         onOpenEstado={openEstadoCuenta}
+        onCobrar={abrirCobrar}
+        sinPagar={avisoSinPagar}
+        sinPagarActivo={sinPagarActivo}
+        onToggleSinPagar={toggleSinPagar}
+        avisoSinPagarDe={avisoSinPagarDe}
+        marcaEnvioDe={marcaEnvioDe}
         canExport={canExport}
         onExportarCsv={handleMobileExportCsv}
         empresaRestriction={empresaRestriction}
@@ -469,21 +678,122 @@ function AdminDashboardInner() {
 
       <div className="hidden lg:block max-w-6xl mx-auto px-6 py-8">
 
-      {/* Sync status — MAX(synced_at) por empresa del cron switch-sync, con
-          warning si alguna empresa lleva >26h sin actualizar. El botón
-          "Actualizar ahora" (admin/secretaria) dispara estadocuenta de la
-          empresa seleccionada en el filtro; con "Todas" queda deshabilitado. */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <SyncStatus
-          tabla="estadocuenta"
-          empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS}
-          empresaLabels={EMPRESA_KEY_TO_NAME}
-        />
-        <SyncNowButton
-          opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
-          disabledReason={companyFilter === "all" ? "Elige una empresa en el filtro para actualizarla" : null}
-          onSuccess={() => loadData()}
-        />
+      {/* ── UNA SOLA LÍNEA DE FILTROS (5-sep-2026) ──────────────────────────
+          🩸 Eran SEIS bloques antes del primer cliente: la frescura por su
+          cuenta, el aviso de rechazos, una línea que solo tenía el botón
+          Exportar, un buscador de ancho completo, cuatro píldoras de tramo y el
+          conteo «N de M clientes». Ahora quedan DOS: esta línea y la tira de
+          totales pegada a la tabla.
+
+          El orden es el del uso: primero se elige la empresa, después se busca,
+          y a la derecha —lejos de los controles, para no tocarlos sin querer—
+          la frescura del dato y los dos botones.
+
+          ⚠️ El buscador es ANGOSTO a propósito (~230 px): a ancho completo
+          empujaba todo lo demás a otro renglón, y lo que se teclea son tres o
+          cuatro letras del nombre, no una frase. */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        {cxcCompanies.length > 1 && (
+          <select
+            value={companyFilter}
+            onChange={(e) => setCompanyFilter(e.target.value)}
+            disabled={!!empresaRestriction}
+            aria-label="Empresa"
+            className="border border-gray-200 rounded-lg px-3 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white disabled:opacity-60"
+          >
+            <option value="all">Todas mis empresas</option>
+            {cxcCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
+          </select>
+        )}
+
+        <div className="relative w-[230px]">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar cliente…"
+            aria-label="Buscar cliente"
+            className="w-full pl-10 pr-3 min-h-[44px] bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* La frescura, empujada a la derecha y en texto tenue: se lee ANTES de
+            creerle a un número, pero no compite con los controles. */}
+        <div className="ml-auto flex items-center gap-3">
+          <SyncStatus
+            tabla="estadocuenta"
+            empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS}
+            empresaLabels={EMPRESA_KEY_TO_NAME}
+          />
+          {canExport && (
+            <div className="relative">
+              <button
+                onClick={() => setShowExport(!showExport)}
+                className="text-sm bg-black text-white px-4 rounded-lg font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 min-h-[44px]"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Exportar
+              </button>
+              {showExport && (<>
+                <div className="fixed inset-0 z-10" onClick={() => setShowExport(false)} />
+                <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-72 py-1">
+                  <button
+                    onClick={() => {
+                      const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "por-vencer" : riskFilter === "watch" ? "vencido-reciente" : "vencido-critico";
+                      const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
+                      const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Por vencer" : riskFilter === "watch" ? "Vencido reciente" : "Vencido crítico";
+                      exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined, riskLabel || undefined, coL || undefined);
+                      setShowExport(false);
+                    }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <div>
+                      <div className="text-sm font-medium text-gray-800">CSV (Excel)</div>
+                      <div className="text-xs text-gray-400 mt-0.5">Hoja de cálculo con el detalle por tramo de días</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const sub = buildExportSubtitle();
+                      const { generatePDFResumen } = await import("@/lib/pdf-cxc");
+                      generatePDFResumen(filtered, sub);
+                      setShowExport(false);
+                    }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><rect x="6" y="3" width="12" height="18" rx="1"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/></svg>
+                    <div>
+                      <div className="text-sm font-medium text-gray-800">PDF Resumen</div>
+                      <div className="text-xs text-gray-400 mt-0.5">Vista general, listo para imprimir</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const sub = buildExportSubtitle();
+                      const { generatePDFDetallado } = await import("@/lib/pdf-cxc");
+                      generatePDFDetallado(filtered, cxcCompanies, sub);
+                      setShowExport(false);
+                    }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
+                    <div>
+                      <div className="text-sm font-medium text-gray-800">PDF Detallado</div>
+                      <div className="text-xs text-gray-400 mt-0.5">Desglose completo por empresa y tramo de días</div>
+                    </div>
+                  </button>
+                </div>
+              </>)}
+            </div>
+          )}
+          <SyncNowButton
+            opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
+            disabledReason={companyFilter === "all" ? "Elige una empresa en el filtro para actualizarla" : null}
+            onSuccess={() => loadData()}
+          />
+        </div>
       </div>
 
       {/* Qué se quedó AFUERA de estos totales. Pegado a la frescura porque
@@ -491,77 +801,6 @@ function AdminDashboardInner() {
           Acotado a las 6 del grupo por el servidor: Boston lo dice en SU
           pestaña. Sin rechazos no se dibuja nada. */}
       <AvisoRechazosSwitch texto={avisoMontos} className="mb-4" />
-
-      {/* Export buttons — admin/secretaria only */}
-      {canExport && (
-        <div className="flex justify-end items-center gap-2 sm:gap-3 mb-6 flex-wrap">
-          <div className="relative">
-            <button
-              onClick={() => setShowExport(!showExport)}
-              className="text-sm bg-black text-white px-4 sm:px-5 rounded-lg font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 min-h-[44px]"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Exportar
-            </button>
-            {showExport && (<>
-              <div className="fixed inset-0 z-10" onClick={() => setShowExport(false)} />
-              {/* El alcance del export ya está dicho arriba de la tabla
-                  ("{N} de {M} clientes"): repetirlo acá era el MISMO número dos
-                  veces en la misma pantalla. */}
-              <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-72 py-1">
-                <button
-                  onClick={() => {
-                    const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "por-vencer" : riskFilter === "watch" ? "vencido-reciente" : "vencido-critico";
-                    const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
-                    const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Por vencer" : riskFilter === "watch" ? "Vencido reciente" : "Vencido crítico";
-                    exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined, riskLabel || undefined, coL || undefined);
-                    setShowExport(false);
-                  }}
-                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">CSV (Excel)</div>
-                    {/* "aging" era jerga en inglés en el menú que describe el
-                        papel. Se dice lo que trae el archivo. */}
-                    <div className="text-xs text-gray-400 mt-0.5">Hoja de cálculo con el detalle por tramo de días</div>
-                  </div>
-                </button>
-                <button
-                  onClick={async () => {
-                    const sub = buildExportSubtitle();
-                    const { generatePDFResumen } = await import("@/lib/pdf-cxc");
-                    generatePDFResumen(filtered, sub);
-                    setShowExport(false);
-                  }}
-                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><rect x="6" y="3" width="12" height="18" rx="1"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/></svg>
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">PDF Resumen</div>
-                    <div className="text-xs text-gray-400 mt-0.5">Vista general, listo para imprimir</div>
-                  </div>
-                </button>
-                <button
-                  onClick={async () => {
-                    const sub = buildExportSubtitle();
-                    const { generatePDFDetallado } = await import("@/lib/pdf-cxc");
-                    generatePDFDetallado(filtered, cxcCompanies, sub);
-                    setShowExport(false);
-                  }}
-                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">PDF Detallado</div>
-                    <div className="text-xs text-gray-400 mt-0.5">Desglose completo por empresa y tramo de días</div>
-                  </div>
-                </button>
-              </div>
-            </>)}
-          </div>
-        </div>
-      )}
 
       {/* Smart empty state: no CXC data loaded */}
       {!loading && roleClients.length === 0 && (
@@ -578,38 +817,46 @@ function AdminDashboardInner() {
         </div>
       )}
 
-      {/* Search input — above KPIs */}
-      <div className="relative mb-4">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar cliente, teléfono, email…"
-          className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-      </div>
-
-      {/* Clickable KPI chips = risk filter */}
-      <KpiCards roleClients={kpiClients} riskFilter={riskFilter} onRiskFilterChange={handleRiskFilterChange} />
+      {/* La tira de totales va PEGADA a la tabla, en su misma grilla: cada
+          total queda parado sobre su columna. El buscador y el selector de
+          empresa viven arriba, en la única línea de filtros. */}
+      <TiraTotales
+        roleClients={kpiClients}
+        riskFilter={riskFilter}
+        onRiskFilterChange={handleRiskFilterChange}
+        sinPagar={avisoSinPagar}
+        sinPagarActivo={sinPagarActivo}
+        onToggleSinPagar={toggleSinPagar}
+      />
 
       <ClientTable
         filtered={filtered}
         roleCompanies={cxcCompanies}
-        roleClients={kpiClients}
         companyFilter={companyFilter}
-        setCompanyFilter={setCompanyFilter}
-        riskFilter={riskFilter}
-        search={search}
-        sortKey={sortKey}
-        sortDir={sortDir}
         toggleSort={toggleSort}
         sortArrow={sortArrow}
-        userRole={userRole}
-        onOpenEmail={openEmail}
-        onWhatsApp={openWhatsApp}
-        onCopyMessage={copyMessage}
+        onCobrar={abrirCobrar}
         onOpenEstado={openEstadoCuenta}
+        seleccion={seleccion}
+        onSeleccionar={alternarSeleccion}
+        onSeleccionarTodos={alternarSeleccionTodos}
+        avisoSinPagarDe={avisoSinPagarDe}
+        marcaEnvioDe={marcaEnvioDe}
+      />
+
+      {/* Mandar a varios: UN correo por DIRECCIÓN, nunca uno por cliente. */}
+      <BarraSeleccion
+        clientes={filtered
+          .filter((c) => seleccion.has(codigoDe(c)))
+          .map((c) => ({
+            codigo: codigoDe(c),
+            nombre: c.nombre_normalized,
+            correo: c.correo || null,
+            total: c.total,
+          }))}
+        onQuitarSeleccion={() => setSeleccion(new Set())}
+        onCobrarATodos={cobrarALosSeleccionados}
+        enviando={enviandoLote}
       />
       </div>
       </>
@@ -619,14 +866,37 @@ function AdminDashboardInner() {
         client={estadoClient}
         companyFilter={companyFilter}
         onClose={() => setEstadoClient(null)}
+        onCobrar={(c) => { setEstadoClient(null); abrirCobrar(c); }}
       />
 
+      {/* «Escribirlo yo»: el formulario completo de siempre, con destinatario,
+          asunto y cuerpo editables. NO se borró — es la salida para el caso que
+          la hoja de un clic no cubre.
+          ⚠️ Ya no recibe `companyFilter`: lo que se manda son SIEMPRE las 6
+          empresas y eso lo decide el servidor. */}
       <EnviarEmailModal
         client={emailClient}
-        companyFilter={companyFilter}
         onClose={() => setEmailClient(null)}
-        onSent={showToast}
+        onSent={(msg) => { showToast(msg); recargarEnvios(); }}
       />
+
+      <HojaCobrar
+        client={cobrarClient}
+        onClose={() => setCobrarClient(null)}
+        onProgramarCorreo={programarCorreo}
+        onWhatsApp={openWhatsApp}
+        onCopiar={copyMessage}
+        onEscribirloYo={openEmail}
+        marcaEnvio={cobrarClient ? marcaEnvioDe(cobrarClient) : null}
+      />
+
+      {pendingUndo && (
+        <UndoToast
+          message={pendingUndo.message}
+          startedAt={pendingUndo.startedAt}
+          onUndo={undoAction}
+        />
+      )}
 
       <Toast message={toast} />
     </div>

@@ -12,7 +12,7 @@ Cubre cinco de los diez módulos del grupo **Ventas y clientes** (`src/lib/modul
 |---|---|---|---|
 | Vista General | `vista-general` | `/vista-general` | `admin` |
 | Ventas | `ventas` | `/ventas` | `admin` |
-| Cuentas por Cobrar | `cxc` | `/admin` | `admin`, `vendedor` |
+| Cuentas por Cobrar | `cxc` | `/cxc` | `admin`, `vendedor` |
 | Clientes | `directorio` | `/clientes` | `admin`, `secretaria`, `vendedor` |
 | Proveedores | `proveedores` | `/proveedores` | `admin`, `contabilidad` |
 
@@ -27,7 +27,7 @@ Confecciones Boston, Catálogos) tienen su propio documento; aquí aparecen solo
 >    en `fg_modules` — o sea que `allowedRoles` puede ser MÁS ancho que `roles[]`.
 > 3. `requireRole` / `getSession` en cada ruta de API decide **si los datos viajan**.
 > El caso concreto está abajo, en CXC: `secretaria` **no** está en `roles[]` de `cxc` pero **sí** en
-> el `allowedRoles` de `/admin` y en el 403 de `/api/cxc/aging`.
+> el `allowedRoles` de `/cxc` y en el 403 de `/api/cxc/aging`.
 
 El middleware (`src/middleware.ts`) **no mira módulos ni roles**: solo valida que la cookie
 `cxc_session` esté firmada y que la fila de `user_sessions` no esté revocada. Todo el permiso por
@@ -83,7 +83,7 @@ mes futuro → se responde con el mes en curso.
 | **Margen bruto** | `utilidad ÷ ventas` del mes | `$X utilidad bruta` | `/ventas` |
 | **Disponibilidad** | suma del ÚLTIMO saldo de banco por empresa | `al <fecha más vieja>` | `/saldos-banco` (redirige a `/gastos-contabilidad?tab=saldos-banco`) |
 | **Inventario** (píldora «al costo») | `totalCosto` | `N piezas · al <fecha>` (ámbar si pasó de 26 h) | `/referencia` |
-| **Por cobrar (CXC)** | total de `switch_estadocuenta_aging` | `$X con más de 90 días` (rojo si > 0) | `/admin` |
+| **Por cobrar (CXC)** | total de `switch_estadocuenta_aging` | `$X con más de 90 días` (rojo si > 0) | `/cxc` |
 | **Por pagar (CXP)** | total de `switch_proveedor_estadocuenta` | `$X vencido +90d` (ámbar si > 0) | `/proveedores` |
 
 Al pasar el mouse, la segunda línea se reemplaza por «Ir a X →». Ninguna tarjeta es editable.
@@ -121,7 +121,7 @@ Semáforo (`estadoSemaforo`, `src/lib/vista-general-calc.ts`): `null` → **Sin 
 **Al límite** (ámbar); resto → **Sana** (verde). Exactamente 5 % es verde.
 
 ### «Requiere tu atención» — tres tarjetas
-- **Clientes con saldo +90 días** → top 6 de `switch_estadocuenta_aging` con vencido > 0, enlaza a `/admin`.
+- **Clientes con saldo +90 días** → top 6 de `switch_estadocuenta_aging` con vencido > 0, enlaza a `/cxc`.
 - **Proveedores con saldo vencido +90d** → top 6 de `switch_proveedor_estadocuenta`, enlaza a `/proveedores`.
 - **Reclamos sin pagar (+30 días)** → hasta 8 reclamos no pagados con `fecha_reclamo` ≥ 30 días,
   enlaza a `/reclamos?id=…`.
@@ -154,7 +154,7 @@ Detalle de cada tabla en `CLAUDE.md § Dónde vive cada dato`. Los conteos medid
 Cosas que hay que saber de esta ruta y no están en ningún otro lado:
 
 - **El CXC se lee de la vista VIVA, no de la MV**, a propósito: la MV se refresca 1×/día y divergía
-  con `/admin` intradía. Así el Δ contra `/admin` es 0,00 siempre.
+  con `/cxc` intradía. Así el Δ contra `/cxc` es 0,00 siempre.
 - **El CXP suma TODAS las filas, incluidos los saldos a favor (negativos)**, para cuadrar con el
   `grupo_saldo` del módulo Proveedores. Antes filtraba `saldo_total > 0` y no cuadraba.
 - **Tramos idénticos para CXC y CXP**: Corriente = `d0_30 + d31_60 + d61_90` (títulos `0-30/31-60/61-90`
@@ -220,14 +220,14 @@ de «no se pudo leer»).
 | Módulo dueño | Qué le lee |
 |---|---|
 | Ventas | RPC `ventas_dashboard_summary_v2`, `ventas_rollup_mensual_mv`, `ventas_dashboard_prev_same_period_v4` |
-| Cuentas por Cobrar | vista `switch_estadocuenta_aging` |
+| Cuentas por Cobrar (`/cxc`) | vista `switch_estadocuenta_aging` |
 | Proveedores | `switch_proveedor_estadocuenta` |
 | Gastos | `leerEgresosMes` (`egresos_varios` + `egresos_importaciones`) y `bancos_saldos` |
 | Referencia / catálogo | `switch_articulo_info` vía `inventario_valorizado_v1` |
 | Reclamos | tabla `reclamos` |
 
 **Quién lee lo suyo:** nadie. Es una hoja del grafo — no tiene tabla, no tiene endpoint que otro
-consuma, y sus enlaces salientes (`/ventas`, `/admin`, `/proveedores`, `/referencia`,
+consuma, y sus enlaces salientes (`/ventas`, `/cxc`, `/proveedores`, `/referencia`,
 `/gastos-contabilidad`, `/saldos-banco`, `/reclamos`) son navegación.
 
 **Qué se rompería si cambiara la forma de sus datos:**
@@ -327,7 +327,7 @@ consuma, y sus enlaces salientes (`/ventas`, `/admin`, `/proveedores`, `/referen
   scripts de medición y renombrarlo los dejaría midiendo cero filas **en verde**.
 
 - **La MV `switch_estadocuenta_aging_mv` dejó de leerse aquí** — refresca 1×/día y quedaba atrás de
-  los re-syncs de la reconciliación, así que divergía con `/admin` intradía. Se lee la **vista viva**
+  los re-syncs de la reconciliación, así que divergía con `/cxc` intradía. Se lee la **vista viva**
   para garantizar Δ = 0,00. La MV sigue existiendo; esta ruta ya no la toca.
 - **El filtro `saldo_total > 0` del CXP — retirado.** Excluía 2 proveedores con saldo a favor y el
   total no cuadraba con el `grupo_saldo` del módulo Proveedores.
@@ -395,8 +395,8 @@ recargar los números. La flecha `›` queda apagada en el mes en curso. Escribe
 `/vista-general?mes=2099-01`: tiene que caer en el mes actual, **no** mostrar una pantalla vacía.
 Y `?mes=basura` tiene que dar el error «Mes inválido. Usa el formato YYYY-MM.».
 
-**2. Que el CXC cuadra al centavo con `/admin`.** La tarjeta «Por cobrar (CXC)» tiene que dar
-**exactamente** el mismo total que la píldora «Total Pendiente» de `/admin` con «Todas» puesto (al
+**2. Que el CXC cuadra al centavo con `/cxc`.** La tarjeta «Por cobrar (CXC)» tiene que dar
+**exactamente** el mismo total que el chip «Total» de la tira de `/cxc` con «Todas» puesto (al
 4-sep-2026: **$3.685.289,04**, 211 clientes). Esa igualdad es a propósito: las dos leen la **vista
 viva**, no la materializada.
 
@@ -1151,14 +1151,18 @@ entra por el **panel web con sesión**, y eso cambia el modo de fallar.
   empresa inválida no da 400, la vista simplemente devuelve 0 filas.
 ---
 
-# Cuentas por Cobrar (`/admin`, key `cxc`)
+# Cuentas por Cobrar (`/cxc`, key `cxc`)
 
 ## Qué es
 
 La pantalla de cobro: quién le debe al grupo, cuánto, desde hace cuánto, y las cuatro cosas que se
-hacen para cobrarlo (ver el estado de cuenta, mandarlo por correo, mandarlo por WhatsApp, copiar el
-mensaje). El nombre del módulo es «Cuentas por Cobrar»; la URL sigue siendo `/admin` por historia y
-la `key` sigue siendo `cxc` porque está en `role_permissions`.
+hacen para cobrarlo (mandar el estado de cuenta por correo, mandarlo por WhatsApp, copiar el mensaje,
+ver o bajar el PDF) — todas detrás de **un solo botón «Cobrar»** desde el 5-sep-2026.
+
+**La URL es `/cxc` desde el 5-sep-2026** (era `/admin`, que se leía como «administración»). El rótulo
+no cambió y la `key` sigue siendo `cxc` porque está en `role_permissions`. `/admin` **redirige**
+(temporal, 307, arrastrando la query); ⚠️ **`/admin/usuarios` y `/admin/data-health` NO se movieron**:
+la redirección es de `/admin` exacto.
 
 Tiene **dos pestañas que nunca se ven juntas**: **«Grupo · 6 empresas»** y **«Confecciones Boston»**.
 Son dos consultas a dos vistas disjuntas, así que no existe ninguna pantalla donde los saldos del
@@ -1167,7 +1171,7 @@ grupo y los de Boston puedan sumarse (ver `docs/postmortems/boston-cxc.md`).
 ## Quién entra
 
 - **La ficha del menú** se le pinta a `admin` y `vendedor` (`roles: ["admin","vendedor"]`).
-- **La pantalla `/admin`** deja entrar a `admin`, `secretaria` y `vendedor`
+- **La pantalla `/cxc`** deja entrar a `admin`, `secretaria` y `vendedor`
   (`useAuth({ moduleKey: "cxc", allowedRoles: [...] })`), y **`/api/cxc/aging` también**: contesta 403
   a todo lo que no sea esos tres. O sea que **`secretaria` tiene el módulo completo aunque el
   catálogo no se lo pinte**.
@@ -1182,8 +1186,10 @@ grupo y los de Boston puedan sumarse (ver `docs/postmortems/boston-cxc.md`).
 - **La pestaña de Boston la ven `admin`, `secretaria` y `gerente_boston`** (`ROLES_BOSTON`,
   `src/lib/cxc/boston-roles.ts`) — **`vendedor` NO**. Y no se dibuja gris: no se dibuja. Un enlace con
   `?tab=boston` cae al grupo (`tabCxcPermitida`). `gerente_boston` (David) llega a esa pestaña por
-  `/boston`, no por `/admin`: su único módulo es `boston`.
-- **Exportar** (CSV / los dos PDF) es solo `admin` y `secretaria` (`canExport` en `admin/page.tsx`).
+  `/boston`, no por `/cxc`: su único módulo es `boston`.
+- **Exportar** (CSV / los dos PDF) es solo `admin` y `secretaria` (`canExport` en `cxc/page.tsx`).
+- **Cobrar lo puede hacer todo el que entra al módulo** (admin · secretaria · vendedor): no se agregó
+  ninguna restricción nueva con el rediseño.
 - 🩸 **La anomalía de roles se cerró borrando la función** (4-sep-2026). `/api/cxc/favorites` exigía
   `rolesBoston()` = `["admin","secretaria","gerente_boston"]`, o sea que un `vendedor` veía el CXC y
   recibía **403** al tocar la estrella. La ruta ya no existe: los favoritos se retiraron enteros
@@ -1204,64 +1210,128 @@ escritorio (≥ 1024 px). El corte es `lg` y no `md` porque lo que decide es el 
 cliente.
 
 ### Pestaña «Grupo · 6 empresas»
+
+🔄 **Rediseñada el 5-sep-2026.** Antes del primer cliente había **SEIS bloques**; quedan **DOS**. El
+porqué de cada cambio, con sus mediciones, está en `docs/postmortems/boston-cxc.md`.
+
 De arriba abajo:
-1. **Frescura + «Actualizar ahora»** — `SyncStatus` (tabla `estadocuenta`, las 6 del grupo) y el botón
-   que dispara el sync de **la empresa del filtro**; con «Todas» queda apagado con el motivo
-   («Elige una empresa en el filtro para actualizarla»).
-2. **Aviso ámbar de rechazos de Switch** (`AvisoRechazosSwitch`, familia `cxc`, acotado a las 6).
-3. **Botón «Exportar»** (admin/secretaria) con tres opciones: **CSV (Excel)** «Hoja de cálculo con el
-   detalle por tramo de días» · **PDF Resumen** «Vista general, listo para imprimir» · **PDF
-   Detallado** «Desglose completo por empresa y tramo de días».
-4. **Buscador** «Buscar cliente, teléfono, email…» — busca en nombre normalizado, correo, teléfono,
-   celular y contacto.
-5. **Cuatro píldoras** (`KpiCards`): **Total Pendiente** · **Por vencer 0-90d** · **Vencido reciente
-   91-120d** · **Vencido crítico 121d+**, cada una con su monto y su conteo de clientes. Tocar una
-   **filtra Y ordena por ese tramo** en una sola acción; tocar la encendida la apaga
-   (`src/lib/cxc-orden.ts`).
-6. **Selector de empresa** «Todas mis empresas» + las 6.
-7. **Línea de alcance**: «N de M clientes · ordenados por \<criterio\>» — el texto describe el orden
-   REAL, venga de la píldora o del clic en un título de columna.
-8. **La tabla**: `Cliente · 0-90d · 91-120d · 121d+ · Total`. A la izquierda de cada fila una barra de
-   color por riesgo; el botón **«Últimos pagos ›»**; y a la derecha el menú **«···»**
-   con **exactamente cuatro** opciones: **Estado de cuenta · WhatsApp · Enviar correo · Copiar
-   mensaje**. El clic derecho (escritorio) abre un menú que dice **lo mismo**.
-9. **«Saldo a favor (N)»** — los clientes con total negativo van en su propio bloque al pie, fuera de
+
+1. **Una sola línea de filtros**, en orden de uso: **selector de empresa** («Todas mis empresas» + las
+   6) · **buscador angosto** (~230 px; busca en nombre normalizado, correo, teléfono, celular y
+   contacto) · empujada a la derecha, **la frescura** (`SyncStatus`, texto tenue) · **Exportar**
+   (negro, admin/secretaria: CSV · PDF Resumen · PDF Detallado) · **Actualizar ahora** (borde; dispara
+   el sync de la empresa del filtro, apagado con «Todas»).
+2. **Aviso ámbar de rechazos de Switch** (`AvisoRechazosSwitch`, familia `cxc`, acotado a las 6), si
+   hay algo que decir.
+3. **La tira de totales, pegada a la tabla y en su MISMA grilla de 12 columnas** (4/2/2/2/2), así que
+   cada total queda **parado sobre su columna**:
+   - **celda 1** (sobre «Cliente»): el aviso **«N sin pagar hace +90 d»** con su monto en rojo,
+     **tocable** (filtra la lista, toggle, en la URL con `replace`). Si no hay ninguno, dice
+     «N clientes».
+   - **celdas 2-4**: `0-90d` · `91-120d` · `121d+`, con su punto de color, el monto y el conteo
+     debajo. 🔴 **El chip dice solo el rango**; el nombre completo («Vencido reciente 91-120d») vive
+     en su `title` y sale de `tramoLabel()`, la misma fuente única que usan el celular, el papel y el
+     correo.
+   - **celda 5** (sobre «Total»): `Total · N` con el total pendiente.
+   Las cuatro **filtran Y ordenan** en una sola acción; tocar la encendida la apaga
+   (`src/lib/cxc-orden.ts`, que **no se tocó**).
+4. **La tabla**: `Cliente · 0-90d · 91-120d · 121d+ · Total`. Cada fila lleva una **casilla de
+   selección** a la izquierda (la del encabezado selecciona lo filtrado), la barra de color por
+   riesgo, y a la derecha del total el botón negro **«Cobrar»** — visible, sin abrir nada.
+   🩸 **Se fueron el menú «···» y el menú de clic derecho**: eran tres listas de acciones en tres
+   archivos, ninguna visible hasta tocar algo, y el clic derecho no existe en el iPad.
+   🩸 **Y se fue la línea «N de M clientes · ordenados por …»**: el conteo está en el chip de Total y
+   el orden lo dice la flecha del encabezado de la columna.
+5. **Barra de selección** (aparece al marcar clientes): `N clientes · $X` · `M comparten correo → K
+   correos` · «Quitar selección» · **«Cobrar a los N»**.
+6. **«Saldo a favor (N)»** — los clientes con total negativo van en su propio bloque al pie, fuera de
    la lista de cobro.
 
-**Al tocar «Últimos pagos ›»** se abre una sub-fila con los **últimos 3 pagos por empresa**
-(`/api/cxc/ultimos-pagos`). Se pide **recién al tocar** (la sub-fila vive montada para los 211
-clientes) y no se vuelve a pedir al cerrar y abrir.
+**Solo con el filtro «sin pagar» encendido**, cada fila muestra al lado del nombre, en gris chico,
+«no paga hace 298 d» o «nunca ha pagado». En las 100 filas normales no se muestra.
 
-**Al tocar la fila** se despliega `ContactPanel`: el desglose por empresa con `Por vencer · Vencido
-reciente · Vencido crítico · Total · Último pago · Última compra`, el botón **«Estado de cuenta»** y
-el enlace **«Ver ficha completa ›»** a `/clientes/<código>`.
-- «Último pago» es el **cobro real** más reciente en esa empresa: excluye retenciones y recibos en
-  cero. Sus días se pintan con la escala del aging (gris ≤90, ámbar 91-120, rojo >120).
-- «Última compra» es la **última Factura** (las notas de crédito no son compras) y sus días van en
-  **gris a propósito**: una compra vieja no es plata en riesgo.
+**Al tocar la fila** se despliega `ContactPanel`:
+- **El desglose por empresa se quedó EXACTAMENTE como estaba** (Daniel lo eligió así): `Por vencer ·
+  Vencido reciente · Vencido crítico · Total · Último pago · Última compra`. «Último pago» es el
+  **cobro real** más reciente en esa empresa (excluye retenciones y recibos en cero) y sus días se
+  pintan con la escala del aging; «Última compra» es la **última Factura** y sus días van en **gris a
+  propósito** — una compra vieja no es plata en riesgo.
+- 🔄 **Debajo, «Últimos pagos» POR FECHA** (no por empresa): las 3 últimas fechas en que pagó, con el
+  total de ese día y en qué empresas — `20 ago · $234,189.21 · Vistana · Fashion Wear · Active Shoes
+  · Fashion Shoes`. Se pide al abrir el panel y no se vuelve a pedir. 🩸 El bloque por empresa y su
+  botón «Últimos pagos ›» se retiraron: un cliente que le paga a las seis el mismo día llenaba **18
+  líneas para decir lo que dicen 3**.
+- **Acciones en una línea**: **[Cobrar]** (negro) · **[Ver los documentos]** · **Ver ficha completa ›**
+  a `/clientes/<código>` · y a la derecha, en gris, la marca de envío («Le enviaste el estado de
+  cuenta hace 3 días» / «Copiaste el mensaje hace 3 días», 7 días).
 
-**El drawer «Estado de cuenta»** (`EstadoCuentaDrawer`) trae, por empresa, un renglón por documento
-con saldo: `Documento · Tipo · Fecha · Ndías · Saldo` y el `de $X` cuando el saldo difiere del monto.
-Al pie, «N documentos con saldo», el **Total** y **un solo botón**, rotulado con lo que de verdad va
-a hacer: **«Compartir»** si el navegador sabe compartir archivos (celular) o **«Descargar PDF»** si no.
-El error de armado se ve en pantalla, no solo en la consola.
+### La hoja «Cobrar» — una hoja, cuatro salidas
 
-**El modal «Enviar estado de cuenta»** (`EnviarEmailModal`) precarga destinatario, asunto y cuerpo
-desde `GET /api/cxc/enviar-email` y los deja editar, con vista previa del HTML. Campos: **Para ·
-Asunto · Mensaje**. Solo **Para** y **Asunto** son obligatorios (`Escribe un correo de destino.` /
-`Asunto requerido`). Si el correo del destinatario está compartido por 10 o más códigos de cliente,
-avisa. Al enviar: «Correo enviado» (o «Correo enviado (no se pudo registrar en la bitácora)»).
+Se abre desde el botón de la fila, desde el panel, desde el celular y desde el pie del cajón de
+documentos. Encabezado: `Estado de cuenta al <fecha> · N empresas · $total`, y debajo la marca de
+envío si aplica. Cuatro filas:
+
+1. **Correo** — muestra el destinatario y **manda con un clic**, sin ventana de compose, con
+   **«Deshacer» de 5 segundos**: el envío real ocurre al vencer el plazo. Sin correo cargado la fila
+   sale **apagada** y dice «Este cliente no tiene correo — cárgalo en su ficha» (medido: 21 de 100).
+2. **WhatsApp** — al celular o al teléfono, con el mismo texto de siempre.
+3. **Copiar el mensaje.**
+4. **Ver o bajar el PDF** — comparte por la hoja del sistema en celular, baja en la computadora.
+
+Más **«Escribirlo yo»**, que abre el `EnviarEmailModal` de siempre (destinatario, asunto y cuerpo
+editables, con vista previa). En celular la hoja **sube desde abajo**.
+
+🔴 **Lo que se manda son SIEMPRE las 6 empresas, sin importar el filtro de la pantalla.** Daniel,
+textual: *«todo»*. La regla vive en el servidor.
+
+### Mandar a varios
+
+Casilla por fila + casilla en el encabezado. 🔴 **UN correo por DIRECCIÓN, no por cliente**: los que
+comparten dirección reciben **un solo correo con UN PDF** que trae una hoja por cliente y el total al
+final. Medido: de los 79 con correo, **31 comparten 9 direcciones → 57 correos**;
+`oficina@citymoda.store` lo comparten **13 clientes** ($402.376,67). Los que no tienen correo **no
+abortan el lote**: se manda a los que se puede y se dicen **por nombre** los que quedaron fuera.
+
+### El cajón «Estado de cuenta» (`Ver los documentos`)
+
+🔄 **Rediseñado el 5-sep-2026.** Arriba: el nombre, **el total grande**, `D-25 · al <fecha> · N
+documentos en M empresas` y una tira de **pastillas por empresa con su subtotal** (tocarlas salta a
+esa sección). La tabla lleva **encabezados de columna** —`Documento` (número arriba, tipo abajo) ·
+`Fecha` · `Días` · `Original` · `Saldo`— y `Original` muestra **«—» cuando es igual al saldo**.
+🩸 Antes eran dos líneas por documento sin un solo encabezado y dos números apilados sin decir cuál
+era cuál.
+
+🔴 **Lo chico se agrupa POR MONTO (< $50), nunca por tipo de documento**: se pliega en una línea
+«N documentos de menos de $50 · $X — ver», que se despliega. Medido: **36 de los 110 documentos de
+City Mall Paso Canoa** valen menos de $50 y suman **$227,20**. Agrupar por tipo escondería notas de
+débito reales de **$5.000**.
+
+**El pie dice «Cobrar»** (era «Compartir»/«Descargar PDF») y abre la misma hoja: hasta hoy, desde el
+papel no se podía mandar el papel.
 
 ### Pestaña «Confecciones Boston»
-Misma forma, **otros buckets**: `Total pendiente · 0-90d · 91-120d · 121d+` sobre
-`switch_estadocuenta_aging_boston` (`d0_90 / d91_120 / d121_plus`). Buscador propio, columna
-«Último pago» y su propio botón de últimos pagos
-(`useUltimosPagosBoston` → `/api/cxc/boston/ultimos-pagos`, que pide el **`cliente_switch_id`**, no
-el código). Un chip marca al cliente que **también existe en el grupo** — es solo una etiqueta: no se
-suma nada. La coletilla a la derecha dice «Confecciones Boston · se lleva aparte».
 
-**Tarea más frecuente (4 pasos):** abrir `/admin` → tocar la píldora **«Vencido crítico 121d+»** →
-abrir el «···» del primero de la lista → **Enviar correo** (o WhatsApp).
+🔄 **Mismo formato desde el 5-sep-2026**: tira de totales alineada a sus columnas, la tabla en la
+misma grilla de 12, y por fila **«Cobrar»** y **«Documentos»**. Como es **UNA** empresa no hay
+desglose: tocar un cliente va **directo a sus documentos**, con los mismos encabezados y la misma
+agrupación de lo chico por monto; sus **3 últimos pagos** viven dentro de ese cajón.
+
+Los tres tramos que se ven son los mismos del grupo (`d0_90 / d91_120 / d121_plus`, sobre
+`switch_estadocuenta_aging_boston`); el **detalle fino** del `title` llega con la migración
+`20260928120000`. Un chip marca al cliente que **también existe en el grupo** — es solo una etiqueta:
+no se suma nada. La coletilla a la derecha dice «Confecciones Boston · se lleva aparte».
+
+⚠️ **Su hoja «Cobrar» ofrece WhatsApp · Copiar · Ver los documentos, pero NO correo**, y es una
+decisión pendiente de Daniel, no un olvido: de sus 390 clientes con saldo, **272 tienen teléfono pero
+solo 113 correo**, y el texto de cobro del sistema lo firma **Fashion Group**, que no es Boston. El
+mensaje que sí sale lo firma **«Confecciones Boston - Departamento de Cobros»**.
+
+🔴 **Y sigue APARTE**: su cajón tiene **su propia ruta** (`/api/cxc/boston/estado-cuenta`) y no reusa
+el lector del grupo; sus teléfonos y correos salen de `switch_clientes` acotado a Boston, **nunca de
+`clientes_master`**.
+
+**Tarea más frecuente (3 pasos):** abrir `/cxc` → tocar el chip **«121d+»** (o el aviso «N sin pagar
+hace +90 d») → **«Cobrar»** en la fila del primero → **Correo** (o WhatsApp).
 
 ## Los datos
 
@@ -1300,8 +1370,12 @@ vacías) · `abrev` 1.769 · `saldo_original` 1.769 · `total_original` 1.769. L
 
 🔴 **Columnas de la vista de aging que NADIE llena** (0 de 211): `upload_id` (es un `NULL::uuid`
 literal en la definición de la vista, herencia del upload de CSV), **`contacto`**, **`distrito`** y
-**`corregimiento`**. `contacto` sí se pinta en la pantalla y en el CSV: siempre sale vacío salvo que
-haya un override (3 de 10 lo tienen).
+**`corregimiento`**.
+✅ **`contacto` dejó de estar vacío el 5-sep-2026**: la vista lo sigue devolviendo `''::text`
+hardcodeado, pero `/api/cxc/aging` lo **relee en vivo** de `clientes_master.contacto` —la columna
+nueva de la ficha del cliente (migración `20260926120000`, pendiente)— junto con
+`email/telefono/celular`, y con la misma tolerancia: si la DDL no corrió, se lee sin ella y nada más
+cambia. **Los montos no se tocan**: siguen saliendo de la MV.
 
 ### Lo que escribe
 
@@ -1425,7 +1499,7 @@ relectura de contacto va en lotes de 300 códigos con `leerTodoPaginado`, que ve
   eligió **SEPARADO**: cada cartera con sus propias notas y estrellas.
 - **«si crea el usuario david, david debe de ver cxc boston… él es mi hermano y ve toda la operación
   de confecciones boston, no quiero que vea info de fashion group»** (27-ago-2026) → `gerente_boston`
-  entró a `ROLES_BOSTON`, y `/admin` lo rebota porque su único módulo es `boston`.
+  entró a `ROLES_BOSTON`, y `/cxc` lo rebota porque su único módulo es `boston`.
 - 🔴 **«sobre darle seguimiento no es algo que quiero para ese módulo, llamo al cliente por fuera y
   ya»** (14-ago-2026) → **el seguimiento de cobro NO va a existir aquí**, y no se reemplaza por otra
   cosa. Por eso el menú «···» tiene cuatro opciones y no siete.
@@ -1547,8 +1621,11 @@ relectura de contacto va en lotes de 300 códigos con `leerTodoPaginado`, que ve
   columnas.
 - **La tolerancia «la vista de última compra no existe» (respondía `[]`) — retirada** el 3-sep-2026:
   leer un error como «nunca compró» es la mentira callada que este módulo ya pagó dos veces.
-- **Mover `/admin` a `/cxc` con redirect permanente** está en `docs/sprint2-backlog.md`, **sin
-  ejecutar**: la URL se quedó del nombre histórico del módulo.
+- ✅ **Mover `/admin` a `/cxc`** estaba en `docs/sprint2-backlog.md` sin ejecutar: **se hizo el
+  5-sep-2026**. ⚠️ El redirect quedó **temporal (307), no permanente**, contra lo que decía el
+  backlog: es el patrón de todos los redirects de `next.config.js` y la razón está escrita ahí — un
+  308 se queda pegado en el caché del navegador de cada persona y no hay forma de sacarlo si un día
+  hay que revertirlo.
 
 ## Cuánto se usa
 
@@ -1611,7 +1688,7 @@ el mismo rótulo que el cliente ve en el correo y que Daniel ve en el drawer.
 
 ## Cómo probarlo a mano
 
-**1. Que la cartera está fresca.** Abre `/admin`. Arriba dice «Sincronizado \<fecha y hora\>». Si eso
+**1. Que la cartera está fresca.** Abre `/cxc`. Arriba dice «Sincronizado \<fecha y hora\>». Si eso
 tiene más de 26 h, se pone en ámbar con el detalle por empresa. La prueba en la base es
 `select max(materializado_en) from switch_estadocuenta_aging_mv`.
 
@@ -1620,7 +1697,7 @@ queda apagado y dice por qué) y toca «Actualizar ahora». Al terminar, la hora
 que ser de hace un momento. En la base: una fila nueva en `switch_sync_log` con
 `sync_type='estadocuenta'`, esa empresa y `status='success'`.
 
-**3. Que el estado de cuenta cuadra.** Abre una fila → «Estado de cuenta». La suma de los saldos de
+**3. Que el estado de cuenta cuadra.** Abre una fila → «Ver los documentos». La suma de los saldos de
 los documentos tiene que dar exactamente el **Total** del pie, y ese Total tiene que ser el mismo
 número de la columna «Total» de la fila. Si no cuadra, el sospechoso es el mapa de signo de
 `src/lib/cxc/estado-cuenta-data.ts` (`Nota de Crédito`, `Recibo` y `Recibo Saldo Anterior` restan;
@@ -1633,7 +1710,7 @@ pone en `cc`). En la base: una fila nueva en `cxc_emails_enviados` con tu nombre
 igual y lo que falló fue la fila.
 
 **5. Que el teléfono editado se ve al toque.** Entra a `/clientes/<código>` → «Editar contacto» →
-cambia el teléfono → Guardar. Vuelve a `/admin` y abre esa fila: el teléfono nuevo tiene que estar
+cambia el teléfono → Guardar. Vuelve a `/cxc` y abre esa fila: el teléfono nuevo tiene que estar
 ahí **sin esperar al cron**. Ese es el único dato de la pantalla que se lee en vivo; la plata sigue
 saliendo de la foto de la MV.
 
@@ -1692,14 +1769,19 @@ pantalla y viaja en el CSV: sale vacío salvo override (3 de 10).
   `favorites` con su `rolesBoston()`): `overrides` y `contact-log` usan
   `["admin","secretaria","vendedor"]`, y `aging-por-cliente` usa
   `["admin","contabilidad","secretaria","vendedor"]`.
-- 🔴 **`src/app/admin/error.tsx` le muestra al usuario el `error.message` Y el stack trace completo.**
-  Es la única pantalla del sistema que lo hace y contradice la regla de errores humanos de
-  `CLAUDE.md § UX Principles`.
+- ✅ **RESUELTO el 5-sep-2026.** `src/app/admin/error.tsx` le mostraba al usuario el `error.message`
+  Y el stack trace completo — la única pantalla del sistema que lo hacía, contra la regla de errores
+  humanos de `CLAUDE.md § UX Principles`, y de paso publicaba nombres de tablas y rutas internas a
+  cualquiera que abriera el módulo. Hoy es `src/app/cxc/error.tsx` y dice qué pasó, qué significa
+  («No se perdió nada: esta pantalla solo consulta saldos, no los modifica») y qué hacer, con
+  «Intentar de nuevo» e «Ir al inicio». El detalle va a la consola y a Sentry.
 
 **Comportamiento sorprendente**
 - Un `POST /api/cxc/overrides` **parcial BORRA** lo que no manda: `str()` convierte lo ausente en
   `""`. La ruta hermana `/api/overrides` (la que usa Cheques) sí distingue `undefined`.
-- El módulo se llama «Cuentas por Cobrar» pero vive en `/admin`, que se lee como «administración» —
+- ✅ **RESUELTO el 5-sep-2026**: el módulo se llamaba «Cuentas por Cobrar» y vivía en `/admin`, que se
+  leía como «administración». Hoy vive en `/cxc` y `/admin` redirige (307, con la query intacta;
+  `/admin/usuarios` no se movió). El texto original decía —
   y `/admin/usuarios` es OTRO módulo (Usuarios, del grupo Administración).
 ---
 
@@ -1777,7 +1859,7 @@ Server-rendered; hace **cinco lecturas en paralelo** y luego una sexta para las 
   factura`, con las empresas sin actividad colapsadas tras «N empresas sin actividad» y una fila
   **Total grupo**. A la derecha, un chip **«Vencido crítico $X»** / **«Vencido reciente $X»** cuando
   hay saldo de más de 90 días, y el enlace **«Ver en Cuentas por Cobrar →»**
-  (`/admin?search=<nombre>`).
+  (`/cxc?search=<nombre>`).
   🩸 Pegado al título hay un ⓘ **que no se borra nunca**: *«Ventas va sin ITBMS — el impuesto se cobra
   para el fisco, no es venta de la empresa. Cobrado y Por cobrar hoy van con ITBMS, porque es la
   plata que entra y la que falta cobrar.»* Sin esa explicación la tabla se lee como un error de la app.
@@ -2074,7 +2156,7 @@ Boston en `clientes_master`: `select count(*) from clientes_master where deleted
 
 **2. Que editar el contacto se guarda y se ve en todos lados.** Abre una ficha → «Editar contacto» →
 cambia el celular → Guardar. Tiene que decir «Datos actualizados». Verifica en tres lugares:
-(a) recarga la ficha y sigue ahí; (b) abre `/admin`, busca ese cliente y despliega su fila — el
+(a) recarga la ficha y sigue ahí; (b) abre `/cxc`, busca ese cliente y despliega su fila — el
 celular nuevo tiene que estar **sin esperar al cron**; (c) abre una guía nueva y busca ese cliente en
 el selector — el nombre y el dato tienen que ser los nuevos (la caché se invalida al guardar).
 En la base: `select telefono, celular, email, notas from clientes_master where codigo = 'D-xx'`.
@@ -2086,7 +2168,7 @@ la lista de campos que el upsert excluye (`sync-clientes-master.ts:274`).
 **4. Que las cifras de la ficha no se contradicen.** «Ventas \<año\>» va **sin ITBMS** y «Cobrado» y
 «Por cobrar hoy» **con ITBMS** — no cuadran entre sí a propósito, y el ⓘ al lado del título lo dice.
 «Por cobrar hoy» del Total grupo tiene que ser el mismo número que la columna «Total» de ese cliente
-en `/admin`.
+en `/cxc`.
 
 **5. Que un código ajeno no abre.** Escribe a mano `/clientes/<un código de Boston>`: tiene que dar
 **404**, el mismo que un código inexistente.

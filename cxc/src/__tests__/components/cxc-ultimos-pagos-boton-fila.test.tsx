@@ -16,6 +16,27 @@
 //     (la sub-fila del botón), no también adentro del panel. Dos lugares eran
 //     dos estados del mismo dato.
 //  5. Boston conserva su botón (el mismo archivo) y su lectura APARTE.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔄 CAMBIÓ DE DIRECCIÓN EL 5-sep-2026, y no se borró.
+//
+// El botón desapareció con el rediseño de Cuentas por Cobrar, pero **el
+// problema que lo motivó sigue resuelto y este archivo lo sigue vigilando**:
+// no hay que hacer «dos expandir» para ver los pagos, y no hay dos lugares
+// donde se dibujen.
+//
+// Qué cambió y por qué. El bloque se agrupaba POR EMPRESA, y medido contra
+// producción los clientes grandes le pagan a varias empresas EL MISMO DÍA —el
+// 29-jun-2026, D-25 pagó $241.857,77 repartido en las SEIS—: eran **18 líneas
+// para decir lo que dicen 3**, en una sub-fila aparte. Ahora los pagos se
+// agrupan POR FECHA y viven DENTRO del panel expandido, junto al desglose por
+// empresa. Con eso, «abrir el cliente» ya trae todo: el botón extra sobraba.
+//
+// Lo que este archivo exige hoy:
+//  1. No queda ni un rastro del botón ni de su sub-fila.
+//  2. El panel abierto trae los pagos, en UN solo lugar, y con UNA lectura.
+//  3. La consulta se dispara al ABRIR, nunca al pintar la lista de los 100.
+//  4. Boston sigue leyendo por SU camino, sin cruzarse con el del grupo.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -30,8 +51,8 @@ vi.mock("@/components/shared/SyncStatus", () => ({ default: () => null }));
 vi.mock("@/components/shared/SyncNowButton", () => ({ default: () => null }));
 vi.mock("@/lib/vendors", () => ({ VENDOR_MAP: {} }));
 
-import ClientTable from "@/app/admin/components/ClientTable";
-import PanelCxcMobile from "@/app/admin/components/PanelCxcMobile";
+import ClientTable from "@/app/cxc/components/ClientTable";
+import PanelCxcMobile from "@/app/cxc/components/PanelCxcMobile";
 import { ContextMenuProvider } from "@/components/ui";
 
 const RAIZ = path.resolve(__dirname, "../../..");
@@ -64,17 +85,14 @@ const CLIENTE: ConsolidatedClient = {
   hasOverride: false,
 } as unknown as ConsolidatedClient;
 
-/** Lo que contesta `/api/cxc/ultimos-pagos?codigo=D-25`: tres en una empresa,
- *  ninguno en la otra. */
+/** Lo que contesta `/api/cxc/ultimos-pagos?codigo=D-25`: las 3 últimas FECHAS
+ *  en que pagó, con el total del día y en qué empresas. */
 const RESPUESTA = {
-  porEmpresa: {
-    fashion_wear: [
-      { fecha: "2026-08-20", monto: 63592.15 },
-      { fecha: "2026-07-22", monto: 187651.51 },
-      { fecha: "2026-06-29", monto: 117777.33 },
-    ],
-    fashion_shoes: [],
-  },
+  porFecha: [
+    { fecha: "2026-08-20", monto: 234189.21, empresas: ["fashion_wear", "fashion_shoes"] },
+    { fecha: "2026-07-29", monto: 70129.85, empresas: ["fashion_wear"] },
+    { fecha: "2026-07-22", monto: 187651.51, empresas: ["fashion_wear"] },
+  ],
 };
 
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -89,106 +107,33 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** El acordeón más cercano que envuelve a `el`: abierto = `1fr`. */
-function acordeonAbierto(el: HTMLElement): boolean {
-  let n: HTMLElement | null = el;
-  while (n) {
-    if (n.style && n.style.gridTemplateRows) return n.style.gridTemplateRows === "1fr";
-    n = n.parentElement;
-  }
-  throw new Error("no está adentro de un AccordionContent");
-}
+const noop = () => {};
+const sinAviso = () => null;
 
 // ─────────────────────────── ESCRITORIO ───────────────────────────
 
 function pintarEscritorio() {
-  const noop = () => {};
   render(
     <ContextMenuProvider>
       <ClientTable
         filtered={[CLIENTE]}
         roleCompanies={EMPRESAS}
-        roleClients={[CLIENTE]}
         companyFilter="all"
-        setCompanyFilter={noop}
-        riskFilter="all"
-        search=""
-        sortKey="total"
-        sortDir="desc"
         toggleSort={noop}
         sortArrow={() => ""}
-        userRole="admin"
-        onOpenEmail={noop}
-        onWhatsApp={noop}
-        onCopyMessage={noop}
+        onCobrar={noop}
         onOpenEstado={noop}
+        seleccion={new Set()}
+        onSeleccionar={noop}
+        onSeleccionarTodos={noop}
+        avisoSinPagarDe={sinAviso}
+        marcaEnvioDe={sinAviso}
       />
     </ContextMenuProvider>,
   );
 }
 
-const boton = () => screen.getByRole("button", { name: "Últimos pagos de CITY MALL PASO CANOA" });
-const panelCliente = () => screen.getByText("Ver ficha completa ›");
-
-describe("CXC escritorio — la fila cerrada", () => {
-  it("🔴 tiene el botón «Últimos pagos», cerrado, y al pintar la lista NO pide nada", () => {
-    pintarEscritorio();
-    expect(boton().getAttribute("aria-expanded")).toBe("false");
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(acordeonAbierto(panelCliente())).toBe(false);
-  });
-
-  it("🔴 UN clic trae los 3 pagos por empresa y el cliente sigue CERRADO", async () => {
-    pintarEscritorio();
-    fireEvent.click(boton());
-    expect(boton().getAttribute("aria-expanded")).toBe("true");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toBe("/api/cxc/ultimos-pagos?codigo=D-25");
-
-    const subfila = await screen.findByTestId("ultimos-pagos-CITY MALL PASO CANOA");
-    await waitFor(() => expect(within(subfila).getAllByRole("listitem").length).toBe(3));
-    expect(acordeonAbierto(subfila)).toBe(true);
-    expect(within(subfila).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-      "20 ago 2026 · $63,592.15",
-      "22 jul 2026 · $187,651.51",
-      "29 jun 2026 · $117,777.33",
-    ]);
-    // Un bloque POR EMPRESA: la que no tiene pagos lo dice, no se mezcla.
-    expect(within(subfila).getByText("Fashion Wear", { exact: false })).toBeTruthy();
-    expect(within(subfila).getByText("Sin pagos registrados")).toBeTruthy();
-
-    // El panel del cliente (desglose + acciones) NO se abrió: un clic, no dos.
-    expect(acordeonAbierto(panelCliente())).toBe(false);
-  });
-
-  it("cerrar y volver a abrir no vuelve a pedir", async () => {
-    pintarEscritorio();
-    fireEvent.click(boton());
-    await screen.findAllByRole("listitem");
-    fireEvent.click(boton());
-    expect(boton().getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(boton());
-    expect(boton().getAttribute("aria-expanded")).toBe("true");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("🔴 expandir el cliente NO trae los pagos: el bloque vive solo en la sub-fila del botón", () => {
-    pintarEscritorio();
-    fireEvent.click(screen.getByText("CITY MALL PASO CANOA"));
-    expect(acordeonAbierto(panelCliente())).toBe(true);
-    expect(fetchMock).not.toHaveBeenCalled();
-    // Y adentro del panel no hay un segundo bloque «Últimos pagos».
-    const panel = panelCliente().closest("div.space-y-3")!;
-    expect(within(panel).queryByText("Últimos pagos")).toBeNull();
-    // El botón de la fila sigue disponible con el cliente abierto.
-    expect(boton().getAttribute("aria-expanded")).toBe("false");
-  });
-});
-
-// ───────────────────────────── CELULAR ─────────────────────────────
-
 function pintarCelular() {
-  const noop = () => {};
   render(
     <PanelCxcMobile
       filtered={[CLIENTE]}
@@ -200,12 +145,13 @@ function pintarCelular() {
       setRiskFilter={noop}
       companyFilter="all"
       setCompanyFilter={noop}
-      favorites={new Set()}
-      onToggleFavorite={noop}
-      onOpenEmail={noop}
-      onWhatsApp={noop}
-      onCopyMessage={noop}
       onOpenEstado={noop}
+      onCobrar={noop}
+      sinPagar={null}
+      sinPagarActivo={false}
+      onToggleSinPagar={noop}
+      avisoSinPagarDe={sinAviso}
+      marcaEnvioDe={sinAviso}
       canExport={false}
       onExportarCsv={noop}
       empresaRestriction={null}
@@ -213,68 +159,91 @@ function pintarCelular() {
   );
 }
 
-describe("CXC celular — la tarjeta cerrada", () => {
-  it("🔴 tiene el botón, y UN toque trae los pagos sin expandir la tarjeta", async () => {
-    pintarCelular();
-    expect(boton().getAttribute("aria-expanded")).toBe("false");
-    expect(fetchMock).not.toHaveBeenCalled();
-    // Cerrada: el desglose no está.
-    expect(screen.queryByText(/Desglose por empresa/)).toBeNull();
+/** Las peticiones a la ruta de los últimos pagos (y solo ésas). */
+const pedidosDePagos = () =>
+  fetchMock.mock.calls.filter((c) => String(c[0]).includes("/api/cxc/ultimos-pagos"));
 
-    fireEvent.click(boton());
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    // Adentro de la tarjeta (la lista de clientes de afuera también es un <ul>).
-    const tarjeta = boton().closest("article")!;
-    await waitFor(() => expect(within(tarjeta).getAllByRole("listitem").length).toBe(3));
-    expect(within(tarjeta).getByText("Sin pagos registrados")).toBeTruthy();
-    // Sigue cerrada.
-    expect(screen.queryByText(/Desglose por empresa/)).toBeNull();
+describe("🩸 el botón «Últimos pagos ›» y su sub-fila ya no existen", () => {
+  it("no está en el escritorio", () => {
+    pintarEscritorio();
+    expect(screen.queryByRole("button", { name: /Últimos pagos de/ })).toBeNull();
   });
 
-  it("🔴 expandir la tarjeta NO trae los pagos ni repite el bloque", () => {
+  it("no está en el celular", () => {
     pintarCelular();
-    fireEvent.click(screen.getByText("CITY MALL PASO CANOA"));
-    expect(screen.getByText(/Desglose por empresa/)).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
-    // El título del bloque es un <p>; el botón de la fila también dice
-    // «Últimos pagos» y ese sí tiene que estar.
-    const titulos = screen.queryAllByText("Últimos pagos").filter((e) => e.tagName === "P");
-    expect(titulos).toEqual([]);
+    expect(screen.queryByRole("button", { name: /Últimos pagos de/ })).toBeNull();
+  });
+
+  it("ni queda el componente que lo dibujaba", () => {
+    expect(fs.existsSync(path.join(RAIZ, "src/components/cxc/BotonUltimosPagos.tsx"))).toBe(false);
+    expect(fs.existsSync(path.join(RAIZ, "src/app/cxc/components/UltimosPagosFila.tsx"))).toBe(false);
   });
 });
 
-// ─────────────────────── UN SOLO LUGAR, Y BOSTON APARTE ───────────────────────
-
-describe("el bloque vive en un solo lugar por cartera", () => {
-  it("el panel expandido (escritorio y celular) ya no lo monta", () => {
-    const panel = leer("src/app/admin/components/ContactPanel.tsx");
-    expect(panel).not.toMatch(/<UltimosPagos|useUltimosPagosGrupo\(/);
-    const movil = leer("src/app/admin/components/PanelCxcMobile.tsx");
-    const expandido = movil.slice(movil.indexOf("function MobileClientExpanded("));
-    expect(expandido).not.toMatch(/<UltimosPagos|useUltimosPagosGrupo\(/);
+describe("🔴 con la lista pintada NO se pide nada", () => {
+  it("escritorio: cero lecturas hasta que alguien abra un cliente", () => {
+    pintarEscritorio();
+    expect(pedidosDePagos()).toHaveLength(0);
   });
 
-  it("el botón es UNO (`BotonUltimosPagos`), es dibujo puro, y lo usan las tres carteras", () => {
-    const btn = leer("src/components/cxc/BotonUltimosPagos.tsx");
-    expect(btn).not.toMatch(/fetch\(|useUltimosPagos\w*\(|supabase/);
-    expect(btn).toContain("min-h-[44px]");
-    for (const f of [
-      "src/app/admin/components/ClientTable.tsx",
-      "src/app/admin/components/PanelCxcMobile.tsx",
-      "src/components/cxc/BostonTab.tsx",
-    ]) {
-      expect(leer(f), f).toContain('from "@/components/cxc/BotonUltimosPagos"');
-      expect(leer(f), f).not.toContain("function BotonUltimosPagos");
-    }
+  it("celular: igual", () => {
+    pintarCelular();
+    expect(pedidosDePagos()).toHaveLength(0);
+  });
+});
+
+describe("🔴 abrir el cliente trae los pagos — UN clic, y en UN solo lugar", () => {
+  it("escritorio: al expandir salen las TRES FECHAS con su total y sus empresas", async () => {
+    pintarEscritorio();
+    fireEvent.click(screen.getByTitle("CITY MALL PASO CANOA"));
+    await waitFor(() => expect(pedidosDePagos()).toHaveLength(1));
+    await screen.findByText(/20 ago/);
+    const bloque = screen.getByText("Últimos pagos").parentElement!;
+    const lineas = within(bloque).getAllByRole("listitem").map((li) => li.textContent);
+    expect(lineas).toHaveLength(3);
+    expect(lineas[0]).toContain("$234,189.21");
+    expect(lineas[0]).toContain("Fashion Wear");
+    expect(lineas[0]).toContain("Fashion Shoes");
   });
 
-  it("🔴 el grupo lee por SU hook y Boston por el SUYO — sin cruzarse", () => {
-    const fila = leer("src/app/admin/components/UltimosPagosFila.tsx");
-    expect(fila).toContain("useUltimosPagosGrupo(codigo, abierto)");
-    expect(fila).not.toContain("useUltimosPagosBoston");
-    const boston = leer("src/components/cxc/BostonTab.tsx");
-    expect(boston).toContain("useUltimosPagosBoston(clienteSwitchId)");
-    expect(boston).not.toContain("useUltimosPagosGrupo");
-    expect(boston).not.toContain("UltimosPagosFila");
+  it("🔴 el bloque se dibuja UNA sola vez, no dos", async () => {
+    pintarEscritorio();
+    fireEvent.click(screen.getByTitle("CITY MALL PASO CANOA"));
+    await screen.findByText(/20 ago/);
+    expect(screen.getAllByText("Últimos pagos")).toHaveLength(1);
+  });
+
+  it("celular: al abrir la tarjeta pasa lo mismo, con UNA sola lectura", async () => {
+    pintarCelular();
+    fireEvent.click(screen.getByText("Ver detalle"));
+    await waitFor(() => expect(pedidosDePagos()).toHaveLength(1));
+    await screen.findByText(/20 ago/);
+    expect(screen.getAllByText("Últimos pagos")).toHaveLength(1);
+  });
+
+  it("cerrar y volver a abrir no vuelve a pedir", async () => {
+    pintarEscritorio();
+    const fila = screen.getByTitle("CITY MALL PASO CANOA");
+    fireEvent.click(fila);
+    await waitFor(() => expect(pedidosDePagos()).toHaveLength(1));
+    fireEvent.click(fila);
+    fireEvent.click(fila);
+    await waitFor(() => expect(screen.getAllByText("Últimos pagos").length).toBe(1));
+    expect(pedidosDePagos()).toHaveLength(1);
+  });
+});
+
+describe("🔴 Boston lee por SU camino, sin cruzarse con el del grupo", () => {
+  it("su cajón usa el hook de Boston; el grupo, el suyo", () => {
+    const cajonBoston = leer("src/components/cxc/BostonDocumentosDrawer.tsx");
+    expect(cajonBoston).toContain("useUltimosPagosBoston");
+    expect(cajonBoston).not.toContain("useUltimosPagosGrupo");
+
+    const panelGrupo = leer("src/app/cxc/components/ContactPanel.tsx");
+    expect(panelGrupo).toContain("useUltimosPagosGrupo");
+    expect(panelGrupo).not.toContain("useUltimosPagosBoston");
+
+    expect(leer("src/app/cxc/hooks/useUltimosPagosGrupo.ts")).toContain("/api/cxc/ultimos-pagos");
+    expect(leer("src/components/cxc/useUltimosPagosBoston.ts")).toContain("/api/cxc/boston/ultimos-pagos");
   });
 });

@@ -116,10 +116,19 @@ export function buildFirma(nombreCompleto: string): string {
   return `${nombreCompleto}\nFashion Group Panamá`;
 }
 
-/** Cuerpo editable por defecto. */
-export function defaultCuerpo(mes: string): string {
+/**
+ * Cuerpo editable por defecto.
+ *
+ * 🔴 SALUDA POR EL NOMBRE DEL CONTACTO CUANDO HAY UNO (5-sep-2026) — la casilla
+ * nueva de la ficha del cliente. Sin contacto, el texto es EXACTAMENTE el de
+ * siempre: no se inventa un nombre ni se saluda con la razón social, que es lo
+ * que dice la factura y no cómo se llama la persona. Del saludo para abajo no
+ * cambió una coma.
+ */
+export function defaultCuerpo(mes: string, contacto?: string | null): string {
+  const nombre = (contacto ?? "").trim();
   return [
-    "Buen día,",
+    nombre ? `Buen día ${nombre},` : "Buen día,",
     "",
     "Espero se encuentren bien.",
     "",

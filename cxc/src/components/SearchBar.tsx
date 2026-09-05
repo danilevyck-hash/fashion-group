@@ -64,7 +64,7 @@ function parseQuickAction(query: string): QuickAction | null {
   const debeMatch = q.match(/cu[aá]nto\s+debe\s+(.+)/i);
   if (debeMatch) {
     const client = debeMatch[1].trim();
-    return { label: `Buscar deuda de "${client}" en CxC`, href: `/admin?search=${encodeURIComponent(client)}` };
+    return { label: `Buscar deuda de "${client}" en CxC`, href: `/cxc?search=${encodeURIComponent(client)}` };
   }
 
   // reclamos de/para [empresa]
@@ -134,7 +134,7 @@ function flatten(r: SearchResults): FlatItem[] {
       module: "CxC",
       label: c.nombre_normalized,
       sub: `$${fmtMoney(c.total)} — ${c.company_key}`,
-      href: `/admin?search=${encodeURIComponent(c.nombre_normalized)}`,
+      href: `/cxc?search=${encodeURIComponent(c.nombre_normalized)}`,
       icon: "📊",
     });
   }
@@ -211,7 +211,7 @@ function flatten(r: SearchResults): FlatItem[] {
 }
 
 const SEARCH_MODULES = [
-  { label: "Cuentas por Cobrar", href: "/admin", keywords: ["cxc", "cartera", "cobrar", "deuda", "saldo", "cliente", "vencido"] },
+  { label: "Cuentas por Cobrar", href: "/cxc", keywords: ["cxc", "cartera", "cobrar", "deuda", "saldo", "cliente", "vencido"] },
   { label: "Reclamos", href: "/reclamos", keywords: ["reclamo", "nota credito", "devolucion", "queja"] },
   // El módulo se llama "Recordatorios" desde ago-2026 (la key interna sigue
   // siendo `cheques`). Las palabras viejas se CONSERVAN: quien teclea "cheque"

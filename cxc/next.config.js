@@ -73,6 +73,20 @@ const nextConfig = {
       // redirige, para que ni siquiera se descargue la pantalla equivocada.
       // Temporal (307) como los demás: no se quema en el caché del navegador.
       { source: "/admin/data-health", destination: "/admin/usuarios?tab=data-health", permanent: false },
+      // Cuentas por Cobrar dejó de vivir en /admin (5-sep-2026): la dirección
+      // ahora dice lo que es, `/cxc`. El RÓTULO no cambió — sigue siendo
+      // "Cuentas por Cobrar" en el home, el sidebar, la barra y la búsqueda.
+      //
+      // ⚠️ `source: "/admin"` matchea SOLO esa ruta exacta: /admin/usuarios y
+      // /admin/data-health siguen donde estaban (Usuarios NO se movió). Y Next
+      // arrastra la query al destino, así que los enlaces guardados con
+      // `?search=`, `?tab=boston`, `?risk=` o `?empresa=` siguen llegando
+      // enteros.
+      //
+      // Temporal (307) como TODOS los redirects de este archivo, y a propósito:
+      // un 308 se queda pegado en el caché del navegador de cada persona y no
+      // hay forma de sacarlo si un día hay que revertirlo.
+      { source: "/admin", destination: "/cxc", permanent: false },
       // Saldos de Banco dejó de ser un módulo suelto (13-ago-2026): vive como 2ª
       // PESTAÑA de Gastos, con la MISMA pantalla. Daniel: *"y debeeria estar en
       // un solo modulo"*. La dirección vieja la tiene la tarjeta

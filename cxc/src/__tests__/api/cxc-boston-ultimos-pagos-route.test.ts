@@ -167,7 +167,7 @@ describe("estático — dos rutas, dos lecturas, cero funciones compartidas", ()
     const texto = fs.readFileSync(path.join(RAIZ, "src/lib/cxc/ultimos-pagos.ts"), "utf8");
     expect(texto).not.toMatch(/\.from\(|supabase|fetch\(/);
     // Y las dos pantallas usan hooks distintos contra rutas distintas.
-    const hookGrupo = fs.readFileSync(path.join(RAIZ, "src/app/admin/hooks/useUltimosPagosGrupo.ts"), "utf8");
+    const hookGrupo = fs.readFileSync(path.join(RAIZ, "src/app/cxc/hooks/useUltimosPagosGrupo.ts"), "utf8");
     const hookBoston = fs.readFileSync(path.join(RAIZ, "src/components/cxc/useUltimosPagosBoston.ts"), "utf8");
     expect(hookGrupo).toContain("/api/cxc/ultimos-pagos?codigo=");
     expect(hookGrupo).not.toContain("/api/cxc/boston/");

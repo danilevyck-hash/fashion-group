@@ -6,6 +6,8 @@ import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt, fmtDate } from "@/lib/format";
 import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
+import UltimosPagosPorFecha from "./UltimosPagosPorFecha";
+import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
 
 interface Props {
   client: ConsolidatedClient;
@@ -16,7 +18,14 @@ interface Props {
   // no guardaba nada.
   companyFilter: string;
   roleCompanies: Company[];
+  /** Abre el cajón con los documentos del estado de cuenta. */
   onOpenEstado?: (client: ConsolidatedClient) => void;
+  /** Abre la hoja «Cobrar» — las cuatro salidas en un solo lugar. */
+  onCobrar?: (client: ConsolidatedClient) => void;
+  /** «Le enviaste el estado de cuenta hace 3 días», o `null`. */
+  marcaEnvio?: string | null;
+  /** El panel está abierto: recién ahí se piden los últimos pagos. */
+  abierto?: boolean;
 }
 
 export default function ContactPanel({
@@ -24,6 +33,9 @@ export default function ContactPanel({
   companyFilter,
   roleCompanies,
   onOpenEstado,
+  onCobrar,
+  marcaEnvio,
+  abierto = true,
 }: Props) {
   const [desgloseOpen, setDesgloseOpen] = useState(true);
 
@@ -34,15 +46,13 @@ export default function ContactPanel({
   // Código del cliente para la ficha (mismo D-XXX en todas las empresas).
   const codigo = Object.values(client.companies).find((c) => c?.codigo)?.codigo ?? null;
 
-  // 🔴 ACÁ VIVIÓ EL BLOQUE «ÚLTIMOS PAGOS» UN DÍA (3-sep-2026 → 4-sep-2026).
-  // Daniel lo vio adentro del panel y dijo, textual: *"lo quiero ahí mismo
-  // pero con un botón para expandir, no solo al expandir el card, tendría que
-  // hacer dos expandir para verlo"*. Ahora vive en UN solo lugar: la sub-fila
-  // que abre el botón «Últimos pagos ›» de la fila cerrada (`UltimosPagosFila`,
-  // montada por `ClientTable`). No se repite acá: dos lugares eran dos estados
-  // del mismo dato, y con los dos abiertos se veían los tres pagos dos veces.
-  // La columna «Último pago» de la tabla de abajo es el vistazo; el botón de
-  // arriba es el detalle.
+  // 🔴 EL DESGLOSE POR EMPRESA SE QUEDA EXACTAMENTE COMO ESTABA — Daniel lo
+  // eligió así el 5-sep-2026, con sus columnas «Último pago» y «Última compra».
+  // Lo que se agrega debajo es el bloque «Últimos pagos» POR FECHA, que
+  // reemplaza al de por-empresa (y al botón «Últimos pagos ›» de la fila
+  // cerrada): un cliente que le paga a las seis el mismo día llenaba 18 líneas
+  // para decir lo que dicen 3.
+  const pagos = useUltimosPagosGrupo(codigo, abierto);
 
   return (
     <div className="bg-gray-50/80 px-6 py-4 border-b border-gray-200 space-y-3">
@@ -134,18 +144,33 @@ export default function ContactPanel({
         </div>
       )}
 
-      {/* ── Acciones: estado de cuenta + ficha completa ──────── */}
-      <div className="flex items-center gap-3">
+      {/* ── Últimos pagos, POR FECHA ──────────────────────────── */}
+      <UltimosPagosPorFecha pagos={pagos} />
+
+      {/* ── Acciones: cobrar · documentos · ficha ──────────────── */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {onCobrar && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onCobrar(client); }}
+            className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white transition active:scale-[0.97]"
+          >
+            Cobrar
+          </button>
+        )}
         {onOpenEstado && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onOpenEstado(client); }}
-            className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white transition active:scale-[0.97]"
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition active:scale-[0.97]"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
-            </svg>
-            Estado de cuenta
+            {/* ⚠️ SIN el número de documentos a propósito: la cartera se arma
+                con el aging (una fila por cliente y empresa) y ahí NO viaja
+                cuántos documentos son. Ponerlo obligaría a una consulta por
+                cada cliente en pantalla —100 en la primera carga— para adornar
+                un botón. El conteo real se lee dentro, en el encabezado del
+                cajón: «N documentos en M empresas». */}
+            Ver los documentos
           </button>
         )}
         {codigo && (
@@ -156,6 +181,9 @@ export default function ContactPanel({
           >
             Ver ficha completa ›
           </Link>
+        )}
+        {marcaEnvio && (
+          <span className="ml-auto text-xs text-gray-400">{marcaEnvio}</span>
         )}
       </div>
     </div>
