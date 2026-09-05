@@ -594,7 +594,12 @@ describe("las pantallas grandes: el texto se fue del CÓDIGO y lo de al lado sig
       fuera: ["editable en fashiongr"],
       // El encabezado corto, los campos, y el aviso de frescura que tiene
       // candado propio en `lib/poda-textos-cxc-multifashion.test.ts`.
-      sigue: [">Contacto</h2>", 'label="Teléfono"', "Última sincronización"],
+      // ⚠️ 5-sep-2026: con el rediseño de la ficha el bloque Contacto dejó de
+      // ser un formulario (`<FormRow label="…">`) y pasó a editarse tocando el
+      // dato (`CampoEnLinea rotulo="…"`), y «Última sincronización» pasó a
+      // «Actualizado desde Switch el» por el diccionario. Los TRES siguen
+      // estando: cambió cómo se escriben, no que estén.
+      sigue: [">Contacto</h2>", 'rotulo="Teléfono"', "Actualizado desde Switch el"],
     },
   ];
 

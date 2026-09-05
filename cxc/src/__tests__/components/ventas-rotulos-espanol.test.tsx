@@ -239,6 +239,11 @@ describe("4 · ⚠️ lo que NO cambió", () => {
 });
 
 describe("5 · la ficha del cliente deja de usar la sigla y la jerga", () => {
+  // ⚠️ CAMBIÓ DE FORMA EL 5-sep-2026, no de regla. La ficha se rediseñó: la
+  // tabla pasó a `Empresa · <año> · <año-1> · vs · Debe` (se retiró la columna
+  // «Cobrado», que no usaba nadie) y arriba aparecieron las cuatro tarjetas.
+  // Lo que este bloque protege es lo MISMO de antes: **cero siglas y cero
+  // jerga en inglés** en la única página de cliente que abren todos los roles.
   const FICHA: ClienteDetailData = {
     cliente: {
       id: "u-1", codigo: "D-01", nombre: "CLIENTE UNO", razon_social: null,
@@ -246,11 +251,14 @@ describe("5 · la ficha del cliente deja de usar la sigla y la jerga", () => {
       celular: null, email: null, notas: null, last_synced_at: null,
       updated_at: null, created_at: null,
     },
-    empresas: [{
-      empresa: "vistana", ventas_ytd: 1000, cobrado_ytd: 800, cxc: 200,
-      ultima_factura: "2026-08-12",
-    }],
-    total_grupo: { ventas_ytd: 1000, cobrado_ytd: 800, cxc: 200, ultima_factura: "2026-08-12" },
+    anio: 2026,
+    empresas: [{ empresa: "vistana", compras: 1000, comprasAnterior: 800, debe: 200 }],
+    compras_brutas: 1000,
+    ultima_compra: "2026-08-12",
+    ultimo_pago: null,
+    pagos_por_fecha: [],
+    documentos_con_saldo: 0,
+    aging: [],
   };
 
   const pintar = () => render(<ClienteDetail initialData={FICHA} />);
@@ -259,7 +267,7 @@ describe("5 · la ficha del cliente deja de usar la sigla y la jerga", () => {
     pintar();
     expect(screen.queryByText("CXC actual")).toBeNull();
     expect(screen.queryByText(/Ver en CXC/)).toBeNull();
-    expect(screen.getByText("Por cobrar hoy")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/\bCXC\b/);
     expect(screen.getByText(/Ver en Cuentas por Cobrar/)).toBeTruthy();
   });
 
@@ -270,27 +278,30 @@ describe("5 · la ficha del cliente deja de usar la sigla y la jerga", () => {
 
   it("las columnas dicen el año con todas sus cifras", () => {
     pintar();
-    const anio = new Date().getFullYear();
-    expect(screen.getByText(`Ventas ${anio}`)).toBeTruthy();
-    expect(screen.getByText(`Cobrado ${anio}`)).toBeTruthy();
-    expect(screen.getByText(`Historial ${anio}`)).toBeTruthy();
+    expect(screen.getByText("Compró 2026")).toBeTruthy();
+    // Los encabezados de la tabla: el año y el año pasado, enteros.
+    expect(screen.getAllByText("2026").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2025").length).toBeGreaterThan(0);
+    expect(screen.getByText("vs 2025")).toBeTruthy();
   });
 
-  it("⚠️ la explicación de por qué las cifras NO cuadran sigue ahí, y nombra la columna nueva", () => {
+  it("⚠️ la explicación de por qué las cifras NO cuadran sigue ahí, con las columnas de HOY", () => {
     pintar();
-    // NO SE BORRA NUNCA: sin ella la tabla se lee como un error de la app.
+    // NO SE BORRA NUNCA: sin ella la tabla se lee como un error de la app. Y
+    // hace más falta que antes, porque la tarjeta «Debe» divide una cifra por
+    // la otra («el 38% de lo que te compró»).
     fireEvent.click(screen.getByRole("button", { name: /Por qué las cifras no cuadran/i }));
-    // Acotado al CONTENIDO de la ayuda: "Por cobrar hoy" también rotula la
-    // columna, así que buscarlo en todo el body pasaría con la explicación
-    // diciendo "CXC" — que es justo la sigla que se fue.
     const ayuda = screen.getByText(/va sin ITBMS/).closest("div")!;
-    expect(ayuda.textContent).toContain("Por cobrar hoy");
+    expect(ayuda.textContent).toContain("Compró");
+    expect(ayuda.textContent).toContain("Debe");
     expect(ayuda.textContent).not.toMatch(/\bCXC\b/);
+    // La columna que se retiró no puede volver por la puerta de atrás.
+    expect(ayuda.textContent).not.toContain("Cobrado");
   });
 
   it("⚠️ las cifras de la tabla no se movieron", () => {
     pintar();
-    // $1,000.00 de venta · $800.00 cobrado · $200.00 por cobrar.
+    // $1,000.00 comprado este año · $800.00 el año pasado · $200.00 por cobrar.
     const texto = document.body.textContent ?? "";
     expect(texto).toContain("1,000.00");
     expect(texto).toContain("800.00");

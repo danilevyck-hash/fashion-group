@@ -136,9 +136,20 @@ describe("la ficha lo dice, con fecha", () => {
       created_at: null,
       ausente_desde: "2026-08-13T05:41:34Z",
     },
+    // ⚠️ La forma de `ClienteDetailData` cambió el 5-sep-2026 con el rediseño
+    // de la ficha (cuatro tarjetas + «Empresa por empresa» con el año pasado).
+    // La regla que este bloque protege NO cambió: el que ya no está en Switch
+    // **sigue abriendo su ficha** y ésta lo dice CON FECHA, porque sus guías y
+    // facturas viejas apuntan a él y no pueden quedar con un enlace roto.
+    anio: 2026,
     empresas: [],
-    total_grupo: { ventas_ytd: 0, cobrado_ytd: 0, cxc: 0, ultima_factura: null },
+    compras_brutas: 0,
+    ultima_compra: null,
+    ultimo_pago: null,
+    pagos_por_fecha: [],
+    documentos_con_saldo: 0,
     ultimas_guias: [],
+    aging: [],
   };
 
   it("con la marca: «Ya no está en Switch» + desde cuándo", () => {

@@ -67,7 +67,10 @@ describe("Tocables · 44 px de alto Y de ancho", () => {
     // Los dos botones: alto declarado.
     expect(src).toContain('inline-flex min-h-[44px] items-center text-xs text-gray-500 hover:text-black');
     expect(src).toContain('inline-flex min-h-[44px] items-center justify-center bg-black text-white text-sm');
-    expect(src).toContain('inline-flex min-h-[44px] items-center text-xs text-gray-400 hover:text-gray-600');
+    // ⚠️ 5-sep-2026: el tercer botón era «N empresas sin actividad», que se fue
+    // con el rediseño de la tabla (ahora las filas sin nada simplemente no se
+    // dibujan). En su lugar el pie trae los enlaces plegables, también de 44.
+    expect(src).toContain('block min-h-[44px] w-full text-left text-sm text-blue-600');
     // Los enlaces dentro de un párrafo NO pueden crecer sin romper el renglón:
     // el área de toque llega a 44 con un ::after transparente (el patrón que ya
     // usa Reclamos › Por empresa). 17 px + 2×14 = 45.

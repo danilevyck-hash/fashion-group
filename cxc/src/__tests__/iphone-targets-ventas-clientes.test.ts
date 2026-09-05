@@ -182,22 +182,40 @@ describe("Nombres cortados — letra más chica, nunca por debajo de 12px", () =
 });
 
 describe("Clientes — llamar es la acción natural del módulo", () => {
+  // ⚠️ CAMBIÓ DE LUGAR EL 5-sep-2026, no de regla. Con el rediseño de la lista,
+  // el correo y el teléfono salieron de la tarjeta y viven en UN componente,
+  // `Contacto`, que dibuja la columna «Cómo contactarlo» en la tabla y la línea
+  // de la tarjeta en el celular. Las tres exigencias son las mismas y ahora se
+  // cumplen en un solo lugar en vez de dos.
+  const contacto = () => {
+    const i = clientes.indexOf("function Contacto(");
+    expect(i).toBeGreaterThan(-1);
+    return clientes.slice(i);
+  };
+
   it("el teléfono de la card mobile es un target de 44x44", () => {
     // Antes: link tel: de 18px de alto (x26 en la primera página).
-    const i = clientes.indexOf("tHref ? (");
-    const bloque = clientes.slice(i, i + 500);
+    const bloque = contacto();
     expect(bloque).toContain("min-h-[44px]");
     expect(bloque).toContain("min-w-[44px]");
-    expect(bloque).toContain("href={tHref}");
+    expect(bloque).toContain("href={tHref ?? undefined}");
+    // El tamaño grande solo en la tarjeta: en la tabla del escritorio no hace
+    // falta y estiraría la fila.
+    expect(bloque).toContain("tocable ?");
   });
 
   it("tocar el teléfono no navega a la ficha del cliente", () => {
-    const i = clientes.indexOf("tHref ? (");
-    expect(clientes.slice(i, i + 500)).toContain("e.stopPropagation()");
+    expect(contacto()).toContain("e.stopPropagation()");
   });
 
   it("el teléfono conserva su etiqueta accesible", () => {
-    expect(clientes).toContain("aria-label={`Llamar a ${c.nombre}`}");
+    expect(clientes).toContain("aria-label={`Llamar a ${nombre}`}");
+  });
+
+  it("🔴 y lo que FALTA se dice en rojo, no con un guion gris", () => {
+    // El trabajo de esta pantalla: de 150 clientes, 50 no tienen correo, 48 no
+    // tienen teléfono y 31 no tienen ninguno de los dos (medido 5-sep-2026).
+    expect(contacto()).toContain('text-red-600">{c.falta}');
   });
 });
 
@@ -236,9 +254,13 @@ describe("Proveedores — chips de empresa", () => {
 });
 
 describe("Campos de formulario de las listas", () => {
-  it("los buscadores y el select de provincia miden 44px", () => {
+  it("los buscadores miden 44px", () => {
+    // ⚠️ 5-sep-2026: el select de provincia de Clientes se RETIRÓ (99 de los 150
+    // clientes no tienen provincia; Daniel: «si, no sirve»), así que ya no hay
+    // un segundo control que medir en esa pantalla. Los chips que lo reemplazan
+    // tienen su propia altura y su candado en `clientes-lista-pantalla`.
     expect(clientes).toContain('className="flex-1 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm');
-    expect(clientes).toContain('rounded-md px-3 min-h-[44px] text-sm outline-none focus:border-black transition sm:w-48');
+    expect(clientes).not.toContain("Todas las provincias");
     expect(proveedores).toContain('className="w-full border border-gray-200 rounded-md px-3 min-h-[44px] text-sm');
   });
 });

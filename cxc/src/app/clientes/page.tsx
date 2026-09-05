@@ -1,19 +1,34 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// /clientes  (Sprint 1 Fase 4D)
+// /clientes — LA LISTA.
 //
-// Reemplaza /directorio. Lista paginada de clientes_master con búsqueda
-// y filtro por provincia. Click en un cliente → /clientes/[codigo].
+// 🔴 SU TRABAJO ES BUSCAR A ALGUIEN Y ARREGLAR SUS DATOS (5-sep-2026). Cobrar es
+// Cuentas por Cobrar y analizar la venta es Ventas › Clientes; esta lista no
+// repite ninguna de las dos. Por eso sus chips son de datos que FALTAN y su
+// última columna es «Cómo contactarlo».
+//
+// 🔴 LOS 150 EN UNA SOLA LISTA CON SCROLL, sin páginas y sin cortar por
+// «activos». Medido: **Outlet Duty Free S.A. (D-119) facturó $21.826,00 este
+// año** —4 facturas, la última el 27-ago— y su neto es cero porque el 1-sep le
+// entraron cuatro notas de crédito por los mismos montos. Con un corte por
+// actividad ese cliente desaparecería estando vivo.
+//
+// 🩸 SE FUE EL FILTRO POR PROVINCIA: **99 de los 150 no tienen provincia**, así
+// que elegir una escondía a dos de cada tres. Daniel: *«si, no sirve»*.
+//
+// 🔴 EL QUE YA NO ESTÁ EN SWITCH NO SALE. Daniel: *«si en switch no esta, aqui
+// no debe de aparecer»*. Su ficha SÍ sigue abriendo por enlace directo — las
+// guías y facturas viejas apuntan a él y no pueden quedar rotas.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/session-cookie";
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import ClientesListClient, { type Cliente } from "./ClientesListClient";
-import { leerClientesDelGrupo, type FilaCliente } from "@/lib/clientes/directorio-cache";
+import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 
 const ALLOWED_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
-const PAGE_SIZE = 50;
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +53,35 @@ async function isSessionValid(token: string | undefined): Promise<boolean> {
   return !!data;
 }
 
+/**
+ * Lo que debe cada cliente, en UNA consulta.
+ *
+ * La vista de aging del grupo tiene 211 filas: cabe entera y no hace falta
+ * paginar. ⚠️ Su columna de empresa se llama `company_key`, no `empresa_key`, y
+ * se filtra por las 6 en la misma cadena — Boston tiene su propia vista y no se
+ * mezcla ni acá ni en ningún lado.
+ *
+ * Falla ABIERTO: sin este dato la lista igual sale, con la columna vacía. Una
+ * lista de clientes que no abre porque el aging no respondió es peor que una
+ * columna en blanco.
+ */
+async function saldoPorCodigo(): Promise<Record<string, number>> {
+  const { data, error } = await supabaseServer
+    .from("switch_estadocuenta_aging")
+    .select("codigo, company_key, total")
+    .in("company_key", [...B2B_EMPRESA_KEYS]);
+  if (error) {
+    console.error("[clientes/lista] aging:", error.message);
+    return {};
+  }
+  const mapa: Record<string, number> = {};
+  for (const r of (data ?? []) as { codigo: string | null; total: number | string }[]) {
+    if (!r.codigo) continue;
+    mapa[r.codigo] = Math.round(((mapa[r.codigo] ?? 0) + Number(r.total ?? 0)) * 100) / 100;
+  }
+  return mapa;
+}
+
 export default async function ClientesPage() {
   const cookieStore = await cookies();
   const session = parseSession(cookieStore.get("cxc_session")?.value);
@@ -48,58 +92,29 @@ export default async function ClientesPage() {
     redirect("/");
   }
 
-  // 🚪 SE ENTRA POR LA MISMA PUERTA QUE `/api/clientes`, y eso es todo el
-  // arreglo de esta pantalla (12-ago-2026).
-  //
-  // 🩸 Acá había una SEGUNDA copia de la lectura: `clientes_master` entera
-  // (5.062 filas, 6 viajes paginados) + `switch_clientes` (6.634 filas, 7
-  // viajes) — 11.700 filas y 13 idas a Supabase — con `force-dynamic` y SIN
-  // caché, o sea en CADA apertura de la pantalla. Y el endpoint `/api/clientes`
-  // ya hacía exactamente lo mismo con una caché de 60 s que esta pantalla no
-  // usaba. Medido contra el build de producción: el HTML tardaba 3.215 ms.
-  //
-  // Las columnas son las MISMAS ocho (se compararon una por una antes de tocar
-  // nada), el filtro de mundos es el mismo y el orden de presentación es el
-  // mismo, así que el primer render y el refetch siguen dando el MISMO total —
-  // que es lo que sostiene la paginación.
-  //
-  // 🩸 La lista se lee ENTERA y se recorta acá, en vez de pedirle a la base la
-  // primera página con `count: exact`. Es por las exclusiones del Directorio:
-  // los que no son del grupo se quitan DESPUÉS de leer, así que un
-  // `count` de la base contaría miles que no se van a mostrar y la paginación
-  // prometería páginas vacías.
-  // CON AUSENTES: esta pantalla es el directorio completo — el cliente que
-  // Switch ya no manda se ve, con su rótulo, y su ficha sigue abriendo. Los
-  // que NO lo ofrecen son los selectores (default de `leerClientesDelGrupo`).
-  const visiblesCache: FilaCliente[] = await leerClientesDelGrupo("", { incluirAusentes: true }).catch(() => []);
+  // 🚪 SE ENTRA POR LA MISMA PUERTA QUE `/api/clientes` — `leerClientesDelGrupo`,
+  // con su caché de 60 s y su filtro de mundos. Sin `incluirAusentes`: el
+  // default de esa puerta es «solo lo que se puede ofrecer», que es exactamente
+  // lo que esta lista quiere desde el 5-sep-2026.
+  const filas = await leerClientesDelGrupo("").catch(() => []);
+  const debe = await saldoPorCodigo();
 
-  // ⚠️ `.slice()` OBLIGATORIO: `visiblesCache` es el MISMO array que guarda el
-  // caché en memoria, y `sort` ordena EN EL LUGAR. Sin la copia, esta pantalla
-  // mutaría estado compartido entre requests. (Es el mismo cuidado que ya
-  // tomaba `/api/clientes`, y por eso hay un test que lo vigila.)
-  const visibles = visiblesCache.slice() as Cliente[];
-  visibles.sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es"));
-  const clientes = visibles.slice(0, PAGE_SIZE);
-  const total = visibles.length;
+  // ⚠️ `.slice()` OBLIGATORIO: `filas` puede ser el MISMO array que guarda el
+  // caché en memoria. Acá se mapea (que ya crea uno nuevo), pero el orden se
+  // aplica sobre la copia, nunca sobre el estado compartido entre requests.
+  const clientes: Cliente[] = filas
+    .filter((c) => !!c.codigo)
+    .map((c) => ({
+      id: c.id,
+      codigo: c.codigo as string,
+      nombre: c.nombre ?? "",
+      razon_social: c.razon_social,
+      telefono: c.telefono,
+      celular: c.celular,
+      email: c.email,
+      debe: debe[c.codigo as string] ?? 0,
+    }))
+    .sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es"));
 
-  // Las provincias salen de los clientes que SE VEN, no de la tabla entera.
-  //
-  // 🩸 Era una segunda consulta a `clientes_master` sin paginar y sin filtro de
-  // mundo: PostgREST cortaba en 1.000 de 5.062 filas EN SILENCIO, y las que sí
-  // llegaban eran casi todas de Boston (4.883 de 5.062). O sea que el
-  // desplegable ofrecía provincias donde no vive NINGÚN cliente visible — se
-  // elegía una y la lista quedaba vacía. Derivarlas de `visibles` no cuesta una
-  // consulta más, no se puede truncar y no puede desincronizarse de la lista.
-  const provincias = [
-    ...new Set(visibles.map(c => (c.provincia ?? "").trim()).filter(Boolean)),
-  ].sort((a, b) => a.localeCompare(b, "es"));
-
-  return (
-    <ClientesListClient
-      initialClientes={clientes}
-      initialTotal={total}
-      provincias={provincias}
-      pageSize={PAGE_SIZE}
-    />
-  );
+  return <ClientesListClient initialClientes={clientes} />;
 }

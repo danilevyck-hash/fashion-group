@@ -38,8 +38,8 @@ vi.mock("@/components/AppHeader", () => ({ default: () => null }));
 vi.mock("@/components/shared/SyncNowButton", () => ({ default: () => null }));
 
 const CLIENTES: Cliente[] = [
-  { id: "1", codigo: "D-25", nombre: "CITY MALL PASO CANOA", razon_social: null, telefono: "507-1", celular: null, email: null, provincia: "Chiriquí" },
-  { id: "2", codigo: "D-24", nombre: "CITY MALL DAVID", razon_social: null, telefono: null, celular: null, email: null, provincia: "Chiriquí" },
+  { id: "1", codigo: "D-25", nombre: "CITY MALL PASO CANOA", razon_social: null, telefono: "507-1", celular: null, email: null, debe: 100 },
+  { id: "2", codigo: "D-24", nombre: "CITY MALL DAVID", razon_social: null, telefono: null, celular: null, email: null, debe: 0 },
 ];
 
 /** URLs que la pantalla llegó a pedir, en orden. */
@@ -67,12 +67,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 function pintar() {
   return render(
     <SWRConfig value={{ provider: () => new Map() }}>
-      <ClientesListClient
-        initialClientes={CLIENTES}
-        initialTotal={120}
-        provincias={["Chiriquí", "Panamá"]}
-        pageSize={50}
-      />
+      <ClientesListClient initialClientes={CLIENTES} />
     </SWRConfig>,
   );
 }
@@ -101,23 +96,40 @@ describe("🔴 la búsqueda VIVE en la URL", () => {
     }
   });
 
-  it("volver de una ficha con la búsqueda puesta la muestra Y la consulta", async () => {
+  it("volver de una ficha con la búsqueda puesta la muestra Y filtra la lista", async () => {
     // Es el defecto exacto: se entra a `/clientes/D-25` y se vuelve. La URL trae
     // el estado; antes se perdía porque vivía en `useState`.
-    QUERY = "search=CITY&page=3";
+    //
+    // ⚠️ 5-sep-2026: la lista ya no se pide por red (llegan los 150 del
+    // servidor y el buscador filtra en memoria), así que lo que se comprueba es
+    // lo que de verdad importaba — que el término VUELVA y que la lista quede
+    // filtrada por él.
+    QUERY = "search=PASO";
     pintar();
-    expect(buscador().value).toBe("CITY");
+    expect(buscador().value).toBe("PASO");
+    // ⚠️ `getAllBy`: la pantalla dibuja los dos layouts (tabla y tarjetas) y el
+    // nombre aparece en los dos. Buscar con `getBy` encontraría dos y fallaría
+    // sin decir nada sobre el filtro, que es lo que se está probando.
     await waitFor(() => {
-      expect(pedidos.some((u) => u.includes("q=CITY") && u.includes("page=3"))).toBe(true);
+      expect(screen.getAllByText("CITY MALL PASO CANOA").length).toBeGreaterThan(0);
+      expect(screen.queryAllByText("CITY MALL DAVID").length).toBe(0);
     });
   });
 
-  it("la provincia también viaja en la URL", () => {
+  it("🔴 el CHIP también viaja en la URL, con REPLACE", () => {
+    // 5-sep-2026: reemplaza al desplegable de provincia, que se retiró (99 de
+    // los 150 clientes no la tienen; Daniel: «si, no sirve»). Un chip es un
+    // filtro del MISMO nivel: `replace`, nunca `push`.
     pintar();
-    fireEvent.change(screen.getByDisplayValue("Todas las provincias"), { target: { value: "Panamá" } });
+    fireEvent.click(screen.getByRole("button", { name: /Sin correo/ }));
     expect(REPLACE).toHaveBeenCalled();
-    expect(REPLACE.mock.calls.at(-1)![0]).toContain("provincia=Panam");
+    expect(REPLACE.mock.calls.at(-1)![0]).toContain("filtro=sin-correo");
     expect(PUSH).not.toHaveBeenCalled();
+  });
+
+  it("⚠️ el desplegable de provincia no volvió", () => {
+    pintar();
+    expect(screen.queryByDisplayValue("Todas las provincias")).toBeNull();
   });
 });
 
@@ -125,22 +137,26 @@ describe("🔴 la búsqueda VIVE en la URL", () => {
 // 2. LA PÁGINA TAMBIÉN
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("🔴 la página VIVE en la URL", () => {
-  it("«Siguiente» escribe la página con REPLACE", () => {
+describe("🔴 YA NO HAY PÁGINAS — los 150 en una sola lista", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 5-sep-2026. La paginación de a 50 se retiró: se
+  // muestran los 150 con scroll. Daniel lo eligió sobre cortar por «activos» por
+  // una razón medida: **Outlet Duty Free S.A. (D-119) facturó $21.826,00 este
+  // año** —4 facturas, la última el 27-ago— y con un corte por actividad ese
+  // cliente desaparecería estando vivo (su neto es cero porque el 1-sep le
+  // entraron cuatro notas de crédito por los mismos montos).
+  //
+  // El candado ya no protege que la página viva en la URL: protege que **no
+  // haya páginas**, que es lo que hace que el problema no pueda volver.
+  it("no hay botones de paginar", () => {
     pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Siguiente/ }));
-    expect(REPLACE).toHaveBeenCalled();
-    expect(REPLACE.mock.calls.at(-1)![0]).toContain("page=2");
-    expect(PUSH).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /Siguiente/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Anterior/ })).toBeNull();
   });
 
-  it("«Anterior» desde la 3 lleva a la 2 (no reinicia a la 1)", async () => {
-    QUERY = "page=3";
+  it("se dibujan TODOS los clientes que mandó el servidor", () => {
     pintar();
-    // La página 3 NO viene del servidor: hay que esperar a que llegue su lote.
-    const anterior = await screen.findByRole("button", { name: /Anterior/ });
-    fireEvent.click(anterior);
-    expect(REPLACE.mock.calls.at(-1)![0]).toContain("page=2");
+    const filas = document.querySelectorAll('[data-vista="tarjetas"] li');
+    expect(filas.length).toBe(CLIENTES.length);
   });
 });
 
@@ -152,7 +168,10 @@ describe("entrar a la ficha sigue creando entrada de historial", () => {
   it("tocar la tarjeta del cliente hace PUSH a su ficha", () => {
     pintar();
     // La lista de tarjetas (celular e iPad) navega con el router.
-    const tarjeta = document.querySelector('[data-vista="tarjetas"] li')!;
+    // ⚠️ La lista arranca ordenada A→Z, así que la primera tarjeta es D-24
+    // (CITY MALL DAVID). Se busca la de D-25 por su código, no por su posición.
+    const tarjetas = [...document.querySelectorAll('[data-vista="tarjetas"] li')];
+    const tarjeta = tarjetas.find((t) => t.textContent?.includes("D-25"))!;
     fireEvent.click(tarjeta);
     expect(PUSH).toHaveBeenCalledWith("/clientes/D-25");
   });

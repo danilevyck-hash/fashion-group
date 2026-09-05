@@ -34,6 +34,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { limpiarDireccionSwitch } from "@/lib/clientes/direccion-switch";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { EMPRESAS_DEL_GRUPO } from "@/lib/clientes/mundos";
 import {
@@ -57,6 +58,34 @@ const cleanText = (s: string | null | undefined): string | null => {
   return v === "" ? null : v;
 };
 
+/**
+ * La dirección de Switch de un código, mirando TODAS sus filas de empresa.
+ *
+ * Desempate DETERMINISTA (la primera alfabéticamente): es el MISMO criterio del
+ * backfill de la migración 20260930120000, así que la primera corrida del sync
+ * después de aplicarla no reescribe nada. Un desempate por «la empresa cuyo
+ * cron corrió último» es el error que ya se pagó con el NOMBRE del cliente.
+ *
+ * 🔴 Este dato se MUESTRA en la ficha y **no alimenta Guías** — ver
+ * `lib/clientes/direccion-switch.ts`.
+ */
+function direccionDeLasFilas(filas: SwitchClienteRow[]): string | null {
+  const candidatas = filas
+    .map((f) => limpiarDireccionSwitch(f.raw_data?.direccion))
+    .filter((d): d is string => !!d)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return candidatas[0] ?? null;
+}
+
+/** El MISMO renglón sin `direccion_switch`, para reintentar cuando la columna
+ *  todavía no existe. Se quita la columna, no se manda `null`: mandar null
+ *  BORRARÍA la dirección de todos si la columna sí existiera. */
+function sinDireccion(fila: MasterUpsertRow): MasterUpsertRow {
+  const copia = { ...fila };
+  delete copia.direccion_switch;
+  return copia;
+}
+
 interface SwitchClienteRow {
   empresa_key: string;
   codigo: string | null;
@@ -79,6 +108,12 @@ interface MasterUpsertRow {
   razon_social: string | null;
   identificacion: string | null;
   dv: string | null;
+  /** 🔴 ESPEJO de Switch, y la ÚNICA columna de esta familia que el sync SÍ
+   *  refresca (telefono/celular/email/notas/contacto los escribe la gente y
+   *  nunca se pisan). ⚠️ **No alimenta los destinos de Guías** — ver
+   *  `lib/clientes/direccion-switch.ts` y la migración 20260930120000.
+   *  Ausente mientras esa DDL no corra: el upsert reintenta sin ella. */
+  direccion_switch?: string | null;
   last_synced_at: string;
 }
 
@@ -254,6 +289,15 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
       razon_social: cleanText(row.razonsocial),
       identificacion: cleanText(row.identificacion),
       dv: cleanText(dvRaw),
+      // La dirección que manda Switch. Se guarda para MOSTRARLA en la ficha;
+      // 🔴 no entra a Guías por ningún lado.
+      //
+      // ⚠️ Se busca en TODAS las filas del código, no solo en `row`: `row` se
+      // eligió por tener RUC o razón social, y la empresa que trae esos dos no
+      // es necesariamente la que trae la dirección. El desempate es la primera
+      // alfabéticamente — determinista, el MISMO criterio que el backfill de la
+      // migración, así que el sync no pisa lo que la migración escribió.
+      direccion_switch: direccionDeLasFilas(filas),
       last_synced_at: now,
     });
   }
@@ -272,14 +316,31 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
   }
 
   // 4. UPSERT onConflict=codigo. Al no incluir telefono/celular/email/notas/
-  //    provincia en el payload, merge-duplicates deja esas columnas intactas.
+  //    contacto/provincia en el payload, merge-duplicates deja esas columnas
+  //    intactas — son las que escribe la gente.
+  //
+  //    🔴 `direccion_switch` PUEDE NO EXISTIR TODAVÍA (migración 20260930120000,
+  //    la corre Daniel). Si el upsert la rechaza, se reintenta el MISMO lote sin
+  //    esa columna: el refresco fiscal de los 150 clientes no puede caerse
+  //    entero por una columna nueva que todavía no está.
   const BATCH = 500;
   let upserted = 0;
+  let sinColumnaDireccion = false;
   for (let i = 0; i < payload.length; i += BATCH) {
     const slice = payload.slice(i, i + BATCH);
-    const { error: upErr } = await supabaseServer
-      .from("clientes_master")
-      .upsert(slice, { onConflict: "codigo", ignoreDuplicates: false });
+    const escribir = (conDireccion: boolean) =>
+      supabaseServer
+        .from("clientes_master")
+        .upsert(conDireccion ? slice : slice.map(sinDireccion), {
+          onConflict: "codigo",
+          ignoreDuplicates: false,
+        });
+    let { error: upErr } = await escribir(!sinColumnaDireccion);
+    if (upErr && !sinColumnaDireccion) {
+      console.error(`[sync clientes_master] WARNING direccion_switch (¿DDL 20260930120000 pendiente?): ${upErr.message}`);
+      sinColumnaDireccion = true;
+      ({ error: upErr } = await escribir(false));
+    }
     if (upErr) {
       return {
         ok: false,

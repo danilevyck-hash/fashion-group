@@ -73,8 +73,15 @@ describe("las consultas de recibos POR CLIENTE filtran empresa en la query", () 
   // Estas dos leen switch_recibos con `.eq("cliente_codigo", codigo)`. Un código
   // de cliente NO es único entre empresas, así que sin filtro de empresa la
   // consulta puede traer plata de otra empresa para el mismo cliente.
+  //
+  // ⚠️ CAMBIÓ DE LUGAR EL 5-sep-2026, no de regla. La lectura de recibos de la
+  // ficha se mudó de `app/clientes/[codigo]/page.tsx` a
+  // `lib/clientes/ficha-datos.ts` (el bloque «Últimos pagos» de la ficha, que
+  // reusa el agrupador del CXC). Allá el filtro es **más fuerte**: una consulta
+  // POR EMPRESA con `.eq("empresa_key", empresa)` sobre `B2B_EMPRESA_KEYS`, que
+  // es el mismo patrón de `/api/cxc/ultimos-pagos` — con `.in` + `.limit`, un
+  // cliente con 30 pagos en Fashion Wear dejaría a Vistana sin ninguno.
   const ARCHIVOS = [
-    "src/app/clientes/[codigo]/page.tsx",
     "src/app/api/clientes/[codigo]/route.ts",
   ];
 
@@ -92,6 +99,34 @@ describe("las consultas de recibos POR CLIENTE filtran empresa en la query", () 
       ).toBe(true);
     });
   }
+
+  it("la ficha del cliente lee los recibos EMPRESA POR EMPRESA, sobre las 6", () => {
+    // 5-sep-2026: el bloque «Últimos pagos» de la ficha. El `.eq` de empresa va
+    // en la MISMA cadena que el `.eq("cliente_codigo", …)`, y las empresas salen
+    // de `B2B_EMPRESA_KEYS`, nunca de una lista escrita ahí.
+    const src = leer("src/lib/clientes/ficha-datos.ts");
+    expect(src).toContain('.from("switch_recibos")');
+    const bloque = src.slice(src.indexOf('.from("switch_recibos")'));
+    const hastaCierre = bloque.slice(0, bloque.indexOf("if (error)"));
+    expect(
+      hastaCierre.includes('.eq("empresa_key", empresa)'),
+      "la ficha perdió el filtro de empresa al leer los recibos: un cliente que exista en Boston y en el grupo sumaría las dos plata.",
+    ).toBe(true);
+    expect(hastaCierre).toContain('.eq("cliente_codigo", codigo)');
+    // Y el filtro de siempre: sin retenciones y sin recibos en cero.
+    expect(hastaCierre).toContain('.eq("es_retencion", false)');
+    expect(hastaCierre).toContain('.neq("total", 0)');
+    expect(src).toContain("B2B_EMPRESA_KEYS.map(");
+  });
+
+  it("la ficha del cliente lee las FACTURAS acotadas a las 6", () => {
+    // Mismo peligro del lado de las compras: `switch_facturas` tiene Boston
+    // (9.145 filas) y american_classic (29.584) conviviendo con las del grupo.
+    const src = leer("src/lib/clientes/ficha-datos.ts");
+    const bloque = src.slice(src.indexOf('.from("switch_facturas")'));
+    const hastaCierre = bloque.slice(0, bloque.indexOf(".range("));
+    expect(hastaCierre).toContain('.in("empresa_key", [...B2B_EMPRESA_KEYS])');
+  });
 
   it('/api/cxc/ultimo-pago acota la vista a las empresas con CXC', () => {
     const src = leer("src/app/api/cxc/ultimo-pago/route.ts");

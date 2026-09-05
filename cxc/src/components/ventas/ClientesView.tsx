@@ -103,6 +103,23 @@ const textoComparativo = (anio: number) =>
 // `esMostrador` es la definición que ya usaban las RPC de comisión y el checkout
 // público. No se copia: se importa.
 
+/**
+ * El código que llega en `?cliente=` — el enlace «Ver en Ventas ›» de la ficha.
+ *
+ * Se lee de `window.location` y no del hook de Next a propósito: este componente
+ * es un cliente que se monta dentro del árbol de pestañas de Ventas y no puede
+ * agregarle un `Suspense` a esa pantalla solo para leer un parámetro opcional.
+ * En el servidor devuelve `""` y todo queda exactamente como estaba.
+ */
+function codigoDeLaUrl(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return (new URLSearchParams(window.location.search).get("cliente") ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
 interface ClientesViewProps {
   data: Clientes;
   /** Año del selector global. Para año en curso: vista rolling 12m
@@ -112,7 +129,20 @@ interface ClientesViewProps {
 }
 
 export function ClientesView({ data: initialData, selectedYear, isClosedYear }: ClientesViewProps) {
-  const [search, setSearch] = useState("");
+  // 🔴 `?cliente=D-25` — LO ÚNICO QUE SE LE AGREGÓ A ESTA PANTALLA (5-sep-2026).
+  //
+  // El pie de la ficha del cliente tiene «Ver en Ventas ›» (solo admin, que es
+  // el único rol del módulo) y hasta hoy caía en la lista pelada: había que
+  // volver a buscar al cliente que se acababa de mirar. Ahora el código llega en
+  // la URL, la búsqueda arranca con él —así el cliente queda a la vista sin
+  // tocar la mecánica de filtros ni el orden— y **su fila queda resaltada**
+  // (`aria-current`) para reconocerla de un vistazo.
+  //
+  // ⚠️ Se lee UNA sola vez, al montar, y de ahí en más manda el buscador: si
+  // esto se re-aplicara en cada render, borrar la búsqueda a mano volvería a
+  // escribir el código y la pantalla se pelearía con quien la usa.
+  const [search, setSearch] = useState(() => codigoDeLaUrl());
+  const [resaltado] = useState(() => codigoDeLaUrl());
   const [empresa, setEmpresa] = useState("todas");
   const [data, setData] = useState<Clientes>(initialData);
   const [loading, setLoading] = useState(false);
@@ -598,6 +628,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                     displayRank={idx + 1}
                     histState={histStateFor(c)}
                     empresaScope={empresa}
+                    resaltado={!!resaltado && c.id === resaltado}
                     onTriggerHistorial={() => loadHistorial(c.id, c.empresaKey)}
                   />
                 );
@@ -735,9 +766,12 @@ function ClienteRow({
   displayRank,
   histState,
   empresaScope,
+  resaltado = false,
   onTriggerHistorial,
 }: {
   c: Cliente;
+  /** Llegó por `?cliente=` desde la ficha: la fila se marca para reconocerla. */
+  resaltado?: boolean;
   /** Rank visual 1..N según el sort actual. Reemplaza c.rank (DB rank
    *  global por compras_ytd DESC) que se veía desordenado cuando el
    *  usuario cambiaba el sort. */
@@ -764,7 +798,11 @@ function ClienteRow({
     // verificador. Buscar por clase de breakpoint (`.md\\:hidden`) es la trampa
     // que hace pasar un chequeo sin comparar nada: al mover el corte, el
     // selector devuelve vacío y el test "aprueba" el silencio.
-    <tr data-fila-cliente={`${c.empresaKey}|${c.id}`} className="cursor-pointer transition hover:bg-gray-50">
+    <tr
+      data-fila-cliente={`${c.empresaKey}|${c.id}`}
+      aria-current={resaltado ? "true" : undefined}
+      className={`cursor-pointer transition hover:bg-gray-50 ${resaltado ? "bg-teal-50/60" : ""}`}
+    >
       <td className="border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{displayRank}</td>
       <td className="border-b border-gray-200 px-2.5 py-3 text-sm text-gray-950">
         {/* Escritorio (lg+): HoverCard con popover. Debajo de lg el mismo

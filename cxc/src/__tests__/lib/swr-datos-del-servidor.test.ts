@@ -32,9 +32,15 @@ const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8"
 // verdad seguía pasando en verde, satisfecho con su propia explicación.
 const codigoDe = (rel: string) => leer(rel).replace(/\/\/.*$/gm, "");
 
+// ⚠️ CLIENTES SALIÓ DE ESTA LISTA EL 5-sep-2026, y no por aflojarse: la lista de
+// clientes **dejó de pedirse por SWR**. Con el rediseño se muestran los 150 de
+// una (sin páginas y sin filtro de provincia), así que el server component los
+// manda enteros y la pantalla los dibuja tal cual — cero peticiones, que es la
+// forma FUERTE de lo que este bloque exige (no volver a pedir lo que el
+// servidor ya mandó). Lo único que sigue por SWR ahí es la columna «Compró»,
+// que va aparte a propósito. Hay un bloque propio más abajo que lo fija.
 const SHELLS = [
   "src/app/ventas/VentasShell.tsx",
-  "src/app/clientes/ClientesListClient.tsx",
   "src/app/multifashion/MultifashionShell.tsx",
   "src/app/reclamos/ReclamosClient.tsx",
 ];
@@ -137,14 +143,23 @@ describe("🔁 la MISMA pantalla no pregunta lo mismo dos veces", () => {
 });
 
 describe("⚠️ las vistas SIN dato del servidor siguen pidiendo", () => {
-  it("Clientes solo considera del servidor la página 1 sin filtros", () => {
-    const src = leer("src/app/clientes/ClientesListClient.tsx");
-    // ⚠️ `provinciaDebounced` se llama `provincia` desde el 24-ago-2026: la
-    // provincia dejó de tener una copia debounced y vive directo en la URL
-    // (`useUrlState`). Lo que este candado protege NO cambió: que los datos del
-    // servidor solo se den por buenos en la página 1 SIN filtros.
-    expect(src).toContain("const isInitialView = page === 1 && !qDebounced && !provincia");
-    expect(src).toContain("isInitialView\n        ?");
+  it("🔴 Clientes NO vuelve a pedir la lista que el servidor ya mandó", () => {
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 5-sep-2026. Antes esta pantalla paginaba de a 50
+    // y solo podía dar por buenos los datos del servidor en la página 1 sin
+    // filtros (`isInitialView`); todo lo demás lo pedía a `/api/clientes`.
+    //
+    // Ahora se muestran los 150 en una sola lista con scroll —sin páginas y sin
+    // filtro de provincia (99 de 150 no la tienen; Daniel: «si, no sirve»)— y
+    // el buscador y los chips filtran EN MEMORIA sobre lo que ya llegó. O sea
+    // que la lista no se vuelve a pedir NUNCA: es la forma fuerte de la misma
+    // regla, no una excepción a ella.
+    const src = codigoDe("src/app/clientes/ClientesListClient.tsx");
+    expect(src).not.toContain("/api/clientes?");
+    expect(src).not.toContain("opcionesDelServidor");
+    // Lo único que se pide por red es la columna «Compró», aparte a propósito:
+    // leer las facturas del año de 150 clientes cuesta ~2.280 filas y la tabla
+    // no tiene por qué esperarla.
+    expect(src).toContain("/api/clientes/ytd?codigos=");
   });
 
   it("Ventas y Multifashion solo consideran del servidor el año inicial", () => {

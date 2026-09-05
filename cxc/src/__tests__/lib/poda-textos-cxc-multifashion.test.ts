@@ -281,7 +281,7 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/caja/[periodoId]/nuevo/page.tsx", que: "Caja · el período del que se viene, repetido en el formulario", texto: "Período Nº" },
   { archivo: "app/caja/[periodoId]/nuevo/page.tsx", que: "Caja · instructivo del formulario con los * ya a la vista", texto: "Los campos con * son obligatorios" },
   { archivo: "app/cxc/page.tsx", que: "CXC · '6 empresas' al lado de la pestaña 'Grupo · 6 empresas'", texto: ': "6 empresas"' },
-  { archivo: "app/clientes/[codigo]/ClienteDetail.tsx", que: "Clientes · coletilla del encabezado (abajo dice 'Última sincronización')", texto: "Datos fiscales · sincronizados de Switch" },
+  { archivo: "app/clientes/[codigo]/ClienteDetail.tsx", que: "Clientes · coletilla del encabezado (abajo dice cuándo se actualizó)", texto: "Datos fiscales · sincronizados de Switch" },
   { archivo: "components/ventas/ClientesView.tsx", que: "Ventas › Clientes · el prefijo 'Vista:' del chip", texto: "Vista: {vistaChipLong}" },
   { archivo: "components/ventas/ClientesView.tsx", que: "Ventas › Clientes · rótulo del globo que se abre desde 'N empresas'", texto: "Desglose por empresa" },
   { archivo: "app/guias/[id]/page.tsx", que: "Guías · 'de esta guía' estando DENTRO de la guía", texto: "Envíos de esta guía" },
@@ -570,7 +570,11 @@ const EN_PANTALLA: { archivo: string; por_que: string; texto: string }[] = [
   {
     archivo: "app/clientes/[codigo]/ClienteDetail.tsx",
     por_que: "la frescura del dato cambia cuánto se le cree a la ficha",
-    texto: "Última sincronización",
+    // ⚠️ CAMBIÓ EL TEXTO EL 5-sep-2026, no la regla. El diccionario (§ 1.7,
+    // decidido por Daniel) sacó la palabra «sincronizar» de la pantalla:
+    // «Actualizar ahora» en el botón y «Actualizado …» en el rótulo. El aviso
+    // sigue A LA VISTA, nunca detrás del ⓘ, que es lo que este candado protege.
+    texto: "Actualizado desde Switch el",
   },
   {
     archivo: "app/proveedores/[key]/ProveedorDetail.tsx",

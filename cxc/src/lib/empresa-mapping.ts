@@ -16,6 +16,40 @@ export const EMPRESA_KEY_TO_NAME: Record<string, string> = {
 };
 
 /**
+ * 🔴 EL NOMBRE CORTO DE CADA EMPRESA — «Vistana», «Boston» (diccionario § 0, #4,
+ * decidido por Daniel el 5-sep-2026).
+ *
+ * Va acá, como SEGUNDO CAMPO de la misma lista, y no en un mapa aparte: el
+ * diccionario encontró **tres mapas de nombres para las mismas 8 empresas que no
+ * decían lo mismo** (`empresa-mapping` decía «Vistana International», el
+ * Telegram del resumen mensual decía «Vistana» y Referencia otra cosa), y un
+ * cuarto mapa habría sido exactamente el problema que se está arreglando.
+ *
+ * Las seis claves son las mismas que `EMPRESA_KEY_TO_NAME` y hay candado que lo
+ * exige: agregar una empresa a un mapa y no al otro pone el build ROJO.
+ *
+ * ⚠️ Se aplica **módulo por módulo**, no de una pasada: hoy lo usa Clientes (la
+ * lista y la ficha). Las demás pantallas siguen con el nombre largo hasta que
+ * les toque su turno, que es como el diccionario dice que se hace.
+ */
+export const EMPRESA_KEY_TO_NOMBRE_CORTO: Record<string, string> = {
+  vistana: "Vistana",
+  fashion_wear: "Fashion Wear",
+  fashion_shoes: "Fashion Shoes",
+  active_shoes: "Active Shoes",
+  active_wear: "Active Wear",
+  joystep: "Joystep",
+  confecciones_boston: "Boston",
+  american_classic: "Multifashion",
+};
+
+/** El nombre corto de una empresa, o su clave si no está en el mapa (nunca se
+ *  rompe la pantalla por un nombre que falta). */
+export function nombreCortoEmpresa(key: string): string {
+  return EMPRESA_KEY_TO_NOMBRE_CORTO[key] ?? EMPRESA_KEY_TO_NAME[key] ?? key;
+}
+
+/**
  * Iniciales por empresa para la numeración de reclamos NUEVOS
  * (<INICIALES>-<AÑO>-<correlativo>, ej. VI-2026-0001). Iniciales confirmadas por
  * Daniel. Los reclamos guardan el NOMBRE de la empresa (no la key), así que el

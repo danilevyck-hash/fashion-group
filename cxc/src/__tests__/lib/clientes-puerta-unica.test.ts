@@ -139,28 +139,54 @@ describe("BARRIDO ESTÁTICO — nadie se hace su propia lista de clientes", () =
     expect(leer(rel)).not.toContain('.from("clientes_master")');
   });
 
-  it("el primer render del Directorio no hace NINGUNA lectura propia", () => {
+  it("el primer render del Directorio no hace NINGUNA lectura propia de clientes", () => {
     // Las provincias del desplegable salían de una consulta aparte, sin paginar
-    // y sin filtro de mundo: 1.000 de 5.062 filas, casi todas de Boston. Ahora
-    // se derivan de los clientes que SE VEN.
+    // y sin filtro de mundo: 1.000 de 5.062 filas, casi todas de Boston.
     //
     // Y desde el 12-ago-2026 la lista tampoco se lee acá: la pantalla entra por
     // la misma puerta cacheada que `/api/clientes`. Antes era UNA consulta
     // propia; ahora tienen que ser CERO.
+    //
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 5-sep-2026, en el rediseño de Clientes: el
+    // desplegable de provincia SE RETIRÓ (99 de los 150 clientes no la tienen;
+    // Daniel: «si, no sirve»), así que ya no hay `provincias` que derivar. Lo
+    // que el candado protege sigue igual: **cero lecturas propias de la lista de
+    // clientes**. La única consulta que la pantalla hace por su cuenta es el
+    // SALDO (`switch_estadocuenta_aging`, 211 filas, acotado a las 6 en la misma
+    // cadena), que no es una lista de clientes y no puede traer a nadie de más:
+    // solo pone un número al lado de los que la puerta ya devolvió.
     const src = leer("src/app/clientes/page.tsx");
     expect((src.match(/\.from\("clientes_master"\)/g) ?? []).length).toBe(0);
-    expect(src).toContain("visibles.map(c => (c.provincia");
+    expect((src.match(/\.from\("switch_clientes"\)/g) ?? []).length).toBe(0);
+    expect(src).toContain("leerClientesDelGrupo");
+    // El saldo, si se lee, entra acotado a las 6 en la MISMA cadena.
+    if (src.includes('.from("switch_estadocuenta_aging")')) {
+      expect(src).toMatch(/switch_estadocuenta_aging[\s\S]{0,300}\.in\("company_key", \[\.\.\.B2B_EMPRESA_KEYS\]\)/);
+    }
+    // Y el desplegable de provincia no volvió por la puerta de atrás.
+    expect(src).not.toContain("provincias");
   });
 
   it("el Directorio COPIA la lista antes de ordenarla (el array es del caché)", () => {
     // `sort` ordena EN EL LUGAR y `leerClientesDelGrupo` devuelve el MISMO array
     // que guarda el caché en memoria: sin la copia, la pantalla mutaría estado
     // compartido entre requests. Es el mismo cuidado que ya tomaba el endpoint.
+    //
+    // ⚠️ 5-sep-2026: la copia ahora la hace la cadena `.filter(...).map(...)`,
+    // que devuelve arrays NUEVOS, y recién sobre el último se aplica `.sort()`.
+    // El candado exige que entre la puerta y el `sort` haya al menos un paso que
+    // copie — nunca un `sort` directo sobre lo que devolvió la puerta.
     const src = leer("src/app/clientes/page.tsx");
-    const iSlice = src.indexOf("visiblesCache.slice()");
-    const iSort = src.indexOf("visibles.sort(");
-    expect(iSlice).toBeGreaterThan(-1);
-    expect(iSort).toBeGreaterThan(iSlice);
+    const iPuerta = src.indexOf("await leerClientesDelGrupo(");
+    const iCopia = Math.min(
+      ...[".slice()", ".filter(", ".map("]
+        .map((t) => src.indexOf(t, iPuerta))
+        .filter((i) => i > -1),
+    );
+    const iSort = src.indexOf(".sort(", iPuerta);
+    expect(iPuerta).toBeGreaterThan(-1);
+    expect(iCopia).toBeGreaterThan(iPuerta);
+    expect(iSort).toBeGreaterThan(iCopia);
   });
 
   it("la puerta lee las DOS tablas en paralelo, no una detrás de la otra", () => {

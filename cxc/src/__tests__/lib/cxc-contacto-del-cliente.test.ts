@@ -93,10 +93,18 @@ describe("🔴 el sync de Switch NUNCA escribe `contacto`", () => {
 
 describe("la ficha del cliente", () => {
   it("la casilla se edita y va ARRIBA de Correo", () => {
+    // ⚠️ CAMBIÓ DE FORMA EL 5-sep-2026, no de regla. La ficha se rediseñó y el
+    // bloque Contacto dejó de ser un formulario con «Editar»/«Guardar»: ahora
+    // **se edita tocando el dato** (`CampoEnLinea`), un solo componente que
+    // sirve para leer y para escribir. Lo que el candado protege es lo mismo:
+    // que la casilla EXISTA, que se pueda EDITAR y que vaya ARRIBA de Correo —
+    // es lo primero que se pregunta al llamar a cobrar («¿con quién hablo?»).
     const src = leer("src/app/clientes/[codigo]/ClienteDetail.tsx");
-    expect(src).toContain('<FormRow label="Contacto"');
-    expect(src).toContain('<Field label="Contacto"');
-    expect(src.indexOf('label="Contacto"')).toBeLessThan(src.indexOf('label="Email"'));
+    expect(src).toContain('campo="contacto" rotulo="Contacto"');
+    expect(src).toContain("puedeEditar={puedeEditar}");
+    expect(src.indexOf('rotulo="Contacto"')).toBeLessThan(src.indexOf('rotulo="Correo"'));
+    // Y el rótulo es «Correo», no «Email» (diccionario § 0, #8).
+    expect(src).not.toContain('rotulo="Email"');
   });
 
   it("la ruta la acepta en su lista blanca, con los demás campos de la gente", () => {
