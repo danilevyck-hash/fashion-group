@@ -14,7 +14,7 @@
 // El 27-jul-2026 `secretaria` se sumó a CATALOGO_ADMIN_ROLES por pedido de
 // Daniel ("a las secretarias, ponle que puedan ver catálogos como a daniel, con
 // administrar también"). Antes la API YA la dejaba entrar a casi todo el admin
-// (`requireAdmin` de lib/api-auth = admin+secretaria, que es lo que protege
+// (`requireAdminOSecretaria` de lib/api-auth = admin+secretaria, que es lo que protege
 // products y variantes), pero la UI le escondía el botón "Administrar" y dos
 // endpoints seguían solo-admin: `upload` en Joybees/Tommy y el borrado/edición
 // de un pedido del link. Esto alinea las tres capas.

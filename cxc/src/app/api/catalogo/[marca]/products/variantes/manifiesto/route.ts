@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
 
   const body = (await req.json().catch(() => null)) as { items?: unknown } | null;

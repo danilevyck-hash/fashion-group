@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizarBultoPzas, BULTO_TOMMY_MAX } from "@/lib/tommy-bulto";
 import { sinColumna } from "@/lib/catalogo/cols-opcionales";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { requireRole } from "@/lib/requireRole";
 import { catalogoRoles } from "@/lib/catalogo/roles";
 import { getSession } from "@/lib/require-auth";
@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 // catálogo debe reflejar al instante el sync y el toggle "Ocultar del catálogo".
 export const fetchCache = "force-no-store";
 
-// Roles del módulo Catálogos (admin/secretaria gestionan vía requireAdmin;
+// Roles del módulo Catálogos (admin/secretaria gestionan vía requireAdminOSecretaria;
 // vendedor/bodega solo consultan el catálogo interno). Fuente única en
 // lib/catalogo/roles. El catálogo PÚBLICO usa /[marca]/public.
 const CATALOGO_ROLES = catalogoRoles();
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     // el toggle desde el admin. Incluye la columna oculto_manual.
     const adminScope = searchParams.get("scope") === "admin";
     if (adminScope) {
-      const denied = requireAdmin(req);
+      const denied = requireAdminOSecretaria(req);
       if (denied) return denied;
     }
 
@@ -144,7 +144,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
 
 async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextResponse> {
   const pcfg = cfg.products;
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
 
   const body = await req.json().catch(() => null);
@@ -276,7 +276,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
   const pcfg = cfg.products;
 
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
 
   const body = await req.json().catch(() => null);
@@ -341,7 +341,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { marca: st
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
   if (!cfg.products.hasDelete) return new NextResponse(null, { status: 405 });
 
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");

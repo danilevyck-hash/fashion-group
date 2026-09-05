@@ -25,7 +25,7 @@ import {
 import { getDefaultModulesForRole, SYSTEM_ROLE_KEYS } from "@/lib/modules";
 import { signSession } from "@/lib/session-cookie";
 import { requireRole } from "@/lib/requireRole";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 
 const SECRET_PREV = process.env.SESSION_SECRET;
@@ -90,8 +90,8 @@ describe("catálogos — guards de API, comportamiento real", () => {
     expect((out as { role: string }).role).toBe("secretaria");
   });
 
-  it("secretaria PASA requireAdmin (products, variantes, ZIP del banco B2B)", () => {
-    expect(requireAdmin(reqComoRol("secretaria"))).toBeNull();
+  it("secretaria PASA requireAdminOSecretaria (products, variantes, ZIP del banco B2B)", () => {
+    expect(requireAdminOSecretaria(reqComoRol("secretaria"))).toBeNull();
   });
 
   it("bodega, contabilidad, vendedor, gerente_acs y gerente_boston NO pasan (403)", () => {
@@ -99,7 +99,7 @@ describe("catálogos — guards de API, comportamiento real", () => {
       const out = requireRole(reqComoRol(rol), catalogoAdminRoles());
       expect(out, `${rol} no debe administrar catálogos`).toBeInstanceOf(NextResponse);
       expect((out as NextResponse).status).toBe(403);
-      expect(requireAdmin(reqComoRol(rol)), `${rol} no debe pasar requireAdmin`).not.toBeNull();
+      expect(requireAdminOSecretaria(reqComoRol(rol)), `${rol} no debe pasar requireAdminOSecretaria`).not.toBeNull();
     }
   });
 

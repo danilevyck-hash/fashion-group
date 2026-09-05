@@ -83,9 +83,35 @@ const FORMAS_PROHIBIDAS = [
   "pegalo", "pegala", "cargale", "ponele", "decile", "hacele", "mandale",
   "pedile", "avisale", "sacale", "dejale", "mostrale", "cambiale", "agregale",
   "fijate", "acordate", "olvidate", "quedate", "apurate", "calmate",
+  // imperativo + «me» pegado (5-sep-2026 — ver la nota de abajo)
+  "avisame", "contame", "decime", "mandame", "mostrame", "pasame", "dejame",
+  "sacame", "traeme", "llamame", "ayudame", "esperame", "escribime", "buscame",
+  "mirame", "prestame", "regalame", "cuidame", "explicame", "mandamelo",
   // adverbio
   "acá",
 ];
+
+/* ── 5-sep-2026 · el agujero de la familia «-me» ─────────────────────────────
+ *
+ * La lista tenía «avisale» (imperativo + LE) pero le faltaba entera la familia
+ * imperativo + ME, y por ahí se colaron **26 «avisame»** en mensajes que
+ * salían por Telegram: `cron-telemetry.ts` (el «Qué hacer:» de CASI TODA
+ * alerta de cron), `api/cron/backup/route.ts` (5), `switch-reconciliacion` y
+ * `alert-policy`. El tuteo es **«avísame»**, con tilde — así ya lo escribían
+ * `alertas/silencio-de-datos.ts` y `alertas/cuadre-costo.ts`.
+ *
+ * Por qué el candado no los veía: es una lista literal, no una regla de
+ * gramática. Solo caza lo que alguien escribió en ella.
+ *
+ * Falsos positivos revisados uno por uno antes de agregarlas: los únicos
+ * «dejame» / «ayudame» del repo son citas TEXTUALES de Daniel dentro de
+ * comentarios («solo dejame las 4 primeras…», «solo ayudame a borrar las
+ * fotos esas»), y los comentarios se blanquean antes de barrer. Sus palabras
+ * no se corrigen; se conservan verbatim.
+ *
+ * ⚠️ «dime», «dame», «ponme», «hazme» NO entran: son el tuteo CORRECTO.
+ * El voseo de esos es «decime», «dame» (igual), «poneme», «haceme».
+ * ────────────────────────────────────────────────────────────────────────── */
 
 const RE_VOSEO = new RegExp(
   `(?<![\\p{L}\\p{M}])(${FORMAS_PROHIBIDAS.join("|")})(?![\\p{L}\\p{M}])`,
@@ -307,5 +333,34 @@ describe("el barrido en sí: qué mira y qué no", () => {
     );
     RE_VOSEO.lastIndex = 0;
     expect(limpio.match(RE_VOSEO)).toBeNull();
+  });
+
+  // ── La familia «-me», el agujero del 5-sep-2026 ──────────────────────────
+  it("SÍ ve «avisame» y sus hermanos de imperativo + me", () => {
+    const limpio = borrarComentarios(
+      'const t = "Qué hacer: avisame para revisarlo.";\n' +
+        'const u = "Contame qué pasó, mandame el archivo y decime cuándo.";',
+    );
+    RE_VOSEO.lastIndex = 0;
+    expect(limpio.match(RE_VOSEO)).toEqual(["avisame", "Contame", "mandame", "decime"]);
+  });
+
+  it("CONTROL: «avísame» con tilde es el tuteo correcto y NO se caza", () => {
+    // Este es el texto que hoy sale por Telegram. Si algún día el candado lo
+    // marcara, estaría prohibiendo justo lo que pide Daniel.
+    const limpio = borrarComentarios(
+      'const t = "Qué hacer: avísame para revisarlo.";\n' +
+        'const u = "Dime qué falta, dame un minuto y ponme el total abajo.";',
+    );
+    RE_VOSEO.lastIndex = 0;
+    expect(limpio.match(RE_VOSEO)).toBeNull();
+  });
+
+  it("la lista incluye la familia imperativo + me (que faltaba entera)", () => {
+    for (const forma of ["avisame", "contame", "decime", "mandame", "mostrame", "dejame"]) {
+      expect(FORMAS_PROHIBIDAS, `falta «${forma}» en FORMAS_PROHIBIDAS`).toContain(forma);
+    }
+    // «dime» es tuteo correcto: prohibirlo sería el falso positivo.
+    expect(FORMAS_PROHIBIDAS).not.toContain("dime");
   });
 });

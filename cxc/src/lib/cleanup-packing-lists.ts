@@ -15,8 +15,11 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
+import { RETENCION_PACKING_LISTS_DIAS } from "@/lib/packing-lists/retencion";
 
-const RETENCION_DIAS = 90;
+// El número vive en UN solo lugar, compartido con el texto de la pantalla
+// (ver el encabezado de packing-lists/retencion.ts: la pantalla decía «7 días»).
+const RETENCION_DIAS = RETENCION_PACKING_LISTS_DIAS;
 
 export interface CleanupPackingResult {
   ok: boolean; // false solo si el select o el delete falló (el caller maneja el error)

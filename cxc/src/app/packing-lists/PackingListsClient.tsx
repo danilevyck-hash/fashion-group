@@ -8,6 +8,7 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Toast, ConfirmModal, ScrollableTable } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { fmtDate } from "@/lib/format";
+import { textoRetencionPackingLists } from "@/lib/packing-lists/retencion";
 import {
   parseMultiplePackingLists,
   buildIndex,
@@ -1109,7 +1110,7 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div>
               <h2 className="text-sm font-semibold">Historial</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Los PLs se eliminan automáticamente después de 7 días.</p>
+              <p className="text-xs text-gray-400 mt-0.5">{textoRetencionPackingLists()}</p>
             </div>
             {plList.length > 0 && (
               <p className="text-xs text-gray-400">

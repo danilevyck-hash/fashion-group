@@ -47,7 +47,7 @@ import { ROL_BOSTON } from "@/lib/boston/rol";
  * porque su único módulo es `boston`. Las dos cosas están probadas por CONDUCTA
  * en `boston-acceso.test.ts`.
  */
-export const ROLES_BOSTON = ["admin", "secretaria", ROL_BOSTON] as const;
+export const ROLES_BOSTON = ["admin", ROL_BOSTON] as const;
 
 /** Copia mutable para las APIs que reciben `string[]` (requireRole). */
 export const rolesBoston = (): string[] => [...ROLES_BOSTON];

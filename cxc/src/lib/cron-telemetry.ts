@@ -1995,93 +1995,93 @@ export async function reconciliarSlotsSwitchSync(
  * Regla de redacción (auditoría de alertas, 27-jul-2026): nada de nombres de
  * tabla, nombres de cron, códigos HTTP ni jerga. Daniel es dueño de negocio, no
  * programador: su trabajo frente a una alerta es entender si tiene que hacer
- * algo y, si no puede resolverlo él, avisar. "Avisame" = avisarle a quien
- * programa; es la acción correcta para casi todo lo que hay acá.
+ * algo y, si no puede resolverlo él, avisar. "Avísame" = avisarle a quien
+ * programa; es la acción correcta para casi todo lo que hay aquí.
  *
  * Los tipos NO listados caen en un texto genérico honesto en vez de vomitar el
  * identificador: preferimos "una tarea automática falló" a "refresh_clientes_vw".
  */
 export function describirCronParaDaniel(tipo: string): string {
   const t = tipo.toLowerCase();
-  const avisame = "Qué hacer: avisame para revisarlo.";
+  const queHacer = "Qué hacer: avísame para revisarlo.";
 
   if (t.startsWith("switch-sync") || t.startsWith("sync-recibos") || t.startsWith("sync_recibos")) {
     return (
       "No se pudieron traer los datos de Switch (ventas, saldos o pagos) y el problema no se " +
-      `resolvió solo.\nQué significa: los números de la app pueden estar viejos.\n${avisame}`
+      `resolvió solo.\nQué significa: los números de la app pueden estar viejos.\n${queHacer}`
     );
   }
   if (t.startsWith("switch-articulos")) {
     return (
       "No se pudieron traer las ventas por artículo de Switch y el problema no se resolvió solo.\n" +
-      `Qué significa: los reportes de costo y utilidad pueden estar viejos.\n${avisame}`
+      `Qué significa: los reportes de costo y utilidad pueden estar viejos.\n${queHacer}`
     );
   }
   if (t.startsWith("sync-articulo-info") || t.startsWith("articulo_info")) {
     return (
       "No se pudo traer el catálogo de Switch para el tab Referencia de Ventas y el problema " +
       "no se resolvió solo.\nQué significa: la existencia y el precio de etiqueta que ves en " +
-      `Referencia pueden estar viejos (el botón de actualizar de la pantalla sigue sirviendo).\n${avisame}`
+      `Referencia pueden estar viejos (el botón de actualizar de la pantalla sigue sirviendo).\n${queHacer}`
     );
   }
   if (t.startsWith("sync-utilidad") || t.startsWith("sync_utilidad")) {
     return (
       "No se pudo actualizar la utilidad desde Switch y el problema no se resolvió solo.\n" +
-      `Qué significa: el margen que ves en los reportes puede estar viejo.\n${avisame}`
+      `Qué significa: el margen que ves en los reportes puede estar viejo.\n${queHacer}`
     );
   }
   if (t.startsWith("sync-proveedores") || t.startsWith("sync_proveedores")) {
     return (
       "No se pudieron traer los saldos de proveedores de Switch y el problema no se resolvió solo.\n" +
-      `Qué significa: lo que debemos a proveedores puede estar viejo.\n${avisame}`
+      `Qué significa: lo que debemos a proveedores puede estar viejo.\n${queHacer}`
     );
   }
   if (t.includes("catalogo")) {
     return (
       "No se pudo actualizar un catálogo desde Switch y el problema no se resolvió solo.\n" +
       "Qué significa: el catálogo que ven los clientes sigue con los precios y el inventario " +
-      `anteriores (no se dañó).\n${avisame}`
+      `anteriores (no se dañó).\n${queHacer}`
     );
   }
   if (t.includes("clientes")) {
     return (
       "No se pudo actualizar la lista de clientes y el problema no se resolvió solo.\n" +
-      `Qué significa: clientes nuevos o cambios de datos pueden no aparecer todavía.\n${avisame}`
+      `Qué significa: clientes nuevos o cambios de datos pueden no aparecer todavía.\n${queHacer}`
     );
   }
   if (t.startsWith("backup")) {
     return (
       "Falló la copia de seguridad y el problema no se resolvió solo.\n" +
-      `Qué significa: hoy la red de seguridad de los datos quedó incompleta.\n${avisame}`
+      `Qué significa: hoy la red de seguridad de los datos quedó incompleta.\n${queHacer}`
     );
   }
   if (t.startsWith("cheques")) {
     return (
       "No se pudo revisar los cheques por vencer.\n" +
-      `Qué significa: hoy puede no haberte llegado el aviso de cheques.\n${avisame}`
+      `Qué significa: hoy puede no haberte llegado el aviso de cheques.\n${queHacer}`
     );
   }
   if (t.startsWith("integrity") || t.includes("integridad")) {
     return (
       "La revisión automática de los datos no se pudo completar.\n" +
-      `Qué significa: hoy nadie verificó que las cuentas cuadren.\n${avisame}`
+      `Qué significa: hoy nadie verificó que las cuentas cuadren.\n${queHacer}`
     );
   }
   if (t.includes("resumen")) {
     return (
       "No se pudo armar uno de los resúmenes que te llegan por aquí.\n" +
-      `Qué significa: puede faltarte un resumen del día o del mes.\n${avisame}`
+      `Qué significa: puede faltarte un resumen del día o del mes.\n${queHacer}`
     );
   }
   if (t.startsWith("cleanup") || t.startsWith("sesiones")) {
     return (
       "Una tarea de limpieza automática falló.\n" +
-      `Qué significa: nada urgente, pero conviene revisarlo.\n${avisame}`
+      `Qué significa: nada urgente, pero conviene revisarlo.\n${queHacer}`
     );
   }
   return (
     "Una tarea automática del sistema falló y no se resolvió sola.\n" +
-    `Qué significa: puede haber datos sin actualizar en la app.\n${avisame}`
+    `Qué significa: puede haber datos sin actualizar en la app.\n${queHacer}`
   );
 }
 

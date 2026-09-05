@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { seedJoybeesProducts } from "@/lib/joybees-seed";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
 
   try {

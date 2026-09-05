@@ -1207,7 +1207,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
         `reintentando.\n` +
         `Qué significa: las ventas, los saldos o los pagos que ves en la app pueden estar ` +
         `viejos en algunas empresas.\n` +
-        `Qué hacer: avisame para revisarlo.\n` +
+        `Qué hacer: avísame para revisarlo.\n` +
         `Detalle:\n${[...lineasPares, ...lineasCol, ...lineasSlots, ...lineasSkip].join("\n")}${recuperadas}`,
     );
   }

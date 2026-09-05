@@ -183,7 +183,7 @@ describe("edición manual de productos — allow-list image_url/badge", () => {
     ).toBe(400);
   });
 
-  it("403 para roles no-admin/secretaria (requireAdmin) — ambas marcas", async () => {
+  it("403 para roles no-admin/secretaria (requireAdminOSecretaria) — ambas marcas", async () => {
     expect(
       (
         await rProductsPut(

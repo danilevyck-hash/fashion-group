@@ -128,11 +128,18 @@ describe("🔴 la cartera de Boston no trae pagos del grupo", () => {
 });
 
 describe("quién puede pedirlo — los mismos que ven la cartera de Boston", () => {
-  it("admin, secretaria y gerente_boston sí; vendedor y bodega no; sin sesión 401", async () => {
-    for (const rol of ["admin", "secretaria", "gerente_boston"]) {
+  // 🔁 CAMBIÓ DE DIRECCIÓN el 5-sep-2026: `secretaria` pasó de la lista de los
+  // que SÍ a la de los que NO. La auditoría de permisos midió que Ángela y
+  // Andrea veían la cartera de Boston **sin tener el módulo `cxc` ni el
+  // `boston`**: entraban por su ROL. Daniel, textual: *«no, quita boston a las
+  // secretarias»*. La regla que este test protege no cambió —quien puede pedir
+  // los últimos pagos es exactamente quien ve la cartera, ni uno más— y por eso
+  // sigue leyendo de `ROLES_BOSTON`, la fuente única.
+  it("admin y gerente_boston sí; secretaria, vendedor y bodega no; sin sesión 401", async () => {
+    for (const rol of ["admin", "gerente_boston"]) {
       expect((await GET(req("/api/cxc/boston/ultimos-pagos?cliente=3", rol))).status, rol).toBe(200);
     }
-    for (const rol of ["vendedor", "bodega", "contabilidad"]) {
+    for (const rol of ["secretaria", "vendedor", "bodega", "contabilidad"]) {
       expect((await GET(req("/api/cxc/boston/ultimos-pagos?cliente=3", rol))).status, rol).toBe(403);
     }
     expect((await GET(req("/api/cxc/boston/ultimos-pagos?cliente=3", null))).status).toBe(401);

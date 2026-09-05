@@ -6,7 +6,7 @@
 //    (el `allowedRoles` de `useAuth` es decorativo — ver la nota de Catálogos
 //    en CLAUDE.md), así que la puerta real es `requireRole(req, ["admin"])`:
 //    con rol `secretaria` devuelve 403 aunque se llame la URL a mano.
-//    ⚠️ NO usar `requireAdmin` de api-auth.ts: ese incluye a la secretaria.
+//    ⚠️ NO usar `requireAdminOSecretaria` de api-auth.ts: ese incluye a la secretaria.
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import {

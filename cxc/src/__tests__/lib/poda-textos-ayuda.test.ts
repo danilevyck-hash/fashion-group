@@ -194,9 +194,18 @@ describe("🔴 lo que FRENA una acción sigue en pantalla, nunca adentro de un �
     ["components/SugerenciasCliente.tsx", "Hay que darlo de alta en Switch"],
     // Borrar una guía no se deshace.
     ["app/guias/page.tsx", "Esta acción no se puede deshacer"],
-    // Packing Lists: validar contra el PDF y la caducidad de 7 días.
+    // Packing Lists: validar contra el PDF y la retención del historial.
     ["app/packing-lists/PackingListsClient.tsx", "Valida cada PL contra el PDF original antes de guardar"],
-    ["app/packing-lists/PackingListsClient.tsx", "Los PLs se eliminan automáticamente después de 7 días"],
+    // 🔄 5-sep-2026 — CAMBIO DE DIRECCIÓN, no borrado. Aquí decía la frase
+    // literal «Los PLs se eliminan automáticamente después de 7 días», y esa
+    // frase era FALSA en sus dos mitades: un PL activo no se borra nunca, y la
+    // retención son 90 días contados desde el borrado a mano. La regla de este
+    // candado —el aviso de caducidad se ve en pantalla, jamás dentro de un ⓘ—
+    // NO cambió: lo que cambió es que el texto ahora sale de una definición
+    // única (`textoRetencionPackingLists`, `lib/packing-lists/retencion.ts`)
+    // compartida con el cron, para que no se puedan volver a separar.
+    // Qué DICE ese texto lo cierra `packing-lists-retencion.test.ts`.
+    ["app/packing-lists/PackingListsClient.tsx", "{textoRetencionPackingLists()}"],
     // Reclamos: el comprobante es obligatorio para marcar Pagado.
     ["app/reclamos/components/SettlementModal.tsx", "obligatorio para marcar Pagado"],
     // Depurador: el bloqueo por descripciones nuevas.

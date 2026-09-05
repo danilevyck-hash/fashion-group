@@ -1,3 +1,39 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 SIN USO desde el 11-abr-2026 — en realidad, NUNCA corrió: ESTO NO CORRE.
+ *
+ * Nació el 6-abr-2026 (`cebba09d`). Su único consumidor fue
+ * `src/components/KeyboardShortcutsProvider.tsx`… que **nunca se montó en
+ * ninguna pantalla**: no hay un solo `<KeyboardShortcutsProvider` en toda
+ * la historia del repo. El componente se borró el 11-abr-2026
+ * (`69c989da`) y desde entonces esto no tiene ni un importador.
+ *
+ * QUÉ NO PASA POR ESTO: **ningún atajo de teclado del sistema funciona** —
+ * ni los saltos `G+H` / `G+C` / `G+G`, ni el `?` de ayuda, ni `J`/`K` para
+ * moverse por filas, ni `E` para editar. La ÚNICA excepción es `⌘K`, que
+ * tiene su propio listener adentro de `src/components/SearchBar.tsx` y por
+ * eso sí anda. La sección «Keyboard Shortcuts» de CLAUDE.md describe este
+ * archivo, no la app.
+ *
+ * ── POR QUÉ SIGUE AQUÍ, EN VEZ DE BORRARSE ──────────────────────────────────
+ *
+ * Volver a enchufarlo es un cambio de conducta REAL, no una limpieza: el teclado empezaría a navegar solo bajo la mano de secretarias y
+ * bodegueros que hoy no esperan que la pantalla se mueva sola.
+ * Esa decisión es de Daniel, y no está tomada. Borrar el archivo cerraría la
+ * puerta; dejarlo mudo y rotulado la deja abierta sin mentir.
+ *
+ * ── SI VAS A EDITARLO, PARA ANTES ───────────────────────────────────────────
+ *
+ * Cambiar una línea aquí NO cambia nada en la app. Sea lo que sea que estés
+ * arreglando, el arreglo está en otro lado.
+ *
+ * 🩸 Ya pasó: el **5-sep-2026** alguien editó `useKeyboardShortcuts.ts` y el
+ * cambio entero fue `q: "/cheques"` → `q: "/recordatorios"`. Se arregló con
+ * cuidado un atajo que no está conectado a nada, y nadie se enteró.
+ *
+ * Candado: `src/__tests__/lib/ganchos-sin-uso.test.ts` — cuenta los
+ * importadores (hoy CERO) y exige que este encabezado siga aquí.
+ * ────────────────────────────────────────────────────────────────────────── */
+
 "use client";
 
 import { useEffect, useCallback, useRef } from "react";

@@ -17,7 +17,7 @@
 //      ver estos costos. Esconder el bloque en el cliente no cierra nada —
 //      es exactamente el error del `allowedRoles` decorativo de Catálogos—,
 //      así que se verifica que las 3 rutas de la API llamen
-//      `requireRole(req, ["admin"])` y que ninguna use `requireAdmin`, que
+//      `requireRole(req, ["admin"])` y que ninguna use `requireAdminOSecretaria`, que
 //      en este repo significa admin+secretaria.
 //   3. PRECIO OPCIONAL → "—", NUNCA "$0.00". Un costo desconocido mostrado
 //      como cero es un dato inventado.
@@ -208,8 +208,10 @@ describe("2 · SOLO ADMIN, y el candado está en el SERVIDOR", () => {
   it.each(RUTAS_API)("%s NO deja entrar a la secretaria", (ruta) => {
     const src = leer(ruta);
     expect(src).not.toContain('"secretaria"');
-    // `requireAdmin` de api-auth.ts es admin+secretaria: sería un colador.
-    expect(src).not.toMatch(/requireAdmin\s*\(/);
+    // `requireAdminOSecretaria` de api-auth.ts es admin+secretaria: sería un colador.
+    // (5-sep-2026: se llamaba `requireAdmin` — el nombre mentía y por eso hacían
+    //  falta carteles como este. Se renombró; los permisos NO cambiaron.)
+    expect(src).not.toMatch(/requireAdminOSecretaria\s*\(/);
   });
 
   // El bloque se fue de la pantalla, pero la puerta de cortesía sigue: hoy la

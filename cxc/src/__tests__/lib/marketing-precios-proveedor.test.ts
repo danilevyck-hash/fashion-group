@@ -317,10 +317,12 @@ describe("los costos del proveedor son solo de admin", () => {
   it("la ruta que alimenta el ? exige admin", () => {
     // Solo CÓDIGO: los comentarios de la ruta citan el guard y nombran a la
     // secretaria para explicar por qué NO entra — contarlos daría rojo falso.
+    // 5-sep-2026: el guard prohibido se llamaba `requireAdmin`; se renombró a
+    // `requireAdminOSecretaria` porque el nombre viejo mentía. Misma conducta.
     const src = soloCodigo(leer(RUTA_NOTAS));
     expect(src).toMatch(/requireRole\(req,\s*\["admin"\]\)/);
     expect(src).not.toContain("secretaria");
-    expect(src).not.toMatch(/requireAdmin\s*\(/);
+    expect(src).not.toMatch(/requireAdminOSecretaria\s*\(/);
   });
 
   it("la pantalla tampoco lo muestra a la secretaria", () => {
@@ -333,7 +335,7 @@ describe("los costos del proveedor son solo de admin", () => {
       const src = soloCodigo(leer(ruta));
       expect(src, ruta).toMatch(/requireRole\(req,\s*\["admin"\]\)/);
       expect(src, ruta).not.toContain("secretaria");
-      expect(src, ruta).not.toMatch(/requireAdmin\s*\(/);
+      expect(src, ruta).not.toMatch(/requireAdminOSecretaria\s*\(/);
     }
   });
 });

@@ -108,7 +108,7 @@ export default function CatalogosMarcasPage() {
 
   // Quién ve "Administrar": admin y secretaria (CATALOGO_ADMIN_ROLES). El
   // vendedor NO administra (ve el catálogo y sus pedidos) y bodega solo ve el
-  // catálogo. El gate de verdad está en el server (requireAdmin/requireRole en
+  // catálogo. El gate de verdad está en el server (requireAdminOSecretaria/requireRole en
   // /api/catalogo/**) — esto solo evita mostrar un botón que terminaría en 403.
   const puedeAdministrar = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(role);
 

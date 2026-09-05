@@ -411,7 +411,7 @@ export function construirMensajeEscalado(items: ErrorEscalado[], nota = ""): str
   return (
     `${encabezado}\n${lineas.join("\n")}\n` +
     `Qué significa: ${consecuencias.join(" ")}\n` +
-    `Qué hacer: avisame para revisarlo.\n` +
+    `Qué hacer: avísame para revisarlo.\n` +
     `Detalle: ${detalle}${nota}`
   );
 }

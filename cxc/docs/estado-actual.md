@@ -771,3 +771,14 @@ Trece agentes en paralelo, **solo lectura de producción, cero cambios de códig
 ### Cómo se repite esta medición
 
 Cada archivo trae la consulta debajo de cada cifra. La regla que nació hoy: **antes de afirmar que un dato no existe, mirar la tabla del propio objeto, no la de sus hijos** (el error de Marketing fue mirar las entregas en vez de los proyectos).
+
+
+### Decisiones de Daniel del 5-sep-2026 (tarde)
+
+| decisión | resultado |
+|---|---|
+| ¿Andrea debe cobrar? | **Sí.** *«si, andrea si cobra»*. Se le agregó el módulo `cxc` a sus permisos: ahora cobra con el módulo puesto, no por el hueco del guardia. |
+| ¿Las secretarias ven la cartera de Boston? | **No.** *«no, quita boston a las secretarias»*. `secretaria` salió de `ROLES_BOSTON`; quedan admin y `gerente_boston`. Candado `cxc-boston-permiso.test.ts` cambiado de dirección con nota. |
+| ¿Cómo se identifica un proveedor entre empresas? | **Se pospone** hasta que toquemos Proveedores. *«dejalo para cuando toquemos proveedores»*. Hoy se unen por NOMBRE y Confecciones Boston sale en 3 fichas. |
+| Las diez palabras del diccionario | **Decididas.** Ver `docs/diccionario.md` § 0. La única donde eligió al revés de mi recomendación: el nombre de la empresa va **corto** («Vistana», «Boston»). |
+| Horas extra sin aprobar · gastos de Fashion Wear · las dos personas sin ficha | **Para después.** *«horas extras y gastos para despues»*, *«es tema de contabilidad que aun no lo han hecho»*. |

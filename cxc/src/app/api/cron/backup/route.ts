@@ -603,7 +603,7 @@ export async function GET(req: NextRequest) {
         await enviarSistema(
           "No se pudo copiar la carpeta de fotos y archivos a la nube de respaldo, y hoy ya no " +
             "queda otro intento.\nQué significa: las fotos de catálogos y los comprobantes de " +
-            "hoy están solo en un lugar.\nQué hacer: avisame para revisarlo.",
+            "hoy están solo en un lugar.\nQué hacer: avísame para revisarlo.",
         );
       }
     }
@@ -711,7 +711,7 @@ export async function GET(req: NextRequest) {
       `No se pudo guardar la copia de seguridad de hoy (${today}). Se conservó la copia ` +
         `anterior, así que no se perdió nada.\nQué significa: si hoy hubiera que recuperar ` +
         `datos, se recuperarían los de la última copia buena, no los de hoy.\n` +
-        `Qué hacer: avisame para revisarlo.\nDetalle: ${shortError(errores[0]?.error)}`,
+        `Qué hacer: avísame para revisarlo.\nDetalle: ${shortError(errores[0]?.error)}`,
     );
   } else {
     const { error: metaErr } = await supabaseServer.storage
@@ -762,7 +762,7 @@ export async function GET(req: NextRequest) {
       await enviarSistema(
         `La copia de seguridad de hoy se guardó, pero no se pudo mandar completa a la nube ` +
           `de respaldo, y hoy ya no queda otro intento.\nQué significa: la copia existe, pero ` +
-          `por ahora en un solo lugar.\nQué hacer: avisame para revisarlo.\n` +
+          `por ahora en un solo lugar.\nQué hacer: avísame para revisarlo.\n` +
           `Detalle: ${shortError(detalleR2)}`,
       );
     }
@@ -784,7 +784,7 @@ export async function GET(req: NextRequest) {
       await enviarSistema(
         `La copia de seguridad de hoy quedó incompleta (${errores.length} tabla(s) sin copiar) ` +
           `y hoy ya no queda otro intento.\nQué significa: si hubiera que recuperar datos de ` +
-          `hoy, faltarían esas tablas.\nQué hacer: avisame para revisarlo.\n` +
+          `hoy, faltarían esas tablas.\nQué hacer: avísame para revisarlo.\n` +
           `Detalle: ${shortError(errores[0]?.error)}`,
       );
     }
@@ -864,7 +864,7 @@ export async function GET(req: NextRequest) {
       await enviarSistema(
         `La copia de seguridad del ${ayer} quedó incompleta: ese día no se podría recuperar ` +
           `entero si hiciera falta.\nQué significa: la red de seguridad de ese día tiene un ` +
-          `hueco (las copias de los otros días están bien).\nQué hacer: avisame para revisarlo.`,
+          `hueco (las copias de los otros días están bien).\nQué hacer: avísame para revisarlo.`,
       );
     }
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
@@ -127,7 +127,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const denied = requireAdmin(req); if (denied) return denied;
+  const denied = requireAdminOSecretaria(req); if (denied) return denied;
   const { id } = params;
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 

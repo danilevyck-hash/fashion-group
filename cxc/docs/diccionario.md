@@ -265,7 +265,32 @@ funcionaron. Quedan estos candidatos:
 
 ---
 
-## 5. Para que Daniel elija
+---
+
+## 0. DECIDIDO — 5-sep-2026
+
+Daniel eligió las diez. **Esto es la regla del sistema**: cualquier texto nuevo nace así, y lo viejo
+se corrige al pasar por cada módulo.
+
+| # | concepto | **la palabra** | qué se cambia |
+|---|---|---|---|
+| 1 | la gente que trabaja | **Colaborador** | Daniel: *«a si se refiere a un nombre de la planilla»* — la palabra es para quien está en la planilla. Asistencia dice «persona» y Préstamos «empleado»: los dos pasan a **Colaborador** cuando se habla de alguien de la planilla. |
+| 2 | a quién se le entrega el mueble en Marketing | **Cliente** | La pestaña «Por Tienda» pasa a «Por cliente». Se elige la palabra del resto del sistema, no la del módulo. |
+| 3 | la fecha en el papel y el Excel | **5 sep 2026** | Los PDF (CXC, reclamos, entrega de mueble) y **todos los Excel** dicen hoy `05/09/2026`. Pasan al formato de la pantalla. Telegram («5-sep») también. |
+| 4 | el nombre de la empresa | **la corta: «Vistana», «Boston»** | Al revés de lo que yo recomendaba. Hoy la mayoría usa la larga («Vistana International», «Confecciones Boston»): pasan todas a la corta. ⚠️ Los tres mapas de nombres se unifican en uno. |
+| 5 | los porcentajes | **sin decimal: 12%** | Hoy conviven 12%, 12.3% y 12.35%. |
+| 6 | la plata negativa | **−$100.00** | El signo delante del símbolo. Hoy Ventas, Referencia y los componentes compartidos escriben `$-100.00`. |
+| 7 | la plata en Vista General y Telegram | **con centavos** | Dejan de redondear: un número redondeado no cuadra contra otra pantalla. |
+| 8 | la dirección de correo | **Correo** | El módulo Clientes es el único que dice «Email». |
+| 9 | las siglas en Vista General | **Cuentas por Cobrar** | Es la regla de la casa: cero jerga. «CXC» solo sobrevive como nombre interno. |
+| 10 | cuando falta encender algo | **«Esto todavía no está encendido. Avísame.»** | Reemplaza los **25 mensajes** que hoy le enseñan al usuario el nombre de un archivo de migración o de una clave del servidor — incluido uno en Vista General. |
+
+**Cómo se aplica.** Los que viven en un solo lugar (6, 7, 10 y los formateadores de fecha) se hacen
+de una pasada, con candado. Los demás se corrigen **al pasar por cada módulo**, para no tocar
+veinte pantallas a la vez sin poder probarlas.
+
+
+## 5. Las diez, ya decididas (se deja el detalle de cada una)
 
 Solo lo que de verdad hay que decidir. Todo lo demás de este archivo tiene una respuesta obvia.
 

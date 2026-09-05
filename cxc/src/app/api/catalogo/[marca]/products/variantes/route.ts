@@ -9,13 +9,13 @@
 //         image_url apunta a esa variante y foto_manual=true (candado contra
 //         la asignación automática del ZIP).
 //
-// Auth: requireAdmin (admin + secretaria) — los mismos roles que ya editan
+// Auth: requireAdminOSecretaria (admin + secretaria) — los mismos roles que ya editan
 // products. Selects explícitos y respeto de los quirks por marca vía
 // MARCAS_CONFIG (idField id/sku, tabla, client de escritura).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
 
   const sku = new URL(req.url).searchParams.get("sku")?.trim();
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;

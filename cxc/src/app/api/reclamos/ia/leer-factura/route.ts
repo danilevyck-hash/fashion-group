@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { FACTURA_BUCKET } from "@/lib/reclamos/factura-storage";
 
@@ -64,7 +64,7 @@ function parsearRespuesta(texto: string): FacturaExtraida | null {
 // Descarga el PDF del bucket privado "reclamo-facturas", lo lee con la IA y
 // devuelve los campos de cabecera. NUNCA inventa; campo ilegible → null.
 export async function POST(req: NextRequest) {
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

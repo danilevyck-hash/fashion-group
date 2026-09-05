@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { FACTURA_BUCKET } from "@/lib/reclamos/factura-storage";
 
@@ -22,7 +22,7 @@ function sanitizarNombre(nombre: string): string {
 // El reclamo aún no existe al crear, así que el path NO depende de su id:
 // usa un prefijo aleatorio. El path se guarda luego en reclamos.factura_pdf_path.
 export async function POST(req: NextRequest) {
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
 
   try {

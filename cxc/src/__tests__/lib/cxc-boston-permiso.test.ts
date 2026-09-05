@@ -37,7 +37,11 @@ beforeAll(() => { process.env.SESSION_SECRET = "test-secret-cxc-boston"; });
 afterAll(() => { process.env.SESSION_SECRET = SECRET_PREV; });
 
 /** Los roles que NO cobran la cartera de Boston. `vendedor` es el del caso real. */
-const SIN_BOSTON = ["vendedor", "bodega", "contabilidad", "gerente_acs"] as const;
+// 🔁 `secretaria` ENTRÓ ACÁ el 5-sep-2026 (antes estaba en la lista de los que
+// SÍ pueden). La auditoría de permisos midió que Ángela y Andrea veían la
+// cartera de Boston sin tener el módulo `cxc` ni el `boston`: la veían por su
+// ROL. Daniel, textual: *«no, quita boston a las secretarias»*.
+const SIN_BOSTON = ["secretaria", "vendedor", "bodega", "contabilidad", "gerente_acs"] as const;
 
 const RAIZ = process.cwd();
 const leer = (rel: string) => readFileSync(path.join(RAIZ, rel), "utf-8");
@@ -49,12 +53,13 @@ const sinComentarios = (src: string) =>
 // ── 1. La lista, congelada ───────────────────────────────────────────────────
 
 describe("quién lee la cartera de Boston", () => {
-  it("admin, secretaria y el gerente de Boston — nadie más", () => {
+  it("admin y el gerente de Boston — nadie más", () => {
     // 🔴 `gerente_boston` (David) entra el 27-ago-2026: la pestaña CXC de su
     // módulo monta el MISMO `<BostonTab />` contra el MISMO `/api/cxc/boston`.
     // Un segundo endpoint habría sido una segunda definición de "la cartera de
     // Boston" — el defecto exacto que costó el bug de la MV.
-    expect([...ROLES_BOSTON]).toEqual(["admin", "secretaria", "gerente_boston"]);
+    // 🔁 `secretaria` SALIÓ el 5-sep-2026 (ver el comentario de SIN_BOSTON).
+    expect([...ROLES_BOSTON]).toEqual(["admin", "gerente_boston"]);
   });
 
   it("todo rol de la lista es un rol REAL del sistema", () => {
@@ -81,7 +86,7 @@ describe("quién lee la cartera de Boston", () => {
 
   it("la copia mutable no contamina la fuente", () => {
     rolesBoston().push("vendedor");
-    expect([...ROLES_BOSTON]).toEqual(["admin", "secretaria", "gerente_boston"]);
+    expect([...ROLES_BOSTON]).toEqual(["admin", "gerente_boston"]);
   });
 });
 
@@ -95,14 +100,14 @@ function reqComoRol(role: string): NextRequest {
 }
 
 describe("el guard del endpoint, con cookies firmadas de verdad", () => {
-  it("admin y secretaria PASAN", () => {
+  it("admin y el gerente de Boston PASAN", () => {
     for (const rol of ROLES_BOSTON) {
       const auth = requireRole(reqComoRol(rol), rolesBoston());
       expect(auth).not.toBeInstanceOf(NextResponse);
     }
   });
 
-  it("🔴 vendedor y los demás reciben 403", () => {
+  it("🔴 secretaria, vendedor y los demás reciben 403", () => {
     for (const rol of SIN_BOSTON) {
       const auth = requireRole(reqComoRol(rol), rolesBoston());
       expect(auth).toBeInstanceOf(NextResponse);
@@ -124,13 +129,13 @@ describe("las pestañas del CXC", () => {
     expect(PESTANAS_CXC.map((p) => p.label)).toEqual(["Grupo · 6 empresas", "Confecciones Boston"]);
   });
 
-  it("admin y secretaria ven las dos", () => {
+  it("admin y el gerente de Boston ven las dos", () => {
     for (const rol of ROLES_BOSTON) {
       expect(pestanasCxc(rol).map((p) => p.key)).toEqual(["grupo", "boston"]);
     }
   });
 
-  it("🔴 el vendedor (y los demás) solo ven la del grupo", () => {
+  it("🔴 la secretaria, el vendedor y los demás solo ven la del grupo", () => {
     for (const rol of SIN_BOSTON) {
       expect(pestanasCxc(rol).map((p) => p.key)).toEqual(["grupo"]);
     }

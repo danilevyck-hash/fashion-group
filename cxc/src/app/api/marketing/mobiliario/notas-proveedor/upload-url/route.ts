@@ -2,7 +2,7 @@
 //
 // 🔴 SOLO ADMIN en el SERVIDOR. Un token de subida firmado escribe en el
 //    bucket saltándose RLS, así que la puerta tiene que estar acá.
-//    ⚠️ NO usar `requireAdmin` de api-auth.ts: ese incluye a la secretaria.
+//    ⚠️ NO usar `requireAdminOSecretaria` de api-auth.ts: ese incluye a la secretaria.
 //
 // Mismo patrón que /api/marketing/adjuntos/upload-url: el archivo va DIRECTO
 // del navegador a Supabase (no pasa por Vercel, así que no hay tope de 4,5 MB

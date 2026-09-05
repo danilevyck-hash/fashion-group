@@ -37,6 +37,7 @@ import { createSwitchClient, type SwitchClient } from "./client";
 import { supabaseServer } from "@/lib/supabase-server";
 import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
 import { particionarFilas } from "./monto-guard";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { enParalelo } from "./en-paralelo";
@@ -263,18 +264,48 @@ export async function traerFichas(
     return vacio;
   }
 
-  const { data, error } = await supabaseServer
-    .from("switch_articulo_info")
-    .select("codigo")
-    .eq("empresa_key", empresaKey)
-    .not("ficha_at", "is", null);
-  // No poder leer lo ya hecho NO es "no hay nada hecho": pedir todo de nuevo
-  // sería castigar a Switch por un error nuestro. Se salta la fase.
-  if (error) {
-    console.error(`[sync-articulo-info] ${empresaKey}: no pude leer qué fichas ya están: ${error.message}`);
+  // 🩸 ESTA LECTURA SE PAGINA, Y NO ES DECORACIÓN (5-sep-2026).
+  //
+  // Hasta hoy era un `select` pelado. `db-max-rows` es **1000 y corta EN
+  // SILENCIO**: el día que una empresa pasó las 1.000 fichas traídas, el `Set`
+  // se quedó con 1.000 y las demás **volvieron a verse como pendientes**.
+  //
+  // Medido el 5-sep-2026 en active_shoes: **1.408 fichas traídas de 1.763
+  // artículos**. La consulta devolvía 1.000, así que 408 artículos que ya
+  // tenían ficha entraban otra vez a `pendientesDeFicha` — se le pedían a
+  // Switch ~400 fichas por día que ya estaban, y como el presupuesto por
+  // corrida es fijo, **los 355 que faltan de verdad no llegaban nunca**. El
+  // 2-sep eran 400 fichas y todo andaba: el defecto se estrenó al cruzar el
+  // tope, sin un solo error en el log. Y esto alimenta la clasificación del
+  // catálogo, que es de donde sale el bulto.
+  //
+  // ⚠️ Vistana tiene **8.273 artículos**: el día que estrene su fase de fichas
+  // cruza el tope ocho veces.
+  //
+  // `leerTodoPaginado` además **verifica contra un COUNT exacto** y tira si la
+  // lectura sale incompleta, así que un truncado futuro se ve en vez de
+  // convertirse en trabajo repetido. El `.order("codigo")` es obligatorio: sin
+  // orden estable, paginar puede repetir y saltear filas.
+  let yaConFicha: Set<string>;
+  try {
+    const filas = await leerTodoPaginado<{ codigo: unknown }>(
+      `switch_articulo_info fichas ${empresaKey}`,
+      (pedirCount, desde, hasta) =>
+        supabaseServer
+          .from("switch_articulo_info")
+          .select("codigo", pedirCount ? { count: "exact" } : {})
+          .eq("empresa_key", empresaKey)
+          .not("ficha_at", "is", null)
+          .order("codigo", { ascending: true })
+          .range(desde, hasta),
+    );
+    yaConFicha = new Set(filas.map((r) => String(r.codigo)));
+  } catch (e) {
+    // No poder leer lo ya hecho NO es "no hay nada hecho": pedir todo de nuevo
+    // sería castigar a Switch por un error nuestro. Se salta la fase.
+    console.error(`[sync-articulo-info] ${empresaKey}: no pude leer qué fichas ya están: ${String(e)}`);
     return { ...vacio, columnasListas: true };
   }
-  const yaConFicha = new Set((data ?? []).map((r) => String((r as { codigo: unknown }).codigo)));
 
   const pendientesTodos = universo.filter((a) => !yaConFicha.has(a.codigo) && !!a.codigoBarra).length;
   const aPedir = pendientesDeFicha(universo, yaConFicha, FICHA_MAX_POR_CORRIDA);

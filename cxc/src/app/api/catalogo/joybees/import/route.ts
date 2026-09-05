@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ interface ImportRow {
 }
 
 export async function POST(req: NextRequest) {
-  const denied = requireAdmin(req);
+  const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
 
   const supabase = getSupabase();

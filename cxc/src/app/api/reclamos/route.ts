@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
-import { getRole, requireAdmin } from "@/lib/api-auth";
+import { getRole, requireAdminOSecretaria } from "@/lib/api-auth";
 import { getSession } from "@/lib/require-auth";
 import { validateReclamoFull } from "@/lib/reclamos/validate";
 import { buildReclamoItemRows } from "@/lib/reclamos/item-rows";
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const denied = requireAdmin(req); if (denied) return denied;
+  const denied = requireAdminOSecretaria(req); if (denied) return denied;
   const body = await req.json();
   const { empresa, proveedor, marca, nro_factura, nro_orden_compra, fecha_reclamo, notas, items, factura_pdf_path } = body;
 
