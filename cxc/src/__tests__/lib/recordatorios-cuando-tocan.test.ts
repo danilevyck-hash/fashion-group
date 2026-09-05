@@ -377,8 +377,12 @@ describe("🔴 QUÉ ES OBLIGATORIO — y qué NO, que es lo que decidió Daniel"
     expect(leerCuerpo({ fecha: "2026-08-24", texto: "x", cliente_codigo: " D-25 " }).clienteCodigo).toBe("D-25");
   });
 
-  it("las tres repeticiones son las tres, y todas tienen su etiqueta en español", () => {
-    expect([...REPETICIONES]).toEqual(["una_vez", "semanal", "mensual"]);
+  it("las CUATRO repeticiones son las cuatro, y todas tienen su etiqueta en español", () => {
+    // 5-sep-2026: entra `cada_dia` con el rediseño. El aviso del módulo es UN
+    // mensaje por día, así que «cada día» era la repetición más natural que
+    // faltaba. La lista sigue siendo CERRADA — un valor inventado dejaría un
+    // recordatorio que no vuelve a sonar y nadie se enteraría.
+    expect([...REPETICIONES]).toEqual(["una_vez", "cada_dia", "semanal", "mensual"]);
     for (const r of REPETICIONES) {
       expect(ETIQUETA_REPETICION[r], r).toBeTruthy();
     }
@@ -434,7 +438,10 @@ describe("🔴 LA `key` DEL MÓDULO NO CAMBIÓ — solo el label", () => {
     // "Asistencia y Planilla".
     const m = ALL_MODULES.find((x) => x.key === "cheques");
     expect(m, "el módulo `cheques` no puede desaparecer del catálogo").toBeTruthy();
-    expect(m!.href).toBe("/cheques");
+    // 5-sep-2026: la DIRECCIÓN cambió a `/recordatorios` (con redirect del
+    // `/cheques` viejo en `next.config.js`). La `key` NO — ver el comentario de
+    // arriba: vive en `role_permissions` y en `fg_users.modulos_override`.
+    expect(m!.href).toBe("/recordatorios");
     expect([...m!.roles].sort()).toEqual(["admin", "secretaria"]);
     expect(RECORDATORIOS_MODULO_KEY).toBe("cheques");
   });
@@ -482,9 +489,10 @@ describe("BARRIDO — la migración es ADITIVA y no toca los cheques", () => {
 
   it("soft delete, y la repetición es una lista CERRADA", () => {
     expect(SQL).toMatch(/deleted\s+boolean\s+NOT NULL\s+DEFAULT false/);
+    // El CHECK original (sin `cada_dia`). La migración del rediseño lo AMPLÍA,
+    // no lo reescribe acá: ver `recordatorios-rediseno.test.ts`, que compara el
+    // CHECK VIGENTE contra `REPETICIONES`.
     expect(SQL).toContain("CHECK (repeticion IN ('una_vez', 'semanal', 'mensual'))");
-    // Y el CHECK de la base admite EXACTAMENTE lo que admite el código.
-    for (const r of REPETICIONES) expect(SQL, r).toContain(`'${r}'`);
   });
 
   it("🔴 el texto no puede ser vacío ni espacios (NOT NULL solo no alcanza)", () => {

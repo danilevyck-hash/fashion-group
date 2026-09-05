@@ -46,18 +46,17 @@ export const SEARCH_ROLES = ["admin", "secretaria", "vendedor", "bodega", "conta
 function parseQuickAction(query: string): QuickAction | null {
   const q = query.trim();
 
-  // cheques que vencen hoy / mañana / esta semana
-  const chequeMatch = q.match(/cheques?.*(venc|hoy|ma[ñn]ana|semana)/i);
-  if (chequeMatch) {
-    const lower = q.toLowerCase();
-    if (lower.includes("mañana") || lower.includes("manana")) {
-      return { label: "Ir a cheques que vencen mañana", href: "/cheques?filter=vencen_manana" };
-    }
-    if (lower.includes("semana")) {
-      return { label: "Ir a cheques que vencen esta semana", href: "/cheques?filter=vencen_semana" };
-    }
-    // default: hoy or generic "vencen"
-    return { label: "Ir a cheques que vencen hoy", href: "/cheques?filter=vencen_hoy" };
+  // 🩸 CHEQUES: SIETE atajos que apuntaban a SIETE pestañas — y las pestañas ya
+  // no existen (5-sep-2026). El módulo Recordatorios pasó a tener UNA sola
+  // lista, agrupada por cuándo: «Vencido · Hoy · Esta semana · Después · Se
+  // repiten». Los siete `?filter=` caían en una pantalla que ya no los lee, así
+  // que se convirtieron en UN atajo a la lista, donde esos mismos grupos están a
+  // la vista sin elegir nada.
+  //
+  // Los recordatorios se nombran adelante porque es el nombre del módulo, y
+  // «cheque» se sigue reconociendo porque es como los llama la gente.
+  if (/cheques?|recordatorios?|recordar/i.test(q)) {
+    return { label: "Ir a Recordatorios", href: "/recordatorios" };
   }
 
   // cuánto debe [client]
@@ -91,19 +90,9 @@ function parseQuickAction(query: string): QuickAction | null {
     return { label: `Buscar préstamos de "${persona}"`, href: `/prestamos?search=${encodeURIComponent(persona)}` };
   }
 
-  // cheques pendientes / rebotados / depositados
-  if (/cheques?\s+pendientes?/i.test(q)) {
-    return { label: "Ir a cheques pendientes", href: "/cheques?filter=pendiente" };
-  }
-  if (/cheques?\s+rebotados?/i.test(q)) {
-    return { label: "Ir a cheques rebotados", href: "/cheques?filter=rebotado" };
-  }
-  if (/cheques?\s+depositados?/i.test(q)) {
-    return { label: "Ir a cheques depositados", href: "/cheques?filter=depositado" };
-  }
-  if (/cheques?\s+vencidos?/i.test(q)) {
-    return { label: "Ir a cheques vencidos", href: "/cheques?filter=vencido" };
-  }
+  // (Los cuatro atajos de estado de cheques —pendientes, rebotados,
+  // depositados, vencidos— se fueron con las pestañas; los cubre el atajo
+  // único de arriba.)
 
   return null;
 }
@@ -170,7 +159,7 @@ function flatten(r: SearchResults): FlatItem[] {
       module: "Cheques",
       label: ch.cliente,
       sub: `$${fmtMoney(ch.monto)} — ${fmtDate(ch.fecha_deposito)}`,
-      href: "/cheques",
+      href: "/recordatorios",
       icon: "🏦",
     });
   }
@@ -216,7 +205,7 @@ const SEARCH_MODULES = [
   // El módulo se llama "Recordatorios" desde ago-2026 (la key interna sigue
   // siendo `cheques`). Las palabras viejas se CONSERVAN: quien teclea "cheque"
   // tiene que seguir llegando acá.
-  { label: "Recordatorios", href: "/cheques", keywords: ["recordatorio", "recordar", "agenda", "cheque", "deposito", "posfechado", "banco"] },
+  { label: "Recordatorios", href: "/recordatorios", keywords: ["recordatorio", "recordar", "agenda", "cheque", "deposito", "posfechado", "banco"] },
   { label: "Guias", href: "/guias", keywords: ["guia", "despacho", "envio", "transporte"] },
   { label: "Ventas", href: "/ventas", keywords: ["venta", "factura", "ingreso", "vendedor"] },
   { label: "Directorio", href: "/clientes", keywords: ["directorio", "contacto", "correo", "telefono", "whatsapp", "clientes"] },

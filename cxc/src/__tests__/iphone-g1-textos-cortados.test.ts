@@ -84,18 +84,49 @@ describe("Marketing › Mobiliario — el rótulo del dato envuelve, el valor no
   });
 });
 
-describe("Cheques — los 15 px de arrastre del cuerpo a 834", () => {
-  const src = leer("src/app/cheques/ChequesClient.tsx");
-  it("las tres casillas del resumen entran recién en lg", () => {
-    expect(src).toContain('<div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-8">');
-    expect(src).not.toContain('<div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-8">');
+/**
+ * 🩸 ESTE BLOQUE CAMBIÓ DE DIRECCIÓN EL 5-SEP-2026.
+ *
+ * LO QUE MEDÍA ANTES: que las tres casillas de totales de Cheques (Total a
+ * cobrar · Vencen esta semana · Depositados) entraran recién en `lg`, porque a
+ * 834 px se salían 15 px del viewport y arrastraban la página entera.
+ *
+ * POR QUÉ YA NO: **las tres casillas se fueron y no se reemplazaron por nada.**
+ * Daniel eligió explícitamente que el módulo Recordatorios no muestre ningún
+ * total sumado. Un arrastre que salía de tres casillas que ya no existen no se
+ * puede medir — y dejar el test viejo apuntando a un archivo renombrado lo
+ * habría vuelto verde por no encontrar nada.
+ *
+ * LO QUE MIDE AHORA: que no VUELVAN. Es el mismo invariante mirado al revés, y
+ * es el que importa: la regla nueva («ningún total sumado») se rompe sola el día
+ * que alguien reponga una tarjeta de resumen porque «se ve vacío arriba».
+ *
+ * ⚠️ Vive acá y no en el archivo del rediseño a propósito: quien vuelva a poner
+ * una fila de KPIs va a estar mirando el ancho, no la regla de negocio.
+ */
+describe("Recordatorios — las tres casillas de totales NO vuelven", () => {
+  const ARCHIVOS = [
+    "src/app/recordatorios/RecordatoriosClient.tsx",
+    "src/app/recordatorios/components/AgendaLista.tsx",
+    "src/app/recordatorios/components/CalendarioMes.tsx",
+  ];
+
+  it("no hay ninguna grilla de tres casillas de resumen", () => {
+    for (const f of ARCHIVOS) {
+      const src = leer(f);
+      expect(src, f).not.toContain("lg:grid-cols-3 gap-2 mb-8");
+      expect(src, f).not.toContain("sm:grid-cols-3 gap-2 mb-8");
+    }
   });
 
-  it("dentro de cada casilla, el rótulo encoge y el número no", () => {
-    // Sin `min-w-0` los dos hijos del flex se niegan a encogerse y el monto se
-    // sale del viewport: eso era el arrastre, no un scroller mal puesto.
-    expect((src.match(/min-w-0 text-xs uppercase tracking-wide text-gray-500/g) ?? []).length).toBe(3);
-    expect((src.match(/flex shrink-0 items-baseline gap-1\.5/g) ?? []).length).toBe(3);
+  it("🔴 y nadie SUMA montos en la pantalla", () => {
+    // El arrastre de 15 px salía de un monto sumado que no cabía. Sin sumas no
+    // hay monto largo que se salga, y sobre todo: Daniel pidió que no los haya.
+    for (const f of ARCHIVOS) {
+      const src = leer(f);
+      expect(src, `${f} volvió a sumar montos`).not.toMatch(/reduce\([^)]*monto/);
+      expect(src, `${f} tiene una casilla "Total"`).not.toMatch(/Total a cobrar|Depositados<|Vencen esta semana/);
+    }
   });
 });
 

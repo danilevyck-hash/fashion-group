@@ -23,13 +23,17 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   TABLA_RECORDATORIOS,
+  esDestino,
   esRepeticion,
   type Recordatorio,
   type RecordatorioNuevo,
 } from "./recordatorio";
 
-/** Una sola lista de columnas, para que las dos lecturas no se separen. */
-const COLS = "id, fecha, texto, cliente, cliente_codigo, repeticion, creado_por, created_at";
+/** Una sola lista de columnas, para que las dos lecturas no se separen.
+ *  `hasta` y `destino` entraron con el rediseño del 5-sep-2026
+ *  (migración 20260925130000_recordatorios_rediseno.sql). */
+const COLS =
+  "id, fecha, texto, cliente, cliente_codigo, repeticion, hasta, destino, creado_por, created_at";
 
 interface Fila {
   id: string;
@@ -38,6 +42,8 @@ interface Fila {
   cliente: string | null;
   cliente_codigo: string | null;
   repeticion: string;
+  hasta: string | null;
+  destino: string | null;
   creado_por: string | null;
   created_at: string | null;
 }
@@ -53,6 +59,11 @@ function aRecordatorio(f: Fila): Recordatorio {
     // recordatorios que no están atados a nadie.
     clienteCodigo: f.cliente_codigo ? String(f.cliente_codigo) : null,
     repeticion: esRepeticion(f.repeticion) ? f.repeticion : "una_vez",
+    hasta: f.hasta ? String(f.hasta).slice(0, 10) : null,
+    // Ante un valor raro se cae a `equipo`, que es lo que pasaba antes de que
+    // existiera la columna. Caer a `privado` escondería del grupo un aviso que
+    // nadie pidió esconder.
+    destino: esDestino(f.destino) ? f.destino : "equipo",
     creadoPor: String(f.creado_por ?? ""),
     createdAt: String(f.created_at ?? ""),
   };
@@ -92,6 +103,32 @@ export async function leerRecordatorios(): Promise<RecordatoriosLeidos> {
   return { recordatorios: filas.map(aRecordatorio), faltaMigracion: false };
 }
 
+/**
+ * UNO solo, por id. Lo necesita el PUT para saber si la FECHA cambió: la regla
+ * «no se guarda para un día que ya pasó» aplica a la fecha NUEVA, no a la vieja
+ * — si aplicara a la vieja, editarle el texto a un recordatorio semanal que
+ * arrancó en junio sería imposible para siempre.
+ */
+export type Lectura =
+  | { ok: true; recordatorio: Recordatorio }
+  | { ok: false; noEsta: true }
+  | { ok: false; noEsta: false; error: string };
+
+export async function leerRecordatorio(id: string): Promise<Lectura> {
+  const { data, error } = await supabaseServer
+    .from(TABLA_RECORDATORIOS)
+    .select(COLS)
+    .eq("id", id)
+    .eq("deleted", false)
+    .maybeSingle();
+  // 🔴 «No está» y «la base falló» NO son lo mismo, y confundirlos es la peor
+  // forma de fallar: un permiso roto o un cambio de esquema se leería como
+  // «ese recordatorio ya no existe» y la persona lo daría por borrado.
+  if (error) return { ok: false, noEsta: false, error: error.message ?? "Error interno" };
+  if (!data) return { ok: false, noEsta: true };
+  return { ok: true, recordatorio: aRecordatorio(data as unknown as Fila) };
+}
+
 export type Escritura =
   | { ok: true; recordatorio: Recordatorio }
   | { ok: false; error: string };
@@ -108,6 +145,8 @@ export async function crearRecordatorio(
       cliente: nuevo.cliente || null,
       cliente_codigo: nuevo.clienteCodigo,
       repeticion: nuevo.repeticion,
+      hasta: nuevo.hasta,
+      destino: nuevo.destino,
       creado_por: quien || null,
     })
     .select(COLS)
@@ -128,6 +167,8 @@ export async function actualizarRecordatorio(
       cliente: nuevo.cliente || null,
       cliente_codigo: nuevo.clienteCodigo,
       repeticion: nuevo.repeticion,
+      hasta: nuevo.hasta,
+      destino: nuevo.destino,
     })
     .eq("id", id)
     .eq("deleted", false)

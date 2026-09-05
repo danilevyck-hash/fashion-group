@@ -202,7 +202,11 @@ describe("Los cinco controles arreglados usan el componente compartido", () => {
     ["components/ClientePicker.tsx", "Guías y Cheques · cliente"],
     ["components/ui/SearchableSelect.tsx", "Cheques · vendedor/empresa y Caja · responsable/categoría"],
     ["app/caja/components/AutocompleteInput.tsx", "Caja · categoría en la fila de la tabla"],
-    ["app/cheques/ChequesClient.tsx", "Cheques · menú ⋯ y globo del calendario"],
+    // 5-sep-2026: la pantalla de Cheques pasó a `/recordatorios` y se partió en
+    // piezas (eran 1.693 líneas). El globo del calendario —lo que este candado
+    // cuida— viajó con el calendario. El menú ⋯ de la fila se retiró con las
+    // pestañas: la lista única no lo usa.
+    ["app/recordatorios/components/CalendarioMes.tsx", "Recordatorios · globo del calendario"],
     ["components/NotificationCenter.tsx", "Header · campana"],
   ];
 

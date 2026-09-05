@@ -193,7 +193,7 @@ export const ALL_MODULES: AppModule[] = [
   // rompe permisos y overrides sin comprar nada. Lo único que cambió es el LABEL
   // (24-ago-2026): adentro conviven los cheques por depositar —intactos— y los
   // recordatorios sueltos. Misma decisión que "Asistencia y Planilla".
-  { key: "cheques",        label: "Recordatorios",     href: "/cheques",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
+  { key: "cheques",        label: "Recordatorios",     href: "/recordatorios",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
 
   // Administración
   //

@@ -48,14 +48,22 @@ export async function GET(req: NextRequest) {
   // los sábados) y ADEMÁS es el candado anti-duplicado que lee `yaAvisoHoy`.
   await recordCronHeartbeat(CRON_NAME);
   if (!r.sent) {
-    // Nada que mandar (ni cheques por vencer ni recordatorios), o Telegram
-    // falló. `detail` lo dice; el heartbeat ya quedó registrado arriba.
-    return NextResponse.json({ message: r.detail, count: r.count, recordatorios: r.recordatorios });
+    // Nada que mandar (ni cheques por vencer, ni vencidos, ni recordatorios), o
+    // Telegram falló. `detail` lo dice; el heartbeat ya quedó registrado arriba.
+    return NextResponse.json({
+      message: r.detail,
+      count: r.count,
+      vencidos: r.vencidos,
+      recordatorios: r.recordatorios,
+      retirados: r.retirados,
+    });
   }
   return NextResponse.json({
     message: "Alerta enviada",
     count: r.count,
+    vencidos: r.vencidos,
     recordatorios: r.recordatorios,
+    retirados: r.retirados,
     sent: r.sent,
   });
 }

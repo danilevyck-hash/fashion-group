@@ -32,7 +32,6 @@ import { buildPrestamosWorkbook } from "../src/lib/exports/prestamos-excel";
 import { buildPedidosWorkbook } from "../src/lib/catalogos/pedidos-excel";
 import { buildReebokSinFotoWorkbook } from "../src/lib/catalogos/sinfoto-excel";
 import { buildProveedoresSheet } from "../src/app/proveedores/excel-proveedores";
-import { buildChequesSheet } from "../src/app/cheques/excel-cheques";
 import { buildGuiasSheet } from "../src/app/guias/components/excel-guias";
 
 const SALIDA = process.env.SALIDA ?? path.join(os.tmpdir(), "excel-panel-fijo");
@@ -92,11 +91,9 @@ function libros(): { nombre: string; bytes: Buffer; hojas: string[] }[] {
     ]),
   }]));
 
-  const ch = buildChequesSheet([
-    { cliente: "Cliente X", numero_cheque: "1001", monto: 350.75, fecha_deposito: "2026-07-10", vendedor: "Ana" },
-    { cliente: "Cliente Y", numero_cheque: "1002", monto: 120, fecha_deposito: "2026-07-11", vendedor: "" },
-  ], "vencen hoy");
-  add("cheques", workbookFromSheets([{ name: ch.sheetName, ws: ch.ws }]));
+  // 🩸 Acá se generaba el Excel de CHEQUES. Se retiró el 5-sep-2026 con el
+  // rediseño del módulo Recordatorios — Daniel: *«se va»*. Ya no hay descarga
+  // que verificar; los datos siguen en la base.
 
   add("guias", workbookFromSheets([{
     name: "Guías",

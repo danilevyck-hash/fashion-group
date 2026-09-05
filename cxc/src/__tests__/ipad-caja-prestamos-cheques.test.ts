@@ -50,7 +50,10 @@ const read = (...p: string[]) => readFileSync(join(src, ...p), "utf8");
 const movimientos = read("app", "prestamos", "components", "MovimientoTable.tsx");
 const periodos = read("app", "caja", "components", "PeriodoList.tsx");
 const gastos = read("app", "caja", "components", "GastoTable.tsx");
-const cheques = read("app", "cheques", "ChequesClient.tsx");
+// 5-sep-2026: la pantalla pasó a `/recordatorios` y la lista salió a su propia
+// pieza. La fila de un cheque vive acá.
+const cheques = read("app", "recordatorios", "components", "AgendaLista.tsx");
+const calendario = read("app", "recordatorios", "components", "CalendarioMes.tsx");
 const gastoForm = read("app", "caja", "components", "GastoForm.tsx");
 
 const veces = (t: string, re: RegExp) => (t.match(re) ?? []).length;
@@ -70,11 +73,26 @@ describe("El corte tarjetas/tabla queda POR ENCIMA del ancho que la barra latera
     expect(periodos).not.toContain('className="hidden md:block overflow-x-auto"');
   });
 
-  it("Cheques › Lista: el corte es xl y NO sm — a 834 se perdían ESTADO y el menú ⋯", () => {
-    expect(cheques).toMatch(/className="xl:hidden space-y-1\.5"/);
-    expect(cheques).toMatch(/className="hidden xl:block overflow-x-auto"/);
-    expect(cheques).not.toContain('className="sm:hidden space-y-1.5"');
-    expect(cheques).not.toContain('className="hidden sm:block overflow-x-auto"');
+  /**
+   * 🩸 CAMBIÓ DE DIRECCIÓN EL 5-SEP-2026.
+   *
+   * LO QUE MEDÍA ANTES: que el corte tarjetas/tabla de Cheques fuera `xl` y no
+   * `sm`, porque a 834 px (iPad con la barra lateral) la tabla pedía 768 contra
+   * 562 útiles y lo que se salía de la pantalla eran ESTADO y el menú ⋯.
+   *
+   * POR QUÉ YA NO: **la tabla desapareció.** Con la lista única del rediseño no
+   * hay dos presentaciones que cortar — hay UNA, en tarjetas, igual en el
+   * celular, en el iPad y en el escritorio. El problema no se movió de
+   * breakpoint: se quedó sin causa.
+   *
+   * LO QUE MIDE AHORA: que la tabla no vuelva. Una tabla de 8 columnas es
+   * exactamente lo que arrastraba la página de lado.
+   */
+  it("Recordatorios › Lista: UNA sola presentación — la tabla no vuelve", () => {
+    expect(cheques).not.toContain("<table");
+    expect(cheques).not.toContain("overflow-x-auto");
+    expect(cheques).not.toContain("xl:hidden");
+    expect(cheques).not.toContain("hidden xl:block");
   });
 
   it("Caja › Detalle: tarjetas hasta lg, tabla desde lg", () => {
@@ -112,15 +130,30 @@ describe("Los mismos datos en las dos vistas, marcados con `data-` estables (no 
     }
   });
 
-  it("Cheques: fila + cliente/monto/estado, en tarjeta Y en tabla", () => {
-    expect(veces(cheques, /data-cheque-fila=/g)).toBe(2);
+  /**
+   * 🩸 CAMBIÓ DE DIRECCIÓN EL 5-SEP-2026, por lo mismo que el bloque de arriba:
+   * ya no hay DOS vistas que comparar, hay UNA. Las marcas `data-*` se quedan —
+   * son lo que buscan los candados de conducta — pero ahora tienen que aparecer
+   * UNA vez, no dos. Que aparezcan CERO veces seguiría siendo un rojo, que es
+   * lo que este bloque siempre vino a evitar.
+   *
+   * El menú ⋯ (`ChequeMoreMenu`) se retiró con las pestañas: las acciones de la
+   * fila —depositar, rebotado, re-depositar— están a la vista, y «Eliminar» vive
+   * en el detalle del cheque, que es donde Daniel lo usa para el que no se va a
+   * cobrar («no lo quiero marcar», se borra).
+   */
+  it("Recordatorios: la fila del cheque conserva cliente/monto/estado, marcados", () => {
+    expect(veces(cheques, /data-cheque-fila=/g)).toBe(1);
     for (const campo of ["cliente", "monto", "estado"]) {
-      expect(veces(cheques, new RegExp(`data-cheque-campo="${campo}"`, "g"))).toBe(2);
+      expect(veces(cheques, new RegExp(`data-cheque-campo="${campo}"`, "g"))).toBe(1);
     }
   });
 
-  it("La tarjeta de Cheques trae el menú ⋯ — es lo que se perdía a 834 junto con ESTADO", () => {
-    expect(veces(cheques, /<ChequeMoreMenu/g)).toBe(2);
+  it("y la fila del RECORDATORIO también está marcada (es la mitad nueva de la lista)", () => {
+    expect(veces(cheques, /data-recordatorio-fila=/g)).toBe(1);
+    for (const campo of ["texto", "fecha"]) {
+      expect(veces(cheques, new RegExp(`data-recordatorio-campo="${campo}"`, "g"))).toBe(1);
+    }
   });
 });
 
@@ -135,8 +168,8 @@ describe("Textos que se cortaban", () => {
 
   it("La píldora del calendario pone el MONTO en su propio renglón (perdía 121 px @834)", () => {
     // el nombre y el monto ya no comparten el mismo `truncate`
-    expect(cheques).not.toContain('cheque.cliente.slice(0, 12)');
-    expect(cheques).toMatch(/<span className="block tabular-nums font-medium">\$\{fmt\(cheque\.monto\)\}<\/span>/);
+    expect(calendario).not.toContain('cheque.cliente.slice(0, 12)');
+    expect(calendario).toMatch(/<span className="block tabular-nums font-medium">\$\{fmt\(cheque\.monto\)\}<\/span>/);
   });
 });
 
@@ -180,6 +213,8 @@ describe("Nada que se toque por debajo de 44 px", () => {
   });
 
   it("Los 2 botones del calendario en celular llegan a 44 (medían 119×26 y 59×26)", () => {
-    expect(veces(cheques, /hover:underline min-h-\[44px\] inline-flex items-center/g)).toBe(4);
+    // 4 = los 2 del globo de escritorio + los 2 de la lista de celular. Viven
+    // en `CalendarioMes.tsx` desde el 5-sep-2026, con el mismo código.
+    expect(veces(calendario, /hover:underline min-h-\[44px\] inline-flex items-center/g)).toBe(4);
   });
 });

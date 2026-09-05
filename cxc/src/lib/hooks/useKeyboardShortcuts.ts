@@ -135,7 +135,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
           h: "/home",
           c: "/cxc",
           g: "/guias",
-          q: "/cheques",
+          q: "/recordatorios",
           r: "/reclamos",
           j: "/caja",
           v: "/ventas",

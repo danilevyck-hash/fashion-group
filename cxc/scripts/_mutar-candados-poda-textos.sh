@@ -29,7 +29,7 @@ ARCHIVOS=(
   "src/app/reclamos/components/ComprobanteModal.tsx"
   "src/app/caja/components/PeriodoList.tsx"
   "src/app/asistencia/CorregirMarcacionModal.tsx"
-  "src/app/cheques/components/RecordatorioFormModal.tsx"
+  "src/app/recordatorios/components/RecordatorioFormModal.tsx"
   "src/app/marketing/components/RegistrarGastoModal.tsx"
   "src/app/marketing/components/PorClienteModal.tsx"
   "src/app/marketing/components/CerrarPeriodoModal.tsx"
@@ -122,7 +122,7 @@ mutar "src/app/asistencia/CorregirMarcacionModal.tsx" \
 probar "vuelve el 'nadie va a acordarse' del motivo de corrección"
 
 # ── Cheques #221 ────────────────────────────────────────────────────────────
-mutar "src/app/cheques/components/RecordatorioFormModal.tsx" \
+mutar "src/app/recordatorios/components/RecordatorioFormModal.tsx" \
   '<Campo label="¿Se repite?">' \
   '<Campo label="¿Se repite?" hint="— casi siempre, una sola vez">'
 probar "vuelve el '— casi siempre, una sola vez' del recordatorio"
@@ -330,7 +330,7 @@ mutar "src/app/asistencia/CorregirMarcacionModal.tsx" \
   'const puedeGuardar = horaOk && !guardando;'
 probar "🔴 el motivo deja de ser obligatorio de verdad"
 
-mutar "src/app/cheques/components/RecordatorioFormModal.tsx" \
+mutar "src/app/recordatorios/components/RecordatorioFormModal.tsx" \
   'aria-label="Se repite"' 'aria-label="Otra cosa"'
 probar "🔴 el grupo de repetición pierde su nombre"
 

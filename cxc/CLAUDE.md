@@ -62,8 +62,8 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):
-- **Ventas y clientes:** Vista General, Ventas, CXC (`/cxc` — era `/admin` hasta el 5-sep-2026; el rótulo sigue siendo «Cuentas por Cobrar» y `/admin` redirige), **Confecciones Boston** (`/boston`, key `boston` — 27-ago-2026), Clientes/Directorio (`/clientes`), Proveedores, **Referencia** (`/referencia`, key `referencia` — 12-ago-2026), Catálogos (**CUATRO** marcas ENCENDIDAS: Reebok, Joybees, Tommy Hilfiger y **Calvin Klein**, cada una con su tarjeta en el hub /catalogos/marcas, su catálogo público compartible y su pedido público `/pedido-<marca>/[id]` accesibles sin sesión)
-- **Operación:** Guías de Despacho, Packing Lists, **Asistencia y Planilla** (`/asistencia`, key `asistencia` — 3-ago-2026), Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos** (`/gastos-contabilidad`, key `gastos-contabilidad` — 11-ago-2026; 2 pestañas: *Gastos* —Egresos Varios, fuente ÚNICA desde el 13-ago-2026— y *Saldos de banco*), Préstamos, **Recordatorios** (era *Cheques*; la `key` sigue siendo `cheques` — ver abajo)
+- **Ventas y clientes:** Vista General, Ventas, CXC (`/cxc` — era `/admin` hasta el 5-sep-2026; el rótulo sigue siendo «Cuentas por Cobrar» y `/admin` redirige), Multifashion, **Confecciones Boston** (`/boston`, key `boston` — 27-ago-2026), Clientes/Directorio (`/clientes`), Proveedores, **Referencia** (`/referencia`, key `referencia` — 12-ago-2026), Catálogos (**CUATRO** marcas ENCENDIDAS: Reebok, Joybees, Tommy Hilfiger y **Calvin Klein**, cada una con su tarjeta en el hub /catalogos/marcas, su catálogo público compartible y su pedido público `/pedido-<marca>/[id]` accesibles sin sesión)
+- **Operación:** Guías de Despacho, Packing Lists, **Asistencia y Planilla** (`/asistencia`, key `asistencia` — 3-ago-2026), Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos** (`/gastos-contabilidad`, key `gastos-contabilidad` — 11-ago-2026; 2 pestañas: *Gastos* —Egresos Varios, fuente ÚNICA desde el 13-ago-2026— y *Saldos de banco*), Préstamos, **Recordatorios** (`/recordatorios` desde el 5-sep-2026, era `/cheques`; era *Cheques*; la `key` sigue siendo `cheques` — ver abajo)
 - **Administración:** Usuarios, Data Health
 
 > **Nacidos después del 5-jul-2026** (auditoría de estado, 31-ago): los cuatro módulos navegables `asistencia` · `gastos-contabilidad` · `referencia` · `boston`, más dos PÁGINAS públicas que **no son módulos** y por eso no tienen ficha ni entrada en `role_permissions`: `/pedido-tommy/[id]` (24-jul) y `/pedido-calvin/[id]` (12-ago). En el mismo período nacieron **89 rutas API** y 6 grupos nuevos (`api/asistencia`, `api/boston`, `api/gastos-contabilidad`, `api/saldos-banco`, `api/recordatorios`, `api/diag`).
@@ -222,6 +222,24 @@ archivo enlazado, verbatim.
 - Al marcar la **fecha de salida** de alguien con deuda, Asistencia lo dice ahí mismo: *«Debe $100 —
   descuéntalo de la liquidación»*. Sin Telegram.
 
+### Recordatorios (era Cheques) — [docs/postmortems/recordatorios.md](docs/postmortems/recordatorios.md)
+
+- La pantalla vive en **`/recordatorios`** desde el 5-sep-2026 (era `/cheques`, con redirect 307 en `next.config.js`). 🔴 **La `key` del módulo sigue siendo `cheques`** — está en `role_permissions` y en `fg_users.modulos_override`. Entran **admin y secretaria**, nadie más.
+- 🔴 **UNA sola lista, sin pestañas**, con cheques y recordatorios juntos, agrupada por CUÁNDO: **Vencido · Hoy · Esta semana · Después · Se repiten**. Eran **8 pestañas**; cuatro de ellas —vencido, vencen hoy, vencen mañana, vencen esta semana— **nunca fueron estados: son CUÁNDO**, y una fecha ya lo dice. «Rebotado» dejó de ser pestaña (cero filas en toda la historia): es una marca roja, y el cheque **se queda** hasta que se redeposite o se borre.
+- 🔴 **La lista muestra solo lo ABIERTO. Lo depositado NO está en la lista pero SÍ aparece al BUSCARLO** (por cliente o número de cheque): el buscador mira TODO y es la única puerta a lo depositado.
+- 🔴 **NINGÚN total sumado, en ninguna parte** — ni tarjetas arriba, ni al pie de un grupo, ni en el calendario. Los montos por fila se quedan; el encabezado dice CUÁNTOS. `lib/recordatorios/agenda.ts` **no tiene una sola operación de suma** y hay candado que lo exige.
+- 🔴 **Escribir un recordatorio es UN RENGLÓN** siempre visible (`¿Qué te recuerdo?` + Cuándo + A quién + Cliente opcional + Guardar). Seis pastillas de «Cuándo»: `Mañana · Lunes · Elegir fecha · Cada día · Cada semana · Cada mes`, más un **«Hasta…» opcional** que **corta INCLUSIVE** y solo existe con repetición.
+- 🔴 **«Hoy» NO existe como opción y NO hay selector de hora.** Todo sale en **UN mensaje diario a las 9:00 a.m.** de Panamá; el primero disponible es MAÑANA. Guardar para un día que ya pasó **no se permite y se dice por qué**, en pantalla y en el servidor (con la fecha de Panamá). ⚠️ **Editar no exige mover la fecha**: el freno solo mira la fecha cuando CAMBIÓ — si no, un semanal arrancado en junio no se podría corregir nunca.
+- 🔴 **`destino` = `equipo` (📊 el grupo) o `privado` (el chat de Daniel). Lo decide el ROL en el SERVIDOR** (`destinoPermitido`): la opción la ven solo los admin y lo de una secretaria va SIEMPRE al equipo. Ante la duda, `equipo` — caer en privado escondería del grupo un aviso que nadie pidió esconder. ⚠️ **Hay UN solo chat privado y DOS admin**: si Alberto marca «solo a mí», le llega a **Daniel**. Aprobado así.
+- 🔴 **Un recordatorio NO se marca como hecho** (Daniel: *«No quiero tener que meterme para poner que lo hice. Se supone que sí.»*) y **un cheque que no se va a cobrar SE BORRA**, no se marca (*«no lo quiero marcar»*). No existe ningún estado de completado ni de «no se cobró».
+- 🩸 **UN CHEQUE QUE VENCIÓ Y NADIE MARCÓ NO SE VOLVÍA A MENCIONAR JAMÁS** — el aviso solo miraba hoy y el próximo día hábil. Medido el 5-sep-2026: Vistana chq 018094, Edwin, **$18.393,32**, vencía el 31-ago y seguía pendiente 5 días después. Bloque nuevo `🔴 N cheque(s) venció…`, que sale **UNA SOLA VEZ** y no se repite nunca más (memoria en `cheques.aviso_vencido_en`). **Se marca DESPUÉS de que Telegram confirme** — marcar antes y que el envío falle quemaría el único aviso de ese cheque. Un **rebotado no avisa**.
+- 🔴 **A los 365 días un cheque DEPOSITADO se retira solo**, con **soft delete** (`deleted` + `deleted_at`), nunca un DELETE, y **solo los depositados**: lo que se debe se queda para siempre. Se cuenta desde `fecha_depositado` (sin ella, `fecha_deposito`; **nunca «hoy»**). Corre **dentro de `cheques-alert`, sin cron nuevo** — ese cron ya toca la tabla, y hoy son 82 entradas de un tope de 100. ⚠️ No corre fin de semana; con 365 días de umbral da igual.
+- 🔴 **Se QUITÓ la línea `WhatsApp seguimiento: +50766745522, +50766494096`** del aviso de cheques (Daniel: *«nada, es recordatorio nada más»*). **El resto del texto no se tocó, palabra por palabra.**
+- 🔴 **El Excel se retiró** (Daniel: *«se va»*). Los datos siguen en la base; lo que se fue es la descarga. El candado de «N lugares arman una hoja» bajó de **25 a 24** a propósito y con nota.
+- El archivo de la pantalla pasó de **1.693 líneas a 800** (el límite de la casa), repartido en seis piezas bajo `src/app/recordatorios/`, con las decisiones en módulos PUROS (`lib/recordatorios/{agenda,cuando,recordatorio}.ts`, `lib/cheques-{vencidos-aviso,retencion}.ts`).
+- Migración **`20260925130000_recordatorios_rediseno.sql`** (⚠️ **pendiente de aplicar**): `recordatorios` gana `hasta` y `destino` y el CHECK de `repeticion` gana `cada_dia`; `cheques` gana `aviso_vencido_en` y `deleted_at`. **Aditiva** — ni una fila cambia de valor. ⚠️ El código **no degrada** sin ella (la tolerancia a «falta el DDL» se retiró de este módulo el 3-sep-2026, a propósito).
+- Candados: `recordatorios-rediseno.test.ts` · `recordatorios-pantalla.test.tsx` · `recordatorios-permiso-y-aviso.test.ts` · `recordatorios-cuando-tocan.test.ts` · `cheques-aviso-vencimiento.test.ts`; **56 mutaciones, 56 cazadas** (`scripts/_mutar-candados-recordatorios.sh`, con 2 controles).
+
 ### Gastos, mayor y banco — [docs/postmortems/gastos-mayor-banco.md](docs/postmortems/gastos-mayor-banco.md)
 
 - **Un solo módulo «Gastos»** (`gastos-contabilidad`) con dos pestañas: *Gastos* (Egresos Varios, **fuente ÚNICA** desde el 13-ago-2026) y *Saldos de banco*.
@@ -334,7 +352,7 @@ archivo enlazado, verbatim.
   - Caja: `caja_gastos` (+ `deleted_by`, `deleted_at`), `caja_periodos`
   - Préstamos: `prestamos_empleados`, `prestamos_movimientos`
   - Reclamos: `reclamos`, `reclamo_items`, `reclamo_settlements`
-  - Cheques: `cheques`
+  - Recordatorios: `cheques` (+ `deleted_at` desde el 5-sep-2026: lo escribe la retención de 365 días) y `recordatorios`
   - Guías: `guia_transporte`, `guia_items`
   - Directorio: `clientes_master` (`directorio_clientes` está retirada desde el 5-sep-2026: sin lectores ni escritores, queda respaldada como congelada)
   - Nota: `packing_lists` usa `deleted_at` (timestamp), NO la columna `deleted` — patrón distinto.
@@ -428,6 +446,13 @@ Detalle de reglas en [asistencia-planilla](docs/postmortems/asistencia-planilla.
 | Aprobaciones y planilla | `asistencia_horas_extra_aprobadas` (521) · `asistencia_prestamo_aprobado` (13) · `asistencia_planilla_manual` (26) · `asistencia_planilla_guardada` + `_linea` (**0 y 0: todavía no se cerró ninguna quincena**) | 1 fila por (empleado, fecha) o (quincena, empleado) | — |
 | Sueldo repartido entre empresas · quién aprueba qué empresa | `asistencia_reparto_empresa` (2) · `asistencia_aprobador_empresa` (6) | 1 fila por (empleado, empresa) / (usuario, empresa) | El reparto tiene que sumar el salario de la ficha o se rechaza entero. |
 
+### Recordatorios y cheques
+
+| Pregunta | Dónde | Grano · filas | ⚠️ |
+|---|---|---|---|
+| Qué cheques me entregaron y para cuándo | `cheques` | 1 fila por cheque · **19 vivas** (17 depositado $257.174,34 + 2 pendiente $22.221,78), **0 borradas** | Un solo cliente en toda la historia: **Jerusalem de Panamá**. `estado` es TEXT sin CHECK (`pendiente · depositado · rebotado`); «vencido» **NO existe en la base**, se calcula al leer. 🔴 `aviso_vencido_en` (5-sep-2026) es la memoria de que el aviso de vencido ya salió: **NULL = todavía no**, y se escribe DESPUÉS de que Telegram confirme. `deleted_at` lo escribe la retención de 365 días (soft delete, nunca DELETE). |
+| Qué hay que recordar, y a quién avisarle | `recordatorios` | 1 fila por recordatorio · **1 viva** | `fecha` + `texto` obligatorios; `cliente`/`cliente_codigo` y `repeticion` opcionales. `hasta` = fin de una repetición (**inclusive**, y solo con `repeticion <> 'una_vez'`); `destino` = `equipo` (default) o `privado`. 🔴 **No hay estado de «hecho»** y no se va a agregar. La lectura NO filtra por fecha a propósito: un mensual de enero tiene que poder sonar en agosto. |
+
 ### Guías de despacho
 
 | Pregunta | Dónde | Grano · filas | ⚠️ |
@@ -518,7 +543,7 @@ Reglas en [catalogos-pedidos](docs/postmortems/catalogos-pedidos.md).
 | /api/cron/sync-proveedores | 09:30 |
 | /api/cron/joybees-catalogo | **14:45, 17:15, 19:55, 22:10** (4 entradas — solo toca joystep en Switch) |
 | /api/cron/integrity-check | 12:00 |
-| /api/cron/cheques-alert | **14:15** (9:15 a.m. Panamá — aviso de cheques por vencer, ver nota abajo) |
+| /api/cron/cheques-alert | **14:00** (9:00 a.m. Panamá — el mensaje diario de Recordatorios: cheques por vencer + cheques VENCIDOS (aviso único) + los recordatorios del equipo, al grupo; y los marcados «solo a mí», al privado. Era 14:15 hasta el 5-sep-2026. También hace la retención de 365 días de los depositados — soft delete, sin cron nuevo) |
 | /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |
 | /api/cron/switch-sync tipo=facturas — **ventas** | 11:50, 13:00, 15:00, 17:00, 19:00, 21:00, 23:00, 00:15 (8 entradas). **13/17/21 y 00:15 = solo american_classic** (ventas ACS cada 2h; 00:15 = sync de cierre, tras cerrar tienda 7pm Panamá — de él depende el resumen de la 01:00). **11:50/15/19/23 = las 8 empresas con facturas** (ACS + las 7 B2B): 06:50, 10:00, 14:00 y 18:00 Panamá |
 | /api/cron/acs-resumen-diario | 01:00 (resumen diario ventas ACS al Telegram **privado** de Daniel, no al grupo de negocio — ver «Alertas» abajo; 20:00 Panamá = 8pm, tras el sync de cierre de 00:15). **Desde el 3-sep-2026 cierra con la línea `🎯 Meta`** —arriba/abajo del ritmo de la meta grupal vigente de Multifashion (Daniel: *«diciéndome si están qué porcentaje arriba o abajo para la meta»*); sin meta que cubra el día no sale. Ver el bloque Multifashion |
