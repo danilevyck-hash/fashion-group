@@ -13,12 +13,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "action y module requeridos" }, { status: 400 });
   }
 
+  // 🩸 Esquema REAL de activity_logs: user_role, action, entity_type,
+  // entity_id, details (ver logActivity en src/lib/log-activity.ts, que sí
+  // escribe en producción). Este insert usaba columnas `user_name` y `module`
+  // que la tabla no tiene, así que fallaba en silencio — nunca se notó porque
+  // logActivityClient no tenía callers hasta el 4-sep-2026 (las descargas de
+  // Tallas y Fotos a mi Excel del Depurador).
+  const merged = {
+    ...(details && typeof details === "object" ? details : {}),
+    ...(session.userName ? { user_name: session.userName } : {}),
+  };
   const { error } = await supabaseServer.from("activity_logs").insert({
     user_role: session.role,
-    user_name: session.userName || null,
     action,
-    module,
-    details: details || null,
+    entity_type: module,
+    details: Object.keys(merged).length > 0 ? JSON.stringify(merged) : null,
   });
 
   if (error) return NextResponse.json({ error: "Error al registrar" }, { status: 500 });
@@ -40,7 +49,7 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(100);
 
-  if (module) query = query.eq("module", module);
+  if (module) query = query.eq("entity_type", module);
   if (from) query = query.gte("created_at", from);
   if (to) query = query.lte("created_at", to + "T23:59:59");
 

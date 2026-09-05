@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
+import { saveAs } from "file-saver";
 import {
-  MESES,
-  EMPRESAS_DESTINO,
+  COMPANIAS_DEPURADOR,
+  companiaLabel,
+  empresasReconocidas,
   pickBestSheet,
   processRows,
   setRowTalla,
@@ -31,6 +33,8 @@ import {
 } from "@/lib/depurador/logic";
 import { veredictoDescripcion } from "@/lib/depurador/veredicto";
 import { mensajeDivisorEnPantalla } from "@/lib/depurador/divisor";
+import { hoyPanama } from "@/lib/fecha-panama";
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import AlarmaDescripcionesNuevas, { type DescripcionNueva } from "./AlarmaDescripcionesNuevas";
@@ -63,13 +67,15 @@ const COL_HEAD: Record<string, string> = {
 const NARROW_COLS = new Set(["__calc", "Costo FOB *", "Costo CIF *", "Precio *", "Stock Ideal"]);
 
 interface DepuradorClientProps {
-  /** Callback al descargar — registra el historial liviano en el server (Tarea 4). */
+  /** Callback al descargar — registra el historial en el server (Tarea 4).
+   *  `archivo` son los MISMOS bytes que bajaron al disco (4-sep-2026). */
   onDownloaded?: (payload: {
     empresa: string;
     marca: string;
     cantidad_estilos: number;
     total_unidades: number;
     total_costo: number;
+    archivo?: { blob: Blob; nombre: string };
   }) => void;
   /** Archivo inyectado por el dispatcher (mismo tab). Si viene, se oculta la dropzone
    *  propia y se procesa automáticamente. La lógica CK/TH no cambia. */
@@ -79,7 +85,6 @@ interface DepuradorClientProps {
 }
 
 export default function DepuradorClient({ onDownloaded, injectedFile, onReset }: DepuradorClientProps) {
-  const now = new Date();
   const embedded = injectedFile !== undefined;
   const fileRef = useRef<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -98,14 +103,9 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   const [orphanSeen, setOrphanSeen] = useState(false); // alarma de descripción nueva (Tarea 8)
 
   // ── Config RECORDADA entre corridas (4-sep-2026) ───────────────────────────
-  // Empresa, mes, año, tasa, factor y modo de precio se re-elegían en cada una
-  // de las ~50-60 corridas del mes. Ahora la pantalla abre como quedó la última
-  // vez, con el patrón de la casa (useLastUsed → fg_last_* en localStorage).
-  // El ARCHIVO no se recuerda: ese siempre se elige.
-  // Defaults idénticos a los de siempre: mes/año actual, tasa 07, factor 1.1.
-  const [empresa, setEmpresa] = useLastUsed("depurador_empresa", "");
-  const [mesStr, setMesStr] = useLastUsed("depurador_mes", String(now.getMonth()));
-  const [anio, setAnio] = useLastUsed("depurador_anio", String(now.getFullYear()));
+  // Tasa, factor y modo de precio se recuerdan con el patrón de la casa
+  // (useLastUsed → fg_last_* en localStorage). El ARCHIVO no se recuerda.
+  // 🔴 La TEMPORADA no se recuerda y la COMPAÑÍA ya no se elige (ver abajo).
   // «07» = el código de Switch para el 7% (texto) y «0» = exento. Daniel,
   // textual: «solo existen esas dos» — la pantalla ofrece un select de dos
   // opciones y nada más. tasaSwitch (que no se tocó) sigue traduciendo lo que
@@ -116,13 +116,30 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 
   // Derivados saneados de lo recordado (un localStorage viejo o tocado a mano
   // no puede meter un valor que la pantalla no ofrece).
-  const mesIdx = (() => {
-    const n = parseInt(mesStr, 10);
-    return Number.isInteger(n) && n >= 0 && n <= 11 ? n : now.getMonth();
-  })();
-  const setMesIdx = (v: number) => setMesStr(String(v));
   const tasa = tasaCruda === "0" ? "0" : "07";
   const setTasa = (v: string) => setTasaCruda(v === "0" ? "0" : "07");
+
+  // ── Temporada (4-sep-2026) ─────────────────────────────────────────────────
+  // Ese dato NO es la fecha de la corrida: arma la columna «Temporada» del
+  // Excel (AAAA-MM) y entra a Switch. 🔴 SIEMPRE arranca en el MES ACTUAL de
+  // Panamá (Daniel: «la temporada es el mes que se hace el archivo») y NO se
+  // recuerda de la corrida anterior — recordarla haría que el 1 de septiembre
+  // siguiera diciendo agosto. Editable, un solo campo.
+  const [temporada, setTemporada] = useState(() => hoyPanama().slice(0, 7));
+  const { mesIdx, anio } = partesDeTemporada(temporada);
+
+  // ── La compañía se RECONOCE, no se elige (4-sep-2026) ──────────────────────
+  // Daniel: «¿para qué elegir la compañía si la puede detectar?». La marca del
+  // archivo ya la dice (empresasReconocidas ← empresaDeMarcaCatalogo). Queda
+  // «cambiar» por si la marca es nueva o el reconocimiento falla — y esa
+  // elección a mano GANA hasta que se cargue otro archivo.
+  const [empresaAuto, setEmpresaAuto] = useState("");
+  const [empresaManual, setEmpresaManual] = useState("");
+  // Compañías reconocidas en el archivo: con 2+ se DICE en pantalla y se elige
+  // a mano — nunca se adivina (confirmado por Daniel: un archivo trae una sola
+  // marca, así que una sola compañía; si llegara uno mixto, no se inventa).
+  const [empresasArchivo, setEmpresasArchivo] = useState<string[]>([]);
+  const empresa = empresaManual || empresaAuto;
 
   // Catálogo de descripciones (tabla depurador_descripciones — fuente de verdad).
   // Sin catálogo NO se procesa ni se descarga nada (sin fallback al archivo TS).
@@ -229,10 +246,23 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         setDescFilter("");
         setMassPrice("");
         setError("");
-        // Empresa destino: preselección del dropdown desde el archivo (Tarea 3)
-        const dest = rows.find((r) => r.destino)?.destino || "";
-        const match = matchEmpresaFromDestino(dest);
-        if (match) setEmpresa(match);
+        // 🔴 La compañía se RECONOCE de las marcas del archivo (CK → Vistana,
+        // TH FOOTWEAR → Fashion Shoes, resto TH → Fashion Wear, KL → Active
+        // Wear). Si ninguna marca del catálogo opina, se cae al destinatario
+        // del archivo (NOMBRE_DESTINATARIO_MERCANCIAS), como antes. Con 2+
+        // compañías reconocidas NO se adivina: se dice en pantalla y se elige
+        // con «cambiar». El re-proceso (mismo archivo) no toca la elección a
+        // mano — esa solo se limpia al cargar OTRO archivo (handleFile).
+        const reconocidas = empresasReconocidas(rows.map((r) => r.cols["Marca *"]));
+        setEmpresasArchivo(reconocidas);
+        if (reconocidas.length === 1) {
+          setEmpresaAuto(reconocidas[0]);
+        } else if (reconocidas.length === 0) {
+          const dest = rows.find((r) => r.destino)?.destino || "";
+          setEmpresaAuto(matchEmpresaFromDestino(dest) ?? "");
+        } else {
+          setEmpresaAuto("");
+        }
       } catch (err) {
         setProcessed(null);
         setWarnings([]);
@@ -247,6 +277,9 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     (file: File) => {
       if (!catalogo) return; // sin catálogo no se procesa (cargando o falló)
       fileRef.current = file;
+      // Archivo NUEVO: la compañía elegida a mano se limpia — la del archivo
+      // nuevo se reconoce sola en runFile.
+      setEmpresaManual("");
       runFile(file, { mesIdx, anio, tasa, factor });
     },
     [runFile, mesIdx, anio, tasa, factor, catalogo]
@@ -315,10 +348,10 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     setWarnings([]);
     setError("");
     setFileName("");
-    // La empresa y los precios a mano NO se limpian: la empresa quedó recordada
-    // para la próxima corrida, y los precios (por referencia de artículo) se
+    // Los precios a mano NO se limpian: van por referencia de artículo y se
     // conservan por si el artículo vuelve en el archivo siguiente. Para
-    // borrarlos está el botón «Borrarlos todos».
+    // borrarlos está el botón «Borrarlos todos». La compañía se reconoce del
+    // próximo archivo (handleFile limpia la elegida a mano).
     setSelected(new Set());
     setDescFilter("");
     setMassPrice("");
@@ -370,6 +403,14 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     for (const f of savedFormulas) m.set(marcaKey(f.marca), f);
     return m;
   }, [savedFormulas]);
+
+  // Marca para la línea «compañía · marca»: la primera real del archivo (el
+  // cajón "Otros" no cuenta); con varias, «CK Footwear +2».
+  const marcaLinea = useMemo(() => {
+    const reales = marcasPresentes.map((m) => m.label).filter((l) => marcaKey(l) !== marcaKey("Otros"));
+    if (reales.length === 0) return "";
+    return reales.length === 1 ? reales[0] : `${reales[0]} +${reales.length - 1}`;
+  }, [marcasPresentes]);
 
   // Siembra/refresca las fórmulas editables de las marcas presentes desde lo guardado.
   useEffect(() => {
@@ -498,7 +539,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     if (!f || savingMarca) return;
     setSavingMarca(key);
     try {
-      const empresaLabel = EMPRESAS_DESTINO.find((e) => e.key === empresa)?.label || null;
+      const empresaLabel = companiaLabel(empresa) || null;
       const res = await fetch("/api/productos/cargar/formulas", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -618,18 +659,26 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "upload");
-      XLSX.writeFile(wb, outputFilename(processed));
+      // 🔴 Los bytes se generan UNA sola vez: lo que baja al disco y lo que se
+      // guarda 90 días en el Historial es EL MISMO archivo, byte a byte —
+      // escribir dos veces podría diferir (SheetJS estampa la hora de creación).
+      const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+      const salida = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(salida).set(new Uint8Array(bytes));
+      const nombre = outputFilename(processed);
+      const blob = new Blob([salida], { type: MIME_XLSX });
+      saveAs(blob, nombre);
 
-      // Historial liviano (Tarea 4) — lo único que toca el server
+      // Historial (Tarea 4 + archivo 4-sep-2026) — lo único que toca el server
       if (onDownloaded) {
         const t = computeTotales(processed);
-        const empresaLabel = EMPRESAS_DESTINO.find((e) => e.key === empresa)?.label || "";
         onDownloaded({
-          empresa: empresaLabel,
+          empresa: companiaLabel(empresa),
           marca: t.marca,
           cantidad_estilos: t.cantidad_estilos,
           total_unidades: t.total_unidades,
           total_costo: t.total_costo,
+          archivo: { blob, nombre },
         });
       }
     } finally {
@@ -750,21 +799,19 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         <summary className="cursor-pointer list-none px-4 py-2 text-[12px] font-medium text-stone-500 [&::-webkit-details-marker]:hidden">
           <span className="text-stone-400">▸</span> Editar temporada y costos
         </summary>
-        <div className="grid grid-cols-2 gap-3.5 border-t border-stone-200 p-4 sm:grid-cols-4">
-        <Field label="Mes de entrada (temporada)" note="Se graba como fecha de ingreso del producto.">
-          <select
-            value={mesIdx}
-            onChange={(e) => { const v = parseInt(e.target.value); setMesIdx(v); reprocesarYa({ mesIdx: v }); }}
-            className={selectCls}
-          >
-            {MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}
-          </select>
-        </Field>
-        <Field label="Año">
+        <div className="grid grid-cols-2 gap-3.5 border-t border-stone-200 p-4 sm:grid-cols-3">
+        {/* 🔴 UN campo «Temporada» (era «Mes» + «Año», que parecían la fecha de
+            la corrida). Arranca SIEMPRE en el mes actual de Panamá y no se
+            recuerda: este dato entra a Switch. */}
+        <Field label="Temporada" note={textoTemporada(temporada)}>
           <input
-            type="number" min={2020} max={2099} value={anio} aria-label="Año"
-            onChange={(e) => { setAnio(e.target.value); reprocesarLuego({ anio: e.target.value }); }}
-            onBlur={reprocesarAlSalir}
+            type="month" value={temporada} aria-label="Temporada"
+            onChange={(e) => {
+              const v = /^\d{4}-\d{2}$/.test(e.target.value) ? e.target.value : hoyPanama().slice(0, 7);
+              setTemporada(v);
+              const p = partesDeTemporada(v);
+              reprocesarYa({ mesIdx: p.mesIdx, anio: p.anio });
+            }}
             className={inputCls}
           />
         </Field>
@@ -825,15 +872,25 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             </div>
           )}
 
-          {/* Barra compacta: empresa destino + acciones (Tarea 3 / A2) */}
+          {/* El archivo trae marcas de DOS compañías: se dice y se elige a
+              mano — nunca se adivina (Daniel confirmó que no debería pasar). */}
+          {empresasArchivo.length > 1 && (
+            <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+              El archivo trae marcas de {empresasArchivo.length} compañías
+              ({empresasArchivo.map((k) => companiaLabel(k)).join(" y ")}). Toca «cambiar» y elige una.
+            </p>
+          )}
+
+          {/* Barra compacta: compañía RECONOCIDA + acciones. La compañía ya no
+              se elige: la dice la marca del archivo, con «cambiar» por si la
+              marca es nueva o el reconocimiento falla (4-sep-2026). */}
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Destino</span>
-            <select value={empresa} aria-label="Empresa destino" onChange={(e) => setEmpresa(e.target.value)} className="min-w-[200px] flex-1 rounded-md border border-stone-300 bg-stone-50 px-2.5 py-1.5 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20">
-              <option value="">Selecciona una empresa…</option>
-              {EMPRESAS_DESTINO.map((e) => (
-                <option key={e.key} value={e.key}>{e.label} ({e.marca})</option>
-              ))}
-            </select>
+            <CompaniaReconocida
+              empresa={empresa}
+              marca={marcaLinea}
+              fileName={fileName}
+              onCambiar={(key) => setEmpresaManual(key)}
+            />
             <button
               onClick={download}
               disabled={downloading || descsNuevas.length > 0 || !catalogo || divisorBloqueaDescarga}
@@ -1229,6 +1286,89 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         </>
       )}
 
+    </div>
+  );
+}
+
+// ── Temporada: helpers puros del campo único (4-sep-2026) ───────────────────
+const MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const MESES_LARGOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+/** "2026-09" → { mesIdx: 8, anio: "2026" }. Un valor raro cae al mes actual
+ *  de Panamá (nunca a un mes viejo recordado). */
+function partesDeTemporada(t: string): { mesIdx: number; anio: string } {
+  const m = /^(\d{4})-(\d{2})$/.exec(t);
+  if (m) {
+    const idx = parseInt(m[2], 10) - 1;
+    if (idx >= 0 && idx <= 11) return { mesIdx: idx, anio: m[1] };
+  }
+  const hoy = hoyPanama();
+  return { mesIdx: parseInt(hoy.slice(5, 7), 10) - 1, anio: hoy.slice(0, 4) };
+}
+
+/** El valor real al lado del campo: "Septiembre 2026 → 2026-09". */
+function textoTemporada(t: string): string {
+  const { mesIdx, anio } = partesDeTemporada(t);
+  return `${MESES_LARGOS[mesIdx]} ${anio} → ${anio}-${String(mesIdx + 1).padStart(2, "0")}`;
+}
+
+/** La línea «Vistana International · CK Footwear» + el archivo + «cambiar».
+ *  «cambiar» abre la lista de las 6 compañías con el desplegable de la casa
+ *  (DesplegableFlotante — candado `desplegables-flotan`). */
+function CompaniaReconocida({ empresa, marca, fileName, onCambiar }: {
+  empresa: string;
+  marca: string;
+  fileName: string;
+  onCambiar: (key: string) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const anclaRef = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2">
+        <span className={`truncate text-sm font-semibold ${empresa ? "text-stone-900" : "text-amber-700"}`}>
+          {empresa ? companiaLabel(empresa) : "Elige la compañía"}
+          {marca && <span className="font-normal text-stone-500"> · {marca}</span>}
+        </span>
+        <button
+          ref={anclaRef}
+          type="button"
+          onClick={() => setAbierto((a) => !a)}
+          aria-haspopup="listbox"
+          aria-expanded={abierto}
+          aria-label="Cambiar compañía"
+          className="shrink-0 text-[12px] font-semibold text-teal-700 underline decoration-teal-300 underline-offset-2 transition hover:text-teal-900"
+        >
+          cambiar
+        </button>
+      </div>
+      {fileName && <div className="truncate text-[11px] text-stone-500">{fileName}</div>}
+      <DesplegableFlotante
+        abierto={abierto}
+        anclaRef={anclaRef}
+        onCerrar={() => setAbierto(false)}
+        marca="depurador-compania"
+        role="listbox"
+        aria-label="Compañía"
+        anchoMinimo={220}
+        className="bg-white rounded-xl border border-black/10 shadow-lg py-1"
+      >
+        {COMPANIAS_DEPURADOR.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            role="option"
+            aria-selected={c.key === empresa}
+            onClick={() => { onCambiar(c.key); setAbierto(false); }}
+            className={`w-full min-h-[44px] px-4 flex items-center justify-between gap-2 text-left text-sm transition hover:bg-black/5 ${
+              c.key === empresa ? "font-semibold text-teal-700" : "text-stone-700"
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </DesplegableFlotante>
     </div>
   );
 }

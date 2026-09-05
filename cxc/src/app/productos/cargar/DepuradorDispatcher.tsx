@@ -4,24 +4,32 @@ import { useCallback, useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
 import DepuradorClient from "./DepuradorClient";
 import ReebokClient from "./ReebokClient";
+import FacturasTiendaClient from "./FacturasTiendaClient";
 import type { SheetRow } from "@/lib/depurador/logic";
 
-type Kind = "ckth" | "reebok";
+type Kind = "ckth" | "reebok" | "tienda";
 
-interface DispatcherProps {
-  onDownloaded?: (payload: {
-    empresa: string;
-    marca: string;
-    cantidad_estilos: number;
-    total_unidades: number;
-    total_costo: number;
-  }) => void;
+export interface DescargaHistorial {
+  empresa: string;
+  marca: string;
+  cantidad_estilos: number;
+  total_unidades: number;
+  total_costo: number;
+  /** El MISMO archivo que se descargó (bytes idénticos), para el Historial. */
+  archivo?: { blob: Blob; nombre: string };
 }
 
-/** Punto de entrada único del tab "Depurador": una sola dropzone. Al soltar el
- *  archivo, olfatea los headers y despacha al flujo correcto (CK/TH o Reebok) SIN
- *  tocar la lógica de ninguno. Detección Reebok = headers Book4 (PO NAME + New
- *  Article + WholesalePrice), que CK/TH nunca tienen. */
+interface DispatcherProps {
+  onDownloaded?: (payload: DescargaHistorial) => void;
+}
+
+/** Punto de entrada único de «Plantilla › Nuevo»: una sola dropzone. Al soltar
+ *  el archivo, olfatea los headers y despacha al flujo correcto SIN tocar la
+ *  lógica de ninguno — los tres caminos ya no se nombran en pantalla:
+ *   · Reebok = headers Book4 (PO NAME + New Article + WholesalePrice).
+ *   · Facturas Tienda = .csv (';') o la factura/reporte que reconoce
+ *     detectFactura (4-sep-2026 — antes era una pestaña propia).
+ *   · Todo lo demás = CK/TH/KL (DepuradorClient). */
 export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -34,15 +42,23 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
     setBusy(true);
     setError("");
     try {
+      // El CSV (';') solo lo come Facturas Tienda: no hace falta abrirlo.
+      if (/\.csv$/i.test(f.name)) {
+        setKind("tienda");
+        setFile(f);
+        return;
+      }
       const XLSX = (await import("xlsx-js-style")).default;
       const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
       const { findHeaderRow } = await import("@/lib/depurador/reebok");
-      let isReebok = false;
+      const { detectFactura } = await import("@/lib/depurador/tienda");
+      let detected: Kind = "ckth";
       for (const sn of wb.SheetNames) {
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null }) as SheetRow[];
-        if (findHeaderRow(rows) !== -1) { isReebok = true; break; }
+        if (findHeaderRow(rows) !== -1) { detected = "reebok"; break; }
+        if (detectFactura(rows)) { detected = "tienda"; break; }
       }
-      setKind(isReebok ? "reebok" : "ckth");
+      setKind(detected);
       setFile(f);
     } catch {
       // Si no se puede leer, deja que el flujo CK/TH muestre su propio error.
@@ -60,11 +76,9 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
   };
 
   if (file) {
-    return kind === "reebok" ? (
-      <ReebokClient injectedFile={file} onReset={back} />
-    ) : (
-      <DepuradorClient injectedFile={file} onReset={back} onDownloaded={onDownloaded} />
-    );
+    if (kind === "reebok") return <ReebokClient injectedFile={file} onReset={back} onDownloaded={onDownloaded} />;
+    if (kind === "tienda") return <FacturasTiendaClient injectedFile={file} onReset={back} onDownloaded={onDownloaded} />;
+    return <DepuradorClient injectedFile={file} onReset={back} onDownloaded={onDownloaded} />;
   }
 
   return (
@@ -89,7 +103,7 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
             <input
               ref={inputRef}
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.csv"
               className="hidden"
               onChange={(e) => { if (e.target.files?.[0]) detect(e.target.files[0]); }}
             />

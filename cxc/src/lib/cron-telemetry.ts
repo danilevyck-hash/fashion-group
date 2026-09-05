@@ -511,6 +511,11 @@ export const SEED_TOLERANT_CRONS = [
   // 3-ago-2026: seed-tolerante hasta que siembre su fila. Promover a
   // CRONS_FAIL_CLOSED cuando lleve días corriendo.
   "guias-pendientes",
+  // Limpieza de los Excel del Historial del Depurador a los 90 días (03:20
+  // UTC; solo DB + Storage, no toca Switch). 🔴 Borra el ARCHIVO, nunca la
+  // fila con los totales. Desplegado el 4-sep-2026: seed-tolerante hasta que
+  // siembre su fila; promover a CRONS_FAIL_CLOSED cuando lleve días corriendo.
+  "cleanup-depurador-archivos",
   // Snapshot de catálogo del tab Ventas › Referencia (3 entradas de 2 empresas,
   // 04:30/04:40/04:50 UTC — ver SWITCH_CRON_ENTRADAS). Desplegado el
   // 10-ago-2026: seed-tolerante hasta que siembre su fila. Las 3 entradas

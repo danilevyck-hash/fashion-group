@@ -343,8 +343,11 @@ describe("Reebok — sin columna de mes NO se entrega un Excel vacío", () => {
     expect(src).toMatch(/const filtrarSinPiezas = monthColIdx !== -1;/);
     // Sin resultados tras filtrar → no se puede descargar.
     expect(src).toMatch(/const quedoVacio = filtrarSinPiezas && vista\.articulos === 0;/);
-    expect(src).toMatch(/disabled=\{!!downloading \|\| quedoVacio\}/);
+    // Desde el 4-sep-2026 la descarga también se apaga con un divisor fuera de
+    // rango (mismo guard de CK/TH) — el candado exige los DOS bloqueos.
+    expect(src).toMatch(/disabled=\{!!downloading \|\| quedoVacio \|\| divisorBloqueaDescarga\}/);
     expect(src).toMatch(/if \(!items \|\| downloading \|\| quedoVacio\) return;/);
+    expect(src).toMatch(/if \(divisorBloqueaDescarga\) return;/);
   });
 });
 

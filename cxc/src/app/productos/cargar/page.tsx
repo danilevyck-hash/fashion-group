@@ -1,41 +1,25 @@
 "use client";
 
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import DepuradorDispatcher from "./DepuradorDispatcher";
 import MiExcelFotosClient from "./MiExcelFotosClient";
-import FacturasTiendaClient from "./FacturasTiendaClient";
 import HistorialView from "./HistorialView";
 import FormulasConfig from "./FormulasConfig";
 import ReglasView from "./ReglasView";
 import CurvasView from "./CurvasView";
 import CatalogoDescripcionesAdmin from "./CatalogoDescripcionesAdmin";
+import { PESTANAS, VISTAS_POR_TAB, resolverTab, type Tab, type Vista } from "./pestanas";
 
-type Tab = "depurador" | "misfotos" | "facturas" | "curvas" | "formulas" | "reglas" | "historial";
 type FormulasScope = "depurador" | "tienda";
-
-/** Las pestañas, en UN solo lugar: las dibujan tanto el desplegable (angosto)
- *  como la fila de píldoras (≥lg), y no pueden desincronizarse. Las etiquetas
- *  son EXACTAMENTE las que ya estaban en pantalla.
- *
- *  "Fotos a mi Excel" es un camino APARTE (14-ago-2026): no reemplaza al pedido
- *  de Reebok, que sigue igual en "Depurador". */
-const PESTANAS: { id: Tab; label: string }[] = [
-  { id: "depurador", label: "Depurador" },
-  { id: "misfotos", label: "Fotos a mi Excel" },
-  { id: "facturas", label: "Facturas Tienda" },
-  { id: "curvas", label: "Tallas" },
-  { id: "formulas", label: "Fórmulas por marca" },
-  { id: "reglas", label: "Reglas" },
-  { id: "historial", label: "Historial" },
-];
 
 /**
  * Las pestañas en celular e iPad vertical: un botón que dice en cuál estás y
- * despliega las 6.
+ * despliega las 3.
  *
  * El panel es `<DesplegableFlotante>` (portal a <body> + `position: fixed`),
  * que es EL desplegable de la casa: un panel `absolute` acá lo recortaría el
@@ -112,101 +96,139 @@ export default function CargarProductosPage() {
 
 function CargarInner() {
   const { authChecked, role } = useAuth({ moduleKey: "cargar", allowedRoles: ["admin", "secretaria"] });
-  // La pestaña vive en la URL (?tab=historial) → refresh y compartir-link
-  // conservan la vista. Tab del MISMO nivel → replace (default): el Atrás del
-  // navegador no cicla por pestañas (convención del sistema). Un valor
-  // desconocido en la URL cae en la pestaña por defecto, nunca en blanco.
-  const [tabRaw, setTab] = useUrlState<Tab>("tab", "depurador");
-  const tab: Tab = PESTANAS.some((p) => p.id === tabRaw) ? tabRaw : "depurador";
-  const [formulasScope, setFormulasScope] = useState<FormulasScope>("depurador");
+  // La pestaña y la vista viven en la URL (?tab= y ?vista=) → refresh y
+  // compartir-link conservan lo que se ve. Tab/vista del MISMO nivel → replace
+  // (default): el Atrás del navegador no cicla por pestañas (convención del
+  // sistema). Un valor desconocido cae en la pestaña por defecto, nunca en
+  // blanco — y un ?tab= VIEJO (depurador, misfotos, historial…) redirige a su
+  // pestaña nueva para no romper enlaces guardados (resolverTab, pestanas.ts).
+  const [tabRaw, setTab] = useUrlState<Tab>("tab", "plantilla");
+  const [vistaRaw, setVista] = useUrlState("vista", "");
+  const esAdmin = role === "admin";
+  const { tab, vista, redirigido } = resolverTab(tabRaw, vistaRaw, esAdmin);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // El ?tab= viejo se reescribe en la URL (UN solo replace, con tab y vista
+  // juntos: dos setValue seguidos se pisarían — cada uno parte de los params
+  // del render) para que el enlace que se copie ya sea el nuevo.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (!redirigido) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    if (vista !== VISTAS_POR_TAB[tab][0].id) params.set("vista", vista);
+    else params.delete("vista");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [redirigido]);
 
   if (!authChecked) return null;
 
+  const cambiarVista = (v: Vista) => setVista(v);
+
   // Registra la carga en el server al descargar (lo único que toca backend).
+  // Desde el 4-sep-2026 viaja también EL ARCHIVO descargado (los mismos bytes),
+  // que queda 90 días en Storage para poder volver a bajarlo del Historial.
+  // 🔴 SOLO los Excel de Switch llegan acá: el pedido para cliente de Reebok,
+  // Tallas y Fotos a mi Excel no llaman este callback.
   const handleDownloaded = async (payload: {
     empresa: string;
     marca: string;
     cantidad_estilos: number;
     total_unidades: number;
     total_costo: number;
+    archivo?: { blob: Blob; nombre: string };
   }) => {
     try {
-      await fetch("/api/productos/cargar/historial", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const fd = new FormData();
+      fd.set("empresa", payload.empresa);
+      fd.set("marca", payload.marca);
+      fd.set("cantidad_estilos", String(payload.cantidad_estilos));
+      fd.set("total_unidades", String(payload.total_unidades));
+      fd.set("total_costo", String(payload.total_costo));
+      if (payload.archivo) fd.set("archivo", payload.archivo.blob, payload.archivo.nombre);
+      await fetch("/api/productos/cargar/historial", { method: "POST", body: fd });
       setRefreshKey((k) => k + 1);
     } catch {
       // El historial es secundario: si falla el registro, la descarga ya ocurrió.
     }
   };
 
+  const vistas = VISTAS_POR_TAB[tab].filter((v) => !v.soloAdmin || esAdmin);
+
   return (
     <div className="min-h-screen bg-stone-50">
       <AppHeader module="Depurador" />
 
       <div className="mx-auto max-w-5xl px-4 pt-4">
-        {/* ── 🩸 LAS 6 PESTAÑAS, MEDIDAS (30-jul-2026, build de producción) ──
-            Antes esto era UNA fila con `overflow-x-auto`. Arrastraba 295px a
-            390 y 75px a 834: de las 6 pestañas se veían ~3, y **Fórmulas por
-            marca, Reglas e Historial solo existían si uno adivinaba que la fila
-            se arrastra de costado**. Es EL MISMO caso que los filtros del
-            catálogo Tommy (10 de 15 opciones invisibles), y se resuelve igual:
-            hasta `lg`, un DESPLEGABLE; de `lg` para arriba, la fila intacta.
-
-            El corte es `lg` (1024) y está MEDIDO, no elegido: a 1024 la fila ya
-            daba 0px de arrastre antes de tocar nada. */}
+        {/* ── 🩸 Las pestañas, MEDIDAS (30-jul-2026, build de producción) ──
+            Hasta `lg`, un DESPLEGABLE; de `lg` para arriba, la fila de
+            píldoras. El corte es `lg` (1024) y está MEDIDO, no elegido. Con 3
+            pestañas la fila entra sobrada, pero el patrón se conserva: es el
+            de toda la casa y el candado `depurador-reclamos-datahealth-anchos`
+            lo exige. */}
         <SelectorPestanas tab={tab} onChange={setTab} />
 
-        {/* ≥lg: la misma fila de siempre. No se le tocó una sola clase salvo el
-            `hidden lg:flex` que la esconde en angosto. */}
+        {/* ≥lg: la fila de píldoras de siempre, ahora con 3. */}
         <div className="hidden lg:flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {PESTANAS.map(p => (
             <TabBtn key={p.id} active={tab === p.id} onClick={() => setTab(p.id)}>{p.label}</TabBtn>
           ))}
         </div>
+
+        {/* Vistas de la pestaña activa (Nuevo/Historial, Tallas/Fotos,
+            Fórmulas/Descripciones/Reglas), en TODOS los anchos. */}
+        {vistas.length > 1 && (
+          <div className="mt-3 flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {vistas.map((v) => (
+              <TabBtn key={v.id} active={vista === v.id} onClick={() => cambiarVista(v.id)}>{v.label}</TabBtn>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Depurador SIEMPRE montado (solo oculto) para que el Excel cargado y sus
-          ediciones sobrevivan al cambiar de pestaña (FIX 1). El dispatcher detecta
-          CK/TH vs Reebok y aplica el flujo correcto en el mismo tab. */}
-      <div className={tab === "depurador" ? "" : "hidden"}>
+      {/* Los caminos con archivo cargado quedan SIEMPRE montados (solo ocultos)
+          para que el Excel y sus ediciones sobrevivan al cambiar de pestaña o
+          de vista (FIX 1). El dispatcher reconoce el formato (CK/TH, Reebok o
+          Facturas Tienda) en la misma dropzone — los caminos ya no se nombran. */}
+      <div className={tab === "plantilla" && vista === "nuevo" ? "" : "hidden"}>
         <DepuradorDispatcher onDownloaded={handleDownloaded} />
       </div>
-      {/* "Fotos a mi Excel" también queda montada (oculta): el archivo subido y la
-          carpeta elegida sobreviven al cambiar de pestaña — mismo criterio que
-          el Depurador. */}
-      <div className={tab === "misfotos" ? "" : "hidden"}>
-        <MiExcelFotosClient />
-      </div>
-      {/* Facturas Tienda también queda montada (oculta) para no perder la factura
-          cargada al cambiar de pestaña — mismo criterio que el Depurador. */}
-      <div className={tab === "facturas" ? "" : "hidden"}>
-        <FacturasTiendaClient onDownloaded={handleDownloaded} />
-      </div>
-      {/* Curvas también queda montada (oculta) para no perder el archivo cargado
-          al cambiar de pestaña — mismo criterio que el Depurador. */}
-      <div className={tab === "curvas" ? "" : "hidden"}>
+      {tab === "plantilla" && vista === "historial" && <HistorialView refreshKey={refreshKey} />}
+
+      <div className={tab === "tallas" && vista === "curvas" ? "" : "hidden"}>
         <CurvasView />
       </div>
-      {tab === "formulas" && (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
-          {/* Dos sets de fórmulas: Depurador (importación) y Tienda (Facturas Tienda).
-              key={scope} remonta el componente para re-sembrar el catálogo. */}
-          <div className="flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <TabBtn active={formulasScope === "depurador"} onClick={() => setFormulasScope("depurador")}>Depurador (importación)</TabBtn>
-            <TabBtn active={formulasScope === "tienda"} onClick={() => setFormulasScope("tienda")}>Tienda (facturas)</TabBtn>
-          </div>
-        </div>
-      )}
-      {tab === "formulas" && <FormulasConfig key={formulasScope} scope={formulasScope} />}
+      <div className={tab === "tallas" && vista === "misfotos" ? "" : "hidden"}>
+        <MiExcelFotosClient />
+      </div>
+
+      {tab === "config" && vista === "formulas" && <FormulasScopeRow />}
       {/* Catálogo de descripciones (tabla depurador_descripciones) — SOLO admin. */}
-      {tab === "formulas" && role === "admin" && <CatalogoDescripcionesAdmin />}
-      {tab === "reglas" && <ReglasView />}
-      {tab === "historial" && <HistorialView refreshKey={refreshKey} />}
+      {tab === "config" && vista === "descripciones" && esAdmin && <CatalogoDescripcionesAdmin />}
+      {tab === "config" && vista === "reglas" && <ReglasView />}
     </div>
+  );
+}
+
+/** El selector de ámbito de fórmulas (Importación / Tienda, los dos que ya
+ *  existían) + el FormulasConfig que le corresponde. El scope es estado LOCAL
+ *  de la vista (no va a la URL). key={scope} remonta el componente para
+ *  re-sembrar el catálogo. */
+function FormulasScopeRow() {
+  const [formulasScope, setFormulasScope] = useState<FormulasScope>("depurador");
+  return (
+    <>
+      <div className="mx-auto max-w-4xl px-4 pt-4">
+        <div className="flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabBtn active={formulasScope === "depurador"} onClick={() => setFormulasScope("depurador")}>Depurador (importación)</TabBtn>
+          <TabBtn active={formulasScope === "tienda"} onClick={() => setFormulasScope("tienda")}>Tienda (facturas)</TabBtn>
+        </div>
+      </div>
+      <FormulasConfig key={formulasScope} scope={formulasScope} />
+    </>
   );
 }
 
@@ -214,11 +236,10 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   return (
     <button
       onClick={onClick}
-      // 🩸 El relleno baja a `px-2.5` hasta `xl`: con la pestaña nueva ("Fotos a
-      // mi Excel") la fila pasó de 6 a 7 y a 1024 px —el iPad ACOSTADO, que es
-      // justo donde arranca este layout— desbordaba 24 px, o sea que la última
-      // pestaña quedaba fuera de la pantalla. Medido: con `px-2.5` da 0.
-      // Desde `xl` sobra ancho y vuelve el relleno de siempre.
+      // 🩸 El relleno baja a `px-2.5` hasta `xl` (medido cuando la fila tenía 7
+      // pestañas y desbordaba 24 px a 1024). Con 3 pestañas sobra el ancho,
+      // pero la regla de verdad —44 px de alto, sin comprimirse, sin partir el
+      // texto— se queda tal cual (candado iphone-targets-operacion).
       className={`shrink-0 whitespace-nowrap rounded-md px-2.5 xl:px-4 min-h-[44px] text-sm font-medium transition ${
         active ? "bg-teal-600 text-white" : "text-stone-600 hover:bg-stone-100"
       }`}

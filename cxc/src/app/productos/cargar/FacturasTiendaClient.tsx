@@ -22,6 +22,8 @@ import {
   type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
 import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
+import { mensajeDivisorEnPantalla } from "@/lib/depurador/divisor";
+import { saveAs } from "file-saver";
 import AlarmaDescripcionesNuevas from "./AlarmaDescripcionesNuevas";
 import {
   EMPRESAS_TIENDA,
@@ -40,20 +42,31 @@ import { Ayuda } from "@/components/shared/Ayuda";
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
 
 interface FacturasTiendaClientProps {
+  /** Historial: `archivo` son los MISMOS bytes que bajaron (xlsx o zip). */
   onDownloaded?: (payload: {
     empresa: string;
     marca: string;
     cantidad_estilos: number;
     total_unidades: number;
     total_costo: number;
+    archivo?: { blob: Blob; nombre: string };
   }) => void;
+  /** Archivo inyectado por el dispatcher (la dropzone única de «Plantilla»).
+   *  Si viene, se oculta la dropzone propia y se procesa automáticamente. */
+  injectedFile?: File | null;
+  /** Volver a la dropzone del dispatcher. */
+  onReset?: () => void;
 }
 
-export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaClientProps) {
+export default function FacturasTiendaClient({ onDownloaded, injectedFile, onReset }: FacturasTiendaClientProps) {
   const now = new Date();
+  const embedded = injectedFile !== undefined;
   const inputRef = useRef<HTMLInputElement>(null);
   // Filas crudas del archivo, para reprocesar al cambiar mes/año (formato A).
   const rawRef = useRef<SheetRow[] | null>(null);
+  // Último archivo inyectado ya procesado (evita reprocesar cuando el catálogo
+  // cambia, p.ej. al aprobar una descripción).
+  const injectedProcesado = useRef<File | null>(null);
 
   const [fileName, setFileName] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -152,6 +165,16 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
     [runRows, temporadaFallback, catalogo]
   );
 
+  // Modo dispatcher: procesar el archivo inyectado automáticamente. Espera a
+  // que el catálogo esté cargado (mismo criterio que el Depurador CK/TH).
+  useEffect(() => {
+    if (injectedFile && catalogo && injectedProcesado.current !== injectedFile) {
+      injectedProcesado.current = injectedFile;
+      handleFile(injectedFile);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [injectedFile, catalogo]);
+
   // Reprocesar al cambiar mes/año (solo afecta facturas sin FECHA).
   const reprocess = (patch: Partial<{ mesIdx: number; anio: string }>) => {
     const m = patch.mesIdx ?? mesIdx;
@@ -169,12 +192,14 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
 
   const reset = () => {
     rawRef.current = null;
+    injectedProcesado.current = null;
     setResult(null);
     setRows([]);
     setError("");
     setFileName("");
     setPriceEdits({});
     if (inputRef.current) inputRef.current.value = "";
+    onReset?.(); // en modo dispatcher, volver a la dropzone compartida
   };
 
   const onMarcaChange = (idx: number, marca: string) =>
@@ -217,9 +242,27 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
   const onMarcaFormChange = (key: string, patch: Partial<MarcaFormula>) =>
     setMarcaForms((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
 
+  // ── Validación del divisor EN LA PANTALLA (4-sep-2026) ─────────────────────
+  // El MISMO guard de las rutas API (validarDivisor, vía
+  // mensajeDivisorEnPantalla — cero copias), igual que en CK/TH: campo rojo,
+  // mensaje y la DESCARGA apagada, nunca el tecleo. Las fórmulas por marca
+  // alimentan el precio EN VIVO, así que cualquiera fuera de rango bloquea.
+  const marcasDivisorMsg = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const { key } of marcasPresentes) {
+      const f = marcaForms[key];
+      if (!f) continue;
+      const msg = mensajeDivisorEnPantalla(String(f.divisor));
+      if (msg) out[key] = msg;
+    }
+    return out;
+  }, [marcasPresentes, marcaForms]);
+  const divisorBloqueaDescarga = Object.keys(marcasDivisorMsg).length > 0;
+
   const saveMarca = async (key: string) => {
     const f = marcaForms[key];
     if (!f || savingMarca) return;
+    if (marcasDivisorMsg[key]) return; // un divisor fuera de rango no se guarda
     setSavingMarca(key);
     try {
       const res = await fetch("/api/productos/cargar/tienda-formulas", {
@@ -295,6 +338,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
   const download = async () => {
     if (!result || rows.length === 0 || downloading || !catalogo) return;
     if (result.bloqueos.length > 0) return; // bloqueado hasta aprobar las descripciones nuevas
+    if (divisorBloqueaDescarga) return; // 🔴 un divisor fuera de rango no baja un Excel 100× mal
     setDownloading(true);
     try {
       const XLSX = (await import("xlsx-js-style")).default;
@@ -326,8 +370,17 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
         return wb;
       };
 
+      // 🔴 UNA sola escritura por archivo: lo que baja al disco y lo que guarda
+      // el Historial son los MISMOS bytes (xlsx suelto o zip, según salga).
+      let archivo: { blob: Blob; nombre: string };
       if (chunks.length === 1) {
-        XLSX.writeFile(buildWorkbook(chunks[0]), `PLANT_TIENDA_${temporada}.xlsx`);
+        const data = XLSX.write(buildWorkbook(chunks[0]), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+        const copia = new ArrayBuffer(data.byteLength);
+        new Uint8Array(copia).set(new Uint8Array(data));
+        archivo = {
+          blob: new Blob([copia], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+          nombre: `PLANT_TIENDA_${temporada}.xlsx`,
+        };
       } else {
         const JSZip = (await import("jszip")).default;
         const zip = new JSZip();
@@ -335,16 +388,12 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
           const data = XLSX.write(buildWorkbook(chunk), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
           zip.file(`PLANT_TIENDA_${temporada}_${i + 1}de${chunks.length}.xlsx`, data);
         });
-        const blob = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `PLANT_TIENDA_${temporada}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
+        archivo = {
+          blob: await zip.generateAsync({ type: "blob" }),
+          nombre: `PLANT_TIENDA_${temporada}.zip`,
+        };
       }
+      saveAs(archivo.blob, archivo.nombre);
 
       if (onDownloaded) {
         const totalUnidades = finalRows.reduce((s, r) => s + (Number(r.cols["Stock Ideal"]) || 0), 0);
@@ -352,12 +401,15 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
           (s, r) => s + (Number(r.cols["Costo FOB *"]) || 0) * (Number(r.cols["Stock Ideal"]) || 0),
           0
         );
+        // «Multifashion» y no «Facturas Tienda»: la compañía real, para que el
+        // filtro por compañía del Historial la encuentre (4-sep-2026).
         onDownloaded({
-          empresa: "Facturas Tienda",
+          empresa: "Multifashion",
           marca: marcasPresentes.map((m) => m.label).join(", ").slice(0, 120),
           cantidad_estilos: finalRows.length,
           total_unidades: totalUnidades,
           total_costo: Math.round(totalCosto * 100) / 100,
+          archivo,
         });
       }
     } finally {
@@ -415,7 +467,17 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
         </div>
       )}
 
-      {/* Drop zone */}
+      {/* Compañía reconocida por el formato (modo dispatcher): la factura de
+          tienda siempre es Multifashion. */}
+      {embedded && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-[13px] text-teal-900">
+          <span className="rounded bg-teal-600 px-1.5 py-0.5 text-[12px] font-bold text-white">MULTIFASHION</span>
+          <span>Detecté una factura de tienda. <b>{fileName}</b></span>
+        </div>
+      )}
+
+      {/* Drop zone (oculta en modo dispatcher: el padre tiene la dropzone) */}
+      {!embedded && (
       <label
         onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -446,6 +508,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
           onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}
         />
       </label>
+      )}
 
       {/* Temporada manual (la usa la factura .xls, que no trae FECHA) */}
       {(!result || result.sinFecha) && (
@@ -525,7 +588,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
             </span>
             <button
               onClick={download}
-              disabled={downloading || bloqueos.length > 0 || !catalogo}
+              disabled={downloading || bloqueos.length > 0 || !catalogo || divisorBloqueaDescarga}
               className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
             >
               {downloading ? "Generando…" : archivos > 1 ? "Descargar ZIP" : "Descargar plantilla"}
@@ -590,6 +653,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
                   {marcasPresentes.map(({ key, label }) => {
                     const f = marcaForms[key] ?? { ...BLANK_FORMULA, marca: label };
                     const saved = savedByNorm.has(key);
+                    const divisorMsg = marcasDivisorMsg[key] ?? null;
                     return (
                       <tr key={key}>
                         <td className="border-b border-stone-100 px-2.5 py-2 font-semibold text-stone-900">{label}</td>
@@ -598,12 +662,19 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
                             ? <span className="rounded bg-emerald-50 px-2 py-0.5 text-[12px] font-semibold text-emerald-700">Guardada</span>
                             : <span className="rounded bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-700">Sin guardar</span>}
                         </td>
-                        <td className="border-b border-stone-100 px-2.5 py-2">
+                        <td className="border-b border-stone-100 px-2.5 py-2 align-top">
                           <input
                             type="number" step="0.01" value={f.divisor || ""}
+                            aria-label={`Divisor ${label}`}
+                            aria-invalid={divisorMsg !== null}
                             onChange={(e) => onMarcaFormChange(key, { divisor: Number(e.target.value) || 0 })}
-                            className={miniInputCls}
+                            className={divisorMsg !== null
+                              ? `${miniInputCls} border-red-400 bg-red-50 text-red-900 focus:border-red-500 focus:ring-red-500/20`
+                              : miniInputCls}
                           />
+                          {divisorMsg !== null && (
+                            <div className="mt-1 max-w-[220px] text-[12px] font-semibold text-red-700">{divisorMsg}</div>
+                          )}
                         </td>
                         <td className="border-b border-stone-100 px-2.5 py-2">
                           <select value={f.extra} onChange={(e) => onMarcaFormChange(key, { extra: parseInt(e.target.value) })} className={miniSelectCls}>
@@ -619,7 +690,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
                         </td>
                         <td className="border-b border-stone-100 px-2.5 py-2">
                           <button
-                            type="button" onClick={() => saveMarca(key)} disabled={savingMarca === key}
+                            type="button" onClick={() => saveMarca(key)} disabled={savingMarca === key || divisorMsg !== null}
                             className="text-[12px] font-semibold text-teal-700 transition hover:text-teal-900 disabled:opacity-50"
                           >
                             {savingMarca === key ? "Guardando…" : saved ? "Guardar cambios" : "Guardar fórmula"}

@@ -26,8 +26,10 @@ import {
   type PrecioAB,
   type PriceFormula,
 } from "@/lib/depurador/reebok";
-import { marcaKey, type Redondeo, type MarcaFormula, type MarcaRubroFormula } from "@/lib/depurador/logic";
+import { marcaKey, computeTotales, type Redondeo, type MarcaFormula, type MarcaRubroFormula } from "@/lib/depurador/logic";
 import type { SheetRow } from "@/lib/depurador/logic";
+import { mensajeDivisorEnPantalla } from "@/lib/depurador/divisor";
+import { hoyPanama } from "@/lib/fecha-panama";
 import {
   indexarFotos,
   parearFotos,
@@ -50,9 +52,20 @@ interface ReebokClientProps {
   injectedFile?: File | null;
   /** Volver a la dropzone del dispatcher. */
   onReset?: () => void;
+  /** Historial (4-sep-2026): 🔴 SOLO lo llama la Plantilla Switch — el pedido
+   *  para cliente NO se guarda (Daniel: «el historial solo quiero los excel
+   *  para switch»). `archivo` son los mismos bytes que bajaron al disco. */
+  onDownloaded?: (payload: {
+    empresa: string;
+    marca: string;
+    cantidad_estilos: number;
+    total_unidades: number;
+    total_costo: number;
+    archivo?: { blob: Blob; nombre: string };
+  }) => void;
 }
 
-export default function ReebokClient({ injectedFile, onReset }: ReebokClientProps = {}) {
+export default function ReebokClient({ injectedFile, onReset, onDownloaded }: ReebokClientProps = {}) {
   const fileRef = useRef<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const embedded = injectedFile !== undefined;
@@ -95,12 +108,9 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   const [fotoProgreso, setFotoProgreso] = useState<{ hechas: number; total: number } | null>(null);
   const [resumenFotos, setResumenFotos] = useState<string>("");
 
-  // Temporada automática: fecha actual, día 1 del mes en curso, formato AAAA-MM
-  // (idéntico a CK/TH → logic.ts). Sin campo manual.
-  const temporada = useMemo(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  }, []);
+  // Temporada automática: el mes ACTUAL de Panamá (UTC−5, no el reloj del
+  // navegador), formato AAAA-MM (idéntico a CK/TH). Sin campo manual.
+  const temporada = useMemo(() => hoyPanama().slice(0, 7), []);
 
   // Cargar fórmulas guardadas de Reebok (si existen). Default = equivalente histórico.
   useEffect(() => {
@@ -263,6 +273,23 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   // Se filtró y no quedó nada: entregar un Excel vacío en silencio sería lo peor.
   const quedoVacio = filtrarSinPiezas && vista.articulos === 0;
 
+  // ── Validación del divisor EN LA PANTALLA (4-sep-2026) ─────────────────────
+  // El MISMO guard de las rutas API (validarDivisor, vía
+  // mensajeDivisorEnPantalla — cero copias), igual que en CK/TH: campo rojo,
+  // mensaje y la DESCARGA apagada, nunca el tecleo. Las fórmulas A/B alimentan
+  // el Excel EN VIVO (sin guardar), así que bloquean según la salida: el
+  // pedido lleva Precio A y B (los dos); la plantilla Switch, solo el elegido.
+  const msgFormulaA = mensajeDivisorEnPantalla(String(formulaA.divisor || ""));
+  const msgFormulaB = mensajeDivisorEnPantalla(String(formulaB.divisor || ""));
+  const divisorBloqueaDescarga =
+    salida === "catalogo"
+      ? msgFormulaA !== null || msgFormulaB !== null
+      : (precioAB === "A" ? msgFormulaA : msgFormulaB) !== null;
+  // El borrador de una excepción por Name no alimenta el Excel hasta GUARDARSE
+  // (los builders leen solo las guardadas): su divisor malo apaga SU «Guardar».
+  const msgDeName = (r: { modo: NameMode; divisor: number }): string | null =>
+    r.modo === "formula" ? mensajeDivisorEnPantalla(String(r.divisor || "")) : null;
+
   // Índice de la carpeta: solo NOMBRES, no se lee el contenido de ningún archivo
   // (la carpeta real son 4.742 fotos y ~800 MB).
   const fotosIndice = useMemo(
@@ -307,6 +334,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   const saveName = async (name: string) => {
     if (savingName) return;
     const r = nameRowFor(name);
+    if (msgDeName(r) !== null) return; // un divisor fuera de rango no se guarda
     setSavingName(name);
     try {
       const tieneFijo = r.modo === "fijo" && r.precioFijo != null && r.precioFijo > 0;
@@ -341,6 +369,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   // Guardar una fórmula Reebok en el sistema de fórmulas por marca.
   const saveFormula = async (which: PrecioAB) => {
     if (savingF) return;
+    if ((which === "A" ? msgFormulaA : msgFormulaB) !== null) return; // fuera de rango: no se guarda
     const marca = which === "A" ? REEBOK_MARCA_A : REEBOK_MARCA_B;
     const f = which === "A" ? formulaA : formulaB;
     setSavingF(which);
@@ -382,6 +411,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   // no puede cambiar el archivo que el Depurador ya entrega.
   const downloadCatalogo = async () => {
     if (!items || downloading || quedoVacio) return;
+    if (divisorBloqueaDescarga) return; // 🔴 un divisor fuera de rango no baja un Excel 100× mal
     setDownloading("catalogo");
     const nombre = `Pedido_ActiveShoes_${monthLabel || temporada}.xlsx`;
     try {
@@ -450,6 +480,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   // Salida B — Plantilla Switch (una fila por artículo).
   const downloadSwitch = async () => {
     if (!items || downloading || quedoVacio) return;
+    if (divisorBloqueaDescarga) return; // 🔴 un divisor fuera de rango no baja un Excel 100× mal
     setDownloading("switch");
     try {
       const XLSX = (await import("xlsx-js-style")).default;
@@ -460,7 +491,28 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
       ws["!cols"] = aoa[0].map((_c, i) => ({ wch: i === 3 ? 26 : i < 3 ? 16 : 13 }));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "upload");
-      XLSX.writeFile(wb, `Plantilla_Switch_ActiveShoes_${temporada}.xlsx`);
+      // 🔴 UNA sola escritura: lo que baja al disco y lo que guarda el
+      // Historial son los MISMOS bytes.
+      const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+      const copia = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(copia).set(new Uint8Array(bytes));
+      const nombre = `Plantilla_Switch_ActiveShoes_${temporada}.xlsx`;
+      const blob = new Blob([copia], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      saveAs(blob, nombre);
+      // Historial: SOLO la plantilla Switch (el pedido para cliente no se guarda).
+      if (onDownloaded) {
+        const t = computeTotales(switchRows);
+        onDownloaded({
+          empresa: "Active Shoes",
+          marca: t.marca || "Reebok",
+          cantidad_estilos: t.cantidad_estilos,
+          total_unidades: t.total_unidades,
+          total_costo: t.total_costo,
+          archivo: { blob, nombre },
+        });
+      }
     } finally {
       setDownloading("");
     }
@@ -605,8 +657,8 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
             <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
               Fórmulas de precio (se guardan y se reusan)
             </div>
-            <FormulaRow label="Precio A" f={formulaA} onChange={setFormulaA} onSave={() => saveFormula("A")} saving={savingF === "A"} flashed={flashF === "A"} />
-            <FormulaRow label="Precio B" f={formulaB} onChange={setFormulaB} onSave={() => saveFormula("B")} saving={savingF === "B"} flashed={flashF === "B"} />
+            <FormulaRow label="Precio A" f={formulaA} onChange={setFormulaA} onSave={() => saveFormula("A")} saving={savingF === "A"} flashed={flashF === "A"} divisorMsg={msgFormulaA} />
+            <FormulaRow label="Precio B" f={formulaB} onChange={setFormulaB} onSave={() => saveFormula("B")} saving={savingF === "B"} flashed={flashF === "B"} divisorMsg={msgFormulaB} />
           </div>
 
           {/* Excepciones por modelo (Name): fórmula propia o precio fijo (gana a la marca) */}
@@ -644,6 +696,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
                   </div>
                   {namesFiltered.map((name) => {
                     const r = nameRowFor(name);
+                    const nameMsg = msgDeName(r);
                     return (
                       <div key={name} className={`grid grid-cols-[minmax(0,1fr)_92px_70px_54px_86px_72px] items-center gap-2 px-1 py-0.5 ${r.propia ? "bg-red-50/40" : "hover:bg-stone-50"}`}>
                         <span className={`truncate text-[13px] ${r.fija ? "font-semibold text-red-700" : r.propia ? "font-medium text-red-600" : "text-stone-700"}`} title={name}>
@@ -659,8 +712,17 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
                             onChange={(e) => patchName(name, { precioFijo: e.target.value === "" ? null : Number(e.target.value) })}
                             className={`${miniInputCls} w-full border-red-300 text-left`} />
                         ) : (
-                          <input type="number" step="0.01" value={r.divisor || ""} placeholder="—" aria-label={`Divisor ${name}`}
-                            onChange={(e) => patchName(name, { divisor: Number(e.target.value) || 0 })} className={`${miniInputCls} w-full`} />
+                          <div>
+                            <input type="number" step="0.01" value={r.divisor || ""} placeholder="—" aria-label={`Divisor ${name}`}
+                              aria-invalid={nameMsg !== null}
+                              onChange={(e) => patchName(name, { divisor: Number(e.target.value) || 0 })}
+                              className={nameMsg !== null
+                                ? `${miniInputCls} w-full border-red-400 bg-red-50 text-red-900 focus:border-red-500 focus:ring-red-500/20`
+                                : `${miniInputCls} w-full`} />
+                            {nameMsg !== null && (
+                              <div className="mt-0.5 text-[12px] font-semibold text-red-700">{nameMsg}</div>
+                            )}
+                          </div>
                         )}
                         {r.modo === "fijo" ? <span /> : (
                           <select value={r.extra} onChange={(e) => patchName(name, { extra: parseInt(e.target.value) })} className={`${miniSelectCls} w-full`} aria-label={`Extra ${name}`}>
@@ -675,7 +737,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
                           </select>
                         )}
                         <span className="whitespace-nowrap">
-                          <button type="button" onClick={() => saveName(name)} disabled={savingName === name}
+                          <button type="button" onClick={() => saveName(name)} disabled={savingName === name || nameMsg !== null}
                             className="rounded-md px-1.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50">
                             {savingName === name ? "…" : r.dirty ? "Guardar" : "✓"}
                           </button>
@@ -794,7 +856,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
             <div className="ml-auto flex flex-wrap gap-2">
               <button
                 onClick={handleDownload}
-                disabled={!!downloading || quedoVacio}
+                disabled={!!downloading || quedoVacio || divisorBloqueaDescarga}
                 className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
               >
                 {fotoProgreso
@@ -915,35 +977,47 @@ const miniInputCls =
 const miniSelectCls =
   "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-[13px] text-stone-900 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20";
 
-function FormulaRow({ label, f, onChange, onSave, saving, flashed }: {
+function FormulaRow({ label, f, onChange, onSave, saving, flashed, divisorMsg }: {
   label: string; f: PriceFormula; onChange: (f: PriceFormula) => void;
   onSave: () => void; saving: boolean; flashed: boolean;
+  /** Mensaje del guard del divisor (mensajeDivisorEnPantalla). null = válido. */
+  divisorMsg: string | null;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 py-1.5">
-      <span className="w-20 text-[13px] font-semibold text-stone-900">{label}</span>
-      <label className="text-[11px] text-stone-500">÷</label>
-      <input
-        type="number" step="0.01" value={f.divisor || ""}
-        onChange={(e) => onChange({ ...f, divisor: Number(e.target.value) || 0 })}
-        className={miniInputCls} aria-label={`Divisor ${label}`}
-      />
-      <label className="ml-1 text-[11px] text-stone-500">+$</label>
-      <select value={f.extra} onChange={(e) => onChange({ ...f, extra: parseInt(e.target.value) })} className={miniSelectCls} aria-label={`Extra ${label}`}>
-        {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-      </select>
-      <select value={f.redondeo} onChange={(e) => onChange({ ...f, redondeo: e.target.value as Redondeo })} className={miniSelectCls} aria-label={`Redondeo ${label}`}>
-        <option value="int">Entero</option>
-        <option value="half">.50</option>
-        <option value="par">Par</option>
-      </select>
-      <button
-        type="button" onClick={onSave} disabled={saving}
-        className="rounded-md px-2.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
-      >
-        {saving ? "Guardando…" : "Guardar"}
-      </button>
-      {flashed && <span className="text-[11px] font-semibold text-emerald-600">✓</span>}
+    <div className="py-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="w-20 text-[13px] font-semibold text-stone-900">{label}</span>
+        <label className="text-[11px] text-stone-500">÷</label>
+        <input
+          type="number" step="0.01" value={f.divisor || ""}
+          aria-invalid={divisorMsg !== null}
+          onChange={(e) => onChange({ ...f, divisor: Number(e.target.value) || 0 })}
+          className={divisorMsg !== null
+            ? `${miniInputCls} border-red-400 bg-red-50 text-red-900 focus:border-red-500 focus:ring-red-500/20`
+            : miniInputCls}
+          aria-label={`Divisor ${label}`}
+        />
+        <label className="ml-1 text-[11px] text-stone-500">+$</label>
+        <select value={f.extra} onChange={(e) => onChange({ ...f, extra: parseInt(e.target.value) })} className={miniSelectCls} aria-label={`Extra ${label}`}>
+          {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select value={f.redondeo} onChange={(e) => onChange({ ...f, redondeo: e.target.value as Redondeo })} className={miniSelectCls} aria-label={`Redondeo ${label}`}>
+          <option value="int">Entero</option>
+          <option value="half">.50</option>
+          <option value="par">Par</option>
+        </select>
+        <button
+          type="button" onClick={onSave} disabled={saving || divisorMsg !== null}
+          className="rounded-md px-2.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+        >
+          {saving ? "Guardando…" : "Guardar"}
+        </button>
+        {flashed && <span className="text-[11px] font-semibold text-emerald-600">✓</span>}
+      </div>
+      {/* Fuera de rango: se dice y se apaga la descarga — el tecleo no se traba. */}
+      {divisorMsg !== null && (
+        <p className="mt-1 text-[12px] font-semibold text-red-700">{divisorMsg}</p>
+      )}
     </div>
   );
 }

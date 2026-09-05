@@ -12,6 +12,7 @@
 import { useMemo, useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { saveAs } from "file-saver";
+import { logActivityClient } from "@/lib/logActivityClient";
 import {
   indexarFotos,
   parearFotos,
@@ -140,6 +141,15 @@ export default function MiExcelFotosClient() {
       setResumen(
         `Listo · ${textoEmparejado(conFotoReal, filas.length)}${falladas} · el archivo pesa ${mb.toFixed(2)} MB · ${((Date.now() - t0) / 1000).toFixed(1)} s`,
       );
+
+      // Rastro de USO (4-sep-2026): Daniel quiere saber en unas semanas si
+      // este camino vale la pena. Solo cuenta — no sale en el Historial ni
+      // guarda el archivo (las fotos nunca se suben; esto manda solo números).
+      logActivityClient({
+        action: "descarga_misfotos",
+        module: "depurador",
+        details: { filas: filas.length, con_foto: conFotoReal },
+      });
     } catch (e) {
       setProgreso(null);
       setError(e instanceof Error ? e.message : "No se pudo armar el archivo.");

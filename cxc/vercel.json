@@ -49,6 +49,10 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/cleanup-depurador-archivos",
+      "schedule": "20 3 * * *"
+    },
+    {
       "path": "/api/cron/refresh-clientes-views",
       "schedule": "35 7 * * *"
     },

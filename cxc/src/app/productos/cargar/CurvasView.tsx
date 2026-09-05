@@ -13,6 +13,7 @@ import {
   type Curva, type CurvasResult,
 } from "@/lib/depurador/curvas";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { logActivityClient } from "@/lib/logActivityClient";
 
 const keyDe = (c: Curva) => `${c.referencia}|||${c.codigo}`;
 
@@ -106,6 +107,15 @@ export default function CurvasView() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "curvas");
       XLSX.writeFile(wb, curvasFilename(seleccion));
+
+      // Rastro de USO (4-sep-2026): Daniel quiere saber en unas semanas si
+      // esta pestaña vale la pena. Solo cuenta — no sale en el Historial ni
+      // guarda el archivo. Best-effort: si falla, la descarga ya ocurrió.
+      logActivityClient({
+        action: "descarga_tallas",
+        module: "depurador",
+        details: { curvas: seleccion.length },
+      });
     } finally {
       setDownloading(false);
     }

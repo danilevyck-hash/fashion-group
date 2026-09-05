@@ -83,7 +83,14 @@ describe("Tabs principales con URL propia (sobreviven refresh, se comparten)", (
     // contadora tampoco puede dejarla parada en una pestaña que no le toca.
     // Es el MISMO movimiento que hizo el CXC con `tabCxcPermitida` y Boston.
     expect(leer("src/app/asistencia/AsistenciaClient.tsx")).toContain('visibles.some(([k]) => k === tabRaw)');
-    expect(leer("src/app/productos/cargar/page.tsx")).toContain("PESTANAS.some((p) => p.id === tabRaw)");
+    // El Depurador resuelve el ?tab= en un módulo puro desde el rediseño de 3
+    // pestañas (4-sep-2026): un valor desconocido cae en "plantilla" y un
+    // ?tab= VIEJO (depurador, misfotos, historial…) redirige a su pestaña
+    // nueva en vez de romper el enlace guardado.
+    expect(leer("src/app/productos/cargar/page.tsx")).toContain("resolverTab(tabRaw");
+    const pestanas = leer("src/app/productos/cargar/pestanas.ts");
+    expect(pestanas).toContain("PESTANAS.some((p) => p.id === tabRaw)");
+    expect(pestanas).toContain('viejo?.tab ?? "plantilla"');
     // Ventas se sumó al retirar la pestaña Referencia (12-ago-2026): sin este
     // filtro, un favorito de `?tab=referencia` dejaba la pantalla EN BLANCO
     // (Radix no dibuja nada con un value sin trigger). Ese enlace además

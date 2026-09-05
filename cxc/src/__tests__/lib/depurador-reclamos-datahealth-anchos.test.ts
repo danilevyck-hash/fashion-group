@@ -52,21 +52,24 @@ const RECLAMO_DETALLE = "src/app/reclamos/components/ReclamoDetail.tsx";
 const EMPRESA_LIST = "src/app/reclamos/components/EmpresaList.tsx";
 const GUIA_DETAIL = "src/app/guias/components/GuiaDetail.tsx";
 
-describe("Depurador — las 6 pestañas son un desplegable en angosto", () => {
+describe("Depurador — las pestañas son un desplegable en angosto", () => {
   it("usa el DesplegableFlotante de la casa, no un panel absolute a mano", () => {
     const src = leer(CARGAR);
     expect(src).toContain('from "@/components/ui/DesplegableFlotante"');
     expect(src).toContain("<DesplegableFlotante");
   });
 
-  it("las 6 pestañas salen de UNA sola lista (desplegable y píldoras no pueden desincronizarse)", () => {
-    const src = leer(CARGAR);
-    const bloque = src.slice(src.indexOf("const PESTANAS"), src.indexOf("];", src.indexOf("const PESTANAS")));
-    for (const label of ["Depurador", "Facturas Tienda", "Tallas", "Fórmulas por marca", "Reglas", "Historial"]) {
+  // Desde el 4-sep-2026 son 3 pestañas (rediseño aprobado por Daniel):
+  // Plantilla · Tallas y catálogo · Configuración. Los tres caminos de
+  // generación viven adentro de «Plantilla» y ya no se nombran en pantalla.
+  it("las 3 pestañas salen de UNA sola lista (desplegable y píldoras no pueden desincronizarse)", () => {
+    const pestanas = leer("src/app/productos/cargar/pestanas.ts");
+    const bloque = pestanas.slice(pestanas.indexOf("const PESTANAS"), pestanas.indexOf("];", pestanas.indexOf("const PESTANAS")));
+    for (const label of ["Plantilla", "Tallas y catálogo", "Configuración"]) {
       expect(bloque).toContain(`label: "${label}"`);
     }
     // La fila de píldoras se dibuja MAPEANDO esa lista, no repitiendo el marcado.
-    expect(src).toContain("PESTANAS.map");
+    expect(leer(CARGAR)).toContain("PESTANAS.map");
   });
 
   it("el corte es lg: desplegable hasta 1024, fila de píldoras de 1024 para arriba", () => {
@@ -84,10 +87,10 @@ describe("Depurador — las 6 pestañas son un desplegable en angosto", () => {
     expect(sel.match(/min-h-\[44px\]/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
-  it("no se cambió ninguna etiqueta visible", () => {
-    const src = leer(CARGAR);
-    for (const label of ["Depurador", "Facturas Tienda", "Tallas", "Fórmulas por marca", "Reglas", "Historial"]) {
-      expect(src).toContain(label);
+  it("cada vista conserva su entrada (nada se borró, cambió dónde cuelga)", () => {
+    const pestanas = leer("src/app/productos/cargar/pestanas.ts");
+    for (const label of ["Nuevo", "Historial", "Tallas por bulto", "Fotos a mi Excel", "Fórmulas", "Descripciones", "Reglas"]) {
+      expect(pestanas).toContain(`label: "${label}"`);
     }
   });
 });

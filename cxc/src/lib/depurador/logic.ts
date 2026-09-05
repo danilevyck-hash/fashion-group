@@ -699,6 +699,49 @@ export function proveedorParaEmpresa(empresaKey: string): string | null {
   }
 }
 
+// ── Las 6 compañías del Depurador (4-sep-2026) ───────────────────────────────
+// Una sola lista para la línea «compañía · marca», la lista de «cambiar» y el
+// filtro del Historial. Son las 4 destino del camino CK/TH/KL + Active Shoes
+// (Reebok) + Multifashion (Facturas Tienda).
+export const COMPANIAS_DEPURADOR: { key: string; label: string }[] = [
+  ...EMPRESAS_DESTINO.map(({ key, label }) => ({ key, label })),
+  { key: "active_shoes", label: "Active Shoes" },
+  { key: "multifashion", label: "Multifashion" },
+];
+
+/** Etiqueta de una compañía del Depurador por su key ("" si no existe). */
+export function companiaLabel(key: string): string {
+  return COMPANIAS_DEPURADOR.find((c) => c.key === key)?.label ?? "";
+}
+
+// Etiqueta de empresa (empresaDeMarcaCatalogo) → key de EMPRESAS_DESTINO.
+const EMPRESA_KEY_POR_LABEL: Record<string, string> = Object.fromEntries(
+  EMPRESAS_DESTINO.map((e) => [e.label, e.key])
+);
+
+/**
+ * Compañías reconocidas a partir de las MARCAS del archivo (4-sep-2026).
+ * Daniel: «¿para qué elegir la compañía si la puede detectar?» — la marca ya
+ * dice la empresa (CK → Vistana, TH FOOTWEAR → Fashion Shoes, resto TH →
+ * Fashion Wear, KL → Active Wear, vía empresaDeMarcaCatalogo). Solo opinan las
+ * marcas DEL CATÁLOGO: una marca desconocida (u "Otros", el cajón de los
+ * servicios) no elige compañía. Devuelve keys únicas, en orden de aparición:
+ *   · 1 key  → se reconoce sola.
+ *   · 0 keys → no se puede saber (se cae al destino del archivo o a mano).
+ *   · 2+     → el archivo trae marcas de dos compañías: se DICE en pantalla y
+ *              se elige a mano — nunca se adivina.
+ */
+export function empresasReconocidas(marcas: Cell[]): string[] {
+  const keys: string[] = [];
+  for (const m of marcas) {
+    const canon = canonicalMarca(m);
+    if (!MARCA_CANON_BY_KEY.has(marcaKey(canon))) continue; // fuera del catálogo: no opina
+    const key = EMPRESA_KEY_POR_LABEL[empresaDeMarcaCatalogo(canon)];
+    if (key && !keys.includes(key)) keys.push(key);
+  }
+  return keys;
+}
+
 /** Preselecciona la empresa leyendo NOMBRE_DESTINATARIO_MERCANCIAS del archivo.
  *  Si no calza o no hay dato, devuelve null (la secretaria elige a mano). */
 export function matchEmpresaFromDestino(destinoRaw: string): string | null {
@@ -721,7 +764,10 @@ export interface MarcaCatalogo {
 // editables, tenga o no fórmula guardada. CK → Vistana; TH apparel → Fashion Wear;
 // TH calzado → Fashion Shoes. Ampliar aquí si el proveedor agrega marcas.
 // Empresa (etiqueta para agrupar en la config) según el prefijo de la marca.
-function empresaDeMarcaCatalogo(marca: string): string {
+// Exportada desde el 4-sep-2026: también reconoce la compañía del archivo
+// (empresasReconocidas) — Daniel: «¿para qué elegir la compañía si la puede
+// detectar?».
+export function empresaDeMarcaCatalogo(marca: string): string {
   const m = marca.toUpperCase();
   if (m.startsWith("KL")) return "Active Wear";
   if (m.startsWith("CK")) return "Vistana International";
@@ -1011,8 +1057,10 @@ export interface CargaTotales {
 }
 
 /** Calcula los totales de la carga para el registro de historial.
- *  total_costo = Σ (Costo CIF × unidades) por estilo. */
-export function computeTotales(rows: ProcessedRow[]): CargaTotales {
+ *  total_costo = Σ (Costo CIF × unidades) por estilo.
+ *  Solo mira `cols`, así que también sirve para las filas Switch de Reebok
+ *  (que guardan las mismas 25 columnas). */
+export function computeTotales(rows: Array<Pick<ProcessedRow, "cols">>): CargaTotales {
   let total_unidades = 0;
   let total_costo = 0;
   for (const r of rows) {

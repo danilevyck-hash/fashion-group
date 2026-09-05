@@ -20,7 +20,14 @@
 //   4. CONTROL: con datos válidos el Excel sale IDÉNTICO al de siempre —
 //      los mismos 25 encabezados de OUT_COLS y los mismos valores.
 //   5. La configuración se recuerda entre corridas (fg_last_* / useLastUsed);
-//      el archivo no.
+//      el archivo no. 🔴 El MES/AÑO de la temporada NO se recuerda (4-sep-2026):
+//      arranca SIEMPRE en el mes actual de Panamá — recordarlo haría que el 1
+//      de septiembre siguiera diciendo agosto, y ese dato entra a Switch.
+//   6. 🔴 La compañía se RECONOCE de la marca del archivo (Daniel: «¿para qué
+//      elegir la compañía si la puede detectar?»): CK → Vistana. «cambiar» la
+//      sobreescribe; con marcas de DOS compañías se dice y no se adivina.
+//   7. 🔴 El archivo que viaja al Historial es EL MISMO blob que bajó al disco
+//      (bytes idénticos por construcción: una sola escritura).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -29,27 +36,24 @@ import { SWRConfig } from "swr";
 import DepuradorClient from "@/app/productos/cargar/DepuradorClient";
 import { OUT_COLS, processRows, buildAoa, calcPrecio, type SheetRow } from "@/lib/depurador/logic";
 import { mensajeDivisorEnPantalla } from "@/lib/depurador/divisor";
+import XLSXReal from "xlsx-js-style";
 
-// Captura de descargas: el writeFile del navegador se reemplaza por un buzón.
-// Todo lo demás de xlsx-js-style es REAL (read, write, utils) — los Excel de
-// prueba se arman y se releen con la librería de verdad.
+// Captura de descargas: la descarga real va por `saveAs` (file-saver) desde el
+// 4-sep-2026 — los bytes se generan UNA vez y el mismo blob viaja al Historial.
+// xlsx-js-style queda 100% REAL: lo que se abre acá es el archivo descargado.
 const { descargas } = vi.hoisted(() => ({
-  descargas: [] as { wb: { Sheets: Record<string, Record<string, { t?: string; v?: unknown }>> }; nombre: string }[],
+  descargas: [] as { blob: Blob; nombre: string }[],
 }));
-vi.mock("xlsx-js-style", async (importOriginal) => {
-  const real = (await importOriginal()) as Record<string, unknown> & { default?: Record<string, unknown> };
-  const XLSX = (real.default ?? real) as Record<string, unknown>;
-  const patched = {
-    ...XLSX,
-    writeFile: (wb: unknown, nombre: string) => {
-      descargas.push({ wb: wb as (typeof descargas)[number]["wb"], nombre });
-    },
-  };
-  return { ...real, default: patched };
-});
+vi.mock("file-saver", () => ({
+  saveAs: (blob: Blob, nombre: string) => { descargas.push({ blob, nombre }); },
+}));
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const XLSX = ((await import("xlsx-js-style")) as any).default;
+const XLSX = XLSXReal;
+
+// 🔒 La fecha del test es FIJA: 15-jun-2026 (Panamá). La temporada tiene que
+// arrancar en 2026-06 SIN mirar localStorage. Se fakea SOLO Date para que los
+// timers reales (debounce de 300 ms, waitFor) sigan andando.
+const AHORA = new Date("2026-06-15T18:00:00.000Z");
 
 // 🩸 El jsdom de este repo expone localStorage sin métodos: se reemplaza por un
 // almacén real en memoria (mismo patrón de comisiones-configuracion-pantalla).
@@ -69,6 +73,7 @@ const almacenReal = (): Storage => {
 // para que la alarma de descripciones nuevas no bloquee la descarga.
 const CATALOGO = {
   "CK Jeans": ["Men-T-Shirts S/S", "Men-Polos S/S", "Men-Shirts Woven L/S"],
+  "TH Menswear": ["Men-Polos S/S"],
 };
 
 const respuesta = (data: unknown): Response =>
@@ -79,6 +84,8 @@ const CABECERA: SheetRow = ["REFERENCIA", "EAN", "FACT", "P_CATEGORY", "TALLA", 
 const FILA_A: SheetRow = ["ART-A", "111111", "F-9", "Men-T-Shirts S/S", "M", 5, 10, 20, "CK Jeans", "Prov X"];
 const FILA_B: SheetRow = ["ART-B", "222222", "F-9", "Men-Polos S/S", "M", 3, 20, 30, "CK Jeans", "Prov X"];
 const FILA_Z: SheetRow = ["ART-Z", "333333", "F-9", "Men-Shirts Woven L/S", "M", 2, 30, 40, "CK Jeans", "Prov X"];
+// Marca de OTRA compañía (TH → Fashion Wear) para el caso de archivo mixto.
+const FILA_TH: SheetRow = ["ART-T", "444444", "F-9", "Men-Polos S/S", "M", 4, 15, 25, "TH Menswear", "Prov X"];
 
 function archivo(nombre: string, filas: SheetRow[]): File {
   const ws = XLSX.utils.aoa_to_sheet(filas);
@@ -93,14 +100,15 @@ function archivo(nombre: string, filas: SheetRow[]): File {
 // catálogo llega ya cacheado en el PRIMER render y el archivo se procesaría
 // antes de que la config recordada hidrate — cosa que en producción no pasa
 // (el archivo siempre se suelta después). Caché nuevo por render.
-const conCache = (file: File) => (
+type OnDownloaded = NonNullable<Parameters<typeof DepuradorClient>[0]["onDownloaded"]>;
+const conCache = (file: File, onDownloaded?: OnDownloaded) => (
   <SWRConfig value={{ provider: () => new Map() }}>
-    <DepuradorClient injectedFile={file} />
+    <DepuradorClient injectedFile={file} onDownloaded={onDownloaded} />
   </SWRConfig>
 );
 
-async function montar(file: File) {
-  const utils = render(conCache(file));
+async function montar(file: File, onDownloaded?: OnDownloaded) {
+  const utils = render(conCache(file, onDownloaded));
   await waitFor(() => expect(screen.getByText(/estilos/)).toBeTruthy());
   return utils;
 }
@@ -114,15 +122,29 @@ async function descargar(): Promise<(typeof descargas)[number]> {
   return descargas[descargas.length - 1];
 }
 
-function aoaDe(d: (typeof descargas)[number]): (string | number)[][] {
-  const ws = d.wb.Sheets["upload"];
-  const crudo = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" }) as (string | number)[][];
+/** Abre el archivo DESCARGADO (los bytes del blob) con la librería real. */
+async function wbDe(d: (typeof descargas)[number]) {
+  const buf = await d.blob.arrayBuffer();
+  return XLSX.read(buf, { type: "array" }) as { Sheets: Record<string, Record<string, { t?: string; v?: unknown }>> };
+}
+
+async function aoaDe(d: (typeof descargas)[number]): Promise<(string | number)[][]> {
+  const wb = await wbDe(d);
+  const crudo = XLSX.utils.sheet_to_json(wb.Sheets["upload"], { header: 1, raw: true, defval: "" }) as (string | number)[][];
   // Filas normalizadas al ancho de la plantilla (sheet_to_json recorta colas vacías).
   return crudo.map((f) => Array.from({ length: OUT_COLS.length }, (_, i) => (f[i] === undefined ? "" : f[i])));
 }
 
+/** Abre el desplegable «cambiar» y elige una compañía por su etiqueta. */
+async function cambiarCompania(label: string) {
+  fireEvent.click(screen.getByRole("button", { name: "Cambiar compañía" }));
+  const opcion = await screen.findByRole("option", { name: label });
+  fireEvent.click(opcion);
+}
+
 beforeEach(() => {
   descargas.length = 0;
+  vi.useFakeTimers({ now: AHORA, toFake: ["Date"] });
   Object.defineProperty(window, "localStorage", { value: almacenReal(), configurable: true });
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const u = String(input);
@@ -136,6 +158,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 /* ═══ 1 · el módulo puro del mensaje (reusa validarDivisor) ═══════════════════ */
@@ -231,8 +254,8 @@ describe("tasa de impuesto — «solo existen esas dos»", () => {
   it("7% baja como «07» TEXTO (celda t:'s', nunca número)", async () => {
     await montar(archivo("a.xlsx", [CABECERA, FILA_A]));
     const celda = XLSX.utils.encode_cell({ r: 1, c: OUT_COLS.indexOf("Tasa de Impuesto *") });
-    const d1 = await descargar();
-    expect(d1.wb.Sheets["upload"][celda]).toMatchObject({ t: "s", v: "07" });
+    const wb = await wbDe(await descargar());
+    expect(wb.Sheets["upload"][celda]).toMatchObject({ t: "s", v: "07" });
   });
 
   it("Exento baja como «0» TEXTO (celda t:'s' — como número el exento se perdería)", async () => {
@@ -242,15 +265,15 @@ describe("tasa de impuesto — «solo existen esas dos»", () => {
     await montar(archivo("a.xlsx", [CABECERA, FILA_A]));
     expect((screen.getByLabelText("Tasa de impuesto") as HTMLSelectElement).value).toBe("0");
     const celda = XLSX.utils.encode_cell({ r: 1, c: OUT_COLS.indexOf("Tasa de Impuesto *") });
-    const d = await descargar();
-    expect(d.wb.Sheets["upload"][celda]).toMatchObject({ t: "s", v: "0" });
+    const wb = await wbDe(await descargar());
+    expect(wb.Sheets["upload"][celda]).toMatchObject({ t: "s", v: "0" });
   });
 });
 
 /* ═══ 4 · los precios a mano sobreviven, pegados por REFERENCIA ═══════════════ */
 
 describe("precios escritos a mano — se conservan y viajan con su artículo", () => {
-  it("cambiar factor/tasa/mes/empresa conserva el precio a mano y lo dice en pantalla", async () => {
+  it("cambiar factor/tasa/temporada/compañía conserva el precio a mano y lo dice en pantalla", async () => {
     await montar(archivo("a.xlsx", [CABECERA, FILA_A, FILA_B]));
     fireEvent.change(screen.getByLabelText("Precio ART-B"), { target: { value: "99" } });
 
@@ -263,14 +286,16 @@ describe("precios escritos a mano — se conservan y viajan con su artículo", (
     expect(screen.getByText("factor 1.2")).toBeTruthy();
     expect((screen.getByLabelText("Precio ART-B") as HTMLInputElement).value).toBe("99");
 
-    // tasa y mes (selects: reprocesan al momento) + empresa (no reprocesa)
+    // tasa y temporada (reprocesan al momento) + compañía (no reprocesa)
     fireEvent.change(screen.getByLabelText("Tasa de impuesto"), { target: { value: "0" } });
     await waitFor(() => expect(screen.getByText("tasa 0")).toBeTruthy());
-    fireEvent.change(screen.getByLabelText("Empresa destino"), { target: { value: "vistana" } });
+    fireEvent.change(screen.getByLabelText("Temporada"), { target: { value: "2026-11" } });
+    await waitFor(() => expect(screen.getByText("2026-11")).toBeTruthy());
+    await cambiarCompania("Fashion Wear");
     expect((screen.getByLabelText("Precio ART-B") as HTMLInputElement).value).toBe("99");
 
     // y el precio bajó al Excel en la fila de SU artículo
-    const aoa = aoaDe(await descargar());
+    const aoa = await aoaDe(await descargar());
     const filaB = aoa.find((f) => f[0] === "ART-B")!;
     expect(filaB[OUT_COLS.indexOf("Precio *")]).toBe(99);
   });
@@ -323,17 +348,20 @@ describe("precios escritos a mano — se conservan y viajan con su artículo", (
 
 describe("CONTROL — mismos 25 encabezados y mismos valores que el pipeline de siempre", () => {
   it("modo por marca (default, sin fórmulas): el AOA descargado == processRows + buildAoa", async () => {
-    // Config determinista vía lo recordado (mismo mecanismo del usuario).
-    window.localStorage.setItem("fg_last_depurador_mes", "5");
-    window.localStorage.setItem("fg_last_depurador_anio", "2026");
+    // Config determinista: la fecha del test es FIJA (15-jun-2026), así que la
+    // temporada arranca en 2026-06 → mesIdx 5, año 2026.
     const filas: SheetRow[] = [CABECERA, FILA_A, FILA_B];
     await montar(archivo("a.xlsx", filas));
-    const aoa = aoaDe(await descargar());
+    const aoa = await aoaDe(await descargar());
 
     // El pipeline de SIEMPRE (logic.ts intacto): sin fórmula → precio vacío.
+    // La compañía reconocida (CK → Vistana) pone su proveedor fijo, igual que
+    // lo ponía elegirla en el selector viejo — el CONTROL lo refleja.
     const esperado = processRows(filas, { mesIdx: 5, anio: "2026", tasa: "07", factor: "1.1" });
-    const aoaEsperado = buildAoa(esperado.rows.map((r) => ({ ...r, cols: { ...r.cols, "Precio *": null } })))
-      .map((f) => f.map((v) => v));
+    const aoaEsperado = buildAoa(esperado.rows.map((r) => ({
+      ...r,
+      cols: { ...r.cols, "Precio *": null, "Proveedor *": "American Designer Fashion" },
+    }))).map((f) => f.map((v) => v));
 
     expect(aoa[0]).toEqual([...OUT_COLS]);
     expect(aoa.length).toBe(aoaEsperado.length);
@@ -348,7 +376,7 @@ describe("CONTROL — mismos 25 encabezados y mismos valores que el pipeline de 
     await montar(archivo("a.xlsx", [CABECERA, FILA_A, FILA_B]));
     fireEvent.click(screen.getByRole("button", { name: /Una fórmula para todo/ }));
     fireEvent.click(screen.getByRole("button", { name: "Aplicar a todo" }));
-    const aoa = aoaDe(await descargar());
+    const aoa = await aoaDe(await descargar());
     const iPrecio = OUT_COLS.indexOf("Precio *");
     const iCif = OUT_COLS.indexOf("Costo CIF *");
     for (const fila of aoa.slice(1)) {
@@ -360,18 +388,16 @@ describe("CONTROL — mismos 25 encabezados y mismos valores que el pipeline de 
   });
 });
 
-/* ═══ 6 · la pantalla abre como quedó la última vez ═══════════════════════════ */
+/* ═══ 6 · la pantalla abre como quedó la última vez (menos temporada/compañía) ═ */
 
 describe("configuración recordada (fg_last_* / useLastUsed)", () => {
-  it("empresa, tasa, factor y modo de precio se releen de localStorage", async () => {
-    window.localStorage.setItem("fg_last_depurador_empresa", "vistana");
+  it("tasa, factor y modo de precio se releen de localStorage", async () => {
     window.localStorage.setItem("fg_last_depurador_tasa", "0");
     window.localStorage.setItem("fg_last_depurador_factor", "1.2");
     window.localStorage.setItem("fg_last_depurador_precio_modo", "global");
     window.localStorage.setItem("fg_last_depurador_formula_global", JSON.stringify({ divisor: "0.63", extra: 3, redondeo: "half" }));
 
     await montar(archivo("a.xlsx", [CABECERA, FILA_A]));
-    expect((screen.getByLabelText("Empresa destino") as HTMLSelectElement).value).toBe("vistana");
     expect((screen.getByLabelText("Tasa de impuesto") as HTMLSelectElement).value).toBe("0");
     expect((screen.getByLabelText("Factor costo CIF") as HTMLInputElement).value).toBe("1.2");
     // modo global recordado → su panel está dibujado, con la fórmula aplicada
@@ -388,9 +414,109 @@ describe("configuración recordada (fg_last_* / useLastUsed)", () => {
     expect(botonDescargar().disabled).toBe(false);
   });
 
-  it("elegir empresa la deja recordada para la próxima corrida", async () => {
+  it("🔴 la TEMPORADA arranca en el mes actual de Panamá y NO se recuerda", async () => {
+    // Un localStorage viejo con mes/año (el mecanismo retirado) NO puede mover
+    // la temporada: el 1 de septiembre no puede seguir diciendo agosto.
+    window.localStorage.setItem("fg_last_depurador_mes", "0");
+    window.localStorage.setItem("fg_last_depurador_anio", "2024");
     await montar(archivo("a.xlsx", [CABECERA, FILA_A]));
-    fireEvent.change(screen.getByLabelText("Empresa destino"), { target: { value: "fashion_wear" } });
-    expect(window.localStorage.getItem("fg_last_depurador_empresa")).toBe("fashion_wear");
+    expect((screen.getByLabelText("Temporada") as HTMLInputElement).value).toBe("2026-06");
+    // El valor real al lado del campo, y en el Excel.
+    expect(screen.getByText("Junio 2026 → 2026-06")).toBeTruthy();
+    const aoa = await aoaDe(await descargar());
+    expect(aoa[1][OUT_COLS.indexOf("Temporada")]).toBe("2026-06");
+  });
+
+  it("editar la temporada vale para ESTA corrida y no deja rastro en localStorage", async () => {
+    await montar(archivo("a.xlsx", [CABECERA, FILA_A]));
+    fireEvent.change(screen.getByLabelText("Temporada"), { target: { value: "2026-12" } });
+    await waitFor(() => expect(screen.getByText("2026-12")).toBeTruthy());
+    const aoa = await aoaDe(await descargar());
+    expect(aoa[1][OUT_COLS.indexOf("Temporada")]).toBe("2026-12");
+    // Nada de la temporada quedó recordado.
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i)!;
+      if (/mes|anio|temporada/i.test(k)) {
+        expect(window.localStorage.getItem(k), `${k} no debería recordar la temporada`).not.toContain("2026-12");
+      }
+    }
+  });
+});
+
+/* ═══ 7 · la compañía se RECONOCE, no se elige ════════════════════════════════ */
+
+describe("compañía reconocida de la marca del archivo — «¿para qué elegirla si la puede detectar?»", () => {
+  it("CK → Vistana International, con la marca y el archivo en la línea", async () => {
+    await montar(archivo("pedido-ck.xlsx", [CABECERA, FILA_A, FILA_B]));
+    expect(screen.getByText(/Vistana International/)).toBeTruthy();
+    expect(screen.getByText(/· CK Jeans/)).toBeTruthy();
+    expect(screen.getByText("pedido-ck.xlsx")).toBeTruthy();
+    // Ya no existe el selector viejo de empresa.
+    expect(screen.queryByLabelText("Empresa destino")).toBeNull();
+  });
+
+  it("la reconocida alimenta el Excel: proveedor fijo de Vistana", async () => {
+    await montar(archivo("a.xlsx", [CABECERA, FILA_A]));
+    const aoa = await aoaDe(await descargar());
+    expect(aoa[1][OUT_COLS.indexOf("Proveedor *")]).toBe("American Designer Fashion");
+  });
+
+  it("«cambiar» abre las 6 compañías y la elegida SOBREESCRIBE (proveedor y historial)", async () => {
+    const descargasHist: { empresa: string }[] = [];
+    await montar(archivo("a.xlsx", [CABECERA, FILA_A]), (p) => descargasHist.push(p));
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar compañía" }));
+    const lista = await screen.findByRole("listbox", { name: "Compañía" });
+    const opciones = within(lista).getAllByRole("option").map((o) => o.textContent);
+    expect(opciones).toEqual([
+      "Vistana International", "Fashion Wear", "Fashion Shoes",
+      "Active Wear", "Active Shoes", "Multifashion",
+    ]);
+    fireEvent.click(screen.getByRole("option", { name: "Fashion Shoes" }));
+    expect(screen.getByText(/Fashion Shoes/)).toBeTruthy();
+
+    const aoa = await aoaDe(await descargar());
+    expect(aoa[1][OUT_COLS.indexOf("Proveedor *")]).toBe("American Fashion Wear, SA");
+    expect(descargasHist[0].empresa).toBe("Fashion Shoes");
+  });
+
+  it("🔴 marcas de DOS compañías: se dice en pantalla y NO se adivina", async () => {
+    await montar(archivo("mixto.xlsx", [CABECERA, FILA_A, FILA_TH]));
+    expect(screen.getByText(/marcas de 2 compañías/)).toBeTruthy();
+    expect(screen.getByText(/Vistana International y Fashion Wear/)).toBeTruthy();
+    expect(screen.getByText("Elige la compañía")).toBeTruthy();
+    // Elegir a mano resuelve (no se bloquea en silencio).
+    await cambiarCompania("Vistana International");
+    expect(screen.queryByText("Elige la compañía")).toBeNull();
+  });
+
+  it("la compañía NO se recuerda entre corridas: la del archivo manda", async () => {
+    const { rerender } = await montar(archivo("a.xlsx", [CABECERA, FILA_A]));
+    await cambiarCompania("Active Wear");
+    expect(window.localStorage.getItem("fg_last_depurador_empresa")).toBeNull();
+    // Otro archivo → se reconoce de nuevo (la elección a mano no se arrastra).
+    rerender(conCache(archivo("b.xlsx", [CABECERA, FILA_B])));
+    await waitFor(() => expect(screen.getByText("b.xlsx")).toBeTruthy());
+    expect(screen.getByText(/Vistana International/)).toBeTruthy();
+  });
+});
+
+/* ═══ 8 · el Historial recibe EL MISMO archivo que bajó ═══════════════════════ */
+
+describe("historial — el blob que viaja es el que se descargó (bytes idénticos)", () => {
+  it("onDownloaded lleva el MISMO blob de saveAs, con su nombre y los totales", async () => {
+    const hist: Parameters<OnDownloaded>[0][] = [];
+    await montar(archivo("a.xlsx", [CABECERA, FILA_A, FILA_B]), (p) => hist.push(p));
+    const d = await descargar();
+
+    expect(hist).toHaveLength(1);
+    expect(hist[0].archivo).toBeTruthy();
+    // El mismo OBJETO: una sola escritura, cero re-generación.
+    expect(hist[0].archivo!.blob).toBe(d.blob);
+    expect(hist[0].archivo!.nombre).toBe(d.nombre);
+    expect(hist[0].empresa).toBe("Vistana International");
+    expect(hist[0].cantidad_estilos).toBe(2);
+    // Y los bytes son un .xlsx real que se abre.
+    const aoa = await aoaDe(d);
+    expect(aoa[0]).toEqual([...OUT_COLS]);
   });
 });

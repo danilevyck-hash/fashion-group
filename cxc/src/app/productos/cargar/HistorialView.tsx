@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { COMPANIAS_DEPURADOR } from "@/lib/depurador/logic";
 
 interface CargaRow {
   id: string;
@@ -11,6 +12,10 @@ interface CargaRow {
   total_unidades: number;
   total_costo: number;
   created_at: string;
+  /** true si el Excel descargado sigue guardado (90 días). Las corridas viejas
+   *  (antes del 4-sep-2026) no tienen archivo: salen en gris, sin botón. */
+  tiene_archivo: boolean;
+  archivo_nombre: string | null;
 }
 
 function fmtFecha(iso: string): string {
@@ -20,8 +25,10 @@ function fmtFecha(iso: string): string {
   });
 }
 
-function fmtMoney(n: number): string {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Las filas viejas de Facturas Tienda decían «Facturas Tienda»; la compañía
+ *  real es Multifashion — así el filtro por compañía también las encuentra. */
+function empresaCanonica(empresa: string): string {
+  return empresa === "Facturas Tienda" ? "Multifashion" : empresa;
 }
 
 interface HistorialViewProps {
@@ -32,6 +39,8 @@ interface HistorialViewProps {
 export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
   const [rows, setRows] = useState<CargaRow[] | null>(null);
   const [error, setError] = useState("");
+  // Filtro por compañía: Todas + las 6. Todos ven todo (Daniel: «todos»).
+  const [empresaFiltro, setEmpresaFiltro] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -43,6 +52,20 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
     return () => { alive = false; };
   }, [refreshKey]);
 
+  const visibles = (rows ?? []).filter(
+    (r) => !empresaFiltro || empresaCanonica(r.empresa) === empresaFiltro
+  );
+
+  const botonDescargar = (r: CargaRow) =>
+    r.tiene_archivo ? (
+      <a
+        href={`/api/productos/cargar/historial/archivo?id=${encodeURIComponent(r.id)}`}
+        className="inline-flex min-h-[44px] items-center rounded-md border border-stone-300 bg-white px-3 text-[12px] font-semibold text-teal-700 transition hover:border-teal-600 hover:text-teal-900 active:scale-[0.97]"
+      >
+        Descargar
+      </a>
+    ) : null;
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
 
@@ -52,43 +75,53 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
         </div>
       )}
 
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <select
+          value={empresaFiltro}
+          aria-label="Compañía"
+          onChange={(e) => setEmpresaFiltro(e.target.value)}
+          className="min-h-[44px] rounded-md border border-stone-300 bg-white px-2.5 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+        >
+          <option value="">Todas</option>
+          {COMPANIAS_DEPURADOR.map((c) => (
+            <option key={c.key} value={c.label}>{c.label}</option>
+          ))}
+        </select>
+        {/* Los archivos se guardan 90 días; la fila con los totales queda. */}
+        <span className="text-[12px] text-stone-500">El Excel se puede volver a bajar por 90 días.</span>
+      </div>
+
       {rows === null ? (
         <div className="py-16 text-center text-stone-500">Cargando…</div>
-      ) : rows.length === 0 ? (
+      ) : visibles.length === 0 ? (
         <div className="py-16 text-center text-stone-500">Todavía no hay cargas registradas.</div>
       ) : (
         /* ── 🩸 EL HISTORIAL, MEDIDO (30-jul-2026) ────────────────────────
-           7 columnas con `whitespace-nowrap` = 777px de contenido. Arrastraba
-           437px en iPhone, 217px en iPad y **27px todavía a 1024**.
-
-           Se midieron las DOS salidas antes de elegir, y ganan las dos en su
-           tramo: hasta `lg` no hay relleno que la haga entrar en 562px útiles
-           (achicar el padding ahorra ~84px de 217) → TARJETAS; de `lg` a `xl`
-           entra apretando el relleno (`px-1.5`, −84px sobre 777 = 693 contra
-           750 útiles) → TABLA. De `xl` para arriba, el relleno de siempre.
+           Hasta `lg` no hay relleno que haga entrar la tabla → TARJETAS; de
+           `lg` a `xl` entra apretando el relleno (`px-1.5 xl:px-3`) → TABLA.
            El escritorio no cambia. */
         <div className="overflow-hidden rounded-xl border border-stone-200 bg-white" data-medir="depurador-historial">
           {/* Celular e iPad vertical: una tarjeta por carga. */}
           <ul className="lg:hidden max-h-[560px] overflow-y-auto divide-y divide-stone-100" data-vista="tarjetas">
-            {rows.map((r) => (
-              <li key={r.id} className="px-3 py-3">
+            {visibles.map((r) => (
+              <li key={r.id} className={`px-3 py-3 ${r.tiene_archivo ? "" : "opacity-60"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[13px] font-medium text-stone-900 truncate">
                       {r.marca || "—"}
                     </div>
                     <div className="text-[12px] text-stone-500 truncate">
-                      {r.empresa || "—"} · {r.usuario}
+                      {empresaCanonica(r.empresa) || "—"} · {r.usuario}
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="text-[13px] font-medium tabular-nums text-stone-900">${fmtMoney(r.total_costo)}</div>
                     <div className="text-[12px] text-stone-500">{fmtFecha(r.created_at)}</div>
                   </div>
                 </div>
-                <div className="mt-1.5 flex gap-4 text-[12px] text-stone-500">
+                <div className="mt-1.5 flex items-center gap-4 text-[12px] text-stone-500">
                   <span>Estilos <span className="tabular-nums text-stone-700">{r.cantidad_estilos.toLocaleString()}</span></span>
                   <span>Unidades <span className="tabular-nums text-stone-700">{r.total_unidades.toLocaleString()}</span></span>
+                  <span className="ml-auto">{botonDescargar(r)}</span>
                 </div>
               </li>
             ))}
@@ -98,11 +131,11 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
             <table className="w-full border-collapse whitespace-nowrap text-[13px] tabular-nums">
               <thead>
                 <tr>
-                  {["Fecha", "Usuario", "Empresa", "Marca", "Estilos", "Unidades", "Total costo"].map((h, i) => (
+                  {["Fecha", "Quién", "Compañía", "Marca", "Estilos", "Unidades", ""].map((h, i) => (
                     <th
-                      key={h}
+                      key={i}
                       className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-1.5 xl:px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-stone-600 ${
-                        i >= 4 ? "text-right" : "text-left"
+                        i === 4 || i === 5 ? "text-right" : "text-left"
                       }`}
                     >
                       {h}
@@ -111,15 +144,15 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-teal-50">
+                {visibles.map((r) => (
+                  <tr key={r.id} className={r.tiene_archivo ? "hover:bg-teal-50" : "text-stone-400"}>
                     <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-stone-700">{fmtFecha(r.created_at)}</td>
-                    <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-stone-900">{r.usuario}</td>
-                    <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-stone-900">{r.empresa || "—"}</td>
-                    <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-stone-900">{r.marca || "—"}</td>
+                    <td className={`border-b border-stone-100 px-1.5 xl:px-3 py-2 ${r.tiene_archivo ? "text-stone-900" : ""}`}>{r.usuario}</td>
+                    <td className={`border-b border-stone-100 px-1.5 xl:px-3 py-2 ${r.tiene_archivo ? "text-stone-900" : ""}`}>{empresaCanonica(r.empresa) || "—"}</td>
+                    <td className={`border-b border-stone-100 px-1.5 xl:px-3 py-2 ${r.tiene_archivo ? "text-stone-900" : ""}`}>{r.marca || "—"}</td>
                     <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-right text-stone-700">{r.cantidad_estilos.toLocaleString()}</td>
                     <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-right text-stone-700">{r.total_unidades.toLocaleString()}</td>
-                    <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-right font-medium text-stone-900">${fmtMoney(r.total_costo)}</td>
+                    <td className="border-b border-stone-100 px-1.5 xl:px-3 py-2 text-right">{botonDescargar(r)}</td>
                   </tr>
                 ))}
               </tbody>
