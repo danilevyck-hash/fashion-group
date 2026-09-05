@@ -126,6 +126,11 @@ import { mapEmpresaName } from "@/lib/empresa-mapping";
  *   · `factura_lineas`, `ingresos_mercancia` — upsert selectivo sobre una ventana.
  *   · `ventas_tipos` — es un centinela: su normal ES cero.
  *   · `multifashion`, `mayor` — retirados.
+ *   · `clientes` (el directorio semanal de Boston) — reescribe un universo
+ *     completo y calificaría de sobra, pero A lee `A_DIAS_DE_LOG` = 30 días de
+ *     log y exige `A_MIN_HISTORIA` = 10 corridas previas: un par SEMANAL nunca
+ *     junta más de 4 en esa ventana. Ponerlo acá sería una vigilancia que
+ *     parece existir y nunca puede disparar. Lo cubre B, que mira la tabla.
  */
 export const SYNCS_DE_UNIVERSO_COMPLETO: Readonly<Record<string, string>> = {
   // Todos los saldos vivos de la empresa, uno por documento. 0 ceros en 1.302
@@ -221,6 +226,17 @@ export interface TablaVigilada {
   que: string;
   /** Horas sin una sola escritura antes de avisar. Ver `HORAS_SIN_ESCRIBIR`. */
   horas: number;
+  /**
+   * Empresas de esta entrada. Ausente = las 8.
+   *
+   * 🔴 Existe porque la MISMA tabla puede tener ritmos distintos según la
+   * empresa, y un solo umbral las mentiría a todas. `switch_clientes` lo
+   * escribe el estado de cuenta DIARIO en las 6 del grupo, un cron diario en
+   * Multifashion y un cron SEMANAL en Boston: vigilar las 8 con las horas de
+   * Boston taparía seis días de silencio del grupo, y con las del grupo sonaría
+   * todos los días por Boston estando sana.
+   */
+  empresas?: readonly string[];
 }
 
 /**
@@ -240,6 +256,28 @@ export interface TablaVigilada {
  * seguidas» de la política de sync, escrita del lado del dato.
  */
 export const HORAS_SIN_ESCRIBIR = 40;
+
+/**
+ * El umbral de B para un sync SEMANAL, y la misma cuenta hecha con siete días.
+ * Hoy solo lo usa el directorio de clientes de Boston (domingos 07:10 UTC), y
+ * la reconciliación sigue mirando a las 10:00, 14:00 y 18:00:
+ *
+ *   · Sano, el dato envejece hasta **154,8 h** — la pasada del sábado a las
+ *     18:00 es la última antes de la corrida del domingo. Cualquier umbral por
+ *     debajo de eso suena todas las semanas sin que pase nada.
+ *   · Una corrida perdida: la pasada del domingo a las 10:00 ve **171 h**.
+ *   · Dos perdidas: 339 h.
+ *
+ * Sirve cualquier valor entre 155 y 171; **165 h** queda en el medio y aguanta
+ * el jitter del scheduler por los dos lados.
+ *
+ * 🔑 A diferencia del umbral diario, éste avisa a la PRIMERA corrida perdida, y
+ * es correcto: la regla 2 del canal de sistema exculpa lo que «se arregla solo
+ * en horas», y acá la próxima oportunidad es dentro de SIETE DÍAS. Esperar una
+ * segunda corrida sería tolerar tres semanas de dato viejo — que es exactamente
+ * lo que ya pasó.
+ */
+export const HORAS_SIN_ESCRIBIR_SEMANAL = 165;
 
 export const TABLAS_VIGILADAS: readonly TablaVigilada[] = [
   {
@@ -264,6 +302,26 @@ export const TABLAS_VIGILADAS: readonly TablaVigilada[] = [
     modulo: "Ventas › Referencia",
     que: "la existencia y el precio de etiqueta de los artículos",
     horas: HORAS_SIN_ESCRIBIR,
+  },
+  {
+    // 🩸 LA QUE FALTABA. El directorio de clientes de Confecciones Boston estuvo
+    // **37 días congelado** —sus 4.915 filas con el mismo `synced_at`, el
+    // 30-jul-2026— y nadie lo notó, porque ninguna alerta lo cubría. Se descubrió
+    // de casualidad, igual que el de Gastos.
+    //
+    // Cumple los tres requisitos: la escritura es COMPLETA en cada corrida
+    // (`persistClientesDirectorio` manda `synced_at` en todas las filas), nadie
+    // más la vigila (`datos-frescos.ts` no la mira) y no tiene segunda
+    // oportunidad — es semanal.
+    tabla: "switch_clientes",
+    columna: "synced_at",
+    modulo: "Confecciones Boston",
+    que: "el directorio de clientes de Confecciones Boston",
+    horas: HORAS_SIN_ESCRIBIR_SEMANAL,
+    // 🔴 SOLO Boston. En las 6 del grupo esta tabla la escribe el estado de
+    // cuenta DIARIO y en Multifashion el cron de fidelización: con el umbral
+    // semanal, seis días de silencio del grupo no dirían nada.
+    empresas: ["confecciones_boston"],
   },
 ];
 

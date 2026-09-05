@@ -1,6 +1,7 @@
 /**
- * LAS ANOTACIONES DEL CXC — la ÚNICA puerta a `cxc_favorites`,
- * `cxc_client_overrides` y `cxc_contact_log`.
+ * LAS ANOTACIONES DEL CXC — la ÚNICA puerta a `cxc_client_overrides` y
+ * `cxc_contact_log`. (`cxc_favorites` también está vigilada por el barrido,
+ * pero desde el 4-sep-2026 ya no tiene puerta: ver el bloque de más abajo.)
  *
  * ─── POR QUÉ UNA PUERTA ÚNICA ───────────────────────────────────────────────
  * La regla que hay que sostener es *"ningún camino escribe sin cartera"*. Con
@@ -66,48 +67,20 @@ function comoError(err: ErrorPg | null, fallback: string): ErrorAnotacion {
 type Resultado<T> = { data: T | null; error: ErrorPg | null };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FAVORITOS (la estrella ⭐, por usuario)
+// 🩸 FAVORITOS (la estrella ⭐) — RETIRADOS EL 4-sep-2026
+//
+// `leerFavoritos` y `alternarFavorito` vivían acá, y `/api/cxc/favorites` era
+// su única puerta. Se fueron con la estrella: Daniel, textual, *«quita
+// favoritos»*. Medido, `cxc_favorites` tuvo **0 filas en toda su historia** —
+// nadie marcó una nunca— y el endpoint exigía `rolesBoston()`, así que un
+// vendedor que sí ve el CXC recibía **403** al tocarla.
+//
+// 🔴 LA TABLA NO SE BORRÓ (el patrón de `mayor_lineas`): queda en la base, sin
+// lectores y sin escritores. `cxc-favoritos-retirados.test.ts` pone el build
+// ROJO si una migración la dropea, y sigue en `TABLAS_ANOTACIONES` para que el
+// barrido de este archivo la vigile: si mañana alguien vuelve a consultarla
+// desde otro lado, el candado lo dice.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Nombres marcados como favoritos por `userId` EN ESA CARTERA. */
-export async function leerFavoritos(cartera: Cartera, userId: string): Promise<string[]> {
-  const { data, error }: Resultado<{ nombre_normalized: string }[]> = await supabaseServer
-    .from("cxc_favorites")
-    .select("nombre_normalized")
-    .eq("user_id", userId)
-    .eq("cartera", cartera);
-  if (error) throw comoError(error, "Error al leer favoritos");
-  return (data ?? []).map((r) => r.nombre_normalized);
-}
-
-/** Pone o quita la estrella. Devuelve qué pasó, para el mensaje de la pantalla. */
-export async function alternarFavorito(
-  cartera: Cartera,
-  userId: string,
-  nombre: string,
-): Promise<"added" | "removed"> {
-  const { data: existente, error: errLeer }: Resultado<{ id: string }[]> = await supabaseServer
-    .from("cxc_favorites")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("nombre_normalized", nombre)
-    .eq("cartera", cartera)
-    .limit(1);
-  if (errLeer) throw comoError(errLeer, "Error al leer favoritos");
-
-  const fila = existente?.[0];
-  if (fila) {
-    const { error } = await supabaseServer.from("cxc_favorites").delete().eq("id", fila.id);
-    if (error) throw comoError(error, "Error al quitar favorito");
-    return "removed";
-  }
-
-  const { error } = await supabaseServer
-    .from("cxc_favorites")
-    .insert({ user_id: userId, nombre_normalized: nombre, cartera });
-  if (error) throw comoError(error, "Error al guardar favorito");
-  return "added";
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATOS DE CONTACTO (`cxc_client_overrides`)

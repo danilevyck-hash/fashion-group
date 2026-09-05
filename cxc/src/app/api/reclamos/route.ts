@@ -6,6 +6,7 @@ import { getSession } from "@/lib/require-auth";
 import { validateReclamoFull } from "@/lib/reclamos/validate";
 import { buildReclamoItemRows } from "@/lib/reclamos/item-rows";
 import { reclamoInitials } from "@/lib/empresa-mapping";
+import { datosDeEmpresa } from "@/lib/reclamos/empresas";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,12 @@ export async function POST(req: NextRequest) {
   // Obligatoriedad (cabecera + ítems). Solo notas / factura PDF / fotos opcionales.
   const vErr = validateReclamoFull({ empresa, nro_factura, fecha_reclamo, nro_orden_compra }, items);
   if (vErr) return NextResponse.json({ error: vErr }, { status: 400 });
+
+  // 🔴 El proveedor, la marca y su CÓDIGO salen del mapa del servidor, no del
+  // cuerpo del request: EMPRESAS_MAP es la fuente única. Si la empresa no está
+  // en el mapa (dato viejo), se conserva lo que mandó el cliente y el código
+  // queda vacío — un reclamo sin código no se pega a ningún proveedor.
+  const empInfo = datosDeEmpresa(empresa);
 
   // Número <INICIALES>-{año}-{correlativo} con correlativo INDEPENDIENTE por
   // empresa Y por año (ej. VI-2026-0001, FW-2026-0001). El correlativo es el MAX
@@ -68,8 +75,9 @@ export async function POST(req: NextRequest) {
       .insert({
         nro_reclamo: attemptedNro,
         empresa,
-        proveedor: proveedor || "",
-        marca: marca || "",
+        proveedor: empInfo?.proveedor ?? (proveedor || ""),
+        marca: empInfo?.marca ?? (marca || ""),
+        proveedor_codigo: empInfo?.proveedor_codigo ?? null,
         nro_factura,
         nro_orden_compra,
         fecha_reclamo,

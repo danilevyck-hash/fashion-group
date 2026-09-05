@@ -339,19 +339,23 @@ describe("lib/catalogo/enviar-switch-route — *_orders y *_switch_envios (20260
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("lib/cxc/anotaciones — columna `cartera` (20260813120000)", () => {
-  it("CONTROL: lee favoritos de ESA cartera", async () => {
-    porTabla.cxc_favorites = { data: [{ nombre_normalized: "CITY MALL" }], error: null };
-    const { leerFavoritos } = await import("@/lib/cxc/anotaciones");
-    expect(await leerFavoritos("boston", "daniel")).toEqual(["CITY MALL"]);
-    expect(toques.cxc_favorites).toBe(1);
+  // ⚠️ Los dos casos de este bloque se medían sobre los FAVORITOS. La estrella
+  // se retiró el 4-sep-2026 (`cxc_favorites` sin lectores), así que la misma
+  // regla se mide sobre las anotaciones que quedan vivas: las notas de contacto
+  // y la bitácora.
+  it("CONTROL: lee los contactos de ESA cartera", async () => {
+    porTabla.cxc_client_overrides = { data: [{ nombre_normalized: "CITY MALL" }], error: null };
+    const { leerOverrides } = await import("@/lib/cxc/anotaciones");
+    expect((await leerOverrides("boston")).map((o) => o.nombre_normalized)).toEqual(["CITY MALL"]);
+    expect(toques.cxc_client_overrides).toBe(1);
   });
 
   it("🔴 42703 en `cartera` → LANZA con el code, UNA sola consulta, NADA escrito (antes: el grupo reintentaba sin cartera)", async () => {
-    porTabla.cxc_favorites = { data: null, error: COL_42703 };
+    porTabla.cxc_client_overrides = { data: null, error: COL_42703 };
     porTabla.cxc_contact_log = { data: null, error: COL_PGRST204 };
-    const { leerFavoritos, registrarContacto } = await import("@/lib/cxc/anotaciones");
-    await expect(leerFavoritos("grupo", "daniel")).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42703" });
-    expect(toques.cxc_favorites).toBe(1);
+    const { leerOverrides, registrarContacto } = await import("@/lib/cxc/anotaciones");
+    await expect(leerOverrides("grupo")).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42703" });
+    expect(toques.cxc_client_overrides).toBe(1);
     await expect(registrarContacto("grupo", "CITY MALL", "llamada")).rejects.toMatchObject({ name: "ErrorAnotacion", code: "PGRST204" });
     expect(toques.cxc_contact_log).toBe(1);
     // 🔴 Boston nunca en el CXC del grupo: lo que se intentó escribir llevaba la cartera.

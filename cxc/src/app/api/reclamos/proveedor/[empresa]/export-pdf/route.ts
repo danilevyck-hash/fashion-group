@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { buildBulkReclamosPdf, fetchReclamosForEmpresa, BulkSelector } from "@/lib/reclamos/pdf-bulk";
+import { buildBulkReclamosPdf, type ReclamoFull } from "@/lib/reclamos/pdf-bulk";
+import { fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/fetch-empresa";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     if (!empresa) return NextResponse.json({ error: "Empresa requerida" }, { status: 400 });
 
     const body = (await req.json().catch(() => ({}))) as BulkSelector;
-    const reclamos = await fetchReclamosForEmpresa(empresa, body);
+    const reclamos = await fetchReclamosForEmpresa<ReclamoFull>(empresa, body);
     if (!reclamos.length) {
       return NextResponse.json({ error: "No hay reclamos para los criterios indicados." }, { status: 404 });
     }

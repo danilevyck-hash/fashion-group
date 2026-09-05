@@ -49,6 +49,10 @@ export const CRON_STALE_HOURS_DEFAULT = 26;
 export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   "grupo-resumen-mensual": 33 * 24,
   "catalogos-fotos-resumen": 8 * 24,
+  // El directorio de clientes de Boston corre los DOMINGOS (07:10 UTC): el hueco
+  // más largo entre dos éxitos es 7 días, y 8 lo cubren con jitter. Mismo número
+  // y mismo motivo que el resumen semanal de fotos.
+  "sync-clientes-boston": 8 * 24,
   // Tres pasadas TODOS los días (15:00, 20:00 y 22:15 UTC): entre la última de
   // una noche y la primera de la mañana siguiente pasan 16h45 (22:15 → 15:00 del
   // día siguiente). El umbral de siempre (26h) le sigue quedando holgado —9h15
@@ -412,6 +416,8 @@ export const NUNCA_SILENCIAR = new Set([
   "switch-reconciliacion",
   "grupo-resumen-mensual",
   "catalogos-fotos-resumen",
+  // Semanal (domingos): su próxima oportunidad es dentro de siete días, no hoy.
+  "sync-clientes-boston",
 ]);
 
 /**
@@ -552,6 +558,17 @@ export const SEED_TOLERANT_CRONS = [
   // fila en `switch_sync_log`. Promover a CRONS_FAIL_CLOSED cuando lleve días
   // sembrado (el mismo camino que recorrió Tommy).
   "sync-ingresos-mercancia",
+  // DIRECTORIO de clientes de Confecciones Boston (domingos 07:10 UTC = domingo
+  // 2:10 a.m. de Panamá). Seed-tolerante y por partida doble: además de la
+  // siembra normal, una entrada SEMANAL puede tardar hasta siete días en dejar
+  // su primera fila — con vigilancia fail-closed, ese primer domingo daría un
+  // 503 falso. Umbral propio de 8 días en CRON_STALE_HOURS_POR_CRON. Promover a
+  // CRONS_FAIL_CLOSED cuando lleve varias semanas sembrado.
+  //
+  // 🩸 Existe porque `switch_clientes` de Boston llevaba 37 días congelado: su
+  // estado de cuenta por API está vetado (EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON) y
+  // el directorio viajaba adentro de ESE sync.
+  "sync-clientes-boston",
 ];
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
@@ -613,6 +630,18 @@ export interface SwitchCronEntrada {
   cron: string;
   /** Hora UTC "hhmm" del schedule en vercel.json. */
   hhmmUtc: string;
+  /**
+   * Día de la semana (0 = domingo) si la entrada NO corre todos los días.
+   * Ausente = diaria, que es el caso de todas menos una.
+   *
+   * Existe desde el 5-sep-2026, cuando entró la primera entrada SEMANAL que
+   * toca Switch (`sync-clientes-boston`, domingos). Sin este campo el espejo
+   * contra vercel.json comparaba contra un `"m h * * *"` armado a mano y una
+   * entrada semanal no podía existir. La separación por empresa se sigue
+   * midiendo como si fuera diaria: es la lectura conservadora, y el domingo es
+   * justamente el día en que sí se cruzan.
+   */
+  diaSemana?: number;
   /** Empresas cuyo Switch toca esa entrada. */
   empresas: readonly string[];
 }
@@ -648,6 +677,13 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // encima con changesession=SI, que expulsa a quien esté en el panel), así que
   // le corresponde la misma separación mínima que a las demás. Queda a 20 min de
   // sync-recibos (07:50) y a 30 de switch-articulos (08:40).
+  // DIRECTORIO de clientes de Boston, SEMANAL (domingos). Entra al cronograma
+  // como cualquier otra entrada que toca Switch: pide un token de esa empresa, y
+  // Switch admite uno solo por usuario. Queda a 40 min del bloque `all-0630`
+  // (que también toca Boston) y a 40 de sync-recibos (07:50) — el DOBLE de
+  // SEPARACION_MINIMA_MIN por los dos lados. Domingo 2:10 a.m. de Panamá: nadie
+  // está adentro.
+  { cron: "sync-clientes-boston", hhmmUtc: "0710", diaSemana: 0, empresas: ["confecciones_boston"] },
   { cron: "boston-cartera", hhmmUtc: "0810", empresas: ["confecciones_boston"] },
   { cron: "switch-articulos", hhmmUtc: "0840", empresas: CRON_EMPRESAS_TODAS },
   // MAYOR CONTABLE de las 8 empresas (09:05 UTC = 04:05 a.m. Panamá). Abre

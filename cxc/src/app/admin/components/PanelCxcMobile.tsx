@@ -78,8 +78,6 @@ interface PanelCxcMobileProps {
   setRiskFilter: (v: RiskFilter) => void;
   companyFilter: string;
   setCompanyFilter: (v: string) => void;
-  favorites: Set<string>;
-  onToggleFavorite: (name: string) => void;
   onOpenEmail: (client: ConsolidatedClient) => void;
   onWhatsApp: (client: ConsolidatedClient) => void;
   onCopyMessage: (client: ConsolidatedClient) => void;
@@ -103,8 +101,6 @@ export default function PanelCxcMobile({
   setRiskFilter,
   companyFilter,
   setCompanyFilter,
-  favorites,
-  onToggleFavorite,
   onOpenEmail,
   onWhatsApp,
   onCopyMessage,
@@ -135,15 +131,12 @@ export default function PanelCxcMobile({
     return { total, current, watch, overdue, cCount, wCount, oCount };
   }, [roleClients]);
 
-  // Ordenamiento mobile: favoritos primero, negativos al final, y después por el
-  // tramo del chip encendido (de mayor a menor); sin chip, por total. Misma regla
-  // y mismo comparador que el escritorio (lib/cxc-orden) — en móvil no hay títulos
-  // de columna que tocar, así que el chip es el único que manda el orden.
+  // Ordenamiento mobile: negativos al final, y después por el tramo del chip
+  // encendido (de mayor a menor); sin chip, por total. Misma regla y mismo
+  // comparador que el escritorio (lib/cxc-orden) — en móvil no hay títulos de
+  // columna que tocar, así que el chip es el único que manda el orden.
   const orden = useMemo(() => ordenParaRiskFilter(riskFilter), [riskFilter]);
-  const sortedMobile = useMemo(
-    () => ordenarClientes(filtered, { orden, esFavorito: (n) => favorites.has(n) }),
-    [filtered, favorites, orden]
-  );
+  const sortedMobile = useMemo(() => ordenarClientes(filtered, { orden }), [filtered, orden]);
 
   const [expandedName, setExpandedName] = useState<string | null>(null);
   // Qué cliente tiene abierto su bloque «Últimos pagos» — INDEPENDIENTE de la
@@ -222,8 +215,6 @@ export default function PanelCxcMobile({
                   <MobileClientCard
                     client={client}
                     cxcCompanies={cxcCompanies}
-                    isFavorite={favorites.has(client.nombre_normalized)}
-                    onToggleFavorite={() => onToggleFavorite(client.nombre_normalized)}
                     isExpanded={isExpanded}
                     onToggle={() => setExpandedName(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
                     pagosAbiertos={pagosAbiertos === client.nombre_normalized}
@@ -520,8 +511,6 @@ function worstBucketBorder(client: ConsolidatedClient): string {
 function MobileClientCard({
   client,
   cxcCompanies,
-  isFavorite,
-  onToggleFavorite,
   isExpanded,
   onToggle,
   pagosAbiertos,
@@ -531,8 +520,6 @@ function MobileClientCard({
 }: {
   client: ConsolidatedClient;
   cxcCompanies: Company[];
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
   isExpanded: boolean;
   onToggle: () => void;
   /** El bloque «Últimos pagos» de ESTA tarjeta está abierto (sin expandirla). */
@@ -557,23 +544,11 @@ function MobileClientCard({
       >
         <div className="flex items-start justify-between gap-2 px-3 py-3">
           <div className="min-w-0 flex-1">
-            {/* gap-0 a propósito: la estrella ya mide 44x44 (regla de la casa)
-                y su caja termina EXACTAMENTE donde arranca el nombre — el aire
-                que se ve alrededor del ☆ es parte de su área de tap, así que
-                errarle no expande la fila. El `-ml-3` la saca hacia el padding
-                de la card para que crecer de 36 a 44 le cueste al nombre 8px y
-                no 20. */}
+            {/* 🩸 Acá vivía la estrella ⭐ (44x44, con su `-ml-3` para que no
+                le comiera ancho al nombre). Se fue el 4-sep-2026 con el resto de
+                los favoritos: `cxc_favorites` nunca tuvo una fila. El nombre se
+                queda con esos 44 px. */}
             <div className="flex items-center gap-0">
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={e => { e.stopPropagation(); onToggleFavorite(); }}
-                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); } }}
-                aria-label={isFavorite ? "Quitar favorito" : "Marcar favorito"}
-                className="-my-3 -ml-3 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center text-base leading-none"
-              >
-                {isFavorite ? <span className="text-amber-500">★</span> : <span className="text-gray-300">☆</span>}
-              </span>
               {/* 12px es el PISO de legibilidad y no se baja de ahí. Lo que
                   faltaba para que los nombres largos entren se sacó de la
                   DERECHA (chevron fuera, gaps al mínimo, "···" metido en el

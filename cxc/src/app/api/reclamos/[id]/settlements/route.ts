@@ -18,6 +18,7 @@ import { requireRole } from "@/lib/requireRole";
 import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
 import { reclamoTaxes } from "@/lib/reclamos/tax";
+import { ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
 
 export const dynamic = "force-dynamic";
 
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const { error: updErr } = await supabaseServer
       .from("reclamos")
-      .update({ estado: "Pagado", monto_reclamado_snapshot: snapshot, updated_at: new Date().toISOString() })
+      .update({ estado: ESTADO_PAGADO, monto_reclamado_snapshot: snapshot, updated_at: new Date().toISOString() })
       .eq("id", id);
     if (updErr) {
       await compensar();

@@ -5,15 +5,10 @@ import { RItem } from "./types";
 export { TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, reclamoTaxes, esActiveShoes, ocultaPedido, impLabel, itbmsLabel, pctLabel } from "@/lib/reclamos/tax";
 export { ESTADO_PAGADO, esPendiente, soloPendientes } from "@/lib/reclamos/pendientes";
 
-export const EMPRESAS_MAP: Record<string, { proveedor: string; marca: string }> = {
-  "Vistana International": { proveedor: "American Designer Fashion", marca: "Calvin Klein" },
-  "Fashion Wear": { proveedor: "American Fashion Wear", marca: "Tommy Hilfiger" },
-  "Fashion Shoes": { proveedor: "American Fashion Wear", marca: "Tommy Hilfiger" },
-  "Active Shoes": { proveedor: "Latin Fitness Group", marca: "Reebok" },
-  "Active Wear": { proveedor: "Latin Fitness Group", marca: "Reebok" },
-};
-
-export const EMPRESAS = Object.keys(EMPRESAS_MAP);
+// El mapa empresa → proveedor · marca · CÓDIGO vive en src/lib/reclamos/empresas.ts
+// (lo lee también el servidor, que es quien escribe el código al guardar).
+export { EMPRESAS_MAP, EMPRESAS, datosDeEmpresa, empresaKeyDeReclamo } from "@/lib/reclamos/empresas";
+import { EMPRESAS_MAP } from "@/lib/reclamos/empresas";
 
 /** Mapea proveedor/marca extraídos por IA a la "empresa" del reclamo (que
  *  determina proveedor+marca al guardar). Match por marca+proveedor; si la marca

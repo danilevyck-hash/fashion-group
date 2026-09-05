@@ -48,10 +48,8 @@ import { useState } from "react";
 import { MONTHS, QUARTERS, formatCompactCurrency } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
-import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { ResumenAnual, type AnualData } from "./ResumenAnual";
 import {
   buildSlotsMetrica, cellValue, cellDelta, renderCellValue, celdaKey,
@@ -137,13 +135,7 @@ export function ResumenViewMobile({
   return (
     <div className="min-[1440px]:hidden space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <SyncStatus
-          tabla="facturas"
-          empresasEsperadas={SWITCH_FACTURAS_EMPRESA_KEYS}
-          empresaLabels={EMPRESA_KEY_TO_NAME}
-          variant="pill"
-          prefix="Sincronizado"
-        />
+        {/* 🔴 Sin píldora «Sincronizado» — ver el comentario de ResumenView. */}
         {/* "Actualizar ahora" (admin/secretaria) — un clic = las 8 empresas en
             secuencia + refresh-vistas como paso final. */}
         <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={() => onReloadData?.()} />

@@ -55,8 +55,10 @@ const VERCEL: { crons: VercelCron[] } = JSON.parse(
 const rutaDe = (cron: string) =>
   `/api/cron/${cron.startsWith("switch-sync ") ? "switch-sync" : cron}`;
 
-/** "hhmm" → expresión cron diaria de vercel.json ("0 15 * * *"). */
-const scheduleDe = (hhmm: string) => `${Number(hhmm.slice(2, 4))} ${Number(hhmm.slice(0, 2))} * * *`;
+/** Entrada del cronograma → expresión cron de vercel.json ("0 15 * * *", o
+ *  "10 7 * * 0" si la entrada es semanal). */
+const scheduleDe = (e: { hhmmUtc: string; diaSemana?: number }) =>
+  `${Number(e.hhmmUtc.slice(2, 4))} ${Number(e.hhmmUtc.slice(0, 2))} * * ${e.diaSemana ?? "*"}`;
 
 /** Rutas de cron que abren sesión en el Switch de alguna empresa. Todo lo que
  *  esté acá TIENE que estar en SWITCH_CRON_ENTRADAS (y viceversa). */
@@ -66,11 +68,12 @@ const RUTAS_QUE_TOCAN_SWITCH = [...new Set(SWITCH_CRON_ENTRADAS.map((e) => rutaD
 const entradasVercelSwitch = VERCEL.crons
   .filter((c) => RUTAS_QUE_TOCAN_SWITCH.includes(c.path.split("?")[0]))
   .map((c) => {
-    const [min, hora] = c.schedule.split(" ");
+    const [min, hora, , , dow] = c.schedule.split(" ");
     return {
       ruta: c.path.split("?")[0],
       path: c.path,
       hhmm: `${hora.padStart(2, "0")}${min.padStart(2, "0")}`,
+      dow,
     };
   });
 
@@ -80,7 +83,7 @@ describe("SWITCH_CRON_ENTRADAS — espejo bidireccional de vercel.json", () => {
     for (const e of SWITCH_CRON_ENTRADAS) {
       const ruta = rutaDe(e.cron);
       const match = VERCEL.crons.filter(
-        (c) => c.path.split("?")[0] === ruta && c.schedule === scheduleDe(e.hhmmUtc),
+        (c) => c.path.split("?")[0] === ruta && c.schedule === scheduleDe(e),
       );
       expect(
         match.length,
@@ -92,7 +95,10 @@ describe("SWITCH_CRON_ENTRADAS — espejo bidireccional de vercel.json", () => {
   it("cada entrada de vercel.json que toca Switch está en el cronograma", () => {
     for (const v of entradasVercelSwitch) {
       const match = SWITCH_CRON_ENTRADAS.filter(
-        (e) => rutaDe(e.cron) === v.ruta && e.hhmmUtc === v.hhmm,
+        (e) =>
+          rutaDe(e.cron) === v.ruta &&
+          e.hhmmUtc === v.hhmm &&
+          String(e.diaSemana ?? "*") === v.dow,
       );
       expect(match.length, `${v.path} (${v.hhmm}) falta en SWITCH_CRON_ENTRADAS`).toBe(1);
     }

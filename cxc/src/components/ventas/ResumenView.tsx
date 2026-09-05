@@ -3,13 +3,8 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { ChevronRight } from "lucide-react";
-import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
-import {
-  SWITCH_FACTURAS_EMPRESA_KEYS,
-  EMPRESA_KEY_TO_NAME,
-} from "@/lib/empresa-mapping";
 import type {
   VentasResumen, Multifashion, ProyeccionResp, ProyeccionEmpresa, ProyeccionGrupo,
   EmpresaMonthlySales,
@@ -328,20 +323,17 @@ export function ResumenView({
           year={selectedYear}
         />
       )}
-      {/* Toolbar — sync pill (left) · controls (right). El meta "Mostrando
-          mes a mes vs 2025" y la nota "Ajustado al día de corte (X may)" se
-          quitaron por ruido: la tabla muestra las columnas del prev year
-          explícitas y el footer "Comparativo vs <mes> 1-X 2025" ya marca
-          el cutoff. El pill + warning ámbar son suficientes acá. */}
+      {/* Toolbar — «Actualizar ahora» (izquierda) · controles (derecha).
+          🔴 SIN píldora «Sincronizado» (4-sep-2026). Vigilaba 3 empresas de 8
+          —con una lista escrita a mano, hoy retirada de `empresa-mapping.ts`—
+          mientras el cron cubre las ocho, así que Vistana o Fashion Wear
+          congeladas se veían en VERDE.
+          Daniel: «¿de qué sirve tenerlo si ya el sistema corre fluido y si no me
+          avisa por Telegram para arreglarlo?». Quien avisa es `datos-frescos.ts`
+          —las 8, `empresasConFacturas()`, +24 h por Telegram— más la regla de
+          dos fallos seguidos. Candado: `textos-pendientes-284.test.ts`. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <SyncStatus
-            tabla="facturas"
-            empresasEsperadas={SWITCH_FACTURAS_EMPRESA_KEYS}
-            empresaLabels={EMPRESA_KEY_TO_NAME}
-            variant="pill"
-            prefix="Sincronizado"
-          />
           {/* "Actualizar ahora" (admin/secretaria) — la vista es de todas las
               empresas: UN clic actualiza facturas de las 8 EN SECUENCIA (sin
               menú; sesión única Switch — nunca 2 a la vez) + refresh-vistas

@@ -115,16 +115,20 @@ export const ALL_EMPRESA_KEYS = [
 export type EmpresaKey = typeof ALL_EMPRESA_KEYS[number];
 
 /**
- * Empresas que el cron switch-sync?tipo=facturas pobla en switch_facturas.
- * Lista usada por el indicador SyncStatus para detectar empresas que
- * deberían estar al día pero no lo están. Si en el futuro se agrega una
- * empresa al sync de facturas, actualizar acá y la UI la cubre automático.
+ * 🩸 `SWITCH_FACTURAS_EMPRESA_KEYS` se retiró el 4-sep-2026, con la píldora
+ * «Sincronizado» de Ventas › Resumen que era su única lectora.
+ *
+ * La lista decía "las empresas que el cron de facturas pobla" y se había
+ * quedado en TRES (`active_shoes`, `active_wear`, `american_classic`) mientras
+ * el cron cubre las OCHO: la píldora vigilaba 3 de 8 y mostraba en VERDE un
+ * Resumen con Vistana o Fashion Wear congeladas. Una lista escrita a mano que
+ * describe a un cron es el mismo modo de falla que ya cobró `CXC_GRUPO_EMPRESA_KEYS`
+ * (ver abajo) — por eso no se "arregló" agregándole las cinco que faltaban:
+ * quien vigila las ventas es `src/lib/datos-frescos.ts`, que DERIVA su lista de
+ * `empresasConFacturas()` y avisa por Telegram a las +24 h.
+ *
+ * Para la lista real: `empresasConFacturas()` en `switch-api/empresas.ts`.
  */
-export const SWITCH_FACTURAS_EMPRESA_KEYS = [
-  "active_shoes",
-  "active_wear",
-  "american_classic",
-] as const;
 
 /**
  * CARTERA DEL GRUPO — las 6 B2B. Lo que se suma, se cobra y se le manda por

@@ -350,7 +350,7 @@ Además la pantalla lee `/api/clientes` (a través de `ClientePicker`) y
   `una_vez` en silencio (`aRecordatorio`), y ese recordatorio deja de repetirse sin error.
 - Tocar el texto exacto del `detail` **«sin cheques por vencer»** → lo lee la recuperación de
   `switch-reconciliacion` y hay candados que lo esperan tal cual.
-- 🔴 **`recordatorios` NO está en el backup.** Ver §9 › *Qué NO se respalda*.
+- ✅ **`recordatorios` entró al backup el 5-sep-2026.** Ver §9.
 
 ## Por qué está así
 
@@ -1031,7 +1031,7 @@ Ver §2 › *Qué lo rompe* para las filas de `integrity-check` y de las vistas 
 ## Lo que sobra o no cuadra
 
 1. **`data_integrity_checks` crece sin techo y sin poda**: 821 filas y subiendo 7 por día.
-   Y **no está en el backup**.
+   Y desde el 5-sep-2026 **sí está en el backup**.
 2. **El `CHECK_INFO` de la pantalla cubre los 7 vivos** pero incluye entradas para checks que ya no
    existen — no: verificado, cubre exactamente los 7. Lo que sí sobra es que
    `switch_facturas_continuidad` explica «Backfill con `scripts/switch-backfill.ts`», una
@@ -2051,8 +2051,8 @@ Un solo path, `/api/cron/backup`, con tres «grupos» y **ocho entradas** en `ve
 
 | Grupo | Entradas UTC | Qué copia | Heartbeat |
 |---|---|---|---|
-| **core** (sin params) | 06:00 · 10:30 · 18:30 | **48 tablas** manuales/config (49 archivos: `fg_users` sale en dos) → `backups/YYYY-MM-DD/<tabla>.ndjson.gz` + `meta.json` | `backup` |
-| **`?grupo=switch`** | 06:45 · 11:15 · **23:30** | **7 tablas `switch_*` + `multifashion_tickets`** → misma carpeta + `meta-switch.json` | `backup-switch` |
+| **core** (sin params) | 06:00 · 10:30 · 18:30 | **113 tablas** manuales/config (114 archivos: `fg_users` sale en dos) → `backups/YYYY-MM-DD/<tabla>.ndjson.gz` + `meta.json` | `backup` |
+| **`?grupo=switch`** | 06:45 · 11:15 · **23:30** | **11 tablas `switch_*` + `multifashion_tickets`** (12) → misma carpeta + `meta-switch.json` | `backup-switch` |
 | **`?grupo=storage`** | 04:00 · 15:30 | los ~3.2 K archivos de 5 buckets → **solo a R2**, `_storage/<bucket>/<path>` | `backup-storage` |
 
 Las 2ª y 3ª entradas de cada grupo son **«segunda oportunidad»**: no-op si una anterior ya registró
@@ -2066,10 +2066,483 @@ cambia: la **última** entrada del día siempre alerta; el fallo se persiste igu
 
 ## Formato y contenido
 
-NDJSON gzipeado **por tabla**, paginado de a 1.000 con **orden estable** (`ORDER_BY`, default `id`;
-excepciones: `comision_vendedor_tasa` → `vendedor_nombre`, `vendedores` → `(empresa_key, nombre)`,
-`app_settings` → `key`). Reemplazó un `backup.json` monolítico que **truncaba a 1.000 filas** por el
-cap silencioso de PostgREST.
+NDJSON gzipeado **por tabla**, paginado de a 1.000 con **orden estable** (`ORDER_BY`, default `id`).
+Reemplazó un `backup.json` monolítico que **truncaba a 1.000 filas** por el cap silencioso de
+PostgREST.
+
+🩸 **Una tabla cuya llave primaria NO es `id` y no está en `ORDER_BY` deja un respaldo INCOMPLETO
+que parece completo**: sin orden determinista, PostgREST puede saltear filas entre página y página y
+nada lo dice. Hasta el 5-sep-2026 el `ORDER_BY` tenía **tres** excepciones escritas a mano; hoy son
+**19**, y no se escriben a ojo: la llave real de producción vive medida en `PK_QUE_NO_ES_ID`
+(`src/lib/backup/tablas.ts`) y `backup-nada-sin-copia.test.ts` exige que el `ORDER_BY` la cubra
+**columna por columna** para toda tabla respaldada — y que no sobre ninguno.
+
+🔴 **Los hashes de contraseña van en archivo aparte**: `fg_users.ndjson.gz` **sin** `password`, y
+`fg_users_auth.ndjson.gz` con `id, name, password`. Los dos en el mismo bucket privado — para que un
+restore no deje a todos sin login.
+
+**Por qué el split core / switch:** ~310 K filas extra ≈ 160-175 MB NDJSON ≈ 310 páginas de fetch
+(60-150 s) + gzip + doble upload. Nació bajo el techo de 300 s del plan Hobby; con Pro son 800 s por
+grupo. Prioridad dentro del grupo switch: **`switch_articulo_diario` primero** porque es
+**IRRECUPERABLE de Switch** (el API solo da el stock del día; el histórico diario solo existe aquí).
+
+## La réplica a Cloudflare R2 (`src/lib/backup/r2.ts`)
+
+- **Datos**: `data/YYYY-MM-DD/…`, con **fecha en el path**. Antes eran paths estables y R2 tenía UN
+  solo punto en el tiempo: un borrado lógico replicado hoy dejaba el backup off-site igual de roto.
+- **`meta.json` y `meta-switch.json` también se replican**: sin el meta, `scripts/restore.mjs` no
+  puede correr desde R2 (es su índice de datasets).
+- **Storage**: paths **estables** `_storage/<bucket>/<path>` — son binarios inmutables; versionarlos
+  por fecha multiplicaría 198 MB por día sin ganar nada.
+- **Manifest** (`key → "size|sha256"`): solo se sube lo que cambió. Cubre el catch-up del **mismo
+  día**; **no es dedup entre días** (mañana son keys nuevas). El manifest de datos se poda a 7 días.
+- 🔴 **Verificación post-subida (HEAD)** tras cada PUT: sin esto, un PUT «200 pero vacío» quedaba en
+  el manifest y jamás se reintentaba.
+- 🔴 **Verificación de lo OMITIDO** (HEAD muestreado): un key con firma igual se omitía **para
+  siempre** aunque alguien lo hubiera borrado en R2, y el cron reportaba éxito. Ahora se verifican
+  todos los ~57 de datos y una ventana rotativa de los ~3.2 K de Storage.
+- **Deadlines**: `R2_DEADLINE_MS = 740 s` y `STORAGE_R2_DEADLINE_MS = 740 s`. Lo que no entra queda
+  **pendiente** y lo toma la corrida siguiente.
+
+## Completitud y retención
+
+🔴 **`saludR2`**: una carpeta `data/<fecha>/` la escriben **DOS** invocaciones (core y switch) y con
+una sola **el día NO se restaura**. Pasó el 25-jul-2026: el deploy entró después de la corrida core,
+las entradas extra fueron no-op, y `restore.mjs --list` mostraba esa fecha como disponible mientras
+el restore moría con 404 en `meta.json`. Ahora la corrida core evalúa **AYER** y alerta por 🔧
+SISTEMA si quedó a medias.
+
+| Destino | Retención |
+|---|---|
+| Supabase Storage | `RETENTION_DAYS = 21` días (bajó de 30 — el histórico largo vive en R2) |
+| Cloudflare R2 | política **calculada y reportada** (`retencionR2`: 21 diarios + 8 semanales + 24 mensuales ≈ 53 carpetas ≈ 1,6 GB) pero 🔴 **NO BORRA NADA**. Un *lifecycle rule* de Cloudflare no sabe hacer abuelo-padre-hijo, así que la poda tiene que ser código — queda para un PR aparte, con la lógica ya escrita en `r2RetentionPlan()` |
+
+🔴 **La réplica bucket→bucket dentro de Supabase se ELIMINÓ el 26-jul-2026, con medición**: eran
+1.597 archivos / 103,2 MB del **MISMO proyecto** —cero red de seguridad si se pierde el proyecto—
+ocupando el 18 % del GB del plan. Además llegaba tarde y a medias: nunca había copiado `marketing`
+(55,1 MB) ni `joybees-photos` (15,9 MB). Antes de borrarla se verificó archivo por archivo que R2
+tuviera los 3.204 originales con el mismo tamaño, y 20 al azar coincidieron byte a byte (sha256).
+**NO reintroducir la copia intra-Supabase.**
+
+## Restore
+
+`scripts/restore.mjs` — acepta `--source r2` para leer los mismos objetos desde R2, y
+`--storage <bucket>` para el camino de vuelta R2 → Supabase (probado el 26-jul con escritura real de
+1 archivo, sha256 idéntico).
+
+## 🔴 Qué se respalda, qué no, y quién lo decide (reescrito el 5-sep-2026)
+
+Hasta el 5-sep-2026 esta sección decía **56 tablas respaldadas de 136** y listaba ~30 que escriben
+personas y no tenían **ninguna copia**. La peor: **`asistencia_marcaciones`, 6.081 filas**, que las
+manda el reloj, son append-only y **no se pueden volver a pedir a ninguna parte**. El módulo
+Asistencia entero estaba afuera. También `bancos_saldos`, la configuración de comisiones, los tres
+catálogos nuevos y —🩸 esta misma página lo daba por respaldado y era falso— **`products`, el
+catálogo de Reebok**.
+
+🔑 **El hueco no fue descuido: fue que nada avisaba.** La lista de `DATASETS` era la única verdad y
+no se comparaba contra nada. Ahora la base entera está clasificada por **qué se pierde si se
+pierde**, en `src/lib/backup/tablas.ts`:
+
+| Clase | Qué es | ¿Obliga respaldo? | Cuántas |
+|---|---|---|---|
+| `personas` | la escriben personas — o un aparato nuestro, como el reloj —, o guarda una ventana que su fuente ya no sirve | 🔴 **sí** | 107 |
+| `congelada` | ya nadie la escribe y su origen no existe más | 🔴 **sí** | 5 |
+| `switch` | la reescribe un sync: se puede volver a bajar. Respaldarla es una decisión de **costo** | no | 15 |
+| `bitacora` | registro de operación; se regenera sola | no | 7 |
+| `retirada` | tabla muerta, sin lectores ni escritores | no | 2 |
+| `vista` | vista o materializada: se recalcula | nunca | 23 |
+
+⚠️ **La clase mira lo que se pierde, no quién escribe.** `egresos_varios` la baja un sync de Switch
+y aun así es `personas`: el reporte se reemplaza mes a mes y los meses viejos no vuelven. Los
+catálogos públicos igual: el PRECIO lo manda Switch, pero la foto, el badge y el nombre a mano no
+tienen otra fuente.
+
+### El candado — que es el arreglo de verdad
+
+`src/__tests__/lib/backup-nada-sin-copia.test.ts` pone el build **ROJO** si:
+
+- una migración crea una tabla que nadie clasificó (**es lo que impide que el hueco se repita**);
+- una tabla `personas` o `congelada` no está en el route;
+- una vista se cuela en el respaldo;
+- las marcaciones del reloj dejan de subirse **primeras** dentro de su grupo;
+- una tabla respaldada con PK distinta de `id` no tiene su `ORDER_BY` completo.
+
+Y `src/__tests__/integration/backup-tablas-produccion.test.ts` (`RUN_DB_TESTS=1`) compara la
+clasificación contra el catálogo de producción: **31 de las 136 tablas nacieron en el panel de
+Supabase**, antes de que existieran las migraciones, y el candado estático no puede verlas.
+
+### Lo que se dejó AFUERA a propósito
+
+| Tabla | Filas | Por qué no |
+|---|---|---|
+| `switch_factura_lineas` | 163.722 (**97,4 MB crudos**) | Re-derivable de verdad (`sync-factura-lineas` + `scripts/_backfill-factura-lineas.ts`). Meterla suma ~10 MB gz **todos los días** para proteger algo que se puede volver a pedir. Si Daniel la quiere, es una línea |
+| `switch_sync_log` · `multifashion_sync_log` | 9.496 · 98 | Se **podan a propósito**: respaldarlas sería guardar lo que decidimos tirar |
+| `cron_heartbeats` · `cron_email_errors` · `data_integrity_checks` · `login_attempts` | 75 · 86 · 821 · 4 | Estado de infraestructura: se regenera solo en horas |
+| `user_sessions` | 1.039 | 🔴 **Por seguridad**: son tokens de sesión vivos. Sacarlos del proyecto es repartir credenciales, y una sesión perdida se arregla volviendo a entrar |
+| `multifashion_caja_diaria` | 8 | Caché del arqueo, para no gastar la sesión única de Switch |
+| `empresa_gastos_mensuales` · `reebok_cart` | 0 · 0 | Tablas muertas |
+
+### Lo re-derivable que SÍ entró, y por qué
+
+- `switch_ingresos_mercancia` (17,6 MB crudos) — re-derivable **por el camino más frágil que
+  tenemos**: el reporte web del panel, el que Switch ya cambió dos veces en dos semanas.
+- `switch_articulo_info` (5,2 MB) — las FICHAS entran de a **400 por corrida**: volver a llenarlas
+  cuesta semanas de cron.
+- `switch_articulo_marca` (1,8 MB) — el mapa artículo → marca de Multifashion.
+- `switch_costo_diario` (296 KB) — 🩸 **parcialmente irrecuperable**: el último día de cada mes vale
+  $0 para siempre.
+- `inventory` (48 KB) — las tallas de Reebok: restaurar `products` sin ellas deja media pantalla.
+
+### Cuánto pesa ahora
+
+| | Antes | Después |
+|---|---|---|
+| Tablas respaldadas | 56 | **125** (113 core + 12 switch) |
+| Archivos por día | 59 (57 datos + 2 meta) | **128** (126 datos + 2 meta) |
+| Peso diario (gz, medido 4-sep-2026) | **33,60 MB** | **~37,2 MB** (+10,7%) |
+| Bucket `backups` (22 días vivos) | 721,9 MB | ~800 MB |
+
+⚠️ **El tiempo de corrida está estimado, no medido:** la core midió **248 s de 800** el 25-jul con
+59 archivos; suma ~69 tablas chiquitas (una página de fetch, un gzip y dos PUT con su HEAD cada una)
+→ +60-120 s. Lo que no entre queda **pendiente**, como siempre. Confirmar con la respuesta del
+primer cron después del deploy.
+
+---
+
+## Por qué está así
+
+| Decisión | Cita / fecha |
+|---|---|
+| **Dos canales, con reglas OPUESTAS** | Daniel, 27-jul-2026: *«tengo dividido los mensajes en info de la empresa y alertas cuando el sistema no funciona»*. *«No son un flujo con más o menos ruido: son DOS COSAS DISTINTAS. Meterlas en la misma bolsa fue el error de diseño original»* |
+| **📊 NEGOCIO no tiene perilla de silenciar, y que no exista es la garantía** | Daniel, 27-jul-2026: ***«NO, ES SUPER IMPORTANTE ESAS. NECESITO SABER QUE PASA EN LA EMPRESA Y ESO AYUDA BASTANTE»*** |
+| **El destino es el PAR (token, chat), no solo el chat** | en un chat privado el `chat_id` es el id del USUARIO, **idéntico para todos los bots**: apuntar el otro canal a ese número habría sido un no-op perfecto. Y Telegram solo deja escribir al bot al que el usuario le habló primero |
+| **El bot que se llama «sistema» lleva el NEGOCIO** | *«Es a propósito, lo decidió Daniel, y el nombre se cambia desde Telegram cuando quiera. **No invertir el ruteo para que haga juego con el nombre**»* |
+| **El resumen diario de ACS va al chat privado** | Daniel, 2-sep-2026: *«Solo me gustaría que las ventas de acs me lleguen solo a mí o por el chat de alertas, ya que ahí no está el celular de la empresa»*. **El motivo es privacidad, no severidad** |
+| **El resumen mensual del grupo también** | Daniel, 4-sep-2026: *«este mensaje también lo quiero en alertas de Telegram, no en negocio.»* |
+| **Y va sin el prefijo `🔧 SISTEMA ·`** | *«rotular la venta del día como avería sería mentir en la notificación del iPhone»* |
+| **`enviarNegocioPrivado` es función propia y no `enviarSistema` a secas** | *«hoy `enviarSistema` tampoco filtra nada por dentro, pero eso es CASUALIDAD, no diseño. El día que alguien agrupe o silencie DENTRO de `enviarSistema` el resumen se iría con la agrupación. La protección tiene que viajar CON el mensaje»* |
+| **El prefijo va al PRINCIPIO** | es lo único que se lee en la notificación del iPhone sin abrirla |
+| **El resumen mensual pasó del día 3 al día 1** | Daniel, 4-sep-2026: *«sí, lo quiero lo antes posible»*. Medido: el margen de «días 1-5» era del **sync de utilidad**, no del de ventas — las ventas cierran la misma noche (última factura de agosto: 31-ago 19:15 UTC) |
+| **Nadie llama `sendTelegramAlert` directo** | barrido global en `acs-resumen-canal-privado.test.ts` |
+| **El fail-safe reintenta en el canal de siempre** | *«Un aviso que no llega es peor que un aviso que llega al chat viejo»* |
+
+## Lo que se intentó y se retiró
+
+| Qué | Cuándo | Por qué se fue |
+|---|---|---|
+| **Un solo canal para todo** | hasta el 27-jul-2026 | El error de diseño original. Los avisos de negocio y las averías tienen reglas opuestas |
+| **El aviso de «costo sospechoso»** | 3-ago-2026 | Daniel, textual: ***«no quiero mensaje de costos»***. **Ya no se manda por NINGÚN canal.** Candado: `costo-sospechoso-canal.test.ts`. ⚠️ El comentario de `canal.ts` lo siguió listando hasta el 2-sep |
+| **Un `TELEGRAM_CHAT_ID_SISTEMA`** | nunca existió | Verificado contra Vercel el 2-sep-2026: solo hay `*_NEGOCIO`. SISTEMA cae al canal de siempre por la última rama de `destinoDeCanal` |
+| **El comentario que decía que NEGOCIO era el chat privado** | corregido el 2-sep-2026 | 🩸 Decía **exactamente lo contrario** de la realidad durante semanas. *«Es la clase de dato viejo que hace que el próximo cambio salga al chat equivocado»* |
+| **Telegram inmediato en los fallos de cron colaterales** | anti-ruido del 17-jul-2026 | Si la reconciliación, una 2ª oportunidad o el propio cron lo recupera en horas, **no se avisa**. Queda el rastro en `cron_email_errors` |
+| **Alertar en el primer fallo de backup del día** | — | 3 de las 5 alertas de backup de un mes eran fallos que se arreglaban solos en la 2ª entrada |
+| **11 pasadas diarias de `db-salud`** | 30-jul-2026 | Bajaron a **5** con la poda de alertas |
+
+## Cuánto se usa
+
+⚠️ **Los mensajes enviados no se guardan en ninguna tabla.** No hay log de Telegram: solo se sabe si
+el cron que lo mandó registró heartbeat. **No es medible** cuántos mensajes salen por día.
+
+Lo que se midió en su lugar — **cuántos lugares del código pueden mandar por cada canal**:
+
+| Canal | Llamadores distintos | Mensajes conocidos |
+|---|---|---|
+| 📊 NEGOCIO | **8 archivos** | cheques por vencer · guías sin despachar · fotos que faltan (semanal) · pedido nuevo (interno y público) · envío a Switch OK · guía despachada |
+| 🔒 NEGOCIO PRIVADO | **2 mensajes, 4 puntos de salida** | resumen diario de ventas de ACS (01:00) · resumen mensual del grupo (día 1, 13:00) |
+| 🔧 SISTEMA | **18 archivos** | reloj de asistencia caído/recuperado · huecos del reloj · 5 avisos de backup · 2 de recursos de la base · datos viejos · escalado de syncs · cuadre de costo · silencio de datos · campos obligatorios · envío a Switch fallido/ambiguo · clasificación desconocida · cron caído · checks `critical` · montos imposibles · renglones ilegibles |
+
+Frecuencia real, inferida de los datos: `cheques-alert` tiene hoy **2 cheques pendientes y 0
+recordatorios**, así que casi nunca manda; `integrity-check` lleva **90 días sin un `critical`**;
+`cuadre-costo` midió **0 disparos** en un backtest de 32 pares (may–ago 2026); `silencio-de-datos`
+midió **0 falsos positivos** en un backtest de 96 días.
+
+## Qué papeles y Excel produce
+
+🔴 **Ninguno.** Son mensajes de texto en Telegram, sin adjuntos. Los recibe:
+📊 NEGOCIO = un **grupo de tres** (Daniel + el celular de la empresa, que miran bodega y marketing);
+🔧 SISTEMA y 🔒 privado = el **chat privado de Daniel**.
+
+## Cómo probarlo a mano
+
+**A) Saber a dónde apunta cada canal SIN escribirle a nadie:**
+`GET /api/diag/canales-telegram` (con `Bearer $CRON_SECRET`, `?secret=`, o sesión de admin).
+Devuelve el bot y el chat de cada canal. **Read-only de verdad**: lo único que sale a la red es
+`getMe`, que es un GET. El token nunca sale entero — solo `bot_id`, los últimos 4 caracteres y el
+largo.
+🔴 **Por qué existe:** antes, la única forma de confirmar la configuración era **mandar un mensaje
+real** — spam para verificar una configuración. Y peor: el fail-safe hace que un mensaje que LLEGA
+**no pruebe** que el ruteo nuevo funciona (pudo haber llegado por el camino de rescate).
+
+**B) Mandar un mensaje de prueba de verdad, claramente rotulado:**
+`GET /api/cron/cheques-alert?test=true` (admin o `CRON_SECRET`) manda al canal 📊 NEGOCIO un mensaje
+que empieza con **🧪 (PRUEBA)**.
+
+**C) Verificar que un mensaje va al chat correcto:** manda el resumen mensual a mano con
+`GET /api/cron/grupo-resumen-mensual?secret=<CRON_SECRET>&mes=2026-08`. **Qué debería pasar:** llega
+al **privado de Daniel**, sin el prefijo `🔧 SISTEMA ·`. Si llega al grupo de tres, el ruteo se
+rompió.
+
+## Qué lo rompe
+
+| Qué falla | Qué pasa | Cómo se notaría |
+|---|---|---|
+| **Se borra `TELEGRAM_CHAT_ID_NEGOCIO`** | **todo el negocio se va al chat privado de Daniel** (última rama de `destinoDeCanal`) | los mensajes llegan, pero al chat equivocado: bodega y marketing dejan de ver las fotos y las guías |
+| **Se pone `TELEGRAM_BOT_TOKEN_NEGOCIO` sin su chat** | se ignora con warning y ese canal cae al de siempre | solo en los logs |
+| **Se borran `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`** | 🔴 **se pierde el fail-safe y el canal de SISTEMA entero**: `sendTelegramAlert` omite con warning y devuelve `false` | **nada avisa** — es el canal de las alertas el que se apagó |
+| **Telegram rechaza el mensaje de un canal aparte** | se reintenta **una vez** en el canal de siempre | el mensaje llega, con otro emisor |
+| **Telegram rechaza un mensaje de `enviarNegocioPrivado`** | 🔴 **no hay a quién reintentarle**: su destino ES el de siempre | lo cubre la reconciliación, que reenvía el resumen en sus 3 pasadas del día |
+| **Alguien agrega una perilla de silenciar dentro de `enviarSistema`** | el resumen de ventas **NO** se iría con ella: por eso `enviarNegocioPrivado` es función propia | el candado `acs-resumen-canal-privado.test.ts` pone el build rojo |
+| **Alguien llama `sendTelegramAlert` directo** | se salta el ruteo y el prefijo | barrido global en CI |
+| **Un cron manda dos veces el mismo aviso** | `cheques-alert` lo impide con `yaAvisoHoy` (heartbeat); los avisos de sistema, con anti-loop de 7 días por módulo | — |
+
+
+# 8. Los crons — `vercel.json` contra el registro de código
+
+## Los números de hoy
+
+**`vercel.json` tiene 80 entradas** (⚠️ `CLAUDE.md` dice 79) repartidas en **30 paths distintos**.
+Límite del plan Vercel Pro: 100 cron jobs por proyecto.
+
+🔴 **Una entrada = una ocurrencia al día.** Para frecuencia sub-diaria se agregan entradas separadas
+del mismo path, **NUNCA** una lista de horas (`0 15,19,23 * * *`), aunque Vercel Pro la acepte.
+
+| Path | Entradas | Path | Entradas |
+|---|---|---|---|
+| `switch-sync` | **18** | `sync-articulo-info` | 3 |
+| `backup` | **8** (3 core + 3 `?grupo=switch` + 2 `?grupo=storage`) | `switch-reconciliacion` | 3 |
+| `db-salud` | 5 | `asistencia-vigia` | 3 |
+| `tommy/calvin/reebok/joybees-catalogo` | 4 c/u = 16 | `acs-fidelizacion` | 2 |
+| `sync-recibos` | 4 | los otros 16 paths | 1 c/u |
+
+**Los dos únicos crons NO diarios:** `catalogos-fotos-resumen` (`30 13 * * 1`, lunes) y
+`grupo-resumen-mensual` (`0 13 1 * *`, día 1 — **cambió hoy**, era el día 3).
+
+### Lo que `CLAUDE.md` todavía no dice
+
+- **`/api/cron/cleanup-depurador-archivos` — `20 3 * * *` (03:20 UTC).** Nuevo el 4-sep-2026.
+  Borra los Excel del Historial del Depurador a los 90 días. 🔴 Borra el **archivo**, nunca la fila
+  con los totales. Solo DB + Storage, no toca Switch. Está en `SEED_TOLERANT_CRONS`.
+- El horario real de `backup?grupo=switch` es **06:45 / 11:15 / 23:30** (la tabla de `CLAUDE.md`
+  está bien; el comentario del código de `cron-telemetry.ts` dice «19:15» en un lugar).
+
+## El registro de código y la biyección
+
+🔴 **El criterio de runtime NO mira `vercel.json`.** Mira un registro que es **constante de código**
+(`src/lib/cron-telemetry.ts`), y la razón está escrita ahí: la regla ingenua «si no está en
+`vercel.json`, no alerto» sería **peor que el bug** — quien borrara una entrada por accidente
+apagaría la alerta junto con el cron, en silencio. Con el registro constante, borrar una entrada de
+`vercel.json` **no** encoge la vigilancia: el heartbeat envejece y los dos vigías alertan.
+
+Retirar un cron a propósito son **dos ediciones deliberadas** (`vercel.json` + el registro), y
+`src/__tests__/lib/cron-registro.test.ts` **exige la biyección**: tocar uno solo pone el build ROJO.
+
+Las tres listas:
+
+| Lista | Qué significa | Contenido |
+|---|---|---|
+| `CRONS_FAIL_CLOSED` (21) | fila de heartbeat **ausente = caído** | acs-fidelizacion, acs-resumen-diario, backup, cheques-alert, cleanup-packing-lists, cleanup-sessions, grupo-resumen-mensual, integrity-check, joybees-catalogo, reebok-catalogo, refresh-clientes-views, switch-articulos, switch-reconciliacion, switch-sync, sync-clientes-master, sync-proveedores, sync-recibos, sync-utilidad, tommy-catalogo |
+| `SEED_TOLERANT_CRONS` (14) | fila ausente = **todavía no sembrada**, no caída | backup-switch, backup-storage, calvin-catalogo, catalogos-fotos-resumen, boston-cartera, sync-factura-lineas, db-salud, guias-pendientes, **cleanup-depurador-archivos**, sync-articulo-info, asistencia-vigia, sync-egresos-varios, sync-ingresos-mercancia |
+| `HEARTBEATS_NO_CRON` (5) | acciones **manuales**, nadie las programa | sync-now-refresh-vistas, catalogos-fotos-nuevos:{reebok,joybees,tommy,calvin} |
+| `HEARTBEATS_EXTERNOS` (1) | se vigila pero **no** está en `vercel.json` | `vigia-externo` |
+
+Cada comentario de `SEED_TOLERANT_CRONS` dice explícitamente cuándo promover el cron a
+`CRONS_FAIL_CLOSED` («cuando la DDL esté corrida y lleve días sembrado»). Varios ya cumplen esa
+condición y siguen ahí.
+
+## Quién alimenta a quién
+
+```
+Switch (API JSON, token por USUARIO)
+  ├─ switch-sync ?tipo=all        → switch_facturas · switch_estadocuenta · switch_costo_diario
+  ├─ switch-sync ?tipo=facturas   → switch_facturas
+  ├─ switch-sync ?tipo=estadocuenta → switch_estadocuenta → (vistas de aging) → CXC
+  ├─ sync-recibos                 → switch_recibos       → comisión de cobro
+  ├─ sync-utilidad                → switch_factura_utilidad → comisiones y costo de las ND
+  ├─ sync-clientes-master         → clientes_master      → ClientePicker, Cheques, Guías, Ventas
+  ├─ sync-proveedores             → switch_proveedor_estadocuenta
+  ├─ sync-articulo-info           → switch_articulo_info → Ventas › Referencia, Catálogos
+  ├─ switch-articulos             → switch_articulo_diario → Productos, costo, Referencia
+  ├─ sync-factura-lineas          → switch_factura_lineas
+  └─ 4× *-catalogo                → products/tommy_/calvin_/joybees_products → catálogos públicos
+
+Switch (panel web Laravel, sesión que EXPULSA al humano)
+  ├─ boston-cartera               → switch_estadocuenta_aging_boston → módulo Boston
+  ├─ sync-ingresos-mercancia      → switch_ingresos_mercancia → «Compré», Referencia
+  └─ sync-egresos-varios          → egresos_varios + cuentas_contables → Gastos
+
+Solo base de datos (no tocan Switch)
+  ├─ refresh-clientes-views       → clientes_agregado_12m_vw / clientes_empresa_12m_vw
+  ├─ integrity-check              → data_integrity_checks → Data Health + 🔧 SISTEMA
+  ├─ cleanup-sessions             → user_sessions + poda de switch_sync_log + candados de sync
+  ├─ cleanup-packing-lists        → packing_lists (purga física a 90 d)
+  ├─ cleanup-depurador-archivos   → Storage del Depurador (90 d)
+  └─ db-salud                     → endpoint Prometheus de Supabase (ni tabla)
+
+Solo salida (leen y avisan; no escriben datos de negocio)
+  ├─ cheques-alert          → 📊 NEGOCIO
+  ├─ guias-pendientes       → 📊 NEGOCIO
+  ├─ catalogos-fotos-resumen→ 📊 NEGOCIO
+  ├─ acs-resumen-diario     → 🔒 privado
+  ├─ grupo-resumen-mensual  → 🔒 privado
+  ├─ acs-fidelizacion       → correo
+  └─ asistencia-vigia       → 🔧 SISTEMA
+
+El que arregla a los demás
+  └─ switch-reconciliacion (10/14/18 UTC) → re-ejecuta IN-PROCESS lo que no vio con success
+     (cheques-alert, integrity-check, sync-clientes-master, los dos resúmenes…), levanta los
+     candados atascados, y corre encima las alertas A/B de silencio y el cuadre de costo
+     — CERO crons nuevos.
+```
+
+🔴 **Crons que tocan la MISMA empresa en Switch van ≥ 15 min separados**
+(`SEPARACION_MINIMA_MIN`): Switch admite **un solo token válido por USUARIO** y cada empresa entra
+con un único usuario de API. El sistema entra como `daniel`, así que **cada corrida saca a Daniel
+del panel de esa empresa, y viceversa**.
+
+## Los dos vigías, y la vigilancia mutua
+
+- **Interno**: `switch-reconciliacion` (10/14/18 UTC) manda 🔧 SISTEMA por los crons stale.
+- **Externo**: cron-job.org llama `GET /api/health-crons` cada hora con `HEALTHCHECK_TOKEN`
+  (**no** `CRON_SECRET`, a propósito: un monitor de terceros no debe poder disparar crons).
+
+🩸 **Incidente 29-jul-2026:** bastaba UN cron stale para devolver 503, cron-job.org deshabilitó el
+monitor tras **26 fallos seguidos**, y nadie se enteró. Un cron roto le costó al sistema la
+vigilancia externa de los otros ~50. Hoy:
+- **200** = la vigilancia funciona (los hallazgos van en el cuerpo: `stale[]`, `staleCount`).
+- **503** = la vigilancia **no puede responder por sí sola**: el watchdog interno está caído, hay
+  caída masiva (≥ `UMBRAL_CAIDA_MASIVA`), o no se pudo leer `cron_heartbeats`.
+
+Y **el que vigila también es vigilado**: cada llamada autenticada escribe el heartbeat
+`vigia-externo`; si cron-job.org deja de llamar, esa fila envejece y el watchdog interno lo reporta
+a las 26 h. Ninguno de los dos puede morir callado, sin agregar un tercer vigilante.
+
+`health-crons` es además **recovery-aware**: un cron stale no cuenta para el 503 si tiene
+recuperación conocida, esa recuperación aún viene hoy, y lleva stale < 30 h. Sale como
+`pendingRecovery[]` con 200. **`switch-reconciliacion` y `grupo-resumen-mensual` jamás se silencian**,
+y un cron sin heartbeat (fila ausente) tampoco.
+
+## `cron_heartbeats` — 74 filas
+
+Columnas: **`cron_name`** (⚠️ no `job`) y `last_success_at`. Nada más.
+Medido: hay **19 filas de marcas retiradas** (`switch-sync:<slot>#recuperado` / `#visto`) con más de
+20 días de antigüedad, la más vieja de hace **41 días** (`switch-sync:all-0535#recuperado`,
+25-jul-2026). No alertan —`esHeartbeatNoVigilable` las salta— pero envejecen para siempre.
+`esHeartbeatHuerfano()` existe justo para que un TEST exija que no queden; `sync-mayor` se barre en
+la migración `20260914120000`.
+
+---
+
+## Por qué está así
+
+| Decisión | Cita / fecha |
+|---|---|
+| **Una entrada = una ocurrencia al día. NUNCA una lista de horas** | Vercel Pro acepta `0 15,19,23 * * *`, pero entonces las tres ocurrencias comparten un solo «slot» y no se puede saber cuál falló |
+| **El criterio de runtime NO mira `vercel.json`** | *«La regla ingenua sería "si no está en vercel.json, no alerto" — y sería PEOR que el bug: quien borrara una entrada por accidente apagaría la alerta del cron junto con el cron, en silencio»*. El registro es **constante de código** y el test exige la biyección |
+| **≥ 15 min entre crons de la misma empresa** | la sesión de Switch es por USUARIO. Ver §10 |
+| **Los crons de login web van de madrugada de Panamá** | cada login web **expulsa a Daniel del panel**. Y su recuperación solo corre en la pasada de las 10:00 UTC: *«un fallo de la corrida de las 2 a.m. se "arreglaba" sacando a Daniel de Switch a las 9 de la mañana»* |
+| **Los 4 catálogos pasaron de 2 a 4 pasadas diarias** | 13-ago-2026, todas dentro de la ventana de uso de Panamá (14:30–22:10 UTC = 9:30 a.m.–5:10 p.m.) |
+| **El código HTTP de `health-crons` dice «¿la vigilancia funciona?», no «¿hay hallazgos?»** | 29-jul-2026. Bastaba UN cron stale para devolver 503; cron-job.org deshabilitó el monitor tras **26 fallos seguidos**. *«Un cron roto le costó al sistema la vigilancia externa de los otros ~50»* |
+| **Vigilancia mutua en vez de un tercer vigilante** | *«El arreglo NO es otro cron (que también podría morirse en silencio)»*: si el vigía externo se cae, deja de escribir su heartbeat y el watchdog interno lo reporta a las 26 h |
+| **`health-crons` usa `HEALTHCHECK_TOKEN`, no `CRON_SECRET`** | *«un monitor de terceros no debe poder disparar crons»* |
+| **`switch-reconciliacion` y `grupo-resumen-mensual` JAMÁS se silencian** | el primero es el watchdog; el segundo es demasiado esporádico para asumir «recuperación en camino» |
+| **Un candado de sync atascado se suelta solo a los 30 min** | `RUNNING_STALE_MIN`, derivado del techo real de 800 s de la función |
+| **La poda de `switch_sync_log` va colgada de `cleanup-sessions`** | *«es el único cron de limpieza puramente de DB que ya existía, así que la poda se engancha aquí en vez de agregar una entrada nueva a vercel.json»* |
+
+## Lo que se intentó y se retiró
+
+| Qué | Cuándo | Por qué se fue |
+|---|---|---|
+| **`multifashion-sync`** | 26-jul-2026 | `multifashion_tickets` quedó congelada. Su fila en `cron_heartbeats` quedó **huérfana** — el motivo por el que existe `esHeartbeatHuerfano()` |
+| **`sync-mayor`** (09:05) | 13-ago-2026 | Daniel: ***«y entonces borra Mayor contable en el sistema»***. Un login web menos por día. Su fila huérfana se barre en la migración `20260914120000` |
+| **11 pasadas de `db-salud`** → 5 | 30-jul-2026 | Poda de alertas. ⚠️ La tabla de `CLAUDE.md` decía 11 hasta el 31-ago |
+| **La pasada de `asistencia-vigia` de las 13:45 UTC** | 10-ago-2026 | Quedaron 3 |
+| **El umbral propio de `asistencia-vigia`** | — | Corriendo todos los días su hueco más largo es 16 h 45 y el default de 26 h lo cubre. Hacía falta cuando corría solo de lunes a viernes |
+| **Los catálogos recuperándose en la pasada de las 14:00** | tras el incidente del 25-jul-2026 | `tommy-catalogo` se re-sincronizaba en **cada** pasada hasta reventar la invocación por `FUNCTION_INVOCATION_TIMEOUT`. Hoy la hora mínima es 15 → **solo la pasada de las 18:00 los recupera**. ⚠️ Consecuencia escrita, no escondida: los slots de las 19:4x y 21:5x/22:1x **no tienen recuperación el mismo día** |
+| **Fusionar los 3 grupos de backup en uno** | — | Nació bajo el techo de 300 s del plan Hobby. Con Pro cada grupo tiene 800 s propios; volver a fusionarlos *«se decide con datos, no aquí»* |
+
+## Cuánto se usa
+
+| Señal | Medida (4-sep-2026) |
+|---|---|
+| Entradas en `vercel.json` | **80** de un límite de 100 |
+| Paths distintos | **30** |
+| Ocurrencias por día (suma de entradas diarias) | **78** (las otras 2 son la semanal y la mensual) |
+| Filas en `cron_heartbeats` | **74** |
+| Filas huérfanas (marcas de slots retirados) | **19**, la más vieja de hace **41 días** |
+| Filas en `switch_sync_log` | **9.119**, podadas a 90 días conservando siempre las 10 últimas de cada par |
+| Crons que abren sesión en el **panel web** | **4** (utilidad, boston-cartera, ingresos, egresos) — los que expulsan a Daniel |
+| Crons que **no** tocan Switch | 10 (backups, limpiezas, integridad, refresh de vistas, db-salud, los avisos) |
+
+## Qué papeles y Excel produce
+
+🔴 **Ninguno directamente.** Los crons producen **filas en tablas**, **mensajes de Telegram** (§7),
+**archivos de backup** (§9) y **un correo**: `acs-fidelizacion`.
+
+## Cómo probarlo a mano
+
+1. **¿Está todo verde?** `GET /api/health-crons?token=<HEALTHCHECK_TOKEN>`.
+   **200** = la vigilancia funciona (los hallazgos van en el cuerpo: `stale[]`, `staleCount`,
+   `pendingRecovery[]`, `slotsCubiertos[]`). **503** = la vigilancia no puede responder por sí sola.
+2. **¿Cuándo corrió bien por última vez cada uno?** La tabla `cron_heartbeats`, columnas
+   **`cron_name`** (⚠️ no `job`) y `last_success_at`.
+3. **Disparar uno a mano:** todos aceptan `?secret=<CRON_SECRET>` o `Authorization: Bearer`, y
+   varios además la cookie de admin (`cheques-alert`, `integrity-check`, `cleanup-sessions`).
+   ⚠️ **Los que tocan Switch abren sesión**: respeta la regla de los 15 min y hazlo de madrugada si
+   es de los cuatro del panel web.
+4. **Que la biyección esté sana:** `npm test` — `cron-registro.test.ts` compara `vercel.json` contra
+   el registro de código y pone el build **rojo** si se tocó uno solo.
+5. **Ver qué descartó una corrida:** `switch_sync_log`, columnas `records_skipped` y
+   **`skip_details`** (jsonb).
+
+## Qué lo rompe
+
+Ver §11 para el mapa completo de qué se cae con cada cron. Lo propio del mecanismo:
+
+| Qué falla | Qué pasa | Cómo se notaría |
+|---|---|---|
+| **Se borra una entrada de `vercel.json` por accidente** | ese cron deja de correr, **pero la vigilancia NO se apaga** (el registro es constante de código): el heartbeat envejece y los dos vigías alertan | 🔧 SISTEMA a las 26 h + `stale[]` en `health-crons`. Y el build se pone **rojo** en CI por la biyección |
+| **Se retira un cron correctamente** (las dos ediciones) | deja de vigilarse, y su fila de `cron_heartbeats` queda **huérfana**: no alerta pero envejece para siempre | `esHeartbeatHuerfano()` existe para que un test lo exija; se barre con una migración |
+| **Se pasan las 100 entradas** | Vercel rechaza el deploy | error de despliegue |
+| **Dos crons de la misma empresa quedan a < 15 min** | se tumban el token de Switch | `cron-calendario.test.ts` lo impide en CI. En producción, uno falla limpio |
+| **Un cron largo desborda su ventana** | el margen real es menor que la distancia inicio-contra-inicio que mide el test | por eso los pares de crons largos se dejaron a **≥ 50 min** |
+| **La reconciliación se cae** | 🔴 se cae el watchdog interno **y** la recuperación de todos los colaterales | `health-crons` devuelve **503** — es una de sus tres condiciones |
+| **cron-job.org deshabilita el monitor** | se cae la vigilancia externa | el heartbeat `vigia-externo` envejece → el watchdog interno lo reporta a las 26 h. Es lo que faltó el 29-jul-2026 |
+| **Un `sync_type` nuevo que no está en el CHECK de `switch_sync_log`** | la corrida **no deja fila**: invisible, corra bien o mal | `SYNC_LOG_TYPES` + `sync-log-tipos-check.test.ts` |
+
+
+# 9. Los backups y la réplica a R2
+
+## Las tres corridas
+
+Un solo path, `/api/cron/backup`, con tres «grupos» y **ocho entradas** en `vercel.json`:
+
+| Grupo | Entradas UTC | Qué copia | Heartbeat |
+|---|---|---|---|
+| **core** (sin params) | 06:00 · 10:30 · 18:30 | **113 tablas** manuales/config (114 archivos: `fg_users` sale en dos) → `backups/YYYY-MM-DD/<tabla>.ndjson.gz` + `meta.json` | `backup` |
+| **`?grupo=switch`** | 06:45 · 11:15 · **23:30** | **11 tablas `switch_*` + `multifashion_tickets`** (12) → misma carpeta + `meta-switch.json` | `backup-switch` |
+| **`?grupo=storage`** | 04:00 · 15:30 | los ~3.2 K archivos de 5 buckets → **solo a R2**, `_storage/<bucket>/<path>` | `backup-storage` |
+
+Las 2ª y 3ª entradas de cada grupo son **«segunda oportunidad»**: no-op si una anterior ya registró
+success hoy (`cronSuccessHoyUtc`).
+
+🔴 **La alerta espera la segunda oportunidad.** Un fallo a las 06:00 ya no le suena el celular a
+Daniel si a las 10:30 se arregla solo — eso viola la regla del canal de sistema. Lo que **no**
+cambia: la **última** entrada del día siempre alerta; el fallo se persiste igual en
+`cron_email_errors`; sin heartbeat, `health-crons` y el watchdog lo ven stale.
+`alertaDeBackupEsperaSegundaOportunidad()`.
+
+## Formato y contenido
+
+NDJSON gzipeado **por tabla**, paginado de a 1.000 con **orden estable** (`ORDER_BY`, default `id`).
+Reemplazó un `backup.json` monolítico que **truncaba a 1.000 filas** por el cap silencioso de
+PostgREST.
+
+🩸 **Una tabla cuya llave primaria NO es `id` y no está en `ORDER_BY` deja un respaldo INCOMPLETO
+que parece completo**: sin orden determinista, PostgREST puede saltear filas entre página y página y
+nada lo dice. Hasta el 5-sep-2026 el `ORDER_BY` tenía **tres** excepciones escritas a mano; hoy son
+**19**, y no se escriben a ojo: la llave real de producción vive medida en `PK_QUE_NO_ES_ID`
+(`src/lib/backup/tablas.ts`) y `backup-nada-sin-copia.test.ts` exige que el `ORDER_BY` la cubra
+**columna por columna** para toda tabla respaldada — y que no sobre ninguno.
 
 🔴 **Los hashes de contraseña van en archivo aparte**: `fg_users.ndjson.gz` **sin** `password`, y
 `fg_users_auth.ndjson.gz` con `id, name, password`. Los dos en el mismo bucket privado — para que un
@@ -2202,8 +2675,8 @@ fallo, `cron_email_errors`. Lo medible:
 
 | Señal | Medida |
 |---|---|
-| Tablas respaldadas | **56** (48 en el grupo core + 8 en el de switch), de **159 definiciones** de PostgREST (tablas + vistas) |
-| Tablas escritas por personas y **sin copia** | **~30** — ver la tabla *Qué NO se respalda*, arriba. La más grave: `asistencia_marcaciones` (6.081 filas, append-only, irrecuperable) |
+| Tablas respaldadas | **125** (113 en el grupo core + 12 en el de switch), de **136 tablas** vivas (159 relaciones con vistas y materializadas) |
+| Tablas escritas por personas y **sin copia** | **0** — y hay candado que pone el build rojo si vuelve a haber una. Eran **63** hasta el 5-sep-2026, la más grave `asistencia_marcaciones` (6.081 filas, append-only, irrecuperable) |
 | Buckets de Storage replicados | **5** (`reclamo-fotos`, `reclamo-facturas`, `product-images`, `joybees-photos`, `marketing`) ≈ 3.204 archivos / 198 MB |
 | Entradas de cron | **8** (3 + 3 + 2) |
 | Heartbeats propios | 3: `backup` (fail-closed), `backup-switch` y `backup-storage` (seed-tolerant) |
@@ -2248,9 +2721,10 @@ No son «papeles» para nadie de afuera, pero son **los archivos más importante
 |---|---|---|
 | **Faltan las env `R2_*`** | la réplica off-site se omite con `enabled:false` y una nota. **El backup a Supabase sigue** | solo en la respuesta del cron. 🔴 Nada avisa que ya no hay copia fuera de Supabase |
 | **Solo corre una de las dos invocaciones de un día** | 🔴 **ese día NO se puede restaurar** | `saludR2` lo detecta al día siguiente y manda 🔧 SISTEMA |
-| **Una tabla nueva no se agrega a `DATASETS`** | 🔴 **no tiene copia, y nada lo dice** | Es lo que pasó con Asistencia entera, los 3 catálogos nuevos, la configuración de comisiones y los saldos de banco |
+| **Una tabla nueva no se agrega a `DATASETS`** | ✅ **el build se pone ROJO** desde el 5-sep-2026 | `backup-nada-sin-copia.test.ts` lee los `create table` de todas las migraciones y exige que estén clasificados en `src/lib/backup/tablas.ts`; si la clase es `personas` o `congelada`, exige además que estén en el route. Hasta ese día no lo decía nada, y así se quedaron afuera Asistencia entera, los 3 catálogos nuevos, el catálogo de Reebok, la configuración de comisiones y los saldos de banco |
+| **Una tabla nace desde el panel de Supabase, sin migración** | el candado estático no la ve | La agarra `backup-tablas-produccion.test.ts` (`RUN_DB_TESTS=1`), que compara contra el catálogo real. 31 de las 136 tablas de hoy nacieron así |
 | **Se dropea una tabla que sigue en `DATASETS`** | la corrida falla en esa tabla y se corta | fallo del cron |
-| **Una tabla cuya PK no es `id` y no está en `ORDER_BY`** | la paginación **no es determinista**: PostgREST puede saltear filas entre páginas | 🔴 **Nada lo dice.** El backup queda incompleto y parece completo |
+| **Una tabla cuya PK no es `id` y no está en `ORDER_BY`** | la paginación **no es determinista**: PostgREST puede saltear filas entre páginas y el respaldo queda incompleto **pareciendo completo** | ✅ **el build se pone ROJO** desde el 5-sep-2026: la PK real de producción vive medida en `PK_QUE_NO_ES_ID` y el candado exige que el `ORDER_BY` la cubra columna por columna. Antes no lo decía nada |
 | **Se pasa el deadline** | lo que no entró queda **pendiente** y lo toma la corrida siguiente (el manifest solo registra lo verificado) | la respuesta lo reporta |
 | **Alguien borra un objeto en R2** | ya está cubierto: los omitidos se verifican (todos los ~57 de datos; ventana rotativa para los ~3.2 K de Storage) y lo que no exista se re-sube | — |
 | **El cron `backup?grupo=storage` no corre** | los archivos subidos a mano no se replican | 🔴 **Nada lo dice** en pantalla; el manifest hace catch-up al día siguiente. Su heartbeat es **seed-tolerant**, o sea vigilancia más floja |

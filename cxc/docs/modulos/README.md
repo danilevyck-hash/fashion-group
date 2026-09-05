@@ -30,11 +30,11 @@ notaría** · lo que sobra.
 ## Lo urgente que salió de aquí
 
 1. 🔴 **El módulo Asistencia entero está fuera del respaldo**, incluidas las **6.081 marcaciones del reloj**, que son append-only y no se pueden recuperar de ninguna otra parte. Tampoco se respaldan Gastos, Saldos de banco, `comision_exclusion`, `recordatorios` ni los catálogos de Tommy, Calvin y Joybees (Reebok sí). ~30 tablas escritas por personas, sin copia. → [06](06-recordatorios-usuarios-infra.md)
-2. 🔴 **El aviso «Sincronizado» de Ventas vigila 3 de las 8 empresas** (`SWITCH_FACTURAS_EMPRESA_KEYS` quedó en `active_shoes, active_wear, american_classic`). Si Vistana o Fashion Wear se congelan, el Resumen muestra números viejos en verde. → [01](01-ventas-y-clientes.md)
+2. ✅ **CERRADO el 4-sep-2026 — el aviso «Sincronizado» de Ventas se quitó.** Vigilaba 3 de las 8 empresas (`SWITCH_FACTURAS_EMPRESA_KEYS` quedó en `active_shoes, active_wear, american_classic`) y con Vistana o Fashion Wear congeladas el Resumen mostraba números viejos en verde. Daniel: *«¿de qué sirve tenerlo si ya el sistema corre fluido y si no me avisa por Telegram para arreglarlo?»* — quien avisa de verdad es `datos-frescos.ts`, que **deriva** la lista de las 8 y manda Telegram a las +24 h. → [01](01-ventas-y-clientes.md)
 3. 🔴 **`switch_clientes` de Boston lleva 37 días congelada** (`synced_at = 30-jul-2026` en las 4.915 filas) y **ningún vigía la cubre**. La pestaña Clientes de David muestra un maestro de julio. → [03](03-multifashion-y-boston.md)
 4. 🔴 **Reclamos y Proveedores se unen por NOMBRE, en JavaScript, sin candado.** Cambiar una grafía deja la ficha de un proveedor en cero reclamos, en silencio. El amarre correcto es por **(empresa, código)**: el mismo proveedor tiene código distinto en cada empresa, y el `122` es dos proveedores distintos según la empresa. → [04](04-operacion.md)
 5. 🔴 **`empleado_codigo` de Préstamos no se puede editar desde ninguna pantalla**, y el aviso de la planilla dice que sí («se atan en Préstamos, eligiendo la persona de la ficha»). Hoy: **$400 de deuda viva sin atar** (Martha $300, Yeritza $100). → [07](07-prestamos.md)
-6. **`POST /api/ventas/referencia/actualizar` es una ruta huérfana que abre sesión en Switch** y expulsa a Daniel del panel. Su botón se borró el 11-ago-2026. → [02](02-catalogos-y-depurador.md)
+6. ✅ **CERRADO el 4-sep-2026 — `POST /api/ventas/referencia/actualizar` ya no es huérfana: su botón volvió.** Daniel: *«activa el botón de Referencia»*, *«referencia lo puede ver todos, y sin aviso»*. Lo ven los tres roles del módulo (`REFERENCIA_ROLES`, una sola lista para la página, la búsqueda y el botón — antes el POST era solo-admin), sin aviso en pantalla, y con el acelerador de 10 min de Guías para que dos toques seguidos no abran dos sesiones de Switch. → [02](02-catalogos-y-depurador.md)
 7. **El literal `"Pagado"` de Reclamos vive suelto en cuatro lugares** entre SQL y TypeScript. Cambiar uno hace que reclamos ya pagados vuelvan al Excel del proveedor — o sea, cobrarle dos veces. → [04](04-operacion.md)
 
 ## Lo que la documentación tenía viejo, y ya se corrigió aquí
@@ -50,9 +50,9 @@ notaría** · lo que sobra.
 
 ## Decisiones que solo puede tomar Daniel
 
-- **Favoritos ⭐ del CXC**: cero filas en toda su historia, y un vendedor que sí ve el CXC recibe **403** al tocarlos. ¿Se quitan?
+- ✅ **RESUELTO el 4-sep-2026 — Favoritos ⭐ del CXC: se quitaron.** Daniel: *«quita favoritos»*. Cero filas en toda su historia, y un vendedor que sí ve el CXC recibía **403** al tocarlos. Se fueron la estrella, la regla de orden, el *optimistic update* con su rollback y la ruta; **la tabla queda** sin lectores, con candado que pone el build rojo si una migración la dropea.
 - **Packing Lists**: 0 filas desde el 22-abr, un cron limpiándolo a diario, y un texto en pantalla que promete 7 días cuando la regla es 90.
 - **Recordatorios**: 0 filas desde que existe; el flujo que Daniel pidió (crear tocando el día del calendario) nunca se construyó.
 - **Marketing**: ningún proyecto se cerró jamás (25 abiertos), 71 de 88 facturas en «creado», y `mk_periodos.reporte` está NULL incluso en el único período cerrado — el Excel de un período «congelado» se recalcula en vivo.
-- **Basura de pruebas en catálogos**: 16 pedidos de Calvin (12-ago) y 16 de Joybees con vendedor «medicion» (13-ago).
+- ✅ **RESUELTO el 4-sep-2026 — Basura de pruebas en catálogos: se borra de verdad.** Daniel: *«borro de verdad de la base»*. Son **16 de Calvin y 37 de Joybees** (todas ya `deleted`, todas `borrador`), por la migración `20260924120000_borrar_pedidos_de_prueba.sql` (**pendiente de aplicar**), con lista explícita de ids y un filtro que salva a cualquiera que tenga un envío vivo a Switch. Los pedidos VIEJOS de verdad **no se borran**: la lista de Comprobantes muestra los últimos 90 días y el resto queda detrás de «Ver más».
 - **Una sesión `admin` sin revocar** de un usuario que no existe en `fg_users` (`medicion-t203b`, último uso 27-ago). El vínculo `user_sessions ↔ fg_users` es **por nombre**, así que ni el guard de «no dejar el sistema sin admins» ni «Revocar todas» la ven.

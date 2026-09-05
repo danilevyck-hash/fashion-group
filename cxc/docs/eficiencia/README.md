@@ -37,8 +37,9 @@ Multifashion con Comisiones, Modo Viaje.
 - **Reclamos:** 29 de 34 llevan 143 días en «Creado» aunque ya se les mandó correo; el estado «En proceso» **nunca se usó**. ¿El estado sirve o estorba?
 - **Marketing:** los 25 proyectos están abiertos para siempre; ninguno se cerró jamás. 71 de 88 facturas siguen en «creado».
 - **Recordatorios: 0 filas desde que existe.** El flujo que Daniel pidió (crear desde el calendario) no se construyó: tocar un día no hace nada.
-- **La capa de escritura del CXC está muerta:** favoritos ⭐ **cero filas en toda la historia**, «marcar contactado» 140 de 141 filas en un solo mes (marzo), correos de cobro solo 2 días de julio.
+- **La capa de escritura del CXC está muerta:** ✅ los favoritos ⭐ (**cero filas en toda la historia**) **se retiraron el 4-sep-2026** — Daniel: *«quita favoritos»*; la tabla queda sin lectores, con candado anti-DROP. Siguen sin decidir «marcar contactado» (140 de 141 filas en un solo mes, marzo) y los correos de cobro (solo 2 días de julio).
 - **La vía pública de pedidos casi no se usa:** 23 desde abril, 7 convertidos, el último el 15-ago.
+- ✅ **RESUELTO el 4-sep-2026 — ¿se borran los pedidos viejos?** Daniel: *«si un pedido se mandó a switch, ya está safe, no?»*. **No se borran**: el pedido guarda lo que Switch no tiene (quién lo armó, el comentario, si fue pedido o cotización, el PDF) y son pocos (123 en todo 2026). Lo que se recortó es la LISTA — 90 días y «Ver más». Lo que **sí** se borra de verdad es la basura de las pruebas (16 Calvin + 37 Joybees), por migración pendiente de aplicar.
 
 ## Correcciones a la documentación que salieron de aquí
 

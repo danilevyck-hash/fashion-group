@@ -25,7 +25,8 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, Search } from "lucide-react";
+import { Download, RefreshCw, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import {
   modeloDe,
@@ -48,6 +49,7 @@ export function ReferenciaView() {
   const [resp, setResp] = useState<ComprasApiResp | null>(null);
   // Lo ÚLTIMO buscado (no lo tecleado): de acá sale el modo pedido y su orden.
   const [buscado, setBuscado] = useState("");
+  const [actualizando, setActualizando] = useState(false);
 
   const buscar = async (q: string) => {
     const query = q.trim();
@@ -90,6 +92,47 @@ export function ReferenciaView() {
   }, [resp]);
 
   const hayResultados = (resp?.articulos.length ?? 0) > 0;
+
+  // ── «Actualizar datos de Switch» ───────────────────────────────────────────
+  // 🔴 VOLVIÓ EL 4-sep-2026. La ruta (`POST /api/ventas/referencia/actualizar`)
+  // nunca se fue, pero su botón desapareció con la franja de catálogo en el
+  // rediseño del 11-ago (`9b1899e1`): fue colateral, no una decisión. Daniel:
+  // *«activa el botón de Referencia»*.
+  //
+  // 🔴 SIN AVISO. Daniel: *«referencia lo puede ver todos, y sin aviso»* — nada
+  // de «esto te saca del panel de Switch». Solo el botón y su estado.
+  //
+  // Va POR EMPRESA porque el catálogo de Switch se trae por empresa; lo normal
+  // es una sola (un código vive en una), y cuando el modelo aparece en dos van
+  // EN SERIE: la sesión de Switch es una por usuario y dos logins simultáneos
+  // se tumban entre sí. El acelerador de 10 min vive en el SERVIDOR, así que
+  // dos toques seguidos no abren dos sesiones aunque la pantalla se recargue.
+  const empresasDeLaBusqueda = useMemo(
+    () => [...new Set((resp?.articulos ?? []).map((a) => a.empresa))],
+    [resp],
+  );
+
+  const actualizar = async () => {
+    if (empresasDeLaBusqueda.length === 0) return;
+    setActualizando(true);
+    setError(null);
+    try {
+      for (const empresa of empresasDeLaBusqueda) {
+        const r = await fetch("/api/ventas/referencia/actualizar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ empresa }),
+        });
+        const body = (await r.json()) as { error?: string };
+        if (!r.ok) throw new Error(body.error ?? "No se pudo actualizar.");
+      }
+      await buscar(buscado);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar. Intenta de nuevo en unos segundos.");
+    } finally {
+      setActualizando(false);
+    }
+  };
   // Daniel: *"quita margen, lo demas dejalo"* — el servidor dice quién lo ve.
   const mostrarMargen = resp?.margenVisible !== false;
 
@@ -150,7 +193,16 @@ export function ReferenciaView() {
       )}
 
       {hayResultados && (
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <Button
+            variant="outline"
+            className="min-h-[44px]"
+            disabled={actualizando || cargando}
+            onClick={() => void actualizar()}
+          >
+            <RefreshCw className={cn("mr-1.5 h-4 w-4", actualizando && "animate-spin")} />
+            {actualizando ? "Actualizando…" : "Actualizar datos de Switch"}
+          </Button>
           <Button
             variant="outline"
             className="min-h-[44px]"

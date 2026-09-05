@@ -105,6 +105,10 @@
       "schedule": "0 13 * * *"
     },
     {
+      "path": "/api/cron/sync-clientes-boston",
+      "schedule": "10 7 * * 0"
+    },
+    {
       "path": "/api/cron/boston-cartera",
       "schedule": "10 8 * * *"
     },

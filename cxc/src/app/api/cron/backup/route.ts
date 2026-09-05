@@ -10,6 +10,16 @@
 // Cobertura: TODAS las tablas con datos creados a mano en la app o config
 // (no re-derivables de Switch), en la corrida CORE (sin params).
 //
+// 🔴 QUIÉN DECIDE QUÉ ENTRA (5-sep-2026). Hasta ese día la lista de abajo era la
+// única verdad y nadie la comparaba con nada: el respaldo tenía 56 tablas de las
+// 136 que existen, y afuera quedaban —entre ~30 más— las 6.081 marcaciones del
+// reloj de asistencia, que son append-only y NO se pueden volver a pedir a
+// ninguna parte. El hueco no fue descuido: fue que NADA avisaba cuando nacía una
+// tabla nueva. Ahora la base entera está clasificada en
+// `src/lib/backup/tablas.ts` (qué se pierde si se pierde) y
+// `backup-nada-sin-copia.test.ts` pone el build ROJO si una tabla que no se
+// puede volver a conseguir no está en esta lista — o si alguien la saca.
+//
 // GRUPO SWITCH (?grupo=switch, audit jul-2026): las tablas switch_* +
 // multifashion_tickets (congelada, ver más abajo) SÍ se respaldan ahora, en una SEGUNDA invocación del
 // mismo path (entradas propias en vercel.json, patrón de entradas repetidas).
@@ -219,6 +229,102 @@ const DATASETS: Dataset[] = [
   { table: "app_settings" },
   { table: "contactos_email" },
   { table: "transportistas" },
+  // ── Asistencia y planilla — el módulo ENTERO estuvo fuera del respaldo hasta
+  // el 5-sep-2026. 🔴 `asistencia_marcaciones` va PRIMERA a propósito, igual
+  // que switch_articulo_diario en su grupo: la manda el reloj, es append-only y
+  // el reloj no reenvía el pasado — es la única tabla de toda la base que, si
+  // se pierde, no se puede volver a conseguir de ninguna parte.
+  { table: "asistencia_marcaciones" },
+  { table: "asistencia_correcciones" },
+  { table: "asistencia_personas" },
+  { table: "asistencia_horarios" },
+  { table: "asistencia_horas_extra_aprobadas" },
+  { table: "asistencia_justificaciones" },
+  { table: "asistencia_vacaciones" },
+  { table: "asistencia_feriados" },
+  { table: "asistencia_reglas" },
+  { table: "asistencia_planilla_manual" },
+  { table: "asistencia_prestamo_aprobado" },
+  { table: "asistencia_reparto_empresa" },
+  { table: "asistencia_aprobador_empresa" },
+  { table: "asistencia_planilla_guardada" },
+  { table: "asistencia_planilla_guardada_linea" },
+  { table: "asistencia_dispositivos" },
+  // Gastos y banco. bancos_saldos lo escribe contabilidad A MANO; egresos_varios
+  // lo baja un sync pero se REEMPLAZA mes a mes (`egresos_reemplazar_mes`), así
+  // que acá solo vive la ventana cargada y los meses viejos no vuelven.
+  { table: "bancos_saldos" },
+  { table: "egresos_varios" },
+  { table: "egresos_importaciones" },
+  { table: "gastos_categorias" },
+  // El diccionario de cuentas: es re-derivable de Switch, pero pesa 177 KB y sin
+  // él los renglones de egresos restaurados son códigos sin nombre.
+  { table: "cuentas_contables" },
+  // Configuración de comisiones: quién no comisiona, qué grafías son la misma
+  // persona, los descuentos fijos. `comision_exclusion` es soft delete = HISTORIAL.
+  { table: "comision_exclusion" },
+  { table: "comision_vendedor_alias" },
+  { table: "comision_descuentos_fijos" },
+  { table: "comision_descuento_excepciones" },
+  // Catálogos públicos de las 4 marcas. El PRECIO lo manda Switch, pero la foto,
+  // el badge y el nombre a mano NO tienen otra fuente. `products` es el de
+  // Reebok — la documentación lo daba por respaldado y no lo estaba.
+  { table: "products" },
+  { table: "inventory" },
+  { table: "tommy_products" },
+  { table: "calvin_products" },
+  { table: "joybees_products" },
+  { table: "fg_catalogo_publico_switch" },
+  // Pedidos de Tommy, Calvin y Joybees (los de Reebok ya estaban) + el registro
+  // at-most-once de qué se envió a Switch.
+  { table: "tommy_orders" },
+  { table: "tommy_order_items" },
+  { table: "tommy_pedidos_publicos" },
+  { table: "calvin_orders" },
+  { table: "calvin_order_items" },
+  { table: "calvin_pedidos_publicos" },
+  { table: "joybees_orders" },
+  { table: "joybees_order_items" },
+  { table: "joybees_pedidos_publicos" },
+  { table: "reebok_switch_envios" },
+  { table: "tommy_switch_envios" },
+  { table: "calvin_switch_envios" },
+  { table: "joybees_switch_envios" },
+  // Depurador: descripciones corregidas a mano y el historial de cargas.
+  { table: "depurador_descripciones" },
+  { table: "carga_history" },
+  { table: "tienda_marca_formulas" },
+  { table: "tienda_rubro_formulas" },
+  // Guías: los destinos por cliente (Guías › Configuración).
+  { table: "guias_destino_cliente" },
+  // Marketing: períodos, sus documentos, impulsadoras y los costos del proveedor
+  // (separados del inventario a propósito — NO fusionar).
+  { table: "mk_periodos" },
+  { table: "mk_periodo_documentos" },
+  { table: "mk_impulsadoras" },
+  { table: "mk_impulsadora_marcas" },
+  { table: "mk_mobiliario_notas_proveedor" },
+  // Multifashion: las metas se escriben a mano, nunca se reparten solas.
+  { table: "multifashion_metas" },
+  { table: "multifashion_meta_participantes" },
+  // Cheques / Recordatorios / Reclamos que faltaban.
+  { table: "cheque_vendedores" },
+  { table: "recordatorios" },
+  { table: "reclamo_custom_motivos" },
+  { table: "cxc_emails_enviados" },
+  // El mapeo usuario↔vendedor de Switch (sin él los pedidos no pueden salir) y
+  // el orden de módulos por usuario.
+  { table: "fg_user_switch_vendedor" },
+  { table: "fg_user_module_order" },
+  // 🔴 Quién hizo qué. No es una bitácora de máquina: es el único registro de
+  // las acciones de la gente y no se regenera.
+  { table: "activity_logs" },
+  // Mayor contable — módulo RETIRADO el 13-ago-2026. Las tablas no se borran y
+  // su sync ya no existe: sin esta copia, no vuelven. (Mismo criterio que
+  // multifashion_tickets: cuando se decida borrarlas, salen de acá en el MISMO
+  // cambio.)
+  { table: "mayor_lineas" },
+  { table: "mayor_importaciones" },
   // Usuarios: datos sin password + hashes en archivo aparte
   {
     table: "fg_users",
@@ -239,6 +345,20 @@ const SWITCH_DATASETS: Dataset[] = [
   { table: "switch_factura_utilidad" },
   { table: "switch_proveedor_estadocuenta" },
   { table: "switch_clientes" },
+  // El detalle línea por artículo de las COMPRAS. Re-derivable en teoría, pero
+  // por el camino más frágil que tenemos: el reporte WEB del panel, que es el
+  // que Switch ya cambió dos veces en dos semanas. 17,6 MB crudos.
+  { table: "switch_ingresos_mercancia" },
+  // El catálogo de las 6 del grupo. La existencia y el precio se rebajan solos
+  // todos los días, pero las FICHAS (rubro/subrubro/marca) entran de a 400 por
+  // corrida: volver a llenarlas cuesta semanas de cron, no una corrida.
+  { table: "switch_articulo_info" },
+  // El mapa artículo → marca de Multifashion.
+  { table: "switch_articulo_marca" },
+  // 🩸 Parcialmente IRRECUPERABLE: el último día de cada mes vale $0 para
+  // siempre (el reporte se lee a las 00:30 de Panamá y el día 1 ya es del mes
+  // nuevo). Lo que hay acá es lo único que hay. 296 KB crudos.
+  { table: "switch_costo_diario" },
   // multifashion_tickets — tabla CONGELADA el 26-jul-2026 (ya no se escribe; ver
   // CLAUDE.md). SE MANTIENE en el backup a propósito: mientras las 15.819 filas
   // existan, esta es la única copia que las protege, y una tabla congelada
@@ -281,10 +401,30 @@ const STORAGE_R2_META_PATH = `${STORAGE_PREFIX}/meta-r2.json`;
 
 // Columna(s) de orden para paginación estable (PostgREST Range sin order NO es
 // determinista). Default: "id". Excepciones = tablas cuya PK no es "id".
+// 🔴 La lista NO se escribe a ojo: `PK_QUE_NO_ES_ID` (src/lib/backup/tablas.ts)
+// tiene la llave real de producción, medida, y `backup-nada-sin-copia.test.ts`
+// exige que ACÁ esté cubierta columna por columna toda tabla respaldada cuya PK
+// no sea `id`. Sin eso el respaldo sale incompleto y parece completo.
 const ORDER_BY: Record<string, string[]> = {
   comision_vendedor_tasa: ["vendedor_nombre"],
   vendedores: ["empresa_key", "nombre"],
   app_settings: ["key"],
+  asistencia_personas: ["empleado_codigo"],
+  asistencia_horarios: ["empleado_codigo"],
+  asistencia_horas_extra_aprobadas: ["empleado_codigo", "fecha"],
+  asistencia_planilla_manual: ["quincena", "empleado_codigo"],
+  asistencia_prestamo_aprobado: ["quincena", "empleado_codigo"],
+  asistencia_reparto_empresa: ["empleado_codigo", "empresa"],
+  asistencia_aprobador_empresa: ["usuario", "empresa"],
+  asistencia_feriados: ["fecha"],
+  asistencia_dispositivos: ["dispositivo"],
+  comision_vendedor_alias: ["nombre_switch"],
+  cuentas_contables: ["empresa_key", "cuenta"],
+  fg_catalogo_publico_switch: ["empresa_key"],
+  fg_user_switch_vendedor: ["user_id", "empresa_key"],
+  switch_articulo_info: ["empresa_key", "codigo"],
+  switch_articulo_marca: ["empresa_key", "articulo_id"],
+  switch_ingresos_mercancia: ["empresa_key", "n_interno", "linea"],
 };
 
 /** Trae TODAS las filas de una tabla paginando de a PAGE con orden estable,

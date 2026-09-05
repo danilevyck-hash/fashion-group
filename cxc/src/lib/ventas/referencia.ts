@@ -30,6 +30,25 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 /** Las 6 empresas del grupo cuyo `switch_articulo_diario` alimenta este tab. */
 export const REFERENCIA_EMPRESA_KEYS: readonly string[] = B2B_EMPRESA_KEYS;
 
+/**
+ * 🔴 QUIÉN ENTRA A REFERENCIA — UNA sola lista, para los TRES lugares.
+ *
+ * Daniel (12-ago-2026): *«habilita referencia para los vendedores y bodega»*.
+ * La leen la página (`/referencia`, el guard del SSR), la búsqueda
+ * (`GET /api/ventas/referencia`) y el botón «Actualizar datos de Switch»
+ * (`POST /api/ventas/referencia/actualizar`).
+ *
+ * 🩸 Tres copias escritas a mano fue exactamente el defecto: el POST se quedó
+ * en `["admin"]` mientras la pantalla se abría a los tres, y cuando el botón
+ * volvió (4-sep-2026) habría muerto en 403 para el vendedor y para bodega —
+ * Daniel: *«referencia lo puede ver todos, y sin aviso»*. Con una sola lista
+ * eso no puede volver a desincronizarse.
+ *
+ * ⚠️ Lo que SÍ es distinto por rol es el MARGEN, y eso no se decide acá:
+ * `margenVisible` sale del rol en el GET (*«quita margen, lo demas dejalo»*).
+ */
+export const REFERENCIA_ROLES: readonly string[] = ["admin", "vendedor", "bodega"];
+
 // ─── Umbrales con nombre — nada de números mágicos regados ───────────────────
 
 /** Tope de filas que una búsqueda puede leer de PostgREST (20 páginas).

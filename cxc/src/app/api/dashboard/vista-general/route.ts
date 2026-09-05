@@ -15,6 +15,7 @@ import {
   type MotivoSinGastoEgresos,
 } from "@/lib/egresos/gasto-mostrable";
 import { leerInventarioValorizado, type LecturaInventario } from "@/lib/inventario/leer";
+import { ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
 
 export const dynamic = "force-dynamic";
 
@@ -209,7 +210,7 @@ export async function GET(req: NextRequest) {
       .select("empresa_key,nombre,saldo_total,aging"),
     supabaseServer.from("reclamos")
       .select("id,nro_reclamo,empresa,estado,fecha_reclamo")
-      .eq("deleted", false).neq("estado", "Pagado")
+      .eq("deleted", false).neq("estado", ESTADO_PAGADO)
       .order("fecha_reclamo", { ascending: true }),
     // Año ANTERIOR completo desde la MV: YoY del mes seleccionado.
     supabaseServer.from("ventas_rollup_mensual_mv")

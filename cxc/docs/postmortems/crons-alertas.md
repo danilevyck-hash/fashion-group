@@ -305,6 +305,238 @@
 
 ---
 
+## 🔴 EL RESPALDO TENÍA 30 TABLAS AFUERA Y UNA ERA IRRECUPERABLE (5-sep-2026)
+
+### Lo que se midió
+
+Contra producción, `pg_class` del esquema `public` (159 relaciones: **136 tablas** + 20 vistas
++ 3 materializadas) contra los `{ table: "…" }` del route del backup (**56 tablas**, 48 en el grupo
+core y 8 en el de switch):
+
+| | |
+|---|---|
+| Tablas que existen | **136** |
+| Respaldadas | **56** |
+| **Tablas escritas por personas y SIN copia** | **63** |
+| La peor | **`asistencia_marcaciones` — 6.081 filas** |
+
+El módulo **Asistencia y Planilla entero** estaba afuera: las marcaciones del reloj, las
+correcciones firmadas, los sueldos y saldos de vacaciones, los horarios, los feriados, las
+justificaciones, la planilla escrita a mano y **el singleton `asistencia_reglas` con toda la
+parametrización del cálculo**. Las marcaciones son **append-only y el reloj no reenvía el pasado**:
+si se perdían, se perdía la asistencia de todos, para siempre. No hay backfill, no hay reporte, no
+hay Switch del que bajarlas.
+
+Con ellas faltaban: `bancos_saldos` (los saldos que escribe contabilidad **a mano**),
+`egresos_varios` + `egresos_importaciones` (se reemplazan mes a mes: acá solo vive la ventana
+cargada), toda la configuración de comisiones (`comision_exclusion` — que es **soft delete, o sea
+historial**—, `comision_vendedor_alias`, los descuentos fijos), los tres catálogos nuevos
+(`tommy_products`, `calvin_products`, `joybees_products`) con sus pedidos y sus envíos a Switch,
+`depurador_descripciones`, `carga_history`, `guias_destino_cliente`, `fg_user_switch_vendedor`
+(sin él los pedidos no pueden salir), el mayor contable retirado, `recordatorios` y `activity_logs`.
+
+🩸 **Y `products`, el catálogo de Reebok.** `docs/modulos/06` decía, textual, «⚠️ `products`
+(Reebok) **sí** está». No estaba. Lo que sí estaban eran `reebok_orders`, `reebok_order_items` y
+`reebok_pedidos_publicos` — los pedidos, no el catálogo. Es la clase de dato viejo que hace que
+nadie vuelva a mirar.
+
+### Por qué pasó, y por qué el arreglo NO es agregar 63 líneas
+
+El hueco no existió por descuido. Existió porque **nada avisaba**: la lista de `DATASETS` era la
+única verdad y no se comparaba contra nada. Una tabla nacía en una migración, el respaldo no se
+enteraba, y el silencio duraba meses. Es exactamente el mismo mecanismo que el de las alertas de
+silencio de datos: *el silencio no cuenta como que está bien*.
+
+El arreglo de verdad es el candado. `src/lib/backup/tablas.ts` clasifica **toda la base** por lo
+que se pierde si se pierde:
+
+| Clase | Qué es | Obliga respaldo |
+|---|---|---|
+| `personas` | la escriben personas — o un aparato nuestro, como el reloj —, o guarda una ventana que su fuente ya no sirve | 🔴 **sí** |
+| `congelada` | ya nadie la escribe y su origen no existe más (un CSV viejo, un módulo retirado) | 🔴 **sí** |
+| `switch` | la reescribe un sync: se puede volver a bajar. Respaldarla es una decisión de **costo**, no de riesgo | no |
+| `bitacora` | registro de operación; se regenera sola y envejece a propósito | no |
+| `retirada` | tabla muerta, sin lectores ni escritores | no |
+| `vista` | vista o materializada: se recalcula | nunca |
+
+⚠️ **La clase mira lo que se pierde, no quién escribe.** `egresos_varios` la baja un sync de Switch
+y aun así es `personas`: el reporte se reemplaza mes a mes y los meses viejos no vuelven. Los
+catálogos públicos igual: el PRECIO lo manda Switch, pero la foto, el badge y el nombre a mano no
+tienen otra fuente.
+
+`src/__tests__/lib/backup-nada-sin-copia.test.ts` pone el build **ROJO** si:
+- una migración crea una tabla que nadie clasificó (**es el que impide que el hueco se repita**);
+- una tabla `personas` o `congelada` no está en el route;
+- una vista se cuela en el respaldo;
+- las marcaciones del reloj dejan de subirse primeras dentro de su grupo.
+
+Y `src/__tests__/integration/backup-tablas-produccion.test.ts` (con `RUN_DB_TESTS=1`) compara la
+clasificación contra el catálogo de producción: 31 de las 136 tablas de hoy nacieron en el panel de
+Supabase, antes de que existieran las migraciones, y el candado estático no puede verlas.
+
+### 🩸 El segundo hueco, que era silencioso de verdad
+
+El respaldo pagina de a 1.000 con `.order()`. **Una tabla cuya llave primaria no es `id` y no está
+en `ORDER_BY` deja un respaldo INCOMPLETO que parece completo** — PostgREST puede saltear filas
+entre página y página y nada lo dice. Antes de este cambio el `ORDER_BY` tenía **tres** excepciones
+escritas a mano; de las 63 tablas que entraron, **16 tienen PK compuesta o distinta de `id`**
+(`asistencia_horas_extra_aprobadas (empleado_codigo, fecha)`, `cuentas_contables (empresa_key,
+cuenta)`, `switch_ingresos_mercancia (empresa_key, n_interno, linea)`…). Ahora la llave real vive
+medida en `PK_QUE_NO_ES_ID` y el candado exige que el `ORDER_BY` la cubra **columna por columna** —
+y que no sobre ninguno.
+
+### Qué entró, qué no, y cuánto pesa
+
+| | Antes | Después |
+|---|---|---|
+| Tablas respaldadas | 56 | **125** (113 core + 12 switch) |
+| Archivos por día | 59 (57 datos + 2 meta) | **128** (126 datos + 2 meta) |
+| Peso diario (gz, medido 4-sep) | **33,60 MB** | **~37,2 MB** (+10,7%) |
+| Bucket `backups` (22 días) | 721,9 MB | ~800 MB |
+
+Al grupo **core** entraron las 63 de `personas`/`congelada` + `inventory` (las tallas de Reebok:
+restaurar `products` sin ellas deja media pantalla). Al grupo **switch** entraron cuatro cachés que
+son re-derivables pero caras o parciales:
+
+- `switch_ingresos_mercancia` (17,6 MB crudos) — las COMPRAS. Re-derivable **por el camino más
+  frágil que tenemos**: el reporte web del panel, el que Switch ya cambió dos veces en dos semanas.
+- `switch_articulo_info` (5,2 MB) — la existencia y el precio se rebajan solos todos los días, pero
+  las FICHAS (`rubro`/`subrubro`/`marca`) entran de a **400 por corrida**: volver a llenarlas cuesta
+  semanas de cron, no una corrida.
+- `switch_articulo_marca` (1,8 MB) — el mapa artículo → marca de Multifashion.
+- `switch_costo_diario` (296 KB) — 🩸 **parcialmente irrecuperable**: el último día de cada mes vale
+  $0 para siempre (el reporte se lee a las 00:30 de Panamá y el día 1 ya es del mes nuevo).
+
+**Lo que se dejó afuera a propósito, con el motivo:**
+
+| Tabla | Filas | Por qué no |
+|---|---|---|
+| `switch_factura_lineas` | 163.722 (**97,4 MB crudos**) | La más grande después de `switch_articulo_diario`, y **re-derivable de verdad**: la trae `sync-factura-lineas` y existe `scripts/_backfill-factura-lineas.ts`. Meterla suma ~10 MB gz **todos los días** (+30% al respaldo) para proteger algo que se puede volver a pedir. Si Daniel la quiere, es una línea |
+| `switch_sync_log` · `multifashion_sync_log` | 9.496 · 98 | Se **podan a propósito** (`podar_switch_sync_log`): respaldarlas sería guardar lo que decidimos tirar |
+| `cron_heartbeats` · `cron_email_errors` · `data_integrity_checks` · `login_attempts` | 75 · 86 · 821 · 4 | Estado de infraestructura: se regenera solo en horas |
+| `user_sessions` | 1.039 | 🔴 **A propósito y por seguridad**: son tokens de sesión vivos. Sacarlos del proyecto es repartir credenciales, y una sesión perdida se arregla volviendo a entrar |
+| `multifashion_caja_diaria` | 8 | Caché del arqueo, para no gastar la sesión única de Switch |
+| `empresa_gastos_mensuales` · `reebok_cart` | 0 · 0 | Tablas muertas: sin lectores ni escritores |
+
+⚠️ **Lo que este cambio NO toca:** el destino (Supabase Storage + réplica a R2), el formato (NDJSON
+gzipeado por tabla), la retención (21 días en Supabase, la política calculada en R2), los guards de
+«segunda oportunidad» y la alerta que espera a la última entrada del día. Solo crece la lista.
+
+⚠️ **El costo en tiempo, sin medir todavía:** la corrida core midió **248 s de 800** el 25-jul con
+59 archivos. Suma ~69 tablas chiquitas: una página de fetch, un gzip y dos PUT (Supabase + R2) con
+su HEAD cada una. La estimación es +60-120 s; el techo sigue siendo 800 s por grupo y lo que no
+entre queda **pendiente**, que es el comportamiento de siempre. **Confirmar con la respuesta del
+primer cron después del deploy.**
+
+---
+
+## 🩸 EL DIRECTORIO DE CLIENTES DE BOSTON: 37 DÍAS CONGELADO Y NINGUNA ALERTA (5-sep-2026)
+
+### Lo que se midió
+
+```
+switch_clientes, por empresa (5-sep-2026)
+  confecciones_boston   4.915 filas   synced_at MIN = MAX = 2026-07-30 06:31:07.524
+  american_classic      1.037         2026-09-04 11:31   (acs-fidelizacion, diario)
+  active_wear             147         2026-09-04 21:11   (estadocuenta, diario)
+  vistana                 142         2026-09-04 21:10
+  joystep / active_shoes / fashion_shoes / fashion_wear  139-140  2026-09-04 21:1x
+```
+
+**Las 4.915 filas de Boston tenían el MISMO `synced_at`, al milisegundo.** Ningún cron las escribía.
+
+### La causa, y por qué era invisible
+
+El único escritor del directorio vivía **dentro** del sync de estado de cuenta por API
+(`sync-empresa.ts`, paso «1b»). Para Boston ese camino está vetado desde el 30-jul-2026
+(`EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON`): hace **una llamada HTTP por cliente** y Boston tiene 4.912
+— su único run exitoso de la historia tardó **3.240 s (54 min)** contra un techo de función de
+800 s, así que cada corrida programada moría siempre.
+
+La cartera se rescató por otro camino (el reporte web, cron `boston-cartera`). El directorio se
+quedó atrás. Y el `switch_sync_log` lo dice al minuto: la última corrida de `estadocuenta` de Boston
+arrancó el **30-jul 06:31:08** —`runStamp` 06:31:07.524, que es exactamente el `synced_at` de las
+4.915 filas—, alcanzó a escribir el directorio y después murió en el recorrido por cliente. **El día
+que Boston salió de ese cron es el día exacto en que su directorio se congeló.**
+
+🔑 Y nadie lo vio porque **ninguna regla lo cubría**: `datos-frescos.ts` no mira `switch_clientes`,
+y la alerta A de silencio necesita filas en `switch_sync_log` que ese par ya no producía.
+
+### El arreglo
+
+1. **Un solo escritor, sacado a la luz.** `src/lib/switch-api/clientes-directorio.ts`: la paginación
+   de `/apicliente/lista` (con su trampa: Switch capea en ~50 aunque se pidan 200, y el corte viejo
+   por `page × porPagina` se llevaba puesto el 60% de vistana), el upsert y la marca de ausentes.
+   Lo usan el sync del grupo y el de Boston — **no hay una segunda implementación que se pueda
+   separar en silencio**.
+2. **Un cron SEMANAL propio.** `/api/cron/sync-clientes-boston`, **domingos 07:10 UTC = domingo
+   2:10 a.m. de Panamá**. Daniel: *«semanal»*. Pide solo la lista (~99 páginas, no 4.912 llamadas).
+   Queda a **40 min** del bloque `all-0630` y a **40** de `sync-recibos` (07:50) — los dos que
+   también tocan Boston —, o sea el doble de `SEPARACION_MINIMA_MIN`, en domingo de madrugada y
+   fuera de las ventanas de deploy.
+3. 🔴 **Escribe SOLO `switch_clientes` con `empresa_key = 'confecciones_boston'`.** Daniel, textual:
+   *«los clientes de Boston no quiero que toquen los de Fashion Group… no quiero volver a pasar por
+   el mismo error»*. El error tiene fecha: el 28-jul-2026 entraron 4.910 clientes de Boston a
+   `clientes_master` y durante cinco semanas el ranking de Ventas publicó **$2,55 millones de venta
+   que no existió**. `sync-clientes-master.ts` sigue pidiendo por **INCLUSIÓN** de las 6 del grupo.
+4. **Dos guardas antes de marcar a alguien como ausente** — que es lo único de todo el sync que
+   puede hacer daño: la lista tiene que haber venido **completa**, y no puede haber **encogido** por
+   debajo del 70% de lo que la tabla ya conoce (mismo criterio y mismo número que el reporte de
+   cartera: una respuesta corta cuadra perfectamente consigo misma y se ve sana). Una lista vacía
+   **no escribe ni marca**: la corrida termina en `error`.
+5. **Y ahora sí se vigila.** Alerta **B** de `silencio-de-datos.ts` sobre `switch_clientes`, con dos
+   novedades:
+   - `TablaVigilada` acepta **`empresas`**: la misma tabla tiene tres ritmos (diario en las 6 del
+     grupo, diario en ACS, **semanal** en Boston) y un solo umbral las mentiría a todas.
+   - `HORAS_SIN_ESCRIBIR_SEMANAL = 165`. La cuenta, con la reconciliación mirando a las 10/14/18:
+     sano el dato envejece hasta **154,8 h** (la pasada del sábado a las 18:00, la última antes de
+     la corrida del domingo); una corrida perdida son **171 h** en la pasada del domingo a las
+     10:00; dos, 339. 165 queda en el medio.
+   - 🔑 **Avisa a la PRIMERA corrida perdida, a diferencia del umbral diario, y es correcto**: la
+     regla 2 del canal de sistema exculpa lo que «se arregla solo en horas», y acá la próxima
+     oportunidad es dentro de **siete días**. Esperar una segunda sería tolerar tres semanas de dato
+     viejo — que es exactamente lo que ya pasó.
+
+### Lo que se decidió NO hacer, y por qué
+
+- **`clientes` NO entra a `SYNCS_DE_UNIVERSO_COMPLETO`** (la alerta A). Calificaría de sobra —
+  reescribe el universo entero en cada corrida— pero A lee `A_DIAS_DE_LOG` = **30 días** de log y
+  exige `A_MIN_HISTORIA` = **10** corridas previas: un par SEMANAL nunca junta más de 4 en esa
+  ventana. Ponerlo ahí sería una vigilancia que **parece existir y nunca puede disparar**. Lo cubre
+  B, que mira la tabla.
+- **Boston no vuelve al cron de estado de cuenta por API.** Ese camino sigue sin caber en la
+  función; lo único que cambió es que el directorio ya no viaja adentro de él.
+
+### El `sync_type` nuevo, y por qué la app funciona antes de la DDL
+
+`switch_sync_log.sync_type` tiene un CHECK y el logger es **degradable**: un tipo que el CHECK no
+lista hace que la corrida no deje **ninguna** fila. Ya pasó dos veces (`catalogo_tommy`,
+`articulo_marca`) y las dos corrieron meses sin rastro. Por eso el tipo `clientes` va con su
+migración (`20260923120000_sync_log_clientes.sql`, **pendiente de aplicar**) — y por eso el cron
+**escribe el directorio y registra su heartbeat igual** mientras esa DDL no corra: lo único que
+falta es la fila del log, y **la alerta B no depende de ella**.
+
+### Candados
+
+`src/__tests__/lib/boston-clientes-no-tocan-el-grupo.test.ts` — 21 casos en cuatro bloques: (A) el
+sync escribe una sola tabla y solo filas de Boston, y **nunca borra**; (B) ningún archivo del camino
+nuevo nombra `clientes_master`, el directorio del grupo sigue teniendo **dos** escritores conocidos
+(el sync por inclusión y el PATCH de la ficha, que pregunta `esCodigoDelGrupo()`), y nadie llama al
+sync de Boston desde un camino del grupo; (C) las cinco formas de corrida a medias y qué hace cada
+una; (D) la vigilancia — la entrada de la alerta B, el umbral semanal probado en los dos bordes, el
+recorrido real preguntando solo por Boston, la separación de sesión única y que un cron semanal no
+pueda llevar umbral diario.
+
+**29 mutaciones, 29 cazadas** (`bash scripts/_mutar-candados-respaldo-boston.sh`), CONTROL en verde.
+Entre ellas: se van las marcaciones del reloj del respaldo · se va el catálogo de Reebok · se pierde
+el `ORDER_BY` de una PK compuesta · nace una tabla en una migración y nadie la clasifica · **el
+directorio de Boston escribe en `clientes_master`** · una lista incompleta marca ausentes igual · la
+lista puede encoger a la mitad · Switch contesta vacío y el sync sigue · el cron se mueve a 5 min del
+bloque de Boston · el `sync_type` se estrena sin su DDL · la alerta B deja de mirar el directorio ·
+el umbral semanal se aplica a las 8 empresas.
+
+---
+
 ## Notas de «Base de datos»
 
 > **REGLA — filtrar por año va por RANGO, nunca con `EXTRACT(YEAR ...)` (26-jul-2026).** `WHERE EXTRACT(YEAR FROM (fecha AT TIME ZONE 'America/Panama'))::int = p_anio` es una función SOBRE la columna: no es sargable, ningún índice de `fecha` se puede usar y Postgres cae en seq scan de `switch_facturas` entera (52.269 filas, ~58 MB de heap por el `raw_data` jsonb) en CADA llamada. Es la causa medida de los picos de /ventas: en frío 2.882-3.493 ms contra 368-451 ms en caliente (8×), y el año anterior casi nunca está en caché. La forma correcta es el intervalo semiabierto en UTC — Panamá es **UTC-5 fijo**, sin horario de verano (verificado fila por fila contra la tzdb en las 52.269 facturas: 0 discrepancias):

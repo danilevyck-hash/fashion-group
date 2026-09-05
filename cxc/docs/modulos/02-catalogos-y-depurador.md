@@ -167,6 +167,8 @@ tiene anotado».
 - **Filtro por origen**: `Todos (N)` · `Del link (N)` · `Míos (N)`.
 - 🔴 **Filtro por tipo, TRES chips y SIN «Todos»**: **Pedidos · Cotizaciones · Borradores**. Abre en «Pedidos». Los tres **particionan** (sin «Todos», una fila que no cayera en ningún chip sería invisible: «Pedidos» es el balde de resto). ⚠️ «Borradores» es `status = 'borrador'`, **no** «no salió a Switch».
 - **Agrupado por MES**, colapsable; el mes en curso abre solo.
+- 🔴 **La lista arranca en los ÚLTIMOS 90 DÍAS**, y el resto queda detrás de un botón **«Ver más (N)»** al pie — sin texto explicativo al lado (Daniel: *«no me gustan tantas palabras extras»*). El corte va DESPUÉS del filtro y de la búsqueda, así que «Ver más» siempre trae lo que falta **de lo que se está mirando ahora**, y una vez tocado muestra todo. El corte es por FECHA y no por cantidad: «¿esto es de este trimestre?» es una pregunta que se contesta sin contar. Definición única en `src/lib/catalogo/comprobantes-ventana.ts` (módulo puro, recibe el «ahora» por parámetro). Candado: `comprobantes-ventana-90-dias.test.ts`.
+- 🔴 **Los pedidos viejos NO se borran.** Daniel preguntó si convenía (*«si un pedido se mandó a switch, ya está safe, no?»*) y la respuesta es **no**: el pedido guarda lo que Switch no tiene —quién lo armó, el comentario, si salió como pedido o cotización, y el PDF que se le mandó al cliente— y son **pocos** (23 Reebok · 38 Tommy · 21 Calvin · 41 Joybees en todo 2026). Lo que pesaba era la LISTA, y eso es lo que se recorta. Ver `docs/postmortems/catalogos-pedidos.md`.
 - Cada fila: chip de origen (**«Del link»** con ✓ si el cliente lo confirmó, o **«Mío»**), cliente, **los DOS números** (`PED-018` · `Pedido en Switch: 16-000000506`, o `Se numera al abrirlo` / `Sin número` / `No se ha mandado a Switch`), fecha y total.
 - Acciones: **«Editar»** (o **«Ver»** para bodega) · **«Duplicar y corregir»** · **«Eliminar pedido»** · selección múltiple con borrado masivo · **«Exportar Excel»** (solo `CATALOGO_ADMIN_ROLES` — al vendedor el endpoint le contesta 403, «ofrecérselo sería ofrecer un botón que no funciona»).
 - Confirmación de borrado, literal: *«¿Eliminar el pedido de \<cliente\> por $N? Desaparecerá de la lista. **No se envía nada a Switch.**»*
@@ -290,10 +292,13 @@ preventa nunca se usó.** `image_url` falta en 4 de las 532 de Tommy y en **19 d
 ⚠️ **`quantity` está en BULTOS, no en piezas.** Tommy tiene 35 renglones con `quantity = 12`:
 eso son 12 **bultos**, no 12 piezas.
 
-⚠️ **Datos de prueba en producción:** Calvin tiene **16 de 21** pedidos con `client_name` =
-`PRUEBA T173 — BORRAR` o `PRUEBA T169 — BORRAR`; Joybees **15 de 41** entre `PRUEBA T143 — BORRAR`,
-`PRUEBA T173 — BORRAR` y `PRUEBA-BOT`. Todos marcados `deleted`, así que no se ven — pero
-están.
+⚠️ **Datos de prueba en producción — SE VAN por migración (4-sep-2026).** Calvin tiene **16 de 21**
+pedidos borrados y Joybees **37 de 41**, todos `borrador` y con nombres «PRUEBA … — BORRAR» /
+«PRUEBA-BOT» o vendedor `medicion`. Están marcados `deleted`, así que no se ven — pero están, y
+Daniel los pidió fuera: *«borro de verdad de la base»*. Los borra
+`supabase/migrations/20260924120000_borrar_pedidos_de_prueba.sql` (**pendiente de aplicar**), con
+lista explícita de ids y un filtro que salva a cualquiera que tenga un envío vivo a Switch (hoy:
+ninguno). Ver `docs/postmortems/catalogos-pedidos.md`.
 
 ### Los pedidos del link
 
@@ -916,10 +921,12 @@ el número de Switch en la segunda. Los emoji por marca son 🛒 Reebok · 🐝 
     `sessionStorage`.
 
 ### Datos sucios en producción
-13. 🔴 **Datos de prueba vivos.** Calvin: **16 de 21** pedidos se llaman `PRUEBA T173 — BORRAR`
-    o `PRUEBA T169 — BORRAR`. Joybees: **15 de 41** entre `PRUEBA T143 — BORRAR` y `PRUEBA-BOT`,
-    y **16 filas con `vendor_name = "medicion"`** (un script de medición). Están marcadas
-    `deleted`, así que no se ven — pero siguen en la base y en los backups.
+13. ✅ **CERRADO el 4-sep-2026 — los datos de prueba se borran de verdad.** Calvin: **16 de 21**
+    pedidos («PRUEBA T173 / T169 — BORRAR»). Joybees: **37 de 41** («PRUEBA T143 / T173 — BORRAR»,
+    «PRUEBA-BOT» y 16 filas con `vendor_name = "medicion"`, de un script de medición). Estaban
+    marcadas `deleted`, así que no se veían — pero seguían en la base y en los backups. Daniel:
+    *«borro de verdad de la base»*. Migración `20260924120000_borrar_pedidos_de_prueba.sql`
+    (**pendiente de aplicar**, la corre Daniel).
 14. ⚠️ **`vendor_name` de los pedidos no tiene formato.** Mezcla el nombre de login (`daniel`,
     `andrea`, `rey`, `Angela`, `Rodrigo`), el nombre de Switch en mayúsculas
     (`REINALDO ESPINOSA`, `DANIEL LEVY ` **con espacio final**), `DEFAULT` y `null`. Es el mismo
@@ -1026,7 +1033,7 @@ Nació como 5.ª pestaña de `/ventas` y desde el 12-ago-2026 **la pestaña ya n
 | `bodega` | sí | Igual que vendedor |
 | `secretaria` · `contabilidad` · `gerente_acs` · `gerente_boston` | **no** | `/referencia` los manda a `/home`; `GET /api/ventas/referencia` les contesta **403** |
 
-- El gate de página está en `src/app/referencia/page.tsx` (`ROLES_REFERENCIA = ["admin","vendedor","bodega"]`, `redirect("/home")`).
+- El gate de página está en `src/app/referencia/page.tsx` y **lee la lista única** `REFERENCIA_ROLES` (`src/lib/ventas/referencia.ts` = `["admin","vendedor","bodega"]`, `redirect("/home")`). Desde el 4-sep-2026 esa MISMA lista la usan también `GET /api/ventas/referencia` y `POST /api/ventas/referencia/actualizar`: tres copias escritas a mano fue lo que dejó el botón en solo-admin. Candado: `referencia-boton-actualizar.test.ts`.
 - El gate del margen **NO está en la vista**: lo pone el servidor (`src/app/api/ventas/referencia/route.ts` → `margenVisible = auth.role === "admin"`). La vista solo lee `resp.margenVisible`.
   Daniel, textual: *«quita margen, lo demas dejalo»*.
 - Personas reales (medido en `fg_users`, 4-sep-2026): **daniel** y **alberto** (admin) · **rey**, **edwin**, **rodrigo** (vendedor) · **Bodega** (bodega). Ocho usuarios en total tienen la puerta.
@@ -1265,8 +1272,19 @@ Ver también `CLAUDE.md § Ventas, Referencia y Comisiones` y
 - **Cero promedios.** Del rediseño del 11-ago-2026 (`9b1899e1`) se retiraron los promedios de
   3/6/12 meses, los veredictos SE AGOTÓ / DESCONTINUADO y la sugerencia de recompra. La
   pestaña «Varias · pegar lista» también murió ahí: **un solo buscador**.
+- 🔴 **El botón «Actualizar datos de Switch»** (vuelto el 4-sep-2026) vive junto a «Bajar a Excel»,
+  aparece cuando hay resultados y actualiza **la empresa (o las empresas) de lo que se buscó**, en
+  SERIE — la sesión de Switch es una por usuario y dos logins simultáneos se tumban entre sí. Al
+  terminar re-hace la búsqueda, así que la ficha muestra lo recién traído. **Sin aviso**: Daniel,
+  *«referencia lo puede ver todos, y sin aviso»* — nada de «esto te saca del panel de Switch».
+  El **acelerador** es el de Guías (`SYNC_NOW_COOLDOWN_MIN` = 10 min, contra `switch_sync_log`
+  `sync_type = 'articulo_info'`) y vive en el SERVIDOR: si esa empresa ya se trajo hace menos de 10
+  minutos se contesta `omitido: "fresca"` sin tocar Switch. El lock de `switch_sync_log` frena las
+  corridas SIMULTÁNEAS; el acelerador frena las CONSECUTIVAS, que es el caso real.
 - Candados conocidos: `src/__tests__/lib/articulo-info.test.ts` (entre otras cosas, exige que
-  el archivo `src/app/api/ventas/referencia/actualizar/route.ts` **exista**).
+  el archivo `src/app/api/ventas/referencia/actualizar/route.ts` **exista**) y
+  `src/__tests__/lib/referencia-boton-actualizar.test.ts` (el botón está, lo tocan los tres roles,
+  no hay aviso, el acelerador corta antes de Switch).
 
 ## Con qué conecta
 
@@ -1330,7 +1348,7 @@ FUENTE, y ahí hay dos lectores que no son obvios:
 | **La pestaña «Varias · pegar lista»** | 11-ago-2026 | Un solo buscador |
 | **La pestaña `/ventas?tab=referencia`** | 12-ago-2026 | Una sola puerta. La dirección vieja **redirige (307)**, acotada con `has`; `/ventas` a secas **no** se redirige |
 | **`VENDIDO = Vendí ÷ Compré`** | — | Decía **100% con mercancía en bodega**: lo registrado como compra no es lo que hubo (el sistema no lee los ajustes de inventario de Switch). Hoy el denominador es `Vendí + Stock` |
-| **El botón «Actualizar datos de Switch»** | 11-ago-2026 (commit `9b1899e1`) | Se fue con el rediseño. 🔴 **El endpoint que llamaba sigue vivo y sin llamadores** — ver «Lo que sobra» |
+| ~~**El botón «Actualizar datos de Switch»**~~ | 11-ago-2026 (`9b1899e1`) → **VOLVIÓ el 4-sep-2026** | Se había ido con el rediseño, dentro de la «franja de catálogo» que ese PR retiró: fue **colateral, no una decisión**, y dejó la ruta viva y sin puerta durante 24 días. Daniel: *«activa el botón de Referencia»* |
 | **Dos búsquedas distintas** (`.in()` exacto con varios códigos, prefijo con uno solo) | — | 🩸 Con la lista real de Daniel (48 tokens → 27 códigos) el sistema decía «no encontré» **en los 27**. Hoy es **UNA sola resolución**: cada código busca por prefijo, venga solo o en lista de 50 |
 | **El FOB de Switch** | — | Llega **igual al CIF en el 93% de las líneas** (error de carga en Switch). El FOB del sistema se **calcula** (`CIF ÷ 1,10`) y se rotula «FOB» a secas |
 
@@ -1423,18 +1441,16 @@ Notas del Excel, fijadas por candado:
 
 ## Lo que sobra o no cuadra
 
-1. 🔴 **`POST /api/ventas/referencia/actualizar` es un endpoint HUÉRFANO.** El botón
-   «Actualizar datos de Switch» que lo llamaba **se eliminó el 11-ago-2026** en el commit
-   `9b1899e1` (se ve el `-` del `fetch("/api/ventas/referencia/actualizar")` en el diff de
-   `ReferenciaView.tsx`). Hoy **no hay ni un `fetch` a esa ruta en todo `src/`** — solo el
-   propio route y un test que verifica que el archivo exista. La ruta sigue viva: `requireRole(["admin"])`,
-   `maxDuration = 300`, dispara `syncArticuloInfo` de una empresa y **saca a Daniel del panel
-   web de Switch** de esa empresa mientras corre.
-   Tres comentarios y un documento siguen afirmando que el botón existe:
-   `src/app/api/ventas/referencia/actualizar/route.ts:2` · `src/app/api/cron/sync-articulo-info/route.ts:7` ·
-   `src/lib/switch-api/sync-articulo-info.ts:21` · `docs/switch-flujo.md:159`.
-   `CLAUDE.md` también lo dice («El botón "Actualizar datos de Switch" del tab SE QUEDA para
-   el dato del momento»).
+1. ✅ **CERRADO el 4-sep-2026 — `POST /api/ventas/referencia/actualizar` ya no es un endpoint
+   huérfano.** El botón «Actualizar datos de Switch» que lo llamaba se había eliminado el
+   11-ago-2026 (`9b1899e1`, se ve el `-` del `fetch(...)` en el diff de `ReferenciaView.tsx`) y la
+   ruta quedó viva y sin llamadores durante 24 días, con `requireRole(["admin"])` — o sea que
+   además le habría contestado 403 al vendedor y a bodega, que sí ven la pantalla.
+   Ahora el botón está de vuelta, la lista de roles es **una sola** (`REFERENCIA_ROLES`) y la ruta
+   trae acelerador. Los comentarios que afirmaban que el botón existía **volvieron a ser ciertos**
+   (`src/app/api/cron/sync-articulo-info/route.ts` · `src/lib/switch-api/sync-articulo-info.ts` ·
+   `CLAUDE.md`); y `docs/switch-flujo.md` §13, que lo describía como del «tab Ventas ›
+   Referencia» y «solo admin», quedó corregido en la misma tanda.
 2. **La herencia `"referencia": "catalogos"` de `MODULO_HEREDA_PERMISO_DE` (`src/lib/modules.ts`)
    ya no hace falta.** Existía «mientras la DDL `20260812120000` no corra». Medido en
    producción el 4-sep-2026: `role_permissions.vendedor.modulos` y `role_permissions.bodega.modulos`

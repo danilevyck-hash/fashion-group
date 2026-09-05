@@ -123,7 +123,8 @@ async function ultimaEscritura(
 export async function medirTablasQuietas(ahoraMs: number = Date.now()): Promise<Hallazgo[]> {
   const out: Hallazgo[] = [];
   for (const cfg of TABLAS_VIGILADAS) {
-    for (const empresaKey of ALL_EMPRESA_KEYS) {
+    // `empresas` ausente = las 8. Ver `TablaVigilada.empresas`.
+    for (const empresaKey of cfg.empresas ?? ALL_EMPRESA_KEYS) {
       const ultima = await ultimaEscritura(cfg.tabla, cfg.columna, empresaKey);
       const h = evaluarTablaQuieta(cfg, empresaKey, ultima, ahoraMs);
       if (h) out.push(h);

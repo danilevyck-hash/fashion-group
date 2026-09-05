@@ -4,6 +4,7 @@ import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { requireRole } from "@/lib/requireRole";
 import { getEndOfWeek } from "@/lib/cheques-dates";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
       .from("reclamos")
       .select("id", { count: "exact", head: true })
       .eq("deleted", false)
-      .not("estado", "in", "(Aplicado,Rechazado,Aplicada,Pagado)")
+      .not("estado", "in", `(Aplicado,Rechazado,Aplicada,${ESTADO_PAGADO})`)
       .lt("fecha_reclamo", dias45),
 
     // Préstamos: movimientos pendientes de aprobación

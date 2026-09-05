@@ -85,10 +85,25 @@ function abrirMeses(container: HTMLElement) {
   }
 }
 
+/**
+ * 🩸 SEGUNDO GOTCHA (4-sep-2026): la lista arranca en los ÚLTIMOS 90 DÍAS y el
+ * resto queda detrás de «Ver más» (`comprobantes-ventana.ts`). Este fixture está
+ * calcado de producción con sus fechas REALES (mayo a agosto de 2026), así que
+ * a medida que pasa el tiempo va cayendo fuera de la ventana. Se toca «Ver más»
+ * —lo mismo que haría una persona— en vez de congelar el reloj: así el candado
+ * mide la pantalla de verdad y no envejece.
+ */
+function verTodo(container: HTMLElement) {
+  for (const b of Array.from(container.querySelectorAll("button"))) {
+    if (/^Ver más \(\d+\)$/.test((b.textContent || "").trim())) fireEvent.click(b);
+  }
+}
+
 async function pintar() {
   const r = render(<PedidosListClient marca="reebok" />);
   // El panel abre en «Pedidos», y ahí están los 4 `confirmado` que nunca salieron.
   await waitFor(() => expect(chips(r.container).length).toBe(3), { timeout: 3000 });
+  verTodo(r.container);
   abrirMeses(r.container);
   await waitFor(() => expect(screen.getByText("PED-001")).toBeTruthy(), { timeout: 3000 });
   return r;

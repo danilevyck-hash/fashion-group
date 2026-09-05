@@ -9,6 +9,14 @@
  *    tiene el mismo codigo"
  * → eligió SEPARAR: cada cartera con sus propias notas y estrellas.
  *
+ * ⚠️ 4-sep-2026 — **las estrellas ya no existen**. Los favoritos ⭐ se
+ * retiraron del CXC entero (Daniel: *«quita favoritos»*; `cxc_favorites` tuvo 0
+ * filas en toda su historia). La TABLA queda en la base, sin lectores, y este
+ * archivo la sigue vigilando: el BARRIDO 1 ahora exige que **nadie** la
+ * consulte —ni siquiera la puerta única—, así que volver a poner la estrella
+ * pone el build rojo. Todo lo demás de la regla sigue igual para las notas de
+ * contacto y la bitácora, que sí se usan.
+ *
  * ─── QUÉ VIGILA ESTE ARCHIVO ────────────────────────────────────────────────
  * 1. BARRIDO por `src/` — ningún archivo fuera de `lib/cxc/anotaciones.ts`
  *    toca las 3 tablas. Sin esto, el route número seis que alguien escriba
@@ -34,7 +42,12 @@ const RAIZ = path.resolve(__dirname, "../../..");
 const SRC = path.join(RAIZ, "src");
 const MIGRACION = path.join(RAIZ, "supabase/migrations/20260813120000_cxc_anotaciones_por_cartera.sql");
 
+/** Las tres tablas de anotación. El barrido las vigila a las TRES. */
 const TABLAS = ["cxc_favorites", "cxc_client_overrides", "cxc_contact_log"] as const;
+
+/** Las que todavía tienen puerta. `cxc_favorites` se quedó sin ella el
+ *  4-sep-2026 y no puede volver a tenerla sin que este archivo lo diga. */
+const TABLAS_CON_PUERTA = ["cxc_client_overrides", "cxc_contact_log"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Doble EN MEMORIA de PostgREST — ejecuta `anotaciones.ts` DE VERDAD.
@@ -128,11 +141,9 @@ vi.mock("@/lib/supabase-server", () => ({
 }));
 
 import {
-  alternarFavorito,
   guardarOverride,
   leerContactLog,
   leerCorreoDeOverride,
-  leerFavoritos,
   leerOverrides,
   registrarContacto,
 } from "@/lib/cxc/anotaciones";
@@ -174,31 +185,7 @@ describe("la cartera es un valor cerrado y SIN default", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("una estrella de Boston NO aparece en el grupo (ni al revés)", () => {
-  it("favoritos: cada cartera ve solo los suyos", async () => {
-    await alternarFavorito(CARTERA_BOSTON, "daniel", COMPARTIDO);
-
-    expect(await leerFavoritos(CARTERA_BOSTON, "daniel")).toEqual([COMPARTIDO]);
-    expect(await leerFavoritos(CARTERA_GRUPO, "daniel")).toEqual([]);
-
-    await alternarFavorito(CARTERA_GRUPO, "daniel", COMPARTIDO);
-    expect(await leerFavoritos(CARTERA_GRUPO, "daniel")).toEqual([COMPARTIDO]);
-    expect(await leerFavoritos(CARTERA_BOSTON, "daniel")).toEqual([COMPARTIDO]);
-
-    // Y quitarla de una NO la quita de la otra.
-    await alternarFavorito(CARTERA_BOSTON, "daniel", COMPARTIDO);
-    expect(await leerFavoritos(CARTERA_BOSTON, "daniel")).toEqual([]);
-    expect(await leerFavoritos(CARTERA_GRUPO, "daniel")).toEqual([COMPARTIDO]);
-  });
-
-  it("favoritos: el toggle de una cartera no ve la fila de la otra como 'ya está'", async () => {
-    await alternarFavorito(CARTERA_GRUPO, "daniel", COMPARTIDO);
-    // Si el toggle mirara sin cartera, esto devolvería "removed" y borraría la
-    // estrella del grupo desde la pestaña de Boston.
-    expect(await alternarFavorito(CARTERA_BOSTON, "daniel", COMPARTIDO)).toBe("added");
-    expect(estado.tablas.cxc_favorites).toHaveLength(2);
-  });
-
+describe("una nota de Boston NO aparece en el grupo (ni al revés)", () => {
   it("contactos: la ficha de una cartera no pisa la de la otra", async () => {
     await guardarOverride(CARTERA_GRUPO, { nombre_normalized: COMPARTIDO, correo: "grupo@x.com" });
     await guardarOverride(CARTERA_BOSTON, { nombre_normalized: COMPARTIDO, correo: "boston@x.com" });
@@ -224,7 +211,6 @@ describe("una estrella de Boston NO aparece en el grupo (ni al revés)", () => {
   });
 
   it("toda escritura deja la cartera guardada en la fila", async () => {
-    await alternarFavorito(CARTERA_BOSTON, "daniel", "X");
     await guardarOverride(CARTERA_BOSTON, { nombre_normalized: "X" });
     await registrarContacto(CARTERA_BOSTON, "X", "email");
 
@@ -277,8 +263,6 @@ describe("sin la columna `cartera` TODO falla visible (antes: el grupo degradaba
     // código intacto (es lo que `respuestaErrorEscritura` necesita) y la tabla
     // queda como estaba. Una fila sin cartera es exactamente la que el #522 vino
     // a prohibir.
-    await expect(alternarFavorito(CARTERA_GRUPO, "daniel", COMPARTIDO)).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42703" });
-    await expect(leerFavoritos(CARTERA_GRUPO, "daniel")).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42703" });
     await expect(guardarOverride(CARTERA_GRUPO, { nombre_normalized: COMPARTIDO, correo: "a@a.com" })).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42P10" });
     await expect(registrarContacto(CARTERA_GRUPO, COMPARTIDO, "llamada")).rejects.toMatchObject({ name: "ErrorAnotacion", code: "PGRST204" });
     await expect(leerContactLog(CARTERA_GRUPO)).rejects.toMatchObject({ name: "ErrorAnotacion", code: "42703" });
@@ -288,7 +272,6 @@ describe("sin la columna `cartera` TODO falla visible (antes: el grupo degradaba
 
   it("🔴 BOSTON no escribe en el namespace compartido: falla y lo dice (ahora con el error de la base)", async () => {
     // Escribir igual metería la nota de Boston donde el grupo la vería.
-    await expect(alternarFavorito(CARTERA_BOSTON, "daniel", COMPARTIDO)).rejects.toMatchObject({ name: "ErrorAnotacion" });
     await expect(guardarOverride(CARTERA_BOSTON, { nombre_normalized: COMPARTIDO })).rejects.toMatchObject({ name: "ErrorAnotacion" });
     await expect(registrarContacto(CARTERA_BOSTON, COMPARTIDO, "llamada")).rejects.toMatchObject({ name: "ErrorAnotacion" });
 
@@ -298,12 +281,10 @@ describe("sin la columna `cartera` TODO falla visible (antes: el grupo degradaba
   it("BOSTON nunca recibe lo del grupo: con la columna rota, lee ERROR — no vacío, no ajeno", async () => {
     // Se siembra el grupo CON la columna, y después se "rompe".
     estado.tieneCartera = true;
-    await alternarFavorito(CARTERA_GRUPO, "daniel", COMPARTIDO);
     await guardarOverride(CARTERA_GRUPO, { nombre_normalized: COMPARTIDO, correo: "grupo@x.com" });
     await registrarContacto(CARTERA_GRUPO, COMPARTIDO, "llamada");
     estado.tieneCartera = false;
 
-    await expect(leerFavoritos(CARTERA_BOSTON, "daniel")).rejects.toMatchObject({ name: "ErrorAnotacion" });
     await expect(leerOverrides(CARTERA_BOSTON)).rejects.toMatchObject({ name: "ErrorAnotacion" });
     await expect(leerContactLog(CARTERA_BOSTON)).rejects.toMatchObject({ name: "ErrorAnotacion" });
     // Lo que NUNCA puede pasar: que Boston reciba la fila del grupo. El correo
@@ -364,13 +345,22 @@ describe("BARRIDO 1 — solo `lib/cxc/anotaciones.ts` toca las 3 tablas", () => 
 
   it("la puerta única sí las consulta (el barrido mide algo real)", () => {
     const src = sinComentarios(fs.readFileSync(PUERTA_UNICA, "utf8"));
-    for (const t of TABLAS) expect(src).toContain(`.from("${t}")`);
+    for (const t of TABLAS_CON_PUERTA) expect(src).toContain(`.from("${t}")`);
+  });
+
+  it("🔴 `cxc_favorites` no la consulta NADIE — ni la puerta única (4-sep-2026)", () => {
+    // Volver a poner la estrella pone el build rojo acá: la tabla queda en la
+    // base a propósito (patrón `mayor_lineas`), pero sin un solo lector.
+    for (const f of archivos) {
+      const src = sinComentarios(fs.readFileSync(f, "utf8"));
+      expect(/\.from\(\s*["'`]cxc_favorites["'`]/.test(src), path.relative(RAIZ, f)).toBe(false);
+    }
   });
 });
 
 describe("BARRIDO 2 — toda ruta que expone anotaciones exige la cartera", () => {
+  // `app/api/cxc/favorites/route.ts` se borró el 4-sep-2026 con los favoritos.
   const RUTAS = [
-    "app/api/cxc/favorites/route.ts",
     "app/api/cxc/overrides/route.ts",
     "app/api/cxc/contact-log/route.ts",
     "app/api/overrides/route.ts",
@@ -402,43 +392,37 @@ describe("BARRIDO 2 — toda ruta que expone anotaciones exige la cartera", () =
 describe("BARRIDO 3 — los dos lados están cableados, cada uno con SU cartera", () => {
   const lee = (rel: string) => sinComentarios(fs.readFileSync(path.join(SRC, rel), "utf8"));
 
-  it("el panel del grupo manda cartera=grupo en todas sus llamadas", () => {
+  it("el panel del grupo manda cartera=grupo en su única llamada de anotación", () => {
+    // ⚠️ Este candado bajó de piso TRES veces, siempre porque se RETIRÓ una
+    // llamada de escritura, nunca porque se aflojara la regla:
+    //  · 14-ago-2026 — el POST a contact-log (el menú "···" perdió "Ya
+    //    contacté"; Daniel: el seguimiento de cobro NO va a existir acá).
+    //  · 24-ago-2026 — `handleSaveEdit`, el POST a `/api/cxc/overrides` que ya
+    //    no llamaba nadie (la edición de contacto se mudó a `/clientes/[codigo]`).
+    //  · 4-sep-2026 — los favoritos ⭐ enteros, con su GET y su POST. Con eso
+    //    `admin/page.tsx` se quedó SIN una sola llamada de anotación, y la
+    //    única que le queda al panel vive en su hook.
+    // Las tablas y sus filas quedan; lo que bajó es la cuenta de llamadas.
     const panel = lee("app/admin/page.tsx");
-    const hook = lee("app/admin/hooks/useAdminData.ts");
-    expect(panel).toContain("CARTERA_GRUPO");
     expect(panel).not.toContain("CARTERA_BOSTON");
-    // favoritos (GET + POST) y overrides (POST), más el import.
-    //
-    // ⚠️ El 14-ago-2026 se retiró el POST a contact-log: el menú "···" perdió
-    // las dos opciones "Ya contacté" (Daniel: el seguimiento de cobro NO va a
-    // existir en este módulo) y la bitácora dejó de escribirse desde acá. La
-    // tabla `cxc_contact_log` y sus 141 filas QUEDAN, y la puerta única sigue
-    // exigiendo la cartera — lo que bajó es la cuenta de llamadas, no el rigor.
-    //
-    // ⚠️ El 24-ago-2026 bajó otra: se retiró `handleSaveEdit`, el POST a
-    // `/api/cxc/overrides` que ya NO llamaba nadie (la edición de contacto se
-    // mudó a la ficha `/clientes/[codigo]` y este panel se quedó con el camino
-    // de escritura sin puerta). Quedan las 3 apariciones que importan —el
-    // import, el GET y el POST de favoritos—, o sea que **toda llamada que
-    // escribe sigue diciendo su cartera**: lo que se retiró fue una llamada, no
-    // una declaración. El piso baja; el invariante no se aflojó.
-    expect(panel.match(/CARTERA_GRUPO/g)!.length).toBeGreaterThanOrEqual(3);
-    // overrides (GET) vive en el hook; el GET de contact-log se retiró el mismo
-    // día (nadie pintaba el resultado: llegaba como prop y no se leía).
+    // overrides (GET) vive en el hook; el GET de contact-log se retiró el
+    // 14-ago (nadie pintaba el resultado: llegaba como prop y no se leía).
+    const hook = lee("app/admin/hooks/useAdminData.ts");
     expect(hook).toContain("cartera=${CARTERA_GRUPO}");
     expect(hook.match(/CARTERA_GRUPO/g)!.length).toBeGreaterThanOrEqual(2);
     // Y lo que NO puede pasar: que el panel del grupo pida otra cartera.
     expect(hook).not.toContain("CARTERA_BOSTON");
   });
 
-  it("la pestaña de Boston manda cartera=boston, y NUNCA la del grupo", () => {
+  it("🔴 la pestaña de Boston no llama NINGUNA anotación, y menos la del grupo", () => {
+    // Su única llamada de anotación era la estrella; se fue el 4-sep-2026. Lo
+    // que no puede pasar nunca es que pida `cartera=grupo`: eso le mostraría a
+    // Boston las notas del grupo, que es lo que esta regla vino a prohibir.
     const tab = lee("components/cxc/BostonTab.tsx");
-    expect(tab).toContain("CARTERA_BOSTON");
     expect(tab).not.toContain("CARTERA_GRUPO");
-    expect(tab).toMatch(/cartera=\$\{CARTERA_BOSTON\}/);
-    expect(tab).toMatch(/cartera:\s*CARTERA_BOSTON/);
-    // Y sus favoritos SÍ ordenan la lista (antes pasaba `() => false`).
-    expect(tab).not.toContain("esFavorito: () => false");
+    expect(tab).not.toMatch(/from\s+["']@\/lib\/cxc\/anotaciones["']/);
+    // CONTROL: la pestaña se sigue dibujando con su cartera propia.
+    expect(tab).toContain("/api/cxc/boston");
   });
 
   it("Cheques escribe en la cartera del grupo (su CXC es el del grupo)", () => {

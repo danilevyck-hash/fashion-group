@@ -6,6 +6,8 @@ import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { firmarFacturaPathSafe } from "@/lib/reclamos/factura-storage";
 import { validateReclamoHeader } from "@/lib/reclamos/validate";
+import { ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
+import { datosDeEmpresa } from "@/lib/reclamos/empresas";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -18,7 +20,7 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Creado": ["En proceso"],
   "En proceso": ["Creado"],
-  "Pagado": ["En proceso"],
+  [ESTADO_PAGADO]: ["En proceso"],
 };
 
 export const dynamic = "force-dynamic";
@@ -96,6 +98,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const key of ["empresa", "proveedor", "marca", "nro_factura", "nro_orden_compra", "fecha_reclamo", "notas", "estado", "monto_reclamado_snapshot", "factura_pdf_path"]) {
     if (fields[key] !== undefined) updates[key] = fields[key];
+  }
+
+  // 🔴 Si cambia la empresa, el proveedor, la marca y el CÓDIGO se rehacen desde
+  // el mapa del servidor. Dejar el código viejo ataría el reclamo al proveedor
+  // de la empresa anterior — y por ahí es por donde se cuela un reclamo de
+  // Fashion Wear en la ficha de Latin Fitness Group.
+  if (fields.empresa !== undefined) {
+    const empInfo = datosDeEmpresa(fields.empresa);
+    if (empInfo) {
+      updates.proveedor = empInfo.proveedor;
+      updates.marca = empInfo.marca;
+      updates.proveedor_codigo = empInfo.proveedor_codigo;
+    } else {
+      updates.proveedor_codigo = null;
+    }
   }
 
   if (Object.keys(updates).length > 1) {

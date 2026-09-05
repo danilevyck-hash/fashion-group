@@ -7,6 +7,102 @@
 
 ---
 
+## 🔴 Pedidos — LOS VIEJOS NO SE BORRAN; LA LISTA MUESTRA 90 DÍAS Y LA BASURA DE PRUEBAS SÍ SE VA (4-sep-2026)
+
+> **La pregunta de Daniel, textual:** *«si un pedido se mandó a switch, ya está safe, no?»*
+> Y sobre lo otro: *«borro de verdad de la base»*.
+
+Son dos preguntas que parecen una y tienen respuestas opuestas.
+
+### 1. Un pedido viejo NO se borra. La respuesta es NO, por dos razones medidas.
+
+**a) El pedido guarda lo que Switch no tiene.** Que el documento haya llegado al ERP no
+significa que el pedido sea desechable: en `<marca>_orders` viven **quién lo armó**
+(`vendor_name`), **el comentario** (`comment`), **si salió como pedido o como cotización**
+(el envío activo en `<marca>_switch_envios.documento`), **el correo al que se le mandó**
+(`client_email`) y el PDF que se generó desde ahí. Switch guarda el documento; no guarda
+cómo se llegó a él. Borrar la fila es perder la única copia de eso.
+
+**b) Son POCOS.** Medido contra producción el 4-sep-2026, pedidos internos creados en todo
+2026: **23 Reebok · 38 Tommy · 21 Calvin · 41 Joybees**. No hay un problema de volumen que
+borrar resuelva — 123 filas en cuatro tablas no le pesan a nadie.
+
+Lo que sí pesaba es **la LISTA**: la pantalla de Comprobantes abría con el año entero, así
+que había que buscar antes de ver. Se recorta la lista, no los datos:
+
+- **Los últimos 90 días** se muestran; el resto queda detrás de **«Ver más (N)»** al pie.
+- 🔴 **Sin texto explicativo al lado del botón.** Daniel: *«no me gustan tantas palabras
+  extras»*. El botón dice lo que hace; el número es lo único que la persona no puede ver
+  por sí misma.
+- El corte va **DESPUÉS** del filtro y de la búsqueda, así que «Ver más» siempre trae lo que
+  falta **de lo que se está mirando ahora**. Y la selección masiva solo alcanza lo visible:
+  lo que la ventana escondió no se puede borrar por accidente.
+- 🔴 **El corte es por FECHA, no por cantidad.** «Los últimos 90 días» es una pregunta que la
+  persona puede contestar sin contar («¿esto es de este trimestre?»); «los últimos 20» no lo
+  es, y además cambia de significado según cuánto se haya vendido.
+- Una fecha ilegible **se muestra**: esconder un comprobante por un dato roto es peor que
+  mostrarlo de más.
+- Definición única en **`src/lib/catalogo/comprobantes-ventana.ts`**, módulo PURO que recibe
+  el «ahora» por parámetro — un candado con `new Date()` adentro no podría medirlo.
+
+**Candado:** `src/__tests__/lib/comprobantes-ventana-90-dias.test.ts` (12 casos: el borde de
+los 90 días, que recientes + viejos sean SIEMPRE la lista entera, la fecha ilegible, que los
+grupos por mes se armen sobre lo visible y no sobre `filtered`, y que el botón vaya solo).
+
+🩸 **Un gotcha que este cambio dejó en los candados de conducta.** El fixture de
+`pedidos-chips-y-verdad-de-la-fila.test.tsx` está calcado de producción **con sus fechas
+reales** (mayo a agosto de 2026), así que a medida que pasa el tiempo se va cayendo fuera de
+la ventana y las filas dejan de estar montadas. La solución es **tocar «Ver más»** —lo mismo
+que haría una persona— y no congelar el reloj: así el candado mide la pantalla de verdad y
+no envejece.
+
+### 2. La basura de las PRUEBAS sí se borra, de verdad, y una sola vez.
+
+Otra cosa distinta son las corridas de verificación de agosto: **16 pedidos en
+`calvin_orders` y 37 en `joybees_orders`**, todos ya marcados `deleted = true`, todos en
+estado `borrador`, con nombres «PRUEBA T143/T169/T173 — BORRAR» y «PRUEBA-BOT» o creados por
+el usuario `medicion` para medir el flujo del checkout. Eso no es un dato del negocio: es
+basura, y Daniel la pidió fuera por su nombre.
+
+Va por migración — **`supabase/migrations/20260924120000_borrar_pedidos_de_prueba.sql`**,
+que **no se aplicó**: la corre Daniel. Trae sus frenos adentro, no en la medición que la
+precedió:
+
+1. 🔴 **Lista EXPLÍCITA de ids.** Nada de `WHERE client_name LIKE '%PRUEBA%'`, que mañana
+   engancharía un pedido de verdad de un cliente que se llame así.
+2. 🔴 **El que tenga un envío VIVO a Switch se saca de la lista y no se toca** (`EXISTS`
+   contra `<marca>_switch_envios` con `estado <> 'error'` — el mismo criterio del índice
+   parcial único del at-most-once). Medido el 4-sep-2026: `calvin_switch_envios` tiene 3
+   filas y `joybees_switch_envios` 4, y **ninguna** apunta a los 53 ids de la lista, o sea
+   que **cero pedidos se salvan por esta vía hoy**. El filtro está igual: si alguno ganara un
+   envío entre que se escribe la migración y que se aplica, se salva solo.
+3. **Segundo freno:** solo se borra lo que ya estaba `deleted IS TRUE`.
+4. Se borran también sus renglones (`<marca>_order_items`: 16 de Calvin, 45 de Joybees),
+   explícitamente y no solo por el `ON DELETE CASCADE`.
+5. Todo o nada (`BEGIN` / `COMMIT`), y no toca ninguna otra tabla — ni Reebok, ni Tommy, ni
+   los pedidos del link.
+
+⚠️ Quedan a propósito dos filas de `joybees_pedidos_publicos` (`jz3tcmm2` y `wsui927p`, del
+bot del 24-jul) cuyo `ped_order_number` apunta a JBP-004 / JBP-005. Las dos están ya
+borradas (`deleted = true`), así que ninguna pantalla las mira; borrar filas que Daniel no
+pidió borrar sería pasarse del encargo.
+
+🔴 **Esto es un borrado REAL y no se deshace. Es la excepción, no la regla:** la casa borra
+suave (`deleted`) y conserva las tablas aunque se queden sin lectores (`mayor_lineas`,
+`cxc_favorites`). Se borra acá porque lo que se va no es un dato del negocio.
+
+**Candado:** `src/__tests__/lib/borrar-pedidos-de-prueba.test.ts` (15 casos: que la lista sea
+de ids y tenga exactamente 16 y 37, que el filtro del envío exista y corra ANTES de los dos
+`DELETE`, que no haya `LIKE` ni criterio por nombre/fecha, y que la migración no toque
+ninguna otra tabla).
+
+**Verificado por mutación:** las cinco mutaciones de esta migración —quitarle el filtro del
+envío en Calvin, quitárselo en Joybees, cambiar la lista por un `LIKE`, perder el
+`deleted IS TRUE` y llevarse por delante los pedidos del link— **caen las cinco**
+(`scripts/_mutar-limpieza-ventas.py`).
+
+---
+
 ## 🔴 Depurador — LA PLANTILLA DE SWITCH ES UNA SOLA, TIENE 25 COLUMNAS, Y AHORA VIVE EN EL REPO (3-sep-2026)
 
 > **Lo que pasaba.** El Depurador (`/productos/cargar`) generaba DOS variantes de 24 columnas (`OUT_COLS_DEFAULT` para Vistana / Fashion Wear / Active Wear / Reebok, `OUT_COLS_SHOES` para Fashion Shoes y Facturas Tienda) y **ninguna coincidía con la plantilla que Switch entrega**, que tiene **25**: la «default» no traía «Composición» (col 21) y las cuatro últimas quedaban corridas; la «shoes» tenía una sola «Costo *» en vez de «Costo FOB *» + «Costo CIF *», así que le faltaba una **obligatoria** y 18 columnas quedaban corridas. Daniel bajó la plantilla de Fashion Shoes y de Multifashion: **idénticas byte a byte** (MD5 `b622f171713642a0393b3c95c7f30de7`, 10.305 bytes), guardadas desde `C:\xampp\htdocs\switch\public\plantillas\` — el archivo fijo de Switch.

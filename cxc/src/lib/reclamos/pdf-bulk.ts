@@ -37,7 +37,7 @@ interface ReclamoSettlement {
   deleted?: boolean;
 }
 
-interface ReclamoFull {
+export interface ReclamoFull {
   id: string;
   nro_reclamo?: string;
   empresa?: string;
@@ -413,46 +413,6 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
   }
 
   return doc;
-}
-
-export interface BulkSelector {
-  reclamo_ids?: string[];
-  all_with_filter?: { tab?: string; search?: string };
-}
-
-export async function fetchReclamosForEmpresa(empresa: string, sel: BulkSelector): Promise<ReclamoFull[]> {
-  if (sel.reclamo_ids && sel.reclamo_ids.length > 0) {
-    const { data, error } = await supabaseServer
-      .from("reclamos")
-      .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_settlements(*)")
-      .eq("empresa", empresa)
-      .eq("deleted", false)
-      .in("id", sel.reclamo_ids)
-      .order("created_at", { ascending: false });
-    if (error) throw new Error("Error al cargar reclamos");
-    return (data as ReclamoFull[]) || [];
-  }
-
-  if (sel.all_with_filter) {
-    const tab = sel.all_with_filter.tab || "all";
-    const search = (sel.all_with_filter.search || "").trim();
-    let query = supabaseServer
-      .from("reclamos")
-      .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_settlements(*)")
-      .eq("empresa", empresa)
-      .eq("deleted", false)
-      .order("created_at", { ascending: false });
-    if (tab !== "all") query = query.eq("estado", tab);
-    if (search) {
-      const escaped = search.replace(/[%_,]/g, "\\$&");
-      query = query.or(`nro_reclamo.ilike.%${escaped}%,nro_factura.ilike.%${escaped}%`);
-    }
-    const { data, error } = await query;
-    if (error) throw new Error("Error al cargar reclamos");
-    return (data as ReclamoFull[]) || [];
-  }
-
-  return [];
 }
 
 export function reclamoBulkConstants() {

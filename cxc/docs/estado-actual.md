@@ -227,6 +227,7 @@ Tampoco migran las píldoras relativas (Mes/3m/6m/12m): no son fechas, son venta
 
 | tema | qué quedó |
 |---|---|
+| **Reclamos — el proveedor se identifica por (empresa, código), no por el nombre** (4-sep) | **Defecto medido:** la ficha de `/proveedores/[key]` leía **toda** la tabla `reclamos` y la unía con el proveedor **por nombre normalizado, en JavaScript, sin ningún candado** — el mismo error que con los clientes de Boston. Y ya estaba fallando: de los **34 reclamos vivos, 26 no cruzaban** porque Switch escribe «American Fashion Wear, SA» y los reclamos dicen «American Fashion Wear»; las fichas de **Fashion Wear (21) y Fashion Shoes (5) mostraban CERO reclamos**, en silencio. **Ahora:** columna nueva `reclamos.proveedor_codigo` y unión por el par **(empresa, código)**, exacta, sin una sola comparación de texto libre. 🔴 El código **no es único entre empresas** — verificado contra `switch_proveedor_estadocuenta`: `122` es American Fashion Wear en Fashion Wear ($2.270.756,78) y Latin Fitness Group en Active Shoes ($206.954,76); `112` es Tommy en Fashion Shoes ($1.302.582,91) y Joybees en Joystep ($16.165,61) — así que el par viaja siempre junto. **`EMPRESAS_MAP` pasa de 5 a 6 filas** (`src/lib/reclamos/empresas.ts`, ahora también la lee el servidor) con el mapa que cerró Daniel: Vistana→American Designer Fashion `01` · Fashion Wear→American Fashion Wear `122` · Fashion Shoes→American Fashion Wear `112` · Active Shoes→Latin Fitness Group `122` · **Active Wear→American Unique Brands SA (Karl Lagerfeld) `126`** · **Joystep→JCBBRANDS (Joybees) `112`**. **Por qué cambia Active Wear:** Daniel pasó todo lo de Reebok (apparel y hardware) a Active Shoes para tenerlo en un solo sistema y le dio Active Wear a Karl Lagerfeld — medido, American Unique Brands (126) es el único proveedor con llegadas a Active Wear entre junio y agosto de 2026, y su ingreso del 20-ago trae 48 artículos, el mismo día en que Andrea corrió el Depurador con 48 estilos de «KL Accessories»; Latin Fitness no le manda nada desde el 11 de junio. **Los 34 reclamos viejos se rellenan en la misma migración**, por lista explícita de (empresa, proveedor) → código — Daniel: *«código a los viejos también, no habrán otros»* —: los 34 cruzan (FW 21 · Vistana 7 · FS 5 · AS 1) y además 10 de las 13 filas borradas; las 3 que no cruzan se quedan **sin código a propósito** (2 de prueba y 1 de Active Wear con el proveedor viejo). **Cero cambio en lo que ve el proveedor:** el correo, el PDF y el Excel siguen imprimiendo el NOMBRE; el código no se muestra nunca. De paso: el literal `"Pagado"` estaba suelto en cuatro lugares entre SQL y TypeScript (cobrarle dos veces al proveedor si uno cambiaba y otro no) — los cuatro usan ya `ESTADO_PAGADO`, con candado que compara byte a byte contra el `'Pagado'` del RPC del home; y **las dos `fetchReclamosForEmpresa`** (la del Excel no filtraba borrados, la del PDF sí) son **una sola, que filtra**. ⚠️ **Migración `20260922120000_reclamos_proveedor_codigo.sql` pendiente de aplicar** — mientras no corra, la ficha de Proveedores muestra 0 reclamos vinculados (hoy ya muestra 8 de 34, así que no empeora nada) y todo lo demás funciona igual. ⚠️ Joystep entra al desplegable sin fila en `reclamo_contactos`: su tarjeta se dibuja sin contacto hasta que se cargue. Candados: `reclamos-proveedor-por-codigo.test.ts` (25, con barrido estático que prohíbe `LIKE/ILIKE/similarity/levenshtein/soundex/regexp` en el SQL) · `reclamos-estado-pagado-unico.test.ts` (9) · `reclamos-fetch-empresa-una-sola.test.ts` (6); **28 mutaciones, 28 cazadas** (`scripts/_mutar-candados-reclamos-proveedor-codigo.sh`). Build en verde. Sin commitear. |
 | **Depurador — 3 pestañas, la compañía se reconoce y el Excel se puede volver a bajar 90 días** (4-sep) | Rediseño de la navegación aprobado por Daniel («Aprobado»), **cero cambio en el cálculo** (misma plantilla de 25 columnas, candado en verde). **(1)** De 7 pestañas a 3: **Plantilla** (Nuevo · Historial) · **Tallas y catálogo** · **Configuración**; los tres caminos (CK/TH, Reebok, Facturas Tienda) viven en la dropzone única de «Plantilla › Nuevo» y no se nombran; todo `?tab=` viejo redirige. **(2)** La compañía se **reconoce de la marca del archivo** (*«¿para qué elegir la compañía si la puede detectar?»*) con «cambiar» (las 6) por si falla; con marcas de 2 compañías se dice y no se adivina. **(3)** UN campo **«Temporada»** (era «Mes»+«Año», que engañaban): arranca SIEMPRE en el mes actual de Panamá (*«la temporada es el mes que se hace el archivo»*) y **no se recuerda**. **(4)** El Historial guarda **el mismo Excel que bajó** (bytes idénticos) 90 días en el bucket privado `depurador-plantillas`; **solo los Excel de Switch** (*«el historial solo quiero los excel para switch»*) — el pedido de Reebok con fotos NO; la fila con los totales queda para siempre; cron nuevo `cleanup-depurador-archivos` 03:20 UTC; filtro por compañía, todos ven todo (*«todos»*). **(5)** El divisor valida en pantalla **en los tres caminos** (Reebok y Facturas Tienda se sumaron al guard de CK/TH). **(6)** Tallas y Fotos a mi Excel dejan rastro en `activity_logs` (`descarga_tallas`/`descarga_misfotos`) para medir uso en unas semanas — de paso se arregló `/api/activity`, que insertaba columnas inexistentes. ⚠️ La marca desconocida quedó EXACTAMENTE como está (*«Como está»*). ⚠️ **Migración `20260921120000_carga_history_archivo.sql` pendiente de aplicar** — mientras no corra, todo funciona y las filas quedan sin botón. Candados: `depurador-validacion-pantalla` (25) · `depurador-divisor-tres-caminos` (5) · `depurador-pestanas-rediseno` (9) · `api/depurador-historial-archivo` (7); **10 mutaciones, 10 cazadas** (`scripts/_mutar-candados-depurador-rediseno.sh`) + las 10/10 del script del 4-sep re-corridas. Suite completa y build en verde. Sin commitear. |
 | **Caja Menuda — el cierre dice la verdad y la tanda no pelea con el formulario** (4-sep) | Los puntos de Caja de la auditoría de eficiencia, aprobados por Daniel. **(1) 🔴 El cierre YA NO exige saldo 0** — Daniel, textual: *«cierro cuando queda poca plata (criterio de la secretaria) y le doy la diferencia para llegar a los 200»*. La regla vieja forzaba los datos (medido: los 2 períodos cerrados dan $200.00 clavados, con gastos de $0.05 y $0.87 creados y borrados el día del cierre para cuadrar). El modal ahora muestra Fondo · Gastado (N recibos) · Queda en caja · Reposición para volver a $200, y el botón es **«Cerrar y abrir el N»**: cierra con el saldo que tenga (negativo se ve en rojo y se dice, pero NO bloquea) y abre el período siguiente en $200 por el mismo camino que «+ Nuevo período» (`src/lib/caja/abrir-periodo.ts`). El saldo del cierre se guarda (`saldo_cierre`); ⚠️ **migración `20260920120000_caja_reposicion.sql` pendiente de aplicar** — mientras no corra, el cierre funciona igual, sin la foto. La 💡 «cerrar período +30 días» se retiró: el criterio es la plata, no los días. **(2)** «Guardar y nuevo» **conserva la fecha elegida** (la tanda real: ~38 recibos de semanas atrás tecleados en una sentada; categoría y responsable ya se conservaban). **(3)** El **ITBMS arranca plegado** tras «＋ Agregar ITBMS» (lo tienen 9 de 77 gastos); la cuenta no cambia: total = subtotal + itbms, plegado = 0. El N° de factura ya era opcional (verificado en el servidor); 🔴 **el proveedor sigue texto libre SIN lista** (Daniel: *«no»*), con candado explícito. **(4) Bugs de la auditoría:** el PATCH de gasto aceptaba `metodo_pago`/`numero_factura` (columnas inexistentes → 500); ahora la lista es de columnas reales e incluye `nro_factura` (el editar en línea lo mandaba y se perdía en silencio). El respaldo de categoría es UNO («Varios»; el cliente decía «Otros»). El GET de un período borrado contesta 404. «¿Restaurar?» ya no pide confirmación (sin consecuencia); la de eliminar queda. La ruta huérfana `/caja/[periodoId]/nuevo` NO se borró: nota en su cabecera (nada la enlaza). Candados: `caja-cierre-con-saldo.test.ts` (7) · `caja-formulario.test.tsx` (5); **8 mutaciones, 8 cazadas** (`scripts/_mutar-candados-caja.sh`). Suite completa y build en verde. Sin commitear. |
 | **Depurador — la pantalla valida lo que se teclea y no borra el trabajo hecho** (4-sep) | El punto 1 de «Lo urgente» de la auditoría de eficiencia, aprobado por Daniel. **(1)** El divisor pasa por `validarDivisor` TAMBIÉN en los inputs de la pantalla (global y por marca, vía `mensajeDivisorEnPantalla` — el mismo guard de las rutas, no otra copia): `70` → campo en rojo, «Debe estar entre 0.10 y 1.00. ¿Quisiste poner 0.70?» y **la descarga se apaga, nunca el tecleo** — antes ese `70` bajaba un Excel con costos 100× mal directo a Switch (50-60 corridas/mes). **(2)** La tasa dejó de ser texto libre: select de dos — Daniel: *«solo existen esas dos»* — 7% → `07` y Exento (0%) → `0`, siempre TEXTO; `tasaSwitch` intacto. **(3)** Los precios escritos a mano **se conservan** al re-procesar y al cambiar empresa/mes/tasa/factor — Daniel: *«y también consérvalos»* — pegados por REFERENCIA de artículo (nunca por índice), con «N precios escritos a mano se conservaron» y botón «Borrarlos todos»; año/factor ya no re-procesan en cada tecla (300 ms o blur). **(4)** La pantalla abre como quedó la última vez (`useLastUsed` / `fg_last_depurador_*`); el archivo no se recuerda. CONTROL: con datos válidos el Excel sale IDÉNTICO (25 encabezados y valores, comparado celda a celda). Candado: `depurador-validacion-pantalla.test.tsx` (18); **10 mutaciones, 10 cazadas** (`scripts/_mutar-candados-depurador-pantalla.sh`); suite completa y build en verde. ~~⚠️ Reebok y Facturas Tienda conservan inputs de divisor sin validación de pantalla — decisión pendiente de Daniel.~~ **Superado el mismo 4-sep: la validación llegó a los tres caminos con el rediseño (fila de arriba).** Sin commitear. |
@@ -298,3 +299,119 @@ Tampoco migran las píldoras relativas (Mes/3m/6m/12m): no son fechas, son venta
 - ✅ **Comisiones — UNA PERSONA, UNA FILA (alias de vendedor) + Venta/Cobro por separado** (3-sep, noche). Daniel revisó la pestaña Configuración ya en producción: *«¿por qué hay 4 Reinaldo?»*, *«llámalo Reynaldo y no Reinaldo»*, Daniel Levy en tasas *«quítalo»*, *«poder quitar comisiones en ventas o comisiones sin que tengan que ser de los dos»* (*«las 11 que ya cargamos quedan con las dos marcadas»*, *«arranca con las dos marcadas pero yo deselecciono»*), agrupado por empresa y sin el botón Configurar de Por empresa (*«configuración en dos lados»*). Commit `c1d84b2d`; **migración `20260913120000_comision_vendedor_alias_v8.sql` aplicada por Daniel el 3-sep** (verificado: alias, tasas 5 filas, 11 exclusiones activas, v8 responde) (tabla `comision_vendedor_alias` + `comision_vendedor_canonico()` + `comision_b2b_v8` + detalle v5 + colapso de tasas 9→5 con `REYNALDO ESPINOSA` 1 %/1 % + exclusiones 17→11 activas con `excluye_venta`/`excluye_cobro`). Hasta entonces la pantalla cae sola a la v7 y lo dice (`alias_aplicado: false`), y la Configuración muestra las grafías como vienen. **Medido con el SQL real, ene–sep 2026, por persona: 0 celdas cambian** (cuadre v7 pglite vs producción 680/0); la fila de tasa con cobro 0 % (`REINDALDO`) solo tocaba 2023 (+1.017,31) y 2024 (+327,79). Detalle en `docs/postmortems/ventas-referencia.md` («UNA PERSONA, UNA FILA»). ✅ **Las dos decisiones que quedaban se tomaron el 3-sep** (*«esconder rey stoute. si capitiliza reynaldo.»* → *«te dije que eliminaras Rey Stoute Aguas.»*): Rey Stoute Aguas **retirado** de Comisiones entera (lista única `lib/comisiones/retirados.ts`, **migración `20260916120000_retirar_rey_stoute_aguas.sql` **aplicada el 3-sep-2026** — desactiva su tasa, nunca DELETE) y «Reynaldo Espinosa» capitalizado en tablas, tarjetas, detalle y Excel. Ver la tabla de decisiones.
 - ✅ **Comisiones — CLIENTES QUE NO COMISIONAN para un vendedor + pestaña Configuración** (3-sep, tarde). **Migración `20260912120000` aplicada por Daniel el 3-sep** (verificado: la tabla, las 17 filas y la RPC v7 responden en producción). Daniel: *«crea configuración en comisiones para desactivar cálculos de clientes»*, grano *«cliente vendedor»*, *«también venta»*; *«no lo llames así [exclusiones] y ponlo en Configuración»*; *«¿por qué en card y no como tab en toda la pantalla normal?»*; *«pon a Reinaldo 1 y 1»*. La migración cargó la tabla `comision_exclusion` + 17 filas de Daniel + `comision_b2b_v7` + detalle v4 + Reinaldo 1 %/1 %. Medido ene–sep 2026 con el SQL real: **solo Reinaldo se mueve**, Active Shoes −447,67 · Active Wear −151,19 · grupo −598,86; nadie sube. 29 mutaciones, 29 cazadas. Detalle en `docs/postmortems/ventas-referencia.md`. La decisión de alias que quedaba abierta se tomó esa misma noche (ver el punto de arriba).
 - ✅ **Comisiones — el cobro se paga a QUIEN REGISTRÓ el recibo, y DEFAULT y Daniel no se pagan** (3-sep). **Migración `20260911120000` aplicada** (la v6 responde en producción) — hasta entonces la pantalla cae sola a la v5 (cobro por cartera) y lo dice en la respuesta (`regla_cobro: "cartera"`). Medido ene–ago 2026 con el SQL real: grupo +1.253,58 · Reinaldo +2.507,14 · Daniel +1.943,86 · Edwin −2.640,50; lo que de verdad se paga (sin DEFAULT ni Daniel) **48.491,64 → 48.064,15**. Detalle en `docs/postmortems/ventas-referencia.md`.
+
+## 5-sep-2026 — el respaldo completo y el directorio de Boston
+
+| qué | resultado |
+|---|---|
+| 🔴 **El respaldo tenía 63 tablas afuera, y una era irrecuperable** | Medido contra producción: **56 tablas respaldadas de 136**. Afuera quedaba el **módulo Asistencia entero**, con las **6.081 marcaciones del reloj** (append-only: el reloj no reenvía el pasado — si se perdían, se perdía la asistencia de todos). También `bancos_saldos` (contabilidad a mano), `egresos_varios`, la configuración de comisiones, los tres catálogos nuevos con sus pedidos, `depurador_descripciones`, `carga_history`, `guias_destino_cliente`, `fg_user_switch_vendedor`, el mayor retirado, `recordatorios` y `activity_logs`. 🩸 Y **`products`, el catálogo de Reebok**, que la documentación daba por respaldado y no lo estaba. Ahora se respaldan **125 tablas** (113 en el grupo core, 12 en el de switch); el archivo diario pasa de **33,60 MB a ~37,2 MB** (+11%). |
+| **El arreglo de verdad es el candado, no las 63 líneas** | El hueco no fue descuido: **nada avisaba**. Toda la base quedó clasificada por *qué se pierde si se pierde* (`src/lib/backup/tablas.ts`: `personas` · `congelada` · `switch` · `bitacora` · `retirada` · `vista`) y `backup-nada-sin-copia.test.ts` pone el build **ROJO** si una migración crea una tabla que nadie clasificó, o si alguien saca del respaldo algo que no vuelve. El test de integración (`RUN_DB_TESTS=1`) compara contra el catálogo real, porque **31 de las 136 tablas nacieron en el panel de Supabase** y el candado estático no las ve. |
+| 🩸 **Segundo hueco, silencioso de verdad** | Una tabla cuya PK **no es `id`** y no está en `ORDER_BY` deja un respaldo **incompleto que parece completo** (PostgREST puede saltear filas entre páginas). Había 3 excepciones escritas a mano; de las 63 tablas nuevas, **16 tienen PK compuesta**. La llave real de producción vive medida en `PK_QUE_NO_ES_ID` y el candado exige que el `ORDER_BY` la cubra columna por columna. |
+| **Lo que quedó afuera a propósito** | `switch_factura_lineas` (163.722 filas, 97 MB crudos): re-derivable de verdad y suma ~10 MB gz **por día**. Los logs de sync (se podan a propósito), el estado de infraestructura y 🔴 **`user_sessions`, por seguridad**: son tokens vivos y sacarlos del proyecto es repartir credenciales. |
+| 🩸 **El directorio de clientes de Boston llevaba 37 días congelado** | Sus **4.915 filas** tenían el MISMO `synced_at` —`2026-07-30 06:31:07`, al milisegundo—. Causa: el único escritor del directorio vivía **dentro** del sync de estado de cuenta por API, vetado para Boston (4.912 llamadas HTTP, 54 min contra un techo de 800 s). El `switch_sync_log` lo confirma: **el día que Boston salió de ese cron es el día exacto en que su directorio se congeló**. Nadie lo vio porque **ninguna alerta lo cubría**. |
+| **El arreglo: un cron semanal propio** | `/api/cron/sync-clientes-boston`, **domingos 07:10 UTC** (domingo 2:10 a.m. de Panamá). Daniel: *«semanal»*. Pide solo la lista (~99 páginas, no 4.912 llamadas) y escribe con el MISMO código que las 6 del grupo (`clientes-directorio.ts`, un solo escritor). Queda a **40 min** del bloque `all-0630` y a 40 de `sync-recibos` (07:50) — el doble de la separación mínima. |
+| 🔴 **Y sigue sin tocar al grupo** | Escribe SOLO `switch_clientes` con `empresa_key = 'confecciones_boston'`. `clientes_master` **no se toca** (Daniel: *«los clientes de Boston no quiero que toquen los de Fashion Group… no quiero volver a pasar por el mismo error»*). Dos guardas antes de marcar a alguien como ausente: lista completa **y** que no haya encogido por debajo del 70% de lo conocido. Lista vacía = error, no se escribe nada. |
+| **Y ahora sí se vigila** | Alerta **B** de silencio de datos sobre `switch_clientes`, **solo Boston** (la misma tabla la escriben tres crons con tres ritmos), umbral **semanal de 165 h**: avisa a la primera corrida perdida, porque la siguiente oportunidad es dentro de siete días. `clientes` **no** entra a la alerta A a propósito: A pide 10 corridas previas en 30 días y un par semanal nunca junta más de 4 — sería una vigilancia que parece existir y nunca puede disparar. |
+| **Tests** | `backup-nada-sin-copia.test.ts` (9) · `backup-tablas-produccion.test.ts` (4, contra producción) · `boston-clientes-no-tocan-el-grupo.test.ts` (21). **29 mutaciones, 29 cazadas** (`scripts/_mutar-candados-respaldo-boston.sh`), CONTROL en verde. |
+
+### Pendiente de Daniel (5-sep)
+
+- 🔴 **Migración `20260923120000_sync_log_clientes.sql` — pendiente de aplicar.** Agrega el `sync_type` `clientes` al CHECK de `switch_sync_log`. **La app funciona sin ella**: el cron escribe el directorio y registra su heartbeat igual; lo único que falta hasta que corra es la fila del log (y la alerta B no depende de ella).
+  `npm run migrar supabase/migrations/20260923120000_sync_log_clientes.sql`
+- **Confirmar el tiempo de la corrida del respaldo después del deploy.** La core midió 248 s de 800 con 59 archivos; ahora suma ~69 tablas chiquitas (estimado +60-120 s). Lo que no entre queda **pendiente**, como siempre, pero conviene mirar la respuesta del primer cron.
+- ⚠️ **`switch_factura_lineas` fuera del respaldo es una decisión de costo, no de riesgo.** Si Daniel prefiere protegerla, es una línea en `SWITCH_DATASETS` y ~10 MB gz por día.
+
+---
+
+## 4-sep-2026 — limpieza de Ventas, CXC, Referencia y Comprobantes
+
+Cuatro cosas chicas, las cuatro aprobadas por Daniel. Nada de esto cambia un número.
+
+### 1. Fuera la píldora «Sincronizado» de Ventas › Resumen
+
+**Estaba:** el Resumen mostraba una píldora verde «Sincronizado \<fecha\>» que vigilaba
+**3 empresas de 8** — `SWITCH_FACTURAS_EMPRESA_KEYS` se había quedado en
+`active_shoes, active_wear, american_classic` mientras el cron de facturas cubre las ocho.
+Con Vistana o Fashion Wear congeladas, el Resumen mostraba números viejos **en verde**.
+
+**Daniel:** *«¿de qué sirve tenerlo si ya el sistema corre fluido y si no me avisa por Telegram
+para arreglarlo?»*
+
+**Queda:** la píldora se fue de las dos caras del Resumen (escritorio y celular) y la constante
+se retiró de `empresa-mapping.ts`. **Verificado antes de quitar nada:** la cobertura por Telegram
+para las 8 es real — `src/lib/datos-frescos.ts` DERIVA su lista de `empresasConFacturas()`, y las
+ocho empresas tienen `facturas: true` en `EMPRESA_SYNC_CAPABILITIES`; el umbral es 24 h, corre en
+las tres pasadas de `switch-reconciliacion` (10/14/18 UTC) y encima está la regla 2 (dos fallos
+seguidos del mismo par). Comisiones **conserva** su píldora: lee `switch_recibos`, otra tabla.
+El candado (`textos-pendientes-284.test.ts`) cambió de dirección —donde exigía la píldora ahora
+exige que NO esté— y lleva CONTROL de que el Resumen sí se pinta.
+
+### 2. Fuera los favoritos ⭐ del Cuentas por Cobrar
+
+**Daniel:** *«quita favoritos»*.
+
+`cxc_favorites` tuvo **0 filas en toda su historia** y su endpoint exigía `rolesBoston()`, así que
+un **vendedor** —que sí ve el CXC— recibía **403** al tocar la estrella. Se fueron: la estrella
+(escritorio, celular y la pestaña de Boston), la regla de orden «favoritos arriba», el
+*optimistic update* con su rollback, la copia en `localStorage`, `leerFavoritos` /
+`alternarFavorito` y la ruta `/api/cxc/favorites`.
+
+🔴 **La tabla NO se borró** (patrón `mayor_lineas`): queda sin lectores ni escritores, y
+`cxc-favoritos-retirados.test.ts` pone el build rojo si una migración la dropea o si la estrella
+vuelve por cualquiera de sus cuatro puertas.
+
+Efecto lateral que conviene saber: era la ÚNICA ruta de anotación que alcanzaba `gerente_boston`
+(David). Hoy no tiene ninguna — las dos que quedan (`overrides`, `contact-log`) son de
+`["admin","secretaria","vendedor"]`. El tabique por cartera (`respuestaSiCarteraAjena`) **se
+conserva** para el día en que alguna se abra a `ROLES_BOSTON`, y pasó a medirse por conducta.
+
+### 3. El botón «Actualizar datos de Switch» de Referencia volvió
+
+**Daniel:** *«activa el botón de Referencia»*, *«referencia lo puede ver todos, y sin aviso»*.
+
+La ruta `POST /api/ventas/referencia/actualizar` siguió viva 24 días **sin botón**: se lo llevó
+por delante el rediseño de Referencia del 11-ago (`9b1899e1`), dentro de la «franja de catálogo»
+que ese PR retiró. No fue una decisión, fue colateral.
+
+**Queda:** el botón vive junto a «Bajar a Excel», aparece cuando hay resultados y actualiza la
+empresa (o las empresas) de lo que se buscó, **en serie** —la sesión de Switch es una por
+usuario—, y al terminar re-hace la búsqueda. **Sin aviso** en pantalla. Los roles salen de
+**`REFERENCIA_ROLES`** (`src/lib/ventas/referencia.ts`), UNA lista que ahora comparten la página,
+la búsqueda y el botón: el POST estaba en `["admin"]` mientras la pantalla se abría a vendedor y
+bodega, y tres copias a mano fue exactamente el defecto. Se le puso el **acelerador de Guías**
+(`SYNC_NOW_COOLDOWN_MIN` = 10 min, contra `switch_sync_log` con `sync_type = 'articulo_info'`):
+dos toques seguidos no abren dos sesiones. Lo que ya hacía —higiene de sesión en el `finally`,
+el candado de una corrida a la vez— quedó intacto.
+
+### 4. Catálogos: la basura fuera de verdad, y la lista a 90 días
+
+**Daniel:** *«borro de verdad de la base»* y, sobre los pedidos viejos,
+*«si un pedido se mandó a switch, ya está safe, no?»*.
+
+- **Se borran de verdad los pedidos de PRUEBA**: 16 de `calvin_orders` y 37 de `joybees_orders`
+  (todos ya `deleted`, todos `borrador`, de las corridas de verificación del 12-13 de agosto más
+  dos del bot del 24-jul). Va por migración —
+  **`supabase/migrations/20260924120000_borrar_pedidos_de_prueba.sql`, ⚠️ PENDIENTE DE APLICAR,
+  la corre Daniel**. Trae los frenos adentro: lista explícita de **ids** (nada de `LIKE`), el que
+  tenga un **envío vivo** a Switch (`estado <> 'error'`) se saca de la lista, y solo se borra lo
+  que ya estaba `deleted`. **Medido: cero pedidos se salvan por tener envío** — las 3 filas de
+  `calvin_switch_envios` y las 4 de `joybees_switch_envios` apuntan a otros pedidos. Se borran
+  también sus renglones (16 y 45).
+  ⚠️ El nombre del archivo iba a ser `20260923120000_…`, pero otro trabajo en paralelo tomó ese
+  timestamp el mismo día; se movió a `20260924120000` porque dos migraciones con el mismo
+  timestamp son **una sola fila** en el registro del CLI.
+- **Los pedidos VIEJOS no se borran.** El pedido guarda lo que Switch no tiene (quién lo armó, el
+  comentario, si fue pedido o cotización, el PDF que se le mandó al cliente) y son pocos: 23
+  Reebok · 38 Tommy · 21 Calvin · 41 Joybees en todo 2026. Lo que se recorta es la **lista**: la
+  pantalla de Comprobantes muestra los **últimos 90 días** y el resto queda detrás de
+  **«Ver más (N)»**, sin texto explicativo al lado. El corte va después del filtro y de la
+  búsqueda, y la selección masiva solo alcanza lo visible. La decisión quedó escrita, con su
+  cita, en `docs/postmortems/catalogos-pedidos.md`.
+
+### Verificación
+
+`tsc` limpio en `src/app`, `src/lib` y `src/components` · `npx next build` verde · suite completa
+verde · candados de voseo y de selector único incluidos. **29 mutaciones, 29 cazadas**
+(`scripts/_mutar-limpieza-ventas.py`, con su mutación de CONTROL saliendo ⛔), más las 2 de
+`_mutar-candados-boston.py` que cubrían el tabique por cartera y que se re-apuntaron a las
+anotaciones que quedan.

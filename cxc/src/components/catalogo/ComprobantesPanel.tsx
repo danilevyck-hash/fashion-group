@@ -54,6 +54,7 @@ import type { ClienteSwitchOpcion } from "@/components/catalogo/ClienteSwitchPic
 import { filasDeOrders, type FilaComprobante, type FilaDeOrders } from "@/lib/catalogo/fila-comprobante";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { precioTexto } from "@/lib/catalogo/precio";
+import { partirPorVentana } from "@/lib/catalogo/comprobantes-ventana";
 import {
   contarComprobantes,
   estaEnSwitch,
@@ -253,6 +254,8 @@ export default function ComprobantesPanel({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openMeses, setOpenMeses] = useState<Record<string, boolean>>({});
   const [bulkOpen, setBulkOpen] = useState(false);
+  // «Ver más»: la lista arranca en los últimos 90 días. Ver `comprobantes-ventana.ts`.
+  const [verTodo, setVerTodo] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   // Duplicar: el botón abre el mini-modal, se elige el cliente y "Usar este
   // cliente" confirma. Viene de la lista del vendedor, que era la única que lo
@@ -465,10 +468,22 @@ export default function ComprobantesPanel({
     { key: "mio", label: `Míos (${counts.mio})` },
   ];
 
+  // 🔴 LA VENTANA DE 90 DÍAS (4-sep-2026). La lista muestra lo de los últimos
+  // 90 días y el resto queda detrás de «Ver más» — sin texto explicativo al
+  // lado (Daniel: *«no me gustan tantas palabras extras»*; el botón dice lo que
+  // hace). Nada se borra: un pedido guarda lo que Switch no tiene y son pocos
+  // (23 Reebok · 38 Tommy · 21 Calvin · 41 Joybees en todo 2026). Lo que se
+  // recorta es la LISTA, no los datos. El corte va DESPUÉS del filtro y de la
+  // búsqueda, así que «Ver más» siempre trae lo que falta de lo que se está
+  // mirando ahora.
+  const { recientes, viejos } = partirPorVentana(filtered, new Date());
+  const visibles = verTodo ? filtered : recientes;
+  const hayMas = !verTodo && viejos.length > 0;
+
   // Agrupar por mes (el API ya viene ordenado por fecha desc → los grupos salen
   // en orden descendente). Mes actual expandido, los demás colapsados.
   const grupos: { key: string; label: string; items: FilaComprobante[] }[] = [];
-  for (const p of filtered) {
+  for (const p of visibles) {
     const k = mesKey(p.created_at);
     const last = grupos[grupos.length - 1];
     if (last && last.key === k) last.items.push(p);
@@ -782,6 +797,19 @@ export default function ComprobantesPanel({
         </div>
         </MesGroup>
         ))}
+        {/* 🔴 Solo el botón — sin texto explicativo al lado (Daniel: «no me
+            gustan tantas palabras extras»). Dice cuántos faltan porque ese
+            número es lo único que la persona no puede ver por sí misma. */}
+        {hayMas && (
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => setVerTodo(true)}
+              className="min-h-[44px] px-4 rounded-md border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 active:scale-[0.97] transition"
+            >
+              Ver más ({viejos.length})
+            </button>
+          </div>
+        )}
         </>
       )}
 

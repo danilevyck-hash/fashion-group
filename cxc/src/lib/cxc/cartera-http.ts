@@ -39,14 +39,22 @@ export function respuestaSiCarteraNoDisponible(e: unknown): NextResponse | null 
  * 🔴 EL RECORTE DE `gerente_boston` — David anota en SU cartera y en ninguna otra.
  *
  * Su rol entró a `ROLES_BOSTON` para poder leer la cartera de Boston, y esa
- * misma lista es la que abre los cinco routes de anotaciones (favoritos, notas,
- * contactos). Sin este `if`, la estrella y la nota que pone en Boston serían la
- * misma puerta hacia `cartera=grupo`.
+ * misma lista abría los routes de anotaciones. Sin este `if`, la nota que pone
+ * en Boston sería la misma puerta hacia `cartera=grupo`.
  *
- * ⚠️ Hoy eso NO le mostraría un nombre del grupo —las anotaciones se leen por
- * `userId`, y el suyo está vacío— pero el argumento "hoy no alcanza para nada"
- * es exactamente el que dejó latentes las dos fugas de frescura del #522. El
- * tabique se pone donde se puede razonar, no donde se nota.
+ * ⚠️ 4-sep-2026 — **el tabique se queda aunque hoy no lo cruce nadie.** La
+ * única ruta de anotaciones que David alcanzaba era `/api/cxc/favorites`, y se
+ * retiró con la estrella (Daniel: «quita favoritos»); las dos que quedan
+ * —`overrides` y `contact-log`— son de `CXC_ROLES`, donde su rol no está, así
+ * que hoy este `if` no lo alcanza ni una vez. Se conserva porque el argumento
+ * "hoy no alcanza para nada" es exactamente el que dejó latentes las dos fugas
+ * de frescura del #522: el día que una ruta de anotación se abra a
+ * `ROLES_BOSTON`, el tabique ya está puesto. Lo vigila `boston-acceso.test.ts`
+ * por conducta, llamando a la función.
+ *
+ * ⚠️ Y aunque se cruzara, hoy NO le mostraría un nombre del grupo —las
+ * anotaciones se leen por `userId`, y el suyo está vacío—. El tabique se pone
+ * donde se puede razonar, no donde se nota.
  *
  * Devuelve un 403 listo para devolver, o `null` si el pedido es legítimo.
  */

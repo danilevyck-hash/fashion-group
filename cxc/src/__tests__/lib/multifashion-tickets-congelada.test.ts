@@ -50,8 +50,16 @@ const rel = (p: string) => path.relative(CXC, p);
 
 describe("multifashion_tickets — tabla congelada, nadie la escribe", () => {
   it("ningún archivo de src/ hace .from(\"multifashion_tickets\") salvo el backup", () => {
+    // Dos archivos la nombran a propósito y ninguno la escribe: el route del
+    // backup (la respalda — es la ÚNICA copia de sus 15.819 filas) y la
+    // clasificación de la base, que la declara `congelada` justamente para que
+    // el candado del respaldo exija que siga adentro.
+    const NOMBRARLA_ES_CORRECTO = [
+      "src/app/api/cron/backup/route.ts",
+      "src/lib/backup/tablas.ts",
+    ];
     const culpables = FUENTES.filter((f) => {
-      if (rel(f) === "src/app/api/cron/backup/route.ts") return false;
+      if (NOMBRARLA_ES_CORRECTO.includes(rel(f))) return false;
       return /multifashion_tickets/.test(sinComentarios(fs.readFileSync(f, "utf8")));
     }).map(rel);
     expect(culpables).toEqual([]);

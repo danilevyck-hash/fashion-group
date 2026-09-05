@@ -145,13 +145,13 @@ MUTACIONES = [
         'export const ROLES_BOSTON = ["admin", "secretaria"] as const;',
     ),
     (
-        "🔴 los favoritos del GRUPO se le abren",
+        "🔴 las anotaciones del GRUPO se le abren (el tabique por cartera se cae)",
         "src/lib/cxc/cartera-http.ts",
         "  if (!esGerenteBoston(rol) || cartera === CARTERA_BOSTON) return null;",
         "  return null;\n  if (!esGerenteBoston(rol) || cartera === CARTERA_BOSTON) return null;",
     ),
     (
-        "el favorito de Boston se le cierra también (el guard se vuelve total)",
+        "el tabique se vuelve total y le cierra también SU propia cartera",
         "src/lib/cxc/cartera-http.ts",
         "  if (!esGerenteBoston(rol) || cartera === CARTERA_BOSTON) return null;",
         "  if (!esGerenteBoston(rol)) return null;",

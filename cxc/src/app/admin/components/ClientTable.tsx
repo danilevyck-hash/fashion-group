@@ -30,8 +30,6 @@ interface Props {
   onWhatsApp: (client: ConsolidatedClient) => void;
   onCopyMessage: (client: ConsolidatedClient) => void;
   onOpenEstado: (client: ConsolidatedClient) => void;
-  favorites?: Set<string>;
-  onToggleFavorite?: (name: string) => void;
 }
 
 export default function ClientTable({
@@ -51,8 +49,6 @@ export default function ClientTable({
   onWhatsApp,
   onCopyMessage,
   onOpenEstado,
-  favorites,
-  onToggleFavorite,
 }: Props) {
   const [expanded, setExpanded] = usePersistedState<string | null>("cxc", "expanded", null);
   const { show: showContextMenu } = useContextMenu();
@@ -144,8 +140,6 @@ export default function ClientTable({
           isExpanded={isExpanded}
           onToggle={() => setExpanded(isExpanded ? null : client.nombre_normalized)}
           userRole={userRole}
-          isFavorite={favorites?.has(client.nombre_normalized)}
-          onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
           onRowContextMenu={(e) => showContextMenu(e, buildClientContextMenu(client))}
           actionsMenu={<OverflowMenu items={buildRowMenuItems(client)} ariaLabel={`Acciones de ${client.nombre_normalized}`} />}
           pagosBoton={<BotonUltimosPagos abierto={pagosOpen} onToggle={() => alternarPagos(client.nombre_normalized)} nombre={client.nombre_normalized} />}

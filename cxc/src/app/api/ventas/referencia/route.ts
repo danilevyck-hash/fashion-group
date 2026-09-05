@@ -51,6 +51,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
   REFERENCIA_EMPRESA_KEYS,
+  REFERENCIA_ROLES,
   MAX_FILAS_BUSQUEDA,
   normalizarBusqueda,
   escapeLike,
@@ -268,8 +269,9 @@ function errorAmplia(): NextResponse {
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  // Daniel: *"habilita referencia para los vendedores y bodega"*.
-  const auth = requireRole(req, ["admin", "vendedor", "bodega"]);
+  // Daniel: *"habilita referencia para los vendedores y bodega"*. La lista vive
+  // UNA vez (`REFERENCIA_ROLES`) y la comparten la página y el botón.
+  const auth = requireRole(req, [...REFERENCIA_ROLES]);
   if (auth instanceof NextResponse) return auth;
   // Daniel: *"quita margen, lo demas dejalo"* — solo admin ve el margen. La
   // vista no lo calcula cuando esto viene en false (y el Excel tampoco).

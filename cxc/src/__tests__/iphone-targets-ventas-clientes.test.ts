@@ -114,27 +114,23 @@ describe("Usuarios — el peor combo del sistema (editar + eliminar)", () => {
   });
 });
 
-describe("CXC mobile — favorito vs expandir", () => {
-  it("la estrella de favorito mide 44x44", () => {
-    // Antes: span con `p-2.5 -m-2.5` = 36x36, pegado al borde de una fila que
-    // hace otra cosa (expandir).
-    const i = panelCxc.indexOf('aria-label={isFavorite ? "Quitar favorito"');
-    const clase = panelCxc.slice(i, i + 400);
-    expect(clase).toContain("h-11 w-11");
-    expect(panelCxc).not.toContain('className="shrink-0 cursor-pointer text-base leading-none p-2.5 -m-2.5"');
+// 🔴 CAMBIÓ DE DIRECCIÓN (4-sep-2026). Este bloque medía la estrella ⭐ de la
+// card de CXC: 44x44, sin propagar el clic a la fila y con `gap-0` para no
+// comerle ancho al nombre. Los favoritos se retiraron del CXC entero — Daniel:
+// *«quita favoritos»*; `cxc_favorites` tuvo 0 filas en toda su historia — así
+// que ahora se exige lo contrario: que no haya un segundo control táctil
+// compitiendo con «expandir» dentro de la misma card.
+describe("CXC mobile — la card tiene UN solo control táctil", () => {
+  it("la estrella de favorito no está", () => {
+    expect(panelCxc).not.toContain("Quitar favorito");
+    expect(panelCxc).not.toContain("Marcar favorito");
+    expect(panelCxc).not.toContain("isFavorite");
   });
 
-  it("la estrella no propaga el click a la fila (no expande al marcar favorito)", () => {
-    const i = panelCxc.indexOf('aria-label={isFavorite ? "Quitar favorito"');
-    const bloque = panelCxc.slice(i - 500, i);
-    expect(bloque).toContain("e.stopPropagation()");
-  });
-
-  it("la caja de la estrella termina donde arranca el nombre (gap-0)", () => {
-    // gap-0 es intencional: los 14px de aire alrededor del ☆ son parte de su
-    // área de tap. Con gap-2 el nombre perdía 8px más de ancho.
-    const i = panelCxc.indexOf('aria-label={isFavorite ? "Quitar favorito"');
-    expect(panelCxc.slice(i - 700, i)).toContain('className="flex items-center gap-0"');
+  it("CONTROL: expandir sigue siendo la acción de la card, y el «···» sus 44x44", () => {
+    expect(panelCxc).toContain("aria-expanded={isExpanded}");
+    const overflow = leer("components/ui/OverflowMenu.tsx");
+    expect(overflow).toContain("min-h-[44px] min-w-[44px]");
   });
 });
 

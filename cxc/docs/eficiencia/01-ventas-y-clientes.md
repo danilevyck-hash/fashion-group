@@ -71,7 +71,7 @@ La cara: «¿qué compró tal cliente este año?» (Productos) = **6 pasos con 2
 **Qué es y quién lo usa.** La cartera del grupo (6 empresas) consolidada por cliente, con antigüedad, último pago, contacto y envío de estado de cuenta. Lo ven admin y vendedores (edwin se acota a Vistana en el servidor); las secretarias también entran por sus `modulos_override` — Angela mandó estados de cuenta desde aquí.
 
 **Uso medido (al 4-sep-2026).** La cartera: **211 clientes, $3,68 M**; 120 con vencido crítico 121d+ ($1,25 M); 57 en 91-120. Las escrituras del módulo, casi todas MUERTAS:
-- **Favoritos ★: 0 filas en toda la historia** (`cxc_favorites` vacía). Nadie marcó una estrella jamás.
+- ✅ **Favoritos ★: 0 filas en toda la historia** (`cxc_favorites` vacía). Nadie marcó una estrella jamás — **se retiraron el 4-sep-2026** (Daniel: «quita favoritos»). La tabla queda, sin lectores.
 - **«Marcar contactado»: 141 filas — 140 de marzo, 1 de abril, todas de admin.** La UI se retiró el 14-ago; el API quedó.
 - **Contactos override (`cxc_client_overrides`): 10 filas, todas del 22-mar-2026.** Sin UI de escritura; el panel las sigue LEYENDO.
 - **Correos enviados: 19 en total, en 2 días de julio** (daniel 5 el 9-jul, Angela 14 el 14-jul, todos ok). Desde entonces, cero.
@@ -89,7 +89,7 @@ En la práctica el módulo es de LECTURA: mirar la cartera y salir a cobrar por 
 **Sugerencias.**
 1. **Una sola fuente de contacto** · **Quién:** quien manda el estado de cuenta (Daniel, Angela) · **Hoy:** el correo que propone el modal sale primero del override de marzo; si el cliente cambió de correo en `/clientes`, el CXC sigue ofreciendo el viejo. Medido: de las 10 filas override, 6 coinciden con el maestro, 3 solo existen ahí (MAZAR CITY SHOES, LUTY LUI y una vacía) · **Después:** migrar esos 3 correos a la ficha del cliente y que el CXC lea SOLO `clientes_master` · **Ahorra:** más corrección que tiempo — evita un estado de cuenta al correo equivocado · **Tamaño:** chico · **Riesgo:** ninguno; la capa override no tiene escritor desde el 22-mar.
 2. **Editar el contacto sin salir del CXC** · **Quién:** los mismos · **Hoy:** 5 pasos + cambio de módulo · **Después:** lápiz en el panel expandido que guarde en la ficha (`PATCH /api/clientes/[codigo]`, ya existe) = 3 pasos sin salir · **Ahorra:** ~30 s por corrección · **Tamaño:** chico · **Riesgo:** respeta que el sync no pisa esos campos (ya es así).
-3. **Retirar del código lo que nadie usó** (★ favoritos con 0 filas históricas, APIs `contact-log`/`overrides` sin UI, menú click-derecho de 1 opción) · **Quién:** nadie lo sufre hoy — es deuda, no fricción · **Ahorra:** tiempo de mantenimiento futuro, no de usuarios · **Tamaño:** chico. Va última a propósito.
+3. **Retirar del código lo que nadie usó** · ✅ **la ★ ya salió (4-sep-2026)**: estrella, columna, regla de orden «favoritos arriba», *optimistic update* con su rollback y la ruta `/api/cxc/favorites`; la tabla se conservó con candado anti-DROP. Quedan las APIs `contact-log`/`overrides` sin UI y el menú click-derecho de 1 opción · **Quién:** nadie lo sufre hoy — es deuda, no fricción · **Ahorra:** tiempo de mantenimiento futuro, no de usuarios · **Tamaño:** chico. Va última a propósito.
 
 **Lo raro que encontré.**
 - `useSmartSuggestions` se llama con un array vacío constante — solo para mantener el orden de hooks.

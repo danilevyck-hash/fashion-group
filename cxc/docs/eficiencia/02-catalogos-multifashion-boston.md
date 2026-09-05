@@ -87,10 +87,10 @@ Fuera de eso, **nada más que proponer**: el desperdicio grande de este módulo 
 
 **Qué es y quién lo usa.** El buscador de artículos del grupo: pegar 1-50 códigos y ver qué llegó, qué se vendió y qué hay en stock. Roles: admin, **vendedor y bodega** (desde el 12-ago; ellos lo ven SIN margen). Ya NO es pestaña de Ventas: `/ventas?tab=referencia` redirige aquí.
 
-**Uso medido (al 4-sep-2026).** **No medible**: es lectura pura y `activity_logs` no registra pantallas. Lo que sí se midió: el botón «Actualizar datos de Switch» (sync manual de `articulo_info`) se usó **1 vez en agosto** — el cron de 3 pasadas nocturnas cubre la frescura.
+**Uso medido (al 4-sep-2026).** **No medible**: es lectura pura y `activity_logs` no registra pantallas. Lo que sí se midió: el botón «Actualizar datos de Switch» (sync manual de `articulo_info`) se usó **1 vez en agosto** — el cron de 3 pasadas nocturnas cubre la frescura. ⚠️ Ese botón **había desaparecido de la pantalla** el 11-ago (colateral del rediseño) dejando la ruta viva y sin puerta; **volvió el 4-sep-2026**, ahora para los tres roles del módulo y con el acelerador de 10 min de Guías.
 
 **Cómo funciona por dentro** (invariantes en CLAUDE.md § Ventas/Referencia):
-- `/referencia/page.tsx` (guard propio, `ROLES_REFERENCIA`) reusa `ReferenciaView` — el mismo componente, cero lógica propia; el gate del margen vive en `/api/ventas/referencia` (`margenVisible: false` para vendedor/bodega — **costos y precios SÍ los ven**, decisión de Daniel: «quita margen, lo demás déjalo»).
+- `/referencia/page.tsx` (guard que lee la lista ÚNICA `REFERENCIA_ROLES`, compartida con la búsqueda y con el botón «Actualizar datos de Switch») reusa `ReferenciaView` — el mismo componente, cero lógica propia; el gate del margen vive en `/api/ventas/referencia` (`margenVisible: false` para vendedor/bodega — **costos y precios SÍ los ven**, decisión de Daniel: «quita margen, lo demás déjalo»).
 - Tres fuentes: `switch_ingresos_mercancia` (compras), `switch_articulo_diario` (ventas, NC restadas), `switch_articulo_info` (stock y etiqueta). Un solo buscador: prefijo para 1 y para 50 códigos (el bug de las dos semánticas ya se pagó el 12-ago).
 
 **La tarea más frecuente, hoy.** Pegar la lista de códigos (desde el Excel de Daniel) → una tarjeta por modelo. **2 pasos.** No hay nada que recortar.

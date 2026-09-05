@@ -38,7 +38,7 @@
 >
 > **Herramientas (solo lectura):** `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-cxc-boston-mezclado.ts` reproduce las tarjetas del panel desde la MV y desde la VIEW, **con y sin la proyección de React**, y lista los clientes que quedarían sumados. `BASE=… node scripts/_medir-panel-cxc-boston.mjs` lo mide en el navegador, en las dos pestañas.
 >
-> ⚠️ **`cxc_favorites`, `cxc_client_overrides` y `cxc_contact_log` comparten el namespace de `nombre_normalized` entre grupo y Boston** (no tienen columna de empresa): los 5-10 nombres que existen en los dos lados comparten estrella, contacto y correo. **NO es plata y no se tocó** — arreglarlo pide DDL y una decisión de Daniel (¿el contacto de CITY MALL PASO CANOA es el mismo señor para las dos carteras?). Hoy la pestaña de Boston ni siquiera muestra favoritos (`BostonTab.tsx` pasa `esFavorito: () => false`).
+> ⚠️ **`cxc_favorites`, `cxc_client_overrides` y `cxc_contact_log` comparten el namespace de `nombre_normalized` entre grupo y Boston** (no tienen columna de empresa): los 5-10 nombres que existen en los dos lados comparten estrella, contacto y correo. **NO es plata y no se tocó** — arreglarlo pide DDL y una decisión de Daniel (¿el contacto de CITY MALL PASO CANOA es el mismo señor para las dos carteras?). ⚠️ **4-sep-2026: los favoritos ⭐ se retiraron del CXC entero** (Daniel: *«quita favoritos»*; `cxc_favorites` tuvo 0 filas en toda su historia). La tabla queda sin lectores, con candado que impide que una migración la dropee, y el namespace compartido pasó a ser cosa solo de `cxc_client_overrides` y `cxc_contact_log`.
 
 
 

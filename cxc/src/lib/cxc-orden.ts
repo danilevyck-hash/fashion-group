@@ -101,19 +101,20 @@ function montoDe(c: ClienteOrdenable, key: SortKey): number {
 }
 
 /**
- * Comparador único de la lista. Dos reglas mandan SIEMPRE, antes del orden
- * elegido, y no se tocaron: los favoritos ⭐ arriba y los saldos a favor
- * (negativos) al final — no son deuda por cobrar.
+ * Comparador único de la lista. Una regla manda SIEMPRE, antes del orden
+ * elegido: los saldos a favor (negativos) van al final — no son deuda por
+ * cobrar.
+ *
+ * 🩸 Había una segunda, «los favoritos ⭐ arriba», y se fue el 4-sep-2026 con
+ * la estrella: `cxc_favorites` tuvo **0 filas en toda su historia**, así que la
+ * regla nunca movió una fila y el `esFavorito` que la alimentaba obligaba a las
+ * dos carteras a cargar un endpoint que a un vendedor le contestaba 403.
  */
 export function compararClientes(
   a: ClienteOrdenable,
   b: ClienteOrdenable,
-  opts: { orden: Orden; esFavorito: (nombre: string) => boolean }
+  opts: { orden: Orden }
 ): number {
-  const aFav = opts.esFavorito(a.nombre_normalized) ? 0 : 1;
-  const bFav = opts.esFavorito(b.nombre_normalized) ? 0 : 1;
-  if (aFav !== bFav) return aFav - bFav;
-
   const aNeg = a.total < 0 ? 1 : 0;
   const bNeg = b.total < 0 ? 1 : 0;
   if (aNeg !== bNeg) return aNeg - bNeg;
@@ -131,7 +132,7 @@ export function compararClientes(
 /** Ordena una copia (no muta la lista que recibe). */
 export function ordenarClientes<T extends ClienteOrdenable>(
   lista: T[],
-  opts: { orden: Orden; esFavorito: (nombre: string) => boolean }
+  opts: { orden: Orden }
 ): T[] {
   return [...lista].sort((a, b) => compararClientes(a, b, opts));
 }

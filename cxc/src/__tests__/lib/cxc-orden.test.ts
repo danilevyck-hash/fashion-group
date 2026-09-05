@@ -23,7 +23,6 @@ function cliente(nombre: string, current: number, watch: number, overdue: number
   return { nombre_normalized: nombre, current, watch, overdue, total: current + watch + overdue };
 }
 
-const sinFavoritos = () => false;
 
 // Cartera de prueba: el orden por TOTAL y el orden por cada TRAMO son distintos
 // a propósito — si no, el test pasaría con la implementación vieja.
@@ -49,13 +48,13 @@ describe("orden derivado del tramo tocado", () => {
     const orden = ordenParaRiskFilter("overdue");
     const visibles = ordenarClientes(
       CARTERA.filter((c) => pasaFiltroRiesgo(c, "overdue")),
-      { orden, esFavorito: sinFavoritos }
+      { orden }
     );
     expect(visibles.map((c) => c.nombre_normalized)).toEqual(["CARLA", "BETO", "ANA"]);
     // Descendente por el monto DEL TRAMO, no por el total.
     expect(visibles.map((c) => c.overdue)).toEqual([9_000, 4_000, 500]);
     // Y es distinto del orden por total: ANA es la que más debe en total y queda última.
-    const porTotal = ordenarClientes(CARTERA, { orden: ordenParaRiskFilter("all"), esFavorito: sinFavoritos });
+    const porTotal = ordenarClientes(CARTERA, { orden: ordenParaRiskFilter("all") });
     expect(porTotal[0].nombre_normalized).toBe("ANA");
   });
 
@@ -98,7 +97,7 @@ describe("apagar el filtro tocando la misma píldora", () => {
     const risk = siguienteRiskFilter("overdue", "overdue");
     const visibles = ordenarClientes(
       CARTERA.filter((c) => pasaFiltroRiesgo(c, risk)),
-      { orden: ordenParaRiskFilter(risk), esFavorito: sinFavoritos }
+      { orden: ordenParaRiskFilter(risk) }
     );
     expect(visibles.map((c) => c.nombre_normalized)).toEqual(["ANA", "CARLA", "BETO", "DIEGO"]);
   });
@@ -155,7 +154,7 @@ describe("orden por título de columna: sigue funcionando y no se desincroniza",
         const orden = ordenEfectivo(risk, override);
         const lista = ordenarClientes(
           CARTERA.filter((c) => pasaFiltroRiesgo(c, risk)),
-          { orden, esFavorito: sinFavoritos }
+          { orden }
         );
         for (let i = 1; i < lista.length; i++) {
           const prev = lista[i - 1];
@@ -175,20 +174,22 @@ describe("orden por título de columna: sigue funcionando y no se desincroniza",
 });
 
 describe("reglas que mandan antes del orden elegido (no se tocaron)", () => {
-  it("los favoritos van arriba aunque deban menos en el tramo", () => {
+  // 🩸 Acá vivía «los favoritos ⭐ van arriba aunque deban menos en el tramo».
+  // La regla se retiró el 4-sep-2026 con la estrella (Daniel: «quita
+  // favoritos»; `cxc_favorites` tuvo 0 filas en toda su historia), así que hoy
+  // se mide lo contrario: el tramo manda solo, sin nadie colado arriba.
+  it("🔴 nada se cuela arriba del tramo: manda el monto de ese tramo", () => {
     const lista = ordenarClientes(CARTERA.filter((c) => pasaFiltroRiesgo(c, "overdue")), {
       orden: ordenParaRiskFilter("overdue"),
-      esFavorito: (n) => n === "ANA",
     });
-    expect(lista[0].nombre_normalized).toBe("ANA"); // 500 en el tramo, y aun así primera
-    expect(lista.slice(1).map((c) => c.nombre_normalized)).toEqual(["CARLA", "BETO"]);
+    expect(lista.map((c) => c.nombre_normalized)).toEqual(["CARLA", "BETO", "ANA"]);
+    expect(ordenarClientes).toHaveLength(2); // (lista, opts) — sin un 3.º de favoritos
   });
 
   it("los saldos a favor (negativos) quedan al final", () => {
     const credito: ClienteOrdenable = { nombre_normalized: "ZETA", current: 0, watch: 0, overdue: 200, total: -800 };
     const lista = ordenarClientes([credito, ...CARTERA], {
-      orden: ordenParaRiskFilter("overdue"),
-      esFavorito: sinFavoritos,
+      orden: ordenParaRiskFilter("overdue")
     });
     expect(lista[lista.length - 1].nombre_normalized).toBe("ZETA");
   });
@@ -196,18 +197,18 @@ describe("reglas que mandan antes del orden elegido (no se tocaron)", () => {
   it("montos empatados desempatan por nombre (orden estable)", () => {
     const a = cliente("BBB", 0, 0, 1_000);
     const b = cliente("AAA", 0, 0, 1_000);
-    const lista = ordenarClientes([a, b], { orden: ordenParaRiskFilter("overdue"), esFavorito: sinFavoritos });
+    const lista = ordenarClientes([a, b], { orden: ordenParaRiskFilter("overdue") });
     expect(lista.map((c) => c.nombre_normalized)).toEqual(["AAA", "BBB"]);
   });
 
   it("ordenar no muta la lista original", () => {
     const original = [...CARTERA];
-    ordenarClientes(CARTERA, { orden: ordenParaRiskFilter("overdue"), esFavorito: sinFavoritos });
+    ordenarClientes(CARTERA, { orden: ordenParaRiskFilter("overdue") });
     expect(CARTERA).toEqual(original);
   });
 
   it("no cambia ningún número: los montos salen intactos", () => {
-    const lista = ordenarClientes(CARTERA, { orden: ordenParaRiskFilter("watch"), esFavorito: sinFavoritos });
+    const lista = ordenarClientes(CARTERA, { orden: ordenParaRiskFilter("watch") });
     const sumar = (xs: ClienteOrdenable[], k: "current" | "watch" | "overdue" | "total") =>
       xs.reduce((s, c) => s + c[k], 0);
     for (const k of ["current", "watch", "overdue", "total"] as const) {

@@ -717,8 +717,12 @@ módulos VISIBLES y sin que `/home` nombre el rol (`moduloCasaDeRol(role)`, no `
 2. **El Inicio del grupo** lo esquiva por su casa.
 
 ⚠️ **El CXC del GRUPO también le contesta 403** (`/api/cxc/aging` exige
-admin/secretaria/vendedor), y sus **favoritos** están separados: `?cartera=boston` entra,
-`?cartera=grupo` **403**.
+admin/secretaria/vendedor). Y desde el 4-sep-2026 David **no tiene NINGUNA ruta de anotación**:
+`/api/cxc/favorites` —la única que alcanzaba, con su recorte `?cartera=boston` entra /
+`?cartera=grupo` 403— se retiró con los favoritos, y las dos que quedan (`overrides` y
+`contact-log`) son de `["admin","secretaria","vendedor"]`. El tabique por cartera
+(`respuestaSiCarteraAjena`) **se conserva** para el día en que una ruta de anotación se abra a
+`ROLES_BOSTON`, y se mide por conducta en `boston-acceso.test.ts`.
 
 **La contraseña de David no está en el repo.** Se creó con un centinela; `isHash()` en
 `/api/auth` saltea toda contraseña que no empiece con `$2a$`/`$2b$`, así que el login era
@@ -763,7 +767,7 @@ contesta «cómo va Boston».
 - Buscador («Buscar cliente...») y **4 píldoras que FILTRAN**: **Total pendiente** (con el
   número de clientes) · **0-90 días** · **91-120** · **121+**. Tocar una filtra **y** reordena
   por ese tramo.
-- Lista: barrita de color por el tramo más viejo con deuda, **estrella de favorito**, nombre,
+- Lista: barrita de color por el tramo más viejo con deuda, nombre,
   chip **«también en el grupo»** (marca visual: ese nombre existe en las dos carteras; **no
   suma nada**), los tres tramos, **«Últ. pago \<fecha\> · $X»** y el botón que despliega los
   **últimos 3 pagos**.
@@ -890,14 +894,38 @@ $3.685.289,04 · 0 filas de Boston.**
 
 ⚠️ **`TCKCTA` (el mostrador) aparece en la cartera de Boston** con **$25,15**. No es un cliente.
 
-### `switch_clientes` (`confecciones_boston`) — **4.915 filas, todas activas, todas CONGELADAS**
+### `switch_clientes` (`confecciones_boston`) — **4.915 filas, todas activas**
 
-🔴 **Las 4.915 tienen el MISMO `synced_at`: `2026-07-30 06:31:07 UTC`** — o sea la carga
-inicial, hace **36 días**, y ni una escritura desde entonces. Es esperable (ningún cron la
-refresca: la escribe el sync de estado de cuenta **por API**, que para Boston está vetado por
-cron), pero significa que **un cliente que Switch dio de alta en agosto no existe para esta
-pantalla**. Contraste medido el mismo día: `switch_clientes` de ACS, `synced_at` de **hoy
-11:31 UTC**.
+🩸 **Estuvo 37 DÍAS CONGELADA, y se arregló el 5-sep-2026.** Las 4.915 filas tenían el MISMO
+`synced_at` —`2026-07-30 06:31:07 UTC`, al milisegundo— y ni una escritura desde entonces, así que
+un cliente que Switch dio de alta en agosto **no existía para esta pantalla**. Contraste medido el
+mismo día: `switch_clientes` de ACS, `synced_at` de hoy 11:31 UTC.
+
+**La causa:** el único escritor del directorio vivía DENTRO del sync de estado de cuenta por API, y
+ese camino para Boston está vetado (4.912 llamadas HTTP, 54 min contra un techo de 800 s). El
+`switch_sync_log` lo dice al minuto: la última corrida de `estadocuenta` de Boston arrancó el
+**30-jul 06:31:08** —`runStamp` 06:31:07.524, exactamente el `synced_at` de las 4.915 filas—,
+alcanzó a escribir el directorio y murió en el recorrido por cliente. **El día que Boston salió de
+ese cron es el día exacto en que su directorio se congeló.** Y nadie lo vio porque **ninguna alerta
+lo cubría**.
+
+**El arreglo (5-sep-2026):** `/api/cron/sync-clientes-boston`, **SEMANAL, domingos 07:10 UTC**
+(domingo 2:10 a.m. de Panamá — Daniel: *«semanal»*). Pide solo `/apicliente/lista` (~99 páginas, no
+4.912 llamadas) y escribe con el MISMO código que las 6 del grupo
+(`src/lib/switch-api/clientes-directorio.ts`: un solo escritor, no dos implementaciones que se
+puedan separar en silencio).
+
+🔴 **Escribe SOLO `switch_clientes` con `empresa_key = 'confecciones_boston'`. `clientes_master` no
+se toca.** Daniel: *«los clientes de Boston no quiero que toquen los de Fashion Group… no quiero
+volver a pasar por el mismo error»*.
+
+**Dos guardas antes de marcar a alguien como ausente** —lo único del sync que puede hacer daño—: la
+lista tiene que haber venido completa **y** no haber encogido por debajo del **70%** de lo conocido.
+Una lista vacía no escribe ni marca: la corrida termina en `error`.
+
+**Y ahora sí se vigila:** alerta **B** de `silencio-de-datos.ts` sobre esta tabla, **solo Boston**
+(la misma tabla la escriben tres crons con tres ritmos), umbral **semanal de 165 h** — avisa a la
+primera corrida perdida, porque la siguiente oportunidad es dentro de siete días.
 
 **8 clientes con saldo en la cartera NO existen aquí** (medido),
 así que **aparecen en «Por cobrar» y NO en «Clientes»**: `165367 PRIVIVIENDA S,A. $323,68` ·
@@ -955,12 +983,15 @@ Por empresa (la columna guarda el **NOMBRE**, no la key): **Confecciones Boston 
 siempre.** Sin filas propias, un aprobador **no aprueba nada** (y lo ve, porque el cuadro le
 sale vacío).
 
-### `cxc_favorites` / `cxc_client_overrides` / `cxc_contact_log`
+### `cxc_client_overrides` / `cxc_contact_log` (y `cxc_favorites`, ya sin lectores)
 
 ⚠️ **Comparten el namespace de `nombre_normalized` entre grupo y Boston** (no tienen columna de
-empresa). La estrella sí lleva la cartera en la llave (`?cartera=boston`); las notas y el
-contacto **no**, así que los ~10 nombres que existen en las dos carteras los comparten. **No es
-plata y no se tocó**: arreglarlo pide DDL y una decisión de Daniel.
+empresa). Las notas y el contacto **no llevan la cartera en la consulta que la pantalla hace**, así
+que los ~10 nombres que existen en las dos carteras los comparten. **No es plata y no se tocó**:
+arreglarlo pide DDL y una decisión de Daniel.
+⚠️ **`cxc_favorites` se quedó sin lectores el 4-sep-2026** (los favoritos ⭐ se retiraron del CXC
+entero; la tabla tuvo 0 filas en toda su historia). La tabla queda, con candado que impide que una
+migración la dropee.
 
 ## De dónde vienen los datos
 
@@ -969,7 +1000,7 @@ plata y no se tocó**: arreglarlo pide DDL y una decisión de Daniel.
 | **La cartera** | 🔴 **panel web**: `GET /estadodecuenta` → `POST /reportesmanager/crearreporteconsola` (devuelve un **uuid**) → `GET /reportesmanager/buscarreporteconsola/<uuid>` cada 2 s hasta `TERMINADO`. Parámetros copiados del botón del panel: **`desde = hasta = hoy`, `claseReporte: '4'`, `tipoReporte: 'ESTADOCUENTACLIENTE'`** (sin `tipoReporte` contesta `{"error":"TIPO_REPORTE_REQUERIDO"}`) | **Panel con sesión** (`web-client.ts`, login con `changesession="SI"`) | **`boston-cartera` 08:10 UTC = 03:10 a.m. de Panamá** | `switch_estadocuenta` → vista `switch_estadocuenta_aging_boston` |
 | **Ventas** | `GET /apifactura/lista` + `GET /apinotacredito/lista` + `GET /apinotadebito/lista`, ventana 7 días. 🩸 **Las NC llegan negativas y se guardan en valor absoluto**; el signo lo pone la lectura | **API con token** | `switch-sync tipo=all` **06:30** (con ACS) + `tipo=facturas` **11:50 · 15:00 · 19:00 · 23:00** (las 8 empresas) | `switch_facturas` → `ventas_rollup_mensual_mv` |
 | **Cobros** | `GET /apireporte/recibos?desde&hasta&porPagina&paginaActual` (**no está en el PDF del API**, y no trae id ni secuencial de recibo: por eso la unidad de reemplazo es el **mes entero**), ventana de los últimos 3 meses | **API** | `sync-recibos` **07:50 · 15:15 · 19:15 · 23:15** | `switch_recibos` |
-| **Clientes** | `GET /apicliente/lista` | **API** | 🔴 **ninguno hoy**: viene del sync de estado de cuenta por API, que **está vetado por cron para Boston**. Las 4.915 filas son de la carga inicial (28-30 jul) | `switch_clientes` |
+| **Clientes** | `GET /apicliente/lista` | **API** | `sync-clientes-boston` — **SEMANAL, domingos 07:10 UTC** (5-sep-2026). Antes: ninguno, porque el directorio viajaba dentro del estado de cuenta por API, vetado por cron para Boston, y las 4.915 filas llevaban 37 días sin tocarse | `switch_clientes` (🔴 **nunca `clientes_master`**) |
 | **Planilla y préstamos** | 🔴 **nada de Switch**: el reloj de asistencia y lo que carga Contabilidad a mano | — | `asistencia-vigia` 15:00 · 20:00 · 22:15 | `asistencia_*`, `prestamos_*` |
 | **Costo / utilidad** | 🔴 **no se trae** (`utilidad: false`) | — | — | — |
 | **Gastos** | 🔴 **fuera del cron a pedido de Daniel** | panel | ninguno (el manual `?empresas=confecciones_boston` lo acepta) | `egresos_varios` |
@@ -1056,7 +1087,6 @@ sale ⛔, el denunciador está roto y todos los ✅ valen lo mismo que un barrid
 | `prestamos_empleados` + `calcularSaldoPrestamo` | la pestaña Préstamos — **la misma función** que `PrestamosClient` | ⚠️ **ninguno, a pedido de Daniel** |
 | `asistencia_personas` | el conteo del Inicio | `.eq("empresa", …)` |
 | `/api/sync-status` | la frescura, por empresa (`.eq`) | `empresasCarteraAparte()` |
-| `/api/cxc/favorites?cartera=boston` | las estrellas | la cartera va en la llave |
 | `lineaDeRechazos({familias:["cxc"], empresas: empresasCarteraAparte()})` | el aviso de lo que el guard descartó | ídem |
 | `switch_estadocuenta_aging` (la del **grupo**) | 🔴 **una sola lectura, y solo de `nombre_normalized`**, para el chip «también en el grupo». **No suma nada** | es la única vez que las dos carteras se miran |
 
@@ -1141,9 +1171,9 @@ casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 fil
 - **Horario de Panamá** (5 logins): 12 h · 16 h · 17 h · 21 h ×2. Muestra chica; no hay patrón.
 - **Comparación honesta**: Jennifer lleva 40 logins y David 5. El módulo de David tiene **8
   días de vida útil** (su primer login fue el 30-ago) contra los dos meses de Multifashion.
-- **Filas que el módulo escribe**: **cero**. Las cuatro rutas de `/api/boston/**` son GET; la
-  planilla es de solo lectura para él; las estrellas de favoritos (`cxc_favorites`) son lo
-  único que puede escribir, y son de la cartera de Boston.
+- **Filas que el módulo escribe**: **cero, y desde el 4-sep-2026 cero de verdad.** Las cuatro
+  rutas de `/api/boston/**` son GET y la planilla es de solo lectura para él. Lo único que David
+  podía escribir eran las estrellas de favoritos de su cartera — y los favoritos se retiraron.
 - Lo que sí se puede medir del **dato**, no del uso: la cartera se reescribe entera **una vez
   al día** (`boston-cartera` 08:10) — 7 corridas `success` en los últimos 7 días, la última el
   **4-sep 08:11 UTC**. Sus facturas: 35 corridas en 7 días. Sus recibos: 28.
@@ -1230,7 +1260,7 @@ casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 fil
 | **Alguien lee `switch_estadocuenta` sin acotar `empresa_key`** | las 985 filas de Boston se suman a las del grupo | BARRIDO 2 del candado |
 | **Alguien agrega una vista o una ruta nueva de cartera** | nace insegura | BARRIDO 1 y 2 (no son listas de objetos: recorren `supabase/migrations/` y `src/` enteros) |
 | **La migración de `asistencia_aprobador_empresa` no hubiera corrido** | ya no aplica: la tolerancia se retiró el 3-sep-2026 | hoy, **sin filas propias, un aprobador no aprueba nada** — y lo ve, porque el cuadro le sale vacío |
-| **`switch_clientes` de Boston ya ESTÁ vieja** | la pestaña Clientes muestra nombres viejos y **no conoce a ningún cliente dado de alta después del 30-jul** | 🔴 **no hay cron que la refresque** y está medido: las 4.915 filas tienen `synced_at = 2026-07-30 06:31:07` **exactamente**. Nada avisa: no es un sync que falla, es un sync que no existe. Es el hueco más silencioso del módulo |
+| **`switch_clientes` de Boston se queda vieja** | la pestaña Clientes muestra nombres viejos y no conoce a nadie dado de alta después de la última corrida | ✅ Desde el 5-sep-2026 la refresca `sync-clientes-boston` (domingos 07:10 UTC) y la **alerta B avisa** si pasa una semana sin escritura (165 h). 🩸 Antes no había cron ni aviso: las 4.915 filas llevaban 37 días con `synced_at = 2026-07-30 06:31:07` exactamente, y era el hueco más silencioso del módulo — no un sync que falla, un sync que no existe |
 | **`ventas_rollup_mensual_mv` no se refresca** | la pestaña Ventas y la tarjeta del Inicio se congelan | se refresca con `rpc refresh_ventas_rollup_mensual_mv` |
 | **Daniel entra al panel de Boston de madrugada** | el cron de las 08:10 recibe la sesión tomada | el login usa `changesession="SI"`: **quien entra después, gana** |
 | **`db-max-rows` = 1000** | las 4 rutas paginan a mano (`PAGE = 1000`); la cartera tiene 390 filas y `switch_ultimo_pago_cliente_v2` de Boston tenía **1.947** — sin paginar, 947 clientes se veían como «sin último pago» | ya arreglado el 13-ago-2026 |
@@ -1258,13 +1288,9 @@ casi todo de solo lectura, así que **no hay escrituras que contar**. Las 45 fil
    en `switch_clientes` (medidos, $748,68 en total). La pantalla no lo dice.
 6. **`TCKCTA` —el mostrador, que no es un cliente— está en la cartera de Boston** con $25,15.
    `esMostrador()` existe y se usa en los rankings de Ventas; esta pestaña no lo aplica.
-7. 🔴 **`switch_clientes` de Boston lleva 36 días congelada y nada lo dice.** Medido: las 4.915
-   filas tienen `synced_at = 2026-07-30 06:31:07 UTC`, todas. No hay cron que la escriba (la
-   escribe el estado de cuenta **por API**, vetado por cron para Boston) y el reporte web de la
-   cartera no toca esta tabla. La pestaña Clientes de David muestra un maestro de julio, y su
-   buscador no encuentra a nadie dado de alta después. **Ningún vigía lo cubre**: la regla 1
-   mira `switch_estadocuenta` (que sí se refresca todos los días) y la alerta B solo vigila las
-   tablas de `TABLAS_VIGILADAS`.
+7. ✅ **RESUELTO el 5-sep-2026 — `switch_clientes` de Boston llegó a estar 37 días congelada y
+   nada lo decía.** Hoy la refresca `/api/cron/sync-clientes-boston` (semanal, domingos 07:10 UTC)
+   y la vigila la alerta B con umbral semanal. Ver el bloque de esa tabla en *Los datos*.
 8. **La pestaña Clientes no muestra el email** aunque el endpoint lo devuelve (`email` viaja en
    el JSON y ningún layout lo pinta).
 9. **`/api/boston/clientes` no puede decir «hay más» en modo saldo**: `truncado` se calcula

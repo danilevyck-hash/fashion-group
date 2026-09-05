@@ -22,7 +22,6 @@ import TabsCartera from "./components/TabsCartera";
 import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
 import EnviarEmailModal from "./components/EnviarEmailModal";
 import useAdminData from "./hooks/useAdminData";
-import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
 import { tabCxcPermitida } from "@/lib/cxc/boston-roles";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
@@ -198,51 +197,15 @@ function AdminDashboardInner() {
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   const [showExport, setShowExport] = useState(false);
-  const [favorites, setFavorites] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("cxc_favorites") || "[]")); } catch { return new Set(); }
-  });
 
-  // Load favorites from DB (overrides localStorage on success)
-  useEffect(() => {
-    if (!authChecked) return;
-    fetch(`/api/cxc/favorites?cartera=${CARTERA_GRUPO}`)
-      .then((r) => r.ok ? r.json() : Promise.reject(r))
-      .then((data: { favorites: string[] }) => {
-        const dbSet = new Set(data.favorites);
-        setFavorites(dbSet);
-        localStorage.setItem("cxc_favorites", JSON.stringify(data.favorites));
-      })
-      .catch(() => {
-        // Fallback: keep localStorage value (already loaded in useState)
-      });
-  }, [authChecked]);
-
-  function toggleFavorite(name: string) {
-    // Optimistic update
-    setFavorites(prev => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
-      localStorage.setItem("cxc_favorites", JSON.stringify([...next]));
-      return next;
-    });
-    // Persist to DB
-    fetch("/api/cxc/favorites", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientName: name, cartera: CARTERA_GRUPO }),
-    }).then(res => {
-      if (!res.ok) throw new Error("Server error");
-    }).catch(() => {
-      // Revert optimistic update
-      setFavorites(prev => {
-        const reverted = new Set(prev);
-        if (reverted.has(name)) reverted.delete(name); else reverted.add(name);
-        localStorage.setItem("cxc_favorites", JSON.stringify([...reverted]));
-        return reverted;
-      });
-      showToast("Error al guardar favorito");
-    });
-  }
+  // 🩸 Acá vivían los favoritos ⭐ del CXC: el estado, su copia en
+  // `localStorage`, la carga desde `/api/cxc/favorites`, el toggle optimista y
+  // su rollback. Se fueron el 4-sep-2026 — Daniel: *«quita favoritos»*.
+  // `cxc_favorites` tuvo **0 filas en toda su historia** y su endpoint exigía
+  // `rolesBoston()`, así que el vendedor que sí ve el CXC recibía 403 al tocar
+  // la estrella. La tabla NO se borró (el patrón de `mayor_lineas`): queda sin
+  // lectores, y `cxc-favoritos-retirados.test.ts` pone el build rojo si una
+  // migración la dropea.
 
   // CXC sólo aplica a las 6 empresas B2B (Boston y American Classic son retail
   // sin código D-XXX, no tienen detallessaldos). B2B_COMPANIES es la lista
@@ -310,11 +273,10 @@ function AdminDashboardInner() {
 
     result.sort((a, b) => compararClientes(a, b, {
       orden: { key: sortKey, dir: sortDir },
-      esFavorito: (nombre) => favorites.has(nombre),
     }));
 
     return result;
-  }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir, favorites]);
+  }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir]);
 
   // ── Role-filtered clients ──
   const roleClients = useMemo(() => {
@@ -494,8 +456,6 @@ function AdminDashboardInner() {
         setRiskFilter={handleRiskFilterChange}
         companyFilter={companyFilter}
         setCompanyFilter={setCompanyFilter}
-        favorites={favorites}
-        onToggleFavorite={toggleFavorite}
         onOpenEmail={openEmail}
         onWhatsApp={openWhatsApp}
         onCopyMessage={copyMessage}
@@ -650,8 +610,6 @@ function AdminDashboardInner() {
         onWhatsApp={openWhatsApp}
         onCopyMessage={copyMessage}
         onOpenEstado={openEstadoCuenta}
-        favorites={favorites}
-        onToggleFavorite={toggleFavorite}
       />
       </div>
       </>

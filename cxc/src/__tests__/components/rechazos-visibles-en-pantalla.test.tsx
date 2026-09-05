@@ -67,9 +67,7 @@ function montarBoston(avisoMontos: string | null) {
           por_empresa: { confecciones_boston: "2026-08-25T02:11:00.000Z" },
           stale: [],
         }
-      : u.startsWith("/api/cxc/favorites")
-        ? { favorites: [] }
-        : { ...CARTERA, avisoMontos };
+      : { ...CARTERA, avisoMontos };
     return { ok: true, status: 200, json: async () => cuerpo } as unknown as Response;
   });
   vi.stubGlobal("fetch", fetchMock);

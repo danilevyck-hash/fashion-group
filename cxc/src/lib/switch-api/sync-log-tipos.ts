@@ -35,6 +35,14 @@ export const SYNC_LOG_TYPES = [
   "articulos",
   "articulo_marca",
   "articulo_info",
+  // El DIRECTORIO de clientes de una empresa (5-sep-2026). Hoy lo escribe un
+  // solo cron: el semanal de Confecciones Boston, cuyo directorio llevaba 37
+  // días congelado porque su estado de cuenta por API está vetado y el
+  // directorio viajaba adentro de ESE sync. Su DDL va en la MISMA migración que
+  // lo estrena (20260923120000) — que es justo lo que NO se hizo con
+  // catalogo_tommy ni con articulo_marca, y por eso las dos corrieron
+  // invisibles durante meses.
+  "clientes",
   "multifashion",
   "catalogo_reebok",
   "catalogo_joybees",

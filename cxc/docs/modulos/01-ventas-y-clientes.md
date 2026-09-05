@@ -490,10 +490,10 @@ Comisiones**. Es la pantalla más pesada del sistema: su SSR cruza el empalme
 |---|---|
 | `/api/ventas/resumen`, `/clientes-12m`, `/años`, `/resumen-anual`, `/mes-anio`, `/v2` | `admin`, `contabilidad` |
 | `/api/ventas/v2/status` | `admin`, `secretaria` |
-| `/api/ventas/productos`, `/productos/codigos`, `/productos/por-cliente`, `/utilidad-cliente`, `/referencia/actualizar`, `/comisiones/config`, `/comisiones/exclusiones*` | **solo `admin`** |
+| `/api/ventas/productos`, `/productos/codigos`, `/productos/por-cliente`, `/utilidad-cliente`, `/comisiones/config`, `/comisiones/exclusiones*` | **solo `admin`** |
 | `/api/ventas/comisiones`, `/comisiones/consolidado`, `/comisiones/detalle`, `GET /comisiones/descuentos` | `admin`, `contabilidad`, `secretaria` |
 | `POST /api/ventas/comisiones/descuentos` | `admin`, `secretaria` |
-| `/api/ventas/referencia` (GET) | `admin`, `vendedor`, `bodega` — y `margenVisible` viaja `false` para los dos últimos |
+| `/api/ventas/referencia` (GET) y **`/referencia/actualizar` (POST)** | `admin`, `vendedor`, `bodega` (`REFERENCIA_ROLES`, una sola lista para la página, la búsqueda y el botón) — y `margenVisible` viaja `false` para los dos últimos |
 
 - La **pestaña Comisiones** existe también como módulo propio `/comisiones`
   (`roles: ["admin","contabilidad","secretaria"]`). Es la ÚNICA puerta de la secretaria a las
@@ -527,9 +527,16 @@ Subtítulo: «8 empresas · cierre \<mes\> (mes en curso \<mes\>)». En un año 
   UTILIDAD · MARGEN PROMEDIO**, cada una con `Ene–<mes> <año> · ▲ X% vs <año anterior>`
   (el margen en **puntos**, no en %). «YTD» se retiró de los rótulos por ser jerga en inglés.
 - **Tarjeta «mes en curso vs mismo mes del año anterior»** (solo año en curso).
-- **Barra**: píldora «Sincronizado \<fecha\>» (`SyncStatus`, tabla `facturas`) · botón **«Actualizar
-  ahora»** (admin/secretaria — dispara facturas de las 8 empresas EN SECUENCIA + `refresh-vistas`) ·
-  conmutador **Ventas / Utilidad / Margen %** · conmutador **Mensual / Trimestral / Anual**.
+- **Barra**: botón **«Actualizar ahora»** (admin/secretaria — dispara facturas de las 8 empresas EN
+  SECUENCIA + `refresh-vistas`) · conmutador **Ventas / Utilidad / Margen %** · conmutador
+  **Mensual / Trimestral / Anual**.
+  🩸 **La píldora «Sincronizado» se retiró el 4-sep-2026.** Vigilaba **3 empresas de 8**
+  (`SWITCH_FACTURAS_EMPRESA_KEYS`, una lista escrita a mano que se quedó atrás del cron), así que
+  Vistana o Fashion Wear congeladas se veían en VERDE. Daniel: *«¿de qué sirve tenerlo si ya el
+  sistema corre fluido y si no me avisa por Telegram para arreglarlo?»*. Quien vigila las ventas es
+  `src/lib/datos-frescos.ts` — **las 8**, derivadas de `empresasConFacturas()`, con aviso por Telegram
+  a las +24 h y la regla de dos fallos seguidos. Comisiones **sí** conserva la suya (lee
+  `switch_recibos`, otra tabla). Candado: `textos-pendientes-284.test.ts`, que cambió de dirección.
 - **La matriz**: filas = las 8 empresas + **Total Grupo**; columnas = 12 meses (o 4 trimestres, o los
   años en modo Anual) + **Total** + **Proyección** (solo año en curso). Cada celda lleva el valor y
   su Δ contra el año anterior. **Tocar una celda transforma la fila en su lugar** (`FilaDetalle`) y
@@ -1073,13 +1080,14 @@ entra por el **panel web con sesión**, y eso cambia el modo de fallar.
   `20260915120000`. Y hay seis posteriores aplicadas que `CLAUDE.md` no menciona
   (`20260914120000`, `20260916120000`, `20260918120000`, `20260919120000`, `20260920120000`,
   `20260921120000`).
-- 🔴 **La píldora «Sincronizado» del Resumen vigila 3 empresas de 8.**
-  `SWITCH_FACTURAS_EMPRESA_KEYS` (`src/lib/empresa-mapping.ts:123`) es
-  `["active_shoes","active_wear","american_classic"]` y su comentario dice «Empresas que el cron
-  switch-sync?tipo=facturas pobla en switch_facturas… Si en el futuro se agrega una empresa al sync
-  de facturas, actualizar acá». El cron cubre **las 8** (`vercel.json`, slots `facturas-1150/1500/
-  1900/2300`). O sea: si Vistana, Fashion Wear, Fashion Shoes, Joystep o Boston se congelan, la
-  píldora del Resumen **no lo dice**.
+- ✅ **CERRADO el 4-sep-2026 — la píldora «Sincronizado» del Resumen vigilaba 3 empresas de 8, y se
+  quitó.** `SWITCH_FACTURAS_EMPRESA_KEYS` era `["active_shoes","active_wear","american_classic"]`
+  mientras el cron cubre **las 8**, así que Vistana, Fashion Wear, Fashion Shoes, Joystep o Boston
+  congeladas se veían en VERDE. Daniel: *«¿de qué sirve tenerlo si ya el sistema corre fluido y si no
+  me avisa por Telegram para arreglarlo?»* — y la vigilancia real ya existe: `datos-frescos.ts`
+  DERIVA su lista de `empresasConFacturas()` (las 8) y avisa por Telegram a las +24 h. Se retiraron
+  la píldora de las dos caras del Resumen y la constante; el candado cambió de dirección y lleva
+  CONTROL de que el Resumen sí se pinta.
 - 🔴 **`CLAUDE.md` dice que la fila de tasa de Rey Stoute Aguas es «decisión pendiente de Daniel».**
   Ya no: la migración `20260916120000_retirar_rey_stoute_aguas` corrió y la fila está con
   `activo = false` desde el 4-sep-2026.
@@ -1176,9 +1184,12 @@ grupo y los de Boston puedan sumarse (ver `docs/postmortems/boston-cxc.md`).
   `?tab=boston` cae al grupo (`tabCxcPermitida`). `gerente_boston` (David) llega a esa pestaña por
   `/boston`, no por `/admin`: su único módulo es `boston`.
 - **Exportar** (CSV / los dos PDF) es solo `admin` y `secretaria` (`canExport` en `admin/page.tsx`).
-- 🔴 **Anomalía de roles medida:** `/api/cxc/favorites` (GET y POST) exige `rolesBoston()` =
-  `["admin","secretaria","gerente_boston"]`, así que **un `vendedor` ve el CXC pero recibe 403 al
-  leer o poner una estrella**. Sus hermanas `overrides` y `contact-log` sí lo dejan pasar.
+- 🩸 **La anomalía de roles se cerró borrando la función** (4-sep-2026). `/api/cxc/favorites` exigía
+  `rolesBoston()` = `["admin","secretaria","gerente_boston"]`, o sea que un `vendedor` veía el CXC y
+  recibía **403** al tocar la estrella. La ruta ya no existe: los favoritos se retiraron enteros
+  (Daniel: *«quita favoritos»*; la tabla tuvo 0 filas en toda su historia). Con eso, `gerente_boston`
+  se quedó **sin ninguna** ruta de anotación: las dos que sobreviven (`overrides` y `contact-log`)
+  son de `["admin","secretaria","vendedor"]`.
 
 ## Las pantallas
 
@@ -1211,7 +1222,7 @@ De arriba abajo:
 7. **Línea de alcance**: «N de M clientes · ordenados por \<criterio\>» — el texto describe el orden
    REAL, venga de la píldora o del clic en un título de columna.
 8. **La tabla**: `Cliente · 0-90d · 91-120d · 121d+ · Total`. A la izquierda de cada fila una barra de
-   color por riesgo; la ⭐ de favorito; el botón **«Últimos pagos ›»**; y a la derecha el menú **«···»**
+   color por riesgo; el botón **«Últimos pagos ›»**; y a la derecha el menú **«···»**
    con **exactamente cuatro** opciones: **Estado de cuenta · WhatsApp · Enviar correo · Copiar
    mensaje**. El clic derecho (escritorio) abre un menú que dice **lo mismo**.
 9. **«Saldo a favor (N)»** — los clientes con total negativo van en su propio bloque al pie, fuera de
@@ -1243,8 +1254,8 @@ avisa. Al enviar: «Correo enviado» (o «Correo enviado (no se pudo registrar e
 
 ### Pestaña «Confecciones Boston»
 Misma forma, **otros buckets**: `Total pendiente · 0-90d · 91-120d · 121d+` sobre
-`switch_estadocuenta_aging_boston` (`d0_90 / d91_120 / d121_plus`). Buscador propio, favoritos con
-`cartera=boston`, columna «Último pago» y su propio botón de últimos pagos
+`switch_estadocuenta_aging_boston` (`d0_90 / d91_120 / d121_plus`). Buscador propio, columna
+«Último pago» y su propio botón de últimos pagos
 (`useUltimosPagosBoston` → `/api/cxc/boston/ultimos-pagos`, que pide el **`cliente_switch_id`**, no
 el código). Un chip marca al cliente que **también existe en el grupo** — es solo una etiqueta: no se
 suma nada. La coletilla a la derecha dice «Confecciones Boston · se lleva aparte».
@@ -1300,15 +1311,19 @@ cartera va en la llave** (`grupo` / `boston`): la misma estrella en dos carteras
 | Tabla | Filas | Grano · llave | Quién escribe | Quién lee | Soft delete |
 |---|---|---|---|---|---|
 | `cxc_client_overrides` | **10** | `UNIQUE (cartera, nombre_normalized)` | 🔴 **ya nadie desde el CXC** — el formulario se mudó a `/clientes/[codigo]` el 24-ago-2026. Sí lo escribe `/api/overrides` desde **Cheques** | `useAdminData` (un override le gana al maestro) y `resolveDestinatario` del correo | no |
-| `cxc_favorites` | **0** | `UNIQUE (cartera, user_id, nombre_normalized)` | la ⭐ de la fila | la ⭐ y el orden (favoritos siempre arriba) | no — se borra la fila |
+| `cxc_favorites` | **0** | `UNIQUE (cartera, user_id, nombre_normalized)` | 🔴 **nadie** — la ⭐ se retiró el 4-sep-2026 | 🔴 **nadie** | no — se borraba la fila |
 | `cxc_contact_log` | **141** | solo PK | 🔴 **nadie** — las opciones «Ya contacté» se retiraron el 14-ago-2026 | 🔴 **nadie** | no |
 | `cxc_emails_enviados` | **19** | solo PK | `POST /api/cxc/enviar-email`, *best effort* (si falla, el correo sale igual y la respuesta dice `logged:false`) | 🔴 **nadie en la app** | no |
 
 Detalle medido de esas cuatro:
 - `cxc_client_overrides`: las 10 son de cartera `grupo`. `celular` 10 · `telefono` 9 · `correo` 8 ·
   `contacto` 3 · **`resultado_contacto` 0 · `proximo_seguimiento` 0** (dos columnas que nadie llena).
-- 🔴 **`cxc_favorites` está VACÍA.** La ⭐ existe en las dos carteras, en escritorio y en celular, con
-  su ruta, su optimistic update y su rollback — y **nunca la usó nadie**.
+- 🩸 **`cxc_favorites` está VACÍA y ya no tiene puerta.** La ⭐ existía en las dos carteras, en
+  escritorio y en celular, con su ruta, su *optimistic update* y su rollback — y **nunca la usó
+  nadie**. El 4-sep-2026 se retiró entera (Daniel: *«quita favoritos»*): se fueron la estrella, la
+  regla de orden «favoritos arriba», la copia en `localStorage`, `leerFavoritos`/`alternarFavorito` y
+  `/api/cxc/favorites`. **La tabla se queda** —patrón `mayor_lineas`— y `cxc-favoritos-retirados.test.ts`
+  pone el build rojo si una migración la dropea o si la estrella vuelve.
 - `cxc_contact_log`: 141 filas, **todas entre el 22-mar y el 16-abr-2026**, todas de rol `admin` y
   cartera `grupo`: whatsapp 117 · llamada 15 · email 9. La columna `note` está vacía en las 141.
 - `cxc_emails_enviados`: 19 envíos, **todos con `resultado = "ok"`**. `Angela` 14 (el último el
@@ -1560,7 +1575,7 @@ logins, 0 filas en `activity_logs`.
 | `cxc_emails_enviados` | 19 | **14-jul-2026** (52 días atrás) | Angela 14 · daniel 5, todos con `resultado = "ok"` |
 | `cxc_contact_log` | 141 | **16-abr-2026** | `created_by = "admin"` en las 141 (es el default de la columna, no distingue persona) |
 | `cxc_client_overrides` | 10 | **22-mar-2026**, las 10 el mismo día | sin columna de autor |
-| `cxc_favorites` | 🔴 **0** | nunca | — |
+| `cxc_favorites` | 🔴 **0** | nunca (y desde el 4-sep-2026 tampoco tiene quién) | — |
 | `activity_logs` con `entity_type = "cxc"` | 38 (`cxc_upload`) | **1-jun-2026** | **andrea**, y son de la carga manual de CSV **ya retirada** |
 
 O sea: **desde el 14 de julio de 2026 el módulo no ha escrito ni una fila.** Eso no dice que no se
@@ -1643,11 +1658,11 @@ clientes). Ese número **no** incluye Boston, que tiene su propia pestaña y sus
 ## Lo que sobra o no cuadra
 
 **Cosas que existen y nadie usa**
-- 🔴 **La ⭐ de favoritos: `cxc_favorites` tiene 0 filas.** El botón está en las dos carteras, en
-  escritorio y en celular, con su ruta, su *optimistic update*, su rollback, su copia en
-  `localStorage` y su regla de orden («favoritos siempre arriba», `compararClientes`). **Nunca se usó.**
-  Y encima su ruta exige `rolesBoston()`, así que un **vendedor** —que sí ve el CXC— recibe **403** al
-  leerla o al tocarla.
+- ✅ **CERRADO el 4-sep-2026 — la ⭐ de favoritos se fue.** Era el caso más claro: `cxc_favorites` con
+  **0 filas en toda su historia**, botón en las dos carteras, en escritorio y en celular, con su ruta,
+  su *optimistic update*, su rollback, su copia en `localStorage` y su regla de orden («favoritos
+  arriba»); y encima su ruta exigía `rolesBoston()`, así que un **vendedor** —que sí ve el CXC—
+  recibía **403** al tocarla. Daniel: *«quita favoritos»*. La tabla se conservó, sin lectores.
 - 🔴 **`cxc_contact_log`: 141 filas, ninguna después del 16-abr-2026, y hoy no la escribe ni la lee
   nadie.** Las opciones «Ya contacté · Llamada/Visita» se retiraron el 14-ago-2026 (Daniel: *«sobre
   darle seguimiento no es algo que quiero para ese módulo, llamo al cliente por fuera y ya»*), pero
@@ -1673,8 +1688,8 @@ pantalla y viaja en el CSV: sale vacío salvo override (3 de 10).
 **Incoherencias de permisos**
 - `secretaria` **no tiene `cxc` en `role_permissions`**, pero la pantalla y `/api/cxc/aging` sí la
   dejan pasar. Hoy solo **Angela** ve la ficha, y por `modulos_override`, no por rol.
-- Las tres tablas de anotaciones tienen **tres listas de roles distintas**: `favorites` usa
-  `rolesBoston()` (deja fuera a vendedor), `overrides` y `contact-log` usan
+- Las listas de roles de las anotaciones **ya no son tres, son dos** (4-sep-2026, al irse
+  `favorites` con su `rolesBoston()`): `overrides` y `contact-log` usan
   `["admin","secretaria","vendedor"]`, y `aging-por-cliente` usa
   `["admin","contabilidad","secretaria","vendedor"]`.
 - 🔴 **`src/app/admin/error.tsx` le muestra al usuario el `error.message` Y el stack trace completo.**
@@ -2175,8 +2190,10 @@ identidad del proveedor **entre empresas**, porque Switch le da un id distinto e
   campos con dato**, y si no hay ninguno la sección entera no aparece. Al pie, «Última
   sincronización: \<fecha\>».
 - **Tabla por empresa**: `Empresa · Por pagar · Último pago` (monto · N d), con fila **Total grupo**.
-- **«Reclamos vinculados»** — los reclamos cuyo proveedor normaliza a la misma `key`, con enlace
-  «Ver en Reclamos →».
+- **«Reclamos vinculados»** — los reclamos que cruzan por el par **(empresa, código de proveedor)**
+  con las filas de Switch de esta ficha, con enlace «Ver en Reclamos →». **No se unen por nombre**
+  (4-sep-2026): `reclamos.proveedor` es texto libre y Switch escribe otra grafía. Un reclamo sin
+  código no aparece en ninguna ficha, a propósito.
 - **«Actualizar ahora»** de la ficha sincroniza **solo las empresas donde ese proveedor tiene cuenta**.
 - Si la `key` no existe: **«Proveedor no encontrado — Puede que aún no esté sincronizado.»**
 
@@ -2213,7 +2230,11 @@ el sync corre 1×/día y «hace N días» se congelaba.
 **`confecciones_boston` = 0 proveedores** (`cxp: false`).
 
 **Lo que la ficha lee además:** la tabla `reclamos` (`deleted = false`, ordenada por `fecha_reclamo`),
-**entera**, y filtra en memoria comparando `normProvName(r.proveedor)` con la `key`.
+**entera**, y cruza en memoria por el par **(`empresa_key`, `proveedor_codigo`)** contra las filas de
+`switch_proveedor_estadocuenta` de esta ficha (`src/lib/reclamos/proveedor-vinculo.ts`).
+🩸 Hasta el 4-sep-2026 se unía por `normProvName(r.proveedor) === key`, y **26 de los 34 reclamos
+vivos ya no cruzaban**: Switch dice «American Fashion Wear, SA» y los reclamos dicen «American
+Fashion Wear». Las fichas de Fashion Wear (21 reclamos) y Fashion Shoes (5) mostraban CERO.
 
 ## De dónde vienen los datos
 
@@ -2269,7 +2290,11 @@ Y comparte con el CXC el vocabulario de tramos (`src/lib/cxc-aging.ts`).
   `CXP_VIGILANCIA_TITLES` / `CXP_VENCIDO_TITLES` de `/api/dashboard/vista-general`.
 - Cambiar la forma de `elements` deja sin «Último pago» a la lista y a la ficha (se recalcula al leer).
 - Renombrar `normProvName` o cambiar su normalización parte la identidad cross-empresa: el mismo
-  proveedor saldría dos veces con dos `key` distintas, y los «Reclamos vinculados» dejarían de cruzar.
+  proveedor saldría dos veces con dos `key` distintas. Los «Reclamos vinculados» sobreviven mientras
+  la ficha exista, porque cruzan por (empresa, código) y no por el nombre.
+- Cambiar el `codigo` que Switch le da a un proveedor **sí** deja los reclamos viejos huérfanos: la
+  identidad es ese código. `EMPRESAS_MAP` (`src/lib/reclamos/empresas.ts`) tiene los seis pares y hay
+  candado que exige que cada uno exista de verdad.
 
 ## Por qué está así
 

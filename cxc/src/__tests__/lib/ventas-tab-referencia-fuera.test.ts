@@ -31,6 +31,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "fs";
 import path from "path";
+import { REFERENCIA_ROLES } from "@/lib/ventas/referencia";
 
 const raiz = path.resolve(__dirname, "../../..");
 const src = path.join(raiz, "src");
@@ -138,10 +139,16 @@ describe("/referencia sigue siendo la pantalla viva", () => {
     }
   });
 
-  it("la ruta abre para admin, vendedor y bodega", () => {
+  it("la ruta abre para admin, vendedor y bodega — con la lista ÚNICA", () => {
+    // 4-sep-2026: la lista dejó de estar escrita en esta página. Vive en
+    // `REFERENCIA_ROLES` y la comparten los tres lugares (página, búsqueda y el
+    // botón «Actualizar datos de Switch»), porque tres copias a mano fue lo que
+    // dejó el POST del botón en solo-admin mientras la pantalla estaba abierta.
     const page = read(path.join(src, pageRel));
-    expect(page).toContain('const ROLES_REFERENCIA = ["admin", "vendedor", "bodega"]');
+    expect(page).toContain("REFERENCIA_ROLES");
+    expect(page).toContain("REFERENCIA_ROLES.includes(role)");
     expect(page).toContain("redirect(\"/home\")");
+    expect([...REFERENCIA_ROLES]).toEqual(["admin", "vendedor", "bodega"]);
   });
 
   it("la pantalla REUSA ReferenciaView (no una copia)", () => {

@@ -75,9 +75,7 @@ function montar(syncIso: string, vieja: boolean) {
     const u = String(url);
     const cuerpo = u.startsWith("/api/sync-status")
       ? respuestaSyncStatus(syncIso, vieja)
-      : u.startsWith("/api/cxc/favorites")
-        ? { favorites: [] }
-        : CARTERA_BOSTON_RESPUESTA;
+      : CARTERA_BOSTON_RESPUESTA;
     return { ok: true, status: 200, json: async () => cuerpo } as unknown as Response;
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -170,9 +168,7 @@ describe("el aviso es un EXTRA: nunca se lleva puesta la cartera", () => {
       const u = String(url);
       const cuerpo = u.startsWith("/api/sync-status")
         ? { ok: true, tabla: "estadocuenta", last_global: CONGELADA_ISO, por_empresa: {} } // sin `stale`
-        : u.startsWith("/api/cxc/favorites")
-          ? { favorites: [] }
-          : CARTERA_BOSTON_RESPUESTA;
+        : CARTERA_BOSTON_RESPUESTA;
       return { ok: true, status: 200, json: async () => cuerpo } as unknown as Response;
     });
     vi.stubGlobal("fetch", fetchMock);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { fetchAllProveedorRows, buildFicha, normProvName } from "@/lib/proveedores";
+import { paresDelProveedor, reclamosDelProveedor } from "@/lib/reclamos/proveedor-vinculo";
 
 export const dynamic = "force-dynamic";
 
@@ -21,17 +22,29 @@ export async function GET(
       return NextResponse.json({ error: "Proveedor no encontrado" }, { status: 404 });
     }
 
-    // Reclamos vinculados: por nombre de proveedor normalizado (mismo criterio de
-    // identidad). reclamos.proveedor es texto libre; matcheamos por norma.
+    // ── RECLAMOS VINCULADOS ─────────────────────────────────────────────────
+    // 🔴 Se unen por el par (empresa, CÓDIGO del proveedor), nunca por el
+    // nombre. `reclamos.proveedor` es texto libre y Switch escribe otra grafía:
+    // medido el 4-sep-2026, 26 de los 34 reclamos vivos NO cruzaban por nombre
+    // («American Fashion Wear» contra «American Fashion Wear, SA») y las fichas
+    // de Fashion Wear y Fashion Shoes mostraban cero reclamos sin decir por qué.
+    // El par viaja junto porque el código NO es único entre empresas: `122` es
+    // American Fashion Wear en Fashion Wear y Latin Fitness Group en Active Shoes.
+    const pares = paresDelProveedor(
+      rows.filter((r) => normProvName(r.nombre) === key),
+    );
+
     const { data: recl, error: rErr } = await supabaseServer
       .from("reclamos")
-      .select("id,nro_reclamo,proveedor,empresa,marca,nro_factura,nro_orden_compra,fecha_reclamo,estado")
+      .select("id,nro_reclamo,proveedor,proveedor_codigo,empresa,marca,nro_factura,nro_orden_compra,fecha_reclamo,estado")
       .eq("deleted", false)
       .order("fecha_reclamo", { ascending: false });
+    // Si `proveedor_codigo` todavía no existe (la migración 20260922120000 no
+    // corrió), esta lectura falla y la ficha se dibuja SIN reclamos vinculados.
+    // El resto de la ficha —saldo, aging, empresas— no depende de esto.
     if (rErr) console.error(`[proveedores ficha] reclamos: ${rErr.message}`);
 
-    const reclamos = (recl ?? [])
-      .filter((r) => normProvName(r.proveedor) === key)
+    const reclamos = reclamosDelProveedor(recl ?? [], pares)
       .map((r) => ({
         id: r.id,
         nro_reclamo: r.nro_reclamo,

@@ -15,8 +15,6 @@ interface Props {
   isExpanded: boolean;
   onToggle: () => void;
   userRole: string;
-  isFavorite?: boolean;
-  onToggleFavorite?: () => void;
   onRowContextMenu?: (e: React.MouseEvent) => void;
   /** Menú "···" con acciones de contacto — visible en la fila (touch-friendly). */
   actionsMenu?: React.ReactNode;
@@ -27,7 +25,7 @@ interface Props {
   pagosBoton?: React.ReactNode;
 }
 
-export default function ClientRow({ client, isExpanded, onToggle, userRole, isFavorite, onToggleFavorite, onRowContextMenu, actionsMenu, pagosBoton }: Props) {
+export default function ClientRow({ client, isExpanded, onToggle, userRole, onRowContextMenu, actionsMenu, pagosBoton }: Props) {
   const risk = riskInfo(client.total, client.current, client.watch, client.overdue);
 
   return (
@@ -48,12 +46,10 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
           onContextMenu={onRowContextMenu}
         >
           <>
+            {/* 🩸 Acá vivía la estrella ⭐ de favorito. Se fue el 4-sep-2026:
+                `cxc_favorites` nunca tuvo una fila, y su endpoint le contestaba
+                403 al vendedor que sí ve el CXC. Daniel: *«quita favoritos»*. */}
             <div className="col-span-4 font-medium truncate flex items-center gap-1.5">
-              {onToggleFavorite && (
-                <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none p-2.5 -m-2.5 hover:scale-110 transition-transform">
-                  {isFavorite ? <span className="text-amber-400">★</span> : <span className="text-gray-300 group-hover:text-gray-400">☆</span>}
-                </button>
-              )}
               <svg width="10" height="10" viewBox="0 0 10 10" className={`flex-shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="currentColor">
                 <path d="M3 1l5 4-5 4V1z"/>
               </svg>

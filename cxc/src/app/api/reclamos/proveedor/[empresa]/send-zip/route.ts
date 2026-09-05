@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { Resend } from "resend";
-import { buildBulkReclamosExcel, fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/excel-bulk";
+import { buildBulkReclamosExcel, type ReclamoFull } from "@/lib/reclamos/excel-bulk";
+import { fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/fetch-empresa";
 import { reclamoTaxes } from "@/lib/reclamos/tax";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       return NextResponse.json({ error: "Falta el asunto." }, { status: 400 });
     }
 
-    const reclamos = await fetchReclamosForEmpresa(empresa, { reclamo_ids: body.reclamo_ids });
+    const reclamos = await fetchReclamosForEmpresa<ReclamoFull>(empresa, { reclamo_ids: body.reclamo_ids });
     if (!reclamos.length) {
       return NextResponse.json({ error: "No hay reclamos para enviar." }, { status: 404 });
     }

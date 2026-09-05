@@ -66,9 +66,17 @@ describe("CXC mobile — el ancho sale de la derecha, no de la letra", () => {
     expect(overflow).toContain("min-h-[44px] min-w-[44px]");
   });
 
-  it("la estrella de favorito NO se tocó (sigue 44x44 con -ml-3)", () => {
-    const i = panelCxc.indexOf('aria-label={isFavorite ? "Quitar favorito"');
-    expect(panelCxc.slice(i, i + 400)).toContain("-my-3 -ml-3 flex h-11 w-11");
+  it("🔴 la estrella de favorito ya no está, y el nombre se quedó con sus 44px", () => {
+    // Cambió de dirección el 4-sep-2026: los favoritos ⭐ se retiraron del CXC
+    // (Daniel: «quita favoritos»; `cxc_favorites` tuvo 0 filas en su historia).
+    // Este test medía que la estrella conservara su área de tap; hoy mide que
+    // no vuelva — devolverla le come 44px al nombre, que es justo lo que este
+    // archivo existe para proteger.
+    expect(panelCxc).not.toContain("Quitar favorito");
+    expect(panelCxc).not.toContain("isFavorite");
+    expect(panelCxc).not.toContain("★");
+    // CONTROL: la cabecera de la card sigue ahí, con su nombre.
+    expect(cabeceraCxc()).toContain("{client.nombre_normalized}");
   });
 
   it("el nombre gana con tracking-tight, no bajando de 12px", () => {

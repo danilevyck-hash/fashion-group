@@ -24,6 +24,10 @@ import type {
 } from "./types";
 import { parseAmount, parseSwitchFecha, parseFechaDMY } from "./parse";
 import { supabaseServer } from "../supabase-server";
+import {
+  escribirDirectorioDeClientes,
+  traerListaDeClientes,
+} from "./clientes-directorio";
 import { clearStaleRunning } from "./sync-log";
 import { particionarFilas, campoSkip } from "./monto-guard";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
@@ -59,8 +63,6 @@ export interface SkipDetail {
 const PAGE_SIZE = 50;
 const UPSERT_BATCH = 100;
 const MAX_PAGES = 1000;
-const CLIENTES_PAGE = 200;
-const MAX_CLIENTES_PAGES = 2000;
 
 /**
  * Cuántos `/apiestadocuenta` (uno por cliente) se piden a la vez.
@@ -676,88 +678,6 @@ function mapEstadoCuentaElement(
   };
 }
 
-/**
- * Persiste el directorio completo de clientes (de /apicliente/lista) en
- * switch_clientes. Es el PUENTE id→codigo que usan las vistas de clientes para
- * mapear switch_facturas.(empresa_key, cliente_switch_id) → codigo D-XXX →
- * clientes_master. Incluye clientes de contado que NO aparecen en
- * switch_estadocuenta (ver migration 20260601000000_switch_clientes.sql).
- *
- * Upsert atómico por (empresa_key, cliente_switch_id). No BORRA nunca: el
- * directorio es acumulativo (un cliente que deja de listarse mantiene su mapeo
- * histórico para no romper facturas viejas que lo referencien).
- *
- * MARCA de ausentes (audit jul-2026): los clientes borrados en Switch (ej.
- * vistana id193 D-135, active_shoes id180 D-30) quedaban indistinguibles de los
- * vivos. Con la columna `activo` (DDL 20260723110000, correr manual) el sync
- * marca activo=false + ausente_desde a los que ya no vienen en /apicliente/lista
- * y revive (activo=true) a los que reaparecen. Tolerante: si la columna aún no
- * existe, solo loguea un warning — el upsert del directorio no se ve afectado.
- * Guard: solo marca con lista completa (paginación cubierta) y no-vacía.
- */
-async function marcarClientesAusentes(
-  empresaKey: string,
-  presentIds: number[],
-  runStamp: string,
-): Promise<void> {
-  const idsCsv = `(${presentIds.join(",")})`;
-  const { error: offErr } = await supabaseServer
-    .from("switch_clientes")
-    .update({ activo: false, ausente_desde: runStamp })
-    .eq("empresa_key", empresaKey)
-    .eq("activo", true)
-    .not("cliente_switch_id", "in", idsCsv);
-  if (offErr) {
-    // Columna `activo` ausente (DDL 20260723110000 pendiente) u otro fallo: no
-    // rompe el sync — el directorio ya quedó upserted.
-    console.error(`[sync ${empresaKey} cxc] WARNING marcarClientesAusentes (¿DDL activo pendiente?): ${offErr.message}`);
-    return;
-  }
-  const { error: onErr } = await supabaseServer
-    .from("switch_clientes")
-    .update({ activo: true, ausente_desde: null })
-    .eq("empresa_key", empresaKey)
-    .eq("activo", false)
-    .in("cliente_switch_id", presentIds);
-  if (onErr) {
-    console.error(`[sync ${empresaKey} cxc] WARNING revivir clientes presentes: ${onErr.message}`);
-  }
-}
-
-async function persistClientesDirectorio(
-  empresaKey: string,
-  clientes: SwitchCliente[],
-  runStamp: string,
-): Promise<number> {
-  // Dedupe within-batch por id (último gana) y descartar sin id numérico.
-  const byId = new Map<number, SwitchCliente>();
-  for (const c of clientes) {
-    if (typeof c.id === "number") byId.set(c.id, c);
-  }
-  if (byId.size === 0) return 0;
-
-  const payload = Array.from(byId.values()).map((c) => ({
-    empresa_key: empresaKey,
-    cliente_switch_id: c.id,
-    codigo: c.codigo ?? null,
-    nombre: c.nombre ?? null,
-    razonsocial: c.razonsocial ?? null,
-    email: c.email ?? null,
-    telefono: c.telefono ?? null,
-    celular: c.celular ?? null,
-    identificacion: c.identificacion ?? null,
-    raw_data: c,
-    synced_at: runStamp,
-    updated_at: runStamp,
-  }));
-
-  const { error } = await supabaseServer
-    .from("switch_clientes")
-    .upsert(payload, { onConflict: "empresa_key,cliente_switch_id", ignoreDuplicates: false });
-  if (error) throw new Error(`UPSERT switch_clientes falló: ${error.message}`);
-  return payload.length;
-}
-
 async function persistEstadoCuentaBatch(
   empresaKey: string,
   rows: EstadoCuentaRow[],
@@ -831,43 +751,28 @@ export async function syncEmpresaEstadoCuenta(
     const umbralCxc = await calibrarUmbral("cxc", empresaKey);
     const rechazadasCxc: Array<ReturnType<typeof particionarFilas<EstadoCuentaRow>>["rechazadas"][number]> = [];
 
-    // 1) Traer todos los clientes de la empresa.
+    // 1) Traer todos los clientes de la empresa y escribir el directorio.
     //
-    // OJO con la paginación: /apicliente/lista NO respeta porPagina (Switch cap
-    // silencioso ~50 por página aunque pidamos 200). El sync anterior usaba
-    //   if (page * CLIENTES_PAGE >= total) break;
-    // y cortaba en la página 1 cuando page*200 >= total — dejaba afuera 60%+
-    // de los clientes en vistana (50 de 135). Ahora cortamos por:
-    //   a) accumulated >= total (clientes ya traídos cubren el total reportado), o
-    //   b) batch vacío (defensa contra loop infinito si total es 0/mentiroso).
-    // No confiamos en porPagina; trackeamos accumulated real.
-    const clientes: SwitchCliente[] = [];
-    let clientesTotalReportado = 0;
-    for (let page = 1; page <= MAX_CLIENTES_PAGES; page++) {
-      const resp = await client.listClientes({ porPagina: CLIENTES_PAGE, paginaActual: page });
-      const batch = resp.clientes ?? [];
-      if (batch.length === 0) break;
-      clientes.push(...batch);
-      const totalPagina = Number(resp.paginacion?.total ?? 0);
-      if (page === 1) clientesTotalReportado = totalPagina;
-      if (totalPagina > 0 && clientes.length >= totalPagina) break;
-    }
-    const cobertura = clientesTotalReportado > 0
-      ? `${clientes.length}/${clientesTotalReportado} (${Math.round((clientes.length / clientesTotalReportado) * 100)}%)`
-      : `${clientes.length} (total no reportado)`;
-    console.error(`[sync ${empresaKey} cxc] ${cobertura} clientes a consultar`);
+    // El camino vive en `clientes-directorio.ts`: un solo escritor de
+    // `switch_clientes`, compartido con el cron semanal de Boston (que no puede
+    // usar este sync porque su estado de cuenta por API no cabe en la función).
+    // Ahí están la trampa de la paginación de `/apicliente/lista` y la guarda de
+    // «lista completa» antes de marcar ausentes.
+    const lista = await traerListaDeClientes(client);
+    const clientes = lista.clientes;
+    console.error(`[sync ${empresaKey} cxc] ${lista.cobertura} clientes a consultar`);
 
     // Warning explícito si el sync no cubrió todos los clientes que el API dice
     // que existen — se persiste también en switch_sync_log vía skipDetails para
     // que sea visible (no silencioso).
-    if (clientesTotalReportado > 0 && clientes.length < clientesTotalReportado) {
-      const faltantes = clientesTotalReportado - clientes.length;
+    if (!lista.completa) {
+      const faltantes = lista.totalReportado - clientes.length;
       console.warn(`[sync ${empresaKey} cxc] WARNING: faltaron ${faltantes} clientes del API (paginación incompleta)`);
       skipDetails.push({
         facturaId: null,
         secuencial: null,
         campo: "listClientes_paginacion_incompleta",
-        valorCrudo: { total_reportado: clientesTotalReportado, traidos: clientes.length, faltantes },
+        valorCrudo: { total_reportado: lista.totalReportado, traidos: clientes.length, faltantes },
       });
     }
 
@@ -876,15 +781,8 @@ export async function syncEmpresaEstadoCuenta(
     //     completa en memoria; incluye clientes de contado ausentes de
     //     switch_estadocuenta. Falla del directorio NO aborta el sync de CXC.
     try {
-      const dirCount = await persistClientesDirectorio(empresaKey, clientes, runStamp);
-      console.error(`[sync ${empresaKey} cxc] switch_clientes: ${dirCount} clientes upserted (puente id→codigo)`);
-      // Marca de ausentes (activo=false) SOLO si la lista vino completa: con
-      // paginación incompleta marcaríamos como ausentes a clientes vivos.
-      const presentIds = clientes.filter((c) => typeof c.id === "number").map((c) => c.id);
-      const listaCompleta = clientesTotalReportado === 0 || clientes.length >= clientesTotalReportado;
-      if (listaCompleta && presentIds.length > 0) {
-        await marcarClientesAusentes(empresaKey, presentIds, runStamp);
-      }
+      const dir = await escribirDirectorioDeClientes(empresaKey, lista, runStamp);
+      console.error(`[sync ${empresaKey} cxc] switch_clientes: ${dir.escritos} clientes upserted (puente id→codigo)`);
     } catch (err) {
       console.error(`[sync ${empresaKey} cxc] WARNING persistClientesDirectorio: ${err instanceof Error ? err.message : String(err)}`);
       skipDetails.push({ facturaId: null, secuencial: null, campo: "persistClientesDirectorio", valorCrudo: err instanceof Error ? err.message : String(err) });

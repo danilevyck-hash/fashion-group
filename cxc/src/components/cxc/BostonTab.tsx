@@ -13,10 +13,9 @@
 // ese tramo. Los tramos de Boston (d0_90 / d91_120 / d121_plus) se mapean a los
 // nombres del módulo (current / watch / overdue) — son los MISMOS cortes.
 
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import useSWR from "swr";
 import { fmt } from "@/lib/format";
-import { CARTERA_BOSTON } from "@/lib/cxc/cartera";
 import { AGING } from "@/lib/cxc-aging";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncStatus from "@/components/shared/SyncStatus";
@@ -97,29 +96,11 @@ const fetcher = (u: string) => fetch(u, { cache: "no-store" }).then((r) => {
   return r.json();
 });
 
-/**
- * Las estrellas son un extra: si la lectura falla —incluido el 503 de
- * "todavía no está habilitado", mientras el DDL de `cartera` no haya
- * corrido— la pestaña se dibuja completa y sin estrellas, en vez de no
- * dibujarse. La PLATA nunca depende de esta lectura.
- */
-const fetcherFavoritos = (u: string) =>
-  fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : { favorites: [] }));
-
-/** La estrella, idéntica a la del panel del grupo (`ClientRow.tsx`). */
-function Estrella({ marcada, onToggle, nombre }: { marcada: boolean; onToggle: () => void; nombre: string }) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      aria-pressed={marcada}
-      aria-label={marcada ? `Quitar ${nombre} de favoritos` : `Marcar ${nombre} como favorito`}
-      className="shrink-0 text-sm leading-none p-2.5 -m-2.5"
-    >
-      {marcada ? <span className="text-amber-400">★</span> : <span className="text-gray-300">☆</span>}
-    </button>
-  );
-}
+// 🩸 Acá vivían la estrella ⭐ de Boston, su lector tolerante y el aviso «No se
+// pudo guardar la estrella». Se fueron el 4-sep-2026 con los favoritos del CXC
+// entero — Daniel: *«quita favoritos»*; `cxc_favorites` nunca tuvo una fila. La
+// separación por CARTERA que las hacía distintas de las del grupo sigue viva en
+// las notas y en la bitácora de contacto, que sí se usan.
 
 function fechaCorta(iso: string | null) {
   if (!iso) return null;
@@ -147,46 +128,6 @@ export default function BostonTab() {
     revalidateOnFocus: false,
   });
 
-  // ── Favoritos DE BOSTON ────────────────────────────────────────────────────
-  // 🔴 La cartera viaja SIEMPRE, en la lectura y en la escritura. Sin ella,
-  // `cxc_favorites` se ata solo a `nombre_normalized` y la estrella que se pone
-  // acá aparecería también en el panel del grupo — hay 6 nombres que existen en
-  // las dos carteras (CITY MALL PASO CANOA entre ellos). Daniel: *"es la misma
-  // persona, pero no lo quiero ver en fashion group porque no tiene el mismo
-  // codigo"*, y eligió SEPARAR: cada cartera con sus propias notas y estrellas.
-  const { data: favData, mutate: mutarFavoritos } = useSWR<{ favorites: string[] }>(
-    `/api/cxc/favorites?cartera=${CARTERA_BOSTON}`,
-    fetcherFavoritos,
-    { revalidateOnFocus: false },
-  );
-  const favoritos = useMemo(() => new Set(favData?.favorites ?? []), [favData]);
-
-  const [avisoFavorito, setAvisoFavorito] = useState<string | null>(null);
-
-  const alternarFavorito = useCallback(
-    async (nombre: string) => {
-      const optimista = new Set(favoritos);
-      if (optimista.has(nombre)) optimista.delete(nombre);
-      else optimista.add(nombre);
-      // `revalidate: false` mientras el POST viaja; al volver se revalida contra
-      // el servidor, así que un fallo NO deja la estrella mintiendo.
-      mutarFavoritos({ favorites: [...optimista] }, { revalidate: false });
-      try {
-        const r = await fetch("/api/cxc/favorites", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientName: nombre, cartera: CARTERA_BOSTON }),
-        });
-        if (!r.ok) throw new Error(String(r.status));
-      } catch {
-        setAvisoFavorito("No se pudo guardar la estrella. Intenta de nuevo.");
-        setTimeout(() => setAvisoFavorito(null), 4000);
-      } finally {
-        mutarFavoritos();
-      }
-    },
-    [favoritos, mutarFavoritos],
-  );
   const [search, setSearch] = useState("");
   // Qué cliente tiene abierto su bloque «Últimos pagos» (por código). Uno a la
   // vez: es un detalle que se mira y se cierra, no una segunda tabla.
@@ -203,13 +144,8 @@ export default function BostonTab() {
     return todos
       .filter((c) => (riskFilter === "all" ? true : pasaFiltroRiesgo(ordenable(c), riskFilter)))
       .filter((c) => (q ? c.nombre.toLowerCase().includes(q) || c.codigo.toLowerCase().includes(q) : true))
-      .sort((a, b) =>
-        compararClientes(ordenable(a), ordenable(b), {
-          orden,
-          esFavorito: (n) => favoritos.has(n),
-        }),
-      );
-  }, [data, search, riskFilter, orden, favoritos]);
+      .sort((a, b) => compararClientes(ordenable(a), ordenable(b), { orden }));
+  }, [data, search, riskFilter, orden]);
 
   const t = data?.totales;
   const pills = [
@@ -295,8 +231,6 @@ export default function BostonTab() {
         })}
       </div>
 
-      {avisoFavorito && <p className="text-sm text-red-600 mb-2">{avisoFavorito}</p>}
-
       <p className="text-sm text-gray-500 mb-3">
         {isLoading ? "Cargando..." : `${filtrados.length} ${filtrados.length === 1 ? "cliente" : "clientes"}`}
       </p>
@@ -324,11 +258,6 @@ export default function BostonTab() {
             <div className="flex-1 min-w-0 p-3">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="flex items-center gap-1.5 min-w-0">
-                  <Estrella
-                    marcada={favoritos.has(c.nombre_normalized)}
-                    onToggle={() => alternarFavorito(c.nombre_normalized)}
-                    nombre={c.nombre}
-                  />
                   <span className="font-medium text-gray-900 truncate">{c.nombre}</span>
                 </span>
                 <span className="font-semibold tabular-nums shrink-0">${fmt(c.total)}</span>
@@ -387,11 +316,6 @@ export default function BostonTab() {
                 <td className="px-4 py-3">
                   <span className="flex items-center gap-2">
                     <span className={`w-1 h-8 rounded-full shrink-0 ${colorFila(c)}`} aria-hidden />
-                    <Estrella
-                      marcada={favoritos.has(c.nombre_normalized)}
-                      onToggle={() => alternarFavorito(c.nombre_normalized)}
-                      nombre={c.nombre}
-                    />
                     <span className="text-gray-900">{c.nombre}</span>
                     {c.tambien_en_grupo && (
                       <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-600 whitespace-nowrap">

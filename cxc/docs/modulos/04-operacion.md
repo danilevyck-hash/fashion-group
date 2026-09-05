@@ -1188,8 +1188,9 @@ desde la URL (`ReclamosClient.tsx`).
 - Encabezado con **«Nuevo Reclamo»**.
 - Tres tarjetas KPI: **Total Pendiente · Abiertos · Alertas +45 días**.
 - Buscador global de texto libre (N° de factura, N° de reclamo, código de ítem o empresa).
-- Grilla de **5 tarjetas de empresa**: Vistana International · Fashion Wear · Fashion Shoes ·
-  Active Shoes · Active Wear (`EMPRESAS_MAP`, `src/app/reclamos/components/constants.ts`). Cada una
+- Grilla de **6 tarjetas de empresa**: Vistana International · Fashion Wear · Fashion Shoes ·
+  Active Shoes · Active Wear · **Joystep** (`EMPRESAS_MAP`, ahora en `src/lib/reclamos/empresas.ts`
+  y re-exportado desde `components/constants.ts` — lo lee también el servidor). Cada una
   con: el contacto, badge **«Alerta»** si algo pasó los 45 días, reclamos abiertos, monto pendiente,
   botones **↓ Excel** y **↓ PDF**, y un **«Historial»** desplegable con los últimos 5.
 
@@ -1212,7 +1213,7 @@ Formulario **progresivo**: se revela paso a paso con un indicador de puntos, y h
 | Paso | Campos | Obligatorio |
 |---|---|---|
 | 1 | **Factura (PDF) — autocompletar** | No. Sube el PDF y la IA rellena la cabecera |
-| 2 | **Empresa** \* | **Sí** — una de las 5; muestra proveedor y marca derivados |
+| 2 | **Empresa** \* | **Sí** — una de las 6; muestra proveedor y marca derivados |
 | 3 | **N° Factura** \* · **Fecha** \* · **N° Pedido** \* | Sí — ⚠️ **el N° Pedido NO aparece para Active Shoes** |
 | 4 | **Ítems**: Código \* · Descripción \* · Talla \* · Género \* · Cant. \* · Precio U. \* · Motivo \* · Subtotal (calculado) | Sí, **al menos un ítem**. Género = Hombre/Mujer/Niños/Accesorios en pantalla, se **guarda en inglés** |
 | — | Al pie: Subtotal / Importación / ITBMS (si aplica) / **Total** | Calculado |
@@ -1287,6 +1288,7 @@ existe en el código y nadie lo usa: todo salta directo de Creado a Pagado.
 | `factura_pdf_path` | **4/34 (12%)** | La mayoría **no** usa el autocompletado por IA |
 | `comprobante_url` / `comprobante_path` | 5/34 | Solo los Pagados |
 | `comprobante_nota` | 🔴 **0/34** | Campo opcional que **se ofrece en pantalla** (`ComprobanteModal`, `SettlementModal`) y **nadie ha escrito jamás** |
+| `proveedor_codigo` | **34/34** tras la migración `20260922120000` (pendiente de aplicar) | 🔴 **La identidad del proveedor.** El par (`empresa`, `proveedor_codigo`) es lo que cruza con `switch_proveedor_estadocuenta`. NULL = el reclamo no se vincula a ningún proveedor |
 
 **`estado`** (vivas): Creado 29 · Pagado 5.
 **`empresa`** (vivas): Fashion Wear 21 · Vistana International 7 · Fashion Shoes 5 · Active Shoes 1 ·
@@ -1333,8 +1335,9 @@ de estado desde que se crearon.
 (comentario de la migración `20260610120000_reclamo_settlements.sql`: *«id interno Switch si se
 linkea»*) reservada para un enlace con Switch que **nunca se construyó**.
 
-### `reclamo_contactos` — Grano: 1 fila por empresa (la libreta del proveedor). **5 filas**, una por
-cada empresa de `EMPRESAS_MAP`, todas `activo=true`, todas creadas el mismo instante (25-mar-2026).
+### `reclamo_contactos` — Grano: 1 fila por empresa (la libreta del proveedor). **5 filas**, todas
+`activo=true`, todas creadas el mismo instante (25-mar-2026). ⚠️ Desde el 4-sep-2026 `EMPRESAS_MAP`
+tiene **6** empresas: **Joystep no tiene contacto todavía** y su tarjeta se dibuja sin él.
 Sin soft delete: se apaga con `activo`.
 🔴 `whatsapp`: se captura en la columna pero **nunca se lee ni se muestra** en ninguna pantalla — el
 propio comentario del código lo dice (`contactos/route.ts`).
@@ -1405,6 +1408,22 @@ huérfano en el bucket.
 11. **`reclamo_contactos.nombre_contacto` es obligatorio y se valida explícitamente** (antes daba un
     500 genérico). La columna `nombre` no existe y se retiró del allow-list. Candado:
     `src/__tests__/lib/campos-obligatorios.test.ts`.
+12. 🔴 **El proveedor de un reclamo se identifica por el par (empresa, CÓDIGO), nunca por el nombre**
+    (4-sep-2026). El código **no es único entre empresas**: `122` es «American Fashion Wear, SA» en
+    Fashion Wear y «LATIN FITNESS GROUP» en Active Shoes; `112` es Tommy en Fashion Shoes y Joybees
+    en Joystep. El par viaja siempre junto. El nombre se conserva **solo para imprimirlo** (PDF,
+    Excel, correo). Fuente única: `EMPRESAS_MAP` en `src/lib/reclamos/empresas.ts`, con las **6**
+    empresas y su código; el servidor lo escribe al crear y lo rehace al cambiar de empresa.
+    🩸 Medido antes del fix: **26 de los 34 reclamos vivos ya no cruzaban** por nombre, y las fichas
+    de Fashion Wear (21) y Fashion Shoes (5) mostraban CERO reclamos sin decir por qué. Candados:
+    `reclamos-proveedor-por-codigo.test.ts` (incluye barrido estático que prohíbe
+    `LIKE/ILIKE/similarity/levenshtein/soundex/regexp` en el SQL de la migración) ·
+    `reclamos-estado-pagado-unico.test.ts` · `reclamos-fetch-empresa-una-sola.test.ts`.
+    **28 mutaciones, 28 cazadas** (`scripts/_mutar-candados-reclamos-proveedor-codigo.sh`).
+13. **Una sola `fetchReclamosForEmpresa`** (`src/lib/reclamos/fetch-empresa.ts`), y **filtra los
+    borrados**. 🩸 Había dos con el mismo nombre: la del PDF filtraba `deleted = false` y la del
+    Excel no — un reclamo borrado no salía en el PDF pero **sí en el Excel que se le manda al
+    proveedor**.
 
 ## Con qué conecta
 
@@ -1416,7 +1435,7 @@ lee el directorio. Su única dependencia externa es Claude para leer la factura.
 
 | Quién | Qué lee | Archivo |
 |---|---|---|
-| 🔴 **Proveedores** (`/proveedores/[key]`) | Los **«reclamos vinculados»** de un proveedor: lee **toda** la tabla `reclamos` (vivas) y filtra **en JavaScript** por `normProvName(reclamos.proveedor) === key` | `src/app/api/proveedores/[key]/route.ts` |
+| **Proveedores** (`/proveedores/[key]`) | Los **«reclamos vinculados»** de un proveedor: lee `reclamos` (vivas) y cruza por el **par (empresa, código)** contra las filas de `switch_proveedor_estadocuenta` de esa ficha (`paresDelProveedor` / `reclamosDelProveedor`, `src/lib/reclamos/proveedor-vinculo.ts`) | `src/app/api/proveedores/[key]/route.ts` |
 | **Búsqueda global** | Por `nro_reclamo` / `nro_factura`, solo para admin y secretaria | `src/app/api/search/route.ts` |
 | **Badge de notificaciones** 🔔 | Reclamos «viejos»: `estado NOT IN ('Aplicado','Rechazado','Aplicada','Pagado')` y `fecha_reclamo` > 45 días | `src/app/api/notification-badges/route.ts` |
 | **Home / Vista General** | `reclamosPendientes` / `reclamosViejos`, vía la RPC `home_dashboard_summary` | migración `20260812190000_home_lastupload_solo_grupo.sql` |
@@ -1429,13 +1448,18 @@ lo menciona** (`src/lib/alertas/*.ts` → vacío). No hay escalamiento automáti
 sugerencia visual dentro del detalle. El único correo saliente lo dispara una persona a mano.
 
 ### Qué se rompería si cambiara la forma de sus datos
-- 🔴 **Cambiar un nombre de `EMPRESAS_MAP`** (empresa / proveedor / marca) **rompe en silencio la
-  ficha de Proveedores** — la unión es por nombre normalizado, en JS, **sin ningún candado que lo
-  garantice**. También rompe la numeración por iniciales (`src/lib/empresa-mapping.ts`).
+- ✅ **Cambiar un nombre de `EMPRESAS_MAP`** (empresa / proveedor / marca) **ya NO rompe la ficha de
+  Proveedores** (4-sep-2026): la unión es por el par **(empresa, código)** y el nombre solo se
+  imprime. Sí sigue mandando en la numeración por iniciales (`src/lib/empresa-mapping.ts`).
+- 🔴 **Cambiar un `proveedor_codigo` o un `empresa_key` de `EMPRESAS_MAP`** sí rompe la ficha: es la
+  identidad. El candado exige que cada par exista de verdad en Switch.
+- 🔴 **Un reclamo sin `proveedor_codigo` no aparece en ninguna ficha de proveedor.** Es a propósito:
+  antes que atarlo por el nombre a quien quizás no es, no aparece.
 - **Cambiar el CHECK de `genero`** sin tocar `GENEROS` lo caza el candado.
-- 🔴 **Cambiar el literal `"Pagado"`** rompe **cuatro cosas a la vez**: `esPendiente()`, el badge de
-  notificaciones, el RPC del home y la condición que exige comprobante — **son cuatro lugares con el
-  mismo literal, sin una constante compartida entre el SQL y el TypeScript**.
+- ✅ **Cambiar el literal `"Pagado"`** ya no rompe cuatro cosas en silencio: los cuatro lugares
+  (`esPendiente()`, el badge de notificaciones, el flip que exige comprobante y la máquina de
+  estados del PATCH — más Vista General) usan `ESTADO_PAGADO`, y un candado compara byte a byte
+  contra el `'Pagado'` del RPC del home, que es SQL y no puede importar la constante.
 
 ## Por qué está así
 

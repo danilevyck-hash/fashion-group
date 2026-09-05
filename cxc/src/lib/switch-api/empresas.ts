@@ -199,6 +199,22 @@ export function empresasConEstadoCuenta(): EmpresaKey[] {
  * que mataba 4 corridas por día. El sync manual y el backfill la siguen
  * aceptando.
  *
+ * 🩸 **EL DAÑO COLATERAL QUE NADIE VIO EN 37 DÍAS (5-sep-2026).** Sacar a Boston
+ * de este cron no solo dejó su cartera afuera: el sync de estado de cuenta era
+ * también el ÚNICO escritor del DIRECTORIO de clientes (`switch_clientes`), que
+ * viajaba adentro. La cartera se rescató el 30-jul por el reporte web; el
+ * directorio se quedó atrás en silencio. Medido: las 4.915 filas de Boston en
+ * `switch_clientes` tenían todas el mismo `synced_at` —**2026-07-30
+ * 06:31:07**—, que es el `runStamp` de la última corrida de este cron que
+ * alcanzó a escribirlo antes de morir en el recorrido por cliente. El día que
+ * Boston salió de acá es el día exacto en que su directorio se congeló.
+ *
+ * ✅ Resuelto por `/api/cron/sync-clientes-boston` (SEMANAL, domingos 07:10 UTC):
+ * pide solo `/apicliente/lista` —99 páginas, no 4.912 llamadas— y escribe el
+ * directorio con el MISMO código (`clientes-directorio.ts`, un solo escritor).
+ * Y ahora sí se vigila: la alerta B de `silencio-de-datos.ts` mira
+ * `switch_clientes` de Boston con umbral semanal.
+ *
  * **El problema del reconcile que hacía imposible partirlo en tandas** —el
  * `saldo = 0` a TODA la empresa por `synced_at < runStamp`, que hacía que cada
  * tanda borrara lo que cargó la anterior— **desaparece por construcción** con el

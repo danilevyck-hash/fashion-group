@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import { readFileSync, readdirSync, statSync } from "fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { signSession } from "@/lib/session-cookie";
@@ -134,7 +134,10 @@ import { GET as packingLists } from "@/app/api/packing-lists/route";
 import { GET as directorio } from "@/app/api/directorio/route";
 import { GET as multifashionOverview } from "@/app/api/multifashion/overview/route";
 import { GET as prestamosEmpleados } from "@/app/api/prestamos/empleados/route";
-import { GET as cxcFavoritos } from "@/app/api/cxc/favorites/route";
+import { respuestaSiCarteraAjena } from "@/lib/cxc/cartera-http";
+import { CARTERA_BOSTON, CARTERA_GRUPO } from "@/lib/cxc/cartera";
+import { GET as cxcOverrides } from "@/app/api/cxc/overrides/route";
+import { GET as cxcContactLog } from "@/app/api/cxc/contact-log/route";
 
 const SECRET_PREV = process.env.SESSION_SECRET;
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-boston-acceso"; });
@@ -487,21 +490,52 @@ describe("gerente_boston — su módulo SÍ le abre", () => {
 // 6. 🔴 Las anotaciones del CXC: David solo escribe en SU cartera
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("gerente_boston — favoritos solo de la cartera de Boston", () => {
-  it("cartera=boston: entra", async () => {
-    const res = await cxcFavoritos(req("/api/cxc/favorites?cartera=boston", ROL));
-    expect(res.status).not.toBe(403);
-  });
+// 🩸 CAMBIÓ DE DIRECCIÓN (4-sep-2026). Este bloque medía los favoritos ⭐:
+// `cartera=boston` entraba y `cartera=grupo` daba 403. Los favoritos se
+// retiraron del CXC entero (Daniel: *«quita favoritos»*; `cxc_favorites` tuvo 0
+// filas en toda su historia) y con ellos se fue `/api/cxc/favorites`, que era la
+// ÚNICA ruta de anotación que David alcanzaba. Hoy la regla es más simple y más
+// fuerte: **David no escribe ninguna anotación del CXC**, ni en su cartera ni en
+// la del grupo, porque las dos que quedan son de `CXC_ROLES` y él no está.
+describe("gerente_boston — ninguna anotación del CXC, en ninguna cartera", () => {
+  const RUTAS: [string, (r: NextRequest) => Promise<Response>][] = [
+    ["/api/cxc/overrides", cxcOverrides],
+    ["/api/cxc/contact-log", cxcContactLog],
+  ];
 
-  it("🔴 cartera=grupo: 403", async () => {
-    const res = await cxcFavoritos(req("/api/cxc/favorites?cartera=grupo", ROL));
-    expect(res.status).toBe(403);
-  });
-
-  it("y admin sí puede en las dos (el 403 de arriba es del rol, no de la ruta)", async () => {
+  it.each(RUTAS)("%s le contesta 403 en las DOS carteras", async (ruta, handler) => {
     for (const cartera of ["boston", "grupo"]) {
-      const res = await cxcFavoritos(req(`/api/cxc/favorites?cartera=${cartera}`, "admin"));
-      expect(res.status, `admin rebotado en ${cartera}`).not.toBe(403);
+      const res = await handler(req(`${ruta}?cartera=${cartera}`, ROL));
+      expect(res.status, `${ruta}?cartera=${cartera}`).toBe(403);
+    }
+  });
+
+  it("CONTROL: admin sí entra (el 403 es del rol, no de la ruta)", async () => {
+    for (const [ruta, handler] of RUTAS) {
+      const res = await handler(req(`${ruta}?cartera=grupo`, "admin"));
+      expect(res.status, `admin rebotado en ${ruta}`).not.toBe(403);
+    }
+  });
+
+  it("🔴 y la ruta de los favoritos ya no existe", () => {
+    expect(existsSync(path.join(process.cwd(), "src/app/api/cxc/favorites/route.ts"))).toBe(false);
+  });
+
+  // 🔴 EL TABIQUE SE QUEDA AUNQUE HOY NO LO CRUCE NADIE.
+  // `respuestaSiCarteraAjena` era el recorte de David en las rutas de
+  // anotación, y su último llamador se fue con la estrella. Se conserva para el
+  // día en que una ruta de anotación se abra a `ROLES_BOSTON` — y se mide acá
+  // por CONDUCTA, llamando a la función, para que quitarlo o volverlo total no
+  // pase en silencio.
+  it("el recorte por cartera sigue en pie: 403 en el grupo, paso libre en Boston", () => {
+    expect(respuestaSiCarteraAjena(ROL, CARTERA_BOSTON)).toBeNull();
+    expect(respuestaSiCarteraAjena(ROL, CARTERA_GRUPO)?.status).toBe(403);
+  });
+
+  it("CONTROL: a los demás roles el recorte no los toca (es del rol, no de la cartera)", () => {
+    for (const rol of ["admin", "secretaria", "vendedor"]) {
+      expect(respuestaSiCarteraAjena(rol, CARTERA_GRUPO), rol).toBeNull();
+      expect(respuestaSiCarteraAjena(rol, CARTERA_BOSTON), rol).toBeNull();
     }
   });
 });
