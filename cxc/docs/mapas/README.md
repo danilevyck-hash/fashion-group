@@ -21,8 +21,8 @@ cuestan hoy y cuántos podrían costar.
 | Multifashion | [multifashion.md](multifashion.md) | Dos «YTD» distintos en la misma pantalla ($3.364,19 de diferencia); la pantalla no comprueba el rol y 10 de 11 rutas dejan entrar a secretaria | pendiente |
 | Confecciones Boston | [boston.md](boston.md) | La regla está sana en las dos direcciones (0 filas suyas en la cartera del grupo, su venta sí suma); su directorio llevaba 38 días congelado | pendiente |
 | Proveedores | [proveedores.md](proveedores.md) | Confecciones Boston se parte en tres filas por la grafía, y una cuarta con su misma cédula se llama `FASHION WEAR, INC` con $76.165,72 | pendiente |
-| Catálogos | [catalogos.md](catalogos.md) | (pendiente de leer el mapa) | pendiente |
-| Referencia | [referencia.md](referencia.md) | (pendiente de leer el mapa) | pendiente |
+| Catálogos | [catalogos.md](catalogos.md) | El 76% de las corridas no escribe nada (174 de 230 sesiones de Switch escribieron CERO); $33.912,00 en 7 pedidos vivos nunca llegaron a Switch y nada lo dice | pendiente |
+| Referencia | [referencia.md](referencia.md) | «VENDIDO no pasa de 100%» vale solo para el 57%: sin ficha de catálogo la cuenta es otra y puede decir 207%, y alcanza a 11.698 códigos (43%) | pendiente |
 | Reclamos | [reclamos.md](reclamos.md) | 26 de 34 reclamos vivos no se pueden editar sin rellenar 134 campos; $12.218,27 llevan más de 45 días sin un segundo correo | pendiente |
 | Packing Lists | [packing-lists.md](packing-lists.md) | El módulo está vacío: el cron borró las 28 listas el 14-may sin copia, y lo usó una sola persona 7 veces en abril | pendiente |
 | Marketing | [marketing.md](marketing.md) | `bultos` está lleno en 0 de 111 renglones y ocupa 6 de los 13 casilleros; borrar una entrega es un DELETE de verdad y falta la entrega 23 | pendiente |

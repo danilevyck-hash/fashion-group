@@ -164,7 +164,7 @@ Medido, en las cuatro marcas, toda la historia:
 
 | Columna | Filas llenas |
 |---|---|
-| `vendor_name` | 62 de 70 |
+| `vendor_name` | 65 de 70 |
 | documento (pedido/cotización) | 52 de 70 |
 | `comment` | **0 de 70** |
 | `client_email` | **0 de 70** |
@@ -247,7 +247,7 @@ De los 56 pedidos vivos, **0 caen fuera de la ventana de 90 días** en las cuatr
 
 ### 🩸15 · Comprobantes no muestra quién armó el pedido
 
-Columnas de la tabla (`ComprobantesPanel.tsx:697-701`): **Origen · Cliente · Total · Fecha**. `vendor_name` — el dato que el postmortem pone primero en la lista de «lo que Switch no tiene» y el único de los cuatro que sí está lleno (62 de 70) — **no se muestra en ninguna columna**.
+Columnas de la tabla (`ComprobantesPanel.tsx:697-701`): **Origen · Cliente · Total · Fecha**. `vendor_name` — el dato que el postmortem pone primero en la lista de «lo que Switch no tiene» y el único de los cuatro que sí está lleno (65 de 70) — **no se muestra en ninguna columna**.
 
 ### 🩸16 · Tres pedidos que SÍ llegaron a Switch están borrados
 
@@ -338,7 +338,7 @@ Ninguno desborda la página. El más discutible es el `text-[9px]`, que es dato 
 
 | Agregaría (una línea, sin chips) | Por qué |
 |---|---|
-| En Comprobantes, la columna **«Armó»** | 62 de 70 pedidos lo tienen y hoy no se ve en ningún lado. |
+| En Comprobantes, la columna **«Armó»** | 65 de 70 pedidos lo tienen y hoy no se ve en ningún lado. |
 | En la fila de un borrador, **los días parados** | $33.912,00 llevan entre 17 y 64 días sin llegar a Switch y nada lo dice. |
 
 ---
@@ -400,7 +400,7 @@ Le falta el aviso «te faltaron piezas» (el cliente nunca lo ve, ni tú en el p
 - 2 de las 4 pasadas diarias de sincronización — 76% escriben cero.
 
 **Falta:**
-- Que la lista de Comprobantes diga **quién armó** el pedido (62 de 70 lo tienen guardado).
+- Que la lista de Comprobantes diga **quién armó** el pedido (65 de 70 lo tienen guardado).
 - Que un borrador diga **cuántos días lleva parado** ($33.912,00 entre 17 y 64 días).
 - Que Calvin tenga `stock_confirmacion` y `foto_manual`.
 - Que Reebok diga **«Niños»** con ñ.
