@@ -1,8 +1,20 @@
 "use client";
 
-// Vista "Por empresa" del tab Comisiones (B2B / mayoreo): una empresa a la vez.
-// El período (mes/año) lo controla el shell; aquí solo el selector de empresa,
-// que RECUERDA la última empresa usada (localStorage fg_last_comision_empresa).
+// La vista de UNA empresa del módulo Comisiones (B2B / mayoreo).
+//
+// 🩸 EL SELECTOR DE EMPRESA SE FUE AL SHELL (6-sep-2026). Vivía acá, DEBAJO de
+// una pestaña que ya decía «Por empresa»: dos controles para una sola pregunta.
+// Hoy hay UNO solo arriba —Fashion Group · las 6 · Multifashion— y esta vista
+// recibe la empresa por props. La memoria (`fg_last_comision_empresa`) es la
+// misma y la lleva el shell.
+//
+// 🩸 SE FUE LA LÍNEA «N vendedores sin actividad este mes» (6-sep-2026). Daniel:
+// es un renglón para decir que no hay nada que decir. Los inactivos siguen
+// saliendo del cálculo igual que antes: lo que se quitó es el aviso.
+//
+// 🔴 Y LOS QUE NO SE PAGAN (Oficina y Daniel Levy) VAN DETRÁS DE «Ver los que no
+// se pagan». Así las filas visibles suman EXACTAMENTE el «Total a pagar» del
+// pie, que es lo que antes no pasaba. Ver `lib/comisiones/sin-pago`.
 //
 // Regla (server, RPC comision_b2b_v8 vía lib/comisiones/rpc): base = facturas
 // con utilidad>20% − todas las NC, excluyendo intercompañía/clientes internos;
@@ -14,32 +26,27 @@
 // vendedores activos aunque base=$0; los sin actividad se colapsan al pie.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Coins } from "lucide-react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import type { ExcelApi } from "./ComisionesView";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
-import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
+import {
+  ROTULO_NO_SE_PAGA,
+  ROTULO_VER_MENOS,
+  rotuloVerNoSePagan,
+  sumarPagable,
+} from "@/lib/comisiones/sin-pago";
 import { sinRetirados } from "@/lib/comisiones/retirados";
-import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
+import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { ComisionesTarjetasPorEmpresa } from "./ComisionesTarjetas";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
-
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-
-// Las 6 empresas con CXC — joystep incluida desde el 14-ago-2026. La lista
-// vive en `lib/comisiones/empresas`, nunca se filtra acá.
-const EMPRESAS = EMPRESAS_COMISIONAN;
 
 interface ComisionVendedor {
   vendedor: string;
@@ -66,6 +73,10 @@ interface ComisionResp {
 }
 
 interface Props {
+  /** La empresa que eligió el ÚNICO selector del shell. */
+  empresa?: string;
+  /** Su nombre CORTO, para el detalle y el Excel (diccionario § 0). */
+  empresaNombre?: string;
   year: number;
   mes: number;
   /** El botón Excel vive en la barra del shell (ver ComisionesView): esta vista
@@ -75,17 +86,21 @@ interface Props {
   refreshKey?: number;
 }
 
-export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }: Props) {
-  // Filtro de empresa con memoria — hook centralizado useLastUsed (igual que
-  // CXC, Préstamos y Packing). Key fg_last_comision_empresa (misma de antes).
-  const [empresa, setEmpresa] = useLastUsed("comision_empresa", EMPRESAS[0]);
+export function ComisionesPorEmpresaView({
+  empresa = EMPRESAS_COMISIONAN[0],
+  empresaNombre,
+  year,
+  mes,
+  onExcel,
+  refreshKey = 0,
+}: Props) {
+  const nombreEmpresa = empresaNombre ?? nombreCortoEmpresa(empresa);
   const [data, setData] = useState<ComisionResp | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detalleVendedor, setDetalleVendedor] = useState<string | null>(null);
-
-  // useLastUsed ya persiste en localStorage al setear.
-  const handleEmpresa = (k: string) => setEmpresa(k);
+  // 🔴 Los que no se pagan, escondidos hasta que se los pida.
+  const [verNoSePagan, setVerNoSePagan] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -127,14 +142,18 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
 
   const isInactivo = (v: ComisionVendedor) =>
     (v.base ?? 0) === 0 && (v.base_cobro ?? 0) === 0 && (v.comision_total ?? 0) === 0;
-  const activos = vendedores.filter((v) => !isInactivo(v));
-  const inactivos = vendedores.filter(isInactivo);
+  // Sin actividad = no se dibuja. La línea «N vendedores sin actividad este mes»
+  // se retiró: era un renglón para decir que no hay nada que decir.
+  const conActividad = vendedores.filter((v) => !isInactivo(v));
+  const activos = conActividad.filter((v) => v.se_paga !== false);
+  const noSePagan = conActividad.filter((v) => v.se_paga === false);
+  const visibles = verNoSePagan ? [...activos, ...noSePagan] : activos;
 
   const handleExport = () => {
     if (vendedores.length === 0) return;
     void exportComisionesResumen({
       empresaKey: empresa,
-      empresaNombre: EMPRESA_KEY_TO_NAME[empresa] ?? empresa,
+      empresaNombre: nombreEmpresa,
       year,
       mes,
       vendedores,
@@ -151,22 +170,6 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
 
   return (
     <div className="space-y-2">
-      {/* Esta fila es SOLO del modo "Por empresa" (el Excel subió a la barra del
-          shell): el selector de empresa y nada más. El botón «Configurar» que
-          vivía a la derecha SE FUE (Daniel, 3-sep-2026: «configuración en dos
-          lados»): la única entrada a la configuración es el chip de arriba. */}
-      <div className="flex items-center gap-2">
-        <Select value={empresa} onValueChange={handleEmpresa}>
-          {/* min-h-[44px] pisa el h-9 (36 px) del SelectTrigger compartido. */}
-          <SelectTrigger className="w-[200px] min-h-[44px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {EMPRESAS.map((k) => (
-              <SelectItem key={k} value={k}>{EMPRESA_KEY_TO_NAME[k] ?? k}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       {loading ? (
         <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-3"><SkeletonTable rows={6} cols={5} /></div>
@@ -186,7 +189,7 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
       ) : vendedores.length === 0 ? (
         <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-8 text-center text-sm text-gray-500">
-            Sin vendedores para {MESES[mes - 1]} {year}.
+            Sin vendedores para {etiquetaPeriodo(year, mes)}.
           </div>
         </Card>
       ) : (
@@ -196,8 +199,10 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
               quedaban 279px RECORTADOS y "Com. cobro" y "Com. total" no se
               podían ver ni arrastrando. */}
           <ComisionesTarjetasPorEmpresa
-            activos={activos}
-            inactivos={inactivos}
+            activos={visibles}
+            noSePagan={noSePagan.length}
+            verNoSePagan={verNoSePagan}
+            onVerNoSePagan={() => setVerNoSePagan((v) => !v)}
             total={totalGeneral}
             onDetalle={setDetalleVendedor}
           />
@@ -218,7 +223,7 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
               </tr>
             </thead>
             <tbody>
-              {activos.map((v) => (
+              {visibles.map((v) => (
                 <tr
                   key={v.vendedor}
                   data-se-paga={v.se_paga === false ? "no" : "si"}
@@ -251,10 +256,17 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
                   <td className={`px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>{fmtMoney(v.comision_total)}</td>
                 </tr>
               ))}
-              {inactivos.length > 0 && (
+              {noSePagan.length > 0 && (
                 <tr className="border-b border-gray-100 last:border-0">
-                  <td colSpan={6} className="px-3 py-2 text-center text-xs italic text-gray-400 xl:px-4">
-                    {inactivos.length} {inactivos.length === 1 ? "vendedor" : "vendedores"} sin actividad este mes
+                  <td colSpan={6} className="px-3 py-1.5 xl:px-4">
+                    <button
+                      type="button"
+                      onClick={() => setVerNoSePagan((v) => !v)}
+                      aria-expanded={verNoSePagan}
+                      className="inline-flex min-h-[44px] -my-1 items-center text-xs text-gray-400 transition hover:text-gray-600"
+                    >
+                      {verNoSePagan ? ROTULO_VER_MENOS : rotuloVerNoSePagan(noSePagan.length)}
+                    </button>
                   </td>
                 </tr>
               )}
@@ -288,7 +300,7 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }:
       {detalleVendedor && (
         <ComisionesDetalleModal
           empresa={empresa}
-          empresaNombre={EMPRESA_KEY_TO_NAME[empresa] ?? empresa}
+          empresaNombre={nombreEmpresa}
           year={year}
           mes={mes}
           vendedor={detalleVendedor}

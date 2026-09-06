@@ -39,6 +39,9 @@ import {
   netearComisiones,
 } from "@/lib/comisiones/descuentos";
 import { leerComision } from "@/lib/comisiones/rpc";
+import { acumularVendedores } from "@/lib/comisiones/acumular-anio";
+import { mesesDelPeriodo, MES_TODO_EL_ANIO } from "@/lib/comisiones/periodo";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { marcarSePaga } from "@/lib/comisiones/sin-pago";
 import { adjuntarClientesSinComision } from "@/lib/comisiones/exclusiones";
 import { leerExclusionesActivasOVacio } from "@/lib/comisiones/exclusiones-server";
@@ -60,9 +63,12 @@ export async function GET(req: NextRequest) {
   if (!Number.isInteger(year) || year < 2024 || year > 2100) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
   }
-  if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
-    return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
+  // `mes = 0` es «todo el año» (ver lib/comisiones/periodo), igual que en el
+  // consolidado: las dos pestañas tienen que poder mostrar el mismo período.
+  if (!Number.isInteger(mes) || mes < MES_TODO_EL_ANIO || mes > 12) {
+    return NextResponse.json({ error: "mes inválido (1..12, o 0 para todo el año)" }, { status: 400 });
   }
+  const meses = mesesDelPeriodo(year, mes, hoyPanama());
 
   // Los descuentos fallan ABIERTO, igual que en el consolidado: si su lectura
   // se cae, la tabla sale con descuentos en 0 en vez de quedar en blanco. Un
@@ -72,23 +78,38 @@ export async function GET(req: NextRequest) {
   // Las exclusiones (clientes que no comisionan para un vendedor) también
   // fallan ABIERTO: son la MARCA informativa pegada al nombre; quien resta es
   // la RPC (comision_b2b_v8). Sin tabla o sin red, la tabla sale sin la marca.
-  const [rpc, descuentos, exclusiones] = await Promise.all([
-    leerComision(empresa, year, mes),
-    leerDescuentosEfectivos([empresa], year, mes).catch(() => []),
+  const [porMes, descuentosPorMes, exclusiones] = await Promise.all([
+    Promise.all(meses.map((m) => leerComision(empresa, year, m))),
+    Promise.all(meses.map((m) => leerDescuentosEfectivos([empresa], year, m).catch(() => []))),
     leerExclusionesActivasOVacio([empresa]),
   ]);
-  if (rpc.error || !rpc.data) {
-    return NextResponse.json({ error: rpc.error?.message ?? "sin datos" }, { status: 500 });
+  const roto = porMes.find((r) => r.error || !r.data);
+  if (roto) {
+    return NextResponse.json({ error: roto.error?.message ?? "sin datos" }, { status: 500 });
+  }
+  if (porMes.length === 0) {
+    // Un año futuro no tiene meses que pedir. Ni error ni datos inventados.
+    return NextResponse.json({ empresa_key: empresa, year, mes, vendedores: [] });
   }
 
-  const data = rpc.data;
+  const data = porMes[porMes.length - 1].data!;
   // `se_paga` se marca ACÁ, después de netear, y la pantalla solo lo lee:
   // DEFAULT y Daniel se calculan y se muestran, pero no entran al total a
   // pagar («no me autopago»). Ver lib/comisiones/sin-pago.
+  //
+  // Con «todo el año» se netea MES A MES (un descuento puede empezar en junio) y
+  // recién después se suman los meses — nunca al revés.
   return NextResponse.json({
     ...data,
+    mes,
     vendedores: adjuntarClientesSinComision(
-      marcarSePaga(netearComisiones(data.vendedores, totalPorVendedor(descuentos, empresa))),
+      marcarSePaga(
+        acumularVendedores(
+          porMes.map((r, i) =>
+            netearComisiones(r.data!.vendedores, totalPorVendedor(descuentosPorMes[i], empresa)),
+          ),
+        ),
+      ),
       exclusiones,
       empresa,
     ),

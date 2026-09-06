@@ -54,3 +54,27 @@ export function sumarPagable<T extends { se_paga?: boolean }>(
 
 /** Texto único de la marca en pantalla y en el Excel. */
 export const ROTULO_NO_SE_PAGA = "no se paga";
+
+/**
+ * 🔴 LOS QUE NO SE PAGAN, DETRÁS DE «VER TODOS» (6-sep-2026).
+ *
+ * Daniel: *«los que no se pagan que no aparezca en la pantalla»* → y después
+ * eligió (b): que se vean SOLO si tocas el enlace. Son **Oficina (DEFAULT)** y
+ * **Daniel Levy** — $8.089,77 en 2026.
+ *
+ * 🔑 ARREGLA ALGO DE PASO: hoy las filas VISIBLES no suman el «Total a pagar»
+ * —esas dos se muestran con su número y no entran—, así que la tabla parecía no
+ * cuadrar. Escondiéndolas, lo que se ve suma exactamente lo que se paga.
+ *
+ * ⚠️ NO CAMBIA NINGÚN CÁLCULO. `VENDEDORES_SIN_PAGO` sigue siendo la fuente
+ * única, el servidor sigue marcando `se_paga`, el total sigue saliendo de
+ * `sumarPagable` y el Excel los sigue llevando con su «(no se paga)»: lo único
+ * que cambia es que la pantalla no los dibuja hasta que se los pide.
+ */
+export const ROTULO_VER_NO_SE_PAGAN = "Ver los que no se pagan";
+export const ROTULO_VER_MENOS = "Ver menos";
+
+/** «Ver los que no se pagan (2)» — con cuántos hay, para no abrir a ciegas. */
+export function rotuloVerNoSePagan(cuantos: number): string {
+  return `${ROTULO_VER_NO_SE_PAGAN} (${cuantos})`;
+}

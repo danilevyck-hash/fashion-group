@@ -103,7 +103,10 @@ describe("🔴 el botón existe en /referencia", () => {
 
   it("CONTROL: el resto de la pantalla sigue (buscador y Excel)", () => {
     const src = sinComentarios(VISTA);
-    expect(src).toContain("Bajar a Excel");
+    // 6-sep-2026: el verbo pasó de «Bajar» a «Descargar» (Daniel: «a, pero
+    // descargar, no bajar, como esté en todos los módulos»). Medido: el sistema
+    // dice «Descargar» 23 veces contra 5 formas raras. El botón es el mismo.
+    expect(src).toContain("Descargar Excel");
     expect(src).toContain("aria-label=\"Buscar referencia\"");
   });
 

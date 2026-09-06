@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
+import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
 
 const excelRecibido: {
   resumen?: { vendedores: { vendedor: string; comision_total: number; se_paga?: boolean }[] };
@@ -62,10 +62,33 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const filasMarcadas = (tabla: HTMLElement, valor: "si" | "no") =>
   within(tabla).getAllByRole("row").filter((r) => r.getAttribute("data-se-paga") === valor);
 
+/**
+ * 🔄 CANDADO RE-APUNTADO EL 6-sep-2026. Las filas que NO se pagan (Oficina y
+ * Daniel Levy) arrancan ESCONDIDAS detrás de «Ver los que no se pagan (2)».
+ * Daniel: *«los que no se pagan que no aparezca en la pantalla»* → y después
+ * eligió (b): que se vean solo si tocas el enlace.
+ *
+ * 🔑 Y ARREGLA ALGO DE PASO, que es lo que este archivo siempre quiso cuidar:
+ * antes esas dos filas se VEÍAN con su número y NO entraban al «Total a pagar»,
+ * así que las filas visibles no sumaban el pie. Escondiéndolas, lo que se ve
+ * suma exactamente lo que se paga.
+ *
+ * Lo que NO cambió: `VENDEDORES_SIN_PAGO` sigue siendo la fuente única, el
+ * servidor sigue marcando `se_paga`, el total sigue saliendo de `sumarPagable`
+ * y el Excel los sigue llevando con su «(no se paga)».
+ */
+const verLosQueNoSePagan = (tabla: HTMLElement) => {
+  const enlace = within(tabla).getByRole("button", { name: /Ver los que no se pagan \(2\)/ });
+  fireEvent.click(enlace);
+};
+
 describe("🔴 Por empresa: la fila se ve, dice «no se paga» y el pie no la suma", () => {
-  it("DEFAULT y Daniel salen con su número y la marca", async () => {
+  it("DEFAULT y Daniel arrancan escondidos y, al pedirlos, salen con su número y la marca", async () => {
     render(<ComisionesPorEmpresaView year={2026} mes={7} />);
     const tabla = await screen.findByRole("table");
+    // Antes de tocar nada NO están: lo visible suma exactamente el pie.
+    expect(filasMarcadas(tabla, "no")).toHaveLength(0);
+    verLosQueNoSePagan(tabla);
     const sinPago = filasMarcadas(tabla, "no");
     expect(sinPago).toHaveLength(2);
     for (const r of sinPago) expect(within(r).getByText("no se paga")).toBeTruthy();
@@ -116,9 +139,11 @@ describe("🔴 Por empresa: la fila se ve, dice «no se paga» y el pie no la su
 });
 
 describe("🔴 Todas las empresas: la matriz marca las filas y el pie suma lo pagable", () => {
-  it("Daniel y la oficina llevan la marca; Edwin y Reinaldo no", async () => {
+  it("Daniel y la oficina arrancan escondidos; al pedirlos llevan la marca, y Edwin y Reinaldo no", async () => {
     render(<ComisionesConsolidadoView year={2026} mes={7} />);
     const tabla = await screen.findByRole("table");
+    expect(filasMarcadas(tabla, "no")).toHaveLength(0);
+    verLosQueNoSePagan(tabla);
     const sinPago = filasMarcadas(tabla, "no");
     // DANIEL LEVY + la fila única de la oficina (DEFAULT de las dos empresas junta).
     expect(sinPago).toHaveLength(2);

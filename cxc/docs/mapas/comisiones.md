@@ -5,6 +5,12 @@
 > Los px del navegador **no se midieron** en esta pasada. Lo que digo de la pantalla sale de leer el código que la dibuja.
 > ⚠️ **Multifashion es otro módulo de comisiones y no se toca.** No hay ninguna propuesta de fusión aquí.
 
+> 🔄 **ESTE MAPA ES DE ANTES DEL 6-sep-2026 y describe una pantalla que ya no existe así.** Ese día se ejecutaron 17 cambios de FORMA aprobados por Daniel uno por uno (ni un número se movió: las 27 celdas de 2026 siguen dando **$67.815,75**, verificado con `scripts/_medir-comisiones-forma.mjs`). Lo que cambió respecto de lo que se lee abajo:
+> - **Las cuatro pestañas se fueron**, en escritorio y en celular: hoy hay UN selector de empresa (**Fashion Group** · las 6 · una línea · **Multifashion**) y Configuración vive en un **⚙** fijo.
+> - «Todas las empresas» se llama **Fashion Group**; «Por empresa» ya no tiene selector propio; la pestaña espejo de Multifashion es ahora **una opción más del selector** (Daniel cambió de opinión: *«multifashion es una empresa más»*) — sin fusionar nada.
+> - El detalle se abre **abajo** de la matriz (el modal se queda para imprimir), con el **total arriba**; el descuento **se ve en la celda**; los que **no se pagan** están detrás de «Ver los que no se pagan (2)»; hay **«Todo el año»** en el período.
+> - Lo medido en las secciones 2, 3, 4 y 7 sobre los descuentos, el interruptor «Activo», D-108 y el mes de apertura **ya se ejecutó** (commit `30c666a4`). Las invariantes vigentes están en `CLAUDE.md` › *Ventas, Referencia y Comisiones*.
+
 ---
 
 ## 1 · Qué es, quién entra, cuánto se usa

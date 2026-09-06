@@ -32,12 +32,25 @@
 // la tabla; la `key` y el detalle siguen con el nombre tal cual llega.
 //
 // Escritorio e iPad (≥md) siguen viendo la tabla, intacta.
+//
+// ── 6-sep-2026: tres cambios de forma, cero de cálculo ───────────────────────
+//  · **`text-sm` (14 px) mínimo para los DATOS.** Era el ÚNICO lugar del módulo
+//    por debajo del piso de la casa: los montos iban en `text-xs` (12 px) y el
+//    nombre del vendedor en `text-[13px]`. Las ETIQUETAS («Ventas», «Com. venta»,
+//    el nombre de la empresa) se quedan en 12: son rótulos, no datos.
+//  · **La línea «N vendedores sin actividad este mes» se fue** — un renglón para
+//    decir que no hay nada que decir. En su lugar está «Ver los que no se pagan»,
+//    que sí esconde números (Oficina y Daniel Levy) y hace que lo visible sume
+//    exactamente el total del pie.
+//  · **Una sola forma de decir «nada»: el guion** (`lib/comisiones/matriz-celda`),
+//    la misma que la tabla. Y donde hay descuento, la celda lo DICE.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, type ReactNode } from "react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
-import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
+import { ROTULO_NO_SE_PAGA, ROTULO_VER_MENOS, rotuloVerNoSePagan } from "@/lib/comisiones/sin-pago";
+import { celdaVacia, desgloseDeCelda } from "@/lib/comisiones/matriz-celda";
 import type { ClienteSinComisionConEmpresa } from "./MarcaClientesSinComision";
 
 /** Rojo para lo negativo, igual que la tabla. */
@@ -87,31 +100,25 @@ function TarjetaTotal({ total, aPagar }: { total: number; aPagar?: boolean }) {
   );
 }
 
-/** "N vendedores sin actividad este mes" — mismo texto que la tabla. */
-function LineaInactivos({
+/** «Ver los que no se pagan (2)» — mismo texto que la tabla. */
+function LineaNoSePagan({
   cantidad,
   abierto,
   onToggle,
 }: {
   cantidad: number;
-  abierto?: boolean;
-  onToggle?: () => void;
+  abierto: boolean;
+  onToggle: () => void;
 }) {
-  const texto = `${cantidad} ${cantidad === 1 ? "vendedor" : "vendedores"} sin actividad este mes`;
-  if (!onToggle) {
-    return (
-      <li className="px-1 py-2 text-center text-xs italic text-gray-400">{texto}</li>
-    );
-  }
   return (
     <li>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={abierto}
-        className="inline-flex min-h-[44px] w-full items-center justify-center text-xs italic text-gray-400 active:text-gray-600"
+        className="inline-flex min-h-[44px] w-full items-center justify-center text-xs text-gray-400 active:text-gray-600"
       >
-        {abierto ? "▾" : "▸"} {texto}
+        {abierto ? ROTULO_VER_MENOS : rotuloVerNoSePagan(cantidad)}
       </button>
     </li>
   );
@@ -131,6 +138,8 @@ function MarcaNoSePaga() {
 export interface FilaConsolidado {
   vendedor: string;
   porEmpresa: Record<string, number>;
+  /** Lo que se le restó en CADA empresa (informativo: el total ya viene neto). */
+  descuentoPorEmpresa?: Record<string, number>;
   total: number;
   /** false = se muestra, pero no entra al total a pagar. */
   se_paga?: boolean;
@@ -139,11 +148,12 @@ export interface FilaConsolidado {
 }
 
 interface PropsConsolidado {
+  /** Los que SÍ se pagan: lo que se ve suma exactamente el total del pie. */
   activos: FilaConsolidado[];
-  sinAsignar: FilaConsolidado | null;
-  inactivos: FilaConsolidado[];
-  mostrarInactivos: boolean;
-  onToggleInactivos: () => void;
+  /** Oficina (DEFAULT) y Daniel Levy — detrás de «Ver los que no se pagan». */
+  noSePagan: FilaConsolidado[];
+  verNoSePagan: boolean;
+  onVerNoSePagan: () => void;
   /** Keys de empresa, en el mismo orden que las columnas de la tabla. */
   // `readonly` porque la lista viene de `EMPRESAS_COMISIONAN`, que se deriva de
   // `B2B_EMPRESA_KEYS` (un `as const`). Estas tarjetas solo la RECORREN.
@@ -156,10 +166,9 @@ interface PropsConsolidado {
 
 export function ComisionesTarjetasConsolidado({
   activos,
-  sinAsignar,
-  inactivos,
-  mostrarInactivos,
-  onToggleInactivos,
+  noSePagan,
+  verNoSePagan,
+  onVerNoSePagan,
   empresas,
   nombreEmpresa,
   granTotal,
@@ -177,25 +186,15 @@ export function ComisionesTarjetasConsolidado({
         />
       ))}
 
-      {sinAsignar && (
-        <TarjetaVendedorMatriz
-          fila={sinAsignar}
-          empresas={empresas}
-          nombreEmpresa={nombreEmpresa}
-          onDetalle={onDetalle}
-          italica
+      {noSePagan.length > 0 && (
+        <LineaNoSePagan
+          cantidad={noSePagan.length}
+          abierto={verNoSePagan}
+          onToggle={onVerNoSePagan}
         />
       )}
-
-      {inactivos.length > 0 && (
-        <LineaInactivos
-          cantidad={inactivos.length}
-          abierto={mostrarInactivos}
-          onToggle={onToggleInactivos}
-        />
-      )}
-      {mostrarInactivos &&
-        inactivos.map((r) => (
+      {verNoSePagan &&
+        noSePagan.map((r) => (
           <TarjetaVendedorMatriz
             key={r.vendedor}
             fila={r}
@@ -206,10 +205,7 @@ export function ComisionesTarjetasConsolidado({
           />
         ))}
 
-      <TarjetaTotal
-        total={granTotal}
-        aPagar={[...activos, ...(sinAsignar ? [sinAsignar] : [])].some((r) => r.se_paga === false)}
-      />
+      <TarjetaTotal total={granTotal} aPagar={noSePagan.length > 0} />
     </ListaTarjetas>
   );
 }
@@ -217,16 +213,15 @@ export function ComisionesTarjetasConsolidado({
 /**
  * Cerrada mide UNA línea (nombre + total), casi lo que medía la fila de la
  * tabla: así el celular no pierde vendedores por pantalla al pasar a tarjetas.
- * Abierta muestra las 5 empresas, cada una tocable → mismo modal de detalle que
- * la celda de la tabla. Las empresas donde el vendedor no aparece van "—" y no
- * se pueden tocar, igual que la celda vacía del escritorio.
+ * Abierta muestra las 6 empresas, cada una tocable → mismo detalle que la celda
+ * de la tabla. Las empresas sin nada van «—» y no se pueden tocar, igual que la
+ * celda vacía del escritorio.
  */
 function TarjetaVendedorMatriz({
   fila,
   empresas,
   nombreEmpresa,
   onDetalle,
-  italica,
   apagada,
 }: {
   fila: FilaConsolidado;
@@ -235,7 +230,6 @@ function TarjetaVendedorMatriz({
   empresas: readonly string[];
   nombreEmpresa: (key: string) => string;
   onDetalle: (empresa: string, vendedor: string) => void;
-  italica?: boolean;
   apagada?: boolean;
 }) {
   const [abierta, setAbierta] = useState(false);
@@ -255,8 +249,8 @@ function TarjetaVendedorMatriz({
           {/* pr-0.5: `truncate` recorta el vuelo de la ITÁLICA — «Oficina (DEFAULT)»
               se leía "Sin asignaı" aunque sobrara ancho. Medido en captura. */}
           <span
-            className={`flex min-w-0 items-center truncate pr-0.5 text-[13px] leading-5 tracking-tight ${
-              italica ? "italic text-gray-500" : apagada || fila.se_paga === false ? "text-gray-400" : "font-medium text-gray-900"
+            className={`flex min-w-0 items-center truncate pr-0.5 text-sm leading-5 tracking-tight ${
+              apagada || fila.se_paga === false ? "text-gray-400" : "font-medium text-gray-900"
             }`}
           >
             <span className="truncate">{nombreVendedorEnPantalla(fila.vendedor)}</span>
@@ -275,17 +269,19 @@ function TarjetaVendedorMatriz({
           <ul className="divide-y divide-gray-100 border-t border-gray-100 bg-gray-50">
             {empresas.map((k) => {
               const val = fila.porEmpresa[k];
-              if (val === undefined) {
+              const desc = fila.descuentoPorEmpresa?.[k] ?? 0;
+              if (celdaVacia(val, desc)) {
                 return (
                   <li
                     key={k}
                     className="flex min-h-[44px] items-center justify-between gap-2 px-3 py-2"
                   >
                     <span className="truncate text-xs text-gray-400">{nombreEmpresa(k)}</span>
-                    <span className="shrink-0 font-mono text-xs tabular-nums text-gray-300">—</span>
+                    <span className="shrink-0 font-mono text-sm tabular-nums text-gray-300">—</span>
                   </li>
                 );
               }
+              const desglose = desgloseDeCelda(val, desc);
               return (
                 <li key={k}>
                   <button
@@ -294,8 +290,17 @@ function TarjetaVendedorMatriz({
                     className="flex min-h-[44px] w-full items-center justify-between gap-2 px-3 py-2 text-left active:bg-gray-100"
                   >
                     <span className="truncate text-xs text-gray-600">{nombreEmpresa(k)}</span>
-                    <span className={`shrink-0 font-mono text-xs tabular-nums ${claseMonto(val)}`}>
-                      {fmtMoney(val)}
+                    <span className="shrink-0 text-right">
+                      <span className={`block font-mono text-sm tabular-nums ${claseMonto(val ?? 0)}`}>
+                        {fmtMoney(val ?? 0)}
+                      </span>
+                      {/* El descuento SE VE: antes había que abrir el detalle
+                          para enterarse de que ahí dentro hay plata restada. */}
+                      {desglose && (
+                        <span className="block font-mono text-xs tabular-nums text-gray-500">
+                          {fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}
+                        </span>
+                      )}
                     </span>
                   </button>
                 </li>
@@ -327,8 +332,12 @@ export interface FilaPorEmpresa {
 }
 
 interface PropsPorEmpresa {
+  /** Lo que se ve. Con «Ver los que no se pagan» abierto, incluye a esos dos. */
   activos: FilaPorEmpresa[];
-  inactivos: FilaPorEmpresa[];
+  /** Cuántos hay detrás de «Ver los que no se pagan». */
+  noSePagan: number;
+  verNoSePagan: boolean;
+  onVerNoSePagan: () => void;
   total: number;
   /** Abre el reporte detallado del vendedor (igual que tocar la fila). */
   onDetalle: (vendedor: string) => void;
@@ -336,7 +345,9 @@ interface PropsPorEmpresa {
 
 export function ComisionesTarjetasPorEmpresa({
   activos,
-  inactivos,
+  noSePagan,
+  verNoSePagan,
+  onVerNoSePagan,
   total,
   onDetalle,
 }: PropsPorEmpresa) {
@@ -357,7 +368,7 @@ export function ComisionesTarjetasPorEmpresa({
               className="min-h-[44px] w-full px-3 py-2.5 text-left active:bg-gray-50"
             >
               <div className="flex min-h-[24px] items-baseline justify-between gap-2">
-                <span className={`flex min-w-0 items-center truncate text-[13px] font-medium leading-5 tracking-tight ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>
+                <span className={`flex min-w-0 items-center truncate text-sm font-medium leading-5 tracking-tight ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>
                   <span className="truncate">{nombreVendedorEnPantalla(v.vendedor)}</span>
                   {v.se_paga === false && <MarcaNoSePaga />}
                 </span>
@@ -386,19 +397,23 @@ export function ComisionesTarjetasPorEmpresa({
         </li>
       ))}
 
-      {inactivos.length > 0 && <LineaInactivos cantidad={inactivos.length} />}
+      {noSePagan > 0 && (
+        <LineaNoSePagan cantidad={noSePagan} abierto={verNoSePagan} onToggle={onVerNoSePagan} />
+      )}
 
-      <TarjetaTotal total={total} aPagar={activos.some((v) => v.se_paga === false)} />
+      <TarjetaTotal total={total} aPagar={noSePagan > 0} />
     </ListaTarjetas>
   );
 }
 
-/** Etiqueta + monto en una línea. Mismos nombres que los `<th>` de la tabla. */
+/** Etiqueta + monto en una línea. Mismos nombres que los `<th>` de la tabla.
+ *  El DATO va en `text-sm` (el piso de la casa); la etiqueta, que es un rótulo
+ *  y no un dato, se queda en 12. */
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: number }) {
   return (
     <div className="flex items-baseline justify-between gap-1.5 py-0.5">
       <dt className="shrink-0 text-xs text-gray-500">{etiqueta}</dt>
-      <dd className={`truncate font-mono text-xs tabular-nums ${claseMonto(valor)}`}>
+      <dd className={`truncate font-mono text-sm tabular-nums ${claseMonto(valor)}`}>
         {fmtMoney(valor)}
       </dd>
     </div>

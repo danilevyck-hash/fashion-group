@@ -36,7 +36,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ConfirmDeleteModal } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { estaRetirado } from "@/lib/comisiones/retirados";
@@ -74,7 +74,8 @@ const VACIO: Borrador = {
   hasta: "",
 };
 
-const nombreEmpresa = (k: string) => EMPRESA_KEY_TO_NAME[k] ?? k;
+/** Nombre CORTO de la empresa — «Vistana», no «Vistana International» (§ 0). */
+const nombreEmpresa = (k: string) => nombreCortoEmpresa(k);
 
 /** «2026-01-01» → «ene 2026». Vacío → «—». El grano es el mes, no el día. */
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];

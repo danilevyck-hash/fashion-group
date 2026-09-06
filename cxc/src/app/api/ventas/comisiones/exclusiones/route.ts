@@ -7,8 +7,11 @@
  *
  *   GET    → { exclusiones: ExclusionActiva[], vendedores: { [empresa]: string[] } }
  *            (las activas de las 6 empresas + los vendedores que se pueden elegir)
- *   POST   → { empresa_key, cliente_codigo, vendedor, excluye_venta?, excluye_cobro? } → 201 { id }
- *            (las casillas ausentes valen true; las dos apagadas es 400)
+ *   POST   → { empresa_key | empresa_keys[], cliente_codigo, vendedor,
+ *              excluye_venta?, excluye_cobro? } → 201 { id, ids, creadas, ya_estaban }
+ *            (las casillas ausentes valen true; las dos apagadas es 400.
+ *             Con varias empresas se escribe UNA FILA POR EMPRESA y la que ya
+ *             existía no tira a las demás — se devuelve en `ya_estaban`)
  *   PATCH  → ?id= { excluye_venta, excluye_cobro } → cambia las casillas de una fila activa
  *   DELETE → ?id= → soft delete (activa = false, firmado). NUNCA borra la fila.
  *
@@ -28,7 +31,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
-import { normalizarVendedor, validarCasillas, validarExclusionNueva } from "@/lib/comisiones/exclusiones";
+import { normalizarVendedor, validarCasillas, validarExclusionesNuevas } from "@/lib/comisiones/exclusiones";
 import { aplicarAlias, type AliasVendedor } from "@/lib/comisiones/alias";
 import { estaRetirado, AVISO_VENDEDOR_RETIRADO } from "@/lib/comisiones/retirados";
 import {
@@ -125,7 +128,10 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-  const v = validarExclusionNueva(body);
+  // 🔴 UNA DECISIÓN, VARIAS EMPRESAS (6-sep-2026). El cuerpo puede traer
+  // `empresa_keys: []` — y sigue aceptando el `empresa_key` de siempre. Son N
+  // filas independientes: el grano de la tabla no cambia.
+  const v = validarExclusionesNuevas(body);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
 
   // El vendedor se guarda como PERSONA (alias), no como grafía: así una
@@ -133,14 +139,38 @@ export async function POST(req: NextRequest) {
   // como «REYNALDO». La base lo vuelve a hacer con su trigger; esto es para
   // que el 409 de «ya está» salga con el nombre correcto.
   const alias = await leerAliasOVacio();
-  const valor = { ...v.valor, vendedor: normalizarVendedor(aplicarAlias(v.valor.vendedor, alias)) };
+  const valores = v.valor.map((x) => ({
+    ...x,
+    vendedor: normalizarVendedor(aplicarAlias(x.vendedor, alias)),
+  }));
   // Un retirado (Aguas) no existe en Comisiones: no se le carga una exclusión.
-  if (estaRetirado(valor.vendedor)) {
+  if (valores.some((x) => estaRetirado(x.vendedor))) {
     return NextResponse.json({ error: AVISO_VENDEDOR_RETIRADO }, { status: 400 });
   }
-  const r = await agregarExclusion(valor, auth.userName ?? auth.userId ?? "admin");
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
-  return NextResponse.json({ ok: true, id: r.id }, { status: 201 });
+
+  const quien = auth.userName ?? auth.userId ?? "admin";
+  const ids: number[] = [];
+  const yaEstaban: string[] = [];
+  for (const valor of valores) {
+    const r = await agregarExclusion(valor, quien);
+    if (r.ok) { ids.push(r.id); continue; }
+    // 🔴 QUE UNA EMPRESA YA LO TENGA NO TIRA LAS OTRAS. Es justo el caso que
+    // este cambio viene a resolver: D-104 ya estaba en dos empresas por dos
+    // altas separadas. Cualquier OTRO error sí corta — no se escribe «más o
+    // menos».
+    if (r.status === 409) { yaEstaban.push(valor.empresa_key); continue; }
+    return NextResponse.json({ error: r.error }, { status: r.status });
+  }
+  if (ids.length === 0) {
+    return NextResponse.json(
+      { error: "Ese cliente ya está en la lista de ese vendedor en las empresas que elegiste" },
+      { status: 409 },
+    );
+  }
+  return NextResponse.json(
+    { ok: true, id: ids[0], ids, creadas: ids.length, ya_estaban: yaEstaban },
+    { status: 201 },
+  );
 }
 
 export async function PATCH(req: NextRequest) {

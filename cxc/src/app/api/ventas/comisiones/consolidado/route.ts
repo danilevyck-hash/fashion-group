@@ -37,13 +37,26 @@
  * otra. Hoy las dos pestañas piden un `comision_total` que YA viene neto de la
  * MISMA función (`netearComisiones`), así que no pueden separarse.
  *
+ * 🔴 `mes=0` ES «TODO EL AÑO» (6-sep-2026). Daniel rechazó una columna fija de
+ * «2026» en la matriz —*«lo verán todo el tiempo»*— y pidió que el selector de
+ * período ofrezca el año completo. El año es LA SUMA DE SUS MESES: la misma RPC,
+ * mes a mes, neteada mes a mes por `netearComisiones` (la vigencia de un
+ * descuento puede empezar a mitad de año) y sumada por `acumularVendedores`.
+ * Medido en producción: 72 llamadas (6 empresas × 12 meses) = **143 ms** dentro
+ * de la base. Verificado contra los 9 meses de 2026: Edwin 9.037,17 · Reynaldo
+ * 58.544,09 · Rodrigo 234,49 = **67.815,75**.
+ *
  * GET ?year=&mes= → { empresas: [{ empresa_key, vendedores[] }] }
+ *   mes = 1..12 → ese mes · mes = 0 → todo el año (+ `meses` en la respuesta)
  *   vendedores[].comision_total = NETO · vendedores[].descuento = lo restado
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { leerComision } from "@/lib/comisiones/rpc";
+import { acumularVendedores } from "@/lib/comisiones/acumular-anio";
+import { esTodoElAnio, mesesDelPeriodo, MES_TODO_EL_ANIO } from "@/lib/comisiones/periodo";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { marcarSePaga } from "@/lib/comisiones/sin-pago";
 import { adjuntarClientesSinComision } from "@/lib/comisiones/exclusiones";
 import { leerExclusionesActivasOVacio } from "@/lib/comisiones/exclusiones-server";
@@ -66,8 +79,20 @@ export async function GET(req: NextRequest) {
   if (!Number.isInteger(year) || year < 2024 || year > 2100) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
   }
-  if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
-    return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
+  // `mes = 0` es «todo el año» (ver lib/comisiones/periodo): no es un mes, es su
+  // ausencia. Cualquier otro valor fuera de 1..12 sigue siendo un error.
+  if (!Number.isInteger(mes) || mes < MES_TODO_EL_ANIO || mes > 12) {
+    return NextResponse.json({ error: "mes inválido (1..12, o 0 para todo el año)" }, { status: 400 });
+  }
+
+  // 🔴 EL AÑO ES LA SUMA DE SUS MESES. Cada mes va a la MISMA RPC con los MISMOS
+  // argumentos y se netea con `netearComisiones` —el único restador— y recién
+  // después se suman. Medido: 72 llamadas (6 empresas × 12 meses) cuestan 143 ms
+  // dentro de la base. No hay una consulta «anual» aparte, que es como el año y
+  // la suma de sus meses dejarían de coincidir.
+  const meses = mesesDelPeriodo(year, mes, hoyPanama());
+  if (meses.length === 0) {
+    return NextResponse.json({ empresas: [] });
   }
 
   // Las 5 RPC en paralelo (mismo trabajo de base que antes) + UNA lectura de
@@ -78,26 +103,34 @@ export async function GET(req: NextRequest) {
   // comisiones visible vale más que una pantalla vacía.
   // Las exclusiones (clientes que no comisionan) fallan ABIERTO igual: son la
   // marca informativa pegada al nombre; quien resta es la RPC (v8).
-  const [porEmpresa, descuentos, exclusiones] = await Promise.all([
+  const [porEmpresa, descuentosPorMes, exclusiones] = await Promise.all([
     Promise.all(
       EMPRESAS_COMISIONAN.map(async (empresa) => {
-        const { data, error } = await leerComision(empresa, year, mes);
-        if (error || !data) throw new Error(`${empresa}: ${error?.message ?? "sin datos"}`);
+        const deCadaMes = await Promise.all(
+          meses.map(async (m) => {
+            const { data, error } = await leerComision(empresa, year, m);
+            if (error || !data) throw new Error(`${empresa}: ${error?.message ?? "sin datos"}`);
+            return data;
+          }),
+        );
+        const ultimo = deCadaMes[deCadaMes.length - 1];
         return {
           // La key PEDIDA, no la que devuelve la RPC: es con la que se filtran
           // los descuentos y con la que la tabla arma sus columnas. Que sean la
           // misma no debe depender de dos fuentes.
           empresa: empresa as string,
-          empresa_key: data.empresa_key,
-          regla_cobro: data.regla_cobro,
-          version: data.version,
-          exclusiones_aplicadas: data.exclusiones_aplicadas,
-          alias_aplicado: data.alias_aplicado,
-          vendedores: data.vendedores,
+          empresa_key: ultimo.empresa_key,
+          regla_cobro: ultimo.regla_cobro,
+          version: ultimo.version,
+          exclusiones_aplicadas: ultimo.exclusiones_aplicadas,
+          alias_aplicado: ultimo.alias_aplicado,
+          porMes: deCadaMes.map((d) => d.vendedores),
         };
       }),
     ).catch((e: unknown) => e instanceof Error ? e : new Error(String(e))),
-    leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, mes).catch(() => []),
+    Promise.all(
+      meses.map((m) => leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, m).catch(() => [])),
+    ),
     leerExclusionesActivasOVacio(EMPRESAS_COMISIONAN),
   ]);
 
@@ -106,21 +139,30 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    empresas: porEmpresa.map(({ empresa, empresa_key, regla_cobro, version, exclusiones_aplicadas, alias_aplicado, vendedores }) => ({
+    empresas: porEmpresa.map(({ empresa, empresa_key, regla_cobro, version, exclusiones_aplicadas, alias_aplicado, porMes }) => ({
       empresa_key,
       regla_cobro,
       version,
       exclusiones_aplicadas,
       alias_aplicado,
       // El descuento es por (empresa, vendedor) y se resta del total de ESA
-      // empresa — que es la celda que Daniel mira.
+      // empresa — que es la celda que Daniel mira. Con «todo el año» se netea
+      // MES A MES (la vigencia de un descuento puede empezar en junio) y recién
+      // después se suman los meses.
       // `se_paga`: DEFAULT y Daniel se calculan y se muestran, pero no entran
       // al total a pagar. Misma marca que en /api/ventas/comisiones.
       vendedores: adjuntarClientesSinComision(
-        marcarSePaga(netearComisiones(vendedores, totalPorVendedor(descuentos, empresa))),
+        marcarSePaga(
+          acumularVendedores(
+            porMes.map((vendedores, i) =>
+              netearComisiones(vendedores, totalPorVendedor(descuentosPorMes[i], empresa)),
+            ),
+          ),
+        ),
         exclusiones,
         empresa,
       ),
     })),
+    ...(esTodoElAnio(mes) ? { meses } : {}),
   });
 }

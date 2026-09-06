@@ -295,7 +295,7 @@ function MobileHeader({
           </button>
           {open && (
             <div role="menu" className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
-              <MenuItem label="Exportar CSV" onClick={() => { setOpen(false); onExportar(); }} />
+              <MenuItem label="Descargar CSV" onClick={() => { setOpen(false); onExportar(); }} />
             </div>
           )}
         </div>

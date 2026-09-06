@@ -217,7 +217,7 @@ describe("modo pedido — la tabla", () => {
 
   it("🔴 el Excel baja LA MISMA lista, en el orden pegado", async () => {
     await buscarPegado();
-    fireEvent.click(screen.getAllByRole("button", { name: /Bajar a Excel/ })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /Descargar Excel/ })[0]);
     expect(exportSpy).toHaveBeenCalledTimes(1);
     const lista = exportSpy.mock.calls[0][0] as ArticuloCompras[];
     expect(lista.map((a) => a.codigo)).toEqual(["ZZZ999001", "AAA111001", "CVM253CR02001"]);

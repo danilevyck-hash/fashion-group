@@ -210,7 +210,7 @@ export function ReferenciaView() {
             // en que se pegaron los códigos, y sin margen si el rol no lo ve.
             onClick={() => void exportComprasToExcel(articulosOrdenados, resp!.hoyMes, { margen: mostrarMargen })}
           >
-            <Download className="mr-1.5 h-4 w-4" /> Bajar a Excel
+            <Download className="mr-1.5 h-4 w-4" /> Descargar Excel
           </Button>
         </div>
       )}

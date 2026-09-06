@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { ComisionesView } from "@/components/ventas/ComisionesView";
@@ -18,6 +19,10 @@ export function ComisionesPageClient({
   // así que sin este renglón la pantalla la seguía rebotando a `/home` con
   // "No tienes acceso a este modulo", ficha del menú o no.
   const { authChecked } = useAuth({ moduleKey: "comisiones", allowedRoles: ["admin", "contabilidad", "secretaria"] });
+  // Un `?tab=` guardado (los valores de las 4 pestañas viejas: todas · empresa ·
+  // multifashion · config) se resuelve a su vista nueva en `vistas.ts`. Ningún
+  // enlace se rompe; nada se escribe de vuelta en la URL.
+  const vistaPedida = useSearchParams().get("tab");
   if (!authChecked) return null;
 
   return (
@@ -27,15 +32,17 @@ export function ComisionesPageClient({
           el breadcrumb (escritorio) — repetirlo costaba 44px de la primera
           pantalla del iPhone. Mismo criterio que el encabezado de CXC. */}
       <main className="mx-auto w-full max-w-[1280px] px-4 pb-8 pt-2 md:px-7 md:pt-3">
-        {/* La pestaña Configuración (solo admin) vive AQUÍ, en el módulo
+        {/* El ⚙ de Configuración (solo admin) vive AQUÍ, en el módulo
             Comisiones, no en la pestaña Comisiones de Ventas. */}
-        {/* `conMultifashion`: la pestaña espejo de Vendedoras vive SOLO en este
-            módulo (6-sep-2026). Ventas ya tiene su propia pestaña Multifashion. */}
+        {/* `conMultifashion`: Multifashion es una opción más del selector y
+            vive SOLO en este módulo (6-sep-2026). Ventas ya tiene su propia
+            pestaña Multifashion. */}
         <ComisionesView
           availableYears={availableYears}
           avisoMontos={avisoMontos}
           conConfiguracion
           conMultifashion
+          vistaPedida={vistaPedida}
         />
       </main>
     </div>

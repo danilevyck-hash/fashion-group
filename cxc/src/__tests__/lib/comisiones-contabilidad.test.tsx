@@ -356,9 +356,11 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     sesion("contabilidad", FG_MODULES_CONTABILIDAD_HOY);
     render(<ComisionesPageClient availableYears={[2026, 2025]} />);
 
-    // 1) No la rebotó: los dos modos de vista están en el DOM.
-    await screen.findByRole("button", { name: "Todas las empresas", exact: true });
-    screen.getByRole("button", { name: "Por empresa", exact: true });
+    // 1) No la rebotó: el selector de empresa está en el DOM, en Fashion Group.
+    // 🔄 6-sep-2026: eran dos PESTAÑAS («Todas las empresas» / «Por empresa») y
+    // hoy son dos opciones del único selector — Daniel: «opino eliminar los tabs».
+    const selector = await screen.findByLabelText("Empresa");
+    expect(selector.textContent).toContain("Fashion Group");
     // 2) Y llegó el DATO, no un esqueleto: el vendedor y su comisión.
     await waitFor(() => expect(screen.getAllByText(/REINALDO ESPINOSA/i).length).toBeGreaterThan(0), { timeout: 5000 });
     expect(screen.getAllByText(/1,234\.56/).length).toBeGreaterThan(0);
@@ -370,7 +372,8 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     const { ComisionesPageClient } = await import("@/app/comisiones/ComisionesPageClient");
     sesion("contabilidad", FG_MODULES_CONTABILIDAD_HOY);
     render(<ComisionesPageClient availableYears={[2026]} />);
-    const excel = await screen.findByRole("button", { name: /Excel/i });
+    // 🔄 6-sep-2026: el botón dice QUÉ TRAE («Descargar el mes»), no «Excel».
+    const excel = await screen.findByRole("button", { name: /Descargar el mes/i });
     await waitFor(() => expect((excel as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
   }, 20000);
 
@@ -381,7 +384,7 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     const { ComisionesPageClient } = await import("@/app/comisiones/ComisionesPageClient");
     sesion("contabilidad", FG_MODULES_CONTABILIDAD_HOY);
     render(<ComisionesPageClient availableYears={[2026]} />);
-    await screen.findByRole("button", { name: "Todas las empresas", exact: true });
+    await screen.findByLabelText("Empresa");
     await waitFor(() => expect(screen.queryByRole("button", { name: /Actualizar ahora/i })).toBeNull());
   }, 20000);
 
@@ -390,7 +393,7 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     const { ComisionesPageClient } = await import("@/app/comisiones/ComisionesPageClient");
     sesion("bodega", ["catalogos", "guias", "packing-lists", "referencia"]);
     render(<ComisionesPageClient availableYears={[2026]} />);
-    expect(screen.queryByRole("button", { name: "Todas las empresas", exact: true })).toBeNull();
+    expect(screen.queryByLabelText("Empresa")).toBeNull();
     await waitFor(() => expect(push).toHaveBeenCalledWith("/home"), { timeout: 5000 });
   }, 20000);
 
@@ -399,7 +402,7 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     for (const [rol, mods] of [["secretaria", ["comisiones", "guias"]], ["admin", []]] as [string, string[]][]) {
       sesion(rol, mods);
       const { unmount } = render(<ComisionesPageClient availableYears={[2026]} />);
-      await screen.findByRole("button", { name: "Todas las empresas", exact: true });
+      await screen.findByLabelText("Empresa");
       await waitFor(() => expect(screen.getAllByText(/REINALDO ESPINOSA/i).length).toBeGreaterThan(0), { timeout: 5000 });
       expect(push, rol).not.toHaveBeenCalled();
       unmount();
@@ -480,7 +483,9 @@ describe("el toggle del descuento solo lo ve quien puede escribirlo", () => {
     expect(porEmpresa).not.toMatch(/Configurar/);
     const shell = plano(leer("src/components/ventas/ComisionesView.tsx"));
     expect(shell).toMatch(/const hayConfig = esAdmin && conConfiguracion;/);
-    expect(shell).toMatch(/hayConfig \? \[\["config", "Configuración"\]/);
+    // 🔄 6-sep-2026: era un chip entre las 4 pestañas y hoy es el ⚙ que se
+    // dibuja SOLO con `hayConfig`. La condición no cambió.
+    expect(shell).toMatch(/\{hayConfig && \(/);
   });
 });
 

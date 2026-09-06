@@ -117,47 +117,61 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-// ═══ 1. El chip ══════════════════════════════════════════════════════════════
-describe("🔴 el chip «Configuración»: solo admin, solo en el módulo /comisiones, y la ÚNICA entrada", () => {
-  it("admin en /comisiones lo ve y lo abre; ahí no hay período ni Excel", async () => {
+// ═══ 1. El engranaje ═════════════════════════════════════════════════════════
+//
+// 🔄 CANDADO RE-APUNTADO EL 6-sep-2026. Era un CHIP entre las cuatro pestañas;
+// hoy es un ⚙ fijo al lado del único selector de empresa. Daniel, textual:
+// *«opino eliminar los tabs y dejar configuración como el depurador, estilo
+// engranaje y ya»* y, sobre si el ⚙ desaparece con Multifashion elegido, *«a y
+// con, para que no se sienta que desapareció un botón»*.
+//
+// 🔑 Y HAY UNA RAZÓN DE FONDO: **Configuración no es de una empresa, es del
+// MÓDULO** — las tasas, los clientes que no comisionan y los descuentos viven
+// ahí sin importar qué estés mirando. Por eso el ⚙ está SIEMPRE, en el mismo
+// lugar. Lo que este bloque cuida no cambió: **solo admin**, **solo en
+// /comisiones**, y **una sola entrada**.
+describe("🔴 el ⚙ «Configuración»: solo admin, solo en el módulo /comisiones, y la ÚNICA entrada", () => {
+  it("admin en /comisiones lo ve y lo abre; ahí no hay período ni descarga", async () => {
     sessionStorage.setItem("cxc_role", "admin");
     render(<ComisionesView availableYears={[2026]} conConfiguracion />);
-    const chip = await screen.findByRole("button", { name: "Configuración", exact: true });
-    await act(async () => { fireEvent.click(chip); });
-    expect(chip.getAttribute("aria-current")).toBe("page");
+    const engranaje = await screen.findByRole("button", { name: "Configuración", exact: true });
+    await act(async () => { fireEvent.click(engranaje); });
+    // Es un interruptor: queda marcado mientras la configuración está abierta.
+    expect(engranaje.getAttribute("aria-pressed")).toBe("true");
     await screen.findByText("Tasas por vendedor");
     await screen.findByText("Clientes que no comisionan");
-    expect(screen.queryByRole("button", { name: /Excel/i })).toBeNull();
-    expect(localStorage.getItem("fg_comisiones_mode")).toBe("config");
+    expect(screen.queryByRole("button", { name: /Descargar el mes/i })).toBeNull();
+    // Y el selector de empresa NO se va: elegir una es la forma de salir.
+    expect(screen.getByLabelText("Empresa")).toBeTruthy();
   });
 
   it("contabilidad y secretaria NO lo ven aunque estén en /comisiones", async () => {
     for (const rol of ["contabilidad", "secretaria"]) {
       sessionStorage.setItem("cxc_role", rol);
       const { unmount } = render(<ComisionesView availableYears={[2026]} conConfiguracion />);
-      await screen.findByRole("button", { name: "Todas las empresas", exact: true });
+      await screen.findByLabelText("Empresa");
       expect(screen.queryByRole("button", { name: "Configuración", exact: true }), rol).toBeNull();
       unmount();
     }
   });
 
-  it("el admin en la pestaña Comisiones de VENTAS tampoco lo ve — y un modo «config» guardado cae a «Todas las empresas»", async () => {
+  it("el admin en la pestaña Comisiones de VENTAS tampoco lo ve — y un «config» guardado cae a Fashion Group", async () => {
     sessionStorage.setItem("cxc_role", "admin");
     localStorage.setItem("fg_comisiones_mode", "config");
     render(<ComisionesView availableYears={[2026]} />);
-    const todas = await screen.findByRole("button", { name: "Todas las empresas", exact: true });
+    const selector = await screen.findByLabelText("Empresa");
     expect(screen.queryByRole("button", { name: "Configuración", exact: true })).toBeNull();
-    expect(todas.getAttribute("aria-current")).toBe("page");
+    expect(selector.textContent).toContain("Fashion Group");
+    await screen.findByRole("table");
   });
 
   // CAMBIÓ DE DIRECCIÓN el 3-sep-2026 (noche): el botón «Configurar» de Por
   // empresa llevaba a la pestaña; Daniel: «configuración en dos lados». Ya no
-  // existe — ni para el admin — y el chip de arriba es la única entrada.
-  it("🔴 Por empresa NO tiene botón «Configurar» (ni para el admin): el chip es la única entrada", async () => {
+  // existe — ni para el admin — y el ⚙ de arriba es la única entrada.
+  it("🔴 la vista de una empresa NO tiene botón «Configurar»: el ⚙ es la única entrada", async () => {
     sessionStorage.setItem("cxc_role", "admin");
     localStorage.setItem("fg_comisiones_mode", "empresa");
     render(<ComisionesView availableYears={[2026]} conConfiguracion />);
-    await screen.findByRole("button", { name: "Por empresa", exact: true });
     await screen.findByRole("table");
     expect(screen.queryByRole("button", { name: /Configurar/ })).toBeNull();
     expect(screen.getByRole("button", { name: "Configuración", exact: true })).toBeTruthy();
@@ -208,11 +222,19 @@ describe("🔴 la pestaña Configuración", () => {
     // Daniel: «quítalo».
     expect(within(tabla).queryByText(/DANIEL LEVY|Daniel Levy/)).toBeNull();
     expect(within(tabla).queryByText("no se paga")).toBeNull();
-    // Guardar manda las DOS tasas con el nombre CANÓNICO (el que agrupa la RPC).
-    await act(async () => { fireEvent.click(within(tabla).getByRole("button", { name: "Guardar tasas" })); });
+    // Se manda con el nombre CANÓNICO (el que agrupa la RPC) y con las DOS tasas.
+    // 🔄 6-sep-2026: se fue el botón «Guardar tasas» (era un segundo botón NEGRO
+    // compitiendo con «+ Agregar», y las tasas pedían guardar mientras las
+    // casillas de al lado se guardaban solas). Ahora se manda al SALIR DEL CAMPO
+    // — y solo si cambió: abrir la pantalla y salir no escribe nada.
+    const ventaRey = within(tabla).getByLabelText("Tasa de venta de Reynaldo Espinosa");
+    await act(async () => { fireEvent.blur(ventaRey); });
+    expect(llamadas.some((c) => c.method === "PUT"), "sin cambiar nada no se escribe").toBe(false);
+    await act(async () => { fireEvent.change(ventaRey, { target: { value: "2" } }); });
+    await act(async () => { fireEvent.blur(ventaRey); });
     const put = llamadas.find((c) => c.method === "PUT")!;
     const upd = (put.body as { updates: { vendedor_nombre: string; tasa_venta: number; tasa_cobro: number }[] }).updates;
-    expect(upd.find((u) => u.vendedor_nombre === "REYNALDO ESPINOSA")).toMatchObject({ tasa_venta: 0.01, tasa_cobro: 0.01 });
+    expect(upd.find((u) => u.vendedor_nombre === "REYNALDO ESPINOSA")).toMatchObject({ tasa_venta: 0.02, tasa_cobro: 0.01 });
     expect(upd.some((u) => u.vendedor_nombre === "DANIEL LEVY")).toBe(false);
   });
 
@@ -228,15 +250,18 @@ describe("🔴 la pestaña Configuración", () => {
     expect(within(activeWear).getByLabelText("1 en Active Wear").textContent).toBe("1");
     // Encabezados de la tabla del grupo: sin columna Empresa, sin Motivo.
     const encabezados = within(activeShoes).getAllByRole("columnheader").map((h) => h.textContent?.trim());
-    expect(encabezados).toEqual(["Cliente", "Vendedor", "Venta", "Cobro", "Desde", "Quitar"]);
+    // 🔄 6-sep-2026: se fue «Desde». Decía «3 sept 2026» en TODAS las filas —el
+    // día en que se cargaron, no una fecha de vigencia—, así que no distinguía
+    // nada. `creado_en` sigue en la base como firma de quién y cuándo.
+    expect(encabezados).toEqual(["Cliente", "Vendedor", "Venta", "Cobro", "Quitar"]);
     expect(encabezados).not.toContain("Empresa");
     expect(encabezados).not.toContain("Motivo");
     const fila = within(activeShoes).getByText("Kheriddine").closest("tr")!;
     expect(within(fila).getByText("D-84")).toBeTruthy();
     expect(within(fila).getByText("Reynaldo Espinosa")).toBeTruthy();
     expect(within(fila).queryByText("Active Shoes")).toBeNull();
-    // La fecha en Panamá, con el mismo formato que todo el sistema.
-    expect(within(fila).getByText(fmtDate("2026-09-03"))).toBeTruthy();
+    // 🔄 6-sep-2026: la fecha ya no se dibuja — decía lo mismo en todas las filas.
+    expect(within(fila).queryByText(fmtDate("2026-09-03"))).toBeNull();
     // Las casillas dicen lo que trae cada fila: Kheriddine las dos; Metro Shoes solo venta.
     expect((within(fila).getByLabelText("Venta de Kheriddine para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(true);
     expect((within(fila).getByLabelText("Cobro de Kheriddine para Reynaldo Espinosa") as HTMLInputElement).checked).toBe(true);
@@ -309,7 +334,7 @@ describe("🔴 la pestaña Configuración", () => {
     await act(async () => { fireEvent.click(guardar); });
     const post = llamadas.find((c) => c.method === "POST")!;
     expect(post.url).toContain("/api/ventas/comisiones/exclusiones");
-    expect(post.body).toEqual({ empresa_key: "vistana", cliente_codigo: "D-84", vendedor: "EDWIN", excluye_venta: true, excluye_cobro: true });
+    expect(post.body).toEqual({ empresa_keys: ["vistana"], cliente_codigo: "D-84", vendedor: "EDWIN", excluye_venta: true, excluye_cobro: true });
     await screen.findByText("Listo, guardado");
   });
 
@@ -377,6 +402,10 @@ describe("🔴 el chip «N clientes sin comisión» NO va en las tablas", () => 
     expect(tabla.querySelector("[data-clientes-sin-comision]")).toBeNull();
     // CONTROL: la tabla sí se pintó y Reynaldo está en ella.
     expect(within(tabla).getByText("Reynaldo Espinosa")).toBeTruthy();
+    // 🔄 6-sep-2026: la oficina arranca detrás de «Ver los que no se pagan».
+    await act(async () => {
+      fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
+    });
     const def = within(tabla).getByText("Oficina (DEFAULT)").closest("tr")!;
     expect(within(def).queryByText(/sin comisión/)).toBeNull();
   });

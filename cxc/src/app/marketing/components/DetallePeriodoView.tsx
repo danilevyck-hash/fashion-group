@@ -241,7 +241,7 @@ export default function DetallePeriodoView({
               {bajando === zipClave
                 ? "Armando…"
                 : abierto || esBucket
-                  ? "Bajar ZIP"
+                  ? "Descargar ZIP"
                   : "ZIP"}
             </button>
           )}

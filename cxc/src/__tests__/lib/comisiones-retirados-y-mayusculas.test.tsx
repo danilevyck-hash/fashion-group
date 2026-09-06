@@ -246,9 +246,15 @@ describe("🔴 (a) Por empresa: ni Aguas ni COLABORADOR existen en la tabla, ni 
     expect(within(tabla).queryByText(/sin actividad/)).toBeNull();
   });
 
-  it("las tarjetas del celular: 3 tarjetas (Edwin, Reynaldo, oficina), ninguna de Aguas, total $400.00", async () => {
+  // 🔄 6-sep-2026: la oficina (que NO se paga) arranca detrás de «Ver los que no
+  // se pagan», así que a la vista quedan 2 tarjetas y con el enlace abierto, 3.
+  // Lo que este caso cuida —que Aguas y COLABORADOR no existan en ninguna de las
+  // dos— no cambió.
+  it("las tarjetas del celular: 2 a la vista (Edwin, Reynaldo) y 3 con la oficina; ninguna de Aguas, total $400.00", async () => {
     const { container } = render(<ComisionesPorEmpresaView year={2026} mes={8} />);
-    await screen.findByRole("table");
+    const tabla = await screen.findByRole("table");
+    expect([...container.querySelectorAll("[data-comision-card]")]).toHaveLength(2);
+    fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
     const tarjetas = [...container.querySelectorAll("[data-comision-card]")].map((c) => c.textContent ?? "");
     expect(tarjetas).toHaveLength(3);
     expect(tarjetas.some((t) => /Aguas/i.test(t))).toBe(false);
@@ -280,6 +286,10 @@ describe("🔴 (a) Todas las empresas: ni el canónico ni la grafía vieja entra
     const tabla = await screen.findByRole("table");
     expect(within(tabla).queryByText(/Aguas/i)).toBeNull();
     expect(within(tabla).queryByText(/Colaborador/i)).toBeNull();
+    // 🔄 6-sep-2026: la oficina arranca escondida (no se paga), así que a la
+    // vista hay 2 filas; con «Ver los que no se pagan» abierto, 3.
+    expect(within(tabla).getAllByRole("row").filter((r) => r.hasAttribute("data-se-paga"))).toHaveLength(2);
+    fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
     const filas = within(tabla).getAllByRole("row").filter((r) => r.hasAttribute("data-se-paga"));
     expect(filas).toHaveLength(3);
     const pie = textoPie(tabla);
@@ -377,7 +387,9 @@ describe("🔴 (b) cada superficie muestra «Reynaldo Espinosa», nunca «REYNAL
     expect(within(tabla).queryByText(CANONICO)).toBeNull();
     expect(within(tabla).getByText("Edwin")).toBeTruthy();
     expect(within(tabla).queryByText("EDWIN")).toBeNull();
-    // La oficina sigue diciendo «Oficina (DEFAULT)», no «Oficina (default)».
+    // La oficina sigue diciendo «Oficina (DEFAULT)», no «Oficina (default)»
+    // — detrás de «Ver los que no se pagan» desde el 6-sep-2026.
+    fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
     expect(within(tabla).getByText(ETIQUETA_DEFAULT)).toBeTruthy();
     // Tarjetas del celular: mismo nombre bonito.
     const tarjetas = [...container.querySelectorAll("[data-comision-card]")].map((c) => c.textContent ?? "");
@@ -393,6 +405,7 @@ describe("🔴 (b) cada superficie muestra «Reynaldo Espinosa», nunca «REYNAL
     const tabla = await screen.findByRole("table");
     expect(within(tabla).getAllByText(BONITO)).toHaveLength(1);
     expect(within(tabla).queryByText(CANONICO)).toBeNull();
+    fireEvent.click(within(tabla).getByRole("button", { name: /Ver los que no se pagan/ }));
     expect(within(tabla).getByText(ETIQUETA_DEFAULT)).toBeTruthy();
     const filaRey = within(tabla).getByText(BONITO).closest("tr")!;
     const celdas = within(filaRey).getAllByRole("cell").map((c) => c.textContent);
@@ -467,7 +480,11 @@ describe("🔴 (c) el Excel lleva el nombre capitalizado y nada más cambia", ()
   });
 
   it("detalle del vendedor: el título de la hoja va capitalizado", async () => {
-    const ws = await buildComisionDetalleSheet(DETALLE, "Vistana International");
-    expect((ws.A1 as { v: unknown }).v).toBe(`Comisión — ${BONITO}`);
+    // 🔄 6-sep-2026: título, empresa y período caben en la FILA 1 (los
+    // encabezados de la tabla pasaron a la 3, con filtro). El nombre sigue
+    // capitalizado, que es lo que este caso cuida.
+    const ws = await buildComisionDetalleSheet(DETALLE, "Vistana");
+    expect((ws.A1 as { v: string }).v).toContain(`Comisión — ${BONITO}`);
+    expect((ws.A1 as { v: string }).v).not.toContain(CANONICO);
   });
 });

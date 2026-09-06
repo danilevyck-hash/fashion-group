@@ -19,6 +19,13 @@
 // las 00:00 y las 05:00 UTC, el navegador de alguien en otra zona podía apagar
 // el mes que sí se puede pedir (o dejar elegir uno que todavía no empezó).
 //
+// 🔴 «TODO EL AÑO» (6-sep-2026). Daniel rechazó una columna fija de «2026» en la
+// matriz —*«lo verán todo el tiempo»*— y pidió esto en su lugar: que el selector
+// ofrezca el año completo, para ver lo que va de 2026 y también 2025 o 2024. Es
+// el botón que corona la grilla de meses; cerrado, el control dice «Todo 2026».
+// El año es LA SUMA DE SUS MESES (`lib/comisiones/periodo` + `acumular-anio`),
+// no otra cuenta.
+//
 // No cambia ningún número: solo elige qué período se pide.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -26,12 +33,15 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { mesEnCurso } from "@/lib/comisiones/mes-inicial";
-
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-const MESES_CORTOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+import {
+  MESES_CORTOS,
+  MESES_LARGOS as MESES,
+  MES_TODO_EL_ANIO,
+  ROTULO_TODO_EL_ANIO,
+  esTodoElAnio,
+  etiquetaPeriodo,
+  etiquetaPeriodoCorta,
+} from "@/lib/comisiones/periodo";
 
 interface Props {
   mes: number;
@@ -64,7 +74,8 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
   const irAnio = (y: number) => {
     if (y < minAnio || y > maxAnio) return;
     // Mismo ajuste que hacía el selector viejo: nunca dejar un mes futuro.
-    const m = y === currentYear && mes > currentMonth ? currentMonth : mes;
+    // «Todo el año» no es un mes: sobrevive al cambio de año tal cual.
+    const m = !esTodoElAnio(mes) && y === currentYear && mes > currentMonth ? currentMonth : mes;
     onChange(y, m);
   };
 
@@ -75,7 +86,7 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label={`Período: ${MESES[mes - 1]} ${year}`}
+        aria-label={`Período: ${etiquetaPeriodo(year, mes)}`}
         /* Ancho FIJO en iPhone (w-[110px]): así el control mide lo mismo en
            mayo que en julio y la fila no se reacomoda al cambiar de mes. Con
            ancho automático, "May 2026" es 8.6px más ancho que "Jul 2026" —
@@ -86,8 +97,8 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
         {/* En iPhone el mes va abreviado para que el ancho del control NO
             dependa del mes: con "Septiembre 2026" la fila se partía en dos y
             el encabezado crecía 52px en septiembre y no en julio. */}
-        <span className="whitespace-nowrap sm:hidden">{MESES_CORTOS[mes - 1]} {year}</span>
-        <span className="hidden whitespace-nowrap sm:inline">{MESES[mes - 1]} {year}</span>
+        <span className="whitespace-nowrap sm:hidden">{etiquetaPeriodoCorta(year, mes)}</span>
+        <span className="hidden whitespace-nowrap sm:inline">{etiquetaPeriodo(year, mes)}</span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
@@ -122,6 +133,19 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
+
+            {/* 🔴 «Todo el año» corona la grilla: es el período más grande, así
+                que va arriba de los doce meses y a todo el ancho. */}
+            <button
+              type="button"
+              aria-pressed={esTodoElAnio(mes)}
+              onClick={() => { onChange(year, MES_TODO_EL_ANIO); setOpen(false); }}
+              className={`mb-1 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg text-sm transition active:scale-[0.97] ${
+                esTodoElAnio(mes) ? "bg-gray-900 font-medium text-white" : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              {ROTULO_TODO_EL_ANIO}
+            </button>
 
             <div className="grid grid-cols-3 gap-1">
               {MESES_CORTOS.map((corto, i) => {

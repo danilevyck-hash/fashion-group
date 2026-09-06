@@ -162,7 +162,13 @@ describe('🔴 "Todas las empresas" NO vuelve a restar lo ya restado', () => {
     const texto = tabla.textContent ?? "";
     expect(texto).toContain("$1,286.57");
     expect(texto).not.toContain("-286.51"); // la doble resta
-    expect(texto).not.toContain("$2,859.65"); // el subtotal
+    // 🔄 CANDADO RE-APUNTADO EL 6-sep-2026. Antes exigía que el SUBTOTAL no
+    // apareciera; hoy aparece a propósito, debajo del neto y como desglose:
+    // «$2,859.65 − $1,573.08». Daniel: la celda decía −$1.513,08 y no decía que
+    // ahí dentro hay plata restada — había que abrir el detalle para enterarse.
+    // Lo que este caso cuida —que la vista NO vuelva a restar— se sostiene en el
+    // número grande, que sigue siendo el que mandó el servidor.
+    expect(texto).toContain("$2,859.65 − $1,573.08");
   });
 });
 

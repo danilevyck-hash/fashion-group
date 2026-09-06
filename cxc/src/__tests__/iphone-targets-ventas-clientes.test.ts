@@ -246,9 +246,11 @@ describe("Proveedores — chips de empresa", () => {
     expect(bloque).not.toContain("py-1 text-xs");
   });
 
-  it("el toggle 'Ver N sin saldo' y 'Exportar Excel' llegan a 44px", () => {
+  it("el toggle 'Ver N sin saldo' y 'Descargar Excel' llegan a 44px", () => {
+    // 6-sep-2026: el verbo pasó de «Exportar» a «Descargar» en los 5 botones que
+    // no lo decían (Daniel: «a»). Medido: el sistema dice «Descargar» 23 veces.
     expect(proveedores).toContain("inline-flex min-h-[44px] items-center text-xs text-gray-400");
-    const i = proveedores.indexOf("Exportar Excel");
+    const i = proveedores.indexOf("Descargar Excel");
     expect(proveedores.slice(i - 400, i)).toContain("min-h-[44px]");
   });
 });

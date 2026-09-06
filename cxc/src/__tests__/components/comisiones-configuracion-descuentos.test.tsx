@@ -95,10 +95,16 @@ describe("🔴 «Activo» salió de Tasas por vendedor — era un control que me
     expect(within(tabla).getByRole("columnheader", { name: "Cobro" })).toBeTruthy();
   });
 
-  it("🔴 «Guardar tasas» no manda `activo`: la columna quedó sin escritores", async () => {
+  // 🔄 CANDADO RE-APUNTADO EL 6-sep-2026. Disparaba el botón «Guardar tasas»,
+  // que se retiró: era un segundo botón NEGRO compitiendo con «+ Agregar», y las
+  // tasas pedían guardar mientras las casillas de las otras dos tarjetas se
+  // guardaban solas. Ahora se manda al SALIR DEL CAMPO. Lo que este caso cuida
+  // —que el PUT no lleve `activo`— no cambió.
+  it("🔴 lo que se guarda no manda `activo`: la columna quedó sin escritores", async () => {
     render(<ComisionesConfiguracionView />);
-    await screen.findByLabelText("Tasa de venta de Edwin");
-    fireEvent.click(screen.getByRole("button", { name: "Guardar tasas" }));
+    const campo = await screen.findByLabelText("Tasa de venta de Edwin");
+    fireEvent.change(campo, { target: { value: "0.75" } });
+    fireEvent.blur(campo);
     await waitFor(() => expect(llamadas.some((l) => l.method === "PUT")).toBe(true));
     const put = llamadas.find((l) => l.method === "PUT")!;
     for (const u of (put.body as { updates: Record<string, unknown>[] }).updates) {

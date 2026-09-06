@@ -57,7 +57,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
-import { render, screen, cleanup, waitFor, fireEvent, act } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, fireEvent, act, within } from "@testing-library/react";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { NextRequest } from "next/server";
@@ -193,10 +193,20 @@ const almacenReal = () => {
 
 // Sigue valiendo, y ahora SOLO en `/comisiones`: las dos vistas que Daniel
 // pidió el 25-ago-2026 no se perdieron al retirar la pestaña.
-describe("las DOS vistas siguen ahí — «Todas las empresas» y «Por empresa»", () => {
+//
+// 🔄 CANDADO RE-APUNTADO EL 6-sep-2026. Eran dos PESTAÑAS («Todas las empresas»
+// y «Por empresa») y hoy son dos opciones del ÚNICO selector de empresa —
+// «Fashion Group» y cada una de las 6. Daniel, textual: *«opino eliminar los
+// tabs… Todas las empresas solo se agrega en una opción con las empresas»* y
+// *«entonces a, pero en todas pon fashion group para no confundir»*.
+//
+// Lo que se exige no cambió: **las dos vistas siguen existiendo y el shell las
+// monta**. Lo que cambió es CÓMO se llega, y que el modo guardado de antes
+// (`fg_comisiones_mode`) sigue llevando a la vista equivalente — ningún enlace
+// ni ninguna memoria se rompe.
+describe("las DOS vistas siguen ahí — «Fashion Group» y una empresa suelta", () => {
   beforeEach(() => {
     Object.defineProperty(window, "localStorage", { value: almacenReal(), configurable: true, writable: true });
-    localStorage.setItem("fg_comisiones_mode", "todas");
     vi.stubGlobal("fetch", async (url: RequestInfo | URL) => {
       const u = String(url);
       const body = u.includes("/consolidado") ? RESPUESTA_CONSOLIDADO : RESPUESTA_EMPRESA;
@@ -205,25 +215,28 @@ describe("las DOS vistas siguen ahí — «Todas las empresas» y «Por empresa�
   });
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-  it("se monta con las dos pestañas de modo y se puede cambiar entre ellas", async () => {
+  it("el modo viejo «todas» abre la matriz de Fashion Group", async () => {
+    localStorage.setItem("fg_comisiones_mode", "todas");
     const { ComisionesView } = await import("@/components/ventas/ComisionesView");
     render(<ComisionesView availableYears={[2026, 2025]} />);
+    const tabla = await screen.findByRole("table");
+    // La matriz: una columna por empresa, con el nombre CORTO.
+    expect(within(tabla).getByText("Vistana")).toBeTruthy();
+    expect(within(tabla).getByText("Fashion Wear")).toBeTruthy();
+    // Y el selector dice dónde estás parado, con el rótulo que eligió Daniel.
+    expect(screen.getByLabelText("Empresa").textContent).toContain("Fashion Group");
+  });
 
-    const todas = screen.getByRole("button", { name: "Todas las empresas", exact: true });
-    const porEmpresa = screen.getByRole("button", { name: "Por empresa", exact: true });
-    // Arranca en la matriz (el default y lo que el localStorage recordó).
-    expect(todas.getAttribute("aria-current")).toBe("page");
-    expect(porEmpresa.getAttribute("aria-current")).toBeNull();
-
-    await act(async () => { fireEvent.click(porEmpresa); });
-    await waitFor(() => expect(porEmpresa.getAttribute("aria-current")).toBe("page"));
-    expect(todas.getAttribute("aria-current")).toBeNull();
-    // Y lo RECUERDA: es lo que hace que Daniel no tenga que reelegir cada vez.
-    expect(localStorage.getItem("fg_comisiones_mode")).toBe("empresa");
-
-    await act(async () => { fireEvent.click(todas); });
-    await waitFor(() => expect(todas.getAttribute("aria-current")).toBe("page"));
-    expect(localStorage.getItem("fg_comisiones_mode")).toBe("todas");
+  it("el modo viejo «empresa» abre la última empresa usada", async () => {
+    localStorage.setItem("fg_comisiones_mode", "empresa");
+    localStorage.setItem("fg_last_comision_empresa", "fashion_wear");
+    const { ComisionesView } = await import("@/components/ventas/ComisionesView");
+    render(<ComisionesView availableYears={[2026, 2025]} />);
+    const tabla = await screen.findByRole("table");
+    // La vista de UNA empresa: sus cinco columnas de números.
+    expect(within(tabla).getByText("Com. venta")).toBeTruthy();
+    expect(within(tabla).getByText("Com. total")).toBeTruthy();
+    expect(screen.getByLabelText("Empresa").textContent).toContain("Fashion Wear");
   });
 
   it("las dos vistas hijas existen y el shell las monta a las dos", () => {

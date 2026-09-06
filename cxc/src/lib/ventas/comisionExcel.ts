@@ -11,6 +11,8 @@ import { ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
 import { sinRetirados } from "@/lib/comisiones/retirados";
+import { nombreArchivoComision } from "@/lib/comisiones/nombre-archivo";
+import { etiquetaPeriodo, sufijoArchivoPeriodo } from "@/lib/comisiones/periodo";
 
 export interface VentaDoc {
   fecha: string;
@@ -82,17 +84,39 @@ export function ventasPagables(ventas: VentaDoc[]): VentaDoc[] {
   return ventas.filter((v) => v.subtotal !== 0);
 }
 
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-
 // ── Detalle por vendedor: UNA hoja con secciones apiladas ────────────────────
-// Misma estructura vertical que el original: título, sección VENTAS (tabla +
-// total), sección COBROS (tabla + total), sección CIERRE (bases × tasas +
-// comisión total). Solo cambia la paleta/estilo unificado. Como el layout es
-// propio (multi-sección) usa makeCellStyles, no buildReportSheet (solo tablas
-// simples).
+//
+// 🔴 TÍTULO EN LA FILA 1, FILA 2 VACÍA, ENCABEZADOS EN LA FILA 3 — con FILTRO y
+// con la fila fija al bajar (6-sep-2026). Daniel, textual: *«se puede mover a la
+// fila 3 para separación y con filtro»*.
+//
+// 🩸 ANTES eran cinco filas antes de la primera columna: banda de título (1),
+// subtítulo con empresa y período (2), una franja separadora de 4 puntos de alto
+// que en pantalla se ve como una fila escondida (3), la banda «VENTAS» (4) y
+// recién ahí los encabezados (5) — sin filtro y sin fila fija, porque
+// `!autofilter` necesita saber dónde empiezan. Es la MISMA queja que ya había
+// arreglado `buildReportSheet` para el resto del sistema: *«la tercera fila está
+// como escondido, no me deja filtrar desde los nombres importantes»*.
+//
+// Ahora la fila 1 dice todo de una: `Comisión — Edwin · Vistana · Agosto 2026`
+// (con el nombre CORTO de la empresa, diccionario § 0), la 2 queda vacía para
+// separar, y la 3 son los encabezados de la tabla de facturas.
+//
+// ⚠️ **UN SOLO FILTRO, Y VA EN LAS FACTURAS.** Daniel: *«como está entonces,
+// filtro en facturas nomás»*. Una hoja de Excel admite UN autofiltro y él lo
+// sabe: COBROS y CIERRE se quedan sin filtro a propósito. Por eso la banda
+// «VENTAS» ya no hace falta —lo que hay debajo del título ES la tabla de
+// facturas— mientras que «COBROS» y «CIERRE» conservan la suya, que es lo que
+// marca dónde termina una sección y empieza la otra.
+//
+// ⚠️ **EL Nº DE FACTURA SE QUEDA LARGO** (`11-000003022`). En pantalla se
+// muestran los últimos 4 dígitos; acá no, y es una decisión de Daniel («no»):
+// este es el papel que se concilia contra Switch. Y las columnas siguen siendo
+// **cinco**: nada de «% de utilidad» ni «Comisión» por línea — *«es a
+// propósito»*.
+//
+// Como el layout es propio (multi-sección) usa makeCellStyles, no
+// buildReportSheet (que es solo para tablas simples).
 
 /** Construcción pura del sheet del detalle (sin DOM) — testeable.
  *  `descuentos` = descuentos ACTIVOS del mes (se restan del total a pagar).
@@ -102,9 +126,8 @@ export async function buildComisionDetalleSheet(
   empresaNombre: string,
   descuentos: ComisionDescuento[] = [],
 ): Promise<WorkSheet> {
-  const { makeCellStyles, CASA_PALETTE, MONEY_FMT, addr } = await import("@/lib/excel-export");
-  const { band, hdr, td, tdN, tot, fillRow } = makeCellStyles(CASA_PALETTE);
-  const periodo = `${MESES[d.mes - 1]} ${d.year}`;
+  const { makeCellStyles, CASA_PALETTE, MONEY_FMT, PCT_FMT, addr } = await import("@/lib/excel-export");
+  const { band, hdr, td, tdN, tot } = makeCellStyles(CASA_PALETTE);
 
   const ws: WorkSheet = {};
   const merges: Range[] = [];
@@ -112,15 +135,17 @@ export async function buildComisionDetalleSheet(
   const lastCol = 4;
   let r = 0;
 
-  // Título + subtítulo (empresa · período) + separador — patrón de la casa.
+  // FILA 1 — qué es, de quién, de dónde y de cuándo, en una sola línea.
   // Capitalizado («Reynaldo Espinosa»), igual que en pantalla (Daniel, 3-sep-2026).
-  band(ws, r, lastCol, merges, `Comisión — ${nombreVendedorEnPantalla(d.vendedor)}`, CASA_PALETTE.pri, 14);
-  heights[r] = 30; r++;
-  band(ws, r, lastCol, merges, `${empresaNombre} · ${periodo}`, CASA_PALETTE.mid, 10);
-  heights[r] = 20; r++;
-  fillRow(ws, r, lastCol, CASA_PALETTE.sep);
-  merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
-  heights[r] = 4; r++;
+  band(
+    ws, r, lastCol, merges,
+    `Comisión — ${nombreVendedorEnPantalla(d.vendedor)} · ${empresaNombre} · ${etiquetaPeriodo(d.year, d.mes)}`,
+    CASA_PALETTE.pri, 12,
+  );
+  heights[r] = 26; r++;
+
+  // FILA 2 — vacía. Sin relleno ni merge: es separación, no una banda más.
+  heights[r] = 14; r++;
 
   const section = (label: string) => {
     band(ws, r, lastCol, merges, label, CASA_PALETTE.mid, 11);
@@ -128,15 +153,20 @@ export async function buildComisionDetalleSheet(
   };
   const spacer = () => { heights[r] = 8; r++; };
 
-  // ── VENTAS ── (columna Tipo FA/NC; SIN % utilidad en el reporte físico)
+  // ── FILA 3: los encabezados de VENTAS ── (columna Tipo FA/NC; SIN % utilidad)
   // Solo lo PAGABLE: las facturas con aporte $0 (utilidad ≤20%) se omiten —
   // siguen visibles en el modal, pero no en el Excel que firma el vendedor.
   const ventasExcel = ventasPagables(d.ventas);
-  section("VENTAS");
+  const filaEncabezados = r;
   ["Fecha", "Cliente", "Factura", "Tipo", "Subtotal"].forEach((h, i) => {
     ws[addr(r, i)] = hdr(h, i === 4 ? "right" : i === 3 ? "center" : "left");
   });
   heights[r] = 22; r++;
+  // El filtro cubre encabezados + facturas y NADA más: el total, los cobros y
+  // el cierre quedan afuera para que filtrar no los esconda. Es también lo que
+  // le dice a `congelarEncabezadosXlsx` qué fila dejar fija (ver
+  // `excel-panel-fijo.ts`).
+  const filtro = `A${filaEncabezados + 1}:${addr(filaEncabezados + ventasExcel.length, lastCol)}`;
   ventasExcel.forEach((v, idx) => {
     const alt = idx % 2 === 0;
     ws[addr(r, 0)] = td(fmtDate(v.fecha), alt);
@@ -174,16 +204,21 @@ export async function buildComisionDetalleSheet(
   spacer();
 
   // ── CIERRE ──
+  // 🔴 LA TASA ES UN PORCENTAJE DE VERDAD, NO UN TEXTO (6-sep-2026). Decía
+  // `× 0.50%` escrito como cadena dentro de la celda, así que la única columna
+  // que explica de dónde sale la comisión era la única que Excel no podía usar
+  // para recalcular. Ahora la base es número (ya lo era) y la tasa es un número
+  // con formato de porcentaje (PCT_FMT): se ve igual y se puede multiplicar.
   section("CIERRE");
-  const cierre: [string, number, string, number][] = [
-    ["Ventas", d.ventas_base, `× ${(d.tasa_venta * 100).toFixed(2)}%`, d.comision_venta],
-    ["Cobros", d.cobros_base, `× ${(d.tasa_cobro * 100).toFixed(2)}%`, d.comision_cobro],
+  const cierre: [string, number, number, number][] = [
+    ["Ventas", d.ventas_base, d.tasa_venta, d.comision_venta],
+    ["Cobros", d.cobros_base, d.tasa_cobro, d.comision_cobro],
   ];
   cierre.forEach(([label, base, tasa, comision], idx) => {
     const alt = idx % 2 === 0;
     ws[addr(r, 0)] = td(label, alt);
     ws[addr(r, 1)] = tdN(base, alt, { fmt: MONEY_FMT });
-    ws[addr(r, 2)] = td(tasa, alt, { ha: "right" });
+    ws[addr(r, 2)] = tdN(tasa, alt, { fmt: PCT_FMT });
     ws[addr(r, 3)] = tdN(comision, alt, { fmt: MONEY_FMT });
     heights[r] = 18; r++;
   });
@@ -220,6 +255,7 @@ export async function buildComisionDetalleSheet(
   }
 
   ws["!ref"] = `A1:${addr(r - 1, lastCol)}`;
+  ws["!autofilter"] = { ref: filtro };
   ws["!merges"] = merges;
   ws["!cols"] = [{ wch: 14 }, { wch: 32 }, { wch: 16 }, { wch: 14 }, { wch: 12 }];
   ws["!rows"] = heights.map((h) => ({ hpt: h || 16 }));
@@ -233,10 +269,10 @@ export async function exportComisionDetalle(
 ): Promise<void> {
   const ws = await buildComisionDetalleSheet(d, empresaNombre, descuentos);
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
-  const safe = d.vendedor.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
+  // El MISMO nombre que el PDF: qué es, de quién, de cuándo (nombre-archivo.ts).
   downloadWorkbook(
     workbookFromSheets([{ name: "Comisión", ws }]),
-    `Comision-${safe}-${empresaNombre.replace(/\s+/g, "")}-${d.year}-${String(d.mes).padStart(2, "0")}.xlsx`,
+    `${nombreArchivoComision(d.vendedor, d.empresa_key, d.year, d.mes)}.xlsx`,
   );
 }
 
@@ -312,7 +348,7 @@ export async function exportComisionesResumen(r: ComisionResumen): Promise<void>
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
   downloadWorkbook(
     workbookFromSheets([{ name: "Comisiones", ws }]),
-    `comisiones-${r.empresaKey}-${String(r.mes).padStart(2, "0")}-${r.year}.xlsx`,
+    `comisiones-${r.empresaKey}-${sufijoArchivoPeriodo(r.year, r.mes)}.xlsx`,
   );
 }
 
@@ -376,6 +412,6 @@ export async function exportComisionesConsolidado(c: ComisionConsolidado): Promi
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
   downloadWorkbook(
     workbookFromSheets([{ name: "Consolidado", ws }]),
-    `comisiones-consolidado-${String(c.mes).padStart(2, "0")}-${c.year}.xlsx`,
+    `comisiones-consolidado-${sufijoArchivoPeriodo(c.year, c.mes)}.xlsx`,
   );
 }

@@ -21,14 +21,30 @@
 // vendedores de hoy no servía: el día que uno nuevo le facture, esa factura
 // vuelve a pagar comisión en silencio. En pantalla nunca se ve el `*`.
 //
+// 🔴 UNA DECISIÓN, VARIAS EMPRESAS (6-sep-2026). El alta ya no pide UNA empresa:
+// pide LAS QUE SEAN, con pastillas. 🩸 Medido: dar de alta costaba **~10 toques**
+// y la misma decisión hay que tomarla una vez por empresa — para cinco, **50
+// toques**. Y ya estaba pasando: **D-104 está cargado dos veces**, en Active
+// Shoes y en Active Wear, por una sola decisión. Ahora son **12**. El servidor
+// escribe UNA FILA POR EMPRESA (el grano de la tabla no cambia) y la que ya
+// existía no tira a las demás.
+//
+// El cliente y el vendedor se eligen del directorio de la PRIMERA empresa
+// marcada: son listas por empresa, y el código del cliente es el mismo en las
+// seis (invariante de la casa: la identidad del cliente es el CÓDIGO).
+//
+// 🩸 SE FUE LA COLUMNA «DESDE» (6-sep-2026). Decía «3 sept 2026» en TODAS las
+// filas: es el día en que se cargaron, no una fecha de vigencia. Un dato que
+// vale lo mismo en todas las filas no distingue nada. La columna `creado_en` de
+// la base NO se toca — sigue siendo la firma de quién y cuándo.
+//
 // Nada de esto se dice «exclusión» en pantalla.
 
 import { useCallback, useEffect, useState } from "react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { ConfirmDeleteModal } from "@/components/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ClienteSwitchPicker, { type ClienteSwitchOpcion } from "@/components/catalogo/ClienteSwitchPicker";
-import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { estaRetirado } from "@/lib/comisiones/retirados";
@@ -39,15 +55,14 @@ import {
   VENDEDOR_TODOS,
   type ExclusionActiva,
 } from "@/lib/comisiones/exclusiones";
-import { fmtDate } from "@/lib/format";
-import { fechaPanamaDe } from "@/lib/fecha-panama";
 
 interface ListaExclusiones {
   exclusiones: ExclusionActiva[];
   vendedores: Record<string, string[]>;
 }
 
-const nombreEmpresa = (k: string) => EMPRESA_KEY_TO_NAME[k] ?? k;
+/** Nombre CORTO de la empresa — «Vistana», no «Vistana International» (§ 0). */
+const nombreEmpresa = (k: string) => nombreCortoEmpresa(k);
 
 /** Una casilla de la lista (Venta / Cobro), con su nombre accesible. */
 function Casilla({
@@ -74,9 +89,9 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fila de alta (encima de las tablas).
+  // Fila de alta (encima de las tablas). VARIAS empresas de una vez.
   const [agregando, setAgregando] = useState(false);
-  const [empresa, setEmpresa] = useState<string>(EMPRESAS_COMISIONAN[0]);
+  const [empresas, setEmpresas] = useState<string[]>([EMPRESAS_COMISIONAN[0]]);
   const [cliente, setCliente] = useState<ClienteSwitchOpcion | undefined>(undefined);
   const [vendedor, setVendedor] = useState<string>("");
   // «arranca con las dos marcadas pero yo deselecciono» — Daniel.
@@ -113,15 +128,27 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
 
   useEffect(() => { void load(); }, [load]);
 
-  // Cambiar de empresa limpia cliente y vendedor: son de ESA empresa.
-  const elegirEmpresa = (k: string) => {
-    setEmpresa(k);
-    setCliente(undefined);
-    setVendedor("");
+  // La PRIMERA marcada (en el orden de las 6) es la que manda el directorio de
+  // clientes y la lista de vendedores. Si deja de estar marcada, cliente y
+  // vendedor se limpian: eran de ESA empresa.
+  const empresaDirectorio =
+    EMPRESAS_COMISIONAN.find((k) => empresas.includes(k)) ?? EMPRESAS_COMISIONAN[0];
+
+  const alternarEmpresa = (k: string) => {
+    setEmpresas((prev) => {
+      const siguiente = prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k];
+      const nuevoDirectorio = EMPRESAS_COMISIONAN.find((e) => siguiente.includes(e));
+      if (nuevoDirectorio !== empresaDirectorio) {
+        setCliente(undefined);
+        setVendedor("");
+      }
+      return siguiente;
+    });
   };
 
   const cancelarAlta = () => {
     setAgregando(false);
+    setEmpresas([EMPRESAS_COMISIONAN[0]]);
     setCliente(undefined);
     setVendedor("");
     setExcluyeVenta(true);
@@ -130,10 +157,11 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
   };
 
   // Los retirados de Comisiones tampoco se ofrecen en el desplegable: no existen.
-  const vendedoresDeEmpresa = (datos?.vendedores[empresa] ?? []).filter((v) => !estaRetirado(v));
+  const vendedoresDeEmpresa = (datos?.vendedores[empresaDirectorio] ?? []).filter((v) => !estaRetirado(v));
   const clienteCodigo = cliente?.codigo?.trim().toUpperCase() ?? "";
   const ningunaCasilla = !excluyeVenta && !excluyeCobro;
-  const puedeGuardar = !!clienteCodigo && !!vendedor && !ningunaCasilla && !guardando;
+  const sinEmpresas = empresas.length === 0;
+  const puedeGuardar = !sinEmpresas && !!clienteCodigo && !!vendedor && !ningunaCasilla && !guardando;
 
   async function guardar() {
     setGuardando(true);
@@ -143,7 +171,9 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          empresa_key: empresa,
+          // UNA fila por empresa: el servidor las escribe todas y avisa cuál ya
+          // estaba, sin tirar a las demás.
+          empresa_keys: EMPRESAS_COMISIONAN.filter((k) => empresas.includes(k)),
           cliente_codigo: clienteCodigo,
           vendedor,
           excluye_venta: excluyeVenta,
@@ -247,26 +277,43 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
 
       {agregando && (
         <div className="mb-3 rounded-md border border-gray-300 bg-gray-50 p-3" data-testid="alta-sin-comision">
-          <div className="grid gap-3 md:grid-cols-[1fr_1.8fr_1fr_auto] md:items-start">
-            <label className="block">
-              <span className="mb-1 block text-[11px] uppercase tracking-wide text-gray-500">Empresa</span>
-              <Select value={empresa} onValueChange={elegirEmpresa}>
-                <SelectTrigger className="min-h-[44px] w-full bg-white" aria-label="Empresa"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {EMPRESAS_COMISIONAN.map((k) => (
-                    <SelectItem key={k} value={k}>{nombreEmpresa(k)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
+          {/* 🔴 LAS EMPRESAS, TODAS LAS QUE SEAN. Era un desplegable de UNA y la
+              misma decisión había que repetirla empresa por empresa: 50 toques
+              para cinco. */}
+          <div className="mb-3">
+            <span className="mb-1 block text-[11px] uppercase tracking-wide text-gray-500">Empresas</span>
+            <div className="flex flex-wrap gap-1.5">
+              {EMPRESAS_COMISIONAN.map((k) => {
+                const marcada = empresas.includes(k);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => alternarEmpresa(k)}
+                    disabled={guardando}
+                    aria-pressed={marcada}
+                    className={`min-h-[44px] rounded-md border px-3 text-sm transition active:scale-[0.97] disabled:opacity-50 ${
+                      marcada
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
+                    }`}
+                  >
+                    {nombreEmpresa(k)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[1.8fr_1fr_auto] md:items-start">
             <div>
               <span className="mb-1 block text-[11px] uppercase tracking-wide text-gray-500">Cliente</span>
-              {/* El ÚNICO selector de cliente de Switch del sistema; la empresa
-                  va en la URL y el servidor lista el directorio de esa empresa. */}
+              {/* El ÚNICO selector de cliente de Switch del sistema. El
+                  directorio es el de la PRIMERA empresa marcada; el código del
+                  cliente es el mismo en las seis (la identidad es el CÓDIGO). */}
               <ClienteSwitchPicker
-                key={empresa}
-                api={`/api/ventas/comisiones/exclusiones/${empresa}`}
-                directorioLabel={nombreEmpresa(empresa)}
+                key={empresaDirectorio}
+                api={`/api/ventas/comisiones/exclusiones/${empresaDirectorio}`}
+                directorioLabel={nombreEmpresa(empresaDirectorio)}
                 valor={cliente}
                 onElegir={setCliente}
                 disabled={guardando}
@@ -321,7 +368,13 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
             </button>
             {!puedeGuardar && !guardando && (
               <span className={`text-xs ${ningunaCasilla ? "text-rose-600" : "text-gray-400"}`}>
-                {ningunaCasilla ? AVISO_NINGUNA_CASILLA : !clienteCodigo ? "Falta elegir el cliente" : "Falta elegir el vendedor"}
+                {ningunaCasilla
+                  ? AVISO_NINGUNA_CASILLA
+                  : sinEmpresas
+                    ? "Falta elegir al menos una empresa"
+                    : !clienteCodigo
+                      ? "Falta elegir el cliente"
+                      : "Falta elegir el vendedor"}
               </span>
             )}
           </div>
@@ -364,7 +417,6 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
                       <th className="px-3.5 py-2 font-medium">Vendedor</th>
                       <th className="px-3.5 py-2 text-center font-medium">Venta</th>
                       <th className="px-3.5 py-2 text-center font-medium">Cobro</th>
-                      <th className="px-3.5 py-2 font-medium">Desde</th>
                       <th className="py-2 pl-3.5"><span className="sr-only">Quitar</span></th>
                     </tr>
                   </thead>
@@ -400,7 +452,6 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
                               <span role="alert" className="mt-1 block whitespace-nowrap text-[11px] text-rose-600">{avisoFila.texto}</span>
                             )}
                           </td>
-                          <td className="px-3.5 py-2.5 text-xs text-gray-500">{fmtDate(fechaPanamaDe(f.creado_en))}</td>
                           <td className="py-2.5 pl-3.5 text-right">
                             <button
                               type="button"

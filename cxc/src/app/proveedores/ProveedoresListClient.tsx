@@ -255,7 +255,7 @@ function ProveedoresList() {
                   disabled={exportando}
                   className="shrink-0 inline-flex min-h-[44px] min-w-[132px] items-center justify-center rounded-md border border-gray-200 px-4 text-xs font-medium text-gray-700 hover:border-gray-300 transition active:scale-[0.97] disabled:text-gray-400 disabled:active:scale-100"
                 >
-                  {exportando ? "Preparando…" : "Exportar Excel"}
+                  {exportando ? "Preparando…" : "Descargar Excel"}
                 </button>
               </div>
 

@@ -19,7 +19,7 @@ vi.mock("@/lib/empresa-mapping", () => ({
   nombreCortoEmpresa: (k: string) => (k === "fashion_wear" ? "Fashion Wear" : k),
 }));
 
-import { workbookFromSheets, MONEY_FMT } from "@/lib/excel-export";
+import { workbookFromSheets, MONEY_FMT, PCT_FMT } from "@/lib/excel-export";
 import { buildResumenSheet } from "@/lib/ventas/excel";
 import {
   buildComisionDetalleSheet,
@@ -111,46 +111,62 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const wb = roundtrip([{ name: "Comisión", ws }]);
     const s = wb.Sheets["Comisión"];
 
-    // Layout apilado (1-based, 1 venta y 1 cobro):
-    // 1 título · 2 subtítulo · 3 sep · 4 VENTAS · 5 hdr · 6 venta · 7 total
-    // 8 spacer · 9 COBROS · 10 hdr · 11 cobro · 12 total · 13 spacer
-    // 14 CIERRE · 15 Ventas · 16 Cobros · 17 Comisión total
-    expect(s["A1"].v).toBe("Comisión — Ana Pérez");
-    expect(s["A2"].v).toBe("Fashion Wear · Junio 2026");
+    // 🔄 CANDADO RE-APUNTADO EL 6-sep-2026. Antes exigía cinco filas antes de la
+    // primera columna: título (1), subtítulo (2), franja separadora de 4 pt (3),
+    // banda «VENTAS» (4) y encabezados (5) — sin filtro y sin fila fija. Daniel:
+    // *«se puede mover a la fila 3 para separación y con filtro»* y, sobre los
+    // dos filtros posibles, *«como está entonces, filtro en facturas nomás»*.
+    //
+    // Layout apilado nuevo (1-based, 1 venta y 1 cobro):
+    // 1 título · 2 VACÍA · 3 hdr · 4 venta · 5 total ventas · 6 spacer
+    // 7 COBROS · 8 hdr · 9 cobro · 10 total cobros · 11 spacer
+    // 12 CIERRE · 13 Ventas · 14 Cobros · 15 Comisión total
+    expect(s["A1"].v).toBe("Comisión — Ana Pérez · Fashion Wear · Junio 2026");
+    expect(s["A2"]).toBeUndefined(); // la fila 2 está VACÍA, no es otra banda
 
     // VENTAS — columnas: Fecha · Cliente · Factura · Tipo · Subtotal (SIN % utilidad).
-    expect(s["A4"].v).toBe("VENTAS");
-    expect(s["A5"].v).toBe("Fecha");
-    expect(s["D5"].v).toBe("Tipo");
-    expect(s["E5"].v).toBe("Subtotal");
-    expect(s["D6"].v).toBe("FA"); // tipo corto
-    expect(s["E6"].t).toBe("n");
-    expect(s["E6"].v).toBe(500);
-    expect(s["E6"].z).toBe(MONEY_FMT);
-    expect(s["F6"]).toBeUndefined(); // no hay columna de % utilidad
-    expect(s["D7"].v).toBe("Total ventas");
-    expect(s["E7"].t).toBe("n");
-    expect(s["E7"].v).toBe(500);
+    expect(s["A3"].v).toBe("Fecha");
+    expect(s["D3"].v).toBe("Tipo");
+    expect(s["E3"].v).toBe("Subtotal");
+    expect(s["D4"].v).toBe("FA"); // tipo corto
+    expect(s["E4"].t).toBe("n");
+    expect(s["E4"].v).toBe(500);
+    expect(s["E4"].z).toBe(MONEY_FMT);
+    expect(s["F4"]).toBeUndefined(); // no hay columna de % utilidad
+    expect(s["D5"].v).toBe("Total ventas");
+    expect(s["E5"].t).toBe("n");
+    expect(s["E5"].v).toBe(500);
+
+    // 🔴 UN SOLO FILTRO, y va sobre las FACTURAS: encabezados (3) + sus filas.
+    // El total, los cobros y el cierre quedan afuera para que filtrar no los
+    // esconda. Ese `ref` es además lo que le dice a `congelarEncabezadosXlsx`
+    // qué fila dejar fija al bajar.
+    expect(s["!autofilter"]).toEqual({ ref: "A3:E4" });
 
     // COBROS
-    expect(s["A9"].v).toBe("COBROS");
-    expect(s["A10"].v).toBe("Fecha");
-    expect(s["C11"].t).toBe("n");
-    expect(s["C11"].v).toBe(300);
-    expect(s["C11"].z).toBe(MONEY_FMT);
-    expect(s["B12"].v).toBe("Total cobros");
-    expect(s["C12"].v).toBe(300);
+    expect(s["A7"].v).toBe("COBROS");
+    expect(s["A8"].v).toBe("Fecha");
+    expect(s["C9"].t).toBe("n");
+    expect(s["C9"].v).toBe(300);
+    expect(s["C9"].z).toBe(MONEY_FMT);
+    expect(s["B10"].v).toBe("Total cobros");
+    expect(s["C10"].v).toBe(300);
 
     // CIERRE
-    expect(s["A14"].v).toBe("CIERRE");
-    expect(s["A15"].v).toBe("Ventas");
-    expect(s["B15"].t).toBe("n");
-    expect(s["B15"].v).toBe(500);
-    expect(s["C15"].v).toBe("× 1.00%");
-    expect(s["D15"].v).toBe(5);
-    expect(s["A17"].v).toBe("Comisión total");
-    expect(s["D17"].t).toBe("n");
-    expect(s["D17"].v).toBe(6.5);
+    expect(s["A12"].v).toBe("CIERRE");
+    expect(s["A13"].v).toBe("Ventas");
+    expect(s["B13"].t).toBe("n");
+    expect(s["B13"].v).toBe(500);
+    // 🔴 LA TASA ES UN NÚMERO CON FORMATO DE PORCENTAJE, no el texto «× 1.00%».
+    // Era la única columna que explicaba de dónde sale la comisión y la única
+    // que Excel no podía usar para recalcular.
+    expect(s["C13"].t).toBe("n");
+    expect(s["C13"].v).toBe(0.01);
+    expect(s["C13"].z).toBe(PCT_FMT);
+    expect(s["D13"].v).toBe(5);
+    expect(s["A15"].v).toBe("Comisión total");
+    expect(s["D15"].t).toBe("n");
+    expect(s["D15"].v).toBe(6.5);
   });
 
   it("comisión detalle con descuentos fijos (subtotal − descuentos = total a pagar)", async () => {
@@ -170,16 +186,18 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const wb = roundtrip([{ name: "Comisión", ws }]);
     const s = wb.Sheets["Comisión"];
 
-    // CIERRE: Ventas(15) Cobros(16) Subtotal comisión(17) Desc(18) Desc(19) Total a pagar(20)
-    expect(s["A17"].v).toBe("Subtotal comisión");
-    expect(s["D17"].v).toBe(3208.42);
-    expect(s["A18"].v).toBe("Descuento");
-    expect(s["D18"].v).toBe(-1400);
-    expect(s["A19"].v).toBe("Descuento de adelanto");
-    expect(s["D19"].v).toBe(-173.08);
-    expect(s["A20"].v).toBe("Total a pagar");
-    expect(s["D20"].t).toBe("n");
-    expect(s["D20"].v).toBeCloseTo(1635.34, 2); // 3208.42 − 1400 − 173.08
+    // CIERRE (−2 filas desde el 6-sep-2026: el título ocupa UNA fila y la 2 va
+    // vacía): Ventas(13) Cobros(14) Subtotal comisión(15) Desc(16) Desc(17)
+    // Total a pagar(18).
+    expect(s["A15"].v).toBe("Subtotal comisión");
+    expect(s["D15"].v).toBe(3208.42);
+    expect(s["A16"].v).toBe("Descuento");
+    expect(s["D16"].v).toBe(-1400);
+    expect(s["A17"].v).toBe("Descuento de adelanto");
+    expect(s["D17"].v).toBe(-173.08);
+    expect(s["A18"].v).toBe("Total a pagar");
+    expect(s["D18"].t).toBe("n");
+    expect(s["D18"].v).toBeCloseTo(1635.34, 2); // 3208.42 − 1400 − 173.08
   });
 
   // El RPC lista las facturas con utilidad ≤20% con aporte $0.00 para que el
@@ -209,12 +227,15 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     const wb = roundtrip([{ name: "Comisión", ws }]);
     const s = wb.Sheets["Comisión"];
 
-    // VENTAS: hdr en 5, dos filas (6 y 7), total en 8 — la de $0 no ocupa fila.
-    expect(s["A5"].v).toBe("Fecha");
-    expect(s["C6"].v).toBe("11-000002973");
-    expect(s["C7"].v).toBe("13-000000800");
-    expect(s["E7"].v).toBe(-200);
-    expect(s["D8"].v).toBe("Total ventas");
+    // VENTAS: hdr en 3, dos filas (4 y 5), total en 6 — la de $0 no ocupa fila.
+    expect(s["A3"].v).toBe("Fecha");
+    // ⚠️ EL SECUENCIAL VA COMPLETO EN EL EXCEL. En pantalla se muestran los
+    // últimos 4 dígitos; acá no, y es decisión de Daniel («no»): este es el
+    // papel que se concilia contra Switch.
+    expect(s["C4"].v).toBe("11-000002973");
+    expect(s["C5"].v).toBe("13-000000800");
+    expect(s["E5"].v).toBe(-200);
+    expect(s["D6"].v).toBe("Total ventas");
     // El secuencial de la factura no pagable no aparece en NINGUNA celda.
     const secuenciales = Object.keys(s)
       .filter((k) => !k.startsWith("!"))
@@ -223,12 +244,12 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
 
     // El total sigue siendo la base del RPC (quitar filas de $0 no la mueve) y
     // coincide con la suma de las filas que SÍ quedaron.
-    expect(s["E8"].t).toBe("n");
-    expect(s["E8"].v).toBe(800);
-    expect(Number(s["E6"].v) + Number(s["E7"].v)).toBe(800);
-    // CIERRE (15 sección · 16 ventas · 17 cobros · 18 total) intacto.
-    expect(s["A18"].v).toBe("Comisión total");
-    expect(s["D18"].v).toBe(6.5);
+    expect(s["E6"].t).toBe("n");
+    expect(s["E6"].v).toBe(800);
+    expect(Number(s["E4"].v) + Number(s["E5"].v)).toBe(800);
+    // CIERRE (13 sección · 14 ventas · 15 cobros · 16 total) intacto.
+    expect(s["A16"].v).toBe("Comisión total");
+    expect(s["D16"].v).toBe(6.5);
   });
 
   // Columna nueva de PANTALLA: cuánto comisiona cada línea. Es informativa —

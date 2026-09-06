@@ -302,7 +302,10 @@ describe("⚠️ la RPC del dinero se llama en UN solo lugar", () => {
       "utf8",
     );
     for (const src of [consolidadoSrc, unaSrc]) {
-      expect(src).toContain("leerComision(empresa, year, mes)");
+      // 🔄 6-sep-2026: el mes es `m` (uno de los del período; «Todo el año» pide
+      // varios). Lo que se exige —una sola función para las dos rutas y cero
+      // `.rpc(` suelto— no cambió.
+      expect(src).toContain("leerComision(empresa, year, m)");
       expect(src).not.toMatch(/\.rpc\(/);
     }
     const rpcSrc = readFileSync(path.join(process.cwd(), "src/lib/comisiones/rpc.ts"), "utf8");

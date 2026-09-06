@@ -83,10 +83,17 @@ function padTopMovil(): number {
   return escala(parseFloat(usada!.split("-")[1]));
 }
 
-/** El bloque JSX de la barra de controles (hasta que arranca la vista hija). */
+/**
+ * El bloque JSX de la barra de controles (hasta que arranca la vista hija).
+ *
+ * 🔄 6-sep-2026: el corte era `{mode === "todas"`, la primera de las CUATRO
+ * pestañas. Las pestañas se fueron (un solo selector de empresa + un ⚙), así que
+ * el corte pasa a ser el aviso de rechazos, que es lo último de la barra y lo
+ * primero que no es un control.
+ */
 function barraDeControles(): string {
   const i = shell.indexOf('<div className="space-y-2">');
-  const j = shell.indexOf('{mode === "todas"', i);
+  const j = shell.indexOf('<AvisoRechazosSwitch', i);
   expect(i).toBeGreaterThan(-1);
   expect(j).toBeGreaterThan(i);
   return shell.slice(i, j);
@@ -262,22 +269,39 @@ describe("Comisiones — la tabla ancha son TARJETAS bajo lg", () => {
 });
 
 describe("Comisiones — lo que Daniel usa sigue a un toque", () => {
-  it("el interruptor Todas / Por empresa conserva sus dos etiquetas", () => {
-    expect(shell).toContain('"Todas las empresas"');
-    expect(shell).toContain('"Por empresa"');
+  // 🔄 CANDADO RE-APUNTADO EL 6-sep-2026. Exigía las etiquetas de las cuatro
+  // pestañas («Todas las empresas», «Por empresa»…) y que el shell NO importara
+  // el `Select` de la casa. Las dos cosas cambiaron a propósito. Daniel,
+  // textual: *«opino eliminar los tabs y dejar configuración como el depurador,
+  // estilo engranaje y ya. Todas las empresas solo se agrega en una opción con
+  // las empresas. Y multifashion es una empresa más»*, *«entonces a, pero en
+  // todas pon fashion group para no confundir»* y *«el merge de los tabs no es
+  // solo en el cel, sino también en desktop»*.
+  it("hay UN selector de empresa, no cuatro pestañas", () => {
+    // Las opciones y sus rótulos viven en el módulo puro, no acá.
+    expect(shell).toContain("OPCIONES_VISTA");
+    expect(shell).toContain("<SelectTrigger");
+    // Ninguna de las cuatro pestañas volvió.
+    expect(shell).not.toContain('"Todas las empresas"');
+    expect(shell).not.toContain('"Por empresa"');
+    expect(shell).not.toContain('"Multifashion"');
   });
 
-  it("mes y año son UN control, no dos cajas sueltas", () => {
+  it("mes y año siguen siendo UN control (el Select de arriba es la EMPRESA)", () => {
     expect(shell).toContain("<ComisionesPeriodo");
-    // El shell ya no arma selectores de mes/año por su cuenta.
-    expect(shell).not.toContain("@/components/ui/select");
-    expect(shell).not.toContain("SelectTrigger");
+    // El shell no arma selectores de mes/año por su cuenta: el único `Select`
+    // que importa es el de la empresa.
+    expect(shell).not.toContain("SelectItem value={String(");
+    expect(shell).not.toContain("MESES");
   });
 
   it("'Actualizar ahora' y Excel viven en la barra, no en una fila propia", () => {
     const barra = barraDeControles();
     expect(barra).toContain("<SyncNowButton");
-    expect(barra).toContain("Excel");
+    // 🔄 6-sep-2026: el botón decía «Excel» y ahora dice QUÉ TRAE — «Descargar
+    // el mes» / «Descargar el año» (Daniel: «a, pero descargar, no bajar, como
+    // esté en todos los módulos»). El rótulo vive en el módulo puro.
+    expect(barra).toContain("rotuloDescargarPeriodo(mes)");
     // Las vistas hijas ya no dibujan su propio botón Excel (era una fila de
     // 44px + 16px de separación, solo para él).
     expect(consolidado).not.toContain("FileSpreadsheet");
@@ -354,7 +378,11 @@ describe("Comisiones — 44px al tacto y cero scroll lateral en iPhone", () => {
     // partiera en dos líneas y el encabezado creciera 6px. Ancho fijo en
     // iPhone + mes abreviado = la fila mide lo mismo los 12 meses del año.
     expect(periodo).toContain("w-[110px]");
-    expect(periodo).toContain("MESES_CORTOS[mes - 1]");
+    // 🔄 6-sep-2026: la abreviatura del mes salió a `lib/comisiones/periodo`
+    // porque «Todo el año» es otro rótulo del mismo control. Sigue siendo el
+    // texto corto en el iPhone y el largo en escritorio.
+    expect(periodo).toContain("etiquetaPeriodoCorta(year, mes)");
+    expect(periodo).toContain("etiquetaPeriodo(year, mes)");
   });
 
   it("los controles no se comprimen; si algún día no entran, bajan de línea", () => {

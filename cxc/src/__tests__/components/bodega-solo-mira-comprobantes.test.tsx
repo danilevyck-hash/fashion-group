@@ -131,7 +131,7 @@ describe("🔴 2. a bodega no se le ofrece lo que el servidor le niega", () => {
 
   it("sin «Exportar Excel» (pedidos-export → 403)", async () => {
     await montarComo("bodega");
-    expect(screen.queryAllByRole("button", { name: /Exportar Excel/ })).toHaveLength(0);
+    expect(screen.queryAllByRole("button", { name: /Descargar Excel/ })).toHaveLength(0);
   });
 
   it("sin las casillas del borrado masivo", async () => {
@@ -216,7 +216,7 @@ describe("🔴 5. los otros tres roles quedaron igual que antes", () => {
       await montarComo(rol);
       expect(screen.queryAllByRole("button", { name: "Duplicar" }).length > 0, "duplicar").toBe(esp.duplicar);
       expect(screen.queryAllByRole("button", { name: "Eliminar" }).length > 0, "eliminar").toBe(esp.eliminar);
-      expect(screen.queryAllByRole("button", { name: /Exportar Excel/ }).length > 0, "exportar").toBe(esp.exportar);
+      expect(screen.queryAllByRole("button", { name: /Descargar Excel/ }).length > 0, "exportar").toBe(esp.exportar);
     });
   }
 

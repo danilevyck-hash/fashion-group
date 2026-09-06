@@ -26,10 +26,24 @@
 // comprimidas, ZIP64, un `<sheetView>` que no aparece. El candado de que hoy sí
 // se aplica lo pone el test, que abre el archivo y busca el `<pane>`.
 
-/** La primera fila queda fija y la vista arranca en A2. */
-const PANEL_FIJO =
-  '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>' +
-  '<selection pane="bottomLeft" activeCell="A2" sqref="A2"/>';
+/**
+ * Todo lo que hay HASTA la fila de encabezados queda fijo, y la vista arranca en
+ * la primera fila de datos.
+ *
+ * ⚠️ NO ES SIEMPRE LA FILA 1 (6-sep-2026). Lo era mientras la única hoja con
+ * filtro fuera la de `buildReportSheet` (encabezados en A1). El detalle de
+ * Comisiones los tiene en la **fila 3** —Daniel: *«se puede mover a la fila 3
+ * para separación y con filtro»*— así que la altura del panel se LEE del propio
+ * `ref` del filtro en vez de estar escrita a mano. Con encabezados en A1 el XML
+ * que sale es byte por byte el de antes.
+ */
+const panelFijo = (filaEncabezados: number) => {
+  const primeraDeDatos = filaEncabezados + 1;
+  return (
+    `<pane ySplit="${filaEncabezados}" topLeftCell="A${primeraDeDatos}" activePane="bottomLeft" state="frozen"/>` +
+    `<selection pane="bottomLeft" activeCell="A${primeraDeDatos}" sqref="A${primeraDeDatos}"/>`
+  );
+};
 
 const SIG_LOCAL = 0x04034b50;
 const SIG_CENTRAL = 0x02014b50;
@@ -67,14 +81,21 @@ interface EntradaZip {
 /**
  * Mete el `<pane>` en el XML de una hoja.
  *
- * 🔑 SOLO en las hojas que YA tienen filtro desde A1 — o sea, exactamente las
- * que salen de `buildReportSheet`. Es un marcador de CONDUCTA, no un índice de
+ * 🔑 SOLO en las hojas que YA tienen filtro — o sea, `buildReportSheet` (A1) y
+ * el detalle de Comisiones (A3). Es un marcador de CONDUCTA, no un índice de
  * hoja: las fichas con layout propio (Reclamos, el Depurador) no ponen filtro y
  * por eso no se les congela una fila que no es de encabezados.
+ *
+ * La fila que se congela sale del `ref` del filtro, no de una constante: donde
+ * empieza el filtro es, por construcción, donde están los encabezados.
  */
 function congelarPrimeraFila(xml: string): string | null {
-  if (!/<autoFilter ref="A1:/.test(xml)) return null;
+  const filtro = /<autoFilter ref="A(\d+):/.exec(xml);
+  if (!filtro) return null;
+  const fila = Number(filtro[1]);
+  if (!Number.isInteger(fila) || fila < 1) return null;
   if (/<pane\b/.test(xml)) return null;
+  const PANEL_FIJO = panelFijo(fila);
 
   const cerrado = /<sheetView\b([^>]*)\/>/.exec(xml);
   if (cerrado) return xml.replace(cerrado[0], `<sheetView${cerrado[1]}>${PANEL_FIJO}</sheetView>`);
@@ -217,8 +238,9 @@ function escribirZip(entradas: readonly EntradaZip[]): Uint8Array {
 
 /**
  * Devuelve el .xlsx con la fila de encabezados fija en todas las hojas que
- * tienen filtro desde A1. Si el archivo no se puede reescribir con seguridad,
- * devuelve los bytes de entrada SIN tocar.
+ * tienen filtro (A1 en los reportes tabulares, A3 en el detalle de Comisiones).
+ * Si el archivo no se puede reescribir con seguridad, devuelve los bytes de
+ * entrada SIN tocar.
  */
 export function congelarEncabezadosXlsx(xlsx: Uint8Array): Uint8Array {
   let entradas: EntradaZip[] | null = null;

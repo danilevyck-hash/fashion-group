@@ -112,6 +112,47 @@ export function validarExclusionNueva(body: unknown): Validacion {
   return { ok: true, valor: { empresa_key: empresa, cliente_codigo: codigo, vendedor, ...casillas } };
 }
 
+/**
+ * 🔴 UNA DECISIÓN, VARIAS EMPRESAS (6-sep-2026).
+ *
+ * 🩸 Medido: dar de alta un cliente que no comisiona costaba **~10 toques**, y
+ * la MISMA decisión hay que tomarla una vez por empresa — para cinco empresas,
+ * **50 toques**. Y ya estaba pasando: **D-104 está cargado dos veces**, en
+ * Active Shoes y en Active Wear, por una sola decisión de Daniel. Con el
+ * selector de empresas múltiple son **12**.
+ *
+ * 🔴 SE VALIDA UNA POR UNA, con la MISMA función de siempre: son N filas
+ * independientes en `comision_exclusion` (el grano de la tabla es (empresa,
+ * cliente, vendedor) y no cambia). Esto solo evita teclear el mismo dato cinco
+ * veces; no inventa un grano nuevo.
+ *
+ * Acepta `empresa_keys: string[]` o el `empresa_key` de siempre — un cuerpo
+ * viejo sigue funcionando. Sin ninguna empresa es un error con texto, nunca
+ * una lista vacía que «no hace nada».
+ */
+export function validarExclusionesNuevas(body: unknown): ValidacionMulti {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const crudas = Array.isArray(b.empresa_keys)
+    ? b.empresa_keys
+    : b.empresa_key !== undefined
+      ? [b.empresa_key]
+      : [];
+  const empresas = [...new Set(crudas.map((k) => (typeof k === "string" ? k.trim() : "")))];
+  if (empresas.length === 0) return { ok: false, error: "Elige al menos una empresa" };
+
+  const valores: ExclusionNueva[] = [];
+  for (const empresa of empresas) {
+    const v = validarExclusionNueva({ ...b, empresa_key: empresa });
+    if (!v.ok) return { ok: false, error: v.error };
+    valores.push(v.valor);
+  }
+  return { ok: true, valor: valores };
+}
+
+export type ValidacionMulti =
+  | { ok: true; valor: ExclusionNueva[] }
+  | { ok: false; error: string };
+
 export type ValidacionCasillas =
   | { ok: true; valor: { excluye_venta: boolean; excluye_cobro: boolean } }
   | { ok: false; error: string };

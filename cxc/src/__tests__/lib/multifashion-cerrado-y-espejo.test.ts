@@ -197,8 +197,12 @@ describe("⚠️ nada fuera del navegador llama a /api/multifashion/*", () => {
   });
 });
 
-// ═══ 6. El espejo ════════════════════════════════════════════════════════════
-describe("🔴 la pestaña «Multifashion» de Comisiones: espejo, no fusión", () => {
+/** El fuente SIN comentarios: lo que este barrido cuida es lo que CORRE. */
+const sinComentarios = (src: string): string =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+// ═══ 6. Multifashion dentro de Comisiones ════════════════════════════════════
+describe("🔴 Multifashion en Comisiones: una opción más, nunca una suma", () => {
   const shell = leer("src/components/ventas/ComisionesView.tsx");
   const vista = leer("src/components/multifashion/VendedorasSubtab.tsx");
 
@@ -214,22 +218,40 @@ describe("🔴 la pestaña «Multifashion» de Comisiones: espejo, no fusión", 
   });
 
   it("🔴 NO se fusiona nada: Comisiones no suma lo de Multifashion en ningún total", () => {
-    // El espejo es su propio modo de vista; ni el consolidado ni «Por empresa»
-    // lo conocen, y `EMPRESAS_COMISIONAN` sigue siendo las 6 del grupo.
-    expect(leer("src/components/ventas/ComisionesConsolidadoView.tsx")).not.toMatch(/multifashion|american_classic/i);
-    expect(leer("src/components/ventas/ComisionesPorEmpresaView.tsx")).not.toMatch(/american_classic/i);
+    // 🔴 SIGUE SIENDO LA REGLA, y desde el 6-sep-2026 pesa MÁS: Multifashion es
+    // una opción del mismo selector que «Fashion Group», así que la tentación de
+    // sumarlas está a un clic. Son dos comisiones calculadas distinto —el grupo
+    // paga 0,5 % solo sobre las facturas con más de 20 % de utilidad;
+    // Multifashion, 0,5 % sobre TODA la venta— y medido en agosto 2026 son
+    // $5.978,55 contra $255,27. Ni el consolidado ni la vista de una empresa la
+    // conocen, y `EMPRESAS_COMISIONAN` sigue siendo las 6 del grupo.
+    // 🔄 Se barre el CÓDIGO, sin comentarios: el porqué de la regla se escribe
+    // arriba de la regla, y nombrarla en una nota no es sumarla.
+    expect(sinComentarios(leer("src/components/ventas/ComisionesConsolidadoView.tsx")))
+      .not.toMatch(/multifashion|american_classic/i);
+    expect(sinComentarios(leer("src/components/ventas/ComisionesPorEmpresaView.tsx")))
+      .not.toMatch(/american_classic/i);
     expect(leer("src/lib/comisiones/empresas.ts")).toContain("export const EMPRESAS_COMISIONAN = B2B_EMPRESA_KEYS;");
+    // Y la matriz de Fashion Group se dibuja SOLO con esas 6.
+    expect(leer("src/components/ventas/ComisionesConsolidadoView.tsx"))
+      .toContain("const EMPRESAS = EMPRESAS_COMISIONAN;");
   });
 
-  it("la pestaña vive SOLO en el módulo /comisiones, no en la pestaña de Ventas", () => {
+  it("Multifashion se ofrece SOLO en el módulo /comisiones, no en la pestaña de Ventas", () => {
+    // 🔄 CANDADO RE-APUNTADO EL 6-sep-2026: era una PESTAÑA y hoy es una opción
+    // del único selector de empresa, debajo de una línea (Daniel: «multifashion
+    // es una empresa más… cambio mi opinión de que sea un espejo»). La bandera
+    // que la enciende es la misma.
     expect(leer("src/app/comisiones/ComisionesPageClient.tsx")).toContain("conMultifashion");
     expect(shell).toContain("conMultifashion = false");
-    // Sin la bandera, el modo ni se dibuja ni se puede restaurar de memoria.
-    expect(shell).toContain('...(conMultifashion ? [["multifashion", "Multifashion"] as [Mode, string]] : [])');
-    expect(shell).toContain('(saved !== "multifashion" || conMultifashion)');
+    // Sin la bandera, la opción ni se ofrece ni se puede restaurar de memoria.
+    expect(shell).toContain("conMultifashion || !esVistaMultifashion(o.valor)");
+    expect(shell).toContain("esVistaMultifashion(resuelta.vista) && !conMultifashion ? VISTA_GRUPO");
+    // Va DEBAJO DE UNA LÍNEA en el selector: no es del grupo y se ve.
+    expect(leer("src/lib/comisiones/vistas.ts")).toContain("separadorAntes: true");
   });
 
-  it("el período y el Excel del shell no aplican al espejo (trae sus propios chips)", () => {
-    expect(shell).toContain('mode !== "config" && !(mode === "multifashion" && conMultifashion)');
+  it("el período y la descarga del shell no aplican a Multifashion (trae sus propios chips)", () => {
+    expect(shell).toContain("!esVistaMultifashion(vista)");
   });
 });

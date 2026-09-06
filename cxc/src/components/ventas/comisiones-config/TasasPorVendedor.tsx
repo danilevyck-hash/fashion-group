@@ -25,6 +25,15 @@
 // lectores en la pantalla y sin escritores en el PUT. Para sacar a alguien de
 // Comisiones hay UNA sola forma, y sí funciona en el servidor: la lista de
 // retirados (`src/lib/comisiones/retirados.ts`).
+//
+// 🩸 SE FUE «GUARDAR TASAS» (6-sep-2026). Era un botón NEGRO que competía con el
+// «+ Agregar» negro de la tarjeta de al lado —dos botones principales en la
+// misma pantalla— y, peor: **las tasas pedían guardar mientras las casillas de
+// las otras dos tarjetas se guardaban solas**. Dos formas de guardar en la misma
+// pestaña es una que alguien va a olvidar. Ahora la tasa se manda **al salir del
+// campo** (`onBlur`) y solo si CAMBIÓ: abrir la pantalla y no tocar nada no
+// escribe. El PUT es el mismo de siempre y sigue mandando la fila entera
+// (venta + cobro), así que la validación del servidor no cambió.
 
 import { useCallback, useEffect, useState } from "react";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -53,7 +62,7 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
   const [pctVenta, setPctVenta] = useState<Record<string, string>>({});
   const [pctCobro, setPctCobro] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [guardando, setGuardando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -82,36 +91,51 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
 
   useEffect(() => { void load(); }, [load]);
 
-  async function save() {
-    setSaving(true);
+  /**
+   * Guarda UNA fila, al salir del campo y solo si cambió.
+   *
+   * 🔴 SE MANDA LA FILA ENTERA (venta + cobro), que es lo que el PUT espera: la
+   * ruta no cambió y sigue validando el rango 0 %–20 % de las dos. Si el valor
+   * no es válido se dice y se deja el campo como estaba en la base — nunca se
+   * escribe una tasa «más o menos».
+   */
+  async function guardarFila(r: ConfigRow) {
+    const venta = fromPct(pctVenta[r.vendedor_nombre] ?? toPct(r.tasa_venta));
+    const cobro = fromPct(pctCobro[r.vendedor_nombre] ?? toPct(r.tasa_cobro));
+    // Nada cambió: abrir la pantalla y salir no puede escribir.
+    if (venta === r.tasa_venta && cobro === r.tasa_cobro) return;
     setError(null);
+    const nombre = nombreVendedorEnPantalla(r.vendedor_nombre);
+    if (!Number.isFinite(venta) || venta < 0 || venta > 0.2) {
+      setError(`Tasa de venta inválida para ${nombre} (0% a 20%)`);
+      setPctVenta((p) => ({ ...p, [r.vendedor_nombre]: toPct(r.tasa_venta) }));
+      return;
+    }
+    if (!Number.isFinite(cobro) || cobro < 0 || cobro > 0.2) {
+      setError(`Tasa de cobro inválida para ${nombre} (0% a 20%)`);
+      setPctCobro((p) => ({ ...p, [r.vendedor_nombre]: toPct(r.tasa_cobro) }));
+      return;
+    }
+    setGuardando(r.vendedor_nombre);
     try {
-      const updates = rows.map((r) => {
-        const venta = fromPct(pctVenta[r.vendedor_nombre] ?? toPct(r.tasa_venta));
-        const cobro = fromPct(pctCobro[r.vendedor_nombre] ?? toPct(r.tasa_cobro));
-        if (!Number.isFinite(venta) || venta < 0 || venta > 0.2) {
-          throw new Error(`Tasa de venta inválida para ${r.vendedor_nombre} (0% a 20%)`);
-        }
-        if (!Number.isFinite(cobro) || cobro < 0 || cobro > 0.2) {
-          throw new Error(`Tasa de cobro inválida para ${r.vendedor_nombre} (0% a 20%)`);
-        }
-        return { vendedor_nombre: r.vendedor_nombre, tasa_venta: venta, tasa_cobro: cobro };
-      });
       const res = await fetch("/api/ventas/comisiones/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
+        body: JSON.stringify({
+          updates: [{ vendedor_nombre: r.vendedor_nombre, tasa_venta: venta, tasa_cobro: cobro }],
+        }),
       });
       if (!res.ok) {
         const b = await res.json().catch(() => ({}));
         throw new Error(b.error ?? `HTTP ${res.status}`);
       }
-      onSaved("Tasas guardadas");
+      onSaved("Listo, guardado");
       void load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo.");
+      void load();
     } finally {
-      setSaving(false);
+      setGuardando(null);
     }
   }
 
@@ -119,22 +143,17 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
     <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5" aria-labelledby="tasas-titulo">
       <div className="mb-3 flex items-center justify-between gap-2">
         {/* La tasa con la que entra un vendedor nuevo se aprende una vez → ⓘ.
-            No se borra: explica por qué alguien aparece ya con un número. */}
+            No se borra: explica por qué alguien aparece ya con un número.
+            Y no hay botón de guardar: la tasa se manda al salir del campo,
+            como las casillas de las otras dos tarjetas. */}
         <h3 id="tasas-titulo" className="flex items-center gap-1 text-sm font-medium text-gray-900">
           Tasas por vendedor
           <Ayuda titulo="Cómo se calcula">
             <p>Los vendedores nuevos entran con 0.50%.</p>
             <p>La tasa de venta se aplica a lo facturado con utilidad mayor a 20%; la de cobro, a lo que ese vendedor registró como recibo.</p>
+            <p className="mt-2">Se guarda solo al salir del campo.</p>
           </Ayuda>
         </h3>
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={saving || loading || rows.length === 0}
-          className="min-h-[44px] shrink-0 rounded-md bg-black px-4 text-sm font-medium text-white transition-all hover:bg-gray-800 active:scale-[0.97] disabled:opacity-50"
-        >
-          {saving ? "Guardando…" : "Guardar tasas"}
-        </button>
       </div>
 
       {loading ? (
@@ -174,7 +193,9 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
                           max="20"
                           aria-label={`Tasa de venta de ${nombre}`}
                           value={pctVenta[r.vendedor_nombre] ?? ""}
+                          disabled={guardando === r.vendedor_nombre}
                           onChange={(e) => setPctVenta((p) => ({ ...p, [r.vendedor_nombre]: e.target.value }))}
+                          onBlur={() => void guardarFila(r)}
                           className={CAJA_PCT}
                         />
                         <span className="text-gray-400">%</span>
@@ -190,7 +211,9 @@ export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }
                           max="20"
                           aria-label={`Tasa de cobro de ${nombre}`}
                           value={pctCobro[r.vendedor_nombre] ?? ""}
+                          disabled={guardando === r.vendedor_nombre}
                           onChange={(e) => setPctCobro((p) => ({ ...p, [r.vendedor_nombre]: e.target.value }))}
+                          onBlur={() => void guardarFila(r)}
                           className={CAJA_PCT}
                         />
                         <span className="text-gray-400">%</span>

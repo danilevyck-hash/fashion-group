@@ -75,7 +75,11 @@ describe("🔴 el descuento se resta donde se ve — y AHORA en el servidor", ()
     ] as const) {
       expect(src, nombre).toContain("netearComisiones(");
       // Por (empresa, vendedor): el descuento cae en la celda de SU empresa.
-      expect(src, nombre).toContain("totalPorVendedor(descuentos, empresa)");
+      // 🔄 6-sep-2026: con «Todo el año» los descuentos se leen MES A MES (un
+      // descuento puede empezar en junio), así que la lista ya no es una sola
+      // variable — pero el segundo argumento sigue siendo la EMPRESA, que es lo
+      // que este candado cuida.
+      expect(src, nombre).toMatch(/totalPorVendedor\([^)]*, empresa\)/);
     }
   });
 
@@ -94,7 +98,9 @@ describe("🔴 el descuento se resta donde se ve — y AHORA en el servidor", ()
     // se mudó al servidor cuando la tabla pasó a hacer UNA sola llamada: si la
     // lectura de descuentos revienta, se responde con la lista vacía y la tabla
     // sale con los descuentos en 0, igual que antes de que existieran.
-    expect(consolidado).toContain("leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, mes).catch(() => [])");
+    // 🔄 6-sep-2026: se lee un mes a la vez (`m`) porque «Todo el año» pide
+    // varios; el `.catch(() => [])` —que es lo que este candado cuida— no cambió.
+    expect(consolidado).toContain("leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, m).catch(() => [])");
   });
 
   it("un error de las COMISIONES sí se propaga (no se disfraza de tabla vacía)", () => {
@@ -209,7 +215,9 @@ describe("🔴 UNA llamada, no diez (12-ago-2026)", () => {
   // CÓDIGO y no por su nombre dentro del SQL). Lo que este caso exige —que las
   // DOS pestañas pidan la MISMA RPC— no cambió.
   it("las RPC siguen siendo la MISMA para las dos pestañas (leerComision → comision_b2b_v9)", () => {
-    expect(consolidado).toContain("leerComision(empresa, year, mes)");
+    // 🔄 6-sep-2026: el mes es `m` (uno de los del período: «Todo el año» pide
+    // varios). Que las DOS pestañas pidan la MISMA función no cambió.
+    expect(consolidado).toContain("leerComision(empresa, year, m)");
     expect(consolidado).not.toMatch(/rpc\("comision_b2b_v5"/);
     const rpc = leer("src/lib/comisiones/rpc.ts");
     expect(rpc).toContain('RPC_COMISION = "comision_b2b_v9"');
