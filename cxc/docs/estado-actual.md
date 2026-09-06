@@ -782,3 +782,42 @@ Cada archivo trae la consulta debajo de cada cifra. La regla que nació hoy: **a
 | ¿Cómo se identifica un proveedor entre empresas? | **Se pospone** hasta que toquemos Proveedores. *«dejalo para cuando toquemos proveedores»*. Hoy se unen por NOMBRE y Confecciones Boston sale en 3 fichas. |
 | Las diez palabras del diccionario | **Decididas.** Ver `docs/diccionario.md` § 0. La única donde eligió al revés de mi recomendación: el nombre de la empresa va **corto** («Vistana», «Boston»). |
 | Horas extra sin aprobar · gastos de Fashion Wear · las dos personas sin ficha | **Para después.** *«horas extras y gastos para despues»*, *«es tema de contabilidad que aun no lo han hecho»*. |
+
+## 5-sep-2026 (noche) — proyección mensual: DEFINIDO, sin código todavía
+
+Se cerró la definición con Daniel y **queda parqueado hasta que termine el rediseño de Ventas**
+(*«3. b»* — va aparte, después). No se escribió una línea de código.
+
+**El disparador.** Daniel preguntó por qué la retrospectiva daba **36% de error en Multifashion**
+si es tienda y debería ser la más predecible (*«es el q mas exacto debe dar porque no es mayoreo»*).
+No era el negocio: **su 2024 arranca en junio** (la tienda abrió en mayo-2024), así que la prueba
+—parada en 5-sep-2025— dividió por una fracción de año rota. Para 2026 el molde es 2025, que está
+completo: proyecta **$790.779** (+15%, igual que su ritmo real). El freno que debería haber
+atajado eso existe (`c_cobertura_min` = 0.10 en `ventas_proyeccion_cierre_v7`) pero es **demasiado
+bajo**: el 2024 de Multifashion sacó 0,55 y pasó. A Joystep, que abrió en julio, sí lo agarra (0,001).
+
+**Lo aprobado** (mockup medido, artifact `13a7bcbb`, las 8 empresas al 5-sep-2026):
+
+| decisión | resultado |
+|---|---|
+| ¿Dónde va la proyección mensual? | **En la MISMA matriz de 12 meses de Ventas › Resumen.** Los meses que faltan se llenan en gris con la forma del año pasado × el factor de crecimiento, y la columna **«Proyección» pasa a ser la SUMA de la fila** — hoy es un número que aparece de la nada al final. Septiembre va mitad y mitad: el mes proyectado completo arriba, «van $10.569» abajo. |
+| ¿Cuáles empresas? | **Las 8.** *«las 8»*. |
+| ¿Y las que venden a golpes? | **Se deja el gris igual.** *«1. a»*. Active Wear y Joystep vendieron **$0 en noviembre de 2025**, así que noviembre de 2026 les proyecta 0 — y eso **es la verdad de lo que hicieron**. Su cierre de año sigue siendo bueno (38.864 y 355.805); lo que no sirve es repartirlo mes a mes. |
+| ¿Nota de «diciembre pesa mucho»? | **No.** *«no, porque todas las empresas su venta mas fuerte es en x mes»*. La fila lo dice sola: Multifashion 230.831 en diciembre, Fashion Wear más en noviembre que en diciembre. |
+| ¿Los tres escenarios (flojo · al ritmo · alto)? | **NO van en pantalla** (*«Los 3 escenarios era solo para verlo. No lo ponga.»*). Se midieron el 5-sep-2026 para que Daniel los viera una vez —sep-dic de Multifashion: flojo $352.002 · al ritmo del año (+15%) $404.127 · al ritmo de los últimos 3 meses (+19%) $417.634, contra los $413.348 que pide su meta de $800.000— y ahí murieron. La tarjeta muestra **un solo número**. |
+| ¿El freno del año incompleto? | **Sí, preventivo.** *«no se si habran nuevos»*. Hoy no cambia un solo número: ninguna empresa tiene el molde roto en 2026. Es para el día que abra una tienda nueva. |
+| ¿Fashion Wear facturó $326 en enero de 2026? | **Daniel ya lo sabía** (*«2. si»*). No es dato faltante: en Switch hay **8 facturas por $2.989** en todo el mes, el resto son notas de crédito y débito. Es la razón de que sea la única grande que proyecta por debajo del año pasado (4.021.278 contra 4.216.180). |
+
+**Los tres detalles que faltaban** (mockup `df95e1e6`, decididos la misma noche):
+
+| detalle | decisión |
+|---|---|
+| La celda del mes en curso | **Se queda EXACTAMENTE como hoy** (*«b pero con % real dia a dia»*). Verificado contra producción: **ya es día a día** — `ventas_dashboard_prev_same_period_v4(2026)` devuelve para septiembre la base **$5.343,98** (1–5 sep 2025, `dia_corte_anio_anterior`), no el mes entero, así que Multifashion muestra **10.569 · +98%**. No había nada que arreglar. Solo oct-nov-dic van en gris. 🔴 **Y la celda NO lleva rótulo de «vs 1–5 sep»** (*«no pongas vs 1–5 sep, ensuscia»*): monto y %, nada más — el rango vive en el panel de detalle, no en la celda. ⚠️ Consecuencia aceptada: **la fila no suma la Proyección** (le faltan los 25 días de septiembre que no se muestran); Total y Proyección siguen correctos cada uno por su lado. |
+| La columna «Total» | **Sin cambios** (*«si igual»*): Total = lo vendido, Proyección = todo el año. Dos preguntas distintas, dos columnas. |
+| El celular | **Los tres meses también se llenan en gris** (*«a»*). ⚠️ Corrección de lo que se le dijo primero: la tarjeta de `ResumenViewMobile` **ya lista los 12 meses en vertical** con su Total y su Proyección al final — no hay que inventar una vista nueva, es el mismo arreglo. |
+
+**Por qué septiembre se ve en −83% y no es un problema** (medido el 5-sep-2026, a raíz de *«porq todo fashion group esta muy abajo en % en sept»*): el grupo va **+2% en el año**. Son tres cosas, ninguna una avería. (1) **Los días 1–4 del mes no dicen nada en mayoreo**: en 2025 fueron de $237 (enero) a $397.546 (diciembre), mediana **$92.124**; en 2026, de $14 a $74.929, mediana **$35.997**. (2) **Septiembre de 2025 arrancó con $260.424 en cuatro días — el segundo mejor arranque de ese año**; septiembre de 2026 arrancó con $21.270, dentro de lo normal. (3) Son **4 días contra 5**: el 5-sep-2026 cae **sábado** y el mayoreo no factura; la última factura de las 6 es del día 4 (Multifashion sí llega a hoy porque es tienda). Fashion Wear lo muestra solo: días 1–4 de 2026 = may 13.919 · jun 41.988 · **jul 361** · ago 17.919 · sep 7.076, y julio cerró en $203.295.
+
+**Pendiente mío** (después de Ventas): llenar oct-nov-dic en gris en la matriz del escritorio y en la
+tarjeta del celular + subir el freno del año incompleto. Números medidos y listos en los dos artifacts;
+**nada que preguntarle a Daniel**.
