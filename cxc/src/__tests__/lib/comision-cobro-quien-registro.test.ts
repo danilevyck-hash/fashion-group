@@ -217,8 +217,8 @@ describe("🔴 leerComision: v6 antes que v5, y se DICE con qué regla salió", 
     expect(r.data?.regla_cobro).toBe("quien_registro");
     expect(r.data?.version).toBe("v6");
     expect(r.data?.exclusiones_aplicadas).toBe(false);
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6"]);
-    expect(rpcCalls[2].args).toEqual({ p_empresa_key: "vistana", p_year: 2026, p_mes: 7 });
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6"]);
+    expect(rpcCalls[3].args).toEqual({ p_empresa_key: "vistana", p_year: 2026, p_mes: 7 });
   });
 
   it("sin la DDL de v6: cae a la v5 y lo confiesa (regla_cobro = cartera) en vez de dejar la pantalla en blanco", async () => {
@@ -228,7 +228,7 @@ describe("🔴 leerComision: v6 antes que v5, y se DICE con qué regla salió", 
     expect(r.error).toBeNull();
     expect(r.data?.regla_cobro).toBe("cartera");
     expect(r.data?.version).toBe("v5");
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
   });
 
   it("un error TRANSITORIO de la v6 no cae a la v5 (sería repetir la misma consulta)", async () => {
@@ -236,7 +236,7 @@ describe("🔴 leerComision: v6 antes que v5, y se DICE con qué regla salió", 
     const { leerComision } = await import("@/lib/comisiones/rpc");
     const r = await leerComision("vistana", 2026, 7);
     expect(r.error?.code).toBe("57014");
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6"]);
   });
 });
 

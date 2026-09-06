@@ -28,6 +28,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { waLink } from "@/lib/phone-wa";
@@ -64,7 +65,7 @@ const addDays = (isoDay: string, days: number): string =>
  */
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "gerente_acs"]);
+  const auth = requireRole(req, ROLES_MULTIFASHION);
   if (auth instanceof NextResponse) return auth;
 
   try {

@@ -478,10 +478,15 @@ const ALIAS = [
   { nombre_switch: "REY STOUTE AGUAS", vendedor_canonico: "REY STOUTE AGUAS" },
 ];
 
-describe("🔴 leerComision: v8 primero, y dice si el alias ya está aplicado", () => {
+// CAMBIÓ DE DIRECCIÓN el 6-sep-2026: la vigente pasó a ser la v9 (D-108
+// excluido por CÓDIGO y no por su nombre dentro del SQL), así que la v8 ya no
+// es la primera de la cadena. Lo que este bloque exige —que la v8 se pida antes
+// que la v7 y que el fallback confiese `version` y `alias_aplicado`— no cambió:
+// se dobla la v9 como inexistente para llegar a la v8.
+describe("🔴 leerComision: v8 después de la v9, y dice si el alias ya está aplicado", () => {
   beforeEach(() => { rpcCalls.length = 0; });
 
-  it("con la DDL aplicada: solo la v8, version = v8, alias_aplicado = true, exclusiones_aplicadas = true", async () => {
+  it("con la DDL de v8 aplicada (y la v9 no): v9 → v8, version = v8, alias_aplicado = true, exclusiones_aplicadas = true", async () => {
     respuestaV8 = () => ({ data: { empresa_key: "active_wear", year: 2026, mes: 7, regla_cobro: "quien_registro", exclusiones: "cliente_vendedor", alias: "canonico", vendedores: VENDEDORES }, error: null });
     const { leerComision } = await import("@/lib/comisiones/rpc");
     const r = await leerComision("active_wear", 2026, 7);
@@ -489,7 +494,7 @@ describe("🔴 leerComision: v8 primero, y dice si el alias ya está aplicado", 
     expect(r.data?.version).toBe("v8");
     expect(r.data?.alias_aplicado).toBe(true);
     expect(r.data?.exclusiones_aplicadas).toBe(true);
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8"]);
   });
 
   it("sin la DDL: cae a la v7 y lo confiesa (version = v7, alias_aplicado = false)", async () => {
@@ -500,7 +505,7 @@ describe("🔴 leerComision: v8 primero, y dice si el alias ya está aplicado", 
     expect(r.data?.version).toBe("v7");
     expect(r.data?.alias_aplicado).toBe(false);
     expect(r.data?.exclusiones_aplicadas).toBe(true);
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7"]);
   });
 });
 
@@ -742,10 +747,21 @@ describe("🔴 /api/ventas/comisiones/exclusiones: casillas en POST y PATCH, ali
 
 // ═══ 6. Barridos ═════════════════════════════════════════════════════════════
 describe("🔴 barridos", () => {
+  // El 6-sep-2026 la pestaña se partió en cuatro archivos (con la tercera
+  // tarjeta adentro pasaba las 800 líneas de la casa). El barrido sigue diciendo
+  // lo mismo, ahora sobre el shell Y sus tres tarjetas.
   it("la pantalla de configuración no lleva la nota «N nombres en Switch» (Daniel la quitó) ni escribe REINALDO con I", () => {
-    const vista = leer("src/components/ventas/ComisionesConfiguracionView.tsx");
-    expect(vista).not.toMatch(/nombres en Switch/);
-    expect(vista).toContain("nombreVendedorEnPantalla");
+    const archivos = [
+      "src/components/ventas/ComisionesConfiguracionView.tsx",
+      "src/components/ventas/comisiones-config/TasasPorVendedor.tsx",
+      "src/components/ventas/comisiones-config/ClientesQueNoComisionan.tsx",
+      "src/components/ventas/comisiones-config/Descuentos.tsx",
+    ];
+    const todo = archivos.map(leer).join("\n");
+    expect(todo).not.toMatch(/nombres en Switch/);
+    for (const a of archivos.slice(1)) {
+      expect(leer(a), a).toContain("nombreVendedorEnPantalla");
+    }
   });
 
   it("la lista de bases de cobro vigiladas por retenciones incluye la v8 y su detalle", () => {

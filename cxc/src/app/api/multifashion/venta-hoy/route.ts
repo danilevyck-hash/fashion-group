@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { calcularVentaHoy, diasComparativos } from "@/lib/multifashion/venta-hoy";
 
@@ -24,7 +25,7 @@ export const fetchCache = "force-no-store";
 export const maxDuration = 30;
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const auth = requireRole(req, ["admin", "secretaria", "contabilidad", "gerente_acs"]);
+  const auth = requireRole(req, ROLES_MULTIFASHION);
   if (auth instanceof NextResponse) return auth;
 
   const ahora = new Date();

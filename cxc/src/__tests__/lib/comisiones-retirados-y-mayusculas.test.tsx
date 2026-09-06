@@ -353,7 +353,10 @@ describe("🔴 (a) Configuración: ni Aguas ni COLABORADOR existen en «Tasas po
   it("al agregar un cliente que no comisiona, el desplegable no ofrece a Aguas", async () => {
     render(<ComisionesConfiguracionView />);
     await screen.findByText("Clientes que no comisionan");
-    fireEvent.click(screen.getByRole("button", { name: "+ Agregar" }));
+    // Desde el 6-sep-2026 hay DOS «+ Agregar» en la pestaña (Clientes que no
+    // comisionan y Descuentos): se acota a la sección que este caso mira.
+    const seccion = document.querySelector('[aria-labelledby="sin-comision-titulo"]') as HTMLElement;
+    fireEvent.click(within(seccion).getByRole("button", { name: "+ Agregar" }));
     const alta = await screen.findByTestId("alta-sin-comision");
     const select = within(alta).getByLabelText("Vendedor") as HTMLSelectElement;
     const opciones = [...select.options].map((o) => o.textContent ?? "");

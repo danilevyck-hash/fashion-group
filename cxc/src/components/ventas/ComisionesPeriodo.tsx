@@ -13,11 +13,19 @@
 //   - Al bajar de año, si el mes quedaba en el futuro, se baja al mes en curso.
 //   - Los años disponibles los manda el server (availableYears), nunca > actual.
 //
+// 🩸 «HOY» ES PANAMÁ, NO EL RELOJ DEL NAVEGADOR (6-sep-2026). Usaba
+// `new Date().getFullYear()` / `.getMonth() + 1` para decidir qué meses quedan
+// apagados. Panamá es UTC−5 fijo y es invariante de la casa: el 1 de mes, entre
+// las 00:00 y las 05:00 UTC, el navegador de alguien en otra zona podía apagar
+// el mes que sí se puede pedir (o dejar elegir uno que todavía no empezó).
+//
 // No cambia ningún número: solo elige qué período se pide.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { mesEnCurso } from "@/lib/comisiones/mes-inicial";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -37,9 +45,7 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { year: currentYear, mes: currentMonth } = mesEnCurso(hoyPanama());
 
   const anios = availableYears.filter((y) => y <= currentYear).sort((a, b) => a - b);
   const minAnio = anios.length > 0 ? anios[0] : currentYear;

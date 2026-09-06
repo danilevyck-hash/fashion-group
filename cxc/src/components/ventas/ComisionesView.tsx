@@ -1,13 +1,40 @@
 "use client";
 
 // Shell del módulo Comisiones (empresas B2B / mayoreo). Controla el modo de
-// vista (Todas las empresas / Por empresa / Configuración, con memoria) y el
-// período compartido (mes/año, con meses futuros no navegables). Delega el
-// render a:
+// vista (Todas las empresas / Por empresa / Multifashion / Configuración, con
+// memoria) y el período compartido (mes/año, con meses futuros no navegables).
+//
+// 🩸 ABRE EN EL ÚLTIMO MES CERRADO (6-sep-2026, Daniel eligió «a»). Abría en el
+// mes EN CURSO: medido el 5-sep, con 5 días de septiembre, la comisión bruta de
+// las 6 empresas era $101,77 y el descuento fijo de $1.573,08 se restaba
+// entero, así que lo PRIMERO que se veía al entrar era «Total a pagar
+// −$1.471,31». Es una pantalla de cierre: nadie paga el día 5. El mes en curso
+// queda a un toque y ningún cálculo cambia.
+//
+// 🩸 Y EL MES LO DECIDÍA EL RELOJ DEL NAVEGADOR (`new Date().getMonth() + 1`).
+// Panamá es UTC−5 fijo y es invariante de la casa (`hoyPanama`): en un
+// componente `"use client"` que también renderiza en el servidor (UTC), el
+// primer y el último día del mes pueden pintar un mes distinto del que el
+// navegador elige después. La cuenta vive en `lib/comisiones/mes-inicial.ts`,
+// módulo puro.
+//
+// Delega el render a:
 //  - ComisionesConsolidadoView   (matriz vendedor × empresa, default)
 //  - ComisionesPorEmpresaView    (una empresa a la vez)
-//  - ComisionesConfiguracionView (SOLO admin: tasas por vendedor y clientes
-//    que no comisionan). Era un modal «Configurar»; Daniel, 3-sep-2026:
+//  - VendedorasSubtab            (pestaña «Multifashion», ESPEJO de la de
+//    Vendedoras del módulo Multifashion — 6-sep-2026. Daniel, textual: «quiero
+//    que la pestaña de vendedoras de Multifashion pase aquí también, ya que
+//    aquí podemos ver todas las comisiones. Y allá dejarlo tal cual como está.
+//    No hay diferencia, solo son un espejo. Así las secretarias no podrán
+//    entrar al módulo Multifashion.» 🔴 ESPEJO, NO FUSIÓN: Multifashion
+//    comisiona con OTRA base (SUM(subtotal firmado) × 0,5 %, sin filtro de
+//    utilidad) y que las dos digan «0,5 %» es coincidencia. No se unifican
+//    cálculos, no se mezclan totales, no se suma una cosa con la otra: es la
+//    MISMA vista, la MISMA RPC y los MISMOS números, dibujados en otra puerta.
+//    Por eso tiene su propio selector de período (chips) y la fila de período /
+//    Excel del shell no aplica.)
+//  - ComisionesConfiguracionView (SOLO admin: tasas por vendedor, clientes
+//    que no comisionan y descuentos). Era un modal «Configurar»; Daniel, 3-sep-2026:
 //    «¿por qué en card y no como tab en toda la pantalla normal?». El período,
 //    «Actualizar ahora» y el Excel no aplican a la configuración, así que esa
 //    fila se esconde en ese modo. El chip es la ÚNICA entrada: el botón
@@ -44,6 +71,8 @@ import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
 import { ComisionesCriterios } from "./ComisionesCriterios";
 import { ComisionesPeriodo } from "./ComisionesPeriodo";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { periodoInicial } from "@/lib/comisiones/mes-inicial";
 import dynamic from "next/dynamic";
 
 // Vistas LAZY: solo el modo activo (Todas / Por empresa) descarga su JS, en su
@@ -63,6 +92,12 @@ const ComisionesConfiguracionView = dynamic(
   () => import("./ComisionesConfiguracionView").then((m) => m.ComisionesConfiguracionView),
   { ssr: false, loading: () => <ViewSkeleton /> },
 );
+// 🔴 La MISMA vista del módulo Multifashion, importada tal cual. Reescribirla
+// sería la forma conocida de que un día los dos rankings digan cosas distintas.
+const VendedorasSubtab = dynamic(
+  () => import("@/components/multifashion/VendedorasSubtab").then((m) => m.VendedorasSubtab),
+  { ssr: false, loading: () => <ViewSkeleton /> },
+);
 
 // La CUARTA copia de la lista de empresas era esta línea, escrita a mano
 // (`B2B_EMPRESA_KEYS.filter(k => k !== "joystep")`) mientras las otras tres ya
@@ -72,8 +107,9 @@ const ComisionesConfiguracionView = dynamic(
 const EMPRESAS = EMPRESAS_COMISIONAN;
 const MODE_KEY = "fg_comisiones_mode";
 
-type Mode = "todas" | "empresa" | "config";
-const esMode = (v: unknown): v is Mode => v === "todas" || v === "empresa" || v === "config";
+type Mode = "todas" | "empresa" | "multifashion" | "config";
+const esMode = (v: unknown): v is Mode =>
+  v === "todas" || v === "empresa" || v === "multifashion" || v === "config";
 
 /** Lo que una vista hija expone para que el Excel viva en la barra de arriba. */
 export interface ExcelApi {
@@ -92,12 +128,25 @@ interface ComisionesViewProps {
    * Ventas».
    */
   conConfiguracion?: boolean;
+  /**
+   * Dibuja la pestaña «Multifashion» (el espejo). La monta SOLO el módulo
+   * /comisiones: la pestaña Comisiones de Ventas no la lleva porque Ventas ya
+   * tiene su propia pestaña Multifashion, y dos puertas a lo mismo en la misma
+   * pantalla es exactamente lo que Daniel mandó a quitar («configuración en dos
+   * lados»).
+   */
+  conMultifashion?: boolean;
 }
 
-export function ComisionesView({ availableYears, avisoMontos, conConfiguracion = false }: ComisionesViewProps) {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+export function ComisionesView({
+  availableYears,
+  avisoMontos,
+  conConfiguracion = false,
+  conMultifashion = false,
+}: ComisionesViewProps) {
+  // Panamá, no el reloj del navegador. Y el período de arranque es el ÚLTIMO
+  // MES CERRADO (ver el encabezado): la cuenta vive en el módulo puro.
+  const inicial = periodoInicial(hoyPanama(), availableYears);
 
   const [mode, setMode] = useState<Mode>("todas");
   // «Configuración» es SOLO de admin y SOLO en el módulo /comisiones: el chip
@@ -110,8 +159,8 @@ export function ComisionesView({ availableYears, avisoMontos, conConfiguracion =
   // vendedor en Switch, tocaba el botón y la tabla seguía diciendo DEFAULT con
   // un toast que le aseguraba que los datos estaban frescos.
   const [refreshKey, setRefreshKey] = useState(0);
-  const [year, setYear] = useState<number>(currentYear);
-  const [mes, setMes] = useState<number>(currentMonth);
+  const [year, setYear] = useState<number>(inicial.year);
+  const [mes, setMes] = useState<number>(inicial.mes);
   const [syncStale, setSyncStale] = useState(false);
 
   // Excel: la vista hija registra su función; acá solo se dispara. La función
@@ -129,8 +178,14 @@ export function ComisionesView({ availableYears, avisoMontos, conConfiguracion =
     const admin = (sessionStorage.getItem("cxc_role") || "") === "admin";
     setEsAdmin(admin);
     const saved = localStorage.getItem(MODE_KEY);
-    if (esMode(saved) && (saved !== "config" || (admin && conConfiguracion))) setMode(saved);
-  }, [conConfiguracion]);
+    if (
+      esMode(saved) &&
+      (saved !== "config" || (admin && conConfiguracion)) &&
+      (saved !== "multifashion" || conMultifashion)
+    ) {
+      setMode(saved);
+    }
+  }, [conConfiguracion, conMultifashion]);
 
   const handleMode = (m: Mode) => {
     setMode(m);
@@ -150,6 +205,7 @@ export function ComisionesView({ availableYears, avisoMontos, conConfiguracion =
         {([
           ["todas", "Todas las empresas"],
           ["empresa", "Por empresa"],
+          ...(conMultifashion ? [["multifashion", "Multifashion"] as [Mode, string]] : []),
           ...(hayConfig ? [["config", "Configuración"] as [Mode, string]] : []),
         ] as [Mode, string][]).map(([m, label]) => (
           <button
@@ -184,7 +240,7 @@ export function ComisionesView({ availableYears, avisoMontos, conConfiguracion =
           líneas) y la fila con flex-wrap, que es el modo de fallar bueno —
           si algún día no entran, se bajan a otra línea en vez de sacar la
           página para el costado. */}
-      {mode !== "config" && (
+      {mode !== "config" && !(mode === "multifashion" && conMultifashion) && (
       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         <ComisionesPeriodo
           mes={mes}
@@ -222,6 +278,11 @@ export function ComisionesView({ availableYears, avisoMontos, conConfiguracion =
         <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} refreshKey={refreshKey} />
       ) : mode === "config" && hayConfig ? (
         <ComisionesConfiguracionView />
+      ) : mode === "multifashion" && conMultifashion ? (
+        /* Espejo: la vista de Multifashion, con SU año y SUS chips de período.
+           No se le pasa el período del shell porque la pestaña de allá tampoco
+           lo usa — sus chips mandan, y así los dos lados dicen lo mismo. */
+        <VendedorasSubtab selectedYear={inicial.year} />
       ) : (
         <ComisionesPorEmpresaView
           year={year}

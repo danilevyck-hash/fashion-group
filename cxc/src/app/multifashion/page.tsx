@@ -1,5 +1,9 @@
 import { Suspense } from "react";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { fetchMultifashion, fetchAvailableYears } from "@/lib/ventas/queries";
+import { verifySession } from "@/lib/session-cookie";
+import { puedeAbrirMultifashion } from "@/lib/multifashion/acceso";
 import { MultifashionShell } from "./MultifashionShell";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +12,22 @@ export const dynamic = "force-dynamic";
 // se corta antes de que el reintento de withDbRetry alcance a salvarla.
 export const maxDuration = 60;
 
+// 🩸 ESTA PÁGINA NO COMPROBABA NINGÚN ROL (hasta el 6-sep-2026). `/ventas`
+// manda a casa a quien no es admin en dos líneas; ésta no tenía ninguna, y el
+// middleware solo valida que la sesión EXISTA. O sea: cualquiera con sesión
+// —bodega, un vendedor, contabilidad— abría esta dirección y el resumen de la
+// tienda le llegaba **ya escrito en el HTML**, antes de que el cliente pudiera
+// rebotarlo. El guard va ANTES de cargar la data, como en /ventas.
+// La lista de roles vive en UN solo lugar y se deriva de `src/lib/modules.ts`.
+function sessionRole(raw: string | undefined): string | null {
+  return verifySession(raw)?.role ?? null;
+}
+
 export default async function MultifashionPage() {
+  const role = sessionRole((await cookies()).get("cxc_session")?.value);
+  if (!role) redirect("/");
+  if (!puedeAbrirMultifashion(role)) redirect("/home");
+
   const now = new Date();
   const year = now.getFullYear();
   // mes 1-indexed = mes en curso. multifashion_mensual_v6 suma WHERE mes <= p_mes

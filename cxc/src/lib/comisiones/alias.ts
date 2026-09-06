@@ -24,6 +24,7 @@
 //     mayúsculas, y ningún número se mueve.
 
 import { etiquetaVendedor, DEFAULT_VENDEDOR, ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
+import { VENDEDOR_TODOS, ROTULO_VENDEDOR_TODOS } from "@/lib/comisiones/vendedor-todos";
 
 /** Una fila de `comision_vendedor_alias`, ya normalizada. */
 export interface AliasVendedor {
@@ -53,10 +54,14 @@ export function aplicarAlias(nombre: string | null | undefined, alias: readonly 
  * cortan palabra («O'Neil», «Jean-Paul»). DEFAULT pasa por `etiquetaVendedor`,
  * y la etiqueta ya puesta («Oficina (DEFAULT)», que es como viaja la fila de la
  * oficina en la matriz consolidada) se respeta tal cual: nunca «Oficina (default)».
+ *
+ * El comodín de «Clientes que no comisionan» (`*`, 6-sep-2026) se dice «Todos
+ * los vendedores»: el `*` pelado no se muestra nunca.
  */
 export function nombreVendedorEnPantalla(nombre: string): string {
   const v = (nombre ?? "").trim();
   if (!v) return "";
+  if (v === VENDEDOR_TODOS) return ROTULO_VENDEDOR_TODOS;
   if (v === DEFAULT_VENDEDOR) return etiquetaVendedor(v);
   if (v === ETIQUETA_DEFAULT) return ETIQUETA_DEFAULT;
   return v

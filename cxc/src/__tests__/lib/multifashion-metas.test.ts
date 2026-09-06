@@ -424,13 +424,17 @@ describe("permiso — quién ve y quién toca", () => {
     expect(rolesQueEntranAMetas()).toContain("gerente_acs");
   });
 
-  it("admin y secretaria también las ven", () => {
+  // CAMBIÓ DE DIRECCIÓN el 6-sep-2026: `secretaria` SALIÓ. El módulo
+  // Multifashion nunca fue suyo y ésta era la última puerta que le quedaba
+  // adentro. Daniel: «A» — ciérralo igual; con la pestaña «Multifashion» de
+  // Comisiones ve el ranking de vendedoras y su comisión.
+  it("admin las ve; secretaria ya no (6-sep-2026)", () => {
     expect(puedeVerMetas("admin")).toBe(true);
-    expect(puedeVerMetas("secretaria")).toBe(true);
+    expect(puedeVerMetas("secretaria")).toBe(false);
   });
 
   it("nadie más entra", () => {
-    for (const rol of ["vendedor", "bodega", "contabilidad", "", null, undefined]) {
+    for (const rol of ["vendedor", "bodega", "contabilidad", "secretaria", "", null, undefined]) {
       expect(puedeVerMetas(rol as string | null | undefined), `rol ${rol}`).toBe(false);
     }
   });
@@ -445,7 +449,7 @@ describe("permiso — quién ve y quién toca", () => {
   });
 
   it("la lista de lectura es explícita y no se ensancha sin querer", () => {
-    expect([...ROLES_LECTURA_METAS].sort()).toEqual(["admin", "gerente_acs", "secretaria"]);
+    expect([...ROLES_LECTURA_METAS].sort()).toEqual(["admin", "gerente_acs"]);
   });
 
   it("🔴 la perilla vieja NO quedó de adorno", () => {

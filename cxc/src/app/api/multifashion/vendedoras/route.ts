@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { ROLES_VENDEDORAS_ESPEJO } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
 import type { VendedorasPeriodo } from "@/components/ventas/types";
 
@@ -32,7 +33,7 @@ function parseIntParam(v: string | null): number | null {
 export async function GET(req: NextRequest) {
   // Multifashion es módulo admin-only por ahora (los demás roles se definen
   // después). overview queda compartido con Ventas, pero los sub-tabs son admin.
-  const auth = requireRole(req, ["admin", "secretaria", "gerente_acs"]);
+  const auth = requireRole(req, ROLES_VENDEDORAS_ESPEJO);
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;

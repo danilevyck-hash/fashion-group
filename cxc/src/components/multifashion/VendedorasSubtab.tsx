@@ -57,15 +57,25 @@ type ChipKey = ChipVendedoras;
 interface BonoBadge { winner: boolean; gerenteBono: number }
 
 interface VendedorasSubtabProps {
-  data: Multifashion;
+  /** El overview del shell de Multifashion. La pestaña NO lo lee (v3 pide lo
+   *  suyo por SWR): es opcional para que la pestaña espejo de Comisiones pueda
+   *  montarla sin traerse el overview entero. */
+  data?: Multifashion;
   selectedYear: number;
   /** Mes del selector del shell — en v3 la pestaña usa sus propios chips, se
    *  conserva el prop por compatibilidad con el llamador. */
-  mes: number;
-  onMesChange: (mes: number) => void;
+  mes?: number;
+  onMesChange?: (mes: number) => void;
 }
 
-export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) {
+/**
+ * ⚠️ ESTA VISTA TIENE DOS PUERTAS Y UNA SOLA IMPLEMENTACIÓN (6-sep-2026):
+ * Multifashion › Vendedoras y Comisiones › Multifashion. Daniel: «no hay
+ * diferencia, solo son un espejo». Misma RPC, mismos números — si algún día
+ * hay que cambiarla, se cambia UNA vez y las dos puertas dicen lo mismo.
+ * 🔴 Multifashion comisiona con OTRA base que el grupo: no se fusiona nada.
+ */
+export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
   const year = selectedYear;
 
   // Meses base relativos a hoy. Para año cerrado, "en curso" = Dic.

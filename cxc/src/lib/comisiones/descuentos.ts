@@ -16,9 +16,16 @@
 // esta función para los dos consumidores (el endpoint por empresa y el
 // consolidado). Dos copias de esta regla serían dos totales de comisión
 // posibles para el mismo mes.
+//
+// 🔴 DESDE EL 6-sep-2026 CADA DESCUENTO TIENE VIGENCIA (`desde` / `hasta`), y
+// la regla vive en `vigencia.ts` — un módulo puro, para que la decisión de
+// «¿este mes lo lleva?» no se pueda copiar. Un descuento fuera de su vigencia
+// NO existe para ese mes: no se le busca la excepción y no viaja a la pantalla.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { descuentoVigente, mesISO } from "./vigencia";
+export { mesISO } from "./vigencia";
 // `DEFAULT_VENDEDOR` vive en `vendedor-default.ts` (módulo puro, sin cliente de
 // servidor) para que las vistas lo puedan importar; acá se re-exporta porque
 // `netearComisiones` lo usa y los lectores viejos lo buscaban aquí.
@@ -35,11 +42,6 @@ export interface DescuentoEfectivo {
   vendedor: string;
 }
 
-/** El mes se guarda como el día 1 (columna `date`). */
-export function mesISO(year: number, mes: number): string {
-  return `${year}-${String(mes).padStart(2, "0")}-01`;
-}
-
 /**
  * Descuentos fijos con su `activo` efectivo del mes, para UNA o VARIAS empresas.
  *
@@ -51,16 +53,27 @@ export async function leerDescuentosEfectivos(
   mes: number,
   vendedor = "",
 ): Promise<DescuentoEfectivo[]> {
+  // `*` y no la lista de columnas: `desde`/`hasta` nacen en la DDL
+  // 20261007120000 y hasta que corra la lectura tiene que seguir saliendo — con
+  // los dos campos ausentes, que es «sin límite» y por lo tanto la conducta de
+  // siempre. Nada se apaga en silencio por una migración que todavía no corrió.
   let q = supabaseServer
     .from("comision_descuentos_fijos")
-    .select("id, empresa_key, concepto, monto, vendedor_nombre")
+    .select("*")
     .in("empresa_key", empresas as string[])
     .eq("activo", true);
   if (vendedor) q = q.eq("vendedor_nombre", vendedor);
   const { data: fijos, error } = await q.order("concepto", { ascending: true });
   if (error) throw new Error(error.message);
 
-  const ids = (fijos ?? []).map((f) => String(f.id));
+  // 🔴 LA VIGENCIA SE APLICA ANTES QUE NADA: un descuento que todavía no
+  // empezó (o que ya terminó) NO existe para ese mes, así que tampoco se le
+  // busca la excepción ni viaja a la pantalla. Regla en `vigencia.ts`.
+  const vigentes = (fijos ?? []).filter((f) =>
+    descuentoVigente(f as { desde?: string | null; hasta?: string | null }, year, mes),
+  );
+
+  const ids = vigentes.map((f) => String(f.id));
   const excById = new Map<string, boolean>();
   if (ids.length > 0) {
     const { data: exc, error: e2 } = await supabaseServer
@@ -72,7 +85,7 @@ export async function leerDescuentosEfectivos(
     for (const x of exc ?? []) excById.set(String(x.descuento_id), Boolean(x.activo));
   }
 
-  return (fijos ?? []).map((f) => {
+  return vigentes.map((f) => {
     const id = String(f.id);
     // Efectivo: excepción del mes si existe; si no, activo por defecto.
     const activo = excById.has(id) ? excById.get(id)! : true;

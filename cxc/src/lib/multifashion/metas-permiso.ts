@@ -45,8 +45,19 @@ export const ROLES_ADMIN_METAS = ["admin"] as const;
  * `gerente_acs` entra desde el 13-ago-2026 por decisión de Daniel: es la gerente
  * de la tienda y la meta del viaje es de su equipo — era justo quien más la
  * necesitaba y la única que la tenía vedada.
+ *
+ * 🩸 `secretaria` SALIÓ el 6-sep-2026. Estaba acá a propósito, pero el módulo
+ * Multifashion nunca fue suyo (`src/lib/modules.ts` lo da a admin y
+ * `gerente_acs` y nada más), y la puerta abierta a las metas era la última que
+ * le quedaba adentro. Daniel, al preguntarle si lo cerraba igual aunque
+ * perdieran el avance de las metas: **«A»** — ciérralo igual; con la pestaña
+ * nueva «Multifashion» de Comisiones ven lo que necesitan (el ranking de
+ * vendedoras y su comisión).
+ *
+ * 🔴 Esta lista es la de VER. `ROLES_ADMIN_METAS` (crear/editar/retirar) no
+ * cambió y sigue siendo solo admin.
  */
-export const ROLES_LECTURA_METAS = ["admin", "secretaria", "gerente_acs"] as const;
+export const ROLES_LECTURA_METAS = ["admin", "gerente_acs"] as const;
 
 /** ¿Este rol puede VER el avance de las metas? */
 export function puedeVerMetas(role: string | null | undefined): boolean {

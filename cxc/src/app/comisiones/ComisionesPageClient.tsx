@@ -29,7 +29,14 @@ export function ComisionesPageClient({
       <main className="mx-auto w-full max-w-[1280px] px-4 pb-8 pt-2 md:px-7 md:pt-3">
         {/* La pestaña Configuración (solo admin) vive AQUÍ, en el módulo
             Comisiones, no en la pestaña Comisiones de Ventas. */}
-        <ComisionesView availableYears={availableYears} avisoMontos={avisoMontos} conConfiguracion />
+        {/* `conMultifashion`: la pestaña espejo de Vendedoras vive SOLO en este
+            módulo (6-sep-2026). Ventas ya tiene su propia pestaña Multifashion. */}
+        <ComisionesView
+          availableYears={availableYears}
+          avisoMontos={avisoMontos}
+          conConfiguracion
+          conMultifashion
+        />
       </main>
     </div>
   );

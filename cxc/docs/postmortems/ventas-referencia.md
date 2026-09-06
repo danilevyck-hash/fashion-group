@@ -489,6 +489,171 @@
 
 ---
 
+## 🔴 Comisiones — EL REDISEÑO: FECHAS EN EL DESCUENTO, EL MES CERRADO, D-108 POR CÓDIGO Y MULTIFASHION CERRADO (6-sep-2026)
+
+> El mapeo del módulo (`docs/mapas/comisiones.md`, medido el 5-sep contra producción) encontró siete cosas que mienten o están rotas. Daniel las revisó y decidió. Esto es lo que quedó, con las mediciones.
+
+### 1 · 🩸 UN DESCUENTO SIN FECHAS SE RESTA HACIA ATRÁS, PARA SIEMPRE
+
+`comision_descuentos_fijos` tenía OCHO columnas y **ninguna de fecha**: `id · vendedor_nombre · empresa_key · concepto · monto · activo · created_at · updated_at`. Sin fecha, la lectura decidía así:
+
+```ts
+const activo = excById.has(id) ? excById.get(id)! : true;   // sin excepción → se aplica
+```
+
+Las dos únicas filas vivas son de **REYNALDO ESPINOSA en Fashion Shoes**, creadas el **8-jul-2026**:
+
+| concepto | monto |
+|---|---:|
+| Descuento | $1.400,00 |
+| Descuento de adelanto | $173,08 |
+| **por mes** | **$1.573,08** |
+
+Se estaban restando también en **enero, febrero, marzo, abril, mayo y junio** — seis meses **anteriores al día en que la fila se creó**. Y para que un mes no lo llevara había que entrar al detalle de ese vendedor, en esa empresa, en ese mes, y apagarlo a mano: **24 apagados al año**, y olvidarse cuesta $1.573,08.
+
+**Daniel, textual:** *«no sé [qué era] pero hay que descontarlo así mensual»*. Y al ver el cuadro del antes/después de este mismo post-mortem, corrigiendo la primera versión del cambio: **«pero el descuento es indefinido. No hay hasta. Ponlo desde enero que se le descuenta esos 1500 y pico.»**
+
+🔴 **O sea: `desde = 2026-01-01`, `hasta` en NULL — y NINGÚN número se mueve.**
+
+| mes | a pagar ANTES | a pagar DESPUÉS | ¿cambia? |
+|---|---:|---:|:--:|
+| ene | 4.595,35 | 4.595,35 | **NO** |
+| feb | 9.795,54 | 9.795,54 | **NO** |
+| mar | 10.468,78 | 10.468,78 | **NO** |
+| abr | 6.949,62 | 6.949,62 | **NO** |
+| may | 12.593,51 | 12.593,51 | **NO** |
+| jun | 8.703,87 | 8.703,87 | **NO** |
+| jul | 10.201,84 | 10.201,84 | **NO** |
+| ago | 5.978,55 | 5.978,55 | **NO** |
+| sep | −1.471,31 | −1.471,31 | **NO** |
+| **2026** | **67.815,75** | **67.815,75** | **NO** |
+
+Y por PERSONA, que es el grano que Daniel mira — las **27 celdas** (3 personas × 9 meses) idénticas:
+
+| mes | Edwin | Reynaldo Espinosa | Rodrigo |
+|---|---:|---:|---:|
+| ene | 1.132,36 | 3.462,99 | 0,00 |
+| feb | 1.970,43 | 7.825,11 | 0,00 |
+| mar | 1.095,27 | 9.373,51 | 0,00 |
+| abr | 1.180,77 | 5.768,85 | 0,00 |
+| may | 1.771,29 | 10.822,22 | 0,00 |
+| jun | 316,62 | 8.387,25 | 0,00 |
+| jul | 876,24 | 9.325,60 | 0,00 |
+| ago | 652,42 | 5.091,64 | 234,49 |
+| sep | 41,77 | −1.513,08 | 0,00 |
+
+Medición: `scripts/_medir-descuento-vigencia.mjs`.
+
+🔑 **ENTONCES ¿PARA QUÉ SIRVE EL CAMBIO? Para el PRÓXIMO descuento.** El defecto nunca fue el monto de Reynaldo —ahí sí correspondía desde enero, y solo Daniel podía saberlo—: fue que **la tabla no tenía forma de decir desde cuándo**. El descuento que se cargue en octubre también se iba a restar en marzo, y ahí sí sin querer, sin que nadie lo notara y sin más remedio que 24 apagados manuales al año.
+
+**Lo que se hizo.** La tabla gana `desde` y `hasta`, la regla vive en un módulo puro (`src/lib/comisiones/vigencia.ts`) y se aplica en `leerDescuentosEfectivos` **antes** de buscar la excepción del mes. `hasta` **corta INCLUSIVE** (el mismo criterio del «Hasta…» de Recordatorios: no puede haber dos formas de leer una fecha final en el mismo sistema). Sin `desde`, la fila se comporta **exactamente como antes** — así una migración que no corrió no apaga plata en silencio. El grano es el **MES**, no el día.
+
+🔴 **Y el «hasta» es OPCIONAL: dejarlo vacío es lo NORMAL.** Daniel: *«el descuento es indefinido. No hay hasta.»* Por eso el campo dice **«(opcional)»** en su rótulo, la columna de la tabla dice **«Sin fin»** —no «—», que se lee como un dato que falta— y guardar sin él **no pide nada ni avisa nada**: lo único que se exige es vendedor, concepto y monto.
+
+Migración `20261007120000` (**sin aplicar**), que pone `desde = 2026-01-01` a las 2 filas por su llave `(vendedor, empresa, concepto)` y no por uuid, y **no les escribe `hasta`**.
+
+### 2 · 🩸 LA PANTALLA ABRÍA DICIENDO QUE LE DEBES PLATA A TU VENDEDOR
+
+Comisiones abría en el **mes en curso** (`now.getMonth() + 1`). El 5-sep-2026, con 5 días de septiembre: bruto de las 6 empresas **$101,77**, descuento entero **−$1.573,08**, y lo primero en pantalla era
+
+| vendedor | total |
+|---|---:|
+| Reynaldo Espinosa | **−$1.513,08** |
+| Edwin | $41,77 |
+| **Total a pagar** | **−$1.471,31** |
+
+El código incluso tenía la clase para pintarlo en rojo. **Daniel eligió «a»**: abre en el **último mes cerrado**, y el mes en curso queda a un toque.
+
+🩸 **Y de paso: el mes lo decidía el RELOJ DEL NAVEGADOR**, tanto en el shell como en el selector de período (que además decide qué meses quedan apagados). Panamá es **UTC−5 fijo** y es invariante de la casa; en un componente `"use client"` que también renderiza en el servidor (UTC), el primer y el último día del mes pueden pintar un mes distinto del que el navegador elige después. Los dos pasaron a `hoyPanama` + el módulo puro `src/lib/comisiones/mes-inicial.ts` (enero abre en diciembre del año anterior). **Ningún cálculo cambia.**
+
+### 3 · 🩸 LA PALANCA QUE MÁS PLATA MUEVE ERA LA ÚNICA QUE NO SE PODÍA VER
+
+`comision_descuentos_fijos` **no tenía POST, ni PUT, ni DELETE en ninguna parte de la aplicación**. Las 2 filas se escribieron directo en la base y solo asomaban dentro del modal de detalle de un vendedor. Son **$14.157,72 en 2026** — más que toda la comisión de Edwin en el año.
+
+**Daniel: *«sí, minimalista»*.** Tercera tarjeta **«Descuentos»** en Comisiones › Configuración, con el mismo molde que las otras dos: vendedor · empresa · concepto · monto · desde · hasta, **y nada más** (sin totales al pie, sin explicaciones alrededor, sin chips). En pantalla se dice **«Descuentos»**, nunca «descuento fijo». Solo admin. **Soft delete (`activo = false`), NUNCA DELETE.**
+
+⚠️ El índice único de la tabla es `(vendedor_nombre, empresa_key, concepto)` y **no es parcial por `activo`**: una fila quitada bloquearía volver a crear el mismo concepto. Por eso el alta **revive** la quitada en vez de chocar — el historial es la misma fila y la pantalla no queda en un callejón que solo se abre desde la base.
+
+🩸 El archivo de la pestaña se partió en cuatro (`src/components/ventas/comisiones-config/`): con la tercera tarjeta adentro pasaba las 800 líneas de la casa.
+
+### 4 · 🩸 UN INTERRUPTOR QUE NO APAGABA NADA
+
+En «Tasas por vendedor», cada fila tenía un interruptor **«Activo»**. En el SQL que reparte la plata (`comision_b2b_v8`):
+
+- la CTE `universo` une `comision_vendedor_tasa` **con** `t.activo = true`… pero eso solo arma la lista de vendedores **que no vendieron ni cobraron nada**;
+- cualquiera con una venta o un cobro entra igual por el `UNION`;
+- y su tasa se aplica desde un `LEFT JOIN comision_vendedor_tasa` **sin filtrar por `activo`**.
+
+**Prueba medida:** `REY STOUTE AGUAS` estaba en `activo = false` desde el 4-sep-2026 y la RPC lo **seguía** devolviendo con comisión en los 9 meses de 2026 (**$49,83**). Solo desaparecía de la pantalla porque el navegador lo filtra por estar en la lista de retirados — el interruptor no tuvo nada que ver.
+
+**Daniel: *«quitarlo»*.** Sale de la pantalla y el GET/PUT de `/api/ventas/comisiones/config` dejan de leerlo y de escribirlo. 🔴 **La columna NO se dropea** (patrón de la casa). Para sacar a alguien queda **una sola forma**, y ésa sí funciona en el servidor: `src/lib/comisiones/retirados.ts`.
+
+### 5 · 🔴 LA IDENTIDAD DEL CLIENTE ES EL CÓDIGO — TAMBIÉN DENTRO DEL SQL
+
+`comision_b2b_v8` llevaba adentro, en las dos CTE que reparten la plata:
+
+```sql
+AND f.cliente        NOT ILIKE '%multi fashion holding%'
+AND r.cliente_nombre NOT ILIKE '%multi fashion holding%'
+```
+
+Ese cliente es **D-108, «Multi Fashion Holding»** (la intercompañía), y en 2026 tiene **203 facturas** (fashion_wear 97 · vistana 52 · fashion_shoes 36 · joystep 7 · active_wear 6 · active_shoes 5) y **21 recibos**. Atado a un TEXTO que Switch puede cambiar con una letra, y era **la única exclusión de cliente que no se veía en ninguna pantalla**.
+
+**Daniel: *«debe de ser por código, ¿no?»*** → sí.
+
+🔴 **Por qué un COMODÍN y no una fila por vendedor.** `comision_exclusion` es por (empresa, cliente, **vendedor**). A D-108 le venden o le cobran hoy **cinco** nombres —DEFAULT · REYNALDO ESPINOSA · EDWIN · DANIEL LEVY · COLABORADOR—, o sea 30 filas para cubrir las 6 empresas. Pero enumerar **no cierra el agujero**: el día que un vendedor nuevo le facture, esa factura vuelve a pagar comisión **en silencio**, que es exactamente lo que este cambio vino a impedir. Por eso el vendedor `*` significa «todos los de esa empresa». Se eligió `*` y no una palabra («TODOS» podría chocar algún día con el nombre real de una persona en Switch); en pantalla se dice **«Todos los vendedores»**, nunca el `*`.
+
+🔴 **El comodín no multiplica filas.** El JOIN sigue siendo `LEFT` + `ce.id IS NULL`: un documento que cruce con DOS filas de exclusión (la del vendedor y el comodín) produce dos renglones unidos y **los dos se descartan**. Lo que se cuenta es lo que NO cruza, y eso cruza cero o una vez.
+
+**`comision_b2b_v9` es la v8 byte a byte** salvo (1) las dos líneas del ILIKE que se van, (2) los cuatro JOIN de exclusión que aceptan el comodín, (3) la respuesta que dice `'exclusiones', 'cliente_vendedor_o_todos'`. Candado que compara los cuerpos, mismo patrón que `comision-alias-v8`.
+
+**Medido con la RPC real contra producción, ene–sep 2026, las 6 empresas, por persona y por mes:**
+
+| corrida | pares (vendedor, mes) | bruto 2026 |
+|---|---:|---:|
+| A) `comision_b2b_v8` real | 56 | $90.107,99 |
+| B) v9 simulada (código + comodín) | 56 | **$90.107,99** |
+| C) CONTROL, sin las filas de D-108 | 56 | $90.860,74 (16 pares cambian) |
+
+**A == B al centavo.** El control prueba que la exclusión sí hace el trabajo. Medición: `scripts/_medir-comision-v9-d108.mjs`. Y la conducta está probada con el SQL de verdad corriendo en pglite, incluido el **control al revés**: si Switch le cambia el nombre a «Multi-Fashion Holding S.A.», la **v8 le paga comisión** ($11.000 de base a Edwin, $20.000 a una vendedora nueva) y la **v9 sigue firme** porque mira el código. Migración `20261008120000` (**sin aplicar**).
+
+### 6 · El mes negativo se queda como está
+
+Reynaldo tiene **−$641,55** en Active Wear en agosto: notas de crédito que superaron la venta del mes. Se muestra en rojo y ya. **Daniel: *«c»*** — no se agrega explicación y no se cambia el cálculo.
+
+### 7 · 🔴 UNA PESTAÑA «MULTIFASHION» EN COMISIONES — ESPEJO, NO FUSIÓN
+
+**Daniel, textual:** *«quiero que la pestaña de vendedoras de Multifashion pase aquí también, ya que aquí podemos ver todas las comisiones. Y allá dejarlo tal cual como está. No hay diferencia, solo son un espejo. Así las secretarias no podrán entrar al módulo Multifashion.»*
+
+🔴 **`CLAUDE.md` dice «Multifashion es OTRO módulo de comisiones y está bien como está — NO fusionar», y sigue vigente.** Multifashion comisiona con **otra base** (`SUM(subtotal firmado) × 0,5 %`, sin filtro de utilidad) que el grupo (0,5 % sobre la venta de las facturas con `pct_utilidad > 20`); que las dos digan «0,5 %» es coincidencia. La pestaña **importa la MISMA vista** (`VendedorasSubtab`), pide la MISMA RPC y muestra los MISMOS números. No se unifican cálculos, no se mezclan totales, no se suma una cosa con la otra. Vive SOLO en el módulo `/comisiones` (Ventas ya tiene su propia pestaña Multifashion) y trae sus propios chips de período. **Multifashion no se tocó.**
+
+### 7b · 🩸 `/multifashion` NO COMPROBABA NINGÚN ROL
+
+Auditoría medida contra el código el 6-sep-2026:
+
+- **`src/app/multifashion/page.tsx` no tenía guard.** `/ventas` manda a casa a quien no es admin en dos líneas (`page.tsx:23-24`); Multifashion no tenía ninguna, y el middleware solo valida que la sesión **exista**. Resultado: **cualquiera con sesión** —bodega, un vendedor, contabilidad— abría esa dirección y el resumen de la tienda le llegaba **ya escrito en el HTML**, antes de que el cliente pudiera rebotarlo.
+- **10 de las 11 rutas** de `/api/multifashion/*` dejaban entrar a `secretaria` (8 con `["admin","secretaria","gerente_acs"]`, 2 con esos más `contabilidad`), y 4 usaban `rolesQueEntranAMetas()`, que incluía `secretaria`. **Ninguno de los dos roles tiene el módulo** en `src/lib/modules.ts` (es de admin y `gerente_acs`).
+
+**Daniel**, al preguntarle si lo cerraba igual aunque las secretarias perdieran el avance de las metas: **«A»** — ciérralo igual.
+
+**Lo que quedó:** guard SSR en la página **antes de cargar la data**, y **una sola lista de roles** en `src/lib/multifashion/acceso.ts`, **derivada de `modules.ts`** (nunca escrita a mano). `ROLES_LECTURA_METAS` pierde `secretaria`; `ROLES_ADMIN_METAS` no cambia (solo admin: ver no es editar).
+
+⚠️ **La única excepción son las DOS rutas que alimentan la pestaña espejo** —`vendedoras` y `bonos`, con `ROLES_VENDEDORAS_ESPEJO` = los del módulo ∪ los de `/comisiones`—. Es lo que esa pestaña muestra, no una puerta al módulo.
+
+⚠️ **Jennifer (`gerente_acs`) no pierde nada** — se recorrió ruta por ruta: sigue en las 11 y en la lectura de metas. Multifashion es su único módulo y su casa.
+
+⚠️ **Los crons tampoco.** El resumen diario de ACS por Telegram, la fidelización y el ritmo de la meta leen la **base** directo (`src/lib/acs-resumen-diario.ts`, `retail-dia.ts`, `meta-ritmo-lectura.ts`) y entran con `CRON_SECRET`: **cero llamadas HTTP a `/api/multifashion/*` fuera del navegador**, verificado con barrido. Hay candado que lo exige.
+
+### Los candados
+
+> `comisiones-descuentos-vigencia.test.ts` (18) · `comision-b2b-v9-por-codigo.test.ts` (21, con la conducta real en pglite) · `comisiones-mes-cerrado-panama.test.ts` (8) · `comisiones-configuracion-descuentos.test.tsx` (16) · `multifashion-cerrado-y-espejo.test.ts` (21).
+>
+> Cinco candados cambiaron de dirección con su nota fechada: `comision-alias-v8` (la v8 ya no encabeza la cadena), `comision-exclusion-v7`, `comision-cobro-quien-registro`, `comisiones-consolidado-neto` (la RPC vigente es la v9), `multifashion-metas` y `multifashion-venta-hoy` (secretaria salió).
+>
+> **Verificado por mutación: 44 de 44 cazadas, con 2 CONTROLES sanos** (`scripts/_mutar-candados-comisiones-rediseno.sh`): el «desde» deja de frenar · el «hasta» deja de frenar · el «hasta» corta exclusive · el «desde» se come su mes · una fecha ilegible falla cerrado · la vigencia no se aplica · la lectura pide columnas por nombre · **la migración arranca en julio y mueve seis meses** · **se le inventa un «hasta» a un descuento indefinido** · se cae el CHECK · solo una fila recibe la fecha · vuelve a abrir en el mes en curso · enero no cruza el año · vuelve el reloj del navegador (shell) · ídem (período) · vuelve la columna «Activo» · el GET vuelve a leer `activo` · el PUT vuelve a escribirlo · en pantalla se dice «descuento fijo» · **el «Hasta» vacío vuelve a ser «—»** · **el «Hasta» deja de decir que es opcional** · **se pide el «Hasta» para guardar** · el alta no manda las fechas · el desplegable ofrece a los retirados · quitar pasa a ser DELETE · se ve el `*` pelado · el nombre no se traduce · se cae el comodín en ventas · ídem en cobros · D-108 se carga para un solo vendedor · falta una empresa · vuelve el filtro por nombre · la cadena no estrena la v9 · la página vuelve a no comprobar el rol · se va el guard entero · la lista se escribe a mano · el espejo repite roles · overview vuelve a la lista a mano · el espejo se queda sin sus roles · secretaria vuelve a ver las metas · Jennifer podría editarse su meta · la pestaña deja de reusar la vista · la pestaña aparece en Ventas · voseo. **CONTROL final verde (187).**
+
+---
+
 ## 🔴 Comisiones — LOS DESCUENTOS SE RESTAN UNA SOLA VEZ, EN EL SERVIDOR (24-ago-2026)
 
 > 🩸 **LA MISMA PERSONA, EL MISMO MES, DOS NÚMEROS EN LA MISMA PANTALLA.** La pestaña **«Por empresa»** mostraba el SUBTOTAL —sin restar los descuentos fijos— mientras **«Todas las empresas»** y el detalle del vendedor sí los restaban. Medido contra producción, **REINALDO ESPINOSA en Fashion Shoes** (sus dos descuentos: `Descuento` $1.400,00 + `Descuento de adelanto` $173,08 = **$1.573,08**, los ÚNICOS dos descuentos vivos de todo el sistema):

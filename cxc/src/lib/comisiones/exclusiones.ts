@@ -21,9 +21,16 @@
 
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
+import { esVendedorTodos } from "./vendedor-todos";
 
 /** Rótulo único de la sección y de la marca en la tabla. */
 export const ROTULO_CLIENTES_SIN_COMISION = "Clientes que no comisionan";
+
+export {
+  VENDEDOR_TODOS,
+  ROTULO_VENDEDOR_TODOS,
+  esVendedorTodos,
+} from "./vendedor-todos";
 
 /** El vendedor como lo guarda la tabla y lo compara la RPC: mayúsculas, sin bordes. */
 export const normalizarVendedor = (s: string): string => s.trim().toUpperCase();
@@ -89,6 +96,15 @@ export function validarExclusionNueva(body: unknown): Validacion {
   if (codigo.length > 40) return { ok: false, error: "El código del cliente no es válido" };
   const vendedor = typeof b.vendedor === "string" ? normalizarVendedor(b.vendedor) : "";
   if (!vendedor) return { ok: false, error: "Elige el vendedor" };
+  // El comodín es un valor legítimo: «todos los vendedores» de esa empresa.
+  if (esVendedorTodos(vendedor)) {
+    const casillasTodos = leerCasillas(b);
+    if (!casillasTodos) return { ok: false, error: "Las casillas de Venta y Cobro no son válidas" };
+    if (!casillasTodos.excluye_venta && !casillasTodos.excluye_cobro) {
+      return { ok: false, error: AVISO_NINGUNA_CASILLA };
+    }
+    return { ok: true, valor: { empresa_key: empresa, cliente_codigo: codigo, vendedor, ...casillasTodos } };
+  }
   if (vendedor.length > 120) return { ok: false, error: "El nombre del vendedor no es válido" };
   const casillas = leerCasillas(b);
   if (!casillas) return { ok: false, error: "Las casillas de Venta y Cobro no son válidas" };

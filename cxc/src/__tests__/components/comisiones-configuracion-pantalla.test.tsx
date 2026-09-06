@@ -169,6 +169,14 @@ describe("🔴 el chip «Configuración»: solo admin, solo en el módulo /comis
   });
 });
 
+
+// Desde el 6-sep-2026 la pestaña tiene TRES tarjetas y hay DOS «+ Agregar»
+// (Clientes que no comisionan y Descuentos): cada caso acota el suyo.
+function agregarEnClientes() {
+  const seccion = document.querySelector('[aria-labelledby="sin-comision-titulo"]') as HTMLElement;
+  fireEvent.click(within(seccion).getByRole("button", { name: "+ Agregar" }));
+}
+
 // ═══ 2–5. La pestaña ═════════════════════════════════════════════════════════
 describe("🔴 la pestaña Configuración", () => {
   beforeEach(() => { sessionStorage.setItem("cxc_role", "admin"); });
@@ -177,7 +185,7 @@ describe("🔴 la pestaña Configuración", () => {
     render(<ComisionesConfiguracionView />);
     await screen.findByText("Clientes que no comisionan");
     await screen.findByText("Kheriddine");
-    fireEvent.click(screen.getByRole("button", { name: "+ Agregar" }));
+    agregarEnClientes();
     await screen.findByTestId("alta-sin-comision");
     expect(document.body.textContent ?? "").not.toMatch(/exclu/i);
   });
@@ -278,7 +286,7 @@ describe("🔴 la pestaña Configuración", () => {
   it("🔴 «+ Agregar»: Empresa → Cliente (el selector compartido) → Vendedor → Venta ☑ Cobro ☑ → Guardar; arranca con las DOS marcadas", async () => {
     render(<ComisionesConfiguracionView />);
     await screen.findByText("Clientes que no comisionan");
-    fireEvent.click(screen.getByRole("button", { name: "+ Agregar" }));
+    agregarEnClientes();
     const alta = await screen.findByTestId("alta-sin-comision");
     const guardar = within(alta).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
     expect(guardar.disabled).toBe(true);
@@ -308,7 +316,7 @@ describe("🔴 la pestaña Configuración", () => {
   it("🔴 las 4 combinaciones: solo Venta y solo Cobro viajan al POST; las dos apagadas no se guardan y se avisa", async () => {
     render(<ComisionesConfiguracionView />);
     await screen.findByText("Clientes que no comisionan");
-    fireEvent.click(screen.getByRole("button", { name: "+ Agregar" }));
+    agregarEnClientes();
     const alta = await screen.findByTestId("alta-sin-comision");
     const guardar = within(alta).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
     fireEvent.click(await within(alta).findByRole("button", { name: /Kheriddine/ }));
@@ -325,7 +333,7 @@ describe("🔴 la pestaña Configuración", () => {
     await screen.findByText("Listo, guardado");
 
     // La fila se cierra al guardar: se vuelve a abrir, y arranca de nuevo con las dos marcadas.
-    fireEvent.click(screen.getByRole("button", { name: "+ Agregar" }));
+    agregarEnClientes();
     const alta2 = await screen.findByTestId("alta-sin-comision");
     const guardar2 = within(alta2).getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
     const venta2 = within(alta2).getByLabelText("Venta") as HTMLInputElement;

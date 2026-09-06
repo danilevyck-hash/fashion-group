@@ -403,13 +403,17 @@ afterAll(() => { process.env.SESSION_SECRET = SECRET_PREV; });
 // a ser «la anterior». Lo que este bloque exige —la v7 antes que la v6, y el
 // fallback confesando `version` y `exclusiones_aplicadas`— se mantiene, con la
 // v8 doblada como inexistente (arriba).
+// CAMBIÓ DE DIRECCIÓN el 6-sep-2026: la vigente es la v9 (D-108 excluido por
+// CÓDIGO, no por nombre) y la v8 pasó a ser «la anterior». Lo que estos casos
+// exigen —el orden de la cadena y el fallback confesando `version`— no cambia:
+// solo se agrega un eslabón adelante.
 describe("🔴 leerComision: v7 después de la v8, y dice qué corrió", () => {
   beforeEach(() => { rpcCalls.length = 0; });
 
-  it("la cadena es v8 → v7 → v6 → v5", async () => {
-    const { RPC_COMISION, RPC_COMISION_ANTERIOR, RPC_COMISION_V6, RPC_COMISION_V5, CADENA_RPC_COMISION } = await import("@/lib/comisiones/rpc");
-    expect([RPC_COMISION, RPC_COMISION_ANTERIOR, RPC_COMISION_V6, RPC_COMISION_V5]).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
-    expect(CADENA_RPC_COMISION.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
+  it("la cadena es v9 → v8 → v7 → v6 → v5", async () => {
+    const { RPC_COMISION, RPC_COMISION_V8, RPC_COMISION_ANTERIOR, RPC_COMISION_V6, RPC_COMISION_V5, CADENA_RPC_COMISION } = await import("@/lib/comisiones/rpc");
+    expect([RPC_COMISION, RPC_COMISION_V8, RPC_COMISION_ANTERIOR, RPC_COMISION_V6, RPC_COMISION_V5]).toEqual(["comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
+    expect(CADENA_RPC_COMISION.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5"]);
   });
 
   it("con la DDL de v7 aplicada (y la v8 no): v8 → v7, version = v7, exclusiones_aplicadas = true", async () => {
@@ -421,7 +425,7 @@ describe("🔴 leerComision: v7 después de la v8, y dice qué corrió", () => {
     expect(r.data?.exclusiones_aplicadas).toBe(true);
     expect(r.data?.alias_aplicado).toBe(false);
     expect(r.data?.regla_cobro).toBe("quien_registro");
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7"]);
   });
 
   it("sin la DDL: cae a la v6 y lo confiesa (version = v6, exclusiones_aplicadas = false)", async () => {
@@ -431,7 +435,7 @@ describe("🔴 leerComision: v7 después de la v8, y dice qué corrió", () => {
     expect(r.error).toBeNull();
     expect(r.data?.version).toBe("v6");
     expect(r.data?.exclusiones_aplicadas).toBe(false);
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6"]);
   });
 });
 

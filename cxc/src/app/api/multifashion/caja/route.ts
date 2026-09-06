@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
 import { createSwitchClient, type SwitchDiarioVentas } from "@/lib/switch-api/client";
 
@@ -44,7 +45,7 @@ interface CacheRow {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const auth = requireRole(req, ["admin", "secretaria", "gerente_acs"]);
+  const auth = requireRole(req, ROLES_MULTIFASHION);
   if (auth instanceof NextResponse) return auth;
 
   const hoy = hoyPanama();

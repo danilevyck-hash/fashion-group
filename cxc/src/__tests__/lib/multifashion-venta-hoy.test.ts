@@ -332,9 +332,15 @@ describe("ruta /api/multifashion/venta-hoy", () => {
     expect((await ventaHoyGet(req("vendedor"))).status).toBe(403);
   });
 
-  it("secretaria y gerente_acs entran", async () => {
-    expect((await ventaHoyGet(req("secretaria"))).status).toBe(200);
+  // CAMBIÓ DE DIRECCIÓN el 6-sep-2026: `secretaria` SALIÓ de Multifashion.
+  // Daniel, al preguntarle si lo cerraba igual aunque perdieran el avance de
+  // las metas: «A». El módulo nunca fue suyo (`src/lib/modules.ts` lo da a
+  // admin y gerente_acs), y con la pestaña espejo de Comisiones ve lo que
+  // necesita. Jennifer (`gerente_acs`) no pierde nada: es su casa.
+  it("gerente_acs entra; secretaria y contabilidad ya NO (6-sep-2026)", async () => {
     expect((await ventaHoyGet(req("gerente_acs"))).status).toBe(200);
+    expect((await ventaHoyGet(req("secretaria"))).status).toBe(403);
+    expect((await ventaHoyGet(req("contabilidad"))).status).toBe(403);
   });
 });
 

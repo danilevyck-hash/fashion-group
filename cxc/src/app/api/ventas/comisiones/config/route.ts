@@ -1,7 +1,15 @@
 /**
  * Configuración de tasas de comisión GLOBALES por vendedor.
  * - GET: lista comision_vendedor_tasa + origen (empresas del maestro vendedores).
- * - PUT: actualiza tasa_venta / tasa_cobro / activo por vendedor.
+ * - PUT: actualiza tasa_venta / tasa_cobro por vendedor.
+ *
+ * 🩸 `activo` NI SE LEE NI SE ESCRIBE DESDE EL 6-sep-2026. Daniel: «quitarlo».
+ * MEDIDO: ese interruptor no le quitaba la comisión a nadie —`comision_b2b_v8`
+ * une la tabla de tasas SIN filtrar por `activo`, y `REY STOUTE AGUAS` estuvo
+ * en `activo = false` desde el 4-sep-2026 y siguió comisionando los 9 meses de
+ * 2026 ($49,83)—. La COLUMNA no se dropea (patrón de la casa): queda ahí, sin
+ * lectores ni escritores. Para sacar a alguien hay UNA sola forma, y sí
+ * funciona en el servidor: `src/lib/comisiones/retirados.ts`.
  * Solo admin (admin pasa siempre por requireRole).
  *
  * Venta y cobro son DOS tasas (3-sep-2026): la pantalla mostraba una sola y
@@ -35,7 +43,6 @@ interface ConfigRow {
   vendedor_nombre: string;
   tasa_venta: number;
   tasa_cobro: number;
-  activo: boolean;
   origen: string[];
 }
 
@@ -46,7 +53,7 @@ export async function GET(req: NextRequest) {
   const [tasasRes, vendRes, alias] = await Promise.all([
     supabaseServer
       .from("comision_vendedor_tasa")
-      .select("vendedor_nombre, tasa_venta, tasa_cobro, activo")
+      .select("vendedor_nombre, tasa_venta, tasa_cobro")
       .order("vendedor_nombre", { ascending: true }),
     supabaseServer.from("vendedores").select("nombre, empresa_key").eq("activo", true),
     leerAliasOVacio(),
@@ -86,7 +93,6 @@ export async function GET(req: NextRequest) {
       vendedor_nombre: nombre,
       tasa_venta: Number(t.tasa_venta),
       tasa_cobro: Number(t.tasa_cobro ?? t.tasa_venta),
-      activo: Boolean(t.activo),
       origen: [...(origenMap.get(nombre) ?? [])].sort(),
     });
   }
@@ -99,7 +105,6 @@ interface UpdateInput {
   tasa_venta: number;
   /** undefined = no se manda: se conserva la de la fila. */
   tasa_cobro?: number;
-  activo: boolean;
 }
 
 export async function PUT(req: NextRequest) {
@@ -157,7 +162,7 @@ export async function PUT(req: NextRequest) {
         );
       }
     }
-    rows.push({ vendedor_nombre: nombre, tasa_venta: tasa, tasa_cobro: tasaCobro, activo: Boolean(r.activo) });
+    rows.push({ vendedor_nombre: nombre, tasa_venta: tasa, tasa_cobro: tasaCobro });
   }
   if (rows.length === 0) {
     return NextResponse.json({ error: "Sin cambios para guardar" }, { status: 400 });
@@ -167,11 +172,13 @@ export async function PUT(req: NextRequest) {
   // PostgREST exige que todas las filas del upsert tengan las MISMAS claves:
   // la de cobro viaja solo si vino en todas (la pantalla siempre la manda).
   const conCobro = rows.every((r) => r.tasa_cobro !== undefined);
+  // `activo` NO viaja: la columna se quedó sin escritores a propósito (ver el
+  // encabezado). En un upsert que solo trae estas claves, PostgREST deja la
+  // columna como estaba en las filas que ya existen.
   const payload = rows.map((r) => ({
     vendedor_nombre: r.vendedor_nombre,
     tasa_venta: r.tasa_venta,
     ...(conCobro ? { tasa_cobro: r.tasa_cobro } : {}),
-    activo: r.activo,
     updated_at: nowIso,
   }));
 
