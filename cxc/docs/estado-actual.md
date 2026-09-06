@@ -292,7 +292,7 @@ Tampoco migran las píldoras relativas (Mes/3m/6m/12m): no son fechas, son venta
 
 ## Pendientes vivos al 3-sep (los del 31-ago siguen salvo los marcados ✅)
 
-- ✅ **Ventas › Clientes «vs 2025» compara 8 meses contra 9** (cortaba el año anterior a fin de mes). Multi Fashion Holding decía +3% y es **+36%**; medido sobre los 115 del ranking, 37 cambiaban de número y 6 de signo. Arreglado el 3-sep con la regla de «mismos días»: **migración `20260909120000_clientes_vs_anio_anterior_mismos_dias.sql` pendiente de que Daniel la aplique** — hasta entonces la columna sigue como estaba.
+- ✅ **Ventas › Clientes «vs 2025» compara 8 meses contra 9** (cortaba el año anterior a fin de mes). Multi Fashion Holding decía +3% y es **+36%**; medido sobre los 115 del ranking, 37 cambiaban de número y 6 de signo. Arreglado el 3-sep con la regla de «mismos días»: **migración `20260909120000_clientes_vs_anio_anterior_mismos_dias.sql` **aplicada** (verificado el 5-sep-2026).
 - **1.363 fichas de Reebok** sin traer (artículos sin existencia). Drenan solas a 400/día.
 - ✅ Documentación de Switch digerida → `docs/switch-referencia.md` (3-sep).
 - ✅ **Los tres chicos del 31-ago** (3-sep, tarde): heartbeat huérfano de `sync-mayor` (**migración `20260914120000` aplicada el 3-sep**; candado en verde), `supabase/.temp/` fuera del índice y en `.gitignore` (nada sensible en el historial), y las filas con saldo 0 de Boston **son correctas** — documentos pagados que el reconcile cerró; se filtran, no se borran. Detalle en la sección 7.
@@ -789,8 +789,10 @@ Se cerró la definición con Daniel y **queda parqueado hasta que termine el red
 
 **El disparador.** Daniel preguntó por qué la retrospectiva daba **36% de error en Multifashion**
 si es tienda y debería ser la más predecible (*«es el q mas exacto debe dar porque no es mayoreo»*).
-No era el negocio: **su 2024 arranca en junio** (la tienda abrió en mayo-2024), así que la prueba
-—parada en 5-sep-2025— dividió por una fracción de año rota. Para 2026 el molde es 2025, que está
+No era el negocio, y **tampoco era el sistema**: 🩸 el 36% salió de una réplica a mano de la
+fórmula que se dejó afuera el CLAMP de la v7. Corrido con el SQL real parado el 5-sep-2025, la v7
+proyecta **$764.549** contra un cierre de **$686.044** = **+11,4%**. Lo que sí es cierto es que su
+2024 arranca en junio (la tienda abrió en mayo-2024). Para 2026 el molde es 2025, que está
 completo: proyecta **$790.779** (+15%, igual que su ritmo real). El freno que debería haber
 atajado eso existe (`c_cobertura_min` = 0.10 en `ventas_proyeccion_cierre_v7`) pero es **demasiado
 bajo**: el 2024 de Multifashion sacó 0,55 y pasó. A Joystep, que abrió en julio, sí lo agarra (0,001).
