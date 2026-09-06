@@ -48,7 +48,14 @@ describe("las constantes de la RPC son las que se midieron", () => {
     expect(r.fracSinClamp).toBe(0.5);
   });
 
-  it("el piso de cobertura del año previo es 0.10", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 5-sep-2026: este candado sigue siendo cierto —la
+  // v7 conserva su 0.10 y no se la toca— pero YA NO describe lo que corre. El
+  // piso vigente es 0.20 y vive en la v8
+  // (`20261001120000_proyeccion_cobertura_v8.sql`), medida sobre 1.246 cortes
+  // de 2023-2025: es el piso más alto que no empeora ni un caso. Su candado es
+  // `ventas-proyeccion-cobertura-v8.test.ts`, que además exige que la v8 sea la
+  // v7 byte a byte salvo esta constante.
+  it("el piso de cobertura de la v7 es 0.10 (la v8 lo sube a 0.20)", () => {
     expect(constanteSql("c_cobertura_min")).toBe(r.coberturaMinima);
     expect(r.coberturaMinima).toBe(0.1);
   });
@@ -223,6 +230,10 @@ describe("el cierre del año pasado sigue siendo un hecho, no una estimación", 
 });
 
 describe("una sola versión de la proyección para todo el sistema", () => {
+  // ⚠️ 5-sep-2026: desde la v8, el dashboard llama a la v8 y CAE a la v7. Este
+  // candado sigue apuntando a lo mismo —que la v7 está en la cadena y que la v5
+  // no volvió— y por eso no cambia; lo nuevo lo cubre
+  // `ventas-proyeccion-cobertura-v8.test.ts`.
   it("el dashboard llama a v7 y no quedó rastro de v5", () => {
     expect(queries).toContain("ventas_proyeccion_cierre_v7");
     expect(queries).toContain("rpcConFallbackDeVersion");

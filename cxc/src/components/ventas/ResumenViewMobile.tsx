@@ -63,6 +63,9 @@ import {
   buildSlotsProyeccion, explicacionProyeccion,
   explicacionProyeccionGrupo, deltaProyeccionTexto,
 } from "@/lib/ventas/proyeccion-texto";
+import {
+  mesesProyectadosPorFila, LEYENDA_MESES_PROYECTADOS,
+} from "@/lib/ventas/proyeccion-mensual";
 import { variacionPct } from "@/lib/variacion";
 
 import { FilaDetalleBloque, medirRenglon, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
@@ -372,6 +375,8 @@ interface Renglon {
   dc: DeltaCelda | null;
   /** Período en curso: se tiñe como la columna resaltada del escritorio. */
   enCurso: boolean;
+  /** Mes que todavía no pasó: va en gris, sin Δ y sin nada que abrir. */
+  proyectado: boolean;
   /** Total / Proyección: separados del bloque de períodos y en negrita. */
   fuerte: boolean;
   /** Qué mostrar al tocarlo. `null` = no hay nada que abrir. */
@@ -430,6 +435,16 @@ function MobileTarjetas({
   const yy = String(selectedYear).slice(-2);
   const yyPrev = String(selectedYear - 1).slice(-2);
   const showProy = !isClosedYear && !!data.proyeccion;
+  // 🔴 Los meses que faltan, en gris — la MISMA cuenta que el escritorio, del
+  // mismo módulo. Solo mensual y solo en modo Ventas.
+  const mesesGris =
+    showProy && granularity === "mensual" && viewMode === "ventas"
+      ? mesesProyectadosPorFila(
+          data.empresas.map(e => ({ id: e.empresa.id, ventasPrevFull: e.ventasPrevFull ?? [] })),
+          data.proyeccion!.mes_corte,
+          id => findProyeccionForEmpresa(data.proyeccion!, id),
+        )
+      : null;
 
   // Una tarjeta abierta a la vez, misma regla que PanelCxcMobile: con 8 empresas
   // × 12 meses, permitir varias abiertas convierte la pantalla en una lista de
@@ -444,10 +459,21 @@ function MobileTarjetas({
   }
 
   /** Renglón de un período. Sirve igual para una empresa y para el grupo. */
-  function renglonPeriodo(filaId: string, titulo: string, cell: CellData, ci: number): Renglon {
+  function renglonPeriodo(
+    filaId: string, titulo: string, cell: CellData, ci: number,
+    proyectado: number | null = null,
+  ): Renglon {
     const cur = cellValue(cell, viewMode);
     const foco = celdaKey("m", filaId, String(ci));
-    const base = { foco, etiqueta: cols[ci], enCurso: ci === currentColIdx, fuerte: false };
+    const base = {
+      foco, etiqueta: cols[ci], enCurso: ci === currentColIdx, fuerte: false, proyectado: false,
+    };
+    if (cur == null && proyectado != null) {
+      return {
+        ...base, proyectado: true,
+        valor: renderCellValue(proyectado, viewMode), dc: null, detalle: null,
+      };
+    }
     if (cur == null) {
       return { ...base, valor: "—", dc: null, detalle: null };
     }
@@ -500,6 +526,7 @@ function MobileTarjetas({
         dc,
         enCurso: false,
         fuerte: true,
+        proyectado: false,
         detalle: {
           titulo,
           subtitulo: `TOTAL ${yy} vs ${yyPrev}`,
@@ -530,7 +557,7 @@ function MobileTarjetas({
       utilidad: sumSeries(e.utilidad2026),
       utilidadPrev: sumSeries(e.utilidad2025),
     };
-    const periodos = cells.map((c, ci) => renglonPeriodo(id, nombre, c, ci));
+    const periodos = cells.map((c, ci) => renglonPeriodo(id, nombre, c, ci, mesesGris?.porFila[id]?.[ci] ?? null));
     const total = renglonTotal(id, nombre, ytdCell, yt.cur, yt.prev, e.margenPct, e.margenPctPrev);
 
     const renglones = [...periodos, total.renglon];
@@ -546,6 +573,7 @@ function MobileTarjetas({
         dc: null,
         enCurso: false,
         fuerte: true,
+        proyectado: false,
         // La Proyección explica de dónde sale, en castellano llano (antes en el
         // escritorio era un número sin origen).
         detalle: p
@@ -610,7 +638,8 @@ function MobileTarjetas({
     { v: 0, vp: 0, u: 0, up: 0 }
   );
 
-  const grupoPeriodos = totalColAggs.map((c, ci) => renglonPeriodo(TOTAL_GRUPO_ID, "Total grupo", c, ci));
+  const grupoPeriodos = totalColAggs.map((c, ci) =>
+    renglonPeriodo(TOTAL_GRUPO_ID, "Total grupo", c, ci, mesesGris?.grupo[ci] ?? null));
   const grupoYtdCell: CellData = {
     ventas: groupYtd.v, ventasPrev: groupYtd.vp, utilidad: groupYtd.u, utilidadPrev: groupYtd.up,
   };
@@ -632,6 +661,7 @@ function MobileTarjetas({
       dc: null,
       enCurso: false,
       fuerte: true,
+      proyectado: false,
       // Sin detalle, igual que en el escritorio: `buildSlotsProyeccion` describe
       // la proyección de UNA empresa y los totales del grupo no traen las mismas
       // partes. Inventarle una explicación sería inventar el dato.
@@ -678,6 +708,9 @@ function MobileTarjetas({
         onAbrirFila={onAbrirFila}
         onCerrarFila={onCerrarFila}
       />
+      {mesesGris && (
+        <p data-leyenda-proyectado="celular" className="px-1 pt-1 text-xs leading-tight text-gray-500">{LEYENDA_MESES_PROYECTADOS}</p>
+      )}
     </div>
   );
 }
@@ -821,6 +854,8 @@ function RenglonPeriodo({
     "flex min-h-[44px] w-full items-center gap-2 px-3 py-2",
     renglon.fuerte && (oscura ? "border-t border-gray-700" : "border-t border-gray-100"),
     renglon.enCurso && (oscura ? "bg-[rgba(15,118,110,0.22)]" : "bg-[rgba(15,118,110,0.06)]"),
+    // Mes que todavía no pasó: fondo tenue, igual que la celda del escritorio.
+    renglon.proyectado && (oscura ? "bg-white/5" : "bg-gray-50"),
   );
 
   const etiqueta = (
@@ -841,8 +876,8 @@ function RenglonPeriodo({
         className={cn(
           "font-mono text-xs tabular-nums",
           renglon.fuerte && "font-semibold",
-          renglon.valor === "—"
-            ? oscura ? "text-gray-500" : "text-gray-300"
+          renglon.valor === "—" || renglon.proyectado
+            ? oscura ? "text-gray-500" : "text-gray-400"
             : oscura ? "text-white" : "text-gray-950",
         )}
       >
@@ -863,7 +898,7 @@ function RenglonPeriodo({
 
   if (!renglon.detalle) {
     return (
-      <div className={claseBase}>
+      <div className={claseBase} data-mes-proyectado={renglon.proyectado ? renglon.foco : undefined}>
         {etiqueta}
         {cifras}
       </div>

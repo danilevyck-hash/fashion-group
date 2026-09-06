@@ -26,6 +26,9 @@ import {
   explicacionProyeccionGrupo, deltaProyeccionTexto,
   type ProyeccionGrupoExplicable,
 } from "@/lib/ventas/proyeccion-texto";
+import {
+  mesesProyectadosPorFila, LEYENDA_MESES_PROYECTADOS,
+} from "@/lib/ventas/proyeccion-mensual";
 import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
@@ -270,6 +273,19 @@ export function ResumenView({
   // La columna "Proyección" en la tabla + el hero al final sólo aplican al
   // año en curso. Año cerrado = ya cerró, no hay nada que proyectar.
   const showProyeccionCol = !isClosedYear && !!data.proyeccion;
+
+  // 🔴 LOS MESES QUE FALTAN, EN GRIS (5-sep-2026). Solo en la matriz MENSUAL y
+  // solo en modo Ventas: no existe una utilidad proyectada por mes, y pintar un
+  // margen de un mes que no pasó sería inventar el dato. La cuenta entera vive
+  // en `lib/ventas/proyeccion-mensual.ts` y la comparte el celular.
+  const mesesGris =
+    showProyeccionCol && granularity === "mensual" && viewMode === "ventas"
+      ? mesesProyectadosPorFila(
+          data.empresas.map(e => ({ id: e.empresa.id, ventasPrevFull: e.ventasPrevFull ?? [] })),
+          data.proyeccion!.mes_corte,
+          id => findProyeccionForEmpresa(data.proyeccion!, id),
+        )
+      : null;
 
   // KPIs YTD del grupo — deltas vs prev year same-period.
   //   ventasDelta   = ratio decimal (0.05 = +5%)
@@ -554,6 +570,7 @@ export function ResumenView({
                       cell={c}
                       mode={viewMode}
                       prevYear={prevYear}
+                      proyectado={mesesGris?.porFila[r.empresa.id]?.[ci] ?? null}
                       filaId={r.empresa.id}
                       columna={String(ci)}
                       titulo={nombreEmpresaEnPantalla(r.empresa.id, r.empresa.nombre)}
@@ -602,6 +619,7 @@ export function ResumenView({
                     key={ci}
                     agg={agg}
                     mode={viewMode}
+                    proyectado={mesesGris?.grupo[ci] ?? null}
                     columna={String(ci)}
                     periodLabel={`${cols[ci]} ${selectedYear}`}
                     cortoLabel={`${cols[ci].toUpperCase()} ${String(selectedYear).slice(-2)} vs ${String(prevYear).slice(-2)}`}
@@ -624,9 +642,11 @@ export function ResumenView({
             </tbody>
           </table>
         </div>
-        {partialFooter && (
-          <p className="border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500">
+        {(partialFooter || mesesGris) && (
+          <p data-pie-matriz="escritorio" className="border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500">
             {partialFooter}
+            {partialFooter && mesesGris ? " · " : null}
+            {mesesGris ? LEYENDA_MESES_PROYECTADOS : null}
           </p>
         )}
       </Card>
@@ -832,11 +852,13 @@ function labelCorto(periodLabel: string, prevYear: number): string {
 }
 
 function HeatCell({
-  cell, mode, prevYear, filaId, columna, titulo, onAbrir,
+  cell, mode, prevYear, proyectado, filaId, columna, titulo, onAbrir,
 }: {
   cell: Cell;
   mode: ViewMode;
   prevYear: number;
+  /** Mes que todavía no pasó: lo que la proyección reparte ahí. null = «—». */
+  proyectado: number | null;
   filaId: string;
   columna: string;
   titulo: string;
@@ -844,6 +866,20 @@ function HeatCell({
 }) {
   const cur   = cellValue(cell, mode);
   const delta = cellDelta(cell, mode);
+
+  // 🔴 Un mes que todavía no pasó se llena EN GRIS con lo que la proyección le
+  // reparte. No es tocable y no lleva Δ: no hay nada medido que abrir, y un %
+  // contra el año pasado sería el factor repetido doce veces.
+  if (cur == null && proyectado != null) {
+    return (
+      <td
+        data-mes-proyectado={columna}
+        className="whitespace-nowrap border-b border-gray-200 bg-gray-50 px-1.5 py-3.5 text-right font-mono text-xs tabular-nums text-gray-400"
+      >
+        {renderCellValue(proyectado, mode)}
+      </td>
+    );
+  }
 
   // Mes futuro sin nada del año anterior: no hay nada que abrir.
   const hasPrev = cell.ventasPrev > 0 || cell.utilidadPrev > 0;
@@ -989,10 +1025,12 @@ function EmpresaTotalCell({
  * inline; al tocarla se transforma la fila oscura entera.
  */
 function TotalGroupCell({
-  agg, mode, columna, periodLabel, cortoLabel, prevYear, onAbrir,
+  agg, mode, proyectado, columna, periodLabel, cortoLabel, prevYear, onAbrir,
 }: {
   agg: Agg;
   mode: ViewMode;
+  /** Suma de lo proyectado por empresa para ese mes. null = «—». */
+  proyectado: number | null;
   columna: string;
   periodLabel: string;
   cortoLabel: string;
@@ -1000,6 +1038,16 @@ function TotalGroupCell({
   onAbrir: AbrirFila;
 }) {
   const cur = cellValue(agg, mode);
+  if (cur == null && proyectado != null) {
+    return (
+      <td
+        data-mes-proyectado-grupo={columna}
+        className="whitespace-nowrap bg-white/5 px-1.5 py-3.5 text-right font-mono text-xs tabular-nums text-gray-400"
+      >
+        {renderCellValue(proyectado, mode)}
+      </td>
+    );
+  }
   if (cur == null) {
     return (
       <td className="whitespace-nowrap px-1.5 py-3.5 text-right font-mono text-xs tabular-nums">

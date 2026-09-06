@@ -34,6 +34,13 @@ import type {
   ProyeccionGrupoCrudo,
 } from "@/components/ventas/types";
 
+/** Una fila de `ventas_rollup_mensual_mv` del año anterior. */
+interface RollupPrevRow {
+  empresa_key: string;
+  mes_num: number;
+  ventas_netas: number | string | null;
+}
+
 interface DashboardSummaryRow {
   empresa: string;
   mes: number;
@@ -76,7 +83,7 @@ function buildEmpresa(key: string): Empresa {
  * construye el shape VentasResumen mapeando empresa key → ventas_id.
  */
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
-  const [curRes, prevRes, proyRes, syncedRes] = await Promise.all([
+  const [curRes, prevRes, proyRes, syncedRes, prevFullRes] = await Promise.all([
     // withDbRetry: en caché fría estas RPC se pasan del statement_timeout y
     // Postgres las cancela; al segundo intento (caché caliente) pasan en <1s.
     // Ver src/lib/supabase-retry.ts para la medición.
@@ -113,16 +120,38 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // FASE 2.1: migrado a v6 (lee switch_ventas_unificado_vw, base subtotal pre-impuesto).
     // v7 (jul-2026): clamp de la proyección, cobertura del año previo y regla de
     // año base. Cae a v6 mientras la migración 20260726120000 no haya corrido.
+    // v8 (5-sep-2026): la v7 byte a byte con UN cambio, el piso de cobertura del
+    // año previo (0.10 → 0.20). Medido sobre 1.246 cortes de 2023-2025: no
+    // cambia un solo número de 2026 —la cobertura más baja de hoy es 0.72— y
+    // arregla tres casos históricos donde el año base era un pedazo de año.
+    // Cae a v7 mientras la migración 20261001120000 no haya corrido, y la v7
+    // sigue cayendo a v6 como siempre.
     rpcConFallbackDeVersion(
-      () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v7", { p_anio: year }), { label: "ventas_proyeccion_cierre_v7" }),
-      () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }), { label: "ventas_proyeccion_cierre_v6" }),
-      { label: "ventas_proyeccion_cierre_v7" },
+      () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v8", { p_anio: year }), { label: "ventas_proyeccion_cierre_v8" }),
+      () => rpcConFallbackDeVersion(
+        () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v7", { p_anio: year }), { label: "ventas_proyeccion_cierre_v7" }),
+        () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }), { label: "ventas_proyeccion_cierre_v6" }),
+        { label: "ventas_proyeccion_cierre_v7" },
+      ),
+      { label: "ventas_proyeccion_cierre_v8" },
     ),
     // FASE 2.1b: MAX(synced_at) de switch_facturas — momento del último sync
     // que insertó data nueva. Alimenta el subtitle "Data actualizada al ..."
     // para mostrar frescura real (no la fecha de hoy). Graceful: si falla,
     // el subtitle cae a fecha_corte (lógica vieja) vía null.
     withDbRetry(() => supabaseServer.from("switch_facturas").select("synced_at").order("synced_at", { ascending: false }).limit(1), { label: "switch_facturas.synced_at" }),
+    // Los 12 meses del año ANTERIOR completos — la FORMA con la que se reparte
+    // lo que falta del año en las celdas grises de la matriz (5-sep-2026).
+    // 🩸 No se puede sacar de `prevRes`: esa RPC recorta el mes en curso a los
+    // mismos días y no emite los meses posteriores, así que oct-nov-dic del año
+    // pasado simplemente no vienen. Misma fuente que el panel mes × año
+    // (`ventas_rollup_mensual_mv`, ~313 filas) y su suma por empresa cuadra al
+    // centavo con `cierre_anio_anterior` de la proyección.
+    // Tolerante: si falla, los meses que faltan se quedan en «—».
+    withDbRetry(() => supabaseServer
+      .from("ventas_rollup_mensual_mv")
+      .select("empresa_key, mes_num, ventas_netas")
+      .eq("anio", year - 1), { label: "ventas_rollup_mensual_mv.prev" }),
     // NOTA (25-jul-2026): acá vivían proyeccion_mensual_retail_v1 y
     // proyeccion_mensual_mayorista_v1, que alimentaban la columna "Cierre <mes>
     // (proy.)". Se quitaron: el negocio B2B factura por embarques, no parejo, así
@@ -157,6 +186,20 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   const cur26Util  = buildSeries(cur,  "total_utilidad");
   const cur26Costo = buildSeries(cur,  "total_costo");
   const prev25     = buildSeries(prev, "total_subtotal");
+  // Los 12 meses del año anterior COMPLETOS (del rollup). `null` donde ese mes
+  // no tiene fila: no vendió nada. Un error de lectura deja los 8 arreglos en
+  // null y las celdas grises no se dibujan — nunca un número inventado.
+  const prevFull: Record<string, MonthlySeries> = {};
+  for (const k of ALL_EMPRESA_KEYS) prevFull[k] = Array(12).fill(null);
+  if (!prevFullRes.error) {
+    for (const r of (prevFullRes.data ?? []) as RollupPrevRow[]) {
+      if (!ALL_EMPRESA_KEYS.includes(r.empresa_key as (typeof ALL_EMPRESA_KEYS)[number])) continue;
+      if (r.mes_num < 1 || r.mes_num > 12) continue;
+      prevFull[r.empresa_key][r.mes_num - 1] = (prevFull[r.empresa_key][r.mes_num - 1] ?? 0) + toNum(r.ventas_netas);
+    }
+  } else {
+    console.warn(`[ventas/resumen] ventas_rollup_mensual_mv(${year - 1}): ${prevFullRes.error.message}`);
+  }
   const prev25Util = buildSeries(prev, "total_utilidad");
   const prev25Costo = buildSeries(prev, "total_costo");
 
@@ -211,6 +254,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
       empresa: buildEmpresa(key),
       ventas2026:   ventas,
       ventas2025:   ventasPrev,
+      ventasPrevFull: prevFull[key],
       utilidad2026: utilidad,
       utilidad2025: utilidadPrev,
       margenPct,

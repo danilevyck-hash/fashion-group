@@ -17,6 +17,20 @@ export type EmpresaMonthlySales = {
   empresa: Empresa;
   ventas2026: MonthlySeries;
   ventas2025: MonthlySeries;
+  /**
+   * Los 12 meses del año anterior COMPLETOS, sin el recorte de «mismos días».
+   *
+   * 🩸 No es lo mismo que `ventas2025` y por eso existe (5-sep-2026):
+   * `ventas2025` sale de `ventas_dashboard_prev_same_period_v4`, que recorta el
+   * mes en curso al mismo día y **no emite los meses posteriores** — medido:
+   * para Multifashion trae 9 renglones (ene..sep) y septiembre vale $5,343.98,
+   * que son 1–5 sep 2025, no el mes. Con eso NO se puede saber qué forma tuvo
+   * oct-nov-dic del año pasado, que es justo lo que la proyección mensual
+   * reparte. Sale de `ventas_rollup_mensual_mv` (misma fuente que el panel mes
+   * × año) y su suma cuadra al centavo con `cierre_anio_anterior` de la RPC de
+   * proyección en las 8 empresas.
+   */
+  ventasPrevFull: MonthlySeries;
   /** Utilidad mensual del año actual (toggle Utilidad del heatmap) */
   utilidad2026: MonthlySeries;
   /** Utilidad mensual del año anterior */
