@@ -341,7 +341,14 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     // lo que se fue es la descarga. Este número baja A PROPÓSITO: es el candado
     // que avisa si alguien pierde un Excel sin querer, y bajarlo sin nota sería
     // exactamente el descuido que vino a cazar.
-    expect(total).toBe(24);
+    //
+    // 🔁 25 desde el 5-sep-2026: **entró el Excel de Ventas › Clientes**
+    // (`src/lib/ventas/clientes-excel.ts`). El botón que se veía arriba de esa
+    // pestaña no era el suyo: era el del Resumen, puesto en la barra del
+    // módulo, así que desde Clientes se bajaba la matriz de empresas × meses.
+    // Ahora cada pestaña baja lo que se está viendo. Sube A PROPÓSITO, con la
+    // misma regla con la que el de Cheques bajó.
+    expect(total).toBe(25);
   });
 });
 

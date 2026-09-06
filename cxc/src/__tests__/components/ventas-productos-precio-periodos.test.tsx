@@ -205,7 +205,9 @@ describe("1 · la columna Precio prom. dice venta ÷ unidades", () => {
     await pintada();
     expect(celda("CAMISA POLO", "cantidad")).toBe("1,000");
     expect(celda("CAMISA POLO", "venta")).toBe("$9,000.00");
-    expect(celda("CAMISA POLO", "margen")).toBe("40.0%");
+    // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5). El VALOR no se
+    // movió: 0,4 sigue siendo 0,4.
+    expect(celda("CAMISA POLO", "margen")).toBe("40%");
     expect(celda("CAMISA POLO", "codigos")).toBe("3");
   });
 
@@ -365,7 +367,8 @@ describe("3 · el selector de período cambia LO QUE SE PIDE", () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
     const p = document.querySelector("[data-totales-productos]")!;
-    expect(p.textContent).toBe("Venta $14,300.00·Margen 40.6%");
+    expect(p.textContent)// 🔁 Sin decimal desde el 5-sep-2026 (40,6% → 41%, redondeado).
+      .toBe("Venta $14,300.00·Margen 41%");
   });
 });
 
@@ -610,12 +613,25 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
 
   it("abre en «Quién lo compra» y lista los clientes, del que más compra al que menos", async () => {
     const tabla = await desplegar();
-    const filas = [...tabla.querySelectorAll("tr")].map(tr => (tr.textContent ?? "").replace(/\s+/g, " ").trim());
+    // 🔁 5-sep-2026: la tabla hija tiene AHORA SU PROPIA CABECERA, así que la
+    // primera `<tr>` es el encabezado. Es el arreglo del defecto más grande de
+    // este encargo: la última columna mostraba la PARTICIPACIÓN bajo el
+    // encabezado «Margen %» heredado de la tabla de arriba (ver
+    // `productos-columna-no-hereda-encabezado.test.tsx`).
+    const encabezado = (tabla.querySelector("thead tr")?.textContent ?? "").replace(/\s+/g, " ").trim();
+    expect(encabezado).toContain("% del total");
+    expect(encabezado).not.toContain("Margen");
+
+    // ⚠️ `:scope >` y no `"tbody tr"` a secas: esta tabla vive DENTRO de un
+    // `<td>` de la tabla madre, así que su propia `<thead><tr>` también es
+    // descendiente del `<tbody>` de arriba y un selector suelto la traería.
+    const filas = [...tabla.querySelectorAll(":scope > tbody > tr")].map(tr => (tr.textContent ?? "").replace(/\s+/g, " ").trim());
     expect(filas[0]).toContain("City Mall Paso Canoa");
     expect(filas[1]).toContain("Golden Mall");
     // El % se mide contra la SUMA DE LA LISTA: 6750/9000 = 75%.
-    expect(filas[0]).toContain("75.0%");
-    expect(filas[1]).toContain("25.0%");
+    // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5).
+    expect(filas[0]).toContain("75%");
+    expect(filas[1]).toContain("25%");
   });
 
   it("y el pie dice cuántas piezas y cuánta venta son", async () => {
@@ -779,7 +795,10 @@ describe("9 · el aviso de código mal clasificado ya no existe", () => {
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     await waitFor(() => expect(document.querySelector("[data-drill-clientes]")).toBeTruthy());
     const tabla = document.querySelector("[data-drill-clientes]")!;
-    expect([...tabla.querySelectorAll("tr")]).toHaveLength(2);
+    // 🔁 Tres desde el 5-sep-2026: la cabecera PROPIA de la tabla hija + los
+    // dos clientes. Ver el arreglo de la columna que heredaba el encabezado.
+    expect([...tabla.querySelectorAll(":scope > tbody > tr")]).toHaveLength(2);
+    expect([...tabla.querySelectorAll(":scope > thead > tr")]).toHaveLength(1);
     expect(tabla.textContent).toContain("City Mall Paso Canoa");
   });
 });
@@ -817,7 +836,8 @@ describe("10 · las tarjetas de celular", () => {
     expect(tarjeta("CAMISA POLO", "cantidad")).toBe("1,000");
     expect(tarjeta("CAMISA POLO", "venta")).toBe("$9,000.00");
     expect(tarjeta("CAMISA POLO", "precio")).toBe("$9.00");
-    expect(tarjeta("CAMISA POLO", "margen")).toBe("40.0%");
+    // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5).
+    expect(tarjeta("CAMISA POLO", "margen")).toBe("40%");
   });
 
   it("🔴 y dice EXACTAMENTE lo mismo que la tabla, celda por celda", async () => {

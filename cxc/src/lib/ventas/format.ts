@@ -4,13 +4,55 @@
 export const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"] as const;
 export const QUARTERS = ["Q1","Q2","Q3","Q4"] as const;
 
+// 🔴 EL SIGNO VA DELANTE DEL SÍMBOLO: «−$100.00», nunca «$-100.00»
+// (diccionario § 0, #6, decidido por Daniel el 5-sep-2026).
+//
+// No es cosmética: `$-100.00` se lee de izquierda a derecha como «dólares
+// menos cien» y en una columna de números pegados el guion se confunde con el
+// separador. `fmtMoneySigned` (utilidad-cliente.ts) ya lo hacía bien desde
+// antes — lo que faltaba era que las DOS funciones de esta casa dijeran lo
+// mismo, porque las dos se pintan en la misma pantalla.
+//
+// ⚠️ NINGÚN VALOR CAMBIA. Es el mismo número con el signo en otro lugar; el
+// candado `ventas-diccionario-formato.test.ts` lo congela.
+function conSigno(sinSigno: string, negativo: boolean): string {
+  return (negativo ? "−" : "") + "$" + sinSigno;
+}
+
 export function fmtMoney(n: number): string {
-  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return conSigno(
+    Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    n < 0,
+  );
 }
 
 export function fmtMoneyCompact(n: number | null | undefined): string {
   if (n == null) return "—";
-  return "$" + Math.round(n).toLocaleString("en-US");
+  // `Math.round(-0.4)` da `-0`, que imprime «−$0» y parece una deuda de cero.
+  const redondeado = Math.round(Math.abs(n));
+  return conSigno(redondeado.toLocaleString("en-US"), n < 0 && redondeado !== 0);
+}
+
+/**
+ * 🔴 UN PORCENTAJE, SIN DECIMAL — «29%», «−12%», «—» (diccionario § 0, #5,
+ * decidido por Daniel el 5-sep-2026).
+ *
+ * Recibe la FRACCIÓN (0.287), no el número ya multiplicado: los tres módulos
+ * que escribían `(x * 100).toFixed(1) + "%"` a mano cada uno por su lado son
+ * exactamente cómo el mismo margen salía «28.7%» en el Resumen y «28.73%» en
+ * otra pantalla. La multiplicación vive acá y en ningún otro lado.
+ *
+ * ⚠️ NO se aplica a los PUNTOS de margen («+2.1 pts»): esos son una DIFERENCIA
+ * entre dos porcentajes, y a cero decimales «+0.4 pts» se convertiría en «+0
+ * pts», que se lee como «no cambió». Son otra unidad y llevan su propia regla
+ * (`formatDeltaRatio` en modo `pts`).
+ */
+export function fmtPorcentaje(fraccion: number | null | undefined): string {
+  if (fraccion == null || !Number.isFinite(fraccion)) return "—";
+  const v = fraccion * 100;
+  // `Math.round(-0.2)` da `-0` → «−0%». Se normaliza a «0%».
+  const redondeado = Math.round(Math.abs(v));
+  return (v < 0 && redondeado !== 0 ? "−" : "") + redondeado + "%";
 }
 
 // "$87K" / "$1.09M" / "$766K". Para el layout mobile del Resumen donde el

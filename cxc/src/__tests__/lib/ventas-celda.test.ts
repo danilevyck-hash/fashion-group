@@ -54,10 +54,19 @@ describe("matemática de la celda", () => {
     expect(cellDelta(futuro, "ventas")).toBeNull();
   });
 
-  it("formato del monto: sin centavos, con separador de miles", () => {
+  // 🔁 CAMBIÓ DE DIRECCIÓN el 5-sep-2026: el porcentaje va SIN DECIMAL.
+  // Decía `"35.0%"`. Es la decisión #5 del diccionario (`docs/diccionario.md`
+  // § 0), tomada por Daniel ese día: «los porcentajes sin decimal: 12%».
+  // Convivían 12%, 12.3% y 12.35% en el mismo módulo. La cuenta NO se tocó —
+  // solo el formateo, que ahora pasa por `fmtPorcentaje`, la única definición.
+  it("formato del monto: sin centavos, con separador de miles; el % sin decimal", () => {
     expect(renderCellValue(null, "ventas")).toBe("—");
     expect(renderCellValue(120_000, "ventas")).toBe("$120,000");
-    expect(renderCellValue(0.35, "margen")).toBe("35.0%");
+    expect(renderCellValue(0.35, "margen")).toBe("35%");
+    // CONTROL: el valor sigue siendo el mismo, redondeado y no truncado.
+    expect(renderCellValue(0.2873, "margen")).toBe("29%");
+    // Y el signo del dinero va DELANTE del símbolo (diccionario § 0, #6).
+    expect(renderCellValue(-1_500, "ventas")).toBe("−$1,500");
   });
 });
 
@@ -79,15 +88,17 @@ describe("buildSlotsMetrica — contenido de la fila transformada", () => {
     expect(utilidad.valor).toBe("$42,000");
     expect(utilidad.prev).toBe("$30,000");
 
-    expect(margen.valor).toBe("35.0%");
-    expect(margen.prev).toBe("30.0%");
+    // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5). Antes "35.0%".
+    expect(margen.valor).toBe("35%");
+    expect(margen.prev).toBe("30%");
   });
 
   it("en celular (conPrev=false) se cae el monto del año previo, no el Δ", () => {
     const slots = buildSlotsMetrica(celda, "ventas", false);
     expect(slots.every((s) => s.prev === null)).toBe(true);
     expect(slots[0].delta).toContain("20");
-    expect(slots.map((s) => s.valor)).toEqual(["$120,000", "$42,000", "35.0%"]);
+    // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5).
+    expect(slots.map((s) => s.valor)).toEqual(["$120,000", "$42,000", "35%"]);
   });
 
   it("destaca la métrica del toggle activo de la tabla", () => {
@@ -100,10 +111,26 @@ describe("buildSlotsMetrica — contenido de la fila transformada", () => {
     expect(buildSlotsMetrica(cayo, "ventas")[0].tone).toBe("orange");
   });
 
-  it("sin comparativo muestra n/a en vez de un Δ inventado", () => {
+  // 🔁 CAMBIÓ DE DIRECCIÓN el 5-sep-2026. Decía que sin comparativo se pinta
+  // «n/a». Daniel, mirando a Joystep con «n/a» de febrero a junio: *el sistema
+  // tiene razón, la palabra es la que no dice nada*. Joystep NO VENDIÓ NADA en
+  // 2025 hasta julio — eso es lo que la celda tiene que decir.
+  //
+  // 🔑 Lo que NO cambió: sigue sin inventarse un Δ. Cambia la palabra, no la
+  // regla; y son DOS palabras porque son dos casos que no son lo mismo.
+  it("sin comparativo dice POR QUÉ, en vez de un Δ inventado", () => {
     const sinPrev: CeldaBase = { ventas: 500, ventasPrev: 0, utilidad: 100, utilidadPrev: 0 };
-    expect(buildSlotsMetrica(sinPrev, "ventas")[0].delta).toBe("n/a");
+    expect(buildSlotsMetrica(sinPrev, "ventas")[0].delta).toBe("no vendiste");
     expect(buildSlotsMetrica(sinPrev, "ventas")[0].prev).toBeNull();
+
+    // CONTROL — base por debajo de $100 pero MAYOR que cero: sí vendió, poco.
+    // Decir «no vendiste» acá sería falso, y es la mitad del cambio.
+    const casiNada: CeldaBase = { ventas: 500, ventasPrev: 40, utilidad: 100, utilidadPrev: 10 };
+    expect(buildSlotsMetrica(casiNada, "ventas")[0].delta).toBe("casi no vendiste");
+
+    // CONTROL — con base comparable vuelve el porcentaje de siempre.
+    const conBase: CeldaBase = { ventas: 500, ventasPrev: 400, utilidad: 100, utilidadPrev: 80 };
+    expect(buildSlotsMetrica(conBase, "ventas")[0].delta).toContain("%");
   });
 
   it("mes futuro: sin valor actual pero conserva el del año previo", () => {

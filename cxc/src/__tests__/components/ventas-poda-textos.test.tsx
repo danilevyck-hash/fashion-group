@@ -676,37 +676,51 @@ const UTILIDAD_RESP: UtilidadClienteResponse = {
   ],
 };
 
-describe("Utilidad · alcance al ⓘ, aviso en pantalla", () => {
+// 🔁 CAMBIÓ DE DIRECCIÓN el 5-sep-2026: el alcance ya NO vive adentro de un ⓘ,
+// se DICE EN PANTALLA. Daniel, mirando el total de Utilidad: $5.337.236,50 sin
+// nada que explicara por qué es más chico que el del Resumen. La razón es real
+// —Boston y Multifashion no llevan utilidad— y escondida en una ayuda, el que
+// no la abre se queda pensando que faltan dos empresas de plata.
+//
+// 🔴 LO QUE NO CAMBIÓ, Y ES LO QUE ESTE BLOQUE SIEMPRE MIRÓ: el NÚMERO se
+// DERIVA del payload (`data.empresas`), no es un texto fijo. Decía «5» mientras
+// la lista real de Fashion Group son SEIS, y así es como joystep se volvió
+// invisible en Comisiones.
+describe("Utilidad · el alcance se dice EN PANTALLA (antes en el ⓘ)", () => {
   async function montar() {
     rutas.push((u) => (u.includes("/api/ventas/utilidad-cliente") ? UTILIDAD_RESP : undefined));
     render(<UtilidadView selectedYear={2026} />);
     await screen.findAllByText("CLIENTE BUENO");
   }
 
-  it("cerrado no muestra de dónde sale el costo", async () => {
+  it("🔁 el alcance está a la vista, sin tener que abrir nada", async () => {
     await montar();
-    expect(screen.queryByText(/Costo real por documento/)).toBeNull();
+    const linea = document.querySelector("[data-alcance-utilidad]")!.textContent ?? "";
+    expect(linea).toContain("6 empresas B2B");
+    // Y dice POR QUÉ no es el total del grupo, que es la pregunta que el
+    // número dejaba sin contestar.
+    expect(linea).toContain("Boston y Multifashion no llevan utilidad");
+    // El ⓘ se retiró: lo que decía ahora está en pantalla.
+    expect(screen.queryByRole("button", { name: "Cómo se calcula" })).toBeNull();
   });
 
   // 🔴 EL NÚMERO SE DERIVA DEL PAYLOAD, NO ES UN TEXTO FIJO. Decía "5" mientras
   // la lista real de Fashion Group son SEIS: joystep sincroniza utilidad desde
   // el 27-jul-2026 y ya comisiona, y esta pantalla no lo dibujaba. Con el
   // alcance derivado, encender una empresa la trae acá sola.
-  it("el ⓘ cuenta las empresas que la consulta miró de verdad — SEIS, no cinco", async () => {
+  it("cuenta las empresas que la consulta miró de verdad — SEIS, no cinco", async () => {
     await montar();
-    tocarAyuda("Cómo se calcula");
-    expect(screen.getByText("Costo real por documento (6 empresas B2B).")).toBeTruthy();
+    expect(document.querySelector("[data-alcance-utilidad]")!.textContent).toContain("6 empresas B2B");
     expect(screen.queryByText(/5 empresas B2B/)).toBeNull();
   });
 
-  it("si la consulta cae a la v1 (migración sin correr), el ⓘ dice CINCO — no miente hacia arriba", async () => {
+  it("si la consulta cae a la v1 (migración sin correr), dice CINCO — no miente hacia arriba", async () => {
     rutas.push((u) => (u.includes("/api/ventas/utilidad-cliente")
       ? { ...UTILIDAD_RESP, empresas: ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear"] }
       : undefined));
     render(<UtilidadView selectedYear={2026} />);
     await screen.findAllByText("CLIENTE BUENO");
-    tocarAyuda("Cómo se calcula");
-    expect(screen.getByText("Costo real por documento (5 empresas B2B).")).toBeTruthy();
+    expect(document.querySelector("[data-alcance-utilidad]")!.textContent).toContain("5 empresas B2B");
   });
 
   it("el aviso de utilidades negativas SIGUE en pantalla (es un aviso, no metodología)", async () => {

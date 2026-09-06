@@ -2,7 +2,7 @@
 // cálculo de rango de fechas por período y export a Excel. Lo consumen las dos
 // rutas API (nivel 1 + drill-down) y el componente ProductosView.
 
-import { MONTHS } from "./format";
+import { MONTHS, fmtPorcentaje } from "./format";
 // El criterio de "la misma ventana un año antes, recortada a los días
 // cargados" vive en UN solo lugar: `clientes-corte-comparativo.ts`, la
 // definición única del corte para todo el sistema. Acá se importa, no se copia.
@@ -275,10 +275,16 @@ export function fmtPrecioProm(n: number | null | undefined): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Margen como % sin signo forzado, 1 decimal. "—" si no aplica.
+/**
+ * Margen como porcentaje, SIN DECIMAL. "—" si no aplica.
+ *
+ * 🔴 Delega en `fmtPorcentaje` (diccionario § 0, #5, decidido por Daniel el
+ * 5-sep-2026). Escribía su propio `(d * 100).toFixed(1)` y había otra función
+ * con el MISMO nombre en `utilidad-cliente.ts` con su propio redondeo: el
+ * mismo margen podía salir «28.7%» en una pestaña y «28.73%» en otra.
+ */
 export function fmtMargen(d: number | null | undefined): string {
-  if (d == null) return "—";
-  return (d * 100).toFixed(1) + "%";
+  return fmtPorcentaje(d);
 }
 
 // Export Excel del nivel 1 (todas las descripciones, no solo el Top 20).

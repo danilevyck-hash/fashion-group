@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
-import { MONTHS } from "@/lib/ventas/format";
+import { MONTHS, fmtPorcentaje } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { variacionPct } from "@/lib/variacion";
@@ -78,7 +78,9 @@ function abbrevAmount(n: number): string {
 // porcentaje 1 decimal. Sin data → "—".
 function renderMetric(v: number | null, mode: ViewMode): string {
   if (v == null) return "—";
-  if (mode === "margen") return (v * 100).toFixed(1) + "%";
+  // Porcentaje SIN DECIMAL, por `fmtPorcentaje` (diccionario § 0, #5): esta
+  // celda es el MISMO margen que el Resumen, y salía con un decimal más.
+  if (mode === "margen") return fmtPorcentaje(v);
   return abbrevAmount(v);
 }
 

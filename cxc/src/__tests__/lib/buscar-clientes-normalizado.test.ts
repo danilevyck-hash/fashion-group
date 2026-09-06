@@ -116,19 +116,45 @@ describe("Ventas → Clientes: buscar alcanza a los huérfanos", () => {
   // el 27-jul-2026: 7 clientes con compras en 12 meses estaban en ese pozo.
   const fs = require("node:fs") as typeof import("node:fs");
   const path = require("node:path") as typeof import("node:path");
-  const vista = fs.readFileSync(
+  const vistaCruda = fs.readFileSync(
     path.join(__dirname, "..", "..", "components/ventas/ClientesView.tsx"), "utf8");
+  // 🔴 SIN COMENTARIOS. Un comentario que NOMBRA lo que se retiró —para
+  // explicar por qué se retiró— no es la cosa retirada, y este repo ya pagó
+  // varias veces el candado que se cumple con su propia explicación.
+  const vista = vistaCruda
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
 
   it("la búsqueda incluye a los huérfanos, no sólo a los masters", () => {
-    expect(vista).toContain("[...masters, ...orphans].filter(c => coincideBusqueda(");
+    // 🔁 5-sep-2026: ya no hace falta unir dos listas porque **ya no hay dos**.
+    // Los huérfanos dejaron de colapsarse en una fila agregada y entran a la
+    // lista como cualquier cliente (Daniel: *«si y si»*), así que la búsqueda
+    // corre sobre el universo entero. Lo que este test vigila es lo mismo de
+    // siempre: que un huérfano se pueda encontrar escribiendo su nombre.
+    expect(vista).toContain("let r = universe.slice();");
+    expect(vista).toContain("r = r.filter(c => coincideBusqueda(search, [c.nombre, c.id]));");
+    // CONTROL: los huérfanos siguen ENTRANDO al universo (no se los filtra
+    // antes de buscar), que es lo que hacía el pozo.
+    expect(vista).not.toMatch(/const\s+masters\s*=\s*universe\.filter/);
   });
 
   it("ya no compara con toLowerCase()/includes() a mano", () => {
     expect(vista).not.toContain("c.nombre.toLowerCase().includes(q)");
   });
 
-  it("con búsqueda activa no se cuela la fila agregada 'Otros clientes'", () => {
-    expect(vista).toContain("if (otrosRow && !search) r.push(otrosRow);");
+  it("🔁 la fila agregada 'Otros clientes' ya no existe: sus clientes se listan", () => {
+    // Decía que con búsqueda activa la fila agregada no se empujaba a la lista.
+    // Desde el 5-sep-2026 no hay fila agregada NI diálogo: esos ocho clientes
+    // van en la lista, bajo un renglón que los separa y los cuenta. La razón es
+    // la misma que la de este archivo — un cliente escondido detrás de un clic
+    // es un cliente que no se encuentra.
+    expect(vista).not.toContain("otrosRow");
+    expect(vista).not.toContain("OtrosClientesDialog");
+    expect(vista).toContain("bloques.huerfanos");
+    // CONTROL — con búsqueda activa NADA se pliega: ni los huérfanos ni los
+    // clientes en cero. Quien escribe un nombre quiere encontrarlo.
+    expect(vista).toContain("(buscando || c.ytd > 0)");
+    expect(vista).toContain("const enCero = buscando ? [] :");
   });
 
   it("usa el MISMO normalizador que el módulo Clientes", () => {

@@ -5,7 +5,7 @@
 // celda del tooltip flotante al panel lateral, las dos vistas y el panel tienen
 // que dar EXACTAMENTE el mismo número, así que la matemática vive acá.
 
-import { fmtMoney, fmtMoneyCompact } from "./format";
+import { fmtMoney, fmtMoneyCompact, fmtPorcentaje } from "./format";
 import { formatDeltaRatio } from "./formatDelta";
 import { baseComparable, variacionPct, BASE_MIN_COMPARATIVO, SIN_COMPARATIVO, SIN_DATO } from "../variacion";
 
@@ -75,10 +75,12 @@ export function deltaModeFor(mode: ViewMode): "pct" | "pts" {
   return mode === "margen" ? "pts" : "pct";
 }
 
-/** Valor compacto para la celda de la tabla ("$1.2M"). */
+/** Valor compacto para la celda de la tabla ("$1,234,567" / "29%"). */
 export function renderCellValue(v: number | null, mode: ViewMode): string {
   if (v == null) return "—";
-  if (mode === "margen") return (v * 100).toFixed(1) + "%";
+  // 🔴 El porcentaje va SIN DECIMAL y por `fmtPorcentaje`, la única definición
+  // (diccionario § 0, #5). Acá decía `(v * 100).toFixed(1)` escrito a mano.
+  if (mode === "margen") return fmtPorcentaje(v);
   return fmtMoneyCompact(v);
 }
 
@@ -101,11 +103,41 @@ export interface DeltaCelda {
 }
 
 /**
+ * 🔴 «n/a» SE DICE CON PALABRAS — Daniel, 5-sep-2026: *el sistema tiene razón,
+ * la palabra es la que no dice nada*.
+ *
+ * QUÉ PASABA: Joystep salía «n/a» de febrero a junio porque en 2025 **no vendió
+ * nada hasta julio**. La cuenta estaba bien (`isNaComparison`: hay valor este
+ * año y no hay base el anterior) y la sigla no explicaba nada. Ahora la celda
+ * dice qué pasó el año pasado, que es la razón por la que no hay comparación.
+ *
+ * 🔑 SON DOS CASOS Y NO UNO, y por eso son dos frases. La base puede no servir
+ * porque fue **cero** —no vendió— o porque fue **menos de $100**, el piso de
+ * `BASE_MIN_COMPARATIVO`: ahí sí vendió, y decir «no vendiste» sería falso.
+ * `prevBase` es lo que separa las dos; sin ese dato se cae a la sigla de antes,
+ * que nunca miente.
+ */
+export const SIN_VENTA_ANTERIOR = "no vendiste";
+export const VENTA_ANTERIOR_MINIMA = "casi no vendiste";
+
+export function textoSinComparativo(prevBase: number | null | undefined): string {
+  if (prevBase == null || !Number.isFinite(prevBase)) return SIN_COMPARATIVO;
+  return prevBase <= 0 ? SIN_VENTA_ANTERIOR : VENTA_ANTERIOR_MINIMA;
+}
+
+/**
  * @param delta Δ ya calculado (cellDelta o el que arme el caller para totales).
  * @param na    true cuando hay valor actual pero NO hay base del año previo.
+ * @param prevBase Base del período anterior, para poder decir POR QUÉ no hay
+ *                 comparación. Omitirla deja la sigla de siempre.
  */
-export function deltaCelda(delta: number | null, mode: ViewMode, na = false): DeltaCelda | null {
-  if (delta == null) return na ? { texto: SIN_COMPARATIVO, tone: "neutral" } : null;
+export function deltaCelda(
+  delta: number | null,
+  mode: ViewMode,
+  na = false,
+  prevBase?: number | null,
+): DeltaCelda | null {
+  if (delta == null) return na ? { texto: textoSinComparativo(prevBase), tone: "neutral" } : null;
   const fmt = formatDeltaRatio(delta, deltaModeFor(mode));
   return {
     texto: `${fmt.arrow ? `${fmt.arrow} ` : ""}${fmt.displayValue}`,
@@ -161,7 +193,8 @@ export function buildSlotsMetrica(
       prev: conPrev && prev > 0 ? renderCellValue(prev, mode) : null,
       delta:
         delta == null
-          ? (na && cur != null ? SIN_COMPARATIVO : SIN_DATO)
+          // Mismo criterio que la celda: sin comparación, se dice POR QUÉ.
+          ? (na && cur != null ? textoSinComparativo(prev) : SIN_DATO)
           : `${fmt.arrow ? `${fmt.arrow} ` : ""}${fmt.displayValue}`,
       tone: delta == null ? "neutral" : fmt.tone === "emerald" ? "emerald" : fmt.tone === "orange" ? "orange" : "neutral",
       destacado: mode === highlight,

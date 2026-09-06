@@ -65,6 +65,31 @@ const nextConfig = {
         destination: "/referencia",
         permanent: false,
       },
+      // Comisiones dejó de ser la 5ª pestaña de Ventas (5-sep-2026). Daniel:
+      // *«si quitala»* — la pantalla vive COMPLETA en `/comisiones`, con su
+      // pestaña Configuración, que adentro de Ventas nunca se montó.
+      //
+      // 🔴 Y NO ES SOLO UN ENLACE VIEJO: `/ventas` es admin-only, así que para
+      // la secretaria y para contabilidad `/comisiones` es la ÚNICA puerta.
+      // Mandar el enlace guardado a la pantalla viva es lo que impide que
+      // alguien crea que perdió el módulo.
+      //
+      // Mismo patrón que `?tab=referencia`: `has` matchea SOLO ese valor de
+      // `tab`, así que /ventas y sus TRES pestañas siguen intactas. Next
+      // arrastra la query al destino (se llega a `/comisiones?tab=comisiones`)
+      // y es INERTE: esa pantalla no lee `tab`.
+      //
+      // ⚠️ `?tab=utilidad` NO se resuelve acá y no es un olvido: su destino es
+      // la MISMA ruta con la MISMA clave `tab` (`/ventas?tab=clientes&modo=
+      // utilidad`), así que el redirect volvería a matchear su propia salida y
+      // el navegador giraría en redondo. Lo traduce `tabHeredado` en
+      // `VentasShell`, donde no puede haber bucle.
+      {
+        source: "/ventas",
+        has: [{ type: "query", key: "tab", value: "comisiones" }],
+        destination: "/comisiones",
+        permanent: false,
+      },
       // Data Health dejó de ser un módulo suelto (13-ago-2026): vive como 2ª
       // PESTAÑA de Usuarios, con la MISMA pantalla. La dirección vieja la tienen
       // en marcadores y la escriben las alertas de integridad

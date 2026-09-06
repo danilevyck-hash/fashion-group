@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
-import { fmtMoneyCompact } from "@/lib/ventas/format";
+import { fmtMoneyCompact, fmtPorcentaje } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
 import { formatDeltaRatio, type DeltaFormat } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
@@ -59,7 +59,9 @@ function metricValue(v: Vals, mode: ViewMode): number | null {
 
 function renderValue(v: number | null, mode: ViewMode): string {
   if (v == null) return "—";
-  if (mode === "margen") return (v * 100).toFixed(1) + "%";
+  // Porcentaje SIN DECIMAL, por `fmtPorcentaje` (diccionario § 0, #5): esta
+  // celda es el MISMO margen que el Resumen, y salía con un decimal más.
+  if (mode === "margen") return fmtPorcentaje(v);
   return fmtMoneyCompact(v);
 }
 

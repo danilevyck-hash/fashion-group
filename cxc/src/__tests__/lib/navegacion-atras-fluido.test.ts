@@ -95,7 +95,15 @@ describe("Tabs principales con URL propia (sobreviven refresh, se comparten)", (
     // filtro, un favorito de `?tab=referencia` dejaba la pantalla EN BLANCO
     // (Radix no dibuja nada con un value sin trigger). Ese enlace además
     // redirige a /referencia en next.config.js; esto es la red de abajo.
-    expect(leer("src/app/ventas/VentasShell.tsx")).toContain("TABS.some((t) => t === tabRaw)");
+    // 🔁 5-sep-2026: el filtro pasó a llamarse `esTabVentas` y vive en el módulo
+    // puro `lib/ventas/pestanas.ts` (con la tira de cinco a tres). Es la MISMA
+    // red de abajo, con nombre y testeable sin montar la pantalla.
+    expect(leer("src/app/ventas/VentasShell.tsx")).toContain('esTabVentas(tabRaw) ? tabRaw : "resumen"');
+    const pestanasVentas = leer("src/lib/ventas/pestanas.ts");
+    expect(pestanasVentas).toContain("TABS_VENTAS");
+    // Y el `?tab=utilidad` viejo —la pestaña que pasó a ser un modo de
+    // Clientes— se traduce en vez de romper el enlace guardado.
+    expect(pestanasVentas).toContain("tabHeredado");
   });
 });
 

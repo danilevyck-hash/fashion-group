@@ -297,7 +297,9 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
     render(<ProductosView selectedYear={2026} />);
     await pintada();
     expect(enTabla().queryByRole("button", { name: /Margen/ })).toBeTruthy();
-    expect(celda("CAMISA POLO", "margen")).toBe("40.0%");
+    // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5). El VALOR no se
+    // movió: 0,4 sigue siendo 0,4.
+    expect(celda("CAMISA POLO", "margen")).toBe("40%");
 
     await elegirCliente(CITY.nombre);
     expect(enTabla().queryByRole("button", { name: /Margen/ })).toBeNull();
@@ -312,7 +314,9 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
     await abrirFiltro();
     fireEvent.click(await screen.findByRole("option", { name: "Cliente: todos" }));
     await pintada();
-    expect(celda("CAMISA POLO", "margen")).toBe("40.0%");
+    // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5). El VALOR no se
+    // movió: 0,4 sigue siendo 0,4.
+    expect(celda("CAMISA POLO", "margen")).toBe("40%");
   });
 
   it("si estaba ordenando por Margen, el orden se muda a Venta y no queda apuntando a nada", async () => {
@@ -454,7 +458,7 @@ describe("7 · cambiar de empresa suelta el cliente", () => {
     await elegirCliente(CITY.nombre);
     const empresa = screen.getByText("Fashion Wear").closest("button")!;
     fireEvent.keyDown(empresa, { key: "ArrowDown" });
-    fireEvent.click(await screen.findByRole("option", { name: "Vistana International" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Vistana" }));
     await pintada();
     expect(trigger().textContent).toContain("Cliente: todos");
     expect(celda("CAMISA POLO", "venta")).toBe("$9,000.00");

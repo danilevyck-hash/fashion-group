@@ -10,7 +10,8 @@
 // SQL, con `joystep` afuera: dos copias de la misma lista, y las dos mintiendo
 // juntas. Ese olvido ya costó 15.262,00 de cobros invisibles.
 
-import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { fmtPorcentaje } from "@/lib/ventas/format";
 
 /** Las cinco que `utilidad_por_cliente(p_anio)` (v1) lleva escritas en su WHERE.
  *  Solo se usa para rotular la respuesta cuando la migración de la v2 todavía
@@ -51,11 +52,23 @@ export function empresaNombre(key: string): string {
   return EMPRESA_KEY_TO_NAME[key] ?? key;
 }
 
-/** Margen como fracción → "28.5%" / "−12.3%" / "—" si null. */
-export function fmtMargen(d: number | null | undefined): string {
-  if (d == null) return "—";
-  const v = d * 100;
-  return (v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + "%";
+/**
+ * Margen como fracción → "29%" / "−12%" / "—" si null.
+ *
+ * 🔴 SIN DECIMAL, y por `fmtPorcentaje` (diccionario § 0, #5, decidido por
+ * Daniel el 5-sep-2026). Se llamaba `fmtMargen` y escribía su propio
+ * `.toFixed(1)`; el módulo tenía DOS funciones con ese nombre —ésta y la de
+ * `productos.ts`— que además redondeaban distinto del Resumen. El nombre
+ * cambió a propósito: `fmtMargen` a secas es lo que hacía que las dos
+ * convivieran sin que nadie lo notara.
+ *
+ * ⚠️ El Excel NO usa esto: ahí el margen viaja como NÚMERO real con formato
+ * de celda (`PCT_FMT`), que es lo que permite ordenarlo y promediarlo en la
+ * planilla. Un texto ya redondeado en un Excel es un número que no se puede
+ * volver a sumar.
+ */
+export function fmtMargenPantalla(d: number | null | undefined): string {
+  return fmtPorcentaje(d);
 }
 
 /** Dinero con signo claro: "$1,234.00" / "−$1,234.00". */
@@ -69,11 +82,30 @@ export function fmtMoneySigned(n: number): string {
 // filtro, zebra, fila TOTAL en banda PRI. Montos MONEY_FMT y margen PCT_FMT
 // como números reales.
 
-/** Construcción pura del sheet (sin DOM) — testeable. */
-export async function buildUtilidadSheet(resp: UtilidadClienteResponse): Promise<import("xlsx-js-style").WorkSheet> {
+/**
+ * Construcción pura del sheet (sin DOM) — testeable.
+ *
+ * 🔴 `filas` ES LO QUE SE ESTÁ VIENDO (5-sep-2026): con la búsqueda o una
+ * empresa puestas, el archivo trae ESAS filas y su TOTAL, no las 209 de la
+ * respuesta completa. Un Excel que ignora los filtros de la pantalla es un
+ * archivo que no cuadra con lo que se acaba de mirar. Sin `filas` baja todo,
+ * que es como se comportaba antes.
+ */
+export async function buildUtilidadSheet(
+  resp: UtilidadClienteResponse,
+  filas?: readonly UtilidadClienteRow[],
+): Promise<import("xlsx-js-style").WorkSheet> {
   const { buildReportSheet, MONEY_FMT, PCT_FMT } = await import("@/lib/excel-export");
 
-  const totalDocs = resp.rows.reduce((s, r) => s + r.nDocs, 0);
+  const usadas = filas ?? resp.rows;
+  const completo = usadas.length === resp.rows.length;
+  const totalDocs = usadas.reduce((s, r) => s + r.nDocs, 0);
+  // Los totales se recalculan sobre lo exportado; con la lista completa se
+  // usan los del servidor, que son la fuente de verdad y no se re-suman.
+  const totVentas = completo ? resp.totales.ventas : usadas.reduce((s, r) => s + r.ventas, 0);
+  const totCosto = completo ? resp.totales.costo : usadas.reduce((s, r) => s + r.costo, 0);
+  const totUtil = completo ? resp.totales.utilidad : usadas.reduce((s, r) => s + r.utilidad, 0);
+  const totMargen = completo ? resp.totales.margen : (totVentas > 0 ? totUtil / totVentas : null);
 
   return buildReportSheet({
     columns: [
@@ -90,13 +122,16 @@ export async function buildUtilidadSheet(resp: UtilidadClienteResponse): Promise
     // convierte en un margen REAL que se suma y se promedia con los demás y
     // baja el promedio sin que nadie lo note. `null` = celda VACÍA (lo soporta
     // `buildReportSheet`), que es lo que "—" significa.
-    rows: resp.rows.map(r => [r.cliente, r.empresa, r.nDocs, r.ventas, r.costo, r.utilidad, r.margen]),
-    totals: ["TOTAL", null, totalDocs, resp.totales.ventas, resp.totales.costo, resp.totales.utilidad, resp.totales.margen],
+    rows: usadas.map(r => [r.cliente, nombreCortoEmpresa(r.empresaKey), r.nDocs, r.ventas, r.costo, r.utilidad, r.margen]),
+    totals: ["TOTAL", null, totalDocs, totVentas, totCosto, totUtil, totMargen],
   });
 }
 
-export async function exportUtilidadToExcel(resp: UtilidadClienteResponse): Promise<void> {
-  const ws = await buildUtilidadSheet(resp);
+export async function exportUtilidadToExcel(
+  resp: UtilidadClienteResponse,
+  filas?: readonly UtilidadClienteRow[],
+): Promise<void> {
+  const ws = await buildUtilidadSheet(resp, filas);
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
   downloadWorkbook(
     workbookFromSheets([{ name: "Utilidad por cliente", ws }]),

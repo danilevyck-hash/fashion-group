@@ -9,14 +9,23 @@ import type {
   VentasResumen, Multifashion, ProyeccionResp, ProyeccionEmpresa, ProyeccionGrupo,
   EmpresaMonthlySales,
 } from "./types";
-import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol } from "@/lib/ventas/format";
+import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, fmtPorcentaje, kpiDeltaSymbol } from "@/lib/ventas/format";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { exportResumenToExcel } from "@/lib/ventas/excel";
+import { ControlSegmentado } from "./ControlSegmentado";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import {
   cellValue, cellPrevValue, cellDelta, isNaComparison,
   renderCellValue, buildSlotsMetrica, celdaKey, deltaCelda,
   type CeldaBase, type DeltaCelda,
 } from "@/lib/ventas/celda";
-import { buildSlotsProyeccion, explicacionProyeccion } from "@/lib/ventas/proyeccion-texto";
+import {
+  buildSlotsProyeccion, explicacionProyeccion,
+  explicacionProyeccionGrupo, deltaProyeccionTexto,
+  type ProyeccionGrupoExplicable,
+} from "@/lib/ventas/proyeccion-texto";
 import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
@@ -43,9 +52,51 @@ function findProyeccionForEmpresa(p: ProyeccionResp, ventasId: string): Proyecci
   return p.empresas.find(e => e.empresa === empresaKey) ?? null;
 }
 
+/**
+ * 🔴 EL NOMBRE CORTO — «Vistana», «Boston» (diccionario § 0, #4, decidido por
+ * Daniel el 5-sep-2026). El nombre largo llega del servidor y acá se traduce
+ * por la clave, sin un cuarto mapa: `nombreCortoEmpresa` es el SEGUNDO CAMPO de
+ * la misma lista de empresas. Si algún id nuevo no estuviera mapeado, se
+ * conserva el nombre que mandó el servidor — nunca se rompe la fila.
+ */
+export function nombreEmpresaEnPantalla(ventasId: string, nombreLargo: string): string {
+  const key = VENTAS_ID_TO_EMPRESA_KEY[ventasId];
+  return key ? nombreCortoEmpresa(key) : nombreLargo;
+}
+
+/**
+ * La proyección del GRUPO, con la parte que `totales_grupo` no trae: cuánto
+ * llevaba vendido el año anterior a esta MISMA altura, que es la suma de lo que
+ * la RPC ya devolvió por empresa. Se arma acá para que la tarjeta y su
+ * explicación salgan del MISMO objeto.
+ */
+export function proyeccionDelGrupo(p: ProyeccionResp): ProyeccionGrupoExplicable {
+  return {
+    ventas_ytd: p.totales_grupo.ventas_ytd,
+    proyeccion_cierre: p.totales_grupo.proyeccion_cierre,
+    cierre_anio_anterior_total: p.totales_grupo.cierre_anio_anterior_total,
+    delta_vs_anio_anterior_total: p.totales_grupo.delta_vs_anio_anterior_total,
+    ventas_prev_ytd_sp: p.empresas.reduce((s, e) => s + (e.ventas_prev_ytd_sp ?? 0), 0),
+  };
+}
+
 
 type Granularity = "mensual" | "trimestral" | "anual";
 type ViewMode = "ventas" | "utilidad" | "margen";
+
+/** Las opciones de los dos controles, EN UN SOLO LUGAR: el escritorio y el
+ *  celular las leen de acá para que no puedan volver a decir cosas distintas.
+ *  («Margen %», no «Margen»: es lo que dice también el control de Clientes.) */
+export const MODO_OPCIONES: { value: ViewMode; label: string }[] = [
+  { value: "ventas", label: "Ventas" },
+  { value: "utilidad", label: "Utilidad" },
+  { value: "margen", label: "Margen %" },
+];
+export const GRANULARIDAD_OPCIONES: { value: Granularity; label: string }[] = [
+  { value: "mensual", label: "Mensual" },
+  { value: "trimestral", label: "Trimestral" },
+  { value: "anual", label: "Anual" },
+];
 
 /** Abridor de detalle que recibe cada celda clicable. */
 type AbrirFila = (d: FilaDetalle) => void;
@@ -101,7 +152,11 @@ export function ResumenView({
   const { data: mesAnioData, error: mesAnioError } = useResumenMesAnio(panelEmpresaId !== null);
   const panelEmpresa = panelEmpresaId ? mesAnioData?.empresas.find((e) => e.id === panelEmpresaId) ?? null : null;
   const panelResumenEmpresa = panelEmpresaId ? data.empresas.find((e) => e.empresa.id === panelEmpresaId) ?? null : null;
-  const panelNombre = panelResumenEmpresa?.empresa.nombre ?? panelEmpresa?.nombre ?? "";
+  // El nombre CORTO también en el panel mes × año: es la misma empresa y no
+  // puede llamarse distinto según desde dónde se la abra.
+  const panelNombre = panelEmpresaId
+    ? nombreEmpresaEnPantalla(panelEmpresaId, panelResumenEmpresa?.empresa.nombre ?? panelEmpresa?.nombre ?? "")
+    : "";
   // Δ justo del Total del año en curso: same-period (día-prorrateado) reusando los
   // mismos números que la card YTD del dashboard (ventas2025 ya viene recortado al
   // mismo período). Solo cuando el año visible es el año en curso (no cerrado);
@@ -144,6 +199,18 @@ export function ResumenView({
 
   const onToggleMode = (mode: ViewMode) => {
     startTransition(() => setViewMode(mode));
+  };
+
+  const [bajando, setBajando] = useState(false);
+  const onExcel = async () => {
+    setBajando(true);
+    try {
+      await exportResumenToExcel(data);
+    } catch (err) {
+      console.error("[ventas/resumen] excel export failed", err);
+    } finally {
+      setBajando(false);
+    }
   };
 
   // Disclaimer/footer cuando el año en curso tiene mes parcial — same-period
@@ -241,6 +308,10 @@ export function ResumenView({
 
   const kpiVentasSub   = `${periodoLabel} · ${kpiDeltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
   const kpiUtilidadSub = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
+  // ⚠️ Los PUNTOS conservan su decimal a propósito: son la DIFERENCIA entre dos
+  // porcentajes, no un porcentaje. A cero decimales «+0.4 pts» se volvería «+0
+  // pts», que se lee como «no cambió». La regla sin decimal es para el % (ver
+  // `fmtPorcentaje`).
   const kpiMargenSub   = `${periodoLabel} · ${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
   // El bloque "mes en curso vs mismo mes del año anterior" solo aplica al año
   // en curso. En un año cerrado el encabezado pegado existe igual, con el
@@ -292,11 +363,11 @@ export function ResumenView({
           bajó el piso para que a 1440 entre de verdad. Correr el corte a `xl`
           no alcanzaba: a 1280 el útil es 1.001 y faltarían 275 px. */}
       <div className="hidden min-[1440px]:block space-y-5">
-      {/* KPI cards YTD del grupo — 3 cols (Ventas Netas / Utilidad / Margen).
-          Comparativo same-period vs prev year (ya viene aplicado desde la RPC
-          ventas_dashboard_prev_same_period). El toggle de la matriz no afecta
-          el banner: siempre muestra el panorama completo. */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      {/* KPI cards del grupo — CUATRO (Ventas Netas / Utilidad / Margen /
+          Cierre del año). Comparativo same-period vs prev year (ya viene
+          aplicado desde la RPC ventas_dashboard_prev_same_period). El toggle de
+          la matriz no afecta el banner: siempre muestra el panorama completo. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label={kpiVentasLabel}
           value={fmtMoney(k.ventasNetasYTD)}
@@ -309,9 +380,34 @@ export function ResumenView({
         />
         <KpiCard
           label="MARGEN PROMEDIO"
-          value={`${(k.margenYTD * 100).toFixed(1)}%`}
+          /* Sin decimal (diccionario § 0, #5): 28.7% → 29%. Por `fmtPorcentaje`,
+             la única definición — acá estaba escrito a mano. */
+          value={fmtPorcentaje(k.margenYTD)}
           sub={kpiMargenSub}
         />
+        {/* 🔴 LA PROYECCIÓN SUBE A TARJETA (5-sep-2026).
+            Vivía en la ÚLTIMA celda de la fila negra, al borde derecho de una
+            matriz de 15 columnas que solo entra entera a partir de 1440 px: para
+            leer en cuánto cierra el año había que arrastrar la tabla hasta el
+            final. Es de los cuatro números que Daniel mira, y estaba en el peor
+            lugar de la pantalla.
+
+            ⚠️ LA COLUMNA «Proyección» DE LA TABLA SE QUEDA: ahí se ve empresa
+            por empresa, que es otra pregunta. Lo que sube es el número del
+            GRUPO.
+
+            🔴 Y NO SE DIBUJA NINGUNA META. `ventas_proyeccion_cierre_v7`
+            devuelve `meta_anual`, `gap_vs_meta` y `status` (rojo/amarillo/verde)
+            desde `ventas_metas`; `stripMetasProyeccion` ya los deja fuera del
+            payload. Daniel: *«quita meta, no lo uso, prefiero proyeccion»*. */}
+        {showProyeccionCol && (
+          <KpiCard
+            label="CIERRE DEL AÑO"
+            value={fmtMoneyCompact(data.proyeccion!.totales_grupo.proyeccion_cierre)}
+            sub={`proyectado · ${deltaProyeccionTexto(data.proyeccion!.totales_grupo.delta_vs_anio_anterior_total)} vs ${prevYear}`}
+            detalle={explicacionProyeccionGrupo(proyeccionDelGrupo(data.proyeccion!), prevYear, { fechaCorte: data.fecha_corte })}
+          />
+        )}
       </div>
 
       {/* Mes en curso vs el mismo mes del año anterior (suma del grupo). Solo
@@ -339,42 +435,38 @@ export function ResumenView({
               menú; sesión única Switch — nunca 2 a la vez) + refresh-vistas
               como paso final (rollup mensual y vw de clientes al día). */}
           <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={() => onReloadData?.()} />
+
+          {/* 🔴 EL EXCEL DEL RESUMEN, ADENTRO DEL RESUMEN (5-sep-2026). Vivía
+              en la barra del módulo, al lado del año — y desde Clientes o desde
+              Productos bajaba ESTA matriz, que no tenía nada que ver con lo que
+              se estaba mirando. Ahora cada pestaña trae el suyo, como ya lo
+              hacían Productos y Utilidad. El archivo NO cambió: mismas
+              columnas, mismos números (`buildResumenSheet`). */}
+          <Button variant="outline" size="sm" onClick={onExcel} disabled={bajando} className="min-h-[44px]">
+            <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
+          </Button>
         </div>
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-full bg-gray-100 p-0.5 text-xs">
-            {(["ventas", "utilidad", "margen"] as const).map(m => (
-              <button
-                key={m}
-                onClick={() => onToggleMode(m)}
-                className={cn(
-                  "rounded-full px-3.5 py-1.5 font-medium capitalize transition",
-                  viewMode === m
-                    ? "bg-white text-gray-950 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                )}
-              >
-                {m === "ventas" ? "Ventas" : m === "utilidad" ? "Utilidad" : "Margen %"}
-              </button>
-            ))}
-          </div>
+          {/* 🔴 EL MISMO CONTROL SEGMENTADO QUE EL CELULAR Y QUE CLIENTES
+              (5-sep-2026). Acá eran cajas grises pegadas escritas a mano, en el
+              celular un `SegmentedRow` propio y en Clientes píldoras sueltas:
+              tres formas de elegir en el mismo módulo. Ahora hay una. */}
+          <ControlSegmentado
+            options={MODO_OPCIONES}
+            active={viewMode}
+            onChange={onToggleMode}
+            ariaLabel="Qué mostrar en la matriz"
+            ancho="contenido"
+          />
           {/* Bug #1 fix: selector año global vive ahora en VentasShell header,
               visible desde cualquier tab. No se duplica aquí. */}
-          <div className="inline-flex rounded-full bg-gray-100 p-0.5 text-xs">
-            {(["mensual", "trimestral", "anual"] as const).map(g => (
-              <button
-                key={g}
-                onClick={() => setGranularity(g)}
-                className={cn(
-                  "rounded-full px-3.5 py-1.5 font-medium transition",
-                  granularity === g
-                    ? "bg-white text-gray-950 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                )}
-              >
-                {g === "mensual" ? "Mensual" : g === "trimestral" ? "Trimestral" : "Anual"}
-              </button>
-            ))}
-          </div>
+          <ControlSegmentado
+            options={GRANULARIDAD_OPCIONES}
+            active={granularity}
+            onChange={setGranularity}
+            ariaLabel="Cada cuánto"
+            ancho="contenido"
+          />
         </div>
       </div>
 
@@ -446,11 +538,11 @@ export function ResumenView({
                     <div className="flex items-center gap-1.5">
                       {isMulti && multiMayoreoNota ? (
                         <MultifashionNameWithBreakdown
-                          nombre={r.empresa.nombre}
+                          nombre={nombreEmpresaEnPantalla(r.empresa.id, r.empresa.nombre)}
                           nota={multiMayoreoNota.texto}
                         />
                       ) : (
-                        <span className="inline-flex items-center gap-1.5">{r.empresa.nombre}</span>
+                        <span className="inline-flex items-center gap-1.5">{nombreEmpresaEnPantalla(r.empresa.id, r.empresa.nombre)}</span>
                       )}
                       {/* Affordance: abre el panel mes × año de la empresa. */}
                       <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-300 transition-colors group-hover:text-gray-500" aria-hidden />
@@ -464,13 +556,13 @@ export function ResumenView({
                       prevYear={prevYear}
                       filaId={r.empresa.id}
                       columna={String(ci)}
-                      titulo={r.empresa.nombre}
+                      titulo={nombreEmpresaEnPantalla(r.empresa.id, r.empresa.nombre)}
                       onAbrir={setFilaDetalle}
                     />
                   ))}
                   <EmpresaTotalCell
                     filaId={r.empresa.id}
-                    titulo={r.empresa.nombre}
+                    titulo={nombreEmpresaEnPantalla(r.empresa.id, r.empresa.nombre)}
                     onAbrir={setFilaDetalle}
                     ventasTotal={r.ventasTotal}
                     ventasPrevTotal={r.ventasPrevTotal}
@@ -488,7 +580,7 @@ export function ResumenView({
                       prevYear={prevYear}
                       fechaCorte={data.fecha_corte}
                       filaId={r.empresa.id}
-                      titulo={r.empresa.nombre}
+                      titulo={nombreEmpresaEnPantalla(r.empresa.id, r.empresa.nombre)}
                       onAbrir={setFilaDetalle}
                     />
                   )}
@@ -602,13 +694,48 @@ function MesVsMesCard({
   );
 }
 
-/** KPI card — label uppercase + monto Geist Mono + sub con delta vs prev year. */
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <Card className="border-gray-200 bg-white p-4">
+/**
+ * KPI card — label uppercase + monto Geist Mono + sub con delta vs prev year.
+ *
+ * `detalle` la vuelve TOCABLE: al abrirla explica de dónde sale el número, en
+ * castellano llano. Solo la de la proyección lo trae — las otras tres son una
+ * suma, y una tarjeta que se abre para no decir nada enseña a no tocarlas.
+ */
+function KpiCard({
+  label, value, sub, detalle,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  detalle?: string;
+}) {
+  const [abierta, setAbierta] = useState(false);
+  const cuerpo = (
+    <>
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
       <p className="mt-1.5 font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{value}</p>
       {sub && <p className="mt-1.5 text-xs text-gray-500">{sub}</p>}
+    </>
+  );
+  if (!detalle) {
+    return <Card className="border-gray-200 bg-white p-4">{cuerpo}</Card>;
+  }
+  return (
+    <Card className="border-gray-200 bg-white p-0">
+      <button
+        type="button"
+        data-kpi-proyeccion="escritorio"
+        aria-expanded={abierta}
+        onClick={() => setAbierta(v => !v)}
+        className="w-full p-4 text-left outline-none transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-700/30"
+      >
+        {cuerpo}
+      </button>
+      {abierta && (
+        <p data-kpi-proyeccion-detalle="escritorio" className="border-t border-gray-200 px-4 py-2.5 text-xs leading-relaxed text-gray-600">
+          {detalle}
+        </p>
+      )}
     </Card>
   );
 }
@@ -816,7 +943,7 @@ function EmpresaTotalCell({
   if (mode === "margen") {
     cur = margenPctYtd;
     delta = margenPctPrevYtd > 0 ? margenPctYtd - margenPctPrevYtd : null;
-    displayValue = (cur * 100).toFixed(1) + "%";
+    displayValue = fmtPorcentaje(cur);
   } else if (mode === "utilidad") {
     cur = utilidadTotal;
     delta = variacionPct(utilidadTotal, utilidadPrevTotal);
@@ -929,7 +1056,7 @@ function TotalGroupAnnualCell({
   const dc = cur == null ? null : deltaCelda(delta, mode, isNaComparison(agg, mode));
   const displayValue = cur == null
     ? "—"
-    : mode === "margen" ? (cur * 100).toFixed(1) + "%" : fmtMoney(cur);
+    : mode === "margen" ? fmtPorcentaje(cur) : fmtMoney(cur);
   const foco = celdaKey("d", TOTAL_GRUPO_ID, "total");
 
   return (

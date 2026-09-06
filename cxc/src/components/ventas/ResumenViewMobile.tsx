@@ -45,7 +45,11 @@ import type {
   ProyeccionEmpresa,
 } from "./types";
 import { useState } from "react";
-import { MONTHS, QUARTERS, formatCompactCurrency } from "@/lib/ventas/format";
+import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPorcentaje } from "@/lib/ventas/format";
+import { ControlSegmentado } from "./ControlSegmentado";
+import {
+  MODO_OPCIONES, GRANULARIDAD_OPCIONES, nombreEmpresaEnPantalla, proyeccionDelGrupo,
+} from "./ResumenView";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import SyncNowButton from "@/components/shared/SyncNowButton";
@@ -55,7 +59,10 @@ import {
   buildSlotsMetrica, cellValue, cellDelta, renderCellValue, celdaKey,
   deltaCelda, isNaComparison, type CeldaBase, type DeltaCelda, type SlotDetalle,
 } from "@/lib/ventas/celda";
-import { buildSlotsProyeccion, explicacionProyeccion } from "@/lib/ventas/proyeccion-texto";
+import {
+  buildSlotsProyeccion, explicacionProyeccion,
+  explicacionProyeccionGrupo, deltaProyeccionTexto,
+} from "@/lib/ventas/proyeccion-texto";
 import { variacionPct } from "@/lib/variacion";
 
 import { FilaDetalleBloque, medirRenglon, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
@@ -178,10 +185,8 @@ function MobileKpis({ data, prevYear, isClosedYear, selectedYear }: { data: Vent
   // dígitos con apóstrofo es notación de planilla. La cifra grande y su cambio
   // no dicen nada si no se sabe contra qué período se están mirando.
   //
-  // El período va en UNA línea arriba de las tres tarjetas, no repetido dentro
-  // de cada una: a 390 px cada tarjeta mide ~120 px y meterle "ene–ago 2026"
-  // adentro la parte en tres renglones. Es el MISMO texto que el escritorio ya
-  // muestra debajo de cada cifra.
+  // El período va en UNA línea arriba de las tarjetas, no repetido dentro de
+  // cada una: es el MISMO texto que el escritorio muestra debajo de cada cifra.
   const periodoLabel = isClosedYear
     ? `Año ${selectedYear} completo`
     : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear}`;
@@ -189,28 +194,55 @@ function MobileKpis({ data, prevYear, isClosedYear, selectedYear }: { data: Vent
   const utilidadDelta = variacionPct(k.utilidadYTD, k.utilidad2025YTD);
   const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
   const pct = (r: number) => `${r >= 0 ? "+" : ""}${(r * 100).toFixed(0)}% vs ${prevYear}`;
+  const proy = !isClosedYear && data.proyeccion ? data.proyeccion : null;
 
   return (
     <div className="space-y-1.5">
       <p data-periodo-kpis className="text-xs text-gray-500">
         {periodoLabel} <span className="text-gray-300">·</span> comparado con {prevYear}
       </p>
-      <div className="grid grid-cols-3 gap-2">
+      {/* 🔴 DOS COLUMNAS, NO TRES (5-sep-2026), Y POR UNA MEDICIÓN.
+          Las tarjetas ahora traen los montos CON CENTAVOS (diccionario § 0, #7):
+          «$6,270,375.73» y no «$6.27M». A 390 px, tres tarjetas dan ~120 px cada
+          una y ese monto pide ~130 en mono de 17 px — se partía en tres
+          renglones. Con dos columnas cada tarjeta mide ~190 y entra con aire.
+          Y son CUATRO tarjetas, así que dos columnas dan dos filas parejas. */}
+      <div className="grid grid-cols-2 gap-2">
         <KpiTile
           label="Ventas"
-          value={formatCompactCurrency(k.ventasNetasYTD)}
+          value={fmtMoney(k.ventasNetasYTD)}
           sub={ventasDelta == null ? null : { text: pct(ventasDelta), sign: ventasDelta }}
         />
         <KpiTile
           label="Utilidad"
-          value={formatCompactCurrency(k.utilidadYTD)}
+          value={fmtMoney(k.utilidadYTD)}
           sub={utilidadDelta == null ? null : { text: pct(utilidadDelta), sign: utilidadDelta }}
         />
         <KpiTile
           label="Margen"
-          value={`${(k.margenYTD * 100).toFixed(1)}%`}
+          /* Sin decimal (diccionario § 0, #5), por `fmtPorcentaje`. Los PUNTOS
+             de abajo sí conservan el suyo: son una diferencia, no un %. */
+          value={fmtPorcentaje(k.margenYTD)}
           sub={{ text: `${margenDeltaPts >= 0 ? "+" : ""}${margenDeltaPts.toFixed(1)} pts`, sign: margenDeltaPts }}
         />
+        {/* 🔴 LA CUARTA: EN CUÁNTO CIERRA EL AÑO. En el celular la proyección
+            del grupo estaba al final de la tarjeta negra «Total grupo», que hay
+            que desplegar y bajar hasta el último renglón. Ahora está arriba,
+            con las otras tres. Sin metas, igual que el escritorio.
+            El monto va REDONDEADO a propósito y no con centavos: es una
+            estimación, y darle centavos a un número estimado lo hace parecer
+            medido. */}
+        {proy && (
+          <KpiTile
+            label="Cierre del año"
+            value={fmtMoneyCompact(proy.totales_grupo.proyeccion_cierre)}
+            sub={{
+              text: `${deltaProyeccionTexto(proy.totales_grupo.delta_vs_anio_anterior_total)} vs ${prevYear}`,
+              sign: proy.totales_grupo.delta_vs_anio_anterior_total,
+            }}
+            detalle={explicacionProyeccionGrupo(proyeccionDelGrupo(proy), prevYear, { fechaCorte: data.fecha_corte })}
+          />
+        )}
       </div>
     </div>
   );
@@ -220,23 +252,53 @@ function KpiTile({
   label,
   value,
   sub,
+  detalle,
 }: {
   label: string;
   value: string;
   sub: { text: string; sign: number | null } | null;
+  /** Explica de dónde sale el número. Solo la proyección lo trae: las otras
+   *  tres son una suma, y una tarjeta que se abre para no decir nada enseña a
+   *  no tocarlas. */
+  detalle?: string;
 }) {
+  const [abierta, setAbierta] = useState(false);
   const subTone = sub == null || sub.sign == null
     ? "text-gray-500"
     : sub.sign > 0 ? "text-emerald-700" : sub.sign < 0 ? "text-rose-700" : "text-gray-500";
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-2.5">
+  const cuerpo = (
+    <>
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="mt-1 font-mono text-[17px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">
+      {/* 15 px y no 17: con los centavos puestos el monto largo del grupo pide
+          ~130 px a 17 px de mono, y la tarjeta tiene ~170 útiles. A 15 entra
+          con margen y sigue muy por encima del piso de 12 px de la casa. */}
+      <p className="mt-1 font-mono text-[15px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">
         {value}
       </p>
       {sub && (
         <p className={cn("mt-0.5 text-xs font-medium leading-tight", subTone)}>
           {sub.text}
+        </p>
+      )}
+    </>
+  );
+  if (!detalle) {
+    return <div className="rounded-xl border border-gray-200 bg-white p-2.5">{cuerpo}</div>;
+  }
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white">
+      <button
+        type="button"
+        data-kpi-proyeccion="celular"
+        aria-expanded={abierta}
+        onClick={() => setAbierta(v => !v)}
+        className="w-full p-2.5 text-left active:bg-gray-50"
+      >
+        {cuerpo}
+      </button>
+      {abierta && (
+        <p data-kpi-proyeccion-detalle="celular" className="border-t border-gray-100 px-2.5 py-2 text-xs leading-relaxed text-gray-600">
+          {detalle}
         </p>
       )}
     </div>
@@ -260,62 +322,30 @@ function MobileToggles({
 }) {
   return (
     <div className="space-y-2">
-      <SegmentedRow
-        options={[
-          { value: "ventas", label: "Ventas" },
-          { value: "utilidad", label: "Utilidad" },
-          { value: "margen", label: "Margen %" },
-        ]}
+      {/* 🔴 EL CONTROL COMPARTIDO (`ControlSegmentado`, 5-sep-2026). Es el
+          `SegmentedRow` que vivía en este archivo, sacado afuera para que el
+          ESCRITORIO use el mismo — allá eran cajas grises escritas a mano. Por
+          eso el celular no cambia ni un píxel. Y las OPCIONES salen de una sola
+          lista (`MODO_OPCIONES` / `GRANULARIDAD_OPCIONES`, en `ResumenView`):
+          acá decían «Margen %» y allá también, pero nada lo garantizaba. */}
+      <ControlSegmentado
+        options={MODO_OPCIONES}
         active={viewMode}
         onChange={setViewMode}
+        ariaLabel="Qué mostrar"
       />
-      <SegmentedRow
-        options={[
-          { value: "mensual", label: "Mensual" },
-          { value: "trimestral", label: "Trimestral" },
-          { value: "anual", label: "Anual" },
-        ]}
+      <ControlSegmentado
+        options={GRANULARIDAD_OPCIONES}
         active={granularity}
         onChange={setGranularity}
+        ariaLabel="Cada cuánto"
       />
     </div>
   );
 }
 
-function SegmentedRow<T extends string>({
-  options,
-  active,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  active: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex rounded-lg bg-gray-100 p-0.5" role="tablist">
-      {options.map(o => {
-        const isActive = active === o.value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onChange(o.value)}
-            className={cn(
-              "flex-1 rounded-md py-2.5 text-xs font-medium transition min-h-[44px]",
-              isActive
-                ? "bg-white text-gray-950 shadow-sm"
-                : "text-gray-500 active:text-gray-700"
-            )}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+// ⛔ ACÁ VIVÍA `SegmentedRow`. Se fue a `components/ventas/ControlSegmentado.tsx`
+// y hoy lo usan también el Resumen de escritorio y Clientes. Ver su cabecera.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tarjetas por empresa — reemplazan la matriz de 15 columnas
@@ -448,10 +478,16 @@ function MobileTarjetas({
     let display: string;
     let delta: number | null;
     if (viewMode === "margen") {
-      display = `${(margenPct * 100).toFixed(1)}%`;
+      display = fmtPorcentaje(margenPct);
       delta = margenPctPrev > 0 ? margenPct - margenPctPrev : null;
     } else {
-      display = formatCompactCurrency(cur);
+      // 🔴 CON CENTAVOS (diccionario § 0, #7, 5-sep-2026). Decía «$1.09M»
+      // mientras la MISMA celda del escritorio decía «$1,090,432.18»: el mismo
+      // total con dos caras según la pantalla, que es como se pierde una hora
+      // buscando un descuadre que no existe. Medido a 390 px: el renglón del
+      // Total tiene el nombre a la izquierda y el monto a la derecha, y
+      // «$1,090,432.18» a 15 px de mono son ~117 px de los ~356 útiles.
+      display = fmtMoney(cur);
       delta = variacionPct(cur, prev);
     }
     const dc = deltaCelda(delta, viewMode, delta == null);
@@ -481,7 +517,9 @@ function MobileTarjetas({
   // ── Una tarjeta por empresa ────────────────────────────────────────────────
   const tarjetas: Tarjeta[] = data.empresas.map((e, ei) => {
     const id = e.empresa.id;
-    const nombre = e.empresa.nombre;
+    // El nombre CORTO, el mismo que la matriz del escritorio (diccionario § 0,
+    // #4). Sale de la MISMA función: dos traducciones son dos nombres.
+    const nombre = nombreEmpresaEnPantalla(id, e.empresa.nombre);
     const cells = cellsPorEmpresa[ei];
     const yt = yearlyTotal(e, viewMode);
     // Las 4 fuentes del YTD, para que el detalle del Total muestre Ventas +
@@ -501,7 +539,10 @@ function MobileTarjetas({
       renglones.push({
         foco: celdaKey("m", id, "proy"),
         etiqueta: "Proyección",
-        valor: p ? formatCompactCurrency(p.proyeccion_cierre) : "—",
+        // La proyección va REDONDEADA a propósito, igual que en el escritorio
+      // (`fmtMoneyCompact`): es una estimación, y darle centavos la haría
+      // parecer medida.
+      valor: p ? fmtMoneyCompact(p.proyeccion_cierre) : "—",
         dc: null,
         enCurso: false,
         fuerte: true,
@@ -587,7 +628,7 @@ function MobileTarjetas({
     grupoRenglones.push({
       foco: celdaKey("m", TOTAL_GRUPO_ID, "proy"),
       etiqueta: "Proyección",
-      valor: formatCompactCurrency(data.proyeccion!.totales_grupo.proyeccion_cierre),
+      valor: fmtMoneyCompact(data.proyeccion!.totales_grupo.proyeccion_cierre),
       dc: null,
       enCurso: false,
       fuerte: true,

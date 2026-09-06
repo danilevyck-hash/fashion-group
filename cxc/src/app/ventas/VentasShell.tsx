@@ -1,20 +1,26 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, TrendingUp, Contact, Package, Percent, Coins } from "lucide-react";
+import { TrendingUp, Contact, Package } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import dynamic from "next/dynamic";
-import { exportResumenToExcel } from "@/lib/ventas/excel";
 import { PullToRefresh } from "@/components/ui";
 import AppHeader from "@/components/AppHeader";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
+import {
+  alcanceDeLaPestana,
+  esModoClientes,
+  esTabVentas,
+  tabHeredado,
+  type ModoClientes,
+} from "@/lib/ventas/pestanas";
 
 // Tabs cargados LAZY: cada vista va en su propio chunk y solo se descarga al
 // activarse su tab → fuera del bundle inicial de /ventas. Skeleton mientras
@@ -39,24 +45,21 @@ const ProductosView = dynamic(
   () => import("@/components/ventas/ProductosView").then((m) => m.ProductosView),
   { ssr: false, loading: () => <TabSkeleton /> },
 );
-const UtilidadView = dynamic(
-  () => import("@/components/ventas/UtilidadView").then((m) => m.UtilidadView),
-  { ssr: false, loading: () => <TabSkeleton /> },
-);
-// Comisiones (25-ago-2026). Daniel, textual: *"Comisiones debe de estar en
-// Ventas. Y también debe de verse empresa por empresa y todas las empresas."*
+// ⛔ ACÁ VIVÍAN `UtilidadView` y `ComisionesView`, LAS PESTAÑAS 4 Y 5 (retiradas
+// el 5-sep-2026). Cinco pestañas pasaron a TRES: Resumen · Clientes · Productos.
 //
-// 🔑 ES EL MISMO COMPONENTE QUE YA SERVÍA `/comisiones`, no una copia. Sus DOS
-// vistas —«Todas las empresas» (matriz vendedor × empresa) y «Por empresa»— ya
-// vivían adentro de `ComisionesView` con memoria en localStorage; la segunda
-// mitad del pedido de Daniel ya estaba construida y lo único que había que
-// garantizar es que sigue funcionando acá adentro. Ningún número, ningún
-// endpoint y ninguna resta cambiaron: esto es una PUERTA nueva, no un cálculo
-// nuevo.
-const ComisionesView = dynamic(
-  () => import("@/components/ventas/ComisionesView").then((m) => m.ComisionesView),
-  { ssr: false, loading: () => <TabSkeleton /> },
-);
+// 🔴 UTILIDAD NO SE BORRÓ: es un MODO de Clientes. La pestaña respondía la
+// misma pregunta que Clientes —quién compra— con otras columnas, y tenerlas
+// separadas obligaba a buscar al mismo cliente dos veces. Ahora Clientes trae
+// el mismo control segmentado que el Resumen (Ventas · Utilidad · Margen %) y
+// `UtilidadView` se MONTA desde adentro: se reusa, no se reescribió.
+// `?tab=utilidad` llega a `?tab=clientes&modo=utilidad` (ver `tabHeredado`).
+//
+// 🔴 COMISIONES SE FUE A SU MÓDULO, COMPLETO. Daniel, 5-sep-2026: *«si
+// quitala»*. La pestaña montaba `ComisionesView` SIN `conConfiguracion`, o sea
+// una versión recortada de la pantalla que `/comisiones` ya sirve entera — y
+// que la secretaria y contabilidad solo pueden ver ahí, porque /ventas es
+// admin-only. `/ventas?tab=comisiones` se redirige en `next.config.js`.
 
 // Bundle del tab Resumen: las 3 lecturas que dependen del año seleccionado.
 //
@@ -110,14 +113,6 @@ interface VentasShellProps {
    * es "qué está mal en Switch ahora", no "qué pasó en 2024".
    */
   avisoMontos?: string | null;
-  /**
-   * Lo mismo, pero de la familia `recibo`, y va SOLO al tab Comisiones: la
-   * comisión sobre cobro lee `switch_recibos`. Es OTRA familia que la de
-   * arriba —factura/utilidad/costo/artículo— y por eso viaja en su propio
-   * prop: mostrarle a Comisiones el aviso de Ventas (o al revés) diría que
-   * quedó afuera plata que no es la suya.
-   */
-  avisoRecibos?: string | null;
 }
 
 export function VentasShell({
@@ -127,7 +122,6 @@ export function VentasShell({
   clientes: initialClientes,
   multi: initialMulti,
   avisoMontos,
-  avisoRecibos,
 }: VentasShellProps) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(initialYear);
@@ -141,7 +135,25 @@ export function VentasShell({
   // la pantalla vacía. `?tab=referencia` además se redirige a /referencia en
   // next.config.js — esto es la red de abajo, no el camino principal.
   const [tabRaw, setTab] = useUrlState("tab", "resumen");
-  const tab = TABS.some((t) => t === tabRaw) ? tabRaw : "resumen";
+  // El MODO de la pestaña Clientes (Ventas · Utilidad · Margen %). Vive en la
+  // URL igual que el tab para que un enlace guardado abra la misma vista.
+  const [modoRaw, setModo] = useUrlState("modo", "ventas");
+  // `?tab=utilidad` es la pestaña que se retiró: hoy es un MODO de Clientes.
+  // Se traduce acá y no con un redirect de `next.config.js` porque el destino
+  // es la MISMA ruta con la MISMA clave `tab`: Next arrastra la query original
+  // al destino, el redirect volvería a matchear su propia salida y el navegador
+  // giraría en redondo. Traducir es lo único que no puede hacer un bucle.
+  const heredado = tabHeredado(tabRaw);
+  const tab = heredado?.tab ?? (esTabVentas(tabRaw) ? tabRaw : "resumen");
+  const modo: ModoClientes = heredado?.modo ?? (esModoClientes(modoRaw) ? modoRaw : "ventas");
+
+  // La URL se normaliza UNA vez, sin entrada de historial: el enlace viejo
+  // queda convertido en el nuevo y el Back no cicla entre los dos.
+  useEffect(() => {
+    if (!heredado) return;
+    setTab(heredado.tab);
+    setModo(heredado.modo);
+  }, [heredado, setTab, setModo]);
 
   // Lo que ya armó el server component, para el año inicial. Memoizado porque
   // su REFERENCIA es la señal de "el servidor mandó datos nuevos" que usa
@@ -209,15 +221,6 @@ export function VentasShell({
     await mutate();
   }, [mutate]);
 
-  const onExportExcel = async () => {
-    if (!resumen) return;
-    try {
-      await exportResumenToExcel(resumen);
-    } catch (err) {
-      console.error("[ventas] excel export failed", err);
-    }
-  };
-
   const isClosedYear = selectedYear < currentYear;
   // resumen.mesActual (1-indexed) = último mes con data en el año en curso.
   // Semánticamente es el "mes en curso" (data parcial cargada). El mes
@@ -251,29 +254,32 @@ export function VentasShell({
               página sin encabezado. El subtítulo se QUEDA: dice qué universo y
               qué meses se están mirando, que no está en ningún otro lado. */}
           <h1 className="sr-only">Ventas</h1>
-          {/* 🔴 «8 empresas» es de Ventas, NO de Comisiones: la matriz de
-              comisiones son las SEIS de Fashion Group (`EMPRESAS_COMISIONAN` =
-              `B2B_EMPRESA_KEYS`) — Confecciones Boston y American Classic no
-              comisionan acá (Multifashion es OTRO módulo, con OTRA base). Un
-              subtítulo que diga 8 arriba de una tabla de 6 hace buscar las dos
-              que faltan. Y el período tampoco es el de Ventas: Comisiones lo
-              elige adentro, mes por mes. */}
-          <p className="text-xs text-gray-500">
-            {tab === "comisiones" ? "6 empresas · mayoreo B2B" : `8 empresas · ${mesesLabel}`}
+          {/* 🔴 CADA PESTAÑA DICE LAS SUYAS, y hasta hoy las tres decían «8».
+              Es la misma clase de error que el subtítulo de Comisiones: un
+              encabezado que promete ocho arriba de una tabla de seis hace
+              buscar las dos que faltan.
+
+              · Resumen son las OCHO: la matriz las lista una por una.
+              · Clientes son las SEIS de Fashion Group (`B2B_EMPRESA_KEYS`) —
+                Boston y Multifashion tienen sus clientes en su propio módulo—
+                y en Utilidad/Margen son esas seis menos las que no llevan
+                utilidad, que la propia vista declara con su número real.
+              · Productos se mira de a UNA empresa, elegida adentro. */}
+          <p data-alcance-pestana className="text-xs text-gray-500">
+            {alcanceDeLaPestana(tab, mesesLabel)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Bug #1 fix: selector año visible desde cualquier tab (antes solo
               en Resumen). State global ya existía — solo cambio de placement. */}
           {/* iPhone: el trigger medía 88×36 — por debajo de los 44 de alto de la
-              regla táctil. h-11 = 44px exactos. En desktop solo crece 8px y
-              queda alineado con el botón Excel (que también va a 44). */}
-          {/* 🔴 En Comisiones NO se dibuja: esa pantalla trae su propio control
-              de período (`ComisionesPeriodo`, que es mes + año en UNA caja) y
-              el de acá NO lo maneja. Dos selectores de año, uno inerte, es
-              exactamente cómo se lee la comisión de julio creyendo que es la de
-              agosto. */}
-          {tab !== "comisiones" && (
+              regla táctil. h-11 = 44px exactos. En desktop solo crece 8px. */}
+          {/* 🔴 EN PRODUCTOS NO SE DIBUJA: esa pantalla trae su propio selector
+              de período, y tres de sus cuatro opciones («Últimos 6 meses»,
+              «Últimos 12 meses», «Año pasado») se cuentan desde HOY y NO miran
+              este año. Dos controles de tiempo, uno inerte, es cómo se lee un
+              número de un año creyendo que es de otro. */}
+          {tab !== "productos" && (
           <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
             <SelectTrigger className="h-11 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
               <SelectValue />
@@ -287,49 +293,41 @@ export function VentasShell({
             </SelectContent>
           </Select>
           )}
-          {/* Excel global = export del Resumen. En Productos, Utilidad y
-              Comisiones se oculta porque esos tabs traen su propio export (y el
-              de Comisiones baja OTRA hoja: la de la vista activa). */}
-          {!TABS_CON_CONTROLES_PROPIOS.some((t) => t === tab) && (
-            /* iPhone: medía 79×32. size="sm" fija h-8; el min-h-[44px] gana
-               sobre `height` en CSS (min-height siempre manda) sin tocar el
-               tamaño de letra ni el padding horizontal. */
-            <Button variant="outline" size="sm" onClick={onExportExcel} disabled={!resumen} className="min-h-[44px]">
-              <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
-            </Button>
-          )}
+          {/* ⛔ ACÁ VIVÍA EL BOTÓN «Excel» DE LA BARRA, Y NO ERA EL DEL MÓDULO:
+              era el del RESUMEN (`exportResumenToExcel`), puesto al lado del
+              año. Desde Clientes o desde Productos bajaba la matriz de empresas
+              × meses — un archivo que no tenía nada que ver con lo que se
+              estaba mirando.
+
+              🔴 Ahora cada pestaña trae el suyo ADENTRO, como ya lo hacían
+              Productos y Utilidad, y cada uno baja LO QUE ESTÁS VIENDO con los
+              filtros puestos. Clientes ganó el que le faltaba
+              (`clientes-excel.ts`). Candado: `ventas-tres-pestanas.test.tsx`. */}
         </div>
       </header>
 
       {/* Qué se quedó AFUERA de los números de este módulo. Va ARRIBA de las
           pestañas y no adentro de una: el mismo documento corrupto envenena la
-          venta, el margen y la comisión, así que se dice UNA vez para las
-          CINCO. Sin rechazos no se dibuja nada.
+          venta y el margen, así que se dice UNA vez para las TRES. Sin
+          rechazos no se dibuja nada.
           ⚠️ Es la familia factura/utilidad/costo/artículo. Los COBROS son otra
-          familia (`recibo`) y tienen su propio aviso DENTRO de Comisiones — no
-          se fusionan: la comisión sobre cobro lee `switch_recibos`. */}
+          familia (`recibo`) y su aviso se fue con la pestaña Comisiones, a
+          `/comisiones`, que ya lo pedía por su cuenta. Nunca se fusionan: la
+          comisión sobre cobro lee `switch_recibos`. */}
       <AvisoRechazosSwitch texto={avisoMontos} className="mb-4" />
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        {/* 🩸 LOS 54 px QUE SOBRABAN EN LAS 4 PESTAÑAS. No era ninguna tabla: era
-            esta tira. Las 4 pestañas pedían 444 px contra 390 de pantalla, así
-            que hasta el Resumen —que ya pasó a tarjetas y su tabla mide 0—
-            seguía arrastrando acá. Sin `overflow-x-auto` y con menos relleno
-            lateral en celular (px-4 → px-2.5, que devuelve 48 px) entran las
-            cuatro sin arrastrar. Ningún texto cambió; desde `sm` vuelve el
-            relleno de siempre.
-            La 5ª pestaña (Referencia) se fue a su propio módulo (/referencia,
-            12-ago-2026) y de su apretujamiento se revirtió LO QUE SE PUDO, que
-            no es todo — medido a 390 px con las cuatro, no supuesto:
-              · la letra vuelve a text-sm y el relleno a px-2.5 (eran 13 px y
-                px-2): las cuatro suman 315 px + 32 de relleno = 347 ≤ 390 → 0
-                de arrastre, con 43 px de aire.
-              · 🔴 el ICONO SIGUE ESCONDIDO bajo `sm`, y no es un olvido: con
-                icono las cuatro miden 395 px y la tira arrastra 6. El icono
-                cuesta 20 px por pestaña (80 en total) y ningún relleno los
-                devuelve — ni px-1.5, que solo recupera 32 y encima aprieta. Es
-                decorativo (el texto dice lo mismo), así que a 390 se va él.
-            Desde `sm` no cambió nada: icono, px-4 y todo como siempre. */}
+        {/* 🩸 LOS px QUE SOBRABAN EN LA TIRA. No era ninguna tabla: era esta
+            tira. Con CINCO pestañas pedía más ancho del que tiene un iPhone, y
+            por eso el icono está escondido bajo `sm` (cuesta 20 px por pestaña
+            y es decorativo: el texto dice lo mismo) y la letra baja a 13 px.
+
+            🔴 CON TRES SOBRA ANCHO, y aun así NO se revirtió nada (5-sep-2026).
+            Medido a 390 px: «Resumen · Clientes · Productos» son 8+8+9 letras
+            contra las 8+8+9+8+10 de antes, así que la tira entra de sobra con
+            los valores que ya estaban — y devolverle el icono o el relleno
+            grande sería volver a acercarse al borde por gusto, en la pantalla
+            donde Daniel de verdad la usa. Desde `sm` no cambia nada. */}
         <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
           <TabsTrigger value="resumen" className={TAB_TRIGGER_CLASS}>
             <TrendingUp className="hidden h-3.5 w-3.5 sm:block" /> Resumen
@@ -339,12 +337,6 @@ export function VentasShell({
           </TabsTrigger>
           <TabsTrigger value="productos" className={TAB_TRIGGER_CLASS}>
             <Package className="hidden h-3.5 w-3.5 sm:block" /> Productos
-          </TabsTrigger>
-          <TabsTrigger value="utilidad" className={TAB_TRIGGER_CLASS}>
-            <Percent className="hidden h-3.5 w-3.5 sm:block" /> Utilidad
-          </TabsTrigger>
-          <TabsTrigger value="comisiones" className={TAB_TRIGGER_CLASS}>
-            <Coins className="hidden h-3.5 w-3.5 sm:block" /> Comisiones
           </TabsTrigger>
         </TabsList>
 
@@ -367,11 +359,18 @@ export function VentasShell({
           {clientes ? (
             // key={selectedYear} fuerza remount al cambiar año — resetea state
             // interno (search, pill, sort) que asume el universo del año cargado.
+            //
+            // ⚠️ El MODO no entra en la `key`: cambiar de Ventas a Utilidad es
+            // mirar las MISMAS filas con otras columnas, y remontar ahí borraría
+            // la búsqueda y la empresa que la persona acaba de elegir — que es
+            // justo lo que Daniel pidió que se conservara entre los tres modos.
             <ClientesView
               key={selectedYear}
               data={clientes}
               selectedYear={selectedYear}
               isClosedYear={isClosedYear}
+              modo={modo}
+              onModo={setModo}
             />
           ) : <ErrorState scope="clientes" detail={data?.clientesError ?? null} onRetry={() => mutate()} />}
         </TabsContent>
@@ -385,20 +384,6 @@ export function VentasShell({
               con el dato en la mano (ver su guard de `data.meses`) en vez de
               borrar tres cosas por las dudas. */}
           <ProductosView selectedYear={selectedYear} />
-        </TabsContent>
-        <TabsContent value="utilidad" className="mt-5">
-          {/* Utilidad real por cliente (5 B2B). Self-fetch por año; key remonta
-              al cambiar año para resetear search/sort. */}
-          <UtilidadView key={selectedYear} selectedYear={selectedYear} />
-        </TabsContent>
-        <TabsContent value="comisiones" className="mt-5">
-          {/* 🔴 SIN `key={selectedYear}`. Comisiones NO depende del año de la
-              barra de arriba —tiene su propio período (mes + año) adentro— así
-              que remontarla al cambiar ese selector le borraría el mes elegido
-              y el modo (Todas / Por empresa) sin que nadie lo haya pedido. Es
-              el mismo motivo por el que Productos tampoco lo lleva.
-              `availableYears` es el MISMO array que recibía `/comisiones`. */}
-          <ComisionesView availableYears={availableYears} avisoMontos={avisoRecibos} />
         </TabsContent>
       </Tabs>
     </main>
@@ -437,34 +422,13 @@ function ErrorState({
 
 const MES_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-// Las pestañas de Ventas, en el orden en que se ven. Es la lista contra la que
-// se valida el ?tab= de la URL: lo que no esté acá cae en "resumen".
-// «Comisiones» va ÚLTIMA a propósito: es la que se abre una vez al mes, y
-// ponerla antes correría de lugar las cuatro que se usan todos los días.
-const TABS = ["resumen", "clientes", "productos", "utilidad", "comisiones"] as const;
-
-// Las pestañas que traen SU PROPIO Excel y SU PROPIO selector de período, así
-// que los de la barra de arriba no se dibujan: dos selectores de año en la
-// misma pantalla es la forma más barata de que alguien lea un número de un año
-// creyendo que es de otro.
-const TABS_CON_CONTROLES_PROPIOS = ["productos", "utilidad", "comisiones"] as const;
-
-// Clase compartida de las 5 pestañas.
+// Clase compartida de las tres pestañas.
 //
-// 🩸 LA QUINTA PESTAÑA VUELVE A APRETAR LA TIRA, Y ES EL MISMO APRIETE DE
-// SIEMPRE. Con CUATRO, la tira medía 315 px de texto + 32 de relleno = 347 en
-// una pantalla de 390: 43 px de aire, y por eso el 12-ago-2026 —cuando
-// Referencia se fue a su propio módulo— se revirtió la letra a `text-sm` y el
-// relleno a `px-2.5`. «Comisiones» tiene EXACTAMENTE las mismas 10 letras que
-// «Referencia», así que devuelve el problema tal cual: sin tocar nada, las
-// cinco no entran en 390 y la PÁGINA se va para el costado.
-//
-// Se restaura lo que ya estaba medido para una tira de cinco, y solo bajo `sm`:
-//   · `text-[13px] sm:text-sm` — 1 px de letra por pestaña.
-//   · `px-2 sm:px-4` — 1 px de relleno por lado.
-// Desde `sm` no cambia un píxel respecto de hoy. El icono SIGUE escondido bajo
-// `sm` (cuesta 20 px por pestaña, 100 en total, y es decorativo: el texto de la
-// pestaña dice lo mismo) y la tira SIGUE sin `overflow-x-auto`: el objetivo es
-// que no haya nada que arrastrar, ni la página ni la tira.
+// 🩸 EL APRIETE DE LA TIRA ES HISTORIA MEDIDA, no gusto. Con CINCO pestañas no
+// entraba en 390 px, y por eso la letra bajó a 13 px, el relleno a `px-2` y el
+// icono se escondió bajo `sm` (cuesta 20 px por pestaña y es decorativo: el
+// texto dice lo mismo). Con TRES sobra ancho y aun así NO se revirtió nada:
+// devolverle el icono sería volver a acercarse al borde en la pantalla donde
+// Daniel de verdad la usa, sin ganar un dato. Desde `sm` no cambia un píxel.
 const TAB_TRIGGER_CLASS =
   "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-[13px] text-gray-500 sm:px-4 sm:text-sm data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";

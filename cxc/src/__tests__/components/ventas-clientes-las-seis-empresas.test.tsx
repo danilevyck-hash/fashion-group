@@ -37,7 +37,7 @@ vi.mock("@/lib/supabase-server", () => ({ supabaseServer: { from: () => ({}) } }
 vi.mock("@/lib/supabase-paginado", () => ({ leerTodoPaginado: async () => [] }));
 
 import { ClientesView } from "@/components/ventas/ClientesView";
-import { B2B_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { B2B_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESA_CARTERA_BOSTON, EMPRESA_MOSTRADOR_MULTIFASHION } from "@/lib/clientes/mundos";
 
 /** Una fila mínima con la forma que la vista espera. */
@@ -65,14 +65,19 @@ afterEach(cleanup);
 
 /** Los rótulos de los botones de la tira de empresas, tal como se pintan. */
 function pillsEnPantalla(): string[] {
-  render(<ClientesView data={DATA} selectedYear={2026} isClosedYear={false} />);
-  const nombres = ["Todas", ...B2B_EMPRESA_KEYS.map((k) => EMPRESA_KEY_TO_NAME[k])];
+  render(<ClientesView data={DATA} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
+  // 🔁 5-sep-2026: el rótulo de la píldora es el nombre CORTO («Vistana», no
+  // «Vistana International») — diccionario § 0, #4, decidido por Daniel ese
+  // día. Lo que este archivo vigila NO cambió: QUIÉNES son las seis y que la
+  // lista se DERIVE de `B2B_EMPRESA_KEYS` en vez de escribirse a mano, que fue
+  // lo que dejó a joystep afuera.
+  const nombres = ["Todas", ...B2B_EMPRESA_KEYS.map((k) => nombreCortoEmpresa(k))];
   return nombres.filter((n) => screen.queryAllByRole("button", { name: n }).length > 0);
 }
 
 describe("Ventas › Clientes — la tira de empresas", () => {
   it("pinta JOYSTEP, que es lo que faltaba", () => {
-    expect(pillsEnPantalla()).toContain(EMPRESA_KEY_TO_NAME["joystep"]);
+    expect(pillsEnPantalla()).toContain(nombreCortoEmpresa("joystep"));
   });
 
   it("pinta las SEIS de Fashion Group más «Todas», y nada más", () => {
@@ -80,16 +85,21 @@ describe("Ventas › Clientes — la tira de empresas", () => {
     // o a Multifashion acá sería el bug OPUESTO, y más caro).
     expect(pillsEnPantalla()).toEqual([
       "Todas",
-      ...B2B_EMPRESA_KEYS.map((k) => EMPRESA_KEY_TO_NAME[k]),
+      ...B2B_EMPRESA_KEYS.map((k) => nombreCortoEmpresa(k)),
     ]);
+    // CONTROL — el nombre corto sale de la MISMA lista que el largo: es su
+    // segundo campo, no un cuarto mapa de nombres (que es el problema que el
+    // diccionario vino a arreglar). Las claves tienen que ser las mismas.
+    expect(Object.keys(EMPRESA_KEY_TO_NAME).sort())
+      .toEqual([...B2B_EMPRESA_KEYS, EMPRESA_CARTERA_BOSTON, EMPRESA_MOSTRADOR_MULTIFASHION].sort());
   });
 
   it("NO ofrece Confecciones Boston ni Multifashion", () => {
     // 🔴 Sus clientes viven en su propio módulo. `docs/postmortems/boston-cxc.md`.
-    render(<ClientesView data={DATA} selectedYear={2026} isClosedYear={false} />);
+    render(<ClientesView data={DATA} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
     for (const key of [EMPRESA_CARTERA_BOSTON, EMPRESA_MOSTRADOR_MULTIFASHION]) {
       expect(
-        screen.queryAllByRole("button", { name: EMPRESA_KEY_TO_NAME[key] }),
+        screen.queryAllByRole("button", { name: nombreCortoEmpresa(key) }),
         `${key} no puede tener botón en Ventas › Clientes`,
       ).toHaveLength(0);
     }

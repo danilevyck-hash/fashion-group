@@ -9,8 +9,14 @@ import XLSX from "xlsx-js-style";
 
 // utilidad-cliente importa @/lib/empresa-mapping, que instancia el cliente de
 // Supabase server-side (requiere env vars). Solo necesitamos el mapa de nombres.
+// 🔁 5-sep-2026: el mock también expone `nombreCortoEmpresa`. El Excel de
+// Utilidad pasó a escribir el nombre CORTO de la empresa (diccionario § 0, #4),
+// que sale de la MISMA lista que el largo — por eso el mock devuelve los dos y
+// no una segunda tabla de nombres.
 vi.mock("@/lib/empresa-mapping", () => ({
   EMPRESA_KEY_TO_NAME: { fashion_wear: "Fashion Wear" } as Record<string, string>,
+  EMPRESA_KEY_TO_NOMBRE_CORTO: { fashion_wear: "Fashion Wear" } as Record<string, string>,
+  nombreCortoEmpresa: (k: string) => (k === "fashion_wear" ? "Fashion Wear" : k),
 }));
 
 import { workbookFromSheets, MONEY_FMT } from "@/lib/excel-export";

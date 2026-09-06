@@ -1,5 +1,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// COMISIONES ES PESTAÑA DE VENTAS — y no se movió un permiso ni un número.
+// 🔁 CAMBIÓ DE DIRECCIÓN EL 5-sep-2026: COMISIONES **YA NO** ES PESTAÑA DE
+// VENTAS. Vuelve a su módulo, completa.
+//
+// Daniel, textual (5-sep-2026), sobre la pestaña: ***«si quitala»***.
+//
+// 🔑 POR QUÉ, Y POR QUÉ ESTE ARCHIVO NO SE BORRA. La pestaña montaba
+// `ComisionesView` **sin `conConfiguracion`**: era una versión RECORTADA de la
+// pantalla que `/comisiones` ya sirve entera (con «Tasas por vendedor» y
+// «Clientes que no comisionan»). Dos puertas a lo mismo, y la de adentro de
+// Ventas era la que menos mostraba y la que menos gente podía abrir —/ventas es
+// admin-only. Es exactamente el caso de Referencia el 12-ago-2026.
+//
+// Lo que este archivo vigilaba de verdad NO cambió y se conserva ENTERO: la
+// `key` del módulo, la ficha del menú, los roles, los códigos de la API y que
+// la resta de los descuentos siga viviendo en el servidor. Lo único que se dio
+// vuelta es dónde se dibuja la pantalla — y se agregó lo que antes no hacía
+// falta pedir: que el enlace viejo `?tab=comisiones` siga llegando.
+//
+// ─── lo que decía antes, y sigue siendo cierto de `/comisiones` ─────────────
 //
 // Daniel, textual (25-ago-2026): ***"Comisiones debe de estar en Ventas. Y
 // también debe de verse empresa por empresa y todas las empresas."***
@@ -67,59 +85,63 @@ const modulosPlano = plano(leer("src/lib/modules.ts"));
 // 1. La PESTAÑA existe, y monta el MISMO componente (no una copia)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Comisiones es una pestaña de Ventas", () => {
-  it("la tira de pestañas la incluye, y el contenido existe", () => {
+describe("🔁 Comisiones YA NO es una pestaña de Ventas (5-sep-2026)", () => {
+  it("el shell no monta ningún trigger, contenido ni import de Comisiones", () => {
+    // Mismas tres direcciones que el candado de Referencia: si volviera a
+    // aparecer una de las tres, sería la firma de que la pantalla está otra vez
+    // en dos lugares.
     const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
     const triggers = [...tira.matchAll(/<TabsTrigger value="([a-z]+)"/g)].map((m) => m[1]);
-    expect(triggers).toContain("comisiones");
+    expect(triggers).not.toContain("comisiones");
+    expect(shellPlano).not.toContain("ComisionesView");
+    expect(shellPlano).not.toContain('value="comisiones"');
 
-    // Un <TabsContent> huérfano es código muerto que nadie puede ver, y una
-    // pestaña sin contenido deja la pantalla en blanco (Radix no dibuja nada si
-    // el value no tiene panel). Los dos lados tienen que coincidir.
+    // CONTROL: la tira sigue teniendo las tres que quedan, y cada trigger su
+    // contenido. Una pestaña sin panel deja la pantalla en blanco.
+    expect(triggers).toEqual(["resumen", "clientes", "productos"]);
     const contenidos = [...shell.matchAll(/<TabsContent value="([a-z]+)"/g)].map((m) => m[1]);
     expect(contenidos).toEqual(triggers);
   });
 
-  it("la lista TABS (la que valida el ?tab= de la URL) también la trae", () => {
-    // Sin esto, `/ventas?tab=comisiones` caería en "resumen" sin decir nada.
-    const m = /const TABS = \[([^\]]+)\]/.exec(shellPlano);
-    expect(m).not.toBeNull();
-    const declarados = [...m![1].matchAll(/"([a-z]+)"/g)].map((x) => x[1]);
-    expect(declarados).toContain("comisiones");
-
-    const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
-    const triggers = [...tira.matchAll(/<TabsTrigger value="([a-z]+)"/g)].map((m2) => m2[1]);
-    expect(declarados).toEqual(triggers);
+  it("🔴 `/ventas?tab=comisiones` sigue llegando — a `/comisiones`", () => {
+    // Sin esto, un favorito guardado caería en una pestaña que ya no existe y
+    // Radix, con un `value` sin trigger, no dibuja NADA: pantalla en blanco sin
+    // error. Y para la SECRETARIA y para CONTABILIDAD ese enlace es la única
+    // puerta viva, porque /ventas los manda a /home.
+    const nextConfig = leer("next.config.js");
+    const bloque = nextConfig.slice(nextConfig.indexOf("async redirects()"), nextConfig.indexOf("experimental:"));
+    const trozo = bloque.slice(bloque.indexOf('value: "comisiones"'));
+    expect(bloque).toContain('has: [{ type: "query", key: "tab", value: "comisiones" }]');
+    expect(trozo).toContain('destination: "/comisiones"');
+    // Temporal (307) como TODOS los redirects de este archivo: un 308 se quema
+    // en el caché del navegador y ya no se puede volver atrás.
+    expect(trozo).toContain("permanent: false");
   });
 
-  it("🔴 REUSA `ComisionesView` — la misma pieza que sirve /comisiones", () => {
-    // Dos implementaciones de la misma pantalla son dos totales posibles para el
-    // mismo mes. Es exactamente el defecto que se pagó el 24-ago con la resta de
-    // los descuentos, que vivía en UNA vista y no en la otra.
-    expect(shellPlano).toContain('import("@/components/ventas/ComisionesView")');
-    expect(shellPlano).toContain("<ComisionesView");
+  it("🔴 `/comisiones` sigue montando la pantalla COMPLETA, con Configuración", () => {
+    // Ésta es la mitad que importa del cambio: lo que se retiró era la versión
+    // RECORTADA. Si /comisiones perdiera `conConfiguracion`, el cambio habría
+    // dejado a todo el mundo con la pantalla chica.
     const cliente = plano(leer("src/app/comisiones/ComisionesPageClient.tsx"));
     expect(cliente).toContain('from "@/components/ventas/ComisionesView"');
     expect(cliente).toContain("<ComisionesView");
+    expect(cliente).toContain("conConfiguracion");
+    expect(existsSync(path.join(raiz, "src/components/ventas/ComisionesView.tsx"))).toBe(true);
   });
 
-  it("el aviso que recibe la pestaña es el de los COBROS, no el de Ventas", () => {
+  it("el aviso de los COBROS se fue con la pestaña, y el de Ventas se queda", () => {
     // La comisión sobre cobro lee `switch_recibos` (familia `recibo`), que NO
-    // está en las 4 familias de Ventas. Pasarle el aviso de Ventas le diría a
-    // Daniel que quedó afuera plata que no es la suya.
-    expect(ventasPage).toContain('lineaDeRechazos({ familias: ["recibo"] })');
-    expect(shellPlano).toContain("avisoMontos={avisoRecibos}");
-    // Y el de Ventas sigue yendo arriba de la tira, para las cinco.
+    // está en las 4 familias de Ventas. Sin la pestaña, /ventas dejó de pedir
+    // esa consulta — es una consulta MENOS en la pantalla más pesada del
+    // sistema, y `/comisiones` ya la pide por su cuenta.
+    expect(ventasPage).not.toContain('familias: ["recibo"]');
+    expect(ventasPage).not.toContain("avisoRecibos");
+    expect(shellPlano).not.toContain("avisoRecibos");
+    // CONTROL: el aviso de Ventas sigue arriba de la tira, para las TRES.
+    expect(ventasPage).toContain('lineaDeRechazos({ familias: ["factura", "utilidad", "costo_diario", "articulo_diario"] })');
     expect(shellPlano).toContain("<AvisoRechazosSwitch texto={avisoMontos}");
-  });
-
-  it("la barra de arriba no dibuja SU año ni SU Excel en esa pestaña", () => {
-    // Comisiones trae su propio período (mes + año en una caja) y su propio
-    // Excel. Dos selectores de año en la misma pantalla, uno inerte, es cómo se
-    // lee la comisión de julio creyendo que es la de agosto.
-    expect(shellPlano).toContain('tab !== "comisiones"');
-    expect(shellPlano).toMatch(/TABS_CON_CONTROLES_PROPIOS[\s\S]{0,200}"comisiones"/);
-    expect(shellPlano).toContain("TABS_CON_CONTROLES_PROPIOS.some((t) => t === tab)");
+    // Y `/comisiones` lo sigue pidiendo para su pantalla.
+    expect(plano(leer("src/app/comisiones/page.tsx"))).toContain('["recibo"]');
   });
 });
 
@@ -169,6 +191,8 @@ const almacenReal = () => {
   } as unknown as Storage;
 };
 
+// Sigue valiendo, y ahora SOLO en `/comisiones`: las dos vistas que Daniel
+// pidió el 25-ago-2026 no se perdieron al retirar la pestaña.
 describe("las DOS vistas siguen ahí — «Todas las empresas» y «Por empresa»", () => {
   beforeEach(() => {
     Object.defineProperty(window, "localStorage", { value: almacenReal(), configurable: true, writable: true });
@@ -406,7 +430,10 @@ describe("ni la base ni la resta cambiaron de lugar", () => {
     const { B2B_EMPRESA_KEYS } = await import("@/lib/empresa-mapping");
     expect([...EMPRESAS_COMISIONAN]).toEqual([...B2B_EMPRESA_KEYS]);
     expect(EMPRESAS_COMISIONAN).toHaveLength(6);
-    // Y el subtítulo de la pestaña dice SEIS, no las 8 de Ventas.
-    expect(shellPlano).toContain("6 empresas");
+    // 🔁 El subtítulo «6 empresas · mayoreo B2B» se fue con la pestaña. El de
+    // /ventas ahora lo arma `alcanceDeLaPestana`, y Clientes también dice SEIS
+    // — pero por otro motivo (sus clientes son los del grupo). Ver
+    // `ventas-tres-pestanas.test.tsx`.
+    expect(shellPlano).not.toContain("mayoreo B2B");
   });
 });

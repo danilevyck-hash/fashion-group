@@ -1,22 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Download, Search } from "lucide-react";
 import { SkeletonTable } from "@/components/ui";
-import { Ayuda } from "@/components/shared/Ayuda";
+import { TiraOrden } from "./ChipOrden";
+import { coincideBusqueda } from "@/lib/buscar-normalizado";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import {
   alcanceEmpresas,
-  fmtMargen,
+  fmtMargenPantalla,
   fmtMoneySigned,
-  exportUtilidadToExcel,
   type UtilidadClienteResponse,
   type UtilidadClienteRow,
 } from "@/lib/ventas/utilidad-cliente";
 
-type SortKey = "ventas" | "utilidad" | "margen";
-const PAGE = 25;
+export type UtilidadSortKey = "ventas" | "utilidad" | "margen";
+type SortKey = UtilidadSortKey;
 
 /** Criterios del selector de orden de las tarjetas. Mismas etiquetas que los
  *  encabezados de la tabla — no se abrevió ni se renombró nada. */
@@ -26,13 +24,54 @@ const ORDEN_TARJETAS: { key: SortKey; label: string }[] = [
   { key: "margen", label: "Margen %" },
 ];
 
-export function UtilidadView({ selectedYear }: { selectedYear: number }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILIDAD POR CLIENTE — desde el 5-sep-2026 es un MODO de Ventas › Clientes,
+// no una pestaña propia.
+//
+// 🔴 ESTE ARCHIVO SE REUSA, NO SE REESCRIBIÓ. La tabla, las tarjetas, el orden
+// y el formateo son los mismos de siempre; lo único nuevo es que el BUSCADOR,
+// las PÍLDORAS DE EMPRESA y el EXCEL ya no viven acá: los pone Clientes y los
+// comparten los tres modos, que es exactamente lo que Daniel pidió («solo
+// cambian las columnas»). Tener dos buscadores para las mismas filas era
+// buscar al mismo cliente dos veces.
+//
+// `data` también viaja HACIA ARRIBA (`onData`): el Excel de Clientes baja lo
+// que se está viendo, y para eso necesita estas filas. Una segunda consulta
+// solo para el archivo sería una segunda respuesta que puede no coincidir.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface UtilidadViewProps {
+  selectedYear: number;
+  /** Texto del buscador de Clientes. Controlado desde afuera. */
+  search?: string;
+  /** Píldora de empresa activa ("todas" o una `empresa_key`). */
+  empresaFiltro?: string;
+  /** Con qué columna arranca el orden: «Utilidad» o «Margen %», según el modo. */
+  ordenInicial?: SortKey;
+  /** Le avisa a Clientes qué filas hay, para su Excel y su contador. */
+  onData?: (d: UtilidadClienteResponse | null) => void;
+  /** Le avisa a Clientes cuántas filas quedan después de buscar y filtrar. */
+  onFilas?: (filas: UtilidadClienteRow[]) => void;
+}
+
+export function UtilidadView({
+  selectedYear,
+  search = "",
+  empresaFiltro = "todas",
+  ordenInicial = "utilidad",
+  onData,
+  onFilas,
+}: UtilidadViewProps) {
   const [data, setData] = useState<UtilidadClienteResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "utilidad", dir: "desc" });
-  const [visible, setVisible] = useState(PAGE);
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: ordenInicial, dir: "desc" });
+
+  // Cambiar de modo (Utilidad ⇄ Margen %) mueve la columna por la que se
+  // ordena, no los datos: no hay refetch y la búsqueda no se toca.
+  useEffect(() => {
+    setSort((prev) => (prev.key === ordenInicial ? prev : { key: ordenInicial, dir: "desc" }));
+  }, [ordenInicial]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,7 +81,6 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as UtilidadClienteResponse;
       setData(json);
-      setVisible(PAGE);
     } catch (e) {
       setError(e instanceof Error ? e.message : "error inesperado");
       setData(null);
@@ -52,12 +90,19 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
   }, [selectedYear]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { onData?.(data); }, [data, onData]);
 
   const rows = useMemo(() => {
     if (!data) return [];
-    const q = search.trim().toLowerCase();
     let r = data.rows;
-    if (q) r = r.filter((c) => c.cliente.toLowerCase().includes(q) || c.empresa.toLowerCase().includes(q));
+    // La píldora de empresa de Clientes filtra ACÁ, en el navegador: la
+    // respuesta ya trae las seis y pedirla de nuevo por empresa sería una
+    // consulta por toque para quedarse con un subconjunto de lo que ya está.
+    if (empresaFiltro !== "todas") r = r.filter((c) => c.empresaKey === empresaFiltro);
+    // 🔴 La MISMA búsqueda normalizada que el modo Ventas (`coincideBusqueda`,
+    // acentos y espacios incluidos): dos formas de buscar en la misma pantalla
+    // devuelven dos listas distintas para lo que se escribió igual.
+    if (search.trim()) r = r.filter((c) => coincideBusqueda(search, [c.cliente, c.empresa]));
     const dir = sort.dir === "asc" ? 1 : -1;
     return [...r].sort((a, b) => {
       // null margen al fondo siempre (independiente de dir).
@@ -70,81 +115,61 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
       const bv = (b[sort.key] ?? -Infinity) as number;
       return (av - bv) * dir;
     });
-  }, [data, search, sort]);
+  }, [data, search, sort, empresaFiltro]);
 
-  const visibleRows = rows.slice(0, visible);
-  const negativos = data?.rows.filter((r) => r.utilidad < 0).length ?? 0;
+  useEffect(() => { onFilas?.(rows); }, [rows, onFilas]);
+
+  // 🔴 SIN «Mostrar más» (5-sep-2026). Daniel: *«no me gusta tener que andar
+  // poniendo mas clientes abajo, ni productos, se deben de ver todo en una sola
+  // lista»*. Mostraba 25 de 209 — una lista chica que cabe entera con scroll, y
+  // entera se puede buscar con ⌘F, que era justo lo que la paginación rompía.
+  const visibleRows = rows;
+  const negativos = rows.filter((r) => r.utilidad < 0).length;
 
   const toggleSort = (key: SortKey) => {
     setSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
   };
 
-  const onExcel = async () => { if (data) await exportUtilidadToExcel(data); };
-
   return (
     <div>
-      {/* Toolbar */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[180px] flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-          <Input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setVisible(PAGE); }}
-            placeholder="Buscar cliente o empresa…"
-            /* h-11 = 44px táctiles; text-base en móvil para que Safari no
-               haga zoom al enfocar (text-xs = 12px). Desde sm, text-xs. */
-            className="h-11 pl-8 text-base sm:text-xs"
-          />
-        </div>
-        {/* size="sm" da 32px de alto — min-h-[44px] lo lleva al mínimo. */}
-        <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading} className="min-h-[44px]">
-          <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
-        </Button>
-      </div>
+      {/* ⛔ ACÁ VIVÍAN EL BUSCADOR Y EL BOTÓN «Excel» DE ESTA VISTA. Se fueron
+          arriba, a Clientes, que los comparte con los tres modos: el mismo
+          buscador y el mismo archivo, solo cambian las columnas. Dos buscadores
+          para las mismas filas era buscar al mismo cliente dos veces. */}
 
       {/* Ordenar en tarjetas. En la tabla el orden se cambia desde los
           encabezados; sin tabla hacía falta un control propio o el celular se
           quedaba sin poder ordenar. Mismos 3 criterios y mismo toggle
-          asc/desc: tocar el criterio activo lo da vuelta. */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5 lg:hidden">
-        <span className="text-xs text-gray-400">Ordenar por</span>
-        {ORDEN_TARJETAS.map((o) => {
-          const activo = sort.key === o.key;
-          return (
-            <button
-              key={o.key}
-              type="button"
-              onClick={() => toggleSort(o.key)}
-              aria-pressed={activo}
-              className={`inline-flex min-h-[44px] items-center gap-1 rounded-full border px-3.5 text-xs font-medium transition ${
-                activo ? "border-teal-700 bg-teal-700 text-white" : "border-gray-200 bg-white text-gray-700"
-              }`}
-            >
-              {o.label}
-              {activo && <span aria-hidden>{sort.dir === "desc" ? "▼" : "▲"}</span>}
-            </button>
-          );
-        })}
-      </div>
+          asc/desc: tocar el criterio activo lo da vuelta.
+          🔴 Es el chip COMPARTIDO (`ChipOrden`): acá era verde y en Productos
+          negro, dos colores para el mismo estado en el mismo módulo. */}
+      <TiraOrden criterios={ORDEN_TARJETAS} active={sort} onClick={toggleSort} className="mb-4 lg:hidden" />
 
-      {/* Totales + alcance. De dónde sale el costo se aprende UNA vez → ⓘ. Lo
-          que sí se queda en pantalla es el aviso de utilidades negativas: eso
-          cambia a quién hay que mirar este mes. */}
+      {/* Totales + alcance.
+          🔴 «6 EMPRESAS» SE DICE EN PANTALLA, NO ADENTRO DE UN ⓘ (5-sep-2026).
+          El total decía $5.337.236,50 y punto — un número más chico que el del
+          Resumen, sin nada que explicara por qué. La razón es real y no es un
+          error: Boston y Multifashion NO llevan utilidad
+          (`EMPRESA_SYNC_CAPABILITIES[…].utilidad = false`), así que este total
+          nunca puede ser el del grupo. Escondido en la ayuda, el que no la abre
+          se queda pensando que faltan dos empresas de plata.
+
+          El número sale del alcance REAL de la consulta (`data.empresas`), no
+          de un texto fijo: decía 5 mientras la lista de verdad son las 6 de
+          Fashion Group, y así es como joystep se volvió invisible en
+          Comisiones. */}
       {data && !loading && (
-        <p className="mb-3 flex flex-wrap items-center text-sm text-gray-600">
+        <p data-totales-utilidad className="mb-3 flex flex-wrap items-baseline gap-x-2 text-sm text-gray-600">
           <span>
             Ventas <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoneySigned(data.totales.ventas)}</span>
             <span className="mx-2 text-gray-300">·</span>
             Utilidad <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoneySigned(data.totales.utilidad)}</span>
             <span className="mx-2 text-gray-300">·</span>
-            Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargen(data.totales.margen)}</span>
+            Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargenPantalla(data.totales.margen)}</span>
           </span>
-          <Ayuda titulo="Cómo se calcula">
-            {/* El número sale del alcance REAL de la consulta, no de un texto
-                fijo: decía 5 mientras la lista de verdad son las 6 de Fashion
-                Group, y así es como joystep se volvió invisible en Comisiones. */}
-            <p>Costo real por documento ({alcanceEmpresas(data.empresas)}).</p>
-          </Ayuda>
+          <span data-alcance-utilidad className="text-xs text-gray-500">
+            {alcanceEmpresas(data.empresas)} · Boston y Multifashion no llevan utilidad, así que este total no es el del grupo
+          </span>
         </p>
       )}
 
@@ -228,13 +253,8 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
         </div>
       )}
 
-      {data && !loading && !error && rows.length > visible && (
-        <div className="mt-3 text-center">
-          <Button variant="outline" size="sm" onClick={() => setVisible((v) => v + PAGE)} className="min-h-[44px]">
-            Mostrar más ({rows.length - visible} restantes)
-          </Button>
-        </div>
-      )}
+      {/* ⛔ ACÁ VIVÍA «Mostrar más (184 restantes)». Ver el comentario de
+          `visibleRows`: la lista se ve entera. */}
     </div>
   );
 }
@@ -285,11 +305,11 @@ function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
           </span>
         )}
       </td>
-      <td data-col="empresa" className="px-3 py-2.5 text-gray-500">{r.empresa}</td>
+      <td data-col="empresa" className="px-3 py-2.5 text-gray-500">{nombreCortoEmpresa(r.empresaKey)}</td>
       <td data-col="ventas" className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-700">{fmtMoneySigned(r.ventas)}</td>
       <td data-col="costo" className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-500">{fmtMoneySigned(r.costo)}</td>
       <td data-col="utilidad" className={`px-3 py-2.5 text-right font-mono font-medium tabular-nums ${utilCls}`}>{fmtMoneySigned(r.utilidad)}</td>
-      <td data-col="margen" className={`px-3 py-2.5 text-right font-mono tabular-nums ${margenCls}`}>{fmtMargen(r.margen)}</td>
+      <td data-col="margen" className={`px-3 py-2.5 text-right font-mono tabular-nums ${margenCls}`}>{fmtMargenPantalla(r.margen)}</td>
     </tr>
   );
 }
@@ -317,7 +337,7 @@ function UtilidadCard({ r }: { r: UtilidadClienteRow }) {
           </span>
         )}
       </div>
-      <div data-col="empresa" className="mt-0.5 text-xs text-gray-500">{r.empresa}</div>
+      <div data-col="empresa" className="mt-0.5 text-xs text-gray-500">{nombreCortoEmpresa(r.empresaKey)}</div>
 
       <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
         <div className="flex items-baseline justify-between gap-2">
@@ -334,7 +354,7 @@ function UtilidadCard({ r }: { r: UtilidadClienteRow }) {
         </div>
         <div className="flex items-baseline justify-between gap-2">
           <dt className="text-xs text-gray-400">Margen %</dt>
-          <dd data-col="margen" className={`font-mono tabular-nums ${margenCls}`}>{fmtMargen(r.margen)}</dd>
+          <dd data-col="margen" className={`font-mono tabular-nums ${margenCls}`}>{fmtMargenPantalla(r.margen)}</dd>
         </div>
       </dl>
     </div>

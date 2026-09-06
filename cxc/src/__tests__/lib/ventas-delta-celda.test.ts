@@ -85,7 +85,17 @@ describe("las 8 celdas de las dos tablas pintan el %", () => {
   });
 
   it("celular conserva el área táctil de 44px", () => {
-    expect(mobile.match(/min-h-\[44px\]/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    // 🔁 5-sep-2026: el `SegmentedRow` de este archivo —que aportaba uno de los
+    // tres 44 px— se fue a `ControlSegmentado`, compartido con el Resumen de
+    // escritorio y con Clientes (antes había TRES formas de elegir en el mismo
+    // módulo). El blanco táctil no se perdió: se mudó, y se cuenta donde vive.
+    const segmentado = read("ControlSegmentado.tsx");
+    const tocables =
+      (mobile.match(/min-h-\[44px\]/g)?.length ?? 0) +
+      (segmentado.match(/min-h-\[44px\]/g)?.length ?? 0);
+    expect(tocables).toBeGreaterThanOrEqual(3);
+    // Y el control compartido lo trae de verdad, no de rebote.
+    expect(segmentado).toContain("min-h-[44px]");
   });
 
   it("nadie quedó pintando solo la flecha suelta (la regresión del #279)", () => {

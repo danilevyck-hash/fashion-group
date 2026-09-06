@@ -1,3 +1,4 @@
+
 // ─────────────────────────────────────────────────────────────────────────────
 // QUIÉN COMPRA UNA DESCRIPCIÓN — módulo PURO.
 //
@@ -22,6 +23,7 @@
 // lista.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { fmtPorcentaje } from "./format";
 import { signoDeTipo } from "@/lib/switch-api/factura-lineas-parse";
 
 /**
@@ -141,10 +143,16 @@ export function participacion(venta: number, totalVenta: number): number | null 
   return venta / totalVenta;
 }
 
-/** Participación lista para pintar. "—" cuando no aplica. */
+/**
+ * Participación lista para pintar. "—" cuando no aplica.
+ *
+ * 🔴 SIN DECIMAL, por `fmtPorcentaje` (diccionario § 0, #5). Es el porcentaje
+ * que la columna «% del total» pinta debajo de cada cliente — la que hasta el
+ * 5-sep-2026 salía bajo el encabezado «Margen %» heredado de la tabla de
+ * arriba. Ver la cabecera de `BloqueClientes` en `ProductosView`.
+ */
 export function fmtParticipacion(p: number | null | undefined): string {
-  if (p == null) return "—";
-  return (p * 100).toFixed(1) + "%";
+  return fmtPorcentaje(p);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

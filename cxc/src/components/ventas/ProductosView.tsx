@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Download, Search, ChevronRight } from "lucide-react";
 import { SkeletonTable } from "@/components/ui";
 import { MONTHS, fmtMoney } from "@/lib/ventas/format";
+import { TiraOrden } from "./ChipOrden";
+import SyncNowButton from "@/components/shared/SyncNowButton";
+import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { dejoDeVenderse, totalDejadoDeVender, type DejadoDeVender } from "@/lib/ventas/productos-dejados";
 import { variacionPct } from "@/lib/variacion";
 import {
   fmtParticipacion,
@@ -48,7 +53,12 @@ type SortKey = "cantidad" | "venta" | "precio" | "margen";
 
 /** Las dos cosas que se ven ADENTRO de una descripción. */
 type DrillTab = "clientes" | "codigos";
-const PAGE = 20;
+
+// ⛔ ACÁ VIVÍA `const PAGE = 20` Y SU «Mostrar más». Se retiró el 5-sep-2026.
+// Daniel: *«no me gusta tener que andar poniendo mas clientes abajo, ni
+// productos, se deben de ver todo en una sola lista»*. Mostraba 20 de 140 —
+// una lista chica que cabe entera con scroll, y entera se puede buscar con ⌘F,
+// que era justo lo que la paginación rompía.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EL FILTRO POR CLIENTE — el camino inverso del #591.
@@ -74,6 +84,18 @@ const TODOS = "todos";
 
 /** Cuántos renglones muestra «Dejó de comprar» antes de decir cuántos faltan. */
 const DEJADOS_VISIBLES = 5;
+
+/** Los criterios de la tira de orden del celular. Mismas etiquetas que los
+ *  encabezados de la tabla — no se abrevió ni se renombró nada. */
+const ORDEN_TARJETAS_SIN_MARGEN: { key: SortKey; label: string }[] = [
+  { key: "cantidad", label: "Piezas" },
+  { key: "venta", label: "Venta" },
+  { key: "precio", label: "Precio prom." },
+];
+const ORDEN_TARJETAS: { key: SortKey; label: string }[] = [
+  ...ORDEN_TARJETAS_SIN_MARGEN,
+  { key: "margen", label: "Margen %" },
+];
 
 /** Valor por el que se ordena cada columna. El precio se calcula al vuelo. */
 function valorOrden(p: ProductoNivel1, key: SortKey): number | null {
@@ -134,7 +156,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "venta", dir: "desc" });
-  const [visible, setVisible] = useState(PAGE);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [codigos, setCodigos] = useState<Record<string, ProductoCodigo[]>>({});
   // Quién compra cada descripción. `null` = la lectura falló (distinto de `[]`,
@@ -198,7 +219,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       setMatrizEstado("sin-pedir");
       setPrevio({});
       setExpanded(null);
-      setVisible(PAGE);
     } catch (e) {
       setError(e instanceof Error ? e.message : "error inesperado");
       setData(null);
@@ -333,6 +353,22 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
     return dejoDeComprar(comprasActual, comprasPrevias, seVendeHoy);
   }, [data, comprasActual, comprasPrevias]);
 
+  /**
+   * QUÉ DEJÓ DE VENDERSE — lo que el año pasado vendió y este año no.
+   *
+   * 🔴 Solo SIN cliente puesto. Con un cliente, la pregunta ya la contesta
+   * «Dejó de comprar», que además distingue si la empresa se lo sigue vendiendo
+   * a otros — y dos listas parecidas al mismo tiempo se leen como una sola.
+   *
+   * ⚠️ Solo cuando la ventana anterior se MIDIÓ (`comparativo === "ok"`). Si la
+   * consulta del año pasado se cayó, no sabemos qué vendió: una lista vacía
+   * diría «no se dejó de vender nada», que es afirmar algo que no se midió.
+   */
+  const dejadosDeVender = useMemo<DejadoDeVender[]>(() => {
+    if (!data || conCliente || comparativo !== "ok") return [];
+    return dejoDeVenderse(data.productos, prevVenta);
+  }, [data, conCliente, comparativo, prevVenta]);
+
   // 🔴 CAMBIAR DE EMPRESA (O DE AÑO) NO BORRA LO QUE ELEGISTE. Antes esto
   // reseteaba el período a "Año en curso" y vaciaba el buscador: estabas
   // mirando "Últimos 12 meses" de una empresa, cambiabas a otra, y la pantalla
@@ -365,12 +401,10 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   const onPeriodoChange = (v: string) => {
     if (!esProductosPeriodo(v)) return;
     setPeriodo(v);
-    setVisible(PAGE);
   };
 
   const onFiltroClienteChange = (v: string) => {
     setFiltroCliente(v);
-    setVisible(PAGE);
     setExpanded(null);
     // Con un cliente puesto, Margen % no se muestra (no hay margen por cliente:
     // la línea de factura no trae costo). Dejar el orden apuntando a una columna
@@ -394,7 +428,8 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
     });
   }, [data, productosDelFiltro, search, sort]);
 
-  const visibleRows = rows.slice(0, visible);
+  // 🔴 LA LISTA SE VE ENTERA — ver el comentario de `PAGE`, que ya no existe.
+  const visibleRows = rows;
 
   const toggleSort = (key: SortKey) => {
     setSort(prev => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
@@ -491,17 +526,27 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            {/* El nombre CORTO — «Vistana», no «Vistana International»
+                (diccionario § 0, #4). Sale del mismo mapa que el resto del
+                módulo, no de la lista local de esta pantalla. */}
             {PRODUCTOS_EMPRESAS.map(e => (
-              <SelectItem key={e.key} value={e.key} className="text-xs">{e.nombre}</SelectItem>
+              <SelectItem key={e.key} value={e.key} className="text-xs">{nombreCortoEmpresa(e.key)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {/* Los 4 períodos de Daniel + el mes suelto de siempre, en un solo
-            desplegable: dos controles de período uno al lado del otro obligan a
-            adivinar cuál manda. */}
-        <Select value={periodo} onValueChange={onPeriodoChange}>
-          <SelectTrigger className="h-11 w-auto min-w-[150px] text-xs" disabled={loading}>
+        {/* 🔴 EL RÓTULO «Período» (5-sep-2026). El desplegable decía «Año en
+            curso» y estaba pegado al selector «2026» de la barra de arriba, así
+            que se leía como un SEGUNDO selector de año — y no lo es: sus cuatro
+            opciones son Año en curso · Últimos 6 meses · Últimos 12 meses · Año
+            pasado (`PERIODOS_FIJOS`), y tres de las cuatro se cuentan desde HOY
+            y ni siquiera miran el año. Con el nombre puesto, la pregunta que
+            contesta cada control se lee sin abrirlo. (El selector de año de la
+            barra, además, ya no se dibuja en esta pestaña.) */}
+        <label className="inline-flex items-center gap-1.5">
+          <span className="text-xs text-gray-500">Período</span>
+          <Select value={periodo} onValueChange={onPeriodoChange}>
+          <SelectTrigger data-selector-periodo className="h-11 w-auto min-w-[150px] text-xs" disabled={loading}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -510,7 +555,8 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
               <SelectItem key={p.key} value={p.key} className="text-xs">{p.nombre}</SelectItem>
             ))}
           </SelectContent>
-        </Select>
+          </Select>
+        </label>
 
         {/* FILTRO por cliente. Cerrado: no es un campo de texto y no ata a
             nadie a nada — sólo acota lo que ya está en pantalla. Las opciones
@@ -561,13 +607,21 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
           <Input
             value={search}
-            onChange={e => { setSearch(e.target.value); setVisible(PAGE); }}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Buscar descripción…"
             /* text-base en móvil: Safari hace zoom al enfocar un input con
                letra < 16px (text-xs = 12px). Desde sm vuelve al text-xs. */
             className="h-11 pl-8 text-base sm:text-xs"
           />
         </div>
+
+        {/* 🔴 «Actualizar ahora» EN LAS TRES PESTAÑAS (5-sep-2026). Estaba solo
+            en Resumen y en Clientes: desde Productos había que cambiar de
+            pestaña para traer datos frescos y volver. Es el MISMO botón y la
+            MISMA secuencia (las 8 empresas en orden + el refresco de vistas al
+            final), no una variante: dos formas de actualizar son dos estados
+            posibles de los mismos datos. */}
+        <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={load} />
 
         <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading} className="min-h-[44px]">
           <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
@@ -651,6 +705,10 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
             </p>
           )}
         </>
+      )}
+
+      {!conCliente && !loading && data && (
+        <DejoDeVenderse filas={dejadosDeVender} comparativo={data.comparativo} />
       )}
 
       {conCliente && !loading && data && (
@@ -763,20 +821,24 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
               criterios quedan acá, que son justo los cuatro números que Daniel
               pidió ver. El activo dice para qué lado va y se invierte al
               volverlo a tocar, igual que el encabezado. */}
-          <div
-            data-orden-tarjetas
-            className="mb-2 flex flex-wrap gap-1.5"
-            role="group"
-            aria-label="Ordenar por"
-          >
-            <span className="flex min-h-[44px] items-center pr-0.5 text-xs text-gray-400">Ordenar por</span>
-            <ChipOrden label="Piezas" sortKey="cantidad" active={sort} onClick={toggleSort} />
-            <ChipOrden label="Venta" sortKey="venta" active={sort} onClick={toggleSort} />
-            <ChipOrden label="Precio prom." sortKey="precio" active={sort} onClick={toggleSort} />
-            {/* Mismo criterio que la tabla: con un cliente puesto no hay margen
-                por cliente, así que tampoco se puede ordenar por él. */}
-            {!conCliente && <ChipOrden label="Margen %" sortKey="margen" active={sort} onClick={toggleSort} />}
-          </div>
+          {/* 🔴 SIN ENCABEZADO NO HAY DÓNDE TOCAR PARA ORDENAR. La tabla se
+              ordena tocando el título de la columna; sin tabla eso se pierde, y
+              perder el orden sería cambiar una carencia por otra. Los CUATRO
+              criterios quedan acá, que son justo los cuatro números que Daniel
+              pidió ver. El activo dice para qué lado va y se invierte al
+              volverlo a tocar, igual que el encabezado.
+
+              🔴 Es la tira COMPARTIDA (`TiraOrden`): acá el chip activo era
+              NEGRO y en Utilidad VERDE, dos colores para el mismo estado a una
+              pestaña de distancia. Ahora hay un solo componente.
+              Mismo criterio que la tabla: con un cliente puesto no hay margen
+              por cliente, así que tampoco se puede ordenar por él. */}
+          <TiraOrden
+            criterios={conCliente ? ORDEN_TARJETAS_SIN_MARGEN : ORDEN_TARJETAS}
+            active={sort}
+            onClick={toggleSort}
+            className="mb-2"
+          />
 
           <ul data-vista="tarjetas" className="space-y-2">
             {visibleRows.length === 0 && (
@@ -802,15 +864,8 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
         </div>
       )}
 
-      {/* Mostrar más */}
-      {data && !loading && !esperandoMatriz && !error && rows.length > visible && (
-        <div className="mt-3 text-center">
-          {/* size="sm" da 32px de alto — min-h-[44px] lo lleva al mínimo. */}
-          <Button variant="outline" size="sm" onClick={() => setVisible(v => v + PAGE)} className="min-h-[44px]">
-            Mostrar más ({rows.length - visible} restantes)
-          </Button>
-        </div>
-      )}
+      {/* ⛔ ACÁ VIVÍA «Mostrar más (120 restantes)». Ver el comentario de la
+          constante `PAGE`, que se retiró con él. */}
     </div>
   );
 }
@@ -1053,37 +1108,9 @@ function Dato({ rotulo, col, children }: { rotulo: string; col: string; children
   );
 }
 
-/**
- * El chip de ordenar de la vista de tarjetas.
- *
- * 44 px de alto, la regla táctil de la casa — y el mismo `toggleSort` que el
- * encabezado de la tabla: un segundo estado de orden en celular sería un
- * segundo criterio esperando divergir del primero.
- */
-function ChipOrden({
-  label, sortKey, active, onClick,
-}: {
-  label: string;
-  sortKey: SortKey;
-  active: { key: SortKey; dir: "asc" | "desc" };
-  onClick: (k: SortKey) => void;
-}) {
-  const isActive = active.key === sortKey;
-  return (
-    <button
-      type="button"
-      data-orden-chip={sortKey}
-      aria-pressed={isActive}
-      onClick={() => onClick(sortKey)}
-      className={`inline-flex min-h-[44px] items-center gap-0.5 rounded-full border px-3 text-xs transition active:scale-[0.97] ${
-        isActive ? "border-gray-800 bg-gray-800 text-white" : "border-gray-200 bg-white text-gray-600"
-      }`}
-    >
-      {label}
-      <span className="w-2">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
-    </button>
-  );
-}
+// ⛔ ACÁ VIVÍA `ChipOrden`, el chip de ordenar de las tarjetas de esta vista.
+// Se fue a `components/ventas/ChipOrden.tsx` y lo comparte con Utilidad, que
+// tenía el suyo pintado de otro color. Ver la cabecera de ese archivo.
 
 /** Pestaña del desplegable. 44 px de alto: se toca desde el iPhone. */
 function DrillTabBtn({
@@ -1138,7 +1165,31 @@ function BloqueClientes({ clientes }: { clientes: ClienteDeProducto[] | null | u
   const total = totalDeClientes(clientes);
   return (
     <>
+      {/* 🩸 ESTA TABLA MENTÍA, Y NO EN EL NÚMERO: EN EL RÓTULO (5-sep-2026).
+          La última columna es `fmtParticipacion(participacion(...))` — qué
+          PARTE del total se lleva ese cliente — y no tenía encabezado propio,
+          así que heredaba el de la tabla de arriba: **«Margen %»**. Medido en
+          Women-Flip Flops (total $139.795,00): Outlet Duty Free N3 $26.883 →
+          19,2 %; La Frontera $24.330 → 17,4 %; Kheriddine $432 → 0,3 %. Son
+          participaciones exactas leídas como márgenes.
+
+          🔴 EL CÁLCULO ESTÁ BIEN; LO QUE FALTABA ERA LA CABECERA. Y un margen
+          por cliente NO EXISTE: `switch_factura_lineas` no trae costo (está
+          dicho en la cabecera de la tabla madre, que por eso esconde Margen %
+          cuando hay un cliente puesto). Inventarlo habría sido lo peor de las
+          dos salidas.
+
+          Desde hoy toda tabla hija de este módulo pone su propio `<thead>`.
+          Candado: `productos-columna-no-hereda-encabezado.test.tsx`. */}
       <table data-drill-clientes className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
+            <th className="py-1.5 pr-3 font-normal">Cliente</th>
+            <th className="hidden py-1.5 pr-3 text-right font-normal sm:table-cell">Piezas</th>
+            <th className="py-1.5 pr-3 text-right font-normal">Venta</th>
+            <th data-col-participacion className="py-1.5 text-right font-normal">% del total</th>
+          </tr>
+        </thead>
         <tbody>
           {clientes.map(c => (
             <tr key={c.cliente_switch_id ?? c.cliente_nombre} className="border-b border-gray-100 last:border-0">
@@ -1149,7 +1200,7 @@ function BloqueClientes({ clientes }: { clientes: ClienteDeProducto[] | null | u
                 {Math.round(c.cantidad).toLocaleString("en-US")}
               </td>
               <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
-              <td className="py-1.5 text-right font-mono tabular-nums text-gray-500">
+              <td data-col="participacion" className="py-1.5 text-right font-mono tabular-nums text-gray-500">
                 {fmtParticipacion(participacion(c.venta, total.venta))}
               </td>
             </tr>
@@ -1178,7 +1229,19 @@ function BloqueCodigos({ codigos }: { codigos: ProductoCodigo[] | undefined }) {
   if (!codigos) return <div className="py-2 text-xs text-gray-500">No se pudieron cargar los códigos.</div>;
   if (codigos.length === 0) return <div className="py-2 text-xs text-gray-400">Sin códigos.</div>;
   return (
+    // Misma regla que la tabla de clientes: cabecera PROPIA. Acá las columnas
+    // sí coinciden de casualidad con las de la tabla madre, y esa casualidad es
+    // exactamente lo que hace que nadie note cuando dejan de coincidir.
     <table data-drill-codigos className="w-full text-xs">
+      <thead>
+        <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
+          <th className="py-1.5 pr-3 font-normal">Código</th>
+          <th className="hidden py-1.5 pr-3 text-right font-normal sm:table-cell">Piezas</th>
+          <th className="py-1.5 pr-3 text-right font-normal">Venta</th>
+          <th className="hidden py-1.5 pr-3 text-right font-normal sm:table-cell">Precio prom.</th>
+          <th className="py-1.5 text-right font-normal">Margen %</th>
+        </tr>
+      </thead>
       <tbody>
         {codigos.map(c => (
           <tr key={c.codigo} className="border-b border-gray-100 last:border-0">
@@ -1299,6 +1362,83 @@ function DejoDeComprar({
         <p data-dejados-restantes className="mt-1.5 text-xs text-gray-400">
           y {restantes} {restantes === 1 ? "más" : "más"}
         </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * QUÉ DEJÓ DE VENDERSE — el reverso de la etiqueta «Nuevo» (5-sep-2026).
+ *
+ * Productos ya marcaba en verde lo que este año existe y el pasado no. Faltaba
+ * lo contrario, que no estaba en ninguna pantalla del sistema: lo que el año
+ * pasado, en este MISMO período, vendió — y este año no vendió nada.
+ *
+ * 🔴 EL RÓTULO DICE LO QUE SE MIDIÓ. No dice «se descontinuó» ni «se agotó»:
+ * el sistema no sabe eso. Dice qué vendía antes y que hoy está en cero, con las
+ * dos fechas del período comparado al lado, que es lo que permite entenderlo
+ * sin preguntar.
+ *
+ * Lista CORTA y plegable: los primeros cinco, que son los que mueven la plata,
+ * y el resto a un toque. Si no dejó de venderse nada, no se dibuja nada — un
+ * cartel que dice «sin novedad» es ruido.
+ */
+function DejoDeVenderse({
+  filas, comparativo,
+}: {
+  filas: DejadoDeVender[];
+  comparativo: ProductosResponse["comparativo"];
+}) {
+  const [abierto, setAbierto] = useState(false);
+  if (filas.length === 0) return null;
+  const visibles = abierto ? filas : filas.slice(0, DEJADOS_VISIBLES);
+  const restantes = filas.length - visibles.length;
+  const total = totalDejadoDeVender(filas);
+  return (
+    <div data-dejo-de-venderse className="mb-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+      <p className="mb-1.5 text-xs font-medium text-gray-700">
+        Dejó de venderse
+        <span className="ml-1.5 font-normal text-gray-500">
+          <span className="font-mono tabular-nums">{filas.length}</span>
+          {filas.length === 1 ? " descripción que vendía " : " descripciones que vendían "}
+          <span className="font-mono tabular-nums">{fmtMoney(total)}</span>
+        </span>
+        {comparativo && (
+          <span className="ml-1.5 font-normal text-gray-400">
+            ({fmtDia(comparativo.desde)} – {fmtDia(comparativo.hasta)})
+          </span>
+        )}
+      </p>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
+            <th className="py-1.5 pr-3 font-normal">Descripción</th>
+            <th className="py-1.5 text-right font-normal">Vendía</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibles.map(f => (
+            <tr key={f.descripcion} className="border-b border-gray-100 last:border-0">
+              <td className="py-1.5 pr-3 text-gray-700">{f.descripcion}</td>
+              <td className="py-1.5 text-right font-mono tabular-nums text-gray-800">{fmtMoney(f.ventaAntes)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {(restantes > 0 || abierto) && (
+        // 🔴 No es la paginación que se acaba de retirar: la LISTA de productos
+        // se ve entera. Esto es un aviso lateral de cinco renglones que se
+        // despliega de un toque y vuelve a plegarse, como el bloque de los
+        // clientes en cero. 44 px táctiles.
+        <button
+          type="button"
+          data-dejados-de-vender-mas
+          aria-expanded={abierto}
+          onClick={() => setAbierto(v => !v)}
+          className="mt-1 min-h-[44px] text-xs font-medium text-teal-700"
+        >
+          {abierto ? "ver menos" : `ver las ${filas.length}`}
+        </button>
       )}
     </div>
   );

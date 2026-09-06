@@ -11,7 +11,7 @@
 // celular, y porque una frase que explica un número es exactamente el tipo de
 // cosa que hay que poder testear sin montar un DOM.
 
-import { formatCompactCurrency } from "./format";
+import { formatCompactCurrency, fmtMoneyCompact } from "./format";
 import { variacionPct, SIN_COMPARATIVO } from "../variacion";
 import type { SlotDetalle } from "./celda";
 
@@ -124,4 +124,113 @@ export function buildSlotsProyeccion(
       destacado: false,
     },
   ];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA PROYECCIÓN DEL GRUPO — la cuarta tarjeta del Resumen (5-sep-2026).
+//
+// Daniel: la proyección vivía en la ÚLTIMA celda de la fila negra, al borde
+// derecho de una tabla de 15 columnas que hay que arrastrar. Sube a tarjeta,
+// al lado de Ventas netas, Utilidad y Margen. La columna «Proyección» de la
+// tabla SE QUEDA: ahí se ve empresa por empresa.
+//
+// 🔴 NO SE INVENTA NADA. `ProyeccionGrupo` no trae `algoritmo` ni
+// `frac_ytd_estacional` —esos son de cada empresa—, así que la frase del grupo
+// no puede copiar la de una empresa. Los tres números que dice salen TODOS del
+// mismo payload de la RPC:
+//
+//   · «llevabas el X% del año» = Σ `ventas_prev_ytd_sp` de las empresas ÷
+//     `cierre_anio_anterior_total`. Es literalmente cuánto del año anterior
+//     estaba cumplido a esta misma altura, medido, no estimado.
+//   · «cierras en $Y» = `totales_grupo.proyeccion_cierre`, que es la SUMA de la
+//     proyección de cada empresa — y la frase lo dice con todas las letras, en
+//     vez de dar a entender que sale de una regla de tres del grupo.
+//
+// ⚠️ NUNCA se nombra una meta. `ventas_proyeccion_cierre_v7` devuelve
+// `meta_anual`, `gap_vs_meta` y `status`, y `stripMetasProyeccion` ya los deja
+// afuera del payload. Daniel, 5-sep-2026: *«quita meta, no lo uso, prefiero
+// proyeccion»*.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lo mínimo del grupo que hace falta para explicar su proyección. */
+export interface ProyeccionGrupoExplicable {
+  ventas_ytd: number;
+  proyeccion_cierre: number;
+  cierre_anio_anterior_total: number;
+  delta_vs_anio_anterior_total: number | null;
+  /** Σ `ventas_prev_ytd_sp` de las empresas: lo que el grupo llevaba vendido el
+   *  año anterior a esta MISMA altura. Se pasa desde afuera porque el bloque
+   *  `totales_grupo` no lo trae. */
+  ventas_prev_ytd_sp: number;
+}
+
+/** Cuánto del año anterior estaba cumplido al día de corte. `null` sin cierre. */
+export function fraccionCumplidaGrupo(g: ProyeccionGrupoExplicable): number | null {
+  if (!(g.cierre_anio_anterior_total > 0)) return null;
+  return g.ventas_prev_ytd_sp / g.cierre_anio_anterior_total;
+}
+
+/** La frase que explica la proyección del GRUPO, en castellano llano. */
+export function explicacionProyeccionGrupo(
+  g: ProyeccionGrupoExplicable,
+  prevYear: number,
+  opts: { fechaCorte?: string | null } = {},
+): string {
+  const cierre = fmtMoneyCompact(g.proyeccion_cierre);
+  const dia = diaCorto(opts.fechaCorte);
+  const frac = fraccionCumplidaGrupo(g);
+  const suma = `Suma la proyección de cada empresa: ${cierre}.`;
+  if (frac == null) {
+    // Sin cierre del año anterior no hay con qué medir la altura del año. Se
+    // dice el número y de dónde sale, y no se inventa un porcentaje.
+    return suma;
+  }
+  const pct = Math.round(frac * 100);
+  const alDia = dia ? ` al ${dia}` : "";
+  return `En ${prevYear}${alDia} llevabas el ${pct}% del año. ${suma}`;
+}
+
+/** Los números que sostienen la frase del grupo, como slots del detalle. */
+export function buildSlotsProyeccionGrupo(
+  g: ProyeccionGrupoExplicable,
+  prevYear: number,
+  opts: { fechaCorte?: string | null } = {},
+): SlotDetalle[] {
+  const dia = diaCorto(opts.fechaCorte);
+  const ratio = variacionPct(g.ventas_ytd, g.ventas_prev_ytd_sp);
+  return [
+    {
+      key: "ytd",
+      label: dia ? `Vas al ${dia}` : "Vas",
+      valor: fmtMoneyCompact(g.ventas_ytd),
+      prev: g.ventas_prev_ytd_sp > 0 ? fmtMoneyCompact(g.ventas_prev_ytd_sp) : null,
+      delta: ratio == null ? SIN_COMPARATIVO : `${ratio >= 0 ? "+" : "−"}${Math.abs(ratio * 100).toFixed(0)}%`,
+      tone: ratio == null ? "neutral" : ratio >= 0 ? "emerald" : "orange",
+      destacado: false,
+    },
+    {
+      key: "cierre",
+      label: "Cierra en",
+      valor: fmtMoneyCompact(g.proyeccion_cierre),
+      prev: null,
+      delta: "",
+      tone: "neutral",
+      destacado: true,
+    },
+    {
+      key: "cierre-prev",
+      label: `Cerró ${prevYear}`,
+      valor: fmtMoneyCompact(g.cierre_anio_anterior_total),
+      prev: null,
+      delta: "",
+      tone: "neutral",
+      destacado: false,
+    },
+  ];
+}
+
+/** «+$210,569» / «−$12,000» / «sin comparativo» — el Δ de la tarjeta. */
+export function deltaProyeccionTexto(delta: number | null | undefined): string {
+  if (delta == null) return SIN_COMPARATIVO;
+  return `${delta >= 0 ? "+" : "−"}${fmtMoneyCompact(Math.abs(delta))}`;
 }

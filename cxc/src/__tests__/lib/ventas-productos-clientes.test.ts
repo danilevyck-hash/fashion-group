@@ -149,7 +149,10 @@ describe("la participación se mide contra la SUMA DE LA LISTA", () => {
     const t = totalDeClientes(clientes);
     const suma = clientes.reduce((s, c) => s + (participacion(c.venta, t.venta) ?? 0), 0);
     expect(suma).toBeCloseTo(1, 10);
-    expect(fmtParticipacion(participacion(clientes[0].venta, t.venta))).toBe("75.0%");
+    // 🔁 CAMBIÓ DE DIRECCIÓN el 5-sep-2026: sin decimal («75%», antes «75.0%»).
+    // Diccionario § 0, #5. La CUENTA no se tocó — la línea de arriba sigue
+    // exigiendo que los porcentajes sumen 1 con 10 decimales de precisión.
+    expect(fmtParticipacion(participacion(clientes[0].venta, t.venta))).toBe("75%");
   });
 
   it("el total es la suma neta, no la bruta", () => {

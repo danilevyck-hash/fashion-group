@@ -19,19 +19,22 @@
 // un favorito guardado caía en una pestaña que ya no existe y Radix, con un
 // `value` sin trigger, no dibuja NADA: pantalla en blanco, sin error.
 //
-// ⚠️ 25-ago-2026 — HAY OTRA VEZ UNA 5ª PESTAÑA, Y NO ES ÉSTA. Ventas ganó
-// **Comisiones** (Daniel: *"Comisiones debe de estar en Ventas"*). Este archivo
-// NO se aflojó: sigue exigiendo que Referencia no vuelva y que /referencia siga
-// viva; lo que cambió es que la tira ahora tiene cinco pestañas nombradas una
-// por una. El caso de Comisiones —que además NO se lleva la ficha del menú,
-// porque /ventas es admin-only y la secretaria entra por /comisiones— vive en
-// `src/__tests__/lib/comisiones-en-ventas.test.tsx`.
+// ⚠️ 25-ago-2026 — HUBO otra vez una 5ª pestaña, y no era ésta: Ventas ganó
+// **Comisiones**.
+//
+// 🔁 5-sep-2026 — LA TIRA VOLVIÓ A **TRES**: Resumen · Clientes · Productos.
+// «Comisiones» se fue a su módulo (Daniel: *«si quitala»*) y «Utilidad» pasó a
+// ser un MODO de Clientes. Este archivo NO se aflojó en lo suyo —Referencia
+// sigue sin poder volver y /referencia sigue viva—; lo que cambió es el número
+// y los nombres de la tira, y el motivo está escrito en cada aserción que se
+// movió. Lo nuevo vive en `ventas-tres-pestanas.test.tsx`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { REFERENCIA_ROLES } from "@/lib/ventas/referencia";
+import { TABS_VENTAS, esTabVentas } from "@/lib/ventas/pestanas";
 
 const raiz = path.resolve(__dirname, "../../..");
 const src = path.join(raiz, "src");
@@ -53,12 +56,13 @@ describe("la pestaña Referencia NO vuelve a /ventas", () => {
     // viejo — eso es documentación, no una pestaña montada.)
   });
 
-  it("la tira tiene EXACTAMENTE 5 pestañas, nombradas una por una", () => {
-    // Una lista literal y no un `toContain`: si mañana aparece una sexta sin que
-    // nadie la haya decidido, el build se pone rojo. Y "referencia" no está.
+  it("la tira tiene EXACTAMENTE 3 pestañas, nombradas una por una", () => {
+    // Una lista literal y no un `toContain`: si mañana aparece una cuarta sin
+    // que nadie la haya decidido, el build se pone rojo. Y "referencia" no está.
+    // 🔁 Eran cinco hasta el 5-sep-2026 (ver la cabecera).
     const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
     const valores = [...tira.matchAll(/<TabsTrigger value="([a-z]+)"/g)].map((m) => m[1]);
-    expect(valores).toEqual(["resumen", "clientes", "productos", "utilidad", "comisiones"]);
+    expect(valores).toEqual(["resumen", "clientes", "productos"]);
 
     // Un <TabsContent> huérfano (contenido sin pestaña que lo abra) es código
     // muerto que nadie puede ver: los dos lados tienen que coincidir.
@@ -67,28 +71,39 @@ describe("la pestaña Referencia NO vuelve a /ventas", () => {
   });
 
   it("la lista TABS (la que valida el ?tab=) dice lo mismo que la tira", () => {
-    const m = /const TABS = \[([^\]]+)\]/.exec(shell);
-    expect(m).not.toBeNull();
-    const declarados = [...m![1].matchAll(/"([a-z]+)"/g)].map((x) => x[1]);
-    expect(declarados).toEqual(["resumen", "clientes", "productos", "utilidad", "comisiones"]);
+    // 🔁 5-sep-2026: la lista se mudó de `VentasShell` a `lib/ventas/pestanas.ts`
+    // — un módulo puro. El motivo: `ClientesView` necesita la lista de modos y
+    // el shell monta a `ClientesView` (import circular esperando), y un candado
+    // que tiene que montar la pantalla entera para preguntar «¿a dónde va
+    // `?tab=utilidad`?» es un candado que se salta cuando molesta.
+    expect([...TABS_VENTAS]).toEqual(["resumen", "clientes", "productos"]);
+
+    const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
+    const valores = [...tira.matchAll(/<TabsTrigger value="([a-z]+)"/g)].map((m) => m[1]);
+    expect(valores).toEqual([...TABS_VENTAS]);
   });
 
   it("un ?tab= desconocido cae en la pestaña por defecto, nunca en blanco", () => {
     // Misma convención que /admin, /asistencia y el Depurador. Sin este filtro,
     // `?tab=loquesea` deja el Tabs con un value sin trigger → pantalla vacía.
-    expect(shell).toContain("TABS.some((t) => t === tabRaw) ? tabRaw : \"resumen\"");
+    // 🔁 El filtro pasó a ser `esTabVentas` (la misma lista, con nombre).
+    expect(esTabVentas("loquesea")).toBe(false);
+    expect(esTabVentas("clientes")).toBe(true);
+    expect(shell).toContain('esTabVentas(tabRaw) ? tabRaw : "resumen"');
     // Y el tab sigue viviendo en la URL (no se volvió useState con el cambio).
     expect(shell).toContain('useUrlState("tab"');
     expect(shell).not.toMatch(/\[tab(?:Raw)?, setTab\] = useState/);
   });
 
-  it("con 5 pestañas la tira sigue entrando en 390 sin arrastrar nada", () => {
+  it("con 3 pestañas la tira sigue entrando en 390 sin arrastrar nada", () => {
     const clase = /const TAB_TRIGGER_CLASS =\s*\n?\s*"([^"]+)"/.exec(shell);
     expect(clase).not.toBeNull();
-    // 🩸 «Comisiones» tiene las MISMAS 10 letras que tenía «Referencia», así que
-    // devolvió el apriete tal cual: con `text-sm` + `px-2.5` las cinco piden más
-    // de 390 y la PÁGINA se va para el costado. Vuelve —solo bajo `sm`— lo que
-    // ya estaba medido para una tira de cinco. Desde `sm` no cambia un píxel.
+    // 🩸 Con CINCO pestañas la tira pedía más de 390 px y la PÁGINA se iba para
+    // el costado; por eso la letra baja a 13 px y el relleno a `px-2` bajo `sm`.
+    // 🔁 Con TRES sobra ancho y aun así NO se revirtió nada (5-sep-2026):
+    // devolverle el relleno grande sería volver a acercarse al borde por gusto,
+    // en la pantalla donde Daniel de verdad la usa. Desde `sm` no cambia un
+    // píxel, como siempre.
     expect(clase![1]).toContain("px-2 ");
     expect(clase![1]).toContain("sm:px-4");
     expect(clase![1]).toContain("text-[13px]");
@@ -97,9 +112,10 @@ describe("la pestaña Referencia NO vuelve a /ventas", () => {
     const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
     // 🔴 EL ICONO SIGUE ESCONDIDO BAJO `sm`, Y NO ES UN OLVIDO. Medido a 390 px
     // con cuatro pestañas: con icono suman 395 px y la tira arrastra 6; sin
-    // icono, 315 y arrastra 0. Cada icono cuesta 20 px (100 con la quinta) y
-    // ningún relleno los devuelve. Es decorativo: el texto dice lo mismo.
-    expect(tira.match(/hidden h-3\.5 w-3\.5 sm:block/g)?.length ?? 0).toBe(5);
+    // icono, 315 y arrastra 0. Cada icono cuesta 20 px y ningún relleno los
+    // devuelve. Es decorativo: el texto dice lo mismo.
+    // 🔁 Son TRES desde el 5-sep-2026 (eran cinco).
+    expect(tira.match(/hidden h-3\.5 w-3\.5 sm:block/g)?.length ?? 0).toBe(3);
     // Y lo que NO puede volver: la tira no scrollea a lo ancho (54 px de #375).
     // El objetivo sigue siendo que no haya NADA que arrastrar — ni la página ni
     // la tira—, no mover el arrastre de lugar.
@@ -122,7 +138,7 @@ describe("el enlace viejo /ventas?tab=referencia lleva a /referencia", () => {
     expect(trozo).toContain("permanent: false");
   });
 
-  it("/ventas sin ese tab NO se redirige (las otras 4 pestañas siguen abriendo)", () => {
+  it("/ventas sin ese tab NO se redirige (las otras pestañas siguen abriendo)", () => {
     // Un redirect de `/ventas` a secas (sin `has`) apagaría el módulo entero.
     expect(nextConfig).not.toMatch(/\{\s*source:\s*"\/ventas",\s*destination:/);
   });

@@ -99,7 +99,14 @@ describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio
   // además las PINTA.
   it("las píldoras se DERIVAN de las 6 y su rótulo es el nombre entero", () => {
     expect(clientes).toContain("B2B_EMPRESA_KEYS.map");
-    expect(clientes).toContain("EMPRESA_KEY_TO_NAME[key]");
+    // 🔁 5-sep-2026: el rótulo es el nombre CORTO («Vistana», «Boston»),
+    // decisión #4 del diccionario. NO es una abreviatura de las que este archivo
+    // vino a prohibir —«Vist. Int.», partir el nombre para que entre—: es el
+    // nombre que Daniel usa, elegido por él, y sale del SEGUNDO CAMPO de la
+    // MISMA lista de empresas, no de un mapa aparte. Lo que este test sostiene
+    // sigue en pie: el rótulo se DERIVA, no se escribe a mano.
+    expect(clientes).toContain("nombreCortoEmpresa(key)");
+    expect(clientes).not.toMatch(/label:\s*"Vistana International"/);
     expect(clientes).toContain('{ id: "todas", label: "Todas" }');
     // Ningún rótulo abreviado a mano: si alguien vuelve a escribirlos, vuelve a
     // poder olvidarse de una empresa.
@@ -142,14 +149,25 @@ describe("Ventas › Utilidad — tarjetas debajo de lg", () => {
     expect(card).toContain("fmtMoneySigned(r.ventas)");
     expect(card).toContain("fmtMoneySigned(r.costo)");
     expect(card).toContain("fmtMoneySigned(r.utilidad)");
-    expect(card).toContain("fmtMargen(r.margen)");
+    // 🔁 5-sep-2026: `fmtMargen` se renombró a `fmtMargenPantalla` (el módulo
+    // tenía DOS funciones con ese nombre, en dos archivos, redondeando distinto)
+    // y ahora delega en `fmtPorcentaje`. Lo que este test exige no cambió: la
+    // tarjeta y la tabla usan EL MISMO formateador.
+    expect(card).toContain("fmtMargenPantalla(r.margen)");
+    const fila = utilidad.slice(utilidad.indexOf("function UtilidadRow"), utilidad.indexOf("function UtilidadCard"));
+    expect(fila).toContain("fmtMargenPantalla(r.margen)");
     // Nada de redondeos ni abreviaturas propias de la tarjeta.
     expect(card).not.toContain("toFixed");
   });
 
   it("sin tabla sigue habiendo forma de ordenar en celular", () => {
+    // 🔁 5-sep-2026: la tira de chips se fue al componente compartido
+    // `TiraOrden` — acá el chip activo era VERDE y en Productos NEGRO, dos
+    // colores para el mismo estado en el mismo módulo. Sigue siendo `lg:hidden`
+    // y siguen siendo los MISMOS tres criterios.
     expect(utilidad).toContain("ORDEN_TARJETAS");
-    expect(utilidad).toContain('<div className="mb-4 flex flex-wrap items-center gap-1.5 lg:hidden">');
+    expect(utilidad).toContain("<TiraOrden criterios={ORDEN_TARJETAS}");
+    expect(utilidad).toContain('className="mb-4 lg:hidden"');
   });
 
   it("las etiquetas del selector de orden son las MISMAS de los encabezados", () => {
@@ -238,26 +256,27 @@ describe("la tira de pestañas de Ventas no se arrastra (54 px que costaban los 
     expect(linea).not.toContain("overflow-x-auto");
   });
 
-  it("las 5 pestañas están con su nombre completo, y son SOLO cinco", () => {
-    for (const t of ["Resumen", "Clientes", "Productos", "Utilidad", "Comisiones"]) {
+  it("🔁 las 3 pestañas están con su nombre completo, y son SOLO tres", () => {
+    for (const t of ["Resumen", "Clientes", "Productos"]) {
       expect(shell).toContain(`> ${t}\n`);
     }
     // Referencia fue la 5ª entre el 9 y el 12-ago-2026 y volvió a arrastrar el
     // celular (por eso se escondían los iconos y la letra bajaba a 13 px). Se
     // mudó a su propio módulo, /referencia.
     //
-    // ⚠️ 25-ago-2026: la 5ª volvió, y es **Comisiones** (Daniel: *"Comisiones
-    // debe de estar en Ventas"*). Tiene las MISMAS 10 letras que «Referencia»,
-    // así que devolvió el mismo apriete y se restauró la misma solución medida
-    // —icono escondido bajo `sm`, letra 13 px y relleno px-2, todo solo bajo
-    // `sm`—. Lo que NO volvió es el `overflow-x-auto`: el test de arriba lo
-    // sigue prohibiendo, y la medición en el navegador dice 0 px de arrastre de
-    // página en los 4 anchos. El inventario completo de la tira vive en
-    // ventas-tab-referencia-fuera.test.ts y el caso de Comisiones en
-    // comisiones-en-ventas.test.tsx.
+    // ⚠️ 25-ago-2026: la 5ª volvió, y era **Comisiones**. Tenía las MISMAS 10
+    // letras que «Referencia», así que devolvió el mismo apriete.
+    //
+    // 🔁 5-sep-2026: la tira volvió a TRES. «Comisiones» se fue a su módulo
+    // (Daniel: *«si quitala»*) y «Utilidad» pasó a ser un MODO de Clientes, con
+    // el mismo control segmentado que el Resumen. Lo que este test sostiene no
+    // cambió: los nombres van ENTEROS, no abreviados, y son exactamente los que
+    // se decidieron — ni uno más.
     const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
-    expect(tira.match(/<TabsTrigger /g)?.length ?? 0).toBe(5);
+    expect(tira.match(/<TabsTrigger /g)?.length ?? 0).toBe(3);
     expect(tira).not.toContain("Referencia");
+    expect(tira).not.toContain("Comisiones");
+    expect(tira).not.toContain("Utilidad");
   });
 });
 

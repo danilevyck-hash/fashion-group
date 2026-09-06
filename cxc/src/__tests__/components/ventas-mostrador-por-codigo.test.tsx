@@ -107,7 +107,7 @@ const filasMostrador = () =>
 
 function pintar(rows: Fila[]) {
   const data = { rows } as unknown as Parameters<typeof ClientesView>[0]["data"];
-  return render(<ClientesView data={data} selectedYear={2026} isClosedYear={false} />);
+  return render(<ClientesView data={data} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
 }
 
 /** El monto de la fila ámbar, leído por su ancla estable. Hay dos renders (la

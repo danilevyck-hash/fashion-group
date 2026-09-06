@@ -28,9 +28,10 @@ import { render, screen, cleanup, within, fireEvent } from "@testing-library/rea
 import { ClientesView } from "@/components/ventas/ClientesView";
 import { ResumenViewMobile } from "@/components/ventas/ResumenViewMobile";
 import { ResumenView } from "@/components/ventas/ResumenView";
-import { OtrosClientesDialog } from "@/components/ventas/OtrosClientesDialog";
 import ClienteDetail, { type ClienteDetailData } from "@/app/clientes/[codigo]/ClienteDetail";
 import type { Clientes, Cliente, VentasResumen } from "@/components/ventas/types";
+import { existsSync, readFileSync } from "fs";
+import path from "path";
 
 vi.mock("@/lib/hooks/useAuth", () => ({
   useAuth: () => ({ authChecked: true, role: "admin", userName: "Daniel" }),
@@ -171,29 +172,41 @@ describe("2 · el mismo renglón dice la misma frase en las dos pantallas", () =
   });
 
   it("ni «huérfanos» ni «master» aparecen en pantalla", () => {
-    render(<ClientesView data={conOtros()} selectedYear={2026} isClosedYear={false} />);
+    render(<ClientesView data={conOtros()} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
     expect(document.body.textContent).not.toMatch(/huérfano/i);
     expect(document.body.textContent).not.toMatch(/sin master/i);
   });
 
-  it("escritorio y celular dicen EXACTAMENTE lo mismo", () => {
-    render(<ClientesView data={conOtros()} selectedYear={2026} isClosedYear={false} />);
+  it("🔁 escritorio y celular dicen EXACTAMENTE lo mismo — ahora, cuántos son", () => {
+    // Decía que las dos pantallas tenían que decir «Tocar para ver el detalle»,
+    // la pista del diálogo. El diálogo se retiró el 5-sep-2026: esos clientes
+    // van en la lista, y el renglón que los separa dice cuántos son.
+    //
+    // Lo que este test siempre miró NO cambió: que el MISMO renglón diga la
+    // MISMA frase en las dos pantallas. Antes eran dos textos distintos («click
+    // para ver detalle» y «Ver detalle de huérfanos sin master») y quien lo
+    // aprendía en el celular no lo reconocía en la computadora.
+    const conHuerfano = clientes({
+      rows: [cliente(), cliente({ id: "SIN-COD", nombre: "SIN CÓDIGO", isOrphan: true, ytd: 500, delta: 0.1 })],
+    });
+    render(<ClientesView data={conHuerfano} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
     // Los dos layouts se montan a la vez en jsdom (uno se esconde con CSS), así
     // que si hubiera dos frases distintas aparecerían las dos.
-    const dichos = screen.getAllByText("Tocar para ver el detalle");
+    const dichos = screen.getAllByText(/Otros clientes \(1\) · todavía no están en el directorio/);
     expect(dichos.length).toBeGreaterThanOrEqual(2);
     expect(document.body.textContent).not.toContain("click para ver detalle");
+    expect(document.body.textContent).not.toContain("Tocar para ver el detalle");
   });
 });
 
 describe("3 · «Δ vs 2025» deja de mentir: el año sale del dato que hace la cuenta", () => {
   it("con 2026 elegido compara contra 2025", () => {
-    render(<ClientesView data={clientes({ anioComparativo: 2025 })} selectedYear={2026} isClosedYear={false} />);
+    render(<ClientesView data={clientes({ anioComparativo: 2025 })} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
     expect(screen.getByText("vs 2025")).toBeTruthy();
   });
 
   it("🔴 con 2025 elegido dice 2024 — que es contra lo que compara de verdad", () => {
-    render(<ClientesView data={clientes({ anioComparativo: 2024 })} selectedYear={2025} isClosedYear />);
+    render(<ClientesView data={clientes({ anioComparativo: 2024 })} selectedYear={2025} isClosedYear modo="ventas" onModo={() => {}} />);
     expect(screen.getByText("vs 2024")).toBeTruthy();
     // El bug era éste: el encabezado decía "2025" al lado de "Compras 2025".
     expect(screen.queryByText("vs 2025")).toBeNull();
@@ -201,7 +214,7 @@ describe("3 · «Δ vs 2025» deja de mentir: el año sale del dato que hace la 
   });
 
   it("la pantalla DICE contra qué compara, no lo deja en un símbolo", () => {
-    render(<ClientesView data={clientes({ anioComparativo: 2024 })} selectedYear={2025} isClosedYear />);
+    render(<ClientesView data={clientes({ anioComparativo: 2024 })} selectedYear={2025} isClosedYear modo="ventas" onModo={() => {}} />);
     const lineas = [...document.querySelectorAll("[data-comparativo-clientes]")];
     expect(lineas.length).toBeGreaterThanOrEqual(1);
     for (const l of lineas) {
@@ -212,26 +225,29 @@ describe("3 · «Δ vs 2025» deja de mentir: el año sale del dato que hace la 
   it("un payload viejo de la caché (sin el campo) cae a `selectedYear − 1`, que da lo mismo", () => {
     const sinCampo = clientes();
     delete (sinCampo as { anioComparativo?: number }).anioComparativo;
-    render(<ClientesView data={sinCampo} selectedYear={2025} isClosedYear />);
+    render(<ClientesView data={sinCampo} selectedYear={2025} isClosedYear modo="ventas" onModo={() => {}} />);
     expect(screen.getByText("vs 2024")).toBeTruthy();
   });
 
   it("la «Δ» no vuelve como rótulo suelto", () => {
-    render(<ClientesView data={clientes({ anioComparativo: 2025 })} selectedYear={2026} isClosedYear={false} />);
+    render(<ClientesView data={clientes({ anioComparativo: 2025 })} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
     expect(document.body.textContent).not.toContain("Δ vs");
   });
 });
 
 describe("4 · ⚠️ lo que NO cambió", () => {
   it("la columna de compras sigue diciendo el año elegido", () => {
-    render(<ClientesView data={clientes({ anioComparativo: 2025 })} selectedYear={2026} isClosedYear={false} />);
+    render(<ClientesView data={clientes({ anioComparativo: 2025 })} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
     expect(screen.getByText("Compras 2026")).toBeTruthy();
   });
 
   it("las cifras de las tarjetas del celular no se movieron", () => {
     pintarMobileKpis();
-    // $500.000 de venta y 30,0% de margen, tal como los manda el servidor.
-    expect(document.body.textContent).toContain("30.0%");
+    // $500.000 de venta y 30% de margen, tal como los manda el servidor.
+    // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5): antes «30.0%».
+    // El VALOR no se movió — solo el formateo, que ahora pasa por
+    // `fmtPorcentaje`, la única definición del módulo.
+    expect(document.body.textContent).toContain("30%");
     const tarjetas = tarjetasKpi();
     expect(tarjetas.length).toBe(3);
     expect(within(tarjetas[0]).getByText("Ventas")).toBeTruthy();
@@ -352,31 +368,43 @@ describe("6 · el ESCRITORIO también dejó la sigla", () => {
   it("⚠️ las cifras del escritorio no se movieron", () => {
     pintarEscritorio();
     const texto = document.body.textContent ?? "";
-    expect(texto).toContain("30.0%");     // margen
+    // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5): «30%».
+    expect(texto).toContain("30%");       // margen
     expect(texto).toContain("500,000");   // ventas netas
   });
 });
 
-describe("7 · el diálogo de «Otros clientes» dice el año REAL", () => {
-  const orphans = [cliente({ id: "—", nombre: "SIN CÓDIGO", delta: 0.2 })];
-
-  it("🔴 con 2025 elegido, el encabezado dice 2024", () => {
-    render(
-      <OtrosClientesDialog
-        open onClose={vi.fn()} orphans={orphans} showEmpresaColumn anioComparativo={2024}
-      />,
-    );
-    expect(screen.getByText("vs 2024")).toBeTruthy();
-    expect(screen.queryByText("Δ vs 2025")).toBeNull();
+// 🔁 CAMBIÓ DE DIRECCIÓN el 5-sep-2026. Decía que el DIÁLOGO de «Otros
+// clientes» tenía que decir el año real contra el que compara.
+//
+// Ya no hay diálogo: esos clientes van EN LA LISTA, bajo un renglón que los
+// separa y los cuenta (Daniel, sobre abrirlo: *«si y si»*). El año contra el
+// que compara lo dice el encabezado de la columna de la propia lista —que es
+// justo lo que los dos casos de arriba, «5 · la columna dice el año REAL», ya
+// exigen— así que la regla no se perdió: se cumple en un solo lugar en vez de
+// dos.
+describe("7 · 🔁 el diálogo de «Otros clientes» se retiró: van en la lista", () => {
+  it("ni el componente ni su montaje existen", () => {
+    const raiz = path.resolve(__dirname, "../../..");
+    expect(existsSync(path.join(raiz, "src/components/ventas/OtrosClientesDialog.tsx"))).toBe(false);
+    const vista = readFileSync(path.join(raiz, "src/components/ventas/ClientesView.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    expect(vista).not.toContain("OtrosClientesDialog");
   });
 
-  it("y lo DICE con todas las letras arriba de la tabla", () => {
-    render(
-      <OtrosClientesDialog
-        open onClose={vi.fn()} orphans={orphans} showEmpresaColumn anioComparativo={2024}
-      />,
-    );
-    expect(document.querySelector("[data-comparativo-otros]")!.textContent)
-      .toContain("mismo período de 2024");
+  it("🔴 y esos clientes se pintan, con su renglón que los cuenta", () => {
+    const conHuerfano = clientes({ anioComparativo: 2024 });
+    conHuerfano.rows = [
+      ...conHuerfano.rows,
+      cliente({ id: "SIN-COD", nombre: "SIN CÓDIGO", delta: 0.2, isOrphan: true, ytd: 500 }),
+    ];
+    render(<ClientesView data={conHuerfano} selectedYear={2025} isClosedYear modo="ventas" onModo={() => {}} />);
+    // El cliente está EN LA LISTA (dos renders: tabla y tarjeta).
+    expect(screen.getAllByText("SIN CÓDIGO").length).toBeGreaterThanOrEqual(1);
+    // Y el renglón que los separa dice cuántos son.
+    expect(screen.getAllByText(/Otros clientes \(1\)/).length).toBeGreaterThanOrEqual(1);
+    // El año comparativo lo sigue diciendo el encabezado de la columna.
+    expect(screen.getByText("vs 2024")).toBeTruthy();
   });
 });
