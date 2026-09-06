@@ -42,3 +42,6 @@ src/lib/asistencia-antes/
 # Supabase CLI: cache local de la versión (`cli-latest`) y lo que el CLI deje ahí.
 # Nada de esto es del repo — lo regenera cada máquina.
 supabase/.temp/
+
+# Archivos que Daniel arrastra para que yo los vea. No se commitean.
+_paraclaude/
