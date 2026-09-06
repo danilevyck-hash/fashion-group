@@ -5,6 +5,7 @@ import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { ultimaDireccionPorCliente } from "@/lib/guias/direccion-sugerida";
 import { destinosHistoricos } from "@/lib/guias/destinos-clientes";
+import { estaRetiradoDeGuias } from "@/lib/guias/american-classics";
 import { leerDefinidosOVacio } from "@/lib/guias/destinos-config-server";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import {
@@ -113,8 +114,16 @@ export async function GET(req: NextRequest) {
         if (c.codigo && c.nombre) nameByCod.set(c.codigo, c.nombre);
       }
       // Conserva el orden por frecuencia; descarta códigos sin nombre vivo.
+      //
+      // 🔴 Y descarta los RETIRADOS de guías (5-sep-2026): `D-201 American
+      // Classics` es el duplicado de `D-108 Multi Fashion Holding` —no existe
+      // en Switch en ninguna de las 6 y no tiene ni una factura— así que deja
+      // de ofrecerse. Daniel: *«Multifashion y american classic es el mismo»*.
+      //
+      // ⚠️ El NOMBRE no se toca acá: el alias de D-108 lo aplica el selector al
+      // dibujar y al elegir (`nombreParaMostrar`), y vive en UN solo lugar.
       clientes = topCodigos
-        .filter((c) => nameByCod.has(c))
+        .filter((c) => nameByCod.has(c) && !estaRetiradoDeGuias(c))
         .map((c) => ({ codigo: c, nombre: nameByCod.get(c) as string }));
     }
 

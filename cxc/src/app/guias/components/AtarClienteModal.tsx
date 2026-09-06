@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import ClientePicker from "@/components/ClientePicker";
+import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 
 interface Props {
@@ -143,6 +144,10 @@ export default function AtarClienteModal({
             codigo={codigo}
             topClientes={topClientes}
             clientesDelGrupo={clientesDelGrupo}
+            // 🔴 D-201 «American Classics» tampoco se ata acá: es el duplicado
+            // de D-108 y esta ventana es la otra puerta a `cliente_codigo`
+            // (5-sep-2026). Ver `american-classics.ts`.
+            codigosOcultos={CODIGOS_RETIRADOS_DE_GUIAS}
             avisarSinParecidos
             onChange={(n, c) => {
               setNombre(n);

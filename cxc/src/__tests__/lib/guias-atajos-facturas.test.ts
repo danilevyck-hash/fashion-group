@@ -35,7 +35,6 @@ import {
   facturaMarcada,
   indiceYaSalio,
   marcarFactura,
-  normalizarNumeroFactura,
   numerosDeFacturas,
   renglonDelCliente,
   tituloDelDia,
@@ -43,6 +42,7 @@ import {
   type FacturaDelCliente,
   type RenglonDeGuia,
 } from "@/lib/guias/atajos-facturas";
+import { claveDeFactura } from "@/lib/guias/numero-factura";
 import { instantaneaRenglones } from "@/lib/guias/cambios-form";
 import { TIPOS_VENTA_SUMAN } from "@/lib/ventas/tipos-comprobante";
 
@@ -79,14 +79,23 @@ describe("el interruptor y el tipo", () => {
 });
 
 describe("normalización exacta, nunca por parecido", () => {
+  // ⚠️ NOTA 5-sep-2026 — este bloque cambió de DIRECCIÓN, no se borró.
+  // `normalizarNumeroFactura` se retiró: solo quitaba ceros a la izquierda de un
+  // número PELADO, así que con el atajo guardando `11-000002534` devolvía el
+  // texto entero y el aviso «ya salió» no pareaba con NINGUNO de los 518
+  // renglones viejos escritos `2534`. La clave ahora son los ÚLTIMOS 4 DÍGITOS
+  // (`claveDeFactura`, `lib/guias/numero-factura.ts`), con su medición: en las
+  // 10.279 facturas de 2026 no se repiten ni una vez dentro de una empresa.
+  // Daniel: *«¿Sugieres agregar la factura completa pero que solo se refleje los
+  // últimos 4 dígitos?»* → sí.
   it("un número con ceros a la izquierda es el MISMO valor", () => {
-    expect(normalizarNumeroFactura("02535")).toBe("2535");
-    expect(normalizarNumeroFactura(" 2535 ")).toBe("2535");
+    expect(claveDeFactura("02535")).toBe("2535");
+    expect(claveDeFactura(" 2535 ")).toBe("2535");
   });
 
-  it("lo que no es puramente numérico NO se recorta (FA-001 ≠ FA-1)", () => {
-    expect(normalizarNumeroFactura("FA-001")).toBe("FA-001");
-    expect(normalizarNumeroFactura("FA-001")).not.toBe(normalizarNumeroFactura("FA-1"));
+  it("el largo de Switch y el corto de siempre dan la MISMA clave", () => {
+    expect(claveDeFactura("11-000002534")).toBe("2534");
+    expect(claveDeFactura("2534")).toBe("2534");
   });
 
   it("numerosDeFacturas parte por coma y tira vacíos", () => {

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Guia } from "./types";
 import PrintDocument from "./PrintDocument";
 import HojaEscalada from "./HojaEscalada";
-import { construirPdfGuia, nombreArchivoGuia } from "@/lib/guias/pdf-guia";
-import { compartirArchivo } from "@/lib/compartir-archivo";
+import { compartirGuia } from "@/lib/guias/papel-de-la-guia";
+import { precargarFirmasGuia } from "@/lib/guias/png-guia";
 import { useToast } from "@/components/ToastSystem";
-import { fmtGuia } from "@/lib/format";
 
 interface GuiaDetailProps {
   guia: Guia;
@@ -18,20 +17,25 @@ export default function GuiaDetail({ guia, onBack }: GuiaDetailProps) {
   const { toast } = useToast();
   const [compartiendo, setCompartiendo] = useState(false);
 
-  // Compartir la guía como PDF por WhatsApp, correo o lo que ofrezca el celular.
+  // 🔑 Las firmas, decodificadas al ABRIR la pantalla: con hasta 6 renglones
+  // «Compartir» manda una IMAGEN y dibujarla es síncrono a propósito.
+  useEffect(() => {
+    precargarFirmasGuia(guia);
+  }, [guia]);
+
+  // Compartir la guía por WhatsApp, correo o lo que ofrezca el celular.
   //
-  // ⚠️ El PDF se arma ANTES de llamar a la hoja de compartir y sin ningún
+  // 🔴 UNA SOLA PUERTA: `compartirGuia` decide imagen o PDF según los renglones
+  // (5-sep-2026). Acá vivía una SEGUNDA copia que armaba el PDF a mano, así que
+  // esta pantalla se habría quedado mandando PDF siempre.
+  //
+  // ⚠️ El archivo se arma ANTES de llamar a la hoja de compartir y sin ningún
   // `await` en el medio: Safari en iOS solo deja abrirla dentro del gesto del
   // toque, y un `await` largo hace que deje de contar como tal.
   async function compartir() {
     setCompartiendo(true);
     try {
-      const blob = construirPdfGuia(guia).output("blob");
-      const archivo = new File([blob], nombreArchivoGuia(guia), { type: "application/pdf" });
-      const r = await compartirArchivo(archivo, {
-        title: `Guía ${fmtGuia(guia.numero)}`,
-        text: `Guía de transporte ${fmtGuia(guia.numero)} — Fashion Group`,
-      });
+      const r = await compartirGuia(guia);
       if (r === "descargado") toast("Guía descargada — revisa tu carpeta de descargas", "success");
     } catch {
       toast("No se pudo preparar la guía. Intenta de nuevo en unos segundos.", "error");

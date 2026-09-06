@@ -269,7 +269,13 @@ describe("🔴 completar el número TARDE no rompe el papel", () => {
   // ya firmada— y la conducta que la sostiene.
   // ───────────────────────────────────────────────────────────────────────────
   it("la regla deja corregir el N° en una guía YA DESPACHADA — y sólo eso más el cliente y las facturas", () => {
-    for (const estado of ["Completada", "Rechazada"]) {
+    // ⚠️ NOTA 5-sep-2026 — este candado CAMBIÓ DE DIRECCIÓN, no se borró.
+    // Daniel retiró el estado «Rechazada» entero (*«quitarlo»*): medido contra
+    // producción, **0 de las 242 guías** de toda la historia lo usaron, el botón de
+    // rechazar ya se había ido el 14-ago-2026 y `motivo_rechazo` salió de la lista
+    // de campos que el PATCH acepta. `guiaYaDespachada` ya no lo reconoce.
+    // Lo que se sigue exigiendo es lo MISMO, sobre «Completada».
+    for (const estado of ["Completada"]) {
       const permitidos = camposEditablesDeRenglon(estado);
       expect(permitidos, estado).toContain("numero_guia_transp");
       // Las otras dos que Daniel aprobó, para que el N° no quede solo por azar.

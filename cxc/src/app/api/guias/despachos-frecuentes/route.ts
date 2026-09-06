@@ -50,7 +50,9 @@ export async function GET(req: NextRequest) {
       .select("estado, fecha, numero, deleted, receptor_nombre, cedula, placa")
       .eq("transportista_id", transportista)
       .eq("deleted", false)
-      .in("estado", ["Completada", "Rechazada"])
+      // «Rechazada» se retiró (5-sep-2026, Daniel: *«quitarlo»*): 0 filas en toda
+      // la historia y ya no hay forma de crear ese estado.
+      .eq("estado", "Completada")
       .order("fecha", { ascending: false })
       .order("numero", { ascending: false })
       .limit(1000);

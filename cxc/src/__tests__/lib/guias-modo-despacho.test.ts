@@ -82,8 +82,14 @@ describe("🔴 el modo arranca en lo que se eligió al CREAR la guía", () => {
     ).toBe("directo");
   });
 
-  it("una guía Rechazada también es historia", () => {
-    expect(guiaYaDespachada("Rechazada")).toBe(true);
+  it("«Rechazada» YA NO es historia: el estado se retiró", () => {
+    // ⚠️ NOTA 5-sep-2026 — este candado CAMBIÓ DE DIRECCIÓN, no se borró.
+    // Daniel retiró el estado «Rechazada» entero (*«quitarlo»*): medido contra
+    // producción, **0 de las 242 guías** de toda la historia lo usaron, el botón de
+    // rechazar ya se había ido el 14-ago-2026 y `motivo_rechazo` salió de la lista
+    // de campos que el PATCH acepta. `guiaYaDespachada` ya no lo reconoce.
+    // Lo que se sigue exigiendo es lo MISMO, sobre «Completada».
+    expect(guiaYaDespachada("Rechazada")).toBe(false);
     expect(guiaYaDespachada("Completada")).toBe(true);
     expect(guiaYaDespachada("Pendiente Bodega")).toBe(false);
     expect(guiaYaDespachada("Confirmada")).toBe(false);

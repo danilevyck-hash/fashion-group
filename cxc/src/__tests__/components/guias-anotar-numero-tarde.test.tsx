@@ -183,8 +183,15 @@ describe("🔴 a una guía despachada se ENTRA y se abre el MISMO formulario", (
     expect(document.querySelector("canvas")).toBeNull();
     expect(screen.queryByRole("button", { name: /Confirmar despacho/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Despachar$/i })).toBeNull();
-    // Las dos firmas guardadas siguen a la vista.
-    expect(document.querySelectorAll('img[alt="Firma"]')).toHaveLength(2);
+    // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026, «las firmas plegadas al MIRAR»). Antes
+    // exigía las DOS firmas dibujadas a tamaño completo. Se pliegan: la línea
+    // dice que está firmada y «Ver firmas» las abre. Lo que este caso protege no
+    // cambió —que la firma vieja SIGA y no se vuelva a pedir— así que se sigue
+    // exigiendo que estén, después de un toque.
+    expect(screen.getByText("✓ Firmada por las dos partes")).toBeTruthy();
+    expect(document.querySelectorAll('img[alt^="Firma"]')).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: /Ver firmas/i }));
+    expect(document.querySelectorAll('img[alt^="Firma"]')).toHaveLength(2);
   });
 
   it("🔴 no se agregan ni se quitan envíos de una guía que ya viajó", async () => {

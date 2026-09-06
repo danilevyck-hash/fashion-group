@@ -212,7 +212,16 @@ describe("⚠️ qué NO entra en la lista", () => {
     expect(juegosMasFrecuentes([g({ receptor_nombre: "   " })])).toEqual([]);
   });
 
-  it("una guía Rechazada SÍ entra: se despachó y alguien firmó", () => {
+  it("el módulo puro NO mira el estado: quien filtra es la ruta", () => {
+    // ⚠️ NOTA 5-sep-2026 — este candado CAMBIÓ DE DIRECCIÓN, no se borró.
+    // Daniel retiró el estado «Rechazada» entero (*«quitarlo»*): medido contra
+    // producción, **0 de las 242 guías** de toda la historia lo usaron, el botón de
+    // rechazar ya se había ido el 14-ago-2026 y `motivo_rechazo` salió de la lista
+    // de campos que el PATCH acepta. `guiaYaDespachada` ya no lo reconoce.
+    // Lo que se sigue exigiendo es lo MISMO, sobre «Completada».
+    // Este módulo arma juegos con lo que le den; el estado lo acota el
+    // `.eq("estado", "Completada")` de la ruta (ver el caso de abajo). Con
+    // «Rechazada» retirada, esa fila ya no puede llegar hasta acá.
     expect(juegosMasFrecuentes([g({ estado: "Rechazada" })])).toHaveLength(1);
   });
 });
@@ -223,7 +232,8 @@ describe("🔴 la ruta acota por transportista y falla ABIERTA", () => {
   it("solo trae guías de ESE transportista, vivas y ya despachadas", () => {
     expect(ruta).toContain('.eq("transportista_id", transportista)');
     expect(ruta).toContain('.eq("deleted", false)');
-    expect(ruta).toContain('.in("estado", ["Completada", "Rechazada"])');
+    expect(ruta).toContain('.eq("estado", "Completada")');
+    expect(ruta).not.toContain("Rechazada\"]");
   });
 
   it("🔴 se trae TODA la historia, no una ventana — contar sobre las N últimas es ordenar por fecha disfrazado", () => {

@@ -17,6 +17,20 @@ export interface GuiaItem {
   empresa: string;
   facturas: string;
   bultos: number;
+  /**
+   * 🔴 EL RASTRO DE LA CORRECCIÓN DE BULTOS (5-sep-2026). Bodega puede corregir
+   * la cuenta MIENTRAS la guía está pendiente (Daniel: *«si al despachar
+   * cuentan más bultos de lo que puso la secretaria, quiero que lo pueda
+   * cambiar»*), y queda registro (*«¿queda registro?»* → sí).
+   *
+   * ⚠️ Los tres son OPCIONALES a propósito: la migración
+   * `20261004120000_guias_bultos_corregidos.sql` está PENDIENTE, y hasta que
+   * corra las columnas no llegan. Sin dato no se afirma nada — ver
+   * `textoCorreccionGuardada` en `lib/guias/bultos-correccion.ts`.
+   */
+  bultos_original?: number | null;
+  bultos_corregido_por?: string | null;
+  bultos_corregido_en?: string | null;
   numero_guia_transp: string;
 }
 
@@ -34,10 +48,23 @@ export interface Guia {
   transportista_id?: string | null;
   placa: string;
   observaciones: string;
-  motivo_rechazo?: string;
+  /**
+   * 🩸 ACÁ VIVÍAN `motivo_rechazo` Y `monto_total`, Y LOS DOS SE FUERON
+   * (5-sep-2026, Daniel: sobre «Rechazada», *«quitarlo»*; sobre los restos,
+   * *«sí»*).
+   *
+   * Medido contra producción el 5-sep-2026 sobre las 242 guías de toda la
+   * historia: `motivo_rechazo` **0 filas** (el estado «Rechazada» nunca se
+   * usó), `monto_total` **0.00 en las 242** y no se mostraba en ninguna
+   * pantalla — viajaba al navegador en cada carga de la lista para nada.
+   *
+   * ⚠️ Las COLUMNAS no se dropean (patrón `mayor_lineas` / `cxc_favorites`):
+   * se quedan sin lectores ni escritores, con su `COMMENT`, y hay candado que
+   * pone el build rojo si una migración las borra o si el código vuelve a
+   * tocarlas — `guias-restos-muertos.test.ts`.
+   */
   total_bultos: number;
   item_count: number;
-  monto_total: number;
   estado: string;
   receptor_nombre?: string;
   cedula?: string;

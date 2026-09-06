@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import ClientePicker from "@/components/ClientePicker";
+import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 import type { GuiaItem } from "./types";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -155,12 +156,17 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
             value={cliente?.nombre ?? ""}
             codigo={cliente?.codigo ?? ""}
             topClientes={clientesTop}
+            // 🔴 D-201 «American Classics» no se ofrece: duplicado de D-108
+            // (5-sep-2026). Ver `american-classics.ts`.
+            codigosOcultos={CODIGOS_RETIRADOS_DE_GUIAS}
             // Acá el cliente sale del directorio: las facturas viven amarradas
             // a su código. El que no está se escribe a mano en los envíos de
             // abajo, exactamente como hoy.
             permitirOtro={false}
             onChange={(nombre, codigo) => {
               setDiasVisibles(DIAS_CON_FACTURA_VISIBLES);
+              // El `nombre` ya viene con el alias que la bodega usa (lo aplica
+              // el selector, `nombreParaMostrar`): el renglón nace con ese texto.
               setCliente(codigo ? { nombre, codigo } : null);
               if (!codigo) setFacturas(null);
             }}

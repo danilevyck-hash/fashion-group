@@ -12,7 +12,17 @@ import { nuevoUid } from "./guia-form-logic";
 // las empresas son las 8 del grupo y viven en `guia-form-logic.ts`
 // (EMPRESAS_CANONICAS), derivadas de empresa-mapping.ts.
 
-export const DEFAULT_DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changinola"];
+// 🔴 «Changuinola» CON «U» (5-sep-2026). Daniel: *«es changuinola»*.
+// 🩸 Esta lista es la que el formulario OFRECE en el `<datalist>` de Dirección,
+// y decía «Changinola». Medido contra producción el 5-sep-2026: **26 renglones
+// vivos** escritos «Changinola» contra **1** bien escrito, y los dos destinos
+// DEFINIDOS de ese pueblo (D-156 Wolf Mall y D-147 Top Shop, en
+// `guias_destino_cliente`) dicen «Changuinola». O sea: la lista ofrecía la
+// grafía mala, la gente la tocaba, y el mismo pueblo contaba como DOS destinos
+// distintos en el agrupado histórico. Los 26 renglones viejos se corrigen con
+// la migración `20261005120000_guias_changuinola.sql` (acotada al valor exacto,
+// nunca un LIKE suelto).
+export const DEFAULT_DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changuinola"];
 
 export function loadList(key: string, defaults: string[]): string[] {
   if (typeof window === "undefined") return defaults;

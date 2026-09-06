@@ -39,6 +39,11 @@ const SIDEBAR = readFileSync(join(process.cwd(), "src/components/Sidebar.tsx"), 
 
 /** La fila de escritorio, desde su `<div` hasta el cierre del bloque. */
 const FILA = LISTA.slice(LISTA.indexOf('<div className="hidden lg:'), LISTA.indexOf('<div className="lg:hidden'));
+/** La tarjeta del celular, desde su `<div` hasta el cierre del botón de la fila.
+ *  ⚠️ El `indexOf` del cierre arranca DESDE la tarjeta: el primer `</button>`
+ *  del archivo está mucho más arriba y devolvía un tramo vacío. */
+const I_TARJETA = LISTA.indexOf('<div className="lg:hidden px-4 py-3"');
+const TARJETA = LISTA.slice(I_TARJETA, LISTA.indexOf("</button>", I_TARJETA));
 
 describe("🔴 el corte tarjeta/fila está en `lg:`, no en `md:`", () => {
   it("la fila de escritorio empieza en lg y la tarjeta manda por debajo", () => {
@@ -107,9 +112,16 @@ describe("🔴 las columnas de texto tienen base propia: ninguna puede valer 0",
 
 describe("🔴 nada de esto reabre lo que se cerró esta semana", () => {
   it("el nombre del cliente se sigue diciendo UNA sola vez (#638)", () => {
-    // El resumen de clientes sale una vez en la fila y una vez en la tarjeta,
-    // y son layouts EXCLUYENTES: nunca los dos a la vez.
-    expect((LISTA.match(/clientesSummary\(g\.guia_items \|\| \[\]\)/g) ?? []).length).toBe(3);
+    // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026, «el panel de guías»). Antes contaba
+    // TRES apariciones del literal en todo el archivo, que era el número que
+    // daba el layout viejo (una en la fila y dos en la tarjeta: la condición y
+    // el texto). Con el cliente ARRIBA y en negrita, la tarjeta ya no lo
+    // pregunta antes de dibujarlo, así que ese número quedó viejo — y contar
+    // apariciones sueltas nunca fue lo que importaba.
+    //
+    // Lo que se protege es lo mismo y no depende de cuántas veces se escriba:
+    // **UNA sola vez por layout**, y los dos layouts son EXCLUYENTES.
     expect(FILA.match(/clientesSummary/g)).toHaveLength(1);
+    expect(TARJETA.match(/clientesSummary/g)).toHaveLength(1);
   });
 });

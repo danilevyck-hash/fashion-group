@@ -6,6 +6,11 @@ import { requireRole } from "@/lib/requireRole";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 import { enviarNegocio } from "@/lib/alertas/canal";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
+import {
+  bultosDespuesDeCorregir,
+  type CorreccionDeBultos,
+  type RenglonBultos,
+} from "@/lib/guias/bultos-correccion";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
@@ -89,7 +94,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const { id } = params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
-  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64, firma_entregador_base64, entregado_por, numero_guia_transp, tipo_despacho, nombre_chofer, items_guia_transp } = body;
+  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, estado, receptor_nombre, cedula, firma_base64, firma_entregador_base64, entregado_por, numero_guia_transp, tipo_despacho, nombre_chofer, items_guia_transp, items_bultos } = body;
 
   // Sprint 2: validar modo_entrega cuando el cliente lo manda (edición de
   // cabecera). En el flujo de despacho de bodega no viene y eso es OK.
@@ -121,12 +126,30 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (errEmpresa) return NextResponse.json({ error: errEmpresa }, { status: 400 });
   }
 
+  // 🔴 LAS CORRECCIONES DE BULTOS DE BODEGA, NORMALIZADAS UNA SOLA VEZ
+  // (5-sep-2026). Daniel: *«bodega si al despachar cuentan más bultos de lo que
+  // puso la secretaria, quiero que lo pueda cambiar»*. Es UNA columna de UNA
+  // línea, por el mismo camino que `items_guia_transp` — NUNCA por `items`,
+  // que es un reemplazo completo y le rotaría el id a cada renglón en pleno
+  // despacho.
+  const correccionesBultos: CorreccionDeBultos[] = Array.isArray(items_bultos)
+    ? (items_bultos as Array<{ id?: unknown; bultos?: unknown }>)
+        .map((f) => ({
+          id: typeof f?.id === "string" ? f.id.trim() : "",
+          bultos: Math.max(0, Math.trunc(Number(f?.bultos ?? 0)) || 0),
+        }))
+        .filter((f) => UUID_RE.test(f.id))
+    : [];
+
   if (estado && (estado === "Completada" || estado === "Despachada")) {
-    const { data: currentItems } = await supabaseServer.from("guia_items").select("bultos").eq("guia_id", id).eq("deleted", false);
+    const { data: currentItems } = await supabaseServer.from("guia_items").select("id, bultos").eq("guia_id", id).eq("deleted", false);
     const itemCount = items !== undefined ? (items?.length || 0) : (currentItems?.length || 0);
+    // ⚠️ El total mira los bultos YA CORREGIDOS: sin esto, subir de 0 a 5 el
+    // único renglón seguiría chocando contra «no se puede despachar con 0
+    // bultos», que es justamente lo que bodega vino a arreglar.
     const totalBultos = items !== undefined
       ? (items || []).reduce((s: number, i: { bultos?: number }) => s + (i.bultos || 0), 0)
-      : (currentItems || []).reduce((s: number, i: { bultos: number }) => s + (i.bultos || 0), 0);
+      : bultosDespuesDeCorregir((currentItems ?? []) as RenglonBultos[], correccionesBultos);
     if (itemCount === 0) return NextResponse.json({ error: "No se puede despachar una guía sin items" }, { status: 400 });
     if (totalBultos === 0) return NextResponse.json({ error: "No se puede despachar una guía con 0 bultos" }, { status: 400 });
     if (!receptor_nombre) return NextResponse.json({ error: "Nombre del receptor requerido" }, { status: 400 });
@@ -166,7 +189,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
   if (placa !== undefined) updateData.placa = placa;
   if (observaciones !== undefined) updateData.observaciones = observaciones;
-  if (monto_total !== undefined) updateData.monto_total = monto_total || 0;
   if (estado !== undefined) updateData.estado = estado;
   if (receptor_nombre !== undefined) updateData.receptor_nombre = receptor_nombre;
   if (cedula !== undefined) updateData.cedula = cedula;
@@ -228,6 +250,73 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     }
   }
 
+  // ── BULTOS CORREGIDOS POR BODEGA, UNO POR LÍNEA ───────────────────────────
+  // 🔴 SOLO MIENTRAS LA GUÍA NO HAYA SALIDO. Los bultos de una guía firmada
+  // siguen sin tocarse — Daniel: *«es lo que el transportista firmó»*—, y por
+  // eso se mira `previous.estado` y NO el `estado` del body: este mismo pedido
+  // es el que la está despachando.
+  //
+  // ⚠️ Queda RASTRO (Daniel: *«¿queda registro?»* → sí): `bultos_original`
+  // guarda lo que había ANTES de la primera corrección y no se pisa después, y
+  // `bultos_corregido_por/_en` dicen quién y cuándo. Las tres columnas nacen en
+  // la migración `20261004120000`, que está PENDIENTE: si no corrió, la
+  // escritura se reintenta con `bultos` solo — el número corregido NUNCA se
+  // pierde por falta de DDL, que es lo único que no se puede perder acá.
+  const correccionesHechas: Array<{ itemId: string; de: number; a: number }> = [];
+  if (correccionesBultos.length > 0 && previous?.estado !== "Completada") {
+    const sesionBultos = getSession(req);
+    const quien = sesionBultos?.userName || sesionBultos?.role || "sin nombre";
+    const ahoraIso = new Date().toISOString();
+
+    // Lo que hay hoy, para saber el «de» y si la línea ya se había corregido.
+    // Si las columnas nuevas no existen todavía, se lee sin ellas.
+    let previos: RenglonBultos[] = [];
+    let ddlLista = true;
+    {
+      const conRastro = await supabaseServer
+        .from("guia_items")
+        .select("id, bultos, bultos_original")
+        .eq("guia_id", id);
+      if (conRastro.error) {
+        ddlLista = false;
+        const { data } = await supabaseServer
+          .from("guia_items")
+          .select("id, bultos")
+          .eq("guia_id", id);
+        previos = (data ?? []) as RenglonBultos[];
+      } else {
+        previos = (conRastro.data ?? []) as RenglonBultos[];
+      }
+    }
+    const porId = new Map(previos.map((r) => [String(r.id ?? ""), r]));
+
+    for (const c of correccionesBultos) {
+      const antes = porId.get(c.id);
+      // Un id que no es de ESTA guía no se toca. El `.eq("guia_id", id)` de
+      // abajo no es cosmético, y esto lo dice antes de intentarlo.
+      if (!antes) continue;
+      const de = Number(antes.bultos ?? 0) || 0;
+      if (de === c.bultos) continue;
+
+      const cambio: Record<string, unknown> = { bultos: c.bultos };
+      if (ddlLista) {
+        // El original es el de la PRIMERA corrección: si ya hay uno, se respeta.
+        cambio.bultos_original = antes.bultos_original ?? de;
+        cambio.bultos_corregido_por = quien;
+        cambio.bultos_corregido_en = ahoraIso;
+      }
+      let err = (await supabaseServer.from("guia_items").update(cambio).eq("id", c.id).eq("guia_id", id)).error;
+      if (err && ddlLista) {
+        // La DDL no corrió: se escribe el número igual. Perder la corrección
+        // por no poder guardar el rastro sería el peor de los dos males.
+        ddlLista = false;
+        err = (await supabaseServer.from("guia_items").update({ bultos: c.bultos }).eq("id", c.id).eq("guia_id", id)).error;
+      }
+      if (err) return NextResponse.json({ error: err.message }, { status: 500 });
+      correccionesHechas.push({ itemId: c.id, de, a: c.bultos });
+    }
+  }
+
   // ── N° DE GUÍA DEL TRANSPORTISTA, UNO POR LÍNEA ───────────────────────────
   // 🩸 El transportista arma VARIAS guías suyas por cada guía nuestra, así que
   // el número es del renglón, no de la guía. La columna `guia_items.
@@ -274,6 +363,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     changes.transportista_id = { from: previous?.transportista_id, to: transportista_id };
   }
   if (items !== undefined) changes.items = { from: "replaced", to: `${(items || []).length} items` };
+  // 🔴 EL RASTRO DE LOS BULTOS TAMBIÉN VA A LA BITÁCORA (Daniel: *«¿queda
+  // registro?»*). Va acá y no en una tabla nueva: `activity_logs` ya es la
+  // bitácora del módulo y esto es exactamente lo que registra.
+  if (correccionesHechas.length > 0) {
+    changes.bultos = {
+      from: correccionesHechas.map((c) => c.de).join(", "),
+      to: correccionesHechas.map((c) => c.a).join(", "),
+    };
+  }
   if (Object.keys(changes).length > 0) {
     await logActivity(session?.role || "unknown", estado ? "guia_dispatch" : "guia_edit", "guias", { guiaId: id, changes }, session?.userName);
   }
@@ -293,7 +391,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
-  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "firma_transportista", "tipo_despacho", "nombre_chofer", "motivo_rechazo"];
+  // 🩸 CINCO CAMPOS SALIERON DE ESTA LISTA (5-sep-2026, Daniel: *«sí»* y, sobre
+  // «Rechazada», *«quitarlo»*). Medido sobre las 242 guías de toda la historia:
+  // `nombre_entregador`, `cedula_entregador` y `firma_transportista` están
+  // **vacías en las 242**; `motivo_rechazo` tiene **0 filas** porque el estado
+  // «Rechazada» nunca se usó; `monto_total` vale **0.00 en las 242**. Ninguna
+  // pantalla los muestra, y aun así el PATCH todavía los aceptaba: una puerta
+  // abierta a columnas que nadie mira.
+  //
+  // ⚠️ Las COLUMNAS no se dropean (patrón `mayor_lineas`): quedan sin lectores
+  // ni escritores, con `COMMENT`, y con candado — `guias-restos-muertos.test.ts`.
+  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "tipo_despacho", "nombre_chofer"];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];

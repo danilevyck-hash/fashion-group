@@ -176,7 +176,13 @@ describe("🔴 escribe UNA fila, y solo los campos que vinieron", () => {
 //     guía despachada quedó exactamente igual de duro** (lo vigila
 //     `guias-numero-transp-tarde-route.test.ts`).
 // ─────────────────────────────────────────────────────────────────────────────
-describe.each(["Completada", "Rechazada"])(
+// ⚠️ NOTA 5-sep-2026 — este candado CAMBIÓ DE DIRECCIÓN, no se borró.
+// Daniel retiró el estado «Rechazada» entero (*«quitarlo»*): medido contra
+// producción, **0 de las 242 guías** de toda la historia lo usaron, el botón de
+// rechazar ya se había ido el 14-ago-2026 y `motivo_rechazo` salió de la lista
+// de campos que el PATCH acepta. `guiaYaDespachada` ya no lo reconoce.
+// Lo que se sigue exigiendo es lo MISMO, sobre «Completada».
+describe.each(["Completada"])(
   "🔴 en una guía %s se corrigen TRES campos, y sólo tres",
   (estado) => {
     beforeEach(() => {

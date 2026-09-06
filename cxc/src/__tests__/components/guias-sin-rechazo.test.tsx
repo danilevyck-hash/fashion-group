@@ -158,43 +158,72 @@ describe("🔴 el camino para rechazar una guía no existe en la pantalla", () =
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("⚠️ lo que NO se tocó sigue en pie", () => {
-  it("una 'Rechazada' heredada sigue siendo HISTORIA (no se vuelve editable)", () => {
-    // Aflojar esto es el lado peligroso: dejaría reabrir el despacho de una
-    // guía que ya salió. La bandera vive en lib/guias/modo-despacho.ts.
-    expect(guiaYaDespachada("Rechazada")).toBe(true);
+  // ⚠️ NOTA 5-sep-2026 — estos dos candados CAMBIARON DE DIRECCIÓN, no se
+  // borraron. El 14-ago-2026 se retiró el BOTÓN de rechazar y el estado se dejó
+  // vivo «por si aparecía una fila heredada». No apareció: medido contra
+  // producción el 5-sep-2026, **0 de las 242 guías** de toda la historia lo
+  // usaron, y `motivo_rechazo` tiene 0 filas. Daniel: *«quitarlo»*. Ahora
+  // `guiaYaDespachada` solo reconoce «Completada», `motivo_rechazo` salió de la
+  // lista de campos que el PATCH acepta y la ruta de juegos frecuentes pide
+  // `.eq("estado", "Completada")`. Lo que se sigue exigiendo —que una guía que
+  // ya salió NO se vuelva editable— vale igual sobre «Completada», que es el
+  // único estado cerrado que queda.
+  it("«Completada» sigue siendo HISTORIA (no se vuelve editable)", () => {
     expect(guiaYaDespachada("Completada")).toBe(true);
     expect(guiaYaDespachada("Pendiente Bodega")).toBe(false);
+    // Y el estado retirado ya no existe para el sistema.
+    expect(guiaYaDespachada("Rechazada")).toBe(false);
   });
 
-  it("una 'Rechazada' se ve como despachada, NO como pendiente", () => {
-    // Al quitarle su rama al borde, el peligro era que cayera en el `else`
-    // ámbar de "pendiente" — una guía que ya salió mostrándose por despachar.
-    const { container } = lista({ estado: "Rechazada" });
+  it("una «Completada» se ve como despachada, NO como pendiente", () => {
+    // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026). Este caso leía el CHIP verde
+    // «despachada», que Daniel retiró: salía en 221 de 222 filas y *«un color
+    // que sale siempre deja de avisar»*. Lo que se sigue exigiendo es la
+    // distinción, leída en el borde izquierdo —que no se tocó— y en que la
+    // despachada NO se pinta como pendiente.
+    const { container } = lista({ estado: "Completada" });
     expect(container.querySelector(".border-l-emerald-400")).not.toBeNull();
     expect(container.querySelector(".border-l-amber-400")).toBeNull();
+    expect(container.textContent).not.toContain("despachada");
+    const { container: pend } = lista({ estado: "Pendiente Bodega" });
+    expect(pend.querySelector(".border-l-amber-400")).not.toBeNull();
+    expect(pend.textContent).toContain("pendiente");
   });
 
   // El flujo que Daniel describió, entero: "se marca como despachado / se
   // edita / se imprime / pdf". Los tres estados, con sus botones REALES.
-  const botones = (c: HTMLElement) =>
+  //
+  // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026, «el panel de guías»). Los cuatro
+  // salieron del acordeón y viven en la FILA: «Imprimir» y «Compartir» como
+  // botones con `aria-label` («Imprimir la guía GT-xxx»), «Despachar» a la vista
+  // solo en la pendiente, y «Editar» dentro del «···». Lo que este bloque
+  // protege es lo mismo —qué se ofrece en cada estado— leído donde ahora está.
+  const acciones = (c: HTMLElement) =>
     Array.from(c.querySelectorAll("button"))
-      .map((b) => (b.textContent || "").trim())
+      .map((b) => (b.getAttribute("aria-label") || b.textContent || "").trim())
       .filter(Boolean);
+
+  /** Los ítems del «···» de la primera fila. Salen por un portal. */
+  const itemsDelMenu = (c: HTMLElement) => {
+    const trigger = c.querySelector('[aria-haspopup="menu"]');
+    if (!trigger) return [];
+    fireEvent.click(trigger);
+    return Array.from(document.querySelectorAll('[role="menuitem"]')).map((e) => (e.textContent || "").trim());
+  };
 
   it("Pendiente Bodega → Editar + Despachar + Imprimir + Compartir", () => {
     const { container } = lista({ estado: "Pendiente Bodega" });
-    const t = botones(container);
-    expect(t.some((x) => /^Editar$/i.test(x))).toBe(true);
+    const t = acciones(container);
     expect(t.some((x) => /^Despachar$/i.test(x))).toBe(true);
-    expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
-    expect(t.some((x) => /^Compartir$/i.test(x))).toBe(true);
+    expect(t.some((x) => /^Imprimir la guía/i.test(x))).toBe(true);
+    expect(t.some((x) => /^Compartir la guía/i.test(x))).toBe(true);
+    expect(itemsDelMenu(container)).toContain("Editar");
   });
 
   it("Confirmada (legacy, sin despachar) → Editar + Imprimir", () => {
     const { container } = lista({ estado: "Confirmada" });
-    const t = botones(container);
-    expect(t.some((x) => /^Editar$/i.test(x))).toBe(true);
-    expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
+    expect(acciones(container).some((x) => /^Imprimir la guía/i.test(x))).toBe(true);
+    expect(itemsDelMenu(container)).toContain("Editar");
   });
 
   it("🔴 Completada → Editar + Imprimir + Compartir, pero NUNCA Despachar", () => {
@@ -215,11 +244,11 @@ describe("⚠️ lo que NO se tocó sigue en pie", () => {
     // «Despachar» NO aparece en una guía que ya salió. Una guía se despacha una
     // sola vez.
     const { container } = lista({ estado: "Completada" });
-    const t = botones(container);
-    expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
-    expect(t.some((x) => /^Compartir$/i.test(x))).toBe(true);
-    expect(t.some((x) => /^Editar$/i.test(x))).toBe(true);
+    const t = acciones(container);
+    expect(t.some((x) => /^Imprimir la guía/i.test(x))).toBe(true);
+    expect(t.some((x) => /^Compartir la guía/i.test(x))).toBe(true);
     expect(t.some((x) => /^Despachar$/i.test(x))).toBe(false);
+    expect(itemsDelMenu(container)).toContain("Editar");
   });
 });
 

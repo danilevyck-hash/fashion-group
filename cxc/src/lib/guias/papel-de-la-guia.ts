@@ -30,7 +30,14 @@ import { compartirArchivo, type ResultadoCompartir } from "@/lib/compartir-archi
 import { fmtGuia } from "@/lib/format";
 import { imprimirPdf } from "@/lib/imprimir-pdf";
 import { construirPdfGuia, nombreArchivoGuia } from "./pdf-guia";
+import { formatoParaCompartir } from "./compartir-formato";
+import { construirPngGuia } from "./png-guia";
 import type { Guia } from "@/app/guias/components/types";
+
+// ⚠️ `precargarFirmasGuia` NO se re-exporta desde acá a propósito: las pantallas
+// lo importan de `png-guia` DIRECTO, que no arrastra jsPDF. Pasarlo por este
+// módulo obligaría a bajar el generador de PDF al abrir cada guía — justo lo
+// que la nota de arriba viene evitando.
 
 /**
  * Manda la guía a la impresora, sin pantalla intermedia.
@@ -45,16 +52,38 @@ export function imprimirGuia(g: Guia): "dialogo" | "visor" | "bloqueado" {
 }
 
 /**
- * Abre la hoja de compartir del celular con el PDF de la guía (WhatsApp,
- * correo, AirDrop). En escritorio —donde esa hoja no existe— lo descarga, que
- * es lo correcto ahí y no un plan B pobre.
+ * Abre la hoja de compartir del celular con la guía (WhatsApp, correo,
+ * AirDrop). En escritorio —donde esa hoja no existe— la descarga, que es lo
+ * correcto ahí y no un plan B pobre.
+ *
+ * 🔴 IMAGEN HASTA 6 RENGLONES, PDF DE AHÍ PARA ARRIBA (5-sep-2026). Daniel:
+ * *«en el grupo de WhatsApp siempre ponen compartir cuando terminan (llega en
+ * pdf)»* — y eligió la imagen con corte. Una imagen se lee DENTRO del chat;
+ * un PDF hay que abrirlo. Medido: 94% de las guías tienen 6 renglones o menos.
+ * El corte y su medición viven en `compartir-formato.ts`.
+ *
+ * ⚠️ EL BOTÓN SIGUE LLAMÁNDOSE «Compartir» Y DECIDE SOLO: no se le pregunta
+ * nada a nadie. E **imprimir no cambió**: el papel es y sigue siendo el PDF.
+ *
+ * ⚠️ Sin canvas 2D (o si algo falla al dibujar) se cae al PDF de siempre. Se
+ * arma antes de llamar a la hoja y sin un solo `await` en el medio — iOS lo
+ * exige.
  */
 export async function compartirGuia(g: Guia): Promise<ResultadoCompartir> {
-  const blob = construirPdfGuia(g).output("blob");
-  const archivo = new File([blob], nombreArchivoGuia(g), { type: "application/pdf" });
+  const archivo = archivoParaCompartir(g);
   return compartirArchivo(archivo, {
     title: `Guía ${fmtGuia(g.numero)}`,
     text: `Guía de transporte ${fmtGuia(g.numero)} — Fashion Group`,
   });
+}
+
+/** El archivo que sale por «Compartir». Síncrono a propósito (ver arriba). */
+function archivoParaCompartir(g: Guia): File {
+  if (formatoParaCompartir((g.guia_items ?? []).length) === "png") {
+    const png = construirPngGuia(g);
+    if (png) return png;
+  }
+  const blob = construirPdfGuia(g).output("blob");
+  return new File([blob], nombreArchivoGuia(g), { type: "application/pdf" });
 }
 

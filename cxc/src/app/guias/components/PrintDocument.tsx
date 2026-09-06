@@ -8,6 +8,9 @@ import {
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
 import { nombreDespachadoPor } from "@/lib/guias/despachado-por";
+import { facturasParaMostrar } from "@/lib/guias/numero-factura";
+import { cedulaParaMostrar } from "@/lib/guias/cedula";
+import { observacionesVisibles } from "@/lib/guias/observaciones";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import type { Guia } from "./types";
 
@@ -145,7 +148,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
                 <td className="border border-gray-300 px-2 py-1">{item.cliente}</td>
                 <td className="border border-gray-300 px-2 py-1">{item.direccion}</td>
                 <td className="border border-gray-300 px-2 py-1">{item.empresa}</td>
-                <td className="border border-gray-300 px-2 py-1">{item.facturas}</td>
+                <td className="border border-gray-300 px-2 py-1">{facturasParaMostrar(item.facturas)}</td>
                 <td className="border border-gray-300 px-2 py-1 text-center">{item.bultos || ""}</td>
                 {!isDirect && (
                   <td className="border border-gray-300 px-2 py-1">
@@ -167,7 +170,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
         <div className="print-obs mb-8 text-xs">
           <div className="font-medium uppercase mb-1">Observaciones Generales del Envio</div>
           <div className="border border-gray-300 rounded p-2 min-h-[40px] whitespace-pre-wrap">
-            {g.observaciones || ""}
+            {observacionesVisibles(g.observaciones)}
           </div>
         </div>
 
@@ -208,7 +211,9 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
             </div>
             <div className="mb-4">
               CEDULA:{" "}
-              <span className="ml-1 font-medium">{g.cedula || ""}</span>
+              {/* Con guiones, como se escribe una cédula. Solo al MOSTRARLA:
+                  la base no se toca — ver `lib/guias/cedula.ts`. */}
+              <span className="ml-1 font-medium">{cedulaParaMostrar(g.cedula)}</span>
               {!g.cedula && <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}
             </div>
             <div>

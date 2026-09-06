@@ -49,10 +49,14 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { observacionesVisibles } from "@/lib/guias/observaciones";
+import { cedulaParaMostrar } from "@/lib/guias/cedula";
+import { precargarFirmasGuia } from "@/lib/guias/png-guia";
 import { Toast } from "@/components/ui";
 import DespachoForm from "../components/DespachoForm";
 import EdicionGuia from "../components/EdicionGuia";
 import ListaEnvios from "../components/ListaEnvios";
+import FirmasPlegadas from "../components/FirmasPlegadas";
 import { useDespachoGuia } from "../components/useDespachoGuia";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import {
@@ -178,6 +182,18 @@ export default function GuiaPage() {
     void import("@/lib/guias/papel-de-la-guia");
   }, []);
 
+  /**
+   * 🔑 Y LAS FIRMAS SE DECODIFICAN AL ABRIR, no al tocar «Compartir». Desde el
+   * 5-sep-2026 una guía de hasta 6 renglones se comparte como IMAGEN, y
+   * dibujarla es síncrono de punta a punta (iOS pierde el gesto con un solo
+   * `await`). Pedir las firmas acá es lo que hace que al llegar el clic ya
+   * estén listas.
+   */
+  useEffect(() => {
+    if (!s.guia) return;
+    precargarFirmasGuia(s.guia);
+  }, [s.guia]);
+
   const cambiarModo = useCallback(
     (abierto: boolean) => {
       setEditando(abierto);
@@ -258,28 +274,12 @@ export default function GuiaPage() {
         {!esEntregaDirecta(g) && <Dato etiqueta="Placa" valor={sinCeroPelado(g.placa)} />}
         {g.nombre_chofer && <Dato etiqueta="Chofer" valor={g.nombre_chofer} />}
         <Dato etiqueta="Recibido por" valor={g.receptor_nombre || ""} />
-        <Dato etiqueta="Cédula" valor={g.cedula || ""} />
+        <Dato etiqueta="Cédula" valor={cedulaParaMostrar(g.cedula)} />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-        {g.firma_base64 && (
-          <div>
-            <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
-              {esEntregaDirecta(g) ? "Firma del chofer" : "Firma del transportista"}
-            </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={g.firma_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
-          </div>
-        )}
-        {g.firma_entregador_base64 && (
-          <div>
-            <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
-              {esEntregaDirecta(g) ? "Firma del cliente" : "Firma del entregador"}
-            </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={g.firma_entregador_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
-          </div>
-        )}
-      </div>
+      {/* 🩸 Las DOS firmas a tamaño completo se llevaban media pantalla del
+          teléfono. Ahora es una línea con «Ver firmas», la MISMA de la lista.
+          🔴 Al FIRMAR no cambió nada: `DespachoForm` sigue igual. */}
+      <FirmasPlegadas guia={g} directa={esEntregaDirecta(g)} />
     </div>
   ) : puedeDespachar ? (
     <DespachoForm
@@ -524,6 +524,16 @@ export default function GuiaPage() {
                 setNumeroTransp={s.setNumeroTransp}
                 editable={!s.despachada && puedeDespachar}
                 externo={s.tipoDespacho === "externo"}
+                /* 🔴 LOS BULTOS SE CUENTAN ACÁ, AL DESPACHAR (5-sep-2026).
+                   Daniel: *«porque bodega si al despachar cuentan más bultos de
+                   lo que puso la secretaria, quiero que lo pueda cambiar en
+                   caso de algún error»*. La caja solo existe mientras la guía
+                   está PENDIENTE y para quien puede despachar (lo decide
+                   `editable`, el mismo de siempre); ya firmada, los bultos son
+                   lo que el transportista firmó y no se tocan. */
+                bultosPorLinea={s.bultosPorLinea}
+                setBultos={s.setBultos}
+                rol={role}
               />
 
               {/* 🔴 LAS OBSERVACIONES, DONDE SE CARGA EL CAMIÓN.
@@ -541,7 +551,7 @@ export default function GuiaPage() {
                   ⚠️ Y se muestra TAL CUAL está guardada. Hay basura adentro
                   (GT-124 tiene "|", GT-001 tiene "S1373259"): filtrarla o
                   "limpiarla" es decisión de Daniel, no de esta pantalla. */}
-              {String(g.observaciones ?? "").trim() && (
+              {observacionesVisibles(g.observaciones) && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
                   <span className="text-xs uppercase tracking-wide text-amber-700 block mb-1">
                     Observaciones
@@ -552,7 +562,7 @@ export default function GuiaPage() {
                       parte una palabra larga en vez de desbordar; `pre-wrap`
                       respeta el salto de línea de la única nota que lo tiene). */}
                   <p className="text-sm text-amber-900 whitespace-pre-wrap break-words">
-                    {String(g.observaciones ?? "").trim()}
+                    {observacionesVisibles(g.observaciones)}
                   </p>
                 </div>
               )}

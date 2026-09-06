@@ -19,6 +19,7 @@ import type { TipoDespacho } from "@/lib/guias/falta-para-despachar";
 import { numeroCabeceraAlDespachar } from "@/lib/guias/falta-para-despachar";
 import { guiaYaDespachada, tipoDespachoEfectivo } from "@/lib/guias/modo-despacho";
 import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
+import { bultosTecleados, correccionesDeBultos } from "@/lib/guias/bultos-correccion";
 
 interface Draft {
   placa?: string;
@@ -27,6 +28,8 @@ interface Draft {
   chofer?: string;
   tipoDespacho?: TipoDespacho;
   numerosTransp?: string[];
+  /** Los bultos que bodega contó, uno por línea (5-sep-2026). */
+  bultos?: number[];
 }
 
 function leerDraft(id: string): Draft {
@@ -59,6 +62,14 @@ export function useDespachoGuia(id: string | null) {
   const [bCedula, _setBCedula] = useState("");
   const [bChofer, _setBChofer] = useState("");
   const [numerosTransp, _setNumerosTransp] = useState<string[]>([]);
+  /**
+   * 🔴 LOS BULTOS QUE BODEGA CUENTA AL DESPACHAR (5-sep-2026). Daniel: *«porque
+   * bodega si al despachar cuentan más bultos de lo que puso la secretaria,
+   * quiero que lo pueda cambiar en caso de algún error»*. Arranca con lo que la
+   * secretaria puso; lo tecleado sobrevive a que se caiga el WiFi de la bodega,
+   * igual que el N° del transportista.
+   */
+  const [bultosPorLinea, _setBultosPorLinea] = useState<number[]>([]);
   const [bSaving, setBSaving] = useState(false);
   const [pendingFirma1, _setPendingFirma1] = useState<string | null>(null);
   const [pendingFirma2, _setPendingFirma2] = useState<string | null>(null);
@@ -105,6 +116,7 @@ export function useDespachoGuia(id: string | null) {
       // que después se ESCRIBE en las 7 líneas como si alguien lo hubiera
       // puesto ahí.
       const desdeServidor = items.map((it) => it.numero_guia_transp || "");
+      const bultosServidor = items.map((it) => Number(it.bultos ?? 0) || 0);
 
       const yaSalio = guiaYaDespachada(g.estado);
       setDespachada(yaSalio);
@@ -120,6 +132,7 @@ export function useDespachoGuia(id: string | null) {
       // terminaron grabadas como transportista externo. Ver `modo-despacho.ts`.
       _setTipoDespacho(tipoDespachoEfectivo(g));
       _setNumerosTransp(desdeServidor);
+      _setBultosPorLinea(bultosServidor);
 
       try {
         const f1 = localStorage.getItem(`guia_firma_${id}_transportista`);
@@ -140,6 +153,22 @@ export function useDespachoGuia(id: string | null) {
         if (Array.isArray(d.numerosTransp)) {
           _setNumerosTransp(
             desdeServidor.map((v, i) => (v ? v : (d.numerosTransp?.[i] ?? "")))
+          );
+        }
+        // ⚠️ El borrador de bultos SOLO manda mientras la guía no salió, y solo
+        // si tiene el mismo largo que los renglones: con una línea agregada o
+        // quitada, las posiciones ya no son las mismas y aplicarlo movería
+        // bultos de un cliente a otro.
+        if (
+          !yaSalio &&
+          Array.isArray(d.bultos) &&
+          d.bultos.length === bultosServidor.length
+        ) {
+          _setBultosPorLinea(
+            bultosServidor.map((v, i) => {
+              const guardado = Number(d.bultos?.[i]);
+              return Number.isFinite(guardado) && guardado >= 0 ? guardado : v;
+            }),
           );
         }
       } catch {
@@ -177,6 +206,15 @@ export function useDespachoGuia(id: string | null) {
   const setBCedula = (v: string) => { _setBCedula(v); if (id) escribirDraft(id, "cedula", v); };
   const setBChofer = (v: string) => { _setBChofer(v); if (id) escribirDraft(id, "chofer", v); };
   const setTipoDespacho = (v: TipoDespacho) => { _setTipoDespacho(v); if (id) escribirDraft(id, "tipoDespacho", v); };
+  /** Teclear bultos: entero ≥ 0, y al borrador — como todo lo del despacho. */
+  const setBultos = (idx: number, v: string) => {
+    _setBultosPorLinea((prev) => {
+      const next = [...prev];
+      next[idx] = bultosTecleados(v);
+      if (id) escribirDraft(id, "bultos", next);
+      return next;
+    });
+  };
   const setNumeroTransp = (idx: number, v: string) => {
     _setNumerosTransp((prev) => {
       const next = [...prev];
@@ -243,6 +281,11 @@ export function useDespachoGuia(id: string | null) {
       .map((it, i) => ({ id: it.id, numero_guia_transp: (numerosTransp[i] ?? "").trim() }))
       .filter((r): r is { id: string; numero_guia_transp: string } => !!r.id);
 
+    // 🔴 SOLO LO QUE CAMBIÓ. `items_bultos` toca UNA columna de las líneas de
+    // ESTA guía —el mismo camino que `items_guia_transp`—, nunca `items`, que
+    // es un reemplazo completo. Sin correcciones no viaja el campo.
+    const bultosCorregidos = correccionesDeBultos(items, bultosPorLinea);
+
     const payload: Record<string, unknown> = {
       estado: "Completada",
       tipo_despacho: tipoDespacho,
@@ -251,6 +294,7 @@ export function useDespachoGuia(id: string | null) {
       firma_base64: firma1,
       firma_entregador_base64: firma2,
     };
+    if (bultosCorregidos.length > 0) payload.items_bultos = bultosCorregidos;
 
     if (tipoDespacho === "externo") {
       payload.placa = bPlaca;
@@ -316,6 +360,7 @@ export function useDespachoGuia(id: string | null) {
     bChofer, setBChofer,
     juegos, usarJuego,
     numerosTransp, setNumeroTransp,
+    bultosPorLinea, setBultos,
     bSaving, confirmarDespacho,
     pendingFirma1, setPendingFirma1,
     pendingFirma2, setPendingFirma2,

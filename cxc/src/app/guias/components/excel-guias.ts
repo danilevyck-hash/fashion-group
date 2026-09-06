@@ -43,6 +43,7 @@ import {
 } from "@/lib/excel-export";
 import XLSX from "xlsx-js-style";
 import { numeroTranspImpreso } from "@/lib/guias/modo-despacho";
+import { facturasParaMostrar } from "@/lib/guias/numero-factura";
 import type { Guia, GuiaItem } from "./types";
 
 function fmtGuia(n: number) {
@@ -89,7 +90,7 @@ function filaDeEnvio(
     { v: item?.cliente || "", sz: 9, fg: "444444" },
     { v: item?.direccion || "", sz: 9, fg: "666666" },
     { v: item?.empresa || "", sz: 9, fg: "555555" },
-    { v: item?.facturas || "", sz: 9, fg: "666666" },
+    { v: facturasParaMostrar(item?.facturas) || "", sz: 9, fg: "666666" },
     item?.bultos || 0,
     // 🔴 EL N° DE **ESTA** LÍNEA, no la lista de los de la guía. Es lo que hace
     // que el reporte sirva para reclamar: este número, esta factura, este

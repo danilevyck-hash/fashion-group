@@ -30,7 +30,13 @@ import {
 } from "@/lib/guias/campos-editables";
 
 const ABIERTAS = ["Pendiente Bodega", "Confirmada", "Despachada", null, undefined, ""];
-const CERRADAS = ["Completada", "Rechazada"];
+// ⚠️ NOTA 5-sep-2026 — este candado CAMBIÓ DE DIRECCIÓN, no se borró.
+// Daniel retiró el estado «Rechazada» entero (*«quitarlo»*): medido contra
+// producción, **0 de las 242 guías** de toda la historia lo usaron, el botón de
+// rechazar ya se había ido el 14-ago-2026 y `motivo_rechazo` salió de la lista
+// de campos que el PATCH acepta. `guiaYaDespachada` ya no lo reconoce.
+// Lo que se sigue exigiendo es lo MISMO, sobre «Completada».
+const CERRADAS = ["Completada"];
 
 describe("antes de salir se corrige TODO", () => {
   it.each(ABIERTAS)("estado %s → todos los campos", (estado) => {

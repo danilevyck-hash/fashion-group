@@ -59,6 +59,7 @@ import AddNewInline from "./AddNewInline";
 import DestinosDelCliente from "./DestinosDelCliente";
 import { destinoParaAutollenar, type DefinidosPorCliente } from "@/lib/guias/destinos-clientes";
 import FacturasDelCliente from "./FacturasDelCliente";
+import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { ScrollableTable } from "@/components/ui";
@@ -518,10 +519,10 @@ export default function GuiaForm({
   const puedeGuardar = soloCorregible ? hayCambios : faltantes.length === 0;
   const avisoFalta = textoFalta(faltantes);
 
-  function SaveButton({ size = "normal" }: { size?: "normal" | "small" }) {
-    const cls = size === "small"
-      ? "bg-black text-white px-4 rounded-md text-xs font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 inline-flex items-center justify-center min-h-[44px] shrink-0"
-      : "bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 inline-flex items-center justify-center min-h-[44px]";
+  /** El ÚNICO botón de guardar del formulario. Ver la nota de la barra pegajosa. */
+  function SaveButton() {
+    const cls =
+      "bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 inline-flex items-center justify-center min-h-[44px]";
     return (
       <button
         type="button"
@@ -599,8 +600,15 @@ export default function GuiaForm({
           value={item.cliente}
           codigo={item.cliente_codigo || ""}
           topClientes={clientesTop}
+          // D-201 no se ofrece: duplicado de D-108 (`american-classics.ts`).
+          codigosOcultos={CODIGOS_RETIRADOS_DE_GUIAS}
           hasError={err}
+          // El `ctrl()` de siempre va acá arriba, junto a los otros campos:
+          // dejarlo al final lo empujaba fuera de la ventana que mira el
+          // candado del iPhone (`iphone-targets-guias.test.ts`).
+          inputClassName={ctrl(err)}
           onChange={(nombre, codigo) => {
+            // El `nombre` ya trae el alias de display (`nombreParaMostrar`).
             const cambios: Partial<GuiaItem> = { cliente: nombre, cliente_codigo: codigo };
             // 🔴 El destino se autollena al ELEGIR el cliente (4-sep-2026):
             // manda «EL DE SIEMPRE», o el destino único de la historia —
@@ -617,7 +625,6 @@ export default function GuiaForm({
             onUpdateItemFields(idx, cambios);
             marcarTocado(clave);
           }}
-          inputClassName={ctrl(err)}
         />
         {err && <ErrorCampo />}
       </>
@@ -763,7 +770,10 @@ export default function GuiaForm({
           min={0}
           inputMode="numeric"
           value={item.bultos || ""}
-          placeholder="0"
+          // 🔴 SIN PLACEHOLDER «0» (5-sep-2026, Daniel: *«sí»*). La caja
+          // arranca VACÍA: un «0» gris dentro del campo se lee como un valor
+          // puesto, y la secretaria lo borraba antes de escribir el número. El
+          // campo ya dice qué es por su rótulo («Bultos») y su asterisco.
           onChange={(e) => { onUpdateItem(idx, "bultos", parseInt(e.target.value) || 0); marcarTocado(clave); }}
           className={ctrl(err, `tabular-nums ${alineado ? "text-right" : ""}`)}
         />
@@ -834,7 +844,20 @@ export default function GuiaForm({
               cabecera de "Detalle de Envío". */}
           <span className="hidden sm:block truncate"><StatusBadge /></span>
         </div>
-          <SaveButton size="small" />
+          {/* 🔴 UN SOLO «GUARDAR GUÍA», Y ES EL DE ABAJO (5-sep-2026, Daniel:
+              *«sí»*). Acá había un segundo botón, chico, con el MISMO texto y
+              la misma acción que el del pie del formulario: dos botones de
+              guardar en la misma pantalla, uno arriba y otro abajo.
+
+              🔑 Se queda el de ABAJO por la misma razón por la que se eligió
+              ahí el aviso «Falta: …» el 25-ago-2026 — Daniel, textual: *«Dejá
+              una sola, la de abajo, que es donde está el botón»*. Guardar,
+              «Cancelar» y el aviso de lo que falta viven juntos, al final del
+              formulario, que es donde se termina de llenar.
+
+              ⚠️ La barra pegajosa NO se quedó muda: sigue diciendo «Sin
+              guardar» / «Listo, guardado» (`StatusBadge`), que es lo que hace
+              falta saber sin bajar. */}
         </div>
       </div>
 

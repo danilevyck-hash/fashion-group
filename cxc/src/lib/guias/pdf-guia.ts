@@ -36,6 +36,9 @@ import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import { nombreDespachadoPor } from "@/lib/guias/despachado-por";
+import { facturasParaMostrar } from "./numero-factura";
+import { cedulaParaMostrar } from "./cedula";
+import { observacionesVisibles } from "./observaciones";
 import type { Guia } from "@/app/guias/components/types";
 import {
   ETIQUETA_TIPO_DESPACHO,
@@ -221,7 +224,7 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
           it.cliente ?? "",
           it.direccion ?? "",
           it.empresa ?? "",
-          it.facturas ?? "",
+          facturasParaMostrar(it.facturas),
           it.bultos ? String(it.bultos) : "",
         ];
         // La columna del transportista no se dibuja en entrega directa: no hay
@@ -254,11 +257,14 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   doc.setFontSize(8);
   doc.text("OBSERVACIONES GENERALES DEL ENVIO", MARGIN, y);
   doc.setFont("helvetica", "normal");
-  const obs = doc.splitTextToSize(g.observaciones || "", ANCHO - 4);
+  // Sin la línea del cierre en bloque del 3-ago-2026 (54 guías): el papel dice
+  // lo que la persona escribió, no el rastro de una operación técnica.
+  const textoObs = observacionesVisibles(g.observaciones);
+  const obs = doc.splitTextToSize(textoObs, ANCHO - 4);
   const altoObs = Math.max(12, obs.length * 4 + 4);
   doc.setDrawColor(180);
   doc.rect(MARGIN, y + 2, ANCHO, altoObs);
-  if (g.observaciones) doc.text(obs, MARGIN + 2, y + 7);
+  if (textoObs) doc.text(obs, MARGIN + 2, y + 7);
   y += altoObs + 14;
 
   // ── Firmas ────────────────────────────────────────────────────────────────
@@ -272,7 +278,8 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   bloqueFirma(doc, MARGIN + ANCHO / 2 + 6, y, colW, {
     titulo: esDirecta ? "Recibido por — Cliente" : "Recibido Conforme — Transportista",
     nombre: g.receptor_nombre ?? "",
-    cedula: g.cedula ?? "",
+    // Con guiones al imprimirla; lo guardado no se toca.
+    cedula: cedulaParaMostrar(g.cedula),
     firma: g.firma_entregador_base64,
     pie: "Nombre, cedula y firma",
   });

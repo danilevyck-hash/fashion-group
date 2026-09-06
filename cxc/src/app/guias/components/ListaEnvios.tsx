@@ -41,7 +41,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { GuiaItem } from "./types";
+import ResumenEnvio from "./ResumenEnvio";
 import { numeroTranspImpreso } from "@/lib/guias/modo-despacho";
+import { textoCorreccionEnVivo, textoCorreccionGuardada } from "@/lib/guias/bultos-correccion";
 
 /** Campo de texto: 44 px con el dedo, denso solo cuando hay mouse. */
 const CAMPO =
@@ -58,16 +60,20 @@ interface ListaEnviosProps {
   editable: boolean;
   /** En entrega directa no hay transportista al que pedirle un número. */
   externo: boolean;
-}
-
-function Resumen({ item }: { item: GuiaItem }) {
-  const detalle = [item.direccion, item.empresa, item.facturas].filter(Boolean).join(" · ");
-  return (
-    <div className="min-w-0">
-      <span className="text-sm font-medium break-words">{item.cliente || "Sin cliente"}</span>
-      {detalle && <span className="block text-xs text-gray-500 break-words">{detalle}</span>}
-    </div>
-  );
+  /**
+   * 🔴 LOS BULTOS QUE BODEGA CUENTA, uno por línea (5-sep-2026). Daniel:
+   * *«porque bodega si al despachar cuentan más bultos de lo que puso la
+   * secretaria, quiero que lo pueda cambiar en caso de algún error»*.
+   *
+   * ⚠️ Solo se dibuja la caja cuando `editable` — o sea con la guía PENDIENTE
+   * y con permiso de despachar. En una guía firmada los bultos son lo que el
+   * transportista firmó y no se tocan; ahí se lee el número y, si alguien lo
+   * corrigió antes de la firma, la línea discreta que lo dice.
+   */
+  bultosPorLinea?: number[];
+  setBultos?: (idx: number, v: string) => void;
+  /** El rol de quien está despachando, para la línea en vivo («↑ 7 → 8, bodega»). */
+  rol?: string | null;
 }
 
 export default function ListaEnvios({
@@ -77,6 +83,9 @@ export default function ListaEnvios({
   setNumeroTransp,
   editable,
   externo,
+  bultosPorLinea,
+  setBultos,
+  rol,
 }: ListaEnviosProps) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -107,12 +116,54 @@ export default function ListaEnvios({
         </p>
       )}
       <ul className="divide-y divide-gray-100">
-        {items.map((item, idx) => (
+        {items.map((item, idx) => {
+          // 🔴 Contar bultos es parte de DESPACHAR: hace falta la guía pendiente
+          // (`editable`) y que la pantalla haya pasado las cajas. Sin el
+          // `setBultos` no se dibuja nada — es la misma pantalla de siempre.
+          const puedeContar = editable && Boolean(setBultos);
+          return (
           <li key={item.id || idx} className="py-3">
             <div className="flex items-start justify-between gap-3">
-              <Resumen item={item} />
-              <span className="text-sm tabular-nums shrink-0">{item.bultos || 0} bultos</span>
+              <ResumenEnvio item={item} />
+              {/* En una guía firmada el número se LEE. Editable, la caja está
+                  abajo junto a la del N° del transportista. */}
+              {!puedeContar && (
+                <span className="text-sm tabular-nums shrink-0">{item.bultos || 0} bultos</span>
+              )}
             </div>
+
+            {/* 🔴 EL RASTRO DE LA CORRECCIÓN, DESPUÉS. Una línea discreta y nada
+                más; en el papel, el PDF y el Excel sale el número FINAL, sin
+                historia. `null` mientras la migración `20261004120000` no corra:
+                sin dato no se afirma nada. */}
+            {textoCorreccionGuardada(item) && (
+              <p className="mt-0.5 text-xs text-gray-400">{textoCorreccionGuardada(item)}</p>
+            )}
+
+            {puedeContar && (
+              <div className="mt-2 flex items-end gap-2">
+                <div className="w-28 shrink-0">
+                  <label htmlFor={`despacho-bultos-${idx}`} className="block text-xs text-gray-500 mb-1">
+                    Bultos
+                  </label>
+                  <input
+                    id={`despacho-bultos-${idx}`}
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={bultosPorLinea?.[idx] ?? ""}
+                    onChange={(e) => setBultos?.(idx, e.target.value)}
+                    className={`${CAMPO} tabular-nums text-right`}
+                  />
+                </div>
+                {/* ↑ 7 → 8, bodega — solo cuando el número de verdad cambió. */}
+                {textoCorreccionEnVivo(item.bultos, bultosPorLinea?.[idx], rol) && (
+                  <p className="text-xs text-amber-700 pb-3">
+                    {textoCorreccionEnVivo(item.bultos, bultosPorLinea?.[idx], rol)}
+                  </p>
+                )}
+              </div>
+            )}
 
             {editable && externo ? (
               <div className="mt-2">
@@ -143,7 +194,8 @@ export default function ListaEnvios({
               </div>
             )}
           </li>
-        ))}
+          );
+        })}
         {items.length === 0 && (
           <li className="py-2.5 text-sm text-gray-400">Esta guía no tiene envíos cargados.</li>
         )}

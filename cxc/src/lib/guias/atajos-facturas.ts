@@ -27,6 +27,7 @@
 
 import { TIPOS_VENTA_SUMAN } from "@/lib/ventas/tipos-comprobante";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
+import { claveDeFactura } from "./numero-factura";
 
 /**
  * 🔴 EL INTERRUPTOR DE REVERSIÓN — un solo lugar.
@@ -99,22 +100,26 @@ export interface ClienteElegido {
 // ─── Normalización (exacta, nunca por parecido) ──────────────────────────────
 
 /**
- * Normaliza UN número de factura para compararlo: trim, y si es puramente
- * numérico se le quitan los ceros a la izquierda ("02535" y "2535" son el
- * MISMO valor). Nada más: "FA-001" y "FA-1" siguen siendo distintos — el
- * pareo por parecido está prohibido en este módulo.
+ * 🔴 LA CLAVE DE COMPARACIÓN SON LOS ÚLTIMOS 4 DÍGITOS (5-sep-2026, Daniel:
+ * *«¿Sugieres agregar la factura completa pero que solo se refleje los últimos
+ * 4 dígitos?»* → sí). Vive en `numero-factura.ts`, con la medición que la
+ * sostiene: en las 10.279 facturas de 2026, los últimos 4 dígitos **no se
+ * repiten ni una vez dentro de una empresa** (y sí 2.449 veces entre empresas,
+ * que es por lo que la empresa sigue siendo parte de la clave).
+ *
+ * 🩸 Acá vivía `normalizarNumeroFactura`, que solo quitaba ceros a la izquierda
+ * de un número PELADO. Con el atajo guardando `11-000002534` esa función
+ * devolvía el texto entero, así que el aviso «ya salió» comparaba
+ * `11-000002534` contra los 518 renglones viejos escritos `2534` y NUNCA
+ * pareaba con ninguno. Se retiró: dos normalizaciones para lo mismo es cómo
+ * nace un pareo que no parea.
  */
-export function normalizarNumeroFactura(v: string | null | undefined): string {
-  const t = (v ?? "").trim();
-  if (/^\d+$/.test(t)) return t.replace(/^0+(?=\d)/, "");
-  return t.toUpperCase();
-}
 
-/** Los números de un campo `facturas` ("2535, 2536"), normalizados y sin vacíos. */
+/** Las CLAVES de un campo `facturas` ("2535, 2536"), sin vacíos ni repetidas. */
 export function numerosDeFacturas(facturas: string | null | undefined): string[] {
   return (facturas ?? "")
     .split(",")
-    .map(normalizarNumeroFactura)
+    .map(claveDeFactura)
     .filter((n) => n !== "");
 }
 
@@ -230,7 +235,11 @@ export function yaSalioEn(
   empresaNombre: string,
   secuencial: string,
 ): number | null {
-  return indice.get(claveYaSalio(empresaNombre, normalizarNumeroFactura(secuencial))) ?? null;
+  const clave = claveDeFactura(secuencial);
+  // Sin clave (un secuencial sin dígitos) no se puede afirmar nada: el aviso
+  // solo existe en positivo.
+  if (clave === "") return null;
+  return indice.get(claveYaSalio(empresaNombre, clave)) ?? null;
 }
 
 // ─── Marcar y desmarcar: las facturas LLENAN los renglones de siempre ────────
@@ -274,7 +283,8 @@ export function facturaMarcada(
   cliente: ClienteElegido,
   f: Pick<FacturaDelCliente, "empresa" | "secuencial">,
 ): boolean {
-  const numero = normalizarNumeroFactura(f.secuencial);
+  const numero = claveDeFactura(f.secuencial);
+  if (numero === "") return false;
   return items.some(
     (r) => esRenglonDe(r, cliente, f.empresa) && numerosDeFacturas(r.facturas).includes(numero),
   );
@@ -338,7 +348,10 @@ export function desmarcarFactura(
   f: Pick<FacturaDelCliente, "empresa" | "secuencial">,
   direccionAutollenada?: string | null,
 ): RenglonDeGuia[] {
-  const numero = normalizarNumeroFactura(f.secuencial);
+  const numero = claveDeFactura(f.secuencial);
+  // Clave vacía = no hay nada que desmarcar. Sin este freno, desmarcar algo sin
+  // dígitos borraría todos los `0000` del renglón.
+  if (numero === "") return [...items];
   const idx = items.findIndex(
     (r) => esRenglonDe(r, cliente, f.empresa) && numerosDeFacturas(r.facturas).includes(numero),
   );
@@ -348,7 +361,7 @@ export function desmarcarFactura(
   const quedan = (r.facturas ?? "")
     .split(",")
     .map((t) => t.trim())
-    .filter((t) => t !== "" && normalizarNumeroFactura(t) !== numero);
+    .filter((t) => t !== "" && claveDeFactura(t) !== numero);
   const facturas = quedan.join(", ");
 
   // La dirección AUTOLLENADA (el destino único del cliente, tal cual) no

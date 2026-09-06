@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, destinosSummary } from "./constants";
@@ -8,6 +8,8 @@ import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTab
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
+import ResumenEnvio from "./ResumenEnvio";
+import FirmasPlegadas from "./FirmasPlegadas";
 import {
   ETIQUETA_TIPO_DESPACHO,
   esEntregaDirecta,
@@ -20,6 +22,15 @@ import {
 import { coincideGuiaConBusqueda } from "@/lib/guias/buscar-guia";
 import { despachadaIncompleta, textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { tieneRenglones } from "@/lib/guias/tiene-renglones";
+import { facturasParaMostrar } from "@/lib/guias/numero-factura";
+import { observacionesVisibles } from "@/lib/guias/observaciones";
+import { partirGuiasPorVentana } from "@/lib/guias/ventana-lista";
+import { separarPendientes, resumenPendientes } from "@/lib/guias/pendientes-arriba";
+import { cedulaParaMostrar } from "@/lib/guias/cedula";
+// ⚠️ `png-guia` NO arrastra jsPDF (el generador del PDF sigue detrás del
+// `await import` de `papel-de-la-guia`), así que esto se puede importar
+// directo sin engordar la carga inicial de la lista.
+import { precargarFirmasGuia } from "@/lib/guias/png-guia";
 
 /**
  * 🔴 LA GUÍA QUE SALIÓ SIN EL N° DEL TRANSPORTISTA, DICHO EN LA LISTA.
@@ -196,8 +207,81 @@ export default function GuiasList({
     if (!cod) return "";
     return nombresPorCodigo?.get(cod) ?? "";
   }
-  const [visibleCount, setVisibleCount] = useState(15);
-  const [groupedView, setGroupedView] = useState(true);
+  /**
+   * LA CELDA «CLIENTE» DE UN RENGLÓN — **UNA SOLA VEZ EN EL ARCHIVO**
+   * (5-sep-2026).
+   *
+   * 🔴 La dibujan las DOS pantallas: la tabla de escritorio y la ficha del
+   * teléfono. Estaba escrita adentro del `<td>`, y la ficha nueva habría sido
+   * una segunda copia — con dos chips distintos el día que alguien tocara uno.
+   * Es una función, no un componente anidado: así no remonta en cada render.
+   *
+   * Lo que dice y en qué orden NO cambió ni una coma; solo se mudó de lugar.
+   *
+   * ⚠️ `ficha` = el teléfono. Lo ÚNICO que cambia es el TAMAÑO de la letra: en
+   * la tabla el nombre hereda los 12 px del `<table>`, y en la ficha sube a 14,
+   * que es el piso de la casa para un dato. Las clases van escritas COMPLETAS
+   * en esta línea a propósito: Tailwind escanea texto y un `text-${n}` no
+   * generaría ninguna de las dos.
+   */
+  function celdaCliente(item: GuiaItem, ficha = false) {
+    const claseTexto = ficha ? "text-sm" : "text-xs";
+    return (
+      <>
+    {/* El chip ya dice el nombre: repetirlo arriba es
+        el ruido que se vino a sacar. Sin chip con
+        nombre, el texto escrito es lo único que hay. */}
+    {!nombreDelChip(item) && (
+      <span className={`block break-words ${claseTexto} ${ficha ? "font-medium" : ""}`}>{item.cliente}</span>
+    )}
+    {/* Esta línea SIEMPRE mide 44 px, esté atada o no,
+        para que las filas no queden desparejas según el
+        estado de cada una. */}
+    <span className="flex items-center min-h-[44px]">
+      {/* 🩸 El código YA PUESTO también se toca. Si el
+          chip fuera solo texto, una línea atada al
+          cliente equivocado no se podría corregir nunca
+          desde la pantalla — y las 5 de D-200 (GT-124,
+          GT-136, GT-183) se arreglaron justamente así,
+          el 26-ago-2026. */}
+      {item.cliente_codigo ? (
+        puedeAtarCliente && item.id ? (
+          <button
+            type="button"
+            onClick={() => onAtarCliente?.(item)}
+            title={`Cambiar o quitar el cliente (${item.cliente_codigo})`}
+            className={`inline-flex items-center min-h-[44px] pr-3 ${claseTexto} text-emerald-700 hover:text-emerald-900 transition max-w-full`}
+          >
+            <ChipCliente codigo={item.cliente_codigo} nombres={nombresPorCodigo} interactivo />
+          </button>
+        ) : (
+          <span className={`inline-flex items-center ${claseTexto} text-emerald-700 max-w-full`}>
+            <ChipCliente codigo={item.cliente_codigo} nombres={nombresPorCodigo} />
+          </span>
+        )
+      ) : puedeAtarCliente && item.id ? (
+        <button
+          type="button"
+          onClick={() => onAtarCliente?.(item)}
+          className={`inline-flex items-center min-h-[44px] pr-3 ${claseTexto} text-gray-400 hover:text-black underline underline-offset-2 transition`}
+        >
+          Atar cliente
+        </button>
+      ) : (
+        <span className={`${claseTexto} text-gray-300`}>sin atar</span>
+      )}
+    </span>
+
+      </>
+    );
+  }
+
+  /** Las que esperan algo, y desde cuándo. `null` cuando no hay ninguna. */
+  const { pendientes: guiasPendientes } = separarPendientes(guias, (g) => !guiaYaDespachada(g.estado));
+  const avisoPendientes = resumenPendientes(guiasPendientes, new Date());
+
+  /** «Ver guías más viejas» — arranca cerrado, con el último mes a la vista. */
+  const [verViejas, setVerViejas] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -264,6 +348,17 @@ export default function GuiasList({
   }
 
   /**
+   * 🔑 Las firmas de la guía abierta, decodificadas ANTES del clic. Desde el
+   * 5-sep-2026 «Compartir» manda una IMAGEN cuando la guía tiene hasta 6
+   * renglones, y dibujarla es síncrono a propósito: en iOS un `await` en el
+   * medio le quita el gesto a la hoja de compartir.
+   */
+  useEffect(() => {
+    if (!expandedGuia) return;
+    precargarFirmasGuia(expandedGuia);
+  }, [expandedGuia]);
+
+  /**
    * 🔴 EL PAPEL DE **UNA** GUÍA: imprimir o compartir, de un toque.
    *
    * ⚠️ La guía que llega acá es la EXPANDIDA (`/api/guias/[id]`), que sí trae
@@ -274,16 +369,63 @@ export default function GuiasList({
    * acordeón. Si tuviera que bajarlo acá, en iOS el navegador dejaría de
    * considerar esto parte del toque y bloquearía la hoja de compartir.
    */
+  /**
+   * 🔴 LA GUÍA COMPLETA, CON SUS FIRMAS — el papel no se imprime a medias.
+   *
+   * 🩸 Desde el 5-sep-2026 «Imprimir» y «Compartir» viven en la FILA, sin
+   * desplegar la guía. Pero la fila viene de `GET /api/guias`, que **deja las
+   * firmas afuera a propósito**: medidas hoy, las 156 guías firmadas suman
+   * **7,3 MB** de base64 (≈47 kB por guía) y mandarlas en cada carga de la
+   * lista multiplicaría el peso por decenas. Usar la guía de la lista tal cual
+   * habría impreso el papel SIN LAS FIRMAS, que es justo lo que ese papel
+   * respalda.
+   *
+   * Así que la fila pide la guía completa a `/api/guias/[id]` — una sola vez
+   * por guía, memorizada. Una guía que ya tiene el campo (la expandida, o una
+   * ya pedida) no se vuelve a pedir.
+   *
+   * ⚠️ Y por eso existe `prepararPapel`: en iOS la hoja de compartir y el visor
+   * de PDF tienen que abrirse DENTRO del gesto del toque, y un `await` de red en
+   * el medio se lo lleva. La petición arranca en el `pointerdown` —al apoyar el
+   * dedo— así que para cuando el `click` llega, casi siempre está resuelta. Si
+   * no llegó a tiempo no se imprime nada malo: se cae al camino de siempre
+   * (descarga en vez de hoja de compartir).
+   */
+  const guiasCompletas = useRef(new Map<string, Promise<Guia>>());
+
+  function pedirCompleta(g: Guia): Promise<Guia> {
+    if ("firma_base64" in g) return Promise.resolve(g);
+    const cache = guiasCompletas.current;
+    const ya = cache.get(g.id);
+    if (ya) return ya;
+    const p = fetch(`/api/guias/${g.id}`)
+      .then((r) => (r.ok ? r.json() : g))
+      // Si la lectura falla, se imprime lo que hay: un papel sin firma es peor
+      // que ningún papel, pero quedarse sin hacer nada y sin decirlo es peor aún
+      // — el toast del error lo dice la pantalla que llama.
+      .catch(() => g);
+    cache.set(g.id, p);
+    return p;
+  }
+
+  /** Arranca la lectura al APOYAR el dedo, no al soltarlo. Ver arriba. */
+  function prepararPapel(g: Guia) {
+    void import("@/lib/guias/papel-de-la-guia");
+    void pedirCompleta(g);
+  }
+
   async function imprimirEsta(g: Guia) {
-    if (!tieneRenglones(g)) return;
+    const completa = await pedirCompleta(g);
+    if (!tieneRenglones(completa)) return;
     const { imprimirGuia } = await import("@/lib/guias/papel-de-la-guia");
-    imprimirGuia(g);
+    imprimirGuia(completa);
   }
 
   async function compartirEsta(g: Guia) {
-    if (!tieneRenglones(g)) return;
+    const completa = await pedirCompleta(g);
+    if (!tieneRenglones(completa)) return;
     const { compartirGuia } = await import("@/lib/guias/papel-de-la-guia");
-    await compartirGuia(g);
+    await compartirGuia(completa);
   }
 
   async function exportSelectedExcel() {
@@ -355,24 +497,24 @@ export default function GuiasList({
           </div>
         </div>
 
-        {/* Bodega pending banner */}
-        {role === "bodega" && (() => {
-          const pendingCount = guias.filter((g) => g.estado === "Pendiente Bodega").length;
-          if (pendingCount === 0) return null;
+        {/* 🔴 ARRIBA, SOLO LO QUE ESPERA ALGO (5-sep-2026).
+            🩸 Este banner decía «N guías pendientes de despachar» y **solo lo
+            veía bodega** (`role === "bodega"`), justo el rol que ya aterriza en
+            Guías. Angela y andrea, que crean el 99% de las guías, nunca lo
+            vieron. Ahora lo ve todo el que abre la lista, dice hace cuánto
+            espera la más vieja y LLEVA a esa guía.
+            🔴 Si no hay ninguna, la línea no existe: nada de un cero grande. */}
+        {(() => {
+          if (!avisoPendientes) return null;
           return (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600 mb-6 flex items-center justify-between">
-              <span>
-                {pendingCount} guía{pendingCount !== 1 ? "s" : ""} pendiente{pendingCount !== 1 ? "s" : ""} de despachar
-              </span>
-              {/* Enlace de texto dentro del banner: sin padding quedaba en 16 px
-                  de alto. Los márgenes negativos evitan que engorde el banner. */}
-              <button
-                onClick={() => setShowPending(!showPending)}
-                className="text-xs font-medium text-gray-500 hover:text-black underline transition inline-flex items-center justify-center min-h-[44px] px-2 -my-2 -mr-2"
-              >
-                {showPending ? "Ver todas" : "Ver pendientes"}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => abrirFila(avisoPendientes.guiaId)}
+              className="w-full bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900 mb-6 flex items-center justify-between gap-3 text-left hover:bg-amber-100 transition min-h-[44px]"
+            >
+              <span className="font-medium">{avisoPendientes.texto}</span>
+              <span aria-hidden className="text-amber-700 shrink-0">›</span>
+            </button>
           );
         })()}
 
@@ -403,11 +545,20 @@ export default function GuiasList({
                 placeholder="Buscar por transportista, cliente, factura o N° de guía…"
                 className="border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full max-w-sm transition"
               />
-              {/* Medía 66.9×18: era el peor blanco de la lista. Alto forzado a 44
-                  con padding lateral compensado por -mx-2 para no correr la fila. */}
-              <button onClick={() => setGroupedView(!groupedView)} className={`text-xs transition whitespace-nowrap inline-flex items-center justify-center min-h-[44px] px-2 -mx-2 ${groupedView ? "text-black font-medium" : "text-gray-400 hover:text-black"}`}>
-                {groupedView ? "Lista plana" : "Agrupar por fecha"}
-              </button>
+              {/* 🔴 ACÁ VIVÍA «LISTA PLANA / AGRUPAR POR FECHA», Y SE RETIRÓ
+                  (5-sep-2026). Daniel, textual: *«el chip por fecha y todos
+                  quítalo. Siempre ordenado por fecha»*.
+
+                  🩸 Era UN botón cuyo texto alternaba entre las dos opciones, o
+                  sea que nombraba el DESTINO y no dónde estabas: agrupado decía
+                  «Lista plana». Y en el teléfono, un texto suelto de 12 px sobre
+                  la lista se lee como un encabezado, no como algo que se toca.
+                  La primera versión del cambio lo convirtió en un control de dos
+                  opciones; Daniel decidió que sobra el control entero.
+
+                  ⚠️ Lo agrupado por fecha NO cambió ni una línea: los mismos
+                  `TimeGroupHeader` con el mismo `groupByTimePeriod`. Lo único que
+                  se fue es la manera de apagarlo, que ya no existe. */}
             </div>
 
             <div className="space-y-1">
@@ -418,27 +569,36 @@ export default function GuiasList({
                   return <p className="text-sm text-gray-400 py-8 text-center">No hay guías</p>;
                 }
 
-                const visible = filtered.slice(0, visibleCount);
-                const hasMore = filtered.length > visibleCount;
+                // 🔴 LA LISTA ABRE CON EL ÚLTIMO MES (5-sep-2026). Medido:
+                // 46 guías de las 222. Antes traía 15 con un «Ver más» que
+                // había que tocar 14 veces para llegar a la primera.
+                const { recientes, viejas } = partirGuiasPorVentana(filtered, new Date());
+                // 🔴 Y LO QUE ESPERA ALGO VA ARRIBA, fuera de los grupos de
+                // fecha: una pendiente del 1-sep no puede quedar enterrada
+                // entre 221 despachadas.
+                const { pendientes, resto } = separarPendientes(recientes, (g) => !guiaYaDespachada(g.estado));
+                const visible = verViejas ? [...resto, ...viejas] : resto;
+                const hasMore = !verViejas && viejas.length > 0;
 
                 const totalBultos = filtered.reduce((s, g) => s + (g.total_bultos || 0), 0);
 
                 const allFilteredIds = filtered.map(g => g.id);
                 const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
 
-                const _gg = groupedView ? groupByTimePeriod(visible, "fecha" as keyof Guia, "guias") : null;
+                // 🔴 SIEMPRE agrupado por fecha: ya no hay forma de apagarlo.
+                const _gg = groupByTimePeriod(visible, "fecha" as keyof Guia, "guias");
                 const _rc = (g: Guia) => {
                       const isExpanded = expandedId === g.id;
-                      // Fuente ÚNICA del "ya salió" (incluye la "Rechazada"
-                      // heredada, que sigue siendo historia). Escribirlo a mano
-                      // acá era una segunda definición del mismo estado.
+                      // Fuente ÚNICA del "ya salió". Escribirlo a mano acá era
+                      // una segunda definición del mismo estado.
+                      // ⚠️ Nota 5-sep-2026: «Rechazada» salió de esa función
+                      // (Daniel: *«quitarlo»*, 0 de 242 guías en toda la
+                      // historia). Ya no hay estado heredado que contemplar.
                       const isDispatched = guiaYaDespachada(g.estado);
 
                       // Status-based left border color
                       // El borde rojo de "Rechazada" se fue con el rechazo
-                      // (14-ago-2026). `isDispatched` ya la trata como historia,
-                      // así que una fila heredada se ve despachada, no pendiente
-                      // — que es lo que es.
+                      // (14-ago-2026) y el estado entero el 5-sep-2026.
                       const statusBorderClass = isDispatched
                         ? "border-l-4 border-l-emerald-400"
                         : (g.estado === "Confirmada" || g.estado === "Despachada")
@@ -524,30 +684,51 @@ export default function GuiasList({
                                   <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleSelect(g.id)} className="accent-black" />
                                 </span>
                               )}
+                              {/* 🔴 EL ORDEN ES EL DE LO QUE SE LEE (5-sep-2026).
+                                  🩸 Iba `Guía · Fecha · Transportista · Cliente ·
+                                  Bultos · Estado`: lo más grande y en negrita era
+                                  el TRANSPORTISTA, que tiene **7 etiquetas
+                                  posibles** (6 del catálogo + «Entrega directa»), y el CLIENTE —lo único que distingue
+                                  una guía de otra, **49 valores**— era la línea
+                                  gris de al lado. Estaba al revés.
+
+                                  Ahora: `Guía · Cliente · Destino · Bultos ·
+                                  Transportista`. La FECHA se fue (la lista va
+                                  siempre agrupada por fecha y el encabezado del
+                                  día ya la dice) y el ESTADO también: 221 de 222
+                                  decían lo mismo, y el color se reserva para lo
+                                  que espera algo. */}
                               <span className="font-medium w-16 shrink-0 font-mono text-xs">{fmtGuia(g.numero)}</span>
-                              <span className="text-gray-500 w-28 xl:w-36 shrink-0 text-xs">{fmtDate(g.fecha)}</span>
                               {/* 🔴 `flex-[3_1_0]` y `flex-[2_1_0]`, NO `flex-1`
                                   + `w-40`: las dos se reparten TODO el sobrante
                                   en proporción 3:2. Con `min-w-0` truncan en vez
                                   de empujar la fila, y como las dos crecen
                                   juntas, ninguna puede quedar en 0 mientras
                                   sobre un píxel. */}
-                              <span className="flex-[3_1_0] min-w-0 truncate">{g.transportista}</span>
+                              <span className="flex-[3_1_0] min-w-0 truncate font-medium">
+                                {clientesSummary(g.guia_items || []) || "Sin cliente"}
+                              </span>
                               <span className="text-gray-400 text-xs flex-[2_1_0] min-w-0 truncate">
-                                {clientesSummary(g.guia_items || [])}
+                                {destinosSummary(g.guia_items || [])}
                               </span>
                               <span className="tabular-nums w-20 xl:w-24 text-right shrink-0">
                                 {g.total_bultos} <span className="text-gray-400">bultos</span>
                               </span>
+                              <span className="text-gray-500 w-28 xl:w-36 shrink-0 text-xs truncate">{g.transportista}</span>
                               {guiaSinNumeroTransp(g) && (
                                 <span className="shrink-0"><FaltaNumeroTransp /></span>
                               )}
                               {despachadaIncompleta(g) && (
                                 <span className="shrink-0"><SalioIncompleta /></span>
                               )}
-                              <span className="w-24 shrink-0">
-                                <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
-                              </span>
+                              {/* 🔴 SOLO SE PINTA LO QUE ESPERA. El chip verde
+                                  «despachada» salía en 221 de 222 filas: un color
+                                  que sale siempre deja de avisar. */}
+                              {!isDispatched && (
+                                <span className="shrink-0">
+                                  <StatusBadge estado="pendiente" />
+                                </span>
+                              )}
                               <svg
                                 className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
                                 fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -565,6 +746,10 @@ export default function GuiasList({
                                 sola vez (#638): acá abajo y en ningún otro
                                 lado de la tarjeta. */}
                             <div className="lg:hidden px-4 py-3">
+                              {/* 🔴 EL CLIENTE ARRIBA, EN NEGRITA (5-sep-2026).
+                                  Antes lo grande era el TRANSPORTISTA —7 etiquetas— y el cliente —49 códigos— era la última línea
+                                  chica. El estado verde se fue: salía en 221 de
+                                  222 tarjetas. */}
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
                                   {selectionMode && (
@@ -572,9 +757,13 @@ export default function GuiasList({
                                       <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleSelect(g.id)} className="accent-black" />
                                     </span>
                                   )}
-                                  <span className="font-medium font-mono text-xs shrink-0">{fmtGuia(g.numero)}</span>
-                                  <span className="font-medium truncate">{g.transportista}</span>
+                                  <span className="font-medium truncate">
+                                    {clientesSummary(g.guia_items || []) || "Sin cliente"}
+                                  </span>
                                 </div>
+                                {!isDispatched && (
+                                  <span className="shrink-0"><StatusBadge estado="pendiente" /></span>
+                                )}
                                 <svg
                                   className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
                                   fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -582,12 +771,16 @@ export default function GuiasList({
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                               </div>
-                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                                <span className="text-gray-500 text-xs">{fmtDate(g.fecha)}</span>
-                                <span className="tabular-nums text-xs text-gray-500">{g.total_bultos} bultos</span>
-                                <span className="ml-auto">
-                                  <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
-                                </span>
+                              {/* `destino · N bultos · transportista`, en gris. */}
+                              <div className="mt-1 text-xs text-gray-500 truncate">
+                                {[destinosSummary(g.guia_items || []), `${g.total_bultos} bultos`, g.transportista]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </div>
+                              {/* El número y la fecha, chicos: sirven para nombrar
+                                  la guía, no para elegirla. */}
+                              <div className="mt-1 text-xs text-gray-400 font-mono">
+                                {fmtGuia(g.numero)} · {fmtDate(g.fecha)}
                               </div>
                               {(guiaSinNumeroTransp(g) || despachadaIncompleta(g)) && (
                                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -595,28 +788,73 @@ export default function GuiasList({
                                   {despachadaIncompleta(g) && <SalioIncompleta />}
                                 </div>
                               )}
-                              {/* Cliente + destino visibles sin expandir (bodega ve a quién va) */}
-                              {(clientesSummary(g.guia_items || []) || destinosSummary(g.guia_items || [])) && (
-                                <div className="mt-1.5 text-xs text-gray-700 truncate">
-                                  <span className="font-medium">{clientesSummary(g.guia_items || []) || "Sin cliente"}</span>
-                                  {destinosSummary(g.guia_items || []) && (
-                                    <span className="text-gray-400"> · {destinosSummary(g.guia_items || [])}</span>
-                                  )}
-                                </div>
-                              )}
                             </div>
                           </button>
-                          {canDelete && !selectionMode && (
-                            <div className="shrink-0 flex items-center pr-1">
+                          {/* 🔴 LO QUE SE HACE TODOS LOS DÍAS, EN LA FILA
+                              (5-sep-2026). Daniel: *«"Compartir" e "Imprimir" en
+                              la tarjeta, sin desplegarla»*. Es lo que se hace al
+                              terminar cada guía y estaba a DOS toques.
+
+                              🔑 SE MOVIERON, NO SE DUPLICARON: los dos salieron
+                              del acordeón en el mismo cambio. Y al revés,
+                              «Editar» y «Eliminar guía» se fueron al «···» —
+                              hasta hoy ese menú tenía UNA sola opción y encima
+                              solo lo veía quien puede borrar, así que bodega no
+                              tenía menú ninguno. */}
+                          {!selectionMode && (
+                            <div className="shrink-0 flex items-center gap-0.5 pr-1">
+                              {/* «Despachar» solo donde hay algo que despachar, y
+                                  a la vista: es UNA guía de 222. NO despacha acá
+                                  — navega, como siempre. */}
+                              {canEdit && !isDispatched && g.estado === "Pendiente Bodega" && (
+                                <button
+                                  type="button"
+                                  onClick={() => onDespachar(g.id)}
+                                  className="inline-flex items-center justify-center text-xs font-medium text-amber-900 bg-amber-100 hover:bg-amber-200 transition px-3 rounded-md min-h-[44px]"
+                                >
+                                  Despachar
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                aria-label={`Imprimir la guía ${fmtGuia(g.numero)}`}
+                                title="Imprimir"
+                                onPointerDown={() => prepararPapel(g)}
+                                onClick={() => { void imprimirEsta(g); }}
+                                className="inline-flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-100 transition rounded-md min-h-[44px] min-w-[44px]"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="6 9 6 2 18 2 18 9" />
+                                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                  <rect x="6" y="14" width="12" height="8" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Compartir la guía ${fmtGuia(g.numero)}`}
+                                title="Compartir"
+                                onPointerDown={() => prepararPapel(g)}
+                                onClick={() => { void compartirEsta(g); }}
+                                className="inline-flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-100 transition rounded-md min-h-[44px] min-w-[44px]"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M12 16V4" />
+                                  <path d="m8 8 4-4 4 4" />
+                                  <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+                                </svg>
+                              </button>
                               {/* El rótulo lleva el N° de la guía: hay un «···»
                                   por fila y "Más opciones" a secas no diría de
                                   cuál. */}
-                              <OverflowMenu
-                                ariaLabel={`Más opciones de la guía ${fmtGuia(g.numero)}`}
-                                items={[
-                                  { label: "Eliminar guía", onClick: () => onDelete(g.id), destructive: true },
-                                ]}
-                              />
+                              {(canEdit || canDelete) && (
+                                <OverflowMenu
+                                  ariaLabel={`Más opciones de la guía ${fmtGuia(g.numero)}`}
+                                  items={[
+                                    ...(canEdit ? [{ label: "Editar", onClick: () => onEditar(g.id) }] : []),
+                                    ...(canDelete ? [{ label: "Eliminar guía", onClick: () => onDelete(g.id), destructive: true }] : []),
+                                  ]}
+                                />
+                              )}
                             </div>
                           )}
                           </div>
@@ -651,139 +889,40 @@ export default function GuiasList({
                                     </p>
                                   )}
 
-                                  {/* Acciones rápidas (header de la card expandida) */}
-                                  {/* 🔴 DOS BOTONES, Y LOS DOS NAVEGAN: NINGUNO DESPACHA.
-                                      Daniel, textual: *"Dos botones en la fila:
-                                      «Editar» y «Despachar», pero que haga
-                                      sentido"*.
+                                  {/* 🔴 ACÁ VIVÍAN «EDITAR · DESPACHAR · IMPRIMIR ·
+                                      COMPARTIR», Y SE FUERON A LA FILA
+                                      (5-sep-2026). Daniel: *«"Compartir" e
+                                      "Imprimir" en la tarjeta, sin desplegarla»*
+                                      y *«"Editar" y "Eliminar guía" pasan al
+                                      "···"»*. «Despachar» también está en la
+                                      fila, y solo en la que espera.
 
-                                      🩸 Con un solo botón llamado «Despachar»,
-                                      corregir un nombre obligaba a tocar
-                                      «Despachar» primero y buscar «Editar»
-                                      adentro — la queja original, sin resolver.
-                                      Ahora cada tarea tiene su puerta: «Editar»
-                                      abre la guía CON el formulario abierto
-                                      (`?editar=1`) y «Despachar» la abre en el
-                                      bloque de despacho.
+                                      🔑 SE MOVIERON, NO SE DUPLICARON: dejarlos
+                                      en los dos lados sería otra vez «cada
+                                      cambio deja su puerta», que es lo que este
+                                      módulo viene podando desde el 25-ago. La
+                                      fila NO desaparece al abrir la guía, así
+                                      que desde acá adentro los cuatro siguen a
+                                      la vista, arriba.
 
-                                      🔴 LO QUE NO SE AFLOJÓ: la lista NO
-                                      despacha. Ni por swipe, ni desplegando el
-                                      formulario en la fila (eso se sacó el
-                                      10-ago-2026 y sigue afuera). Los dos
-                                      botones son `router.push`, nada más.
+                                      ⚠️ LO QUE NO SE AFLOJÓ: la lista NO
+                                      despacha. Los botones son `router.push`,
+                                      igual que antes. */}
+                                  {/* ── LOS RENGLONES, DOS PANTALLAS ────────────────
+                                      🩸 Esta tabla pide 600 px dentro de un iPhone
+                                      de 390: **210 px de arrastre lateral** para
+                                      llegar a los bultos, y medido sobre las 222
+                                      guías vivas (5-sep-2026) **127 (el 57%) tienen UN
+                                      solo renglón** y 172 (el 77%) tres o menos. Arrastrar
+                                      una tabla para leer una línea.
 
-                                      ⚠️ Una guía YA DESPACHADA no muestra
-                                      ninguno de los dos: sigue cerrada a
-                                      edición (candado en
-                                      `guias-sin-rechazo.test.tsx`). */}
-                                  <div className="flex items-center justify-end gap-2 pt-3 flex-wrap">
-                                    {/* 🔴 «EDITAR» TAMBIÉN EN UNA GUÍA YA DESPACHADA
-                                        (Daniel, punto 9: *"se entra igual que a
-                                        cualquier otra"*).
-
-                                        🩸 Hasta hoy la fila de una Completada no
-                                        tenía ningún botón para ENTRAR: `/guias/[id]`
-                                        de una despachada solo se abría escribiendo la
-                                        URL a mano. Y ahí adentro viven el N° del
-                                        transportista y el aviso de la guía que salió
-                                        sin él — el chip ámbar marcaba guías que nadie
-                                        podía destildar desde la pantalla.
-
-                                        ⚠️ Entrar no es poder tocar todo: en una guía
-                                        firmada el formulario abre TRES cosas (N° del
-                                        transportista, cliente y facturas) y muestra el
-                                        resto como texto. La regla vive en
-                                        `campos-editables.ts` y la aplica también el
-                                        servidor. El candado del PUT no se tocó. */}
-                                    {canEdit && (
-                                      <button
-                                        type="button"
-                                        onClick={() => onEditar(expandedGuia.id)}
-                                        className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3.5 rounded-md border border-gray-200 hover:bg-gray-100 min-h-[44px]"
-                                      >
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                          <path d="M12 20h9" />
-                                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
-                                        </svg>
-                                        Editar
-                                      </button>
-                                    )}
-                                    {/* «Despachar» solo donde hay algo que despachar:
-                                        "Pendiente Bodega". "Confirmada" es un estado
-                                        legacy que ya salió sin firmar y ahí editar es
-                                        lo único que tiene sentido. */}
-                                    {canEdit && !isDispatched && expandedGuia.estado === "Pendiente Bodega" && (
-                                      <button
-                                        type="button"
-                                        onClick={() => onDespachar(expandedGuia.id)}
-                                        className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3.5 rounded-md border border-gray-200 hover:bg-gray-100 min-h-[44px]"
-                                      >
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                          <rect x="1" y="3" width="15" height="13" />
-                                          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                                          <circle cx="5.5" cy="18.5" r="2.5" />
-                                          <circle cx="18.5" cy="18.5" r="2.5" />
-                                        </svg>
-                                        Despachar
-                                      </button>
-                                    )}
-                                    {/* 🔴 DOS BOTONES, Y CADA UNO HACE LO SUYO DE UNA.
-                                        Daniel, puntos 10 y 11: *"Imprimir → un botón
-                                        que imprime directo"* · *"Compartir → otro
-                                        botón que manda el PDF"*.
-
-                                        🩸 Había UNO solo, y no hacía ninguna de las
-                                        dos cosas: abría una PESTAÑA con la vista
-                                        previa, y adentro había que buscar «Imprimir» o
-                                        «Compartir». Dos toques y un cambio de pantalla
-                                        para cada tarea.
-
-                                        🔑 El documento es el MISMO para las dos y es
-                                        el de siempre (`construirPdfGuia`). No hay dos
-                                        papeles.
-
-                                        ⚠️ El módulo se pide al ABRIR el acordeón, no
-                                        al tocar el botón: en iOS la hoja de compartir
-                                        y el visor tienen que abrirse DENTRO del toque,
-                                        y una descarga de red en el medio hace que el
-                                        navegador deje de contarlo como gesto. */}
-                                    <button
-                                      type="button"
-                                      onClick={() => { void imprimirEsta(expandedGuia); }}
-                                      /* Medía 85.5×36 — el min-h-[36px] anterior se quedaba corto. */
-                                      className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3 rounded hover:bg-gray-100 min-h-[44px]"
-                                    >
-                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="6 9 6 2 18 2 18 9" />
-                                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                                        <rect x="6" y="14" width="12" height="8" />
-                                      </svg>
-                                      Imprimir
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => { void compartirEsta(expandedGuia); }}
-                                      className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3 rounded hover:bg-gray-100 min-h-[44px]"
-                                    >
-                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M12 16V4" />
-                                        <path d="m8 8 4-4 4 4" />
-                                        <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
-                                      </svg>
-                                      Compartir
-                                    </button>
-                                    {/* 🔴 ACÁ VIVÍA EL «···» CON SU ÚNICO ÍTEM, y
-                                        por eso borrar costaba TRES toques:
-                                        abrir la guía, abrir el menú, elegir.
-                                        Subió a la FILA (27-ago-2026) y son
-                                        DOS. No se dejó una copia acá: el menú
-                                        de la fila está a la vista mientras la
-                                        guía está abierta, y dos puertas para
-                                        lo mismo es lo que este módulo viene
-                                        podando desde el 25-ago. */}
-                                  </div>
-                                  {/* Items table */}
-                                  <ScrollableTable minWidth={600} className="mt-4">
+                                      🔴 En pantalla ancha la tabla SE QUEDA (de
+                                      `lg:` para arriba sobran los 600 px y las
+                                      columnas alineadas se leen de un vistazo). En
+                                      el teléfono manda la ficha de abajo, que es el
+                                      MISMO formato de `ListaEnvios` — el que bodega
+                                      ya ve al despachar. */}
+                                  <ScrollableTable minWidth={600} className="mt-4 hidden lg:block">
                                     <table className="w-full text-xs">
                                       <thead className="sticky top-0 bg-white z-10">
                                         <tr className="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-200">
@@ -847,52 +986,10 @@ export default function GuiasList({
                                                 pasaron a D-25 Paso Canoas y D-24 David. Así se
                                                 arregla un desacuerdo: tocando el chip, NO
                                                 escondiéndolo detrás de un segundo texto. */}
-                                            <td className="py-1.5 px-2">
-                                              {/* El chip ya dice el nombre: repetirlo arriba es
-                                                  el ruido que se vino a sacar. Sin chip con
-                                                  nombre, el texto escrito es lo único que hay. */}
-                                              {!nombreDelChip(item) && <span className="block">{item.cliente}</span>}
-                                              {/* Esta línea SIEMPRE mide 44 px, esté atada o no,
-                                                  para que las filas no queden desparejas según el
-                                                  estado de cada una. */}
-                                              <span className="flex items-center min-h-[44px]">
-                                                {/* 🩸 El código YA PUESTO también se toca. Si el
-                                                    chip fuera solo texto, una línea atada al
-                                                    cliente equivocado no se podría corregir nunca
-                                                    desde la pantalla — y las 5 de D-200 (GT-124,
-                                                    GT-136, GT-183) se arreglaron justamente así,
-                                                    el 26-ago-2026. */}
-                                                {item.cliente_codigo ? (
-                                                  puedeAtarCliente && item.id ? (
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => onAtarCliente?.(item)}
-                                                      title={`Cambiar o quitar el cliente (${item.cliente_codigo})`}
-                                                      className="inline-flex items-center min-h-[44px] pr-3 text-xs text-emerald-700 hover:text-emerald-900 transition max-w-full"
-                                                    >
-                                                      <ChipCliente codigo={item.cliente_codigo} nombres={nombresPorCodigo} interactivo />
-                                                    </button>
-                                                  ) : (
-                                                    <span className="inline-flex items-center text-xs text-emerald-700 max-w-full">
-                                                      <ChipCliente codigo={item.cliente_codigo} nombres={nombresPorCodigo} />
-                                                    </span>
-                                                  )
-                                                ) : puedeAtarCliente && item.id ? (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => onAtarCliente?.(item)}
-                                                    className="inline-flex items-center min-h-[44px] pr-3 text-xs text-gray-400 hover:text-black underline underline-offset-2 transition"
-                                                  >
-                                                    Atar cliente
-                                                  </button>
-                                                ) : (
-                                                  <span className="text-xs text-gray-300">sin atar</span>
-                                                )}
-                                              </span>
-                                            </td>
+                                            <td className="py-1.5 px-2">{celdaCliente(item)}</td>
                                             <td className="py-1.5 px-2 text-gray-500">{item.direccion}</td>
                                             <td className="py-1.5 px-2 text-gray-500">{item.empresa}</td>
-                                            <td className="py-1.5 px-2 text-gray-500">{item.facturas}</td>
+                                            <td className="py-1.5 px-2 text-gray-500">{facturasParaMostrar(item.facturas)}</td>
                                             <td className="py-1.5 px-2 text-center tabular-nums">{item.bultos}</td>
                                           </tr>
                                         ))}
@@ -900,9 +997,31 @@ export default function GuiasList({
                                     </table>
                                   </ScrollableTable>
 
+                                  {/* La MISMA ficha que `ListaEnvios`: nombre arriba,
+                                      `destino · empresa · factura` en gris debajo y los
+                                      bultos a la derecha. Sin `#`: con uno o tres
+                                      renglones apilados, numerarlos es ruido. */}
+                                  <ul className="lg:hidden divide-y divide-gray-100 mt-4">
+                                    {(expandedGuia.guia_items || []).map((item, idx) => (
+                                      <li key={item.id || idx} className="py-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <ResumenEnvio item={item}>{celdaCliente(item, true)}</ResumenEnvio>
+                                          <span className="text-sm tabular-nums shrink-0">{item.bultos || 0} bultos</span>
+                                        </div>
+                                      </li>
+                                    ))}
+                                    {(expandedGuia.guia_items || []).length === 0 && (
+                                      <li className="py-2.5 text-sm text-gray-400">Esta guía no tiene envíos cargados.</li>
+                                    )}
+                                  </ul>
+
                                   {/* Observaciones */}
-                                  {expandedGuia.observaciones && (
-                                    <p className="text-xs text-gray-500 mt-3 italic">{expandedGuia.observaciones}</p>
+                                  {/* Sin la línea del cierre en bloque del
+                                      3-ago-2026 (54 guías): se muestra lo que
+                                      la persona escribió. La base no se toca —
+                                      ver `lib/guias/observaciones.ts`. */}
+                                  {observacionesVisibles(expandedGuia.observaciones) && (
+                                    <p className="text-xs text-gray-500 mt-3 italic">{observacionesVisibles(expandedGuia.observaciones)}</p>
                                   )}
 
                                   {/* Dispatched: read-only despacho data */}
@@ -950,28 +1069,17 @@ export default function GuiasList({
                                         </div>
                                         <div>
                                           <span className="text-gray-400 block">Cedula</span>
-                                          <span className="font-medium">{expandedGuia.cedula || "—"}</span>
+                                          <span className="font-medium">{cedulaParaMostrar(expandedGuia.cedula) || "—"}</span>
                                         </div>
                                       </div>
-                                      {/* Signatures */}
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                                        {expandedGuia.firma_base64 && (
-                                          <div>
-                                            <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
-                                              {esEntregaDirecta(expandedGuia) ? "Firma del chofer" : "Firma del transportista"}
-                                            </span>
-                                            <img src={expandedGuia.firma_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
-                                          </div>
-                                        )}
-                                        {expandedGuia.firma_entregador_base64 && (
-                                          <div>
-                                            <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
-                                              {esEntregaDirecta(expandedGuia) ? "Firma del cliente" : "Firma del entregador"}
-                                            </span>
-                                            <img src={expandedGuia.firma_entregador_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
-                                          </div>
-                                        )}
-                                      </div>
+                                      {/* 🩸 ACÁ SE DIBUJABAN LOS DOS CUADROS DE FIRMA A
+                                          TAMAÑO COMPLETO: en un iPhone caen apilados y se
+                                          llevan media pantalla para decir lo que casi
+                                          siempre es lo mismo (156 de las 221 despachadas
+                                          tienen las dos). Ahora es una línea con «Ver
+                                          firmas»; si falta una, lo DICE.
+                                          🔴 Al FIRMAR no cambió nada — ver `FirmasPlegadas`. */}
+                                      <FirmasPlegadas guia={expandedGuia} directa={esEntregaDirecta(expandedGuia)} />
                                     </div>
                                   )}
 
@@ -987,23 +1095,27 @@ export default function GuiasList({
 
                 return (
                   <>
-                    {_gg ? (
-                      <div className="space-y-0">
-                        {_gg.map((group) => (
-                          <TimeGroupHeader key={group.key} label={group.label} count={group.items.length} color={group.color} bgColor={group.bgColor}>
-                            <div className="space-y-1 p-1">{group.items.map(_rc)}</div>
-                          </TimeGroupHeader>
-                        ))}
-                      </div>
-                    ) : (
-                      visible.map(_rc)
+                    {/* 🔴 LO PENDIENTE, ARRIBA Y FUERA DE LOS GRUPOS. Es UNA
+                        guía de 222 y es la única con algo que hacer. */}
+                    {pendientes.length > 0 && (
+                      <div className="space-y-1 mb-3">{pendientes.map(_rc)}</div>
                     )}
+                    {/* Sin la lista plana ya no hay una segunda rama: se dibujan
+                        los grupos y nada más. */}
+                    <div className="space-y-0">
+                      {_gg.map((group) => (
+                        <TimeGroupHeader key={group.key} label={group.label} count={group.items.length} color={group.color} bgColor={group.bgColor}>
+                          <div className="space-y-1 p-1">{group.items.map(_rc)}</div>
+                        </TimeGroupHeader>
+                      ))}
+                    </div>
 
-                    {/* Ver más */}
+                    {/* El resto de la historia, a un toque. No se deja de
+                        pedir: se deja de dibujar. */}
                     {hasMore && (
-                      <button onClick={() => setVisibleCount(c => c + 15)}
+                      <button onClick={() => setVerViejas(true)}
                         className="w-full py-4 text-base font-medium text-gray-700 hover:text-black hover:bg-gray-50 transition border-2 border-gray-300 rounded-lg mt-3 flex items-center justify-center gap-2">
-                        <span>Ver más ({filtered.length - visibleCount} restantes)</span>
+                        <span>Ver guías más viejas ({viejas.length})</span>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>

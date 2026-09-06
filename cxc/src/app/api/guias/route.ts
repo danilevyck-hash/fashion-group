@@ -52,11 +52,17 @@ export async function GET(req: NextRequest) {
   // tiene su número. Es un TEXT corto; las firmas base64 siguen fuera.
   const { data, error } = await supabaseServer
     .from("guia_transporte")
-    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, cedula, numero_guia_transp, created_at, deleted, guia_items(orden, bultos, facturas, cliente, cliente_codigo, direccion, empresa, numero_guia_transp)")
+    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, estado, tipo_despacho, receptor_nombre, entregado_por, nombre_chofer, cedula, numero_guia_transp, created_at, deleted, guia_items(orden, bultos, facturas, cliente, cliente_codigo, direccion, empresa, numero_guia_transp)")
     .eq("deleted", false)
     .order("numero", { ascending: false });
 
-  /* monto_total and estado come from the DB columns directly */
+  // 🩸 `monto_total` Y `nombre_entregador` SALIERON DE ESTE SELECT (5-sep-2026).
+  // Medido sobre las 242 guías de toda la historia: `monto_total` vale **0.00 en
+  // las 242** y `nombre_entregador` está **vacío en las 242** — y ninguna
+  // pantalla los muestra. Viajaban al navegador en cada carga de la lista para
+  // nada. Las columnas NO se dropean (patrón `mayor_lineas`): quedan sin
+  // lectores, con su `COMMENT`, y con candado que impide que vuelvan.
+  // Daniel: *«sí»*.
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
@@ -81,7 +87,10 @@ export async function POST(req: NextRequest) {
   const s = getSession(req);
   if (!s || !GUIAS_WRITE_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
-  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por, numero_guia_transp } = body;
+  // 🩸 `monto_total` y `firma_transportista` ya NO se leen del body (5-sep-2026):
+  // 0.00 y vacía en las 242 guías de la historia, sin una sola pantalla que las
+  // muestre. Ver el comentario del GET.
+  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, estado, entregado_por, numero_guia_transp } = body;
 
   // `guia_transporte.fecha` es NOT NULL sin default y era el ÚNICO obligatorio
   // que llegaba crudo del body: el formulario la valida en el navegador
@@ -133,12 +142,10 @@ export async function POST(req: NextRequest) {
       transportista_id: modo_entrega === "transportista" ? transportista_id : null,
       placa: placa || null,
       observaciones: observaciones || null,
-      monto_total: monto_total || 0,
       estado: estado || "Pendiente Bodega",
       entregado_por: entregado_por || null,
       numero_guia_transp: numero_guia_transp || null,
     };
-    if (firma_transportista) insertData.firma_transportista = firma_transportista;
 
     const { data, error } = await supabaseServer
       .from("guia_transporte")

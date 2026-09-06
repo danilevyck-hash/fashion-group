@@ -333,18 +333,28 @@ describe("🔴 el botón de la fila dice 'Despachar' cuando la guía está pendi
   // pasó a llamarse "Despachar" y "Editar" desapareció de la fila; corregir un
   // nombre obligaba a entrar por "Despachar" y buscar el formulario adentro.
   // Daniel: *"Dos botones en la fila: «Editar» y «Despachar»"*.
-  it("Pendiente Bodega → los DOS: 'Editar' y 'Despachar'", () => {
-    listaCon("Pendiente Bodega");
-    expect(screen.getByRole("button", { name: /Despachar/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Editar$/ })).toBeTruthy();
+  // ⚠️ SEGUNDO CAMBIO DE DIRECCIÓN (5-sep-2026, «el panel de guías»). Los dos
+  // botones dejaron de vivir DENTRO del acordeón: «Despachar» está en la FILA de
+  // la guía pendiente, a la vista, y «Editar» se fue al «···» de la fila
+  // (Daniel: *«"Editar" y "Eliminar guía" pasan al "···"»*). Lo que este bloque
+  // protege no cambió: que «Despachar» aparezca SOLO donde hay algo que
+  // despachar, que «Editar» esté siempre, y que los dos NAVEGUEN.
+  it("Pendiente Bodega → «Despachar» a la vista en la fila, y «Editar» en el «···»", () => {
+    const { container } = listaCon("Pendiente Bodega");
+    expect(screen.getByRole("button", { name: /^Despachar$/ })).toBeTruthy();
+    fireEvent.click(container.querySelector('[aria-haspopup="menu"]')!);
+    const items = Array.from(document.querySelectorAll('[role="menuitem"]')).map((e) => (e.textContent || "").trim());
+    expect(items).toContain("Editar");
   });
 
   it("los demás estados sin despachar siguen con 'Editar' solo", () => {
     // "Confirmada" es un estado legacy que existe en la base y NO está
     // despachado, pero ya salió: no hay nada que despachar, solo corregir.
-    listaCon("Confirmada");
-    expect(screen.getByRole("button", { name: /Editar/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Despachar/ })).toBeNull();
+    const { container } = listaCon("Confirmada");
+    expect(screen.queryByRole("button", { name: /^Despachar$/ })).toBeNull();
+    fireEvent.click(container.querySelector('[aria-haspopup="menu"]')!);
+    const items = Array.from(document.querySelectorAll('[role="menuitem"]')).map((e) => (e.textContent || "").trim());
+    expect(items).toContain("Editar");
   });
 
   it("los dos botones NAVEGAN — la fila no despacha", () => {
@@ -360,17 +370,21 @@ describe("🔴 el botón de la fila dice 'Despachar' cuando la guía está pendi
       />,
     );
     const botones = [...container.querySelectorAll("button")];
-    fireEvent.click(botones.find((b) => /^Editar$/.test((b.textContent ?? "").trim()))!);
     fireEvent.click(botones.find((b) => /^Despachar$/.test((b.textContent ?? "").trim()))!);
+    fireEvent.click(container.querySelector('[aria-haspopup="menu"]')!);
+    fireEvent.click(
+      Array.from(document.querySelectorAll('[role="menuitem"]'))
+        .find((e) => /^Editar$/.test((e.textContent ?? "").trim()))!,
+    );
     expect(editar).toHaveBeenCalledWith("g1");
     expect(despachar).toHaveBeenCalledWith("g1");
     // 🔴 Y nada más: ni un pedido al servidor salió de la lista.
     expect(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
   });
 
-  it("Imprimir no se perdió", () => {
+  it("Imprimir no se perdió — ahora en la fila, sin desplegar la guía", () => {
     listaCon("Pendiente Bodega");
-    expect(screen.getByRole("button", { name: /Imprimir/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Imprimir la guía/ })).toBeTruthy();
   });
 });
 

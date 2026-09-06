@@ -165,16 +165,34 @@ describe("🔴 compartir de verdad abre la hoja del sistema", () => {
     expect(compartir).toContain('return "cancelado"');
   });
 
-  it("⚠️ el PDF se arma ANTES de share — Safari exige el gesto del toque", () => {
+  it("⚠️ el archivo se arma ANTES de share — Safari exige el gesto del toque", () => {
     // Un `await` entre el clic y `share()` hace que iOS deje de contarlo como
     // gesto y lo bloquee con NotAllowedError.
+    //
+    // ⚠️ NOTA 5-sep-2026 — este candado cambió de DIRECCIÓN, no se aflojó.
+    // Antes exigía ver `construirPdfGuia(guia).output("blob")` dentro de esta
+    // pantalla. Desde el 5-sep «Compartir» manda una IMAGEN cuando la guía
+    // tiene hasta 6 renglones (Daniel: *«en el grupo de WhatsApp siempre ponen
+    // compartir cuando terminan»*; 94% de las guías entran), y armar el archivo
+    // pasó a `compartirGuia`, que decide imagen o PDF — SIN un solo `await` en
+    // el medio, igual que antes. Tener DOS copias del armado era justo lo que
+    // habría dejado esta pantalla mandando PDF para siempre.
     const cuerpo = /async function compartir\(\)[\s\S]*?\n  }/.exec(detalle)?.[0] ?? "";
-    expect(cuerpo).toContain("construirPdfGuia(guia).output(\"blob\")");
-    // Lo que importa: nada se espera ANTES de armar el archivo. El único
-    // `await` permitido es el de la propia hoja de compartir.
-    const antesDelPdf = cuerpo.slice(0, cuerpo.indexOf("construirPdfGuia"));
-    expect(antesDelPdf).not.toContain("await ");
+    expect(cuerpo).toContain("compartirGuia(guia)");
+    // Lo que importa sigue igual: el ÚNICO `await` es el de compartir.
     expect((cuerpo.match(/await /g) ?? []).length).toBe(1);
+  });
+
+  it("🔴 el armado del archivo es SÍNCRONO: ni un await antes de la hoja", () => {
+    // La regla se mudó a `papel-de-la-guia.ts`, así que se vigila ahí.
+    const papel = readFileSync(path.join(raiz, "src/lib/guias/papel-de-la-guia.ts"), "utf8");
+    const armado = /function archivoParaCompartir\(g: Guia\): File \{[\s\S]*?\n\}/.exec(papel)?.[0] ?? "";
+    expect(armado.length).toBeGreaterThan(0);
+    expect(armado).not.toContain("await ");
+    expect(armado).toContain("construirPngGuia(g)");
+    expect(armado).toContain("construirPdfGuia(g)");
+    // Y el que decide es el módulo puro del corte, no un número suelto.
+    expect(papel).toContain("formatoParaCompartir");
   });
 
   it("el botón vive en la guía y muestra que está trabajando", () => {

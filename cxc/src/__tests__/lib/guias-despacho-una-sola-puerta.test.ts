@@ -73,24 +73,28 @@ describe("🔴 la lista NO despacha: ni deslizando ni desplegando el formulario"
     }
   });
 
-  // ⚠️ CANDADO QUE CAMBIÓ DE DIRECCIÓN (25-ago-2026). Antes exigía UN SOLO
-  // botón por fila, porque el 10-ago había que sacar el par "Despachar" +
-  // "Editar" que convivía con el FORMULARIO desplegado en la misma tarjeta.
-  // Daniel pidió los dos botones de vuelta: *"Dos botones en la fila: «Editar»
-  // y «Despachar»"*. Lo que nunca se aflojó —y es lo que este archivo
-  // protege— es que la lista NO DESPACHA: los dos botones navegan.
-  it("los dos botones de la fila NAVEGAN: ninguno despacha ni guarda", () => {
+  // ⚠️ SEGUNDO CAMBIO DE DIRECCIÓN (5-sep-2026, «el panel de guías»). El bloque
+  // «Acciones rápidas» del ACORDEÓN ya no existe: Daniel sacó los cuatro botones
+  // a la fila —*«"Compartir" e "Imprimir" en la tarjeta, sin desplegarla»* y
+  // *«"Editar" y "Eliminar guía" pasan al "···"»*—. Así que el barrido mira
+  // ahora la tira de acciones DE LA FILA, que es donde viven. Lo que nunca se
+  // aflojó —y es lo que este archivo protege— es que la lista NO DESPACHA:
+  // «Despachar» y «Editar» solo avisan al padre, que hace `router.push`.
+  it("los botones de la fila NAVEGAN: ninguno despacha ni guarda", () => {
     const acciones = LISTA.slice(
-      LISTA.indexOf("{/* Acciones rápidas (header de la card expandida) */}"),
-      LISTA.indexOf("{/* Items table */}")
+      LISTA.indexOf("{!selectionMode && (\n                            <div className=\"shrink-0 flex items-center gap-0.5 pr-1\">"),
+      LISTA.indexOf("{/* Expanded content */}"),
     );
     expect(acciones).toContain("Editar");
     expect(acciones).toContain("Despachar");
     expect(acciones).toContain("Imprimir");
+    expect(acciones).toContain("Compartir");
     // Lo único que hacen es avisar al padre, que hace `router.push`.
     expect((acciones.match(/onEditar\(/g) ?? []).length).toBe(1);
     expect((acciones.match(/onDespachar\(/g) ?? []).length).toBe(1);
-    // Ni un campo del despacho, ni un guardado, dentro del bloque de acciones.
+    // Ni un campo del despacho, ni un guardado, dentro de la tira de acciones.
+    // ⚠️ `fetch(` sigue prohibido ACÁ: la lectura de la guía completa para el
+    // papel vive en `pedirCompleta`, arriba, y es un GET.
     for (const prohibido of ["confirmarDespacho", "SignatureCanvas", "fetch("]) {
       expect(acciones, prohibido).not.toContain(prohibido);
     }

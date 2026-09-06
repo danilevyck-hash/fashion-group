@@ -123,6 +123,17 @@ interface ClientePickerProps {
    */
   mostrarVinculo?: boolean;
   /**
+   * 🔴 CÓDIGOS QUE ESTA PANTALLA NO OFRECE (5-sep-2026). El cliente sigue vivo
+   * en el directorio y su ficha abre igual: lo que cambia es que este selector
+   * deja de proponerlo — el MISMO mecanismo que los ausentes de Switch, pero
+   * decidido por el módulo que llama.
+   *
+   * Hoy lo usa Guías con `D-201 American Classics`, el duplicado de `D-108
+   * Multi Fashion Holding` (Daniel: *«Multifashion y american classic es el
+   * mismo»*). Vacío o sin pasar = se ofrecen todos, como siempre.
+   */
+  codigosOcultos?: readonly string[];
+  /**
    * false = SIN la salida a mano: acá el cliente SOLO puede salir de la lista.
    *
    * Lo pidió Daniel para Marketing › Registrar gasto (12-ago-2026), textual:
@@ -213,6 +224,7 @@ export default function ClientePicker({
   codigo,
   onChange,
   topClientes,
+  codigosOcultos,
   mostrarVinculo = true,
   permitirOtro = true,
   clientesDelGrupo,
@@ -242,7 +254,7 @@ export default function ClientePicker({
   // de seguridad y el `sr-only` del final, nada más.
   const escritoAMano = Boolean(value.trim()) && !codigo.trim();
   const directorioPropio = useClientesDelGrupo(escritoAMano && clientesDelGrupo === undefined);
-  const directorio = clientesDelGrupo ?? directorioPropio;
+  const directorioCrudo = clientesDelGrupo ?? directorioPropio;
   const mostrarSugerencias = escritoAMano && descartada !== value.trim();
 
   // Ubicar la lista, seguirla al scrollear y cerrarla al tocar afuera es todo
@@ -254,10 +266,22 @@ export default function ClientePicker({
     setAbierto(false);
   }
 
+  // 🔴 Los códigos que este módulo no ofrece salen de LAS DOS listas — la
+  // buscada y la de «Más usados» — y del `Enter`, que elige la primera. Filtrar
+  // una sola dejaría el retirado a un toque de distancia por la otra puerta.
+  const ocultar = <T extends { codigo?: string | null }>(lista: readonly T[]): T[] =>
+    !codigosOcultos || codigosOcultos.length === 0
+      ? [...lista]
+      : lista.filter((h) => !codigosOcultos.some((c) => c.trim().toUpperCase() === (h.codigo ?? "").trim().toUpperCase()));
+
   // Lo que se ve en el campo: mientras está abierto es la BÚSQUEDA; cerrado, el
   // valor guardado. Por eso cerrar sin elegir no puede ensuciar la fila.
   const textoVisible = abierto ? query : value;
-  const listaTop = q.length < 2 ? (topClientes ?? []) : [];
+  const hitsVisibles = ocultar(hits);
+  // La red de seguridad tampoco puede ofrecer un retirado: es la tercera puerta
+  // al mismo cliente y sin esto quedaría abierta.
+  const directorio = ocultar(directorioCrudo);
+  const listaTop = q.length < 2 ? ocultar(topClientes ?? []) : [];
 
   return (
     <div ref={wrapRef} className="relative">
@@ -295,7 +319,7 @@ export default function ClientePicker({
             e.preventDefault();
             // Enter elige el primer resultado si hay uno; nunca guarda a mano
             // por accidente (para eso está la salida a mano, que hay que tocar).
-            const primero = hits[0] ?? listaTop[0];
+            const primero = hitsVisibles[0] ?? listaTop[0];
             if (primero) elegir(primero.nombre, primero.codigo);
           }
         }}
@@ -341,7 +365,7 @@ export default function ClientePicker({
             <div className="px-3 py-2 text-xs text-gray-400">Buscando…</div>
           )}
 
-          {q.length >= 2 && !cargando && hits.length === 0 && (
+          {q.length >= 2 && !cargando && hitsVisibles.length === 0 && (
             <div className="px-3 py-2 text-xs text-gray-500">
               {permitirOtro
                 ? "No está en el directorio."
@@ -351,7 +375,7 @@ export default function ClientePicker({
 
           {q.length >= 2 &&
             !cargando &&
-            hits.map((h) => (
+            hitsVisibles.map((h) => (
               <OpcionCliente key={h.codigo} hit={h} onElegir={elegir} />
             ))}
 

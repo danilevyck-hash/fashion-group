@@ -533,6 +533,36 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
     }
     // 🔴 Un guardado AUTOMÁTICO no pinta nada. Ver `validate`.
     if (!validate({ pintar: !silent })) return;
+    // 🔴 GUARDAR SIN NADA QUE GUARDAR NO ESCRIBE (5-sep-2026). Daniel: *«al
+    // guardar, mandar solo lo que cambió»*.
+    //
+    // 🩸 Medido contra la bitácora: de los **549 guardados** de esta pantalla,
+    // **407 (74%)** mandaron `items` y con eso BORRARON y recrearon todos los
+    // renglones — la guía 85 pasó por eso **45 veces en 3 h 38 min**. Desde el
+    // 17-ago los renglones ya solo viajan cuando cambiaron (`renglonesCambiaron`),
+    // pero el botón seguía disparando un PUT completo de la cabecera aunque no
+    // se hubiera tocado una tecla: abrir una guía, mirarla y apretar Guardar
+    // reescribía la cabecera y dejaba una línea en la bitácora.
+    //
+    // ⚠️ **NADIE PIERDE ACCESO.** Daniel: *«quiero que bodega también pueda
+    // agregar algo si sale a último segundo, editar un cliente o algo»*. Esto
+    // no mira roles: mira si LO QUE SE MANDARÍA es distinto de lo que el
+    // servidor ya tiene. Cambiar un cliente o agregar un renglón sigue
+    // guardando igual, para bodega y para todos.
+    //
+    // ⚠️ Solo al EDITAR. Al crear no hay nada guardado contra qué comparar y la
+    // guía tiene que nacer sí o sí.
+    if (editingId && !calcularHayCambios(guardado, instantanea)) {
+      setError(null);
+      // El botón hizo lo que se le pidió: no había nada que guardar. Se navega
+      // igual —quedarse quieto sin decir nada es peor— y en silencio (el
+      // autoguardado) simplemente no se hace nada.
+      if (!silent) {
+        if (alGuardar) alGuardar();
+        else router.push("/guias");
+      }
+      return;
+    }
     try {
       localStorage.setItem("fg_last_modo_entrega", modoEntrega);
       if (transportistaId) localStorage.setItem("fg_last_transportista_id", transportistaId);

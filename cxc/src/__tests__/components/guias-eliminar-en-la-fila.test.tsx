@@ -152,8 +152,15 @@ describe("🔴 el «···» está en la fila CERRADA — no hay que abrir la gu
     // TOQUE 1 — el menú. Con el menú cerrado no hay ítems: si los hubiera, el
     // candado estaría leyendo un menú que nadie abrió.
     expect(itemsAbiertos()).toHaveLength(0);
+    // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026, «el panel de guías»). Daniel:
+    // *«"Editar" y "Eliminar guía" pasan al "···"»* — el menú tenía UNA sola
+    // opción y además solo lo veía quien puede borrar, así que bodega no tenía
+    // menú ninguno. Lo que este archivo protege NO cambió: borrar sigue
+    // costando DOS toques desde la fila cerrada, sigue detrás del menú y sigue
+    // pidiendo escribir ELIMINAR. Lo que cambió es que el menú ahora lleva
+    // también «Editar».
     fireEvent.click(trigger!);
-    expect(itemsAbiertos()).toEqual(["Eliminar guía"]);
+    expect(itemsAbiertos()).toEqual(["Editar", "Eliminar guía"]);
 
     // Y la guía SIGUE sin abrirse: el menú no dispara la carga del acordeón.
     expect(pedidos.some((p) => p.url === "/api/guias/guia-aaa")).toBe(false);
@@ -237,17 +244,29 @@ describe("🔴 el «···» está en la fila CERRADA — no hay que abrir la gu
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 quien no puede borrar no ve ni el menú", () => {
-  for (const rol of ["bodega", "vendedor"]) {
-    it(`${rol}: la lista NO dibuja ningún «···»`, async () => {
-      const { container } = await abrirLista(rol);
-      // La lista sí cargó — si no, "no hay menú" sería verde por nada.
-      expect(container.textContent).toContain("GT-231");
-      expect(menusDeFila(container)).toHaveLength(0);
-      // Ni el ítem suelto en ningún lado de la pantalla.
-      expect(doc().textContent || "").not.toContain("Eliminar guía");
-    });
-  }
+describe("🔴 quien no puede borrar NUNCA ve «Eliminar guía»", () => {
+  // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026, «el panel de guías»). Antes este bloque
+  // exigía que bodega y vendedor no vieran NINGÚN «···», porque el menú tenía un
+  // solo ítem y era el destructivo. Desde que «Editar» se mudó al menú, bodega
+  // —que sí puede editar— tiene menú. Lo que se protege es lo mismo y más
+  // preciso: el permiso, no el dibujo. **«Eliminar guía» no le aparece a nadie
+  // que no pueda borrar**, tenga menú o no.
+  it("bodega tiene menú porque puede EDITAR, pero ahí no está «Eliminar guía»", async () => {
+    const { container } = await abrirLista("bodega");
+    expect(container.textContent).toContain("GT-231");
+    const trigger = menuDe(container, "GT-231");
+    expect(trigger, "bodega perdió el «···» y con él «Editar»").toBeTruthy();
+    fireEvent.click(trigger!);
+    expect(itemsAbiertos()).toEqual(["Editar"]);
+    expect(doc().textContent || "").not.toContain("Eliminar guía");
+  });
+
+  it("vendedor: la lista NO dibuja ningún «···» — no edita ni borra", async () => {
+    const { container } = await abrirLista("vendedor");
+    expect(container.textContent).toContain("GT-231");
+    expect(menusDeFila(container)).toHaveLength(0);
+    expect(doc().textContent || "").not.toContain("Eliminar guía");
+  });
 
   it("admin también lo tiene (el conjunto de siempre: admin + secretaria)", async () => {
     const { container } = await abrirLista("admin");
@@ -321,15 +340,22 @@ describe("⚠️ lo que NO se tocó", () => {
     expect(pedidos.filter((p) => p.metodo !== "GET")).toHaveLength(0);
   });
 
-  it("abrir una fila sigue mostrando Editar · Despachar · Imprimir · Compartir", async () => {
+  it("🔴 los cuatro siguen alcanzables SIN abrir la guía — se mudaron a la FILA", async () => {
+    // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026, «el panel de guías»). Este caso exigía
+    // los cuatro rótulos DENTRO del acordeón. Daniel los sacó de ahí: *«
+    // "Compartir" e "Imprimir" en la tarjeta, sin desplegarla»* y *«"Editar" y
+    // "Eliminar guía" pasan al "···"»*. Lo que se protege es lo mismo —que
+    // ninguno se pierda— pero contra la fila CERRADA, que es el camino nuevo.
     const { container } = await abrirLista("admin");
-    const fila = Array.from(container.querySelectorAll("button"))
-      .find((b) => /GT-231/.test(b.textContent || ""))!;
-    await act(async () => { fireEvent.click(fila); await new Promise((r) => setTimeout(r, 30)); });
-    const textos = Array.from(container.querySelectorAll("button")).map((b) => (b.textContent || "").trim());
-    for (const rotulo of ["Editar", "Despachar", "Imprimir", "Compartir"]) {
-      expect(textos, `se perdió «${rotulo}» de la guía abierta`).toContain(rotulo);
-    }
+    const nombres = Array.from(container.querySelectorAll("button"))
+      .map((b) => (b.getAttribute("aria-label") || b.textContent || "").trim());
+    expect(nombres.some((n) => /^Imprimir la guía GT-231$/.test(n)), "se perdió «Imprimir»").toBe(true);
+    expect(nombres.some((n) => /^Compartir la guía GT-231$/.test(n)), "se perdió «Compartir»").toBe(true);
+    // «Despachar» está en la fila de la guía PENDIENTE (GT-232 en este fixture).
+    expect(nombres, "se perdió «Despachar»").toContain("Despachar");
+    // «Editar» vive en el «···», que no pinta sus ítems hasta abrirse.
+    fireEvent.click(menuDe(container, "GT-231")!);
+    expect(itemsAbiertos(), "se perdió «Editar»").toContain("Editar");
   });
 
   it("🔑 con la guía ABIERTA el «···» sigue a la vista — no se perdió una puerta", async () => {
@@ -341,7 +367,7 @@ describe("⚠️ lo que NO se tocó", () => {
     await act(async () => { fireEvent.click(fila); await new Promise((r) => setTimeout(r, 30)); });
     expect(menusDeFila(container)).toHaveLength(2);
     fireEvent.click(menuDe(container, "GT-231")!);
-    expect(itemsAbiertos()).toEqual(["Eliminar guía"]);
+    expect(itemsAbiertos()).toEqual(["Editar", "Eliminar guía"]);
   });
 
   it("«Eliminar guía» se ofrece UNA sola vez con la guía abierta", async () => {

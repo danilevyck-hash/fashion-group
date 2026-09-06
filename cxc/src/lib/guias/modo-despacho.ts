@@ -54,9 +54,17 @@ export const ETIQUETA_TIPO_DESPACHO: Record<TipoDespacho, string> = {
   directo: "Entrega directa",
 };
 
-/** Los estados en los que la guía ya salió: ahí manda `tipo_despacho`. */
+/**
+ * Los estados en los que la guía ya salió: ahí manda `tipo_despacho`.
+ *
+ * 🩸 «Rechazada» SALIÓ DE ESTA LISTA (5-sep-2026). Daniel, sobre ese estado:
+ * *«quitarlo»*. Medido contra producción: **0 de las 242 guías** de toda la
+ * historia lo usaron — el botón de rechazar se había retirado el 14-ago-2026 y
+ * el estado quedó sin forma de crearse, así que la rama era inalcanzable. Con
+ * el `motivo_rechazo` fuera del PATCH tampoco se puede volver a escribir.
+ */
 export function guiaYaDespachada(estado: string | null | undefined): boolean {
-  return estado === "Completada" || estado === "Rechazada";
+  return estado === "Completada";
 }
 
 /** `modo_entrega` (lo que se elige al crear) → `tipo_despacho` (lo que se despacha). */
