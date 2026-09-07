@@ -168,9 +168,17 @@ export async function yaAvisadoPorModulo(
  * mirar el anti-loop, así que el caso real —el sync de Gastos que deja de traer
  * y dispara las dos— manda un solo Telegram con las dos mitades adentro.
  *
- * El registro en `cron_email_errors` va ANTES del envío, y es a propósito: es la
- * llave del dedup, y dejarla después haría que un fallo de Telegram provocara un
- * segundo intento en la pasada siguiente.
+ * 🩸 EL REGISTRO EN `cron_email_errors` VA **DESPUÉS** DE QUE TELEGRAM CONFIRME
+ * (7-sep-2026). Iba antes, con el argumento de que un fallo de Telegram
+ * provocaría un segundo intento en la pasada siguiente — y eso es EXACTAMENTE lo
+ * que tiene que pasar. Al revés, un envío fallido quemaba los SIETE DÍAS de
+ * silencio de ese módulo: la fila quedaba puesta, el mensaje no llegaba nunca y
+ * nadie se enteraba hasta la semana siguiente. Un reintento de más cuesta un
+ * mensaje repetido; un reintento de menos cuesta la avería entera.
+ *
+ * Es el mismo orden que ya usa `cheques.aviso_vencido_en` con el aviso de cheque
+ * vencido, y por el mismo motivo escrito ahí: marcar antes de saber que salió
+ * quema el único aviso que ese cheque iba a tener.
  */
 export async function revisarSilencioDeDatos(ahoraMs: number = Date.now()): Promise<string[]> {
   const hallazgos: Hallazgo[] = [];
@@ -206,6 +214,11 @@ export async function revisarSilencioDeDatos(ahoraMs: number = Date.now()): Prom
       console.error(`[silencio-de-datos] ya avisado hace <${DIAS_ENTRE_AVISOS}d, no repito: ${modulo}`);
       continue;
     }
+    const enviado = await enviarSistema(mensajeSilencio(modulo, items));
+    if (!enviado) {
+      console.error(`[silencio-de-datos] Telegram no confirmó, no marco el dedup: ${modulo}`);
+      continue;
+    }
     await logCronError(
       tipoDeModulo(modulo),
       items
@@ -214,7 +227,6 @@ export async function revisarSilencioDeDatos(ahoraMs: number = Date.now()): Prom
       null,
       { telegram: false },
     );
-    await enviarSistema(mensajeSilencio(modulo, items));
   }
   return etiquetas;
 }

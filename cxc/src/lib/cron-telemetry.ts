@@ -809,6 +809,83 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"] },
 ];
 
+// ─── QUÉ ESCRIBE CADA ENTRADA DEL CRONOGRAMA, Y CUÁNTAS VECES AL DÍA ─────────
+//
+// 🔑 Existe para una sola pregunta: **¿cuántas oportunidades al día tiene este
+// par (empresa, sync_type) de arreglarse solo?** De eso depende cuántos fallos
+// seguidos hacen falta antes de despertar a Daniel (`alert-policy.ts`): un par
+// que corre 5 veces al día y falla dos seguidas todavía tiene tres intentos por
+// delante; uno que corre una vez al día y falla dos seguidas ya perdió dos días.
+//
+// 🔴 EL NÚMERO SE DERIVA DEL CRONOGRAMA, NUNCA SE ESCRIBE A MANO. Si alguien
+// agrega, mueve o quita una entrada de `SWITCH_CRON_ENTRADAS` (que es el espejo
+// de vercel.json), la cuenta cambia sola. Escribir `{ recibos: 4 }` en algún
+// lado sería la clase de lista paralela que este archivo ya cazó dos veces.
+//
+// Lo único que hace falta declarar es la TRADUCCIÓN entrada → `sync_type`, que
+// el cronograma no puede adivinar: el nombre del cron no siempre lo dice.
+
+/**
+ * Los `sync_type` de `switch_sync_log` que escribe cada entrada del cronograma.
+ *
+ * La lista vacía es información, no un olvido: dice «esta entrada NO deja fila
+ * en `switch_sync_log`», y por eso la regla 2 no puede verla. Hoy son dos:
+ *   · `switch-reconciliacion` — re-ejecuta pares AJENOS; sus filas las escribe
+ *     el sync que recupera, con el `sync_type` de ese sync.
+ *   · `acs-fidelizacion` — baja el directorio de Multifashion y el descuento de
+ *     fidelización SIN registrar corrida. Verificado contra producción el
+ *     7-sep-2026: en 90 días no hay una sola fila suya en `switch_sync_log`.
+ *     Es justamente por eso que entra al vigía de `crons-que-avisan.ts`.
+ */
+export const SYNC_TYPES_POR_CRON: Readonly<Record<string, readonly string[]>> = {
+  "switch-sync all": ["facturas", "estadocuenta", "costo"],
+  "switch-sync facturas": ["facturas"],
+  "switch-sync estadocuenta": ["estadocuenta"],
+  "switch-reconciliacion": [],
+  "sync-articulo-info": ["articulo_info"],
+  "sync-utilidad": ["utilidad"],
+  "sync-recibos": ["recibos"],
+  "sync-clientes-boston": ["clientes"],
+  // La cartera de Boston baja por el reporte WEB, pero se anota con el MISMO
+  // `sync_type` que el estado de cuenta por API.
+  "boston-cartera": ["estadocuenta"],
+  "switch-articulos": ["articulos", "articulo_marca"],
+  "sync-ingresos-mercancia": ["ingresos_mercancia"],
+  "sync-proveedores": ["proveedores"],
+  "sync-egresos-varios": ["egresos_varios", "cuentas_contables"],
+  "acs-fidelizacion": [],
+  "tommy-catalogo": ["catalogo_tommy"],
+  "calvin-catalogo": ["catalogo_calvin"],
+  "reebok-catalogo": ["catalogo_reebok"],
+  "joybees-catalogo": ["catalogo_joybees"],
+};
+
+/**
+ * Cuántas veces al día corre ese par (empresa, `sync_type`), contando las
+ * entradas del cronograma. Una entrada semanal cuenta 1/7.
+ *
+ * 🔴 Devuelve **0** para un par que el cronograma no conoce (un `sync_type`
+ * nuevo, un centinela como `ventas_tipos` que no tiene cron propio). Eso es a
+ * propósito y cae del lado seguro: quien lo consume pide MENOS fallos antes de
+ * avisar cuanto menos corre el par, así que un desconocido avisa cuanto antes.
+ */
+export function corridasPorDiaDelPar(empresaKey: string, syncType: string): number {
+  const conCxc = new Set<string>(empresasConCxc());
+  let n = 0;
+  for (const entrada of SWITCH_CRON_ENTRADAS) {
+    if (!entrada.empresas.includes(empresaKey)) continue;
+    const tipos = SYNC_TYPES_POR_CRON[entrada.cron];
+    if (!tipos || !tipos.includes(syncType)) continue;
+    // `tipo=all` corre facturas → estadocuenta → costo, pero el estadocuenta
+    // SOLO en las empresas que lo tienen (misma regla que `paresDelSlot`):
+    // Boston trae su cartera por otro camino y ahí el bloque `all` no la toca.
+    if (entrada.cron === "switch-sync all" && syncType === "estadocuenta" && !conCxc.has(empresaKey))
+      continue;
+    n += entrada.diaSemana === undefined ? 1 : 1 / 7;
+  }
+  return n;
+}
+
 /**
  * Separación MÍNIMA (minutos) entre dos entradas del cronograma que tocan la
  * MISMA empresa en Switch. Switch admite un solo token válido por USUARIO (PDF

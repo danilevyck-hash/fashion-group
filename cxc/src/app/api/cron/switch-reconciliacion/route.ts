@@ -101,6 +101,7 @@ import { revisarCuadreCosto } from "@/lib/alertas/cuadre-costo-io";
 import { barrerRunningAtascados } from "@/lib/switch-api/sync-log";
 import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
 import { enviarResumenCaidaSiAplica } from "@/lib/switch-api/outage-resumen";
+import { revisarCronsQueAvisan } from "@/lib/alertas/crons-que-avisan-io";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
 const CRON_NAME = "switch-reconciliacion";
@@ -780,6 +781,35 @@ async function checkStaleCrons(): Promise<string[]> {
 }
 
 /**
+ * 🩸 LAS TAREAS CUYO PRODUCTO ES EL MENSAJE (7-sep-2026) —
+ * `src/lib/alertas/crons-que-avisan.ts`.
+ *
+ * El watchdog de arriba dejó de mandar Telegram el 30-jul-2026 y estuvo bien:
+ * medía el mecanismo y sonaba por syncs cuyo trabajo igual se había hecho. Pero
+ * dejó sin cobertura a un puñado de tareas para las que la pregunta «¿el dato
+ * está viejo?» no se puede hacer, porque no producen un dato sino un MENSAJE. Si
+ * `cheques-alert` deja de correr, el aviso de las 9 de la mañana simplemente no
+ * llega, ninguna pantalla queda desactualizada y nada lo dice.
+ *
+ * 🔴 No estrena una regla: es la regla 1 mirando la frescura del AVISO en vez de
+ * la del dato. Y los syncs de Switch NO vuelven — el candado exige que ningún
+ * cron de esa lista escriba en `switch_sync_log`, así que la regla 2, la A y la
+ * B siguen siendo las únicas que los miran.
+ *
+ * No lanza: un fallo mirando los heartbeats no puede tumbar la reconciliación.
+ */
+async function checkCronsQueAvisan(): Promise<string[]> {
+  try {
+    return await revisarCronsQueAvisan();
+  } catch (err) {
+    console.error(
+      `[crons-que-avisan] no pude revisarlo: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return [];
+  }
+}
+
+/**
  * REGLA 1 — "Un dato que mirás está viejo". La única alerta de datos.
  *
  * Avisa si la cartera o las ventas llevan más de 24 h sin actualizarse, con
@@ -1011,6 +1041,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
 
   // 0b. Watchdog de heartbeats (INFORMATIVO, ya no alerta) + registrar el propio.
   const staleCrons = await checkStaleCrons();
+  // 0b-bis-0. Las tareas cuyo PRODUCTO es el mensaje: si no corren, el fallo es
+  //           el silencio mismo y no hay dato viejo que lo delate.
+  const cronsSinAvisar = await checkCronsQueAvisan();
   // 0b-bis. REGLA 1: la única alerta de datos — cartera/ventas con más de 24 h.
   const datosViejos = await checkDatosViejos();
   // 0b-ter. Las dos alertas del SILENCIO: un sync que trajo cero donde siempre
@@ -1062,6 +1095,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       telegram: "none",
       outageResumen: outage.resumen,
       staleCrons,
+      cronsSinAvisar,
       datosViejos,
       silencioDeDatos,
       cuadreCosto,
@@ -1244,6 +1278,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       telegram,
       outageResumen,
       staleCrons,
+      cronsSinAvisar,
       datosViejos,
       silencioDeDatos,
       cuadreCosto,

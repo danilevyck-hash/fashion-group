@@ -24,7 +24,14 @@ const logPorPar = vi.hoisted(() => new Map<string, unknown[]>());
 const lecturaRota = vi.hoisted(() => ({ valor: false }));
 
 vi.mock("@/lib/alertas/canal", () => ({ enviarSistema: enviarSistemaMock }));
-vi.mock("@/lib/cron-telemetry", () => ({ logCronError: logCronErrorMock }));
+// `corridasPorDiaDelPar` (7-sep-2026) decide cuántos fallos seguidos pide cada
+// par según su ritmo. Acá se fija en 1 corrida/día —el umbral de siempre, DOS
+// fallos— para que estos casos sigan probando exactamente lo que probaban. El
+// umbral de tres, y de qué pares es, se prueba en `alertas-que-llegan.test.ts`.
+vi.mock("@/lib/cron-telemetry", () => ({
+  logCronError: logCronErrorMock,
+  corridasPorDiaDelPar: () => 1,
+}));
 vi.mock("@/lib/telegram", () => ({
   sendTelegramAlert: vi.fn(),
   shortError: (s: string) => s,

@@ -332,19 +332,27 @@ describe("CANDADOS ESTRUCTURALES", () => {
     expect(iDedup).toBeLessThan(iEnvio);
   });
 
-  it("🔴 la llave del dedup se ESCRIBE antes del envío, no después", () => {
-    // Si se registrara después, un fallo de Telegram dejaría la llave sin poner y
-    // la pasada siguiente volvería a intentar de inmediato. Mismo orden que la
-    // regla 1 en `datos-frescos.ts`.
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 7-sep-2026, a propósito y con nota. Decía «la
+  // llave del dedup se ESCRIBE antes del envío, no después», con el argumento de
+  // que un fallo de Telegram haría reintentar en la pasada siguiente — y eso es
+  // EXACTAMENTE lo que tiene que pasar. Al revés, un envío fallido quemaba los
+  // SIETE DÍAS de silencio del módulo: la fila puesta, el mensaje nunca enviado,
+  // nadie enterado hasta la semana siguiente. Un reintento de más cuesta un
+  // mensaje repetido; uno de menos cuesta la avería entera.
+  //
+  // El otro candado —que el anti-loop se CONSULTE antes de mandar— no se tocó.
+  it("🔴 la llave del dedup se escribe DESPUÉS del envío, y solo si Telegram confirmó", () => {
+    const iEnvio = IO.indexOf("const enviado = await enviarSistema(mensajeSilencio");
+    const iGuard = IO.indexOf("if (!enviado)");
     // El match exige que la llamada abra la sentencia (`^\s*await`), no que
     // aparezca en algún lado: envuelta en un `if` que nunca entra, el archivo
     // seguiría conteniendo el texto y el candado no vería nada.
     const m = IO.match(/^[ \t]*await logCronError\(\s*$/m);
     expect(m).not.toBeNull();
     const iLog = IO.indexOf(m![0]);
-    const iEnvio = IO.indexOf("await enviarSistema(mensajeSilencio");
     expect(iEnvio).toBeGreaterThan(-1);
-    expect(iLog).toBeLessThan(iEnvio);
+    expect(iGuard).toBeGreaterThan(iEnvio);
+    expect(iLog).toBeGreaterThan(iGuard);
   });
 
   it("🩸 la lectura del log va PAGINADA, nunca con un .limit() pelado", () => {

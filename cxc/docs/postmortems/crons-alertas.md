@@ -7,6 +7,99 @@
 
 ---
 
+> ## 🩸 «SIEMPRE QUE ME LLEGA UN TELEGRAMA ME DICES QUE ES FALSA ALARMA» — cuatro arreglos al canal (7-sep-2026)
+>
+> Daniel, textual: ***«Siempre que me llega un telegrama me dices que es falsa alarma. Quiero que me lleguen de veras.»***
+>
+> Una auditoría de 90 días contra producción (`scripts/_medir-alertas-90-dias.mjs`, 9.950 corridas de `switch_sync_log`) mostró que **el problema no es que los avisos mientan**: es que hay avisos que **no llegan nunca** y que una regla **repite el mismo aviso todos los días**. En 90 días salieron 42 mensajes de 🔧 SISTEMA.
+>
+> ### 1. Vuelven a vigilarse los crons cuya caída no deja rastro
+>
+> El 30-jul-2026 se apagó el vigía de crons y se apagó BIEN: medía el MECANISMO y sonaba por syncs cuyo trabajo igual se había hecho. Pero dejó sin cobertura a las tareas para las que la pregunta «¿el dato está viejo?» **no se puede hacer**, porque no producen un dato: producen un MENSAJE. Si `cheques-alert` deja de correr, el aviso de las 9 de la mañana simplemente no llega, ninguna pantalla queda desactualizada y nada lo dice. **El fallo es el silencio mismo.**
+>
+> 🔴 **No estrena una cuarta regla.** Es la **regla 1** («un dato que miras está viejo») mirando la frescura del AVISO en vez de la del dato.
+>
+> Son **seis**, y son dos familias con el mismo motivo — *su caída no deja rastro en ningún dato que otra regla mire*:
+>
+> | cron | por qué entra |
+> |---|---|
+> | `cheques-alert` · `guias-pendientes` · `acs-resumen-diario` · `grupo-resumen-mensual` · `prestamos-caducan` | su PRODUCTO es el mensaje: no hay dato que envejecer |
+> | `acs-fidelizacion` | **no manda ningún mensaje** —verificado en su route— pero **no registra su corrida**: medido, 0 filas suyas en `switch_sync_log` en 90 días, y su tabla no está entre las que vigila B. Hoy no lo mira nadie |
+>
+> 🔴 **LOS SYNCS DE SWITCH NO VUELVEN.** Son exactamente los que hicieron apagar esto, y hoy tienen quien los mire por el RESULTADO (regla 2, alerta A, alerta B). El candado lo exige de forma estructural: **ningún cron de la lista puede escribir en `switch_sync_log`**, comprobado contra `SYNC_TYPES_POR_CRON`, que es el registro del cronograma. Un sync no puede entrar ni por descuido.
+>
+> **Nada se inventa dos veces:** el umbral es `cronStaleThresholdHours` (26 h, y **33 días** para el resumen mensual), el freno de la alerta fantasma es `staleEsPendingRecovery` (la 2ª entrada de `acs-fidelizacion` a las 16:30), y el vigía cuelga de la reconciliación — **cero entradas nuevas de cron**. Anti-loop de 7 días por cron.
+>
+> ⚠️ **Backtest imposible de reconstruir, y se dice:** `cron_heartbeats` guarda solo `last_success_at` (una foto, no historia), así que no hay forma de replayear cuántas veces habría sonado. Lo que sí se midió: en 90 días **ninguno de los seis dejó una sola fila de error** en `cron_email_errors`, y hoy los seis están frescos. La cota superior está puesta por el anti-loop: **como máximo un mensaje por cron por semana.**
+>
+> ### 2. La regla 2 gana un freno: un aviso por avería, no uno por día
+>
+> 🩸 **La regla 2 no tenía anti-loop.** Medido: la cartera de Boston falló **seis días seguidos** (20 al 25-ago-2026) y mandó **cinco mensajes casi idénticos, uno por día**. Ahí es donde el canal se gasta.
+>
+> **La llave es `(par, arranque de la racha)`**, no el par a secas: si el par se recupera y se vuelve a romper, la racha arranca en otra fecha, la llave es otra y **la avería nueva suena en el acto**. Lo que se calla es repetir la MISMA.
+>
+> **48 h, no 24, y el porqué:** `boston-cartera` corre UNA vez al día, así que con 24 h volvía a avisar todos los días igual que antes — y con el jitter del scheduler la decisión quedaba en cara o cruz por azar de segundos. Con 48 h la avería de seis días de Boston pasa de **5 mensajes a 2** y sigue apareciendo cada dos días: no se puede olvidar. Tampoco los 7 días del patrón de la casa: una semana de silencio es demasiado para algo que se puede arreglar hoy. **El primer mensaje de una avería no se demora ni un minuto.**
+>
+> **Y el umbral de fallos seguidos pasa a depender del RITMO del par.** La pregunta de la regla 2 es «¿esto se está recuperando solo?», y la respuesta depende de cuántos intentos le quedan hoy: un par que corre 5 veces al día y falló dos veces todavía tiene tres oportunidades; uno que corre una vez ya perdió dos días. **3 fallos desde 5 corridas/día, 2 para todo lo demás.**
+>
+> 🔴 **CINCO Y NO CUATRO, y el número salió de la medición, no de la intuición.** Con el corte en 4 entraban también los recibos, y el backtest mostró que eso **perdía una avería real**: `active_shoes/recibos` del 21-jun-2026 falló dos veces seguidas, avisó, y volvió a funcionar recién **24 h después** — con el umbral en 3 nunca habría llegado a un tercer fallo y ese aviso se perdía entero. La regla de la casa manda: *si un cambio hace que una avería real deje de avisar, no se hace*.
+>
+> El «cuántas veces al día corre» **se DERIVA del cronograma** (`corridasPorDiaDelPar`, contando las entradas de `SWITCH_CRON_ENTRADAS`, el espejo de vercel.json). Escribir `{ recibos: 4 }` en algún lado sería la lista paralela que este repo ya cazó dos veces. Lo único declarado es la traducción entrada → `sync_type`, que el cronograma no puede adivinar.
+>
+> **Backtest sobre 90 días (9.950 corridas):**
+>
+> | | fallos avisados | mensajes | averías reales cubiertas |
+> |---|---|---|---|
+> | **Antes** | 38 | **20** | 10 de 10 |
+> | **Después** | 27 | **13** | **10 de 10** |
+>
+> «Avería real» = el par NO volvió a funcionar solo en 12 h o menos. **Ninguna se pierde.** Los dos avisos que quita el umbral de 3 son `fashion_wear/facturas` (19-jul) y `joystep/facturas` (21-jul), que se recuperaron solos en 4 y 3 horas.
+>
+> ### 3. 🩸 El dedup se marca DESPUÉS de que Telegram confirme
+>
+> En las alertas A y B la fila del anti-loop se escribía **ANTES** de mandar, con el argumento de que un fallo de Telegram provocaría un segundo intento en la pasada siguiente — y eso es EXACTAMENTE lo que tiene que pasar. Al revés, **un envío fallido quemaba los SIETE DÍAS de silencio de ese módulo**: la fila puesta, el mensaje nunca enviado, nadie enterado hasta la semana siguiente.
+>
+> Un reintento de más cuesta un mensaje repetido; uno de menos cuesta la avería entera. Es el mismo orden que ya usa `cheques.aviso_vencido_en`. Vale también para los dos anti-loop nuevos.
+>
+> ⚠️ **La regla 1 (`datos-frescos.ts`) sigue marcando antes.** No se tocó a propósito: su ventana es de **20 h**, así que un envío fallido cuesta a lo sumo un día de silencio y no una semana. Queda pendiente de unificar.
+>
+> ### 4. El resumen de caída de Switch — ya estaba retirado
+>
+> Medido: `switch_outage_resumen` tiene **3 filas en 90 días** (2, 4 y 13 de agosto) y las tres dicen textualmente *«todo re-sincronizado, sin impacto»*. **Pero ninguna llegó a Telegram**: el envío se retiró el 27-jul-2026 (`logCronError(..., { telegram: false })`) y lo que la auditoría contó fueron filas del registro, no mensajes. La conducta pedida ya era la vigente; lo que faltaba era el candado, que ahora existe: el módulo no puede volver a llamar a `enviarSistema` ni a `sendTelegramAlert`.
+>
+> ### 5. Lo que NO entra a la alerta B, y por qué (medido)
+>
+> La auditoría propuso vigilar `switch_recibos` —«la plata que te entra», 1.898 corridas en 90 días— y `switch_ingresos_mercancia`. **Los dos se midieron y los dos quedan afuera.**
+>
+> **`switch_recibos` escribe SOLO lo que cambió** (`diffRecibos`: borra e inserta los recibos que cambiaron, no la ventana entera). Medido con TODO al día, el mismo día en que el cron corrió sus 4 pasadas:
+>
+> | empresa | horas desde la última escritura |
+> |---|---|
+> | active_wear | **263 h** (11 días) |
+> | joystep | 95 h |
+> | active_shoes · fashion_shoes · confecciones_boston | 67 h |
+> | fashion_wear | 63 h · vistana 43 h · american_classic 31 h |
+>
+> Con el umbral de 40 h, **siete de las ocho empresas dispararían desde la primera pasada estando perfectamente sanas**, y el peor hueco histórico de joystep es de **581 h**. Es exactamente el requisito 1 de B, y falla.
+>
+> **`switch_ingresos_mercancia` sí reescribe su ventana entera** en cada corrida (14 de 14 corridas con filas, ninguna en cero) — pero **la ventana son 45 días y la compra es un hecho del negocio que puede no ocurrir**. Hueco más largo sin una sola compra, sobre toda la historia: **active_wear 452 días · joystep 206 · active_shoes 139 · fashion_shoes 56 · vistana 52**. Cinco de las seis por encima de la ventana: con la ventana vacía no se escribe nada y la alerta sonaría para siempre con el sync perfecto.
+>
+> 💡 **Lo que sí serviría para los recibos, y es una decisión de Daniel, no mía:** la regla 1 mide las VENTAS por la última corrida exitosa del sync (`switch_sync_log`), no por la tabla — justamente para esquivar este problema. Agregar «los pagos» como TERCER dato de la regla 1, con el mismo umbral de 24 h, vigilaría la plata que entra sin un solo falso positivo. No se hizo porque la lista de datos de la regla 1 la eligió Daniel el 30-jul («la cartera y las ventas, nada más») y ampliarla es suya.
+>
+> ### Candados
+>
+> `alertas-que-llegan.test.ts` — 29 casos, en las dos direcciones. Los números medidos viven DENTRO de los comentarios de los casos (las 263 h de active_wear, los 452 días de active_wear sin comprar, el caso de `active_shoes/recibos`) para que nadie los cambie sin volver a medir.
+>
+> Un candado **cambió de dirección con nota fechada**, ninguno se borró: `silencio-de-datos.test.ts` › «la llave del dedup se ESCRIBE antes del envío» ahora exige lo contrario. El que exige que el anti-loop se **consulte** antes de mandar no se tocó.
+>
+> ### Verificado por mutación (7-sep-2026)
+>
+> **35 mutaciones, 35 cazadas** (`scripts/_mutar-candados-alertas-que-llegan.sh`), con **2 CONTROLES verdes** (retocar una frase que ningún candado fija; renombrar una variable local).
+>
+> Entre otras: que se caiga un cron de la lista · que se cuele un sync de Switch · que se retire `acs-fidelizacion` · que el vigía no dispare nunca · que ignore la recuperación en camino · que use un 26 h fijo y haga sonar el resumen mensual · que un cron sin heartbeat deje de contar como caído · que el mensaje nombre el cron · que el dedup vuelva a escribirse antes del envío (en los tres lugares) · que el umbral de 3 se pida desde 4 corridas/día · que el anti-loop sea de 24 h o de 7 días · que la llave deje de llevar el arranque de la racha · que el umbral por par se ignore · que «cuántas veces al día» se escriba a mano · que el bloque `all` le cuente a Boston un estadocuenta que no corre · que una entrada semanal cuente como diaria · que el resumen de caída vuelva a Telegram · que se agreguen recibos o ingresos a la alerta B.
+
+---
+
 > ## 🩸 EL SILENCIO NO CUENTA COMO QUE ESTÁ BIEN — dos alertas para cuando Switch no da error y simplemente no manda nada (2-sep-2026)
 >
 > ### Lo que pasó

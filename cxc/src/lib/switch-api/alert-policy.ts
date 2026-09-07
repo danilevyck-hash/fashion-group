@@ -29,8 +29,15 @@
  * Es la unidad que ya usaba el streak de 401 y la misma con la que la
  * reconciliación recupera; no se inventa ninguna agrupación nueva.
  *
- * ── LOS CINCO DESENLACES (`evaluateSwitchEscalation`) ────────────────────────
- *   racha        streak ≥ 2  → AVISA, y el texto dice cuántas van y desde cuándo.
+ * ── LOS SEIS DESENLACES (`evaluateSwitchEscalation`) ─────────────────────────
+ *   racha        streak ≥ el umbral DE SU RITMO → AVISA, y el texto dice cuántas
+ *                              van y desde cuándo. El umbral es 2 para casi
+ *                              todos y 3 para los pares que corren 5 o más veces
+ *                              al día (ver `fallosParaAvisar`, 7-sep-2026).
+ *   racha-corta  streak ≥ 2 pero por debajo de su umbral → calla. Al par le
+ *                              quedan corridas hoy para recuperarse solo. Queda
+ *                              escrito en el rastro con su nombre, para no
+ *                              confundirlo con un primer fallo.
  *   primer-fallo streak = 1  → calla. La corrida anterior del par fue bien; la
  *                              siguiente decide.
  *   no-medible   streak = 0 CON historia del par → calla. La corrida que acaba de
@@ -82,6 +89,13 @@
  * (outage-resumen, la clasificación de slots), pero **ya no decide si se avisa**:
  * eso lo decide la racha, para todos los errores por igual.
  *
+ * ── Y UN AVISO POR AVERÍA, NO UNO POR DÍA (7-sep-2026) ──────────────────────
+ * Lo que faltaba entero: esta regla NO tenía anti-loop. La cartera de Boston
+ * falló seis días seguidos (20 al 25-ago-2026) y mandó CINCO mensajes casi
+ * idénticos, uno por día. Ahora hay una llave por (par, arranque de la racha) y
+ * 48 h entre repeticiones; la avería nueva no espera nada. El detalle medido
+ * está en el bloque de constantes, más abajo.
+ *
  * Los routes que usan esto: switch-sync (facturas/estadocuenta/costo),
  * sync-recibos, sync-utilidad, sync-proveedores y —vía sync-log.ts—
  * switch-articulos (articulos) y los catálogos (catalogo_reebok /
@@ -92,9 +106,102 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { shortError } from "@/lib/telegram";
 import { enviarSistema } from "@/lib/alertas/canal";
-import { logCronError } from "@/lib/cron-telemetry";
+import { corridasPorDiaDelPar, logCronError } from "@/lib/cron-telemetry";
 import { mapEmpresaName } from "@/lib/empresa-mapping";
 import { esRunAtascado } from "./sync-log";
+
+// ═══════════════════════════════════════════════════════════════════════════
+//   🩸 UN AVISO POR AVERÍA, NO UNO POR DÍA (7-sep-2026)
+//
+//   Esta regla no tenía anti-loop. Medido contra producción: la cartera de
+//   Boston falló SEIS DÍAS SEGUIDOS (20 al 25-ago-2026) y mandó **cinco
+//   mensajes casi idénticos, uno por día**. Ahí es donde el canal se gasta: el
+//   día que llegue el aviso que importa, ya nadie lo lee.
+//
+//   Dos frenos, los dos medidos sobre los 90 días de `switch_sync_log`
+//   (9.948 corridas, 7-sep-2026). Antes: 38 fallos avisados en **20 mensajes**.
+//   Después: **13 mensajes**. Las 10 averías reales —las que NO se recuperaron
+//   solas en 12 h— se siguen avisando las 10.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Fallos seguidos del par que hacen falta para avisar. El número de siempre. */
+export const FALLOS_PARA_AVISAR = 2;
+
+/**
+ * Fallos seguidos que hacen falta cuando el par corre MUCHAS veces al día.
+ *
+ * La pregunta de la regla 2 es «¿esto se está recuperando solo?», y la respuesta
+ * depende de cuántos intentos le quedan por delante hoy. Un par que corre 5
+ * veces al día y falló dos seguidas todavía tiene tres oportunidades antes de que
+ * termine el día; uno que corre una vez ya perdió dos días enteros.
+ *
+ * Medido: de los 38 avisos de 90 días, **20 fueron de pares que volvieron a
+ * funcionar solos en 12 h o menos**.
+ */
+export const FALLOS_PARA_AVISAR_ALTA_FRECUENCIA = 3;
+
+/**
+ * 🔴 A partir de cuántas corridas por día se pide el tercer fallo. **CINCO, no
+ * cuatro**, y el número salió de la medición, no de la intuición.
+ *
+ * Con el corte en 4 entraban también los recibos (4 corridas/día) y el backtest
+ * mostró que eso **perdía una avería real**: `active_shoes|recibos` del
+ * 21-jun-2026 falló dos veces seguidas, avisó, y recién volvió a funcionar
+ * **24 h después** — con el umbral en 3 nunca habría llegado a un tercer fallo y
+ * ese aviso se habría perdido entero. Con el corte en 5 quedan adentro solo las
+ * ventas (5 a 9 corridas/día) y los catálogos quedan afuera; se dejan de mandar
+ * exactamente 2 avisos en 90 días, los dos de pares que se recuperaron solos en
+ * 3 y 4 horas, y no se pierde ninguna avería real.
+ *
+ * El «cuántas veces al día» NO se escribe acá: lo deriva
+ * `corridasPorDiaDelPar` contando las entradas del cronograma
+ * (`SWITCH_CRON_ENTRADAS`, el espejo de vercel.json). Mover un horario ajusta
+ * este umbral solo.
+ */
+export const CORRIDAS_PARA_TRES_FALLOS = 5;
+
+/**
+ * Horas entre dos avisos de la MISMA avería. **48**, y no las 24 que parecían
+ * obvias, porque 24 no arregla el caso que originó el cambio: la cartera de
+ * Boston corre UNA vez al día, así que con 24 h volvía a avisar todos los días
+ * igual que antes —y con el jitter del scheduler la decisión quedaba en cara o
+ * cruz, alertando un día sí y otro no por azar de segundos—.
+ *
+ * Con 48 h la avería de seis días de Boston pasa de **5 mensajes a 2**, y sigue
+ * apareciendo en el celular cada dos días: no se puede olvidar. No es el 7 de la
+ * casa a propósito — una semana de silencio es demasiado para algo que se puede
+ * arreglar hoy.
+ *
+ * 🔑 El PRIMER mensaje de una avería no se demora ni un minuto: el anti-loop
+ * solo mira los REPETIDOS.
+ */
+export const HORAS_ENTRE_AVISOS_RACHA = 48;
+
+/** `tipo` con el que se registra el aviso en `cron_email_errors` (llave del
+ *  anti-loop). Lleva el par y el ARRANQUE de la racha pegados. */
+export const TIPO_RACHA = "switch_racha";
+
+/**
+ * La llave del anti-loop. 🔴 Lleva el arranque de la racha adentro, y eso es lo
+ * que hace que **una avería NUEVA avise en el acto aunque la anterior sea de
+ * hace un rato**: si el par se recuperó y se volvió a romper, la racha arranca
+ * en otra fecha, la llave es otra y el mensaje sale. Lo que se silencia es
+ * repetir la MISMA avería, nunca una distinta.
+ */
+export function tipoDeRacha(
+  empresaKey: string,
+  syncType: string,
+  sinceIso: string | null,
+): string {
+  return `${TIPO_RACHA}:${empresaKey}|${syncType}|${sinceIso ?? "sin-fecha"}`;
+}
+
+/** Cuántos fallos seguidos pide este par antes de avisar. */
+export function fallosParaAvisar(empresaKey: string, syncType: string): number {
+  return corridasPorDiaDelPar(empresaKey, syncType) >= CORRIDAS_PARA_TRES_FALLOS
+    ? FALLOS_PARA_AVISAR_ALTA_FRECUENCIA
+    : FALLOS_PARA_AVISAR;
+}
 
 /** Qué le pasa AL NEGOCIO si este sync se queda atrás. Traduce el `sync_type`
  *  interno a la consecuencia que Daniel puede ver en la app. */
@@ -228,7 +335,8 @@ interface SyncLogStreakRow {
 /** Por qué se decidió avisar (o callar). Se persiste en cron_email_errors para
  *  poder auditar después por qué Daniel recibió —o no— un mensaje. */
 export type MotivoEscalacion =
-  | "racha" // 2+ corridas seguidas fallando → avisa
+  | "racha" // llegó a los fallos seguidos que pide su ritmo → avisa
+  | "racha-corta" // falla repetida, pero al par le quedan intentos hoy → calla
   | "primer-fallo" // la anterior fue bien → calla
   | "no-medible" // esta corrida no se registró, pero el par tiene historia → calla
   | "sin-historia" // el par nunca dejó una fila → fail-open, avisa
@@ -334,7 +442,15 @@ export async function evaluateSwitchEscalation(
       return { escalate: true, streak: 0, sinceIso: null, motivo: "sin-historia" };
     }
     const { streak, sinceIso } = computeStreakFallos(rows);
-    if (streak >= 2) return { escalate: true, streak, sinceIso, motivo: "racha" };
+    // 🔴 Cuántos fallos seguidos hacen falta lo decide el RITMO del par, no un
+    // número fijo: ver `fallosParaAvisar` y `CORRIDAS_PARA_TRES_FALLOS`.
+    const umbral = fallosParaAvisar(empresaKey, syncType);
+    if (streak >= umbral) return { escalate: true, streak, sinceIso, motivo: "racha" };
+    // Falla repetida pero todavía por debajo de SU umbral. No es «primer fallo»
+    // —eso sería mentir en el rastro— y tampoco amerita despertar a nadie: al par
+    // le quedan corridas hoy para recuperarse solo.
+    if (streak >= FALLOS_PARA_AVISAR)
+      return { escalate: false, streak, sinceIso, motivo: "racha-corta" };
     if (streak === 1) return { escalate: false, streak, sinceIso, motivo: "primer-fallo" };
     // streak = 0 con historia: la corrida que acaba de fallar no llegó a
     // registrarse. No es evidencia de nada — la siguiente vuelve a medir, y si
@@ -343,6 +459,34 @@ export async function evaluateSwitchEscalation(
   } catch (err) {
     console.error(`[alert-policy] evaluateSwitchEscalation threw: ${err instanceof Error ? err.message : String(err)}`);
     return { escalate: true, streak: 0, sinceIso: null, motivo: "lectura-fallo" };
+  }
+}
+
+/**
+ * ¿Ya se avisó por ESTA avería en las últimas `HORAS_ENTRE_AVISOS_RACHA`?
+ *
+ * **Fail-OPEN**: si no se puede leer el registro, se avisa igual. Perder el aviso
+ * de una avería cuesta más que repetirlo — el mismo criterio de `datos-frescos`,
+ * del silencio de datos y de `db-salud`.
+ */
+export async function yaAvisadoPorRacha(
+  empresaKey: string,
+  syncType: string,
+  sinceIso: string | null,
+  ahoraMs: number = Date.now(),
+): Promise<boolean> {
+  try {
+    const desde = new Date(ahoraMs - HORAS_ENTRE_AVISOS_RACHA * 3_600_000).toISOString();
+    const { data, error } = await supabaseServer
+      .from("cron_email_errors")
+      .select("id")
+      .eq("tipo", tipoDeRacha(empresaKey, syncType, sinceIso))
+      .gte("created_at", desde)
+      .limit(1);
+    if (error) return false;
+    return (data ?? []).length > 0;
+  } catch {
+    return false;
   }
 }
 
@@ -448,18 +592,56 @@ export async function alertSwitchCronErrors(
     evaluados.push({ ...e, escalacion });
   }
 
+  // 🔴 ANTI-LOOP: un aviso por AVERÍA, no uno por día. La llave lleva el par y el
+  // arranque de la racha, así que una avería NUEVA suena en el acto y lo único
+  // que se calla es repetir la misma. Ver `HORAS_ENTRE_AVISOS_RACHA`.
   const escalan = evaluados.filter((e) => e.escalacion.escalate);
-  if (escalan.length > 0) {
-    await enviarSistema(construirMensajeEscalado(escalan, nota));
+  const aAvisar: ErrorEscalado[] = [];
+  const repetidos: ErrorEscalado[] = [];
+  for (const e of escalan) {
+    if (await yaAvisadoPorRacha(e.empresaKey, e.syncType, e.escalacion.sinceIso)) repetidos.push(e);
+    else aAvisar.push(e);
+  }
+
+  if (aAvisar.length > 0) {
+    const enviado = await enviarSistema(construirMensajeEscalado(aAvisar, nota));
+    // 🔴 La llave del anti-loop se escribe DESPUÉS de que Telegram confirme.
+    // Ponerla antes es lo que hace que un envío fallido queme las 48 h de
+    // silencio de esa avería: la fila queda puesta, el mensaje nunca llegó y
+    // nadie se entera. Mismo orden que `cheques.aviso_vencido_en`.
+    if (enviado) {
+      for (const e of aAvisar) {
+        await logCronError(
+          tipoDeRacha(e.empresaKey, e.syncType, e.escalacion.sinceIso),
+          `${e.empresaKey}/${e.syncType}: van ${e.escalacion.streak || "?"} (${e.escalacion.motivo})`,
+          null,
+          { telegram: false },
+        );
+      }
+    } else {
+      console.error(
+        `[alert-policy] Telegram no confirmó, no marco el anti-loop: ${aAvisar
+          .map((e) => `${e.empresaKey}/${e.syncType}`)
+          .join(", ")}`,
+      );
+    }
+  }
+  for (const e of repetidos) {
+    console.error(
+      `[alert-policy] ya avisado hace <${HORAS_ENTRE_AVISOS_RACHA}h, no repito: ${e.empresaKey}/${e.syncType}`,
+    );
   }
 
   // El rastro completo, avise o no. El motivo va en el texto para que
   // cron_email_errors se pueda auditar sin adivinar.
+  const repetido = new Set(repetidos);
   for (const e of evaluados) {
     const m = e.escalacion.motivo;
-    const prefijo = e.escalacion.escalate
-      ? `fallo repetido (${e.escalacion.streak || "?"} corridas, ${m})`
-      : `fallo sin alerta (${m})`;
+    const prefijo = repetido.has(e)
+      ? `fallo repetido SIN alerta (anti-loop de ${HORAS_ENTRE_AVISOS_RACHA} h, ${e.escalacion.streak || "?"} corridas)`
+      : e.escalacion.escalate
+        ? `fallo repetido (${e.escalacion.streak || "?"} corridas, ${m})`
+        : `fallo sin alerta (${m})`;
     await logCronError(cronName, `${prefijo} — ${e.empresaKey}/${e.syncType}: ${e.error}`, null, {
       telegram: false,
     });
