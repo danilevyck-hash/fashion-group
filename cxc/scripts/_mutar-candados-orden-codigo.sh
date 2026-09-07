@@ -6,13 +6,14 @@ set -u
 cd "$(dirname "$0")/.."
 V=src/components/catalogo/CatalogoVendedorPage.tsx
 P=src/components/catalogo/CatalogoPublicoPage.tsx
-B='src/app/catalogos/admin/[marca]/ProductosBatch.tsx'
-T='src/app/catalogos/admin/[marca]/ProductosTarjetas.tsx'
+# 🔄 6-sep-2026: las dos listas del admin (tarjetas de Reebok y filas de las
+# otras tres) se fundieron en UNA, y su orden vive en un módulo puro.
+B=src/lib/catalogos/admin-lista.ts
 O=src/lib/catalogos/orden-codigo.ts
 TEST=src/__tests__/components/catalogo-orden-por-codigo.test.tsx
 TMP=$(mktemp -d)
-for f in "$V" "$P" "$B" "$T" "$O"; do mkdir -p "$TMP/$(dirname "$f")"; cp "$f" "$TMP/$f"; done
-restaurar() { for f in "$V" "$P" "$B" "$T" "$O"; do cp "$TMP/$f" "$f"; done; }
+for f in "$V" "$P" "$B" "$O"; do mkdir -p "$TMP/$(dirname "$f")"; cp "$f" "$TMP/$f"; done
+restaurar() { for f in "$V" "$P" "$B" "$O"; do cp "$TMP/$f" "$f"; done; }
 CAZADAS=0; TOTAL=0
 
 probar() {
@@ -44,11 +45,8 @@ probar "vendedor: Nombre A-Z pierde el desempate"
 perl -0pi -e 's/\(a\.price \|\| 0\) - \(b\.price \|\| 0\) \|\| compararCodigos\(a\.sku, b\.sku\)/(a.price || 0) - (b.price || 0)/' "$V"
 probar "vendedor: Precio ascendente pierde el desempate"
 
-perl -0pi -e 's/a\.name\.localeCompare\(b\.name\) \|\| compararCodigos\(a\.sku, b\.sku\)/a.name.localeCompare(b.name)/' "$B"
-probar "admin (lista): pierde el desempate"
-
-perl -0pi -e 's/ \|\| compararCodigos\(a\.sku, b\.sku\)//' "$T"
-probar "admin (tarjetas): pierde el desempate"
+perl -0pi -e 's/ \|\| compararCodigos\(a\.sku, b\.sku\)//' "$B"
+probar "admin (la lista única): pierde el desempate"
 
 perl -0pi -e 's/const A = ca\.toUpperCase\(\);/const A = ca.replace(\/-\/g, "").toUpperCase();/; s/const B = cb\.toUpperCase\(\);/const B = cb.replace(\/-\/g, "").toUpperCase();/' "$O"
 probar "el comparador se come los guiones (normaliza)"

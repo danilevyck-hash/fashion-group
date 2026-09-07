@@ -127,13 +127,21 @@ describe("🔴 el nombre no puede volver a mentir", () => {
     expect(culpables, "quedó una llamada al nombre viejo").toEqual([]);
   });
 
-  it("las 10 rutas que lo usan siguen usándolo (no se apagó un permiso)", () => {
+  it("las 9 rutas que lo usan siguen usándolo (no se apagó un permiso)", () => {
     const rutas = todos.filter(
       (f) => f.rel.startsWith("src/app/api/") && /requireAdminOSecretaria\s*\(/.test(f.src),
     );
-    // 4 de Reclamos + 6 de Catálogos. Si el número baja, alguien dejó una ruta
+    // 4 de Reclamos + 5 de Catálogos. Si el número baja, alguien dejó una ruta
     // sin guard o le cambió el permiso sin decirlo.
-    expect(rutas.length, `rutas encontradas: ${rutas.map((r) => r.rel).join(", ")}`).toBe(10);
+    //
+    // ⚠️ ERAN 10 hasta el 6-sep-2026: la décima era `POST /api/catalogo/joybees/seed`,
+    // que se RETIRÓ ese día — reescribía precio, existencia, regalía y
+    // visibilidad de los 83 productos de Joybees desde una lista escrita a mano,
+    // sin botón en ninguna pantalla y con cero llamadores desde `src/`. El
+    // número baja A PROPÓSITO y con nota: no se apagó ningún permiso, se fue la
+    // ruta entera. Que no vuelva lo exige
+    // `src/__tests__/lib/rutas-de-catalogo-retiradas.test.ts`.
+    expect(rutas.length, `rutas encontradas: ${rutas.map((r) => r.rel).join(", ")}`).toBe(9);
     expect(rutas.every((r) => /\/reclamos\/|\/catalogo\//.test(r.rel))).toBe(true);
   });
 

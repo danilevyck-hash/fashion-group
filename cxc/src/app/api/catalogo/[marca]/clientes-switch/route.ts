@@ -17,6 +17,7 @@ import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { clienteSwitchRoles } from "@/lib/catalogo/roles";
 import { errorClienteNoExiste, parsearClienteSwitchId, resolverClienteSwitch } from "@/lib/catalogo/cliente-switch";
 import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
+import { correoDelDirectorio } from "@/lib/catalogo/correo-del-cliente";
 
 function esColumnaAusente(err: { message?: string | null } | null): boolean {
   return /cliente_switch_id|column/i.test(err?.message ?? "");
@@ -57,10 +58,17 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       .eq("empresa_key", cfg.empresaKey)
       .eq("cliente_switch_id", cid)
       .maybeSingle();
+    // 🔴 EL CORREO DEL CLIENTE SALE DEL DIRECTORIO, NO SE TECLEA (6-sep-2026).
+    // Daniel: *«no quiero que sea obligatorio mandar el correo, pero sí que sea
+    // opcional, ya escrito automáticamente el mail del cliente»*. Se une por
+    // CÓDIGO —la identidad del cliente en esta casa—, nunca por nombre. Falla
+    // ABIERTO: sin correo el campo queda vacío, como hoy.
+    const correo = await correoDelDirectorio(supabaseServer, cli?.codigo ?? null);
     return NextResponse.json({
       clienteSwitchId: cid,
       codigo: cli?.codigo ?? null,
       nombre: cli?.nombre ?? null,
+      correo,
     });
   }
 
@@ -174,5 +182,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
     }
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, clienteSwitchId, nombre, codigo });
+  // El correo del cliente recién elegido, para que la pantalla lo escriba sola
+  // en el campo de «Mandar por correo». No se manda nada: solo se ofrece.
+  const supabaseServer = await cfg.mainDb();
+  const correo = await correoDelDirectorio(supabaseServer, codigo);
+  return NextResponse.json({ ok: true, clienteSwitchId, nombre, codigo, correo });
 }

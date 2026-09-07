@@ -91,6 +91,36 @@ export const CATALOGO_ADMIN_ROLES = ["admin", "secretaria"] as const;
 export const catalogoRoles = (): string[] => [...CATALOGO_ROLES];
 export const catalogoAdminRoles = (): string[] => [...CATALOGO_ADMIN_ROLES];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 LA PANTALLA DE ADMINISTRAR NO COMPROBABA NINGÚN ROL (hasta el 6-sep-2026)
+//
+// `/catalogos/admin/[marca]/page.tsx` resolvía la marca y montaba el componente,
+// y punto. El único guardia era del navegador, y el middleware solo valida que
+// la sesión EXISTA. O sea: cualquiera con sesión —un vendedor, bodega, David—
+// abría esa dirección y la pantalla de administrar se le armaba antes de
+// rebotarlo.
+//
+// ⚠️ NO había fuga de datos: las rutas que traen la información sí contestan
+// 403 (`products` PUT/POST, `upload`, `variantes`, el manifiesto del ZIP). Lo
+// que se cierra es la PUERTA, con el mismo patrón que Multifashion el mismo día:
+// el guard va en el servidor, ANTES de dibujar nada, y la lista de roles se
+// DERIVA de `CATALOGO_ADMIN_ROLES` — nunca se escribe a mano.
+//
+// 🔴 Administrar es de admin y secretaria. Vendedor, bodega y `gerente_boston`
+// solo VEN (`CATALOGO_ROLES`): a ellos la pantalla de administrar les toca
+// rebotar a su casa.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** ¿Este rol abre la PANTALLA `/catalogos/admin/<marca>`? */
+export function puedeAdministrarCatalogo(role: string | null | undefined): boolean {
+  return (CATALOGO_ADMIN_ROLES as readonly string[]).includes(role ?? "");
+}
+
+/** ¿Este rol abre el catálogo interno (el hub y el catálogo por marca)? */
+export function puedeVerCatalogo(role: string | null | undefined): boolean {
+  return (CATALOGO_ROLES as readonly string[]).includes(role ?? "");
+}
+
 /** QUIRK heredado: Reebok todavía lista 'cliente' en `createRoles`. NO es un
  *  rol del sistema (`SYSTEM_ROLES` no lo tiene) y ningún usuario puede tenerlo,
  *  pero mientras esté en la lista hay que nombrarlo para poder excluirlo. */

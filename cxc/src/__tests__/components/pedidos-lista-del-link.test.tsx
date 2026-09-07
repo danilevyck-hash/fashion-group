@@ -212,22 +212,60 @@ describe("🔴 el primer toque lo convierte y abre su detalle", () => {
   });
 });
 
+
+// ⚠️ 6-sep-2026 — «Editar · Duplicar · Reenviar el correo · Eliminar» se MUDARON
+// al «···» de la casa (`OverflowMenu`) y a la fila salió «Ver PDF»: en la fila,
+// «Eliminar» era el botón más a la vista. Las acciones son las MISMAS; cambió
+// dónde se tocan, así que el candado toca donde se toca ahora.
+function opcionesDelMenu(fila: HTMLElement): string[] {
+  const kebab = Array.from(fila.querySelectorAll("button")).find(
+    (b) => (b.getAttribute("aria-label") || "").startsWith("Más opciones"),
+  );
+  if (!kebab) return [];
+  fireEvent.click(kebab);
+  const items = Array.from(document.querySelectorAll('[role="menuitem"]')).map(
+    (b) => (b.textContent || "").trim(),
+  );
+  fireEvent.keyDown(window, { key: "Escape" });
+  return items;
+}
+
+/** El botón de una opción del «···», ya abierto. */
+function tocarOpcion(fila: HTMLElement, label: string): boolean {
+  const kebab = Array.from(fila.querySelectorAll("button")).find(
+    (b) => (b.getAttribute("aria-label") || "").startsWith("Más opciones"),
+  );
+  if (!kebab) return false;
+  fireEvent.click(kebab);
+  const item = Array.from(document.querySelectorAll('[role="menuitem"]')).find(
+    (b) => (b.textContent || "").trim() === label,
+  ) as HTMLButtonElement | undefined;
+  if (!item) { fireEvent.keyDown(window, { key: "Escape" }); return false; }
+  fireEvent.click(item);
+  return true;
+}
+
 describe("🔴 lo que NO se le ofrece a un pedido del link sin convertir", () => {
-  it("no tiene botón Duplicar (todavía no existe como pedido interno)", async () => {
+  it("no ofrece Duplicar (todavía no existe como pedido interno)", async () => {
+    const { container } = await pintar();
+    expect(opcionesDelMenu(filaDe(container, "ab12cd34"))).not.toContain("Duplicar");
+    // Uno interno que YA está en Switch sí lo tiene: si no, el test no probaría
+    // nada. (Duplicar solo se dibuja donde el servidor lo permite — a los que no
+    // salieron les contesta 409, ver `duplicar-pedido.ts`.)
+    expect(opcionesDelMenu(filaDe(container, "PED-022"))).toContain("Duplicar");
+  });
+
+  it("🔴 tampoco ofrece «Ver PDF»: no hay pedido interno del que sacarlo", async () => {
     const { container } = await pintar();
     const botones = (f: HTMLElement) =>
       Array.from(f.querySelectorAll("button")).map((b) => (b.textContent || "").trim());
-    expect(botones(filaDe(container, "ab12cd34"))).not.toContain("Duplicar");
-    // Uno interno sí lo tiene: si no, el test no probaría nada.
-    expect(botones(filaDe(container, "PED-022"))).toContain("Duplicar");
+    expect(botones(filaDe(container, "ab12cd34"))).not.toContain("Ver PDF");
+    expect(botones(filaDe(container, "PED-022"))).toContain("Ver PDF");
   });
 
   it("🔴 Eliminar pega en la tabla FÍSICA correcta (publicos, no orders)", async () => {
     const { container } = await pintar();
-    const btnBorrar = Array.from(filaDe(container, "ab12cd34").querySelectorAll("button"))
-      .find((b) => (b.textContent || "").trim() === "Eliminar");
-    expect(btnBorrar, "el admin tiene que poder borrar").toBeTruthy();
-    fireEvent.click(btnBorrar!);
+    expect(tocarOpcion(filaDe(container, "ab12cd34"), "Eliminar"), "el admin tiene que poder borrar").toBe(true);
     // ConfirmDeleteModal habilita su botón rojo recién al segundo (freno para
     // acciones destructivas): se espera a que se pueda tocar de verdad.
     const confirmar = await waitFor(() => {
@@ -250,13 +288,13 @@ describe("🔴 lo que NO se le ofrece a un pedido del link sin convertir", () =>
     const { container } = await pintar("vendedor");
     const textos = (f: HTMLElement) =>
       Array.from(f.querySelectorAll("button")).map((b) => (b.textContent || "").trim());
-    expect(textos(filaDe(container, "ab12cd34"))).not.toContain("Eliminar");
-    expect(textos(filaDe(container, "PED-022"))).not.toContain("Eliminar");
+    expect(opcionesDelMenu(filaDe(container, "ab12cd34"))).not.toContain("Eliminar");
+    expect(opcionesDelMenu(filaDe(container, "PED-022"))).not.toContain("Eliminar");
     expect(textos(container)).not.toContain("Exportar Excel");
     expect(container.textContent).not.toContain("Seleccionar todos");
     expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
     // Y lo que SÍ puede sigue estando.
-    expect(textos(filaDe(container, "PED-022"))).toContain("Duplicar");
-    expect(textos(filaDe(container, "PED-022"))).toContain("Editar");
+    expect(opcionesDelMenu(filaDe(container, "PED-022"))).toContain("Duplicar");
+    expect(opcionesDelMenu(filaDe(container, "PED-022"))).toContain("Editar");
   });
 });

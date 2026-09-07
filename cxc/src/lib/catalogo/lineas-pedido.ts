@@ -32,7 +32,8 @@
 
 /** Item tal como sale de la tabla de items o del carrito. */
 export interface ItemCrudo {
-  product_id?: string;
+  /** Puede llegar en `null` desde una vista o un jsonb; se normaliza acá. */
+  product_id?: string | null;
   sku?: string | null;
   name?: string | null;
   image_url?: string | null;

@@ -172,19 +172,30 @@ describe("MARCA_THEME.tommy — theme completo y coherente", () => {
     ]);
   });
 
-  it("admin: estilo batch, nombre editable, sync manual catalogo-tommy", () => {
-    expect(t.admin.productosStyle).toBe("batch");
-    expect(t.admin.nombreEditable).toBe(true);
-    expect(t.admin.importarTab).toBe(false);
-    expect(t.admin.badgeEditable).toBe(false);
+  // 🔄 6-sep-2026 — CAMBIÓ LA PANTALLA, NO LA CONFIGURACIÓN DEL SERVIDOR. Se
+  // fueron del tema `productosStyle` (ya no hay dos dibujos de la misma lista),
+  // `nombreEditable` y `badgeEditable` (0 usos en 1.120 productos: los dos
+  // controles se retiraron) e `importarTab` (la importación por plantilla se
+  // retiró). Lo que sí decide el SERVIDOR sigue medido abajo y en el bloque de
+  // `marcas.ts`: `products.nombreEditable` y `products.cols` NO se tocaron, así
+  // que el sync sigue respetando un nombre editado a mano si alguien lo tuviera.
+  it("admin: sync manual catalogo-tommy, edición por sku", () => {
     expect(t.admin.productEdit).toEqual({ idField: "sku", verb: "POST" });
     expect(t.admin.syncModulo).toBe("catalogo-tommy");
     expect(t.admin.productsUrl).toBe("/api/catalogo/tommy/products");
   });
 
-  it("las otras marcas NO tienen nombre editable en el admin", () => {
-    expect(MARCA_THEME.reebok.admin.nombreEditable).toBe(false);
-    expect(MARCA_THEME.joybees.admin.nombreEditable).toBe(false);
+  it("🔴 la pantalla de administrar NO puede volver a ofrecer nombre ni etiqueta", () => {
+    // 🔄 6-sep-2026: antes esto se leía del tema (`admin.nombreEditable`). El
+    // campo se fue; lo que se vigila ahora es que NINGUNA marca vuelva a traer
+    // esas palancas de vuelta al tema.
+    for (const t of Object.values(MARCA_THEME)) {
+      const admin = t.admin as Record<string, unknown>;
+      expect(admin.nombreEditable).toBeUndefined();
+      expect(admin.badgeEditable).toBeUndefined();
+      expect(admin.importarTab).toBeUndefined();
+      expect(admin.productosStyle).toBeUndefined();
+    }
   });
 });
 

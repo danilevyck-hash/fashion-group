@@ -105,12 +105,18 @@ describe("el corte es de 90 días y es por FECHA", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("la pantalla usa el corte, y «Ver más» trae el resto", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 6-sep-2026, no se borró. El rediseño de la lista
+  // renombró `filtered` → `buscadas` (el corte va ANTES de los dos filtros,
+  // para que los chips puedan contar lo que se está mirando) y mudó la
+  // agrupación por mes a `mes-comprobantes.ts`. Lo que se vigila es lo MISMO:
+  // que la lista pase por la ventana y que los grupos se armen sobre lo
+  // visible, nunca sobre la lista entera.
   it("🔴 la lista NO se dibuja entera: pasa por la ventana", () => {
-    expect(PANEL_LIMPIO).toContain("partirPorVentana(filtered, new Date())");
-    expect(PANEL_LIMPIO).toContain("const visibles = verTodo ? filtered : recientes;");
-    // Los grupos por mes se arman sobre lo VISIBLE, no sobre `filtered`.
-    expect(PANEL_LIMPIO).toContain("for (const p of visibles)");
-    expect(PANEL_LIMPIO).not.toContain("for (const p of filtered)");
+    expect(PANEL_LIMPIO).toContain("partirPorVentana(buscadas, new Date())");
+    expect(PANEL_LIMPIO).toContain("const candidatas = verTodo ? buscadas : recientes;");
+    // Los grupos por mes se arman sobre lo VISIBLE, no sobre la lista entera.
+    expect(PANEL_LIMPIO).toContain("const grupos = agruparPorMes(visibles);");
+    expect(PANEL_LIMPIO).not.toContain("agruparPorMes(pedidos)");
   });
 
   it("«Ver más» aparece solo si hay algo detrás, y lo trae TODO", () => {
@@ -139,6 +145,7 @@ describe("la pantalla usa el corte, y «Ver más» trae el resto", () => {
   it("CONTROL: la lista se sigue dibujando y agrupando por mes", () => {
     expect(PANEL_LIMPIO).toContain("{grupos.map((grupo) => (");
     expect(PANEL_LIMPIO).toContain("<MesGroup");
-    expect(PANEL_LIMPIO).toContain("mesLabel(p.created_at)");
+    // El rótulo del mes lo arma `mes-comprobantes.ts` desde el 6-sep-2026.
+    expect(PANEL_LIMPIO).toContain("agruparPorMes");
   });
 });

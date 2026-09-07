@@ -53,6 +53,12 @@ const FEED = [
     status: "confirmado",
     fuente: "orders",
     del_link: false,
+    // ⚠️ 6-sep-2026: el feed real SIEMPRE manda `en_switch`, y desde hoy es lo
+    // que decide si se ofrece «Duplicar» — el servidor le contesta 409 («Este
+    // pedido no está en Switch») a un pedido sin envío activo, así que ofrecer
+    // el botón ahí era ofrecer un error. Un pedido con número de Switch está en
+    // Switch: al fixture le faltaba el campo.
+    en_switch: true,
     switch_numero: "16-000000503",
     switch_documento: "pedido",
     items: [{ product_id: "p1", quantity: 12, unit_price: 10 }],
@@ -82,7 +88,31 @@ async function montarComo(rol: string, marca: MarcaUiKey = "reebok") {
   // 🩸 Hay un skeleton mientras carga: buscar botones antes de que llegue el
   // feed mide una pantalla vacía y cualquier `queryAll…` daría 0 — verde por
   // nada. Se espera a que la fila EXISTA.
-  await screen.findByText("Sporting Shoes");
+  // ⚠️ 6-sep-2026: la lista dibuja FICHA (<lg) y TABLA (>=lg); jsdom no aplica
+  // Tailwind, así que el nombre está dos veces. Se espera a que EXISTA.
+  await screen.findAllByText("Sporting Shoes");
+}
+
+// ⚠️ 6-sep-2026 — «Editar/Ver · Duplicar · Reenviar el correo · Eliminar» se
+// MUDARON al «···» de la casa y a la fila salió «Ver PDF»: en la fila,
+// «Eliminar» era el botón más a la vista. Las acciones son las MISMAS; cambió
+// dónde se tocan, así que el candado toca donde se toca ahora.
+function opciones(f: HTMLElement): string[] {
+  const kebab = Array.from(f.querySelectorAll("button")).find(
+    (b) => (b.getAttribute("aria-label") || "").startsWith("Más opciones"),
+  );
+  if (!kebab) return [];
+  fireEvent.click(kebab);
+  const items = Array.from(document.querySelectorAll('[role="menuitem"]')).map(
+    (b) => (b.textContent || "").trim(),
+  );
+  fireEvent.keyDown(window, { key: "Escape" });
+  return items;
+}
+
+/** Todas las opciones ofrecidas en la TABLA, fila por fila. */
+function opcionesDeTodasLasFilas(): string[] {
+  return Array.from(document.querySelectorAll("tbody tr")).flatMap((tr) => opciones(tr as HTMLElement));
 }
 
 /** La fila de un pedido, por su hook estable `data-pedido`. */
@@ -109,7 +139,7 @@ describe("🔴 1. bodega VE las filas — en las 4 marcas", () => {
   for (const marca of MARCAS) {
     it(`${marca}: la lista pide su feed y pinta las filas`, async () => {
       await montarComo("bodega", marca);
-      expect(screen.getByText("Sporting Shoes")).toBeTruthy();
+      expect(screen.getAllByText("Sporting Shoes").length).toBeGreaterThan(0);
       const pedidas = fetchSpy.mock.calls.map((c) => String(c[0]));
       expect(pedidas.some((u) => u === `${getMarcaTheme(marca)!.api}/orders`)).toBe(true);
     });
@@ -121,12 +151,17 @@ describe("🔴 1. bodega VE las filas — en las 4 marcas", () => {
 describe("🔴 2. a bodega no se le ofrece lo que el servidor le niega", () => {
   it("sin «Eliminar» en ninguna fila", async () => {
     await montarComo("bodega");
-    expect(screen.queryAllByRole("button", { name: "Eliminar" })).toHaveLength(0);
+    expect(opcionesDeTodasLasFilas()).not.toContain("Eliminar");
   });
 
   it("sin «Duplicar» (duplicar es un POST /orders → 403)", async () => {
     await montarComo("bodega");
-    expect(screen.queryAllByRole("button", { name: "Duplicar" })).toHaveLength(0);
+    expect(opcionesDeTodasLasFilas()).not.toContain("Duplicar");
+  });
+
+  it("sin «Reenviar el correo» (send-order no es de bodega)", async () => {
+    await montarComo("bodega");
+    expect(opcionesDeTodasLasFilas()).not.toContain("Reenviar el correo");
   });
 
   it("sin «Exportar Excel» (pedidos-export → 403)", async () => {
@@ -151,22 +186,20 @@ describe("🔴 2. a bodega no se le ofrece lo que el servidor le niega", () => {
 // ── 3. La palabra: «Ver», no «Editar» ────────────────────────────────────────
 
 describe("🔴 3. la fila le promete lo que puede cumplir", () => {
-  it("bodega: el botón de la fila dice «Ver»", async () => {
+  it("bodega: lo que se le ofrece dice «Ver» — y es lo ÚNICO", async () => {
     await montarComo("bodega");
-    const btn = within(fila("PED-017")).getByRole("button");
-    expect(btn.textContent!.trim()).toBe("Ver");
+    expect(opciones(fila("PED-017"))).toEqual(["Ver"]);
   });
 
   it("bodega: y NO existe ningún «Editar» en toda la pantalla", async () => {
     await montarComo("bodega");
-    expect(screen.queryAllByRole("button", { name: "Editar" })).toHaveLength(0);
+    expect(opcionesDeTodasLasFilas()).not.toContain("Editar");
   });
 
   for (const rol of COMPROBANTES_EDITAR_ROLES) {
     it(`${rol}: sigue diciendo «Editar» — no se le cambió la palabra a nadie`, async () => {
       await montarComo(rol);
-      const btn = within(fila("PED-017")).getAllByRole("button")[0];
-      expect(btn.textContent!.trim()).toBe("Editar");
+      expect(opciones(fila("PED-017"))[0]).toBe("Editar");
     });
   }
 });
@@ -214,8 +247,9 @@ describe("🔴 5. los otros tres roles quedaron igual que antes", () => {
   for (const [rol, esp] of Object.entries(ESPERADO)) {
     it(`${rol}: duplicar=${esp.duplicar} · eliminar=${esp.eliminar} · exportar=${esp.exportar}`, async () => {
       await montarComo(rol);
-      expect(screen.queryAllByRole("button", { name: "Duplicar" }).length > 0, "duplicar").toBe(esp.duplicar);
-      expect(screen.queryAllByRole("button", { name: "Eliminar" }).length > 0, "eliminar").toBe(esp.eliminar);
+      const ofrecidas = opcionesDeTodasLasFilas();
+      expect(ofrecidas.includes("Duplicar"), "duplicar").toBe(esp.duplicar);
+      expect(ofrecidas.includes("Eliminar"), "eliminar").toBe(esp.eliminar);
       expect(screen.queryAllByRole("button", { name: /Descargar Excel/ }).length > 0, "exportar").toBe(esp.exportar);
     });
   }
@@ -225,7 +259,7 @@ describe("🔴 5. los otros tres roles quedaron igual que antes", () => {
       cleanup();
       sessionStorage.clear();
       await montarComo(rol);
-      expect(screen.getByText("Sporting Shoes"), rol).toBeTruthy();
+      expect(screen.getAllByText("Sporting Shoes").length, rol).toBeGreaterThan(0);
     }
   });
 });

@@ -52,8 +52,15 @@ describe("Tabs principales con URL propia (sobreviven refresh, se comparten)", (
     ["src/app/asistencia/AsistenciaClient.tsx", 'useUrlState<Tab>("tab"'],
     ["src/app/productos/cargar/page.tsx", 'useUrlState<Tab>("tab"'],
     ["src/app/ventas/VentasShell.tsx", 'useUrlState("tab"'],
-    ["src/components/multifashion/MultifashionView.tsx", 'useUrlState("subtab"'],
-    ["src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx", 'useUrlState<Tab>("tab"'],
+    // 🔄 6-sep-2026: la pestaña de Multifashion se resuelve en el SHELL (junto
+    // con el período único del módulo), no adentro de la vista. Sigue viviendo
+    // en `?subtab=`, que es lo que este candado protege.
+    ["src/app/multifashion/MultifashionShell.tsx", 'useUrlState("subtab"'],
+    // 🔄 6-sep-2026: Administrar catálogos SE QUEDÓ SIN PESTAÑAS («Faltan foto»
+    // y «Catálogo completo» se fundieron en una lista con chips). Lo que ahora
+    // vive en la URL —y es lo que este candado protege— es el chip elegido, en
+    // `?ver=`. Sigue siendo `replace`: es un filtro del MISMO nivel.
+    ["src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx", 'useUrlState("ver"'],
     ["src/app/marketing/components/ReportesTabs.tsx", 'useUrlState<Tab>("rep"'],
   ];
 

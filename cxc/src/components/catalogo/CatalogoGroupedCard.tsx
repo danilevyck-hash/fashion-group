@@ -319,8 +319,17 @@ export default function CatalogoGroupedCard({
           )}
 
           {/* Action buttons — Regalia usa Agregar como cualquier producto normal.
-              38px de alto y márgenes apretados (Daniel, 25-jul-2026); el control
-              de cantidad mide lo MISMO (h-9 + 1px de borde arriba y abajo = 38). */}
+              44px de alto (6-sep-2026) y márgenes apretados (Daniel,
+              25-jul-2026); el control de cantidad mide lo MISMO (h-11 + 1px de
+              borde arriba y abajo = 46) para que la fila del grid no crezca
+              cuando un producto entra al pedido.
+
+              🔴 ANTES MEDÍA 38 (h-9). Es el MISMO cambio que la tarjeta plana,
+              aplicado acá por la regla de PARIDAD del repo: las dos tarjetas
+              miden igual, si no el «+» de Joybees se queda en 36 px mientras el
+              de Reebok cumple los 44. También se fue el `xl:min-h-[38px]` de
+              «Agregar»: si bajara a 38 en escritorio, la fila SÍ saltaría al
+              entrar al pedido, que es lo que este bloque existe para evitar. */}
           <div className="mt-1.5">
               {(() => {
                 const v = sel;
@@ -340,7 +349,7 @@ export default function CatalogoGroupedCard({
                     <div className={t.qtyWrap}>
                       <button
                         onClick={() => setQty(v.product.id, v.product, qty - 1)}
-                        className={`h-9 shrink-0 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
+                        className={`h-11 shrink-0 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
                           qty === 1 ? "px-2 gap-1" : "w-11"
                         }`}
                       >
@@ -358,14 +367,14 @@ export default function CatalogoGroupedCard({
                       </button>
                       <button
                         onClick={showBultos ? () => openQtyInput(v.product, qty) : undefined}
-                        className="text-center min-w-[48px] py-1"
+                        className="text-center min-w-[48px] min-h-[44px] py-1"
                       >
                         <span className={t.qtyNum}>{qty}</span>
                         <span className={t.qtyUnit}>{qty === 1 ? "bulto" : "bultos"}</span>
                       </button>
                       <button
                         onClick={() => setQty(v.product.id, v.product, qty + 1)}
-                        className={`w-11 h-9 shrink-0 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
+                        className={`w-11 h-11 shrink-0 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
                       >
                         +
                       </button>
@@ -376,7 +385,7 @@ export default function CatalogoGroupedCard({
                     key={v.product.id}
                     onClick={() => { if (!disabled) setQty(v.product.id, v.product, 1); }}
                     disabled={disabled || agotado}
-                    className={`w-full py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px] xl:min-h-[38px] ${
+                    className={`w-full py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px] ${
                       disabled || agotado
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                         : t.addBtn

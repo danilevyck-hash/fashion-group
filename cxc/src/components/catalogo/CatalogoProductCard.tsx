@@ -248,16 +248,25 @@ export default function CatalogoProductCard({
             )}
           </div>
 
-          {/* Add/Qty button — 38px de alto y márgenes apretados (Daniel,
-              25-jul-2026). El control de cantidad mide lo MISMO (h-9 + 1px de
-              borde arriba y abajo = 38) para que la fila del grid no crezca
-              cuando un producto entra al pedido. */}
+          {/* Add/Qty button — 44px de alto (6-sep-2026) y márgenes apretados
+              (Daniel, 25-jul-2026). El control de cantidad mide lo MISMO
+              (h-11 + 1px de borde arriba y abajo = 46) para que la fila del
+              grid no crezca cuando un producto entra al pedido.
+
+              🔴 ANTES MEDÍA 38 (h-9). Medido el 6-sep-2026 en el iPhone y en
+              el iPad: el «−», el «+» y el número quedaban en 36, 36 y 32 px de
+              alto — justo el control MÁS TOCADO del módulo, mientras 57
+              botones del mismo módulo sí cumplían los 44. Daniel eligió la
+              opción A: subirlo a 44 y dejar que la tarjeta crezca. También se
+              fue el `xl:min-h-[38px]` de «Agregar»: si el botón de agregar
+              bajara a 38 en escritorio, la fila SÍ saltaría al entrar al
+              pedido, que es lo que este bloque existe para evitar. */}
           {inOrder ? (
             <div className="mt-1.5">
               <div className={t.qtyWrap}>
                 <button
                   onClick={() => setQty(qty - 1)}
-                  className={`h-9 shrink-0 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
+                  className={`h-11 shrink-0 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
                     qty === 1 ? "px-2 gap-1" : "w-11"
                   }`}
                 >
@@ -273,18 +282,23 @@ export default function CatalogoProductCard({
                     <span className="text-xl leading-none">&minus;</span>
                   )}
                 </button>
-                <button onClick={showBultos ? openQtyInput : undefined} className="text-center min-w-[48px] py-1">
+                <button
+                  onClick={openQtyInput}
+                  aria-label="Escribir la cantidad"
+                  className="text-center min-w-[48px] min-h-[44px] py-1"
+                >
                   <span className={t.qtyNum}>{qty}</span>
                   <span className={t.qtyUnit}>{qty === 1 ? "bulto" : "bultos"}</span>
                 </button>
                 {/* `shrink-0`: sin esto el flex del qtyWrap achicaba el "+" de los
                     44 px que pide `w-11` a 23 px reales en el iPhone — el "−" no
                     se encoge porque su contenido lo sostiene, y el "+" (un solo
-                    carácter) se comía todo el ajuste. La altura h-9 se respeta a
-                    propósito: subirla cambiaría el alto fijo de la card. */}
+                    carácter) se comía todo el ajuste. ⚠️ La altura ya NO es h-9:
+                    subió a h-11 el 6-sep-2026 y la tarjeta crece, que es lo que
+                    Daniel aprobó (ver el bloque de arriba). */}
                 <button
                   onClick={() => setQty(qty + 1)}
-                  className={`w-11 h-9 shrink-0 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
+                  className={`w-11 h-11 shrink-0 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
                 >
                   +
                 </button>
@@ -294,7 +308,7 @@ export default function CatalogoProductCard({
             <button
               onClick={() => { if (!disabled) setQty(1); }}
               disabled={disabled}
-              className={`w-full mt-1.5 py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px] xl:min-h-[38px] ${
+              className={`w-full mt-1.5 py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px] ${
                 disabled
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : isPreOrder
@@ -320,8 +334,8 @@ export default function CatalogoProductCard({
               className="w-full border-b-2 border-[#1A2656] text-2xl text-center font-semibold py-2 outline-none tabular-nums"
             />
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowQtyInput(false)} className="flex-1 py-2 text-sm text-gray-500 hover:text-black transition">Cancelar</button>
-              <button onClick={submitQtyInput} className="flex-1 py-2 text-sm bg-[#1A2656] text-white rounded-lg hover:bg-[#0f1a3d] transition">Listo</button>
+              <button onClick={() => setShowQtyInput(false)} className="flex-1 py-2 min-h-[44px] text-sm text-gray-500 hover:text-black transition">Cancelar</button>
+              <button onClick={submitQtyInput} className="flex-1 py-2 min-h-[44px] text-sm bg-[#1A2656] text-white rounded-lg hover:bg-[#0f1a3d] transition">Listo</button>
             </div>
           </div>
         </div>

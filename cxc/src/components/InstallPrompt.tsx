@@ -21,7 +21,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { MARCA_THEME, MARCAS_UI } from "@/lib/catalogo/marcas-ui";
+import { esRutaDelCliente } from "@/lib/catalogo/rutas-publicas";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -42,10 +42,13 @@ const DISMISS_KEY = "fg_modoviaje_install_dismissed";
 // Group · Toca Compartir y luego Agregar a inicio" tapando, desde abajo de la
 // pantalla, los botones de WhatsApp de su propio pedido. Derivándolo, una
 // marca nueva queda cubierta sola.
-const PUBLIC_PREFIXES = [
-  "/catalogo-publico",
-  ...MARCAS_UI.map((m) => MARCA_THEME[m].pedidoPublicoBase),
-];
+// La lista vive en `lib/catalogo/rutas-publicas` desde el 6-sep-2026: era la
+// MISMA que el sidebar tenía escrita a mano (y vieja), así que ahora hay una
+// sola definición derivada de las marcas.
+//
+// ⚠️ Acá se usa `esRutaDelCliente`, NO `sinBarraLateral`: el catálogo CON
+// sesión (`/catalogo/<marca>`) también se dibuja a ancho completo, pero del
+// otro lado hay un vendedor de la casa — a él sí se le ofrece instalar la app.
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
@@ -114,7 +117,7 @@ export default function InstallPrompt() {
 
   // Gating
   if (dismissed || !ready) return null;
-  if (pathname === "/" || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return null;
+  if (pathname === "/" || esRutaDelCliente(pathname)) return null;
 
   // Qué mostrar: SOLO si el navegador ofreció instalar de verdad
   // (`beforeinstallprompt`) y la app no está ya instalada. Sin eso, no se

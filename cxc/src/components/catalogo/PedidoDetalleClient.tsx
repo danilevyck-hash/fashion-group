@@ -47,6 +47,7 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { hrefCatalogoAgregando } from "@/lib/catalogo/modo-pedido";
 import { avisosBloqueantes, type AvisoEnvio } from "@/lib/catalogo/switch-prevalidacion";
 import { fmtPrecio } from "@/lib/catalogo/precio";
+import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
 import {
   SIN_CLIENTE_ELEGIDO,
   esPedidoDelLink,
@@ -228,6 +229,13 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             if (cr.ok) {
               const cd = await cr.json();
               setClienteSwitch(cd.clienteSwitchId ? { id: cd.clienteSwitchId, nombre: cd.nombre || null, codigo: cd.codigo || null } : null);
+              // 🔴 EL CORREO VIENE YA ESCRITO, DEL CLIENTE ELEGIDO (6-sep-2026).
+              // Daniel: *«ya escrito automáticamente el mail del cliente»*. El
+              // que el PEDIDO tenga guardado manda; éste es el respaldo, y sale
+              // del directorio por CÓDIGO (`correo-del-cliente.ts`). Sin correo
+              // el campo queda vacío, como siempre. No manda nada: solo lo
+              // escribe — el correo NUNCA sale solo.
+              if (!d.client_email && cd.correo) setClientEmail(String(cd.correo));
             }
           } catch { /* no bloquea la carga del pedido */ }
           // Vendedor Switch del pedido: a nombre de quién va a salir. Se muestra
@@ -630,6 +638,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         // Switch); el del selector es el respaldo.
         const elegido: ClienteSwitchOpcion = { id: c.id, nombre: (d.nombre as string | null) ?? c.nombre, codigo: (d.codigo as string | null) ?? c.codigo };
         setClienteSwitch(elegido.id != null ? { id: elegido.id, nombre: elegido.nombre, codigo: elegido.codigo } : null);
+        // El correo del cliente recién elegido se escribe solo, pero NUNCA pisa
+        // uno ya escrito: lo tecleado a mano gana siempre.
+        if (d.correo && !clientEmail.trim()) setClientEmail(String(d.correo));
         setShowClienteModal(false);
         if (!delLink) {
           const titulo = nombreDeCliente(elegido);
@@ -774,20 +785,44 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     }
   }
 
+  /**
+   * 🔴 EL AVISO DICE LA MISMA PALABRA QUE EL PAPEL (6-sep-2026).
+   *
+   * 🩸 Al mandar una COTIZACIÓN el mensaje decía «Pedido enviado a …», mientras
+   * el PDF, el nombre del archivo, el adjunto del correo y la lista sí decían
+   * «Cotización» (hay 3 reales en Tommy: TOM-027, TOM-030 y TOM-031). Una
+   * cotización NO APARTA MERCANCÍA: llamarla pedido en el único texto que la
+   * persona lee después de mandarla es la confusión más cara del módulo.
+   * La palabra sale del ENVÍO ACTIVO, con la MISMA `palabraDelPapel` que arma
+   * el PDF — no se reescribió la regla.
+   *
+   * 🔴 Y EL CORREO SE GUARDA EN EL PEDIDO. Antes se hacía `setClientEmail("")`
+   * al terminar: se tecleaba a mano y el sistema lo tiraba (medido: 0 de 56
+   * pedidos tenían `client_email`). El guardado va DESPUÉS de que el correo
+   * salió, y si falla no rompe nada — el correo ya llegó.
+   */
   async function sendToClient() {
     if (!clientEmail.trim() || !clientEmail.includes("@")) {
       showToast("Ingresa un email válido"); return;
     }
+    const correo = clientEmail.trim();
     setSendingToClient(true);
     try {
       const res = await fetch(`${theme.api}/send-order`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: id, clientEmail: clientEmail.trim() }),
+        body: JSON.stringify({ orderId: id, clientEmail: correo }),
       });
       if (res.ok) {
-        showToast(`Pedido enviado a ${clientEmail.trim()}`);
+        const palabra = palabraDelPapel(
+          switchEnvio,
+          order?.status === "confirmado" ? "Pedido" : "Cotización",
+        );
+        showToast(`${palabra} ${palabra === "Cotización" ? "enviada" : "enviado"} a ${correo}`);
         setShowEmailInput(false);
-        setClientEmail("");
+        // El correo QUEDA escrito en pantalla; guardarlo en el pedido lo hace
+        // el SERVIDOR, después de que Resend confirma (`send-order`). Desde acá
+        // no se puede: el PUT de `orders/[id]` cuenta `client_email` como
+        // contenido y el candado post-envío a Switch lo rechaza con 409.
       } else {
         showToast("No se pudo enviar. Intenta de nuevo.");
       }
@@ -848,7 +883,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Back button */}
       <button onClick={() => router.push(theme.pedidosHref)} className="text-sm text-gray-400 hover:text-black transition mb-4 inline-block">
-        ← Volver a Pedidos
+        ← Volver a {PANEL_COMPROBANTES}
       </button>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -864,7 +899,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                 <input value={clientName} onChange={e => setClientName(e.target.value)}
                   onFocus={() => { if (suggestions.length) setShowSugg(true); }}
                   placeholder={theme.pedido.clientNamePlaceholder ?? undefined}
-                  className="text-xl font-semibold border-b border-transparent outline-none transition w-full bg-transparent hover:border-gray-200 focus:border-black" />
+                  // 🔴 QUE SE VEA QUE SE TOCA (6-sep-2026). La raya de abajo
+                  // era `border-transparent` y solo aparecía al pasar el mouse
+                  // por encima — y en el iPad no hay mouse: el nombre parecía
+                  // texto fijo y nadie descubría que se edita. Ahora la raya
+                  // punteada está SIEMPRE, y al escribir se pone sólida.
+                  className="text-xl font-semibold border-b border-dashed border-gray-300 outline-none transition w-full bg-transparent hover:border-gray-500 focus:border-solid focus:border-black" />
                 {showSugg && suggestions.length > 0 && (
                   <div className={theme.pedido.suggDropdownClass}>
                     {suggList.map((c, i) => (
@@ -955,7 +995,17 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
            que se siente al deslizar. Es el patrón de la casa para tablas
            anchas, y además cubre el pedido de mañana con nombres más largos:
            lo que se mueve es la tabla, nunca la pantalla. */
-        <div className="mb-4 overflow-x-auto">
+        /* 🔴 EL ENCABEZADO SE QUEDA FIJO — DE VERDAD (6-sep-2026).
+           🩸 El `sticky top-0` del <thead> estaba puesto desde siempre y NO
+           funcionaba: `overflow-x-auto` convierte a esta caja en un contenedor
+           de desplazamiento (en CSS, fijar un eje pone el otro en `auto`), y un
+           `sticky` se pega al contenedor que lo desplaza, no a la página. Como
+           la caja no tenía alto, no había nada de dónde pegarse: en el pedido
+           más largo de producción (TOM-023, 38 líneas) los encabezados se
+           perdían al bajar y no volvían.
+           El arreglo es darle ALTO a la caja: la tabla se desplaza adentro —a
+           lo alto y a lo ancho— y ahí el encabezado sí se queda. */
+        <div className="mb-4 overflow-auto max-h-[70vh]">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
@@ -1274,7 +1324,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     className="text-xs bg-black text-white px-4 min-h-[44px] rounded-md hover:bg-gray-800 transition disabled:opacity-40">
                     {sendingToClient ? "Enviando..." : "Enviar"}
                   </button>
-                  <button onClick={() => { setShowEmailInput(false); setClientEmail(""); }}
+                  {/* Cerrar la caja NO borra el correo: es lo que hacía que
+                      hubiera que teclearlo de nuevo cada vez. */}
+                  <button onClick={() => setShowEmailInput(false)}
                     className="text-xs text-gray-400 hover:text-black transition min-h-[44px] px-2">x</button>
                 </div>
               )}

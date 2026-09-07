@@ -103,7 +103,8 @@ const SANEADOS = [
   //  lista propia del checkout. Hoy queda una sola, `[marca]/clientes-switch`,
   //  que lista con `.limit(20)` por búsqueda y no necesita paginar.)
   "src/app/api/catalogo/[marca]/public/route.ts",
-  "src/app/api/catalogo/reebok/stats/route.ts",
+  // (`src/app/api/catalogo/reebok/stats/route.ts` se RETIRÓ el 6-sep-2026:
+  //  cero llamadores desde `src/`. Ver `rutas-de-catalogo-retiradas.test.ts`.)
   "src/app/api/catalogo/reebok/inventory/route.ts",
   // Ranking de productos de Multifashion: 21.749 filas en la ventana de 12
   // meses. Sin paginar leería 1.000 y la pestaña mostraría el 5% de las ventas

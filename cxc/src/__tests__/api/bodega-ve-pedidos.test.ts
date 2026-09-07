@@ -64,7 +64,6 @@ import {
   PUT as publicaPut,
   DELETE as publicaDelete,
 } from "@/app/api/catalogo/[marca]/pedidos-publicos/[short_id]/route";
-import { GET as unificadoGet } from "@/app/api/catalogo/[marca]/pedidos-unificado/route";
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
 import { COMPROBANTES_ROLES, COMPROBANTES_EDITAR_ROLES, CATALOGO_ADMIN_ROLES } from "@/lib/catalogo/roles";
 
@@ -232,13 +231,10 @@ const ESCRITURAS: {
         method: "DELETE", role,
       }) as NextRequest, { params: { marca, short_id: "abc123" } }),
   },
-  {
-    nombre: "el feed del panel de admin (GET /pedidos-unificado)",
-    llamar: (marca, role) =>
-      unificadoGet(makeReq(`/api/catalogo/${marca}/pedidos-unificado`, { role }) as NextRequest, {
-        params: { marca },
-      }),
-  },
+  // ⚠️ «el feed del panel de admin (GET /pedidos-unificado)» SE RETIRÓ CON SU
+  // RUTA (6-sep-2026): sin un solo llamador desde `src/` desde que la lista de
+  // administrar se reemplazó el 25-ago. Que no vuelva lo exige
+  // `src/__tests__/lib/rutas-de-catalogo-retiradas.test.ts`.
 ];
 
 describe("🔴 2. bodega NO gana ninguna escritura — 403 en las 4 marcas", () => {

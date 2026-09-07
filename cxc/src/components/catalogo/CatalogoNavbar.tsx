@@ -40,7 +40,10 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
             en el header grande (theme.logos.navbar === null) no lo repiten
             aquí — su navbar queda solo con "← Inicio". */}
         {theme.logos.navbar && (
-          <Link href={theme.catalogoHref} className="flex-shrink-0">
+          /* 6-sep-2026: el logo es un ENLACE al catálogo y medía 24-28 px de
+             alto. `min-h-[44px]` lo sube al mínimo táctil; el logo se dibuja
+             igual, solo gana aire arriba y abajo. */
+          <Link href={theme.catalogoHref} className="flex-shrink-0 min-h-[44px] inline-flex items-center">
             {theme.logos.navbar()}
           </Link>
         )}

@@ -14,7 +14,8 @@
 //   · el stock usa las palabras completas ("Disponibilidad N" / "Existencia N")
 //     en dos renglones apilados — medido: en una sola línea no cabe (ver
 //     CatalogoStockLine),
-//   · el botón Agregar mide 38px y el control de cantidad mide lo mismo,
+//   · el botón Agregar mide 44px (era 38 hasta el 6-sep-2026) y el control de
+//     cantidad mide lo mismo,
 //   · la foto es 4:3 con object-contain en las 3 marcas,
 //   · el grid sube a 5 columnas SOLO en xl (iPad y móvil intactos),
 //   · el menú Compartir tiene Copiar link + Descargar PDF en las 3 marcas.
@@ -50,6 +51,13 @@ function src(rel: string): string {
  *  que un comentario que NOMBRA una clase vieja no dispare un falso positivo. */
 function clasesAplicadas(code: string): string {
   return code.split("\n").filter((l) => l.includes("className")).join("\n");
+}
+
+/** El archivo SIN comentarios. Este candado cuenta apariciones de un TEXTO de
+ *  pantalla, así que un comentario que lo NOMBRA (para explicar una decisión)
+ *  contaba como un segundo menú. No afloja nada: sigue exigiendo uno solo. */
+function sinComentarios(code: string): string {
+  return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 const PRODUCT_CARD = src("src/components/catalogo/CatalogoProductCard.tsx");
@@ -185,32 +193,51 @@ describe("card de producto — paridad en las 3 marcas", () => {
     expect(arriba.includes("genderLabel"), "ningún chip de género arriba del precio").toBe(false);
   });
 
-  it("el botón Agregar: 44px táctil en móvil/tablet, 38px desde xl", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 6-sep-2026, y no se borró.
+  //
+  // Decía «44px táctil en móvil/tablet, 38px desde xl»: el botón «Agregar»
+  // llevaba `xl:min-h-[38px]` para que la tarjeta cerrara en 328 px en
+  // escritorio. Ese 38 ya no puede estar, y no por gusto: el control de
+  // cantidad subió a 44 (h-11, ver el caso de abajo), así que un «Agregar» de
+  // 38 haría SALTAR la fila del grid al meter un producto al pedido — que es
+  // justo lo que estos dos casos existen para evitar. Daniel aprobó que la
+  // tarjeta crezca.
+  //
+  // ⚠️ Lo que se protege es lo mismo de siempre: **44 es el piso y los dos
+  // botones miden igual en las dos tarjetas**. Y el CONTROL al revés sigue
+  // puesto, ahora más fuerte: ningún 38 puede volver, ni suelto ni con `xl:`.
+  it("el botón Agregar: 44px táctil en TODOS los anchos (ya no baja a 38 en xl)", () => {
     for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
-      // 38px en escritorio (py-[9px] + leading-5 del text-sm) para que la card
-      // cierre en 328px, pero 44px hasta xl: es el mínimo táctil de iOS/Android
-      // y el catálogo se usa desde el celular con el cliente al frente
-      // (Daniel, 25-jul-2026 — revirtió el 38 plano del mismo día).
-      expect(code, nombre).toContain("py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px] xl:min-h-[38px]");
-      // el 38 nunca debe quedar suelto sin el 44 táctil delante
-      expect(code, nombre).not.toMatch(/transition min-h-\[38px\]/);
+      expect(code, nombre).toContain("py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px]");
+      // CONTROL: el 38 no vuelve por ningún lado — ni suelto ni detrás de `xl:`.
+      // Se mira solo lo APLICADO: un comentario que nombra la clase vieja para
+      // contar por qué se fue no puede disparar un falso positivo.
+      expect(clasesAplicadas(code), nombre).not.toMatch(/min-h-\[38px\]/);
     }
   });
 
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 6-sep-2026, y no se borró: `h-9` (36 px) pasó a
+  // `h-11` (44 px) en las DOS tarjetas. Medido en el iPhone y en el iPad: el
+  // «−», el «+» y el número quedaban en 36, 36 y 32 px de alto — el control MÁS
+  // tocado del módulo era el único bajo el piso de 44, mientras 57 botones del
+  // mismo módulo sí lo cumplían. Daniel aprobó subirlo y que la tarjeta crezca.
+  //
+  // ⚠️ LO QUE ESTE CASO PROTEGE NO CAMBIÓ: que el control y el botón «Agregar»
+  // midan LO MISMO —hoy 44 y 44— para que meter un producto al pedido no
+  // estire la fila del grid, y que `shrink-0` siga ahí (sin él el flex del
+  // qtyWrap achicaba el «+» de los 44 px que pide `w-11` a 23 px reales en
+  // 390×844: el «−» no se encoge porque su contenido lo sostiene y todo el
+  // ajuste se lo comía el «+», que es un solo carácter).
   it("el control de cantidad mide lo MISMO que el botón (la fila no crece)", () => {
     for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
-      // h-9 (36) + 1px de borde arriba y abajo del qtyWrap = 38, igual que el
-      // botón Agregar: meter un producto al pedido no puede estirar la fila.
-      //
-      // `shrink-0` (auditoría iPhone, 2ª vuelta): el ALTO sigue siendo h-9, pero
-      // sin esto el flex del qtyWrap achicaba el "+" de los 44px que pide w-11 a
-      // 23px reales en 390×844 — el "−" no se encoge porque su contenido lo
-      // sostiene, así que todo el ajuste se lo comía el "+", que es un solo
-      // carácter. El arreglo es de ANCHO: la fila no crece.
-      expect(code, nombre).toContain("h-9 shrink-0 flex items-center justify-center");
-      expect(code, nombre).toContain("w-11 h-9 shrink-0 flex items-center justify-center");
-      expect(code, nombre).not.toContain("h-11 flex items-center");
-      expect(code, nombre).not.toContain("w-11 h-11");
+      expect(code, nombre).toContain("h-11 shrink-0 flex items-center justify-center");
+      expect(code, nombre).toContain("w-11 h-11 shrink-0 flex items-center justify-center");
+      // CONTROL 1: `shrink-0` no puede perderse — es el arreglo de ANCHO.
+      expect(code, nombre).not.toMatch(/h-11 flex items-center/);
+      expect(code, nombre).not.toMatch(/w-11 h-11 flex items-center/);
+      // CONTROL 2: el 36 viejo no vuelve por ningún lado.
+      expect(clasesAplicadas(code), nombre).not.toContain("h-9 shrink-0");
+      expect(clasesAplicadas(code), nombre).not.toContain("w-11 h-9");
     }
     for (const m of MARCAS) {
       expect(MARCA_THEME[m].card.qtyWrap, m).toContain("border");
@@ -341,9 +368,10 @@ describe("grid del catálogo — 5 columnas SOLO en escritorio grande", () => {
 
 describe("menú Compartir — Copiar link + Descargar PDF en las 3 marcas", () => {
   it("el menú vive UNA sola vez y no está condicionado por marca", () => {
-    expect(VENDEDOR.split("Descargar PDF").length - 1).toBe(1);
+    const vendedorSinComentarios = sinComentarios(VENDEDOR);
+    expect(vendedorSinComentarios.split("Descargar PDF").length - 1).toBe(1);
     // El ítem del PDF no puede colgar de ningún flag/feature de marca.
-    const item = VENDEDOR.slice(VENDEDOR.indexOf("const shareMenu"));
+    const item = vendedorSinComentarios.slice(vendedorSinComentarios.indexOf("const shareMenu"));
     const pdfBtn = item.slice(0, item.indexOf("Descargar PDF"));
     expect(pdfBtn).not.toMatch(/theme\.features\.\w+ &&/);
   });

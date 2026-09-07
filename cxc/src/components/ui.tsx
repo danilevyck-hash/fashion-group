@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, ReactNode, createContext, useContext } from "react";
 import { usePathname } from "next/navigation";
 import { useSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
+import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useBackdropDismiss, useEscapeClose, useFormGuard } from "@/lib/hooks/useModalDismiss";
 
@@ -132,13 +133,11 @@ export function ModalOverlay({
       : align === "middle"
         ? "items-center"
         : "items-end sm:items-center";
-  // Mismo criterio que SidebarAwareMain: en rutas públicas (login, catálogos
-  // públicos, vista de pedido compartible) no hay sidebar → sin offset, si no
-  // el modal quedaría descentrado al revés.
-  const isPublic =
-    pathname === "/" ||
-    pathname.startsWith("/catalogo-publico") ||
-    pathname.startsWith("/pedido-reebok");
+  // Mismo criterio que SidebarAwareMain: donde no hay barra lateral (login,
+  // catálogos públicos, la vista del pedido compartible y —desde el
+  // 6-sep-2026— el catálogo con sesión) no hay offset, si no el modal quedaría
+  // descentrado al revés. La lista es UNA sola y se deriva de las marcas.
+  const isPublic = sinBarraLateral(pathname);
   const sidebarPad = isPublic ? "" : collapsed ? "md:pl-16" : "md:pl-56";
   // El clic fuera solo cuenta si el mousedown Y el click cayeron sobre el
   // backdrop mismo — así un clic dentro del panel nunca cierra (aunque el panel

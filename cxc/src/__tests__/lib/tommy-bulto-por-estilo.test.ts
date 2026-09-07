@@ -245,8 +245,10 @@ describe("🔴 el control cabe en un iPhone", () => {
     // Medido a 390px contra Joybees, que usa el MISMO componente sin este
     // control: Joybees 0px, Tommy 107px. La alternativa —achicar los botones—
     // estaba vedada: estos deciden cuántas piezas se facturan.
-    const batch = leer("src/app/catalogos/admin/[marca]/ProductosBatch.tsx");
-    expect(batch).toContain('className="flex flex-wrap sm:flex-nowrap items-center gap-3"');
+    // 🔄 6-sep-2026: la fila del admin es UNA sola para las 4 marcas y vive en
+    // `ProductoFila.tsx`. El `flex-wrap sm:flex-nowrap` no se tocó.
+    const fila = leer("src/app/catalogos/admin/[marca]/ProductoFila.tsx");
+    expect(fila).toContain('className="flex flex-wrap sm:flex-nowrap items-center gap-3"');
   });
 
   it("los botones respetan el blanco táctil de 44px", () => {

@@ -185,11 +185,17 @@ afterEach(() => {
 /** Cuántas filas se ven ahora mismo. Es lo que el chip promete. */
 const filasVisibles = (c: HTMLElement) => [...c.querySelectorAll("tbody tr")];
 
-/** El número que pinta el chip `label`, leído del DOM. */
+/**
+ * El número que pinta el chip `label`, leído del DOM.
+ *
+ * ⚠️ Desde el 6-sep-2026 **un chip en cero NO se dibuja** (Daniel: «Cotizaciones
+ * 0» ocupaba lugar para decir que no hay nada). Que el chip no esté es la forma
+ * de decir cero, así que eso es lo que devuelve — no un fallo.
+ */
 function conteoDelChip(c: HTMLElement, label: string): number {
   const btn = botonesTipo(c).find((b) => (b.textContent || "").startsWith(label));
-  expect(btn, `no hay chip «${label}»`).toBeTruthy();
-  const n = (btn!.textContent || "").replace(/\s+/g, "").slice(label.length);
+  if (!btn) return 0;
+  const n = (btn.textContent || "").replace(/\s+/g, "").slice(label.length);
   return Number(n);
 }
 
@@ -198,10 +204,15 @@ describe("🔴 TRES chips, sin «Todos» — las 4 marcas", () => {
     it(`${marca}: son exactamente Pedidos · Cotizaciones · Borradores`, () => {
       const { container } = pintarTab(TODAS, marca);
       const textos = botonesTipo(container).map((b) => (b.textContent || "").replace(/\s+/g, " ").trim());
-      expect(textos).toEqual(["Pedidos4", "Cotizaciones1", "Borradores2"]);
-      // 🔴 «Todos» se fue, y «Sin mandar» tampoco vuelve por la ventana.
+      // ⚠️ CAMBIÓ DE DIRECCIÓN el 6-sep-2026, no se borró. Daniel aprobó un
+      // CUARTO chip, «Sin mandar», que NO es un cuarto balde: es un SUBCONJUNTO
+      // de «Pedidos» (los terminados que no llegaron a Switch — 2 reales en
+      // producción, PED-004 y CKP-020). Por eso vive fuera de
+      // `FILTROS_COMPROBANTE` y la partición de los TRES sigue exigida abajo,
+      // intacta.
+      expect(textos).toEqual(["Pedidos4", "Cotizaciones1", "Borradores2", "Sin mandar1"]);
+      // 🔴 «Todos» se fue de este filtro, y no vuelve.
       expect(textos.join(" ")).not.toContain("Todos");
-      expect(textos.join(" ")).not.toContain("Sin mandar");
     });
 
     it(`${marca}: 🔴 abre en «Pedidos» — sin tocar nada`, () => {
@@ -313,10 +324,14 @@ describe("🔴 TRES chips, sin «Todos» — las 4 marcas", () => {
       const filas = [...borradores, PEDIDO, DEL_LINK, CONFIRMADO_SIN_SALIR];
       const { container } = pintarTab(filas, marca);
       expect(conteoDelChip(container, "Borradores"), `${marca}`).toBe(PROD[marca].length);
-      tocarTipo(container, "Borradores");
-      expect(filasVisibles(container)).toHaveLength(PROD[marca].length);
-      for (const b of PROD[marca]) {
-        expect(container.textContent, `${marca} ${b.numero}`).toContain(b.numero);
+      // Joybees no tiene borradores vivos: su chip no se dibuja, y eso ES el
+      // cero. Solo se toca donde hay algo que ver.
+      if (PROD[marca].length > 0) {
+        tocarTipo(container, "Borradores");
+        expect(filasVisibles(container)).toHaveLength(PROD[marca].length);
+        for (const b of PROD[marca]) {
+          expect(container.textContent, `${marca} ${b.numero}`).toContain(b.numero);
+        }
       }
       cleanup();
     }
@@ -338,16 +353,24 @@ describe("🔴 TRES chips, sin «Todos» — las 4 marcas", () => {
     expect(filasVisibles(container)).toHaveLength(4);
   });
 
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 6-sep-2026: el filtro por ORIGEN dejó de ser una
+  // barra de pestañas subrayadas y pasó a píldoras, con el conteo al lado en vez
+  // de entre paréntesis, y sus rótulos son **«Del cliente»** y **«Del vendedor»**
+  // (Daniel: *«no me gusta la palabra del link y míos, no suena profesional»*).
+  // Lo que se protege es lo mismo: que los DOS filtros se crucen y no se pisen.
   it("el filtro por TIPO y el de ORIGEN se cruzan (no se pisan)", () => {
     const { container } = pintarTab(TODAS);
-    fireEvent.click(screen.getByText(/^Del link \(/));
+    const chipOrigen = (label: string) =>
+      [...(container.querySelector('[data-medir="filtro-origen-comprobante"]')?.querySelectorAll("button") || [])]
+        .find((b) => (b.textContent || "").startsWith(label)) as HTMLButtonElement;
+    fireEvent.click(chipOrigen("Del cliente"));
     tocarTipo(container, "Pedidos");
     const filas = filasVisibles(container);
     expect(filas).toHaveLength(1);
     expect(filas[0].textContent).toContain("Nathalie");
     // 🔴 El filtro de ORIGEN conserva su «Todos»: ése NO se tocó.
-    expect(screen.getByText(/^Todos \(/)).toBeTruthy();
-    fireEvent.click(screen.getByText(/^Todos \(/));
+    expect(chipOrigen("Todos")).toBeTruthy();
+    fireEvent.click(chipOrigen("Todos"));
     expect(filasVisibles(container)).toHaveLength(4);
   });
 });
@@ -360,18 +383,37 @@ describe("los vacíos hablan de COMPROBANTES", () => {
     expect(screen.getByText("No hay comprobantes aún")).toBeTruthy();
   });
 
-  it("con un filtro que no trae nada: «Ningún comprobante coincide»", () => {
-    const { container } = pintarTab([PEDIDO]);
-    tocarTipo(container, "Cotizaciones");
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 6-sep-2026: **lo que está en cero ya no se
+  // dibuja** («Cotizaciones 0» ocupaba un lugar para decir que no hay nada), así
+  // que el vacío se provoca CRUZANDO los dos filtros —que es como pasa de
+  // verdad— y no tocando un chip que ya no existe. El texto que se exige es el
+  // mismo.
+  it("con una búsqueda que no trae nada: «Ningún comprobante coincide»", () => {
+    pintarTab([PEDIDO, COTIZACION]);
+    fireEvent.change(screen.getByPlaceholderText(/buscar por cliente o número/i), {
+      target: { value: "no-existe-este-cliente" },
+    });
     expect(screen.getByText("Ningún comprobante coincide")).toBeTruthy();
   });
 
-  it("🔴 la tabla conserva sus 6 columnas (el filtro creció hacia ABAJO)", () => {
+  it("🔴 lo que está en CERO no ocupa lugar", () => {
+    // Con un solo pedido no hay cotizaciones ni borradores: esos chips no se
+    // dibujan. El activo SIEMPRE se dibuja, aunque quede en cero — si no, la
+    // pantalla quedaría sin ningún chip encendido y sin forma de volver.
+    const { container } = pintarTab([PEDIDO]);
+    const textos = botonesTipo(container).map((b) => (b.textContent || "").replace(/\s+/g, " ").trim());
+    expect(textos).toEqual(["Pedidos1"]);
+  });
+
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 6-sep-2026: la tabla pasó a SIETE columnas al
+  // entrar **Vendedor** (aprobada por Daniel). Lo que este caso protege es lo
+  // mismo de siempre: que el FILTRO no ensanche la tabla — crece hacia abajo.
+  it("🔴 la tabla conserva sus columnas: el filtro creció hacia ABAJO", () => {
     const { container } = pintarTab(TODAS);
     const tablas = [...container.querySelectorAll("table")];
     expect(tablas.length).toBeGreaterThan(0);
     for (const t of tablas) {
-      expect(within(t as HTMLElement).getAllByRole("columnheader")).toHaveLength(6);
+      expect(within(t as HTMLElement).getAllByRole("columnheader")).toHaveLength(7);
     }
   });
 

@@ -31,6 +31,23 @@
 //      es lo que evita ofrecerle «Editar» y «Duplicar» — dos botones que le
 //      mueren en 403.
 //
+// 🔄 CAMBIÓ DE DIRECCIÓN EL 6-sep-2026 — EL BOTÓN SE LLAMA «COMPROBANTES»
+//
+// Daniel, textual: ***«todo Comprobantes, porque ahí también hay cotizaciones y
+// borradores»***. Hasta hoy este archivo buscaba el enlace por el rótulo
+// «Pedidos». El mismo lugar tenía TRES nombres —el botón decía «Pedidos», el
+// título de la pantalla «Comprobantes» y el camino de vuelta «← Catálogo»—, así
+// que el candado fijaba uno de los tres. **No se borró ni se aflojó**: sigue
+// exigiendo las mismas seis cosas del enlace, con el rótulo en UNA constante
+// (`ROTULO`) para que no vuelva a haber dos nombres para un solo botón.
+//
+// ⚠️ LO QUE **NO** CAMBIÓ, Y HAY CONTROL QUE LO EXIGE: la `key` sigue siendo
+// `pedidos` —vive en `role_permissions` y en enlaces guardados—, así que el
+// destino sigue siendo `/catalogo/<marca>/pedidos`. Se cambió el RÓTULO, nunca
+// la llave. Y el CONTROL al revés: ya no puede quedar un enlace llamado
+// «Pedidos» en la tarjeta, que es el defecto original —dos nombres para el
+// mismo lugar— visto desde el otro lado.
+//
 // El punto 2 se prueba dos veces: en el DOM (lo que el rol ve) y en el SERVIDOR
 // con cookies firmadas (lo que el rol puede). Un botón dibujado no es un
 // permiso; el permiso es lo que contesta el handler — y las escrituras rol por
@@ -82,6 +99,11 @@ const NOMBRE: Record<MarcaUiKey, string> = {
   calvin: "CALVIN KLEIN",
 };
 
+/** 🔄 6-sep-2026: el rótulo del botón, en UN solo lugar. Era «Pedidos». */
+const ROTULO = "Comprobantes";
+/** El rótulo viejo, para el CONTROL: no puede quedar ninguno con ese nombre. */
+const ROTULO_VIEJO = "Pedidos";
+
 /** Monta el hub como lo vería `rol`, con el módulo `catalogos` puesto (que es
  *  lo que `hasModuleAccess` mira de verdad). Los contadores no importan acá:
  *  `fetch` devuelve una lista vacía y nada sale a la red. */
@@ -110,17 +132,17 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 /** La lista de VER, congelada. gerente_boston entró el 27-ago-2026. */
 const NUEVA_VER = ["admin", "secretaria", "vendedor", "bodega", "gerente_boston"];
 
-describe("🔴 «Pedidos» en la tarjeta — las 4 marcas", () => {
+describe("🔴 «Comprobantes» en la tarjeta — las 4 marcas", () => {
   for (const marca of MARCAS_UI) {
     it(`${marca}: el botón existe y va a /catalogo/${marca}/pedidos`, async () => {
       await montarComo("admin");
-      const link = within(tarjeta(marca)).getByRole("link", { name: "Pedidos" });
+      const link = within(tarjeta(marca)).getByRole("link", { name: ROTULO });
       expect(link.getAttribute("href")).toBe(`/catalogo/${marca}/pedidos`);
     });
 
     it(`${marca}: 🩸 NO apunta a la ruta vieja del panel de administrar`, async () => {
       await montarComo("admin");
-      const link = within(tarjeta(marca)).getByRole("link", { name: "Pedidos" });
+      const link = within(tarjeta(marca)).getByRole("link", { name: ROTULO });
       const href = link.getAttribute("href")!;
       // La pestaña vieja (`/catalogos/admin/<marca>?tab=pedidos`) sigue
       // redirigiendo, pero mandar ahí a un vendedor era el bug del #611.
@@ -130,13 +152,13 @@ describe("🔴 «Pedidos» en la tarjeta — las 4 marcas", () => {
 
     it(`${marca}: el destino sale del tema, no de un href a mano`, async () => {
       await montarComo("admin");
-      const link = within(tarjeta(marca)).getByRole("link", { name: "Pedidos" });
+      const link = within(tarjeta(marca)).getByRole("link", { name: ROTULO });
       expect(link.getAttribute("href")).toBe(getMarcaTheme(marca)!.pedidosHref);
     });
 
     it(`${marca}: una sola vez (no se duplicó con «Ver catálogo»)`, async () => {
       await montarComo("admin");
-      expect(within(tarjeta(marca)).getAllByRole("link", { name: "Pedidos" })).toHaveLength(1);
+      expect(within(tarjeta(marca)).getAllByRole("link", { name: ROTULO })).toHaveLength(1);
     });
 
     it(`${marca}: 🩸 la fila de acciones PUEDE bajar de línea`, async () => {
@@ -145,13 +167,13 @@ describe("🔴 «Pedidos» en la tarjeta — las 4 marcas", () => {
       // renglón y la tarjeta crezca HACIA ABAJO; sin él, flexbox los comprime y
       // el blanco tocable se pierde. Se lee del DOM renderizado, no del .tsx.
       await montarComo("admin");
-      const fila = within(tarjeta(marca)).getByRole("link", { name: "Pedidos" }).parentElement!;
+      const fila = within(tarjeta(marca)).getByRole("link", { name: ROTULO }).parentElement!;
       expect(fila.className).toContain("flex-wrap");
     });
 
     it(`${marca}: blanco tocable de 44 px, igual que los otros dos`, async () => {
       await montarComo("admin");
-      const link = within(tarjeta(marca)).getByRole("link", { name: "Pedidos" });
+      const link = within(tarjeta(marca)).getByRole("link", { name: ROTULO });
       expect(link.className).toContain("min-h-[44px]");
       // Y el texto no baja de 12 px: `text-sm` = 14 px.
       expect(link.className).toContain("text-sm");
@@ -163,11 +185,11 @@ describe("🔴 «Pedidos» en la tarjeta — las 4 marcas", () => {
 
 describe("🔴 quién ve qué en la tarjeta — NADIE gana un permiso", () => {
   const ESPERADO: Record<string, string[]> = {
-    admin: ["Ver catálogo", "Pedidos", "Administrar"],
-    secretaria: ["Ver catálogo", "Pedidos", "Administrar"],
-    vendedor: ["Ver catálogo", "Pedidos"],
+    admin: ["Ver catálogo", ROTULO, "Administrar"],
+    secretaria: ["Ver catálogo", ROTULO, "Administrar"],
+    vendedor: ["Ver catálogo", ROTULO],
     // 🔴 25-ago-2026: bodega ganó «Pedidos» y NADA más. Sigue sin «Administrar».
-    bodega: ["Ver catálogo", "Pedidos"],
+    bodega: ["Ver catálogo", ROTULO],
   };
 
   for (const [rol, botones] of Object.entries(ESPERADO)) {
@@ -180,9 +202,9 @@ describe("🔴 quién ve qué en la tarjeta — NADIE gana un permiso", () => {
     });
   }
 
-  it("🔴 BODEGA VE «Pedidos» en las 4 marcas — es lo que pidió Daniel", async () => {
+  it("🔴 BODEGA VE «Comprobantes» en las 4 marcas — es lo que pidió Daniel", async () => {
     await montarComo("bodega");
-    expect(screen.getAllByRole("link", { name: "Pedidos" })).toHaveLength(MARCAS_UI.length);
+    expect(screen.getAllByRole("link", { name: ROTULO })).toHaveLength(MARCAS_UI.length);
     // Y sigue viendo el catálogo: no se le cambió nada de lo que ya tenía.
     expect(screen.getAllByRole("link", { name: /Ver catálogo/ })).toHaveLength(MARCAS_UI.length);
   });
@@ -195,7 +217,23 @@ describe("🔴 quién ve qué en la tarjeta — NADIE gana un permiso", () => {
   it("🩸 el VENDEDOR sigue SIN «Administrar» (el botón nuevo no se lo abrió)", async () => {
     await montarComo("vendedor");
     expect(screen.queryAllByRole("link", { name: "Administrar" })).toHaveLength(0);
-    expect(screen.getAllByRole("link", { name: "Pedidos" })).toHaveLength(MARCAS_UI.length);
+    expect(screen.getAllByRole("link", { name: ROTULO })).toHaveLength(MARCAS_UI.length);
+  });
+
+  // ── CONTROL del cambio de dirección del 6-sep-2026 ────────────────────────
+  // El defecto original era que un mismo lugar tuviera dos nombres. Si alguien
+  // devuelve «Pedidos» al botón —o deja los dos rótulos conviviendo— esto lo
+  // caza. Y la llave NO se movió: el destino sigue siendo `/…/pedidos`.
+  it("🔄 CONTROL: no queda ningún enlace llamado «Pedidos» — y la llave sigue", async () => {
+    await montarComo("admin");
+    expect(
+      screen.queryAllByRole("link", { name: ROTULO_VIEJO }),
+      "volvió el rótulo viejo: el mismo lugar con dos nombres otra vez",
+    ).toHaveLength(0);
+    for (const marca of MARCAS_UI) {
+      const link = within(tarjeta(marca)).getByRole("link", { name: ROTULO });
+      expect(link.getAttribute("href"), marca).toBe(`/catalogo/${marca}/pedidos`);
+    }
   });
 
   it("«Administrar» sigue siendo de admin + secretaria y de nadie más", async () => {
@@ -277,7 +315,7 @@ describe("🔴 la lista nueva no inventó un permiso", () => {
     );
   });
 
-  it("🔴 y «Pedidos» dentro del catálogo tampoco: sale de la MISMA constante", () => {
+  it("🔴 y «Comprobantes» dentro del catálogo tampoco: sale de la MISMA constante", () => {
     const src = leer("src/components/catalogo/CatalogoVendedorPage.tsx");
     expect(src).toContain("COMPROBANTES_ROLES");
     expect(src, "volvieron los `role === \"…\"` a mano").not.toMatch(

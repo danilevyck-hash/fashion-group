@@ -183,12 +183,13 @@ describe("MARCA_THEME.calvin — blanco/negro minimalista, completo y coherente"
     expect(t.calcTotal([{ quantity: 1, unit_price: 20, bulto_pzas: 8 }])).toBe(160);
   });
 
-  it("admin: estilo batch, nombre y bulto editables, sync manual catalogo-calvin", () => {
-    expect(t.admin.productosStyle).toBe("batch");
-    expect(t.admin.nombreEditable).toBe(true);
+  // 🔄 6-sep-2026: ver la nota en `tommy-config.test.ts` — se fueron del TEMA
+  // `productosStyle`, `nombreEditable`, `badgeEditable` e `importarTab`. El
+  // bulto se QUEDA: Daniel, textual — *«algunos productos de Calvin vienen de a
+  // 8 piezas, pero actualmente ninguno en existencia viene de 8, pero lo
+  // queremos para cuando venga»*.
+  it("admin: bulto editable, sync manual catalogo-calvin", () => {
     expect(t.admin.bultoEditable).toBe(true);
-    expect(t.admin.importarTab).toBe(false);
-    expect(t.admin.badgeEditable).toBe(false);
     expect(t.admin.productEdit).toEqual({ idField: "sku", verb: "POST" });
     expect(t.admin.syncModulo).toBe("catalogo-calvin");
     expect(t.admin.productsUrl).toBe("/api/catalogo/calvin/products");

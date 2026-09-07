@@ -84,21 +84,43 @@ describe("SearchBar · el buscador de pantalla completa (solo móvil)", () => {
 describe("Catálogos · los controles de cantidad y el mini-carrito", () => {
   // Las dos cards van SIEMPRE en paridad (regla del repo), así que el arreglo
   // se verifica en las dos.
+  //
+  // 🔄 LOS TRES CASOS DE ABAJO CAMBIARON DE DIRECCIÓN EL 6-sep-2026, y ninguno
+  // se borró. `h-9` (36 px) pasó a `h-11` (44 px) en las dos tarjetas: medido en
+  // el iPhone y en el iPad, el «−», el «+» y el número quedaban en 36, 36 y
+  // 32 px de alto — el control MÁS tocado del módulo era el único bajo el piso
+  // de 44 de la casa, mientras 57 botones del mismo módulo sí lo cumplían.
+  // Daniel aprobó subirlo y que la tarjeta crezca hacia abajo.
+  //
+  // ⚠️ EL ARREGLO DE ANCHO NO SE TOCÓ, y sigue siendo lo que estos casos
+  // protegen: sin `shrink-0` el flex del qtyWrap achica el «+» de los 44 px que
+  // pide `w-11` a 23 px reales en 390×844 (el «−» no se encoge porque su
+  // contenido lo sostiene, así que todo el ajuste se lo come el «+», que es un
+  // solo carácter). Lo que cambió es el ALTO, no el ancho.
   it('el "+" no se deja encoger por el flex (w-11 medía 23 px reales)', () => {
     for (const [nombre, code] of [["plana", productCard], ["agrupada", groupedCard]] as const) {
-      expect(code.match(/className=\{`w-11 h-9[^`]*`\}/)?.[0] ?? "", nombre).toContain("shrink-0");
+      expect(code.match(/className=\{`w-11 h-11[^`]*`\}/)?.[0] ?? "", nombre).toContain("shrink-0");
     }
   });
 
   it('el "−"/"Quitar" tampoco se encoge', () => {
     for (const [nombre, code] of [["plana", productCard], ["agrupada", groupedCard]] as const) {
-      expect(code, nombre).toMatch(/className=\{`h-9 shrink-0 flex items-center justify-center/);
+      expect(code, nombre).toMatch(/className=\{`h-11 shrink-0 flex items-center justify-center/);
     }
   });
 
-  it("la altura h-9 se respeta: subirla cambiaría el alto fijo de la card", () => {
-    // La card mide 365.5px por diseño (#268-270). El arreglo es de ANCHO.
-    expect(productCard).not.toContain("h-11 flex items-center justify-center ${t.qtyBtn}");
+  it("🔄 la altura ya es 44: el 36 viejo no vuelve, y el ancho sigue protegido", () => {
+    // CONTROL del cambio de dirección, en las dos direcciones a la vez:
+    //   · nadie devuelve `h-9` al control (sería volver bajo el piso de 44);
+    //   · nadie se lleva por delante el `shrink-0` al subir la altura, que es
+    //     el defecto original que este bloque nació para cazar.
+    for (const [nombre, code] of [["plana", productCard], ["agrupada", groupedCard]] as const) {
+      const aplicadas = code.split("\n").filter((l) => l.includes("className")).join("\n");
+      expect(aplicadas, nombre).not.toContain("h-9 shrink-0");
+      expect(aplicadas, nombre).not.toContain("w-11 h-9");
+      expect(aplicadas, nombre).not.toContain("h-11 flex items-center justify-center");
+      expect(aplicadas, nombre).not.toContain("w-11 h-11 flex items-center");
+    }
   });
 
   it('"Vaciar" es táctil en las TRES marcas (medía 38×18)', () => {

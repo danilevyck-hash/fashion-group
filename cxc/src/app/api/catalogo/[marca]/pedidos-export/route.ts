@@ -4,6 +4,7 @@ import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { workbookBuffer, exportFilename, XLSX_MIME } from "@/lib/excel-export";
 import { buildPedidosWorkbook, type PedidoExportRow } from "@/lib/catalogos/pedidos-excel";
 import { normalizarDocumento, type DocumentoSwitch } from "@/lib/catalogo/documento-switch";
+import { contextoDeLineas, totalDeLaLista } from "@/lib/catalogo/totales-lista";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,12 @@ interface UnifiedRow {
  * se baja de esa MISMA lista no los llevaba. Se resuelven con las MISMAS dos
  * consultas que `pedidos-unificado` —envío activo + `order_number`— y los
  * textos los arma `numeros-pedido.ts`, no este archivo.
+ *
+ * 🔴 EL TOTAL SALE DE LA MISMA FUNCIÓN QUE LA PANTALLA (6-sep-2026).
+ * Este Excel armaba los items sin las PIEZAS POR BULTO del estilo, así que todo
+ * lo marcado en 8 se cobraba en 12: seis pedidos de Tommy salían con $1.516,00
+ * de más. Ahora el total lo dan `contextoDeLineas` + `totalDeLaLista`, las
+ * mismas que usa la lista de Comprobantes. Ver `lib/catalogo/totales-lista.ts`.
  */
 export async function POST(req: NextRequest, { params }: { params: { marca: string } }) {
   const cfg = getMarcaConfig(params.marca);
@@ -72,11 +79,11 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
 
     const rows = (data || []) as unknown as UnifiedRow[];
 
-    let categoryMap = new Map<string, string>();
-    if (cfg.categoryLookup) {
-      const allProductIds = rows.flatMap((r) => (r.items || []).map((i) => i.product_id));
-      categoryMap = await cfg.categoryLookup(allProductIds);
-    }
+    // Categoría Y piezas por bulto, en lote, con la MISMA cadena de la pantalla.
+    // Los productos viven en la base de la marca (`cfg.db()`), no en la de la
+    // vista unificada.
+    const allProductIds = rows.flatMap((r) => (r.items || []).map((i) => i.product_id));
+    const ctxLineas = await contextoDeLineas(cfg, await cfg.db(), allProductIds);
 
     // ── Los dos números, con las MISMAS consultas que /pedidos-unificado ──────
     // Solo las filas 'orders' pueden tener envío y `order_number`; la del link
@@ -123,20 +130,13 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
 
     const pedidos: PedidoExportRow[] = rows.map((r) => {
       const items = r.items || [];
-      const itemsForTotal = items.map((i) => ({
-        quantity: Number(i.quantity) || 0,
-        unit_price: Number(i.unit_price) || 0,
-        ...(cfg.categoryLookup
-          ? { category: (i.product_id && categoryMap.get(i.product_id)) || cfg.fallbackCategory || undefined }
-          : {}),
-      }));
       const id = r.id_natural ?? "";
       return {
         origen: r.origen,
         cliente: r.cliente,
         vendor: r.vendor,
         item_count: items.length,
-        total: cfg.calcTotal(itemsForTotal),
+        total: totalDeLaLista(items, ctxLineas),
         created_at: r.created_at,
         numero_pedido: numerosPedido.get(id) ?? null,
         switch_numero: switchNumeros.get(id) ?? null,

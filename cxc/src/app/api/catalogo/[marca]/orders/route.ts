@@ -47,8 +47,8 @@
 // is_preorder; Joybees es bulto 12 fijo sin preventa.
 
 import { NextRequest, NextResponse } from "next/server";
-import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
-import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
+import { resumirDesdeItems, type ContextoLineas, type ItemCrudo } from "@/lib/catalogo/lineas-pedido";
+import { contextoDeLineas, totalDeLaLista } from "@/lib/catalogo/totales-lista";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { comprobantesRoles } from "@/lib/catalogo/roles";
@@ -136,10 +136,11 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       (Array.isArray(f.items) ? (f.items as { product_id?: string }[]) : []).map((i) => i.product_id).filter(Boolean) as string[],
     ),
   ];
-  const categoryMap = cfg.categoryLookup ? await cfg.categoryLookup(allProductIds) : new Map<string, string>();
-  // Las piezas por bulto son del ESTILO (Tommy): sin esto la lista mostraba el
-  // total con el bulto por default, distinto del que abre el detalle.
-  const { bultoPzasByProduct } = await leerCategoriaYBulto(db as never, cfg.productsTable, allProductIds);
+  // Categoría + piezas por bulto del ESTILO (Tommy): sin esto la lista mostraba
+  // el total con el bulto por default, distinto del que abre el detalle. Las dos
+  // lecturas y la fórmula viven en `totales-lista.ts`, que es también de donde
+  // saca su total el Excel de esta misma pantalla.
+  const ctxLineas = await contextoDeLineas(cfg, db as never, allProductIds);
 
   // ¿Cuáles están en Switch, y QUÉ se mandó? Mismo criterio que el candado de
   // edición (envío 'enviado'/'verificado'), en UNA sola query. Decide el chip de
@@ -157,12 +158,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const orders = (data || []).map((o) => {
     const row = o as unknown as Record<string, unknown>;
     const items = (row[cfg.itemsRelation] || []) as { product_id: string; quantity: number; unit_price: number }[];
-    const resumen = resumirDesdeItems(items, {
-      bultoSize: cfg.bultoSize,
-      categoryByProduct: categoryMap,
-      bultoPzasByProduct,
-      fallbackCategory: cfg.fallbackCategory,
-    });
+    const resumen = resumirDesdeItems(items, ctxLineas);
     const idPedido = String(row.id);
     return {
       ...row,
@@ -194,7 +190,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     };
   });
 
-  const delLinkSinConvertir = filasPublicas.map((f) => filaPublicaComoPedido(cfg, f, categoryMap));
+  const delLinkSinConvertir = filasPublicas.map((f) => filaPublicaComoPedido(f, ctxLineas));
 
   // Una sola lista, la más nueva arriba (el orden que ya traía la query).
   const todos = [...orders, ...delLinkSinConvertir].sort(
@@ -259,27 +255,14 @@ async function leerPublicos(cfg: MarcaConfig): Promise<LecturaPublicos> {
  * la pantalla que primero hay que convertirlo.
  */
 function filaPublicaComoPedido(
-  cfg: MarcaConfig,
   f: Record<string, unknown>,
-  categoryMap: Map<string, string>,
+  ctxLineas: ContextoLineas,
 ): Record<string, unknown> {
-  const items = (Array.isArray(f.items) ? f.items : []) as {
-    product_id?: string;
-    quantity?: number;
-    unit_price?: number;
-    category?: string;
-  }[];
-  // Mismo recálculo que la lista unificada del admin: nunca el `total`
-  // guardado, que en pedidos viejos quedó subvaluado.
-  const total = cfg.calcTotal(
-    items.map((i) => ({
-      quantity: Number(i.quantity) || 0,
-      unit_price: Number(i.unit_price) || 0,
-      ...(cfg.categoryLookup
-        ? { category: (i.product_id && categoryMap.get(i.product_id)) || i.category || cfg.fallbackCategory || undefined }
-        : {}),
-    })),
-  );
+  const items = (Array.isArray(f.items) ? f.items : []) as ItemCrudo[];
+  // Mismo recálculo que el resto de la lista y que el Excel: nunca el `total`
+  // guardado, que en pedidos viejos quedó subvaluado. Y con las MISMAS piezas
+  // por bulto — un pedido del link de un estilo de 8 no puede cobrarse en 12.
+  const total = totalDeLaLista(items, ctxLineas);
   return {
     // El id de una fila pública es su short_id: la pantalla lo usa para
     // convertirla, no para abrir un detalle interno que todavía no existe.
@@ -329,15 +312,8 @@ interface IncomingItem {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function resumenDePedido(cfg: MarcaConfig, db: any, items: IncomingItem[]) {
-  const ids = items.map((i) => i.product_id);
-  const categoryMap = cfg.categoryLookup ? await cfg.categoryLookup(ids) : new Map<string, string>();
-  const { bultoPzasByProduct } = await leerCategoriaYBulto(db as never, cfg.productsTable, ids);
-  return resumirDesdeItems(items, {
-    bultoSize: cfg.bultoSize,
-    categoryByProduct: categoryMap,
-    bultoPzasByProduct,
-    fallbackCategory: cfg.fallbackCategory,
-  });
+  const ctx = await contextoDeLineas(cfg, db, items.map((i) => i.product_id));
+  return resumirDesdeItems(items, ctx);
 }
 
 export async function POST(req: NextRequest, { params }: { params: { marca: string } }) {

@@ -169,6 +169,35 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
       }),
     });
     if (!res.ok) { const err = await res.json(); return NextResponse.json({ error: err.message }, { status: 500 }); }
+    // ─────────────────────────────────────────────────────────────────────────
+    // 🔴 EL CORREO DEL CLIENTE QUEDA GUARDADO EN EL PEDIDO (6-sep-2026)
+    //
+    // 🩸 Se tecleaba a mano cada vez y el sistema lo tiraba: medido contra
+    // producción el 7-sep-2026, **`client_email` estaba vacío en los 56 pedidos
+    // vivos** aunque la columna existe desde el día uno.
+    //
+    // 🔑 SE ANOTA ACÁ, DESPUÉS DE QUE RESEND CONFIRMA, y no con un PUT desde la
+    // pantalla — por dos razones:
+    //   1. es el patrón de la casa (el CXC anota el envío DESPUÉS de que Resend
+    //      dice que sí; anotar antes registraría un correo que nunca salió);
+    //   2. el PUT de `orders/[id]` cuenta `client_email` como CONTENIDO y el
+    //      candado post-envío a Switch lo rechaza con 409 — o sea que en un
+    //      pedido ya mandado, que es justo el que se le manda al cliente, el
+    //      correo no se habría podido guardar nunca.
+    //
+    // ⚠️ Solo cuando fue al CLIENTE: el aviso interno a Fashion Group va a
+    // `daniel@fashiongr.com` y ése no es el correo de nadie. Falla ABIERTA — el
+    // correo ya salió, y no poder anotarlo no lo deshace.
+    // ─────────────────────────────────────────────────────────────────────────
+    if (body.orderId && esCliente) {
+      try {
+        const db = await cfg.db();
+        await db
+          .from(cfg.ordersTable)
+          .update({ client_email: String(body.clientEmail).trim() })
+          .eq("id", body.orderId);
+      } catch { /* el correo ya llegó: anotarlo es un extra, no una condición */ }
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(err); return NextResponse.json({ error: "Error interno" }, { status: 500 });

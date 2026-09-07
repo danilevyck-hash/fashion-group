@@ -118,9 +118,10 @@ export function VariantePicker({
     }
   }
 
+  // 44 px de alto: esto se usa con el dedo en el iPad (6-sep-2026).
   const btnBase = compacto
-    ? "px-3 py-2 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] transition whitespace-nowrap"
-    : "w-full py-2 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] transition";
+    ? "min-h-[44px] px-3 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] transition whitespace-nowrap"
+    : "w-full min-h-[44px] rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] transition";
 
   // Sin alternativas no hay nada que elegir → no se pinta ningún control.
   if (alternativas <= 0) return null;

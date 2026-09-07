@@ -4,7 +4,7 @@
 // MARCA_THEME. Las secciones Pedido/Pre-orden del mini-carrito son feature
 // (preorder, hoy solo Reebok).
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
@@ -35,6 +35,17 @@ interface CatalogoStickyCartBarProps {
   miniCartLink?: React.ReactNode;
   // Format function
   formatTotal: (n: number) => string;
+  /**
+   * Alto REAL de la barra, en px, cada vez que cambia.
+   *
+   * 🩸 El grid reservaba abajo un `pb-28` (112 px) escrito a mano. Medido el
+   * 6-sep-2026 en el catálogo PÚBLICO: la barra mide **180 px** —lleva encima
+   * el bloque «Tu nombre *», que es obligatorio y siempre visible— así que
+   * tapaba el «Agregar» de la última fila y el botón de subir. Del lado del
+   * vendedor mide 93 y no se notaba. Un número escrito a mano no puede seguir
+   * a una barra que crece: ahora el espacio sale de la MEDIDA.
+   */
+  onAltoChange?: (alto: number) => void;
 }
 
 export default function CatalogoStickyCartBar({
@@ -42,7 +53,7 @@ export default function CatalogoStickyCartBar({
   onQtyChange, onClearCart,
   variant, onSubmitOrder, clientName, onClientNameChange, onCreateOrder,
   saving, actionLabel, actionColor,
-  miniCartLink, formatTotal,
+  miniCartLink, formatTotal, onAltoChange,
 }: CatalogoStickyCartBarProps) {
   const theme = getMarcaTheme(marca)!;
   const c = theme.cart;
@@ -59,6 +70,30 @@ export default function CatalogoStickyCartBar({
   // Escape cierra el mini-carrito igual que el clic en el backdrop. El hook va
   // ANTES del early return de cartCount (reglas de hooks).
   useEscapeClose(miniCartOpen, () => setMiniCartOpen(false));
+
+  // El alto de la barra se MIDE y se avisa. Cambia sola: el aviso de
+  // «Guardando…», el error del nombre y el mini-carrito abierto la hacen
+  // crecer, y el `env(safe-area-inset-bottom)` del iPhone le suma abajo. Un
+  // ResizeObserver es lo único que sigue todo eso. Los hooks van antes del
+  // early return de `cartCount` (reglas de hooks).
+  const barraRef = useRef<HTMLDivElement | null>(null);
+  const avisarAlto = useCallback((alto: number) => { onAltoChange?.(alto); }, [onAltoChange]);
+  useEffect(() => {
+    const el = barraRef.current;
+    if (!el) { avisarAlto(0); return; }
+    // Sin ResizeObserver (navegador viejo) se mide una vez: mejor un número
+    // real de una sola lectura que volver al 112 escrito a mano.
+    if (typeof ResizeObserver === "undefined") {
+      avisarAlto(el.getBoundingClientRect().height);
+      return;
+    }
+    const ro = new ResizeObserver(() => {
+      if (barraRef.current) avisarAlto(barraRef.current.getBoundingClientRect().height);
+    });
+    ro.observe(el);
+    avisarAlto(el.getBoundingClientRect().height);
+    return () => ro.disconnect();
+  }, [avisarAlto, cartCount, miniCartOpen, saving, clientName]);
 
   if (cartCount === 0) return null;
 
@@ -133,6 +168,7 @@ export default function CatalogoStickyCartBar({
   return (
     <>
     <div
+      ref={barraRef}
       className="fixed bottom-0 left-0 right-0 z-40"
       style={{ animation: "slideUp 0.25s ease-out" }}
     >

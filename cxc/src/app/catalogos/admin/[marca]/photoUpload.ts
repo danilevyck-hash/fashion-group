@@ -80,65 +80,16 @@ async function compress(file: File): Promise<File> {
   }
 }
 
-/**
- * Actualiza la etiqueta (badge) de un producto. `badge` null = sin etiqueta.
- * Solo marcas con badgeEditable (Reebok — PUT por id). Lanza Error con mensaje
- * legible si falla (server/red/timeout) → el caller siempre puede mostrar el
- * error y revertir el optimista.
- */
-const BADGE_TIMEOUT_MS = 15_000;
-
-export async function updateProductBadge(marca: MarcaUiKey, productId: string, badge: string | null): Promise<void> {
-  const theme = getMarcaTheme(marca)!;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), BADGE_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${theme.api}/products`, {
-      method: theme.admin.productEdit.verb,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: productId, badge }),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      throw new Error(body?.error || "No se pudo guardar la etiqueta.");
-    }
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error("Tardó demasiado. Revisa tu conexión e intenta de nuevo.");
-    }
-    if (err instanceof Error) throw err;
-    throw new Error("No se pudo guardar la etiqueta.");
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/**
- * Renombra un producto (solo marcas con nombreEditable — Tommy). El endpoint
- * marca nombre_manual=true → el sync deja de pisar el nombre. Lanza Error con
- * mensaje legible si falla.
- */
-export async function editProductName(
-  marca: MarcaUiKey,
-  producto: { id: string; sku: string },
-  name: string,
-): Promise<void> {
-  const theme = getMarcaTheme(marca)!;
-  const body =
-    theme.admin.productEdit.idField === "id"
-      ? { id: producto.id, name }
-      : { sku: producto.sku, name };
-  const res = await fetch(`${theme.api}/products`, {
-    method: theme.admin.productEdit.verb,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => null);
-    throw new Error(d?.error || "No se pudo guardar el nombre.");
-  }
-}
+// 🔴 6-sep-2026 — AQUÍ VIVÍAN `updateProductBadge` y `editProductName`, y se
+// RETIRARON con sus controles de la pantalla: la etiqueta (Nuevo · Oferta ·
+// Próximamente) tenía 0 usos en los 1.120 productos, y el nombre editado a
+// mano, 0 de 1.120. Las COLUMNAS `badge` y `nombre_manual` NO se dropean —
+// quedan sin lectores en esta pantalla y el sync las sigue respetando— y hay
+// candado (`catalogo-admin-una-lista.test.ts`) que pone el build ROJO si una
+// migración las borra o si esta pantalla vuelve a escribirlas.
+//
+/** Tiempo de espera de los guardados cortos (hoy solo el bulto). */
+const GUARDADO_TIMEOUT_MS = 15_000;
 
 /**
  * Toggle "Ocultar del catálogo / Mostrar en catálogo" (oculto_manual) vía
@@ -235,7 +186,7 @@ export async function updateProductBulto(
 ): Promise<void> {
   const theme = getMarcaTheme(marca)!;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), BADGE_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), GUARDADO_TIMEOUT_MS);
   try {
     const res = await fetch(`${theme.api}/products`, {
       method: theme.admin.productEdit.verb,

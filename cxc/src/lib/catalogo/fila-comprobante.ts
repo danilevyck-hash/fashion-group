@@ -60,6 +60,13 @@ export interface FilaComprobante {
   switch_documento: DocumentoSwitch | null;
   /** `status` de la tabla de orders. 🔴 Null en el pedido del link: no tiene fila ahí. */
   status: string | null;
+  /**
+   * El correo al que se le mandó el papel. Medido el 7-sep-2026: **0 de 56
+   * pedidos lo tienen** — se tecleaba a mano cada vez y el detalle lo borraba al
+   * terminar. Viaja acá para que «Reenviar el correo» de la fila abra con el
+   * correo YA ESCRITO en vez de pedirlo otra vez.
+   */
+  client_email: string | null;
 }
 
 /** Una fila cruda del GET /api/catalogo/<marca>/orders. */
@@ -78,6 +85,7 @@ export interface FilaDeOrders {
   en_switch?: boolean;
   switch_documento?: DocumentoSwitch | string | null;
   confirmado_cliente_at?: string | null;
+  client_email?: string | null;
 }
 
 const DOCS: readonly string[] = ["pedido", "cotizacion"];
@@ -90,6 +98,13 @@ const DOCS: readonly string[] = ["pedido", "cotizacion"];
  * como "Del link" — de ahí vino. La tabla física viaja aparte, en `fuente`, que
  * es la que decide a qué detalle se entra y qué ruta borra. Confundirlas es
  * exactamente el bug que el panel del admin ya pagó una vez.
+ *
+ * 🩸 Y `origen` TAMPOCO mira quién entró (6-sep-2026). Se probó comparar el
+ * vendedor de la fila contra el nombre de la sesión, y está mal por dos
+ * motivos: el chip se llama «Del vendedor», no «Míos» —dice de dónde vino el
+ * comprobante, no de quién es—, así que el pedido de una compañera le salía
+ * como «Del cliente»; y este módulo también corre en el SERVIDOR, donde
+ * `sessionStorage` no existe.
  *
  * 🔴 `status` se copia TAL CUAL, incluido el null. Un null NO es un borrador:
  * el pedido del link todavía no tiene fila en la tabla de orders. Rellenarlo
@@ -116,6 +131,7 @@ export function filaDeOrders(o: FilaDeOrders): FilaComprobante {
     numero_pedido: o.order_number ?? null,
     switch_documento: doc,
     status: o.status ?? null,
+    client_email: (o.client_email ?? null) || null,
   };
 }
 

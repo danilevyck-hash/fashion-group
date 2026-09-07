@@ -231,6 +231,12 @@ export const FILTRO_COMPROBANTE_DEFAULT: FiltroComprobante = "pedido";
  * Los tres filtros, en el orden en que se leen. «Cotizaciones» es el que Daniel
  * pidió poder ver de un vistazo: lo que se cotizó y todavía no se vendió.
  * «Borradores» es lo que todavía no se terminó de armar.
+ *
+ * 🔴 «SIN MANDAR» NO VA ACÁ (6-sep-2026). Es un chip más en la pantalla, pero
+ * es un SUBCONJUNTO de «Pedidos» —los terminados que no llegaron a Switch—, no
+ * un cuarto balde: metido en esta lista rompe la partición de los tres (que es
+ * lo que permitió que «Todos» se fuera) y además se dibujaba DOS veces, porque
+ * `VISTAS_COMPROBANTE` ya lo agrega al final. Vive en `chips-comprobantes.ts`.
  */
 export const FILTROS_COMPROBANTE: readonly { clave: FiltroComprobante; label: string }[] = [
   { clave: "pedido", label: "Pedidos" },

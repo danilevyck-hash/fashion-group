@@ -127,8 +127,24 @@ async function abrirBorrado() {
   // borrado siga funcionando DESDE AHÍ es justamente lo que hay que probar.
   await waitFor(() => expect(screen.getByRole("button", { name: /Borradores/ })).toBeTruthy());
   fireEvent.click(screen.getByRole("button", { name: /Borradores/ }));
-  await waitFor(() => expect(screen.getByText("PED-021")).toBeTruthy());
-  fireEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+  // ⚠️ 6-sep-2026: la lista dibuja FICHA (<lg) y TABLA (>=lg) y jsdom no aplica
+  // Tailwind, así que cada número está dos veces en el árbol. Se mide la TABLA.
+  await waitFor(() => expect(document.querySelector("tbody tr")?.textContent).toContain("PED-021"));
+  // ⚠️ 6-sep-2026: «Eliminar» se MUDÓ al «···» de la casa — en la fila era el
+  // botón más a la vista. La acción es la misma; cambió dónde se toca.
+  const filaBorrador = [...document.querySelectorAll("tbody tr")].find((tr) =>
+    (tr.textContent || "").includes("PED-021"),
+  ) as HTMLElement;
+  fireEvent.click(
+    [...filaBorrador.querySelectorAll("button")].find(
+      (b) => (b.getAttribute("aria-label") || "").startsWith("Más opciones"),
+    )!,
+  );
+  fireEvent.click(
+    [...document.querySelectorAll('[role="menuitem"]')].find(
+      (b) => (b.textContent || "").trim() === "Eliminar",
+    ) as HTMLButtonElement,
+  );
   // ConfirmDeleteModal habilita el botón rojo recién al segundo.
   const confirmar = await waitFor(() => {
     const b = document.querySelector<HTMLButtonElement>("button.bg-red-600");
@@ -434,7 +450,17 @@ describe("🔴 7. la fila y su botón «Editar» llevan al MISMO lado", () => {
     const r2 = render(
       <ComprobantesPanel marca="reebok" pedidos={[DEL_LINK, INTERNO]} onRefresh={async () => {}} showToast={vi.fn()} puedeAdministrar puedeEditar />,
     );
-    const btn = within(filaDe(r2.container, "Nathalie")).getByRole("button", { name: "Editar" });
+    // ⚠️ 6-sep-2026: «Editar» vive dentro del «···». Lo que se compara sigue
+    // siendo lo mismo: la fila y su «Editar» tienen que llevar al MISMO lado.
+    const fila2 = filaDe(r2.container, "Nathalie");
+    fireEvent.click(
+      [...fila2.querySelectorAll("button")].find(
+        (b) => (b.getAttribute("aria-label") || "").startsWith("Más opciones"),
+      )!,
+    );
+    const btn = [...document.querySelectorAll('[role="menuitem"]')].find(
+      (b) => (b.textContent || "").trim() === "Editar",
+    ) as HTMLButtonElement;
     await act(async () => { fireEvent.click(btn); });
     await waitFor(() => expect(PUSH).toHaveBeenCalled());
     expect([...PUSH.mock.calls]).toEqual(porFila);

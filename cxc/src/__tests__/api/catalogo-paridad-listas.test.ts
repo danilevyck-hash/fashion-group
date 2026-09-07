@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PR-0 paridad catálogos — CONTRATO de pedidos-unificado y pedidos-export.
+// PR-0 paridad catálogos — CONTRATO de pedidos-export.
+// (`pedidos-unificado` se retiró el 6-sep-2026 — ver la nota más abajo.)
 //
 //   · roles admin/secretaria (vendedor 403)
 //   · total SIEMPRE re-calculado desde items (nunca el guardado de la vista)
@@ -37,10 +38,7 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
 // PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
 // inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
 import type { NextRequest } from "next/server";
-import { GET as unificadoGet } from "@/app/api/catalogo/[marca]/pedidos-unificado/route";
 import { POST as exportPost } from "@/app/api/catalogo/[marca]/pedidos-export/route";
-const rUnificado = (req: NextRequest) => unificadoGet(req, { params: { marca: "reebok" } });
-const jUnificado = (req: NextRequest) => unificadoGet(req, { params: { marca: "joybees" } });
 const rExport = (req: NextRequest) => exportPost(req, { params: { marca: "reebok" } });
 const jExport = (req: NextRequest) => exportPost(req, { params: { marca: "joybees" } });
 import { XLSX_MIME } from "@/lib/excel-export";
@@ -61,109 +59,13 @@ beforeEach(() => {
   categoryMap = new Map();
 });
 
-describe("GET /pedidos-unificado", () => {
-  it("401 sin sesión, 403 vendedor (solo admin/secretaria) — ambas marcas", async () => {
-    for (const get of [rUnificado, jUnificado]) {
-      expect((await get(makeReq("/x"))).status).toBe(401);
-      expect((await get(makeReq("/x", { role: "vendedor" }))).status).toBe(403);
-    }
-  });
-
-  it("reebok: total re-calculado por categoría, fuente con fallback y switch_numero de envíos activos", async () => {
-    categoryMap = new Map([[P1, "footwear"]]);
-    mainDb.queue("reebok_pedidos_unificado_vw", {
-      data: [
-        {
-          origen: "mio",
-          id_natural: OID,
-          cliente: "Cliente A",
-          total: 1, // stale — no debe salir
-          created_at: "2026-07-20T10:00:00Z",
-          vendor: "V",
-          items: [{ product_id: P1, sku: "S1", name: "P", image_url: null, quantity: 2, unit_price: 10 }],
-          fuente: "orders",
-        },
-        {
-          origen: "link",
-          id_natural: "abc12345",
-          cliente: "Cliente B",
-          total: 1,
-          created_at: "2026-07-19T10:00:00Z",
-          vendor: null,
-          items: [{ product_id: null, sku: null, name: "X", image_url: null, quantity: 1, unit_price: 5 }],
-          // sin `fuente` → fallback por origen
-        },
-      ],
-    });
-    reebokDb.queue("reebok_switch_envios", {
-      data: [{ order_id: OID, numero_interno: "16-000000489", pedido_switch_id: 489, documento: "pedido" }],
-    });
-    reebokDb.queue("reebok_orders", { data: [{ id: OID, order_number: "PED-017" }] });
-
-    const res = await rUnificado(makeReq("/x", { role: "admin" }));
-    expect(res.status).toBe(200);
-    const rows = await res.json();
-
-    expect(rows[0]).toEqual({
-      origen: "mio",
-      id_natural: OID,
-      cliente: "Cliente A",
-      total: 240, // 2×12×10
-      created_at: "2026-07-20T10:00:00Z",
-      vendor: "V",
-      item_count: 1,
-      fuente: "orders",
-      confirmado_cliente_at: null,
-      switch_numero: "16-000000489",
-      // Los DOS números de la fila (24-ago-2026): el de la casa y el del ERP,
-      // con qué se mandó (pedido | cotizacion) para que el número no mienta.
-      numero_pedido: "PED-017",
-      switch_documento: "pedido",
-      // `status` de la tabla de orders (25-ago-2026): es lo que mira el chip
-      // «Borradores». El mock no lo trae ⇒ null, que NO es borrador.
-      status: null,
-    });
-    // link sin fuente → publicos; product_id null → fallback apparel (bulto 6)
-    expect(rows[1].fuente).toBe("publicos");
-    expect(rows[1].total).toBe(30); // 1×6×5
-    expect(rows[1].switch_numero).toBeNull();
-    // El pedido del LINK sin convertir NO tiene número propio: se lo asigna la
-    // conversión. Null, y la pantalla lo dice con palabras.
-    expect(rows[1].numero_pedido).toBeNull();
-    expect(rows[1].switch_documento).toBeNull();
-
-    // El criterio del candado: solo envíos enviado/verificado
-    const enviosChain = reebokDb.chainsFor("reebok_switch_envios")[0];
-    expect(enviosChain._calls.in).toContainEqual(["estado", ["enviado", "verificado"]]);
-  });
-
-  it("joybees: todo en su client, total bulto 12", async () => {
-    joybeesDb.queue("joybees_pedidos_unificado_vw", {
-      data: [
-        {
-          origen: "mio",
-          id_natural: OID,
-          cliente: "C",
-          total: 1,
-          created_at: "2026-07-20T10:00:00Z",
-          vendor: null,
-          items: [{ product_id: P1, sku: "S1", name: "P", image_url: null, quantity: 2, unit_price: 10 }],
-          fuente: "orders",
-        },
-      ],
-    });
-    joybeesDb.queue("joybees_switch_envios", { data: [] });
-
-    const res = await jUnificado(makeReq("/x", { role: "secretaria" }));
-    expect(res.status).toBe(200);
-    const rows = await res.json();
-    expect(rows[0].total).toBe(240); // 2×12×10
-    expect(rows[0].switch_numero).toBeNull();
-    // Nada de joybees toca los clients de reebok/principal
-    expect(reebokDb.tables()).toEqual([]);
-    expect(mainDb.tables()).toEqual([]);
-  });
-});
+// ⚠️ EL BLOQUE `GET /pedidos-unificado` SE RETIRÓ CON SU RUTA (6-sep-2026).
+// La lista de administrar que esa ruta alimentaba se reemplazó el 25-ago-2026
+// por `/catalogo/<marca>/pedidos`, y desde entonces la ruta no tenía un solo
+// llamador desde `src/` — además de calcular mal la plata (hasta $680 en un
+// pedido: no pasaba las piezas por el bulto). Quien impide que vuelva es
+// `src/__tests__/lib/rutas-de-catalogo-retiradas.test.ts`. El bloque de
+// `pedidos-export` de abajo NO se tocó: esa ruta sigue viva.
 
 describe("POST /pedidos-export — Excel de la lista unificada", () => {
   it("401 sin sesión, 403 vendedor — ambas marcas", async () => {

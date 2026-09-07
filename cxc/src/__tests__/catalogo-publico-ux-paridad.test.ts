@@ -188,11 +188,30 @@ describe("prompt de instalar la app", () => {
     }
   });
 
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 6-sep-2026, y no se aflojó. La lista se seguía
+  // derivando de las marcas, pero **se mudó**: vivía escrita en tres lugares
+  // (acá, y dos más en el layout) y ahora hay UNA sola, en
+  // `src/lib/catalogo/rutas-publicas.ts`, que las tres pantallas leen. Este
+  // archivo ya no puede contener `MARCAS_UI.map` porque ya no arma la lista:
+  // pregunta. Lo que se exige es lo mismo —**que nadie escriba las rutas a
+  // mano**— y ahora se exige en las DOS piezas.
   it("la lista se DERIVA del tema — no se escribe marca por marca", () => {
     // El bug original: ["/catalogo-publico", "/pedido-reebok"] a mano, así que
     // Joybees y Tommy sí mostraban "Instala Fashion Group" al cliente.
-    expect(INSTALL).toContain("MARCAS_UI.map");
-    expect(INSTALL).not.toMatch(/PUBLIC_PREFIXES\s*=\s*\[\s*"\/catalogo-publico",\s*"\/pedido-reebok"\s*\]/);
+    const RUTAS = src("src/lib/catalogo/rutas-publicas.ts");
+    expect(RUTAS).toContain("MARCAS_UI.map");
+    // El prompt PREGUNTA, no lista: una sola fuente para las tres pantallas.
+    expect(INSTALL).toContain("esRutaDelCliente");
+    // CONTROL: ni acá ni allá vuelve una ruta de marca escrita a mano.
+    expect(INSTALL).not.toMatch(/PUBLIC_PREFIXES\s*=\s*\[/);
+    // Se mira el CÓDIGO, sin comentarios: los dos archivos cuentan en su
+    // cabecera cuál era la lista vieja, y contarlo no es escribirla.
+    const pelado = (c: string) =>
+      c.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    for (const marca of MARCAS) {
+      expect(pelado(INSTALL), `${marca} escrita a mano en el prompt`).not.toContain(`/pedido-${marca}`);
+      expect(pelado(RUTAS), `${marca} escrita a mano en la lista`).not.toContain(`"/pedido-${marca}"`);
+    }
   });
 });
 

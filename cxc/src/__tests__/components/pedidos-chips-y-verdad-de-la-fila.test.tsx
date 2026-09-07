@@ -99,13 +99,25 @@ function verTodo(container: HTMLElement) {
   }
 }
 
+/**
+ * 🩸 TERCER GOTCHA (6-sep-2026): por debajo de 1024 px la lista es una FICHA y
+ * de ahí para arriba una TABLA, y jsdom no aplica Tailwind — así que las DOS
+ * están en el árbol y cada número aparece dos veces. Este archivo mide la
+ * TABLA (es donde estaba escrito), así que todo se lee dentro de ella. El
+ * mismo criterio que usó Guías cuando pasó a ficha en el teléfono.
+ */
+const soloTabla = (c: HTMLElement) => c.querySelector("table") as HTMLElement | null;
+
 async function pintar() {
   const r = render(<PedidosListClient marca="reebok" />);
   // El panel abre en «Pedidos», y ahí están los 4 `confirmado` que nunca salieron.
-  await waitFor(() => expect(chips(r.container).length).toBe(3), { timeout: 3000 });
+  await waitFor(() => expect(chips(r.container).length).toBeGreaterThanOrEqual(3), { timeout: 3000 });
   verTodo(r.container);
   abrirMeses(r.container);
-  await waitFor(() => expect(screen.getByText("PED-001")).toBeTruthy(), { timeout: 3000 });
+  await waitFor(
+    () => expect((soloTabla(r.container)?.textContent || "").includes("PED-001")).toBe(true),
+    { timeout: 3000 },
+  );
   return r;
 }
 
@@ -124,13 +136,13 @@ function chips(container: HTMLElement): string[] {
  * basura contra basura.
  */
 const numeros = (c: HTMLElement) =>
-  Array.from(c.querySelectorAll("div.leading-snug"))
+  Array.from(c.querySelectorAll("table div.leading-snug"))
     .map((d) => (d.querySelector("span")?.textContent || "").trim())
     .filter((t) => /^[A-Z]+-\d+$/.test(t));
 
 /** La FILA de un pedido: el <tr> que lo contiene. */
 function filaDe(container: HTMLElement, numero: string): HTMLElement {
-  const tr = Array.from(container.querySelectorAll("tr")).find((f) =>
+  const tr = Array.from(container.querySelectorAll("tbody tr")).find((f) =>
     (f.textContent || "").includes(numero),
   );
   expect(tr, `no encontré ninguna fila con ${numero}`).toBeTruthy();
@@ -146,14 +158,20 @@ const tocar = (c: HTMLElement, label: RegExp) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 son EXACTAMENTE tres chips, y particionan", () => {
-  it("hay tres, ni uno más, y en su orden", async () => {
+describe("🔴 los TRES chips particionan (y el cuarto es un subconjunto)", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 6-sep-2026, no se borró. Entró un cuarto chip,
+  // «Sin mandar», que NO parte nada: es un SUBCONJUNTO de «Pedidos» (los
+  // terminados que no llegaron a Switch). Y **lo que está en cero ya no se
+  // dibuja**, así que «Cotizaciones0» dejó de existir en pantalla. Lo que este
+  // bloque protege sigue siendo lo mismo: que los TRES de siempre estén, en su
+  // orden, y que NINGUNA fila viva se quede sin chip.
+  it("están los tres, en su orden, y el cuarto va al final", async () => {
     const { container } = await pintar();
     const c = chips(container);
-    expect(c).toHaveLength(3);
     expect(c[0]).toMatch(/^Pedidos\d+$/);
-    expect(c[1]).toMatch(/^Cotizaciones\d+$/);
-    expect(c[2]).toMatch(/^Borradores\d+$/);
+    expect(c[1]).toMatch(/^Borradores\d+$/);   // no hay cotizaciones en el fixture
+    expect(c[2]).toMatch(/^Sin mandar\d+$/);
+    expect(c).toHaveLength(3);
   });
 
   it("no vuelven «Todos», «Confirmado» ni «Enviado»", async () => {
@@ -164,14 +182,19 @@ describe("🔴 son EXACTAMENTE tres chips, y particionan", () => {
     }
   });
 
-  it("🩸 los conteos SUMAN el total: sin «Todos», una fila sin chip es invisible", async () => {
+  it("🩸 los TRES conteos SUMAN el total: una fila sin chip es invisible", async () => {
     const { container } = await pintar();
-    const n = chips(container).map((t) => Number(t.match(/(\d+)$/)?.[1] ?? -1));
-    expect(n.some((x) => x < 0)).toBe(false);
-    expect(n.reduce((a, b) => a + b, 0)).toBe(PEDIDOS.length);
+    const c = chips(container);
+    const conteo = (label: string) =>
+      Number(c.find((t) => t.startsWith(label))?.match(/(\d+)$/)?.[1] ?? 0);
+    // «Sin mandar» NO entra en la suma: es un subconjunto de «Pedidos», no un
+    // cuarto balde. Sumarlo contaría dos veces las mismas 4 filas.
+    expect(conteo("Pedidos") + conteo("Cotizaciones") + conteo("Borradores")).toBe(PEDIDOS.length);
     // 2 borradores (PED-018 y PED-021) · 0 cotizaciones · 6 pedidos.
-    expect(chips(container)[2]).toBe("Borradores2");
-    expect(chips(container)[1]).toBe("Cotizaciones0");
+    expect(conteo("Borradores")).toBe(2);
+    expect(conteo("Cotizaciones")).toBe(0);
+    // Y los 4 «confirmado» que nunca salieron son exactamente el chip nuevo.
+    expect(conteo("Sin mandar")).toBe(4);
   });
 });
 
@@ -193,7 +216,10 @@ describe("🔴 LA FILA DICE LA VERDAD, aunque el chip organice por otra cosa", (
     const { container } = await pintar();
     for (const n of ["PED-001", "PED-002", "PED-003", "PED-004"]) {
       expect(numeros(container), `${n} tiene que estar a la vista`).toContain(n);
-      expect(filaDe(container, n).textContent, n).toContain("No se ha mandado a Switch");
+      // ⚠️ 6-sep-2026: el mismo hecho, dicho más fuerte. Un pedido TERMINADO
+      // que no salió pasó de «No se ha mandado a Switch» en gris a «Sin mandar
+      // a Switch · hace N días» en rojo. La verdad sigue en la fila.
+      expect(filaDe(container, n).textContent, n).toMatch(/Sin mandar a Switch/);
     }
   });
 

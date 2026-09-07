@@ -42,6 +42,7 @@ const empresaSelector = read("app", "reclamos", "components", "EmpresaSelector.t
 const saldosBancarios = read("app", "gastos-contabilidad", "components", "saldos", "SaldosBancarios.tsx");
 const mfResumen = read("components", "multifashion", "MultifashionResumenView.tsx");
 const mfView = read("components", "multifashion", "MultifashionView.tsx");
+const mfPeriodoSelect = read("components", "multifashion", "PeriodoSelect.tsx");
 const mfCharts = read("components", "multifashion", "DetalleMensualCharts.tsx");
 const login = read("app", "page.tsx");
 
@@ -104,10 +105,15 @@ describe("Targets de 44px", () => {
     expect(saldosBancarios).toMatch(/bg-black text-white px-3 min-h-\[44px\]/);
   });
 
-  it("Multifashion · las flechas de mes son 44×44 y no van pegadas al selector", () => {
-    expect(mfView).not.toMatch(/flex h-9 w-9 items-center justify-center rounded-md border/);
-    expect((mfView.match(/flex h-11 w-11 items-center justify-center rounded-md border/g) ?? []).length).toBe(2);
-    expect(mfView).toMatch(/\{\/\* iPhone[\s\S]*?\*\/\}\s*<div className="flex items-center gap-2">/);
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 6-sep-2026. Pedía que las flechas ‹ › del mes
+  // midieran 44×44. **Ya no hay flechas**: el mes se elige en el desplegable
+  // único del módulo (`PeriodoSelect`), que es el que tiene que medir 44. El
+  // candado se conserva apuntando al control que quedó, no se borra.
+  it("Multifashion · el selector de período mide 44 y ya no hay flechas de mes", () => {
+    expect(mfView).not.toMatch(/aria-label="Mes anterior"/);
+    expect(mfView).not.toMatch(/aria-label="Mes siguiente"/);
+    expect(mfPeriodoSelect).toContain('aria-label="Período"');
+    expect(mfPeriodoSelect).toMatch(/className="h-11 [^"]*"/);
   });
 
   it("Multifashion · el toggle Mes/Año deja de medir 26px", () => {

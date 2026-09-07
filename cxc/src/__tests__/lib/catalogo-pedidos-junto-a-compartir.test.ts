@@ -32,17 +32,31 @@ const VENDEDOR = "src/components/catalogo/CatalogoVendedorPage.tsx";
 const HEADER = "src/components/catalogo/CatalogoHeader.tsx";
 const PUBLICO = "src/components/catalogo/CatalogoPublicoPage.tsx";
 
-describe("🔴 'Pedidos' se mudó, no se duplicó", () => {
+// 🔄 CAMBIÓ DE DIRECCIÓN EL 6-sep-2026, y no se borró: el botón se llama
+// **«Comprobantes»**. Daniel, textual: *«todo Comprobantes, porque ahí también
+// hay cotizaciones y borradores»*. El mismo lugar tenía TRES nombres —el botón
+// decía «Pedidos», el título de la pantalla «Comprobantes» y el camino de
+// vuelta «← Catálogo»—, así que este candado fijaba uno de los tres.
+// ⚠️ La `key` y la RUTA no se movieron (`theme.pedidosHref` sigue siendo
+// `/catalogo/<marca>/pedidos`): se cambió el RÓTULO, nunca la llave. Y el
+// CONTROL al revés queda puesto: el rótulo viejo no puede volver a aparecer,
+// que es el defecto original —dos nombres para el mismo lugar— visto de frente.
+describe("🔴 'Comprobantes' se mudó, no se duplicó", () => {
   it("la navbar ya no lo dibuja", () => {
     const s = leer(NAVBAR);
     expect(s).not.toMatch(/>Pedidos</);
+    expect(s).not.toMatch(/>Comprobantes</);
     expect(s).not.toContain("pedidosHref");
   });
 
   it("la pantalla del catálogo lo dibuja UNA sola vez", () => {
     const s = leer(VENDEDOR);
-    expect((s.match(/>Pedidos</g) || []).length).toBe(1);
+    expect((s.match(/>Comprobantes</g) || []).length).toBe(1);
     expect(s).toContain("theme.vendorShare.pedidosBtn");
+    // CONTROL: el rótulo viejo no vuelve — un solo lugar, un solo nombre.
+    expect((s.match(/>Pedidos</g) || []).length).toBe(0);
+    // Y la RUTA sigue siendo la de siempre: se cambió el rótulo, no la llave.
+    expect(s).toContain("theme.pedidosHref");
   });
 
   it("queda en la MISMA fila que Compartir, en los dos layouts", () => {

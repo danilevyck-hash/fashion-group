@@ -77,10 +77,6 @@ export interface AdminProducto {
   bulto_pzas?: number | null;
 }
 
-function tieneFotoAdmin(p: AdminProducto): boolean {
-  return !!(p.image_url && p.image_url.trim());
-}
-
 // Label por categoría real de Reebok (vive 100% en active_shoes; el grupo del
 // catálogo ES la categoría: Footwear / Apparel / Accessories).
 const REEBOK_CATEGORIA_LABEL: Record<string, string> = {
@@ -281,6 +277,8 @@ export interface MarcaTheme {
   // ── Clases por componente (strings literales completos) ──
   navbar: {
     accentBar: string;
+    /** «← Inicio». 6-sep-2026: medía 47×34 en las 4 marcas — `min-h-[44px]`
+     *  lo sube al mínimo táctil de la casa sin cambiar cómo se ve. */
     inicioLink: string;
   };
   header: {
@@ -392,6 +390,8 @@ export interface MarcaTheme {
     pedidosBtn: string;
     iconSize: number;
     panel: string;
+    /** Cada opción del menú «Compartir». 6-sep-2026: medían 34 px (Reebok) y
+     *  41 (las otras tres) — `min-h-[44px]` las sube al mínimo táctil. */
     item: string;
     copyLabel: string;
     /** Color del botón principal de la barra sticky (null = default del tema). */
@@ -436,12 +436,17 @@ export interface MarcaTheme {
     subtituloSync: (lastSync: string | null) => string;
     /** GET de products del admin (QUIRK 4 heredado: Reebok usa scope=admin). */
     productsUrl: string;
-    /** Cards de resumen sobre los productos VISIBLES (sin ocultos a mano). */
-    metrics: (visibles: AdminProducto[]) => { label: string; value: number; highlight?: boolean }[];
     /** Excel "sin foto" por marca (columnas y libs propias). Lanza si falla. */
     excelSinFoto: (sin: AdminProducto[]) => Promise<void>;
-    /** Contador del tab Faltan foto: chip rojo (Reebok) o inline en el label. */
-    fotoTabBadge: "chip" | "inline";
+    /**
+     * Chips de categoría de la pantalla «Administrar» (6-sep-2026). Vacío = se
+     * DERIVA de `filtros.categoryOptions`, el MISMO mapa que usa el catálogo
+     * público. Solo se escribe donde hay una razón: Joybees no tiene columna de
+     * categoría y clasifica por el nombre del producto.
+     */
+    categorias?: { value: string; label: string }[];
+    /** De qué categoría es un producto, para esos chips. Vacío = `p.category`. */
+    categoriaDe?: (p: AdminProducto) => string | null;
     syncModulo: string;
     syncSubtext: string;
     toastBg: string;
@@ -450,16 +455,11 @@ export interface MarcaTheme {
     metricValue: string;
     metricHighlightBox: string;
     metricHighlightValue: string;
-    /** Estilo del tab de fotos/productos: "tarjetas" (Reebok, badge+stock+bulk)
-     *  o "batch" (Joybees/Tommy, batch simple). */
-    productosStyle: "tarjetas" | "batch";
-    /** Solo Tommy: nombre editable inline en las filas del admin (al guardarlo
-     *  el endpoint marca nombre_manual=true y el sync deja de pisarlo). */
-    nombreEditable: boolean;
-    /** Import por plantilla como respaldo (?tab=importar) — solo Joybees. */
-    importarTab: boolean;
-    /** Edición de etiqueta (badge) por producto — solo Reebok. */
-    badgeEditable: boolean;
+    // 🔴 6-sep-2026: se fueron `metrics` (las 5 tarjetas repetían los chips de
+    // abajo), `fotoTabBadge` y `productosStyle` (ya no hay pestañas ni dos
+    // dibujos de la misma lista), `nombreEditable` y `badgeEditable` (0 usos en
+    // 1.120 productos) e `importarTab` (la importación por plantilla se retiró
+    // de la pantalla). Las COLUMNAS de la base no se tocaron.
     /** QUIRK 5 client-side: identificador y verbo del update de products. */
     productEdit: { idField: "id" | "sku"; verb: "PUT" | "POST" };
     /**
@@ -636,7 +636,7 @@ const REEBOK: MarcaTheme = {
 
   navbar: {
     accentBar: "bg-[#E4002B]",
-    inicioLink: "text-xs text-[#1A2656] hover:text-[#E4002B] transition flex-shrink-0 py-2",
+    inicioLink: "text-xs text-[#1A2656] hover:text-[#E4002B] transition flex-shrink-0 py-2 min-h-[44px] inline-flex items-center",
   },
   header: {
     fashionGroupBar: "w-1 h-4 bg-[#E4002B] rounded-full",
@@ -744,7 +744,7 @@ const REEBOK: MarcaTheme = {
     pedidosBtn: "text-xs border border-[#1A2656]/10 text-[#1A2656] px-3 py-1.5 rounded-lg hover:border-[#1A2656]/25 transition flex items-center gap-1.5 min-h-[44px] font-medium",
     iconSize: 12,
     panel: "absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 w-48 z-50",
-    item: "w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition flex items-center gap-2",
+    item: "w-full text-left px-3 py-2 min-h-[44px] text-xs hover:bg-gray-50 transition flex items-center gap-2",
     copyLabel: "Copiar link público",
     stickyActionColor: "bg-[#E4002B] hover:bg-[#c90025]",
   },
@@ -774,16 +774,6 @@ const REEBOK: MarcaTheme = {
       return `Sincronizado con Switch ${rel} · 1×/día`;
     },
     productsUrl: "/api/catalogo/reebok/products?scope=admin",
-    metrics: (visibles) => {
-      const sinFoto = visibles.filter((p) => !tieneFotoAdmin(p)).length;
-      return [
-        { label: "Productos", value: visibles.length },
-        { label: "Sin foto", value: sinFoto, highlight: sinFoto > 0 },
-        { label: "Footwear", value: visibles.filter((p) => p.category === "footwear").length },
-        { label: "Apparel", value: visibles.filter((p) => p.category === "apparel").length },
-        { label: "Accessories", value: visibles.filter((p) => p.category === "accessories").length },
-      ];
-    },
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
       const [{ buildReebokSinFotoWorkbook }, { downloadWorkbook, exportFilename }] = await Promise.all([
@@ -801,7 +791,6 @@ const REEBOK: MarcaTheme = {
       );
       downloadWorkbook(wb, exportFilename("reebok-sin-foto"));
     },
-    fotoTabBadge: "chip",
     syncModulo: "catalogo-reebok",
     syncSubtext: "tarda ~3 min",
     toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1A2656] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
@@ -810,10 +799,6 @@ const REEBOK: MarcaTheme = {
     metricValue: "text-[#1A2656]",
     metricHighlightBox: "border-[#E4002B]/30 bg-[#E4002B]/5",
     metricHighlightValue: "text-[#E4002B]",
-    productosStyle: "tarjetas",
-    nombreEditable: false,
-    importarTab: false,
-    badgeEditable: true,
     productEdit: { idField: "id", verb: "PUT" },
     pedidos: {
       linkBadge: "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700",
@@ -949,7 +934,7 @@ const JOYBEES: MarcaTheme = {
 
   navbar: {
     accentBar: "bg-[#FFE443]",
-    inicioLink: "text-xs text-[#404041] hover:text-[#FFE443] transition flex-shrink-0 py-2",
+    inicioLink: "text-xs text-[#404041] hover:text-[#FFE443] transition flex-shrink-0 py-2 min-h-[44px] inline-flex items-center",
   },
   header: {
     fashionGroupBar: "w-1 h-4 bg-[#FFE443] rounded-full",
@@ -1048,7 +1033,7 @@ const JOYBEES: MarcaTheme = {
     pedidosBtn: "flex items-center gap-1.5 text-xs text-[#404041] hover:text-black transition px-3 py-2 rounded-lg border border-[#404041]/10 hover:border-[#404041]/20 min-h-[44px] font-medium",
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
-    item: "w-full text-left px-4 py-2.5 text-sm text-[#404041] hover:bg-gray-50 transition flex items-center gap-2",
+    item: "w-full text-left px-4 py-2.5 min-h-[44px] text-sm text-[#404041] hover:bg-gray-50 transition flex items-center gap-2",
     copyLabel: "Copiar link público",
     stickyActionColor: null,
   },
@@ -1080,16 +1065,16 @@ const JOYBEES: MarcaTheme = {
           : ""
       }`,
     productsUrl: "/api/catalogo/joybees/products",
-    metrics: (visibles) => {
-      const sinFoto = visibles.filter((p) => !tieneFotoAdmin(p)).length;
-      return [
-        { label: "Productos", value: visibles.length },
-        { label: "Sin foto", value: sinFoto, highlight: sinFoto > 0 },
-        { label: "Clogs", value: visibles.filter((p) => tipoJoybees(p.name) === "Clogs").length },
-        { label: "Sandalias", value: visibles.filter((p) => tipoJoybees(p.name) === "Sandalias").length },
-        { label: "Flips", value: visibles.filter((p) => tipoJoybees(p.name) === "Flips").length },
-      ];
-    },
+    // Joybees es 100% calzado y NO tiene columna de categoría: su
+    // `categoryOptions` está vacía a propósito (el catálogo público
+    // tampoco ofrece ese filtro). El tipo se deriva del NOMBRE, con el
+    // mismo `tipoJoybees` que ya usa su Excel — no una lista nueva.
+    categorias: [
+      { value: "Clogs", label: "Clogs" },
+      { value: "Sandalias", label: "Sandalias" },
+      { value: "Flips", label: "Flips" },
+    ],
+    categoriaDe: (p) => tipoJoybees(p.name),
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
       const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, JOYBEES_PALETTE } =
@@ -1113,7 +1098,6 @@ const JOYBEES: MarcaTheme = {
       ]);
       downloadWorkbook(wb, exportFilename("joybees-sin-foto"));
     },
-    fotoTabBadge: "inline",
     syncModulo: "catalogo-joybees",
     syncSubtext: "tarda ~1-2 min",
     toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#404041] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
@@ -1122,10 +1106,6 @@ const JOYBEES: MarcaTheme = {
     metricValue: "text-[#404041]",
     metricHighlightBox: "border-amber-300 bg-amber-50",
     metricHighlightValue: "text-amber-600",
-    productosStyle: "batch",
-    nombreEditable: false,
-    importarTab: true,
-    badgeEditable: false,
     productEdit: { idField: "sku", verb: "POST" },
     pedidos: {
       linkBadge: "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-[#FFE443] text-[#404041]",
@@ -1266,7 +1246,7 @@ const TOMMY: MarcaTheme = {
 
   navbar: {
     accentBar: "bg-[#AE0029]",
-    inicioLink: "text-xs text-[#152342] hover:text-[#AE0029] transition flex-shrink-0 py-2",
+    inicioLink: "text-xs text-[#152342] hover:text-[#AE0029] transition flex-shrink-0 py-2 min-h-[44px] inline-flex items-center",
   },
   header: {
     fashionGroupBar: "w-1 h-4 bg-[#AE0029] rounded-full",
@@ -1382,7 +1362,7 @@ const TOMMY: MarcaTheme = {
     pedidosBtn: "flex items-center gap-1.5 text-xs text-[#152342] hover:text-[#AE0029] transition px-3 py-2 rounded-lg border border-[#152342]/10 hover:border-[#152342]/20 min-h-[44px] font-medium",
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
-    item: "w-full text-left px-4 py-2.5 text-sm text-[#152342] hover:bg-gray-50 transition flex items-center gap-2",
+    item: "w-full text-left px-4 py-2.5 min-h-[44px] text-sm text-[#152342] hover:bg-gray-50 transition flex items-center gap-2",
     copyLabel: "Copiar link público",
     stickyActionColor: "bg-[#AE0029] hover:bg-[#8c0021]",
   },
@@ -1414,16 +1394,6 @@ const TOMMY: MarcaTheme = {
           : ""
       }`,
     productsUrl: "/api/catalogo/tommy/products",
-    metrics: (visibles) => {
-      const sinFoto = visibles.filter((p) => !tieneFotoAdmin(p)).length;
-      return [
-        { label: "Productos", value: visibles.length },
-        { label: "Sin foto", value: sinFoto, highlight: sinFoto > 0 },
-        { label: "Sneakers", value: visibles.filter((p) => p.category === "sneakers").length },
-        { label: "Flip Flops", value: visibles.filter((p) => p.category === "flip_flops").length },
-        { label: "Sandalias", value: visibles.filter((p) => p.category === "sandals").length },
-      ];
-    },
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
       const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, TOMMY_PALETTE } =
@@ -1453,7 +1423,6 @@ const TOMMY: MarcaTheme = {
       ]);
       downloadWorkbook(wb, exportFilename("tommy-sin-foto"));
     },
-    fotoTabBadge: "inline",
     syncModulo: "catalogo-tommy",
     syncSubtext: "tarda ~2-3 min",
     toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#152342] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
@@ -1462,10 +1431,6 @@ const TOMMY: MarcaTheme = {
     metricValue: "text-[#152342]",
     metricHighlightBox: "border-[#AE0029]/30 bg-[#AE0029]/5",
     metricHighlightValue: "text-[#AE0029]",
-    productosStyle: "batch",
-    nombreEditable: true,
-    importarTab: false,
-    badgeEditable: false,
     productEdit: { idField: "sku", verb: "POST" },
     bultoEditable: true,
     pedidos: {
@@ -1607,7 +1572,7 @@ const CALVIN: MarcaTheme = {
 
   navbar: {
     accentBar: "bg-[#1A1A1A]",
-    inicioLink: "text-xs text-[#1A1A1A] hover:text-black transition flex-shrink-0 py-2",
+    inicioLink: "text-xs text-[#1A1A1A] hover:text-black transition flex-shrink-0 py-2 min-h-[44px] inline-flex items-center",
   },
   header: {
     fashionGroupBar: "w-1 h-4 bg-[#1A1A1A] rounded-full",
@@ -1723,7 +1688,7 @@ const CALVIN: MarcaTheme = {
     pedidosBtn: "flex items-center gap-1.5 text-xs text-[#1A1A1A] hover:text-black transition px-3 py-2 rounded-lg border border-[#1A1A1A]/10 hover:border-[#1A1A1A]/20 min-h-[44px] font-medium",
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
-    item: "w-full text-left px-4 py-2.5 text-sm text-[#1A1A1A] hover:bg-gray-50 transition flex items-center gap-2",
+    item: "w-full text-left px-4 py-2.5 min-h-[44px] text-sm text-[#1A1A1A] hover:bg-gray-50 transition flex items-center gap-2",
     copyLabel: "Copiar link público",
     stickyActionColor: "bg-[#1A1A1A] hover:bg-black",
   },
@@ -1755,16 +1720,6 @@ const CALVIN: MarcaTheme = {
           : ""
       }`,
     productsUrl: "/api/catalogo/calvin/products",
-    metrics: (visibles) => {
-      const sinFoto = visibles.filter((p) => !tieneFotoAdmin(p)).length;
-      return [
-        { label: "Productos", value: visibles.length },
-        { label: "Sin foto", value: sinFoto, highlight: sinFoto > 0 },
-        { label: "Sneakers", value: visibles.filter((p) => p.category === "sneakers").length },
-        { label: "Flip Flops", value: visibles.filter((p) => p.category === "flip_flops").length },
-        { label: "Sandalias", value: visibles.filter((p) => p.category === "sandals").length },
-      ];
-    },
     excelSinFoto: async (sin) => {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
       const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, CALVIN_PALETTE } =
@@ -1795,7 +1750,6 @@ const CALVIN: MarcaTheme = {
       ]);
       downloadWorkbook(wb, exportFilename("calvin-sin-foto"));
     },
-    fotoTabBadge: "inline",
     syncModulo: "catalogo-calvin",
     syncSubtext: "tarda ~2-3 min",
     toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
@@ -1804,10 +1758,6 @@ const CALVIN: MarcaTheme = {
     metricValue: "text-[#1A1A1A]",
     metricHighlightBox: "border-[#1A1A1A]/30 bg-[#1A1A1A]/5",
     metricHighlightValue: "text-[#1A1A1A]",
-    productosStyle: "batch",
-    nombreEditable: true,
-    importarTab: false,
-    badgeEditable: false,
     productEdit: { idField: "sku", verb: "POST" },
     bultoEditable: true,
     pedidos: {

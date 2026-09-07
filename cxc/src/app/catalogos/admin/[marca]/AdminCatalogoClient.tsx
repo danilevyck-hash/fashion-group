@@ -1,26 +1,47 @@
 "use client";
 
-// Shell del admin de catálogos — ÚNICO por marca (PR-2). El encabezado,
-// métricas, tabs y data-layer (SWR) son compartidos; el contenido del tab de
-// productos depende del estilo de la marca (MARCA_THEME.admin.productosStyle):
-//   · "tarjetas" (Reebok): bulk upload por SKU + tarjetas con etiqueta/stock/
-//     ocultar + catálogo completo con filtros.
-//   · "batch" (Joybees): batch simple nombre=SKU + lista con ocultar + tab
-//     Importar de respaldo (solo por URL ?tab=importar).
+// ─────────────────────────────────────────────────────────────────────────────
+// «Administrar» el catálogo — UNA pantalla, UNA lista, para las cuatro marcas.
+// Rediseño del 6-sep-2026, aprobado punto por punto por Daniel.
+//
+// 🩸 SE ENTRABA A UNA PESTAÑA VACÍA. Eran dos pestañas —«Faltan foto» y
+// «Catálogo completo»— y abría la de fotos. En Reebok hay 0 productos sin foto,
+// así que lo primero que se veía al entrar era «Ningún producto activo sin
+// foto» y dos cajas de arrastre: dos pantallas de alto, y para llegar a los
+// productos había que tocar la otra pestaña. Ahora hay UNA lista y «Sin foto»
+// es un chip más.
+//
+// 🩸 LOS MISMOS NÚMEROS ESTABAN DOS VECES. Arriba cinco tarjetas
+// —`232 Productos · 0 Sin foto · 162 Footwear · 54 Apparel · 16 Accessories`—
+// y justo debajo los mismos números como chips, en inglés. Quedó UNA fila:
+// `Todos 232 · Calzado 162 · Ropa 54 · Accesorios 16 · Sin foto 0 ·
+// Escondidos 1`. 🔴 Los números se CALCULAN (`admin-chips.ts`) y los nombres
+// de categoría salen del mapa que ya existe por marca, nunca de una traducción
+// escrita acá.
+//
+// 🔴 Se retiraron de la pantalla la ETIQUETA (Nuevo/Oferta/Próximamente), el
+// NOMBRE editado a mano y la importación por plantilla de Joybees: 0 usos
+// medidos el 6-sep-2026. Las COLUMNAS de la base no se dropean.
+// ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useMemo, Suspense } from "react";
+import { useCallback, useMemo, useState, Suspense } from "react";
 import useSWR from "swr";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import SyncNowButton from "@/components/shared/SyncNowButton";
-import { FaltanFotoTarjetasTab, CatalogoCompletoTab } from "./ProductosTarjetas";
-import { FaltanFotoBatchTab, ProductosBatchListTab, ImportarTab } from "./ProductosBatch";
+import { FiltroDesplegable } from "@/components/catalogo/CatalogoFilters";
+import SubirFotos from "./SubirFotos";
+import ProductoFila from "./ProductoFila";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { catalogoAdminRoles } from "@/lib/catalogo/roles";
-import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
 import { normalizarSkuStorage } from "@/lib/catalogos/fotos-b2b";
 import { contarAlternativas, type StorageMarcaKey } from "@/lib/catalogos/variantes-paths";
+import {
+  categoriasDeLaMarca, chipValido, chipsDelCatalogo, pasaElChip,
+} from "@/lib/catalogos/admin-chips";
+import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
+import { coincideBusqueda, ordenarParaTrabajar } from "@/lib/catalogos/admin-lista";
 
 /** Respuesta de GET /products/variantes (sin `sku`): el mapa completo de la marca. */
 interface VariantesResp {
@@ -31,11 +52,12 @@ interface VariantesResp {
   exacto: boolean;
 }
 
-// 🔴 `pedidos` YA NO ES UNA PESTAÑA DE ESTE PANEL (25-ago-2026). Los
-// comprobantes son UNA pantalla propia, la misma para los tres roles:
-// `/catalogo/<marca>/pedidos`. La `key` vieja no murió — `page.tsx` redirige
-// `?tab=pedidos` allá, así que el marcador guardado sigue llegando.
-type Tab = "faltan-foto" | "completo" | "importar";
+/** Opciones del filtro de bulto. Los dos tamaños que existen en el negocio. */
+const BULTO_FILTRO_OPCIONES = [
+  { value: "", label: "Todos" },
+  { value: "12", label: "12 piezas" },
+  { value: "8", label: "8 piezas" },
+];
 
 const ADMIN_SWR_OPTS = { dedupingInterval: 60_000, revalidateOnFocus: true } as const;
 
@@ -62,7 +84,12 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   // Administrar catálogos = admin + secretaria (fuente única en lib/catalogo/roles).
   const { authChecked } = useAuth({ moduleKey: "catalogos", allowedRoles: catalogoAdminRoles() });
 
-  const [tab, setTab] = useUrlState<Tab>("tab", "faltan-foto");
+  // El chip elegido vive en la URL (`?ver=`): sobrevive al refresh y se comparte.
+  // Es un filtro del MISMO nivel → `replace`, como manda la convención.
+  const [verBruto, setVer] = useUrlState("ver", "todos");
+  const [busqueda, setBusqueda] = useState("");
+  const [genero, setGenero] = useState("");
+  const [bulto, setBulto] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -88,21 +115,44 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   );
 
   const products = useMemo(() => productsData ?? [], [productsData]);
-  // Visibles = catálogo vivo: sin ocultados a mano (oculto_manual) NI ocultos
-  // por el sync (active=false — en Joybees/Tommy el GET admin también trae los
-  // inactivos, que no deben ensuciar métricas ni cola de fotos; en Reebok el
-  // scope=admin ya filtra y esto es no-op).
-  const visibles = useMemo(
-    () => products.filter((p) => p.oculto_manual !== true && p.active !== false),
-    [products],
-  );
-  // Cola "Faltan foto": visibles sin foto, ordenados por disponibilidad desc
-  // (lo más vendible primero). Regla única en lib/catalogos/fotos-faltantes.ts.
-  const sinFoto = useMemo(() => colaSinFoto(visibles), [visibles]);
-  const loading = productsLoading && !productsData;
+  // Lo que el sync apagó (active=false) no es lo mismo que lo escondido a mano:
+  // el GET de Joybees/Tommy/Calvin también trae inactivos y no deben ensuciar
+  // ni los chips ni la lista. En Reebok el scope=admin ya filtra y esto es no-op.
+  const vivos = useMemo(() => products.filter((p) => p.active !== false), [products]);
 
-  const metrics = useMemo(() => theme.admin.metrics(visibles), [theme, visibles]);
-  const sinFotoCount = sinFoto.length;
+  // Categorías de los chips: el mapa que YA existe por marca, nunca una lista
+  // escrita en la pantalla (ver `marcas-ui` → `admin.categorias`).
+  const categorias = useMemo(
+    () => theme.admin.categorias ?? categoriasDeLaMarca(theme.filtros.categoryOptions),
+    [theme],
+  );
+  const categoriaDe = useMemo(
+    () => theme.admin.categoriaDe ?? ((p: AdminProducto) => p.category ?? null),
+    [theme],
+  );
+
+  const chips = useMemo(
+    () => chipsDelCatalogo(vivos, categorias, categoriaDe),
+    [vivos, categorias, categoriaDe],
+  );
+  const ver = chipValido(verBruto, chips);
+
+  // El Excel «sin foto» sale de la MISMA cola de siempre (activos, sin los
+  // escondidos, lo más vendible primero) — `fotos-faltantes.ts`, la fuente que
+  // comparten el admin, la alerta del sync y el resumen semanal de los lunes.
+  const sinFoto = useMemo(() => colaSinFoto(vivos), [vivos]);
+
+  const lista = useMemo(() => {
+    const filtrados = vivos.filter((p) => {
+      if (!pasaElChip(p, ver, categoriaDe)) return false;
+      if (!theme.genero.match(p.gender, genero)) return false;
+      // Se compara contra el tamaño EFECTIVO, no contra la columna: un producto
+      // sin marcar es de 12, y filtrar por 12 tiene que traerlo.
+      if (bulto && String(theme.bulto(p.category, p.bulto_pzas)) !== bulto) return false;
+      return coincideBusqueda(p, busqueda);
+    });
+    return ordenarParaTrabajar(filtrados);
+  }, [vivos, ver, categoriaDe, genero, bulto, busqueda, theme]);
 
   // Cuántas fotos ALTERNATIVAS tiene cada SKU — o sea, distintas a la que ya
   // está puesta. Se calcula UNA vez para toda la lista, con datos que ya
@@ -128,15 +178,16 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
     [alternativasPorSku],
   );
 
-  const reloadProducts = useCallback(async () => { await mutateProducts(); }, [mutateProducts]);
+  const recargar = useCallback(async () => { await mutateProducts(); }, [mutateProducts]);
   // Tras el ZIP hay que revalidar productos Y la lista de variantes.
-  const reloadTrasZip = useCallback(async () => {
+  const recargarTrasZip = useCallback(async () => {
     await Promise.all([mutateProducts(), mutateVariantes()]);
   }, [mutateProducts, mutateVariantes]);
 
-  async function excelSinFoto() {
-    // Mismo conjunto y orden que la pestaña "Faltan foto" (cola sinFoto).
-    if (sinFoto.length === 0) { showToast("No hay productos sin foto — todo al día."); return; }
+  const hayFiltros = !!(genero || bulto || busqueda);
+  const cargando = productsLoading && !productsData;
+
+  async function descargarExcelSinFoto() {
     try {
       await theme.admin.excelSinFoto(sinFoto);
       showToast("Excel listo — revisa tu carpeta de descargas");
@@ -147,22 +198,11 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
 
   if (!authChecked) return null;
 
-  const tabs: { key: Tab; label: string; badge?: number }[] = [
-    theme.admin.fotoTabBadge === "chip"
-      ? { key: "faltan-foto", label: "Faltan foto", badge: sinFotoCount }
-      : { key: "faltan-foto", label: sinFotoCount > 0 ? `Faltan foto (${sinFotoCount})` : "Faltan foto" },
-    { key: "completo", label: "Catálogo completo" },
-  ];
-
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Catálogos" />
 
-      {toast && (
-        <div className={theme.admin.toastBg}>
-          {toast}
-        </div>
-      )}
+      {toast && <div className={theme.admin.toastBg}>{toast}</div>}
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Encabezado */}
@@ -186,82 +226,124 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
               />
             </div>
           </div>
+          {/* 🩸 Con 0 productos sin foto el botón seguía encendido y bajaba un
+              Excel vacío. Apagado dice por qué. */}
           <button
-            onClick={excelSinFoto}
-            className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.97] transition"
+            onClick={descargarExcelSinFoto}
+            disabled={sinFoto.length === 0}
+            title={sinFoto.length === 0 ? "Todos los productos tienen foto" : undefined}
+            className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-40 disabled:hover:bg-transparent disabled:active:scale-100"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            Excel sin foto
+            {sinFoto.length === 0 ? "Todos tienen foto" : "Descargar Excel sin foto"}
           </button>
         </div>
 
-        {/* Resumen */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-          {metrics.map((m) => (
-            <Metric key={m.label} marca={marca} label={m.label} value={m.value} highlight={m.highlight} />
-          ))}
-        </div>
-
-        {/* Pestañas */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex-1 min-h-[44px] py-2 text-sm font-medium rounded-md transition flex items-center justify-center gap-1.5 ${
-                tab === t.key ? theme.admin.tabActive : "text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              {t.label}
-              {t.badge != null && t.badge > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold rounded-full bg-[#E4002B] text-white">
-                  {t.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
+        {cargando ? (
           <div className="flex justify-center py-20">
             <div className={theme.admin.spinner} />
           </div>
         ) : (
           <>
-            {tab === "faltan-foto" && (
-              theme.admin.productosStyle === "tarjetas" ? (
-                <FaltanFotoTarjetasTab marca={marca} products={visibles} sinFoto={sinFoto} onPhotoSaved={reloadProducts} onZipDone={reloadTrasZip} tieneVariantes={tieneVariantes} showToast={showToast} />
-              ) : (
-                <FaltanFotoBatchTab marca={marca} products={visibles} sinFoto={sinFoto} showToast={showToast} onComplete={reloadProducts} onZipDone={reloadTrasZip} tieneVariantes={tieneVariantes} />
-              )
-            )}
-            {tab === "completo" && (
-              theme.admin.productosStyle === "tarjetas" ? (
-                <CatalogoCompletoTab marca={marca} products={products} onPhotoSaved={reloadProducts} tieneVariantes={tieneVariantes} showToast={showToast} />
-              ) : (
-                <ProductosBatchListTab marca={marca} products={products} showToast={showToast} onComplete={reloadProducts} tieneVariantes={tieneVariantes} />
-              )
-            )}
-            {tab === "importar" && theme.admin.importarTab && (
-              <ImportarTab marca={marca} products={products} showToast={showToast} onImportComplete={reloadProducts} />
+            <SubirFotos
+              marca={marca}
+              products={products}
+              onFotoSubida={recargar}
+              onZipListo={recargarTrasZip}
+              showToast={showToast}
+            />
+
+            {/* Buscador */}
+            <div className="relative mb-3">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar por código o nombre…"
+                className="w-full min-h-[44px] pl-10 pr-4 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-gray-400 transition"
+              />
+            </div>
+
+            {/* UNA fila de chips, con el número adentro. */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {chips.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setVer(c.key)}
+                  aria-pressed={ver === c.key}
+                  className={`inline-flex min-h-[44px] items-center gap-1.5 px-3 rounded-lg text-xs font-medium transition active:scale-[0.97] ${
+                    ver === c.key
+                      ? "bg-gray-900 text-white"
+                      : "bg-gray-100 text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {c.label}
+                  <span className={`tabular-nums ${ver === c.key ? "text-white/60" : "text-gray-400"}`}>
+                    {c.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Género y bulto — los MISMOS controles y opciones del catálogo. */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <FiltroDesplegable
+                etiqueta="Género"
+                valor={genero}
+                opciones={theme.filtros.genderOptions}
+                onChange={setGenero}
+                chipActive={theme.filtros.chipActive}
+                chipInactive={theme.filtros.chipInactive}
+              />
+              {theme.admin.bultoEditable && (
+                <FiltroDesplegable
+                  etiqueta="Bulto"
+                  valor={bulto}
+                  opciones={BULTO_FILTRO_OPCIONES}
+                  onChange={setBulto}
+                  chipActive={theme.filtros.chipActive}
+                  chipInactive={theme.filtros.chipInactive}
+                />
+              )}
+              {hayFiltros && (
+                <button
+                  type="button"
+                  onClick={() => { setGenero(""); setBulto(""); setBusqueda(""); }}
+                  className="min-h-[44px] px-3 text-xs font-medium text-gray-500 underline-offset-2 hover:underline hover:text-gray-700 transition"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            {/* Que los filtros no dejen una pantalla vacía sin explicación: es la
+                diferencia entre "no hay ninguno así" y "algo se rompió". */}
+            {lista.length === 0 ? (
+              <p className="py-10 text-center text-sm text-gray-500">
+                {hayFiltros ? "Ningún producto con esos filtros." : "Ningún producto aquí."}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {lista.map((p) => (
+                  <ProductoFila
+                    key={p.id}
+                    marca={marca}
+                    product={p}
+                    onCambio={recargar}
+                    tieneVariantes={tieneVariantes}
+                    showToast={showToast}
+                  />
+                ))}
+              </div>
             )}
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-// ── Resumen ─────────────────────────────────────────────────────────────────
-
-function Metric({ marca, label, value, highlight }: { marca: MarcaUiKey; label: string; value: number; highlight?: boolean }) {
-  const theme = getMarcaTheme(marca)!;
-  return (
-    <div className={`rounded-lg border p-3 ${highlight ? theme.admin.metricHighlightBox : "border-gray-200 bg-white"}`}>
-      <div className={`text-2xl font-bold tabular-nums ${highlight ? theme.admin.metricHighlightValue : theme.admin.metricValue}`}>{value}</div>
-      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
     </div>
   );
 }

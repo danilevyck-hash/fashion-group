@@ -88,7 +88,6 @@ import type { NextRequest, NextResponse } from "next/server";
 import { GET as productsGet, PUT as productsPut, POST as productsPost } from "@/app/api/catalogo/[marca]/products/route";
 // Lo que NO es suyo, dentro del mismo módulo.
 import { GET as ordersGet, POST as ordersPost } from "@/app/api/catalogo/[marca]/orders/route";
-import { GET as unificadoGet } from "@/app/api/catalogo/[marca]/pedidos-unificado/route";
 import { POST as exportPost } from "@/app/api/catalogo/[marca]/pedidos-export/route";
 import { GET as clientesSwitchGet } from "@/app/api/catalogo/[marca]/clientes-switch/route";
 import { GET as vendedoresSwitchGet } from "@/app/api/catalogo/[marca]/vendedores-switch/route";
@@ -227,11 +226,10 @@ const AJENAS: {
     llamar: (marca, role) =>
       ordersGet(makeReq(`/api/catalogo/${marca}/orders`, { role }) as NextRequest, { params: { marca } }),
   },
-  {
-    nombre: "el feed del panel de admin (GET /pedidos-unificado)",
-    llamar: (marca, role) =>
-      unificadoGet(makeReq(`/api/catalogo/${marca}/pedidos-unificado`, { role }) as NextRequest, { params: { marca } }),
-  },
+  // ⚠️ «el feed del panel de admin (GET /pedidos-unificado)» SE RETIRÓ CON SU
+  // RUTA (6-sep-2026): sin un solo llamador desde `src/` desde que la lista de
+  // administrar se reemplazó el 25-ago. Que no vuelva lo exige
+  // `src/__tests__/lib/rutas-de-catalogo-retiradas.test.ts`.
   {
     nombre: "crear un pedido (POST /orders)",
     llamar: (marca, role) =>

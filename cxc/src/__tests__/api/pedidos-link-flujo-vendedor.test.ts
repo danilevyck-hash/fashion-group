@@ -67,7 +67,6 @@ import { PATCH as itemPatch } from "@/app/api/catalogo/[marca]/orders/[id]/item/
 import { POST as envioPost } from "@/app/api/catalogo/[marca]/orders/[id]/enviar-switch/route";
 import { GET as clientesGet, PATCH as clientesPatch } from "@/app/api/catalogo/[marca]/clientes-switch/route";
 import { GET as vendedoresGet } from "@/app/api/catalogo/[marca]/vendedores-switch/route";
-import { GET as unificadoGet } from "@/app/api/catalogo/[marca]/pedidos-unificado/route";
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
 
 beforeAll(() => {
@@ -133,10 +132,9 @@ const NO_ABIERTOS: { nombre: string; llamar: (rol: string) => Promise<NextRespon
     nombre: "borrar la fila del link",
     llamar: (role) => publicoDelete(makeReq("/x", { method: "DELETE", role }), { params: { marca: MARCA, short_id: SID } }),
   },
-  {
-    nombre: "la lista unificada del panel de admin",
-    llamar: (role) => unificadoGet(makeReq("/x", { role }), { params: { marca: MARCA } }),
-  },
+  // ⚠️ «la lista unificada del panel de admin» SE RETIRÓ CON SU RUTA
+  // (6-sep-2026): sin llamadores desde `src/` desde el 25-ago. Que no vuelva lo
+  // exige `src/__tests__/lib/rutas-de-catalogo-retiradas.test.ts`.
 ];
 
 beforeEach(() => {

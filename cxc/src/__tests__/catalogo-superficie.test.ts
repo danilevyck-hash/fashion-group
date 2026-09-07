@@ -9,6 +9,13 @@
 //
 // Si una ruta se elimina/renombra A PROPÓSITO, actualizar la lista aquí en el
 // MISMO PR con la justificación en la descripción.
+//
+// 🩸 CUATRO RUTAS RETIRADAS EL 6-sep-2026, ninguna con un solo llamador desde
+// `src/`: `[marca]/pedidos-unificado` (la lista vieja de administrar, que
+// además calculaba mal la plata), `joybees/seed` (reescribía precio, existencia,
+// regalía y visibilidad de los 83 productos desde una lista escrita a mano),
+// `reebok/stats` y `reebok/inventory/bulk`. Las TABLAS no se tocaron. Que
+// ninguna vuelva lo exige `src/__tests__/lib/rutas-de-catalogo-retiradas.test.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
@@ -48,7 +55,6 @@ const CORE_MARCA = [
   "pedidos-export",
   "pedidos-publicos/[short_id]",
   "pedidos-publicos/[short_id]/convertir",
-  "pedidos-unificado",
   // Permiso 0001 de Switch (cambiar precio) — se consulta al EDITAR el precio,
   // no al final del envío (toque único, 12-ago-2026). Solo lectura.
   "permiso-precio",
@@ -68,8 +74,8 @@ const CORE_MARCA = [
 
 // Rutas EXCLUSIVAS de una marca — siguen estáticas bajo su directorio (el
 // snapshot de PR-0 las esperaba ahí y el PR-1 no las generaliza).
-const SOLO_REEBOK = ["inventory", "inventory/bulk", "pedidos-publicos", "stats"].sort();
-const SOLO_JOYBEES = ["import", "seed"].sort();
+const SOLO_REEBOK = ["inventory", "pedidos-publicos"].sort();
+const SOLO_JOYBEES = ["import"].sort();
 
 describe("superficie API de catálogos — snapshot post-refactor [marca]", () => {
   it("[marca] expone exactamente el núcleo compartido", () => {

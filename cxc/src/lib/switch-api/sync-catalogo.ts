@@ -675,17 +675,45 @@ export async function syncCatalogo(
       if (exErr) throw new Error(`leer ${productsTable}: ${exErr.message}`);
       const bySku = new Map<string, ExistingProduct>();
       const activeSkus = new Set<string>();
+      // 🩸 Los ESCONDIDOS A MANO, aparte. Ver la nota del punto (2).
+      const ocultosManualSkus = new Set<string>();
       // Cast vía unknown: el select dinámico (fallback oculto_manual) hace que
       // supabase-js no pueda inferir las columnas.
       for (const p of (existing ?? []) as unknown as ExistingProduct[]) {
         if (!p.sku) continue;
         bySku.set(String(p.sku), p);
         if (p.active) activeSkus.add(String(p.sku));
+        // `oculto_manual` puede venir undefined pre-migración (fallback de
+        // lectura): sin la columna no hay escondidos que rescatar y el conjunto
+        // queda vacío, o sea el comportamiento de siempre.
+        if (p.oculto_manual === true) ocultosManualSkus.add(String(p.sku));
       }
 
-      // (2) Set a /stock = catálogo ACTIVO ∪ disponible>=1.
+      // (2) Set a /stock = catálogo ACTIVO ∪ disponible>=1 ∪ ESCONDIDO A MANO.
+      //
+      // 🩸 POR QUÉ ESTÁN LOS ESCONDIDOS (6-sep-2026). Esconder un producto le
+      // pone `active = false`, así que un escondido SIN disponible en Switch no
+      // caía en ninguna de las dos primeras: nunca se le volvía a preguntar la
+      // existencia y su `stock` quedaba CONGELADO en el número del día que se
+      // escondió. Medido contra producción: de los 25 escondidos, el catálogo
+      // mostraba **465 piezas contra las 213 reales** de Switch — Tommy 252
+      // contra 72 y Calvin 121 contra 49. Es el mismo agujero que el punto (4b)
+      // ya había tapado para el PRECIO en jul-2026, con la existencia todavía
+      // adentro.
+      //
+      // 🔴 ESCONDER SIGUE SIENDO ESCONDER. Preguntar la existencia NO vuelve a
+      // mostrar nada: la visibilidad la decide `esVisibleEnCatalogo` en el loop
+      // (4), donde `oculto_manual = true` gana SIEMPRE. Lo que entra acá es a
+      // qué artículos se les pregunta el número, no cuáles se publican.
+      //
+      // Costo: como mucho un /stock más por escondido — 25 en las cuatro marcas
+      // (16 en Tommy sobre ~462), menos del 3%. La corrida más lenta de los
+      // últimos 30 días fue de 282 s contra un techo de 800.
       const stockSet = arts.filter(
-        (a) => activeSkus.has(String(a.codigo)) || num(a.disponible) >= 1,
+        (a) =>
+          activeSkus.has(String(a.codigo)) ||
+          num(a.disponible) >= 1 ||
+          ocultosManualSkus.has(String(a.codigo)),
       );
 
       // (3) Junta TODOS los /stock primero (read-all). Si uno falla → throw → ABORTA empresa sin escribir.
@@ -828,9 +856,13 @@ export async function syncCatalogo(
       }
 
       // (4b) PRECIO SIEMPRE ALINEADO A SWITCH (decisión Daniel 22-jul-2026): el
-      // loop (4) solo toca artículos con /stock (activos ∪ disponible>=1). Un
-      // producto OCULTO con disponible=0 conservaba su precio local para siempre
-      // (audit 22-jul: 100256061 local 45 vs Switch 46). El bulk /lista ya trae
+      // loop (4) solo toca artículos con /stock (activos ∪ disponible>=1 ∪
+      // escondidos a mano). Un producto OCULTO con disponible=0 conservaba su
+      // precio local para siempre (audit 22-jul: 100256061 local 45 vs Switch
+      // 46). ⚠️ Desde el 6-sep-2026 los escondidos A MANO ya pasan por (4) —así
+      // que salen por el `continue` de acá—, pero este bloque NO se toca: sigue
+      // cubriendo al oculto por existencia 0 (el que no tiene el toggle puesto)
+      // y a todo lo demás que quede fuera del /stock. El bulk /lista ya trae
       // `precio` para TODO el universo filtrado → aquí se alinea el precio del
       // resto de los productos matcheados SIN llamadas extra a Switch. Solo se
       // escribe `price` (no se toca active/stock/foto).

@@ -44,6 +44,7 @@ import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carr
 import { idAgregarA, querySinPerderModo, tituloPedido } from "@/lib/catalogo/modo-pedido";
 import { useModoPedido } from "@/lib/hooks/useModoPedido";
 import BarraModoPedido from "./BarraModoPedido";
+import { useDescargarCatalogoPdf } from "./useDescargarCatalogoPdf";
 
 // Fotos que se piden YA (eager + fetchpriority=high) al abrir el catálogo: las
 // del primer viewport. A 1440px el grid es de 5 columnas → 10 cards visibles;
@@ -82,6 +83,13 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  // 🔴 EL ESPACIO DE ABAJO SALE DE LA MEDIDA DE LA BARRA, no de un número
+  // escrito a mano (6-sep-2026). Era `pb-28` (112 px) fijo; la barra la MIDE
+  // `CatalogoStickyCartBar` con un ResizeObserver y avisa acá. Del lado del
+  // vendedor mide 93 px, así que ya alcanzaba — pero es la MISMA pantalla que
+  // el público, donde la barra llega a 180 y tapaba el «Agregar» de la última
+  // fila. Un solo mecanismo para las dos.
+  const [altoBarra, setAltoBarra] = useState(0);
 
   // ── State: cart ──
   const [cart, setCart] = useState<CatalogoCartItem[]>([]);
@@ -228,7 +236,19 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           fetch(`${theme.api}/products?active=true`),
           fetch(`${theme.api}/inventory`),
         ]);
-        const prods: CatalogoProducto[] = pRes.ok ? await pRes.json() : [];
+        // 🩸 ACÁ SE PERDÍA EL ERROR (6-sep-2026). Las otras dos ramas —y el
+        // catálogo público— hacen `if (!res.ok) throw`, así que un 500 o un
+        // 403 llegaba a «No pudimos cargar el catálogo · Reintentar». Esta,
+        // con su `pRes.ok ? … : []`, se lo tragaba y dejaba `products = []`:
+        // Reebok era la ÚNICA de las cuatro marcas que decía «Por ahora no hay
+        // productos disponibles» cuando lo que pasaba era que la lectura
+        // falló. Mismo texto que las otras tres, no uno nuevo.
+        if (!pRes.ok) throw new Error("fetch failed");
+        const prods: CatalogoProducto[] = await pRes.json();
+        // ⚠️ El inventario SÍ se sigue tolerando: es respaldo de existencia y
+        // fuente de las tallas. Sin él el catálogo se ve igual (la
+        // disponibilidad correcta vive en la fila del producto); sin
+        // productos, no hay catálogo.
         const inv: { product_id: string; size: string; quantity: number }[] = iRes.ok ? await iRes.json() : [];
         const stockMap: Record<string, number> = {};
         const sizesMap: Record<string, Set<string>> = {};
@@ -421,7 +441,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const fmt = precioTexto;
 
   // ── Download catalog as PDF ──
-  const [downloading, setDownloading] = useState(false);
+  const { descargando: downloading, descargar: descargarPdf } = useDescargarCatalogoPdf();
 
   // ── Share dropdown ──
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -439,19 +459,29 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     }
   }, [showShareMenu]);
 
+  // 🔴 EL ENLACE SALE SIEMPRE LIMPIO (6-sep-2026). Daniel, textual: *«quiero
+  // que el cliente cuando abra el catálogo por el link se sienta como si fuese
+  // el mismo catálogo»*.
+  //
+  // 🩸 Hasta hoy el enlace se llevaba los SEIS filtros de la pantalla (género,
+  // categoría, búsqueda, bultos y los dos precios), así que el cliente recibía
+  // el catálogo RECORTADO como lo tenía el vendedor en ese momento — y lo único
+  // que decía la pantalla era «Link copiado». Medido el 6-sep-2026: con Calvin
+  // › Niñas puesto, el cliente abría **1 producto de 84**; Tommy › Niñas, 27 de
+  // 460; Reebok › Niños, 4 de 232.
+  //
+  // ⚠️ Era una decisión, no un descuido: el comentario que estaba acá la
+  // defendía («si el vendedor comparte "2 bultos o más", el cliente abre el
+  // catálogo ya filtrado igual que él»). Daniel la revirtió a propósito, así
+  // que el comentario se fue con ella.
+  //
+  // ⚠️ Lo que SÍ sigue respetando los filtros es el **PDF** («Descargar PDF»),
+  // y está bien: un PDF es la foto de lo que estás mirando y escribe los
+  // filtros en su subtítulo. Un enlace es la puerta al catálogo entero. La
+  // vista previa de WhatsApp tampoco depende de la query: sale de la metadata
+  // del layout público (`theme.ogImage`, URL absoluta y fija por marca).
   function handleCopyLink() {
-    const params = new URLSearchParams();
-    if (gender) params.set("gender", gender);
-    if (category) params.set("category", category);
-    if (search) params.set("search", search);
-    // Los filtros extra viajan en el link: si el vendedor comparte "2 bultos o
-    // más", el cliente abre el catálogo ya filtrado igual que él.
-    if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
-    if (theme.features.filtroPrecio && precio.desde.trim()) params.set("precio_desde", precio.desde.trim());
-    if (theme.features.filtroPrecio && precio.hasta.trim()) params.set("precio_hasta", precio.hasta.trim());
-    const qs = params.toString();
-    const url = `${theme.publicoShareUrl}${qs ? `?${qs}` : ""}`;
-    navigator.clipboard.writeText(url).then(() => {
+    navigator.clipboard.writeText(theme.publicoShareUrl).then(() => {
       setToast("Link copiado");
     }).catch(() => {
       setToast("No se pudo copiar el link");
@@ -459,95 +489,15 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     setShowShareMenu(false);
   }
 
-  async function handleDownloadCatalog() {
-    if ((agrupado ? !sortedGroups.length : !filtered.length) || downloading) return;
-
-    setDownloading(true);
-    setToast("Generando catalogo PDF...");
-
-    try {
-      // Lib compartida de todas las marcas (src/lib/catalogo/catalog-pdf.ts).
-      const { downloadCatalogPdf } = await import("@/lib/catalogo/catalog-pdf");
-
-      const filterDesc: string[] = [];
-      if (agrupado) {
-        if (gender) filterDesc.push(SECTION_LABELS[gender as DisplaySection] || gender);
-        if (category) filterDesc.push(category);
-        if (search) filterDesc.push(`“${search}”`);
-      } else {
-        if (gender) filterDesc.push(theme.genero.filterLabel(gender));
-        if (category) filterDesc.push(catLabel[category] || category);
-        if (search) filterDesc.push(`“${search}”`);
-      }
-      // 🩸 EL PRECIO Y LOS BULTOS TAMBIÉN SE ESCRIBEN. El subtítulo listaba
-      // género, categoría y búsqueda y NADA MÁS: con el filtro de precio puesto
-      // salía un PDF de 12 productos que se leía como "este es todo el catálogo
-      // Tommy", y quien lo recibe por WhatsApp no tiene cómo saber que estaba
-      // recortado. El link compartido sí llevaba el precio (handleCopyLink),
-      // así que el PDF era el único que mentía. Vale para las dos ramas: los
-      // dos filtros son de Tommy/Calvin, que van por la rama plana, pero
-      // escribirlo acá abajo lo deja atado al FILTRO y no al pipeline.
-      if (theme.features.filtroBultos && bultosFilter) filterDesc.push("2 bultos o más");
-      const pDesde = precio.desde.trim();
-      const pHasta = precio.hasta.trim();
-      if (theme.features.filtroPrecio && (pDesde || pHasta)) {
-        filterDesc.push(
-          pDesde && pHasta ? `$${pDesde} a $${pHasta}`
-            : pDesde ? `desde $${pDesde}`
-              : `hasta $${pHasta}`,
-        );
-      }
-      // Sin filtros el subtítulo va VACÍO (poda, 12-ago-2026): decía "Todos los
-      // productos" sobre un PDF que ya anuncia "{n} productos" en la portada —
-      // no distinguía nada de nada. Con filtros puestos sí informa ("HOMBRE ·
-      // CALZADO"), y ahí se conserva tal cual.
-      const subtitle = filterDesc.length > 0 ? filterDesc.join("  ·  ") : "";
-
-      let pdfSections: { label: string; items: { name: string; sku: string; color?: string | null; price: number | null; image_url: string | null; badge: string | null }[] }[];
-      if (agrupado) {
-        // Secciones canónicas por SECTION_ORDER (mismo orden que la vista).
-        const bySection = new Map<DisplaySection, GroupedProduct[]>();
-        for (const gs of sortedGroups) {
-          if (!bySection.has(gs.section)) bySection.set(gs.section, []);
-          bySection.get(gs.section)!.push(gs.group);
-        }
-        pdfSections = [...bySection.entries()]
-          .sort((a, b) => (SECTION_ORDER[a[0]] ?? 99) - (SECTION_ORDER[b[0]] ?? 99))
-          .map(([section, groups]) => ({
-            label: SECTION_LABELS[section] || section,
-            items: groups.map(g => ({
-              name: g.name, sku: g.baseSku, price: g.price,
-              image_url: g.image_url, badge: null,
-            })),
-          }));
-      } else {
-        // Agrupación canónica de la marca (theme.genero.pdfSections): Reebok
-        // Hombre/Mujer/Niños/Unisex, Tommy Women/Men/Boys/Girls. "otros" cierra
-        // el catch-all para que ningún producto con género no contemplado se
-        // caiga del PDF en silencio.
-        pdfSections = theme.genero.pdfSections.map(g => ({
-          label: g.label,
-          items: filtered.filter(p => theme.genero.groupKey(p.gender) === g.key).map(p => ({
-            name: p.name, sku: p.sku || "", color: p.color, price: p.price,
-            image_url: p.image_url || null, badge: p.badge ?? null,
-          })),
-        }));
-      }
-
-      await downloadCatalogPdf({
-        marca,
-        sections: pdfSections,
-        subtitle,
-        totalCount: filteredCount,
-        filename: `catalogo-${marca}-${new Date().toISOString().slice(0, 10)}.pdf`,
-      });
-      setToast("Catalogo descargado");
-    } catch (e) {
-      console.error(e);
-      setToast("Error al generar PDF");
-    } finally {
-      setDownloading(false);
-    }
+  // El PDF lo arma un hook COMPARTIDO con el catálogo público
+  // (`useDescargarCatalogoPdf`): las ~90 líneas que vivían acá se MUDARON,
+  // no se copiaron, para que las dos pantallas saquen el MISMO archivo.
+  function handleDownloadCatalog() {
+    return descargarPdf({
+      marca, theme, agrupado, filtered, sortedGroups, filteredCount,
+      gender, category, search, bultosFilter, precio, catLabel,
+      avisar: setToast,
+    });
   }
 
   function handleClearAll() {
@@ -618,9 +568,13 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     </div>
   );
 
+  // Con el carrito vacío la barra no existe y no se reserva nada (+16 px de
+  // aire para que el último botón no quede pegado a la barra).
+  const reservaAbajo = cartCount > 0 && altoBarra > 0 ? altoBarra + 16 : 0;
+
   // Grid
   const productGrid = (
-    <div className={`${cartCount > 0 ? "pb-28" : ""}`}>
+    <div style={{ paddingBottom: reservaAbajo || undefined }}>
       {agrupado ? (
         isGrouped ? (
           <div className="space-y-8">
@@ -746,8 +700,13 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // NO se esconde en modo pedido: es la salida a la lista, no compite con
   // "Listo, volver al pedido" (que vive en la barra pegajosa de arriba).
   const puedeVerPedidos = (COMPROBANTES_ROLES as readonly string[]).includes(role);
+  // 🔴 EL RÓTULO ES «COMPROBANTES» (6-sep-2026). Daniel, textual: *«todo
+  // Comprobantes, porque ahí también hay cotizaciones y borradores»*. La `key`
+  // del módulo y de la pestaña sigue siendo `pedidos` —vive en
+  // `role_permissions` y en enlaces guardados—: cambia el RÓTULO, nunca la
+  // llave. El destino tampoco se toca (`theme.pedidosHref`).
   const pedidosBtn = puedeVerPedidos ? (
-    <Link href={theme.pedidosHref} className={theme.vendorShare.pedidosBtn}>Pedidos</Link>
+    <Link href={theme.pedidosHref} className={theme.vendorShare.pedidosBtn}>Comprobantes</Link>
   ) : null;
 
   return (
@@ -830,7 +789,12 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         <Toast message={toast} />
 
         {showScrollTop && (
+          /* El botón de subir vive `bottom-24` (96 px) en el tema. Con la
+             barra del carrito arriba se escondía detrás: el `bottom` en línea
+             lo levanta por encima del alto REAL de la barra y, sin carrito,
+             se queda con el del tema. */
           <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            style={reservaAbajo ? { bottom: reservaAbajo } : undefined}
             className={theme.grid.scrollTopBtn}>&uarr;</button>
         )}
 
@@ -848,6 +812,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             saving={false}
             actionLabel="Ver pedido"
             actionColor={theme.vendorShare.stickyActionColor ?? undefined}
+          onAltoChange={setAltoBarra}
             formatTotal={fmt}
           />
         )}

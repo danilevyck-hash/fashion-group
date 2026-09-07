@@ -7,6 +7,193 @@
 
 ---
 
+## 🔴 CUATRO ARREGLOS DE CATÁLOGOS — LA EXISTENCIA CONGELADA, LA FOTO DE CALVIN, LA PUERTA ABIERTA Y CUATRO RUTAS SIN DUEÑO (6-sep-2026)
+
+> Cuatro cosas independientes que salieron de una auditoría del módulo. Ninguna
+> cambia lo que la persona hace en pantalla; las cuatro tapan un agujero que
+> nadie podía ver desde adentro de la app.
+
+### 1 · 🩸 LA EXISTENCIA DE UN PRODUCTO ESCONDIDO SE CONGELABA
+
+**Qué pasaba.** Esconder un producto a mano (`oculto_manual = true`, el toggle
+del admin) le pone `active = false`. El motor (`src/lib/switch-api/sync-catalogo.ts`)
+arma el conjunto de artículos a los que le pregunta la existencia a Switch como:
+
+    catálogo ACTIVO  ∪  Switch dice disponible ≥ 1
+
+Un escondido **sin disponible en Switch no cae en ninguna de las dos**. O sea:
+desde el día que se escondió, **nunca se le volvió a preguntar el número** y su
+`stock` quedó clavado ahí para siempre.
+
+🔑 Lo que hace este bug difícil de ver es que el módulo ya había tapado la mitad
+del agujero: el bloque **(4b)**, de julio-2026, alinea el PRECIO de todo lo que
+queda fuera del `/stock` usando el bulk de `/lista` (que sí trae el precio de
+todo el universo). El precio se arreglaba solo; la existencia, no — porque
+`/lista` no la trae por bodega.
+
+**Medido contra producción el 6-sep-2026** (cada escondido cruzado contra
+`switch_articulo_info` por `(empresa_key, codigo)`):
+
+| marca | escondidos | el catálogo dice | Switch dice | de más | filas que difieren |
+|---|---|---|---|---|---|
+| Tommy | 16 | **252** | **72** | 180 | 13 de 16 |
+| Calvin | 6 | **121** | **49** | 72 | 2 de 6 |
+| Reebok | 1 | 90 | 90 | 0 | 0 de 1 |
+| Joybees | 2 | 2 | 2 | 0 | 0 de 2 |
+| **TOTAL** | **25** | **465** | **213** | **252** | 15 de 25 |
+
+Los peores, uno por uno: Tommy `FW0FW05821DW5` y `T3A932982265` dicen **24
+piezas** y Switch dice **0**; Calvin `KCSALYA050` dice **60** contra **0**.
+Reebok y Joybees coinciden **hoy y por casualidad** — sus escondidos tienen
+disponible en Switch, así que entran por la segunda vía.
+
+**El arreglo.** Los escondidos a mano también entran al conjunto. La regla vive
+en UN solo lugar (`ocultosManualSkus`, dentro del motor) y las cuatro marcas la
+heredan; hay candado que prohíbe que una marca se haga su copia.
+
+🔴 **ESCONDER SIGUE SIENDO ESCONDER.** Preguntar la existencia **no puede volver
+a mostrar** un producto: la visibilidad la decide `esVisibleEnCatalogo`, donde
+`oculto_manual = true` gana SIEMPRE. Los 25 escondidos son una decisión
+explícita de Daniel y se quedan escondidos. El candado lo exige en las **dos**
+direcciones — que al escondido se le pregunte el número, y que su UPDATE siga
+saliendo con `active: false` aunque Switch le mande 7 piezas.
+
+**Lo que cuesta** (medido contra `switch_sync_log`, 30 días):
+
+| marca | /stock hoy | escondidos | de más | corrida más lenta (techo 800 s) |
+|---|---|---|---|---|
+| Tommy | ~463 | +16 | +3,5 % | 218 s |
+| Reebok | ~233 | +1 | +0,4 % | 172 s |
+| Calvin | ~88 | +6 | +6,8 % | **282 s** |
+| Joybees | ~83 | +2 | +2,4 % | 62 s |
+
+⚠️ **Tolerancia intacta:** si la columna `oculto_manual` no existiera (fallback
+de lectura pre-migración), el conjunto queda vacío y todo se comporta **como
+antes**. Y el fail-closed del sync **no se tocó**: `/lista` con 0 artículos sigue
+abortando sin escribir, y un `/stock` que falle sigue tirando la empresa entera
+antes de la primera escritura.
+
+⚠️ **El bloque (4b) NO se retiró**: los escondidos a mano ahora salen por su
+`continue`, pero sigue cubriendo al producto que se apagó **solo** por llegar a
+existencia 0 (ése no tiene el toggle puesto y sigue fuera del `/stock`, a
+propósito — el candado tiene un CONTROL que lo exige).
+
+**Candado:** `src/__tests__/lib/catalogo-escondidos-existencia-viva.test.ts` (9,
+sobre el motor REAL con un Switch y un Supabase simulados; mira qué `/stock` se
+pidieron y qué payloads se escribieron).
+**Medición:** `scripts/_medir-catalogo-escondidos-y-fotos.mjs`.
+
+### 2 · 🩸 CALVIN ERA LA ÚNICA MARCA SIN CANDADO DE FOTO
+
+La migración `20260725120000_foto_manual.sql` creó la columna en las **tres**
+marcas que existían ese día (Reebok `products`, Joybees, Tommy). **Calvin nació
+el 12-ago-2026, dieciocho días después**, y nadie volvió a esa lista. Verificado
+contra producción en `information_schema.columns`: `calvin_products` es la única
+sin `foto_manual`.
+
+No es cosmético. El código es el MISMO para las cuatro
+(`lib/catalogos/variantes-server.ts`, por `cfg.productsTable`), y sin la columna:
+
+- `skusConFotoManual` devuelve el conjunto **vacío** → el ZIP del banco B2B
+  **pisa sin avisar** la foto que alguien eligió a mano;
+- el manifiesto la cuenta como **«asignada»** en vez de «respetada», así que en
+  pantalla parece que todo salió bien.
+
+Medido: **Tommy tiene 30 fotos protegidas** así; **Calvin, 0** — no porque nadie
+haya elegido, sino porque no se puede marcar.
+
+**El arreglo es SOLO la migración**, `20261011120000_calvin_foto_manual.sql`
+(**pendiente de aplicar**): aditiva, una sola tabla, mismo `default false`, sin
+un DROP/DELETE/UPDATE adentro. **El código no cambió y no lo necesita** — ya era
+tolerante a que la DDL no haya corrido (`guardarFotoElegida` reintenta sin la
+columna; `skusConFotoManual` falla abierto), y el candado exige que siga siéndolo.
+
+**Candado:** `src/__tests__/lib/catalogo-calvin-foto-manual.test.ts` (13).
+
+### 3 · 🩸 LA PANTALLA DE ADMINISTRAR NO COMPROBABA NINGÚN ROL
+
+`src/app/catalogos/admin/[marca]/page.tsx` resolvía la marca y montaba el
+componente, y punto. El único guardia era del navegador, y el middleware solo
+valida que la sesión **exista** — o sea que cualquiera con sesión (un vendedor,
+bodega, David de Boston) abría esa dirección y la pantalla de administrar se le
+armaba antes de rebotarlo.
+
+⚠️ **No había fuga de datos:** las rutas que traen la información sí contestan
+**403** (`products` PUT/POST, `upload`, `variantes`, el manifiesto del ZIP). Lo
+que se cierra es la PUERTA.
+
+Es el mismo hueco que se cerró en Multifashion el mismo día y se aplicó el MISMO
+patrón: guard en el SERVIDOR, **antes de resolver la marca y antes de montar el
+cliente**, con la lista **derivada** de `CATALOGO_ADMIN_ROLES`
+(`puedeAdministrarCatalogo`, en `src/lib/catalogo/roles.ts`) — la misma que ya
+protege las rutas de datos, nunca una copia a mano.
+
+🔴 Administrar es **admin y secretaria**. Vendedor, bodega y `gerente_boston`
+solo **VEN** el catálogo: a ellos la pantalla de administrar les rebota a
+`/home`, y desde ahí cada uno cae en su casa.
+
+**Candado:** `src/__tests__/lib/catalogo-admin-pantalla-cerrada.test.ts` (21) —
+de CONDUCTA: llama a la página real, rol por rol y marca por marca, y mira a
+dónde manda.
+
+### 4 · 🩸 CUATRO RUTAS SIN UN SOLO LLAMADOR
+
+Verificadas una por una (barrido sobre `src/`, sin contar comentarios) antes de
+tocarlas.
+
+🔴 **`POST /api/catalogo/joybees/seed` — la urgente.** Reescribía **precio,
+existencia, regalía y visibilidad** de los productos de Joybees desde una lista
+**escrita a mano dentro del código** (`src/lib/joybees-seed.ts`, 82 SKUs y
+**10.065 piezas inventadas**, precios de $0 a $14). Producción tiene **83
+productos, 8.927 piezas, 6 regalías y 2 escondidos a mano**: correrla habría
+pisado los precios que manda Switch, reemplazado la existencia real por la de la
+lista y, con su `active: true`, **vuelto a mostrar los 2 escondidos**. No tenía
+botón en ninguna pantalla — la disparaba cualquier admin o secretaria que
+supiera la dirección. Con la ruta se fue la lista, que no tenía otro consumidor.
+
+**`GET /api/catalogo/[marca]/pedidos-unificado`** — la lista VIEJA de
+administrar, reemplazada el 25-ago-2026 por `/catalogo/<marca>/pedidos`. Además
+**calcula mal la plata**: hasta **$680 de diferencia en un solo pedido**, porque
+no pasa las piezas por el bulto (el defecto ya documentado en
+`src/lib/catalogo/fila-comprobante.ts`).
+
+**`GET /api/catalogo/reebok/stats`** y **`POST /api/catalogo/reebok/inventory/bulk`**.
+
+🔴 **Las TABLAS no se tocaron** — patrón de la casa (`mayor_lineas`,
+`cxc_favorites`): se retiran RUTAS, y solo rutas. ⚠️ Y siguen vivas
+`reebok/inventory` (sin `/bulk`), `joybees/import`, `pedidos-export` y `orders`;
+las vistas `<marca>_pedidos_unificado_vw` tampoco se tocaron, porque
+`pedidos-export` las sigue leyendo.
+
+**Candados que cambiaron de dirección, con nota fechada y ninguno borrado:**
+`catalogo-superficie.test.ts` (el snapshot de la superficie API baja de 4 rutas),
+`require-admin-no-miente.test.ts` (de **10 a 9** rutas con `requireAdminOSecretaria`
+— baja **a propósito**: no se apagó un permiso, se fue la ruta entera),
+`bodega-ve-pedidos`, `boston-ve-catalogo`, `pedidos-link-flujo-vendedor` y
+`catalogo-paridad-listas` (cada uno pierde el paso de `pedidos-unificado` y gana
+la nota; el bloque de `pedidos-export` no se tocó) y `supabase-paginado`.
+**Candado nuevo:** `src/__tests__/lib/rutas-de-catalogo-retiradas.test.ts` (9) —
+exige las dos mitades: que el archivo no exista **y** que nadie las vuelva a
+llamar desde `src/`, con CONTROL de que las rutas vecinas siguen ahí.
+
+### Verificado por mutación
+
+**25 mutaciones, 25 cazadas**, con **2 CONTROLES en verde**
+(`bash scripts/_mutar-candados-catalogo-4-arreglos.sh`): el conjunto vuelve a ser
+el de antes · el conjunto de escondidos se queda vacío · **el escondido se vuelve
+a mostrar al actualizarle la existencia** · la visibilidad la decide la
+existencia · el conjunto se abre a TODO · se pierde la tolerancia · se pregunta y
+no se escribe · la migración deja a Calvin afuera · la columna nace en `true` ·
+la migración toca filas · se pierde la tolerancia a la DDL en las dos funciones ·
+las fotos protegidas se leen siempre de Tommy · **la pantalla vuelve a no
+comprobar el rol** · el guard corre después de dibujar · la lista se escribe a
+mano y entra el vendedor · la función se hace su propia lista y entra bodega ·
+sin sesión ya no se manda al login · administrar sale de quien ve el catálogo ·
+**vuelven las cuatro rutas, una por una** · vuelve la lista escrita a mano de
+Joybees · una pantalla vuelve a llamar a `/pedidos-unificado`.
+
+---
+
 ## 🔴 Pedidos — LOS VIEJOS NO SE BORRAN; LA LISTA MUESTRA 90 DÍAS Y LA BASURA DE PRUEBAS SÍ SE VA (4-sep-2026)
 
 > **La pregunta de Daniel, textual:** *«si un pedido se mandó a switch, ya está safe, no?»*
@@ -100,6 +287,189 @@ ninguna otra tabla).
 envío en Calvin, quitárselo en Joybees, cambiar la lista por un `LIKE`, perder el
 `deleted IS TRUE` y llevarse por delante los pedidos del link— **caen las cinco**
 (`scripts/_mutar-limpieza-ventas.py`).
+
+---
+
+## 🔴 COMPROBANTES — LA LISTA QUE SE LEE, Y LOS TRES ARREGLOS DEL DETALLE (6-sep-2026)
+
+> Diez cambios aprobados por Daniel uno por uno. Todo medido contra producción el
+> **7-sep-2026: 56 comprobantes vivos** — Tommy 32 · Reebok 15 · Calvin 5 ·
+> Joybees 4.
+
+### 1 · Los dos filtros tenían dos aspectos distintos, y uno de ellos mentía
+
+Arriba una barra de **pestañas subrayadas** (`Todos (20) · Del link (6) · Míos
+(14)`) y abajo **píldoras** (`Pedidos 18 · Cotizaciones 0 · Borradores 2`). Son
+dos preguntas del mismo rango —**quién lo armó** y **qué es**—, así que van con
+el mismo aspecto: dos grupos de píldoras, cada uno con su rótulo chico. El
+subrayado en este sistema es el aspecto de la NAVEGACIÓN, y ahí no se navega a
+ningún lado.
+
+🔴 **Lo que está en CERO no aparece.** «Cotizaciones 0» ocupaba un lugar para
+decir que no hay nada. La ÚNICA excepción es el chip activo: esconderlo dejaría
+la pantalla sin ningún chip encendido y sin forma de volver (el filtro por tipo
+está SIEMPRE puesto — no hay «Todos»).
+
+### 2 · 🔴 «Del cliente» y «Del vendedor»
+
+> Daniel, textual: *«no me gusta la palabra del link y míos, no suena
+> profesional»* y, confirmando: *«cambia los nombres a cliente y vendedor»*.
+
+🔑 **Antes de ponerle nombre se verificó QUÉ FILTRA CADA UNO.** «Míos» **no era
+del usuario que entró**: el origen se decide en `fila-comprobante.ts` con una
+sola línea —`o.del_link === true || fuente === "publicos" ? "link" : "mio"`— y
+ahí no aparece la sesión por ningún lado. O sea que «Míos» quería decir «los que
+armó alguien de la casa», y con Angela mirando la pantalla le decía «míos» a los
+pedidos de Reinaldo. **Medido en Tommy: las 32 filas son «Míos» y las armaron
+TRES personas** (REINALDO ESPINOSA 28 · daniel 2 · rey 2).
+
+Por eso los nombres describen de dónde VINO el pedido, no de quién es. Los dos
+textos viven en UN lugar (`origen-comprobante.ts`) porque los leen el chip **y**
+la etiqueta de la fila. ⚠️ El Excel de la pantalla sigue escribiendo «Del link» /
+«Mío» en su columna Origen: tiene su propio candado y su propia decisión.
+
+### 3 · 🔴 El PDF sale a la fila; «Eliminar» se va al «···»
+
+La fila ofrecía `Editar · Duplicar · Eliminar` y **«Eliminar» era el más a la
+vista** —rojo, al final, del mismo tamaño—, mientras que el PDF, el correo y el
+vendedor solo existían ADENTRO del pedido. Se invirtió: **«Ver PDF»** sale a la
+fila y `Editar · Duplicar · Reenviar el correo · Eliminar` pasan al `OverflowMenu`
+de la casa (el mismo de Guías, Préstamos y Caja).
+
+🩸 **En iOS la descarga se pierde si hay un `await` de red en el medio.** El PDF
+necesita los renglones, que no viajan en la fila: **la lectura arranca en el
+`pointerdown`**, como resolvió Guías, y la promesa se guarda por id (pasar el
+dedo por encima no dispara dos lecturas).
+
+⚠️ **«Duplicar» solo se dibuja donde el servidor lo permite.** Salía en las 56
+filas y solo funciona en las que YA están en Switch: `duplicar-pedido.ts` exige
+un envío activo y contesta **409 «Este pedido no está en Switch»** a las otras.
+
+### 4 · 🔴 Los que no llegaron a Switch se notan
+
+La fila **sí lo decía** (`TEXTO_NO_ENVIADO`), pero en gris chiquito, con el mismo
+peso que todo lo demás, sin días y sin forma de filtrarlos. Medido: **7 de 56 no
+han salido, y DOS están CONFIRMADOS**:
+
+| | | | |
+|---|---|---|---|
+| PED-004 | Reebok · CITY MALL PASO CANOA | $420,00 | hace 65 d |
+| CKP-020 | Calvin · HJsn | $1.284,00 | hace 23 d |
+
+Los dos se trabaron por lo mismo: no tienen cliente de Switch elegido, así que el
+botón de mandar les contesta «falta elegir el cliente» y ahí quedan. Los otros 5
+son **borradores** (1 Reebok · 3 Tommy · 1 Calvin) y no entran: un borrador
+todavía no es un pedido, y **un aviso que exagera se aprende a ignorar**.
+
+Chip **«Sin mandar (2)»** que filtra, y la frase de la fila **en rojo con los
+días** («Sin mandar a Switch · hace 65 días»), contados con el día de **PANAMÁ**.
+🔴 **No es un cuarto balde**: `sin_mandar` vive FUERA de `FILTROS_COMPROBANTE`
+—es un subconjunto de «Pedidos»— así que la partición de los tres sigue exigida
+tal cual por su candado de siempre.
+
+### 5 · 🔴 El pedido del link que nadie confirmó se va a los 30 días
+
+Medido: **6 pedidos del link llevan meses sin confirmar, $31.620,00**, entre 48 y
+62 días (5 son pruebas de Daniel en Reebok; uno es real: **CITY MALL PASO CANOAS,
+Joybees, $3.264 del 21-jul**). A los 30 días salen de la lista y quedan detrás de
+**«Ver más»**, sin texto explicativo.
+
+🔴 **No se borra nada, y no se estrenó un mecanismo**: es la MISMA
+`partirPorVentana` de los 90 días, que ahora acepta un plazo por fila
+(`diasDeVentana`). ⚠️ El que el cliente SÍ confirmó se queda con sus 90 días: eso
+es trabajo esperando, no un carrito abandonado.
+
+### 6 · 🩸 Joybees abría con la pantalla vacía
+
+La lista abría el mes del CALENDARIO. Joybees no vende todos los meses —su pedido
+más nuevo es del **24-ago**— y en septiembre la pantalla mostraba **tres
+encabezados de mes y CERO filas**. Ahora abre el **mes más reciente CON
+comprobantes**, que en una lista por fecha desc es siempre el primer grupo.
+
+Y el encabezado decía **«Julio De 2026»**: la `D` mayúscula venía de la clase
+`capitalize` de CSS, que capitaliza CADA palabra. Se capitaliza solo la primera
+letra, y en el TEXTO, no en el estilo.
+
+### 7 · 🔴 Los chips cuentan lo que se está mirando
+
+Contaban sobre todo el listado, sin importar el filtro de origen ni la ventana.
+Hoy casi no se nota; **en octubre sí**: los pedidos de julio caen fuera de los 90
+días y el chip diría 20 donde la lista muestra 5.
+
+🔑 **El universo de cada grupo es «todo menos su propia pregunta»**: el conteo de
+«Cotizaciones» se calcula sobre las filas que pasan el origen, la búsqueda y la
+ventana, pero NO el filtro por tipo. Contarlo con el tipo ya aplicado dejaría
+todos los chips en 0 menos el encendido, que es como no decir nada.
+
+### 8 · 🔴 Ficha en vez de tabla por debajo de 1024 px
+
+La tabla pide ~660 px y el iPad acostado le da 512: lo que se cortaba era justo
+**la tira de acciones**, y los tres botones medían **27 px de alto** contra los 44
+que este sistema exige. Es el mismo arreglo de Guías y del CXC. De `lg` para
+arriba la tabla se queda igual, y los dos dibujos comen de las MISMAS piezas.
+
+### 9 · 🩸 El correo del cliente se tecleaba y se tiraba
+
+**`client_email` está VACÍO en los 56 pedidos vivos** aunque la columna existe
+desde el día uno: la pantalla lo pedía, lo mandaba y hacía `setClientEmail("")`.
+
+> Daniel, textual: *«no quiero que sea obligatorio mandar el correo, pero sí que
+> sea opcional, ya escrito automáticamente el mail del cliente»*.
+
+Ahora viene **ya escrito** del cliente elegido —`clientes_master.email`, unido por
+**CÓDIGO** y nunca por nombre (`correo-del-cliente.ts`, **falla abierta**: sin
+correo el campo queda vacío como siempre; medido: 100 de las 150 filas vivas lo
+traen)— y **queda guardado en el pedido**.
+
+🔑 **Lo anota el SERVIDOR, en `send-order`, DESPUÉS de que Resend confirma**, y no
+con un PUT desde la pantalla, por dos razones: es el patrón del CXC (anotar antes
+registraría un correo que nunca salió), y **el PUT de `orders/[id]` cuenta
+`client_email` como CONTENIDO y el candado post-envío a Switch lo rechaza con
+409** — o sea que en el pedido ya mandado, que es justo el que se le manda al
+cliente, no se habría podido guardar nunca. ⚠️ Solo cuando el correo fue al
+CLIENTE: el aviso interno va a `daniel@fashiongr.com` y ése no es el correo de
+nadie. 🔴 **No se manda solo y no es obligatorio.**
+
+### 10 · 🩸 Al mandar una cotización el aviso decía «Pedido enviado»
+
+El PDF, el nombre del archivo, el adjunto y la lista sí decían «Cotización» (hay
+3 reales en Tommy: TOM-027, TOM-030, TOM-031). Ahora el aviso usa la MISMA
+palabra, derivada del envío activo con la misma `palabraDelPapel` que arma el
+papel. ⚠️ Desde el detalle solo se manda mientras el pedido **no salió** —la caja
+«Enviar por email al cliente» vive dentro del bloque que el candado post-envío
+esconde—, así que ahí la palabra la decide el `status`, que es exactamente el
+caso que estaba mal. Con el pedido ya en Switch se manda desde **«Reenviar el
+correo»** de la fila.
+
+### 11 · 🩸 Dos cosas que solo se descubrían con el mouse
+
+- **El nombre del cliente parecía texto fijo y se edita**: su raya era
+  `border-transparent` y solo aparecía al pasar el mouse — y en el iPad no hay
+  mouse. Ahora la raya punteada está SIEMPRE y se pone sólida al escribir.
+- **El encabezado de la tabla del pedido estaba puesto para quedarse fijo y no lo
+  hacía.** `overflow-x-auto` convierte la caja en un contenedor de
+  desplazamiento (en CSS, fijar un eje pone el otro en `auto`) y un `sticky` se
+  pega al contenedor que lo desplaza, no a la página; como la caja no tenía alto,
+  no había de dónde pegarse. En el pedido más largo de producción (**TOM-023, 38
+  líneas**) los encabezados se perdían y no volvían. Se le dio alto a la caja.
+
+⚠️ **RECHAZADO por Daniel, no se hizo:** el aviso de «este pedido se parece a otro
+que ya está en Switch». Textual: *«no, porque se puede duplicar el pedido a
+veces»*.
+
+**Candados:** `comprobantes-rediseno.test.ts` (40) ·
+`comprobantes-rediseno-pantalla.test.tsx` (27) ·
+`pedido-detalle-rediseno.test.tsx` (12) ·
+`api/comprobantes-correo-del-cliente.test.ts` (9).
+Script de mutación: `scripts/_mutar-candados-comprobantes-rediseno.sh`.
+
+**Candados que cambiaron de DIRECCIÓN con nota fechada, ninguno borrado:**
+`comprobantes-ventana-90-dias` (el corte va antes de los dos filtros) ·
+`comprobantes-panel` (cuarto chip, 7 columnas, cero no se dibuja) ·
+`pedidos-numeros-en-la-lista` (columna Vendedor, la frase en rojo, el «···») ·
+`pedidos-chips-y-verdad-de-la-fila` (los tres siguen particionando; el cuarto es
+subconjunto) · `pedidos-lista-del-link` y `bodega-solo-mira-comprobantes` (las
+acciones se tocan en el «···») · `catalogo-pedidos-ux-arreglos` (idem).
 
 ---
 

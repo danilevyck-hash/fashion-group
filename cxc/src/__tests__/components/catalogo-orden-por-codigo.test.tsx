@@ -242,8 +242,11 @@ describe("barrido: los CUATRO .sort() del catálogo desempatan por código", () 
   const ARCHIVOS = [
     "src/components/catalogo/CatalogoVendedorPage.tsx",
     "src/components/catalogo/CatalogoPublicoPage.tsx",
-    "src/app/catalogos/admin/[marca]/ProductosBatch.tsx",
-    "src/app/catalogos/admin/[marca]/ProductosTarjetas.tsx",
+    // 🔄 6-sep-2026 — CAMBIÓ EL ARCHIVO, NO LA REGLA (y el candado quedó más
+    // fuerte). Las dos listas del admin —tarjetas de Reebok y filas de las
+    // otras tres— se fundieron en UNA sola, y su orden salió de los dos .tsx a
+    // un módulo PURO. Sigue siendo el mismo `.sort()` con el mismo desempate.
+    "src/lib/catalogos/admin-lista.ts",
   ];
 
   it("ninguna rama de orden se queda sin el desempate", async () => {

@@ -103,7 +103,7 @@ describe.skipIf(!RUN)("catálogos — contrato de esquema en DB real (read-only)
     }
   });
 
-  it("vistas unificadas: columnas base que consume pedidos-unificado", async () => {
+  it("vistas unificadas: columnas base que consume pedidos-export", async () => {
     const { error: rErr } = await main
       .from("reebok_pedidos_unificado_vw")
       .select("origen, id_natural, cliente, total, created_at, vendor, items, fuente")

@@ -95,7 +95,11 @@ describe("Tocables · 44 px de alto Y de ancho", () => {
   });
 
   it("Catálogos › Admin y los dos campos del Depurador", () => {
-    expect(leer("src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx")).toContain("flex-1 min-h-[44px] py-2 text-sm font-medium");
+    // 🔄 6-sep-2026: el admin ya no tiene pestañas — se vigila el CHIP, que es
+    // lo que ocupó su lugar, y el botón de subir/esconder de cada fila.
+    expect(leer("src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx")).toContain("inline-flex min-h-[44px] items-center gap-1.5 px-3 rounded-lg text-xs font-medium");
+    expect(leer("src/app/catalogos/admin/[marca]/ProductoFila.tsx")).toContain("min-h-[44px] px-3 rounded-md text-xs font-semibold border");
+    expect(leer("src/app/catalogos/admin/[marca]/SubirFotos.tsx")).toContain("w-full min-h-[44px] cursor-pointer rounded-lg border-2 border-dashed");
     expect(leer("src/app/productos/cargar/FacturasTiendaClient.tsx")).toContain("w-full min-h-[44px] rounded-lg border border-stone-300");
     expect(leer("src/app/productos/cargar/ReglasView.tsx")).toContain("w-48 min-h-[44px] rounded-md border border-stone-300");
   });

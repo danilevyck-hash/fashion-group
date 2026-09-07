@@ -126,19 +126,25 @@ describe("1-2. los dos números están en la fila, y el que falta se dice con pa
     expect(tr.textContent).toContain("16-000000503");
   });
 
-  it("🔴 uno que NO salió dice «No se ha mandado a Switch» y no un guion", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 6-sep-2026, no se borró. Lo que se protege es lo
+  // MISMO —que un pedido sin mandar lo DIGA con palabras y no con un guion—,
+  // solo que ahora, cuando el pedido está TERMINADO, lo dice más fuerte: «Sin
+  // mandar a Switch · hace N días», en rojo. El borrador conserva la frase gris
+  // de siempre (ver el bloque «los que no llegaron a Switch se notan»).
+  it("🔴 uno que NO salió lo DICE con palabras y no con un guion", () => {
     const { container } = pintar([SIN_ENVIAR]);
     const tr = fila(container, "Zapatería Nueva");
     expect(tr.textContent).toContain("PED-019");
-    expect(tr.textContent).toMatch(/no se ha mandado a switch/i);
+    expect(tr.textContent).toMatch(/sin mandar a switch/i);
     // Ni un guion suelto donde iría el número (se leería como un cero).
-    expect(tr.textContent).not.toMatch(/—/);
+    const celdaCliente = [...tr.querySelectorAll("td")][2];
+    expect(celdaCliente.textContent).not.toMatch(/—/);
   });
 
   it("los dos casos conviven en la MISMA lista sin confundirse", () => {
     const { container } = pintar([EN_SWITCH, SIN_ENVIAR]);
     expect(fila(container, "Sporting Shoes").textContent).toContain("16-000000503");
-    expect(fila(container, "Zapatería Nueva").textContent).toMatch(/no se ha mandado/i);
+    expect(fila(container, "Zapatería Nueva").textContent).toMatch(/sin mandar a switch/i);
     expect(fila(container, "Zapatería Nueva").textContent).not.toContain("16-000000503");
   });
 });
@@ -175,9 +181,14 @@ describe("4. el pedido del link sin convertir no tiene número — y lo dice", (
 });
 
 describe("5. 🔴 los números NO son columnas nuevas", () => {
-  const ENCABEZADOS = ["", "Origen", "Cliente", "Total", "Fecha", ""];
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 6-sep-2026: entró la columna **Vendedor** (7 en
+  // total), aprobada por Daniel — en Tommy las 32 filas se veían iguales y las
+  // armaron tres personas distintas. Lo que este bloque sigue protegiendo es lo
+  // de siempre: **los dos NÚMEROS no son columnas**, viven dentro de la celda
+  // del cliente y la tabla crece hacia abajo, no hacia el costado.
+  const ENCABEZADOS = ["", "Origen", "Cliente", "Vendedor", "Total", "Fecha", ""];
 
-  it("la tabla conserva exactamente sus 6 columnas", () => {
+  it("la tabla conserva sus columnas — y los números no agregaron ninguna", () => {
     const { container } = pintar([EN_SWITCH, DEL_LINK]);
     const ths = [...container.querySelectorAll("thead th")].map((th) => (th.textContent || "").trim());
     expect(ths).toEqual(ENCABEZADOS);
@@ -239,7 +250,7 @@ describe("7. las 4 marcas se comportan igual (Joybees es espejo EXACTO de Reebok
     for (const marca of MARCAS_UI) {
       const { container, unmount } = pintar([EN_SWITCH, SIN_ENVIAR, COTIZADO, DEL_LINK], marca);
       expect(fila(container, "Sporting Shoes").textContent).toContain("16-000000503");
-      expect(fila(container, "Zapatería Nueva").textContent).toMatch(/no se ha mandado/i);
+      expect(fila(container, "Zapatería Nueva").textContent).toMatch(/sin mandar a switch/i);
       expect(fila(container, "A-Amani").textContent).toMatch(/cotizaci/i);
       expect(fila(container, "Nathalie").textContent).toMatch(/se numera al abrirlo/i);
       unmount();
@@ -264,10 +275,17 @@ describe("no se rompió lo que ya funcionaba", () => {
     expect(ROUTER.push).toHaveBeenCalledWith(`/catalogo/reebok/pedido/${EN_SWITCH.id_natural}`);
   });
 
-  it("la fila conserva sus botones Editar y Eliminar", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 6-sep-2026: «Editar» y «Eliminar» se MUDARON al
+  // «···» de la casa y a la fila salió «Ver PDF». Lo que se protege es lo mismo
+  // —que las dos acciones sigan estando y sean alcanzables desde la fila—, no
+  // el dibujo del botón.
+  it("la fila conserva Editar y Eliminar, ahora dentro del «···»", () => {
     const { container } = pintar([EN_SWITCH]);
     const tr = fila(container, "Sporting Shoes");
-    expect(within(tr).getByRole("button", { name: "Editar" })).toBeTruthy();
-    expect(within(tr).getByRole("button", { name: "Eliminar" })).toBeTruthy();
+    expect(within(tr).getByRole("button", { name: "Ver PDF" })).toBeTruthy();
+    fireEvent.click(within(tr).getByRole("button", { name: /Más opciones/ }));
+    const items = [...document.querySelectorAll('[role="menuitem"]')].map((b) => (b.textContent || "").trim());
+    expect(items).toContain("Editar");
+    expect(items).toContain("Eliminar");
   });
 });

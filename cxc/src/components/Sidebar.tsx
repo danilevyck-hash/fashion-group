@@ -10,6 +10,12 @@ import {
   type AppGroup, type AppModule,
 } from "@/lib/modules";
 import { useSidebarCollapsed, writeSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
+// 🩸 La lista de rutas sin barra vivía acá escrita a mano y decía
+// `["/catalogo-publico", "/pedido-reebok"]`: los pedidos de Tommy, Calvin y
+// Joybees nacían corridos contra 224 px vacíos en el iPad. Ahora se DERIVA de
+// las marcas (`src/lib/catalogo/rutas-publicas.ts`) e incluye el catálogo con
+// sesión, que a Daniel se le veía más chico en el iPad que en el iPhone.
+import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { recordModuleClick } from "@/lib/module-frequents";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -17,7 +23,6 @@ const ROLE_LABELS: Record<string, string> = {
  contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
 };
 
-const PUBLIC_PATH_PREFIXES = ["/catalogo-publico", "/pedido-reebok"];
 
 // Acordeón EXCLUSIVO: un solo grupo abierto a la vez. Persistencia simple
 // (no crítica) del grupo abierto.
@@ -185,7 +190,7 @@ export default function Sidebar() {
     return () => document.removeEventListener("mousedown", onDown);
   }, [flyout]);
 
-  if (pathname === "/" || PUBLIC_PATH_PREFIXES.some(p => pathname.startsWith(p))) return null;
+  if (sinBarraLateral(pathname)) return null;
   if (!userRole) return null;
 
   const visibleGroups = getVisibleGroups(userRole, fgModules);
@@ -409,7 +414,7 @@ export default function Sidebar() {
 export function SidebarAwareMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "";
   const collapsed = useSidebarCollapsed();
-  const isPublic = pathname === "/" || PUBLIC_PATH_PREFIXES.some(p => pathname.startsWith(p));
+  const isPublic = sinBarraLateral(pathname);
   if (isPublic) return <div>{children}</div>;
   return (
     <div
