@@ -201,9 +201,30 @@ describe("🔴 compartir de verdad abre la hoja del sistema", () => {
     expect(detalle).toContain('min-h-[44px]'); // blanco táctil de la casa
   });
 
-  it("no se pierde el botón Imprimir", () => {
-    expect(detalle).toContain("window.print()");
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 7-SEP-2026, con motivo — no se borró.
+  //
+  // Decía «no se pierde el botón Imprimir» y lo comprobaba buscando
+  // `window.print()`. Ese `window.print()` imprimía la PANTALLA, y esta
+  // pantalla vive dentro de `HojaEscalada`, que le aplica un `transform:
+  // scale(…)`: Daniel imprimió y le salió *«una foto impresa de la guía y no
+  // como estaba antes en pdf bien bonito»*. Eran DOS caminos con DOS papeles.
+  // Ahora imprime el MISMO PDF que la fila de la lista.
+  //
+  // ⚠️ El texto `window.print()` sigue apareciendo en el comentario que cuenta
+  // esta historia, así que NO alcanza con buscarlo: se mira el `onClick`.
+  it("🔴 Imprimir manda el MISMO PDF que la lista, no la pantalla", () => {
     expect(detalle).toContain("Imprimir");
+    expect(detalle).toContain("imprimirGuia(guia)");
+    // El botón ya no llama a window.print() — se mira la llamada, no la palabra.
+    expect(detalle).not.toMatch(/onClick=\{\s*\(\)\s*=>\s*window\.print\(\)/);
+    expect(detalle).not.toMatch(/onClick=\{window\.print\}/);
+  });
+
+  it("CONTROL — el papel del PDF no cambió: sigue saliendo de construirPdfGuia", () => {
+    const papel = readFileSync(path.join(raiz, "src/lib/guias/papel-de-la-guia.ts"), "utf8");
+    const imprimir = /export function imprimirGuia\(g: Guia\)[\s\S]*?\n\}/.exec(papel)?.[0] ?? "";
+    expect(imprimir).toContain("construirPdfGuia(g)");
+    expect(imprimir).toContain("doc.autoPrint()");
   });
 
   it("la ruta /guias tiene ToastProvider — sin él la pantalla se cae", () => {

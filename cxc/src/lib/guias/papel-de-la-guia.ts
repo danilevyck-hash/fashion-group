@@ -26,6 +26,7 @@
 // día— la carga inicial pasaba de 196 kB a 344 kB. La pregunta barata («¿esta
 // guía trae renglones?») vive aparte en `tiene-renglones.ts` justamente para
 // que preguntarla no cueste el generador de PDF.
+import { aparatoDeQuienMira } from "@/lib/aparato";
 import { compartirArchivo, type ResultadoCompartir } from "@/lib/compartir-archivo";
 import { fmtGuia } from "@/lib/format";
 import { imprimirPdf } from "@/lib/imprimir-pdf";
@@ -56,7 +57,8 @@ export function imprimirGuia(g: Guia): "dialogo" | "visor" | "bloqueado" {
  * AirDrop). En escritorio —donde esa hoja no existe— la descarga, que es lo
  * correcto ahí y no un plan B pobre.
  *
- * 🔴 IMAGEN HASTA 6 RENGLONES, PDF DE AHÍ PARA ARRIBA (5-sep-2026). Daniel:
+ * 🔴 IMAGEN HASTA 6 RENGLONES, PDF DE AHÍ PARA ARRIBA — **en el CELULAR**
+ * (5-sep-2026). En la COMPUTADORA sale SIEMPRE el PDF (7-sep-2026). Daniel:
  * *«en el grupo de WhatsApp siempre ponen compartir cuando terminan (llega en
  * pdf)»* — y eligió la imagen con corte. Una imagen se lee DENTRO del chat;
  * un PDF hay que abrirlo. Medido: 94% de las guías tienen 6 renglones o menos.
@@ -79,7 +81,7 @@ export async function compartirGuia(g: Guia): Promise<ResultadoCompartir> {
 
 /** El archivo que sale por «Compartir». Síncrono a propósito (ver arriba). */
 function archivoParaCompartir(g: Guia): File {
-  if (formatoParaCompartir((g.guia_items ?? []).length) === "png") {
+  if (formatoParaCompartir((g.guia_items ?? []).length, aparatoDeQuienMira()) === "png") {
     const png = construirPngGuia(g);
     if (png) return png;
   }

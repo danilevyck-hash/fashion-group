@@ -47,7 +47,6 @@ interface CatalogoGroupedCardProps {
   cartMap: Map<string, number>;
   onQtyChange: (productId: string, qty: number, product: JoybeesProduct) => void;
   disabled?: boolean;
-  showBultos?: boolean; // vendor mode: cantidad tecleable (tap sobre el número)
   showStock?: boolean;  // catálogo interno: Disponibilidad + Existencia (NO en público)
   /** Cards del primer viewport: foto eager + prioridad alta (LCP). Ver
    *  CatalogoProductCard — misma regla en las dos cards. */
@@ -55,7 +54,7 @@ interface CatalogoGroupedCardProps {
 }
 
 export default function CatalogoGroupedCard({
-  marca, group, cartMap, onQtyChange, disabled, showBultos, showStock, priority,
+  marca, group, cartMap, onQtyChange, disabled, showStock, priority,
 }: CatalogoGroupedCardProps) {
   const theme = getMarcaTheme(marca)!;
   const t = theme.card;
@@ -365,8 +364,18 @@ export default function CatalogoGroupedCard({
                           <span className="text-xl leading-none">&minus;</span>
                         )}
                       </button>
+                      {/* 🔴 EL CLIENTE TAMBIÉN TECLEA LA CANTIDAD (7-sep-2026).
+                          El número era un botón que solo hacía algo del lado del
+                          VENDEDOR (colgaba de `showBultos`): en el catálogo
+                          público, pedir 30 bultos costaba treinta toques al «+».
+                          Daniel: *«que se sienta como si fuese el mismo
+                          catálogo»*. Es el MISMO control y la MISMA ventana de
+                          siempre — no se duplicó nada, se quitó la condición.
+                          `showBultos` no quedó: era su único uso, y en
+                          CatalogoProductCard ya no se leía desde antes. */}
                       <button
-                        onClick={showBultos ? () => openQtyInput(v.product, qty) : undefined}
+                        onClick={() => openQtyInput(v.product, qty)}
+                        aria-label="Escribir la cantidad"
                         className="text-center min-w-[48px] min-h-[44px] py-1"
                       >
                         <span className={t.qtyNum}>{qty}</span>
@@ -411,8 +420,8 @@ export default function CatalogoGroupedCard({
               className="w-full border-b-2 border-[#1A2656] text-2xl text-center font-semibold py-2 outline-none tabular-nums"
             />
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setQtyInputFor(null)} className="flex-1 py-2 text-sm text-gray-500 hover:text-black transition">Cancelar</button>
-              <button onClick={submitQtyInput} className="flex-1 py-2 text-sm bg-[#1A2656] text-white rounded-lg hover:bg-[#0f1a3d] transition">Listo</button>
+              <button onClick={() => setQtyInputFor(null)} className="flex-1 py-2 min-h-[44px] text-sm text-gray-500 hover:text-black transition">Cancelar</button>
+              <button onClick={submitQtyInput} className="flex-1 py-2 min-h-[44px] text-sm bg-[#1A2656] text-white rounded-lg hover:bg-[#0f1a3d] transition">Listo</button>
             </div>
           </div>
         </div>

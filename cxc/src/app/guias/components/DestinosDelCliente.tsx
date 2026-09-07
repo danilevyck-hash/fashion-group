@@ -31,6 +31,7 @@ import { useState } from "react";
 import {
   baseDeDestino,
   botonesDeDestino,
+  botonesQueSeDibujan,
   claveDestino,
   componerDestino,
   tiendasDelDestino,
@@ -64,13 +65,20 @@ export default function DestinosDelCliente({ codigo, direccion, historicos, defi
   const [otraAbierta, setOtraAbierta] = useState(false);
   const [otra, setOtra] = useState("");
 
-  const botones = botonesDeDestino(codigo, historicos, definidos);
-  // Cliente sin historia (y sin definición): CERO botones — como hoy.
-  if (botones.length === 0) return null;
+  // 🔴 EL DESTINO REPETIDO NO SE DIBUJA (7-sep-2026). Daniel: *«si el cliente
+  // tiene un solo destino y ya está escrito en el campo, no dibujar el botón.
+  // No ofrece nada.»* Con VARIOS destinos salen todos, incluido el que coincide.
+  // La regla vive en el módulo puro, no acá.
+  const botones = botonesQueSeDibujan(botonesDeDestino(codigo, historicos, definidos), direccion);
 
   const base = baseDeDestino(direccion);
   const claveActual = claveDestino(base);
   const tiendas = tiendasDelDestino(codigo, direccion, definidos);
+
+  // Cliente sin historia (y sin definición), o el único destino ya escrito:
+  // CERO botones. ⚠️ La fila de TIENDAS sí se conserva — es otra pregunta
+  // («¿cuál tienda de Westland?») y no está respondida en el campo.
+  if (botones.length === 0 && tiendas.length === 0) return null;
 
   function elegirTienda(t: string) {
     onElegir(componerDestino(base, t));

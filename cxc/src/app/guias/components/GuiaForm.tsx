@@ -677,10 +677,17 @@ export default function GuiaForm({
             onChange={(e) => { onUpdateItem(idx, "direccion", e.target.value); marcarTocado(clave); }}
             className={ctrl(err)}
           />
+          {/* 🔴 CON RÓTULO VISIBLE (7-sep-2026): antes solo lo explicaba el
+              `title`, que aparece pasando el mouse por encima — y en el iPad,
+              que es donde se arman las guías, no hay mouse.
+              🔴 Y lo que se agrega queda PARA TODO EL EQUIPO, no en este
+              navegador: la lista vive en la base (`guias_destino_lista`) y se
+              administra en Guías › Configuración. */}
           <AddNewInline
             placeholder="Ciudad"
             onAdd={onAddDireccion}
-            etiqueta="Agregar destino a la lista de direcciones"
+            etiqueta="Agregar destino a la lista que ve todo el equipo"
+            textoBoton="Agregar destino"
           />
         </div>
         {err && <ErrorCampo />}

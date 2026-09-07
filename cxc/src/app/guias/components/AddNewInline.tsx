@@ -14,18 +14,31 @@ interface AddNewInlineProps {
   placeholder: string;
   /** Qué agrega, en español simple. Va a aria-label: un "＋" solo no dice nada. */
   etiqueta?: string;
+  /**
+   * 🔴 EL RÓTULO VISIBLE al lado del "＋" (7-sep-2026). Sin él, lo único que
+   * dice qué hace el botón es el `title`, que **solo aparece pasando el mouse
+   * por encima — y en el iPad no hay mouse**. Daniel lo pidió de vuelta para el
+   * "＋" del campo Dirección. Opcional: sin rótulo, el control es el de antes.
+   */
+  textoBoton?: string;
 }
 
 /**
- * 🩸 ACÁ VIVÍA UN `textoBoton` — el rótulo VISIBLE al lado del "＋", agregado el
- * 25-ago-2026 porque Daniel abrió el control en el iPhone y no entendió qué era.
- * Murió el 26-ago-2026, con su único uso: el problema NO era que faltara texto,
- * era que el "＋" estaba lejos del campo que lo explica. Pegado al campo de
- * Dirección se entiende sin leer, y el rótulo pasaba a ser el ruido que Daniel
- * fue a sacar (*"se ve ruidoso ahí"*). Si vuelve a hacer falta un texto acá, la
- * pregunta correcta es dónde está el botón, no qué dice.
+ * 🩸 `textoBoton` —el rótulo VISIBLE al lado del "＋"— nació el 25-ago-2026,
+ * murió el 26-ago (*"se ve ruidoso ahí"*, y el diagnóstico entonces fue que el
+ * problema era la POSICIÓN del botón, no su texto) y **volvió el 7-sep-2026**,
+ * esta vez solo para el "＋" del campo Dirección.
+ *
+ * Por qué vuelve, y esta vez con razón medida: pegado al campo se entiende
+ * dónde está, pero **no qué hace** — lo único que lo explicaba era el `title`,
+ * y un `title` solo aparece pasando el mouse por encima. En el iPad, que es
+ * donde se arman las guías, no hay mouse: el control era un símbolo gris sin
+ * nombre. Regla de la casa: *nada que dependa de pasar el mouse por encima*.
+ *
+ * ⚠️ Sigue siendo OPCIONAL. El "＋" de «quién despacha» no lo lleva: ese vive
+ * debajo de un rótulo que ya dice qué es.
  */
-export default function AddNewInline({ onAdd, placeholder, etiqueta = "Agregar nuevo" }: AddNewInlineProps) {
+export default function AddNewInline({ onAdd, placeholder, etiqueta = "Agregar nuevo", textoBoton }: AddNewInlineProps) {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState("");
 
@@ -43,9 +56,13 @@ export default function AddNewInline({ onAdd, placeholder, etiqueta = "Agregar n
         onClick={() => setOpen(true)}
         aria-label={etiqueta}
         title={etiqueta}
-        className="transition text-base inline-flex items-center justify-center min-w-[44px] min-h-[44px] -my-3 text-gray-300 hover:text-gray-500"
+        className={`transition text-base inline-flex items-center justify-center gap-1 min-w-[44px] min-h-[44px] -my-3 text-gray-400 hover:text-black ${
+          textoBoton ? "px-2" : ""
+        }`}
       >
         ＋
+        {/* El rótulo, chico y en gris: dice qué hace sin competir con el campo. */}
+        {textoBoton && <span className="text-xs whitespace-nowrap">{textoBoton}</span>}
       </button>
     );
   }

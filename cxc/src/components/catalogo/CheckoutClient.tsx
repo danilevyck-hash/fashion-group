@@ -34,8 +34,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabaseThumb } from "@/lib/image-thumb";
 import { fmt } from "@/lib/format";
+import LineasPedidoEditables, { type LineaEnPantalla } from "@/components/catalogo/LineasPedidoEditables";
 import { getMarcaTheme, type MarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
 import VendedorSwitchPicker from "@/components/catalogo/VendedorSwitchPicker";
@@ -138,7 +138,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   // sobre el mismo universo se separan solos.)
 
   // ── Derivados ──
-  const lineas = useMemo(() => cart.map((i) => {
+  const lineas: LineaEnPantalla[] = useMemo(() => cart.map((i) => {
     // Línea resuelta: piezas y subtotal ya vienen del único lugar que multiplica.
     const l = resolverLineas([i], { bultoSize: cfg.bulto })[0];
     return { ...i, bulto: l.bulto_pzas, piezas: l.piezas, subtotal: l.subtotal };
@@ -249,76 +249,49 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Items */}
-          <section className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
-            {lineas.map((l) => {
-              return (
-                <div key={l.product_id} className="flex gap-3 p-3">
-                  <div className="h-16 w-16 shrink-0 rounded-md bg-gray-50 overflow-hidden">
-                    {l.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={supabaseThumb(l.image_url, 160) ?? l.image_url} alt="" className="h-full w-full object-contain" />
-                    ) : null}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{l.name}</p>
-                        <p className="text-xs text-gray-400 tabular-nums">{l.sku} · bulto de {l.bulto}</p>
-                        {/* Precio: campo tocable OBVIO (borde + fondo + lápiz),
-                            no un link sutil — cualquiera debe intuir que se
-                            puede cambiar sin explicárselo. */}
-                        <div className="mt-1">
-                          {editingPrice === l.product_id ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                              $
-                              <input
-                                type="number"
-                                inputMode="decimal"
-                                min="0.01"
-                                step="0.01"
-                                autoFocus
-                                value={priceDraft}
-                                onChange={(e) => setPriceDraft(e.target.value)}
-                                onBlur={() => commitPrice(l.product_id)}
-                                onKeyDown={(e) => { if (e.key === "Enter") commitPrice(l.product_id); if (e.key === "Escape") setEditingPrice(null); }}
-                                className="w-24 rounded-md border-2 border-black bg-white px-2 min-h-[40px] text-sm font-medium tabular-nums outline-none"
-                              />
-                              /pza
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => { setEditingPrice(l.product_id); setPriceDraft(String(l.unit_price)); }}
-                              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-gray-50 px-2.5 min-h-[40px] text-sm font-medium tabular-nums text-gray-800 hover:border-gray-400 hover:bg-gray-100 active:scale-[0.97] transition"
-                              title="Tocar para cambiar el precio"
-                            >
-                              ${fmt(l.unit_price)}<span className="text-xs font-normal text-gray-400">/pza</span>
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums">${fmt(l.subtotal)}</span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => setQty(l.product_id, l.quantity - 1)} aria-label="Menos" className="min-h-[44px] min-w-[44px] rounded-md border border-gray-200 text-lg leading-none hover:border-gray-300 transition">−</button>
-                        <span className="w-14 text-center text-sm tabular-nums">{l.quantity} {l.quantity === 1 ? "bulto" : "bultos"}</span>
-                        <button onClick={() => setQty(l.product_id, l.quantity + 1)} aria-label="Más" className="min-h-[44px] min-w-[44px] rounded-md border border-gray-200 text-lg leading-none hover:border-gray-300 transition">+</button>
-                        <button onClick={() => setQty(l.product_id, 0)} className="ml-2 min-h-[44px] px-2 text-xs text-gray-400 hover:text-red-600 transition">Quitar</button>
-                      </div>
-                      <div className="text-right text-xs tabular-nums">
-                        <span className="text-gray-400">{l.piezas} pzas</span>
-                        {l.is_preorder && <span className="ml-2 text-amber-700 font-medium">preventa</span>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </section>
+          {/* Items — la MISMA lista que revisa el cliente en el catálogo
+              público (`LineasPedidoEditables`, 7-sep-2026). Estas ~70 líneas
+              vivían acá; se MUDARON para que las dos pantallas se vean y se
+              toquen igual. Lo único propio del checkout es que el precio se
+              puede cambiar, y por eso viaja como `renderPrecio`. */}
+          <LineasPedidoEditables
+            lineas={lineas}
+            onQty={setQty}
+            renderPrecio={(l) => (
+              /* Precio: campo tocable OBVIO (borde + fondo + lápiz), no un link
+                 sutil — cualquiera debe intuir que se puede cambiar sin
+                 explicárselo. */
+              editingPrice === l.product_id ? (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                  $
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0.01"
+                    step="0.01"
+                    autoFocus
+                    value={priceDraft}
+                    onChange={(e) => setPriceDraft(e.target.value)}
+                    onBlur={() => commitPrice(l.product_id)}
+                    onKeyDown={(e) => { if (e.key === "Enter") commitPrice(l.product_id); if (e.key === "Escape") setEditingPrice(null); }}
+                    className="w-24 rounded-md border-2 border-black bg-white px-2 min-h-[40px] text-sm font-medium tabular-nums outline-none"
+                  />
+                  /pza
+                </span>
+              ) : (
+                <button
+                  onClick={() => { setEditingPrice(l.product_id); setPriceDraft(String(l.unit_price)); }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-gray-50 px-2.5 min-h-[40px] text-sm font-medium tabular-nums text-gray-800 hover:border-gray-400 hover:bg-gray-100 active:scale-[0.97] transition"
+                  title="Tocar para cambiar el precio"
+                >
+                  ${fmt(l.unit_price)}<span className="text-xs font-normal text-gray-400">/pza</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
+                </button>
+              )
+            )}
+          />
 
           {/* Cliente — ARRANCA VACÍO. Mientras no se elija, el borde va en
               ámbar: es lo único que falta para poder mandar el pedido y tiene

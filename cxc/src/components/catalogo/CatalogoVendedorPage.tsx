@@ -594,7 +594,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                       group={g}
                       cartMap={cartMap}
                       onQtyChange={onQtyChange}
-                      showBultos
                       showStock
                     />
                   ))}
@@ -612,7 +611,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 group={gs.group}
                 cartMap={cartMap}
                 onQtyChange={onQtyChange}
-                showBultos
                 showStock
               />
             ))}
@@ -636,7 +634,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                     product={p}
                     qty={cartMap.get(p.id) || 0}
                     onQtyChange={onQtyChange}
-                    showBultos
                     showStock
                   />
                 ))}
@@ -654,7 +651,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
               product={p}
               qty={cartMap.get(p.id) || 0}
               onQtyChange={onQtyChange}
-              showBultos
               showStock
             />
           ))}

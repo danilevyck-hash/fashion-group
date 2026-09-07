@@ -87,7 +87,6 @@ function pintar(productos: JoybeesProduct[], opts: { showStock?: boolean } = {})
       group={grupos[0]}
       cartMap={new Map()}
       onQtyChange={onQtyChange}
-      showBultos
       showStock={opts.showStock ?? true}
     />
   );

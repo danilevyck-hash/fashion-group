@@ -22,26 +22,26 @@ import { nuevoUid } from "./guia-form-logic";
 // distintos en el agrupado histórico. Los 26 renglones viejos se corrigen con
 // la migración `20261005120000_guias_changuinola.sql` (acotada al valor exacto,
 // nunca un LIKE suelto).
-export const DEFAULT_DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changuinola"];
+//
+// ⚠️ DESDE EL 7-SEP-2026 ESTA LISTA ES SOLO LA RED. La lista que el campo
+// ofrece de verdad vive en la base (`guias_destino_lista`) y se administra en
+// Guías › Configuración: es COMPARTIDA por todo el equipo. Acá queda el
+// re-export de `DESTINOS_BASE` para no mover a quien ya la importaba.
+export { DESTINOS_BASE as DEFAULT_DIRECCIONES } from "@/lib/guias/destinos-lista";
 
-export function loadList(key: string, defaults: string[]): string[] {
-  if (typeof window === "undefined") return defaults;
-  try {
-    const stored = JSON.parse(localStorage.getItem(key) || "[]") as string[];
-    const merged = [...defaults];
-    for (const s of stored) {
-      if (s && !merged.includes(s)) merged.push(s);
-    }
-    return merged;
-  } catch {
-    return defaults;
-  }
-}
-
-export function saveList(key: string, defaults: string[], list: string[]) {
-  const custom = list.filter((s) => !defaults.includes(s));
-  localStorage.setItem(key, JSON.stringify(custom));
-}
+// 🩸 ACÁ VIVÍAN `loadList` y `saveList` — RETIRADAS el 7-sep-2026.
+//
+// Guardaban en `localStorage` (`fg_direcciones`) la lista de destinos del campo
+// Dirección, así que un destino que agregaba Angela NO lo veía nadie más, y no
+// se podía quitar desde ninguna pantalla: se podía agregar, nunca borrar. Así
+// quedó vivo para siempre un destino de prueba llamado «hola» en un solo
+// navegador. Daniel, textual: *«lo de solo ver en mi pantalla no tiene lógica,
+// el sistema debe de trabajar todo igual, que sea para todo»*.
+//
+// Ahora la lista vive en la tabla `guias_destino_lista` y se pide por
+// `/api/guias/destinos-lista`. `localStorage` se queda para las comodidades de
+// cada persona —el último transportista, un filtro, un borrador—, nunca para
+// datos que otro necesita ver. Hay candado que lo exige.
 
 export function emptyItem(orden: number): GuiaItem {
   return { uid: nuevoUid(), orden, cliente: "", cliente_codigo: "", direccion: "", empresa: "", facturas: "", bultos: 0, numero_guia_transp: "" };

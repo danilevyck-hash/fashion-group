@@ -10,9 +10,10 @@
 //   · DELETE reebok = soft-delete (active=false), nunca borrado físico
 //
 // DIVERGENCIAS ACTUALES capturadas:
-//   · GET products reebok es público sin sesión (solo scope=admin exige rol);
-//     joybees exige sesión SIEMPRE (401)
 //   · identificador de edición: reebok por `id`, joybees por `sku`
+//
+// 🔄 UNA DIVERGENCIA SE CERRÓ EL 7-sep-2026: el GET de products de Reebok ya
+// NO es legible sin sesión. Ver el test de abajo, que cambió de dirección.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
@@ -100,13 +101,36 @@ beforeEach(() => {
 
 // ─── GET products ────────────────────────────────────────────────────────────
 
-describe("GET /products — divergencia de auth actual", () => {
-  it("reebok: SIN sesión responde 200 (catálogo legible); scope=admin sin sesión → 403", async () => {
+describe("GET /products — las CUATRO marcas piden sesión", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 7-sep-2026, y no se aflojó: se APRETÓ.
+  // Antes este test fijaba que `/api/catalogo/reebok/products` contestara 200
+  // SIN sesión —era el quirk heredado de cuando Reebok era la única marca— y
+  // que solo `scope=admin` exigiera rol. Las otras tres marcas siempre pidieron
+  // sesión. No agregaba fuga nueva (devuelve las mismas columnas que el
+  // catálogo público) pero era una puerta abierta de más, y la única de su
+  // clase. Ahora pide sesión con los roles del módulo Catálogos.
+  //
+  // El CONTROL de la dirección vieja se conserva en el `scope=admin`: ese sigue
+  // exigiendo admin o secretaria, y un vendedor con sesión válida se lo come.
+  it("reebok: SIN sesión responde 401; con sesión del módulo, 200", async () => {
+    expect((await rProductsGet(makeReq("/api/catalogo/reebok/products"))).status).toBe(401);
+    expect(
+      (await rProductsGet(makeReq("/api/catalogo/reebok/products?active=true"))).status,
+    ).toBe(401);
     reebokAnonDb.queue("products", { data: [] });
-    expect((await rProductsGet(makeReq("/api/catalogo/reebok/products"))).status).toBe(200);
+    expect(
+      (await rProductsGet(makeReq("/api/catalogo/reebok/products", { role: "vendedor" }))).status,
+    ).toBe(200);
+  });
+
+  it("reebok scope=admin: con sesión pero sin ser admin/secretaria → 403", async () => {
+    expect(
+      (await rProductsGet(makeReq("/api/catalogo/reebok/products?scope=admin", { role: "vendedor" }))).status,
+    ).toBe(403);
+    // Y sin ninguna sesión, 401 — la sesión se pide antes que el rol.
     expect(
       (await rProductsGet(makeReq("/api/catalogo/reebok/products?scope=admin"))).status,
-    ).toBe(403);
+    ).toBe(401);
   });
 
   it("joybees: SIN sesión responde 401; bodega SÍ puede consultar (roles del módulo)", async () => {

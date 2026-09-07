@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ClientePicker from "@/components/ClientePicker";
+import DestinosListaConfig from "./DestinosListaConfig";
 import { Toast } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { useNombresDeClientes } from "@/lib/hooks/useBusquedaClientes";
@@ -452,6 +453,13 @@ export default function GuiasConfiguracionView() {
           </div>
         )}
       </section>
+
+      {/* 🔴 LA LISTA GENERAL DE DESTINOS (7-sep-2026) — la que ofrece el campo
+          Dirección para cualquier cliente. Vivía en el `localStorage` de cada
+          navegador: lo que agregaba una persona no lo veía nadie más y no se
+          podía quitar. Es OTRA cosa que los destinos POR CLIENTE de arriba y
+          por eso va en su propia tarjeta, no fusionada. */}
+      <DestinosListaConfig onAviso={setToast} />
 
       <QuitarDestinoModal
         fila={aQuitar}

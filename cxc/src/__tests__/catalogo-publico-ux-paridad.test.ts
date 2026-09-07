@@ -58,6 +58,7 @@ function existe(rel: string): boolean {
 }
 
 const PUBLICO = src("src/components/catalogo/CatalogoPublicoPage.tsx");
+const REVISAR = src("src/components/catalogo/RevisarPedidoPublico.tsx");
 const PEDIDO = src("src/components/catalogo/PedidoPublicoClient.tsx");
 const BARRA = src("src/components/catalogo/CatalogoStickyCartBar.tsx");
 const FILTROS = src("src/components/catalogo/CatalogoFilters.tsx");
@@ -158,11 +159,16 @@ describe("estados de error del flujo público", () => {
 // ── 3. Guardado: el cliente no puede cerrar la pantalla a medias ─────────────
 
 describe("aviso de guardado", () => {
-  it("confirmar DESDE EL CATÁLOGO avisa y frena el cierre de la pestaña", () => {
-    // Es el camino que usa todo el mundo; el aviso vivía solo en la página del
-    // pedido, que casi nadie llega a ver sin confirmar antes.
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 7-sep-2026, y no se aflojó: se MUDÓ con el paso
+  // que vigila. Confirmar dejó de ocurrir en el catálogo — ahora el cliente
+  // pasa por «Revisa tu pedido» y confirma ahí, igual que el vendedor en su
+  // checkout. El aviso y el freno del cierre viajaron con él.
+  it("confirmar avisa y frena el cierre de la pestaña", () => {
     expect(BARRA).toContain("Guardando tu pedido, no cierres esta pantalla");
-    expect(PUBLICO).toContain("beforeunload");
+    expect(REVISAR).toContain("beforeunload");
+    // CONTROL de la dirección vieja: el catálogo ya no confirma nada, así que
+    // tampoco puede quedarse con un camino de confirmación sin aviso.
+    expect(sinComentarios(PUBLICO)).not.toContain("pedido-publico");
   });
 
   it("la página del pedido conserva su aviso", () => {

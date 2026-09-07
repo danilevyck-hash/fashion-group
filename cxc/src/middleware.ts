@@ -30,8 +30,11 @@ const PUBLIC_PREFIXES = [
   // deliberadamente distinta de CRON_SECRET, porque vive en una PC de la
   // oficina y si se filtrara solo debe permitir escribir marcaciones.
   "/api/asistencia/ingest",
-  "/api/catalogo/reebok/products", // public catalog reads
-  "/api/catalogo/reebok/inventory", // public catalog stock
+  // 🔴 `/api/catalogo/reebok/products` y `/api/catalogo/reebok/inventory`
+  // SALIERON de esta lista el 7-sep-2026: eran el catálogo INTERNO de Reebok
+  // legible sin sesión, la única marca de las cuatro con esa puerta. Las dos
+  // rutas piden sesión ahora, y lo público de verdad es
+  // `/api/catalogo/reebok/public`, que sigue abajo.
   "/api/catalogo/reebok/public",    // public catalog endpoint (no auth)
   "/catalogo-publico/",             // public catalog page (no auth)
   "/marketing/galeria/",            // galería pública de fotos por cliente (token HMAC)

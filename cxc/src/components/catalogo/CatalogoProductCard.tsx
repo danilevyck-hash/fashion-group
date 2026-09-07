@@ -39,7 +39,6 @@ interface CatalogoProductCardProps {
   qty: number;
   onQtyChange: (productId: string, qty: number, product: CatalogoProducto) => void;
   disabled?: boolean;
-  showBultos?: boolean; // vendor mode shows "bultos"
   showStock?: boolean;  // catálogo interno: muestra disponibilidad + existencia (NO en público)
   /** Cards del primer viewport: la foto se pide YA y con prioridad alta (LCP).
    *  El resto va lazy — es lo que evita bajar cientos de fotos al abrir. */
@@ -47,7 +46,7 @@ interface CatalogoProductCardProps {
 }
 
 export default function CatalogoProductCard({
-  marca, product, qty, onQtyChange, disabled, showBultos, showStock, priority,
+  marca, product, qty, onQtyChange, disabled, showStock, priority,
 }: CatalogoProductCardProps) {
   const theme = getMarcaTheme(marca)!;
   const t = theme.card;

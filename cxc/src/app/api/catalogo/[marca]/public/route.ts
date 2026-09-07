@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { leerConColumnaOpcional } from "@/lib/catalogo/cols-opcionales";
 import { unstable_cache } from "next/cache";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
+import { paquetePublico } from "@/lib/catalogo/publico-payload";
 import { catalogoTag, CATALOGO_PUBLICO_TTL_SEGUNDOS } from "@/lib/catalogo/cache";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 
@@ -39,10 +40,7 @@ const HEADERS_NO_STORE = {
   "CDN-Cache-Control": "no-store",
 };
 
-interface PayloadPublico {
-  products: unknown[];
-  inventory?: unknown[];
-}
+type PayloadPublico = ReturnType<typeof paquetePublico>;
 
 /** Lectura VIVA del catálogo — es lo que se cachea. Lanza en vez de devolver un
  *  payload a medias, así un fallo de Supabase nunca queda cacheado. */
@@ -89,7 +87,15 @@ async function leerCatalogo(cfg: MarcaConfig): Promise<PayloadPublico> {
           .range(desde, hasta),
     );
 
-    return { products, inventory };
+    // 🔴 LO QUE SALE AL NAVEGADOR SE RESUELVE ACÁ (7-sep-2026). `existencia` y
+    // `stock` se LEEN (hacen falta para el fallback cuando el sync todavía no
+    // escribió `disponibilidad`) pero NO viajan, y el inventario se acota a los
+    // productos de este mismo paquete — Reebok mandaba las 391 filas, 159 de
+    // ellas de productos apagados. Regla única en `lib/catalogo/publico-payload`.
+    return paquetePublico(
+      products as Record<string, unknown>[],
+      inventory as Record<string, unknown>[],
+    );
   }
 
   // Columnas explícitas (no select("*")): endpoint público — blinda contra
@@ -111,7 +117,7 @@ async function leerCatalogo(cfg: MarcaConfig): Promise<PayloadPublico> {
         .range(desde, hasta),
   ));
 
-  return { products };
+  return paquetePublico(products as Record<string, unknown>[]);
 }
 
 /** La misma lectura, cacheada bajo la tag de la marca. `marca` viaja como

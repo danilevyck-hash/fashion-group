@@ -7,9 +7,11 @@
 
 import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
-import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
+import { rutaRevisarPublico } from "@/lib/catalogo/rutas-publicas";
+import { WHATSAPP_CONTACTOS } from "@/lib/catalogo/whatsapp-msg";
+import { useDescargarCatalogoPdf } from "./useDescargarCatalogoPdf";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
 import { compararCodigos } from "@/lib/catalogos/orden-codigo";
 import {
@@ -45,6 +47,13 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
   const agrupado = theme.features.agrupacionPorModelo;
   const searchParams = useSearchParams();
+  const router = useRouter();
+  // 🔴 EL ESPACIO DE ABAJO SALE DE LA MEDIDA DE LA BARRA, no de un número
+  // escrito a mano (7-sep-2026). Era `pb-28` (112 px) fijo. La barra la MIDE
+  // `CatalogoStickyCartBar` con un ResizeObserver y avisa acá — cambia sola con
+  // el mini-carrito abierto y con el `env(safe-area-inset-bottom)` del iPhone.
+  // Es el MISMO mecanismo que ya usa el catálogo del vendedor.
+  const [altoBarra, setAltoBarra] = useState(0);
   const [products, setProducts] = useState<CatalogoProducto[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
@@ -65,7 +74,13 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
       : PRECIO_VACIO,
   );
   const [sortBy, setSortBy] = useState("relevancia");
-  const [toast, setToast] = useState<string | null>(null);
+  // El aviso lleva su TIPO: un error se lee 8 s y un éxito 3 s, y los dos se
+  // van solos y se pueden cerrar (regla de la casa; antes el único aviso de
+  // esta pantalla se quedaba pegado para siempre encima de la barra).
+  const [toast, setToast] = useState<{ texto: string; tipo: "success" | "error" } | null>(null);
+  const avisar = useCallback((texto: string, tipo: "success" | "error" = "success") => {
+    setToast({ texto, tipo });
+  }, []);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Cart state
@@ -356,107 +371,39 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   // Precio de catálogo, igual en las 3 marcas: sin `.00` y sin redondear.
   const fmt = precioTexto;
 
+  // 🔴 EL CLIENTE TAMBIÉN DESCARGA EL CATÁLOGO EN PDF (7-sep-2026). Es
+  // EXACTAMENTE el mismo archivo que Daniel manda a mano por WhatsApp: lo arma
+  // el hook COMPARTIDO con el catálogo del vendedor (`useDescargarCatalogoPdf`),
+  // no una segunda copia. El verbo es «Descargar» en los dos lados.
+  //
+  // ⚠️ El PDF sí respeta los filtros de quien lo pide —es la foto de lo que
+  // estás mirando— y los escribe en su subtítulo. El ENLACE compartido, en
+  // cambio, sale pelado (ver `handleCopyLink` del vendedor).
+  const { descargando: descargandoPdf, descargar: descargarPdf } = useDescargarCatalogoPdf();
+  function handleDescargarPdf() {
+    return descargarPdf({
+      marca, theme, agrupado, filtered, sortedGroups, filteredCount,
+      gender, category, search, bultosFilter, precio, catLabel,
+      avisar,
+    });
+  }
+
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
     setBultosFilter(false); setPrecio(PRECIO_VACIO);
     setSortBy("relevancia");
   }
 
-  const [sendingOrder, setSendingOrder] = useState(false);
-  const [clientName, setClientName] = useState("");
-  // short_id del pedido YA creado en el server: si la confirmación falla y el
-  // cliente reintenta, se reusa (no se duplica el pedido).
-  const [pendingShortId, setPendingShortId] = useState<string | null>(null);
-
-  // Confirmar desde el catálogo hace DOS llamadas (crear + confirmar) y la
-  // segunda sale a Switch: son ~5 s en los que cerrar la pestaña deja el
-  // pedido a medias. La página del pedido ya avisaba y frenaba el cierre; este
-  // camino —el que usa TODO el mundo— no hacía ninguna de las dos cosas.
-  useEffect(() => {
-    if (!sendingOrder) return;
-    const avisar = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", avisar);
-    return () => window.removeEventListener("beforeunload", avisar);
-  }, [sendingOrder]);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(theme.publicClientNameKey);
-      if (saved) setClientName(saved);
-    } catch { /* ignore */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem(theme.publicClientNameKey, clientName); } catch { /* */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientName]);
-
-  // Si el cliente cambia el carrito o su nombre, el pedido pendiente ya no
-  // representa lo que ve → se creará uno nuevo al confirmar.
-  useEffect(() => {
-    setPendingShortId(null);
-  }, [cart, clientName]);
-
-  // Confirmar pedido: 1) crea el pedido en el server (precios validados
-  // server-side), 2) lo CONFIRMA (auto-convierte a número interno y lo manda a
-  // Switch) y 3) lleva al cliente a su página permanente
-  // /pedido-<marca>/[short_id], donde ve la cantidad real disponible y puede
-  // avisar por WhatsApp (opcional).
-  // SIN modal de stock (25-jul-2026): si algún producto tiene menos piezas, el
-  // pedido entra igual y la cantidad REAL se muestra en la página del pedido.
-  async function handleConfirmarPedido() {
-    if (cart.length === 0 || sendingOrder) return;
-    // Nombre OBLIGATORIO — misma regla que el server (lib/catalogo/
-    // nombre-cliente): la barra ya bloquea el botón y escribe el motivo; esto
-    // es el cinturón por si el estado llega sucio desde localStorage.
-    const nombre = validarNombreCliente(clientName);
-    if (!nombre.ok) {
-      setToast(nombre.error);
-      return;
-    }
-    const trimmedName = nombre.nombre;
-    setSendingOrder(true);
-    try {
-      let shortId = pendingShortId;
-      if (!shortId) {
-        const res = await fetch(`${theme.api}/pedido-publico`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: cart, cliente_nombre: trimmedName }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok || !data?.short_id) {
-          setToast((data?.error as string) || "Error al enviar el pedido. Intenta de nuevo.");
-          return;
-        }
-        shortId = data.short_id as string;
-        setPendingShortId(shortId);
-      }
-
-      const conf = await fetch(`${theme.api}/pedido-publico/${shortId}/confirmar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-      const confData = await conf.json().catch(() => null);
-      if (!conf.ok || !confData?.numero) {
-        setToast((confData?.error as string) || "No se pudo confirmar el pedido. Intenta de nuevo.");
-        return;
-      }
-
-      // Confirmado → vaciar carrito y abrir su página permanente del pedido.
-      setCart([]);
-      limpiarCarrito(theme.publicCartKey);
-      window.location.href = `${theme.pedidoPublicoBase}/${shortId}`;
-    } catch {
-      setToast("Error al enviar el pedido. Intenta de nuevo.");
-    } finally {
-      setSendingOrder(false);
-    }
+  // 🔴 CONFIRMAR YA NO OCURRE ACÁ (7-sep-2026). El cliente aterrizaba en su
+  // pedido ya confirmado, de un toque; ahora pasa por «Revisar tu pedido»
+  // —`/catalogo-publico/<marca>/revisar`—, donde ve lo que va a pedir, cambia
+  // cantidades, quita líneas y recién ahí confirma. Es el mismo paso que el
+  // vendedor da en su checkout. Daniel: *«así puede agregar, quitar o editar»*.
+  //
+  // Todo lo que estaba acá (crear + confirmar + el aviso de «no cierres esta
+  // pantalla») se MUDÓ a `RevisarPedidoPublico`, no se copió.
+  function handleRevisarPedido() {
+    router.push(rutaRevisarPublico(marca));
   }
 
   function handleClearCart() {
@@ -509,6 +456,27 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
       <p className={`${theme.grid.emptyText} mt-1 font-normal`}>
         Vuelve a entrar más tarde o escríbenos por WhatsApp.
       </p>
+      {/* 🩸 El texto decía «escríbenos por WhatsApp» y en esta pantalla NO
+          había ningún WhatsApp: los números existían, pero solo salían en el
+          pedido ya confirmado — o sea, después de comprar. Son los MISMOS dos
+          contactos de siempre (`WHATSAPP_CONTACTOS`), con nombre y número a la
+          vista para que el cliente sepa a quién le escribe. */}
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        {WHATSAPP_CONTACTOS.map((c) => (
+          <a
+            key={c.telefono}
+            href={`https://wa.me/${c.telefono}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 min-h-[44px] text-sm font-bold text-white active:scale-[0.98] transition"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+            </svg>
+            {c.nombre} · {c.telefonoLabel}
+          </a>
+        ))}
+      </div>
     </div>
   ) : (
     <div className="text-center py-20">
@@ -520,9 +488,13 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
     </div>
   );
 
+  // Con el carrito vacío la barra no existe y no se reserva nada (+16 px de
+  // aire para que el último «Agregar» no quede pegado a la barra).
+  const reservaAbajo = cartCount > 0 && altoBarra > 0 ? altoBarra + 16 : 0;
+
   // Product grid
   const productGrid = (
-    <div className={`${cartCount > 0 ? "pb-28" : ""}`}>
+    <div style={{ paddingBottom: reservaAbajo || undefined }}>
       {agrupado ? (
         isGrouped ? (
           <div className="space-y-8">
@@ -608,6 +580,22 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
       <div className="max-w-7xl mx-auto px-4 py-6">
         <CatalogoHeader marca={marca} variant="public" />
 
+        {/* «Descargar PDF» — el MISMO archivo que ofrece el vendedor. Solo se
+            dibuja si hay algo que bajar: un botón que descarga un PDF vacío no
+            se ofrece. */}
+        {filteredCount > 0 && (
+          <div className="-mt-3 mb-4 flex justify-end">
+            <button
+              onClick={handleDescargarPdf}
+              disabled={descargandoPdf}
+              className={`${theme.vendorShare.btn} disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width={theme.vendorShare.iconSize} height={theme.vendorShare.iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              {descargandoPdf ? "Generando..." : "Descargar PDF"}
+            </button>
+          </div>
+        )}
+
         <CatalogoFilters
           marca={marca}
           searchInput={searchInput}
@@ -631,17 +619,27 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
 
         {loading ? skeletonGrid : filteredCount === 0 ? emptyState : productGrid}
 
-        <Toast message={toast} />
+        <Toast message={toast?.texto ?? null} type={toast?.tipo} onDismiss={() => setToast(null)} />
 
         {showScrollTop && (
+          /* El botón de subir vive `bottom-24` (96 px) en el tema. Con la barra
+             del carrito arriba se escondía detrás: el `bottom` en línea lo
+             levanta por encima del alto REAL de la barra y, sin carrito, se
+             queda con el del tema. Mismo arreglo que en el catálogo del
+             vendedor. */
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            style={reservaAbajo ? { bottom: reservaAbajo } : undefined}
             className={theme.grid.scrollTopBtn}
           >
             &uarr;
           </button>
         )}
 
+        {/* La barra lleva a REVISAR. El nombre del cliente y «Confirmar
+            pedido» viven en esa pantalla, en esta MISMA barra: acá no se pide
+            nada todavía, así que la barra queda corta y no tapa el «Agregar»
+            de la última fila. */}
         <CatalogoStickyCartBar
           marca={marca}
           cart={cart}
@@ -650,11 +648,9 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
           onQtyChange={handleQtyChange}
           onClearCart={handleClearCart}
           variant="public"
-          onSubmitOrder={() => handleConfirmarPedido()}
-          clientName={clientName}
-          onClientNameChange={setClientName}
-          saving={sendingOrder}
-          actionLabel={sendingOrder ? theme.publico.confirmingLabel : undefined}
+          onSubmitOrder={handleRevisarPedido}
+          actionLabel="Revisar pedido"
+          onAltoChange={setAltoBarra}
           formatTotal={fmt}
         />
 

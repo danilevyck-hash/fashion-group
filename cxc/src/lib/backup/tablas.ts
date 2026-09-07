@@ -156,6 +156,10 @@ export const TABLAS_PERSONAS = [
   "guia_transporte",
   "guia_items",
   "guias_destino_cliente",
+  // La lista general de destinos que ofrece el campo Dirección (7-sep-2026).
+  // La escriben personas —Angela y Andrea al armar una guía— y NO se puede
+  // volver a conseguir: antes vivía en el localStorage de cada navegador.
+  "guias_destino_lista",
   "transportistas",
 
   // ── Caja menuda

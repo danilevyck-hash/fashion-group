@@ -56,8 +56,10 @@ export interface DescargaPdfArgs {
   precio: FiltroPrecio;
   /** Etiqueta legible de cada categoría (sale del tema, la arma la pantalla). */
   catLabel: Record<string, string>;
-  /** Un aviso corto en pantalla (toast). */
-  avisar: (mensaje: string) => void;
+  /** Un aviso corto en pantalla (toast). `tipo` decide cuánto dura y de qué
+   *  color sale: un error se lee 8 s, un éxito 3 s (regla de la casa). Quien
+   *  solo maneja éxitos puede pasar una función de un argumento. */
+  avisar: (mensaje: string, tipo?: "success" | "error") => void;
 }
 
 export function useDescargarCatalogoPdf() {
@@ -72,7 +74,7 @@ export function useDescargarCatalogoPdf() {
     if ((agrupado ? !sortedGroups.length : !filtered.length) || descargando) return;
 
     setDescargando(true);
-    avisar("Generando catalogo PDF...");
+    avisar("Generando el catálogo en PDF...");
 
     try {
       // Lib compartida de todas las marcas (src/lib/catalogo/catalog-pdf.ts).
@@ -149,10 +151,10 @@ export function useDescargarCatalogoPdf() {
         totalCount: filteredCount,
         filename: `catalogo-${marca}-${new Date().toISOString().slice(0, 10)}.pdf`,
       });
-      avisar("Catalogo descargado");
+      avisar("Catálogo descargado");
     } catch (e) {
       console.error(e);
-      avisar("Error al generar PDF");
+      avisar("No pudimos generar el PDF. Intenta de nuevo en unos segundos.", "error");
     } finally {
       setDescargando(false);
     }

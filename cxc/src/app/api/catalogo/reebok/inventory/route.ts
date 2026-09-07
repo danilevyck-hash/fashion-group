@@ -2,16 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/components/reebok/supabase'
 import { reebokServer } from '@/lib/reebok-supabase-server'
 import { requireRole } from '@/lib/requireRole'
+import { catalogoRoles } from '@/lib/catalogo/roles'
 import { invalidarCatalogoPublico } from '@/lib/catalogo/cache'
 import { leerTodoPaginado } from '@/lib/supabase-paginado'
 
 export const dynamic = "force-dynamic";
 
+// Roles del módulo Catálogos — la MISMA lista que el GET de /products.
+const CATALOGO_ROLES = catalogoRoles()
+
 export async function GET(req: NextRequest) {
+  // 🔴 CERRADO (7-sep-2026), la otra mitad de la misma puerta. Esta ruta se
+  // leía SIN sesión —decía «endpoint público»— y devuelve la EXISTENCIA por
+  // talla de todo Reebok, que es justo lo que el paquete público dejó de
+  // mandar. Sus dos únicos llamadores (el hub de marcas y el catálogo del
+  // vendedor) entran con sesión, así que no pierde nada.
+  // ⚠️ Lo PÚBLICO de verdad es `/api/catalogo/reebok/public`, que responde
+  // productos e inventario ya resueltos (lib/catalogo/publico-payload).
+  const auth = requireRole(req, CATALOGO_ROLES)
+  if (auth instanceof NextResponse) return auth
+
   const { searchParams } = new URL(req.url)
   const productId = searchParams.get('product_id')
 
-  // Columnas explícitas (no select('*')): endpoint público.
+  // Columnas explícitas (no select('*')).
   // ⚠️ PAGINADO (26-jul-2026): sin `product_id` esto lee el inventario ENTERO
   // (una fila por producto y talla) y se cortaba en 1.000 sin error — tallas que
   // desaparecen y productos que se ven Agotado sin estarlo. Orden de negocio

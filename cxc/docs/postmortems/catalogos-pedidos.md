@@ -1513,3 +1513,68 @@ acciones se tocan en el «···») · `catalogo-pedidos-ux-arreglos` (idem).
 >   - ⚠️ **Hoy NO existe en producción ningún producto con alternativas** (Tommy quedó sin banco por decisión de Daniel; Reebok/Joybees nunca lo tuvieron). Por eso el caso positivo se verifica sirviéndole a la pantalla la forma exacta que tenía el banco antes de la limpieza, no inventando datos.
 >   - Candado: 9 casos nuevos en `variantes-fotos.test.ts`, incluido el caso real `THS10159C000` (1 foto y ES la puesta → 0 alternativas) y que Reebok/Joybees conserven el botón cuando sí hay banco.
 > - ⚠️ **Volver a tener alternativas = volver a subir el ZIP del B2B.** No hay vuelta atrás para las 2.157.
+
+---
+
+## La pantalla que ve el CLIENTE — «como si fuese el mismo catálogo» (7-sep-2026)
+
+> Daniel, textual: *«quiero que el cliente cuando abra el catálogo por el link se sienta como si fuese el mismo catálogo, solamente con par de limitaciones que ya sabemos, por ejemplo escoger el cliente, porque no quiero que él vea toda la cartera de clientes que tengo»*.
+
+Seis cosas, todas medidas antes de tocar nada. Las 4 marcas, iguales.
+
+### 1. 🔴 La barra del carrito tapaba el botón «Agregar» de la última fila
+
+La página reservaba abajo **112 px** escritos a mano (`pb-28`). En el catálogo PÚBLICO la barra lleva encima el bloque **«Tu nombre \*»** —obligatorio y siempre visible— y mide **≈164 px**: sobraban ≈52 px, justo el alto de un botón. El botón de «subir» quedaba escondido detrás por el mismo motivo. Del lado del vendedor la barra mide ~93 px y no se notaba.
+
+- **El espacio sale de la MEDIDA, no de un número.** `CatalogoStickyCartBar` mide su alto real con un `ResizeObserver` y lo avisa (`onAltoChange`); las tres pantallas —público, revisar y vendedor— reservan `alto + 16`. Sin `ResizeObserver` (navegador viejo) se mide una vez: mejor un número real de una sola lectura que volver al 112.
+- El **botón de subir** se levanta con el mismo número, y sin carrito se queda con el `bottom` del tema.
+- 🔑 De paso, la barra del catálogo dejó de pedir el nombre (ver el punto 4): en la pantalla donde está el grid, la barra ahora es la corta.
+
+### 2. El cliente no podía teclear la cantidad
+
+El número entre el `−` y el `+` era un botón que **no hacía nada** en el público: colgaba de `showBultos`, un interruptor que solo prendía el vendedor. Para pedir 30 bultos había que tocar «+» treinta veces.
+
+- Se **quitó la condición**, no se agregó un control: es la MISMA ventana de cantidad de siempre (`Cantidad de bultos`), una por tarjeta.
+- `showBultos` se retiró de las dos tarjetas — en `CatalogoProductCard` ya ni se leía— y de los 4 llamadores del vendedor.
+- El número dice qué hace (`aria-label="Escribir la cantidad"`) y los botones de la ventana llegan a los 44 px en las dos tarjetas.
+
+### 3. El cliente no podía descargar el catálogo en PDF
+
+Vivía solo del lado del vendedor, en «Compartir › Descargar PDF» — y es **exactamente el mismo archivo** que Daniel manda a mano por WhatsApp.
+
+- Se ofrece también en el público, con el **hook compartido** (`useDescargarCatalogoPdf`): un solo archivo, no una segunda copia.
+- El verbo es **«Descargar»** en los dos lados (la palabra de la casa).
+- **Con cero resultados el botón no se dibuja**: bajaría un PDF vacío.
+- ⚠️ El PDF sí respeta los filtros de quien lo pide y los escribe en su subtítulo — es la foto de lo que estás mirando. El **enlace** compartido sigue saliendo pelado.
+
+### 4. 🔴 El cliente REVISA antes de confirmar
+
+Aterrizaba en su pedido **ya confirmado, de un toque**: «Confirmar pedido» creaba el pedido, lo mandaba a Switch y lo dejaba en una página donde ya no había nada que cambiar. El vendedor, en cambio, pasa por su checkout y revisa antes de mandar. Daniel: *«así puede agregar, quitar o editar»*.
+
+- Pantalla nueva: **`/catalogo-publico/<marca>/revisar`** (`RevisarPedidoPublico`). La ruta se **deriva de la marca** y cuelga del catálogo público, así que hereda sin tocar nada las dos listas de `rutas-publicas.ts` (ni barra lateral, ni prompt de instalar el ERP).
+- 🔑 **No es una segunda pantalla que haga lo mismo.** Las líneas las dibuja `LineasPedidoEditables`, que **SALIÓ del checkout del vendedor** (~70 líneas mudadas, no copiadas) y ahora la usan los dos. El nombre del cliente y «Confirmar pedido» viven en `CatalogoStickyCartBar`, la MISMA barra del catálogo.
+- Ahí puede **cambiar cantidades**, **quitar líneas** y **volver al catálogo a agregar más** sin perder nada: el carrito vive en la sesión de la pestaña y el nombre en `localStorage`, como siempre.
+- 🔴 **El precio NO se toca.** No es por esconder un botón: el servidor **reescribe los precios desde la base** al recibir el pedido del link, y eso no se tocó. En la lista compartida el precio editable es un `renderPrecio` OPCIONAL — el checkout se lo pasa, el cliente no.
+- ⚠️ **La cartera de clientes sigue cerrada**: el cliente escribe su propio nombre (`validarNombreCliente`, la regla de siempre) y nunca elige del directorio. Las rutas de la cartera siguen exigiendo sesión.
+- ⚠️ **El pedido del link sigue sin salir solo a Switch** — alguien de adentro le pone el cliente (decisión del 14-ago-2026).
+- El aviso «Guardando tu pedido, no cierres esta pantalla» y el freno del cierre de la pestaña **viajaron con el paso que vigilan**.
+
+### 5. El aviso de error se quedaba pegado para siempre
+
+En el público el `Toast` **no se auto-ocultaba y no tenía botón de cerrar**, y quedaba encima de la barra del carrito. El único aviso de esa pantalla era un error.
+
+- El `Toast` compartido se cierra solo cuando le pasan `onDismiss`: **8 s un error, 3 s un éxito** (`lib/ui/toast-duracion.ts`, un solo lugar), y trae su ✕.
+- 🩸 El reloj **NO depende de `onDismiss`**: casi todas las pantallas lo pasan como `() => setToast(null)`, una función nueva en cada render — como dependencia, el reloj se reiniciaría solo y el aviso no se iría nunca. Viaja por `ref`.
+- ⚠️ Sin `onDismiss` el comportamiento es el de antes: las ~20 pantallas con su propio `setTimeout` no cambian.
+
+### 6. Lo que viajaba al navegador del cliente
+
+- 🩸 **La existencia física viajaba y nadie la dibujaba.** Las 4 marcas mandaban `existencia` (y `stock`, su espejo) junto a `disponibilidad`, que es la única que se pinta — y **difieren en 282 de 857 productos**. Ahora el servidor **resuelve y manda un solo número**: `disponibleVendible` corre del lado del servidor (con su caída a existencia cuando el sync todavía no escribió la columna) y afuera sale solo `disponibilidad`. ⚠️ No se puede arreglar quitando las columnas de la LECTURA: sin `existencia` desaparece el respaldo y un producto con el sync a medias se vería agotado.
+- 🩸 **Reebok mandaba 4 columnas que las otras tres no mandan** y que nadie dibuja: `description`, `sub_category`, `on_sale`, `created_at`. Salieron de `publicCatalog.cols`. `created_at` sigue **ordenando** la consulta (PostgREST ordena por una columna que no se selecciona), solo dejó de viajar.
+- 🩸 **Reebok mandaba el inventario de productos apagados**: 391 filas, **159 de productos que no están en el catálogo** (`products` se acotaba a `active = true` e `inventory` se leía entera). Ahora el inventario se acota a los productos del mismo paquete.
+- Regla única y PURA en `src/lib/catalogo/publico-payload.ts`.
+- 🔴 **El catálogo interno de Reebok se leía SIN sesión** (`/api/catalogo/reebok/products?active=true`); las otras tres siempre la exigieron. No agregaba fuga nueva —devuelve las mismas columnas que el público— pero era una puerta abierta de más y la única de su clase. Ahora pide sesión con los roles del módulo Catálogos; el `scope=admin` sigue siendo suyo y sigue exigiendo admin o secretaria. El `authStyle` pasó de `publico-scope-admin` a **`scope-admin`**.
+- 🔴 **Y la otra mitad de la misma puerta: `/api/catalogo/reebok/inventory`**, que decía «endpoint público» y devuelve la EXISTENCIA por talla de todo Reebok — justo lo que el paquete público dejó de mandar. Las **dos** rutas salieron de `PUBLIC_PREFIXES` en `src/middleware.ts`; sus únicos llamadores (el hub de marcas y el catálogo del vendedor) entran con sesión, así que no pierden nada. ⚠️ Lo público de verdad es `/api/catalogo/reebok/public`, que se queda.
+- **El estado vacío prometía un WhatsApp que no estaba**: decía «escríbenos por WhatsApp» y en esa pantalla no había ningún número (existían, pero solo salían en el pedido ya confirmado — o sea, después de comprar). Ahora ofrece los **mismos dos contactos** de siempre (`WHATSAPP_CONTACTOS`), con nombre y número a la vista.
+
+**Candados:** `catalogo-publico-como-el-catalogo.test.ts` (38 casos, contratos y barridos) · `catalogo-publico-revisar.test.tsx` (18 casos de CONDUCTA: se renderiza la pantalla del cliente, se tocan los botones y se mira qué quedó en el carrito y qué `fetch` salió). Dos candados **cambiaron de dirección con nota fechada**, ninguno se borró: `catalogo-publico-ux-paridad.test.ts` (el aviso de guardado se mudó con el paso que vigila, y el CONTROL nuevo exige que el catálogo ya no confirme nada) y `catalogo-paridad-products.test.ts` (la puerta de Reebok, con el CONTROL de que `scope=admin` sigue siendo de admin/secretaria). **47 mutaciones, 47 cazadas** con 2 controles (`scripts/_mutar-candados-catalogo-publico.sh`).

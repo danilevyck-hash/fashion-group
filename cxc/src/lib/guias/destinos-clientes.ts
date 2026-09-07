@@ -411,6 +411,34 @@ export function botonesDeDestino(
 }
 
 /**
+ * 🔴 EL DESTINO REPETIDO NO SE DIBUJA (7-sep-2026).
+ *
+ * Daniel, textual: *«si el cliente tiene un solo destino y ya está escrito en
+ * el campo, no dibujar el botón. No ofrece nada.»* Le pasó con «Paso Canoas»:
+ * el destino se autollenó al elegir el cliente y justo debajo aparecía un
+ * botón que decía lo MISMO — se lee como el dato dos veces, y tocarlo no
+ * cambia nada. Es la regla de la casa: *un control que no ofrece nada, no se
+ * dibuja*.
+ *
+ * ⚠️ SOLO cuando es UNO. Con varios destinos se dibujan todos, incluido el que
+ * coincide (marcado como elegido): ahí sí ofrecen algo — cambiar de destino.
+ *
+ * El pareo es por `claveDestino` (regla exacta), así que «PASO CANOAS» escrito
+ * a mano también tapa el botón; y se compara contra la BASE del campo, para
+ * que «Westland · tienda 6» siga contando como «Westland».
+ */
+export function botonesQueSeDibujan(
+  botones: readonly string[],
+  direccion: string | null | undefined,
+): string[] {
+  const lista = [...botones];
+  if (lista.length !== 1) return lista;
+  const base = baseDeDestino(direccion);
+  if (!base) return lista;
+  return claveDestino(lista[0]) === claveDestino(base) ? [] : lista;
+}
+
+/**
  * 🔴 EL DESTINO QUE SE LLENA SOLO AL ELEGIR EL CLIENTE (4-sep-2026).
  *
  * Daniel, textual: *«sí quiero que se llene sola, ¿ese no era el propósito de

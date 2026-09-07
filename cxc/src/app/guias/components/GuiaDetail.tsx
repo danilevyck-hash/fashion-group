@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Guia } from "./types";
 import PrintDocument from "./PrintDocument";
 import HojaEscalada from "./HojaEscalada";
-import { compartirGuia } from "@/lib/guias/papel-de-la-guia";
+import { compartirGuia, imprimirGuia } from "@/lib/guias/papel-de-la-guia";
 import { precargarFirmasGuia } from "@/lib/guias/png-guia";
 import { useToast } from "@/components/ToastSystem";
 
@@ -22,6 +22,23 @@ export default function GuiaDetail({ guia, onBack }: GuiaDetailProps) {
   useEffect(() => {
     precargarFirmasGuia(guia);
   }, [guia]);
+
+  // 🔴 IMPRIMIR = EL MISMO PDF QUE IMPRIME LA LISTA (7-sep-2026).
+  //
+  // 🩸 Acá había un `window.print()` sobre la PANTALLA, y esta pantalla vive
+  // dentro de `HojaEscalada`, que le aplica un `transform: scale(…)`. Daniel
+  // imprimió desde acá y le salió *«una foto impresa de la guía y no como
+  // estaba antes en pdf bien bonito»*. Eran DOS caminos con DOS papeles: la
+  // fila de la lista mandaba el PDF de `pdf-guia.ts` y esta pantalla mandaba el
+  // DOM. Ahora hay UNO solo, salga de donde salga.
+  //
+  // ⚠️ El bloque `@media print` de `HojaEscalada` NO se toca: sigue cubriendo
+  // el Ctrl+P del navegador, que nadie puede quitar.
+  function imprimir() {
+    if (imprimirGuia(guia) === "bloqueado") {
+      toast("El navegador bloqueó la ventana. Permite las ventanas emergentes y vuelve a intentar.", "error");
+    }
+  }
 
   // Compartir la guía por WhatsApp, correo o lo que ofrezca el celular.
   //
@@ -63,7 +80,7 @@ export default function GuiaDetail({ guia, onBack }: GuiaDetailProps) {
           {compartiendo ? "Preparando…" : "Compartir"}
         </button>
         <button
-          onClick={() => window.print()}
+          onClick={imprimir}
           className="inline-flex min-h-[44px] items-center justify-center text-sm border border-gray-200 text-gray-700 px-6 rounded-md font-medium hover:border-gray-400 hover:text-black active:scale-[0.97] transition-all"
         >
           Imprimir

@@ -1,9 +1,11 @@
 // Catálogo interno de productos, dirigido por cfg.products (marcas.ts).
 //
 // QUIRKS heredados (unificar con OK de Daniel):
-//   · QUIRK 4 (auth del GET): en Reebok el catálogo es legible SIN sesión y
-//     solo scope=admin exige rol; en Joybees TODA lectura exige sesión con los
-//     roles del módulo Catálogos (incluye bodega).
+//   · QUIRK 4 (auth del GET): las CUATRO marcas exigen sesión con los roles del
+//     módulo Catálogos (incluye bodega). Reebok además acepta `scope=admin`
+//     (catálogo vivo + los ocultados a mano), que pide admin o secretaria.
+//     🩸 Hasta el 7-sep-2026 el GET de Reebok se leía SIN NINGUNA sesión: era
+//     la única de las cuatro con esa puerta abierta.
 //   · QUIRK 5 (edición): Reebok edita por `id` vía PUT; Joybees por `sku` vía
 //     POST. El verbo que la marca no usa responde 405 (antes la ruta no
 //     existía y Next respondía 405 igual).
@@ -63,11 +65,18 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
 
   const { searchParams } = new URL(req.url);
 
-  if (pcfg.authStyle === "publico-scope-admin") {
-    // QUIRK 4 (Reebok): catálogo legible sin sesión; scope=admin (solo
-    // admin/secretaria) devuelve el catálogo vivo (active=true) MÁS los
-    // ocultados a mano (oculto_manual=true, active=false) para poder revertir
-    // el toggle desde el admin. Incluye la columna oculto_manual.
+  if (pcfg.authStyle === "scope-admin") {
+    // QUIRK 4 (Reebok): scope=admin (solo admin/secretaria) devuelve el
+    // catálogo vivo (active=true) MÁS los ocultados a mano
+    // (oculto_manual=true, active=false) para poder revertir el toggle desde el
+    // admin. Incluye la columna oculto_manual.
+    //
+    // 🔴 LA PUERTA SE CERRÓ (7-sep-2026): sesión SIEMPRE, con los MISMOS roles
+    // que las otras tres marcas. Antes de esta línea `/api/catalogo/reebok/
+    // products?active=true` contestaba 200 a cualquiera.
+    const auth = requireRole(req, CATALOGO_ROLES);
+    if (auth instanceof NextResponse) return auth;
+
     const adminScope = searchParams.get("scope") === "admin";
     if (adminScope) {
       const denied = requireAdminOSecretaria(req);

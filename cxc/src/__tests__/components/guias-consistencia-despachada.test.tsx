@@ -386,7 +386,7 @@ describe("🔴 «Si lo dio» se fue de los DOS lugares", () => {
 const camposDestinoAbiertos = () =>
   Array.from(
     document.querySelectorAll<HTMLInputElement>(
-      "input[aria-label='Agregar destino a la lista de direcciones']",
+      "input[aria-label='Agregar destino a la lista que ve todo el equipo']",
     ),
   );
 
@@ -422,13 +422,34 @@ describe('🔴 «Agregar destino» vive PEGADO AL CAMPO de Dirección', () => {
     }
   });
 
-  it("va PELADO: pegado a su campo se entiende sin leer, y el nombre queda en el aria-label", async () => {
+  // 🔄 ESTE CANDADO CAMBIÓ DE DIRECCIÓN EL 7-SEP-2026, con motivo — no se borró.
+  //
+  // Decía «va PELADO»: el 26-ago-2026 se le quitó el rótulo visible porque
+  // Daniel lo vio ruidoso, y el diagnóstico de entonces fue que el problema era
+  // la POSICIÓN del "＋", no su texto. La posición se arregló y quedó bien;
+  // el texto NO: lo único que decía qué hacía el botón era el `title`, y un
+  // `title` **solo aparece pasando el mouse por encima**. Las guías se arman en
+  // el iPad, donde no hay mouse — o sea, un símbolo gris sin nombre. Daniel lo
+  // pidió de vuelta.
+  //
+  // Lo que NO cambió y se sigue exigiendo: el nombre accesible (aria-label) y
+  // el `title`. El control al revés vive abajo: el "＋" de «quién despacha»
+  // sigue PELADO, así el rótulo no se derrama por toda la pantalla.
+  it("🔴 LLEVA RÓTULO VISIBLE: en el iPad no hay mouse, y el title no se ve", async () => {
     await montarPendiente();
     const b = screen.getAllByRole("button", { name: /Agregar destino a la lista/i })[0];
-    // Un rótulo visible al lado del campo es el ruido que Daniel fue a sacar.
-    expect((b.textContent || "").replace(/\s/g, "")).toBe("＋");
+    expect((b.textContent || "").replace(/\s/g, "")).toContain("＋");
+    expect(b.textContent).toMatch(/Agregar destino/i);
     expect(b.getAttribute("aria-label")).toMatch(/Agregar destino a la lista/i);
     expect(b.getAttribute("title")).toMatch(/Agregar destino a la lista/i);
+    // Y sigue siendo táctil: el rótulo no lo achicó.
+    expect(b.className).toContain("min-h-[44px]");
+  });
+
+  it("CONTROL — el ＋ de «quién despacha» sigue PELADO: el rótulo no se derrama", async () => {
+    await montarPendiente();
+    const b = screen.getByRole("button", { name: /Agregar quien despacha/i });
+    expect((b.textContent || "").replace(/\s/g, "")).toBe("＋");
   });
 
   it("hay UNO POR FILA en los dos layouts — en móvil no existe el <th>", async () => {

@@ -302,8 +302,10 @@ const DATASETS: Dataset[] = [
   { table: "carga_history" },
   { table: "tienda_marca_formulas" },
   { table: "tienda_rubro_formulas" },
-  // Guías: los destinos por cliente (Guías › Configuración).
+  // Guías: los destinos por cliente (Guías › Configuración) y la lista general
+  // que ofrece el campo Dirección — las dos las escriben personas.
   { table: "guias_destino_cliente" },
+  { table: "guias_destino_lista" },
   // Marketing: períodos, sus documentos, impulsadoras y los costos del proveedor
   // (separados del inventario a propósito — NO fusionar).
   { table: "mk_periodos" },

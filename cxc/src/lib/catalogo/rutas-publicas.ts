@@ -63,3 +63,30 @@ export function esRutaDelCliente(pathname: string): boolean {
 export function sinBarraLateral(pathname: string): boolean {
   return pathname === "/" || RUTAS_SIN_BARRA.some((p) => cuelgaDe(pathname, p));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAS DOS DIRECCIONES DEL CLIENTE, DERIVADAS DE LA MARCA (7-sep-2026).
+//
+// El catálogo público vive en `/catalogo-publico/<marca>` y —desde hoy— su
+// pantalla de REVISAR en `/catalogo-publico/<marca>/revisar`. Se derivan por la
+// misma razón que la lista de arriba: escribirlas marca por marca es lo que
+// dejó a tres marcas afuera la vez pasada. Nada que agregar el día que nazca
+// la quinta.
+//
+// ⚠️ `revisar` cuelga de `/catalogo-publico`, así que YA entra en
+// `esRutaDelCliente` y en `sinBarraLateral` sin tocar ninguna de las dos listas
+// (se comparan por segmento).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Segmento de la pantalla donde el cliente revisa antes de confirmar. */
+export const SEGMENTO_REVISAR = "revisar";
+
+/** `/catalogo-publico/<marca>` — el link que se comparte. */
+export function rutaCatalogoPublico(marca: string): string {
+  return `/catalogo-publico/${marca}`;
+}
+
+/** `/catalogo-publico/<marca>/revisar` — lo que va a pedir, antes de confirmar. */
+export function rutaRevisarPublico(marca: string): string {
+  return `${rutaCatalogoPublico(marca)}/${SEGMENTO_REVISAR}`;
+}

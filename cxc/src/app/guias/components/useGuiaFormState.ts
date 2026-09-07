@@ -12,7 +12,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import type { Guia, GuiaItem, ModoEntrega, Transportista } from "./types";
-import { DEFAULT_DIRECCIONES, loadList, saveList, emptyItem } from "./constants";
+import { emptyItem } from "./constants";
+import { DESTINOS_BASE, listaParaElCampo, yaEstaEnLaLista } from "@/lib/guias/destinos-lista";
 import { nuevoUid, quitarFila, restaurarFila, validarGuia } from "./guia-form-logic";
 import {
   hayCambios as calcularHayCambios,
@@ -130,7 +131,13 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
 
   // Catálogo canónico de transportistas (vive en DB, no localStorage).
   const [transportistas, setTransportistas] = useState<Transportista[]>([]);
-  const [direcciones, setDirecciones] = useState<string[]>(DEFAULT_DIRECCIONES);
+  // 🔴 LA LISTA DE DESTINOS TAMBIÉN VIVE EN LA BASE (7-sep-2026). Antes salía
+  // de `localStorage` (`fg_direcciones`), así que lo que agregaba una persona
+  // no lo veía nadie más y no se podía quitar. Daniel: *«lo de solo ver en mi
+  // pantalla no tiene lógica, el sistema debe de trabajar todo igual, que sea
+  // para todo»*. Arranca con la red (`DESTINOS_BASE`) por si la lectura tarda
+  // o falla: el campo nunca queda sin sugerencias.
+  const [direcciones, setDirecciones] = useState<string[]>([...DESTINOS_BASE]);
 
   // 🔴 LO QUE LA PANTALLA YA CARGÓ, listo antes del primer dibujo. Los
   // `useState` de abajo lo leen en su inicializador PEREZOSO: si esperaran a un
@@ -223,7 +230,17 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
 
   // Cargar listas dinámicas + catálogo de transportistas
   useEffect(() => {
-    setDirecciones(loadList("fg_direcciones", DEFAULT_DIRECCIONES));
+    // La lista COMPARTIDA de destinos. Best-effort: si la tabla todavía no
+    // existe o la red falla, se queda la red de `DESTINOS_BASE` y el campo
+    // ofrece exactamente lo que ofrecía antes del cambio.
+    fetch("/api/guias/destinos-lista", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const filas = Array.isArray(d?.lista) ? (d.lista as { destino?: string }[]) : [];
+        const textos = filas.map((f) => String(f?.destino ?? "")).filter(Boolean);
+        if (textos.length > 0) setDirecciones(listaParaElCampo(textos));
+      })
+      .catch(() => { /* el campo se queda con la lista de siempre */ });
     fetch("/api/transportistas", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Transportista[]) => setTransportistas(data || []))
@@ -359,10 +376,29 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
 
   // Adders de listas dinámicas (transportistas ya no se agregan desde el form
   // — son catálogo controlado por admin)
+  // 🔴 AGREGAR UN DESTINO LO AGREGA PARA TODOS (7-sep-2026). Se ve al momento
+  // (optimista) y se guarda en la base; si el servidor lo rechaza se saca de la
+  // pantalla y se dice por qué, nunca en silencio. Un destino que ya está —por
+  // clave exacta, jamás por parecido— no se manda: se ignora y ya está.
   function addDireccion(name: string) {
-    const updated = [...direcciones, name];
-    setDirecciones(updated);
-    saveList("fg_direcciones", DEFAULT_DIRECCIONES, updated);
+    const destino = String(name ?? "").trim();
+    if (!destino || yaEstaEnLaLista(destino, direcciones)) return;
+    setDirecciones((prev) => [...prev, destino]);
+    fetch("/api/guias/destinos-lista", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ destino }),
+    })
+      .then(async (r) => {
+        if (r.ok || r.status === 409) return;
+        const d = await r.json().catch(() => null);
+        setDirecciones((prev) => prev.filter((x) => x !== destino));
+        showToast(d?.error || "No se pudo agregar el destino. Intenta de nuevo en unos segundos.");
+      })
+      .catch(() => {
+        setDirecciones((prev) => prev.filter((x) => x !== destino));
+        showToast("No se pudo agregar el destino. Revisa la conexión.");
+      });
   }
 
   // Items. La fila nueva arranca SIEMPRE vacía: no se copia nada de la anterior.

@@ -229,10 +229,12 @@ export interface MarcaConfig {
 
   // ── Endpoint /products y /public (QUIRKS 4 y 5) ──
   products: {
-    /** QUIRK 4: 'publico-scope-admin' = GET legible SIN sesión salvo
-     *  scope=admin (Reebok); 'roles-modulo' = sesión SIEMPRE con roles del
-     *  módulo Catálogos (Joybees, incluye bodega). */
-    authStyle: "publico-scope-admin" | "roles-modulo";
+    /** QUIRK 4: 'scope-admin' = sesión SIEMPRE (roles del módulo Catálogos) y
+     *  además admin/secretaria para `scope=admin` (Reebok); 'roles-modulo' =
+     *  sesión SIEMPRE con los roles del módulo (las otras tres).
+     *  ⚠️ Hasta el 7-sep-2026 esto se llamaba 'publico-scope-admin' y el GET de
+     *  Reebok se leía sin sesión — ver la nota en la config de la marca. */
+    authStyle: "scope-admin" | "roles-modulo";
     /** QUIRK 5: edición por `id` vía PUT (Reebok) o por `sku` vía POST
      *  (Joybees). El verbo no configurado responde 405. */
     editVerb: "PUT" | "POST";
@@ -331,7 +333,16 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       priceCols: "id, price, category",
     },
     products: {
-      authStyle: "publico-scope-admin", // quirk heredado, unificar con OK de Daniel
+      // 🔴 CERRADO (7-sep-2026). Se llamaba `publico-scope-admin`: el catálogo
+      // INTERNO de Reebok se leía SIN sesión (`/api/catalogo/reebok/products
+      // ?active=true`) y solo `scope=admin` pedía rol. Las otras tres marcas
+      // siempre exigieron sesión. No agregaba fuga nueva —devuelve las mismas
+      // columnas que el público— pero era una puerta abierta de más, y la única
+      // de su clase. Ahora pide sesión con los roles del módulo Catálogos,
+      // igual que las otras tres; lo que SIGUE siendo propio de Reebok es el
+      // `scope=admin` (catálogo vivo + los ocultados a mano), que además exige
+      // admin o secretaria.
+      authStyle: "scope-admin",
       editVerb: "PUT", // quirk heredado: edición por id
       idField: "id",
       cols: "id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at",
@@ -346,8 +357,18 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       // guarda existencia (el sync escribe quantity: existencia bajo la talla
       // "UNICA"), así que la disponibilidad correcta es la agregada de la fila
       // del producto — por eso viaja también en el payload público.
+      //
+      // 🩸 REEBOK MANDABA CUATRO COLUMNAS QUE NADIE DIBUJA (7-sep-2026):
+      // `description`, `sub_category`, `on_sale` y `created_at` — herencia de
+      // cuando era la única marca; las otras tres nunca las mandaron. Salieron
+      // de la lista. `created_at` sigue ORDENANDO la consulta (PostgREST ordena
+      // por una columna que no se selecciona), solo dejó de viajar.
+      //
+      // ⚠️ `existencia` SE SIGUE LEYENDO y NO SALE: es el respaldo de
+      // `disponibilidad` cuando el sync todavía no la escribió, y el servidor
+      // resuelve el número antes de responder (lib/catalogo/publico-payload).
       db: reebokServerDb,
-      cols: "id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at",
+      cols: "id,name,sku,category,gender,color,price,image_url,badge,active,existencia,disponibilidad",
       conInventario: true,
     },
     fallback: {

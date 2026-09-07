@@ -6,6 +6,7 @@ import { useSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
 import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useBackdropDismiss, useEscapeClose, useFormGuard } from "@/lib/hooks/useModalDismiss";
+import { duracionToastMs } from "@/lib/ui/toast-duracion";
 
 export { Avatar } from "./ui/Avatar";
 export type { AvatarProps } from "./ui/Avatar";
@@ -76,7 +77,37 @@ export function EmptyState({
 }
 
 // ── ESTÉTICA 6: Toast Component ──
+//
+// 🔴 SE CIERRA SOLO Y SE PUEDE CERRAR (7-sep-2026). Con `onDismiss` puesto, el
+// aviso se va solo —3 s un éxito, 8 s un error, la regla de la casa, en un solo
+// lugar (`lib/ui/toast-duracion`)— y además trae su ✕.
+//
+// 🩸 En el catálogo PÚBLICO no había ninguna de las dos cosas: el único aviso
+// de esa pantalla es un error («Error al enviar el pedido») y se quedaba
+// pegado para siempre, tapando la barra del carrito. El resto del sistema lo
+// resolvía con un `setTimeout` escrito a mano en cada pantalla.
+//
+// ⚠️ Sin `onDismiss` el comportamiento es EXACTAMENTE el de antes: se queda
+// hasta que quien lo mostró lo apague. Las ~20 pantallas con su propio
+// `setTimeout` no cambian.
 export function Toast({ message, type = "success", onDismiss }: { message: string | null; type?: "success" | "error"; onDismiss?: () => void }) {
+  // Los hooks van ANTES del early return de `message` (reglas de hooks). El
+  // temporizador se REINICIA con cada mensaje nuevo: dos avisos seguidos no
+  // comparten el reloj del primero.
+  //
+  // ⚠️ `onDismiss` viaja por REF y NO es dependencia: casi todas las pantallas
+  // lo pasan como `() => setToast(null)`, que es una función nueva en cada
+  // render — si fuera dependencia, el reloj se reiniciaría con cada render del
+  // padre y el aviso no se iría nunca.
+  const cerrarRef = useRef(onDismiss);
+  cerrarRef.current = onDismiss;
+  const seCierraSolo = !!onDismiss;
+  useEffect(() => {
+    if (!message || !seCierraSolo) return;
+    const t = setTimeout(() => cerrarRef.current?.(), duracionToastMs(type));
+    return () => clearTimeout(t);
+  }, [message, type, seCierraSolo]);
+
   if (!message) return null;
   return (
     <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-md text-sm border border-gray-200 z-50 flex items-center gap-2 ${
