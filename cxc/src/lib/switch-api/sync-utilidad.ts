@@ -22,6 +22,7 @@ import { clearStaleRunning } from "./sync-log";
 import { loginSwitchWeb, fetchUtilidadMes, type UtilidadRow } from "./web-client";
 import { particionarFilas } from "./monto-guard";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
+import { filtroTiposFueraDelReporteDeUtilidad } from "./utilidad-cobertura";
 
 /**
  * Empresas B2B con comisión sobre venta: las 6 B2B (excluye Multifashion, que es
@@ -101,21 +102,32 @@ function rangoPanama(meses: Mes[]): { desde: string; hastaExcl: string } | null 
   };
 }
 
-/** Cuántas facturas tiene switch_facturas para (empresa, rango de meses).
- *  Solo lo usa el guard del "cero silencioso" — ver syncEmpresaUtilidad. */
-async function contarFacturasEnRango(empresaKey: EmpresaKey, meses: Mes[]): Promise<number> {
+/** Cuántos documentos QUE EL REPORTE DE UTILIDAD PUEDE TRAER tiene
+ *  switch_facturas para (empresa, rango de meses).
+ *
+ *  Solo lo usa el guard del "cero silencioso" — ver syncEmpresaUtilidad.
+ *
+ *  🩸 Hasta el 6-sep-2026 contaba TODO, incluidas las ventas de mostrador, que
+ *  el reporte no trae nunca: el guard comparaba contra un universo más grande
+ *  que el suyo y sonaba solo. La lista de lo que el reporte no cubre, con lo
+ *  medido, vive en `utilidad-cobertura.ts` — acá no se escribe a mano.
+ *
+ *  🔴 Sigue contando cualquier tipo desconocido: lo que se recorta es lo
+ *  MEDIDO como fuera del reporte, nada más. */
+async function contarFacturasCubiertasEnRango(empresaKey: EmpresaKey, meses: Mes[]): Promise<number> {
   const r = rangoPanama(meses);
   if (!r) return 0;
   const { count, error } = await supabaseServer
     .from("switch_facturas")
     .select("*", { count: "exact", head: true })
     .eq("empresa_key", empresaKey)
+    .not("tipo_comprobante", "in", filtroTiposFueraDelReporteDeUtilidad())
     .gte("fecha", r.desde)
     .lt("fecha", r.hastaExcl);
   if (error) {
     // No se puede desmentir el cero → se deja pasar (el guard no debe inventar
     // un fallo por un problema de lectura suyo), pero queda el rastro.
-    console.error(`[sync-utilidad ${empresaKey}] contarFacturasEnRango: ${error.message}`);
+    console.error(`[sync-utilidad ${empresaKey}] contarFacturasCubiertasEnRango: ${error.message}`);
     return 0;
   }
   return count ?? 0;
@@ -447,15 +459,20 @@ export async function syncEmpresaUtilidad(
     // vacía convivía con un panel que mostraba $0,00 de comisión como si fuera
     // un dato real. Cero filas es LEGÍTIMO cuando la empresa no facturó en el
     // rango; deja de serlo cuando switch_facturas sí tiene documentos ahí.
+    //
+    // 🔴 Y "documentos ahí" son SOLO los que el reporte puede traer. El
+    // mostrador no entra: contarlo hacía sonar la alerta por una venta de $30
+    // (6-sep-2026, ver utilidad-cobertura.ts). Lo que el reporte SÍ cubre se
+    // sigue exigiendo entero: si falta una factura, esto tiene que sonar.
     if (uniqueRows.length === 0) {
-      const facturasEnRango = await contarFacturasEnRango(empresaKey, meses);
+      const facturasEnRango = await contarFacturasCubiertasEnRango(empresaKey, meses);
       if (facturasEnRango > 0) {
         // Si lo que vació el lote fue el guard de montos, decirlo: "0 documentos"
         // y "todos los documentos venían corruptos" son diagnósticos distintos.
         throw new Error(
           rechazadas.length > 0
             ? `el reporte de utilidad trajo ${rechazadas.length} documento(s) y TODOS traían montos imposibles (umbral ${umbralUtilidad}) — no se registra success con la tabla vacía`
-            : `el reporte de utilidad devolvió 0 documentos pero switch_facturas tiene ${facturasEnRango} en el rango — no se registra success con la tabla vacía`,
+            : `el reporte de utilidad devolvió 0 documentos pero hay ${facturasEnRango} factura(s), nota(s) de crédito o de débito en el rango — no se registra success con la tabla vacía`,
         );
       }
     }

@@ -68,6 +68,13 @@ vi.mock("@/lib/supabase-server", () => {
               eq: () => p,
               gte: () => p,
               lt: () => p,
+              // `.not("tipo_comprobante","in",…)`: desde el 6-sep-2026 el COUNT
+              // acota a lo que el reporte de utilidad PUEDE traer. Acá es un
+              // no-op a propósito — `countFacturas` ya representa ese subconjunto
+              // y lo que este candado fija es la otra mitad de la regla: con
+              // documentos que faltan, se anota error. La conducta del filtro se
+              // mide en utilidad-cobertura-del-reporte.test.ts.
+              not: () => p,
               then: (res: (v: unknown) => void) =>
                 res({ count: countFacturas, error: null, data: null }),
             } as Record<string, unknown>;
@@ -124,7 +131,7 @@ beforeEach(() => {
 
 describe("guard del cero silencioso en sync-utilidad", () => {
   it("0 documentos CON facturas en el rango → error, no success", async () => {
-    countFacturas = 15; // joystep tiene 15 facturas en julio 2026
+    countFacturas = 15; // 15 documentos de los que el reporte SÍ trae
     filasReporte = [];
 
     const r = await syncEmpresaUtilidad("joystep", MESES, "manual");
