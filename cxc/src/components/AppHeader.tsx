@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useBackdropDismiss, useEscapeClose } from "@/lib/hooks/useModalDismiss";
@@ -18,9 +18,18 @@ interface AppHeaderProps {
   module: string;
   breadcrumbs?: { label: string; onClick?: () => void }[];
   hideBreadcrumbBar?: boolean;
+  /**
+   * Acciones del MÓDULO que en el teléfono viven adentro del menú ☰ (6-sep-2026,
+   * estrenado por Multifashion con «Sincronizado …» y «Actualizar ahora»).
+   *
+   * Es aditivo: quien no la pasa no dibuja nada nuevo, y el cajón queda
+   * exactamente como estaba. En el escritorio el módulo las muestra donde
+   * quiera — este cajón es SOLO móvil (`sm:hidden`, como todo el drawer).
+   */
+  acciones?: ReactNode;
 }
 
-export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: AppHeaderProps) {
+export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acciones }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -180,6 +189,9 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
                     alineado con el borde de la fila. */}
                 <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center text-xs text-gray-400 hover:text-red-600 transition">Salir</button>
               </div>
+            )}
+            {acciones && (
+              <div className="border-b border-gray-100 px-5 py-3">{acciones}</div>
             )}
             <nav className="flex-1 overflow-y-auto py-2">
               <button onClick={() => { router.push("/home"); setDrawerOpen(false); }}

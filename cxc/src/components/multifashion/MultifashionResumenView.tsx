@@ -8,8 +8,13 @@
 //   2) Titular del mes (RETAIL PURO; el mayoreo se declara aparte) + 2 comparativos
 //      con monto + línea de tickets/ticket promedio/proyección.
 //   3) Gráfico "Ventas día por día" con toggle Mes/Año (Año = acumulado vs prev).
-//   4) Banda de 3 cards: mejor/peor día · mejor día de semana · hora pico.
-//   5) "Panorama del año" colapsable (YTD / proyección cierre / margen tienda).
+//   4) "Cuándo vende la tienda": UNA sección de 4 líneas, cada una diciendo de
+//      qué período habla (ver `src/lib/multifashion/patrones.ts`).
+//
+// 🩸 EL "PANORAMA DEL AÑO" COLAPSABLE SE RETIRÓ (6-sep-2026). El año no puede
+// vivir escondido detrás de un «Ver»: subió a las TARJETAS de arriba, con lo que
+// ese desplegable traía (venta del año, proyección de cierre y margen de la
+// tienda) puesto en la tarjeta «Año». Nada se perdió; dejó de estar guardado.
 //
 // NO toca cálculos ni vistas: cada número sale de la MISMA fuente que ya usaban
 // Overview (prop `overview`, server → multifashion_mensual_v6) y Detalle mensual
@@ -19,7 +24,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import {
-  Award, AlertTriangle, Info, Clock, CalendarDays, ChevronDown,
+  Award, AlertTriangle, Info, Clock, CalendarDays,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import type {
@@ -33,10 +38,9 @@ const VentasDiariasChart = dynamic(
   () => import("./DetalleMensualCharts").then((m) => m.VentasDiariasChart),
   { ssr: false, loading: () => <div className="h-[260px] w-full animate-pulse rounded bg-gray-100" /> },
 );
-const HorasChart = dynamic(
-  () => import("./DetalleMensualCharts").then((m) => m.HorasChart),
-  { ssr: false, loading: () => <div className="h-[200px] w-full animate-pulse rounded bg-gray-100" /> },
-);
+// 🩸 `HorasChart` se importaba acá con next/dynamic y NUNCA se renderizaba
+// (auditoría del 5-sep-2026). Se retiró el import muerto; el componente sigue
+// existiendo en `DetalleMensualCharts` por si alguna vez se dibuja.
 const CumulativeChartCard = dynamic(
   () => import("./CumulativeChartCard").then((m) => m.CumulativeChartCard),
   { ssr: false, loading: () => <div className="h-[260px] w-full animate-pulse rounded-lg bg-gray-100" /> },
@@ -45,6 +49,7 @@ const CumulativeChartCard = dynamic(
 import { fmtMoney, fmtMoneyCompact, fmtPct, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
+import { ROTULO_ESTE_MES, ROTULO_VENTANA } from "@/lib/multifashion/patrones";
 
 interface DiaRow {
   dia: number;
@@ -87,6 +92,9 @@ interface Totales {
   /** null cuando la fuente es switch_facturas (sin costo). UI → '—'. */
   margen: number | null;
   proyeccion_cierre: number | null;
+  /** Sobre CUÁNTOS días está hecha la proyección (`dia_corte` de la RPC). */
+  proyeccion_dias?: number | null;
+  proyeccion_dias_mes?: number | null;
 }
 
 interface ComparativoBlock {
@@ -126,6 +134,18 @@ interface DetalleMensualResp {
   mayoreo_clientes?: string[];
   /** Facturas de mayoreo del mes (resumen "N facturas" de la nota). */
   mayoreo_facturas?: number;
+  /** Día más fuerte y hora pico sobre los últimos N meses. Aditivo. */
+  patrones?: {
+    dow: HeatmapDow[];
+    mejorDow: HeatmapDow | null;
+    horas: HoraRow[];
+    horaPico: number | null;
+    horaPicoVentas: number | null;
+    mesesUsados: number;
+    n_meses: number;
+    desde: string;
+    hasta: string;
+  };
 }
 
 interface MultifashionResumenViewProps {
@@ -180,13 +200,6 @@ function deltaTone(delta: number | null): string {
   if (delta > 0.05)  return "text-emerald-700";
   if (delta < -0.05) return "text-red-700";
   return "text-gray-500";
-}
-
-// Hora 0-23 → etiqueta corta para el eje X ("9a", "12p", "4p").
-function horaLabelShort(h: number): string {
-  const period = h < 12 ? "a" : "p";
-  const hr = h % 12 === 0 ? 12 : h % 12;
-  return `${hr}${period}`;
 }
 
 // Hora pico 0-23 → rango legible ("4–5 pm", cruce de meridiano "11 pm–12 am").
@@ -273,7 +286,6 @@ function buildCumulativeChart(act: MultifashionSerieAnio, prev: MultifashionSeri
   return [...map.values()].sort((a, b) => a.doy - b.doy);
 }
 
-
 export function MultifashionResumenView({
   overview, selectedYear, isClosedYear, mes, syncTick = 0,
 }: MultifashionResumenViewProps) {
@@ -283,7 +295,6 @@ export function MultifashionResumenView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartView, setChartView] = useState<"mes" | "anio">("mes");
-  const [panoramaOpen, setPanoramaOpen] = useState(false);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -362,73 +373,20 @@ export function MultifashionResumenView({
       {/* 2-4. Titular del mes → gráfico Mes/Año → banda de 3 cards. */}
       {data && (
         <>
-          <Titular data={data} year={year} />
-          {/* PANORAMA DEL AÑO — colapsable, debajo del titular y antes del gráfico. */}
-          <div className="overflow-hidden rounded-lg border border-gray-200">
-            <button
-              type="button"
-              onClick={() => setPanoramaOpen((o) => !o)}
-              aria-expanded={panoramaOpen}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
-            >
-              <span className="font-display text-sm font-semibold text-gray-950">
-                Panorama del año {year}
-              </span>
-              <span className="flex items-center gap-2 text-xs text-gray-500">
-                {panoramaOpen ? "Ocultar" : "Ver"}
-                <ChevronDown className={cn("h-4 w-4 transition-transform", panoramaOpen && "rotate-180")} />
-              </span>
-            </button>
-            {panoramaOpen && (
-              <div className="border-t border-gray-200 p-4">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <MiniKpi
-                    label={`VENTAS ${ytdSuffix}`}
-                    value={fmtMoney(overview.retail.ytdVentas)}
-                    sub={
-                      <>
-                        {retailYtdSub}
-                        {notaMayoreoAnio && (
-                          <span className="block text-gray-500">{notaMayoreoAnio.texto}</span>
-                        )}
-                      </>
-                    }
-                  />
-                  {overview.proyeccionCierre.tiene_proyeccion ? (
-                    <MiniKpi
-                      label={`PROYECCIÓN CIERRE ${year}`}
-                      value={fmtMoney(proyRetail)}
-                      sub={
-                        <>
-                          <span className={deltaToneCierre(deltaCierreRetail)}>
-                            {deltaStrCierre(deltaCierreRetail)}{" "}
-                            <span className="text-gray-500">vs cierre {prevYear}</span>
-                          </span>
-                          {notaMayoreoAnio && (
-                            <span className="block text-gray-500">{notaMayoreoAnio.texto}</span>
-                          )}
-                        </>
-                      }
-                    />
-                  ) : (
-                    <MiniKpi
-                      label={`CIERRE ${year}`}
-                      value={fmtMoney(cierreActual)}
-                      sub={
-                        <>
-                          acumulado del año
-                          {notaMayoreoAnio && (
-                            <span className="block text-gray-500">{notaMayoreoAnio.texto}</span>
-                          )}
-                        </>
-                      }
-                    />
-                  )}
-                  <MiniKpi label="MARGEN BRUTO · TIENDA" value={fmtMargen(overview.total.margen)} sub={margenSub} />
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Las CUATRO tarjetas de arriba. El año ya no está escondido detrás
+              de un desplegable: es una de ellas. */}
+          <TarjetasDelMes
+            data={data}
+            year={year}
+            overview={overview}
+            retailYtdSub={retailYtdSub}
+            margenSub={margenSub}
+            ytdSuffix={ytdSuffix}
+            proyRetail={proyRetail}
+            deltaCierreRetail={deltaCierreRetail}
+            cierreActual={cierreActual}
+            notaMayoreoAnio={notaMayoreoAnio?.texto ?? null}
+          />
           <ChartMesAnioMount
             chartView={chartView}
             setChartView={setChartView}
@@ -444,18 +402,46 @@ export function MultifashionResumenView({
             year={year}
             diaActual={data.dia_actual}
           />
-          <BandCards data={data} />
+          <CuandoVendeLaTienda data={data} />
         </>
       )}
     </div>
   );
 }
 
-// 2. Titular del mes: RETAIL PURO (la tienda) + 2 comparativos con monto +
-// línea de tickets/ticket promedio/proyección. El mayoreo del mes (venta
-// intercompañía / Frontera facturada por la caja) NO entra al número y se
-// declara debajo con "no incluye $X de mayoreo · …".
-function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
+// 2. LAS CUATRO TARJETAS DE ARRIBA (6-sep-2026).
+//
+//    Ventas del mes · Tickets · Cierra en · Año <Y>
+//
+// 🔴 EL AÑO SUBIÓ ACÁ. Vivía en dos lugares peores: la última fila de la tabla
+// «Mes a mes» (rotulada «YTD», una sigla) y un desplegable «Panorama del año»
+// que había que abrir. Ahora es una tarjeta, con lo que ese desplegable traía:
+// la venta del año, la proyección de cierre contra el año pasado, el margen de
+// la tienda y la nota de mayoreo.
+//
+// 🔴 «CIERRA EN» DICE SOBRE CUÁNTOS DÍAS ESTÁ HECHA. Medido el 6-sep-2026:
+// $65.202,51 = $10.867,09 ÷ 5 × 30, al centavo. El número NO está inflado —con
+// la forma real de septiembre de 2025 daría $74.077— pero leerlo sin saber que
+// sale de CINCO días es leer otra cosa. Es la misma regla que el módulo ya
+// aplica en Metas (por debajo del 5% de temporada no proyecta y lo dice).
+// ⚠️ La FÓRMULA no se tocó (`proyeccion_mensual_retail_v1`, método B).
+//
+// El mes es RETAIL PURO: el mayoreo no entra al número y se declara debajo.
+function TarjetasDelMes({
+  data, year, overview, retailYtdSub, margenSub, ytdSuffix,
+  proyRetail, deltaCierreRetail, cierreActual, notaMayoreoAnio,
+}: {
+  data: DetalleMensualResp;
+  year: number;
+  overview: Multifashion;
+  retailYtdSub: string;
+  margenSub: string;
+  ytdSuffix: string;
+  proyRetail: number;
+  deltaCierreRetail: number | null;
+  cierreActual: number;
+  notaMayoreoAnio: string | null;
+}) {
   const { totales, mes_anterior, yoy, mes_label, is_mes_actual } = data;
   const notaMayoreo = buildNotaMayoreo({
     incluido: false,
@@ -471,43 +457,97 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
     ? `${mes_label} ${year} · al día ${data.dia_actual}`
     : `${mes_label} ${year}`;
 
+  const hayProyeccion = is_mes_actual && totales.proyeccion_cierre != null;
+  const dias = totales.proyeccion_dias ?? null;
+  const hayMargen = typeof totales.margen === "number" && Number.isFinite(totales.margen);
+
   return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {/* 1 · Ventas del mes, con sus dos comparativos. */}
       <Card className="p-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-[200px]">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Ventas del mes · {headerTitle}
-            </p>
-            <p className="mt-1 font-mono text-3xl font-semibold leading-tight tabular-nums text-gray-950">
-              {fmtMoney(totales.ventas)}
-            </p>
-            {notaMayoreo && (
-              <>
-                <p className="mt-1 text-xs text-gray-500">{notaMayoreo.texto}</p>
-                {notaMayoreo.detalle && (
-                  <p className="mt-0.5 text-xs text-gray-400">{notaMayoreo.detalle}</p>
-                )}
-              </>
-            )}
-          </div>
-          <div className="flex gap-6">
-            {/* El "(al día N)" salió de los dos labels: el título de la card ya
-                dice "· al día N" y aplica a los dos comparativos. */}
-            <ComparativoStat label="vs mes anterior" delta={deltaMoM} comp={mes_anterior} />
-            <ComparativoStat label={`vs ${MESES_SHORT[data.mes - 1]} ${year - 1}`} delta={deltaYoy} comp={yoy} />
-          </div>
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+          Ventas del mes
+        </p>
+        <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+          {fmtMoney(totales.ventas)}
+        </p>
+        <p className="mt-0.5 text-xs text-gray-500">{headerTitle}</p>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-100 pt-2">
+          <ComparativoStat label="vs mes anterior" delta={deltaMoM} comp={mes_anterior} />
+          <ComparativoStat label={`vs ${MESES_SHORT[data.mes - 1]} ${year - 1}`} delta={deltaYoy} comp={yoy} />
         </div>
-        {/* Línea inferior: tickets retail · ticket promedio · proyección/margen */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-gray-100 pt-3 font-mono text-xs tabular-nums text-gray-600">
-          <span>{totales.n_tickets.toLocaleString()} tickets retail</span>
-          <span>ticket promedio ${totales.ticket_promedio.toFixed(2)}</span>
-          {is_mes_actual && totales.proyeccion_cierre != null ? (
-            <span>proyección cierre {fmtMoney(totales.proyeccion_cierre)}</span>
-          ) : typeof totales.margen === "number" && Number.isFinite(totales.margen) ? (
-            <span>margen tienda {(totales.margen * 100).toFixed(0)}%</span>
-          ) : null}
+        {notaMayoreo && (
+          <>
+            <p className="mt-2 text-xs text-gray-500">{notaMayoreo.texto}</p>
+            {notaMayoreo.detalle && (
+              <p className="mt-0.5 text-xs text-gray-400">{notaMayoreo.detalle}</p>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* 2 · Tickets. */}
+      <Card className="p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tickets</p>
+        <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+          {totales.n_tickets.toLocaleString()}
+        </p>
+        <p className="mt-0.5 text-xs text-gray-500">
+          ticket promedio <span className="font-mono tabular-nums">${totales.ticket_promedio.toFixed(2)}</span>
+        </p>
+      </Card>
+
+      {/* 3 · Cierra en (mes en curso) / Margen tienda (mes cerrado). */}
+      <Card className="p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+          {hayProyeccion ? "Cierra en" : "Margen tienda"}
+        </p>
+        <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+          {hayProyeccion
+            ? fmtMoney(totales.proyeccion_cierre as number)
+            : hayMargen
+              ? `${((totales.margen as number) * 100).toFixed(0)}%`
+              : "—"}
+        </p>
+        <p className="mt-0.5 text-xs text-gray-500">
+          {hayProyeccion
+            ? (dias != null && dias > 0
+                ? `con ${dias} ${dias === 1 ? "día" : "días"}`
+                : "proyección del mes")
+            : hayMargen
+              ? "del mes, tienda completa"
+              : "sin costo disponible"}
+        </p>
+      </Card>
+
+      {/* 4 · El AÑO. Lo que traía el «Panorama del año», sin esconderlo. */}
+      <Card className="p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Año {year}</p>
+        <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+          {fmtMoney(overview.retail.ytdVentas)}
+        </p>
+        <p className="mt-0.5 text-xs text-gray-500">{retailYtdSub}</p>
+        <div className="mt-2 space-y-0.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+          {overview.proyeccionCierre.tiene_proyeccion ? (
+            <p>
+              cierra en <span className="font-mono tabular-nums text-gray-700">{fmtMoney(proyRetail)}</span>{" "}
+              <span className={deltaToneCierre(deltaCierreRetail)}>{deltaStrCierre(deltaCierreRetail)}</span>{" "}
+              vs {year - 1}
+            </p>
+          ) : (
+            <p>
+              acumulado <span className="font-mono tabular-nums text-gray-700">{fmtMoney(cierreActual)}</span>
+              {ytdSuffix === "YTD" ? "" : ` de ${ytdSuffix}`}
+            </p>
+          )}
+          <p>
+            margen tienda <span className="font-mono tabular-nums text-gray-700">{fmtMargen(overview.total.margen)}</span>
+            {" · "}{margenSub}
+          </p>
+          {notaMayoreoAnio && <p>{notaMayoreoAnio}</p>}
         </div>
       </Card>
+    </div>
   );
 }
 
@@ -644,15 +684,134 @@ function ComparativoInteranualCard({
   );
 }
 
-// 4. Banda de 3 cards: mejor/peor día · mejor día de semana · hora pico.
-function BandCards({ data }: { data: DetalleMensualResp }) {
-  const { totales, mejor_dia, peor_dia, heatmap_dia_semana } = data;
+// 4. «CUÁNDO VENDE LA TIENDA» — UNA sección, no tres tarjetas (6-sep-2026).
+//
+// Daniel: *«¿lo podemos juntar para que se sienta una sola sección?»* → sí. Y
+// con eso se arregla el defecto de fondo, que era peor que el desorden:
+//
+// 🩸 El 6-sep-2026, con septiembre corriendo su quinto día, la pantalla decía
+//    «mejor día de semana: **Sáb, $3.364 promedio**» y «mejor día del mes:
+//    **$3.364,19, el 5 de septiembre**». **Es el mismo número.** Ese «promedio»
+//    del sábado era UN SOLO sábado, porque la tarjeta miraba nada más el mes.
+//
+// Ahora «Día más fuerte» y «Hora pico» miran los ÚLTIMOS 3 MESES —donde un
+// sábado se repite diez veces— y «Mejor / peor día» sigue siendo del mes, que
+// ahí sí es la pregunta. 🔑 Y **cada línea dice de qué período habla**: eso es lo
+// que faltaba y lo que hacía que un sábado pareciera un patrón.
+function CuandoVendeLaTienda({ data }: { data: DetalleMensualResp }) {
+  const { totales, mejor_dia, peor_dia, heatmap_dia_semana, patrones } = data;
   if (totales.n_tickets <= 0) return null;
+
+  // Sin `patrones` (una respuesta vieja en caché, o una lectura que falló) se
+  // cae al mes, que es lo que había antes — y el rótulo lo dice, no miente.
+  const hayVentana = patrones != null && patrones.mesesUsados > 0;
+  const dow = hayVentana ? patrones!.dow : heatmap_dia_semana;
+  const mejorDow = hayVentana
+    ? patrones!.mejorDow
+    : heatmap_dia_semana.reduce<HeatmapDow | null>(
+        (acc, h) => (h.ventas_promedio > (acc?.ventas_promedio ?? -1) ? h : acc),
+        null,
+      );
+  const horas = hayVentana ? patrones!.horas : (data.horas ?? []);
+  const horaPico = hayVentana ? patrones!.horaPico : (data.hora_pico ?? null);
+  const horaVentas = hayVentana ? patrones!.horaPicoVentas : (data.hora_pico_ventas ?? null);
+  const rotuloVentana = hayVentana ? ROTULO_VENTANA : ROTULO_ESTE_MES;
+
+  // Reordenar lun→dom (dow 1..6, luego 0) para el mini gráfico.
+  const barsDow = [1, 2, 3, 4, 5, 6, 0]
+    .map((d) => dow.find((h) => h.dow === d))
+    .filter((h): h is HeatmapDow => !!h)
+    .map((h) => ({ label: h.dow_label, value: h.ventas_promedio, full: `${h.dow_label} (promedio)` }));
+  const idxDow = mejorDow ? barsDow.findIndex((b) => b.label === mejorDow.dow_label) : -1;
+  const hayDow = barsDow.some((b) => b.value > 0);
+
+  const barsHora = horas.map((h) => ({ label: String(h.hora), value: h.ventas, full: horaPicoLabel(h.hora) }));
+  const idxHora = horaPico != null ? barsHora.findIndex((b) => Number(b.label) === horaPico) : -1;
+
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-      <BestWorstDayCard mejor={mejor_dia} peor={peor_dia} />
-      <BestDowCard heatmap={heatmap_dia_semana} />
-      <HoraPicoCard hora={data.hora_pico ?? null} ventas={data.hora_pico_ventas ?? null} horas={data.horas ?? []} />
+    <Card className="p-4">
+      <h4 className="font-display text-sm font-semibold text-gray-950">Cuándo vende la tienda</h4>
+      <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* Las dos del MES. */}
+        <div className="space-y-2.5">
+          <LineaPatron
+            icono={<Award className="h-4 w-4" strokeWidth={1.75} />}
+            tono="emerald"
+            titulo="Mejor día"
+            valor={mejor_dia ? fmtMoney(mejor_dia.ventas) : "—"}
+            detalle={mejor_dia ? formatFechaShort(mejor_dia.fecha) : null}
+            periodo={ROTULO_ESTE_MES}
+          />
+          <LineaPatron
+            icono={<AlertTriangle className="h-4 w-4" strokeWidth={1.75} />}
+            tono="amber"
+            titulo="Peor día"
+            valor={peor_dia ? fmtMoney(peor_dia.ventas) : "—"}
+            detalle={peor_dia ? formatFechaShort(peor_dia.fecha) : null}
+            periodo={ROTULO_ESTE_MES}
+          />
+        </div>
+
+        {/* Las dos del HÁBITO. */}
+        <div className="space-y-2.5">
+          <LineaPatron
+            icono={<CalendarDays className="h-4 w-4" strokeWidth={1.75} />}
+            tono="teal"
+            titulo="Día más fuerte"
+            valor={hayDow && mejorDow ? mejorDow.dow_label : "—"}
+            detalle={hayDow && mejorDow ? `${fmtMoneyCompact(mejorDow.ventas_promedio)} promedio` : "sin data"}
+            periodo={rotuloVentana}
+            grafico={hayDow ? <MiniBars data={barsDow} highlightIdx={idxDow} tone="teal" showLabels /> : null}
+          />
+          <LineaPatron
+            icono={<Clock className="h-4 w-4" strokeWidth={1.75} />}
+            tono="violet"
+            titulo="Hora pico"
+            valor={horaPico != null ? horaPicoLabel(horaPico) : "—"}
+            detalle={horaVentas != null ? `${fmtMoneyCompact(horaVentas)} en la hora` : "sin data"}
+            periodo={rotuloVentana}
+            grafico={barsHora.length > 0 ? <MiniBars data={barsHora} highlightIdx={idxHora} tone="violet" /> : null}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+const TONO_PATRON: Record<string, string> = {
+  emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
+  amber: "border-amber-100 bg-amber-50 text-amber-700",
+  teal: "border-teal-100 bg-teal-50 text-teal-700",
+  violet: "border-violet-100 bg-violet-50 text-violet-700",
+};
+
+/** Una línea de la sección. 🔑 El período va SIEMPRE, pegado al título. */
+function LineaPatron({
+  icono, tono, titulo, valor, detalle, periodo, grafico,
+}: {
+  icono: ReactNode;
+  tono: keyof typeof TONO_PATRON;
+  titulo: string;
+  valor: string;
+  detalle: string | null;
+  periodo: string;
+  grafico?: ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-start gap-2.5">
+        <div className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border", TONO_PATRON[tono])}>
+          {icono}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-gray-500">
+            {titulo} <span className="text-gray-400">· {periodo}</span>
+          </p>
+          <p className="mt-0.5 font-mono text-base font-medium tabular-nums text-gray-950">{valor}</p>
+          {detalle && <p className="text-xs text-gray-500">{detalle}</p>}
+        </div>
+      </div>
+      {grafico && <div className="mt-2 pl-[42px]">{grafico}</div>}
     </div>
   );
 }
@@ -806,48 +965,6 @@ function ComparativoStat({
   );
 }
 
-// Card combinada mejor / peor día del mes (antes eran 2 cards separadas).
-function BestWorstDayCard({
-  mejor, peor,
-}: {
-  mejor: { fecha: string; ventas: number } | null;
-  peor: { fecha: string; ventas: number } | null;
-}) {
-  return (
-    <Card className="p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Mejor / peor día</p>
-      <div className="mt-2 space-y-2">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700">
-            <Award className="h-4 w-4" strokeWidth={1.75} />
-          </div>
-          <div className="min-w-0">
-            <p className="font-mono text-base font-medium tabular-nums text-gray-950">
-              {mejor ? fmtMoney(mejor.ventas) : "—"}
-            </p>
-            <p className="text-xs text-gray-500">
-              mejor{mejor ? ` · ${formatFechaShort(mejor.fecha)}` : ""}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-100 bg-amber-50 text-amber-700">
-            <AlertTriangle className="h-4 w-4" strokeWidth={1.75} />
-          </div>
-          <div className="min-w-0">
-            <p className="font-mono text-base font-medium tabular-nums text-gray-950">
-              {peor ? fmtMoney(peor.ventas) : "—"}
-            </p>
-            <p className="text-xs text-gray-500">
-              peor{peor ? ` · ${formatFechaShort(peor.fecha)}` : ""}
-            </p>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 // Mini gráfico de barras (CSS, sin recharts) para las cards de patrones. Usa los
 // mismos datos que ya alimentan la card (heatmap día-semana / ventas por hora).
 function MiniBars({
@@ -883,96 +1000,5 @@ function MiniBars({
         </div>
       )}
     </div>
-  );
-}
-
-// Mejor día de la semana (max promedio) + mini gráfico de barras lun→dom.
-function BestDowCard({ heatmap }: { heatmap: HeatmapDow[] }) {
-  const best = heatmap.reduce<HeatmapDow | null>(
-    (acc, h) => (h.ventas_promedio > (acc?.ventas_promedio ?? -1) ? h : acc),
-    null,
-  );
-  // Reordenar lun→dom (dow 1..6, luego 0) para el mini gráfico.
-  const bars = [1, 2, 3, 4, 5, 6, 0]
-    .map((dow) => heatmap.find((h) => h.dow === dow))
-    .filter((h): h is HeatmapDow => !!h)
-    .map((h) => ({ label: h.dow_label, value: h.ventas_promedio, full: `${h.dow_label} (promedio)` }));
-  const highlightIdx = best ? bars.findIndex((b) => b.label === best.dow_label) : -1;
-  const hayData = bars.some((b) => b.value > 0);
-  return (
-    <Card className="p-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-teal-100 bg-teal-50 text-teal-700">
-          <CalendarDays className="h-5 w-5" strokeWidth={1.75} />
-        </div>
-        <div className="flex-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Mejor día de semana</p>
-          <p className="mt-0.5 font-display text-base font-semibold text-gray-950">{hayData ? best!.dow_label : "—"}</p>
-          <p className="mt-0.5 font-mono text-xs tabular-nums text-gray-500">
-            {hayData ? `${fmtMoneyCompact(best!.ventas_promedio)} promedio` : "sin data"}
-          </p>
-        </div>
-      </div>
-      {hayData && (
-        <div className="mt-3">
-          <MiniBars data={bars} highlightIdx={highlightIdx} tone="teal" showLabels />
-        </div>
-      )}
-    </Card>
-  );
-}
-
-// Hora pico del mes (hora Panamá) + mini gráfico de barras por hora del día.
-function HoraPicoCard({
-  hora, ventas, horas,
-}: {
-  hora: number | null;
-  ventas: number | null;
-  horas: HoraRow[];
-}) {
-  const bars = horas.map((h) => ({ label: String(h.hora), value: h.ventas, full: horaPicoLabel(h.hora) }));
-  const highlightIdx = hora != null ? bars.findIndex((b) => Number(b.label) === hora) : -1;
-  return (
-    <Card className="p-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-violet-100 bg-violet-50 text-violet-700">
-          <Clock className="h-5 w-5" strokeWidth={1.75} />
-        </div>
-        <div className="flex-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Hora pico</p>
-          <p className="mt-0.5 font-display text-base font-semibold text-gray-950">
-            {hora != null ? horaPicoLabel(hora) : "—"}
-          </p>
-          <p className="mt-0.5 font-mono text-xs tabular-nums text-gray-500">
-            {ventas != null ? `${fmtMoneyCompact(ventas)} en la hora` : "sin data"}
-          </p>
-        </div>
-      </div>
-      {bars.length > 0 && (
-        <div className="mt-3">
-          <MiniBars data={bars} highlightIdx={highlightIdx} tone="violet" />
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function MiniKpi({
-  label, value, sub, valueClassName,
-}: {
-  label: string;
-  value: string;
-  sub?: ReactNode;
-  valueClassName?: string;
-}) {
-  return (
-    <Card className="p-3.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      <p className={cn(
-        "mt-1.5 font-mono text-[22px] font-medium leading-tight tabular-nums text-gray-950",
-        valueClassName,
-      )}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
-    </Card>
   );
 }

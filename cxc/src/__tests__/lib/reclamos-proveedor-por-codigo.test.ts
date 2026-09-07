@@ -31,7 +31,7 @@ import {
   paresDelProveedor,
   reclamosDelProveedor,
 } from "@/lib/reclamos/proveedor-vinculo";
-import { normProvName } from "@/lib/proveedores";
+import { normProvName } from "@/lib/proveedores/lista";
 
 /** Filas reales de `switch_proveedor_estadocuenta` (producción, 4-sep-2026). */
 const SWITCH = [

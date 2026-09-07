@@ -5,6 +5,35 @@
 > `src/lib/multifashion/*` + `src/components/multifashion/*` ≈ **11.400 líneas**.
 > La tienda **es `american_classic`** y la empresa nunca se lee de la URL: constante del
 > servidor. ✅ verificado.
+>
+> ---
+>
+> ## ⚠️ 6-sep-2026 — EL REDISEÑO YA SE HIZO. Qué de este mapa quedó viejo
+>
+> Daniel revisó las seis pantallas del escritorio y diez del teléfono y decidió punto por
+> punto. La regla vigente vive en **`cxc/CLAUDE.md` › Multifashion › «El rediseño del
+> módulo (6-sep-2026)»**. Lo que este mapa describe y **ya no es así**:
+>
+> | Lo que dice el mapa | Hoy |
+> |---|---|
+> | Seis pestañas | **Cuatro**: Resumen · Vendedoras · Productos · Clientes. Metas se mudó ENTERA adentro de Vendedoras; Caja salió de la navegación (su ruta y su caché se quedan) |
+> | 🩸 #6 «la pestaña Caja» / § 7 «sobra» | **Retirada del menú.** ⚠️ El argumento de que «abre una sesión en Switch» era **FALSO**: tiene caché por día. La razón es que nadie la usa |
+> | 🩸 #3 «tres personas partidas en dos, y el arreglo solo vive en Metas» | **Arreglado en la base**, y por CÓDIGO: `multifashion_vendedora_alias` (12→3 · 13→8 · 14→10) + `multifashion_vendedora_canonica`, que la vista expone y usan las tres RPC. ⚠️ Migración **PENDIENTE** de aplicar |
+> | 🩸 #7 / #8 «las píldoras de Clientes» y «el control escondido» | **Se fueron.** Un solo desplegable de período para todo el módulo (`?mfPeriodo=`), con los meses, el año y últimos 3/6/12 |
+> | 🩸 #9 «un `?subtab=` con basura deja la pantalla en blanco» | **Arreglado**: todo lo desconocido cae en Resumen |
+> | 🩸 #14 «`showMesCerradoHint` no puede ser `true` jamás» · «`HorasChart` importado y nunca renderizado» | **Los dos se retiraron** |
+> | § 3 «Tarea B: 2 toques y el chip no queda en la URL» | El período es UNO y **vive en la URL** |
+> | § 6 «los mini-gráficos no dicen nada en el teléfono» | Siguen igual ⚠️ (el `title` no se tocó), pero ahora cada línea dice de qué PERÍODO habla |
+> | 🩸 #1 «dos YTD con $3.364,19 de diferencia» | **No reproduce el 6-sep-2026**: la tabla y la tarjeta dan las dos $369.153,24. Era el sync corriendo un día atrás |
+> | § 7 «la columna Comisión sobra» | Se queda: es plata que se paga |
+>
+> Lo que **sigue vigente** de este mapa: el uso medido (Jennifer entra 27 veces en 30
+> días), las tablas y sus filas, 🩸 #2 (retail vs retail+mayoreo), #4 (el bono premia
+> vender más, no crecer), #5 (−10% en una pestaña y +15.073% en la de al lado), #10 (seis
+> pantallas imprimen el error crudo), #11 (el nombre del archivo SQL en pantalla) y
+> § 7 «falta poder bajar algo a Excel».
+>
+> ---
 
 ---
 

@@ -14,6 +14,7 @@ import {
 // Solo el TIPO: el valor XLSX vive dentro de @/lib/excel-export. Un import de
 // valor acá volvería a anclar la librería al grafo de quien importe este módulo.
 import type XLSX from "xlsx-js-style";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 
 export interface ProveedorExportRow {
   nombre: string;
@@ -22,6 +23,9 @@ export interface ProveedorExportRow {
   aging_overdue: number;
   saldo_total: number;
   ultimo_pago_dias: number | null;
+  // De qué empresas viene. Antes era un conteo; ahora dice CUÁLES, igual que la
+  // pantalla — un «3» no le sirve a la contadora para nada.
+  empresas: string[];
   empresas_count: number;
 }
 
@@ -32,7 +36,7 @@ const COLUMNS: ReportColumn[] = [
   { header: "121d+", wch: 12, align: "right", fmt: MONEY_FMT },
   { header: "Por pagar", wch: 14, align: "right", fmt: MONEY_FMT },
   { header: "Último pago", wch: 12, align: "right" },
-  { header: "Empresas", wch: 10, align: "right" },
+  { header: "Empresas", wch: 34 },
 ];
 
 /** Construcción pura de la hoja (sin DOM) — testeable. */
@@ -44,7 +48,7 @@ export function buildProveedoresSheet(rows: ProveedorExportRow[]): XLSX.WorkShee
     { v: p.aging_overdue, ...(p.aging_overdue > 0 ? { fg: "B91C1C" } : {}) },
     { v: p.saldo_total, bold: true, ...(p.saldo_total < 0 ? { fg: "2563EB" } : {}) },
     { v: p.ultimo_pago_dias != null ? `hace ${p.ultimo_pago_dias}d` : "—", fg: "555555" },
-    { v: p.empresas_count, fg: "555555" },
+    { v: (p.empresas ?? []).map(nombreCortoEmpresa).join(" · "), fg: "555555" },
   ]);
 
   const tot = rows.reduce(

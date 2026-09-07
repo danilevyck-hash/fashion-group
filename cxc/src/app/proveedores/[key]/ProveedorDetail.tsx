@@ -13,7 +13,7 @@ import { agingKeyForBucket } from "@/lib/proveedores-aging";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
 import { empresasConCxp } from "@/lib/switch-api/empresas";
-import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 
 // Universo válido del módulo proveedores (7 empresas con CxP).
 const EMPRESAS_CXP = empresasConCxp() as readonly string[];
@@ -37,6 +37,8 @@ interface Reclamo {
 interface Ficha {
   key: string;
   nombre: string;
+  /** Las otras maneras en que Switch escribe a este proveedor. */
+  grafias: string[];
   identificacion: string | null;
   dv: string | null;
   direccion: string | null;
@@ -105,6 +107,14 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight">{data.nombre}</h1>
                 {data.tipo_proveedor && <div className="text-sm text-gray-500 mt-0.5">{data.tipo_proveedor}</div>}
+                {/* 🔴 Las otras grafías. No es adorno: es lo que explica por qué
+                    esta ficha suma empresas que en Switch se llaman distinto —
+                    Confecciones Boston llega escrito de cuatro maneras. */}
+                {(data.grafias ?? []).length > 0 && (
+                  <div className="text-sm text-gray-500 mt-1">
+                    En Switch también aparece como {(data.grafias ?? []).join(" · ")}
+                  </div>
+                )}
               </div>
               {/* Actualiza el CxP de las empresas de ESTE proveedor (en
                   secuencia si son varias) y recarga la ficha. */}
@@ -158,7 +168,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                 { label: "Contacto", value: data.contacto },
                 { label: "Teléfono", value: data.telefono, href: telHref(data.telefono) },
                 { label: "Celular", value: data.celular, href: telHref(data.celular) },
-                { label: "Email", value: data.email, href: mailtoHref(data.email) },
+                { label: "Correo", value: data.email, href: mailtoHref(data.email) },
                 { label: "Dirección", value: data.direccion, fullWidth: true },
               ].filter((c) => c.value != null && String(c.value).trim() !== "");
               if (campos.length === 0) return null;
@@ -198,7 +208,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                 <tbody>
                   {data.empresas.map((e) => (
                     <tr key={e.empresa} className="border-b border-gray-100">
-                      <td className="py-2 text-gray-700">{getCompanyDisplay(e.empresa)}</td>
+                      <td className="py-2 text-gray-700">{nombreCortoEmpresa(e.empresa)}</td>
                       <PorPagarCell value={e.por_pagar} />
                       <td className="py-2 text-right tabular-nums text-gray-600">
                         {e.ultimo_pago_monto != null

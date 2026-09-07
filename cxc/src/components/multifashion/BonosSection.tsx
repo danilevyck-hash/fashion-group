@@ -1,18 +1,23 @@
 "use client";
 
-// Banner del bono de gerente del subtab Vendedoras (/multifashion) — v3.
+// El CONTEXTO del bono del gerente en el subtab Vendedoras (/multifashion).
 //
-// Tras el rediseño v3 (Daniel jun-2026) esto YA NO renderiza una tabla de
-// ranking propia: la única tabla de vendedoras vive en VendedorasSubtab con los
-// badges de bono inline. Acá queda SOLO la línea de contexto del bono gerente
-// (tienda completa, incl. mayoreo) y se eleva la data cruda al padre vía onData
-// para que arme los badges de la tabla única.
+// 🩸 DEJÓ DE SER UNA BARRA (6-sep-2026). Era un recuadro de color a lo ancho de
+// la pantalla, arriba de la tabla, para decir una cosa que le toca a UNA fila.
+// El BONO se mudó a una COLUMNA de la tabla (ver `VendedorasSubtab`), y acá
+// queda una línea gris con lo único que la columna no puede decir: cuánto vendió
+// la TIENDA COMPLETA ese mes contra el mismo mes del año pasado, que es la base
+// del bono del gerente.
 //
-// Poda 1 (Daniel): el banner NO lleva el badge del bono; "✓ Bono $X" del gerente
-// vive únicamente como badge en su fila de la tabla.
+// El aviso «pendiente — se calcula al cierre del mes» también se fue: eso lo
+// dice ahora la propia columna, con la palabra **«al cierre»** en cada fila.
 //
-// Server-side: RPC multifashion_bonos_v3 (migration 20260604180000). Misma
-// fuente que Overview (_multifashion_sf_vw / switch_facturas), tienda completa.
+// Este componente sigue siendo quien PIDE los bonos y los eleva al padre vía
+// `onData` — la columna se arma con esa misma respuesta, sin una segunda lectura.
+//
+// Server-side: RPC multifashion_bonos_v4 (con el amarre de códigos; cae a la v3
+// mientras la migración no corra). Misma fuente que Overview
+// (_multifashion_sf_vw / switch_facturas), tienda completa.
 
 import { useEffect } from "react";
 import useSWR from "swr";
@@ -90,18 +95,19 @@ export function BonosSection({ selectedYear, mes, onData }: BonosSectionProps) {
       : null;
   }
 
+  // Mes todavía abierto: no hay nada que contar que la columna «Bono» no diga ya.
+  if (!resp.es_elegible) return null;
+
   return (
     <div className={cn(loading && "opacity-60 transition-opacity")}>
-      {resp.es_elegible
-        ? <GerenteBanner resp={resp} />
-        : <PendienteBanner resp={resp} />}
+      <GerenteLinea resp={resp} />
     </div>
   );
 }
 
-// Banner de UNA línea: tienda completa (incl. mayoreo) vs mismo mes año anterior.
-// SIN badge de bono (poda 1) — el bono del gerente va como badge en su fila.
-function GerenteBanner({ resp }: { resp: BonosMultifashion }) {
+// UNA línea gris (ya no un recuadro de color): tienda completa (incl. mayoreo)
+// contra el mismo mes del año anterior. El bono en sí vive en la columna.
+function GerenteLinea({ resp }: { resp: BonosMultifashion }) {
   const g = resp.gerente;
   const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
   // La RPC corta en `ventas_prev > 0`; acá se re-valida contra la base REAL
@@ -115,8 +121,8 @@ function GerenteBanner({ resp }: { resp: BonosMultifashion }) {
     : REGLA_BONO;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-teal-100 bg-teal-50/50 px-3.5 py-2.5 text-sm">
-      <span className="font-medium text-gray-700">Tienda completa {mesLabel} (incl. mayoreo):</span>
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-gray-500">
+      <span>Tienda completa {mesLabel} (incl. mayoreo):</span>
       {g.tiene_comparacion ? (
         <>
           <span className="font-mono tabular-nums text-gray-900">{fmtMoney(g.ventas_mes)}</span>
@@ -135,16 +141,6 @@ function GerenteBanner({ resp }: { resp: BonosMultifashion }) {
       <span title={tooltipRegla} className="ml-0.5 inline-flex cursor-help text-gray-400" aria-label="Regla del bono">
         <Info className="h-3.5 w-3.5" />
       </span>
-    </div>
-  );
-}
-
-// Mes en curso / no evaluable: una línea de aviso (sin cifras de bono).
-function PendienteBanner({ resp }: { resp: BonosMultifashion }) {
-  const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
-  return (
-    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50/60 px-3.5 py-2.5 text-sm text-gray-600">
-      Bono de {mesLabel} pendiente — se calcula al cierre del mes.
     </div>
   );
 }

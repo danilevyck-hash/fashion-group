@@ -3,7 +3,7 @@
 //
 // Módulo PURO: no toca base ni red. Lo usan DOS lugares, y por eso vive aparte:
 //   - src/lib/switch-api/sync-proveedores.ts → escribe las columnas al sincronizar
-//   - src/lib/proveedores.ts                 → las RECALCULA al leer, desde el
+//   - src/lib/proveedores/lista.ts           → las RECALCULA al leer, desde el
 //     mismo `elements` que ya está guardado en la fila
 // Recalcular al leer no es redundancia: arregla las filas viejas sin esperar al
 // cron (que corre 1×/día) y mantiene "hace N días" fresco entre corridas.

@@ -9,7 +9,7 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
 import { getCompanyDisplay } from "@/lib/companies";
 import { empresasConCxp } from "@/lib/switch-api/empresas";
-import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
 import { AGING, type AgingKey } from "@/lib/cxc-aging";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
@@ -37,6 +37,11 @@ interface ListItem {
   key: string;
   nombre: string;
   saldo_total: number;
+  // 🔴 DE QUÉ EMPRESAS VIENE. Hasta el 6-sep-2026 acá había un NÚMERO pelado
+  // («3») y el proveedor venía partido en varias filas, así que ni el número
+  // era cierto: Confecciones Boston salía en 3 filas de 5 empresas y ninguna
+  // decía que las otras existían.
+  empresas: string[];
   empresas_count: number;
   ultimo_pago_dias: number | null;
   aging_current: number;
@@ -141,7 +146,11 @@ function ProveedoresList() {
       <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums text-gray-500">
         {it.ultimo_pago_dias != null ? `hace ${it.ultimo_pago_dias}d` : <span className="text-gray-300">—</span>}
       </td>
-      {!empresa && <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums text-gray-400">{it.empresas_count}</td>}
+      {!empresa && (
+        <td className="py-2 px-1.5 xl:px-3 text-right text-xs text-gray-500">
+          {(it.empresas ?? []).map(nombreCortoEmpresa).join(" · ")}
+        </td>
+      )}
     </tr>
   );
 
@@ -162,9 +171,9 @@ function ProveedoresList() {
       </div>
       <div className="mt-0.5 text-xs text-gray-500 tabular-nums">
         {[
-          !empresa && it.empresas_count > 1 ? `${it.empresas_count} empresas` : "",
+          !empresa ? (it.empresas ?? []).map(nombreCortoEmpresa).join(" · ") : "",
           it.ultimo_pago_dias != null ? `pago hace ${it.ultimo_pago_dias}d` : "",
-        ].filter(Boolean).join(" · ")}
+        ].filter(Boolean).join(" — ")}
       </div>
       {(it.aging_watch !== 0 || it.aging_overdue !== 0) && (
         <div className="mt-0.5 flex gap-3 text-xs tabular-nums">

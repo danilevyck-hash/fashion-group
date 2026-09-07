@@ -73,11 +73,24 @@ export async function GET(req: NextRequest) {
     if (mes == null || mes < 1 || mes > 12) {
       return NextResponse.json({ error: "mes (fin de ventana) requerido (1..12)" }, { status: 400 });
     }
-    const { data, error } = await supabaseServer.rpc("multifashion_vendedoras_range", {
-      p_year: year,
-      p_fin_mes: mes,
-      p_n_meses: n,
-    });
+    // v2 = la misma ventana rodante con el amarre de códigos puesto
+    // (`multifashion_vendedora_alias`). Mientras la migración
+    // `20261009120000_multifashion_vendedora_alias.sql` no corra, la v2 no
+    // existe y se cae a la de siempre: la pantalla se comporta exactamente como
+    // antes, con las tres vendedoras todavía partidas en dos.
+    const { data, error } = await (async () => {
+      const v2 = await supabaseServer.rpc("multifashion_vendedoras_range_v2", {
+        p_year: year,
+        p_fin_mes: mes,
+        p_n_meses: n,
+      });
+      if (!v2.error) return v2;
+      return supabaseServer.rpc("multifashion_vendedoras_range", {
+        p_year: year,
+        p_fin_mes: mes,
+        p_n_meses: n,
+      });
+    })();
     if (error) {
       console.error("[multifashion/vendedoras] range rpc error", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -85,12 +98,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data as VendedorasPeriodo);
   }
 
-  const { data, error } = await supabaseServer.rpc("multifashion_vendedoras_v3", {
-    p_year: year,
-    p_periodo: periodoRaw,
-    p_mes: periodoRaw === "mes" ? mes : null,
-    p_trimestre: periodoRaw === "trimestre" ? trimestre : null,
-  });
+  // v4 = v3 con el amarre de códigos (ver la nota de la ventana rodante).
+  const { data, error } = await (async () => {
+    const args = {
+      p_year: year,
+      p_periodo: periodoRaw,
+      p_mes: periodoRaw === "mes" ? mes : null,
+      p_trimestre: periodoRaw === "trimestre" ? trimestre : null,
+    };
+    const v4 = await supabaseServer.rpc("multifashion_vendedoras_v4", args);
+    if (!v4.error) return v4;
+    return supabaseServer.rpc("multifashion_vendedoras_v3", args);
+  })();
 
   if (error) {
     console.error("[multifashion/vendedoras] rpc error", error);

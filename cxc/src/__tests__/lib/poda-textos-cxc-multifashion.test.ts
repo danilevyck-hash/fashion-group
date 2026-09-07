@@ -100,13 +100,17 @@ const A_LA_AYUDA: { archivo: string; que: string; texto: string }[] = [
     que: "Ficha de cliente · por qué Ventas y CXC no cuadran (ITBMS)",
     texto: "va sin ITBMS",
   },
+  // 🔄 6-sep-2026 — CAMBIÓ EL ARCHIVO, NO LA REGLA. `ZipB2BUpload` y
+  // `BulkPhotoUpload` se fundieron en UN solo cuadro (`SubirFotos.tsx`), que
+  // acepta el ZIP y las fotos sueltas. Los dos textos siguen adentro del ⓘ,
+  // palabra por palabra.
   {
-    archivo: "app/catalogos/admin/[marca]/ZipB2BUpload.tsx",
+    archivo: "app/catalogos/admin/[marca]/SubirFotos.tsx",
     que: "Catálogos · cómo se trata el ZIP del B2B",
     texto: "Arrastra el ZIP tal como lo bajas del portal, sin descomprimirlo.",
   },
   {
-    archivo: "app/catalogos/admin/[marca]/ZipB2BUpload.tsx",
+    archivo: "app/catalogos/admin/[marca]/SubirFotos.tsx",
     que: "Catálogos · el ZIP no se sube entero",
     texto: "Puede pesar 80 MB — se procesa en tu navegador, no se sube entero.",
   },
@@ -153,11 +157,15 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/proveedores/ProveedoresListClient.tsx", que: "Proveedores · orden fijo descrito en prosa", texto: "ordenados por monto" },
   { archivo: "app/proveedores/[key]/ProveedorDetail.tsx", que: "Proveedores · coletilla del encabezado", texto: "sincronizados de Switch" },
   { archivo: "app/catalogos/marcas/page.tsx", que: "Catálogos · bajada decorativa de cada marca", texto: "tagline" },
-  { archivo: "app/catalogos/admin/[marca]/ProductosBatch.tsx", que: "Catálogos · conteo repetido en 'Actualizar inventario'", texto: "productos en catalogo" },
-  { archivo: "app/catalogos/admin/[marca]/ProductosBatch.tsx", que: "Catálogos · 'o haz click para seleccionar'", texto: "haz click para seleccionar" },
-  { archivo: "app/catalogos/admin/[marca]/ProductosBatch.tsx", que: "Catálogos · regla del SKU dicha dos veces en la misma tarjeta", texto: "Nombra cada archivo con el SKU" },
-  { archivo: "app/catalogos/admin/[marca]/BulkPhotoUpload.tsx", que: "Catálogos · 'puedes soltar muchas a la vez'", texto: "soltar muchas a la vez" },
-  { archivo: "app/catalogos/admin/[marca]/ProductosTarjetas.tsx", que: "Catálogos · vacío de fotos en dos líneas", texto: "Todo al día" },
+  // 🔄 6-sep-2026 — CAMBIARON LOS ARCHIVOS, NO LAS PODAS. La pantalla de
+  // administrar pasó de 4 componentes (`ProductosBatch` · `ProductosTarjetas` ·
+  // `BulkPhotoUpload` · `ZipB2BUpload`) a 3 (`AdminCatalogoClient` ·
+  // `SubirFotos` · `ProductoFila`). Ninguno de estos textos volvió.
+  { archivo: "app/catalogos/admin/[marca]/AdminCatalogoClient.tsx", que: "Catálogos · conteo repetido en 'Actualizar inventario'", texto: "productos en catalogo" },
+  { archivo: "app/catalogos/admin/[marca]/SubirFotos.tsx", que: "Catálogos · 'o haz click para seleccionar'", texto: "haz click para seleccionar" },
+  { archivo: "app/catalogos/admin/[marca]/SubirFotos.tsx", que: "Catálogos · regla del SKU dicha dos veces en la misma tarjeta", texto: "Nombra cada archivo con el SKU" },
+  { archivo: "app/catalogos/admin/[marca]/SubirFotos.tsx", que: "Catálogos · 'puedes soltar muchas a la vez'", texto: "soltar muchas a la vez" },
+  { archivo: "app/catalogos/admin/[marca]/AdminCatalogoClient.tsx", que: "Catálogos · vacío de fotos en dos líneas", texto: "Todo al día" },
   // Daniel (12-ago-2026, con captura del catálogo Calvin): "quítame las palabras
   // obvias como Catálogo Panamá" — ya estás EN el catálogo y TODO el negocio es
   // Panamá. Se podó en las 4 marcas. OJO: los "Fashion Group · Panamá" de los
@@ -538,22 +546,26 @@ const EN_PANTALLA: { archivo: string; por_que: string; texto: string }[] = [
     texto: "Switch no respondió",
   },
   {
-    archivo: "app/catalogos/admin/[marca]/ZipB2BUpload.tsx",
+    // 🔄 6-sep-2026: mismo aviso, archivo nuevo (el cuadro único de subida).
+    archivo: "app/catalogos/admin/[marca]/SubirFotos.tsx",
     por_que: "cerrar la pestaña corta la subida: es un aviso, no metodología",
     texto: "No cierres esta pestaña hasta que termine.",
   },
-  {
-    archivo: "app/catalogos/admin/[marca]/ProductosBatch.tsx",
-    por_que: "🔴 el archivo incompleto DESACTIVA productos y pone su stock en 0",
-    texto: "Cualquier producto que no este en el archivo se desactiva",
-  },
+  // 🔄 6-sep-2026 — SE FUE EL AVISO PORQUE SE FUE LA PANTALLA. «Importar Excel»
+  // (solo Joybees, solo por `?tab=importar`) se retiró: reemplazaba nombre,
+  // precio, cantidad, género y etiqueta de todas las filas del archivo de una
+  // vez y sin deshacer, el precio lo manda Switch, y tuvo 0 usos. El aviso
+  // existía para frenar ese botón; sin botón, no hay nada que frenar. Lo que se
+  // vigila ahora es que la pantalla NO vuelva — ver `catalogo-admin-una-lista`.
   {
     archivo: "app/catalogos/admin/[marca]/VariantePicker.tsx",
     por_que: "🩸 ofrecer 'cambiar foto' cuando no hay otra sería mentir",
     texto: "Este código no tiene más fotos guardadas.",
   },
   {
-    archivo: "app/catalogos/admin/[marca]/BulkPhotoUpload.tsx",
+    // 🔄 6-sep-2026: mismo aviso, archivo nuevo. Y sigue AFUERA del ⓘ a
+    // propósito: adentro quedó solo cómo se trata el ZIP.
+    archivo: "app/catalogos/admin/[marca]/SubirFotos.tsx",
     por_que: "sin la regla del nombre por SKU la subida masiva no hace nada",
     texto: "El nombre del archivo debe ser el código (SKU).",
   },

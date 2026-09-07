@@ -89,6 +89,11 @@ export const TABLAS_PERSONAS = [
   "comision_descuentos_fijos",
   "comision_descuento_excepciones",
 
+  // ── Proveedores: qué filas de Switch son el MISMO proveedor. Lista escrita a
+  // mano y revisada una por una por Daniel (6-sep-2026); Switch no tiene de
+  // dónde volver a sacarla — de hecho es lo que Switch tiene mal.
+  "proveedor_amarre",
+
   // ── Catálogos públicos: el precio lo manda Switch, pero la FOTO, el badge y
   // el nombre a mano no tienen otra fuente. `products` es el de Reebok — la
   // documentación lo daba por respaldado y no lo estaba.
@@ -187,6 +192,10 @@ export const TABLAS_PERSONAS = [
   // ── Multifashion (las metas se escriben a mano)
   "multifashion_metas",
   "multifashion_meta_participantes",
+  // El amarre de las vendedoras con DOS códigos en Switch (6-sep-2026). Lo
+  // escribe una PERSONA a mano (hoy, por migración): Switch no lo manda y no se
+  // puede volver a deducir de ningún lado.
+  "multifashion_vendedora_alias",
 
   // ── Ventas / vendedores
   "vendedores",

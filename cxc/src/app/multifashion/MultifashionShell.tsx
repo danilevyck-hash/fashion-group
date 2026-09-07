@@ -1,33 +1,54 @@
 "use client";
 
-// Shell del módulo de primer nivel Multifashion (/multifashion). Antes era un
-// tab dentro de Ventas; ahora vive solo. Tiene su PROPIO selector de año (el
-// año global de Ventas no aplica aquí). El MES y los sub-tabs los maneja
-// MultifashionView (selector único de mes + flechas ‹ ›, PR #25) — este shell
-// solo provee año + data overview y delega el resto.
+// ─────────────────────────────────────────────────────────────────────────────
+// Shell del módulo Multifashion (/multifashion).
 //
-// Gate vía useAuth (mismo patrón que /admin): admin + gerente_acs (Jennifer).
-// gerente_acs va explícito en allowedRoles — sin eso dependía del fallback
-// fg_modules de sessionStorage y un load frío podía rebotarla a /home, que la
-// re-redirige aquí (loop).
+// 🔴 EL MÓDULO SE LLAMA MULTIFASHION EN TODOS LADOS (6-sep-2026). Daniel,
+// textual: *«multifashion en todos lados»*. El menú ya decía Multifashion y el
+// título de la pantalla decía «American Classics» (el nombre comercial que
+// guarda `app_settings.multifashion_tienda`): ese título es el que cambia. La
+// ruta `/multifashion` y la clave interna `american_classic` NO se tocan — la
+// tienda sigue siendo constante del servidor y nunca se lee de la URL.
+//
+// 🩸 EL ENCABEZADO DEL TELÉFONO PASÓ DE SEIS BLOQUES A TRES. Medido sobre la
+// captura de Daniel: antes de la primera cifra se pasaban ONCE bloques y una
+// pantalla entera de scroll — nombre de la tienda, píldora «Sincronizado …»,
+// botón «Actualizar ahora», selector de año, la tarjeta «Hoy» de cuatro
+// renglones y recién ahí las pestañas. Quedan tres:
+//
+//   1. título + período   (un solo desplegable: ver `lib/multifashion/periodo.ts`)
+//   2. la línea de hoy    (`VentaHoyCard`, ahora de una línea)
+//   3. las pestañas
+//
+// «Sincronizado …» y «Actualizar ahora» se fueron al menú ☰ en el teléfono
+// (`AppHeader acciones=`); en el escritorio, donde sobra ancho, se quedan a la
+// vista. ⚠️ El botón conserva su gate de rol y su acelerador: no cambió QUIÉN lo
+// puede tocar ni cada cuánto, cambió dónde está.
+// ─────────────────────────────────────────────────────────────────────────────
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
 import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
 import { PullToRefresh } from "@/components/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultifashionView } from "@/components/multifashion/MultifashionView";
+import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";
 import { VentaHoyCard } from "@/components/multifashion/VentaHoyCard";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { resolverTabMultifashion, type TabMultifashion } from "@/lib/multifashion/pestanas";
+import {
+  ajustarPeriodo, anioDelPeriodo, etiquetaPeriodo, opcionesPeriodo, periodoAUrl,
+  periodoDesdeUrl, periodoPorDefecto, type CortePeriodo, type Periodo,
+} from "@/lib/multifashion/periodo";
 import type { Multifashion } from "@/components/ventas/types";
 
-// Fetcher puro del overview por año. Misma llamada que tenía el onYearChange
-// (cache:"no-store"); SWR la cachea por año → volver a un año ya visto pinta al
-// instante y revalida en background, en vez del refetch desde cero anterior.
+// Fetcher puro del overview por año. SWR lo cachea por año → volver a un año ya
+// visto pinta al instante y revalida en background.
 async function fetchOverview(year: number): Promise<Multifashion> {
   const res = await fetch(`/api/multifashion/overview?year=${year}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -45,21 +66,35 @@ export function MultifashionShell({
   availableYears,
   multi: initialMulti,
 }: MultifashionShellProps) {
-  const currentYear = new Date().getFullYear();
   // Mientras no esté chequeado no renderizamos contenido para no parpadear
   // data a un rol sin acceso (useAuth redirige si no pasa).
   const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ["admin", "gerente_acs"] });
 
-  // Todos los años con datos, para todos los roles del módulo. El 13-ago-2026
-  // se levantó la ventana acotada de `gerente_acs` — Daniel, textual:
-  // *"abrile Multifashion completo"* (ver CLAUDE.md § Roles). Lo que NO cambió:
-  // Multifashion sigue siendo su ÚNICO módulo.
+  // 🔴 El corte es el mes de PANAMÁ (UTC−5 fijo), no el del navegador: es la
+  // misma regla de borde de mes de todo el módulo.
+  const corte: CortePeriodo = useMemo(() => {
+    const hoy = hoyPanama();
+    return { anio: Number(hoy.slice(0, 4)), mes: Number(hoy.slice(5, 7)) };
+  }, []);
+
+  // Pestaña y período: los dos en la URL, los dos filtros del MISMO nivel
+  // (`replace`, no ciclan el back). `?subtab=` viejo redirige y la basura cae en
+  // Resumen, nunca en una pantalla en blanco.
+  const [subtabRaw, setSubtabRaw] = useUrlState("subtab", "resumen");
+  const tab: TabMultifashion = resolverTabMultifashion(subtabRaw).tab;
+
+  const [periodoRaw, setPeriodoRaw] = useUrlState("mfPeriodo", "");
+  const periodoPedido: Periodo = periodoDesdeUrl(periodoRaw) ?? periodoPorDefecto(corte);
+  // Un período que la pestaña no sabe servir cae a SU MES — nunca a otra cosa
+  // en silencio (ver la nota de `periodo.ts`).
+  const periodo = ajustarPeriodo(periodoPedido, tab, corte);
+
+  const selectedYear = anioDelPeriodo(periodo, corte);
+  const currentYear = corte.anio;
   const años = availableYears.length > 0 ? availableYears : [currentYear];
 
-  // El año es estado de UI local (no data de SWR): cambia la KEY del overview.
-  const [selectedYear, setSelectedYear] = useState(initialYear);
-  // Señal de "acabo de sincronizar": el botón del header la incrementa y el tab
-  // Resumen la usa para re-pedir el detalle del mes (mismos year/mes).
+  // Señal de "acabo de sincronizar": el botón la incrementa y el tab Resumen la
+  // usa para re-pedir el detalle del mes.
   const [syncTick, setSyncTick] = useState(0);
 
   // Lo que ya armó el server component, SOLO para el año inicial.
@@ -68,16 +103,6 @@ export function MultifashionShell({
     [selectedYear, initialYear, initialMulti],
   );
 
-  // Overview por año vía SWR (clave null hasta authChecked → respeta el gate
-  // admin-only). El dato del SSR es el del año inicial; los demás años se piden
-  // bajo demanda. Cambiar el selector solo cambia la key (sin fetch manual):
-  // SWR sirve caché si ya se vio ese año y revalida en background.
-  //
-  // 🔑 `opcionesDelServidor` evita re-pedir `/api/multifashion/overview` (618 ms
-  // medidos) apenas llega el HTML que el servidor acaba de armar con ESE MISMO
-  // dato. Ojo con la key `null` de `authChecked`: mientras la key es null SWR ni
-  // siquiera monta el efecto, así que al activarse sigue siendo "primer montaje"
-  // y la opción que apaga la revalidación inicial aplica igual.
   const { data: multi, error, isLoading, mutate } = useSWR<Multifashion>(
     authChecked ? ["multifashion-overview", selectedYear] : null,
     () => fetchOverview(selectedYear),
@@ -88,12 +113,53 @@ export function MultifashionShell({
     },
   );
 
-  // Que un render nuevo del servidor gane sobre lo que quedó en caché (sin red).
   useSembrarDelServidor(mutate, delServidor);
 
-  // Deshabilita el selector mientras carga un año sin dato en caché.
   const loading = isLoading && !multi;
   const fetchError = error && !multi ? (error instanceof Error ? error.message : "error inesperado") : null;
+
+  // Los meses con dato del año que se está mirando: el desplegable no ofrece un
+  // mes en el que la tienda no vendió nada. De los OTROS años se ofrecen todos
+  // (el overview de ese año todavía no se pidió) y la lista se afina sola al
+  // cambiar de año.
+  const mesesConDato = useMemo<Record<number, number[]> | undefined>(() => {
+    if (!multi) return undefined;
+    const conDato: number[] = [];
+    multi.retail.meses.forEach((m, i) => {
+      if (m.tickets > 0 || m.ventas > 0) conDato.push(i + 1);
+    });
+    return conDato.length > 0 ? { [selectedYear]: conDato } : undefined;
+  }, [multi, selectedYear]);
+
+  const opciones = useMemo(
+    () => opcionesPeriodo({ tab, anios: años, corte, mesesConDato }),
+    [tab, años, corte, mesesConDato],
+  );
+
+  const onPeriodo = useCallback((valor: string) => setPeriodoRaw(valor), [setPeriodoRaw]);
+  const onTab = useCallback((t: TabMultifashion) => setSubtabRaw(t), [setSubtabRaw]);
+
+  // Las dos acciones de sync: en el teléfono viven en el menú ☰; desde `md`
+  // están a la vista en el encabezado. El componente es el MISMO en los dos
+  // lados — el gate de rol y el acelerador viven adentro de SyncNowButton.
+  const accionesSync = (
+    <div className="flex flex-wrap items-center gap-2">
+      <SyncStatus
+        tabla="facturas"
+        empresasEsperadas={["american_classic"]}
+        empresaLabels={EMPRESA_KEY_TO_NAME}
+        variant="pill"
+        prefix="Sincronizado"
+      />
+      <SyncNowButton
+        opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
+        onSuccess={async () => {
+          await mutate();
+          setSyncTick((t) => t + 1);
+        }}
+      />
+    </div>
+  );
 
   if (!authChecked) return null;
 
@@ -103,79 +169,49 @@ export function MultifashionShell({
     <>
     {/* Único chrome en móvil (drawer/búsqueda/logout/notifs) — el Sidebar es
         desktop-only. Para gerente_acs (módulo único, PWA) es su ÚNICA salida. */}
-    <AppHeader module="Multifashion" />
+    <AppHeader module="Multifashion" acciones={accionesSync} />
     <PullToRefresh onRefresh={async () => { await mutate(); }}>
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
-      <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          {/* Sin título grande: "Multifashion" ya lo dicen la barra sticky
-              (celular) y el breadcrumb (escritorio). Queda sr-only para no
-              dejar la página sin encabezado. */}
+      {/* Bloque 1 de 3: título + período. */}
+      <header className="relative z-20 mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          {/* El h1 sigue siendo `sr-only` (invariante de la casa: el título
+              grande se podó en toda la app y lo dicen la barra sticky y el
+              breadcrumb). Lo que se ve al lado es el NOMBRE DEL MÓDULO, que
+              hasta el 6-sep-2026 decía «American Classics» — el nombre comercial
+              de `app_settings.multifashion_tienda`. Daniel: *«multifashion en
+              todos lados»*. El ajuste vive únicamente acá. */}
           <h1 className="sr-only">Multifashion</h1>
-          {/* Nombre comercial de la tienda + frescura del sync + "Actualizar
-              ahora". Antes vivían en una card de identidad dentro del tab
-              Resumen; acá se ven desde cualquier sub-tab y sin repetir el
-              bloque. El nombre se conserva porque el módulo se llama
-              Multifashion pero la tienda se conoce por su nombre comercial. */}
-          {multi?.tienda && (
-            <p className="text-sm font-medium text-gray-700">{multi.tienda}</p>
-          )}
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <SyncStatus
-              tabla="facturas"
-              empresasEsperadas={["american_classic"]}
-              empresaLabels={EMPRESA_KEY_TO_NAME}
-              variant="pill"
-              prefix="Sincronizado"
-            />
-            {/* gerente_acs NO lo ve — el gate de rol vive en SyncNowButton. Un
-                clic = sync de facturas de american_classic (mismo candado y
-                cooldown del endpoint). Al terminar se revalida el overview y
-                sube syncTick para que el Resumen re-pida el detalle del mes;
-                SyncStatus se refresca solo (evento focus). */}
-            <SyncNowButton
-              opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
-              onSuccess={async () => {
-                await mutate();
-                setSyncTick((t) => t + 1);
-              }}
-            />
-          </div>
+          <p className="text-sm font-medium text-gray-700">Multifashion</p>
+          {/* Escritorio: la frescura y «Actualizar ahora», a la vista. En el
+              teléfono viven en el menú ☰ (ver arriba). */}
+          <div className="hidden md:block">{accionesSync}</div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* iPhone: el trigger medía 88×36. h-11 = 44px exactos (regla táctil),
-              igual que el selector de mes de MultifashionView, que ya iba en 44. */}
-          <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(parseInt(v, 10))}>
-            <SelectTrigger className="h-11 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {años.map(y => (
-                <SelectItem key={y} value={String(y)} className="font-mono tabular-nums">
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <PeriodoSelect
+          valor={periodoAUrl(periodo)}
+          opciones={opciones}
+          onChange={onPeriodo}
+          disabled={loading}
+        />
       </header>
 
-      {/* Venta del día — lo PRIMERO que se ve, arriba de los sub-tabs y del
-          selector de mes: es la pregunta con la que se abre el módulo. Se pide
-          aparte del overview (que es anual y pesado) para que aparezca sin
-          esperarlo, y se re-pide tras un "Actualizar ahora". */}
+      {/* Bloque 2 de 3: la venta de hoy, en UNA línea. */}
       <VentaHoyCard syncTick={syncTick} habilitado={authChecked} />
 
       {fetchError && (
         <div className="mb-4 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
-          No se pudo actualizar el año: {fetchError}
+          No se pudo actualizar {etiquetaPeriodo(periodo).toLowerCase()}: {fetchError}
         </div>
       )}
 
+      {/* Bloque 3 de 3: las pestañas y su contenido. */}
       {multi ? (
         <MultifashionView
           data={multi}
-          selectedYear={selectedYear}
+          tab={tab}
+          onTabChange={onTab}
+          periodo={periodo}
+          corte={corte}
           isClosedYear={isClosedYear}
           syncTick={syncTick}
         />

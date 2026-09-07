@@ -49,7 +49,8 @@ vista, que hoy no existe en ningún módulo.
 | Renglones de detalle guardados | 933 |
 | Última corrida | 5-sep 09:30-09:32 UTC — **14 corridas, 14 éxitos en 14 días**, 0 descartes |
 
-🩸 **El encabezado de `src/lib/proveedores.ts:3` dice «42 filas hoy». Son 65.**
+🩸 **El encabezado de `src/lib/proveedores.ts` decía «42 filas hoy». Son 65** — corregido el
+6-sep-2026, cuando el archivo se mudó a `src/lib/proveedores/lista.ts`.
 
 🩸 **`CLAUDE.md` decía que era «la única tabla `switch_*` con soft delete». Es FALSO y ya está
 corregido en la doc, pero confirmado aquí:** la tabla **no tiene columna `deleted`** y el sync
@@ -115,10 +116,20 @@ sin abrir. Los 8 tramos sí están en la ficha del proveedor.
 
 ## 🩸 Lo que miente o está roto
 
-### 1. 🔴 LOS PROVEEDORES SE UNEN POR NOMBRE — el defecto que Daniel aplazó
+### 1. ✅ RESUELTO el 6-sep-2026 — LOS PROVEEDORES SE UNÍAN POR NOMBRE
 
-**La identidad es `normProvName(nombre)`** = mayúsculas + quitar `.` y `,` + colapsar espacios
-(`src/lib/proveedores.ts:44`). El propio archivo lo admite en su encabezado.
+> **Lo que se hizo:** una lista **escrita a mano** (`proveedor_amarre`, migración
+> `20261010120000`, **pendiente de aplicar**) con grano `(empresa_key, proveedor_switch_id)`,
+> resuelta por UNA función (`aplicarAmarre`). Daniel revisó los grupos uno por uno y
+> confirmó **CUATRO**: ACTIVE WEAR · GRUPO J NAVARRO · **CONFECCIONES BOSTON** ·
+> LATIN FITNESS GROUP. La lista pasa de **47 filas a 43** y el total **$5,199,705.82
+> no se mueve ni un centavo**. 🔴 **La cédula NO decide** — Daniel: *«no te fijes por la
+> cédula, solo por nombre para saber cuáles son iguales»*; tres pares que la comparten
+> son empresas distintas. Lo de abajo queda como la medición que lo motivó.
+
+**La identidad ERA `normProvName(nombre)`** = mayúsculas + quitar `.` y `,` + colapsar espacios.
+El propio archivo lo admitía en su encabezado. Hoy `normProvName` sigue siendo la caída por
+defecto —lo que pasa cuando no hay amarre— y vive en `src/lib/proveedores/identidad.ts`.
 
 **Confecciones Boston, el caso que motivó esto — medido:**
 
@@ -198,7 +209,7 @@ participación: rótulo heredado sobre otro dato.
 ### 4. La lista no se puede ordenar
 
 Los encabezados **no son botones**: el orden es fijo, por saldo de mayor a menor
-(`src/lib/proveedores.ts:118`). En Clientes y en el CXC se ordena tocando el encabezado. Con
+(`src/lib/proveedores/lista.ts`). En Clientes y en el CXC se ordena tocando el encabezado. Con
 89% del dinero en 2 filas, ordenar por «121d+» o por «Último pago» es justamente lo que haría
 falta y no se puede.
 
@@ -212,7 +223,7 @@ suman entre sí**. Aquí sí se suman, y nadie lo decidió por escrito.
 
 | Dónde | Dice | Debería decir |
 |---|---|---|
-| Ficha, campo fiscal (`ProveedorDetail.tsx:161`) | **Email** | **Correo** |
+| ~~Ficha, campo fiscal~~ ✅ **arreglado el 6-sep-2026** | ~~Email~~ | **Correo** |
 | Lista, chip | «Confecciones Boston»… | no aplica (Boston no está aquí) |
 
 **Lo que NO está roto, y se buscó con saña:**
@@ -301,7 +312,7 @@ Si el correo está mal, hay que arreglarlo en Switch y esperar al cron del día 
 | Qué | Por qué |
 |---|---|
 | La columna **«Último pago»** de la lista y del Excel | Dice «—» en 79% de las filas con saldo, y cuando dice algo significa otra cosa |
-| La columna **«Empresas»** | Es un número sin unidad pegado al borde derecho; hoy miente en 12 filas y en la ficha ya está el desglose real |
+| ~~La columna **«Empresas»**~~ ✅ **arreglada el 6-sep-2026** | Era un número pelado que además mentía en 12 filas. Ahora dice **de qué empresas viene** con el nombre corto, y con el amarre puesto ya no miente |
 | El bloque **«Ver 13 sin saldo»** | 13 proveedores en $0.00 que nadie va a mirar; si hace falta, están en el buscador |
 | 3 de los 8 chips de empresa | Joystep ($21,189.19), Active Wear y Multifashion son 5% del total entre los tres; ocupan una fila entera del celular |
 
@@ -355,7 +366,7 @@ Lo más caro a 390 px son los **8 chips**: hay que bajar dos filas para llegar a
 
 | Qué | La medición que lo prueba |
 |---|---|
-| **Una lista de equivalencias de nombre** | 5 grupos partidos; Boston en 3 filas de 5 empresas |
+| ~~Una lista de equivalencias de nombre~~ ✅ **hecha el 6-sep-2026** | `proveedor_amarre`, 4 grupos confirmados por Daniel; la lista pasó de 47 a 43 filas y el total no se movió |
 | Ordenar por columna | 73% del dinero en la columna que no se ordena |
 | Ver la antigüedad real sin abrir fichas | 56% del dinero tiene +271 días y la lista no lo dice |
 | Poder corregir un correo | 0 verbos de escritura; hay que ir a Switch |
@@ -365,16 +376,17 @@ Lo más caro a 390 px son los **8 chips**: hay que bajar dos filas para llegar a
 
 ## Preguntas para Daniel
 
-**1. La cédula `655-544-133465` la tienen CINCO filas: cuatro dicen «Confecciones Boston» (con
-distinta escritura) y una dice `FASHION WEAR, INC` con $76,165.72. ¿Son la misma empresa?**
-a) Sí, es Boston mal escrito en Multifashion → una sola fila de $80,331.68 ·
-b) No, son dos empresas y la cédula está mal copiada en una · c) No sé, hay que preguntarle a la
-contadora.
-→ **No recomiendo nada: esto no lo puedo saber desde aquí y adivinarlo sería inventar un dato.**
-Es la primera pregunta que hay que contestar, porque de ella depende si el total de Boston son
-$4,165.96 o $80,331.68.
+**1. ✅ CONTESTADA (6-sep-2026).** *«fashion wear no es boston»* — son **dos empresas** y la
+cédula está mal copiada en Switch. El total de Boston son **$4,165.96**; `FASHION WEAR, INC`
+sigue siendo su propia fila con $76,165.72. Daniel también revisó los otros dos pares que
+comparten cédula: `CIF EXPRESS SA.` / `Luis Alberto Torres De Gracias` y `ACTIVE SHOES S.A` /
+`BDL SERVICES INC` — *«son diferentes»* los dos. Los tres quedaron escritos en el código y en
+la migración para que nadie los una nunca.
 
-**2. Hoy los proveedores se juntan por el NOMBRE. La cédula tampoco alcanza sola (28% de las
+**2. ✅ CONTESTADA (6-sep-2026): opción (a), la lista escrita a mano.** Hecha en
+`proveedor_amarre`; cuatro grupos, 13 filas, el total intacto. El texto original queda abajo.
+
+**2 (original). Hoy los proveedores se juntan por el NOMBRE. La cédula tampoco alcanza sola (28% de las
 filas no la tienen o la tienen en basura, y el proveedor más grande —American Fashion Wear,
 $3,633,293.25— tiene dos cédulas por un guion de más). ¿Cómo lo arreglamos?**
 a) Una **lista escrita a mano** de «este nombre y este otro son el mismo proveedor», igual que la
@@ -411,3 +423,21 @@ c) Se suman pero el rótulo dice «7 empresas».
 → **Recomiendo (a) escrito.** Multifashion es 2% y a un proveedor se le paga desde donde se le
 compre; lo que falta no es cambiar el número, es que la decisión quede escrita para que nadie la
 «arregle» después.
+
+
+---
+
+## Lo que apareció al construir el amarre (6-sep-2026)
+
+Medido contra producción mientras se escribía `proveedor_amarre`. **Nada de esto se juntó**:
+son grupos que Daniel no revisó, y unir por parecido está prohibido.
+
+| Candidato | Filas | Plata | Por qué NO se tocó |
+|---|---|---:|---|
+| `AMERICAN  SPORTSWEAR` (Multifashion, con dos espacios, sin RUC) vs `AMERICAN SPORTSWEAR, S.A.` (Fashion Shoes + Fashion Wear, RUC `21154-184-190522`) | 1 + 2 | **$0.00 las tres** | Se parecen mucho y probablemente sean el mismo, pero Daniel no lo revisó. Como las tres están en cero, juntarlas o no **no mueve un centavo** — se puede decidir sin apuro. |
+| `GENERAL` — una fila por empresa, `proveedor_switch_id = 1`, código `1`, RUC `0000000001` | **7** (una en cada empresa) | −$284.62 (todo de Active Wear) | **No es un proveedor**: es el renglón comodín de Switch. Hoy la pantalla lo junta en UNA fila por el nombre, o sea que ya está «amarrado» sin que nadie lo decidiera. Se dejó como estaba: cambiarlo no era el encargo. |
+
+**Y una que sí cambia el número, para tenerla presente:** el par `AMERICAN FASHION WEAR SA`
+(Fashion Shoes + Fashion Wear) **ya estaba unido por el nombre** y trae **DOS cédulas** que
+difieren en un guion (`2238988-1-779356` y `2238988-1779356`). Son **$3,633,293.25**, el 70% de
+todo lo que el grupo debe. Es el ejemplo más caro de por qué la cédula no puede agrupar.

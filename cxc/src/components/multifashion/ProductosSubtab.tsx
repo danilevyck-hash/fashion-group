@@ -126,9 +126,11 @@ import {
   type PorMarcaComparativo,
   type TotalesMarca,
 } from "@/lib/multifashion/productos-marca";
+import type { Periodo } from "@/lib/multifashion/periodo";
 
 type Vista = "categoria" | "articulo" | "marca";
-type Periodo = "mes" | "12m";
+/** Lo que entiende la ruta: `periodo=mes|12m`. Nada más. */
+type PeriodoApi = "mes" | "12m";
 
 interface RenglonMarca {
   marcaId: number | null;
@@ -156,7 +158,7 @@ interface Comparativo {
 interface ProductosResp {
   year: number;
   mes: number;
-  periodo: Periodo;
+  periodo: PeriodoApi;
   desde: string;
   hasta: string;
   filasLeidas: number;
@@ -247,19 +249,25 @@ function flechaVariacion(n: number | null): string {
 interface ProductosSubtabProps {
   selectedYear: number;
   mes: number;
-  /** El período lo maneja MultifashionView: es lo que decide si el selector de
-   *  mes compartido se dibuja o no. Con dos controles de período en pantalla,
-   *  uno de los dos siempre está mintiendo. */
+  /**
+   * El período ÚNICO del módulo (6-sep-2026). Esta pestaña ya no tiene píldoras
+   * propias: se elige arriba, en el desplegable del encabezado, que para
+   * Productos ofrece los meses y «Últimos 12 meses» — las dos únicas ventanas
+   * que la ruta sabe servir (`periodo=mes|12m`).
+   *
+   * ⚠️ Es LO ÚNICO que cambió de esta pestaña. Daniel: es la mejor del módulo.
+   */
   periodo: Periodo;
-  onPeriodoChange: (p: Periodo) => void;
 }
 
 export function ProductosSubtab({
   selectedYear,
   mes,
-  periodo,
-  onPeriodoChange,
+  periodo: periodoModulo,
 }: ProductosSubtabProps) {
+  // El período del módulo, dicho en el vocabulario de la ruta.
+  const periodo: PeriodoApi =
+    periodoModulo.tipo === "ultimos" && periodoModulo.n === 12 ? "12m" : "mes";
   const [vista, setVista] = useState<Vista>("categoria");
   const [orden, setOrden] = useState<{ col: ColumnaRanking; dir: DireccionOrden }>(ORDEN_DEFAULT);
   const [texto, setTexto] = useState("");
@@ -425,11 +433,6 @@ export function ProductosSubtab({
     setDetalleAbierto(false);
   };
 
-  const cambiarPeriodo = (p: Periodo) => {
-    onPeriodoChange(p);
-    setVisibles(TANDA);
-  };
-
   /** Un toque cambia de marca. El agrupador y el orden se CONSERVAN —quien está
    *  mirando artículos por utilidad quiere seguir viéndolos así en la otra
    *  marca—, pero el buscador y el filtro de categoría se limpian: son textos de
@@ -457,19 +460,9 @@ export function ProductosSubtab({
         </div>
       )}
 
-      {/* Período. Va PRIMERO porque enmarca todo lo de abajo: los tres números
-          del pulso dependen de él y no del agrupador. */}
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Período">
-        <Pill activo={periodo === "12m"} onClick={() => cambiarPeriodo("12m")}>
-          Últimos 12 meses
-        </Pill>
-        {/* "Un mes" y no "Agosto 2026": al elegirlo aparece arriba el selector
-            de mes, que es el que dice CUÁL. Repetir el nombre acá dejaba dos
-            rótulos del mismo período, y uno se desactualiza. */}
-        <Pill activo={periodo === "mes"} onClick={() => cambiarPeriodo("mes")}>
-          Un mes
-        </Pill>
-      </div>
+      {/* Las dos píldoras de período («Últimos 12 meses» / «Un mes») se
+          retiraron el 6-sep-2026: el período es UNO solo para todo el módulo y
+          se elige en el encabezado. Ver `src/lib/multifashion/periodo.ts`. */}
 
       {/* MARCA. Va arriba de todo lo demás porque filtra todo lo demás — el
           mismo lugar y la misma lógica que el período. Y no es solo un control:

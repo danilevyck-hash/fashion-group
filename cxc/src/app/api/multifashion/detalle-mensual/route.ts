@@ -16,6 +16,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
+import {
+  MESES_DEL_PATRON, agregarPatrones, mesesDeLaVentana,
+  type MesPatron,
+} from "@/lib/multifashion/patrones";
 
 export const dynamic = "force-dynamic";
 // Hace 2 llamados al RPC mensual (año actual + año anterior para la comparación
@@ -65,7 +69,7 @@ export async function GET(req: NextRequest) {
   // Detalle + hora pico + margen mensual tienda completa + mayoreo del mes +
   // cliente(s) de mayoreo, en paralelo. Todo lo extra es aditivo: si falla, el
   // detalle igual responde (el titular cae a retail puro y la nota no se muestra).
-  const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes, prevYearRes, retailProyRes] = await Promise.all([
+  const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes, prevYearRes, retailProyRes, ...patronRes] = await Promise.all([
     supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: year, p_mes: mes }),
     // _v2: margen mensual desde ventas_rollup_mensual_mv (híbrido cerrados/mes en
@@ -102,6 +106,19 @@ export async function GET(req: NextRequest) {
     // Proyección de cierre MÉTODO-B (pico fuera + run-rate plano + mayoreo). Reemplaza
     // la proyección lineal del titular (que se inflaba con días pico de feriado).
     supabaseServer.rpc("proyeccion_mensual_retail_v1", { p_anio: year, p_mes: mes }),
+    // ── «Cuándo vende la tienda» sobre los ÚLTIMOS 3 MESES ──────────────────
+    // 🩸 Con la ventana de UN mes, «mejor día de semana» y «mejor día del mes»
+    // daban EL MISMO número el 6-sep-2026 ($3.364,19): ese «promedio» del sábado
+    // era un solo sábado. El día más fuerte y la hora pico son HÁBITOS y
+    // necesitan repeticiones; el mejor/peor día sí es del mes y no se toca.
+    // Se piden los MISMOS dos procedimientos de siempre, uno por mes de la
+    // ventana (16 ms y 6,5 ms medidos), sin RPC nueva ni DDL.
+    ...mesesDeLaVentana(year, mes, MESES_DEL_PATRON)
+      .filter((m) => !(m.anio === year && m.mes === mes))
+      .flatMap((m) => [
+        supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: m.anio, p_mes: m.mes }),
+        supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: m.anio, p_mes: m.mes }),
+      ]),
   ]);
 
   if (detalleRes.error) {
@@ -210,6 +227,43 @@ export async function GET(req: NextRequest) {
     console.error("[multifashion/detalle-mensual] proyeccion_mensual_retail_v1", retailProyRes.error.message);
   }
 
+  // 🔴 SOBRE CUÁNTOS DÍAS ESTÁ HECHA LA PROYECCIÓN. Medido el 6-sep-2026:
+  // $65.202,51 = $10.867,09 ÷ 5 × 30, al centavo. El número no está inflado
+  // —con la forma real de septiembre de 2025 daría $74.077— pero leerlo sin
+  // saber que sale de CINCO días es leer otra cosa. El dato ya venía en el
+  // payload de la RPC (`dia_corte` y `dias_mes`); solo no se mostraba.
+  const proyeccionDias = acProy && proyeccionRetail != null
+    ? { dias: Number((acProy as { dia_corte?: number }).dia_corte ?? 0), diasMes: Number((acProy as { dias_mes?: number }).dias_mes ?? 0) }
+    : null;
+
+  // ── Patrones de los últimos 3 meses (día más fuerte + hora pico) ───────────
+  // El mes elegido entra con lo que YA se pidió arriba; los otros dos vienen de
+  // `patronRes`, en pares (detalle, horas). Aditivo de punta a punta: si alguna
+  // de esas llamadas falla, se juntan las que llegaron y `meses_usados` lo dice.
+  const mesesPatron: MesPatron[] = [
+    {
+      heatmap: ((detalle?.heatmap_dia_semana ?? []) as MesPatron["heatmap"]),
+      horas: (((horas as { horas?: MesPatron["horas"] }).horas ?? []) as MesPatron["horas"]),
+    },
+  ];
+  for (let i = 0; i < patronRes.length; i += 2) {
+    const det = patronRes[i] as { data?: Record<string, unknown> | null; error?: unknown };
+    const hrs = patronRes[i + 1] as { data?: Record<string, unknown> | null; error?: unknown };
+    if (det?.error) console.error("[multifashion/detalle-mensual] patrón detalle", det.error);
+    if (hrs?.error) console.error("[multifashion/detalle-mensual] patrón horas", hrs.error);
+    mesesPatron.push({
+      heatmap: det?.error ? [] : (((det?.data?.heatmap_dia_semana ?? []) as MesPatron["heatmap"])),
+      horas: hrs?.error ? [] : (((hrs?.data?.horas ?? []) as MesPatron["horas"])),
+    });
+  }
+  const ventanaPatron = mesesDeLaVentana(year, mes, MESES_DEL_PATRON);
+  const patrones = {
+    ...agregarPatrones(mesesPatron),
+    n_meses: MESES_DEL_PATRON,
+    desde: `${ventanaPatron[0].anio}-${String(ventanaPatron[0].mes).padStart(2, "0")}`,
+    hasta: `${year}-${String(mes).padStart(2, "0")}`,
+  };
+
   return NextResponse.json({
     ...detalle,
     dias: diasConYoY,
@@ -221,7 +275,10 @@ export async function GET(req: NextRequest) {
       mayoreo: mayoreoMes,
       ventas_total: retailVentas + mayoreoMes,
       proyeccion_cierre: proyeccionRetail,
+      proyeccion_dias: proyeccionDias?.dias ?? null,
+      proyeccion_dias_mes: proyeccionDias?.diasMes ?? null,
     },
+    patrones,
     mayoreo_cliente: mayoreoCliente,
     // Lista completa y conteo de facturas: la nota de Multifashion resume
     // ("N facturas") y deja el detalle de clientes accesible debajo.

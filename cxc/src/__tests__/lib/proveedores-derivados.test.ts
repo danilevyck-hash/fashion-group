@@ -23,7 +23,7 @@ import {
   diasDesde,
   type ElementoLedger,
 } from "@/lib/proveedores-derivados";
-import { buildFicha, buildList, type ProveedorRow } from "@/lib/proveedores";
+import { buildFicha, buildList, type ProveedorRow } from "@/lib/proveedores/lista";
 
 // Renglón con la forma REAL que devuelve /apiproveedor/info (muestra copiada de
 // switch_proveedor_estadocuenta en producción).

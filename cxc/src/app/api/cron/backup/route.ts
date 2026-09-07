@@ -266,6 +266,10 @@ const DATASETS: Dataset[] = [
   { table: "comision_vendedor_alias" },
   { table: "comision_descuentos_fijos" },
   { table: "comision_descuento_excepciones" },
+  // Qué filas de Switch son el MISMO proveedor. Lista escrita a mano y revisada
+  // una por una; soft delete = HISTORIAL. Switch no la tiene — de hecho es lo
+  // que Switch tiene mal (tres pares comparten cédula y son empresas distintas).
+  { table: "proveedor_amarre" },
   // Catálogos públicos de las 4 marcas. El PRECIO lo manda Switch, pero la foto,
   // el badge y el nombre a mano NO tienen otra fuente. `products` es el de
   // Reebok — la documentación lo daba por respaldado y no lo estaba.
@@ -307,6 +311,7 @@ const DATASETS: Dataset[] = [
   // Multifashion: las metas se escriben a mano, nunca se reparten solas.
   { table: "multifashion_metas" },
   { table: "multifashion_meta_participantes" },
+  { table: "multifashion_vendedora_alias" },
   // Cheques / Recordatorios / Reclamos que faltaban.
   { table: "cheque_vendedores" },
   { table: "recordatorios" },

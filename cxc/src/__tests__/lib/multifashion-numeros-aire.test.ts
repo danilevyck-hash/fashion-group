@@ -102,9 +102,16 @@ describe("las reglas que no se pueden romper para ganar espacio", () => {
 });
 
 describe("blancos táctiles de Multifashion › Clientes", () => {
-  it("las píldoras de período llegan a 44 px", () => {
-    // Medían 26. Mínimo de la casa: 44.
-    expect(clientes).toMatch(/opcionesRango\.map[\s\S]{0,600}min-h-\[44px\]/);
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 6-sep-2026. Pedía que las CUATRO píldoras de
+  // período de esta pestaña (Mes · 3m · 6m · 12m) midieran 44 px. **Ya no
+  // existen**: el período es uno solo para todo el módulo y se elige en el
+  // desplegable del encabezado, que sí mide 44 (`PeriodoSelect`, candado en
+  // `iphone-targets-operacion`). El candado se conserva exigiendo que no
+  // vuelvan por la puerta de atrás.
+  it("la pestaña ya no tiene píldoras de período propias", () => {
+    expect(clientes).not.toContain("opcionesRango");
+    expect(clientes).not.toContain("RANGO_OPCIONES");
+    expect(clientes).not.toContain("mfCliRango");
   });
 
   it("los chips de segmento llegan a 44 px", () => {

@@ -314,15 +314,27 @@ describe("ruta /api/multifashion/venta-hoy", () => {
     expect(body.hayVentas).toBe(true);
   });
 
+  // 🔄 EL TEXTO SE ACORTÓ EL 6-sep-2026 (la tarjeta pasó a UNA línea): «Todavía
+  // no hay ventas hoy» en letra grande → «· sin ventas todavía» pegado al día.
+  // 🔴 LA REGLA NO CAMBIÓ y es la que este candado protege: sin documentos NO se
+  // escribe «$0», y la hora del sync se pinta en los TRES estados.
   it("la UI distingue los dos casos y no escribe $0 cuando no arrancó el día", () => {
     const src = readFileSync(
       path.join(process.cwd(), "src/components/multifashion/VentaHoyCard.tsx"), "utf-8",
     );
     expect(src).toContain("data.hayVentas ?");
-    expect(src).toContain("Todavía no hay ventas hoy");
+    expect(src).toContain("sin ventas todavía");
+    // El monto grande vive SOLO en la rama con ventas: aparece DESPUÉS del
+    // ternario y ANTES del texto del día sin arrancar.
+    const desdeTernario = src.slice(src.indexOf("data.hayVentas ?"));
+    const iMonto = desdeTernario.indexOf("fmtMoney(data.ventas)");
+    const iSinVentas = desdeTernario.indexOf("sin ventas todavía");
+    expect(iMonto).toBeGreaterThan(-1);
+    expect(iMonto).toBeLessThan(iSinVentas);
     // Y la hora del sync se pinta en los tres estados, sin rama que la omita.
     expect(src).toContain("no pudimos confirmar cuándo se actualizó");
-    expect(src).toMatch(/actualizado \$\{horaSync/);
+    expect(src).toMatch(/sin actualizar desde las \$\{horaSync/);
+    expect(src).toMatch(/: horaSync\(data\.sync\.ultimo as string, data\.fecha\)/);
   });
 
   it("sin sesión → 401; rol ajeno → 403", async () => {

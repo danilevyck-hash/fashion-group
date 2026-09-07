@@ -8,9 +8,12 @@
 // fuera de la pantalla y SIN forma de alcanzarlos, y el nombre del cliente
 // colapsaba a 0 px de ancho).
 //
-// Período: filtro PROPIO del tab (Mes · 3m · 6m · 12m), persistido en URL
-// (?mfCliRango). El mes/año del shell ancla el FIN del rango; los rangos
-// móviles cuentan N meses hacia atrás desde ese mes (cruzan año solos).
+// Período: el ÚNICO del módulo, elegido en el encabezado (6-sep-2026). Antes
+// esta pestaña tenía sus CUATRO píldoras propias.
+//
+// Arriba, en una línea, la cobertura del período: cuántos tiquetes tienen nombre
+// y qué porción de la venta son. Es lo primero que hay que saber antes de leer
+// el ranking — el mostrador anónimo es la mayor parte de la tienda.
 //
 // Dos secciones:
 //   1. Mayoreo: clientes con is_wholesale=true (la columna sigue llamándose
@@ -30,6 +33,9 @@ import { Package, Users, ChevronDown, Store, Repeat, UserPlus, Moon, Percent, Me
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { useUrlState } from "@/lib/hooks/useUrlState";
+import { nombreEnPantalla } from "@/lib/multifashion/nombres";
+import { coberturaDeClientes, FILAS_CLIENTES_AL_ABRIR } from "@/lib/multifashion/clientes-cobertura";
+import { etiquetaPeriodo, type Periodo } from "@/lib/multifashion/periodo";
 
 // "Escala compartida entre mayoreo y retail" vivía escrito DOS veces —una en la
 // lista vertical del celular, otra en la tira del escritorio— y por eso podían
@@ -93,15 +99,6 @@ interface RetailResp {
   clientes: ClienteRow[];
 }
 
-type RangoCli = "mes" | "3m" | "6m" | "12m";
-
-const RANGO_OPCIONES: { value: RangoCli; label: string }[] = [
-  { value: "mes", label: "Mes" },
-  { value: "3m", label: "3 meses" },
-  { value: "6m", label: "6 meses" },
-  { value: "12m", label: "12 meses" },
-];
-
 // ─── Fidelización ACS (endpoint /api/multifashion/fidelizacion) ─────────────
 
 export interface FidelCliente {
@@ -143,6 +140,14 @@ const normNombre = (s: string): string =>
 interface ClientesMultifashionSubtabProps {
   selectedYear: number;
   mes: number;
+  /**
+   * El período ÚNICO del módulo (6-sep-2026). 🩸 Esta pestaña tenía CUATRO
+   * píldoras propias (Mes · 3m · 6m · 12m) que decían el LARGO de la ventana
+   * pero nunca el mes en el que termina — y ese mes lo fijaba el selector del
+   * shell, que en esta pestaña **ni siquiera se dibujaba**. Ahora el período es
+   * uno solo, se elige arriba y dice con todas las letras cuál es.
+   */
+  periodo: Periodo;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -164,22 +169,28 @@ const MES_NOMBRES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-// Rango del tab Clientes. El FIN siempre es el último día del mes seleccionado
-// en el shell; el INICIO depende del filtro propio: "mes" = ese mes; "3m/6m/12m"
-// = primer día N-1 meses atrás (cruza año automáticamente vía Date).
-function computeRange(
-  rango: RangoCli, selectedYear: number, mes: number,
+// Las dos fechas que pide el RPC, sacadas del período único del módulo.
+//   · un MES        → ese mes entero.
+//   · TODO EL AÑO   → del 1 de enero al 31 de diciembre de ese año.
+//   · últimos N     → N meses terminando en el mes de corte (cruza año solo).
+// El fin de una ventana rodante y de un mes es el último día del mes; que el mes
+// esté en curso no cambia nada: el RPC no encuentra ventas que no existen.
+export function computeRange(
+  periodo: Periodo, selectedYear: number, mes: number,
 ): { fecha_inicio: string; fecha_fin: string } {
+  if (periodo.tipo === "anio") {
+    return { fecha_inicio: `${periodo.anio}-01-01`, fecha_fin: `${periodo.anio}-12-31` };
+  }
+
   const mm = String(mes).padStart(2, "0");
   const lastDay = new Date(selectedYear, mes, 0).getDate();
   const fecha_fin = `${selectedYear}-${mm}-${String(lastDay).padStart(2, "0")}`;
 
-  if (rango === "mes") {
+  if (periodo.tipo === "mes") {
     return { fecha_inicio: `${selectedYear}-${mm}-01`, fecha_fin };
   }
 
-  const nMonths = rango === "3m" ? 3 : rango === "6m" ? 6 : 12;
-  const start = new Date(selectedYear, mes - 1 - (nMonths - 1), 1);
+  const start = new Date(selectedYear, mes - 1 - (periodo.n - 1), 1);
   const sy = start.getFullYear();
   const sm = String(start.getMonth() + 1).padStart(2, "0");
   return { fecha_inicio: `${sy}-${sm}-01`, fecha_fin };
@@ -187,20 +198,16 @@ function computeRange(
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
-export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultifashionSubtabProps) {
+export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: ClientesMultifashionSubtabProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Filtro de período PROPIO del tab (persistido en URL ?mfCliRango). Es un
-  // filtro del mismo nivel → history "replace" (no cicla en back/forward).
-  const [rango, setRango] = useUrlState<RangoCli>("mfCliRango", "mes");
-  const opcionesRango = RANGO_OPCIONES;
-
-  const range = useMemo(() => computeRange(rango, selectedYear, mes), [rango, selectedYear, mes]);
+  const range = useMemo(() => computeRange(periodo, selectedYear, mes), [periodo, selectedYear, mes]);
   const periodoStr = useMemo(() => {
-    if (rango === "mes") return `${MES_NOMBRES[mes - 1]} ${selectedYear}`;
-    const n = rango === "3m" ? 3 : rango === "6m" ? 6 : 12;
-    return `Últimos ${n} meses · hasta ${MES_NOMBRES[mes - 1].toLowerCase()} ${selectedYear}`;
-  }, [rango, selectedYear, mes]);
+    if (periodo.tipo === "ultimos") {
+      return `${etiquetaPeriodo(periodo)} · hasta ${MES_NOMBRES[mes - 1].toLowerCase()} ${selectedYear}`;
+    }
+    return etiquetaPeriodo(periodo);
+  }, [periodo, mes, selectedYear]);
 
   // MISMOS params que antes: el querystring (fecha_inicio + fecha_fin) ES la
   // clave SWR → cada rango cachea por separado y revalida en background. Un solo
@@ -233,6 +240,8 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
 
   const wholesale = data?.wholesale ?? null;
   const retail = data?.retail ?? null;
+  // Cuántos tiquetes del período tienen nombre y qué porción de la venta son.
+  const cobertura = useMemo(() => coberturaDeClientes(retail), [retail]);
   const loading = isLoading && !data;
   const errorMsg = error ? (error instanceof Error ? error.message : "error inesperado") : null;
 
@@ -302,36 +311,17 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
         </Card>
       ) : (
         <div className="space-y-8">
-          {/* Encabezado + filtro de período propio del tab. */}
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              {/* `sr-only`: la pestaña ya dice "Clientes" y el selector de la
-                  derecha enseña el período. El aviso del mostrador anónimo SÍ
-                  se queda: cambia cómo se lee el top. */}
-              <h3 className="sr-only">Clientes · {periodoStr}</h3>
-              <p className="text-xs text-gray-400">Mostrador anónimo va aparte</p>
-            </div>
-            <div className="inline-flex items-center gap-0.5 rounded-md border border-gray-200 bg-gray-50 p-0.5">
-              {opcionesRango.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setRango(opt.value)}
-                  // 44 px de alto: la regla de la casa. Medían 26 y salió en la
-                  // verificación del 30-jul-2026. El `-my-1.5` le devuelve al
-                  // contenedor el aire que suma el área de tap, así que crecer no
-                  // separa el filtro del título.
-                  className={cn(
-                    "-my-1.5 inline-flex min-h-[44px] items-center rounded px-2.5 text-xs font-medium transition",
-                    rango === opt.value
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-800",
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+          {/* 🔴 LA COBERTURA, ARRIBA Y EN UNA LÍNEA. Se recalcula para el período
+              elegido — nunca escrita fija. Sin tiquetes no se dibuja: un
+              «0% — 0%» se leería como dato roto. Ver `clientes-cobertura.ts`. */}
+          <div>
+            {/* `sr-only`: la pestaña ya dice "Clientes" y el desplegable del
+                encabezado enseña el período. */}
+            <h3 className="sr-only">Clientes · {periodoStr}</h3>
+            {cobertura.texto && (
+              <p className="text-sm text-gray-700">{cobertura.texto}</p>
+            )}
+            <p className="mt-0.5 text-xs text-gray-400">Mostrador anónimo va aparte</p>
           </div>
 
           {/* Fidelización ACS: 4 segmentos (snapshot hoy, independiente del rango) */}
@@ -394,30 +384,42 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
             </section>
           )}
 
-          {/* Sección 1: Mayoreo (is_wholesale=true) */}
-          <ClientesSection
-            prefix="ws"
-            title="Mayoreo"
-            subtitle={wholesale
-              ? `${wholesale.total_clientes} ${wholesale.total_clientes === 1 ? "cliente" : "clientes"} · ${fmtMoney(wholesale.total_ventas)} · ${wholesale.total_tickets.toLocaleString()} ${wholesale.total_tickets === 1 ? "ticket" : "tickets"}`
-              : "—"}
-            icon={<Package className="h-4 w-4" />}
-            iconTone="amber"
-            clientes={wholesale?.clientes ?? []}
-            peakMes={peakMes}
-            spansYears={spansYears}
-            expandedId={expandedId}
-            onToggleRow={toggleRow}
-            emptyText={`No hay clientes de mayoreo en ${periodoStr}.`}
-          />
+          {/* Sección 1: Mayoreo (is_wholesale=true).
+              🔴 SI NO HAY, NO APARECE (6-sep-2026). Medido: en 2026 el mayoreo
+              de la tienda son CINCO facturas en tres meses de nueve — o sea que
+              seis meses de cada nueve la pantalla gastaba una caja entera para
+              decir «No hay clientes de mayoreo en Septiembre 2026». Un bloque
+              vacío no es información. Cuando SÍ hay, se ve igual que siempre. */}
+          {(wholesale?.clientes.length ?? 0) > 0 && (
+            <ClientesSection
+              key={`ws-${range.fecha_inicio}-${range.fecha_fin}`}
+              prefix="ws"
+              title="Mayoreo"
+              subtitle={wholesale
+                ? `${wholesale.total_clientes} ${wholesale.total_clientes === 1 ? "cliente" : "clientes"} · ${fmtMoney(wholesale.total_ventas)} · ${wholesale.total_tickets.toLocaleString()} ${wholesale.total_tickets === 1 ? "ticket" : "tickets"}`
+                : "—"}
+              icon={<Package className="h-4 w-4" />}
+              iconTone="amber"
+              clientes={wholesale?.clientes ?? []}
+              peakMes={peakMes}
+              spansYears={spansYears}
+              expandedId={expandedId}
+              onToggleRow={toggleRow}
+              emptyText={`No hay clientes de mayoreo en ${periodoStr}.`}
+            />
+          )}
 
           {/* Sección 2: Clientes identificados (retail por monto) */}
           <ClientesSection
+            key={`rt-${range.fecha_inicio}-${range.fecha_fin}-${seg}`}
             prefix="rt"
             title="Clientes identificados"
             subtitle={retail
-              ? `${retail.pct_identificado ?? 0}% de las ventas retail · top ${retail.limit} por monto · ${retail.clientes_identificados ?? retail.total_clientes} con nombre${seg !== "todos" ? ` · filtro: ${SEG_OPCIONES.find(o => o.value === seg)?.label}` : ""}`
+              ? `${retail.clientes_identificados ?? retail.total_clientes} con nombre · top ${retail.limit} por monto${seg !== "todos" ? ` · filtro: ${SEG_OPCIONES.find(o => o.value === seg)?.label}` : ""}`
               : "—"}
+            /* La lista abre con 10 filas. Medido el 6-sep-2026: septiembre trae
+               33 clientes y los dibujaba los 33 de una, bajando hasta $20,72. */
+            filasAlAbrir={FILAS_CLIENTES_AL_ABRIR}
             icon={<Users className="h-4 w-4" />}
             iconTone="teal"
             clientes={retailFiltrado}
@@ -492,6 +494,7 @@ function SegCard({ icon, tone, valor, label, sub }: {
 function ClientesSection({
   prefix, title, subtitle, icon, iconTone,
   clientes, fidelMap, peakMes, spansYears, expandedId, onToggleRow, emptyText,
+  filasAlAbrir,
 }: {
   prefix: "ws" | "rt";
   title: string;
@@ -506,10 +509,17 @@ function ClientesSection({
   expandedId: string | null;
   onToggleRow: (id: string) => void;
   emptyText: string;
+  /** Cuántas filas se ven antes de tocar «Ver los N». Sin esto, todas. */
+  filasAlAbrir?: number;
 }) {
   const toneIcon = iconTone === "amber"
     ? "border-amber-100 bg-amber-50 text-amber-700"
     : "border-teal-100 bg-teal-50 text-teal-700";
+
+  // «Ver los N» — nunca «Ver más», que no dice cuántos faltan.
+  const [verTodos, setVerTodos] = useState(false);
+  const recorta = filasAlAbrir != null && !verTodos && clientes.length > filasAlAbrir;
+  const visibles = recorta ? clientes.slice(0, filasAlAbrir) : clientes;
 
   return (
     <section className="space-y-3">
@@ -531,7 +541,7 @@ function ClientesSection({
         <>
         {/* Celular e iPad: una tarjeta por cliente. Ver el porqué arriba. */}
         <div data-vista="tarjetas" className="space-y-2 lg:hidden">
-          {clientes.map((c, idx) => {
+          {visibles.map((c, idx) => {
             const id = `${prefix}-${c.nombre}`;
             return (
               <ClienteTarjeta
@@ -567,7 +577,7 @@ function ClientesSection({
             <span />
           </div>
 
-          {clientes.map((c, idx) => {
+          {visibles.map((c, idx) => {
             const id = `${prefix}-${c.nombre}`;
             const isExpanded = expandedId === id;
             return (
@@ -585,6 +595,15 @@ function ClientesSection({
             );
           })}
         </Card>
+        {recorta && (
+          <button
+            type="button"
+            onClick={() => setVerTodos(true)}
+            className="inline-flex min-h-[44px] items-center rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-950 active:scale-[0.97]"
+          >
+            Ver los {clientes.length}
+          </button>
+        )}
         </>
       )}
     </section>
@@ -652,7 +671,7 @@ function ClienteTarjeta({
         <span className="min-w-0 flex-1">
           {/* El nombre manda: acá SÍ tiene el ancho, que es justo lo que la
               grilla le quitaba. */}
-          <span className="block truncate text-sm font-medium text-gray-900">{cliente.nombre}</span>
+          <span className="block truncate text-sm font-medium text-gray-900">{nombreEnPantalla(cliente.nombre)}</span>
           <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-gray-500">
             <span className="font-mono tabular-nums text-gray-950">{fmtMoney(cliente.total_ytd)}</span>
             <span className="font-mono tabular-nums">{cliente.tickets_ytd.toLocaleString()} tickets</span>
@@ -793,7 +812,7 @@ function ClienteRowItem({
         )}
       >
         <span className="text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</span>
-        <span className="truncate font-medium text-gray-900">{cliente.nombre}</span>
+        <span className="truncate font-medium text-gray-900">{nombreEnPantalla(cliente.nombre)}</span>
         <span className="text-right font-mono text-gray-950 tabular-nums">{fmtMoney(cliente.total_ytd)}</span>
         <span className="text-right font-mono text-gray-700 tabular-nums">{cliente.tickets_ytd.toLocaleString()}</span>
         <span className="text-right font-mono text-gray-700 tabular-nums">${ticketProm.toFixed(2)}</span>
@@ -817,7 +836,7 @@ function ClienteRowItem({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                title={`WhatsApp a ${cliente.nombre}`}
+                title={`WhatsApp a ${nombreEnPantalla(cliente.nombre)}`}
                 className="flex h-6 w-6 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.95]"
               >
                 <MessageCircle className="h-3.5 w-3.5" />

@@ -40,10 +40,17 @@ export async function GET(req: NextRequest) {
   // `mes` puede venir nulo a propósito: el RPC lo lee como "último mes
   // elegible". Todos los roles con acceso al módulo piden lo mismo — la ventana
   // acotada de `gerente_acs` se levantó el 13-ago-2026 (ver CLAUDE.md § Roles).
-  const { data, error } = await supabaseServer.rpc("multifashion_bonos_v3", {
-    p_year: year,
-    p_mes: mes,
-  });
+  // v4 = v3 con el amarre de códigos de `multifashion_vendedora_alias`: las
+  // vendedoras con DOS códigos en Switch se juntan antes de elegir a la del
+  // bono. Mientras la migración `20261009120000_multifashion_vendedora_alias.sql`
+  // no corra, la v4 no existe y se cae a la v3 — el bono se calcula igual que
+  // hasta hoy. ⚠️ El MONTO y la REGLA del bono no se tocaron.
+  const { data, error } = await (async () => {
+    const args = { p_year: year, p_mes: mes };
+    const v4 = await supabaseServer.rpc("multifashion_bonos_v4", args);
+    if (!v4.error) return v4;
+    return supabaseServer.rpc("multifashion_bonos_v3", args);
+  })();
 
   if (error) {
     console.error("[multifashion/bonos] rpc error", error);

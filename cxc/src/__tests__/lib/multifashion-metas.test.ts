@@ -876,35 +876,66 @@ describe("desde cuándo no vende cada una", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 4ter. La 6ª pestaña tiene que ENTRAR
+// 4ter. 🔄 CAMBIÓ DE DIRECCIÓN EL 6-sep-2026 — LAS METAS YA NO SON UNA PESTAÑA
+//
+// Este bloque exigía que existiera la pestaña «Metas» y que las SEIS entraran en
+// el iPhone. Daniel decidió, mirando las seis pantallas: *«de acuerdo, ponerlo
+// en vendedoras, pero el tab de metas no es idéntico, tiene más cosas útiles»*.
+// Metas se mudó ENTERA adentro de Vendedoras (nada se perdió) y las pestañas
+// bajaron a cuatro. El candado no se borra: cambia de dirección y ahora exige
+// que las Metas SIGAN estando, en su lugar nuevo.
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("la tira de sub-tabs con 6 pestañas", () => {
+describe("las cuatro pestañas, y las Metas adentro de Vendedoras", () => {
   const view = readFileSync(
     path.join(process.cwd(), "src/components/multifashion/MultifashionView.tsx"),
     "utf-8",
   );
+  const vendedoras = readFileSync(
+    path.join(process.cwd(), "src/components/multifashion/VendedorasSubtab.tsx"),
+    "utf-8",
+  );
+  const pestanas = readFileSync(
+    path.join(process.cwd(), "src/lib/multifashion/pestanas.ts"),
+    "utf-8",
+  );
 
-  it("existe la pestaña Metas y monta su contenido", () => {
-    expect(view).toContain('<TabsTrigger value="metas"');
-    expect(view).toContain('<TabsContent value="metas"');
-    expect(view).toContain("<MetasSubtab />");
+  it("las Metas viven ENTERAS en Vendedoras — la tarjeta, el alta y el aporte", () => {
+    // Las tres piezas: `MetasSubtab` (avance + «Nueva meta» + «Cambiar» + premio
+    // + fechas + historia) y `MetasEnVendedoras` (cuánto aportó cada una).
+    expect(vendedoras).toContain("<MetasSubtab />");
+    expect(vendedoras).toContain("<MetasEnVendedoras />");
+    // Y ya NO son una pestaña.
+    expect(view).not.toContain('<TabsTrigger value="metas"');
+    expect(view).not.toContain('<TabsContent value="metas"');
   });
 
-  it("🩸 los íconos se esconden hasta `lg` — es lo que hace que las 6 entren", () => {
-    // Medido en el navegador: con el 6º sub-tab la tira pasó a 433 px contra
-    // 390 (desborda 43) y a 565 contra 554 en el iPad (desborda 11). Una tira
-    // que desborda deja la última pestaña fuera de la pantalla, alcanzable solo
-    // arrastrando — el mismo defecto que ya se corrigió con el 5º sub-tab.
-    // Con los íconos ocultos y `px-1.5`, mide 390/390 · 554/554 · 744/744.
+  it("⚠️ el espejo de Comisiones NO monta las Metas (le contestarían 403)", () => {
+    // La misma vista tiene dos puertas. Solo Multifashion pide `conMetas`.
+    expect(view).toContain("conMetas");
+    expect(vendedoras).toContain("conMetas &&");
+    const comisiones = readFileSync(
+      path.join(process.cwd(), "src/components/ventas/ComisionesView.tsx"),
+      "utf-8",
+    );
+    expect(comisiones).toContain("<VendedorasSubtab selectedYear={inicial.year} />");
+    expect(comisiones).not.toContain("conMetas");
+  });
+
+  it("un `?subtab=metas` guardado sigue funcionando: cae en Vendedoras", () => {
+    expect(pestanas).toContain('metas: "vendedoras"');
+    expect(pestanas).toContain('caja: "resumen"');
+  });
+
+  it("🩸 los íconos se esconden hasta `lg` — la regla que hacía entrar la tira", () => {
     expect(view).toContain('const SUBTAB_ICON_CLASS = "hidden h-3 w-3 lg:inline-block"');
-    expect(view).toMatch(/px-1\.5 py-2 text-xs text-gray-500 lg:px-3/);
+    expect(view).toMatch(/px-2 py-2 text-xs text-gray-500 lg:px-3/);
   });
 
   it("⚠️ ningún rótulo se acortó para hacer lugar", () => {
     // Son texto que el personal lee: cambiarlos es decisión de Daniel.
-    for (const rotulo of ["Resumen", "Vendedoras", "Productos", "Clientes", "Caja", "Metas"]) {
-      expect(view, `falta el rótulo ${rotulo}`).toContain(`> ${rotulo}\n`);
+    for (const rotulo of ["Resumen", "Vendedoras", "Productos", "Clientes"]) {
+      expect(pestanas, `falta el rótulo ${rotulo}`).toContain(`label: "${rotulo}"`);
     }
   });
 });

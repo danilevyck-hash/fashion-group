@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { fetchAllProveedorRows, buildFicha, normProvName } from "@/lib/proveedores";
+import { fetchAllProveedorRows, buildFicha, filasDelProveedor } from "@/lib/proveedores/lista";
+import { leerAmarresProveedor } from "@/lib/proveedores/amarre-lectura";
 import { paresDelProveedor, reclamosDelProveedor } from "@/lib/reclamos/proveedor-vinculo";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +17,10 @@ export async function GET(
 
   try {
     const key = decodeURIComponent(params.key); // ya viene normalizado (UPPER, sin puntuación)
-    const rows = await fetchAllProveedorRows();
-    const ficha = buildFicha(rows, key);
+    // La ficha y los reclamos miran las MISMAS filas: las que `aplicarAmarre`
+    // manda a esta clave. Falla abierto — sin amarres es la agrupación de antes.
+    const [rows, amarres] = await Promise.all([fetchAllProveedorRows(), leerAmarresProveedor()]);
+    const ficha = buildFicha(rows, key, amarres);
     if (!ficha) {
       return NextResponse.json({ error: "Proveedor no encontrado" }, { status: 404 });
     }
@@ -30,9 +33,7 @@ export async function GET(
     // de Fashion Wear y Fashion Shoes mostraban cero reclamos sin decir por qué.
     // El par viaja junto porque el código NO es único entre empresas: `122` es
     // American Fashion Wear en Fashion Wear y Latin Fitness Group en Active Shoes.
-    const pares = paresDelProveedor(
-      rows.filter((r) => normProvName(r.nombre) === key),
-    );
+    const pares = paresDelProveedor(filasDelProveedor(rows, key, amarres));
 
     const { data: recl, error: rErr } = await supabaseServer
       .from("reclamos")

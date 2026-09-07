@@ -1,30 +1,42 @@
 "use client";
 
-// Sub-tab Vendedoras del módulo Multifashion (/multifashion) — REDISEÑO v3.
+// ─────────────────────────────────────────────────────────────────────────────
+// Multifashion › VENDEDORAS — y, desde el 6-sep-2026, TAMBIÉN LAS METAS.
 //
-// UNA sola tabla (una fila por vendedora) con los badges de bono inline junto
-// al nombre:
-//   - "🏆 Bono $50" en la vendedora ganadora del mes (bono_vendedora del RPC).
-//   - "Gerente" siempre en Jennifer; "✓ Bono $X" si la tienda cumplió meta.
-// Arriba, un banner de UNA línea con el contexto del bono gerente (tienda
-// completa, incl. mayoreo). Sin tiles KPI de bono.
+// UNA sola tabla (una fila por vendedora). Lo que cambió el 6-sep-2026:
 //
-// Chips de período (controlan la tabla): en curso (default) · mes cerrado
-// anterior · YTD · últimos 3/6/12. La columna Δ es ÚNICA y su rótulo dice
-// CONTRA QUÉ compara: en los chips de mes la RPC compara contra el MES
-// ANTERIOR (`p_mes − 1`), así que dice «Δ vs julio 2026» y no «vs año pasado»
-// (decisión de Daniel, 3-sep-2026 — ver `vendedoras-rotulo.ts`); YTD y las
-// ventanas de N meses sí comparan contra el año pasado y lo dicen.
+// 1. 🩸 SE FUERON LAS SEIS PÍLDORAS de período. En el teléfono ocupaban TRES
+//    filas antes del primer número. Las reemplaza el desplegable único del
+//    módulo (`src/lib/multifashion/periodo.ts`): los meses cubren «en curso» y
+//    «cerrado», «Todo el año» es el YTD de siempre y las tres ventanas rodantes
+//    son las mismas. Ni la RPC ni un solo parámetro cambiaron.
+// 2. 🩸 EL BONO DEJÓ DE SER UNA BARRA. Era un recuadro de color a lo ancho, y
+//    arriba de la tabla, para decir una cosa que le toca a UNA fila. Ahora es
+//    una COLUMNA: dice el monto de quien lo gana y **«al cierre»** mientras el
+//    mes no termine (que es la verdad: el bono se calcula con el mes cerrado).
+//    ⚠️ Ni el monto ni la regla del bono se tocaron — cambió dónde se lee.
+// 3. LAS METAS VIVEN ABAJO, ENTERAS: la tarjeta de avance, «Nueva meta»,
+//    «Cambiar», el premio, el rango de fechas, la historia y el aporte de cada
+//    una. Daniel: *«de acuerdo, ponerlo en vendedoras, pero el tab de metas no
+//    es idéntico, tiene más cosas útiles»*. No se perdió nada.
+// 4. Los nombres se CAPITALIZAN (`nombreEnPantalla`): en la misma lista convivían
+//    «Martin Montenegro» y «MARIA APARICIO». Solo cambia cómo se muestran.
 //
-// Server-side: RPC multifashion_vendedoras (ranking por período) +
-// multifashion_bonos_v3 (bono del mes, vía BonosSection). Sin fórmulas nuevas.
+// ⚠️ La columna Δ es ÚNICA y su rótulo dice CONTRA QUÉ compara: en los períodos
+// de MES la RPC compara contra el MES ANTERIOR, así que dice «Δ vs julio 2026» y
+// no «vs año pasado» (decisión de Daniel, 3-sep-2026 — `vendedoras-rotulo.ts`);
+// el año completo y las ventanas de N meses sí comparan contra el año pasado.
+//
+// Server-side: RPC multifashion_vendedoras_v4 (con el amarre de códigos de
+// `multifashion_vendedora_alias`; cae a la v3 mientras la migración no corra) +
+// multifashion_bonos_v4 (vía BonosSection). Sin fórmulas nuevas.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
-import { Users, Award } from "lucide-react";
+import { Users } from "lucide-react";
 import type {
-  Multifashion,
   VendedoraDetalle,
   VendedorasPeriodo,
   VendedorasPeriodoTipo,
@@ -35,8 +47,11 @@ import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { BonosSection } from "./BonosSection";
+import { MetasSubtab } from "./MetasSubtab";
 import { MetasEnVendedoras } from "./MetasEnVendedoras";
+import { nombreEnPantalla } from "@/lib/multifashion/nombres";
 import { notaComparacionVendedoras, rotuloDeltaVendedoras, type ChipVendedoras } from "@/lib/multifashion/vendedoras-rotulo";
+import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -49,6 +64,9 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
   stone:   "text-gray-500",
 };
 
+/** Lo que dice la columna Bono mientras el mes no cierre. */
+export const BONO_AL_CIERRE = "al cierre";
+
 type SortKey = "tickets" | "ventas" | "delta_ventas" | "comision";
 type SortDir = "asc" | "desc";
 type ChipKey = ChipVendedoras;
@@ -57,15 +75,20 @@ type ChipKey = ChipVendedoras;
 interface BonoBadge { winner: boolean; gerenteBono: number }
 
 interface VendedorasSubtabProps {
-  /** El overview del shell de Multifashion. La pestaña NO lo lee (v3 pide lo
-   *  suyo por SWR): es opcional para que la pestaña espejo de Comisiones pueda
-   *  montarla sin traerse el overview entero. */
-  data?: Multifashion;
   selectedYear: number;
-  /** Mes del selector del shell — en v3 la pestaña usa sus propios chips, se
-   *  conserva el prop por compatibilidad con el llamador. */
-  mes?: number;
-  onMesChange?: (mes: number) => void;
+  /**
+   * El período del módulo. Cuando llega, esta pestaña NO dibuja ningún control
+   * de tiempo: manda el desplegable único del encabezado.
+   *
+   * ⚠️ SIN ÉL la vista se comporta EXACTAMENTE como antes, con sus seis
+   * píldoras. Ésa es la pestaña espejo de Comisiones (`ComisionesView`), que no
+   * tiene el encabezado de Multifashion y **no se toca**.
+   */
+  periodo?: Periodo;
+  corte?: CortePeriodo;
+  /** Dibuja las Metas debajo. Solo el módulo Multifashion las pide (el espejo
+   *  de Comisiones recibiría un 403 de `/api/multifashion/metas`). */
+  conMetas?: boolean;
 }
 
 /**
@@ -75,7 +98,7 @@ interface VendedorasSubtabProps {
  * hay que cambiarla, se cambia UNA vez y las dos puertas dicen lo mismo.
  * 🔴 Multifashion comisiona con OTRA base que el grupo: no se fusiona nada.
  */
-export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
+export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas }: VendedorasSubtabProps) {
   const year = selectedYear;
 
   // Meses base relativos a hoy. Para año cerrado, "en curso" = Dic.
@@ -84,20 +107,33 @@ export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
   const enCursoMes = isCurrentYear ? now.getMonth() + 1 : 12;
   const mesAnteriorMes = Math.max(1, enCursoMes - 1);
 
-  const [chip, setChip] = useState<ChipKey>("en_curso");
+  // Control PROPIO — solo cuando no llega el período del módulo (el espejo).
+  const [chipPropio, setChipPropio] = useState<ChipKey>("en_curso");
+  const conControlPropio = periodo == null;
 
-  // Ventana rolling (botones "Últimos N meses"): periodo='ultimos', N meses
-  // terminando en el mes en curso. Δ vs misma ventana del año anterior; sin bono.
+  // El período, dicho en el vocabulario de la RPC. Los dos caminos terminan en
+  // el MISMO chip → el rótulo de la Δ y la nota salen de un solo lugar.
+  const { chip, rpcMes } = useMemo((): { chip: ChipKey; rpcMes: number } => {
+    if (periodo == null) {
+      return { chip: chipPropio, rpcMes: chipPropio === "en_curso" ? enCursoMes : mesAnteriorMes };
+    }
+    if (periodo.tipo === "ultimos") {
+      return { chip: `ultimos_${periodo.n}` as ChipKey, rpcMes: corte?.mes ?? enCursoMes };
+    }
+    if (periodo.tipo === "anio") return { chip: "ytd", rpcMes: enCursoMes };
+    // Un mes: «en curso» si es el mes de corte, «cerrado» si no. La distinción
+    // solo cambia el RÓTULO — la RPC recibe el mismo `p_mes` en los dos casos.
+    const esElDeCorte = corte != null && periodo.anio === corte.anio && periodo.mes === corte.mes;
+    return { chip: esElDeCorte ? "en_curso" : "mes_anterior", rpcMes: periodo.mes };
+  }, [periodo, corte, chipPropio, enCursoMes, mesAnteriorMes]);
+
   const rangoN = chip === "ultimos_3" ? 3 : chip === "ultimos_6" ? 6 : chip === "ultimos_12" ? 12 : null;
   const esRango = rangoN != null;
 
-  // Parámetros del ranking según el chip.
   const rpcPeriodo: VendedorasPeriodoTipo | "ultimos" =
     esRango ? "ultimos" : chip === "ytd" ? "ytd" : "mes";
-  const rpcMes = chip === "en_curso" ? enCursoMes : mesAnteriorMes;
-  // Mes cuyo bono se evalúa: en_curso → mes en curso (será pendiente);
-  // mes_anterior / ytd → último mes cerrado. (No aplica a ventanas rolling.)
-  const bonoMes = chip === "en_curso" ? enCursoMes : mesAnteriorMes;
+  // Mes cuyo bono se evalúa. (No aplica a ventanas rodantes: el bono es por mes.)
+  const bonoMes = rpcMes;
 
   const [bonos, setBonos] = useState<BonosMultifashion | null>(null);
   const onBonosData = useCallback((r: BonosMultifashion | null) => setBonos(r), []);
@@ -106,12 +142,10 @@ export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   // Querystring del ranking — MISMOS params que antes: year + periodo; mes solo
-  // en "mes"; n+mes(en curso) en "ultimos". El querystring ES la clave SWR →
-  // cada combinación (año/chip/mes) cachea por separado; volver a un chip ya
-  // visto pinta al instante y revalida en background. SWR maneja cancelación.
+  // en "mes"; n+mes en "ultimos". El querystring ES la clave SWR.
   const params = new URLSearchParams({ year: String(year), periodo: rpcPeriodo });
   if (rpcPeriodo === "mes") params.set("mes", String(rpcMes));
-  if (rpcPeriodo === "ultimos") { params.set("n", String(rangoN)); params.set("mes", String(enCursoMes)); }
+  if (rpcPeriodo === "ultimos") { params.set("n", String(rangoN)); params.set("mes", String(rpcMes)); }
   const vendedorasUrl = `/api/multifashion/vendedoras?${params.toString()}`;
 
   const { data: resp, error, isLoading, mutate } = useSWR<VendedorasPeriodo>(
@@ -143,6 +177,10 @@ export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
     return map;
   }, [bonos, esRango]);
 
+  // El mes todavía no cerró (o no hay datos de bono): la columna dice «al cierre»
+  // en vez de un guion, que se leería como «no le toca».
+  const bonoPendiente = !esRango && (!bonos || bonos.sin_data || !bonos.es_elegible);
+
   const sortedVendedoras = useMemo(() => {
     if (!resp) return [];
     const arr = resp.vendedoras.slice();
@@ -169,7 +207,7 @@ export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
     else { setSortBy(col); setSortDir("desc"); }
   };
 
-  // Contra qué compara la Δ en el chip activo (ver el encabezado del archivo).
+  // Contra qué compara la Δ en el período activo (ver el encabezado del archivo).
   const rotuloDelta = rotuloDeltaVendedoras(chip, rpcMes, year);
   const notaComparacion = resp
     ? notaComparacionVendedoras(chip, rpcMes, year, resp.es_periodo_parcial, resp.dia_corte_periodo_anterior)
@@ -193,34 +231,34 @@ export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
         </div>
       )}
 
-      {/* Banner del bono gerente (una línea). Eleva la data para los badges.
-          No aplica a ventanas rolling (el bono es por mes). */}
+      {/* Contexto del bono del gerente. Ya NO es una barra de color: es una línea
+          gris debajo del subtítulo. Sigue elevando la data para la columna Bono. */}
       {!esRango && (
         <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
       )}
 
-      {/* Chips de período: mes en curso · mes cerrado · YTD · ventanas rolling. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <ChipPill active={chip === "en_curso"} onClick={() => setChip("en_curso")}>
-          {`${MES_FULL[enCursoMes - 1]} (en curso)`}
-        </ChipPill>
-        <ChipPill active={chip === "mes_anterior"} onClick={() => setChip("mes_anterior")}>
-          {`${MES_FULL[mesAnteriorMes - 1]} (cerrado)`}
-        </ChipPill>
-        <ChipPill active={chip === "ytd"} onClick={() => setChip("ytd")}>
-          {`YTD ${year}`}
-        </ChipPill>
-        <span className="mx-1 h-4 w-px bg-gray-200" aria-hidden />
-        <ChipPill active={chip === "ultimos_3"} onClick={() => setChip("ultimos_3")}>Últimos 3 meses</ChipPill>
-        <ChipPill active={chip === "ultimos_6"} onClick={() => setChip("ultimos_6")}>Últimos 6 meses</ChipPill>
-        <ChipPill active={chip === "ultimos_12"} onClick={() => setChip("ultimos_12")}>Últimos 12 meses</ChipPill>
-      </div>
+      {/* ⚠️ Las píldoras SOLO en la pestaña espejo de Comisiones, que no tiene el
+          desplegable del módulo. En Multifashion se retiraron (ver arriba). */}
+      {conControlPropio && (
+        <div className="flex flex-wrap items-center gap-2">
+          <ChipPill active={chipPropio === "en_curso"} onClick={() => setChipPropio("en_curso")}>
+            {`${MES_FULL[enCursoMes - 1]} (en curso)`}
+          </ChipPill>
+          <ChipPill active={chipPropio === "mes_anterior"} onClick={() => setChipPropio("mes_anterior")}>
+            {`${MES_FULL[mesAnteriorMes - 1]} (cerrado)`}
+          </ChipPill>
+          <ChipPill active={chipPropio === "ytd"} onClick={() => setChipPropio("ytd")}>
+            {`YTD ${year}`}
+          </ChipPill>
+          <span className="mx-1 h-4 w-px bg-gray-200" aria-hidden />
+          <ChipPill active={chipPropio === "ultimos_3"} onClick={() => setChipPropio("ultimos_3")}>Últimos 3 meses</ChipPill>
+          <ChipPill active={chipPropio === "ultimos_6"} onClick={() => setChipPropio("ultimos_6")}>Últimos 6 meses</ChipPill>
+          <ChipPill active={chipPropio === "ultimos_12"} onClick={() => setChipPropio("ultimos_12")}>Últimos 12 meses</ChipPill>
+        </div>
+      )}
 
-      {/* Subtitle */}
       <div className={cn(loading && "opacity-60 transition-opacity")}>
-        {/* `sr-only`: la pestaña dice "Vendedoras" y las píldoras de acá arriba
-            enseñan el período elegido. El encabezado sigue existiendo para
-            quien navega con lector de pantalla. */}
+        {/* `sr-only`: la pestaña dice "Vendedoras" y el período está arriba. */}
         <h3 className="sr-only">Vendedoras · {chipLabel[chip]}</h3>
         {resp && (
           <p className="mt-0.5 text-xs text-gray-500">
@@ -241,16 +279,9 @@ export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
       ) : (
         <div className={cn(loading && "opacity-60 pointer-events-none transition-opacity")}>
           {/* Escritorio. El corte es `lg` y no `md` porque lo que decide es el
-              ancho ÚTIL, no el de la ventana: la barra lateral se lleva 224 px,
-              así que un iPad de 834 deja 552 y esta tabla pide 760 (su propio
-              `minWidth`) — 208 px de arrastre, medidos en el navegador. Las
-              tarjetas de abajo ya existían; solo se les amplió el tramo. */}
+              ancho ÚTIL: la barra lateral se lleva 224 px. */}
           <Card data-vista="tabla" className="hidden p-0 lg:block">
             <div className="overflow-x-auto">
-              {/* 720 y no 760: a 1024 px (el MISMO iPad, acostado) el contenido
-                  dispone de 742, así que el piso viejo forzaba 18 px de arrastre
-                  justo ahí. Bajarlo no aprieta nada en pantallas anchas — la
-                  tabla es `w-full` y ya mide más que su piso. */}
               <table className="w-full border-collapse" style={{ minWidth: 720 }}>
                 <thead>
                   <tr className="bg-gray-100">
@@ -261,11 +292,22 @@ export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
                     <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Ticket prom.</th>
                     <SortHeader col="delta_ventas" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>{rotuloDelta.columna}</SortHeader>
                     <SortHeader col="comision"     sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Comisión</SortHeader>
+                    {/* El bono, donde le corresponde: una columna, no una barra. */}
+                    {!esRango && (
+                      <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Bono</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {sortedVendedoras.map((v, i) => (
-                    <VendedoraRow key={v.nombre} v={v} rank={i + 1} badge={bonoBadges.get(v.nombre)} />
+                    <VendedoraRow
+                      key={v.nombre}
+                      v={v}
+                      rank={i + 1}
+                      badge={bonoBadges.get(v.nombre)}
+                      conBono={!esRango}
+                      pendiente={bonoPendiente}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -275,43 +317,49 @@ export function VendedorasSubtab({ selectedYear }: VendedorasSubtabProps) {
           {/* Celular e iPad */}
           <div data-vista="tarjetas" className="space-y-2 lg:hidden">
             {sortedVendedoras.map((v, i) => (
-              <VendedoraCard key={v.nombre} v={v} rank={i + 1} badge={bonoBadges.get(v.nombre)} rotuloDelta={rotuloDelta.corto} />
+              <VendedoraCard
+                key={v.nombre}
+                v={v}
+                rank={i + 1}
+                badge={bonoBadges.get(v.nombre)}
+                conBono={!esRango}
+                pendiente={bonoPendiente}
+                rotuloDelta={rotuloDelta.corto}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* Las metas andando, al final y sin tocar nada de lo de arriba.
-          · Meta GRUPAL      → cuánto APORTÓ cada una al avance (sin podio).
-          · Meta POR VENDEDORA → la meta de cada una y su avance.
-          Si no hay metas instaladas o no hay ninguna andando, no dibuja nada. */}
-      <MetasEnVendedoras />
+      {/* ── LAS METAS, ENTERAS Y ABAJO ────────────────────────────────────────
+          Primero cómo van (la tarjeta de avance, «Nueva meta», «Cambiar», el
+          premio, las fechas y la historia) y después cuánto aportó cada una.
+          Las dos leen la MISMA clave de SWR: se pide una sola vez. */}
+      {conMetas && (
+        <section className="mt-8 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-950">Metas</h3>
+          <MetasSubtab />
+          <MetasEnVendedoras />
+        </section>
+      )}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Badges de bono inline (junto al nombre)
+// Fila y tarjeta
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BonoBadges({ v, badge }: { v: VendedoraDetalle; badge?: BonoBadge }) {
-  return (
-    <>
-      {v.manager && (
-        <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
-      )}
-      {badge?.winner && (
-        <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
-          <Award className="h-3 w-3" /> Bono $50
-        </span>
-      )}
-      {v.manager && badge && badge.gerenteBono > 0 && (
-        <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
-          <Award className="h-3 w-3" /> Bono ${badge.gerenteBono}
-        </span>
-      )}
-    </>
-  );
+/** Lo que dice la celda Bono de una vendedora. */
+export function textoBono(
+  v: { manager: boolean },
+  badge: BonoBadge | undefined,
+  pendiente: boolean,
+): string {
+  if (pendiente) return BONO_AL_CIERRE;
+  if (badge?.winner) return "$50";
+  if (v.manager && badge && badge.gerenteBono > 0) return `$${badge.gerenteBono}`;
+  return "—";
 }
 
 function rowHighlight(v: VendedoraDetalle, badge?: BonoBadge): boolean {
@@ -321,15 +369,22 @@ function rowHighlight(v: VendedoraDetalle, badge?: BonoBadge): boolean {
 // El payload no trae las ventas del período previo, así que la base se despeja
 // del propio ratio (prev = ventas / (1 + pct)) y se le aplica la MISMA regla.
 // Una vendedora que el año pasado vendió $8 en el mes no genera un +40000%.
-function VendedoraRow({ v, rank, badge }: { v: VendedoraDetalle; rank: number; badge?: BonoBadge }) {
+function VendedoraRow({
+  v, rank, badge, conBono, pendiente,
+}: {
+  v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean;
+}) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
+  const bono = textoBono(v, badge, pendiente);
   return (
     <tr className={rowHighlight(v, badge) ? "bg-amber-50/60" : ""}>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</td>
       <td className="border-b border-gray-200 px-3.5 py-3 text-sm text-gray-950">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium">{v.nombre}</span>
-          <BonoBadges v={v} badge={badge} />
+          <span className="font-medium">{nombreEnPantalla(v.nombre)}</span>
+          {v.manager && (
+            <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
+          )}
         </div>
       </td>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums">{v.tickets.toLocaleString()}</td>
@@ -339,12 +394,25 @@ function VendedoraRow({ v, rank, badge }: { v: VendedoraDetalle; rank: number; b
         {dv.arrow && <span className="mr-1">{dv.arrow}</span>}{dv.displayValue}
       </td>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">${v.comision.toFixed(2)}</td>
+      {conBono && (
+        <td className={cn(
+          "border-b border-gray-200 px-3.5 py-3 text-right text-sm tabular-nums",
+          bono === BONO_AL_CIERRE ? "text-xs text-gray-400" : bono === "—" ? "text-gray-400" : "font-mono font-semibold text-amber-700",
+        )}>
+          {bono}
+        </td>
+      )}
     </tr>
   );
 }
 
-function VendedoraCard({ v, rank, badge, rotuloDelta }: { v: VendedoraDetalle; rank: number; badge?: BonoBadge; rotuloDelta: string }) {
+function VendedoraCard({
+  v, rank, badge, conBono, pendiente, rotuloDelta,
+}: {
+  v: VendedoraDetalle; rank: number; badge?: BonoBadge; conBono: boolean; pendiente: boolean; rotuloDelta: string;
+}) {
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
+  const bono = textoBono(v, badge, pendiente);
   return (
     <div className={cn(
       "rounded-lg border bg-white px-4 py-3.5",
@@ -352,8 +420,10 @@ function VendedoraCard({ v, rank, badge, rotuloDelta }: { v: VendedoraDetalle; r
     )}>
       <div className="flex flex-wrap items-baseline gap-1.5">
         <span className="font-mono text-xs text-gray-500 tabular-nums">{rank}.</span>
-        <span className="truncate text-[15px] font-medium leading-tight text-gray-950">{v.nombre}</span>
-        <BonoBadges v={v} badge={badge} />
+        <span className="truncate text-[15px] font-medium leading-tight text-gray-950">{nombreEnPantalla(v.nombre)}</span>
+        {v.manager && (
+          <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
+        )}
       </div>
       <div className="mt-2 flex items-baseline gap-3">
         <span className="font-mono text-base font-medium tabular-nums text-gray-950">{fmtMoneyCompact(v.ventas)}</span>
@@ -366,6 +436,7 @@ function VendedoraCard({ v, rank, badge, rotuloDelta }: { v: VendedoraDetalle; r
         <span className="font-mono tabular-nums">{v.tickets.toLocaleString()}</span> tickets ·{" "}
         <span className="font-mono tabular-nums">${v.ticket_promedio.toFixed(2)}</span> tkt prom ·{" "}
         <span className="font-mono tabular-nums">${v.comision.toFixed(2)}</span> comisión
+        {conBono && <> · bono <span className={cn(bono === BONO_AL_CIERRE || bono === "—" ? "text-gray-400" : "font-mono font-semibold text-amber-700")}>{bono}</span></>}
       </div>
     </div>
   );

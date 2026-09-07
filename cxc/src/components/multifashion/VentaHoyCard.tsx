@@ -1,14 +1,25 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tarjeta "HOY" — lo primero que se ve al abrir Multifashion.
+// "HOY" — UNA LÍNEA, lo primero que se ve al abrir Multifashion.
 //
 // Pedido de Daniel: *"quiero ver también venta del día en multifashion"*. Ese
 // número existía sólo en el Telegram de las 8pm; acá se ve cuando se abre el
 // módulo. El monto es el MISMO (misma función de cálculo — ver
 // `@/lib/multifashion/retail-dia`).
 //
-// Las tres cosas que esta tarjeta no puede hacer mal:
+// 🩸 DE BLOQUE A LÍNEA (6-sep-2026). Sin ventas todavía, la tarjeta ocupaba una
+// franja de CUATRO renglones —«Hoy · domingo 6 de septiembre», «el día todavía
+// no cierra», «Todavía no hay ventas hoy» en letra grande, y la frescura— para
+// decir que no había pasado nada. Y como vive arriba de las pestañas, esa franja
+// se repetía en todas. Queda una línea:
+//
+//     Hoy · domingo 6 sep · sin ventas todavía · 2:00 p. m.
+//
+// Con ventas la línea lleva el monto grande, los tiquetes y los comparativos, en
+// la misma fila (envuelve sola en el teléfono).
+//
+// Las tres cosas que esta línea no puede hacer mal:
 //
 // 1. NUNCA mostrar el monto sin decir DE CUÁNDO ES. El sync corre cada ~2 h; a
 //    las 11pm el número puede ser el de las 8pm. "$2.619" a secas sería mentira.
@@ -21,10 +32,8 @@
 //    "Hoy hasta ahora" contra "el viernes pasado completo" no es una caída del
 //    negocio: es la hora. Mientras el día no cierre (7pm) se rotula "en curso".
 //
-// Anchos: probado en 390 (iPhone) · 834 (iPad) · 1440. El monto y el
-// comparativo se apilan en celular y van en fila desde `sm`; nada se recorta ni
-// se arrastra. Sin controles táctiles adentro (es sólo lectura), así que no hay
-// blancos de 44 px que respetar.
+// Anchos: probado en 390 (iPhone) · 834 (iPad) · 1440. Sin controles táctiles
+// adentro (es sólo lectura), así que no hay blancos de 44 px que respetar.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import useSWR from "swr";
@@ -33,8 +42,9 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { SIN_COMPARATIVO } from "@/lib/variacion";
 import type { VentaHoy } from "@/lib/multifashion/venta-hoy";
 
+// "domingo 6 sep" — corto, para que la línea entre en el teléfono.
 const FMT_DIA = new Intl.DateTimeFormat("es-PA", {
-  timeZone: "UTC", weekday: "long", day: "numeric", month: "long",
+  timeZone: "UTC", weekday: "long", day: "numeric", month: "short",
 });
 
 const FMT_HORA = new Intl.DateTimeFormat("es-PA", {
@@ -106,13 +116,13 @@ export function VentaHoyCard({ syncTick = 0, habilitado = true }: VentaHoyCardPr
 
   if (isLoading && !data) {
     return (
-      <div className="mb-5 h-[104px] w-full animate-pulse rounded-lg border border-gray-200 bg-gray-50" />
+      <div className="mb-4 h-[42px] w-full animate-pulse rounded-lg border border-gray-200 bg-gray-50" />
     );
   }
 
   if (error && !data) {
     return (
-      <div className="mb-5 rounded-lg border border-gray-200 bg-white px-4 py-3">
+      <div className="mb-4 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5">
         <p className="text-xs text-gray-500">No se pudo cargar la venta de hoy. Intenta recargar.</p>
       </div>
     );
@@ -123,71 +133,55 @@ export function VentaHoyCard({ syncTick = 0, habilitado = true }: VentaHoyCardPr
   const rezagado = data.sync.estado === "rezagado";
   const sinFrescura = data.sync.estado === "sin_dato";
   const alerta = rezagado || sinFrescura;
+  const frescura = sinFrescura
+    ? "no pudimos confirmar cuándo se actualizó"
+    : rezagado
+      ? `sin actualizar desde las ${horaSync(data.sync.ultimo as string, data.fecha)}`
+      : horaSync(data.sync.ultimo as string, data.fecha);
 
   return (
     <section
       aria-label="Venta de hoy"
-      className={`mb-5 w-full overflow-hidden rounded-lg border px-4 py-3.5 md:px-5 ${
+      className={`mb-4 flex w-full flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border px-3.5 py-2.5 text-sm ${
         alerta ? "border-amber-300 bg-amber-50" : "border-teal-200 bg-teal-50/60"
       }`}
     >
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-xs font-semibold uppercase tracking-wide text-teal-800">Hoy</span>
-        <span className="text-xs text-gray-600">· {tituloDia(data.fecha)}</span>
-        {data.enCurso && (
-          <span className="text-xs text-gray-500">· el día todavía no cierra</span>
-        )}
-      </div>
+      <span className="text-xs font-semibold uppercase tracking-wide text-teal-800">Hoy</span>
+      <span className="text-xs text-gray-600">· {tituloDia(data.fecha)}</span>
 
-      {/* Monto + documentos. En 390 px se apilan; desde sm van en una fila. */}
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        {data.hayVentas ? (
-          <>
-            <span className="font-mono text-3xl font-semibold tabular-nums tracking-tight text-gray-950 md:text-4xl">
-              {fmtMoney(data.ventas)}
-            </span>
-            <span className="font-mono text-sm tabular-nums text-gray-600">
-              {data.documentos} {data.documentos === 1 ? "tiquete" : "tiquetes"}
-            </span>
-          </>
-        ) : (
-          // 🩸 "$0" y "todavía no hay ventas" NO son lo mismo.
-          <span className="text-lg font-medium text-gray-700 md:text-xl">
-            Todavía no hay ventas hoy
+      {data.hayVentas ? (
+        <>
+          <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-gray-950">
+            {fmtMoney(data.ventas)}
           </span>
-        )}
-      </div>
+          <span className="font-mono text-xs tabular-nums text-gray-600">
+            {data.documentos} {data.documentos === 1 ? "tiquete" : "tiquetes"}
+          </span>
+          {data.semanaPasada && (
+            <span className={`text-xs font-medium ${colorPct(data.semanaPasada.pct)}`}>
+              {fmtPctVariacion(data.semanaPasada.pct)}{" "}
+              <span className="font-normal text-gray-600">
+                vs el {nombreDia(data.semanaPasada.fecha)} pasado
+              </span>
+            </span>
+          )}
+          {data.enCurso && (
+            <span className="text-xs text-gray-500">· el día todavía no cierra</span>
+          )}
+        </>
+      ) : (
+        // 🩸 "$0" y "todavía no hay ventas" NO son lo mismo. Sin ventas la línea
+        // no crece: lo dice en las mismas tres palabras de siempre.
+        <span className="text-xs text-gray-700">· sin ventas todavía</span>
+      )}
 
-      {/* Comparativos + frescura. El titular es HACE 7 DÍAS (mismo día de la
-          semana); "ayer" va detrás, en chico, porque un lunes contra un domingo
-          no dice nada del negocio. Ver la cabecera de venta-hoy.ts. */}
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        {data.hayVentas && data.semanaPasada && (
-          <span className={`font-medium ${colorPct(data.semanaPasada.pct)}`}>
-            {fmtPctVariacion(data.semanaPasada.pct)}{" "}
-            <span className="font-normal text-gray-600">
-              vs el {nombreDia(data.semanaPasada.fecha)} pasado ({fmtMoney(data.semanaPasada.ventas)})
-            </span>
-          </span>
-        )}
-        {data.hayVentas && data.ayer && (
-          <span className="text-gray-500">
-            <span className={colorPct(data.ayer.pct)}>{fmtPctVariacion(data.ayer.pct)}</span> vs ayer
-          </span>
-        )}
-
-        {/* La frescura va SIEMPRE — el monto sin ella es una media verdad. */}
-        <span
-          className={`inline-flex items-center gap-1 ${alerta ? "font-medium text-amber-800" : "text-gray-500"}`}
-        >
-          {alerta ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> : <Clock className="h-3.5 w-3.5 shrink-0" />}
-          {sinFrescura
-            ? "no pudimos confirmar cuándo se actualizó"
-            : rezagado
-              ? `sin actualizar desde las ${horaSync(data.sync.ultimo as string, data.fecha)}`
-              : `actualizado ${horaSync(data.sync.ultimo as string, data.fecha)}`}
-        </span>
-      </div>
+      {/* La frescura va SIEMPRE — el monto sin ella es una media verdad. */}
+      <span
+        className={`inline-flex items-center gap-1 text-xs ${alerta ? "font-medium text-amber-800" : "text-gray-500"}`}
+      >
+        {alerta ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> : <Clock className="h-3.5 w-3.5 shrink-0" />}
+        {frescura}
+      </span>
     </section>
   );
 }
