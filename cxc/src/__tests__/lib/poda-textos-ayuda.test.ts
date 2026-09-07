@@ -141,16 +141,23 @@ describe("🩸 el aviso de saldo negativo de Caja es UNO, no dos copias", () => 
   // Los dos caminos guardan el MISMO gasto contra el MISMO fondo: dos copias es
   // una que se corrige y otra que se queda vieja, y la que se queda vieja es un
   // freno a una acción que descuadra la caja.
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 7-SEP-2026: el segundo consumidor —la página
+  // `/caja/[id]/nuevo`— se RETIRÓ (410 líneas que nada enlazaba). Queda UN solo
+  // camino de alta, así que ya no puede haber dos copias del aviso; lo que este
+  // bloque sigue vigilando es que ese camino lo USE y no lo reescriba, que es
+  // exactamente el defecto original.
   const CONSUMIDORES = [
     "app/caja/components/NuevoGastoDrawer.tsx",
-    "app/caja/[periodoId]/nuevo/page.tsx",
   ];
 
   it("el texto vive en el componente compartido", () => {
     const fuente = aplanar(leer("app/caja/components/AvisoSaldoNegativo.tsx"));
     expect(fuente).toContain("¿Continuar con saldo negativo?");
     expect(fuente).toContain("Este gasto deja el fondo en");
-    expect(fuente).toContain("Considera solicitar reabastecimiento antes de seguir gastando");
+    // ⚠️ 7-sep-2026: dice «reposición», la palabra del diccionario de la casa
+    // — «reabastecimiento» era la única aparición en todo el sistema.
+    expect(fuente).toContain("Considera pedir la reposición antes de seguir gastando");
+    expect(fuente).not.toContain("reabastecimiento");
   });
 
   it.each(CONSUMIDORES)("%s lo usa y no lo reescribe", (archivo) => {

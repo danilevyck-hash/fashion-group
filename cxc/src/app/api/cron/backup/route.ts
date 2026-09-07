@@ -194,6 +194,9 @@ const DATASETS: Dataset[] = [
   { table: "caja_gastos" },
   { table: "caja_categorias" },
   { table: "caja_responsables" },
+  // La foto del recibo: quién la subió y de qué gasto es. El archivo vive en el
+  // bucket privado `caja-recibos` y entra por la réplica de Storage.
+  { table: "caja_gasto_fotos" },
   // Préstamos (todos los estados, no solo activos)
   { table: "prestamos_empleados" },
   { table: "prestamos_movimientos" },
@@ -382,6 +385,9 @@ const STORAGE_REPLICA_BUCKETS = [
   "product-images",
   "joybees-photos",
   "marketing",
+  // La foto del recibo de caja menuda: la saca una persona y el papel ya se
+  // tiró. No se puede volver a conseguir.
+  "caja-recibos",
 ];
 const STORAGE_PREFIX = "_storage";
 // Réplica off-site a Cloudflare R2 (src/lib/backup/r2.ts): el set completo pesa

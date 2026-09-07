@@ -163,6 +163,11 @@ export const TABLAS_PERSONAS = [
   "caja_gastos",
   "caja_categorias",
   "caja_responsables",
+  // La foto (o el PDF) del recibo: la sube una persona y NO se puede volver a
+  // conseguir — el papel ya se tiró. El ARCHIVO vive en el bucket privado
+  // `caja-recibos`, que entra a la réplica de Storage; esta fila es la que dice
+  // de qué gasto es.
+  "caja_gasto_fotos",
 
   // ── Préstamos
   "prestamos_empleados",

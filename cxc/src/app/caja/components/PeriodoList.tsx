@@ -1,6 +1,7 @@
 "use client";
 
 import { fmt, fmtDate } from "@/lib/format";
+import { montoEnPantalla, saldoDelPeriodo, saldoEsNegativo } from "@/lib/caja/dinero";
 import { CajaPeriodo } from "./types";
 import { SkeletonTable, EmptyState } from "@/components/ui";
 import OverflowMenu, { OverflowMenuItem } from "@/components/ui/OverflowMenu";
@@ -9,6 +10,8 @@ interface Props {
   periodos: CajaPeriodo[];
   loading: boolean;
   error: string | null;
+  /** Un hecho que hay que decir, no una falla (ej.: no se abrió otro período). */
+  aviso?: string | null;
   hasOpenPeriod: boolean;
   role: string | null;
   onCreatePeriodo: () => void;
@@ -63,7 +66,9 @@ function StatusPill({ estado }: { estado: string }) {
 /** Saldo del período: pill rojo si es negativo, ámbar si queda <10% del fondo,
  *  texto normal si está sano. Estilo pill consistente con StatusPill. */
 function SaldoValue({ saldo, fondo }: { saldo: number; fondo: number }) {
-  const neg = saldo < 0;
+  // 🩸 `saldo < 0` a pelo pintaba EN ROJO el período Nº2, cuadrado al centavo:
+  // la suma de sus 26 recibos daba 200.00000000000003 y el saldo, −2.8e-14.
+  const neg = saldoEsNegativo(saldo);
   const low = !neg && fondo > 0 && saldo < 0.1 * fondo;
   if (neg || low) {
     const tone = neg ? "danger" : "warning";
@@ -76,21 +81,28 @@ function SaldoValue({ saldo, fondo }: { saldo: number; fondo: number }) {
           border: `1px solid var(--caja-${tone}-border)`,
         }}
       >
-        ${fmt(saldo)}
+        {montoEnPantalla(saldo)}
       </span>
     );
   }
   return (
     <span className="caja-money caja-money-strong" style={{ color: "var(--caja-fg-strong)" }}>
-      ${fmt(saldo)}
+      {montoEnPantalla(saldo)}
     </span>
   );
+}
+
+/** Cuántos recibos vivos tiene un período. Lo cuenta el servidor. */
+function recibosDe(p: CajaPeriodo): number {
+  if (typeof p.recibos === "number") return p.recibos;
+  return (p.caja_gastos || []).filter((g) => !(g as { deleted?: boolean }).deleted).length;
 }
 
 export default function PeriodoList({
   periodos,
   loading,
   error,
+  aviso,
   hasOpenPeriod,
   role,
   onCreatePeriodo,
@@ -118,6 +130,18 @@ export default function PeriodoList({
         </div>
       )}
 
+      {aviso && !error && (
+        <p
+          className="text-sm mb-4 px-3 py-2 rounded-md"
+          style={{
+            color: "var(--caja-warning-onSoft)",
+            background: "var(--caja-warning-soft)",
+            border: "1px solid var(--caja-warning-border)",
+          }}
+        >
+          {aviso}
+        </p>
+      )}
       {error && (
         <p
           className="text-sm mb-4 px-3 py-2 rounded-md"
@@ -155,14 +179,17 @@ export default function PeriodoList({
               240 px de aire. */}
           <div className="xl:hidden space-y-3">
             {periodos.map((p) => {
-              const saldo = p.fondo_inicial - p.total_gastado;
+              const saldo = saldoDelPeriodo(p.fondo_inicial, p.total_gastado);
               const items: OverflowMenuItem[] = [
                 { label: "Imprimir", onClick: () => onPrintPeriodo(p.id) },
               ];
               if (p.estado === "abierto") {
                 items.push({ label: "Cerrar período", onClick: () => onClosePeriodo(p.id) });
               }
-              if (p.estado === "cerrado" && role === "admin") {
+              // 🔴 Un período CON GASTOS no se elimina (Daniel: «no es
+              // normal»), así que el botón no se dibuja: el servidor lo
+              // rechazaría igual, y un control que no ofrece nada no va.
+              if (p.estado === "cerrado" && role === "admin" && recibosDe(p) === 0) {
                 items.push({ label: "Eliminar", onClick: () => onDeletePeriodo(p.id), destructive: true });
               }
               return (
@@ -244,9 +271,9 @@ export default function PeriodoList({
               <div className="px-4 py-2.5 text-right">Acciones</div>
             </div>
             {periodos.map((p, i) => {
-              const saldo = p.fondo_inicial - p.total_gastado;
+              const saldo = saldoDelPeriodo(p.fondo_inicial, p.total_gastado);
               const items: OverflowMenuItem[] = [];
-              if (p.estado === "cerrado" && role === "admin") {
+              if (p.estado === "cerrado" && role === "admin" && recibosDe(p) === 0) {
                 items.push({ label: "Eliminar", onClick: () => onDeletePeriodo(p.id), destructive: true });
               }
               const stop = (e: React.MouseEvent) => e.stopPropagation();

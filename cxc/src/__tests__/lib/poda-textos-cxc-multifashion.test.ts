@@ -286,8 +286,13 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/referencia/ReferenciaClient.tsx", que: "Referencia · la bajada narraba la ficha que está debajo", texto: "pegá tu lista: cuánto llegó" },
   { archivo: "app/caja/components/PeriodoDetailHeader.tsx", que: "Caja · el % ya está arriba como '% del fondo'", texto: "% gastado" },
   { archivo: "app/caja/components/PeriodoDetailHeader.tsx", que: "Caja · 'Disponible' bajo el saldo", texto: 'sub="Disponible"' },
-  { archivo: "app/caja/[periodoId]/nuevo/page.tsx", que: "Caja · el período del que se viene, repetido en el formulario", texto: "Período Nº" },
-  { archivo: "app/caja/[periodoId]/nuevo/page.tsx", que: "Caja · instructivo del formulario con los * ya a la vista", texto: "Los campos con * son obligatorios" },
+  // ⚠️ 7-sep-2026: las dos líneas de `app/caja/[periodoId]/nuevo/page.tsx` se
+  // fueron con la PÁGINA ENTERA — 410 líneas que nada enlazaba, retiradas en el
+  // rediseño de Caja. Un texto podado no puede volver a un archivo que ya no
+  // existe; que la página no vuelva lo vigila `caja-columnas-retiradas.test.ts`.
+  // Los dos textos se siguen prohibiendo, ahora en el ÚNICO camino de alta.
+  { archivo: "app/caja/components/NuevoGastoDrawer.tsx", que: "Caja · el período del que se viene, repetido en el formulario", texto: "Período Nº" },
+  { archivo: "app/caja/components/GastoForm.tsx", que: "Caja · instructivo del formulario con los * ya a la vista", texto: "Los campos con * son obligatorios" },
   { archivo: "app/cxc/page.tsx", que: "CXC · '6 empresas' al lado de la pestaña 'Grupo · 6 empresas'", texto: ': "6 empresas"' },
   { archivo: "app/clientes/[codigo]/ClienteDetail.tsx", que: "Clientes · coletilla del encabezado (abajo dice cuándo se actualizó)", texto: "Datos fiscales · sincronizados de Switch" },
   { archivo: "components/ventas/ClientesView.tsx", que: "Ventas › Clientes · el prefijo 'Vista:' del chip", texto: "Vista: {vistaChipLong}" },

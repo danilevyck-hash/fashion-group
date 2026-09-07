@@ -9,8 +9,6 @@ interface Props {
   open: boolean;
   onClose: () => void;
   deletedGastos: CajaGasto[];
-  periodOpen: boolean;
-  onRestore: (g: CajaGasto) => void;
 }
 
 function fmtDeletedAt(iso: string | null | undefined): string {
@@ -31,17 +29,22 @@ function fmtDeletedAt(iso: string | null | undefined): string {
 }
 
 /**
- * Modal over the detail view showing soft-deleted gastos with a restore
- * button per row. Opened from the header's kebab. On mobile it slides
- * up from the bottom; on desktop it centers at max-w-3xl so the seven
- * columns fit without scrolling.
+ * Los gastos eliminados de un período: se MIRAN, no se restauran.
+ *
+ * 🩸 «Restaurar gasto» se retiró el 7-sep-2026: cero usos en toda la historia
+ * del módulo (el registro no tiene una sola línea de `caja_gasto_restore`).
+ * Un botón que nadie tocó nunca es un botón que solo puede sorprender. Lo
+ * borrado se queda borrado y sigue estando a la vista, con quién lo borró y
+ * cuándo — que es lo que sí se usaba de esta pantalla.
+ *
+ * La columna «Responsable» también se fue: el gasto ya no lleva responsable
+ * (es del PERÍODO). En su lugar va el proveedor, que es lo que distingue un
+ * recibo de otro.
  */
 export default function DeletedGastosModal({
   open,
   onClose,
   deletedGastos,
-  periodOpen,
-  onRestore,
 }: Props) {
   // Lock body scroll mientras está abierto (hook compartido, ref-count).
   useBodyScrollLock(open);
@@ -94,16 +97,15 @@ export default function DeletedGastosModal({
             <p className="text-sm text-gray-400 p-8 text-center">Ninguno.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs min-w-[720px]">
+              <table className="w-full text-xs min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
                     <th className="text-left py-2 px-3 font-normal">Fecha</th>
                     <th className="text-left py-2 px-3 font-normal">Descripción</th>
-                    <th className="text-left py-2 px-3 font-normal">Responsable</th>
+                    <th className="text-left py-2 px-3 font-normal">Proveedor</th>
                     <th className="text-right py-2 px-3 font-normal">Total</th>
                     <th className="text-left py-2 px-3 font-normal">Borrado por</th>
                     <th className="text-left py-2 px-3 font-normal">Borrado cuándo</th>
-                    {periodOpen && <th className="py-2 px-3 font-normal"></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -111,20 +113,10 @@ export default function DeletedGastosModal({
                     <tr key={g.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
                       <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{fmtDate(g.fecha)}</td>
                       <td className="py-2 px-3">{g.descripcion || g.nombre || "—"}</td>
-                      <td className="py-2 px-3 text-gray-500">{g.responsable || "—"}</td>
+                      <td className="py-2 px-3 text-gray-500">{g.proveedor || "—"}</td>
                       <td className="py-2 px-3 text-right tabular-nums">${fmt(g.total)}</td>
                       <td className="py-2 px-3 text-gray-500">{g.deleted_by_name || "—"}</td>
                       <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{fmtDeletedAt(g.deleted_at)}</td>
-                      {periodOpen && (
-                        <td className="py-2 px-3 text-right">
-                          <button
-                            onClick={() => onRestore(g)}
-                            className="text-xs text-gray-500 hover:text-black transition border border-gray-200 rounded px-2 py-1 hover:border-gray-400 whitespace-nowrap"
-                          >
-                            Restaurar
-                          </button>
-                        </td>
-                      )}
                     </tr>
                   ))}
                 </tbody>

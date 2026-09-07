@@ -3,11 +3,16 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
+import { centavos } from "@/lib/caja/dinero";
 
 // Solo columnas REALES de caja_gastos. Aquí estuvieron "metodo_pago" y
 // "numero_factura", que no existen (la real es nro_factura): si un cliente las
 // mandaba, el update reventaba con 500.
-const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "responsable", "responsable_id", "nro_factura"];
+//
+// 🔴 `responsable` y `responsable_id` SALIERON de esta lista el 7-sep-2026: el
+// gasto ya no lleva responsable (es del PERÍODO). Las columnas se quedan en la
+// base, sin escritores.
+const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "nro_factura"];
 
 function normalizeStr(s: string): string {
   const t = s.trim();
@@ -25,40 +30,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
-
-  // ── Restore branch ──
-  if (body.action === "restore") {
-    const { data: existing } = await supabaseServer
-      .from("caja_gastos")
-      .select("id, deleted, descripcion, total, categoria, responsable, fecha, proveedor, empresa, caja_periodos(estado, deleted)")
-      .eq("id", params.id)
-      .maybeSingle();
-    if (!existing) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });
-
-    const owningPeriodo = Array.isArray(existing.caja_periodos) ? existing.caja_periodos[0] : existing.caja_periodos;
-    if (!owningPeriodo || owningPeriodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 400 });
-    if (owningPeriodo.estado !== "abierto") return NextResponse.json({ error: "No se pueden restaurar gastos de un período cerrado." }, { status: 400 });
-    if (!existing.deleted) return NextResponse.json({ error: "Este gasto no está eliminado." }, { status: 400 });
-
-    const { error: restoreError } = await supabaseServer
-      .from("caja_gastos")
-      .update({ deleted: false, deleted_by: null, deleted_at: null })
-      .eq("id", params.id);
-    if (restoreError) return NextResponse.json({ error: "Error al restaurar gasto" }, { status: 500 });
-
-    await logActivity(auth.role, "caja_gasto_restore", "caja", {
-      gastoId: params.id,
-      descripcion: existing.descripcion,
-      total: existing.total,
-      categoria: existing.categoria,
-      responsable: existing.responsable,
-      fecha: existing.fecha,
-      proveedor: existing.proveedor,
-      empresa: existing.empresa,
-    }, auth.userName);
-
-    return NextResponse.json({ ok: true });
-  }
 
   const fields = pick(body, ALLOWED_FIELDS);
 
@@ -80,35 +51,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (typeof fields.categoria === "string") fields.categoria = normalizeStr(fields.categoria) || "Varios";
 
-  if ("responsable_id" in fields) {
-    const rid = typeof fields.responsable_id === "string" ? fields.responsable_id : "";
-    if (!rid) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
-    const { data: responsableRow } = await supabaseServer
-      .from("caja_responsables")
-      .select("id, nombre, activo")
-      .eq("id", rid)
-      .maybeSingle();
-    if (!responsableRow || !responsableRow.activo) {
-      return NextResponse.json({ error: "Responsable inválido o inactivo." }, { status: 400 });
-    }
-    fields.responsable_id = rid;
-    // Keep the text column in sync for display paths (PrintView, mobile card, Excel).
-    fields.responsable = responsableRow.nombre;
-  } else if ("responsable" in fields) {
-    // Legacy inline-edit path: text-only update. Backward compat for GastoTable.
-    const normalized = typeof fields.responsable === "string" ? normalizeStr(fields.responsable) : "";
-    if (!normalized) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
-    fields.responsable = normalized;
-  }
-
   if ("proveedor" in fields) {
     const raw = typeof fields.proveedor === "string" ? fields.proveedor.trim() : "";
     if (!raw || raw === "—") return NextResponse.json({ error: "El proveedor es obligatorio." }, { status: 400 });
     fields.proveedor = raw;
   }
 
-  if (fields.itbms !== undefined) fields.itbms = Math.round((Number(fields.itbms) || 0) * 100) / 100;
-  if (fields.total !== undefined) fields.total = Math.round((Number(fields.total) || 0) * 100) / 100;
+  if (fields.itbms !== undefined) fields.itbms = centavos(fields.itbms as number);
+  if (fields.total !== undefined) fields.total = centavos(fields.total as number);
   const { data, error } = await supabaseServer.from("caja_gastos").update(fields).eq("id", params.id).select().single();
   if (error) return NextResponse.json({ error: "Error al actualizar gasto" }, { status: 500 });
 
@@ -125,7 +75,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   const { data: existing } = await supabaseServer
     .from("caja_gastos")
-    .select("id, descripcion, total, categoria, responsable, fecha, proveedor, empresa")
+    .select("id, descripcion, total, categoria, fecha, proveedor, nro_factura")
     .eq("id", params.id)
     .maybeSingle();
   if (!existing) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });
@@ -141,10 +91,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     descripcion: existing.descripcion,
     total: existing.total,
     categoria: existing.categoria,
-    responsable: existing.responsable,
     fecha: existing.fecha,
     proveedor: existing.proveedor,
-    empresa: existing.empresa,
+    nro_factura: existing.nro_factura,
   }, auth.userName);
 
   return NextResponse.json({ ok: true });

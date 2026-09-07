@@ -18,8 +18,9 @@ export default function CajaPage() {
   });
 
   const {
-    periodos, loading, error,
+    periodos, loading, error, aviso,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
+    responsableInput, setResponsableInput, responsablesCatalog,
     confirmClosePeriodo, setConfirmClosePeriodo,
     confirmDeletePeriodoId, setConfirmDeletePeriodoId,
     createPeriodo, confirmCreatePeriodo,
@@ -36,8 +37,13 @@ export default function CajaPage() {
   // primero + 1.
   const periodoACerrar = periodos.find((p) => p.id === confirmClosePeriodo) || null;
   const siguienteNumero = (periodos[0]?.numero || 0) + 1;
-  const recibosACerrar = (periodoACerrar?.caja_gastos || [])
-    .filter((g) => !(g as { deleted?: boolean }).deleted).length;
+  const recibosACerrar = periodoACerrar?.recibos
+    ?? (periodoACerrar?.caja_gastos || []).filter((g) => !(g as { deleted?: boolean }).deleted).length;
+  // 🔴 Un período con gastos no se elimina (Daniel: «no es normal»). El aviso
+  // viejo prometía borrar «este período y todos sus gastos» y era mentira: solo
+  // marcaba el período y los recibos quedaban vivos, colgando de un ciclo que
+  // ya no se podía abrir. El freno también vive en el servidor.
+  const periodoABorrar = periodos.find((p) => p.id === confirmDeletePeriodoId) || null;
 
   async function handleConfirmCreate() {
     const newId = await confirmCreatePeriodo();
@@ -52,6 +58,7 @@ export default function CajaPage() {
           periodos={periodos}
           loading={loading}
           error={error}
+          aviso={aviso}
           hasOpenPeriod={hasOpenPeriod}
           role={role}
           onCreatePeriodo={createPeriodo}
@@ -68,6 +75,8 @@ export default function CajaPage() {
       >
         <div className="space-y-4">
           <div>
+            {/* $200 viene sugerido: es el fondo de los 3 períodos de la
+                historia. Se puede cambiar. */}
             <label className="text-xs text-gray-400 uppercase">Fondo inicial ($)</label>
             <input
               type="number"
@@ -78,6 +87,27 @@ export default function CajaPage() {
               className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition"
               placeholder="200"
             />
+          </div>
+          {/* 🔴 La responsable es del PERÍODO y se elige UNA vez, aquí. Se
+              guarda su código de colaborador (Angela = 7), nunca su nombre.
+              Con una sola en el catálogo, viene puesta. */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase" htmlFor="caja-responsable">
+              Responsable
+            </label>
+            <select
+              id="caja-responsable"
+              value={responsableInput}
+              onChange={(e) => setResponsableInput(e.target.value)}
+              className="w-full border-b border-gray-200 py-2 min-h-[44px] text-sm outline-none focus:border-black transition bg-white"
+            >
+              <option value="">Sin responsable</option>
+              {responsablesCatalog
+                .filter((r) => r.empleado_codigo)
+                .map((r) => (
+                  <option key={r.id} value={String(r.empleado_codigo)}>{r.nombre}</option>
+                ))}
+            </select>
           </div>
           <div className="flex gap-2 pt-2">
             <button
@@ -113,7 +143,7 @@ export default function CajaPage() {
         onClose={() => setConfirmDeletePeriodoId(null)}
         onConfirm={doDeletePeriodo}
         title="Eliminar período"
-        message="¿Eliminar este período y todos sus gastos? Esta acción no se puede deshacer."
+        message={`¿Eliminar el período Nº ${periodoABorrar?.numero ?? ""}? No tiene ningún gasto cargado.`}
         confirmLabel="Eliminar"
         destructive
       />

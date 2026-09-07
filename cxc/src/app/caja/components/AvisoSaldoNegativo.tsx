@@ -66,7 +66,7 @@ export default function AvisoSaldoNegativo({
           Este gasto deja el fondo en <strong className="caja-mono">${fmt(saldoFuturo)}</strong> (fondo <span className="caja-mono">${fmt(fondo)}</span>, gastos <span className="caja-mono">${fmt(gastado)}</span>, nuevo <span className="caja-mono">${fmt(nuevo)}</span>).
         </p>
         <p className="text-xs mb-6" style={{ color: "var(--caja-fg-muted)" }}>
-          Considera solicitar reabastecimiento antes de seguir gastando.
+          Considera pedir la reposición antes de seguir gastando.
         </p>
         <div className="flex gap-3">
           <button

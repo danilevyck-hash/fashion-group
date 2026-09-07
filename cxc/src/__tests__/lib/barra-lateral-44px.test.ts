@@ -64,7 +64,6 @@ const read = (...p: string[]) => readFileSync(join(src, ...p), "utf8");
 
 const sidebar = read("components", "Sidebar.tsx");
 const periodoHeader = read("app", "caja", "components", "PeriodoDetailHeader.tsx");
-const nuevoGasto = read("app", "caja", "[periodoId]", "nuevo", "page.tsx");
 const periodoList = read("app", "caja", "components", "PeriodoList.tsx");
 
 const veces = (t: string, re: RegExp) => (t.match(re) ?? []).length;
@@ -134,8 +133,13 @@ describe("Caja · los 2 enlaces de volver (medían 70×18 y 71×18)", () => {
   });
 
   it('"‹ Cancelar" del formulario de nuevo gasto', () => {
-    expect(nuevoGasto).toContain('inline-flex min-h-[44px] items-center gap-1 text-xs mb-2 -mt-2');
-    expect(nuevoGasto).not.toContain('inline-flex items-center gap-1 text-xs mb-5');
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 7-SEP-2026: la página `/caja/[id]/nuevo` se
+    // RETIRÓ — 410 líneas que nada enlazaba, con 0 usos en toda la historia.
+    // Su botón de volver ya no existe, así que no puede medir 32 px. Que la
+    // página no vuelva lo vigila `caja-columnas-retiradas.test.ts`; el mismo
+    // botón de volver, con sus 44 px, vive en `PeriodoDetailHeader` y se mide
+    // en la línea de arriba.
+    expect(periodoHeader).toContain('inline-flex min-h-[44px] items-center gap-1 text-xs mb-1 -mt-2');
   });
 
   it('"Imprimir" y "Cerrar" de la fila del período (medían 68×28 y 57×28)', () => {

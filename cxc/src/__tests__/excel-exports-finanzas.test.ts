@@ -56,12 +56,20 @@ describe("buildCajaWorkbook", () => {
     expect(ws["H5"].t).toBe("n");
     expect(ws["H5"].v).toBeCloseTo(16.05);
 
-    // Bloque de resumen: saldo = 200 - 16.05
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 7-SEP-2026: bajo «Saldo disponible» ahora va
+    // «A reponer» — cuánta plata hay que poner para que la caja vuelva a su
+    // fondo. Lo decía el modal de cierre y no el papel ni el Excel, que son los
+    // que se firman. Los dos salen de la MISMA función (`src/lib/caja/dinero`).
+    // El CONTROL de siempre se conserva: el saldo sigue siendo fondo − gastado.
     const range = XLSX.utils.decode_range(ws["!ref"] as string);
     const lastRow = range.e.r + 1; // 1-based
-    expect(ws[`F${lastRow}`].v).toBe("Saldo disponible:");
+    expect(ws[`F${lastRow - 1}`].v).toBe("Saldo disponible:");
+    expect(ws[`H${lastRow - 1}`].t).toBe("n");
+    expect(ws[`H${lastRow - 1}`].v).toBeCloseTo(183.95);
+
+    expect(ws[`F${lastRow}`].v).toBe("A reponer:");
     expect(ws[`H${lastRow}`].t).toBe("n");
-    expect(ws[`H${lastRow}`].v).toBeCloseTo(183.95);
+    expect(ws[`H${lastRow}`].v).toBeCloseTo(16.05);
   });
 });
 

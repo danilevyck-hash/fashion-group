@@ -55,6 +55,10 @@ const gastos = read("app", "caja", "components", "GastoTable.tsx");
 const cheques = read("app", "recordatorios", "components", "AgendaLista.tsx");
 const calendario = read("app", "recordatorios", "components", "CalendarioMes.tsx");
 const gastoForm = read("app", "caja", "components", "GastoForm.tsx");
+// 7-sep-2026: la TARJETA de un gasto salió a su propia pieza (`FichaGasto`)
+// porque ahora también EDITA — hasta ese día «Editar» no hacía nada por debajo
+// de 1024 px. Las dos vistas siguen existiendo; una vive en cada archivo.
+const fichaGasto = read("app", "caja", "components", "FichaGasto.tsx");
 
 const veces = (t: string, re: RegExp) => (t.match(re) ?? []).length;
 
@@ -123,10 +127,25 @@ describe("Los mismos datos en las dos vistas, marcados con `data-` estables (no 
     }
   });
 
+  /**
+   * ⚠️ CAMBIÓ DE DIRECCIÓN EL 7-SEP-2026: se cuenta una vez por LAYOUT, no dos
+   * veces en el mismo archivo. La tarjeta se mudó a `FichaGasto.tsx` (ahora
+   * edita de verdad; antes «Editar» no hacía nada en pantalla angosta), así que
+   * la tabla queda en `GastoTable.tsx` y la ficha en el suyo.
+   *
+   * Lo que este bloque siempre vino a evitar sigue igual de vigilado: que un
+   * dato exista en UNA sola de las dos vistas. Por eso se exige uno en cada
+   * archivo, nunca cero.
+   */
   it("Caja › Detalle: fila + descripción/categoría/total, en tarjeta Y en tabla", () => {
-    expect(veces(gastos, /data-gasto-fila=/g)).toBe(2);
+    expect(veces(gastos, /data-gasto-fila=/g)).toBe(1);
+    // La ficha marca sus DOS estados con la misma marca: el de mirar y el de
+    // editar (`data-gasto-editando`), que es el que no existía.
+    expect(veces(fichaGasto, /data-gasto-fila=/g)).toBe(2);
+    expect(veces(fichaGasto, /data-gasto-editando=/g)).toBe(1);
     for (const campo of ["descripcion", "categoria", "total"]) {
-      expect(veces(gastos, new RegExp(`data-gasto-campo="${campo}"`, "g"))).toBe(2);
+      expect(veces(gastos, new RegExp(`data-gasto-campo="${campo}"`, "g"))).toBe(1);
+      expect(veces(fichaGasto, new RegExp(`data-gasto-campo="${campo}"`, "g"))).toBe(1);
     }
   });
 

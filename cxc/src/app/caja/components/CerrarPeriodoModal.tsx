@@ -3,6 +3,7 @@
 import { ModalOverlay } from "@/components/ui";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { fmt } from "@/lib/format";
+import { montoEnPantalla, reposicionDelPeriodo, saldoDelPeriodo, saldoEsNegativo } from "@/lib/caja/dinero";
 
 interface Props {
   open: boolean;
@@ -25,14 +26,15 @@ export default function CerrarPeriodoModal({ open, onClose, onConfirm, fondo, ga
   useEscapeClose(open, onClose);
   if (!open) return null;
 
-  const queda = Math.round((fondo - gastado) * 100) / 100;
-  const reposicion = Math.round((fondo - queda) * 100) / 100;
-  const monto = (v: number) => (v < 0 ? `-$${fmt(Math.abs(v))}` : `$${fmt(v)}`);
+  // Las MISMAS cuentas que la lista, el encabezado, el papel y el Excel.
+  const queda = saldoDelPeriodo(fondo, gastado);
+  const reposicion = reposicionDelPeriodo(fondo, gastado);
+  const monto = montoEnPantalla;
 
   const filas: Array<{ label: string; value: number; negativo?: boolean }> = [
     { label: "Fondo", value: fondo },
     { label: `Gastado (${recibos} ${recibos === 1 ? "recibo" : "recibos"})`, value: gastado },
-    { label: "Queda en caja", value: queda, negativo: queda < 0 },
+    { label: "Queda en caja", value: queda, negativo: saldoEsNegativo(queda) },
     { label: `Reposición para volver a $${fmt(fondo)}`, value: reposicion },
   ];
 
@@ -53,7 +55,7 @@ export default function CerrarPeriodoModal({ open, onClose, onConfirm, fondo, ga
             </div>
           ))}
         </div>
-        {queda < 0 && (
+        {saldoEsNegativo(queda) && (
           <p className="text-xs mb-2" style={{ color: "var(--caja-danger-onSoft)" }}>
             Se gastó más que el fondo.
           </p>

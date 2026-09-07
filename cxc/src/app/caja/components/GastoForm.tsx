@@ -1,7 +1,6 @@
 "use client";
 
 import { ReactNode, useState, type CSSProperties } from "react";
-import { CajaResponsable } from "./types";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 
 // Estilo que iguala el look de los <select> nativos de Caja para los
@@ -32,7 +31,6 @@ export interface GastoFormValues {
   gSubtotal: string;
   gItbmsPct: string;
   gCategoria: string;
-  gResponsableId: string;
 }
 
 export interface GastoFormSetters {
@@ -43,7 +41,6 @@ export interface GastoFormSetters {
   setGSubtotal: (v: string) => void;
   setGItbmsPct: (v: string) => void;
   setGCategoria: (v: string) => void;
-  setGResponsableId: (v: string) => void;
 }
 
 export function normalizeStr(s: string): string {
@@ -58,13 +55,14 @@ interface Props {
   subtotalNum: number;
   totalNum: number;
   categorias: string[];
-  responsablesCatalog: CajaResponsable[];
   showManageCat: boolean;
   newCatName: string;
   isOwner: boolean;
   setCategorias: (v: string[]) => void;
   setShowManageCat: (v: boolean) => void;
   setNewCatName: (v: string) => void;
+  /** La foto del recibo: opcional, se arrastra o se toca. Lo pone el llamador. */
+  zonaFotos?: ReactNode;
 }
 
 /* ---------- Layout primitives ---------- */
@@ -320,12 +318,22 @@ const CATEGORIA_KEYWORDS: { cat: string; kws: string[] }[] = [
   { cat: "Mantenimiento", kws: ["ferreteria", "ferretería", "tornillo", "herramienta", "reparacion", "reparación", "mantenimiento", "pintura", "bombillo", "foco"] },
 ];
 
+/** Sin acentos y en minúsculas, para comparar. */
+function sinAcentos(v: string): string {
+  return v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 function suggestCategoria(desc: string, categorias: string[]): string | null {
   const d = desc.toLowerCase();
   if (d.trim().length < 3) return null;
   for (const { cat, kws } of CATEGORIA_KEYWORDS) {
     if (kws.some((k) => d.includes(k))) {
-      const match = categorias.find((c) => c.toLowerCase() === cat.toLowerCase());
+      // 🩸 Se comparaba CON acentos: la lista de arriba dice «Alimentacion» y
+      // la categoría real es «Alimentación», así que la regla de «comida» NO
+      // podía dispararse nunca. Medido: de 10 gastos en «Transporte», 3 dicen
+      // comida; de 18 en «Otros», 5. Sigue siendo una PRESELECCIÓN — se cambia
+      // de un toque y nunca fuerza nada.
+      const match = categorias.find((c) => sinAcentos(c) === sinAcentos(cat));
       if (match) return match;
     }
   }
@@ -340,23 +348,21 @@ export default function GastoForm({
   subtotalNum,
   totalNum,
   categorias,
-  responsablesCatalog,
   showManageCat,
   newCatName,
   isOwner,
   setCategorias,
   setShowManageCat,
   setNewCatName,
+  zonaFotos,
 }: Props) {
   const {
     gFecha, gDescripcion, gProveedor, gNroFactura,
     gSubtotal, gItbmsPct, gCategoria,
-    gResponsableId,
   } = values;
   const {
     setGFecha, setGDescripcion, setGProveedor, setGNroFactura,
     setGSubtotal, setGItbmsPct, setGCategoria,
-    setGResponsableId,
   } = setters;
 
   const [catError, setCatError] = useState<string | null>(null);
@@ -441,6 +447,11 @@ export default function GastoForm({
 
       {/* Clasificación */}
       <Section eyebrow="Clasificación">
+        {/* 🔴 EL GASTO NO LLEVA RESPONSABLE (7-sep-2026). Daniel: «no deberían
+            de haber 2 nombres en un gasto, solo uno». La responsable es la
+            dueña del PERÍODO, se elige una vez al abrirlo y se reconoce por su
+            código de colaborador. Aquí quedaba el nombre escrito a mano, con
+            tres formas para la misma persona. */}
         <div
           style={{
             display: "grid",
@@ -449,17 +460,6 @@ export default function GastoForm({
           }}
           className="caja-grid-clasif"
         >
-          <Field label="Responsable" required>
-            <SearchableSelect
-              value={gResponsableId}
-              onChange={setGResponsableId}
-              options={responsablesCatalog.map((r) => ({ value: r.id, label: r.nombre }))}
-              placeholder="Buscar responsable…"
-              ariaLabel="Responsable"
-              style={cajaInputStyle}
-              focusStyle={cajaInputFocusStyle}
-            />
-          </Field>
           <Field label="Categoría" required>
             <SearchableSelect
               value={gCategoria}
@@ -471,6 +471,11 @@ export default function GastoForm({
               focusStyle={cajaInputFocusStyle}
             />
           </Field>
+          {zonaFotos && (
+            <Field label="Foto del recibo">
+              {zonaFotos}
+            </Field>
+          )}
         </div>
         {isOwner && (
           <div style={{ marginTop: 12 }}>

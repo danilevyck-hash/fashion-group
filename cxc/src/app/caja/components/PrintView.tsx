@@ -3,6 +3,8 @@
 import { fmt, fmtDate } from "@/lib/format";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { CajaPeriodo } from "./types";
+import { reposicionDelPeriodo, saldoDelPeriodo, sumaMontos, totalGastado } from "@/lib/caja/dinero";
+import { etiquetaResponsable } from "@/lib/caja/responsable";
 
 interface Props {
   current: CajaPeriodo;
@@ -11,13 +13,24 @@ interface Props {
 
 export default function PrintView({ current, onBack }: Props) {
   const gastos = current.caja_gastos || [];
-  const totalGastado = gastos.reduce((s, g) => s + (g.total || 0), 0);
-  const totalSubtotal = gastos.reduce((s, g) => s + (g.subtotal || 0), 0);
-  const totalItbms = gastos.reduce((s, g) => s + (g.itbms || 0), 0);
-  const saldo = current.fondo_inicial - totalGastado;
-  // Responsable a nivel período (derivado de los gastos), no por gasto.
-  const responsablesPeriodo = [...new Set(gastos.map((g) => (g.responsable || "").trim()).filter(Boolean))];
-  const responsableLabel = responsablesPeriodo.length ? responsablesPeriodo.join(", ") : "—";
+  // Todo redondeado a centavos: la suma en coma flotante ponía el papel del
+  // período Nº2 en «−$0.00», en rojo, con la caja cuadrada al centavo.
+  const gastado = totalGastado(gastos);
+  const totalSubtotal = sumaMontos(gastos.map((g) => g.subtotal));
+  const totalItbms = sumaMontos(gastos.map((g) => g.itbms));
+  const saldo = saldoDelPeriodo(current.fondo_inicial, gastos);
+  // 🔴 Cuánto hay que reponer para que la caja vuelva a su fondo. El modal de
+  // cierre ya lo decía; el papel —el que lleva «Preparado por / Aprobado por»,
+  // el que se firma— no. Misma función que el modal: una sola cuenta.
+  const aReponer = reposicionDelPeriodo(current.fondo_inicial, gastos);
+  // 🔴 La responsable es del PERÍODO y sale de Asistencia por su código. Antes
+  // se derivaba de los gastos y este papel listaba TRES personas donde hay una
+  // («Angela Garcia» · «Angela garcia» · «Angela garciia»).
+  const responsableLabel = etiquetaResponsable(
+    current.responsable_empleado_codigo
+      ? { codigo: String(current.responsable_empleado_codigo), nombre: current.responsable_nombre || "" }
+      : null,
+  ) || "—";
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -77,6 +90,9 @@ export default function PrintView({ current, onBack }: Props) {
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
                 Categoría
               </th>
+              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
+                N° Factura
+              </th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">
                 Sub-total
               </th>
@@ -103,6 +119,9 @@ export default function PrintView({ current, onBack }: Props) {
                 <td className="border border-gray-300 px-2 py-1">
                   {g.categoria || "Varios"}
                 </td>
+                <td className="border border-gray-300 px-2 py-1">
+                  {g.nro_factura?.trim() || "—"}
+                </td>
                 <td className="border border-gray-300 px-2 py-1 text-right">
                   ${fmt(g.subtotal)}
                 </td>
@@ -116,7 +135,7 @@ export default function PrintView({ current, onBack }: Props) {
             ))}
             <tr className="font-bold">
               <td
-                colSpan={4}
+                colSpan={5}
                 className="border border-gray-300 px-2 py-1.5 text-right uppercase"
               >
                 Totales
@@ -128,17 +147,22 @@ export default function PrintView({ current, onBack }: Props) {
                 ${fmt(totalItbms)}
               </td>
               <td className="border border-gray-300 px-2 py-1.5 text-right">
-                ${fmt(totalGastado)}
+                ${fmt(gastado)}
               </td>
             </tr>
           </tbody>
         </table>
 
-        <div className="text-sm font-bold mb-8">
-          Saldo Final:{" "}
-          <span className={saldo < 0 ? "text-red-600" : ""}>
-            ${fmt(saldo)}
-          </span>
+        <div className="text-sm mb-8 space-y-1">
+          <div className="font-bold">
+            Saldo Final:{" "}
+            <span className={saldo < 0 ? "text-red-600" : ""}>
+              ${fmt(saldo)}
+            </span>
+          </div>
+          <div className="font-bold">
+            A reponer: <span>${fmt(aReponer)}</span>
+          </div>
         </div>
 
         <div className="mt-16 text-sm flex justify-between">

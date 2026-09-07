@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { CajaPeriodo, CajaGasto, CajaResponsable } from "../components/types";
+import { centavos, totalGastado } from "@/lib/caja/dinero";
 
 function normalizeStr(s: string): string {
   const t = s.trim();
@@ -28,8 +29,10 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 async function fetchPeriodoDetail(id: string): Promise<CajaPeriodo> {
   const data = await fetchJson<CajaPeriodo>(`/api/caja/periodos/${id}?include_deleted=1`);
-  const gastos = data.caja_gastos || [];
-  data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
+  // 🩸 Redondeado a centavos: sumar los 26 recibos del período Nº2 en coma
+  // flotante daba 200.00000000000003, el saldo quedaba en −2.8e-14 y la
+  // pantalla lo pintaba EN ROJO con «−$0.00». La cuenta vive en un solo lugar.
+  data.total_gastado = totalGastado(data.caja_gastos || []);
   return data;
 }
 
@@ -48,16 +51,18 @@ export function useCajaState(opts?: UseCajaOptions) {
   // Errores de MUTACIÓN (escritura). Los errores de LECTURA salen de SWR y se
   // combinan abajo en `error`.
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [confirmClosePeriodo, setConfirmClosePeriodo] = useState<string | null>(null);
   const [confirmDeletePeriodoId, setConfirmDeletePeriodoId] = useState<string | null>(null);
   const [showNewPeriodoModal, setShowNewPeriodoModal] = useState(false);
   const [fondoInput, setFondoInput] = useState("200");
+  const [responsableInput, setResponsableInput] = useState("");
 
   // Cuál período está abierto en la vista de detalle. Lo setea loadDetail(id) →
   // cambia la clave SWR del detalle y dispara su fetch.
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  // Inline-edit state (still lives here because GastoTable edits in place)
+  // Inline-edit state (lo usan la tabla de escritorio Y la ficha del celular).
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
   const [editGasto, setEditGasto] = useState<Partial<CajaGasto>>({});
 
@@ -90,21 +95,13 @@ export function useCajaState(opts?: UseCajaOptions) {
         ? "No se pudieron cargar los responsables. Recarga la página."
         : null;
 
-  // Merge distinct categories/responsables from loaded gastos with managed lists
+  // Merge distinct categories from loaded gastos with the managed list.
   const allCategorias = useMemo(() => {
     const gastos = current?.caja_gastos || [];
     const fromGastos = gastos.map((g) => normalizeStr(g.categoria || "")).filter(Boolean);
     const merged = new Set([...categorias, ...fromGastos]);
     return Array.from(merged).sort((a, b) => a.localeCompare(b, "es"));
   }, [categorias, current]);
-
-  const allResponsables = useMemo(() => {
-    const gastos = current?.caja_gastos || [];
-    const fromGastos = gastos.map((g) => normalizeStr(g.responsable || "")).filter(Boolean);
-    const fromCatalog = responsablesCatalog.map((r) => r.nombre);
-    const merged = new Set([...fromCatalog, ...fromGastos]);
-    return Array.from(merged).sort((a, b) => a.localeCompare(b, "es"));
-  }, [responsablesCatalog, current]);
 
   const loadPeriodos = useCallback(async () => { await mutatePeriodos(); }, [mutatePeriodos]);
 
@@ -125,7 +122,12 @@ export function useCajaState(opts?: UseCajaOptions) {
   }, [globalMutate]);
 
   function createPeriodo() {
+    // El fondo arranca en $200: es lo que usan los 3 períodos de la historia.
+    // Se puede cambiar.
     setFondoInput("200");
+    // Con una sola responsable en el catálogo (hoy, Angela), viene puesta.
+    const conCodigo = responsablesCatalog.filter((r) => r.empleado_codigo);
+    setResponsableInput(conCodigo.length === 1 ? String(conCodigo[0].empleado_codigo) : "");
     setShowNewPeriodoModal(true);
   }
 
@@ -138,9 +140,16 @@ export function useCajaState(opts?: UseCajaOptions) {
       const res = await fetch("/api/caja/periodos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fondo_inicial: fondo }),
+        body: JSON.stringify({
+          fondo_inicial: fondo,
+          responsable_empleado_codigo: responsableInput || null,
+        }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        setError((payload && typeof payload.error === "string" ? payload.error : null) || "Error al crear período");
+        return null;
+      }
       const p = await res.json();
       loadPeriodos();
       return p.id as string;
@@ -158,18 +167,24 @@ export function useCajaState(opts?: UseCajaOptions) {
     if (!confirmClosePeriodo) return;
     const id = confirmClosePeriodo;
     setConfirmClosePeriodo(null);
+    setAviso(null);
     try {
       const res = await fetch(`/api/caja/periodos/${id}`, { method: "PATCH" });
       if (!res.ok) {
         const payload = await res.json().catch(() => null);
         const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
-        setError(backendMsg || "Error al cerrar periodo");
+        setError(backendMsg || "Error al cerrar período");
         return;
       }
+      // 🔴 El cierre ya no abre otro período a ciegas: si quedó uno abierto, el
+      // servidor no abre nada y DICE por qué.
+      const payload = await res.json().catch(() => null);
+      const motivo = payload && typeof payload.siguiente_motivo === "string" ? payload.siguiente_motivo : null;
+      if (motivo) setAviso(motivo);
       if (current?.id === id) await loadDetail(id);
       loadPeriodos();
     } catch {
-      setError("Error al cerrar periodo");
+      setError("Error al cerrar período");
     }
   }
 
@@ -187,18 +202,11 @@ export function useCajaState(opts?: UseCajaOptions) {
       if (current?.id === id) setCurrent(null);
       opts?.onPeriodoDeleted?.(id);
     } else {
-      setError("Error al eliminar período");
+      // 🔴 Un período con gastos no se elimina: el servidor dice por qué y esa
+      // frase es la que se lee, no un «Error al eliminar» pelado.
+      const payload = await res.json().catch(() => null);
+      setError((payload && typeof payload.error === "string" ? payload.error : null) || "Error al eliminar período");
     }
-  }
-
-  async function aprobarReposicion(id: string) {
-    const res = await fetch(`/api/caja/periodos/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "repuesto" }),
-    });
-    if (res.ok) { await loadDetail(id); loadPeriodos(); }
-    else setError("Error al aprobar reposición");
   }
 
   function requestDeleteGasto(gastoId: string) {
@@ -232,41 +240,15 @@ export function useCajaState(opts?: UseCajaOptions) {
     }
   }
 
-  // Restaurar va directo, sin confirmación: no tiene consecuencia que proteger
-  // (deshace un borrado, y el borrado sí se confirma).
-  async function doRestoreGasto(gasto: CajaGasto) {
-    if (!current) return;
-    const gastoId = gasto.id;
-    const periodoId = current.id;
-    try {
-      const res = await fetch(`/api/caja/gastos/${gastoId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "restore" }),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null);
-        const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
-        setError(backendMsg || "Error al restaurar gasto");
-        return;
-      }
-      await loadDetail(periodoId);
-      loadPeriodos();
-    } catch {
-      setError("Error al restaurar gasto");
-    }
-  }
-
   async function saveEditGasto() {
     if (!current || !editingGastoId) return;
-    const sub = parseFloat(String(editGasto.subtotal)) || 0;
-    const tax = Math.round((parseFloat(String(editGasto.itbms)) || 0) * 100) / 100;
-    const total = Math.round((sub + tax) * 100) / 100;
+    const sub = centavos(editGasto.subtotal);
+    const tax = centavos(editGasto.itbms);
+    const total = centavos(sub + tax);
     const normalizedEdit = {
       ...editGasto,
       subtotal: sub, itbms: tax, total,
       categoria: normalizeStr(editGasto.categoria || ""),
-      responsable: normalizeStr(editGasto.responsable || ""),
     };
     try {
       const res = await fetch(`/api/caja/gastos/${editingGastoId}`, {
@@ -329,18 +311,18 @@ export function useCajaState(opts?: UseCajaOptions) {
     periodos, loading, current, setCurrent,
     // Mutación tiene prioridad; si no, error de lectura (SWR).
     error: error ?? loadError,
+    aviso, setAviso,
     allCategorias,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
-    allResponsables,
+    responsableInput, setResponsableInput, responsablesCatalog,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     confirmClosePeriodo, setConfirmClosePeriodo,
     confirmDeletePeriodoId, setConfirmDeletePeriodoId,
     loadDetail, createPeriodo, confirmCreatePeriodo,
     requestClosePeriodo, doClosePeriodo,
     requestDeletePeriodo, doDeletePeriodo,
-    aprobarReposicion,
     requestDeleteGasto, saveEditGasto, quickUpdateCategoria, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
-    doRestoreGasto,
+    mutateDetail,
   };
 }

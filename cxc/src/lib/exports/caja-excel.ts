@@ -2,6 +2,7 @@
 // La route solo hace auth + fetch + workbookBuffer; esto es testeable en vitest.
 
 import XLSX from "xlsx-js-style";
+import { centavos, reposicionDelPeriodo, saldoDelPeriodo } from "@/lib/caja/dinero";
 import {
   CASA_PALETTE,
   MONEY_FMT,
@@ -27,7 +28,6 @@ export interface CajaGasto {
   proveedor?: string | null;
   categoria?: string | null;
   nro_factura?: string | null;
-  responsable?: string | null;
   subtotal?: number | null;
   itbms?: number | null;
   total?: number | null;
@@ -39,11 +39,13 @@ const SALDO_NEGATIVO = { fg: "DC2626", bg: "FEF2F2" };
 export function buildCajaWorkbook(periodo: CajaPeriodo, gastos: CajaGasto[]): XLSX.WorkBook {
   const fondo = periodo?.fondo_inicial || 200;
 
+  // Redondeado a centavos, igual que la pantalla y el papel: la misma suma en
+  // coma flotante daba 200.00000000000003 y pintaba un saldo negativo de nada.
   let totalSub = 0, totalItbms = 0, totalTotal = 0;
   const rows: ReportCell[][] = gastos.map((g) => {
-    totalSub += g.subtotal || 0;
-    totalItbms += g.itbms || 0;
-    totalTotal += g.total || 0;
+    totalSub = centavos(totalSub + centavos(g.subtotal));
+    totalItbms = centavos(totalItbms + centavos(g.itbms));
+    totalTotal = centavos(totalTotal + centavos(g.total));
     return [
       fmtFechaExcel(g.fecha),
       { v: g.descripcion || g.nombre || "", fg: "111111" },
@@ -134,7 +136,8 @@ function appendSaldoSummary(ws: XLSX.WorkSheet, fondo: number, totalTotal: numbe
   ws[addr(r, lastCol)] = num(totalTotal, totalTotal > fondo * 0.8 ? { fg: SALDO_NEGATIVO.fg } : {});
   heights[r] = 18; r++;
 
-  const saldo = fondo - totalTotal;
+  // MISMA cuenta que la pantalla, el modal de cierre y el papel: una sola vez.
+  const saldo = saldoDelPeriodo(fondo, totalTotal);
   const saldoColor = saldo > 0 ? SALDO_POSITIVO : SALDO_NEGATIVO;
   ws[addr(r, lastCol - 2)] = lbl("Saldo disponible:", true);
   ws[addr(r, lastCol)] = {
@@ -145,7 +148,13 @@ function appendSaldoSummary(ws: XLSX.WorkSheet, fondo: number, totalTotal: numbe
       border: B,
     },
   };
-  heights[r] = 20;
+  heights[r] = 20; r++;
+
+  // Cuánto hay que reponer para volver al fondo. Lo dicen el modal de cierre y
+  // el papel; el Excel también.
+  ws[addr(r, lastCol - 2)] = lbl("A reponer:", true);
+  ws[addr(r, lastCol)] = num(reposicionDelPeriodo(fondo, totalTotal), { bold: true });
+  heights[r] = 18;
 
   ws["!ref"] = `A1:${addr(r, lastCol)}`;
   ws["!rows"] = heights.map((h) => ({ hpt: h || 16 }));

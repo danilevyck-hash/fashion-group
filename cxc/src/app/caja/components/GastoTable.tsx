@@ -1,18 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { Fragment, useMemo, useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaGasto } from "./types";
 import AutocompleteInput from "./AutocompleteInput";
+import FichaGasto from "./FichaGasto";
+import ZonaFotos from "./ZonaFotos";
 import { EmptyState, ScrollableTable } from "@/components/ui";
+import { centavos, sumaMontos, totalGastado } from "@/lib/caja/dinero";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 
 interface Props {
   gastos: CajaGasto[];
   isOpen: boolean;
   categorias: string[];
-  responsables: string[];
   editingGastoId: string | null;
   editGasto: Partial<CajaGasto>;
   setEditingGastoId: (id: string | null) => void;
@@ -20,9 +21,7 @@ interface Props {
   onSaveEdit: () => void;
   onDeleteGasto: (id: string) => void;
   recentlyAddedIds?: Set<string>;
-  /** Link de fallback (deep-link) para "+ Nuevo gasto". Si viene onNuevoGasto, ese tiene prioridad. */
-  nuevoHref?: string;
-  /** Callback para abrir el Drawer inline de nuevo gasto (camino normal). */
+  /** Callback para abrir el Drawer inline de nuevo gasto (único camino de alta). */
   onNuevoGasto?: () => void;
   /** Cambio rápido de categoría desde el chip inline de la fila. */
   onQuickCategoria?: (gastoId: string, categoria: string) => void;
@@ -115,19 +114,20 @@ export default function GastoTable({
   onSaveEdit,
   onDeleteGasto,
   recentlyAddedIds = new Set(),
-  nuevoHref,
   onNuevoGasto,
   onQuickCategoria,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [showFiscal, setShowFiscal] = useState(false);
   const [quickCatId, setQuickCatId] = useState<string | null>(null);
+  // Qué gasto tiene abierta su foto del recibo (una fila extra bajo la suya).
+  const [fotosDeGasto, setFotosDeGasto] = useState<string | null>(null);
 
   const catTotals = useMemo(() => {
     const map: Record<string, number> = {};
     for (const g of gastos) {
       const cat = g.categoria || "Sin categoría";
-      map[cat] = (map[cat] || 0) + (g.total || 0);
+      map[cat] = centavos((map[cat] || 0) + centavos(g.total));
     }
     return map;
   }, [gastos]);
@@ -135,18 +135,15 @@ export default function GastoTable({
     () => Object.entries(catTotals).sort((a, b) => b[1] - a[1]),
     [catTotals],
   );
-  const grandTotal = useMemo(
-    () => gastos.reduce((s, g) => s + (g.total || 0), 0),
-    [gastos],
-  );
+  const grandTotal = useMemo(() => totalGastado(gastos), [gastos]);
 
   const filteredGastos = useMemo(
     () => (selectedCat ? gastos.filter((g) => (g.categoria || "Sin categoría") === selectedCat) : gastos),
     [gastos, selectedCat],
   );
-  const totalSubtotal = filteredGastos.reduce((s, g) => s + (g.subtotal || 0), 0);
-  const totalItbms = filteredGastos.reduce((s, g) => s + (g.itbms || 0), 0);
-  const totalGastado = filteredGastos.reduce((s, g) => s + (g.total || 0), 0);
+  const totalSubtotal = sumaMontos(filteredGastos.map((g) => g.subtotal));
+  const totalItbms = sumaMontos(filteredGastos.map((g) => g.itbms));
+  const totalDelFiltro = totalGastado(filteredGastos);
 
   // Display newest first so a freshly entered gasto lands on top.
   const sortedGastos = [...filteredGastos].reverse();
@@ -158,7 +155,6 @@ export default function GastoTable({
       descripcion: g.descripcion || g.nombre,
       proveedor: g.proveedor || "",
       nro_factura: g.nro_factura || "",
-      responsable: g.responsable || "",
       categoria: g.categoria || "Varios",
       subtotal: g.subtotal,
       itbms: g.itbms,
@@ -168,6 +164,10 @@ export default function GastoTable({
   function rowMenuItems(g: CajaGasto) {
     return [
       { label: "Editar", onClick: () => startEdit(g) },
+      {
+        label: (g.fotos ?? 0) > 0 ? `Foto del recibo (${g.fotos})` : "Foto del recibo",
+        onClick: () => setFotosDeGasto(fotosDeGasto === g.id ? null : g.id),
+      },
       { label: "Eliminar", onClick: () => onDeleteGasto(g.id), destructive: true },
     ];
   }
@@ -202,14 +202,6 @@ export default function GastoTable({
           >
             <PlusIcon /> Nuevo gasto
           </button>
-        ) : nuevoHref ? (
-          <Link
-            href={nuevoHref}
-            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-transform active:scale-[0.97]"
-            style={{ background: "var(--caja-accent)", color: "#fff" }}
-          >
-            <PlusIcon /> Nuevo gasto
-          </Link>
         ) : null}
       </div>
 
@@ -251,43 +243,20 @@ export default function GastoTable({
         ) : (
           <>
             {sortedGastos.map((g) => (
-              <div
+              <FichaGasto
                 key={g.id}
-                data-gasto-fila={g.id}
-                className={`rounded-lg p-4 ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
-                style={{
-                  background: "var(--caja-bg-surface)",
-                  border: "1px solid var(--caja-border-subtle)",
-                }}
-              >
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <p
-                    className="text-sm font-medium truncate flex-1"
-                    style={{ color: "var(--caja-fg-strong)" }}
-                    data-gasto-campo="descripcion"
-                  >
-                    {g.descripcion || g.nombre || "—"}
-                  </p>
-                  <p className="caja-money caja-money-strong text-sm whitespace-nowrap" data-gasto-campo="total">
-                    ${fmt(g.total)}
-                  </p>
-                  {isOpen && (
-                    <div className="-my-2 -mr-2">
-                      <OverflowMenu items={rowMenuItems(g)} />
-                    </div>
-                  )}
-                </div>
-                <div className="mb-1" data-gasto-campo="categoria">
-                  <CategoryDot categoria={g.categoria || "Varios"} />
-                </div>
-                <p
-                  className="text-xs caja-mono"
-                  style={{ color: "var(--caja-fg-subtle)" }}
-                >
-                  {fmtDate(g.fecha)}
-                  {g.proveedor && ` · ${g.proveedor}`}
-                </p>
-              </div>
+                gasto={g}
+                isOpen={isOpen}
+                categorias={categorias}
+                editando={editingGastoId === g.id}
+                editGasto={editGasto}
+                setEditGasto={setEditGasto}
+                onEditar={() => startEdit(g)}
+                onCancelar={() => setEditingGastoId(null)}
+                onGuardar={onSaveEdit}
+                onEliminar={() => onDeleteGasto(g.id)}
+                resaltado={recentlyAddedIds.has(g.id)}
+              />
             ))}
             <div
               className="pt-3 flex items-center justify-between"
@@ -295,7 +264,7 @@ export default function GastoTable({
             >
               <span className="caja-eyebrow">Total</span>
               <span className="caja-money caja-money-strong text-sm">
-                ${fmt(totalGastado)}
+                ${fmt(totalDelFiltro)}
               </span>
             </div>
           </>
@@ -440,8 +409,8 @@ export default function GastoTable({
                         )}
                       </tr>
                     ) : (
+                      <Fragment key={g.id}>
                       <tr
-                        key={g.id}
                         data-gasto-fila={g.id}
                         className={`transition-colors ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
                         style={{
@@ -525,6 +494,16 @@ export default function GastoTable({
                           </td>
                         )}
                       </tr>
+                      {/* La foto del recibo, en una fila que se abre debajo de
+                          la suya: opcional, se arrastra o se toca. */}
+                      {fotosDeGasto === g.id && (
+                        <tr style={{ background: "var(--caja-bg-page)" }}>
+                          <td colSpan={dataCols + (isOpen ? 1 : 0)} className="px-4 py-3">
+                            <ZonaFotos gastoId={g.id} soloVer={!isOpen} />
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     ),
                   )}
                   {/* Totals row */}
@@ -546,7 +525,7 @@ export default function GastoTable({
                       </>
                     )}
                     <td className="py-3 px-4 text-right caja-money caja-money-strong">
-                      ${fmt(totalGastado)}
+                      ${fmt(totalDelFiltro)}
                     </td>
                     {isOpen && <td />}
                   </tr>

@@ -3,6 +3,7 @@
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaPeriodo } from "./types";
 import OverflowMenu, { OverflowMenuItem } from "@/components/ui/OverflowMenu";
+import { etiquetaResponsable } from "@/lib/caja/responsable";
 
 interface Props {
   current: CajaPeriodo;
@@ -13,22 +14,10 @@ interface Props {
   onClosePeriodo?: () => void;
   onPrint?: () => void;
   onExportExcel?: () => void;
-  onAprobarReposicion?: (id: string) => void;
   /** Count shown beside the "Ver gastos eliminados" menu entry. */
   deletedCount?: number;
   /** When provided and deletedCount > 0, the menu entry appears. */
   onViewDeleted?: () => void;
-}
-
-function fmtRepuestoDate(iso: string | null): string {
-  if (!iso) return "";
-  try {
-    return new Date(iso)
-      .toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" })
-      .replace(".", "");
-  } catch {
-    return "";
-  }
 }
 
 function StatusPill({ open, fechaCierre }: { open: boolean; fechaCierre: string | null }) {
@@ -159,29 +148,21 @@ export default function PeriodoDetailHeader({
   onClosePeriodo,
   onPrint,
   onExportExcel,
-  onAprobarReposicion,
   deletedCount,
   onViewDeleted,
 }: Props) {
   const isOpen = current.estado === "abierto";
   const fondoInicial = current.fondo_inicial;
 
-  const daysSinceOpen = isOpen
-    ? Math.floor((Date.now() - new Date(current.fecha_apertura).getTime()) / (24 * 60 * 60 * 1000))
-    : 0;
-
-  // Responsable a NIVEL PERÍODO (derivado de los gastos): aparece una sola vez
-  // en el encabezado en lugar de repetirse por gasto. El dato por gasto se
-  // sigue guardando en DB.
-  const responsablesPeriodo = [
-    ...new Set((current.caja_gastos || []).map((g) => (g.responsable || "").trim()).filter(Boolean)),
-  ];
-  const responsableLabel =
-    responsablesPeriodo.length === 0
-      ? null
-      : responsablesPeriodo.length === 1
-        ? responsablesPeriodo[0]
-        : `${responsablesPeriodo[0]} +${responsablesPeriodo.length - 1}`;
+  // 🔴 La responsable es del PERÍODO y sale de Asistencia por su código
+  // (Angela = 7). Antes se derivaba de los gastos, donde el nombre estaba
+  // escrito de tres formas distintas y se leía como tres personas.
+  // Sin código puesto no se dice nada: no se inventa a quién pertenece.
+  const responsableLabel = etiquetaResponsable(
+    current.responsable_empleado_codigo
+      ? { codigo: String(current.responsable_empleado_codigo), nombre: current.responsable_nombre || "" }
+      : null,
+  );
 
   // Used percentage (0 → 100). pctUsed (passed in) is the *remaining* percentage.
   const pctSpent = fondoInicial > 0 ? (totalGastado / fondoInicial) * 100 : 0;
@@ -196,9 +177,6 @@ export default function PeriodoDetailHeader({
   const menuItems: OverflowMenuItem[] = [
     ...(onPrint ? [{ label: "Imprimir", onClick: onPrint }] : []),
     ...(onExportExcel ? [{ label: "Descargar Excel", onClick: onExportExcel }] : []),
-    ...(!isOpen && !current.repuesto && onAprobarReposicion
-      ? [{ label: "Aprobar reposición", onClick: () => onAprobarReposicion(current.id) }]
-      : []),
     ...(onViewDeleted && (deletedCount ?? 0) > 0
       ? [{ label: `Ver gastos eliminados (${deletedCount})`, onClick: onViewDeleted }]
       : []),
@@ -237,25 +215,6 @@ export default function PeriodoDetailHeader({
             {responsableLabel && (
               <span className="text-xs" style={{ color: "var(--caja-fg-muted)" }}>
                 Responsable: <span style={{ color: "var(--caja-fg-default)", fontWeight: 500 }}>{responsableLabel}</span>
-              </span>
-            )}
-            {isOpen && daysSinceOpen > 30 && (
-              <span
-                className="text-xs"
-                style={{
-                  color: "var(--caja-warning-onSoft)",
-                  fontWeight: 500,
-                }}
-              >
-                {daysSinceOpen} días abierto
-              </span>
-            )}
-            {!isOpen && current.repuesto && current.repuesto_at && (
-              <span
-                className="text-xs"
-                style={{ color: "var(--caja-success-onSoft)", fontWeight: 500 }}
-              >
-                Repuesto ✓ {fmtRepuestoDate(current.repuesto_at)}
               </span>
             )}
           </div>

@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { ConfirmModal } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
+import { centavos, saldoDelPeriodo, totalGastado } from "@/lib/caja/dinero";
 
 import { useCajaState } from "../hooks/useCajaState";
 import PeriodoDetailHeader from "../components/PeriodoDetailHeader";
@@ -44,19 +44,14 @@ export default function PeriodoDetailPage() {
   }, [drawerOpen]);
 
   const {
-    current, error,
+    current, error, aviso,
     allCategorias,
-    allResponsables,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     confirmClosePeriodo, setConfirmClosePeriodo,
-    confirmDeletePeriodoId, setConfirmDeletePeriodoId,
     loadDetail,
     requestClosePeriodo, doClosePeriodo,
-    requestDeletePeriodo, doDeletePeriodo,
-    aprobarReposicion,
     requestDeleteGasto, saveEditGasto, quickUpdateCategoria, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
-    doRestoreGasto,
   } = useCajaState({ authReady: authChecked, onPeriodoDeleted: () => router.push("/caja") });
 
   useEffect(() => {
@@ -82,9 +77,11 @@ export default function PeriodoDetailPage() {
   }
 
   const detailGastos = current.caja_gastos || [];
-  const detailTotalGastado = detailGastos.reduce((s, g) => s + (Number(g.total) || 0), 0);
-  const detailFondoInicial = Number(current.fondo_inicial) || 0;
-  const detailSaldo = detailFondoInicial - detailTotalGastado;
+  // 🩸 Redondeado a centavos: sumar los 26 recibos del período Nº2 en coma
+  // flotante daba 200.00000000000003 y el saldo salía en rojo con «−$0.00».
+  const detailTotalGastado = totalGastado(detailGastos);
+  const detailFondoInicial = centavos(current.fondo_inicial);
+  const detailSaldo = saldoDelPeriodo(detailFondoInicial, detailGastos);
   const detailIsOpen = current.estado === "abierto";
   const detailPctUsed = detailFondoInicial > 0 ? (detailSaldo / detailFondoInicial) * 100 : 100;
 
@@ -104,12 +101,23 @@ export default function PeriodoDetailPage() {
           onClosePeriodo={detailIsOpen ? () => requestClosePeriodo(current.id) : undefined}
           onPrint={() => router.push(`/caja/${current.id}/imprimir`)}
           onExportExcel={exportExcel}
-          onAprobarReposicion={aprobarReposicion}
           deletedCount={(current.deleted_gastos || []).length}
           onViewDeleted={() => setShowDeletedModal(true)}
         />
 
         <div className="max-w-6xl mx-auto px-5 sm:px-9 pt-6 pb-14">
+          {aviso && !error && (
+            <p
+              className="text-sm mb-4 px-3 py-2 rounded-md"
+              style={{
+                color: "var(--caja-warning-onSoft)",
+                background: "var(--caja-warning-soft)",
+                border: "1px solid var(--caja-warning-border)",
+              }}
+            >
+              {aviso}
+            </p>
+          )}
           {error && (
             <p
               className="text-sm mb-4 px-3 py-2 rounded-md"
@@ -127,7 +135,6 @@ export default function PeriodoDetailPage() {
             gastos={detailGastos}
             isOpen={!!detailIsOpen}
             categorias={allCategorias}
-            responsables={allResponsables}
             editingGastoId={editingGastoId}
             editGasto={editGasto}
             setEditingGastoId={setEditingGastoId}
@@ -144,7 +151,14 @@ export default function PeriodoDetailPage() {
         <NuevoGastoDrawer
           open={drawerOpen}
           onClose={closeGastoDrawer}
-          periodo={{ id: current.id, fondo_inicial: detailFondoInicial }}
+          periodo={{
+            id: current.id,
+            numero: current.numero,
+            fondo_inicial: detailFondoInicial,
+            fecha_apertura: current.fecha_apertura,
+            fecha_cierre: current.fecha_cierre,
+            gastos: detailGastos,
+          }}
           totalGastado={detailTotalGastado}
           isOwner={isOwner}
           onSaved={({ keepOpen }) => {
@@ -158,8 +172,6 @@ export default function PeriodoDetailPage() {
         open={showDeletedModal}
         onClose={() => setShowDeletedModal(false)}
         deletedGastos={current.deleted_gastos || []}
-        periodOpen={!!detailIsOpen}
-        onRestore={doRestoreGasto}
       />
 
       <CerrarPeriodoModal
@@ -171,15 +183,6 @@ export default function PeriodoDetailPage() {
         recibos={detailGastos.length}
         siguienteNumero={current.numero + 1}
       />
-      <ConfirmModal
-        open={!!confirmDeletePeriodoId}
-        onClose={() => setConfirmDeletePeriodoId(null)}
-        onConfirm={doDeletePeriodo}
-        title="Eliminar período"
-        message="¿Eliminar este período y todos sus gastos? Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-        destructive
-      />
       {pendingDeleteGasto && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" {...deleteBackdrop}>
           {/* El cuadro ya no necesita stopPropagation: el hook solo cierra si el
@@ -187,7 +190,7 @@ export default function PeriodoDetailPage() {
           <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
             <h3 className="text-base font-medium mb-3">¿Eliminar este gasto?</h3>
             <p className="text-sm text-gray-800 mb-2">
-              Gasto &ldquo;{pendingDeleteGasto.descripcion?.trim() || "Sin descripción"}&rdquo; · ${fmt(pendingDeleteGasto.total)} · {pendingDeleteGasto.categoria || "Sin categoría"} · {pendingDeleteGasto.responsable || "Sin responsable"} · {fmtDate(pendingDeleteGasto.fecha)}
+              Gasto &ldquo;{pendingDeleteGasto.descripcion?.trim() || "Sin descripción"}&rdquo; · ${fmt(pendingDeleteGasto.total)} · {pendingDeleteGasto.categoria || "Sin categoría"} · {pendingDeleteGasto.proveedor || "Sin proveedor"} · {fmtDate(pendingDeleteGasto.fecha)}
             </p>
             <p className="text-xs text-gray-500 mb-6">
               Podrás restaurarlo desde Gastos eliminados si es un error.
