@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, destinosSummary } from "./constants";
@@ -27,10 +27,6 @@ import { observacionesVisibles } from "@/lib/guias/observaciones";
 import { partirGuiasPorVentana } from "@/lib/guias/ventana-lista";
 import { separarPendientes, resumenPendientes } from "@/lib/guias/pendientes-arriba";
 import { cedulaParaMostrar } from "@/lib/guias/cedula";
-// ⚠️ `png-guia` NO arrastra jsPDF (el generador del PDF sigue detrás del
-// `await import` de `papel-de-la-guia`), así que esto se puede importar
-// directo sin engordar la carga inicial de la lista.
-import { precargarFirmasGuia } from "@/lib/guias/png-guia";
 
 /**
  * 🔴 LA GUÍA QUE SALIÓ SIN EL N° DEL TRANSPORTISTA, DICHO EN LA LISTA.
@@ -348,15 +344,11 @@ export default function GuiasList({
   }
 
   /**
-   * 🔑 Las firmas de la guía abierta, decodificadas ANTES del clic. Desde el
-   * 5-sep-2026 «Compartir» manda una IMAGEN cuando la guía tiene hasta 6
-   * renglones, y dibujarla es síncrono a propósito: en iOS un `await` en el
-   * medio le quita el gesto a la hoja de compartir.
+   * 🔄 9-SEP-2026 — SE FUE LA PRECARGA DE FIRMAS. Servía a la IMAGEN que
+   * «Compartir» mandaba en el celular; desde que todo sale en PDF (Daniel:
+   * *«en guía, quiero todo PDF, quita lo de PNG que lo enredó»*) las firmas las
+   * pinta jsPDF desde el `data:` guardado, sin esperar nada.
    */
-  useEffect(() => {
-    if (!expandedGuia) return;
-    precargarFirmasGuia(expandedGuia);
-  }, [expandedGuia]);
 
   /**
    * 🔴 EL PAPEL DE **UNA** GUÍA: imprimir o compartir, de un toque.

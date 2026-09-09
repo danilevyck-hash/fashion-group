@@ -193,19 +193,33 @@ describe("🔴 la flecha AGREGA un camino; no reemplaza ninguno", () => {
   });
 
   it("🔴 son los MISMOS archivos de siempre: no hay un generador nuevo", () => {
+    // 🔄 9-SEP-2026 — la mitad del PAPEL cambió de dirección, no se borró.
+    // Decía `ImpresionComision` (la hoja HTML que se mandaba a `window.print()`).
+    // Daniel: *«¿no podemos hacer un botón de PDF, ya que de PDF en la compu
+    // paso a imprimir?»* — ahora el papel es el PDF de `pdf-comision`, y la
+    // regla es la misma: el archivo de la flecha y el de adentro del detalle
+    // salen del MISMO generador.
     const motor = plano(leer("src/components/ventas/comisiones-detalle/useDescargaComision.tsx"));
     expect(motor).toContain("exportComisionDetalle");
-    expect(motor).toContain("ImpresionComision");
+    expect(motor).toContain("descargarPdfComision");
+    const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
+    expect(modal).toContain("descargarPdfComision");
     // Y la MISMA lectura que hace el detalle, con los mismos parámetros.
     expect(motor).toContain("/api/ventas/comisiones/detalle?");
     expect(motor).toContain("/api/ventas/comisiones/descuentos?");
   });
 
-  it("🩸 y SOLO se imprime el papel que se pidió, aunque el detalle esté abierto", () => {
-    // Con el detalle abierto su hoja también está montada en <body>: sin esto,
-    // el PDF de una empresa traería el reporte de otra atrás.
-    expect(plano(leer("src/components/ventas/comisiones-detalle/useDescargaComision.tsx")))
-      .toContain("body > [data-cds-print]:not([data-cds-lote]) { display: none !important; }");
+  it("🩸 y SOLO sale el reporte que se pidió, aunque el detalle esté abierto", () => {
+    // 🔄 9-SEP-2026 — CAMBIA DE DIRECCIÓN. La regla es la misma y el defecto es
+    // el mismo (el PDF de una empresa se llevaba el reporte de otra pegado
+    // atrás); lo que cambió es que ya no hace falta taparlo con CSS: el PDF se
+    // arma SOLO con las hojas que se le pasan, así que nada montado en <body>
+    // puede colarse. Se exige que el motor no lea el DOM.
+    const motor = plano(leer("src/components/ventas/comisiones-detalle/useDescargaComision.tsx"));
+    expect(motor).not.toContain("createPortal");
+    expect(motor).not.toContain("document.body");
+    expect(motor).not.toContain("window.print");
+    // CONTROL: el papel del MES sigue siendo HTML impreso, y su guardia se queda.
     expect(plano(leer("src/components/ventas/comisiones-detalle/ImpresionTablaComisiones.tsx")))
       .toContain("body > [data-cds-print]:not([data-cds-tabla]) { display: none !important; }");
   });

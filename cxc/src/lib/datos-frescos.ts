@@ -4,6 +4,29 @@
 // Regla aprobada el 30-jul-2026: avisar si la **cartera** o las **ventas** llevan
 // más de **24 horas** sin actualizarse. Nada más.
 //
+// 🩸 LOS PAGOS ENTRARON EL 9-sep-2026 — LA PLATA QUE ENTRA NO LA VIGILABA NADIE.
+// Daniel, textual: «Siempre que me llega un telegrama me dices que es falsa
+// alarma. Quiero que me lleguen de veras.» No es una cuarta regla: es un dato más
+// de ésta, con el MISMO umbral de 24 h, el MISMO dedup de 20 h, la MISMA pasada
+// de la reconciliación. Cero crons nuevos, cero DDL.
+//   • Por qué NO va por la alerta B (silencio de escritura): medido el 9-sep-2026,
+//     con las 4 pasadas del día corridas y todo sano, `switch_recibos` llevaba
+//     **319 h sin una escritura en active_wear**, 151 en joystep y 123 en
+//     active_shoes — el sync escribe por DIFERENCIA, así que una empresa sin
+//     cobros nuevos no escribe nada estando perfecta. Backtest de B con 40 h:
+//     26 mensajes en 90 días, TODOS falsos.
+//   • Por qué SÍ va por la regla 1: no mira la tabla, mira la última CORRIDA
+//     EXITOSA del sync. Backtest de 90 días: **6 mensajes, los 6 con una fila en
+//     `error` detrás** (13, 16, 20, 21, 23 y 25-jun-2026). Como comparten mensaje
+//     y dedup con las ventas, el costo MARGINAL real es **1 mensaje más en 90
+//     días**: los otros 5 días el aviso salía igual y los pagos solo agregan una
+//     línea. El 16-jun las ventas estaban bien y los cobros parados — ese día
+//     nadie dijo nada.
+//   • Y el agujero era real: de esas 6 averías la regla 2 avisó UNA sola
+//     (active_shoes, 21-jun, dos fallos seguidos). Las otras cinco fueron un
+//     tropiezo suelto que nunca llegó a dos, mientras los cobros de active_shoes
+//     estuvieron 72 h sin llegar (19 al 22-jun).
+//
 // 🩸 POR QUÉ REEMPLAZA AL WATCHDOG DE HEARTBEATS. El vigía viejo alertaba por
 // CRON: "⏰ Watchdog crons — N sin success reciente: switch-sync:all-0630". Eso
 // mide el mecanismo, no el resultado, y se equivoca en las DOS direcciones:
@@ -26,6 +49,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import {
   empresasConEstadoCuenta,
   empresasConFacturas,
+  empresasConRecibos,
 } from "@/lib/switch-api/empresas";
 
 /**
@@ -50,13 +74,15 @@ export const HORAS_ENTRE_AVISOS = 20;
 /** `tipo` con el que se registra en `cron_email_errors` (llave del dedup). */
 export const TIPO_DATO_VIEJO = "dato_viejo";
 
-/** Los dos datos que Daniel mira y que esta regla vigila. */
-export type Dato = "cartera" | "ventas";
+/** Los TRES datos que Daniel mira y que esta regla vigila. */
+export type Dato = "cartera" | "ventas" | "pagos";
 
-/** Cómo se llama cada dato cuando se lo nombra en un mensaje. */
+/** Cómo se llama cada dato cuando se lo nombra en un mensaje. Es la palabra de
+ *  Daniel, no la nuestra: él dice «pagos», no «recibos» ni «cobros». */
 const NOMBRE: Record<Dato, string> = {
   cartera: "la cartera (lo que te deben)",
   ventas: "las ventas",
+  pagos: "los pagos (la plata que te entra)",
 };
 
 /**
@@ -73,6 +99,14 @@ const NOMBRE: Record<Dato, string> = {
  *   payload a propósito para preservar el valor del primer insert, o sea que
  *   significa "cuándo apareció esta factura", no "cuándo corrió el sync". Un día
  *   sin ventas nuevas dejaría el máximo congelado y daría una alerta falsa.
+ *
+ * • **pagos → `switch_sync_log` (`sync_type='recibos'`, `status='success'`).**
+ *   🔴 Y por el MISMO motivo que las ventas, pero peor: `switch_recibos` se
+ *   escribe por DIFERENCIA (`diffRecibos` borra e inserta solo lo que cambió),
+ *   así que su `synced_at` no dice "cuándo corrió el sync" sino "cuándo cambió
+ *   un cobro". Medido el 9-sep-2026 con todo sano: active_wear 319 h sin una
+ *   escritura, joystep 151 h, active_shoes 123 h. Preguntarle a la tabla sería
+ *   el falso positivo eterno; preguntarle a la corrida acierta.
  */
 export interface EstadoDato {
   dato: Dato;
@@ -114,9 +148,21 @@ export interface EstadoDato {
  * una: no hay un total, ni una suma, ni una fila de Boston contestando una
  * pregunta del grupo. Lo único que comparten es la frase "la cartera está vieja",
  * que no es plata.
+ *
+ * ─── PAGOS = LAS 8 QUE TRAEN COBROS ──────────────────────────────────────────
+ *
+ * `empresasConRecibos()` = las 6 del grupo + Multifashion + Boston, DERIVADA de
+ * `EMPRESA_SYNC_CAPABILITIES`: una empresa que mañana empiece a traer cobros nace
+ * vigilada sin que nadie se acuerde de agregarla. Los cobros de Boston y los de
+ * Multifashion también son plata que entra, y que su sync se pare es un problema
+ * aunque su cartera no se sume con la del grupo.
+ *
+ * ⚠️ **Esto tampoco mezcla a Boston con el grupo**, por lo mismo de arriba: se
+ * mide empresa por empresa y el mensaje las NOMBRA. No hay un total ni una suma.
  */
 export function empresasDe(dato: Dato): string[] {
   if (dato === "ventas") return empresasConFacturas();
+  if (dato === "pagos") return empresasConRecibos();
   return empresasConEstadoCuenta();
 }
 
@@ -190,30 +236,51 @@ async function ultimaCartera(empresa: string): Promise<string | null> {
   return data?.synced_at ?? null;
 }
 
-/** Último sync de facturas exitoso de una empresa. Se ordena por `started_at`
- *  para usar el índice `idx_ssl_empresa_type_started`. */
-async function ultimaVenta(empresa: string): Promise<string | null> {
+/**
+ * Última corrida EXITOSA de un sync para una empresa. Se ordena por `started_at`
+ * para usar el índice `idx_ssl_empresa_type_started`.
+ *
+ * 🔑 **Ésta es la pregunta que hace que los pagos se puedan vigilar.** Mirar la
+ * TABLA (`switch_recibos.synced_at`) no sirve: el sync escribe por DIFERENCIA,
+ * así que una empresa sin cobros nuevos pasa días sin una sola escritura estando
+ * perfectamente sana. Mirar la CORRIDA contesta lo que de verdad importa —
+ * ¿seguimos pudiendo traer los pagos?— y no se mueve con el ritmo del negocio.
+ *
+ * `etiqueta` es cómo se nombra el dato si la lectura falla; nunca sale a
+ * Telegram, es para el log.
+ */
+async function ultimoSyncExitoso(
+  empresa: string,
+  syncType: string,
+  etiqueta: string,
+): Promise<string | null> {
   const { data, error } = await supabaseServer
     .from("switch_sync_log")
     .select("started_at, finished_at")
     .eq("empresa_key", empresa)
-    .eq("sync_type", "facturas")
+    .eq("sync_type", syncType)
     .eq("status", "success")
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) throw new Error(`ventas ${empresa}: ${error.message}`);
+  if (error) throw new Error(`${etiqueta} ${empresa}: ${error.message}`);
   return data?.finished_at ?? data?.started_at ?? null;
 }
 
-/** Mide los dos datos para todas sus empresas. Consultas PUNTUALES (una por
+/** Mide los TRES datos para todas sus empresas. Consultas PUNTUALES (una por
  *  empresa y dato, con `limit(1)` sobre índice) — nada de barridos: la base ya se
- *  cayó una vez por saturación. */
+ *  cayó una vez por saturación. Los pagos suman 8 consultas más por pasada, del
+ *  mismo tamaño que las que ya se hacían. */
 export async function medirFrescura(now: number = Date.now()): Promise<EstadoDato[]> {
   const out: EstadoDato[] = [];
-  for (const dato of ["cartera", "ventas"] as const) {
+  for (const dato of ["cartera", "ventas", "pagos"] as const) {
     for (const empresa of empresasDe(dato)) {
-      const ultimaIso = dato === "cartera" ? await ultimaCartera(empresa) : await ultimaVenta(empresa);
+      const ultimaIso =
+        dato === "cartera"
+          ? await ultimaCartera(empresa)
+          : dato === "ventas"
+            ? await ultimoSyncExitoso(empresa, "facturas", "ventas")
+            : await ultimoSyncExitoso(empresa, "recibos", "pagos");
       const t = ultimaIso ? new Date(ultimaIso).getTime() : NaN;
       out.push({
         dato,

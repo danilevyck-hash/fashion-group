@@ -630,6 +630,122 @@ el umbral semanal se aplica a las 8 empresas.
 
 ---
 
+## 🩸 LOS PAGOS —LA PLATA QUE ENTRA— NO LOS VIGILABA NADIE (9-sep-2026)
+
+Daniel, textual: *«Siempre que me llega un telegrama me dices que es falsa alarma. Quiero que me
+lleguen de veras.»*
+
+En los pendientes estaba anotado «meter los recibos a la vigilancia de 24 h». Se volvió a MEDIR antes
+de tocar nada, porque el **7-sep-2026 se había medido lo CONTRARIO** para la alerta B y las dos cosas
+parecían chocar. No chocan: son la misma pregunta con dos lentes, y sobre los recibos **solo una de
+las dos funciona**.
+
+### Por qué la alerta B NO sirve aquí (y sigue sin servir)
+
+La alerta B mira **cuándo se ESCRIBIÓ la tabla**. `switch_recibos` se escribe por **DIFERENCIA**
+(`diffRecibos` borra e inserta solo los recibos que cambiaron), así que una empresa sin cobros nuevos
+**no escribe nada estando perfectamente sana**. Medido el 9-sep-2026, con las cuatro pasadas del día
+corridas y las 8 empresas en `success`:
+
+| empresa | tabla escrita hace | sync exitoso hace | la B diría |
+|---|---|---|---|
+| active_wear | **319,5 h** (13 días) | 3,5 h | 🔴 «está viejo» — FALSO |
+| joystep | **151,5 h** | 3,5 h | 🔴 «está viejo» — FALSO |
+| active_shoes | **123,5 h** | 3,5 h | 🔴 «está viejo» — FALSO |
+| las otras cinco | 3,4-3,5 h | 3,4-3,5 h | ok |
+
+**3 de 8 empresas darían un falso positivo AHORA MISMO.** Y no es un mal día: en 90 días hay **52
+huecos de escritura por encima de las 40 h** del umbral de B, con máximos de **581 h en joystep**,
+261,6 en active_shoes y 192 en active_wear. `switch_ingresos_mercancia` es todavía peor (solo escribe
+cuando llegó mercancía). Por eso las dos tablas **siguen FUERA de `TABLAS_VIGILADAS`**, y eso lo
+exige `alertas-que-llegan.test.ts`, que no se tocó.
+
+### Por qué la regla 1 SÍ sirve
+
+La regla 1 **no mira la tabla: mira la última CORRIDA EXITOSA del sync** (`switch_sync_log`,
+`sync_type='recibos'`, `status='success'`). Es el mismo truco que ya usaba con las ventas, inventado
+justamente para esquivar este problema — y contesta lo que de verdad importa: *¿seguimos pudiendo
+traer los pagos?*, que no se mueve con el ritmo del negocio.
+
+🔴 **No es una cuarta regla.** Mismo umbral (**24 h**), mismo dedup (**20 h**), misma pasada de la
+reconciliación, mismo mensaje. **Cero crons nuevos, cero DDL, cero tablas nuevas.**
+
+### El backtest — 90 días, las mismas 270 pasadas
+
+**6 mensajes, y los 6 con una avería REAL detrás** — 13, 16, 20, 21, 23 y 25-jun-2026, cada uno con
+su fila en `error` en `switch_sync_log` (`TOKEN INVALIDO`, y la caída del 20-jun que tumbó cinco
+empresas a la vez). **0 de ruido.**
+
+Y el costo real es todavía más chico, porque los pagos **comparten mensaje y dedup con las ventas**:
+
+| | mensajes en 90 días |
+|---|---|
+| solo ventas (lo de hoy) | 13 |
+| ventas + pagos | **14** |
+| **costo marginal de agregar los pagos** | **1 mensaje** |
+
+Los otros 5 días el aviso salía igual y los pagos solo agregan una línea diciendo qué cobros también
+están parados. El día que **solo** aparece por los pagos es el **16-jun-2026**: las ventas estaban
+bien, los cobros de active_shoes parados, y **hoy nadie avisa**.
+
+### 🔴 Y el agujero era real
+
+De las **10** averías de cobros en 90 días, la **regla 2** (dos fallos seguidos del mismo par) avisó
+**3**. Las otras **7 pasaron calladas** — fueron un tropiezo suelto que nunca llegó a dos, mientras
+los cobros de active_shoes se quedaban **72 h sin llegar** (19 al 22-jun). Ninguna otra regla los
+cubre: la **alerta A** excluye `recibos` a propósito (carga el mes en curso, el día 1 vale 0 por
+definición), la **B** queda descartada arriba, y el **vigía de crons** prohíbe estructuralmente los
+syncs de Switch.
+
+### ⚠️ Lo que hay que volver a medir si algo cambia
+
+Hoy el sync corre **4×/día** en las 8 empresas: un tropiezo suelto se cura en horas y **nunca llega a
+24 h**. Por eso en los **últimos 44 días** —desde que las 8 están vivas con ese ritmo— el backtest da
+**0 mensajes**: la alerta solo suena si los pagos se detienen un día entero. Si alguien bajara ese
+ritmo, **el umbral hay que volver a medirlo**; el candado congela el `4` y se pone rojo si cambia.
+
+⚠️ **El dedup es compartido con la cartera y las ventas** (una sola llave `dato_viejo`). Eso ya era
+así antes y no se tocó, pero significa que un aviso de pagos puede tapar por 20 h uno de cartera. Es
+el precio de que sea UN mensaje y no tres; queda anotado, no resuelto.
+
+### 🩸 El accidente del método, que no fue del diseño
+
+La primera corrida de este encargo **midió bien, concluyó bien y perdió el código**. El script de
+mutación traía `trap 'git checkout -- …' EXIT`; el agente se colgó EN MEDIO de la verificación, el
+trap disparó al morir el proceso y `git checkout` devolvió los archivos a HEAD — **le borró su propia
+implementación sin commitear**. Sobrevivió el candado, que estaba escrito. Desde entonces
+`scripts/_mutar-candados-pagos-vigilados.sh` **restaura POR COPIA a /tmp**, que devuelve lo que había
+al empezar esté commiteado o no. **Ningún script de mutación de la casa puede volver a `git
+checkout`.**
+
+### 🔴 Tres roturas que los 15 candados escritos NO veían
+
+La verificación por mutación encontró que los 15 casos originales **eran todos de las funciones
+puras**, y las tres roturas de `medirFrescura` (la parte que toca la base) pasaban en verde. La peor:
+**sacar «pagos» del recorrido de `medirFrescura`** — el código compila, `empresasDe("pagos")` sigue
+contestando las 8, los 15 casos siguen verdes **y la alerta no vuelve a sonar nunca**. Las otras dos:
+leer los pagos de la TABLA en vez del sync (el falso positivo eterno vuelve), y que el «peor caso»
+tome el primero de la lista en vez del peor (los dos fixtures existentes tenían el peor primero, así
+que la diferencia no se veía).
+
+Se agregaron **3 casos de conducta** —`medirFrescura` contra un Supabase stubeado que ANOTA qué se
+pidió y con qué filtros— y el candado quedó en **18**. La lección: *un candado de módulo puro no
+prueba que el módulo puro se esté LLAMANDO.*
+
+### Candados
+
+`src/__tests__/lib/pagos-vigilados-regla-1.test.ts` (**18 casos**). **13 mutaciones, 13 cazadas**
+(`bash scripts/_mutar-candados-pagos-vigilados.sh`), **2 controles en verde**. Entre ellas: los pagos
+salen del recorrido · caen a la lista de la cartera · se recortan a las 6 del grupo · la lista se
+escribe a mano en vez de derivarse de `EMPRESA_SYNC_CAPABILITIES` · estrenan un umbral propio de 48 h
+· el dedup se separa · un pago que nunca sincronizó deja de contar como viejo · **se leen de la tabla
+en vez del sync** · el mensaje dice «recibos» en vez de «los pagos (la plata que te entra)» · deja de
+nombrar las empresas · el peor caso deja de mandar · **`switch_recibos` entra a la alerta B**.
+
+Medición reproducible: `node scripts/_medir-pagos-vigilados.mjs` (SOLO LECTURA).
+
+---
+
 ## Notas de «Base de datos»
 
 > **REGLA — filtrar por año va por RANGO, nunca con `EXTRACT(YEAR ...)` (26-jul-2026).** `WHERE EXTRACT(YEAR FROM (fecha AT TIME ZONE 'America/Panama'))::int = p_anio` es una función SOBRE la columna: no es sargable, ningún índice de `fecha` se puede usar y Postgres cae en seq scan de `switch_facturas` entera (52.269 filas, ~58 MB de heap por el `raw_data` jsonb) en CADA llamada. Es la causa medida de los picos de /ventas: en frío 2.882-3.493 ms contra 368-451 ms en caliente (8×), y el año anterior casi nunca está en caché. La forma correcta es el intervalo semiabierto en UTC — Panamá es **UTC-5 fijo**, sin horario de verano (verificado fila por fila contra la tzdb en las 52.269 facturas: 0 discrepancias):

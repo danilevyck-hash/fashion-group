@@ -166,7 +166,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   const [verNoSePagan, setVerNoSePagan] = useState(false);
   // El motor de la flechita ↓: los MISMOS archivos que ya bajaban desde adentro
   // del detalle, sin tener que abrirlo. Ver `comisiones-detalle/useDescargaComision`.
-  const { descargarExcel, descargarPdf, papel, MENSAJE_ERROR } = useDescargaComision(year, mes);
+  const { descargarExcel, descargarPdf, MENSAJE_ERROR } = useDescargaComision(year, mes);
   // El papel del mes entero (los dos botones de arriba). Se monta, se imprime y
   // se desmonta; en pantalla no se ve nada.
   const [imprimiendoMes, setImprimiendoMes] = useState(false);
@@ -572,8 +572,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
         />
       )}
 
-      {/* El papel de la flechita (uno o varios reportes) — invisible en pantalla. */}
-      {papel}
+      {/* 🔄 9-SEP-2026 — acá iba el papel de la flechita, montado invisible para
+          imprimirlo. Ahora la flechita baja un PDF armado en código y no hay
+          nada que montar. */}
 
       {/* El papel del mes: la misma matriz que se ve, con las 6 empresas. */}
       {imprimiendoMes && (

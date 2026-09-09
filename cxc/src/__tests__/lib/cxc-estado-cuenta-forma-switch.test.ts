@@ -366,21 +366,26 @@ describe("la forma del papel es la de Switch", () => {
   });
 
   it("⚠️ una empresa sin ficha NO toma los datos de otra", () => {
-    // Las cinco que todavía no dictó Daniel salen con su nombre corto y las
-    // tres líneas en blanco. Escribirles la identificación de Fashion Wear en
-    // el papel de un cliente sería una mentira fiscal.
+    // 🔄 CAMBIA DE DIRECCIÓN EL 9-SEP-2026, NO SE BORRA. Decía «las CINCO que
+    // todavía no dictó Daniel salen con su nombre corto y las tres líneas en
+    // blanco»; ese día Daniel bajó de Switch el papel de las seis y dictó el
+    // nombre legal y la identificación de cada una, así que ya no hay ninguna
+    // vacía. La regla de fondo —**nadie hereda los datos de otro**— se conserva
+    // y ahora se comprueba con las seis llenas, más el CONTROL de una clave que
+    // no está en la lista.
     for (const key of ["vistana", "fashion_shoes", "active_shoes", "active_wear", "joystep"]) {
       const f = fichaFiscal(key, "Nombre Corto");
-      expect(f.legal, `${key} inventó un nombre legal`).toBe("Nombre Corto");
-      expect(f.identificacion, `${key} tomó una identificación prestada`).toBe("");
-      expect(f.telefono).toBe("");
-      expect(f.correo).toBe("");
-      expect(f.identificacion).not.toBe(EMPRESA_FISCAL.fashion_wear.identificacion);
-      expect(f.correo).not.toBe(EMPRESA_FISCAL.fashion_wear.correo);
+      expect(f.identificacion, `${key} tomó una identificación prestada`)
+        .not.toBe(EMPRESA_FISCAL.fashion_wear.identificacion);
+      expect(f.legal, `${key} tomó el nombre legal de Fashion Wear`)
+        .not.toBe(EMPRESA_FISCAL.fashion_wear.legal);
     }
-    // Y una clave que ni existe en la lista tampoco hereda nada.
+    // CONTROL (la dirección original): una clave que ni existe en la lista
+    // sigue sin heredar nada — sale con el nombre de la pantalla y en blanco.
     const rara = fichaFiscal("confecciones_boston", "Boston");
+    expect(rara.legal).toBe("Boston");
     expect(rara.identificacion).toBe("");
+    expect(rara.telefono).toBe("");
     expect(rara.correo).toBe("");
   });
 

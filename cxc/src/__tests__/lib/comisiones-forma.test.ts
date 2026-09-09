@@ -277,10 +277,23 @@ describe("🔴 12 · el PDF ya no se llama «Fashion Group.pdf»", () => {
     expect(motor).toContain('window.addEventListener("afterprint", restaurar)');
     expect(motor).toContain("window.setTimeout(restaurar,");
     expect(motor).toContain("document.title = anterior;");
-    // CONTROL de la regla original: el botón de imprimir del detalle la USA —
-    // tenerla definida y no llamarla es lo mismo que no tenerla.
+    // CONTROL de la regla original: los dos papeles que SIGUEN siendo HTML
+    // impreso (el del mes y el de una empresa) la USAN — tenerla definida y no
+    // llamarla es lo mismo que no tenerla.
+    for (const vista of [
+      "src/components/ventas/ComisionesConsolidadoView.tsx",
+      "src/components/ventas/ComisionesPorEmpresaView.tsx",
+    ]) {
+      expect(plano(leer(vista)), vista).toContain("imprimirComo(");
+    }
+    // 🔄 9-SEP-2026 — el DETALLE de un vendedor ya no pasa por acá: es un PDF de
+    // verdad (`descargarPdfComision`), con el nombre puesto por nosotros y no
+    // por el `document.title`. La regla de fondo —el archivo NO se llama
+    // «Fashion Group.pdf»— se conserva, y se exige el mismo nombre de siempre.
     const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
-    expect(modal).toContain("onClick={() => imprimirComo(nombreArchivo)}");
+    expect(modal).not.toContain("imprimirComo(");
+    expect(modal).toContain("descargarPdfComision(");
+    expect(modal).toContain("nombreArchivo,");
     // Y NADIE se escribe su propia copia.
     for (const f of [
       "src/components/ventas/ComisionesDetalleModal.tsx",

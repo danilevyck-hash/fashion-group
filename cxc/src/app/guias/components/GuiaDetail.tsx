@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Guia } from "./types";
 import PrintDocument from "./PrintDocument";
 import HojaEscalada from "./HojaEscalada";
 import { compartirGuia, imprimirGuia } from "@/lib/guias/papel-de-la-guia";
-import { precargarFirmasGuia } from "@/lib/guias/png-guia";
 import { useToast } from "@/components/ToastSystem";
 
 interface GuiaDetailProps {
@@ -17,11 +16,12 @@ export default function GuiaDetail({ guia, onBack }: GuiaDetailProps) {
   const { toast } = useToast();
   const [compartiendo, setCompartiendo] = useState(false);
 
-  // 🔑 Las firmas, decodificadas al ABRIR la pantalla: con hasta 6 renglones
-  // «Compartir» manda una IMAGEN y dibujarla es síncrono a propósito.
-  useEffect(() => {
-    precargarFirmasGuia(guia);
-  }, [guia]);
+  // 🔄 9-SEP-2026 — SE FUE LA PRECARGA DE FIRMAS. Existía porque «Compartir»
+  // mandaba una IMAGEN dibujada a mano, y dibujarla tenía que ser síncrono (en
+  // iOS un `await` en el medio le quita el gesto a la hoja de compartir).
+  // Daniel: *«en guía, quiero todo PDF, quita lo de PNG que lo enredó»* — el
+  // PDF pinta las firmas con jsPDF desde el mismo `data:` guardado, sin esperar
+  // nada, así que no hay nada que precargar.
 
   // 🔴 IMPRIMIR = EL MISMO PDF QUE IMPRIME LA LISTA (7-sep-2026).
   //

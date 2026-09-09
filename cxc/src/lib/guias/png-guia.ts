@@ -1,4 +1,18 @@
 // ============================================================================
+// 🔄 RETIRADO EL 9-SEP-2026 — ESTE ARCHIVO YA NO LO LLAMA NADIE.
+//
+// Daniel, textual: *«en guía, quiero todo PDF, quita lo de PNG que lo enredó»*.
+// «Compartir» manda el PDF en el celular y en la computadora, así que ni este
+// dibujo ni `precargarFirmasGuia` tienen lectores.
+//
+// 🔴 NO SE BORRA (patrón de la casa: nada se borra). Queda con su medición, su
+// calibración y —sobre todo— el porqué de que TODO acá sea síncrono, que es una
+// lección que vale para cualquier cosa que se comparta desde un iPhone.
+// ⚠️ Y sigue SIN arrastrar jsPDF: el día que alguien lo vuelva a importar, no
+// puede costarle el generador de PDF a la pantalla que lo haga.
+// ============================================================================
+
+// ============================================================================
 // LA GUÍA COMO IMAGEN, para el grupo de WhatsApp.
 //
 // Daniel, 5-sep-2026: *«en el grupo de WhatsApp siempre ponen compartir cuando

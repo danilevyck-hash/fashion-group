@@ -1,6 +1,22 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 🔄 RETIRADO EL 9-SEP-2026 — ESTE COMPONENTE YA NO LO MONTA NADIE.
+//
+// Daniel: *«¿no podemos hacer un botón de PDF, ya que de PDF en la compu paso a
+// imprimir?»*. El reporte de comisión ahora es un PDF de verdad, armado en
+// `lib/comisiones/pdf-comision.ts`, y no una hoja HTML mandada a
+// `window.print()`.
+//
+// 🔴 NO SE BORRA (patrón de la casa: nada se borra). Lo que queda escrito acá
+// vale más que el código: la paginación calibrada MIDIENDO (`ROWS_PER_COL`), los
+// anchos de columna medidos con las cadenas reales de producción, y sobre todo
+// el porqué del portal a `<body>` — un `body` con `position:fixed` NO pagina en
+// Chrome e imprime una sola hoja en silencio. Cualquiera que vuelva a imprimir
+// HTML en esta app se ahorra ese día leyendo esto.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LA HOJA IMPRESA del reporte de comisión de un vendedor. Vive aparte del
 // componente de pantalla desde el 6-sep-2026, cuando el detalle pasó a poder
 // abrirse ABAJO de la matriz además de en el modal: con las dos formas y las

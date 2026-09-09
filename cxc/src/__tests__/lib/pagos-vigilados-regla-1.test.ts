@@ -1,26 +1,4 @@
 // ═══════════════════════════════════════════════════════════════════════════
-//   ⏸️  EN PAUSA — 9-sep-2026. ESTE CANDADO ES LA ESPECIFICACIÓN, NO UNA DEUDA.
-//
-//   La medición está hecha y la conclusión sostenida (los pagos van por la
-//   REGLA 1, no por la alerta B). Lo que falta es la implementación en
-//   `datos-frescos.ts`, y se perdió por un accidente del método, no del diseño:
-//
-//   🩸 El script de mutación traía `trap 'git checkout -- …' EXIT`. El agente
-//      que lo escribió se colgó EN MEDIO de la verificación, el trap disparó al
-//      morir el proceso y `git checkout` devolvió los archivos a HEAD — le borró
-//      su propia implementación sin commitear. El candado sobrevivió; el código
-//      no. El trap ya está arreglado (copia a /tmp) y la lección quedó anotada
-//      en la skill de la casa.
-//
-//   🔴 NO SE BORRA. Es la especificación de lo que hay que construir: dice con
-//      qué números, con qué palabras y para qué empresas. Al retomarlo, se le
-//      quita el `.skip` y se implementa hasta que los 15 casos pasen.
-//
-//   Los 4 bloques están en `describe.skip` para que el build no quede rojo por
-//   una obra a medias. Nada de esto está en producción.
-// ═══════════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════
 //   🩸 LOS PAGOS — LA PLATA QUE ENTRA — NO LOS VIGILABA NADIE (9-sep-2026)
 //
 //   Daniel, textual: «Siempre que me llega un telegrama me dices que es falsa
@@ -84,9 +62,11 @@ import {
   HORAS_ENTRE_AVISOS,
   clasificarDatosViejos,
   mensajeDatosViejos,
+  medirFrescura,
   empresasDe,
   type EstadoDato,
 } from "@/lib/datos-frescos";
+import { supabaseServer } from "@/lib/supabase-server";
 import { empresasConRecibos, empresasConFacturas } from "@/lib/switch-api/empresas";
 import { TABLAS_VIGILADAS } from "@/lib/alertas/silencio-de-datos";
 import { corridasPorDiaDelPar } from "@/lib/cron-telemetry";
@@ -105,7 +85,7 @@ const cartera = (empresa: string, horas: number): EstadoDato => ({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe.skip("los pagos son un dato de la regla 1, no una regla nueva", () => {
+describe("los pagos son un dato de la regla 1, no una regla nueva", () => {
   it("«pagos» se clasifica con el MISMO umbral de 24 h que la cartera y las ventas", () => {
     // Si alguien le pusiera un umbral propio, esto sería una cuarta regla
     // disfrazada — y la lista de reglas de SISTEMA es cerrada.
@@ -133,7 +113,7 @@ describe.skip("los pagos son un dato de la regla 1, no una regla nueva", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe.skip("qué empresas se vigilan, y de dónde sale la lista", () => {
+describe("qué empresas se vigilan, y de dónde sale la lista", () => {
   it("pagos = las 8 empresas que traen cobros, DERIVADAS, nunca escritas a mano", () => {
     // `empresasConRecibos()` sale de EMPRESA_SYNC_CAPABILITIES: una empresa que
     // mañana empiece a traer recibos nace vigilada sin que nadie se acuerde.
@@ -163,7 +143,7 @@ describe.skip("qué empresas se vigilan, y de dónde sale la lista", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe.skip("🔴 la tabla de recibos NO se vigila, y por eso esto vive en la regla 1", () => {
+describe("🔴 la tabla de recibos NO se vigila, y por eso esto vive en la regla 1", () => {
   it("`switch_recibos` sigue fuera de la alerta B (312 h sin escribir, sano)", () => {
     // Medido el 9-sep-2026 con las 4 pasadas del día corridas: active_wear
     // llevaba 312,7 h sin una escritura, joystep 144,7 y active_shoes 116,7.
@@ -185,7 +165,7 @@ describe.skip("🔴 la tabla de recibos NO se vigila, y por eso esto vive en la 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe.skip("el mensaje habla como Daniel", () => {
+describe("el mensaje habla como Daniel", () => {
   const texto = mensajeDatosViejos([pagos("active_shoes", 72), pagos("vistana", 30)]);
 
   it("dice QUÉ dato en palabras del negocio: la plata que entra", () => {
@@ -230,5 +210,76 @@ describe.skip("el mensaje habla como Daniel", () => {
     expect(t).toContain("40 horas");
     expect(t).toContain("50 horas");
     expect(t).toContain("60 horas");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LO QUE LOS 15 CASOS DE ARRIBA NO PODÍAN VER (9-sep-2026).
+//
+// La verificación por mutación encontró TRES roturas que ningún candado cazaba,
+// y las tres son de la parte que toca la base (`medirFrescura`), no de las
+// funciones puras. La peor de las tres: **sacar «pagos» de la lista de datos que
+// se miden**. El código compila, los 15 casos siguen verdes, `empresasDe("pagos")`
+// sigue contestando las 8 — y la alerta no vuelve a sonar nunca. Un candado que
+// no ve eso no está cuidando nada.
+//
+// Estos tres casos se agregaron DESPUÉS de medir, por eso están aparte: no
+// cambian la especificación, la terminan.
+describe("🔴 lo que de verdad se le pregunta a la base", () => {
+  /** Stub encadenable de Supabase que ANOTA qué se pidió y con qué filtros.
+   *  No toca la red: solo devuelve una fecha fresca para todo. */
+  function anotarPedidos(): { tabla: string; eq: Record<string, string> }[] {
+    const pedidos: { tabla: string; eq: Record<string, string> }[] = [];
+    const ahora = new Date().toISOString();
+    vi.mocked(supabaseServer.from).mockImplementation(((tabla: string) => {
+      const registro = { tabla, eq: {} as Record<string, string> };
+      pedidos.push(registro);
+      const cadena: Record<string, unknown> = {};
+      for (const m of ["select", "order", "limit"]) cadena[m] = () => cadena;
+      cadena.eq = (k: string, v: string) => {
+        registro.eq[k] = v;
+        return cadena;
+      };
+      cadena.maybeSingle = async () => ({
+        data: { synced_at: ahora, started_at: ahora, finished_at: ahora },
+        error: null,
+      });
+      return cadena;
+    }) as never);
+    return pedidos;
+  }
+
+  it("los pagos SE MIDEN de verdad: una lectura por cada una de las 8 empresas", async () => {
+    // 🩸 Sin este caso, borrar "pagos" del recorrido deja el aviso mudo para
+    // siempre sin poner un solo test en rojo.
+    anotarPedidos();
+    const estados = await medirFrescura();
+    const dePagos = estados.filter((e) => e.dato === "pagos");
+    expect(dePagos).toHaveLength(8);
+    expect(dePagos.map((e) => e.empresa).sort()).toEqual([...empresasConRecibos()].sort());
+  });
+
+  it("los pagos se leen de la CORRIDA del sync, nunca de la tabla de recibos", async () => {
+    // Es la línea entera del cambio: preguntarle a `switch_recibos.synced_at`
+    // sería el falso positivo eterno (319 h sin escribir estando sano).
+    const pedidos = anotarPedidos();
+    await medirFrescura();
+    const dePagos = pedidos.filter((p) => p.eq.sync_type === "recibos");
+    expect(dePagos).toHaveLength(8);
+    for (const p of dePagos) {
+      expect(p.tabla).toBe("switch_sync_log");
+      expect(p.eq.status).toBe("success");
+    }
+    // Y a la tabla de la cartera solo se le pregunta por la CARTERA: 7 lecturas,
+    // ni una más. Si los pagos cayeran ahí, serían 15.
+    expect(pedidos.filter((p) => p.tabla === "switch_estadocuenta")).toHaveLength(7);
+  });
+
+  it("el peor caso manda AUNQUE VENGA SEGUNDO en la lista", () => {
+    // Los otros casos ponían el peor primero, así que «tomar el primero» pasaba
+    // por «tomar el peor» sin serlo.
+    const t = mensajeDatosViejos([pagos("vistana", 30), pagos("active_shoes", 72)]);
+    expect(t).toContain("72 horas");
+    expect(t).not.toContain("30 horas");
   });
 });

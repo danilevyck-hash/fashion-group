@@ -1331,3 +1331,47 @@ Un candado **cambió de dirección con nota fechada, ninguno se borró**: `iphon
 («se renderiza UNA vez por lista») pasó de **2 `<AddNewInline>` a 3** —nació el del transportista— y
 se le agregó el **control al revés**: que ninguno de los tres caiga dentro del mapa de renglones, que
 era el defecto original (un ＋ por FILA).
+
+---
+
+## Todo PDF: se va el PNG (9-sep-2026)
+
+Daniel, textual: *«en guía, quiero todo PDF, quita lo de PNG que lo enredó»*.
+
+**Ahora:** «Compartir» manda el **PDF**, en el celular y en la computadora, con uno o con cien
+renglones. **Antes:** decidía solo — imagen PNG en el celular con 6 renglones o menos, PDF de ahí para
+arriba y siempre en computadora.
+
+🔑 **Por qué se va algo que estaba medido y funcionaba.** Eran DOS documentos con dos formas para la
+misma guía, y cuál salía dependía del aparato y de cuántos renglones tenía — o sea, de cosas que quien
+toca el botón no ve. Lo que se comparte y lo que se imprime son ahora **el mismo archivo**, siempre.
+
+⚠️ **La medición que fijó el corte se conserva**, porque explica por qué la imagen existió: una imagen
+se LEE dentro del chat de WhatsApp y un PDF hay que abrirlo, y sobre las 222 guías vivas del 5-sep-2026
+el **94% tenía 6 renglones o menos**. `MAX_RENGLONES_PNG` queda retirada con ese número adentro.
+
+**Lo que NO se tocó:**
+
+- 🩸 **Ni un `await` entre el clic y la hoja de compartir.** Safari en iOS solo la abre DENTRO del gesto
+  del toque; un `await` de red hace que deje de contarlo como gesto y la bloquea sin decir por qué. Era
+  la razón por la que el PNG se dibujaba síncrono, y sigue valiendo para el PDF.
+- **Imprimir ya mandaba el PDF** en los tres botones del módulo (`imprimirGuia`).
+- El bloque `@media print` de `HojaEscalada`, que cubre el Ctrl+P del navegador.
+- El botón se sigue llamando **«Compartir»** y no pregunta nada.
+
+**Lo que quedó retirado, no borrado:**
+
+- 🔴 **`src/lib/guias/png-guia.ts` se queda, sin un solo lector**, con nota fechada. Lo que hay escrito
+  ahí vale más que el código: el porqué de que TODO sea síncrono, que es una lección para cualquier cosa
+  que se comparta desde un iPhone. Y **sigue sin arrastrar jsPDF**.
+- **Se fue la precarga de firmas** (`precargarFirmasGuia`) de las tres pantallas: existía para dibujar
+  la imagen sin esperar. El PDF pinta las firmas desde el `data:` guardado sin esperar nada.
+- `formatoParaCompartir` sigue siendo el módulo puro que decide; hoy contesta `pdf` siempre.
+
+- Candado: `src/__tests__/lib/guias-todo-pdf.test.ts` (13).
+- Tres candados **cambiaron de dirección con nota fechada, ninguno se borró**: `guias-compartir-png`
+  (todo el archivo se dio vuelta; conserva la medición y los CONTROLES de que el armado es síncrono y de
+  que `png-guia` no arrastra jsPDF), `guias-papel-uno-solo` (el bloque 2, con la mitad que ya era cierta
+  —computadora → PDF— como CONTROL) y `guia-pdf-compartir` (pedía ver el PNG y el PDF en el armado;
+  ahora exige el PDF y que la imagen no pueda volver, con el «ni un await» intacto).
+- Mutaciones: `scripts/_mutar-candados-papel-pdf.sh` (**17 mutaciones, 17 cazadas**, 2 controles).

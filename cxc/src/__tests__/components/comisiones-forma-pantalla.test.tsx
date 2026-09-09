@@ -20,6 +20,8 @@ vi.mock("next/navigation", () => ({
 
 import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
 import { ComisionesDetalleModal } from "@/components/ventas/ComisionesDetalleModal";
+// El papel dejó de ser HTML: lo que lleva sale del módulo puro del reporte.
+import { COLUMNAS_VENTAS, filasVentas } from "@/lib/comisiones/reporte-comision";
 
 const REYNALDO = "REYNALDO ESPINOSA";
 
@@ -176,7 +178,7 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
     expect(html.indexOf("$652.42")).toBeLessThan(html.indexOf("TOTAL VENTAS"));
   });
 
-  it("🔴 el modal SE QUEDA — es lo que se imprime — y las dos formas son el MISMO componente", async () => {
+  it("🔴 el modal SE QUEDA, y las dos formas son el MISMO componente", async () => {
     render(
       <ComisionesDetalleModal
         empresa="vistana"
@@ -187,10 +189,18 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
         onClose={() => {}}
       />,
     );
-    await waitFor(() => expect(document.querySelector('[data-comision-detalle="modal"]')).toBeTruthy());
-    // La hoja de impresión existe en las dos formas (va en un portal a <body>).
-    await waitFor(() => expect(document.querySelector("[data-cds-print]")).toBeTruthy());
-    expect(document.querySelector("#print-document")).toBeTruthy();
+    const panel = await waitFor(
+      () => document.querySelector('[data-comision-detalle="modal"]') as HTMLElement,
+    );
+    // 🔄 9-SEP-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. Pedía ver la hoja de
+    // impresión montada en un portal a <body> (`[data-cds-print]` /
+    // `#print-document`), que era el mecanismo con el que las dos formas
+    // imprimían igual. Daniel: *«¿no podemos hacer un botón de PDF, ya que de
+    // PDF en la compu paso a imprimir?»* — el papel es un PDF armado en código,
+    // así que no hay nada que montar. La regla de fondo (las dos formas bajan el
+    // MISMO archivo) se comprueba ahora por el botón, que es el mismo en las dos.
+    expect(document.querySelector("[data-cds-print]")).toBeNull();
+    await waitFor(() => expect(within(panel).getByRole("button", { name: "PDF" })).toBeTruthy());
   });
 
   it("🔴 1 · en pantalla la factura va corta; el papel la lleva completa", async () => {
@@ -208,9 +218,10 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
     const panel = await waitFor(() => document.querySelector('[data-comision-detalle="inline"]') as HTMLElement);
     await within(panel).findByText("3022");
     expect(panel.textContent).not.toContain("11-000003022");
-    // El mismo documento, completo, en la hoja que se imprime.
-    const papel = document.querySelector("#print-document")!;
-    expect(papel.textContent).toContain("11-000003022");
+    // 🔄 El papel dejó de ser HTML: lo que se imprime lo decide el módulo puro
+    // del reporte. La regla no cambió — larga en el papel, corta en pantalla.
+    const celdas = filasVentas(DETALLE).map((f) => f.celdas.join(" "));
+    expect(celdas.join(" ")).toContain("11-000003022");
   });
 
   it("🔴 6 · la columna «Tipo» no está en pantalla, y sí en el papel", async () => {
@@ -230,7 +241,9 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
     const encabezados = within(panel).getAllByRole("columnheader").map((h) => h.textContent?.trim());
     expect(encabezados).not.toContain("Tipo");
     expect(encabezados).toContain("Factura");
-    expect(document.querySelector("#print-document")!.textContent).toContain("Tipo");
+    // 🔄 Y en el papel SÍ está: ahora se comprueba sobre el módulo puro del
+    // reporte, que es de donde el PDF saca sus columnas.
+    expect([...COLUMNAS_VENTAS]).toContain("Tipo");
   });
 
   it("🔴 19 · el botón dice que descarga EL DETALLE", async () => {

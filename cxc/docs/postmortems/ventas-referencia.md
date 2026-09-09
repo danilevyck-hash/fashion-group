@@ -1075,3 +1075,57 @@ Auditoría medida contra el código el 6-sep-2026:
 > ### Lo que NO se tocó
 >
 > El motor de llegadas (`medirTandas`, los tres vetos del timeline, el ritmo sin los meses vacíos) · que los TRES GRANDES sean de la última llegada y **Stock siga siendo la existencia REAL de Switch, nunca deducida** · el histórico en chico · la frase de la llegada y su historia gris (`fraseLlegadaAnterior` sigue con `parteDeTanda`: habla de un episodio CERRADO, donde el stock de hoy no dice nada) · las barras · la fila de plata y el FOB calculado · los 13 encabezados del Excel (candado `TRECE`) · la hoja Compras · el buscador y el orden pegado.
+
+---
+
+## Comisiones: un solo botón, y es PDF (9-sep-2026)
+
+Daniel, textual: *«¿no podemos hacer un botón de PDF, ya que de PDF en la compu paso a imprimir?»* —
+tiene razón: desde un PDF ya se imprime, así que dos botones para lo mismo sobran.
+
+🩸 **Y el reporte no era un archivo.** Se dibujaba en HTML dentro de un portal a `<body>` y se llamaba a
+`window.print()`: lo que aparecía era el **diálogo del navegador**, y «Guardar como PDF» quedaba
+escondido adentro de un menú. Por eso «sale impresión directa».
+
+**Ahora:** el detalle de un vendedor tiene **un** botón, dice **«PDF»**, y baja un PDF armado con jsPDF
+(`src/lib/comisiones/pdf-comision.ts`). Lo que el papel DICE vive aparte, en el módulo puro
+`src/lib/comisiones/reporte-comision.ts` — el mismo reparto que el papel del CXC y el de las guías.
+
+**Lo que estaba resuelto y no se perdió:**
+
+- 🔴 **El nombre del archivo** (`Comisión-Edwin-Vistana-2026-08`). Con `window.print()` lo ponía Chrome
+  desde el `document.title`, que en toda la app es «Fashion Group»: los doce reportes de un cierre
+  bajaban con el mismo nombre. Ahora lo pone el código, y sale de `nombre-archivo.ts`, el **mismo** que
+  usa el Excel.
+- 🩸 **El PDF de una empresa ya no se lleva el de otra pegado atrás.** Con el papel en HTML, si el
+  detalle estaba abierto su hoja también vivía montada en `<body>` y entraba al mismo trabajo de
+  impresión; había que taparla con una regla de CSS. Ahora el documento se arma **solo con las hojas que
+  se le pasan** y el generador no lee el DOM: el defecto es estructuralmente imposible.
+- **Sale igual desde el modal y desde el detalle de abajo** — antes lo garantizaba el portal; ahora, que
+  las dos formas llaman al mismo generador. Lo mismo vale para la flechita ↓ de la celda.
+- **La factura va LARGA** (`11-000003022`) y **la columna «Tipo» (FA/NC) se queda** en el papel: es el
+  documento que se concilia contra Switch. En pantalla siguen cortas y sin Tipo.
+- Los totales salen del RPC tal cual; lo único que se calcula es la resta de los descuentos **activos**.
+
+**Retirado, no borrado:** `ComisionesDetalleModal` ya no monta `ImpresionComision.tsx`, que **queda sin
+lectores y con nota fechada**. Lo que hay escrito ahí vale: la paginación calibrada midiendo
+(`ROWS_PER_COL`), los anchos medidos con las cadenas reales de producción y —sobre todo— el porqué del
+portal: un `<body>` con `position:fixed` **no pagina** en Chrome e imprime una sola hoja en silencio.
+
+⚠️ **Los otros dos papeles del módulo NO se tocaron**: «Descargar el mes» y «Descargar el año» siguen
+imprimiendo la matriz en HTML con `imprimirComo` (`ImpresionTablaComisiones`), con su guardia de CSS
+intacta. El encargo era el detalle de un vendedor.
+
+⚠️ **Pendiente de que Daniel lo mire:** el papel viejo apretaba las filas en **dos columnas tipo
+periódico** (hasta 84 renglones por hoja); el PDF usa **una columna a lo ancho**, más legible pero con
+menos filas por hoja (~33). Un mes largo puede ocupar una hoja más.
+
+- Candado: `src/__tests__/lib/comisiones-un-boton-pdf.test.ts` (18) — incluye verificación **sobre el
+  PDF real** (se lee el texto del archivo con `pdfjs-dist`).
+- Cinco candados **cambiaron de dirección con nota fechada, ninguno se borró**: `comisiones-flecha` (dos
+  pruebas: el generador y el aislamiento del reporte, esta última conservando como CONTROL la guardia
+  del papel del MES, que sigue siendo HTML), `comisiones-forma` (el nombre del archivo; conserva como
+  CONTROL que las dos vistas que siguen imprimiendo HTML usan `imprimirComo`),
+  `comisiones-flecha-pantalla` (tres pruebas), `comisiones-forma-pantalla` (tres) y
+  `comisiones-retirados-y-mayusculas` (el encabezado capitalizado del papel).
+- Mutaciones: `scripts/_mutar-candados-papel-pdf.sh` (**17 mutaciones, 17 cazadas**, 2 controles).

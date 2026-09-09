@@ -26,19 +26,11 @@
 // día— la carga inicial pasaba de 196 kB a 344 kB. La pregunta barata («¿esta
 // guía trae renglones?») vive aparte en `tiene-renglones.ts` justamente para
 // que preguntarla no cueste el generador de PDF.
-import { aparatoDeQuienMira } from "@/lib/aparato";
 import { compartirArchivo, type ResultadoCompartir } from "@/lib/compartir-archivo";
 import { fmtGuia } from "@/lib/format";
 import { imprimirPdf } from "@/lib/imprimir-pdf";
 import { construirPdfGuia, nombreArchivoGuia } from "./pdf-guia";
-import { formatoParaCompartir } from "./compartir-formato";
-import { construirPngGuia } from "./png-guia";
 import type { Guia } from "@/app/guias/components/types";
-
-// ⚠️ `precargarFirmasGuia` NO se re-exporta desde acá a propósito: las pantallas
-// lo importan de `png-guia` DIRECTO, que no arrastra jsPDF. Pasarlo por este
-// módulo obligaría a bajar el generador de PDF al abrir cada guía — justo lo
-// que la nota de arriba viene evitando.
 
 /**
  * Manda la guía a la impresora, sin pantalla intermedia.
@@ -57,19 +49,20 @@ export function imprimirGuia(g: Guia): "dialogo" | "visor" | "bloqueado" {
  * AirDrop). En escritorio —donde esa hoja no existe— la descarga, que es lo
  * correcto ahí y no un plan B pobre.
  *
- * 🔴 IMAGEN HASTA 6 RENGLONES, PDF DE AHÍ PARA ARRIBA — **en el CELULAR**
- * (5-sep-2026). En la COMPUTADORA sale SIEMPRE el PDF (7-sep-2026). Daniel:
- * *«en el grupo de WhatsApp siempre ponen compartir cuando terminan (llega en
- * pdf)»* — y eligió la imagen con corte. Una imagen se lee DENTRO del chat;
- * un PDF hay que abrirlo. Medido: 94% de las guías tienen 6 renglones o menos.
- * El corte y su medición viven en `compartir-formato.ts`.
+ * 🔴 SIEMPRE EL PDF, EN LOS DOS APARATOS (9-sep-2026). Daniel: *«en guía,
+ * quiero todo PDF, quita lo de PNG que lo enredó»*. Hasta ese día el celular
+ * mandaba una IMAGEN si la guía tenía 6 renglones o menos: dos documentos con
+ * dos formas para la misma guía, y cuál salía dependía del aparato y del largo
+ * — cosas que quien toca el botón no ve. Lo que se comparte y lo que se imprime
+ * son ahora el MISMO archivo. La decisión sigue viviendo en el módulo puro
+ * `compartir-formato.ts`, con su medición conservada.
  *
- * ⚠️ EL BOTÓN SIGUE LLAMÁNDOSE «Compartir» Y DECIDE SOLO: no se le pregunta
- * nada a nadie. E **imprimir no cambió**: el papel es y sigue siendo el PDF.
+ * ⚠️ EL BOTÓN SIGUE LLAMÁNDOSE «Compartir» Y NO PREGUNTA NADA. E **imprimir no
+ * cambió**: el papel es y sigue siendo el PDF.
  *
- * ⚠️ Sin canvas 2D (o si algo falla al dibujar) se cae al PDF de siempre. Se
- * arma antes de llamar a la hoja y sin un solo `await` en el medio — iOS lo
- * exige.
+ * 🩸 El archivo se arma sin un solo `await` en el medio: Safari en iOS solo
+ * abre la hoja de compartir DENTRO del gesto del toque, y un `await` de red
+ * hace que deje de contarlo como tal.
  */
 export async function compartirGuia(g: Guia): Promise<ResultadoCompartir> {
   const archivo = archivoParaCompartir(g);
@@ -79,13 +72,17 @@ export async function compartirGuia(g: Guia): Promise<ResultadoCompartir> {
   });
 }
 
-/** El archivo que sale por «Compartir». Síncrono a propósito (ver arriba). */
+/**
+ * El archivo que sale por «Compartir»: **el PDF, siempre**. Síncrono a
+ * propósito (ver arriba).
+ *
+ * 🔄 Hasta el 9-sep-2026 acá se preguntaba el formato (`formatoParaCompartir`)
+ * y el aparato (`aparatoDeQuienMira`) para decidir entre la imagen y el PDF.
+ * Ya no hay dos formatos que decidir, así que no se pregunta nada: dejar la
+ * pregunta escrita cuando la respuesta es una sola es cómo se lee un camino que
+ * no existe. Los dos módulos siguen en su sitio, retirados y con su medición.
+ */
 function archivoParaCompartir(g: Guia): File {
-  if (formatoParaCompartir((g.guia_items ?? []).length, aparatoDeQuienMira()) === "png") {
-    const png = construirPngGuia(g);
-    if (png) return png;
-  }
   const blob = construirPdfGuia(g).output("blob");
   return new File([blob], nombreArchivoGuia(g), { type: "application/pdf" });
 }
-

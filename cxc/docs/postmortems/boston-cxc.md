@@ -932,3 +932,50 @@ siempre.
   del CXC en celular vive ahora en el componente compartido) y `excel-encabezados-fila-1` (los lugares
   que arman una hoja pasan de **25 a 27**: entran las dos descargas, que antes eran un CSV armado a
   mano).
+
+---
+
+## Los datos fiscales de las SEIS empresas (9-sep-2026)
+
+El estado de cuenta que recibe el cliente copia la forma del de Switch, que arriba imprime **cuatro
+líneas de la empresa que cobra**: nombre legal, identificación, teléfono y correo. Hasta hoy solo se
+conocía **Fashion Wear** —medida del papel del 8-sep— y las otras cinco salían con el nombre corto de
+siempre y sin esas líneas, que era lo correcto mientras no se supieran: **lo que no se sabe no se
+escribe**.
+
+Daniel bajó de Switch el papel de las seis y dictó, verbatim:
+
+| Empresa | Nombre legal | Identificación |
+|---|---|---|
+| `fashion_wear` | FASHION WEAR, INC | 40254-103-278837 |
+| `vistana` | VISTANA INTERNATIONAL PANAMA, S.A. | 626251-1-455645 |
+| `fashion_shoes` | FASHION SHOES HOLDINGS, S.A. | 1481660-1-643734 |
+| `active_shoes` | ACTIVE SHOES S.A | 155727670-2-2022 |
+| `active_wear` | ACTIVE WEAR S.A | 155727673-2-2022 |
+| `joystep` | JOYSTEP CORP | 155769235-2-2025 |
+
+**Dos cosas se apartan de lo que dice Switch, por decisión suya:**
+
+- 🔴 **El teléfono va VACÍO en las seis.** Switch tampoco lo trae. La línea `TEL:` sale como en el
+  papel de Switch, sin número.
+- 🔴 **El correo de las SEIS es `info@fashiongr.com`.** Textual: *«los correos de todos debe de ser
+  info@fashiongr.com»*. Los papeles de Switch traen `vistanaa@cwpanama.net`, `alberto@cboston.net`,
+  `albertolevyalberto@cboston.net` y `fashionvista.pa@gmail.com` — **ninguno se usa**.
+
+🔑 **Y ese correo se escribe UNA sola vez** (`CORREO_DEL_GRUPO`, `src/lib/cxc/empresa-fiscal.ts`): las
+seis fichas se ARMAN con él. Repetido seis veces, el día que cambie queda corregido en cinco empresas y
+viejo en la sexta — que es exactamente la clase de dato que nadie vuelve a mirar.
+
+⚠️ **Sigue siendo una lista escrita a mano**, como el amarre de proveedores y el alias de vendedores. No
+se deriva del `numero_fiscal` de las facturas: la identificación vive adentro de ese texto sin separador
+que diga dónde termina, y sacarla a fuerza de recortar ceros es el «adivinar» que esta casa prohíbe.
+
+⚠️ **Ninguna empresa puede salir con los datos de otra** — escribir en el papel de un cliente la
+identificación equivocada es una mentira fiscal, no un detalle de forma. Una clave que no está en la
+lista (Boston, Multifashion) sale con el nombre de la pantalla y las tres líneas en blanco.
+
+- Candado: `src/__tests__/lib/cxc-empresa-fiscal-las-seis.test.ts` (11).
+- Un candado **cambió de dirección con nota fechada, no se borró**:
+  `cxc-estado-cuenta-forma-switch` › «una empresa sin ficha NO toma los datos de otra» — exigía las
+  cinco vacías; ahora exige que nadie herede nada, con el CONTROL de una clave fuera de la lista.
+- Mutaciones: ver `scripts/_mutar-candados-papel-pdf.sh` (**17 mutaciones, 17 cazadas**, 2 controles).

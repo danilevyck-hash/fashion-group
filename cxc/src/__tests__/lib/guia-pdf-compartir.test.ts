@@ -185,14 +185,18 @@ describe("🔴 compartir de verdad abre la hoja del sistema", () => {
 
   it("🔴 el armado del archivo es SÍNCRONO: ni un await antes de la hoja", () => {
     // La regla se mudó a `papel-de-la-guia.ts`, así que se vigila ahí.
+    //
+    // 🔄 NOTA 9-SEP-2026 — cambió de DIRECCIÓN, no se aflojó. Pedía ver
+    // `construirPngGuia(g)` Y `construirPdfGuia(g)` acá adentro, porque eran los
+    // dos formatos posibles. Daniel: *«en guía, quiero todo PDF, quita lo de PNG
+    // que lo enredó»* — ahora se exige el PDF y que la imagen NO pueda volver.
+    // Lo que importaba sigue igual: ni un solo `await`.
     const papel = readFileSync(path.join(raiz, "src/lib/guias/papel-de-la-guia.ts"), "utf8");
     const armado = /function archivoParaCompartir\(g: Guia\): File \{[\s\S]*?\n\}/.exec(papel)?.[0] ?? "";
     expect(armado.length).toBeGreaterThan(0);
     expect(armado).not.toContain("await ");
-    expect(armado).toContain("construirPngGuia(g)");
     expect(armado).toContain("construirPdfGuia(g)");
-    // Y el que decide es el módulo puro del corte, no un número suelto.
-    expect(papel).toContain("formatoParaCompartir");
+    expect(armado).not.toContain("Png");
   });
 
   it("el botón vive en la guía y muestra que está trabajando", () => {

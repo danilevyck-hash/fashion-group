@@ -1,4 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
+// 🔄 CAMBIÓ DE DIRECCIÓN EL 9-SEP-2026 — NO SE BORRÓ.
+//
+// Daniel: *«en guía, quiero todo PDF, quita lo de PNG que lo enredó»*. Este
+// archivo exigía lo contrario (imagen hasta 6 renglones en el celular), así que
+// cada regla se dio vuelta y quedó escrito lo que sí tiene que seguir siendo
+// cierto: el archivo se arma SÍNCRONO, hay UNA sola puerta de compartir,
+// imprimir no cambió y `png-guia` no arrastra jsPDF. La medición original se
+// conserva abajo, palabra por palabra, porque explica por qué la imagen existió.
+//
+// ── LO QUE DECÍA (y por qué) ─────────────────────────────────────────────────
 // 🔴 COMPARTIR: IMAGEN HASTA 6 RENGLONES, PDF DE AHÍ PARA ARRIBA.
 //
 // Daniel, 5-sep-2026: *«en el grupo de WhatsApp siempre ponen compartir cuando
@@ -21,20 +31,22 @@ import { MAX_RENGLONES_PNG, formatoParaCompartir } from "@/lib/guias/compartir-f
 const raiz = process.cwd();
 const leer = (p: string) => readFileSync(path.join(raiz, p), "utf8");
 
-describe("🔴 el corte está en SEIS renglones", () => {
-  it("la constante dice seis", () => {
+describe("🔄 el corte se retiró: ahora es PDF SIEMPRE", () => {
+  it("la constante se conserva con su medición, retirada", () => {
+    // 🔄 Antes esto era la regla; hoy es historia. No se borra: el 6 salió de
+    // medir que el 94% de las guías tiene 6 renglones o menos.
     expect(MAX_RENGLONES_PNG).toBe(6);
   });
 
-  it("de 1 a 6 renglones sale IMAGEN — el 94% de las guías", () => {
-    for (const n of [1, 2, 3, 4, 5, 6]) expect(formatoParaCompartir(n)).toBe("png");
+  it("🔴 de 1 a 6 renglones YA NO sale imagen — sale PDF", () => {
+    for (const n of [1, 2, 3, 4, 5, 6]) expect(formatoParaCompartir(n)).toBe("pdf");
   });
 
-  it("de 7 para arriba sale PDF — el 6% restante", () => {
+  it("de 7 para arriba sigue saliendo PDF (CONTROL: eso nunca cambió)", () => {
     for (const n of [7, 8, 17]) expect(formatoParaCompartir(n)).toBe("pdf");
   });
 
-  it("⚠️ cero renglones cae en PDF: una imagen vacía no sirve", () => {
+  it("⚠️ cero renglones sigue cayendo en PDF (CONTROL)", () => {
     expect(formatoParaCompartir(0)).toBe("pdf");
     expect(formatoParaCompartir(-1)).toBe("pdf");
     expect(formatoParaCompartir(NaN)).toBe("pdf");
@@ -51,17 +63,16 @@ describe("🩸 el archivo se arma SÍNCRONO — iOS exige el gesto del toque", (
     expect(armado).not.toContain("import(");
   });
 
-  it("decide con el módulo puro, no con un número suelto", () => {
-    expect(armado).toContain("formatoParaCompartir(");
+  it("🔴 arma el PDF y NADA MÁS: la imagen no puede volver por acá", () => {
+    expect(armado).toContain("construirPdfGuia(g)");
+    // 🔄 Antes se exigía `formatoParaCompartir(` acá adentro, para que el corte
+    // no quedara escrito como un número suelto. Con un solo formato posible la
+    // pregunta sobra; lo que se vigila ahora es que no vuelva la imagen.
+    expect(armado).not.toContain("Png");
     expect(armado).not.toMatch(/length\s*<=\s*\d/);
   });
 
-  it("⚠️ sin canvas cae al PDF de siempre: nunca se queda sin compartir", () => {
-    expect(armado).toContain("if (png) return png");
-    expect(armado).toContain("construirPdfGuia(g)");
-  });
-
-  it("el generador de la imagen tampoco espera nada", () => {
+  it("⚠️ el generador de la imagen queda RETIRADO, y sigue sin esperar nada", () => {
     const png = leer("src/lib/guias/png-guia.ts");
     const fn = /export function construirPngGuia\(g: Guia\): File \| null \{[\s\S]*?\n\}/.exec(png)?.[0] ?? "";
     expect(fn.length).toBeGreaterThan(0);
@@ -72,13 +83,16 @@ describe("🩸 el archivo se arma SÍNCRONO — iOS exige el gesto del toque", (
     expect(png).not.toContain("fetch(");
   });
 
-  it("🔴 las firmas se precargan al ABRIR la guía, no al tocar el botón", () => {
+  it("🔄 las firmas YA NO se precargan: no hay imagen que dibujar", () => {
+    // 🔄 Decía lo contrario («se precargan al ABRIR la guía, no al tocar el
+    // botón»), y era cierto mientras «Compartir» dibujaba una imagen síncrona.
+    // El PDF pinta las firmas desde el `data:` guardado sin esperar nada.
     for (const p of [
       "src/app/guias/components/GuiasList.tsx",
       "src/app/guias/[id]/page.tsx",
       "src/app/guias/components/GuiaDetail.tsx",
     ]) {
-      expect(leer(p), p).toContain("precargarFirmasGuia");
+      expect(leer(p), p).not.toContain("precargarFirmasGuia(");
     }
   });
 

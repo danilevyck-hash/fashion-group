@@ -88,19 +88,26 @@ function barrerGuias(re: RegExp): string[] {
 
 // ─── 2 · compartir mira el aparato ───────────────────────────────────────────
 
-describe("🔴 2. compartir: PNG en el celular, PDF en la computadora", () => {
-  it("en el CELULAR el corte de siempre: imagen hasta 6, PDF de ahí para arriba", () => {
-    for (const n of [1, 2, 3, 4, 5, 6]) expect(formatoParaCompartir(n, "celular")).toBe("png");
+describe("🔄 2. compartir: PDF EN LOS DOS APARATOS (9-sep-2026)", () => {
+  // 🔄 CAMBIA DE DIRECCIÓN, NO SE BORRA. Este bloque exigía «PNG en el celular,
+  // PDF en la computadora». Daniel: *«en guía, quiero todo PDF, quita lo de PNG
+  // que lo enredó»* — eran dos documentos para la misma guía y cuál salía
+  // dependía del aparato y del largo, que es justo lo que quien toca el botón
+  // no ve. La mitad que ya era cierta (computadora → PDF) se conserva como
+  // CONTROL, y la que cambió quedó escrita al revés con su motivo.
+  it("🔴 en el CELULAR ya NO sale imagen: PDF con uno o con seis renglones", () => {
+    for (const n of [1, 2, 3, 4, 5, 6]) expect(formatoParaCompartir(n, "celular")).toBe("pdf");
     for (const n of [7, 8, 17]) expect(formatoParaCompartir(n, "celular")).toBe("pdf");
+    // La constante se conserva retirada, con la medición que la fijó.
     expect(MAX_RENGLONES_PNG).toBe(6);
   });
 
-  it("🔴 en la COMPUTADORA es SIEMPRE el PDF, tenga los renglones que tenga", () => {
+  it("🔴 en la COMPUTADORA es SIEMPRE el PDF (CONTROL: eso no cambió)", () => {
     for (const n of [1, 2, 6, 7, 100]) expect(formatoParaCompartir(n, "computadora")).toBe("pdf");
   });
 
-  it("sin decir el aparato se asume celular: el corte de siempre (CONTROL)", () => {
-    expect(formatoParaCompartir(3)).toBe("png");
+  it("sin decir el aparato, también PDF", () => {
+    expect(formatoParaCompartir(3)).toBe("pdf");
     expect(formatoParaCompartir(9)).toBe("pdf");
   });
 
@@ -112,12 +119,17 @@ describe("🔴 2. compartir: PNG en el celular, PDF en la computadora", () => {
     }
   });
 
-  it("el que comparte PREGUNTA por el aparato — no se quedó con el corte pelado", () => {
+  it("🔄 el que comparte YA NO pregunta por el aparato: hay un solo formato", () => {
+    // 🔄 Decía «PREGUNTA por el aparato — no se quedó con el corte pelado», y
+    // era la regla mientras había dos formatos. Con uno solo, dejar la pregunta
+    // escrita es leer un camino que no existe.
     const papel = leer("src/lib/guias/papel-de-la-guia.ts");
     const armado = /function archivoParaCompartir\(g: Guia\): File \{[\s\S]*?\n\}/.exec(papel)?.[0] ?? "";
-    expect(armado).toContain("aparatoDeQuienMira()");
-    // 🩸 Y SIGUE SIN UN SOLO `await`: iOS solo deja abrir la hoja de compartir
-    // dentro del gesto del toque.
+    expect(armado).not.toContain("aparatoDeQuienMira()");
+    expect(armado).toContain("construirPdfGuia(g)");
+    expect(armado).not.toContain("Png");
+    // 🩸 Y SIGUE SIN UN SOLO `await` (CONTROL): iOS solo deja abrir la hoja de
+    // compartir dentro del gesto del toque.
     expect(armado).not.toContain("await ");
   });
 });

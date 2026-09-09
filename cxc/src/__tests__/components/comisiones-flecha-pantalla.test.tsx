@@ -20,6 +20,15 @@ vi.mock("next/navigation", () => ({
 // afirmar QUÉ alcance se pidió sin tocar el disco.
 const excelUna = vi.fn();
 const excelVarias = vi.fn();
+// 🔄 9-SEP-2026 — el PDF dejó de salir por `window.print()` y es un archivo de
+// verdad. Se espía el generador para poder afirmar QUÉ alcance se pidió y con
+// qué nombre, sin escribir un PDF en el disco.
+const pdfBajado = vi.fn();
+vi.mock("@/lib/comisiones/pdf-comision", () => ({
+  descargarPdfComision: (...a: unknown[]) => pdfBajado(...a),
+  construirPdfComision: vi.fn(),
+}));
+
 vi.mock("@/lib/ventas/comisionExcel", async (original) => {
   const real = await original<typeof import("@/lib/ventas/comisionExcel")>();
   return {
@@ -196,7 +205,12 @@ describe("🔴 tres alcances: una empresa · las de esa persona", () => {
     expect(excelUna).not.toHaveBeenCalled();
   });
 
-  it("el PDF de una celda monta el MISMO papel del detalle e imprime", async () => {
+  it("el PDF de una celda baja el MISMO reporte del detalle, ya como archivo", async () => {
+    // 🔄 9-SEP-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. Decía «monta el MISMO
+    // papel del detalle e imprime» y lo comprobaba viendo la hoja HTML montada
+    // (`#print-document`) más el `window.print()`. Daniel: *«¿no podemos hacer
+    // un botón de PDF, ya que de PDF en la compu paso a imprimir?»*. La regla es
+    // la misma —un solo reporte, el de siempre— y ahora sale como archivo.
     render(<ComisionesConsolidadoView year={2026} mes={9} />);
     const fila = await filaDe("Edwin");
     const celda = celdaCon(fila, "$70.69");
@@ -205,16 +219,20 @@ describe("🔴 tres alcances: una empresa · las de esa persona", () => {
     await act(async () => {
       fireEvent.click(within(menu).getByRole("menuitem", { name: /Descargar en PDF/ }));
     });
-    await waitFor(() => expect(document.querySelector("#print-document")).toBeTruthy());
-    // El papel es el de siempre: la factura LARGA (se concilia contra Switch).
-    expect(document.querySelector("#print-document")!.textContent).toContain("11-000003022");
-    expect(window.print).toHaveBeenCalled();
+    await waitFor(() => expect(pdfBajado).toHaveBeenCalled());
+    const hojas = pdfBajado.mock.calls.at(-1)![0] as { empresaNombre: string; vendedor: string }[];
+    expect(hojas).toHaveLength(1);
+    expect(hojas[0].empresaNombre).toBe("Vistana");
+    // El papel sigue siendo el de siempre: nadie imprime la pantalla.
+    expect(window.print).not.toHaveBeenCalled();
   });
 });
 
 describe("🔴 el archivo dice cuál de los tres alcances es", () => {
   it("el PDF del TOTAL se llama «Todas», no como el de una empresa", async () => {
-    const tituloOriginal = document.title;
+    // 🔄 El nombre ya no viaja por el `document.title` (que es como Chrome
+    // nombraba el archivo al imprimir): lo pone el código. El nombre esperado
+    // no cambió ni una letra.
     render(<ComisionesConsolidadoView year={2026} mes={9} />);
     const fila = await filaDe("Reynaldo Espinosa");
     const total = celdaCon(fila, "−$1,471.31");
@@ -223,13 +241,11 @@ describe("🔴 el archivo dice cuál de los tres alcances es", () => {
     await act(async () => {
       fireEvent.click(within(menu).getByRole("menuitem", { name: /Descargar en PDF/ }));
     });
-    // Chrome nombra el PDF con el `document.title`: eso es el nombre del archivo.
-    await waitFor(() => expect(document.title).toBe("Comisión-Reynaldo-Espinosa-Todas-2026-09"));
-    document.title = tituloOriginal;
+    await waitFor(() => expect(pdfBajado).toHaveBeenCalled());
+    expect(pdfBajado.mock.calls.at(-1)![1]).toBe("Comisión-Reynaldo-Espinosa-Todas-2026-09");
   });
 
   it("y el de una CELDA lleva la empresa en el nombre", async () => {
-    const tituloOriginal = document.title;
     render(<ComisionesConsolidadoView year={2026} mes={9} />);
     const fila = await filaDe("Edwin");
     const celda = celdaCon(fila, "$70.69");
@@ -238,8 +254,8 @@ describe("🔴 el archivo dice cuál de los tres alcances es", () => {
     await act(async () => {
       fireEvent.click(within(menu).getByRole("menuitem", { name: /Descargar en PDF/ }));
     });
-    await waitFor(() => expect(document.title).toBe("Comisión-Edwin-Vistana-2026-09"));
-    document.title = tituloOriginal;
+    await waitFor(() => expect(pdfBajado).toHaveBeenCalled());
+    expect(pdfBajado.mock.calls.at(-1)![1]).toBe("Comisión-Edwin-Vistana-2026-09");
   });
 });
 

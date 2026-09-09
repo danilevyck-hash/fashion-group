@@ -69,6 +69,9 @@ import { estaRetirado, sinRetirados, VENDEDORES_RETIRADOS, AVISO_VENDEDOR_RETIRA
 import { readFileSync } from "fs";
 import path from "path";
 import { nombreVendedorEnPantalla, type AliasVendedor } from "@/lib/comisiones/alias";
+// El encabezado del PAPEL: desde el 9-sep-2026 el reporte es un PDF y su
+// encabezado lo arma este módulo puro, no la pantalla.
+import { encabezadoReporte } from "@/lib/comisiones/reporte-comision";
 import { ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
 import type { ExcelApi } from "@/components/ventas/ComisionesView";
 
@@ -429,8 +432,20 @@ describe("🔴 (b) cada superficie muestra «Reynaldo Espinosa», nunca «REYNAL
     await waitFor(() => expect(screen.getAllByText("TOTAL VENTAS").length).toBeGreaterThan(0));
     expect(screen.getByRole("heading", { name: `Comisión — ${BONITO}` })).toBeTruthy();
     expect(screen.queryByText(new RegExp(`Comisión — ${CANONICO}`))).toBeNull();
-    // El encabezado que se repite en cada hoja impresa.
-    expect(screen.getAllByText(new RegExp(`^Comisión — ${BONITO} · Vistana International`)).length).toBeGreaterThan(0);
+    // 🔄 9-SEP-2026 — el encabezado de la hoja impresa se comprueba ahora sobre
+    // el módulo puro del reporte: el papel dejó de ser HTML montado en pantalla
+    // y pasó a ser el PDF (Daniel: *«¿no podemos hacer un botón de PDF…?»*). El
+    // capitalizado, que es lo que este candado cuida, no cambió.
+    expect(
+      encabezadoReporte({
+        data: { vendedor: CANONICO } as never,
+        descuentos: [],
+        empresaNombre: "Vistana International",
+        vendedor: CANONICO,
+        year: 2026,
+        mes: 8,
+      }),
+    ).toBe(`Comisión — ${BONITO} · Vistana International · Agosto 2026`);
     // Y el detalle se pidió con el nombre canónico tal cual.
     expect(llamadas.some((u) => u.includes("/comisiones/detalle?") && u.includes(encodeURIComponent(CANONICO)))).toBe(true);
   });

@@ -27,20 +27,23 @@
 // ya va en rojo y con el monto en negativo. En el Excel y en el papel se queda,
 // que es donde se concilia contra Switch.
 //
-// 🔴 **EL PDF YA NO SE LLAMA «Fashion Group.pdf».** Se imprime con
-// `window.print()` y Chrome nombra el archivo con el `document.title`, que en
-// toda la app es «Fashion Group» — o sea que los doce reportes de un cierre de
-// mes bajaban con el mismo nombre. Ahora el título se cambia justo antes de
-// imprimir y se devuelve como estaba después, **también si se cancela el
-// diálogo** (ver `nombre-archivo.ts`).
+// 🔴 UN SOLO BOTÓN, Y ES «PDF» (9-sep-2026). Daniel: *«¿no podemos hacer un
+// botón de PDF, ya que de PDF en la compu paso a imprimir?»*. Desde un PDF ya se
+// imprime, así que «Imprimir» sobraba.
 //
-// La hoja impresa vive en `comisiones-detalle/ImpresionComision.tsx` y va
-// SIEMPRE en un portal a <body>: es lo que permite imprimir igual desde el modal
-// y desde el detalle inline. El porqué del portal está en ese archivo.
+// 🩸 Y ANTES NO SALÍA NINGÚN ARCHIVO: el reporte se dibujaba en HTML y se
+// llamaba a `window.print()`, o sea que lo que aparecía era el DIÁLOGO del
+// navegador y «Guardar como PDF» quedaba escondido adentro. Ahora el botón baja
+// un PDF de verdad, armado con jsPDF en `lib/comisiones/pdf-comision.ts`, con el
+// nombre de siempre (`Comisión-Edwin-Vistana-2026-08`) puesto por NOSOTROS y no
+// por el `document.title` del navegador.
+//
+// 🩸 Con eso se cierra solo el defecto de que el PDF de una empresa se llevara el
+// reporte de otra pegado atrás: el documento se arma con las hojas que se le
+// pasan, no con lo que haya montado en `<body>`.
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { X, Download, Printer } from "lucide-react";
+import { X, Download, FileText } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
 import { exportComisionDetalle, comisionLinea, type ComisionDetalle, type ComisionDescuento } from "@/lib/ventas/comisionExcel";
@@ -50,13 +53,11 @@ import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
 import { facturaParaMostrar } from "@/lib/comisiones/factura-en-pantalla";
 import { nombreArchivoComision } from "@/lib/comisiones/nombre-archivo";
-// 🔴 IMPRIMIR CON EL NOMBRE CORRECTO VIVE EN UN SOLO LUGAR (8-sep-2026): la
-// flechita de la celda imprime el mismo reporte sin abrir esta pantalla, y dos
-// copias del mecanismo es cómo una de las dos deja el `document.title` de toda
-// la app renombrado.
-import { imprimirComo } from "@/lib/comisiones/imprimir";
+// 🔴 EL PDF SE ARMA EN UN SOLO LUGAR: la flechita de la celda baja el MISMO
+// reporte sin abrir esta pantalla, y dos generadores es cómo se llega a que el
+// archivo de un camino y el del otro no se parezcan.
+import { descargarPdfComision } from "@/lib/comisiones/pdf-comision";
 import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
-import { ImpresionComision } from "./comisiones-detalle/ImpresionComision";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -108,9 +109,9 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // El portal necesita `document`; en SSR no existe. Montamos en el cliente.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // 🔄 9-SEP-2026 — se fue el `mounted`: existía porque la hoja impresa iba en un
+  // portal y `document` no existe en SSR. Sin portal, el detalle se dibuja en el
+  // primer render y no se pierde un cuadro esperando el montaje.
 
   useEffect(() => {
     let alive = true;
@@ -171,8 +172,6 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const pctTasaV = data ? (data.tasa_venta * 100).toFixed(2) : "";
   const pctTasaC = data ? (data.tasa_cobro * 100).toFixed(2) : "";
 
-  if (!mounted) return null;
-
   const nombreArchivo = nombreArchivoComision(vendedor, empresa, year, mes);
 
   // ── Encabezado (título + total arriba + botones) ────────────────────────────
@@ -214,11 +213,19 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
         >
           <Download className="h-3.5 w-3.5" /> Descargar el detalle
         </button>
+        {/* 🔴 UN SOLO botón, y dice «PDF»: de un PDF ya se imprime. */}
         <button
-          onClick={() => imprimirComo(nombreArchivo)}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 text-sm text-gray-700 transition hover:border-black active:scale-[0.97]"
+          onClick={() =>
+            data &&
+            descargarPdfComision(
+              [{ data, descuentos, empresaNombre, vendedor, year, mes }],
+              nombreArchivo,
+            )
+          }
+          disabled={!data}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 text-sm text-gray-700 transition hover:border-black active:scale-[0.97] disabled:opacity-40"
         >
-          <Printer className="h-3.5 w-3.5" /> Imprimir
+          <FileText className="h-3.5 w-3.5" /> PDF
         </button>
         <button
           onClick={onClose}
@@ -412,21 +419,10 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
     </div>
   );
 
-  // La hoja impresa: SIEMPRE en un portal a <body>, en las dos formas. Es lo que
-  // permite que imprimir desde el detalle inline salga igual que desde el modal.
-  const impresion = data
-    ? createPortal(
-        <ImpresionComision
-          data={data}
-          descuentos={descuentos}
-          empresaNombre={empresaNombre}
-          vendedor={vendedor}
-          year={year}
-          mes={mes}
-        />,
-        document.body,
-      )
-    : null;
+  // 🔄 9-SEP-2026 — SE FUE LA HOJA IMPRESA EN HTML. Vivía en un portal a
+  // `<body>` porque `window.print()` no puede aislar un pedazo de la pantalla de
+  // otra forma. Con el PDF armado en código, el modal y el detalle de abajo bajan
+  // el MISMO archivo sin montar nada.
 
   if (inline) {
     return (
@@ -439,7 +435,6 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           {encabezado}
           {cuerpo}
         </section>
-        {impresion}
       </>
     );
   }
@@ -455,7 +450,6 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           {cuerpo}
         </div>
       </ModalOverlay>
-      {impresion}
     </>
   );
 }

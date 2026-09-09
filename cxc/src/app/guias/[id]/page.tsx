@@ -51,7 +51,6 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { observacionesVisibles } from "@/lib/guias/observaciones";
 import { cedulaParaMostrar } from "@/lib/guias/cedula";
-import { precargarFirmasGuia } from "@/lib/guias/png-guia";
 import { Toast } from "@/components/ui";
 import DespachoForm from "../components/DespachoForm";
 import EdicionGuia from "../components/EdicionGuia";
@@ -183,16 +182,13 @@ export default function GuiaPage() {
   }, []);
 
   /**
-   * 🔑 Y LAS FIRMAS SE DECODIFICAN AL ABRIR, no al tocar «Compartir». Desde el
-   * 5-sep-2026 una guía de hasta 6 renglones se comparte como IMAGEN, y
-   * dibujarla es síncrono de punta a punta (iOS pierde el gesto con un solo
-   * `await`). Pedir las firmas acá es lo que hace que al llegar el clic ya
-   * estén listas.
+   * 🔄 9-SEP-2026 — SE FUE LA PRECARGA DE FIRMAS. Decodificaba las dos firmas al
+   * ABRIR la guía porque «Compartir» mandaba una IMAGEN dibujada a mano y eso
+   * tenía que ser síncrono de punta a punta (iOS pierde el gesto con un solo
+   * `await`). Daniel: *«en guía, quiero todo PDF, quita lo de PNG que lo
+   * enredó»* — el PDF pinta las firmas desde el `data:` guardado sin esperar
+   * nada, así que ya no hay nada que adelantar.
    */
-  useEffect(() => {
-    if (!s.guia) return;
-    precargarFirmasGuia(s.guia);
-  }, [s.guia]);
 
   const cambiarModo = useCallback(
     (abierto: boolean) => {

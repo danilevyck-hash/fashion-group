@@ -4,41 +4,43 @@
 // BAJAR EL REPORTE SIN ABRIR EL DETALLE — el motor de la flechita.
 //
 // 🔴 SON LOS MISMOS ARCHIVOS DE SIEMPRE. El Excel sale de
-// `exportComisionDetalle` y el papel de `ImpresionComision`, exactamente los que
-// ya bajaban desde adentro del detalle: acá no se arma ningún reporte nuevo. Lo
-// único que cambia es que el reporte no necesita que la pantalla lo dibuje
-// primero.
+// `exportComisionDetalle` y el PDF de `pdf-comision`, exactamente los que bajan
+// desde adentro del detalle: acá no se arma ningún reporte nuevo. Lo único que
+// cambia es que el reporte no necesita que la pantalla lo dibuje primero.
 //
 // 🔴 Y ES LA MISMA LECTURA. Se piden las dos rutas que el detalle ya pide
 // (`/detalle` y `/descuentos`) con los mismos parámetros: si el archivo bajado
 // por la flecha y el bajado desde adentro pudieran diferir, sería porque uno de
 // los dos consulta otra cosa.
 //
-// 🔑 CÓMO SE IMPRIME SIN ABRIR NADA. El papel se monta en un portal a <body>
-// (invisible en pantalla, `hidden print:block`), se espera a que React lo pinte
-// —el efecto corre DESPUÉS del commit— y recién ahí se llama a imprimir. Al
-// terminar (o al cancelar el diálogo) el papel se desmonta: dejarlo puesto haría
-// que el siguiente `window.print()` de otra pantalla se llevara dos documentos.
+// 🔄 9-SEP-2026 — SE FUE EL PAPEL EN HTML. Hasta hoy el reporte se montaba en un
+// portal a `<body>` (invisible, `hidden print:block`), se esperaba a que React
+// lo pintara y recién ahí se llamaba a `window.print()`. Daniel: *«¿no podemos
+// hacer un botón de PDF, ya que de PDF en la compu paso a imprimir?»*. Ahora el
+// PDF se arma en código y se baja; no hay nada que montar, nada que esperar y
+// nada que desmontar después.
 //
-// ⚠️ VARIAS EMPRESAS = VARIOS REPORTES, UNO POR HOJA. Cada `ImpresionComision`
-// cierra su última página sin salto, así que el salto entre reportes lo pone
-// este archivo; sin él, la segunda empresa arrancaría a media hoja de la primera.
+// 🩸 Y CON ESO SE CIERRA SOLO EL DEFECTO QUE OBLIGABA A TAPAR CON CSS: con el
+// detalle abierto, su hoja también vivía en `<body>` y entraba al mismo trabajo
+// de impresión — el PDF de una empresa se llevaba el reporte de otra pegado
+// atrás. El documento ahora se arma SOLO con las hojas que se le pasan.
+//
+// ⚠️ VARIAS EMPRESAS = VARIOS REPORTES, UNO POR HOJA. El salto entre reportes lo
+// pone el generador (`construirPdfComision` abre hoja nueva por empresa).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback } from "react";
 import {
   exportComisionDetalle,
   exportComisionDetalleVarias,
   type ComisionDetalle,
   type ComisionDescuento,
 } from "@/lib/ventas/comisionExcel";
-import { imprimirComo } from "@/lib/comisiones/imprimir";
+import { descargarPdfComision } from "@/lib/comisiones/pdf-comision";
 import {
   nombreArchivoComision,
   nombreArchivoComisionTodas,
 } from "@/lib/comisiones/nombre-archivo";
-import { ImpresionComision } from "./ImpresionComision";
 
 /** Una empresa del alcance: su key y su nombre CORTO (diccionario § 0). */
 export interface EmpresaDelAlcance {
@@ -79,26 +81,6 @@ async function cargarUna(
 }
 
 export function useDescargaComision(year: number, mes: number) {
-  const [hojas, setHojas] = useState<Cargado[] | null>(null);
-  const [nombrePdf, setNombrePdf] = useState("");
-  const [vendedorPdf, setVendedorPdf] = useState("");
-  // El efecto imprime SOLO cuando el papel se montó por una descarga pedida.
-  const porImprimir = useRef(false);
-
-  useEffect(() => {
-    if (!hojas || !porImprimir.current) return;
-    porImprimir.current = false;
-    const limpiar = () => {
-      setHojas(null);
-      window.removeEventListener("afterprint", limpiar);
-    };
-    window.addEventListener("afterprint", limpiar);
-    // Red por si el navegador no dispara `afterprint`: el papel no se queda
-    // puesto para siempre.
-    window.setTimeout(limpiar, 60_000);
-    imprimirComo(nombrePdf);
-  }, [hojas, nombrePdf]);
-
   const cargar = useCallback(
     (empresas: EmpresaDelAlcance[], vendedor: string) =>
       Promise.all(empresas.map((e) => cargarUna(e, year, mes, vendedor))),
@@ -143,46 +125,20 @@ export function useDescargaComision(year: number, mes: number) {
   const descargarPdf = useCallback(
     async (empresas: EmpresaDelAlcance[], vendedor: string) => {
       const cargados = await cargar(empresas, vendedor);
-      setNombrePdf(nombreDe(empresas, vendedor));
-      setVendedorPdf(vendedor);
-      porImprimir.current = true;
-      setHojas(cargados);
+      descargarPdfComision(
+        cargados.map((c) => ({
+          data: c.data,
+          descuentos: c.descuentos,
+          empresaNombre: c.empresa.nombre,
+          vendedor,
+          year,
+          mes,
+        })),
+        nombreDe(empresas, vendedor),
+      );
     },
-    [cargar, nombreDe],
+    [cargar, nombreDe, year, mes],
   );
 
-  /** El papel. La vista lo renderiza; en pantalla no se ve nada. */
-  const papel =
-    hojas && typeof document !== "undefined"
-      ? createPortal(
-          <div data-cds-print="" data-cds-lote={hojas.length}>
-            {/* El salto entre reportes: cada `ImpresionComision` cierra su
-                última hoja sin `break-after`, así que sin esto la segunda
-                empresa arrancaría a media hoja de la primera. */}
-            <style>{`@media print {
-              [data-cds-lote] > [data-cds-print] + [data-cds-print] {
-                break-before: page; page-break-before: always;
-              }
-              /* 🩸 SOLO ESTE PAPEL. Si el detalle está abierto, su hoja también
-                 está montada en <body> y saldría pegada a este archivo: el PDF
-                 de una empresa traería el reporte de otra atrás. */
-              body > [data-cds-print]:not([data-cds-lote]) { display: none !important; }
-            }`}</style>
-            {hojas.map((h) => (
-              <ImpresionComision
-                key={h.empresa.key}
-                data={h.data}
-                descuentos={h.descuentos}
-                empresaNombre={h.empresa.nombre}
-                vendedor={vendedorPdf}
-                year={year}
-                mes={mes}
-              />
-            ))}
-          </div>,
-          document.body,
-        )
-      : null;
-
-  return { descargarExcel, descargarPdf, papel, MENSAJE_ERROR };
+  return { descargarExcel, descargarPdf, MENSAJE_ERROR };
 }
