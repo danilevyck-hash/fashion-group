@@ -147,3 +147,5 @@ Cuando se afirma algo de una pantalla, **se mira la pantalla**, no solo el códi
 - Toda sugerencia **numerada**, con **ahora vs recomendación** lado a lado, y las opciones **a·b·c** cuando hay que elegir. Él aprueba una por una.
 - **Mockup visual** cuando hace falta verlo; nunca datos inventados en un mockup.
 - **Se dice el riesgo, no las horas.** Cuánto se toca y qué puede romperse, no cuánto tarda.
+
+🔴 **Aprobar un cambio NO es aprobar que se ejecute.** Son dos permisos distintos y hacen falta los dos, **módulo por módulo**. Daniel puede decir «sí» a las 16 cosas de una pantalla y todavía no querer que se toque el código hoy. Antes de lanzar un agente a construir se pregunta, con esas palabras: **«¿lo lanzo?»**. Es el tercer paso de *mapear → definir juntos → ejecutar*, y es suyo.

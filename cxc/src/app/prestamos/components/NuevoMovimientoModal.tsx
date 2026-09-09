@@ -6,8 +6,7 @@ import {
   CONCEPTO_DANO,
   CONCEPTO_PAGO,
   CONCEPTO_PRESTAMO,
-  ORIGENES_PAGO,
-  ORIGEN_POR_DEFECTO,
+  ORIGENES_QUE_SE_OFRECEN,
 } from "@/lib/prestamos-conceptos";
 import {
   CUENTA_DANO,
@@ -29,10 +28,13 @@ import { MOV_TIPOS } from "./types";
  *   · **Baja de** solo aparece si debe LAS DOS cuentas. Viene puesta en la más
  *     vieja, y se puede cambiar. Con una sola cuenta con saldo no hay nada que
  *     preguntar.
- *   · **De dónde salió** solo aparece en un Pago, y viene en «Quincena» —que es
- *     de donde sale casi siempre—. Medido: 9 pagos reales salieron de una
- *     liquidación, del décimo o de vacaciones, y eso hoy solo se sabe si alguien
- *     lo escribió a mano en la nota.
+ *   · **De dónde salió** solo aparece en un Pago y **no viene ninguna puesta**:
+ *     hay que elegir. Medido el 8-sep-2026: los 434 movimientos vivos tienen ese
+ *     campo VACÍO —nunca se llenó, ni una vez— justamente porque venía contestado
+ *     de antemano. La «Quincena» ya NO se ofrece acá: ese descuento lo escribe el
+ *     botón «Aplicar quincena», así que lo que se teclea a mano es la excepción
+ *     (9 pagos reales salieron de una liquidación, del décimo o de vacaciones, y
+ *     hoy eso solo se sabe si alguien lo escribió a mano en la nota).
  *   · **La nota es opcional.** 8 de cada 10 eran un eco del concepto.
  *
  * 🔴 EL TOPE SE CALCULA EN PANTALLA PARA DECIRLO ANTES, no para decidir: la
@@ -57,7 +59,7 @@ export default function NuevoMovimientoModal({
   const [fecha, setFecha] = useState(hoy);
   const [monto, setMonto] = useState("");
   const [cuenta, setCuenta] = useState<CuentaPrestamo>(cuentaMasVieja ?? CUENTA_PRESTAMO);
-  const [origen, setOrigen] = useState<string>(ORIGEN_POR_DEFECTO);
+  const [origen, setOrigen] = useState<string>("");
   const [notas, setNotas] = useState("");
   const [guardando, setGuardando] = useState(false);
 
@@ -72,7 +74,10 @@ export default function NuevoMovimientoModal({
     : null;
   const necesitaAprobacion = evaluacion !== null && !evaluacion.pasa;
 
-  const listo = Number(monto) > 0 && !!fecha && !guardando;
+  // 🔴 EN UN PAGO HAY QUE ELEGIR DE DÓNDE SALIÓ. Ya no viene ninguna puesta
+  // (ver `ORIGENES_QUE_SE_OFRECEN`), así que si no se exige, el campo se salta
+  // — que es exactamente lo que pasó las 434 veces anteriores.
+  const listo = Number(monto) > 0 && !!fecha && !guardando && (!esPago || !!origen);
 
   async function guardar() {
     if (!listo) return;
@@ -144,7 +149,7 @@ export default function NuevoMovimientoModal({
           <div>
             <label className="text-xs text-gray-400 uppercase">De dónde salió</label>
             <div className="mt-1 flex flex-wrap gap-2">
-              {ORIGENES_PAGO.map((o) => (
+              {ORIGENES_QUE_SE_OFRECEN.map((o) => (
                 <button
                   key={o}
                   type="button"
