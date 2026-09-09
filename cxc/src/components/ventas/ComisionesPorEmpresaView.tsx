@@ -42,6 +42,10 @@ import { sinRetirados } from "@/lib/comisiones/retirados";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
+import { ROTULO_NO_SE_PAGA as MARCA_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
+import { nombreArchivoComisionesEmpresa } from "@/lib/comisiones/nombre-archivo";
+import { imprimirComo } from "@/lib/comisiones/imprimir";
+import { ImpresionTablaComisiones } from "./comisiones-detalle/ImpresionTablaComisiones";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
@@ -82,6 +86,8 @@ interface Props {
   /** El botón Excel vive en la barra del shell (ver ComisionesView): esta vista
    *  sigue siendo la dueña del cálculo y solo registra su función acá. */
   onExcel?: (api: ExcelApi | null) => void;
+  /** Lo mismo, para el botón «Descargar el mes en PDF» de esa misma barra. */
+  onPdf?: (api: ExcelApi | null) => void;
   /** Cambia cuando "Actualizar ahora" termina: fuerza re-pedir los datos. */
   refreshKey?: number;
 }
@@ -92,6 +98,7 @@ export function ComisionesPorEmpresaView({
   year,
   mes,
   onExcel,
+  onPdf,
   refreshKey = 0,
 }: Props) {
   const nombreEmpresa = empresaNombre ?? nombreCortoEmpresa(empresa);
@@ -160,13 +167,53 @@ export function ComisionesPorEmpresaView({
     });
   };
 
+  // 🔴 EL PDF DE ARRIBA DICE LO MISMO QUE EL EXCEL: las mismas filas que ya
+  // están en pantalla y el mismo pie (`sumarPagable`). Ninguna suma nueva.
+  const [imprimiendoMes, setImprimiendoMes] = useState(false);
+  const filasImpresas = () =>
+    conActividad.map((v) => ({
+      apagada: v.se_paga === false,
+      celdas: [
+        v.se_paga === false
+          ? `${nombreVendedorEnPantalla(v.vendedor)} (${MARCA_NO_SE_PAGA})`
+          : nombreVendedorEnPantalla(v.vendedor),
+        fmtMoney(v.base ?? 0),
+        fmtMoney(v.comision ?? 0),
+        fmtMoney(v.base_cobro ?? 0),
+        fmtMoney(v.comision_cobro ?? 0),
+        fmtMoney(v.comision_total ?? 0),
+      ],
+    }));
+
+  const handlePrint = () => {
+    if (vendedores.length === 0) return;
+    setImprimiendoMes(true);
+  };
+
+  useEffect(() => {
+    if (!imprimiendoMes) return;
+    const limpiar = () => {
+      setImprimiendoMes(false);
+      window.removeEventListener("afterprint", limpiar);
+    };
+    window.addEventListener("afterprint", limpiar);
+    window.setTimeout(limpiar, 60_000);
+    imprimirComo(nombreArchivoComisionesEmpresa(empresa, year, mes));
+  }, [imprimiendoMes, empresa, year, mes]);
+
   // El shell dispara el Excel de la vista activa (ver ComisionesView).
   const exportRef = useRef(handleExport);
   exportRef.current = handleExport;
+  const printRef = useRef(handlePrint);
+  printRef.current = handlePrint;
   useEffect(() => {
     onExcel?.({ run: () => exportRef.current(), disabled: vendedores.length === 0 });
     return () => onExcel?.(null);
   }, [onExcel, vendedores.length]);
+  useEffect(() => {
+    onPdf?.({ run: () => printRef.current(), disabled: vendedores.length === 0 });
+    return () => onPdf?.(null);
+  }, [onPdf, vendedores.length]);
 
   return (
     <div className="space-y-2">
@@ -305,6 +352,31 @@ export function ComisionesPorEmpresaView({
           mes={mes}
           vendedor={detalleVendedor}
           onClose={() => setDetalleVendedor(null)}
+        />
+      )}
+
+      {/* El papel del mes de ESTA empresa. Invisible en pantalla. */}
+      {imprimiendoMes && (
+        <ImpresionTablaComisiones
+          titulo={`Comisiones — ${nombreEmpresa}`}
+          subtitulo={etiquetaPeriodo(year, mes)}
+          columnas={[
+            { header: "Vendedor" },
+            { header: "Ventas", numerica: true },
+            { header: "Com. Venta", numerica: true },
+            { header: "Cobros", numerica: true },
+            { header: "Com. Cobro", numerica: true },
+            { header: "Com. Total", numerica: true },
+          ]}
+          filas={filasImpresas()}
+          totales={[
+            haySinPago ? "Total a pagar" : "Total",
+            fmtMoney(totalBase),
+            fmtMoney(totalComision),
+            fmtMoney(totalCobroBase),
+            fmtMoney(totalComisionCobro),
+            fmtMoney(totalGeneral),
+          ]}
         />
       )}
     </div>

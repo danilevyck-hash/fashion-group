@@ -98,7 +98,11 @@ describe("nada se borró: los componentes son los mismos, cambia dónde cuelgan"
 
   it("los caminos ya no se nombran como pestañas y el ámbito de fórmulas conserva sus dos lados", () => {
     const page = leer("src/app/productos/cargar/page.tsx");
-    expect(page).toContain("Depurador (importación)");
+    // 🔄 8-sep-2026: el módulo pasó a llamarse «Plantilla Switch», así que el
+    // rótulo del ámbito dejó de decir «Depurador». Los DOS lados se conservan:
+    // el candado sigue exigiendo que ninguno desaparezca.
+    expect(page).toContain("Plantilla (importación)");
     expect(page).toContain("Tienda (facturas)");
+    expect(page).not.toContain("Depurador (importación)");
   });
 });

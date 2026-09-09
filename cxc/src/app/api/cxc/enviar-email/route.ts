@@ -299,18 +299,14 @@ export async function POST(req: NextRequest) {
   // Un PDF por empresa (incluye empresas con saldo a favor).
   const attachments: { filename: string; content: string }[] = [];
   for (const emp of result.empresas) {
+    // Un PDF por empresa: el paquete conserva TODO lo del cliente (su nombre
+    // como lo escribe Switch, su ficha y el cuadre de esa empresa) y solo
+    // recorta las demás empresas. Copiar la empresa a mano y olvidar un campo es
+    // como el papel se quedaba sin datos que el servidor ya tenía.
     const pdfData: EstadoCuenta = {
-      codigo: result.codigo,
-      empresas: [
-        {
-          empresa_key: emp.empresa_key,
-          empresa_nombre: emp.empresa_nombre,
-          documentos: emp.documentos,
-          subtotal: emp.subtotal,
-        },
-      ],
+      ...result,
+      empresas: [emp],
       total: emp.subtotal,
-      generadoEn: result.generadoEn,
     };
     const { doc } = buildEstadoCuentaPDF(pdfData, nombre);
     const base64 = Buffer.from(doc.output("arraybuffer")).toString("base64");

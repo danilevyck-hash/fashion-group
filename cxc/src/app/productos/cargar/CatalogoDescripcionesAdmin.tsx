@@ -90,7 +90,7 @@ export default function CatalogoDescripcionesAdmin() {
           {/* Qué es y qué pasa al desactivar: se aprende una vez → ⓘ. */}
           <Ayuda titulo="Qué es este catálogo" className="-my-2">
             <p>
-              La fuente de verdad del Depurador y Facturas Tienda. Desactivar no borra: la descripción
+              La fuente de verdad de Plantilla Switch y Facturas Tienda. Desactivar no borra: la descripción
               deja de valer en el catálogo pero el histórico queda.
             </p>
           </Ayuda>

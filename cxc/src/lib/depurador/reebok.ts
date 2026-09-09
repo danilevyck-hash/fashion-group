@@ -291,10 +291,48 @@ const cmpPoNameGender = (a: { po: string; name: string; gender: string }, b: { p
 
 /** true si el artículo es Kids/Unisex para la talla-muestra:
  *  AGE GROUP presente y ≠ Adult, o GENDER = Unisex. */
-const esKidsUnisex = (it: ReebokItem): boolean => {
+const esKidsUnisex = (it: Pick<ReebokItem, "ageGroup" | "gender">): boolean => {
   const ag = normH(it.ageGroup);
   return (ag !== "" && ag !== "ADULT") || normH(it.gender) === "UNISEX";
 };
+
+/* ── LA REGLA DE TALLA-MUESTRA DE REEBOK, COMO DATO (8-sep-2026) ──────────────
+ * Igual que en el Depurador CK/TH: la pestaña «Reglas» dibujaba una tabla
+ * TECLEADA A MANO que decía ser el espejo de `pickSample`. Ahora hay UNA sola
+ * tabla — `pickSample` decide con `casoTallaReebok` y la pantalla dibuja
+ * `CASOS_TALLA_REEBOK`. */
+
+export type CasoTallaReebokId = "calzado-hombre" | "calzado-dama" | "calzado-kids" | "ropa";
+
+export interface CasoTallaReebok {
+  id: CasoTallaReebokId;
+  /** Cómo se llama el caso en pantalla. */
+  caso: string;
+  /** Qué talla se elige. */
+  talla: string;
+}
+
+export const CASOS_TALLA_REEBOK: CasoTallaReebok[] = [
+  { id: "calzado-hombre", caso: "Calzado · Male", talla: "9 · si no existe, la numérica más cercana (queda en ámbar)" },
+  { id: "calzado-dama", caso: "Calzado · Female", talla: "7 · si no existe, la numérica más cercana (queda en ámbar)" },
+  { id: "calzado-kids", caso: "Calzado · Kids / Unisex (AGE GROUP ≠ Adult, GENDER Unisex o sin género)", talla: "la mediana de las tallas disponibles" },
+  { id: "ropa", caso: "Ropa y accesorios (Apparel / Hardware)", talla: "M · si no hay M, la talla única (ámbar si hay varias)" },
+];
+
+/** La talla numérica que busca cada caso de calzado con género conocido. */
+const TALLA_OBJETIVO_REEBOK: Record<"calzado-hombre" | "calzado-dama", number> = {
+  "calzado-hombre": 9,
+  "calzado-dama": 7,
+};
+
+/** Qué caso de CASOS_TALLA_REEBOK le toca a un artículo. Es la MISMA decisión
+ *  que toma `pickSample`: no hay una segunda copia de la regla. */
+export function casoTallaReebok(it: Pick<ReebokItem, "department" | "ageGroup" | "gender">): CasoTallaReebokId {
+  if (!esFootwear(it.department)) return "ropa";
+  const g = normH(it.gender);
+  if (esKidsUnisex(it) || (g !== "MALE" && g !== "FEMALE")) return "calzado-kids";
+  return g === "MALE" ? "calzado-hombre" : "calzado-dama";
+}
 
 interface SampleResult { sku: string; talla: string; fallback: boolean }
 
@@ -317,13 +355,14 @@ function pickSample(group: ReebokItem[]): SampleResult {
     return { sku: skuOf(t), talla: t, fallback: bySize.size > 1 };
   };
 
-  if (esFootwear(first.department)) {
-    if (esKidsUnisex(first) || (normH(first.gender) !== "MALE" && normH(first.gender) !== "FEMALE")) {
+  const caso = casoTallaReebok(first);
+  if (caso !== "ropa") {
+    if (caso === "calzado-kids") {
       if (nums.length === 0) return fallbackAll();
       const mid = nums[Math.floor((nums.length - 1) / 2)]; // mediana (talla real, sin fallback)
       return { sku: skuOf(mid.t), talla: mid.t, fallback: false };
     }
-    const target = normH(first.gender) === "MALE" ? 9 : 7;
+    const target = TALLA_OBJETIVO_REEBOK[caso];
     if (nums.length === 0) return fallbackAll();
     const exact = nums.find((x) => x.n === target);
     if (exact) return { sku: skuOf(exact.t), talla: exact.t, fallback: false };

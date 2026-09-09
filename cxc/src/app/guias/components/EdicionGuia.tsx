@@ -83,6 +83,7 @@ export default function EdicionGuia({ id, guia, onSalir, onGuardado }: Props) {
         instantanea={s.instantanea}
         guardadoEn={s.guardadoEn}
         onAddDireccion={s.addDireccion}
+        onAddTransportista={s.addTransportista}
         onUpdateItem={s.updateItem}
         onUpdateItemFields={s.updateItemFields}
         onAddRow={s.addRow}

@@ -18,6 +18,23 @@
 // pantalla sería inventar. Se agrupa por lo que se puede medir: el monto.
 //
 // El corte mira el VALOR ABSOLUTO: un crédito de -$12 también es chico.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔄 9-sep-2026 — ESTE MÓDULO QUEDÓ SIN LECTORES, A PROPÓSITO.
+//
+// Daniel, preguntado en qué pantallas quería seguir plegando los de menos de
+// $50 al copiar la forma del estado de cuenta de Switch: *«En ninguno. Quiero
+// ver todo.»* Los dos cajones —el del grupo y el de Boston— dejaron de plegar.
+//
+// 🩸 Y no era solo una preferencia: la regla vivía SOLO en la pantalla y nunca
+// en el PDF, así que el cajón de D-25 mostraba 74 renglones y el papel que se
+// le mandaba al cliente imprimía 111. Dos superficies del MISMO estado de
+// cuenta diciendo cosas distintas.
+//
+// El archivo se conserva con su candado (mismo patrón que `mayor_lineas`): la
+// regla que guarda —**se agrupa por MONTO, jamás por tipo de documento**— es lo
+// que hay que volver a leer el día que se quiera volver a plegar algo. Lo que
+// se retiró es su USO, no la lección.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Debajo de esto (en valor absoluto) el documento se pliega. Dólares. */

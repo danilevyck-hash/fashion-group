@@ -32,6 +32,7 @@ import {
   rotuloDescargarPeriodo,
   sufijoArchivoPeriodo,
 } from "@/lib/comisiones/periodo";
+import { rotuloDescargarExcel } from "@/lib/comisiones/descarga";
 import { acumularVendedores } from "@/lib/comisiones/acumular-anio";
 import { celdaVacia, desgloseDeCelda } from "@/lib/comisiones/matriz-celda";
 import { facturaParaMostrar } from "@/lib/comisiones/factura-en-pantalla";
@@ -262,17 +263,33 @@ describe("🔴 12 · el PDF ya no se llama «Fashion Group.pdf»", () => {
   });
 
   it("🔴 el título se cambia antes de imprimir y SE DEVUELVE, aunque se cancele", () => {
-    const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
-    expect(modal).toContain("function imprimirComo(");
-    expect(modal).toContain("const anterior = document.title;");
+    // 🔄 8-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. El mecanismo salió de
+    // `ComisionesDetalleModal` a `lib/comisiones/imprimir`, porque la flechita
+    // de la celda imprime el MISMO reporte sin abrir esta pantalla: una segunda
+    // copia sería una de las dos dejando el título de toda la app renombrado.
+    // La regla no cambió, cambió dónde vive — y ahora se exige que viva en UN
+    // solo lugar.
+    const motor = plano(leer("src/lib/comisiones/imprimir.ts"));
+    expect(motor).toContain("export function imprimirComo(");
+    expect(motor).toContain("const anterior = document.title;");
     // `afterprint` cubre imprimir Y cancelar; el timeout es la red por si algún
     // navegador no lo dispara — dejarlo cambiado renombraría toda la app.
-    expect(modal).toContain('window.addEventListener("afterprint", restaurar)');
-    expect(modal).toContain("window.setTimeout(restaurar,");
-    expect(modal).toContain("document.title = anterior;");
-    // Y el botón de imprimir la USA: tenerla definida y no llamarla es lo mismo
-    // que no tenerla.
+    expect(motor).toContain('window.addEventListener("afterprint", restaurar)');
+    expect(motor).toContain("window.setTimeout(restaurar,");
+    expect(motor).toContain("document.title = anterior;");
+    // CONTROL de la regla original: el botón de imprimir del detalle la USA —
+    // tenerla definida y no llamarla es lo mismo que no tenerla.
+    const modal = plano(leer("src/components/ventas/ComisionesDetalleModal.tsx"));
     expect(modal).toContain("onClick={() => imprimirComo(nombreArchivo)}");
+    // Y NADIE se escribe su propia copia.
+    for (const f of [
+      "src/components/ventas/ComisionesDetalleModal.tsx",
+      "src/components/ventas/ComisionesConsolidadoView.tsx",
+      "src/components/ventas/ComisionesPorEmpresaView.tsx",
+      "src/components/ventas/comisiones-detalle/useDescargaComision.tsx",
+    ]) {
+      expect(plano(leer(f)), f).not.toContain("function imprimirComo(");
+    }
   });
 
   it("🔴 el Excel del detalle usa el MISMO nombre: uno solo para los dos archivos", () => {
@@ -435,7 +452,15 @@ describe("🔴 19 · los botones dicen QUÉ traen, y el verbo es «Descargar»",
   it("el del período dice el mes o el año", () => {
     expect(rotuloDescargarPeriodo(8)).toBe("Descargar el mes");
     expect(rotuloDescargarPeriodo(MES_TODO_EL_ANIO)).toBe("Descargar el año");
-    expect(plano(leer("src/components/ventas/ComisionesView.tsx"))).toContain("rotuloDescargarPeriodo(mes)");
+    // 🔄 8-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. Daniel pidió el mes en
+    // los DOS formatos, así que la barra ya no llama a `rotuloDescargarPeriodo`
+    // directo: llama a `rotuloDescargarExcel`, que le pega « en Excel» a ESTE
+    // mismo rótulo. CONTROL de que la regla original sigue viva: el «el mes» /
+    // «el año» sigue saliendo de un solo lugar, y con el año elegido el botón
+    // dice exactamente lo de siempre.
+    expect(plano(leer("src/components/ventas/ComisionesView.tsx"))).toContain("rotuloDescargarExcel(mes)");
+    expect(rotuloDescargarExcel(MES_TODO_EL_ANIO)).toBe(rotuloDescargarPeriodo(MES_TODO_EL_ANIO));
+    expect(rotuloDescargarExcel(8)).toBe("Descargar el mes en Excel");
   });
 
   it("el del detalle dice que es el detalle", () => {
@@ -447,7 +472,13 @@ describe("🔴 19 · los botones dicen QUÉ traen, y el verbo es «Descargar»",
     // formas raras. Daniel: «a, pero descargar, no bajar, como esté en todos los
     // módulos». Cada uno conserva QUÉ descarga.
     const esperado: [string, string][] = [
-      ["src/app/cxc/components/PanelCxcMobile.tsx", "Descargar CSV"],
+      // 🔄 8-sep-2026 — CAMBIA DE DIRECCIÓN, NO DE SENTIDO. El «···» del CXC en
+      // celular decía «Descargar CSV» y bajaba un archivo DISTINTO al del menú
+      // de la computadora. Los dos CSV se retiraron (Daniel: *«en ningún lado
+      // quiero exportar CSV, solo Excel»*) y las dos pantallas montan ahora el
+      // MISMO `MenuDescargar`. El verbo sigue siendo «Descargar» —que es lo que
+      // este candado vino a proteger— y ahora vive en el componente compartido.
+      ["src/app/cxc/components/MenuDescargar.tsx", "Descargar"],
       ["src/app/proveedores/ProveedoresListClient.tsx", "Descargar Excel"],
       ["src/app/marketing/components/DetallePeriodoView.tsx", "Descargar ZIP"],
       ["src/components/ventas/ReferenciaView.tsx", "Descargar Excel"],

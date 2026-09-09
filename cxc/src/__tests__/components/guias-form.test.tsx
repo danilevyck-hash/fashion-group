@@ -85,6 +85,7 @@ function Harness({
       error={null}
       saving={false}
       onAddDireccion={() => {}}
+      onAddTransportista={() => {}}
       onUpdateItem={(idx, field, value) =>
         set(items.map((it, i) => (i === idx ? { ...it, [field]: value } : it)))
       }

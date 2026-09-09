@@ -4,28 +4,24 @@ import { useEffect, useState } from "react";
 import Drawer from "@/components/Drawer";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt, fmtDate } from "@/lib/format";
-import { partirDocumentos, textoDocsChicos } from "@/lib/cxc/documentos-chicos";
+import { cuadrarConSwitch } from "@/lib/cxc/estado-cuenta-switch";
+import { seLeCobra } from "@/lib/cxc/cobrable";
 
-export interface EstadoDocumento {
-  numero: string;
-  fecha: string | null;
-  tipo: string;
-  monto: number;
-  saldo: number; // con signo (crédito negativo)
-  dias: number | null;
-}
-export interface EstadoEmpresa {
-  empresa_key: string;
-  empresa_nombre: string;
-  documentos: EstadoDocumento[];
-  subtotal: number;
-}
-export interface EstadoCuenta {
-  codigo: string;
-  empresas: EstadoEmpresa[];
-  total: number;
-  generadoEn: string;
-}
+// 🔴 LA FORMA DEL ESTADO DE CUENTA VIVE EN UN SOLO ARCHIVO (9-sep-2026).
+//
+// 🩸 Estaba escrita dos veces —acá y en `lib/cxc/estado-cuenta-data.ts`— y de
+// ACÁ la importaban el PDF y las dos rutas de correo. Agregar un campo en el
+// servidor y no acá no rompe nada: el papel simplemente deja de verlo, que es
+// como el número fiscal y el plazo de crédito llegaban al navegador desde
+// siempre sin que ninguna superficie los mostrara. Los `export` se conservan
+// para no tocar a los seis archivos que los importan por este nombre.
+export type {
+  EstadoDocumento,
+  EstadoEmpresa,
+  EstadoCuenta,
+  FichaCliente,
+} from "@/lib/cxc/estado-cuenta-tipos";
+import type { EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
 
 /** El código Switch (D-XXX) es el mismo en todas las empresas del cliente. */
 function codigoDe(client: ConsolidatedClient): string | null {
@@ -59,8 +55,6 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
   const [data, setData] = useState<EstadoCuenta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  /** Qué empresas tienen su bloque de documentos chicos desplegado. */
-  const [chicosAbiertos, setChicosAbiertos] = useState<Set<string>>(new Set());
 
   // ─────────────────────────────────────────────────────────────────────────
   // 🩸 ACÁ VIVÍA EL APARATO DE ENTREGAR EL PDF (5-sep-2026).
@@ -86,7 +80,6 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
     let cancel = false;
     setLoading(true);
     setError(false);
-    setChicosAbiertos(new Set());
     setData(null);
     fetch(`/api/cxc/estado-cuenta/${encodeURIComponent(codigo)}?empresa=${encodeURIComponent(empresaScope)}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("http"))))
@@ -118,7 +111,7 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
                 volver a la fila y abrir otro menú. Abre la MISMA hoja que el
                 botón de la fila; el PDF sigue estando, es una de sus cuatro
                 salidas. */}
-            {onCobrar && client && (
+            {onCobrar && client && seLeCobra(client.total) && (
               <button
                 type="button"
                 onClick={() => onCobrar(client)}
@@ -139,7 +132,7 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
           las filas. Ahora las pastillas los dicen de un vistazo y llevan a su
           sección de un toque. */}
       <div className="mb-4">
-        <p className="text-base font-medium text-gray-900">{nombre}</p>
+        <p className="text-base font-medium text-gray-900">{data?.clienteNombre || nombre}</p>
         <p className="text-2xl font-semibold tabular-nums text-gray-900 mt-1 leading-none">
           {data ? money(data.total) : "—"}
         </p>
@@ -174,17 +167,36 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
         <p className="text-sm text-gray-500">Este cliente no tiene documentos con saldo pendiente.</p>
       )}
 
+      {/* 🔴 EL CUADRE CONTRA SWITCH SE DICE, NO SE ESCONDE (9-sep-2026). El
+          sistema suma los documentos por su cuenta; Switch manda además su
+          propio total con cada estado de cuenta. Si no coinciden, el papel que
+          se le va a mandar al cliente lleva un número que Switch no reconoce —
+          y hasta hoy nada lo decía. Sin dato de Switch NO se afirma nada. */}
+      {data && !loading && (() => {
+        const saldoSwitch = data.empresas.reduce<number | null>(
+          (acc, e) => (e.saldoSwitch == null ? acc : (acc ?? 0) + e.saldoSwitch),
+          null,
+        );
+        const cuadre = cuadrarConSwitch(data.total, saldoSwitch);
+        if (cuadre.cuadra || !cuadre.aviso) return null;
+        return (
+          <p role="alert" className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {cuadre.aviso}
+          </p>
+        );
+      })()}
+
       {data && !loading && data.empresas.map((emp) => {
-        // 🔴 LO CHICO SE AGRUPA POR MONTO, NUNCA POR TIPO DE DOCUMENTO. Medido:
-        // City Mall Paso Canoa abre con 110 documentos y **36 valen menos de
-        // $50 y suman $227,20** — un tercio de la lista para el 0,05 % del
-        // saldo. Agrupar por tipo («las notas de débito son las chicas») es la
-        // tentación obvia y es FALSA: hay notas de débito de $5.000
-        // (Internacional Belén) y de $3.349,10 (City Mall David) que no se
-        // pueden esconder. La regla vive en `lib/cxc/documentos-chicos.ts`.
-        const { grandes, chicos, totalChicos } = partirDocumentos(emp.documentos);
-        const abierto = chicosAbiertos.has(emp.empresa_key);
-        const visibles = abierto ? [...grandes, ...chicos] : grandes;
+        // 🔴 SE MUESTRAN TODOS LOS DOCUMENTOS (9-sep-2026). Daniel, preguntado
+        // en qué pantallas quería seguir plegando los de menos de $50: *«En
+        // ninguno. Quiero ver todo.»*
+        //
+        // 🩸 Y no era solo una preferencia: el cajón de D-25 mostraba 74
+        // renglones y el papel imprimía 111 — la pantalla y el papel decían
+        // cosas distintas del MISMO estado de cuenta. La regla vivía solo acá,
+        // nunca en el PDF. `lib/cxc/documentos-chicos.ts` se conserva con su
+        // candado (agrupar por MONTO y jamás por tipo de documento sigue siendo
+        // la regla el día que se vuelva a plegar algo), pero ya no se usa.
         return (
         <section key={emp.empresa_key} id={`ec-${emp.empresa_key}`} className="mb-5 last:mb-0 scroll-mt-4">
           {data.empresas.length > 1 && (
@@ -208,7 +220,7 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
           </div>
 
           <ul className="divide-y divide-gray-100">
-            {visibles.map((doc, i) => (
+            {emp.documentos.map((doc, i) => (
               <li key={`${emp.empresa_key}-${doc.numero}-${i}`} className="grid grid-cols-12 gap-2 px-1 py-2 items-center">
                 <div className="col-span-4 min-w-0">
                   <p className="text-sm text-gray-900 truncate" title={doc.numero}>{doc.numero}</p>
@@ -231,21 +243,6 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose, onC
               </li>
             ))}
           </ul>
-
-          {chicos.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setChicosAbiertos((previas) => {
-                const siguientes = new Set(previas);
-                if (siguientes.has(emp.empresa_key)) siguientes.delete(emp.empresa_key);
-                else siguientes.add(emp.empresa_key);
-                return siguientes;
-              })}
-              className="w-full text-left px-1 py-2 min-h-[44px] text-xs text-gray-500 hover:text-gray-800 transition"
-            >
-              {textoDocsChicos(chicos.length, money(totalChicos))} — {abierto ? "ocultar" : "ver"}
-            </button>
-          )}
         </section>
         );
       })}

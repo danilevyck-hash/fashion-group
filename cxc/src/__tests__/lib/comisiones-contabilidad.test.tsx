@@ -373,8 +373,14 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     sesion("contabilidad", FG_MODULES_CONTABILIDAD_HOY);
     render(<ComisionesPageClient availableYears={[2026]} />);
     // 🔄 6-sep-2026: el botón dice QUÉ TRAE («Descargar el mes»), no «Excel».
-    const excel = await screen.findByRole("button", { name: /Descargar el mes/i });
+    // 🔄 8-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA: ahora son DOS botones
+    // (el mes en PDF y el mes en Excel), así que hay que nombrar cuál. La regla
+    // no cambió: contabilidad se lleva el mes.
+    const excel = await screen.findByRole("button", { name: /Descargar el mes en Excel/i });
     await waitFor(() => expect((excel as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
+    // CONTROL: y el de PDF, que es el mismo mes, también le sirve.
+    const pdf = await screen.findByRole("button", { name: /Descargar el mes en PDF/i });
+    await waitFor(() => expect((pdf as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
   }, 20000);
 
   it("🔴 NO le dibuja «Actualizar ahora» — ese POST le contesta 403", async () => {

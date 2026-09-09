@@ -1,268 +1,222 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL PAPEL DE CUENTAS POR COBRAR — UNO SOLO, CON EL BRANDBOOK DE LA CASA
+// (8-sep-2026).
+//
+// 🩸 ERAN DOS PDF QUE SALÍAN DEL MISMO MENÚ Y NO SE PARECÍAN. El «Resumen»
+// llevaba el encabezado de tabla casi BLANCO (`#F9FAFB`, letra gris) y el
+// «Detallado» casi NEGRO (`#111827`, letra blanca); uno era vertical y el otro
+// horizontal; uno traía cuatro cajas de totales y una barra de colores que el
+// otro no. Dos documentos de la misma pantalla, el mismo día, con dos identidades.
+//
+// Ahora son **las dos descargas de Daniel** —«Total por cliente» y «Detallado
+// por compañía»— y las dos comparten cabecera, pie, colores y tipografía:
+//
+//   · arriba a la izquierda el logo, y debajo en gris chico qué es y de qué empresa
+//   · arriba a la derecha la fecha, y debajo `Hoja 2 de 6`
+//   · encabezado de tabla en **navy `#1B3A5C`** (el mismo de los Excel), letra blanca
+//   · filas alternadas muy suaves, montos a la derecha con cifras de ancho fijo
+//   · Total en fila destacada con borde superior navy
+//   · pie: `Confidencial` a la izquierda, `fashiongr.com` a la derecha
+//
+// 🔴 LOS RÓTULOS DE LOS TRAMOS NO SE ESCRIBEN ACÁ: salen de `tramoLabel()`, la
+// misma función que rotula las píldoras de la pantalla, las columnas de la tabla
+// y las tarjetas del celular. Este papel llegó a decir tres cosas distintas del
+// mismo tramo en el mismo documento («Corriente», «Vigilancia», «+121d»); nada
+// de eso vuelve mientras el nombre se derive.
+//
+// 🔴 Y QUÉ SE IMPRIME LO DECIDE `lib/cxc/descargas.ts`, no este archivo: acá solo
+// se dibuja. Ahí vive el saldo a favor que no entra, el nombre capitalizado y —lo
+// que costó un papel que se contradecía a sí mismo— qué empresas se listan.
+// ─────────────────────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { ConsolidatedClient } from "@/lib/types";
-import type { Company } from "@/lib/companies";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-import { AGING, tramoLabel } from "@/lib/cxc-aging";
+import { tramoLabel } from "@/lib/cxc-aging";
+import { fmtDate } from "@/lib/format";
+import type { BloqueCliente, FilaCliente } from "@/lib/cxc/descargas";
+import { totalDeLasFilas } from "@/lib/cxc/descargas";
 
-// 🔴 EL PAPEL NO ESCRIBE SUS PROPIOS RÓTULOS: los DERIVA de `cxc-aging.ts`, la
-// misma fuente que rotula las píldoras KPI, las columnas de la tabla y las
-// tarjetas del celular (12-ago-2026).
-//
-// 🩸 Por qué. Este PDF sale del botón "Exportar" de la pantalla de Cuentas por
-// Cobrar, y decía tres cosas distintas del MISMO tramo — en el mismo documento:
-//
-//   cajas KPI:  "Corriente 0-90d" · "Vigilancia 91-120d" · "Vencido +121d"
-//   barra:      "Corriente"       · "Vigilancia"          · "Vencido"
-//   tabla:      "Por vencer 0-90d"· "Vencido reciente…"   · "Vencido crítico +120d"
-//
-// "Corriente" y "Vigilancia" NO EXISTEN en ninguna otra superficie del sistema
-// —ni en la pantalla, ni en el correo, ni en el CSV—, y el tramo viejo llegó a
-// tener CUATRO redacciones ("+121d", "+120d", "121d+", "Vencido crítico").
-// Derivarlo es lo único que impide que vuelvan a separarse.
-//
-// ⚠️ LOS TRAMOS NO SE TOCAN: 0-90 / 91-120 / 121+ son exactamente los mismos, y
-// las cifras salen de los mismos campos `current`/`watch`/`overdue` que suma la
-// pantalla. "+120d" y "121d+" son dos maneras de escribir EL MISMO corte (más de
-// 120 = 121 en adelante); se elige la de la pantalla, que es la referencia.
-// El nombre del tramo vive en `cxc-aging` y lo comparten el papel, la pantalla
-// de escritorio y la del celular. Acá se importa, no se copia.
+// El nombre del tramo se importa, no se copia (ver el 🔴 de arriba).
 const tramo = tramoLabel;
+
+/** Navy de la casa — el MISMO `pri` de `CASA_PALETTE` en `excel-export.ts`. */
+const NAVY: [number, number, number] = [27, 58, 92];
+const TINTA: [number, number, number] = [17, 24, 39];
+const GRIS: [number, number, number] = [107, 114, 128];
+const GRIS_CLARO: [number, number, number] = [156, 163, 175];
+const CEBRA: [number, number, number] = [248, 249, 249];
+
+const MARGEN = 19;
+/** Dónde arranca la tabla: debajo de la cabecera, en todas las hojas. */
+const ALTO_CABECERA = 32;
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function fmtDate() {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+function dinero(n: number) {
+  return `$${fmt(n)}`;
 }
 
-function isoDate() {
-  return new Date().toISOString().slice(0, 10).replace(/-/g, "");
-}
-
-function addHeader(doc: jsPDF, subtitle?: string) {
+/**
+ * La cabecera de CADA hoja: logo, qué es, de qué empresa y la fecha.
+ *
+ * El `Hoja N de M` NO se dibuja acá: cuántas hojas hay recién se sabe al final
+ * (ver `piePorHoja`).
+ */
+function cabecera(doc: jsPDF, subtitulo: string, hoy: string) {
   const w = doc.internal.pageSize.getWidth();
 
-  // Logo
   try {
-    doc.addImage(FG_LOGO_BASE64, "JPEG", 19, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
-  } catch { /* skip if logo fails */ }
+    doc.addImage(FG_LOGO_BASE64, "JPEG", MARGEN, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
+  } catch { /* sin logo el papel sale igual: nunca se cae por una imagen */ }
 
-  const textX = 19 + FG_LOGO_WIDTH + 3;
+  const x = MARGEN + FG_LOGO_WIDTH + 3;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(17, 24, 39);
-  doc.text("FASHION GROUP", textX, 18);
+  doc.setFontSize(13);
+  doc.setTextColor(...TINTA);
+  doc.text("FASHION GROUP", x, 17);
 
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...GRIS);
+  doc.text(subtitulo, x, 22);
+
   doc.setFontSize(9);
-  doc.setTextColor(107, 114, 128);
-  // "Cuentas por Cobrar", no "Reporte CXC": es como se llama la pantalla de la
-  // que sale este papel (AppHeader module=), y "CXC" es jerga que la propia
-  // guía de UX del proyecto manda traducir.
-  doc.text(`Cuentas por Cobrar — ${fmtDate()}`, w - 19, 18, { align: "right" });
+  doc.setTextColor(...TINTA);
+  doc.text(fmtDate(hoy), w - MARGEN, 17, { align: "right" });
 
-  if (subtitle) {
-    doc.setFontSize(9);
-    doc.text(subtitle, textX, 24);
-  }
-
-  // Line under header
-  const y = subtitle ? 28 : 24;
-  doc.setDrawColor(229, 231, 235);
-  doc.setLineWidth(0.5);
-  doc.line(19, y, w - 19, y);
-  return y + 4;
+  doc.setDrawColor(...NAVY);
+  doc.setLineWidth(0.4);
+  doc.line(MARGEN, 26, w - MARGEN, 26);
 }
 
-function addFooter(doc: jsPDF) {
-  const pages = doc.getNumberOfPages();
+/** `Hoja N de M` arriba a la derecha y el pie, en todas las hojas. */
+function piePorHoja(doc: jsPDF) {
+  const hojas = doc.getNumberOfPages();
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
-  for (let i = 1; i <= pages; i++) {
+  for (let i = 1; i <= hojas; i++) {
     doc.setPage(i);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...GRIS);
+    doc.text(`Hoja ${i} de ${hojas}`, w - MARGEN, 22, { align: "right" });
+
     doc.setFontSize(7);
-    doc.setTextColor(156, 163, 175);
-    doc.text(`Generado ${fmtDate()} · Confidencial · Fashion Group`, w / 2, h - 10, { align: "center" });
-    doc.text(`${i} / ${pages}`, w - 19, h - 10, { align: "right" });
+    doc.setTextColor(...GRIS_CLARO);
+    doc.text("Confidencial", MARGEN, h - 10);
+    doc.text("fashiongr.com", w - MARGEN, h - 10, { align: "right" });
   }
 }
 
-export function generatePDFResumen(data: ConsolidatedClient[], subtitle?: string): string {
+/** Los estilos de tabla que comparten los dos papeles. */
+function estilosDeTabla() {
+  return {
+    styles: { font: "helvetica" as const, fontSize: 8, cellPadding: 2, textColor: TINTA },
+    headStyles: { fillColor: NAVY, textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" as const, fontSize: 7.5 },
+    alternateRowStyles: { fillColor: CEBRA },
+    // El Total va destacado y con borde superior navy: es una fila que se lee
+    // sola, no la última de la lista.
+    footStyles: {
+      fillColor: [255, 255, 255] as [number, number, number],
+      textColor: TINTA,
+      fontStyle: "bold" as const,
+      fontSize: 8.5,
+      lineColor: NAVY,
+      lineWidth: { top: 0.6, right: 0, bottom: 0, left: 0 },
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1 · «Total por cliente» — un renglón por cliente
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function pdfTotalPorCliente(
+  filas: FilaCliente[],
+  opts: { subtitulo: string; archivo: string; hoy: string },
+): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
-
-  const totalCxc = data.reduce((s, c) => s + c.total, 0);
-  const totalCurrent = data.reduce((s, c) => s + c.current, 0);
-  const totalWatch = data.reduce((s, c) => s + c.watch, 0);
-  const totalOverdue = data.reduce((s, c) => s + c.overdue, 0);
-  const pctCur = totalCxc > 0 ? (totalCurrent / totalCxc) * 100 : 0;
-  const pctWat = totalCxc > 0 ? (totalWatch / totalCxc) * 100 : 0;
-  const pctOvr = totalCxc > 0 ? (totalOverdue / totalCxc) * 100 : 0;
-
-  let y = addHeader(doc, subtitle ? `${subtitle} · ${data.length} clientes` : `${data.length} clientes`);
-
-  // Summary boxes
-  const w = doc.internal.pageSize.getWidth();
-  const boxW = (w - 38 - 9) / 4; // 4 boxes with 3mm gaps
-  const boxes = [
-    // "Total pendiente" es como lo rotula la pantalla (píldora de KpiCards, hero
-    // del celular y píldora de Boston). "Total CXC" era jerga y era el único
-    // lugar del sistema que lo llamaba así.
-    { label: "Total pendiente", value: `$${fmt(totalCxc)}`, bg: [249, 250, 251] },
-    { label: tramo("current"), value: `$${fmt(totalCurrent)}`, bg: [236, 253, 245] },
-    { label: tramo("watch"), value: `$${fmt(totalWatch)}`, bg: [255, 251, 235] },
-    { label: tramo("overdue"), value: `$${fmt(totalOverdue)}`, bg: [254, 242, 242] },
-  ];
-  boxes.forEach((box, i) => {
-    const x = 19 + i * (boxW + 3);
-    doc.setFillColor(box.bg[0], box.bg[1], box.bg[2]);
-    doc.roundedRect(x, y, boxW, 14, 1.5, 1.5, "F");
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
-    doc.setTextColor(107, 114, 128);
-    doc.text(box.label, x + 3, y + 5);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(17, 24, 39);
-    doc.text(box.value, x + 3, y + 11);
-  });
-  y += 18;
-
-  // Aging bar
-  const barX = 19;
-  const barW = w - 38;
-  const barH = 4;
-  // Green
-  doc.setFillColor(5, 150, 105);
-  doc.roundedRect(barX, y, barW * (pctCur / 100), barH, 1, 1, "F");
-  // Yellow
-  if (pctWat > 0) {
-    doc.setFillColor(217, 119, 6);
-    doc.rect(barX + barW * (pctCur / 100), y, barW * (pctWat / 100), barH, "F");
-  }
-  // Red
-  if (pctOvr > 0) {
-    doc.setFillColor(220, 38, 38);
-    const redX = barX + barW * ((pctCur + pctWat) / 100);
-    doc.roundedRect(redX, y, barW * (pctOvr / 100), barH, 1, 1, "F");
-  }
-  y += 6;
-  doc.setFontSize(6);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(107, 114, 128);
-  doc.text(`${AGING.current.label} ${pctCur.toFixed(0)}%`, barX, y + 2.5);
-  doc.text(`${AGING.watch.label} ${pctWat.toFixed(0)}%`, barX + barW / 2, y + 2.5, { align: "center" });
-  doc.text(`${AGING.overdue.label} ${pctOvr.toFixed(0)}%`, barX + barW, y + 2.5, { align: "right" });
-  y += 6;
-
-  // Table
-  const tableData = data.map((c) => [
-    c.nombre_normalized,
-    `$${fmt(c.current)}`,
-    `$${fmt(c.watch)}`,
-    `$${fmt(c.overdue)}`,
-    `$${fmt(c.total)}`,
-  ]);
+  const t = totalDeLasFilas(filas);
 
   autoTable(doc, {
-    startY: y,
-    margin: { left: 19, right: 19 },
-    head: [["Cliente", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
-    body: tableData,
-    foot: [["Total", `$${fmt(totalCurrent)}`, `$${fmt(totalWatch)}`, `$${fmt(totalOverdue)}`, `$${fmt(totalCxc)}`]],
-    styles: { font: "helvetica", fontSize: 8, cellPadding: 2, textColor: [17, 24, 39] },
-    headStyles: { fillColor: [249, 250, 251], textColor: [107, 114, 128], fontStyle: "bold", fontSize: 7 },
-    footStyles: { fillColor: [17, 24, 39], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
+    startY: ALTO_CABECERA,
+    margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: 18 },
+    head: [["Código", "Cliente", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
+    body: filas.map((f) => [f.codigo, f.nombre, dinero(f.t0), dinero(f.t1), dinero(f.t2), dinero(f.total)]),
+    foot: [["", "Total", dinero(t.t0), dinero(t.t1), dinero(t.t2), dinero(t.total)]],
     columnStyles: {
-      0: { cellWidth: "auto" },
-      1: { halign: "right", textColor: [5, 150, 105] },
-      2: { halign: "right", textColor: [217, 119, 6] },
-      3: { halign: "right", textColor: [220, 38, 38] },
-      4: { halign: "right", fontStyle: "bold" },
+      0: { cellWidth: 18 },
+      1: { cellWidth: "auto" },
+      2: { halign: "right", cellWidth: 24 },
+      3: { halign: "right", cellWidth: 24 },
+      4: { halign: "right", cellWidth: 24 },
+      5: { halign: "right", cellWidth: 26, fontStyle: "bold" },
     },
-    alternateRowStyles: { fillColor: [249, 250, 251] },
-    didDrawPage: () => {},
+    ...estilosDeTabla(),
+    didDrawPage: () => cabecera(doc, opts.subtitulo, opts.hoy),
   });
 
-  addFooter(doc);
-  const filename = `CXC_Resumen_${isoDate()}.pdf`;
-  doc.save(filename);
-  return filename;
+  piePorHoja(doc);
+  doc.save(opts.archivo);
+  return doc;
 }
 
-export function generatePDFDetallado(
-  data: ConsolidatedClient[],
-  companies: Company[],
-  subtitle?: string
-): string {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
+// ─────────────────────────────────────────────────────────────────────────────
+// 2 · «Detallado por compañía» — las compañías ADENTRO del cliente, y la suma
+//     del cliente ABAJO de sus compañías
+// ─────────────────────────────────────────────────────────────────────────────
 
-  let y = addHeader(doc, subtitle ? `${subtitle} · Detallado · ${data.length} clientes` : `Detallado · ${data.length} clientes`);
+type Celda = string | { content: string; colSpan?: number; styles?: Record<string, unknown> };
 
-  const clientsWithData = data.filter((c) => c.total !== 0);
+export function pdfPorCompania(
+  bloques: BloqueCliente[],
+  opts: { subtitulo: string; archivo: string; hoy: string },
+): jsPDF {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const t = totalDeLasFilas(bloques);
 
-  const tableBody: (string | { content: string; styles?: Record<string, unknown> })[][] = [];
-
-  for (const c of clientsWithData) {
-    // Client header row
-    tableBody.push([
-      { content: c.nombre_normalized, styles: { fontStyle: "bold" as const, fillColor: [243, 244, 246] } },
-      { content: "", styles: { fillColor: [243, 244, 246] } },
-      { content: "", styles: { fillColor: [243, 244, 246] } },
-      { content: "", styles: { fillColor: [243, 244, 246] } },
-      { content: "", styles: { fillColor: [243, 244, 246] } },
-      { content: "", styles: { fillColor: [243, 244, 246] } },
-      { content: "", styles: { fillColor: [243, 244, 246] } },
-      { content: "", styles: { fillColor: [243, 244, 246] } },
-      { content: "", styles: { fillColor: [243, 244, 246] } },
-      { content: `$${fmt(c.total)}`, styles: { fontStyle: "bold" as const, fillColor: [243, 244, 246], halign: "right" as const } },
+  const cuerpo: Celda[][] = [];
+  for (const b of bloques) {
+    // El nombre del cliente ENCABEZA su bloque.
+    cuerpo.push([
+      { content: b.codigo, styles: { fontStyle: "bold", fillColor: [237, 242, 247] } },
+      { content: b.nombre, colSpan: 5, styles: { fontStyle: "bold", fillColor: [237, 242, 247] } },
     ]);
-
-    // Company rows
-    for (const co of companies) {
-      const d = c.companies[co.key];
-      if (!d || d.total === 0) continue;
-      tableBody.push([
-        `  ${co.name}`,
-        `$${fmt(d.d0_30)}`,
-        `$${fmt(d.d31_60)}`,
-        `$${fmt(d.d61_90)}`,
-        `$${fmt(d.d91_120)}`,
-        `$${fmt(d.d121_180)}`,
-        `$${fmt(d.d181_270)}`,
-        `$${fmt(d.d271_365)}`,
-        `$${fmt(d.mas_365)}`,
-        `$${fmt(d.total)}`,
-      ]);
+    for (const e of b.empresas) {
+      cuerpo.push(["", e.empresa, dinero(e.t0), dinero(e.t1), dinero(e.t2), dinero(e.total)]);
     }
+    // …y la suma del cliente va ABAJO de sus compañías, nunca arriba.
+    cuerpo.push([
+      "",
+      { content: `Total ${b.nombre}`, styles: { fontStyle: "bold", halign: "right" } },
+      { content: dinero(b.t0), styles: { fontStyle: "bold", halign: "right" } },
+      { content: dinero(b.t1), styles: { fontStyle: "bold", halign: "right" } },
+      { content: dinero(b.t2), styles: { fontStyle: "bold", halign: "right" } },
+      { content: dinero(b.total), styles: { fontStyle: "bold", halign: "right" } },
+    ]);
   }
 
   autoTable(doc, {
-    startY: y,
-    margin: { left: 19, right: 19 },
-    head: [["Cliente / Empresa", "0-30", "31-60", "61-90", "91-120", "121-180", "181-270", "271-365", "+365", "Total"]],
-    body: tableBody,
-    styles: { font: "helvetica", fontSize: 7, cellPadding: 1.5, textColor: [17, 24, 39] },
-    headStyles: { fillColor: [17, 24, 39], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 6.5 },
+    startY: ALTO_CABECERA,
+    margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: 18 },
+    head: [["Código", "Cliente / Compañía", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
+    body: cuerpo,
+    foot: [["", "Total", dinero(t.t0), dinero(t.t1), dinero(t.t2), dinero(t.total)]],
     columnStyles: {
-      0: { cellWidth: 50 },
-      1: { halign: "right" },
-      2: { halign: "right" },
-      3: { halign: "right" },
-      4: { halign: "right", textColor: [217, 119, 6] },
-      5: { halign: "right", textColor: [217, 119, 6] },
-      6: { halign: "right", textColor: [220, 38, 38] },
-      7: { halign: "right", textColor: [220, 38, 38] },
-      8: { halign: "right", textColor: [220, 38, 38] },
-      9: { halign: "right", fontStyle: "bold" },
+      0: { cellWidth: 18 },
+      1: { cellWidth: "auto" },
+      2: { halign: "right", cellWidth: 24 },
+      3: { halign: "right", cellWidth: 24 },
+      4: { halign: "right", cellWidth: 24 },
+      5: { halign: "right", cellWidth: 26 },
     },
+    ...estilosDeTabla(),
+    didDrawPage: () => cabecera(doc, opts.subtitulo, opts.hoy),
   });
 
-  addFooter(doc);
-  const filename = `CXC_Detallado_${isoDate()}.pdf`;
-  doc.save(filename);
-  return filename;
+  piePorHoja(doc);
+  doc.save(opts.archivo);
+  return doc;
 }

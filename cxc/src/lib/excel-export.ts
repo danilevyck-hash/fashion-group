@@ -251,11 +251,23 @@ export interface ReportSheetOpts {
    * bajada por un rango que no es quincena NO sirve para pagar.
    */
   nota?: string;
+  /**
+   * Título en la FILA 1, con la fila 2 vacía y los encabezados en la 3.
+   *
+   * ⚠️ ES OPCIONAL Y NO CAMBIA NADA SIN ÉL: sin `titulo`, los encabezados
+   * siguen en A1 y el archivo que sale es byte por byte el de siempre. Lo
+   * estrenó el detalle de Comisiones (6-sep-2026) —Daniel: *«se puede mover a
+   * la fila 3 para separación y con filtro»*— y desde el 8-sep-2026 lo usan las
+   * dos descargas de Cuentas por Cobrar. El panel fijo se acomoda solo: lo
+   * deriva del `ref` del filtro (`excel-panel-fijo.ts`).
+   */
+  titulo?: string;
   palette?: ExcelPalette;
 }
 
 /**
- * La hoja estándar: **los encabezados en la FILA 1 y nada arriba de ellos.**
+ * La hoja estándar: **los encabezados en la FILA 1 y nada arriba de ellos**
+ * (salvo que se pase `titulo`, que los baja a la 3 con la 2 vacía).
  *
  * 🔴 ANTES había banda de título (fila 1), subtítulo (2) y una franja
  * separadora de 4 puntos de alto (3) que en pantalla se veía como una fila
@@ -272,18 +284,27 @@ export interface ReportSheetOpts {
  */
 export function buildReportSheet(opts: ReportSheetOpts): XLSX.WorkSheet {
   const p = opts.palette || CASA_PALETTE;
-  const { hdr, td, tdN, tot } = makeCellStyles(p);
+  const { band, hdr, td, tdN, tot } = makeCellStyles(p);
   const ws: XLSX.WorkSheet = {};
   const merges: XLSX.Range[] = [];
   const heights: number[] = [];
   const lastCol = opts.columns.length - 1;
   let r = 0;
 
+  if (opts.titulo) {
+    // Banda de título (fila 1) + una fila VACÍA de separación (fila 2). Los
+    // encabezados quedan en la 3 y el filtro arranca ahí.
+    band(ws, r, lastCol, merges, opts.titulo, p.pri, 14);
+    heights[r] = 26; r++;
+    heights[r] = 8; r++;
+  }
+
+  const filaEncabezados = r + 1; // 1-based, como lo escribe Excel
   opts.columns.forEach((c, i) => { ws[addr(r, i)] = hdr(c.header, c.align || "left"); });
   heights[r] = 22; r++;
   // El filtro cubre encabezados + datos y NADA más: la fila de totales y la
   // nota quedan afuera a propósito, para que filtrar no las esconda.
-  const filtro = `A1:${addr(opts.rows.length, lastCol)}`;
+  const filtro = `A${filaEncabezados}:${addr(r - 1 + opts.rows.length, lastCol)}`;
 
   opts.rows.forEach((row, idx) => {
     const alt = idx % 2 === 0;

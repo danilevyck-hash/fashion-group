@@ -95,6 +95,7 @@ function Harness({ itemsIniciales }: { itemsIniciales: GuiaItem[] }) {
       error={null}
       saving={false}
       onAddDireccion={(v) => direccionesAgregadas.push(v)}
+      onAddTransportista={() => {}}
       onUpdateItem={(idx, field, value) =>
         setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)))
       }

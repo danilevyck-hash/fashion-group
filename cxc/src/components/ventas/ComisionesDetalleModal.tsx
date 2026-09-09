@@ -50,6 +50,11 @@ import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
 import { facturaParaMostrar } from "@/lib/comisiones/factura-en-pantalla";
 import { nombreArchivoComision } from "@/lib/comisiones/nombre-archivo";
+// 🔴 IMPRIMIR CON EL NOMBRE CORRECTO VIVE EN UN SOLO LUGAR (8-sep-2026): la
+// flechita de la celda imprime el mismo reporte sin abrir esta pantalla, y dos
+// copias del mecanismo es cómo una de las dos deja el `document.title` de toda
+// la app renombrado.
+import { imprimirComo } from "@/lib/comisiones/imprimir";
 import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import { ImpresionComision } from "./comisiones-detalle/ImpresionComision";
 
@@ -70,25 +75,6 @@ const NOTA_COMISION_LINEA =
  *  mueve, esta se mueve con ella — un botón que el server rechaza es peor que
  *  ningún botón. */
 export const ROLES_EDITAR_DESCUENTOS = ["admin", "secretaria"];
-
-/**
- * 🔴 IMPRIME CON EL NOMBRE CORRECTO Y DEVUELVE EL TÍTULO COMO ESTABA.
- *
- * `afterprint` cubre el caso normal Y el de cancelar el diálogo; el `setTimeout`
- * es la red por si algún navegador no lo dispara — dejar el `document.title`
- * cambiado renombraría la pestaña de toda la app.
- */
-function imprimirComo(nombre: string) {
-  const anterior = document.title;
-  const restaurar = () => {
-    document.title = anterior;
-    window.removeEventListener("afterprint", restaurar);
-  };
-  document.title = nombre;
-  window.addEventListener("afterprint", restaurar);
-  window.setTimeout(restaurar, 60_000);
-  window.print();
-}
 
 interface Props {
   empresa: string;

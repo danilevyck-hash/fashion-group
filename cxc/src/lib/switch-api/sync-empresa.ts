@@ -644,6 +644,37 @@ interface EstadoCuentaRow {
   raw_data: unknown;
 }
 
+/** Una fila de `switch_estadocuenta_saldo`: el cuadre de UN cliente en UNA
+ *  empresa, tal cual lo manda Switch. */
+interface SaldoSwitchRow {
+  empresa_key: string;
+  cliente_switch_id: number;
+  cliente_codigo: string | null;
+  saldo_total: number | null;
+  saldos: unknown;
+  synced_at: string;
+  updated_at: string;
+}
+
+/**
+ * Guarda el `saldoTotal`/`Saldos[]` de cada cliente. Best-effort a propósito:
+ * un fallo acá NO puede tumbar el sync de la cartera, que es lo que la gente
+ * cobra. Sin la DDL aplicada se omite en silencio y todo sigue igual.
+ */
+async function guardarSaldosSwitch(empresaKey: string, filas: SaldoSwitchRow[]): Promise<void> {
+  if (filas.length === 0) return;
+  for (let i = 0; i < filas.length; i += UPSERT_BATCH) {
+    const lote = filas.slice(i, i + UPSERT_BATCH);
+    const { error } = await supabaseServer
+      .from("switch_estadocuenta_saldo")
+      .upsert(lote, { onConflict: "empresa_key,cliente_switch_id" });
+    if (error) {
+      console.error(`[sync ${empresaKey} cxc] cuadre de Switch no guardado: ${error.message}`);
+      return;
+    }
+  }
+}
+
 function mapEstadoCuentaElement(
   empresaKey: string,
   cliente: SwitchCliente,
@@ -796,6 +827,14 @@ export async function syncEmpresaEstadoCuenta(
     let buffer: EstadoCuentaRow[] = [];
     let procesados = 0;
     const failedClienteIds: number[] = [];
+    // 🔴 EL CUADRE QUE SWITCH YA MANDABA Y SE TIRABA (9-sep-2026). La misma
+    // respuesta que trae los documentos trae `saldoTotal` (lo que Switch dice
+    // que debe el cliente) y `Saldos[]` (su aging de ocho tramos). Se
+    // descartaban a propósito, así que el sistema sumaba los documentos SIN
+    // NADA CON QUÉ COMPROBARSE: si un documento no llegaba, el estado de cuenta
+    // salía al cliente con un número que Switch no reconoce y nada lo decía.
+    // No se pide una sola llamada nueva: ya venía en la respuesta.
+    const saldosSwitch: SaldoSwitchRow[] = [];
     // Las LECTURAS van de a ESTADOCUENTA_CONCURRENCIA; el PROCESADO y las
     // escrituras siguen en serie y en el orden original de `clientes`. Un
     // orden que cambia entre corridas vuelve el sync irreproducible al depurar,
@@ -846,6 +885,20 @@ export async function syncEmpresaEstadoCuenta(
           continue;
         }
         const ec = lectura.ec;
+        if (typeof cliente.id === "number") {
+          const bruto = ec?.saldoTotal;
+          const totalSwitch =
+            bruto == null || bruto === "" ? null : Number(String(bruto).replace(/,/g, ""));
+          saldosSwitch.push({
+            empresa_key: empresaKey,
+            cliente_switch_id: cliente.id,
+            cliente_codigo: cliente.codigo ?? null,
+            saldo_total: totalSwitch != null && Number.isFinite(totalSwitch) ? totalSwitch : null,
+            saldos: (ec?.Saldos ?? null) as SaldoSwitchRow["saldos"],
+            synced_at: runStamp,
+            updated_at: new Date().toISOString(),
+          });
+        }
         const elements = ec?.estadocuenta?.elements ?? [];
         for (const el of elements) {
           const res = mapEstadoCuentaElement(empresaKey, cliente, el);
@@ -894,6 +947,12 @@ export async function syncEmpresaEstadoCuenta(
       updated += r.updated;
       buffer = [];
     }
+
+    // El cuadre se escribe DESPUÉS de los documentos y NUNCA tumba la corrida:
+    // es un dato de control, no la cartera. Mientras la migración
+    // `20261023120000_estadocuenta_saldo_switch.sql` no corra, la tabla no
+    // existe y esto se omite limpio — el sistema se comporta como hoy.
+    await guardarSaldosSwitch(empresaKey, saldosSwitch);
 
     // Aviso DESPUÉS de escribir; nunca tumba la corrida.
     if (rechazadasCxc.length > 0) {

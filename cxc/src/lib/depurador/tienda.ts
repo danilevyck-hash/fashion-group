@@ -420,7 +420,9 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
     desc: string,
     empresaKey?: string
   ) => {
-    const v = veredictoDescripcion(desc, cfg.catalogo);
+    // La marca viaja al veredicto: las dos mitades solo valen DENTRO de su
+    // marca (8-sep-2026).
+    const v = veredictoDescripcion(desc, cfg.catalogo, marca);
     if (v.veredicto !== "alerta") { pasaronSolasSet.add(clave); return; }
     bloqueosSet.set(clave, { marca, desc, empresaKey, motivo: v.texto, gemela: v.gemela });
   };

@@ -287,6 +287,7 @@ describe("🔴 las MISMAS palabras al crear y al despachar", () => {
         error={null}
         saving={false}
         onAddDireccion={() => {}}
+        onAddTransportista={() => {}}
         onUpdateItem={() => {}}
         onUpdateItemFields={() => {}}
         onAddRow={() => {}}
@@ -465,6 +466,7 @@ describe("🔴 el N° del transportista se pide POR LÍNEA — y no en entrega d
         error={null}
         saving={false}
         onAddDireccion={() => {}}
+        onAddTransportista={() => {}}
         onUpdateItem={() => {}}
         onUpdateItemFields={() => {}}
         onAddRow={() => {}}

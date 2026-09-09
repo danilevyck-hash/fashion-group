@@ -301,7 +301,12 @@ describe("Comisiones — lo que Daniel usa sigue a un toque", () => {
     // 🔄 6-sep-2026: el botón decía «Excel» y ahora dice QUÉ TRAE — «Descargar
     // el mes» / «Descargar el año» (Daniel: «a, pero descargar, no bajar, como
     // esté en todos los módulos»). El rótulo vive en el módulo puro.
-    expect(barra).toContain("rotuloDescargarPeriodo(mes)");
+    // 🔄 8-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA: ahora son DOS botones
+    // (el mes en PDF y el mes en Excel) y los dos rótulos siguen viniendo del
+    // módulo puro, nunca escritos a mano en la barra. CONTROL de la regla
+    // original más abajo: las vistas hijas siguen sin dibujar su propio botón.
+    expect(barra).toContain("rotuloDescargarExcel(mes)");
+    expect(barra).toContain("ROTULO_DESCARGAR_MES_PDF");
     // Las vistas hijas ya no dibujan su propio botón Excel (era una fila de
     // 44px + 16px de separación, solo para él).
     expect(consolidado).not.toContain("FileSpreadsheet");

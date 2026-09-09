@@ -1,35 +1,40 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { mutate } from "swr";
 import {
-  NORMALIZACION,
-} from "@/lib/depurador/marca-descripciones";
-import {
-  PRINCIPIOS_LIMPIEZA,
+  CASOS_TALLA,
+  CASO_TALLA_RESTO,
   MARCA_CATALOGO,
   descripcionesDeMarca,
   norm,
+  reglasDeNormalizacionQueHacenFalta,
 } from "@/lib/depurador/logic";
-import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
+import { CASOS_TALLA_REEBOK } from "@/lib/depurador/reebok";
+import { CATALOGO_DESCRIPCIONES_KEY, useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
 
-// Regla de talla del EAN representativo (espejo de pickEAN en lib/depurador/logic.ts).
-// Solo lectura: si se cambia la regla en el código hay que actualizar esta tabla.
-const REGLA_TALLA: { caso: string; detecta: string; talla: string }[] = [
-  { caso: "Calzado hombre", detecta: "descripción con palabra de calzado (sneaker, sandal, shoe…) + Men", talla: "41" },
-  { caso: "Calzado dama", detecta: "descripción con palabra de calzado + Women", talla: "37" },
-  { caso: "Pantalón / short hombre", detecta: "descripción con short, pant, denim, jean, chino… + Men", talla: "32" },
-  { caso: "Pantalón / short dama", detecta: "descripción con short, pant, denim, jean, chino… + Women", talla: "27" },
-  { caso: "Kids", detecta: "género o descripción con Kids (Boys/Girls/Toddler van por la regla general)", talla: "8 · si no existe, M" },
-  { caso: "Resto (tops, ropa interior, accesorios…)", detecta: "todo lo demás", talla: "M" },
-];
-
-// Regla Reebok (espejo de pickSample en lib/depurador/reebok.ts).
-const REGLA_TALLA_REEBOK: { caso: string; talla: string }[] = [
-  { caso: "Footwear · Male", talla: "9 · si no existe, la numérica más cercana (queda en ámbar)" },
-  { caso: "Footwear · Female", talla: "7 · si no existe, la numérica más cercana (queda en ámbar)" },
-  { caso: "Footwear · Kids / Unisex (AGE GROUP ≠ Adult o GENDER Unisex)", talla: "mediana de las tallas disponibles" },
-  { caso: "Apparel / Hardware", talla: "M · si no hay M, la talla única (ámbar si hay varias)" },
-];
+/* ─────────────────────────────────────────────────────────────────────────────
+ * «Reglas» — minimalista (8-sep-2026).
+ *
+ * Daniel: «es solo para nosotros los usuarios ver en caso de algo, se usará muy
+ * poco, al menos que lo escribas de manera concisa, justo lo necesario y
+ * ordenado de manera minimalista».
+ *
+ * Quedan DOS secciones:
+ *   1) Cómo se elige la talla — GENERADA del código (CASOS_TALLA y
+ *      CASOS_TALLA_REEBOK). Antes las dos tablas estaban TECLEADAS aquí y ya se
+ *      habían separado de la regla real.
+ *   2) Descripciones por marca — la única ventana que la secretaria tiene al
+ *      catálogo (la pestaña «Descripciones» es solo de admin). Aquí puede
+ *      QUITAR una descripción que escribió mal, y el buscador busca DENTRO de
+ *      las descripciones, no solo en los nombres de las correcciones.
+ *
+ * Se fueron los 8 principios de limpieza y la tabla de 22 reglas de
+ * normalización. De esas 22, las 10 que de verdad hacen falta se quedan —
+ * derivadas, y mostrando LO QUE SALE AL EXCEL, no el valor crudo del mapa (una
+ * fila mentía: decía «Boys-Shirts - Woven Tops S/S» y al Excel sale
+ * «Boys-Shirts Woven S/S»).
+ * ────────────────────────────────────────────────────────────────────────── */
 
 // Grupos por empresa (igual que en config).
 const GRUPOS = [
@@ -39,41 +44,66 @@ const GRUPOS = [
   { label: "Active Wear", brand: "Karl Lagerfeld", marcas: MARCA_CATALOGO.filter((c) => c.empresa === "Active Wear") },
 ];
 
+/** Lo que se dice cuando una marca existe pero nunca se le cargó nada.
+ *  Daniel: «no se esconden» — pero un «(0)» pelado no explica qué pasa. */
+export const SIN_DESCRIPCIONES = "Todavía sin descripciones cargadas";
+
 export default function ReglasView() {
   const [q, setQ] = useState("");
-  // Catálogo de descripciones (tabla depurador_descripciones — fuente de verdad).
-  const { catalogo, cargando, fallo, reintentar } = useCatalogoDescripciones();
-  const normEntries = useMemo(() => Object.entries(NORMALIZACION).sort((a, b) => a[0].localeCompare(b[0], "es")), []);
-  const filteredNorm = useMemo(() => {
-    const s = norm(q);
-    return s ? normEntries.filter(([k, v]) => norm(k).includes(s) || norm(v).includes(s)) : normEntries;
-  }, [normEntries, q]);
+  const { catalogo, filas, cargando, fallo, reintentar } = useCatalogoDescripciones();
+  const [quitando, setQuitando] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  // Las correcciones de nombre que de VERDAD hacen falta, con el resultado real
+  // de normalizeDescripcion. Derivadas: no hay lista tecleada.
+  const correcciones = useMemo(() => reglasDeNormalizacionQueHacenFalta(), []);
+  const s = norm(q);
+  const correccionesFiltradas = useMemo(
+    () => (s ? correcciones.filter((r) => norm(r.sucia).includes(s) || norm(r.limpia).includes(s)) : correcciones),
+    [correcciones, s]
+  );
+
+  // id de cada descripción activa, para poder quitarla.
+  const idPorClave = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const f of filas ?? []) m.set(`${norm(f.marca)}|||${norm(f.descripcion)}`, f.id);
+    return m;
+  }, [filas]);
+
+  const quitar = async (id: string) => {
+    if (quitando) return;
+    setQuitando(id);
+    setError("");
+    try {
+      const res = await fetch(`/api/productos/cargar/descripciones/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activa: false }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        setError(d?.error || "No se pudo quitar. Intenta de nuevo.");
+        return;
+      }
+      await mutate(CATALOGO_DESCRIPCIONES_KEY);
+    } catch {
+      setError("No se pudo quitar. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setQuitando(null);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      {/* Sección B — Principios */}
+      {/* ── 1 · Cómo se elige la talla ─────────────────────────────────────── */}
       <section className="mb-8">
-        <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-teal-800">Principios de limpieza</h3>
-        <ol className="space-y-1.5">
-          {PRINCIPIOS_LIMPIEZA.map((p, i) => (
-            <li key={i} className="rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-[13px]">
-              <span className="mr-2 inline-block w-5 text-right font-semibold text-teal-700">{i + 1}.</span>
-              <span className="font-medium text-stone-900">{p.titulo}</span>
-              <span className="ml-2 font-mono text-[12px] text-stone-500">{p.ejemplo}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {/* Sección — Regla de talla del EAN representativo (solo lectura) */}
-      <section className="mb-8">
-        <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-teal-800">Regla de talla (EAN representativo)</h3>
+        <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-teal-800">Cómo se elige la talla</h3>
         <p className="mb-3 text-[13px] text-stone-500">
           Cada estilo colapsa a una fila y el código de barra que se sube a Switch es el de esta talla.
           Si la talla esperada no existe, se usa la más chica y la fila queda marcada en ámbar para revisar.
         </p>
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <table className="w-full border-collapse text-[13px]">
+        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+          <table className="w-full border-collapse text-[13px]" aria-label="Cómo se elige la talla">
             <thead>
               <tr>
                 <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Caso</th>
@@ -82,7 +112,7 @@ export default function ReglasView() {
               </tr>
             </thead>
             <tbody>
-              {REGLA_TALLA.map((r) => (
+              {[...CASOS_TALLA, CASO_TALLA_RESTO].map((r) => (
                 <tr key={r.caso} className="hover:bg-teal-50">
                   <td className="border-b border-stone-100 px-3 py-1.5 font-medium text-stone-900">{r.caso}</td>
                   <td className="border-b border-stone-100 px-3 py-1.5 text-stone-500">{r.detecta}</td>
@@ -96,8 +126,8 @@ export default function ReglasView() {
         <div className="mt-4 rounded-lg border border-stone-200 bg-white px-3.5 py-3">
           <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-teal-800">Reebok · Active Shoes (talla-muestra)</div>
           <ul className="space-y-1.5">
-            {REGLA_TALLA_REEBOK.map((r) => (
-              <li key={r.caso} className="text-[13px]">
+            {CASOS_TALLA_REEBOK.map((r) => (
+              <li key={r.id} className="text-[13px]">
                 <span className="font-medium text-stone-900">{r.caso}</span>
                 <span className="ml-2 text-stone-500">→ {r.talla}</span>
               </li>
@@ -106,38 +136,19 @@ export default function ReglasView() {
         </div>
       </section>
 
-      {/* Sección A — Reglas directas de normalización */}
-      <section className="mb-8">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h3 className="text-[13px] font-bold uppercase tracking-wide text-teal-800">Reglas de normalización ({normEntries.length})</h3>
+      {/* ── 2 · Descripciones por marca ────────────────────────────────────── */}
+      <section>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-[13px] font-bold uppercase tracking-wide text-teal-800">Descripciones por marca</h3>
           <input
-            value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…"
-            className="w-48 min-h-[44px] rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar marca o descripción…"
+            aria-label="Buscar marca o descripción"
+            className="min-h-[44px] w-full max-w-xs rounded-md border border-stone-300 bg-white px-3 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
           />
         </div>
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <table className="w-full border-collapse text-[13px]">
-            <thead>
-              <tr>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Texto sucio</th>
-                <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Texto limpio</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredNorm.map(([k, v]) => (
-                <tr key={k} className="hover:bg-teal-50">
-                  <td className="border-b border-stone-100 px-3 py-1.5 font-mono text-[12px] text-stone-600">{k}</td>
-                  <td className="border-b border-stone-100 px-3 py-1.5 font-mono text-[12px] text-stone-900">{v}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
-      {/* Sección C — Catálogo de marcas y descripciones (desde la tabla) */}
-      <section>
-        <h3 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-teal-800">Catálogo de marcas y descripciones</h3>
         {cargando && (
           <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
             Cargando catálogo de descripciones…
@@ -149,30 +160,104 @@ export default function ReglasView() {
             <button
               type="button"
               onClick={reintentar}
-              className="rounded-md border border-red-300 bg-white px-2.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+              className="min-h-[44px] rounded-md border border-red-300 bg-white px-2.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
             >
               Reintentar
             </button>
           </div>
         )}
-        {catalogo && GRUPOS.map((g) => (
-          <div key={g.label} className="mb-5">
-            <div className="mb-2 border-b border-stone-200 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-800">
-              {g.label}<span className="ml-2 font-normal normal-case tracking-normal text-stone-500">· {g.brand}</span>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {g.marcas.map((c) => {
-                const ds = descripcionesDeMarca(catalogo, c.marca);
-                return (
-                  <div key={c.marca} className="rounded-lg border border-stone-200 bg-white px-3 py-2">
-                    <div className="text-[13px] font-semibold text-stone-900">{c.marca} <span className="text-[12px] font-normal text-stone-400">({ds.length})</span></div>
-                    <div className="mt-1 text-[12px] leading-snug text-stone-500">{ds.join(" · ")}</div>
+        {error && (
+          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800">{error}</div>
+        )}
+
+        {catalogo && GRUPOS.map((g) => {
+          // Una marca se dibuja si su NOMBRE coincide con la búsqueda (así las
+          // vacías siguen a la vista) o si alguna de sus descripciones coincide.
+          const marcas = g.marcas
+            .map((c) => {
+              const todas = descripcionesDeMarca(catalogo, c.marca);
+              const nombreCoincide = !s || norm(c.marca).includes(s);
+              const ds = nombreCoincide ? todas : todas.filter((d) => norm(d).includes(s));
+              return { marca: c.marca, ds, todas, visible: nombreCoincide || ds.length > 0 };
+            })
+            .filter((m) => m.visible);
+          if (marcas.length === 0) return null;
+          return (
+            <div key={g.label} className="mb-5">
+              <div className="mb-2 border-b border-stone-200 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-800">
+                {g.label}<span className="ml-2 font-normal normal-case tracking-normal text-stone-500">· {g.brand}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {marcas.map((m) => (
+                  <div key={m.marca} className="rounded-lg border border-stone-200 bg-white px-3 py-2">
+                    <div className="text-[13px] font-semibold text-stone-900">
+                      {m.marca}
+                      {m.todas.length > 0 && (
+                        <span className="ml-2 text-[12px] font-normal text-stone-400">({m.todas.length})</span>
+                      )}
+                    </div>
+                    {m.todas.length === 0 ? (
+                      // 🔴 La marca se MUESTRA igual (Daniel: «no se esconden»),
+                      // pero diciendo qué le pasa en vez de un «(0)» pelado.
+                      <div className="mt-1 text-[13px] italic text-stone-400">{SIN_DESCRIPCIONES}</div>
+                    ) : (
+                      <ul className="mt-1 flex flex-wrap gap-x-1 gap-y-1">
+                        {m.ds.map((d) => {
+                          const id = idPorClave.get(`${norm(m.marca)}|||${norm(d)}`);
+                          return (
+                            <li key={d} className="inline-flex items-center gap-1 rounded bg-stone-50 pl-1.5 text-[13px] text-stone-600">
+                              <span>{d}</span>
+                              {id && (
+                                <button
+                                  type="button"
+                                  onClick={() => quitar(id)}
+                                  disabled={quitando === id}
+                                  aria-label={`Quitar ${d} de ${m.marca}`}
+                                  title="Quitar del catálogo (no se borra: deja de valer)"
+                                  className="inline-flex h-[44px] w-[32px] items-center justify-center text-stone-400 transition hover:text-red-600 disabled:opacity-50"
+                                >
+                                  {quitando === id ? "…" : "×"}
+                                </button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </div>
-                );
-              })}
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Las 10 correcciones de nombre que hacen falta. Lo que se ve es lo que
+            sale al Excel (normalizeDescripcion), nunca el valor crudo del mapa. */}
+        {correccionesFiltradas.length > 0 && (
+          <div className="mt-6">
+            <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-teal-800">
+              Nombres que se corrigen solos ({correcciones.length})
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+              <table className="w-full border-collapse text-[13px]" aria-label="Nombres que se corrigen solos">
+                <thead>
+                  <tr>
+                    <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Como lo manda el proveedor</th>
+                    <th className="border-b border-stone-200 px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide text-stone-500">Como sale al Excel</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {correccionesFiltradas.map((r) => (
+                    <tr key={r.sucia} className="hover:bg-teal-50">
+                      <td className="border-b border-stone-100 px-3 py-1.5 font-mono text-[12px] text-stone-600">{r.sucia}</td>
+                      <td className="border-b border-stone-100 px-3 py-1.5 font-mono text-[12px] text-stone-900">{r.limpia}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        ))}
+        )}
       </section>
     </div>
   );

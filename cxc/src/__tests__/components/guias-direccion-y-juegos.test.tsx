@@ -72,6 +72,7 @@ function montarForm(items: GuiaItem[]) {
       error={null}
       saving={false}
       onAddDireccion={() => {}}
+      onAddTransportista={() => {}}
       onUpdateItem={() => {}}
       onUpdateItemFields={() => {}}
       onAddRow={() => {}}
@@ -137,6 +138,7 @@ describe("🔴 la dirección del cliente aparece PRIMERA en la lista", () => {
         items={[fila({ cliente: "CITY MALL PASO CANOA", cliente_codigo: "D-25" })]}
         transportistas={[]} direcciones={DIRECCIONES_BASE} validationErrors={new Set()} error={null} saving={false}
         onAddDireccion={() => {}}
+        onAddTransportista={() => {}}
         onUpdateItem={(_i, campo, valor) => { if (campo === "direccion") cambios.push(String(valor)); }}
         onUpdateItemFields={() => {}} onAddRow={() => {}} onRemoveRow={() => {}} onRestoreRow={() => {}}
         onSave={() => {}} onCancel={() => {}}

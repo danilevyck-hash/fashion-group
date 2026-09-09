@@ -11,7 +11,7 @@ import { ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_NO_SE_PAGA, sumarPagable } from "@/lib/comisiones/sin-pago";
 import { sinRetirados } from "@/lib/comisiones/retirados";
-import { nombreArchivoComision } from "@/lib/comisiones/nombre-archivo";
+import { nombreArchivoComision, nombreArchivoComisionTodas } from "@/lib/comisiones/nombre-archivo";
 import { etiquetaPeriodo, sufijoArchivoPeriodo } from "@/lib/comisiones/periodo";
 
 export interface VentaDoc {
@@ -273,6 +273,36 @@ export async function exportComisionDetalle(
   downloadWorkbook(
     workbookFromSheets([{ name: "Comisión", ws }]),
     `${nombreArchivoComision(d.vendedor, d.empresa_key, d.year, d.mes)}.xlsx`,
+  );
+}
+
+/**
+ * 🔴 TODAS LAS EMPRESAS DE UNA PERSONA, EN UN SOLO ARCHIVO (8-sep-2026) — lo que
+ * baja la flecha de la columna «Total».
+ *
+ * Una HOJA por empresa, con el nombre corto de la empresa como nombre de la
+ * hoja, y en el MISMO orden en que se ven las columnas de la matriz. No hay una
+ * segunda forma de armar el detalle: cada hoja sale de `buildComisionDetalleSheet`,
+ * exactamente la misma que baja la flecha de una celda.
+ */
+export async function exportComisionDetalleVarias(
+  detalles: { data: ComisionDetalle; empresaNombre: string; descuentos: ComisionDescuento[] }[],
+  vendedor: string,
+  year: number,
+  mes: number,
+): Promise<void> {
+  const hojas = [];
+  for (const d of detalles) {
+    hojas.push({
+      // Excel no admite más de 31 caracteres en el nombre de una hoja.
+      name: d.empresaNombre.slice(0, 31),
+      ws: await buildComisionDetalleSheet(d.data, d.empresaNombre, d.descuentos),
+    });
+  }
+  const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
+  downloadWorkbook(
+    workbookFromSheets(hojas),
+    `${nombreArchivoComisionTodas(vendedor, year, mes)}.xlsx`,
   );
 }
 

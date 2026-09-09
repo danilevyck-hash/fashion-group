@@ -180,7 +180,7 @@ function pintarCelular(onCobrar: (c: ConsolidatedClient) => void = noop) {
       avisoSinPagarDe={sinAviso}
       marcaEnvioDe={sinAviso}
       canExport={false}
-      onExportarCsv={noop}
+      onDescargar={noop}
       empresaRestriction={null}
     />,
   );

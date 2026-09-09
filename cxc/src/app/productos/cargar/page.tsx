@@ -43,7 +43,7 @@ function SelectorPestanas({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => v
         onClick={() => setAbierto(a => !a)}
         aria-haspopup="listbox"
         aria-expanded={abierto}
-        aria-label="Sección del Depurador"
+        aria-label="Sección de Plantilla Switch"
         className="flex w-full items-center justify-between gap-2 rounded-lg border border-stone-200 bg-white px-4 min-h-[44px] text-sm font-medium text-stone-700 transition hover:bg-stone-50"
       >
         <span className="truncate">{actual.label}</span>
@@ -58,7 +58,7 @@ function SelectorPestanas({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => v
         onCerrar={() => setAbierto(false)}
         marca="depurador-pestanas"
         role="listbox"
-        aria-label="Sección del Depurador"
+        aria-label="Sección de Plantilla Switch"
         anchoMinimo={220}
         className="bg-white rounded-xl border border-black/10 shadow-lg py-1"
       >
@@ -160,7 +160,7 @@ function CargarInner() {
 
   return (
     <div className="min-h-screen bg-stone-50">
-      <AppHeader module="Depurador" />
+      <AppHeader module="Plantilla Switch" />
 
       <div className="mx-auto max-w-5xl px-4 pt-4">
         {/* ── 🩸 Las pestañas, MEDIDAS (30-jul-2026, build de producción) ──
@@ -223,7 +223,7 @@ function FormulasScopeRow() {
     <>
       <div className="mx-auto max-w-4xl px-4 pt-4">
         <div className="flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <TabBtn active={formulasScope === "depurador"} onClick={() => setFormulasScope("depurador")}>Depurador (importación)</TabBtn>
+          <TabBtn active={formulasScope === "depurador"} onClick={() => setFormulasScope("depurador")}>Plantilla (importación)</TabBtn>
           <TabBtn active={formulasScope === "tienda"} onClick={() => setFormulasScope("tienda")}>Tienda (facturas)</TabBtn>
         </div>
       </div>

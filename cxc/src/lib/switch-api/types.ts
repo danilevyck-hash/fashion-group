@@ -250,6 +250,21 @@ export interface SwitchEstadoCuentaData {
   estadocuenta: {
     elements: SwitchEstadoCuentaElement[];
   };
+  /**
+   * 🔴 EL CUADRE QUE SWITCH YA MANDABA Y SE TIRABA (9-sep-2026). La respuesta
+   * trae, además de los documentos, el aging de ocho tramos (`Saldos`) y el
+   * total que Switch mismo calculó (`saldoTotal`). Los dos se descartaban a
+   * propósito —está escrito en `docs/switch-referencia.md`— y con eso el
+   * sistema sumaba los documentos sin nada con qué comprobarse.
+   *
+   * ⚠️ `Saldos` va como `unknown`: su forma NO está documentada (el PDF del
+   * API solo dice «aging 0-30…») y nunca se vio en vivo. Se guarda crudo en
+   * `switch_estadocuenta_saldo.saldos`; inventarle campos sería fijar una
+   * suposición en la base. Lo único que se lee es `saldoTotal`.
+   */
+  Saldos?: unknown;
+  saldoTotal?: string | number | null;
+  [key: string]: unknown;
 }
 
 // ─── Errores ─────────────────────────────────────────────────────────────────

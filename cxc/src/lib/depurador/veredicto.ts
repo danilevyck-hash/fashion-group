@@ -20,6 +20,29 @@
 // aunque el conjunto se parezca a otra del catálogo (ej. "Newborn-T-Shirts L/S"
 // con "Newborn-T-Shirts S/S" ya catalogada). Es la decisión de Daniel: las
 // mitades exactas ganan sobre el parecido.
+//
+// ── 8-sep-2026 · LAS DOS MITADES SOLO VALEN DENTRO DE LA MISMA MARCA ─────────
+//
+// 🩸 La regla 1 estaba TAPANDO a la regla 2, que es justo lo que a Daniel le
+// preocupaba. `veredictoDescripcion("Men-Polos S/S Core", …)` devolvía **pasa**:
+// la mitad «Men» existe en TH Menswear y la mitad «Polos S/S Core» existe —pero
+// en TH KIDS (`Boys-Polos S/S Core`)—, así que «las dos mitades existen» y la
+// casi-gemela real, `Men-Polo S/S Core` (singular, TH Menswear), nunca se
+// llegaba a mirar.
+//
+// Costó plata: en Fashion Wear conviven `Men-Polo S/S Core` (28 artículos ·
+// 4.361 piezas) y `Men-Polos S/S Core` (37 · 3.027) — 7.388 piezas de la misma
+// prenda partidas en dos, con los estilos MW0MW32346 y MW0MW32347 escritos de
+// las dos formas al mismo precio.
+//
+// Daniel eligió la opción «b»: las mitades cuentan SOLO si existen dentro de la
+// MISMA marca que se está evaluando. Con eso «Polos S/S Core» ya no se
+// encuentra en TH Menswear y la descripción cae en alerta, mostrando la gemela.
+//
+// ⚠️ NO cambió nada más: «ya-existe» (misma descripción con otros espacios o
+// mayúsculas) y `normalizarEspacios` siguen mirando TODO el catálogo, y la
+// casi-gemela COMPLETA también. Lo único que se acotó es el ALCANCE de las
+// mitades.
 
 import type { CatalogoDescripciones, Cell } from "./logic";
 
@@ -118,24 +141,50 @@ export function esCasiIgual(a: string, b: string): boolean {
 
 /* ── Índice del catálogo ──────────────────────────────────────────────────── */
 
-interface IndiceCatalogo {
-  /** clave → descripción tal cual está en el catálogo (primera aparición). */
-  completas: Map<string, string>;
+/** Las dos mitades conocidas de un conjunto de descripciones. */
+export interface MitadesConocidas {
   /** clave de mitad izquierda → mitad tal cual. */
   izquierdas: Map<string, string>;
   /** clave de mitad derecha → mitad tal cual. */
   derechas: Map<string, string>;
 }
 
+interface IndiceCatalogo {
+  /** clave → descripción tal cual está en el catálogo (primera aparición). */
+  completas: Map<string, string>;
+  /** clave de mitad izquierda → mitad tal cual (TODAS las marcas). */
+  izquierdas: Map<string, string>;
+  /** clave de mitad derecha → mitad tal cual (TODAS las marcas). */
+  derechas: Map<string, string>;
+  /** Las mismas mitades, pero SEPARADAS por marca (clave marcaKey). Es lo que
+   *  mira la regla de las dos mitades desde el 8-sep-2026. */
+  porMarca: Map<string, MitadesConocidas>;
+}
+
+/** Clave de marca del índice: insensible a caja y a espacios (espejo de
+ *  `marcaKey` de logic.ts, replicado aquí para no acoplar los dos módulos). */
+function claveMarca(marca: Cell): string {
+  return String(marca ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 const CACHE = new WeakMap<CatalogoDescripciones, IndiceCatalogo>();
 
-/** Índice de TODAS las descripciones del catálogo, de TODAS las marcas
- *  («en cualquiera de las 3 marcas»). Cacheado por objeto de catálogo. */
+/** Índice del catálogo: las descripciones COMPLETAS de todas las marcas juntas
+ *  (para «ya-existe» y la casi-gemela) y las MITADES separadas por marca (para
+ *  la regla de las dos mitades). Cacheado por objeto de catálogo. */
 export function indexarCatalogo(catalogo: CatalogoDescripciones): IndiceCatalogo {
   const hit = CACHE.get(catalogo);
   if (hit) return hit;
-  const idx: IndiceCatalogo = { completas: new Map(), izquierdas: new Map(), derechas: new Map() };
-  for (const lista of Object.values(catalogo)) {
+  const idx: IndiceCatalogo = {
+    completas: new Map(), izquierdas: new Map(), derechas: new Map(), porMarca: new Map(),
+  };
+  for (const [marca, lista] of Object.entries(catalogo)) {
+    const km = claveMarca(marca);
+    let deLaMarca = idx.porMarca.get(km);
+    if (!deLaMarca) {
+      deLaMarca = { izquierdas: new Map(), derechas: new Map() };
+      idx.porMarca.set(km, deLaMarca);
+    }
     for (const cruda of lista ?? []) {
       const d = normalizarEspacios(cruda);
       if (!d) continue;
@@ -145,6 +194,8 @@ export function indexarCatalogo(catalogo: CatalogoDescripciones): IndiceCatalogo
       const der = mitadDer(d);
       if (izq && !idx.izquierdas.has(izq.toLowerCase())) idx.izquierdas.set(izq.toLowerCase(), izq);
       if (der && !idx.derechas.has(der.toLowerCase())) idx.derechas.set(der.toLowerCase(), der);
+      if (izq && !deLaMarca.izquierdas.has(izq.toLowerCase())) deLaMarca.izquierdas.set(izq.toLowerCase(), izq);
+      if (der && !deLaMarca.derechas.has(der.toLowerCase())) deLaMarca.derechas.set(der.toLowerCase(), der);
     }
   }
   CACHE.set(catalogo, idx);
@@ -164,21 +215,44 @@ function buscarGemela(k: string, mapa: Map<string, string>): string | null {
 /* ── El veredicto ─────────────────────────────────────────────────────────── */
 
 /**
+ * 🔴 EL INTERRUPTOR de la regla del 8-sep-2026 (mitades acotadas a la marca).
+ *
+ * En `false` el veredicto es EXACTAMENTE el de siempre: las mitades se buscan
+ * en todo el catálogo. En `true`, solo dentro de la marca que se evalúa.
+ *
+ * Está en `true` porque se MIDIÓ contra producción antes de encenderlo: de las
+ * 360 descripciones vivas del inventario (con existencia > 0, cruzadas a su
+ * marca real) solo TRES cambian de veredicto, y las tres son gemelas de verdad.
+ * Ver `scripts/_medir-veredicto-por-marca.mjs`.
+ */
+export const MITADES_POR_MARCA = true;
+
+/**
  * Decide qué hacer con una descripción entrante frente al catálogo actual.
  *
  *   "ya-existe" → normalizada es idéntica (sin distinguir mayúsculas) a una del
  *                 catálogo. Se usa la existente: no se crea nada, no se alerta.
- *   "pasa"      → las DOS mitades existen exactas en el catálogo (izquierda
- *                 contra izquierdas, derecha contra derechas, en cualquier
- *                 marca). No alerta.
+ *   "pasa"      → las DOS mitades existen exactas DENTRO DE SU MARCA (izquierda
+ *                 contra izquierdas, derecha contra derechas). No alerta.
  *   "alerta"    → todo lo demás, con el motivo de por qué.
+ *
+ * `marca` es la marca bajo la que entra la descripción. Sin ella —o con el
+ * interruptor apagado— las mitades se buscan en todo el catálogo, que es como
+ * se comportaba hasta el 8-sep-2026.
  */
 export function veredictoDescripcion(
   desc: Cell,
-  catalogo: CatalogoDescripciones
+  catalogo: CatalogoDescripciones,
+  marca?: Cell
 ): ResultadoVeredicto {
   const normalizada = normalizarEspacios(desc);
   const idx = indexarCatalogo(catalogo);
+  // Las mitades contra las que se compara: las de SU marca, o las de todo el
+  // catálogo si no se dijo la marca o el interruptor está apagado.
+  const deLaMarca = marca !== undefined && marca !== null && MITADES_POR_MARCA
+    ? idx.porMarca.get(claveMarca(marca))
+    : undefined;
+  const mitades: MitadesConocidas = deLaMarca ?? { izquierdas: idx.izquierdas, derechas: idx.derechas };
 
   if (!normalizada) {
     return { veredicto: "alerta", normalizada, motivo: "formato", texto: "descripción vacía" };
@@ -199,8 +273,8 @@ export function veredictoDescripcion(
     return { veredicto: "alerta", normalizada, motivo: "formato", texto: "guion al borde" };
   }
 
-  const izqOk = idx.izquierdas.get(izq.toLowerCase());
-  const derOk = idx.derechas.get(der.toLowerCase());
+  const izqOk = mitades.izquierdas.get(izq.toLowerCase());
+  const derOk = mitades.derechas.get(der.toLowerCase());
 
   // 3) Las dos mitades exactas → pasa sola (decisión de Daniel).
   if (izqOk && derOk) return { veredicto: "pasa", normalizada };
@@ -212,7 +286,7 @@ export function veredictoDescripcion(
   }
 
   if (!izqOk) {
-    const g = buscarGemela(izq.toLowerCase(), idx.izquierdas);
+    const g = buscarGemela(izq.toLowerCase(), mitades.izquierdas);
     if (g) {
       return {
         veredicto: "alerta",
@@ -224,7 +298,7 @@ export function veredictoDescripcion(
     }
   }
   if (!derOk) {
-    const g = buscarGemela(der.toLowerCase(), idx.derechas);
+    const g = buscarGemela(der.toLowerCase(), mitades.derechas);
     if (g) {
       return {
         veredicto: "alerta",

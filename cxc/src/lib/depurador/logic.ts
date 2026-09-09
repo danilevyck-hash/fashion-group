@@ -11,8 +11,13 @@
 // Los cálculos (redondeos, reglas, totales) son idénticos.
 
 import { NORMALIZACION } from "./marca-descripciones";
+import type { Cell } from "./celda";
+import { norm } from "./celda";
+import { tallasAProbar } from "./talla";
 
-export type Cell = string | number | boolean | null | undefined;
+// Re-exportados: todo el sistema los importa desde `logic.ts` y así sigue.
+export type { Cell } from "./celda";
+export { norm } from "./celda";
 
 /** Catálogo de descripciones por marca. La fuente de verdad es la tabla
  *  `depurador_descripciones` (GET /api/productos/cargar/descripciones);
@@ -154,10 +159,17 @@ const ALIAS: Record<string, string[]> = {
     "NO_DOCUMENTO", "DOCUMENTO", "INVOICE", "INVOICE NUMBER", "INVOICE_NO", "DOCUMENT"],
 };
 
-// Palabras que indican prenda inferior (pantalón/short) → talla numérica de ropa
-const BOTTOMS = ["SHORT", "PANT", "DENIM", "TROUSER", "JEAN", "CHINO", "BERMUDA", "JOGGER", "LEGGING", "SKIRT", "FALDA"];
-// Palabras que indican calzado → talla numérica de zapato (distinta de ropa)
-const FOOTWEAR = ["SNEAKER", "SANDAL", "SHOE", "BOOT", "FLIP FLOP", "FLIPFLOP", "SLIPPER", "ESPADRILLE", "LOAFER", "HEEL", "MULE", "FOOTWEAR", "CHANCLA", "ZAPATO", "BOTA", "TENIS", "MOCASIN", "SWIMSHO"];
+// Las reglas de TALLA (qué talla se prueba y en qué orden) viven en su propio
+// módulo puro, `./talla`, y se re-exportan acá: `pickEAN` las usa y la pestaña
+// «Reglas» dibuja la MISMA tabla.
+export type { FamiliaTalla, CasoTalla } from "./talla";
+export {
+  CASOS_TALLA,
+  CASO_TALLA_RESTO,
+  TALLA_POR_DEFECTO,
+  familiaDeTalla,
+  tallasAProbar,
+} from "./talla";
 
 // Palabras que, si aparecen en un encabezado, lo descalifican para ciertos campos
 // (evita que "COSTO" parcial agarre "COSTO CIF", o "PRECIO" agarre "PRECIO1"=costo inflado)
@@ -167,8 +179,6 @@ const COL_BLOCK: Record<string, string[]> = {
 };
 
 /* ============ UTILES ============ */
-export const norm = (s: Cell): string => (s === null || s === undefined) ? "" : String(s).trim().toUpperCase();
-
 /** Clave canónica para emparejar marcas entre el Excel y la tabla de fórmulas.
  *  Insensible a mayúsculas Y a espacios: NFKC (NBSP → espacio normal), colapsa
  *  espacios múltiples, recorta y pasa a minúsculas. Así "CK MENSWEAR",
@@ -357,23 +367,10 @@ interface PickEANResult {
 function pickEAN(items: RawItem[], catRaw: string, genRaw: string): PickEANResult {
   const map: Record<string, string> = {};
   for (const it of items) { map[norm(it.talla)] = it.ean; }
-  const cat = norm(catRaw), gen = norm(genRaw);
-  const isMen = (cat.includes("MEN") && !cat.includes("WOMEN")) || gen === "MEN";
-  const isWomen = cat.includes("WOMEN") || gen === "WOMEN";
-  const isBottom = BOTTOMS.some((w) => cat.includes(w));
-  const isFoot = FOOTWEAR.some((w) => cat.includes(w));
-  // Kids: a veces viene con tallas USA (M) y a veces Europa (8, 10, 12) →
-  // intentar "8" primero y caer a "M". Solo KIDS literal (Boys/Girls/Toddler
-  // siguen en la regla general). Caso ADITIVO: no toca los existentes.
-  const isKids = cat.includes("KIDS") || gen === "KIDS";
 
-  const order: string[] = [];
-  if (isKids) order.push("8");                  // kids: talla Europa 8
-  if (isFoot && isMen) order.push("41");        // zapato hombre
-  else if (isFoot && isWomen) order.push("37"); // zapato dama
-  else if (isBottom && isMen) order.push("32"); // pantalón/short hombre
-  else if (isBottom && isWomen) order.push("27"); // pantalón/short dama
-  order.push("M"); // tops por defecto
+  // La regla vive en CASOS_TALLA (dato, no if/else): la pestaña «Reglas» dibuja
+  // esa MISMA tabla, así que la pantalla no puede quedar desfasada del código.
+  const order = tallasAProbar(catRaw, genRaw);
 
   for (const t of order) { if (map[t] !== undefined) return { ean: map[t], talla: t, fallback: false }; }
 
@@ -976,6 +973,41 @@ export function normalizeDescripcion(desc: Cell): string {
   d = applyPrinciples(d);                                  // 2) principios
   d = NORM_BY_KEY.get(marcaKey(d)) ?? d;                   // 3) re-chequear mapa
   return d;
+}
+
+/* ── LAS CORRECCIONES DE NOMBRE QUE DE VERDAD HACEN FALTA (8-sep-2026) ────────
+ *
+ * `NORMALIZACION` tiene 22 filas, pero 12 de ellas los PRINCIPIOS ya las
+ * resuelven solos: están de más. Peor: la pestaña «Reglas» dibujaba el valor
+ * CRUDO del mapa, y en una fila eso era MENTIRA — el mapa dice que
+ * "Boys-Shirts - Woven Tops S-S" queda "Boys-Shirts - Woven Tops S/S" y lo que
+ * sale al Excel es "Boys-Shirts Woven S/S", porque el principio de Shirts Woven
+ * lo reescribe DESPUÉS.
+ *
+ * Esta función devuelve las que hacen falta, con lo que de verdad sale al
+ * Excel — pasado por `normalizeDescripcion`, nunca leyendo el mapa. Es
+ * DERIVADA: el día que un principio cubra una fila más, esa fila desaparece
+ * sola de la pantalla.
+ *
+ * Medido el 8-sep-2026: 10 de 22 hacen falta.
+ */
+export interface ReglaDeNombre {
+  /** Como lo manda el proveedor. */
+  sucia: string;
+  /** Lo que sale al Excel de Switch (normalizeDescripcion, no el mapa). */
+  limpia: string;
+}
+
+export function reglasDeNormalizacionQueHacenFalta(): ReglaDeNombre[] {
+  const out: ReglaDeNombre[] = [];
+  for (const sucia of Object.keys(NORMALIZACION)) {
+    const limpia = normalizeDescripcion(sucia);
+    // Si los principios solos ya dan el mismo resultado, la fila del mapa no
+    // agrega nada y no se muestra.
+    if (applyPrinciples(sucia.trim()) === limpia) continue;
+    out.push({ sucia, limpia });
+  }
+  return out.sort((a, b) => a.sucia.localeCompare(b.sucia, "es"));
 }
 
 /** Redondeo CEILING al entero hacia arriba (13.00→13, 13.01→14).

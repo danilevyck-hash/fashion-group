@@ -18,10 +18,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { rolesCxc } from "@/lib/cxc/roles";
 
 export const dynamic = "force-dynamic";
 
-const READ_ROLES = ["admin", "contabilidad", "secretaria", "vendedor"];
+// 🔴 LOS ROLES DEL CXC, DERIVADOS — NO UNA CUARTA COPIA (8-sep-2026).
+//
+// 🩸 Acá decía `["admin", "contabilidad", "secretaria", "vendedor"]`. Y
+// **`contabilidad` NO tiene el módulo Cuentas por Cobrar** (`src/lib/modules.ts`):
+// esta ruta le entregaba el saldo de CUALQUIER cliente del grupo con solo saber
+// su código. No fue una decisión, fue una lista escrita a mano que se quedó
+// atrás de las otras tres.
+//
+// ⚠️ La tarjeta que se abre al pasar el mouse en Ventas › Clientes —su único
+// llamador— NO se rompe: **Ventas es solo de admin**, y admin sigue adentro.
+const READ_ROLES = rolesCxc();
 
 interface AgingRow {
   d0_30: number | string | null;

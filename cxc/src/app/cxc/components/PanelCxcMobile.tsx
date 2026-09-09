@@ -41,6 +41,10 @@ import {
 } from "@/lib/cxc-orden";
 import { rotuloSinPagar } from "@/lib/cxc/sin-pagar";
 import { AGING, tramoLabel } from "@/lib/cxc-aging";
+import MenuDescargar from "./MenuDescargar";
+import { seLeCobra } from "@/lib/cxc/cobrable";
+import type { ClaveDescarga } from "@/lib/cxc/descargas";
+import type { FormatoDescarga } from "../hooks/useDescargasCartera";
 
 // 🩸 Acá vivían `haceCuanto`, `ultimoPagoLabel` y `ultimaCompraLabel`: las tres
 // líneas de texto que llevaba CADA empresa dentro de la tarjeta abierta. Con
@@ -69,7 +73,14 @@ interface PanelCxcMobileProps {
   /** «Le enviaste el estado de cuenta hace 3 días», o `null`. */
   marcaEnvioDe: (client: ConsolidatedClient) => string | null;
   canExport: boolean;
-  onExportarCsv: () => void;
+  /**
+   * 🔴 LAS MISMAS DOS DESCARGAS QUE LA COMPUTADORA (8-sep-2026).
+   *
+   * 🩸 Acá había `onExportarCsv`, que bajaba un CSV **distinto** al del menú de
+   * escritorio: otras columnas, otro nombre de archivo. Dos archivos para la
+   * misma pregunta. Ahora las dos pantallas llaman al mismo hook.
+   */
+  onDescargar: (clave: ClaveDescarga, formato: FormatoDescarga) => void;
   empresaRestriction: string | null;
   /** Reload de datos tras un "Actualizar ahora" exitoso. */
   onSyncedNow?: () => void;
@@ -95,7 +106,7 @@ export default function PanelCxcMobile({
   avisoSinPagarDe,
   marcaEnvioDe,
   canExport,
-  onExportarCsv,
+  onDescargar,
   empresaRestriction,
   onSyncedNow,
   avisoMontos,
@@ -143,7 +154,7 @@ export default function PanelCxcMobile({
       <div className="px-4 pt-4 pb-6 space-y-4">
         <MobileHeader
           canExport={canExport}
-          onExportar={onExportarCsv}
+          onDescargar={onDescargar}
           companyFilter={companyFilter}
           onSyncedNow={onSyncedNow}
         />
@@ -226,17 +237,17 @@ export default function PanelCxcMobile({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Header — título + overflow menu (Cargar / Consolidado / Exportar)
+// Header — frescura, «Actualizar ahora» y el «···» con las dos descargas
 // ─────────────────────────────────────────────────────────────────────────────
 
 function MobileHeader({
   canExport,
-  onExportar,
+  onDescargar,
   companyFilter,
   onSyncedNow,
 }: {
   canExport: boolean;
-  onExportar: () => void;
+  onDescargar: (clave: ClaveDescarga, formato: FormatoDescarga) => void;
   companyFilter: string;
   onSyncedNow?: () => void;
 }) {
@@ -294,8 +305,10 @@ function MobileHeader({
             </svg>
           </button>
           {open && (
-            <div role="menu" className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
-              <MenuItem label="Descargar CSV" onClick={() => { setOpen(false); onExportar(); }} />
+            <div className="absolute right-0 top-12 z-30 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+              <MenuDescargar
+                onDescargar={(clave, formato) => { setOpen(false); onDescargar(clave, formato); }}
+              />
             </div>
           )}
         </div>
@@ -304,18 +317,9 @@ function MobileHeader({
   );
 }
 
-function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className="block w-full px-4 py-3 text-left text-sm text-gray-700 active:bg-gray-100"
-    >
-      {label}
-    </button>
-  );
-}
+// 🩸 Acá vivía `MenuItem`, el renglón del «···» del celular. Su única entrada
+// era «Descargar CSV», y ese camino se retiró el 8-sep-2026: el menú ahora monta
+// `MenuDescargar`, el MISMO componente que dibuja el menú de la computadora.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hero — total pendiente Stone-900
@@ -587,8 +591,11 @@ function MobileClientCard({
       </div>
 
       {/* Tarjeta CERRADA: los dos botones que se usan. «Cobrar» abre la hoja de
-          las cuatro salidas; «Ver detalle» expande la tarjeta. */}
+          las cuatro salidas; «Ver detalle» expande la tarjeta.
+          🔴 Al que tiene saldo A FAVOR no se le cobra, así que no lleva botón
+          (`lib/cxc/cobrable.ts`): le pedía que pagara una plata que le debemos. */}
       <div className="flex gap-2 px-3 pb-3">
+        {seLeCobra(client.total) && (
         <button
           type="button"
           onClick={e => { e.stopPropagation(); onCobrar(); }}
@@ -596,6 +603,7 @@ function MobileClientCard({
         >
           Cobrar
         </button>
+        )}
         <button
           type="button"
           onClick={e => { e.stopPropagation(); onToggle(); }}
@@ -730,6 +738,7 @@ function MobileClientExpanded({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        {seLeCobra(client.total) && (
         <button
           type="button"
           onClick={onCobrar}
@@ -737,6 +746,7 @@ function MobileClientExpanded({
         >
           Cobrar
         </button>
+        )}
         <button
           type="button"
           onClick={onOpenEstado}

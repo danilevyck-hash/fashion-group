@@ -8,6 +8,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 import UltimosPagosPorFecha from "./UltimosPagosPorFecha";
 import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
+import { seLeCobra } from "@/lib/cxc/cobrable";
 
 interface Props {
   client: ConsolidatedClient;
@@ -149,7 +150,8 @@ export default function ContactPanel({
 
       {/* ── Acciones: cobrar · documentos · ficha ──────────────── */}
       <div className="flex items-center gap-3 flex-wrap">
-        {onCobrar && (
+        {/* 🔴 Al que tiene saldo A FAVOR no se le cobra (`lib/cxc/cobrable.ts`). */}
+        {onCobrar && seLeCobra(client.total) && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onCobrar(client); }}

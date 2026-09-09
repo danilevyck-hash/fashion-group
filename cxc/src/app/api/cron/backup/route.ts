@@ -352,6 +352,9 @@ const SWITCH_DATASETS: Dataset[] = [
   { table: "switch_facturas" },
   { table: "switch_recibos" },
   { table: "switch_estadocuenta" },
+  // El total que Switch calcula para cada cliente: es el CUADRE del estado de
+  // cuenta. Una fila por (empresa, cliente); pesa nada y se re-baja con el sync.
+  { table: "switch_estadocuenta_saldo" },
   { table: "switch_factura_utilidad" },
   { table: "switch_proveedor_estadocuenta" },
   { table: "switch_clientes" },
@@ -437,6 +440,7 @@ const ORDER_BY: Record<string, string[]> = {
   fg_user_switch_vendedor: ["user_id", "empresa_key"],
   switch_articulo_info: ["empresa_key", "codigo"],
   switch_articulo_marca: ["empresa_key", "articulo_id"],
+  switch_estadocuenta_saldo: ["empresa_key", "cliente_switch_id"],
   switch_ingresos_mercancia: ["empresa_key", "n_interno", "linea"],
 };
 

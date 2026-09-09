@@ -14,6 +14,7 @@ import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import type { Guia, GuiaItem, ModoEntrega, Transportista } from "./types";
 import { emptyItem } from "./constants";
 import { DESTINOS_BASE, listaParaElCampo, yaEstaEnLaLista } from "@/lib/guias/destinos-lista";
+import { yaEsUnTransportista } from "@/lib/guias/transportistas";
 import { nuevoUid, quitarFila, restaurarFila, validarGuia } from "./guia-form-logic";
 import {
   hayCambios as calcularHayCambios,
@@ -374,8 +375,48 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
     clearGuiaDraft();
   }
 
-  // Adders de listas dinámicas (transportistas ya no se agregan desde el form
-  // — son catálogo controlado por admin)
+  // 🔴 AGREGAR UN TRANSPORTISTA DESDE LA GUÍA MISMA (9-sep-2026). Daniel:
+  // *«Ponme opción en configuración de guía para poder agregar un transportista
+  // nuevo.»*, y al preguntarle quién puede: *«Todos»* — admin, secretaria Y
+  // bodega. Antes este comentario decía «los transportistas ya no se agregan
+  // desde el form — son catálogo controlado por admin»: en la práctica no los
+  // agregaba NADIE (los seis eran del 26-may-2026) y por eso se escribían a
+  // mano en el campo de texto, saltándose la lista.
+  //
+  // ⚠️ Acá NO se puede ser optimista: el desplegable elige por id y el id lo da
+  // el servidor. Se espera la respuesta, y recién entonces entra a la lista y
+  // queda ELEGIDO — que es a lo que se vino. Si falla, se dice por qué.
+  async function addTransportista(name: string) {
+    const nombre = String(name ?? "").trim();
+    if (!nombre) return;
+    const yaEsta = transportistas.find((t) => yaEsUnTransportista(nombre, [t.nombre]));
+    if (yaEsta) {
+      // Ya está: no se manda nada, se elige el que hay. Nunca dos veces el mismo.
+      setTransportistaId(yaEsta.id);
+      return;
+    }
+    try {
+      const r = await fetch("/api/transportistas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d?.id) {
+        showToast(d?.error || "No se pudo agregar el transportista. Intenta de nuevo en unos segundos.");
+        return;
+      }
+      const fila: Transportista = { id: String(d.id), nombre, activo: true };
+      setTransportistas((prev) =>
+        [...prev, fila].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+      );
+      setTransportistaId(fila.id);
+    } catch {
+      showToast("No se pudo agregar el transportista. Revisa la conexión.");
+    }
+  }
+
+  // Adders de listas dinámicas
   // 🔴 AGREGAR UN DESTINO LO AGREGA PARA TODOS (7-sep-2026). Se ve al momento
   // (optimista) y se guarda en la base; si el servidor lo rechaza se saca de la
   // pantalla y se dice por qué, nunca en silencio. Un destino que ya está —por
@@ -706,6 +747,8 @@ export function useGuiaFormState({ editingId = null, alGuardar, guiaInicial = nu
     // listas
     transportistas, direcciones,
     addDireccion,
+    /** 🔴 Agrega un transportista a la lista que ve TODO el equipo, y lo elige. */
+    addTransportista,
     // form
     formNumero,
     fecha, setFecha,

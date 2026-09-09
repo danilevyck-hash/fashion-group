@@ -124,6 +124,7 @@ function Harness({
       saving={false}
       soloCorregible={soloCorregible}
       onAddDireccion={() => {}}
+      onAddTransportista={() => {}}
       onUpdateItem={(idx, field, value) =>
         setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)))
       }

@@ -15,8 +15,19 @@ import { normalizarEspacios } from "@/lib/depurador/veredicto";
 
 export const CATALOGO_DESCRIPCIONES_KEY = "/api/productos/cargar/descripciones";
 
+/** Una descripción ACTIVA con su id: lo que hace falta para poder QUITARLA
+ *  desde la pestaña «Reglas» (el `catalogo` solo trae los textos). */
+export interface FilaDescripcion {
+  id: string;
+  marca: string;
+  descripcion: string;
+}
+
 interface CatalogoResponse {
   catalogo: CatalogoDescripciones;
+  /** Puede faltar si el servidor todavía no la manda: los consumidores la
+   *  tratan como opcional y sin ella se comportan como antes. */
+  filas?: FilaDescripcion[];
 }
 
 const fetcher = async (url: string): Promise<CatalogoResponse> => {
@@ -45,7 +56,9 @@ export function useCatalogoDescripciones() {
         ...base,
         [marcaExistente]: [...lista, descripcion].sort((a, b) => a.localeCompare(b, "es")),
       };
-      mutate({ catalogo: actualizado }, { revalidate: false });
+      // Se conserva `filas` tal cual: la recién aprobada todavía no tiene id
+      // (lo trae el próximo refresco) y sin id no se le dibuja «Quitar».
+      mutate({ ...data, catalogo: actualizado }, { revalidate: false });
       return actualizado;
     },
     [data, mutate]
@@ -56,6 +69,8 @@ export function useCatalogoDescripciones() {
   return {
     /** null mientras carga o si falló — los consumidores bloquean con esto. */
     catalogo: data?.catalogo ?? null,
+    /** Las mismas descripciones activas, con su id (para quitarlas). */
+    filas: data?.filas ?? null,
     cargando: !data && !error,
     fallo: !data && !!error,
     reintentar,

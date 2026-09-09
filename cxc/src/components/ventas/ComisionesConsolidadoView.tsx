@@ -72,11 +72,23 @@ import {
 import { estaRetirado } from "@/lib/comisiones/retirados";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { celdaVacia, desgloseDeCelda } from "@/lib/comisiones/matriz-celda";
+import {
+  conDescargaPorVendedor,
+  empresasConComision,
+  hayQueDescargar,
+  hayQueDescargarTotal,
+  tituloDescarga,
+} from "@/lib/comisiones/descarga";
+import { nombreArchivoComisionesMes } from "@/lib/comisiones/nombre-archivo";
 import { esTodoElAnio, etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
+import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
+import { ImpresionTablaComisiones } from "./comisiones-detalle/ImpresionTablaComisiones";
+import { useDescargaComision } from "./comisiones-detalle/useDescargaComision";
+import { imprimirComo } from "@/lib/comisiones/imprimir";
 import { ComisionesTarjetasConsolidado } from "./ComisionesTarjetas";
 
 // Las 6 empresas con CXC — joystep incluida desde el 14-ago-2026. La lista
@@ -128,6 +140,8 @@ interface Props {
   /** El botón de descarga vive en la barra del shell (ver ComisionesView): esta
    *  vista sigue siendo la dueña del cálculo y solo registra su función acá. */
   onExcel?: (api: ExcelApi | null) => void;
+  /** Lo mismo, para el botón «Descargar el mes en PDF» de esa misma barra. */
+  onPdf?: (api: ExcelApi | null) => void;
   /** Cambia cuando "Actualizar ahora" termina: fuerza re-pedir los datos. */
   refreshKey?: number;
 }
@@ -143,13 +157,19 @@ export function MarcaNoSePaga() {
   );
 }
 
-export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }: Props) {
+export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKey = 0 }: Props) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [sinAsignar, setSinAsignar] = useState<Row | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<{ empresa: string; vendedor: string } | null>(null);
   const [verNoSePagan, setVerNoSePagan] = useState(false);
+  // El motor de la flechita ↓: los MISMOS archivos que ya bajaban desde adentro
+  // del detalle, sin tener que abrirlo. Ver `comisiones-detalle/useDescargaComision`.
+  const { descargarExcel, descargarPdf, papel, MENSAJE_ERROR } = useDescargaComision(year, mes);
+  // El papel del mes entero (los dos botones de arriba). Se monta, se imprime y
+  // se desmonta; en pantalla no se ve nada.
+  const [imprimiendoMes, setImprimiendoMes] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -260,21 +280,70 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
     });
   };
 
+  // ── El PAPEL DEL MES: las 6 empresas, lo mismo que el Excel ────────────────
+  // 🔴 EL PDF Y EL EXCEL DE ARRIBA DICEN LO MISMO: las dos salidas se arman de
+  // las MISMAS filas que ya están en pantalla (`conActividad` + la oficina) y
+  // con el MISMO pie (`sumarPagable`). Ni una suma nueva.
+  const filasImpresas = () => {
+    const todas = [...conActividad, ...(sinAsignar ? [sinAsignar] : [])];
+    return todas.map((r) => ({
+      apagada: r.se_paga === false,
+      celdas: [
+        r.se_paga === false
+          ? `${nombreVendedorEnPantalla(r.vendedor)} (${ROTULO_NO_SE_PAGA})`
+          : nombreVendedorEnPantalla(r.vendedor),
+        ...EMPRESAS.map((k) => fmtMoney(r.porEmpresa[k] ?? 0)),
+        fmtMoney(r.total),
+      ],
+    }));
+  };
+
+  const handlePrint = () => {
+    if (empty || !rows) return;
+    setImprimiendoMes(true);
+  };
+
+  // El papel se monta primero y se imprime DESPUÉS del commit: sin esto,
+  // `window.print()` saldría con la hoja todavía sin pintar.
+  useEffect(() => {
+    if (!imprimiendoMes) return;
+    const limpiar = () => {
+      setImprimiendoMes(false);
+      window.removeEventListener("afterprint", limpiar);
+    };
+    window.addEventListener("afterprint", limpiar);
+    window.setTimeout(limpiar, 60_000);
+    imprimirComo(nombreArchivoComisionesMes(year, mes));
+  }, [imprimiendoMes, year, mes]);
+
   // El shell dispara la descarga de la vista activa. La función se guarda en un
   // ref (cambia en cada render, con los datos frescos) y solo se re-registra
   // cuando cambia si el botón va habilitado — así el efecto no corre de más.
   const exportRef = useRef(handleExport);
   exportRef.current = handleExport;
+  const printRef = useRef(handlePrint);
+  printRef.current = handlePrint;
   useEffect(() => {
     onExcel?.({ run: () => exportRef.current(), disabled: empty });
     return () => onExcel?.(null);
   }, [onExcel, empty]);
+  useEffect(() => {
+    onPdf?.({ run: () => printRef.current(), disabled: empty });
+    return () => onPdf?.(null);
+  }, [onPdf, empty]);
 
   // 🔴 CON «TODO EL AÑO» NO SE ABRE EL DETALLE. El reporte por vendedor es de UN
   // mes (`comision_b2b_detalle` recibe year + mes) y armar doce y pegarlos sería
   // otra cuenta del año, además de la que ya suma la matriz. Se dice en el pie
   // en vez de ofrecer un botón que no lleva a ninguna parte.
   const conDetalle = !esTodoElAnio(mes);
+  // 🔴 LA FLECHITA SIGUE LA MISMA REGLA QUE EL DETALLE: con «Todo el año» no se
+  // dibuja, porque el reporte por vendedor es de UN mes.
+  const conDescarga = conDescargaPorVendedor(mes);
+  /** Las empresas de esa fila que tienen algo que bajar, en el orden de las columnas. */
+  const empresasDeLaFila = (r: Row) =>
+    empresasConComision(r.porEmpresa, r.descuentoPorEmpresa, EMPRESAS)
+      .map((k) => ({ key: k, nombre: nombreCortoEmpresa(k) }));
 
   const renderCells = (r: Row) => (
     <>
@@ -288,6 +357,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
         }
         const desglose = desgloseDeCelda(val, desc);
         const abierta = detalle?.empresa === k && detalle?.vendedor === claveDetalle(r.vendedor);
+        const conFlecha = conDescarga && hayQueDescargar(val, desc);
         return (
           <td
             key={k}
@@ -300,6 +370,17 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
             }`}
             title={conDetalle ? `Ver detalle · ${nombreCortoEmpresa(k)}` : undefined}
           >
+            {/* 🔴 LA FLECHITA VA PEGADA AL NÚMERO Y EN GRIS, y solo donde hay
+                algo que bajar. Tocar el número sigue abriendo el detalle: la
+                flecha para el clic para que los dos caminos convivan. */}
+            {conFlecha && (
+              <MenuDescargaComision
+                titulo={tituloDescarga(nombreVendedorEnPantalla(r.vendedor), nombreCortoEmpresa(k), mes)}
+                mensajeError={MENSAJE_ERROR}
+                onPdf={() => descargarPdf([{ key: k, nombre: nombreCortoEmpresa(k) }], claveDetalle(r.vendedor))}
+                onExcel={() => descargarExcel([{ key: k, nombre: nombreCortoEmpresa(k) }], claveDetalle(r.vendedor))}
+              />
+            )}
             {fmtMoney(val ?? 0)}
             {/* 🔴 El descuento SE VE acá: antes había que abrir el detalle para
                 saber que dentro de −$1,513.08 hay $1,573.08 restados. */}
@@ -312,6 +393,16 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
         );
       })}
       <td className={`bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${!r.se_paga ? "text-gray-400" : r.total < 0 ? "text-rose-600" : "text-gray-900"}`}>
+        {/* 🔴 LA FLECHA DEL TOTAL BAJA TODAS LAS EMPRESAS DE ESA PERSONA, en un
+            solo archivo — una hoja por empresa, en el orden de las columnas. */}
+        {conDescarga && hayQueDescargarTotal(r.porEmpresa, r.descuentoPorEmpresa, EMPRESAS) && (
+          <MenuDescargaComision
+            titulo={tituloDescarga(nombreVendedorEnPantalla(r.vendedor), null, mes)}
+            mensajeError={MENSAJE_ERROR}
+            onPdf={() => descargarPdf(empresasDeLaFila(r), claveDetalle(r.vendedor))}
+            onExcel={() => descargarExcel(empresasDeLaFila(r), claveDetalle(r.vendedor))}
+          />
+        )}
         {fmtMoney(r.total)}
       </td>
     </>
@@ -376,6 +467,28 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
             nombreEmpresa={nombreCortoEmpresa}
             granTotal={grandTotal}
             onDetalle={conDetalle ? detalleDe : () => {}}
+            menuEmpresa={(k, fila) =>
+              conDescarga && hayQueDescargar(fila.porEmpresa[k], fila.descuentoPorEmpresa?.[k] ?? 0) ? (
+                <MenuDescargaComision
+                  compacta
+                  titulo={tituloDescarga(nombreVendedorEnPantalla(fila.vendedor), nombreCortoEmpresa(k), mes)}
+                  mensajeError={MENSAJE_ERROR}
+                  onPdf={() => descargarPdf([{ key: k, nombre: nombreCortoEmpresa(k) }], claveDetalle(fila.vendedor))}
+                  onExcel={() => descargarExcel([{ key: k, nombre: nombreCortoEmpresa(k) }], claveDetalle(fila.vendedor))}
+                />
+              ) : null
+            }
+            menuTotal={(fila) =>
+              conDescarga && hayQueDescargarTotal(fila.porEmpresa, fila.descuentoPorEmpresa, EMPRESAS) ? (
+                <MenuDescargaComision
+                  compacta
+                  titulo={tituloDescarga(nombreVendedorEnPantalla(fila.vendedor), null, mes)}
+                  mensajeError={MENSAJE_ERROR}
+                  onPdf={() => descargarPdf(empresasDeLaFila(fila as Row), claveDetalle(fila.vendedor))}
+                  onExcel={() => descargarExcel(empresasDeLaFila(fila as Row), claveDetalle(fila.vendedor))}
+                />
+              ) : null
+            }
           />
 
           {/* iPad y escritorio: la tabla, intacta. */}
@@ -456,6 +569,28 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
           mes={mes}
           vendedor={detalle.vendedor}
           onClose={() => setDetalle(null)}
+        />
+      )}
+
+      {/* El papel de la flechita (uno o varios reportes) — invisible en pantalla. */}
+      {papel}
+
+      {/* El papel del mes: la misma matriz que se ve, con las 6 empresas. */}
+      {imprimiendoMes && (
+        <ImpresionTablaComisiones
+          titulo="Comisiones — Fashion Group"
+          subtitulo={etiquetaPeriodo(year, mes)}
+          columnas={[
+            { header: "Vendedor" },
+            ...EMPRESAS.map((k) => ({ header: nombreCortoEmpresa(k), numerica: true })),
+            { header: "Total", numerica: true },
+          ]}
+          filas={filasImpresas()}
+          totales={[
+            haySinPago ? "Total a pagar" : "Total",
+            ...EMPRESAS.map((k) => fmtMoney(colTotal(k))),
+            fmtMoney(grandTotal),
+          ]}
         />
       )}
     </div>

@@ -2,6 +2,7 @@
 
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
+import { seLeCobra } from "@/lib/cxc/cobrable";
 
 function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
   if (total < 0) return { border: "border-l-blue-400", tooltip: "Saldo a favor: saldo negativo (nota de credito o sobrepago)" };
@@ -51,14 +52,21 @@ export default function ClientRow({
         onClick={onToggle}
       >
         <div className="col-span-4 font-medium truncate flex items-center gap-1.5 min-w-0">
-          <input
-            type="checkbox"
-            checked={seleccionado}
-            onClick={(e) => e.stopPropagation()}
-            onChange={() => onSeleccionar(client)}
-            aria-label={`Seleccionar a ${client.nombre_normalized}`}
-            className="shrink-0 h-4 w-4 rounded border-gray-300 accent-black cursor-pointer"
-          />
+          {/* La casilla es para MANDAR A VARIOS, o sea cobrar: al saldo a favor
+              tampoco se le dibuja. Se reserva su ancho para que las filas del
+              bloque «Saldo a favor» no queden corridas. */}
+          {seLeCobra(client.total) ? (
+            <input
+              type="checkbox"
+              checked={seleccionado}
+              onClick={(e) => e.stopPropagation()}
+              onChange={() => onSeleccionar(client)}
+              aria-label={`Seleccionar a ${client.nombre_normalized}`}
+              className="shrink-0 h-4 w-4 rounded border-gray-300 accent-black cursor-pointer"
+            />
+          ) : (
+            <span aria-hidden className="shrink-0 h-4 w-4" />
+          )}
           <svg width="10" height="10" viewBox="0 0 10 10" className={`flex-shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="currentColor">
             <path d="M3 1l5 4-5 4V1z"/>
           </svg>
@@ -76,13 +84,18 @@ export default function ClientRow({
         </div>
         <div className="col-span-2 text-right tabular-nums font-semibold flex items-center justify-end gap-2">
           <span>{fmt(client.total)}</span>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onCobrar(client); }}
-            className="shrink-0 rounded-md bg-black px-2.5 py-1 text-xs font-medium text-white transition active:scale-[0.97] hover:bg-gray-800"
-          >
-            Cobrar
-          </button>
+          {/* 🔴 SIN BOTÓN PARA EL SALDO A FAVOR (8-sep-2026). La regla vive en
+              `lib/cxc/cobrable.ts`: a quien le debemos plata no se le cobra. La
+              fila SIGUE viéndose, en su bloque «Saldo a favor» del pie. */}
+          {seLeCobra(client.total) && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onCobrar(client); }}
+              className="shrink-0 rounded-md bg-black px-2.5 py-1 text-xs font-medium text-white transition active:scale-[0.97] hover:bg-gray-800"
+            >
+              Cobrar
+            </button>
+          )}
         </div>
       </div>
     </div>

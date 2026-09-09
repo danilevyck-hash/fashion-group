@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ClientePicker from "@/components/ClientePicker";
 import DestinosListaConfig from "./DestinosListaConfig";
+import TransportistasConfig from "./TransportistasConfig";
 import { Toast } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { useNombresDeClientes } from "@/lib/hooks/useBusquedaClientes";
@@ -460,6 +461,14 @@ export default function GuiasConfiguracionView() {
           podía quitar. Es OTRA cosa que los destinos POR CLIENTE de arriba y
           por eso va en su propia tarjeta, no fusionada. */}
       <DestinosListaConfig onAviso={setToast} />
+
+      {/* 🔴 LOS TRANSPORTISTAS (9-sep-2026) — Daniel: *«Ponme opción en
+          configuración de guía para poder agregar un transportista nuevo.»*
+          Los seis de la lista se sembraron el 26-may-2026 y desde entonces
+          nadie pudo agregar uno; por eso se escribieron a mano en el campo de
+          texto de la guía, saltándose la lista. Tercera tarjeta, no fusionada:
+          las de arriba son DESTINOS, ésta es QUIÉN LLEVA. */}
+      <TransportistasConfig onAviso={setToast} />
 
       <QuitarDestinoModal
         fila={aQuitar}

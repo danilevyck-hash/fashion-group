@@ -80,10 +80,31 @@ describe("PDF de estado de cuenta — barra TOTAL ADEUDADO", () => {
       empresa_nombre: "Fashion Wear, S.A.",
       subtotal: docs(n).reduce((s, d) => s + d.saldo, 0),
       documentos: docs(n),
+      saldoSwitch: null,
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return buildEstadoCuentaPDF({ codigo: "D-170", empresas: [emp], total: emp.subtotal } as any, "CLIENTE");
+    return buildEstadoCuentaPDF({ codigo: "D-170", clienteNombre: "Cliente Del Papel", empresas: [emp], total: emp.subtotal } as any, "CLIENTE");
   };
+
+  /** Los renglones dibujados en cada página, con su altura desde el BORDE DE
+   *  ABAJO en milímetros — que es donde vive el pie. */
+  async function renglonesPorPagina(doc: { output: (t: "arraybuffer") => ArrayBuffer }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(doc.output("arraybuffer")), useSystemFonts: true }).promise;
+    const salida: Array<Array<{ str: string; mmDesdeAbajo: number }>> = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      salida.push(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (content.items as any[])
+          .filter((it) => String(it.str).trim())
+          .map((it) => ({ str: String(it.str), mmDesdeAbajo: (it.transform[5] as number) / 72 * 25.4 })),
+      );
+    }
+    return salida;
+  }
 
   it("salta de página cuando el total no cabe por encima del pie", () => {
     const doc = new jsPDF({ unit: "mm", format: "letter" });
@@ -94,15 +115,41 @@ describe("PDF de estado de cuenta — barra TOTAL ADEUDADO", () => {
     expect(doc.getNumberOfPages()).toBe(antes + 1);
   });
 
-  it("con 29 documentos el total ya NO queda pegado al borde inferior", () => {
-    // 29 era exactamente el caso que tapaba el pie antes del fix.
-    const { doc } = build(29);
-    expect(doc.getNumberOfPages()).toBe(2);
+  // 🔄 9-sep-2026 — CAMBIA DE DIRECCIÓN, NO DE SENTIDO. El candado exigía «con
+  // 29 documentos son 2 páginas», que era la CONSECUENCIA del arreglo en el
+  // papel de entonces. El papel pasó a tener la forma de Switch —diez columnas,
+  // renglones más chicos— así que 29 documentos ahora entran en una hoja y ese
+  // conteo dejó de significar nada.
+  //
+  // Lo que siempre quiso decir se exige ahora directo, y sirve para cualquier
+  // papel futuro: NINGÚN renglón del documento puede caer en la banda del pie.
+  // Se mide con el PDF de verdad, en milímetros.
+  it("🔴 nada se dibuja encima del pie — ni con 29 documentos ni con 120", async () => {
+    for (const n of [29, 120]) {
+      const { doc } = build(n);
+      const paginas = await renglonesPorPagina(doc);
+      for (const [i, renglones] of paginas.entries()) {
+        const invasores = renglones.filter(
+          (r) => r.mmDesdeAbajo < 14 && !/Confidencial|fashiongr\.com|^\d+ ?\/ ?\d+$/.test(r.str),
+        );
+        expect(
+          invasores.map((r) => `${r.str} @ ${r.mmDesdeAbajo.toFixed(1)}mm`),
+          `con ${n} documentos, la hoja ${i + 1} dibuja encima del pie`,
+        ).toEqual([]);
+      }
+    }
   });
 
   it("no rompe el caso corto (todo en una página)", () => {
     const { doc, filename } = build(6);
     expect(doc.getNumberOfPages()).toBe(1);
     expect(filename).toMatch(/^Estado-cuenta-D-170-\d{4}-\d{2}-\d{2}\.pdf$/);
+  });
+
+  // CONTROL de que el papel sigue paginando: con 120 documentos no cabe en una
+  // hoja, y si algún día cupieran todos habría que volver a mirar el candado de
+  // arriba, no darlo por bueno.
+  it("con 120 documentos el papel pagina", () => {
+    expect(build(120).doc.getNumberOfPages()).toBeGreaterThan(1);
   });
 });

@@ -256,6 +256,9 @@ export const TABLAS_SWITCH = [
   "switch_factura_utilidad",
   "switch_recibos",
   "switch_estadocuenta",
+  // El `saldoTotal` que Switch manda con cada estado de cuenta y que hasta el
+  // 9-sep-2026 se tiraba. Se vuelve a bajar con el sync: es de Switch.
+  "switch_estadocuenta_saldo",
   "switch_proveedor_estadocuenta",
   "switch_clientes",
   "switch_articulo_diario",
@@ -287,6 +290,12 @@ export const TABLAS_BITACORA = [
   // arregla volviendo a entrar.
   "user_sessions",
   "login_attempts",
+  // Quién ya cerró cada aviso de «qué cambió» (9-sep-2026). Es `bitacora` y no
+  // `personas` a propósito: cerrar un aviso es UN CLIC, no un dato tecleado. Si
+  // se perdiera, la tira vuelve a salir una vez y ya — nadie pierde trabajo. Y
+  // a los 30 días la novedad caduca sola, así que la fila deja de significar
+  // nada por su cuenta. Ver `src/lib/novedades/lista.ts`.
+  "novedades_vistas",
 ] as const;
 
 // ─── `retirada` — tabla muerta ──────────────────────────────────────────────
@@ -382,6 +391,7 @@ export const PK_QUE_NO_ES_ID: Readonly<Record<string, readonly string[]>> = Obje
   multifashion_caja_diaria: ["fecha"],
   switch_articulo_info: ["empresa_key", "codigo"],
   switch_articulo_marca: ["empresa_key", "articulo_id"],
+  switch_estadocuenta_saldo: ["empresa_key", "cliente_switch_id"],
   switch_ingresos_mercancia: ["empresa_key", "n_interno", "linea"],
   vendedores: ["empresa_key", "nombre"],
 });

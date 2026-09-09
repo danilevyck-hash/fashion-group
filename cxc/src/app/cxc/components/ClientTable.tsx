@@ -7,6 +7,7 @@ import ContactPanel from "./ContactPanel";
 import { AccordionContent } from "@/components/ui";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 import type { SortKey } from "@/lib/cxc-orden";
+import { seLeCobra } from "@/lib/cxc/cobrable";
 
 interface Props {
   filtered: ConsolidatedClient[];
@@ -73,7 +74,10 @@ export default function ClientTable({
   const codigoDe = (c: ConsolidatedClient) =>
     Object.values(c.companies).find((x) => x?.codigo)?.codigo ?? c.nombre_normalized;
 
-  const todosSeleccionados = filtered.length > 0 && filtered.every((c) => seleccion.has(codigoDe(c)));
+  // 🔴 «Seleccionar a todos» selecciona a todos LOS QUE SE COBRAN: mandar a
+  // varios es cobrar, y al saldo a favor no se le cobra (`lib/cxc/cobrable.ts`).
+  const cobrables = filtered.filter((c) => seLeCobra(c.total));
+  const todosSeleccionados = cobrables.length > 0 && cobrables.every((c) => seleccion.has(codigoDe(c)));
 
   const renderClientRow = (client: ConsolidatedClient) => {
     const isExpanded = expanded === client.nombre_normalized;

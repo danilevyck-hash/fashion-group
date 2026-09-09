@@ -172,7 +172,7 @@ export const ALL_MODULES: AppModule[] = [
   // los permisos sin comprar nada.
   { key: "asistencia",     label: "Asistencia y Planilla", href: "/asistencia",   icon: Clock,         roles: [...new Set([...asistenciaRoles(), ...aprobacionesRoles()])],                       group: "operacion" },
   { key: "reclamos",       label: "Reclamos",          href: "/reclamos",         icon: AlertTriangle, roles: ["admin", "secretaria"],                       group: "operacion" },
-  { key: "cargar",         label: "Depurador",         href: "/productos/cargar", icon: PackagePlus,   roles: ["admin", "secretaria"],                       group: "operacion" },
+  { key: "cargar",         label: "Plantilla Switch",  href: "/productos/cargar", icon: PackagePlus,   roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "caja",           label: "Caja Menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
   // "Gastos" a secas: es el ÚNICO módulo de gastos que queda, y desde el

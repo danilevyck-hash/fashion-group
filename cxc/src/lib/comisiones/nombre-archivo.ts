@@ -47,3 +47,43 @@ export function nombreArchivoComision(
     .filter(Boolean)
     .join("-");
 }
+
+/**
+ * `Comisión-Reynaldo-Espinosa-Todas-2026-08` — el archivo de la flecha de la
+ * columna «Total»: TODAS las empresas de esa persona, en uno solo.
+ *
+ * Lleva «Todas» adentro a propósito: sin eso, el archivo de una persona con una
+ * sola empresa y el de todas se llamarían casi igual y quedarían uno al lado del
+ * otro en la carpeta de descargas sin poder distinguirse.
+ */
+export function nombreArchivoComisionTodas(
+  vendedor: string,
+  year: number,
+  mes: number,
+): string {
+  const quien = trozo(nombreVendedorEnPantalla(vendedor));
+  return ["Comisión", quien, "Todas", sufijoArchivoPeriodo(year, mes)]
+    .filter(Boolean)
+    .join("-");
+}
+
+/**
+ * El nombre del archivo del MES entero (las 6 empresas) — el de los dos botones
+ * de arriba.
+ *
+ * 🔴 ES EL MISMO NOMBRE QUE YA USA EL EXCEL (`comisiones-consolidado-2026-08`),
+ * sin extensión: el PDF y el Excel del mismo mes tienen que poder ponerse uno al
+ * lado del otro. La extensión la pone quien descarga o el navegador al imprimir.
+ */
+export function nombreArchivoComisionesMes(year: number, mes: number): string {
+  return `comisiones-consolidado-${sufijoArchivoPeriodo(year, mes)}`;
+}
+
+/** Igual, para la vista de UNA empresa: `comisiones-vistana-2026-08`. */
+export function nombreArchivoComisionesEmpresa(
+  empresaKey: string,
+  year: number,
+  mes: number,
+): string {
+  return `comisiones-${empresaKey}-${sufijoArchivoPeriodo(year, mes)}`;
+}

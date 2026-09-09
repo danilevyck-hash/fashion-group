@@ -327,7 +327,7 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     expect(nota[0].length).toBeLessThan(220);
   });
 
-  it("los 24 lugares que arman una hoja siguen ahí (nada se perdió de camino)", () => {
+  it("los lugares que arman una hoja siguen ahí (nada se perdió de camino)", () => {
     const total = archivosQueLlaman().reduce(
       (n, f) => n + (sinComentarios(leer(f)).match(/buildReportSheet\(\{/g) ?? []).length,
       0,
@@ -348,7 +348,14 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     // módulo, así que desde Clientes se bajaba la matriz de empresas × meses.
     // Ahora cada pestaña baja lo que se está viendo. Sube A PROPÓSITO, con la
     // misma regla con la que el de Cheques bajó.
-    expect(total).toBe(25);
+    //
+    // 🔁 27 desde el 8-sep-2026: **las DOS descargas de Cuentas por Cobrar**
+    // (`src/lib/cxc/excel-cartera.ts`, «Total por cliente» y «Detallado por
+    // compañía»). Ese módulo bajaba un **CSV** armado a mano —12 columnas, sin
+    // pasar por acá— y Daniel lo mandó sacar: *«en ningún lado quiero exportar
+    // CSV, solo Excel»*. Sube A PROPÓSITO: son dos hojas que ANTES no existían,
+    // no dos que se duplicaron.
+    expect(total).toBe(27);
   });
 });
 

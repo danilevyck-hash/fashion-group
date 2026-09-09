@@ -130,7 +130,7 @@ function pintarCelular() {
       onCopyMessage={noop}
       onOpenEstado={noop}
       canExport={false}
-      onExportarCsv={noop}
+      onDescargar={noop}
       empresaRestriction={null}
     />,
   );

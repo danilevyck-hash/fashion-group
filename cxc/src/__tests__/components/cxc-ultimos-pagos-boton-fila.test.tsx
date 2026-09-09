@@ -153,7 +153,7 @@ function pintarCelular() {
       avisoSinPagarDe={sinAviso}
       marcaEnvioDe={sinAviso}
       canExport={false}
-      onExportarCsv={noop}
+      onDescargar={noop}
       empresaRestriction={null}
     />,
   );

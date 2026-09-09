@@ -420,7 +420,11 @@ const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   { archivo: "app/guias/components/GuiasList.tsx", nombre: "Guías de Despacho" },
   { archivo: "app/reclamos/components/EmpresaSelector.tsx", nombre: "Reclamos" },
   { archivo: "app/reclamos/components/ReclamoForm.tsx", nombre: "Nuevo Reclamo" },
-  { archivo: "app/productos/cargar/DepuradorClient.tsx", nombre: "Depurador de Productos" },
+  // El módulo pasó a llamarse "Plantilla Switch" el 8-sep-2026 (Daniel: «se
+  // cambia a Plantilla Switch»; la key interna sigue siendo `cargar`). El
+  // invariante NO se aflojó: sigue habiendo UN solo h1 y sigue siendo
+  // `sr-only`; lo único que cambió es la palabra.
+  { archivo: "app/productos/cargar/DepuradorClient.tsx", nombre: "Plantilla Switch" },
   { archivo: "app/productos/cargar/FacturasTiendaClient.tsx", nombre: "Facturas Tienda" },
   { archivo: "app/asistencia/AsistenciaClient.tsx", nombre: "Asistencia" },
   // El módulo pasó a llamarse "Recordatorios" el 24-ago-2026 (la key interna

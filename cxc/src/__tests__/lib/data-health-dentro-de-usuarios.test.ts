@@ -189,9 +189,22 @@ describe("la pantalla sigue siendo solo de admin", () => {
     expect(src).toMatch(/\{esAdmin && \(\s*<TabsContent value="data-health"/);
   });
 
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 9-sep-2026, y no se borró.
+  //
+  // Hasta hoy este candado exigía la comparación TEXTUAL
+  // `(tabRaw !== "data-health" || esAdmin)`. Ese día nació la 3ª pestaña
+  // —«Novedades», la lista de avisos de «qué cambió»—, que también es solo de
+  // admin, y la condición pasó a ser una LISTA (`SOLO_ADMIN`). Escribir la
+  // segunda a mano al lado de la primera es exactamente cómo nace la tercera
+  // pestaña que se le abre a quien no debe.
+  //
+  // Lo que el candado protege NO cambió: un `?tab=` que este rol no puede ver
+  // cae en «Usuarios», nunca en blanco. Ahora se exige eso mismo sobre la lista,
+  // y que Data Health SIGA adentro de ella — el control original.
   it("un `?tab=` que este rol no puede ver cae en Usuarios, nunca en blanco", () => {
     const src = plano(leer(PAGINA));
-    expect(src).toContain('(tabRaw !== "data-health" || esAdmin)');
+    expect(src).toMatch(/const SOLO_ADMIN[^\n]*=\s*\[[^\]]*"data-health"/);
+    expect(src).toContain("!SOLO_ADMIN.includes(tabRaw) || esAdmin");
     expect(src).toContain(': "usuarios"');
   });
 

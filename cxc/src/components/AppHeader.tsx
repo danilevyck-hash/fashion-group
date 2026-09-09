@@ -8,6 +8,8 @@ import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
 import { getModuleColor } from "@/lib/moduleColors";
 import { ALL_MODULES, getVisibleGroups } from "@/lib/modules";
+import NovedadesAviso from "@/components/NovedadesAviso";
+import { moduloDeRuta } from "@/lib/novedades/seleccion";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
@@ -156,6 +158,15 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           );
         })()}
       </div>
+
+      {/* «Qué cambió» — la tira de novedades del módulo (9-sep-2026).
+          Va acá y no en 22 pantallas: este encabezado es lo único que todas
+          comparten. Queda FUERA del bloque sticky a propósito — es un aviso, no
+          una barra: se lee y se va con el scroll.
+          El módulo se saca de la DIRECCIÓN (`moduloDeRuta`), no del rótulo que
+          llega por prop: el rótulo es texto para leer («Cuentas por Cobrar») y
+          lo que la novedad guarda es la `key` (`cxc`). */}
+      <NovedadesAviso moduloKey={moduloDeRuta(pathname, ALL_MODULES)} />
 
       {/* Mobile search overlay */}
       {mobileSearchOpen && (

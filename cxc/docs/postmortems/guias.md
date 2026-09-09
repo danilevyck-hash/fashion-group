@@ -1196,3 +1196,138 @@
 >
 > Se EXTENDIERON los archivos que ya existían — sin duplicar: `guias-atajos-facturas.test.ts` (28 — la agrupación por día con fechas FIJAS, 3 días que abarcan 3 semanas, «Ver más días», el borde de Panamá, `tituloDelDia`, Traslado + la validación del formulario) · `guia-form-marcar-facturas.test.tsx` (15 — los encabezados en palabras, «Ver más días» tocado, «Traslado» con el «o», la empresa vacía, y el papel y el Excel GENERADOS con «Traslado» adentro) · `guias-destinos-cliente.test.ts` (54 — los 26 definidos exactos, los 5 corregidos con el texto nuevo, D-26 autollena con varios, D-142 no autollena) · `guia-form-destinos.test.tsx` (16 — D-26 en pantalla: llena Sport Corner Calidonia y «Chorrera» queda de botón) · `guias-destinos-precedencia.test.ts` (11 — la marca de la TABLA manda; una fila sin marca no llena) · `guias-destinos-config-route.test.ts` (19 — marcar apaga a los hermanos primero, dos UPDATE y cero DELETE) · `guias-configuracion-pantalla.test.tsx` (14 — la marca por fila, el PATCH con el id, el texto que dice qué se llena solo).
 > - **Verificado por mutación: 16/16 (`_mutar-candados-guias-facturas.sh`) · 15/15 (`_mutar-candados-guias-destinos.sh`) · 17/17 (`_mutar-candados-guias-ajustes-4sep.sh`) · 11/11 (`_mutar-candados-guias-destinos-config.sh`) — 59 de 59 cazadas, 0 sobrevivientes**, los cuatro scripts re-corridos ENTEROS tras el cambio y con su mutación de CONTROL saliendo ⛔. Las nuevas: agrupar por días de CALENDARIO muere en rojo · abrir 2 días en vez de 3 · «Ver más días» trayendo 2 · Traslado escribiendo `0000` · «el de siempre» ignorado · autollenar el primero sin marca · marcar sin apagar a los hermanos · la marca de la pantalla sin escribir. Y todas las previas siguen cazadas (D-87 vuelve al histórico, City Moda recupera la tienda, la tabla deja de ganar, el separador cambia…). ⚠️ Tres patrones de los scripts previos quedaron MUERTOS por la reestructura de `DESTINOS_DEFINIDOS` (D-87, la tienda de City Moda, la red de la constante) y se actualizaron a la firma nueva — el aplicador literal los habría denunciado (⛔) en vez de cantarlos cazados, que es exactamente para lo que existe.
+
+---
+
+## Las tres grafías de la lista de destinos (8-sep-2026)
+
+La lista que el campo **Dirección** ofrece es del equipo desde el 7-sep-2026 (`guias_destino_lista`, se administra en **Guías › Configuración**). Su semilla salió del uso real, y con el uso real se arrastró **dos typos y una calle**. Es el mismo arreglo tres veces: **lo que la lista ofrece es lo que la gente toca, y lo que la gente toca se repite.**
+
+### 1 · «Changuinola» con «u» — ya estaba hecho, y se verificó
+
+Daniel, 5-sep-2026: *«es changuinola»*. Medido **contra producción el 8-sep-2026**: la migración `20261005120000_guias_changuinola.sql` **corrió** y hoy quedan **0 renglones** que digan «Changinola» (ni vivos ni borrados). La red del campo (`DESTINOS_BASE`) y la semilla de la lista dicen las dos «Changuinola». **No hizo falta tocar nada** — lo que se agregó es el candado, para que no vuelva.
+
+### 2 · «Westland», no «Wesland» — migración `20261016120000_guias_westland.sql` (pendiente)
+
+Medido el 8-sep-2026:
+
+| | |
+|---|---|
+| La lista compartida ofrece | **«Wesland»** (fila 15, sembrada con 4 usos) |
+| `guia_items` con «Wesland» exacto | **5** — 4 vivos en 4 guías distintas + 1 de guía borrada |
+| `guia_items` con «Westland» exacto | **0** — la grafía buena sola nunca se escribió |
+| Lo que Daniel ya definió a mano | **«Westland»** para D-99 (el de siempre) y D-142 Sporting Shoes (tiendas 5 · 6 · 14 · «Mas Flow») |
+
+🔴 **Son el mismo lugar, y eso lo dice la lista escrita a mano, no un algoritmo.** `claveDestino` sigue viendo «Wesland» y «Westland» como dos destinos distintos y **eso no cambió**: el pareo por parecido sigue prohibido. Lo que cambia es el VALOR guardado, por una corrección explícita.
+
+- Los renglones: `UPDATE … WHERE btrim(direccion) = 'Wesland'`. 🔴 **Valor exacto, nunca un `LIKE`** — un `ILIKE '%wesland%'` se llevaría por delante «WESTLAND TIENDA 5», «TIENDA 6 WESTLAND MALL» o «MAS FLOW - WESTLAND», que dicen **más** que el nombre del mall y que nadie pidió reescribir.
+- La lista: **soft delete firmado** de «Wesland» + alta de «Westland». **No un `UPDATE` del texto en su lugar**: la fila dice `creado_por = 'sistema'` el 7-sep, y reescribirle el destino haría que esa firma mienta. Así queda escrito en la tabla que «Wesland» se ofreció y por qué dejó de ofrecerse.
+
+### 3 · «CALLE 19» sale de la lista — migración `20261017120000_guias_calle19_fuera_de_la_lista.sql` (pendiente)
+
+**No es un destino: es una calle.** Entró a la semilla porque se usó 13 veces, y el criterio fue el uso real (3+). El uso era cierto; lo que estaba mal es que se siguiera **ofreciendo**, porque «CALLE 19» sola no dice a qué tienda va el envío. Ya hay dos destinos definidos que la nombran bien, los dos dictados por Daniel el 4-sep-2026: **D-35 City Shoes → «Calle 19 Central, al lado de la joyería Super Oro»** y **D-112 Nine Sport → «Calle 19 Central»**.
+
+- 🔴 **Soft delete firmado, nunca `DELETE`.** Si mañana hace falta, se vuelve a agregar de un toque (el índice único es solo entre activas).
+- 🔴 **Los 13 renglones viejos NO se tocan** — «CALLE 19» ×9 · «Calle 19» ×3 · «Calle 19 » ×1. Es historia: dicen lo que se escribió el día que salió cada guía. Acá no hay un tipeo que corregir, hay un destino que dejó de ofrecerse. La migración **no tiene ni un `UPDATE` sobre `guia_items`**, y hay candado que lo exige.
+- ⚠️ Acotada al valor exacto (`destino = 'CALLE 19'`): un `LIKE '%CALLE 19%'` se llevaría **«Calle 19 Central»**, que es el destino bueno y se queda en la lista (14 usos).
+
+### Medición antes y después
+
+**226 guías vivas · 540 renglones · 7.630 bultos**, idénticos antes y después. (La medición del 7-sep decía 225 · 536 · 7.599; la diferencia es **una guía nueva creada entre el 7 y el 8 de septiembre**, no un efecto de estos cambios: ninguna de las tres migraciones toca `guia_transporte`, ni los bultos, ni el estado, ni las firmas.)
+
+### Candado
+
+`src/__tests__/lib/guias-grafias-de-destinos.test.ts` (23 casos): la red del campo nunca vuelve a ofrecer una grafía mala · las tres migraciones miran el **valor exacto** · quitar de la lista es soft delete **firmado**, nunca `DELETE` · la calle **no toca el histórico** · ninguna toca `guia_transporte` · `claveDestino` **sigue separando** «Wesland» de «Westland» y «CALLE 19» de «Calle 19 Central».
+**16 mutaciones, 16 cazadas**, con 2 controles verdes (`scripts/_mutar-candados-guias-grafias.sh`).
+
+---
+
+## 🔴 Guías — SE PUEDE AGREGAR UN TRANSPORTISTA NUEVO, Y QUITARLO (9-sep-2026)
+
+**Daniel, textual:** *«Ponme opción en configuración de guía para poder agregar un transportista nuevo.»*
+Y al preguntarle quién puede hacerlo: ***«Todos»*.**
+
+### 🩸 Por qué hacía falta — medido contra producción el 9-sep-2026
+
+Los **seis** transportistas se sembraron el **26-may-2026** y **desde entonces nadie pudo agregar uno**:
+no había pantalla, ni botón, ni ruta de alta (`/api/transportistas` era **solo GET**).
+
+| Transportista | Guías | Desde |
+|---|---:|---|
+| RedNblue | 53 | 26-may-2026 |
+| Boston | 30 | 26-may-2026 |
+| Edwin | 29 | 26-may-2026 |
+| Mojica | 17 | 26-may-2026 |
+| Transporte Sol | 16 | 26-may-2026 |
+| Sanjur | 14 | 26-may-2026 |
+
+Y por no poder agregarlos, **se escribieron a mano en el campo de texto de la guía**, saltándose la
+lista: `NUÑEZ GLOBAL SOLUTIONS` (24-abr) · `CITY MODA` y `SPORTING SHOES` (13-may) · `LUTY LUI`
+(14-may) · y uno que dice literalmente **`no`** (16-abr). Es el mismo cuento del destino «hola» que
+vivía en un solo navegador: **si se puede agregar, se tiene que poder quitar — y si no se puede
+agregar, se agrega por fuera.**
+
+⚠️ Las **63 guías con el transportista vacío** son las de **Entrega directa** (nuestro propio camión).
+**Están bien así y no se tocaron.**
+
+### Las tres decisiones de Daniel
+
+1. 🔴 **Agregar lo pueden hacer TODOS los que arman guías** — admin, secretaria **y bodega**, desde
+   Configuración **y** desde la guía misma, con un **＋ al lado del desplegable**, igual que el ＋ del
+   campo Dirección. ⚠️ **Quitar se queda en admin y secretaria**, como el resto de Configuración:
+   agregar es un atajo, quitar es una decisión que le cambia la lista a todo el equipo.
+   (Bodega no ve la pestaña Configuración; su puerta es el ＋ de la guía.)
+2. 🔴 **Los cinco escritos a mano NO entran a la lista.** Cuatro son **nombres de cliente**, no
+   transportistas, y uno dice «no». **Sus guías viejas no se tocan** — se quedan exactamente como
+   están. La migración **no siembra nada** y hay candado que lo exige.
+3. 🔴 **Solo el nombre.** Nada de teléfono ni campos extra: es lo único que la guía usa y lo único
+   que se imprime.
+
+### Lo que quedó
+
+- **Tercera tarjeta en Guías › Configuración**, debajo de las dos de destinos. **No se fusiona con
+  ellas**: aquéllas son DESTINOS (a dónde va), ésta es QUIÉN LLEVA. Campo + «＋ Agregar
+  transportista», y la lista con **cuántas guías lleva cada uno** — 🔴 ese es el dato que dice si se
+  puede quitar sin dudar — y un «Quitar» por fila.
+- **El ＋ al lado del desplegable de la guía**, con **rótulo VISIBLE** («Agregar transportista»): el
+  `title` solo aparece pasando el mouse por encima, y en el iPad —donde se arman las guías— no hay
+  mouse. Lo que se agrega **queda elegido en el acto** y le aparece a todo el equipo.
+- 🔴 **Soft delete FIRMADO, nunca DELETE.** La tabla ya tenía `activo`; lo que faltaba era la firma
+  (`desactivado_por` / `desactivado_en`, con CHECK que la exige) y el candado de que no se ofrezca
+  dos veces el mismo nombre. **Un transportista quitado deja de ofrecerse, pero las guías viejas
+  siguen diciendo su nombre**: la guía apunta a la fila por id y la fila se queda para siempre.
+- 🔴 **El repetido se rechaza por clave EXACTA y normalizada, jamás por parecido** — se reusa
+  `claveDestino`, la MISMA regla de los destinos, no una segunda: «RedNblue», «REDNBLUE» y
+  « Red N Blue » son uno solo, y «RedNbleu» (una letra distinta) es OTRO transportista.
+- 🔴 **Único solo entre los ACTIVOS**: el que se quitó y vuelve **REVIVE su fila**, no crea una
+  segunda — así las guías que lo usaban siguen apuntando al mismo.
+- ⚠️ El **GET pelado de `/api/transportistas` no cambió de forma** (devuelve el array tal cual): es
+  lo que el formulario lee desde el 26-may-2026, y envolverlo lo habría dejado sin transportistas.
+  La cuenta de guías va detrás de `?config=1`, que es la única que la necesita.
+- ⚠️ Contar guías usa `leerTodoPaginado`: `db-max-rows` es 1000 y corta EN SILENCIO. Hoy son 227,
+  pero un día serán 1.001.
+
+### Medición antes y después
+
+**227 guías vivas · 543 renglones · 7.662 bultos** — **idénticos**. Este cambio toca lo que la
+pantalla OFRECE, jamás lo guardado. Script: `scripts/_medir-transportistas.mjs`.
+
+### Migración
+
+`supabase/migrations/20261025120000_transportistas_alta_y_baja.sql` — **PENDIENTE de aplicar**.
+**Aditiva**: solo agrega columnas (`creado_por`, `desactivado_por`, `desactivado_en`), dos CHECK y un
+índice único parcial. Ni un `INSERT`, ni un `UPDATE`, ni un `DELETE`, ni un `DROP`, y no nombra
+`guia_transporte` ni `guia_items`. Sin ella, el alta contesta «falta correr la migración» y el resto
+de Guías no se entera.
+
+### Candados
+
+`guias-transportistas.test.ts` (33) · `guias-transportistas-servidor.test.ts` (9, la conducta con la
+base fingida) · `guias-transportistas-pantalla.test.tsx` (8).
+**32 mutaciones, 32 cazadas**, con **2 controles** que no se cazan
+(`scripts/_mutar-candados-transportistas.sh`).
+
+Un candado **cambió de dirección con nota fechada, ninguno se borró**: `iphone-targets-guias`
+(«se renderiza UNA vez por lista») pasó de **2 `<AddNewInline>` a 3** —nació el del transportista— y
+se le agregó el **control al revés**: que ninguno de los tres caiga dentro del mapa de renglones, que
+era el defecto original (un ＋ por FILA).

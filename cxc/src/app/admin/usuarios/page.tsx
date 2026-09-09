@@ -5,10 +5,11 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users as UsersIcon, ShieldCheck } from "lucide-react";
+import { Users as UsersIcon, ShieldCheck, Megaphone } from "lucide-react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import VendedorSwitchSection from "./VendedorSwitchSection";
 import DataHealthTab from "./DataHealthTab";
+import NovedadesTab from "./NovedadesTab";
 import IconButton from "@/components/IconButton";
 import { ALL_MODULES, getDefaultModulesForRole } from "@/lib/modules";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
@@ -39,7 +40,10 @@ function relativeTime(iso: string): string {
 // back/forward caigan donde estaba el usuario — y para que la dirección vieja
 // `/admin/data-health` pueda aterrizar en la de Data Health (el redirect vive
 // en next.config.js, como el resto de los slugs viejos).
-const TABS = ["usuarios", "data-health"] as const;
+// «Novedades» (9-sep-2026) es la lista de avisos de «qué cambió» y quién ya
+// los leyó. Va acá y no en un módulo nuevo: ésta ya es la pantalla admin-only
+// donde se mira quién es quién.
+const TABS = ["usuarios", "data-health", "novedades"] as const;
 
 // Misma clase que las pestañas de Ventas y Multifashion. No se inventa un
 // patrón nuevo: subrayado teal, sin píldora, 44px de alto al tacto.
@@ -75,7 +79,8 @@ function UsuariosPageInner() {
   // Un `?tab=` desconocido —o uno que este rol no puede ver— cae en la pestaña
   // por defecto, NUNCA en blanco: Radix no dibuja nada si el `value` no tiene
   // trigger (misma convención que /ventas, /admin y el Depurador).
-  const tab = TABS.some((t) => t === tabRaw) && (tabRaw !== "data-health" || esAdmin)
+  const SOLO_ADMIN: readonly string[] = ["data-health", "novedades"];
+  const tab = TABS.some((t) => t === tabRaw) && (!SOLO_ADMIN.includes(tabRaw) || esAdmin)
     ? tabRaw
     : "usuarios";
   const [toast, setToast] = useState<string | null>(null);
@@ -249,6 +254,12 @@ function UsuariosPageInner() {
             {esAdmin && (
               <TabsTrigger value="data-health" className={TAB_TRIGGER_CLASS}>
                 <ShieldCheck className="hidden h-3.5 w-3.5 sm:block" /> Data Health
+              </TabsTrigger>
+            )}
+            {/* La lista de avisos de «qué cambió» — también SOLO de admin. */}
+            {esAdmin && (
+              <TabsTrigger value="novedades" className={TAB_TRIGGER_CLASS}>
+                <Megaphone className="hidden h-3.5 w-3.5 sm:block" /> Novedades
               </TabsTrigger>
             )}
           </TabsList>
@@ -663,6 +674,11 @@ function UsuariosPageInner() {
           {esAdmin && (
             <TabsContent value="data-health" className="mt-0">
               <DataHealthTab />
+            </TabsContent>
+          )}
+          {esAdmin && (
+            <TabsContent value="novedades" className="mt-0">
+              <NovedadesTab />
             </TabsContent>
           )}
         </Tabs>

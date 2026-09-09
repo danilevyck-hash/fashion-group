@@ -139,6 +139,8 @@ Cuando se afirma algo de una pantalla, **se mira la pantalla**, no solo el códi
 - Migraciones **aditivas y acotadas**. Nunca un `LIKE` suelto, nunca un UPDATE amplio.
 - **Detrás de un interruptor** lo que cambia una pantalla que se usa a diario: en `false`, la pantalla es la de hoy.
 
+🩸 **El script de mutación restaura POR COPIA, jamás con `git checkout`** (9-sep-2026). Un agente escribió `trap 'git checkout -- …' EXIT`, se colgó **en medio de la verificación**, el trap disparó al morir el proceso y `git checkout` devolvió los archivos a HEAD: **le borró su propia implementación sin commitear**. Quedó el candado escrito y el código desaparecido. Se copia lo que hay **al empezar** a un directorio temporal y se restaura de ahí — así vuelve lo que había, esté commiteado o no. (Y hay un segundo motivo, ya conocido: con archivos NUEVOS en la rama, `git checkout` aborta el comando entero sin restaurar nada.)
+
 ## 16. Cómo se le habla a Daniel
 
 - **Resumido.** Es el dueño, no programador. Sin nombres de tabla ni jerga.

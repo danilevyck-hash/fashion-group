@@ -713,7 +713,9 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
       if (seen.has(k)) continue;
       seen.add(k);
       if (esDescripcionCatalogada(catalogo, marca, desc)) continue;
-      const v = veredictoDescripcion(desc, catalogo);
+      // La marca viaja al veredicto: las dos mitades solo valen DENTRO de su
+      // marca (8-sep-2026).
+      const v = veredictoDescripcion(desc, catalogo, marca);
       if (v.veredicto !== "alerta") { solas++; continue; }
       out.push({ marca, desc, motivo: v.texto, gemela: v.gemela });
     }
@@ -734,12 +736,12 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         />
       )}
 
-      {/* Sin masthead: "Depurador" ya lo dicen la barra sticky (celular), el
+      {/* Sin masthead: "Plantilla Switch" ya lo dicen la barra sticky (celular), el
           breadcrumb (escritorio) Y el selector de pestañas de arriba, que en
           los tres anchos muestra en cuál estás. Queda sr-only para no dejar la
           pantalla sin encabezado. La línea divisoria se fue con el título: era
           el subrayado del masthead, no una separación de contenido. */}
-      <h1 className="sr-only">Depurador de Productos</h1>
+      <h1 className="sr-only">Plantilla Switch</h1>
 
       {/* Estado del catálogo de descripciones (bloquea procesar/descargar) */}
       {catalogoCargando && (

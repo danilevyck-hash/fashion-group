@@ -521,7 +521,14 @@ describe("Depurador · la puerta pierde 'La marca se detecta sola'", () => {
 // ───────────────────────────────────────────────────────────────────────────
 import ReglasView from "@/app/productos/cargar/ReglasView";
 
-describe("Depurador · Reglas pierde las dos bajadas, no los principios", () => {
+// 🔄 8-sep-2026 · CAMBIA DE DIRECCIÓN, con nota. La pestaña «Reglas» se rehízo
+// minimalista (Daniel: «justo lo necesario y ordenado de manera minimalista») y
+// los 8 principios de limpieza SE FUERON de la pantalla — los principios siguen
+// vivos en el código (`applyPrinciples`), y lo que la pantalla muestra ahora son
+// las 10 correcciones de nombre que de verdad hacen falta, con el resultado real
+// de `normalizeDescripcion`. El candado conserva su mitad original —las dos
+// bajadas explicativas no vuelven— y estrena la nueva.
+describe("Plantilla Switch · Reglas: sin bajadas y sin la lista de principios", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
@@ -536,10 +543,16 @@ describe("Depurador · Reglas pierde las dos bajadas, no los principios", () => 
     expect(screen.queryByText(/antes de buscar en el catálogo/i)).toBeNull();
   });
 
-  it("el título de la sección y la lista de principios SIGUEN", () => {
+  it("los principios ya no se listan en pantalla", () => {
     render(<ReglasView />);
-    expect(screen.getByText("Principios de limpieza")).toBeTruthy();
-    expect(document.querySelectorAll("ol li").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Principios de limpieza")).toBeNull();
+    expect(document.querySelectorAll("ol li").length).toBe(0);
+  });
+
+  it("CONTROL: la pantalla NO quedó vacía — sigue diciendo cómo se elige la talla", () => {
+    render(<ReglasView />);
+    expect(screen.getByText("Cómo se elige la talla")).toBeTruthy();
+    expect(screen.getByText("Descripciones por marca")).toBeTruthy();
   });
 });
 

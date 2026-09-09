@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
-import { csvBlob, buildCsv } from "@/lib/csv-export";
 import { waHref } from "@/lib/contact-links";
 import { COMPANIES, B2B_COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
@@ -22,9 +21,13 @@ import PanelCxcMobile from "./components/PanelCxcMobile";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import TabsCartera from "./components/TabsCartera";
 import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
+import MenuDescargar from "./components/MenuDescargar";
 import EnviarEmailModal from "./components/EnviarEmailModal";
 import useAdminData from "./hooks/useAdminData";
+import { useDescargasCartera } from "./hooks/useDescargasCartera";
 import { tabCxcPermitida } from "@/lib/cxc/boston-roles";
+import { veCxc } from "@/lib/cxc/roles";
+import { seLeCobra } from "@/lib/cxc/cobrable";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import {
@@ -112,41 +115,17 @@ function buildEmailBody(client: ConsolidatedClient) {
   return lines.join("\n");
 }
 
-// ── PDF generation (via jsPDF) ────────────────────
-
-function exportCSV(data: ConsolidatedClient[], label?: string, riskLabel?: string, companyLabel?: string) {
-  const date = new Date().toISOString().slice(0, 10);
-  // "Cuentas por Cobrar", no "Reporte CXC": mismo criterio que el PDF — es como
-  // se llama la pantalla, y "CXC" es jerga. (El NOMBRE del archivo se deja como
-  // está: Daniel ya tiene esos CSV archivados con ese prefijo.)
-  const meta = `Cuentas por Cobrar · Fashion Group — ${date}${companyLabel ? ` — ${companyLabel}` : ""}${riskLabel ? ` — ${riskLabel}` : ""} — ${data.length} registros`;
-  const header = ["Cliente", "0-30d", "31-60d", "61-90d", "91-120d", "121d+", "Total", "Estado", "Correo", "Telefono", "Celular", "Contacto"];
-  const rows = data.map((c) => {
-    const estado = c.overdue > 0 ? "Vencido crítico" : c.watch > 0 ? "Vencido reciente" : "Por vencer";
-    return [
-      c.nombre_normalized,
-      (c.d0_30 ?? c.current).toFixed(2),
-      (c.d31_60 ?? 0).toFixed(2),
-      (c.d61_90 ?? 0).toFixed(2),
-      (c.d91_120 ?? c.watch).toFixed(2),
-      (c.d121_plus ?? c.overdue).toFixed(2),
-      c.total.toFixed(2),
-      estado,
-      c.correo,
-      c.telefono,
-      c.celular,
-      c.contacto,
-    ];
-  });
-  const blob = csvBlob(buildCsv([[meta], header, ...rows], ","));
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  const suffix = label ? `_${label.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}` : "";
-  a.download = `CXC${suffix}_${date}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 ACÁ VIVÍA `exportCSV`, EL CSV DEL CXC — SE FUE EL 8-sep-2026.
+//
+// Daniel, textual: *«en ningún lado quiero exportar CSV, solo Excel»*. Bajaba
+// una hoja de 12 columnas —los OCHO tramos finos más `Estado · Correo ·
+// Telefono · Celular · Contacto`— que además nadie más del sistema produce: todo
+// export sale por `excel-export.ts`. Las dos descargas que la reemplazan viven
+// en `hooks/useDescargasCartera.ts`, y el celular usa las MISMAS.
+//
+// ⚠️ `lib/csv-export.ts` NO se borró: lo sigue usando el export de Reclamos.
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ── Main Component ───────────────────────────────────────
 
@@ -443,6 +422,10 @@ function AdminDashboardInner() {
     [sinPagarActivo, diasSinPagarDe],
   );
 
+  // 🔴 LAS DOS DESCARGAS. Es el MISMO hook que usa el celular: lo que se baja
+  // desde la computadora y desde el «···» del teléfono es el mismo archivo.
+  const descargar = useDescargasCartera(filtered, cxcCompanies, companyFilter);
+
   useEffect(() => {
     if (!authChecked) return;
     // El fetch inicial lo dispara SWR al activarse su clave (authChecked); aquí
@@ -533,10 +516,13 @@ function AdminDashboardInner() {
     });
   }
 
-  /** La casilla del encabezado selecciona LO FILTRADO, no el universo entero. */
+  /**
+   * La casilla del encabezado selecciona LO FILTRADO, no el universo entero.
+   * 🔴 Y solo a los que se cobran: al saldo a favor no se le manda un cobro.
+   */
   function alternarSeleccionTodos() {
     setSeleccion((previa) => {
-      const todos = filtered.map(codigoDe);
+      const todos = filtered.filter((c) => seLeCobra(c.total)).map(codigoDe);
       const yaEstaban = todos.length > 0 && todos.every((c) => previa.has(c));
       return yaEstaban ? new Set<string>() : new Set(todos);
     });
@@ -595,18 +581,10 @@ function AdminDashboardInner() {
   // ⚠️ La tabla `cxc_client_overrides` NO se toca y se sigue LEYENDO en
   // `useAdminData` (un override guardado antes le sigue ganando al maestro).
 
-  function buildExportSubtitle() {
-    const parts: string[] = [];
-    if (riskFilter !== "all") {
-      const labels: Record<string, string> = { current: "Por vencer", watch: "Vencido reciente", overdue: "Vencido crítico" };
-      parts.push(labels[riskFilter] || "");
-    }
-    if (companyFilter !== "all") {
-      const co = COMPANIES.find((c) => c.key === companyFilter);
-      if (co) parts.push(co.name);
-    }
-    return parts.length > 0 ? parts.join(" — ") : undefined;
-  }
+  // 🩸 ACÁ VIVÍA `buildExportSubtitle`, que armaba a mano el subtítulo de los
+  // papeles viejos. Lo reemplaza `subtituloDelPapel()` en `lib/cxc/descargas.ts`
+  // — el mismo texto para el PDF y para el título del Excel, que es lo que
+  // impide que un formato diga de qué empresa es y el otro no.
 
   // ── Render ────────────────────────────────────────────
 
@@ -627,16 +605,12 @@ function AdminDashboardInner() {
     );
   }
 
-  const canExport = userRole === "admin" || userRole === "secretaria";
-
-  // Mobile actions — wired al mismo handler que usa el dropdown del desktop.
-  // Inline para evitar prop drilling de COMPANIES + import dinámicos.
-  const handleMobileExportCsv = () => {
-    const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "por-vencer" : riskFilter === "watch" ? "vencido-reciente" : "vencido-critico";
-    const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
-    const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Por vencer" : riskFilter === "watch" ? "Vencido reciente" : "Vencido crítico";
-    exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined, riskLabel || undefined, coL || undefined);
-  };
+  // 🔴 DESCARGA TODO EL QUE VE EL MÓDULO — también el VENDEDOR (8-sep-2026).
+  // Daniel, textual: *«que lo pueda usar igual que yo, a todo su poder»*. Era
+  // solo admin y secretaria, y el vendedor es justamente el que sale a cobrar
+  // con la lista en la mano. La lista de roles se DERIVA de `veCxc()`, la misma
+  // que abre la pantalla: quien entra, descarga.
+  const canExport = veCxc(userRole);
 
   return (
     <PullToRefresh onRefresh={loadData}>
@@ -670,7 +644,7 @@ function AdminDashboardInner() {
         avisoSinPagarDe={avisoSinPagarDe}
         marcaEnvioDe={marcaEnvioDe}
         canExport={canExport}
-        onExportarCsv={handleMobileExportCsv}
+        onDescargar={descargar}
         empresaRestriction={empresaRestriction}
         onSyncedNow={() => loadData()}
         avisoMontos={avisoMontos}
@@ -728,62 +702,25 @@ function AdminDashboardInner() {
           />
           {canExport && (
             <div className="relative">
+              {/* 🔴 «Descargar», no «Exportar» (8-sep-2026): el sistema entero
+                  dice «Descargar» — el diccionario de la casa lo manda y los
+                  otros módulos ya lo cumplen. Mismo botón, mismo lugar, mismo
+                  color; cambia el verbo y lo que ofrece. */}
               <button
                 onClick={() => setShowExport(!showExport)}
+                aria-haspopup="menu"
+                aria-expanded={showExport}
                 className="text-sm bg-black text-white px-4 rounded-lg font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 min-h-[44px]"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Exportar
+                Descargar
               </button>
               {showExport && (<>
                 <div className="fixed inset-0 z-10" onClick={() => setShowExport(false)} />
-                <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-72 py-1">
-                  <button
-                    onClick={() => {
-                      const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "por-vencer" : riskFilter === "watch" ? "vencido-reciente" : "vencido-critico";
-                      const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
-                      const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Por vencer" : riskFilter === "watch" ? "Vencido reciente" : "Vencido crítico";
-                      exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined, riskLabel || undefined, coL || undefined);
-                      setShowExport(false);
-                    }}
-                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    <div>
-                      <div className="text-sm font-medium text-gray-800">CSV (Excel)</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Hoja de cálculo con el detalle por tramo de días</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const sub = buildExportSubtitle();
-                      const { generatePDFResumen } = await import("@/lib/pdf-cxc");
-                      generatePDFResumen(filtered, sub);
-                      setShowExport(false);
-                    }}
-                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><rect x="6" y="3" width="12" height="18" rx="1"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/></svg>
-                    <div>
-                      <div className="text-sm font-medium text-gray-800">PDF Resumen</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Vista general, listo para imprimir</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const sub = buildExportSubtitle();
-                      const { generatePDFDetallado } = await import("@/lib/pdf-cxc");
-                      generatePDFDetallado(filtered, cxcCompanies, sub);
-                      setShowExport(false);
-                    }}
-                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
-                    <div>
-                      <div className="text-sm font-medium text-gray-800">PDF Detallado</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Desglose completo por empresa y tramo de días</div>
-                    </div>
-                  </button>
+                <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-80 py-1">
+                  <MenuDescargar
+                    onDescargar={(clave, formato) => { setShowExport(false); void descargar(clave, formato); }}
+                  />
                 </div>
               </>)}
             </div>

@@ -71,6 +71,7 @@ export default function GuiaNuevaPage() {
         instantanea={s.instantanea}
         guardadoEn={s.guardadoEn}
         onAddDireccion={s.addDireccion}
+        onAddTransportista={s.addTransportista}
         onUpdateItem={s.updateItem}
         onUpdateItemFields={s.updateItemFields}
         onReemplazarItems={s.reemplazarItems}

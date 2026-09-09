@@ -822,3 +822,82 @@ bajo**: el 2024 de Multifashion sacó 0,55 y pasó. A Joystep, que abrió en jul
 **Pendiente mío** (después de Ventas): llenar oct-nov-dic en gris en la matriz del escritorio y en la
 tarjeta del celular + subir el freno del año incompleto. Números medidos y listos en los dos artifacts;
 **nada que preguntarle a Daniel**.
+
+---
+
+## 9-sep-2026 — «Qué cambió»: el aviso de novedades dentro de cada módulo
+
+Daniel, textual: *«revisa todo lo que hemos hecho desde que empezó esta conversación, para que a cada
+usuario que entre a cada módulo le salga mensajito de que hay nuevo o qué cambió, de manera súper
+resumida»*.
+
+🩸 **El porqué.** En cuatro días cambiaron de sitio el botón de descargar de Cuentas por Cobrar, el
+nombre entero del módulo «Depurador», el desplegable de dónde salió un pago en Préstamos y dos
+destinos de Guías. Angela, andrea, Edwin y David abren la pantalla al día siguiente y la encuentran
+distinta, sin que nada se los diga.
+
+### Las siete reglas (`src/lib/novedades/seleccion.ts`, módulo PURO)
+
+1. Se ve **una sola vez por persona y por novedad**. Cerrada, no vuelve; si nunca la cerró, sigue.
+2. **No bloquea nada**: una tira gris arriba del contenido con una ×, nunca un modal.
+3. **Máximo 3 a la vez**, las más nuevas.
+4. **Cada novedad es UNA línea**, sin jerga (hay barrido que prohíbe «endpoint», rutas y nombres de tabla).
+5. **Solo la ve quien TIENE ese módulo** — lo decide el SERVIDOR, con los módulos de la cookie firmada.
+6. **Caduca sola a los 30 días.**
+7. **Nunca sale una novedad de un módulo dentro de otro** — y el `id` empieza con la key del módulo,
+   así que cerrar una en Guías no puede apagar otra en Préstamos.
+
+🔴 **Las novedades son DATOS escritos a mano** en `src/lib/novedades/lista.ts` (módulo · fecha · una
+línea). No se generan del historial de cambios: un texto para una persona lo escribe una persona.
+**Mejor cero que una de relleno** — hoy la traen CINCO de los 22 módulos.
+
+### Las 10 novedades que quedaron (verificadas contra el código, una por una)
+
+| módulo | qué dice |
+|---|---|
+| **Plantilla Switch** | El módulo ahora se llama «Plantilla Switch». Es el mismo de siempre, con el nombre de lo que hace. |
+| **Plantilla Switch** | En «Reglas» ya puedes quitar una descripción que escribiste, sin pedírselo a nadie. |
+| **Plantilla Switch** | Si una descripción es casi igual a otra de la misma marca, el sistema te lo avisa antes de que entre. |
+| **Cuentas por Cobrar** | «Exportar» ahora dice «Descargar» y ofrece dos cosas: total por cliente o detallado por compañía, en PDF o Excel. |
+| **Cuentas por Cobrar** | Al cliente que tiene saldo a favor ya no se le ofrece cobrar: sigue viéndose, pero no se le pide plata que le debemos. |
+| **Cuentas por Cobrar** | El estado de cuenta que le mandas al cliente ahora sale con la misma forma que el de Switch. |
+| **Comisiones** | La flechita gris al lado de cada número descarga ese reporte sin tener que abrir el detalle. |
+| **Guías de Despacho** | La lista de destinos ya dice «Westland» bien escrito; las guías viejas quedan como están. |
+| **Guías de Despacho** | «CALLE 19» salió de la lista de destinos: sola no dice a qué tienda va el envío. |
+| **Préstamos** | Al registrar un pago ahora eliges de dónde salió la plata; ya no viene contestado «Quincena». |
+
+Los otros 17 módulos **no llevan ninguna**: no tuvieron un cambio que la persona note.
+
+### Dónde se guarda lo leído, y por qué
+
+🔴 **En una tabla (`novedades_vistas`), no solo en el navegador.** «Qué leí yo» ES un dato de la
+persona, así que la regla 2 de la casa no lo manda al servidor por sí sola. Lo que lo manda es la otra
+mitad del encargo: Daniel quiere **saber cuántas personas la vieron**, y un `localStorage` vive dentro
+de UN navegador — no lo puede leer nadie más, ni la misma persona desde el iPad.
+
+⚠️ **`localStorage` se queda como respaldo del mismo dato personal**, por dos razones: (1) mientras la
+DDL no corra, cerrar un aviso tiene que funcionar igual; (2) la × tiene que apagar la tira en el acto,
+sin esperar a la red. Se leen los dos y se unen.
+
+Migración **`20261024120000_novedades_vistas.sql`** — ⚠️ **escrita, SIN aplicar**. Aditiva (crea una
+tabla y no toca una fila de nada), llave `(usuario_id, novedad_id)`, RLS service_role. El código
+**falla abierto**: sin ella el aviso sale y se cierra igual. Clasificada como `bitacora` en el
+respaldo (cerrar un aviso es un clic, no un dato tecleado).
+
+### Dónde vive cada cosa
+
+- Tira: `src/components/NovedadesAviso.tsx`, montada UNA vez en `AppHeader` (no se tocaron 22 pantallas).
+- 🩸 **El aviso ESPERA 800 ms a que la pantalla cargue.** Sin esa espera pedía lo suyo en el mismo
+  instante que el módulo y le competía: Guías › Configuración se quedó en «Cargando…» dentro de su
+  propia prueba. Primero los datos del módulo, después el aviso. Y si la lista escrita a mano no tiene
+  nada vivo para ese módulo, **no se pregunta nada** — en 17 de los 22 no hay ni una lectura de red.
+- Pantalla de Daniel: **Usuarios › Novedades** (`?tab=novedades`, solo admin) — la lista completa y
+  quiénes la leyeron. No es un módulo nuevo.
+
+### Candados
+
+`src/__tests__/lib/novedades.test.ts` (43) · `src/__tests__/components/novedades-aviso.test.tsx` (14);
+**30 mutaciones, 30 cazadas** con 2 controles (`scripts/_mutar-candados-novedades.sh`).
+Un candado **cambió de dirección con nota fechada**, ninguno se borró:
+`data-health-dentro-de-usuarios` (la condición de la pestaña solo-admin pasó de una comparación
+textual a una LISTA, con Data Health adentro como control).

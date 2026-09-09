@@ -162,6 +162,15 @@ interface PropsConsolidado {
   granTotal: number;
   /** Abre el mismo modal de detalle que la celda de la tabla. */
   onDetalle: (empresa: string, vendedor: string) => void;
+  /**
+   * 🔴 LA FLECHITA ↓, la misma de la tabla. Se pasa dibujada desde la vista —que
+   * es la dueña de la descarga— para que estas tarjetas no sepan nada de rutas
+   * ni de archivos: acá solo se decide DÓNDE va.
+   * Devolver `null` = esa línea no lleva flecha (la vista ya aplicó la regla de
+   * `lib/comisiones/descarga`).
+   */
+  menuEmpresa?: (empresaKey: string, fila: FilaConsolidado) => ReactNode;
+  menuTotal?: (fila: FilaConsolidado) => ReactNode;
 }
 
 export function ComisionesTarjetasConsolidado({
@@ -173,6 +182,8 @@ export function ComisionesTarjetasConsolidado({
   nombreEmpresa,
   granTotal,
   onDetalle,
+  menuEmpresa,
+  menuTotal,
 }: PropsConsolidado) {
   return (
     <ListaTarjetas>
@@ -183,6 +194,8 @@ export function ComisionesTarjetasConsolidado({
           empresas={empresas}
           nombreEmpresa={nombreEmpresa}
           onDetalle={onDetalle}
+          menuEmpresa={menuEmpresa}
+          menuTotal={menuTotal}
         />
       ))}
 
@@ -201,6 +214,8 @@ export function ComisionesTarjetasConsolidado({
             empresas={empresas}
             nombreEmpresa={nombreEmpresa}
             onDetalle={onDetalle}
+            menuEmpresa={menuEmpresa}
+            menuTotal={menuTotal}
             apagada
           />
         ))}
@@ -222,6 +237,8 @@ function TarjetaVendedorMatriz({
   empresas,
   nombreEmpresa,
   onDetalle,
+  menuEmpresa,
+  menuTotal,
   apagada,
 }: {
   fila: FilaConsolidado;
@@ -230,6 +247,8 @@ function TarjetaVendedorMatriz({
   empresas: readonly string[];
   nombreEmpresa: (key: string) => string;
   onDetalle: (empresa: string, vendedor: string) => void;
+  menuEmpresa?: (empresaKey: string, fila: FilaConsolidado) => ReactNode;
+  menuTotal?: (fila: FilaConsolidado) => ReactNode;
   apagada?: boolean;
 }) {
   const [abierta, setAbierta] = useState(false);
@@ -240,11 +259,14 @@ function TarjetaVendedorMatriz({
         data-comision-card
         className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
       >
+        {/* 🔴 La flechita ↓ del TOTAL va AL LADO del botón que abre la tarjeta,
+            no adentro: un botón dentro de otro botón no se puede tocar. */}
+        <div className="flex items-center">
         <button
           type="button"
           onClick={() => setAbierta((v) => !v)}
           aria-expanded={abierta}
-          className="flex min-h-[44px] w-full items-center justify-between gap-2 px-3 py-2.5 text-left active:bg-gray-50"
+          className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2.5 text-left active:bg-gray-50"
         >
           {/* pr-0.5: `truncate` recorta el vuelo de la ITÁLICA — «Oficina (DEFAULT)»
               se leía "Sin asignaı" aunque sobrara ancho. Medido en captura. */}
@@ -264,6 +286,8 @@ function TarjetaVendedorMatriz({
             {fmtMoney(fila.total)}
           </span>
         </button>
+        {menuTotal && <span className="pr-1">{menuTotal(fila)}</span>}
+        </div>
 
         {abierta && (
           <ul className="divide-y divide-gray-100 border-t border-gray-100 bg-gray-50">
@@ -283,11 +307,11 @@ function TarjetaVendedorMatriz({
               }
               const desglose = desgloseDeCelda(val, desc);
               return (
-                <li key={k}>
+                <li key={k} className="flex items-center">
                   <button
                     type="button"
                     onClick={() => onDetalle(k, fila.vendedor)}
-                    className="flex min-h-[44px] w-full items-center justify-between gap-2 px-3 py-2 text-left active:bg-gray-100"
+                    className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left active:bg-gray-100"
                   >
                     <span className="truncate text-xs text-gray-600">{nombreEmpresa(k)}</span>
                     <span className="shrink-0 text-right">
@@ -303,6 +327,7 @@ function TarjetaVendedorMatriz({
                       )}
                     </span>
                   </button>
+                  {menuEmpresa && <span className="pr-1">{menuEmpresa(k, fila)}</span>}
                 </li>
               );
             })}

@@ -85,9 +85,23 @@ describe("🔴 lo chico se decide por MONTO", () => {
 describe("el cajón del GRUPO", () => {
   const src = sinComentarios(leer("src/app/cxc/components/EstadoCuentaDrawer.tsx"));
 
-  it("🔴 usa el módulo puro, no un `< 50` escrito a mano", () => {
-    expect(src).toContain("partirDocumentos");
-    expect(src).toContain('from "@/lib/cxc/documentos-chicos"');
+  // 🔄 9-sep-2026 — EL CANDADO CAMBIA DE DIRECCIÓN, NO DE SENTIDO. Daniel,
+  // preguntado en qué pantallas quería seguir plegando los de menos de $50 al
+  // copiar la forma del estado de cuenta de Switch: *«En ninguno. Quiero ver
+  // todo.»*
+  //
+  // 🩸 Y había un defecto medido detrás: la regla vivía SOLO en la pantalla y
+  // nunca en el PDF, así que el cajón de D-25 mostraba 74 renglones y el papel
+  // que se le mandaba al cliente imprimía 111 — dos superficies del MISMO
+  // estado de cuenta diciendo cosas distintas.
+  //
+  // Lo que se exige ahora es lo contrario Y su control: que no se pliegue nada,
+  // y que si algún día se vuelve a plegar sea POR MONTO y jamás por tipo (esa
+  // regla sigue viva y probada arriba, sobre el módulo puro, que se conserva).
+  it("🔴 NO pliega nada: se dibujan TODOS los documentos", () => {
+    expect(src, "volvió a plegarse el estado de cuenta del grupo").not.toContain("partirDocumentos");
+    expect(src).not.toContain('from "@/lib/cxc/documentos-chicos"');
+    expect(src, "la lista dejó de dibujar todos los documentos").toContain("emp.documentos.map");
   });
 
   it("⚠️ NO agrupa por tipo de documento en ningún lado", () => {
@@ -130,11 +144,13 @@ describe("el cajón del GRUPO", () => {
 describe("el cajón de la cartera de BOSTON", () => {
   const src = sinComentarios(leer("src/components/cxc/BostonDocumentosDrawer.tsx"));
 
-  it("tiene los MISMOS encabezados y la MISMA agrupación por monto", () => {
+  // 🔄 9-sep-2026 — misma vuelta que el cajón del grupo, el MISMO día: los dos
+  // dejaron de plegar juntos para que sigan diciendo lo mismo.
+  it("tiene los MISMOS encabezados y TAMPOCO pliega nada", () => {
     expect(src).toContain(">Documento<");
     expect(src).toContain(">Original<");
     expect(src).toContain(">Saldo<");
-    expect(src).toContain("partirDocumentos");
+    expect(src, "Boston volvió a plegar y el grupo no").not.toContain("partirDocumentos");
   });
 
   it("🔴 lee SU propia ruta, no la del grupo", () => {

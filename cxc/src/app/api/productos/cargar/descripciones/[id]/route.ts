@@ -9,13 +9,24 @@ const MISCONFIG = NextResponse.json(
   { status: 503 }
 );
 
+// Quitar una descripción: admin Y SECRETARIA (8-sep-2026).
+//
+// Daniel: «que también la pueda quitar — ella la escribió». La secretaria ya
+// podía AGREGAR (POST /descripciones/aprobar, 54 de las 281 filas de hoy nacen
+// así, aprobadas desde la alarma que sale al procesar un archivo) y no podía
+// quitar la que escribió mal: la puerta era solo-admin. Es la regla de la casa
+// — si se puede agregar, se tiene que poder quitar.
+//
+// 🔴 Desactivar NO borra: sigue siendo `activa = false`, nunca un DELETE.
+const ALLOWED = ["admin", "secretaria"];
+
 /**
- * Activa / desactiva una descripción del catálogo (SOLO admin).
+ * Activa / desactiva una descripción del catálogo (admin y secretaria).
  * Desactivar NO borra: la fila y su auditoría quedan (histórico).
  * Body: { activa: boolean }.
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const authError = requireAuth(req, ["admin"]);
+  const authError = requireAuth(req, ALLOWED);
   if (authError) return authError;
   if (!HAS_SERVICE_ROLE) return MISCONFIG;
 

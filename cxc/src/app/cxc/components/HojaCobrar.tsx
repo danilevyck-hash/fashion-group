@@ -33,6 +33,7 @@ import { ModalOverlay } from "@/components/ui";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt, fmtDate } from "@/lib/format";
 import type { EstadoCuenta } from "./EstadoCuentaDrawer";
+import { cuadrarConSwitch } from "@/lib/cxc/estado-cuenta-switch";
 
 /** El código Switch (D-XXX) es el mismo en todas las empresas del cliente. */
 function codigoDe(client: ConsolidatedClient): string | null {
@@ -118,6 +119,18 @@ export default function HojaCobrar({
 
   const tieneCorreo = !!preview?.destinatario;
 
+  // 🔴 SI EL TOTAL NO CUADRA CONTRA SWITCH, SE DICE ANTES DE MANDARLO
+  // (9-sep-2026). Es el último momento en que se puede parar: de acá para
+  // adelante el papel ya salió al cliente con un número que Switch no
+  // reconoce. Sin dato de Switch no se afirma nada.
+  const saldoSwitch = datos
+    ? datos.empresas.reduce<number | null>(
+        (acc, e) => (e.saldoSwitch == null ? acc : (acc ?? 0) + e.saldoSwitch),
+        null,
+      )
+    : null;
+  const cuadre = datos ? cuadrarConSwitch(datos.total, saldoSwitch) : null;
+
   async function entregarPdf() {
     if (!datos) return;
     setOcupado(true);
@@ -164,10 +177,16 @@ export default function HojaCobrar({
   const cuerpo = (
     <div className="space-y-3">
       <div>
-        <p className="text-base font-semibold text-gray-900">{nombre}</p>
+        <p className="text-base font-semibold text-gray-900">{datos?.clienteNombre || nombre}</p>
         <p className="text-xs text-gray-500 mt-0.5">{encabezado}</p>
         {marcaEnvio && <p className="text-xs text-gray-400 mt-0.5">{marcaEnvio}</p>}
       </div>
+
+      {cuadre && !cuadre.cuadra && cuadre.aviso && (
+        <p role="alert" className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+          {cuadre.aviso}
+        </p>
+      )}
 
       {preview && preview.sharedCount >= 10 && (
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">

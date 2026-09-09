@@ -328,7 +328,22 @@ describe("AddNewInline · el ＋ que se escapó de las dos vueltas", () => {
 
   it("se renderiza UNA vez por lista, no una por fila", () => {
     // El de destinos vivía dentro del <th> de la tabla — que en móvil no existe.
-    expect((form.match(/<AddNewInline/g) ?? []).length).toBe(2); // quien despacha + destinos
+    //
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 9-sep-2026, no se borró: eran DOS (quien
+    // despacha + destinos) y ahora son TRES. Nació el ＋ del desplegable
+    // «Transportista» — Daniel: *«Ponme opción en configuración de guía para
+    // poder agregar un transportista nuevo.»*, y los seis de la lista se habían
+    // sembrado el 26-may-2026 sin que nadie pudiera agregar uno.
+    //
+    // Lo que el candado cuida NO cambió: uno por LISTA, jamás uno por FILA.
+    expect((form.match(/<AddNewInline/g) ?? []).length).toBe(3); // quien despacha + destinos + transportista
+  });
+
+  it("CONTROL — y ninguno de los tres vive dentro del mapa de renglones", () => {
+    // El defecto original: el ＋ dibujado una vez POR FILA. Se comprueba que
+    // ningún `<AddNewInline` cae dentro de un `items.map(`.
+    const dentroDelMapa = /items\.map\(([\s\S]*?)\n  \)/.exec(form)?.[1] ?? "";
+    expect(dentroDelMapa).not.toContain("<AddNewInline");
   });
 });
 

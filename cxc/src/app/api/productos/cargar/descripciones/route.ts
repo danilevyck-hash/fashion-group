@@ -19,8 +19,11 @@ const MISCONFIG = NextResponse.json(
  * Catálogo de descripciones por marca (tabla depurador_descripciones — la
  * fuente de verdad; reemplazó la constante MARCA_DESCRIPCIONES).
  *
- * - Default: { catalogo: { marca: [descripciones ACTIVAS] } } — lo consumen
- *   Depurador, Facturas Tienda, fórmulas y reglas.
+ * - Default: { catalogo: { marca: [descripciones ACTIVAS] }, filas: [{ id,
+ *   marca, descripcion }] } — lo consumen Plantilla Switch, Facturas Tienda,
+ *   fórmulas y reglas. `filas` trae el id de cada descripción ACTIVA para que
+ *   la pestaña «Reglas» pueda quitar una (la secretaria escribió esa fila y
+ *   tiene que poder deshacerla); el `catalogo` no cambió de forma.
  * - ?admin=1 (SOLO admin): { rows: [...] } con todas las filas (activas e
  *   inactivas) y su metadata (origen, quién aprobó, cuándo) para la vista admin.
  */
@@ -43,9 +46,11 @@ export async function GET(req: NextRequest) {
   if (adminView) return NextResponse.json({ rows: data ?? [] });
 
   const catalogo: Record<string, string[]> = {};
+  const filas: { id: string; marca: string; descripcion: string }[] = [];
   for (const r of data ?? []) {
     if (!r.activa) continue;
     (catalogo[r.marca] ??= []).push(r.descripcion);
+    filas.push({ id: r.id, marca: r.marca, descripcion: r.descripcion });
   }
-  return NextResponse.json({ catalogo });
+  return NextResponse.json({ catalogo, filas });
 }

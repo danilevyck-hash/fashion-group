@@ -49,7 +49,7 @@
 // cálculo del Excel y solo registra su función con `onExcel`.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileSpreadsheet, Settings } from "lucide-react";
+import { FileSpreadsheet, FileText, Settings } from "lucide-react";
 import { EMPRESA_KEY_TO_NOMBRE_CORTO, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import SyncStatus from "@/components/shared/SyncStatus";
@@ -61,7 +61,11 @@ import { ComisionesCriterios } from "./ComisionesCriterios";
 import { ComisionesPeriodo } from "./ComisionesPeriodo";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { periodoInicial } from "@/lib/comisiones/mes-inicial";
-import { rotuloDescargarPeriodo } from "@/lib/comisiones/periodo";
+import {
+  ROTULO_DESCARGAR_MES_PDF,
+  conPdfDelPeriodo,
+  rotuloDescargarExcel,
+} from "@/lib/comisiones/descarga";
 import {
   OPCIONES_VISTA,
   VISTA_GRUPO,
@@ -178,6 +182,15 @@ export function ComisionesView({
   const registrarExcel = useCallback((api: ExcelApi | null) => {
     excelRef.current = api ? api.run : null;
     setExcelDisabled(api ? api.disabled : true);
+  }, []);
+  // 🔴 EL MISMO MECANISMO PARA EL PDF (8-sep-2026). Daniel pidió el mes en los
+  // dos formatos: el papel lo arma la vista —que es la dueña del cálculo— y acá
+  // solo se dispara, igual que el Excel.
+  const pdfRef = useRef<(() => void) | null>(null);
+  const [pdfDisabled, setPdfDisabled] = useState(true);
+  const registrarPdf = useCallback((api: ExcelApi | null) => {
+    pdfRef.current = api ? api.run : null;
+    setPdfDisabled(api ? api.disabled : true);
   }, []);
 
   // Qué se está mirando: lo que pide la URL manda; si no, lo último guardado.
@@ -296,17 +309,31 @@ export function ComisionesView({
           onSuccess={() => setRefreshKey((k) => k + 1)}
         />
 
-        {/* 🔴 EL BOTÓN DICE QUÉ TRAE (Daniel: «a, pero descargar, no bajar, como
-            esté en todos los módulos»). Medido: el sistema dice «Descargar» 23
-            veces contra 5 formas raras. Con «Todo el año» elegido, dice «el
-            año». */}
+        {/* 🔴 DOS BOTONES: EL MES EN LOS DOS FORMATOS (8-sep-2026). El botón
+            dice QUÉ TRAE y el verbo es «Descargar» (Daniel: «a, pero descargar,
+            no bajar, como esté en todos los módulos»). Los dos traen LO MISMO:
+            el mes con las 6 empresas.
+            ⚠️ «Descargar el año» se queda como está —Excel y nada más—: el
+            reporte por vendedor es de un mes, así que no hay PDF del año. */}
+        {conPdfDelPeriodo(mes) && (
+          <button
+            type="button"
+            onClick={() => pdfRef.current?.()}
+            disabled={pdfDisabled}
+            className="ml-auto inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2.5 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-1.5 sm:px-3"
+          >
+            <FileText className="h-4 w-4 shrink-0" /> {ROTULO_DESCARGAR_MES_PDF}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => excelRef.current?.()}
           disabled={excelDisabled}
-          className="ml-auto inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2.5 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-1.5 sm:px-3"
+          className={`inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2.5 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-1.5 sm:px-3 ${
+            conPdfDelPeriodo(mes) ? "" : "ml-auto"
+          }`}
         >
-          <FileSpreadsheet className="h-4 w-4 shrink-0" /> {rotuloDescargarPeriodo(mes)}
+          <FileSpreadsheet className="h-4 w-4 shrink-0" /> {rotuloDescargarExcel(mes)}
         </button>
       </div>
       )}
@@ -325,7 +352,7 @@ export function ComisionesView({
            lados dicen lo mismo. */
         <VendedorasSubtab selectedYear={inicial.year} />
       ) : esVistaGrupo(vista) ? (
-        <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} refreshKey={refreshKey} />
+        <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} onPdf={registrarPdf} refreshKey={refreshKey} />
       ) : (
         <ComisionesPorEmpresaView
           empresa={vista}
@@ -333,6 +360,7 @@ export function ComisionesView({
           year={year}
           mes={mes}
           onExcel={registrarExcel}
+          onPdf={registrarPdf}
           refreshKey={refreshKey}
         />
       )}

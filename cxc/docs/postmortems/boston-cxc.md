@@ -780,3 +780,155 @@ pasa aunque `const hoy = new Date()`. Se ajustaron a mirar el uso real (`const h
 script mutaba `src/lib/cxc/estado-cuenta-email.ts` sin tenerlo en su lista de respaldo, así que esa
 mutación **nunca se restauraba** y contaminaba todo lo que corriera después. Un script de mutación que
 muta un archivo que no respalda es peor que no tenerlo.
+
+---
+
+## 🔴 «DESCARGAR» SON DOS COSAS, EN PDF Y EN EXCEL — Y AL SALDO A FAVOR NO SE LE COBRA (8-sep-2026)
+
+> Daniel, textual: *«en ningún lado quiero exportar CSV, solo Excel»* · *«no quisiera eso»* (por las
+> columnas de Estado, Correo, Teléfono, Celular y Contacto) · *«las compañías deberían estar adentro
+> del cliente, no como separado»* · *«se tiene que sumar el total del cliente y ponerlo ABAJO del
+> cliente, las sumas, no arriba»* · *«se queda»* (el mostrador `TCKCTA`) · *«que lo pueda usar igual
+> que yo, a todo su poder»* (el vendedor).
+
+### Lo que hay ahora
+
+El botón negro de la línea de filtros dice **«Descargar»** —era «Exportar»— y abre **dos líneas sin
+subtítulo**, cada una en los dos formatos:
+
+```
+TODOS LOS CLIENTES
+  Total por cliente          PDF · EXCEL
+  Detallado por compañía     PDF · EXCEL
+```
+
+🔴 **Lo mismo en la computadora y en el celular.** Las dos pantallas montan el MISMO componente
+(`app/cxc/components/MenuDescargar.tsx`) y llaman al MISMO hook
+(`app/cxc/hooks/useDescargasCartera.ts`). 🩸 Antes el «···» del teléfono bajaba un **CSV distinto** al
+del menú de escritorio: otras columnas, otro nombre de archivo. Dos archivos para la misma pregunta es
+cómo se arregla uno y queda mal el otro.
+
+- **«Total por cliente»** — un renglón por cliente: `Código · Cliente · 0 a 90 días · 91 a 120 · 121 y
+  más · Total`, con Total al pie. **Los TRES tramos de la pantalla**, no los ocho finos, y sus rótulos
+  salen de `tramoLabel()` como en todas las superficies.
+- **«Detallado por compañía»** — un renglón por cliente **y** compañía. En el **PDF** el nombre del
+  cliente encabeza su bloque, debajo van sus compañías y **el total del cliente cierra el bloque**. En
+  el **Excel** el código y el cliente **se repiten en cada renglón**: sin eso no se puede filtrar por
+  cliente ni armar una tabla dinámica, que es para lo que se baja una hoja.
+
+### 🩸 EL «PDF DETALLADO» SE CONTRADECÍA A SÍ MISMO
+
+Con una empresa puesta en el filtro, el encabezado de cada cliente traía el total de **esa** empresa y
+debajo listaba **las seis**: `filtered` recorta los totales pero **no recorta `c.companies`**, y la
+lista de empresas del papel salía de `cxcCompanies`, que no mira el filtro. Medido contra producción el
+8-sep-2026 (`scripts/_medir-cxc-descargas.mjs`), empresa por empresa:
+
+| Empresa | ANTES · encabezados | ANTES · filas de abajo | DESPUÉS · las dos cosas |
+|---|---:|---:|---:|
+| Vistana | $843.796,40 | $3.142.648,65 | $845.197,43 |
+| Fashion Wear | $1.228.400,31 | $2.782.535,19 | $1.228.523,06 |
+| Fashion Shoes | $852.966,71 | $3.075.076,59 | $859.625,45 |
+| Active Shoes | $413.375,01 | $2.406.851,71 | $413.689,50 |
+| Active Wear | $310.859,07 | $2.052.435,18 | $310.859,17 |
+| Joystep | $64.726,17 | $1.552.544,52 | $64.856,07 |
+
+Quién decide qué empresas se dibujan vive ahora en **una función pura**, `companiasDeLaVista()`
+(`src/lib/cxc/descargas.ts`), y el total de cada bloque es **la suma de sus renglones**, no un número
+que llega por otro lado. ⚠️ La diferencia entre el «ANTES · encabezados» y el «DESPUÉS» de cada fila
+son los clientes con saldo a favor de esa empresa, que salieron del archivo (ver abajo).
+
+### 🩸 A CINCO CLIENTES SE LES ESTABA COBRANDO PLATA QUE LES DEBEMOS
+
+Medido el 8-sep-2026: **5 clientes tienen saldo A FAVOR, −$1.220,05 en total**, y a los cinco les salía
+el botón negro **«Cobrar»**. El mensaje de WhatsApp que ese botón arma decía, textual:
+
+```
+Total: $-1,147.52
+Agradecemos su pronta atencion a este saldo.
+```
+
+| Código | Cliente | Saldo |
+|---|---|---:|
+| D-139 | Viva Panama Dutty Free | −$1.147,52 |
+| D-116 | Novedades La Reina, S.A. | −$37,45 |
+| TCKCTA | VENTAS LOCAL | −$19,00 |
+| D-75 | Ines Collection | −$13,93 |
+| D-69 | Grupo Tova | −$2,15 |
+
+La regla vive en **un solo lugar** (`src/lib/cxc/cobrable.ts`, `seLeCobra(total)`) y la leen la fila del
+escritorio, la tarjeta del celular, el panel desplegado, el pie del cajón de documentos y las dos
+descargas. 🔴 **También se cae la casilla de «mandar a varios»**: mandar a varios es cobrar, y
+«Seleccionar a todos» ahora selecciona solo a los que se cobran.
+
+⚠️ **En la pantalla siguen viéndose**, en su bloque «Saldo a favor» del pie, exactamente como hoy:
+esconderlos sería otro defecto, esa plata existe y alguien la tiene que ver.
+
+⚠️ **El mostrador `TCKCTA` se queda en la cartera** —Daniel: *«se queda»*—; hoy tiene −$19,00, así que
+le aplica esta regla **por su saldo, no por ser el mostrador**. Hay candado que exige que ni el módulo
+de decisiones ni el de cobro nombren ese código.
+
+### 🔴 EL NOMBRE DEL CLIENTE VA CAPITALIZADO
+
+`nombre_normalized` está en MAYÚSCULAS porque es **la llave** con la que se consolidan las 6 empresas,
+no un texto para leer. El nombre que Switch manda (`nombre`) —el mismo que ya usa el papel que se le
+envía al cliente— viene capitalizado. Medido: de las **213 filas** de la cartera, **211 difieren** entre
+uno y otro.
+
+🔑 **No se transforma nada**: se muestra la grafía de Switch tal cual. Las **3** que él manda en
+mayúsculas son siglas —`R.J.A.S.A.`, `ACTIVE SHOES, S.A.` y `VENTAS LOCAL`— y capitalizarlas a la
+fuerza daría `R.j.a.s.a.`.
+
+### 🩸 DOS PDF DEL MISMO MENÚ QUE NO SE PARECÍAN
+
+El «Resumen» llevaba el encabezado de tabla casi **blanco** (`#F9FAFB`, letra gris) y el «Detallado»
+casi **negro** (`#111827`, letra blanca); uno vertical y el otro horizontal; uno con cuatro cajas de
+totales y una barra de colores que el otro no tenía. Se fusionaron en los dos archivos de arriba, con
+**una sola cabecera y un solo pie**: logo arriba a la izquierda y debajo en gris qué es y de qué
+empresa; a la derecha la fecha (`fmtDate`, la del sistema) y `Hoja N de M`; encabezado de tabla en el
+**navy `#1B3A5C`** —el mismo `pri` de los Excel de la casa—, filas alternadas suaves, montos a la
+derecha, Total con borde superior navy, y al pie `Confidencial` · `fashiongr.com`.
+
+El **Excel** sale por el estándar de la casa (`buildReportSheet` + `workbookBytes`): **título en la
+fila 1, fila 2 vacía, encabezados en la 3 con filtro y fila fija**, y la plata como NÚMERO con
+`$#,##0.00`. Para eso `buildReportSheet` ganó un `titulo` **opcional** — sin él, los encabezados siguen
+en A1 y el archivo que sale es el de siempre; el panel fijo se acomoda solo porque lo deriva del `ref`
+del filtro.
+
+Los nombres dicen **qué es · de quién · de cuándo**, con guiones y sin espacios:
+`CXC-cartera-2026-09-08.pdf` · `CXC-cartera-por-compania-2026-09-08.xlsx`. 🩸 Y la fecha **no se pierde
+en el camino** (hay un caso conocido en Caja donde el servidor arma el nombre con fecha y el navegador
+lo guarda sin ella): acá el nombre se arma del lado del navegador y viaja entero al `download` del
+enlace y al `doc.save()`.
+
+### Permisos
+
+- 🔴 **Descarga TODO el que ve el módulo, también el VENDEDOR.** Era admin y secretaria, y el vendedor
+  es justamente el que sale a cobrar con la lista en la mano. La lista se DERIVA de `veCxc()`.
+- ⚠️ **`/api/cxc/aging-por-cliente/[codigo]` dejaba entrar a `contabilidad`**, un rol que **no tiene el
+  módulo CXC**, y devuelve el saldo de cualquier cliente con solo saber su código. No fue una decisión:
+  era una **cuarta copia** de la lista de roles que se quedó atrás. Ahora las cuatro salen de
+  `src/lib/cxc/roles.ts`. La tarjeta que se abre al pasar el mouse en Ventas › Clientes —su único
+  llamador— no se rompe: **Ventas es solo de admin**.
+
+### ⚠️ Boston no se toca
+
+Ni el módulo de decisiones, ni los dos formatos, ni el hook nombran `confecciones_boston` (hay candado).
+Las empresas salen de `B2B_COMPANIES`, que ya excluye a Boston, y la cartera sale de la vista del grupo.
+**La pestaña de Boston no cambió en nada**, y su hoja «Cobrar» sigue siendo la decisión pendiente de
+siempre.
+
+### Medición y candados
+
+- Medición: `scripts/_medir-cxc-descargas.mjs` (solo lectura contra producción). Cartera del 8-sep-2026:
+  **100 clientes con saldo ≠ 0 · $3.714.123,67** (0-90 $1.405.572,85 · 91-120 $932.610,65 · 121+
+  $1.375.940,17). Lo que baja cada archivo: **95 renglones** el «Total por cliente» y **207 renglones**
+  el «Detallado», los dos sumando **$3.715.343,72** — uno reparte lo que el otro junta.
+- Candados: `src/__tests__/lib/cxc-descargas.test.ts` (41) · `src/__tests__/components/cxc-descargas-pantalla.test.tsx` (8).
+  **35 mutaciones, 35 cazadas**, con 2 controles sanos (`scripts/_mutar-candados-cxc-descargas.sh`).
+- Cuatro candados **cambiaron de dirección con nota fechada, ninguno se borró**:
+  `cxc-papel-vocabulario` (tres pruebas: el corte del bloque de helpers ya no puede apoyarse en
+  `exportCSV`; la derivación del tramo se exige sobre los ENCABEZADOS de las dos tablas en vez de sobre
+  las cajas KPI que se retiraron; y el encabezado del papel), `comisiones-forma` (el verbo «Descargar»
+  del CXC en celular vive ahora en el componente compartido) y `excel-encabezados-fila-1` (los lugares
+  que arman una hoja pasan de **25 a 27**: entran las dos descargas, que antes eran un CSV armado a
+  mano).

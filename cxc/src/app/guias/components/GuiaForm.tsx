@@ -89,6 +89,8 @@ interface GuiaFormProps {
   error: string | null;
   saving: boolean;
   onAddDireccion: (v: string) => void;
+  /** 🔴 Agrega un transportista a la lista que ve TODO el equipo, y lo elige. */
+  onAddTransportista: (v: string) => void;
   onUpdateItem: (idx: number, field: keyof GuiaItem, value: string | number) => void;
   onUpdateItemFields: (idx: number, partial: Partial<GuiaItem>) => void;
   onAddRow: () => void;
@@ -318,6 +320,7 @@ export default function GuiaForm({
   items, transportistas, direcciones,
   validationErrors, error, saving,
   onAddDireccion,
+  onAddTransportista,
   onUpdateItem, onUpdateItemFields, onAddRow, onRemoveRow, onRestoreRow, onSave, onCancel,
   etiquetaVolver = "← Guías",
   hayCambios = false, instantanea = "", guardadoEn = null,
@@ -948,16 +951,36 @@ export default function GuiaForm({
             </div>
             {modoEntrega === "transportista" ? (
               <>
-                <select
-                  value={transportistaId || ""}
-                  onChange={e => { setTransportistaId(e.target.value || null); marcarTocado("transportista"); }}
-                  className={ctrl(Boolean(transportistaError), "appearance-none")}
-                >
-                  <option value="">Seleccionar transportista...</option>
-                  {transportistas.map(t => (
-                    <option key={t.id} value={t.id}>{t.nombre}</option>
-                  ))}
-                </select>
+                {/* 🔴 EL ＋ PARA AGREGAR UN TRANSPORTISTA NUEVO (9-sep-2026).
+                    Daniel: *«Ponme opción en configuración de guía para poder
+                    agregar un transportista nuevo.»* — y quién puede: *«Todos»*
+                    (admin, secretaria y bodega). 🩸 Los seis de la lista se
+                    sembraron el 26-may-2026 y desde entonces nadie pudo agregar
+                    uno: por eso se escribieron a mano en el campo de texto,
+                    saltándose la lista («NUÑEZ GLOBAL SOLUTIONS», «CITY MODA»,
+                    «SPORTING SHOES», «LUTY LUI» y uno que dice «no»).
+                    🔴 Lo que se agrega queda PARA TODO EL EQUIPO, y se puede
+                    quitar en Guías › Configuración. Con rótulo VISIBLE: el
+                    `title` solo aparece pasando el mouse por encima, y en el
+                    iPad —donde se arman las guías— no hay mouse. */}
+                <div className="flex items-center gap-1">
+                  <select
+                    value={transportistaId || ""}
+                    onChange={e => { setTransportistaId(e.target.value || null); marcarTocado("transportista"); }}
+                    className={ctrl(Boolean(transportistaError), "appearance-none")}
+                  >
+                    <option value="">Seleccionar transportista...</option>
+                    {transportistas.map(t => (
+                      <option key={t.id} value={t.id}>{t.nombre}</option>
+                    ))}
+                  </select>
+                  <AddNewInline
+                    placeholder="Nombre"
+                    onAdd={onAddTransportista}
+                    etiqueta="Agregar transportista a la lista que ve todo el equipo"
+                    textoBoton="Agregar transportista"
+                  />
+                </div>
                 {transportistaError && <ErrorCampo>Selecciona un transportista</ErrorCampo>}
               </>
             ) : (

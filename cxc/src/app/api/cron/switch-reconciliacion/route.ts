@@ -812,8 +812,11 @@ async function checkCronsQueAvisan(): Promise<string[]> {
 /**
  * REGLA 1 — "Un dato que mirás está viejo". La única alerta de datos.
  *
- * Avisa si la cartera o las ventas llevan más de 24 h sin actualizarse, con
- * dedup de 20 h para no repetirlo en cada pasada. Toda la decisión vive en
+ * Avisa si la cartera, las ventas o los pagos llevan más de 24 h sin
+ * actualizarse, con dedup de 20 h para no repetirlo en cada pasada. Los PAGOS
+ * entraron el 9-sep-2026 con el MISMO umbral y el MISMO dedup: no es una regla
+ * nueva, es ésta mirando un dato más (medido: 6 mensajes en 90 días, los 6 con
+ * avería real; 0 en los últimos 44 días con todo sano). Toda la decisión vive en
  * `src/lib/datos-frescos.ts` (pura y testeable); acá queda el I/O. No lanza: un
  * fallo midiendo frescura no puede tumbar la reconciliación.
  */

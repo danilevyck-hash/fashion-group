@@ -9,15 +9,18 @@
 //
 // 🔑 Boston es UNA sola empresa, así que no hay desglose por empresa ni panel
 // intermedio: tocar un cliente lleva DIRECTO a sus documentos. Lo demás es
-// igual que el del grupo, a propósito: mismos encabezados de columna, misma
-// separación de «Original» y «Saldo», y lo chico agrupado por MONTO con el
-// mismo módulo puro (`lib/cxc/documentos-chicos.ts`).
+// igual que el del grupo, a propósito: mismos encabezados de columna y misma
+// separación de «Original» y «Saldo».
+//
+// 🔴 SE MUESTRAN TODOS LOS DOCUMENTOS (9-sep-2026). Daniel, preguntado en qué
+// pantallas quería seguir plegando los de menos de $50: *«En ninguno. Quiero
+// ver todo.»* Los dos cajones —éste y el del grupo— dejaron de plegar el mismo
+// día, para que sigan diciendo lo mismo.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
 import Drawer from "@/components/Drawer";
 import { fmt, fmtDate } from "@/lib/format";
-import { partirDocumentos, textoDocsChicos } from "@/lib/cxc/documentos-chicos";
 import UltimosPagos from "@/components/cxc/UltimosPagos";
 import { useUltimosPagosBoston } from "@/components/cxc/useUltimosPagosBoston";
 
@@ -63,7 +66,6 @@ export default function BostonDocumentosDrawer({
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(false);
-  const [chicosAbiertos, setChicosAbiertos] = useState(false);
 
   const abierto = !!codigo;
 
@@ -72,7 +74,6 @@ export default function BostonDocumentosDrawer({
     let cancelado = false;
     setCargando(true);
     setError(false);
-    setChicosAbiertos(false);
     setData(null);
     fetch(`/api/cxc/boston/estado-cuenta?codigo=${encodeURIComponent(codigo)}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("http"))))
@@ -90,8 +91,7 @@ export default function BostonDocumentosDrawer({
   // con los del grupo.
   const pagos = useUltimosPagosBoston(abierto ? clienteSwitchId : null);
 
-  const { grandes, chicos, totalChicos } = partirDocumentos(data?.documentos ?? []);
-  const visibles = chicosAbiertos ? [...grandes, ...chicos] : grandes;
+  const visibles = data?.documentos ?? [];
 
   return (
     <Drawer open={abierto} onClose={onClose} title="Estado de cuenta">
@@ -151,15 +151,6 @@ export default function BostonDocumentosDrawer({
               </li>
             ))}
           </ul>
-          {chicos.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setChicosAbiertos((a) => !a)}
-              className="w-full text-left px-1 py-2 min-h-[44px] text-xs text-gray-500 hover:text-gray-800 transition"
-            >
-              {textoDocsChicos(chicos.length, money(totalChicos))} — {chicosAbiertos ? "ocultar" : "ver"}
-            </button>
-          )}
         </>
       )}
     </Drawer>
