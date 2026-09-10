@@ -33,6 +33,17 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
   proveedores: { border: "border-purple-600",  text: "text-purple-600",  hex: "#9333ea" },
   cargar:      { border: "border-teal-600",     text: "text-teal-600",    hex: "#0d9488" },
   "gastos-contabilidad": { border: "border-green-600", text: "text-green-600", hex: "#16a34a" },
+  // Comisiones y Asistencia — 9-sep-2026. Eran los dos ÚLTIMOS módulos sin
+  // acento propio, y se notó cuando el aviso de «qué cambió» empezó a pintar
+  // cada cuadrito del color de su módulo: los suyos salían en gris.
+  //
+  // 🔴 De los 22 tonos de la paleta quedaban TRES libres: lima, amarillo y
+  // rosado. El amarillo se descartó por vecino del ámbar de Recordatorios.
+  // Rosado para Comisiones (rose es de Préstamos y fucsia de Marketing, pero
+  // pink-500 se separa de los dos) y lima para Asistencia — el único verde que
+  // no choca con el esmeralda de Guías ni con el verde de Gastos.
+  comisiones:  { border: "border-pink-500",    text: "text-pink-500",    hex: "#ec4899" },
+  asistencia:  { border: "border-lime-500",    text: "text-lime-500",    hex: "#84cc16" },
 };
 
 /** El acento de un módulo por su KEY (la de `src/lib/modules.ts`).
@@ -63,6 +74,8 @@ export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/proveedores"))     return "proveedores";
   if (pathname.startsWith("/productos/cargar")) return "cargar";
   if (pathname.startsWith("/gastos-contabilidad")) return "gastos-contabilidad";
+  if (pathname.startsWith("/comisiones"))      return "comisiones";
+  if (pathname.startsWith("/asistencia"))      return "asistencia";
   return null;
 }
 

@@ -225,13 +225,32 @@ describe("🔴 el cuadrito se pinta del color de SU módulo", () => {
     expect(acentoDelModulo("guias")).not.toBe(acentoDelModulo("prestamos"));
   });
 
+  // ⚠️ CAMBIÓ DE DIRECCIÓN el 9-sep-2026, no se borró. Este caso usaba a
+  // COMISIONES como ejemplo de «módulo sin color», y ese día dejó de serlo:
+  // Daniel eligió rosado para Comisiones y lima para Asistencia, los dos
+  // últimos módulos sin acento propio. Lo que el candado protege NO cambió —
+  // «a un módulo sin color NO se le inventa un tono»—, solo el ejemplo.
   it("⚠️ el módulo SIN color en el mapa cae al gris: no se le inventa un tono", () => {
-    // Hoy: Comisiones y Asistencia. Si algún día entran a `moduleColors.ts`,
-    // el cuadrito se pinta solo — acá no hay nada que tocar.
-    expect(getModuleColorByKey("comisiones")).toBeNull();
-    expect(acentoDelModulo("comisiones")).toBe(ACENTO_SIN_COLOR);
+    // Una key que no existe: nadie le inventa un color.
+    expect(getModuleColorByKey("modulo-que-no-existe")).toBeNull();
+    expect(acentoDelModulo("modulo-que-no-existe")).toBe(ACENTO_SIN_COLOR);
     expect(acentoDelModulo(undefined)).toBe(ACENTO_SIN_COLOR);
     expect(ACENTO_SIN_COLOR.startsWith("text-gray-")).toBe(true);
+  });
+
+  // 🔴 EL CONTROL AL REVÉS del caso de arriba: los dos que ANTES caían al gris
+  // ahora tienen el suyo, y son distintos entre sí y de todos los demás.
+  it("🔴 Comisiones va rosado y Asistencia lima — ya no caen al gris", () => {
+    expect(acentoDelModulo("comisiones")).toBe("text-pink-500");
+    expect(acentoDelModulo("asistencia")).toBe("text-lime-500");
+    for (const k of ["comisiones", "asistencia"]) {
+      expect(acentoDelModulo(k)).not.toBe(ACENTO_SIN_COLOR);
+    }
+    // Y ninguno pisa un tono que ya tenía dueño.
+    expect(acentoDelModulo("comisiones")).not.toBe(acentoDelModulo("prestamos"));
+    expect(acentoDelModulo("comisiones")).not.toBe(acentoDelModulo("marketing"));
+    expect(acentoDelModulo("asistencia")).not.toBe(acentoDelModulo("guias"));
+    expect(acentoDelModulo("asistencia")).not.toBe(acentoDelModulo("gastos-contabilidad"));
   });
 
   it("🔴 los catorce NO salen todos del mismo color", () => {
