@@ -17,11 +17,10 @@ import path from "path";
 
 import {
   ROTULO_DESCARGAR_EXCEL,
-  ROTULO_DESCARGAR_MES_PDF,
   ROTULO_DESCARGAR_PDF,
   ROTULO_TODAS_LAS_EMPRESAS,
   conDescargaPorVendedor,
-  conPdfDelPeriodo,
+  rotuloDescargarPdf,
   empresasConComision,
   hayQueDescargar,
   hayQueDescargarTotal,
@@ -102,31 +101,39 @@ describe("🔴 tres alcances: una empresa · las de esa persona · las 6", () =>
 
 // ═══ 3 · «Todo el año» no ofrece lo que no existe ══════════════════════════
 
-describe("🔴 con «Todo el año» no hay flecha ni PDF del período", () => {
+describe("🔴 con «Todo el año» no hay flecha por vendedor (el papel del período SÍ)", () => {
   it("el reporte por vendedor es de UN mes: la misma regla que el detalle", () => {
     expect(conDescargaPorVendedor(8)).toBe(true);
     expect(conDescargaPorVendedor(MES_TODO_EL_ANIO)).toBe(false);
-    expect(conPdfDelPeriodo(8)).toBe(true);
-    expect(conPdfDelPeriodo(MES_TODO_EL_ANIO)).toBe(false);
   });
 
-  it("🔴 y la barra de arriba dibuja el botón CON esa condición, no siempre", () => {
+  it("🔴 y la barra de arriba tiene el botón de PDF, y hace algo al tocarlo", () => {
+    // 🔄 9-SEP-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. Decía que el botón de
+    // PDF colgaba de `conPdfDelPeriodo(mes)`, o sea que con «Todo el año» no se
+    // dibujaba. Daniel: *«Los paso a PDF también, para que todo el módulo se
+    // comporte igual»*. El papel de arriba es LA MATRIZ, que existe igual para
+    // el año; el que es de un mes es el reporte por VENDEDOR, y ése sigue
+    // condicionado (CONTROL abajo).
     const shell = plano(leer("src/components/ventas/ComisionesView.tsx"));
-    // El botón existe, cuelga de la regla, y hace algo al tocarlo.
-    expect(shell).toContain("{conPdfDelPeriodo(mes) && (");
-    expect(shell).toContain("ROTULO_DESCARGAR_MES_PDF");
+    expect(shell).toContain("rotuloDescargarPdf(mes)");
     expect(shell).toContain("onClick={() => pdfRef.current?.()}");
     // Y la vista que lo alimenta registra su papel.
     expect(plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx")))
       .toContain("onPdf?.(");
     expect(plano(leer("src/components/ventas/ComisionesPorEmpresaView.tsx")))
       .toContain("onPdf?.(");
+    // CONTROL AL REVÉS — la regla original sigue viva donde nació: la flechita
+    // de la celda SÍ cuelga de que haya un mes elegido.
+    expect(plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx")))
+      .toContain("conDescargaPorVendedor(mes)");
   });
 
-  it("⚠️ y «Descargar el año» se queda como está: Excel y nada más", () => {
-    expect(rotuloDescargarExcel(MES_TODO_EL_ANIO)).toBe("Descargar el año");
+  it("🔴 «Descargar el año» ahora también dice en qué formato", () => {
+    // 🔄 9-SEP-2026 — antes acá decía «se queda como está: Excel y nada más».
+    expect(rotuloDescargarExcel(MES_TODO_EL_ANIO)).toBe("Descargar el año en Excel");
     expect(rotuloDescargarExcel(8)).toBe("Descargar el mes en Excel");
-    expect(ROTULO_DESCARGAR_MES_PDF).toBe("Descargar el mes en PDF");
+    expect(rotuloDescargarPdf(MES_TODO_EL_ANIO)).toBe("Descargar el año en PDF");
+    expect(rotuloDescargarPdf(8)).toBe("Descargar el mes en PDF");
   });
 });
 
@@ -141,7 +148,7 @@ describe("🔴 el menú dice de quién, de qué empresa y de qué mes", () => {
   });
 
   it("el verbo es «Descargar», nunca «Exportar» ni «Bajar»", () => {
-    for (const r of [ROTULO_DESCARGAR_PDF, ROTULO_DESCARGAR_EXCEL, ROTULO_DESCARGAR_MES_PDF]) {
+    for (const r of [ROTULO_DESCARGAR_PDF, ROTULO_DESCARGAR_EXCEL, rotuloDescargarPdf(8), rotuloDescargarPdf(0)]) {
       expect(r.startsWith("Descargar")).toBe(true);
     }
     expect(ROTULO_DESCARGAR_PDF).toBe("Descargar en PDF");
@@ -219,8 +226,15 @@ describe("🔴 la flecha AGREGA un camino; no reemplaza ninguno", () => {
     expect(motor).not.toContain("createPortal");
     expect(motor).not.toContain("document.body");
     expect(motor).not.toContain("window.print");
-    // CONTROL: el papel del MES sigue siendo HTML impreso, y su guardia se queda.
-    expect(plano(leer("src/components/ventas/comisiones-detalle/ImpresionTablaComisiones.tsx")))
+    // 🔄 9-SEP-2026 — el papel del período TAMBIÉN dejó de ser HTML impreso, así
+    // que su generador se mide con la misma vara: nada de leer el DOM.
+    const papel = plano(leer("src/lib/comisiones/pdf-tabla-comisiones.ts"));
+    expect(papel).not.toContain("createPortal");
+    expect(papel).not.toContain("document.body");
+    expect(papel).not.toContain("window.print");
+    // CONTROL de la regla original: el archivo de la hoja HTML NO se borró —
+    // conserva la guardia de CSS que documenta el defecto que la obligó.
+    expect(leer("src/components/ventas/comisiones-detalle/ImpresionTablaComisiones.tsx"))
       .toContain("body > [data-cds-print]:not([data-cds-tabla]) { display: none !important; }");
   });
 
@@ -236,13 +250,16 @@ describe("🔴 la flecha AGREGA un camino; no reemplaza ninguno", () => {
 describe("🔴 el botón de arriba trae las 6 empresas, no una", () => {
   const matriz = plano(leer("src/components/ventas/ComisionesConsolidadoView.tsx"));
 
-  it("el papel del mes recorre la MISMA lista de empresas que la tabla", () => {
+  it("el papel del período recorre la MISMA lista de empresas que la tabla", () => {
+    // 🔄 9-SEP-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. El papel dejó de ser una
+    // hoja HTML (`<ImpresionTablaComisiones …>`) y pasó a ser un PDF armado en
+    // código: las mismas columnas y los mismos totales, ahora como argumento.
     // `EMPRESAS` = `EMPRESAS_COMISIONAN`, derivada — nunca escrita a mano acá.
     expect(matriz).toContain("const EMPRESAS = EMPRESAS_COMISIONAN;");
-    expect(matriz).toContain("<ImpresionTablaComisiones");
+    expect(matriz).toContain("descargarPdfTablaComisiones(");
     // Las columnas del papel y los totales salen de esa misma lista.
-    expect(matriz).toMatch(/columnas=\{\[\s*\{ header: "Vendedor" \},\s*\.\.\.EMPRESAS\.map/);
-    expect(matriz).toMatch(/totales=\{\[[\s\S]{0,200}\.\.\.EMPRESAS\.map/);
+    expect(matriz).toMatch(/columnas: \[\s*\{ header: "Vendedor" \},\s*\.\.\.EMPRESAS\.map/);
+    expect(matriz).toMatch(/totales: \[[\s\S]{0,200}\.\.\.EMPRESAS\.map/);
   });
 
   it("🔴 y el papel dice lo MISMO que el Excel: mismas filas, mismo pie", () => {

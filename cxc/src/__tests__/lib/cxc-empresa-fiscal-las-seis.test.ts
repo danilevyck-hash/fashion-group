@@ -35,6 +35,9 @@ import {
 } from "@/lib/cxc/empresa-fiscal";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
+/** La empresa de cartera aparte que TAMBIÉN tiene ficha, con su propio correo. */
+const BOSTON = "confecciones_boston";
+
 const raiz = process.cwd();
 const fuente = readFileSync(path.join(raiz, "src/lib/cxc/empresa-fiscal.ts"), "utf8");
 
@@ -53,10 +56,20 @@ const DICTADO: Array<[string, string, string]> = [
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("🔴 1. las SEIS empresas del grupo tienen su ficha", () => {
-  it("la lista cubre exactamente las 6 empresas del CXC del grupo", () => {
-    // 🔴 Derivada, nunca escrita a mano: el día que nazca una séptima empresa
-    // del grupo, este candado la reclama en vez de dejarla salir sin cabeza.
-    expect([...Object.keys(EMPRESA_FISCAL)].sort()).toEqual([...B2B_EMPRESA_KEYS].sort());
+  // 🔄 CAMBIÓ DE DIRECCIÓN, CON NOTA (9-sep-2026, más tarde el mismo día). Acá
+  // se exigía que la lista fuera EXACTAMENTE las 6 del grupo. Daniel bajó el
+  // papel de Confecciones Boston y dictó sus cuatro líneas, así que ahora la
+  // lista es «las 6 + Boston»: sigue siendo EXACTA y cerrada —una empresa nueva
+  // del grupo la sigue reclamando, y una octava clave rompe el build—, y el
+  // CONTROL de que nadie hereda nada se conserva abajo con Multifashion.
+  it("la lista cubre las 6 del CXC del grupo — ni una menos", () => {
+    for (const k of B2B_EMPRESA_KEYS) {
+      expect(Object.keys(EMPRESA_FISCAL), `${k} se quedó sin ficha`).toContain(k);
+    }
+  });
+
+  it("y NADIE MÁS que ellas y Confecciones Boston", () => {
+    expect([...Object.keys(EMPRESA_FISCAL)].sort()).toEqual([...B2B_EMPRESA_KEYS, BOSTON].sort());
   });
 
   it("ninguna sale con el nombre legal ni la identificación en blanco", () => {
@@ -147,14 +160,73 @@ describe("🔴 3. ninguna empresa puede salir con los datos de otra", () => {
   });
 
   it("⚠️ CONTROL: una clave que no está en la lista no hereda nada", () => {
-    // Boston y Multifashion no son del CXC del grupo: salen con el nombre de la
-    // pantalla y las tres líneas en blanco, nunca con los datos de una del grupo.
-    for (const key of ["confecciones_boston", "american_classic", "lo_que_sea"]) {
+    // Multifashion no está: sale con el nombre de la pantalla y las tres líneas
+    // en blanco, nunca con los datos de una del grupo. (Boston SÍ está desde el
+    // 9-sep-2026, con su propia ficha — ver el bloque 4.)
+    for (const key of ["american_classic", "lo_que_sea"]) {
       const f = fichaFiscal(key, "Nombre Corto");
       expect(f.legal, key).toBe("Nombre Corto");
       expect(f.identificacion, key).toBe("");
       expect(f.telefono, key).toBe("");
       expect(f.correo, key).toBe("");
     }
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4 · 🔴 CONFECCIONES BOSTON — SUS CUATRO LÍNEAS, Y SU CORREO NO ES EL DEL GRUPO
+//
+// Daniel bajó su papel de Switch (9-sep-2026) y dictó, verbatim:
+//
+//     CONFECCIONES BOSTON S.A
+//     Identificación: 655-544-133465
+//     TEL:
+//     ventas@cboston.net
+//
+// 🔴 Y ACÁ SE CRUZAN DOS REGLAS. Para las seis del grupo, Daniel dictó que el
+// correo del papel es `info@fashiongr.com` y que los de Switch no se usan. Para
+// Boston manda la otra: **su papel no dice Fashion Group en ninguna parte** —no
+// lleva el logo del grupo ni `fashiongr.com` en el pie, porque lo lee un cliente
+// que le compró a Confecciones Boston—. Meterle el correo del grupo en la cabeza
+// le devolvería justo lo que se le sacó. Por eso usa el de SU papel.
+//
+// ⚠️ El REMITENTE del correo no cambia: sigue saliendo por nuestro dominio
+// (Daniel, preguntado: *«fashiongr»*). Lo que cambia es la cabeza del PDF.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("🔴 4. la cabeza del papel de Confecciones Boston", () => {
+  it("trae sus cuatro líneas, letra por letra", () => {
+    const f = fichaFiscal(BOSTON, "NO DEBERÍA VERSE");
+    expect(f.legal).toBe("CONFECCIONES BOSTON S.A");
+    expect(f.identificacion).toBe("655-544-133465");
+    expect(f.telefono).toBe(""); // ⚠️ Switch tampoco lo trae
+    expect(f.correo).toBe("ventas@cboston.net");
+  });
+
+  it("🔴 su correo NO es el del grupo — su papel no dice Fashion Group", () => {
+    const f = fichaFiscal(BOSTON, "X");
+    expect(f.correo).not.toBe(CORREO_DEL_GRUPO);
+    expect(f.correo).not.toContain("fashiongr.com");
+  });
+
+  it("🔴 y no toma nada de una empresa del grupo", () => {
+    const f = fichaFiscal(BOSTON, "X");
+    for (const key of B2B_EMPRESA_KEYS) {
+      const g = fichaFiscal(key, "X");
+      expect(f.legal, `Boston tomó el nombre de ${key}`).not.toBe(g.legal);
+      expect(f.identificacion, `Boston tomó la identificación de ${key}`).not.toBe(g.identificacion);
+    }
+  });
+
+  it("⚠️ CONTROL: ninguna de las seis se llevó el correo de Boston", () => {
+    for (const key of B2B_EMPRESA_KEYS) {
+      expect(fichaFiscal(key, "X").correo, key).toBe(CORREO_DEL_GRUPO);
+    }
+  });
+
+  it("🔑 el correo del grupo se sigue escribiendo UNA sola vez", () => {
+    const codigo = fuente.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect((codigo.match(/info@fashiongr\.com/g) ?? []).length).toBe(1);
+    expect((codigo.match(/ventas@cboston\.net/g) ?? []).length).toBe(1);
   });
 });

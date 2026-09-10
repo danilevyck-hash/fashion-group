@@ -5,19 +5,32 @@
 //
 // 🔴 ES SU PROPIA HOJA, con sus propios datos. No comparte una sola línea de
 // consulta con la del grupo: los teléfonos y correos de Boston salen de
-// `switch_clientes` acotado a Boston (llegan dentro de `/api/cxc/boston`),
-// nunca de `clientes_master`, donde Boston no está a propósito.
+// `switch_clientes` acotado a Boston (llegan dentro de `/api/cxc/boston` y de
+// `/api/cxc/boston/enviar-email`), nunca de `clientes_master`, donde Boston no
+// está a propósito.
 //
-// ⚠️ ACÁ NO HAY «CORREO», Y ES UNA DECISIÓN, NO UN OLVIDO (5-sep-2026).
-// Medido: de los 390 clientes de Boston con saldo, **272 tienen teléfono pero
-// solo 113 tienen correo**, y el texto de cobro del sistema está escrito y
-// firmado por Fashion Group —Boston no está en esa lista de empresas—. Mandar
-// un correo desde acá exige decidir quién lo firma y con qué texto, y eso es
-// una decisión de negocio de Daniel, no un detalle de pantalla. Las tres
-// salidas que SÍ se pueden dar con el dato que hay están todas.
+// 🔴 EL CORREO SE PRENDIÓ EL 9-SEP-2026, Y LO FIRMA BOSTON. Daniel, textual:
+// *«Firma Confecciones Boston»*. Hasta ese día esta hoja no mandaba correos y
+// eso era una decisión pendiente, no un olvido: el texto de cobro del sistema
+// lo firmaba Fashion Group, que no es quien le vendió a este cliente. Ahora el
+// remitente, el asunto, el cuerpo, la firma y el PDF adjunto dicen Confecciones
+// Boston, y nada de lo que recibe el cliente dice Fashion Group.
+//
+// 🔴 UN CLIC, CON DESHACER DE 5 SEGUNDOS — el mismo patrón del grupo
+// (`useUndoAction`/`UndoToast`): el envío real ocurre recién al vencer esos 5
+// segundos, así que «Deshacer» no cancela un correo que ya salió: impide que
+// salga.
+//
+// ⚠️ Sin correo cargado la fila de Correo sale APAGADA y dice dónde cargarlo.
+// Medido el 9-sep-2026: de los 398 clientes con saldo, 284 tienen teléfono y
+// solo 119 correo.
+//
+// ⚠️ ACÁ NO HAY «MANDAR A VARIOS»: el encargo era el correo de UN cliente, y
+// estrenar el lote sin decidir qué pasa con los 279 sin correo sería inventar
+// una regla que nadie aprobó.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
 import { fmt } from "@/lib/format";
 import { waHref } from "@/lib/contact-links";
@@ -27,10 +40,28 @@ export interface ClienteCobrarBoston {
   nombre: string;
   telefono: string;
   celular: string;
+  correo: string;
   d0_90: number;
   d91_120: number;
   d121_plus: number;
   total: number;
+}
+
+/** Lo que hay que saber para mandar el correo cuando venzan los 5 segundos. */
+export interface CorreoProgramadoBoston {
+  codigo: string;
+  destinatario: string;
+  asunto: string;
+  cuerpo: string;
+}
+
+/** Lo que contesta `/api/cxc/boston/enviar-email` cuando se abre la hoja. */
+interface Preview {
+  destinatario: string;
+  asunto: string;
+  cuerpo: string;
+  totalDocs: number;
+  marcaEnvio: string | null;
 }
 
 /**
@@ -65,15 +96,41 @@ export default function BostonHojaCobrar({
   cliente,
   onClose,
   onVerDocumentos,
+  onProgramarCorreo,
 }: {
   cliente: ClienteCobrarBoston | null;
   onClose: () => void;
   onVerDocumentos: (c: ClienteCobrarBoston) => void;
+  /** Programa el envío con sus 5 segundos de «Deshacer». */
+  onProgramarCorreo: (datos: CorreoProgramadoBoston) => void;
 }) {
   const [aviso, setAviso] = useState<string | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  const abierta = !!cliente;
+  const codigo = cliente?.codigo ?? null;
+
+  useEffect(() => {
+    if (!abierta || !codigo) return;
+    let cancelado = false;
+    setCargando(true);
+    setPreview(null);
+    setAviso(null);
+    fetch(`/api/cxc/boston/enviar-email?codigo=${encodeURIComponent(codigo)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("http"))))
+      .then((d: Preview) => { if (!cancelado) setPreview(d); })
+      .catch(() => {
+        if (!cancelado) setAviso("No se pudo preparar el estado de cuenta. Intenta de nuevo en unos segundos.");
+      })
+      .finally(() => { if (!cancelado) setCargando(false); });
+    return () => { cancelado = true; };
+  }, [abierta, codigo]);
+
   if (!cliente) return null;
 
   const tel = cliente.celular || cliente.telefono;
+  const tieneCorreo = !!preview?.destinatario;
 
   function abrirWhatsApp() {
     if (!cliente) return;
@@ -88,6 +145,17 @@ export default function BostonHojaCobrar({
     navigator.clipboard.writeText(mensajeBoston(cliente))
       .then(() => onClose())
       .catch(() => setAviso("No se pudo copiar. Intenta de nuevo."));
+  }
+
+  function mandarCorreo() {
+    if (!cliente || !preview?.destinatario) return;
+    onProgramarCorreo({
+      codigo: cliente.codigo,
+      destinatario: preview.destinatario,
+      asunto: preview.asunto,
+      cuerpo: preview.cuerpo,
+    });
+    onClose();
   }
 
   return (
@@ -110,11 +178,31 @@ export default function BostonHojaCobrar({
             <p className="text-xs text-gray-500 mt-0.5">
               Confecciones Boston · {cliente.codigo} · ${fmt(cliente.total)}
             </p>
+            {preview?.marcaEnvio && (
+              <p className="text-xs text-gray-400 mt-0.5">{preview.marcaEnvio}</p>
+            )}
           </div>
 
           {aviso && <p role="alert" className="text-sm text-red-600">{aviso}</p>}
 
           <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 overflow-hidden">
+            <li>
+              <button
+                type="button"
+                disabled={!tieneCorreo || cargando}
+                onClick={mandarCorreo}
+                className="w-full text-left px-4 py-3 min-h-[44px] transition hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              >
+                <span className="block text-sm font-medium text-gray-900">Correo</span>
+                <span className="block text-xs text-gray-500 mt-0.5 truncate">
+                  {cargando
+                    ? "Buscando el correo del cliente…"
+                    : tieneCorreo
+                      ? preview!.destinatario
+                      : "Este cliente no tiene correo — cárgalo en Switch"}
+                </span>
+              </button>
+            </li>
             <li>
               <button
                 type="button"
@@ -145,7 +233,11 @@ export default function BostonHojaCobrar({
                 className="w-full text-left px-4 py-3 min-h-[44px] transition hover:bg-gray-50"
               >
                 <span className="block text-sm font-medium text-gray-900">Ver los documentos</span>
-                <span className="block text-xs text-gray-500 mt-0.5">Su estado de cuenta, documento por documento</span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  {preview
+                    ? `Su estado de cuenta — ${preview.totalDocs} ${preview.totalDocs === 1 ? "documento" : "documentos"} con saldo`
+                    : "Su estado de cuenta, documento por documento"}
+                </span>
               </button>
             </li>
           </ul>

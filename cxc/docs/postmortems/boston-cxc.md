@@ -974,8 +974,124 @@ que diga dónde termina, y sacarla a fuerza de recortar ceros es el «adivinar»
 identificación equivocada es una mentira fiscal, no un detalle de forma. Una clave que no está en la
 lista (Boston, Multifashion) sale con el nombre de la pantalla y las tres líneas en blanco.
 
+> 🔄 **Actualización del mismo 9-sep-2026, más tarde: Confecciones Boston YA tiene su ficha** —Daniel
+> bajó también su papel de Switch— **y su correo NO es el del grupo**. Ver el bloque del correo de
+> Boston, al final de este archivo. Multifashion sigue sin ficha, y sigue saliendo en blanco.
+
 - Candado: `src/__tests__/lib/cxc-empresa-fiscal-las-seis.test.ts` (11).
 - Un candado **cambió de dirección con nota fechada, no se borró**:
   `cxc-estado-cuenta-forma-switch` › «una empresa sin ficha NO toma los datos de otra» — exigía las
   cinco vacías; ahora exige que nadie herede nada, con el CONTROL de una clave fuera de la lista.
 - Mutaciones: ver `scripts/_mutar-candados-papel-pdf.sh` (**17 mutaciones, 17 cazadas**, 2 controles).
+
+---
+
+## 🔴 EL CORREO DE COBRO DE CONFECCIONES BOSTON — «FIRMA CONFECCIONES BOSTON» (9-sep-2026)
+
+**Daniel, textual:** *«Firma Confecciones Boston»*.
+
+Hasta hoy la hoja «Cobrar» de Boston tenía tres salidas —WhatsApp · Copiar el mensaje · Ver los
+documentos— y **no mandaba correos**. No era un olvido: estaba anotado como decisión pendiente desde
+el 5-sep, porque el texto de cobro del sistema lo firma **Fashion Group**, que no es quien le vendió a
+ese cliente, y quién firma el correo de Boston es una decisión de negocio. Daniel la tomó.
+
+### Lo que se midió ANTES de prenderlo (producción, 9-sep-2026)
+
+| | |
+|---|---|
+| Clientes con saldo en Boston | **398** |
+| Total de su cartera | **$197.799,82** |
+| Con teléfono cargado | **284** |
+| Con correo cargado | **119** |
+| Códigos que existen en las DOS carteras | **1** (`TCKCTA`, el mostrador) |
+
+Idénticas después: **esto prende un botón, no toca un número** (`scripts/_medir-boston-correo.mjs`).
+
+### Las reglas
+
+- 🔴 **UN CLIC, CON DESHACER DE 5 SEGUNDOS.** El mismo patrón del grupo (`useUndoAction`/`UndoToast`):
+  el POST real ocurre recién al vencer el plazo, así que «Deshacer» no cancela un correo que ya salió
+  —**impide que salga**—.
+- 🔴 **NADA DE LO QUE RECIBE UN CLIENTE DE BOSTON DICE FASHION GROUP.** Ni el remitente, ni el asunto,
+  ni el cuerpo, ni la firma, ni el membrete de la banda negra, ni el nombre del archivo adjunto, ni el
+  PDF —que además sale **sin el logo** de Fashion Group y **sin `fashiongr.com`** en el pie.
+- 🔑 **QUIÉN FIRMA NO SE ELIGE: SE DERIVA DE LA EMPRESA** (`src/lib/cxc/casa-del-papel.ts`,
+  `casaDeEmpresa` / `casaDeEmpresas`). Un parámetro «casa» con valor por defecto arreglaba hoy y dejaba
+  el defecto para mañana: el día que alguien no lo pase, un cliente de Boston recibe un cobro firmado
+  por una empresa que no le vendió nada. La casa se pregunta por `empresa_key`, que el papel ya tiene
+  en la mano. La lista de casas es **explícita** —derivarla de `empresasCarteraAparte()` haría que una
+  empresa nueva heredara el membrete de Boston sin que nadie lo decida— y hay candado que exige que
+  toda empresa de cartera aparte esté nombrada ahí.
+- 🔴 **SIN LOGO, PORQUE NO SE PRESTA EL DE OTRO.** Boston no tiene logo cargado en el sistema. Su papel
+  sale sin ninguno: la misma regla de `empresa-fiscal.ts` —lo que no se sabe no se escribe, y **nunca**
+  se escriben los datos de otra empresa.
+- 🔴 **SU PROPIA RUTA** (`/api/cxc/boston/enviar-email`), no un parámetro en la del grupo:
+  `/api/cxc/enviar-email` manda SIEMPRE las 6 empresas (`empresasDelEnvio()`), y abrirle una puerta a
+  Boston es exactamente la mezcla que esta casa prohíbe.
+- 🔴 **SU PROPIA CONSULTA** (`src/lib/cxc/boston-estado-cuenta.ts`): `.eq("empresa_key",
+  EMPRESA_BOSTON)` en la misma cadena, ficha del cliente de `switch_clientes` **acotado a Boston**, y
+  **nunca** `clientes_master` ni `fetchEstadoCuentaData`. La consulta salió de la ruta del cajón para
+  que el papel lea EXACTAMENTE los mismos documentos que muestra la pantalla — dos consultas para el
+  mismo estado de cuenta es cómo se llega a que el papel diga un número y el cajón otro.
+- 🔴 **UN SOLO PDF, con la FORMA DE SWITCH.** Boston es UNA compañía: no hay desglose por empresa, así
+  que es una hoja. Es el MISMO `buildEstadoCuentaPDF` del grupo — se comparte la FORMA, no la CONSULTA.
+- 🔴 **EL ENVÍO SE ANOTA DESPUÉS DE QUE RESEND CONFIRMA**, nunca antes: anotar antes deja la marca gris
+  puesta por un correo que no salió. Mismo orden que `cheques.aviso_vencido_en`.
+- 🩸 **Y LA ANOTACIÓN DICE DE QUÉ CARTERA ES** (`empresas: ["confecciones_boston"]`, la columna que la
+  tabla ya tenía — cero DDL). Sin eso, un cobro de Boston pintaría su marca gris en el CXC del grupo:
+  medido, `TCKCTA` existe en las dos carteras. **Un badge también es mezclar**, así que la lectura del
+  grupo (`/api/cxc/envios`) ahora salta esas filas; las viejas, sin `empresas`, siguen siendo del grupo.
+- ⚠️ **Sin correo cargado el botón sale APAGADO** y dice dónde cargarlo — **solo 119 de 398 lo tienen**.
+  Y no se inventa ninguno: sin fila, el destinatario va vacío.
+- ⚠️ **NO se estrenó el «mandar a varios»**: el encargo era el correo de UN cliente, y el lote sin
+  decidir qué pasa con los 279 sin correo sería inventar una regla que nadie aprobó.
+- ⚠️ **La palabra «vencido» sigue prohibida** hacia el cliente: los tres tramos del correo se rotulan
+  por su RANGO, con `tramoRango()` de `cxc-aging` — la misma lista que rotula la pantalla y el papel.
+- **Quién entra:** `ROLES_BOSTON` = admin + `gerente_boston` (David). Secretaria y vendedor no ven esta
+  cartera y la ruta les contesta **403**.
+
+### Lo que queda pendiente de Daniel
+
+1. ✅ **RESUELTO EL MISMO DÍA — las cuatro líneas fiscales.** Daniel bajó el papel de Switch de
+   Confecciones Boston y dictó, verbatim: `CONFECCIONES BOSTON S.A` · `Identificación: 655-544-133465`
+   · `TEL:` (vacío, Switch tampoco lo trae) · `ventas@cboston.net`. Ya viven en
+   `src/lib/cxc/empresa-fiscal.ts` con la clave `confecciones_boston`, y la cabeza de su papel dejó de
+   salir con las líneas en blanco.
+2. ⚠️ **El dominio del remitente.** Resend solo tiene verificado `fashiongr.com`, así que el correo
+   sale como `Confecciones Boston <cobros@fashiongr.com>`: lo que el cliente LEE dice Confecciones
+   Boston, la dirección técnica sigue siendo la nuestra. Verificar un dominio propio de Boston (por
+   ejemplo `cboston.net`) es una decisión suya.
+
+### 🔴 EL CORREO DE LA CABEZA: DOS REGLAS QUE SE CRUZAN
+
+Para **las 6 del grupo** Daniel dictó *«los correos de todos debe de ser info@fashiongr.com»*, y ahí
+**no** se usa el que trae cada papel de Switch. Para **Boston manda la otra regla**: su papel **no dice
+Fashion Group en ninguna parte** —se le quitó el logo del grupo y el `fashiongr.com` del pie— porque lo
+lee un cliente que le compró a Confecciones Boston. Ponerle `info@fashiongr.com` en la cabeza fiscal le
+devolvería exactamente lo que se le acaba de sacar.
+
+🔴 **Por eso Boston usa `ventas@cboston.net`**, el que Switch imprime en SU papel. Es **la única
+excepción** a `CORREO_DEL_GRUPO`, y está escrito en el código **por qué** — para que el próximo no la
+«unifique» sin querer. El correo del grupo se sigue escribiendo **una sola vez**, y el de Boston
+también.
+
+⚠️ **El REMITENTE del correo no cambia.** Daniel, preguntado: *«fashiongr»* — sigue saliendo como
+`Confecciones Boston <cobros@fashiongr.com>`. Lo que cambió es la cabeza del PDF, que es la que dice
+quién cobra.
+
+### Candados
+
+- `cxc-empresa-fiscal-las-seis.test.ts` (17) — las cuatro líneas de Boston, su correo propio, y el
+  CONTROL de que ninguna de las seis se llevó el suyo.
+- `boston-correo-lo-firma-boston.test.ts` (33) — el texto, el papel de verdad generado con jsPDF, la
+  conducta de la ruta (roles, orden del anotado, Resend caído) y la lectura del grupo.
+- `boston-hoja-cobrar-correo.test.tsx` (7) — la hoja **pintada**: el botón prendido, apagado, y lo que
+  programa.
+- **37 mutaciones, 37 cazadas** con 2 controles (`scripts/_mutar-candados-boston-correo.sh`).
+- Cuatro candados **cambiaron de dirección con nota fechada, ninguno se borró**:
+  `cxc-boston-mismo-formato` › «la hoja de Boston NO manda correos» pasó a exigir que el correo salga
+  por LA RUTA DE BOSTON; `cxc-estado-cuenta-legible` › la consulta de Boston se busca ahora en su
+  módulo, con el CONTROL de que la ruta ya no arma la suya; `cxc-empresa-fiscal-las-seis` › la lista
+  pasó de «exactamente las 6» a «las 6 + Boston», sigue siendo exacta y cerrada; y
+  `cxc-estado-cuenta-forma-switch` › «una empresa sin ficha no toma los datos de otra» cambió su
+  ejemplo de Boston a Multifashion, sumando el control de que Boston tampoco hereda nada.

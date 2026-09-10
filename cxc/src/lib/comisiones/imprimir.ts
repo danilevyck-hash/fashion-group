@@ -1,4 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
+// 🔄 SIN LECTORES DESDE EL 9-SEP-2026 — Y NO SE BORRA (patrón de la casa).
+//
+// Los tres papeles del módulo (el reporte de un vendedor, la matriz del mes y la
+// del año) son PDF armados en código y ya no pasan por `window.print()`, así que
+// nadie llama a esta función. Se conserva porque es la memoria del defecto: el
+// día que algo del sistema vuelva a imprimir por el navegador, el archivo NO
+// puede llamarse «Fashion Group.pdf» ni dejar la pestaña de toda la app
+// renombrada. Escribir esto de nuevo sería repetir el error de cero.
+//
+// ── Lo que decía cuando tenía lectores ───────────────────────────────────────
 // IMPRIMIR CON EL NOMBRE CORRECTO — y devolver el título como estaba.
 //
 // 🩸 EL PDF SE LLAMABA «Fashion Group.pdf» (6-sep-2026). El reporte se imprime

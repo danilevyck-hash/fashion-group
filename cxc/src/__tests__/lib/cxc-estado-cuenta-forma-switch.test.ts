@@ -382,11 +382,21 @@ describe("la forma del papel es la de Switch", () => {
     }
     // CONTROL (la dirección original): una clave que ni existe en la lista
     // sigue sin heredar nada — sale con el nombre de la pantalla y en blanco.
-    const rara = fichaFiscal("confecciones_boston", "Boston");
-    expect(rara.legal).toBe("Boston");
+    // 🔄 El ejemplo pasó de Boston a Multifashion ese mismo 9-sep-2026, más
+    // tarde: Daniel bajó también el papel de Confecciones Boston y dictó sus
+    // cuatro líneas, así que Boston YA tiene ficha (ver el bloque de abajo). El
+    // control se conserva con la empresa que sigue sin tenerla.
+    const rara = fichaFiscal("american_classic", "Multifashion");
+    expect(rara.legal).toBe("Multifashion");
     expect(rara.identificacion).toBe("");
     expect(rara.telefono).toBe("");
     expect(rara.correo).toBe("");
+
+    // Y Boston, que sí la tiene, no toma nada de una del grupo — ni su correo.
+    const boston = fichaFiscal("confecciones_boston", "Confecciones Boston");
+    expect(boston.legal).toBe("CONFECCIONES BOSTON S.A");
+    expect(boston.identificacion).not.toBe(EMPRESA_FISCAL.fashion_wear.identificacion);
+    expect(boston.correo).not.toContain("fashiongr.com");
   });
 
   it("⚠️ la columna Comentario va vacía: el API de Switch no lo manda", () => {

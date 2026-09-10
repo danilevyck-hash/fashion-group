@@ -898,6 +898,192 @@ respaldo (cerrar un aviso es un clic, no un dato tecleado).
 
 `src/__tests__/lib/novedades.test.ts` (43) · `src/__tests__/components/novedades-aviso.test.tsx` (14);
 **30 mutaciones, 30 cazadas** con 2 controles (`scripts/_mutar-candados-novedades.sh`).
+
+---
+
+## 9-sep-2026 (tarde) — «Salen todas»: las novedades de las DOS SEMANAS anteriores
+
+Daniel, textual: *«lo de novedades tienes que empezar de todo lo aplicable desde que empezó este
+chat»* y, al preguntarle si recortaba por antigüedad: ***«Salen todas — que se enteren de todo aunque
+sea viejo»***.
+
+El aviso nació esa mañana con **10 novedades** (el 8 y el 9 de septiembre, cinco módulos). Ahora la
+lista trae **55 novedades en los 21 módulos**: todo lo que cambió del **25-ago al 9-sep** y que la
+persona NOTA al usar la pantalla.
+
+### 🔴 Lo único que se tocó del mecanismo: `desde`
+
+La regla 6 (caduca a los 30 días) contaba desde `fecha`, el día en que el cambio SALIÓ. Con eso, lo
+del 25 de agosto habría nacido con **cuatro días de vida**. La novedad gana un campo OPCIONAL,
+`desde` — *el día en que empezó a avisarse* — y **los 30 días se cuentan de ahí**. Las 45 nuevas
+llevan `desde: "2026-09-09"`; las 10 de la mañana no lo necesitan.
+
+`fecha` no cambió de significado: sigue diciendo **cuándo cambió**, es lo que ordena la tira (lo más
+nuevo arriba) y es lo que Daniel ve en Usuarios › Novedades. `estaVigente` ahora exige las dos cosas
+—que el cambio ya haya salido **y** que el aviso ya haya empezado y no lleve 30 días—, así que una
+novedad no puede avisar antes de existir (hay candado sobre la lista real).
+
+⚠️ **Un módulo con más de tres NO pierde ninguna**: se ven las tres más nuevas, se cierran con la ×, y
+a la vuelta salen las siguientes. Lo que sigue prohibido es escribir más de tres del MISMO módulo con
+la MISMA fecha — entre esas no hay segunda vuelta que valga. Tope nuevo de higiene: **6 por módulo**
+(Guías y Cuentas por Cobrar llegan a 6 y 5).
+
+⚠️ **Colateral medido:** con 20 de los 21 módulos trayendo novedad, el aviso ya pide lo suyo en casi
+todas las pantallas (antes eran 5 de 22). Sigue detrás de los 800 ms de espera y de una sola lectura;
+cuando estas caduquen, en 30 días, vuelve a callarse solo.
+
+### Lo que se verificó ANTES de escribir cada línea
+
+Cuatro barridos en paralelo contra el código, y las claves dudosas **contra la base de producción**
+(lectura de solo lectura, `apikey` de servicio). Se comprobó que **están aplicadas**:
+`cheques.aviso_vencido_en` · `cheques.deleted_at` · `recordatorios.hasta` · `recordatorios.destino` ·
+`clientes_master.contacto` · `guia_items.bultos_original` · `comision_descuentos_fijos.desde` ·
+`caja_gasto_fotos` **y el bucket `caja-recibos`** · `novedades_vistas` · `proveedor_amarre` ·
+`switch_estadocuenta_saldo` · `guias_destino_lista` · `calvin_products.foto_manual` ·
+`multifashion_vendedora_alias`.
+
+🩸 **La documentación miente en las dos direcciones y por eso se midió.** `docs/estado-actual.md` daba
+por pendientes `20260925130000` (Recordatorios) y `20260926120000` (el contacto del cliente), y
+`CLAUDE.md` las daba por aplicadas; `CLAUDE.md` da por pendientes `20261010120000` (Proveedores),
+`20261013120000` (la foto del recibo de Caja), `20261004120000` (los bultos de Bodega) y
+`20261007120000` (las fechas del descuento) — **las cuatro están aplicadas**. Sin medir, o se anunciaba
+una pantalla que no abre, o se dejaba de anunciar media docena de cosas que sí se ven.
+
+### Lo que se decidió NO anunciar
+
+- **El freno del año base incompleto de Ventas** (`ventas_proyeccion_cierre_v8`): está vivo, y con las
+  coberturas de 2026 **no mueve un solo número**. Nadie lo nota.
+- **«Descargar» en Marketing**: la estandarización del verbo se hizo en Comisiones y Catálogos, no ahí
+  — el módulo sigue mezclando «Exportar Excel», «Bajar ZIP» y «Descargar ZIP». Sería falso.
+- **El ITBMS de Reclamos como cambio de plata**: sobre los 47 reclamos vivos el total da **el mismo
+  centavo** con las dos fórmulas. Lo que cambió es el PAPEL, que decía una tasa que no existe. Se
+  anunció así.
+- **«Compartir manda una imagen en el celular»**: dejó de ser cierto el 9-sep — `formatoParaCompartir`
+  devuelve **siempre PDF**. La novedad dice PDF en los dos aparatos.
+
+### Candados
+
+`src/__tests__/lib/novedades.test.ts` (**53**) · `src/__tests__/components/novedades-aviso.test.tsx`
+(14); **36 mutaciones, 36 cazadas** con **3 controles**
+(`scripts/_mutar-candados-novedades.sh`). Seis mutaciones nuevas para `desde` y para «salen todas»,
+entre ellas *«los 30 días vuelven a contarse desde el cambio: lo viejo nace muerto»* y *«un módulo que
+cambió se queda sin novedad»*. Dos candados **cambiaron de dirección con nota fechada, ninguno se
+borró**: la forma de una novedad ahora admite `desde` (y lo exige `YYYY-MM-DD` y nunca anterior a
+`fecha`), y «son las de los CINCO módulos» pasó a «los 21 módulos tienen la suya» — el día que nazca
+un módulo, ese candado obliga a decidir si lleva novedad o no lleva ninguna a propósito.
+
+⚠️ **Pendiente de Daniel:** leer las 55 líneas y cambiar las que no suenen a él. Se cambian en
+`src/lib/novedades/lista.ts` y nada más; no hay nada que volver a aplicar.
+
 Un candado **cambió de dirección con nota fechada**, ninguno se borró:
 `data-health-dentro-de-usuarios` (la condición de la pestaña solo-admin pasó de una comparación
 textual a una LISTA, con Data Health adentro como control).
+
+---
+
+## Los cuadritos del aviso «qué cambió» (9-sep-2026)
+
+Daniel, textual: *«pero hazlo con una imagen cada punto de ser necesario para que el usuario lo vea»*
+y, al acotarlo, *«las que cambian de botón o algo más que sea necesario para facilidad de usuario»*.
+Y cómo: *«yo dibujo un cuadrito simple — la flechita, el botón nuevo — sin captura real»*.
+
+🔴 **La regla que manda sobre todo**: *«acuérdate que solo lo verá una vez cada vez que entra al
+módulo por usuario»*. Una sola oportunidad ⇒ **un dibujo que no aclara ESTORBA**.
+
+- 🔴 **CATORCE de las 55, y no una más.** Llevan cuadrito solo las novedades donde la persona **no
+  encuentra la cosa sola**: un botón que se movió, cambió de nombre o nació, y un control que
+  desapareció y hay que decir a dónde se fue. Las que cambian un **número, una regla o un texto** no
+  llevan — ahí no hay nada que buscar en pantalla. El candado congela las catorce una por una y trae
+  el **control al revés**: nueve novedades de regla que no pueden ganar dibujo.
+- 🔴 **SVG en línea, sin archivos de imagen y sin dependencias.** Siete formas y nada más: una caja
+  con su rótulo, una flecha, una tira de pestañas, una lista, una caja punteada, un texto subrayado y
+  el ⚙. El catálogo es **dato puro** (`src/lib/novedades/dibujos.ts`) y quien lo pinta es
+  `src/components/novedades/DibujoNovedad.tsx` — así el catálogo se prueba sin montar React.
+- 🔴 **SE SIENTEN DEL SISTEMA** (Daniel, corrigiendo la primera versión: *«que se sienta como si
+  fuese del sistema»*). Dos cosas, y las dos **derivadas**:
+  - **El acento es EL COLOR DE SU MÓDULO** (`src/lib/moduleColors.ts`, el mismo filete de 2 px que
+    pinta el encabezado): Cuentas por Cobrar azul · Guías esmeralda · Recordatorios ámbar · Clientes
+    cian · Préstamos rosa · Caja violeta · Multifashion celeste · Plantilla Switch verde azulado.
+    🩸 La primera versión sacaba los catorce del MISMO `teal`, **un color que la paleta de Fashion
+    Group no usa en ningún módulo** — se veía pegado encima, no salido de la app. ⚠️ **Comisiones y
+    Asistencia no están en ese mapa y caen al GRIS** — no se les inventa un tono; el día que entren,
+    el cuadrito se pinta solo. `getModuleColorByKey()` es nuevo y aditivo.
+  - **El botón principal se dibuja NEGRO RELLENO con letra blanca** (`bg-black text-white` del
+    sistema de diseño), y **solo donde de verdad lo es**: 🩸 antes «Cobrar» se dibujaba con borde, o
+    sea igual que un campo de texto — quien buscara el botón negro no lo iba a reconocer. Medido en
+    el código: `ClientRow.tsx` pinta **Cobrar** `rounded-md bg-black … text-white`; el botón de la
+    barra del CXC (`cxc/page.tsx`) es `bg-black text-white` y su propio comentario dice *«mismo
+    botón, mismo lugar, mismo color; cambia el verbo»*, así que **`Exportar` y `Descargar ⌄` van
+    los DOS negros** —no se movió, se renombró—; y el **Guardar** que se fue de la ficha del cliente
+    era `bg-black text-white` (commit `0b2701d5`), por eso se dibuja negro **y tachado**.
+    🩸 **La primera medición fue del botón equivocado**: se miró `MenuDescargar.tsx` (`text-gray-500`),
+    que es el `PDF · EXCEL` gris de ADENTRO del menú, no el botón que la persona busca en la barra.
+    Hay candado que mira el archivo de la barra. ⚠️ Los tres desplegables (`Empresa ⌄`,
+    `Septiembre 2026 ⌄`, `¿De dónde? ⌄`) llevan borde, con candado que lo exige.
+- **El redondeo es el de la app**: `rounded-md` son 6 px sobre los ~25 de un botón real ⇒ **4** sobre
+  los 16 de la caja del dibujo. Se decidió mirando: con 3 se veía más cuadrado que todo lo demás.
+- 🔴 **Ni un `#hex`, y ningún tono escrito.** Todo se pinta con `currentColor` desde clases de la app.
+  El barrido exige que en el dibujo **no viva ni una clase de color** que no sea gris, negro o blanco:
+  cada tono entra en tiempo de dibujo desde `moduleColors.ts`. El negro del botón lleva su vuelta
+  (`dark:text-white` / `dark:fill-black`): un relleno negro clavado es lo que desaparece el día que la
+  pantalla cambie de fondo.
+- 🔴 **Los anchos se CALCULAN del rótulo** (`anchoDePieza`), nunca se teclean uno por uno. Ninguno
+  pasa de **200 px** y hay candado con el número adentro: es un cuadrito, no un banner.
+- 🔴 **Sin dibujo, la novedad se ve EXACTAMENTE como antes**: el renglón queda texto pelado, sin
+  envoltura. Con dibujo, el renglón envuelve — en el celular el cuadrito cae **debajo** del texto en
+  vez de cortarlo, y se achica sin deformarse (`max-w-full` + `preserveAspectRatio`).
+- **Accesible**: cada cuadrito lleva `role="img"`, `aria-label` y `<title>` con el mismo texto, que
+  dice **la cosa** y no «imagen de…». Ninguno se esconde con `aria-hidden`.
+- ⚠️ **Nada se mueve**, así que `prefers-reduced-motion` no tiene qué apagar; hay candado que prohíbe
+  `animate-`, `transition` y `@keyframes` en el dibujo.
+- ⚠️ **Una llave que el navegador no conoce NO se dibuja** y la novedad se ve como si no tuviera:
+  el dato viaja por la red y una llave vieja no puede dejar un cuadro roto.
+
+**Los catorce, y qué dibuja cada uno** (novedad → cuadrito):
+
+| módulo | qué dibuja |
+|---|---|
+| Comisiones | la celda `$1,234.00` con la **flechita ↓** gris al lado |
+| Comisiones | cuatro pestañas tachadas → `Empresa ⌄` + el **⚙** |
+| Cuentas por Cobrar | el botón negro `Exportar` tachado → el mismo, ahora `Descargar ⌄` |
+| Cuentas por Cobrar | `Menú ···` tachado → el botón **`Cobrar`**, negro relleno |
+| Multifashion | el control único `Septiembre 2026 ⌄` |
+| Multifashion | seis pestañas, las dos últimas tachadas → cuatro |
+| Recordatorios | ocho pestañas tachadas → una sola lista |
+| Clientes | el botón negro `Guardar` tachado → el campo `Correo` con su cursor |
+| Guías | `N° transp.` al lado de la caja nueva `Bultos 8` |
+| Plantilla Switch | `Compañía ⌄` tachado → `Vistana` (la reconoce sola) |
+| Plantilla Switch | la fila `Descripción` con su **×** al lado |
+| Préstamos | `Quincena` tachado → `¿De dónde? ⌄` |
+| Caja Menuda | el cuadro punteado `＋ Foto` |
+| Asistencia | `el nombre` subrayado → `su día` |
+
+🩸 **Todo lo que se arregló salió de MIRAR LA PANTALLA, no el código.** Se renderizaron los catorce
+a un PNG, dos veces:
+- **Primera pasada:** una caja con `···` tachada se lee como una caja **vacía** (pasó a decir
+  `Menú ···`), y el ⚙ con un aro fino y rayas largas se lee como un **sol** (aro grueso, dientes
+  cortos y un hueco adentro).
+- **Segunda pasada, en los DOS temas:** con el color de cada módulo puesto, la tira dejó de parecer
+  una lista de dibujitos iguales — se lee de un golpe de qué módulo habla cada renglón. El botón
+  negro es lo único que salta a la vista en su línea, que es exactamente lo que hace en la pantalla
+  de verdad. Sobre fondo oscuro **no desaparece nada**: el negro se invierte y los acentos de `-500`
+  siguen legibles.
+- **Tercera pasada, la tira REAL del CXC**: se preguntó si los dos botones negros del módulo
+  (`Descargar` y `Cobrar`) iban a competir. **No se cruzan, y está medido**: de las cinco novedades
+  vivas de Cuentas por Cobrar, la primera ronda de tres trae `Descargar` (2ª) y la segunda trae
+  `Cobrar` (4ª) — **un solo botón negro por tanda**.
+
+### Candados
+
+`src/__tests__/components/novedades-dibujos.test.tsx` (**41**); **40 mutaciones, 40 cazadas** con
+**2 controles** (`scripts/_mutar-candados-novedades-dibujos.sh`). Entre ellas *«vuelve el color único
+para los catorce»*, *«al módulo sin color se le inventa un tono»*, *«Cobrar vuelve a dibujarse con
+borde»*, *«Descargar vuelve al borde»* y *«un desplegable se pinta como el botón negro»*. Un candado **cambió de dirección
+con nota fechada, no se borró**: la forma de una novedad ahora admite `dibujo` como quinto campo, y
+el CONTROL al revés exige que un campo **inventado** siga cayendo — la lista sigue siendo CERRADA.
+
+⚠️ **Pendiente de Daniel:** (1) mirar los catorce cuadritos y decir cuál no se entiende — se cambian
+en `src/lib/novedades/dibujos.ts` (el catálogo) y en `src/lib/novedades/lista.ts` (a quién se le
+pone), y no hay nada que aplicar a la base; (2) decidir si **Comisiones y Asistencia** merecen su
+color de módulo en `moduleColors.ts` — hoy son los únicos dos de los catorce que salen en gris, y no
+por olvido del dibujo sino porque nunca tuvieron acento propio en el encabezado.

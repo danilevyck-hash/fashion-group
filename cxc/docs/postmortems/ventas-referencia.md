@@ -1112,9 +1112,9 @@ lectores y con nota fechada**. Lo que hay escrito ahí vale: la paginación cali
 (`ROWS_PER_COL`), los anchos medidos con las cadenas reales de producción y —sobre todo— el porqué del
 portal: un `<body>` con `position:fixed` **no pagina** en Chrome e imprime una sola hoja en silencio.
 
-⚠️ **Los otros dos papeles del módulo NO se tocaron**: «Descargar el mes» y «Descargar el año» siguen
-imprimiendo la matriz en HTML con `imprimirComo` (`ImpresionTablaComisiones`), con su guardia de CSS
-intacta. El encargo era el detalle de un vendedor.
+⚠️ **Los otros dos papeles del módulo no entraban en ese encargo** — «Descargar el mes» y «Descargar el
+año» seguían imprimiendo la matriz en HTML con `imprimirComo`. Se pasaron el MISMO día, en el bloque de
+abajo.
 
 ⚠️ **Pendiente de que Daniel lo mire:** el papel viejo apretaba las filas en **dos columnas tipo
 periódico** (hasta 84 renglones por hoja); el PDF usa **una columna a lo ancho**, más legible pero con
@@ -1129,3 +1129,70 @@ menos filas por hoja (~33). Un mes largo puede ocupar una hoja más.
   `comisiones-flecha-pantalla` (tres pruebas), `comisiones-forma-pantalla` (tres) y
   `comisiones-retirados-y-mayusculas` (el encabezado capitalizado del papel).
 - Mutaciones: `scripts/_mutar-candados-papel-pdf.sh` (**17 mutaciones, 17 cazadas**, 2 controles).
+
+
+## Comisiones: el papel del mes y el del año también son PDF (9-sep-2026)
+
+Daniel, al preguntarle si pasaba también los dos botones de arriba, textual: *«Los paso a PDF también,
+para que todo el módulo se comporte igual»*.
+
+**Ahora:** los dos botones de la barra bajan un PDF armado por el sistema
+(`src/lib/comisiones/pdf-tabla-comisiones.ts`), y **«Descargar el año» —que era Excel y nada más— quedó
+con los dos formatos**, igual que el mes. Los rótulos son «Descargar el mes / el año en PDF» y «… en
+Excel», los cuatro derivados de `rotuloDescargarPeriodo`: el «el mes» / «el año» sigue saliendo de un
+solo lugar.
+
+🔴 **NINGÚN NÚMERO SE MUEVE.** Medido con la RPC real contra producción, antes y después: las **27
+celdas** (3 personas × 9 meses de 2026) dan **idénticas** y el total sigue en **$68.541,03** (Edwin
+9.066,09 · Reynaldo 59.159,11 · Rodrigo 315,83). ⚠️ Ese total no es el $68.325,18 del 8-sep: **enero–agosto
+están idénticos al centavo** (8.995,40 · 60.057,17 · 234,49, los mismos del 6 y del 8-sep) y lo que se
+movió es **septiembre**, que sigue creciendo con producción nueva. Medición:
+`scripts/_medir-comisiones-papel-mes-anio.mjs` (se saca una foto antes, otra después y se comparan celda
+por celda).
+
+**Lo que no se perdió:**
+
+- 🔴 **El papel se arma de las MISMAS filas de la pantalla y con el MISMO pie** (`sumarPagable`): ni una
+  suma nueva. El generador **no tiene una sola operación aritmética** —ni un `reduce`, ni un `fmtMoney`—
+  y hay candado que lo exige.
+- 🔴 **Los que no se pagan** (Oficina y Daniel Levy) siguen **escondidos en pantalla** detrás de «Ver los
+  que no se pagan» y **siguen saliendo en el archivo**, en gris y con su «(no se paga)» — mientras el pie
+  suma solo lo pagable.
+- **El nombre lo pone el código** y es el **mismo del Excel del mismo período**
+  (`comisiones-consolidado-2026-08`, `comisiones-vistana-2026`), para que los dos archivos se puedan
+  poner uno al lado del otro.
+- 🩸 **Un papel no se lleva otro pegado atrás**: el documento se arma solo con la tabla que se le pasa y
+  el generador no lee el DOM. Se cerró estructuralmente el defecto que la hoja HTML tapaba con CSS.
+- **El Excel de los dos botones no se tocó**: mismos exportadores, mismos nombres.
+- **Parado o acostado se DERIVA de las columnas** (`orientacionPapel`): la matriz del grupo son 8 y se
+  acuesta; la de una empresa son 6 y va parada. El día que nazca la séptima empresa el papel se acuesta
+  solo.
+
+🩸 **Y salió a la luz un defecto del PDF de AYER: el menos de la plata negativa no se leía.** La casa
+escribe la plata negativa con `−` (U+2212, diccionario § 0) y la fuente base de jsPDF (helvetica con
+`WinAnsiEncoding`) **no tiene ese carácter**: mangla el **renglón entero**. Medido en el archivo de
+verdad, no en un harness — el reporte de un vendedor imprimía `−$250.00` como `" $ 2 5 0 . 0 0` y
+arrastraba la línea consigo (`V e n t a s " $ 2 5 0 . 0 0 × 0 . 5 0 %`). 🔴 **Se cambia AL DIBUJAR, nunca
+en el dato**: `textoDePdf` (`pdf-chrome.ts`) pasa el `−` a guion solo para el papel; la pantalla, el
+Excel y las comparaciones del código siguen con el signo de la casa —el rojo de la nota de crédito, por
+ejemplo, se decide con el texto CRUDO—. Es la misma solución que ya había tomado la planilla de
+Asistencia con su fórmula del neto.
+
+**Retirado, no borrado:** `ImpresionTablaComisiones.tsx` (la hoja HTML) y `lib/comisiones/imprimir.ts`
+quedan **sin lectores y con nota fechada**. El segundo se conserva porque es la memoria del defecto: el
+día que algo del sistema vuelva a imprimir por el navegador, el archivo no puede llamarse «Fashion
+Group.pdf». Y el logo, la cabeza, el pie y los estilos de los dos PDF del módulo se unificaron en
+`lib/comisiones/pdf-chrome.ts`: dos copias de la misma carrocería es cómo se llega a que un papel tenga
+el logo y el otro no.
+
+- Candados: `src/__tests__/lib/comisiones-papel-mes-anio.test.ts` (24, con verificación **sobre el PDF
+  real** vía `pdfjs-dist`) · `src/__tests__/components/comisiones-papel-pantalla.test.tsx` (4, montando
+  la barra y las dos vistas).
+- Mutaciones: `scripts/_mutar-candados-comisiones-papel-mes-anio.sh` — **28 mutaciones, 28 cazadas**, con
+  2 controles que sobreviven.
+- Cuatro candados **cambiaron de dirección con nota fechada, ninguno se borró**: `comisiones-flecha` (el
+  botón del año ya no cuelga de una condición —CONTROL al revés: la flechita por vendedor SÍ sigue
+  colgando—; y el papel dejó de ser HTML, conservando como CONTROL que el archivo retirado guarda su
+  guardia de CSS), `comisiones-forma` (las dos vistas ya no llaman a `imprimirComo`, con el CONTROL de
+  que el módulo se conserva entero), `comisiones-flecha-pantalla` (el papel se lee del PDF y no del DOM)
+  e `iphone-comisiones-encabezado` (el rótulo del PDF pasó de constante a función).

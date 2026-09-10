@@ -24,11 +24,31 @@
 //
 // 🔑 QUÉ DICE EL PAPEL vive aparte, en `reporte-comision.ts` (módulo puro): acá
 // solo se dibuja. Es lo mismo que hacen el papel del CXC y el de las guías.
+//
+// 🔄 9-SEP-2026 — el logo, la cabeza, el pie y los estilos se mudaron a
+// `pdf-chrome.ts`: desde que la matriz del mes y la del año también son un PDF
+// de verdad, los dos papeles del módulo tienen que verse igual, y dos copias de
+// la misma carrocería es cómo se llega a que uno lleve el logo y el otro no.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
+import {
+  ALTO_CABECERA,
+  MARGEN,
+  NAVY,
+  PIE,
+  ROJO,
+  TINTA,
+  GRIS,
+  LINEA,
+  asegurarEspacio,
+  cabecera,
+  estilosDeTabla,
+  finDeTabla,
+  piePorHoja,
+  textoDePdf,
+} from "./pdf-chrome";
 import {
   COLUMNAS_COBROS,
   COLUMNAS_VENTAS,
@@ -40,98 +60,13 @@ import {
   type HojaReporte,
 } from "./reporte-comision";
 
-/** Navy de la casa — el MISMO `pri` de los Excel y del papel del CXC. */
-const NAVY: [number, number, number] = [27, 58, 92];
-const TINTA: [number, number, number] = [17, 24, 39];
-const GRIS: [number, number, number] = [107, 114, 128];
-const GRIS_CLARO: [number, number, number] = [156, 163, 175];
-const CEBRA: [number, number, number] = [248, 249, 249];
-const ROJO: [number, number, number] = [225, 29, 72];
-const LINEA: [number, number, number] = [209, 213, 219];
-
-const MARGEN = 19;
-/** Dónde arranca la tabla: debajo de la cabecera, en todas las hojas. */
-const ALTO_CABECERA = 32;
-/** Aire de abajo, donde va el pie. */
-const PIE = 18;
-
-/** La cabeza de cada hoja: logo, de quién es el reporte y de qué período. */
-function cabecera(doc: jsPDF, titulo: string): void {
-  const w = doc.internal.pageSize.getWidth();
-  try {
-    doc.addImage(FG_LOGO_BASE64, "JPEG", MARGEN, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
-  } catch {
-    /* el papel sale igual sin el logo */
-  }
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...TINTA);
-  doc.text(titulo, MARGEN, 10 + FG_LOGO_HEIGHT + 5);
-  doc.setDrawColor(...LINEA);
-  doc.setLineWidth(0.3);
-  doc.line(MARGEN, 10 + FG_LOGO_HEIGHT + 7.5, w - MARGEN, 10 + FG_LOGO_HEIGHT + 7.5);
-}
-
-/** El pie de la casa, con la numeración. Se escribe al final, ya con el total. */
-function piePorHoja(doc: jsPDF): void {
-  const w = doc.internal.pageSize.getWidth();
-  const h = doc.internal.pageSize.getHeight();
-  const hojas = doc.getNumberOfPages();
-  for (let i = 1; i <= hojas; i++) {
-    doc.setPage(i);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(...GRIS_CLARO);
-    doc.text("Confidencial", MARGEN, h - 10);
-    doc.text(`Página ${i} de ${hojas}`, w / 2, h - 10, { align: "center" });
-    doc.text("fashiongr.com", w - MARGEN, h - 10, { align: "right" });
-  }
-}
-
-/** Los estilos de tabla de la casa (los mismos del papel del CXC). */
-function estilosDeTabla() {
-  return {
-    styles: { font: "helvetica" as const, fontSize: 8, cellPadding: 2, textColor: TINTA },
-    headStyles: {
-      fillColor: NAVY,
-      textColor: [255, 255, 255] as [number, number, number],
-      fontStyle: "bold" as const,
-      fontSize: 7.5,
-    },
-    alternateRowStyles: { fillColor: CEBRA },
-    footStyles: {
-      fillColor: [255, 255, 255] as [number, number, number],
-      textColor: TINTA,
-      fontStyle: "bold" as const,
-      fontSize: 8.5,
-      lineColor: NAVY,
-      lineWidth: { top: 0.6, right: 0, bottom: 0, left: 0 },
-    },
-  };
-}
-
 /** El rótulo de una sección: «Ventas», «Cobros». */
 function tituloSeccion(doc: jsPDF, y: number, texto: string): number {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...GRIS);
-  doc.text(texto.toUpperCase(), MARGEN, y);
+  doc.text(textoDePdf(texto.toUpperCase()), MARGEN, y);
   return y + 3;
-}
-
-/** Dónde terminó la última tabla. */
-function finDeTabla(doc: jsPDF): number {
-  const y = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY;
-  return typeof y === "number" ? y : ALTO_CABECERA;
-}
-
-/** Deja lugar para `alto` mm; si no cabe, abre hoja y repite la cabeza. */
-function asegurarEspacio(doc: jsPDF, y: number, alto: number, titulo: string): number {
-  const h = doc.internal.pageSize.getHeight();
-  if (y + alto <= h - PIE) return y;
-  doc.addPage();
-  cabecera(doc, titulo);
-  return ALTO_CABECERA;
 }
 
 /** La caja de cierre: de dónde sale cada comisión y qué se paga. */
@@ -156,9 +91,11 @@ function dibujarCierre(doc: jsPDF, y: number, hoja: HojaReporte, titulo: string)
   for (const l of lineas) {
     doc.setFont("helvetica", l.fuerte ? "bold" : "normal");
     doc.setFontSize(l.fuerte ? 9 : 8);
+    // 🔴 El rojo se decide con el texto CRUDO (que sí lleva el «−»); lo que se
+    // dibuja va saneado. Al revés, el negativo dejaría de pintarse.
     doc.setTextColor(...(l.monto.startsWith("−") ? ROJO : TINTA));
-    doc.text(l.rotulo, MARGEN + 3, yy);
-    doc.text(l.monto, w - MARGEN - 3, yy, { align: "right" });
+    doc.text(textoDePdf(l.rotulo), MARGEN + 3, yy);
+    doc.text(textoDePdf(l.monto), w - MARGEN - 3, yy, { align: "right" });
     yy += 5;
   }
   return yy + 4;
@@ -173,8 +110,8 @@ function dibujarTotal(doc: jsPDF, y: number, rotulo: string, monto: string): num
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...TINTA);
-  doc.text(rotulo, MARGEN, y + 5);
-  doc.text(monto, w - MARGEN, y + 5, { align: "right" });
+  doc.text(textoDePdf(rotulo), MARGEN, y + 5);
+  doc.text(textoDePdf(monto), w - MARGEN, y + 5, { align: "right" });
   return y + 9;
 }
 
@@ -202,7 +139,7 @@ export function construirPdfComision(hojas: HojaReporte[]): jsPDF {
       margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: PIE },
       head: [[...COLUMNAS_VENTAS]],
       body: ventas.length
-        ? ventas.map((f) => f.celdas)
+        ? ventas.map((f) => f.celdas.map(textoDePdf))
         : [["", "Sin ventas comisionables.", "", "", ""]],
       columnStyles: {
         0: { cellWidth: 20 },
@@ -229,7 +166,7 @@ export function construirPdfComision(hojas: HojaReporte[]): jsPDF {
       margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: PIE },
       head: [[...COLUMNAS_COBROS]],
       body: cobros.length
-        ? cobros.map((f) => f.celdas)
+        ? cobros.map((f) => f.celdas.map(textoDePdf))
         : [["", "Sin cobros comisionables.", ""]],
       columnStyles: {
         0: { cellWidth: 20 },

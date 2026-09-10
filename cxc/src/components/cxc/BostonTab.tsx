@@ -22,7 +22,10 @@ import SyncStatus from "@/components/shared/SyncStatus";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 import BostonDocumentosDrawer from "@/components/cxc/BostonDocumentosDrawer";
-import BostonHojaCobrar from "@/components/cxc/BostonHojaCobrar";
+import BostonHojaCobrar, { type CorreoProgramadoBoston } from "@/components/cxc/BostonHojaCobrar";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import UndoToast from "@/components/UndoToast";
+import { Toast } from "@/components/ui";
 import {
   ordenEfectivo,
   ordenAlTocarTitulo,
@@ -152,6 +155,32 @@ export default function BostonTab() {
   const [cobrarA, setCobrarA] = useState<ClienteBoston | null>(null);
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [ordenOverride, setOrdenOverride] = useState<OrdenOverride | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  function avisar(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
+
+  // ── EL CORREO SALE CON UN CLIC Y SE PUEDE DESHACER 5 SEGUNDOS ─────────────
+  // 🔴 El POST real ocurre recién al vencer el plazo, así que «Deshacer» no
+  // cancela un correo que ya salió: impide que salga. Es el MISMO patrón del
+  // CXC del grupo (`useUndoAction`/`UndoToast`), contra la ruta de Boston.
+  const { scheduleAction, undoAction, pendingUndo } = useUndoAction();
+
+  function programarCorreo(datos: CorreoProgramadoBoston) {
+    scheduleAction({
+      id: `boston-correo-${datos.codigo}`,
+      message: `Correo enviado a ${datos.destinatario}`,
+      execute: async () => {
+        const res = await fetch("/api/cxc/boston/enviar-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(datos),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          avisar(d?.error || "No se pudo enviar el correo. Intenta de nuevo.");
+        }
+      },
+    });
+  }
 
   const orden = ordenEfectivo(riskFilter, ordenOverride);
 
@@ -453,8 +482,18 @@ export default function BostonTab() {
           setCobrarA(null);
           setDocumentosDe(filtrados.find((f) => f.codigo === c.codigo) ?? null);
         }}
+        onProgramarCorreo={programarCorreo}
       />
 
+      {pendingUndo && (
+        <UndoToast
+          message={pendingUndo.message}
+          startedAt={pendingUndo.startedAt}
+          onUndo={undoAction}
+        />
+      )}
+
+      <Toast message={toast} />
     </div>
   );
 }

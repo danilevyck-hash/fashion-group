@@ -64,7 +64,7 @@ const PEDIDOS = [
 
 let llamadas: { url: string; method: string }[] = [];
 
-function sembrarFetch(convertirOk = true) {
+function sembrarFetch(convertirOk = true, filas: unknown[] = PEDIDOS) {
   llamadas = [];
   global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
     const u = String(url);
@@ -73,7 +73,7 @@ function sembrarFetch(convertirOk = true) {
       return { ok: convertirOk, json: async () => (convertirOk ? { order_id: "o-nuevo", order_number: "PED-023" } : {}) } as Response;
     }
     if (u.includes("/orders") && !init?.method) {
-      return { ok: true, json: async () => PEDIDOS } as Response;
+      return { ok: true, json: async () => filas } as Response;
     }
     return { ok: true, json: async () => ({}) } as Response;
   }) as unknown as typeof fetch;
@@ -114,6 +114,33 @@ function abrirMeses(c: HTMLElement) {
   }
 }
 
+/**
+ * 🩸 NOTA FECHADA — 9-sep-2026: ESTE CANDADO SE VENCIÓ SOLO, POR CALENDARIO.
+ *
+ * El 6-sep-2026 nació la regla «el pedido del link que nadie confirmó dura 30
+ * días en la lista» (`comprobantes-ventana.ts`). Las fechas de este fixture
+ * están calcadas de producción —agosto de 2026— y la pantalla parte la lista
+ * contra el reloj de VERDAD, así que la fila `ab12cd34` (del link, sin
+ * confirmar, del 10-ago) cumplió sus 30 días **el 9-sep** y se fue detrás de
+ * «Ver más». Los 11 casos murieron el mismo día en `filaDe()`, sin que nadie
+ * tocara ni la pantalla ni el archivo.
+ *
+ * 🔴 La pantalla NO tiene defecto y la regla NO cambió: se comprobó que con la
+ * fila dentro de la ventana los 12 casos pasan tal como estaban escritos —
+ * incluido el del VENDEDOR, o sea que **no hay ningún agujero de permisos**.
+ *
+ * Lo que se corrige es el candado, con el MISMO remedio que ya eligió su
+ * hermano `pedidos-chips-y-verdad-de-la-fila.test.tsx` (4-sep-2026): se toca
+ * «Ver más» —lo que haría una persona— en vez de congelar el reloj. Así el
+ * candado mide la pantalla de verdad y no se vuelve a vencer solo. El control
+ * al revés vive abajo, en «la ventana de 30 días sigue mordiendo».
+ */
+function verTodo(c: HTMLElement) {
+  for (const b of Array.from(c.querySelectorAll("button"))) {
+    if (/^Ver más \(\d+\)$/.test((b.textContent || "").trim())) fireEvent.click(b);
+  }
+}
+
 const chipEl = (c: HTMLElement, label: RegExp) =>
   Array.from(c.querySelectorAll('[data-medir="filtro-tipo-comprobante"] button'))
     .find((x) => label.test(x.textContent || ""));
@@ -123,6 +150,7 @@ function tocarChip(c: HTMLElement, label: RegExp) {
   const b = chipEl(c, label);
   expect(b, `no encontré el chip ${label}`).toBeTruthy();
   fireEvent.click(b!);
+  verTodo(c);
   abrirMeses(c);
 }
 
@@ -131,6 +159,9 @@ async function pintar(rol = "admin") {
   const r = render(<PedidosListClient marca="reebok" />);
   // El panel abre en «Pedidos»: ahí están el del link sin convertir y PED-022.
   await waitFor(() => expect(chipEl(r.container, /^Pedidos/)).toBeTruthy(), { timeout: 3000 });
+  // La ventana (90 días, y 30 para el del link sin confirmar) deja el fixture
+  // de agosto detrás de «Ver más». Ver la nota fechada de arriba.
+  verTodo(r.container);
   abrirMeses(r.container);
   // "Nathalie" está en DOS filas (la del link sin convertir y PED-022, que
   // también vino del link): getByText tiraría por múltiples coincidencias.
@@ -296,5 +327,59 @@ describe("🔴 lo que NO se le ofrece a un pedido del link sin convertir", () =>
     // Y lo que SÍ puede sigue estando.
     expect(opcionesDelMenu(filaDe(container, "PED-022"))).toContain("Duplicar");
     expect(opcionesDelMenu(filaDe(container, "PED-022"))).toContain("Editar");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL CONTROL AL REVÉS (9-sep-2026)
+//
+// El arreglo de arriba toca «Ver más». Sin este control, ese toque podría estar
+// tapando que la ventana dejó de funcionar — y nadie se enteraría. Aquí se
+// comprueba que la regla del 6-sep SIGUE MORDIENDO: un pedido del link que
+// nadie confirmó desaparece de la lista a los 30 días, y el que el cliente SÍ
+// confirmó se queda con los 90 de siempre.
+//
+// 🔴 Las fechas van RELATIVAS al día en que corre la prueba, no escritas a
+// mano: escribirlas a mano es exactamente lo que venció a este archivo.
+// ─────────────────────────────────────────────────────────────────────────────
+const haceDias = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+
+describe("🔴 la ventana de 30 días sigue mordiendo al pedido del link", () => {
+  const VIEJOS = [
+    {
+      id: "o-9", order_number: "PED-030", client_name: "Sporting Shoes", vendor_name: "Rey",
+      status: "confirmado", total: 500, item_count: 2, created_at: haceDias(1),
+      en_switch: false, switch_numero: null, fuente: "orders", del_link: false,
+    },
+    {
+      // Del link, 45 días, NADIE lo confirmó: es el carrito abandonado.
+      id: "abandonado", order_number: null, client_name: "Nathalie", vendor_name: null,
+      status: null, total: 360, item_count: 1, created_at: haceDias(45),
+      en_switch: false, switch_numero: null, fuente: "publicos", del_link: true,
+      confirmado_cliente_at: null,
+    },
+    {
+      // Del link, los MISMOS 45 días, pero el cliente SÍ lo confirmó: eso es
+      // trabajo esperando, y se queda con los 90 días de siempre.
+      id: "confirmado", order_number: null, client_name: "Marisol", vendor_name: null,
+      status: null, total: 200, item_count: 1, created_at: haceDias(45),
+      en_switch: false, switch_numero: null, fuente: "publicos", del_link: true,
+      confirmado_cliente_at: haceDias(45),
+    },
+  ];
+
+  it("el abandonado se esconde y vuelve con «Ver más»; el confirmado nunca se fue", async () => {
+    sembrarFetch(true, VIEJOS);
+    const { container } = render(<PedidosListClient marca="reebok" />);
+    await waitFor(() => expect(chipEl(container, /^Pedidos/)).toBeTruthy(), { timeout: 3000 });
+    abrirMeses(container);
+    await waitFor(() => expect(container.querySelector('[data-pedido="confirmado"]')).toBeTruthy(), { timeout: 3000 });
+
+    // A los 45 días sin confirmar, fuera de la lista — pero NO borrado.
+    expect(container.querySelector('[data-pedido="abandonado"]')).toBeNull();
+
+    verTodo(container);
+    abrirMeses(container);
+    expect(container.querySelector('[data-pedido="abandonado"]')).toBeTruthy();
   });
 });

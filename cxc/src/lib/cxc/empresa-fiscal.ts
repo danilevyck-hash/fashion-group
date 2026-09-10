@@ -16,6 +16,11 @@
 // y dictó el nombre legal y la identificación, verbatim. Hasta ese día solo se
 // conocía Fashion Wear y las otras cinco salían sin esas líneas.
 //
+// 🔴 Y ESTÁ CONFECCIONES BOSTON, QUE NO ES DEL GRUPO Y NO SE FIRMA COMO ÉL
+// (9-sep-2026). Su papel también salía sin esas cuatro líneas; Daniel bajó el
+// suyo de Switch y lo dictó igual que las seis. **Su correo NO es el del grupo**
+// — ver `CORREO_DEL_GRUPO` más abajo.
+//
 // 🔴 DOS COSAS SE APARTAN DE LO QUE DICE SWITCH, POR DECISIÓN DE DANIEL:
 //
 //   1. **El teléfono va VACÍO en las seis.** Switch tampoco lo trae. La línea
@@ -39,6 +44,19 @@
 /**
  * El correo que va en el papel de las SEIS. Un solo lugar, a propósito
  * (Daniel, 9-sep-2026: *«los correos de todos debe de ser info@fashiongr.com»*).
+ *
+ * 🔴 «LAS SEIS» ES LITERAL: CONFECCIONES BOSTON NO ENTRA ACÁ. Es la excepción, y
+ * conviene entender por qué antes de «unificarla»: el papel de Boston lo lee un
+ * cliente que **le compró a Confecciones Boston**, no a Fashion Group, y por eso
+ * ese papel sale sin el logo del grupo y sin `fashiongr.com` en el pie (ver
+ * `casa-del-papel.ts`, la decisión de Daniel *«Firma Confecciones Boston»*).
+ * Ponerle `info@fashiongr.com` en la cabeza fiscal le devolvería al papel
+ * exactamente lo que se le acaba de sacar. Su correo es el que Switch imprime en
+ * SU papel: `ventas@cboston.net`.
+ *
+ * ⚠️ Esto NO cambia el REMITENTE del correo, que sigue saliendo por nuestro
+ * dominio (Daniel, preguntado: *«fashiongr»*). Lo que cambia es la cabeza del
+ * PDF, que es lo que dice quién cobra.
  */
 export const CORREO_DEL_GRUPO = "info@fashiongr.com";
 
@@ -54,21 +72,31 @@ export interface EmpresaFiscal {
  * Lo que dice el registro de cada empresa: nombre legal e identificación,
  * verbatim de los papeles que Daniel bajó de Switch el 9-sep-2026.
  *
- * El teléfono y el correo NO están acá porque no son de cada empresa: el
- * teléfono va vacío en las seis y el correo es uno solo para todas.
+ * El teléfono NO está acá porque va VACÍO en todas — Switch tampoco lo trae. El
+ * correo tampoco, SALVO donde no es el del grupo: `correo` solo se escribe en la
+ * empresa que es la excepción, así que las seis siguen tomándolo de un lugar
+ * único y no hay seis copias que mantener iguales a mano.
  */
-const REGISTRO: Readonly<Record<string, { legal: string; identificacion: string }>> = {
+const REGISTRO: Readonly<Record<string, { legal: string; identificacion: string; correo?: string }>> = {
   fashion_wear: { legal: "FASHION WEAR, INC", identificacion: "40254-103-278837" },
   vistana: { legal: "VISTANA INTERNATIONAL PANAMA, S.A.", identificacion: "626251-1-455645" },
   fashion_shoes: { legal: "FASHION SHOES HOLDINGS, S.A.", identificacion: "1481660-1-643734" },
   active_shoes: { legal: "ACTIVE SHOES S.A", identificacion: "155727670-2-2022" },
   active_wear: { legal: "ACTIVE WEAR S.A", identificacion: "155727673-2-2022" },
   joystep: { legal: "JOYSTEP CORP", identificacion: "155769235-2-2025" },
+  // 🔴 La excepción, y a propósito: su papel no dice Fashion Group en ninguna
+  // parte, así que su correo tampoco. Es el que Switch imprime en SU papel.
+  confecciones_boston: {
+    legal: "CONFECCIONES BOSTON S.A",
+    identificacion: "655-544-133465",
+    correo: "ventas@cboston.net",
+  },
 };
 
 /**
  * La ficha completa de cada empresa. Se ARMA del registro + el correo del grupo:
- * el correo vive en `CORREO_DEL_GRUPO` y no se escribe una vez por empresa.
+ * el correo vive en `CORREO_DEL_GRUPO` y no se escribe una vez por empresa —
+ * salvo el de la empresa que declara el suyo, que es Confecciones Boston.
  */
 export const EMPRESA_FISCAL: Readonly<Record<string, EmpresaFiscal>> = Object.freeze(
   Object.fromEntries(
@@ -77,9 +105,9 @@ export const EMPRESA_FISCAL: Readonly<Record<string, EmpresaFiscal>> = Object.fr
       Object.freeze({
         legal: r.legal,
         identificacion: r.identificacion,
-        // 🔴 Vacío en las seis: Switch tampoco lo trae (decisión de Daniel).
+        // 🔴 Vacío en TODAS: Switch tampoco lo trae (decisión de Daniel).
         telefono: "",
-        correo: CORREO_DEL_GRUPO,
+        correo: r.correo ?? CORREO_DEL_GRUPO,
       }),
     ]),
   ),

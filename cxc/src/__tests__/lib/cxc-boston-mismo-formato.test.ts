@@ -132,12 +132,16 @@ describe("🔴 Boston sigue sin mezclarse con el grupo, en las dos direcciones",
     expect(ruta).not.toContain("clientes_master");
   });
 
-  it("⚠️ la hoja de Boston NO manda correos: es una decisión pendiente, no un olvido", () => {
-    // Medido: de los 390 clientes con saldo, 272 tienen teléfono y solo 113
-    // correo — y el texto de cobro del sistema lo firma Fashion Group, que no
-    // es Boston. Quién firma ese correo es una decisión de Daniel.
-    expect(hoja).not.toContain("resend");
-    expect(hoja).not.toContain("/api/cxc/enviar-email");
+  // 🔄 CAMBIÓ DE DIRECCIÓN, CON NOTA (9-sep-2026). Acá decía «la hoja de Boston
+  // NO manda correos: es una decisión pendiente, no un olvido». Daniel la tomó:
+  // *«Firma Confecciones Boston»*. Se prendió el correo y el candado pasó a
+  // exigir lo que de verdad protegía: que el correo salga por LA RUTA DE BOSTON
+  // y nunca por la del grupo. Nada se borró.
+  it("🔴 la hoja manda el correo por SU ruta, nunca por la del grupo", () => {
+    expect(hoja).toContain("/api/cxc/boston/enviar-email");
+    expect(hoja).not.toContain("/api/cxc/enviar-email?");
+    expect(hoja).not.toMatch(/"\/api\/cxc\/enviar-email"/);
+    expect(hoja).toContain("Correo");
     expect(hoja).toContain("WhatsApp");
     expect(hoja).toContain("Copiar el mensaje");
   });

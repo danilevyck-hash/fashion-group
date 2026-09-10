@@ -44,8 +44,8 @@ import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import { ROTULO_NO_SE_PAGA as MARCA_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
 import { nombreArchivoComisionesEmpresa } from "@/lib/comisiones/nombre-archivo";
-import { imprimirComo } from "@/lib/comisiones/imprimir";
-import { ImpresionTablaComisiones } from "./comisiones-detalle/ImpresionTablaComisiones";
+import { descargarPdfTablaComisiones } from "@/lib/comisiones/pdf-tabla-comisiones";
+import { tituloPapelEmpresa } from "@/lib/comisiones/tabla-papel";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
@@ -169,7 +169,6 @@ export function ComisionesPorEmpresaView({
 
   // 🔴 EL PDF DE ARRIBA DICE LO MISMO QUE EL EXCEL: las mismas filas que ya
   // están en pantalla y el mismo pie (`sumarPagable`). Ninguna suma nueva.
-  const [imprimiendoMes, setImprimiendoMes] = useState(false);
   const filasImpresas = () =>
     conActividad.map((v) => ({
       apagada: v.se_paga === false,
@@ -185,27 +184,43 @@ export function ComisionesPorEmpresaView({
       ],
     }));
 
-  const handlePrint = () => {
+  // 🔄 9-SEP-2026 — acá se montaba una hoja HTML y se llamaba a `window.print()`:
+  // salía el DIÁLOGO del navegador y el archivo lo nombraba Chrome. Ahora se
+  // arma el PDF y se baja, con el MISMO nombre que ya usa el Excel de esta
+  // empresa y este período.
+  const handlePdf = () => {
     if (vendedores.length === 0) return;
-    setImprimiendoMes(true);
+    descargarPdfTablaComisiones(
+      {
+        titulo: tituloPapelEmpresa(nombreEmpresa),
+        subtitulo: etiquetaPeriodo(year, mes),
+        columnas: [
+          { header: "Vendedor" },
+          { header: "Ventas", numerica: true },
+          { header: "Com. Venta", numerica: true },
+          { header: "Cobros", numerica: true },
+          { header: "Com. Cobro", numerica: true },
+          { header: "Com. Total", numerica: true },
+        ],
+        filas: filasImpresas(),
+        totales: [
+          haySinPago ? "Total a pagar" : "Total",
+          fmtMoney(totalBase),
+          fmtMoney(totalComision),
+          fmtMoney(totalCobroBase),
+          fmtMoney(totalComisionCobro),
+          fmtMoney(totalGeneral),
+        ],
+      },
+      nombreArchivoComisionesEmpresa(empresa, year, mes),
+    );
   };
-
-  useEffect(() => {
-    if (!imprimiendoMes) return;
-    const limpiar = () => {
-      setImprimiendoMes(false);
-      window.removeEventListener("afterprint", limpiar);
-    };
-    window.addEventListener("afterprint", limpiar);
-    window.setTimeout(limpiar, 60_000);
-    imprimirComo(nombreArchivoComisionesEmpresa(empresa, year, mes));
-  }, [imprimiendoMes, empresa, year, mes]);
 
   // El shell dispara el Excel de la vista activa (ver ComisionesView).
   const exportRef = useRef(handleExport);
   exportRef.current = handleExport;
-  const printRef = useRef(handlePrint);
-  printRef.current = handlePrint;
+  const printRef = useRef(handlePdf);
+  printRef.current = handlePdf;
   useEffect(() => {
     onExcel?.({ run: () => exportRef.current(), disabled: vendedores.length === 0 });
     return () => onExcel?.(null);
@@ -355,30 +370,6 @@ export function ComisionesPorEmpresaView({
         />
       )}
 
-      {/* El papel del mes de ESTA empresa. Invisible en pantalla. */}
-      {imprimiendoMes && (
-        <ImpresionTablaComisiones
-          titulo={`Comisiones — ${nombreEmpresa}`}
-          subtitulo={etiquetaPeriodo(year, mes)}
-          columnas={[
-            { header: "Vendedor" },
-            { header: "Ventas", numerica: true },
-            { header: "Com. Venta", numerica: true },
-            { header: "Cobros", numerica: true },
-            { header: "Com. Cobro", numerica: true },
-            { header: "Com. Total", numerica: true },
-          ]}
-          filas={filasImpresas()}
-          totales={[
-            haySinPago ? "Total a pagar" : "Total",
-            fmtMoney(totalBase),
-            fmtMoney(totalComision),
-            fmtMoney(totalCobroBase),
-            fmtMoney(totalComisionCobro),
-            fmtMoney(totalGeneral),
-          ]}
-        />
-      )}
     </div>
   );
 }

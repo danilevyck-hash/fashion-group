@@ -18,7 +18,8 @@
 //   3. MÁXIMO 3 a la vez, las más nuevas.
 //   4. Cada novedad es UNA línea, en el idioma de ellos.
 //   5. Solo la ve quien TIENE ese módulo.
-//   6. Caduca sola a los 30 días.
+//   6. Caduca sola a los 30 días — contados desde que se AVISA (`desde`), no
+//      desde que el cambio salió: ver `estaVigente`.
 //   7. Nunca sale una novedad de un módulo dentro de otro.
 //
 // 🔴 LAS NOVEDADES SON DATOS ESCRITOS A MANO (`lista.ts`), nunca generadas del
@@ -30,16 +31,47 @@
 // `hoyPanama()`.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { DibujoKey } from "./dibujos";
+
 /** Una novedad: a qué módulo pertenece, de cuándo es y qué dice. */
 export interface Novedad {
   /** Identidad estable. Empieza con la `key` del módulo — ver `idEsDelModulo`. */
   id: string;
   /** La `key` del módulo en `src/lib/modules.ts`. NUNCA la ruta ni el rótulo. */
   modulo: string;
-  /** `YYYY-MM-DD`, el día en que el cambio salió. */
+  /** `YYYY-MM-DD`, el día en que el cambio SALIÓ. Es lo que ordena la tira. */
   fecha: string;
+  /**
+   * `YYYY-MM-DD` OPCIONAL: el día en que esta novedad EMPEZÓ A AVISARSE.
+   *
+   * 🔴 LOS 30 DÍAS SE CUENTAN DESDE ACÁ, no desde `fecha`. Existe por una sola
+   * razón, y es la que dijo Daniel el 9-sep-2026: *«Salen todas — que se enteren
+   * de todo aunque sea viejo»*. El aviso nació ese día con lo de esa semana; el
+   * resto del trabajo de dos semanas se escribió después, y un cambio del 25 de
+   * agosto habría nacido con **cuatro días de vida** y se habría ido antes de
+   * que Angela abriera la pantalla.
+   *
+   * `fecha` sigue diciendo la verdad de cuándo cambió (es lo que ordena y lo que
+   * Daniel ve en su lista); `desde` dice desde cuándo se avisa. Sin `desde`, las
+   * dos cosas son el mismo día — que es el caso normal de acá en adelante.
+   */
+  desde?: string;
   /** UNA línea. Sin jerga, sin nombres de tabla, sin rutas. */
   texto: string;
+  /**
+   * OPCIONAL: el cuadrito que acompaña a esta novedad (`src/lib/novedades/dibujos.ts`).
+   *
+   * 🔴 SOLO donde la persona NO ENCUENTRA LA COSA SOLA — un botón que se movió,
+   * cambió de nombre o nació; un control que desapareció y hay que decir a dónde
+   * se fue. Daniel: *«las que cambian de botón o algo más que sea necesario para
+   * facilidad de usuario»*.
+   *
+   * ⚠️ Y NUNCA por un número, una regla o un texto que cambió: ahí el dibujo no
+   * agrega nada, y **solo se ve una vez** — un dibujo que no aclara ESTORBA.
+   *
+   * Sin `dibujo`, la novedad se ve exactamente como antes de que existieran.
+   */
+  dibujo?: DibujoKey;
 }
 
 /** Cuántas se muestran a la vez. Más que esto ya no es un aviso, es una lista. */
@@ -54,14 +86,26 @@ function diasEntre(a: string, b: string): number {
   return Math.round((dia(b) - dia(a)) / 86_400_000);
 }
 
+/** Desde qué día se avisa esta novedad. Sin `desde`, el día del cambio. */
+export function seAvisaDesde(novedad: Novedad): string {
+  return novedad.desde ?? novedad.fecha;
+}
+
 /**
  * ¿Esta novedad todavía es nueva al día `hoy`?
  *
- * Vale el día que sale y los 30 siguientes. Una novedad con fecha FUTURA no se
- * muestra: es un cambio que todavía no salió.
+ * Dos condiciones, y las dos hacen falta:
+ *   · el cambio ya SALIÓ (`fecha` no es futura) — avisar de algo que todavía no
+ *     está en pantalla es peor que no avisar;
+ *   · el aviso ya EMPEZÓ y no lleva más de 30 días (`desde`, o `fecha` si no
+ *     hay `desde`).
+ *
+ * 🔴 Los 30 días se cuentan desde que se AVISA, no desde que cambió. Un cambio
+ * viejo que recién hoy se pone en la tira tiene sus 30 días completos.
  */
 export function estaVigente(novedad: Novedad, hoy: string): boolean {
-  const dias = diasEntre(novedad.fecha, hoy);
+  if (diasEntre(novedad.fecha, hoy) < 0) return false;
+  const dias = diasEntre(seAvisaDesde(novedad), hoy);
   return dias >= 0 && dias <= DIAS_VIGENCIA;
 }
 

@@ -41,6 +41,7 @@ import {
   dibujarRecibidoConforme,
   dibujarPieDeLaCasa,
 } from "@/lib/cxc/pdf-estado-cuenta-hoja";
+import { casaDeEmpresas } from "@/lib/cxc/casa-del-papel";
 
 /** Y de arranque de un bloque, saltando de página si no cabe entero. */
 export function yParaTotal(doc: jsPDF, y: number, alto = 9): number {
@@ -82,10 +83,16 @@ function dibujarCliente(doc: jsPDF, data: EstadoCuenta, nombreDeLaPantalla: stri
   return Math.round(total * 100) / 100;
 }
 
+/**
+ * 🔴 EL PAPEL LO FIRMA LA CASA DE SUS EMPRESAS, y esa casa se DERIVA de los
+ * datos (`casaDeEmpresas`), no se elige al llamar: un parámetro con valor por
+ * defecto haría que el día que alguien lo olvide, un cliente de Confecciones
+ * Boston reciba un estado de cuenta con el logo de Fashion Group.
+ */
 export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc: jsPDF; filename: string } {
   const doc = new jsPDF({ unit: "mm", format: "letter" });
   dibujarCliente(doc, data, nombre);
-  dibujarPieDeLaCasa(doc);
+  dibujarPieDeLaCasa(doc, casaDeEmpresas(data.empresas.map((e) => e.empresa_key)));
 
   const iso = new Date().toISOString().slice(0, 10);
   return { doc, filename: `Estado-cuenta-${data.codigo}-${iso}.pdf` };
@@ -158,7 +165,10 @@ export function buildEstadoCuentaLotePDF(clientes: ClienteDelLote[]): { doc: jsP
     doc.text(`Total General: ${monto(Math.round(total * 100) / 100)}`, w - MARGEN, y, { align: "right" });
   }
 
-  dibujarPieDeLaCasa(doc);
+  dibujarPieDeLaCasa(
+    doc,
+    casaDeEmpresas(clientes.flatMap((c) => c.data.empresas.map((e) => e.empresa_key))),
+  );
 
   const iso = new Date().toISOString().slice(0, 10);
   const filename = clientes.length === 1

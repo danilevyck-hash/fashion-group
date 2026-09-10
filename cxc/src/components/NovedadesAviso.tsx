@@ -27,6 +27,7 @@ import { useCallback, useEffect, useState } from "react";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { NOVEDADES } from "@/lib/novedades/lista";
 import { novedadesParaMostrar, type Novedad } from "@/lib/novedades/seleccion";
+import DibujoNovedad from "@/components/novedades/DibujoNovedad";
 
 /**
  * 🔴 EL AVISO ESPERA A QUE LA PANTALLA CARGUE (9-sep-2026).
@@ -143,7 +144,18 @@ export default function NovedadesAviso({ moduloKey }: Props) {
         <ul className="flex-1 space-y-1 py-1">
           {aMostrar.map((n) => (
             <li key={n.id} className="text-sm leading-snug text-gray-700">
-              {n.texto}
+              {/* 🔴 SIN DIBUJO, EL RENGLÓN ES EL DE SIEMPRE. Solo las novedades
+                  donde la persona no encuentra la cosa sola llevan cuadrito, y
+                  ahí el renglón se vuelve una fila que ENVUELVE: en el celular
+                  el dibujo cae debajo del texto en vez de cortarlo. */}
+              {n.dibujo ? (
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>{n.texto}</span>
+                  <DibujoNovedad clave={n.dibujo} modulo={n.modulo} />
+                </span>
+              ) : (
+                n.texto
+              )}
             </li>
           ))}
         </ul>

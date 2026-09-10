@@ -10,10 +10,15 @@
 // DECIDE (fechas, vencimiento, saldo corrido, tramos, cuadre) está en
 // `lib/cxc/estado-cuenta-switch.ts`, que es puro y se puede probar sin dibujar.
 //
-// 🔴 ES NUESTRO PAPEL CON SU FORMA, NO UNA COPIA ANÓNIMA: lleva el logo de
-// Fashion Group y el pie de la casa («Confidencial · fashiongr.com»). Lo que se
-// copia de Switch es el ORDEN y los NOMBRES de las columnas, que es lo que el
-// cliente ya sabe leer.
+// 🔴 ES NUESTRO PAPEL CON SU FORMA, NO UNA COPIA ANÓNIMA: lleva el logo y el pie
+// de la CASA QUE COBRA. Lo que se copia de Switch es el ORDEN y los NOMBRES de
+// las columnas, que es lo que el cliente ya sabe leer.
+//
+// 🔴 QUIÉN FIRMA SALE DE `casa-del-papel.ts` Y SE DERIVA DE LA EMPRESA
+// (9-sep-2026, Daniel: *«Firma Confecciones Boston»*): las seis del grupo
+// llevan el logo de Fashion Group y «Confidencial · fashiongr.com»; el papel de
+// Confecciones Boston sale sin logo y sin ese dominio. Nadie elige la casa a
+// mano — se pregunta por `empresa_key`, que el papel ya tiene.
 //
 // ⚠️ El papel del cliente NUNCA dice «vencido». `dias` es la EDAD del documento,
 // no días de mora, así que los tres tramos salen rotulados por su RANGO —igual
@@ -24,7 +29,7 @@
 
 import type jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
+import { casaDeEmpresa, type CasaDelPapel } from "@/lib/cxc/casa-del-papel";
 import { AGING_ORDER, tramoRango } from "@/lib/cxc-aging";
 import { fichaFiscal } from "@/lib/cxc/empresa-fiscal";
 import type { EstadoEmpresa, FichaCliente } from "@/lib/cxc/estado-cuenta-tipos";
@@ -57,15 +62,23 @@ export function hoyDMY(): string {
  * Logo a la izquierda, la empresa acreedora centrada (nombre legal,
  * identificación, teléfono y correo) y a la derecha «ESTADO DE CUENTA» con la
  * fecha. Las líneas que no sabemos NO se dibujan — nunca las de otra empresa.
+ *
+ * 🔴 EL LOGO SALE DE LA CASA QUE COBRA, y la casa se DERIVA de `empresaKey`
+ * (`casaDeEmpresa`). Confecciones Boston no tiene logo cargado, así que su papel
+ * sale sin ninguno — nunca con el de Fashion Group, que no le vendió nada a ese
+ * cliente.
  */
 export function dibujarCabeza(doc: jsPDF, empresaKey: string, empresaNombre: string): number {
   const w = doc.internal.pageSize.getWidth();
   const centro = w / 2;
   const f = fichaFiscal(empresaKey, empresaNombre);
+  const casa = casaDeEmpresa(empresaKey);
 
-  try {
-    doc.addImage(FG_LOGO_BASE64, "JPEG", MARGEN, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
-  } catch { /* el papel sale igual sin el logo */ }
+  if (casa.logo) {
+    try {
+      doc.addImage(casa.logo.base64, "JPEG", MARGEN, 10, casa.logo.width, casa.logo.height);
+    } catch { /* el papel sale igual sin el logo */ }
+  }
 
   let y = 14;
   doc.setFont("helvetica", "bold");
@@ -264,7 +277,7 @@ export function dibujarRecibidoConforme(doc: jsPDF, y: number): number {
 
 // ── 5. El pie de la casa ─────────────────────────────────────────────────────
 
-export function dibujarPieDeLaCasa(doc: jsPDF): void {
+export function dibujarPieDeLaCasa(doc: jsPDF, casa: CasaDelPapel): void {
   const pages = doc.getNumberOfPages();
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
@@ -273,7 +286,7 @@ export function dibujarPieDeLaCasa(doc: jsPDF): void {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(156, 163, 175);
-    doc.text(`Generado ${hoyDMY()} · Confidencial · fashiongr.com`, w / 2, h - 10, { align: "center" });
+    doc.text(`Generado ${hoyDMY()} · ${casa.pie}`, w / 2, h - 10, { align: "center" });
     doc.text(`${i} / ${pages}`, w - MARGEN, h - 10, { align: "right" });
   }
 }

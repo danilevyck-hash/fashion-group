@@ -228,6 +228,41 @@ mutar "src/lib/novedades/seleccion.ts" \
   "  return dias <= DIAS_VIGENCIA;" \
   "6 · una novedad con fecha FUTURA ya se muestra"
 
+# ═══ 6b · «salen todas, aunque sean viejas» ══════════════════════════════════
+# Daniel, 9-sep-2026: «Salen todas — que se enteren de todo aunque sea viejo».
+
+mutar "src/lib/novedades/seleccion.ts" \
+  "  return novedad.desde ?? novedad.fecha;" \
+  "  return novedad.fecha;" \
+  "6b · los 30 días vuelven a contarse desde el CAMBIO (lo viejo nace muerto)"
+
+mutar "src/lib/novedades/seleccion.ts" \
+  "  if (diasEntre(novedad.fecha, hoy) < 0) return false;" \
+  "  if (false) return false;" \
+  "6b · se avisa de un cambio que TODAVÍA NO SALIÓ"
+
+mutar "src/lib/novedades/lista.ts" \
+  'const ARRANQUE = "2026-09-09";' \
+  'const ARRANQUE = "2026-08-01";' \
+  "6b · el aviso de lo viejo arranca hace 39 días: ya caducó sin que nadie lo leyera"
+
+mutar "src/lib/novedades/lista.ts" \
+  'const ARRANQUE = "2026-09-09";' \
+  'const ARRANQUE = "2026-09-10";' \
+  "6b · el aviso de lo viejo arranca MAÑANA: hoy no sale ninguna"
+
+mutar "src/lib/novedades/lista.ts" \
+  '    modulo: "marketing",
+    fecha: "2026-08-25",' \
+  '    modulo: "marketing",
+    fecha: "2026-09-10",' \
+  "6b · una novedad avisa ANTES de que el cambio saliera"
+
+mutar "src/lib/novedades/lista.ts" \
+  '    modulo: "vista-general",' \
+  '    modulo: "ventas",' \
+  "«salen todas» · un módulo que cambió se queda SIN novedad"
+
 # ═══ 7 · nunca de otro módulo ════════════════════════════════════════════════
 
 mutar "src/lib/novedades/seleccion.ts" \
@@ -297,6 +332,11 @@ control "src/lib/novedades/seleccion.ts" \
   "/** Cuántas se muestran a la vez. Más que esto ya no es un aviso, es una lista. */" \
   "/** Cuántas se muestran a la vez. Tres. */" \
   "se reescribe un comentario"
+
+control "src/lib/novedades/lista.ts" \
+  "/** El día en que arrancó el aviso de las dos semanas viejas. Ver el encabezado. */" \
+  "/** El día en que arrancó el aviso de lo viejo. */" \
+  "se reescribe el comentario del arranque"
 
 restaurar
 echo "─────────────────────────────────────────────────────────────────────────"

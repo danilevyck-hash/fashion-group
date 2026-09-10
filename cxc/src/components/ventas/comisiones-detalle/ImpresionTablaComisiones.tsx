@@ -1,6 +1,20 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 🔄 RETIRADO EL 9-SEP-2026 — SIN LECTORES, Y NO SE BORRA (patrón de la casa).
+//
+// Esta era la hoja HTML que se montaba invisible en `<body>` para mandarla al
+// diálogo de imprimir del navegador. Daniel: *«¿no podemos hacer un botón de
+// PDF, ya que de PDF en la compu paso a imprimir?»* y *«Los paso a PDF también,
+// para que todo el módulo se comporte igual»*. El papel del mes y el del año son
+// ahora un PDF armado en código (`lib/comisiones/pdf-tabla-comisiones.ts`), con
+// el nombre puesto por nosotros y sin nada montado en la página que se pueda
+// colar en el archivo.
+//
+// El archivo se queda con su calibración: es la única memoria de cómo se veía
+// este papel, y de qué defecto obligó a la regla de CSS que hay más abajo.
+//
+// ── Lo que decía cuando estaba vivo ──────────────────────────────────────────
 // LA HOJA IMPRESA DE UNA TABLA DE COMISIONES — el papel de «Descargar el mes en
 // PDF».
 //

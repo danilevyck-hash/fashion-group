@@ -35,6 +35,16 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
   "gastos-contabilidad": { border: "border-green-600", text: "text-green-600", hex: "#16a34a" },
 };
 
+/** El acento de un módulo por su KEY (la de `src/lib/modules.ts`).
+ *
+ *  Existe para que nada vuelva a escribir un color a mano: los cuadritos del
+ *  aviso «qué cambió» lo usan para pintarse del color de SU módulo. Un módulo
+ *  que no está en el mapa devuelve `null` — se cae al gris, nunca se le inventa
+ *  un tono. */
+export function getModuleColorByKey(key: string | null | undefined): ModuleColor | null {
+  return key ? MODULE_COLORS[key] ?? null : null;
+}
+
 /** Map pathname to module key */
 export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/cxc"))             return "cxc";

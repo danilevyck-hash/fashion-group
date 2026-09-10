@@ -61,11 +61,7 @@ import { ComisionesCriterios } from "./ComisionesCriterios";
 import { ComisionesPeriodo } from "./ComisionesPeriodo";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { periodoInicial } from "@/lib/comisiones/mes-inicial";
-import {
-  ROTULO_DESCARGAR_MES_PDF,
-  conPdfDelPeriodo,
-  rotuloDescargarExcel,
-} from "@/lib/comisiones/descarga";
+import { rotuloDescargarExcel, rotuloDescargarPdf } from "@/lib/comisiones/descarga";
 import {
   OPCIONES_VISTA,
   VISTA_GRUPO,
@@ -183,9 +179,9 @@ export function ComisionesView({
     excelRef.current = api ? api.run : null;
     setExcelDisabled(api ? api.disabled : true);
   }, []);
-  // 🔴 EL MISMO MECANISMO PARA EL PDF (8-sep-2026). Daniel pidió el mes en los
-  // dos formatos: el papel lo arma la vista —que es la dueña del cálculo— y acá
-  // solo se dispara, igual que el Excel.
+  // 🔴 EL MISMO MECANISMO PARA EL PDF. Daniel pidió el período en los dos
+  // formatos: el papel lo arma la vista —que es la dueña del cálculo— y acá solo
+  // se dispara, igual que el Excel.
   const pdfRef = useRef<(() => void) | null>(null);
   const [pdfDisabled, setPdfDisabled] = useState(true);
   const registrarPdf = useCallback((api: ExcelApi | null) => {
@@ -309,29 +305,28 @@ export function ComisionesView({
           onSuccess={() => setRefreshKey((k) => k + 1)}
         />
 
-        {/* 🔴 DOS BOTONES: EL MES EN LOS DOS FORMATOS (8-sep-2026). El botón
-            dice QUÉ TRAE y el verbo es «Descargar» (Daniel: «a, pero descargar,
-            no bajar, como esté en todos los módulos»). Los dos traen LO MISMO:
-            el mes con las 6 empresas.
-            ⚠️ «Descargar el año» se queda como está —Excel y nada más—: el
-            reporte por vendedor es de un mes, así que no hay PDF del año. */}
-        {conPdfDelPeriodo(mes) && (
-          <button
-            type="button"
-            onClick={() => pdfRef.current?.()}
-            disabled={pdfDisabled}
-            className="ml-auto inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2.5 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-1.5 sm:px-3"
-          >
-            <FileText className="h-4 w-4 shrink-0" /> {ROTULO_DESCARGAR_MES_PDF}
-          </button>
-        )}
+        {/* 🔴 DOS BOTONES: EL PERÍODO EN LOS DOS FORMATOS. El botón dice QUÉ
+            TRAE y el verbo es «Descargar» (Daniel: «a, pero descargar, no bajar,
+            como esté en todos los módulos»). Los dos traen LO MISMO: la matriz
+            del período con las 6 empresas.
+            🔄 9-SEP-2026 — EL AÑO TAMBIÉN LLEVA PDF. Estaba condicionado a que
+            hubiera un mes elegido; Daniel: *«Los paso a PDF también, para que
+            todo el módulo se comporte igual»*. La flechita de la celda SÍ sigue
+            sin aparecer con «Todo el año»: ese reporte es de UN mes, éste es la
+            matriz. */}
+        <button
+          type="button"
+          onClick={() => pdfRef.current?.()}
+          disabled={pdfDisabled}
+          className="ml-auto inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2.5 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-1.5 sm:px-3"
+        >
+          <FileText className="h-4 w-4 shrink-0" /> {rotuloDescargarPdf(mes)}
+        </button>
         <button
           type="button"
           onClick={() => excelRef.current?.()}
           disabled={excelDisabled}
-          className={`inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2.5 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-1.5 sm:px-3 ${
-            conPdfDelPeriodo(mes) ? "" : "ml-auto"
-          }`}
+          className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2.5 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-1.5 sm:px-3"
         >
           <FileSpreadsheet className="h-4 w-4 shrink-0" /> {rotuloDescargarExcel(mes)}
         </button>

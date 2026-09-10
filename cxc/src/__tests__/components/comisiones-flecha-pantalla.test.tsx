@@ -28,6 +28,12 @@ vi.mock("@/lib/comisiones/pdf-comision", () => ({
   descargarPdfComision: (...a: unknown[]) => pdfBajado(...a),
   construirPdfComision: vi.fn(),
 }));
+// Y el de la MATRIZ del período (los dos botones de arriba), por lo mismo.
+const papelBajado = vi.fn();
+vi.mock("@/lib/comisiones/pdf-tabla-comisiones", () => ({
+  descargarPdfTablaComisiones: (...a: unknown[]) => papelBajado(...a),
+  construirPdfTablaComisiones: vi.fn(),
+}));
 
 vi.mock("@/lib/ventas/comisionExcel", async (original) => {
   const real = await original<typeof import("@/lib/ventas/comisionExcel")>();
@@ -286,7 +292,12 @@ describe("🔴 tocar el número sigue abriendo el detalle", () => {
 // ═══ 5 · El botón de arriba: las 6 empresas ════════════════════════════════
 
 describe("🔴 «Descargar el mes en PDF» trae las 6 empresas", () => {
-  it("el papel del mes lista las SEIS columnas, no una", async () => {
+  // 🔄 9-SEP-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. Las mismas afirmaciones,
+  // sobre el mismo papel: lo que cambió es que ya no se leen del DOM de una hoja
+  // HTML montada para `window.print()`, sino de lo que se le entrega al
+  // generador del PDF. Daniel: *«Los paso a PDF también, para que todo el módulo
+  // se comporte igual»*.
+  it("el papel del período lista las SEIS columnas, no una", async () => {
     let correr: (() => void) | null = null;
     render(
       <ComisionesConsolidadoView
@@ -302,21 +313,22 @@ describe("🔴 «Descargar el mes en PDF» trae las 6 empresas", () => {
     await waitFor(() => expect(correr).not.toBeNull());
     await act(async () => { correr!(); });
 
-    const papel = await waitFor(() => document.querySelector("#print-document") as HTMLElement);
-    const encabezados = [...papel.querySelectorAll("thead th")].map((t) => t.textContent);
-    expect(encabezados).toEqual([
+    expect(papelBajado).toHaveBeenCalledTimes(1);
+    const [papel, nombre] = papelBajado.mock.calls[0] as [
+      { columnas: { header: string }[]; filas: { celdas: string[] }[]; totales: string[]; titulo: string; subtitulo: string },
+      string,
+    ];
+    expect(papel.columnas.map((c) => c.header)).toEqual([
       "Vendedor", "Vistana", "Fashion Wear", "Fashion Shoes",
       "Active Shoes", "Active Wear", "Joystep", "Total",
     ]);
     // 🔴 Y CADA FILA TRAE LAS OCHO CELDAS: si el papel se armara con una sola
     // empresa, acá saldrían 3 y el archivo sería otra cosa con el mismo nombre.
-    const cuerpo = [...papel.querySelectorAll("tbody tr")];
-    expect(cuerpo.length).toBeGreaterThan(0);
-    for (const tr of cuerpo) expect(tr.querySelectorAll("td").length).toBe(8);
+    expect(papel.filas.length).toBeGreaterThan(0);
+    for (const f of papel.filas) expect(f.celdas.length).toBe(8);
     // Y los números son los de la matriz: Reynaldo en Fashion Shoes y en Vistana.
-    const reynaldo = cuerpo.find((tr) => tr.textContent?.includes("Reynaldo Espinosa"))!;
-    const celdas = [...reynaldo.querySelectorAll("td")].map((td) => td.textContent);
-    expect(celdas).toEqual([
+    const reynaldo = papel.filas.find((f) => f.celdas[0].includes("Reynaldo Espinosa"))!;
+    expect(reynaldo.celdas).toEqual([
       "Reynaldo Espinosa", "$41.77", "$0.00", "−$1,513.08",
       "$0.00", "$0.00", "$0.00", "−$1,471.31",
     ]);
@@ -324,8 +336,33 @@ describe("🔴 «Descargar el mes en PDF» trae las 6 empresas", () => {
     // 🔴 Y EL PIE DEL PAPEL ES EL MISMO DE LA PANTALLA, celda por celda: si el
     // papel se armara de otra suma, acá se vería. (−$1,400.62 = Reynaldo
     // −1.471,31 + Edwin 70,69.)
-    expect(papel.querySelector("tfoot")!.textContent!.trim()).toBe(pieEnPantalla);
+    expect(papel.totales.join("")).toBe(pieEnPantalla);
     expect(pieEnPantalla).toContain("−$1,400.62");
-    expect(window.print).toHaveBeenCalled();
+    // 🔴 EL NOMBRE LO PONE EL SISTEMA — el MISMO que ya usa el Excel del mes.
+    expect(nombre).toBe("comisiones-consolidado-2026-09");
+    // 🩸 CONTROL de la regla original: ya NO sale por el diálogo del navegador.
+    expect(window.print).not.toHaveBeenCalled();
+  });
+
+  it("🔴 con «Todo el año» el papel también sale, y dice de qué año es", async () => {
+    // 🔄 9-SEP-2026 — el año dejó de ser Excel y nada más.
+    let correr: (() => void) | null = null;
+    render(
+      <ComisionesConsolidadoView
+        year={2026}
+        mes={0}
+        onPdf={(api) => { correr = api ? api.run : null; }}
+      />,
+    );
+    await screen.findByRole("table");
+    await waitFor(() => expect(correr).not.toBeNull());
+    await act(async () => { correr!(); });
+
+    const [papel, nombre] = papelBajado.mock.calls.at(-1) as [
+      { titulo: string; subtitulo: string }, string,
+    ];
+    expect(papel.titulo).toBe("Comisiones — Fashion Group");
+    expect(papel.subtitulo).toBe("Todo 2026");
+    expect(nombre).toBe("comisiones-consolidado-2026");
   });
 });

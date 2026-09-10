@@ -19,8 +19,13 @@
 // verdad. Esta ruta anota lo que el navegador hace y el servidor no ve:
 // abrir WhatsApp y copiar al portapapeles.
 //
-// 🔴 ES SOLO EL CXC DEL GRUPO. Boston no pasa por esta pantalla y no tiene
-// códigos D-XXX; nada acá lee ni escribe su cartera.
+// 🔴 ES SOLO EL CXC DEL GRUPO, Y AHORA ESO SE COMPRUEBA (9-sep-2026). Desde que
+// la hoja «Cobrar» de Confecciones Boston manda correos, sus envíos también se
+// anotan en esta tabla —cada uno con `empresas: ["confecciones_boston"]`—, así
+// que la lectura del grupo los SALTA. Medido: hay UN código de cliente que
+// existe en las dos carteras (`TCKCTA`, el mostrador), y sin este filtro un
+// cobro de Boston pintaría su marca gris en el CXC del grupo. Un badge también
+// es mezclar.
 //
 // ⚠️ La columna `canal` puede NO EXISTIR todavía (migración
 // 20260927120000_cxc_envios_canal.sql, la corre Daniel a mano). Las dos puntas
@@ -33,6 +38,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { esCanalEnvio, VENTANA_MARCA_DIAS, type CanalEnvio } from "@/lib/cxc/envios-registro";
+import { EMPRESA_BOSTON as EMPRESA_CARTERA_APARTE } from "@/lib/cxc/boston-estado-cuenta";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -66,7 +72,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseServer
     .from("cxc_emails_enviados")
-    .select("cliente_codigo, canal, created_at")
+    .select("cliente_codigo, canal, created_at, empresas")
     .gte("created_at", desde)
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -83,6 +89,10 @@ export async function GET(req: NextRequest) {
   // cada código es el último envío. No se pisa después.
   const porCodigo: Record<string, UltimoEnvio> = {};
   for (const fila of data ?? []) {
+    // 🔴 Lo de Boston se salta ANTES de mirar nada más: su cartera va aparte.
+    // Las filas viejas no traen empresas o vienen vacías — todas son del grupo.
+    const empresas = (fila as { empresas?: unknown }).empresas;
+    if (Array.isArray(empresas) && empresas.includes(EMPRESA_CARTERA_APARTE)) continue;
     const codigo = ((fila as { cliente_codigo: string | null }).cliente_codigo ?? "").trim();
     if (!codigo || porCodigo[codigo]) continue;
     const canal = (fila as { canal?: unknown }).canal;

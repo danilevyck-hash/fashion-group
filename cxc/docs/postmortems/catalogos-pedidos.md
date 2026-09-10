@@ -1578,3 +1578,202 @@ En el público el `Toast` **no se auto-ocultaba y no tenía botón de cerrar**, 
 - **El estado vacío prometía un WhatsApp que no estaba**: decía «escríbenos por WhatsApp» y en esa pantalla no había ningún número (existían, pero solo salían en el pedido ya confirmado — o sea, después de comprar). Ahora ofrece los **mismos dos contactos** de siempre (`WHATSAPP_CONTACTOS`), con nombre y número a la vista.
 
 **Candados:** `catalogo-publico-como-el-catalogo.test.ts` (38 casos, contratos y barridos) · `catalogo-publico-revisar.test.tsx` (18 casos de CONDUCTA: se renderiza la pantalla del cliente, se tocan los botones y se mira qué quedó en el carrito y qué `fetch` salió). Dos candados **cambiaron de dirección con nota fechada**, ninguno se borró: `catalogo-publico-ux-paridad.test.ts` (el aviso de guardado se mudó con el paso que vigila, y el CONTROL nuevo exige que el catálogo ya no confirme nada) y `catalogo-paridad-products.test.ts` (la puerta de Reebok, con el CONTROL de que `scope=admin` sigue siendo de admin/secretaria). **47 mutaciones, 47 cazadas** con 2 controles (`scripts/_mutar-candados-catalogo-publico.sh`).
+
+---
+
+## Los cuatro polos «Core» del catálogo van en PLURAL (9-sep-2026)
+
+Es la **segunda mitad** del arreglo del 8-sep-2026. Ese día se acotó a la marca
+el alcance de la regla de las dos mitades (`MITADES_POR_MARCA`), que era lo que
+dejaba pasar la gemela. Esto arregla **lo que la gemela dividió**: el catálogo.
+
+### 🩸 El dato
+
+Medido contra producción el 9-sep-2026 (`switch_articulo_info`, Fashion Wear —
+la única empresa donde existe esta descripción):
+
+| Descripción | Artículos | Piezas | Con existencia |
+|---|---:|---:|---:|
+| `Men-Polo S/S Core` (singular) | 42 | 4.280 | 28 |
+| `Men-Polos S/S Core` (plural) | 81 | 2.939 | 37 |
+| **La misma prenda, partida en dos** | **123** | **7.219** | |
+
+Los estilos **MW0MW32346** y **MW0MW32347** están escritos de las **dos formas
+y al mismo precio**: 26 códigos bajo el singular y 50 bajo el plural.
+
+### 🔑 Por qué se coló: el catálogo se contradecía solo
+
+`depurador_descripciones` guardaba, para la misma prenda, el **singular en los
+adultos** y el **plural en los niños**:
+
+| Marca | Decía | ¿Plural? |
+|---|---|---|
+| TH Menswear | `Men-Polo S/S Core` | ❌ |
+| TH Womenswear | `Women-Polo S/S Core` | ❌ |
+| TH Kids | `Boys-Polos S/S Core` | ✅ |
+| TH Kids | `Toddler Boys-Polos S/S Core` | ✅ |
+
+La regla de las dos mitades encontraba «Men» en TH Menswear y «Polos S/S Core»
+en **TH Kids**, daba la descripción por buena, y la casi-gemela real —la
+singular, **de su propia marca**— nunca se llegaba a mirar.
+
+⚠️ **La señal ya estaba escrita y nadie la juntó.** La migración de Multifashion
+del **9-ago-2026** (`20260809140000`) dejó anotado, en un comentario, que *«69 de
+3.941 códigos tienen MÁS DE UNA descripción en la ventana ("Women-Polo S/S Core"
+vs "Women-Polos S/S Core")»*. Se usó para justificar un `ORDER BY`, no para
+preguntarse por qué la misma prenda tenía dos nombres.
+
+### 🔴 Daniel eligió el PLURAL, con dos razones medidas
+
+1. De las **18 filas de polo** del catálogo, **16 ya van en plural**. El singular
+   es la excepción, no la regla.
+2. En plural se tocan **menos artículos en Switch** que al revés.
+
+### Lo que se hizo
+
+**Migración `20261026120000_polos_core_en_plural.sql`** — dos `UPDATE`,
+**acotados al VALOR EXACTO** (marca y descripción completas), jamás un `LIKE`:
+un `ILIKE '%polo%'` se llevaría por delante las 16 filas que ya están bien, en
+seis marcas distintas.
+
+| Marca | Decía | Dice |
+|---|---|---|
+| `TH Menswear` | `Men-Polo S/S Core` | `Men-Polos S/S Core` |
+| `TH Womenswear` | `Women-Polo S/S Core` | `Women-Polos S/S Core` |
+
+- 🔴 **Nada se borra**: son dos `UPDATE`, sin un solo `DELETE`, `DROP` ni
+  `TRUNCATE`.
+- 🔴 **TH Kids no se toca**: sus dos filas ya venían en plural desde la semilla
+  del 22-jul-2026. Con esto **las cuatro quedan emparejadas**, que es el punto.
+- ⚠️ **Guarda `NOT EXISTS` en los dos**: el índice único es
+  `(lower(marca), lower(descripcion))`. Medido antes de escribir, el destino
+  **no existía** en ninguna de las dos marcas; aun así, si alguien aprueba el
+  plural antes de que la migración corra, **no duplica y no falla** — deja la
+  fila como está y hay que mirarla a mano.
+- 🔴 **Nada por parecido.** Que el singular y el plural sean la misma prenda lo
+  dijo Daniel mirando los dos estilos al mismo precio, no una distancia de
+  edición. `esCasiIgual` los sigue viendo como dos descripciones **distintas** —
+  eso es la alarma, no el amarre.
+- ⚠️ **`normalizeDescripcion` no se tocó.** Sigue sin pluralizar «Polo → Polos»
+  (`logic.ts`, principio comentado a propósito). Es justamente lo que hace que
+  el orden importe.
+
+### ⚠️ Lo que queda pendiente de Daniel, y el ORDEN importa
+
+1. **Él cambia los 42 artículos en Switch** (Fashion Wear,
+   `Men-Polo S/S Core` → `Men-Polos S/S Core`). 🔴 **Primero la migración,
+   después Switch.** Al revés, esos 42 artículos le saltan la alarma de
+   descripción desconocida hasta que la migración corra.
+2. **En mujer no hay nada que tocar en Switch**: medido,
+   `Women-Polo S/S Core` (singular) **no existe en ningún artículo** — solo vivía
+   en el catálogo. Lo que Switch manda ya es `Women-Polos S/S Core`
+   (**22 artículos · 1.409 piezas**), que hasta hoy **no estaba en el catálogo**
+   y con esta migración empieza a estarlo.
+
+### Candado
+
+`src/__tests__/lib/depurador-polos-core-plural.test.ts` (23 casos): el valor
+exacto sin `LIKE`, sin `DELETE`, con guarda; TH Kids intacto; **ninguna
+migración posterior puede devolver el singular**; y la **conducta real** de
+`veredictoDescripcion` **dada vuelta** — con el catálogo arreglado alerta el
+singular y pasa el plural, y el CONTROL exige que antes fuera exactamente al
+revés. **18 mutaciones, 18 cazadas** con 2 controles
+(`scripts/_mutar-candados-polos-core-plural.sh`).
+
+---
+
+## 🔴 Las 23 descripciones que Switch ya tenía y el catálogo no conocía (9-sep-2026)
+
+Daniel, textual: **«apruébalas todas»**.
+
+### 🔑 Por qué faltaban — esto es lo que hay que dejar escrito
+
+**`depurador_descripciones` SOLO se llena por la Plantilla Switch**: la semilla
+del 22-jul-2026 (227 filas `seed`) y lo que la secretaria aprueba al procesar un
+archivo del proveedor (54 filas `aprobada`). Estos artículos **no entraron por
+ahí: se tecleron DIRECTO en Switch**, así que el catálogo nunca se enteró de que
+existían.
+
+La consecuencia se veía todos los meses: al llegar el archivo, esas
+descripciones caían fuera del catálogo, el producto salía **sin precio** y la
+alarma sonaba otra vez por lo mismo. No era un defecto del veredicto — es el
+catálogo con un agujero por donde entra la mercancía tecleada a mano. Es el
+mismo agujero, por el otro lado, que el de los polos «Core» de arriba.
+
+### 🔴 Son 23 FILAS, no 27 — el conteo del encargo estaba mal
+
+El grano de la tabla es `(marca, descripción)` y **cuatro descripciones llegan
+en las DOS compañías** — `Boys-Shorts Denim` · `Boys-Short Knit` ·
+`Men-Short Knit` · `Girls-Panties` —, así que cada una lleva su fila en la casa
+TH y otra en la CK. **Esas ocho filas ya estaban enumeradas**, una en cada
+lista: **13 (Fashion Wear) + 10 (Vistana) = 23 filas sobre 19 descripciones
+distintas**. Sumarle 4 a 23 contaba los duplicados dos veces.
+
+### Lo medido contra producción (`switch_articulo_info`, existencia > 0)
+
+Las 23 filas dan exactamente las piezas del encargo — 332 · 97 · 83 · 72 · 32 ·
+29 · 27 · 23 · 20 · 20 · 6 · 2 · 1 en Fashion Wear, y 428 · 376 · 191 · 96 · 73
+· 36 · 10 · 6 · 1 · 1 en Vistana.
+
+### ⚠️ La marca es una propuesta razonada, NO un dato medido
+
+Sale de mirar en qué marca vive la **hermana** de cada descripción en el
+catálogo de hoy (`Girls-Bras` junto a `Women-Bras` en CK Underwear;
+`Boys-Underwear Bottoms` junto a `Men-Underwear Bottoms` en TH Underwear;
+`Women-Socks Dress` junto a `Men-Socks Dress` en TH Legwear). **La marca de
+verdad la manda el Excel del proveedor.** Medido: las 23 filas de
+`switch_articulo_info` traen **`marca` en NULL** — Switch solo devuelve la ficha
+con marca para Active Shoes—, así que no había contra qué contrastarla.
+
+### ⚠️ Pregunta abierta: tres «Short Knit» de Tommy sin hermana en Tommy
+
+En **todo** el catálogo «Short Knit» existe **UNA sola vez**:
+`Women-Short Knit`, en **CK Performance**. Por eso `Boys-Short Knit`,
+`Girls-Short Knit` y `Men-Short Knit` entran a la casa TH **sin una hermana que
+respalde la marca**: esa prenda Tommy nunca la ha tenido en el catálogo. O son
+prendas nuevas de verdad, o llegaron con la marca equivocada en el archivo. Lo
+decide Daniel; si lo decide distinto se corrige con un `UPDATE` de la marca, sin
+borrar nada.
+
+⚠️ La cuarta que el encargo señalaba, `Girls-Panties`, **sí tiene hermana en
+Tommy**: `Girls-Panties 7PK`, en TH Underwear (7-pack contra unidad, la misma
+distinción que ya existe entre `Women-Panties` y `Women-Panties 3PK`).
+
+### Lo que se verificó antes de escribir, con el código real
+
+1. **Ninguna de las 23 existe hoy** en el catálogo, en ninguna marca (0 filas).
+2. Las **9 marcas** usadas existen en `MARCAS_CATALOGO` (`src/lib/depurador/logic.ts`).
+3. **Ninguna se mueve** al pasar por `normalizeDescripcion`: lo que se da de alta
+   es exactamente lo que sale al Excel de Switch. (Las tres candidatas
+   descartadas —`Men-Ties / Neckwear`, `Men-Shirts Woven Tops L/S` y
+   `Men-Shirts Woven Tops S/S`— quedaron fuera justo por esto.)
+4. **Ninguna dispara `esCasiIgual`** contra una fila de su marca ni de ninguna
+   otra: no se crea una gemela por una «s».
+
+### La migración
+
+`supabase/migrations/20261027120000_descripciones_que_switch_ya_tiene.sql`
+(**pendiente de aplicar**). Un `INSERT` con la **lista explícita de 23 filas**,
+jamás generada de un `SELECT`. `origen = 'aprobada'` y `aprobada_por = 'daniel'`
+— el CHECK de la tabla solo admite `seed` o `aprobada`, y `seed` es la carga
+inicial: esto es una aprobación de Daniel, igual que las otras 54.
+**Aditiva e idempotente** (`ON CONFLICT DO NOTHING` contra el índice único
+`(lower(marca), lower(descripcion))`, nunca `DO UPDATE`, que pisaría una fila
+que alguien ya aprobó a mano). 🔴 **Nada se borra**: ni un `DELETE`, ni un
+`DROP`, ni un `UPDATE`.
+
+⚠️ El número **20261027120000** se eligió después de comprobar las dos cosas:
+`supabase_migrations.schema_migrations` llega hasta **20261025120000**, y en la
+carpeta hay una **sin aplicar**, `20261026120000_polos_core_en_plural.sql`.
+
+### Candado
+
+`src/__tests__/lib/depurador-descripciones-tecleadas-en-switch.test.ts`
+(142 casos): las 23 filas exactas con su marca, escritas a mano y pareadas
+contra el SQL; la lista explícita (nada de `SELECT`, `LIKE` ni `%`); las 9
+marcas en `MARCAS_CATALOGO`; ninguna se mueve al normalizarse; ninguna es
+casi-gemela de nada; nada se borra y corre dos veces sin daño; la **conducta
+real dada vuelta** —cada una pasa de alertar a ser del catálogo, con el CONTROL
+de que antes **ninguna** lo era—; y ninguna migración posterior las saca.
+**17 mutaciones, 17 cazadas** con 2 controles
+(`scripts/_mutar-candados-descripciones-tecleadas.sh`).

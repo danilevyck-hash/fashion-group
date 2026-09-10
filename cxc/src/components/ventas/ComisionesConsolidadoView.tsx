@@ -86,9 +86,9 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
-import { ImpresionTablaComisiones } from "./comisiones-detalle/ImpresionTablaComisiones";
 import { useDescargaComision } from "./comisiones-detalle/useDescargaComision";
-import { imprimirComo } from "@/lib/comisiones/imprimir";
+import { descargarPdfTablaComisiones } from "@/lib/comisiones/pdf-tabla-comisiones";
+import { TITULO_PAPEL_GRUPO } from "@/lib/comisiones/tabla-papel";
 import { ComisionesTarjetasConsolidado } from "./ComisionesTarjetas";
 
 // Las 6 empresas con CXC — joystep incluida desde el 14-ago-2026. La lista
@@ -167,9 +167,6 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   // El motor de la flechita ↓: los MISMOS archivos que ya bajaban desde adentro
   // del detalle, sin tener que abrirlo. Ver `comisiones-detalle/useDescargaComision`.
   const { descargarExcel, descargarPdf, MENSAJE_ERROR } = useDescargaComision(year, mes);
-  // El papel del mes entero (los dos botones de arriba). Se monta, se imprime y
-  // se desmonta; en pantalla no se ve nada.
-  const [imprimiendoMes, setImprimiendoMes] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -280,7 +277,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
     });
   };
 
-  // ── El PAPEL DEL MES: las 6 empresas, lo mismo que el Excel ────────────────
+  // ── El PAPEL DEL PERÍODO: las 6 empresas, lo mismo que el Excel ────────────
   // 🔴 EL PDF Y EL EXCEL DE ARRIBA DICEN LO MISMO: las dos salidas se arman de
   // las MISMAS filas que ya están en pantalla (`conActividad` + la oficina) y
   // con el MISMO pie (`sumarPagable`). Ni una suma nueva.
@@ -298,31 +295,40 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
     }));
   };
 
-  const handlePrint = () => {
+  // 🔄 9-SEP-2026 — ACÁ SE MONTABA UNA HOJA HTML Y SE LLAMABA A `window.print()`.
+  // Salía el DIÁLOGO del navegador («impresión directa», como le dice Daniel) y
+  // el archivo lo nombraba Chrome. Ahora se arma el PDF y se baja: nada que
+  // montar, nada que esperar, nada que desmontar — y el nombre lo ponemos
+  // nosotros, el MISMO que ya usa el Excel de este período.
+  const handlePdf = () => {
     if (empty || !rows) return;
-    setImprimiendoMes(true);
+    descargarPdfTablaComisiones(
+      {
+        titulo: TITULO_PAPEL_GRUPO,
+        subtitulo: etiquetaPeriodo(year, mes),
+        columnas: [
+          { header: "Vendedor" },
+          ...EMPRESAS.map((k) => ({ header: nombreCortoEmpresa(k), numerica: true })),
+          { header: "Total", numerica: true },
+        ],
+        filas: filasImpresas(),
+        totales: [
+          haySinPago ? "Total a pagar" : "Total",
+          ...EMPRESAS.map((k) => fmtMoney(colTotal(k))),
+          fmtMoney(grandTotal),
+        ],
+      },
+      nombreArchivoComisionesMes(year, mes),
+    );
   };
-
-  // El papel se monta primero y se imprime DESPUÉS del commit: sin esto,
-  // `window.print()` saldría con la hoja todavía sin pintar.
-  useEffect(() => {
-    if (!imprimiendoMes) return;
-    const limpiar = () => {
-      setImprimiendoMes(false);
-      window.removeEventListener("afterprint", limpiar);
-    };
-    window.addEventListener("afterprint", limpiar);
-    window.setTimeout(limpiar, 60_000);
-    imprimirComo(nombreArchivoComisionesMes(year, mes));
-  }, [imprimiendoMes, year, mes]);
 
   // El shell dispara la descarga de la vista activa. La función se guarda en un
   // ref (cambia en cada render, con los datos frescos) y solo se re-registra
   // cuando cambia si el botón va habilitado — así el efecto no corre de más.
   const exportRef = useRef(handleExport);
   exportRef.current = handleExport;
-  const printRef = useRef(handlePrint);
-  printRef.current = handlePrint;
+  const printRef = useRef(handlePdf);
+  printRef.current = handlePdf;
   useEffect(() => {
     onExcel?.({ run: () => exportRef.current(), disabled: empty });
     return () => onExcel?.(null);
@@ -572,28 +578,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
         />
       )}
 
-      {/* 🔄 9-SEP-2026 — acá iba el papel de la flechita, montado invisible para
-          imprimirlo. Ahora la flechita baja un PDF armado en código y no hay
-          nada que montar. */}
-
-      {/* El papel del mes: la misma matriz que se ve, con las 6 empresas. */}
-      {imprimiendoMes && (
-        <ImpresionTablaComisiones
-          titulo="Comisiones — Fashion Group"
-          subtitulo={etiquetaPeriodo(year, mes)}
-          columnas={[
-            { header: "Vendedor" },
-            ...EMPRESAS.map((k) => ({ header: nombreCortoEmpresa(k), numerica: true })),
-            { header: "Total", numerica: true },
-          ]}
-          filas={filasImpresas()}
-          totales={[
-            haySinPago ? "Total a pagar" : "Total",
-            ...EMPRESAS.map((k) => fmtMoney(colTotal(k))),
-            fmtMoney(grandTotal),
-          ]}
-        />
-      )}
+      {/* 🔄 9-SEP-2026 — acá iban DOS hojas HTML montadas invisibles para
+          imprimirlas: la de la flechita y la del mes. Las dos son ahora un PDF
+          armado en código, así que no queda nada que montar. */}
     </div>
   );
 }

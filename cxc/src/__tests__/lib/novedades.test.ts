@@ -23,6 +23,7 @@ import {
   MAX_A_LA_VEZ,
   DIAS_VIGENCIA,
   estaVigente,
+  seAvisaDesde,
   idEsDelModulo,
   moduloDeRuta,
   novedadesPendientes,
@@ -40,8 +41,8 @@ const HOY = "2026-09-09";
 const TODOS_LOS_MODULOS = ALL_MODULE_KEYS;
 
 /** Una novedad de mentira, para probar la regla sin depender de la lista real. */
-const n = (id: string, modulo: string, fecha: string): Novedad =>
-  ({ id, modulo, fecha, texto: `cambió algo en ${modulo}` });
+const n = (id: string, modulo: string, fecha: string, desde?: string): Novedad =>
+  ({ id, modulo, fecha, texto: `cambió algo en ${modulo}`, ...(desde ? { desde } : {}) });
 
 const ctx = (extra: Partial<Parameters<typeof novedadesPendientes>[0]> = {}) => ({
   novedades: [] as Novedad[],
@@ -243,6 +244,69 @@ describe("🔴 6 · a los 30 días se va sola", () => {
   });
 });
 
+/* ═══ 6b · «salen todas, aunque sean viejas» ══════════════════════════════ */
+
+describe("🔴 6b · los 30 días se cuentan desde que se AVISA, no desde que cambió", () => {
+  // Daniel, 9-sep-2026: *«Salen todas — que se enteren de todo aunque sea
+  // viejo»*. El aviso nació el 9-sep con lo de esa semana; el resto del trabajo
+  // de dos semanas se escribió después. Sin esto, un cambio del 25-ago nacería
+  // con cuatro días de vida.
+  it("sin `desde`, se cuenta desde el día del cambio — como siempre", () => {
+    expect(seAvisaDesde(n("cxc-a", "cxc", "2026-08-25"))).toBe("2026-08-25");
+  });
+
+  it("con `desde`, se cuenta desde ese día", () => {
+    expect(seAvisaDesde(n("cxc-a", "cxc", "2026-08-25", "2026-09-09"))).toBe("2026-09-09");
+  });
+
+  it("🔴 una novedad VIEJA que recién hoy se avisa SÍ se ve", () => {
+    const vieja = n("cxc-vieja", "cxc", "2026-08-25", "2026-09-09");
+    expect(estaVigente(vieja, HOY)).toBe(true);
+    expect(novedadesParaMostrar(ctx({ novedades: [vieja] })).map((x) => x.id))
+      .toEqual(["cxc-vieja"]);
+  });
+
+  it("CONTROL: la MISMA novedad sin `desde` se apaga 15 días antes", () => {
+    // Las dos son del 25-ago; lo que se mide es CUÁNDO se apaga cada una.
+    const conDesde = n("cxc-a", "cxc", "2026-08-25", "2026-09-09");
+    const sinDesde = n("cxc-b", "cxc", "2026-08-25");
+    expect(estaVigente(sinDesde, "2026-09-25")).toBe(false);  // 31 días del cambio
+    expect(estaVigente(conDesde, "2026-09-25")).toBe(true);   // 16 días del aviso
+    expect(estaVigente(conDesde, "2026-10-09")).toBe(true);   // 30 del aviso
+    expect(estaVigente(conDesde, "2026-10-10")).toBe(false);  // 31 del aviso
+  });
+
+  it("un `desde` FUTURO no adelanta nada: todavía no se avisa", () => {
+    expect(estaVigente(n("cxc-a", "cxc", "2026-08-25", "2026-09-10"), HOY)).toBe(false);
+  });
+
+  it("y un cambio que TODAVÍA NO SALIÓ no se avisa aunque el `desde` ya pasó", () => {
+    // Avisar de algo que no está en pantalla es peor que no avisar.
+    expect(estaVigente(n("cxc-a", "cxc", "2026-09-10", "2026-09-01"), HOY)).toBe(false);
+  });
+
+  it("🔴 ninguna novedad avisa ANTES de que el cambio saliera", () => {
+    for (const nov of NOVEDADES) {
+      if (!nov.desde) continue;
+      expect(nov.desde >= nov.fecha, `«${nov.id}» avisa antes de existir`).toBe(true);
+    }
+  });
+
+  it("el orden lo sigue mandando `fecha`, no `desde`", () => {
+    // Todas empezaron a avisarse el mismo día; arriba va el cambio más nuevo.
+    const r = novedadesParaMostrar(ctx({ novedades: [
+      n("cxc-vieja", "cxc", "2026-08-25", "2026-09-09"),
+      n("cxc-nueva", "cxc", "2026-09-08", "2026-09-09"),
+    ] }));
+    expect(r.map((x) => x.id)).toEqual(["cxc-nueva", "cxc-vieja"]);
+  });
+
+  it("🔴 TODAS las novedades escritas están vigentes hoy — ninguna nació muerta", () => {
+    const muertas = NOVEDADES.filter((x) => !estaVigente(x, HOY)).map((x) => x.id);
+    expect(muertas, "nadie las va a leer").toEqual([]);
+  });
+});
+
 /* ═══ 7 · nunca una de otro módulo ════════════════════════════════════════ */
 
 describe("🔴 7 · nunca sale una novedad de un módulo dentro de otro", () => {
@@ -301,16 +365,51 @@ describe("🔴 las novedades se ESCRIBEN, no se generan del historial", () => {
     }
   });
 
-  it("cada una trae módulo, fecha y texto — nada más y nada menos", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 9-sep-2026, NO SE BORRÓ. Hasta ese día los campos
+  // permitidos eran cuatro (+ `desde`); Daniel pidió el cuadrito —*«hazlo con
+  // una imagen cada punto de ser necesario para que el usuario lo vea»*— y
+  // `dibujo` es el quinto. Lo que la regla cuida sigue siendo lo mismo: NADA
+  // fuera de esa lista cerrada. El CONTROL de abajo lo comprueba al revés.
+  it("cada una trae módulo, fecha y texto — y a lo sumo `desde` y `dibujo`, nada más", () => {
+    const PERMITIDOS = ["desde", "dibujo", "fecha", "id", "modulo", "texto"];
     for (const nov of NOVEDADES) {
-      expect(Object.keys(nov).sort()).toEqual(["fecha", "id", "modulo", "texto"]);
+      const campos = Object.keys(nov).sort();
+      const esperado = PERMITIDOS.filter((c) => campos.includes(c));
+      expect(campos, `«${nov.id}» trae campos de más`).toEqual(esperado);
+      for (const obligatorio of ["fecha", "id", "modulo", "texto"]) {
+        expect(campos.includes(obligatorio), `«${nov.id}» sin ${obligatorio}`).toBe(true);
+      }
       expect(/^\d{4}-\d{2}-\d{2}$/.test(nov.fecha), `«${nov.id}» sin fecha`).toBe(true);
+      if (nov.desde) {
+        expect(/^\d{4}-\d{2}-\d{2}$/.test(nov.desde), `«${nov.id}» con un «desde» raro`).toBe(true);
+      }
     }
   });
 
-  it("son las de los CINCO módulos que cambiaron, medidas contra el código", () => {
-    const modulos = [...new Set(NOVEDADES.map((x) => x.modulo))].sort();
-    expect(modulos).toEqual(["cargar", "comisiones", "cxc", "guias", "prestamos"]);
+  it("CONTROL · un campo inventado sigue cayendo — la lista es CERRADA", () => {
+    const PERMITIDOS = ["desde", "dibujo", "fecha", "id", "modulo", "texto"];
+    const inventada = { ...n("cxc-x", "cxc", "2026-09-09"), color: "rojo" } as Record<string, unknown>;
+    const campos = Object.keys(inventada).sort();
+    expect(campos).not.toEqual(PERMITIDOS.filter((c) => campos.includes(c)));
+  });
+
+  it("🔴 «salen todas»: los 21 módulos tienen la suya, medida contra el código", () => {
+    // Daniel, 9-sep-2026: *«Salen todas — que se enteren de todo aunque sea
+    // viejo»*. En las dos semanas del 25-ago al 9-sep cambió algo VISIBLE en
+    // los 21; si mañana nace un módulo, este candado obliga a decidir si lleva
+    // novedad o no lleva ninguna a propósito.
+    const con = new Set(NOVEDADES.map((x) => x.modulo));
+    const sin = ALL_MODULE_KEYS.filter((k) => !con.has(k));
+    expect(sin, "un módulo sin novedad: decide si es a propósito").toEqual([]);
+  });
+
+  it("ningún módulo se lleva la mitad de la lista: tope de 6 por módulo", () => {
+    // No es un límite del mecanismo (se ven de a 3 y las demás vuelven), es
+    // higiene: pasado eso ya no es un aviso, es un manual.
+    const porModulo = new Map<string, number>();
+    for (const nov of NOVEDADES) porModulo.set(nov.modulo, (porModulo.get(nov.modulo) ?? 0) + 1);
+    const pasados = [...porModulo].filter(([, c]) => c > 6).map(([k, c]) => `${k}=${c}`);
+    expect(pasados).toEqual([]);
   });
 
   it("y lo que dicen es cierto: el módulo se llama «Plantilla Switch»", () => {

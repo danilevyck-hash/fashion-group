@@ -114,26 +114,24 @@ export function tituloDescarga(
 }
 
 /**
- * Los DOS botones de arriba. Daniel, 8-sep-2026: el mes en los dos formatos.
+ * Los DOS botones de arriba: el período en los dos formatos.
  *
- * ⚠️ «Descargar el año» SE QUEDA COMO ESTÁ: es Excel y nada más. El PDF del año
- * no existe porque el reporte por vendedor tampoco, y un botón de PDF que
- * bajara solo la matriz del año sería otra cosa con el mismo nombre.
+ * 🔄 9-SEP-2026 — «DESCARGAR EL AÑO» TAMBIÉN LLEVA PDF. Acá decía que el año se
+ * quedaba en Excel «porque el reporte por vendedor es de un mes». Era mezclar
+ * dos papeles distintos: el del vendedor sí es de un mes (y por eso la flechita
+ * de la celda sigue sin aparecer con «Todo el año»), pero el de arriba es LA
+ * MATRIZ, que existe igual para el año. Daniel: *«Los paso a PDF también, para
+ * que todo el módulo se comporte igual»*.
+ *
+ * 🔴 EL «EL MES» / «EL AÑO» SIGUE SALIENDO DE UN SOLO LUGAR: los dos rótulos le
+ * pegan « en PDF» o « en Excel» al que ya existía (`rotuloDescargarPeriodo`).
+ * Escribir de nuevo esas dos palabras acá es cómo se llega a que un botón diga
+ * «el mes» y el de al lado «este mes».
  */
-export const ROTULO_DESCARGAR_MES_PDF = "Descargar el mes en PDF";
-
-/**
- * 🔴 EL «EL MES» / «EL AÑO» SIGUE SALIENDO DE UN SOLO LUGAR: se le pega « en
- * Excel» al rótulo que ya existía (`rotuloDescargarPeriodo`). Escribir de nuevo
- * las dos palabras acá es cómo se llega a que un botón diga «el mes» y el de al
- * lado «este mes».
- */
-export function rotuloDescargarExcel(mes: number): string {
-  const base = rotuloDescargarPeriodo(mes);
-  return esTodoElAnio(mes) ? base : `${base} en Excel`;
+export function rotuloDescargarPdf(mes: number): string {
+  return `${rotuloDescargarPeriodo(mes)} en PDF`;
 }
 
-/** ¿Se dibuja el botón de PDF de arriba? Solo con un mes elegido. */
-export function conPdfDelPeriodo(mes: number): boolean {
-  return !esTodoElAnio(mes);
+export function rotuloDescargarExcel(mes: number): string {
+  return `${rotuloDescargarPeriodo(mes)} en Excel`;
 }

@@ -159,22 +159,39 @@ describe("el cajón de la cartera de BOSTON", () => {
   });
 });
 
-describe("🔴 la ruta de Boston no toca al grupo", () => {
+// 🔄 CAMBIÓ DE DIRECCIÓN, CON NOTA (9-sep-2026). La consulta de Boston salió de
+// la ruta del cajón y vive en `lib/cxc/boston-estado-cuenta.ts`, porque desde
+// hoy su hoja «Cobrar» manda correos y el PAPEL tiene que leer exactamente los
+// mismos documentos que muestra el cajón — dos consultas para el mismo estado de
+// cuenta es cómo se llega a que la pantalla diga un número y el papel otro.
+// El invariante NO se aflojó: se mudó de archivo y se le agregó el CONTROL de
+// que la ruta ya no lee la tabla por su cuenta.
+describe("🔴 la lectura de Boston no toca al grupo", () => {
+  const lector = sinComentarios(leer("src/lib/cxc/boston-estado-cuenta.ts"));
   const src = sinComentarios(leer("src/app/api/cxc/boston/estado-cuenta/route.ts"));
 
   it("acota a `confecciones_boston` EN LA MISMA CADENA de la consulta", () => {
-    expect(src).toMatch(/\.from\("switch_estadocuenta"\)[\s\S]{0,400}\.eq\("empresa_key", EMPRESA_BOSTON\)/);
-    expect(src).toContain('const EMPRESA_BOSTON = "confecciones_boston"');
+    expect(lector).toMatch(/\.from\("switch_estadocuenta"\)[\s\S]{0,400}\.eq\("empresa_key", EMPRESA_BOSTON\)/);
+    expect(lector).toContain('export const EMPRESA_BOSTON = "confecciones_boston"');
+  });
+
+  it("CONTROL: la ruta ya no arma su propia consulta — le pregunta al lector", () => {
+    expect(src).not.toContain('from("switch_estadocuenta")');
+    expect(src).toContain("fetchEstadoCuentaBoston");
   });
 
   it("la empresa es una CONSTANTE del servidor, nunca sale de la URL", () => {
-    expect(src).not.toMatch(/searchParams\.get\(["']empresa["']\)/);
+    for (const archivo of [src, lector]) {
+      expect(archivo).not.toMatch(/searchParams\.get\(["']empresa["']\)/);
+    }
   });
 
   it("🔴 NO reusa el lector del grupo (`fetchEstadoCuentaData`)", () => {
     // Ese helper recibe una LISTA de empresas: bastaría con pasarle Boston para
     // mezclar los dos mundos por descuido.
-    expect(src).not.toContain("fetchEstadoCuentaData");
+    for (const archivo of [src, lector]) {
+      expect(archivo).not.toContain("fetchEstadoCuentaData");
+    }
   });
 
   it("el permiso sale de la misma lista que la pestaña", () => {

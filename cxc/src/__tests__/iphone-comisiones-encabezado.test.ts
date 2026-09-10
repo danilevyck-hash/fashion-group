@@ -306,7 +306,10 @@ describe("Comisiones — lo que Daniel usa sigue a un toque", () => {
     // módulo puro, nunca escritos a mano en la barra. CONTROL de la regla
     // original más abajo: las vistas hijas siguen sin dibujar su propio botón.
     expect(barra).toContain("rotuloDescargarExcel(mes)");
-    expect(barra).toContain("ROTULO_DESCARGAR_MES_PDF");
+    // 🔄 9-SEP-2026 — el rótulo del PDF pasó de constante a función, porque el
+    // botón también existe con «Todo el año» («Descargar el año en PDF»). Sigue
+    // saliendo del módulo puro, nunca escrito a mano en la barra.
+    expect(barra).toContain("rotuloDescargarPdf(mes)");
     // Las vistas hijas ya no dibujan su propio botón Excel (era una fila de
     // 44px + 16px de separación, solo para él).
     expect(consolidado).not.toContain("FileSpreadsheet");

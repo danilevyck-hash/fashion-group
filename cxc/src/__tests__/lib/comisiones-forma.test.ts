@@ -277,15 +277,25 @@ describe("🔴 12 · el PDF ya no se llama «Fashion Group.pdf»", () => {
     expect(motor).toContain('window.addEventListener("afterprint", restaurar)');
     expect(motor).toContain("window.setTimeout(restaurar,");
     expect(motor).toContain("document.title = anterior;");
-    // CONTROL de la regla original: los dos papeles que SIGUEN siendo HTML
-    // impreso (el del mes y el de una empresa) la USAN — tenerla definida y no
-    // llamarla es lo mismo que no tenerla.
+    // 🔄 9-SEP-2026 — CAMBIA DE DIRECCIÓN OTRA VEZ. Acá se exigía que los dos
+    // papeles del período (el del mes y el de una empresa) LLAMARAN a esta
+    // función. Ya no la llaman: también son PDF armados en código. Daniel: *«Los
+    // paso a PDF también, para que todo el módulo se comporte igual»*. La regla
+    // de fondo —el archivo NO se llama «Fashion Group.pdf»— no cambió: ahora se
+    // cumple porque el nombre se le pasa al generador.
     for (const vista of [
       "src/components/ventas/ComisionesConsolidadoView.tsx",
       "src/components/ventas/ComisionesPorEmpresaView.tsx",
     ]) {
-      expect(plano(leer(vista)), vista).toContain("imprimirComo(");
+      const v = plano(leer(vista));
+      expect(v, vista).not.toContain("imprimirComo(");
+      expect(v, vista).not.toContain("window.print");
+      expect(v, vista).toContain("descargarPdfTablaComisiones(");
     }
+    // CONTROL de la regla original: el módulo NO se borró y conserva entero el
+    // mecanismo de devolver el título, para el día que algo vuelva a imprimir
+    // por el navegador.
+    expect(leer("src/lib/comisiones/imprimir.ts")).toContain("SIN LECTORES DESDE EL 9-SEP-2026");
     // 🔄 9-SEP-2026 — el DETALLE de un vendedor ya no pasa por acá: es un PDF de
     // verdad (`descargarPdfComision`), con el nombre puesto por nosotros y no
     // por el `document.title`. La regla de fondo —el archivo NO se llama
@@ -472,7 +482,11 @@ describe("🔴 19 · los botones dicen QUÉ traen, y el verbo es «Descargar»",
     // «el año» sigue saliendo de un solo lugar, y con el año elegido el botón
     // dice exactamente lo de siempre.
     expect(plano(leer("src/components/ventas/ComisionesView.tsx"))).toContain("rotuloDescargarExcel(mes)");
-    expect(rotuloDescargarExcel(MES_TODO_EL_ANIO)).toBe(rotuloDescargarPeriodo(MES_TODO_EL_ANIO));
+    // 🔄 9-SEP-2026 — el año TAMBIÉN lleva formato en el rótulo, porque ahora
+    // tiene los dos archivos. El «el mes» / «el año» sigue saliendo de UN solo
+    // lugar: los dos rótulos se lo pegan a `rotuloDescargarPeriodo`.
+    expect(rotuloDescargarExcel(MES_TODO_EL_ANIO))
+      .toBe(`${rotuloDescargarPeriodo(MES_TODO_EL_ANIO)} en Excel`);
     expect(rotuloDescargarExcel(8)).toBe("Descargar el mes en Excel");
   });
 
