@@ -34,6 +34,31 @@
  */
 export const DISPOSITIVO_FG = "reloj cboston";
 
+/**
+ * 🔑 CÓMO SE LLAMA CADA RELOJ EN PANTALLA — lista ESCRITA A MANO.
+ *
+ * Desde el 10-sep-2026 hay DOS relojes: el de Confecciones Boston y el de
+ * Multifashion, los dos leídos por la misma PC de la oficina. El nombre técnico
+ * (`reloj cboston`, `reloj acs`) es la LLAVE anti-duplicado y no se toca; esto
+ * es solo cómo se lee.
+ *
+ * Lista a mano y no derivada de nada: es la regla de la casa para pasar de un
+ * código a un nombre. Un reloj que no esté en la lista se muestra **con su
+ * llave tal cual** — nunca se inventa un nombre bonito para algo que el sistema
+ * no conoce.
+ *
+ * ⚠️ Se dice **Multifashion**, no «American Classics»: es el nombre que va en
+ * todas las pantallas desde el 6-sep-2026, aunque la llave diga `acs`.
+ */
+export const NOMBRE_DE_RELOJ: Readonly<Record<string, string>> = {
+  "reloj cboston": "Reloj de Boston",
+  "reloj acs": "Reloj de Multifashion",
+};
+
+export function nombreRelojEnPantalla(clave: string): string {
+  return NOMBRE_DE_RELOJ[clave] ?? clave;
+}
+
 /** El archivo que Daniel tiene que correr para que el botón "Traer ahora"
  *  funcione. Se nombra en pantalla; nadie deduce un DDL de un 500. */
 export const MIGRACION_AGENTE = "20260806200000_asistencia_agente_pedido.sql";

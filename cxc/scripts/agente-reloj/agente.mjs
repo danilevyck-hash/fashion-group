@@ -2,8 +2,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // EL AGENTE DEL RELOJ — el programita que corre en la PC de la oficina.
 //
-// Cada pocos minutos: le pregunta al reloj Hikvision de la entrada por las
+// Cada pocos minutos: le pregunta a CADA reloj Hikvision de la lista por las
 // marcaciones de los últimos días y las manda a fashiongr.com.
+//
+// Desde el 10-sep-2026 son DOS: el de Confecciones Boston (192.168.10.10, en la
+// red de la oficina) y el de Multifashion (192.168.20.98, por el túnel
+// WireGuard). Se configuran en el `.env`; agregar uno más son dos renglones.
+// 🔴 Un reloj caído NO frena al otro — ver `ronda.mjs`.
 //
 // ── POR QUÉ EXISTE ───────────────────────────────────────────────────────────
 // El reloj vive en `192.168.10.10`, una IP privada. Vercel no la alcanza. Y el
@@ -31,8 +36,7 @@ import { join } from "node:path";
 import { CARPETA, leerConfig, VERSION } from "./config.mjs";
 import { traerEventos, relojVivo } from "./reloj.mjs";
 import { leerEstado, mandarEventos, reportarError } from "./puente.mjs";
-import { darVuelta } from "./vuelta.mjs";
-import { nuevoEstadoReloj } from "./espera.mjs";
+import { darRonda, nuevosEstados, etiqueta } from "./ronda.mjs";
 
 const RUTA_LOG = join(CARPETA, "agente-reloj.log");
 /** El log se rota a los 5 MB. Sin esto, en una PC que nadie mira, el archivo
@@ -60,28 +64,37 @@ const deps = { leerEstado, traerEventos, mandarEventos, reportarError };
 
 async function probar(config) {
   log(`Agente v${VERSION}. Probando la conexión…`);
-  log(`Reloj: ${config.host} (usuario ${config.usuario})`);
-  try {
-    await relojVivo({ host: config.host, usuario: config.usuario, clave: config.clave });
-    log("✔ El reloj contesta.");
-  } catch (e) {
-    log(`✘ No se llegó al reloj: ${e.message}`);
-    return false;
+  log(`${config.relojes.length} reloj(es) configurado(s).`);
+
+  // Se prueban TODOS y recién al final se decide: así el instalador dice de una
+  // vez cuál de los dos falló, en vez de mandar a correrlo dos veces.
+  let todosBien = true;
+  for (const r of config.relojes) {
+    log(`Reloj "${r.dispositivo}": ${r.host} (usuario ${r.usuario})`);
+    try {
+      await relojVivo({ host: r.host, usuario: r.usuario, clave: r.clave });
+      log("  ✔ El reloj contesta.");
+    } catch (e) {
+      log(`  ✘ No se llegó al reloj: ${e.message}`);
+      todosBien = false;
+      continue;
+    }
+    try {
+      const estado = await leerEstado({
+        base: config.base,
+        secret: config.secret,
+        dispositivo: r.dispositivo,
+      });
+      log(`  ✔ fashiongr contesta. Leído hasta: ${estado?.estado?.leido_hasta ?? "(nunca)"}`);
+    } catch (e) {
+      log(`  ✘ No se llegó a fashiongr: ${e.message}`);
+      if (/no autorizado|401/i.test(e.message)) pistaLlave(config);
+      todosBien = false;
+    }
   }
-  try {
-    const estado = await leerEstado({
-      base: config.base,
-      secret: config.secret,
-      dispositivo: config.dispositivo,
-    });
-    log(`✔ fashiongr contesta. Leído hasta: ${estado?.estado?.leido_hasta ?? "(nunca)"}`);
-  } catch (e) {
-    log(`✘ No se llegó a fashiongr: ${e.message}`);
-    if (/no autorizado|401/i.test(e.message)) pistaLlave(config);
-    return false;
-  }
-  log("Todo bien. Ya se puede instalar para que arranque solo.");
-  return true;
+
+  if (todosBien) log("Todo bien. Ya se puede instalar para que arranque solo.");
+  return todosBien;
 }
 
 /**
@@ -126,8 +139,9 @@ async function main() {
   }
 
   log(
-    `Agente v${VERSION} arrancado. Reloj ${config.host} · dispositivo "${config.dispositivo}" · ` +
-      `ventana ${config.ventanaDias} día(s) (${config.ventanaRecuperacionDias} si falta algo) · ` +
+    `Agente v${VERSION} arrancado. ` +
+      config.relojes.map((r) => `"${r.dispositivo}" en ${r.host}`).join(" · ") +
+      ` · ventana ${config.ventanaDias} día(s) (${config.ventanaRecuperacionDias} si falta algo) · ` +
       `vuelta cada ${config.vueltaMin} min.`,
   );
 
@@ -140,26 +154,31 @@ async function main() {
   // 🔑 El castigo del reloj vive ACÁ, no dentro de `darVuelta`: una vuelta sola
   // no puede saber que la anterior fue rechazada, y sin memoria entre vueltas el
   // agente vuelve a golpear el aparato cada 3 minutos (ver `espera.mjs`).
-  const estadoReloj = nuevoEstadoReloj();
+  // 🔴 UNA MEMORIA POR RELOJ: el que rechaza la contraseña no puede dejar mudo
+  // al otro (ver `nuevosEstados` en `ronda.mjs`).
+  const estados = nuevosEstados(config.relojes);
 
   // Bucle sin fin y sin salidas. Lo único que puede terminarlo es que Windows
   // apague la máquina, y en ese caso arranca solo cuando se prenda.
   for (;;) {
     try {
-      const r = await darVuelta({ config, deps, estado: estadoReloj, log });
-      if (r.ok) {
-        log(
-          `Vuelta lista: ${r.traidos} del reloj · ${r.guardados} nuevas · ` +
-            `${r.descartados} descartadas${r.pedidoCerrado ? " · pedido 'Traer ahora' cumplido" : ""}.`,
-        );
-      } else if (!yaExpliqueLaLlave && /no autorizado|401/i.test(r.error ?? "")) {
-        pistaLlave(config);
-        yaExpliqueLaLlave = true;
+      const resultados = await darRonda({ config, deps, estados, log });
+      for (const r of resultados) {
+        const pre = etiqueta(config.relojes, r.dispositivo);
+        if (r.ok) {
+          log(
+            `${pre}Vuelta lista: ${r.traidos} del reloj · ${r.guardados} nuevas · ` +
+              `${r.descartados} descartadas${r.pedidoCerrado ? " · pedido 'Traer ahora' cumplido" : ""}.`,
+          );
+        } else if (!yaExpliqueLaLlave && /no autorizado|401/i.test(r.error ?? "")) {
+          pistaLlave(config);
+          yaExpliqueLaLlave = true;
+        }
       }
     } catch (e) {
-      // Red de seguridad final. `darVuelta` promete no lanzar; si igual lanzara
+      // Red de seguridad final. `darRonda` promete no lanzar; si igual lanzara
       // (un bug nuestro), el agente NO puede morirse por eso.
-      log(`Error inesperado en la vuelta: ${e?.message ?? e}`);
+      log(`Error inesperado en la ronda: ${e?.message ?? e}`);
     }
     if (unaVez) break;
     await dormir(config.vueltaMin * 60_000);

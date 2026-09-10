@@ -27,6 +27,7 @@ import { enviarSistema } from "@/lib/alertas/canal";
 import {
   decidirAlerta,
   esColumnaFaltante,
+  nombreRelojEnPantalla,
   textoCaido,
   textoRecuperado,
   type FilaDispositivo,
@@ -173,7 +174,7 @@ export async function POST(req: NextRequest) {
     // avisa: mandar Telegram con un contador que siempre vale 1 sería avisar en
     // cada tropiezo, justo lo que la regla prohíbe. El vigía diario igual lo ve.
     if (d.alerta === "caido" && !faltaMigracion) {
-      await enviarSistema(textoCaido(dispositivo, motivo));
+      await enviarSistema(textoCaido(nombreRelojEnPantalla(dispositivo), motivo));
     }
     return NextResponse.json({ ok: true, registrado: "error", fallosSeguidos: d.fallosSeguidos });
   }
@@ -234,7 +235,7 @@ export async function POST(req: NextRequest) {
   // El "ya volvió" NO es ruido: sin él Daniel se queda con la última noticia
   // mala y va a la oficina a revisar algo que ya se arregló solo.
   if (d.alerta === "recuperado" && !faltaMigracion) {
-    await enviarSistema(textoRecuperado(dispositivo));
+    await enviarSistema(textoRecuperado(nombreRelojEnPantalla(dispositivo)));
   }
 
   if (descartados.length > 0) {

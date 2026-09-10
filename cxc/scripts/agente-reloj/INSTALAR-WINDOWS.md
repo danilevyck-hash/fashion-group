@@ -10,12 +10,23 @@ Toma unos 10 minutos.
 
 ## Qué hace este programita
 
-Cada 3 minutos le pregunta al reloj de la entrada qué marcaciones hubo y las
-manda a fashiongr.com.
+Cada 3 minutos le pregunta a **cada reloj** qué marcaciones hubo y las manda a
+fashiongr.com.
 
-Hace falta porque el reloj está en la red de la oficina y fashiongr está en
+Hoy son **dos**:
+
+| Reloj | Dirección | Nombre en el sistema |
+|---|---|---|
+| Confecciones Boston | `192.168.10.10` | `reloj cboston` |
+| Multifashion | `192.168.20.98` (por el túnel WireGuard) | `reloj acs` |
+
+Hace falta porque los relojes están en la red de la oficina y fashiongr está en
 internet: **no se ven entre ellos**. Alguien tiene que hacer de puente desde
 adentro, y ese alguien es esta PC.
+
+**Si un reloj se cae, el otro sigue.** Si el túnel WireGuard se corta, el reloj
+de Multifashion deja de contestar y el de Boston sigue trayendo sus marcaciones
+como siempre. Cada uno lleva su propia cuenta y su propio aviso.
 
 **Si esta PC está apagada no se pierde ninguna marcación.** El reloj las guarda
 en su memoria; cuando la PC se prende, entran todas juntas. Lo único que pasa es
@@ -62,6 +73,9 @@ Dentro de la carpeta hay un archivo que se llama **`.env.ejemplo`**.
 
 4. Guardar.
 
+> El archivo ya trae los dos relojes escritos. Si más adelante hay que agregar
+> otro, mira **«Agregar otro reloj»** más abajo.
+
 > **Este archivo tiene contraseñas.** No lo mandes por WhatsApp ni lo subas a
 > ningún lado. Vive solo en esa PC.
 
@@ -88,13 +102,14 @@ con Windows lo pide.
 
 ## Cómo saber si está funcionando
 
-**Desde cualquier lado:** entrá a fashiongr → **Asistencia** → pestaña
-**Reporte**. Arriba de todo hay un cartel que dice cómo va:
+**Desde cualquier lado:** entra a fashiongr → **Asistencia** → pestaña
+**Reporte**. Arriba de todo hay **un cartel por cada reloj**, con su nombre y su
+propio botón «Traer ahora»:
 
 | Lo que dice | Qué significa |
 |---|---|
 | 🟢 *"Las marcaciones están entrando solas"* | Todo bien. |
-| 🟠 *"La PC de la oficina no responde"* | Está apagada. Prendela y en unos minutos se pone al día sola. |
+| 🟠 *"La PC de la oficina no responde"* | Está apagada. Préndela y en unos minutos se pone al día sola. |
 | 🔴 *"No pudo leer el reloj"* | La PC está prendida pero el reloj no contesta. Revisar que el reloj esté encendido y en la red. |
 
 **Desde la PC:** abrir el archivo `agente-reloj.log` que está en la misma
@@ -125,8 +140,8 @@ sistema, pero **solo si el problema es de verdad**:
 - si falla **3 veces seguidas**, ahí sí llega el aviso, con qué pasó y qué
   hacer;
 - si la PC lleva **más de 6 horas sin reportar**, llega el aviso en la revisión
-  siguiente. Se revisa **todos los días** (también sábado y domingo) a las 8:45
-  y 10:00 de la mañana y a las 3:00 y 5:15 de la tarde. De noche no se revisa a
+  siguiente. Se revisa **todos los días** (también sábado y domingo) a las 10:00
+  de la mañana y a las 3:00 y 5:15 de la tarde. De noche no se revisa a
   propósito: nadie va a ir a la oficina a las 3 a.m. a prender una PC;
 - y cuando se arregla, llega un *"ya volvieron a entrar"* para no dejar a nadie
   con la última noticia mala.
@@ -163,6 +178,54 @@ ignoran solas.
 
 ---
 
+## Agregar otro reloj
+
+Son **dos renglones** en el archivo `.env` de esa misma carpeta. No hay que
+reinstalar nada.
+
+1. Abrir `.env` con el Bloc de notas.
+2. Debajo del bloque del reloj 1, escribir estas dos líneas (cambiando la
+   dirección y el nombre por los del reloj nuevo):
+
+   ```
+   RELOJ_3_HOST=192.168.30.50
+   RELOJ_3_DISPOSITIVO=reloj bodega
+   ```
+
+3. Guardar el archivo.
+4. Reiniciar el agente. Dos formas, cualquiera sirve:
+   - **la fácil:** reiniciar la PC; o
+   - abrir el **Programador de tareas** de Windows, buscar
+     **`FashionGroup-AgenteReloj`**, clic derecho → **Finalizar**, y otra vez
+     clic derecho → **Ejecutar**.
+5. Comprobar: abrir `agente-reloj.log` (en la misma carpeta). La primera línea
+   después de reiniciar nombra **todos** los relojes que quedaron cargados.
+
+### Las reglas de los relojes, en corto
+
+- **Cada reloj TIENE que llevar su propio nombre** en `_DISPOSITIVO`. Si dos
+  relojes se llaman igual, las marcaciones de uno tapan las del otro y alguien
+  aparece sin haber entrado. El programa **no arranca** y dice por qué.
+- **El nombre del reloj 1 (`reloj cboston`) no se cambia nunca.** Es el nombre
+  con el que ya están guardadas todas sus marcaciones.
+- **El usuario y la contraseña se heredan del reloj 1** si no se escriben. Hoy
+  los dos aparatos tienen los mismos, así que no hace falta repetirlos. Si algún
+  día le cambian la contraseña a uno solo, se agregan `RELOJ_3_USUARIO=` y
+  `RELOJ_3_CLAVE=`.
+- Caben hasta **9** relojes (`RELOJ_2_…` hasta `RELOJ_9_…`).
+
+### Antes de dejarlo corriendo
+
+Vale la pena probar sin instalar nada:
+
+```
+node agente.mjs --probar
+```
+
+Prueba **cada reloj por separado** y dice cuál contesta y cuál no.
+
+---
+
 ## Para quitarlo
 
 Clic derecho sobre **`desinstalar.bat`** → "Ejecutar como administrador".
@@ -187,3 +250,8 @@ segundos.
 
 **¿Se puede correr en dos PCs a la vez?**
 Sí, no rompe nada — las marcaciones repetidas se ignoran. Pero no tiene sentido.
+
+**¿Y si se cae el túnel WireGuard?**
+Solo deja de entrar el reloj de Multifashion. El de Boston sigue igual. En la
+pantalla se ve en rojo cuál de los dos es, y a los 3 intentos fallidos llega el
+aviso a Telegram diciendo el nombre del reloj.

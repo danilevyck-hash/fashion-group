@@ -52,6 +52,7 @@ import {
   HORAS_PARA_VIGIA,
   DIAS_RECUPERACION_AGENTE,
   esColumnaFaltante,
+  nombreRelojEnPantalla,
   textoSilencio,
   textoHuecoViejo,
   textoHuecoCerrado,
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    await enviarSistema(textoSilencio(f.dispositivo, minutos));
+    await enviarSistema(textoSilencio(nombreRelojEnPantalla(f.dispositivo), minutos));
     avisados.push(f.dispositivo);
   }
 
@@ -160,7 +161,7 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
-        await enviarSistema(textoHuecoViejo(f.dispositivo, DIAS_RECUPERACION_AGENTE));
+        await enviarSistema(textoHuecoViejo(nombreRelojEnPantalla(f.dispositivo), DIAS_RECUPERACION_AGENTE));
         huecosAvisados.push(f.dispositivo);
       } else if (vigiaHuecoCerrado(f, ahora)) {
         // Se limpia la marca ANTES de mandar, por la misma razón de siempre:
@@ -175,7 +176,7 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
-        await enviarSistema(textoHuecoCerrado(f.dispositivo));
+        await enviarSistema(textoHuecoCerrado(nombreRelojEnPantalla(f.dispositivo)));
         huecosCerrados.push(f.dispositivo);
       }
     }

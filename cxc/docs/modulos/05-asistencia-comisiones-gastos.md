@@ -280,10 +280,46 @@ calcula un solo dólar. Salen del cuadro (`separarSinFicha`) y se muestran UNA v
 
 🔴 **Asistencia NO toca Switch.** Su única fuente externa es el reloj.
 
-### El reloj — Hikvision DS-K1T804AEF, firmware V1.4.1, en `192.168.10.10`
-- **No se puede llamar desde Vercel**: es una IP privada, y el reloj tampoco sabe empujar datos.
+### Los relojes — Hikvision, leídos por una PC de la oficina
+🔴 **Son DOS desde el 10-sep-2026**, los dos Hikvision y los dos leídos por la MISMA PC:
+
+| Reloj | Dirección | `dispositivo` | Cómo se ve desde la PC |
+|---|---|---|---|
+| Confecciones Boston (DS-K1T804AEF, firmware V1.4.1) | `192.168.10.10` | `reloj cboston` | red de la oficina |
+| Multifashion (en el iVMS-4200 figura como «Reloj Amercan Classics») | `192.168.20.98` | `reloj acs` | túnel **WireGuard** |
+
+- **No se pueden llamar desde Vercel**: son IPs privadas, y el reloj tampoco sabe empujar datos.
   Por eso hay un **agente** que corre en una PC de la oficina (`scripts/agente-reloj/`,
-  instalación en `INSTALAR-WINDOWS.md`).
+  instalación y el paso a paso para agregar otro reloj en `INSTALAR-WINDOWS.md`).
+- 🔴 **La lista de relojes es ADITIVA y vive en el `.env` de esa PC**: `RELOJ_HOST` /
+  `RELOJ_USUARIO` / `RELOJ_CLAVE` / `DISPOSITIVO` siguen siendo el reloj 1, sin cambiar de
+  nombre — el archivo escrito hoy vale sin tocar una letra. Uno más son **dos renglones**
+  (`RELOJ_2_HOST` + `RELOJ_2_DISPOSITIVO`, hasta el 9); usuario y contraseña se **heredan** del
+  reloj 1 si no se escriben, porque hoy los dos aparatos tienen los mismos.
+- 🔴 **Cada reloj lleva su propio nombre, y se rechaza el repetido antes de mandar nada**
+  (`armarRelojes`, `config.mjs`): los dos aparatos numeran sus `serialNo` desde 1, así que dos
+  relojes con un mismo `dispositivo` chocarían en la llave `(dispositivo, evento_id)` y una
+  marcación **taparía** a la otra. También se rechaza la misma dirección dos veces (sería el
+  mismo aparato leído dos veces = horas al doble).
+- 🔴 **UN RELOJ CAÍDO NO FRENA AL OTRO** (`ronda.mjs`). El túnel WireGuard se cae; la red de la
+  oficina no. Cada reloj va en su propio `try`, con su propio `leido_hasta` (ya era por
+  dispositivo en el servidor), sus propios `fallos_seguidos` / `alertado_en`, su propio castigo
+  de espera cuando rechaza la contraseña (`nuevosEstados`) y su propia línea en el log. Con un
+  solo reloj el log queda **exactamente** como siempre (la etiqueta `[nombre]` solo aparece con
+  dos o más).
+- 🩸 **La pantalla dibujaba `relojes[0]`** — el primero y nada más. Con un solo reloj no se
+  notaba; con dos, el segundo quedaba INVISIBLE (sin cartel, sin «Traer ahora») y el túnel caído
+  no se habría visto en ninguna parte. Ahora es **una tarjeta por reloj**, cada una con su botón,
+  y el nombre del reloj (`nombreRelojEnPantalla`, lista escrita a mano: «Reloj de Boston» ·
+  «Reloj de Multifashion») **solo se muestra cuando hay más de uno**. El servidor ya devolvía la
+  lista entera; lo único que faltaba era dibujarla.
+- ⚠️ **El Telegram también dice el nombre legible**: las cinco salidas de sistema del reloj
+  (caído · recuperado · silencio · hueco · hueco cerrado) pasan por `nombreRelojEnPantalla`, en
+  el ingest y en el vigía. «No puede leer el reloj (reloj acs)» no le dice a nadie cuál se cayó.
+- Candados: `agente-dos-relojes.test.ts` · `asistencia-dos-relojes-pantalla.test.tsx`;
+  **33 mutaciones, 33 cazadas** con 3 controles (`scripts/_mutar-candados-agente-dos-relojes.sh`).
+  ⚠️ **No se pudo probar contra los aparatos de verdad**: los dos viven en IPs privadas de la
+  oficina y desde afuera no se alcanzan. Todo se probó contra dobles.
 - **Endpoint del reloj**: `POST /ISAPI/AccessControl/AcsEvent?format=json` con
   `{ AcsEventCond: { searchID, searchResultPosition, maxResults, major: 5, minor: 0,
   startTime, endTime } }`. Autenticación **Digest**.

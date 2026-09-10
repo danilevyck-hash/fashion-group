@@ -883,3 +883,61 @@ describe("🔴 si el reloj rechaza la contraseña, se ESPERA — no se insiste",
     expect(v[5]).toBe(v[3]); // topa y no crece para siempre
   });
 });
+
+/* ── DOS RELOJES: la vuelta es de UNO, y no se mezcla ─────────────────────── */
+
+describe("🔴 con dos relojes, cada vuelta manda lo suyo", () => {
+  // Desde el 10-sep-2026 la misma PC lee el reloj de Boston y el de
+  // Multifashion. La ronda que los recorre y el `.env` que los configura tienen
+  // su propio candado (`agente-dos-relojes.test.ts`); acá se fija lo que le toca
+  // a ESTE archivo: una vuelta trabaja con UN reloj y su `dispositivo` viaja
+  // pegado a los eventos que manda, que es la mitad de la llave anti-duplicado.
+  const comun = {
+    base: "https://www.fashiongr.com",
+    secret: "s",
+    ventanaDias: 3,
+    ventanaRecuperacionDias: 15,
+    piso: null,
+    version: "1.2.0",
+  };
+
+  function depsQueAnotan(anotados: Array<Record<string, unknown>>) {
+    return {
+      leerEstado: async () => ({ pedidoPendiente: false, estado: { leido_hasta: null } }),
+      traerEventos: async (a: { host: string }) => ({
+        // Los dos aparatos numeran desde 1: el MISMO serialNo en los dos.
+        eventos: [{ serialNo: 40001, time: "2026-09-10T08:00:00-05:00", employeeNoString: "7", host: a.host }],
+      }),
+      mandarEventos: async (a: Record<string, unknown>) => {
+        anotados.push(a);
+        return { lotes: 1, guardados: 1, descartados: 0, pedidoCerrado: false };
+      },
+      reportarError: async () => true,
+    };
+  }
+
+  it("el `dispositivo` de cada vuelta es el del reloj que se leyó", async () => {
+    const anotados: Array<Record<string, unknown>> = [];
+    const deps = depsQueAnotan(anotados);
+    await darVuelta({
+      config: { ...comun, dispositivo: "reloj cboston", host: "http://192.168.10.10", usuario: "admin", clave: "x" },
+      deps,
+    });
+    await darVuelta({
+      config: { ...comun, dispositivo: "reloj acs", host: "http://192.168.20.98", usuario: "admin", clave: "x" },
+      deps,
+    });
+    expect(anotados.map((a) => a.dispositivo)).toEqual(["reloj cboston", "reloj acs"]);
+  });
+
+  it("🩸 el mismo serialNo en los dos relojes son DOS marcaciones, no una", async () => {
+    // Con un solo nombre para los dos, la del segundo se ignoraría en silencio
+    // y esa persona aparecería sin haber entrado.
+    const evento = { serialNo: 40001, time: "2026-09-10T08:00:00-05:00", employeeNoString: "7" };
+    const llaves = ["reloj cboston", "reloj acs"].map((d) => {
+      const f = normalizarEventos(d, [evento]).filas[0];
+      return `${f.dispositivo}|${f.evento_id}`;
+    });
+    expect(new Set(llaves).size).toBe(2);
+  });
+});
