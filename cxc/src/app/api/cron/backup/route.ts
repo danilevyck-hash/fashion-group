@@ -252,6 +252,10 @@ const DATASETS: Dataset[] = [
   { table: "asistencia_aprobador_empresa" },
   { table: "asistencia_planilla_guardada" },
   { table: "asistencia_planilla_guardada_linea" },
+  // El amarre cierre ↔ pago de préstamo. Es lo único que impide que cerrar
+  // dos veces cobre dos veces: sin él, un restore volvería a descontarle a
+  // la gente una plata que ya se le había descontado.
+  { table: "asistencia_planilla_prestamo" },
   { table: "asistencia_dispositivos" },
   // Gastos y banco. bancos_saldos lo escribe contabilidad A MANO; egresos_varios
   // lo baja un sync pero se REEMPLAZA mes a mes (`egresos_reemplazar_mes`), así

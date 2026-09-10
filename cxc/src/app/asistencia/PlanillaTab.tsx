@@ -84,6 +84,7 @@ import type {
   PrestamoSinAtar,
   SugerenciaPrestamo,
 } from "@/lib/asistencia/prestamos-planilla";
+import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
 // 🔴 QUIÉN CIERRA SALE DEL MISMO MÓDULO QUE EL CANDADO DEL SERVIDOR
@@ -729,6 +730,67 @@ export default function PlanillaTab() {
     }
   }
 
+  // ── 🔴 LOS COMPROBANTES DE PAGO — el papel que cada uno firma ─────────────
+  //
+  // Una hoja por persona, UN SOLO FORMATO para las tres empresas, y todos los
+  // renglones dibujados aunque vayan en 0.00 (Daniel: *«si alguien no lo lleva
+  // se pone 0 en el de esa persona»*). Reemplaza los 13 formatos distintos que
+  // salieron de los 34 comprobantes de julio de 2026.
+  //
+  // 🔑 LOS MONTOS SON LOS DE ESTA PANTALLA. No se vuelve a pedir el cuadro ni
+  // se recalcula nada: `data.lineas` es lo que ya está a la vista. Lo único que
+  // se busca aparte son el cargo y la cédula, que la planilla no conoce.
+  async function bajarComprobantes() {
+    if (!data?.lineas.length) return;
+    try {
+      const [{ armarComprobante, lineasConComprobante }, pdf] = await Promise.all([
+        import("@/lib/asistencia/comprobante"),
+        import("@/lib/asistencia/comprobante-pdf"),
+      ]);
+
+      // El cargo y la cédula. Si la lectura falla, el papel sale igual con un
+      // guion en «POSICION DESEMPEÑADA»: quedarse sin comprobantes por un dato
+      // que no mueve plata sería peor que imprimirlo incompleto y visible.
+      const porCodigo = new Map<string, { posicion: string | null; cedula: string | null }>();
+      try {
+        const r = await fetch("/api/asistencia/comprobante", { cache: "no-store" });
+        const j = (await r.json()) as { personas?: { codigo: string; posicion: string | null; cedula: string | null }[] };
+        for (const p of j.personas ?? []) porCodigo.set(p.codigo, { posicion: p.posicion, cedula: p.cedula });
+      } catch { /* el papel sale con guion */ }
+
+      const periodo = {
+        esQuincena: data.periodo?.esQuincena ?? false,
+        anio: data.periodo?.quincena?.anio ?? null,
+        mes: data.periodo?.quincena?.mes ?? null,
+        n: (data.periodo?.quincena?.n ?? null) as 1 | 2 | null,
+        etiqueta: data.periodo?.etiqueta ?? "",
+      };
+
+      const hojas = lineasConComprobante(data.lineas).map((l) => {
+        const extra = porCodigo.get(l.codigo);
+        return armarComprobante(
+          { linea: l, posicion: extra?.posicion ?? null, cedula: extra?.cedula ?? null },
+          periodo,
+        );
+      });
+      if (!hojas.length) {
+        toast("Todavía no hay a quién hacerle comprobante en este cuadro.", "warning");
+        return;
+      }
+      pdf.construirPdfComprobantes(hojas).save(
+        pdf.nombreArchivoComprobante({ empresa, desde, hasta }),
+      );
+      toast(
+        hojas.length === 1
+          ? "Comprobante listo — revisa tu carpeta de descargas"
+          : `${hojas.length} comprobantes listos — revisa tu carpeta de descargas`,
+        "success",
+      );
+    } catch {
+      toast("No se pudieron armar los comprobantes. Intenta de nuevo.", "error");
+    }
+  }
+
   // 🔴 CUATRO grupos, no dos, y el reparto lo hace `grupoDeLinea` —la MISMA
   // función que ordena el cuadro, cuenta los totales y arma el Excel y el PDF—.
   // Con la lista partida acá a mano, la pantalla y el papel podían discrepar
@@ -814,6 +876,17 @@ export default function PlanillaTab() {
           >
             PDF
           </button>
+          {/* 🔴 EL PAPEL QUE SE FIRMA. Va con los otros dos y no escondido en un
+              «···»: es el entregable de la quincena, no una acción secundaria.
+              Dice QUÉ trae, como el resto del sistema. */}
+          {PLANILLA_UNIDA && (
+            <button
+              type="button" onClick={bajarComprobantes} disabled={!data?.lineas.length}
+              className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40"
+            >
+              Comprobantes
+            </button>
+          )}
         </div>
       </div>
 

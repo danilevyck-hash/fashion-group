@@ -84,15 +84,54 @@ describe("las 6 pestañas y su orden", () => {
   //
   // ⚠️ El orden no es cosmético: `porDefecto` toma la PRIMERA visible, así que
   // esta lista decide dónde aterriza cada rol. Por eso el candado la fija.
-  it("son exactamente 6, en el orden Reporte · Planilla · Justificaciones · Vacaciones · Aprobaciones · Configuración", () => {
+  // 🩸 SON SIETE DESDE EL 10-SEP-2026, Y LA SÉPTIMA ES PRÉSTAMOS.
+  //
+  // Este candado exigía SEIS. No se afloja ni se borra: cambia de dirección con
+  // esta nota, porque la regla que protege sigue siendo la misma —«una pestaña
+  // se gana el lugar por lo que haces ahí, no por la tabla que guarda»— y
+  // Préstamos la cumple igual que Vacaciones y Aprobaciones.
+  //
+  // Daniel, textual: *«asistencia se ingresa la info y prestamos seria para
+  // como ver la info y hacer pagos extraordinarios como abonos etc»*.
+  //
+  // Lo que la ganó no fue una opinión de diseño: fue plata. Quincena del 1 al
+  // 15 de agosto de 2026, medido contra producción — el módulo de Préstamos
+  // registró **9 descuentos por $360,00** y la casilla de la planilla decía
+  // **7 por $265,00**. KEVIN LUBO ($50), LUIS PARAJON ($45) y YULICAR CORONA
+  // ($50) tenían el pago anotado en el módulo y la casilla EN CERO: se les bajó
+  // la deuda por plata que nunca se les quitó del sueldo. LUIS ARROYO al revés.
+  // Dos pantallas, en dos módulos, para la misma plata.
+  //
+  // ⚠️ VA PEGADA A PLANILLA y no al final: es la misma plata y el mismo día de
+  // trabajo. Y el ORDEN sigue sin ser cosmético — `porDefecto` toma la PRIMERA
+  // visible, así que Reporte tiene que seguir siendo el primero.
+  it("son exactamente 7, en el orden Reporte · Planilla · Préstamos · Justificaciones · Vacaciones · Aprobaciones · Configuración", () => {
     expect(tabs).toEqual([
       ["reporte", "Reporte"],
       ["planilla", "Planilla"],
+      ["prestamos", "Préstamos"],
       ["justificaciones", "Justificaciones"],
       ["vacaciones", "Vacaciones"],
       ["aprobaciones", "Aprobaciones"],
       ["configuracion", "Configuración"],
     ]);
+  });
+
+  // CONTROL de la nota de arriba: Reporte sigue abriendo el módulo. Si alguien
+  // mueve Préstamos —o cualquier otra— al primer lugar, todo el mundo aterriza
+  // en otra pantalla y este test lo dice.
+  it("Reporte sigue siendo el PRIMERO: es donde aterriza todo el mundo", () => {
+    expect(tabs[0]).toEqual(["reporte", "Reporte"]);
+    expect(src).toMatch(/useUrlState<Tab>\("tab", "reporte"\)/);
+  });
+
+  // 🔴 PRÉSTAMOS CUELGA DEL INTERRUPTOR. Con `PLANILLA_UNIDA` apagado la
+  // pestaña no se dibuja NI se abre por la URL, y el módulo queda exactamente
+  // como el día antes del cambio. Sin esto, apagar el interruptor dejaría media
+  // pantalla prendida.
+  it("la pestaña Préstamos cuelga de PLANILLA_UNIDA", () => {
+    expect(src).toMatch(/PLANILLA_UNIDA/);
+    expect(src).toMatch(/k === "prestamos" \? PLANILLA_UNIDA : true/);
   });
 
   it("Aprobaciones NO se le muestra a quien no puede aprobar", () => {

@@ -59,6 +59,8 @@ import {
 import { COLUMNA_PAGA_SEGUROS, validarPagaSeguros } from "@/lib/asistencia/seguros";
 import { COLUMNA_NO_MARCA_RELOJ, validarNoMarcaReloj } from "@/lib/asistencia/sueldo-fijo";
 import { COLUMNA_BASE_SEGUROS, validarBaseSeguros } from "@/lib/asistencia/seguros-base";
+// El cargo y la cédula del comprobante de pago. Ver `datos-del-papel.ts`.
+import { cedulaDeFicha, posicionDeFicha, COLUMNA_CEDULA, COLUMNA_POSICION } from "@/lib/asistencia/datos-del-papel";
 import {
   COLS_SALDO_VACACIONES,
   numeroDeDias,
@@ -248,6 +250,12 @@ export async function GET(req: NextRequest) {
         // 🔴 Cobra fijo y no pasa por el reloj. Sigue en la planilla, con
         // seguros y todo; lo que se le ignora son las marcaciones.
         noMarcaReloj,
+        // 🔴 LOS DOS TEXTOS QUE SOLO EXISTEN PARA EL COMPROBANTE DE PAGO: el
+        // cargo («POSICION DESEMPEÑADA») y la cédula del pie. `null` = todavía
+        // no se cargó, y el papel escribe un guion o deja la línea en blanco.
+        // Ninguno de los dos toca el cálculo. Ver `datos-del-papel.ts`.
+        posicion: f?.posicion ?? null,
+        cedula: f?.cedula ?? null,
         // 🔴 Su sueldo se paga entre dos empresas y sale en las dos planillas.
         // Es de SOLO LECTURA en esta pantalla: la regla la fija la contadora y
         // los montos tienen que sumar el salario de la ficha. Ver `reparto.ts`.
@@ -496,6 +504,17 @@ export async function PUT(req: NextRequest) {
     ...conReloj,
     [COLUMNA_BASE_SEGUROS]: baseSeguros,
   };
+  // 🔴 EL CARGO Y LA CÉDULA — los dos textos que SOLO existen para el papel.
+  //
+  // No tocan la rata, ni el bruto, ni el neto: se imprimen. Van al final del
+  // upsert por eso mismo, y por eso vacío se guarda como `null` y nunca como
+  // `""` (la base tiene un CHECK que lo rechaza, y con razón: una cadena vacía
+  // es un dato cargado que no dice nada).
+  const conPapel = {
+    ...conBaseSeguros,
+    [COLUMNA_POSICION]: posicionDeFicha((body as Record<string, unknown> | null)?.posicion),
+    [COLUMNA_CEDULA]: cedulaDeFicha((body as Record<string, unknown> | null)?.cedula),
+  };
 
   // ── UN solo upsert, con TODAS las columnas ──────────────────────────────────
   //
@@ -516,7 +535,7 @@ export async function PUT(req: NextRequest) {
   // ficha SIN el dato que la contadora tecleó, en silencio.
   const { error } = await supabaseServer
     .from(TABLA_PERSONAS)
-    .upsert(conBaseSeguros, { onConflict: "empleado_codigo" });
+    .upsert(conPapel, { onConflict: "empleado_codigo" });
 
   if (error) {
     console.error("[asistencia/configuracion PUT]", error.message);

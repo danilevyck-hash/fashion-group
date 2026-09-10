@@ -89,6 +89,15 @@ import {
   cerrarPlanillaRoles,
 } from "@/lib/asistencia/planilla-guardada";
 import type { SugerenciaPrestamo } from "@/lib/asistencia/prestamos-planilla";
+// 🔴 EL CIERRE ANOTA EL PAGO DEL PRÉSTAMO. Ver `cierre-prestamo.ts`: hasta hoy
+// lo tecleaba una persona en el otro módulo y por eso el 1-15 de agosto de 2026
+// el módulo decía 9 descuentos por $360,00 y la casilla 7 por $265,00.
+import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import {
+  escribirPagosDelCierre,
+  planearCierre,
+  revertirPagosDelCierre,
+} from "@/lib/asistencia/cierre-prestamo-server";
 import {
   cerrarPlanilla,
   leerCabecera,
@@ -303,8 +312,25 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
+    // ── 🔴 EL PAGO DEL PRÉSTAMO SE ANOTA SOLO, Y RECIÉN ACÁ ────────────────
+    //
+    // Después del cierre y no antes: si el cierre se cae, no puede quedar una
+    // deuda bajada por un cuadro que nunca existió. Al revés sí se puede vivir
+    // —un cuadro cerrado sin su pago se ve y se arregla— y por eso este es el
+    // orden y no el otro.
+    //
+    // 🔴 CON `await`. Esto mueve plata: un `.then().catch()` acá sería una
+    // deuda que baja a veces.
+    let prestamosAnotados: { escritos: number; total: number } | null = null;
+    if (PLANILLA_UNIDA && r.id) {
+      const plan = await planearCierre({ lineas, desde, hasta });
+      const escrito = await escribirPagosDelCierre({ planillaId: r.id, plan });
+      prestamosAnotados = { escritos: escrito.escritos, total: escrito.total };
+    }
+
     return NextResponse.json({
       ok: true, id: r.id, version: r.version, totales: r.totales, empresa, desde, hasta,
+      prestamosAnotados,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -366,7 +392,23 @@ export async function PATCH(req: NextRequest) {
     if (!r.ok) {
       return NextResponse.json({ ok: false, error: "Esa quincena ya estaba reabierta." }, { status: 409 });
     }
-    return NextResponse.json({ ok: true, id });
+
+    // ── 🔴 REABRIR DEVUELVE LA DEUDA ───────────────────────────────────────
+    //
+    // 🩸 Sin esto, reabrir dejaría la deuda bajada por un cuadro que ya no vale
+    // — y al volver a cerrar, ese pago viejo caería en el «caso 1» de
+    // `montoDeFicha` («ya está registrado»): la deuda bajaría UNA vez y el
+    // sueldo se descontaría DOS. Es exactamente el descuadre que este cambio
+    // vino a terminar.
+    //
+    // Soft delete, nunca un DELETE: el movimiento queda con `deleted = true` y
+    // el amarre firmado con quién y cuándo.
+    let prestamosRevertidos = 0;
+    if (PLANILLA_UNIDA) {
+      const rev = await revertirPagosDelCierre({ planillaId: id, usuario });
+      prestamosRevertidos = rev.revertidos;
+    }
+    return NextResponse.json({ ok: true, id, prestamosRevertidos });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[asistencia/planilla-guardada PATCH]", msg);

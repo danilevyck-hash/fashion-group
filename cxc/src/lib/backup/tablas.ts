@@ -68,6 +68,16 @@ export const TABLAS_PERSONAS = [
   "asistencia_aprobador_empresa",
   "asistencia_planilla_guardada",
   "asistencia_planilla_guardada_linea",
+  // 🔴 EL AMARRE ENTRE UN CIERRE Y EL PAGO DE PRÉSTAMO QUE ESE CIERRE ESCRIBIÓ.
+  //
+  // No la escribe una persona: la escribe el cierre. Va igual al respaldo, y
+  // por una razón concreta — es lo ÚNICO que impide que cerrar dos veces cobre
+  // dos veces. Sin ella, un `prestamos_movimientos` restaurado quedaría sin su
+  // amarre y el próximo cierre volvería a descontarle a la gente una plata que
+  // ya se le había descontado. No se puede volver a derivar de ningún lado:
+  // sabe qué movimiento salió de qué cuadro, y eso no está escrito en otra
+  // parte.
+  "asistencia_planilla_prestamo",
   "asistencia_dispositivos",
 
   // ── Gastos y banco

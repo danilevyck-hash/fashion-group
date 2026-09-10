@@ -120,6 +120,12 @@ interface Persona {
   /** `true` = cobra fijo y NO pasa por el reloj. `false` mientras nadie diga lo
    *  contrario: es lo que hacía la planilla con las 39 fichas. */
   noMarcaReloj: boolean;
+  /** El cargo que sale impreso en «POSICION DESEMPEÑADA» del comprobante de
+   *  pago. `null` = todavía no se cargó, y el papel escribe un guion.
+   *  🔴 NO TOCA EL CÁLCULO: es un texto que se imprime. */
+  posicion?: string | null;
+  /** La cédula, para el pie del comprobante. `null` = se escribe a mano. */
+  cedula?: string | null;
   /** 🔴 Su sueldo se paga entre DOS empresas. Vacío = cobra entero en la suya,
    *  que es el caso de 36 de las 37 fichas. Ver `lib/asistencia/reparto.ts`.
    *  Llega YA VALIDADO por el servidor: si el guard lo rechaza viene vacío.
@@ -222,6 +228,10 @@ interface Borrador {
    *  🔑 La FECHA DE CORTE no está acá a propósito: la pone el servidor al
    *  guardar, y solo cuando el número cambia. Ver la nota del PUT. */
   saldoVacaciones: string;
+  /** El cargo del comprobante. "" = todavía no se cargó. */
+  posicion: string;
+  /** La cédula del pie del comprobante. "" = se escribe a mano. */
+  cedula: string;
 }
 
 const CAMPO =
@@ -271,7 +281,10 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
 const firma = (b: Borrador) =>
   `${b.nombre.trim()}|${b.salario.trim()}|${b.jornada}|${b.empresa}`
   + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}|${b.servicioProfesional}`
-  + `|${b.pagaSeguros}|${b.baseSeguros.trim()}|${b.noMarcaReloj}|${b.saldoVacaciones}`;
+  + `|${b.pagaSeguros}|${b.baseSeguros.trim()}|${b.noMarcaReloj}|${b.saldoVacaciones}`
+  // Los dos textos del comprobante entran a la firma como cualquier otro campo:
+  // sin esto, cambiar solo el cargo no dispararía el guardado.
+  + `|${b.posicion.trim()}|${b.cedula.trim()}`;
 
 /**
  * ¿La baja está completa? La fecha y el motivo VIAJAN JUNTOS: una baja sin
@@ -336,6 +349,8 @@ export default function ConfiguracionTab() {
       baseSeguros: p.baseSeguros === null ? "" : String(p.baseSeguros),
       noMarcaReloj: p.noMarcaReloj,
       saldoVacaciones: p.saldoVacacionesDias === null ? "" : String(p.saldoVacacionesDias),
+      posicion: p.posicion ?? "",
+      cedula: p.cedula ?? "",
     };
     setAbierta(p.codigo);
     setBorrador(b);
@@ -397,6 +412,10 @@ export default function ConfiguracionTab() {
             // viajara como 0, y un 0 apagaría los seguros por la puerta de atrás.
             baseSeguros: b.baseSeguros,
             noMarcaReloj: b.noMarcaReloj,
+            // 🔴 Los dos textos del comprobante. Van tal cual: el servidor los
+            // limpia y convierte el vacío en `null` (la base rechaza `""`).
+            posicion: b.posicion,
+            cedula: b.cedula,
             // Se manda el TEXTO tal cual, igual que el salario: el servidor
             // decide qué es un saldo válido y le pone la fecha de corte.
             saldoVacacionesDias: b.saldoVacaciones,
@@ -972,6 +991,42 @@ export default function ConfiguracionTab() {
                                 // un PUT por letra sería un PUT por letra.
                                 onBlur={() => void guardar(p.codigo, borrador)}
                                 placeholder="Ángela García"
+                                className={CAMPO}
+                              />
+                            </div>
+                            <div>
+                              {/* 🔴 SALE IMPRESO EN EL COMPROBANTE, en
+                                  «POSICION DESEMPEÑADA». Hasta el 10-sep-2026
+                                  el sistema no lo conocía y el papel lo lleva:
+                                  la contadora lo escribía a mano en cada una de
+                                  las 34 hojas.
+                                  ⚠️ NO toca el cálculo. Vacío = el papel dice
+                                  un guion; nunca un cargo inventado. */}
+                              <Etiqueta
+                                texto="Cargo"
+                                ayuda="Sale impreso en el comprobante de pago, en «POSICION DESEMPEÑADA». Si lo dejas vacío, el papel escribe un guion."
+                              />
+                              <input
+                                type="text"
+                                value={borrador.posicion}
+                                onChange={(e) => setBorrador({ ...borrador, posicion: e.target.value })}
+                                onBlur={() => void guardar(p.codigo, borrador)}
+                                placeholder="Asistente de Bodega"
+                                className={CAMPO}
+                              />
+                            </div>
+                            <div>
+                              {/* Va al pie del comprobante, donde se firma. */}
+                              <Etiqueta
+                                texto="Cédula"
+                                ayuda="Sale al pie del comprobante de pago, al lado de la firma. Si la dejas vacía, la línea queda en blanco para escribirla a mano."
+                              />
+                              <input
+                                type="text"
+                                value={borrador.cedula}
+                                onChange={(e) => setBorrador({ ...borrador, cedula: e.target.value })}
+                                onBlur={() => void guardar(p.codigo, borrador)}
+                                placeholder="8-1010-2403"
                                 className={CAMPO}
                               />
                             </div>

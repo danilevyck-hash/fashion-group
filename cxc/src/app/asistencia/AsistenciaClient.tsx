@@ -75,6 +75,8 @@ import VacacionesTab from "./VacacionesTab";
 import AprobacionesTab from "./AprobacionesTab";
 import { APROBACIONES_ROLES, vePestana } from "@/lib/asistencia/roles";
 import ComoFuncionaTab from "./ComoFuncionaTab";
+import PrestamosTab from "./PrestamosTab";
+import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 
 const TABS = [
   // 🔴 REPORTE PRIMERO, Y ES EL ORDEN DEL TRABAJO (2-sep-2026). Daniel:
@@ -94,6 +96,24 @@ const TABS = [
   // El cuadro quincenal que sale de lo de arriba: cada minuto del Reporte,
   // convertido en plata. Es lo que se firma.
   ["planilla", "Planilla"],
+  // 🔴 LA SÉPTIMA, PRÉSTAMOS — y se gana el lugar por la MISMA regla que las
+  // otras: por lo que se hace ahí. Daniel, textual: *«asistencia se ingresa la
+  // info y prestamos seria para como ver la info y hacer pagos extraordinarios
+  // como abonos etc»*.
+  //
+  // 🩸 Y por lo que costaba tenerla afuera. Quincena del 1 al 15 de agosto de
+  // 2026, medido: el módulo de Préstamos registró 9 descuentos por $360,00 y la
+  // casilla de la planilla decía 7 por $265,00. KEVIN LUBO ($50), LUIS PARAJON
+  // ($45) y YULICAR CORONA ($50) tenían el pago anotado y la casilla en cero —
+  // se les bajó la deuda por plata que nunca se les quitó del sueldo—; LUIS
+  // ARROYO al revés. Dos pantallas en dos módulos para la misma plata es cómo
+  // nacen dos números.
+  //
+  // Va PEGADA a Planilla porque es la misma plata y el mismo día de trabajo.
+  //
+  // ⚠️ El módulo `/prestamos` NO se retira: sigue teniendo la ficha, el
+  // historial y las aprobaciones. Esta pestaña es VER y abonar.
+  ["prestamos", "Préstamos"],
   // Lo del día a día: lo único que se toca seguido.
   ["justificaciones", "Justificaciones"],
   // 🔴 APARTE de Justificaciones, y es todo el punto (25-ago-2026): unas
@@ -155,7 +175,11 @@ function AsistenciaInner() {
   // admin ve todo. Desde que `bodega` aprueba —el usuario con el que trabaja
   // Julio Garay— hay que preguntar las DOS cosas: él entra a Asistencia solo
   // para autorizar horas extra, y la Planilla trae el sueldo de las 38.
-  const visibles = TABS.filter(([k]) => vePestana(rol, k));
+  // 🔴 CON EL INTERRUPTOR APAGADO, PRÉSTAMOS NO EXISTE. Ni en la barra, ni por
+  // la URL: el `?tab=prestamos` de alguien cae en la pestaña por defecto, igual
+  // que cualquier valor desconocido. Ver `planilla-unida.ts`.
+  const visibles = TABS.filter(([k]) => (k === "prestamos" ? PLANILLA_UNIDA : true))
+    .filter(([k]) => vePestana(rol, k));
   // Una pestaña que no se ve tampoco se abre por la URL: cae en la primera que
   // esta persona SÍ puede ver. 🔑 No en "planilla" a secas: quien solo aprueba
   // aterrizaría en una pantalla que su propio rol no puede cargar, y vería un
@@ -227,6 +251,7 @@ function AsistenciaInner() {
           ) : (
             <>
               {tab === "planilla" && <PlanillaTab />}
+              {tab === "prestamos" && <PrestamosTab />}
               {tab === "reporte" && <ReporteTab />}
               {tab === "justificaciones" && <JustificacionesTab />}
               {tab === "vacaciones" && <VacacionesTab />}

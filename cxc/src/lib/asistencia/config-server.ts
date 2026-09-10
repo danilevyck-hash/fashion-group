@@ -68,6 +68,9 @@ import type { Vacacion } from "./vacaciones";
 import { COLUMNA_PAGA_SEGUROS, pagaSeguros } from "./seguros";
 import { COLUMNA_NO_MARCA_RELOJ, noMarcaReloj } from "./sueldo-fijo";
 import { COLUMNA_BASE_SEGUROS, baseSeguros } from "./seguros-base";
+// Los dos textos que solo existen para el comprobante de pago. Ver
+// `datos-del-papel.ts`: el nombre de la columna y quien la sabe leer van juntos.
+import { COLUMNAS_DEL_PAPEL } from "./datos-del-papel";
 
 // Se re-exportan para que las rutas importen todo de un solo lugar. La
 // DETECCIÓN es pura y vive en `config.ts`; acá solo está el I/O.
@@ -150,6 +153,13 @@ export interface FilaPersonaDb {
    *  un `Number(...)` unas líneas más arriba. */
   saldo_vacaciones_dias?: number | string | null;
   saldo_vacaciones_corte?: string | null;
+  /** El cargo impreso en «POSICION DESEMPEÑADA» del comprobante (20261028120000).
+   *  `null` = todavía no se cargó, y el papel dice un guion. NO toca el cálculo. */
+  posicion?: string | null;
+  /** La cédula, para el pie del comprobante. `null` = se escribe a mano, como hoy. */
+  cedula?: string | null;
+  /** La foto de la cédula en Storage. Se carga UNA vez en la ficha. */
+  cedula_foto_path?: string | null;
 }
 
 export interface PersonasLeidas {
@@ -190,6 +200,13 @@ const COLS_CON_RELOJ = `${COLS_CON_SALDO}, ${COLUMNA_NO_MARCA_RELOJ}`;
  *  Es LA lista que se pide: las de arriba solo documentan de dónde sale cada
  *  columna. */
 const COLS_CON_BASE_SEGUROS = `${COLS_CON_RELOJ}, ${COLUMNA_BASE_SEGUROS}`;
+/** Todo, con el cargo y la cédula del comprobante. Salen de `datos-del-papel.ts`.
+ *  Es LA lista que se pide: las de arriba solo documentan de dónde sale cada
+ *  columna.
+ *
+ *  ⚠️ Ninguna de las tres toca el cálculo: son textos que se imprimen. Por eso
+ *  van al final y por eso su ausencia no cambiaría un centavo. */
+const COLS_CON_PAPEL = `${COLS_CON_BASE_SEGUROS}, ${COLUMNAS_DEL_PAPEL.join(", ")}`;
 
 /**
  * Las fichas guardadas — UN solo `select`, con todas las columnas.
@@ -211,7 +228,7 @@ const COLS_CON_BASE_SEGUROS = `${COLS_CON_RELOJ}, ${COLUMNA_BASE_SEGUROS}`;
  * error se propaga.
  */
 export async function leerPersonas(): Promise<PersonasLeidas> {
-  const { data, error } = await supabaseServer.from(TABLA_PERSONAS).select(COLS_CON_BASE_SEGUROS);
+  const { data, error } = await supabaseServer.from(TABLA_PERSONAS).select(COLS_CON_PAPEL);
   if (error) {
     throw new Error(`No se pudieron leer las fichas de asistencia: ${error.message}`);
   }
