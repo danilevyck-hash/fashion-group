@@ -118,3 +118,47 @@ export async function subirAdjunto({
   const data = (await adjRes.json()) as AdjuntoCreado;
   return data;
 }
+
+/**
+ * 🔴 CUELGA EL PDF DE UNA FACTURA — Y NUNCA LO SUBE DOS VECES (10-sep-2026).
+ *
+ * Si el archivo YA se subió (para que la IA pudiera leerlo), lo único que
+ * falta es registrar el adjunto con ESE MISMO `path`. Volver a subirlo dejaría
+ * dos copias del mismo PDF en el bucket privado y la ficha mostrando dos
+ * comprobantes iguales.
+ *
+ * Vive acá, y no dentro de una pantalla, porque las DOS puertas que crean una
+ * factura con PDF hacen exactamente esto: «Registrar gasto» y la sección de
+ * facturas del proyecto.
+ *
+ * Tira si algo falla — el gasto YA quedó guardado cuando esto corre, así que
+ * quien llama lo dice con un aviso y no revienta el guardado.
+ */
+export async function adjuntarPdfDeFactura(args: {
+  facturaId: string;
+  file: File;
+  /** El `path` en Storage si el PDF ya se subió antes. */
+  pathPreSubido?: string | null;
+}): Promise<void> {
+  let path = (args.pathPreSubido ?? "").trim();
+  if (!path) {
+    const subida = await pedirUploadUrl({ file: args.file, facturaId: args.facturaId });
+    await subirArchivoAStorage(subida.uploadUrl, args.file);
+    path = subida.path;
+  }
+  const res = await fetch("/api/marketing/adjuntos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      facturaId: args.facturaId,
+      tipo: "pdf_factura",
+      url: path,
+      nombreOriginal: args.file.name,
+      sizeBytes: args.file.size,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error ?? "No se pudo registrar el comprobante");
+  }
+}

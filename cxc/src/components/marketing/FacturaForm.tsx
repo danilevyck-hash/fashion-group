@@ -7,7 +7,7 @@
 // debe invocar setMarcasDeFactura(facturaId, marcas) después de crear/editar
 // la fila en mk_facturas.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   EstadoPagoFactura,
   MarcaPorcentajeInput,
@@ -18,6 +18,7 @@ import type {
 import { useToast } from "@/components/ToastSystem";
 import { PasoInstruccion } from "./PasoInstruccion";
 import { PdfUploader, UploadResult } from "./PdfUploader";
+import { MAX_PDF_MB, faltaLaFactura } from "@/lib/marketing/pdf-en-la-puerta";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import {
@@ -127,6 +128,27 @@ interface FacturaFormProps {
   onSubmit: (data: FacturaFormValues, pdfFile?: File) => Promise<void>;
   onCancel?: () => void;
   onUploadPdfForIA?: (file: File) => Promise<string | null>;
+  /**
+   * 🔴 EL PDF QUE YA ENTRÓ POR LA PUERTA (10-sep-2026). Daniel: *«es una
+   * factura en PDF que con AI lee los campos y lo rellena solo»*.
+   *
+   * Con esto puesto el paso 1 NO vuelve a pedir el archivo —pedirlo dos veces
+   * es pedirlo dos veces— y el mismo PDF pasa por el MISMO camino de siempre
+   * (`handlePdfUpload` → `onUploadPdfForIA` → `/api/marketing/ia/leer-factura`),
+   * así que los campos llegan rellenados y listos para revisar.
+   */
+  pdfInicial?: File;
+  /**
+   * 🔴 LA FACTURA EN PDF ES OBLIGATORIA para este gasto (10-sep-2026). Daniel:
+   * *«cada gasto con su prueba, según el camino — Compra → factura obligatoria;
+   * Impulsadora → comprobante obligatorio»*.
+   *
+   * Lo enciende la puerta de «Registrar gasto» en los caminos de COMPRA
+   * (Factura y «Otro gasto»), y solo con `MARKETING_PDF_EN_LA_PUERTA`
+   * encendido. ⚠️ Sin esta prop nada cambia: la pantalla del proyecto y la
+   * EDICIÓN de una factura vieja siguen guardando sin PDF, como siempre.
+   */
+  pdfObligatorio?: boolean;
 }
 
 type ItbmsOption = "0" | "7";
@@ -179,6 +201,8 @@ export function FacturaForm({
   onSubmit,
   onCancel,
   onUploadPdfForIA,
+  pdfInicial,
+  pdfObligatorio = false,
 }: FacturaFormProps) {
   const { toast } = useToast();
 
@@ -315,7 +339,10 @@ export function FacturaForm({
     concepto.trim().length > 0 &&
     subtotal > 0;
 
-  const puedeGuardar = pasoDatos && marcasValidas && !enviando;
+  // 🔴 Sin factura no se guarda el gasto — pero solo donde SE PIDE (compras),
+  // y la pantalla dice QUÉ falta en vez de apagar el botón sin explicación.
+  const falta = faltaLaFactura(Boolean(pdfFile), pdfObligatorio);
+  const puedeGuardar = pasoDatos && marcasValidas && !enviando && falta === null;
 
   // Check de duplicados con debounce 500ms. Se activa cuando cambian
   // numero_factura o proveedor. Excluye la factura en edición actual.
@@ -368,7 +395,7 @@ export function FacturaForm({
     else if (data.itbms_pct === 0) setItbmsOption("0");
   }, []);
 
-  const handlePdfUpload = async (file: File): Promise<UploadResult> => {
+  const handlePdfUpload = useCallback(async (file: File): Promise<UploadResult> => {
     setPdfFile(file);
     setPdfSubido(true);
 
@@ -405,7 +432,20 @@ export function FacturaForm({
       nombreOriginal: file.name,
       sizeBytes: file.size,
     };
-  };
+  }, [onUploadPdfForIA, aplicarRespuestaIA, toast]);
+
+  /**
+   * 🔴 EL PDF DE LA PUERTA ENTRA SOLO, UNA SOLA VEZ. Es el MISMO camino que
+   * si lo soltaran acá: no hay una segunda lectura, ni una segunda subida.
+   * El `ref` es el freno — sin él, cualquier re-render volvería a llamar a la
+   * IA (y a gastar la llamada) por el mismo archivo.
+   */
+  const pdfDeLaPuertaLeido = useRef(false);
+  useEffect(() => {
+    if (!pdfInicial || pdfDeLaPuertaLeido.current) return;
+    pdfDeLaPuertaLeido.current = true;
+    void handlePdfUpload(pdfInicial);
+  }, [pdfInicial, handlePdfUpload]);
 
   const ejecutarGuardar = async (permitirDuplicado = false) => {
     try {
@@ -450,16 +490,25 @@ export function FacturaForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <PasoInstruccion
         numero={1}
-        titulo="Sube el PDF de la factura"
+        titulo={pdfInicial ? "La factura ya está" : "Sube el PDF de la factura"}
         descripcion={leyendoIA ? "Leyendo factura con IA..." : undefined}
         completado={pdfSubido}
       >
+        {/* 🔴 EL PDF QUE VINO DE LA PUERTA NO SE VUELVE A PEDIR: se dice cuál
+            es y se sigue. Pedir dos veces el mismo archivo es lo que este
+            cambio vino a sacar. */}
+        {pdfInicial ? (
+          <p className="text-sm text-gray-600 truncate" data-testid="pdf-de-la-puerta">
+            {pdfInicial.name}
+          </p>
+        ) : (
         <PdfUploader
           onUpload={handlePdfUpload}
           label="Sube el PDF de la factura"
           accept="application/pdf"
-          maxSizeMb={10}
+          maxSizeMb={MAX_PDF_MB}
         />
+        )}
         {leyendoIA && (
           <div className="mt-3 flex items-center gap-2 text-sm text-fuchsia-700">
             <svg
@@ -822,6 +871,11 @@ export function FacturaForm({
         {checkingDup && (
           <span className="text-xs text-gray-400 mr-auto">
             Verificando duplicados…
+          </span>
+        )}
+        {!checkingDup && falta && (
+          <span className="text-xs text-amber-700 mr-auto" data-testid="falta-para-guardar">
+            {falta}
           </span>
         )}
         {onCancel && (

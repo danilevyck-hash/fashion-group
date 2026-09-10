@@ -480,7 +480,14 @@ describe("barrido estático", () => {
     // (Desde el 12-ago-2026 el tercer camino se llama "Gasto de la marca",
     // key "marca", con Impulsadora y Otro gasto adentro — la foto sigue viva
     // en TODOS, con o sin cliente.)
-    const bloqueFoto = src.indexOf("Subir foto");
+    //
+    // ⚠️ NOTA 10-sep-2026 — CAMBIO DE ANCLA, no de regla. El rótulo del botón
+    // dejó de estar escrito acá: sale de `rotuloBotonDeLaPuerta()`, porque el
+    // campo ahora acepta también la factura en PDF («Subir foto» / «Subir foto
+    // o factura», según el interruptor). Lo que este candado protege —que el
+    // campo viva FUERA del condicional que separa los caminos— no cambió, y
+    // los dos barridos de abajo tampoco.
+    const bloqueFoto = src.indexOf("rotuloBotonDeLaPuerta()");
     const finCondicional = src.indexOf('camino === "marca" ? (');
     expect(finCondicional).toBeGreaterThan(0);
     expect(bloqueFoto).toBeGreaterThan(finCondicional);

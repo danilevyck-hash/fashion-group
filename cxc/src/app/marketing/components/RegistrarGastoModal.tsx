@@ -55,8 +55,26 @@
 // de gasto ni por tener o no cliente. Lo único que mira el cliente es el AVISO
 // del cierre ("N gastos sin foto"), que es otra cosa y vive en otro archivo.
 //
-// 🔴 EL COMPROBANTE ES OBLIGATORIO EN LOS TRES CAMINOS, y eso ya lo exigen los
-// formularios de siempre — no se reimplementa acá.
+// 🔴 CADA GASTO CON SU PRUEBA, SEGÚN EL CAMINO (10-sep-2026). Daniel, textual:
+// *«cada gasto con su prueba, según el camino — Compra → factura obligatoria;
+// Impulsadora → comprobante obligatorio. Así ningún gasto queda sin respaldo, y
+// no le pides factura a quien no la tiene.»*
+//   · Factura y «Otro gasto» (COMPRAS) → la factura en PDF es OBLIGATORIA: sin
+//     ella el botón no guarda y la pantalla dice qué falta (`pdfObligatorio`
+//     en `FacturaForm`).
+//   · Impulsadora → comprobante obligatorio, y ya lo era: lo exige su propio
+//     modal (`RegistrarPagoModal`), que no se tocó.
+//   · Mueble → lo pide `EntregaForm` con sus reglas, que no cambiaron.
+// 🩸 Acá decía «EL COMPROBANTE ES OBLIGATORIO EN LOS TRES CAMINOS» y era FALSO:
+// en Factura no lo era (`puedeGuardar` miraba los datos y las marcas, nunca el
+// archivo). Ahora lo es — pero solo con el interruptor encendido.
+//
+// 🔴 LA FACTURA EN PDF ENTRA POR LA PUERTA (10-sep-2026). Daniel: *«Marketing
+// PDF, que sea como la factura, porque es una factura en PDF que con AI lee
+// los campos y lo rellena solo»*. El campo de la foto acepta también PDF: si
+// es imagen, todo sigue igual; si es PDF, ES la factura — se lee con la IA que
+// ya existía y llega al paso 3 con los campos puestos, sin pedirlo de nuevo ni
+// subirlo dos veces. Todo cuelga de `MARKETING_PDF_EN_LA_PUERTA`, APAGADO.
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -67,7 +85,18 @@ import ClientePicker from "@/components/ClientePicker";
 import { FacturaForm } from "@/components/marketing";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import RegistrarPagoModal from "./RegistrarPagoModal";
-import { pedirUploadUrl, subirArchivoAStorage } from "./uploadHelpers";
+import {
+  adjuntarPdfDeFactura,
+  pedirUploadUrl,
+  subirArchivoAStorage,
+} from "./uploadHelpers";
+import {
+  MARKETING_PDF_EN_LA_PUERTA,
+  aceptaDeLaPuerta,
+  clasificarArchivoDeLaPuerta,
+  rotuloBotonDeLaPuerta,
+  rotuloDeLaPuerta,
+} from "@/lib/marketing/pdf-en-la-puerta";
 import { MARCAS_BLOQUE } from "@/lib/marketing/bloques";
 import type {
   EstadoPagoFactura,
@@ -160,6 +189,10 @@ export default function RegistrarGastoModal({
   const [cambiandoMarca, setCambiandoMarca] = useState(false);
   const [foto, setFoto] = useState<File | null>(null);
   const fotoRef = useRef<HTMLInputElement>(null);
+  /** La factura en PDF que entró por la puerta (nunca a la vez que la foto). */
+  const [pdfPuerta, setPdfPuerta] = useState<File | null>(null);
+  /** Su `path` en Storage si ya se subió para que la IA lo leyera. */
+  const [pdfPathPreSubido, setPdfPathPreSubido] = useState<string | null>(null);
 
   const [impulsadoras, setImpulsadoras] = useState<ImpulsadoraConEstado[] | null>(null);
   const [impulsadoraSel, setImpulsadoraSel] = useState<ImpulsadoraConEstado | null>(null);
@@ -174,7 +207,7 @@ export default function RegistrarGastoModal({
 
   // Hooks SIEMPRE antes de cualquier return condicional.
   const cerrar = useCallback(() => onClose(), [onClose]);
-  const tocado = camino !== null || cliente.trim() !== "" || !!foto;
+  const tocado = camino !== null || cliente.trim() !== "" || !!foto || !!pdfPuerta;
   const { panelRef, backdrop } = useFormModalDismiss(
     mounted,
     cerrar,
@@ -332,6 +365,88 @@ export default function RegistrarGastoModal({
     [foto, toast],
   );
 
+  /**
+   * 🔴 SUBE EL PDF PARA QUE LA IA LO PUEDA LEER — Y GUARDA SU `path`.
+   *
+   * Es el MISMO camino que ya usaba la pantalla del proyecto: se sube al
+   * bucket privado y `/api/marketing/ia/leer-factura` lo lee de ahí. El `path`
+   * queda anotado para que al guardar NO se vuelva a subir el mismo archivo.
+   *
+   * ⚠️ Sin proyecto NO se puede subir todavía: la ruta que firma la subida
+   * exige un proyecto, una factura o una impulsadora, y en «Gasto de la marca ›
+   * Otro gasto» no hay ninguno hasta que la factura existe. Ahí se devuelve
+   * `null`: el PDF viaja igual y se cuelga al guardar (una sola subida), pero
+   * la IA no puede leerlo antes. Es una decisión pendiente de Daniel, no un
+   * olvido — y la pantalla no promete nada que no vaya a pasar.
+   */
+  const subirPdfParaIA = useCallback(
+    async (file: File): Promise<string | null> => {
+      const proyectoId = proyecto?.id;
+      if (!proyectoId) return null;
+      try {
+        const { uploadUrl, path } = await pedirUploadUrl({ file, proyectoId });
+        await subirArchivoAStorage(uploadUrl, file);
+        setPdfPathPreSubido(path);
+        return path;
+      } catch {
+        setPdfPathPreSubido(null);
+        toast(
+          "No se pudo leer la factura con IA. Llena los campos a mano — el PDF se sube al guardar.",
+          "warning",
+        );
+        return null;
+      }
+    },
+    [proyecto?.id, toast],
+  );
+
+  /**
+   * 🔴 EL PDF EN UN CAMINO SIN FACTURA (Mueble): se cuelga del PROYECTO y ya.
+   * No se inventa ningún flujo nuevo — es lo que ya hace la foto.
+   *
+   * 🩸 Va como `otro`, y las otras dos opciones son trampas: `pdf_factura`
+   * EXIGE una factura (lo rechaza el CHECK de la base, `createAdjunto`), y
+   * `foto_proyecto` se PUBLICA en la galería del cliente — la factura de un
+   * proveedor terminaría a la vista de la tienda con un link firmado de un año.
+   */
+  const adjuntarPdfDelProyecto = useCallback(
+    async (proyectoId?: string) => {
+      if (!pdfPuerta) return;
+      if (!proyectoId) {
+        toast(
+          "El gasto quedó guardado. La factura en PDF no se pudo adjuntar todavía — agrégala desde su ficha.",
+          "warning",
+        );
+        return;
+      }
+      try {
+        const { uploadUrl, path } = await pedirUploadUrl({
+          file: pdfPuerta,
+          proyectoId,
+        });
+        await subirArchivoAStorage(uploadUrl, pdfPuerta);
+        const res = await fetch("/api/marketing/adjuntos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            proyectoId,
+            tipo: "otro",
+            url: path,
+            nombreOriginal: pdfPuerta.name,
+            sizeBytes: pdfPuerta.size,
+          }),
+        });
+        if (!res.ok) throw new Error();
+      } catch {
+        toast(
+          "El gasto quedó guardado, pero la factura en PDF no subió. Vuelve a intentarlo desde su ficha.",
+          "warning",
+        );
+      }
+    },
+    [pdfPuerta, toast],
+  );
+
   const continuar = async () => {
     if (resolviendo) return;
     // "Gasto de la marca" NUNCA lleva cliente: el gasto va con
@@ -399,24 +514,15 @@ export default function RegistrarGastoModal({
       throw new Error(err?.error ?? "No se pudo asignar la marca");
     }
 
-    // El comprobante (PDF o foto de la factura) que pidió el formulario.
+    // El comprobante (el PDF de la factura) que pidió el formulario — o el que
+    // ya entró por la puerta. 🔴 Si se subió para que la IA lo leyera, NO se
+    // sube otra vez: se registra el mismo archivo.
     if (pdfFile) {
       try {
-        const { uploadUrl, path } = await pedirUploadUrl({
-          file: pdfFile,
+        await adjuntarPdfDeFactura({
           facturaId: factura.id,
-        });
-        await subirArchivoAStorage(uploadUrl, pdfFile);
-        await fetch("/api/marketing/adjuntos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            facturaId: factura.id,
-            tipo: "pdf_factura",
-            url: path,
-            nombreOriginal: pdfFile.name,
-            sizeBytes: pdfFile.size,
-          }),
+          file: pdfFile,
+          pathPreSubido: pdfPathPreSubido,
         });
       } catch {
         toast(
@@ -447,6 +553,7 @@ export default function RegistrarGastoModal({
         onClose={onClose}
         onSaved={async () => {
           await adjuntarFoto({ proyectoId: proyecto?.id });
+          await adjuntarPdfDelProyecto(proyecto?.id);
           onSaved();
         }}
       />
@@ -719,24 +826,54 @@ export default function RegistrarGastoModal({
                 </>
               )}
 
-              {/* FOTO — viva en los TRES caminos, siempre, y opcional. */}
+              {/* FOTO O FACTURA — viva en los TRES caminos, siempre, y
+                  opcional. 🔴 Con el interruptor apagado es EXACTAMENTE el
+                  campo de hoy: dice «Foto» y solo acepta imágenes. */}
               <div>
                 <div className="text-sm font-medium text-gray-700 mb-1">
-                  Foto <span className="font-normal text-gray-400">(opcional)</span>
+                  {rotuloDeLaPuerta()}{" "}
+                  <span className="font-normal text-gray-400">(opcional)</span>
                 </div>
                 <input
                   ref={fotoRef}
                   type="file"
-                  accept="image/*"
+                  accept={aceptaDeLaPuerta()}
                   className="hidden"
-                  onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const archivo = e.target.files?.[0] ?? null;
+                    // Vaciar el input deja quitar y volver a elegir EL MISMO
+                    // archivo (el navegador no dispara `change` si no cambió).
+                    e.target.value = "";
+                    if (!archivo) return;
+                    const cual = clasificarArchivoDeLaPuerta(archivo);
+                    if (!cual.ok) {
+                      toast(cual.mensaje, "error");
+                      return;
+                    }
+                    // 🔴 UNO U OTRO, nunca los dos: el campo es uno solo.
+                    if (cual.clase === "pdf") {
+                      setPdfPuerta(archivo);
+                      setPdfPathPreSubido(null);
+                      setFoto(null);
+                    } else {
+                      setFoto(archivo);
+                      setPdfPuerta(null);
+                      setPdfPathPreSubido(null);
+                    }
+                  }}
                 />
-                {foto ? (
+                {foto || pdfPuerta ? (
                   <div className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 min-h-[44px] py-2 text-sm">
-                    <span className="text-gray-800 truncate">{foto.name}</span>
+                    <span className="text-gray-800 truncate">
+                      {(foto ?? pdfPuerta)!.name}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setFoto(null)}
+                      onClick={() => {
+                        setFoto(null);
+                        setPdfPuerta(null);
+                        setPdfPathPreSubido(null);
+                      }}
                       className="shrink-0 text-sm text-gray-600 hover:text-black min-h-[44px] -my-2 inline-flex items-center"
                     >
                       Quitar
@@ -748,7 +885,7 @@ export default function RegistrarGastoModal({
                     onClick={() => fotoRef.current?.click()}
                     className="w-full rounded-md border border-dashed border-gray-300 px-3 min-h-[44px] py-2 text-sm text-gray-600 hover:border-gray-500 hover:text-black transition"
                   >
-                    Subir foto
+                    {rotuloBotonDeLaPuerta()}
                   </button>
                 )}
               </div>
@@ -799,6 +936,7 @@ export default function RegistrarGastoModal({
                 </>
               )}
               {foto && <> · Foto lista</>}
+              {pdfPuerta && <> · Factura lista</>}
             </div>
             <FacturaForm
               proyecto={{ id: proyecto?.id ?? "", marcas: [] }}
@@ -809,6 +947,19 @@ export default function RegistrarGastoModal({
               marcaFija={marcaElegida}
               onSubmit={guardarFactura}
               onCancel={onClose}
+              /* 🔴 Los dos van SOLO con el interruptor encendido: apagado, el
+                 paso 3 es el de hoy (pide el PDF y no llama a la IA). */
+              {...(MARKETING_PDF_EN_LA_PUERTA
+                ? {
+                    onUploadPdfForIA: subirPdfParaIA,
+                    // 🔴 COMPRA → FACTURA OBLIGATORIA. Los dos caminos que
+                    // montan este formulario son compras (Factura y «Otro
+                    // gasto»); Impulsadora ya exige su comprobante en su propio
+                    // modal y Mueble no cambia.
+                    pdfObligatorio: true,
+                    ...(pdfPuerta ? { pdfInicial: pdfPuerta } : {}),
+                  }
+                : {})}
             />
           </div>
         )}

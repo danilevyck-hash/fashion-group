@@ -2,6 +2,9 @@
 
 import { useCallback, useRef, useState, DragEvent, ChangeEvent } from "react";
 import { useToast } from "@/components/ToastSystem";
+// El tope y su mensaje viven en UN solo lugar: la puerta de «Registrar gasto»
+// no puede dejar pasar lo que este paso rechaza (ni al revés).
+import { MAX_PDF_MB, mensajeArchivoPesado } from "@/lib/marketing/pdf-en-la-puerta";
 
 export interface UploadResult {
   url: string;
@@ -27,7 +30,7 @@ export function PdfUploader({
   onUpload,
   label = "Sube el PDF",
   accept = "application/pdf",
-  maxSizeMb = 10,
+  maxSizeMb = MAX_PDF_MB,
 }: PdfUploaderProps) {
   const [estado, setEstado] = useState<Estado>({ kind: "idle" });
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,7 +40,7 @@ export function PdfUploader({
     (file: File): string | null => {
       const maxBytes = maxSizeMb * 1024 * 1024;
       if (file.size > maxBytes) {
-        return `El archivo pesa más de ${maxSizeMb}MB. Intenta uno más liviano.`;
+        return mensajeArchivoPesado(maxSizeMb);
       }
       // Aceptamos comparando tipos MIME o extensión
       const accepted = accept
