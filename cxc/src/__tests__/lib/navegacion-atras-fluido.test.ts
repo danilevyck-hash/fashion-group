@@ -89,7 +89,13 @@ describe("Tabs principales con URL propia (sobreviven refresh, se comparten)", (
     // ve quien puede aprobar, así que un `?tab=aprobaciones` en manos de la
     // contadora tampoco puede dejarla parada en una pestaña que no le toca.
     // Es el MISMO movimiento que hizo el CXC con `tabCxcPermitida` y Boston.
-    expect(leer("src/app/asistencia/AsistenciaClient.tsx")).toContain('visibles.some(([k]) => k === tabRaw)');
+    // 🩸 CAMBIÓ DE DIRECCIÓN EL 10-SEP-2026, y el candado se ENDURECIÓ otra
+    // vez: la decisión se mudó a `pestanaQueSeAbre` (módulo puro), que además
+    // de caer en la primera VISIBLE resuelve las direcciones viejas —
+    // `?tab=configuracion` aterriza en Personas, `?tab=justificaciones` en
+    // Reporte— en vez de tirarlas al default. Sigue sin poder quedar en blanco.
+    expect(leer("src/app/asistencia/AsistenciaClient.tsx"))
+      .toContain("pestanaQueSeAbre(tabRaw, visibles)");
     // El Depurador resuelve el ?tab= en un módulo puro desde el rediseño de 3
     // pestañas (4-sep-2026): un valor desconocido cae en "plantilla" y un
     // ?tab= VIEJO (depurador, misfotos, historial…) redirige a su pestaña

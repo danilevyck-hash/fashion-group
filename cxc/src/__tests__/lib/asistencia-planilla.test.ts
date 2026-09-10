@@ -21,6 +21,7 @@ import {
 } from "@/lib/asistencia/planilla";
 import { REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
 import { armarReporte, type Marcacion, type HorarioPersona } from "@/lib/asistencia/reporte";
+import { pestanasDeAsistencia } from "@/lib/asistencia/persona-en-el-centro";
 
 const R = REGLAS_DEFAULT;
 
@@ -702,9 +703,16 @@ describe("higiene de la planilla", () => {
     expect(src).toContain("overflow-x-auto");
   });
 
+  // 🩸 CAMBIÓ DE DIRECCIÓN EL 10-SEP-2026: la lista de pestañas se mudó a
+  // `lib/asistencia/persona-en-el-centro.ts`, donde conviven el acomodo de hoy
+  // y el nuevo. La regla no cambió — Planilla está en LOS DOS — y ahora se le
+  // pregunta al módulo puro en vez de a una cadena dentro de la pantalla.
   it("la pestaña está enchufada en el módulo", () => {
     const src = leer("src/app/asistencia/AsistenciaClient.tsx");
-    expect(src).toContain('["planilla", "Planilla"]');
+    for (const modo of [true, false]) {
+      expect(pestanasDeAsistencia({ personaEnElCentro: modo, planillaUnida: true }))
+        .toContainEqual(["planilla", "Planilla"]);
+    }
     expect(src).toContain("<PlanillaTab />");
   });
 

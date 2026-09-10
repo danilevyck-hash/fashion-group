@@ -38,6 +38,10 @@ import {
 import { motivosDeQuienNoMarco } from "@/lib/asistencia/periodo";
 import type { Vacacion } from "@/lib/asistencia/vacaciones";
 import { ASISTENCIA_ROLES, vePestana } from "@/lib/asistencia/roles";
+import {
+  pestanaPorDefecto,
+  pestanasDeAsistencia,
+} from "@/lib/asistencia/persona-en-el-centro";
 import { rataPorHoraCalculo } from "@/lib/asistencia/rata";
 import {
   avisoPendientes,
@@ -55,8 +59,21 @@ const CONFIG = "app/asistencia/ConfiguracionTab.tsx";
 describe("las 6 pestañas y su orden", () => {
   const src = leer(CLIENTE);
 
-  /** Los pares [clave, "Etiqueta"] del arreglo TABS, en el orden del archivo. */
-  const tabs = [...src.matchAll(/\["(\w+)",\s*"([^"]+)"\]/g)].map((m) => [m[1], m[2]]);
+  // 🩸 ESTE CANDADO CAMBIÓ DE DIRECCIÓN EL 10-SEP-2026, NO SE BORRÓ.
+  //
+  // Leía los pares `["reporte", "Reporte"]` como TEXTO de `AsistenciaClient`.
+  // Con el acomodo nuevo —«la persona en el centro», aprobado por Daniel— hay
+  // DOS listas de pestañas (la de hoy y la nueva) y elegir entre ellas es una
+  // decisión, no un renglón de JSX: se mudó a `lib/asistencia/persona-en-el-
+  // centro.ts`. Lo que este bloque protege es lo MISMO de siempre —cuántas
+  // pestañas hay, en qué orden y dónde aterriza cada rol— pero preguntándoselo
+  // al módulo puro en vez de a una expresión regular sobre una pantalla.
+  //
+  // 🔴 El CONTROL de que nada se aflojó: con el interruptor APAGADO la lista
+  // sigue siendo exactamente la de antes, las siete, en su orden. Eso es lo que
+  // comprueba el primer caso.
+  const tabs = pestanasDeAsistencia({ personaEnElCentro: false, planillaUnida: true })
+    .map(([k, l]) => [k, l]);
 
   // ⚠️ ESTE CANDADO SE AMPLIÓ A CONCIENCIA el 25-ago-2026, no se aflojó: entró
   // VACACIONES, y se ganó el lugar por lo que se hace ahí, no por la tabla que
@@ -120,18 +137,43 @@ describe("las 6 pestañas y su orden", () => {
   // CONTROL de la nota de arriba: Reporte sigue abriendo el módulo. Si alguien
   // mueve Préstamos —o cualquier otra— al primer lugar, todo el mundo aterriza
   // en otra pantalla y este test lo dice.
-  it("Reporte sigue siendo el PRIMERO: es donde aterriza todo el mundo", () => {
+  // 🩸 CAMBIÓ DE DIRECCIÓN EL 10-SEP-2026, y sigue cazando lo mismo.
+  //
+  // Exigía `useUrlState<Tab>("tab", "reporte")` escrito a mano. Con el acomodo
+  // nuevo el módulo abre en **Personas** —que es su punto entero: se entra a la
+  // gente, no a un cuadro— así que el default se DERIVA del interruptor.
+  //
+  // 🔴 EL CONTROL AL REVÉS SE CONSERVA: con el interruptor apagado sigue siendo
+  // «reporte», al pie de la letra. Si eso se rompe, apagar el acomodo nuevo ya
+  // no devuelve la pantalla de siempre.
+  it("apagado, Reporte SIGUE siendo el primero y el aterrizaje de todos", () => {
     expect(tabs[0]).toEqual(["reporte", "Reporte"]);
-    expect(src).toMatch(/useUrlState<Tab>\("tab", "reporte"\)/);
+    expect(pestanaPorDefecto(false)).toBe("reporte");
+    // Y prendido abre en Personas, que es lo que Daniel aprobó.
+    expect(pestanaPorDefecto(true)).toBe("personas");
+    // La pantalla no lo escribe a mano: se lo pregunta al módulo puro.
+    expect(src).toMatch(/pestanaPorDefecto\(PERSONA_EN_EL_CENTRO\)/);
   });
 
   // 🔴 PRÉSTAMOS CUELGA DEL INTERRUPTOR. Con `PLANILLA_UNIDA` apagado la
   // pestaña no se dibuja NI se abre por la URL, y el módulo queda exactamente
   // como el día antes del cambio. Sin esto, apagar el interruptor dejaría media
   // pantalla prendida.
+  // 🩸 CAMBIÓ DE DIRECCIÓN EL 10-SEP-2026: la condición se mudó al módulo puro
+  // junto con las listas. La REGLA no cambió ni un poco — con el interruptor
+  // apagado, Préstamos no existe ni por la URL— y ahora se prueba sobre la
+  // función en vez de sobre un renglón de JSX, que es más fuerte.
   it("la pestaña Préstamos cuelga de PLANILLA_UNIDA", () => {
     expect(src).toMatch(/PLANILLA_UNIDA/);
-    expect(src).toMatch(/k === "prestamos" \? PLANILLA_UNIDA : true/);
+    for (const modo of [true, false]) {
+      const claves = pestanasDeAsistencia({ personaEnElCentro: modo, planillaUnida: false })
+        .map(([k]) => k);
+      expect(`${modo}:${claves.includes("prestamos")}`).toBe(`${modo}:false`);
+    }
+    expect(
+      pestanasDeAsistencia({ personaEnElCentro: false, planillaUnida: true })
+        .map(([k]) => k),
+    ).toContain("prestamos");
   });
 
   it("Aprobaciones NO se le muestra a quien no puede aprobar", () => {
@@ -139,9 +181,14 @@ describe("las 6 pestañas y su orden", () => {
     // `/api/asistencia/aprobaciones`, que exige el rol. Pero si la pestaña se
     // viera para todos, la contadora tendría a la vista un botón que le da 403.
     expect(src).toMatch(/APROBACIONES_ROLES/);
-    expect(src).toMatch(/const visibles = TABS\.filter/);
-    // Y una pestaña que no se ve tampoco se abre escribiendo la URL.
-    expect(src).toMatch(/visibles\.some\(\(\[k\]\) => k === tabRaw\)/);
+    // 🩸 Decía `const visibles = TABS.filter`; desde el 10-sep-2026 las
+    // pestañas salen del módulo puro y se filtran por rol acá. La regla es la
+    // misma: se filtra por `vePestana`, y lo que no se ve no se abre por la URL.
+    expect(src).toMatch(/pestanasDeAsistencia\(\{/);
+    expect(src).toMatch(/\.filter\(\(\[k\]\) => vePestana\(rol, k\)\)/);
+    // Y una pestaña que no se ve tampoco se abre escribiendo la URL: la regla
+    // vive en `pestanaQueSeAbre`, que cae en la primera VISIBLE.
+    expect(src).toMatch(/pestanaQueSeAbre\(tabRaw, visibles\)/);
   });
 
   it("Vacaciones va APARTE de Justificaciones, con su propio componente", () => {
@@ -161,7 +208,11 @@ describe("las 6 pestañas y su orden", () => {
     // Reporte —marcas, justificaciones, horas extra aprobadas— y recién
     // después se genera la Planilla, que lee de ahí. Abrir en el resultado
     // hace que nadie mire el respaldo.
-    expect(src).toMatch(/useUrlState<Tab>\("tab", "reporte"\)/);
+    // 🩸 El literal `"reporte"` se fue del renglón el 10-sep-2026: ahora lo
+    // decide `pestanaPorDefecto`, que con el interruptor apagado devuelve
+    // exactamente eso. Se comprueba el VALOR, no el texto del archivo.
+    expect(pestanaPorDefecto(false)).toBe("reporte");
+    expect(src).toMatch(/useUrlState<Tab>\("tab", pestanaPorDefecto\(/);
   });
 
   it("Horarios y Feriados YA NO son pestañas de primer nivel", () => {
@@ -213,7 +264,12 @@ describe("las 6 pestañas y su orden", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 describe("🔴 la pestaña Vacaciones se ve, y sin permiso propio", () => {
   const src = leer(CLIENTE);
-  const tabs = [...src.matchAll(/\["(\w+)",\s*"([^"]+)"\]/g)].map((m) => [m[1], m[2]]);
+  // 🩸 Igual que arriba: la lista salía de una expresión regular sobre el
+  // archivo de pantalla y desde el 10-sep-2026 vive en un módulo puro. Se
+  // pregunta por el acomodo APAGADO, que es donde Vacaciones sigue siendo
+  // pestaña.
+  const tabs = pestanasDeAsistencia({ personaEnElCentro: false, planillaUnida: true })
+    .map(([k, l]) => [k, l]);
 
   it("la ve quien tiene Asistencia — no es una pestaña de aprobación", () => {
     for (const rol of ASISTENCIA_ROLES) {
@@ -235,6 +291,10 @@ describe("🔴 la pestaña Vacaciones se ve, y sin permiso propio", () => {
   it("está declarada, importada y montada — y su ruta viva", () => {
     expect(src).toMatch(/import VacacionesTab from "\.\/VacacionesTab"/);
     expect(src).toMatch(/tab === "vacaciones" && <VacacionesTab \/>/);
+    // 🩸 Con el acomodo nuevo Vacaciones deja de ser PESTAÑA —su saldo se mudó
+    // a la lista de Personas y cargarlas se hace desde la persona— pero la
+    // pantalla sigue montada y su ruta viva, que es lo que este caso protege.
+    // Apagado el interruptor, la pestaña está donde siempre.
     expect(tabs.map((t) => t[0])).toContain("vacaciones");
     expect(() => leer("app/asistencia/VacacionesTab.tsx")).not.toThrow();
     expect(() => leer("app/api/asistencia/vacaciones/route.ts")).not.toThrow();

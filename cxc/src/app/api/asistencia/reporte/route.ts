@@ -56,6 +56,15 @@ export async function GET(req: NextRequest) {
   }
   const dispositivo = (sp.get("dispositivo") ?? "").trim();
   const q = (sp.get("q") ?? "").trim().toLowerCase();
+  // 🔴 UNA SOLA PERSONA, POR CÓDIGO (10-sep-2026). Lo pide la página de la
+  // persona, que muestra SUS días del período.
+  //
+  // 🔑 ES OTRA PREGUNTA QUE `q`, y por eso es otro parámetro. `q` busca TEXTO
+  // en el código y en el nombre: con `q=1` entrarían el 1, el 11, el 13 y el
+  // 21. Acá la identidad es el código EXACTO, como en todo el sistema.
+  //
+  // ⚠️ ADITIVO: sin este parámetro la ruta se comporta exactamente como antes.
+  const soloCodigo = (sp.get("codigo") ?? "").trim();
 
   try {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
@@ -119,8 +128,14 @@ export async function GET(req: NextRequest) {
     // 🩸 La búsqueda mira el nombre del DIRECTORIO además del código. Buscando
     // solo en la marcación, escribir "BRICEIDA" no encontraba nada: el reloj
     // manda `empleado_nombre` vacío en las 3.287 filas cargadas.
+    const porCodigo = soloCodigo
+      ? efectivas.marcaciones.filter(
+          (m) => (m.empleado_codigo ?? "").trim() === soloCodigo,
+        )
+      : efectivas.marcaciones;
+
     const visibles = q
-      ? efectivas.marcaciones.filter((m) => {
+      ? porCodigo.filter((m) => {
           const cod = (m.empleado_codigo ?? "").trim();
           return (
             cod.toLowerCase().includes(q) ||
@@ -128,7 +143,7 @@ export async function GET(req: NextRequest) {
             (nombres.get(cod) ?? "").toLowerCase().includes(q)
           );
         })
-      : efectivas.marcaciones;
+      : porCodigo;
 
     // ── 🔴 QUIÉN SALE: EL QUE ESTABA TRABAJANDO EN EL RANGO CONSULTADO ────────
     //

@@ -48,6 +48,7 @@ import {
 } from "@/lib/asistencia/config";
 
 import { armarReporte, TOLERANCIA_MIN, type Marcacion, type HorarioPersona } from "@/lib/asistencia/reporte";
+import { pestanasDeAsistencia } from "@/lib/asistencia/persona-en-el-centro";
 
 const leer = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), "utf8");
 const MIGRACION = `supabase/migrations/${MIGRACION_CONFIGURACION}`;
@@ -896,10 +897,19 @@ describe("higiene", () => {
     expect(src).not.toMatch(/min-h-\[(3\d|4[0-3])px\]/);
   });
 
+  // 🩸 CAMBIÓ DE DIRECCIÓN EL 10-SEP-2026, no se borró. El par
+  // `["configuracion", "Configuración"]` estaba escrito en la pantalla y ahora
+  // vive en `lib/asistencia/persona-en-el-centro.ts` (hay DOS acomodos: el de
+  // hoy y «la persona en el centro», donde esta pestaña se llama **Personas**).
+  // Lo que se protege es lo mismo: que la pestaña EXISTA y que monte SU
+  // componente. El CONTROL es que con el interruptor apagado nada cambió.
   it("la pestaña está enchufada en el módulo", () => {
     const src = leer("src/app/asistencia/AsistenciaClient.tsx");
-    expect(src).toContain('["configuracion", "Configuración"]');
+    expect(pestanasDeAsistencia({ personaEnElCentro: false, planillaUnida: true }))
+      .toContainEqual(["configuracion", "Configuración"]);
     expect(src).toContain("<ConfiguracionTab />");
+    // Y con el acomodo nuevo es la MISMA pantalla, en modo lista.
+    expect(src).toContain("<ConfiguracionTab personaEnElCentro />");
   });
 
   it("la migración es aditiva e idempotente (no toca nada existente)", () => {

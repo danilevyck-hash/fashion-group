@@ -59,8 +59,15 @@ export async function GET(req: NextRequest) {
         saldo: f.saldo,
         saldoPrestamo: f.saldoPrestamo,
         saldoDano: f.saldoDano,
+        // 🔴 LA TERCERA CUENTA VIAJA TAMBIÉN (10-sep-2026). Se agregó cuando la
+        // página de la persona empezó a desglosar la deuda: sin ella, «Debe
+        // $120» no cuadraba con las dos filas que se dibujaban debajo, y una
+        // resta que no cierra a la vista es exactamente lo que hace desconfiar
+        // del número entero. Es ADITIVO: quien no la lee sigue igual.
+        saldoTerceros: f.saldoTerceros,
         cuota: f.cuota,
         cuotaDano: f.cuotaDano,
+        cuotaTerceros: f.cuotaTerceros,
         yaDescontado: f.yaDescontado,
       })),
       // Quien puede anotar un abono. La pantalla lo usa para no dibujar un

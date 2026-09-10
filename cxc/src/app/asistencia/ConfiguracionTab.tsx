@@ -97,7 +97,14 @@ import {
   tieneBaja,
   type MotivoSalida,
 } from "@/lib/asistencia/vigencia";
-import { ETIQUETA_SALDO_INICIAL } from "@/lib/asistencia/saldo-vacaciones";
+import {
+  ETIQUETA_SALDO_INICIAL,
+  textoSaldo,
+  type SaldoVacaciones,
+} from "@/lib/asistencia/saldo-vacaciones";
+import { excepcionesDeLaFicha } from "@/lib/asistencia/ficha-persona";
+import { rutaDePersona, RUTA_PERSONA_NUEVA } from "@/lib/asistencia/persona-en-el-centro";
+import Link from "next/link";
 import { puedeCerrar } from "@/lib/asistencia/roles";
 import { textoConfirmar, textoIgnorados } from "@/lib/asistencia/codigos-ignorados";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
@@ -261,6 +268,20 @@ const PILL_OFF = "border-gray-200 text-gray-600 hover:border-gray-400";
 const COLUMNAS =
   "lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_5rem_6.5rem_6rem_5rem] lg:items-center lg:gap-x-3";
 
+/**
+ * 🔴 LA MISMA REJILLA CON UNA COLUMNA MÁS: VACACIONES (10-sep-2026).
+ *
+ * Daniel, corrigiendo dónde iba a parar la vista de «todos»: *«Reporte es para
+ * otra cosa»*. El saldo de vacaciones es un dato **de la persona**, no del
+ * período, así que vive acá — en la lista y en la página de cada quien— y no
+ * en una pestaña propia ni adentro del Reporte.
+ *
+ * ⚠️ Va escrita COMPLETA, como la de arriba: Tailwind purga leyendo el archivo
+ * como texto y una clase armada con plantillas nunca llega al CSS.
+ */
+const COLUMNAS_CON_VACACIONES =
+  "lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_5rem_6.5rem_6rem_7rem_5rem] lg:items-center lg:gap-x-3";
+
 const money = (n: number | null, dec = 2) =>
   n === null
     ? "—"
@@ -301,7 +322,17 @@ const firma = (b: Borrador) =>
 const bajaCompleta = (b: Borrador) =>
   (b.fechaSalida.trim() === "") === (b.motivoSalida.trim() === "");
 
-export default function ConfiguracionTab() {
+export default function ConfiguracionTab({ personaEnElCentro = false }: {
+  /**
+   * 🔴 EL MISMO COMPONENTE, EN MODO LISTA (10-sep-2026). Prendido:
+   *   · la fila LLEVA a la página de esa persona en vez de desplegarse,
+   *   · se ven sus excepciones y su saldo de vacaciones sin abrir nada,
+   *   · y aparece el chip «Sin saldo (N)» para filtrar.
+   * Apagado —el default— la pantalla es EXACTAMENTE la de hoy: se despliega,
+   * se edita en línea y se guarda solo. Ni un píxel cambia.
+   */
+  personaEnElCentro?: boolean;
+} = {}) {
   const { toast } = useToast();
   // 🔑 El rol sale de `sessionStorage`, igual que en `AppHeader` y en
   // `PlanillaTab`. Solo decide si se DIBUJAN el cargo y la cédula: el freno de
@@ -310,6 +341,18 @@ export default function ConfiguracionTab() {
   useEffect(() => { setRol(sessionStorage.getItem("cxc_role") || ""); }, []);
   const puedeTocarLaFicha = puedeCerrar(rol);
   const [verIgnorados, setVerIgnorados] = useState(false);
+  /**
+   * 🔴 EL SALDO DE VACACIONES DE CADA QUIEN, en la lista (10-sep-2026).
+   *
+   * Sale de la MISMA ruta que lo calculaba en la pestaña Vacaciones
+   * (`/api/asistencia/vacaciones` → `saldos`), no de una cuenta nueva: el
+   * número que se ve acá tiene que ser el mismo que la contadora ya conocía, y
+   * dos motores para el mismo saldo es cómo nacen dos números.
+   *
+   * ⚠️ Solo se pide con el acomodo nuevo prendido. Apagado, esta pantalla no
+   * hace ni una petición de más.
+   */
+  const [saldos, setSaldos] = useState<Map<string, SaldoVacaciones>>(new Map());
 
   /**
    * 🔴 IGNORAR ESCONDE, NO BORRA. Daniel: *«pon la opción de ignorar código así
@@ -377,6 +420,26 @@ export default function ConfiguracionTab() {
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  // 🔑 FALLA ABIERTA: si los saldos no llegan, la columna dice «Falta el
+  // saldo» y la lista se sigue usando. Un error acá no puede dejar sin ficha a
+  // 37 personas.
+  useEffect(() => {
+    if (!personaEnElCentro) return;
+    let vivo = true;
+    (async () => {
+      try {
+        const r = await fetch("/api/asistencia/vacaciones", { cache: "no-store" });
+        const d = await r.json();
+        if (!vivo || !r.ok) return;
+        const lista = (d.saldos ?? []) as SaldoVacaciones[];
+        setSaldos(new Map(lista.map((x) => [String(x.codigo), x])));
+      } catch {
+        /* sin saldos la columna lo dice; no se rompe nada */
+      }
+    })();
+    return () => { vivo = false; };
+  }, [personaEnElCentro]);
 
   function abrir(p: Persona) {
     if (abierta === p.codigo) {
@@ -750,11 +813,30 @@ export default function ConfiguracionTab() {
   const activos = useMemo(() => (datos?.personas ?? []).filter((p) => p.activo), [datos]);
   const bajas = useMemo(() => (datos?.personas ?? []).filter((p) => !p.activo), [datos]);
 
+  /**
+   * 🔴 A QUIÉN LE FALTA EL SALDO DE VACACIONES.
+   *
+   * 🩸 Esto era un BLOQUE de aviso en la pestaña Vacaciones («38 personas no
+   * tienen saldo…»): un cartel que decía un número y no se podía tocar. Ahora
+   * es un chip que FILTRA, así que enterarse y arreglarlo son el mismo gesto.
+   */
+  const sinSaldo = useMemo(
+    () => activos.filter((p) => {
+      const s = saldos.get(String(p.codigo));
+      return !s || s.saldo === null || s.falta !== null;
+    }),
+    [activos, saldos],
+  );
+
   const visibles = useMemo(() => {
     if (filtro === "todos") return activos;
     if (filtro === "faltan") return activos.filter((p) => !p.configurado || p.faltaSalario);
+    if (filtro === "sin-saldo") {
+      const cods = new Set(sinSaldo.map((p) => p.codigo));
+      return activos.filter((p) => cods.has(p.codigo));
+    }
     return activos.filter((p) => p.empresa === filtro);
-  }, [activos, filtro]);
+  }, [activos, filtro, sinSaldo]);
 
   // UN solo aviso, con el desglose adentro. Antes eran dos carteles ámbar
   // apilados que decían casi lo mismo y competían entre ellos.
@@ -767,6 +849,8 @@ export default function ConfiguracionTab() {
     setForm((f) => (f ? { ...f, [k]: v } : f));
 
   const pendientes = datos ? datos.resumen.sinConfigurar + datos.resumen.sinSalario : 0;
+  // La rejilla del escritorio: con el acomodo nuevo lleva una columna más.
+  const rejilla = personaEnElCentro ? COLUMNAS_CON_VACACIONES : COLUMNAS;
 
   return (
     <div className="space-y-3">
@@ -886,7 +970,27 @@ export default function ConfiguracionTab() {
                   {etiquetaEmpresa(e)} ({activos.filter((p) => p.empresa === e).length})
                 </button>
               ))}
+              {/* 🔴 EL CHIP QUE REEMPLAZA AL CARTEL. Sin nadie sin saldo NO SE
+                  DIBUJA: un chip en cero es un control que no ofrece nada. */}
+              {personaEnElCentro && sinSaldo.length > 0 && (
+                <button type="button" onClick={() => setFiltro("sin-saldo")}
+                  className={`${PILL_BASE} ${filtro === "sin-saldo" ? PILL_ON : PILL_OFF}`}>
+                  Sin saldo ({sinSaldo.length})
+                </button>
+              )}
             </div>
+
+            {/* 🔴 DAR DE ALTA A ALGUIEN ABRE DIRECTO EN EDITAR. Mostrarle una
+                ficha vacía en modo texto y pedirle además que toque «Editar»
+                es un paso de más para decir lo que la pantalla ya sabe. */}
+            {personaEnElCentro && puedeTocarLaFicha && (
+              <div>
+                <Link href={RUTA_PERSONA_NUEVA}
+                  className="inline-flex min-h-[44px] items-center rounded-md bg-black px-3 text-sm text-white transition active:scale-[0.97]">
+                  + Nueva persona
+                </Link>
+              </div>
+            )}
 
             {visibles.length > 0 && (
               <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -894,69 +998,126 @@ export default function ConfiguracionTab() {
                     columna no se sabe qué es cada número. En celular cada dato
                     lleva su propia etiqueta dentro de la tarjeta. */}
                 <div
-                  className={`hidden border-b border-gray-200 px-3 py-2 text-[10.5px] uppercase tracking-wide text-gray-400 ${COLUMNAS}`}
+                  className={`hidden border-b border-gray-200 px-3 py-2 text-[10.5px] uppercase tracking-wide text-gray-400 ${rejilla}`}
                 >
                   <span>Persona</span>
                   <span>Empresa</span>
                   <span className="text-right">Jornada</span>
                   <span className="text-right">Salario</span>
                   <span className="text-right">Rata / hora</span>
+                  {personaEnElCentro && <span className="text-right">Vacaciones</span>}
                   <span className="text-right">Estado</span>
                 </div>
 
                 {visibles.map((p) => {
                   const falta = faltaEnPersona(p);
                   const abiertaEsta = abierta === p.codigo;
+                  const saldo = saldos.get(String(p.codigo));
+                  const saldoTexto = personaEnElCentro
+                    ? (saldo ? textoSaldo(saldo) : "Falta el saldo")
+                    : "";
+                  const saldoFalta = !saldo || saldo.saldo === null || saldo.falta !== null;
+                  // 🔴 SOLO LO RARO. Una ficha normal no dibuja ni una etiqueta,
+                  // y por eso cuando aparece una se mira. Ver `ficha-persona.ts`.
+                  const excepciones = personaEnElCentro ? excepcionesDeLaFicha(p) : [];
+
+                  /* El contenido de la fila es el MISMO en los dos acomodos: lo
+                     único que cambia es si va adentro de un botón que despliega
+                     o de un enlace que lleva a la página de la persona. */
+                  const contenido = (
+                    <>
+                      {/* ── ESCRITORIO: columnas alineadas ── */}
+                      <span className={`hidden ${rejilla}`}>
+                        <span className="min-w-0">
+                          <NombrePersona p={p} />
+                          {excepciones.length > 0 && (
+                            <span className="mt-1 flex flex-wrap gap-1">
+                              {excepciones.map((e) => (
+                                <Excepcion key={e.clave} e={e} />
+                              ))}
+                            </span>
+                          )}
+                        </span>
+                        <span className="truncate text-[13px] text-gray-600">
+                          {p.empresa ? etiquetaEmpresa(p.empresa) : "—"}
+                        </span>
+                        <span className="text-right text-[13px] tabular-nums text-gray-600">
+                          {p.jornadaSemanal} h
+                        </span>
+                        <span className="text-right text-[13px] tabular-nums text-gray-600">
+                          {money(p.salarioMensual)}
+                        </span>
+                        {/* 🔴 DOS decimales, no cuatro: es el número EXACTO con
+                            el que multiplica la planilla. Ver lib/asistencia/rata.ts */}
+                        <span className="text-right text-[13px] tabular-nums text-gray-600">
+                          {money(p.rataHora)}
+                        </span>
+                        {personaEnElCentro && (
+                          <span className={`text-right text-[13px] tabular-nums ${
+                            saldoFalta ? "text-amber-700" : "text-gray-600"
+                          }`}>
+                            {saldoTexto}
+                          </span>
+                        )}
+                        <span className="text-right">
+                          <Indicador falta={falta.length} fueraDePlanilla={p.servicioProfesional} />
+                        </span>
+                      </span>
+
+                      {/* ── CELULAR e iPAD: tarjeta (patrón PanelCxcMobile) ── */}
+                      <span className="block lg:hidden">
+                        <span className="flex items-start justify-between gap-3">
+                          <NombrePersona p={p} />
+                          <Indicador falta={falta.length} fueraDePlanilla={p.servicioProfesional} />
+                        </span>
+                        {excepciones.length > 0 && (
+                          <span className="mt-1.5 flex flex-wrap gap-1">
+                            {excepciones.map((e) => (
+                              <Excepcion key={e.clave} e={e} />
+                            ))}
+                          </span>
+                        )}
+                        <span className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
+                          <Dato etiqueta="Empresa" valor={p.empresa ? etiquetaEmpresa(p.empresa) : "—"} />
+                          <Dato etiqueta="Jornada" valor={`${p.jornadaSemanal} h/semana`} numero />
+                          <Dato etiqueta="Salario" valor={money(p.salarioMensual)} numero />
+                          <Dato etiqueta="Rata / hora" valor={money(p.rataHora)} numero />
+                          {personaEnElCentro && (
+                            <Dato etiqueta="Vacaciones" valor={saldoTexto} numero ojo={saldoFalta} />
+                          )}
+                        </span>
+                      </span>
+                    </>
+                  );
+
                   return (
                     <div key={p.codigo} className="border-b border-gray-100 last:border-0">
-                      <button
-                        type="button"
-                        onClick={() => abrir(p)}
-                        aria-expanded={abiertaEsta}
-                        className={`w-full px-3 py-2.5 text-left transition hover:bg-gray-50 ${
-                          abiertaEsta ? "bg-gray-50" : ""
-                        }`}
-                      >
-                        {/* ── ESCRITORIO: columnas alineadas ── */}
-                        <span className={`hidden ${COLUMNAS}`}>
-                          <span className="min-w-0">
-                            <NombrePersona p={p} />
-                          </span>
-                          <span className="truncate text-[13px] text-gray-600">
-                            {p.empresa ? etiquetaEmpresa(p.empresa) : "—"}
-                          </span>
-                          <span className="text-right text-[13px] tabular-nums text-gray-600">
-                            {p.jornadaSemanal} h
-                          </span>
-                          <span className="text-right text-[13px] tabular-nums text-gray-600">
-                            {money(p.salarioMensual)}
-                          </span>
-                          {/* 🔴 DOS decimales, no cuatro: es el número EXACTO con
-                              el que multiplica la planilla. Ver lib/asistencia/rata.ts */}
-                          <span className="text-right text-[13px] tabular-nums text-gray-600">
-                            {money(p.rataHora)}
-                          </span>
-                          <span className="text-right">
-                            <Indicador falta={falta.length} fueraDePlanilla={p.servicioProfesional} />
-                          </span>
-                        </span>
+                      {personaEnElCentro ? (
+                        /* 🔴 LA FILA LLEVA A SU PÁGINA. Es un enlace de verdad
+                           —no un `onClick` con `router.push`— para que se pueda
+                           abrir en otra pestaña, copiar la dirección y volver
+                           con el Atrás del navegador, como la ficha del
+                           cliente. */
+                        <Link
+                          href={rutaDePersona(p.codigo)}
+                          className="block min-h-[44px] px-3 py-2.5 text-left transition hover:bg-gray-50"
+                        >
+                          {contenido}
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => abrir(p)}
+                          aria-expanded={abiertaEsta}
+                          className={`w-full px-3 py-2.5 text-left transition hover:bg-gray-50 ${
+                            abiertaEsta ? "bg-gray-50" : ""
+                          }`}
+                        >
+                          {contenido}
+                        </button>
+                      )}
 
-                        {/* ── CELULAR e iPAD: tarjeta (patrón PanelCxcMobile) ── */}
-                        <span className="block lg:hidden">
-                          <span className="flex items-start justify-between gap-3">
-                            <NombrePersona p={p} />
-                            <Indicador falta={falta.length} fueraDePlanilla={p.servicioProfesional} />
-                          </span>
-                          <span className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
-                            <Dato etiqueta="Empresa" valor={p.empresa ? etiquetaEmpresa(p.empresa) : "—"} />
-                            <Dato etiqueta="Jornada" valor={`${p.jornadaSemanal} h/semana`} numero />
-                            <Dato etiqueta="Salario" valor={money(p.salarioMensual)} numero />
-                            <Dato etiqueta="Rata / hora" valor={money(p.rataHora)} numero />
-                          </span>
-                        </span>
-                      </button>
-
-                      {abiertaEsta && borrador && (
+                      {!personaEnElCentro && abiertaEsta && borrador && (
                         <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
                           {falta.length > 0 && (
                             <p className="mb-3 text-[12px] text-amber-800">
@@ -1875,11 +2036,37 @@ function Indicador({ falta, fueraDePlanilla }: { falta: number; fueraDePlanilla?
 
 /** Un par etiqueta/valor de la tarjeta de celular. En la tabla del escritorio la
  *  etiqueta vive en el encabezado de la columna y acá no haría falta. */
-function Dato({ etiqueta, valor, numero }: { etiqueta: string; valor: string; numero?: boolean }) {
+function Dato({ etiqueta, valor, numero, ojo }: {
+  etiqueta: string; valor: string; numero?: boolean;
+  /** `true` = falta el dato y hay que hacer algo. Ámbar, no rojo: nada se rompió. */
+  ojo?: boolean;
+}) {
   return (
     <span className="block">
       <span className="block text-[10.5px] uppercase tracking-wide text-gray-400">{etiqueta}</span>
-      <span className={`block text-gray-700 ${numero ? "tabular-nums" : ""}`}>{valor}</span>
+      <span className={`block ${ojo ? "text-amber-700" : "text-gray-700"} ${numero ? "tabular-nums" : ""}`}>
+        {valor}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * UNA ETIQUETA DE EXCEPCIÓN — lo raro de una ficha, y solo lo raro.
+ *
+ * 🔴 Qué es raro lo decide `excepcionesDeLaFicha` (módulo puro), no este
+ * componente: acá solo se pinta. Ámbar cuando es plata que no se le paga por
+ * asistencia; gris cuando es una forma de trabajar distinta.
+ */
+function Excepcion({ e }: { e: { texto: string; ayuda: string; ojo?: boolean } }) {
+  return (
+    <span
+      title={e.ayuda}
+      className={`inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] ${
+        e.ojo ? "bg-amber-50 text-amber-800" : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {e.texto}
     </span>
   );
 }

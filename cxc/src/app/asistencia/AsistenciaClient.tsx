@@ -77,70 +77,26 @@ import { APROBACIONES_ROLES, vePestana } from "@/lib/asistencia/roles";
 import ComoFuncionaTab from "./ComoFuncionaTab";
 import PrestamosTab from "./PrestamosTab";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import {
+  PERSONA_EN_EL_CENTRO,
+  pestanaPorDefecto,
+  pestanaQueSeAbre,
+  pestanasDeAsistencia,
+  type ClavePestana,
+} from "@/lib/asistencia/persona-en-el-centro";
 
-const TABS = [
-  // 🔴 REPORTE PRIMERO, Y ES EL ORDEN DEL TRABAJO (2-sep-2026). Daniel:
-  // «primero va reporte, ¿por qué es el segundo tab?». Tenía razón y estaba
-  // al revés: primero se ORDENA la asistencia (corregir marcas, justificar,
-  // aprobar horas extra) y recién después se PAGA. Una planilla generada
-  // antes de eso paga números que todavía se van a mover.
-  //
-  // Antes abría en Planilla, con el argumento de que «a esto viene la
-  // contable». Pero el que abre primero el resultado y después el respaldo
-  // termina revisando al revés: la planilla no se cuestiona sola.
-  //
-  // ⚠️ El orden de esta lista DECIDE la pestaña que abre (ver `porDefecto`
-  // abajo, que toma la primera VISIBLE para cada rol). Moverla de lugar no es
-  // cosmético: cambia dónde aterriza todo el mundo.
-  ["reporte", "Reporte"],
-  // El cuadro quincenal que sale de lo de arriba: cada minuto del Reporte,
-  // convertido en plata. Es lo que se firma.
-  ["planilla", "Planilla"],
-  // 🔴 LA SÉPTIMA, PRÉSTAMOS — y se gana el lugar por la MISMA regla que las
-  // otras: por lo que se hace ahí. Daniel, textual: *«asistencia se ingresa la
-  // info y prestamos seria para como ver la info y hacer pagos extraordinarios
-  // como abonos etc»*.
-  //
-  // 🩸 Y por lo que costaba tenerla afuera. Quincena del 1 al 15 de agosto de
-  // 2026, medido: el módulo de Préstamos registró 9 descuentos por $360,00 y la
-  // casilla de la planilla decía 7 por $265,00. KEVIN LUBO ($50), LUIS PARAJON
-  // ($45) y YULICAR CORONA ($50) tenían el pago anotado y la casilla en cero —
-  // se les bajó la deuda por plata que nunca se les quitó del sueldo—; LUIS
-  // ARROYO al revés. Dos pantallas en dos módulos para la misma plata es cómo
-  // nacen dos números.
-  //
-  // Va PEGADA a Planilla porque es la misma plata y el mismo día de trabajo.
-  //
-  // ⚠️ El módulo `/prestamos` NO se retira: sigue teniendo la ficha, el
-  // historial y las aprobaciones. Esta pestaña es VER y abonar.
-  ["prestamos", "Préstamos"],
-  // Lo del día a día: lo único que se toca seguido.
-  ["justificaciones", "Justificaciones"],
-  // 🔴 APARTE de Justificaciones, y es todo el punto (25-ago-2026): unas
-  // vacaciones no explican una falta —no se pagan por asistencia y llevan su
-  // propia cuenta de días—, así que no pueden vivir en la misma lista. Va al
-  // lado porque las dos son «lo que pasa con la gente esta quincena».
-  //
-  // 🩸 Estuvo apagada unas horas el 1-sep-2026 y volvió el mismo día: lo que
-  // enredaba era el texto del interruptor, no la pestaña. Ver la nota de
-  // arriba y `efectoDelInterruptor` en `lib/asistencia/vacaciones.ts`.
-  ["vacaciones", "Vacaciones"],
-  // 🔴 LA SEXTA, APROBACIONES (26-ago-2026). Se ganó el lugar por lo que se
-  // hace ahí y por QUIÉN lo hace: es la única pantalla del módulo donde una
-  // persona AUTORIZA algo en vez de cargar un dato. Contadora, textual: *«Sólo
-  // se pagan las horas extras autorizadas y las reportadas por Julio Garay»* —
-  // hasta hoy la planilla pagaba todos los minutos del reloj, y por eso nunca
-  // cuadró con ella. Va después de Vacaciones y antes de Configuración: es
-  // trabajo de la quincena, no un ajuste que se deja puesto.
-  //
-  // ⚠️ NO LA VE TODO EL MUNDO. Ver `soloAdmin` abajo y la nota de
-  // `APROBACIONES_ROLES`.
-  ["aprobaciones", "Aprobaciones"],
-  // Personas · Horarios · Feriados · Reglas. Se llena una vez y se corrige poco.
-  ["configuracion", "Configuración"],
-] as const;
+// 🩸 ESTA LISTA SE MUDÓ A UN MÓDULO PURO (10-sep-2026). Vivía acá abajo, con
+// todas sus notas, y `asistencia-pestanas.test.ts` la leía como TEXTO de este
+// archivo. Con el acomodo nuevo hay DOS listas —la de hoy y la de «la persona
+// en el centro»— y elegir entre ellas es una decisión, no un renglón de JSX:
+// vive en `lib/asistencia/persona-en-el-centro.ts`, con las notas completas de
+// por qué cada pestaña se ganó su lugar, y acá solo se aplica.
+//
+// El orden sigue sin ser cosmético: `pestanaQueSeAbre` toma la PRIMERA visible,
+// así que esas listas deciden dónde aterriza cada rol.
 
-type Tab = (typeof TABS)[number][0];
+
+type Tab = ClavePestana;
 
 // Qué pestañas ve cada rol vive en `lib/asistencia/roles.ts` (`vePestana`).
 
@@ -159,7 +115,10 @@ function AsistenciaInner() {
   // conservan la vista. Tab del MISMO nivel → replace (default): el Atrás del
   // navegador no cicla por pestañas (convención del sistema). Un valor
   // desconocido en la URL cae en la pestaña por defecto, nunca en blanco.
-  const [tabRaw, setTab] = useUrlState<Tab>("tab", "reporte");
+  // 🔴 CON EL INTERRUPTOR APAGADO SIGUE SIENDO «reporte», al pie de la letra.
+  // Prendido abre en Personas, que es el punto del acomodo nuevo. La decisión
+  // vive en el módulo puro, no en este renglón.
+  const [tabRaw, setTab] = useUrlState<Tab>("tab", pestanaPorDefecto(PERSONA_EN_EL_CENTRO));
   const [ayuda, setAyuda] = useState(false);
 
   // 🔑 El rol sale de `sessionStorage`, igual que en `AppHeader` y `useAuth`.
@@ -178,14 +137,20 @@ function AsistenciaInner() {
   // 🔴 CON EL INTERRUPTOR APAGADO, PRÉSTAMOS NO EXISTE. Ni en la barra, ni por
   // la URL: el `?tab=prestamos` de alguien cae en la pestaña por defecto, igual
   // que cualquier valor desconocido. Ver `planilla-unida.ts`.
-  const visibles = TABS.filter(([k]) => (k === "prestamos" ? PLANILLA_UNIDA : true))
-    .filter(([k]) => vePestana(rol, k));
+  const visibles = pestanasDeAsistencia({
+    personaEnElCentro: PERSONA_EN_EL_CENTRO,
+    planillaUnida: PLANILLA_UNIDA,
+  }).filter(([k]) => vePestana(rol, k));
   // Una pestaña que no se ve tampoco se abre por la URL: cae en la primera que
   // esta persona SÍ puede ver. 🔑 No en "planilla" a secas: quien solo aprueba
   // aterrizaría en una pantalla que su propio rol no puede cargar, y vería un
   // error en vez de su trabajo.
-  const porDefecto: Tab = (visibles[0]?.[0] ?? "reporte") as Tab;
-  const tab: Tab = visibles.some(([k]) => k === tabRaw) ? tabRaw : porDefecto;
+  //
+  // 🔴 Y CON EL ACOMODO NUEVO, LAS DIRECCIONES VIEJAS ATERRIZAN DONDE VIVE
+  // AHORA ESO: `?tab=configuracion` guardado en un favorito cae en Personas y
+  // `?tab=justificaciones` en Reporte. La regla vive en `pestanaQueSeAbre`;
+  // nadie se queda mirando una pantalla en blanco por un enlace viejo.
+  const tab: Tab = pestanaQueSeAbre(tabRaw, visibles);
 
   return (
     <>
@@ -256,6 +221,13 @@ function AsistenciaInner() {
               {tab === "justificaciones" && <JustificacionesTab />}
               {tab === "vacaciones" && <VacacionesTab />}
               {tab === "aprobaciones" && <AprobacionesTab />}
+              {/* 🔴 «PERSONAS» ES LA MISMA PANTALLA, EN MODO LISTA. Daniel:
+                  *«te acepto la queja»* — «Configuración» se llama Personas. No
+                  es un componente nuevo: es `ConfiguracionTab` con las filas
+                  llevando a la página de cada quien en vez de desplegarse, y
+                  con Horarios, Feriados y Reglas exactamente donde estaban. Un
+                  segundo componente sería una segunda lista de personas. */}
+              {tab === "personas" && <ConfiguracionTab personaEnElCentro />}
               {tab === "configuracion" && <ConfiguracionTab />}
             </>
           )}

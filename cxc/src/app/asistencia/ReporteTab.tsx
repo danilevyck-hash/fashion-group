@@ -17,6 +17,8 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 import EstadoReloj from "./EstadoReloj";
+import JustificacionesDelPeriodo from "./JustificacionesDelPeriodo";
+import { PERSONA_EN_EL_CENTRO } from "@/lib/asistencia/persona-en-el-centro";
 import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -65,6 +67,12 @@ export default function ReporteTab() {
   // si dijera "5 de tolerancia" mientras el motor usa 10, el texto sería falso.
   const [reglas, setReglas] = useState<Partial<ReglasReporte> | null>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
+  /**
+   * 🔴 LA VISTA «JUSTIFICACIONES DEL PERÍODO» (10-sep-2026). Arranca CERRADA:
+   * el trabajo de esta pantalla es el reporte, y las justificaciones son la
+   * explicación que se va a buscar cuando algo no cuadra.
+   */
+  const [verJustificaciones, setVerJustificaciones] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Correcciones: cuántas hay en el rango, si se pueden hacer (la migración
@@ -169,6 +177,26 @@ export default function ReporteTab() {
           </button>
         </div>
       </div>
+
+      {/* 🔴 UN ENLACE AL LADO DE LA TABLA, no un bloque suelto ni filas
+          metidas adentro. Daniel: *«Reporte es para otra cosa»* — pero una
+          justificación EXPLICA una ausencia de acá, así que vive a un toque.
+          Solo con el acomodo nuevo: con el interruptor apagado, Justificaciones
+          sigue siendo su propia pestaña y esto sería la misma lista dos veces. */}
+      {PERSONA_EN_EL_CENTRO && (
+        <div>
+          <button type="button" onClick={() => setVerJustificaciones((v) => !v)}
+            aria-expanded={verJustificaciones}
+            className="min-h-[44px] text-sm text-gray-500 underline-offset-2 transition hover:text-gray-900 hover:underline">
+            {verJustificaciones ? "Ocultar las justificaciones" : "Justificaciones del período"}
+          </button>
+          {verJustificaciones && (
+            <div className="mt-2">
+              <JustificacionesDelPeriodo desde={desde} hasta={hasta} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sin horario fijado se asume 5:00 p.m., y con eso las extras y la salida
           temprana pueden estar mal. Vale avisarlo antes de que descuente. */}
