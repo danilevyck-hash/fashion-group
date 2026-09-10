@@ -10,8 +10,9 @@
 // Es el mismo patrón de `GUIAS_ATAJOS_NUEVOS`: UNA constante, leída desde un
 // solo lugar, para que apagarlo sea un cambio de una línea y no una cacería.
 //
-// ⚠️ En el ambiente de PRUEBAS se prende con `NEXT_PUBLIC_PLANILLA_UNIDA=1`.
-// Sin la variable, apagado.
+// ⚠️ SE PRENDE con la variable `NEXT_PUBLIC_PLANILLA_UNIDA=1` en Vercel (y un
+// despliegue: Next la reemplaza como TEXTO al compilar, así que no basta con
+// cambiarla en caliente). Sin la variable, apagado.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**

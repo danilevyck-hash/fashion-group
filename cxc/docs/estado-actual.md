@@ -1087,3 +1087,68 @@ en `src/lib/novedades/dibujos.ts` (el catálogo) y en `src/lib/novedades/lista.t
 pone), y no hay nada que aplicar a la base; (2) decidir si **Comisiones y Asistencia** merecen su
 color de módulo en `moduleColors.ts` — hoy son los únicos dos de los catorce que salen en gris, y no
 por olvido del dibujo sino porque nunca tuvieron acento propio en el encabezado.
+
+---
+
+## 10-sep-2026 — La Planilla Unida llega a producción, APAGADA
+
+Todo el trabajo de **Asistencia · Planilla · Préstamos** que se construyó en la copia
+de pruebas está en `main` y desplegado. 🔴 **Con los dos interruptores apagados el
+módulo en producción es EXACTAMENTE el de siempre**, y hay candado que lo exige en las
+dos direcciones.
+
+### Los DOS interruptores (los dos apagados)
+
+| Interruptor | Archivo:línea | Qué prende |
+|---|---|---|
+| `NEXT_PUBLIC_PLANILLA_UNIDA` | `src/lib/asistencia/planilla-unida.ts:26` | Comprobante de pago · el cierre que escribe el pago del préstamo (reabrir lo revierte) · corte 13/28 + «Ajuste quincena anterior» · **pestaña Préstamos** y la «una sola puerta» |
+| `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO` | `src/lib/asistencia/persona-en-el-centro.ts:43` | 6 pestañas → 4 (5 con Préstamos) · Personas primera · la página de cada persona con Editar · saldo de vacaciones en Personas · justificaciones del período en Reporte |
+
+**Cómo se prenden:** variable en Vercel (`=1`) **+ un despliegue**. Next reemplaza las
+`NEXT_PUBLIC_*` como TEXTO al compilar, así que cambiarla en caliente no alcanza.
+Se prenden **uno por uno**, cuando Daniel diga.
+
+### Lo que NO cuelga de un interruptor (aditivo por datos, hoy inerte)
+
+Medido contra producción antes de subirlo: la tercera cuenta **«Descuento a terceros»**
+(0 movimientos), el daño que **deja de proponer cuota** (0 de 31 empleados tenían cuota
+de daño, así que esa casilla no se dibujaba), **códigos ignorados** (tabla vacía),
+**ACS como cuarta empresa** (0 personas en `american_classic`) y sus **30 min de extra
+automáticos** (las otras tres empresas en 0). Lo único visible hoy sin prender nada es
+**una cuarta opción en el desplegable de conceptos de Préstamos**, que no hace nada
+hasta que alguien la use.
+
+### Migraciones aplicadas ese día (las 6, verificadas contra la base)
+
+`20261028120000_planilla_unida` · `20261029120000_terceros_tercera_cuenta` ·
+`20261030120000_codigos_ignorados` · `20261031120000_acs_cuarta_empresa` ·
+`20261101120000_acs_aprueba_daniel` · `20261102120000_cedula_foto_bucket`.
+
+Todas aditivas; los CHECK que se re-crean van **más anchos**. ⚠️ La única sentencia no
+aditiva es el `DELETE` de `(Contabilidad, american_classic)` en `20261101120000`:
+**medido antes y después, 0 filas** — esa fila no existía, y Contabilidad conserva sus 3.
+Se creó el bucket **privado** `asistencia-cedulas` (`public = false`).
+
+### Lo que se resolvió al traerlo
+
+- **Un solo choque con producción**, en la pantalla del reloj: los dos lados arreglaron
+  el mismo defecto (dibujaba solo `relojes[0]`). Se conservó **la versión de producción**,
+  que es superconjunto (una tarjeta por reloj, pedido y spinner por dispositivo, el
+  nombre del reloj solo cuando hay más de uno). El candado que venía de pruebas fijaba
+  la GRAFÍA de la otra solución: cambió de dirección con nota fechada y conserva su
+  control (`relojes[0]` sigue prohibido).
+- **El andamiaje del ambiente de pruebas NO viajó**: sello amarillo, `vercel.json` vacío,
+  el bloqueo de `/api/cron/*`, `npm run migrar` apagado, `LEEME-PRUEBAS.md`,
+  `scripts/pruebas/` y el título «PRUEBAS». Verificado: **82 crons intactos** y el
+  middleware NO bloquea los crons.
+- **`.env.local` no se tocó** en ningún commit.
+
+### Pendiente de Daniel
+
+1. **Prender `NEXT_PUBLIC_PLANILLA_UNIDA`** cuando quiera empezar a usar el comprobante,
+   el corte 13/28 y la pestaña de Préstamos. ⚠️ Al prenderlo, `/prestamos` deja de estar
+   en el menú y redirige a la pestaña.
+2. **Prender `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO`** para el acomodo nuevo del módulo.
+3. **Cargar las personas de ACS** si quiere que Multifashion entre a la planilla (hoy
+   tiene 0) — recién ahí los 30 min automáticos mueven algo.
+4. **Dictar el cargo y la cédula** de la gente: sin cargo, el comprobante imprime un guion.

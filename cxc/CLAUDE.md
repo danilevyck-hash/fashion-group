@@ -271,6 +271,29 @@ archivo enlazado, verbatim.
 - El descuento de **préstamo se propone solo pero se APRUEBA**; lo que no está aprobado se ve en ámbar, con nombre y monto.
 - Panamá es **UTC−5 fijo**; los tests usan fechas fijas, nunca `new Date()`.
 
+### La Planilla Unida — TODO detrás de DOS interruptores, los dos APAGADOS (10-sep-2026)
+
+> 🔴 **Al 10-sep-2026 los dos están APAGADOS en producción y el módulo es EXACTAMENTE el de siempre.** Se prenden con una **variable en Vercel + un despliegue** (Next reemplaza `NEXT_PUBLIC_*` como TEXTO al compilar: cambiarla en caliente no basta). Daniel los prende uno por uno.
+
+| Interruptor | Dónde vive | Qué prende |
+|---|---|---|
+| `NEXT_PUBLIC_PLANILLA_UNIDA` | `src/lib/asistencia/planilla-unida.ts:26` | El comprobante de pago · el cierre que escribe el pago del préstamo (y reabrir que lo revierte) · el corte 13/28 y el «Ajuste quincena anterior» · **la pestaña Préstamos** y con ella la «una sola puerta» |
+| `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO` | `src/lib/asistencia/persona-en-el-centro.ts:43` | El acomodo nuevo: 6 pestañas → 4 (5 con Préstamos), Personas primera, la página `/asistencia/personas/[codigo]` con Editar, el saldo de vacaciones como columna en Personas y las justificaciones del período en Reporte |
+
+⚠️ **Lo que NO cuelga de un interruptor, porque es ADITIVO POR DATOS** — medido contra producción antes de subirlo, y hoy inerte: la tercera cuenta «Descuento a terceros» (0 movimientos; el daño dejó de proponer cuota y **0 de 31 empleados tenían cuota de daño**, así que esa casilla no se dibujaba), `asistencia_codigos_ignorados` (tabla vacía = nada escondido), **ACS como cuarta empresa** (los CHECK se ensancharon; producción tiene **0 personas** en `american_classic`) y sus **30 min de extra automáticos** (`EXTRA_AUTOMATICO_POR_EMPRESA`: las otras tres empresas están en **0**, y con 0 el motor da lo mismo campo por campo). Lo único que se VE hoy sin prender nada es una cuarta opción en el desplegable de conceptos de Préstamos, que no hace nada hasta que alguien la use.
+
+- 🔴 **PRÉSTAMOS: UNA SOLA PUERTA, NUNCA DOS** (`src/lib/prestamos-una-puerta.ts`). Con `PLANILLA_UNIDA` **apagado** todo es lo de hoy: la ficha en el menú y el home, `/prestamos` sin redirigir, y Asistencia SIN pestaña de Préstamos. **Prendido**: la ficha se **FILTRA** de `getVisibleModules` (no se borra de `ALL_MODULES` — la key sigue en `role_permissions` y en `fg_users.modulos_override`), y `/prestamos` y sus subrutas redirigen a `/asistencia?tab=prestamos` con **307 temporal** y la **query intacta**. ⚠️ **`/api/prestamos/*` NO se redirige**: son las MISMAS rutas que usa la pestaña.
+- 🔴 **La pestaña se autoriza por `PRESTAMOS_ROLES`, no por tener Asistencia** — si la autorizara `ASISTENCIA_ROLES`, mover la puerta le quitaría el módulo en silencio a quien tiene Préstamos y no tiene Asistencia. La lista se **deriva** (`PRESTAMOS_PESTANA_ROLES` = admin · contabilidad **+ secretaria, que entra SOLO A VER** y ya entraba antes). Bodega y vendedor, no. Lo de «solo ver» lo decide el SERVIDOR.
+- **La sección Préstamos de la página de la persona ENLAZA, no duplica**: `enlaceAPrestamos()` manda a la pestaña (prendido) o a la ficha de siempre (apagado). No dibuja formulario ni hace POST.
+- 🔴 **El comprobante de pago** es UNO para las cuatro empresas, una hoja por persona, con TODOS los renglones aunque vayan en 0.00. Multifashion sale con **`MULTI FASHION HOLDING CORP.` · `155638923-2-2016`**, de la MISMA lista fiscal del estado de cuenta, **sin correo ni teléfono** (es otra entidad). Sin cargo cargado, el papel pone un guion: no se inventa.
+- 🔴 **El pago del préstamo lo escribe el CIERRE**, con `await`, y **reabrir lo revierte** con soft delete. Cerrar dos veces no cobra dos veces (índice único). 🩸 Medido en la quincena 1-15 ago 2026: Préstamos tenía 9 descuentos por $360,00 y la casilla decía 7 por $265,00.
+- 🔴 **El corte (13/28) NO prorratea el sueldo**: el período queda entero y solo se recorta **hasta dónde se MIDE el reloj** (`hastaReloj`). El **«Ajuste quincena anterior»** va en su **propio renglón**, nunca mezclado con la ausencia.
+- 🔴 **En ACS aprueba `daniel`**, no la contadora — y **cerrar no sale de esa tabla**, así que ella sigue cerrando las cuatro empresas.
+- **Los nombres se capitalizan** en pantalla con `src/lib/nombre-en-pantalla.ts` (UN solo lugar; Comisiones lo LLAMA en vez de tener el suyo). Solo cambia cómo se MUESTRA y **no se inventan acentos**: «LUIS PARAJON» → «Luis Parajon».
+- **La foto de la cédula** vive en el bucket **PRIVADO `asistencia-cedulas`**; se guarda la RUTA y la URL se **firma al leer**, con vencimiento de una hora.
+- Migraciones **aplicadas el 10-sep-2026**: `20261028120000_planilla_unida` · `20261029120000_terceros_tercera_cuenta` · `20261030120000_codigos_ignorados` · `20261031120000_acs_cuarta_empresa` · `20261101120000_acs_aprueba_daniel` · `20261102120000_cedula_foto_bucket`. Todas aditivas; los CHECK que se re-crean van **más anchos** (ninguna fila existente deja de ser válida). ⚠️ La única sentencia no aditiva es el `DELETE` de la fila `(Contabilidad, american_classic)` en `20261101120000`: **medido antes y después, 0 filas** — esa fila no existía, y Contabilidad conserva sus 3.
+- Candados: `planilla-unida-comprobante` · `planilla-unida-cierre-prestamo` · `planilla-unida-corte-y-cableado` · `planilla-tres-descuentos` · `persona-en-el-centro` · `prestamos-una-puerta`. Mutación: **90/90** (`_mutar-candados-planilla-unida.sh`), **86/86** (`_mutar-candados-persona-en-el-centro.sh`) y **17/17** (`_mutar-candados-prestamos-una-puerta.sh`), cada uno con 2 controles.
+
 ### Préstamos — [docs/postmortems/prestamos.md](docs/postmortems/prestamos.md)
 
 - 🔴 **Cada persona tiene DOS cuentas con su propia cuota: Préstamo y Daño de mercancía.** El total es
