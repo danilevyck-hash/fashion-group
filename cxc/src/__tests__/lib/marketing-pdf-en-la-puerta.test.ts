@@ -29,10 +29,11 @@ const MB = 1024 * 1024;
 const pdf = (size = MB) => ({ name: "factura.pdf", type: "application/pdf", size });
 const jpg = (size = MB) => ({ name: "foto.jpg", type: "image/jpeg", size });
 
-describe("🔴 el interruptor nace APAGADO", () => {
-  it("MARKETING_PDF_EN_LA_PUERTA es un booleano y hoy vale false", () => {
+describe("🔴 el interruptor nació APAGADO y Daniel lo prendió el 10-sep-2026", () => {
+  // Cambió de dirección con nota fechada: Daniel, textual, «prende marketing».
+  it("MARKETING_PDF_EN_LA_PUERTA es un booleano y hoy vale true", () => {
     expect(typeof MARKETING_PDF_EN_LA_PUERTA).toBe("boolean");
-    expect(MARKETING_PDF_EN_LA_PUERTA).toBe(false);
+    expect(MARKETING_PDF_EN_LA_PUERTA).toBe(true);
   });
 
   it("apagado, el campo es el de hoy: dice «Foto» y solo acepta imágenes", () => {

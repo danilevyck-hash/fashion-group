@@ -22,10 +22,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * 🔴 EL INTERRUPTOR — un solo lugar, APAGADO hasta que Daniel lo prenda.
- * En `false`, «Registrar gasto» es la pantalla de hoy, campo por campo.
+ * 🔴 EL INTERRUPTOR — un solo lugar. Nació APAGADO (10-sep-2026) y Daniel lo
+ * PRENDIÓ el mismo día: *«prende marketing»*. En `false`, «Registrar gasto»
+ * vuelve a ser la pantalla de antes, campo por campo.
  */
-export const MARKETING_PDF_EN_LA_PUERTA = false;
+export const MARKETING_PDF_EN_LA_PUERTA = true;
 
 /**
  * El tope de la factura en PDF, en MB. Es el MISMO número que ya usaba el
