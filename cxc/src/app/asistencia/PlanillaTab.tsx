@@ -85,6 +85,7 @@ import type {
   SugerenciaPrestamo,
 } from "@/lib/asistencia/prestamos-planilla";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import { corteSugerido, netoConAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
 // 🔴 QUIÉN CIERRA SALE DEL MISMO MÓDULO QUE EL CANDADO DEL SERVIDOR
@@ -117,7 +118,14 @@ interface Respuesta {
   empresaEtiqueta: string | null;
   lineas: LineaPlanilla[];
   totales: TotalesPlanilla;
+  /** El ajuste de la quincena anterior, para restarlo del neto que se congela. */
+  ajusteTotal?: number;
   reglas: ReglasAsistencia;
+  /** 🔴 El corte con el que se midió (día 13/28). `null` = quincena entera. */
+  corte?: string | null;
+  /** 🔴 El ajuste de la quincena anterior, con nombre y monto. Solo con el
+   *  interruptor y cuando la quincena pasada se cerró con corte. */
+  ajusteQuincenaAnterior?: { total: number; personas: { codigo: string; etiqueta: string; monto: number }[] };
   /** 🔴 Lo que el módulo de Préstamos dice que hay que descontar esta quincena,
    *  persona por persona. Vacío en un rango libre.
    *
@@ -197,6 +205,8 @@ interface Pedido {
   desde: string;
   hasta: string;
   empresa: string;
+  /** 🔴 Hasta qué día se lee el reloj (día 13/28). "" = la quincena entera. */
+  corte?: string;
 }
 
 /** Lo que la base sabe de este período. `GET /api/asistencia/planilla-guardada`. */
@@ -320,6 +330,9 @@ export default function PlanillaTab() {
   /** `false` hasta que alguien elige un período. Sin esto no se pide nada. */
   const [elegido, setElegido] = useState(false);
   const [empresa, setEmpresa] = useState<string>(EMPRESAS_ASISTENCIA[0]);
+  // 🔴 EL CORTE (día 13/28). "" = la quincena entera, el comportamiento de
+  // siempre. Solo se usa con el interruptor. Cambiarlo vuelve viejo el cuadro.
+  const [corte, setCorte] = useState("");
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -424,6 +437,7 @@ export default function PlanillaTab() {
     setFrenos([]);
     try {
       const q = new URLSearchParams({ desde: p.desde, hasta: p.hasta, empresa: p.empresa });
+      if (p.corte) q.set("corte", p.corte);
       const res = await fetch(`/api/asistencia/planilla?${q}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
@@ -449,12 +463,12 @@ export default function PlanillaTab() {
   /** Generar / Regenerar: pedir el cuadro de lo que está elegido AHORA. */
   const generar = useCallback(() => {
     if (!elegido) return;
-    setPedido({ desde, hasta, empresa });
-  }, [desde, elegido, empresa, hasta]);
+    setPedido({ desde, hasta, empresa, corte });
+  }, [desde, elegido, empresa, hasta, corte]);
 
   // ── LO QUE SE DERIVA DEL ESTADO ────────────────────────────────────────────
   /** ¿El cuadro en pantalla es de lo que está elegido arriba? */
-  const coincide = !!pedido && pedido.desde === desde && pedido.hasta === hasta && pedido.empresa === empresa;
+  const coincide = !!pedido && pedido.desde === desde && pedido.hasta === hasta && pedido.empresa === empresa && (pedido.corte ?? "") === corte;
   /** 🔴 Hay números en pantalla que ya no son los de lo que está elegido. */
   const vieja = !!data && (!coincide || desactualizada);
   const cerrada = cierre?.cerrada ?? null;
@@ -601,7 +615,7 @@ export default function PlanillaTab() {
       const res = await fetch("/api/asistencia/planilla-guardada", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empresa: pedido.empresa, desde: pedido.desde, hasta: pedido.hasta }),
+        body: JSON.stringify({ empresa: pedido.empresa, desde: pedido.desde, hasta: pedido.hasta, corte: pedido.corte || null }),
       });
       const j = await res.json();
       setModal(null);
@@ -769,7 +783,7 @@ export default function PlanillaTab() {
       const hojas = lineasConComprobante(data.lineas).map((l) => {
         const extra = porCodigo.get(l.codigo);
         return armarComprobante(
-          { linea: l, posicion: extra?.posicion ?? null, cedula: extra?.cedula ?? null },
+          { linea: l, posicion: extra?.posicion ?? null, cedula: extra?.cedula ?? null, ajusteAnterior: l.ajusteAnterior },
           periodo,
         );
       });
@@ -859,6 +873,39 @@ export default function PlanillaTab() {
             ))}
           </select>
         </label>
+
+        {/* 🔴 EL CORTE — hasta qué día se lee el reloj (día 13/28). Solo con el
+            interruptor y cuando el período es una quincena. Cambiarlo vuelve
+            viejo el cuadro; se aprieta «Regenerar» para verlo cortado. */}
+        {PLANILLA_UNIDA && !!data?.periodo.quincena && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500">Cortar el reloj el</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={corte}
+                min={data.periodo.desde}
+                max={data.periodo.hasta}
+                onChange={(e) => setCorte(e.target.value)}
+                className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+              />
+              {corte && (
+                <button type="button" onClick={() => setCorte("")}
+                  className="min-h-[44px] rounded-md border border-gray-300 px-2 text-xs text-gray-600 transition hover:border-black hover:text-black">
+                  Quincena entera
+                </button>
+              )}
+            </div>
+            {/* Un botón que llena el día sugerido (13 o 28) de un toque. */}
+            {!corte && data.periodo.quincena && corteSugerido(data.periodo.quincena) && (
+              <button type="button"
+                onClick={() => setCorte(corteSugerido(data.periodo.quincena!)!)}
+                className="self-start text-xs text-blue-700 underline">
+                Sugerido: día {Number((corteSugerido(data.periodo.quincena)!).slice(8, 10))}
+              </button>
+            )}
+          </label>
+        )}
 
         {/* Plegado, el botón va acá; abierto, va en el pie del calendario. */}
         {!calendarioAbierto && botonGenerar}
@@ -975,9 +1022,9 @@ export default function PlanillaTab() {
               con los datos de HOY; el cerrado es de cuando se cerró. Si no dan
               lo mismo, algo cambió después del pago y hay que saberlo — pero lo
               que vale sigue siendo lo cerrado. */}
-          {!!data && Math.abs(data.totales.netoPagar - cerrada.totalNeto) > 0.005 && (
+          {!!data && Math.abs((data.totales.netoPagar - (data.ajusteQuincenaAnterior?.total ?? 0)) - cerrada.totalNeto) > 0.005 && (
             <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[12px] text-amber-900">
-              Ojo: el cuadro que ves ahora da <b>${$(data.totales.netoPagar)}</b> y lo que se cerró
+              Ojo: el cuadro que ves ahora da <b>${$(data.totales.netoPagar - (data.ajusteQuincenaAnterior?.total ?? 0))}</b> y lo que se cerró
               fue <b>${$(cerrada.totalNeto)}</b>. Cambió algo después del cierre. Vale lo cerrado;
               si hay que rehacerlo, hay que reabrir la quincena.
             </p>
@@ -1053,6 +1100,44 @@ export default function PlanillaTab() {
             ))}
           </ul>
         </div>
+      )}
+
+      {/* 🔴 EL CORTE Y EL AJUSTE — solo con el interruptor y cuando hay algo que
+          decir. El corte dice hasta dónde se leyó el reloj; el ajuste, con
+          nombre y monto, es la corrección de los días que la quincena pasada
+          pagó sin medir. La misma regla de Daniel: lo que mueve plata se dice. */}
+      {PLANILLA_UNIDA && !!data && !vieja && (
+        <>
+          {data.corte && textoCorte(data.periodo.hasta, data.corte,
+            Math.max(0, Math.round((Date.parse(`${data.periodo.hasta}T12:00:00Z`) - Date.parse(`${data.corte}T12:00:00Z`)) / 86400000))) && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+              <p className="text-[13px] text-gray-700">
+                {textoCorte(data.periodo.hasta, data.corte,
+                  Math.max(0, Math.round((Date.parse(`${data.periodo.hasta}T12:00:00Z`) - Date.parse(`${data.corte}T12:00:00Z`)) / 86400000)))}
+              </p>
+            </div>
+          )}
+          {!!data.ajusteQuincenaAnterior && data.ajusteQuincenaAnterior.personas.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <p className="text-sm font-medium text-amber-900">
+                {data.ajusteQuincenaAnterior.personas.length === 1
+                  ? "1 persona trae un ajuste de la quincena anterior"
+                  : `${data.ajusteQuincenaAnterior.personas.length} personas traen un ajuste de la quincena anterior`}
+              </p>
+              <p className="mt-0.5 text-[13px] text-amber-900">
+                Son los días que la quincena pasada pagó sin medir (después del corte).
+                {" "}+ se le descuenta, − se le devuelve.
+              </p>
+              <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[13px] text-amber-900">
+                {data.ajusteQuincenaAnterior.personas.map((a) => (
+                  <li key={a.codigo} className="tabular-nums">
+                    {a.etiqueta}: {a.monto > 0 ? "−" : "+"}${$(Math.abs(a.monto))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
       )}
 
       {/* 🔴 BORRADOR: todavía no se guardó nada. Va con el botón de cerrar al
@@ -1405,7 +1490,8 @@ export default function PlanillaTab() {
                       data.totales.domingos, data.totales.feriados, data.totales.totalBruto,
                       data.totales.seguroSocial, data.totales.seguroEducativo, data.totales.isr,
                       data.totales.prestamo, data.totales.terceros, data.totales.mercancia,
-                      data.totales.totalDeducciones, data.totales.otrosServicios, data.totales.netoPagar,
+                      data.totales.totalDeducciones, data.totales.otrosServicios,
+                      data.totales.netoPagar - (data.ajusteQuincenaAnterior?.total ?? 0),
                     ].map((v, i) => (
                       <td key={i} className="px-2 py-2.5 text-right tabular-nums">
                         {v === 0 ? <span className="text-gray-400">—</span> : $$(v)}
@@ -1479,7 +1565,7 @@ export default function PlanillaTab() {
                 {data.totales.personas === 1 ? "persona" : "personas"}
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
-                ${$(data.totales.netoPagar)}
+                ${$(data.totales.netoPagar - (data.ajusteQuincenaAnterior?.total ?? 0))}
               </p>
               <p className="text-[13px] text-gray-500">
                 Bruto ${$(data.totales.totalBruto)} · deducciones ${$(data.totales.totalDeducciones)}
@@ -1531,6 +1617,7 @@ export default function PlanillaTab() {
           empresa={data.empresaEtiqueta ?? etiquetaEmpresa(empresa)}
           rango={etiquetaRangoGuardado({ desde, hasta })}
           totales={data.totales}
+          ajusteTotal={data.ajusteQuincenaAnterior?.total ?? 0}
           cerrada={cerrada}
           trabajando={trabajandoCierre}
           onConfirmar={(motivo) => { void (modal === "cerrar" ? cerrarQuincena() : reabrir(motivo)); }}
@@ -1568,12 +1655,14 @@ export default function PlanillaTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ModalCierre({
-  modo, empresa, rango, totales, cerrada, trabajando, onConfirmar, onCerrar,
+  modo, empresa, rango, totales, ajusteTotal, cerrada, trabajando, onConfirmar, onCerrar,
 }: {
   modo: "cerrar" | "reabrir";
   empresa: string;
   rango: string;
   totales: TotalesPlanilla;
+  /** El ajuste de la quincena anterior, para restarlo del neto que se congela. */
+  ajusteTotal?: number;
   cerrada: CabeceraGuardada | null;
   trabajando: boolean;
   onConfirmar: (motivo: string) => void;
@@ -1649,7 +1738,7 @@ function ModalCierre({
                   de que está elegida la empresa equivocada antes de firmar. */}
               <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] tabular-nums text-gray-700">
                 Se congelan <b>{totales.personas} {totales.personas === 1 ? "persona" : "personas"}</b>,
-                con un <b>neto a pagar de ${$(totales.netoPagar)}</b> — bruto ${$(totales.totalBruto)},
+                con un <b>neto a pagar de ${$(totales.netoPagar - (ajusteTotal ?? 0))}</b> — bruto ${$(totales.totalBruto)},
                 deducciones ${$(totales.totalDeducciones)}.
               </p>
               <p className="text-[13px] text-gray-600">
@@ -1896,6 +1985,17 @@ function Fila({
             {chipBaseSeguros(sobreQueBase)}
           </span>
         )}
+        {/* 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR. Sin el chip, un neto que no da
+            lo esperado no tiene explicación a la vista. El signo lo dice todo:
+            + se le descuenta, − se le devuelve. */}
+        {!!l.ajusteAnterior && (
+          <span
+            className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800"
+            title={`Ajuste de la quincena anterior: ${l.ajusteAnterior > 0 ? "se le descuentan" : "se le devuelven"} $${$(Math.abs(l.ajusteAnterior))} por los días que la quincena pasada pagó sin medir.`}
+          >
+            {l.ajusteAnterior > 0 ? "−" : "+"}${$(Math.abs(l.ajusteAnterior))} ajuste
+          </span>
+        )}
       </td>
       {num(d.salarioQuincenal)}
       {num(d.extraDiurno)}
@@ -1935,7 +2035,9 @@ function Fila({
         <CeldaManual codigo={l.codigo} campo="otrosServicios" valor={l.manuales.otrosServicios}
           onGuardar={onGuardar} bloqueo={bloqueo} />
       </td>
-      {num(d.netoPagar, "font-semibold text-gray-900")}
+      {/* 🔴 EL NETO REAL = netoPagar MENOS el ajuste, por `netoConAjuste`, la
+          MISMA cuenta que el papel. Sin ajuste da idéntico. */}
+      {num(netoConAjuste(d.netoPagar, l.ajusteAnterior), "font-semibold text-gray-900")}
     </tr>
   );
 }
@@ -1982,7 +2084,7 @@ function Tarjeta({
         </span>
         <span className="shrink-0 text-right">
           <span className="block text-lg font-semibold tabular-nums text-gray-900">
-            ${$(d.netoPagar)}
+            ${$(netoConAjuste(d.netoPagar, l.ajusteAnterior))}
           </span>
           <span className="text-[11px] text-gray-400">{abierta ? "cerrar" : "ver detalle"}</span>
         </span>
@@ -2053,9 +2155,19 @@ function Tarjeta({
               <span className="tabular-nums text-emerald-700">+${$(d.otrosServicios)}</span>
             </div>
           )}
+          {/* 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, en su propio renglón, nunca
+              mezclado con la ausencia. + descuenta, − devuelve. */}
+          {!!l.ajusteAnterior && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Ajuste quincena anterior</span>
+              <span className={`tabular-nums ${l.ajusteAnterior > 0 ? "text-red-700" : "text-emerald-700"}`}>
+                {l.ajusteAnterior > 0 ? "−" : "+"}${$(Math.abs(l.ajusteAnterior))}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between font-semibold">
             <span>Neto a pagar</span>
-            <span className="tabular-nums">${$(d.netoPagar)}</span>
+            <span className="tabular-nums">${$(netoConAjuste(d.netoPagar, l.ajusteAnterior))}</span>
           </div>
 
           {h.diasARevisar > 0 && (

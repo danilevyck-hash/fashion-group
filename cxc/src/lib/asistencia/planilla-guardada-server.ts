@@ -40,7 +40,7 @@ export const TABLA_GUARDADA_LINEA = "asistencia_planilla_guardada_linea";
 const COLS_CABECERA =
   "id, empresa, desde, hasta, quincena, version, estado, cerrada_por, cerrada_en, "
   + "reabierta_por, reabierta_en, motivo_reabrir, personas, total_bruto, "
-  + "total_deducciones, total_neto, factor_base";
+  + "total_deducciones, total_neto, factor_base, corte";
 
 interface FilaCabecera {
   id: string;
@@ -60,6 +60,7 @@ interface FilaCabecera {
   total_deducciones: number | string | null;
   total_neto: number | string | null;
   factor_base: number | string | null;
+  corte: string | null;
 }
 
 /** ⚠️ PostgREST devuelve los `numeric` como TEXTO. Convertir acá, una vez. */
@@ -86,6 +87,9 @@ function cabeceraDeFila(f: FilaCabecera): CabeceraGuardada {
     reabiertaPor: f.reabierta_por ?? null,
     reabiertaEn: f.reabierta_en ?? null,
     motivoReabrir: f.motivo_reabrir ?? null,
+    // 🔴 Hasta qué día se leyó el reloj. De acá lo lee el ajuste de la quincena
+    // siguiente. `null` = la quincena entera (comportamiento de siempre).
+    corte: f.corte ? String(f.corte).slice(0, 10) : null,
     personas: Math.round(num(f.personas)),
     totalBruto: num(f.total_bruto),
     totalDeducciones: num(f.total_deducciones),
@@ -194,6 +198,8 @@ export async function cerrarPlanilla(opts: {
   lineas: readonly LineaPlanilla[];
   /** Todas las cabeceras de esa empresa, ya leídas: de ahí sale la versión. */
   yaGuardadas: readonly CabeceraGuardada[];
+  /** 🔴 Hasta qué día se leyó el reloj. `null` = la quincena entera. */
+  corte?: string | null;
 }): Promise<ResultadoGuardado> {
   const id = randomUUID();
   const totales = totalesDe(opts.lineas);
@@ -208,6 +214,7 @@ export async function cerrarPlanilla(opts: {
     quincena: opts.quincena,
     version,
     factor_base: opts.factorBase,
+    corte: opts.corte ?? null,
     estado: "cerrando",
     cerrada_por: opts.usuario,
     cerrada_en: new Date().toISOString(),

@@ -324,3 +324,123 @@ describe("G. EN EL IPHONE (~390 px) LA PÁGINA NO SE DESLIZA DE LADO", () => {
     expect(tab).toMatch(/minimumFractionDigits: 2/);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("H. EL CORTE Y EL AJUSTE, CABLEADOS (10-sep-2026)", () => {
+  const ruta = leerSinComentarios("src/app/api/asistencia/planilla/route.ts");
+  const cierre = leerSinComentarios("src/app/api/asistencia/planilla-guardada/route.ts");
+
+  // 🔴 EL SUELDO NO SE PRORRATEA: el período (desde..hasta, factorBase) NO se
+  // toca; lo único que se recorta es hasta dónde se MIDE el reloj (`hastaReloj`).
+  it("el reloj se mide con `hastaReloj`, pero el período queda entero", () => {
+    // El corte solo nace con el interruptor, en una quincena, y si es válido.
+    expect(ruta).toMatch(/PLANILLA_UNIDA && q\.esQuincena && corteRaw && corteValido/);
+    expect(ruta).toMatch(/const hastaReloj = corte \?\? q\.hasta;/);
+    // La medición usa hastaReloj…
+    expect(ruta).toMatch(/leerCorrecciones\(q\.desde, hastaReloj\)/);
+    expect(ruta).toMatch(/leerVacaciones\(q\.desde, hastaReloj\)/);
+    expect(ruta).toMatch(/hasta: hastaReloj,/);
+    // …pero el factor y la clave de montos siguen saliendo del período entero.
+    expect(ruta).toMatch(/factorBase: q\.factorBase/);
+  });
+
+  // 🔴 EL AJUSTE SOLO CORRE CON EL INTERRUPTOR, EN UNA QUINCENA Y CON EMPRESA.
+  it("el ajuste cuelga de PLANILLA_UNIDA, la quincena y la empresa", () => {
+    expect(ruta).toMatch(/if \(PLANILLA_UNIDA && q\.esQuincena && q\.quincena && empresa\)/);
+    expect(ruta).toMatch(/medirAjusteAnterior\(req, empresa, q\.quincena\)/);
+  });
+
+  // 🔑 NO HAY RECURSIÓN: el rango corto que mide los días sin medir NO lleva
+  // corte, así que su propio bloque de ajuste (que exige esQuincena) no corre.
+  it("el rango que mide los días sin medir no se le pasa corte", () => {
+    const bloque = ruta.slice(ruta.indexOf("async function medirAjusteAnterior"), ruta.indexOf("export async function GET"));
+    expect(bloque).toMatch(/url\.searchParams\.set\("desde", restante\.desde\)/);
+    expect(bloque).not.toMatch(/set\("corte"/);
+    // y usa `ajusteDeDiasSinMedir` sobre el dinero medido.
+    expect(bloque).toMatch(/ajusteDeDiasSinMedir\(l\.dinero\)/);
+  });
+
+  // 🔴 EL CIERRE GUARDA EL CORTE Y LO PASA AL CÁLCULO.
+  it("el cierre pasa el corte al cálculo y a la cabecera", () => {
+    expect(cierre).toMatch(/PLANILLA_UNIDA && corteRaw && corteValido\(desde, hasta, corteRaw\)/);
+    expect(cierre).toMatch(/if \(corte\) url\.searchParams\.set\("corte", corte\)/);
+    expect(cierre).toMatch(/corte,\s*\n\s*\}\);/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("I. EL AJUSTE, LA CUENTA (pura)", () => {
+  const DINERO = (o: Partial<import("@/lib/asistencia/planilla").DineroLinea>) =>
+    ({ ...DINERO_BASE, ...o } as import("@/lib/asistencia/planilla").DineroLinea);
+
+  // 🔴 UNA SOLA CUENTA para el neto real: netoPagar − ajuste. El motor no
+  // conoce el ajuste; sin él, da idéntico.
+  it("netoConAjuste resta el ajuste, y sin ajuste no cambia nada", async () => {
+    const { netoConAjuste } = await import("@/lib/asistencia/corte-quincena");
+    expect(netoConAjuste(229.95, 12.5)).toBeCloseTo(217.45, 2);   // descuenta
+    expect(netoConAjuste(229.95, -8)).toBeCloseTo(237.95, 2);     // devuelve
+    expect(netoConAjuste(229.95, 0)).toBeCloseTo(229.95, 2);
+    expect(netoConAjuste(229.95, null)).toBeCloseTo(229.95, 2);
+    expect(netoConAjuste(229.95, undefined)).toBeCloseTo(229.95, 2);
+  });
+
+  // 🔴 EL NETO GUARDADO ES EL QUE SE PAGA: netoPagar − ajuste.
+  it("totalesDe resta el ajuste del total neto", async () => {
+    const { totalesDe } = await import("@/lib/asistencia/planilla-guardada");
+    const base = { horas: {}, faltaConfigurar: [], fueraDePlanilla: false } as unknown as Record<string, unknown>;
+    const linea = (neto: number, ajuste?: number) => ({
+      ...base, codigo: "x", etiqueta: "X", dinero: DINERO({ netoPagar: neto, totalBruto: neto }),
+      ajusteAnterior: ajuste,
+    }) as unknown as import("@/lib/asistencia/planilla").LineaPlanilla;
+    const t = totalesDe([linea(200, 15), linea(300)]);
+    expect(t.totalNeto).toBeCloseTo(200 - 15 + 300, 2);
+  });
+
+  // La quincena anterior: la 2ª de un mes → la 1ª; la 1ª → la 2ª del mes pasado.
+  it("quincenaAnterior encadena las quincenas, y cruza el año en enero", async () => {
+    const { quincena, quincenaAnterior } = await import("@/lib/asistencia/planilla");
+    expect(quincenaAnterior(quincena(2026, 8, 2)).clave).toBe("2026-08-1");
+    expect(quincenaAnterior(quincena(2026, 8, 1)).clave).toBe("2026-07-2");
+    expect(quincenaAnterior(quincena(2026, 1, 1)).clave).toBe("2025-12-2");
+  });
+});
+
+const DINERO_BASE = {
+  rataHora: 3, valorMinuto: 0.05, salarioQuincenal: 200,
+  extraDiurno: 0, extraNocturno: 0, excedente: 0, domingos: 0, feriados: 0,
+  ausencias: 0, ausenciaPorTardanza: 0, ausenciaDeDiaCompleto: 0, vacacionesYaPagadas: 0,
+  tardanzas: 0, totalBruto: 200, baseSeguros: null, seguroSocial: 0, seguroEducativo: 0,
+  isr: 0, prestamo: 0, terceros: 0, mercancia: 0, totalDeducciones: 0, otrosServicios: 0, netoPagar: 200,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("J. EL CIERRE CONGELA EL CORTE Y EL AJUSTE", () => {
+  // 🔴 `filaDeLinea` escribe el ajuste de cada línea, para que el cuadro
+  // congelado sepa cuánto se le corrigió a cada persona.
+  it("filaDeLinea escribe ajuste_anterior de la línea", async () => {
+    const { filaDeLinea } = await import("@/lib/asistencia/planilla-guardada");
+    const base = {
+      codigo: "x", etiqueta: "X", nombre: "X", empresa: "vistana",
+      empresaEtiqueta: "Vistana", salarioMensual: 500, jornadaSemanal: 48,
+      horas: {} as never, faltaConfigurar: [], fueraDePlanilla: false,
+      pagaSeguros: true, baseSeguros: null, noMarcaReloj: false, parte: null,
+      decidirAMano: null, quincenalReferencia: null, extraMedido: null,
+      extraNoAprobada: null, extraAprobada: true,
+      dinero: null, manuales: { isr: 0, prestamo: 0, terceros: 0, mercancia: 0, otrosServicios: 0 },
+    };
+    const conAjuste = filaDeLinea("p1", "vistana", { ...base, ajusteAnterior: 12.5 } as never);
+    expect(conAjuste.ajuste_anterior).toBe(12.5);
+    // Sin ajuste, cero — el comportamiento de siempre.
+    const sinAjuste = filaDeLinea("p1", "vistana", base as never);
+    expect(sinAjuste.ajuste_anterior).toBe(0);
+  });
+
+  // 🔴 `cerrarPlanilla` inserta el corte en la cabecera (de ahí lo lee la
+  // quincena siguiente para armar su ajuste). Barrido sobre el I/O.
+  it("cerrarPlanilla escribe el corte en la cabecera", () => {
+    const srv = leerSinComentarios("src/lib/asistencia/planilla-guardada-server.ts");
+    expect(srv).toMatch(/corte: opts\.corte \?\? null/);
+    // Y la cabecera LEE el corte (para encadenar las quincenas).
+    expect(srv).toMatch(/corte: f\.corte \? String\(f\.corte\)/);
+  });
+});

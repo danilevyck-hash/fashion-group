@@ -248,6 +248,9 @@ export function filaDeLinea(planillaId: string, empresa: string, l: LineaPlanill
     // cerrado no tenga ni un minuto ahí — salvo que se haya cerrado antes del
     // 3-sep-2026, cuando el freno leía el campo equivocado y nunca frenó.
     extra_aprobada: l.extraAprobada,
+    // 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, congelado con el resto del cuadro.
+    // `undefined`/0 sin el interruptor: la columna nace con default 0.
+    ajuste_anterior: l.ajusteAnterior ?? 0,
   };
 
   for (const [campo, col] of Object.entries(COLUMNAS_HORAS)) {
@@ -286,7 +289,9 @@ export function totalesDe(lineas: readonly LineaPlanilla[]): TotalesGuardados {
     if (!l.dinero) continue;
     totalBruto += l.dinero.totalBruto;
     totalDeducciones += l.dinero.totalDeducciones;
-    totalNeto += l.dinero.netoPagar;
+    // 🔴 El neto GUARDADO es el que se paga: netoPagar MENOS el ajuste de la
+    // quincena anterior. `?? 0` sin el interruptor → el número de siempre.
+    totalNeto += l.dinero.netoPagar - (l.ajusteAnterior ?? 0);
   }
   const c = (n: number) => Math.round(n * 100) / 100;
   return {
@@ -346,6 +351,12 @@ export interface CabeceraGuardada {
   empresa: string;
   desde: string;
   hasta: string;
+  /**
+   * 🔴 Hasta qué día se LEYÓ EL RELOJ. `null` = la quincena entera, el
+   * comportamiento de siempre. Con corte, los días de `corte`+1 a `hasta` se
+   * pagaron como normales y su verdad se corrige en la quincena siguiente.
+   */
+  corte: string | null;
   quincena: string | null;
   /** La etiqueta que lee una persona: «1 ago 2026 al 15 ago 2026». */
   etiqueta: string;

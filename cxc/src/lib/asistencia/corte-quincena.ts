@@ -146,6 +146,14 @@ export function ajusteDeDiasSinMedir(
  * papel («si alguien no lo lleva se pone 0»). Esto es el aviso de la PANTALLA,
  * que es otra cosa.
  */
+export function netoConAjuste(netoPagar: number, ajuste: number | null | undefined): number {
+  // 🔴 UNA SOLA CUENTA. El motor NO conoce el ajuste: el neto real es su
+  // `netoPagar` menos el ajuste, y esta función es el único lugar que lo hace,
+  // para que el papel, la pantalla y el cierre no puedan decir números
+  // distintos. Positivo = descuenta (baja el neto); negativo = devuelve.
+  return centavos(Number(netoPagar || 0) - Number(ajuste || 0));
+}
+
 export function textoAjuste(monto: number): string | null {
   const m = centavos(monto);
   if (m === 0) return null;

@@ -190,6 +190,20 @@ export function quincenasHasta(hoy: string, cuantas = 12): Quincena[] {
   return out;
 }
 
+/**
+ * La quincena INMEDIATAMENTE anterior. La 2ª de un mes → la 1ª del mismo; la
+ * 1ª → la 2ª del mes pasado (y en enero, la 2ª de diciembre del año anterior).
+ *
+ * 🔑 Es de dónde sale el ajuste: para armar la quincena de hoy hay que mirar si
+ * la de antes se cerró con un corte que dejó días sin medir.
+ */
+export function quincenaAnterior(q: Quincena): Quincena {
+  if (q.n === 2) return quincena(q.anio, q.mes, 1);
+  const mes = q.mes === 1 ? 12 : q.mes - 1;
+  const anio = q.mes === 1 ? q.anio - 1 : q.anio;
+  return quincena(anio, mes, 2);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EL PERÍODO — la quincena de siempre, o un rango de fechas cualquiera
 //
@@ -1233,6 +1247,18 @@ export interface LineaPlanilla {
    * chip «sin aprobar», no para adivinarlo mirando si el monto dio cero.
    */
   extraAprobada: boolean;
+  /**
+   * 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, cuando la pasada se cerró con un
+   * CORTE (día 13 o 28) y estos días quedaron sin medir. Positivo = se le
+   * descuenta ahora; negativo = se le devuelve. `undefined`/0 = no hay ajuste.
+   *
+   * 🔑 OPCIONAL Y ADITIVO: sin el interruptor de la planilla unida nadie lo
+   * setea, sigue en `undefined`, y todo se comporta EXACTAMENTE como antes.
+   * NO entra al `dinero` del motor: el neto real se calcula restándolo (una
+   * sola cuenta, `netoConAjuste`), para que el papel y la pantalla no puedan
+   * decir números distintos. Ver `corte-quincena.ts`.
+   */
+  ajusteAnterior?: number;
   dinero: DineroLinea | null;
   manuales: ManualesLinea;
 }

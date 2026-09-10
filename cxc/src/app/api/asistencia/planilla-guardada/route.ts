@@ -93,6 +93,7 @@ import type { SugerenciaPrestamo } from "@/lib/asistencia/prestamos-planilla";
 // lo tecleaba una persona en el otro módulo y por eso el 1-15 de agosto de 2026
 // el módulo decía 9 descuentos por $360,00 y la casilla 7 por $265,00.
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import { corteValido } from "@/lib/asistencia/corte-quincena";
 import {
   escribirPagosDelCierre,
   planearCierre,
@@ -207,6 +208,13 @@ export async function POST(req: NextRequest) {
     if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
     const { empresa, desde, hasta } = v;
 
+    // 🔴 EL CORTE con el que se midió el reloj. Solo con el interruptor y solo
+    // si es válido; si no, `null` = la quincena entera, como siempre. Se pasa al
+    // cálculo (para que mida hasta ahí) y se guarda en la cabecera (para que la
+    // quincena siguiente sepa qué días quedaron sin medir).
+    const corteRaw = typeof body?.corte === "string" ? body.corte.trim() : "";
+    const corte = PLANILLA_UNIDA && corteRaw && corteValido(desde, hasta, corteRaw) ? corteRaw : null;
+
     // 🔴 LA FIRMA SALE DE LA SESIÓN, NUNCA DEL CUERPO. Es la misma regla que las
     // correcciones de marcación: si «todos los de Asistencia pueden», sin firma
     // «todos pueden» se vuelve «nadie sabe quién fue».
@@ -233,6 +241,9 @@ export async function POST(req: NextRequest) {
     url.searchParams.set("empresa", empresa);
     url.searchParams.set("desde", desde);
     url.searchParams.set("hasta", hasta);
+    // El mismo corte con el que la pantalla mostró el cuadro: así lo que se
+    // congela es exactamente lo que se revisó.
+    if (corte) url.searchParams.set("corte", corte);
     // Solo la cookie: el resto de los encabezados son los del POST (content-type,
     // largo del cuerpo) y no tienen nada que hacer en un GET sin cuerpo.
     const headers = new Headers();
@@ -302,6 +313,9 @@ export async function POST(req: NextRequest) {
       // De acá sale la VERSIÓN: las cabeceras ya se leyeron para el solapamiento
       // y no se vuelve a consultar la base para contar.
       yaGuardadas: cabeceras,
+      // 🔴 Hasta qué día se leyó el reloj. La quincena siguiente lo lee para
+      // armar su ajuste.
+      corte,
     });
     if (r.choque) {
       // El EXCLUDE de la base. Se llega acá cuando dos personas cierran rangos

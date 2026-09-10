@@ -35,6 +35,10 @@ ARCHIVOS=(
   "src/app/asistencia/PrestamosTab.tsx"
   "supabase/migrations/20261028120000_planilla_unida.sql"
   "src/lib/backup/tablas.ts"
+  "src/lib/asistencia/planilla.ts"
+  "src/lib/asistencia/planilla-guardada.ts"
+  "src/lib/asistencia/planilla-guardada-server.ts"
+  "src/app/api/asistencia/planilla/route.ts"
 )
 for f in "${ARCHIVOS[@]}"; do
   mkdir -p "$RESPALDO/$(dirname "$f")"
@@ -202,6 +206,25 @@ mutar "el cargo vacío se guarda como cadena vacía" src/lib/asistencia/datos-de
   's = s.replace("  if (!t) return null;", "  if (!t) return \"\" as unknown as null;")'
 mutar "el select deja de pedir las columnas del papel" src/lib/asistencia/config-server.ts \
   's = s.replace("const COLS_CON_PAPEL = `${COLS_CON_BASE_SEGUROS}, ${COLUMNAS_DEL_PAPEL.join(\", \")}`;", "const COLS_CON_PAPEL = COLS_CON_BASE_SEGUROS;")'
+
+echo "── EL CORTE Y EL AJUSTE ────────────────────────────────────────────────"
+mutar "el reloj se mide hasta el fin, ignorando el corte" src/app/api/asistencia/planilla/route.ts \
+  's = s.replace("const hastaReloj = corte ?? q.hasta;", "const hastaReloj = q.hasta;")'
+mutar "el corte prorratea el sueldo (mide el período corto)" src/app/api/asistencia/planilla/route.ts \
+  's = s.replace("hasta: hastaReloj,\n      reglas,\n      nombres,\n      incluirNoHabiles: true,", "hasta: hastaReloj,\n      reglas,\n      nombres,\n      incluirNoHabiles: true,")
+s = s.replace("factorBase: q.factorBase", "factorBase: 0.5")'
+mutar "el neto guardado NO resta el ajuste" src/lib/asistencia/planilla-guardada.ts \
+  's = s.replace("totalNeto += l.dinero.netoPagar - (l.ajusteAnterior ?? 0);", "totalNeto += l.dinero.netoPagar;")'
+mutar "el ajuste NO se congela en la línea guardada" src/lib/asistencia/planilla-guardada.ts \
+  's = s.replace("ajuste_anterior: l.ajusteAnterior ?? 0,", "ajuste_anterior: 0,")'
+mutar "el cierre NO guarda el corte en la cabecera" src/lib/asistencia/planilla-guardada-server.ts \
+  's = s.replace("corte: opts.corte ?? null,", "corte: null,")'
+mutar "el rango que mide los días sin medir SÍ lleva corte (recursión)" src/app/api/asistencia/planilla/route.ts \
+  's = s.replace("url.searchParams.set(\"hasta\", restante.hasta);", "url.searchParams.set(\"hasta\", restante.hasta);\n  url.searchParams.set(\"corte\", restante.desde);")'
+mutar "netoConAjuste ignora el ajuste" src/lib/asistencia/corte-quincena.ts \
+  's = s.replace("return centavos(Number(netoPagar || 0) - Number(ajuste || 0));", "return centavos(Number(netoPagar || 0));")'
+mutar "quincenaAnterior no cruza el año en enero" src/lib/asistencia/planilla.ts \
+  's = s.replace("const anio = q.mes === 1 ? q.anio - 1 : q.anio;", "const anio = q.anio;")'
 
 echo
 echo "── CONTROLES: NO se tienen que cazar ───────────────────────────────────"

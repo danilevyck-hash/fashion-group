@@ -87,13 +87,26 @@ import {
   normalizarManuales,
   periodoDeQuincena,
   periodoDesdeRango,
+  quincenaAnterior,
   quincenaDesdeClave,
   separarSinFicha,
   totalizar,
   type FichaPlanilla,
+  type LineaPlanilla,
   type ManualesLinea,
   type Periodo,
 } from "@/lib/asistencia/planilla";
+// 🔴 EL CORTE (día 13/28) y el AJUSTE de la quincena anterior. Todo cuelga del
+// interruptor: sin él, `hastaReloj` es `q.hasta` y no se computa ningún ajuste,
+// o sea el módulo de siempre. Ver `planilla-unida.ts` y `corte-quincena.ts`.
+import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import {
+  ajusteDeDiasSinMedir,
+  corteValido,
+  diasSinMedir,
+} from "@/lib/asistencia/corte-quincena";
+import { leerCabeceras } from "@/lib/asistencia/planilla-guardada-server";
+import { esCerrada } from "@/lib/asistencia/planilla-guardada";
 import {
   avisoMigracionPlanilla,
   guardarManuales,
@@ -132,6 +145,58 @@ function instante(dia: string, fin: boolean): string {
   return new Date(
     Date.parse(`${dia}T${fin ? "23:59:59.999" : "00:00:00.000"}${PANAMA}`),
   ).toISOString();
+}
+
+/**
+ * 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR — lo que produjeron de verdad los días
+ * que la quincena pasada pagó sin medir.
+ *
+ * Se llega acá SOLO con el interruptor y en una quincena con empresa elegida.
+ * Mira si la quincena anterior de esa empresa se cerró con un CORTE; si sí, mide
+ * los días que quedaron afuera [corte+1 .. fin] volviendo a llamar a ESTE mismo
+ * cálculo para ese rango corto —cero aritmética nueva— y saca el ajuste por
+ * persona con `ajusteDeDiasSinMedir`.
+ *
+ * 🔑 NO HAY RECURSIÓN: el rango corto no es una quincena (`esQuincena` false),
+ * así que su propio bloque de ajuste no corre. Y `ajusteDeDiasSinMedir` solo lee
+ * ausencia/tardanza/extra, que se valúan por minuto y NO dependen del
+ * `factorBase` del rango corto (ver `calcularDinero`).
+ */
+async function medirAjusteAnterior(
+  req: NextRequest,
+  empresa: string,
+  quincenaActual: import("@/lib/asistencia/planilla").Quincena,
+): Promise<Map<string, number>> {
+  const vacio = new Map<string, number>();
+  const prev = quincenaAnterior(quincenaActual);
+  const { cabeceras } = await leerCabeceras(empresa);
+  const cerrada = cabeceras.find(
+    (c) => esCerrada(c.estado) && c.desde === prev.desde && c.hasta === prev.hasta && c.corte,
+  );
+  if (!cerrada || !cerrada.corte) return vacio;
+
+  const restante = diasSinMedir(prev.desde, prev.hasta, cerrada.corte);
+  if (!restante) return vacio;
+
+  // El mismo camino que usa el cierre para calcular sin duplicar el motor.
+  const url = new URL("/api/asistencia/planilla", req.nextUrl.origin);
+  url.searchParams.set("empresa", empresa);
+  url.searchParams.set("desde", restante.desde);
+  url.searchParams.set("hasta", restante.hasta);
+  const headers = new Headers();
+  const cookie = req.headers.get("cookie");
+  if (cookie) headers.set("cookie", cookie);
+  const resp = await GET(new NextRequest(url, { headers }));
+  if (resp.status !== 200) return vacio;
+  const cuadro = (await resp.json()) as { lineas?: LineaPlanilla[] };
+
+  const out = new Map<string, number>();
+  for (const l of cuadro.lineas ?? []) {
+    if (!l.dinero) continue;
+    const a = ajusteDeDiasSinMedir(l.dinero);
+    if (a !== 0) out.set(l.codigo, a);
+  }
+  return out;
 }
 
 export async function GET(req: NextRequest) {
@@ -204,6 +269,26 @@ export async function GET(req: NextRequest) {
     periodo = periodoDeQuincena(quincena);
   }
   const q = periodo;
+
+  // ── 🔴 EL CORTE — hasta qué día se lee el reloj ────────────────────────────
+  //
+  // Daniel: la quincena se cierra el 13 (o el 28) para tener los pagos listos.
+  // El reloj se mide hasta ahí; los días que faltan se pagan como normales y su
+  // verdad se corrige en la quincena siguiente.
+  //
+  // 🔴 EL PERÍODO NO SE TOCA: `q.desde`..`q.hasta` y `q.factorBase` siguen
+  // siendo los de la quincena ENTERA, así que el SUELDO no se prorratea. Lo
+  // único que se recorta es hasta dónde se MIRA el reloj (`hastaReloj`).
+  //
+  // ⚠️ Solo con el interruptor y solo en una quincena; un corte inválido se
+  // ignora (se lee la quincena entera, como siempre).
+  const corteRaw = (sp.get("corte") ?? "").trim();
+  const corte =
+    PLANILLA_UNIDA && q.esQuincena && corteRaw && corteValido(q.desde, q.hasta, corteRaw)
+      ? corteRaw
+      : null;
+  const hastaReloj = corte ?? q.hasta;
+
   const empresaRaw = (sp.get("empresa") ?? "").trim();
   // 🔴 A `gerente_boston` la empresa NO se la decide la URL: ES Boston. Mismo
   // criterio que Multifashion, que ES `american_classic` y no acepta `?empresa=`
@@ -242,7 +327,7 @@ export async function GET(req: NextRequest) {
             pedirCount ? { count: "exact" } : {},
           )
           .gte("ocurrio_en", instante(q.desde, false))
-          .lte("ocurrio_en", instante(q.hasta, true))
+          .lte("ocurrio_en", instante(hastaReloj, true))
           .order("ocurrio_en", { ascending: true })
           .order("id", { ascending: true })
           .range(from, to),
@@ -255,7 +340,7 @@ export async function GET(req: NextRequest) {
       // hora no serviría para nada: la pantalla diría una cosa y la planilla
       // pagaría otra. Sin la tabla corrida devuelve CERO correcciones, o sea la
       // misma planilla de siempre, hasta el centavo.
-      leerCorrecciones(q.desde, q.hasta),
+      leerCorrecciones(q.desde, hastaReloj),
       // ⚠️ En un rango libre NO hay montos manuales: se guardan por quincena y
       // repartir un ISR por días sería inventar plata. Se avisa en la respuesta.
       q.claveManuales ? leerManuales(q.claveManuales) : Promise.resolve({ porCodigo: new Map(), faltaMigracion: false }),
@@ -263,7 +348,7 @@ export async function GET(req: NextRequest) {
       // se pagan las horas extras autorizadas y las reportadas por Julio
       // Garay»*. Si no se puede leer, la planilla no sale: «cero aprobadas»
       // ante un error soltaría el candado y pagaría todas.
-      leerAprobaciones(q.desde, q.hasta),
+      leerAprobaciones(q.desde, hastaReloj),
       // 🔴 QUIÉN REPARTE SU SUELDO ENTRE DOS EMPRESAS. Si no se puede leer, la
       // planilla no sale.
       leerRepartos(),
@@ -273,15 +358,15 @@ export async function GET(req: NextRequest) {
       // 🔑 Por la fuente ÚNICA, no con un `select` copiado. Ver la nota de
       // `leerJustificaciones`: leer distinto acá que en el reporte es la
       // diferencia entre «el día entero» y «un permiso de dos horas».
-      leerJustificaciones(q.desde, q.hasta),
+      leerJustificaciones(q.desde, hastaReloj),
       // 🔴 LAS VACACIONES, por la MISMA puerta que el reporte. El motor las
       // honra pase lo que pase: si no se pueden leer, la planilla no sale.
-      leerVacaciones(q.desde, q.hasta),
+      leerVacaciones(q.desde, hastaReloj),
       supabaseServer
         .from("asistencia_feriados")
         .select("fecha, nombre")
         .gte("fecha", q.desde)
-        .lte("fecha", q.hasta),
+        .lte("fecha", hastaReloj),
     ]);
     if (hRes.error) throw new Error(hRes.error.message);
     if (fRes.error) throw new Error(fRes.error.message);
@@ -387,7 +472,9 @@ export async function GET(req: NextRequest) {
       vacaciones: vRes.filas,
       feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
       desde: q.desde,
-      hasta: q.hasta,
+      // 🔴 EL RELOJ SE MIDE HASTA EL CORTE, no hasta el fin de la quincena. Sin
+      // corte, `hastaReloj` ES `q.hasta` y esto no cambia nada.
+      hasta: hastaReloj,
       reglas,
       nombres,
       incluirNoHabiles: true,
@@ -669,6 +756,30 @@ export async function GET(req: NextRequest) {
     const prestamoSinAprobar = prestamosSinAprobar(prestamos);
     const prestamoSinAtar = prestamosSinAtar(presRes.fichas);
 
+    // ── 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, PEGADO A CADA LÍNEA ────────────
+    //
+    // Solo con el interruptor, en una quincena y con empresa elegida (cada
+    // empresa cierra la suya, así que el ajuste es por empresa). Se calcula UNA
+    // vez y viaja en la línea; el neto real se saca con `netoConAjuste` en la
+    // pantalla y en el papel. `undefined` sin todo esto → el módulo de siempre.
+    let lineasFinal = lineas;
+    let totalAjuste = 0;
+    const ajustePersonas: { codigo: string; etiqueta: string; monto: number }[] = [];
+    if (PLANILLA_UNIDA && q.esQuincena && q.quincena && empresa) {
+      const mapa = await medirAjusteAnterior(req, empresa, q.quincena);
+      if (mapa.size) {
+        lineasFinal = lineas.map((l) => {
+          const a = mapa.get(l.codigo);
+          return a ? { ...l, ajusteAnterior: a } : l;
+        });
+        for (const l of lineas) {
+          const a = mapa.get(l.codigo);
+          if (a) { ajustePersonas.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto: a }); totalAjuste += a; }
+        }
+        totalAjuste = Math.round(totalAjuste * 100) / 100;
+      }
+    }
+
     return NextResponse.json({
       // `quincena` se mantiene con el mismo nombre y forma para no romper a
       // nadie que ya lo lea; `periodo` es lo que la pantalla usa ahora.
@@ -676,8 +787,13 @@ export async function GET(req: NextRequest) {
       periodo: q,
       empresa,
       empresaEtiqueta: empresa ? etiquetaEmpresa(empresa) : null,
-      lineas,
-      totales: totalizar(lineas),
+      lineas: lineasFinal,
+      totales: totalizar(lineasFinal),
+      // 🔴 El corte con el que se midió (para que la pantalla lo muestre y el
+      // cierre lo guarde) y el ajuste de la quincena anterior, con nombre y
+      // monto — la misma regla de Daniel: lo que mueve plata se dice.
+      corte,
+      ajusteQuincenaAnterior: { total: totalAjuste, personas: ajustePersonas },
       reglas,
       // La lista de la pestaña Aprobaciones. `null` para quien no puede aprobar
       // o cuando no se pidió: no se manda una lista de nombres y horas a quien

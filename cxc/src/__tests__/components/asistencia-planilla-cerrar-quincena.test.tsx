@@ -278,7 +278,11 @@ describe("🔴 CERRAR — confirma, y no manda un solo monto", () => {
       const post = llamadas.find((c) => c.init?.method === "POST");
       expect(post).toBeTruthy();
       const body = JSON.parse(String(post!.init!.body)) as Record<string, unknown>;
-      expect(body).toEqual({ empresa: "confecciones_boston", desde: "2026-08-01", hasta: "2026-08-15" });
+      // 🩸 EL CUERPO GANÓ `corte` EL 10-SEP-2026 (planilla unida). No es plata:
+      // es la fecha hasta la que se leyó el reloj (día 13/28), y va en `null`
+      // sin el interruptor —que es este caso—. La regla que este candado
+      // protege NO cambió: NINGÚN monto viaja; la ruta recalcula y congela.
+      expect(body).toEqual({ empresa: "confecciones_boston", desde: "2026-08-01", hasta: "2026-08-15", corte: null });
       // 🔴 Nada de plata viaja desde el navegador: la ruta recalcula y congela.
       for (const campo of ["netoPagar", "totales", "lineas", "totalNeto"]) {
         expect(body).not.toHaveProperty(campo);
