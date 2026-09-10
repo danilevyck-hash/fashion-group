@@ -82,7 +82,10 @@ beforeEach(() => {
       const u = String(url);
       if (u.startsWith("/api/guias/facturas-cliente")) {
         const codigo = decodeURIComponent(u.split("codigo=")[1] ?? "");
-        return { ok: true, json: async () => ({ facturas: facturasDe(codigo), hasta: null }) };
+        // Sporting llega SIN frescura y City Mall CON: el pie tiene que
+        // aguantar las dos (sin `hasta` no se inventa una hora).
+        const hasta = codigo === CITY.codigo ? "2026-08-21T17:05:00Z" : null;
+        return { ok: true, json: async () => ({ facturas: facturasDe(codigo), hasta }) };
       }
       if (u.startsWith("/api/guias/frecuencias")) {
         return { ok: true, json: async () => ({ clientes: [CITY, SPORTING], empresas: [] }) };
@@ -247,6 +250,23 @@ describe("🔴 «+ Otro cliente»: un cliente a la vez, y los de antes SE QUEDAN
     ]);
   });
 
+  it("🔴 vive DEBAJO del cuadro, no adentro — Daniel: «debería estar abajo de ese cuadro, no dentro»", async () => {
+    render(<Harness />);
+    await asentar();
+    await elegirCliente(SPORTING.nombre);
+    fireEvent.click(casillas()[0]);
+
+    const panel = screen.getByTestId("facturas-del-cliente");
+    const cuadro = panel.querySelector(".border.border-gray-200.rounded-lg") as HTMLElement;
+    expect(cuadro).toBeTruthy();
+    // Está en el panel, pero NO adentro del cuadro con borde.
+    expect(panel.contains(otroCliente())).toBe(true);
+    expect(cuadro.contains(otroCliente())).toBe(false);
+    // Y es un enlace discreto de ancho natural, no un botón de ancho completo.
+    expect(otroCliente()!.className).not.toContain("w-full");
+    expect(otroCliente()!.className).toContain("inline-flex");
+  });
+
   it("🔴 acá el cliente SALE DEL DIRECTORIO: no hay salida a mano", async () => {
     // Las facturas viven amarradas al CÓDIGO del cliente, así que un nombre
     // escrito a mano no podría traer ninguna. La salida a mano sigue existiendo
@@ -376,7 +396,74 @@ describe("🔴 solo el día más reciente viene abierto", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. El teléfono no pierde los 44 px
+// 3. El pie: UNA sola línea
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("🔴 el pie es UNA línea, y no perdió ninguna función", () => {
+  async function pie() {
+    render(<Harness />);
+    await asentar();
+    await elegirCliente(SPORTING.nombre);
+    return screen.getByTestId("pie-facturas");
+  }
+
+  it("los pedazos viven en el MISMO renglón, en orden y separados por puntos", async () => {
+    // (el espacio alrededor del punto lo pone el `gap` del renglón, no el texto)
+    const linea = await pie();
+    expect((linea.textContent || "").trim()).toBe("Traslado·Escribir el número·Buscar otra vez");
+    expect(linea.querySelectorAll("button")).toHaveLength(3);
+  });
+
+  it("🔴 con frescura, «Actualizado» va A LA VISTA y en el MISMO renglón — no en un title", async () => {
+    // En el iPad no hay mouse: lo que solo se ve pasando el mouse por encima no
+    // existe. Y sin `hasta` no se inventa una hora (el caso de arriba).
+    render(<Harness />);
+    await asentar();
+    await elegirCliente(CITY.nombre);
+    const linea = screen.getByTestId("pie-facturas");
+    expect((linea.textContent || "").trim()).toMatch(
+      /^Traslado·Escribir el número·Actualizado .+·Buscar otra vez$/,
+    );
+    expect(linea.querySelector("[title]")).toBeNull();
+  });
+
+  it("🔴 «Traslado» sigue escribiendo el TEXTO Traslado y sigue sin pedir empresa", async () => {
+    await pie();
+    fireEvent.click(screen.getByRole("button", { name: "Traslado" }));
+    expect(itemsCapturados[0].facturas).toBe("Traslado");
+    expect(itemsCapturados[0].empresa).toBe("");
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-142");
+  });
+
+  it("🔴 «Escribir el número» sigue dejando el renglón del cliente con facturas vacío", async () => {
+    await pie();
+    fireEvent.click(screen.getByText("Escribir el número"));
+    expect(itemsCapturados[0].cliente_codigo).toBe("D-142");
+    expect(itemsCapturados[0].facturas).toBe("");
+  });
+
+  it("🩸 sin cajas ni botones con borde: el pie es texto chico y una línea finita", async () => {
+    const linea = await pie();
+    expect(linea.className).toContain("text-xs");
+    expect(linea.className).toContain("flex-wrap"); // en el celular envuelve, no se arrastra
+    expect(linea.className).toContain("border-t border-gray-100");
+    for (const b of Array.from(linea.querySelectorAll("button"))) {
+      expect(b.className).not.toContain("rounded-md");
+      expect(b.className).not.toContain("border ");
+    }
+  });
+
+  it("«Ver más días» quedó como enlace chico, pegado al final de la lista", async () => {
+    await pie();
+    const verMas = screen.getByText("Ver más días");
+    expect(verMas.className).toContain("text-xs");
+    // Y sigue estando ARRIBA del pie, no adentro.
+    expect(screen.getByTestId("pie-facturas").contains(verMas)).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. El teléfono no pierde los 44 px
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("🔴 con el dedo son 44 px; lo que se aprieta es la computadora", () => {
@@ -418,7 +505,7 @@ describe("🔴 con el dedo son 44 px; lo que se aprieta es la computadora", () =
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. 🔴 CONTROL — el interruptor lo apaga TODO
+// 5. 🔴 CONTROL — el interruptor lo apaga TODO
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("🔴 CONTROL — con GUIAS_ATAJOS_NUEVOS en false no existe nada de esto", () => {
@@ -432,6 +519,10 @@ describe("🔴 CONTROL — con GUIAS_ATAJOS_NUEVOS en false no existe nada de es
     expect(screen.queryByTestId("facturas-del-cliente")).toBeNull();
     expect(otroCliente()).toBeNull();
     expect(screen.queryByText("Ver más días")).toBeNull();
+    expect(screen.queryByTestId("pie-facturas")).toBeNull();
+    expect(screen.queryByText("Traslado")).toBeNull();
+    expect(screen.queryByText("Escribir el número")).toBeNull();
+    expect(screen.queryByText("Buscar otra vez")).toBeNull();
     expect(screen.queryByText(/facturas$/)).toBeNull();
     // Y la pantalla de siempre sigue entera.
     expect(screen.getByText("Detalle de Envío")).toBeTruthy();

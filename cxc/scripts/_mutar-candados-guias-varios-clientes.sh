@@ -88,6 +88,15 @@ mutar "src/app/guias/components/FacturasDelCliente.tsx" \
   'className={`w-2.5 h-2.5 text-gray-400 shrink-0 transition-transform' \
   'className={`w-2.5 h-2.5 text-gray-500 shrink-0 transition-transform' \
   "CONTROL 2 — el gris de la flechita del día. Lo bueno es el 🔴"
+mutar "src/app/guias/components/FacturasDelCliente.tsx" \
+  '          data-testid="otro-cliente"' \
+  '          data-fuera="no"
+          data-testid="otro-cliente"' \
+  "CONTROL 3 — un atributo de más en el botón. Lo bueno es el 🔴"
+mutar "src/app/guias/components/FacturasDelCliente.tsx" \
+  '      <div className="border border-gray-200 rounded-lg p-4">' \
+  '      <div className="border border-gray-200 rounded-lg p-4" data-cuadro>' \
+  "CONTROL 4 — marcar el cuadro con un atributo. Lo bueno es el 🔴"
 control_fallos=$cazadas
 cazadas=0; sobrevivientes=0
 
@@ -213,13 +222,96 @@ mutar "src/app/guias/components/FacturasDelCliente.tsx" \
   "4.2 el encabezado del día pierde los 44 px y se aprieta por ANCHO (el iPad se toca con el dedo)"
 
 mutar "src/app/guias/components/FacturasDelCliente.tsx" \
-  '                  data-testid="otro-cliente"
-                  onClick={otroCliente}
-                  className="text-sm border border-gray-300 rounded-md px-3 text-gray-700 hover:text-black hover:border-black transition inline-flex items-center min-h-[44px]' \
-  '                  data-testid="otro-cliente"
-                  onClick={otroCliente}
-                  className="text-sm border border-gray-300 rounded-md px-3 text-gray-700 hover:text-black hover:border-black transition inline-flex items-center' \
+  'className="mt-2 text-sm text-gray-500 hover:text-black transition inline-flex items-center min-h-[44px]' \
+  'className="mt-2 text-sm text-gray-500 hover:text-black transition inline-flex items-center' \
   "4.3 «+ Otro cliente» deja de tocarse desde el teléfono"
+
+echo "── 6. MINIMALISMO: EL BOTÓN AFUERA Y EL PIE EN UNA LÍNEA ────────────────"
+
+mutar "src/app/guias/components/FacturasDelCliente.tsx" \
+  '          className="mt-2 text-sm text-gray-500 hover:text-black transition inline-flex items-center' \
+  '          className="mt-2 w-full text-sm text-gray-500 hover:text-black transition flex items-center' \
+  "6.2 «+ Otro cliente» vuelve a ser un botón gordo de ancho completo"
+
+mutar "src/app/guias/components/FacturasDelCliente.tsx" \
+  '                className="mt-3 flex flex-wrap items-center gap-x-2 border-t border-gray-100 pt-1 text-xs text-gray-400"' \
+  '                className="mt-3 flex flex-col items-start gap-y-2 border-t-2 border-gray-200 pt-3 text-sm text-gray-400"' \
+  "6.3 el pie vuelve a ser varios renglones con letra grande y línea gruesa"
+
+mutar "src/app/guias/components/FacturasDelCliente.tsx" \
+  '                    <span>Actualizado {horaCorta(hasta)}</span>' \
+  '                    <span title={`Actualizado ${horaCorta(hasta)}`}>·</span>' \
+  "6.4 la frescura se esconde en un title (en el iPad no hay mouse)"
+
+mutar "src/app/guias/components/FacturasDelCliente.tsx" \
+  '                  Escribir el número
+                </button>' \
+  '                </button>' \
+  "6.5 se pierde «Escribir el número» (la salida a mano de siempre)"
+
+mutar "src/app/guias/components/FacturasDelCliente.tsx" \
+  '                  {buscandoOtraVez ? "Buscando…" : "Buscar otra vez"}' \
+  '                  {buscandoOtraVez ? "Buscando…" : ""}' \
+  "6.6 se pierde «Buscar otra vez»"
+
+mutar "src/app/guias/components/FacturasDelCliente.tsx" \
+  '      </div>
+
+      {/* 🔴 «+ OTRO CLIENTE» VA DEBAJO DEL CUADRO, NO ADENTRO (10-sep-2026).
+          Daniel, textual: *«agregar otro cliente debería estar abajo de ese
+          cuadro, no dentro»* — adentro se leía como una acción MÁS del cliente
+          que se está mirando; afuera se lee como lo que es: terminaste con
+          éste, sigue con el próximo.
+
+          🔴 Lo que HACE no cambió: limpia el buscador y deja el foco ahí; los
+          renglones ya marcados se quedan abajo, en «Detalle de Envío». Y se
+          dibuja solo cuando este cliente ya dejó algo en la guía. */}
+      {!cargando && clienteYaTieneRenglon && (
+        <button
+          type="button"
+          data-testid="otro-cliente"
+          onClick={otroCliente}
+          className="mt-2 text-sm text-gray-500 hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1"
+        >
+          + Otro cliente
+        </button>
+      )}
+    </div>
+  );
+}' \
+  '      {/* 🔴 «+ OTRO CLIENTE» VA DEBAJO DEL CUADRO, NO ADENTRO (10-sep-2026).
+          Daniel, textual: *«agregar otro cliente debería estar abajo de ese
+          cuadro, no dentro»* — adentro se leía como una acción MÁS del cliente
+          que se está mirando; afuera se lee como lo que es: terminaste con
+          éste, sigue con el próximo.
+
+          🔴 Lo que HACE no cambió: limpia el buscador y deja el foco ahí; los
+          renglones ya marcados se quedan abajo, en «Detalle de Envío». Y se
+          dibuja solo cuando este cliente ya dejó algo en la guía. */}
+      {!cargando && clienteYaTieneRenglon && (
+        <button
+          type="button"
+          data-testid="otro-cliente"
+          onClick={otroCliente}
+          className="mt-2 text-sm text-gray-500 hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1"
+        >
+          + Otro cliente
+        </button>
+      )}
+      </div>
+    </div>
+  );
+}' \
+  "6.8 el botón vuelve ADENTRO del cuadro (Daniel: «no dentro»)"
+
+mutar "src/app/guias/components/FacturasDelCliente.tsx" \
+  '                    className="text-xs text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:mt-1"
+                  >
+                    Ver más días' \
+  '                    className="text-base text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px]"
+                  >
+                    Ver más días' \
+  "6.7 «Ver más días» deja de ser un enlace chico"
 
 echo "── 5. LO QUE NO SE TOCA ─────────────────────────────────────────────────"
 

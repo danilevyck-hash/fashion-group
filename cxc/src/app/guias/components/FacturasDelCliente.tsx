@@ -252,9 +252,10 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
             )}
 
             {!cargando && facturas && facturas.length > 0 && (
-              <div className="space-y-4">
+              <div>
                 {/* 🔴 Los últimos días CON FACTURA, el más reciente arriba,
                     cada día con su encabezado en palabras («Miércoles 3 sep»). */}
+                <div className="space-y-4">
                 {grupos.map(({ dia, facturas: fs }) => {
                   const abierto = diaAbierto(dia, diaMasReciente, diasAlternados);
                   const marcadasDelDia = cliente
@@ -336,12 +337,13 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                   </div>
                   );
                 })}
+                </div>
 
                 {diasOcultos > 0 && (
                   <button
                     type="button"
                     onClick={() => setDiasVisibles((v) => v + DIAS_POR_VER_MAS)}
-                    className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2"
+                    className="text-xs text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:mt-1"
                   >
                     Ver más días
                   </button>
@@ -349,71 +351,85 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
               </div>
             )}
 
-            {/* 🔴 EL OTRO CAMINO: Traslado. Son DOS y nada más — factura o
-                Traslado (Daniel descartó «Factura pendiente» y «Sin factura»).
-                Es del ENVÍO, no del cliente; escribe el texto «Traslado» en el
-                campo facturas y la EMPRESA se elige a mano en el renglón. */}
+            {/* 🔴 EL PIE ES UNA SOLA LÍNEA (10-sep-2026). Daniel: *«abajo de
+                ver más días en guías, se desperdicia mucho espacio con esa
+                info, cómo la puedes hacer más minimalista»* y *«todo siempre
+                minimalista»*. Eran TRES renglones —el «o [Traslado]» en una
+                caja, la frescura y «Buscar otra vez» a la izquierda, «Escribir
+                el número» empujado a la derecha—; ahora es un renglón de texto
+                chico separado por puntos medios.
+
+                🔴 NO SE FUE NINGUNA FUNCIÓN, solo la caja y los renglones:
+                  · «Traslado» es el OTRO CAMINO del envío (Daniel descartó
+                    «Factura pendiente» y «Sin factura»): escribe el TEXTO
+                    `Traslado` en el campo facturas y la empresa se elige a
+                    mano en el renglón.
+                  · «Escribir el número» es la salida a mano de siempre.
+                  · La frescura sigue A LA VISTA y no en un `title`: en el iPad
+                    no hay mouse, y saber hasta qué hora llegó la lista es lo
+                    que dice si una factura recién hecha puede faltar. */}
             {!cargando && (
-              <div className="mt-3 flex items-center gap-3">
-                <span className="text-xs text-gray-400">o</span>
+              <div
+                data-testid="pie-facturas"
+                className="mt-3 flex flex-wrap items-center gap-x-2 border-t border-gray-100 pt-1 text-xs text-gray-400"
+              >
                 <button
                   type="button"
                   onClick={() =>
                     onReemplazarItems(renglonDelCliente(items, cliente, TEXTO_TRASLADO, destinoAuto) as GuiaItem[])
                   }
-                  className="text-sm border border-gray-200 rounded-md px-3 text-gray-600 hover:text-black hover:border-gray-300 transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1.5"
+                  className="hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1"
                 >
                   Traslado
                 </button>
-              </div>
-            )}
-
-            {/* 🔴 «+ OTRO CLIENTE» — un cliente a la vez, y los que ya se
-                marcaron SE QUEDAN ABAJO (10-sep-2026). Solo limpia el buscador;
-                `items` no se toca. Se dibuja únicamente cuando este cliente ya
-                dejó algo en la guía: sin nada hecho no ofrece nada que el
-                buscador no ofrezca ya. */}
-            {!cargando && clienteYaTieneRenglon && (
-              <div className="mt-3">
+                <span aria-hidden="true">·</span>
                 <button
                   type="button"
-                  data-testid="otro-cliente"
-                  onClick={otroCliente}
-                  className="text-sm border border-gray-300 rounded-md px-3 text-gray-700 hover:text-black hover:border-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1.5"
+                  onClick={() => onReemplazarItems(renglonDelCliente(items, cliente, "", destinoAuto) as GuiaItem[])}
+                  className="hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1"
                 >
-                  + Otro cliente
+                  Escribir el número
                 </button>
-              </div>
-            )}
-
-            {!cargando && (
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 pt-3">
                 {hasta && (
-                  <span className="text-xs text-gray-400">hasta las {horaCorta(hasta)}</span>
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>Actualizado {horaCorta(hasta)}</span>
+                  </>
                 )}
+                <span aria-hidden="true">·</span>
                 <button
                   type="button"
                   onClick={() => void buscarOtraVez()}
                   disabled={buscandoOtraVez}
-                  className="text-xs text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2 disabled:opacity-40"
+                  className="hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1 disabled:opacity-40"
                 >
                   {buscandoOtraVez ? "Buscando…" : "Buscar otra vez"}
-                </button>
-                <span className="flex-1" />
-                {/* La salida a mano de siempre, con el cliente ya puesto: un
-                    renglón vacío en facturas para escribir el número. */}
-                <button
-                  type="button"
-                  onClick={() => onReemplazarItems(renglonDelCliente(items, cliente, "", destinoAuto) as GuiaItem[])}
-                  className="text-xs text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2"
-                >
-                  Escribir el número
                 </button>
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* 🔴 «+ OTRO CLIENTE» VA DEBAJO DEL CUADRO, NO ADENTRO (10-sep-2026).
+          Daniel, textual: *«agregar otro cliente debería estar abajo de ese
+          cuadro, no dentro»* — adentro se leía como una acción MÁS del cliente
+          que se está mirando; afuera se lee como lo que es: terminaste con
+          éste, sigue con el próximo.
+
+          🔴 Lo que HACE no cambió: limpia el buscador y deja el foco ahí; los
+          renglones ya marcados se quedan abajo, en «Detalle de Envío». Y se
+          dibuja solo cuando este cliente ya dejó algo en la guía. */}
+      {!cargando && clienteYaTieneRenglon && (
+        <button
+          type="button"
+          data-testid="otro-cliente"
+          onClick={otroCliente}
+          className="mt-2 text-sm text-gray-500 hover:text-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1"
+        >
+          + Otro cliente
+        </button>
+      )}
     </div>
   );
 }

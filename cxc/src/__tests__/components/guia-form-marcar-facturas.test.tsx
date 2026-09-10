@@ -250,7 +250,7 @@ describe("el atajo encendido, al crear", () => {
     expect(itemsCapturados.some((r) => r.empresa === "Joystep" && r.facturas === "88")).toBe(true);
   });
 
-  it("🔴 «Traslado» va debajo de la lista, separado por un «o», y escribe el TEXTO `Traslado` — la empresa se pide a mano", async () => {
+  it("🔴 «Traslado» va en el pie y escribe el TEXTO `Traslado` — la empresa se pide a mano", async () => {
     render(<Harness itemsIniciales={[filaVacia()]} />);
     await asentar();
     await elegirCliente();
@@ -260,7 +260,13 @@ describe("el atajo encendido, al crear", () => {
     expect(screen.queryByText(/Factura pendiente/)).toBeNull();
     expect(screen.queryByText(/Sin factura/)).toBeNull();
     expect(screen.queryByText("Traslado sin factura")).toBeNull();
-    expect(screen.getByText("o")).toBeTruthy();
+    // ⚠️ NOTA 10-sep-2026 — CAMBIO DE DIRECCIÓN: se fue el «o» suelto y la caja
+    // con borde. Daniel: *«se desperdicia mucho espacio con esa info»* y *«todo
+    // siempre minimalista»*. Traslado es ahora un enlace más del pie de UNA
+    // línea. CONTROL: sigue siendo un botón, sigue escribiendo el mismo texto y
+    // sigue sin pedir la empresa — que es lo que este candado protege.
+    expect(screen.queryByText("o")).toBeNull();
+    expect(screen.getByTestId("pie-facturas")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Traslado" }));
     expect(itemsCapturados[0].cliente_codigo).toBe("D-24");
@@ -313,7 +319,10 @@ describe("el atajo encendido, al crear", () => {
     render(<Harness itemsIniciales={[filaVacia()]} />);
     await asentar();
     await elegirCliente();
-    expect(screen.getByText(/hasta las/)).toBeTruthy();
+    // ⚠️ NOTA 10-sep-2026 — la frescura pasó de «hasta las 12:05 p.m.» a
+    // «Actualizado 12:05 p.m.» dentro del pie de una línea. Sigue A LA VISTA
+    // (no en un `title`: en el iPad no hay mouse).
+    expect(screen.getByText(/Actualizado/)).toBeTruthy();
     await act(async () => {
       fireEvent.click(screen.getByText("Buscar otra vez"));
       await Promise.resolve();
