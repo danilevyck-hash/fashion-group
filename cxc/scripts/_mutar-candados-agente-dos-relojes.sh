@@ -10,6 +10,10 @@
 #   5  el castigo de la contraseña es de CADA reloj, no de los dos
 #   6  la PANTALLA dibuja los DOS, cada uno con su botón y su nombre
 #   7  con UN solo reloj la pantalla no cambia ni un píxel
+#   8  el archivo de DOBLE CLIC: encuentra la carpeta solo y agrega una sola vez
+#   9  el .bat es autosuficiente y lleva ADENTRO el programa del repo
+#  10  🔴 y lleva el AGENTE NUEVO: la PC tiene la 1.1.0, que solo lee un reloj
+#  11  🔴 se eleva solo: sin administrador, schtasks contesta "Acceso denegado"
 #
 # Se rompe el código a propósito, una cosa por vez, y se exige que los tests se
 # pongan ROJOS. Los CONTROLES (cambios inocuos) tienen que SOBREVIVIR.
@@ -27,6 +31,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 TESTS="src/__tests__/scripts/agente-dos-relojes.test.ts \
+src/__tests__/scripts/agregar-reloj-multifashion.test.ts \
 src/__tests__/scripts/agente-reloj.test.ts \
 src/__tests__/components/asistencia-dos-relojes-pantalla.test.tsx \
 src/__tests__/components/asistencia-poda-textos.test.tsx \
@@ -36,7 +41,10 @@ src/__tests__/lib/asistencia-una-sola-entrada.test.ts \
 src/__tests__/lib/nada-de-voseo.test.ts"
 
 ARCHIVOS=(
+  "scripts/_generar-bat-agregar-reloj.mjs"
   "scripts/agente-reloj/config.mjs"
+  "scripts/agente-reloj/agregar-reloj.mjs"
+  "scripts/agente-reloj/agregar-reloj-multifashion.bat"
   "src/app/api/asistencia/ingest/route.ts"
   "src/app/api/cron/asistencia-vigia/route.ts"
   "scripts/agente-reloj/ronda.mjs"
@@ -86,6 +94,16 @@ probar_control() { # $1 = nombre del control (NO debe ser cazado)
   fi
 }
 
+# 🩸 EL .BAT SE VUELVE A ARMAR DESPUÉS DE CADA MUTACIÓN.
+#
+# El .bat lleva ADENTRO el programa y los 8 archivos del agente, así que tocar
+# `config.mjs` y no regenerarlo dispara el candado de «el .bat quedó viejo» en
+# vez del candado de la regla que se quería probar — y hasta un CONTROL inocuo
+# saldría cazado. Se regenera siempre, salvo cuando lo que se muta ES el .bat:
+# ese caso es justamente el de «alguien lo tocó a mano».
+BAT="scripts/agente-reloj/agregar-reloj-multifashion.bat"
+regenerar() { node scripts/_generar-bat-agregar-reloj.mjs >/dev/null 2>&1; }
+
 aplicar() { # $1 archivo, $2 viejo, $3 nuevo
   restaurar
   python3 - "$1" "$2" "$3" <<'PY'
@@ -97,17 +115,18 @@ if viejo not in s:
     sys.exit(3)
 open(ruta, "w").write(s.replace(viejo, nuevo, 1))
 PY
+  rc=$?
+  if [ "$rc" -eq 0 ] && [ "$1" != "$BAT" ]; then regenerar; fi
+  return $rc
 }
 
 mutar() { # $1 archivo, $2 viejo, $3 nuevo, $4 nombre
-  aplicar "$1" "$2" "$3"
-  [ $? -eq 3 ] && { sobrevivientes=$((sobrevivientes + 1)); return; }
+  if ! aplicar "$1" "$2" "$3"; then sobrevivientes=$((sobrevivientes + 1)); return; fi
   probar "$4"
 }
 
 control() { # $1 archivo, $2 viejo, $3 nuevo, $4 nombre
-  aplicar "$1" "$2" "$3"
-  [ $? -eq 3 ] && { controles_mal=$((controles_mal + 1)); return; }
+  if ! aplicar "$1" "$2" "$3"; then controles_mal=$((controles_mal + 1)); return; fi
   probar_control "$4"
 }
 
@@ -302,6 +321,134 @@ mutar "src/app/api/asistencia/ingest/route.ts" \
   "      await enviarSistema(textoCaido(dispositivo, motivo));" \
   "el aviso de reloj caído no dice CUÁL de los dos se cayó, en cristiano"
 
+# ═══ 8 · El archivo de doble clic ════════════════════════════════════════════
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  host: \"192.168.20.98\"," \
+  "  host: \"192.168.20.99\"," \
+  "el .bat escribe una dirección que no es la del reloj de Multifashion"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  dispositivo: \"reloj acs\"," \
+  "  dispositivo: \"reloj cboston\"," \
+  "🔴 el .bat le pone al reloj 2 el nombre del reloj 1 (las marcaciones se TAPAN)"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  if (!faltaHost && !faltaNombre) {" \
+  "  if (false) {" \
+  "🔴 correrlo dos veces DUPLICA los renglones del reloj 2"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  '  if (!tieneVariable(texto, "RELOJ_HOST")) {' \
+  "  if (false) {" \
+  "escribe el reloj 2 en un archivo que ni siquiera tiene el reloj 1"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  const base = texto.replace(/[\\r\\n]+\$/, \"\");" \
+  "  const base = texto.replace(/RELOJ_USUARIO=.*/, \"\");" \
+  "🔴 se toca una línea que ya estaba (se pierde el usuario del reloj 1)"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  '  const fin = texto.includes("\r\n") ? "\r\n" : "\n";' \
+  '  const fin = "\n";' \
+  "el archivo queda con saltos de Unix y el Bloc de notas lo muestra todo pegado"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  const trabajo = etiqueta(xml, \"WorkingDirectory\");" \
+  "  const trabajo = etiqueta(xml, \"Description\");" \
+  "la carpeta se saca de la etiqueta equivocada del XML de la tarea"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  if (m) return m[1].replace(/\\\\[^\\\\]*\$/, \"\");" \
+  "  if (m) return m[1];" \
+  "se toma el archivo como si fuera la carpeta"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  const esUtf16 = (b[0] === 0xff && b[1] === 0xfe) || (b.length > 1 && b[1] === 0x00);" \
+  "  const esUtf16 = false;" \
+  "🩸 la salida de schtasks se lee como UTF-8 y no se encuentra nada"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  const conEnv = encontrados.find((c) => hayArchivo(join(c, \".env\")));" \
+  "  const conEnv = null;" \
+  "con dos copias del agente se elige la que no está configurada"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "        if (hondo + 1 > hondoMax) continue;" \
+  "        if (false) continue;" \
+  "la búsqueda deja de estar acotada (recorrer el disco entero tarda horas)"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  '      actual.motivo = mal[1].replace(/^No se lleg[oó] al reloj:\s*/i, "").trim();' \
+  '      actual.motivo = "";' \
+  "el reloj que falla no dice POR QUÉ falla"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  '  "reloj acs": "Reloj de Multifashion",' \
+  '  "reloj acs": "Reloj ACS",' \
+  "el .bat le dice al reloj distinto que la pantalla de la web"
+
+# ═══ 9 · El .bat lleva el programa adentro ═══════════════════════════════════
+
+mutar "scripts/agente-reloj/agregar-reloj-multifashion.bat" \
+  'if not exist "%TRABAJO%" mkdir "%TRABAJO%" >nul 2>&1' \
+  'if not exist "%TRABAJO%" mkdir "%TRABAJO%"' \
+  "🩸 el .bat se toca a mano y el programa que lleva adentro se queda viejo"
+
+mutar "scripts/agente-reloj/agregar-reloj-multifashion.bat" \
+  "pause" \
+  "REM pause" \
+  "la ventana se cierra sola y Daniel no alcanza a leer nada"
+
+# ═══ 10 · El agente nuevo viaja adentro ══════════════════════════════════════
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  return instalada !== deAdentro;" \
+  "  return true;" \
+  "🔴 se reemplaza el programa aunque ya sea el nuevo (se pisa el respaldo bueno)"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  return instalada !== deAdentro;" \
+  "  return false;" \
+  "🩸 nunca se actualiza: la PC se queda con la 1.1.0 y el reloj 2 no entra"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  "  return m ? m[1] : null;" \
+  "  return null;" \
+  "no se puede leer la versión instalada y no se sabe si hay que cambiarla"
+
+mutar "scripts/agente-reloj/agregar-reloj.mjs" \
+  '    if (!paquete || typeof paquete !== "object" || !paquete["agente.mjs"]) return null;' \
+  "    if (!paquete) return null;" \
+  "un paquete a medias pasa por bueno y se escribe medio agente"
+
+mutar "scripts/_generar-bat-agregar-reloj.mjs" \
+  '  "ronda.mjs",' \
+  '  "ronda-vieja.mjs",' \
+  "🔴 falta un archivo del agente: el programa nuevo no arranca en esa PC"
+
+mutar "scripts/_generar-bat-agregar-reloj.mjs" \
+  '  "vuelta.mjs",' \
+  "" \
+  "el paquete sale incompleto y nadie se entera hasta la PC de la oficina"
+
+# ═══ 11 · El .bat se eleva solo ══════════════════════════════════════════════
+
+mutar "scripts/_generar-bat-agregar-reloj.mjs" \
+  '    "net session >nul 2>&1",' \
+  '    "REM net session >nul 2>&1",' \
+  "🩸 no se pide administrador: schtasks contesta Acceso denegado y no hace nada"
+
+mutar "scripts/_generar-bat-agregar-reloj.mjs" \
+  "    \"  if errorlevel 1 (\"," \
+  "    \"  if %errorlevel% neq 0 (\"," \
+  "🩸 %errorlevel% adentro del bloque: siempre dice que falló el permiso"
+
+mutar "scripts/_generar-bat-agregar-reloj.mjs" \
+  "    \"  echo   Windows va a pedir permiso para hacer este cambio.\"," \
+  "    \"  echo   Elevando privilegios mediante UAC.\"," \
+  "la ventana de Windows aparece sin avisar y en jerga"
+
 # ═══ Voseo ═══════════════════════════════════════════════════════════════════
 
 # ⚠️ El barrido de voseo de la casa mira `src/**`, no `scripts/**`: la mutación
@@ -331,6 +478,7 @@ control "scripts/agente-reloj/ronda.mjs" \
   "CONTROL: se reescribe la condición de la etiqueta con la misma lógica"
 
 restaurar
+regenerar
 echo
 echo "── CONTROL FINAL (sin mutar) ────────────────────────────────────────────"
 salida="$(npx vitest run $TESTS 2>&1)"

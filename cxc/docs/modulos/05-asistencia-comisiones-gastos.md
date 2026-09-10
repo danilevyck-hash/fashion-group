@@ -316,8 +316,29 @@ calcula un solo dólar. Salen del cuadro (`separarSinFicha`) y se muestran UNA v
 - ⚠️ **El Telegram también dice el nombre legible**: las cinco salidas de sistema del reloj
   (caído · recuperado · silencio · hueco · hueco cerrado) pasan por `nombreRelojEnPantalla`, en
   el ingest y en el vigía. «No puede leer el reloj (reloj acs)» no le dice a nadie cuál se cayó.
-- Candados: `agente-dos-relojes.test.ts` · `asistencia-dos-relojes-pantalla.test.tsx`;
-  **33 mutaciones, 33 cazadas** con 3 controles (`scripts/_mutar-candados-agente-dos-relojes.sh`).
+- 🔑 **El segundo reloj se agrega con un ARCHIVO DE DOBLE CLIC**
+  (`scripts/agente-reloj/agregar-reloj-multifashion.bat`). Daniel no sabe dónde quedó instalado
+  el agente en esa PC, así que el programa **encuentra la carpeta solo** —por la tarea programada
+  de Windows, y si no está con ese nombre, buscando entre todas la que corre `agente.mjs`— y hace
+  los seis pasos diciéndolos en pantalla. 🔴 **ES UN SOLO ARCHIVO**: el programa y los **8 archivos
+  del agente** viajan ADENTRO en base64 (`certutil -decode`, que existe en todo Windows), porque
+  dos archivos que tienen que viajar juntos son un archivo que se pierde. Lo arma
+  `scripts/_generar-bat-agregar-reloj.mjs`; **el .bat no se edita a mano** y hay candado que
+  decodifica lo que lleva adentro y lo compara byte a byte con el repo.
+- 🩸 **La PC de la oficina tenía la versión VIEJA (1.1.0), la que solo lee UN reloj** — agregarle el
+  renglón del segundo no habría servido de nada, y el repo es privado así que esa PC no puede
+  bajarlo. Por eso el .bat **también actualiza el programa**: respalda cada archivo con
+  `.antes-de-multifashion` y escribe el nuevo. **Idempotente**: con la misma versión no toca nada
+  (si reemplazara igual, la segunda corrida pisaría el respaldo bueno). ⚠️ **No hace falta
+  `npm install`**: el agente no usa una sola librería de fuera, y hay candado que lo exige.
+- 🩸 **Sin administrador no funciona ni el primer paso**: medido en la PC real, `schtasks /Query`
+  contesta **«Acceso denegado»**. El .bat pregunta (`net session`) y **se relanza solo** pidiéndole
+  permiso a Windows, avisando antes en pantalla. ⚠️ Adentro de ese bloque se usa `if errorlevel 1`
+  y **nunca `%errorlevel%`**: cmd reemplaza las variables de todo el bloque antes de correr la
+  primera línea, así que diría siempre que el permiso falló.
+- Candados: `agente-dos-relojes.test.ts` · `asistencia-dos-relojes-pantalla.test.tsx` ·
+  `agregar-reloj-multifashion.test.ts`;
+  **57 mutaciones, 57 cazadas** con 3 controles (`scripts/_mutar-candados-agente-dos-relojes.sh`).
   ⚠️ **No se pudo probar contra los aparatos de verdad**: los dos viven en IPs privadas de la
   oficina y desde afuera no se alcanzan. Todo se probó contra dobles.
 - **Endpoint del reloj**: `POST /ISAPI/AccessControl/AcsEvent?format=json` con

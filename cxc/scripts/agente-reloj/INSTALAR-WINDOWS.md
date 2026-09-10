@@ -178,10 +178,62 @@ ignoran solas.
 
 ---
 
-## Agregar otro reloj
+## Agregar Multifashion con un doble clic
 
-Son **dos renglones** en el archivo `.env` de esa misma carpeta. No hay que
-reinstalar nada.
+**Esta es la forma fácil, y no hay que buscar nada.**
+
+Hay un archivo que lo hace todo solo: **`agregar-reloj-multifashion.bat`**.
+
+Son **tres pasos**:
+
+1. Copiar **`agregar-reloj-multifashion.bat`** a la PC de la oficina — por
+   OneDrive, por un pendrive, como sea. **Es un solo archivo**: no necesita
+   nada al lado. Llevarlo al Escritorio está bien.
+2. **Doble clic.** Windows va a pedir permiso (una ventana azul): elegir **Sí**.
+3. Leer lo que dice y esperar a que termine.
+
+Va contando cada paso en pantalla:
+
+| Paso | Qué hace |
+|---|---|
+| 1 | Busca el programa del reloj en la PC. No hay que decirle dónde está. |
+| 2 | **Le pone el programa nuevo**, el que sabe leer dos relojes. |
+| 3 | Revisa que la configuración tenga el reloj de Boston. |
+| 4 | Agrega el reloj de Multifashion. |
+| 5 | Prueba los dos relojes y dice cuál contesta. |
+| 6 | Reinicia el programa para que arranque con los dos. |
+
+Al final resume en **tres líneas**: si se agregó, cuántos relojes contestan y
+con qué versión quedó corriendo. **La ventana no se cierra sola.**
+
+### Por qué pide permiso de administrador
+
+Porque para mirar y reiniciar la tarea de Windows hace falta. Sin permiso,
+Windows contesta *«Acceso denegado»* y no se puede hacer nada. El archivo lo
+pide solo: no hay que acordarse de hacer clic derecho.
+
+Si por alguna razón la ventana azul no aparece, se puede hacer a mano: clic
+**derecho** sobre el archivo → **"Ejecutar como administrador"**.
+
+### Lo que deja guardado
+
+**Correrlo dos veces no rompe nada.** Si ya estaba hecho lo dice y sigue.
+
+Antes de cambiar nada deja copias de respaldo en la misma carpeta, con
+**`.antes-de-multifashion`** al final del nombre: la configuración
+(`.env.antes-de-multifashion`) y cada archivo del programa. Y escribe todo lo
+que hizo en **`agregar-reloj.log`**.
+
+> **¿Y si dice «No encontré el programa del reloj en esta PC»?** Entonces el
+> agente está instalado en otra computadora de la oficina. No cambió nada.
+
+---
+
+## Agregar otro reloj (a mano)
+
+Para un reloj que **no** sea el de Multifashion —ese ya tiene su archivo de
+doble clic, arriba—. Son **dos renglones** en el archivo `.env` de esa misma
+carpeta. No hay que reinstalar nada.
 
 1. Abrir `.env` con el Bloc de notas.
 2. Debajo del bloque del reloj 1, escribir estas dos líneas (cambiando la
