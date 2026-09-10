@@ -524,9 +524,18 @@ describe("H. 🔴 LAS CUATRO SECCIONES, CON LOS ENDPOINTS DE SIEMPRE", () => {
   it("🔴 un préstamo NUEVO se sigue creando en el módulo de Préstamos", () => {
     // La regla de que solo Daniel aprueba no se toca, y un segundo lugar para
     // crear un préstamo sería un segundo camino a la misma plata.
+    //
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 10-sep-2026, y no se borró. Nació fijando el
+    // texto `href="/prestamos"`, y ese texto dejó de ser correcto cuando
+    // Préstamos pasó a tener UNA SOLA PUERTA: con el interruptor prendido el
+    // módulo suelto ya no existe y esa dirección REBOTA, así que el enlace lo
+    // resuelve `enlaceAPrestamos()` (apagado → `/prestamos`, el de siempre).
+    // 🔑 LA REGLA QUE PROTEGE NO CAMBIÓ y su control se conserva INTACTO: acá
+    // no se crea nada — ni un `<form>`, ni un POST. Se enlaza.
     const src = puro("app/asistencia/personas/SeccionPrestamos.tsx");
-    expect(src).toMatch(/href="\/prestamos"/);
+    expect(src).toMatch(/enlaceAPrestamos\(\)/);
     expect(src).not.toMatch(/method: "POST"/);
+    expect(src).not.toMatch(/<form/);
   });
 
   it("la deuda se desglosa solo con lo que tiene algo, y el cero se dice con palabras", () => {

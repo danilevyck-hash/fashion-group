@@ -18,6 +18,8 @@
 
 import { ROL_BOSTON } from "@/lib/boston/rol";
 
+import { vePestanaPrestamos } from "@/lib/prestamos-una-puerta";
+
 export const ASISTENCIA_ROLES = ["admin", "secretaria", "contabilidad"] as const;
 
 export function asistenciaRoles(): string[] {
@@ -145,6 +147,12 @@ export const PESTANAS_DE_APROBACION = ["aprobaciones"] as const;
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function vePestana(rol: string, pestana: string): boolean {
+  // 🔴 PRÉSTAMOS SE AUTORIZA POR SU PROPIO MÓDULO (10-sep-2026), no por
+  // Asistencia. Con la Planilla Unida prendida, la pestaña es la ÚNICA puerta a
+  // Préstamos: si la autorizara `ASISTENCIA_ROLES`, mover la puerta le quitaría
+  // el módulo en silencio a quien tiene Préstamos y no tiene Asistencia. Ver
+  // `lib/prestamos-una-puerta.ts`.
+  if (pestana === "prestamos") return vePestanaPrestamos(rol);
   const esDeAprobacion = (PESTANAS_DE_APROBACION as readonly string[]).includes(pestana);
   return esDeAprobacion
     ? aprobacionesRoles().includes(rol)

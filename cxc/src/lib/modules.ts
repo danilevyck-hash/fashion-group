@@ -40,6 +40,7 @@ import {
 import { asistenciaRoles, aprobacionesRoles } from "@/lib/asistencia/roles";
 import { MODULO_BOSTON, ROL_BOSTON, ROLES_MODULO_BOSTON } from "@/lib/boston/rol";
 import { catalogoRoles } from "@/lib/catalogo/roles";
+import { MODULO_PRESTAMOS, moduloPrestamosEnElMenu } from "./prestamos-una-puerta";
 
 export type ModuleGroup =
   | "ventas-clientes"
@@ -393,11 +394,18 @@ export function fgModulesDaAcceso(fgModules: string[], moduleKey: string, role: 
 /** Filtra módulos visibles para un rol. Si hay fgModules (permisos custom),
  *  prevalece sobre el default por rol. */
 export function getVisibleModules(role: string, fgModules?: string[] | null): AppModule[] {
-  if (role === "admin") return ALL_MODULES;
+  // 🔴 PRÉSTAMOS: UNA SOLA PUERTA (10-sep-2026). Con la Planilla Unida prendida
+  // vive como pestaña de Asistencia, así que su ficha sale del menú y del home.
+  // Se FILTRA acá, no se borra de `ALL_MODULES`: la `key` sigue viva en
+  // `role_permissions` y en `fg_users.modulos_override`, y apagar el
+  // interruptor la devuelve sola. Ver `lib/prestamos-una-puerta.ts`.
+  const podar = (ms: AppModule[]): AppModule[] =>
+    moduloPrestamosEnElMenu() ? ms : ms.filter((m) => m.key !== MODULO_PRESTAMOS);
+  if (role === "admin") return podar(ALL_MODULES);
   if (fgModules && fgModules.length > 0) {
-    return ALL_MODULES.filter(m => fgModulesIncluye(fgModules, m, role));
+    return podar(ALL_MODULES.filter(m => fgModulesIncluye(fgModules, m, role)));
   }
-  return ALL_MODULES.filter(m => m.roles.includes(role));
+  return podar(ALL_MODULES.filter(m => m.roles.includes(role)));
 }
 
 /** Filtra los grupos visibles: solo aparecen los grupos que tienen al menos

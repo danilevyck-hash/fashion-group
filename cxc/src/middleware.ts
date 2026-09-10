@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { verifySessionEdge } from "@/lib/session-cookie-edge";
+import { destinoDePrestamos } from "@/lib/prestamos-una-puerta";
 
 const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -132,6 +133,17 @@ function clearSessionAndRedirect(req: NextRequest, pathname: string): NextRespon
 
 export async function middleware(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
+
+  // 🔴 PRÉSTAMOS: UNA SOLA PUERTA (10-sep-2026). Con la Planilla Unida prendida
+  // el módulo suelto ya no existe y su dirección lleva a la pestaña. Es un 307
+  // TEMPORAL a propósito: el día que el interruptor se apague, los favoritos y
+  // los enlaces viejos vuelven a servir solos, sin que nadie tenga que limpiar
+  // un caché. ⚠️ `/api/prestamos/*` NO entra — son las rutas que la pestaña
+  // usa para leer y escribir. La regla vive en `lib/prestamos-una-puerta.ts`.
+  {
+    const destino = destinoDePrestamos(pathname, req.nextUrl.search);
+    if (destino) return NextResponse.redirect(new URL(destino, req.url), 307);
+  }
 
   // Legacy URL redirects — preserve bookmarks from WhatsApp / email.
   // Ejecutar ANTES del auth check para que el redirect funcione sin sesión

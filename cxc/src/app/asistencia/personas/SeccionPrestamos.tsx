@@ -17,6 +17,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+// 🔴 El destino lo decide el interruptor: con la pestaña prendida el módulo
+// suelto ya no existe, y un enlace a una dirección que redirige es un rebote
+// de más. Sigue sin haber una tercera copia: acá se MUESTRA y se enlaza.
+import { enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
 
 import { desgloseDeuda, textoDeuda } from "@/lib/asistencia/ficha-persona";
 import Seccion, { Vacio } from "./Seccion";
@@ -87,12 +91,12 @@ export default function SeccionPrestamos({ codigo, refresco }: { codigo: string;
         {/* 🔴 LOS DOS BOTONES LLEVAN AL MÓDULO DE PRÉSTAMOS, no abren un
             formulario propio: ahí viven la ficha, los movimientos y la regla
             de que un préstamo lo aprueba Daniel. */}
-        <Link href="/prestamos"
+        <Link href={enlaceAPrestamos()}
           className="inline-flex min-h-[44px] items-center rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black">
           + Préstamo
         </Link>
         {ficha && (
-          <Link href={`/prestamos/${encodeURIComponent(ficha.id)}`}
+          <Link href={enlaceAPrestamos(ficha.id)}
             className="inline-flex min-h-[44px] items-center px-1 text-sm text-gray-500 transition hover:text-gray-900">
             Ver movimientos ›
           </Link>
