@@ -68,8 +68,19 @@ describe("🔴 1. las SEIS empresas del grupo tienen su ficha", () => {
     }
   });
 
-  it("y NADIE MÁS que ellas y Confecciones Boston", () => {
-    expect([...Object.keys(EMPRESA_FISCAL)].sort()).toEqual([...B2B_EMPRESA_KEYS, BOSTON].sort());
+  // 🩸 Y MULTIFASHION DESDE EL 10-SEP-2026. Daniel mandó su Aviso de Operación
+  // (Ministerio de Comercio e Industrias) al entrar ACS a Asistencia y Planilla:
+  // su nombre legal y su RUC van en el encabezado del COMPROBANTE DE PAGO.
+  //
+  // 🔑 LA REGLA QUE ESTE CANDADO PROTEGE NO CAMBIÓ: la lista es CERRADA y
+  // escrita a mano. Lo que se agregó es una ficha dictada de un papel oficial,
+  // no una derivada de un número.
+  //
+  // ⚠️ ACS NO cobra por este camino: no tiene estado de cuenta. Su ficha existe
+  // para el papel que firma su gente.
+  it("y NADIE MÁS que ellas, Confecciones Boston y Multifashion", () => {
+    expect([...Object.keys(EMPRESA_FISCAL)].sort())
+      .toEqual([...B2B_EMPRESA_KEYS, BOSTON, "american_classic"].sort());
   });
 
   it("ninguna sale con el nombre legal ni la identificación en blanco", () => {
@@ -160,10 +171,10 @@ describe("🔴 3. ninguna empresa puede salir con los datos de otra", () => {
   });
 
   it("⚠️ CONTROL: una clave que no está en la lista no hereda nada", () => {
-    // Multifashion no está: sale con el nombre de la pantalla y las tres líneas
-    // en blanco, nunca con los datos de una del grupo. (Boston SÍ está desde el
-    // 9-sep-2026, con su propia ficha — ver el bloque 4.)
-    for (const key of ["american_classic", "lo_que_sea"]) {
+    // Una clave desconocida sale con el nombre de la pantalla y las tres líneas
+    // en blanco, nunca con los datos de una del grupo. (Boston está desde el
+    // 9-sep-2026 y Multifashion desde el 10-sep-2026, cada una con SU ficha.)
+    for (const key of ["lo_que_sea", "empresa_nueva"]) {
       const f = fichaFiscal(key, "Nombre Corto");
       expect(f.legal, key).toBe("Nombre Corto");
       expect(f.identificacion, key).toBe("");

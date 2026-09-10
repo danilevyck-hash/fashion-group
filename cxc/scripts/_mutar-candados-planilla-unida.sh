@@ -62,6 +62,9 @@ ARCHIVOS=(
   "src/app/asistencia/ConfiguracionTab.tsx"
   "src/app/asistencia/EstadoReloj.tsx"
   "src/lib/asistencia/config.ts"
+  "src/lib/asistencia/extra-automatico.ts"
+  "src/lib/cxc/empresa-fiscal.ts"
+  "supabase/migrations/20261101120000_acs_aprueba_daniel.sql"
 )
 for f in "${ARCHIVOS[@]}"; do
   mkdir -p "$RESPALDO/$(dirname "$f")"
@@ -341,6 +344,31 @@ mutar "la migración de ACS se olvida de una tabla" supabase/migrations/20261031
   'i = s.index("ALTER TABLE asistencia_reparto_empresa")
 j = s.index("ALTER TABLE asistencia_aprobador_empresa")
 s = s[:i] + s[j:]'
+
+echo "── ACS: NOMBRE LEGAL Y LOS 30 MINUTOS ──────────────────────────────────"
+mutar "ACS hereda el correo del grupo" src/lib/cxc/empresa-fiscal.ts \
+  's = s.replace("""    identificacion: "155638923-2-2016",
+    correo: "",""", """    identificacion: "155638923-2-2016",""")'
+mutar "el comprobante deja de decir el nombre legal de ACS" src/lib/asistencia/comprobante.ts \
+  's = s.replace("""  const legal = fichaFiscal(k, "").legal.trim();
+  if (legal) return legal;
+""", "")'
+mutar "el comprobante deja de imprimir la identificación" src/lib/asistencia/comprobante.ts \
+  's = s.replace("""    identificacion: identificacionEmpresa(linea.empresa),""", """    identificacion: "",""")'
+mutar "ACS deja de tener sus 30 minutos" src/lib/asistencia/extra-automatico.ts \
+  's = s.replace("  american_classic: 30,", "  american_classic: 0,")'
+mutar "los 30 minutos se le dan a TODAS las empresas" src/lib/asistencia/extra-automatico.ts \
+  's = s.replace("  confecciones_boston: 0,", "  confecciones_boston: 30,")'
+mutar "el motor deja de mirar los minutos automáticos" src/lib/asistencia/planilla.ts \
+  's = s.replace("      const auto = Math.max(0, aprob?.autoMin ?? 0);", "      const auto = 0;")'
+mutar "los minutos automáticos no salen de la empresa de la ficha" src/lib/asistencia/planilla.ts \
+  's = s.replace("          autoMin: minutosExtraAutomaticos(ficha.empresa ?? null),", "          autoMin: 30,")'
+mutar "los 30 minutos se comen el domingo y el feriado" src/lib/asistencia/planilla.ts \
+  's = s.replace("      h.extraAutoMin += pagaDiurno + pagaNocturno;", "      h.extraAutoMin += pagaDiurno + pagaNocturno;\n      h.domingoMin += c.domingoMin;\n      h.feriadoMin += c.feriadoMin;")'
+mutar "lo automático deja de congelarse en el cierre" src/lib/asistencia/planilla-guardada.ts \
+  's = s.replace(chr(34)+"extra_auto_min"+chr(34), chr(34)+"jornada_diaria_min"+chr(34))'
+mutar "en ACS vuelve a aprobar la contadora" supabase/migrations/20261101120000_acs_aprueba_daniel.sql \
+  's = s.replace("VALUES (" + chr(39) + "daniel" + chr(39) + ", " + chr(39) + "american_classic" + chr(39) + ")", "VALUES (" + chr(39) + "Contabilidad" + chr(39) + ", " + chr(39) + "american_classic" + chr(39) + ")")'
 
 echo
 echo "── CONTROLES: NO se tienen que cazar ───────────────────────────────────"

@@ -37,6 +37,7 @@ import type { HorasPersona, LineaPlanilla } from "./planilla";
 import { centavos, minutosTardanzaMostrados } from "./planilla";
 import { fmtMin } from "./reporte";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import { fichaFiscal } from "@/lib/cxc/empresa-fiscal";
 
 /**
  * 🔴 EL NOMBRE DE LA EMPRESA ES LO ÚNICO QUE CAMBIA DE UN COMPROBANTE A OTRO.
@@ -56,6 +57,22 @@ export const EMPRESAS: Readonly<Record<string, string>> = {
   vistana: "VISTANA INTERNATIONAL",
 };
 
+/**
+ * El nombre que va ARRIBA del comprobante.
+ *
+ * 🔑 DOS FUENTES PARA DOS HECHOS DISTINTOS, no dos fuentes para el mismo:
+ *
+ *   1. `EMPRESAS` — el encabezado que la contadora ESCRIBE en su Excel. Son las
+ *      tres que ella arma a mano, y Daniel las dictó así («FASHION WEAR», no
+ *      «FASHION WEAR, INC»). Es lo que la gente reconoce en el papel.
+ *   2. `fichaFiscal` (`lib/cxc/empresa-fiscal.ts`) — el REGISTRO: el nombre
+ *      legal y la identificación. Es la lista única de la casa y de ahí sale
+ *      también la cabeza del estado de cuenta.
+ *
+ * Una empresa que ella todavía no escribe a mano —Multifashion— toma su nombre
+ * LEGAL del registro. Sin ninguno de los dos, el nombre corto en mayúsculas.
+ * ⚠️ Nunca el nombre de OTRA empresa.
+ */
 export function nombreEmpresaComprobante(
   empresa: string | null | undefined,
   etiqueta?: string | null,
@@ -63,8 +80,22 @@ export function nombreEmpresaComprobante(
   const k = String(empresa ?? "").trim();
   const nombre = EMPRESAS[k];
   if (nombre) return nombre;
+  const legal = fichaFiscal(k, "").legal.trim();
+  if (legal) return legal;
   const alterno = String(etiqueta ?? "").trim();
   return alterno ? alterno.toUpperCase() : "—";
+}
+
+/**
+ * La identificación (RUC) de la empresa que paga, para la línea de abajo del
+ * nombre. Vacío = todavía no se sabe, y entonces la línea NO se dibuja: una
+ * identificación en blanco en un papel de pago no informa, confunde.
+ *
+ * 🔴 SALE DEL REGISTRO, NUNCA DE UN NÚMERO DERIVADO. La misma lista escrita a
+ * mano que usa el estado de cuenta.
+ */
+export function identificacionEmpresa(empresa: string | null | undefined): string {
+  return fichaFiscal(String(empresa ?? "").trim(), "").identificacion.trim();
 }
 
 const MESES = [
@@ -185,6 +216,8 @@ export interface DatosComprobante {
 
 export interface Comprobante {
   empresa: string;
+  /** La identificación (RUC) de la empresa. `""` = no se sabe: no se dibuja. */
+  identificacion: string;
   titulo: string;
   /** «PLANILLA QUINCENAL» · «COMPROBANTE DE PAGO» · el período. */
   encabezado: readonly string[];
@@ -299,6 +332,7 @@ export function armarComprobante(
 
   return {
     empresa,
+    identificacion: identificacionEmpresa(linea.empresa),
     titulo,
     encabezado: ["PLANILLA QUINCENAL", "COMPROBANTE DE PAGO", titulo],
     // 🔴 CAPITALIZADO (10-sep-2026). `linea.nombre` es el crudo de la ficha,

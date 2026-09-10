@@ -17,7 +17,6 @@ import {
   ORIGEN_QUINCENA,
   TEXTO_OMISION,
   planDeCierre,
-  repartirEntreCuentas,
   textoPlan,
   type DeudaDePersona,
 } from "@/lib/asistencia/cierre-prestamo";
@@ -38,10 +37,20 @@ const DINERO = (prestamo: number): DineroLinea => ({
 const linea = (codigo: string, etiqueta: string, prestamo: number): LineaPlanilla =>
   ({ codigo, etiqueta, nombre: etiqueta, dinero: DINERO(prestamo), horas: {} } as unknown as LineaPlanilla);
 
+/** Una línea con las TRES casillas de descuento puestas a mano. */
+const lineaCon = (
+  codigo: string, etiqueta: string,
+  c: { prestamo?: number; terceros?: number; mercancia?: number },
+): LineaPlanilla => ({
+  codigo, etiqueta, nombre: etiqueta, horas: {},
+  dinero: { ...DINERO(c.prestamo ?? 0), terceros: c.terceros ?? 0, mercancia: c.mercancia ?? 0 },
+} as unknown as LineaPlanilla);
+
 const deuda = (o: Partial<DeudaDePersona> & { codigo: string }): DeudaDePersona => ({
   fichaId: `f-${o.codigo}`, nombrePrestamos: "X",
-  saldoPrestamo: 500, saldoDano: 0, cuotaPrestamo: 50, cuotaDano: 0,
-  yaDescontado: 0, cuentaMasVieja: "prestamo", ...o,
+  saldoPrestamo: 500, saldoDano: 0, saldoTerceros: 0,
+  cuotaPrestamo: 50, cuotaTerceros: 0,
+  yaDescontado: 0, yaDescontadoTerceros: 0, yaDescontadoDano: 0, ...o,
 });
 
 const mapa = (...ds: DeudaDePersona[]) => new Map(ds.map((d) => [d.codigo, d]));
@@ -148,69 +157,117 @@ describe("C. LO QUE NO SE ESCRIBE, SE DICE — nunca en silencio", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("D. CÓMO SE PARTE LA CASILLA ENTRE LAS DOS CUENTAS", () => {
-  // 🔴 La planilla propone la SUMA de las dos cuotas en UNA casilla (Daniel:
-  // *«juntos»*), así que al escribir hay que volver a partirla.
-  it("con la casilla igual a la propuesta, cada cuenta recibe SU cuota", () => {
-    const r = repartirEntreCuentas(40, {
-      saldoPrestamo: 1000, saldoDano: 100, cuotaPrestamo: 30, cuotaDano: 10, cuentaMasVieja: "prestamo",
-    });
-    expect(r).toEqual({ prestamo: 30, dano: 10, sobrante: 0 });
-  });
+describe("D. UNA CASILLA, UNA CUENTA — las tres, sin repartir nada", () => {
+  // 🩸 ESTE BLOQUE EXIGÍA LO CONTRARIO HASTA EL 10-SEP-2026, y cambió de
+  // dirección, no se borró. Se llamaba «CÓMO SE PARTE LA CASILLA ENTRE LAS DOS
+  // CUENTAS»: la casilla «Préstamo» traía la suma de las dos cuotas (Daniel:
+  // *«juntos»*) y al cerrar había que volver a partirla.
+  //
+  // Lo cambió la contadora al separar los renglones del comprobante. Ahora cada
+  // cuenta tiene SU casilla, así que el reparto —la única parte de este archivo
+  // que podía mandar plata a la cuenta equivocada— dejó de existir.
+  //
+  // 🔑 LA REGLA DE FONDO NO CAMBIÓ: nunca se anota más de lo que se debe.
 
-  it("y eso genera DOS movimientos, uno por cuenta", () => {
+  it("la casilla «Préstamo» va a la cuenta préstamo, y nada más", () => {
     const plan = planDeCierre({
-      lineas: [linea("8", "BRICEIDA", 40)],
-      deudas: mapa(deuda({ codigo: "8", saldoPrestamo: 1000, saldoDano: 100, cuotaPrestamo: 30, cuotaDano: 10 })),
+      lineas: [linea("6", "KEVIN LUBO", 50)],
+      deudas: mapa(deuda({ codigo: "6", saldoPrestamo: 500, saldoDano: 500, saldoTerceros: 500 })),
       fecha: "2026-08-15",
     });
-    expect(plan.pagos.map((p) => [p.cuenta, p.monto])).toEqual([["prestamo", 30], ["dano", 10]]);
-    expect(plan.total).toBe(40);
+    expect(plan.pagos.map((p) => [p.cuenta, p.monto])).toEqual([["prestamo", 50]]);
   });
 
-  // 🔑 Cada cuenta se capea a SU saldo. Capear la suma contra el total dejaría
-  // cobrar de más en una cuenta lo que sobra en la otra.
-  it("cada cuenta se capea a su propio saldo", () => {
-    const r = repartirEntreCuentas(35, {
-      saldoPrestamo: 20, saldoDano: 100, cuotaPrestamo: 30, cuotaDano: 10, cuentaMasVieja: "prestamo",
+  it("la casilla «Terceros» va a la cuenta terceros, con su concepto", () => {
+    const plan = planDeCierre({
+      lineas: [lineaCon("23", "ANDRES GONZALEZ", { terceros: 40 })],
+      deudas: mapa(deuda({ codigo: "23", saldoPrestamo: 0, saldoTerceros: 79.94 })),
+      fecha: "2026-08-15",
     });
-    expect(r.prestamo).toBe(20);
-  });
-
-  // Corregida a mano → la cuenta MÁS VIEJA primero, que es la regla que el
-  // módulo ya usa cuando alguien debe las dos.
-  it("corregida a mano, va a la cuenta más vieja primero", () => {
-    const r = repartirEntreCuentas(25, {
-      saldoPrestamo: 1000, saldoDano: 100, cuotaPrestamo: 30, cuotaDano: 10, cuentaMasVieja: "prestamo",
+    expect(plan.pagos).toHaveLength(1);
+    expect(plan.pagos[0]).toMatchObject({
+      cuenta: "terceros", monto: 40, concepto: "Pago de terceros",
     });
-    expect(r).toEqual({ prestamo: 25, dano: 0, sobrante: 0 });
   });
 
-  it("si la más vieja es el daño, ahí va primero", () => {
-    const r = repartirEntreCuentas(25, {
-      saldoPrestamo: 1000, saldoDano: 100, cuotaPrestamo: 30, cuotaDano: 10, cuentaMasVieja: "dano",
+  it("la casilla «Mercancía» va a la cuenta daño, con su concepto", () => {
+    const plan = planDeCierre({
+      lineas: [lineaCon("21", "RAMON MIRANDA", { mercancia: 16 })],
+      deudas: mapa(deuda({ codigo: "21", saldoPrestamo: 0, saldoDano: 120 })),
+      fecha: "2026-08-15",
     });
-    expect(r).toEqual({ prestamo: 0, dano: 25, sobrante: 0 });
-  });
-
-  // ⚠️ Lo que sobra después de capear las DOS cuentas NO se escribe: pagar más
-  // de lo que se debe dejaría un saldo a favor que nadie pidió.
-  it("lo que pasa de las dos deudas no se escribe, se devuelve como sobrante", () => {
-    const r = repartirEntreCuentas(500, {
-      saldoPrestamo: 100, saldoDano: 50, cuotaPrestamo: 999, cuotaDano: 999, cuentaMasVieja: "prestamo",
+    expect(plan.pagos).toHaveLength(1);
+    expect(plan.pagos[0]).toMatchObject({
+      cuenta: "dano", monto: 16, concepto: "Pago de responsabilidad",
     });
-    expect(r.prestamo + r.dano).toBe(150);
-    expect(r.sobrante).toBe(350);
   });
 
-  it("una casilla en cero no reparte nada", () => {
-    expect(repartirEntreCuentas(0, {
-      saldoPrestamo: 100, saldoDano: 100, cuotaPrestamo: 10, cuotaDano: 10, cuentaMasVieja: "prestamo",
-    })).toEqual({ prestamo: 0, dano: 0, sobrante: 0 });
+  it("las TRES a la vez son TRES movimientos, uno por cuenta", () => {
+    const plan = planDeCierre({
+      lineas: [lineaCon("8", "BRICEIDA", { prestamo: 30, terceros: 40, mercancia: 16 })],
+      deudas: mapa(deuda({ codigo: "8", saldoPrestamo: 300, saldoTerceros: 200, saldoDano: 100 })),
+      fecha: "2026-08-15",
+    });
+    expect(plan.pagos.map((p) => [p.cuenta, p.monto])).toEqual([
+      ["prestamo", 30], ["terceros", 40], ["dano", 16],
+    ]);
+    expect(plan.total).toBe(86);
+  });
+
+  // ⚠️ Nunca se anota más de lo que se debe: pagar de más dejaría un saldo a
+  // favor que nadie pidió.
+  it("lo que pasa del saldo de SU cuenta se recorta", () => {
+    const plan = planDeCierre({
+      lineas: [lineaCon("9", "LUIS", { prestamo: 500, terceros: 500, mercancia: 500 })],
+      deudas: mapa(deuda({ codigo: "9", saldoPrestamo: 100, saldoTerceros: 50, saldoDano: 25 })),
+      fecha: "2026-08-15",
+    });
+    expect(plan.pagos.map((p) => [p.cuenta, p.monto])).toEqual([
+      ["prestamo", 100], ["terceros", 50], ["dano", 25],
+    ]);
+  });
+
+  // 🔴 EL «YA DESCONTADO» ES POR CUENTA. Si fuera uno solo, un pago de terceros
+  // apagaría el descuento del préstamo — la persona pagaría una cuenta y se le
+  // perdonaría la otra en silencio.
+  it("un pago ya registrado de UNA cuenta no apaga a las otras", () => {
+    const plan = planDeCierre({
+      lineas: [lineaCon("8", "BRICEIDA", { prestamo: 30, terceros: 40 })],
+      deudas: mapa(deuda({
+        codigo: "8", saldoPrestamo: 300, saldoTerceros: 200,
+        yaDescontadoTerceros: 40,
+      })),
+      fecha: "2026-08-15",
+    });
+    // Terceros se omite (hecho consumado); el préstamo SÍ se anota.
+    expect(plan.pagos.map((p) => [p.cuenta, p.monto])).toEqual([["prestamo", 30]]);
+    expect(plan.omisiones.map((o) => o.motivo)).toEqual(["ya-registrado"]);
+  });
+
+  it("una casilla en cero no anota nada en su cuenta", () => {
+    const plan = planDeCierre({
+      lineas: [lineaCon("8", "BRICEIDA", { prestamo: 0, terceros: 0, mercancia: 0 })],
+      deudas: mapa(deuda({ codigo: "8", saldoPrestamo: 300, saldoTerceros: 200, saldoDano: 100 })),
+      fecha: "2026-08-15",
+    });
+    expect(plan.pagos).toEqual([]);
+  });
+
+  // 🔴 EL DAÑO NO PROPONE, ASÍ QUE SU CASILLA VACÍA ES LO NORMAL — y no se
+  // avisa. Las dos automáticas SÍ: una casilla en cero sobre una deuda viva es
+  // un descuento que faltó.
+  it("la casilla vacía del DAÑO no genera aviso; las automáticas sí", () => {
+    const plan = planDeCierre({
+      lineas: [lineaCon("8", "BRICEIDA", { prestamo: 0, terceros: 0, mercancia: 0 })],
+      deudas: mapa(deuda({ codigo: "8", saldoPrestamo: 300, saldoTerceros: 200, saldoDano: 100 })),
+      fecha: "2026-08-15",
+    });
+    // Dos avisos (préstamo y terceros), NO tres.
+    expect(plan.omisiones).toHaveLength(2);
+    expect(plan.omisiones.every((o) => o.motivo === "casilla-en-cero")).toBe(true);
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 describe("E. LO QUE SE DICE ANTES DE CERRAR", () => {
   it("con pagos, se dice cuántas personas y cuánto", () => {
     const plan = planDeCierre({

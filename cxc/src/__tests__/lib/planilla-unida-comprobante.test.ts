@@ -11,11 +11,14 @@
  * ()», «TARDANZA(45 MINUTOS)», «TARDANZAS (69 minutos  )»…).
  * ────────────────────────────────────────────────────────────────────────── */
 
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CLAVES_RENGLON,
   EMPRESAS,
   armarComprobante,
+  identificacionEmpresa,
   lineasConComprobante,
   nombreEmpresaComprobante,
   notaTardanza,
@@ -61,6 +64,13 @@ function linea(over: Partial<LineaPlanilla> = {}): LineaPlanilla {
     ...over,
   } as LineaPlanilla;
 }
+
+// Lee un archivo del repo SIN sus comentarios: un candado no se puede dar por
+// cumplido con una palabra que está dentro de la explicación de la regla.
+const leerSinComentarios = (rel: string) =>
+  fs.readFileSync(path.join(process.cwd(), rel), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 const PERIODO = { esQuincena: true, anio: 2026, mes: 7, n: 2 as const, etiqueta: "16 al 31 de julio de 2026" };
 const claves = (c: ReturnType<typeof armarComprobante>) => c.renglones.map((r) => r.clave);
@@ -258,6 +268,37 @@ describe("F. LA CABEZA DEL PAPEL", () => {
     const c = armarComprobante({ linea: linea(), posicion: "Asistente de Bodega" }, PERIODO);
     expect(c.posicion).toBe("Asistente de Bodega");
     expect(c.rataPorHora).toBeCloseTo(3.02, 2);
+  });
+
+  // 🔴 EL ENCABEZADO LLEVA DOS COSAS Y NADA MÁS: nombre legal e IDENTIFICACIÓN.
+  // 🩸 El RUC se probaba solo contra la lista (`identificacionEmpresa`), así
+  // que el papel podía dejar de imprimirlo y los 51 candados seguían verdes
+  // (mutación del 9-sep-2026: «el comprobante deja de imprimir la
+  // identificación»). Se prueba sobre el comprobante ARMADO, que es lo que se
+  // dibuja.
+  it("el comprobante armado trae la identificación de SU empresa", () => {
+    const acs = armarComprobante(
+      { linea: linea({ empresa: "american_classic", empresaEtiqueta: "Multifashion" }) },
+      PERIODO,
+    );
+    expect(acs.empresa).toBe("MULTI FASHION HOLDING CORP.");
+    expect(acs.identificacion).toBe("155638923-2-2016");
+
+    // Y la del grupo trae la SUYA, nunca la de ACS.
+    const fw = armarComprobante({ linea: linea() }, PERIODO);
+    expect(fw.identificacion).toBe(identificacionEmpresa("fashion_wear"));
+    expect(fw.identificacion).not.toBe("155638923-2-2016");
+  });
+
+  // 🔴 Y NO LLEVA CORREO NI TELÉFONO. Daniel, textual: el comprobante de pago
+  // solo lleva el nombre y la identificación — el correo y el teléfono son del
+  // estado de cuenta del CXC, otro papel. Con ACS además serían INVENTADOS.
+  it("el papel NO lleva correo ni teléfono", () => {
+    const c = armarComprobante({ linea: linea() }, PERIODO) as Record<string, unknown>;
+    expect(Object.keys(c)).not.toContain("correo");
+    expect(Object.keys(c)).not.toContain("telefono");
+    const pdf = leerSinComentarios("src/lib/asistencia/comprobante-pdf.ts");
+    expect(pdf).not.toMatch(/correo|telefono|@fashiongr/i);
   });
 
   // 🔴 Sin cargo cargado, un GUION. Nunca un cargo adivinado del nombre.

@@ -20,6 +20,10 @@
  *      de tocarlo y no al fallar el guardado.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🩸 Los nombres se muestran CAPITALIZADOS desde el 10-sep-2026 (Daniel: «no me
+// gustan los nombres en planilla de los usuarios todo en mayúscula»). Los
+// buscadores van sin distinguir mayúsculas: lo guardado no cambió, solo la
+// grafía en pantalla.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 
@@ -78,8 +82,8 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 async function abrirFicha(cuerpo: unknown = datos()) {
   servir(cuerpo);
   montar();
-  await screen.findAllByText(/ANGELA GARCIA/);
-  fireEvent.click(screen.getAllByRole("button", { name: /ANGELA GARCIA/ })[0]);
+  await screen.findAllByText(/ANGELA GARCIA/i);
+  fireEvent.click(screen.getAllByRole("button", { name: /ANGELA GARCIA/i })[0]);
 }
 
 /**

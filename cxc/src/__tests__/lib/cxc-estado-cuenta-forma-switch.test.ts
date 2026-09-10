@@ -382,15 +382,23 @@ describe("la forma del papel es la de Switch", () => {
     }
     // CONTROL (la dirección original): una clave que ni existe en la lista
     // sigue sin heredar nada — sale con el nombre de la pantalla y en blanco.
-    // 🔄 El ejemplo pasó de Boston a Multifashion ese mismo 9-sep-2026, más
-    // tarde: Daniel bajó también el papel de Confecciones Boston y dictó sus
-    // cuatro líneas, así que Boston YA tiene ficha (ver el bloque de abajo). El
-    // control se conserva con la empresa que sigue sin tenerla.
-    const rara = fichaFiscal("american_classic", "Multifashion");
-    expect(rara.legal).toBe("Multifashion");
+    // 🔄 El ejemplo pasó de Boston a Multifashion el 9-sep-2026 y de
+    // Multifashion a una clave cualquiera el 10-sep-2026: ese día Daniel mandó
+    // el Aviso de Operación de ACS y Multifashion TAMBIÉN tiene ficha. El
+    // control se conserva con una clave que no existe.
+    const rara = fichaFiscal("empresa_que_no_existe", "Nombre Corto");
+    expect(rara.legal).toBe("Nombre Corto");
     expect(rara.identificacion).toBe("");
     expect(rara.telefono).toBe("");
     expect(rara.correo).toBe("");
+
+    // 🔴 Y MULTIFASHION, que ahora sí la tiene, NO hereda el correo del grupo:
+    // es otra entidad y Daniel todavía no dijo cuál usa.
+    const acs = fichaFiscal("american_classic", "Multifashion");
+    expect(acs.legal).toBe("MULTI FASHION HOLDING CORP.");
+    expect(acs.identificacion).toBe("155638923-2-2016");
+    expect(acs.correo).toBe("");
+    expect(acs.telefono).toBe("");
 
     // Y Boston, que sí la tiene, no toma nada de una del grupo — ni su correo.
     const boston = fichaFiscal("confecciones_boston", "Confecciones Boston");

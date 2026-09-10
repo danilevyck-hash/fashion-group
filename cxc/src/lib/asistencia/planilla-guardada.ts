@@ -202,6 +202,9 @@ export const COLUMNAS_HORAS: Record<
   diasARevisar: "dias_a_revisar",
   tardanzaDeDiasARevisarMin: "tardanza_de_dias_a_revisar_min",
   jornadaDiariaMin: "jornada_diaria_min",
+  // 🔴 Cuántos de esos minutos de extra se pagaron sin aprobación (el horario
+  // de la tienda). Se congela para que una quincena vieja se pueda explicar.
+  extraAutoMin: "extra_auto_min",
 };
 
 export type FilaLineaGuardada = Record<string, unknown>;

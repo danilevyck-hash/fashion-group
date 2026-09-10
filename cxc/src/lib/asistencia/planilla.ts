@@ -75,6 +75,7 @@ import {
 } from "./config";
 import { etiquetaPersona } from "./directorio";
 import { esHabil, fmtMin, type DiaReporte, type PersonaReporte } from "./reporte";
+import { minutosExtraAutomaticos } from "./extra-automatico";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CENTAVOS — el redondeo, en un solo lugar
@@ -406,6 +407,19 @@ export interface HorasPersona {
   extraNoAprobadaDiurnoMin: number;
   extraNoAprobadaNocturnoMin: number;
   /**
+   * 🔴 LOS MINUTOS DE EXTRA QUE SE PAGARON SIN QUE NADIE LOS APROBARA, porque
+   * son el horario de la tienda (ACS cierra a las 7 p.m.: 30 min por día).
+   * SOLO PARA MOSTRAR — ya están adentro de `extraDiurnoMin`/`extraNocturnoMin`
+   * y no se suman en ningún lado.
+   *
+   * 🔑 Existe para poder DECIRLO: ver horas extra pagadas que nadie aprobó se
+   * lee como un error del sistema si no hay una frase que explique de dónde
+   * salen. Ver `extra-automatico.ts`.
+   *
+   * `0` en las otras tres empresas, siempre.
+   */
+  extraAutoMin: number;
+  /**
    * Excedente. **HOY SIEMPRE 0** — se conserva la columna porque el cuadro de
    * la contadora también la conserva, y también en $0,00. Ver `clasificarDia`.
    */
@@ -472,7 +486,7 @@ export interface HorasPersona {
 
 export const HORAS_CERO: HorasPersona = {
   extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0, extraNoAprobadaMin: 0,
-  extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0,
+  extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0, extraAutoMin: 0,
   domingoMin: 0, feriadoMin: 0, tardanzaMin: 0,
   tardanzaGraveMin: 0, tardanzaGraveDias: 0,
   ausenciaMin: 0, ausenciaDias: 0, ausenciaJustificadaDias: 0,
@@ -776,6 +790,11 @@ export interface DiasAprobados {
   exigir: boolean;
   /** `codigo|fecha` de cada día autorizado. */
   claves: ReadonlySet<string>;
+  /**
+   * 🔴 Minutos de extra POR DÍA que se pagan sin aprobación (el horario de la
+   * tienda). `0` = como siempre: o el día está aprobado, o no se paga nada.
+   */
+  autoMin?: number;
   codigo: string;
 }
 
@@ -800,15 +819,39 @@ export function medirHoras(
       h.domingoMin += c.domingoMin;
       h.feriadoMin += c.feriadoMin;
     } else {
+      // ── 🔴 LOS MINUTOS QUE NO HAY QUE APROBAR (ACS: 30 por día) ───────────
+      //
+      // Daniel: *«ya by default allá trabajan hasta las 7pm, así que siempre
+      // sin aprobación ganan 30 mins de horas extras»*. Los primeros `autoMin`
+      // del día se pagan; lo que pase de ahí sigue esperando aprobación.
+      //
+      // ⚠️ Se reparte DIURNO PRIMERO y después nocturno, porque así ocurre en
+      // el día: los 30 minutos después de la jornada caen antes de las 6 p.m.
+      // Al revés se pagaría el minuto más caro primero.
+      //
+      // ⚠️ SOLO la hora extra. El domingo, el feriado y el excedente NO entran:
+      // son otros recargos y no salen del horario de la tienda.
+      //
+      // 🔑 Con `autoMin = 0` —las otras tres empresas— este bloque es
+      // exactamente el `else` de siempre: `Math.min(x, 0)` es 0 y todo cae en
+      // «no aprobado», que es lo que hacía ayer.
+      const auto = Math.max(0, aprob?.autoMin ?? 0);
+      const pagaDiurno = Math.min(c.extraDiurnoMin, auto);
+      const pagaNocturno = Math.min(c.extraNocturnoMin, Math.max(0, auto - pagaDiurno));
+
+      h.extraDiurnoMin += pagaDiurno;
+      h.extraNocturnoMin += pagaNocturno;
+      h.extraAutoMin += pagaDiurno + pagaNocturno;
+
       // Lo que NO se pagó, para poder DECIRLO. Rechazar sí, esconder no.
       //
       // 🔴 SE APARTA CON SU RECARGO, no solo el total: es lo que permite que
       // `armarLinea` lo valúe con la MISMA fórmula del pago (1,25 el diurno,
       // 1,50 el nocturno) y el aviso diga cuánto se pagaría al aprobar. Sumar
       // los dos en una sola cifra era perder el precio de cada minuto.
-      h.extraNoAprobadaMin += c.extraDiurnoMin + c.extraNocturnoMin;
-      h.extraNoAprobadaDiurnoMin += c.extraDiurnoMin;
-      h.extraNoAprobadaNocturnoMin += c.extraNocturnoMin;
+      h.extraNoAprobadaMin += (c.extraDiurnoMin - pagaDiurno) + (c.extraNocturnoMin - pagaNocturno);
+      h.extraNoAprobadaDiurnoMin += c.extraDiurnoMin - pagaDiurno;
+      h.extraNoAprobadaNocturnoMin += c.extraNocturnoMin - pagaNocturno;
     }
     h.tardanzaMin += c.tardanzaMin;
     // 🔴 EL RÓTULO, NO EL DINERO. Un día de más de 30 minutos tarde se sigue
@@ -1961,6 +2004,9 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
           exigir: opts.exigirAprobacionExtra === true,
           claves: opts.diasExtraAprobados ?? new Set<string>(),
           codigo: cod,
+          // 🔴 POR EMPRESA, de la ficha. Sin ficha —o en las otras tres— es 0 y
+          // el motor se comporta exactamente como antes.
+          autoMin: minutosExtraAutomaticos(ficha.empresa ?? null),
         })
       : { ...HORAS_CERO, jornadaDiariaMin: jornadaDiariaMin(cod) };
 

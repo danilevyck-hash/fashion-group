@@ -51,6 +51,14 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
   doc.setFont("helvetica", "bold").setFontSize(13);
   doc.text(c.empresa, HOJA.ancho / 2, y + 2, { align: "center" });
   y += 8;
+  // 🔴 LA IDENTIFICACIÓN, debajo del nombre y solo si se sabe. Una línea de RUC
+  // en blanco en un papel de pago no informa: confunde.
+  if (c.identificacion) {
+    doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(90);
+    doc.text(c.identificacion, HOJA.ancho / 2, y - 3.5, { align: "center" });
+    doc.setTextColor(0);
+    y += 2;
+  }
   doc.setFont("helvetica", "normal").setFontSize(9.5);
   for (const linea of c.encabezado.slice(0, 2)) {
     doc.text(linea, HOJA.ancho / 2, y, { align: "center" });

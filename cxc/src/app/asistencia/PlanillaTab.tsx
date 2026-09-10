@@ -88,6 +88,7 @@ import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import { corteSugerido, netoConAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import { textoExtraAutomatico } from "@/lib/asistencia/extra-automatico";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
 // 🔴 QUIÉN CIERRA SALE DEL MISMO MÓDULO QUE EL CANDADO DEL SERVIDOR
@@ -1987,6 +1988,17 @@ function Fila({
             {chipBaseSeguros(sobreQueBase)}
           </span>
         )}
+        {/* 🔴 LOS MINUTOS DE EXTRA QUE NADIE APROBÓ PORQUE SON EL HORARIO. Sin
+            el sello, ver horas extra pagadas sin aprobación se lee como un
+            error del sistema — que es el susto que la regla existe para evitar. */}
+        {!!l.horas.extraAutoMin && (
+          <span
+            className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500"
+            title="La tienda cierra a las 7 p.m.: estos minutos se pagan sin aprobación. Lo que pasa de ahí sí se aprueba."
+          >
+            {textoExtraAutomatico(l.horas.extraAutoMin, l.empresaEtiqueta)}
+          </span>
+        )}
         {/* 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR. Sin el chip, un neto que no da
             lo esperado no tiene explicación a la vista. El signo lo dice todo:
             + se le descuenta, − se le devuelve. */}
@@ -2082,6 +2094,7 @@ function Tarjeta({
             {/* El mismo sello que en el escritorio, y con las MISMAS palabras:
                 dos redacciones del mismo hecho es la forma de que se separen. */}
             {sobreQueBaseTarjeta !== null && ` · ${chipBaseSeguros(sobreQueBaseTarjeta)}`}
+            {!!l.horas.extraAutoMin && ` · ${textoExtraAutomatico(l.horas.extraAutoMin, l.empresaEtiqueta)}`}
           </span>
         </span>
         <span className="shrink-0 text-right">

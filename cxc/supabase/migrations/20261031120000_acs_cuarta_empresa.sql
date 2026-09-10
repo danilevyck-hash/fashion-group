@@ -36,11 +36,8 @@ ALTER TABLE asistencia_aprobador_empresa
   ADD CONSTRAINT asistencia_aprobador_empresa_valida
   CHECK (empresa = ANY (ARRAY['confecciones_boston'::text,'vistana'::text,'fashion_wear'::text,'american_classic'::text]));
 
--- ── LA CONTADORA CIERRA LAS CUATRO ──────────────────────────────────────────
+-- ── ⚠️ QUIÉN APRUEBA LAS HORAS DE ACS ───────────────────────────────────────
 --
--- ⚠️ Su alcance ya NO depende de esta fila desde el 10-sep-2026 —quien cierra
--- la planilla alcanza a todas (`alcanceDe`)— pero la fila se agrega igual para
--- que la tabla siga diciendo la verdad de quién aprueba qué.
-INSERT INTO asistencia_aprobador_empresa (usuario, empresa)
-VALUES ('Contabilidad', 'american_classic')
-ON CONFLICT DO NOTHING;
+-- NO se agrega acá: lo decide `20261101120000_acs_aprueba_daniel.sql`, donde
+-- Daniel dictó *«acs lo aprueba daniel»*. La contadora CIERRA las cuatro sin
+-- depender de esta tabla (ver `alcanceDe`), que es otra pregunta.

@@ -24,7 +24,7 @@ import {
   NOMBRE_CUENTA, calcularSaldoPrestamo, cuentaDeMovimiento, cuentaMasVieja, debeLasDos,
 } from "@/lib/prestamos-saldo";
 import { CONCEPTOS_OFRECIDOS, CONCEPTO_TERCEROS, cuentaDeCargo } from "@/lib/prestamos-conceptos";
-import { CLAVES_RENGLON, EMPRESAS, armarComprobante, nombreEmpresaComprobante } from "@/lib/asistencia/comprobante";
+import { CLAVES_RENGLON, EMPRESAS, armarComprobante, identificacionEmpresa, nombreEmpresaComprobante } from "@/lib/asistencia/comprobante";
 import { CASILLA_DE_CUENTA, CONCEPTO_DE_CUENTA } from "@/lib/asistencia/cierre-prestamo";
 import { capitalizarNombre, esGritado } from "@/lib/nombre-en-pantalla";
 import { MOTIVOS_JUSTIFICACION, MOTIVO_CONSTANCIA, motivoSeOfrece } from "@/lib/asistencia/motivos";
@@ -411,13 +411,30 @@ describe("J. ACS (Multifashion) — la CUARTA empresa", () => {
     }
   });
 
-  // ⚠️ EL NOMBRE LEGAL DE ACS NO EXISTE EN NINGÚN LADO, Y NO SE INVENTA. El
-  // comprobante cae al nombre corto —«MULTIFASHION»— igual que las otras dos
-  // empresas cuyas cuatro líneas fiscales Daniel todavía no dictó. Nunca sale
-  // con el nombre de OTRA empresa.
-  it("el comprobante de ACS dice MULTIFASHION, sin inventar un nombre legal", () => {
-    expect(nombreEmpresaComprobante("american_classic", "Multifashion")).toBe("MULTIFASHION");
+  // 🔴 EL NOMBRE LEGAL Y EL RUC SALEN DEL AVISO DE OPERACIÓN que mandó Daniel
+  // (Ministerio de Comercio e Industrias), cargados en la MISMA lista escrita a
+  // mano que usa el estado de cuenta — no en una segunda copia.
+  it("el comprobante de ACS dice su nombre legal y su identificación", () => {
+    expect(nombreEmpresaComprobante("american_classic", "Multifashion"))
+      .toBe("MULTI FASHION HOLDING CORP.");
+    expect(identificacionEmpresa("american_classic")).toBe("155638923-2-2016");
+    // No se agregó una segunda lista: el nombre sale del registro fiscal.
     expect(Object.keys(EMPRESAS)).not.toContain("american_classic");
+  });
+
+  // 🔴 SU CORREO VA VACÍO. ACS es otra entidad: ponerle `info@fashiongr.com`
+  // —el de las SEIS del grupo— sería firmarle el papel a nombre de otro.
+  it("ACS NO hereda el correo del grupo", async () => {
+    const { EMPRESA_FISCAL, CORREO_DEL_GRUPO } = await import("@/lib/cxc/empresa-fiscal");
+    expect(EMPRESA_FISCAL.american_classic.correo).toBe("");
+    expect(EMPRESA_FISCAL.american_classic.correo).not.toBe(CORREO_DEL_GRUPO);
+    expect(EMPRESA_FISCAL.american_classic.telefono).toBe("");
+  });
+
+  // ⚠️ Y una empresa SIN registro sigue sin inventarse nada.
+  it("una empresa sin registro no inventa un nombre legal ni un RUC", () => {
+    expect(nombreEmpresaComprobante("empresa_nueva", "Empresa Nueva")).toBe("EMPRESA NUEVA");
+    expect(identificacionEmpresa("empresa_nueva")).toBe("");
   });
 
   // ⚠️ La KEY no se renombra: es la misma de las ventas y las comisiones.
@@ -434,5 +451,167 @@ describe("J. ACS (Multifashion) — la CUARTA empresa", () => {
     expect(src).not.toMatch(/relojes\?\.\[0\]/);
     // El pedido va POR dispositivo.
     expect(src).toMatch(/dispositivo: reloj\.dispositivo/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Un día con hora extra, con la MISMA forma que usan los otros tests del motor.
+ * Salida a las 18:20 sobre una jornada que termina a las 17:00 = 80 min de
+ * extra, todos DIURNOS (la ventana nocturna arranca a las 18:00 → 60 diurnos +
+ * 20 nocturnos, según las reglas por defecto).
+ */
+function personaConExtra(salida: string, codigo = "1") {
+  const d = {
+    fecha: "2026-09-01",
+    marcas: ["08:00:00", "12:00:00", "12:30:00", `${salida}:00`],
+    marcasIds: ["a", "b", "c", "d"],
+    entrada: "08:00:00", salida: `${salida}:00`,
+    tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0,
+    extraMin: 80, trabajadoMin: 480, revisar: false,
+  };
+  return {
+    codigo, nombre: `P${codigo}`, salida: "17:00", almuerzoMin: 30, dias: [d],
+    resumen: { diasTrabajados: 1, ausenciasSinJustificar: 0 },
+  } as never;
+}
+
+describe("K. ACS: 30 MIN DE EXTRA AUTOMÁTICOS, Y LAS APRUEBA DANIEL", () => {
+  // Daniel: *«ya by default allá trabajan hasta las 7pm, así que siempre sin
+  // aprobación ganan 30 mins de horas extras»*.
+
+  it("30 en ACS, 0 en las otras tres", async () => {
+    const { EXTRA_AUTOMATICO_POR_EMPRESA, minutosExtraAutomaticos } =
+      await import("@/lib/asistencia/extra-automatico");
+    expect(EXTRA_AUTOMATICO_POR_EMPRESA.american_classic).toBe(30);
+    for (const e of ["confecciones_boston", "vistana", "fashion_wear"] as const) {
+      expect(EXTRA_AUTOMATICO_POR_EMPRESA[e], e).toBe(0);
+    }
+    // Una empresa desconocida o vacía: 0, como siempre.
+    expect(minutosExtraAutomaticos("joystep")).toBe(0);
+    expect(minutosExtraAutomaticos(null)).toBe(0);
+  });
+
+  // 🔴 EL MOTOR: los primeros 30 min del día se pagan; el resto espera.
+  it("paga los primeros 30 y aparta el resto", async () => {
+    const { medirHoras } = await import("@/lib/asistencia/planilla");
+    const { REGLAS_DEFAULT } = await import("@/lib/asistencia/config");
+    // Un día con 50 min de extra diurna, SIN aprobar.
+    const persona = personaConExtra("18:20");
+    const sinAuto = medirHoras(persona, REGLAS_DEFAULT, 480,
+      { exigir: true, claves: new Set<string>(), codigo: "1", autoMin: 0 });
+    const conAuto = medirHoras(persona, REGLAS_DEFAULT, 480,
+      { exigir: true, claves: new Set<string>(), codigo: "1", autoMin: 30 });
+
+    // Sin la regla: NADA se paga y todo queda sin aprobar (lo de siempre).
+    expect(sinAuto.extraDiurnoMin + sinAuto.extraNocturnoMin).toBe(0);
+    expect(sinAuto.extraAutoMin).toBe(0);
+    // Con la regla: se pagan 30 y el resto sigue esperando.
+    const pagado = conAuto.extraDiurnoMin + conAuto.extraNocturnoMin;
+    expect(pagado).toBe(30);
+    expect(conAuto.extraAutoMin).toBe(30);
+    expect(conAuto.extraNoAprobadaMin).toBeCloseTo(sinAuto.extraNoAprobadaMin - 30, 4);
+    // 🔑 Y el total medido no cambia: los 30 se MOVIERON de lado, no aparecieron.
+    expect(pagado + conAuto.extraNoAprobadaMin)
+      .toBeCloseTo(sinAuto.extraNoAprobadaMin, 4);
+  });
+
+  // 🔴 LOS 30 MINUTOS SALEN DE LA EMPRESA DE LA FICHA, NO DE UN NÚMERO SUELTO.
+  // 🩸 Los tests de arriba le pasan `autoMin` a mano a `medirHoras`, así que
+  // seguían verdes con el cableado clavado en 30 — y con eso las CUATRO
+  // empresas habrían pagado media hora sin aprobar. Este va por el motor
+  // entero (`armarPlanilla`), con dos personas del MISMO día y el mismo
+  // horario, y lo único distinto entre las dos es la empresa de su ficha.
+  // (mutación 9-sep-2026: «los minutos automáticos no salen de la empresa de
+  // la ficha» se escapaba de los 51 candados.)
+  it("por el motor entero: la de ACS gana 30 y la de Vistana 0", async () => {
+    const { armarPlanilla } = await import("@/lib/asistencia/planilla");
+    const { REGLAS_DEFAULT } = await import("@/lib/asistencia/config");
+    const fichas = new Map([
+      ["1", { codigo: "1", nombre: "TIENDA", salarioMensual: 1000, jornadaSemanal: 40,
+              empresa: "american_classic" }],
+      ["2", { codigo: "2", nombre: "OFICINA", salarioMensual: 1000, jornadaSemanal: 40,
+              empresa: "vistana" }],
+    ]);
+    const lineas = armarPlanilla({
+      personas: [personaConExtra("18:20", "1"), personaConExtra("18:20", "2")],
+      fichas: fichas as never,
+      jornadaDiariaMin: () => 480,
+      reglas: REGLAS_DEFAULT,
+      empresa: null,
+      exigirAprobacionExtra: true,
+      diasExtraAprobados: new Set<string>(),
+    });
+    const acs = lineas.find((l) => l.codigo === "1")!;
+    const vis = lineas.find((l) => l.codigo === "2")!;
+
+    expect(acs.horas.extraAutoMin).toBe(30);
+    expect(acs.horas.extraDiurnoMin + acs.horas.extraNocturnoMin).toBe(30);
+    // 🔴 CONTROL: la de Vistana no gana un solo minuto sin aprobación.
+    expect(vis.horas.extraAutoMin).toBe(0);
+    expect(vis.horas.extraDiurnoMin + vis.horas.extraNocturnoMin).toBe(0);
+    // Y lo no aprobado de la de ACS es exactamente 30 menos que el de la otra.
+    expect(vis.horas.extraNoAprobadaMin - acs.horas.extraNoAprobadaMin)
+      .toBeCloseTo(30, 6);
+  });
+
+  // 🔴 CON EL DÍA APROBADO se paga TODO, y nada se cuenta como automático: los
+  // 30 min no son un tope, son un piso que no hay que aprobar.
+  it("un día aprobado se paga entero y no cuenta como automático", async () => {
+    const { medirHoras } = await import("@/lib/asistencia/planilla");
+    const { REGLAS_DEFAULT } = await import("@/lib/asistencia/config");
+    const persona = personaConExtra("18:20");
+    const h = medirHoras(persona, REGLAS_DEFAULT, 480,
+      { exigir: true, claves: new Set(["1|2026-09-01"]), codigo: "1", autoMin: 30 });
+    expect(h.extraNoAprobadaMin).toBe(0);
+    expect(h.extraAutoMin).toBe(0);
+    expect(h.extraDiurnoMin + h.extraNocturnoMin).toBeGreaterThan(30);
+  });
+
+  // 🔴 LAS OTRAS TRES EMPRESAS NO SE MUEVEN. Con 0 minutos el motor da idéntico.
+  it("con 0 minutos el motor se comporta EXACTAMENTE como antes", async () => {
+    const { medirHoras } = await import("@/lib/asistencia/planilla");
+    const { REGLAS_DEFAULT } = await import("@/lib/asistencia/config");
+    const persona = personaConExtra("18:20");
+    const base = { exigir: true, claves: new Set<string>(), codigo: "1" };
+    const sinCampo = medirHoras(persona, REGLAS_DEFAULT, 480, base);
+    const conCero = medirHoras(persona, REGLAS_DEFAULT, 480, { ...base, autoMin: 0 });
+    expect(conCero).toEqual(sinCampo);
+  });
+
+  // 🔑 SOLO la hora extra. El domingo, el feriado y el excedente son otros
+  // recargos y no salen del horario de la tienda.
+  it("no toca el domingo, el feriado ni el excedente", () => {
+    const puro = sinComentarios("src/lib/asistencia/planilla.ts");
+    const i = puro.indexOf("const auto = Math.max(0, aprob?.autoMin ?? 0);");
+    const j = puro.indexOf("h.tardanzaMin += c.tardanzaMin;", i);
+    const bloque = puro.slice(i, j);
+    expect(bloque).not.toMatch(/domingoMin|feriadoMin|excedenteMin/);
+  });
+
+  // 🔴 SE DICE DE DÓNDE SALEN, para que nadie lo lea como un error.
+  it("hay una frase que lo explica, y calla en cero", async () => {
+    const { textoExtraAutomatico } = await import("@/lib/asistencia/extra-automatico");
+    expect(textoExtraAutomatico(30, "Multifashion")).toBe("30 min fijos de Multifashion");
+    expect(textoExtraAutomatico(0)).toBeNull();
+  });
+
+  // 🔴 Y SE CONGELA con el cuadro: una quincena vieja se tiene que poder explicar.
+  it("los minutos automáticos se guardan en el cierre", async () => {
+    const { COLUMNAS_HORAS } = await import("@/lib/asistencia/planilla-guardada");
+    expect(COLUMNAS_HORAS.extraAutoMin).toBe("extra_auto_min");
+    const sql = leer("supabase/migrations/20261101120000_acs_aprueba_daniel.sql");
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS extra_auto_min/);
+  });
+
+  // 🔴 APROBAR ≠ CERRAR. Daniel: *«acs lo aprueba daniel»* — pero la contadora
+  // sigue cerrando las cuatro.
+  it("en ACS aprueba daniel; la contadora sale de esa fila y conserva el cierre", async () => {
+    const sql = leer("supabase/migrations/20261101120000_acs_aprueba_daniel.sql");
+    expect(sql).toMatch(/VALUES \('daniel', 'american_classic'\)/);
+    expect(sql).toMatch(/DELETE FROM asistencia_aprobador_empresa[\s\S]{0,120}'Contabilidad'[\s\S]{0,60}'american_classic'/);
+    // Y su alcance para CERRAR no depende de esa tabla.
+    const { alcanceDe, alcanza } = await import("@/lib/asistencia/aprobador-empresa");
+    expect(alcanza(alcanceDe("contabilidad", "Contabilidad", []), "american_classic")).toBe(true);
   });
 });

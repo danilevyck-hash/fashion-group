@@ -87,12 +87,16 @@ describe("🔴 se congela TODO: las 24 cifras de dinero y las 20 del reloj", () 
   it("los dos mapas tienen todos los campos y ninguna columna repetida", () => {
     const dinero = Object.values(COLUMNAS_DINERO);
     const horas = Object.values(COLUMNAS_HORAS);
+    // 🩸 Las horas pasaron de 20 a 21 el 10-sep-2026: entró `extra_auto_min`,
+    // los minutos que se pagan SIN aprobación porque son el horario de la
+    // tienda de ACS. La regla que este candado protege no cambió — el número
+    // exacto y que NINGUNA columna se repita entre los dos mapas.
     expect(dinero.length).toBe(24);
-    expect(horas.length).toBe(20);
+    expect(horas.length).toBe(21);
     expect(new Set(dinero).size).toBe(24);
-    expect(new Set(horas).size).toBe(20);
+    expect(new Set(horas).size).toBe(21);
     // Una columna de dinero con el nombre de una de horas se pisaría en la fila.
-    expect(new Set([...dinero, ...horas]).size).toBe(44);
+    expect(new Set([...dinero, ...horas]).size).toBe(45);
   });
 
   it("la fila escrita trae TODAS las columnas, con el valor de la línea", () => {
@@ -388,6 +392,8 @@ describe("lo que llega se valida acá, no en el llamador", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 la migración sostiene lo que el código promete", () => {
+  const leerMigracion = (n: string) =>
+    readFileSync(path.join(process.cwd(), "supabase/migrations", n), "utf-8");
   const SQL_CRUDO = readFileSync(
     path.join(process.cwd(), "supabase/migrations", MIGRACION_PLANILLA_GUARDADA),
     "utf-8",
@@ -429,8 +435,18 @@ describe("🔴 la migración sostiene lo que el código promete", () => {
   it("🔴 TODA columna de los dos mapas existe en el SQL", () => {
     // Es lo que amarra el TypeScript con la base: una columna en el mapa que la
     // tabla no tenga haría fallar el INSERT entero el día de guardar.
+    //
+    // 🩸 SE MIRAN LAS MIGRACIONES QUE AGREGAN COLUMNAS, no solo la que creó la
+    // tabla (10-sep-2026): `ajuste_anterior` llegó con la planilla unida y
+    // `extra_auto_min` con los 30 minutos de ACS. La regla no cambió —ninguna
+    // columna del mapa puede faltar en la base— pero la base ya no se describe
+    // en un solo archivo.
+    const TODAS = [SQL,
+      leerMigracion("20261028120000_planilla_unida.sql"),
+      leerMigracion("20261101120000_acs_aprueba_daniel.sql"),
+    ].join("\n");
     for (const col of [...Object.values(COLUMNAS_DINERO), ...Object.values(COLUMNAS_HORAS)]) {
-      expect(SQL, `falta la columna ${col}`).toMatch(new RegExp(`^\\s*${col}\\s+numeric`, "m"));
+      expect(TODAS, `falta la columna ${col}`).toMatch(new RegExp(`\\b${col}\\s+numeric`, "m"));
     }
   });
 

@@ -91,6 +91,23 @@ const REGISTRO: Readonly<Record<string, { legal: string; identificacion: string;
     identificacion: "655-544-133465",
     correo: "ventas@cboston.net",
   },
+  // 🔴 MULTIFASHION / ACS (10-sep-2026). Los dos datos salen del AVISO DE
+  // OPERACIÓN del Ministerio de Comercio e Industrias que mandó Daniel — no de
+  // Switch, que para esta empresa no imprime papel de cobro.
+  //
+  // ⚠️ SU CORREO VA VACÍO, Y NO ES UN OLVIDO. `info@fashiongr.com` es el de las
+  // SEIS del grupo y ACS es otra entidad; Daniel todavía no dijo cuál usa, así
+  // que ponerle el del grupo sería firmarle el papel a nombre de otro. El
+  // teléfono va vacío como en todas.
+  //
+  // 🔑 El `correo: ""` es EXPLÍCITO: sin él, `?? CORREO_DEL_GRUPO` le pondría el
+  // del grupo por descarte. Un vacío escrito a propósito no es lo mismo que un
+  // campo que nadie llenó.
+  american_classic: {
+    legal: "MULTI FASHION HOLDING CORP.",
+    identificacion: "155638923-2-2016",
+    correo: "",
+  },
 };
 
 /**

@@ -100,6 +100,8 @@ import {
 import { ETIQUETA_SALDO_INICIAL } from "@/lib/asistencia/saldo-vacaciones";
 import { puedeCerrar } from "@/lib/asistencia/roles";
 import { textoConfirmar, textoIgnorados } from "@/lib/asistencia/codigos-ignorados";
+// 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import HorariosTab from "./HorariosTab";
 import FeriadosTab from "./FeriadosTab";
 
@@ -699,7 +701,7 @@ export default function ConfiguracionTab() {
         // estaba: se cierra en vez de dejar un formulario huérfano.
         setAbierta(null);
         setBorrador(null);
-        const quien = p.nombre ?? `el código ${p.codigo}`;
+        const quien = p.nombre ? capitalizarNombre(p.nombre) : `el código ${p.codigo}`;
         const debe = p.deudaPrestamo ?? 0;
         toast(
           fechaSalida
@@ -1425,7 +1427,7 @@ export default function ConfiguracionTab() {
                             {puedeTocarLaFicha && (
                               <button
                                 type="button"
-                                onClick={() => void ignorar(p.codigo, p.nombre ?? p.codigo)}
+                                onClick={() => void ignorar(p.codigo, p.nombre ? capitalizarNombre(p.nombre) : p.codigo)}
                                 className="min-h-[44px] text-[12px] text-gray-500 underline transition hover:text-black"
                               >
                                 Ignorar este código
@@ -1480,7 +1482,7 @@ export default function ConfiguracionTab() {
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm text-gray-900">
-                          {p.nombre ?? `Código ${p.codigo}`}
+                          {p.nombre ? capitalizarNombre(p.nombre) : `Código ${p.codigo}`}
                           <span className="ml-1.5 text-xs text-gray-400">código {p.codigo}</span>
                         </span>
                         <span className="block text-[12px] text-gray-500">
@@ -1739,7 +1741,7 @@ function NombrePersona({ p }: { p: { nombre: string | null; codigo: string; marc
   return (
     <span className="block min-w-0">
       <span className="block truncate text-sm text-gray-900">
-        {p.nombre ?? `Código ${p.codigo}`}
+        {p.nombre ? capitalizarNombre(p.nombre) : `Código ${p.codigo}`}
         {p.nombre && <span className="ml-1.5 text-xs text-gray-400">código {p.codigo}</span>}
       </span>
       <span className="block truncate text-[11px] text-gray-400">
