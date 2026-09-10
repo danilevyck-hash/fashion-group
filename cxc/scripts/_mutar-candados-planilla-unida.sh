@@ -27,6 +27,7 @@ ARCHIVOS=(
   "src/lib/asistencia/abono-extra.ts"
   "src/lib/asistencia/datos-del-papel.ts"
   "src/lib/asistencia/planilla-unida.ts"
+  "src/lib/asistencia/persona-en-el-centro.ts"
   "src/lib/asistencia/config-server.ts"
   "src/app/api/asistencia/planilla-guardada/route.ts"
   "src/app/api/asistencia/prestamos-deuda/route.ts"
@@ -93,7 +94,7 @@ mutar() {
   # archivos quedaron mutados y 75 candados en rojo, y el script decía que todo
   # había sido restaurado.
   if [ ! -f "$RESPALDO/$archivo" ]; then
-    echo "  ⛔ $nombre — «$archivo» NO está en ARCHIVOS: se aborta para no dejarlo mutado."
+    echo "  ⛔ $nombre — «${archivo}» NO está en ARCHIVOS: se aborta para no dejarlo mutado."
     exit 1
   fi
   TOTAL=$((TOTAL + 1))
@@ -217,15 +218,21 @@ mutar "un corte fuera del rango se acepta" src/lib/asistencia/corte-quincena.ts 
 echo "── EL INTERRUPTOR Y LA FICHA ───────────────────────────────────────────"
 mutar "el interruptor arranca PRENDIDO" src/lib/asistencia/planilla-unida.ts \
   's = s.replace('"'"'  return v === "1" || v === "true" || v === "si" || v === "sí";'"'"', "  return v !== \"0\";")'
-mutar "la pestaña Préstamos deja de colgar del interruptor" src/app/asistencia/AsistenciaClient.tsx \
-  's = s.replace('"'"'  const visibles = TABS.filter(([k]) => (k === "prestamos" ? PLANILLA_UNIDA : true))\n    .filter(([k]) => vePestana(rol, k));'"'"',
-              "  const visibles = TABS.filter(([k]) => vePestana(rol, k));")'
+# ⚠️ ANCLA ACTUALIZADA EL 10-sep-2026: «la persona en el centro» mudó el armado
+# de las pestañas de AsistenciaClient.tsx a `pestanasDeAsistencia`. La regla que
+# se muta es la MISMA: Préstamos solo existe con el interruptor prendido.
+mutar "la pestaña Préstamos deja de colgar del interruptor" src/lib/asistencia/persona-en-el-centro.ts \
+  's = s.replace('"'"'  return base.filter(([k]) => (k === "prestamos" ? opts.planillaUnida : true));'"'"',
+              "  return base;")'
 mutar "el botón de comprobantes deja de colgar del interruptor" src/app/asistencia/PlanillaTab.tsx \
   's = s.replace("          {PLANILLA_UNIDA && (\n            <button\n              type=\"button\" onClick={bajarComprobantes}", "          {true && (\n            <button\n              type=\"button\" onClick={bajarComprobantes}")
 s = s.replace("import { PLANILLA_UNIDA } from \"@/lib/asistencia/planilla-unida\";", "")'
-mutar "la pestaña Préstamos se va al primer lugar" src/app/asistencia/AsistenciaClient.tsx \
-  's = s.replace('"'"'  ["prestamos", "Préstamos"],\n'"'"', "")
-s = s.replace('"'"'  ["reporte", "Reporte"],'"'"', '"'"'  ["prestamos", "Préstamos"],\n  ["reporte", "Reporte"],'"'"')'
+# ⚠️ ANCLA ACTUALIZADA EL 10-sep-2026: misma mudanza. Se mueve Préstamos al
+# primer lugar del acomodo de HOY, que es donde el candado exige que Reporte
+# siga abriendo el módulo con el interruptor apagado.
+mutar "la pestaña Préstamos se va al primer lugar" src/lib/asistencia/persona-en-el-centro.ts \
+  's = s.replace('"'"'  ["reporte", "Reporte"],\n  ["planilla", "Planilla"],\n  ["prestamos", "Préstamos"],'"'"',
+              '"'"'  ["prestamos", "Préstamos"],\n  ["reporte", "Reporte"],\n  ["planilla", "Planilla"],'"'"')'
 mutar "el cargo vacío se guarda como cadena vacía" src/lib/asistencia/datos-del-papel.ts \
   's = s.replace("  if (!t) return null;", "  if (!t) return \"\" as unknown as null;")'
 mutar "el select deja de pedir las columnas del papel" src/lib/asistencia/config-server.ts \
@@ -338,8 +345,11 @@ mutar "ACS se cae de la lista de empresas" src/lib/asistencia/config.ts \
   'q = chr(34)
 s = s.replace("  " + q + "confecciones_boston" + q + ", " + q + "vistana" + q + ", " + q + "fashion_wear" + q + ", " + q + "american_classic" + q + ",",
               "  " + q + "confecciones_boston" + q + ", " + q + "vistana" + q + ", " + q + "fashion_wear" + q + ",")'
+# ⚠️ ANCLA ACTUALIZADA EL 10-sep-2026: producción arregló este mismo defecto por
+# su cuenta y lo escribió distinto (`(reloj)` en vez de `(r)`). Se muta la
+# CONDUCTA: volver a dibujar uno solo.
 mutar "la pantalla del reloj vuelve a mostrar solo el primero" src/app/asistencia/EstadoReloj.tsx \
-  's = s.replace("      {relojes.map((r) => (", "      {relojes.slice(0, 1).map((r) => (")'
+  's = s.replace("      {relojes.map((reloj) => (", "      {relojes.slice(0, 1).map((reloj) => (")'
 mutar "la migración de ACS se olvida de una tabla" supabase/migrations/20261031120000_acs_cuarta_empresa.sql \
   'i = s.index("ALTER TABLE asistencia_reparto_empresa")
 j = s.index("ALTER TABLE asistencia_aprobador_empresa")

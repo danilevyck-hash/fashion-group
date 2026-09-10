@@ -66,7 +66,7 @@ mutar() {
   # archivos quedaron mutados y 75 candados en rojo, y el script decía que todo
   # había sido restaurado.
   if [ ! -f "$RESPALDO/$archivo" ]; then
-    echo "  ⛔ $nombre — «$archivo» NO está en ARCHIVOS: se aborta para no dejarlo mutado."
+    echo "  ⛔ $nombre — «${archivo}» NO está en ARCHIVOS: se aborta para no dejarlo mutado."
     exit 1
   fi
   TOTAL=$((TOTAL + 1))
