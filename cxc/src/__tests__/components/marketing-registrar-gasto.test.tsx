@@ -39,6 +39,23 @@ import type { MkMarca } from "@/lib/marketing/types";
 // El pago de impulsadora es SU propio modal y no se toca en este cambio: se
 // dobla para que el test pueda afirmar "se abrió el flujo de siempre" sin
 // arrastrar el anti-solape/split/comprobante que ya cubren sus propios tests.
+// ⚠️ Nota fechada (10-sep-2026): Daniel prendió MARKETING_PDF_EN_LA_PUERTA.
+// Este archivo prueba la pantalla DE ANTES («Foto», «Subir foto», el cliente
+// obligatorio sin la factura en PDF), que sigue viva detrás del interruptor en
+// `false`. La conducta con el interruptor prendido la cubre
+// `marketing-pdf-en-la-puerta.test.tsx`, con su propio control apagado.
+vi.mock("@/lib/marketing/pdf-en-la-puerta", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/marketing/pdf-en-la-puerta")>();
+  return {
+    ...real,
+    MARKETING_PDF_EN_LA_PUERTA: false,
+    aceptaDeLaPuerta: (v?: boolean) => real.aceptaDeLaPuerta(v ?? false),
+    rotuloDeLaPuerta: (v?: boolean) => real.rotuloDeLaPuerta(v ?? false),
+    rotuloBotonDeLaPuerta: (v?: boolean) => real.rotuloBotonDeLaPuerta(v ?? false),
+    faltaLaFactura: () => null,
+  };
+});
+
 vi.mock("@/app/marketing/components/RegistrarPagoModal", () => ({
   default: ({ impulsadora }: { impulsadora: { nombre: string } }) => (
     <div data-testid="registrar-pago-modal">Pago a {impulsadora.nombre}</div>

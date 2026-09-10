@@ -266,6 +266,23 @@ describe("Cheques · el recordatorio pierde el pie de '¿Se repite?', no las opc
 import RegistrarGastoModal from "@/app/marketing/components/RegistrarGastoModal";
 import type { MkMarca } from "@/lib/marketing/types";
 
+// ⚠️ Nota fechada (10-sep-2026): Daniel prendió MARKETING_PDF_EN_LA_PUERTA.
+// Este archivo prueba la pantalla DE ANTES («Foto», «Subir foto», el cliente
+// obligatorio sin la factura en PDF), que sigue viva detrás del interruptor en
+// `false`. La conducta con el interruptor prendido la cubre
+// `marketing-pdf-en-la-puerta.test.tsx`, con su propio control apagado.
+vi.mock("@/lib/marketing/pdf-en-la-puerta", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/marketing/pdf-en-la-puerta")>();
+  return {
+    ...real,
+    MARKETING_PDF_EN_LA_PUERTA: false,
+    aceptaDeLaPuerta: (v?: boolean) => real.aceptaDeLaPuerta(v ?? false),
+    rotuloDeLaPuerta: (v?: boolean) => real.rotuloDeLaPuerta(v ?? false),
+    rotuloBotonDeLaPuerta: (v?: boolean) => real.rotuloBotonDeLaPuerta(v ?? false),
+    faltaLaFactura: () => null,
+  };
+});
+
 vi.mock("@/app/marketing/components/RegistrarPagoModal", () => ({
   default: () => <div data-testid="registrar-pago-modal" />,
 }));
