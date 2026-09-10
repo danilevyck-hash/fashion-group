@@ -71,9 +71,13 @@ export interface FilaPrestamo {
   empresa: string | null;
   empleadoCodigo: string | null;
   cuotaPrestamo: number;
+  /** ⚠️ Sin lectores desde el 10-sep-2026: el daño no propone cuota. */
   cuotaDano: number;
+  /** 🔴 La cuota quincenal de «Descuento a terceros». */
+  cuotaTerceros: number;
   saldoPrestamo: number;
   saldoDano: number;
+  saldoTerceros: number;
   saldo: number;
   prestado: number;
   pagado: number;
@@ -107,6 +111,7 @@ interface FilaEmpleadoDb {
   empresa: string | null;
   deduccion_quincenal: number | string | null;
   deduccion_dano: number | string | null;
+  deduccion_terceros?: number | string | null;
   empleado_codigo: string | null;
   prestamos_movimientos: MovimientoFicha[] | null;
 }
@@ -126,7 +131,7 @@ function num(n: unknown): number {
 }
 
 const COLS_EMPLEADO =
-  "id, nombre, empresa, deduccion_quincenal, deduccion_dano, empleado_codigo, "
+  "id, nombre, empresa, deduccion_quincenal, deduccion_dano, deduccion_terceros, empleado_codigo, "
   + "prestamos_movimientos(id, empleado_id, fecha, concepto, monto, notas, estado, deleted, cuenta, origen_pago, created_at)";
 
 /**
@@ -206,8 +211,10 @@ export async function leerDatosPrestamos(hoy: string = hoyPanamaYmd()): Promise<
       empleadoCodigo: cod || null,
       cuotaPrestamo: num(e.deduccion_quincenal),
       cuotaDano: num(e.deduccion_dano),
+      cuotaTerceros: num(e.deduccion_terceros),
       saldoPrestamo: s.cuentas.prestamo.saldo,
       saldoDano: s.cuentas.dano.saldo,
+      saldoTerceros: s.cuentas.terceros.saldo,
       saldo: s.saldo,
       prestado: s.prestado,
       pagado: s.pagado,

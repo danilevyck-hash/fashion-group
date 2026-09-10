@@ -113,11 +113,25 @@ export function avisoMigracionPrestamoAprobado(): string {
  */
 export const CONCEPTOS_DESCUENTO = ["Pago", "Pago de responsabilidad"] as const;
 
+/**
+ * 🔴 LOS PAGOS QUE BAJAN UNA CUENTA CONCRETA (10-sep-2026). Es
+ * `CONCEPTOS_DESCUENTO` más el pago de la tercera cuenta.
+ *
+ * 🔑 Se usa para preguntar «¿qué se le descontó YA en esta quincena, y de cuál
+ * cuenta?». La cuenta sale de `cuentaDeMovimiento`, no del concepto: un «Pago»
+ * puede bajar cualquiera de las tres.
+ */
+export const CONCEPTOS_PAGO_DE_CUENTA = [
+  ...CONCEPTOS_DESCUENTO, "Pago de terceros",
+] as const;
+
 /** Lo que SUMA a la deuda. */
-export const CONCEPTOS_DEUDA = ["Préstamo", "Responsabilidad por daño"] as const;
+export const CONCEPTOS_DEUDA = [
+  "Préstamo", "Responsabilidad por daño", "Descuento a terceros",
+] as const;
 
 /** Todo lo que RESTA de la deuda, incluido el abono de bolsillo. */
-export const CONCEPTOS_PAGO = [...CONCEPTOS_DESCUENTO, "Abono extra"] as const;
+export const CONCEPTOS_PAGO = [...CONCEPTOS_PAGO_DE_CUENTA, "Abono extra"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LO QUE ENTRA
@@ -156,6 +170,15 @@ export interface FichaPrestamo {
   /** Lo que debe de daño de mercancía. */
   saldoDano: number;
   /**
+   * 🔴 LA TERCERA CUENTA (10-sep-2026). La contadora: *«los descuentos a
+   * terceros debe ser manejado igual como un préstamo permitiendo colocar un
+   * monto inicial y un monto a descontar quincenal»*.
+   */
+  cuotaTerceros: number;
+  saldoTerceros: number;
+  /** Lo que el módulo YA registró como pago de TERCEROS dentro de esta quincena. */
+  yaDescontadoTerceros: number;
+  /**
    * Lo que el módulo YA registró como «Pago» DENTRO de esta quincena. Es un
    * hecho consumado: si hay algo acá, la casilla dice esto y no la cuota.
    */
@@ -182,6 +205,8 @@ export interface PersonaEnCuadro {
   empresaEtiqueta: string | null;
   /** Lo que HOY dice la casilla Préstamo de esta quincena. */
   enCasilla: number;
+  /** Lo que HOY dice la casilla «Terceros» de esta quincena. */
+  enCasillaTerceros: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -214,6 +239,12 @@ export interface SugerenciaPrestamo {
   montoVisto: number | null;
   /** Lo que HOY dice la casilla. */
   enCasilla: number;
+  /** 🔴 LA TERCERA CUENTA, con su propia casilla y su propio renglón en el
+   *  papel. `min(cuotaTerceros, saldoTerceros)`, o lo ya descontado. */
+  cuotaTerceros: number;
+  saldoTerceros: number;
+  sugeridoTerceros: number;
+  enCasillaTerceros: number;
   /**
    * 🔴 Aprobado, pero lo que hay ya no es lo que se aprobó — porque el módulo
    * cambió (se registró un pago, se tomó otro préstamo) o porque alguien
@@ -255,18 +286,36 @@ export function montoDeFicha(f: FichaPrestamo): { monto: number; origen: OrigenS
   // **solo entra quien está en el cuadro de esta quincena**, o sea quien cobra.
   // Ver `sugerirPrestamos`.
 
-  // 🔴 CADA CUENTA SE CAPEA A SU PROPIO SALDO, y recién después se suman. Capear
-  // la suma contra el total dejaría cobrar de más en una cuenta lo que sobra en
-  // la otra — y son dos deudas distintas, con su propia cuota.
+  // 🔴 SOLO LA CUENTA «PRÉSTAMO». Cada cuenta tiene su propia casilla y su
+  // propio renglón en el comprobante, así que ninguna se mezcla con otra.
+  //
+  // 🩸 HASTA EL 10-SEP-2026 ACÁ SE SUMABA EL DAÑO DE MERCANCÍA (Daniel:
+  // *«juntos»*, una sola casilla para las dos cuotas). Lo cambió la contadora:
+  // *«los daños de mercancía debe permanecer en blanco y que nos permita
+  // colocar quincenalmente la cantidad a descontar»*. El daño ya NO propone
+  // cuota — su casilla queda vacía y ella escribe el monto— así que sumarlo acá
+  // pondría en «Préstamo» una plata que va en otro renglón.
   const saldoP = centavos(num(f.saldoPrestamo));
-  const saldoD = centavos(num(f.saldoDano));
   const cuotaP = centavos(num(f.cuota));
-  const cuotaD = centavos(num(f.cuotaDano));
-  const deP = saldoP > 0 && cuotaP > 0 ? Math.min(cuotaP, saldoP) : 0;
-  const deD = saldoD > 0 && cuotaD > 0 ? Math.min(cuotaD, saldoD) : 0;
-  const monto = centavos(deP + deD);
-  if (monto <= 0) return { monto: 0, origen: "cuota" };
-  return { monto, origen: "cuota" };
+  const monto = saldoP > 0 && cuotaP > 0 ? Math.min(cuotaP, saldoP) : 0;
+  return { monto: centavos(monto), origen: "cuota" };
+}
+
+/**
+ * Cuánto le toca de la cuenta «Descuento a terceros» en esta quincena.
+ *
+ * 🔴 LA MISMA REGLA DEL PRÉSTAMO, sobre la otra cuenta: el hecho consumado le
+ * gana a la estimación, y la cuota se capea a SU saldo. La contadora lo pidió
+ * así — *«igual como un préstamo»*— y por eso es la misma función escrita para
+ * otra cuenta, no una regla nueva.
+ */
+export function montoTercerosDeFicha(f: FichaPrestamo): { monto: number; origen: OrigenSugerencia } {
+  const ya = centavos(Math.max(0, num(f.yaDescontadoTerceros)));
+  if (ya > 0) return { monto: ya, origen: "descontado" };
+  const saldo = centavos(num(f.saldoTerceros));
+  const cuota = centavos(num(f.cuotaTerceros));
+  const monto = saldo > 0 && cuota > 0 ? Math.min(cuota, saldo) : 0;
+  return { monto: centavos(monto), origen: "cuota" };
 }
 
 export interface OpcionesSugerencia {
@@ -296,7 +345,13 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
 
   const acumulado = new Map<
     string,
-    { monto: number; cuota: number; saldo: number; origen: OrigenSugerencia; nombres: string[] }
+    {
+      monto: number; cuota: number; saldo: number; origen: OrigenSugerencia; nombres: string[];
+      // 🔴 LA TERCERA CUENTA VIAJA APARTE, con su cuota y su saldo: es otro
+      // renglón del comprobante y otra casilla. Mezclarla con el préstamo es
+      // exactamente lo que la contadora pidió deshacer.
+      montoT: number; cuotaT: number; saldoT: number;
+    }
   >();
 
   for (const f of opts.fichas) {
@@ -304,25 +359,36 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
     if (!cod) continue;             // sin amarre no se sugiere nada. Se avisa aparte.
     if (!personaDe.has(cod)) continue;
     const { monto, origen } = montoDeFicha(f);
-    if (monto <= 0) continue;
+    const { monto: montoT, origen: origenT } = montoTercerosDeFicha(f);
+    // 🔑 Entra quien tenga algo que descontar en CUALQUIERA de las dos cuentas
+    // automáticas. Antes bastaba con mirar el préstamo porque era la única.
+    if (monto <= 0 && montoT <= 0) continue;
 
     const prev = acumulado.get(cod);
     if (prev) {
       prev.monto = centavos(prev.monto + monto);
-      // La cuota que se muestra es la SUMA de las dos cuentas: es lo que se le
-      // va a descontar, y la casilla es una sola.
-      prev.cuota = centavos(prev.cuota + num(f.cuota) + num(f.cuotaDano));
-      prev.saldo = centavos(prev.saldo + num(f.saldo));
+      prev.cuota = centavos(prev.cuota + num(f.cuota));
+      prev.saldo = centavos(prev.saldo + num(f.saldoPrestamo));
+      prev.montoT = centavos(prev.montoT + montoT);
+      prev.cuotaT = centavos(prev.cuotaT + num(f.cuotaTerceros));
+      prev.saldoT = centavos(prev.saldoT + num(f.saldoTerceros));
       // Con fichas mezcladas manda «descontado»: hay un hecho consumado adentro.
-      if (origen === "descontado") prev.origen = "descontado";
+      if (origen === "descontado" || origenT === "descontado") prev.origen = "descontado";
       prev.nombres.push(f.nombre);
     } else {
       acumulado.set(cod, {
         monto,
-        cuota: centavos(num(f.cuota) + num(f.cuotaDano)),
-        saldo: centavos(num(f.saldo)),
-        origen,
+        // 🩸 La cuota y el saldo que se MUESTRAN son los del PRÉSTAMO, no la
+        // suma de las cuentas: hasta el 10-sep-2026 acá se sumaba la cuota del
+        // daño, y con el daño ya sin cuota esa suma diría un número que no se
+        // le va a descontar a nadie.
+        cuota: centavos(num(f.cuota)),
+        saldo: centavos(num(f.saldoPrestamo)),
+        origen: origen === "descontado" || origenT === "descontado" ? "descontado" : origen,
         nombres: [f.nombre],
+        montoT,
+        cuotaT: centavos(num(f.cuotaTerceros)),
+        saldoT: centavos(num(f.saldoTerceros)),
       });
     }
   }
@@ -347,6 +413,10 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
       cuando: ap?.cuando ?? null,
       montoVisto: ap ? ap.montoVisto : null,
       enCasilla: centavos(num(p.enCasilla)),
+      cuotaTerceros: a.cuotaT,
+      saldoTerceros: a.saldoT,
+      sugeridoTerceros: a.montoT,
+      enCasillaTerceros: centavos(num(p.enCasillaTerceros)),
       // Solo tiene sentido avisar de un cambio sobre algo que SE aprobó.
       cambio:
         aprobado
@@ -356,9 +426,10 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
   }
 
   // Más plata arriba: si alguien mira una sola línea, que sea ésa.
+  const total = (s: SugerenciaPrestamo) => num(s.sugerido) + num(s.sugeridoTerceros);
   return out.sort((x, y) =>
-    x.sugerido !== y.sugerido
-      ? y.sugerido - x.sugerido
+    total(x) !== total(y)
+      ? total(y) - total(x)
       : x.etiqueta.localeCompare(y.etiqueta, "es"),
   );
 }
@@ -367,9 +438,16 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
 export function prestamosSinAprobar(
   sugerencias: readonly SugerenciaPrestamo[],
 ): SugerenciaPrestamo[] {
-  // ⚠️ Sin aprobar Y sin monto en la casilla. Si alguien ya lo escribió a mano,
-  // la planilla SÍ lo descontó y decir «no se descontó» sería mentir.
-  return sugerencias.filter((s) => !s.aprobado && s.enCasilla <= 0);
+  // ⚠️ Sin aprobar Y sin monto en NINGUNA de las dos casillas automáticas. Si
+  // alguien ya lo escribió a mano, la planilla SÍ lo descontó y decir «no se
+  // descontó» sería mentir.
+  // ⚠️ `num()` y no `<= 0` a secas: un objeto SIN los campos de terceros —una
+  // respuesta guardada de antes del 10-sep-2026, o un fixture— daría
+  // `undefined <= 0` = false y APAGARÍA el freno en silencio. El freno del
+  // cierre no se puede apagar por un campo que todavía no llegó.
+  return sugerencias.filter(
+    (s) => !s.aprobado && num(s.enCasilla) <= 0 && num(s.enCasillaTerceros) <= 0,
+  );
 }
 
 function plata(n: number): string {
@@ -389,7 +467,14 @@ export function textoPrestamoSinAprobar(
 ): string | null {
   if (items.length === 0) return null;
   const detalle = items
-    .map((s) => `${s.etiqueta} · ${plata(s.sugerido)}`)
+    .map((s) => {
+      // Se nombran las dos cuentas cuando las dos tienen algo: un solo monto
+      // escondería la mitad de lo que no se descontó.
+      const partes: string[] = [];
+      if (num(s.sugerido) > 0) partes.push(plata(num(s.sugerido)));
+      if (num(s.sugeridoTerceros) > 0) partes.push(`${plata(num(s.sugeridoTerceros))} a terceros`);
+      return `${s.etiqueta} · ${partes.join(" + ") || plata(0)}`;
+    })
     .join(" — ");
   const cabeza =
     items.length === 1
@@ -439,7 +524,7 @@ export function resumenPrestamos(sugerencias: readonly SugerenciaPrestamo[]): {
   const faltan = sugerencias.filter((s) => !s.aprobado);
   return {
     pendientes: faltan.length,
-    monto: centavos(faltan.reduce((a, s) => a + s.sugerido, 0)),
+    monto: centavos(faltan.reduce((a, s) => a + num(s.sugerido) + num(s.sugeridoTerceros), 0)),
     codigos: faltan.map((s) => s.codigo),
   };
 }

@@ -17,11 +17,13 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
+  CUENTA_DANO,
+  CUENTA_TERCEROS,
   calcularSaldoPrestamo,
-  cuentaMasVieja,
+  cuentaDeMovimiento,
   type MovimientoParaSaldo,
 } from "@/lib/prestamos-saldo";
-import { CONCEPTOS_DESCUENTO } from "./prestamos-planilla";
+import { CONCEPTOS_PAGO_DE_CUENTA } from "./prestamos-planilla";
 import {
   planDeCierre,
   type DeudaDePersona,
@@ -37,6 +39,7 @@ interface FilaEmpleado {
   nombre: string | null;
   deduccion_quincenal: number | string | null;
   deduccion_dano: number | string | null;
+  deduccion_terceros?: number | string | null;
   empleado_codigo?: string | null;
 }
 
@@ -69,7 +72,7 @@ export async function leerDeudas(
     (pedirCount, from, to) =>
       supabaseServer
         .from("prestamos_empleados")
-        .select("id, nombre, deduccion_quincenal, deduccion_dano, empleado_codigo",
+        .select("id, nombre, deduccion_quincenal, deduccion_dano, deduccion_terceros, empleado_codigo",
           pedirCount ? { count: "exact" } : {})
         // 🔑 `deleted` es NULLABLE en préstamos: un `.eq("deleted", false)`
         // PIERDE filas, y perderlas acá es una deuda que no baja.
@@ -92,7 +95,12 @@ export async function leerDeudas(
   );
 
   const movsDe = new Map<string, FilaMovimiento[]>();
+  // 🔴 LO YA DESCONTADO, POR CUENTA. Con tres cuentas, contarlo todo junto
+  // dejaría sin anotar la cuenta que todavía no se pagó (regla 2 disparada por
+  // el pago de OTRA cuenta).
   const descontadoDe = new Map<string, number>();
+  const descontadoTercerosDe = new Map<string, number>();
+  const descontadoDanoDe = new Map<string, number>();
   for (const m of movimientos) {
     const emp = String(m.empleado_id ?? "");
     if (!emp) continue;
@@ -101,10 +109,14 @@ export async function leerDeudas(
     else movsDe.set(emp, [m]);
     // Ventana EXACTA, sin tolerancia de días: los pagos caen justo en el borde
     // (el 15 y el 30) y ±3 días haría que el mismo pago entre en dos quincenas.
-    if ((CONCEPTOS_DESCUENTO as readonly string[]).includes(String(m.concepto))) {
+    if ((CONCEPTOS_PAGO_DE_CUENTA as readonly string[]).includes(String(m.concepto))) {
       const f = String(m.fecha).slice(0, 10);
       if (f >= desde && f <= hasta) {
-        descontadoDe.set(emp, (descontadoDe.get(emp) ?? 0) + num(m.monto));
+        const destino =
+          cuentaDeMovimiento(m) === CUENTA_TERCEROS ? descontadoTercerosDe
+            : cuentaDeMovimiento(m) === CUENTA_DANO ? descontadoDanoDe
+              : descontadoDe;
+        destino.set(emp, (destino.get(emp) ?? 0) + num(m.monto));
       }
     }
   }
@@ -120,10 +132,12 @@ export async function leerDeudas(
       nombrePrestamos: String(e.nombre ?? "").trim(),
       saldoPrestamo: s.cuentas.prestamo.saldo,
       saldoDano: s.cuentas.dano.saldo,
+      saldoTerceros: s.cuentas.terceros.saldo,
       cuotaPrestamo: num(e.deduccion_quincenal),
-      cuotaDano: num(e.deduccion_dano),
+      cuotaTerceros: num(e.deduccion_terceros),
       yaDescontado: descontadoDe.get(String(e.id)) ?? 0,
-      cuentaMasVieja: cuentaMasVieja(s),
+      yaDescontadoTerceros: descontadoTercerosDe.get(String(e.id)) ?? 0,
+      yaDescontadoDano: descontadoDanoDe.get(String(e.id)) ?? 0,
     });
   }
   return out;

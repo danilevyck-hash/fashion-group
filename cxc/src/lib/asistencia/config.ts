@@ -37,7 +37,20 @@ import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 // ── Empresas que comparten el reloj ──────────────────────────────────────────
 // Solo estas tres. ACS/Multifashion usa OTRO reloj y no entra acá; si algún día
 // entra, se agrega a esta lista y al CHECK de la migración (los dos, hay test).
-export const EMPRESAS_ASISTENCIA = ["confecciones_boston", "vistana", "fashion_wear"] as const;
+// 🔴 LA FUENTE ÚNICA DE LAS EMPRESAS DEL MÓDULO. Todo lo que enumera empresas
+// —los filtros, el selector de la ficha, el validador, la planilla, el alcance
+// del aprobador— sale de acá. Por eso la CUARTA fue una línea.
+//
+// 🔴 ACS (Multifashion) entró el 10-sep-2026. Daniel, textual: *«Sí — ACS entra
+// completa a Asistencia y Planilla»*.
+//
+// ⚠️ LA KEY ES `american_classic` Y NO SE RENOMBRA: es la misma key de las
+// ventas, los tickets y las comisiones de ese negocio. Lo que se VE es
+// «Multifashion», y sale de `EMPRESA_KEY_TO_NAME` (`etiquetaEmpresa`), no de
+// una copia acá — Daniel: *«multifashion en todos lados»*.
+export const EMPRESAS_ASISTENCIA = [
+  "confecciones_boston", "vistana", "fashion_wear", "american_classic",
+] as const;
 export type EmpresaAsistencia = (typeof EMPRESAS_ASISTENCIA)[number];
 
 /** El nombre que ve la gente. Sale de `empresa-mapping`, no de una copia. */

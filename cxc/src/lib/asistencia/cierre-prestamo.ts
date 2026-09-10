@@ -43,7 +43,7 @@
 import { centavos } from "./planilla";
 import type { LineaPlanilla } from "./planilla";
 import type { CuentaPrestamo } from "@/lib/prestamos-saldo";
-import { CUENTA_DANO, CUENTA_PRESTAMO } from "@/lib/prestamos-saldo";
+import { CUENTA_DANO, CUENTA_PRESTAMO, CUENTA_TERCEROS } from "@/lib/prestamos-saldo";
 
 /**
  * El concepto con el que se anota cada cuenta.
@@ -55,6 +55,7 @@ import { CUENTA_DANO, CUENTA_PRESTAMO } from "@/lib/prestamos-saldo";
 export const CONCEPTO_DE_CUENTA: Readonly<Record<CuentaPrestamo, string>> = {
   prestamo: "Pago",
   dano: "Pago de responsabilidad",
+  terceros: "Pago de terceros",
 };
 
 /** De dónde salió el pago. La planilla siempre escribe «Quincena». */
@@ -70,16 +71,18 @@ export interface DeudaDePersona {
   /** Ya calculado por `prestamos-saldo.ts`. Acá solo se usa de tope. */
   saldoPrestamo: number;
   saldoDano: number;
-  /** La cuota de cada cuenta, tal como está en la ficha. */
+  saldoTerceros: number;
+  /** La cuota de cada cuenta automática, tal como está en la ficha.
+   *  ⚠️ El DAÑO ya no tiene cuota: su descuento lo escribe la contadora. */
   cuotaPrestamo: number;
-  cuotaDano: number;
+  cuotaTerceros: number;
   /**
-   * 🔴 Lo que el módulo YA registró como pago DENTRO de esta quincena. Mayor
-   * que cero = no se escribe nada (regla 2).
+   * 🔴 Lo que el módulo YA registró como pago DENTRO de esta quincena, POR
+   * CUENTA. Mayor que cero = esa cuenta no se vuelve a anotar (regla 2).
    */
   yaDescontado: number;
-  /** Cuál cuenta se abrió primero. Decide a cuál va el pago corregido a mano. */
-  cuentaMasVieja: CuentaPrestamo | null;
+  yaDescontadoTerceros: number;
+  yaDescontadoDano: number;
 }
 
 /** Un movimiento que el cierre tiene que escribir. */
@@ -126,60 +129,30 @@ const n = (v: unknown): number => {
 };
 
 /**
- * 🔴 CÓMO SE PARTE EL MONTO DE LA CASILLA ENTRE LAS DOS CUENTAS.
+ * 🔴 UNA CASILLA, UNA CUENTA. Las tres, y sin repartir nada.
  *
- * La planilla propone la SUMA de las dos cuotas en UNA casilla (Daniel:
- * *«juntos»*), así que al escribir hay que volver a partirla.
+ * 🩸 HASTA EL 10-SEP-2026 ACÁ SE REPARTÍA: la casilla «Préstamo» traía la suma
+ * de la cuota de préstamo y la de daño (Daniel: *«juntos»*) y había que volver
+ * a partirla entre las dos cuentas al escribir. Eso se terminó porque la
+ * contadora separó los renglones: cada cuenta tiene SU casilla en la planilla y
+ * SU renglón en el comprobante, así que el reparto ya no existe — y con él se
+ * fue la única parte de este archivo que podía mandar plata a la cuenta
+ * equivocada.
  *
- * Dos caminos, y el orden importa:
- *
- *   a) La casilla dice EXACTAMENTE lo que se propuso → se usa el reparto de la
- *      propuesta (`min(cuota, saldo)` en cada cuenta). Es el caso normal, y es
- *      el único que respeta que cada cuenta tiene SU cuota: repartir $40 de
- *      «$30 de préstamo + $10 de daño» todo al préstamo dejaría el daño sin
- *      abonar aunque la casilla lo incluía.
- *
- *   b) Alguien la corrigió a mano → va a la cuenta MÁS VIEJA primero, capeada a
- *      su saldo, y el resto a la otra. Es la misma regla que el módulo ya usa
- *      cuando una persona debe las dos («Baja de» viene puesto en la más vieja).
- *
- * ⚠️ Lo que sobre después de capear las DOS cuentas no se escribe: pagar más de
- * lo que se debe dejaría un saldo a favor que nadie pidió. Se devuelve en
- * `sobrante` para poder decirlo.
+ *   casilla «Préstamo»  → cuenta `prestamo`   (propuesta: min(cuota, saldo))
+ *   casilla «Terceros»  → cuenta `terceros`   (propuesta: min(cuota, saldo))
+ *   casilla «Mercancía» → cuenta `dano`       (SIN propuesta: la escribe ella)
  */
-export function repartirEntreCuentas(
-  montoCasilla: number,
-  deuda: Pick<DeudaDePersona, "saldoPrestamo" | "saldoDano" | "cuotaPrestamo" | "cuotaDano" | "cuentaMasVieja">,
-): { prestamo: number; dano: number; sobrante: number } {
-  const monto = n(montoCasilla);
-  if (monto <= 0) return { prestamo: 0, dano: 0, sobrante: 0 };
-
-  const saldoP = Math.max(0, n(deuda.saldoPrestamo));
-  const saldoD = Math.max(0, n(deuda.saldoDano));
-  const cuotaP = Math.max(0, n(deuda.cuotaPrestamo));
-  const cuotaD = Math.max(0, n(deuda.cuotaDano));
-
-  // (a) El reparto de la propuesta — la MISMA cuenta que `montoDeFicha`.
-  const propuestaP = saldoP > 0 && cuotaP > 0 ? Math.min(cuotaP, saldoP) : 0;
-  const propuestaD = saldoD > 0 && cuotaD > 0 ? Math.min(cuotaD, saldoD) : 0;
-  if (centavos(propuestaP + propuestaD) === monto) {
-    return { prestamo: centavos(propuestaP), dano: centavos(propuestaD), sobrante: 0 };
-  }
-
-  // (b) Corregida a mano: la cuenta más vieja primero.
-  const primero: CuentaPrestamo =
-    deuda.cuentaMasVieja ?? (saldoP > 0 ? CUENTA_PRESTAMO : CUENTA_DANO);
-  const topePrimero = primero === CUENTA_PRESTAMO ? saldoP : saldoD;
-  const topeSegundo = primero === CUENTA_PRESTAMO ? saldoD : saldoP;
-
-  const aPrimero = Math.min(monto, Math.max(0, topePrimero));
-  const aSegundo = Math.min(centavos(monto - aPrimero), Math.max(0, topeSegundo));
-  const sobrante = centavos(monto - aPrimero - aSegundo);
-
-  return primero === CUENTA_PRESTAMO
-    ? { prestamo: centavos(aPrimero), dano: centavos(aSegundo), sobrante }
-    : { prestamo: centavos(aSegundo), dano: centavos(aPrimero), sobrante };
-}
+export const CASILLA_DE_CUENTA = [
+  { cuenta: CUENTA_PRESTAMO, campo: "prestamo", yaDescontado: "yaDescontado", saldo: "saldoPrestamo" },
+  { cuenta: CUENTA_TERCEROS, campo: "terceros", yaDescontado: "yaDescontadoTerceros", saldo: "saldoTerceros" },
+  { cuenta: CUENTA_DANO, campo: "mercancia", yaDescontado: "yaDescontadoDano", saldo: "saldoDano" },
+] as const satisfies readonly {
+  cuenta: CuentaPrestamo;
+  campo: "prestamo" | "terceros" | "mercancia";
+  yaDescontado: keyof DeudaDePersona;
+  saldo: keyof DeudaDePersona;
+}[];
 
 /**
  * El plan completo de un cierre: qué movimientos escribir y qué se dejó afuera.
@@ -199,47 +172,54 @@ export function planDeCierre(opts: {
   for (const l of opts.lineas) {
     // Sin dinero calculado no hay nada que se le haya descontado.
     if (!l.dinero) continue;
-    const monto = n(l.dinero.prestamo);
     const deuda = opts.deudas.get(l.codigo);
 
-    if (monto <= 0) {
-      // 🔑 Solo se NOMBRA la omisión de quien tiene una deuda viva: decirle a
-      // la contadora «a estas 30 personas no se les descontó nada» sobre gente
-      // que no debe nada es ruido, y el ruido es lo que hace que un aviso de
-      // verdad pase desapercibido.
-      if (deuda && centavos(deuda.saldoPrestamo + deuda.saldoDano) > 0) {
-        omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto: 0, motivo: "casilla-en-cero" });
+    for (const c of CASILLA_DE_CUENTA) {
+      const monto = n(l.dinero[c.campo]);
+      const saldo = deuda ? n(deuda[c.saldo] as number) : 0;
+
+      if (monto <= 0) {
+        // 🔑 Solo se NOMBRA la omisión de quien tiene una deuda viva EN ESA
+        // CUENTA: decirle a la contadora «a estas 30 personas no se les
+        // descontó nada» sobre gente que no debe nada es ruido, y el ruido es
+        // lo que hace que un aviso de verdad pase desapercibido.
+        //
+        // ⚠️ El DAÑO no entra a este aviso: no propone cuota, así que una
+        // casilla vacía es lo NORMAL y no un descuento que faltó.
+        if (deuda && c.cuenta !== CUENTA_DANO && saldo > 0.004) {
+          omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto: 0, motivo: "casilla-en-cero" });
+        }
+        continue;
       }
-      continue;
-    }
 
-    if (!deuda) {
-      omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto, motivo: "sin-ficha" });
-      continue;
-    }
+      if (!deuda) {
+        omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto, motivo: "sin-ficha" });
+        continue;
+      }
 
-    // 🔴 REGLA 2. El hecho consumado le gana a todo: el módulo ya lo anotó.
-    if (n(deuda.yaDescontado) > 0) {
-      omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto, motivo: "ya-registrado" });
-      continue;
-    }
+      // 🔴 REGLA 2. El hecho consumado le gana a todo: el módulo ya lo anotó
+      // EN ESA CUENTA.
+      if (n(deuda[c.yaDescontado] as number) > 0) {
+        omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto, motivo: "ya-registrado" });
+        continue;
+      }
 
-    if (centavos(deuda.saldoPrestamo + deuda.saldoDano) <= 0) {
-      omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto, motivo: "sin-saldo" });
-      continue;
-    }
+      if (saldo <= 0.004) {
+        omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto, motivo: "sin-saldo" });
+        continue;
+      }
 
-    const parte = repartirEntreCuentas(monto, deuda);
-    for (const cuenta of [CUENTA_PRESTAMO, CUENTA_DANO] as const) {
-      const m = cuenta === CUENTA_PRESTAMO ? parte.prestamo : parte.dano;
-      if (m <= 0) continue;
+      // ⚠️ Se anota lo que dice la casilla, capeado a lo que se debe: pagar más
+      // de lo que se debe dejaría un saldo a favor que nadie pidió.
+      const aAnotar = centavos(Math.min(monto, saldo));
+      if (aAnotar <= 0) continue;
       pagos.push({
         fichaId: deuda.fichaId,
         codigo: deuda.codigo,
         nombrePrestamos: deuda.nombrePrestamos,
-        cuenta,
-        concepto: CONCEPTO_DE_CUENTA[cuenta],
-        monto: m,
+        cuenta: c.cuenta,
+        concepto: CONCEPTO_DE_CUENTA[c.cuenta],
+        monto: aAnotar,
         fecha: opts.fecha,
         origenPago: ORIGEN_QUINCENA,
       });

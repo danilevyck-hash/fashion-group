@@ -22,12 +22,15 @@
 // distintas de la misma fila.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { CUENTA_DANO, CUENTA_PRESTAMO, type CuentaPrestamo } from "./prestamos-saldo";
+import { CUENTA_DANO, CUENTA_PRESTAMO, CUENTA_TERCEROS, type CuentaPrestamo } from "./prestamos-saldo";
 
 /** El valor tal como se guarda en `prestamos_movimientos.concepto`. */
 export const CONCEPTO_PRESTAMO = "Préstamo";
 export const CONCEPTO_DANO = "Responsabilidad por daño";
 export const CONCEPTO_PAGO = "Pago";
+/** 🔴 EL CARGO de la tercera cuenta (10-sep-2026): el «monto inicial» que la
+ *  contadora carga, igual que un préstamo. Se guarda con ESTE texto. */
+export const CONCEPTO_TERCEROS = "Descuento a terceros";
 
 /** Los conceptos retirados del formulario el 5-sep-2026. Siguen contando. */
 export const CONCEPTOS_RETIRADOS = ["Abono extra", "Pago de responsabilidad"] as const;
@@ -36,7 +39,9 @@ export const CONCEPTOS_RETIRADOS = ["Abono extra", "Pago de responsabilidad"] as
  * 🔴 LOS TRES QUE SE OFRECEN. El POST solo acepta estos: un concepto retirado
  * ya no se puede crear, aunque los viejos se sigan leyendo y contando.
  */
-export const CONCEPTOS_OFRECIDOS = [CONCEPTO_PRESTAMO, CONCEPTO_DANO, CONCEPTO_PAGO] as const;
+export const CONCEPTOS_OFRECIDOS = [
+  CONCEPTO_PRESTAMO, CONCEPTO_DANO, CONCEPTO_TERCEROS, CONCEPTO_PAGO,
+] as const;
 
 /** Todos los conceptos que la base puede contener hoy. */
 export const CONCEPTOS_CONOCIDOS = [...CONCEPTOS_OFRECIDOS, ...CONCEPTOS_RETIRADOS] as const;
@@ -51,12 +56,16 @@ export function etiquetaConcepto(concepto: string): string {
 
 /** ¿Este concepto AUMENTA la deuda? (los dos cargos). */
 export function esCargo(concepto: string): boolean {
-  return concepto === CONCEPTO_PRESTAMO || concepto === CONCEPTO_DANO;
+  return concepto === CONCEPTO_PRESTAMO
+    || concepto === CONCEPTO_DANO
+    || concepto === CONCEPTO_TERCEROS;
 }
 
 /** La cuenta a la que va un CARGO. Un pago se decide aparte (lo elige quien registra). */
 export function cuentaDeCargo(concepto: string): CuentaPrestamo {
-  return concepto === CONCEPTO_DANO ? CUENTA_DANO : CUENTA_PRESTAMO;
+  if (concepto === CONCEPTO_DANO) return CUENTA_DANO;
+  if (concepto === CONCEPTO_TERCEROS) return CUENTA_TERCEROS;
+  return CUENTA_PRESTAMO;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

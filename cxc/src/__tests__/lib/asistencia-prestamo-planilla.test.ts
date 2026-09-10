@@ -28,6 +28,7 @@ import {
   CONCEPTOS_DEUDA,
   CONCEPTOS_PAGO,
   montoDeFicha,
+  montoTercerosDeFicha,
   prestamosSinAprobar,
   prestamosSinAtar,
   resumenPrestamos,
@@ -46,21 +47,29 @@ function ficha(p: Partial<FichaPrestamo> & { nombre: string }): FichaPrestamo {
   // saldo neto $0). Los casos de DAÑO pasan las dos cuentas explícitas.
   const saldoP = p.saldoPrestamo ?? p.saldo ?? 0;
   const saldoD = p.saldoDano ?? 0;
+  // 🔴 La TERCERA cuenta (10-sep-2026). Por defecto en cero: los casos viejos
+  // siguen valiendo exactamente lo mismo.
+  const saldoT = p.saldoTerceros ?? 0;
   return {
     id: p.id ?? p.nombre,
     codigo: p.codigo ?? null,
     nombre: p.nombre,
     cuota: p.cuota ?? 0,
     cuotaDano: p.cuotaDano ?? 0,
-    saldo: p.saldo ?? saldoP + saldoD,
+    saldo: p.saldo ?? saldoP + saldoD + saldoT,
     saldoPrestamo: saldoP,
     saldoDano: saldoD,
     yaDescontado: p.yaDescontado ?? 0,
+    cuotaTerceros: p.cuotaTerceros ?? 0,
+    saldoTerceros: saldoT,
+    yaDescontadoTerceros: p.yaDescontadoTerceros ?? 0,
   };
 }
 
-function persona(codigo: string, etiqueta: string, enCasilla = 0): PersonaEnCuadro {
-  return { codigo, etiqueta, empresa: null, empresaEtiqueta: null, enCasilla };
+function persona(
+  codigo: string, etiqueta: string, enCasilla = 0, enCasillaTerceros = 0,
+): PersonaEnCuadro {
+  return { codigo, etiqueta, empresa: null, empresaEtiqueta: null, enCasilla, enCasillaTerceros };
 }
 
 function aprobacion(codigo: string, montoVisto: number, aprobado = true): AprobacionPrestamo {
@@ -101,26 +110,38 @@ describe("de dónde sale el monto de la casilla", () => {
     expect(montoDeFicha({ ...b, yaDescontado: 50 }).monto).toBe(50);
   });
 
-  it("🔴 LAS DOS CUENTAS: cada una capeada a SU saldo, y después se suman", () => {
-    // El mockup que Daniel aprobó: $30 de préstamo + $10 de daño = $40 en UNA
-    // casilla. Daniel, textual: «juntos».
+  // 🩸 ESTE CANDADO EXIGÍA LO CONTRARIO HASTA EL 10-SEP-2026, Y CAMBIÓ DE
+  // DIRECCIÓN, NO SE BORRÓ.
+  //
+  // Decía: «LAS DOS CUENTAS: cada una capeada a SU saldo, y después se SUMAN»
+  // — $30 de préstamo + $10 de daño = $40 en UNA casilla (Daniel: *«juntos»*).
+  //
+  // Lo cambió la CONTADORA, textual: *«los daños de mercancía debe permanecer
+  // en blanco y que nos permita colocar quincenalmente la cantidad a
+  // descontar»*. Con el daño ya SIN cuota, sumarlo en la casilla del préstamo
+  // pondría ahí una plata que va en otro renglón del comprobante.
+  //
+  // 🔑 LO QUE NO CAMBIÓ, y es la regla de fondo: cada cuenta se capea a SU
+  // PROPIO SALDO. Antes eso importaba al sumarlas; ahora importa porque cada
+  // una tiene su casilla. La cuota nunca cobra más de lo que se debe.
+  it("🔴 la casilla «Préstamo» es SOLO la cuenta préstamo, capeada a su saldo", () => {
     const f = ficha({
       nombre: "CON DAÑO", codigo: "21",
       cuota: 30, cuotaDano: 10,
       saldoPrestamo: 220, saldoDano: 50, saldo: 270,
     });
-    expect(montoDeFicha(f).monto).toBe(40);
-    // La ÚLTIMA cuota de cada cuenta se capea a SU saldo, no al total: con $5
-    // de daño solo entran $5, aunque de préstamo sobre de más.
-    expect(montoDeFicha({ ...f, saldoDano: 5, saldo: 225 }).monto).toBe(35);
-    // Y una cuenta sin saldo no aporta nada aunque tenga cuota.
-    expect(montoDeFicha({ ...f, saldoDano: 0, saldo: 220 }).monto).toBe(30);
+    // El daño NO entra: $30, no $40.
+    expect(montoDeFicha(f).monto).toBe(30);
+    // Aunque el daño tenga cuota y saldo, la casilla del préstamo no lo mira.
+    expect(montoDeFicha({ ...f, saldoDano: 5, saldo: 225 }).monto).toBe(30);
+    expect(montoDeFicha({ ...f, cuotaDano: 999, saldoDano: 999 }).monto).toBe(30);
+    // La ÚLTIMA cuota se capea a SU saldo: con $12 de préstamo solo entran $12.
+    expect(montoDeFicha({ ...f, saldoPrestamo: 12 }).monto).toBe(12);
+    // Y sin saldo de préstamo no propone nada, tenga la cuota que tenga.
+    expect(montoDeFicha({ ...f, saldoPrestamo: 0 }).monto).toBe(0);
   });
 
-  it("🔴 y la CUOTA que se muestra también es la suma: la casilla es UNA", () => {
-    // Daniel, al ver el mockup de las dos cuentas: «juntos». Si la línea dijera
-    // «cuota $30» mientras descuenta $40, el número de la pantalla y el de la
-    // planilla serían dos.
+  it("🔴 la CUOTA que se muestra es la del préstamo, no una suma", () => {
     const out = sugerirPrestamos({
       fichas: [ficha({
         nombre: "CON DAÑO", codigo: "21",
@@ -131,8 +152,47 @@ describe("de dónde sale el monto de la casilla", () => {
       aprobaciones: new Map(),
     });
     expect(out).toHaveLength(1);
-    expect(out[0].cuota).toBe(40);
-    expect(out[0].sugerido).toBe(40);
+    expect(out[0].cuota).toBe(30);
+    expect(out[0].sugerido).toBe(30);
+    // Y el daño no se cuela por la puerta de terceros.
+    expect(out[0].sugeridoTerceros).toBe(0);
+  });
+
+  // 🔴 LA TERCERA CUENTA: «igual como un préstamo» (la contadora), con su propia
+  // casilla, su cuota de la ficha y su saldo.
+  it("🔴 «Descuento a terceros» propone min(cuota, saldo) en SU casilla", () => {
+    const f = ficha({
+      nombre: "CON TERCEROS", codigo: "23",
+      cuota: 0, saldoPrestamo: 0,
+      cuotaTerceros: 40, saldoTerceros: 79.94, saldo: 79.94,
+    });
+    // La cuota entera mientras alcance…
+    expect(montoTercerosDeFicha(f).monto).toBe(40);
+    // …y la ÚLTIMA se capea a lo que queda: $39.94, no $40.
+    expect(montoTercerosDeFicha({ ...f, saldoTerceros: 39.94 }).monto).toBe(39.94);
+    // Sin saldo no propone nada; sin cuota tampoco.
+    expect(montoTercerosDeFicha({ ...f, saldoTerceros: 0 }).monto).toBe(0);
+    expect(montoTercerosDeFicha({ ...f, cuotaTerceros: 0 }).monto).toBe(0);
+    // Y un pago YA registrado de terceros le gana a la propuesta (regla 2).
+    expect(montoTercerosDeFicha({ ...f, yaDescontadoTerceros: 15 })).toEqual({
+      monto: 15, origen: "descontado",
+    });
+  });
+
+  it("🔴 quien SOLO debe terceros igual entra al cuadro", () => {
+    const out = sugerirPrestamos({
+      fichas: [ficha({
+        nombre: "SOLO TERCEROS", codigo: "23",
+        cuota: 0, saldoPrestamo: 0,
+        cuotaTerceros: 40, saldoTerceros: 79.94, saldo: 79.94,
+      })],
+      personas: [persona("23", "ANDRES GONZALEZ")],
+      aprobaciones: new Map(),
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].sugerido).toBe(0);
+    expect(out[0].sugeridoTerceros).toBe(40);
+    expect(out[0].saldoTerceros).toBe(79.94);
   });
 
   it("un préstamo sin cuota no propone nada — no se inventa una", () => {

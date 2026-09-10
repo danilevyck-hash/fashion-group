@@ -126,7 +126,7 @@ export default function PrestamoDetallePage() {
           saldoPrestamo={s.cuentas.prestamo.saldo}
           saldoDano={s.cuentas.dano.saldo}
           cuotaPrestamo={Number(empleado.deduccion_quincenal ?? 0)}
-          cuotaDano={Number(empleado.deduccion_dano ?? 0)}
+          cuotaTerceros={Number(empleado.deduccion_terceros ?? 0)}
           prestado={s.prestado}
           pagado={s.pagado}
           saldo={s.saldo}
@@ -191,13 +191,13 @@ export default function PrestamoDetallePage() {
       <EditEmpleadoModal
         show={actions.showEditModal}
         fCuotaPrestamo={actions.fCuotaPrestamo}
-        fCuotaDano={actions.fCuotaDano}
+        fCuotaTerceros={actions.fCuotaTerceros}
         fCodigo={actions.fCodigo}
         colaboradores={actions.colaboradores}
         saving={actions.savingEdit}
         onClose={() => actions.setShowEditModal(false)}
         onChangeCuotaPrestamo={actions.setFCuotaPrestamo}
-        onChangeCuotaDano={actions.setFCuotaDano}
+        onChangeCuotaTerceros={actions.setFCuotaTerceros}
         onChangeCodigo={actions.setFCodigo}
         onSave={actions.saveEdit}
       />

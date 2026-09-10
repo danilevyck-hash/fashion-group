@@ -244,12 +244,20 @@ describe("🔴 EL REPORTE LOS DISTINGUE — es el punto de haber agregado el mot
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("El motivo, la lista y el reconocedor", () => {
-  // ⚠️ 25-ago-2026: Daniel cambió la lista. Son CUATRO —Incapacidad,
+  // ⚠️ 25-ago-2026: Daniel cambió la lista. Eran CUATRO —Incapacidad,
   // Catástrofe, Escolares y Trabajo de vendedor— y se fueron «Vacaciones»
   // (a su propia pestaña), «Permiso», «Luto» y «Otro».
-  it("la lista que ofrece la pantalla son EXACTAMENTE los cuatro de Daniel", () => {
+  //
+  // 🩸 SON CINCO DESDE EL 10-SEP-2026: entró «Constancia». Daniel, textual:
+  // *«los que están en el módulo todos se deben de pagar si se seleccionó, solo
+  // es agregar constancia. No hagamos justificar que no pague, ensucia.»*
+  //
+  // 🔑 LA REGLA QUE ESTE CANDADO PROTEGE NO CAMBIÓ: la lista es CERRADA y
+  // EXACTA. Lo que se agregó es un motivo más que PAGA como los otros cuatro —
+  // no un tipo nuevo de justificación.
+  it("la lista que ofrece la pantalla son EXACTAMENTE los cinco de Daniel", () => {
     expect([...MOTIVOS_JUSTIFICACION]).toEqual([
-      "Incapacidad", "Catástrofe", "Escolares", MOTIVO_TRABAJO_VENDEDOR,
+      "Incapacidad", "Catástrofe", "Escolares", MOTIVO_TRABAJO_VENDEDOR, "Constancia",
     ]);
   });
 

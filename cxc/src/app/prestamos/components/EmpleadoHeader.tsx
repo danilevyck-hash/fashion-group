@@ -1,5 +1,6 @@
 "use client";
 
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { Empleado } from "./types";
 
 /**
@@ -25,7 +26,7 @@ export default function EmpleadoHeader({ empleado, onEdit, onBack }: Props) {
   return (
     <div className="flex items-start justify-between mb-6">
       <div>
-        <h1 className="text-xl font-light">{empleado.nombre}</h1>
+        <h1 className="text-xl font-light">{capitalizarNombre(empleado.nombre)}</h1>
         <div className="flex items-center gap-2 mt-1">
           {empleado.empresa && <span className="text-sm text-gray-500">{empleado.empresa}</span>}
           {!empleado.trabaja && (

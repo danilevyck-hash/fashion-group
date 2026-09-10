@@ -24,7 +24,11 @@ export interface Empleado {
   empresa: string | null;
   empleado_codigo: string | null;
   deduccion_quincenal: number;
+  /** ⚠️ SIN LECTORES desde el 10-sep-2026: el daño no propone cuota. La
+   *  contadora escribe el monto de cada quincena en la casilla. */
   deduccion_dano: number;
+  /** 🔴 La cuota quincenal de «Descuento a terceros» (10-sep-2026). */
+  deduccion_terceros: number;
   notas: string | null;
   salario_mensual: number | null;
   trabaja: boolean;

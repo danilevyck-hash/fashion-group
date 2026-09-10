@@ -21,13 +21,16 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
-  CONCEPTOS_DESCUENTO,
+  CONCEPTOS_PAGO_DE_CUENTA,
   TABLA_PRESTAMO_APROBADO,
   type AprobacionPrestamo,
   type FichaPrestamo,
 } from "./prestamos-planilla";
 import {
+  CUENTA_PRESTAMO,
+  CUENTA_TERCEROS,
   calcularSaldoPrestamo,
+  cuentaDeMovimiento,
   type MovimientoParaSaldo,
 } from "@/lib/prestamos-saldo";
 
@@ -44,6 +47,7 @@ interface FilaEmpleado {
   nombre: string | null;
   deduccion_quincenal: number | string | null;
   deduccion_dano: number | string | null;
+  deduccion_terceros?: number | string | null;
   empleado_codigo?: string | null;
 }
 
@@ -80,7 +84,7 @@ export async function leerPrestamosDeQuincena(
   desde: string,
   hasta: string,
 ): Promise<PrestamosLeidos> {
-  const COLS_CON_AMARRE = `id, nombre, deduccion_quincenal, deduccion_dano, ${COLUMNA_AMARRE}`;
+  const COLS_CON_AMARRE = `id, nombre, deduccion_quincenal, deduccion_dano, deduccion_terceros, ${COLUMNA_AMARRE}`;
 
   // Sin reintento «sin amarre» (tolerancia a la DDL retirada el 3-sep-2026):
   // si esto falla, la planilla no sale. Ver el encabezado.
@@ -119,6 +123,7 @@ export async function leerPrestamosDeQuincena(
   // saldo antes de sumarlas.
   const movsDe = new Map<string, FilaMovimiento[]>();
   const descontadoDe = new Map<string, number>();
+  const descontadoTercerosDe = new Map<string, number>();
   for (const m of movimientos) {
     const emp = String(m.empleado_id ?? "");
     if (!emp) continue;
@@ -132,10 +137,21 @@ export async function leerPrestamosDeQuincena(
     // 15 y en el 30, o sea justo en el borde, y un pago del 15 entraría a la
     // vez en la quincena 1-15 (exacta) y en la 16-31 (15 ≥ 16−3). El mismo
     // descuento contado dos veces.
-    if ((CONCEPTOS_DESCUENTO as readonly string[]).includes(String(m.concepto))) {
+    // 🔴 LO YA DESCONTADO SE SEPARA POR CUENTA. Con tres cuentas, un pago de
+    // terceros contado como «ya descontado» del préstamo dejaría al préstamo
+    // sin descontar esa quincena (caso 1 de `montoDeFicha`) — la persona
+    // pagaría una cuenta y se le perdonaría la otra en silencio.
+    if ((CONCEPTOS_PAGO_DE_CUENTA as readonly string[]).includes(String(m.concepto))) {
       const f = String(m.fecha).slice(0, 10);
       if (f >= desde && f <= hasta) {
-        descontadoDe.set(emp, (descontadoDe.get(emp) ?? 0) + num(m.monto));
+        const cuenta = cuentaDeMovimiento(m);
+        if (cuenta === CUENTA_TERCEROS) {
+          descontadoTercerosDe.set(emp, (descontadoTercerosDe.get(emp) ?? 0) + num(m.monto));
+        } else if (cuenta === CUENTA_PRESTAMO) {
+          descontadoDe.set(emp, (descontadoDe.get(emp) ?? 0) + num(m.monto));
+        }
+        // ⚠️ El DAÑO no lleva «ya descontado»: no propone cuota, así que no hay
+        // ninguna estimación a la que un hecho consumado le pueda ganar.
       }
     }
   }
@@ -152,6 +168,10 @@ export async function leerPrestamosDeQuincena(
       saldoPrestamo: s.cuentas.prestamo.saldo,
       saldoDano: s.cuentas.dano.saldo,
       yaDescontado: descontadoDe.get(String(e.id)) ?? 0,
+      // 🔴 La tercera cuenta, con su cuota de la ficha y su propio saldo.
+      cuotaTerceros: num(e.deduccion_terceros),
+      saldoTerceros: s.cuentas.terceros.saldo,
+      yaDescontadoTerceros: descontadoTercerosDe.get(String(e.id)) ?? 0,
     };
   });
 
@@ -203,8 +223,21 @@ export async function leerAprobacionesPrestamo(
 
 export interface PrestamoAAprobar {
   codigo: string;
-  /** Lo que el módulo sugiere AHORA. Es el testigo y lo que va a la casilla. */
+  /** Lo que el módulo sugiere AHORA para el PRÉSTAMO. Es el testigo y lo que
+   *  va a la casilla «Préstamo». */
   monto: number;
+  /**
+   * 🔴 Lo que el módulo sugiere para «Descuento a terceros» (10-sep-2026), que
+   * va a SU casilla. Aprobar a una persona aprueba sus DOS descuentos
+   * automáticos de la quincena: son la misma decisión —«sí, descuéntenle lo que
+   * el módulo dice»— y partirla en dos casillas de aprobación obligaría a la
+   * contadora a firmar dos veces la misma cosa.
+   *
+   * ⚠️ El TESTIGO (`monto_visto`) sigue siendo el del préstamo: la tabla tiene
+   * una columna y no se amplía. Lo único que hace el testigo es detectar que
+   * alguien corrigió la casilla del préstamo a mano.
+   */
+  montoTerceros: number;
 }
 
 /**

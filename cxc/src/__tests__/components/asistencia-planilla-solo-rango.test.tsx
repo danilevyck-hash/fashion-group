@@ -25,6 +25,12 @@
  *   5. los manuales ya guardados se siguen viendo.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🩸 LOS NOMBRES SE MUESTRAN CAPITALIZADOS DESDE EL 10-SEP-2026, y por eso los
+// buscadores de este archivo van sin distinguir mayúsculas. Daniel: *«no me
+// gustan los nombres en planilla de los usuarios todo en mayúscula, arréglalo a
+// capitalización»*. Lo GUARDADO sigue en mayúsculas y ningún número cambia —
+// solo cómo se dibuja— así que lo que estos candados protegen (que la persona
+// aparezca en pantalla, y en qué grupo) no cambió: cambió la grafía.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 
@@ -200,7 +206,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     servir(respuestaQuincena());
     montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     // 🔑 Con una sola opción, un segmentado no es una elección: es un botón que
     // no hace nada.
     expect(screen.queryByRole("button", { name: /^Quincena$/ })).toBeNull();
@@ -224,7 +230,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     servir(respuestaQuincena());
     montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     // El FORMATO de la etiqueta («1 ago – 15 ago 2026 · 15 días») se prueba
     // sobre el control real en `rango-fechas-calendario.test.tsx`. Acá alcanza
     // con que el control DEJE de decir «Elige el período» al haber elegido.
@@ -235,7 +241,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     servir(respuestaQuincena());
     const { container } = montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(container.querySelectorAll('input[type="date"]').length).toBe(0);
   });
 
@@ -285,7 +291,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     servir(respuestaQuincena());
     const { container } = montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(container.querySelectorAll("[data-day]").length).toBe(0);
   });
 
@@ -303,7 +309,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     const llamadas = servir(respuestaQuincena());
     montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla?"))!;
     expect(get.url).toContain("desde=");
     expect(get.url).toContain("hasta=");
@@ -319,7 +325,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
     servir(respuestaQuincena());
     montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     const isr = screen.getAllByDisplayValue("25.5")[0] as HTMLInputElement;
     expect(isr.disabled).toBe(false);
   });
@@ -328,7 +334,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
     const llamadas = servir(respuestaQuincena());
     montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     const isr = screen.getAllByDisplayValue("25.5")[0] as HTMLInputElement;
 
     fireEvent.change(isr, { target: { value: "30" } });
@@ -351,7 +357,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
     servir(respuestaQuincena());
     montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(screen.getAllByDisplayValue("25.5").length).toBeGreaterThan(0);
   });
 
@@ -359,7 +365,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
     servir(respuestaRangoLibre());
     montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     const apagados = screen.getAllByPlaceholderText("por quincena") as HTMLInputElement[];
     expect(apagados.length).toBeGreaterThan(0);
     expect(apagados.every((i) => i.disabled)).toBe(true);
@@ -371,7 +377,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
     const llamadas = servir(respuestaRangoLibre());
     montar();
     await elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     const campo = screen.getAllByPlaceholderText("por quincena")[0] as HTMLInputElement;
     campo.disabled = false;
     fireEvent.change(campo, { target: { value: "99" } });
@@ -394,7 +400,7 @@ describe("🔴 LOS MONTOS A MANO — lo único que la quincena decidía", () => 
     servir(respuestaQuincena());
     montar();
     await elegirPeriodo("2026-08-04", "2026-08-20");
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(screen.queryByText(/Los montos a mano se guardan por quincena/)).toBeNull();
   });
 });
@@ -416,7 +422,7 @@ describe("lo que el rango libre cambia en la PLATA se sigue diciendo", () => {
     servir(respuestaQuincena());
     montar();
     await elegirPeriodo("2026-08-04", "2026-08-20");
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(screen.queryByText(/no son una quincena/)).toBeNull();
   });
 });

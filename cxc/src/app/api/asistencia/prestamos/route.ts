@@ -61,11 +61,13 @@ export async function POST(req: NextRequest) {
       const codigo = String(o?.codigo ?? "").trim();
       if (!codigo) continue;
       const n = Number(o?.monto ?? 0);
+      const t = Number(o?.montoTerceros ?? 0);
       // ⚠️ Negativo o basura → 0. La casilla tiene un CHECK `>= 0` y un
       // préstamo con el signo al revés le SUMARÍA al neto sin que nadie lo note.
       porCodigo.set(codigo, {
         codigo,
         monto: Number.isFinite(n) && n > 0 ? centavos(n) : 0,
+        montoTerceros: Number.isFinite(t) && t > 0 ? centavos(t) : 0,
       });
     }
     const items = [...porCodigo.values()];
@@ -108,6 +110,7 @@ export async function POST(req: NextRequest) {
     for (const it of items) {
       const actual = manuales.porCodigo.get(it.codigo);
       const enCasilla = centavos(actual?.prestamo ?? 0);
+      const enCasillaT = centavos(actual?.terceros ?? 0);
 
       let nuevo: number;
       if (aprobado) {
@@ -127,11 +130,29 @@ export async function POST(req: NextRequest) {
         nuevo = 0;
       }
 
-      if (nuevo === enCasilla) continue; // nada que escribir
+      // ── 🔴 LA CASILLA DE TERCEROS, con la MISMA regla que la del préstamo ──
+      //
+      // Al aprobar se llena con lo sugerido; al retirar la aprobación solo se
+      // vacía si todavía dice lo que puso la aprobación. Un número corregido a
+      // mano es una decisión y no se pisa.
+      let nuevoT: number;
+      if (aprobado) {
+        nuevoT = it.montoTerceros;
+      } else {
+        const previa = antes.porCodigo.get(it.codigo);
+        const puestoPorNosotros = previa != null && centavos(previa.montoVisto) === enCasilla;
+        nuevoT = puestoPorNosotros || enCasillaT <= 0 ? 0 : enCasillaT;
+      }
+
+      if (nuevo === enCasilla && nuevoT === enCasillaT) continue; // nada que escribir
       const ok = await guardarManuales(q.clave, it.codigo, {
         isr: actual?.isr ?? 0,
         prestamo: nuevo,
-        terceros: actual?.terceros ?? 0,
+        terceros: nuevoT,
+        // 🔴 EL DAÑO NO SE TOCA NUNCA DESDE ACÁ. La contadora: *«los daños de
+        // mercancía debe permanecer en blanco y que nos permita colocar
+        // quincenalmente la cantidad a descontar»*. Lo que ella escriba se
+        // conserva tal cual.
         mercancia: actual?.mercancia ?? 0,
         otrosServicios: actual?.otrosServicios ?? 0,
       });

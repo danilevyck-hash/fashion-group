@@ -130,17 +130,9 @@ export type EstadoDelCuadro = "borrador" | "cerrada";
 // pasar en silencio.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Entra a Asistencia, pero NO cierra la quincena. */
-export const MIRAN_PERO_NO_CIERRAN = ["secretaria"] as const;
-
-export function cerrarPlanillaRoles(): string[] {
-  const noCierran = new Set<string>(MIRAN_PERO_NO_CIERRAN);
-  return asistenciaRoles().filter((r) => !noCierran.has(r));
-}
-
-export function puedeCerrar(rol: string): boolean {
-  return cerrarPlanillaRoles().includes(rol);
-}
+// 🔑 Viven en `roles.ts` desde el 10-sep-2026 (ver la nota allá) y se
+// re-exportan acá para no tocar a ningún llamador.
+export { MIRAN_PERO_NO_CIERRAN, cerrarPlanillaRoles, puedeCerrar } from "./roles";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LAS COLUMNAS QUE SE CONGELAN

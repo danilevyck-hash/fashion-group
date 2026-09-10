@@ -167,13 +167,33 @@ describe("los valores por defecto son los que confirmó la contable", () => {
 
 // ── Empresas y jornadas ─────────────────────────────────────────────────────
 
-describe("las tres empresas que comparten el reloj", () => {
-  it("son exactamente Boston, Vistana y Fashion Wear", () => {
-    expect([...EMPRESAS_ASISTENCIA]).toEqual(["confecciones_boston", "vistana", "fashion_wear"]);
+describe("las empresas del módulo", () => {
+  // 🩸 ERAN TRES HASTA EL 10-SEP-2026. Daniel, textual: *«Sí — ACS entra
+  // completa a Asistencia y Planilla»*. Este candado cambió de dirección, no se
+  // borró: sigue fijando la lista EXACTA, que es lo que protege — la lista es
+  // cerrada y vive en UN solo lugar, así que la quinta empresa vuelve a ser una
+  // línea y no una cacería.
+  it("son exactamente Boston, Vistana, Fashion Wear y Multifashion", () => {
+    expect([...EMPRESAS_ASISTENCIA]).toEqual([
+      "confecciones_boston", "vistana", "fashion_wear", "american_classic",
+    ]);
   });
 
-  it("ACS/Multifashion NO entra: usa otro reloj", () => {
-    expect(validarEmpresa("american_classic").ok).toBe(false);
+  // 🩸 Y ESTE DECÍA «ACS NO entra: usa otro reloj». Ahora entra: su reloj lo va
+  // a leer la MISMA PC de la oficina que lee el de Boston, con otro nombre de
+  // dispositivo. Lo que se conserva es la otra mitad de la regla: una empresa
+  // que NO es del módulo se sigue rechazando.
+  it("ACS/Multifashion entra; una empresa ajena se sigue rechazando", () => {
+    expect(validarEmpresa("american_classic").ok).toBe(true);
+    expect(validarEmpresa("active_shoes").ok).toBe(false);
+    expect(validarEmpresa("joystep").ok).toBe(false);
+  });
+
+  // 🔴 Y SE LLAMA «Multifashion» EN PANTALLA, aunque la key sea
+  // `american_classic` (Daniel: *«multifashion en todos lados»*). El nombre
+  // sale de `empresa-mapping`, no de una copia del módulo.
+  it("ACS se muestra como «Multifashion»", () => {
+    expect(etiquetaEmpresa("american_classic")).toBe("Multifashion");
   });
 
   it("el nombre que ve la gente sale de empresa-mapping, no de una copia", () => {
@@ -182,10 +202,35 @@ describe("las tres empresas que comparten el reloj", () => {
     expect(etiquetaEmpresa("fashion_wear")).toBe("Fashion Wear");
   });
 
-  it("el CHECK de la migración dice lo MISMO que el código", () => {
-    const sql = leer(MIGRACION);
+  // 🩸 SE MIRAN LAS DOS MIGRACIONES DESDE EL 10-SEP-2026. La original creó el
+  // CHECK con tres empresas; la de ACS lo reescribe con las cuatro. Mirar solo
+  // la primera diría que falta `american_classic` cuando en la base SÍ está —
+  // y la regla que este candado protege es «el CHECK de la base dice lo mismo
+  // que el código», no «todo vive en un archivo».
+  it("el CHECK de las migraciones dice lo MISMO que el código", () => {
+    const sql = leer(MIGRACION) + "\n" + leer("supabase/migrations/20261031120000_acs_cuarta_empresa.sql");
     for (const e of EMPRESAS_ASISTENCIA) expect(sql, `falta ${e} en el CHECK`).toContain(`'${e}'`);
-    expect(sql).toContain("jornada_semanal IN (40, 48)");
+    expect(leer(MIGRACION)).toContain("jornada_semanal IN (40, 48)");
+  });
+
+  // 🔴 Y LA MIGRACIÓN DE ACS REESCRIBE **TODOS** LOS CHECK DE EMPRESA DEL
+  // MÓDULO. Dejar uno afuera es una tabla que rechaza a Multifashion mientras
+  // las otras la aceptan — y eso se descubre recién al guardar.
+  it("la migración de ACS toca las cuatro tablas con CHECK de empresa", () => {
+    // ⚠️ SIN COMENTARIOS: el encabezado NOMBRA las tablas, así que leer el
+    // archivo crudo daría por bueno un CHECK que se borró y quedó solo
+    // mencionado en la nota. Es la misma lección que los barridos de prohibidos.
+    const sql = leer("supabase/migrations/20261031120000_acs_cuarta_empresa.sql")
+      .split("\n").map((l) => l.split("--")[0]).join("\n");
+    for (const t of [
+      "asistencia_personas",
+      "asistencia_planilla_guardada",
+      "asistencia_reparto_empresa",
+      "asistencia_aprobador_empresa",
+    ]) {
+      expect(sql, `falta el CHECK de ${t}`).toContain(t);
+    }
+    expect(sql).not.toMatch(/DROP\s+TABLE/i);
   });
 
   it.each(SE_VUELVEN_CERO)("la empresa vacía %p se rechaza", (v) => {

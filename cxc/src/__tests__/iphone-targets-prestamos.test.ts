@@ -258,7 +258,7 @@ describe("Préstamos · lo que NO se puede romper", () => {
     // y en desktop siguen en su columna propia de w-24
     expect(lista).toMatch(/<div className="hidden shrink-0 text-center lg:block lg:w-24">/);
     // el nombre conserva flex-1 + truncate en su propia línea
-    expect(lista).toMatch(/<span data-empleado-campo="nombre" className="font-medium truncate tracking-tight">\{emp\.nombre\}<\/span>/);
+    expect(lista).toMatch(/<span data-empleado-campo="nombre" className="font-medium truncate tracking-tight">\{[^}]*emp\.nombre[^}]*\}<\/span>/);
     // los badges de la línea 1 acompañan el mismo corte
     expect(lista).toMatch(/<div className="hidden shrink-0 items-center gap-2 lg:flex">\{badges\}<\/div>/);
     // y la columna de progreso también

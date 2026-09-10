@@ -98,6 +98,8 @@ import {
   type MotivoSalida,
 } from "@/lib/asistencia/vigencia";
 import { ETIQUETA_SALDO_INICIAL } from "@/lib/asistencia/saldo-vacaciones";
+import { puedeCerrar } from "@/lib/asistencia/roles";
+import { textoConfirmar, textoIgnorados } from "@/lib/asistencia/codigos-ignorados";
 import HorariosTab from "./HorariosTab";
 import FeriadosTab from "./FeriadosTab";
 
@@ -175,6 +177,9 @@ interface Resumen {
 
 interface Datos {
   personas: Persona[];
+  /** 🔴 Los códigos escondidos (10-sep-2026). Viajan aparte: no están en
+   *  `personas` justamente porque no se cuentan en ningún lado. */
+  ignorados?: { codigo: string; motivo: string | null; por: string; cuando: string }[];
   reglas: ReglasAsistencia;
   resumen: Resumen;
   faltaMigracion: boolean;
@@ -296,6 +301,47 @@ const bajaCompleta = (b: Borrador) =>
 
 export default function ConfiguracionTab() {
   const { toast } = useToast();
+  // 🔑 El rol sale de `sessionStorage`, igual que en `AppHeader` y en
+  // `PlanillaTab`. Solo decide si se DIBUJAN el cargo y la cédula: el freno de
+  // verdad está en el PUT, que no los escribe para quien no puede.
+  const [rol, setRol] = useState("");
+  useEffect(() => { setRol(sessionStorage.getItem("cxc_role") || ""); }, []);
+  const puedeTocarLaFicha = puedeCerrar(rol);
+  const [verIgnorados, setVerIgnorados] = useState(false);
+
+  /**
+   * 🔴 IGNORAR ESCONDE, NO BORRA. Daniel: *«pon la opción de ignorar código así
+   * como DANIEL LEVY código 52»* — vale para cualquier fila, tenga ficha o no.
+   * Ni las marcaciones ni la ficha se tocan.
+   */
+  const ignorar = useCallback(async (codigo: string, etiqueta: string) => {
+    if (!window.confirm(textoConfirmar(codigo, etiqueta))) return;
+    try {
+      const r = await fetch("/api/asistencia/codigos-ignorados", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "No se pudo");
+      toast("Listo, ya no sale en la lista", "success");
+      await cargar();
+    } catch {
+      toast("No se pudo ignorar el código. Intenta de nuevo.", "error");
+    }
+  }, [toast]);
+
+  const mostrarDeNuevo = useCallback(async (codigo: string) => {
+    try {
+      const r = await fetch(`/api/asistencia/codigos-ignorados?codigo=${encodeURIComponent(codigo)}`, {
+        method: "DELETE",
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "No se pudo");
+      toast("Listo, vuelve a salir", "success");
+      await cargar();
+    } catch {
+      toast("No se pudo volver a mostrarlo. Intenta de nuevo.", "error");
+    }
+  }, [toast]);
   const [datos, setDatos] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<"todos" | "faltan" | string>("todos");
@@ -994,6 +1040,11 @@ export default function ConfiguracionTab() {
                                 className={CAMPO}
                               />
                             </div>
+                            {/* 🔴 EL CARGO Y LA CÉDULA: Daniel y la contadora,
+                                nadie más (10-sep-2026). El freno de verdad está
+                                en el PUT; acá solo se evita ofrecer un campo
+                                que no se va a guardar. */}
+                            {puedeTocarLaFicha && (<>
                             <div>
                               {/* 🔴 SALE IMPRESO EN EL COMPROBANTE, en
                                   «POSICION DESEMPEÑADA». Hasta el 10-sep-2026
@@ -1030,6 +1081,7 @@ export default function ConfiguracionTab() {
                                 className={CAMPO}
                               />
                             </div>
+                            </>)}
                             <div>
                               <Etiqueta texto="Salario mensual" />
                               {/* «Déjalo vacío si todavía no lo sabes» vive en el
@@ -1365,6 +1417,20 @@ export default function ConfiguracionTab() {
                               className="min-h-[44px] rounded-md border border-gray-300 px-4 text-sm text-gray-700 transition hover:border-black active:scale-[0.97]">
                               Cerrar
                             </button>
+                            {/* 🔴 IGNORAR ESTE CÓDIGO — discreto y al final:
+                                es raro y no compite con el trabajo de la fila.
+                                Vale para CUALQUIERA, tenga ficha o no (Daniel:
+                                *«pon la opción de ignorar código así como DANIEL
+                                LEVY código 52»*). Esconde; no borra nada. */}
+                            {puedeTocarLaFicha && (
+                              <button
+                                type="button"
+                                onClick={() => void ignorar(p.codigo, p.nombre ?? p.codigo)}
+                                className="min-h-[44px] text-[12px] text-gray-500 underline transition hover:text-black"
+                              >
+                                Ignorar este código
+                              </button>
+                            )}
                             {/* El estado del guardado automático, dicho en la
                                 misma fila. Sin esto, "se guarda solo" es un acto
                                 de fe: no hay botón que confirme nada. */}
@@ -1435,6 +1501,47 @@ export default function ConfiguracionTab() {
                       >
                         Volvió a trabajar aquí
                       </button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            {/* ── 🔴 LOS IGNORADOS ──────────────────────────────────────────
+                Códigos que alguien marcó como basura —o su propia ficha, que no
+                va en planilla—. No salen en la lista ni en ningún conteo, y de
+                acá se vuelven a mostrar. Nada se borró: ni la ficha ni una sola
+                marcación. */}
+            {!!datos.ignorados?.length && (
+              <details
+                className="rounded-lg border border-gray-200 bg-gray-50"
+                open={verIgnorados}
+                onToggle={(e) => setVerIgnorados((e.target as HTMLDetailsElement).open)}
+              >
+                <summary className="flex min-h-[44px] cursor-pointer items-center px-3 py-2.5 text-sm text-gray-700">
+                  {textoIgnorados(datos.ignorados.length)}
+                </summary>
+                <div className="border-t border-gray-200 bg-white">
+                  {datos.ignorados.map((i) => (
+                    <div
+                      key={i.codigo}
+                      className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-3 py-2.5 first:border-t-0"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-gray-900">código {i.codigo}</span>
+                        <span className="block text-[12px] text-gray-500">
+                          {i.por}{i.motivo ? ` · ${i.motivo}` : ""}
+                        </span>
+                      </span>
+                      {puedeTocarLaFicha && (
+                        <button
+                          type="button"
+                          onClick={() => void mostrarDeNuevo(i.codigo)}
+                          className={`${PILL_BASE} ${PILL_OFF}`}
+                        >
+                          Volver a mostrar
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

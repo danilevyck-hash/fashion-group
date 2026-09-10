@@ -48,17 +48,30 @@
 // LUIS ARROYO, 22 días en cero).
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Las dos cuentas de una persona. */
-export type CuentaPrestamo = "prestamo" | "dano";
+// ── 🔴 TRES CUENTAS DESDE EL 10-SEP-2026 ────────────────────────────────────
+//
+// La contadora, textual: *«los descuentos a terceros debe ser manejado igual
+// como un préstamo permitiendo colocar un monto inicial y un monto a descontar
+// quincenal»*. O sea una cuenta más, con su cargo y su cuota, que la quincena
+// descuenta sola hasta pagarla.
+//
+// 🔑 AGREGAR UNA CUENTA NO MUEVE UN CENTAVO DE LAS OTRAS DOS: los dos conceptos
+// nuevos no existen en ninguna fila vieja, así que las 14 personas que deben
+// hoy dan exactamente el mismo saldo. Lo comprueba `prestamos-dos-cuentas`.
+
+/** Las TRES cuentas de una persona. */
+export type CuentaPrestamo = "prestamo" | "dano" | "terceros";
 
 export const CUENTA_PRESTAMO: CuentaPrestamo = "prestamo";
 export const CUENTA_DANO: CuentaPrestamo = "dano";
-export const CUENTAS: readonly CuentaPrestamo[] = [CUENTA_PRESTAMO, CUENTA_DANO];
+export const CUENTA_TERCEROS: CuentaPrestamo = "terceros";
+export const CUENTAS: readonly CuentaPrestamo[] = [CUENTA_PRESTAMO, CUENTA_DANO, CUENTA_TERCEROS];
 
 /** Cómo se llama cada cuenta en pantalla. Un solo lugar. */
 export const NOMBRE_CUENTA: Record<CuentaPrestamo, string> = {
   prestamo: "Préstamo",
   dano: "Daño de mercancía",
+  terceros: "Descuento a terceros",
 };
 
 /** Lo mínimo que hace falta de un movimiento para poder sumarlo. */
@@ -67,17 +80,25 @@ export interface MovimientoParaSaldo {
   monto: number | string;
   estado?: string | null;
   deleted?: boolean | null;
-  /** `prestamo` | `dano`. NULL en todo lo viejo: se deriva del concepto. */
+  /** `prestamo` | `dano` | `terceros`. NULL en todo lo viejo: se deriva del concepto. */
   cuenta?: string | null;
   /** Solo para saber cuál cuenta es la MÁS VIEJA. Opcional. */
   fecha?: string | null;
 }
 
 /** Los conceptos que AUMENTAN lo que la persona debe. */
-export const CONCEPTOS_SUMAN = ["Préstamo", "Responsabilidad por daño"] as const;
+export const CONCEPTOS_SUMAN = [
+  "Préstamo", "Responsabilidad por daño",
+  // El cargo inicial de la tercera cuenta (10-sep-2026).
+  "Descuento a terceros",
+] as const;
 
 /** Los conceptos que BAJAN lo que la persona debe. */
-export const CONCEPTOS_RESTAN = ["Pago", "Abono extra", "Pago de responsabilidad"] as const;
+export const CONCEPTOS_RESTAN = [
+  "Pago", "Abono extra", "Pago de responsabilidad",
+  // El pago de la tercera cuenta (10-sep-2026).
+  "Pago de terceros",
+] as const;
 
 /**
  * Los conceptos históricos que, sin columna `cuenta`, pertenecen a DAÑO.
@@ -85,9 +106,19 @@ export const CONCEPTOS_RESTAN = ["Pago", "Abono extra", "Pago de responsabilidad
  */
 export const CONCEPTOS_DE_DANO = ["Responsabilidad por daño", "Pago de responsabilidad"] as const;
 
+/**
+ * Los conceptos que, sin columna `cuenta`, pertenecen a TERCEROS.
+ *
+ * ⚠️ Hoy ninguna fila vieja los trae —nacieron con la columna `cuenta` ya
+ * escrita— pero la derivación existe igual: un movimiento que pierda su
+ * `cuenta` tiene que seguir cayendo en la suya, no en «Préstamo» por descarte.
+ */
+export const CONCEPTOS_DE_TERCEROS = ["Descuento a terceros", "Pago de terceros"] as const;
+
 const SUMAN = new Set<string>(CONCEPTOS_SUMAN);
 const RESTAN = new Set<string>(CONCEPTOS_RESTAN);
 const DE_DANO = new Set<string>(CONCEPTOS_DE_DANO);
+const DE_TERCEROS = new Set<string>(CONCEPTOS_DE_TERCEROS);
 
 /**
  * 🔑 A QUÉ CUENTA VA UN MOVIMIENTO.
@@ -100,8 +131,11 @@ const DE_DANO = new Set<string>(CONCEPTOS_DE_DANO);
 export function cuentaDeMovimiento(m: MovimientoParaSaldo): CuentaPrestamo {
   const c = String(m.cuenta ?? "").trim();
   if (c === CUENTA_DANO) return CUENTA_DANO;
+  if (c === CUENTA_TERCEROS) return CUENTA_TERCEROS;
   if (c === CUENTA_PRESTAMO) return CUENTA_PRESTAMO;
-  return DE_DANO.has(m.concepto) ? CUENTA_DANO : CUENTA_PRESTAMO;
+  if (DE_DANO.has(m.concepto)) return CUENTA_DANO;
+  if (DE_TERCEROS.has(m.concepto)) return CUENTA_TERCEROS;
+  return CUENTA_PRESTAMO;
 }
 
 export interface SaldoCuenta {
@@ -128,7 +162,7 @@ export interface SaldoPrestamo {
   saldo: number;
   /** % devuelto, para la barrita. 0 si nunca se le prestó nada. */
   pct: number;
-  /** El mismo total, partido en las dos cuentas. Suman exactamente `saldo`. */
+  /** El mismo total, partido en las TRES cuentas. Suman exactamente `saldo`. */
   cuentas: Record<CuentaPrestamo, SaldoCuenta>;
 }
 
@@ -147,6 +181,7 @@ export function calcularSaldoPrestamo(
   const cuentas: Record<CuentaPrestamo, SaldoCuenta> = {
     prestamo: cuentaVacia(),
     dano: cuentaVacia(),
+    terceros: cuentaVacia(),
   };
   for (const m of movs ?? []) {
     if (!m || m.deleted === true) continue;
@@ -164,11 +199,12 @@ export function calcularSaldoPrestamo(
       c.pagado += monto;
     }
   }
-  cuentas.prestamo.saldo = cuentas.prestamo.prestado - cuentas.prestamo.pagado;
-  cuentas.dano.saldo = cuentas.dano.prestado - cuentas.dano.pagado;
+  // 🔑 EL TOTAL SALE DE LAS CUENTAS, y las cuentas de `CUENTAS`: agregar una
+  // cuarta no puede dejar plata afuera del total por olvidar una línea acá.
+  for (const k of CUENTAS) cuentas[k].saldo = cuentas[k].prestado - cuentas[k].pagado;
 
-  const prestado = cuentas.prestamo.prestado + cuentas.dano.prestado;
-  const pagado = cuentas.prestamo.pagado + cuentas.dano.pagado;
+  const prestado = CUENTAS.reduce((a, k) => a + cuentas[k].prestado, 0);
+  const pagado = CUENTAS.reduce((a, k) => a + cuentas[k].pagado, 0);
   const saldo = prestado - pagado;
   return {
     prestado,
@@ -179,9 +215,16 @@ export function calcularSaldoPrestamo(
   };
 }
 
-/** ¿Debe las dos cuentas a la vez? Es lo único que obliga a preguntar «baja de». */
+/**
+ * ¿Debe MÁS DE UNA cuenta a la vez? Es lo único que obliga a preguntar «baja de».
+ *
+ * ⚠️ El nombre dice «las dos» porque hasta el 10-sep-2026 eran dos. Con la
+ * tercera cuenta la pregunta es la misma —¿hay que elegir?— y por eso la
+ * función no se renombró: la usan el formulario y la ficha, y renombrarla sin
+ * necesidad es cómo se pierde de vista qué decide.
+ */
 export function debeLasDos(s: SaldoPrestamo): boolean {
-  return s.cuentas.prestamo.saldo > 0 && s.cuentas.dano.saldo > 0;
+  return CUENTAS.filter((k) => s.cuentas[k].saldo > 0).length > 1;
 }
 
 /**
@@ -194,16 +237,20 @@ export function debeLasDos(s: SaldoPrestamo): boolean {
  * azar del orden en que llegó el array.
  */
 export function cuentaMasVieja(s: SaldoPrestamo): CuentaPrestamo | null {
-  const p = s.cuentas.prestamo.saldo > 0;
-  const d = s.cuentas.dano.saldo > 0;
-  if (!p && !d) return null;
-  if (p && !d) return CUENTA_PRESTAMO;
-  if (d && !p) return CUENTA_DANO;
-  const fp = s.cuentas.prestamo.desde;
-  const fd = s.cuentas.dano.desde;
-  if (fp && fd) return fd < fp ? CUENTA_DANO : CUENTA_PRESTAMO;
-  if (fd && !fp) return CUENTA_DANO;
-  return CUENTA_PRESTAMO;
+  // Solo compiten las que DEBEN algo.
+  const conSaldo = CUENTAS.filter((k) => s.cuentas[k].saldo > 0);
+  if (conSaldo.length === 0) return null;
+  if (conSaldo.length === 1) return conSaldo[0];
+  // 🔑 Gana la que se abrió antes. Sin fecha NO gana: una cuenta sin fecha no
+  // puede desbancar a una que sí la tiene. Y el desempate final es el ORDEN de
+  // `CUENTAS` (préstamo primero), estable, nunca el azar del array de entrada.
+  let mejor: CuentaPrestamo | null = null;
+  for (const k of conSaldo) {
+    const f = s.cuentas[k].desde;
+    if (!f) continue;
+    if (mejor === null || f < (s.cuentas[mejor].desde as string)) mejor = k;
+  }
+  return mejor ?? conSaldo[0];
 }
 
 /**

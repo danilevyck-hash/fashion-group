@@ -86,6 +86,8 @@ import type {
 } from "@/lib/asistencia/prestamos-planilla";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import { corteSugerido, netoConAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
+// 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import type { VacacionNoPagada } from "@/lib/asistencia/vacaciones";
 import { fmtMin } from "@/lib/asistencia/reporte";
 // 🔴 QUIÉN CIERRA SALE DEL MISMO MÓDULO QUE EL CANDADO DEL SERVIDOR
@@ -1440,7 +1442,7 @@ export default function PlanillaTab() {
                   {fueraDePlanilla.map((l) => (
                     <tr key={l.codigo} className="border-b border-gray-100 last:border-0">
                       <td className="sticky left-0 z-10 bg-white px-3 py-2.5 text-gray-500">
-                        {l.etiqueta}
+                        {capitalizarNombre(l.etiqueta)}
                         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
                       </td>
                       <td colSpan={18} className="px-2 py-2.5 text-[13px] text-gray-500">
@@ -1455,7 +1457,7 @@ export default function PlanillaTab() {
                   {decidir.map((l) => (
                     <tr key={l.codigo} className="border-b border-gray-100 last:border-0">
                       <td className="sticky left-0 z-10 bg-white px-3 py-2.5 text-gray-700">
-                        {l.etiqueta}
+                        {capitalizarNombre(l.etiqueta)}
                         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
                       </td>
                       <td colSpan={18} className="px-2 py-2.5 text-[13px] text-gray-600">
@@ -1469,7 +1471,7 @@ export default function PlanillaTab() {
                   {pendientes.map((l) => (
                     <tr key={l.codigo} className="border-b border-gray-100 bg-amber-50/50 last:border-0">
                       <td className="sticky left-0 z-10 bg-amber-50 px-3 py-2.5 text-gray-900">
-                        {l.etiqueta}
+                        {capitalizarNombre(l.etiqueta)}
                         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
                       </td>
                       <td colSpan={18} className="px-2 py-2.5 text-[13px] font-medium text-amber-800">
@@ -1529,7 +1531,7 @@ export default function PlanillaTab() {
             {fueraDePlanilla.map((l) => (
               <div key={l.codigo} className="rounded-lg border border-gray-200 bg-white p-3">
                 <p className="font-medium text-gray-700">
-                  {l.etiqueta} <span className="text-xs text-gray-400">{l.codigo}</span>
+                  {capitalizarNombre(l.etiqueta)} <span className="text-xs text-gray-400">{l.codigo}</span>
                 </p>
                 <p className="mt-0.5 text-[13px] text-gray-500">
                   {MOTIVO_FUERA_DE_PLANILLA} · se le mide la asistencia, no se le calcula pago
@@ -1539,7 +1541,7 @@ export default function PlanillaTab() {
             {decidir.map((l) => (
               <div key={l.codigo} className="rounded-lg border border-gray-200 bg-white p-3">
                 <p className="font-medium text-gray-700">
-                  {l.etiqueta} <span className="text-xs text-gray-400">{l.codigo}</span>
+                  {capitalizarNombre(l.etiqueta)} <span className="text-xs text-gray-400">{l.codigo}</span>
                 </p>
                 <p className="mt-0.5 text-[13px] text-gray-600">
                   {l.decidirAMano}
@@ -1552,7 +1554,7 @@ export default function PlanillaTab() {
             {pendientes.map((l) => (
               <div key={l.codigo} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <p className="font-medium text-gray-900">
-                  {l.etiqueta} <span className="text-xs text-gray-400">{l.codigo}</span>
+                  {capitalizarNombre(l.etiqueta)} <span className="text-xs text-gray-400">{l.codigo}</span>
                 </p>
                 <p className="mt-0.5 text-[13px] text-amber-800">
                   falta configurar — {l.faltaConfigurar.join(" · ")}
@@ -1949,7 +1951,7 @@ function Fila({
   return (
     <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
       <td className="sticky left-0 z-10 bg-white px-3 py-1.5 text-gray-900 hover:bg-gray-50">
-        {l.etiqueta}
+        {capitalizarNombre(l.etiqueta)}
         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
         {/* 🔑 Sin esto, los ceros de ausencias, tardanzas y extras se leen como
             un error de cálculo. El chip dice que están en cero A PROPÓSITO. */}
@@ -2071,7 +2073,7 @@ function Tarjeta({
         className="flex min-h-[44px] w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
       >
         <span className="min-w-0">
-          <span className="block truncate font-medium text-gray-900">{l.etiqueta}</span>
+          <span className="block truncate font-medium text-gray-900">{capitalizarNombre(l.etiqueta)}</span>
           <span className="text-xs text-gray-400">
             {l.codigo} · bruto ${$(d.totalBruto)}
             {l.noMarcaReloj && ` · ${CHIP_NO_MARCA_RELOJ}`}

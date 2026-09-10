@@ -20,6 +20,12 @@
  *   5. el interruptor de la pestaña dice el efecto y cambia al tocarlo.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🩸 LOS NOMBRES SE MUESTRAN CAPITALIZADOS DESDE EL 10-SEP-2026, y por eso los
+// buscadores de este archivo van sin distinguir mayúsculas. Daniel: *«no me
+// gustan los nombres en planilla de los usuarios todo en mayúscula, arréglalo a
+// capitalización»*. Lo GUARDADO sigue en mayúsculas y ningún número cambia —
+// solo cómo se dibuja— así que lo que estos candados protegen (que la persona
+// aparezca en pantalla, y en qué grupo) no cambió: cambió la grafía.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 
@@ -140,7 +146,7 @@ describe("🔴 el renglón del día dice «Vacaciones», nunca «ausencia»", ()
   it("sin marcar dice «Vacaciones» a secas", async () => {
     servir(conReporte(personaConVacacion(false)));
     montar(<ReporteTab />);
-    fireEvent.click(await screen.findByText(/ELOYN MENDOZA/));
+    fireEvent.click(await screen.findByText(/ELOYN MENDOZA/i));
 
     expect(screen.getAllByText(/Vacaciones/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Vacaciones \(ya pagadas\)/)).toBeNull();
@@ -152,14 +158,14 @@ describe("🔴 el renglón del día dice «Vacaciones», nunca «ausencia»", ()
   it("marcada dice «Vacaciones (ya pagadas)» — el día que NO se paga se ve", async () => {
     servir(conReporte(personaConVacacion(true)));
     montar(<ReporteTab />);
-    fireEvent.click(await screen.findByText(/ELOYN MENDOZA/));
+    fireEvent.click(await screen.findByText(/ELOYN MENDOZA/i));
     expect(screen.getAllByText(/Vacaciones \(ya pagadas\)/).length).toBeGreaterThan(0);
   });
 
   it("🔴 las marcas de ese día se MUESTRAN, con su «(no cuenta)»", async () => {
     servir(conReporte(personaConVacacion(false, ["08:47:00", "18:30:00"])));
     montar(<ReporteTab />);
-    fireEvent.click(await screen.findByText(/ELOYN MENDOZA/));
+    fireEvent.click(await screen.findByText(/ELOYN MENDOZA/i));
     const t = document.body.textContent ?? "";
     expect(t).toContain("08:47:00");
     expect(t).toContain("18:30:00");
@@ -169,7 +175,7 @@ describe("🔴 el renglón del día dice «Vacaciones», nunca «ausencia»", ()
   it("sin marcas no se inventa un «marcó» vacío", async () => {
     servir(conReporte(personaConVacacion(false)));
     montar(<ReporteTab />);
-    fireEvent.click(await screen.findByText(/ELOYN MENDOZA/));
+    fireEvent.click(await screen.findByText(/ELOYN MENDOZA/i));
     expect(document.body.textContent).not.toContain("no cuenta");
   });
 });
@@ -279,7 +285,7 @@ describe("🔴 NADA SE DESCARTA EN SILENCIO — el aviso, en la pantalla", () =>
     ]]);
     montar(<PlanillaTab />);
     elegirPeriodo();
-    await screen.findAllByText(/ELOYN MENDOZA/);
+    await screen.findAllByText(/ELOYN MENDOZA/i);
     expect(screen.queryByText(/ya se le pagó/)).toBeNull();
   });
 
@@ -329,7 +335,7 @@ describe("la pestaña: persona + desde + hasta + un interruptor, y nada más", (
     servir([["/api/asistencia/vacaciones", RESPUESTA_TAB]]);
     montar(<VacacionesTab />);
     // 🔑 Dos veces a propósito: en el desplegable de personas y en la fila.
-    await screen.findAllByText(/ELOYN MENDOZA/);
+    await screen.findAllByText(/ELOYN MENDOZA/i);
     // 16-jul → 13-ago son 29 días de calendario.
     expect(screen.getByText(/16 jul 2026 → 13 ago 2026/).textContent).toContain("29");
   });
@@ -345,7 +351,7 @@ describe("la pestaña: persona + desde + hasta + un interruptor, y nada más", (
     servir([["/api/asistencia/vacaciones", RESPUESTA_TAB]]);
     montar(<VacacionesTab />);
     // 🔑 Dos veces a propósito: en el desplegable de personas y en la fila.
-    await screen.findAllByText(/ELOYN MENDOZA/);
+    await screen.findAllByText(/ELOYN MENDOZA/i);
 
     // El del formulario de carga arranca SIN marcar: el caso normal es que se
     // pagan, y ese default decide una quincena.
@@ -371,7 +377,7 @@ describe("la pestaña: persona + desde + hasta + un interruptor, y nada más", (
     vi.stubGlobal("fetch", espia);
     montar(<VacacionesTab />);
     // 🔑 Dos veces a propósito: en el desplegable de personas y en la fila.
-    await screen.findAllByText(/ELOYN MENDOZA/);
+    await screen.findAllByText(/ELOYN MENDOZA/i);
 
     const casillas = screen.getAllByRole("checkbox") as HTMLInputElement[];
     // La segunda es la de la fila cargada (la primera es la del formulario).
@@ -401,7 +407,7 @@ describe("la pestaña: persona + desde + hasta + un interruptor, y nada más", (
     servir([["/api/asistencia/vacaciones", RESPUESTA_TAB]]);
     montar(<VacacionesTab />);
     // 🔑 Dos veces a propósito: en el desplegable de personas y en la fila.
-    await screen.findAllByText(/ELOYN MENDOZA/);
+    await screen.findAllByText(/ELOYN MENDOZA/i);
     expect(screen.queryByText(/Nota/)).toBeNull();
     expect(screen.queryByText(/Motivo/)).toBeNull();
   });

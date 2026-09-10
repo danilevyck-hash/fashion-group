@@ -183,6 +183,16 @@ export async function POST(req: NextRequest) {
   // plata que se entrega, es plata que ya se perdió, y no anotarla no la
   // devuelve. Y el tope mira la deuda TOTAL (préstamo + daño), no solo la de
   // préstamos.
+  //
+  // 🔴 «DESCUENTO A TERCEROS» TAMPOCO ESPERA APROBACIÓN (10-sep-2026), y no es
+  // un olvido: es una ORDEN EXTERNA —una pensión, un embargo—, no un favor que
+  // Daniel concede. Daniel lo decidió así: la contadora la carga con su total y
+  // su cuota y queda activa al instante. La regla del préstamo NO se tocó: sigue
+  // frenándose sobre el tope y aprobándola solo Daniel.
+  //
+  // ⚠️ Este `if` es lo único que decide quién espera. Agregar el concepto de
+  // terceros acá pondría una orden judicial a esperar un permiso que nadie tiene
+  // por qué dar; hay candado que lo impide.
   let estado = "aprobado";
   let avisoTope: string | null = null;
   if (concepto === CONCEPTO_PRESTAMO) {

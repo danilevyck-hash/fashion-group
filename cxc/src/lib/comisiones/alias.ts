@@ -25,6 +25,7 @@
 
 import { etiquetaVendedor, DEFAULT_VENDEDOR, ETIQUETA_DEFAULT } from "@/lib/comisiones/vendedor-default";
 import { VENDEDOR_TODOS, ROTULO_VENDEDOR_TODOS } from "@/lib/comisiones/vendedor-todos";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 
 /** Una fila de `comision_vendedor_alias`, ya normalizada. */
 export interface AliasVendedor {
@@ -64,7 +65,10 @@ export function nombreVendedorEnPantalla(nombre: string): string {
   if (v === VENDEDOR_TODOS) return ROTULO_VENDEDOR_TODOS;
   if (v === DEFAULT_VENDEDOR) return etiquetaVendedor(v);
   if (v === ETIQUETA_DEFAULT) return ETIQUETA_DEFAULT;
-  return v
-    .toLocaleLowerCase("es")
-    .replace(/(^|[\s\-'])(\p{L})/gu, (_m, sep: string, letra: string) => sep + letra.toLocaleUpperCase("es"));
+  // 🔑 El capitalizador vive en `lib/nombre-en-pantalla.ts` desde el
+  // 10-sep-2026 y lo comparte con la Planilla: dos formas de capitalizar un
+  // nombre es cómo la misma persona termina escrita distinto en dos pantallas.
+  // Los casos propios de VENDEDOR (el comodín, el DEFAULT de Switch) se quedan
+  // acá arriba, que es donde significan algo.
+  return capitalizarNombre(v);
 }

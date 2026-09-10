@@ -150,3 +150,33 @@ export function vePestana(rol: string, pestana: string): boolean {
     ? aprobacionesRoles().includes(rol)
     : (ASISTENCIA_ROLES as readonly string[]).includes(rol);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 QUIÉN CIERRA LA QUINCENA
+//
+// Daniel: cerrar la quincena es la firma de un pago, y quien arma la planilla es
+// la contadora. La secretaria puede generar el cuadro y mirarlo —eso ya lo hace
+// hoy y no se le quita— pero no puede cerrarlo ni reabrirlo.
+//
+// ⚠️ SE DERIVA DE `ASISTENCIA_ROLES`, no se escribe suelta. Una cuarta lista de
+// roles que haya que acordarse de tocar es exactamente el bug que este archivo
+// vino a matar.
+//
+// 🩸 VIVÍA EN `planilla-guardada.ts` HASTA EL 10-SEP-2026. Se mudó acá —a la
+// casa de las listas de roles, que no importa a nadie— porque
+// `aprobador-empresa.ts` necesita preguntarle «¿este rol cierra?» y desde allá
+// habría sido un ciclo de imports. `planilla-guardada` la re-exporta, así que
+// ningún llamador cambió.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Entra a Asistencia, pero NO cierra la quincena. */
+export const MIRAN_PERO_NO_CIERRAN = ["secretaria"] as const;
+
+export function cerrarPlanillaRoles(): string[] {
+  const noCierran = new Set<string>(MIRAN_PERO_NO_CIERRAN);
+  return asistenciaRoles().filter((r) => !noCierran.has(r));
+}
+
+export function puedeCerrar(rol: string): boolean {
+  return cerrarPlanillaRoles().includes(rol);
+}

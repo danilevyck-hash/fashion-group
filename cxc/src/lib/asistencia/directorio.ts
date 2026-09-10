@@ -34,6 +34,7 @@
  * Módulo PURO: sin base, sin red. El I/O vive en `config-server.ts`.
  * ────────────────────────────────────────────────────────────────────────── */
 
+
 /** Una fila de `asistencia_personas`, con lo mínimo que el directorio usa. */
 export interface FichaNombre {
   empleado_codigo: string;
@@ -65,6 +66,14 @@ const limpio = (v: unknown): string | null => {
  * blanco, y una celda en blanco no se puede ni buscar ni reclamar.
  */
 export function etiquetaPersona(codigo: string, nombre?: string | null): string {
+  // ⚠️ ACÁ NO SE CAPITALIZA, Y ES A PROPÓSITO (10-sep-2026). `etiqueta` la usan
+  // TODAS las pantallas del módulo —Reporte, Vacaciones, Justificaciones,
+  // Aprobaciones— y Daniel pidió el cambio para la PLANILLA. Capitalizar acá
+  // habría movido el texto de media docena de superficies que él no miró.
+  //
+  // 🔴 Lo hace `capitalizarNombre` en cada superficie de Planilla: la lista, la
+  // ficha, la pestaña Préstamos, el comprobante y el Excel. Ver
+  // `lib/nombre-en-pantalla.ts` — el capitalizador es UNO solo.
   return limpio(nombre) ?? String(codigo ?? "").trim();
 }
 

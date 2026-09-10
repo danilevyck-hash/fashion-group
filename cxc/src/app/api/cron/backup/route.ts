@@ -256,6 +256,9 @@ const DATASETS: Dataset[] = [
   // dos veces cobre dos veces: sin él, un restore volvería a descontarle a
   // la gente una plata que ya se le había descontado.
   { table: "asistencia_planilla_prestamo" },
+  // Los códigos escondidos: lo decide una persona y no se re-deriva de nada.
+  // ⚠️ Su PK es `empleado_codigo`, no `id`.
+  { table: "asistencia_codigos_ignorados" },
   { table: "asistencia_dispositivos" },
   // Gastos y banco. bancos_saldos lo escribe contabilidad A MANO; egresos_varios
   // lo baja un sync pero se REEMPLAZA mes a mes (`egresos_reemplazar_mes`), así
@@ -436,6 +439,7 @@ const ORDER_BY: Record<string, string[]> = {
   asistencia_prestamo_aprobado: ["quincena", "empleado_codigo"],
   asistencia_reparto_empresa: ["empleado_codigo", "empresa"],
   asistencia_aprobador_empresa: ["usuario", "empresa"],
+  asistencia_codigos_ignorados: ["empleado_codigo"],
   asistencia_feriados: ["fecha"],
   asistencia_dispositivos: ["dispositivo"],
   comision_vendedor_alias: ["nombre_switch"],

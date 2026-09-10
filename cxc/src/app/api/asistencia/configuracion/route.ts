@@ -61,6 +61,9 @@ import { COLUMNA_NO_MARCA_RELOJ, validarNoMarcaReloj } from "@/lib/asistencia/su
 import { COLUMNA_BASE_SEGUROS, validarBaseSeguros } from "@/lib/asistencia/seguros-base";
 // El cargo y la cédula del comprobante de pago. Ver `datos-del-papel.ts`.
 import { cedulaDeFicha, posicionDeFicha, COLUMNA_CEDULA, COLUMNA_POSICION } from "@/lib/asistencia/datos-del-papel";
+import { puedeCerrar } from "@/lib/asistencia/roles";
+import { sinIgnorados } from "@/lib/asistencia/codigos-ignorados";
+import { leerIgnorados } from "@/lib/asistencia/codigos-ignorados-server";
 import {
   COLS_SALDO_VACACIONES,
   numeroDeDias,
@@ -320,14 +323,27 @@ export async function GET(req: NextRequest) {
       return compararPersonas(pa, pb);
     });
 
+    // ── 🔴 LOS CÓDIGOS IGNORADOS NO SALEN, NI SE CUENTAN ──────────────────
+    //
+    // Se filtra ACÁ, una sola vez, y con eso desaparecen de la lista, de «N sin
+    // terminar», del aviso amarillo y de cualquier conteo — que es exactamente
+    // lo que Daniel pidió. Filtrarlo en la pantalla habría dejado los números de
+    // arriba contando lo que ya no se ve.
+    //
+    // ⚠️ La FILA no se borra: se esconde. Ver `codigos-ignorados.ts`.
+    const escondidos = await leerIgnorados();
+    const personasVisibles = sinIgnorados(personas, escondidos.codigos);
+
     // 🩸 EL RESUMEN CUENTA SOLO A LOS ACTIVOS. El aviso de pendientes dice
     // «X de N todavía no salen en la planilla», y quien ya no trabaja acá no es
     // trabajo pendiente de nadie: meterlo en la N infla para siempre un número
     // que la contable usa para saber cuánto le falta.
-    const activos = personas.filter((p) => p.activo);
+    const activos = personasVisibles.filter((p) => p.activo);
 
     return NextResponse.json({
-      personas,
+      personas: personasVisibles,
+      // Los escondidos viajan aparte, para el bloque plegado que los devuelve.
+      ignorados: escondidos.lista,
       reglas,
       reglasDefault: REGLAS_DEFAULT,
       resumen: {
@@ -336,7 +352,7 @@ export async function GET(req: NextRequest) {
         sinSalario: activos.filter((p) => p.faltaSalario).length,
         conMarcaciones: activos.filter((p) => p.marcaciones > 0).length,
         /** Los que ya no trabajan acá. Se ven aparte, no mezclados. */
-        bajas: personas.length - activos.length,
+        bajas: personasVisibles.length - activos.length,
         /** Marcan y no van en planilla. No son pendientes de nadie. */
         servicioProfesional: activos.filter((p) => p.servicioProfesional).length,
         /** Cobran fijo y no pasan por el reloj. Tampoco son pendientes. */
@@ -510,11 +526,24 @@ export async function PUT(req: NextRequest) {
   // upsert por eso mismo, y por eso vacío se guarda como `null` y nunca como
   // `""` (la base tiene un CHECK que lo rechaza, y con razón: una cadena vacía
   // es un dato cargado que no dice nada).
-  const conPapel = {
-    ...conBaseSeguros,
-    [COLUMNA_POSICION]: posicionDeFicha((body as Record<string, unknown> | null)?.posicion),
-    [COLUMNA_CEDULA]: cedulaDeFicha((body as Record<string, unknown> | null)?.cedula),
-  };
+  // 🔴 EL CARGO Y LA CÉDULA LOS EDITAN DANIEL Y LA CONTADORA, NADIE MÁS
+  // (10-sep-2026). Daniel: las fichas las tocan él y la contadora; la secretaria
+  // solo mira. Se pregunta por lo que HACE el rol —quien cierra la planilla— y
+  // no por su nombre, que es la misma lista derivada de siempre.
+  //
+  // ⚠️ Si quien guarda no puede, sus dos campos NO VIAJAN al upsert: se
+  // conserva lo que había. No se rechaza el guardado entero —la secretaria sí
+  // puede seguir corrigiendo el nombre o el salario— pero tampoco se le escribe
+  // en silencio un cargo que no le corresponde tocar.
+  const puedeTocarLaFicha = puedeCerrar(String(auth.role ?? ""));
+  const b = body as Record<string, unknown> | null;
+  const conPapel = puedeTocarLaFicha
+    ? {
+      ...conBaseSeguros,
+      [COLUMNA_POSICION]: posicionDeFicha(b?.posicion),
+      [COLUMNA_CEDULA]: cedulaDeFicha(b?.cedula),
+    }
+    : conBaseSeguros;
 
   // ── UN solo upsert, con TODAS las columnas ──────────────────────────────────
   //

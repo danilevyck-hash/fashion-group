@@ -26,6 +26,12 @@
  * en modo `inline`, pone ahí el botón «Generar».
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🩸 LOS NOMBRES SE MUESTRAN CAPITALIZADOS DESDE EL 10-SEP-2026, y por eso los
+// buscadores de este archivo van sin distinguir mayúsculas. Daniel: *«no me
+// gustan los nombres en planilla de los usuarios todo en mayúscula, arréglalo a
+// capitalización»*. Lo GUARDADO sigue en mayúsculas y ningún número cambia —
+// solo cómo se dibuja— así que lo que estos candados protegen (que la persona
+// aparezca en pantalla, y en qué grupo) no cambió: cambió la grafía.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
 
@@ -160,7 +166,7 @@ function generar() {
   fireEvent.click(screen.getAllByRole("button", { name: /^Generar$/ })[0]);
 }
 
-const cuadroEnPantalla = () => screen.findAllByText(/ALEJANDRA CAMAÑO/);
+const cuadroEnPantalla = () => screen.findAllByText(/ALEJANDRA CAMAÑO/i);
 
 beforeEach(() => {
   vi.unstubAllGlobals();
@@ -342,7 +348,7 @@ describe("🔴 LOS FRENOS Y EL SOLAPAMIENTO SE VEN DISTINTO", () => {
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cerrar quincena" }));
 
     expect(await screen.findByText(/No se puede cerrar la quincena todavía/)).toBeTruthy();
-    expect(screen.getByText(/BRICEIDA MONTERO/)).toBeTruthy();
+    expect(screen.getByText(/BRICEIDA MONTERO/i)).toBeTruthy();
     const ir = screen.getByRole("link", { name: /Ir a Aprobaciones/ });
     expect(ir.getAttribute("href")).toBe("/asistencia?tab=aprobaciones");
   });

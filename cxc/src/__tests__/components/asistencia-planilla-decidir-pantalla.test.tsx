@@ -17,6 +17,12 @@
  *   4. el código sin ficha se dice UNA vez arriba y no aparece en el cuadro.
  * ─────────────────────────────────────────────────────────────────────────────
  */
+// 🩸 LOS NOMBRES SE MUESTRAN CAPITALIZADOS DESDE EL 10-SEP-2026, y por eso los
+// buscadores de este archivo van sin distinguir mayúsculas. Daniel: *«no me
+// gustan los nombres en planilla de los usuarios todo en mayúscula, arréglalo a
+// capitalización»*. Lo GUARDADO sigue en mayúsculas y ningún número cambia —
+// solo cómo se dibuja— así que lo que estos candados protegen (que la persona
+// aparezca en pantalla, y en qué grupo) no cambió: cambió la grafía.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 
@@ -170,7 +176,7 @@ describe("🔴 arreglo 1 · el aviso del período sin terminar se ve arriba", ()
     servir(r);
     montar();
     elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(screen.queryByText(/todavía no termina/)).toBeNull();
   });
 });
@@ -181,7 +187,7 @@ describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", ()
     servir(respuesta());
     montar();
     elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     const fila = screen.getAllByText(
       /Trabajo fuera de la oficina del 1 ago 2026 al 13 ago 2026/,
     )[0];
@@ -193,7 +199,7 @@ describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", ()
     servir(respuesta());
     montar();
     elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     const fila = screen.getAllByText(/entró el 10 de agosto de 2026/)[0];
     expect(fila.textContent).toContain("300.00");
     // 🔴 Ni $133,34 ni ningún otro número inventado en su renglón.
@@ -204,7 +210,7 @@ describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", ()
     servir(respuesta());
     montar();
     elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     const resumen = screen.getByText(/Tú decides:/).parentElement!;
     expect(resumen.textContent).toContain("no hay nada que arreglar");
     expect(resumen.textContent).not.toContain("Configuración");
@@ -216,9 +222,9 @@ describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", ()
     servir(respuesta());
     montar();
     elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     for (const t of ["RODRIGO MIRANDA", "ELOYN MENDOZA", "YEISHKA IRENE DIAZ MARKHAM"]) {
-      const fila = screen.getAllByText(new RegExp(t))[0].closest("tr, div")!;
+      const fila = screen.getAllByText(new RegExp(t, "i"))[0].closest("tr, div")!;
       expect(fila.textContent).not.toContain("falta configurar");
     }
   });
@@ -227,7 +233,7 @@ describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", ()
     servir(respuesta());
     montar();
     elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     const resumen = screen.getByText(/Falta un dato:/).parentElement!;
     expect(resumen.textContent).toContain("Configuración");
     expect(screen.getAllByText(/falta configurar — falta el salario/).length).toBeGreaterThan(0);
@@ -237,7 +243,7 @@ describe("🔴 arreglo 2 y 3 · «Tú decides» es su propio grupo, en gris", ()
     servir(respuesta());
     montar();
     elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(screen.getByText(/Tú decides:/)).toBeTruthy();
     expect(screen.getByText(/Falta un dato:/)).toBeTruthy();
   });
@@ -257,7 +263,7 @@ describe("🔴 arreglo 3 · el código sin ficha, una sola vez y fuera del cuadr
     servir(respuesta());
     montar();
     elegirPeriodo();
-    await screen.findAllByText(/ALEJANDRA CAMAÑO/);
+    await screen.findAllByText(/ALEJANDRA CAMAÑO/i);
     expect(screen.getAllByText(/no tiene ficha \(código 50\)/)).toHaveLength(1);
     // Y no quedó ninguna fila suya adentro del cuadro.
     expect(screen.queryByText(/sin ficha en Configuración/)).toBeNull();

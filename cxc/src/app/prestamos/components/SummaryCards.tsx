@@ -26,7 +26,7 @@ interface Props {
   saldoPrestamo: number;
   saldoDano: number;
   cuotaPrestamo: number;
-  cuotaDano: number;
+  cuotaTerceros: number;
   prestado: number;
   pagado: number;
   saldo: number;
@@ -36,13 +36,14 @@ interface Props {
 }
 
 export default function SummaryCards({
-  saldoPrestamo, saldoDano, cuotaPrestamo, cuotaDano, prestado, pagado, saldo, pct, pendiente, quincenaEstado,
+  saldoPrestamo, saldoDano, cuotaPrestamo, cuotaTerceros, prestado, pagado, saldo, pct, pendiente, quincenaEstado,
 }: Props) {
   const saldoColor = saldo > 0 ? "text-red-600" : saldo < 0 ? "text-blue-600" : "text-gray-400";
   const dosCuentas = saldoPrestamo !== 0 && saldoDano !== 0;
   const cuotas = [
     cuotaPrestamo > 0 ? `Préstamo $${fmt(cuotaPrestamo)}` : null,
-    cuotaDano > 0 ? `Daño $${fmt(cuotaDano)}` : null,
+    // 🔴 El daño ya no lleva cuota: la contadora escribe su monto cada quincena.
+    cuotaTerceros > 0 ? `Terceros $${fmt(cuotaTerceros)}` : null,
   ].filter(Boolean).join(" · ");
 
   return (

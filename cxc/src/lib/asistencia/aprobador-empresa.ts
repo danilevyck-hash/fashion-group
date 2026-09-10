@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { EMPRESAS_ASISTENCIA } from "./config";
+import { puedeCerrar } from "./roles";
 
 /** Una fila de `asistencia_aprobador_empresa`. */
 export interface AsignacionAprobador {
@@ -46,6 +47,29 @@ export function alcanceDe(
   filas: readonly AsignacionAprobador[],
 ): AlcanceAprobador {
   if (rol === "admin") return { empresas: null, faltaTabla: false };
+  // 🔴 QUIEN CIERRA LA PLANILLA VE LAS TRES EMPRESAS, BOSTON INCLUIDA.
+  //
+  // Daniel, 10-sep-2026: *«una sola persona cierra todo»* — la contadora arma y
+  // cierra la planilla de las tres. Este reparto nació para los APROBADORES de
+  // horas extra (🩸 Julio había aprobado 57 días de Boston que no le tocaban) y
+  // para ellos sigue igual; pero segmentar a quien firma el pago de las tres
+  // empresas es dejar su alcance colgando de una fila de configuración que, si
+  // alguien borra, le quita Boston EN SILENCIO.
+  //
+  // ⚠️ Se pregunta por lo que HACE el rol (`puedeCerrar`), no por su nombre:
+  // así el día que entre otro rol que cierre, esto no hay que acordárselo.
+  if (puedeCerrar(rol)) return { empresas: null, faltaTabla: false };
+  // 🔴 QUIEN CIERRA LA PLANILLA VE LAS TRES EMPRESAS, BOSTON INCLUIDA.
+  //
+  // Daniel, 10-sep-2026: *«una sola persona cierra todo»* — la contadora arma y
+  // cierra la planilla de las tres. Este reparto nació para los APROBADORES de
+  // horas extra (🩸 Julio había aprobado 57 días de Boston que no le tocaban) y
+  // para ellos sigue igual; pero segmentar a quien firma el pago de las tres
+  // empresas es dejar su alcance colgando de una fila de configuración que, si
+  // alguien borra, le quita Boston EN SILENCIO.
+  //
+  // ⚠️ Se pregunta por lo que HACE el rol (`puedeCerrar`), no por su nombre:
+  // así el día que entre otro rol que cierre, esto no hay que acordárselo.
   // Historia: había un cuarto parámetro `faltaTabla` y con él en `true` NADIE
   // quedaba segmentado (fail-open el día del deploy, por una migración que en
   // este repo tardaba días). Tolerancia retirada el 3-sep-2026: la tabla existe

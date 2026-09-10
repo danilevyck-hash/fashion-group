@@ -155,8 +155,21 @@ describe("🔴 lo que ESPERA APROBACIÓN no suma al saldo, pero se ve", () => {
 });
 
 describe("🔴 tres conceptos se ofrecen, cinco se siguen contando", () => {
-  it("el formulario ofrece TRES", () => {
-    expect([...CONCEPTOS_OFRECIDOS]).toEqual(["Préstamo", "Responsabilidad por daño", "Pago"]);
+  // 🩸 SON CUATRO DESDE EL 10-SEP-2026, y este candado cambió de dirección, no
+  // se borró. La contadora pidió una TERCERA cuenta: *«los descuentos a
+  // terceros debe ser manejado igual como un préstamo permitiendo colocar un
+  // monto inicial y un monto a descontar quincenal»*. El cargo de esa cuenta es
+  // el concepto nuevo.
+  //
+  // 🔑 LA REGLA QUE PROTEGE NO CAMBIÓ: la lista es CERRADA y los valores viejos
+  // no se renombran. Los dos retirados siguen retirados.
+  it("el formulario ofrece CUATRO, y los dos retirados siguen afuera", () => {
+    expect([...CONCEPTOS_OFRECIDOS]).toEqual([
+      "Préstamo", "Responsabilidad por daño", "Descuento a terceros", "Pago",
+    ]);
+    for (const r of CONCEPTOS_RETIRADOS) {
+      expect(CONCEPTOS_OFRECIDOS as readonly string[]).not.toContain(r);
+    }
   });
 
   it("🔴 «Daño de mercancía» es una ETIQUETA, no un valor guardado", () => {

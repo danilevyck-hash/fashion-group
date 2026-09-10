@@ -36,6 +36,7 @@
 import type { HorasPersona, LineaPlanilla } from "./planilla";
 import { centavos, minutosTardanzaMostrados } from "./planilla";
 import { fmtMin } from "./reporte";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 
 /**
  * 🔴 EL NOMBRE DE LA EMPRESA ES LO ÚNICO QUE CAMBIA DE UN COMPROBANTE A OTRO.
@@ -122,10 +123,12 @@ export interface RenglonComprobante {
  * empresa: el día que alguien quiera esconder un renglón, tiene que borrarlo de
  * acá y el candado se pone rojo.
  *
- * `DESCUENTO POR COMPRAS` no tiene ninguna fuente de datos en el sistema, así
- * que hoy sale SIEMPRE en 0.00. No es un olvido: es el renglón del papel de la
- * contadora, y dibujarlo en cero es exactamente lo que Daniel pidió. El día que
- * se cargue de algún lado, cambia el origen y no el papel.
+ * 🩸 `DESCUENTO POR COMPRAS` SE RETIRÓ el 10-sep-2026. Daniel, textual:
+ * *«olvida descuento por compras»*. Estuvo dibujado en 0.00 desde que existe
+ * este papel porque no tenía NINGUNA fuente de datos en el sistema — un renglón
+ * que siempre dice cero no informa nada, solo alarga la hoja. Los otros
+ * renglones en cero SÍ se quedan: ésos sí tienen de dónde salir el día que
+ * alguien los use.
  */
 export const CLAVES_RENGLON = [
   "salarioQuincenal",
@@ -145,7 +148,6 @@ export const CLAVES_RENGLON = [
   "__descuentos",
   "prestamo",
   "terceros",
-  "compras",
   "mercancia",
   "ajusteAnterior",
   "totalDescuentos",
@@ -249,9 +251,8 @@ export function armarComprobante(
   const v = (x: number | null | undefined) => (d ? n2(x) : 0);
 
   const totalDeducciones = centavos(v(d?.seguroSocial) + v(d?.seguroEducativo) + v(d?.isr));
-  const compras = 0; // sin fuente de datos hoy — ver la nota de CLAVES_RENGLON
   const totalDescuentos = centavos(
-    v(d?.prestamo) + v(d?.terceros) + compras + v(d?.mercancia) + ajuste,
+    v(d?.prestamo) + v(d?.terceros) + v(d?.mercancia) + ajuste,
   );
   // 🔴 El neto del papel = el neto de la planilla, menos el ajuste. El ajuste es
   // lo ÚNICO que este módulo le puede mover al neto, y solo porque es un
@@ -288,7 +289,6 @@ export function armarComprobante(
     R("__descuentos", "DESCUENTOS :", null, "seccion", false),
     R("prestamo", "PRESTAMO", v(d?.prestamo), "dato", true),
     R("terceros", "DESCUENTO A TERCEROS", v(d?.terceros), "dato", true),
-    R("compras", "DESCUENTO POR COMPRAS", compras, "dato", true),
     R("mercancia", "DAÑO DE MERCANCIA", v(d?.mercancia), "dato", true),
     R("ajusteAnterior", "AJUSTE QUINCENA ANTERIOR", ajuste, "dato", true),
     R("totalDescuentos", "TOTAL DE DESCUENTOS", totalDescuentos, "total", true),
@@ -301,7 +301,11 @@ export function armarComprobante(
     empresa,
     titulo,
     encabezado: ["PLANILLA QUINCENAL", "COMPROBANTE DE PAGO", titulo],
-    empleado: linea.nombre?.trim() || linea.etiqueta,
+    // 🔴 CAPITALIZADO (10-sep-2026). `linea.nombre` es el crudo de la ficha,
+    // que está guardado en MAYÚSCULAS; `etiqueta` ya viene capitalizada. Se
+    // pasa igual por el capitalizador para que el papel diga lo mismo por los
+    // dos caminos. Lo guardado no se toca.
+    empleado: capitalizarNombre(linea.nombre) || linea.etiqueta,
     // Sin cargo cargado se dice que falta; no se escribe un cargo inventado.
     posicion: String(datos.posicion ?? "").trim() || "—",
     rataPorHora: v(d?.rataHora),
@@ -321,5 +325,21 @@ export function armarComprobante(
 export function lineasConComprobante(
   lineas: readonly LineaPlanilla[],
 ): readonly LineaPlanilla[] {
-  return lineas.filter((l) => !!l.dinero);
+  // 🔴 ORDEN ESTABLE, POR NOMBRE. Daniel pidió *«un solo PDF con todos los de
+  // la empresa»* para imprimirlos de una: si el orden cambiara entre dos
+  // corridas, la tanda impresa de hoy no se podría comparar con la de ayer y
+  // buscar la hoja de alguien sería a ojo.
+  //
+  // ⚠️ Se compara con `localeCompare("es")` —la Ñ y los acentos en su lugar— y
+  // el CÓDIGO desempata: dos personas con el mismo nombre no pueden quedar en
+  // un orden que dependa de cómo vino el array.
+  return lineas
+    .filter((l) => !!l.dinero)
+    .slice()
+    .sort((a, b) => {
+      const na = (a.nombre ?? a.etiqueta).trim();
+      const nb = (b.nombre ?? b.etiqueta).trim();
+      const c = na.localeCompare(nb, "es");
+      return c !== 0 ? c : a.codigo.localeCompare(b.codigo, "es");
+    });
 }

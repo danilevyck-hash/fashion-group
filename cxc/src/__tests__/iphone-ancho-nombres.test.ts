@@ -160,8 +160,14 @@ describe("Préstamos — los chips bajan a la línea 2 en mobile y iPad", () => 
     expect(prestamos).toContain("flex items-center gap-2 sm:gap-4 rounded-lg border p-3 sm:px-4");
   });
 
+  // ⚠️ Lo que este candado protege son las CLASES, no la expresión: el nombre
+  // se muestra capitalizado desde el 10-sep-2026 (Daniel: *«no me gustan los
+  // nombres … todo en mayúscula»*) y eso no cambia ni el ancho ni el cuerpo de
+  // la letra. Se comprueba la clase y que el campo siga siendo el nombre.
   it("el nombre usa tracking-tight (sin bajar el cuerpo de la letra)", () => {
-    expect(prestamos).toContain('<span data-empleado-campo="nombre" className="font-medium truncate tracking-tight">{emp.nombre}</span>');
+    expect(prestamos).toMatch(
+      /<span data-empleado-campo="nombre" className="font-medium truncate tracking-tight">\{[^}]*emp\.nombre[^}]*\}<\/span>/,
+    );
   });
 
   it("el saldo y el menú de acciones no se tocaron", () => {

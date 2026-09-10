@@ -65,12 +65,30 @@ export const MOTIVO_TRABAJO_VENDEDOR = "Trabajo de vendedor";
  */
 export const MOTIVO_TRABAJO_FUERA_ANTES = "Trabajo fuera de la oficina";
 
-/** Los cuatro que la pantalla ofrece. */
+/**
+ * 🔴 «CONSTANCIA» — el quinto, desde el 10-sep-2026.
+ *
+ * Daniel, textual: *«los que están en el módulo todos se deben de pagar si se
+ * seleccionó, solo es agregar constancia. No hagamos justificar que no pague,
+ * ensucia.»*
+ *
+ * Es para CUALQUIER constancia oficial —un juzgado, la escuela, un trámite— y
+ * se paga igual que los otros cuatro: el rango justificado no se descuenta.
+ *
+ * ⛔ Y ES TODO LO QUE SE AGREGÓ. No existe —ni se va a crear— un motivo
+ * «justificado pero no se paga»: Daniel lo descartó por nombre. En este módulo
+ * justificar SIGNIFICA que no se descuenta, y un motivo que justifica sin pagar
+ * volvería ambigua la única palabra con la que se decide un pago.
+ */
+export const MOTIVO_CONSTANCIA = "Constancia";
+
+/** Los cinco que la pantalla ofrece. */
 export const MOTIVOS_JUSTIFICACION = [
   "Incapacidad",
   "Catástrofe",
   "Escolares",
   MOTIVO_TRABAJO_VENDEDOR,
+  MOTIVO_CONSTANCIA,
 ] as const;
 
 /**

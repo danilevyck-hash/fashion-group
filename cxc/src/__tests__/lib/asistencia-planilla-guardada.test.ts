@@ -365,7 +365,10 @@ describe("lo que llega se valida acá, no en el llamador", () => {
   it("🔴 sin empresa NO se guarda: el cuadro sería de las tres a la vez", () => {
     expect(validarGuardado("", "2026-08-01", "2026-08-15").ok).toBe(false);
     expect(validarGuardado(null, "2026-08-01", "2026-08-15").ok).toBe(false);
-    expect(validarGuardado("american_classic", "2026-08-01", "2026-08-15").ok).toBe(false);
+    // 🩸 Era `american_classic`; entró a Asistencia el 10-sep-2026. La ajena
+    // de hoy es otra — la regla («lo que no está en la lista se rechaza») no
+    // cambió.
+    expect(validarGuardado("joystep", "2026-08-01", "2026-08-15").ok).toBe(false);
   });
 
   it("una fecha que no existe se rechaza", () => {
@@ -444,9 +447,16 @@ describe("🔴 la migración sostiene lo que el código promete", () => {
     expect(SQL).toMatch(/CREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS[\s\S]*\(empresa,\s*desde,\s*hasta,\s*version\)/i);
   });
 
+  // 🩸 La migración original trae TRES y la de ACS reescribe el CHECK con las
+  // CUATRO. Se leen las dos, y se sigue exigiendo que NO haya empresas de más.
   it("el CHECK de empresas es EXACTAMENTE `EMPRESAS_ASISTENCIA`", () => {
-    for (const e of EMPRESAS_ASISTENCIA) expect(SQL).toContain(`'${e}'`);
-    expect(SQL).not.toContain("'american_classic'");
+    const acs = readFileSync(
+      path.join(process.cwd(), "supabase/migrations/20261031120000_acs_cuarta_empresa.sql"), "utf-8");
+    for (const e of EMPRESAS_ASISTENCIA) expect(SQL + acs).toContain(`'${e}'`);
+    // Ninguna empresa del grupo que NO sea del módulo se coló en el CHECK.
+    for (const ajena of ["'joystep'", "'active_shoes'", "'active_wear'"]) {
+      expect(SQL + acs).not.toContain(ajena);
+    }
   });
 
   it("los tres estados de la máquina están en el CHECK", () => {

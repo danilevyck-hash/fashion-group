@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
   const codigo = String(body?.empleado_codigo ?? "").trim();
   const cuotaPrestamo = Number(body?.deduccion_quincenal) || 0;
   const cuotaDano = Number(body?.deduccion_dano) || 0;
+  const cuotaTerceros = Number(body?.deduccion_terceros) || 0;
 
   if (!codigo) {
     return NextResponse.json(
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
       empleado_codigo: codigo,
       deduccion_quincenal: cuotaPrestamo,
       deduccion_dano: cuotaDano,
+      deduccion_terceros: cuotaTerceros,
     })
     .select()
     .single();

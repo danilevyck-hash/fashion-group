@@ -39,6 +39,29 @@ ARCHIVOS=(
   "src/lib/asistencia/planilla-guardada.ts"
   "src/lib/asistencia/planilla-guardada-server.ts"
   "src/app/api/asistencia/planilla/route.ts"
+  "src/lib/prestamos-saldo.ts"
+  "src/lib/prestamos-conceptos.ts"
+  "src/lib/asistencia/prestamos-planilla.ts"
+  "src/lib/asistencia/prestamos-planilla-server.ts"
+  "src/lib/asistencia/motivos.ts"
+  "src/lib/asistencia/roles.ts"
+  "src/lib/asistencia/aprobador-empresa.ts"
+  "src/lib/asistencia/directorio.ts"
+  "src/lib/asistencia/planilla-exportar.ts"
+  "src/lib/nombre-en-pantalla.ts"
+  "src/lib/comisiones/alias.ts"
+  "src/app/api/asistencia/configuracion/route.ts"
+  "src/app/api/prestamos/movimientos/route.ts"
+  "src/app/prestamos/components/EditEmpleadoModal.tsx"
+  "supabase/migrations/20261029120000_terceros_tercera_cuenta.sql"
+  "supabase/migrations/20261030120000_codigos_ignorados.sql"
+  "supabase/migrations/20261031120000_acs_cuarta_empresa.sql"
+  "src/lib/asistencia/codigos-ignorados.ts"
+  "src/lib/asistencia/codigos-ignorados-server.ts"
+  "src/app/api/asistencia/codigos-ignorados/route.ts"
+  "src/app/asistencia/ConfiguracionTab.tsx"
+  "src/app/asistencia/EstadoReloj.tsx"
+  "src/lib/asistencia/config.ts"
 )
 for f in "${ARCHIVOS[@]}"; do
   mkdir -p "$RESPALDO/$(dirname "$f")"
@@ -51,13 +74,25 @@ TESTS="src/__tests__/lib/planilla-unida-comprobante.test.ts \
 src/__tests__/lib/planilla-unida-cierre-prestamo.test.ts \
 src/__tests__/lib/planilla-unida-corte-y-cableado.test.ts \
 src/__tests__/lib/asistencia-pestanas.test.ts \
-src/__tests__/lib/backup-nada-sin-copia.test.ts"
+src/__tests__/lib/backup-nada-sin-copia.test.ts \
+src/__tests__/lib/planilla-tres-descuentos.test.ts \
+src/__tests__/lib/asistencia-prestamo-planilla.test.ts \
+src/__tests__/lib/prestamos-dos-cuentas.test.ts \
+src/__tests__/lib/asistencia-config.test.ts"
 
 CAZADAS=0; TOTAL=0; ESCAPADAS=()
 
 # $1 = qué se rompe · $2 = archivo · $3 = python de la mutación
 mutar() {
   local nombre="$1" archivo="$2" py="$3"
+  # 🩸 SIN ESTE FRENO, UN ARCHIVO QUE NO ESTÁ EN `ARCHIVOS` SE MUTA Y NO SE
+  # RESTAURA NUNCA: `restaurar` solo devuelve lo que respaldó. Ya pasó — doce
+  # archivos quedaron mutados y 75 candados en rojo, y el script decía que todo
+  # había sido restaurado.
+  if [ ! -f "$RESPALDO/$archivo" ]; then
+    echo "  ⛔ $nombre — «$archivo» NO está en ARCHIVOS: se aborta para no dejarlo mutado."
+    exit 1
+  fi
   TOTAL=$((TOTAL + 1))
   restaurar
   if ! python3 - "$archivo" <<PY
@@ -100,7 +135,7 @@ mutar "el ajuste se suma a AUSENCIA en vez de ir en su renglón" src/lib/asisten
               '"'"'R("ausencia", "AUSENCIA", centavos(v(d?.ausencias) + ajuste), "dato", false),'"'"')
 s = s.replace("    v(d?.prestamo) + v(d?.terceros) + compras + v(d?.mercancia) + ajuste,", "    v(d?.prestamo) + v(d?.terceros) + compras + v(d?.mercancia),")'
 mutar "el total de descuentos deja de incluir la mercancía" src/lib/asistencia/comprobante.ts \
-  's = s.replace("v(d?.prestamo) + v(d?.terceros) + compras + v(d?.mercancia) + ajuste,", "v(d?.prestamo) + v(d?.terceros) + compras + ajuste,")'
+  's = s.replace("v(d?.prestamo) + v(d?.terceros) + v(d?.mercancia) + ajuste,", "v(d?.prestamo) + v(d?.terceros) + ajuste,")'
 mutar "«otros servicios» se resta en vez de sumar" src/lib/asistencia/comprobante.ts \
   's = s.replace("  const salarioAPagar = centavos(v(d?.netoPagar) - ajuste);", "  const salarioAPagar = centavos(v(d?.netoPagar) - ajuste - 2 * v(d?.otrosServicios));")'
 mutar "una empresa desconocida sale con el nombre de Fashion Wear" src/lib/asistencia/comprobante.ts \
@@ -110,7 +145,7 @@ mutar "un rango libre se disfraza de I QUINCENA" src/lib/asistencia/comprobante.
 mutar "sin cargo cargado se inventa un cargo" src/lib/asistencia/comprobante.ts \
   's = s.replace('"'"'String(datos.posicion ?? "").trim() || "—",'"'"', '"'"'String(datos.posicion ?? "").trim() || "Colaborador",'"'"')'
 mutar "se le hace comprobante a quien no produjo dinero" src/lib/asistencia/comprobante.ts \
-  's = s.replace("  return lineas.filter((l) => !!l.dinero);", "  return lineas;")'
+  's = s.replace("    .filter((l) => !!l.dinero)", "    .filter(() => true)")'
 mutar "el PDF junta a todos en una sola hoja" src/lib/asistencia/comprobante-pdf.ts \
   's = s.replace("    if (i > 0) doc.addPage();", "")'
 mutar "el PDF se salta los renglones en cero" src/lib/asistencia/comprobante-pdf.ts \
@@ -120,13 +155,9 @@ mutar "el PDF deja de imprimir el pie que se firma" src/lib/asistencia/comproban
 
 echo "── EL PAGO DEL PRÉSTAMO ────────────────────────────────────────────────"
 mutar "escribe el pago aunque el módulo ya lo tenía (cobra dos veces)" src/lib/asistencia/cierre-prestamo.ts \
-  's = s.replace("    if (n(deuda.yaDescontado) > 0) {", "    if (false) {")'
+  's = s.replace("      if (n(deuda[c.yaDescontado] as number) > 0) {", "      if (false) {")'
 mutar "escribe la SUGERENCIA en vez de lo que dice la casilla" src/lib/asistencia/cierre-prestamo.ts \
-  's = s.replace("    const monto = n(l.dinero.prestamo);", "    const monto = n(opts.deudas.get(l.codigo)?.cuotaPrestamo);")'
-mutar "no capea cada cuenta a su propio saldo" src/lib/asistencia/cierre-prestamo.ts \
-  's = s.replace("  const aPrimero = Math.min(monto, Math.max(0, topePrimero));", "  const aPrimero = monto;")'
-mutar "reparte todo al préstamo e ignora la cuota del daño" src/lib/asistencia/cierre-prestamo.ts \
-  's = s.replace("  if (centavos(propuestaP + propuestaD) === monto) {", "  if (false) {")'
+  's = s.replace("      const monto = n(l.dinero[c.campo]);", "      const monto = n(opts.deudas.get(l.codigo)?.cuotaPrestamo);")'
 mutar "se calla cuando alguien que debe no tuvo descuento" src/lib/asistencia/cierre-prestamo.ts \
   's = s.replace('"'"'        omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto: 0, motivo: "casilla-en-cero" });'"'"', "")'
 mutar "se calla cuando el descuento no está atado a ninguna ficha" src/lib/asistencia/cierre-prestamo.ts \
@@ -153,18 +184,8 @@ mutar "el cierre escribe el pago sin await (fire-and-forget)" src/app/api/asiste
                 "      const escrito = { escritos: 0, total: 0 };\n      void escribirPagosDelCierre({ planillaId: r.id, plan }).then(() => {});")'
 mutar "lee los préstamos con .eq(deleted,false) y pierde filas" src/lib/asistencia/cierre-prestamo-server.ts \
   's = s.replace('"'"'        .or("deleted.is.null,deleted.eq.false")'"'"', '"'"'        .eq("deleted", false)'"'"')'
-mutar "recalcula el saldo en vez de usar prestamos-saldo" src/lib/asistencia/cierre-prestamo-server.ts \
-  's = s.replace("""import {
-  calcularSaldoPrestamo,
-  cuentaMasVieja,
-  type MovimientoParaSaldo,
-} from "@/lib/prestamos-saldo";""", """import {
-  cuentaMasVieja,
-  type MovimientoParaSaldo,
-} from "@/lib/prestamos-saldo";
-const calcularSaldoPrestamo = (ms: readonly MovimientoParaSaldo[]) => ({
-  cuentas: { prestamo: { saldo: 0, desde: null }, dano: { saldo: 0, desde: null } },
-} as never);""")'
+mutar "el cierre deja de leer el saldo de terceros" src/lib/asistencia/cierre-prestamo-server.ts \
+  's = s.replace("      saldoTerceros: s.cuentas.terceros.saldo,", "      saldoTerceros: 0,")'
 mutar "el amarre pierde su índice único (cerrar dos veces cobra dos veces)" supabase/migrations/20261028120000_planilla_unida.sql \
   's = s.replace("CREATE UNIQUE INDEX IF NOT EXISTS asistencia_planilla_prestamo_una_vez", "CREATE INDEX IF NOT EXISTS asistencia_planilla_prestamo_una_vez")'
 mutar "el amarre se cae del respaldo" src/lib/backup/tablas.ts \
@@ -225,6 +246,101 @@ mutar "netoConAjuste ignora el ajuste" src/lib/asistencia/corte-quincena.ts \
   's = s.replace("return centavos(Number(netoPagar || 0) - Number(ajuste || 0));", "return centavos(Number(netoPagar || 0));")'
 mutar "quincenaAnterior no cruza el año en enero" src/lib/asistencia/planilla.ts \
   's = s.replace("const anio = q.mes === 1 ? q.anio - 1 : q.anio;", "const anio = q.anio;")'
+
+echo "── LOS TRES DESCUENTOS ─────────────────────────────────────────────────"
+mutar "el préstamo vuelve a sumarle la cuota del daño" src/lib/asistencia/prestamos-planilla.ts \
+  's = s.replace("""  const monto = saldoP > 0 && cuotaP > 0 ? Math.min(cuotaP, saldoP) : 0;
+  return { monto: centavos(monto), origen: "cuota" };""", """  const monto = (saldoP > 0 && cuotaP > 0 ? Math.min(cuotaP, saldoP) : 0) + centavos(num(f.cuotaDano));
+  return { monto: centavos(monto), origen: "cuota" };""")'
+mutar "terceros deja de capearse a su saldo (cobra de más)" src/lib/asistencia/prestamos-planilla.ts \
+  's = s.replace("""  const monto = saldo > 0 && cuota > 0 ? Math.min(cuota, saldo) : 0;""", """  const monto = cuota;""")'
+mutar "la casilla de terceros va a la cuenta del préstamo" src/lib/asistencia/cierre-prestamo.ts \
+  's = s.replace("""  { cuenta: CUENTA_TERCEROS, campo: "terceros", yaDescontado: "yaDescontadoTerceros", saldo: "saldoTerceros" },""", """  { cuenta: CUENTA_PRESTAMO, campo: "terceros", yaDescontado: "yaDescontadoTerceros", saldo: "saldoTerceros" },""")'
+mutar "la casilla de mercancía deja de anotarse en la cuenta de daño" src/lib/asistencia/cierre-prestamo.ts \
+  's = s.replace("""  { cuenta: CUENTA_DANO, campo: "mercancia", yaDescontado: "yaDescontadoDano", saldo: "saldoDano" },\n""", "")'
+mutar "el «ya descontado» vuelve a ser uno solo para las tres cuentas" src/lib/asistencia/cierre-prestamo.ts \
+  's = s.replace("      if (n(deuda[c.yaDescontado] as number) > 0) {", "      if (n(deuda.yaDescontado) > 0) {")'
+mutar "el cierre anota más de lo que se debe" src/lib/asistencia/cierre-prestamo.ts \
+  's = s.replace("      const aAnotar = centavos(Math.min(monto, saldo));", "      const aAnotar = centavos(monto);")'
+mutar "terceros se anota con el concepto del préstamo" src/lib/asistencia/cierre-prestamo.ts \
+  's = s.replace("""  terceros: "Pago de terceros",""", """  terceros: "Pago",""")'
+mutar "el saldo deja de contar la cuenta de terceros" src/lib/prestamos-saldo.ts \
+  's = s.replace("export const CUENTAS: readonly CuentaPrestamo[] = [CUENTA_PRESTAMO, CUENTA_DANO, CUENTA_TERCEROS];", "export const CUENTAS: readonly CuentaPrestamo[] = [CUENTA_PRESTAMO, CUENTA_DANO];")'
+mutar "un movimiento de terceros sin cuenta cae en préstamo" src/lib/prestamos-saldo.ts \
+  's = s.replace("  if (DE_TERCEROS.has(m.concepto)) return CUENTA_TERCEROS;\n", "")'
+mutar "el cargo de terceros deja de ofrecerse" src/lib/prestamos-conceptos.ts \
+  's = s.replace("  CONCEPTO_PRESTAMO, CONCEPTO_DANO, CONCEPTO_TERCEROS, CONCEPTO_PAGO,", "  CONCEPTO_PRESTAMO, CONCEPTO_DANO, CONCEPTO_PAGO,")'
+mutar "«descuento por compras» vuelve al papel" src/lib/asistencia/comprobante.ts \
+  's = s.replace("""  "terceros",
+  "mercancia",""", """  "terceros",
+  "compras",
+  "mercancia",""")
+s = s.replace("""    R("mercancia", "DAÑO DE MERCANCIA", v(d?.mercancia), "dato", true),""", """    R("compras" as never, "DESCUENTO POR COMPRAS", 0, "dato", true),
+    R("mercancia", "DAÑO DE MERCANCIA", v(d?.mercancia), "dato", true),""")'
+mutar "el terceros pasa a esperar la aprobación de Daniel" src/app/api/prestamos/movimientos/route.ts \
+  's = s.replace("  if (concepto === CONCEPTO_PRESTAMO) {", "  if (concepto === CONCEPTO_PRESTAMO || concepto === \"Descuento a terceros\") {")'
+mutar "la ficha vuelve a ofrecer la cuota de daño" src/app/prestamos/components/EditEmpleadoModal.tsx \
+  's = s.replace("<label className=\"text-xs text-gray-400 uppercase\">Cuota de terceros ($ por quincena)</label>", "<label className=\"text-xs text-gray-400 uppercase\">Cuota de daño ($ por quincena)</label>")'
+
+echo "── ROLES, NOMBRES Y MOTIVOS ────────────────────────────────────────────"
+mutar "la contadora deja de alcanzar a Boston" src/lib/asistencia/aprobador-empresa.ts \
+  's = s.replace("  if (puedeCerrar(rol)) return { empresas: null, faltaTabla: false };\n", "")'
+mutar "la secretaria pasa a cerrar la quincena" src/lib/asistencia/roles.ts \
+  's = s.replace("""export const MIRAN_PERO_NO_CIERRAN = ["secretaria"] as const;""", "export const MIRAN_PERO_NO_CIERRAN = [] as const;")'
+mutar "cualquiera de Asistencia escribe el cargo y la cédula" src/app/api/asistencia/configuracion/route.ts \
+  's = s.replace("""  const puedeTocarLaFicha = puedeCerrar(String(auth.role ?? ""));""", "  const puedeTocarLaFicha = true;")'
+mutar "los nombres vuelven a gritarse en la planilla" src/app/asistencia/PlanillaTab.tsx \
+  's = s.replace("capitalizarNombre(l.etiqueta)", "l.etiqueta")'
+mutar "el comprobante vuelve a gritar el nombre" src/lib/asistencia/comprobante.ts \
+  's = s.replace("capitalizarNombre(linea.nombre) || linea.etiqueta", "linea.nombre?.trim() || linea.etiqueta")'
+mutar "el capitalizador inventa un acento" src/lib/nombre-en-pantalla.ts \
+  's = s.replace("  const palabras = v.toLocaleLowerCase(\"es\").split(\" \");", "  const palabras = v.toLocaleLowerCase(\"es\").replace(/on\\b/g, \"ón\").split(\" \");")'
+mutar "las partículas se capitalizan («Luz De La Cruz»)" src/lib/nombre-en-pantalla.ts \
+  's = s.replace("      if (i > 0 && PARTICULAS.has(p)) return p;\n", "")'
+mutar "Comisiones vuelve a tener su propio capitalizador" src/lib/comisiones/alias.ts \
+  's = s.replace("  return capitalizarNombre(v);", "  return v.toLocaleLowerCase(\"es\");")'
+mutar "el orden del PDF deja de ser estable" src/lib/asistencia/comprobante.ts \
+  's = s.replace("""  return lineas
+    .filter((l) => !!l.dinero)
+    .slice()
+    .sort((a, b) => {""", """  return lineas
+    .filter((l) => !!l.dinero)
+    .slice()
+    .sort(() => 0).sort((a, b) => {
+      if (true) return 0;""")'
+mutar "«Constancia» deja de ofrecerse" src/lib/asistencia/motivos.ts \
+  's = s.replace("  MOTIVO_CONSTANCIA,\n] as const;", "] as const;")'
+
+echo "── IGNORAR UN CÓDIGO Y LA CUARTA EMPRESA ───────────────────────────────"
+mutar "ignorar deja de esconder (el filtro no filtra)" src/lib/asistencia/codigos-ignorados.ts \
+  's = s.replace("  return filas.filter((f) => !ignorados.has(String(f.codigo).trim()));", "  return [...filas];")'
+mutar "volver a mostrar BORRA la fila" src/lib/asistencia/codigos-ignorados-server.ts \
+  's = s.replace("""    .update({
+      activo: false,
+      mostrado_por: opts.usuario,
+      mostrado_en: new Date().toISOString(),
+    })""", "    .delete()")'
+mutar "el resumen sigue contando a los escondidos" src/app/api/asistencia/configuracion/route.ts \
+  's = s.replace("    const activos = personasVisibles.filter((p) => p.activo);", "    const activos = personas.filter((p) => p.activo);")'
+mutar "la planilla sigue mostrando a los escondidos" src/app/api/asistencia/planilla/route.ts \
+  's = s.replace("    for (const c of ignorados) fuera.add(c);", "")'
+mutar "cualquiera puede esconder un código" src/app/api/asistencia/codigos-ignorados/route.ts \
+  's = s.replace("""export async function POST(req: NextRequest) {
+  const auth = requireAsistencia(req, cerrarPlanillaRoles());""", """export async function POST(req: NextRequest) {
+  const auth = requireAsistencia(req, asistenciaRoles());""")'
+mutar "ignorar solo se ofrece a quien NO tiene ficha" src/lib/asistencia/codigos-ignorados.ts \
+  's = s.replace("export const TABLA_CODIGOS_IGNORADOS", "export const SOLO_SIN_FICHA = true;\nexport const TABLA_CODIGOS_IGNORADOS")
+s = s.replace("export function estaIgnorado(codigo: string, ignorados: ReadonlySet<string>): boolean {", "export function estaIgnorado(codigo: string, ignorados: ReadonlySet<string>): boolean {\n  if (SOLO_SIN_FICHA) return false;")'
+mutar "ACS se cae de la lista de empresas" src/lib/asistencia/config.ts \
+  'q = chr(34)
+s = s.replace("  " + q + "confecciones_boston" + q + ", " + q + "vistana" + q + ", " + q + "fashion_wear" + q + ", " + q + "american_classic" + q + ",",
+              "  " + q + "confecciones_boston" + q + ", " + q + "vistana" + q + ", " + q + "fashion_wear" + q + ",")'
+mutar "la pantalla del reloj vuelve a mostrar solo el primero" src/app/asistencia/EstadoReloj.tsx \
+  's = s.replace("      {relojes.map((r) => (", "      {relojes.slice(0, 1).map((r) => (")'
+mutar "la migración de ACS se olvida de una tabla" supabase/migrations/20261031120000_acs_cuarta_empresa.sql \
+  'i = s.index("ALTER TABLE asistencia_reparto_empresa")
+j = s.index("ALTER TABLE asistencia_aprobador_empresa")
+s = s[:i] + s[j:]'
 
 echo
 echo "── CONTROLES: NO se tienen que cazar ───────────────────────────────────"

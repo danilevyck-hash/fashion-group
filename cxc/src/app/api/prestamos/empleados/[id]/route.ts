@@ -76,6 +76,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     }
     update.deduccion_dano = v;
   }
+  // 🔴 LA CUOTA DE LA TERCERA CUENTA. La contadora: *«no hacerlo manual, la
+  // información se le configura en el perfil y la debe tomar de allí»*.
+  if (body.deduccion_terceros !== undefined) {
+    const v = Number(body.deduccion_terceros);
+    if (!Number.isFinite(v) || v < 0) {
+      return NextResponse.json({ error: "La cuota de terceros no puede ser negativa." }, { status: 400 });
+    }
+    update.deduccion_terceros = v;
+  }
   if (body.notas !== undefined) update.notas = body.notas;
 
   if (body.empleado_codigo !== undefined) {

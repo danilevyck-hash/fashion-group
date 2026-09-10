@@ -22,6 +22,8 @@ import type * as XLSX from "xlsx-js-style";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
+// 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import {
   buildReportSheet,
   workbookFromSheets,
@@ -195,7 +197,7 @@ function filaPlanilla(l: LineaPlanilla): ReportCell[] {
   // exactamente lo que este cambio vino a dejar de decir.
   if (grupoDeLinea(l) === "decidir") {
     return [
-      { v: l.etiqueta, ...FUERA },
+      { v: capitalizarNombre(l.etiqueta), ...FUERA },
       l.codigo,
       { v: textoDecidir(l), ...FUERA },
       ...Array<ReportCell>(17).fill(null),
@@ -205,7 +207,7 @@ function filaPlanilla(l: LineaPlanilla): ReportCell[] {
     // Sale en el archivo —omitirla sería peor: el papel sobrevive a la
     // discusión— con el motivo escrito y las 18 columnas de dinero vacías.
     return [
-      { v: l.etiqueta, ...FUERA },
+      { v: capitalizarNombre(l.etiqueta), ...FUERA },
       l.codigo,
       { v: MOTIVO_FUERA_DE_PLANILLA, ...FUERA },
       ...Array<ReportCell>(17).fill(null),
@@ -214,7 +216,7 @@ function filaPlanilla(l: LineaPlanilla): ReportCell[] {
   if (!l.dinero) {
     // 🔴 Se lista, se dice POR QUÉ, y las 18 columnas de dinero quedan vacías.
     return [
-      { v: l.etiqueta, ...PENDIENTE },
+      { v: capitalizarNombre(l.etiqueta), ...PENDIENTE },
       l.codigo,
       { v: `⚠ ${l.faltaConfigurar.join(" · ")}`, ...PENDIENTE },
       ...Array<ReportCell>(17).fill(null),
@@ -222,7 +224,7 @@ function filaPlanilla(l: LineaPlanilla): ReportCell[] {
   }
   const d = l.dinero;
   return [
-    l.etiqueta, l.codigo,
+    capitalizarNombre(l.etiqueta), l.codigo,
     d.salarioQuincenal, c0(d.extraDiurno), c0(d.ausencias), c0(d.tardanzas),
     c0(d.extraNocturno), c0(d.excedente), c0(d.domingos), c0(d.feriados),
     d.totalBruto, d.seguroSocial, d.seguroEducativo,
@@ -286,7 +288,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
     rows: d.lineas.map((l) => {
       const h = l.horas;
       return [
-        l.etiqueta, l.codigo, l.empresaEtiqueta ?? "—",
+        capitalizarNombre(l.etiqueta), l.codigo, l.empresaEtiqueta ?? "—",
         l.salarioMensual ?? null,
         l.jornadaSemanal ? `${l.jornadaSemanal} h` : "—",
         l.dinero?.rataHora ?? null,
@@ -452,14 +454,14 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     body: d.lineas.map((l) => {
       if (grupoDeLinea(l) === "decidir") {
         return [
-          `${l.etiqueta} (${l.codigo})`,
+          `${capitalizarNombre(l.etiqueta)} (${l.codigo})`,
           textoDecidir(l),
           ...Array<string>(17).fill(""),
         ];
       }
       if (l.fueraDePlanilla) {
         return [
-          `${l.etiqueta} (${l.codigo})`,
+          `${capitalizarNombre(l.etiqueta)} (${l.codigo})`,
           MOTIVO_FUERA_DE_PLANILLA,
           ...Array<string>(17).fill(""),
         ];
@@ -469,14 +471,14 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
         // lo imprimía como un «&». La fila igual se distingue —va en rojo— y
         // acá lo que importa es que el motivo se lea.
         return [
-          `${l.etiqueta} (${l.codigo})`,
+          `${capitalizarNombre(l.etiqueta)} (${l.codigo})`,
           `falta configurar: ${l.faltaConfigurar.join(" · ")}`,
           ...Array<string>(17).fill(""),
         ];
       }
       const x = l.dinero;
       return [
-        l.etiqueta,
+        capitalizarNombre(l.etiqueta),
         m2(x.salarioQuincenal), m2(c0(x.extraDiurno)), m2(c0(x.ausencias)), m2(c0(x.tardanzas)),
         m2(c0(x.extraNocturno)), m2(c0(x.excedente)), m2(c0(x.domingos)), m2(c0(x.feriados)),
         m2(x.totalBruto), m2(x.seguroSocial), m2(x.seguroEducativo),

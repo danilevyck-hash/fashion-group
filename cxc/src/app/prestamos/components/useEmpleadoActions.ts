@@ -25,7 +25,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
   // ── Editar la ficha: las dos cuotas y la persona ──
   const [showEditModal, setShowEditModal] = useState(false);
   const [fCuotaPrestamo, setFCuotaPrestamo] = useState("");
-  const [fCuotaDano, setFCuotaDano] = useState("");
+  const [fCuotaTerceros, setFCuotaTerceros] = useState("");
   const [fCodigo, setFCodigo] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
@@ -47,7 +47,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
 
   function openEditModal() {
     setFCuotaPrestamo(String(empleado.deduccion_quincenal ?? 0));
-    setFCuotaDano(String(empleado.deduccion_dano ?? 0));
+    setFCuotaTerceros(String(empleado.deduccion_terceros ?? 0));
     setFCodigo(empleado.empleado_codigo ?? "");
     setShowEditModal(true);
   }
@@ -57,7 +57,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
     try {
       const body: Record<string, unknown> = {
         deduccion_quincenal: Number(fCuotaPrestamo) || 0,
-        deduccion_dano: Number(fCuotaDano) || 0,
+        deduccion_terceros: Number(fCuotaTerceros) || 0,
       };
       if (fCodigo && fCodigo !== (empleado.empleado_codigo ?? "")) body.empleado_codigo = fCodigo;
       const res = await fetch(`/api/prestamos/empleados/${empleadoId}`, {
@@ -136,7 +136,7 @@ export function useEmpleadoActions({ empleadoId, empleado, onSuccess, onDeleted,
   return {
     showEditModal, setShowEditModal,
     fCuotaPrestamo, setFCuotaPrestamo,
-    fCuotaDano, setFCuotaDano,
+    fCuotaTerceros, setFCuotaTerceros,
     fCodigo, setFCodigo,
     colaboradores,
     savingEdit,

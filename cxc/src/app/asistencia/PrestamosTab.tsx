@@ -32,6 +32,7 @@ import { useToast } from "@/components/ToastSystem";
 import { NOMBRE_CUENTA, type CuentaPrestamo } from "@/lib/prestamos-saldo";
 import { ORIGENES_ABONO } from "@/lib/asistencia/abono-extra";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { quincenasHasta } from "@/lib/asistencia/planilla";
 
 interface FichaDeuda {
@@ -135,7 +136,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
             {fichas.map((f) => (
               <tr key={f.id} className="border-b border-gray-100 last:border-0">
                 <td className="px-3 py-2">
-                  <span className="text-gray-900">{f.nombre}</span>
+                  <span className="text-gray-900">{capitalizarNombre(f.nombre)}</span>
                   {/* 🔴 SIN CÓDIGO NO HAY A QUIÉN DESCONTARLE, y se DICE. El
                       amarre es por código y nunca por parecido de nombre. */}
                   {!f.codigo && (
@@ -171,7 +172,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
         {fichas.map((f) => (
           <div key={f.id} className="rounded-lg border border-gray-200 p-3">
             <div className="flex items-baseline justify-between gap-2">
-              <p className="text-sm font-medium text-gray-900">{f.nombre}</p>
+              <p className="text-sm font-medium text-gray-900">{capitalizarNombre(f.nombre)}</p>
               <p className="text-sm tabular-nums font-medium text-gray-900">{money(f.saldo)}</p>
             </div>
             <p className="mt-1 text-sm text-gray-500">
@@ -267,10 +268,10 @@ function AbonoModal(props: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
-      role="dialog" aria-modal="true" aria-label={`Anotar abono de ${ficha.nombre}`}>
+      role="dialog" aria-modal="true" aria-label={`Anotar abono de ${capitalizarNombre(ficha.nombre)}`}>
       <div className="w-full max-w-md rounded-t-lg border border-gray-200 bg-white p-4 sm:rounded-lg">
         <h2 className="text-base font-medium text-gray-900">Anotar un abono</h2>
-        <p className="mt-0.5 text-sm text-gray-500">{ficha.nombre}</p>
+        <p className="mt-0.5 text-sm text-gray-500">{capitalizarNombre(ficha.nombre)}</p>
 
         <div className="mt-4 space-y-3">
           {debeLasDos && (

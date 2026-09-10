@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { CuentaPrestamo } from "@/lib/prestamos-saldo";
-import { CUENTA_DANO, CUENTA_PRESTAMO } from "@/lib/prestamos-saldo";
+import { CUENTAS } from "@/lib/prestamos-saldo";
 
 /**
  * 🔴 LOS ORÍGENES QUE LA BASE ACEPTA, MENOS «Quincena».
@@ -36,6 +36,7 @@ export const ORIGEN_DE_LA_QUINCENA = "Quincena";
 export const CONCEPTO_DE_ABONO: Readonly<Record<CuentaPrestamo, string>> = {
   prestamo: "Pago",
   dano: "Pago de responsabilidad",
+  terceros: "Pago de terceros",
 };
 
 export const MONTO_MAX = 100_000;
@@ -66,8 +67,8 @@ export function validarAbono(body: unknown): Validacion {
   if (!fichaId) return { ok: false, error: "Elige a quién se le anota el abono." };
 
   const cuentaRaw = String(b.cuenta ?? "").trim();
-  if (cuentaRaw !== CUENTA_PRESTAMO && cuentaRaw !== CUENTA_DANO) {
-    return { ok: false, error: "Elige de qué cuenta baja: préstamo o daño de mercancía." };
+  if (!(CUENTAS as readonly string[]).includes(cuentaRaw)) {
+    return { ok: false, error: "Elige de qué cuenta baja: préstamo, daño de mercancía o descuento a terceros." };
   }
   const cuenta = cuentaRaw as CuentaPrestamo;
 

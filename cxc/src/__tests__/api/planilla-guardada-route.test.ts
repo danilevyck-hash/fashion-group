@@ -555,9 +555,13 @@ describe("quién entra", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("lo que llega se valida", () => {
+  // 🩸 ACS ENTRÓ A ASISTENCIA EL 10-SEP-2026 (Daniel: *«Sí — ACS entra completa
+  // a Asistencia y Planilla»*). Este caso usaba `american_classic` como ejemplo
+  // de «empresa ajena»; ahora la ajena es otra. La regla NO cambió: lo que no
+  // está en `EMPRESAS_ASISTENCIA` se rechaza.
   it("una empresa que no es del reloj se rechaza", async () => {
     const r = await POST(pedir("POST", "admin", "daniel", {
-      empresa: "american_classic", desde: "2026-08-01", hasta: "2026-08-15",
+      empresa: "joystep", desde: "2026-08-01", hasta: "2026-08-15",
     }));
     expect(r.status).toBe(400);
     expect(db.cabeceras.length).toBe(0);

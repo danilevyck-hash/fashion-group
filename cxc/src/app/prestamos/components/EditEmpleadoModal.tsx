@@ -22,20 +22,20 @@ import type { Colaborador } from "@/lib/prestamos-lista-server";
 interface Props {
   show: boolean;
   fCuotaPrestamo: string;
-  fCuotaDano: string;
+  fCuotaTerceros: string;
   fCodigo: string;
   colaboradores: readonly Colaborador[];
   saving: boolean;
   onClose: () => void;
   onChangeCuotaPrestamo: (v: string) => void;
-  onChangeCuotaDano: (v: string) => void;
+  onChangeCuotaTerceros: (v: string) => void;
   onChangeCodigo: (v: string) => void;
   onSave: () => void;
 }
 
 export default function EditEmpleadoModal({
-  show, fCuotaPrestamo, fCuotaDano, fCodigo, colaboradores, saving,
-  onClose, onChangeCuotaPrestamo, onChangeCuotaDano, onChangeCodigo, onSave,
+  show, fCuotaPrestamo, fCuotaTerceros, fCodigo, colaboradores, saving,
+  onClose, onChangeCuotaPrestamo, onChangeCuotaTerceros, onChangeCodigo, onSave,
 }: Props) {
   useEffect(() => {
     if (!show) return;
@@ -72,8 +72,17 @@ export default function EditEmpleadoModal({
             <input type="number" step="0.01" min="0" value={fCuotaPrestamo} onChange={e => onChangeCuotaPrestamo(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
           </div>
           <div>
-            <label className="text-xs text-gray-400 uppercase">Cuota de daño ($ por quincena)</label>
-            <input type="number" step="0.01" min="0" value={fCuotaDano} onChange={e => onChangeCuotaDano(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            {/* 🩸 ACÁ ESTABA «Cuota de daño», y se fue el 10-sep-2026. La
+                contadora: *«los daños de mercancía debe permanecer en blanco y
+                que nos permita colocar quincenalmente la cantidad a
+                descontar»* — el daño ya no propone cuota, así que un campo para
+                configurarla prometía algo que no pasa. La columna se conserva
+                con su valor; no la lee nadie. */}
+            <label className="text-xs text-gray-400 uppercase">Cuota de terceros ($ por quincena)</label>
+            <input type="number" step="0.01" min="0" value={fCuotaTerceros} onChange={e => onChangeCuotaTerceros(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            <p className="mt-1 text-xs text-gray-500">
+              Se descuenta solo al cerrar la quincena, hasta pagarlo.
+            </p>
             <p className="mt-1 text-xs text-gray-400">
               Son dos cuentas separadas. La planilla propone la suma de las dos en una sola casilla.
             </p>

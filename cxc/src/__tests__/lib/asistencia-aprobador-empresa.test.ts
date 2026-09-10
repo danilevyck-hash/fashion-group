@@ -112,12 +112,29 @@ describe("🔴 el veredicto del POST: TODO O NADA", () => {
     expect(v.fuera).toEqual(["50"]);
   });
 
+  // 🩸 ESTE CASO USABA `contabilidad` HASTA EL 10-SEP-2026. Se cambió a
+  // `bodega` —el aprobador de verdad— porque desde ese día la contadora CIERRA
+  // la planilla de las tres empresas (Daniel: *«una sola persona cierra
+  // todo»*) y por eso su alcance es «todas», no el que diga la tabla.
+  //
+  // 🔑 LA REGLA QUE ESTE CANDADO PROTEGE NO CAMBIÓ: un aprobador que nadie
+  // configuró no aprueba a nadie, y se le dice por qué.
   it("un aprobador SIN filas propias no aprueba a nadie, y se le dice por qué", () => {
-    const a = de("contabilidad", "alguien-que-nadie-configuro");
+    const a = de("bodega", "alguien-que-nadie-configuro");
     expect([...(a.empresas ?? [])]).toEqual([]);
     const v = puedeAprobarA(a, [JULIO]);
     expect(v.ok).toBe(false);
     expect(v.motivo).toMatch(/no tienes ninguna empresa asignada/i);
+  });
+
+  // 🔴 Y LA CONTADORA CIERRA LAS TRES, BOSTON INCLUIDA, sin depender de una
+  // fila de configuración que alguien pueda borrar.
+  it("quien CIERRA la planilla alcanza a las tres empresas, sin filas propias", () => {
+    const a = alcanceDe("contabilidad", "Contabilidad", []);
+    expect(a.empresas).toBeNull();
+    expect(alcanza(a, "confecciones_boston")).toBe(true);
+    expect(alcanza(a, "vistana")).toBe(true);
+    expect(alcanza(a, "fashion_wear")).toBe(true);
   });
 
   it("admin nunca queda fuera", () => {
@@ -150,11 +167,15 @@ describe("🔴 ya no existe la puerta «sin la tabla, nadie queda segmentado»",
 });
 
 describe("una empresa que no existe no entra por la puerta de atrás", () => {
+  // 🩸 ACS ENTRÓ A ASISTENCIA EL 10-SEP-2026 (Daniel: *«Sí — ACS entra completa
+  // a Asistencia y Planilla»*). Este caso usaba `american_classic` como ejemplo
+  // de «empresa ajena»; ahora la ajena es otra. La regla NO cambió: lo que no
+  // está en `EMPRESAS_ASISTENCIA` se rechaza.
   it("una fila con una empresa inventada se ignora", () => {
     const a = alcanceDe("bodega", "Bodega",
-      [{ usuario: "Bodega", empresa: "american_classic" }]);
+      [{ usuario: "Bodega", empresa: "joystep" }]);
     expect([...(a.empresas ?? [])]).toEqual([]);
-    expect(alcanza(a, "american_classic")).toBe(false);
+    expect(alcanza(a, "joystep")).toBe(false);
   });
 });
 
@@ -192,10 +213,17 @@ const SQL = readFileSync(
 const sinComentarios = SQL.replace(/^\s*--.*$/gm, "");
 
 describe("la migración", () => {
-  it("crea la tabla con llave compuesta y CHECK a las tres empresas", () => {
+  // 🩸 La migración original creó el CHECK con TRES; la de ACS lo reescribe con
+  // las CUATRO. Se miran las dos: la regla es «el CHECK dice lo mismo que el
+  // código», no «todo vive en un archivo».
+  it("crea la tabla con llave compuesta y el CHECK dice las mismas empresas que el código", () => {
     expect(sinComentarios).toMatch(/CREATE TABLE IF NOT EXISTS asistencia_aprobador_empresa/);
     expect(sinComentarios).toMatch(/PRIMARY KEY \(usuario, empresa\)/);
-    for (const e of EMPRESAS_ASISTENCIA) expect(sinComentarios).toContain(`'${e}'`);
+    const acs = readFileSync(
+      path.join(process.cwd(), "supabase/migrations/20261031120000_acs_cuarta_empresa.sql"), "utf-8");
+    for (const e of EMPRESAS_ASISTENCIA) {
+      expect(sinComentarios + acs, `falta ${e}`).toContain(`'${e}'`);
+    }
   });
 
   it("🔴 NO TOCA las 521 aprobaciones que ya existen", () => {

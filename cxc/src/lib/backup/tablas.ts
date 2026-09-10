@@ -78,6 +78,12 @@ export const TABLAS_PERSONAS = [
   // sabe qué movimiento salió de qué cuadro, y eso no está escrito en otra
   // parte.
   "asistencia_planilla_prestamo",
+  // 🔴 QUÉ CÓDIGOS DEL RELOJ SE ESCONDEN. Lo decide una PERSONA y no se puede
+  // volver a derivar de ningún lado: el reloj nunca manda el nombre (0 de 1.000
+  // marcaciones lo traen), así que un código sin ficha se ve igual que una
+  // persona nueva. Si se pierde, la basura (39, 55, 9999) vuelve a contarse
+  // como trabajo pendiente y hay que decidirlo todo otra vez.
+  "asistencia_codigos_ignorados",
   "asistencia_dispositivos",
 
   // ── Gastos y banco
@@ -383,6 +389,7 @@ export function tablasQueObliganRespaldo(): string[] {
 export const PK_QUE_NO_ES_ID: Readonly<Record<string, readonly string[]>> = Object.freeze({
   app_settings: ["key"],
   asistencia_aprobador_empresa: ["usuario", "empresa"],
+  asistencia_codigos_ignorados: ["empleado_codigo"],
   asistencia_dispositivos: ["dispositivo"],
   asistencia_feriados: ["fecha"],
   asistencia_horarios: ["empleado_codigo"],

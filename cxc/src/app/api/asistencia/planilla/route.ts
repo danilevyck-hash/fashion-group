@@ -106,6 +106,7 @@ import {
   diasSinMedir,
 } from "@/lib/asistencia/corte-quincena";
 import { leerCabeceras } from "@/lib/asistencia/planilla-guardada-server";
+import { leerIgnorados } from "@/lib/asistencia/codigos-ignorados-server";
 import { esCerrada } from "@/lib/asistencia/planilla-guardada";
 import {
   avisoMigracionPlanilla,
@@ -391,6 +392,21 @@ export async function GET(req: NextRequest) {
     // alguien esta tarde no puede mover un centavo de la planilla de julio.
     const vigencias = vigenciasDeFilas(personasDb.filas);
     const fuera = codigosFueraDeRango(vigencias, q.desde, q.hasta);
+
+    // ── 🔴 LOS CÓDIGOS IGNORADOS TAMPOCO ENTRAN A LA PLANILLA ──────────────
+    //
+    // Daniel pidió esconderlos «de la lista y de la planilla»: un código que él
+    // marcó como basura —o su propia ficha, la 52, que no va en planilla— no
+    // puede seguir apareciendo en el cuadro que se paga.
+    //
+    // 🔑 Se suman a `fuera`, que es el filtro que YA saca a quien no entra a
+    // esta quincena. Una segunda lista paralela sería un segundo lugar donde
+    // acordarse de filtrar.
+    //
+    // ⚠️ Ni la ficha ni las marcaciones se tocan: si se vuelve a mostrar, la
+    // persona reaparece con todo su histórico.
+    const { codigos: ignorados } = await leerIgnorados();
+    for (const c of ignorados) fuera.add(c);
 
     // ── 🔴 EL REPARTO DEL SUELDO ENTRE DOS EMPRESAS ──────────────────────────
     //
@@ -743,6 +759,10 @@ export async function GET(req: NextRequest) {
       empresa: l.empresa,
       empresaEtiqueta: l.empresaEtiqueta,
       enCasilla: l.manuales.prestamo,
+      // 🔴 La casilla de la TERCERA cuenta. Sale de las MISMAS líneas del
+      // cuadro, igual que la del préstamo: lo que la pantalla dice que hay y lo
+      // que la planilla suma no pueden separarse.
+      enCasillaTerceros: l.manuales.terceros,
     }));
     const prestamos = sugerirPrestamos({
       fichas: presRes.fichas,
