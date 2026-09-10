@@ -34,7 +34,7 @@ import type { DiaAprobacion } from "./aprobaciones";
 const MIN_FMT = "0.00";
 
 const COLUMNAS: ReportColumn[] = [
-  { header: "Persona", wch: 30 },
+  { header: "Colaborador", wch: 30 },
   { header: "Código", wch: 9, align: "center" },
   { header: "Empresa", wch: 22 },
   { header: "Fecha", wch: 12, align: "center" },
@@ -95,7 +95,7 @@ export function construirExcelAprobaciones(opts: OpcionesExcelAprobaciones) {
   }
 
   const totals: ReportCell[] = [
-    `TOTAL · ${apr + sin} ${apr + sin === 1 ? "día-persona" : "días-persona"}`,
+    `TOTAL · ${apr + sin} ${apr + sin === 1 ? "día-colaborador" : "días-colaborador"}`,
     null, null, null, null,
     { v: opts.dias.reduce((a, d) => a + d.gente.reduce((b, g) => b + g.diurnoMin, 0), 0), fmt: MIN_FMT },
     { v: opts.dias.reduce((a, d) => a + d.gente.reduce((b, g) => b + g.nocturnoMin, 0), 0), fmt: MIN_FMT },
@@ -109,7 +109,7 @@ export function construirExcelAprobaciones(opts: OpcionesExcelAprobaciones) {
   // a mano la columna filtrando por «Sin aprobar».
   const nota =
     sin > 0
-      ? `${sin} día(s)-persona sin aprobar por ${minSin.toFixed(2)} minutos: la planilla NO los pagó.`
+      ? `${sin} día(s)-colaborador sin aprobar por ${minSin.toFixed(2)} minutos: la planilla NO los pagó.`
       : undefined;
 
   const ws = buildReportSheet({ columns: COLUMNAS, rows, totals, nota });

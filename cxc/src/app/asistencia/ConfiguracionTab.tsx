@@ -872,13 +872,13 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
 
       {datos && (
         <>
-          {/* ── 1. PERSONAS ──────────────────────────────────────────────── */}
+          {/* ── 1. COLABORADORES (era «Personas» hasta el 10-sep-2026) ──────────────────────────────────────────────── */}
           <Seccion
-            titulo="Personas"
+            titulo="Colaboradores"
             resumen={
               pendientes > 0
                 ? `${datos.resumen.total} en la lista · ${pendientes} sin terminar`
-                : `${datos.resumen.total} en la lista · todas listas`
+                : `${datos.resumen.total} en la lista · todos listos`
             }
             alerta={pendientes > 0}
             abierta={!!seccion.personas}
@@ -890,7 +890,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
             <div className="-ml-2 -mt-1">
               <Ayuda titulo="Cómo se llena esta lista" etiqueta="Cómo se llena">
                 <p>
-                  El reloj solo manda un número por persona. Aquí le pones nombre, sueldo y
+                  El reloj solo manda un número por colaborador. Aquí le pones nombre, sueldo y
                   <b> a qué empresa pertenece</b> — eso último es lo que separa la planilla de
                   Boston, la de Vistana y la de Fashion Wear, que comparten el mismo reloj.
                   <b> Se guarda solo</b> apenas cambias algo.
@@ -987,7 +987,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
               <div>
                 <Link href={RUTA_PERSONA_NUEVA}
                   className="inline-flex min-h-[44px] items-center rounded-md bg-black px-3 text-sm text-white transition active:scale-[0.97]">
-                  + Nueva persona
+                  + Nuevo colaborador
                 </Link>
               </div>
             )}
@@ -1000,7 +1000,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                 <div
                   className={`hidden border-b border-gray-200 px-3 py-2 text-[10.5px] uppercase tracking-wide text-gray-400 ${rejilla}`}
                 >
-                  <span>Persona</span>
+                  <span>Colaborador</span>
                   <span>Empresa</span>
                   <span className="text-right">Jornada</span>
                   <span className="text-right">Salario</span>
@@ -1715,7 +1715,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
           {/* ── 2. HORARIOS ──────────────────────────────────────────────── */}
           <Seccion
             titulo="Horarios"
-            resumen="Hora de salida, persona por persona"
+            resumen="Hora de salida, colaborador por colaborador"
             abierta={!!seccion.horarios}
             onToggle={() => alternar("horarios")}
           >

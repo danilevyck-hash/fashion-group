@@ -207,7 +207,7 @@ export async function POST(req: NextRequest) {
   const codigo = (b.codigo ?? "").trim();
   const desde = (b.desde ?? "").trim();
   const hasta = (b.hasta ?? desde).trim();
-  if (!codigo) return NextResponse.json({ error: "Falta la persona" }, { status: 400 });
+  if (!codigo) return NextResponse.json({ error: "Falta el colaborador" }, { status: 400 });
   const mal = revisarFechas(desde, hasta);
   if (mal) return NextResponse.json({ error: mal }, { status: 400 });
 

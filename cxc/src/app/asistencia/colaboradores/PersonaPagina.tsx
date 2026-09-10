@@ -100,7 +100,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
 
   const titulo = useMemo(
     () => (nueva
-      ? "Persona nueva"
+      ? "Colaborador nuevo"
       : tituloDePersona({ nombre: persona?.nombre ?? null, codigo })),
     [nueva, persona, codigo],
   );
@@ -163,7 +163,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "No se pudo");
       toast("Listo, ya no sale en la lista", "success");
-      router.push("/asistencia?tab=personas");
+      router.push("/asistencia?tab=colaboradores");
     } catch {
       toast("No se pudo ignorar el código. Intenta de nuevo.", "error");
     }
@@ -175,10 +175,10 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
       <div className="mx-auto max-w-4xl px-4 py-6">
         {/* Volver: una sola salida, arriba, sin competir con nada. */}
         <Link
-          href="/asistencia?tab=personas"
+          href="/asistencia?tab=colaboradores"
           className="inline-flex min-h-[44px] items-center text-sm text-gray-500 transition hover:text-gray-900"
         >
-          ‹ Personas
+          ‹ Colaboradores
         </Link>
 
         <h1 className="mt-1 text-xl font-semibold text-gray-900">{titulo}</h1>
@@ -205,7 +205,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
                 borrador={borrador}
                 onCambio={setBorrador}
                 onGuardar={() => void guardar(borrador)}
-                onCancelar={() => { setEditando(false); if (nueva) router.push("/asistencia?tab=personas"); }}
+                onCancelar={() => { setEditando(false); if (nueva) router.push("/asistencia?tab=colaboradores"); }}
                 guardando={guardando}
                 nueva={nueva}
                 permisos={permisos}

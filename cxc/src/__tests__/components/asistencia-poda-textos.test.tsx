@@ -444,7 +444,10 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
 
   it("cómo se llena la lista de personas queda detrás del ⓘ", async () => {
     await abrirConfiguracion();
-    esperaDetrasDelInfo("Cómo se llena esta lista", /El reloj solo manda un número por persona/);
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    esperaDetrasDelInfo("Cómo se llena esta lista", /El reloj solo manda un número por colaborador/);
   });
 
   it("🔴 el aviso de pendientes y el ROJO de «se dio de baja y sigue marcando» NO se esconden", async () => {

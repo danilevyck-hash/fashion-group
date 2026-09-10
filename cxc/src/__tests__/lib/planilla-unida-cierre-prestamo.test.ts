@@ -276,7 +276,10 @@ describe("E. LO QUE SE DICE ANTES DE CERRAR", () => {
       fecha: "2026-08-15",
     });
     const t = textoPlan(plan)!;
-    expect(t).toContain("2 personas");
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    expect(t).toContain("2 colaboradores");
     expect(t).toContain("95.00");
     // Y se dice que nadie lo teclea: es el cambio entero.
     expect(t).toMatch(/nadie lo teclea/i);

@@ -172,7 +172,7 @@ export function avisoMigracionServicioProfesional(): string {
   return (
     "Todavía no se puede marcar a nadie como servicio profesional: falta preparar "
     + `la base de datos. Pídele a Daniel que corra el archivo ${MIGRACION_SERVICIO_PROFESIONAL} `
-    + "en Supabase. Mientras tanto todo lo demás funciona igual y todas las personas "
+    + "en Supabase. Mientras tanto todo lo demás funciona igual y todos los colaboradores "
     + "aparecen en la planilla."
   );
 }

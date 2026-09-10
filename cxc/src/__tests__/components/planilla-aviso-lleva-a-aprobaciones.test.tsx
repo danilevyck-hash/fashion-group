@@ -104,7 +104,7 @@ const AVISOS = {
   sinFicha: [], avisoSinFicha: null,
   vacacionesNoPagadas: [], avisoVacacionesNoPagadas: null,
   extraSinAprobar: EXTRA_SIN_APROBAR,
-  avisoExtraSinAprobar: "2 personas tienen horas extra sin aprobar: NO se pagaron en este cuadro. Se aprueban en la pestaña Aprobaciones. KEVIN LUBO · 2,50 h · $12.20 — JULIO GARAY · 1,28 h · $9.20",
+  avisoExtraSinAprobar: "2 colaboradores tienen horas extra sin aprobar: NO se pagaron en este cuadro. Se aprueban en la pestaña Aprobaciones. KEVIN LUBO · 2,50 h · $12.20 — JULIO GARAY · 1,28 h · $9.20",
   rangoLibre: false, factorBase: 1, diasCalendario: 15,
 };
 
@@ -120,7 +120,7 @@ const BORRADOR = { ok: true, estado: "borrador", cerrada: null, solapadas: [], h
 const FRENO = {
   tipo: "horas-extra", personas: 2,
   quienes: ["KEVIN LUBO", "JULIO GARAY"], codigos: ["6", "11"],
-  texto: "2 personas tienen horas extra sin aprobar (KEVIN LUBO · 150.00 min, JULIO GARAY · 76.50 min). Ve a la pestaña «Aprobaciones», aprueba o deja sin aprobar esas horas, y vuelve a cerrar.",
+  texto: "2 colaboradores tienen horas extra sin aprobar (KEVIN LUBO · 150.00 min, JULIO GARAY · 76.50 min). Ve a la pestaña «Aprobaciones», aprueba o deja sin aprobar esas horas, y vuelve a cerrar.",
 };
 
 function servirPlanilla(conFreno = false) {
@@ -156,7 +156,10 @@ describe("🔴 PLANILLA: cada persona del aviso es un enlace a Aprobaciones", ()
     render(<ToastProvider><PlanillaTab /></ToastProvider>);
     generar();
     const aviso = await screen.findByTestId("aviso-extra-sin-aprobar");
-    expect(aviso.textContent).toContain("2 personas tienen horas extra sin aprobar");
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    expect(aviso.textContent).toContain("2 colaboradores tienen horas extra sin aprobar");
     expect(aviso.textContent).toContain("Se aprueban en la pestaña Aprobaciones");
 
     const enlaces = within(aviso).getAllByRole("link");

@@ -234,7 +234,7 @@ export function planDeCierre(opts: {
 export function textoPlan(plan: PlanDeCierre): string | null {
   if (!plan.pagos.length) return null;
   const personas = new Set(plan.pagos.map((p) => p.codigo)).size;
-  const q = personas === 1 ? "1 persona" : `${personas} personas`;
+  const q = personas === 1 ? "1 colaborador" : `${personas} colaboradores`;
   return `Al cerrar se anota el pago del préstamo de ${q}, por $${plan.total.toFixed(2)} en total. La deuda baja sola: nadie lo teclea a mano.`;
 }
 

@@ -149,8 +149,9 @@ describe("las 6 pestañas y su orden", () => {
   it("apagado, Reporte SIGUE siendo el primero y el aterrizaje de todos", () => {
     expect(tabs[0]).toEqual(["reporte", "Reporte"]);
     expect(pestanaPorDefecto(false)).toBe("reporte");
-    // Y prendido abre en Personas, que es lo que Daniel aprobó.
-    expect(pestanaPorDefecto(true)).toBe("personas");
+    // Y prendido abre en Colaboradores (era «Personas» hasta el 10-sep-2026,
+    // Daniel: *«no lo llames personas, sino colaboradores»*), que es lo que aprobó.
+    expect(pestanaPorDefecto(true)).toBe("colaboradores");
     // La pantalla no lo escribe a mano: se lo pregunta al módulo puro.
     expect(src).toMatch(/pestanaPorDefecto\(PERSONA_EN_EL_CENTRO\)/);
   });
@@ -404,7 +405,10 @@ describe("un solo aviso de pendientes, con el desglose adentro", () => {
 
   it("el caso de producción (38 personas, 6 sin ficha y 4 sin salario) es UN aviso con DOS renglones", () => {
     const a = avisoPendientes({ total: 38, sinConfigurar: 6, sinSalario: 4 })!;
-    expect(a.titulo).toBe("10 personas de 38 todavía no salen en la planilla.");
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    expect(a.titulo).toBe("10 colaboradores de 38 todavía no salen en la planilla.");
     expect(a.detalle).toHaveLength(2);
     expect(a.detalle[0]).toContain("6 marcan en el reloj");
     expect(a.detalle[1]).toContain("4 ya tienen ficha");
@@ -417,7 +421,7 @@ describe("un solo aviso de pendientes, con el desglose adentro", () => {
 
   it("habla en singular cuando es una sola persona", () => {
     const a = avisoPendientes({ total: 38, sinConfigurar: 1, sinSalario: 0 })!;
-    expect(a.titulo).toBe("1 persona de 38 todavía no sale en la planilla.");
+    expect(a.titulo).toBe("1 colaborador de 38 todavía no sale en la planilla.");
   });
 
   it("la palabra «vencido» no aparece — se dice qué falta, no se reta a nadie", () => {

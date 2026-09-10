@@ -136,6 +136,12 @@ const nextConfig = {
       // existen — la lista es UNA sola — y Next arrastra la query al destino:
       // es INERTE, esa pantalla no lee `filter`.
       { source: "/cheques", destination: "/recordatorios", permanent: false },
+      // La página de cada colaborador de Asistencia nació el 10-sep-2026 en
+      // `/asistencia/personas/[codigo]` y ese mismo día Daniel pidió el nombre:
+      // *«no lo llames personas, sino colaboradores»*. Temporal (307) y con la
+      // query intacta, como las demás. La pestaña vieja (`?tab=personas`) la
+      // resuelve el módulo puro (`persona-en-el-centro.ts`, MUDANZA).
+      { source: "/asistencia/personas/:codigo", destination: "/asistencia/colaboradores/:codigo", permanent: false },
     ];
   },
   experimental: {

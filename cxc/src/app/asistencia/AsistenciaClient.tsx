@@ -221,13 +221,14 @@ function AsistenciaInner() {
               {tab === "justificaciones" && <JustificacionesTab />}
               {tab === "vacaciones" && <VacacionesTab />}
               {tab === "aprobaciones" && <AprobacionesTab />}
-              {/* 🔴 «PERSONAS» ES LA MISMA PANTALLA, EN MODO LISTA. Daniel:
-                  *«te acepto la queja»* — «Configuración» se llama Personas. No
+              {/* 🔴 «COLABORADORES» ES LA MISMA PANTALLA, EN MODO LISTA. Daniel:
+                  *«te acepto la queja»* — «Configuración» se llama Personas; y
+                  desde el 10-sep-2026, *«no lo llames personas, sino colaboradores»*. No
                   es un componente nuevo: es `ConfiguracionTab` con las filas
                   llevando a la página de cada quien en vez de desplegarse, y
                   con Horarios, Feriados y Reglas exactamente donde estaban. Un
                   segundo componente sería una segunda lista de personas. */}
-              {tab === "personas" && <ConfiguracionTab personaEnElCentro />}
+              {tab === "colaboradores" && <ConfiguracionTab personaEnElCentro />}
               {tab === "configuracion" && <ConfiguracionTab />}
             </>
           )}

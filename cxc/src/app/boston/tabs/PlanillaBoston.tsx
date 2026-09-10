@@ -175,7 +175,7 @@ export default function PlanillaBoston() {
       {!error && data && (
         <>
           <p className="text-sm text-gray-500 mb-3">
-            {lineas.length} {lineas.length === 1 ? "persona" : "personas"} · {fmtDate(desde)} al{" "}
+            {lineas.length} {lineas.length === 1 ? "colaborador" : "colaboradores"} · {fmtDate(desde)} al{" "}
             {fmtDate(hasta)}
           </p>
 
@@ -300,7 +300,7 @@ export default function PlanillaBoston() {
                   <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
                     <td className="sticky left-0 z-10 bg-gray-50 px-4 py-3">
                       TOTAL · {data.totales.personas}{" "}
-                      {data.totales.personas === 1 ? "persona" : "personas"}
+                      {data.totales.personas === 1 ? "colaborador" : "colaboradores"}
                     </td>
                     {montosDe(data.totales).map((v, i) => (
                       <td key={i} className="px-2 py-3 text-right tabular-nums">

@@ -71,9 +71,15 @@ const puro = (p: string) =>
 
 const CLIENTE = "app/asistencia/AsistenciaClient.tsx";
 const CONFIG = "app/asistencia/ConfiguracionTab.tsx";
-const PAGINA = "app/asistencia/personas/PersonaPagina.tsx";
-const TEXTO = "app/asistencia/personas/FichaTexto.tsx";
-const EDITAR = "app/asistencia/personas/FichaEditar.tsx";
+// 🔴 10-sep-2026: la pestaña y la dirección se llaman «Colaboradores»
+// (Daniel: *«no lo llames personas, sino colaboradores»*): clave `colaboradores`,
+// carpeta `app/asistencia/colaboradores/`. Los nombres de los componentes y de
+// las constantes (`PersonaPagina`, `RUTA_PERSONAS`) se quedan: son identificadores.
+// Este candado cambió de texto, no de regla. Ver
+// `asistencia-colaboradores-no-personas.test.ts`.
+const PAGINA = "app/asistencia/colaboradores/PersonaPagina.tsx";
+const TEXTO = "app/asistencia/colaboradores/FichaTexto.tsx";
+const EDITAR = "app/asistencia/colaboradores/FichaEditar.tsx";
 const REPORTE = "app/asistencia/ReporteTab.tsx";
 
 /** Una ficha NORMAL: la de 36 de las 37 personas medidas. */
@@ -124,7 +130,7 @@ describe("A. 🔴 EL INTERRUPTOR ARRANCA APAGADO", () => {
   });
 
   it("🔴 apagado, la página de una persona NO existe: manda al módulo", () => {
-    const pag = puro("app/asistencia/personas/[codigo]/page.tsx");
+    const pag = puro("app/asistencia/colaboradores/[codigo]/page.tsx");
     expect(pag).toMatch(/PERSONA_EN_EL_CENTRO/);
     expect(pag).toMatch(/redirect\("\/asistencia"\)/);
   });
@@ -144,7 +150,7 @@ describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
   it("prendido: Personas · Planilla · Préstamos · Aprobaciones · Reporte", () => {
     expect(pestanasDeAsistencia({ personaEnElCentro: true, planillaUnida: true }))
       .toEqual([
-        ["personas", "Personas"],
+        ["colaboradores", "Colaboradores"],
         ["planilla", "Planilla"],
         ["prestamos", "Préstamos"],
         ["aprobaciones", "Aprobaciones"],
@@ -155,7 +161,7 @@ describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
   it("🔴 son CUATRO sin Préstamos — las que Daniel aprobó", () => {
     const claves = pestanasDeAsistencia({ personaEnElCentro: true, planillaUnida: false })
       .map(([k]) => k);
-    expect(claves).toEqual(["personas", "planilla", "aprobaciones", "reporte"]);
+    expect(claves).toEqual(["colaboradores", "planilla", "aprobaciones", "reporte"]);
   });
 
   it("🔴 Justificaciones y Vacaciones dejaron de ser pestañas", () => {
@@ -166,8 +172,8 @@ describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
   });
 
   it("🔴 el módulo abre en Personas, no en un cuadro", () => {
-    expect(pestanaPorDefecto(true)).toBe("personas");
-    expect(PESTANAS_PERSONA_EN_EL_CENTRO[0]).toEqual(["personas", "Personas"]);
+    expect(pestanaPorDefecto(true)).toBe("colaboradores");
+    expect(PESTANAS_PERSONA_EN_EL_CENTRO[0]).toEqual(["colaboradores", "Colaboradores"]);
   });
 
   it("Préstamos sigue colgando de SU interruptor, y en las dos listas", () => {
@@ -181,7 +187,7 @@ describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
   it("la pantalla monta «Personas» con el MISMO componente, no con uno nuevo", () => {
     // 🔴 Un segundo componente sería una segunda lista de personas.
     const src = puro(CLIENTE);
-    expect(src).toMatch(/tab === "personas" && <ConfiguracionTab personaEnElCentro \/>/);
+    expect(src).toMatch(/tab === "colaboradores" && <ConfiguracionTab personaEnElCentro \/>/);
     expect(src).toMatch(/tab === "configuracion" && <ConfiguracionTab \/>/);
     // Y la decisión de qué pestañas hay NO vive en el JSX.
     expect(src).toMatch(/pestanasDeAsistencia\(/);
@@ -194,14 +200,14 @@ describe("C. 🔴 LAS DIRECCIONES VIEJAS NO CAEN EN BLANCO", () => {
   const VISIBLES = PESTANAS_PERSONA_EN_EL_CENTRO;
 
   it("`?tab=configuracion` → Personas", () => {
-    expect(pestanaMudada("configuracion")).toBe("personas");
-    expect(pestanaQueSeAbre("configuracion", VISIBLES)).toBe("personas");
+    expect(pestanaMudada("configuracion")).toBe("colaboradores");
+    expect(pestanaQueSeAbre("configuracion", VISIBLES)).toBe("colaboradores");
   });
 
   it("🔴 `?tab=vacaciones` → PERSONAS, que es adonde se fue el saldo", () => {
     // Daniel: *«Reporte es para otra cosa»*. El saldo es un dato DE LA PERSONA.
-    expect(pestanaMudada("vacaciones")).toBe("personas");
-    expect(pestanaQueSeAbre("vacaciones", VISIBLES)).toBe("personas");
+    expect(pestanaMudada("vacaciones")).toBe("colaboradores");
+    expect(pestanaQueSeAbre("vacaciones", VISIBLES)).toBe("colaboradores");
   });
 
   it("🔴 `?tab=justificaciones` → REPORTE, que es lo que explican", () => {
@@ -211,7 +217,7 @@ describe("C. 🔴 LAS DIRECCIONES VIEJAS NO CAEN EN BLANCO", () => {
 
   it("basura, vacío o nulo caen en la primera visible — nunca en blanco", () => {
     for (const v of ["", "   ", "cualquiera", "PERSONAS", null, undefined]) {
-      expect(pestanaQueSeAbre(v, VISIBLES)).toBe("personas");
+      expect(pestanaQueSeAbre(v, VISIBLES)).toBe("colaboradores");
     }
   });
 
@@ -220,7 +226,7 @@ describe("C. 🔴 LAS DIRECCIONES VIEJAS NO CAEN EN BLANCO", () => {
     // suyo tiene que caer ahí, no en Personas.
     const suyas = PESTANAS_PERSONA_EN_EL_CENTRO.filter(([k]) => k === "aprobaciones");
     expect(pestanaQueSeAbre("configuracion", suyas)).toBe("aprobaciones");
-    expect(pestanaQueSeAbre("personas", suyas)).toBe("aprobaciones");
+    expect(pestanaQueSeAbre("colaboradores", suyas)).toBe("aprobaciones");
   });
 
   it("una pestaña que este rol SÍ ve se respeta tal cual", () => {
@@ -369,10 +375,10 @@ describe("F. 🔴 UNA PERSONA NUEVA ABRE DIRECTO EN EDITAR", () => {
   });
 
   it("la dirección del alta y la de una persona son las de siempre", () => {
-    expect(rutaDePersona("7")).toBe("/asistencia/personas/7");
-    expect(RUTA_PERSONA_NUEVA).toBe("/asistencia/personas/nueva");
+    expect(rutaDePersona("7")).toBe("/asistencia/colaboradores/7");
+    expect(RUTA_PERSONA_NUEVA).toBe("/asistencia/colaboradores/nueva");
     // 🔑 El código se codifica: puede traer cualquier cosa.
-    expect(rutaDePersona("a b/c")).toBe("/asistencia/personas/a%20b%2Fc");
+    expect(rutaDePersona("a b/c")).toBe("/asistencia/colaboradores/a%20b%2Fc");
   });
 
   it("la página lo aplica, no lo reescribe", () => {
@@ -461,7 +467,7 @@ describe("G. 🔴 LA FOTO DE LA CÉDULA: PRIVADA Y FIRMADA", () => {
   });
 
   it("se puede VER, DESCARGAR y QUITAR — si se agrega, se quita", () => {
-    const src = leer("app/asistencia/personas/CedulaFoto.tsx");
+    const src = leer("app/asistencia/colaboradores/CedulaFoto.tsx");
     expect(src).toMatch(/Ver la foto/);
     expect(src).toMatch(/Descargar/);
     // 🩸 EL BOTÓN VISIBLE, CON SU RÓTULO — no la palabra suelta.
@@ -499,17 +505,17 @@ describe("H. 🔴 LAS CUATRO SECCIONES, CON LOS ENDPOINTS DE SIEMPRE", () => {
   });
 
   it("🔴 cada una llama a SU ruta de siempre, con la persona ya puesta", () => {
-    expect(puro("app/asistencia/personas/SeccionPrestamos.tsx"))
+    expect(puro("app/asistencia/colaboradores/SeccionPrestamos.tsx"))
       .toMatch(/\/api\/asistencia\/prestamos-deuda/);
-    const just = puro("app/asistencia/personas/SeccionJustificaciones.tsx");
+    const just = puro("app/asistencia/colaboradores/SeccionJustificaciones.tsx");
     // 🩸 La ruta PEGADA al método: suelta, la caza el GET de arriba y un POST
     // a un endpoint inventado se colaba.
     expect(just).toMatch(/fetch\(\s*"\/api\/asistencia\/justificaciones",\s*\{\s*method: "POST"/);
     expect(just).toMatch(/JSON\.stringify\(\{ codigo, desde, hasta, motivo, nota \}\)/);
-    const vac = puro("app/asistencia/personas/SeccionVacaciones.tsx");
+    const vac = puro("app/asistencia/colaboradores/SeccionVacaciones.tsx");
     expect(vac).toMatch(/"\/api\/asistencia\/vacaciones"/);
     expect(vac).toMatch(/JSON\.stringify\(\{ codigo, desde, hasta, yaPagadas \}\)/);
-    expect(puro("app/asistencia/personas/SeccionAsistencia.tsx"))
+    expect(puro("app/asistencia/colaboradores/SeccionAsistencia.tsx"))
       .toMatch(/\/api\/asistencia\/reporte\?desde=/);
   });
 
@@ -517,7 +523,7 @@ describe("H. 🔴 LAS CUATRO SECCIONES, CON LOS ENDPOINTS DE SIEMPRE", () => {
     // 🩸 Ese selector, duplicado en las dos pestañas viejas, es el campo donde
     // se equivoca quien justifica de apuro.
     for (const f of ["SeccionJustificaciones", "SeccionVacaciones"]) {
-      expect(puro(`app/asistencia/personas/${f}.tsx`), f).not.toMatch(/optgroup/);
+      expect(puro(`app/asistencia/colaboradores/${f}.tsx`), f).not.toMatch(/optgroup/);
     }
   });
 
@@ -532,7 +538,7 @@ describe("H. 🔴 LAS CUATRO SECCIONES, CON LOS ENDPOINTS DE SIEMPRE", () => {
     // resuelve `enlaceAPrestamos()` (apagado → `/prestamos`, el de siempre).
     // 🔑 LA REGLA QUE PROTEGE NO CAMBIÓ y su control se conserva INTACTO: acá
     // no se crea nada — ni un `<form>`, ni un POST. Se enlaza.
-    const src = puro("app/asistencia/personas/SeccionPrestamos.tsx");
+    const src = puro("app/asistencia/colaboradores/SeccionPrestamos.tsx");
     expect(src).toMatch(/enlaceAPrestamos\(\)/);
     expect(src).not.toMatch(/method: "POST"/);
     expect(src).not.toMatch(/<form/);
@@ -627,15 +633,15 @@ describe("I. 🔴 EL SALDO EN PERSONAS, LAS JUSTIFICACIONES EN REPORTE", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 describe("🔴 SE USA EN EL CELULAR", () => {
   const ARCHIVOS = [
-    "app/asistencia/personas/PersonaPagina.tsx",
-    "app/asistencia/personas/FichaTexto.tsx",
-    "app/asistencia/personas/FichaEditar.tsx",
-    "app/asistencia/personas/Seccion.tsx",
-    "app/asistencia/personas/CedulaFoto.tsx",
-    "app/asistencia/personas/SeccionPrestamos.tsx",
-    "app/asistencia/personas/SeccionJustificaciones.tsx",
-    "app/asistencia/personas/SeccionVacaciones.tsx",
-    "app/asistencia/personas/SeccionAsistencia.tsx",
+    "app/asistencia/colaboradores/PersonaPagina.tsx",
+    "app/asistencia/colaboradores/FichaTexto.tsx",
+    "app/asistencia/colaboradores/FichaEditar.tsx",
+    "app/asistencia/colaboradores/Seccion.tsx",
+    "app/asistencia/colaboradores/CedulaFoto.tsx",
+    "app/asistencia/colaboradores/SeccionPrestamos.tsx",
+    "app/asistencia/colaboradores/SeccionJustificaciones.tsx",
+    "app/asistencia/colaboradores/SeccionVacaciones.tsx",
+    "app/asistencia/colaboradores/SeccionAsistencia.tsx",
     "app/asistencia/JustificacionesDelPeriodo.tsx",
   ];
 

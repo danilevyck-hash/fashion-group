@@ -405,7 +405,7 @@ export function textoSolapamiento(solapadas: readonly CabeceraGuardada[]): strin
   const plural = solapadas.length === 1 ? "una quincena ya cerrada" : `${solapadas.length} quincenas ya cerradas`;
   return (
     `Estas fechas se pisan con ${plural}: ${cuales}. `
-    + "Una persona no puede quedar pagada dos veces por el mismo día. "
+    + "Un colaborador no puede quedar pagado dos veces por el mismo día. "
     + "Si hay que rehacerla, primero reabre la que ya está cerrada."
   );
 }
@@ -504,7 +504,7 @@ export function frenosParaCerrar(
       quienes,
       codigos: extras.map((e) => e.codigo),
       texto:
-        `${extras.length === 1 ? "1 persona tiene" : `${extras.length} personas tienen`} horas extra sin aprobar `
+        `${extras.length === 1 ? "1 colaborador tiene" : `${extras.length} colaboradores tienen`} horas extra sin aprobar `
         + `(${lista(extras.map((e) => `${e.etiqueta} · ${e.minutos.toFixed(2)} min`))}). `
         + "Ve a la pestaña «Aprobaciones», aprueba o deja sin aprobar esas horas, y vuelve a cerrar. "
         + "Si se cierra así, esas horas no se pagan y no hay forma de arreglarlo después sin reabrir.",
@@ -520,7 +520,7 @@ export function frenosParaCerrar(
       quienes,
       codigos: pres.map((p) => p.codigo),
       texto:
-        `${pres.length === 1 ? "1 persona tiene" : `${pres.length} personas tienen`} un descuento de préstamo sin aprobar `
+        `${pres.length === 1 ? "1 colaborador tiene" : `${pres.length} colaboradores tienen`} un descuento de préstamo sin aprobar `
         + `(${lista(pres.map((p) => `${p.etiqueta} · ${plata(p.sugerido)}`))}). `
         + "Apruébalo (o déjalo en cero) en el bloque «Préstamo por descontar» de esta misma pestaña, y vuelve a cerrar.",
     });

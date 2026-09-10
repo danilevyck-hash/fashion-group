@@ -198,7 +198,10 @@ describe("🔴 con los sueldos abiertos", () => {
     responder(CON_DINERO);
     render(<PlanillaBoston />);
     elegirPeriodo();
-    await waitFor(() => expect(screen.getByText(/TOTAL · 1 persona/)).toBeTruthy());
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    await waitFor(() => expect(screen.getByText(/TOTAL · 1 colaborador/)).toBeTruthy());
   });
 
   it("⚠️ el pie «los sueldos los lleva contabilidad» YA NO se dibuja", async () => {

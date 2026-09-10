@@ -1102,7 +1102,7 @@ dos direcciones.
 | Interruptor | Archivo:línea | Qué prende |
 |---|---|---|
 | `NEXT_PUBLIC_PLANILLA_UNIDA` | `src/lib/asistencia/planilla-unida.ts:26` | Comprobante de pago · el cierre que escribe el pago del préstamo (reabrir lo revierte) · corte 13/28 + «Ajuste quincena anterior» · **pestaña Préstamos** y la «una sola puerta» |
-| `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO` | `src/lib/asistencia/persona-en-el-centro.ts:43` | 6 pestañas → 4 (5 con Préstamos) · Personas primera · la página de cada persona con Editar · saldo de vacaciones en Personas · justificaciones del período en Reporte |
+| `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO` | `src/lib/asistencia/persona-en-el-centro.ts:43` | 6 pestañas → 4 (5 con Préstamos) · **Colaboradores** primera (era «Personas» hasta el 10-sep-2026 por la tarde) · la página de cada colaborador con Editar · saldo de vacaciones en Colaboradores · justificaciones del período en Reporte |
 
 **Cómo se prenden:** variable en Vercel (`=1`) **+ un despliegue**. Next reemplaza las
 `NEXT_PUBLIC_*` como TEXTO al compilar, así que cambiarla en caliente no alcanza.
@@ -1152,3 +1152,48 @@ Se creó el bucket **privado** `asistencia-cedulas` (`public = false`).
 3. **Cargar las personas de ACS** si quiere que Multifashion entre a la planilla (hoy
    tiene 0) — recién ahí los 30 min automáticos mueven algo.
 4. **Dictar el cargo y la cédula** de la gente: sin cargo, el comprobante imprime un guion.
+
+---
+
+## 10-sep-2026 (tarde) — «Colaboradores», no «personas»
+
+Daniel, textual, con `NEXT_PUBLIC_PERSONA_EN_EL_CENTRO` ya prendido en producción:
+*«no lo llames personas, sino colaboradores»*.
+
+**Qué cambió (solo NOMBRES; nada de lo que se guarda):**
+
+- La pestaña que abre Asistencia se rotula **«Colaboradores»** y su clave de URL es
+  `?tab=colaboradores` (`src/lib/asistencia/persona-en-el-centro.ts`).
+- La página de cada quien vive en **`/asistencia/colaboradores/[codigo]`** (carpeta
+  `src/app/asistencia/colaboradores/`, movida con `git mv`).
+- **Lo viejo sigue llegando:** `?tab=personas` entró a la MUDANZA del módulo puro (junto a
+  `configuracion` y `vacaciones`) y `/asistencia/personas/:codigo` redirige **307** con la
+  query intacta desde `next.config.js`, como `/cheques` → `/recordatorios`.
+- Todo texto visible del módulo (pantalla, Excel, PDF, avisos): columna «Colaborador» en
+  Planilla · Reporte · Horarios · Préstamos · Justificaciones · Vacaciones · los dos Excel y
+  el PDF; «+ Nuevo colaborador» y «Colaborador nuevo»; «‹ Colaboradores»; «Buscar
+  colaborador»; «Elige al colaborador»; «N colaboradores tienen horas extra sin aprobar»;
+  «N colaboradores de 38 todavía no salen en la planilla»; «N colaboradores no tienen
+  saldo»; «1 colaborador dado de baja siguió marcando»; «TOTAL — N colaboradores»;
+  «días-colaborador» (Excel de aprobaciones); «Préstamos sin colaborador»; los mensajes
+  «Falta el colaborador» de las rutas API; los avisos de DDL pendiente («todos los
+  colaboradores aparecen como activos»…); y la planilla de Boston, que reusa el mismo
+  cuadro («N colaboradores»).
+
+**Lo que se dejó a propósito:** identificadores y tablas (`asistencia_personas`,
+`persona-en-el-centro.ts`, `PersonaPagina`, `RUTA_PERSONAS`, `PARAM_PERSONA = "persona"`
+en la URL de Aprobaciones, `data-testid="chip-persona"`, `seccion.personas` del
+acordeón), los comentarios de código, y las frases donde «persona» es «un humano decide»
+(«lo decide una persona», en la planilla exportada). También `PrestamosClient.tsx`
+(«N personas · $…»), que es el módulo Préstamos y no Asistencia. ⚠️ Detalle visto de paso,
+sin tocar: el aviso de saldo de vacaciones dice «Se cargan en Configuración» y con el
+interruptor prendido esa pestaña se llama Colaboradores.
+
+**Candados:** nuevo `asistencia-colaboradores-no-personas.test.ts` (rótulo · `?tab=personas`
+→ colaboradores · la carpeta vieja no existe y el redirect está · barrido de «Personas» y
+`"Persona"` en `src/app/asistencia` + `src/lib/asistencia` · los avisos). **13 candados
+cambiaron de texto con nota fechada, ninguno se borró**: `persona-en-el-centro` ·
+`asistencia-pestanas` · `asistencia-poda-textos` · `asistencia-vacaciones-saldo` ·
+`boston-planilla-con-dinero` · `planilla-aviso-lleva-a-aprobaciones` · `aprobaciones-excel` ·
+`asistencia-aprobador-empresa` · `asistencia-saldo-vacaciones` · `asistencia-vigencia` ·
+`planilla-aviso-extras-sin-aprobar` · `planilla-unida-cierre-prestamo` · `prestamos-una-puerta`.

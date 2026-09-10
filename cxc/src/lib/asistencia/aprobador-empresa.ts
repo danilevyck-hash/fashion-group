@@ -137,7 +137,7 @@ export function puedeAprobarA(
       mias.length === 0
         ? "No tienes ninguna empresa asignada para aprobar horas extra. Pídele a Daniel que te la asigne."
         : fuera.length === 1
-          ? "No se aprobó nada: hay una persona que no es de tus empresas."
-          : `No se aprobó nada: hay ${fuera.length} personas que no son de tus empresas.`,
+          ? "No se aprobó nada: hay un colaborador que no es de tus empresas."
+          : `No se aprobó nada: hay ${fuera.length} colaboradores que no son de tus empresas.`,
   };
 }

@@ -77,7 +77,7 @@ export default function JustificacionesTab() {
   const sinNombre = personas.filter((p) => !p.configurado);
 
   async function agregar() {
-    if (!codigo) return toast("Elige la persona", "error");
+    if (!codigo) return toast("Elige al colaborador", "error");
     if (!motivo) return toast("Elige el motivo", "error");
     if (hasta < desde) return toast("La fecha final es anterior a la inicial", "error");
     // La MISMA función que usa el motor decide si la ventana sirve: una regla
@@ -128,7 +128,7 @@ export default function JustificacionesTab() {
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Persona</label>
+            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Colaborador</label>
             {/* Los que tienen nombre van arriba y alfabéticos; los que todavía
                 no, agrupados abajo y por número de verdad (5 antes que 49).
                 Siguen siendo ELEGIBLES: son gente que marca y a la que hay que
@@ -136,7 +136,7 @@ export default function JustificacionesTab() {
             <select value={codigo} onChange={(e) => setCodigo(e.target.value)} className={campo}>
               <option value="">Elegir…</option>
               {conNombre.length > 0 && (
-                <optgroup label="Personas">
+                <optgroup label="Colaboradores">
                   {conNombre.map((p) => (
                     <option key={p.codigo} value={p.codigo}>{p.etiqueta}</option>
                   ))}
@@ -203,7 +203,7 @@ export default function JustificacionesTab() {
           <p className="mt-2 rounded bg-blue-50 px-2 py-1.5 text-[12px] text-blue-900">
             Es un <b>permiso de horas</b>: perdona los minutos de tardanza que caigan entre las{" "}
             <b>{horaDesde}</b> y las <b>{horaHasta}</b>, y nada más.{" "}
-            <b>No justifica el día entero</b> — si la persona no viene, ese día se le sigue
+            <b>No justifica el día entero</b> — si el colaborador no viene, ese día se le sigue
             descontando completo.
           </p>
         ) : (
@@ -224,7 +224,7 @@ export default function JustificacionesTab() {
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-[10.5px] uppercase tracking-wide text-gray-400">
-              <th className="px-3 py-2.5 text-left font-medium">Persona</th>
+              <th className="px-3 py-2.5 text-left font-medium">Colaborador</th>
               <th className="px-3 py-2.5 text-left font-medium">Días</th>
               <th className="px-3 py-2.5 text-left font-medium">Motivo</th>
               <th className="px-3 py-2.5 text-left font-medium">Nota</th>

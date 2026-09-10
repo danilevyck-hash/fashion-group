@@ -298,7 +298,10 @@ describe("el aviso de quién se quedó sin saldo", () => {
 
   it("con las dos causas dice el total y CADA número, y suman", () => {
     const t = avisoSinSaldo(20, 16)!;
-    expect(t).toContain("36 personas no tienen saldo");
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    expect(t).toContain("36 colaboradores no tienen saldo");
     expect(t).toContain("a 20 les falta la fecha de ingreso");
     expect(t).toContain("a 16 el saldo");
     expect(t).toContain("Configuración");
@@ -311,7 +314,7 @@ describe("el aviso de quién se quedó sin saldo", () => {
   });
 
   it("una sola persona se dice en singular", () => {
-    expect(avisoSinSaldo(1, 0)).toContain("1 persona no tiene saldo");
+    expect(avisoSinSaldo(1, 0)).toContain("1 colaborador no tiene saldo");
   });
 });
 

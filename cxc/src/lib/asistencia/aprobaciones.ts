@@ -417,7 +417,7 @@ export function enlaceAprobaciones(
 
 /** La cabecera del aviso, sin el detalle: el detalle va como enlaces. */
 export function cabeceraExtraNoAprobada(cantidad: number): string {
-  const quien = cantidad === 1 ? "1 persona tiene" : `${cantidad} personas tienen`;
+  const quien = cantidad === 1 ? "1 colaborador tiene" : `${cantidad} colaboradores tienen`;
   return `${quien} horas extra sin aprobar: NO se pagaron en este cuadro. Se aprueban en la pestaña Aprobaciones.`;
 }
 
@@ -481,8 +481,8 @@ export function textoExtraNoAprobada(
     .join(" — ");
   const cabeza =
     items.length === 1
-      ? "1 persona tiene horas extra sin aprobar: NO se pagaron en este cuadro."
-      : `${items.length} personas tienen horas extra sin aprobar: NO se pagaron en este cuadro.`;
+      ? "1 colaborador tiene horas extra sin aprobar: NO se pagaron en este cuadro."
+      : `${items.length} colaboradores tienen horas extra sin aprobar: NO se pagaron en este cuadro.`;
   return `${cabeza} Se aprueban en la pestaña Aprobaciones. ${detalle}`;
 }
 

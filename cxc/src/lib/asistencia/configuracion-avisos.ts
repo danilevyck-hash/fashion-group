@@ -45,7 +45,7 @@ export function avisoPendientes(r: ResumenConfiguracion): AvisoPendientes | null
   const pendientes = r.sinConfigurar + r.sinSalario;
   if (pendientes <= 0) return null;
 
-  const personas = pendientes === 1 ? "persona" : "personas";
+  const personas = pendientes === 1 ? "colaborador" : "colaboradores";
   const titulo =
     `${pendientes} ${personas} de ${r.total} todavía no ${pendientes === 1 ? "sale" : "salen"}` +
     " en la planilla.";

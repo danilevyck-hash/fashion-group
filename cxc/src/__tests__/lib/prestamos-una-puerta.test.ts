@@ -192,7 +192,10 @@ describe("E. El cableado está puesto donde tiene que estar", () => {
   });
 
   it("la sección de la persona enlaza, no dibuja un segundo formulario", () => {
-    const src = leer("src/app/asistencia/personas/SeccionPrestamos.tsx");
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    const src = leer("src/app/asistencia/colaboradores/SeccionPrestamos.tsx");
     expect(src).toMatch(/enlaceAPrestamos\(\)/);
     expect(src).toMatch(/enlaceAPrestamos\(ficha\.id\)/);
     // 🔴 Ni un `<form>` ni un POST: acá se MUESTRA y se enlaza.

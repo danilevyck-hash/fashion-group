@@ -309,8 +309,8 @@ export function avisoMarcasPosteriores(
   const n = casos.length;
   const titulo =
     n === 1
-      ? "1 persona dada de baja siguió marcando en el reloj."
-      : `${n} personas dadas de baja siguieron marcando en el reloj.`;
+      ? "1 colaborador dado de baja siguió marcando en el reloj."
+      : `${n} colaboradores dados de baja siguieron marcando en el reloj.`;
   const detalle = casos.map(
     (c) =>
       `${c.etiqueta} salió el ${fechaLegible(c.fechaSalida)} y marcó el `
@@ -438,6 +438,6 @@ export function avisoMigracionBajas(): string {
   return (
     "Todavía no se puede dar de baja a nadie: falta preparar la base de datos. "
     + `Pídele a Daniel que corra el archivo ${MIGRACION_BAJAS} en Supabase. `
-    + "Mientras tanto todo lo demás funciona igual y todas las personas aparecen como activas."
+    + "Mientras tanto todo lo demás funciona igual y todos los colaboradores aparecen como activos."
   );
 }

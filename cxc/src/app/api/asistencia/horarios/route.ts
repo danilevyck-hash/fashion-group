@@ -122,7 +122,7 @@ export async function PUT(req: NextRequest) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
 
   const codigo = (body.codigo ?? "").trim();
-  if (!codigo) return NextResponse.json({ error: "Falta la persona" }, { status: 400 });
+  if (!codigo) return NextResponse.json({ error: "Falta el colaborador" }, { status: 400 });
   const salida = (body.salida ?? "").trim();
   if (!/^\d{2}:\d{2}$/.test(salida)) return NextResponse.json({ error: "Hora de salida inválida" }, { status: 400 });
 

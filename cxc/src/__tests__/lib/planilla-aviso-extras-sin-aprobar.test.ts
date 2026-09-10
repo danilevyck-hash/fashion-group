@@ -147,7 +147,10 @@ describe("a. 🔴 todo sin aprobar → el aviso SALE y el cierre FRENA", () => {
     expect(aviso[0].monto!).toBeGreaterThan(0);
 
     const texto = textoExtraNoAprobada(aviso)!;
-    expect(texto).toContain("1 persona tiene horas extra sin aprobar");
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    expect(texto).toContain("1 colaborador tiene horas extra sin aprobar");
     expect(texto).toContain("KEVIN LUBO");
     expect(texto).toContain("1,60 h");
   });

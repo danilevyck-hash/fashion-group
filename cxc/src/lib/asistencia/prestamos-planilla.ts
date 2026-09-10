@@ -478,8 +478,8 @@ export function textoPrestamoSinAprobar(
     .join(" — ");
   const cabeza =
     items.length === 1
-      ? "1 persona tiene préstamo por descontar sin aprobar: NO se descontó en este cuadro."
-      : `${items.length} personas tienen préstamo por descontar sin aprobar: NO se descontó en este cuadro.`;
+      ? "1 colaborador tiene préstamo por descontar sin aprobar: NO se descontó en este cuadro."
+      : `${items.length} colaboradores tienen préstamo por descontar sin aprobar: NO se descontó en este cuadro.`;
   return `${cabeza} Se aprueba aquí arriba, en «Préstamos por descontar». ${detalle}`;
 }
 
@@ -506,12 +506,12 @@ export function textoPrestamoSinAtar(
   const detalle = items.map((s) => `${s.nombre} · ${plata(s.saldo)}`).join(" — ");
   const cabeza =
     items.length === 1
-      ? "1 préstamo con saldo no está atado a nadie de la planilla, así que no se le descuenta a ninguna persona."
-      : `${items.length} préstamos con saldo no están atados a nadie de la planilla, así que no se le descuentan a ninguna persona.`;
+      ? "1 préstamo con saldo no está atado a nadie de la planilla, así que no se le descuenta a ningún colaborador."
+      : `${items.length} préstamos con saldo no están atados a nadie de la planilla, así que no se le descuentan a ningún colaborador.`;
   // ⚠️ Esta frase decía lo mismo desde el 2-sep-2026 y la acción NO EXISTÍA: no
   // había forma de poner el código desde ninguna pantalla. Desde el 5-sep-2026
   // sí la hay — se elige a la persona de Asistencia en la ficha del préstamo.
-  return `${cabeza} Se atan en Préstamos, eligiendo la persona en su ficha. ${detalle}`;
+  return `${cabeza} Se atan en Préstamos, eligiendo al colaborador en su ficha. ${detalle}`;
 }
 
 /** Cuántas faltan y cuánto suman. Es el contador del bloque. */

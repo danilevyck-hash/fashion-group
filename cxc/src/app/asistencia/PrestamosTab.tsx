@@ -109,7 +109,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm text-gray-600">
-          {fichas.length === 1 ? "1 persona con deuda" : `${fichas.length} personas con deuda`}
+          {fichas.length === 1 ? "1 colaborador con deuda" : `${fichas.length} colaboradores con deuda`}
         </p>
         <p className="text-sm tabular-nums text-gray-900">
           <span className="text-gray-500">Total </span>
@@ -123,7 +123,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-3 py-2 font-medium">Persona</th>
+              <th className="px-3 py-2 font-medium">Colaborador</th>
               <th className="px-3 py-2 text-right font-medium">Préstamo</th>
               <th className="px-3 py-2 text-right font-medium">Daño de mercancía</th>
               <th className="px-3 py-2 text-right font-medium">Debe</th>

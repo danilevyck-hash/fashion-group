@@ -336,9 +336,9 @@ export const NOMBRE_MAX = 120;
 
 /** El nombre de la persona. Es obligatorio: el reloj manda el código pelado. */
 export function validarNombre(v: unknown): Resultado<string> {
-  if (typeof v !== "string") return { ok: false, error: "Escribe el nombre de la persona." };
+  if (typeof v !== "string") return { ok: false, error: "Escribe el nombre del colaborador." };
   const s = v.trim().replace(/\s+/g, " ");
-  if (!s) return { ok: false, error: "Escribe el nombre de la persona." };
+  if (!s) return { ok: false, error: "Escribe el nombre del colaborador." };
   if (s.length > NOMBRE_MAX) {
     return { ok: false, error: `El nombre es muy largo (máximo ${NOMBRE_MAX} letras).` };
   }
@@ -403,7 +403,7 @@ export interface PersonaConfig {
 export function validarPersona(body: unknown): Resultado<PersonaConfig> {
   const b = (body ?? {}) as Record<string, unknown>;
   const codigo = typeof b.codigo === "string" ? b.codigo.trim() : "";
-  if (!codigo) return { ok: false, error: "Falta el código de la persona en el reloj." };
+  if (!codigo) return { ok: false, error: "Falta el código del colaborador en el reloj." };
 
   const nombre = validarNombre(b.nombre);
   if (!nombre.ok) return nombre;

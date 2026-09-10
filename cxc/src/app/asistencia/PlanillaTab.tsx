@@ -1006,7 +1006,7 @@ export default function PlanillaTab() {
               </p>
               <p className="mt-0.5 text-[13px] text-gray-600">
                 La cerró <b>{cerrada.cerradaPor}</b> el {cuandoBonito(cerrada.cerradaEn)} —{" "}
-                {cerrada.personas} {cerrada.personas === 1 ? "persona" : "personas"}, neto{" "}
+                {cerrada.personas} {cerrada.personas === 1 ? "colaborador" : "colaboradores"}, neto{" "}
                 <b>${$(cerrada.totalNeto)}</b>. Esos números quedaron congelados: aunque después
                 alguien corrija una marcación, lo que se pagó no cambia.
               </p>
@@ -1124,8 +1124,8 @@ export default function PlanillaTab() {
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
               <p className="text-sm font-medium text-amber-900">
                 {data.ajusteQuincenaAnterior.personas.length === 1
-                  ? "1 persona trae un ajuste de la quincena anterior"
-                  : `${data.ajusteQuincenaAnterior.personas.length} personas traen un ajuste de la quincena anterior`}
+                  ? "1 colaborador trae un ajuste de la quincena anterior"
+                  : `${data.ajusteQuincenaAnterior.personas.length} colaboradores traen un ajuste de la quincena anterior`}
               </p>
               <p className="mt-0.5 text-[13px] text-amber-900">
                 Son los días que la quincena pasada pagó sin medir (después del corte).
@@ -1330,8 +1330,8 @@ export default function PlanillaTab() {
         <p className="rounded-md bg-red-50 px-3 py-2 text-[13px] text-red-800">
           <b>{data.avisos.marcoDespuesDeIrse}</b>{" "}
           {data.avisos.marcoDespuesDeIrse === 1
-            ? "persona marcó en el reloj después de la fecha en que salió"
-            : "personas marcaron en el reloj después de la fecha en que salieron"}
+            ? "colaborador marcó en el reloj después de la fecha en que salió"
+            : "colaboradores marcaron en el reloj después de la fecha en que salieron"}
           . O volvieron a trabajar —hay que reactivarlas en <b>Configuración</b> o la planilla
           les paga cero— o alguien más está usando su huella.
         </p>
@@ -1339,7 +1339,7 @@ export default function PlanillaTab() {
       {!!data?.avisos.fueraPorBaja && (
         <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
           <b>{data.avisos.fueraPorBaja}</b>{" "}
-          {data.avisos.fueraPorBaja === 1 ? "persona no sale" : "personas no salen"} en esta
+          {data.avisos.fueraPorBaja === 1 ? "colaborador no sale" : "colaboradores no salen"} en esta
           quincena: ya no trabajaban aquí, o entraron después. Las quincenas en las que sí
           trabajaron siguen igual — se ven eligiendo esa quincena arriba.
         </p>
@@ -1347,7 +1347,7 @@ export default function PlanillaTab() {
       {!!data?.avisos.sinHorario && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           <b>{data.avisos.sinHorario}</b>{" "}
-          {data.avisos.sinHorario === 1 ? "persona no tiene" : "personas no tienen"} su hora de
+          {data.avisos.sinHorario === 1 ? "colaborador no tiene" : "colaboradores no tienen"} su hora de
           salida confirmada. Mientras tanto se asume {data.avisos.salidaAsumida} para las horas
           extra, y un día de ausencia se cuenta como{" "}
           <b>{data.avisos.horasAusenciaDefault} horas</b>. Revísalo en <b>Horarios</b>.
@@ -1356,7 +1356,7 @@ export default function PlanillaTab() {
       {!!data?.avisos.conSabado && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           <b>{data.avisos.conSabado}</b>{" "}
-          {data.avisos.conSabado === 1 ? "persona trabajó" : "personas trabajaron"} un sábado. El
+          {data.avisos.conSabado === 1 ? "colaborador trabajó" : "colaboradores trabajaron"} un sábado. El
           cuadro no tiene columna para el sábado, así que esas horas <b>no se pagan aquí</b>: las
           ves en la hoja «Horas» del Excel.
         </p>
@@ -1414,7 +1414,7 @@ export default function PlanillaTab() {
               <table className="w-max min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-400">
-                    <th className="sticky left-0 z-10 bg-white px-3 py-2.5 text-left font-medium">Persona</th>
+                    <th className="sticky left-0 z-10 bg-white px-3 py-2.5 text-left font-medium">Colaborador</th>
                     {[
                       "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas",
                       "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
@@ -1485,7 +1485,7 @@ export default function PlanillaTab() {
                   <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
                     <td className="sticky left-0 z-10 bg-gray-50 px-3 py-2.5">
                       TOTAL · {data.totales.personas}{" "}
-                      {data.totales.personas === 1 ? "persona" : "personas"}
+                      {data.totales.personas === 1 ? "colaborador" : "colaboradores"}
                     </td>
                     {[
                       data.totales.salarioQuincenal, data.totales.extraDiurno, data.totales.ausencias,
@@ -1510,7 +1510,7 @@ export default function PlanillaTab() {
             {buenas.some((l) => (l.dinero?.ausenciaPorTardanza ?? 0) > 0) && (
               <p className="mt-2 px-1 text-[12px] text-gray-600">
                 <span className="font-semibold text-amber-700">*</span>{" "}
-                Incluye días en que la persona SÍ vino pero llegó más de{" "}
+                Incluye días en que el colaborador SÍ vino pero llegó más de{" "}
                 {MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde. <b>Se descuentan los minutos, igual
                 que una tardanza</b> — la columna solo cambia de nombre, el total bruto es el mismo.
                 Pasa el cursor por el número para ver cuánto y de cuántos días.
@@ -1565,7 +1565,7 @@ export default function PlanillaTab() {
             <div className="rounded-lg border-2 border-gray-300 bg-gray-50 p-3">
               <p className="text-xs uppercase tracking-wide text-gray-500">
                 Total · {data.totales.personas}{" "}
-                {data.totales.personas === 1 ? "persona" : "personas"}
+                {data.totales.personas === 1 ? "colaborador" : "colaboradores"}
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
                 ${$(data.totales.netoPagar - (data.ajusteQuincenaAnterior?.total ?? 0))}
@@ -1579,7 +1579,7 @@ export default function PlanillaTab() {
           {!!fueraDePlanilla.length && (
             <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
               <b>{fueraDePlanilla.length}</b>{" "}
-              {fueraDePlanilla.length === 1 ? "persona no va" : "personas no van"} en la planilla
+              {fueraDePlanilla.length === 1 ? "colaborador no va" : "colaboradores no van"} en la planilla
               (servicio profesional). {EXPLICACION_SERVICIO_PROFESIONAL} Se cambia en{" "}
               <b>Configuración</b>.
             </p>
@@ -1593,7 +1593,7 @@ export default function PlanillaTab() {
           {!!decidir.length && (
             <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
               <b>Tú decides:</b> {decidir.length}{" "}
-              {decidir.length === 1 ? "persona quedó" : "personas quedaron"} fuera del total porque
+              {decidir.length === 1 ? "colaborador quedó" : "colaboradores quedaron"} fuera del total porque
               el sistema no puede saber cuánto le toca —está justificada, o entró o salió a mitad
               del período—. <b>No es un error y no hay nada que arreglar</b>: al lado de cada una
               está el motivo y lo que le daría la quincena completa. Para sacar lo suyo, usa{" "}
@@ -1603,7 +1603,7 @@ export default function PlanillaTab() {
           {!!pendientes.length && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
               <b>Falta un dato:</b> {pendientes.length}{" "}
-              {pendientes.length === 1 ? "persona quedó" : "personas quedaron"} fuera del total
+              {pendientes.length === 1 ? "colaborador quedó" : "colaboradores quedaron"} fuera del total
               porque falta configurarles algo. <b>No valen $0</b> — se arreglan en la pestaña{" "}
               <b>Configuración</b>.
             </p>
@@ -1740,7 +1740,7 @@ function ModalCierre({
               {/* Los cuatro números, en una línea: es lo que deja darse cuenta
                   de que está elegida la empresa equivocada antes de firmar. */}
               <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] tabular-nums text-gray-700">
-                Se congelan <b>{totales.personas} {totales.personas === 1 ? "persona" : "personas"}</b>,
+                Se congelan <b>{totales.personas} {totales.personas === 1 ? "colaborador" : "colaboradores"}</b>,
                 con un <b>neto a pagar de ${$(totales.netoPagar - (ajusteTotal ?? 0))}</b> — bruto ${$(totales.totalBruto)},
                 deducciones ${$(totales.totalDeducciones)}.
               </p>

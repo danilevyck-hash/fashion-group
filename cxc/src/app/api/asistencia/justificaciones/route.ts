@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
   const desde = (b.desde ?? "").trim();
   const hasta = (b.hasta ?? desde).trim();
   const motivo = (b.motivo ?? "").trim();
-  if (!codigo) return NextResponse.json({ error: "Falta la persona" }, { status: 400 });
+  if (!codigo) return NextResponse.json({ error: "Falta el colaborador" }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
     return NextResponse.json({ error: "Fechas inválidas" }, { status: 400 });
   }

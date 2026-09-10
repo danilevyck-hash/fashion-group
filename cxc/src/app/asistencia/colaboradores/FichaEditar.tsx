@@ -138,7 +138,7 @@ export default function FichaEditar({
   return (
     <div className="rounded-lg border border-gray-200 bg-white">
       <p className="border-b border-gray-100 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-gray-400">
-        {nueva ? "Persona nueva" : "Editando su información"}
+        {nueva ? "Colaborador nuevo" : "Editando su información"}
       </p>
 
       {/* ── DATOS ───────────────────────────────────────────────────────── */}

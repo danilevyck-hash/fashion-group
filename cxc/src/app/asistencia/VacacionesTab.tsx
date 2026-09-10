@@ -96,7 +96,7 @@ export default function VacacionesTab() {
   const saldoElegido = codigo ? (saldos.find((s) => s.codigo === codigo) ?? null) : null;
 
   async function agregar() {
-    if (!codigo) return toast("Elige la persona", "error");
+    if (!codigo) return toast("Elige al colaborador", "error");
     if (hasta < desde) return toast("La fecha final es anterior a la inicial", "error");
     setGuardando(true);
     try {
@@ -167,14 +167,14 @@ export default function VacacionesTab() {
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Persona</label>
+            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Colaborador</label>
             {/* Los que tienen nombre arriba y alfabéticos; los que todavía no,
                 agrupados abajo. Siguen siendo ELEGIBLES: son gente que marca y
                 a la que hay que poder darle vacaciones. */}
             <select value={codigo} onChange={(e) => setCodigo(e.target.value)} className={campo}>
               <option value="">Elegir…</option>
               {conNombre.length > 0 && (
-                <optgroup label="Personas">
+                <optgroup label="Colaboradores">
                   {conNombre.map((p) => (
                     <option key={p.codigo} value={p.codigo}>{p.etiqueta}</option>
                   ))}
@@ -307,7 +307,7 @@ export default function VacacionesTab() {
       {saldos.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <div className="mb-3">
-            <h2 className="text-sm font-medium text-gray-900">Saldo por persona</h2>
+            <h2 className="text-sm font-medium text-gray-900">Saldo por colaborador</h2>
             {/* Una línea y corta: 30 días al año, y desde cuándo cuenta la
                 resta. Lo segundo NO se puede sacar: los días ganados vienen
                 desde que la persona entró y las vacaciones solo existen en el

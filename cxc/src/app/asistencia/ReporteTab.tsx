@@ -163,7 +163,7 @@ export default function ReporteTab() {
       <div className="flex flex-wrap items-end gap-3">
         <RangoFechas desde={desde} hasta={hasta} recordarComo="asistencia_reporte" onChange={(d, h) => { setDesde(d); setHasta(h); }} />
         <input
-          type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar persona"
+          type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar colaborador"
           className="min-h-[44px] flex-1 min-w-[160px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
         />
         <div className="flex gap-2">
@@ -202,7 +202,7 @@ export default function ReporteTab() {
           temprana pueden estar mal. Vale avisarlo antes de que descuente. */}
       {sinHorario > 0 && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          <b>{sinHorario}</b> {sinHorario === 1 ? "persona no tiene" : "personas no tienen"} su hora de salida
+          <b>{sinHorario}</b> {sinHorario === 1 ? "colaborador no tiene" : "colaboradores no tienen"} su hora de salida
           confirmada. Mientras tanto se asume 5:00 p.m. — revísalo en <b>Horarios</b>.
         </p>
       )}
@@ -218,7 +218,7 @@ export default function ReporteTab() {
           {correcciones.agregadas > 0 && (
             <> — {correcciones.agregadas} {correcciones.agregadas === 1 ? "es una marcación agregada" : "son marcaciones agregadas"}</>
           )}
-          . Los números de abajo ya cuentan con eso. Abre a la persona para ver qué se cambió y por qué.
+          . Los números de abajo ya cuentan con eso. Abre al colaborador para ver qué se cambió y por qué.
         </p>
       )}
 
@@ -238,7 +238,7 @@ export default function ReporteTab() {
       {fueraDelRango > 0 && (
         <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
           <b>{fueraDelRango}</b>{" "}
-          {fueraDelRango === 1 ? "persona no aparece" : "personas no aparecen"} porque no
+          {fueraDelRango === 1 ? "colaborador no aparece" : "colaboradores no aparecen"} porque no
           estaba trabajando en estas fechas (entró después o ya se había ido). Sus marcaciones
           siguen guardadas y salen si consultas el rango en que sí trabajaba.
         </p>
@@ -263,7 +263,7 @@ export default function ReporteTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-[10.5px] uppercase tracking-wide text-gray-400">
-                <th className="px-3 py-2.5 text-left font-medium">Persona</th>
+                <th className="px-3 py-2.5 text-left font-medium">Colaborador</th>
                 <th className="px-2 py-2.5 text-center font-medium">Sale</th>
                 <th className="px-2 py-2.5 text-right font-medium">Días</th>
                 <th className="px-2 py-2.5 text-right font-medium">Ausen.</th>
@@ -286,7 +286,7 @@ export default function ReporteTab() {
             </tbody>
             <tfoot>
               <tr className="border-t border-gray-200 bg-gray-50 font-semibold">
-                <td className="px-3 py-2.5" colSpan={3}>{personas.length} personas</td>
+                <td className="px-3 py-2.5" colSpan={3}>{personas.length} {personas.length === 1 ? "colaborador" : "colaboradores"}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{tot.aus || "—"}</td>
                 <td className="px-2 py-2.5"></td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{tot.tarde || "—"}</td>

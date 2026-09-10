@@ -154,7 +154,7 @@ export function avisoMigracionSeguros(): string {
   return (
     "Todavía no se puede quitarle los seguros a nadie: falta preparar la base de "
     + `datos. Pídele a Daniel que corra el archivo ${MIGRACION_SEGUROS} en Supabase. `
-    + "Mientras tanto todo lo demás funciona igual y a todas las personas se les "
+    + "Mientras tanto todo lo demás funciona igual y a todos los colaboradores se les "
     + "descuentan el seguro social y el educativo, como hasta ahora."
   );
 }

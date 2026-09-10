@@ -298,7 +298,7 @@ export function avisoMigracionReparto(): string {
   return (
     "Todavía no se puede repartir el sueldo de nadie entre dos empresas: falta "
     + `preparar la base de datos. Pídele a Daniel que corra el archivo ${MIGRACION_REPARTO} `
-    + "en Supabase. Mientras tanto todo lo demás funciona igual y cada persona sale "
+    + "en Supabase. Mientras tanto todo lo demás funciona igual y cada colaborador sale "
     + "en una sola planilla, como hasta ahora."
   );
 }

@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
   const codigo = (sp.get("codigo") ?? "").trim();
   const fecha = (sp.get("fecha") ?? "").trim();
   if (!codigo || !fechaValida(fecha)) {
-    return NextResponse.json({ error: "Falta la persona o la fecha." }, { status: 400 });
+    return NextResponse.json({ error: "Falta el colaborador o la fecha." }, { status: 400 });
   }
 
   try {
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
     } else {
       // ── AGREGAR una marcación que el reloj nunca registró ────────────────
       if (!codigo) {
-        return NextResponse.json({ error: "Falta la persona." }, { status: 400 });
+        return NextResponse.json({ error: "Falta el colaborador." }, { status: 400 });
       }
       if (!fechaValida(fecha)) {
         return NextResponse.json({ error: "La fecha no sirve." }, { status: 400 });

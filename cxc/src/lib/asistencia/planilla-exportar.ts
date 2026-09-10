@@ -149,7 +149,7 @@ export function nombreArchivo(d: DatosPlanillaExport, ext: "xlsx" | "pdf"): stri
 // ── Las 19 columnas del cuadro, en el orden de la contable ───────────────────
 
 const COLUMNAS: ReportColumn[] = [
-  { header: "Persona", wch: 28 },
+  { header: "Colaborador", wch: 28 },
   { header: "Código", wch: 8, align: "center" },
   { header: "Salario quincenal", wch: 15, align: "right", fmt: MONEY_FMT },
   { header: "Horas extra 1.25", wch: 14, align: "right", fmt: MONEY_FMT },
@@ -235,7 +235,7 @@ function filaPlanilla(l: LineaPlanilla): ReportCell[] {
 
 function filaTotales(t: TotalesPlanilla): ReportCell[] {
   return [
-    `TOTAL — ${t.personas} ${t.personas === 1 ? "persona" : "personas"}`, "",
+    `TOTAL — ${t.personas} ${t.personas === 1 ? "colaborador" : "colaboradores"}`, "",
     t.salarioQuincenal, t.extraDiurno, t.ausencias, t.tardanzas,
     t.extraNocturno, t.excedente, t.domingos, t.feriados,
     t.totalBruto, t.seguroSocial, t.seguroEducativo,
@@ -257,7 +257,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
   // Hoja 2 — de dónde salió cada hora. Es la que se abre cuando alguien
   // reclama: sin ella el cuadro es una lista de dólares sin respaldo.
   const colsHoras: ReportColumn[] = [
-    { header: "Persona", wch: 28 },
+    { header: "Colaborador", wch: 28 },
     { header: "Código", wch: 8, align: "center" },
     { header: "Empresa", wch: 20 },
     { header: "Salario mensual", wch: 14, align: "right", fmt: MONEY_FMT },
@@ -347,7 +347,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Excedente", `NO SE USA: esos minutos se pagan × ${r.recargoExtraNocturno} junto con el resto de la hora extra de noche. La columna queda en $0.00, igual que en el cuadro de la contadora.`],
       ["Domingos y feriados", `Horas trabajadas × ${r.recargoDomingoFeriado}.`],
       ["Ausencias", "8 horas × rata por hora, sin recargo, por cada día completo sin marcar. Son 8 fijas para todos: no las mueve el horario de cada quien."],
-      ["Vacaciones «ya se le pagó»", "Se muestran en la columna «Ausencias» pero NO son una ausencia: la persona no faltó. Son días de vacaciones que ya había cobrado en dinero antes, así que no se le pagan otra vez y se le descuentan como un día no trabajado. Una vacación SIN marcar se paga normal y no aparece en ninguna columna."],
+      ["Vacaciones «ya se le pagó»", "Se muestran en la columna «Ausencias» pero NO son una ausencia: el colaborador no faltó. Son días de vacaciones que ya había cobrado en dinero antes, así que no se le pagan otra vez y se le descuentan como un día no trabajado. Una vacación SIN marcar se paga normal y no aparece en ninguna columna."],
       ["Llegar más de 30 minutos tarde", "Se muestra en la columna «Ausencias», no en «Tardanzas» — pero SE DESCUENTAN LOS MINUTOS, exactamente igual que una tardanza. La columna solo cambia de nombre: el total bruto y el neto son los mismos. Hasta 30 minutos va en «Tardanzas»."],
       ["Seguro social", `${r.seguroSocialPct} % del total bruto.`],
       ["Seguro educativo", `${r.seguroEducativoPct} % del total bruto.`],
@@ -374,7 +374,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
         ? [["Préstamos que no se descontaron", d.avisoPrestamoSinAprobar]]
         : []),
       ...(d.avisoPrestamoSinAtar
-        ? [["Préstamos sin persona", d.avisoPrestamoSinAtar]]
+        ? [["Préstamos sin colaborador", d.avisoPrestamoSinAtar]]
         : []),
       ["Período", d.periodo && !d.periodo.esQuincena
         ? `Del ${d.periodo.desde} al ${d.periodo.hasta} (${d.periodo.diasCalendario} días). NO es una quincena: el salario base se pagó al ${(d.periodo.factorBase * 100).toFixed(1)} % —la parte de quincena que cubren estas fechas— y los montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios) NO se aplicaron, porque se cargan por quincena: para llenarlos hay que pedir el cuadro con las fechas exactas de una quincena.`
@@ -437,7 +437,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
       : null,
     FORMULA_NETO,
-    "En rojo: falta configurar a esa persona — no vale $0 y NO entra al total.  "
+    "En rojo: falta configurar a ese colaborador — no vale $0 y NO entra al total.  "
     + "En gris: no se le calcula pago — o no va en planilla (servicio profesional), "
     + "o lo decide una persona (justificada, o entró o salió a mitad del período).",
   ], PIE_PT, PIE_MARGEN);
@@ -446,7 +446,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
   autoTable(doc, {
     startY: 24,
     head: [[
-      "Persona", "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas",
+      "Colaborador", "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas",
       "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
       "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
       "Mercan-\ncía", "Total\ndeducc.", "Otros\nserv. (+)", "Neto a\npagar",
@@ -487,7 +487,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       ];
     }),
     foot: [[
-      `TOTAL — ${t.personas} ${t.personas === 1 ? "persona" : "personas"}`,
+      `TOTAL — ${t.personas} ${t.personas === 1 ? "colaborador" : "colaboradores"}`,
       m2(t.salarioQuincenal), m2(t.extraDiurno), m2(t.ausencias), m2(t.tardanzas),
       m2(t.extraNocturno), m2(t.excedente), m2(t.domingos), m2(t.feriados),
       m2(t.totalBruto), m2(t.seguroSocial), m2(t.seguroEducativo),

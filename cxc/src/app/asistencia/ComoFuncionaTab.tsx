@@ -117,7 +117,7 @@ export default function ComoFuncionaTab() {
           {/* 🩸 Este renglón nombraba la casilla «ya se le pagó», y esa casilla
               se renombró el 1-sep-2026 porque enredaba. Un cartel que
               contradice a la pantalla es peor que no tener cartel. */}
-          <li>· Las <b>vacaciones</b> se pagan: esos días entran en el sueldo de la quincena y no descuentan nada. Solo se descuentan si al cargarlas se contestó que <b>la persona ya había cobrado esos días antes</b>, y en ese caso la planilla dice a quién y cuánto no le pagó.</li>
+          <li>· Las <b>vacaciones</b> se pagan: esos días entran en el sueldo de la quincena y no descuentan nada. Solo se descuentan si al cargarlas se contestó que <b>el colaborador ya había cobrado esos días antes</b>, y en ese caso la planilla dice a quién y cuánto no le pagó.</li>
           <li>· El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios</b> no salen de ningún sistema: se escriben a mano en la planilla. Los cuatro primeros se restan; <b>«otros servicios» se SUMA</b>, porque es un pago extra y no un descuento.</li>
           <li>· 🔴 A quien le falte el salario, la jornada o la ficha <b>no se le calcula nada</b>: sale listado con lo que le falta y queda <b>fuera del total</b>. Nunca en $0.</li>
         </ul>
@@ -128,7 +128,7 @@ export default function ComoFuncionaTab() {
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <h3 className="text-sm font-medium text-gray-900">Antes de descontarle a alguien</h3>
         <ul className="mt-1 space-y-1.5 text-[13px] leading-relaxed text-gray-600">
-          <li>· Revisa en <b>Horarios</b> que la hora de salida de esa persona sea la correcta. La que trae el reloj viene equivocada seguido.</li>
+          <li>· Revisa en <b>Horarios</b> que la hora de salida de ese colaborador sea la correcta. La que trae el reloj viene equivocada seguido.</li>
           <li>· Mira si sus minutos vienen de <b>días a revisar</b>: ahí el número puede estar inflado porque no marcó.</li>
           <li>· Comprueba que las <b>justificaciones</b> del período ya estén cargadas.</li>
           <li>· Los números de arriba se cambian en <b>Configuración</b> si la regla cambia.</li>

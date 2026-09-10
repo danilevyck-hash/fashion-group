@@ -88,10 +88,13 @@ describe("🔴 el veredicto del POST: TODO O NADA", () => {
     const v = puedeAprobarA(a, [JULIO, RODRIGO, KEVIN]);
     expect(v.ok).toBe(false);
     expect(v.fuera).toEqual(["40"]);
-    expect(v.motivo).toBe("No se aprobó nada: hay una persona que no es de tus empresas.");
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    expect(v.motivo).toBe("No se aprobó nada: hay un colaborador que no es de tus empresas.");
     // Y en plural concuerda: «una persona que no son» era el texto viejo.
     expect(puedeAprobarA(a, [KEVIN, { codigo: "99", empresa: "confecciones_boston" }]).motivo)
-      .toBe("No se aprobó nada: hay 2 personas que no son de tus empresas.");
+      .toBe("No se aprobó nada: hay 2 colaboradores que no son de tus empresas.");
   });
 
   it("✅ y con SOLO gente suya, pasa — el rechazo prueba algo", () => {

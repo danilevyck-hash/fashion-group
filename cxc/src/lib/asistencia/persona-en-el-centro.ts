@@ -5,6 +5,13 @@
 // como seguros, que sea con Editar»*. Y sobre el nombre de la pestaña:
 // *«te acepto la queja»* — «Configuración» se llama **Personas**.
 //
+// 🔴 Y DESDE EL 10-SEP-2026 SE LLAMA **COLABORADORES**. Daniel, textual: *«no lo
+// llames personas, sino colaboradores»*. Cambia el RÓTULO, la clave de la URL
+// (`?tab=colaboradores`) y la dirección de la página (`/asistencia/colaboradores/`).
+// Los identificadores de código, las tablas (`asistencia_personas`) y el
+// `persona=<código>` de Aprobaciones NO cambian: son nombres internos, no texto
+// que alguien lea. `?tab=personas` y `/asistencia/personas/7` siguen llegando.
+//
 // 🔴 QUÉ CAMBIA Y QUÉ NO. Esto es REUBICAR Y PRESENTAR, no un modelo nuevo:
 // las tablas, los endpoints y los cálculos son exactamente los de hoy. Lo único
 // aditivo es la foto de la cédula.
@@ -55,7 +62,7 @@ export const PERSONA_EN_EL_CENTRO = personaEnElCentroPrendida();
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ClavePestana =
-  | "personas" | "reporte" | "planilla" | "prestamos"
+  | "colaboradores" | "reporte" | "planilla" | "prestamos"
   | "justificaciones" | "vacaciones" | "aprobaciones" | "configuracion";
 
 export type Pestana = readonly [ClavePestana, string];
@@ -78,7 +85,7 @@ export const PESTANAS_HOY: readonly Pestana[] = [
 /**
  * EL ACOMODO NUEVO — cuatro pestañas (cinco con Préstamos prendido).
  *
- * 🔴 PERSONAS PRIMERA, y es todo el punto: el módulo abre en la gente, no en un
+ * 🔴 COLABORADORES PRIMERA (era «Personas» hasta el 10-sep-2026), y es todo el punto: el módulo abre en la gente, no en un
  * cuadro. Desde ahí se entra a la persona y ahí está todo lo suyo.
  *
  * 🔴 REPORTE PASA AL FINAL, y este es el cambio que hay que mirar dos veces.
@@ -95,7 +102,7 @@ export const PESTANAS_HOY: readonly Pestana[] = [
  * trabajo. La página de la persona muestra lo SUYO; la pestaña, el conjunto.
  */
 export const PESTANAS_PERSONA_EN_EL_CENTRO: readonly Pestana[] = [
-  ["personas", "Personas"],
+  ["colaboradores", "Colaboradores"],
   ["planilla", "Planilla"],
   ["prestamos", "Préstamos"],
   ["aprobaciones", "Aprobaciones"],
@@ -145,9 +152,13 @@ export function pestanasDeAsistencia(opts: {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MUDANZA: Readonly<Record<string, ClavePestana>> = Object.freeze({
-  configuracion: "personas",
+  configuracion: "colaboradores",
   justificaciones: "reporte",
-  vacaciones: "personas",
+  vacaciones: "colaboradores",
+  // 🔴 `personas` fue la clave de esta misma pestaña del 10-sep-2026 (mañana) al
+  // 10-sep-2026 (tarde), cuando Daniel pidió «colaboradores». Un enlace guardado
+  // con `?tab=personas` sigue cayendo aquí.
+  personas: "colaboradores",
 });
 
 /**
@@ -155,7 +166,7 @@ const MUDANZA: Readonly<Record<string, ClavePestana>> = Object.freeze({
  *
  * Apagado: **Reporte**, exactamente como hoy (Daniel, 2-sep-2026: *«primero va
  * reporte, ¿por qué es el segundo tab?»*).
- * Prendido: **Personas**, que es el punto entero del acomodo nuevo — el módulo
+ * Prendido: **Colaboradores**, que es el punto entero del acomodo nuevo — el módulo
  * abre en la gente y desde ahí se entra a cada quien.
  *
  * 🔑 No alcanza con que sea la primera de la lista: el valor por defecto de la
@@ -163,7 +174,7 @@ const MUDANZA: Readonly<Record<string, ClavePestana>> = Object.freeze({
  * acá. Lo que el rol puede ver lo filtra después `pestanaQueSeAbre`.
  */
 export function pestanaPorDefecto(personaEnElCentro: boolean): ClavePestana {
-  return personaEnElCentro ? "personas" : "reporte";
+  return personaEnElCentro ? "colaboradores" : "reporte";
 }
 
 /**
@@ -204,9 +215,15 @@ export function pestanaQueSeAbre(
 // pierde. 🔑 La identidad es el CÓDIGO, nunca el nombre.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const RUTA_PERSONAS = "/asistencia/personas";
+// 🔴 `/asistencia/colaboradores` desde el 10-sep-2026 (Daniel: *«no lo llames
+// personas, sino colaboradores»*). La vieja, `/asistencia/personas/[codigo]`,
+// redirige 307 con la query intacta desde `next.config.js`, como `/cheques` →
+// `/recordatorios`. El nombre de la constante se queda: es un identificador.
+export const RUTA_PERSONAS = "/asistencia/colaboradores";
+/** La dirección que tuvo la página hasta el 10-sep-2026; solo para el redirect y su candado. */
+export const RUTA_PERSONAS_VIEJA = "/asistencia/personas";
 
-/** `/asistencia/personas/7`. El código va codificado: puede traer cualquier cosa. */
+/** `/asistencia/colaboradores/7`. El código va codificado: puede traer cualquier cosa. */
 export function rutaDePersona(codigo: string): string {
   return `${RUTA_PERSONAS}/${encodeURIComponent(String(codigo).trim())}`;
 }

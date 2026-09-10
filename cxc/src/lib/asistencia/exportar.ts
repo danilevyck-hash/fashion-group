@@ -117,7 +117,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
   // Hoja 1 — Detalle. Solo días CON marcas o con ausencia: los feriados y los
   // días justificados sin marca llenarían la hoja de renglones vacíos.
   const detalle: unknown[][] = [[
-    "Persona","Código","Día","Entrada","Sale almuerzo","Vuelve","Salida",
+    "Colaborador","Código","Día","Entrada","Sale almuerzo","Vuelve","Salida",
     "Tarde (min)","Exceso almuerzo (min)","Salida temprana (min)","Extra (min)",
     // 🔑 «Ausencia» a secas ya no alcanza: un día de trabajo fuera de la
     // oficina cae en esta misma columna y NO es una ausencia.
@@ -174,7 +174,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
 
   // Hoja 2 — Resumen. Es la que se mira.
   const resumen: unknown[][] = [[
-    "Persona","Código","Sale","Días trabajados","Ausencias sin justificar",
+    "Colaborador","Código","Sale","Días trabajados","Ausencias sin justificar",
     // 🔑 Columna propia, no sumada a las ausencias justificadas: son días
     // TRABAJADOS y meterlos en la misma cifra es lo que este motivo eliminó.
     "Ausencias justificadas","Días trabajando fuera","Veces tarde","Minutos tarde","…de días a revisar",
@@ -258,7 +258,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     // Este papel viaja por correo: si miente, la contadora paga otra cosa.
     ["Horas extra", `Desde ${g.extraMinimoMin} minutos se pagan completas, desde el primer minuto. Menos de eso no cuenta. El atraso del mismo día se descuenta aparte: no se le resta a la hora extra.`],
     ["Ausencia", "Día hábil sin ninguna marca, que no sea feriado ni tenga justificación."],
-    ["Trabajo de vendedor", `"${MOTIVO_TRABAJO_VENDEDOR}" NO es una ausencia: la persona trabajó, solo que en otro lado y sin un reloj donde marcar. No se le descuenta nada, no le consume vacaciones y no genera horas extra (sin marcas no hay horas que medir). Va en columna propia, aparte de las ausencias justificadas.`],
+    ["Trabajo de vendedor", `"${MOTIVO_TRABAJO_VENDEDOR}" NO es una ausencia: el colaborador trabajó, solo que en otro lado y sin un reloj donde marcar. No se le descuenta nada, no le consume vacaciones y no genera horas extra (sin marcas no hay horas que medir). Va en columna propia, aparte de las ausencias justificadas.`],
     ["Permiso de horas", "Una justificación puede traer un rango de HORAS (de X a X). Cuando lo trae, NO justifica el día entero: solo perdona los minutos de tardanza que caen adentro de esa ventana, y un día sin ninguna marca sigue contando como ausencia completa."],
     ["Días a revisar", "El día no tiene las 4 marcas. Los minutos SÍ cuentan; la marca es para corregirlo."],
     ["Corregido a mano", "La hora que marcó el reloj NUNCA se borra: la corrección va encima y es la que cuenta. La columna dice la hora del reloj, la corregida, por qué y quién la puso."],
@@ -318,7 +318,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     // afuera aparece con "Días 0". Sin esta línea, ese cero se lee como
     // que no vino a trabajar.
     t.fuera > 0
-      ? `${t.fuera} ${t.fuera === 1 ? "día es" : "días son"} de trabajo fuera de la oficina: la persona trabajó (no marcó porque no estaba aquí), no se descuenta y no genera extras`
+      ? `${t.fuera} ${t.fuera === 1 ? "día es" : "días son"} de trabajo fuera de la oficina: el colaborador trabajó (no marcó porque no estaba aquí), no se descuenta y no genera extras`
       : null,
   ], PIE_PT, PIE_MARGEN);
 
@@ -327,7 +327,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     // 🔴 «Corregidos» va en el papel QUE SE FIRMA. Este PDF es el que llega a
     // planilla: un total que se lee sin saber que hay horas escritas a mano es
     // exactamente lo que no puede pasar.
-    head: [["Persona", "Sale", "Días", "Ausen.", "Veces\ntarde", "Min\ntarde",
+    head: [["Colaborador", "Sale", "Días", "Ausen.", "Veces\ntarde", "Min\ntarde",
             "Exceso\nalmuerzo", "Salida\ntemprana", "No trabajado\n(min)", "Extras\n(min)", "A\nrevisar", "Días\ncorreg."]],
     body: personas.map((p) => {
       const r = p.resumen;

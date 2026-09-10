@@ -924,7 +924,7 @@ export async function POST(req: NextRequest) {
     }
     const codigo = String(body?.codigo ?? "").trim();
     if (!codigo) {
-      return NextResponse.json({ error: "Falta la persona." }, { status: 400 });
+      return NextResponse.json({ error: "Falta el colaborador." }, { status: 400 });
     }
 
     // 🔑 La normalización la hace el módulo puro, no esta ruta: negativos a 0,

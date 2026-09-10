@@ -225,7 +225,10 @@ describe("🩸 marcó DESPUÉS de su baja: se avisa, no se esconde", () => {
     const a = avisoMarcasPosteriores([
       { etiqueta: "YERIBETH GONZALEZ", fechaSalida: "2026-07-20", ultimaMarca: "2026-07-25" },
     ])!;
-    expect(a.titulo).toBe("1 persona dada de baja siguió marcando en el reloj.");
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    expect(a.titulo).toBe("1 colaborador dado de baja siguió marcando en el reloj.");
     expect(a.detalle[0]).toContain("YERIBETH GONZALEZ");
     expect(a.detalle[0]).toContain("20 de julio de 2026");
     expect(a.detalle[0]).toContain("25 de julio de 2026");

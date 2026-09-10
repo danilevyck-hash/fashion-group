@@ -95,7 +95,7 @@ export default function HorariosTab() {
           </p>
           <p className="mt-1.5">
             El <b>almuerzo es de {ALMUERZO_FIJO_MIN} minutos para todos</b> y no se elige. Lo único
-            que se fija persona por persona es la hora de salida.
+            que se fija colaborador por colaborador es la hora de salida.
           </p>
         </Ayuda>
       </div>
@@ -118,7 +118,7 @@ export default function HorariosTab() {
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-[10.5px] uppercase tracking-wide text-gray-400">
-              <th className="px-3 py-2.5 text-left font-medium">Persona</th>
+              <th className="px-3 py-2.5 text-left font-medium">Colaborador</th>
               <th className="px-3 py-2.5 text-left font-medium">Sale a las</th>
               <th className="px-3 py-2.5 text-left font-medium">Almuerzo</th>
               <th className="px-3 py-2.5 text-left font-medium"></th>

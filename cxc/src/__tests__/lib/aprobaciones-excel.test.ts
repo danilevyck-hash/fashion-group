@@ -56,8 +56,11 @@ describe("la hoja", () => {
 
   it("los encabezados están en la FILA 1, con el estado y quién aprobó", () => {
     const { filas } = abrir();
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
     expect(filas[0]).toEqual([
-      "Persona", "Código", "Empresa", "Fecha", "Salida",
+      "Colaborador", "Código", "Empresa", "Fecha", "Salida",
       "Extra 1.25 (min)", "Extra 1.50 (min)", "Total (min)",
       "Estado", "Aprobó", "Cuándo",
     ]);
@@ -132,7 +135,7 @@ describe("el pie", () => {
     const { filas } = abrir();
     // Fila 4 (0-indexada): el layout de la casa deja una vacía antes del total.
     const tot = filas[4];
-    expect(String(tot[0])).toContain("TOTAL · 2 días-persona");
+    expect(String(tot[0])).toContain("TOTAL · 2 días-colaborador");
     expect(String(tot[8])).toBe("1 aprobadas · 1 sin aprobar");
     expect(tot[7]).toBeCloseTo(81.9, 2);
   });
@@ -173,6 +176,6 @@ describe("el archivo sale usable", () => {
 
   it("sin días, no revienta: hoja vacía con sus encabezados", () => {
     const { filas } = abrir([]);
-    expect(filas[0][0]).toBe("Persona");
+    expect(filas[0][0]).toBe("Colaborador");
   });
 });

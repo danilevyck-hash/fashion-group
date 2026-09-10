@@ -89,7 +89,7 @@ export default function JustificacionesDelPeriodo({ desde, hasta }: {
   if (lista.length === 0) {
     return (
       <p className="text-[13px] text-gray-400">
-        Ninguna justificación en estos días. Se cargan desde la persona, en Personas.
+        Ninguna justificación en estos días. Se cargan desde el colaborador, en Colaboradores.
       </p>
     );
   }

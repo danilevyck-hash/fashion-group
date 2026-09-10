@@ -101,7 +101,10 @@ describe("la columna de saldo", () => {
   it("se ve, con el título y la regla en UNA línea", async () => {
     servir(RESPUESTA);
     montar();
-    await screen.findByText("Saldo por persona");
+// 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
+// (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
+// texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+    await screen.findByText("Saldo por colaborador");
     expect(
       screen.getByText((t) => t.includes("30 días por cada 11 meses trabajados")),
     ).toBeTruthy();
@@ -183,7 +186,7 @@ describe("🔴 a quien le falta un dato", () => {
   it("la línea de arriba dice cuántas son, por qué, y DÓNDE se arregla", async () => {
     servir(RESPUESTA);
     montar();
-    const aviso = await screen.findByText((t) => t.includes("36 personas no tienen saldo"));
+    const aviso = await screen.findByText((t) => t.includes("36 colaboradores no tienen saldo"));
     expect(aviso.textContent).toContain("a 20 les falta la fecha de ingreso");
     expect(aviso.textContent).toContain("a 16 el saldo");
     expect(aviso.textContent).toContain("Configuración");
@@ -194,7 +197,7 @@ describe("al elegir a la persona en el formulario", () => {
   it("le dice el saldo ahí mismo, que es donde se decide", async () => {
     servir(RESPUESTA);
     montar();
-    await screen.findByText("Saldo por persona");
+    await screen.findByText("Saldo por colaborador");
     const select = document.querySelector("select") as HTMLSelectElement;
     fireEvent.change(select, { target: { value: "7" } });
     // 🔑 Se lee el PÁRRAFO entero: el número va en un <b> adentro, así que un
@@ -208,7 +211,7 @@ describe("al elegir a la persona en el formulario", () => {
   it("y si le falta un dato, lo dice en vez de inventar un número", async () => {
     servir(RESPUESTA);
     montar();
-    await screen.findByText("Saldo por persona");
+    await screen.findByText("Saldo por colaborador");
     const select = document.querySelector("select") as HTMLSelectElement;
     fireEvent.change(select, { target: { value: "22" } });
     await waitFor(() => {
@@ -236,6 +239,6 @@ describe("nada se descarta en silencio", () => {
     servir({ ...RESPUESTA, saldos: [], avisoSaldo: null });
     montar();
     await waitFor(() => expect(document.querySelector("select")).toBeTruthy());
-    expect(screen.queryByText("Saldo por persona")).toBeNull();
+    expect(screen.queryByText("Saldo por colaborador")).toBeNull();
   });
 });

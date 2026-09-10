@@ -4,10 +4,12 @@ import { PERSONA_EN_EL_CENTRO } from "@/lib/asistencia/persona-en-el-centro";
 import PersonaPagina from "../PersonaPagina";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Persona · Asistencia · Fashion Group" };
+export const metadata = { title: "Colaborador · Asistencia · Fashion Group" };
 
 /**
- * LA PÁGINA DE UNA PERSONA — ruta propia, como la ficha del cliente.
+ * LA PÁGINA DE UN COLABORADOR — ruta propia, como la ficha del cliente.
+ * (`/asistencia/colaboradores/[codigo]` desde el 10-sep-2026; la vieja
+ * `/asistencia/personas/[codigo]` redirige desde `next.config.js`.)
  *
  * 🔴 CON EL INTERRUPTOR APAGADO ESTA DIRECCIÓN NO EXISTE, y no basta con
  * esconder el enlace: quien la escriba a mano vuelve al módulo. Sin esto,
