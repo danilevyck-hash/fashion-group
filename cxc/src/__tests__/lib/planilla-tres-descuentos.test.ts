@@ -445,12 +445,29 @@ describe("J. ACS (Multifashion) — la CUARTA empresa", () => {
 
   // 🔴 DOS RELOJES: la misma PC lee el de Boston y el de la tienda. La pantalla
   // dibuja UNO POR RELOJ; con `relojes[0]` el segundo no existía.
+  //
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 10-sep-2026, y no se borró. Nació mirando la
+  // GRAFÍA de la copia de pruebas (`relojes.map((r) =>` y
+  // `dispositivo: reloj.dispositivo`). Producción arregló el MISMO defecto por
+  // su cuenta y mejor —una tarjeta por reloj, `pidiendo` como lista, y el
+  // nombre del reloj solo cuando hay más de uno— pero escrito distinto
+  // (`relojes.map((reloj) =>`, y el pedido con la variable suelta). Un candado
+  // que exige cómo se DELETREA la solución rechaza una solución mejor: ahora
+  // exige la CONDUCTA. 🔑 El control original se conserva intacto: `relojes[0]`
+  // sigue prohibido, que es el defecto que este candado nació a cazar.
   it("la pantalla del reloj dibuja uno por dispositivo, no el primero", () => {
     const src = sinComentarios("src/app/asistencia/EstadoReloj.tsx");
-    expect(src).toMatch(/relojes\.map\(\(r\) =>/);
+    // 1. Se dibuja recorriendo la LISTA, no tomando un elemento.
+    expect(src).toMatch(/relojes\.map\(/);
+    // 2. EL DEFECTO ORIGINAL, prohibido en sus dos grafías.
     expect(src).not.toMatch(/relojes\?\.\[0\]/);
-    // El pedido va POR dispositivo.
-    expect(src).toMatch(/dispositivo: reloj\.dispositivo/);
+    expect(src).not.toMatch(/relojes\[0\]/);
+    // 3. Cada tarjeta se identifica por SU dispositivo: sin eso, dos relojes
+    //    comparten estado y los dos carteles hablan del mismo.
+    expect(src).toMatch(/key=\{reloj\.dispositivo\}/);
+    // 4. El pedido va POR dispositivo, nunca uno fijo ni el primero.
+    expect(src).toMatch(/body: JSON\.stringify\(\{ dispositivo/);
+    expect(src).toMatch(/pedir\(reloj\.dispositivo\)/);
   });
 });
 
