@@ -34,11 +34,14 @@ import {
   DIAS_POR_VER_MAS,
   TEXTO_TRASLADO,
   agruparPorDia,
+  alternarDia,
   desmarcarFactura,
+  diaAbierto,
   esDeHoy,
   facturaMarcada,
   marcarFactura,
   renglonDelCliente,
+  resumenDelDia,
   tituloDelDia,
   type FacturaDelCliente as Factura,
 } from "@/lib/guias/atajos-facturas";
@@ -89,7 +92,15 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
   // 3 más cada vez. Medido: 77% de las facturas usadas en guías salen del
   // último día facturado, 95% de los últimos 3.
   const [diasVisibles, setDiasVisibles] = useState(DIAS_CON_FACTURA_VISIBLES);
+  // 🔴 LOS DÍAS SE PLIEGAN Y SOLO EL MÁS RECIENTE ABRE (10-sep-2026, Daniel:
+  // «que ya venga plegado solo el último día desplegado by default»). Acá no se
+  // guarda «qué está abierto» sino QUÉ TOCÓ LA PERSONA: abierto se DERIVA con
+  // `diaAbierto`. Así los días que trae «Ver más días» nacen plegados sin
+  // ningún efecto de inicialización que los pueda abrir por accidente.
+  const [diasAlternados, setDiasAlternados] = useState<ReadonlySet<string>>(new Set());
   const [buscandoOtraVez, setBuscandoOtraVez] = useState(false);
+  /** Contador para devolverle el foco al buscador DESPUÉS del re-render. */
+  const [pedirFoco, setPedirFoco] = useState(0);
 
   const hoy = hoyPanama();
 
@@ -117,6 +128,12 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
     if (cliente?.codigo) void cargarFacturas(cliente.codigo);
   }, [cliente?.codigo, cargarFacturas]);
 
+  useEffect(() => {
+    if (pedirFoco === 0) return;
+    const campo = document.getElementById("facturas-cliente");
+    if (campo instanceof HTMLInputElement) campo.focus();
+  }, [pedirFoco]);
+
   /** «Buscar otra vez»: primero la lectura corta de HOY, después la lista. */
   async function buscarOtraVez() {
     if (!cliente?.codigo || buscandoOtraVez) return;
@@ -142,7 +159,51 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
     onReemplazarItems(nuevos as GuiaItem[]);
   }
 
+  /**
+   * 🔴 «+ OTRO CLIENTE» — UNA GUÍA LLEVA FACTURAS DE VARIOS CLIENTES
+   * (10-sep-2026). Daniel, textual: *«Una guía lleva facturas de varios
+   * clientes en un mismo despacho»*, *«un cliente a la vez»*, *«se quedan
+   * abajo»*.
+   *
+   * 🔴 LO ÚNICO QUE HACE ES LIMPIAR EL BUSCADOR. Los renglones ya marcados NO
+   * se tocan: siguen abajo, en «Detalle de Envío», que es donde viven desde el
+   * primer día (`items` nunca se limpió al cambiar de cliente — lo que faltaba
+   * era la invitación a seguir con el siguiente).
+   *
+   * 🔴 Y REUSA EL MISMO `ClientePicker`, no dibuja un segundo selector: el
+   * sistema tiene UNO solo y hay barrido que lo exige
+   * (`un-solo-selector-de-cliente.test.ts`).
+   */
+  function otroCliente() {
+    setCliente(null);
+    setFacturas(null);
+    setHasta(null);
+    setSinLista(false);
+    setDiasVisibles(DIAS_CON_FACTURA_VISIBLES);
+    setDiasAlternados(new Set());
+    // El foco vuelve al buscador para escribir el siguiente nombre. Sin mouse
+    // (iPad) esto es la diferencia entre seguir de un toque o tener que buscar
+    // el campo con el dedo.
+    //
+    // 🩸 Va por un efecto y NO acá mismo: enfocando en el acto, el selector
+    // todavía no re-renderizó y su `onFocus` copia al buscador el nombre del
+    // cliente ANTERIOR (`query = value`) — o sea, el campo se veía «limpio»
+    // con el nombre viejo escrito adentro.
+    setPedirFoco((n) => n + 1);
+  }
+
+  /**
+   * ¿Este cliente ya dejó algo en la guía? (una factura marcada, un Traslado o
+   * un «Escribir el número»). Es lo que decide si se dibuja «+ Otro cliente»:
+   * sin nada hecho, el botón no ofrece nada que el buscador no ofrezca ya.
+   */
+  const clienteYaTieneRenglon = Boolean(
+    cliente && items.some((r) => (r.cliente_codigo ?? "").trim() === cliente.codigo),
+  );
+
   const { grupos, diasOcultos } = agruparPorDia(facturas ?? [], diasVisibles);
+  /** El día de arriba: el ÚNICO que abre solo. */
+  const diaMasReciente = grupos[0]?.dia ?? null;
 
   return (
     <div data-testid="facturas-del-cliente" className="mb-8">
@@ -165,6 +226,7 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
             permitirOtro={false}
             onChange={(nombre, codigo) => {
               setDiasVisibles(DIAS_CON_FACTURA_VISIBLES);
+              setDiasAlternados(new Set());
               // El `nombre` ya viene con el alias que la bodega usa (lo aplica
               // el selector, `nombreParaMostrar`): el renglón nace con ese texto.
               setCliente(codigo ? { nombre, codigo } : null);
@@ -193,17 +255,58 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
               <div className="space-y-4">
                 {/* 🔴 Los últimos días CON FACTURA, el más reciente arriba,
                     cada día con su encabezado en palabras («Miércoles 3 sep»). */}
-                {grupos.map(({ dia, facturas: fs }) => (
+                {grupos.map(({ dia, facturas: fs }) => {
+                  const abierto = diaAbierto(dia, diaMasReciente, diasAlternados);
+                  const marcadasDelDia = cliente
+                    ? fs.filter((f) => facturaMarcada(items, cliente, f)).length
+                    : 0;
+                  return (
                   <div key={dia}>
-                    <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1">
-                      {tituloDelDia(dia)}
-                    </div>
+                    {/* 🔴 EL DÍA SE PLIEGA DE UN TOQUE. 44 px con el dedo; en la
+                        computadora (pointer fino) la línea se aprieta. */}
+                    <button
+                      type="button"
+                      data-dia={dia}
+                      aria-expanded={abierto}
+                      onClick={() => setDiasAlternados((a) => alternarDia(a, dia))}
+                      className="w-full flex items-center gap-2 text-left mb-1 min-h-[44px] lg:[@media(pointer:fine)]:min-h-0 lg:[@media(pointer:fine)]:py-1"
+                    >
+                      <svg
+                        className={`w-2.5 h-2.5 text-gray-400 shrink-0 transition-transform ${abierto ? "rotate-90" : ""}`}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                        aria-hidden="true"
+                      >
+                        <path d="M6 4l8 6-8 6V4z" />
+                      </svg>
+                      <span className="text-xs uppercase tracking-[0.05em] text-gray-400">
+                        {tituloDelDia(dia)}
+                      </span>
+                      <span className="text-xs text-gray-400 tabular-nums">
+                        {`· ${resumenDelDia(fs.length, marcadasDelDia, abierto)}`}
+                      </span>
+                    </button>
+                    {abierto && (
                     <ul>
                       {fs.map((f) => {
                         const marcada = cliente ? facturaMarcada(items, cliente, f) : false;
                         return (
                           <li key={`${f.empresa_key}-${f.secuencial}`}>
-                            <label className="flex items-center gap-3 py-1.5 min-h-[44px] cursor-pointer text-sm">
+                            {/* 44 px con el dedo (celular e iPad); en la
+                                computadora la fila se aprieta — Daniel: «algo
+                                un poco más reducido sin consumir mucho espacio
+                                de pantalla».
+
+                                🔴 `flex-wrap` para que en 390 px NADA se salga
+                                de lado: todo lo de esta fila es `shrink-0`
+                                menos el nombre de la empresa, así que con la
+                                etiqueta «Ya salió en GT-XXX» —que se queda
+                                COMPLETA, Daniel: «el ya salió no me molesta»—
+                                la fila pide más ancho del que tiene el iPhone.
+                                Envolviendo, la etiqueta baja un renglón en vez
+                                de empujar la página. En la computadora todo
+                                entra en una línea y no cambia nada. */}
+                            <label className="flex flex-wrap items-center gap-3 py-1.5 min-h-[44px] lg:[@media(pointer:fine)]:min-h-0 lg:[@media(pointer:fine)]:py-1 cursor-pointer text-sm">
                               <input
                                 type="checkbox"
                                 checked={marcada}
@@ -229,8 +332,10 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                         );
                       })}
                     </ul>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
 
                 {diasOcultos > 0 && (
                   <button
@@ -259,6 +364,24 @@ export default function FacturasDelCliente({ items, onReemplazarItems, clientesT
                   className="text-sm border border-gray-200 rounded-md px-3 text-gray-600 hover:text-black hover:border-gray-300 transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1.5"
                 >
                   Traslado
+                </button>
+              </div>
+            )}
+
+            {/* 🔴 «+ OTRO CLIENTE» — un cliente a la vez, y los que ya se
+                marcaron SE QUEDAN ABAJO (10-sep-2026). Solo limpia el buscador;
+                `items` no se toca. Se dibuja únicamente cuando este cliente ya
+                dejó algo en la guía: sin nada hecho no ofrece nada que el
+                buscador no ofrezca ya. */}
+            {!cargando && clienteYaTieneRenglon && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  data-testid="otro-cliente"
+                  onClick={otroCliente}
+                  className="text-sm border border-gray-300 rounded-md px-3 text-gray-700 hover:text-black hover:border-black transition inline-flex items-center min-h-[44px] md:[@media(pointer:fine)]:min-h-0 md:[@media(pointer:fine)]:py-1.5"
+                >
+                  + Otro cliente
                 </button>
               </div>
             )}

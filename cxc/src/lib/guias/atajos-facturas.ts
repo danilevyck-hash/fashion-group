@@ -175,6 +175,58 @@ export function agruparPorDia(
   return { grupos, diasOcultos: dias.length - visibles.length };
 }
 
+// ─── Los días se PLIEGAN: solo el más reciente abre ──────────────────────────
+//
+// (10-sep-2026) Daniel, textual: *«al menos déjame poder desplegar más días y
+// que no me llene la pantalla»* y *«que se pueda desplegar los días, que ya
+// venga plegado solo el último día desplegado by default»*.
+//
+// 🩸 El caso real: Sporting Shoes N 4 (D-142) tiene 3 días con 12-17 facturas
+// cada uno, así que el panel abría con ~45 renglones y tapaba la pantalla
+// entera — justo debajo está «Detalle de Envío», que es donde se ve lo marcado.
+//
+// 🔑 QUÉ ESTÁ ABIERTO SE DERIVA, NO SE GUARDA. El estado es solo el conjunto de
+// días que la persona ALTERNÓ a mano; abierto = (es el más reciente) XOR
+// (lo alternó). Así, los días que trae «Ver más días» nacen plegados sin
+// ningún efecto de inicialización, y un día que alguien abrió a mano sigue
+// abierto cuando llegan más días.
+
+/**
+ * ¿Este día se dibuja abierto? `diaMasReciente` es el primer grupo (el de
+ * arriba) o null si no hay ninguno; `alternados` son los días que la persona
+ * tocó.
+ */
+export function diaAbierto(
+  dia: string,
+  diaMasReciente: string | null,
+  alternados: ReadonlySet<string>,
+): boolean {
+  const abrePorDefecto = dia === diaMasReciente;
+  return alternados.has(dia) ? !abrePorDefecto : abrePorDefecto;
+}
+
+/** Alterna un día, devolviendo un conjunto NUEVO (nunca muta el anterior). */
+export function alternarDia(alternados: ReadonlySet<string>, dia: string): Set<string> {
+  const siguiente = new Set(alternados);
+  if (siguiente.has(dia)) siguiente.delete(dia);
+  else siguiente.add(dia);
+  return siguiente;
+}
+
+/**
+ * Lo que dice el encabezado del día al lado del título: cuántas facturas tiene
+ * y —SOLO cuando está plegado— cuántas de ellas ya están marcadas.
+ *
+ * 🔴 Las marcadas se dicen únicamente si están ESCONDIDAS: con el día abierto
+ * las casillas se ven, y repetirlo sería una palabra de más. Con el día
+ * plegado, callarlo escondería trabajo ya hecho.
+ */
+export function resumenDelDia(total: number, marcadas: number, abierto: boolean): string {
+  const facturas = `${total} ${total === 1 ? "factura" : "facturas"}`;
+  if (abierto || marcadas <= 0) return facturas;
+  return `${facturas} · ${marcadas} ${marcadas === 1 ? "marcada" : "marcadas"}`;
+}
+
 const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 

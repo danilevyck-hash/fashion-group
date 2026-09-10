@@ -164,6 +164,20 @@ async function elegirCliente() {
 
 const casillas = () => screen.getAllByRole("checkbox") as HTMLInputElement[];
 
+/**
+ * ⚠️ NOTA 10-sep-2026 — LOS DÍAS AHORA VIENEN PLEGADOS y solo el más reciente
+ * abre solo (Daniel: *«que ya venga plegado solo el último día desplegado by
+ * default»*). Los casos de abajo que tocan facturas de días viejos abren ese
+ * día PRIMERO, con un toque en su encabezado: no se aflojó ninguna regla, se
+ * agregó el toque que la pantalla ahora pide. Lo que el pliegue hace y no hace
+ * está congelado en `guias-varios-clientes-y-dias.test.tsx`.
+ */
+function abrirDia(titulo: string) {
+  const encabezado = screen.getByText(titulo).closest("button");
+  expect(encabezado).toBeTruthy();
+  fireEvent.click(encabezado as HTMLButtonElement);
+}
+
 describe("el atajo encendido, al crear", () => {
   it("elegir el cliente NO escribe ningún renglón — marcar es la elección", async () => {
     render(<Harness itemsIniciales={[filaVacia()]} />);
@@ -183,6 +197,8 @@ describe("el atajo encendido, al crear", () => {
     render(<Harness itemsIniciales={[filaVacia()]} />);
     await asentar();
     await elegirCliente();
+    abrirDia("Sábado 30 may");
+    abrirDia("Viernes 29 may");
 
     for (const c of casillas()) fireEvent.click(c);
 
@@ -210,6 +226,8 @@ describe("el atajo encendido, al crear", () => {
     render(<Harness itemsIniciales={[filaVacia()]} />);
     await asentar();
     await elegirCliente();
+    abrirDia("Sábado 30 may");
+    abrirDia("Viernes 29 may");
     for (const c of casillas()) fireEvent.click(c);
     // desmarcar la 2536 de Vistana
     fireEvent.click(casillas()[1]);
@@ -223,8 +241,10 @@ describe("el atajo encendido, al crear", () => {
     await asentar();
     await elegirCliente();
 
+    // La 88 de Joystep vive en el tercer día: hay que abrirlo.
+    abrirDia("Viernes 29 may");
     expect(screen.getByText(/Ya salió en GT-204/)).toBeTruthy();
-    const casillaJoystep = casillas()[3];
+    const casillaJoystep = casillas()[casillas().length - 1];
     expect(casillaJoystep.disabled).toBe(false);
     fireEvent.click(casillaJoystep);
     expect(itemsCapturados.some((r) => r.empresa === "Joystep" && r.facturas === "88")).toBe(true);
@@ -278,6 +298,13 @@ describe("el atajo encendido, al crear", () => {
 
     fireEvent.click(screen.getByText("Ver más días"));
     expect(screen.getByText("Viernes 15 may")).toBeTruthy();
+    // ⚠️ NOTA 10-sep-2026 — CAMBIO DE DIRECCIÓN: el día que trae «Ver más días»
+    // llega PLEGADO (antes se dibujaba abierto con sus facturas). Es el punto
+    // del cambio: Daniel pidió poder desplegar más días «sin que me llene la
+    // pantalla». El CONTROL de que nada se perdió está una línea más abajo —
+    // la factura aparece con un toque en el día.
+    expect(screen.queryByText("7055")).toBeNull();
+    abrirDia("Viernes 15 may");
     expect(screen.getByText("7055")).toBeTruthy();
     expect(screen.queryByText("Ver más días")).toBeNull();
   });
