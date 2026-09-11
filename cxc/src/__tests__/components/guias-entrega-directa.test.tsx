@@ -48,7 +48,29 @@ function textoDelPapel(guia: Guia): string {
   return container.querySelector("#print-document")?.textContent ?? "";
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 EL RELOJ VA FIJO — nota del 11-sep-2026.
+//
+// Este archivo se puso ROJO SOLO a la medianoche del 11-sep-2026, sin que
+// nadie tocara Guías. Sus guías de prueba están fechadas a mano (11-ago) y la
+// lista dibuja SOLO EL ÚLTIMO MES (`lib/guias/ventana-lista.ts`, 30 días),
+// contando desde el día REAL: cumplidos los 30 días la guía se va detrás de
+// «Ver guías más viejas» y los botones que estos casos buscan dejan de
+// dibujarse.
+//
+// 🔴 EL DEFECTO ES DEL TEST, NO DEL MÓDULO. `GuiasList` resuelve su ventana con
+// `new Date()` adentro, así que un test que no fija el reloj mide contra el
+// calendario y caduca solo. Regla de la casa: los tests usan fechas fijas,
+// nunca `new Date()`.
+//
+// ⚠️ Se finge SOLO `Date` (`toFake: ["Date"]`). Fingir también los
+// temporizadores congelaría `setTimeout`, del que dependen React Testing
+// Library y los `await` de esta suite.
+// ─────────────────────────────────────────────────────────────────────────────
 beforeEach(() => {
+  // El reloj, fijo — ver la nota de arriba.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-01T17:00:00Z"));
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
@@ -61,6 +83,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
