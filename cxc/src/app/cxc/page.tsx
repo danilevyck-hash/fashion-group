@@ -34,7 +34,6 @@ import {
   CXC_GRUPO_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
 } from "@/lib/empresa-mapping";
-import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
@@ -433,10 +432,6 @@ function AdminDashboardInner() {
     const q = new URLSearchParams(window.location.search).get("search");
     if (q) setSearch(q);
   }, [authChecked]);
-
-  // Hook still called to maintain hook order, but SuggestionCard removed from render
-  const cxcSuggestions = useMemo<SmartSuggestion[]>(() => [], []);
-  useSmartSuggestions(cxcSuggestions);
 
   if (!authChecked) return null;
 

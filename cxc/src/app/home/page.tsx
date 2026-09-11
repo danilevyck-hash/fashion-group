@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FGLogo from "@/components/FGLogo";
-import SearchBar from "@/components/SearchBar";
+import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
 import IconButton from "@/components/IconButton";
 import { getVisibleGroups, getVisibleModules, getModulesInGroup, moduloCasaDeRol, type AppModule } from "@/lib/modules";
 import { recordModuleClick, getFrequentModules } from "@/lib/module-frequents";
@@ -173,8 +173,15 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Global Search — admin, secretaria */}
-        {["admin", "secretaria"].includes(role) && (
+        {/* 🔴 LA CAJA DE BUSCAR ES DE LOS MISMOS CINCO ROLES EN TODAS PARTES.
+            11-sep-2026. Acá estaba escrita a mano `["admin","secretaria"]`
+            mientras la lista única del sistema (`SEARCH_ROLES`, la que decide
+            en `AppHeader` y la que acepta `/api/search`) tiene CINCO. Medido:
+            contabilidad y vendedor entraban al Inicio sin caja de buscar y la
+            encontraban arriba en cualquier módulo — la misma app diciendo dos
+            cosas. Bodega aterriza en Guías, así que en la práctica los que
+            recuperan la caja del Inicio son contabilidad y vendedor. */}
+        {SEARCH_ROLES.includes(role) && (
           <SearchBar darkMode={darkMode} />
         )}
 

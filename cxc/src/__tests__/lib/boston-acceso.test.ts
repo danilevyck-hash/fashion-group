@@ -58,6 +58,7 @@ import {
 } from "@/lib/boston/rol";
 import { CAMPOS_SIN_DINERO, lineaSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import { ROLES_BOSTON, puedeVerBoston } from "@/lib/cxc/boston-roles";
+import { SEARCH_ROLES } from "@/components/SearchBar";
 import {
   aprobacionesRoles,
   asistenciaRoles,
@@ -382,10 +383,17 @@ describe("gerente_boston — /home lo manda solo a Boston", () => {
   });
 
   it("🔴 y el /home NO le dibuja la búsqueda global (fuga nº 1, lado pantalla)", () => {
-    // La barra se pinta solo para admin y secretaria. Si mañana alguien la
-    // abriera a todos, David vería un buscador que cubre 8 módulos del grupo.
+    // ⚠️ CAMBIÓ DE ANCLA EL 11-sep-2026, no de regla. Medía la lista escrita a
+    // mano `["admin","secretaria"].includes(role)`, que era justamente el
+    // defecto: la caja del Inicio se dibujaba para DOS roles mientras la lista
+    // única del sistema (`SEARCH_ROLES`, la del header y la que acepta
+    // `/api/search`) tiene CINCO — contabilidad y vendedor no tenían caja en el
+    // Inicio y sí en cualquier módulo. Ahora el Inicio usa esa lista, y lo que
+    // protege a David es lo mismo de antes: **`gerente_boston` no está en
+    // `SEARCH_ROLES`**, que es lo que se exige acá.
     const src = sinComentarios(leer("src/app/home/page.tsx"));
-    expect(src).toMatch(/\["admin",\s*"secretaria"\]\.includes\(role\)/);
+    expect(src).toMatch(/SEARCH_ROLES\.includes\(role\)/);
+    expect(SEARCH_ROLES, `${ROL} no puede entrar a la búsqueda global`).not.toContain(ROL);
     expect(src).not.toMatch(new RegExp(`["']${ROL}["']`));
   });
 });

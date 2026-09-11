@@ -31,10 +31,11 @@
  * deshacer una decisión de Daniel, no arreglar un bug: van al reporte.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import path from "path";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
+const existe = (rel: string) => existsSync(path.join(process.cwd(), rel));
 const clases = (src: string) => [
   ...(src.match(/className="[^"]*"/g) ?? []),
   ...(src.match(/className=\{`[^`]*`/g) ?? []),
@@ -79,10 +80,15 @@ describe("Tocables · 44 px de alto Y de ancho", () => {
     expect(src).not.toContain('className="text-blue-600 hover:underline"');
   });
 
-  it("la tarjeta de sugerencia: el botón y la ✕ de cerrar", () => {
-    const src = leer("src/components/SuggestionCard.tsx");
-    expect(src).toContain("mt-2 inline-flex min-h-[44px] items-center justify-center text-xs bg-black");
-    expect(src).toContain("after:absolute after:-inset-[15px] after:content-['']"); // 14 + 2×15 = 44
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-sep-2026, NO SE BORRÓ. Medía los 44 px del
+  // botón y de la ✕ de `SuggestionCard.tsx` — una tarjeta que **no se dibujaba
+  // en ninguna pantalla**: `useSmartSuggestions` solo se llamaba en `/cxc`, y
+  // ahí mismo el código decía «SuggestionCard removed from render». Las 💡
+  // sugerencias proactivas que CLAUDE.md prometía no existían. Daniel: *«quita
+  // lo que no funciona»*. Lo que se mide ahora es que no vuelva sin pantalla.
+  it("la tarjeta de sugerencia se retiró (no había dónde tocarla)", () => {
+    expect(existe("src/components/SuggestionCard.tsx")).toBe(false);
+    expect(existe("src/lib/hooks/useSmartSuggestions.ts")).toBe(false);
   });
 
   it("Marketing › Reportes: las 3 pestañas, el año y el export", () => {

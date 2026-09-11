@@ -619,7 +619,11 @@ describe("J · LA DIRECCIÓN — /cheques sigue llegando a /recordatorios", () =
       "src/lib/modules.ts",
       "src/components/SearchBar.tsx",
       "src/lib/moduleColors.ts",
-      "src/lib/hooks/useKeyboardShortcuts.ts",
+      // ⚠️ 11-sep-2026: la lista bajó de 4 archivos a 3 A PROPÓSITO.
+      // `src/lib/hooks/useKeyboardShortcuts.ts` SE RETIRÓ (no tenía un solo
+      // importador desde el 11-abr-2026, así que ninguno de sus atajos corría).
+      // Era justamente el archivo cuyo `q: "/cheques"` se corrigió el 5-sep
+      // sobre código muerto. Que no vuelva lo exige `atajos-retirados.test.ts`.
     ]) {
       const src = plano(leer(f));
       expect(src, f).not.toMatch(/["']\/cheques(\?|["'])/);

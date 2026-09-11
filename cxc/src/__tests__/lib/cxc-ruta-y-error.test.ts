@@ -79,7 +79,14 @@ describe("🔴 Cuentas por Cobrar vive en /cxc", () => {
     expect(leer("src/components/SearchBar.tsx")).toContain("/cxc?search=");
     expect(leer("src/app/vista-general/page.tsx")).toContain('href="/cxc"');
     expect(leer("src/app/clientes/[codigo]/ClienteDetail.tsx")).toContain("/cxc?search=");
-    expect(leer("src/lib/hooks/useKeyboardShortcuts.ts")).toContain('c: "/cxc"');
+    // ⚠️ 11-sep-2026: se cayó la 5ª comprobación, la de
+    // `src/lib/hooks/useKeyboardShortcuts.ts`, porque el archivo SE RETIRÓ:
+    // ningún atajo de teclado corría desde el 11-abr-2026 (cero importadores),
+    // así que ese `c: "/cxc"` no llevaba a nadie a ninguna parte. Daniel:
+    // *«quita lo que no funciona»*. CONTROL de que el módulo sigue cubierto:
+    // las cuatro superficies VIVAS de arriba siguen probadas, y
+    // `atajos-retirados.test.ts` impide que el archivo vuelva.
+    expect(fs.existsSync(path.join(RAIZ, "src/lib/hooks/useKeyboardShortcuts.ts"))).toBe(false);
   });
 
   it("el color del módulo se resuelve por la ruta nueva", () => {
