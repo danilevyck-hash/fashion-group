@@ -1361,15 +1361,31 @@ export interface LineaPlanilla {
   /**
    * 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, cuando la pasada se cerró con un
    * CORTE (día 13 o 28) y estos días quedaron sin medir. Positivo = se le
-   * descuenta ahora; negativo = se le devuelve. `undefined`/0 = no hay ajuste.
+   * descontó; negativo = se le devolvió. `undefined`/0 = no hay ajuste.
    *
    * 🔑 OPCIONAL Y ADITIVO: sin el interruptor de la planilla unida nadie lo
    * setea, sigue en `undefined`, y todo se comporta EXACTAMENTE como antes.
-   * NO entra al `dinero` del motor: el neto real se calcula restándolo (una
-   * sola cuenta, `netoConAjuste`), para que el papel y la pantalla no puedan
-   * decir números distintos. Ver `corte-quincena.ts`.
+   *
+   * 🔴 DESDE EL 11-sep-2026 YA ESTÁ ADENTRO DE `dinero`: el ajuste se reparte
+   * concepto por concepto y se suma en las columnas de siempre
+   * (`aplicarAjusteEnLinea`, `corte-quincena.ts`), así que `netoPagar` ES el
+   * neto que se paga. Este número queda como TESTIGO (es lo que el cierre
+   * congela en `ajuste_anterior`) — NO se vuelve a restar en ningún lado.
    */
   ajusteAnterior?: number;
+  /**
+   * De qué días salió el ajuste y cuánto le entró a cada columna. Es lo que
+   * permite DECIR «Horas extra 1.25 incluye $5.00 de los días 14–15 sep» en
+   * la celda, el pie del cuadro, el Excel, el PDF y el comprobante.
+   */
+  ajusteDetalle?: {
+    desde: string;
+    hasta: string;
+    reparto: Partial<Record<
+      "ausencias" | "tardanzas" | "extraDiurno" | "extraNocturno" | "excedente" | "domingos" | "feriados",
+      number
+    >>;
+  };
   dinero: DineroLinea | null;
   manuales: ManualesLinea;
 }
