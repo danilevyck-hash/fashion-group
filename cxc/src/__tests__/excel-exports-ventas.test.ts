@@ -14,6 +14,8 @@ import XLSX from "xlsx-js-style";
 // que sale de la MISMA lista que el largo — por eso el mock devuelve los dos y
 // no una segunda tabla de nombres.
 vi.mock("@/lib/empresa-mapping", () => ({
+  // 🔁 11-sep-2026: `productos.ts` deriva sus empresas de `B2B_EMPRESA_KEYS`.
+  B2B_EMPRESA_KEYS: ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"],
   EMPRESA_KEY_TO_NAME: { fashion_wear: "Fashion Wear" } as Record<string, string>,
   EMPRESA_KEY_TO_NOMBRE_CORTO: { fashion_wear: "Fashion Wear" } as Record<string, string>,
   nombreCortoEmpresa: (k: string) => (k === "fashion_wear" ? "Fashion Wear" : k),

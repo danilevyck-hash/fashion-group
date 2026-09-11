@@ -112,8 +112,8 @@ function resumen(conProyeccion = true): VentasResumen {
 function pintarEscritorio(datos = resumen()) {
   return render(
     <ResumenView
-      data={datos} multi={null} availableYears={[2026, 2025]} selectedYear={2026}
-      isClosedYear={false} loading={false} error={null} onYearChange={vi.fn()}
+      data={datos} multi={null} selectedYear={2026}
+      isClosedYear={false} loading={false} error={null}
     />,
   );
 }
@@ -121,8 +121,8 @@ function pintarCelular(datos = resumen()) {
   return render(
     <ResumenViewMobile
       data={datos} selectedYear={2026} isClosedYear={false}
-      viewMode="ventas" setViewMode={vi.fn()} granularity="mensual" setGranularity={vi.fn()}
-      anualData={null} anualError={null} onOpenEmpresa={vi.fn()} onAbrirFila={vi.fn()}
+      viewMode="ventas" setViewMode={vi.fn()}
+      onOpenEmpresa={vi.fn()} onAbrirFila={vi.fn()}
       filaDetalle={null} onCerrarFila={vi.fn()}
     />,
   );
@@ -144,7 +144,9 @@ describe("1 · «Cierre del año» es la cuarta tarjeta, arriba", () => {
     // compara contra el cierre real del año pasado.
     const tarjeta = screen.getByText("CIERRE DEL AÑO").closest("div")!;
     expect(tarjeta.textContent).toContain("+$211,855");
-    expect(tarjeta.textContent).toContain("vs 2025");
+    // 🔁 11-sep-2026: el «vs 2025» salió del texto de la tarjeta (el período
+    // se dice una vez, en el selector) y vive en el `title` del delta.
+    expect(tarjeta.querySelector("p[title]")?.getAttribute("title")).toContain("2025");
   });
 
   it("celular: la misma tarjeta, con el mismo número", () => {
@@ -163,8 +165,8 @@ describe("1 · «Cierre del año» es la cuarta tarjeta, arriba", () => {
   it("en un año CERRADO no hay nada que proyectar y la tarjeta no se dibuja", () => {
     render(
       <ResumenView
-        data={{ ...resumen(false), year: 2025 }} multi={null} availableYears={[2025]}
-        selectedYear={2025} isClosedYear loading={false} error={null} onYearChange={vi.fn()}
+        data={{ ...resumen(false), year: 2025 }} multi={null}
+        selectedYear={2025} isClosedYear loading={false} error={null}
       />,
     );
     expect(screen.queryByText("CIERRE DEL AÑO")).toBeNull();
@@ -294,7 +296,8 @@ describe("4 · 🔴 OCT, NOV y DIC siguen dibujándose", () => {
 describe("5 · el margen del grupo va sin decimal (diccionario § 0, #5)", () => {
   it("28,7332 % se pinta «29%» — el VALOR no se movió, el formateo sí", () => {
     pintarEscritorio();
-    const tarjeta = screen.getByText("MARGEN PROMEDIO").closest("div")!;
+    // 🔁 11-sep-2026: «MARGEN PROMEDIO» → «MARGEN», como el celular.
+    const tarjeta = screen.getByText("MARGEN").closest("div")!;
     expect(tarjeta.textContent).toContain("29%");
     expect(tarjeta.textContent).not.toContain("28.7%");
     // ⚠️ Los PUNTOS conservan su decimal: son una DIFERENCIA entre dos

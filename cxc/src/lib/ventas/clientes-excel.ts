@@ -24,20 +24,22 @@ import type { Cliente } from "@/components/ventas/types";
 //    reescribe: el guard de $100 de base mínima es el que impide que un total
 //    previo de centavos produzca un porcentaje absurdo en el archivo.
 import { variacionPct } from "@/lib/variacion";
+import { rotuloCompras, rotuloVs, type PeriodoVentas } from "@/lib/ventas/periodo";
 
 export interface ClientesExcelOpts {
-  /** Año de la columna «Compras». */
+  /** Año de la columna «Compras» (el nombre del archivo lo lleva). */
   year: number;
+  /** El período que la pantalla está sumando: «Año 2026» o «Últimos 12 meses».
+   *  Los encabezados salen de ÉL, con las mismas funciones que la pantalla. */
+  periodo: PeriodoVentas;
   /** Año contra el que compara la columna de cambio. */
   anioComparativo: number;
   /** Las filas tal como se ven, ya filtradas y ordenadas. */
   filas: readonly Cliente[];
   /** La fila ámbar del mostrador, si la pantalla la está mostrando. */
   mostrador?: Cliente | null;
-  /** Qué píldora de empresa está puesta ("todas" o una key). Va en la nota. */
+  /** Qué empresa está puesta ("todas" o una key). */
   empresa: string;
-  /** Etiqueta legible del universo elegido («Clientes: últimos 12 meses»). */
-  universo: string;
 }
 
 /** Construcción pura del sheet (sin DOM) — testeable. */
@@ -52,8 +54,8 @@ export async function buildClientesSheet(opts: ClientesExcelOpts): Promise<WorkS
     c.ytd,
     // 🔴 `delta` VA TAL CUAL Y SIN `?? 0`. Un 0,0% en el Excel se lee como «no
     // cambió», que es otra cosa que «no hay con qué comparar». La celda vacía
-    // es lo que «—» significa en la pantalla.
-    Number.isFinite(c.delta) ? c.delta : null,
+    // es lo que «Nuevo» significa en la pantalla.
+    c.delta != null && Number.isFinite(c.delta) ? c.delta : null,
     c.ultima || null,
   ]);
 
@@ -77,8 +79,8 @@ export async function buildClientesSheet(opts: ClientesExcelOpts): Promise<WorkS
       { header: "Cliente", wch: 34 },
       { header: "Código", wch: 12 },
       { header: "Empresas", wch: 10, align: "right", fmt: "#,##0" },
-      { header: `Compras ${opts.year}`, wch: 16, align: "right", fmt: MONEY_FMT },
-      { header: `vs ${opts.anioComparativo}`, wch: 12, align: "right", fmt: PCT_FMT },
+      { header: rotuloCompras(opts.periodo), wch: 22, align: "right", fmt: MONEY_FMT },
+      { header: rotuloVs(opts.periodo, opts.anioComparativo), wch: 14, align: "right", fmt: PCT_FMT },
       { header: "Última compra", wch: 16 },
     ],
     rows,
@@ -98,8 +100,9 @@ export async function buildClientesSheet(opts: ClientesExcelOpts): Promise<WorkS
 export async function exportClientesToExcel(opts: ClientesExcelOpts): Promise<void> {
   const ws = await buildClientesSheet(opts);
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
+  const sufijo = opts.periodo.tipo === "ultimos" ? `ultimos-${opts.periodo.n}-meses` : String(opts.year);
   downloadWorkbook(
     workbookFromSheets([{ name: "Clientes", ws }]),
-    `ventas-clientes-${opts.year}.xlsx`,
+    `ventas-clientes-${sufijo}.xlsx`,
   );
 }

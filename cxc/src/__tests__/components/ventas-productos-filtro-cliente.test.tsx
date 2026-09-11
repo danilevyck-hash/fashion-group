@@ -27,6 +27,11 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
 import { ProductosView } from "@/components/ventas/ProductosView";
+
+// 🔴 EL PERÍODO LLEGA POR PROP (11-sep-2026). Esta pantalla ya no tiene su
+// desplegable «Período»: lo manda el selector ÚNICO de arriba de Ventas y
+// `ProductosView` recibe `{ periodo, anioEnCurso }` (`lib/ventas/periodo.ts`).
+const ANIO_2026 = { tipo: "anio", anio: 2026 } as const;
 import type { ProductosResponse } from "@/lib/ventas/productos";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,20 +201,20 @@ const pedidosMatriz = () => urls.filter(u => u.includes("/productos/por-cliente"
 
 describe("1 · el control está y no cuesta nada hasta que se lo toca", () => {
   it("dibuja «Cliente: todos» al lado del buscador", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(trigger()).toBeTruthy();
     expect(trigger().textContent).toContain("Cliente: todos");
   });
 
   it("🔑 al CARGAR la pantalla no se pide la matriz — ni una consulta de más", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(pedidosMatriz()).toHaveLength(0);
   });
 
   it("se pide reción al ABRIR el desplegable, y una sola vez", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await abrirFiltro();
     await waitFor(() => expect(pedidosMatriz().length).toBe(1));
@@ -223,7 +228,7 @@ describe("1 · el control está y no cuesta nada hasta que se lo toca", () => {
   it("🔴 si no hay detalle por cliente lo DICE, no deja un menú vacío sin motivo", async () => {
     // Multifashion no tiene ni una línea en `switch_factura_lineas` (medido: 0).
     matriz = [];
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await abrirFiltro();
     await waitFor(() =>
@@ -234,7 +239,7 @@ describe("1 · el control está y no cuesta nada hasta que se lo toca", () => {
   });
 
   it("los clientes que ofrece son los de la respuesta, del que más compra al que menos", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await abrirFiltro();
     await screen.findByRole("option", { name: CITY.nombre });
@@ -245,7 +250,7 @@ describe("1 · el control está y no cuesta nada hasta que se lo toca", () => {
 
 describe("2 · elegir un cliente FILTRA la tabla de verdad", () => {
   it("quedan sólo sus descripciones, con SUS piezas y SU venta", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]);
@@ -256,7 +261,7 @@ describe("2 · elegir un cliente FILTRA la tabla de verdad", () => {
   });
 
   it("el total de arriba pasa a ser el del cliente", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     const totales = document.querySelector("[data-totales-productos]")!.textContent ?? "";
@@ -266,7 +271,7 @@ describe("2 · elegir un cliente FILTRA la tabla de verdad", () => {
   });
 
   it("volver a «Cliente: todos» devuelve la tabla entera, sin pedir nada nuevo", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     const antes = urls.length;
@@ -278,7 +283,7 @@ describe("2 · elegir un cliente FILTRA la tabla de verdad", () => {
   });
 
   it("la ventana ANTERIOR se pide por cliente, y una sola vez por cliente", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     const previas = urls.filter(u => u.includes("ventana=previa"));
@@ -294,7 +299,7 @@ describe("2 · elegir un cliente FILTRA la tabla de verdad", () => {
 
 describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
   it("la columna desaparece — no hay margen por cliente y no se puede inventar", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(enTabla().queryByRole("button", { name: /Margen/ })).toBeTruthy();
     // 🔁 Sin decimal desde el 5-sep-2026 (diccionario § 0, #5). El VALOR no se
@@ -308,7 +313,7 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
   });
 
   it("y vuelve intacta al sacar el filtro", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     await abrirFiltro();
@@ -320,7 +325,7 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
   });
 
   it("si estaba ordenando por Margen, el orden se muda a Venta y no queda apuntando a nada", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     fireEvent.click(enTabla().getByRole("button", { name: /Margen/ }));
     await elegirCliente(CITY.nombre);
@@ -331,7 +336,7 @@ describe("3 · 🔴 con un cliente puesto NO hay Margen %", () => {
 
 describe("4 · la columna de cambio compara contra lo que compraba ÉL", () => {
   it("usa la venta anterior DEL CLIENTE, no la de la empresa", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     // 2000 contra 1500 = +33%. Con la base de la empresa (7200) sería −72%.
@@ -339,7 +344,7 @@ describe("4 · la columna de cambio compara contra lo que compraba ÉL", () => {
   });
 
   it("lo que no compraba antes sale «Nuevo»", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     expect(celda("SANDALIA", "delta")).toBe("Nuevo");
@@ -348,7 +353,7 @@ describe("4 · la columna de cambio compara contra lo que compraba ÉL", () => {
 
 describe("5 · «Dejó de comprar»", () => {
   it("sale ordenado por CUÁNTA PLATA ERA, de mayor a menor", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     const bloque = await waitFor(() => {
@@ -363,7 +368,7 @@ describe("5 · «Dejó de comprar»", () => {
   });
 
   it("🔴 DISTINGUE lo que se sigue vendiendo de lo que ya no se vende", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     const bloque = await waitFor(() => {
@@ -378,7 +383,7 @@ describe("5 · «Dejó de comprar»", () => {
   });
 
   it("lo que SIGUE comprando no entra a la lista", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     const bloque = await waitFor(() => {
@@ -393,7 +398,7 @@ describe("5 · «Dejó de comprar»", () => {
     previaCity = [
       { cliente_switch_id: CITY.id, cliente_nombre: CITY.nombre, descripcion: "CAMISA POLO", cantidad: 90, venta: 1500 },
     ];
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     await waitFor(() => expect(document.querySelector("[data-dejo-de-comprar-cargando]")).toBeNull());
@@ -401,7 +406,7 @@ describe("5 · «Dejó de comprar»", () => {
   });
 
   it("sin filtro no existe: es parte del filtro, no una pantalla nueva", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(document.querySelector("[data-dejo-de-comprar]")).toBeNull();
   });
@@ -425,7 +430,7 @@ describe("6 · el aviso ÁMBAR ya no sale — tampoco con el filtro puesto", () 
   // un cliente no HAGA APARECER el aviso, ni siquiera si el servidor lo manda.
   it("con un cliente elegido, la fila NO avisa nada", async () => {
     avisoDeLaFila = [{ otra: "Camisa Polo M/C", codigo: "A-1" }];
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     await waitFor(() => expect(filas()).toEqual(["CAMISA POLO", "SANDALIA"]));
@@ -435,8 +440,15 @@ describe("6 · el aviso ÁMBAR ya no sale — tampoco con el filtro puesto", () 
       .querySelector('[class*="amber"]')).toBeNull();
   });
 
-  it("y el pie que dice que el mostrador no trae detalle también", async () => {
-    render(<ProductosView selectedYear={2026} />);
+  // 🔁 CAMBIÓ DE DIRECCIÓN el 11-sep-2026. Este candado exigía que el pie de
+  // «Quién lo compra» repitiera «mostrador» CON un cliente puesto — o sea, el
+  // MISMO descargo dos veces en la misma pantalla (corto arriba, largo abajo).
+  // Daniel, con el mapa medido: *«queda UN solo descargo»*. Con cliente puesto
+  // lo dice SOLO la línea de arriba (`data-sin-mostrador`, cinco palabras); el
+  // pie deja de repetirlo. Sin cliente puesto, el pie sí lo dice — una vez — y
+  // eso lo fija `ventas-productos-selector-unico.test.tsx`.
+  it("⛔ con un cliente puesto, el descargo del mostrador se dice UNA vez: arriba, no en el pie", async () => {
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
@@ -445,15 +457,18 @@ describe("6 · el aviso ÁMBAR ya no sale — tampoco con el filtro puesto", () 
       expect(el, "no se dibujó el pie de «Quién lo compra»").toBeTruthy();
       return el!;
     });
-    expect(pie.textContent).toContain("mostrador");
-    // Y la tabla filtrada lo dice una vez arriba, en cinco palabras.
+    expect(pie.textContent).not.toContain("mostrador");
+    // La pantalla lo dice UNA vez, arriba, al lado de las fechas — y en
+    // ningún otro lado (ni en la tabla ni en las tarjetas, que en jsdom
+    // están las dos montadas).
+    expect(document.querySelectorAll("[data-sin-mostrador]")).toHaveLength(1);
     expect(document.querySelector("[data-sin-mostrador]")!.textContent).toBe("sin las ventas de mostrador");
   });
 });
 
 describe("7 · cambiar de empresa suelta el cliente", () => {
   it("el id es de UNA empresa: arrastrarlo mostraría otro negocio con el nombre viejo", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     const empresa = screen.getByText("Fashion Wear").closest("button")!;
@@ -467,7 +482,7 @@ describe("7 · cambiar de empresa suelta el cliente", () => {
 
 describe("8 · ordenar y buscar siguen andando, y NO piden nada", () => {
   it("ordenar por Cant reordena las filas filtradas sin una consulta más", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     const antes = urls.length;
@@ -481,7 +496,7 @@ describe("8 · ordenar y buscar siguen andando, y NO piden nada", () => {
   });
 
   it("buscar acota lo filtrado, sin consultar", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     const antes = urls.length;
@@ -497,7 +512,7 @@ describe("8 · ordenar y buscar siguen andando, y NO piden nada", () => {
 // un cliente no ESCRIBE nada en ninguna parte.
 describe("9 · 🔴 esto es un FILTRO, no un segundo selector de cliente", () => {
   it("no guarda el cliente en ningún lado: sacar el filtro no deja rastro", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await elegirCliente(CITY.nombre);
     await abrirFiltro();

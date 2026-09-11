@@ -33,6 +33,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { marcarVistaClientesRefrescada, RPC_REFRESH_VISTA_CLIENTES } from "@/lib/ventas/refrescar-vista-clientes";
 import { verifySession } from "@/lib/session-cookie";
 
 export const dynamic = "force-dynamic";
@@ -118,6 +119,9 @@ export async function GET(req: NextRequest) {
         { status: 500 },
       );
     }
+    // La marca de frescura de Ventas › Clientes (11-sep-2026), DESPUÉS de que
+    // el refresh confirmó — el mismo camino que el sync de facturas y el botón.
+    if (rpc === RPC_REFRESH_VISTA_CLIENTES) await marcarVistaClientesRefrescada();
   }
 
   const refreshedAt = new Date().toISOString();

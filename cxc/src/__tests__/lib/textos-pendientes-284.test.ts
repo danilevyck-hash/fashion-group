@@ -31,7 +31,8 @@ import { join } from "path";
 const root = join(__dirname, "..", "..", "..");
 const src = (...p: string[]) => readFileSync(join(root, "src", ...p), "utf8");
 
-const VISTAS_CON_PILL = [["components", "ventas", "ComisionesView.tsx"]];
+// 🔁 11-sep-2026: Comisiones se mudó a su carpeta (`components/comisiones/`).
+const VISTAS_CON_PILL = [["components", "comisiones", "ComisionesView.tsx"]];
 
 /** Las dos caras del Resumen — la de escritorio y la de celular. */
 const VISTAS_DEL_RESUMEN = [

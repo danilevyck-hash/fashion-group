@@ -129,79 +129,27 @@ describe("la definición única del corte (clientes-corte-comparativo.ts)", () =
 // ═════════════════════════════════════════════════════════════════════════════
 // #1 Resumen › Anual
 // ═════════════════════════════════════════════════════════════════════════════
-describe("#1 Resumen › Anual — el año en curso contra los MISMOS DÍAS, no contra ene–sep entero", () => {
-  const armar = () => {
-    // 2025 entero: 100 por mes → ene–sep = 900, año = 1.200. 2026: ene–ago 100 + sep 10 = 810.
-    estado.mv = [];
-    for (let m = 1; m <= 12; m++) estado.mv.push(mvRow("fashion_wear", 2025, m, 100));
-    for (let m = 1; m <= 8; m++) estado.mv.push(mvRow("fashion_wear", 2026, m, 100));
-    estado.mv.push(mvRow("fashion_wear", 2026, 9, 10));
-    // 2024 cerrado, para el Δ de un año cerrado.
-    for (let m = 1; m <= 12; m++) estado.mv.push(mvRow("fashion_wear", 2024, m, 50));
-    // La RPC: ene–ago 2025 enteros (100) + sep 1–3 = 12.
-    estado.prev = {
-      rows: [...Array.from({ length: 8 }, (_, i) => prevRow("fashion_wear", i + 1, 100)), prevRow("fashion_wear", 9, 12)],
-      es_periodo_parcial: true,
-      fecha_corte: "2026-09-03",
-      dia_corte_anio_anterior: "2025-09-03",
-    };
-  };
-
-  it("el previo de 2026 es 812 (ene–ago + 1–3 sep), NO 900 (ene–sep entero)", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(MEDIODIA);
-    armar();
-    const { GET } = await import("@/app/api/ventas/resumen-anual/route");
-    const body = await (await GET(req("/api/ventas/resumen-anual"))).json();
-    const fw = body.empresas.find((e: { nombre: string }) => e.nombre === "Fashion Wear");
-    expect(fw.byYear[2026].ventas).toBe(810);
-    expect(fw.byYear[2026].prev.ventas).toBe(812);
-    // Y el grupo suma lo mismo (una sola empresa en el arnés).
-    expect(body.totalGrupo.byYear[2026].prev.ventas).toBe(812);
-    // La respuesta dice hasta qué día comparó.
-    expect(body.corte).toEqual({ fecha_corte: "2026-09-03", dia_corte_anio_anterior: "2025-09-03" });
+// 🔁 CAMBIÓ DE DIRECCIÓN el 11-sep-2026. Este bloque probaba `/api/ventas/
+// resumen-anual` (la vista «Anual» del Resumen): el año en curso contra los
+// MISMOS DÍAS, el año cerrado entero contra entero, la cadena v4 → v3 → v2 y el
+// borde de las 9 p.m. La vista Anual se RETIRÓ con su ruta (el detalle anual
+// se abre tocando la empresa, en el histórico mes × año, que es el bloque #2).
+// La REGLA no se perdió: la misma lectura (`leerPrevSamePeriod` +
+// `sumarPrevPorEmpresa`, `prev-same-period.ts`) la siguen usando el Resumen y
+// Vista General, y eso es lo que acá se exige ahora.
+describe("#1 🔁 Resumen › Anual se retiró con su ruta; la regla vive en prev-same-period", () => {
+  it("la ruta y el componente ya no existen", () => {
+    expect(existsSync("src/app/api/ventas/resumen-anual/route.ts")).toBe(false);
+    expect(existsSync("src/components/ventas/ResumenAnual.tsx")).toBe(false);
   });
 
-  it("un año CERRADO sigue entero contra entero desde la MV (2025 vs 2024 = 1.200 vs 600)", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(MEDIODIA);
-    armar();
-    const { GET } = await import("@/app/api/ventas/resumen-anual/route");
-    const body = await (await GET(req("/api/ventas/resumen-anual"))).json();
-    const fw = body.empresas.find((e: { nombre: string }) => e.nombre === "Fashion Wear");
-    expect(fw.byYear[2025].prev.ventas).toBe(600);
-  });
-
-  it("pide la RPC v4 (costo con ND) y cae a v3 → v2 solo si la anterior no existe", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(MEDIODIA);
-    armar();
-    const { GET } = await import("@/app/api/ventas/resumen-anual/route");
-    await GET(req("/api/ventas/resumen-anual"));
-    expect(estado.rpc.map(r => r.fn)).toEqual(["ventas_dashboard_prev_same_period_v4"]);
-    estado.rpc.length = 0;
-    estado.versiones.delete("ventas_dashboard_prev_same_period_v4");
-    await GET(req("/api/ventas/resumen-anual"));
-    expect(estado.rpc.map(r => r.fn)).toEqual(["ventas_dashboard_prev_same_period_v4", "ventas_dashboard_prev_same_period_v3"]);
-    estado.rpc.length = 0;
-    estado.versiones.delete("ventas_dashboard_prev_same_period_v3");
-    const body = await (await GET(req("/api/ventas/resumen-anual"))).json();
-    expect(estado.rpc.map(r => r.fn)).toEqual(["ventas_dashboard_prev_same_period_v4", "ventas_dashboard_prev_same_period_v3", "ventas_dashboard_prev_same_period_v2"]);
-    expect(body.empresas[0].byYear[2026].prev.ventas).toBe(812);
-    estado.versiones.add("ventas_dashboard_prev_same_period_v4");
-    estado.versiones.add("ventas_dashboard_prev_same_period_v3");
-  });
-
-  it("🩸 9 p.m. de Panamá del 31-dic: el año en curso sigue siendo el viejo", async () => {
-    // 31-dic-2026 21:00 Panamá = 1-ene-2027 02:00 UTC. Con el reloj UTC el
-    // «año de hoy» sería 2027 y el previo de 2026 saldría entero desde la MV.
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2027-01-01T02:00:00Z"));
-    armar();
-    const { GET } = await import("@/app/api/ventas/resumen-anual/route");
-    const body = await (await GET(req("/api/ventas/resumen-anual"))).json();
-    expect(estado.rpc.map(r => r.fn)).toContain("ventas_dashboard_prev_same_period_v4");
-    expect(body.empresas[0].byYear[2026].prev.ventas).toBe(812);
+  it("la lectura de los MISMOS DÍAS sigue siendo una, y la usan Resumen y Vista General", () => {
+    const limpiar = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const prev = limpiar(readFileSync("src/lib/ventas/prev-same-period.ts", "utf8"));
+    expect(prev).toMatch(/export function sumarPrevPorEmpresa/);
+    expect(prev).toMatch(/export function leerPrevSamePeriod/);
+    expect(limpiar(readFileSync("src/lib/ventas/queries.ts", "utf8"))).toMatch(/leerPrevSamePeriod\(year\)/);
+    expect(limpiar(readFileSync("src/app/api/dashboard/vista-general/route.ts", "utf8"))).toMatch(/sumarPrevPorEmpresa|leerPrevSamePeriod/);
   });
 });
 

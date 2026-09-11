@@ -56,6 +56,8 @@ import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 import { correrCentinelaTipos } from "@/lib/ventas/centinela-tipos";
+import { refrescarVistaClientes } from "@/lib/ventas/refrescar-vista-clientes";
+import { esEmpresaDelGrupo } from "@/lib/clientes/mundos";
 
 type SyncTipo = "facturas" | "estadocuenta" | "all";
 
@@ -243,6 +245,26 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       if (mvErr) console.error(`[switch-sync] refresh aging_mv falló (no fatal): ${mvErr.message}`);
     } catch (err) {
       console.error(`[switch-sync] refresh aging_mv threw (no fatal): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // ── LA VISTA DE VENTAS › CLIENTES SE REFRESCA CON CADA SYNC DE FACTURAS ──
+  //
+  // 🩸 Se refrescaba UNA vez al día (07:35 UTC) mientras las facturas entran
+  // cuatro veces: al mediodía la pestaña Clientes iba nueve horas atrás de la
+  // ficha del mismo cliente (11-sep-2026, City Mall: $1.256.838,89 contra
+  // $1.260.018,89). Ahora cuelga de cada corrida que trae facturas y al menos
+  // una empresa del GRUPO terminó bien (la vista es de las 6; ACS y Boston no
+  // la mueven). CONCURRENTLY, ~1.600 filas, segundos. TOLERANTE: si falla, NO
+  // marca el sync como fallido ni avisa — solo log; el cron de las 07:35 y la
+  // reconciliación lo recuperan. Y deja la marca de frescura que lee la
+  // pantalla (`refrescar-vista-clientes.ts`). Cero crons nuevos.
+  if ((tipo === "facturas" || tipo === "all") && results.some((r) => esEmpresaDelGrupo(r.empresaKey))) {
+    try {
+      const r = await refrescarVistaClientes();
+      if (!r.ok) console.error(`[switch-sync] refresh clientes_vw falló (no fatal): ${r.error}`);
+    } catch (err) {
+      console.error(`[switch-sync] refresh clientes_vw threw (no fatal): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

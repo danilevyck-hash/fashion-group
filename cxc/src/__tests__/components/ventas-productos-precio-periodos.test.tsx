@@ -13,7 +13,9 @@
 // Las cuatro cosas que se prueban tocando:
 //   1. Precio prom. sale de venta ÷ unidades, y sin unidades netas NO es cero.
 //   2. Tocar "Precio prom." REORDENA las filas (no solo pinta una flechita).
-//   3. Cambiar el período cambia LO QUE SE PIDE, y pide su comparativo `previo=1`.
+//   3. Cambiar el período (que desde el 11-sep-2026 LLEGA POR PROP desde el
+//      selector único de Ventas) cambia LO QUE SE PIDE, y pide su comparativo
+//      `previo=1`.
 //   4. Si la ventana de comparación vino VACÍA, la pantalla lo DICE.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -21,6 +23,14 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vite
 import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
 import { ProductosView } from "@/components/ventas/ProductosView";
 import type { ProductosResponse } from "@/lib/ventas/productos";
+
+// 🔴 EL PERÍODO LLEGA POR PROP (11-sep-2026). Esta pantalla ya no tiene su
+// desplegable «Período»: lo manda el selector ÚNICO de arriba de Ventas y
+// `ProductosView` recibe `{ periodo, anioEnCurso }` (`lib/ventas/periodo.ts`).
+const ANIO_2026 = { tipo: "anio", anio: 2026 } as const;
+const ULTIMOS_12 = { tipo: "ultimos", n: 12 } as const;
+const ULTIMOS_6 = { tipo: "ultimos", n: 6 } as const;
+const ANIO_2025 = { tipo: "anio", anio: 2025 } as const;
 import { readFileSync } from "fs";
 import path from "path";
 
@@ -187,7 +197,7 @@ async function elegirEnSelector(valorActual: string | RegExp, opcion: string | R
 
 describe("1 · la columna Precio prom. dice venta ÷ unidades", () => {
   it("cada fila trae su precio promedio, con el formato de plata de la casa", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(celda("CAMISA POLO", "precio")).toBe("$9.00");
     expect(celda("SANDALIA", "precio")).toBe("$50.00");
@@ -195,13 +205,13 @@ describe("1 · la columna Precio prom. dice venta ÷ unidades", () => {
 
   it("un grupo sin unidades netas muestra '—', NO $0.00", async () => {
     // Un "$0.00" se lee como "lo regalé". La devolución neta no tiene precio.
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(celda("DEVUELTO", "precio")).toBe("—");
   });
 
   it("las columnas que ya estaban siguen diciendo lo mismo", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(celda("CAMISA POLO", "cantidad")).toBe("1,000");
     expect(celda("CAMISA POLO", "venta")).toBe("$9,000.00");
@@ -215,7 +225,7 @@ describe("1 · la columna Precio prom. dice venta ÷ unidades", () => {
     // 🔑 El desplegable abre en «Quién lo compra» desde el 25-ago-2026 (es lo
     // que pidió Daniel). Los códigos NO se perdieron: están a un toque, en su
     // pestaña — y esta prueba lo comprueba tocándola.
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     await waitFor(() => enTabla().getByRole("tab", { name: /Códigos/ }));
@@ -233,7 +243,7 @@ describe("1 · la columna Precio prom. dice venta ÷ unidades", () => {
 
 describe("2 · tocar el encabezado REORDENA de verdad", () => {
   it("por precio promedio: la sandalia sube por encima de la camisa", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     // Default = venta desc: la camisa ($9.000) va antes que la sandalia ($5.000).
     expect(ordenEnPantalla()).toEqual(["CAMISA POLO", "SANDALIA", "DEVUELTO"]);
@@ -244,7 +254,7 @@ describe("2 · tocar el encabezado REORDENA de verdad", () => {
   });
 
   it("un segundo toque invierte el orden (no lo deja quieto)", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const th = enTabla().getByRole("button", { name: /Precio prom\./ });
     fireEvent.click(th);
@@ -254,7 +264,7 @@ describe("2 · tocar el encabezado REORDENA de verdad", () => {
   });
 
   it("las otras tres columnas siguen ordenando como siempre", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     fireEvent.click(enTabla().getByRole("button", { name: /^Cant/ }));
     await waitFor(() => expect(ordenEnPantalla()).toEqual(["CAMISA POLO", "SANDALIA", "DEVUELTO"]));
@@ -265,52 +275,37 @@ describe("2 · tocar el encabezado REORDENA de verdad", () => {
   });
 });
 
-describe("3 · el selector de período cambia LO QUE SE PIDE", () => {
+describe("3 · el período cambia LO QUE SE PIDE", () => {
+  // ⛔ ACÁ VIVÍAN «ofrece los cuatro períodos de Daniel, con esos nombres» y
+  // «los 12 meses sueltos NO vuelven al desplegable». Los DOS cambiaron de
+  // dirección el 11-sep-2026: el desplegable «Período» de esta pantalla SE
+  // RETIRÓ (Daniel, con el mockup: *«un solo selector arriba… que manda en las
+  // tres pestañas»*). El período llega por prop desde `VentasShell` y esta
+  // pantalla no dibuja ningún selector de tiempo. Lo que SÍ sigue vivo —y se
+  // prueba abajo— es que cada período pide su ventana y su `previo=1`, y que
+  // nada manda `mes=`. El CONTROL de que no volvió el desplegable está en
+  // `ventas-productos-selector-unico.test.tsx`.
   it("arranca en el año en curso y pide su comparativo", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    expect(urlsPedidas.some(u => u.includes("periodo=ytd") && !u.includes("previo"))).toBe(true);
+    expect(urlsPedidas.some(u => u.includes("periodo=ytd") && u.includes("year=2026") && !u.includes("previo"))).toBe(true);
     expect(urlsPedidas.some(u => u.includes("periodo=ytd") && u.includes("previo=1"))).toBe(true);
   });
 
-  it("ofrece los cuatro períodos de Daniel, con esos nombres", async () => {
-    render(<ProductosView selectedYear={2026} />);
+  it("⛔ la pantalla NO dibuja ningún selector de período propio", async () => {
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    const trigger = screen.getByText("Año en curso").closest("button")!;
-    fireEvent.keyDown(trigger, { key: "ArrowDown" });
-    for (const nombre of ["Año en curso", "Últimos 6 meses", "Últimos 12 meses", "Año pasado"]) {
-      expect(await screen.findByRole("option", { name: nombre })).toBeTruthy();
-    }
+    expect(document.querySelector("[data-selector-periodo]")).toBeNull();
+    expect(screen.queryByText("Año en curso")).toBeNull();
+    expect(screen.queryByText("Año pasado")).toBeNull();
+    expect(screen.queryByText(">Período<")).toBeNull();
   });
 
-  // ⛔ ACÁ VIVÍA «el mes suelto que ya existía NO desapareció», y el candado
-  // CAMBIÓ DE DIRECCIÓN el 25-ago-2026. Daniel, textual, mirando el
-  // desplegable: *"solo dejame las 4 primeras, las otras quítamelas que sobran,
-  // nunca te las pedí"*. O sea que el test viejo fijaba justo lo que él mandó
-  // sacar. Ahora se exige lo contrario: que NINGÚN mes vuelva a la lista.
-  it("⛔ los 12 meses sueltos NO vuelven al desplegable", async () => {
-    render(<ProductosView selectedYear={2026} />);
-    await pintada();
-    const trigger = screen.getByText("Año en curso").closest("button")!;
-    fireEvent.keyDown(trigger, { key: "ArrowDown" });
-    // Se espera a que la lista esté pintada antes de afirmar una ausencia: sin
-    // esto, "no hay ningún mes" se cumpliría con el desplegable todavía vacío.
-    expect(await screen.findByRole("option", { name: "Últimos 6 meses" })).toBeTruthy();
-    const opciones = screen.getAllByRole("option").map(o => (o.textContent ?? "").trim());
-    expect(opciones).toEqual([
-      "Año en curso",
-      "Últimos 6 meses",
-      "Últimos 12 meses",
-      "Año pasado",
-    ]);
-    expect(opciones.some(t => /^(Ene|Feb|Mar|Abr|May|Jun|Jul|Ago|Sep|Oct|Nov|Dic)\b/.test(t))).toBe(false);
-  });
-
-  it("elegir 'Últimos 12 meses' pide periodo=12m y su previo=1", async () => {
-    render(<ProductosView selectedYear={2026} />);
+  it("«Últimos 12 meses» por prop pide periodo=12m y su previo=1", async () => {
+    const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     urlsPedidas = [];
-    await elegirEnSelector("Año en curso", "Últimos 12 meses");
+    rerender(<ProductosView periodo={ULTIMOS_12} anioEnCurso={2026} />);
     await waitFor(() => {
       expect(urlsPedidas.some(u => u.includes("periodo=12m") && !u.includes("previo"))).toBe(true);
       expect(urlsPedidas.some(u => u.includes("periodo=12m") && u.includes("previo=1"))).toBe(true);
@@ -319,36 +314,45 @@ describe("3 · el selector de período cambia LO QUE SE PIDE", () => {
     expect(urlsPedidas.every(u => !u.includes("mes="))).toBe(true);
   });
 
+  it("«Año 2025» por prop pide periodo=ytd con year=2025, sin mes", async () => {
+    // 🔴 «Año pasado» ya no existe como opción: un año cerrado llega como
+    // `{ tipo: "anio", anio: 2025 }` y se pide `ytd` de ESE año — que es
+    // exactamente el rango que `anio_pasado` calculaba (1-ene a 31-dic).
+    const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
+    await pintada();
+    urlsPedidas = [];
+    rerender(<ProductosView periodo={ANIO_2025} anioEnCurso={2026} />);
+    await waitFor(() => expect(urlsPedidas.some(u => u.includes("periodo=ytd") && u.includes("year=2025"))).toBe(true));
+    expect(urlsPedidas.every(u => !u.includes("mes=") && !u.includes("anio_pasado"))).toBe(true);
+  });
+
   it("⛔ la pantalla ya no manda `mes=` en ninguna de sus peticiones", async () => {
     // El servidor SIGUE aceptando `?mes=6` (un marcador viejo tiene que seguir
     // contestando lo mismo — hay candado en la ruta). Lo que se retiró es que
     // la PANTALLA lo pida.
-    render(<ProductosView selectedYear={2026} />);
+    const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    let actual = "Año en curso";
-    for (const periodo of ["Últimos 6 meses", "Últimos 12 meses", "Año pasado"]) {
+    for (const periodo of [ULTIMOS_6, ULTIMOS_12, ANIO_2025]) {
       urlsPedidas = [];
-      await elegirEnSelector(actual, periodo);
+      rerender(<ProductosView periodo={periodo} anioEnCurso={2026} />);
       await waitFor(() => expect(urlsPedidas.length).toBeGreaterThan(0));
       expect(urlsPedidas.every(u => !u.includes("mes="))).toBe(true);
-      // «Año pasado» se dibuja como «Año 2025» una vez elegido.
-      actual = periodo === "Año pasado" ? "Año 2025" : periodo;
     }
   });
 
   // La "Δ" se fue del rótulo: es notación de matemática en una tabla que mira
   // gente que no la conoce. Lo que NO cambió es que el año deje de mentir.
   it("el rótulo de la columna de cambio deja de mentir un año cuando la ventana es relativa", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(screen.getByText("vs 2025")).toBeTruthy();
-    await elegirEnSelector("Año en curso", "Últimos 6 meses");
+    rerender(<ProductosView periodo={ULTIMOS_6} anioEnCurso={2026} />);
     await waitFor(() => expect(screen.getByText("vs año ant.")).toBeTruthy());
     expect(screen.queryByText(/^Δ/)).toBeNull();
   });
 
   it("las DOS fechas del período están en pantalla (un rótulo relativo solo, no)", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const resumen = document.querySelector("[data-resumen-productos]")!;
     expect(resumen.textContent).toContain("Del 1 ene 2026 al 24 ago 2026");
@@ -356,7 +360,7 @@ describe("3 · el selector de período cambia LO QUE SE PIDE", () => {
   });
 
   it("el total de piezas y el precio promedio del período están arriba", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const resumen = document.querySelector("[data-resumen-productos]")!;
     expect(resumen.textContent).toContain("1,100 piezas");    // 1000 + 100 + 0
@@ -364,7 +368,7 @@ describe("3 · el selector de período cambia LO QUE SE PIDE", () => {
   });
 
   it("el renglón de Venta/Margen de siempre quedó intacto", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const p = document.querySelector("[data-totales-productos]")!;
     expect(p.textContent)// 🔁 Sin decimal desde el 5-sep-2026 (40,6% → 41%, redondeado).
@@ -373,13 +377,14 @@ describe("3 · el selector de período cambia LO QUE SE PIDE", () => {
 });
 
 describe("3b · el desplegable de códigos hereda el período elegido", () => {
-  it("con 'Últimos 12 meses', los códigos se piden con periodo=12m", async () => {
+  it("con «Últimos 12 meses», los códigos se piden con periodo=12m", async () => {
     // Sin esto los códigos de adentro suman OTRA ventana que la fila de arriba:
     // el desplegable no cuadra con su propio total y nadie sabe cuál miente.
-    render(<ProductosView selectedYear={2026} />);
+    const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    await elegirEnSelector("Año en curso", "Últimos 12 meses");
+    rerender(<ProductosView periodo={ULTIMOS_12} anioEnCurso={2026} />);
     await waitFor(() => expect(urlsPedidas.some(u => u.includes("periodo=12m"))).toBe(true));
+    await pintada();
     urlsPedidas = [];
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     await waitFor(() => {
@@ -389,17 +394,18 @@ describe("3b · el desplegable de códigos hereda el período elegido", () => {
     });
   });
 
-  it("con «Año pasado», los códigos se piden con ese período y sin mes", async () => {
-    render(<ProductosView selectedYear={2026} />);
+  it("con «Año 2025», los códigos se piden con ese año y sin mes", async () => {
+    const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    await elegirEnSelector("Año en curso", "Año pasado");
-    await waitFor(() => expect(urlsPedidas.some(u => u.includes("periodo=anio_pasado"))).toBe(true));
+    rerender(<ProductosView periodo={ANIO_2025} anioEnCurso={2026} />);
+    await waitFor(() => expect(urlsPedidas.some(u => u.includes("year=2025"))).toBe(true));
+    await pintada();
     urlsPedidas = [];
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     await waitFor(() => {
       const drill = urlsPedidas.filter(u => u.includes("/codigos"));
       expect(drill.length).toBeGreaterThan(0);
-      expect(drill.every(u => u.includes("periodo=anio_pasado") && !u.includes("mes="))).toBe(true);
+      expect(drill.every(u => u.includes("periodo=ytd") && u.includes("year=2025") && !u.includes("mes="))).toBe(true);
     });
   });
 });
@@ -407,7 +413,7 @@ describe("3b · el desplegable de códigos hereda el período elegido", () => {
 describe("4 · un período sin comparativo lo DICE, no inventa un porcentaje", () => {
   it("con la ventana anterior vacía sale el aviso", async () => {
     productosPrevios = [];
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const aviso = await waitFor(() => {
       const el = document.querySelector("[data-sin-comparativo]");
@@ -422,7 +428,7 @@ describe("4 · un período sin comparativo lo DICE, no inventa un porcentaje", (
     productosPrevios = [
       { descripcion: "CAMISA POLO", num_codigos: 3, cantidad: 900, venta: 8000, costo: 4800, margen: 0.4 },
     ];
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await waitFor(() => expect(celda("CAMISA POLO", "delta")).toBe("+13%"));
     expect(document.querySelector("[data-sin-comparativo]")).toBeNull();
@@ -430,21 +436,25 @@ describe("4 · un período sin comparativo lo DICE, no inventa un porcentaje", (
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5 · EL PERÍODO ELEGIDO SE CONSERVA — cambiar empresa o año no lo borra
+// 5 · EL PERÍODO ELEGIDO SE CONSERVA — cambiar empresa no lo borra
 //
-// 🩸 Estabas mirando "Últimos 12 meses", cambiabas de empresa (o el año de
-// arriba) y la pantalla volvía sola a "Año en curso" y te vaciaba el buscador,
-// sin avisar. En la empresa era un `setPeriodo("ytd") + setSearch("")` puesto
-// "por las dudas" (el motivo real era el MES, que puede no existir en la
-// combinación nueva); en el año era el `key={selectedYear}` de VentasShell, que
-// REMONTA la vista entera y le tira todo el estado.
+// 🩸 Estabas mirando "Últimos 12 meses", cambiabas de empresa y la pantalla
+// volvía sola a "Año en curso" y te vaciaba el buscador, sin avisar. Era un
+// `setPeriodo("ytd") + setSearch("")` puesto "por las dudas".
+//
+// 🔁 11-sep-2026: el período ya no es estado de esta pantalla —llega por prop
+// desde el selector único de Ventas—, así que «cambiar de empresa no vuelve al
+// año» se prueba pidiendo la ventana por prop y cambiando la empresa. Y el
+// candado del `key={selectedYear}` de VentasShell cambió de forma: el shell
+// monta `<ProductosView periodo={periodo} anioEnCurso={anioEnCurso} />` sin
+// `key`, así que cambiar el período tampoco remonta la vista.
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("5 · el período elegido se conserva", () => {
-  it("cambiar de EMPRESA no vuelve a «Año en curso»", async () => {
-    render(<ProductosView selectedYear={2026} />);
+  it("cambiar de EMPRESA no vuelve al año en curso", async () => {
+    const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    await elegirEnSelector("Año en curso", "Últimos 12 meses");
+    rerender(<ProductosView periodo={ULTIMOS_12} anioEnCurso={2026} />);
     await waitFor(() => expect(urlsPedidas.some(u => u.includes("periodo=12m"))).toBe(true));
 
     urlsPedidas = [];
@@ -455,7 +465,7 @@ describe("5 · el período elegido se conserva", () => {
   });
 
   it("cambiar de EMPRESA no borra lo que estabas buscando", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const buscador = screen.getByPlaceholderText(/Buscar descripción/);
     fireEvent.change(buscador, { target: { value: "SANDALIA" } });
@@ -466,26 +476,29 @@ describe("5 · el período elegido se conserva", () => {
     expect((buscador as HTMLInputElement).value).toBe("SANDALIA");
   });
 
-  it("cambiar el AÑO de arriba tampoco lo borra: la vista ya no se remonta", async () => {
-    const { rerender } = render(<ProductosView selectedYear={2026} />);
+  it("cambiar el PERÍODO de arriba tampoco borra el buscador: la vista no se remonta", async () => {
+    const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
-    await elegirEnSelector("Año en curso", "Últimos 6 meses");
-    await waitFor(() => expect(urlsPedidas.some(u => u.includes("periodo=6m"))).toBe(true));
+    const buscador = screen.getByPlaceholderText(/Buscar descripción/);
+    fireEvent.change(buscador, { target: { value: "SANDALIA" } });
+    await waitFor(() => expect(ordenEnPantalla()).toEqual(["SANDALIA"]));
 
     urlsPedidas = [];
-    rerender(<ProductosView selectedYear={2025} />);
+    rerender(<ProductosView periodo={ULTIMOS_6} anioEnCurso={2026} />);
     await waitFor(() => expect(urlsPedidas.length).toBeGreaterThan(0));
     expect(urlsPedidas.every(u => u.includes("periodo=6m"))).toBe(true);
+    expect((buscador as HTMLInputElement).value).toBe("SANDALIA");
   });
 
-  it("🔴 VentasShell ya no remonta Productos al cambiar el año", () => {
+  it("🔴 VentasShell monta Productos con el período por prop y sin `key`", () => {
     const shell = readFileSync(
       path.join(process.cwd(), "src/app/ventas/VentasShell.tsx"), "utf8",
     )
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .split("\n").map(l => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
-    expect(shell).toContain("<ProductosView selectedYear={selectedYear} />");
+    expect(shell).toContain("<ProductosView periodo={periodo} anioEnCurso={anioEnCurso} />");
     expect(shell).not.toMatch(/<ProductosView\s+key=/);
+    expect(shell).not.toContain("<ProductosView selectedYear=");
   });
 
   // ⛔ ACÁ VIVÍA «el MES que no existe en la combinación nueva SÍ se suelta».
@@ -493,9 +506,7 @@ describe("5 · el período elegido se conserva", () => {
   // los meses sueltos (Daniel: *"solo dejame las 4 primeras, las otras
   // quítamelas que sobran, nunca te las pedí"*). Sin meses en el selector no
   // hay ninguna elección que pueda quedar inválida al cambiar de empresa, así
-  // que no queda nada que cuidar. Lo que ese mismo cambio trajo y SÍ sigue
-  // vivo son los dos candados de arriba: cambiar de empresa no te devuelve al
-  // año en curso ni te borra el buscador.
+  // que no queda nada que cuidar.
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -510,7 +521,7 @@ describe("5 · el período elegido se conserva", () => {
 describe("6 · la pantalla distingue «falló» de «no había nada»", () => {
   it("si el comparativo VINO VACÍO, el aviso es ámbar y los renglones dicen «Nuevo»", async () => {
     productosPrevios = [];
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await waitFor(() => expect(document.querySelector("[data-sin-comparativo]")).toBeTruthy());
     expect(document.querySelector("[data-comparativo-fallo]")).toBeNull();
@@ -519,7 +530,7 @@ describe("6 · la pantalla distingue «falló» de «no había nada»", () => {
 
   it("🔴 si el comparativo FALLÓ, la pantalla lo DICE y no hay ni un «Nuevo»", async () => {
     fallarComparativo = true;
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await waitFor(() => expect(document.querySelector("[data-comparativo-fallo]")).toBeTruthy());
     const aviso = document.querySelector("[data-comparativo-fallo]")!;
@@ -534,7 +545,7 @@ describe("6 · la pantalla distingue «falló» de «no había nada»", () => {
 
   it("el aviso del fallo ofrece reintentar — es lo único accionable", async () => {
     fallarComparativo = true;
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     await waitFor(() => expect(document.querySelector("[data-comparativo-fallo]")).toBeTruthy());
     const boton = within(document.querySelector("[data-comparativo-fallo]") as HTMLElement)
@@ -548,7 +559,7 @@ describe("6 · la pantalla distingue «falló» de «no había nada»", () => {
 
   it("⚠️ los números de la tabla NO cambian por que el comparativo falle", async () => {
     fallarComparativo = true;
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(celda("CAMISA POLO", "venta")).toBe("$9,000.00");
     expect(celda("SANDALIA", "precio")).toBe("$50.00");
@@ -558,35 +569,29 @@ describe("6 · la pantalla distingue «falló» de «no había nada»", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 7 · EL AÑO DE ARRIBA NO MANDA SOBRE LOS PERÍODOS RELATIVOS — y la pantalla
-//     lo dice. Había DOS controles de tiempo y ninguno aclaraba cuál gana:
-//     "Últimos 12 meses" se cuenta desde HOY y el servidor ni mira el año.
+// 7 · ⛔ EL AVISO «el año de arriba no se aplica» SE FUE (cambió de dirección
+//     el 11-sep-2026). Existía porque había DOS controles de tiempo en la misma
+//     pantalla (el año de la barra y el «Período» propio) y ninguno decía cuál
+//     mandaba; encima mandaba a elegir «un mes» en un selector que no existía
+//     desde el 24-ago-2026. Con UN solo selector no hay nada que aclarar: ahora
+//     el candado exige que el aviso NO exista con ningún período.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("7 · la pantalla avisa cuando el año de arriba no aplica", () => {
-  it("con un período relativo lo DICE, con el año a la vista", async () => {
-    render(<ProductosView selectedYear={2026} />);
+describe("7 · ⛔ el aviso «el año de arriba no se aplica» no existe con ningún período", () => {
+  it("ni con el año, ni con una ventana, ni con un año cerrado", async () => {
+    const { rerender } = render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(document.querySelector("[data-anio-no-aplica]")).toBeNull();
 
-    await elegirEnSelector("Año en curso", "Últimos 12 meses");
-    await waitFor(() => expect(document.querySelector("[data-anio-no-aplica]")).toBeTruthy());
-    const aviso = document.querySelector("[data-anio-no-aplica]")!;
-    expect(aviso.textContent).toContain("2026");
-    expect(aviso.textContent).toContain("Últimos 12 meses");
-    expect(aviso.textContent).toContain("se cuenta desde hoy");
-  });
-
-  it("con «Año en curso» el aviso NO está: ahí el año sí manda", async () => {
-    // (Antes esto volvía por un mes suelto; los meses ya no están en el
-    // selector, así que se vuelve por «Año en curso», que es el otro período
-    // donde el año de arriba SÍ manda.)
-    render(<ProductosView selectedYear={2026} />);
-    await pintada();
-    await elegirEnSelector("Año en curso", "Últimos 6 meses");
-    await waitFor(() => expect(document.querySelector("[data-anio-no-aplica]")).toBeTruthy());
-    await elegirEnSelector("Últimos 6 meses", "Año en curso");
-    await waitFor(() => expect(document.querySelector("[data-anio-no-aplica]")).toBeNull());
+    for (const periodo of [ULTIMOS_12, ULTIMOS_6, ANIO_2025]) {
+      urlsPedidas = [];
+      rerender(<ProductosView periodo={periodo} anioEnCurso={2026} />);
+      await waitFor(() => expect(urlsPedidas.length).toBeGreaterThan(0));
+      await pintada();
+      expect(document.querySelector("[data-anio-no-aplica]")).toBeNull();
+      expect(document.body.textContent).not.toContain("no se aplica a este período");
+      expect(document.body.textContent).not.toContain("se cuenta desde hoy");
+    }
   });
 });
 
@@ -601,7 +606,7 @@ describe("7 · la pantalla avisa cuando el año de arriba no aplica", () => {
 
 describe("8 · el desplegable dice QUIÉN lo compra", () => {
   async function desplegar() {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     return waitFor(() => {
@@ -644,7 +649,7 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
 
   it("🔴 sin detalle NO afirma que no lo compra nadie", async () => {
     clientesDelDrill = [];
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     const texto = await waitFor(() => {
@@ -660,7 +665,7 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
 
   it("si la lectura FALLÓ lo dice distinto de «no hay»", async () => {
     clientesDelDrill = null;
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     fireEvent.click(document.querySelector('tr[data-fila-producto="CAMISA POLO"]')!);
     await waitFor(() => {
@@ -681,7 +686,7 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
   it("una descripción de UN SOLO código también se despliega", async () => {
     // 🩸 Antes `num_codigos <= 1` cortaba el despliegue. En Joystep y Active
     // Wear las descripciones que más venden son justo de un código.
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     fireEvent.click(document.querySelector('tr[data-fila-producto="DEVUELTO"]')!);
     await waitFor(() => expect(document.querySelector("[data-drill-clientes]")).toBeTruthy());
@@ -721,7 +726,7 @@ describe("8 · el desplegable dice QUIÉN lo compra", () => {
 
 describe("9 · el aviso de código mal clasificado ya no existe", () => {
   async function pantalla() {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
   }
 
@@ -831,7 +836,7 @@ function tarjeta(descripcion: string, col: string): string {
 
 describe("10 · las tarjetas de celular", () => {
   it("🔴 la tarjeta trae los CUATRO números, PIEZAS y PRECIO PROM. incluidos", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(tarjeta("CAMISA POLO", "cantidad")).toBe("1,000");
     expect(tarjeta("CAMISA POLO", "venta")).toBe("$9,000.00");
@@ -841,7 +846,7 @@ describe("10 · las tarjetas de celular", () => {
   });
 
   it("🔴 y dice EXACTAMENTE lo mismo que la tabla, celda por celda", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     // Las tres filas x los cuatro números. Si la tarjeta tuviera su propio
     // formateador o su propio redondeo, esto cae.
@@ -853,7 +858,7 @@ describe("10 · las tarjetas de celular", () => {
   });
 
   it("hay una tarjeta por fila, con las mismas descripciones y en el mismo orden", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const enTarjetasOrden = [...document.querySelectorAll("li[data-tarjeta-producto]")]
       .map(li => li.getAttribute("data-tarjeta-producto"));
@@ -861,7 +866,7 @@ describe("10 · las tarjetas de celular", () => {
   });
 
   it("🔴 los CUATRO criterios de orden están disponibles en celular", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const chips = [...document.querySelectorAll("[data-orden-chip]")]
       .map(b => b.getAttribute("data-orden-chip"));
@@ -869,7 +874,7 @@ describe("10 · las tarjetas de celular", () => {
   });
 
   it("🔴 tocar un chip REORDENA de verdad, y el segundo toque invierte", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     expect(ordenEnPantalla()).toEqual(["CAMISA POLO", "SANDALIA", "DEVUELTO"]);
     const precio = document.querySelector('[data-orden-chip="precio"]')!;
@@ -880,7 +885,7 @@ describe("10 · las tarjetas de celular", () => {
   });
 
   it("el chip activo dice para qué lado va, y es UNO solo", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     // Arranca en Venta ▼, igual que la tabla: un segundo estado de orden en
     // celular sería un segundo criterio esperando divergir del primero.
@@ -894,7 +899,7 @@ describe("10 · las tarjetas de celular", () => {
   });
 
   it("⚠️ el orden es UNO SOLO: tocar el chip mueve también el encabezado de la tabla", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     fireEvent.click(document.querySelector('[data-orden-chip="cantidad"]')!);
     await waitFor(() =>
@@ -906,7 +911,7 @@ describe("10 · las tarjetas de celular", () => {
   });
 
   it("🔴 el desplegable abre DESDE LA TARJETA, con «Quién lo compra» y «Códigos»", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     const li = document.querySelector('li[data-tarjeta-producto="CAMISA POLO"]') as HTMLElement;
     fireEvent.click(li.querySelector("button")!);
@@ -920,7 +925,7 @@ describe("10 · las tarjetas de celular", () => {
   });
 
   it("🩸 el layout se marca con `data-vista` FIJO, no con la clase del corte", async () => {
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await pintada();
     // Si esto se buscara por `.sm\\:hidden`, mover el corte devolvería null y
     // cualquier medidor compararía CERO celdas pasando en verde.

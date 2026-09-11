@@ -170,12 +170,10 @@ describe("⚠️ las vistas SIN dato del servidor siguen pidiendo", () => {
     expect(src).toContain('method: "POST"');
   });
 
-  it("Ventas y Multifashion solo consideran del servidor el año inicial", () => {
-    for (const rel of [
-      "src/app/ventas/VentasShell.tsx",
-      "src/app/multifashion/MultifashionShell.tsx",
-    ]) {
-      expect(leer(rel), rel).toContain("selectedYear === initialYear");
-    }
+  it("Ventas y Multifashion solo consideran del servidor el período inicial", () => {
+    // 🔁 11-sep-2026: Ventas pasó del año suelto al selector único de período;
+    // el servidor dice cuál armó (`periodoServidor`) y solo ese se sirve sin red.
+    expect(leer("src/app/ventas/VentasShell.tsx")).toContain("keyPeriodo === periodoServidor");
+    expect(leer("src/app/multifashion/MultifashionShell.tsx")).toContain("selectedYear === initialYear");
   });
 });

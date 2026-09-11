@@ -9,7 +9,7 @@
 //
 // La usan:
 //   · Ventas › Resumen (KPI y matriz)          — `fetchVentasResumen`
-//   · Ventas › Resumen › Anual (Δ del año)     — `/api/ventas/resumen-anual`
+//   · (Ventas › Resumen › Anual se retiró el 11-sep-2026 con su ruta)
 //   · Vista General › tarjeta Ventas (YoY)     — `/api/dashboard/vista-general`
 //
 // 🩸 Hasta el 3-sep-2026 solo la primera la usaba; las otras dos sumaban el mes

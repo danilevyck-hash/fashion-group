@@ -1113,6 +1113,12 @@ export const CRONS_FAIL_CLOSED = [
  */
 export const HEARTBEATS_NO_CRON = [
   "sync-now-refresh-vistas",
+  // La marca de agua de Ventas › Clientes (11-sep-2026): cuándo se refrescó
+  // por última vez `clientes_empresa_12m_vw`. La escriben los TRES caminos
+  // que la refrescan (el sync de facturas, el botón y el cron de las 07:35)
+  // por `refrescar-vista-clientes.ts`, y la lee la línea de frescura de la
+  // pestaña. Nadie la programa: es una marca, no un cron.
+  "clientes-vw-refrescada",
   "catalogos-fotos-nuevos:reebok",
   "catalogos-fotos-nuevos:joybees",
   "catalogos-fotos-nuevos:tommy",

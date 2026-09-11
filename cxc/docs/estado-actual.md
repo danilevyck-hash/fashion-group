@@ -2262,3 +2262,39 @@ Encargo de Daniel: *«pon buscador en módulos o tabs que lo ameriten, como cola
 - **La pestaña Asistencia (`ReporteTab`) conserva su propio buscador**, que filtra contra el SERVIDOR (`?q=`) y del que salen su Excel y su PDF: es otra pregunta y otro camino, y no se tocó.
 - **Los chips de Colaboradores («Falta para pagar», «Falta completar») siguen contando sobre la lista entera**, no sobre lo buscado: son el estado de la ficha, no de lo que se está mirando.
 - **«Ya no trabajan aquí» y «Ya decididas» no se filtran**: son bloques plegados aparte, no la lista.
+
+---
+
+## 11-sep-2026 (noche) — Ventas: los 13 cambios aprobados sobre el mockup, y ningún total se mueve
+
+Encargo de Daniel sobre el mapa medido de Ventas (`_paraclaude`/`tmp/ventas/mapa.md`) y el mockup «Ventas, ahora vs después»: los trece puntos, aprobados uno por uno. **Medido antes y después con la RPC real y con la capa TS** (`scripts/_medir-ventas-13-cambios.mjs` · `scripts/_medir-ventas-totales-ts.ts`, solo lectura): agosto de las 8 = **$788.475,49** en los dos; el año 2026 = **$6.430.087,46** a la misma hora en los dos (la cifra de $6.427.806,78 del mediodía es la MISMA suma con menos horas de venta: producción avanza). Utilidad y margen del año, idénticos mientras la migración del corte no corra.
+
+| # | Dónde | Antes | Ahora |
+|---|---|---|---|
+| 1 | **Resumen** — el período | el año arriba, «Ene–Sep 2026 · vs 2025» en las 4 tarjetas y otra vez en el pie, «8 empresas · cierre Ago (mes en curso Sep)» encima de la tabla | **UN selector arriba** (`Año 2026 · 2025 · … · Últimos 12 meses · Últimos 6 meses`, `lib/ventas/periodo.ts`) que manda en las tres pestañas, en la URL y recordado por usuario; cada pestaña ofrece solo lo que sabe servir. Las tarjetas con cifra y delta; la caja del mes: «Septiembre · $… ▼ 50% · vs $… en 2025» (el «vs» se queda) |
+| 2 | **Resumen** — la matriz | 15 columnas, solo «Empresa» fija: Total y Proyección se salían de pantalla | **Total y Proyección fijas a la derecha** (`data-col-fija`, fondo sólido, sombra fina) |
+| 3 | **Resumen** — modos | `Ventas · Utilidad · Margen %` | `Ventas · Utilidad`; en Utilidad el margen % va debajo de cada cifra (`data-margen-celda`) |
+| 4 | **Resumen** — granularidad | `Mensual · Trimestral · Anual` | queda Mensual; `ResumenAnual.tsx` y `/api/ventas/resumen-anual` retirados |
+| 5 | **Resumen** — margen del mes en curso | venta hasta hoy ÷ costo hasta ayer: Vistana 28,6 %, el día 1 sale 100 % | hasta el **último día con costo** y dicho en el pie («Utilidad y margen de septiembre al 10 de septiembre, el último día con costo cargado»). Módulo puro `lib/ventas/margen-mes-en-curso.ts`; RPC `ventas_mes_en_curso_corte_costo` (migración `20261120120000`, **pendiente**); sin ella todo queda como hoy |
+| 6 | **Las 3 pestañas** — descarga | «Excel»; el del Resumen bajaba siempre la matriz de Ventas; sin botón en el celular | **«Descargar en Excel»**, baja lo que se ve (el Resumen, por modo), también en el celular, y se anota en `activity_logs` (`descarga_excel`) |
+| 7 | **Clientes** — empresa | 7 píldoras | desplegable; **«Todas las empresas»** (solo el grupo) — «Fashion Group» solo cuando la lista mezcla (Comisiones). Regla en `lib/ventas/rotulo-empresas.ts` |
+| 8 | **Clientes** — frescura | la vista se refrescaba a las 2:35 a.m.; City Mall $1.256.838,89 contra $1.260.018,89 en su ficha | se refresca con cada sync de facturas (cero crons nuevos), los tres caminos dejan la marca `clientes-vw-refrescada`, y la pestaña dice «datos de hoy 10:00 a.m.» |
+| 9 | **Clientes** — período | «Compras 2026» y un desplegable «Clientes: últimos 12 meses» que en Utilidad no hacía nada | la columna dice «Compras · Año 2026» / «Compras · Últimos 12 meses»; el desplegable se retiró. Las ventanas salen de la migración `20261121120000` (**pendiente**); sin ella se sirve el año y se dice |
+| 10 | **Clientes** — «Nuevo» | 34 de 116 decían «+0 %» | «Nuevo» (`delta: null`), al final al ordenar; el +30994 % se queda |
+| 11 | **Productos** — empresas | 7 con Multifashion (su «quién lo compra» siempre vacío) | las 6 del grupo, derivadas de `B2B_EMPRESA_KEYS`; Boston NO entra (Daniel: «NO») |
+| 12 | **Productos** — avisos | «para mirar un año elige "Año en curso" o un mes» (selector que ya no existía) y «sin ventas de mostrador» dos veces | el aviso se retiró; un solo descargo |
+| 13 | **Puerta de atrás** | 6 rutas aceptaban `contabilidad`, `/v2/status` a `secretaria`; 208 líneas de rutas sin llamador; 19 componentes de Comisiones/Referencia en `components/ventas/`; la búsqueda le ofrecía «Ventas» a contabilidad | solo `admin`; `/v2`, `/v2/status`, `/años` y `/ventas/reporte` retirados; los 19 archivos en `components/comisiones/` y `components/referencia/` sin cambiar una pantalla; contabilidad ya no recibe «Ventas» (commit `499f7e37`) |
+
+**El margen del mes en curso, medido el 11-sep-2026 (hoy → con el corte):** Vistana 28,6 → **22,8** · Fashion Wear 27,6 → 27,6 · Boston 43,5 → 43,2 · Fashion Shoes 30,0 → 28,2 · Multifashion 36,4 → 31,6 · Active Wear 3,2 · Active Shoes 22,3 · Joystep −12,9 sin cambio · **grupo 32,1 → 29,8**. ⚠️ Esa corrección solo se VERÁ cuando corra la migración `20261120120000`.
+
+**Migraciones escritas, pendientes de aplicar (las dos aditivas, validadas contra producción en solo lectura con `EXPLAIN` y con la consulta de muestra):**
+- `20261120120000_ventas_mes_en_curso_corte_costo.sql` — la RPC del corte del costo. No toca ninguna RPC existente.
+- `20261121120000_clientes_vw_ventanas_6_y_12.sql` — `compras_12m/_prev` y `compras_6m/_prev` en la MV y en la vista agregada; `compras_ytd` y `delta_vs_2025` byte a byte; DROP+CREATE con los mismos índices.
+
+**Candados nuevos:** `ventas-selector-periodo-unico.test.ts` · `ventas-resumen-13-cambios.test.tsx` · `ventas-clientes-desplegable-y-nuevo.test.tsx` · `ventas-clientes-periodo-y-frescura.test.ts` · `ventas-productos-selector-unico.test.tsx` · `ventas-puerta-cerrada.test.ts`. Los que cambiaron de dirección, con nota fechada y sin borrar ninguno, están listados en el bloque de Ventas de `CLAUDE.md`.
+
+### ⚠️ Dejado a propósito / pendiente de Daniel
+- **Aplicar las dos migraciones** (`npm run migrar …`). Hasta entonces: el margen del mes en curso sigue mezclando (con un aviso en el log, una vez por proceso) y Clientes ofrece solo años.
+- **Clientes › Utilidad sirve el año** aunque el selector diga «Últimos 12 meses»: `utilidad_por_cliente_v2` no tiene ventanas. La pantalla lo dice («· Año 2026»). Agregarle ventanas es otra RPC.
+- **Al pasar por el Resumen con «Últimos 12 meses» elegido, el Resumen muestra el año en curso** y el desplegable dice «Año 2026»; al volver a Productos la ventana sigue ahí (la URL la conserva). Es la regla «cada pestaña sirve lo que sabe».
+- **Los tests de `src/__tests__` con errores de tipos preexistentes** (266 en `main`; ninguno nuevo de este trabajo) siguen igual: no era parte del encargo.

@@ -174,11 +174,12 @@ describe("#6 el código pide las versiones nuevas y cae a las viejas", () => {
     expect([...orden]).toEqual([...orden].sort((a, b) => a - b));
   });
 
-  it("summary: Resumen, Vista General y /api/ventas/v2 leen por `leerDashboardSummary` (_v2 → _v1)", () => {
+  it("summary: Resumen y Vista General leen por `leerDashboardSummary` (_v2 → _v1)", () => {
+    // 🔁 11-sep-2026: `/api/ventas/v2` se retiró (cero llamadores); quedan dos lectores.
     const ds = readFileSync("src/lib/ventas/dashboard-summary.ts", "utf8");
     expect(ds).toMatch(/RPC_DASHBOARD_SUMMARY = "ventas_dashboard_summary_v2"/);
     expect(ds).toMatch(/RPC_DASHBOARD_SUMMARY_ANTERIOR = "ventas_dashboard_summary"/);
-    for (const ruta of ["src/lib/ventas/queries.ts", "src/app/api/dashboard/vista-general/route.ts", "src/app/api/ventas/v2/route.ts"]) {
+    for (const ruta of ["src/lib/ventas/queries.ts", "src/app/api/dashboard/vista-general/route.ts"]) {
       const s = readFileSync(ruta, "utf8").replace(/^\s*\/\/.*$/gm, "");
       expect(s, ruta).toMatch(/leerDashboardSummary\(/);
       expect(s, ruta).not.toMatch(/rpc\("ventas_dashboard_summary"/);

@@ -24,6 +24,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { marcarVistaClientesRefrescada, RPC_REFRESH_VISTA_CLIENTES } from "@/lib/ventas/refrescar-vista-clientes";
 
 /** cron_name del heartbeat manual (cooldown). También se mira el del cron. */
 export const REFRESH_VISTAS_HEARTBEAT = "sync-now-refresh-vistas";
@@ -54,6 +55,9 @@ export async function runRefreshVistas(): Promise<{ ok: true } | { ok: false; er
       ({ error } = await supabaseServer.rpc(rpc));
     }
     if (error) return { ok: false, error: `${rpc}: ${error.message}` };
+    // La marca de frescura de Ventas › Clientes (11-sep-2026): se deja DESPUÉS
+    // de que el refresh confirmó, por el mismo camino que el sync de facturas.
+    if (rpc === RPC_REFRESH_VISTA_CLIENTES) await marcarVistaClientesRefrescada();
   }
   await recordCronHeartbeat(REFRESH_VISTAS_HEARTBEAT);
   return { ok: true };

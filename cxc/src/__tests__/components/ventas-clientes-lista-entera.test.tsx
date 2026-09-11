@@ -86,13 +86,15 @@ describe("1 · 🩸 el «#» solo existe cuando el orden ES por compras", () => 
     expect(encabezados.some((h) => h.startsWith("#"))).toBe(false);
     // CONTROL: las demás columnas siguen todas ahí.
     expect(encabezados.join("|")).toContain("Cliente");
-    expect(encabezados.join("|")).toContain("Compras 2026");
+    // 🔁 11-sep-2026: la columna dice QUÉ período suma («Compras · Año 2026»),
+    // porque el selector único de arriba también sirve «Últimos 12 meses».
+    expect(encabezados.join("|")).toContain("Compras · Año 2026");
     expect(encabezados.join("|")).toContain("Última compra");
   });
 
   it("🔴 al ordenar POR COMPRAS aparece, y numera de mayor a menor", () => {
     pintar();
-    fireEvent.click(screen.getByText(/Compras 2026/));
+    fireEvent.click(screen.getByText(/Compras · Año 2026/));
     const encabezados = [...tabla().querySelectorAll("thead th")].map((th) => th.textContent?.trim() ?? "");
     expect(encabezados[0]).toBe("#");
 
@@ -103,7 +105,7 @@ describe("1 · 🩸 el «#» solo existe cuando el orden ES por compras", () => 
 
   it("🩸 y al volver a otro orden el «#» desaparece — no queda un ranking falso", () => {
     pintar();
-    fireEvent.click(screen.getByText(/Compras 2026/));
+    fireEvent.click(screen.getByText(/Compras · Año 2026/));
     expect([...tabla().querySelectorAll("thead th")][0].textContent?.trim()).toBe("#");
     fireEvent.click(screen.getByText(/Última compra/));
     expect([...tabla().querySelectorAll("thead th")][0].textContent?.trim()).not.toBe("#");
@@ -204,51 +206,63 @@ describe("4 · 🔴 «Empresas» dice SIEMPRE el número", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5 · EL UNIVERSO ES UN CONTROL, NO UNA NOTA AL PIE
+// 5 · ⛔ EL DESPLEGABLE «Clientes: últimos 12 meses» SE RETIRÓ (11-sep-2026)
+//
+// 🔁 CAMBIÓ DE DIRECCIÓN. Este bloque fijaba que el universo fuera un control
+// visible (`data-universo-clientes`). Medido el 11-sep-2026: en los modos
+// Utilidad y Margen no hacía nada, y en Ventas su segunda opción («con compras
+// en 2026») era lo mismo que no abrir los «N clientes sin compras en 2026»
+// plegados al final. El período lo manda ahora el selector ÚNICO de arriba
+// de Ventas (`lib/ventas/periodo.ts`). Lo que este bloque protegía de verdad
+// —que los dormidos no se escondan— lo sigue vigilando el bloque 3.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("5 · «Clientes: últimos 12 meses» es un selector visible", () => {
-  it("está al lado del buscador, no como leyenda gris", () => {
+describe("5 · ⛔ el desplegable del universo ya no existe", () => {
+  it("no queda ningún `data-universo-clientes`, ni en año en curso ni cerrado", () => {
     pintar();
-    const control = document.querySelector("[data-universo-clientes]")!;
-    expect(control).toBeTruthy();
-    expect(control.textContent).toContain("Clientes: últimos 12 meses");
-    // Y es TOCABLE: decide qué clientes se listan (209 contra 92 filas).
-    expect(control.tagName === "BUTTON" || control.getAttribute("role") === "combobox").toBe(true);
+    expect(document.querySelector("[data-universo-clientes]")).toBeNull();
+    cleanup();
+    render(<ClientesView data={DATA} selectedYear={2025} isClosedYear modo="ventas" onModo={() => {}} />);
+    expect(document.querySelector("[data-universo-clientes]")).toBeNull();
+    expect(document.body.textContent).not.toContain("Clientes: últimos 12 meses");
   });
 
-  it("en un año CERRADO no se ofrece una opción falsa", () => {
-    // La consulta ya filtra ese año: no hay nada que elegir, y se dice como
-    // texto en vez de dibujar un control que no hace nada.
-    render(<ClientesView data={DATA} selectedYear={2025} isClosedYear modo="ventas" onModo={() => {}} />);
-    const control = document.querySelector("[data-universo-clientes]")!;
-    expect(control.textContent).toContain("Año 2025");
-    expect(control.getAttribute("role")).not.toBe("combobox");
+  it("CONTROL — los dormidos siguen plegados y contados, que era lo que importaba", () => {
+    pintar();
+    expect(document.querySelector("[data-clientes-en-cero]")!.textContent).toContain("2");
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6 · LOS TRES MODOS COMPARTEN LOS CONTROLES
+// 6 · LOS DOS MODOS COMPARTEN LOS CONTROLES
+//
+// 🔁 11-sep-2026: eran TRES (Ventas · Utilidad · Margen %). «Margen %» se
+// retiró: montaba el MISMO componente que Utilidad, con la misma consulta y
+// las mismas columnas; solo cambiaba por cuál columna arrancaba el orden. Eran
+// dos botones para un «ordenar por». Y las píldoras de empresa pasaron a un
+// desplegable (`data-empresa-clientes`), que sigue filtrando los dos modos.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("6 · Ventas · Utilidad · Margen % — solo cambian las columnas", () => {
-  it("el control segmentado ofrece los tres, con las palabras del Resumen", () => {
+describe("6 · Ventas · Utilidad — solo cambian las columnas", () => {
+  it("el control segmentado ofrece los DOS, con las palabras del Resumen, y ya no «Margen %»", () => {
     pintar();
     const grupos = [...document.querySelectorAll("[data-control-segmentado]")];
     expect(grupos.length).toBeGreaterThanOrEqual(1);
     const textos = grupos.map((g) => g.textContent ?? "");
-    expect(textos.some((t) => t.includes("Ventas") && t.includes("Utilidad") && t.includes("Margen %"))).toBe(true);
+    expect(textos.some((t) => t.includes("Ventas") && t.includes("Utilidad"))).toBe(true);
+    expect(textos.some((t) => t.includes("Margen %"))).toBe(false);
   });
 
-  it("🔴 el buscador y las píldoras de empresa son los MISMOS en los tres", () => {
+  it("🔴 el buscador y el desplegable de empresa son los MISMOS en los dos", () => {
     // Un solo buscador para las mismas filas: tener dos era buscar al mismo
     // cliente dos veces. En Utilidad NO se dibuja uno propio.
     const { rerender } = pintar();
     expect(screen.getAllByPlaceholderText("Buscar cliente o código…")).toHaveLength(1);
+    expect(document.querySelectorAll("[data-empresa-clientes]")).toHaveLength(1);
     rerender(<ClientesView data={DATA} selectedYear={2026} isClosedYear={false} modo="utilidad" onModo={() => {}} />);
     expect(screen.getAllByPlaceholderText("Buscar cliente o código…")).toHaveLength(1);
     expect(screen.queryByPlaceholderText("Buscar cliente o empresa…")).toBeNull();
-    // Y las píldoras siguen ahí, filtrando también ese modo.
-    expect(screen.getAllByRole("button", { name: "Todas" }).length).toBeGreaterThanOrEqual(1);
+    // Y el desplegable sigue ahí, filtrando también ese modo.
+    expect(document.querySelectorAll("[data-empresa-clientes]")).toHaveLength(1);
   });
 });

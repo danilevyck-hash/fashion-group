@@ -28,9 +28,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
+import * as pestanas from "@/lib/ventas/pestanas";
 import {
   TABS_VENTAS, MODOS_CLIENTES, esTabVentas, esModoClientes,
-  tabHeredado, alcanceDeLaPestana,
+  tabHeredado, modoHeredado,
 } from "@/lib/ventas/pestanas";
 
 const raiz = path.resolve(__dirname, "../../..");
@@ -133,9 +134,14 @@ describe("2 · un favorito guardado no muere", () => {
   });
 
   it("un `?modo=` desconocido cae en Ventas, nunca en blanco", () => {
-    expect([...MODOS_CLIENTES]).toEqual(["ventas", "utilidad", "margen"]);
+    // 🔁 11-sep-2026: «Margen %» dejó de ser un modo (era el MISMO componente
+    // que Utilidad con otro orden inicial). Son DOS, y `?modo=margen` guardado
+    // llega a `utilidad`, nunca en blanco.
+    expect([...MODOS_CLIENTES]).toEqual(["ventas", "utilidad"]);
     expect(esModoClientes("loquesea")).toBe(false);
-    expect(esModoClientes("margen")).toBe(true);
+    expect(esModoClientes("margen")).toBe(false);
+    expect(modoHeredado("margen")).toBe("utilidad");
+    expect(shellPlano).toContain("modoHeredado(modoRaw)");
     expect(shellPlano).toContain('esModoClientes(modoRaw) ? modoRaw : "ventas"');
     // Y el modo vive en la URL: un enlace compartido abre la misma vista.
     expect(shellPlano).toContain('useUrlState("modo"');
@@ -146,22 +152,19 @@ describe("2 · un favorito guardado no muere", () => {
 // 3 · CADA PESTAÑA DICE SUS EMPRESAS
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("3 · el encabezado ya no dice «8 empresas» en las tres", () => {
-  it("Resumen ocho, Clientes seis, Productos una a la vez", () => {
-    expect(alcanceDeLaPestana("resumen", "cierre Ago (mes en curso Sep)"))
-      .toBe("8 empresas · cierre Ago (mes en curso Sep)");
-    expect(alcanceDeLaPestana("clientes", "cierre Ago (mes en curso Sep)"))
-      .toBe("6 empresas · cierre Ago (mes en curso Sep)");
-    // Productos se mira de a UNA y con su propio período: nombrar el rango de
-    // meses del Resumen ahí sería nombrar un período que esa pantalla no usa.
-    expect(alcanceDeLaPestana("productos", "cierre Ago (mes en curso Sep)"))
-      .toBe("una empresa a la vez");
-  });
-
-  it("el shell lo pinta desde esa función, no con un texto fijo", () => {
-    expect(shellPlano).toContain("alcanceDeLaPestana(tab, mesesLabel)");
-    // Y ya no queda el literal viejo escrito a mano.
-    expect(shellPlano).not.toContain("`8 empresas · ${mesesLabel}`");
+// 🔁 CAMBIÓ DE DIRECCIÓN el 11-sep-2026. Decía que el encabezado contaba las
+// empresas de cada pestaña («8 empresas · cierre Ago (mes en curso Sep)» …).
+// Con el selector ÚNICO de período esa línea se retiró: la matriz lista las
+// ocho empresas una por una y abajo dice hasta qué día llegan los datos, y un
+// contador encima de una tabla que ya cuenta era una línea de más. Lo que NO
+// vuelve: ni la función ni el literal.
+describe("3 · 🔁 el encabezado ya no cuenta empresas: la línea se retiró", () => {
+  it("`alcanceDeLaPestana` ya no existe y el shell no la llama", () => {
+    expect((pestanas as Record<string, unknown>).alcanceDeLaPestana).toBeUndefined();
+    expect(shellPlano).not.toContain("alcanceDeLaPestana");
+    expect(shellPlano).not.toContain("8 empresas");
+    expect(shellPlano).not.toContain("una empresa a la vez");
+    expect(shellPlano).not.toContain("mesesLabel");
   });
 });
 
@@ -196,19 +199,24 @@ describe("4 · cada pestaña baja LO QUE ESTÁS VIENDO", () => {
 // 5 · UN SOLO CONTROL DE TIEMPO POR PANTALLA
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("5 · el año de la barra no se dibuja donde no manda", () => {
-  it("🔴 en Productos NO se dibuja", () => {
-    // «Últimos 6 meses», «Últimos 12 meses» y «Año pasado» se cuentan desde HOY
-    // y NO miran el año del selector. Dos controles de tiempo en la misma
-    // pantalla, uno inerte, es cómo se lee un número de un año creyendo que es
-    // de otro.
-    expect(shellPlano).toContain('tab !== "productos"');
+// 🔁 CAMBIÓ DE DIRECCIÓN el 11-sep-2026. Decía que el año de la barra NO se
+// dibujaba en Productos, porque esa pestaña traía su propio «Período». Hoy hay
+// UN solo selector de período arriba, que manda en las tres pestañas y ofrece
+// en cada una lo que sabe servir (`lib/ventas/periodo.ts`); Productos lo recibe
+// por prop y ya no dibuja el suyo. Ni dos controles de tiempo ni uno inerte.
+describe("5 · 🔁 un solo selector de período para las tres pestañas", () => {
+  it("🔴 el shell monta el selector único, y no el año suelto", () => {
+    expect(shellPlano).toContain("data-selector-periodo-ventas");
+    expect(shellPlano).toContain("<PeriodoSelect");
+    expect(shellPlano).toContain("opcionesPeriodo({ tab");
+    expect(shellPlano).not.toContain('tab !== "productos"');
+    expect(shellPlano).not.toContain("availableYears.map(y =>");
   });
 
-  it("y Productos rotula el suyo «Período», que es lo que es", () => {
-    // Decía «Año en curso» pegado al «2026» de arriba y se leía como un segundo
-    // selector de año. Sus cuatro opciones son períodos, no años.
-    expect(productos).toContain("data-selector-periodo");
-    expect(productos).toContain(">Período<");
+  it("y Productos ya no dibuja el suyo: el período le llega por prop", () => {
+    expect(productos).not.toContain("data-selector-periodo");
+    expect(productos).not.toContain(">Período<");
+    expect(productos).toContain("periodoParaProductos(periodoElegido, anioEnCurso)");
+    expect(shellPlano).toContain("<ProductosView periodo={periodo} anioEnCurso={anioEnCurso} />");
   });
 });

@@ -215,6 +215,14 @@ const PERMITIDOS = new Set([path.join("lib", "variacion.ts")]);
  */
 const EXCEPCIONES = new Map<string, string>([
   [
+    path.join("lib", "ventas", "queries.ts"),
+    "Ventas › Clientes, «Últimos 12/6 meses» (11-sep-2026): `deltaComoLaVista` es el ESPEJO de la regla " +
+      "que la vista escribe en SQL para el año (`WHEN prev > 0`, sin el piso de $100). La columna de cambio " +
+      "de esa pestaña tiene que decir lo mismo con un año y con una ventana; Daniel dejó el porcentaje " +
+      "grande a propósito (*«deja el porcentaje para que todo tenga una misma línea»*). Si algún día la " +
+      "vista aplica el piso, esto pasa a variacionPct y se borra la excepción.",
+  ],
+  [
     path.join("components", "ventas", "ResumenMesAnio.tsx"),
     "modo margen: la base es un RATIO (0,30), no dólares — el piso en dólares ya lo puso metricValue",
   ],

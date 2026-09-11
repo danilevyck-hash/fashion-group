@@ -74,12 +74,21 @@ describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio
   });
 
   it("los textos de los encabezados NO se abreviaron", () => {
-    expect(clientes).toContain("Compras {selectedYear}");
+    // 🔁 11-sep-2026: el encabezado de compras dice el período por su nombre
+    // («Compras · Año 2026» / «Compras · Últimos 12 meses», `rotuloCompras`).
+    // Más largo, no más corto: sigue sin abreviarse.
+    expect(clientes).toContain("rotuloCompras(periodoServido)");
     expect(clientes).toContain("Última compra");
   });
 
-  it("las píldoras de empresa ENVUELVEN en vez de arrastrarse (eran los 369 px del iPhone)", () => {
-    expect(clientes).toContain("flex flex-wrap gap-1.5");
+  // 🔁 CAMBIÓ DE DIRECCIÓN el 11-sep-2026. Las píldoras de empresa se
+  // retiraron: Daniel eligió el desplegable («B») — en el celular eran cuatro
+  // líneas antes del primer cliente. Lo que este archivo siempre quiso, que
+  // nada se arrastre de lado, se cumple mejor: un `Select` no envuelve ni
+  // arrastra.
+  it("🔁 el filtro de empresa es un desplegable: ni píldoras ni scroll-snap", () => {
+    expect(clientes).toContain("data-empresa-clientes");
+    expect(clientes).not.toContain("EMPRESA_PILLS");
     expect(clientes).not.toContain("flex flex-nowrap gap-1.5");
     expect(clientes).not.toContain("scrollSnapType");
     expect(clientes).not.toContain("scrollSnapAlign");
@@ -97,17 +106,24 @@ describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio
   // rótulos salen de `EMPRESA_KEY_TO_NAME`, que trae el nombre entero. QUIÉNES
   // son las píldoras lo vigila `ventas-clientes-las-seis-empresas.test.tsx`, que
   // además las PINTA.
-  it("las píldoras se DERIVAN de las 6 y su rótulo es el nombre entero", () => {
-    expect(clientes).toContain("B2B_EMPRESA_KEYS.map");
+  it("las opciones se DERIVAN de las 6 y su rótulo es el nombre entero", () => {
+    // 🔁 11-sep-2026: la derivación vive en `lib/ventas/rotulo-empresas.ts`
+    // (`opcionesEmpresaClientes`), y la vista la importa.
+    expect(clientes).toContain("opcionesEmpresaClientes()");
+    const rotulos = read(path.join(__dirname, "..", "..", "lib", "ventas", "rotulo-empresas.ts"));
+    expect(rotulos).toContain("B2B_EMPRESA_KEYS.map");
     // 🔁 5-sep-2026: el rótulo es el nombre CORTO («Vistana», «Boston»),
     // decisión #4 del diccionario. NO es una abreviatura de las que este archivo
     // vino a prohibir —«Vist. Int.», partir el nombre para que entre—: es el
     // nombre que Daniel usa, elegido por él, y sale del SEGUNDO CAMPO de la
     // MISMA lista de empresas, no de un mapa aparte. Lo que este test sostiene
     // sigue en pie: el rótulo se DERIVA, no se escribe a mano.
-    expect(clientes).toContain("nombreCortoEmpresa(key)");
+    // (🔁 11-sep-2026: el rótulo se arma en `rotulo-empresas.ts`, y la primera
+    // opción dice «Todas las empresas» por la regla `rotuloDeTodas`.)
+    expect(rotulos).toContain("nombreCortoEmpresa(k)");
+    expect(rotulos).toContain("rotuloDeTodas(B2B_EMPRESA_KEYS)");
     expect(clientes).not.toMatch(/label:\s*"Vistana International"/);
-    expect(clientes).toContain('{ id: "todas", label: "Todas" }');
+    expect(rotulos).not.toMatch(/etiqueta:\s*"Vistana International"/);
     // Ningún rótulo abreviado a mano: si alguien vuelve a escribirlos, vuelve a
     // poder olvidarse de una empresa.
     for (const label of [

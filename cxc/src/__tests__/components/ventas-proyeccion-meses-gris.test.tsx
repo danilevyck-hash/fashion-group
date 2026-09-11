@@ -136,8 +136,8 @@ function resumen(over: Partial<VentasResumen> = {}): VentasResumen {
 }
 
 const props = {
-  multi: null, availableYears: [2026], selectedYear: 2026,
-  loading: false, error: null, onYearChange: vi.fn(),
+  multi: null, selectedYear: 2026,
+  loading: false, error: null,
 };
 
 /** Las celdas grises del ESCRITORIO (el celular usa `m:<fila>:<col>`). */
@@ -228,20 +228,21 @@ describe("🔴 lo que NO cambió", () => {
     expect(document.querySelectorAll("[data-mes-proyectado-grupo]")).toHaveLength(0);
   });
 
-  it("en Utilidad y en Margen no se dibuja ningún mes proyectado", () => {
+  it("en Utilidad no se dibuja ningún mes proyectado", () => {
+    // 🔁 11-sep-2026: «Margen %» dejó de ser un modo (va debajo de la
+    // utilidad); «Trimestral» y «Anual» se retiraron. Queda Utilidad.
     render(<ResumenView {...props} data={resumen()} isClosedYear={false} />);
-    for (const modo of ["Utilidad", "Margen %"]) {
-      fireEvent.click(screen.getAllByRole("tab", { name: modo })[0]);
-      expect(celdasGrisEscritorio(), modo).toHaveLength(0);
-    }
-  });
-
-  it("en Trimestral tampoco: el reparto es MENSUAL", () => {
-    render(<ResumenView {...props} data={resumen()} isClosedYear={false} />);
-    fireEvent.click(screen.getAllByRole("tab", { name: "Trimestral" })[0]);
+    fireEvent.click(screen.getAllByRole("tab", { name: "Utilidad" })[0]);
     expect(celdasGrisEscritorio()).toHaveLength(0);
     // Y la leyenda del gris tampoco: no hay ningún gris que explicar.
     expect(document.body.textContent).not.toContain(LEYENDA_MESES_PROYECTADOS);
+  });
+
+  it("🔁 ya no hay pestaña «Trimestral», «Anual» ni «Margen %» que tocar", () => {
+    render(<ResumenView {...props} data={resumen()} isClosedYear={false} />);
+    for (const nombre of ["Trimestral", "Anual", "Margen %"]) {
+      expect(screen.queryAllByRole("tab", { name: nombre }), nombre).toHaveLength(0);
+    }
   });
 });
 
@@ -251,10 +252,6 @@ describe("celular — el MISMO arreglo de 12 meses de la tarjeta", () => {
     isClosedYear: false,
     viewMode: "ventas" as const,
     setViewMode: vi.fn(),
-    granularity: "mensual" as const,
-    setGranularity: vi.fn(),
-    anualData: null,
-    anualError: null,
     onOpenEmpresa: vi.fn(),
     onAbrirFila: vi.fn(),
     filaDetalle: null,

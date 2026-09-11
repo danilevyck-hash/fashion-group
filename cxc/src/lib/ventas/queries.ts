@@ -20,6 +20,11 @@ import {
   type VentasEmpresaId,
 } from "@/lib/empresa-mapping";
 import { fmtDate } from "@/lib/format";
+import { hoyPanama } from "@/lib/fecha-panama";
+import {
+  aplicarCorteCosto, corteMasNuevo, type CorteCosto,
+} from "@/lib/ventas/margen-mes-en-curso";
+import { leerFrescuraVistaClientes } from "@/lib/ventas/refrescar-vista-clientes";
 import type {
   VentasResumen,
   Clientes,
@@ -83,7 +88,12 @@ function buildEmpresa(key: string): Empresa {
  * construye el shape VentasResumen mapeando empresa key → ventas_id.
  */
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
-  const [curRes, prevRes, proyRes, syncedRes, prevFullRes] = await Promise.all([
+  // El mes en curso es el de PANAMÁ, y solo existe si `year` es el año en curso.
+  const hoy = hoyPanama();
+  const anioHoy = Number(hoy.slice(0, 4));
+  const mesEnCurso = year === anioHoy ? Number(hoy.slice(5, 7)) : 0;
+
+  const [curRes, prevRes, proyRes, syncedRes, prevFullRes, corteRes] = await Promise.all([
     // withDbRetry: en caché fría estas RPC se pasan del statement_timeout y
     // Postgres las cancela; al segundo intento (caché caliente) pasan en <1s.
     // Ver src/lib/supabase-retry.ts para la medición.
@@ -158,6 +168,14 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // que la proyección del mes salía marcada "estimación volátil" en las 8
     // empresas y no ayudaba a decidir. La proyección de Multifashion (retail
     // diario, sí confiable) sigue viva en su propio módulo.
+    //
+    // 🔴 EL CORTE DEL COSTO DEL MES EN CURSO (11-sep-2026): hasta qué día hay
+    // costo cargado por empresa y cuánto se vendió hasta ese día. Con eso la
+    // utilidad y el margen del mes en curso dejan de mezclar la venta de hoy con
+    // el costo de ayer (`lib/ventas/margen-mes-en-curso.ts`). Solo en el año en
+    // curso. TOLERANTE: mientras la migración `20261120120000` no corra, la RPC
+    // no existe, la lectura devuelve null y todo se comporta como hoy.
+    mesEnCurso > 0 ? leerCorteCosto(year) : Promise.resolve(null),
   ]);
 
   if (curRes.error)  throw new Error(`${RPC_DASHBOARD_SUMMARY}(${year}): ${curRes.error.message}`);
@@ -203,6 +221,14 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   const prev25Util = buildSeries(prev, "total_utilidad");
   const prev25Costo = buildSeries(prev, "total_costo");
 
+  // El corte del mes en curso, por empresa. Vacío = sin corte (año cerrado, o la
+  // RPC todavía no existe) → las series salen tal cual llegaron.
+  const corte: CorteCosto = {};
+  for (const r of corteRes ?? []) {
+    if (!r.empresa) continue;
+    corte[r.empresa] = { costoHasta: r.costo_hasta ?? null, ventasHastaCosto: toNum(r.subtotal_hasta_costo) };
+  }
+
   // mesActual: último mes con data en el año en curso (cualquier empresa)
   let mesActual = 0;
   for (const k of ALL_EMPRESA_KEYS) {
@@ -237,15 +263,23 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   const upTo = Math.max(mesActual, 1);
 
   // Empresa-level: margen real (filtered) — current year y prev year
+  // 🔴 LA UTILIDAD Y EL MARGEN DEL MES EN CURSO VAN HASTA EL ÚLTIMO DÍA CON
+  // COSTO (11-sep-2026). La VENTA del mes no se toca: sigue siendo la de hoy.
+  const corregidas: Record<string, { utilidad: MonthlySeries; ventasParaMargen: MonthlySeries }> = {};
+  for (const k of ALL_EMPRESA_KEYS) {
+    corregidas[k] = aplicarCorteCosto(cur26[k], cur26Util[k], cur26Costo[k], mesEnCurso, corte[k]);
+  }
+
   const empresas: EmpresaMonthlySales[] = ALL_EMPRESA_KEYS.map(key => {
     const ventas       = cur26[key];
-    const utilidad     = cur26Util[key];
+    const utilidad     = corregidas[key].utilidad;
+    const ventasMargen = corregidas[key].ventasParaMargen;
     const costo        = cur26Costo[key];
     const ventasPrev   = prev25[key];
     const utilidadPrev = prev25Util[key];
     const costoPrev    = prev25Costo[key];
-    const filteredVCur  = sumFiltered(ventas,     costo);
-    const filteredUCur  = sumFiltered(utilidad,   costo);
+    const filteredVCur  = sumFiltered(ventasMargen, costo);
+    const filteredUCur  = sumFiltered(utilidad,     costo);
     const filteredVPrev = sumFiltered(ventasPrev, costoPrev, upTo);
     const filteredUPrev = sumFiltered(utilidadPrev, costoPrev, upTo);
     const margenPct     = filteredVCur  > 0 ? filteredUCur  / filteredVCur  : 0;
@@ -259,6 +293,8 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
       utilidad2025: utilidadPrev,
       margenPct,
       margenPctPrev,
+      ventasParaMargen: ventasMargen,
+      costoHasta: mesEnCurso > 0 ? (corte[key]?.costoHasta ?? null) : null,
     };
   });
 
@@ -272,8 +308,8 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   let totalFilteredUtilCur = 0, totalFilteredVCur = 0;
   let totalFilteredUtilPrev = 0, totalFilteredVPrev = 0;
   for (const k of ALL_EMPRESA_KEYS) {
-    totalFilteredUtilCur  += sumFiltered(cur26Util[k],  cur26Costo[k]);
-    totalFilteredVCur     += sumFiltered(cur26[k],      cur26Costo[k]);
+    totalFilteredUtilCur  += sumFiltered(corregidas[k].utilidad,         cur26Costo[k]);
+    totalFilteredVCur     += sumFiltered(corregidas[k].ventasParaMargen, cur26Costo[k]);
     totalFilteredUtilPrev += sumFiltered(prev25Util[k], prev25Costo[k], upTo);
     totalFilteredVPrev    += sumFiltered(prev25[k],     prev25Costo[k], upTo);
   }
@@ -314,7 +350,41 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     dia_corte_anio_anterior: prevPayload.dia_corte_anio_anterior,
     data_actualizada_at:     dataActualizadaAt,
     proyeccion,
+    corte_costo:             mesEnCurso > 0 ? corteMasNuevo(corte) : null,
   };
+}
+
+/** Una fila de `ventas_mes_en_curso_corte_costo`. */
+interface CorteCostoRow {
+  empresa: string;
+  costo_hasta: string | null;
+  subtotal_hasta_costo: number | string | null;
+}
+
+/**
+ * Lee el corte del costo del mes en curso. Falla ABIERTA: si la RPC no existe
+ * (migración `20261120120000` pendiente) o se cae, devuelve null y el Resumen
+ * se comporta como hasta hoy. Un aviso en consola y nada más — la pantalla no
+ * puede caerse por la línea «margen al 10 de septiembre».
+ */
+let avisoCorteDado = false;
+async function leerCorteCosto(year: number): Promise<CorteCostoRow[] | null> {
+  try {
+    const r = await supabaseServer.rpc("ventas_mes_en_curso_corte_costo", { p_anio: year });
+    if (r.error) {
+      // UNA vez por proceso: mientras la migración no corra, cada carga del
+      // Resumen pasaría por acá y llenaría el log con la misma línea.
+      if (!avisoCorteDado) {
+        avisoCorteDado = true;
+        console.warn(`[ventas/resumen] ventas_mes_en_curso_corte_costo(${year}): ${r.error.message}`);
+      }
+      return null;
+    }
+    return (r.data as CorteCostoRow[] | null) ?? null;
+  } catch (err) {
+    console.warn(`[ventas/resumen] ventas_mes_en_curso_corte_costo(${year}) threw`, err);
+    return null;
+  }
 }
 
 interface ClientesEmpresaRow {
@@ -331,8 +401,30 @@ interface ClientesEmpresaRow {
   whatsapp: string | null;
   /** Sólo presente en clientes_agregado_12m_vw (modo Todas) */
   empresas_count?: number | string | null;
-  /** jsonb_agg de { empresa, monto } ordenado DESC. Modo Todas únicamente. */
-  empresas_breakdown?: Array<{ empresa: string; monto: number | string }> | null;
+  /** jsonb_agg de { empresa, monto } ordenado DESC. Modo Todas únicamente.
+   *  `monto_12m` / `monto_6m` solo desde la migración 20261121120000. */
+  empresas_breakdown?: Array<{ empresa: string; monto: number | string; monto_12m?: number | string; monto_6m?: number | string }> | null;
+  /** Las ventanas rodantes. Solo existen desde la migración 20261121120000. */
+  compras_12m?: number | string | null;
+  compras_12m_prev?: number | string | null;
+  compras_6m?: number | string | null;
+  compras_6m_prev?: number | string | null;
+}
+
+/** Las ventanas que la vista sabe servir, dichas por las FILAS que llegaron. */
+function ventanasDeLasFilas(rows: ClientesEmpresaRow[]): (6 | 12)[] {
+  const r = rows[0];
+  if (!r) return [];
+  const out: (6 | 12)[] = [];
+  if ("compras_12m" in r) out.push(12);
+  if ("compras_6m" in r) out.push(6);
+  return out;
+}
+
+/** El Δ con la MISMA regla que el SQL de la vista: sin base (prev ≤ 0) no hay
+ *  comparación — es «Nuevo», no «+0 %». */
+function deltaComoLaVista(actual: number, prev: number): number | null {
+  return prev > 0 ? (actual - prev) / prev : null;
 }
 
 /**
@@ -352,17 +444,26 @@ interface ClientesEmpresaRow {
 export async function fetchClientes({
   year,
   empresaKey,
+  ventana = null,
 }: {
   year: number;
   empresaKey?: string | null;
+  /** 🔴 «Últimos 12 / 6 meses» (11-sep-2026). Solo se sirve en el año en curso
+   *  y solo si la vista trae las columnas (migración `20261121120000`); si no,
+   *  se sirve el AÑO y la respuesta lo dice (`ventana: null`). */
+  ventana?: 6 | 12 | null;
 }): Promise<Clientes> {
   const isTodas = !empresaKey || empresaKey === "todas";
-  const currentYear = new Date().getFullYear();
+  // El año en curso es el de PANAMÁ (11-sep-2026): con el reloj UTC del
+  // servidor, después de las 7 p.m. del 31-dic el año «en curso» era el que
+  // viene y la lista del año caía en la rama de año cerrado.
+  const currentYear = Number(hoyPanama().slice(0, 4));
   const isClosedYear = year < currentYear;
 
   let data: ClientesEmpresaRow[] | null;
   let error: { message: string } | null;
   let viewLabel: string;
+  let actualizadoAt: string | null = null;
 
   if (isClosedYear) {
     // Año cerrado: usar RPC clientes_anio(p_year, p_empresa). Filtra
@@ -415,6 +516,9 @@ export async function fetchClientes({
         : filasCrudas.filter((r) => esEmpresaDelGrupo((r as { empresa?: string }).empresa));
       data = filas;
       error = null;
+      // Cuándo se refrescó la vista: la marca que deja quien la refresca
+      // (`refrescar-vista-clientes.ts`). Tolerante: sin marca, sin línea.
+      actualizadoAt = await leerFrescuraVistaClientes().catch(() => null);
     } catch (e) {
       data = null;
       error = { message: e instanceof Error ? e.message : String(e) };
@@ -425,7 +529,15 @@ export async function fetchClientes({
     throw new Error(`${viewLabel}: ${error.message}`);
   }
 
-  const rows = ((data as ClientesEmpresaRow[] | null) ?? []).map((r, i) => {
+  const filasCrudas = (data as ClientesEmpresaRow[] | null) ?? [];
+  // 🔴 LA VENTANA SE SIRVE SOLO SI LA VISTA LA TRAE. Un año cerrado no tiene
+  // ventana (la RPC `clientes_anio` suma el año entero), y mientras la DDL no
+  // corra las filas no traen `compras_12m`: en los dos casos se sirve el año y
+  // la respuesta lo dice. Nunca se rotula un período que no se sumó.
+  const ventanasDisponibles = isClosedYear ? [] : ventanasDeLasFilas(filasCrudas);
+  const ventanaServida: 6 | 12 | null = ventana && ventanasDisponibles.includes(ventana) ? ventana : null;
+
+  const rows = filasCrudas.map((r, i) => {
     const ek = r.empresa ?? "";
     const empresasCount = isTodas ? Math.max(1, toNum(r.empresas_count)) : 1;
     const empresasBreakdown =
@@ -433,18 +545,37 @@ export async function fetchClientes({
         ? r.empresas_breakdown.map(b => ({
             empresaKey: b.empresa,
             empresaNombre: EMPRESA_KEY_TO_NAME[b.empresa] ?? b.empresa,
-            monto: toNum(b.monto),
+            monto: toNum(
+              ventanaServida === 12 ? (b.monto_12m ?? b.monto)
+              : ventanaServida === 6 ? (b.monto_6m ?? b.monto)
+              : b.monto,
+            ),
           }))
         : undefined;
+    // La columna de compras y su comparativo, según lo que se sirvió: el año
+    // (`compras_ytd` / `compras_anio_anterior`, con el Δ que ya calculó la
+    // vista) o la ventana (la MISMA regla del Δ, escrita una vez arriba).
+    const actual = ventanaServida === 12 ? toNum(r.compras_12m)
+      : ventanaServida === 6 ? toNum(r.compras_6m)
+      : toNum(r.compras_ytd);
+    const previo = ventanaServida === 12 ? toNum(r.compras_12m_prev)
+      : ventanaServida === 6 ? toNum(r.compras_6m_prev)
+      : toNum(r.compras_anio_anterior);
+    const delta = ventanaServida
+      ? deltaComoLaVista(actual, previo)
+      : (r.delta_vs_2025 == null ? null : toNum(r.delta_vs_2025));
     return {
       rank: i + 1,
       id: r.cliente_codigo ?? "—",
       nombre: r.cliente_nombre ?? "(Sin nombre)",
       empresa: EMPRESA_KEY_TO_NAME[ek] ?? ek ?? "—",
       empresaKey: ek,
-      ytd: toNum(r.compras_ytd),
-      prev: toNum(r.compras_anio_anterior),
-      delta: r.delta_vs_2025 == null ? 0 : toNum(r.delta_vs_2025),
+      ytd: actual,
+      prev: previo,
+      // 🔴 `null` = «Nuevo» (11-sep-2026). Acá decía `?? 0` y 34 de 116
+      // clientes salían «+0 %», igual que uno que no creció. La rama que dice
+      // «no hay con qué comparar» existía en `formatDelta.ts` y nunca llegaba.
+      delta,
       ultima: r.ultima_compra ? fmtDate(r.ultima_compra) : "",
       ultimaIso: r.ultima_compra ?? "",
       wa: r.whatsapp ? normalizeWa(r.whatsapp) : "",
@@ -474,6 +605,9 @@ export async function fetchClientes({
     // rolling con `current_year - 1` sobre los mismos meses—, así que el año se
     // deriva del MISMO dato que hace la división y no puede volver a mentir.
     anioComparativo: year - 1,
+    ventanasDisponibles,
+    ventana: ventanaServida,
+    actualizadoAt,
     rows,
   };
 }

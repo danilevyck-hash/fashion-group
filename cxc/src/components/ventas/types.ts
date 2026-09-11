@@ -39,6 +39,18 @@ export type EmpresaMonthlySales = {
   margenPct: number;
   /** Margen YTD real del año previo, filtrado por costo > 0 (mismo período Ene..mesActual) */
   margenPctPrev: number;
+  /**
+   * 🔴 LA BASE DEL MARGEN (11-sep-2026). Igual a `ventas2026` salvo en el mes
+   * en curso, donde es la venta HASTA EL ÚLTIMO DÍA CON COSTO: la venta de hoy
+   * dividida por el costo de ayer daba un margen inflado (Vistana 28,6 % en
+   * pantalla, 22,8 % real). `utilidad2026` del mes en curso también sale con
+   * ese corte. Ver `lib/ventas/margen-mes-en-curso.ts`. Sin la RPC del corte
+   * (migración pendiente) es idéntica a `ventas2026`.
+   */
+  ventasParaMargen: MonthlySeries;
+  /** YYYY-MM-DD del último día con costo cargado en el mes en curso. null en
+   *  un año cerrado o mientras la RPC del corte no exista. */
+  costoHasta: string | null;
 };
 
 export type ResumenKpis = {
@@ -179,6 +191,10 @@ export type VentasResumen = {
   /** Proyección de cierre del año actual (por empresa + grupo). null si
    *  la RPC falló o el año seleccionado no tiene data. */
   proyeccion: ProyeccionResp | null;
+  /** Hasta qué día vale la utilidad y el margen del mes en curso (el corte
+   *  más nuevo entre las empresas). null = sin corte (año cerrado, o la RPC
+   *  `ventas_mes_en_curso_corte_costo` todavía no existe). */
+  corte_costo: string | null;
   /** Proyección de cierre del MES en curso por empresa (clave = ventas id).
    *  null para años cerrados. */
 };
@@ -195,8 +211,11 @@ export type Cliente = {
   ytd: number;
   /** Variación contra el MISMO período del año anterior, como decimal
    *  (0.18 = +18%). Qué año es "el anterior" lo dice `Clientes.anioComparativo`
-   *  — acá no se puede saber, y escribirlo en el rótulo fue el bug. */
-  delta: number;
+   *  — acá no se puede saber, y escribirlo en el rótulo fue el bug.
+   *  🔴 `null` = NO HAY CON QUÉ COMPARARSE (11-sep-2026): el cliente no compró
+   *  el año pasado y la pantalla dice «Nuevo». Antes llegaba como `0` y se
+   *  leía «+0 %», igual que uno estancado: 34 de 116. */
+  delta: number | null;
   /** Display-formatted date "27 abr 2026" */
   ultima: string;
   /** Raw ISO date for sorting; "" when no purchase */
@@ -238,6 +257,16 @@ export type Clientes = {
    *  separarse de la cuenta. Opcional: un payload viejo en la caché de SWR no
    *  lo trae, y ahí la pantalla cae a `selectedYear - 1`. */
   anioComparativo?: number;
+  /** Ventanas rodantes que la vista sabe servir (`[12, 6]` cuando la migración
+   *  `20261121120000` ya corrió; `[]` mientras tanto o en un año cerrado). */
+  ventanasDisponibles?: (6 | 12)[];
+  /** La ventana que se SIRVIÓ (`null` = el año). Si se pidió una que la vista
+   *  no tiene, acá viene `null` y la columna dice el año: nunca se afirma un
+   *  período que no se sumó. */
+  ventana?: 6 | 12 | null;
+  /** Cuándo se refrescó por última vez la vista de la que sale la lista (ISO).
+   *  null cuando no hay marca todavía. Alimenta la línea de frescura. */
+  actualizadoAt?: string | null;
   rows: Cliente[];
 };
 

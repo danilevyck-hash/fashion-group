@@ -34,17 +34,16 @@ import {
   PRODUCTOS_EMPRESAS,
   PRODUCTOS_EMPRESA_KEYS,
   DEFAULT_PRODUCTOS_EMPRESA,
-  esProductosPeriodo,
   fmtMargen,
   fmtPrecioProm,
   precioPromedio,
-  periodoLabel,
   exportProductosToExcel,
   type ProductosResponse,
   type ProductoNivel1,
   type ProductoCodigo,
-  type ProductosPeriodo,
 } from "@/lib/ventas/productos";
+import { periodoParaProductos, type PeriodoVentas } from "@/lib/ventas/periodo";
+import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
 
 // "precio" NO es una columna de la RPC: sale de venta ÷ cantidad. Por eso el
 // orden pasa por `valorOrden` y no por `p[sort.key]` — indexar un campo que no
@@ -102,23 +101,15 @@ function valorOrden(p: ProductoNivel1, key: SortKey): number | null {
   return key === "precio" ? precioPromedio(p.venta, p.cantidad) : p[key];
 }
 
-// El selector de período: los CUATRO que pidió Daniel y nada más.
-//
-// ⛔ ACÁ VIVÍAN TAMBIÉN LOS 12 MESES SUELTOS (Ene 2026, Feb 2026, …). Daniel,
-// textual (24-ago-2026): *"solo dejame las 4 primeras, las otras quítamelas que
-// sobran, nunca te las pedí"*. Se fueron de la LISTA, no del sistema: el
-// servidor sigue aceptando `?mes=6` y contestando exactamente lo mismo, así que
-// nada que ya funcionara dejó de funcionar — simplemente la pantalla no lo pide
-// más, y `productosRange(year, mes)` sigue intacta con sus candados.
-//
-// Los tres relativos están anclados en HOY y no en el año del selector global
-// (ver la nota de `productosRangoPeriodo`), por eso la pantalla imprime siempre
-// las dos fechas debajo del total.
-const PERIODOS_FIJOS: { key: ProductosPeriodo; nombre: string }[] = [
-  { key: "6m", nombre: "Últimos 6 meses" },
-  { key: "12m", nombre: "Últimos 12 meses" },
-  { key: "anio_pasado", nombre: "Año pasado" },
-];
+// ⛔ ACÁ VIVÍA EL SELECTOR «Período» PROPIO DE ESTA PESTAÑA (Año en curso ·
+// Últimos 6 meses · Últimos 12 meses · Año pasado). Se retiró el 11-sep-2026:
+// el período lo manda el selector ÚNICO de arriba de Ventas, el mismo de las
+// tres pestañas (`lib/ventas/periodo.ts`), y esta vista lo recibe por prop. Lo
+// que el servidor acepta no cambió: `periodo=ytd|6m|12m` con su `year`, y
+// «Año 2025» llega como `ytd` de ese año (que es exactamente lo que
+// `anio_pasado` calculaba). Los 12 meses sueltos ya se habían ido el
+// 24-ago-2026 (Daniel: *"solo dejame las 4 primeras"*); `?mes=` sigue vivo en
+// la ruta para un marcador viejo.
 
 /** "24 ago 2026" — fecha corta y legible, sin depender de la zona del navegador. */
 function fmtDia(iso: string): string {
@@ -126,17 +117,26 @@ function fmtDia(iso: string): string {
   return `${Number(d)} ${MONTHS[Number(m) - 1].toLowerCase()} ${y}`;
 }
 
-export function ProductosView({ selectedYear }: { selectedYear: number }) {
-  // Deep-link: /ventas?tab=productos&empresa=american_classic preselecciona la
-  // empresa (ej. desde el link "Top productos" del módulo Multifashion). Es solo
-  // semilla inicial; el usuario puede cambiarla con el selector después.
+export function ProductosView({ periodo: periodoElegido, anioEnCurso }: {
+  /** El período del selector único de arriba (11-sep-2026). */
+  periodo: PeriodoVentas;
+  /** El año en curso de PANAMÁ, para las ventanas «Últimos N meses». */
+  anioEnCurso: number;
+}) {
+  // Lo que se le pide a la ruta, DERIVADO del período: un año → `ytd` de ese
+  // año; una ventana → `6m`/`12m` desde hoy. Nunca dos controles de tiempo.
+  const { periodo, year: selectedYear } = periodoParaProductos(periodoElegido, anioEnCurso);
+  // Deep-link: /ventas?tab=productos&empresa=<key> preselecciona la empresa.
+  // Es solo semilla inicial; el usuario puede cambiarla con el selector después.
+  // ⚠️ Desde el 11-sep-2026 solo valen las 6 del grupo: `american_classic` ya
+  // no está en `PRODUCTOS_EMPRESA_KEYS` y cae al default (Multifashion tiene
+  // sus productos en su propio módulo).
   const searchParams = useSearchParams();
   const initialEmpresa = (() => {
     const e = searchParams.get("empresa");
     return e && PRODUCTOS_EMPRESA_KEYS.includes(e) ? e : DEFAULT_PRODUCTOS_EMPRESA;
   })();
   const [empresa, setEmpresa] = useState(initialEmpresa);
-  const [periodo, setPeriodo] = useState<ProductosPeriodo>("ytd");
   const [data, setData] = useState<ProductosResponse | null>(null);
   // Venta del MISMO período del año anterior por descripción → columna Δ.
   const [prevVenta, setPrevVenta] = useState<Record<string, number>>({});
@@ -394,15 +394,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   // Lo que SÍ se conserva de ese mismo cambio es lo de arriba: cambiar de
   // empresa YA NO borra el buscador ni te devuelve al año en curso.
 
-  // Cuatro opciones y ninguna más. `esProductosPeriodo` sigue guardando la
-  // puerta: un valor que no sea uno de los cuatro no cambia nada (antes acá
-  // convivían los meses "1".."12", y `parseInt("12m")` = 12 convertía "Últimos
-  // 12 meses" en diciembre en silencio — ese enredo ya no existe).
-  const onPeriodoChange = (v: string) => {
-    if (!esProductosPeriodo(v)) return;
-    setPeriodo(v);
-  };
-
   const onFiltroClienteChange = (v: string) => {
     setFiltroCliente(v);
     setExpanded(null);
@@ -477,16 +468,18 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
     // archivo que se manda por correo se lee como un cero.
     if (!comprasActual || !totalCliente) {
       await exportProductosToExcel(data);
-      return;
+    } else {
+      await exportProductosToExcel(
+        {
+          ...data,
+          productos: productosDelFiltro,
+          totales: { venta: totalCliente.venta, costo: 0, margen: null },
+        },
+        nombreCliente,
+      );
     }
-    await exportProductosToExcel(
-      {
-        ...data,
-        productos: productosDelFiltro,
-        totales: { venta: totalCliente.venta, costo: 0, margen: null },
-      },
-      nombreCliente,
-    );
+    // Rastro en `activity_logs` (11-sep-2026): ver `lib/ventas/descarga.ts`.
+    anotarDescarga("productos", { empresa, periodo, anio: selectedYear, cliente: conCliente ? nombreCliente : null });
   };
 
   // Unidades y precio promedio del período completo (no del Top 20 visible):
@@ -501,19 +494,16 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
     ? precioPromedio(totalCliente.venta, totalCliente.cantidad)
     : totalPrecio;
 
-  // El rótulo de la columna de cambio: para el año/mes sigue diciendo el año
-  // contra el que compara (lo que se lee hoy); para las ventanas relativas no
-  // hay un año que nombrar. Sin la "Δ", que es notación de matemática.
+  // El rótulo de la columna de cambio: para un año dice el año contra el que
+  // compara; para las ventanas no hay un año que nombrar. Sin la "Δ", que es
+  // notación de matemática.
   const deltaLabel = periodo === "ytd" ? `vs ${selectedYear - 1}` : "vs año ant.";
 
-  // 🔴 CON UN PERÍODO RELATIVO, EL SELECTOR DE AÑO DE ARRIBA NO HACE NADA — y
-  // hasta hoy no lo decía. "Últimos 12 meses" y "Año pasado" se cuentan desde
-  // HOY (ver `productosRangoPeriodo`: para esos tres el servidor ni mira el
-  // año), así que había dos controles de tiempo en la misma pantalla y ninguno
-  // aclaraba cuál manda. Ahora lo dice la pantalla, al lado de las fechas que
-  // ya imprime — apagar el selector no se puede: es global de /ventas y lo
-  // comparten los otros tres tabs, donde sí manda.
-  const anioNoAplica = periodo !== "ytd";
+  // ⛔ ACÁ VIVÍA `anioNoAplica` y su párrafo «El año 2026 de arriba no se aplica
+  // a este período… Para mirar un año elige "Año en curso" o un mes». Se retiró
+  // el 11-sep-2026: con UN solo selector de período ya no hay dos controles de
+  // tiempo que puedan contradecirse, y el aviso mandaba a elegir «un mes» en
+  // un selector que no existía desde el 24-ago-2026.
 
   return (
     <div>
@@ -535,28 +525,8 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
           </SelectContent>
         </Select>
 
-        {/* 🔴 EL RÓTULO «Período» (5-sep-2026). El desplegable decía «Año en
-            curso» y estaba pegado al selector «2026» de la barra de arriba, así
-            que se leía como un SEGUNDO selector de año — y no lo es: sus cuatro
-            opciones son Año en curso · Últimos 6 meses · Últimos 12 meses · Año
-            pasado (`PERIODOS_FIJOS`), y tres de las cuatro se cuentan desde HOY
-            y ni siquiera miran el año. Con el nombre puesto, la pregunta que
-            contesta cada control se lee sin abrirlo. (El selector de año de la
-            barra, además, ya no se dibuja en esta pestaña.) */}
-        <label className="inline-flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">Período</span>
-          <Select value={periodo} onValueChange={onPeriodoChange}>
-          <SelectTrigger data-selector-periodo className="h-11 w-auto min-w-[150px] text-xs" disabled={loading}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ytd" className="text-xs">{periodoLabel(selectedYear, null, "ytd")}</SelectItem>
-            {PERIODOS_FIJOS.map(p => (
-              <SelectItem key={p.key} value={p.key} className="text-xs">{p.nombre}</SelectItem>
-            ))}
-          </SelectContent>
-          </Select>
-        </label>
+        {/* ⛔ ACÁ VIVÍA el desplegable «Período» de esta pestaña. Ver la nota
+            del selector único, arriba del componente. */}
 
         {/* FILTRO por cliente. Cerrado: no es un campo de texto y no ata a
             nadie a nada — sólo acota lo que ya está en pantalla. Las opciones
@@ -624,7 +594,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
         <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={load} />
 
         <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading} className="min-h-[44px]">
-          <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
+          <Download className="mr-1.5 h-3.5 w-3.5" /> {ROTULO_DESCARGAR_EXCEL}
         </Button>
       </div>
 
@@ -679,14 +649,6 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
               </>
             )}
           </p>
-          {/* El aviso va JUNTO a las fechas, que son la prueba de lo que dice:
-              el período impreso arranca en otro año que el del selector. */}
-          {anioNoAplica && (
-            <p data-anio-no-aplica className="mb-3 text-xs text-gray-500">
-              El año {selectedYear} de arriba no se aplica a este período: «{periodoLabel(selectedYear, null, periodo)}»
-              se cuenta desde hoy hacia atrás. Para mirar un año elige «{periodoLabel(selectedYear, null, "ytd")}» o un mes.
-            </p>
-          )}
           {comparativo === "vacio" && data.comparativo && (
             <p data-sin-comparativo className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               El período de comparación ({fmtDia(data.comparativo.desde)} – {fmtDia(data.comparativo.hasta)}) no tiene
@@ -1002,7 +964,7 @@ function ProductoRow({
                     </DrillTabBtn>
                   </div>
 
-                  {tab === "clientes" && <BloqueClientes clientes={clientes} />}
+                  {tab === "clientes" && <BloqueClientes clientes={clientes} conDescargo={mostrarMargen} />}
                   {tab === "codigos" && <BloqueCodigos codigos={codigos} />}
                 </>
               )}
@@ -1087,7 +1049,7 @@ function ProductoCard({
                   Códigos{codigos ? ` (${codigos.length})` : ""}
                 </DrillTabBtn>
               </div>
-              {tab === "clientes" && <BloqueClientes clientes={clientes} />}
+              {tab === "clientes" && <BloqueClientes clientes={clientes} conDescargo={mostrarMargen} />}
               {tab === "codigos" && <BloqueCodigos codigos={codigos} />}
             </>
           )}
@@ -1146,7 +1108,13 @@ function DrillTabBtn({
  * David devolvió el 58% de lo que se le facturó a $30, y en bruto saldría muy
  * por encima de donde va.
  */
-function BloqueClientes({ clientes }: { clientes: ClienteDeProducto[] | null | undefined }) {
+function BloqueClientes({ clientes, conDescargo = true }: {
+  clientes: ClienteDeProducto[] | null | undefined;
+  /** 🔴 UN SOLO DESCARGO de «sin las ventas de mostrador» (11-sep-2026). Con un
+   *  cliente puesto ya lo dice la línea de arriba, al lado de las fechas; acá
+   *  se repetía en largo. `false` = no se repite. */
+  conDescargo?: boolean;
+}) {
   if (clientes === null) {
     return <div className="py-2 text-xs text-gray-500">No se pudo cargar quién lo compra. Cierra y vuelve a abrir la fila.</div>;
   }
@@ -1217,8 +1185,12 @@ function BloqueClientes({ clientes }: { clientes: ClienteDeProducto[] | null | u
         <span className="font-mono tabular-nums text-gray-700">{Math.round(total.cantidad).toLocaleString("en-US")}</span> piezas
         <span className="mx-1.5 text-gray-300">·</span>
         <span className="font-mono tabular-nums text-gray-700">{fmtMoney(total.venta)}</span>
-        <span className="mx-1.5 text-gray-300">·</span>
-        <span>sale de las facturas y notas de crédito; las ventas de mostrador no traen detalle, así que puede quedar un poco por debajo de la venta de la fila</span>
+        {conDescargo && (
+          <>
+            <span className="mx-1.5 text-gray-300">·</span>
+            <span data-sin-mostrador>sin las ventas de mostrador</span>
+          </>
+        )}
       </p>
     </>
   );

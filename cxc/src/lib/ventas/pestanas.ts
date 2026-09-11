@@ -21,11 +21,24 @@
 export const TABS_VENTAS = ["resumen", "clientes", "productos"] as const;
 export type TabVentas = (typeof TABS_VENTAS)[number];
 
-/** Los tres modos de la pestaña Clientes. Mismas palabras que el control del
+/** Los DOS modos de la pestaña Clientes. Mismas palabras que el control del
  *  Resumen: dos pantallas del mismo módulo que llaman distinto a lo mismo
- *  obligan a aprenderlo dos veces. */
-export const MODOS_CLIENTES = ["ventas", "utilidad", "margen"] as const;
+ *  obligan a aprenderlo dos veces.
+ *
+ *  🔴 «Margen %» DEJÓ DE SER UN MODO (11-sep-2026). Medido: «Utilidad» y
+ *  «Margen %» montaban el MISMO componente, con la MISMA consulta, las MISMAS
+ *  filas y las MISMAS columnas; lo único que cambiaba era por cuál columna
+ *  arrancaba el orden. Eran dos botones para un «ordenar por». Queda
+ *  «Utilidad», con el margen % en su columna, y se ordena tocando el
+ *  encabezado como en el resto de la casa. `?modo=margen` guardado llega a
+ *  `utilidad` (`modoHeredado`). */
+export const MODOS_CLIENTES = ["ventas", "utilidad"] as const;
 export type ModoClientes = (typeof MODOS_CLIENTES)[number];
+
+/** Un `?modo=` viejo, traducido a donde vive hoy. `margen` → `utilidad`. */
+export function modoHeredado(modo: string): ModoClientes | null {
+  return modo === "margen" ? "utilidad" : null;
+}
 
 export function esTabVentas(v: string): v is TabVentas {
   return (TABS_VENTAS as readonly string[]).includes(v);
@@ -50,20 +63,10 @@ export function tabHeredado(tab: string): { tab: TabVentas; modo: ModoClientes }
   return tab === "utilidad" ? { tab: "clientes", modo: "utilidad" } : null;
 }
 
-/**
- * 🔴 CADA PESTAÑA DICE CUÁNTAS EMPRESAS ESTÁ MIRANDO. Las cinco decían «8
- * empresas» y solo el Resumen las mira todas.
- *
- * · Resumen — las OCHO, una fila por empresa más el total del grupo.
- * · Clientes — las SEIS de Fashion Group. Boston y Multifashion tienen sus
- *   clientes en su propio módulo, y hay candado en las dos direcciones. (En
- *   Utilidad y Margen son menos todavía, y ESO lo dice la propia vista con su
- *   número medido: acá no se puede saber cuántas trajo la consulta.)
- * · Productos — se mira de a UNA, elegida adentro, y el período también sale de
- *   ahí: por eso no se nombra el rango de meses del Resumen.
- */
-export function alcanceDeLaPestana(tab: string, mesesLabel: string): string {
-  if (tab === "clientes") return `6 empresas · ${mesesLabel}`;
-  if (tab === "productos") return "una empresa a la vez";
-  return `8 empresas · ${mesesLabel}`;
-}
+// ⛔ ACÁ VIVÍA `alcanceDeLaPestana` — la línea «8 empresas · cierre Ago (mes en
+// curso Sep)» / «6 empresas · …» / «una empresa a la vez» que iba arriba de las
+// pestañas. Se retiró el 11-sep-2026 con el selector único de período: la
+// matriz lista las ocho empresas una por una y abajo dice hasta qué día llegan
+// los datos; Clientes trae el desplegable de empresa, y Productos el suyo. Un
+// contador encima de una tabla que ya cuenta es una línea de más (Daniel, con
+// el mockup: *«el período dicho una vez arriba»*).

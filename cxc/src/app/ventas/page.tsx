@@ -6,6 +6,7 @@ import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
 import { VentasShell } from "./VentasShell";
 import { verifySession } from "@/lib/session-cookie";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { anioDelPeriodo, periodoAUrl, periodoDesdeUrl, ventanaParaClientes, PARAM_PERIODO_VENTAS } from "@/lib/ventas/periodo";
 
 export const dynamic = "force-dynamic";
 // El SSR de esta página cruza el empalme switch_facturas/ventas_raw (blend
@@ -19,7 +20,11 @@ function sessionRole(raw: string | undefined): string | null {
   return verifySession(raw)?.role ?? null;
 }
 
-export default async function VentasPage() {
+export default async function VentasPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const role = sessionRole((await cookies()).get("cxc_session")?.value);
   if (!role) redirect("/");
   if (role !== "admin") redirect("/home");
@@ -31,7 +36,15 @@ export default async function VentasPage() {
   // abría en el año nuevo, vacío. Es el mismo defecto que ya se corrigió en
   // Comisiones (6-sep) y en `ventas_dashboard_prev_same_period_v3` (3-sep).
   const hoy = hoyPanama();
-  const year = Number(hoy.slice(0, 4));
+  const anioEnCurso = Number(hoy.slice(0, 4));
+  // 🔴 EL PERÍODO DEL SELECTOR ÚNICO (11-sep-2026): si el enlace trae
+  // `?periodo=2025` o `?periodo=u12`, el servidor arma ESE período y no el año
+  // en curso — así la pantalla no pide dos veces. Basura → el año en curso.
+  const rawPeriodo = searchParams?.[PARAM_PERIODO_VENTAS];
+  const periodo = periodoDesdeUrl(Array.isArray(rawPeriodo) ? rawPeriodo[0] : rawPeriodo)
+    ?? { tipo: "anio" as const, anio: anioEnCurso };
+  const year = anioDelPeriodo(periodo, anioEnCurso);
+  const ventana = ventanaParaClientes(periodo);
   // mes 1-indexed = mes en curso del calendario. multifashion_mensual_v6
   // suma WHERE mes <= p_mes para los KPIs YTD (retail.ytdVentas, ticketProm,
   // margen tienda completa, etc.) — pasarlo como mes en curso garantiza que la data parcial
@@ -48,7 +61,7 @@ export default async function VentasPage() {
       console.error("[ventas] resumen error", err);
       return null;
     }),
-    fetchClientes({ year }).catch(err => {
+    fetchClientes({ year, ventana }).catch(err => {
       console.error("[ventas] clientes error", err);
       return null;
     }),
@@ -74,7 +87,8 @@ export default async function VentasPage() {
     // VentasShell) en Next 14 App Router. Mismo patrón que reclamos/upload.
     <Suspense>
       <VentasShell
-        year={year}
+        year={anioEnCurso}
+        periodoServidor={periodoAUrl(periodo)}
         availableYears={availableYears}
         resumen={resumen}
         clientes={clientes}

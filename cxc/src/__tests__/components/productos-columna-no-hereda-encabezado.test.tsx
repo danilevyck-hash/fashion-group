@@ -33,6 +33,11 @@ import { readFileSync } from "fs";
 import path from "path";
 import { ProductosView } from "@/components/ventas/ProductosView";
 
+// 🔴 EL PERÍODO LLEGA POR PROP (11-sep-2026). Esta pantalla ya no tiene su
+// desplegable «Período»: lo manda el selector ÚNICO de arriba de Ventas y
+// `ProductosView` recibe `{ periodo, anioEnCurso }` (`lib/ventas/periodo.ts`).
+const ANIO_2026 = { tipo: "anio", anio: 2026 } as const;
+
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -90,7 +95,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 /** Despliega la descripción y devuelve la tabla de «Quién lo compra». */
 async function abrirQuienLoCompra(): Promise<HTMLElement> {
-  render(<ProductosView selectedYear={2026} />);
+  render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
   await screen.findAllByText("Women-Flip Flops");
   fireEvent.click(document.querySelector('tr[data-fila-producto="Women-Flip Flops"]')!);
   return waitFor(() => {
@@ -151,7 +156,7 @@ describe("🔴 la tabla hija NO hereda el encabezado de la madre", () => {
     // Acá las columnas SÍ coinciden de casualidad con las de la tabla madre — y
     // esa casualidad es exactamente lo que hace que nadie note el día que dejan
     // de coincidir.
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await screen.findAllByText("Women-Flip Flops");
     fireEvent.click(document.querySelector('tr[data-fila-producto="Women-Flip Flops"]')!);
     await waitFor(() => expect(document.querySelector("[data-drill-clientes]")).toBeTruthy());
@@ -208,7 +213,7 @@ describe("«Dejó de venderse» — lo que el año pasado vendía y este año no
           : NIVEL1;
       return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
     });
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await screen.findAllByText("Women-Flip Flops");
     const bloque = document.querySelector("[data-dejo-de-venderse]")!;
     expect(bloque, "el bloque no se dibujó").toBeTruthy();
@@ -224,7 +229,7 @@ describe("«Dejó de venderse» — lo que el año pasado vendía y este año no
 
   it("⚠️ si no dejó de venderse nada, NO se dibuja nada", async () => {
     // Un cartel que dice «sin novedad» es ruido, y enseña a no leer los avisos.
-    render(<ProductosView selectedYear={2026} />);
+    render(<ProductosView periodo={ANIO_2026} anioEnCurso={2026} />);
     await screen.findAllByText("Women-Flip Flops");
     expect(document.querySelector("[data-dejo-de-venderse]")).toBeNull();
   });

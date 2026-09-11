@@ -104,10 +104,6 @@ function pintarMobileKpis(datos = resumen()) {
       isClosedYear={false}
       viewMode="ventas"
       setViewMode={vi.fn()}
-      granularity="mensual"
-      setGranularity={vi.fn()}
-      anualData={null}
-      anualError={null}
       onOpenEmpresa={vi.fn()}
       onAbrirFila={vi.fn()}
       filaDetalle={null}
@@ -116,10 +112,11 @@ function pintarMobileKpis(datos = resumen()) {
   );
 }
 
-/** Las tres tarjetas de la grilla de KPIs del celular, en orden. */
+/** Las tres tarjetas de la grilla de KPIs del celular, en orden.
+ *  🔁 11-sep-2026: la grilla se ancla en `data-kpis-celular`; la línea de
+ *  período que iba arriba (`data-periodo-kpis`) se retiró. */
 function tarjetasKpi(): HTMLElement[] {
-  const linea = document.querySelector("[data-periodo-kpis]");
-  const grilla = linea?.nextElementSibling;
+  const grilla = document.querySelector("[data-kpis-celular]");
   return [...(grilla?.children ?? [])] as HTMLElement[];
 }
 
@@ -135,31 +132,41 @@ describe("1 · «YTD» se fue, y el celular DICE qué meses está mirando", () =
     expect(document.body.textContent).not.toContain("YTD");
   });
 
-  it("🔴 el período va A LA VISTA, con sus meses y su año", () => {
+  // 🔁 CAMBIÓ DE DIRECCIÓN el 11-sep-2026. Decía que el período («Ene–Ago
+  // 2026 · comparado con 2025») iba en una línea arriba de las tarjetas. Con el
+  // selector ÚNICO de período arriba del módulo, el período se dice UNA vez
+  // —Daniel, con el mockup: *«las tarjetas con su cifra y su delta, sin
+  // repetir el período»*— y esa línea se retiró. Lo que NO se pierde: contra
+  // qué compara sigue dicho, en el `title` de cada delta, sin la sigla ni el
+  // año cortado con apóstrofo.
+  it("🔁 el período NO se repite arriba de las tarjetas: lo dice el selector", () => {
     pintarMobileKpis();
-    const linea = document.querySelector("[data-periodo-kpis]")!;
-    expect(linea.textContent).toContain("Ene–Ago 2026");
-    expect(linea.textContent).toContain("comparado con 2025");
+    expect(document.querySelector("[data-periodo-kpis]")).toBeNull();
+    expect(document.body.textContent).not.toContain("Ene–Ago 2026");
+    expect(document.body.textContent).not.toContain("comparado con 2025");
   });
 
-  it("el año del cambio va completo, no cortado con apóstrofo", () => {
+  it("el año del cambio va completo (en el title del delta), no cortado con apóstrofo", () => {
     pintarMobileKpis();
-    expect(document.body.textContent).toContain("vs 2025");
-    expect(document.body.textContent).not.toContain("vs '25");
+    const subs = tarjetasKpi().map(t => t.querySelectorAll("p")[2]?.getAttribute("title") ?? "");
+    expect(subs.every(t => t.includes("2025"))).toBe(true);
+    expect(document.body.innerHTML).not.toContain("vs '25");
+    // Y la tarjeta muestra el delta a secas.
+    expect(within(tarjetasKpi()[0]).getByText("▲ +12%")).toBeTruthy();
   });
 
-  it("un año CERRADO lo dice con su año, no «Año completo» a secas", () => {
+  it("🔁 un año CERRADO tampoco escribe «Año 2025 completo»: el selector dice «Año 2025»", () => {
     const datos = { ...resumen(), year: 2025, mesActual: 12 };
     render(
       <ResumenViewMobile
         data={datos} selectedYear={2025} isClosedYear
-        viewMode="ventas" setViewMode={vi.fn()} granularity="mensual" setGranularity={vi.fn()}
-        anualData={null} anualError={null} onOpenEmpresa={vi.fn()} onAbrirFila={vi.fn()}
+        viewMode="ventas" setViewMode={vi.fn()}
+        onOpenEmpresa={vi.fn()} onAbrirFila={vi.fn()}
         filaDetalle={null} onCerrarFila={vi.fn()}
       />,
     );
-    const linea = document.querySelector("[data-periodo-kpis]")!;
-    expect(linea.textContent).toContain("Año 2025 completo");
+    expect(document.querySelector("[data-periodo-kpis]")).toBeNull();
+    expect(document.body.textContent).not.toContain("Año 2025 completo");
   });
 });
 
@@ -236,9 +243,12 @@ describe("3 · «Δ vs 2025» deja de mentir: el año sale del dato que hace la 
 });
 
 describe("4 · ⚠️ lo que NO cambió", () => {
-  it("la columna de compras sigue diciendo el año elegido", () => {
+  it("la columna de compras sigue diciendo el año elegido — y desde el 11-sep-2026, con el período por su nombre", () => {
     render(<ClientesView data={clientes({ anioComparativo: 2025 })} selectedYear={2026} isClosedYear={false} modo="ventas" onModo={() => {}} />);
-    expect(screen.getByText("Compras 2026")).toBeTruthy();
+    // 🔁 «Compras 2026» → «Compras · Año 2026»: la columna dice QUÉ período suma
+    // (con «Últimos 12 meses» dice eso). El año sigue siendo el elegido.
+    expect(screen.getByText("Compras · Año 2026")).toBeTruthy();
+    expect(screen.queryByText("Compras 2026")).toBeNull();
   });
 
   it("las cifras de las tarjetas del celular no se movieron", () => {
@@ -330,38 +340,41 @@ describe("6 · el ESCRITORIO también dejó la sigla", () => {
     const datos = { ...resumen(), year, mesActual: cerrado ? 12 : 8 };
     return render(
       <ResumenView
-        data={datos} multi={null} availableYears={[2026, 2025]}
+        data={datos} multi={null}
         selectedYear={year} isClosedYear={cerrado} loading={false} error={null}
-        onYearChange={vi.fn()}
       />,
     );
   };
 
   it("🔴 las tarjetas se llaman por su nombre, sin «YTD»", () => {
     pintarEscritorio();
-    expect(screen.getByText("VENTAS NETAS")).toBeTruthy();
+    // 🔁 11-sep-2026: «VENTAS NETAS» pasó a «VENTAS» (una palabra, como el
+    // celular) y «MARGEN PROMEDIO» a «MARGEN». Sin la sigla sigue.
+    expect(screen.getByText("VENTAS")).toBeTruthy();
     expect(screen.getByText("UTILIDAD")).toBeTruthy();
+    expect(screen.getByText("MARGEN")).toBeTruthy();
     expect(screen.queryByText(/YTD/)).toBeNull();
   });
 
-  it("el período va debajo de cada cifra, con sus meses y su año", () => {
+  // 🔁 CAMBIÓ DE DIRECCIÓN el 11-sep-2026. Decía que los TRES subtítulos del
+  // escritorio llevaban «Ene–Ago 2026 · … vs 2025». Con el selector único de
+  // período arriba del módulo eso se repetía cuatro veces más el pie; Daniel,
+  // con el mockup: *«las tarjetas quedan con su cifra y su delta, sin repetir
+  // el período»*. Contra qué compara sigue dicho en el `title` del delta.
+  it("🔁 el período NO va debajo de cada cifra: solo el delta, y el año en el title", () => {
     pintarEscritorio();
-    // ⚠️ `ResumenView` monta TAMBIÉN la vista de celular (se esconde con CSS),
-    // así que hay que quedarse con los subtítulos del escritorio: los del
-    // celular dicen su período en la línea de arriba, no adentro de la tarjeta.
     const escritorio = document.querySelector(".min-\\[1440px\\]\\:block")!;
-    const subs = [...escritorio.querySelectorAll("p")]
-      .map(p => p.textContent ?? "")
-      .filter(t => t.includes("vs 2025"));
-    // Los TRES subtítulos lo dicen: si uno se quedara sin período, la misma
-    // fila respondería "¿de cuándo?" de dos maneras distintas.
-    expect(subs.length).toBe(3);
-    for (const t of subs) expect(t).toContain("Ene–Ago 2026");
+    const textos = [...escritorio.querySelectorAll("p")].map(p => p.textContent ?? "");
+    expect(textos.some(t => t.includes("Ene–Ago 2026"))).toBe(false);
+    expect(textos.some(t => t.includes("vs 2025"))).toBe(false);
+    const conTitle = [...escritorio.querySelectorAll("p[title]")].map(p => p.getAttribute("title") ?? "");
+    expect(conTitle.length).toBeGreaterThanOrEqual(3);
+    for (const t of conTitle) expect(t).toContain("2025");
   });
 
-  it("🔴 un año CERRADO dice CUÁL, no «Año completo» a secas", () => {
+  it("🔁 un año CERRADO tampoco dice «Año 2025 completo»: lo dice el selector", () => {
     pintarEscritorio(2025, true);
-    expect(document.body.textContent).toContain("Año 2025 completo");
+    expect(document.body.textContent).not.toContain("Año 2025 completo");
     expect(document.body.textContent).not.toMatch(/(^|[^0-9])Año completo/);
   });
 

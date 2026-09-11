@@ -6,10 +6,11 @@
 // el contenedor. El layout desktop existente queda intacto detrás de
 // hidden min-[1440px]:block en ResumenView.tsx.
 //
-// Estructura: pill de frescura → 3 KPI cards (Ventas/Utilidad/Margen YTD) →
-// Toggles segmented → UNA TARJETA POR EMPRESA (+ la del total del grupo).
-// Sin tooltips (no hay hover en touch): tocar un período abre el detalle con
-// Ventas, Utilidad y Margen, en el lugar donde se tocó.
+// Estructura: «Actualizar ahora» + «Descargar en Excel» → 4 KPI cards
+// (Ventas/Utilidad/Margen/Cierre) → el control Ventas · Utilidad → UNA TARJETA
+// POR EMPRESA (+ la del total del grupo). Sin tooltips (no hay hover en
+// touch): tocar un período abre el detalle con Ventas, Utilidad y Margen, en
+// el lugar donde se tocó.
 //
 // 🩸 POR QUÉ TARJETAS Y NO EL HEATMAP. Hasta el 30-jul-2026 esto era la misma
 // matriz del escritorio: empresa + 12 meses + Total + Proyección = 15 columnas
@@ -24,19 +25,15 @@
 //
 // El patrón es el de `admin/components/PanelCxcMobile.tsx` (tabla ancha →
 // tarjetas), no uno nuevo. Cada tarjeta cerrada muestra lo que se mira de un
-// golpe (empresa, total del año y el período en curso); abierta, la lista
-// vertical de los 12 meses (o 4 trimestres) + Total + Proyección.
+// golpe (empresa, total del año y el mes en curso); abierta, la lista vertical
+// de los 12 meses + Total + Proyección.
 //
-// NINGÚN NÚMERO CAMBIA y no se perdió ninguno: los 12 períodos, el Total, la
+// NINGÚN NÚMERO CAMBIA y no se perdió ninguno: los 12 meses, el Total, la
 // Proyección, el detalle por período, el panel mes × año de la empresa y la nota
 // de mayoreo de Multifashion están todos. Es presentación.
 //
-// La matriz sigue viva en `ResumenView.tsx` para la pantalla ancha, pero su
-// corte YA NO ES `md`: es 1440 px. El 30-jul-2026 se midió lo que hasta entonces
-// se daba por sentado —"en una pantalla ancha la matriz se ve entera"— y era
-// falso: necesitaba 1.276 px de ancho mínimo y arrastraba en TODOS los anchos,
-// 724 px en un iPad de 834 y 118 px hasta en un escritorio de 1440. Ahora la
-// matriz entra de verdad en su tramo, y las tarjetas cubren todo lo de abajo.
+// ⛔ Acá vivían «Mensual · Trimestral · Anual» y el modo «Margen %». Se
+// retiraron el 11-sep-2026 junto con los del escritorio: ver `ResumenView`.
 
 import type {
   VentasResumen,
@@ -45,19 +42,21 @@ import type {
   ProyeccionEmpresa,
 } from "./types";
 import { useState } from "react";
-import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPorcentaje } from "@/lib/ventas/format";
+import { MONTHS, fmtMoney, fmtMoneyCompact, fmtPorcentaje } from "@/lib/ventas/format";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import { ControlSegmentado } from "./ControlSegmentado";
 import {
-  MODO_OPCIONES, GRANULARIDAD_OPCIONES, nombreEmpresaEnPantalla, proyeccionDelGrupo,
+  MODO_OPCIONES, nombreEmpresaEnPantalla, proyeccionDelGrupo, type ViewMode,
 } from "./ResumenView";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
-import { ResumenAnual, type AnualData } from "./ResumenAnual";
+import { ROTULO_DESCARGAR_EXCEL } from "@/lib/ventas/descarga";
 import {
   buildSlotsMetrica, cellValue, cellDelta, renderCellValue, celdaKey,
-  deltaCelda, isNaComparison, type CeldaBase, type DeltaCelda, type SlotDetalle,
+  deltaCelda, isNaComparison, marginRatio, type CeldaBase, type DeltaCelda, type SlotDetalle,
 } from "@/lib/ventas/celda";
 import {
   buildSlotsProyeccion, explicacionProyeccion,
@@ -66,6 +65,7 @@ import {
 import {
   mesesProyectadosPorFila, LEYENDA_MESES_PROYECTADOS,
 } from "@/lib/ventas/proyeccion-mensual";
+import { pieCorteCosto } from "@/lib/ventas/margen-mes-en-curso";
 import { variacionPct } from "@/lib/variacion";
 
 import { FilaDetalleBloque, medirRenglon, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
@@ -77,9 +77,6 @@ function toneDeltaClaro(tone: DeltaCelda["tone"]): string {
 function toneDeltaOscuro(tone: DeltaCelda["tone"]): string {
   return tone === "emerald" ? "text-emerald-300" : tone === "orange" ? "text-rose-300" : "text-gray-400";
 }
-
-type Granularity = "mensual" | "trimestral" | "anual";
-type ViewMode = "ventas" | "utilidad" | "margen";
 
 /** Abridor de detalle que recibe cada celda clicable. */
 type AbrirFila = (d: FilaDetalle) => void;
@@ -101,11 +98,6 @@ interface ResumenViewMobileProps {
   isClosedYear: boolean;
   viewMode: ViewMode;
   setViewMode: (m: ViewMode) => void;
-  granularity: Granularity;
-  setGranularity: (g: Granularity) => void;
-  /** Datos del modo Anual (compartidos con el desktop; fetch perezoso en ResumenView). */
-  anualData: AnualData | null;
-  anualError: string | null;
   /** Abre el panel mes × año de una empresa (id ventas corto). El panel lo
    *  renderiza ResumenView (único en el árbol). */
   onOpenEmpresa: (id: string) => void;
@@ -121,6 +113,10 @@ interface ResumenViewMobileProps {
   multiMayoreoNota?: string | null;
   /** Reload del bundle tras un "Actualizar ahora" exitoso. */
   onReloadData?: () => void;
+  /** 🔴 «Descargar en Excel» también en el celular (11-sep-2026): el MISMO
+   *  archivo que el escritorio, con el modo elegido. Acá no había botón. */
+  onExcel?: () => void;
+  bajando?: boolean;
 }
 
 export function ResumenViewMobile({
@@ -129,16 +125,14 @@ export function ResumenViewMobile({
   isClosedYear,
   viewMode,
   setViewMode,
-  granularity,
-  setGranularity,
-  anualData,
-  anualError,
   onOpenEmpresa,
   onAbrirFila,
   filaDetalle,
   onCerrarFila,
   multiMayoreoNota,
   onReloadData,
+  onExcel,
+  bajando = false,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
 
@@ -149,100 +143,94 @@ export function ResumenViewMobile({
         {/* "Actualizar ahora" (admin/secretaria) — un clic = las 8 empresas en
             secuencia + refresh-vistas como paso final. */}
         <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={() => onReloadData?.()} />
+        {onExcel && (
+          <Button variant="outline" size="sm" onClick={onExcel} disabled={bajando} className="min-h-[44px]">
+            <Download className="mr-1.5 h-3.5 w-3.5" /> {ROTULO_DESCARGAR_EXCEL}
+          </Button>
+        )}
       </div>
-      <MobileKpis data={data} prevYear={prevYear} isClosedYear={isClosedYear} selectedYear={selectedYear} />
-      <MobileToggles
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        granularity={granularity}
-        setGranularity={setGranularity}
+      <MobileKpis data={data} prevYear={prevYear} isClosedYear={isClosedYear} />
+      {/* 🔴 EL CONTROL COMPARTIDO (`ControlSegmentado`, 5-sep-2026), con las
+          MISMAS opciones que el escritorio (`MODO_OPCIONES`). */}
+      <ControlSegmentado
+        options={MODO_OPCIONES}
+        active={viewMode}
+        onChange={setViewMode}
+        ariaLabel="Qué mostrar"
       />
-      {granularity === "anual" ? (
-        <ResumenAnual data={anualData} error={anualError} viewMode={viewMode} />
-      ) : (
-        <MobileTarjetas
-          data={data}
-          viewMode={viewMode}
-          granularity={granularity}
-          isClosedYear={isClosedYear}
-          multiMayoreoNota={multiMayoreoNota}
-          onOpenEmpresa={onOpenEmpresa}
-          onAbrirFila={onAbrirFila}
-          filaDetalle={filaDetalle}
-          onCerrarFila={onCerrarFila}
-          selectedYear={selectedYear}
-        />
-      )}
+      <MobileTarjetas
+        data={data}
+        viewMode={viewMode}
+        isClosedYear={isClosedYear}
+        multiMayoreoNota={multiMayoreoNota}
+        onOpenEmpresa={onOpenEmpresa}
+        onAbrirFila={onAbrirFila}
+        filaDetalle={filaDetalle}
+        onCerrarFila={onCerrarFila}
+        selectedYear={selectedYear}
+      />
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KPI cards — Ventas / Utilidad / Margen YTD (paridad con desktop)
+// KPI cards — Ventas / Utilidad / Margen / Cierre (paridad con desktop)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function MobileKpis({ data, prevYear, isClosedYear, selectedYear }: { data: VentasResumen; prevYear: number; isClosedYear: boolean; selectedYear: number }) {
+function MobileKpis({ data, prevYear, isClosedYear }: { data: VentasResumen; prevYear: number; isClosedYear: boolean }) {
   const k = data.kpis;
-  // 🔴 EL CELULAR DECÍA "Ventas YTD · +12% vs '25" Y NO DECÍA QUÉ MESES. Las dos
-  // mitades eran jerga: "YTD" es year-to-date en inglés, y el año cortado a dos
-  // dígitos con apóstrofo es notación de planilla. La cifra grande y su cambio
-  // no dicen nada si no se sabe contra qué período se están mirando.
-  //
-  // El período va en UNA línea arriba de las tarjetas, no repetido dentro de
-  // cada una: es el MISMO texto que el escritorio muestra debajo de cada cifra.
-  const periodoLabel = isClosedYear
-    ? `Año ${selectedYear} completo`
-    : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear}`;
+  // 🔴 LAS TARJETAS LLEVAN SU CIFRA Y SU DELTA, Y NADA MÁS (11-sep-2026). La
+  // línea «Ene–Ago 2026 · comparado con 2025» que iba arriba se fue: el período
+  // lo dice el selector de arriba, una vez. Contra qué compara queda en el
+  // `title`, igual que en el escritorio.
+  const vsTitle = `Comparado con el mismo período de ${prevYear}`;
   const ventasDelta   = variacionPct(k.ventasNetasYTD, k.ventas2025YTD);
   const utilidadDelta = variacionPct(k.utilidadYTD, k.utilidad2025YTD);
   const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
-  const pct = (r: number) => `${r >= 0 ? "+" : ""}${(r * 100).toFixed(0)}% vs ${prevYear}`;
+  const pct = (r: number) => `${r >= 0 ? "▲ +" : "▼ "}${Math.abs(r * 100).toFixed(0)}%`;
   const proy = !isClosedYear && data.proyeccion ? data.proyeccion : null;
 
   return (
     <div className="space-y-1.5">
-      <p data-periodo-kpis className="text-xs text-gray-500">
-        {periodoLabel} <span className="text-gray-300">·</span> comparado con {prevYear}
-      </p>
       {/* 🔴 DOS COLUMNAS, NO TRES (5-sep-2026), Y POR UNA MEDICIÓN.
-          Las tarjetas ahora traen los montos CON CENTAVOS (diccionario § 0, #7):
+          Las tarjetas traen los montos CON CENTAVOS (diccionario § 0, #7):
           «$6,270,375.73» y no «$6.27M». A 390 px, tres tarjetas dan ~120 px cada
           una y ese monto pide ~130 en mono de 17 px — se partía en tres
           renglones. Con dos columnas cada tarjeta mide ~190 y entra con aire.
           Y son CUATRO tarjetas, así que dos columnas dan dos filas parejas. */}
-      <div className="grid grid-cols-2 gap-2">
+      <div data-kpis-celular className="grid grid-cols-2 gap-2">
         <KpiTile
           label="Ventas"
           value={fmtMoney(k.ventasNetasYTD)}
           sub={ventasDelta == null ? null : { text: pct(ventasDelta), sign: ventasDelta }}
+          title={vsTitle}
         />
         <KpiTile
           label="Utilidad"
           value={fmtMoney(k.utilidadYTD)}
           sub={utilidadDelta == null ? null : { text: pct(utilidadDelta), sign: utilidadDelta }}
+          title={vsTitle}
         />
         <KpiTile
           label="Margen"
           /* Sin decimal (diccionario § 0, #5), por `fmtPorcentaje`. Los PUNTOS
              de abajo sí conservan el suyo: son una diferencia, no un %. */
           value={fmtPorcentaje(k.margenYTD)}
-          sub={{ text: `${margenDeltaPts >= 0 ? "+" : ""}${margenDeltaPts.toFixed(1)} pts`, sign: margenDeltaPts }}
+          sub={{ text: `${margenDeltaPts >= 0 ? "▲ +" : "▼ "}${Math.abs(margenDeltaPts).toFixed(1)} pts`, sign: margenDeltaPts }}
+          title={vsTitle}
         />
-        {/* 🔴 LA CUARTA: EN CUÁNTO CIERRA EL AÑO. En el celular la proyección
-            del grupo estaba al final de la tarjeta negra «Total grupo», que hay
-            que desplegar y bajar hasta el último renglón. Ahora está arriba,
-            con las otras tres. Sin metas, igual que el escritorio.
-            El monto va REDONDEADO a propósito y no con centavos: es una
-            estimación, y darle centavos a un número estimado lo hace parecer
-            medido. */}
+        {/* 🔴 LA CUARTA: EN CUÁNTO CIERRA EL AÑO. El monto va REDONDEADO a
+            propósito y no con centavos: es una estimación, y darle centavos a
+            un número estimado lo hace parecer medido. */}
         {proy && (
           <KpiTile
             label="Cierre del año"
             value={fmtMoneyCompact(proy.totales_grupo.proyeccion_cierre)}
             sub={{
-              text: `${deltaProyeccionTexto(proy.totales_grupo.delta_vs_anio_anterior_total)} vs ${prevYear}`,
+              text: deltaProyeccionTexto(proy.totales_grupo.delta_vs_anio_anterior_total),
               sign: proy.totales_grupo.delta_vs_anio_anterior_total,
             }}
+            title={`Proyectado · comparado con el cierre de ${prevYear}`}
             detalle={explicacionProyeccionGrupo(proyeccionDelGrupo(proy), prevYear, { fechaCorte: data.fecha_corte })}
           />
         )}
@@ -255,11 +243,13 @@ function KpiTile({
   label,
   value,
   sub,
+  title,
   detalle,
 }: {
   label: string;
   value: string;
   sub: { text: string; sign: number | null } | null;
+  title?: string;
   /** Explica de dónde sale el número. Solo la proyección lo trae: las otras
    *  tres son una suma, y una tarjeta que se abre para no decir nada enseña a
    *  no tocarlas. */
@@ -279,7 +269,7 @@ function KpiTile({
         {value}
       </p>
       {sub && (
-        <p className={cn("mt-0.5 text-xs font-medium leading-tight", subTone)}>
+        <p className={cn("mt-0.5 text-xs font-medium leading-tight", subTone)} title={title}>
           {sub.text}
         </p>
       )}
@@ -308,45 +298,6 @@ function KpiTile({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Toggles segmented — Ventas/Utilidad/Margen + Mensual/Trimestral
-// ─────────────────────────────────────────────────────────────────────────────
-
-function MobileToggles({
-  viewMode,
-  setViewMode,
-  granularity,
-  setGranularity,
-}: {
-  viewMode: ViewMode;
-  setViewMode: (m: ViewMode) => void;
-  granularity: Granularity;
-  setGranularity: (g: Granularity) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      {/* 🔴 EL CONTROL COMPARTIDO (`ControlSegmentado`, 5-sep-2026). Es el
-          `SegmentedRow` que vivía en este archivo, sacado afuera para que el
-          ESCRITORIO use el mismo — allá eran cajas grises escritas a mano. Por
-          eso el celular no cambia ni un píxel. Y las OPCIONES salen de una sola
-          lista (`MODO_OPCIONES` / `GRANULARIDAD_OPCIONES`, en `ResumenView`):
-          acá decían «Margen %» y allá también, pero nada lo garantizaba. */}
-      <ControlSegmentado
-        options={MODO_OPCIONES}
-        active={viewMode}
-        onChange={setViewMode}
-        ariaLabel="Qué mostrar"
-      />
-      <ControlSegmentado
-        options={GRANULARIDAD_OPCIONES}
-        active={granularity}
-        onChange={setGranularity}
-        ariaLabel="Cada cuánto"
-      />
-    </div>
-  );
-}
-
 // ⛔ ACÁ VIVÍA `SegmentedRow`. Se fue a `components/ventas/ControlSegmentado.tsx`
 // y hoy lo usan también el Resumen de escritorio y Clientes. Ver su cabecera.
 
@@ -361,11 +312,7 @@ type CellData = CeldaBase;
  * la Proyección.
  *
  * Se arma en el padre y no dentro de la tarjeta a propósito: así la tarjeta de
- * una empresa y la del total del grupo dibujan EXACTAMENTE lo mismo. El heatmap
- * tenía cinco componentes de celda (`MobileCell`, `MobileTotalCell`,
- * `MobileProyCell`, `MobileTotalGrupoCell`, `MobileTotalGrupoYtdCell`) con la
- * misma lógica escrita cinco veces y ya habían divergido: la Proyección del
- * grupo era un `<td>` mudo mientras la de cada empresa sí abría su explicación.
+ * una empresa y la del total del grupo dibujan EXACTAMENTE lo mismo.
  */
 interface Renglon {
   /** `data-celda` — es también la llave con la que se sabe cuál está abierto. */
@@ -373,6 +320,8 @@ interface Renglon {
   etiqueta: string;
   valor: string;
   dc: DeltaCelda | null;
+  /** En modo Utilidad, el margen % del período, chico y gris. */
+  margen: string | null;
   /** Período en curso: se tiñe como la columna resaltada del escritorio. */
   enCurso: boolean;
   /** Mes que todavía no pasó: va en gris, sin Δ y sin nada que abrir. */
@@ -389,7 +338,7 @@ interface Tarjeta {
   /** Nota de mayoreo de Multifashion, o nada. */
   nota: string | null;
   /** Lo que se ve con la tarjeta cerrada: el total del año. */
-  resumen: { valor: string; dc: DeltaCelda | null };
+  resumen: { valor: string; dc: DeltaCelda | null; margen: string | null };
   /** El período en curso, también visible con la tarjeta cerrada. */
   enCurso: { etiqueta: string; valor: string; dc: DeltaCelda | null } | null;
   renglones: Renglon[];
@@ -399,10 +348,16 @@ interface Tarjeta {
   abrirPanel: (() => void) | null;
 }
 
+/** El margen del período, chico, solo en modo Utilidad. */
+function margenChico(cell: CellData, mode: ViewMode): string | null {
+  if (mode !== "utilidad" || cell.ventas == null || cell.utilidad == null) return null;
+  const m = marginRatio(cell.ventasMargen ?? cell.ventas, cell.utilidad);
+  return m == null ? null : fmtPorcentaje(m);
+}
+
 function MobileTarjetas({
   data,
   viewMode,
-  granularity,
   isClosedYear,
   multiMayoreoNota,
   onOpenEmpresa,
@@ -413,7 +368,6 @@ function MobileTarjetas({
 }: {
   data: VentasResumen;
   viewMode: ViewMode;
-  granularity: Granularity;
   isClosedYear: boolean;
   multiMayoreoNota?: string | null;
   onOpenEmpresa: (id: string) => void;
@@ -422,29 +376,25 @@ function MobileTarjetas({
   onCerrarFila: () => void;
   selectedYear: number;
 }) {
-  const cols = granularity === "mensual" ? MONTHS : QUARTERS;
+  const cols = MONTHS;
 
-  // Índice del período en curso, para resaltarlo.
-  // mesActual es 1-indexed (5 = May). En trimestral: ceil(5/3)=2 → Q2 → idx 1.
-  const currentColIdx = isClosedYear || data.mesActual === 0
-    ? -1
-    : granularity === "mensual"
-      ? data.mesActual - 1
-      : Math.ceil(data.mesActual / 3) - 1;
+  // Índice del mes en curso, para resaltarlo. mesActual es 1-indexed (5 = May).
+  const currentColIdx = isClosedYear || data.mesActual === 0 ? -1 : data.mesActual - 1;
 
   const yy = String(selectedYear).slice(-2);
   const yyPrev = String(selectedYear - 1).slice(-2);
   const showProy = !isClosedYear && !!data.proyeccion;
   // 🔴 Los meses que faltan, en gris — la MISMA cuenta que el escritorio, del
-  // mismo módulo. Solo mensual y solo en modo Ventas.
+  // mismo módulo. Solo en modo Ventas.
   const mesesGris =
-    showProy && granularity === "mensual" && viewMode === "ventas"
+    showProy && viewMode === "ventas"
       ? mesesProyectadosPorFila(
           data.empresas.map(e => ({ id: e.empresa.id, ventasPrevFull: e.ventasPrevFull ?? [] })),
           data.proyeccion!.mes_corte,
           id => findProyeccionForEmpresa(data.proyeccion!, id),
         )
       : null;
+  const pieCorte = isClosedYear ? null : pieCorteCosto(data.corte_costo);
 
   // Una tarjeta abierta a la vez, misma regla que PanelCxcMobile: con 8 empresas
   // × 12 meses, permitir varias abiertas convierte la pantalla en una lista de
@@ -466,7 +416,7 @@ function MobileTarjetas({
     const cur = cellValue(cell, viewMode);
     const foco = celdaKey("m", filaId, String(ci));
     const base = {
-      foco, etiqueta: cols[ci], enCurso: ci === currentColIdx, fuerte: false, proyectado: false,
+      foco, etiqueta: cols[ci], enCurso: ci === currentColIdx, fuerte: false, proyectado: false, margen: null,
     };
     if (cur == null && proyectado != null) {
       return {
@@ -481,6 +431,7 @@ function MobileTarjetas({
       ...base,
       valor: renderCellValue(cur, viewMode),
       dc: deltaCelda(cellDelta(cell, viewMode), viewMode, isNaComparison(cell, viewMode)),
+      margen: margenChico(cell, viewMode),
       detalle: {
         titulo,
         subtitulo: `${cols[ci].toUpperCase()} ${yy} vs ${yyPrev}`,
@@ -491,7 +442,7 @@ function MobileTarjetas({
     };
   }
 
-  /** Renglón del Total del año. En modo margen NO es una suma: es el margen. */
+  /** Renglón del Total del año. En modo Utilidad lleva el margen del año. */
   function renglonTotal(
     filaId: string,
     titulo: string,
@@ -499,31 +450,23 @@ function MobileTarjetas({
     cur: number,
     prev: number,
     margenPct: number,
-    margenPctPrev: number,
-  ): { renglon: Renglon; dc: DeltaCelda | null } {
-    let display: string;
-    let delta: number | null;
-    if (viewMode === "margen") {
-      display = fmtPorcentaje(margenPct);
-      delta = margenPctPrev > 0 ? margenPct - margenPctPrev : null;
-    } else {
-      // 🔴 CON CENTAVOS (diccionario § 0, #7, 5-sep-2026). Decía «$1.09M»
-      // mientras la MISMA celda del escritorio decía «$1,090,432.18»: el mismo
-      // total con dos caras según la pantalla, que es como se pierde una hora
-      // buscando un descuadre que no existe. Medido a 390 px: el renglón del
-      // Total tiene el nombre a la izquierda y el monto a la derecha, y
-      // «$1,090,432.18» a 15 px de mono son ~117 px de los ~356 útiles.
-      display = fmtMoney(cur);
-      delta = variacionPct(cur, prev);
-    }
+  ): { renglon: Renglon; dc: DeltaCelda | null; margen: string | null } {
+    // 🔴 CON CENTAVOS (diccionario § 0, #7, 5-sep-2026): el mismo total con
+    // dos caras según la pantalla es como se pierde una hora buscando un
+    // descuadre que no existe.
+    const display = fmtMoney(cur);
+    const delta = variacionPct(cur, prev);
     const dc = deltaCelda(delta, viewMode, delta == null);
+    const margen = viewMode === "utilidad" ? fmtPorcentaje(margenPct) : null;
     return {
       dc,
+      margen,
       renglon: {
         foco: celdaKey("m", filaId, "total"),
         etiqueta: `Total ${selectedYear}`,
         valor: display,
         dc,
+        margen,
         enCurso: false,
         fuerte: true,
         proyectado: false,
@@ -537,9 +480,8 @@ function MobileTarjetas({
   }
 
   // Las celdas de cada empresa, UNA vez: las usan la tarjeta de la empresa y
-  // también el agregado del grupo, y `buildCells` construye 12 objetos por
-  // llamada. Recalcularlas dentro del bucle del grupo serían 96 llamadas.
-  const cellsPorEmpresa = data.empresas.map(e => buildCells(e, granularity));
+  // también el agregado del grupo.
+  const cellsPorEmpresa = data.empresas.map(e => buildCells(e));
 
   // ── Una tarjeta por empresa ────────────────────────────────────────────────
   const tarjetas: Tarjeta[] = data.empresas.map((e, ei) => {
@@ -558,7 +500,7 @@ function MobileTarjetas({
       utilidadPrev: sumSeries(e.utilidad2025),
     };
     const periodos = cells.map((c, ci) => renglonPeriodo(id, nombre, c, ci, mesesGris?.porFila[id]?.[ci] ?? null));
-    const total = renglonTotal(id, nombre, ytdCell, yt.cur, yt.prev, e.margenPct, e.margenPctPrev);
+    const total = renglonTotal(id, nombre, ytdCell, yt.cur, yt.prev, e.margenPct);
 
     const renglones = [...periodos, total.renglon];
     if (showProy) {
@@ -567,15 +509,15 @@ function MobileTarjetas({
         foco: celdaKey("m", id, "proy"),
         etiqueta: "Proyección",
         // La proyección va REDONDEADA a propósito, igual que en el escritorio
-      // (`fmtMoneyCompact`): es una estimación, y darle centavos la haría
-      // parecer medida.
-      valor: p ? fmtMoneyCompact(p.proyeccion_cierre) : "—",
+        // (`fmtMoneyCompact`): es una estimación, y darle centavos la haría
+        // parecer medida.
+        valor: p ? fmtMoneyCompact(p.proyeccion_cierre) : "—",
         dc: null,
+        margen: null,
         enCurso: false,
         fuerte: true,
         proyectado: false,
-        // La Proyección explica de dónde sale, en castellano llano (antes en el
-        // escritorio era un número sin origen).
+        // La Proyección explica de dónde sale, en castellano llano.
         detalle: p
           ? {
               titulo: nombre,
@@ -599,7 +541,7 @@ function MobileTarjetas({
       // La nota es VISIBLE (paridad con escritorio): la fila es american_classic
       // COMPLETA (tienda + mayoreo) y declara CUÁNTO es mayoreo.
       nota: id === "multi" ? multiMayoreoNota ?? null : null,
-      resumen: { valor: total.renglon.valor, dc: total.dc },
+      resumen: { valor: total.renglon.valor, dc: total.dc, margen: total.margen },
       enCurso: enCursoR ? { etiqueta: enCursoR.etiqueta, valor: enCursoR.valor, dc: enCursoR.dc } : null,
       renglones,
       oscura: false,
@@ -611,7 +553,7 @@ function MobileTarjetas({
   // Los agregados por período son la suma de todas las empresas; el YTD sale de
   // las series reales (no de sumar columnas), igual que en el escritorio.
   const totalColAggs: CellData[] = cols.map((_, ci) => {
-    let v = 0, vp = 0, u = 0, up = 0;
+    let v = 0, vp = 0, u = 0, up = 0, vm = 0;
     let hasV = false, hasU = false;
     for (const cells of cellsPorEmpresa) {
       const c = cells[ci];
@@ -619,12 +561,14 @@ function MobileTarjetas({
       vp += c.ventasPrev;
       if (c.utilidad != null) { u += c.utilidad; hasU = true; }
       up += c.utilidadPrev;
+      vm += c.ventasMargen ?? c.ventas ?? 0;
     }
     return {
       ventas: hasV ? v : null,
       ventasPrev: vp,
       utilidad: hasU ? u : null,
       utilidadPrev: up,
+      ventasMargen: hasV ? vm : null,
     };
   });
 
@@ -650,7 +594,6 @@ function MobileTarjetas({
     viewMode === "utilidad" ? groupYtd.u : groupYtd.v,
     viewMode === "utilidad" ? groupYtd.up : groupYtd.vp,
     data.kpis.margenYTD,
-    data.kpis.margen2025YTD,
   );
   const grupoRenglones = [...grupoPeriodos, grupoTotal.renglon];
   if (showProy) {
@@ -659,6 +602,7 @@ function MobileTarjetas({
       etiqueta: "Proyección",
       valor: fmtMoneyCompact(data.proyeccion!.totales_grupo.proyeccion_cierre),
       dc: null,
+      margen: null,
       enCurso: false,
       fuerte: true,
       proyectado: false,
@@ -674,7 +618,7 @@ function MobileTarjetas({
     id: TOTAL_GRUPO_ID,
     nombre: "Total grupo",
     nota: null,
-    resumen: { valor: grupoTotal.renglon.valor, dc: grupoTotal.dc },
+    resumen: { valor: grupoTotal.renglon.valor, dc: grupoTotal.dc, margen: grupoTotal.margen },
     enCurso: grupoEnCurso
       ? { etiqueta: grupoEnCurso.etiqueta, valor: grupoEnCurso.valor, dc: grupoEnCurso.dc }
       : null,
@@ -708,8 +652,10 @@ function MobileTarjetas({
         onAbrirFila={onAbrirFila}
         onCerrarFila={onCerrarFila}
       />
-      {mesesGris && (
-        <p data-leyenda-proyectado="celular" className="px-1 pt-1 text-xs leading-tight text-gray-500">{LEYENDA_MESES_PROYECTADOS}</p>
+      {(mesesGris || pieCorte) && (
+        <p data-leyenda-proyectado="celular" className="px-1 pt-1 text-xs leading-tight text-gray-500">
+          {[pieCorte, mesesGris ? LEYENDA_MESES_PROYECTADOS : null].filter(Boolean).join(" · ")}
+        </p>
       )}
     </div>
   );
@@ -788,9 +734,13 @@ function TarjetaEmpresa({
           >
             {tarjeta.resumen.valor}
           </span>
-          {tarjeta.resumen.dc && (
-            <span className={cn("block text-xs", tono(tarjeta.resumen.dc))}>
-              {tarjeta.resumen.dc.texto}
+          {(tarjeta.resumen.dc || tarjeta.resumen.margen) && (
+            <span className="block text-xs">
+              {tarjeta.resumen.margen && (
+                <span data-margen-celda className={oscura ? "text-gray-400" : "text-gray-500"}>{tarjeta.resumen.margen}</span>
+              )}
+              {tarjeta.resumen.margen && tarjeta.resumen.dc && <span className="text-gray-400"> · </span>}
+              {tarjeta.resumen.dc && <span className={tono(tarjeta.resumen.dc)}>{tarjeta.resumen.dc.texto}</span>}
             </span>
           )}
         </span>
@@ -872,6 +822,10 @@ function RenglonPeriodo({
 
   const cifras = (
     <span className="ml-auto flex items-baseline gap-2">
+      {/* En modo Utilidad, el margen del período va chico y gris antes del monto. */}
+      {renglon.margen && (
+        <span data-margen-celda className={cn("text-xs", oscura ? "text-gray-400" : "text-gray-500")}>{renglon.margen}</span>
+      )}
       <span
         className={cn(
           "font-mono text-xs tabular-nums",
@@ -930,26 +884,14 @@ function RenglonPeriodo({
 // Helpers de derivación de cells
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildCells(e: EmpresaMonthlySales, granularity: Granularity): CellData[] {
-  if (granularity === "mensual") {
-    return e.ventas2026.map((v, i) => ({
-      ventas: v,
-      ventasPrev: e.ventas2025[i] ?? 0,
-      utilidad: e.utilidad2026[i],
-      utilidadPrev: e.utilidad2025[i] ?? 0,
-    }));
-  }
-  const groups = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]];
-  return groups.map(q => {
-    const hasV = q.some(i => e.ventas2026[i] != null);
-    const hasU = q.some(i => e.utilidad2026[i] != null);
-    return {
-      ventas: hasV ? q.reduce((s, i) => s + (e.ventas2026[i] ?? 0), 0) : null,
-      ventasPrev: q.reduce((s, i) => s + (e.ventas2025[i] ?? 0), 0),
-      utilidad: hasU ? q.reduce((s, i) => s + (e.utilidad2026[i] ?? 0), 0) : null,
-      utilidadPrev: q.reduce((s, i) => s + (e.utilidad2025[i] ?? 0), 0),
-    };
-  });
+function buildCells(e: EmpresaMonthlySales): CellData[] {
+  return e.ventas2026.map((v, i) => ({
+    ventas: v,
+    ventasPrev: e.ventas2025[i] ?? 0,
+    utilidad: e.utilidad2026[i],
+    utilidadPrev: e.utilidad2025[i] ?? 0,
+    ventasMargen: e.ventasParaMargen?.[i] ?? v,
+  }));
 }
 
 function sumSeries(arr: (number | null)[]): number {

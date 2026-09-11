@@ -85,7 +85,8 @@ const NO_SON_BARRAS_DE_PAGINA: { archivo: string; motivo: string }[] = [
   { archivo: "app/productos/cargar/FacturasTiendaClient.tsx", motivo: "thead de la vista previa" },
   { archivo: "app/prestamos/components/MovimientoTable.tsx", motivo: "thead de movimientos" },
   { archivo: "components/ventas/ResumenView.tsx", motivo: "thead del heatmap (sticky en los dos ejes)" },
-  { archivo: "components/ventas/ResumenAnual.tsx", motivo: "thead del anual (sticky en los dos ejes)" },
+  // (`components/ventas/ResumenAnual.tsx` salió de la lista el 11-sep-2026: la
+  // vista Anual se retiró con la pestaña.)
   { archivo: "components/catalogo/PedidoDetalleClient.tsx", motivo: "thead del detalle del pedido" },
   // Cabeceras y pies de MODAL — se pegan al panel del modal, no a la página.
   { archivo: "app/marketing/components/HistorialImpulsadoraModal.tsx", motivo: "cabecera del modal" },

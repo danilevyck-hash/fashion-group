@@ -22,7 +22,11 @@ import { type ModoClientes } from "@/lib/ventas/pestanas";
 import { exportClientesToExcel } from "@/lib/ventas/clientes-excel";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { exportUtilidadToExcel, type UtilidadClienteResponse, type UtilidadClienteRow } from "@/lib/ventas/utilidad-cliente";
-import { nombreCortoEmpresa, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { opcionesEmpresaClientes, VALOR_TODAS } from "@/lib/ventas/rotulo-empresas";
+import { rotuloCompras, rotuloVs, ventanaParaClientes, type PeriodoVentas } from "@/lib/ventas/periodo";
+import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
+import { textoFrescura } from "@/lib/ventas/frescura";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { esMostrador } from "@/lib/clientes/mostrador";
 import SyncNowButton from "@/components/shared/SyncNowButton";
@@ -42,39 +46,25 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
 // (SORT_LABELS se retiró con el subtítulo "ordenados por X": el encabezado de
 // columna activo ya muestra el criterio, y en celular lo dice el SortSheet.)
 
-// Pills del filtro de empresa: "Todas" + LAS SEIS DE FASHION GROUP.
+// 🔴 EL FILTRO DE EMPRESA ES UN DESPLEGABLE, NO SIETE PÍLDORAS (11-sep-2026).
+// Daniel: «B». Siete chips en una fila —en el celular, cuatro líneas antes del
+// primer cliente— pasan a ser el mismo desplegable del resto del sistema.
 //
-// 🔴 SE DERIVA DE `B2B_EMPRESA_KEYS`, NO SE ENUMERA. Daniel, 2-sep-2026:
-// *"deberían estar solo las 6 de Fashion Group, que son las 5 de las fotos y
-// joystep"*. Boston y Multifashion no están porque no son del grupo — la lista
-// EXCLUYE por construcción (nombra a las 6 que sí), no por un `.filter`.
-//
-// 🩸 ACÁ FALTABA JOYSTEP, y el comentario que estaba en su lugar decía que era
-// "decisión visual". No lo era: era una lista escrita a mano que se quedó en 5
-// cuando joystep entró al grupo. Es la CUARTA vez que este repo paga una lista
-// de empresas copiada a mano — ver el post-mortem de Comisiones, donde
-// `ComisionesView.tsx` tenía su propio `.filter(k => k !== "joystep")` mientras
-// las otras tres vistas ya leían la constante.
-//
-// La PLATA nunca se perdió y está medido (2-sep-2026): el modo "Todas" lee
-// `clientes_agregado_12m_vw`, que incluye a joystep desde siempre. Lo que
-// faltaba era poder FILTRAR por ella: sus 14 clientes no se podían aislar.
-// 🔴 El nombre CORTO — «Vistana», no «Vistana International» (diccionario § 0,
-// #4). Sale de `nombreCortoEmpresa`, el segundo campo de la MISMA lista de
-// empresas: un cuarto mapa de nombres era justo el problema que el diccionario
-// vino a arreglar.
-const EMPRESA_PILLS: { id: string; label: string }[] = [
-  { id: "todas", label: "Todas" },
-  ...B2B_EMPRESA_KEYS.map((key) => ({ id: key, label: nombreCortoEmpresa(key) })),
-];
+// 🔴 Y LA PRIMERA OPCIÓN DICE «Todas las empresas», no «Fashion Group»: acá las
+// únicas que hay son las 6 del grupo (en Comisiones dice «Fashion Group» porque
+// ahí también está Multifashion). La regla vive en `lib/ventas/rotulo-empresas.ts`,
+// y las seis se DERIVAN de `B2B_EMPRESA_KEYS` — nunca una lista escrita a mano:
+// así fue como faltó Joystep hasta el 2-sep-2026. Boston y Multifashion no
+// están porque no son del grupo; sus clientes viven en su propio módulo.
+const EMPRESA_OPCIONES = opcionesEmpresaClientes();
 
 /** Las etiquetas del control segmentado. Las MISMAS palabras que el Resumen:
  *  dos pantallas del mismo módulo que llaman distinto a lo mismo obligan a
- *  aprenderlo dos veces. */
+ *  aprenderlo dos veces. ⛔ «Margen %» se retiró el 11-sep-2026: era el mismo
+ *  componente que Utilidad con otro orden inicial (ver `pestanas.ts`). */
 const MODO_OPCIONES: { value: ModoClientes; label: string }[] = [
   { value: "ventas", label: "Ventas" },
   { value: "utilidad", label: "Utilidad" },
-  { value: "margen", label: "Margen %" },
 ];
 
 // Pills donde la fila agregada "Otros clientes" NO se renderiza.
@@ -92,10 +82,12 @@ const OTROS_CLIENTES_PISTA = "Tocar para ver el detalle";
 
 /** Lo que la columna de cambio está comparando, dicho con todas las letras y con
  *  el año REAL. Criterio del PR #573 en Ventas › Productos: un símbolo suelto no
- *  dice contra qué se compara, así que el período se imprime al lado del total.
- *  Una sola frase para las dos pantallas (escritorio y celular). */
-const textoComparativo = (anio: number) =>
-  `El cambio compara contra el mismo período de ${anio}`;
+ *  dice contra qué se compara. Solo en el CELULAR desde el 11-sep-2026: en el
+ *  escritorio lo dice el encabezado «vs 2025» de la columna, a diez centímetros. */
+const textoComparativo = (anio: number, periodo: PeriodoVentas) =>
+  periodo.tipo === "ultimos"
+    ? "El cambio compara contra los mismos meses del año anterior"
+    : `El cambio compara contra el mismo período de ${anio}`;
 
 /** «6 empresas» / «1 empresa». El número es lo que varía; la palabra acompaña.
  *  Una sola función para la tabla y para la tarjeta: dos formas de decirlo son
@@ -105,8 +97,10 @@ export function textoEmpresas(n: number): string {
   return `${cuantas} ${cuantas === 1 ? "empresa" : "empresas"}`;
 }
 
-/** «clientes sin compras en 2026». Se dice igual en las dos pantallas. */
-export function textoSinCompras(anio: number): string {
+/** «clientes sin compras en 2026» / «… en los últimos 12 meses». Se dice igual
+ *  en las dos pantallas. */
+export function textoSinCompras(anio: number, periodo?: PeriodoVentas): string {
+  if (periodo && periodo.tipo === "ultimos") return `clientes sin compras en los últimos ${periodo.n} meses`;
   return `clientes sin compras en ${anio}`;
 }
 
@@ -152,18 +146,24 @@ function codigoDeLaUrl(): string {
 
 interface ClientesViewProps {
   data: Clientes;
-  /** Año del selector global. Para año en curso: vista rolling 12m
-   *  (chip "Vista 12m"). Para año cerrado: vista YTD anual (chip "Año 2025"). */
+  /** El año del período elegido arriba. En el año en curso la lista es la
+   *  vista rolling (los activos de los últimos 12 meses); en un año cerrado,
+   *  los que compraron ese año. */
   selectedYear: number;
   isClosedYear: boolean;
-  /** Ventas · Utilidad · Margen %. Vive en la URL (`?modo=`), lo maneja el
-   *  shell — así un enlace guardado abre la misma vista. */
+  /** Ventas · Utilidad. Vive en la URL (`?modo=`), lo maneja el shell — así
+   *  un enlace guardado abre la misma vista. */
   modo: ModoClientes;
   onModo: (m: ModoClientes) => void;
+  /** El período del selector único de arriba (11-sep-2026). Lo que se PIDIÓ;
+   *  lo que se sirvió lo dice `data.ventana`, y la columna rotula ESO. Sin él,
+   *  el año de `selectedYear`. */
+  periodo?: PeriodoVentas;
 }
 
 export function ClientesView({
   data: initialData, selectedYear, isClosedYear, modo, onModo,
+  periodo = { tipo: "anio", anio: selectedYear },
 }: ClientesViewProps) {
   // 🔴 `?cliente=D-25` — LO ÚNICO QUE SE LE AGREGÓ A ESTA PANTALLA (5-sep-2026).
   //
@@ -188,12 +188,11 @@ export function ClientesView({
   // año en curso → última compra (vista rolling 12m).
   const [sortBy, setSortBy] = useState<SortKey>(isClosedYear ? "ytd" : "ultima");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  // PERÍODO (universo) separado del ORDEN: ordenar NUNCA cambia qué clientes se
-  // ven. "12m" = universo rolling (todos los activos en 12 meses, incluidos los
-  // sin compras este año); "ytd" = estricto del año en curso (ytd>0). Antes esto
-  // estaba acoplado al sort y ordenar por "Compras YTD" borraba clientes en
-  // silencio. Para año cerrado no aplica (la RPC ya filtra el año).
-  const [vista, setVista] = useState<"12m" | "ytd">("12m");
+  // ⛔ ACÁ VIVÍA `vista` («Clientes: últimos 12 meses / con compras en 2026»),
+  // el desplegable que decidía el UNIVERSO. Se retiró el 11-sep-2026: en los
+  // modos Utilidad y Margen no hacía nada, y en Ventas su segunda opción era
+  // lo mismo que no abrir los «N clientes sin compras en 2026» plegados al
+  // final. El período lo manda el selector único de arriba.
   const [sheetCliente, setSheetCliente] = useState<Cliente | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   // 🔴 LOS CLIENTES EN $0.00 SE AGRUPAN AL FINAL (5-sep-2026). Desde ~la fila 92
@@ -208,6 +207,17 @@ export function ClientesView({
   const [bajando, setBajando] = useState(false);
 
   const enUtilidad = modo !== "ventas";
+
+  // 🔴 LO QUE SE SIRVIÓ, no lo que se pidió: si se pidió «Últimos 12 meses» y
+  // la vista todavía no trae esa suma (migración pendiente) o el año está
+  // cerrado, el servidor sirvió el AÑO y la columna dice el año. Nunca se
+  // rotula un período que no se sumó.
+  const periodoServido: PeriodoVentas = data.ventana
+    ? { tipo: "ultimos", n: data.ventana }
+    : { tipo: "anio", anio: selectedYear };
+  const ventanaPedida = ventanaParaClientes(periodo);
+  const qsVentana = ventanaPedida ? `&ventana=${ventanaPedida}` : "";
+  const frescura = textoFrescura(data.actualizadoAt);
 
   // 🔴 EL AÑO DEL RÓTULO SALE DEL MISMO DATO QUE HACE LA CUENTA. Antes decía
   // "Δ vs 2025" clavado: con 2025 elegido arriba, la pantalla decía
@@ -225,7 +235,7 @@ export function ClientesView({
     setFetchError(null);
     try {
       const res = await fetch(
-        `/api/ventas/clientes-12m?empresa=${encodeURIComponent(next)}&year=${selectedYear}`,
+        `/api/ventas/clientes-12m?empresa=${encodeURIComponent(next)}&year=${selectedYear}${qsVentana}`,
         { cache: "no-store" }
       );
       if (!res.ok) {
@@ -248,7 +258,7 @@ export function ClientesView({
   const reloadData = useCallback(async () => {
     try {
       const res = await fetch(
-        `/api/ventas/clientes-12m?empresa=${encodeURIComponent(empresa)}&year=${selectedYear}`,
+        `/api/ventas/clientes-12m?empresa=${encodeURIComponent(empresa)}&year=${selectedYear}${qsVentana}`,
         { cache: "no-store" }
       );
       if (!res.ok) return;
@@ -257,7 +267,7 @@ export function ClientesView({
     } catch {
       /* el toast del botón ya informó; la lista queda con lo que había */
     }
-  }, [empresa, selectedYear]);
+  }, [empresa, selectedYear, qsVentana]);
 
   // Cache de historial-mensual por (codigo + empresaKey). Lazy: solo se
   // popula al primer hover/tap sobre cada cliente. El CXC aging se fetchea
@@ -292,49 +302,11 @@ export function ClientesView({
       .finally(() => { histInFlight.current.delete(histKey); });
   }, []);
 
-  // Vista 12m (universo rolling) vs YTD strict — el universo cambia con
-  // el sort: cuando el usuario ordena por última compra quiere ver a TODOS
-  // los clientes activos en los últimos 12 meses, incluyendo los que no
-  // compraron aún en el año en curso. Para cualquier otro sort, la lista
-  // se restringe a clientes con compras YTD > 0 (vista "estricta del año").
-  //
-  // Para años cerrados, la vista rolling 12m no aplica — la RPC clientes_anio
-  // ya filtra al año específico. Forzamos is12mView=false.
-  const is12mView = !isClosedYear && vista === "12m";
-
-  // Etiquetas del chip "Vista".
-  //
-  // 🩸 Decían "Últimos 12 meses" mientras la columna de plata decía "Compras
-  // YTD" — dos períodos distintos en la misma pantalla, y Daniel lo leyó como
-  // una contradicción. No lo era, pero el texto mentía por omisión: el chip
-  // elige QUÉ CLIENTES se listan (los que compraron en los últimos 12 meses, o
-  // sólo los que compraron este año) y la columna SIEMPRE muestra las compras
-  // del AÑO EN CURSO. Ahora el chip dice "Clientes: …" y la columna dice
-  // "Compras {año}", así que cada texto nombra lo que de verdad hace.
-  const vistaChipLabel = isClosedYear
-    ? `Año ${selectedYear}`
-    : (is12mView ? "Clientes 12m" : `Clientes ${selectedYear}`);
-  const vistaChipLong = isClosedYear
-    ? `Año ${selectedYear}`
-    : (is12mView ? "Clientes: últimos 12 meses" : `Clientes: con compras en ${selectedYear}`);
-  // El período NO se repite en el contador de clientes (limpieza jul-2026): el
-  // chip de al lado ya lo dice y además es clicable para cambiarlo. El prefijo
-  // "Vista:" del propio chip se podó en ago-2026 — el valor ya se lee solo.
-  const vistaChipTitle = isClosedYear
-    ? `Vista anual: clientes con compras en ${selectedYear} y delta vs ${selectedYear - 1}.`
-    : (is12mView
-        ? "Universo rolling de 12 meses (incluye clientes sin compras este año). Toca para ver solo el año en curso."
-        : "Estricto del año en curso (solo clientes con compras YTD). Toca para ver los últimos 12 meses.");
-  // Color del chip: teal cuando 12m rolling (señal "expandido"), stone para
-  // YTD strict o año cerrado.
-  const vistaChipTone = is12mView ? "bg-teal-50 text-teal-700" : "bg-gray-100 text-gray-700";
-
-  // Universo según el PERÍODO (no el sort). El mostrador queda fuera (se muestra
-  // marcado aparte, fuera del ranking). Esto define qué huérfanos van a "Otros".
-  const universe = useMemo(() => {
-    const base = data.rows.filter(c => !esMostrador(c.id));
-    return is12mView ? base : base.filter(c => c.ytd > 0);
-  }, [data.rows, is12mView]);
+  // El universo: en el año en curso, los activos de los últimos 12 meses (los
+  // que este período no compraron van plegados al final, en «N clientes sin
+  // compras»); en un año cerrado, los que compraron ese año (la RPC ya filtra).
+  // El mostrador queda fuera (se muestra marcado aparte, fuera del ranking).
+  const universe = useMemo(() => data.rows.filter(c => !esMostrador(c.id)), [data.rows]);
 
   // La fila-mostrador: SUMA de todas las filas de mostrador que llegaron.
   //
@@ -421,7 +393,13 @@ export function ClientesView({
         case "nombre":  return a.nombre.localeCompare(b.nombre) * sign;
         case "empresa": return a.empresa.localeCompare(b.empresa) * sign;
         case "ytd":     return (a.ytd - b.ytd) * sign;
-        case "delta":   return (a.delta - b.delta) * sign;
+        // «Nuevo» (sin base) va al final en los dos sentidos: no es un cambio.
+        case "delta": {
+          if (a.delta == null && b.delta == null) return 0;
+          if (a.delta == null) return 1;
+          if (b.delta == null) return -1;
+          return (a.delta - b.delta) * sign;
+        }
         case "ultima":  return a.ultimaIso.localeCompare(b.ultimaIso) * sign;
       }
     });
@@ -472,18 +450,22 @@ export function ClientesView({
     try {
       if (enUtilidad) {
         // Baja LO QUE SE ESTÁ VIENDO: las filas ya filtradas por la búsqueda y
-        // la píldora de empresa, no las 209 de la respuesta completa.
-        if (utilidadData) await exportUtilidadToExcel(utilidadData, utilidadFilas);
+        // la empresa, no las 209 de la respuesta completa.
+        if (utilidadData) {
+          await exportUtilidadToExcel(utilidadData, utilidadFilas);
+          anotarDescarga("clientes", { modo, anio: selectedYear, empresa });
+        }
         return;
       }
       await exportClientesToExcel({
         year: selectedYear,
+        periodo: periodoServido,
         anioComparativo,
         filas: enPantalla,
         mostrador: mostradorRow && !search.trim() ? mostradorRow : null,
         empresa,
-        universo: vistaChipLong,
       });
+      anotarDescarga("clientes", { modo, periodo: rotuloCompras(periodoServido), empresa });
     } catch (err) {
       console.error("[ventas/clientes] excel export failed", err);
     } finally {
@@ -555,31 +537,24 @@ export function ClientesView({
             />
           </div>
 
-          {/* 🔴 EL UNIVERSO ES UN CONTROL, NO UNA NOTA AL PIE (5-sep-2026).
-              «Clientes: últimos 12 meses ⓘ» vivía arriba a la derecha con forma
-              de aclaración, en letra chica y color de nota — y decide QUÉ
-              CLIENTES se listan: los activos de los últimos 12 meses (incluidos
-              los que este año no compraron) o solo los que compraron este año.
-              Es lo que hace que la lista pase de 209 a 92 filas. Un control que
-              cambia la lista no puede parecer una leyenda.
-
-              ⚠️ En un año CERRADO no hay nada que elegir —la consulta ya filtra
-              ese año— y se dice como texto, sin ofrecer una opción falsa. */}
-          {isClosedYear ? (
-            <span data-universo-clientes className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md bg-gray-100 px-2.5 text-xs font-medium text-gray-700">
-              {vistaChipLong}
-            </span>
-          ) : (
-            <Select value={vista} onValueChange={(v) => setVista(v === "ytd" ? "ytd" : "12m")}>
-              <SelectTrigger data-universo-clientes className="h-11 w-auto min-w-[190px] text-xs" title={vistaChipTitle}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="12m" className="text-xs">Clientes: últimos 12 meses</SelectItem>
-                <SelectItem value="ytd" className="text-xs">Clientes: con compras en {selectedYear}</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+          {/* 🔴 EL DESPLEGABLE DE EMPRESA (11-sep-2026), en el lugar de las
+              siete píldoras. Filtra los DOS modos: en Ventas vuelve a pedirle
+              la lista al servidor (la branching vive en `queries.ts`); en
+              Utilidad filtra las filas que ya llegaron. Es el MISMO control
+              para los dos: dos filtros de empresa en la misma pantalla es cómo
+              se lee el número de una empresa creyendo que es el de otra. */}
+          <Select value={empresa} onValueChange={onEmpresaChange}>
+            <SelectTrigger data-empresa-clientes aria-label="Empresa" className="h-11 w-auto min-w-[170px] text-xs" disabled={loading}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {EMPRESA_OPCIONES.map(o => (
+                <SelectItem key={o.valor} value={o.valor} className="text-xs">{o.etiqueta}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* ⛔ ACÁ VIVÍA el desplegable «Clientes: últimos 12 meses / con
+              compras en 2026». Ver la nota de `vista`, arriba. */}
 
           {/* Sort button — visible sólo en mobile (md-). En desktop se usan
               los headers de columna clickeables. Texto fijo "Ordenar" para
@@ -604,11 +579,9 @@ export function ClientesView({
               (facturas de las 8 + refresh-vistas al final) y refetch. */}
           <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={reloadData} />
 
-          {/* 🔴 EL EXCEL DE CLIENTES — el que faltaba (5-sep-2026). El botón que
-              se veía arriba era el del RESUMEN: desde acá se bajaba la matriz de
-              empresas × meses. Éste baja LO QUE ESTÁS VIENDO, con la búsqueda,
-              la empresa y el orden puestos, y en los modos Utilidad y Margen %
-              baja esas columnas. */}
+          {/* 🔴 «Descargar en Excel» (11-sep-2026; decía «Excel»). Baja LO QUE
+              ESTÁS VIENDO, con la búsqueda, la empresa y el orden puestos, y en
+              Utilidad baja esas columnas. Ver `lib/ventas/descarga.ts`. */}
           <Button
             variant="outline"
             size="sm"
@@ -616,18 +589,19 @@ export function ClientesView({
             disabled={bajando || (enUtilidad ? !utilidadData : filtered.length === 0)}
             className="min-h-[44px]"
           >
-            <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
+            <Download className="mr-1.5 h-3.5 w-3.5" /> {ROTULO_DESCARGAR_EXCEL}
           </Button>
 
-          {/* Contador — desktop, a la derecha. El chip de universo se fue al
-              selector de arriba; acá queda la cuenta y contra qué compara. */}
+          {/* Contador — desktop, a la derecha: cuántos, y de cuándo son los
+              datos (🔴 la línea de frescura, 11-sep-2026: la vista se refresca
+              con cada sync y acá se dice a qué hora). Contra qué compara ya lo
+              dice el encabezado «vs 2025» de la columna. */}
           <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-gray-500 lg:flex">
             <p>
-              {/* "ordenados por X" se fue: el encabezado de columna activo ya
-                  lo dice con su flecha, en la misma pantalla y a la vista. */}
               <span className="font-mono text-gray-950">{cuantosClientes}</span> clientes
+              {frescura && !enUtilidad && <span data-frescura-clientes> · {frescura}</span>}
+              {enUtilidad && <span data-periodo-utilidad> · Año {selectedYear}</span>}
             </p>
-            {!enUtilidad && <p data-comparativo-clientes>{textoComparativo(anioComparativo)}</p>}
           </div>
         </div>
 
@@ -635,66 +609,20 @@ export function ClientesView({
         <div className="lg:hidden">
           <div className="text-xs text-gray-500">
             <span className="font-mono text-gray-950">{cuantosClientes}</span> clientes
+            {frescura && !enUtilidad && <span data-frescura-clientes> · {frescura}</span>}
+            {enUtilidad && <span data-periodo-utilidad> · Año {selectedYear}</span>}
           </div>
           {/* En el celular no hay encabezado de columna que rotule el %: sin
               esta línea, el "▲ +18%" de cada tarjeta no dice contra qué. */}
           {!enUtilidad && (
             <div data-comparativo-clientes className="mt-0.5 text-xs text-gray-500">
-              {textoComparativo(anioComparativo)}
+              {textoComparativo(anioComparativo, periodoServido)}
             </div>
           )}
         </div>
 
-        {/* 🩸 ACÁ ESTABAN LOS 369 px DEL IPHONE, y no era la tabla: era esta tira
-            de píldoras. En celular la tabla ya estaba resuelta con tarjetas
-            desde antes; lo que quedaba arrastrando eran los seis filtros de
-            empresa metidos en un `overflow-x-auto` con scroll-snap. Medido a
-            390 px: 725 px de píldoras contra 356 visibles.
-
-            Se resuelve con `flex-wrap`, una sola clase — es la misma salida que
-            ganó por medición en los filtros del catálogo (#371), donde correr el
-            breakpoint NI SIQUIERA LLEGABA A CERO. Envolver además ARREGLA el
-            filtro en vez de sólo dejar de arrastrarlo: los seis se ven de una,
-            que es lo que un filtro tiene que hacer.
-
-            🔴 SIGUEN SIENDO PÍLDORAS Y NO UN CONTROL SEGMENTADO, aunque el resto
-            del módulo se haya unificado: son SIETE opciones y envuelven en dos
-            líneas. Un segmentado de siete a 390 px aprieta los nombres hasta
-            partirlos. No es una excepción olvidada; es que no son la misma clase
-            de control.
-
-            🔴 Y FILTRAN LOS TRES MODOS. En Ventas la píldora vuelve a pedirle la
-            lista al servidor (la branching vive en `queries.ts`); en Utilidad y
-            Margen filtra las filas que ya llegaron. En los dos casos es la MISMA
-            píldora: dos filtros de empresa en la misma pantalla es cómo se lee
-            el número de una empresa creyendo que es el de otra. */}
-        <div className="-mx-1 px-1">
-          <div className="flex flex-wrap gap-1.5">
-            {EMPRESA_PILLS.map(p => {
-              const active = empresa === p.id;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => onEmpresaChange(p.id)}
-                  disabled={loading}
-                  className={cn(
-                    // Box-sizing idéntico entre estados: ambos llevan border
-                    // para que el activo no crezca 1px respecto al inactivo.
-                    // 44px, no 40: las pills de empresa se tocan de pasada en
-                    // iPhone — 4px de más evitan el filtro equivocado.
-                    "min-h-[44px] whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-medium transition",
-                    active
-                      ? "border-teal-700 bg-teal-700 text-white"
-                      : "border-gray-200 bg-white text-gray-700"
-                  )}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {/* ⛔ ACÁ VIVÍA LA TIRA DE SIETE PÍLDORAS DE EMPRESA. Se retiró el
+            11-sep-2026: es el desplegable de arriba (Daniel: «B»). */}
       </div>
 
       {/* ─────── Utilidad y Margen %: las MISMAS filas, otras columnas ───────
@@ -707,7 +635,6 @@ export function ClientesView({
           selectedYear={selectedYear}
           search={search}
           empresaFiltro={empresa}
-          ordenInicial={modo === "margen" ? "margen" : "utilidad"}
           onData={setUtilidadData}
           onFilas={setUtilidadFilas}
         />
@@ -761,11 +688,14 @@ export function ClientesView({
                     contesta UNA: cuántas. Cuáles, y con cuánto en cada una, sale
                     al abrir la fila. */}
                 <SortHeader col="empresa" align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Empresas</SortHeader>
-                <SortHeader col="ytd"     align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras {selectedYear}</SortHeader>
+                {/* 🔴 LA COLUMNA DICE QUÉ PERÍODO SUMA (11-sep-2026): «Compras ·
+                    Año 2026» o «Compras · Últimos 12 meses», el que el servidor
+                    SIRVIÓ. Decía «Compras 2026» a secas. */}
+                <SortHeader col="ytd"     align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>{rotuloCompras(periodoServido)}</SortHeader>
                 {/* Sin la "Δ": es notación de matemática y esta columna la lee gente
                     que no la conoce. "vs 2025" con las flechas de cada celda se
                     entiende solo, y el año es el REAL. */}
-                <SortHeader col="delta"   align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>vs {anioComparativo}</SortHeader>
+                <SortHeader col="delta"   align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>{rotuloVs(periodoServido, anioComparativo)}</SortHeader>
                 <SortHeader col="ultima"  align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Última compra</SortHeader>
               </tr>
             </thead>
@@ -838,7 +768,7 @@ export function ClientesView({
                       className="flex min-h-[44px] w-full items-center gap-2 px-2.5 text-left text-xs text-gray-600 hover:bg-gray-100"
                     >
                       <span className="font-mono tabular-nums text-gray-950">{bloques.enCero.length}</span>
-                      <span>{textoSinCompras(selectedYear)}</span>
+                      <span>{textoSinCompras(selectedYear, periodoServido)}</span>
                       <span className="ml-auto font-medium text-teal-700">{ceroAbierto ? "ocultar" : "ver"}</span>
                     </button>
                   </td>
@@ -911,7 +841,7 @@ export function ClientesView({
             className="flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 text-left text-xs text-gray-600 active:bg-gray-100"
           >
             <span className="font-mono tabular-nums text-gray-950">{bloques.enCero.length}</span>
-            <span>{textoSinCompras(selectedYear)}</span>
+            <span>{textoSinCompras(selectedYear, periodoServido)}</span>
             <span className="ml-auto font-medium text-teal-700">{ceroAbierto ? "ocultar" : "ver"}</span>
           </button>
         )}
@@ -989,6 +919,29 @@ function DelGrupoBadge() {
   );
 }
 
+/**
+ * 🔴 «Nuevo» (11-sep-2026). Un cliente sin base comparativa (no compró el año
+ * pasado en el mismo período) llegaba como `delta: 0` y se pintaba «+0 %» en
+ * gris, idéntico a uno que no creció: 34 de 116. La rama que dice «no hay con
+ * qué comparar» existía (`NO_COMPARATIVE`) y nunca se alcanzaba. El porcentaje
+ * grande (+30994 %) SE QUEDA como está — Daniel: *«deja el porcentaje para que
+ * todo tenga una misma línea»*.
+ */
+export const ROTULO_NUEVO = "Nuevo";
+
+function CambioCelda({ c, className }: { c: Cliente; className?: string }) {
+  if (c.delta == null) {
+    return <span data-col="delta" data-nuevo className={cn("font-sans text-xs font-medium text-teal-700", className)}>{ROTULO_NUEVO}</span>;
+  }
+  const fmt = formatDeltaRatio(c.delta);
+  return (
+    <span data-col="delta" className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone], className)}>
+      {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
+      {fmt.displayValue}
+    </span>
+  );
+}
+
 function ClienteRow({
   c,
   displayRank,
@@ -1010,7 +963,6 @@ function ClienteRow({
   empresaScope: string;
   onTriggerHistorial: () => void;
 }) {
-  const fmt = formatDeltaRatio(c.delta);
   const isMultiEmpresa = c.empresas_count > 1 && (c.empresas_breakdown?.length ?? 0) > 1;
   // Auto-flip: cliente en la mitad inferior de la viewport → HoverCard se
   // abre hacia arriba (side="top") en vez de a la derecha. Evita que el
@@ -1126,9 +1078,8 @@ function ClienteRow({
         </TooltipProvider>
       </td>
       <td data-col="ytd" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(c.ytd)}</td>
-      <td data-col="delta" className={cn("whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
-        {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
-        {fmt.displayValue}
+      <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right">
+        <CambioCelda c={c} />
       </td>
       <td data-col="ultima" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{c.ultima || "—"}</td>
     </tr>
@@ -1166,7 +1117,6 @@ function ClienteCard({
   showEmpresa: boolean;
   onTap: () => void;
 }) {
-  const fmt = formatDeltaRatio(c.delta);
   return (
     <div
       data-fila-cliente={`${c.empresaKey}|${c.id}`}
@@ -1221,10 +1171,7 @@ function ClienteCard({
           <div data-col="ytd-compacto" className="font-mono text-base font-medium tabular-nums text-gray-950">
             {fmtMoney(c.ytd)}
           </div>
-          <div data-col="delta" className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
-            {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
-            {fmt.displayValue}
-          </div>
+          <CambioCelda c={c} />
           <div data-col="ultima" className="ml-auto truncate text-xs text-gray-500">
             {c.ultima || "—"}
           </div>

@@ -361,7 +361,14 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     // días después del corte dejó de ser una columna neta y entró en las
     // columnas de siempre (la contadora: *«valen diferente»*); esa hoja es el
     // detalle por concepto y SOLO nace cuando hay ajuste. Sube A PROPÓSITO.
-    expect(total).toBe(28);
+    //
+    // 🔁 29 desde el 11-sep-2026: **la hoja del Resumen de Ventas en modo
+    // Utilidad** (`buildUtilidadSheet`, en `src/lib/ventas/excel.ts`). El botón
+    // «Descargar en Excel» del Resumen baja LO QUE ESTÁ EN PANTALLA (Daniel lo
+    // aprobó sobre el mockup): en Ventas es el archivo de siempre, byte a byte;
+    // en Utilidad, la utilidad de cada mes con el margen del año. Sube A
+    // PROPÓSITO: una hoja que antes no existía, no una que se duplicó.
+    expect(total).toBe(29);
   });
 });
 

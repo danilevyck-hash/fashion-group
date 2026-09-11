@@ -99,21 +99,26 @@ describe("3 · 🔴 un solo control segmentado en todo el módulo", () => {
     // Escritorio y celular decían las mismas palabras, pero nada lo garantizaba.
     expect(fuentes.resumen).toContain("export const MODO_OPCIONES");
     expect(fuentes.resumenMovil).toContain("MODO_OPCIONES");
-    expect(fuentes.resumenMovil).toContain("GRANULARIDAD_OPCIONES");
+    // 🔁 11-sep-2026: «Mensual · Trimestral · Anual» se retiró de las DOS
+    // caras (queda la matriz mensual; el detalle anual se abre tocando la
+    // empresa). Ni la lista ni un literal con esas palabras pueden volver.
+    expect(fuentes.resumen).not.toContain("GRANULARIDAD_OPCIONES");
+    expect(fuentes.resumenMovil).not.toContain("GRANULARIDAD_OPCIONES");
     // 🔴 Y las PASA tal cual, sin rearmarlas: la mutación barata es escribir
     // un array literal con las mismas palabras, que hoy coincide y mañana no.
     expect(fuentes.resumenMovil).toContain("options={MODO_OPCIONES}");
-    expect(fuentes.resumenMovil).toContain("options={GRANULARIDAD_OPCIONES}");
     expect(fuentes.resumenMovil).not.toMatch(/value:\s*"trimestral"/);
     expect(fuentes.resumenMovil).not.toMatch(/label:\s*"Utilidad"/);
   });
 
-  it("⚠️ las píldoras de EMPRESA se quedan como píldoras, y no es un olvido", () => {
-    // Son SIETE opciones y envuelven en dos líneas: un segmentado de siete a
-    // 390 px aprieta los nombres hasta partirlos. No son la misma clase de
-    // control.
-    expect(fuentes.clientes).toContain("EMPRESA_PILLS");
-    expect(fuentes.clientes).toContain("flex flex-wrap gap-1.5");
+  // 🔁 CAMBIÓ DE DIRECCIÓN el 11-sep-2026. Decía que las píldoras de empresa
+  // de Clientes se quedaban como píldoras (siete opciones que envuelven).
+  // Daniel eligió el desplegable («B»): en el celular eran cuatro líneas antes
+  // del primer cliente. Es el mismo `Select` del resto del sistema.
+  it("🔁 el filtro de EMPRESA de Clientes es un desplegable, no siete píldoras", () => {
+    expect(fuentes.clientes).not.toContain("EMPRESA_PILLS");
+    expect(fuentes.clientes).toContain("data-empresa-clientes");
+    expect(fuentes.clientes).toContain("opcionesEmpresaClientes()");
   });
 });
 
@@ -258,9 +263,12 @@ describe("8 · 🔴 las DOS vistas del Resumen muestran los mismos bloques", () 
     { nombre: "tarjeta de Margen",        escritorio: /margenYTD/,                 celular: /margenYTD/ },
     { nombre: "tarjeta Cierre del año",   escritorio: /CIERRE DEL AÑO/,            celular: /Cierre del año/ },
     { nombre: "explicación del cierre",   escritorio: /explicacionProyeccionGrupo/, celular: /explicacionProyeccionGrupo/ },
-    { nombre: "control Ventas/Utilidad/Margen", escritorio: /MODO_OPCIONES/,       celular: /MODO_OPCIONES/ },
-    { nombre: "control Mensual/Trim/Anual",     escritorio: /GRANULARIDAD_OPCIONES/, celular: /GRANULARIDAD_OPCIONES/ },
-    { nombre: "vista Anual",              escritorio: /<ResumenAnual/,             celular: /<ResumenAnual/ },
+    { nombre: "control Ventas/Utilidad",  escritorio: /MODO_OPCIONES/,             celular: /MODO_OPCIONES/ },
+    // 🔁 11-sep-2026: «control Mensual/Trim/Anual» y «vista Anual» salieron de
+    // las DOS caras a la vez (ver abajo, que exige que no vuelvan en ninguna).
+    { nombre: "botón Descargar en Excel", escritorio: /ROTULO_DESCARGAR_EXCEL/,    celular: /ROTULO_DESCARGAR_EXCEL/ },
+    { nombre: "el corte del costo del mes en curso", escritorio: /pieCorteCosto/,  celular: /pieCorteCosto/ },
+    { nombre: "el margen chico bajo la utilidad", escritorio: /data-margen-celda/, celular: /data-margen-celda/ },
     { nombre: "proyección por empresa",   escritorio: /buildSlotsProyeccion/,      celular: /buildSlotsProyeccion/ },
     { nombre: "detalle de la celda",      escritorio: /buildSlotsMetrica/,         celular: /buildSlotsMetrica/ },
     { nombre: "nota de mayoreo de Multifashion", escritorio: /multiMayoreoNota/,   celular: /multiMayoreoNota/ },
@@ -274,6 +282,14 @@ describe("8 · 🔴 las DOS vistas del Resumen muestran los mismos bloques", () 
       expect(b.celular.test(fuentes.resumenMovil), `falta en el CELULAR`).toBe(true);
     });
   }
+
+  it("🔁 Trimestral, Anual y Margen % se fueron de las DOS caras, no de una", () => {
+    for (const k of ["resumen", "resumenMovil"] as const) {
+      expect(fuentes[k], `${k} conserva Trimestral`).not.toMatch(/trimestral/i);
+      expect(fuentes[k], `${k} conserva Anual`).not.toContain("<ResumenAnual");
+      expect(fuentes[k], `${k} conserva el modo margen`).not.toMatch(/value:\s*"margen"/);
+    }
+  });
 
   it("🔴 el celular NO abrevia la plata en millones (diccionario § 0, #7)", () => {
     // Decía «$6.27M» donde el escritorio decía «$6,270,375.73»: el mismo total

@@ -173,7 +173,8 @@ describe("costos — el CIF es real, el FOB SOLO derivado y etiquetado (decisió
     // La fila de plata vive en ReferenciaTarjeta.tsx desde el 12-ago-2026 (el
     // modo pedido reusa el cuerpo); se barren las TRES piezas de la vista.
     const vista = ["ReferenciaTarjeta.tsx", "ReferenciaView.tsx", "ReferenciaTablaPedido.tsx"]
-      .map((f) => fs.readFileSync(path.resolve(process.cwd(), "src/components/ventas", f), "utf8"))
+      // 🔁 11-sep-2026: Referencia se mudó a su carpeta (`components/referencia/`).
+      .map((f) => fs.readFileSync(path.resolve(process.cwd(), "src/components/referencia", f), "utf8"))
       .join("\n");
     const codigo = vista
       .split("\n")

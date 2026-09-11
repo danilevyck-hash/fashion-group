@@ -88,8 +88,10 @@ describe("a la matriz se le bajó el piso para que entre de verdad en su tramo",
   });
 
   it("NINGÚN texto se abrevió: los encabezados siguen enteros", () => {
-    expect(matriz).toContain(">Total</th>");
-    expect(matriz).toContain(">Proyección</th>");
+    // 🔁 11-sep-2026: Total y Proyección van FIJAS a la derecha y su `<th>`
+    // lleva atributos en varias líneas; el texto sigue entero.
+    expect(matriz).toMatch(/>\s*Total\s*<\/th>/);
+    expect(matriz).toMatch(/>\s*Proyección\s*<\/th>/);
     expect(matriz).toContain(">\n                  Empresa\n                </th>");
   });
 });

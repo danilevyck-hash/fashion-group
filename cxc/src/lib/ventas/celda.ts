@@ -17,6 +17,9 @@ export interface CeldaBase {
   ventasPrev: number;
   utilidad: number | null;
   utilidadPrev: number;
+  /** 🔴 La base del MARGEN cuando no es `ventas` (11-sep-2026): en el mes en
+   *  curso es la venta hasta el último día con costo. Ausente = `ventas`. */
+  ventasMargen?: number | null;
 }
 
 // Por debajo de $100 de ventas el ratio utilidad/ventas no es informativo
@@ -30,11 +33,13 @@ export function marginRatio(ventas: number, utilidad: number): number | null {
 }
 
 /** Valor de la celda en el modo activo. Margen: ratio 0..1, o null sin base. */
-export function cellValue(c: Pick<CeldaBase, "ventas" | "utilidad">, mode: ViewMode): number | null {
+export function cellValue(c: Pick<CeldaBase, "ventas" | "utilidad" | "ventasMargen">, mode: ViewMode): number | null {
   if (c.ventas == null || c.utilidad == null) {
     return mode === "margen" ? null : (mode === "utilidad" ? c.utilidad : c.ventas);
   }
-  if (mode === "margen") return marginRatio(c.ventas, c.utilidad);
+  // El margen se divide por su BASE: en el mes en curso, la venta hasta el
+  // último día con costo (ver `margen-mes-en-curso.ts`). Nunca por la de hoy.
+  if (mode === "margen") return marginRatio(c.ventasMargen ?? c.ventas, c.utilidad);
   if (mode === "utilidad") return c.utilidad;
   return c.ventas;
 }

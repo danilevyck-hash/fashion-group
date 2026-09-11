@@ -23,8 +23,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
   }
 
+  // 🔴 «Últimos 12 / 6 meses» (11-sep-2026): el selector único de período de
+  // Ventas. Cualquier otro valor = el año. Si la vista no trae la ventana, el
+  // servidor sirve el año y lo DICE en la respuesta (`ventana: null`).
+  const ventanaRaw = req.nextUrl.searchParams.get("ventana");
+  const ventana: 6 | 12 | null = ventanaRaw === "12" ? 12 : ventanaRaw === "6" ? 6 : null;
+
   try {
-    const clientes = await fetchClientes({ year, empresaKey: empresa });
+    const clientes = await fetchClientes({ year, empresaKey: empresa, ventana });
     return NextResponse.json(clientes);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "error inesperado";

@@ -11,18 +11,28 @@ import { ventanaUnAnioAntes, type VentanaComparativa } from "@/lib/ventas/client
 // importa, no se copia: este repo ya pagó dos veces por agrupar en UTC (el borde
 // de mes de Multifashion y el día de las marcaciones del reloj).
 import { hoyPanama } from "@/lib/fecha-panama";
+import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 
-// Las 7 empresas con switch_articulo_diario poblado (todo el grupo menos
-// Confecciones Boston, que no se backfilleó). Default Fashion Wear.
-export const PRODUCTOS_EMPRESAS: { key: string; nombre: string }[] = [
-  { key: "fashion_wear", nombre: "Fashion Wear" },
-  { key: "vistana", nombre: "Vistana International" },
-  { key: "fashion_shoes", nombre: "Fashion Shoes" },
-  { key: "active_shoes", nombre: "Active Shoes" },
-  { key: "active_wear", nombre: "Active Wear" },
-  { key: "joystep", nombre: "Joystep" },
-  { key: "american_classic", nombre: "Multifashion" },
-];
+// 🔴 LAS SEIS DE FASHION GROUP, Y NADA MÁS (11-sep-2026). Default Fashion Wear.
+//
+// 🩸 Acá había SIETE, con Multifashion, y el comentario decía que Boston «no se
+// backfilleó». Las dos cosas se midieron el 11-sep-2026 y las dos estaban mal:
+//   · Multifashion (`american_classic`) SÍ tiene `switch_articulo_diario`, pero
+//     NO tiene ni una fila en `switch_factura_lineas`: en esta pestaña su
+//     «Quién lo compra» y su filtro por cliente salían SIEMPRE vacíos, con un
+//     mensaje genérico. Y esa misma información —qué se vende más, por período—
+//     vive completa en su propio módulo (`/multifashion`, pestaña Productos).
+//     Daniel: sacarla de aquí.
+//   · Boston tiene 18.186 renglones desde el 14-oct-2022 y 520 descripciones en
+//     2026 — más que cualquiera del grupo. Se le preguntó a Daniel si entraba
+//     al selector: **«NO»**. Boston se queda afuera por decisión, no por dato.
+//
+// Deriva de `B2B_EMPRESA_KEYS` (las 6 del grupo) — nunca una lista escrita a
+// mano, que es como Multifashion entró y Joystep faltó en otras pantallas.
+export const PRODUCTOS_EMPRESAS: { key: string; nombre: string }[] = B2B_EMPRESA_KEYS.map((key) => ({
+  key,
+  nombre: nombreCortoEmpresa(key),
+}));
 
 export const PRODUCTOS_EMPRESA_KEYS = PRODUCTOS_EMPRESAS.map(e => e.key);
 export const DEFAULT_PRODUCTOS_EMPRESA = "fashion_wear";

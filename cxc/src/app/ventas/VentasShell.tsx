@@ -1,26 +1,39 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useUrlState } from "@/lib/hooks/useUrlState";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Contact, Package } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import dynamic from "next/dynamic";
 import { PullToRefresh } from "@/components/ui";
 import AppHeader from "@/components/AppHeader";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
+import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 import {
-  alcanceDeLaPestana,
   esModoClientes,
   esTabVentas,
+  modoHeredado,
   tabHeredado,
   type ModoClientes,
 } from "@/lib/ventas/pestanas";
+import {
+  MEMORIA_PERIODO_VENTAS,
+  PARAM_PERIODO_VENTAS,
+  anioDelPeriodo,
+  opcionesPeriodo,
+  periodoAUrl,
+  periodoDesdeUrl,
+  resolverPeriodo,
+  ventanaParaClientes,
+  type CapacidadesPeriodo,
+  type PeriodoVentas,
+} from "@/lib/ventas/periodo";
 
 // Tabs cargados LAZY: cada vista va en su propio chunk y solo se descarga al
 // activarse su tab → fuera del bundle inicial de /ventas. Skeleton mientras
@@ -48,20 +61,14 @@ const ProductosView = dynamic(
 // ⛔ ACÁ VIVÍAN `UtilidadView` y `ComisionesView`, LAS PESTAÑAS 4 Y 5 (retiradas
 // el 5-sep-2026). Cinco pestañas pasaron a TRES: Resumen · Clientes · Productos.
 //
-// 🔴 UTILIDAD NO SE BORRÓ: es un MODO de Clientes. La pestaña respondía la
-// misma pregunta que Clientes —quién compra— con otras columnas, y tenerlas
-// separadas obligaba a buscar al mismo cliente dos veces. Ahora Clientes trae
-// el mismo control segmentado que el Resumen (Ventas · Utilidad · Margen %) y
-// `UtilidadView` se MONTA desde adentro: se reusa, no se reescribió.
-// `?tab=utilidad` llega a `?tab=clientes&modo=utilidad` (ver `tabHeredado`).
+// 🔴 UTILIDAD NO SE BORRÓ: es un MODO de Clientes. `UtilidadView` se MONTA
+// desde adentro de Clientes. `?tab=utilidad` llega a `?tab=clientes&modo=
+// utilidad` (ver `tabHeredado`).
 //
-// 🔴 COMISIONES SE FUE A SU MÓDULO, COMPLETO. Daniel, 5-sep-2026: *«si
-// quitala»*. La pestaña montaba `ComisionesView` SIN `conConfiguracion`, o sea
-// una versión recortada de la pantalla que `/comisiones` ya sirve entera — y
-// que la secretaria y contabilidad solo pueden ver ahí, porque /ventas es
-// admin-only. `/ventas?tab=comisiones` se redirige en `next.config.js`.
+// 🔴 COMISIONES SE FUE A SU MÓDULO, COMPLETO (`/comisiones`; Daniel, 5-sep-2026:
+// *«si quitala»*). `/ventas?tab=comisiones` se redirige en `next.config.js`.
 
-// Bundle del tab Resumen: las 3 lecturas que dependen del año seleccionado.
+// Bundle del tab Resumen: las 3 lecturas que dependen del PERÍODO elegido.
 //
 // CADA LECTURA ES INDEPENDIENTE. Antes las 3 iban en un Promise.all que rechazaba
 // si CUALQUIERA fallaba, así que un 500 transitorio en /api/multifashion/overview
@@ -76,11 +83,11 @@ interface VentasBundle {
   clientesError: string | null;
 }
 
-// Fetcher keyed por año. NUNCA rechaza: reintenta cada endpoint por separado
+// Fetcher keyed por período. NUNCA rechaza: reintenta cada endpoint por separado
 // (fetchJsonWithRetry, 3 intentos con backoff corto — los timeouts de statement
 // de Postgres en caché fría se curan solos al segundo intento) y devuelve lo que
 // haya logrado traer. Lo que falló definitivamente viaja como mensaje.
-async function fetchVentasBundle(year: number): Promise<VentasBundle> {
+async function fetchVentasBundle(periodo: PeriodoVentas, anioEnCurso: number): Promise<VentasBundle> {
   const settle = async <T,>(p: Promise<T>): Promise<[T, null] | [null, string]> => {
     try {
       return [await p, null];
@@ -89,9 +96,14 @@ async function fetchVentasBundle(year: number): Promise<VentasBundle> {
     }
   };
 
+  const year = anioDelPeriodo(periodo, anioEnCurso);
+  const ventana = ventanaParaClientes(periodo);
   const [[resumen, resumenError], [clientes, clientesError], [multi]] = await Promise.all([
     settle(fetchJsonWithRetry<VentasResumen>(`/api/ventas/resumen?year=${year}`)),
-    settle(fetchJsonWithRetry<Clientes>(`/api/ventas/clientes-12m?year=${year}`)),
+    // 🔴 La ventana viaja solo cuando el período es una: el año, sin parámetro.
+    settle(fetchJsonWithRetry<Clientes>(
+      `/api/ventas/clientes-12m?year=${year}${ventana ? `&ventana=${ventana}` : ""}`,
+    )),
     // Multifashion overview: SOLO alimenta el indicador de mayoreo de la fila
     // Multifashion. Su fallo se traga en silencio — nunca debe apagar el Resumen.
     settle(fetchJsonWithRetry<Multifashion>(`/api/multifashion/overview?year=${year}`)),
@@ -101,7 +113,10 @@ async function fetchVentasBundle(year: number): Promise<VentasBundle> {
 }
 
 interface VentasShellProps {
+  /** El año en curso de PANAMÁ (lo calcula la página con `hoyPanama`). */
   year: number;
+  /** El período que el servidor ya armó (`periodoAUrl`): con ese no se pide de nuevo. */
+  periodoServidor: string;
   availableYears: number[];
   resumen: VentasResumen | null;
   clientes: Clientes | null;
@@ -116,54 +131,89 @@ interface VentasShellProps {
 }
 
 export function VentasShell({
-  year: initialYear,
+  year: anioEnCurso,
+  periodoServidor,
   availableYears,
   resumen: initialResumen,
   clientes: initialClientes,
   multi: initialMulti,
   avisoMontos,
 }: VentasShellProps) {
-  const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState(initialYear);
-  // Tab activo en la URL (?tab=resumen|clientes) para que refresh, back/forward
-  // y compartir-link mantengan dónde estaba el usuario. Multifashion se separó
-  // a su propio módulo (/multifashion); Ventas queda con Resumen + Clientes.
+  // Tab activo en la URL (?tab=resumen|clientes|productos) para que refresh,
+  // back/forward y compartir-link mantengan dónde estaba el usuario.
   //
   // Un ?tab= desconocido cae en la pestaña por defecto, NUNCA en blanco (misma
-  // convención que /admin, /asistencia y el Depurador): Radix no dibuja nada si
-  // el `value` no tiene trigger, así que sin este filtro un enlace viejo dejaba
-  // la pantalla vacía. `?tab=referencia` además se redirige a /referencia en
-  // next.config.js — esto es la red de abajo, no el camino principal.
+  // convención que /cxc, /asistencia y el Depurador): Radix no dibuja nada si
+  // el `value` no tiene trigger. `?tab=referencia` y `?tab=comisiones` se
+  // redirigen en next.config.js — esto es la red de abajo, no el camino.
   const [tabRaw, setTab] = useUrlState("tab", "resumen");
-  // El MODO de la pestaña Clientes (Ventas · Utilidad · Margen %). Vive en la
-  // URL igual que el tab para que un enlace guardado abra la misma vista.
+  // El MODO de la pestaña Clientes (Ventas · Utilidad). Vive en la URL igual
+  // que el tab para que un enlace guardado abra la misma vista.
   const [modoRaw, setModo] = useUrlState("modo", "ventas");
   // `?tab=utilidad` es la pestaña que se retiró: hoy es un MODO de Clientes.
   // Se traduce acá y no con un redirect de `next.config.js` porque el destino
-  // es la MISMA ruta con la MISMA clave `tab`: Next arrastra la query original
-  // al destino, el redirect volvería a matchear su propia salida y el navegador
-  // giraría en redondo. Traducir es lo único que no puede hacer un bucle.
+  // es la MISMA ruta con la MISMA clave `tab`: un redirect volvería a matchear
+  // su propia salida y el navegador giraría en redondo. `?modo=margen` (el modo
+  // que se fue el 11-sep-2026) llega a `utilidad` por el mismo camino.
   const heredado = tabHeredado(tabRaw);
   const tab = heredado?.tab ?? (esTabVentas(tabRaw) ? tabRaw : "resumen");
-  const modo: ModoClientes = heredado?.modo ?? (esModoClientes(modoRaw) ? modoRaw : "ventas");
+  const modoViejo = modoHeredado(modoRaw);
+  const modo: ModoClientes = heredado?.modo ?? modoViejo ?? (esModoClientes(modoRaw) ? modoRaw : "ventas");
 
   // La URL se normaliza UNA vez, sin entrada de historial: el enlace viejo
   // queda convertido en el nuevo y el Back no cicla entre los dos.
   useEffect(() => {
-    if (!heredado) return;
-    setTab(heredado.tab);
-    setModo(heredado.modo);
-  }, [heredado, setTab, setModo]);
+    if (heredado) {
+      setTab(heredado.tab);
+      setModo(heredado.modo);
+    } else if (modoViejo) {
+      setModo(modoViejo);
+    }
+  }, [heredado, modoViejo, setTab, setModo]);
 
-  // Lo que ya armó el server component, para el año inicial. Memoizado porque
-  // su REFERENCIA es la señal de "el servidor mandó datos nuevos" que usa
-  // `useSembrarDelServidor`; recrearlo en cada render lo dispararía siempre.
+  // ── 🔴 EL ÚNICO SELECTOR DE PERÍODO (11-sep-2026) ─────────────────────────
+  // Vive en la URL (`?periodo=`, mismo nivel → replace) y se recuerda por
+  // usuario. La URL manda; sin URL, lo último elegido; sin nada, el año en
+  // curso. Lo que la pestaña no sepa servir cae al año en curso — ver
+  // `src/lib/ventas/periodo.ts`, donde está el porqué de cada regla.
+  const [periodoUrl, setPeriodoUrl] = useUrlState(PARAM_PERIODO_VENTAS, "");
+  const [periodoMemoria, setPeriodoMemoria] = useLastUsed(MEMORIA_PERIODO_VENTAS, "");
+
+  // Lo que se pidió (URL o memoria), ANTES de ajustarlo a la pestaña: la
+  // llave de la caché. Así «Últimos 12 meses» no se pierde por pasar un
+  // momento por el Resumen, que no lo sirve.
+  const pedido = useMemo<PeriodoVentas>(
+    () => periodoDesdeUrl(periodoUrl) ?? periodoDesdeUrl(periodoMemoria) ?? { tipo: "anio", anio: anioEnCurso },
+    [periodoUrl, periodoMemoria, anioEnCurso],
+  );
+
+  // Las ventanas que la vista de Clientes sabe servir las dice el SERVIDOR con
+  // la primera respuesta (`ventanasDisponibles`); mientras no se sepa, ninguna.
+  const capSemilla = initialClientes?.ventanasDisponibles ?? [];
+
+  const onPeriodoChange = useCallback((valor: string) => {
+    const p = periodoDesdeUrl(valor);
+    if (!p) return;
+    setPeriodoUrl(periodoAUrl(p));
+    setPeriodoMemoria(periodoAUrl(p));
+  }, [setPeriodoUrl, setPeriodoMemoria]);
+
+  // El bundle se pide por lo PEDIDO; cada pestaña toma de ahí lo que sabe
+  // servir (el Resumen mira el año del período; Clientes, la ventana si la
+  // vista la trae). Al pedir «Últimos 12 meses», el Resumen ve el año en curso
+  // —que es lo que `anioDelPeriodo` devuelve para una ventana— sin otra lectura.
+  const keyPeriodo = periodoAUrl(pedido);
+  const esPeriodoInicial = keyPeriodo === periodoServidor;
+
+  // Lo que ya armó el server component, para el período inicial. Memoizado
+  // porque su REFERENCIA es la señal de "el servidor mandó datos nuevos" que
+  // usa `useSembrarDelServidor`; recrearlo en cada render lo dispararía siempre.
   //
   // La condición `&& initialResumen` se conserva tal cual: si el SSR del resumen
   // falló, la pantalla NO tiene datos del servidor y tiene que pedirlos.
   const delServidor = useMemo<VentasBundle | undefined>(
     () =>
-      selectedYear === initialYear && initialResumen
+      esPeriodoInicial && initialResumen
         ? {
             resumen: initialResumen,
             clientes: initialClientes,
@@ -172,21 +222,19 @@ export function VentasShell({
             clientesError: null,
           }
         : undefined,
-    [selectedYear, initialYear, initialResumen, initialClientes, initialMulti],
+    [esPeriodoInicial, initialResumen, initialClientes, initialMulti],
   );
 
-  // Bundle del Resumen cacheado por SWR, keyed por el año → cada año cachea por
-  // separado y volver a un año ya visto pinta al instante (sin re-fetch). El
-  // dato del SSR solo aplica al año inicial (no servir el initial de un año
-  // distinto). dedupe 5min + sin revalidar al volver a la pestaña (módulo
-  // pesado). La caché vive a nivel app (SWRProvider).
+  // Bundle cacheado por SWR, keyed por el período → cada período cachea por
+  // separado y volver a uno ya visto pinta al instante (sin re-fetch). El dato
+  // del SSR solo aplica al período inicial. dedupe 5min + sin revalidar al
+  // volver a la pestaña (módulo pesado). La caché vive a nivel app (SWRProvider).
   //
   // 🔑 `opcionesDelServidor` es lo que evita pedir de nuevo los 3 endpoints que
-  // el servidor ACABA de resolver (2.150 ms de base de datos por visita). Al
-  // cambiar de año no hay dato del servidor → SWR pide, como siempre.
+  // el servidor ACABA de resolver (2.150 ms de base de datos por visita).
   const { data, isLoading, mutate } = useSWR<VentasBundle>(
-    ["ventas-bundle", selectedYear],
-    () => fetchVentasBundle(selectedYear),
+    ["ventas-bundle", keyPeriodo],
+    () => fetchVentasBundle(pedido, anioEnCurso),
     {
       dedupingInterval: 5 * 60_000,
       revalidateOnFocus: false,
@@ -197,43 +245,37 @@ export function VentasShell({
   // Que un render nuevo del servidor gane sobre lo que quedó en caché (sin red).
   useSembrarDelServidor(mutate, delServidor);
 
-  // Red de seguridad: si el refetch del año inicial falló pero el SSR sí trajo
-  // data, se sigue mostrando la del SSR (stale) en vez de una pantalla de error.
-  const isInitialYear = selectedYear === initialYear;
-  const resumen = data?.resumen ?? (isInitialYear ? initialResumen : null);
-  const clientes = data?.clientes ?? (isInitialYear ? initialClientes : null);
-  const multi = data?.multi ?? (isInitialYear ? initialMulti : null);
+  // Red de seguridad: si el refetch del período inicial falló pero el SSR sí
+  // trajo data, se sigue mostrando la del SSR (stale) en vez de un error.
+  const resumen = data?.resumen ?? (esPeriodoInicial ? initialResumen : null);
+  const clientes = data?.clientes ?? (esPeriodoInicial ? initialClientes : null);
+  const multi = data?.multi ?? (esPeriodoInicial ? initialMulti : null);
   // "Cargando" solo cuando aún no hay nada que mostrar (deshabilita el selector).
   const loading = isLoading && !data;
   // Banner ámbar de "data vieja": solo cuando hay algo que mostrar Y el último
   // refresh falló. Si no hay nada que mostrar, manda el ErrorState del tab.
   const fetchError = resumen ? (data?.resumenError ?? null) : null;
 
-  const onYearChange = useCallback((year: number) => {
-    if (year === selectedYear) return;
-    // Cambiar el año cambia la key del useSWR → SWR dispara el fetch del año
-    // nuevo (o sirve su caché). No se llama a ningún loader manual.
-    setSelectedYear(year);
-  }, [selectedYear]);
+  // Las ventanas que Clientes sabe servir HOY: lo dijo la última respuesta.
+  const cap = useMemo<CapacidadesPeriodo>(
+    () => ({ clientesVentanas: clientes?.ventanasDisponibles ?? capSemilla }),
+    [clientes, capSemilla],
+  );
 
-  // Pull-to-refresh (mobile): revalida el año actual sin cambiarlo.
+  // Lo que se MUESTRA en esta pestaña: lo pedido, ajustado a lo que sabe servir.
+  const periodo = resolverPeriodo({ url: periodoUrl, memoria: periodoMemoria, tab, anioEnCurso, cap });
+  const selectedYear = anioDelPeriodo(periodo, anioEnCurso);
+  const isClosedYear = selectedYear < anioEnCurso;
+
+  const opciones = useMemo(
+    () => opcionesPeriodo({ tab, anios: availableYears, anioEnCurso, cap }),
+    [tab, availableYears, anioEnCurso, cap],
+  );
+
+  // Pull-to-refresh (mobile): revalida el período actual sin cambiarlo.
   const onRefresh = useCallback(async () => {
     await mutate();
   }, [mutate]);
-
-  const isClosedYear = selectedYear < currentYear;
-  // resumen.mesActual (1-indexed) = último mes con data en el año en curso.
-  // Semánticamente es el "mes en curso" (data parcial cargada). El mes
-  // cerrado inmediatamente anterior es mesActual - 1.
-  //   mesActual = 5 (May) → "cierre Abr (mes en curso May)"
-  //   mesActual = 1 (solo Ene)  → "mes en curso Ene" (no hay cerrado en este año)
-  const mesesLabel = isClosedYear
-    ? "año cerrado"
-    : (resumen && resumen.mesActual > 0
-        ? (resumen.mesActual >= 2
-            ? `cierre ${MES_SHORT[resumen.mesActual - 2]} (mes en curso ${MES_SHORT[resumen.mesActual - 1]})`
-            : `mes en curso ${MES_SHORT[resumen.mesActual - 1]}`)
-        : "sin cierres aún");
 
   return (
     <>
@@ -244,65 +286,29 @@ export function VentasShell({
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       {/* Page head — `relative z-20` para garantizar stacking context propio
           encima del TabsList (que tiene overflow-x-auto y crea su propio
-          stacking en algunos browsers, tapando los buttons del header en
-          viewports angostos). Sin esto, el botón Excel no respondía a click
-          en producción. */}
-      <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          {/* Sin título grande: "Ventas" ya lo dicen la barra sticky (celular)
-              y el breadcrumb (escritorio). Queda sr-only para no dejar la
-              página sin encabezado. El subtítulo se QUEDA: dice qué universo y
-              qué meses se están mirando, que no está en ningún otro lado. */}
-          <h1 className="sr-only">Ventas</h1>
-          {/* 🔴 CADA PESTAÑA DICE LAS SUYAS, y hasta hoy las tres decían «8».
-              Es la misma clase de error que el subtítulo de Comisiones: un
-              encabezado que promete ocho arriba de una tabla de seis hace
-              buscar las dos que faltan.
-
-              · Resumen son las OCHO: la matriz las lista una por una.
-              · Clientes son las SEIS de Fashion Group (`B2B_EMPRESA_KEYS`) —
-                Boston y Multifashion tienen sus clientes en su propio módulo—
-                y en Utilidad/Margen son esas seis menos las que no llevan
-                utilidad, que la propia vista declara con su número real.
-              · Productos se mira de a UNA empresa, elegida adentro. */}
-          <p data-alcance-pestana className="text-xs text-gray-500">
-            {alcanceDeLaPestana(tab, mesesLabel)}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Bug #1 fix: selector año visible desde cualquier tab (antes solo
-              en Resumen). State global ya existía — solo cambio de placement. */}
-          {/* iPhone: el trigger medía 88×36 — por debajo de los 44 de alto de la
-              regla táctil. h-11 = 44px exactos. En desktop solo crece 8px. */}
-          {/* 🔴 EN PRODUCTOS NO SE DIBUJA: esa pantalla trae su propio selector
-              de período, y tres de sus cuatro opciones («Últimos 6 meses»,
-              «Últimos 12 meses», «Año pasado») se cuentan desde HOY y NO miran
-              este año. Dos controles de tiempo, uno inerte, es cómo se lee un
-              número de un año creyendo que es de otro. */}
-          {tab !== "productos" && (
-          <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
-            <SelectTrigger className="h-11 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {availableYears.map(y => (
-                <SelectItem key={y} value={String(y)} className="font-mono tabular-nums">
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          )}
-          {/* ⛔ ACÁ VIVÍA EL BOTÓN «Excel» DE LA BARRA, Y NO ERA EL DEL MÓDULO:
-              era el del RESUMEN (`exportResumenToExcel`), puesto al lado del
-              año. Desde Clientes o desde Productos bajaba la matriz de empresas
-              × meses — un archivo que no tenía nada que ver con lo que se
-              estaba mirando.
-
-              🔴 Ahora cada pestaña trae el suyo ADENTRO, como ya lo hacían
-              Productos y Utilidad, y cada uno baja LO QUE ESTÁS VIENDO con los
-              filtros puestos. Clientes ganó el que le faltaba
-              (`clientes-excel.ts`). Candado: `ventas-tres-pestanas.test.tsx`. */}
+          stacking en algunos browsers, tapando los controles del header en
+          viewports angostos). */}
+      <header className="relative z-20 mb-5 flex flex-wrap items-center justify-between gap-3">
+        {/* Sin título grande: "Ventas" ya lo dicen la barra sticky (celular)
+            y el breadcrumb (escritorio). Queda sr-only para no dejar la
+            página sin encabezado. */}
+        <h1 className="sr-only">Ventas</h1>
+        {/* ⛔ ACÁ IBA «8 empresas · cierre Ago (mes en curso Sep)» (y «6
+            empresas · …», «una empresa a la vez»). Se retiró el 11-sep-2026: la
+            matriz lista las ocho empresas una por una y abajo dice hasta qué
+            día llegan los datos; un contador encima de una tabla que ya cuenta
+            era una línea de más. */}
+        {/* 🔴 EL ÚNICO SELECTOR DE PERÍODO, arriba, que manda en las tres
+            pestañas (11-sep-2026). Reemplaza al año suelto de acá, al
+            desplegable «Clientes: últimos 12 meses» y al «Período» propio de
+            Productos. Cada pestaña ofrece solo lo que sabe servir. */}
+        <div data-selector-periodo-ventas className="flex flex-wrap items-center gap-2">
+          <PeriodoSelect
+            valor={periodoAUrl(periodo)}
+            opciones={opciones}
+            onChange={onPeriodoChange}
+            disabled={loading}
+          />
         </div>
       </header>
 
@@ -311,23 +317,14 @@ export function VentasShell({
           venta y el margen, así que se dice UNA vez para las TRES. Sin
           rechazos no se dibuja nada.
           ⚠️ Es la familia factura/utilidad/costo/artículo. Los COBROS son otra
-          familia (`recibo`) y su aviso se fue con la pestaña Comisiones, a
-          `/comisiones`, que ya lo pedía por su cuenta. Nunca se fusionan: la
-          comisión sobre cobro lee `switch_recibos`. */}
+          familia (`recibo`) y su aviso vive en `/comisiones`. */}
       <AvisoRechazosSwitch texto={avisoMontos} className="mb-4" />
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        {/* 🩸 LOS px QUE SOBRABAN EN LA TIRA. No era ninguna tabla: era esta
-            tira. Con CINCO pestañas pedía más ancho del que tiene un iPhone, y
-            por eso el icono está escondido bajo `sm` (cuesta 20 px por pestaña
-            y es decorativo: el texto dice lo mismo) y la letra baja a 13 px.
-
-            🔴 CON TRES SOBRA ANCHO, y aun así NO se revirtió nada (5-sep-2026).
-            Medido a 390 px: «Resumen · Clientes · Productos» son 8+8+9 letras
-            contra las 8+8+9+8+10 de antes, así que la tira entra de sobra con
-            los valores que ya estaban — y devolverle el icono o el relleno
-            grande sería volver a acercarse al borde por gusto, en la pantalla
-            donde Daniel de verdad la usa. Desde `sm` no cambia nada. */}
+        {/* 🩸 LOS px QUE SOBRABAN EN LA TIRA. Con CINCO pestañas pedía más
+            ancho del que tiene un iPhone; por eso el icono está bajo `sm` y la
+            letra baja a 13 px. Con TRES sobra ancho y aun así NO se revirtió
+            nada (5-sep-2026). Desde `sm` no cambia nada. */}
         <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
           <TabsTrigger value="resumen" className={TAB_TRIGGER_CLASS}>
             <TrendingUp className="hidden h-3.5 w-3.5 sm:block" /> Resumen
@@ -345,45 +342,38 @@ export function VentasShell({
             <ResumenView
               data={resumen}
               multi={multi}
-              availableYears={availableYears}
               selectedYear={selectedYear}
               isClosedYear={isClosedYear}
               loading={loading}
               error={fetchError}
-              onYearChange={onYearChange}
               onReloadData={() => mutate()}
             />
           ) : <ErrorState scope="resumen" detail={data?.resumenError ?? null} onRetry={() => mutate()} />}
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
           {clientes ? (
-            // key={selectedYear} fuerza remount al cambiar año — resetea state
-            // interno (search, pill, sort) que asume el universo del año cargado.
+            // key={período} fuerza remount al cambiar el período — resetea
+            // state interno (search, empresa, sort) que asume el universo cargado.
             //
             // ⚠️ El MODO no entra en la `key`: cambiar de Ventas a Utilidad es
             // mirar las MISMAS filas con otras columnas, y remontar ahí borraría
-            // la búsqueda y la empresa que la persona acaba de elegir — que es
-            // justo lo que Daniel pidió que se conservara entre los tres modos.
+            // la búsqueda y la empresa que la persona acaba de elegir.
             <ClientesView
-              key={selectedYear}
+              key={keyPeriodo}
               data={clientes}
               selectedYear={selectedYear}
               isClosedYear={isClosedYear}
+              periodo={periodo}
               modo={modo}
               onModo={setModo}
             />
           ) : <ErrorState scope="clientes" detail={data?.clientesError ?? null} onRetry={() => mutate()} />}
         </TabsContent>
         <TabsContent value="productos" className="mt-5">
-          {/* 🔴 SIN `key={selectedYear}`. Ese remonte tiraba TODO el estado
-              interno al cambiar el año de arriba: el período volvía solo a "Año
-              en curso" y el buscador se vaciaba, sin avisar, estando la persona
-              mirando "Últimos 12 meses" — un período que ni siquiera depende
-              del año. Lo único que el remonte protegía era el MES elegido
-              cuando el año nuevo no lo tiene, y eso lo resuelve ProductosView
-              con el dato en la mano (ver su guard de `data.meses`) en vez de
-              borrar tres cosas por las dudas. */}
-          <ProductosView selectedYear={selectedYear} />
+          {/* 🔴 SIN `key`: remontar tiraría el buscador y el filtro de cliente
+              al cambiar el período. El período le llega por prop y la vista
+              vuelve a pedir sola lo suyo (ver su `load`). */}
+          <ProductosView periodo={periodo} anioEnCurso={anioEnCurso} />
         </TabsContent>
       </Tabs>
     </main>
@@ -410,7 +400,7 @@ function ErrorState({
         Ya lo intentamos varias veces. Vuelve a probar en unos segundos.
       </p>
       {onRetry && (
-        /* min-h-[44px]: mismo motivo que el botón Excel — size="sm" da 32px. */
+        /* min-h-[44px]: mismo motivo que el botón de descarga — size="sm" da 32px. */
         <Button variant="outline" size="sm" className="mt-3 min-h-[44px]" onClick={onRetry}>
           Reintentar
         </Button>
@@ -420,15 +410,6 @@ function ErrorState({
   );
 }
 
-const MES_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-
-// Clase compartida de las tres pestañas.
-//
-// 🩸 EL APRIETE DE LA TIRA ES HISTORIA MEDIDA, no gusto. Con CINCO pestañas no
-// entraba en 390 px, y por eso la letra bajó a 13 px, el relleno a `px-2` y el
-// icono se escondió bajo `sm` (cuesta 20 px por pestaña y es decorativo: el
-// texto dice lo mismo). Con TRES sobra ancho y aun así NO se revirtió nada:
-// devolverle el icono sería volver a acercarse al borde en la pantalla donde
-// Daniel de verdad la usa, sin ganar un dato. Desde `sm` no cambia un píxel.
+// Clase compartida de las tres pestañas. Ver la nota de la tira, arriba.
 const TAB_TRIGGER_CLASS =
   "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-[13px] text-gray-500 sm:px-4 sm:text-sm data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
