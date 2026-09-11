@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { fmtDate } from "@/lib/format";
+import { textoPermiso } from "@/lib/asistencia/permiso-horas";
 import Seccion, { Vacio } from "./Seccion";
 import JustificarForm from "../JustificarForm";
 
@@ -31,6 +32,9 @@ interface Justificacion {
   hasta: string;
   motivo: string;
   nota: string | null;
+  /** Las horas de una Constancia por horas (11-sep-2026). Sin ellas, el día completo. */
+  hora_desde?: string | null;
+  hora_hasta?: string | null;
 }
 
 export default function SeccionJustificaciones({ codigo, refresco }: {
@@ -95,7 +99,7 @@ export default function SeccionJustificaciones({ codigo, refresco }: {
           {lista.map((j) => (
             <li key={j.id} className="flex items-start justify-between gap-3 py-2">
               <span className="min-w-0">
-                <span className="block text-sm text-gray-900">{j.motivo}</span>
+                <span className="block text-sm text-gray-900">{textoPermiso(j.motivo, j.hora_desde, j.hora_hasta)}</span>
                 <span className="block text-[12px] text-gray-500">
                   {fmtDate(j.desde)}{j.hasta !== j.desde ? ` al ${fmtDate(j.hasta)}` : ""}
                   {j.nota ? ` · ${j.nota}` : ""}

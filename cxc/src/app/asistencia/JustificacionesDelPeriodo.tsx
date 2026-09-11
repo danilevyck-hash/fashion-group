@@ -28,6 +28,7 @@ import { fmtDate } from "@/lib/format";
 import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { rutaDePersona } from "@/lib/asistencia/persona-en-el-centro";
+import { textoPermiso } from "@/lib/asistencia/permiso-horas";
 
 interface Justificacion {
   id: string;
@@ -36,6 +37,9 @@ interface Justificacion {
   hasta: string;
   motivo: string;
   nota: string | null;
+  /** Las horas de una Constancia por horas (11-sep-2026). Sin ellas, el día completo. */
+  hora_desde?: string | null;
+  hora_hasta?: string | null;
 }
 
 export default function JustificacionesDelPeriodo({ desde, hasta, empresa = "", refresco = 0 }: {
@@ -114,7 +118,7 @@ export default function JustificacionesDelPeriodo({ desde, hasta, empresa = "", 
               {nombreDe(j.empleado_codigo)}
             </Link>
             <span className="block text-[12px] text-gray-500">
-              {j.motivo} · {fmtDate(j.desde)}
+              {textoPermiso(j.motivo, j.hora_desde, j.hora_hasta)} · {fmtDate(j.desde)}
               {j.hasta !== j.desde ? ` al ${fmtDate(j.hasta)}` : ""}
               {j.nota ? ` · ${j.nota}` : ""}
             </span>

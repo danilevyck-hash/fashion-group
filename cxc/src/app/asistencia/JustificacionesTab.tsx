@@ -11,7 +11,7 @@ import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
 import { Ayuda } from "@/components/shared/Ayuda";
-import { textoPermiso, ventanaDe } from "@/lib/asistencia/permiso-horas";
+import { horasParaGuardar, motivoAdmiteHoras, textoPermiso, ventanaDe } from "@/lib/asistencia/permiso-horas";
 
 import RangoFechas from "@/components/ui/RangoFechas";
 interface Justificacion {
@@ -83,15 +83,18 @@ export default function JustificacionesTab() {
     if (hasta < desde) return toast("La fecha final es anterior a la inicial", "error");
     // La MISMA función que usa el motor decide si la ventana sirve: una regla
     // escrita dos veces es una regla que se contradice.
-    const pidioHoras = horaDesde !== "" || horaHasta !== "";
-    if (pidioHoras && !ventanaDe(horaDesde, horaHasta)) {
+    // 🔴 Las horas solo van con Constancia (11-sep-2026): con otro motivo no
+    // viajan, aunque queden tecleadas de antes.
+    const horas = horasParaGuardar(motivo, horaDesde, horaHasta);
+    const pidioHoras = horas.horaDesde !== "" || horas.horaHasta !== "";
+    if (pidioHoras && !ventanaDe(horas.horaDesde, horas.horaHasta)) {
       return toast("El permiso necesita las DOS horas, y la de fin tiene que ser posterior", "error");
     }
     setGuardando(true);
     try {
       const res = await fetch("/api/asistencia/justificaciones", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo, desde, hasta, motivo, nota, horaDesde, horaHasta }),
+        body: JSON.stringify({ codigo, desde, hasta, motivo, nota, ...horas }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
@@ -162,24 +165,27 @@ export default function JustificacionesTab() {
             <RangoFechas desde={desde} hasta={hasta} label="Días"
               onChange={(d, h) => { setDesde(d); setHasta(h); }} />
           </div>
-          {/* 🔴 EL PERMISO DE HORAS. Vacías = el día entero, que es lo de
-              siempre y lo que hace que nada cambie hasta que alguien las use.
-              Van al lado de las fechas porque son la MISMA pregunta —¿cuándo?—
-              y separarlas haría creer que es otra cosa. */}
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-              Desde qué hora <span className="normal-case text-gray-400">(opcional)</span>
-            </label>
-            <input type="time" value={horaDesde} disabled={!puedeHoras} className={`${campo} disabled:opacity-40`}
-              onChange={(e) => setHoraDesde(e.target.value)} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-              Hasta qué hora <span className="normal-case text-gray-400">(opcional)</span>
-            </label>
-            <input type="time" value={horaHasta} disabled={!puedeHoras} className={`${campo} disabled:opacity-40`}
-              onChange={(e) => setHoraHasta(e.target.value)} />
-          </div>
+          {/* 🔴 EL PERMISO DE HORAS, SOLO CON CONSTANCIA (11-sep-2026). Vacías =
+              el día entero. Van al lado de las fechas porque son la MISMA
+              pregunta —¿cuándo?— y separarlas haría creer que es otra cosa. */}
+          {motivoAdmiteHoras(motivo) && (
+            <>
+              <div>
+                <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
+                  Desde qué hora <span className="normal-case text-gray-400">(opcional)</span>
+                </label>
+                <input type="time" value={horaDesde} disabled={!puedeHoras} className={`${campo} disabled:opacity-40`}
+                  onChange={(e) => setHoraDesde(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
+                  Hasta qué hora <span className="normal-case text-gray-400">(opcional)</span>
+                </label>
+                <input type="time" value={horaHasta} disabled={!puedeHoras} className={`${campo} disabled:opacity-40`}
+                  onChange={(e) => setHoraHasta(e.target.value)} />
+              </div>
+            </>
+          )}
         </div>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <div className="min-w-[200px] flex-1">
@@ -200,7 +206,7 @@ export default function JustificacionesTab() {
         {/* 🔴 LA REGLA SE DICE ANTES DE GUARDAR, no después. La diferencia
             entre «el día entero» y «un permiso de dos horas» es ocho horas de
             sueldo, y no se puede dejar que alguien la descubra el día de pago. */}
-        {ventanaDe(horaDesde, horaHasta) ? (
+        {motivoAdmiteHoras(motivo) && ventanaDe(horaDesde, horaHasta) ? (
           <p className="mt-2 rounded bg-blue-50 px-2 py-1.5 text-[12px] text-blue-900">
             Es un <b>permiso de horas</b>: perdona los minutos de tardanza que caigan entre las{" "}
             <b>{horaDesde}</b> y las <b>{horaHasta}</b>, y nada más.{" "}

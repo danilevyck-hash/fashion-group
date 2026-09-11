@@ -530,7 +530,9 @@ describe("H. 🔴 LAS CUATRO SECCIONES, CON LOS ENDPOINTS DE SIEMPRE", () => {
     // 🩸 La ruta PEGADA al método: suelta, la caza el GET de arriba y un POST
     // a un endpoint inventado se colaba.
     expect(just).toMatch(/fetch\(\s*"\/api\/asistencia\/justificaciones",\s*\{\s*method: "POST"/);
-    expect(just).toMatch(/JSON\.stringify\(\{ codigo, desde, hasta, motivo, nota \}\)/);
+    // ⚠️ 11-sep-2026: el cuerpo ganó `...horas` (solo con Constancia; vacías con
+    // los otros motivos). Ver `justificar-horas-solo-constancia.test.ts`.
+    expect(just).toMatch(/JSON\.stringify\(\{ codigo, desde, hasta, motivo, nota, \.\.\.horas \}\)/);
     const vac = puro("app/asistencia/colaboradores/SeccionVacaciones.tsx");
     expect(vac).toMatch(/"\/api\/asistencia\/vacaciones"/);
     expect(vac).toMatch(/JSON\.stringify\(\{ codigo, desde, hasta, yaPagadas \}\)/);

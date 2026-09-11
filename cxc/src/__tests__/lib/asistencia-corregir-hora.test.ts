@@ -280,7 +280,11 @@ describe("3. 🔴 «Justificar» en la fila abre el MISMO formulario de la ficha
   it("hay UN formulario (JustificarForm) y lo montan la sección de la ficha y la ventana del día", () => {
     const form = puro("app/asistencia/JustificarForm.tsx");
     expect(form).toMatch(/fetch\("\/api\/asistencia\/justificaciones",\s*\{\s*method: "POST"/);
-    expect(form).toMatch(/JSON\.stringify\(\{ codigo, desde, hasta, motivo, nota \}\)/);
+    // ⚠️ 11-sep-2026: el cuerpo ganó las HORAS de una Constancia (`...horas`, que
+    // salen de `horasParaGuardar` y van vacías con cualquier otro motivo). Daniel:
+    // «que se ponga rango de hora solamente en constancia». Sigue siendo el MISMO
+    // cuerpo y la MISMA ruta. Ver `justificar-horas-solo-constancia.test.ts`.
+    expect(form).toMatch(/JSON\.stringify\(\{ codigo, desde, hasta, motivo, nota, \.\.\.horas \}\)/);
     expect(form).toMatch(/MOTIVOS_JUSTIFICACION\.map\(/);
     // La sección de la ficha abre con HOY.
     expect(puro("app/asistencia/colaboradores/SeccionJustificaciones.tsx"))

@@ -16,6 +16,7 @@ import {
   avisoMigracionPermisoHoras,
   COLS_PERMISO_HORAS,
   esColumnaPermisoHorasFaltante,
+  motivoAdmiteHoras,
   ventanaDe,
 } from "@/lib/asistencia/permiso-horas";
 import { leerPersonasDelModulo } from "@/lib/asistencia/config-server";
@@ -117,6 +118,16 @@ export async function POST(req: NextRequest) {
   const horaDesde = (b.horaDesde ?? "").trim();
   const horaHasta = (b.horaHasta ?? "").trim();
   const pidioHoras = horaDesde !== "" || horaHasta !== "";
+  // 🔴 LAS HORAS SOLO VAN CON CONSTANCIA (11-sep-2026, Daniel: *«que se ponga
+  // rango de hora solamente en constancia»*). Un motivo de día completo que
+  // llegue con horas NO se guarda a medias ni se le quitan en silencio: se
+  // rechaza, y se dice.
+  if (pidioHoras && !motivoAdmiteHoras(motivo)) {
+    return NextResponse.json(
+      { error: "Las horas solo van con Constancia. Los otros motivos cubren el día completo." },
+      { status: 400 },
+    );
+  }
   if (pidioHoras && !ventanaDe(horaDesde, horaHasta)) {
     return NextResponse.json(
       { error: "El permiso de horas necesita las DOS horas, y la de fin tiene que ser posterior a la de inicio." },

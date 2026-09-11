@@ -27,7 +27,44 @@
  * que hace que las 5 justificaciones vivas de producción —ninguna tiene horas—
  * se comporten EXACTAMENTE igual que ayer, y que este cambio salga sin mover un
  * centavo.
+ *
+ * ── 🔴 LAS HORAS SOLO VAN CON «CONSTANCIA» (11-sep-2026) ─────────────────────
+ *
+ * Daniel, textual: *«que se ponga rango de hora solamente en constancia,
+ * porque no siempre es todo el día, sino unas horas»*. Una constancia (del
+ * juzgado, de la escuela, de un trámite) cubre unas horas; una incapacidad, una
+ * catástrofe, lo escolar y el trabajo de vendedor son de DÍA COMPLETO y el
+ * formulario no ofrece horas para ellos. La regla vive en `motivoAdmiteHoras` y
+ * la aplican las DOS puertas (el formulario y la ruta): un motivo sin horas
+ * que llegue con horas se rechaza, no se guarda a medias.
+ *
+ * ⚠️ El MOTOR no mira el motivo: honra las horas que estén guardadas. Es a
+ * propósito — lo que ya está en la base es una decisión tomada, y cambiarle el
+ * valor a una fila vieja por su motivo sería mover un pago sin que nadie lo
+ * pida. Hoy no hay ninguna fila con horas fuera de Constancia (medido: las
+ * justificaciones vivas no tienen horas).
  * ────────────────────────────────────────────────────────────────────────── */
+
+import { MOTIVO_CONSTANCIA } from "./motivos";
+
+/** ¿Este motivo admite un rango de HORAS? Solo Constancia. */
+export function motivoAdmiteHoras(motivo: string | null | undefined): boolean {
+  return String(motivo ?? "").trim() === MOTIVO_CONSTANCIA;
+}
+
+/**
+ * Las horas que VIAJAN al servidor para un motivo: las escritas si el motivo
+ * las admite, vacías si no. Es lo que impide que un «de/hasta» tecleado con
+ * Incapacidad y después cambiado a otro motivo se cuele en el guardado.
+ */
+export function horasParaGuardar(
+  motivo: string | null | undefined,
+  horaDesde: string | null | undefined,
+  horaHasta: string | null | undefined,
+): { horaDesde: string; horaHasta: string } {
+  if (!motivoAdmiteHoras(motivo)) return { horaDesde: "", horaHasta: "" };
+  return { horaDesde: String(horaDesde ?? "").trim(), horaHasta: String(horaHasta ?? "").trim() };
+}
 
 /** "HH:MM" o "HH:MM:SS" → segundos del día. `null` si no es una hora. */
 export function horaASegundos(hhmm: string | null | undefined): number | null {
