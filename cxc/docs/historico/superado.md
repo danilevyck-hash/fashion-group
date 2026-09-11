@@ -8,6 +8,103 @@
 
 ---
 
+> ## 🩸 DATA HEALTH SE FUE DE LA PANTALLA — la medición se quedó entera (11-sep-2026)
+>
+> Daniel, textual: ***«data health quiero que el sistema o tú mida todo pero no verlo… no lo uso y no lo quiero usar»***.
+> Y antes, el 3-sep-2026, al decidir que el cuadre mensual de costo avisara por Telegram y no por ahí: ***«yo no uso Data Health, nunca lo veo»***.
+>
+> ### Lo medido contra producción ANTES de tocar nada (11-sep-2026)
+>
+> | Qué | Cuánto |
+> |---|---|
+> | `data_integrity_checks` | **870 filas · 121 corridas**, del 13-may al 11-sep-2026 |
+> | Última corrida | **11-sep 12:00:11 UTC** — los 7 checks vivos, todos en `ok` |
+> | `cron_heartbeats` de `integrity-check` | **11-sep 12:00:11 UTC** |
+> | Rastros en `activity_logs` de la pantalla | **CERO, en toda su historia** |
+> | La key `data-health` en `role_permissions` | **en ninguno de los 7 roles** |
+> | La key en `fg_users.modulos_override` | **en ninguno de los 2 overrides vivos** (`Angela`, `andrea`) |
+>
+> 🔑 **«Quién entró» no se podía medir, y ésa fue la respuesta.** La pantalla nunca
+> registró una entrada en `activity_logs` — ni una vez en los cuatro meses que
+> existió. No hubo que decidir si valía la pena: no había nada que pesar.
+>
+> ### Lo que se retiró
+>
+> - La **2ª pestaña de `/admin/usuarios`** (`?tab=data-health`) y su componente
+>   `DataHealthTab.tsx` (478 líneas: KPI por severidad, tabla de checks, mapa de
+>   30 días, detalle en modal y el botón «Correr checks ahora»).
+> - El **aviso proactivo del Inicio** — la franja que le aparecía a admin al
+>   entrar y llevaba a esa pestaña. Sin pantalla a la que llevar, el aviso no
+>   tiene a dónde ir; los `warning` vuelven a vivir solo en la tabla.
+> - La ruta `GET /api/admin/data-health`, que era la que dibujaba la pantalla.
+> - El **link del mensaje de Telegram**: un aviso 🔧 SISTEMA que apunta a una
+>   pantalla que no existe es el marcador roto que este repo evita en todos
+>   lados. El aviso se basta solo — dice el check, la tabla, cuántas filas y el
+>   detalle.
+>
+> ### 🔴 Lo que NO se retiró, que es el punto entero
+>
+> - El cron **`integrity-check`** (12:00 UTC) y su recuperación in-process dentro
+>   de `switch-reconciliacion`. El cronograma **no se movió**: siguen 81 entradas.
+> - La tabla **`data_integrity_checks`**, insert-only, con su clase en
+>   `src/lib/backup/tablas.ts` intacta. Ninguna migración la dropea, y hay
+>   candado que lo exige.
+> - **`LIVE_CHECK_NAMES`** con sus 7 checks vivos, y `src/lib/integrity-checks.ts`
+>   entero.
+> - **La alerta**: un check `critical` sigue saliendo por 🔧 SISTEMA.
+> - El **botón de correr los checks a mano** sobrevive como ruta: el route del
+>   cron conserva su puerta de sesión de admin. Eso ALIMENTA la medición, no la
+>   dibuja.
+>
+> ### Cómo se mira ahora, sin pantalla
+>
+> ```bash
+> curl -s -H "Authorization: Bearer $CRON_SECRET" \
+>   https://fashiongr.com/api/diag/data-health | jq '.latest[] | {check_name, severity, rows_affected}'
+> ```
+>
+> `GET /api/diag/data-health` es la MISMA lectura que alimentaba el dashboard,
+> movida a `/api/diag/` para que se pueda consultar desde una terminal, sin
+> navegador. Auth: `CRON_SECRET` (Bearer o `?secret=`) **o** sesión de admin.
+> **Fail-closed**: sin `CRON_SECRET` configurado responde 503; sin ninguna de las
+> dos, 401. Read-only de verdad: un solo `SELECT` sobre `data_integrity_checks`,
+> filtrado por `LIVE_CHECK_NAMES`. Devuelve `latest`, `history` (30 días, peor
+> severidad por día) y `last_run`.
+>
+> ### Las direcciones viejas siguen llegando
+>
+> `/admin/data-health` y `/data-health` → **`/home`**, redirect **307** en
+> `next.config.js` (temporal, como todos los de este repo: un 308 se queda pegado
+> en el caché del navegador y no hay forma de sacarlo). Daniel tiene la primera
+> en marcadores y las alertas de integridad se la mandaron por Telegram durante
+> meses — esos mensajes no se pueden reescribir.
+>
+> ### Migración y candados
+>
+> Migración `20261112120000_retirar_pantalla_data_health.sql` (**aplicada**),
+> aditiva: `array_remove` de la key en `role_permissions.modulos` y en
+> `fg_users.modulos_override`. Medido antes de aplicarla, **afecta CERO filas**
+> — la migración de agosto (`20260813120000`) ya había limpiado las dos tablas.
+> Se escribe igual porque es idempotente y porque la key pudo volver a
+> escribirse a mano desde la pantalla de Usuarios.
+>
+> Candado nuevo: **`data-health-sin-pantalla.test.ts`** (20 casos). Cada caso de
+> AUSENCIA lleva su CONTROL de presencia al lado, justamente porque es fácil leer
+> «quítalo» como «bórralo»: si de paso se fuera el cron o la tabla, el sistema
+> dejaría de saber que un tipo de comprobante nuevo no se está contando — y nadie
+> se enteraría, porque la pantalla que lo decía ya no existe.
+>
+> Siete candados **cambiaron de dirección con nota fechada, ninguno se borró**:
+> `data-health-dentro-de-usuarios` (los bloques 3, 4 y 5 exigen ahora lo
+> contrario, con controles; los bloques del catálogo, de quién ve qué, del h1
+> único y del patrón de pestañas **no se tocaron** — eran sobre Usuarios),
+> `iphone-targets-ventas-clientes`, `depurador-reclamos-datahealth-anchos`,
+> `poda-textos-explicaciones`, `poda-textos-cxc-multifashion` y el e2e
+> `modales-clic-fuera` (su caso 6 pasó de «el detalle cierra con clic fuera» a
+> «la dirección vieja lleva al Inicio, no a un 404»).
+
+---
+
 > ## 🩸 PACKING LISTS SE RETIRÓ — el módulo que llevaba cuatro meses vacío (10-sep-2026)
 >
 > Daniel, textual: ***«packing list no se usa, eliminar»***.

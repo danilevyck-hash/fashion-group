@@ -1589,6 +1589,59 @@ no marca · fail-open) y el barrido que exige que **solo `lib/ia/anthropic.ts` i
 - Nada. Se comprueba subiendo un PDF en Marketing o en Reclamos; si la llave vuelve a fallar, el
   aviso llega solo.
 
-⚠️ Al correr la suite completa fallaba `data-health-dentro-de-usuarios` — es el trabajo **en curso
-de otra sesión** (está retirando la pantalla Data Health y ya borró `DataHealthTab.tsx`), no de este
-cambio. Nada de ese árbol se tocó ni se commiteó.
+⚠️ Al correr la suite completa fallaba `data-health-dentro-de-usuarios` — era el trabajo **en curso
+de otra sesión** (la que retiró la pantalla Data Health), no de este cambio. Nada de ese árbol se
+tocó ni se commiteó. **Ya cerró**: ver el bloque de abajo.
+
+---
+
+## Data Health se va de la pantalla, la medición se queda (11-sep-2026)
+
+Daniel, textual: ***«data health quiero que el sistema o tú mida todo pero no verlo… no lo uso y no
+lo quiero usar»***. Y antes: ***«yo no uso Data Health, nunca lo veo»***.
+
+### Lo medido contra producción, antes de tocar nada
+
+| Qué | Cuánto |
+|---|---|
+| `data_integrity_checks` | **870 filas · 121 corridas**, del 13-may al 11-sep-2026 |
+| Última corrida | 11-sep **12:00:11 UTC** — los 7 checks vivos, todos en `ok` |
+| `cron_heartbeats` de `integrity-check` | 11-sep 12:00:11 UTC |
+| Entradas de la pantalla en `activity_logs` | **CERO**, en toda su historia |
+| La key `data-health` en permisos | **en ninguno** de los 7 roles ni de los 2 overrides vivos |
+
+🔑 **«Quién entró» no se podía medir, y ésa fue la respuesta.** La pantalla nunca registró una
+entrada en `activity_logs`.
+
+### Qué se fue
+
+La **2ª pestaña de `/admin/usuarios`** (`DataHealthTab.tsx`, 478 líneas), el **aviso proactivo del
+Inicio**, la ruta `GET /api/admin/data-health` y el **link del mensaje de Telegram** (apuntaba a una
+pantalla que ya no existe). `/admin/data-health` y `/data-health` → **`/home`**, 307.
+
+### 🔴 Qué se quedó — que es el punto
+
+El cron **`integrity-check`** (12:00 UTC) y su recuperación in-process en `switch-reconciliacion`;
+las **81 entradas de cron NO se movieron**; `data_integrity_checks` (insert-only, sin dropear, con
+su clase intacta en el respaldo); `LIVE_CHECK_NAMES` con sus 7 checks; y la **alerta**: un check
+`critical` sigue saliendo por 🔧 SISTEMA.
+
+### Cómo se mira ahora, sin pantalla
+
+```bash
+curl -s -H "Authorization: Bearer $CRON_SECRET" \
+  https://fashiongr.com/api/diag/data-health | jq '.latest[] | {check_name, severity, rows_affected}'
+```
+
+Es la MISMA lectura del dashboard, movida a `/api/diag/`. Auth: `CRON_SECRET` **o** sesión de admin.
+Fail-closed (503 sin secreto configurado, 401 sin credencial). Read-only: un solo SELECT.
+
+### Migración y candados
+
+`20261112120000_retirar_pantalla_data_health.sql` (**aplicada**), aditiva, **cero filas afectadas**
+— la de agosto ya había limpiado los permisos. Candado nuevo `data-health-sin-pantalla.test.ts` (20
+casos, cada ausencia con su control de presencia). Siete candados cambiaron de dirección con nota
+fechada, ninguno se borró.
+
+### Pendiente de Daniel
+- Nada.
