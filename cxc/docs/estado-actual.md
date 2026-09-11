@@ -1645,3 +1645,66 @@ fechada, ninguno se borró.
 
 ### Pendiente de Daniel
 - Nada.
+
+---
+
+## 11-sep-2026 — El ajuste de los días después del corte entra en las columnas de siempre
+
+Viene de la contadora (Yulissa), textual: *«no puedes netear las horas extras con las horas de
+tardanza o de ausencia porque valen diferente… debe poner lo que llegó en tardanza en tardanza y lo
+que llegó como extra en extra porque los valores de la rata por hora son diferentes porque una tiene
+recargo»*. Daniel: *«el ajuste separado como lo hace ella»* → *«sí»*. Medido en sus Excel (backtest
+del 10-sep, § 3.4): ella NO tiene columna de ajuste; las horas de los días después del corte entran
+en la quincena siguiente dentro de las columnas normales.
+
+**Dónde:** Asistencia › Planilla (pantalla, Excel, PDF y comprobante), con `NEXT_PUBLIC_PLANILLA_UNIDA`
+prendido (lo está en producción desde el 10-sep).
+
+**Antes:** `ajusteDeDiasSinMedir()` devolvía UN número (la suma firmada de los 7 conceptos del reloj)
+y la planilla lo mostraba como una línea/columna «Ajuste quincena anterior» (chip ámbar en la fila,
+caja ámbar arriba del cuadro, renglón en el comprobante), restándolo del neto en pantalla, en el
+cierre y en el papel.
+
+**Ahora:** el ajuste se reparte concepto por concepto (`repartirAjuste`) y se SUMA dentro de la
+columna de la quincena que se paga (`aplicarAjusteEnLinea`, en la ruta, antes de totalizar): extra
+diurna → Horas extra 1.25 · nocturna → 1.50 · excedente/domingo/feriado → las suyas · tardanza →
+Tardanzas · ausencia → Ausencias. Cada monto con SU rata (ya venía valuado por el motor). `netoPagar`
+ES el neto que se paga; nadie lo vuelve a restar (pantalla, `totalesDe`, comprobante, Boston).
+La columna «Ajuste quincena anterior» se retiró de las cuatro superficies. En su lugar:
+- Planilla: `title` en la celda («Incluye $5.00 de los días 14–15 sep, que la quincena anterior pagó
+  sin medir.») y un pie de tabla; en el celular, una línea gris en el detalle de la tarjeta.
+- Excel: nota al pie de la hoja «Planilla», fila en «Cómo se calcula» y hoja aparte **«Ajuste
+  anterior»** (una fila por colaborador, una columna por concepto, efecto en el neto) — solo cuando
+  hay ajuste.
+- PDF y comprobante: la misma nota al pie. Sin cajas ni chips.
+
+**🔴 El neto por persona no cambia.** Candado con el caso de Daniel (Ana, $600, 14 y 15 con 1 h
+tarde y 1 h extra: antes «ajuste −2.00 (se le devuelven $2)», después «Extras +5.00» y «Tardanza
++3.00», neto 269 por los dos caminos) y **medición contra producción (solo lectura)**: quincena
+16–31 ago con corte el 28 → días sin medir 29–31 ago → quincena 1–15 sep, las 3 empresas
+(`scripts/_medir-ajuste-por-concepto.ts`):
+
+| | Personas con dinero | Con ajuste | Dif. neto antes/después (máx.) | Dif. Σreparto vs ajuste viejo (máx.) |
+|---|---:|---:|---:|---:|
+| Boston · Fashion Wear · Vistana | 35 | 9 | **$0,00** | **$0,00** |
+
+Los 9 con ajuste: Alejandra 22 (tard. 0,69) · Andrés 23 (tard. 0,77) · Yeritza 51 (aus. 2,90) ·
+Julio Garay 11 FW (extra 1.25 10,94 + 1.50 3,93 → −14,87) · Andrea 16 (extra 3,35 · tard. 0,84 →
+−2,51) · Jorman 5 (extra 5,97 · tard. 0,81 → −5,16) · Luis Arroyo 9 (extra 6,20 + 2,22 → −8,42) ·
+Rodrigo 13 (extra 8,76 + 3,13 → −11,89) · Roxana 1 (tard. 0,74).
+
+**Lo que se conserva:** `ajusteDeDiasSinMedir` (derivada: Σ signo × reparto), `netoConAjuste` (la
+única cuenta, ahora adentro de `aplicarAjusteEnLinea`), el testigo `ajuste_anterior` del cierre, ISR
+a mano, préstamo/daño/terceros desde Préstamos.
+
+**⚠️ Pendiente de Daniel (dos cosas que se dejaron a propósito):**
+1. **La salida temprana de los días después del corte NO entra al ajuste** — `CONCEPTOS_DEL_RELOJ`
+   son 7 y «Salida temprana» nació el 10-sep, después del corte. Medido: **$11,83** (Eloyn 29, el
+   29–31 ago) que ni antes ni ahora se descuentan. Agregarla es una línea; falta que Daniel diga.
+2. **Los seguros no se recalculan sobre lo repartido** (nunca lo hicieron): con $5 más de extras el
+   seguro social de esa quincena sigue saliendo del bruto sin ajuste.
+
+**Candados:** `planilla-ajuste-por-concepto.test.ts` (nuevo); cambiaron de dirección con nota
+fechada `planilla-unida-comprobante` (bloque C), `planilla-unida-corte-y-cableado` (H e I) y
+`excel-encabezados-fila-1` (27 → 28 hojas). Mutaciones: `scripts/_mutar-candados-ajuste-por-concepto.sh`.
+
