@@ -11,10 +11,17 @@
  *   1. PLANILLA — el aviso ámbar «N personas tienen horas extra sin aprobar» y
  *      el freno rojo del cierre nombran a cada persona como un ENLACE a
  *      `?tab=aprobaciones&persona=<código>`, con el rango del cuadro.
- *   2. APROBACIONES — con `persona` en la URL toma el rango de la URL, ABRE el
- *      primer día que esa persona tiene sin aprobar, resalta su fila
- *      (`aria-current`) y muestra el chip «Mostrando a … — ver a todos ×».
- *      Sin `persona` (CONTROL), nada cambia: días cerrados, sin chip.
+ *   2. APROBACIONES — con `persona` en la URL toma el rango de la URL, ABRE
+ *      su renglón (en la vista «Colaborador», la que abre) o el primer día que
+ *      tiene sin decidir (en la vista «Día»), resalta su fila (`aria-current`)
+ *      y muestra el chip «Mostrando a … — ver a todos ×». Sin `persona`
+ *      (CONTROL), nada cambia: renglones cerrados, sin chip.
+ *
+ * 🔴 CAMBIÓ DE DIRECCIÓN EL 10-sep-2026 (noche), NO SE BORRÓ: la pestaña abre
+ * por colaborador con botones Sí/No (Daniel: *«Cada renglón es una persona en
+ * la quincena […] Dos botones: Sí y No»*). El recorrido es el mismo; lo que se
+ * abre es su renglón. La conducta vieja —abrir el primer día pendiente— se
+ * conserva como CONTROL con `?vista=dia`.
  *
  * 🩸 El doble del selector de rango es obligatorio acá (ver el candado de
  * cerrar-quincena): `next/dynamic` no resuelve bajo vitest.
@@ -200,7 +207,7 @@ describe("🔴 PLANILLA: cada persona del aviso es un enlace a Aprobaciones", ()
 const gente = (xs: Array<[string, string, number, boolean]>) =>
   xs.map(([codigo, etiqueta, minutos, aprobado]) => ({
     codigo, etiqueta, empresa: "fashion_wear", empresaEtiqueta: "Fashion Wear",
-    salida: "18:11", minutos, diurnoMin: minutos, nocturnoMin: 0,
+    salida: "18:11", minutos, diurnoMin: minutos, nocturnoMin: 0, domFerMin: 0, tipo: "extra" as const,
     aprobado, por: aprobado ? "Julio" : null, cuando: null,
     minutosVistos: aprobado ? minutos : null, cambio: false,
   }));
@@ -234,7 +241,7 @@ async function montarAprobaciones(dias: DiaAprobacion[] = DIAS) {
 }
 
 describe("🔴 APROBACIONES con ?persona= en la URL", () => {
-  beforeEach(() => { URL_ACTUAL = "tab=aprobaciones&persona=6&desde=2026-08-01&hasta=2026-08-15"; });
+  beforeEach(() => { URL_ACTUAL = "tab=aprobaciones&persona=6&desde=2026-08-01&hasta=2026-08-15"; globalThis.localStorage?.clear(); });
 
   it("el rango es el de la URL, no el recordado", async () => {
     await montarAprobaciones();
@@ -244,27 +251,41 @@ describe("🔴 APROBACIONES con ?persona= en la URL", () => {
     expect(screen.getByTestId("rango").getAttribute("data-desde")).toBe("2026-08-01");
   });
 
-  it("🔴 abre el primer día donde ESA persona tiene extras SIN aprobar (el martes, no el lunes aprobado)", async () => {
+  it("🔴 abre SU renglón — y adentro se ven sus dos días: el lunes ya con Sí y el martes pendiente", async () => {
     await montarAprobaciones();
-    // El martes está abierto: se ve la fila de Kevin de ese día.
-    const martes = screen.getByText(/mar 4/).closest("button")!;
-    expect(martes.getAttribute("aria-expanded")).toBe("true");
-    // El lunes sigue cerrado: no se ve a Julio.
-    expect(screen.getByText(/lun 3/).closest("button")!.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByText("JULIO GARAY")).toBeNull();
+    const kevin = screen.getByRole("button", { name: /^KEVIN LUBO$/ });
+    expect(kevin.getAttribute("aria-expanded")).toBe("true");
+    const dias = screen.getByTestId("dias-de-6");
+    expect(within(dias).getByLabelText("Sí a KEVIN LUBO el lun 3 ago").getAttribute("aria-pressed")).toBe("true");
+    expect(within(dias).getByLabelText("Sí a KEVIN LUBO el mar 4 ago").getAttribute("aria-pressed")).toBe("false");
+    // Los demás siguen cerrados.
+    expect(screen.getByRole("button", { name: /^JULIO GARAY$/ }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByTestId("dias-de-11")).toBeNull();
   });
 
-  it("🔴 resalta SU fila (aria-current), y a nadie más", async () => {
+  it("🔴 resalta SU renglón (aria-current), y a nadie más", async () => {
     await montarAprobaciones();
     const resaltadas = document.querySelectorAll('[aria-current="true"]');
     expect(resaltadas).toHaveLength(1);
     expect(resaltadas[0].textContent).toContain("KEVIN LUBO");
-    // Luis está en el mismo día abierto, a la vista y SIN resaltar.
+    // Luis y Julio están a la vista y SIN resaltar: no se filtra a nadie.
     expect(screen.getByText("LUIS ARROYO")).toBeTruthy();
-    expect(screen.getByText("LUIS ARROYO").closest("label")!.getAttribute("aria-current")).toBeNull();
-    // Y los demás días siguen en pantalla: no se filtra a nadie.
-    expect(screen.getByText(/mié 5/)).toBeTruthy();
-    expect(screen.getByText(/lun 3/)).toBeTruthy();
+    expect(screen.getByText("JULIO GARAY")).toBeTruthy();
+    expect(screen.getByText("LUIS ARROYO").closest('[aria-current="true"]')).toBeNull();
+  });
+
+  it("CONTROL (`?vista=dia`): la vista por día abre el primer día donde ESA persona está pendiente (el martes, no el lunes)", async () => {
+    URL_ACTUAL = "tab=aprobaciones&vista=dia&persona=6&desde=2026-08-01&hasta=2026-08-15";
+    await montarAprobaciones();
+    expect(screen.getByTestId("vista-dia")).toBeTruthy();
+    // El lunes ya no trae a Kevin (está decidido): solo Julio, pendiente.
+    const martes = screen.getByText(/mar 4/).closest("button")!;
+    expect(martes.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText(/lun 3/).closest("button")!.getAttribute("aria-expanded")).toBe("false");
+    const resaltadas = document.querySelectorAll('[aria-current="true"]');
+    expect(resaltadas).toHaveLength(1);
+    expect(resaltadas[0].textContent).toContain("KEVIN LUBO");
+    expect(screen.getByText("LUIS ARROYO").closest('[aria-current="true"]')).toBeNull();
   });
 
   it("muestra el chip «Mostrando a KEVIN LUBO — ver a todos ×», y tocarlo limpia `persona`", async () => {
@@ -279,7 +300,7 @@ describe("🔴 APROBACIONES con ?persona= en la URL", () => {
     expect(url).toContain("tab=aprobaciones");
   });
 
-  it("si no tiene nada pendiente en el rango, lo dice y no abre ningún día", async () => {
+  it("si no tiene nada pendiente en el rango, lo dice y no abre ningún renglón", async () => {
     URL_ACTUAL = "tab=aprobaciones&persona=11&desde=2026-08-01&hasta=2026-08-15";
     const TODO_APROBADO: DiaAprobacion[] = [
       { ...DIAS[0], gente: gente([["11", "JULIO GARAY", 76, true], ["6", "KEVIN LUBO", 100, false]]) },
@@ -287,20 +308,22 @@ describe("🔴 APROBACIONES con ?persona= en la URL", () => {
     await montarAprobaciones(TODO_APROBADO);
     expect(screen.getByTestId("chip-persona").textContent)
       .toContain("JULIO GARAY no tiene horas extra pendientes en este período.");
-    expect(screen.getByText(/lun 3/).closest("button")!.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("button", { name: /^KEVIN LUBO$/ }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByTestId("dias-de-6")).toBeNull();
   });
 });
 
 describe("CONTROL: sin ?persona= nada cambia", () => {
-  it("días cerrados, sin chip, sin fila resaltada, y el rango recordado manda", async () => {
+  it("renglones cerrados, sin chip, sin fila resaltada, y el rango recordado manda", async () => {
     URL_ACTUAL = "tab=aprobaciones";
+    globalThis.localStorage?.clear();
     await montarAprobaciones();
     expect(screen.queryByTestId("chip-persona")).toBeNull();
     expect(document.querySelectorAll('[aria-current="true"]')).toHaveLength(0);
-    for (const t of ["lun 3", "mar 4", "mié 5"]) {
-      expect(screen.getByText(new RegExp(t)).closest("button")!.getAttribute("aria-expanded")).toBe("false");
+    for (const n of ["JULIO GARAY", "KEVIN LUBO", "LUIS ARROYO"]) {
+      expect(screen.getByRole("button", { name: new RegExp(`^${n}$`) }).getAttribute("aria-expanded")).toBe("false");
     }
-    expect(screen.queryByText("KEVIN LUBO")).toBeNull();
+    expect(screen.queryByTestId("dias-de-6")).toBeNull();
     // El último rango recordado, como siempre.
     await waitFor(() => expect(pedidas.some((u) => u.includes("desde=2026-07-01"))).toBe(true));
   });

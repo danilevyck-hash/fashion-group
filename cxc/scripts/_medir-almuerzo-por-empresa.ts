@@ -12,7 +12,7 @@ import { aplicarCorrecciones, type MarcacionConId } from "@/lib/asistencia/corre
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
 import {
   leerReglas, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, pagaSegurosDeFila,
-  baseSegurosDeFila, noMarcaRelojDeFila, leerJustificaciones, leerVacaciones, leerRepartos,
+  baseSegurosDeFila, noMarcaRelojDeFila, cobraHorasExtraDeFila, leerJustificaciones, leerVacaciones, leerRepartos,
 } from "@/lib/asistencia/config-server";
 import { agruparPorCodigo, partesDe } from "@/lib/asistencia/reparto";
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
@@ -23,7 +23,7 @@ import {
   armarPlanilla, jornadaDiariaMin, quincenaDesdeClave, separarSinFicha, type FichaPlanilla,
 } from "@/lib/asistencia/planilla";
 import { leerManuales } from "@/lib/asistencia/planilla-server";
-import { estaAprobado, indexarAprobaciones } from "@/lib/asistencia/aprobaciones";
+import { estaAprobado, estaRechazado, indexarAprobaciones } from "@/lib/asistencia/aprobaciones";
 import { leerAprobaciones } from "@/lib/asistencia/aprobaciones-server";
 
 const PANAMA = "-05:00";
@@ -74,6 +74,8 @@ async function main() {
       jornadaSemanal: f.jornada_semanal ?? null, empresa: f.empresa ?? null,
       servicioProfesional: servicioProfesionalDeFila(f), pagaSeguros: pagaSegurosDeFila(f),
       baseSeguros: baseSegurosDeFila(f), noMarcaReloj: noMarcaRelojDeFila(f),
+      // 10-sep-2026: la casilla «cobra horas extra» y los días con «No», como en la ruta.
+      cobraHorasExtra: cobraHorasExtraDeFila(f),
       reparto: partesDe(salario, repartoPorCodigo.get(codigo)),
     });
   }
@@ -99,10 +101,12 @@ async function main() {
   const aprobaciones = indexarAprobaciones(aprRes.filas);
   const diasExtraAprobados = new Set<string>();
   for (const [k, a] of aprobaciones) if (estaAprobado(a)) diasExtraAprobados.add(k);
+  const diasExtraNo = new Set<string>();
+  for (const [k, a] of aprobaciones) if (estaRechazado(a)) diasExtraNo.add(k);
   const todas = armarPlanilla({
     personas: personasVigentes, fichas, manuales: manualesLeidos.porCodigo,
     jornadaDiariaMin: (c: string) => jornadaDiariaMin(horarioDe.get(c)),
-    reglas, empresa: null, exigirAprobacionExtra: true, diasExtraAprobados,
+    reglas, empresa: null, exigirAprobacionExtra: true, diasExtraAprobados, diasExtraNo,
     factorBase: q.factorBase, decidirAMano, prorrateo, justificados,
   });
   const { lineas } = separarSinFicha(todas);

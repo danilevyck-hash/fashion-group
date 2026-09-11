@@ -25,11 +25,13 @@ const DIAS: DiaAprobacion[] = [
     gente: [
       { codigo: "1", etiqueta: "ALEJANDRA CAMAÑO", empresa: "confecciones_boston",
         empresaEtiqueta: "Confecciones Boston", salida: "17:41", minutos: 40.83,
-        diurnoMin: 40.83, nocturnoMin: 0, aprobado: true, por: "Contabilidad",
+        diurnoMin: 40.83, nocturnoMin: 0, domFerMin: 0, tipo: "extra", cambio: false,
+        aprobado: true, por: "Contabilidad",
         cuando: "2026-08-26T14:02:11.501+00:00", minutosVistos: 40 },
       { codigo: "11", etiqueta: "JULIO GARAY", empresa: "vistana",
         empresaEtiqueta: "Vistana International", salida: "17:41", minutos: 41.07,
-        diurnoMin: 35.07, nocturnoMin: 6, aprobado: false, por: null,
+        diurnoMin: 35.07, nocturnoMin: 6, domFerMin: 0, tipo: "extra", cambio: false,
+        aprobado: false, por: null,
         cuando: null, minutosVistos: null },
     ],
   },
@@ -59,10 +61,13 @@ describe("la hoja", () => {
 // 🔴 10-sep-2026: «persona» pasó a «colaborador» en todo texto visible del módulo
 // (Daniel: *«no lo llames personas, sino colaboradores»*). Este candado cambió de
 // texto, no de regla. Ver `asistencia-colaboradores-no-personas.test.ts`.
+// 🔴 10-sep-2026 (noche): entró la columna «Decisión» (Sí / No / Pendiente),
+// entre Estado y Aprobó. «Sin aprobar» no distingue a quien dijo «No» de quien
+// todavía no miró, y esa diferencia es toda la pestaña desde ese día.
     expect(filas[0]).toEqual([
       "Colaborador", "Código", "Empresa", "Fecha", "Salida",
       "Extra 1.25 (min)", "Extra 1.50 (min)", "Total (min)",
-      "Estado", "Aprobó", "Cuándo",
+      "Estado", "Decisión", "Aprobó", "Cuándo",
     ]);
   });
 
@@ -92,10 +97,29 @@ describe("🔴 el ESTADO, que es para lo que existe este archivo", () => {
 
   it("la aprobada trae quién y cuándo; la que no, ninguno de los dos", () => {
     const { filas } = abrir();
-    expect(filas[1][9]).toBe("Contabilidad");
-    expect(filas[1][10]).toBe("2026-08-26");
-    expect(filas[2][9]).toBe("");
+    expect(filas[1][10]).toBe("Contabilidad");
+    expect(filas[1][11]).toBe("2026-08-26");
     expect(filas[2][10]).toBe("");
+    expect(filas[2][11]).toBe("");
+  });
+
+  it("🔴 «Decisión» dice Sí / No / Pendiente (10-sep-2026)", () => {
+    const conNo: DiaAprobacion[] = [{
+      ...DIAS[0],
+      gente: [
+        DIAS[0].gente[0],
+        DIAS[0].gente[1],
+        { ...DIAS[0].gente[1], codigo: "9", etiqueta: "LUIS ARROYO", decision: "no", por: "Julio" },
+      ],
+    }];
+    const { filas } = abrir(conNo);
+    expect(filas[1][9]).toBe("Sí");
+    expect(filas[2][9]).toBe("Pendiente");
+    expect(filas[3][9]).toBe("No");
+    // El «No» sigue siendo «Sin aprobar» en Estado: no se pagó.
+    expect(filas[3][8]).toBe("Sin aprobar");
+    // Y el pie cuenta las tres cosas por separado.
+    expect(String(filas[5][9])).toBe("1 Sí · 1 No · 1 pendientes");
   });
 
   it("⚠️ una aprobada SIN firma no inventa una: la celda queda vacía", () => {
@@ -105,7 +129,7 @@ describe("🔴 el ESTADO, que es para lo que existe este archivo", () => {
     }];
     const { filas } = abrir(sinFirma);
     expect(filas[1][8]).toBe("Aprobado");
-    expect(filas[1][9]).toBe("");
+    expect(filas[1][10]).toBe("");
   });
 });
 
@@ -141,6 +165,7 @@ describe("el pie", () => {
     const tot = filas[4];
     expect(String(tot[0])).toContain("TOTAL · 2 días-colaborador");
     expect(String(tot[8])).toBe("1 aprobadas · 1 sin aprobar");
+    expect(String(tot[9])).toBe("1 Sí · 0 No · 1 pendientes");
     expect(tot[7]).toBeCloseTo(81.9, 2);
   });
 
@@ -175,7 +200,8 @@ describe("el archivo sale usable", () => {
     expect(ref.startsWith("A1")).toBe(true);
     // El filtro llega hasta la última fila de DATOS (la 3): si abarcara el
     // total o la nota, filtrar por «Sin aprobar» los escondería.
-    expect(ref).toBe("A1:K3");
+    // (Doce columnas desde el 10-sep-2026: «Decisión» entró entre Estado y Aprobó.)
+    expect(ref).toBe("A1:L3");
   });
 
   it("sin días, no revienta: hoja vacía con sus encabezados", () => {

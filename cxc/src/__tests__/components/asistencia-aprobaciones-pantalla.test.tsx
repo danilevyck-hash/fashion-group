@@ -1,22 +1,26 @@
 /* ─────────────────────────────────────────────────────────────────────────────
- * APROBACIONES POR DÍA — CONDUCTA: se monta la pantalla y se tocan las casillas.
+ * APROBACIONES — CONDUCTA: se monta la pantalla y se tocan los botones.
  *
- * Daniel, 27-ago-2026: *«que el usuario entre y vea por dias quienes y cuantas
- * horas, y pueda aprobar seleccionando todos o individualmente, por dia, por
- * semana»*, y de antes: *«con un clic se aprueba y ya»*.
+ * 🔴 CAMBIÓ DE DIRECCIÓN EL 10-sep-2026 (noche), NO SE BORRÓ. Daniel: *«Aprobaciones
+ * es una sola lista de decisiones. Cada renglón es una persona en la quincena,
+ * con sus horas extra sumadas. Dos botones: Sí y No. Se decide, y el renglón se
+ * va»* · *«con un tab arriba que diga colaborador / día»*. Hasta ese día la
+ * pantalla era días con casillas (27-ago-2026: *«que el usuario entre y vea por
+ * dias quienes y cuantas horas»*). Lo que se conserva como CONTROL: la vista
+ * «Día» sigue existiendo, a un toque, con un renglón por día que dice cuánta
+ * gente y cuántas horas; y lo que viaja sigue siendo un PERMISO por DÍA, nunca
+ * una plata ni un período. Lo que se fue: la casilla, la fila por semana.
  *
- * 🔴 POR QUÉ SE MONTA LA PANTALLA Y NO SE MIRA EL MÓDULO. Que
- * `armarDiasAprobacion` agrupe bien no prueba NADA sobre lo que Julio ve ni
- * sobre lo que sale por `fetch`. El riesgo de esta pantalla es que un toque
- * mande la lista equivocada — aprobar a alguien que no era, o un día que no
- * era. Eso solo se ve tocando.
+ * 🔴 POR QUÉ SE MONTA LA PANTALLA Y NO SE MIRA EL MÓDULO. El riesgo de esta
+ * pantalla es que un toque mande la lista equivocada — decidir sobre alguien
+ * que no era, o un día que no era. Eso solo se ve tocando.
  * ─────────────────────────────────────────────────────────────────────────── */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, cleanup, within } from "@testing-library/react";
 import { act } from "react";
 
 import { ToastProvider } from "@/components/ToastSystem";
-import AprobacionesTab from "@/app/asistencia/AprobacionesTab";
+import AprobacionesTab, { ROTULO_SI_A_TODO } from "@/app/asistencia/AprobacionesTab";
 import { claveDia, type DiaAprobacion } from "@/lib/asistencia/aprobaciones";
 
 vi.mock("next/navigation", () => ({
@@ -29,7 +33,7 @@ vi.mock("next/navigation", () => ({
 const gente = (xs: Array<[string, string, number, boolean]>) =>
   xs.map(([codigo, etiqueta, minutos, aprobado]) => ({
     codigo, etiqueta, empresa: "vistana", empresaEtiqueta: "Vistana",
-    salida: "18:11", minutos, diurnoMin: minutos, nocturnoMin: 0,
+    salida: "18:11", minutos, diurnoMin: minutos, nocturnoMin: 0, domFerMin: 0, tipo: "extra" as const,
     aprobado, por: aprobado ? "Julio" : null, cuando: null,
     minutosVistos: aprobado ? minutos : null, cambio: false,
   }));
@@ -58,9 +62,9 @@ function servidor(dias: DiaAprobacion[] = DIAS) {
   });
 }
 
-async function montar(dias: DiaAprobacion[] = DIAS) {
+async function montar() {
   render(<ToastProvider><AprobacionesTab /></ToastProvider>);
-  await waitFor(() => expect(screen.getByText(/lun 24/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("KEVIN LUBO")).toBeTruthy());
 }
 
 /** Un toque de verdad sobre el DOM. */
@@ -69,108 +73,156 @@ async function toca(el: Element | null | undefined) {
   await act(async () => { (el as HTMLElement).click(); });
 }
 
-const casilla = (etiqueta: RegExp) =>
-  screen.getAllByRole("checkbox").find((c) => etiqueta.test(c.getAttribute("aria-label") ?? ""));
+const boton = (nombre: RegExp) => screen.getAllByRole("button").find((b) => nombre.test(b.getAttribute("aria-label") ?? ""));
+const aDia = async () => toca(screen.getByRole("radio", { name: "Día" }));
 
-beforeEach(() => { enviados = []; vi.stubGlobal("fetch", servidor()); });
+beforeEach(() => { enviados = []; globalThis.localStorage?.clear(); vi.stubGlobal("fetch", servidor()); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-describe("🔴 se ve POR DÍAS, que es lo que pidió Daniel", () => {
-  it("cada día es un renglón, con cuánta gente y cuántas horas", async () => {
+describe("🔴 abre POR COLABORADOR: un renglón por persona con sus extras sumadas", () => {
+  it("cuatro renglones, cada uno con «N días · H:MM h» y sus dos botones", async () => {
     await montar();
-    for (const t of ["lun 24", "mar 25", "mié 26"]) expect(screen.getByText(new RegExp(t))).toBeTruthy();
-    // 178 min = 2:58
-    expect(screen.getByText("2:58 h")).toBeTruthy();
+    expect(screen.getByTestId("vista-colaborador")).toBeTruthy();
+    for (const n of ["JULIO GARAY", "KEVIN LUBO", "LUIS ARROYO", "ANGELA GARCIA"]) {
+      expect(screen.getByText(n)).toBeTruthy();
+      expect(boton(new RegExp(`^Sí a ${n}$`))).toBeTruthy();
+      expect(boton(new RegExp(`^No a ${n}$`))).toBeTruthy();
+    }
+    expect(screen.getByText("1 día · 1:47 h")).toBeTruthy(); // Julio, 107 min
   });
 
-  it("los días arrancan CERRADOS — 28 personas abiertas serían siete pantallas", async () => {
+  it("los renglones arrancan CERRADOS; el ⌄ abre los días con su Sí/No", async () => {
     await montar();
-    expect(screen.queryByText("JULIO GARAY")).toBeNull();
-    await toca(screen.getByText(/lun 24/).closest("button"));
-    expect(screen.getByText("JULIO GARAY")).toBeTruthy();
+    expect(screen.queryByTestId("dias-de-6")).toBeNull();
+    await toca(screen.getByRole("button", { name: /^KEVIN LUBO$/ }));
+    expect(screen.getByTestId("dias-de-6")).toBeTruthy();
+    expect(boton(/^Sí a KEVIN LUBO el lun 24 ago$/)).toBeTruthy();
   });
 
-  it("la semana agrupa los tres días", async () => {
+  it("el contador cuenta RENGLONES por decidir y suma sus horas", async () => {
     await montar();
-    expect(screen.getByText(/Semana del 24 – 26 ago/)).toBeTruthy();
-  });
-
-  it("el contador dice cuántas faltan", async () => {
-    await montar();
-    // 2 + 1 + 1 persona-día. El número grande, no los conteos de cada fila.
-    const linea = screen.getByText(/sin aprobar/).parentElement!;
-    expect(linea.textContent).toMatch(/^4sin aprobar/);
+    // 4 personas · 337 min = 5:37 h
+    expect(screen.getByTestId("por-decidir").textContent).toBe("4por decidir · 5:37 h");
   });
 });
 
-describe("🔴 las CUATRO formas de aprobar mandan la lista correcta", () => {
-  it("UNA PERSONA: solo esa persona y solo ese día", async () => {
+describe("🔴 lo que mandan los botones", () => {
+  it("SÍ en el renglón: todos los días pendientes de ESA persona, con decision 'si'", async () => {
     await montar();
-    await toca(screen.getByText(/lun 24/).closest("button"));
-    await toca(casilla(/Aprobar KEVIN LUBO/));
+    await toca(boton(/^Sí a KEVIN LUBO$/));
     expect(enviados).toHaveLength(1);
-    expect(enviados[0].aprobado).toBe(true);
+    expect(enviados[0].decision).toBe("si");
     expect(enviados[0].dias).toEqual([{ codigo: "6", fecha: "2026-08-24", minutos: 71 }]);
+  });
+
+  it("NO en el renglón manda decision 'no' — y el renglón SE VA a «Ya decididas»", async () => {
+    await montar();
+    await toca(boton(/^No a KEVIN LUBO$/));
+    expect(enviados[0].decision).toBe("no");
+    expect(within(screen.getByTestId("vista-colaborador")).queryByText("KEVIN LUBO")).toBeNull();
+    expect(screen.getByRole("button", { name: /Ya decididas \(1\)/ })).toBeTruthy();
+    expect(screen.getByTestId("por-decidir").textContent).toBe("3por decidir · 4:26 h");
+  });
+
+  it("UN DÍA de una persona (abriendo el ⌄): solo ese día", async () => {
+    await montar();
+    await toca(screen.getByRole("button", { name: /^JULIO GARAY$/ }));
+    await toca(boton(/^No a JULIO GARAY el lun 24 ago$/));
+    expect(enviados[0].decision).toBe("no");
+    expect(enviados[0].dias).toEqual([{ codigo: "11", fecha: "2026-08-24", minutos: 107 }]);
+  });
+
+  it("«Sí a todo lo pendiente»: las cuatro de una, con decision 'si'", async () => {
+    await montar();
+    await toca(screen.getByRole("button", { name: ROTULO_SI_A_TODO }));
+    expect((enviados[0].dias as unknown[]).length).toBe(4);
+    expect(enviados[0].decision).toBe("si");
+  });
+
+  it("⛔ no existe «No a todo»", async () => {
+    await montar();
+    expect(screen.queryByRole("button", { name: /No a todo/i })).toBeNull();
+  });
+});
+
+describe("🔴 la vista «Día» — CONTROL de lo que pidió el 27-ago: por días, cuánta gente y cuántas horas", () => {
+  it("cada día es un renglón, con cuánta gente y cuántas horas, y arranca cerrado", async () => {
+    await montar();
+    await aDia();
+    expect(screen.getByTestId("vista-dia")).toBeTruthy();
+    expect(screen.getByText(/lun 24/)).toBeTruthy();
+    expect(screen.getByText("2 · 2:58 h")).toBeTruthy();
+    expect(screen.getByText("1 · 0:55 h")).toBeTruthy();
+    expect(screen.getByText(/lun 24/).closest("button")!.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("KEVIN LUBO")).toBeNull();
   });
 
   it("UN DÍA: toda su gente, de ese día y de ningún otro", async () => {
     await montar();
-    await toca(casilla(/Aprobar lun 24 ago/));
-    expect(enviados).toHaveLength(1);
+    await aDia();
+    await toca(boton(/^Sí a lun 24 ago$/));
     const ds = enviados[0].dias as Array<Record<string, unknown>>;
     expect(ds).toHaveLength(2);
     expect(new Set(ds.map((d) => d.codigo))).toEqual(new Set(["11", "6"]));
     expect(ds.every((d) => d.fecha === "2026-08-24")).toBe(true);
   });
 
-  it("UNA SEMANA: los tres días completos", async () => {
+  it("UNA PERSONA en un día: solo esa persona y solo ese día", async () => {
     await montar();
-    await toca(casilla(/Aprobar la semana/));
-    const ds = enviados[0].dias as Array<Record<string, unknown>>;
-    expect(ds).toHaveLength(4);
-    expect(new Set(ds.map((d) => d.fecha)))
-      .toEqual(new Set(["2026-08-24", "2026-08-25", "2026-08-26"]));
+    await aDia();
+    await toca(screen.getByText(/lun 24/).closest("button"));
+    await toca(boton(/^Sí a KEVIN LUBO el lun 24 ago$/));
+    expect(enviados[0].dias).toEqual([{ codigo: "6", fecha: "2026-08-24", minutos: 71 }]);
   });
 
-  it("TODO: las cuatro de una", async () => {
+  it("🔴 el día decidido SE VA de la lista (era la fila por semana, retirada)", async () => {
     await montar();
-    await toca(screen.getByRole("button", { name: "Aprobar todo" }));
-    expect((enviados[0].dias as unknown[]).length).toBe(4);
-    expect(enviados[0].aprobado).toBe(true);
+    await aDia();
+    await toca(boton(/^Sí a mar 25 ago$/));
+    expect(screen.queryByText(/mar 25/)).toBeNull();
+    expect(screen.queryByLabelText(/semana/)).toBeNull();
   });
 });
 
-describe("🔴 se puede DESAPROBAR — un toque de más no es irreversible", () => {
+describe("🔴 un toque de más no es irreversible: «cambiar» en Ya decididas", () => {
   const CON_UNO_APROBADO: DiaAprobacion[] = [
     { ...DIAS[0], gente: gente([["11", "JULIO GARAY", 107, true], ["6", "KEVIN LUBO", 71, false]]) },
   ];
 
-  it("volver a tocar una casilla aprobada manda `aprobado: false`", async () => {
+  it("volver a tocar el Sí prendido manda decision null (pendiente) y el renglón vuelve arriba", async () => {
     vi.stubGlobal("fetch", servidor(CON_UNO_APROBADO));
-    await montar(CON_UNO_APROBADO);
-    await toca(screen.getByText(/lun 24/).closest("button"));
-    await toca(casilla(/Aprobar JULIO GARAY/));
-    expect(enviados[0].aprobado).toBe(false);
+    await montar();
+    expect(within(screen.getByTestId("vista-colaborador")).queryByText("JULIO GARAY")).toBeNull();
+    await toca(screen.getByRole("button", { name: /Ya decididas \(1\)/ }));
+    expect(screen.getByText("JULIO GARAY")).toBeTruthy();
+    await toca(screen.getByRole("button", { name: "cambiar" }));
+    const si = boton(/^Sí a JULIO GARAY el lun 24 ago$/)!;
+    expect(si.getAttribute("aria-pressed")).toBe("true");
+    await toca(si);
+    expect(enviados[0].decision).toBeNull();
     expect(enviados[0].dias).toEqual([{ codigo: "11", fecha: "2026-08-24", minutos: 107 }]);
+    expect(within(screen.getByTestId("vista-colaborador")).getByText("JULIO GARAY")).toBeTruthy();
   });
 
-  it("el día a medias se ve a medias, no aprobado", async () => {
+  it("tocar el otro botón cambia la decisión: Sí → No", async () => {
     vi.stubGlobal("fetch", servidor(CON_UNO_APROBADO));
-    await montar(CON_UNO_APROBADO);
-    const cb = casilla(/Aprobar lun 24 ago/) as HTMLInputElement;
-    expect(cb.checked).toBe(false);
-    expect(cb.indeterminate).toBe(true);
+    await montar();
+    await toca(screen.getByRole("button", { name: /Ya decididas \(1\)/ }));
+    await toca(screen.getByRole("button", { name: "cambiar" }));
+    await toca(boton(/^No a JULIO GARAY el lun 24 ago$/));
+    expect(enviados[0].decision).toBe("no");
   });
 });
 
 describe("🔴 lo que viaja es un PERMISO, nunca una plata", () => {
-  it("el cuerpo lleva código, fecha y minutos — y ni un monto", async () => {
+  it("el cuerpo lleva decisión y (código, fecha, minutos) — y ni un monto", async () => {
     await montar();
-    await toca(screen.getByRole("button", { name: "Aprobar todo" }));
+    await toca(screen.getByRole("button", { name: ROTULO_SI_A_TODO }));
     const cuerpo = JSON.stringify(enviados[0]);
     for (const prohibido of ["monto", "rata", "neto", "salario", "$"]) {
       expect(cuerpo, `«${prohibido}» viajó`).not.toContain(prohibido);
     }
+    expect(Object.keys(enviados[0]).sort()).toEqual(["decision", "dias"]);
     for (const d of enviados[0].dias as Array<Record<string, unknown>>) {
       expect(Object.keys(d).sort()).toEqual(["codigo", "fecha", "minutos"]);
     }
@@ -178,19 +230,24 @@ describe("🔴 lo que viaja es un PERMISO, nunca una plata", () => {
 
   it("🔑 la llave que se manda es la del DÍA, no la del período", async () => {
     await montar();
-    await toca(casilla(/Aprobar lun 24 ago/));
+    await toca(boton(/^Sí a LUIS ARROYO$/));
     const ds = enviados[0].dias as Array<Record<string, unknown>>;
-    // Ni «desde» ni «hasta» en ningún lado: el corte de la quincena no entra.
     expect(JSON.stringify(enviados[0])).not.toContain("desde");
-    expect(claveDia(String(ds[0].codigo), String(ds[0].fecha))).toMatch(/^\d+\|2026-08-24$/);
+    expect(claveDia(String(ds[0].codigo), String(ds[0].fecha))).toMatch(/^\d+\|2026-08-25$/);
   });
 });
 
-describe("sin nada que aprobar", () => {
-  it("lo dice y no ofrece el botón", async () => {
+describe("sin nada que decidir", () => {
+  it("lo dice y apaga el botón", async () => {
     vi.stubGlobal("fetch", servidor([]));
     render(<ToastProvider><AprobacionesTab /></ToastProvider>);
     await waitFor(() => expect(screen.getByText(/Nadie hizo horas extra/)).toBeTruthy());
-    expect((screen.getByRole("button", { name: "Aprobar todo" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: ROTULO_SI_A_TODO }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByTestId("ya-decididas")).toBeNull();
+  });
+
+  it("⛔ la casilla no vuelve: ni un checkbox en la pantalla", async () => {
+    await montar();
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
   });
 });
