@@ -918,7 +918,11 @@ describe("las cuatro pestañas, y las Metas adentro de Vendedoras", () => {
       path.join(process.cwd(), "src/components/ventas/ComisionesView.tsx"),
       "utf-8",
     );
-    expect(comisiones).toContain("<VendedorasSubtab selectedYear={inicial.year} />");
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ: el año es el ELEGIDO
+    // en el shell (`year`), no el del arranque — en enero `inicial.year` abría
+    // el ranking sobre el año pasado. Lo que este candado protege sigue igual:
+    // el espejo NO monta las Metas.
+    expect(comisiones).toContain("<VendedorasSubtab selectedYear={year} />");
     expect(comisiones).not.toContain("conMetas");
   });
 
