@@ -91,7 +91,7 @@ Leyenda: **URL** = ¿la pestaña o el nivel cambia la dirección al tocarlo? · 
 
 | Módulo | Dirección | Qué muestra | Pestañas | URL | Compartir | Archivo |
 |---|---|---|---|---|---|---|
-| Usuarios | `/admin/usuarios?tab=usuarios\|data-health` | Usuarios · Data Health | 2 | **Sí** | Sí; rango de sesiones y check elegido no | `admin/usuarios/page.tsx:69` |
+| Usuarios | `/admin/usuarios?tab=usuarios\|novedades` | Usuarios · Novedades | 2 | **Sí** | Sí; el rango de sesiones no | `admin/usuarios/page.tsx` | (🩸 la pestaña **Data Health** se retiró el 11-sep-2026 — Daniel: «no lo uso y no lo quiero usar». La medición sigue: `GET /api/diag/data-health`) |
 
 ---
 
@@ -229,7 +229,8 @@ Lo que sí da un error limpio, en español y con salida: `/catalogo/nike`, `/cat
 |---|---|
 | `/g/sistema`, `/g/plata-entra`, `/g/plata-sale`, `/g/productos` | ✅ |
 | `/ventas?tab=referencia` → `/referencia` · `?tab=comisiones` → `/comisiones` · `?tab=utilidad` (en `VentasShell`) | ✅ Ningún enlace vivo en `src/` apunta a los viejos. ⚠️ `docs/modulos/01-ventas-y-clientes.md:550,880` y `05-…:762,767,1017` y `docs/eficiencia/04-…:60` todavía dicen que Comisiones vive dentro de Ventas |
-| `/admin/data-health` → `/admin/usuarios?tab=data-health` | ✅ |
+| `/admin/data-health` → `/home` | ✅ | (era `→ /admin/usuarios?tab=data-health`; la pantalla se retiró el 11-sep-2026) |
+| `/data-health` → `/home` | ✅ | (11-sep-2026) |
 | `/admin` → `/cxc` | ✅ como redirect; ❌ como destino del breadcrumb de Usuarios (B-2) |
 | `/saldos-banco` → Gastos | ✅ (Vista General todavía lo usa) |
 | `/cheques` → `/recordatorios` | ✅; `?filter=` viejo es inerte y **ningún generador quedó** en `src/` |
@@ -284,7 +285,7 @@ Lo que sí da un error limpio, en español y con salida: `/catalogo/nike`, `/cat
 | Asistencia › Reporte / Planilla / Aprobaciones | Rango (Reporte y Aprobaciones lo recuerdan en `localStorage`); quincena y empresa; fila abierta | `ReporteTab.tsx:50-61`, `PlanillaTab.tsx:317-321`, `AprobacionesTab.tsx:148-149` |
 | Préstamos | Buscador | `PrestamosClient.tsx:66` |
 | Recordatorios | Buscador, día del calendario, detalle | `RecordatoriosClient.tsx:119,142-143` |
-| Usuarios / Data Health | Rango de sesiones; check elegido | `admin/usuarios/page.tsx:108-109`, `DataHealthTab.tsx:137` |
+| Usuarios | Rango de sesiones | `admin/usuarios/page.tsx` | (🩸 «check elegido» se fue con la pantalla de Data Health, 11-sep-2026) |
 
 ---
 

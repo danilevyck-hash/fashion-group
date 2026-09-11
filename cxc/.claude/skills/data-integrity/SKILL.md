@@ -1,6 +1,6 @@
 ---
 name: data-integrity
-description: Sistema de monitoreo automático de integridad de datos. Cron diario que corre 6 checks vivos contra cheques, prestamos_movimientos, switch_estadocuenta y switch_facturas (los del CSV legacy ya se retiraron). Resultados en data_integrity_checks; dashboard /admin/data-health filtra por LIVE_CHECK_NAMES; alerta por email a daniel@ si hay críticos.
+description: Sistema de monitoreo automático de integridad de datos. Cron diario que corre los checks vivos contra cheques, prestamos_movimientos, switch_estadocuenta y switch_facturas (los del CSV legacy ya se retiraron). Resultados en data_integrity_checks; un check crítico avisa por Telegram 🔧 SISTEMA. 🔴 DESDE EL 11-sep-2026 NO HAY PANTALLA: se consulta por GET /api/diag/data-health (CRON_SECRET o sesión de admin), que filtra por LIVE_CHECK_NAMES.
 ---
 
 # Data Integrity Monitoring
@@ -16,16 +16,16 @@ Shoes (factura en CXC sin venta correspondiente) y el RPC home roto.
 | Tabla histórica | `data_integrity_checks` (migration `20260524000000_data_integrity_checks.sql`) |
 | Runner (6 checks vivos) + `LIVE_CHECK_NAMES` | `src/lib/integrity-checks.ts` |
 | Endpoint cron | `src/app/api/cron/integrity-check/route.ts` |
-| Endpoint para dashboard | `src/app/api/admin/data-health/route.ts` |
-| Dashboard | `src/app/admin/data-health/page.tsx` |
+| Endpoint de LECTURA | `src/app/api/diag/data-health/route.ts` |
+| Dashboard | 🩸 **RETIRADO el 11-sep-2026** — ver abajo |
 | Cron schedule | `vercel.json` → `0 12 * * *` (7am Panamá) |
 
 ## Los checks
 
 Los checks VIVOS son los que produce `runAllChecks()`. La fuente única de verdad
 de esa lista es `LIVE_CHECK_NAMES` (exportada de `src/lib/integrity-checks.ts`);
-el dashboard `/api/admin/data-health` filtra por ella para no mostrar el historial
-stale de los checks legacy retirados.
+la ruta de lectura `/api/diag/data-health` filtra por ella para no devolver el
+historial stale de los checks legacy retirados.
 
 | # | check_name | Tabla / fuente | Severity por threshold |
 |---|---|---|---|
@@ -108,16 +108,41 @@ const grouped = await Promise.all([
 
 ## Correr checks manualmente
 
-### Vía dashboard
-1. Ir a `/admin/data-health`
-2. Click en "Correr checks ahora" (auth via cookie de admin)
-3. Resultado aparece en la tabla + queda persistido
+### 🩸 El dashboard se retiró (11-sep-2026)
 
-### Vía curl (con CRON_SECRET)
+Daniel, textual: *«data health quiero que el sistema o tú mida todo pero no
+verlo… no lo uso y no lo quiero usar»*. Y antes: *«yo no uso Data Health, nunca
+lo veo»*. Medido ese día: `activity_logs` no tenía **ni una** entrada de esa
+pantalla en toda su historia.
+
+🔴 **La medición no se tocó**: el cron sigue a las 12:00 UTC, la tabla sigue
+insert-only, `LIVE_CHECK_NAMES` no cambió y un check `critical` sigue avisando
+por Telegram 🔧 SISTEMA (ahora **sin link**, porque no hay pantalla a la que
+llevar). `/admin/data-health` y `/data-health` redirigen al Inicio (307).
+Candado: `data-health-sin-pantalla.test.ts`.
+
+### Vía curl — MIRAR el último resultado, sin correr nada
+
+```bash
+curl -s -H "Authorization: Bearer $CRON_SECRET" \
+  https://fashiongr.com/api/diag/data-health | jq '.latest[] | {check_name, severity, rows_affected}'
+```
+
+Devuelve `latest` (lo último por check), `history` (30 días, peor severidad por
+día), `last_run` y `total_runs_30d`. Auth: `CRON_SECRET` (Bearer o `?secret=`) o
+sesión de admin — así también se puede abrir desde el navegador. Fail-closed:
+503 sin `CRON_SECRET` configurado, 401 sin credencial. Read-only: un solo
+SELECT, no corre los checks.
+
+### Vía curl — CORRER los checks a mano
+
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" \
   https://fashiongr.com/api/cron/integrity-check | jq
 ```
+(También acepta cookie de sesión de admin: ésa es la puerta que quedó del botón
+«Correr checks ahora» del dashboard retirado. Correr los checks ALIMENTA la
+medición; no la dibuja.)
 
 ### Vía SQL (sin correr nuevos checks, solo leer histórico)
 ```sql
@@ -142,6 +167,7 @@ ORDER BY checked_at DESC LIMIT 1;
 
 ### Histórico de calibraciones
 
+- 2026-09-11: **la PANTALLA se retiró; la medición no.** Daniel: *«data health quiero que el sistema o tú mida todo pero no verlo… no lo uso y no lo quiero usar»*. Se fueron la 2ª pestaña de `/admin/usuarios` (`DataHealthTab.tsx`), el aviso proactivo del Inicio, la ruta `/api/admin/data-health` y el link del mensaje de Telegram. Medido: `activity_logs` no tenía **ni una** entrada de esa pantalla en toda su historia; `data_integrity_checks` iba en **870 filas / 121 corridas** desde el 13-may-2026. La lectura volvió como **`GET /api/diag/data-health`** (CRON_SECRET o sesión de admin, fail-closed, read-only), que es lo que hay que usar desde ahora para mirar los chequeos. El cron, la tabla, `LIVE_CHECK_NAMES` y la alerta crítica quedaron intactos. Candado: `data-health-sin-pantalla.test.ts`.
 - 2026-06-07: **`LIVE_CHECK_NAMES` + filtro del dashboard.** El runner ya solo corre 6 checks (los del CSV legacy se habían retirado el 05-jun), pero el dashboard seguía mostrando ~9 check_name stale de `data_integrity_checks` dentro de la ventana de 30d (severidades congeladas engañosas, ej. `cxc_fecha_null=critical` del 13-may). Se exportó `LIVE_CHECK_NAMES` (fuente única de verdad) y `/api/admin/data-health` filtra por ella. `data_integrity_checks` queda INTACTA (historial = archivo). Agregar un check ahora exige sumarlo a la allowlist (guard en `runAllChecks` lo avisa).
 - 2026-05-13: thresholds de `cxc_sin_venta_correspondiente` recalibrados de `0=ok, 1-5=info, 6-20=warning, >20=critical` a `0-20=ok, 21-50=info, 51-150=warning, >150=critical`. Razón: NDs/intereses/refacturación normal alcanzan ~50-100 sin ser anómalos. Solo volumen >150 sugiere pipeline roto.
 - 2026-05-13: `cxc_fecha_null` split en `cxc_fecha_emision_null` (excluye solo `Saldo Anterior`) y `cxc_fecha_vencimiento_null` (excluye `Saldo Anterior`, `Nota de Crédito`, `Recibo`). Razón: Recibos son pagos sin vencimiento por naturaleza — quedaban marcados como anómalos.

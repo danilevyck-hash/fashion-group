@@ -418,7 +418,7 @@ guard vive en el handler compartido (§3).
 |---|---|---|---|
 | `/activity-logs` | GET | requireAuth | admin |
 | `/activity` | POST,GET | requireAuth | admin |
-| `/admin/data-health` | GET | requireRole | admin |
+| `/api/diag/data-health` | GET | CRON_SECRET (timingSafeEqual) **o** sesión admin; fail-closed 503/401 | admin | 🩸 era `/api/admin/data-health` con `requireRole(['admin'])`; se mudó el 11-sep-2026 al retirarse la pantalla |
 | `/admin/sessions` | GET,DELETE | requireAuth | admin |
 | `/admin/switch-vendedores` | GET | requireRole |  (+ sin resolver) |
 | `/admin/sync-now` | POST | requireRole | admin, contabilidad, secretaria, vendedor |

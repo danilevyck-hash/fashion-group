@@ -31,7 +31,7 @@ cuestan hoy y cuántos podrían costar.
 | Comisiones | [comisiones.md](comisiones.md) | Un descuento de $1.573,08 sin fecha se resta TODOS los meses ($14.157,72 en 2026), y el interruptor «Activo» de las tasas no hace nada | pendiente |
 | Depurador | [depurador.md](depurador.md) | 38 de 140 descargas son repeticiones exactas (21 de ellas a menos de 30 minutos de la anterior); el Historial que lo cura tiene 0 archivos | pendiente |
 | Usuarios | [usuarios.md](usuarios.md) | Angela y Andrea no ven «Asistencia y Planilla» aunque su rol se lo da; el desplegable ofrece 5 de los 7 roles | pendiente |
-| Data Health | [data-health.md](data-health.md) | 551 resultados en 90 días, los 551 «todo bien», y el botón se tocó 1 vez en 120 días | pendiente |
+| Data Health | [data-health.md](data-health.md) | 551 resultados en 90 días, los 551 «todo bien», y el botón se tocó 1 vez en 120 días | 🩸 **RESUELTO el 11-sep-2026: la pantalla se retiró, la medición se quedó.** Daniel: «data health quiero que el sistema o tú mida todo pero no verlo… no lo uso y no lo quiero usar». Se mira por `GET /api/diag/data-health`. Ver `docs/historico/superado.md` |
 
 ## Cómo se usa esto
 
