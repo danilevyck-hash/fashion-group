@@ -1859,3 +1859,118 @@ exige que nadie firme ya un token de galería). También cambiaron de dirección
 `excel-exports-reclamos` (la hoja no puede tener NI UN hipervínculo, ni siquiera cuando se le pasa
 una `factura_pdf_url` ya firmada) y `reclamos-rediseno` (el barrido de URL públicas bajó de 5
 archivos a 3, porque dos ya no existen).
+
+---
+
+## 11-sep-2026 (tarde) — Préstamos sin aprobación, la pestaña completa, Constancia por horas, el ajuste con salida temprana y seguros, y «Antes de cerrar»
+
+Seis puntos aprobados por Daniel en el día, cada uno con su commit propio. Todo cuelga de lo que ya
+estaba desplegado; ningún interruptor nuevo.
+
+### A · La pestaña Préstamos recupera lo que se perdió con «una sola puerta»
+
+Daniel: *«sí, arregla lo de préstamos»* (mockup aprobado). 🩸 Del 10 al 11-sep, con
+`NEXT_PUBLIC_PLANILLA_UNIDA` prendido, la pestaña tenía SOLO «Anotar abono» y todo `/prestamos/*`
+rebotaba: no se podía crear un préstamo ni ver un movimiento.
+
+- **«+ Nuevo préstamo»** reusa el formulario del módulo (`ElegirPersonaModal` + `NuevoMovimientoModal`);
+  pregunta la **cuota** junto al monto (préstamo y terceros) y la escribe en la ficha en una segunda
+  llamada; «Descuento a terceros» es la **cuarta tarjeta** (existía la cuenta y no había forma de cargarla).
+- **Tocar el nombre** abre `/prestamos/<id>` (la página de siempre), que vuelve con «← Préstamos». Solo
+  `/prestamos` exacto redirige (`esRutaDelModuloPrestamos`). Con la planilla unida la ficha ofrece
+  «Anotar abono» y «+ Nuevo préstamo a …», y NO «Pago Quincenal» (lo escribe el cierre).
+- Terceros solo si alguien lo tiene; **los ceros con guion**. La secretaria sigue solo mirando.
+- ⚠️ El bloque «Pendientes de aprobación» del mockup **no se construyó**: la aprobación se quitó ese
+  mismo día (punto B).
+
+### B · 🔴 Un préstamo nuevo queda activo de una, nadie lo aprueba
+
+Daniel, textual: *«Aprobar préstamos: eso también se quita»*.
+
+- `POST /api/prestamos/movimientos` guarda `aprobado` siempre. El tope de un sueldo sigue
+  calculándose pero solo **avisa** (pantalla + Telegram privado a Daniel, con quién lo registró).
+- Se retiraron `/api/prestamos/pendientes`, la pantalla «Por aprobar», `puedeAprobarPrestamo`, el estado
+  pendiente en lista/ficha/tarjetas y el cron **`prestamos-caducan`** (`vercel.json`, registro y crons
+  que avisan: **81 → 80 entradas**).
+- **Medido antes: 0 préstamos esperando** (447 movimientos, todos `aprobado`): no hizo falta migración.
+
+### C · 🔴 El descuento de préstamo entra SOLO a la planilla (se fue la aprobación quincenal)
+
+Daniel, textual: *«quita lo de aprobación a préstamos, no es necesario»*.
+
+- La cuota (préstamo y terceros, cada una capeada a su saldo) entra a la casilla sola
+  (`aplicarPrestamoEnLinea`): **lo escrito a mano manda, vacío = lo que propone el módulo**. Va a
+  `dinero`, nunca a `manuales` (la pantalla manda `manuales` entero al guardar el ISR).
+- Se retiraron el bloque «Préstamos por descontar», `POST /api/asistencia/prestamos` y el freno del
+  cierre por préstamo. `asistencia_prestamo_aprobado` **no se dropea**.
+- Se avisa solo la última cuota y quien debe pero no está en el cuadro.
+- 🩸 **«Ya descontado» ahora mira el ORIGEN del pago.** CRISTIAM BLANCO canceló su préstamo el 7-sep con
+  **$125 de liquidación** («Cancela prestamo»); el hecho consumado miraba solo el concepto y la planilla
+  se lo habría vuelto a quitar del sueldo. Arreglado en los DOS lectores (casilla y cierre).
+
+**Medido contra producción (solo lectura), quincena 1–15 sep, 3 empresas
+(`scripts/_medir-prestamo-sin-aprobacion.ts`):**
+
+| | Hoy (aprobado) | Después (solo) |
+|---|---:|---:|
+| Boston — Alejandra Camaño · Andrés González · Gabriela Jaramillo · Luz Bosquez · María V. Bethancourth · Martha Chavarría · Ramón Miranda · Yeritza Solís · Yulicar Corona | $0 | $10 · $50 · $60 · $25 · $25 · $50 · $30 · $50 · $25 |
+| Fashion Wear — Luis Parajón | $0 | $70 |
+| Vistana — Andrea Pérez · Ángela García (ya aprobados) | $50 · $50 | $50 · $50 |
+| **Total descontado** | **$100,00** | **$495,00** |
+
+El neto del cuadro baja **$395,00 en 10 colaboradores**. Cristiam Blanco salió de la lista con la
+regla del origen (antes aparecía con $125).
+
+### D · Justificaciones: las horas solo con Constancia
+
+Daniel, textual: *«que se ponga rango de hora solamente en constancia, porque no siempre es todo el
+día, sino unas horas»*. `motivoAdmiteHoras` / `horasParaGuardar` en `permiso-horas.ts`;
+`JustificarForm` dibuja «De» y «Hasta» solo con Constancia; la ruta rechaza con 400 otro motivo con
+horas; la pestaña vieja se alinea; las listas leen la constancia con sus horas. Candado en el motor:
+una Constancia de 8 a 10 perdona 120 min y descuenta solo los 15 de afuera, sin borrar el día.
+
+### E · El ajuste del corte: entra la salida temprana, y los seguros se recalculan
+
+Daniel: *«la salida temprana incluirla»* · *«los seguros, va»*. `CONCEPTOS_DEL_RELOJ` 7 → 8;
+`aplicarAjusteEnLinea` recibe los porcentajes de las reglas y recalcula seguro social y educativo
+sobre el bruto con ajuste (respeta `paga_seguros` y la base propia).
+
+**Medido 16–31 ago → 1–15 sep, 3 empresas (`scripts/_medir-ajuste-por-concepto.ts`, ANTES/DESPUÉS):**
+35 con dinero, 10 con algo que repartir, cambian **4 netos** — Eloyn (29) **−$11,83** (salida temprana
+29–31 ago), Luis Arroyo (9) **−$0,93** (seguros sobre $8,42 de extras), Alejandra Camaño (22) **+$0,08**
+y Roxana Hernández (1) **+$0,08** (seguros sobre una tardanza). Los demás con ajuste tienen base propia
+o no pagan seguros: 0 cambios.
+
+### F · Planilla: «Antes de cerrar»
+
+Mockup aprobado. Las siete cajas → UNA lista (`lib/asistencia/antes-de-cerrar.ts` + `AntesDeCerrar.tsx`):
+encabezado con el estado, arriba lo que hay que arreglar con número y enlace, abajo en gris lo
+informativo; «ver quiénes» trae los nombres con su enlace a Aprobaciones; «Todo listo para cerrar».
+Botones: `Regenerar · Descargar ⌄ (Excel · PDF · Comprobantes) · Cerrar quincena`; chip «Corte 11 sep».
+Los avisos siguen viajando como datos para el Excel y el PDF.
+
+### Candados y verificación
+
+Nuevos: `planilla-prestamo-sin-aprobacion` · `prestamos-pestana-completa` ·
+`justificar-horas-solo-constancia` · `planilla-antes-de-cerrar`. Cambiaron de dirección con nota
+fechada (ninguno se borró): `asistencia-prestamo-planilla` · `asistencia-planilla-guardada` ·
+`tolerancia-ddl-retirada-asistencia` · `planilla-guardada-route` · `prestamos-tope` ·
+`prestamos-tope-y-duplicados` · `prestamos-un-solo-lugar` · `prestamos-salida-con-deuda` ·
+`iphone-targets-prestamos` · `ipad-caja-prestamos-cheques` · `alertas-que-llegan` ·
+`data-health-sin-pantalla` · `prestamos-una-puerta` · `asistencia-corregir-hora` ·
+`persona-en-el-centro` · `asistencia-justificaciones-conducta` · `planilla-ajuste-por-concepto` ·
+`planilla-unida-corte-y-cableado` · `asistencia-planilla-cerrar-quincena` ·
+`asistencia-planilla-decidir-pantalla` · `planilla-elegir-quincena` ·
+`planilla-aviso-lleva-a-aprobaciones`.
+
+### ⚠️ Dejado a propósito / pendiente de Daniel
+
+1. **No hay forma de «no descontar esta quincena» escribiendo un 0** en la casilla de préstamo: la
+   columna es `NOT NULL DEFAULT 0` y el 0 se lee como «vacío = la cuota». Distinguirlo pide una
+   migración (columna nullable). Hoy el camino es bajar la cuota en la ficha.
+2. El tope de un sueldo **avisa y no frena**: si Daniel prefiere que frene sin aprobación, es un
+   cambio de una línea en la ruta.
+3. El motor honra las horas de una justificación **sin mirar el motivo** (hoy no hay filas con horas
+   fuera de Constancia); las puertas (formulario y ruta) son las que exigen Constancia.
+4. En «Antes de cerrar» las líneas de préstamo/vacaciones/reparto llevan su texto completo (con
+   nombres): la regla de Daniel de que lo que mueve plata se dice con nombre gana a «sin nombres».
