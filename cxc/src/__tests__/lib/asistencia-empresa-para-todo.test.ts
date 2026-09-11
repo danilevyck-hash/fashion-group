@@ -167,3 +167,43 @@ describe("E. las pantallas cuelgan del MISMO selector", () => {
     expect(puro("src/app/asistencia/PrestamosTab.tsx")).toMatch(/filtrarPorEmpresa\(j\.fichas \?\? \[\], props\.empresa\)/);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E. 🔴 LAS OPCIONES SALEN DE LO QUE SU ROL PUEDE VER EN EL SERVIDOR (11-sep-2026)
+//
+// 🩸 A `bodega` (Julio) el selector le ofrecía las 4 empresas y el servidor le
+// recortaba a las suyas (`asistencia_aprobador_empresa`: fashion_wear +
+// vistana): eligiendo Boston o Multifashion la pestaña quedaba vacía sin decir
+// por qué. Las opciones salían solo de `esGerenteBoston`, no del alcance real.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("E. 🔴 el selector ofrece SOLO lo que el alcance del servidor deja ver", () => {
+  it("bodega con alcance [fashion_wear, vistana]: «Todas» + esas dos, en el orden de la casa", () => {
+    expect(empresasQueVe("bodega", ["vistana", "fashion_wear"])).toEqual(
+      EMPRESAS_ASISTENCIA.filter((k) => k === "fashion_wear" || k === "vistana"),
+    );
+    const o = opcionesDeEmpresa("bodega", ["vistana", "fashion_wear"]);
+    expect(o.map((x) => x.clave)).toEqual([TODAS, ...EMPRESAS_ASISTENCIA.filter((k) => k === "fashion_wear" || k === "vistana")]);
+    expect(o.some((x) => x.clave === "confecciones_boston")).toBe(false);
+  });
+  it("con UNA sola empresa en el alcance, solo ésa y sin «Todas»; una recordada ajena cae ahí", () => {
+    expect(opcionesDeEmpresa("bodega", ["vistana"])).toEqual([{ clave: "vistana", etiqueta: etiquetaDeFiltro("vistana") }]);
+    expect(empresaElegida("confecciones_boston", "bodega", ["vistana"])).toBe("vistana");
+  });
+  it("alcance `null` (admin, quien cierra) o todavía sin respuesta: las cuatro, como siempre", () => {
+    expect(empresasQueVe("admin", null)).toEqual(EMPRESAS_ASISTENCIA);
+    expect(empresasQueVe("bodega", undefined)).toEqual(EMPRESAS_ASISTENCIA);
+  });
+  it("🔴 David sigue siendo Boston, diga lo que diga el alcance", () => {
+    expect(empresasQueVe("gerente_boston", ["vistana"])).toEqual(["confecciones_boston"]);
+  });
+  it("un alcance que no cruza con ninguna no deja el selector vacío: lo del rol, y el servidor recorta", () => {
+    expect(empresasQueVe("bodega", [])).toEqual(EMPRESAS_ASISTENCIA);
+    expect(empresasQueVe("bodega", ["otra"])).toEqual(EMPRESAS_ASISTENCIA);
+  });
+  it("y la pantalla se lo pregunta al servidor (`/api/asistencia/alcance`) y se lo pasa a las dos funciones", () => {
+    const src = puro("src/app/asistencia/AsistenciaClient.tsx");
+    expect(src).toContain('fetch("/api/asistencia/alcance"');
+    expect(src).toContain("opcionesDeEmpresa(rol, alcance)");
+    expect(src).toContain("empresaElegida(empresaUrl || empresaRecordada, rol, alcance)");
+  });
+});

@@ -22,17 +22,38 @@ export const TODAS = "todas";
 /** La llave de `useLastUsed` (queda como `fg_last_asistencia_empresa`). */
 export const RECORDAR_EMPRESA = "asistencia_empresa";
 
-/** Las empresas que este rol puede mirar. Derivado, nunca escrito a mano. */
-export function empresasQueVe(rol: string | null | undefined): readonly string[] {
+/**
+ * El alcance que el SERVIDOR le reconoce a esta persona (`GET /api/asistencia/alcance`):
+ * `null` = las cuatro; una lista = exactamente ésas. `undefined` = todavía no
+ * se preguntó (se ofrece lo del rol, como siempre).
+ */
+export type AlcanceDeEmpresas = readonly string[] | null | undefined;
+
+/**
+ * Las empresas que este rol puede mirar. Derivado, nunca escrito a mano.
+ *
+ * 🔴 CON EL ALCANCE DEL SERVIDOR, SOLO LAS SUYAS (11-sep-2026). 🩸 A `bodega`
+ * (Julio) el selector le ofrecía las 4 y el servidor le recortaba a fashion_wear
+ * + vistana (`asistencia_aprobador_empresa`): eligiendo Boston o Multifashion
+ * la pestaña quedaba vacía sin decir por qué. Las opciones salían solo de
+ * `esGerenteBoston`, no del alcance real. Ahora el alcance lo dice la MISMA
+ * lectura que recorta en el servidor, y acá solo se intersecta.
+ */
+export function empresasQueVe(rol: string | null | undefined, alcance?: AlcanceDeEmpresas): readonly string[] {
   if (esGerenteBoston(rol)) return [EMPRESA_BOSTON];
-  return EMPRESAS_ASISTENCIA;
+  if (alcance == null) return EMPRESAS_ASISTENCIA;
+  const mias = EMPRESAS_ASISTENCIA.filter((k) => alcance.includes(k));
+  // Un alcance que no cruza con ninguna (tabla vacía para este usuario, o
+  // basura) no deja el selector sin opciones: se ofrece lo del rol y el
+  // servidor sigue recortando, como hasta hoy.
+  return mias.length ? mias : EMPRESAS_ASISTENCIA;
 }
 
 export interface OpcionEmpresa { clave: string; etiqueta: string }
 
 /** «Todas» + las suyas. Con UNA sola, solo ésa. */
-export function opcionesDeEmpresa(rol: string | null | undefined): OpcionEmpresa[] {
-  const mias = empresasQueVe(rol);
+export function opcionesDeEmpresa(rol: string | null | undefined, alcance?: AlcanceDeEmpresas): OpcionEmpresa[] {
+  const mias = empresasQueVe(rol, alcance);
   const propias = mias.map((k) => ({ clave: k, etiqueta: nombreCortoEmpresa(k) }));
   return mias.length > 1 ? [{ clave: TODAS, etiqueta: "Todas" }, ...propias] : propias;
 }
@@ -44,8 +65,8 @@ export const esTodas = (e: string | null | undefined): boolean =>
  * Lo que de verdad se filtra, a partir de lo que trae la URL o lo recordado.
  * Basura o una empresa que el rol no ve → la primera opción (Todas, o la única).
  */
-export function empresaElegida(cruda: string | null | undefined, rol: string | null | undefined): string {
-  const opciones = opcionesDeEmpresa(rol);
+export function empresaElegida(cruda: string | null | undefined, rol: string | null | undefined, alcance?: AlcanceDeEmpresas): string {
+  const opciones = opcionesDeEmpresa(rol, alcance);
   const k = String(cruda ?? "").trim();
   return opciones.some((o) => o.clave === k) ? k : opciones[0].clave;
 }

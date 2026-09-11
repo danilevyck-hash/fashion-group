@@ -85,7 +85,7 @@ import {
   type ClavePestana,
 } from "@/lib/asistencia/persona-en-el-centro";
 import {
-  PARAM_EMPRESA, RECORDAR_EMPRESA, empresaElegida, opcionesDeEmpresa,
+  PARAM_EMPRESA, RECORDAR_EMPRESA, empresaElegida, opcionesDeEmpresa, type AlcanceDeEmpresas,
 } from "@/lib/asistencia/empresa-para-todo";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 
@@ -146,8 +146,24 @@ function AsistenciaInner() {
   // por usuario; las opciones salen del rol (David solo ve Boston, sin «Todas»).
   const [empresaUrl, setEmpresaUrl] = useUrlState<string>(PARAM_EMPRESA, "");
   const [empresaRecordada, recordarEmpresa] = useLastUsed(RECORDAR_EMPRESA, "");
-  const opciones = opcionesDeEmpresa(rol);
-  const empresa = empresaElegida(empresaUrl || empresaRecordada, rol);
+  // 🔴 LAS OPCIONES SALEN DE LO QUE SU ROL PUEDE VER EN EL SERVIDOR (11-sep-2026):
+  // `/api/asistencia/alcance` es la misma lectura que recorta la planilla y las
+  // aprobaciones. Hasta que conteste, lo del rol (como siempre).
+  const [alcance, setAlcance] = useState<AlcanceDeEmpresas>(undefined);
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const r = await fetch("/api/asistencia/alcance", { cache: "no-store" });
+        if (!r.ok) return;
+        const j = (await r.json()) as { empresas?: string[] | null };
+        if (vivo) setAlcance(j.empresas === undefined ? null : j.empresas);
+      } catch { /* sin respuesta, lo del rol */ }
+    })();
+    return () => { vivo = false; };
+  }, []);
+  const opciones = opcionesDeEmpresa(rol, alcance);
+  const empresa = empresaElegida(empresaUrl || empresaRecordada, rol, alcance);
   const elegirEmpresa = (e: string) => { setEmpresaUrl(e); recordarEmpresa(e); };
 
   const visibles = pestanasDeAsistencia({
