@@ -64,6 +64,23 @@ describe("🔴 en un período CERRADO el recibo se puede mirar", () => {
     expect(screen.queryByText("Eliminar")).toBeNull();
   });
 
+  it("🔴 la tabla no se descuadra: mismas celdas en encabezado, fila y total", () => {
+    montar(false);
+    const tabla = document.querySelector("table")!;
+    const enc = tabla.querySelectorAll("thead tr th").length;
+    const filas = Array.from(tabla.querySelectorAll("tbody tr"));
+    for (const tr of filas) {
+      const celdas = tr.querySelectorAll("td").length;
+      if (celdas === 0) continue;
+      // Una celda con colSpan cuenta por lo que abarca.
+      const abarca = Array.from(tr.querySelectorAll("td")).reduce(
+        (s, td) => s + (Number(td.getAttribute("colSpan") ?? td.getAttribute("colspan")) || 1),
+        0,
+      );
+      expect(abarca).toBe(enc);
+    }
+  });
+
   it("con el período ABIERTO no se perdió nada: las tres siguen", () => {
     montar(true);
     const menu = screen.getAllByRole("button", { name: /Más opciones|opciones/i })[0];

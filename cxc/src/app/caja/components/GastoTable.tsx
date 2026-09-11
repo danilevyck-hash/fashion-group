@@ -310,13 +310,16 @@ export default function GastoTable({
                   </>
                 )}
                 <th className="text-right py-2.5 px-4 font-medium">Total</th>
-                {isOpen && <th className="w-10 py-2.5 px-2 font-medium" />}
+                {/* 🔴 La columna del «···» existe SIEMPRE: con el período
+                    cerrado el menú sigue ahí (solo la foto del recibo), y un
+                    encabezado que aparece y desaparece descuadra la tabla. */}
+                <th className="w-10 py-2.5 px-2 font-medium" />
               </tr>
             </thead>
             <tbody>
               {sortedGastos.length === 0 ? (
                 <tr>
-                  <td colSpan={dataCols + (isOpen ? 1 : 0)}>
+                  <td colSpan={dataCols + 1}>
                     <EmptyState title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"} />
                   </td>
                 </tr>
@@ -534,7 +537,7 @@ export default function GastoTable({
                     <td className="py-3 px-4 text-right caja-money caja-money-strong">
                       ${fmt(totalDelFiltro)}
                     </td>
-                    {isOpen && <td />}
+                    <td />
                   </tr>
                 </>
               )}
