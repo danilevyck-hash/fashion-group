@@ -253,6 +253,9 @@ export function filaDeLinea(planillaId: string, empresa: string, l: LineaPlanill
     extra_aprobada: l.extraAprobada,
     // 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, congelado con el resto del cuadro.
     // `undefined`/0 sin el interruptor: la columna nace con default 0.
+    // ⚠️ Desde el 11-sep-2026 es un TESTIGO: el ajuste ya está repartido
+    // adentro de las columnas de dinero que se guardan al lado (extra en
+    // extra, tardanza en tardanza). No se vuelve a restar de nada.
     ajuste_anterior: l.ajusteAnterior ?? 0,
   };
 
@@ -292,9 +295,11 @@ export function totalesDe(lineas: readonly LineaPlanilla[]): TotalesGuardados {
     if (!l.dinero) continue;
     totalBruto += l.dinero.totalBruto;
     totalDeducciones += l.dinero.totalDeducciones;
-    // 🔴 El neto GUARDADO es el que se paga: netoPagar MENOS el ajuste de la
-    // quincena anterior. `?? 0` sin el interruptor → el número de siempre.
-    totalNeto += l.dinero.netoPagar - (l.ajusteAnterior ?? 0);
+    // 🔴 El neto GUARDADO es el que se paga: `netoPagar` tal cual. Desde el
+    // 11-sep-2026 el ajuste de la quincena anterior ya viene ADENTRO de
+    // `dinero` (repartido por columna, `aplicarAjusteEnLinea`); restarlo otra
+    // vez lo cobraría dos veces.
+    totalNeto += l.dinero.netoPagar;
   }
   const c = (n: number) => Math.round(n * 100) / 100;
   return {
