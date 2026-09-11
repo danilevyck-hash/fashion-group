@@ -817,6 +817,13 @@ export interface DiasAprobados {
    */
   autoMin?: number;
   codigo: string;
+  /**
+   * 🔴 `codigo|fecha` de cada día que alguien decidió que NO se paga
+   * (10-sep-2026). No se paga —igual que un pendiente— pero NO se aparta en
+   * `extraNoAprobada*`: ya está decidido, y contarlo ahí lo pondría en el aviso
+   * ámbar y frenaría el cierre como si nadie lo hubiera mirado.
+   */
+  clavesNo?: ReadonlySet<string>;
 }
 
 export function medirHoras(
@@ -833,6 +840,9 @@ export function medirHoras(
     // algo que alguien conceda.
     const pagaExtra =
       !aprob?.exigir || aprob.claves.has(`${aprob.codigo}|${d.fecha}`);
+    // 🔴 «No se paga» es una DECISIÓN, no un pendiente (10-sep-2026): se cierra
+    // igual, pero no se aparta para el aviso ni para el freno.
+    const decididoNo = aprob?.clavesNo?.has(`${aprob.codigo}|${d.fecha}`) === true;
     // 🔴 EL DOMINGO Y EL FERIADO TRABAJADOS TAMBIÉN NECESITAN APROBACIÓN
     // (10-sep-2026, Daniel: *«domingo también necesita aprobación»*). 🩸 Lo que
     // estaba roto era que Aprobaciones NUNCA LOS OFRECÍA —solo días hábiles con
@@ -840,7 +850,7 @@ export function medirHoras(
     // personas el domingo 26-jul y 7 el 23-ago-2026 (la contable pagó $90,38 y
     // $223,88; el sistema, $0, sin decirlo). Ahora se ofrecen, y lo no aprobado
     // se aparta abajo (`extraNoAprobadaDomFerMin`) para que el aviso lo diga.
-    if (!pagaExtra) {
+    if (!pagaExtra && !decididoNo) {
       // Lo trabajado en domingo o feriado sin aprobar: NO se paga, pero SE VE
       // (se aparta con su recargo para el aviso ámbar y el freno del cierre).
       // ⚠️ Va ANTES del bloque de los 30 min de ACS, que solo toca la hora extra.
@@ -884,9 +894,12 @@ export function medirHoras(
       // `armarLinea` lo valúe con la MISMA fórmula del pago (1,25 el diurno,
       // 1,50 el nocturno) y el aviso diga cuánto se pagaría al aprobar. Sumar
       // los dos en una sola cifra era perder el precio de cada minuto.
-      h.extraNoAprobadaMin += (c.extraDiurnoMin - pagaDiurno) + (c.extraNocturnoMin - pagaNocturno);
-      h.extraNoAprobadaDiurnoMin += c.extraDiurnoMin - pagaDiurno;
-      h.extraNoAprobadaNocturnoMin += c.extraNocturnoMin - pagaNocturno;
+      // 🔴 Salvo que alguien ya haya dicho «No»: eso no es un pendiente.
+      if (!decididoNo) {
+        h.extraNoAprobadaMin += (c.extraDiurnoMin - pagaDiurno) + (c.extraNocturnoMin - pagaNocturno);
+        h.extraNoAprobadaDiurnoMin += c.extraDiurnoMin - pagaDiurno;
+        h.extraNoAprobadaNocturnoMin += c.extraNocturnoMin - pagaNocturno;
+      }
     }
     h.tardanzaMin += c.tardanzaMin;
     h.salidaTempranaMin += c.salidaTempranaMin;
@@ -993,6 +1006,15 @@ export interface FichaPlanilla {
    * reloj se le ignora SIEMPRE**, marque o no marque.
    */
   noMarcaReloj?: boolean;
+  /**
+   * 🔴 `false` = NO COBRA HORAS EXTRA (10-sep-2026). Ver `cobra-horas-extra.ts`.
+   * Ausente o `true` = cobra, que es como estaban las 46 fichas —Daniel: *«por
+   * default a todos sí»*—. Con `false` el motor le cierra la MISMA mitad que al
+   * servicio profesional (`sinHorasExtra`): extra, excedente, domingo y feriado
+   * en cero; tardanzas, ausencias y salida temprana intactas; y SIGUE en
+   * planilla con su quincenal, sus seguros y su neto.
+   */
+  cobraHorasExtra?: boolean;
   /**
    * 🔴 SU SUELDO SE PAGA ENTRE DOS EMPRESAS Y SALE EN LAS DOS PLANILLAS. Ver
    * `reparto.ts` y `ParteReparto` acá abajo. Ausente o vacío = una sola línea,
@@ -1243,6 +1265,11 @@ export interface LineaPlanilla {
    * cero: alguien que vino todos los días y no hizo extras también daría cero.
    */
   noMarcaReloj: boolean;
+  /**
+   * `false` = no cobra horas extra (10-sep-2026): Aprobaciones no la ofrece y el
+   * aviso no la cuenta. Ausente o `true` = cobra. Sale de la ficha.
+   */
+  cobraHorasExtra?: boolean;
   /**
    * 🔴 ESTA LÍNEA ES **UNA PARTE** DE UN SUELDO REPARTIDO ENTRE DOS EMPRESAS.
    * `null` = la persona cobra entero acá, que es el caso de 36 de las 37 fichas.
@@ -1761,6 +1788,11 @@ export function armarLinea(
   // saltear. La jornada diaria se conserva —es del horario, no del reloj— para
   // que la línea siga sabiendo cuánto dura su día.
   const noMarca = ficha.noMarcaReloj === true;
+  // 🔴 Y QUIEN NO COBRA HORAS EXTRA (ficha, 10-sep-2026) recibe el MISMO trato
+  // que el servicio profesional en esta mitad: `sinHorasExtra`. Solo un `false`
+  // explícito lo apaga; ausente es «cobra», como las 46 fichas de ese día.
+  const noCobraExtra = ficha.cobraHorasExtra === false;
+  const sinRecargos = fueraDePlanilla || noCobraExtra;
   // 🔴 Y EL SERVICIO PROFESIONAL SE QUEDA SIN LAS HORAS QUE SE PAGAN CON
   // RECARGO (3-sep-2026). Daniel: *«yulisa marca pero no deberia de calcular
   // ya que es salario fijo, es solo para ver sus tardanzas y ausencias»*. Va
@@ -1770,7 +1802,7 @@ export function armarLinea(
   // Aprobaciones. Tardanza y ausencia pasan intactas.
   const horasMedidas: HorasPersona = noMarca
     ? { ...HORAS_CERO, jornadaDiariaMin: horas.jornadaDiariaMin }
-    : fueraDePlanilla
+    : sinRecargos
       ? sinHorasExtra(horas)
       : horas;
 
@@ -1793,7 +1825,7 @@ export function armarLinea(
   // 🔑 El servicio profesional no tiene nada que aprobar: el rótulo dice
   // «nada quedó afuera» aunque `armarPlanilla` haya visto minutos sin aprobar
   // en `h` — esos minutos se cerraron arriba y no se van a pagar nunca.
-  const extraAprobada = fueraDePlanilla || !exigir || extra.aprobada === true;
+  const extraAprobada = sinRecargos || !exigir || extra.aprobada === true;
 
   // 🔴 EL FILTRO VIVE EN `medirHoras`, Y ACÁ NO SE REPITE (27-ago-2026).
   //
@@ -1917,6 +1949,7 @@ export function armarLinea(
         ? ficha.baseSeguros
         : null,
     noMarcaReloj: noMarca,
+    cobraHorasExtra: !noCobraExtra,
     decidirAMano: motivoDecidir,
     prorrateo: prorrateoTexto,
     quincenalReferencia,
@@ -2013,6 +2046,11 @@ export interface OpcionesPlanilla {
    * final de la línea — ahí el detalle ya se perdió.
    */
   diasExtraAprobados?: ReadonlySet<string>;
+  /**
+   * 🔴 `codigo|fecha` de cada día que alguien decidió que NO se paga
+   * (10-sep-2026). No se paga y NO cuenta como pendiente. Ver `DiasAprobados`.
+   */
+  diasExtraNo?: ReadonlySet<string>;
 }
 
 /**
@@ -2067,6 +2105,7 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       ? medirHoras(p, reglas, jornadaDiariaMin(cod), {
           exigir: opts.exigirAprobacionExtra === true,
           claves: opts.diasExtraAprobados ?? new Set<string>(),
+          clavesNo: opts.diasExtraNo,
           codigo: cod,
           // 🔴 POR EMPRESA, de la ficha. Sin ficha —o en las otras tres— es 0 y
           // el motor se comporta exactamente como antes.

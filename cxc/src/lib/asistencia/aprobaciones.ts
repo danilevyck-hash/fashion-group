@@ -95,13 +95,49 @@ export function claveDia(codigo: string, fecha: string): string {
   return `${String(codigo).trim()}|${fecha}`;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 TRES ESTADOS, NO DOS (10-sep-2026)
+//
+// Daniel, textual: *«Aprobaciones es una sola lista de decisiones. […] Dos
+// botones: Sí y No. Se decide, y el renglón se va»*.
+//
+// 🩸 Hasta ese día `aprobado` era true/false y `false` significaba PENDIENTE:
+// no existía la forma de decir «lo miré y NO se paga». Lo que nadie marcaba
+// quedaba pendiente para siempre — en el aviso ámbar y frenando el cierre.
+//
+//   'si'  → se paga. Es EXACTAMENTE `aprobado = true`: el motor no cambió.
+//   'no'  → se decidió que no se paga. No se paga (igual que pendiente) y
+//           DEJA de contar como pendiente: ni aviso, ni freno, ni renglón.
+//   null  → pendiente (sin fila, o con fila sin decisión).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type Decision = "si" | "no" | null;
+
+/**
+ * La decisión de una fila, mirando primero `decision` y, si no viene (fixtures
+ * viejos, una lectura sin la columna), `aprobado`. UN solo lugar para no tener
+ * dos lecturas del mismo hecho.
+ */
+export function decisionDe(a: { decision?: Decision; aprobado?: boolean } | null | undefined): Decision {
+  if (!a) return null;
+  if (a.decision === "si" || a.decision === "no") return a.decision;
+  return a.aprobado === true ? "si" : null;
+}
+
+/** Cómo se lee cada decisión en pantalla y en el Excel. */
+export function textoDecision(d: Decision): "Sí" | "No" | "Pendiente" {
+  return d === "si" ? "Sí" : d === "no" ? "No" : "Pendiente";
+}
+
 /** Una aprobación guardada, tal como la lee el módulo. */
 export interface Aprobacion {
   codigo: string;
   /** El DÍA aprobado. YYYY-MM-DD */
   fecha: string;
-  /** `false` = se desaprobó. La fila NO se borra: el registro se conserva. */
+  /** `true` ⇔ `decision === 'si'`. Se conserva porque el motor paga con esto. */
   aprobado: boolean;
+  /** Sí · No · pendiente. Ver arriba. Ausente = se deriva de `aprobado`. */
+  decision?: Decision;
   /**
    * 🔑 EL TESTIGO, NO EL PAGO. Cuántos minutos de hora extra había medidos
    * cuando alguien tocó el botón. No se paga con este número: se compara.
@@ -131,7 +167,12 @@ export function indexarAprobaciones(
  * `exigirAprobacion`, y ése sí depende de que la tabla exista.
  */
 export function estaAprobado(a: Aprobacion | undefined | null): boolean {
-  return a?.aprobado === true;
+  return decisionDe(a) === "si";
+}
+
+/** ¿Se decidió que ESE día NO se paga? No es pendiente: nadie lo espera. */
+export function estaRechazado(a: Aprobacion | undefined | null): boolean {
+  return decisionDe(a) === "no";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,7 +301,10 @@ export interface PersonaEnDia {
   /** Lo trabajado en domingo o feriado, y de qué tipo es el día (10-sep-2026). */
   domFerMin: number;
   tipo: "extra" | "domingo" | "feriado";
+  /** `true` ⇔ `decision === 'si'`. Lo que se PAGA. */
   aprobado: boolean;
+  /** Sí · No · pendiente (10-sep-2026). Ausente = se deriva de `aprobado`. */
+  decision?: Decision;
   por: string | null;
   cuando: string | null;
   /** El testigo guardado. `null` si nunca se tocó. */
@@ -332,6 +376,11 @@ export function armarDiasAprobacion(opts: OpcionesDias): DiaAprobacion[] {
     // Si alguien la aprobó antes de esta fecha, esas filas se IGNORAN, no se
     // borran: el registro de quién tocó qué se conserva.
     if (l.fueraDePlanilla) continue;
+    // 🔴 QUIEN NO COBRA HORAS EXTRA TAMPOCO SE OFRECE (10-sep-2026). La casilla
+    // de la ficha (`cobra_horas_extra`, Daniel: *«por default a todos sí»*)
+    // apaga el recargo en el motor, así que acá no hay nada que decidir:
+    // ofrecerla era pedir un «No» sobre la misma persona cada quincena.
+    if (l.cobraHorasExtra === false) continue;
     for (const d of diasConExtra(p, opts.reglas)) {
       const a = opts.aprobaciones.get(claveDia(p.codigo, d.fecha));
       const arr = porFecha.get(d.fecha) ?? [];
@@ -347,6 +396,7 @@ export function armarDiasAprobacion(opts: OpcionesDias): DiaAprobacion[] {
         domFerMin: d.domFerMin,
         tipo: d.tipo,
         aprobado: estaAprobado(a),
+        decision: decisionDe(a),
         por: a?.por ?? null,
         cuando: a?.cuando ?? null,
         minutosVistos: a ? a.minutosVistos : null,
@@ -388,41 +438,51 @@ export function horasBonitas(minutos: number): string {
  */
 export interface ToqueAprobacion { codigo: string; fecha: string; minutos: number }
 
-/** El `aprobado` de cada persona-día ANTES de tocar, para poder volver atrás. */
-export function previoDe(dias: readonly DiaAprobacion[], items: readonly ToqueAprobacion[]): Map<string, boolean> {
+/** `true` → 'si', `false` → pendiente. Es lo que la casilla vieja significaba. */
+export function decisionDeToque(v: Decision | boolean): Decision {
+  if (v === true) return "si";
+  if (v === false) return null;
+  return v;
+}
+
+/** La decisión de cada persona-día ANTES de tocar, para poder volver atrás. */
+export function previoDe(dias: readonly DiaAprobacion[], items: readonly ToqueAprobacion[]): Map<string, Decision> {
   const claves = new Set(items.map((i) => claveDia(i.codigo, i.fecha)));
-  const out = new Map<string, boolean>();
+  const out = new Map<string, Decision>();
   for (const d of dias) for (const g of d.gente) {
     const k = claveDia(g.codigo, d.fecha);
-    if (claves.has(k)) out.set(k, g.aprobado);
+    if (claves.has(k)) out.set(k, decisionDe(g));
   }
   return out;
 }
 
-/** Los mismos días con esas personas-día en `aprobado`. Nuevo arreglo, nada se muta. */
+/** Los mismos días con esas personas-día en `decision`. Nuevo arreglo, nada se muta. */
 export function aplicarAprobacionLocal(
   dias: readonly DiaAprobacion[],
   items: readonly ToqueAprobacion[],
-  aprobado: boolean,
+  decision: Decision | boolean,
 ): DiaAprobacion[] {
+  const dec = decisionDeToque(decision);
   const claves = new Set(items.map((i) => claveDia(i.codigo, i.fecha)));
   return dias.map((d) => ({
     ...d,
     gente: d.gente.map((g) =>
       claves.has(claveDia(g.codigo, d.fecha))
-        ? { ...g, aprobado, minutosVistos: aprobado ? g.minutos : g.minutosVistos, cambio: false }
+        ? { ...g, aprobado: dec === "si", decision: dec, minutosVistos: dec === "si" ? g.minutos : g.minutosVistos, cambio: false }
         : g,
     ),
   }));
 }
 
 /** Vuelve cada persona-día a lo que decía antes del toque que falló. */
-export function revertirAprobacionLocal(dias: readonly DiaAprobacion[], previo: ReadonlyMap<string, boolean>): DiaAprobacion[] {
+export function revertirAprobacionLocal(dias: readonly DiaAprobacion[], previo: ReadonlyMap<string, Decision>): DiaAprobacion[] {
   return dias.map((d) => ({
     ...d,
     gente: d.gente.map((g) => {
       const k = claveDia(g.codigo, d.fecha);
-      return previo.has(k) ? { ...g, aprobado: previo.get(k)! } : g;
+      if (!previo.has(k)) return g;
+      const dec = previo.get(k) ?? null;
+      return { ...g, aprobado: dec === "si", decision: dec };
     }),
   }));
 }
@@ -438,7 +498,8 @@ export function resumenPendientes(dias: readonly DiaAprobacion[]): {
   const claves: string[] = [];
   for (const d of dias) {
     for (const g of d.gente) {
-      if (g.aprobado) continue;
+      // 🔴 Pendiente = SIN decisión. Un «No» ya está decidido (10-sep-2026).
+      if (decisionDe(g) !== null) continue;
       pendientes += 1;
       minutos += g.minutos;
       claves.push(claveDia(g.codigo, d.fecha));
@@ -496,7 +557,7 @@ export function primerDiaPendienteDe(
   if (!cod) return null;
   const orden = [...dias].sort((a, b) => a.fecha.localeCompare(b.fecha));
   for (const d of orden) {
-    if (d.gente.some((g) => g.codigo === cod && !g.aprobado)) return d.fecha;
+    if (d.gente.some((g) => g.codigo === cod && decisionDe(g) === null)) return d.fecha;
   }
   return null;
 }
