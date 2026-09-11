@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { SYSTEM_ROLE_KEYS, ALL_MODULE_KEYS } from "@/lib/modules";
+import { moduloOfrecible } from "@/lib/modulos-ofrecibles";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,18 @@ function validateRoleAndModulos(role: unknown, modulos_override: unknown): strin
     const invalid = modulos_override.find((m) => typeof m !== "string" || !ALL_MODULE_KEYS.includes(m));
     if (invalid !== undefined) {
       return `Módulo inválido: '${invalid}'. Módulos válidos: ${ALL_MODULE_KEYS.join(", ")}`;
+    }
+    // 🔴 Y que el ROL pueda de verdad abrirlo (11-sep-2026). Un módulo que el
+    // guard de su pantalla rebota por rol no se puede guardar: así nació el
+    // `multifashion` de andrea, una ficha que se pintaba y mandaba de vuelta al
+    // Inicio. El editor ya no lo ofrece; acá se cierra también la puerta de
+    // atrás, que es la que importa cuando la casilla vuelva por cualquier
+    // motivo.
+    if (typeof role === "string") {
+      const rebota = modulos_override.find((m) => !moduloOfrecible(role, m));
+      if (rebota !== undefined) {
+        return `El rol '${role}' no puede abrir '${rebota}': la pantalla lo devuelve al Inicio. Quítalo de los permisos personalizados.`;
+      }
     }
   } else if (modulos_override !== undefined && modulos_override !== null) {
     return "modulos_override debe ser un arreglo de módulos o null.";

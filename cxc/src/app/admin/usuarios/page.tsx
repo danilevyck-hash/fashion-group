@@ -10,7 +10,8 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import VendedorSwitchSection from "./VendedorSwitchSection";
 import NovedadesTab from "./NovedadesTab";
 import IconButton from "@/components/IconButton";
-import { ALL_MODULES, getDefaultModulesForRole } from "@/lib/modules";
+import { getDefaultModulesForRole } from "@/lib/modules";
+import { modulosOfrecibles, moduloOfrecible } from "@/lib/modulos-ofrecibles";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { Ayuda } from "@/components/shared/Ayuda";
 
@@ -18,8 +19,8 @@ import { Ayuda } from "@/components/shared/Ayuda";
 // el <link> queda inerte si ya está en cache desde otra página.
 const PLAYFAIR_HREF = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap";
 
-// Módulos disponibles para el override per-usuario. Fuente única: ALL_MODULES.
-const MODULES = ALL_MODULES.map(m => ({ key: m.key, label: m.label }));
+// (Los módulos que se pueden ofrecer dependen del ROL del usuario que se está
+// editando: se calculan abajo con `modulosOfrecibles`, no son una lista fija.)
 
 function relativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -197,7 +198,11 @@ function UsuariosPageInner() {
         name: uName.trim(),
         role: uRole,
         associated_company: uCompany || null,
-        modulos_override: customPerms ? uModules : null,
+        // Se manda solo lo que ese ROL puede abrir: si alguien cambia el rol
+        // con casillas ya marcadas, las que el nuevo rol no alcanza se caen
+        // acá en vez de guardarse para rebotar después (el servidor también
+        // las rechaza).
+        modulos_override: customPerms ? uModules.filter((k) => moduloOfrecible(uRole, k)) : null,
       };
       if (uPassword.trim()) body.password = uPassword.trim();
       const method = editUserId ? "PUT" : "POST";
@@ -510,7 +515,7 @@ function UsuariosPageInner() {
                   </div>
                   {customPerms && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-3">
-                      {MODULES.map(mod => {
+                      {modulosOfrecibles(uRole).map(mod => {
                         const checked = uModules.includes(mod.key);
                         return (
                           /* Misma receta: la fila-<label> da los 44px de alto
