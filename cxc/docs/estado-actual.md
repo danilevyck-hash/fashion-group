@@ -1974,3 +1974,70 @@ fechada (ninguno se borró): `asistencia-prestamo-planilla` · `asistencia-plani
    fuera de Constancia); las puertas (formulario y ruta) son las que exigen Constancia.
 4. En «Antes de cerrar» las líneas de préstamo/vacaciones/reparto llevan su texto completo (con
    nombres): la regla de Daniel de que lo que mueve plata se dice con nombre gana a «sin nombres».
+
+---
+
+## Barras pegajosas — se pegan DEBAJO del encabezado (11-sep-2026)
+
+Daniel, con captura de **Ventas › Clientes**: *«mira cómo se corta arriba; y así también pasa en
+otros módulos, para que chequees y arregles eso»*. Al hacer scroll, la barra de filtros
+(Ventas/Utilidad/Margen · buscador · «Clientes: últimos 12 meses» · Actualizar · Excel · las
+píldoras de empresa) se montaba **encima** del encabezado de la app.
+
+**La causa, en dos números que vivían a 300 archivos de distancia:** la barra era
+`sticky top-0 z-20` y el `AppHeader` es `sticky top-0` con z-index **10**. Mismo tope y más
+z-index. Medido en Chrome: la barra cubría el encabezado por su **alto entero** — 72 px en
+escritorio, 46 en celular.
+
+**Y no había número bueno que escribir a mano.** El encabezado **no tiene alto fijo**: en el
+escritorio lleva la tira del breadcrumb (**72 px**) y en el celular no (**46 px**). Por eso el
+`top-14` (56 px) de `TimeGroupHeader` fallaba en las DOS pantallas a la vez: en escritorio se metía
+14 px encima del breadcrumb, y en celular dejaba 10 px de franja por la que se veía pasar la lista.
+
+**El arreglo, en un solo lugar.** El alto se **MIDE** con `ResizeObserver` —el mismo patrón que ya
+usaba la barra del carrito del catálogo— y viaja en `--fg-altura-encabezado`. Lo publican los DOS
+encabezados del sistema: `AppHeader` y `CatalogoNavbar` (el catálogo con sesión no lleva
+`AppHeader`). La clase `CLASE_BARRA_PEGAJOSA` (`src/lib/ui/barra-pegajosa.ts`) es la única forma de
+pegar una barra de contenido: `top: var(--fg-altura-encabezado)` y **z-index 9**, por debajo del 10
+del encabezado. Los dos z-index viven juntos en un archivo.
+
+### El mapa: 34 sitios, 4 barras de página
+
+| Barra | Antes | Módulo |
+|---|---|---|
+| Barra de filtros | `top-0 z-20` | **Ventas › Clientes** (la captura) |
+| Barra de arriba | `top-0 z-20` | **Guías › Nueva guía** |
+| `TimeGroupHeader` | `top-14 z-[5]` | **Guías** y **Recordatorios** |
+| Barra del modo pedido | `top-0 z-30` | **Catálogo** (con sesión) |
+
+Los **30 restantes se dejan como están, a propósito**: `<thead>`/`<th>` con `sticky top-0` (se pegan
+al contenedor con scroll de SU tabla) y cabeceras de modal (se pegan al panel del modal). Ninguno
+compite con el encabezado de la app y darles su tope los rompería. Están enumerados uno por uno, con
+su motivo, en el candado.
+
+### Medición (Chrome real, servidor de producción local)
+
+|  | varAlto | encabezado | barra | solapa | hueco | debajo |
+|---|---|---|---|---|---|---|
+| Ventas › Clientes · 1440 | 72px | 72 z10 | 72 z9 | **0** | 0 | se ve |
+| Guías · 1440 | 72px | 72 z10 | 72 z9 | **0** | 0 | se ve |
+| Ventas › Clientes · 390 | 46px | 46 z10 | 46 z9 | **0** | 0 | se ve |
+| Guías · 390 | 46px | 46 z10 | 46 z9 | **0** | 0 | se ve |
+
+**CONTROL en la misma página:** devolviéndole a la barra el tope 0 y el z-index 20 de antes, las
+cuatro invaden el encabezado por su alto entero (72 y 46) — el medidor sí mira.
+
+Candados: `barras-pegajosas.test.ts` (barrido de `src/**`, con la lista de exentos exigida VIVA y
+CONTROL de que reconoce una barra mal escrita) · `barras-pegajosas.test.tsx` (pantalla de Ventas ›
+Clientes). Medición: `scripts/_medir-barras-pegajosas.mjs`.
+
+### ⚠️ Dejado a propósito / pendiente de Daniel
+
+1. **Marketing › Proyecto (overlay):** adentro del panel conviven DOS `sticky top-0` —la cabecera
+   del overlay y la tira de «N facturas sin guardar» de `FacturasSection`—, que comparten el mismo
+   contenedor de scroll. Es el mismo tipo de choque, pero adentro de un modal y en otro módulo: no
+   es lo que Daniel reportó y no se tocó.
+2. **Ninguna barra se quitó.** El encargo permitía señalar barras que solo estorban; las cuatro
+   aportan (la de Clientes lleva el buscador y los filtros, la de Guías el estado y el «volver», la
+   de grupo dice en qué fecha estás, la del catálogo es el único camino de vuelta al pedido). Si
+   Daniel quiere retirar alguna, es decisión suya.
