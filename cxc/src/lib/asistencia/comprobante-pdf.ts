@@ -121,6 +121,17 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
   // ── El pie que se firma. Va abajo del todo, siempre en el mismo lugar, para
   //    que 34 hojas se firmen sin buscar la línea en cada una.
   const yPie = HOJA.alto - 34;
+
+  // ── La nota del ajuste (11-sep-2026), chica y gris, ARRIBA de la raya de
+  //    las firmas: dice que unas columnas traen los días que la quincena
+  //    anterior pagó sin medir. Solo se dibuja cuando hay algo que decir.
+  if (c.nota) {
+    doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(110);
+    const lineasNota = doc.splitTextToSize(c.nota, derecha - MARGEN) as string[];
+    doc.text(lineasNota, MARGEN, yPie - 10 - (lineasNota.length - 1) * 3.5);
+    doc.setTextColor(0);
+  }
+
   doc.setDrawColor(180).setLineWidth(0.3);
   doc.line(MARGEN, yPie - 6, derecha, yPie - 6);
 
