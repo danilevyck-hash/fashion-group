@@ -1523,3 +1523,26 @@ Justificaciones, no en este formulario mínimo; en el iPhone el selector no ofre
 se conservan los del reloj. ⚠️ Al momento de subir, `guias-entrega-directa` y `guias-sin-rechazo`
 fallaban **en HEAD puro** (13 casos, ajenos a este trabajo): lo tiene que mirar quien tocó Guías.
 
+
+
+---
+
+## 11-sep-2026 — Reclamos: el rediseño (portada, empresa, reclamo, nuevo reclamo) y el bucket de fotos cerrado
+
+Aprobado por Daniel el 10/11-sep con tres mockups (portada+empresa+nuevo, «Reclamar un renglón de cien», «La pantalla del reclamo»). El bloque **Reclamos — el rediseño** de `CLAUDE.md` trae cada decisión con su cita. Aquí, lo que quedó y lo que falta.
+
+### Lo medido (antes y después, idéntico)
+- 29 por cobrar · **$14.939,64**; 20 reclamados **$5.347,61** · 9 sin reclamar **$9.592,03**; 5 pagados $5.306,62.
+- Migración `20261111120000_reclamos_rediseno.sql` **aplicada**: `reclamado_en` rellenó 20 de 20 desde las notas de correo del sistema; `fecha_factura` nació vacía; las dos facturas pegadas (REC-2026-0019 y REC-2026-0020) corregidas por id; bucket `reclamo-fotos` → **privado** (la URL pública vieja contesta 400; una firmada, 200).
+- Los PDF del bucket: 26 archivos = **8 distintos** (el mismo subido hasta 13 veces). 7 de 9 (con la factura de referencia de Daniel) sin talla por renglón (aswgr); 2 de 9 con talla desglosada (Latin Fitness). 4 de los de aswgr son imagen escaneada.
+
+### Pendiente de Daniel
+1. 🔴 **Rotar `ANTHROPIC_API_KEY`**: la llave de `.env.local` y la de Vercel son la misma y el API la rechaza («API key is invalid»). Sin ella el lector de facturas no lee (Reclamos y Marketing, en producción, desde antes de hoy). Al rotarla, correr el backfill: `ANTHROPIC_API_KEY=<nueva> npx tsx scripts/_backfill-reclamos-fecha-factura.mjs` → llena `fecha_factura` en los **4** reclamos vivos con PDF; los **30** sin PDF los teclea Andrea (la lista los muestra al final con «Falta la fecha de la factura» y Editar la pide).
+2. Los links públicos de fotos/comprobantes ya se cerraron (decisión del 11-sep). Lo que sigue abierto es la **galería del proveedor** con token HMAC en el link del Excel (la página firma las fotos al cargar) — es lo que hace que el correo no se rompa.
+3. En la página de la empresa quedaron **Correo · Descargar Excel · Descargar PDF** arriba (actúan sobre la selección o sobre lo que se está mirando). Los ↓Excel/↓PDF de la tarjeta de la portada se fueron con el mockup; si Daniel los quiere de vuelta en la tarjeta, es un cambio de pantalla, no de datos.
+4. Género quedó como columna en la lista de renglones del PDF porque el formulario lo exige desde siempre (Daniel: «no lo toques»). Si quiere que deje de ser obligatorio, es otra decisión.
+
+### Candados
+`reclamos-rediseno.test.ts` (puro + barridos) · `reclamos-rediseno.test.tsx` (las cuatro pantallas montadas); **34 mutaciones, 34 cazadas, 2 controles** (`scripts/_mutar-candados-reclamos-rediseno.sh`). Seis candados viejos cambiaron de dirección con nota fechada (ver CLAUDE.md).
+
+⚠️ Al correr la suite completa fallaban además `guias-entrega-directa` y `guias-sin-rechazo` (13 casos) — **fallan igual en HEAD limpio**, no son de este cambio; y en el árbol había trabajo de Asistencia sin commitear de otra sesión (con errores de `tsc`), que no se tocó ni se commiteó.
