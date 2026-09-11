@@ -41,7 +41,7 @@ import {
 import { sinRetirados } from "@/lib/comisiones/retirados";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
-import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
+import { esTodoElAnio, etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import { ROTULO_NO_SE_PAGA as MARCA_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
 import { nombreArchivoComisionesEmpresa } from "@/lib/comisiones/nombre-archivo";
 import { descargarPdfTablaComisiones } from "@/lib/comisiones/pdf-tabla-comisiones";
@@ -108,6 +108,14 @@ export function ComisionesPorEmpresaView({
   const [detalleVendedor, setDetalleVendedor] = useState<string | null>(null);
   // 🔴 Los que no se pagan, escondidos hasta que se los pida.
   const [verNoSePagan, setVerNoSePagan] = useState(false);
+  // 🔴 CON «TODO EL AÑO» NO SE ABRE EL DETALLE — el MISMO candado que la matriz
+  // de Fashion Group (11-sep-2026). El reporte por vendedor es de UN mes
+  // (`comision_b2b_detalle` recibe year + mes). 🩸 Esta vista no lo tenía: con
+  // «Todo el año» y una empresa, tocar una fila abría el detalle y mostraba el
+  // error crudo del servidor «mes inválido (1..12)», mientras el pie seguía
+  // diciendo «Toca para ver el detalle».
+  const conDetalle = !esTodoElAnio(mes);
+  const abrirDetalle = conDetalle ? setDetalleVendedor : () => {};
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -266,7 +274,7 @@ export function ComisionesPorEmpresaView({
             verNoSePagan={verNoSePagan}
             onVerNoSePagan={() => setVerNoSePagan((v) => !v)}
             total={totalGeneral}
-            onDetalle={setDetalleVendedor}
+            onDetalle={abrirDetalle}
           />
 
           {/* iPad y escritorio: la tabla. El `overflow-x-auto` es nuevo — sin
@@ -289,9 +297,9 @@ export function ComisionesPorEmpresaView({
                 <tr
                   key={v.vendedor}
                   data-se-paga={v.se_paga === false ? "no" : "si"}
-                  onClick={() => setDetalleVendedor(v.vendedor)}
-                  className={`cursor-pointer border-b border-gray-100 last:border-0 transition hover:bg-gray-50 ${v.se_paga === false ? "text-gray-400" : ""}`}
-                  title="Ver reporte detallado"
+                  onClick={conDetalle ? () => setDetalleVendedor(v.vendedor) : undefined}
+                  className={`border-b border-gray-100 last:border-0 transition ${conDetalle ? "cursor-pointer hover:bg-gray-50" : ""} ${v.se_paga === false ? "text-gray-400" : ""}`}
+                  title={conDetalle ? "Ver reporte detallado" : undefined}
                 >
                   <td className={`px-3 py-2.5 font-medium xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>
                     {/* Capitalizado solo para MOSTRAR («Reynaldo Espinosa»);
@@ -353,13 +361,13 @@ export function ComisionesPorEmpresaView({
           muestran el MISMO neto, así que tienen que explicarlo igual. */}
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        Toca para ver el detalle
+        {conDetalle ? "Toca para ver el detalle" : "Elige un mes para ver el detalle"}
         <Ayuda titulo="Cómo se calcula">
           <p>Ya están descontados lo devuelto y los descuentos.</p>
         </Ayuda>
       </p>
 
-      {detalleVendedor && (
+      {detalleVendedor && conDetalle && (
         <ComisionesDetalleModal
           empresa={empresa}
           empresaNombre={nombreEmpresa}
