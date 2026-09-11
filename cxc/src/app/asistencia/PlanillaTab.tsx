@@ -96,6 +96,16 @@ import {
   prestamosSinDescontar,
   valorTecleado,
 } from "@/lib/asistencia/casilla-sin-descontar";
+import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import {
+  LIMPIAR_BUSQUEDA,
+  PARAM_BUSCAR,
+  PLACEHOLDER_COLABORADOR,
+  VACIO_BUSQUEDA,
+  filtrarPorTexto,
+  textoDeConteo,
+} from "@/lib/buscar-en-lista";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import AntesDeCerrar from "./AntesDeCerrar";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
@@ -366,6 +376,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   const [corte, setCorte] = useState("");
   // «Descargar ⌄»: Excel · PDF · Comprobantes en un solo botón (11-sep-2026).
   const [descargaOpen, setDescargaOpen] = useState(false);
+  /** El texto del buscador vive en la URL (`replace`), con la MISMA llave de las otras pestañas de Asistencia. */
+  const [busqueda, setBusqueda] = useUrlState(PARAM_BUSCAR, "");
   const descargaRef = useRef<HTMLButtonElement>(null);
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -832,6 +844,29 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   const decidir = data?.lineas.filter((l) => grupoDeLinea(l) === "decidir") ?? [];
   const pendientes = data?.lineas.filter((l) => grupoDeLinea(l) === "falta") ?? [];
 
+  // ── 🔴 EL BUSCADOR SOLO TACHA RENGLONES DE LA PANTALLA (11-sep-2026) ───────
+  //
+  // 🔴 NO TOCA LA PLATA. El Excel, el PDF, los comprobantes y el CIERRE salen de
+  // `data.lineas` y de `data.totales` —lo que el servidor calculó, completo— y
+  // ninguno de los cuatro mira `busqueda`. Filtrar la descarga sería pagar una
+  // quincena a medias porque alguien dejó un nombre escrito en el campo.
+  // El TOTAL del pie tampoco cambia: sigue siendo `data.totales`.
+  //
+  // Lo único que el buscador decide es qué FILAS se dibujan, en las dos
+  // superficies (la tabla del escritorio y las tarjetas del celular).
+  const enPantalla = useCallback(
+    (ls: LineaPlanilla[]) => filtrarPorTexto(ls, busqueda, (l) => [l.etiqueta, l.codigo]),
+    [busqueda],
+  );
+  const buenasVistas = enPantalla(buenas);
+  const fueraVistas = enPantalla(fueraDePlanilla);
+  const decidirVistas = enPantalla(decidir);
+  const pendientesVistas = enPantalla(pendientes);
+  const buscando = busqueda.trim() !== "";
+  const nadieEnLaBusqueda =
+    buscando &&
+    buenasVistas.length + fueraVistas.length + decidirVistas.length + pendientesVistas.length === 0;
+
   /**
    * 🔴 UN SOLO BOTÓN, y cambia de nombre según lo que va a hacer: «Generar» la
    * primera vez y cuando lo elegido no es lo que está en pantalla; «Regenerar»
@@ -1211,6 +1246,34 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               quincenal: la cuota del módulo entra sola a la casilla de cada
               fila (`prestamoAutomatico`) y la casilla sigue siendo editable. */}
 
+          {/* 🔴 EL BUSCADOR, arriba de las dos superficies y de la tabla: la
+              quincena son 19 columnas y hasta 42 filas, y encontrar a alguien
+              para corregirle una casilla costaba rodar la pantalla entera.
+              ⚠️ Solo tacha renglones — ver la nota de `enPantalla`. */}
+          <BuscadorDeLista
+            valor={busqueda}
+            onCambiar={setBusqueda}
+            placeholder={PLACEHOLDER_COLABORADOR}
+            etiqueta="Buscar colaborador por nombre o código"
+            conteo={textoDeConteo(
+              buenasVistas.length + fueraVistas.length + decidirVistas.length + pendientesVistas.length,
+              data.lineas.length,
+              busqueda,
+            )}
+          />
+
+          {nadieEnLaBusqueda && (
+            <VacioDeBusqueda texto={VACIO_BUSQUEDA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
+          )}
+
+          {/* 🔑 Con búsqueda escrita se DICE que el pie no cambió: el total es
+              el de la quincena entera, no el de lo que quedó a la vista. */}
+          {buscando && !nadieEnLaBusqueda && (
+            <p className="text-[13px] text-gray-500">
+              El total de abajo y lo que se descarga siguen siendo la quincena completa.
+            </p>
+          )}
+
           {/* ── ESCRITORIO: la tabla de 19 columnas ── */}
           <div className="hidden md:block">
             <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
@@ -1226,7 +1289,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                   </tr>
                 </thead>
                 <tbody>
-                  {buenas.map((l) => (
+                  {buenasVistas.map((l) => (
                     <Fila
                       key={l.codigo} l={l} onGuardar={guardar}
                       // Apagados, no escondidos: su ausencia es parte de lo que
@@ -1237,7 +1300,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                   ))}
                   {/* Fuera de planilla a propósito: en GRIS, no en ámbar. El
                       color es la mitad del mensaje — ámbar dice "arreglame". */}
-                  {fueraDePlanilla.map((l) => (
+                  {fueraVistas.map((l) => (
                     <tr key={l.codigo} className="border-b border-gray-100 last:border-0">
                       <td className="sticky left-0 z-10 bg-white px-3 py-2.5 text-gray-500">
                         {capitalizarNombre(l.etiqueta)}
@@ -1252,7 +1315,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                       quincenal que le correspondería, para que la contadora no
                       tenga que calcularlo aparte. No es un error: es una
                       decisión que el sistema no puede tomar. */}
-                  {decidir.map((l) => (
+                  {decidirVistas.map((l) => (
                     <tr key={l.codigo} className="border-b border-gray-100 last:border-0">
                       <td className="sticky left-0 z-10 bg-white px-3 py-2.5 text-gray-700">
                         {capitalizarNombre(l.etiqueta)}
@@ -1266,7 +1329,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                       </td>
                     </tr>
                   ))}
-                  {pendientes.map((l) => (
+                  {pendientesVistas.map((l) => (
                     <tr key={l.codigo} className="border-b border-gray-100 bg-amber-50/50 last:border-0">
                       <td className="sticky left-0 z-10 bg-amber-50 px-3 py-2.5 text-gray-900">
                         {capitalizarNombre(l.etiqueta)}
@@ -1317,7 +1380,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
 
           {/* ── CELULAR: una tarjeta por persona ── */}
           <div className="space-y-2 md:hidden">
-            {buenas.map((l) => (
+            {buenasVistas.map((l) => (
               <Tarjeta
                 key={l.codigo} l={l}
                 abierta={abierta === l.codigo}
@@ -1326,7 +1389,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 bloqueo={bloqueoManuales}
               />
             ))}
-            {fueraDePlanilla.map((l) => (
+            {fueraVistas.map((l) => (
               <div key={l.codigo} className="rounded-lg border border-gray-200 bg-white p-3">
                 <p className="font-medium text-gray-700">
                   {capitalizarNombre(l.etiqueta)} <span className="text-xs text-gray-400">{l.codigo}</span>
@@ -1336,7 +1399,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 </p>
               </div>
             ))}
-            {decidir.map((l) => (
+            {decidirVistas.map((l) => (
               <div key={l.codigo} className="rounded-lg border border-gray-200 bg-white p-3">
                 <p className="font-medium text-gray-700">
                   {capitalizarNombre(l.etiqueta)} <span className="text-xs text-gray-400">{l.codigo}</span>
@@ -1349,7 +1412,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 </p>
               </div>
             ))}
-            {pendientes.map((l) => (
+            {pendientesVistas.map((l) => (
               <div key={l.codigo} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <p className="font-medium text-gray-900">
                   {capitalizarNombre(l.etiqueta)} <span className="text-xs text-gray-400">{l.codigo}</span>

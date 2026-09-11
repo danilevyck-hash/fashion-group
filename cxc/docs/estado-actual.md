@@ -2231,3 +2231,34 @@ Encargo de Daniel sobre `grupo-3.md`. **Arreglar, no rediseñar.** Trece puntos,
 - **Los eliminados de Marketing se muestran en el período ABIERTO** (o en un bucket sin período): un proyecto anulado no pertenece a un período cerrado, y repetirlo en los tres sería decir lo mismo tres veces.
 - **La columna «estado» de Reclamos no ordena por separado**: la tabla tiene cinco columnas y «Reclamado» ya dice «Cobrado» cuando no está pendiente. El estado se elige con los chips de arriba, que es donde vive esa pregunta.
 - **Hallazgos 🟡 del grupo 3 que NO estaban en el encargo siguen abiertos**: la lista de guías no filtra `guia_items.deleted` (medido: 0 renglones borrados hoy, trampa latente) · el botón «Despachar» de la fila exige el estado exacto `Pendiente Bodega` · `png-guia.ts` quedó sin llamadores desde que todo sale en PDF · las cinco rutas de Reclamos y las cinco de Marketing sin un solo llamador · el enlace viejo `/marketing?bloque=&proyecto=` pierde el proyecto con 2+ períodos · «Falta la factura en PDF» parpadea mientras corre el chequeo de duplicados · en Caja: `POST /api/caja/responsables` sin pantalla, un período abierto y vacío no se puede eliminar, «Cerrar y abrir el N» puede decir otro número, y borrar el Proveedor al editar deja «Guardar» encendido.
+
+---
+
+## 11-sep-2026 (noche) — Buscador en las cuatro listas de Asistencia que lo pedían
+
+Encargo de Daniel: *«pon buscador en módulos o tabs que lo ameriten, como colaboradores por ejemplo»* → *«sí a buscadores»*.
+
+**Medido antes:** ya tenían buscador Guías, CXC, Reclamos, Clientes, Proveedores, Catálogos, Marketing, Boston, Recordatorios, Plantilla Switch y la pestaña Asistencia. Las cuatro que faltaban son las cuatro listas de personas de `/asistencia`.
+
+| Dónde | Filas | Qué pasaba |
+|---|---|---|
+| **Colaboradores** (`ConfiguracionTab`) | 42 | llegar a alguien era rodar la pantalla entera |
+| **Planilla** (`PlanillaTab`) | 19 por empresa | 19 columnas × 19 filas, y se usa con prisa dos veces al mes |
+| **Préstamos** (`PrestamosTab`) | 12 | — |
+| **Aprobaciones › Colaborador** | 15 | — |
+
+- 🔴 **UN SOLO COMPONENTE PARA LAS CUATRO**: `src/components/BuscadorDeLista.tsx` (el campo y su conteo) sobre el módulo puro `src/lib/buscar-en-lista.ts`. Mismo aspecto que Guías y CXC: 44 px, `text-base sm:text-sm` (por debajo de 16 px el iPhone hace zoom solo al tocar), borde inferior que se pone negro al escribir, y su `aria-label` — el `placeholder` desaparece al teclear.
+- 🔴 **FILTRA LO QUE YA ESTÁ CARGADO. Cero peticiones nuevas.** Por **nombre y código** —el código es lo que el reloj manda—, sin acentos ni mayúsculas, reusando `coincideBusqueda` (`buscar-normalizado.ts`). **Subcadena exacta normalizada, NUNCA por parecido**: es la regla de la casa y acá lo que se decide es plata.
+- 🔴 **EL TEXTO VIAJA EN LA URL** (`?buscar=`, `useUrlState` con `replace` — mismo nivel, no ensucia el Atrás), con **la MISMA llave en las cuatro pestañas**: se comparte el enlace y no se pierde al cambiar de pestaña.
+- 🔴 **LOS TOTALES NO CAMBIAN DE SIGNIFICADO: el pie sigue sumando TODO** y quien dice cuántos se ven es el buscador («1 de 3 colaboradores»). ⚠️ **Es al revés que en Cuentas por Cobrar**, donde la tira de totales SÍ suma lo filtrado, y es a propósito: allá el buscador es un filtro más de la misma pila (empresa · riesgo · sin pagar) y el total es de lo que se está mirando; acá el total es **la plata de la quincena** y en Planilla ni siquiera se calcula en el navegador (viene en `data.totales`, del servidor).
+- 🔴 **EN PLANILLA NO TOCA LA PLATA.** El Excel, el PDF, los comprobantes y el **CIERRE** salen de `data.lineas` / `data.totales`, completos, y ninguno mira la búsqueda. Con texto escrito la pantalla lo **dice**: «El total de abajo y lo que se descarga siguen siendo la quincena completa». Filtrar la descarga sería pagar una quincena a medias porque alguien dejó un nombre en el campo.
+- 🔴 **EN APROBACIONES, «Sí a todo lo pendiente» SIGUE SIENDO DE TODO** lo pendiente de la empresa elegida, y el contador «N por decidir · H:MM h» también cuenta a todos. Un botón que dijera «todo» y decidiera solo lo filtrado dejaría horas sin resolver sin que nadie se entere. ⚠️ El buscador **solo se dibuja en la vista «Colaborador»**: en «Día» los renglones son fechas, no personas.
+- Sin resultados se dice con palabras —«No se encontró a nadie con ese nombre»— y se ofrece **«Ver a todos»**. Ninguna lista queda vacía sin salida.
+
+**Candado:** `src/__tests__/components/asistencia-buscadores.test.tsx` (**26 casos**), con los cinco puntos de arriba probados sobre las pantallas de verdad. **Dos mutaciones de plata, las dos cazadas**: que el Excel/PDF salga filtrado (2 casos rojos) y que «Sí a todo» respete el filtro (2 casos rojos).
+**Colateral:** nueve candados de Asistencia que montan `PlanillaTab` o `ConfiguracionTab` estrenan el doble de `next/navigation` — sin app router montado, `useUrlState` tira «invariant expected app router to be mounted». El doble devuelve una URL **vacía** a propósito: sin búsqueda escrita, esos candados miran exactamente lo que miraban.
+
+### ⚠️ Dejado a propósito / pendiente de Daniel
+- **La pestaña Asistencia (`ReporteTab`) conserva su propio buscador**, que filtra contra el SERVIDOR (`?q=`) y del que salen su Excel y su PDF: es otra pregunta y otro camino, y no se tocó.
+- **Los chips de Colaboradores («Falta para pagar», «Falta completar») siguen contando sobre la lista entera**, no sobre lo buscado: son el estado de la ficha, no de lo que se está mirando.
+- **«Ya no trabajan aquí» y «Ya decididas» no se filtran**: son bloques plegados aparte, no la lista.

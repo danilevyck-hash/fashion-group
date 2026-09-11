@@ -120,6 +120,16 @@ import { puedeCerrar } from "@/lib/asistencia/roles";
 import { textoConfirmar, textoIgnorados } from "@/lib/asistencia/codigos-ignorados";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import {
+  LIMPIAR_BUSQUEDA,
+  PARAM_BUSCAR,
+  PLACEHOLDER_COLABORADOR,
+  VACIO_BUSQUEDA,
+  filtrarPorTexto,
+  textoDeConteo,
+} from "@/lib/buscar-en-lista";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import HorariosTab from "./HorariosTab";
 import FeriadosTab from "./FeriadosTab";
 
@@ -410,6 +420,10 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   const [datos, setDatos] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<"todos" | "para-pagar" | "completar" | string>("todos");
+  // 🔴 EL TEXTO DEL BUSCADOR VIAJA EN LA URL (`replace`, mismo nivel): con 42
+  // filas hay que poder mandar el enlace de alguien, y cambiar de pestaña no lo
+  // tiene que borrar. Es la MISMA llave en las cuatro listas de Asistencia.
+  const [busqueda, setBusqueda] = useUrlState(PARAM_BUSCAR, "");
   const [abierta, setAbierta] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [estadoFila, setEstadoFila] = useState<string | null>(null);
@@ -855,12 +869,23 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
    */
   const conteo = useMemo(() => contarFaltantes(activos), [activos]);
 
-  const visibles = useMemo(() => {
+  const porChip = useMemo(() => {
     if (filtro === "todos") return activos;
     if (filtro === "para-pagar") return activos.filter((p) => queLeFalta(p).paraPagar.length > 0);
     if (filtro === "completar") return activos.filter((p) => queLeFalta(p).completar.length > 0);
     return activos.filter((p) => p.empresa === filtro);
   }, [activos, filtro]);
+
+  // 🔴 El buscador filtra por NOMBRE y por CÓDIGO —el código es lo que el reloj
+  // manda y lo que se escribe en Préstamos—, sin acentos ni mayúsculas y por
+  // subcadena exacta, nunca por parecido. Los CHIPS de arriba siguen contando
+  // sobre la lista entera: son el estado de la ficha, no de lo que se está
+  // mirando.
+  const visibles = useMemo(
+    () => filtrarPorTexto(porChip, busqueda, (p) => [p.nombre, p.codigo]),
+    [porChip, busqueda],
+  );
+  const buscando = busqueda.trim() !== "";
 
   // UN solo aviso, con el desglose adentro. Antes eran dos carteles ámbar
   // apilados que decían casi lo mismo y competían entre ellos.
@@ -1012,6 +1037,21 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   + Nuevo colaborador
                 </Link>
               </div>
+            )}
+
+            {/* 🔴 EL BUSCADOR, pegado a la lista y debajo de los chips: con 42
+                filas, llegar a alguien era rodar la pantalla. Filtra lo que ya
+                está cargado; no le pregunta nada al servidor. */}
+            <BuscadorDeLista
+              valor={busqueda}
+              onCambiar={setBusqueda}
+              placeholder={PLACEHOLDER_COLABORADOR}
+              etiqueta="Buscar colaborador por nombre o código"
+              conteo={textoDeConteo(visibles.length, porChip.length, busqueda)}
+            />
+
+            {buscando && visibles.length === 0 && (
+              <VacioDeBusqueda texto={VACIO_BUSQUEDA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
             )}
 
             {visibles.length > 0 && (

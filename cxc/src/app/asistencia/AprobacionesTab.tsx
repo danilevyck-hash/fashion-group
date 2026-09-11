@@ -66,6 +66,15 @@ import {
   vistaElegida,
   type Vista,
 } from "@/lib/asistencia/aprobaciones-vistas";
+import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import {
+  LIMPIAR_BUSQUEDA,
+  PARAM_BUSCAR,
+  PLACEHOLDER_COLABORADOR,
+  VACIO_BUSQUEDA,
+  filtrarPorTexto,
+  textoDeConteo,
+} from "@/lib/buscar-en-lista";
 import PorColaborador from "./aprobaciones/PorColaborador";
 import PorDia from "./aprobaciones/PorDia";
 import YaDecididas from "./aprobaciones/YaDecididas";
@@ -167,6 +176,24 @@ export default function AprobacionesTab({ empresa = "" }: {
   const { porDecidir, decididas } = useMemo(() => separarPorDecidir(personas), [personas]);
   const porDia = useMemo(() => agruparPorDia(dias ?? []), [dias]);
   const minutosPendientes = useMemo(() => porDecidir.reduce((a, p) => a + p.minutosPendientes, 0), [porDecidir]);
+
+  // ── 🔴 EL BUSCADOR DE «COLABORADOR» (11-sep-2026) ─────────────────────────
+  //
+  // Tacha renglones de la vista «Colaborador» y NADA MÁS. En particular:
+  //   · El contador «N por decidir · H:MM h» sigue contando TODO lo pendiente
+  //     del período —es el trabajo que queda, no lo que se está mirando—.
+  //   · 🔴 «Sí a todo lo pendiente» sigue siendo de TODO lo pendiente de la
+  //     empresa elegida (`pendientes` sale de `toquesPendientes(dias)` y jamás
+  //     mira `busqueda`). Un botón que dijera «todo» y aprobara lo que quedó
+  //     filtrado dejaría horas sin decidir sin que nadie se entere.
+  //   · El Excel sale de `dias`, completo.
+  // Por nombre y por código, sin acentos y por subcadena exacta, nunca por parecido.
+  const [busqueda, setBusqueda] = useUrlState(PARAM_BUSCAR, "");
+  const porDecidirVistas = useMemo(
+    () => filtrarPorTexto(porDecidir, busqueda, (p) => [p.etiqueta, p.codigo]),
+    [porDecidir, busqueda],
+  );
+  const buscando = busqueda.trim() !== "";
 
   // ── La persona que trajo la URL ───────────────────────────────────────────
   const personaCodigo = persona.trim();
@@ -332,6 +359,18 @@ export default function AprobacionesTab({ empresa = "" }: {
               </button>
             ))}
           </div>
+          {/* 🔴 El buscador SOLO en «Colaborador»: en «Día» los renglones son
+              fechas, no personas, y un campo que dice «Buscar colaborador»
+              encima de una lista de días no busca nada. */}
+          {vista === "colaborador" && (
+            <BuscadorDeLista
+              valor={busqueda}
+              onCambiar={setBusqueda}
+              placeholder={PLACEHOLDER_COLABORADOR}
+              etiqueta="Buscar colaborador por nombre o código"
+              conteo={textoDeConteo(porDecidirVistas.length, porDecidir.length, busqueda)}
+            />
+          )}
           <div className="flex items-baseline gap-2 tabular-nums" data-testid="por-decidir">
             {porDecidir.length === 0 ? (
               <>
@@ -368,9 +407,11 @@ export default function AprobacionesTab({ empresa = "" }: {
             personaResaltada={personaCodigo}
             refResaltada={filaResaltada}
           />
+        ) : buscando && porDecidirVistas.length === 0 ? (
+          <VacioDeBusqueda texto={VACIO_BUSQUEDA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
         ) : (
           <PorColaborador
-            personas={porDecidir}
+            personas={porDecidirVistas}
             onDecidir={decidir}
             enVuelo={enVuelo}
             bloqueado={bloqueado}

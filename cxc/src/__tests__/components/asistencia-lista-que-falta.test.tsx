@@ -12,6 +12,19 @@
 //      («Completar: cargo, cédula»), vacío cuando no falta nada.
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, afterEach, vi } from "vitest";
+
+// 🔴 EL DOBLE DEL ROUTER (11-sep-2026). Desde que la Planilla y Colaboradores
+// llevan buscador, su texto vive en la URL (`useUrlState`, `replace`), y eso
+// llama a `useRouter()`: sin app router montado, jsdom tira «invariant expected
+// app router to be mounted» antes de dibujar una sola fila. El doble devuelve
+// una URL VACÍA a propósito — sin búsqueda escrita, la lista es la de siempre,
+// que es justo lo que estos candados miran.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/asistencia",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { render, screen, cleanup } from "@testing-library/react";
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";

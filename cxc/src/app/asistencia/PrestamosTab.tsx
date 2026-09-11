@@ -49,6 +49,16 @@ import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { quincenasHasta } from "@/lib/asistencia/planilla";
 import { PARAM_NUEVO_PRESTAMO, enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
 import type { Colaborador, DatosPrestamos } from "@/lib/prestamos-lista-server";
+import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import {
+  LIMPIAR_BUSQUEDA,
+  PARAM_BUSCAR,
+  PLACEHOLDER_COLABORADOR,
+  VACIO_BUSQUEDA,
+  filtrarPorTexto,
+  textoDeConteo,
+} from "@/lib/buscar-en-lista";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import ElegirPersonaModal from "@/app/prestamos/components/ElegirPersonaModal";
 import NuevoMovimientoModal from "@/app/prestamos/components/NuevoMovimientoModal";
 import { useMovimientoForm } from "@/app/prestamos/components/useMovimientoForm";
@@ -96,6 +106,8 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
   const [puedeAnotar, setPuedeAnotar] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [abonando, setAbonando] = useState<FichaDeuda | null>(null);
+  /** El texto del buscador vive en la URL (`replace`), con la MISMA llave de las otras pestañas. */
+  const [busqueda, setBusqueda] = useUrlState(PARAM_BUSCAR, "");
 
   // ── «+ Nuevo préstamo»: la misma elección y el mismo formulario del módulo ──
   // Los colaboradores (las fichas activas de Asistencia) y las filas con saldo
@@ -183,10 +195,20 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
     } catch { toast("Sin conexión. Intenta de nuevo.", "error"); }
   }
 
+  // 🔴 EL TOTAL SIGUE SUMANDO TODO, aunque haya búsqueda escrita: es lo que se
+  // debe, no lo que se está mirando. Cuántos se ven lo dice el buscador.
   const total = useMemo(
     () => (fichas ?? []).reduce((a, f) => a + f.saldo, 0),
     [fichas],
   );
+
+  // 🔴 Por nombre y por código, sin acentos ni mayúsculas y por subcadena
+  // exacta — nunca por parecido. Filtra lo ya cargado; cero peticiones nuevas.
+  const visibles = useMemo(
+    () => filtrarPorTexto(fichas ?? [], busqueda, (f) => [f.nombre, f.codigo]),
+    [fichas, busqueda],
+  );
+  const buscando = busqueda.trim() !== "";
 
   if (fichas === null) {
     return <p className="text-sm text-gray-500">Leyendo la deuda…</p>;
@@ -274,8 +296,21 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
         {botonNuevo}
       </div>
 
+      <BuscadorDeLista
+        valor={busqueda}
+        onCambiar={setBusqueda}
+        placeholder={PLACEHOLDER_COLABORADOR}
+        etiqueta="Buscar colaborador por nombre o código"
+        conteo={textoDeConteo(visibles.length, fichas.length, busqueda)}
+      />
+
+      {buscando && visibles.length === 0 && (
+        <VacioDeBusqueda texto={VACIO_BUSQUEDA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
+      )}
+
       {/* 🔴 EL DESLIZAMIENTO VIVE ADENTRO DE LA TABLA, nunca en la página: en el
           iPhone la pantalla entera no se puede mover de lado. */}
+      {visibles.length > 0 && (
       <div className="hidden overflow-x-auto rounded-lg border border-gray-200 lg:block">
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
@@ -291,7 +326,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
             </tr>
           </thead>
           <tbody>
-            {fichas.map((f) => (
+            {visibles.map((f) => (
               <tr key={f.id} className="border-b border-gray-100 last:border-0">
                 <td className="px-3 py-2">
                   {nombre(f, "text-gray-900")}
@@ -328,11 +363,13 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
           </tbody>
         </table>
       </div>
+      )}
 
       {/* En el celular, tarjetas: una tabla de 7 columnas en 390 px pide 200 px
           de arrastre lateral y nadie la lee. */}
+      {visibles.length > 0 && (
       <div className="space-y-2 lg:hidden">
-        {fichas.map((f) => (
+        {visibles.map((f) => (
           <div key={f.id} className="rounded-lg border border-gray-200 p-3">
             <div className="flex items-baseline justify-between gap-2">
               <p className="text-sm font-medium text-gray-900">{nombre(f, "text-gray-900")}</p>
@@ -358,6 +395,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
           </div>
         ))}
       </div>
+      )}
 
       <p className="text-sm text-gray-500">
         El descuento de la quincena lo anota el cierre de la planilla. Aquí van los
