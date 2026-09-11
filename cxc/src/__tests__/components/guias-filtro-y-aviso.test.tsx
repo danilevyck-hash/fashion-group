@@ -53,10 +53,10 @@ function guia(over: Partial<Guia> = {}): Guia {
 }
 
 interface Espias {
-  setSearch: ReturnType<typeof vi.fn>;
-  setShowPending: ReturnType<typeof vi.fn>;
-  onToggleExpand: ReturnType<typeof vi.fn>;
-  onDespachar: ReturnType<typeof vi.fn>;
+  setSearch: ReturnType<typeof vi.fn<(v: string) => void>>;
+  setShowPending: ReturnType<typeof vi.fn<(v: boolean) => void>>;
+  onToggleExpand: ReturnType<typeof vi.fn<(id: string) => void>>;
+  onDespachar: ReturnType<typeof vi.fn<(id: string) => void>>;
 }
 
 function pintar(
@@ -64,10 +64,10 @@ function pintar(
   opciones: { search?: string; showPending?: boolean } = {},
 ): Espias {
   const espias: Espias = {
-    setSearch: vi.fn(),
-    setShowPending: vi.fn(),
-    onToggleExpand: vi.fn(),
-    onDespachar: vi.fn(),
+    setSearch: vi.fn<(v: string) => void>(),
+    setShowPending: vi.fn<(v: boolean) => void>(),
+    onToggleExpand: vi.fn<(id: string) => void>(),
+    onDespachar: vi.fn<(id: string) => void>(),
   };
   render(
     <GuiasList
