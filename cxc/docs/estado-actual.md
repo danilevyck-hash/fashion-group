@@ -2165,3 +2165,36 @@ Aprobados por Daniel uno por uno sobre `grupo-4.md` y la sección Boston de `gru
 - En Multifashion dentro de Comisiones el selector de período del shell sigue oculto (la vista trae sus chips): el año que recibe es el que se eligió ANTES de cambiar a Multifashion.
 - La pestaña Planilla de Boston sigue sin descargas (Excel/PDF/comprobantes): no estaba en el encargo.
 - `ToastSystem` ahora dura 8 s en TODOS los errores y avisos del sistema (era 3 s para todo): es la regla de CLAUDE.md, aplicada por fin en el componente.
+
+---
+
+## 11-sep-2026 (noche) — Auditoría grupos 1 y 4: diez defectos arreglados sin rediseñar (CXC · Búsqueda · Inicio · Usuarios · Vista General · Ventas · Clientes · Proveedores · Referencia)
+
+Encargo de Daniel sobre los hallazgos de `grupo-1.md` y `grupo-4.md` (secciones Usuarios · Inicio · Búsqueda). **Arreglar, no rediseñar.** Diez puntos, cada uno aprobado antes de tocar nada.
+
+| # | Dónde | Antes | Ahora |
+|---|---|---|---|
+| 1 | **CXC** | la secretaria cobraba (pantalla y las 12 rutas la nombran) pero el módulo no le salía ni en el Inicio ni en el sidebar: había que saberse la dirección | `modules.ts` importa `ROLES_CXC` + migración `20261117120000` (aplicada y verificada): `role_permissions.secretaria` pasa de 10 a 11 módulos. Daniel: *«a) sí, le doy CXC completo»*. **Boston sigue afuera** |
+| 2 | **Búsqueda global (⌘K)** | una **guía** abría la hoja de imprimir (`/guias?id=` + redirect viejo); un **cliente** dejaba en la lista de 148; **Ventas** mandaba `?search=`, que no lee nadie (caía en Resumen); un gasto de **Caja** mandaba `?periodo=`, tampoco leído | `/guias/<id>` · `/clientes/<codigo>` · `/ventas?tab=clientes&cliente=<CÓDIGO>` · `/caja/<periodoId>`. El código del cliente de Ventas sale del **puente por ID**, nunca del nombre |
+| 3 | **Inicio** | la caja de buscar se dibujaba con `["admin","secretaria"]` escrito a mano; contabilidad y vendedor no la tenían en el Inicio y sí en cualquier módulo | `SEARCH_ROLES`, la lista única (cinco roles) |
+| 4 | **Atajos de teclado** | `G+H · G+C · G+G · G+Q · G+R`, «?», `J/K`, `E` documentados y **ninguno corría**: `useKeyboardShortcuts` sin importadores desde el 11-abr-2026 | retirados el hook y la sección de CLAUDE.md. Queda **⌘K**, que tiene su propio listener. Daniel: *«quita lo que no funciona»* |
+| 5 | **Inicio — lo que la doc prometía** | feed «Acciones pendientes» (`/api/home-stats` viva, **cero lectores**), badges del 🔔 (`useBadges` sin importadores desde el 29-abr) y 💡 sugerencias (`SuggestionCard` sin render) | los cuatro archivos retirados y CLAUDE.md corregido. **No se construyó nada** |
+| 6 | **Usuarios** | el editor ofrecía las 20 keys para cualquier rol; andrea (secretaria) tenía `multifashion` y la pantalla la rebotaba en silencio | `modulosOfrecibles(rol)` derivado de `ALL_MODULES`, y el **servidor lo rechaza**; migración `20261118120000` (aplicada y verificada) |
+| 7 | **Vista General · Ventas** | el mes salía de `new Date()`: navegador en Vista General, **UTC del servidor** en Ventas (cada 31 después de las 7 p.m. pedía el mes siguiente) | `hoyPanama()` en las dos. **Ningún cálculo cambia** |
+| 8 | **Clientes** | `/api/clientes/ytd` daba 400 con más de 200 códigos y la lista manda los 148 juntos → la columna «Compró» se apagaría en silencio; **bodega** entraba al directorio completo escribiendo `/clientes` | tope 1.000 + **POST** con la lista en el cuerpo (el GET se queda); los cuatro guards salen de `ROLES_CLIENTES` |
+| 9 | **Proveedores** | una lectura caída mostraba «Sin proveedores — No hay datos sincronizados aún»; el cartel decía «Por pagar · grupo» con el número ya filtrado por el buscador | «No se pudo cargar. Intenta de nuevo en unos segundos» con reintento, sin borrar lo que había; el rótulo dice **lo buscado** (`lib/proveedores/rotulo.ts`) |
+| 10 | **Referencia** | «Actualizar datos de Switch» solo se dibujaba después de buscar, mientras la novedad en pantalla dice que lo ve todo el que entra | está desde que abres; sin búsqueda queda apagado **diciendo por qué** (texto a la vista, no un `title`) |
+
+**Migraciones aplicadas y verificadas contra producción:**
+- `20261117120000_cxc_para_secretaria.sql` — `role_permissions.secretaria` gana `cxc` (`array_append`, solo si no estaba). Verificado: 11 módulos, los otros 6 roles intactos.
+- `20261118120000_andrea_sin_multifashion.sql` — `array_remove` sobre el `modulos_override` de **andrea**, por `name` exacto. Verificado: le quedan 10 módulos, Angela sin tocar.
+
+**Candados nuevos:** `cxc-secretaria-cobra.test.ts` · `busqueda-global-destinos.test.ts` · `atajos-de-teclado-retirados.test.ts` · `inicio-sin-promesas.test.ts` · `usuarios-modulos-ofrecibles.test.ts` · `mes-de-panama-vista-general-y-ventas.test.ts` · `clientes-directorio-entero-y-bodega.test.ts` · `proveedores-error-y-rotulo.test.ts`.
+**Cambiaron de dirección o de ancla con nota fechada, ninguno se borró:** `ganchos-sin-uso` (de tres ganchos vigilados queda **uno**, `useSessionCheck`) · `catalogo-roles` y `data-health-dentro-de-usuarios` (la secretaria gana `cxc`) · `boston-acceso` (ahora exige que `gerente_boston` no esté en `SEARCH_ROLES`) · `buscador-solo-grupo` (el 4º `.in()` es el puente al código) · `swr-datos-del-servidor` (la columna va por POST) · `referencia-boton-actualizar` (el botón se dibuja siempre) · `cxc-ruta-y-error`, `recordatorios-rediseno` e `iphone-tocables-y-letra` (nombraban archivos retirados).
+
+### ⚠️ Dejado a propósito / pendiente de Daniel
+- **El gasto de Caja encontrado abre su PERÍODO, no queda resaltado adentro.** Resaltarlo pide que la pantalla de Caja lea un parámetro y hoy no lee ninguno; Caja la está tocando otro trabajo en paralelo.
+- **El `modulos_override` REEMPLAZA la lista del rol en vez de sumarla, y la pantalla no lo dice.** Por eso Angela y andrea, con override sin `asistencia`, no ven Asistencia aunque su rol sí la trae. Es una decisión, no un defecto que se pueda arreglar solo.
+- **La `/` para buscar nunca existió** (solo ⌘K): se quitó de la documentación en vez de inventarla — escribir el atajo era construir, no arreglar.
+- **`/api/notification-badges` se queda sin llamadores**: la nombran por su ruta tres candados de otros módulos, igual que `/api/cxc/contact-log` y `/api/cxc-summary`.
+- **Un resultado de Ventas se le sigue ofreciendo a contabilidad**, que no abre `/ventas`. Es un hallazgo aparte, del filtro por rol de `/api/search`, y no estaba en el encargo.
