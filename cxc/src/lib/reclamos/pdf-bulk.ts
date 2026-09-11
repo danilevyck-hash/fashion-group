@@ -8,6 +8,7 @@ import autoTable from "jspdf-autotable";
 import { supabaseServer } from "@/lib/supabase-server";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { reclamoTaxes, ocultaPedido, impLabel, itbmsLabel, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
+import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 
 const PAGE_W = 216;
 const PAGE_H = 279;
@@ -124,7 +125,7 @@ function drawReclamoSectionHeader(doc: jsPDF, rec: ReclamoFull, startY: number):
   doc.text(rec.nro_reclamo || "Reclamo", MARGIN + 3, startY + 6);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(`Factura: ${rec.nro_factura || "—"}`, PAGE_W - MARGIN - 3, startY + 6, { align: "right" });
+  doc.text(`Factura: ${facturasEnPantalla(rec.nro_factura) || "—"}`, PAGE_W - MARGIN - 3, startY + 6, { align: "right" });
   return startY + 13;
 }
 
@@ -291,7 +292,7 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
       return [
         r.nro_reclamo || "",
         fmtDate(r.fecha_reclamo),
-        r.nro_factura || "",
+        facturasEnPantalla(r.nro_factura),
         r.estado || "",
         `${items.length}`,
         `$${fmt(total)}`,

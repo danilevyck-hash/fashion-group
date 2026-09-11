@@ -3,7 +3,9 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getRole, requireAdminOSecretaria } from "@/lib/api-auth";
 import { getSession } from "@/lib/require-auth";
-import { validateReclamoFull } from "@/lib/reclamos/validate";
+import { validateReclamoNuevo } from "@/lib/reclamos/validate";
+import { facturasATexto, facturasDe } from "@/lib/reclamos/facturas";
+import { LISTA_SELECT } from "@/lib/reclamos/lista-select";
 import { buildReclamoItemRows } from "@/lib/reclamos/item-rows";
 import { reclamoInitials } from "@/lib/empresa-mapping";
 import { datosDeEmpresa } from "@/lib/reclamos/empresas";
@@ -17,7 +19,10 @@ export async function GET(req: NextRequest) {
   }
   const { data, error } = await supabaseServer
     .from("reclamos")
-    .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
+    // La lista NO trae la URL de las fotos (el bucket es privado desde el
+    // 11-sep-2026 y solo el detalle firma); trae los ids para contarlas. Y trae
+    // los settlements: la portada dice «Cobrado <año>» con lo que de verdad entró.
+    .select(LISTA_SELECT)
     .eq("deleted", false)
     .order("created_at", { ascending: false });
 
@@ -28,10 +33,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const denied = requireAdminOSecretaria(req); if (denied) return denied;
   const body = await req.json();
-  const { empresa, proveedor, marca, nro_factura, nro_orden_compra, fecha_reclamo, notas, items, factura_pdf_path } = body;
+  const { empresa, proveedor, marca, nro_orden_compra, fecha_reclamo, notas, items, factura_pdf_path } = body;
+  // Las facturas entran como lista o como texto; se guardan con UN separador.
+  const nro_factura = facturasATexto(Array.isArray(body.nro_factura) ? body.nro_factura.map(String) : facturasDe(body.nro_factura));
+  const fecha_factura = typeof body.fecha_factura === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.fecha_factura) ? body.fecha_factura : null;
 
-  // Obligatoriedad (cabecera + ítems). Solo notas / factura PDF / fotos opcionales.
-  const vErr = validateReclamoFull({ empresa, nro_factura, fecha_reclamo, nro_orden_compra }, items);
+  // Obligatoriedad (PDF + cabecera + ítems). Solo notas / fotos opcionales.
+  const vErr = validateReclamoNuevo({ empresa, nro_factura, fecha_reclamo, nro_orden_compra, factura_pdf_path }, items);
   if (vErr) return NextResponse.json({ error: vErr }, { status: 400 });
 
   // 🔴 El proveedor, la marca y su CÓDIGO salen del mapa del servidor, no del
@@ -79,6 +87,7 @@ export async function POST(req: NextRequest) {
         marca: empInfo?.marca ?? (marca || ""),
         proveedor_codigo: empInfo?.proveedor_codigo ?? null,
         nro_factura,
+        fecha_factura,
         nro_orden_compra,
         fecha_reclamo,
         estado: "Creado",

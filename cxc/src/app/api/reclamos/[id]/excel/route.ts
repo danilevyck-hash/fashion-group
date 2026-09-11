@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
 import { adjuntarFacturaUrls } from "@/lib/reclamos/factura-storage";
+import { marcarReclamados } from "@/lib/reclamos/marcar-reclamado";
 
 const RECLAMOS_ROLES = ["admin", "secretaria"];
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -34,6 +35,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   XLSX.utils.book_append_sheet(wb, ws, "Reclamo");
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  // Descargar el Excel de un reclamo es sacarlo de la casa: se marca «reclamado» (una sola vez).
+  await marcarReclamados([id]);
 
   return new NextResponse(buf, {
     headers: {

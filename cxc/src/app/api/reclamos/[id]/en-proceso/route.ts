@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (file) {
       subido = await subirComprobante(id, file);
       if (!subido) return NextResponse.json({ error: "No se pudo subir el comprobante." }, { status: 500 });
-      updates.comprobante_url = subido.url;
+      updates.comprobante_url = null; // el bucket es privado: la URL se firma al leer
       updates.comprobante_path = subido.path;
       updates.comprobante_nota = nota || null;
     }

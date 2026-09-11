@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { buildBulkReclamosExcel, type ReclamoFull } from "@/lib/reclamos/excel-bulk";
 import { fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/fetch-empresa";
+import { marcarReclamados } from "@/lib/reclamos/marcar-reclamado";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,6 +32,8 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     // Excel pelado con links WEB (factura firmada + fotos públicas) → abre con un
     // clic en Mac/Windows, sin extraer ni permisos. Ya no se arma ZIP con binarios.
     const buf = await buildBulkReclamosExcel(reclamos, empresa, contacto);
+    // Descargar el archivo es sacarlo de la casa: «reclamado», una sola vez.
+    await marcarReclamados(reclamos.map((r) => r.id));
 
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
     const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.xlsx`;

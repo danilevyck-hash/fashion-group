@@ -74,7 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (markPaid) {
     const { data: rec } = await supabaseServer
       .from("reclamos")
-      .select("estado, empresa, comprobante_url, reclamo_items(cantidad, precio_unitario, deleted)")
+      .select("estado, empresa, comprobante_url, comprobante_path, reclamo_items(cantidad, precio_unitario, deleted)")
       .eq("id", id)
       .single();
 
@@ -92,7 +92,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // Comprobante obligatorio para Pagado (foto o PDF ya adjunto al reclamo).
-    if (!rec.comprobante_url) {
+    // Desde el 11-sep-2026 la fila guarda el PATH (la URL se firma al leer);
+    // las filas viejas traen las dos cosas.
+    if (!rec.comprobante_path && !rec.comprobante_url) {
       await compensar();
       return NextResponse.json(
         { error: "Adjunta el comprobante (foto o PDF) antes de marcar como Pagado." },

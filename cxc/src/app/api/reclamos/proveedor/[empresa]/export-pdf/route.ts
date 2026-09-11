@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { buildBulkReclamosPdf, type ReclamoFull } from "@/lib/reclamos/pdf-bulk";
 import { fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/fetch-empresa";
+import { marcarReclamados } from "@/lib/reclamos/marcar-reclamado";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     }
 
     const doc = await buildBulkReclamosPdf(reclamos, empresa);
+    // Descargar el archivo es sacarlo de la casa: «reclamado», una sola vez.
+    await marcarReclamados(reclamos.map((r) => r.id));
     const buf = doc.output("arraybuffer");
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
     const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`;

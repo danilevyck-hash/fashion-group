@@ -1,6 +1,7 @@
 import XLSX from "xlsx-js-style";
 import { reclamoGaleriaUrl } from "@/lib/reclamos/gallery-token";
 import { reclamoTaxes, ocultaPedido, impLabel, itbmsLabel } from "@/lib/reclamos/tax";
+import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 import { addr, makeCellStyles, CASA_PALETTE, MONEY_FMT } from "@/lib/excel-export";
 
 interface ReclamoFoto {
@@ -55,7 +56,7 @@ export function buildReclamoSheet(
     ["N° Reclamo", nroReclamo, true],
     ["Empresa", String(rec.empresa || ""), false],
     ["Proveedor", String(rec.proveedor || ""), false],
-    ["N° Factura", String(rec.nro_factura || ""), true],
+    ["N° Factura", facturasEnPantalla(String(rec.nro_factura || "")), true],
     ...(ocultaPedido(empresa) ? [] : [["N° Pedido", String(rec.nro_orden_compra || "—"), false] as [string, string, boolean]]),
   ];
 

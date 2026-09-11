@@ -8,6 +8,8 @@ import { firmarFacturaPathSafe } from "@/lib/reclamos/factura-storage";
 import { validateReclamoHeader } from "@/lib/reclamos/validate";
 import { ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
 import { datosDeEmpresa } from "@/lib/reclamos/empresas";
+import { firmarFotoPathSafe, firmarFotos } from "@/lib/reclamos/fotos-storage";
+import { facturasATexto, facturasDe } from "@/lib/reclamos/facturas";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -17,10 +19,14 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 // A Pagado NUNCA se llega por este PATCH: solo vía settlements con markPaid, que
 // exige comprobante (foto o PDF) y acepta desde Creado (pago inmediato) o En proceso.
 // Este PATCH solo permite los rollbacks de un paso.
+// 🔄 10-sep-2026: «En proceso» se retiró de la PANTALLA (0 usos en 3 meses);
+// el valor sigue válido en la base y estas transiciones se conservan. Se
+// agregó Pagado → Creado, que es el único «me equivoqué» que queda en pantalla
+// («Volver a por cobrar»): comprobante y notas de crédito se conservan.
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Creado": ["En proceso"],
   "En proceso": ["Creado"],
-  [ESTADO_PAGADO]: ["En proceso"],
+  [ESTADO_PAGADO]: ["En proceso", "Creado"],
 };
 
 export const dynamic = "force-dynamic";
@@ -48,6 +54,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // Firma el PDF de factura (signed URL TTL 1h) para "Ver factura". Nunca público.
   if (data?.factura_pdf_path) {
     data.factura_pdf_url = await firmarFacturaPathSafe(data.factura_pdf_path);
+  }
+  // 🔴 Las fotos y el comprobante también se firman (bucket privado desde el
+  // 11-sep-2026, «Link público ciérralo»): la URL guardada en la fila ya no abre.
+  if (Array.isArray(data?.reclamo_fotos)) {
+    data.reclamo_fotos = await firmarFotos(data.reclamo_fotos as { storage_path: string }[]);
+  }
+  if (data?.comprobante_path) {
+    data.comprobante_url = await firmarFotoPathSafe(data.comprobante_path);
   }
 
   return NextResponse.json(data);
@@ -77,7 +91,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (editaCabecera) {
     const vErr = validateReclamoHeader({
       empresa: fields.empresa,
-      nro_factura: fields.nro_factura,
+      nro_factura: Array.isArray(fields.nro_factura) ? facturasATexto(fields.nro_factura.map(String)) : fields.nro_factura,
       fecha_reclamo: fields.fecha_reclamo,
       nro_orden_compra: fields.nro_orden_compra,
     });
@@ -96,8 +110,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const key of ["empresa", "proveedor", "marca", "nro_factura", "nro_orden_compra", "fecha_reclamo", "notas", "estado", "monto_reclamado_snapshot", "factura_pdf_path"]) {
+  for (const key of ["empresa", "proveedor", "marca", "nro_factura", "nro_orden_compra", "fecha_reclamo", "notas", "estado", "monto_reclamado_snapshot", "factura_pdf_path", "fecha_factura"]) {
     if (fields[key] !== undefined) updates[key] = fields[key];
+  }
+  // Las facturas se guardan siempre con UN separador (lista o texto, da igual cómo lleguen).
+  if (fields.nro_factura !== undefined) {
+    updates.nro_factura = facturasATexto(Array.isArray(fields.nro_factura) ? fields.nro_factura.map(String) : facturasDe(fields.nro_factura));
+  }
+  if (fields.fecha_factura !== undefined) {
+    updates.fecha_factura = typeof fields.fecha_factura === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fields.fecha_factura) ? fields.fecha_factura : null;
   }
 
   // 🔴 Si cambia la empresa, el proveedor, la marca y el CÓDIGO se rehacen desde

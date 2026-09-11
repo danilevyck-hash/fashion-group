@@ -5,6 +5,9 @@ import { Resend } from "resend";
 import { buildBulkReclamosExcel, type ReclamoFull } from "@/lib/reclamos/excel-bulk";
 import { fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/fetch-empresa";
 import { reclamoTaxes } from "@/lib/reclamos/tax";
+import { facturasEnPantalla } from "@/lib/reclamos/facturas";
+import { marcarReclamados } from "@/lib/reclamos/marcar-reclamado";
+import { notaCorreoEnviado } from "@/lib/reclamos/texto";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -106,7 +109,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
         grandTotal += total;
         return `<tr>
           <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${esc(r.nro_reclamo)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${esc(r.nro_factura)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${esc(facturasEnPantalla(r.nro_factura))}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${esc(fmtDate(r.fecha_reclamo))}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${esc(r.estado)}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right">$${fmt(total)}</td>
@@ -165,18 +168,22 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       return NextResponse.json({ error: "Error al enviar el correo." }, { status: 500 });
     }
 
-    // Registro en seguimiento (igual que el correo consolidado existente)
+    // 🔴 «Reclamado» se marca solo, DESPUÉS de que Resend confirma (marcar
+    // antes y que el envío falle diría «reclamado» de algo que nunca salió).
+    // La primera vez marca; las siguientes no pisan la fecha.
     const ids = reclamos.map((r) => r.id);
+    await marcarReclamados(ids);
+
+    // Registro en seguimiento (igual que el correo consolidado existente)
     if (ids.length > 0) {
-      const ccNota = ccList.length ? ` · CC: ${ccList.join(", ")}` : "";
-      const nota = `Correo con Excel adjunto enviado a ${recipients.join(", ")}${ccNota} (${reclamos.length} reclamos)`;
+      const nota = notaCorreoEnviado(recipients, ccList);
       await supabaseServer.from("reclamo_seguimiento").insert(
         ids.map((reclamo_id) => ({ reclamo_id, nota, autor: "Sistema" })),
       );
     }
 
-    // Pipeline de 2 estados: enviar el correo NO cambia el estado. El reclamo se
-    // queda en "Creado"; solo el settlement (Pagado) lo avanza.
+    // Enviar el correo NO cambia el estado (sigue por cobrar): lo que cambia
+    // es `reclamado_en`, que la lista muestra como «Reclamado <fecha>».
 
     return NextResponse.json({
       ok: true,

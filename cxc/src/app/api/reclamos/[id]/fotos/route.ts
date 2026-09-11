@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { FOTOS_BUCKET, firmarFotoPathSafe } from "@/lib/reclamos/fotos-storage";
 
 const RECLAMOS_ROLES = ["admin", "secretaria"];
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
        ext === "webp" ? "image/webp" : "image/jpeg");
 
     const { error: uploadError } = await supabaseServer.storage
-      .from("reclamo-fotos")
+      .from(FOTOS_BUCKET)
       .upload(storagePath, buffer, { contentType, upsert: true });
 
     if (uploadError) {
@@ -37,16 +38,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: uploadError.message, details: uploadError }, { status: 500 });
     }
 
-    const { data: urlData } = supabaseServer.storage.from("reclamo-fotos").getPublicUrl(storagePath);
-
+    // 🔴 El bucket es PRIVADO (11-sep-2026, «Link público ciérralo»): en la fila
+    // no se guarda ninguna URL —la verdad es `storage_path`— y la miniatura de
+    // este momento se firma con vida corta.
     const { data, error: dbError } = await supabaseServer
       .from("reclamo_fotos")
-      .insert({ reclamo_id: id, storage_path: storagePath, url: urlData.publicUrl })
+      .insert({ reclamo_id: id, storage_path: storagePath, url: null })
       .select()
       .single();
 
     if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
-    return NextResponse.json(data);
+    return NextResponse.json({ ...data, url: (await firmarFotoPathSafe(storagePath)) ?? "" });
   } catch (err) {
     console.error("Foto upload exception:", err);
     console.error(err); return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -68,7 +70,7 @@ export async function DELETE(req: NextRequest) {
 
   // 2. Then delete from storage (best-effort — DB record is already gone)
   try {
-    const { error: storageError } = await supabaseServer.storage.from("reclamo-fotos").remove([storage_path]);
+    const { error: storageError } = await supabaseServer.storage.from(FOTOS_BUCKET).remove([storage_path]);
     if (storageError) {
       console.warn("[foto-delete] Storage delete failed (DB record already removed):", storageError.message);
     }

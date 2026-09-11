@@ -3,6 +3,7 @@ import { buildReclamoSheet } from "@/lib/excel-reclamo";
 import { adjuntarFacturaUrls } from "./factura-storage";
 import { reclamoGaleriaUrl } from "./gallery-token";
 import { reclamoTaxes, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
+import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 import {
   addr,
   buildReportSheet,
@@ -90,7 +91,7 @@ function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
 
     return [
       { v: rec.nro_reclamo || "", bold: true },
-      rec.nro_factura || "",
+      facturasEnPantalla(rec.nro_factura),
       fmtFechaExcel(rec.fecha_reclamo),
       rec.estado || "",
       sub,

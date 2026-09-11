@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!subido) return NextResponse.json({ error: "No se pudo subir el comprobante." }, { status: 500 });
 
     const { error: updErr } = await supabaseServer.from("reclamos").update({
-      comprobante_url: subido.url,
+      comprobante_url: null, // el bucket es privado: la URL se firma al leer
       comprobante_path: subido.path,
       comprobante_nota: nota || null,
       updated_at: new Date().toISOString(),
