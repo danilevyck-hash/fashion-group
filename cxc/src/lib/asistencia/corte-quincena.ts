@@ -16,8 +16,36 @@
 //   2. Los días que quedan se pagan COMO UN DÍA NORMAL: sin horas extra, sin
 //      tardanza y sin ausencia. El sueldo quincenal NO se toca — sigue siendo
 //      `salario ÷ 2`, porque esos días se pagan enteros.
-//   3. Lo que de verdad pasó en esos días entra en la quincena SIGUIENTE, en un
-//      renglón propio: «AJUSTE QUINCENA ANTERIOR».
+//   3. Lo que de verdad pasó en esos días entra en la quincena SIGUIENTE,
+//      CONCEPTO POR CONCEPTO, dentro de las columnas de siempre.
+//
+// ── 🔴 CADA COSA EN SU COLUMNA — NUNCA UNA LÍNEA NETA (11-sep-2026) ─────────
+//
+// Hasta el 11-sep-2026 el ajuste era UN número («Ajuste quincena anterior»):
+// la suma firmada de los siete conceptos. La contadora (Yulissa), textual:
+//
+//   *«no puedes netear las horas extras con las horas de tardanza o de
+//   ausencia porque valen diferente… debe poner lo que llegó en tardanza en
+//   tardanza y lo que llegó como extra en extra porque los valores de la rata
+//   por hora son diferentes porque una tiene recargo»*.
+//
+// Daniel: *«el ajuste separado como lo hace ella»* → *«sí»*. Medido en sus
+// Excel: ella NO tiene columna de ajuste; las horas de los días después del
+// corte entran en la quincena siguiente dentro de las columnas normales.
+//
+// Así que el ajuste se REPARTE (`repartirAjuste`) y se SUMA dentro de la
+// columna que corresponde (`aplicarAjusteEnLinea`): la extra diurna del 14–15
+// va a «Horas extra 1.25», la nocturna a «1.50», la tardanza a «Tardanzas», la
+// ausencia a «Ausencias». Cada monto ya viene VALUADO por el motor con SU rata
+// (`dineroDeLosDiasSinMedir`); acá no se recalcula ni un centavo.
+//
+// 🔴 EL NETO NO CAMBIA: el neto de la línea es el mismo `netoPagar − ajuste`
+// de antes (`netoConAjuste`, una sola cuenta). Lo que cambia es DÓNDE se ve.
+// Y `ajusteDeDiasSinMedir` se conserva, DERIVADA del reparto, para que el
+// número viejo siga siendo comprobable: Σ signo × reparto = el ajuste viejo.
+//
+// ⚠️ LOS SEGUROS NO SE RECALCULAN sobre lo repartido (ni antes ni ahora los
+// tocaba el ajuste). Decisión pendiente de Daniel, no un olvido.
 //
 // ── 🔴 EL SUELDO NO SE PRORRATEA. NUNCA ─────────────────────────────────────
 //
@@ -111,31 +139,188 @@ export const CONCEPTOS_DEL_RELOJ = [
   { campo: "feriados", signo: -1 },
 ] as const satisfies readonly { campo: keyof DineroLinea; signo: 1 | -1 }[];
 
+/** Un concepto del reloj: los siete campos de `CONCEPTOS_DEL_RELOJ`. */
+export type CampoDelReloj = (typeof CONCEPTOS_DEL_RELOJ)[number]["campo"];
+
 /**
- * El ajuste de los días que se pagaron sin medir.
+ * El ajuste REPARTIDO: cuánto le entra a cada columna de la quincena que se
+ * paga. Solo los conceptos con monto; un concepto en cero no aparece.
+ *
+ * 🔑 El valor es el monto de la COLUMNA, tal como lo valuó el motor para los
+ * días sin medir (positivo). El SIGNO con que pega en el neto lo lleva
+ * `CONCEPTOS_DEL_RELOJ` (+ descuenta, − devuelve), no el número.
+ */
+export type RepartoAjuste = Partial<Record<CampoDelReloj, number>>;
+
+/** Los días que la quincena anterior pagó sin medir (después del corte). */
+export interface DiasDelAjuste { desde: string; hasta: string }
+
+/**
+ * 🔴 EL AJUSTE, CONCEPTO POR CONCEPTO (11-sep-2026).
  *
  * `dineroDeLosDiasSinMedir` es lo que el motor calculó para ESE rango corto y
  * NADA MÁS — nunca la quincena entera. Se le pasa la línea tal cual sale del
  * mismo `armarPlanilla` de siempre; acá no se recalcula ni un centavo, solo se
- * eligen siete campos y se les pone signo.
- *
- * Positivo = se le DESCUENTA en la quincena siguiente (llegó tarde, faltó).
- * Negativo = se le DEVUELVE (hizo horas extra que no se le pagaron).
- * Cero      = esos días fueron normales, que es el caso corriente.
+ * eligen los siete campos.
  *
  * 🔴 El SUELDO de esos días no entra: ya se pagó entero y no se vuelve a pagar.
+ */
+export function repartirAjuste(
+  dineroDeLosDiasSinMedir: DineroLinea | null | undefined,
+): RepartoAjuste {
+  const d = dineroDeLosDiasSinMedir;
+  const out: RepartoAjuste = {};
+  if (!d) return out;
+  for (const { campo } of CONCEPTOS_DEL_RELOJ) {
+    const v = centavos(Number(d[campo] ?? 0));
+    if (Number.isFinite(v) && v !== 0) out[campo] = v;
+  }
+  return out;
+}
+
+/**
+ * Lo que el reparto le hace al NETO: Σ signo × monto. Es el «ajuste» de antes.
+ * Positivo = se le descuenta (llegó tarde, faltó). Negativo = se le devuelve.
+ */
+export function efectoEnElNeto(reparto: RepartoAjuste): number {
+  let total = 0;
+  for (const { campo, signo } of CONCEPTOS_DEL_RELOJ) {
+    const v = Number(reparto[campo] ?? 0);
+    if (Number.isFinite(v)) total += signo * v;
+  }
+  return centavos(total);
+}
+
+/**
+ * El ajuste como UN número, derivado del reparto. Se conserva para que el
+ * cierre (`ajuste_anterior`) y los candados viejos sigan valiendo: la suma de
+ * lo repartido ES el ajuste de siempre, al centavo.
+ *
+ * Cero = esos días fueron normales, que es el caso corriente.
  */
 export function ajusteDeDiasSinMedir(
   dineroDeLosDiasSinMedir: DineroLinea | null | undefined,
 ): number {
-  const d = dineroDeLosDiasSinMedir;
-  if (!d) return 0;
-  let total = 0;
-  for (const { campo, signo } of CONCEPTOS_DEL_RELOJ) {
-    const v = Number(d[campo] ?? 0);
-    if (Number.isFinite(v)) total += signo * v;
+  return efectoEnElNeto(repartirAjuste(dineroDeLosDiasSinMedir));
+}
+
+/**
+ * 🔴 EL AJUSTE ENTRA EN LAS COLUMNAS DE SIEMPRE, cada cosa en la suya.
+ *
+ * Devuelve la línea con `dinero` NUEVO: cada concepto del reloj suma lo suyo,
+ * el bruto baja (o sube) por el efecto neto, y `netoPagar` es el MISMO
+ * `netoConAjuste(netoPagar, ajuste)` de antes — una sola cuenta. Los seguros,
+ * el ISR, el préstamo y lo escrito a mano no se tocan.
+ *
+ * Los tres desgloses de la ausencia (`ausenciaPorTardanza`,
+ * `ausenciaDeDiaCompleto`, `vacacionesYaPagadas`) también suman lo suyo: son
+ * SUBCONJUNTOS de `ausencias` y tienen que seguir siéndolo.
+ *
+ * `ajusteAnterior` queda con el número viejo (para el cierre) y
+ * `ajusteDetalle` dice de qué días y cuánto por columna (para la nota).
+ * Sin nada que repartir, la línea vuelve TAL CUAL.
+ */
+export function aplicarAjusteEnLinea<L extends { dinero: DineroLinea | null }>(
+  linea: L,
+  dineroDeLosDiasSinMedir: DineroLinea | null | undefined,
+  dias: DiasDelAjuste,
+): L & { ajusteAnterior?: number; ajusteDetalle?: AjusteDetalle } {
+  const d = linea.dinero;
+  const reparto = repartirAjuste(dineroDeLosDiasSinMedir);
+  if (!d || Object.keys(reparto).length === 0) return linea;
+  const ajuste = efectoEnElNeto(reparto);
+  const dinero: DineroLinea = { ...d };
+  for (const { campo } of CONCEPTOS_DEL_RELOJ) {
+    const v = reparto[campo];
+    if (v) dinero[campo] = centavos(d[campo] + v);
   }
-  return centavos(total);
+  const s = dineroDeLosDiasSinMedir!;
+  dinero.ausenciaPorTardanza = centavos(d.ausenciaPorTardanza + Number(s.ausenciaPorTardanza ?? 0));
+  dinero.ausenciaDeDiaCompleto = centavos(d.ausenciaDeDiaCompleto + Number(s.ausenciaDeDiaCompleto ?? 0));
+  dinero.vacacionesYaPagadas = centavos(d.vacacionesYaPagadas + Number(s.vacacionesYaPagadas ?? 0));
+  dinero.totalBruto = centavos(d.totalBruto - ajuste);
+  dinero.netoPagar = netoConAjuste(d.netoPagar, ajuste);
+  return {
+    ...linea,
+    dinero,
+    ajusteAnterior: ajuste,
+    ajusteDetalle: { desde: dias.desde, hasta: dias.hasta, reparto },
+  };
+}
+
+/** Lo que viaja en la línea para poder DECIR de dónde salió cada monto. */
+export interface AjusteDetalle extends DiasDelAjuste { reparto: RepartoAjuste }
+
+/** El nombre de cada columna, el MISMO de la planilla, el Excel y el PDF. */
+export const ROTULO_DEL_RELOJ: Readonly<Record<CampoDelReloj, string>> = {
+  extraDiurno: "Horas extra 1.25",
+  extraNocturno: "Horas extra 1.50",
+  excedente: "Excedente",
+  domingos: "Domingos",
+  feriados: "Feriados",
+  ausencias: "Ausencias",
+  tardanzas: "Tardanzas",
+};
+
+/** El orden en que se nombran las columnas: el del cuadro de la contable. */
+export const ORDEN_DEL_RELOJ: readonly CampoDelReloj[] = [
+  "extraDiurno", "ausencias", "tardanzas", "extraNocturno", "excedente", "domingos", "feriados",
+];
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** «14–15 sep» · «14 sep» · «29 ago–2 sep». Fechas YYYY-MM-DD. */
+export function etiquetaDiasSinMedir(desde: string, hasta: string): string {
+  const [, m1, d1] = desde.split("-").map(Number);
+  const [, m2, d2] = hasta.split("-").map(Number);
+  const mes = (m: number) => MESES_CORTOS[m - 1] ?? "";
+  if (desde === hasta) return `${d1} ${mes(m1)}`;
+  if (m1 === m2) return `${d1}–${d2} ${mes(m1)}`;
+  return `${d1} ${mes(m1)}–${d2} ${mes(m2)}`;
+}
+
+function nombrar(cols: readonly string[]): string {
+  if (cols.length <= 1) return cols[0] ?? "";
+  return `${cols.slice(0, -1).join(", ")} y ${cols[cols.length - 1]}`;
+}
+
+/** Las columnas que traen ajuste, en el orden del cuadro. */
+export function columnasConAjuste(reparto: RepartoAjuste): CampoDelReloj[] {
+  return ORDEN_DEL_RELOJ.filter((c) => !!reparto[c]);
+}
+
+/**
+ * La nota de UNA celda: «Incluye $5.00 de los días 14–15 sep, que la quincena
+ * anterior pagó sin medir.» `null` si esa columna no trae ajuste.
+ */
+export function notaCeldaAjuste(
+  campo: CampoDelReloj,
+  detalle: AjusteDetalle | null | undefined,
+): string | null {
+  const v = detalle?.reparto[campo];
+  if (!detalle || !v) return null;
+  return `Incluye $${Math.abs(v).toFixed(2)} de los días ${etiquetaDiasSinMedir(detalle.desde, detalle.hasta)}, que la quincena anterior pagó sin medir.`;
+}
+
+/**
+ * La nota al pie del cuadro, el Excel, el PDF y el comprobante: «Horas extra
+ * 1.25 y Tardanzas incluyen los días 14–15 sep, que la quincena anterior pagó
+ * sin medir.» Se arma con la UNIÓN de las columnas que traen ajuste en las
+ * líneas que se le pasan. `null` sin ajuste.
+ */
+export function notaAjuste(
+  lineas: readonly { ajusteDetalle?: AjusteDetalle | null }[],
+): string | null {
+  const con = lineas.filter((l) => !!l.ajusteDetalle);
+  if (!con.length) return null;
+  const union: RepartoAjuste = {};
+  for (const l of con) for (const c of columnasConAjuste(l.ajusteDetalle!.reparto)) union[c] = 1;
+  const cols = columnasConAjuste(union).map((c) => ROTULO_DEL_RELOJ[c]);
+  if (!cols.length) return null;
+  const { desde, hasta } = con[0].ajusteDetalle!;
+  const verbo = cols.length === 1 ? "incluye" : "incluyen";
+  const quienes = con.length === 1 ? "" : ` (${con.length} colaboradores)`;
+  return `${nombrar(cols)} ${verbo} los días ${etiquetaDiasSinMedir(desde, hasta)}, que la quincena anterior pagó sin medir${quienes}.`;
 }
 
 /**
