@@ -32,6 +32,7 @@ import type {
 } from "@/components/ventas/types";
 import type { CumPoint } from "./CumulativeChartCard";
 import { variacionPct, baseDesdeRatio, fmtVariacionPct } from "@/lib/variacion";
+import { filaAnio, ROTULO_FILA_ANIO } from "@/lib/multifashion/fila-anio";
 
 // recharts cargado aparte (ssr:false) → fuera del bundle inicial de /multifashion.
 const VentasDiariasChart = dynamic(
@@ -401,6 +402,7 @@ export function MultifashionResumenView({
             meses={overview.retail.meses}
             year={year}
             diaActual={data.dia_actual}
+            totalAnio={overview.retail.ytdVentas}
           />
           <CuandoVendeLaTienda data={data} />
         </>
@@ -556,12 +558,23 @@ function TarjetasDelMes({
 // que cuadra al centavo con switch_facturas; NO usa la serie blend (ventas_raw) para
 // no mezclar fuentes. El mes en curso se compara al mismo día (parcial), consistente
 // con el % mostrado. Es retail por la decisión híbrida (mayoreo no entra a comparativos).
+//
+// 🩸 EL AÑO SE DECÍA DOS VECES CON NÚMEROS DISTINTOS (hasta el 11-sep-2026). La
+// tarjeta «Año» dice `overview.retail.ytdVentas` (los 12 meses) y la fila del
+// pie de esta tabla sumaba SOLO los meses que tienen base del año anterior:
+// medido contra producción, 2025 daba $652.420,19 arriba y $509.291,64 abajo
+// (ene–abr 2025 no tienen 2024). Ahora el total de la fila ES el de la tarjeta
+// (`totalAnio`), la fila se llama «Año» (la sigla YTD se fue) y el Δ sigue
+// midiéndose sobre los meses comparables — con una línea que dice sobre
+// cuántos, cuando no son todos. Regla en `lib/multifashion/fila-anio.ts`.
 function ComparativoInteranualCard({
-  meses, year, diaActual,
+  meses, year, diaActual, totalAnio,
 }: {
   meses: RetailMonthly[];
   year: number;
   diaActual: number;
+  /** El MISMO número de la tarjeta «Año» (`overview.retail.ytdVentas`). */
+  totalAnio: number;
 }) {
   const prevYear = year - 1;
   const filas = meses
@@ -586,13 +599,13 @@ function ComparativoInteranualCard({
 
   if (filas.length === 0) return null;
 
-  // YTD a mismo corte: solo meses con comparación del año anterior disponible.
-  // El criterio NO cambió (sigue siendo "hay base"): los montos del YTD tienen
-  // que quedar exactamente iguales — acá solo se arregla el %.
-  const comp = filas.filter((f) => f.vPrev != null);
-  const tot = comp.reduce((s, f) => s + f.v, 0);
-  const totPrev = comp.reduce((s, f) => s + (f.vPrev ?? 0), 0);
-  const totPct = variacionPct(tot, totPrev);
+  // La fila del año: el total es el de la TARJETA; el Δ, sobre los meses que
+  // tienen base del año anterior (ver `filaAnio`).
+  const anio = filaAnio({
+    totalAnio,
+    meses: filas.map((f) => ({ label: f.label, v: f.v, vPrev: f.vPrev })),
+    prevYear,
+  });
 
   // 🩸 POR QUÉ SON DOS REPARTOS Y NO UNO (30-jul-2026). Daniel, sobre el iPhone:
   // *"lo pegado que estan los numeros"*. Medido en el navegador a 390 px, el aire
@@ -672,14 +685,21 @@ function ComparativoInteranualCard({
         </div>
       ))}
       <div data-fila="mes" className={cn(GRID, "border-t border-gray-300 bg-gray-50 py-2 text-sm font-semibold")}>
-        <span data-col="mes" className="text-gray-700">YTD</span>
-        <span data-col="actual" className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(tot)}</span>
-        <span data-col="previo" className="text-right font-mono tabular-nums text-gray-600">{fmtMoney(totPrev)}</span>
+        <span data-col="mes" className="text-gray-700">{ROTULO_FILA_ANIO}</span>
+        <span data-col="actual" className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(anio.total)}</span>
+        <span data-col="previo" className="text-right font-mono tabular-nums text-gray-600">
+          {anio.totalPrev != null ? fmtMoney(anio.totalPrev) : "—"}
+        </span>
         <span data-col="delta" className={cn(CELDA_DELTA, "flex items-baseline justify-end gap-2 text-right font-mono tabular-nums leading-tight md:block md:gap-0")}>
-          <span className={cn("font-medium", deltaTone(totPct))}>{fmtPct(totPct)}</span>
-          <span className={cn("text-xs md:block", deltaTone(tot - totPrev))}>{fmtAbs(tot - totPrev)}</span>
+          <span className={cn("font-medium", deltaTone(anio.pct))}>{fmtPct(anio.pct)}</span>
+          {anio.abs != null && (
+            <span className={cn("text-xs md:block", deltaTone(anio.abs))}>{fmtAbs(anio.abs)}</span>
+          )}
         </span>
       </div>
+      {anio.nota && (
+        <p data-nota="anio" className="border-t border-gray-100 px-4 py-2 text-xs text-gray-400">{anio.nota}</p>
+      )}
     </Card>
   );
 }
