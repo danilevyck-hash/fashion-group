@@ -30,6 +30,18 @@
 //
 // 🔴 LAS TABLAS NO SE TOCARON. Se retiran RUTAS, y solo rutas — el patrón de la
 // casa (`mayor_lineas`, `cxc_favorites`): lo que se queda sin lectores se queda.
+//
+// 🔴 5. `POST /api/catalogo/joybees/import` — LA QUINTA (11-sep-2026). Este
+//    candado CAMBIÓ DE DIRECCIÓN: hasta hoy la usaba como CONTROL de que no
+//    mira una carpeta vacía, y por eso quedó fuera de la poda del 6-sep. Era la
+//    gemela de `seed`: reescribía precio, nombre, categoría, etiqueta y
+//    visibilidad de los 83 productos desde un cuerpo JSON, ponía `stock 0 /
+//    active false` a todo SKU que no viniera, y calculaba `active = stock > 0`
+//    SIN pasar por `esVisibleEnCatalogo` — los 2 escondidos de Joybees tienen
+//    stock 1 y habrían vuelto al catálogo público. Sin un solo llamador desde
+//    `src/` (la pantalla de importar por plantilla se retiró el 6-sep). El
+//    CONTROL pasa a `reebok/inventory`, `pedidos-export` y `orders`, que siguen
+//    vivas.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
@@ -38,10 +50,11 @@ import path from "path";
 
 const RAIZ = process.cwd();
 
-/** Las cuatro rutas retiradas: la carpeta que no puede volver a existir y el
+/** Las cinco rutas retiradas: la carpeta que no puede volver a existir y el
  *  texto que ninguna pantalla puede volver a pedir. */
 const RETIRADAS = [
   { carpeta: "src/app/api/catalogo/joybees/seed", url: "/api/catalogo/joybees/seed" },
+  { carpeta: "src/app/api/catalogo/joybees/import", url: "/api/catalogo/joybees/import" },
   { carpeta: "src/app/api/catalogo/[marca]/pedidos-unificado", url: "pedidos-unificado" },
   { carpeta: "src/app/api/catalogo/reebok/stats", url: "/api/catalogo/reebok/stats" },
   { carpeta: "src/app/api/catalogo/reebok/inventory/bulk", url: "/api/catalogo/reebok/inventory/bulk" },
@@ -54,7 +67,6 @@ const ARCHIVOS_RETIRADOS = ["src/lib/joybees-seed.ts"] as const;
  *  candado no está simplemente mirando una carpeta vacía. */
 const SIGUEN_VIVAS = [
   "src/app/api/catalogo/reebok/inventory/route.ts",
-  "src/app/api/catalogo/joybees/import/route.ts",
   "src/app/api/catalogo/[marca]/pedidos-export/route.ts",
   "src/app/api/catalogo/[marca]/orders/route.ts",
 ] as const;
@@ -79,7 +91,7 @@ function sinComentarios(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
-describe("las cuatro rutas de catálogos retiradas (6-sep-2026)", () => {
+describe("las cinco rutas de catálogos retiradas (6-sep-2026 · 11-sep-2026)", () => {
   for (const { carpeta } of RETIRADAS) {
     it(`no existe el archivo de ${carpeta}`, () => {
       expect(existsSync(path.join(RAIZ, carpeta, "route.ts"))).toBe(false);

@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
-import { readdirSync, statSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
 import path from "path";
 
 function collectRoutes(base: string): string[] {
@@ -75,7 +75,16 @@ const CORE_MARCA = [
 // Rutas EXCLUSIVAS de una marca — siguen estáticas bajo su directorio (el
 // snapshot de PR-0 las esperaba ahí y el PR-1 no las generaliza).
 const SOLO_REEBOK = ["inventory", "pedidos-publicos"].sort();
-const SOLO_JOYBEES = ["import"].sort();
+// 🔴 Joybees se quedó SIN rutas exclusivas (11-sep-2026): `import` se retiró
+// (la gemela de `seed`, sin llamadores; ver rutas-de-catalogo-retiradas.test.ts)
+// y con ella se fue la carpeta. Una carpeta vacía o inexistente cuenta como
+// «ninguna ruta», y este candado sigue exigiendo que no vuelva ninguna.
+const SOLO_JOYBEES: string[] = [];
+
+/** Como `collectRoutes`, pero una carpeta que ya no existe es «sin rutas». */
+function rutasSiExiste(dir: string): string[] {
+  return existsSync(dir) ? collectRoutes(dir) : [];
+}
 
 describe("superficie API de catálogos — snapshot post-refactor [marca]", () => {
   it("[marca] expone exactamente el núcleo compartido", () => {
@@ -87,12 +96,12 @@ describe("superficie API de catálogos — snapshot post-refactor [marca]", () =
   });
 
   it("joybees conserva SOLO sus rutas exclusivas como estáticas", () => {
-    expect(collectRoutes(path.join(API_BASE, "joybees"))).toEqual(SOLO_JOYBEES);
+    expect(rutasSiExiste(path.join(API_BASE, "joybees"))).toEqual(SOLO_JOYBEES);
   });
 
   it("ninguna ruta del núcleo quedó duplicada como estática (conflicto de routing)", () => {
     const reebok = new Set(collectRoutes(path.join(API_BASE, "reebok")));
-    const joybees = new Set(collectRoutes(path.join(API_BASE, "joybees")));
+    const joybees = new Set(rutasSiExiste(path.join(API_BASE, "joybees")));
     for (const ruta of CORE_MARCA) {
       expect(reebok.has(ruta), `duplicada en reebok: ${ruta}`).toBe(false);
       expect(joybees.has(ruta), `duplicada en joybees: ${ruta}`).toBe(false);
