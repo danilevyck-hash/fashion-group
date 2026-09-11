@@ -41,36 +41,53 @@
  * Por eso:
  *
  *   1. **Si el módulo YA registró el descuento de ESTA quincena** (uno o más
- *      movimientos «Pago» con fecha adentro), la casilla dice EXACTAMENTE eso.
- *      Es un hecho consumado, no una estimación.
+ *      movimientos «Pago» DE LA QUINCENA con fecha adentro), la casilla dice
+ *      EXACTAMENTE eso. Es un hecho consumado, no una estimación.
  *   2. **Si no**, la casilla dice `min(cuota, saldo)` — la misma fórmula de la
  *      RPC, sobre las fichas activas con cuota y saldo.
  *
- * ⚠️ «Abono extra» NO entra en el caso 1. Un abono es plata que la persona
- * pagó por fuera —en efectivo, de su bolsillo— y descontárselo otra vez del
- * sueldo sería cobrarle dos veces. Sí baja el saldo, y el saldo ya viene con
- * eso adentro, así que el caso 2 lo tiene en cuenta solo.
+ * ── 🔴 EL DESCUENTO ENTRA SOLO. YA NO SE APRUEBA (11-sep-2026) ───────────────
  *
- * ── 🔴 EL DESCUENTO SE APRUEBA, NO SE APLICA SOLO ────────────────────────────
+ * Daniel, textual: *«quita lo de aprobación a préstamos, no es necesario»*.
  *
- * La contadora, textual: *«El préstamo si debe ser por aprobarlo»*. La
- * sugerencia entra a la casilla cuando alguien la aprueba, y **la casilla sigue
- * siendo editable** después.
+ * 🩸 Hasta el 11-sep-2026 la cuota entraba a la casilla cuando alguien la
+ * aprobaba en el bloque «Préstamos por descontar» (la contadora había pedido
+ * *«El préstamo si debe ser por aprobarlo»*), y lo no aprobado NO se descontaba.
+ * Medido el 11-sep sobre la quincena 1–15 sep: **10 colaboradores con $495 de
+ * cuota que la planilla no descontaba** porque nadie había tocado «Aprobar».
+ * Un paso que hay que dar cada quincena para que pase lo que siempre pasa es un
+ * paso que un día no se da.
  *
- * ⚠️ Y esta aprobación NO ESCONDE PLATA — es la lección del #651, donde un
- * freno de $700 dejó un préstamo mostrándose en CERO durante 22 días. Lo que
- * está sin aprobar SE VE, con nombre y monto, en ámbar, arriba del cuadro; y el
- * saldo del módulo no depende de esta aprobación en absoluto.
+ * Ahora la cuota (préstamo y terceros, cada una capeada a SU saldo) entra a la
+ * casilla SOLA (`aplicarPrestamoEnLinea`). La casilla sigue siendo editable:
+ * **lo escrito a mano manda** (un monto > 0 en `asistencia_planilla_manual`)
+ * y **vacía = lo que propone el módulo**. Se avisa SOLO cuando algo no es lo
+ * de siempre: la última cuota (cuota mayor que el saldo) y quien debe pero no
+ * está en el cuadro (salió, o no cobra en esta planilla).
+ *
+ * ⚠️ La tabla `asistencia_prestamo_aprobado` NO se dropea (patrón
+ * `mayor_lineas`): queda sin lectores ni escritores, y hay candado.
+ *
+ * ── 🔴 «YA DESCONTADO» ES SOLO LO QUE SALIÓ DE LA QUINCENA (11-sep-2026) ─────
+ *
+ * 🩸 Medido el 11-sep-2026: CRISTIAM BLANCO canceló su préstamo el 7-sep con
+ * $125 de su LIQUIDACIÓN (origen «Liquidación», nota «Cancela prestamo»). El
+ * hecho consumado miraba solo el CONCEPTO, así que ese abono contaba como
+ * «ya descontado esta quincena» y la casilla proponía $125 — con la cuota
+ * automática, la planilla le habría vuelto a quitar del sueldo los $125 que
+ * él ya pagó de su bolsillo. `esDescuentoDeQuincena` mira también el ORIGEN:
+ * cuenta lo que dice «Quincena» (o no dice nada, que son las filas viejas) y
+ * NADA más. Un abono de bolsillo baja el saldo —y por ahí la cuota siguiente ya
+ * lo tiene en cuenta—, pero nunca vale como descuento del sueldo.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { centavos } from "./planilla";
+import type { DineroLinea, ManualesLinea } from "./planilla";
+import { ORIGEN_POR_DEFECTO } from "@/lib/prestamos-conceptos";
 
 /** Los archivos que Daniel tiene que correr. Se le muestran tal cual. */
 export const MIGRACION_AMARRE_PRESTAMOS =
   "20260902120000_prestamos_amarre_codigo.sql";
-export const MIGRACION_PRESTAMO_APROBADO =
-  "20260902130000_planilla_prestamo_aprobado.sql";
-export const TABLA_PRESTAMO_APROBADO = "asistencia_prestamo_aprobado";
 
 /**
  * 🔴 SIN EL AMARRE CORRIDO, LA CASILLA SIGUE SIENDO LO QUE ES HOY: un número
@@ -82,15 +99,6 @@ export function avisoMigracionAmarrePrestamos(): string {
     "La casilla de Préstamo todavía no se llena sola: falta preparar la base. "
     + `Pídele a Daniel que corra el archivo ${MIGRACION_AMARRE_PRESTAMOS} en Supabase. `
     + "Mientras tanto se escribe a mano, como hasta ahora."
-  );
-}
-
-/** Sin la tabla no se puede aprobar; la planilla da lo mismo de hoy. */
-export function avisoMigracionPrestamoAprobado(): string {
-  return (
-    "Los descuentos de préstamo todavía no se pueden aprobar: falta preparar la base. "
-    + `Pídele a Daniel que corra el archivo ${MIGRACION_PRESTAMO_APROBADO} en Supabase. `
-    + "Mientras tanto la casilla de Préstamo se escribe a mano, como hasta ahora."
   );
 }
 
@@ -133,6 +141,26 @@ export const CONCEPTOS_DEUDA = [
 /** Todo lo que RESTA de la deuda, incluido el abono de bolsillo. */
 export const CONCEPTOS_PAGO = [...CONCEPTOS_PAGO_DE_CUENTA, "Abono extra"] as const;
 
+/**
+ * 🔴 ¿ESTE MOVIMIENTO ES UN DESCUENTO QUE SALIÓ DEL SUELDO?
+ *
+ * Dos condiciones, y las dos: el CONCEPTO es un pago de cuenta, y el ORIGEN es
+ * la quincena. Sin origen escrito (las 443 filas anteriores al 5-sep-2026) se
+ * asume que sí — es lo conservador: en la duda no se vuelve a descontar.
+ *
+ * 🩸 Un abono con origen «Liquidación», «Décimo», «Vacaciones» o «Efectivo»
+ * NO es un descuento del sueldo, aunque su concepto sea «Pago». Es el caso de
+ * CRISTIAM BLANCO (ver el encabezado).
+ */
+export function esDescuentoDeQuincena(m: {
+  concepto: string;
+  origen_pago?: string | null;
+}): boolean {
+  if (!(CONCEPTOS_PAGO_DE_CUENTA as readonly string[]).includes(String(m.concepto))) return false;
+  const o = String(m.origen_pago ?? "").trim();
+  return o === "" || o === ORIGEN_POR_DEFECTO;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LO QUE ENTRA
 // ─────────────────────────────────────────────────────────────────────────────
@@ -158,9 +186,8 @@ export interface FichaPrestamo {
   /**
    * `deduccion_dano`: la cuota de la cuenta DAÑO DE MERCANCÍA (5-sep-2026).
    *
-   * 🔴 LA PLANILLA PROPONE LA SUMA DE LAS DOS EN UNA SOLA CASILLA. Daniel, al
-   * ver el mockup de las dos cuentas: *«juntos»*. La casilla «Préstamo» del
-   * cuadro es UNA y así se queda: $30 de préstamo + $10 de daño = $40.
+   * ⚠️ SIN LECTORES desde el 10-sep-2026: el daño no propone cuota. La
+   * contadora escribe el monto de cada quincena en su casilla.
    */
   cuotaDano: number;
   /** `prestado − pagado` de las DOS cuentas, ya firmado por el módulo. */
@@ -176,24 +203,15 @@ export interface FichaPrestamo {
    */
   cuotaTerceros: number;
   saldoTerceros: number;
-  /** Lo que el módulo YA registró como pago de TERCEROS dentro de esta quincena. */
+  /** Lo que el módulo YA registró como pago DE QUINCENA de TERCEROS dentro de esta quincena. */
   yaDescontadoTerceros: number;
   /**
-   * Lo que el módulo YA registró como «Pago» DENTRO de esta quincena. Es un
-   * hecho consumado: si hay algo acá, la casilla dice esto y no la cuota.
+   * Lo que el módulo YA registró como pago DE QUINCENA dentro de esta
+   * quincena. Es un hecho consumado: si hay algo acá, la casilla dice esto y no
+   * la cuota. ⚠️ Solo lo que pasa `esDescuentoDeQuincena`: un abono de bolsillo
+   * no entra.
    */
   yaDescontado: number;
-}
-
-/** Una decisión guardada. */
-export interface AprobacionPrestamo {
-  codigo: string;
-  /** `false` = se desaprobó. La fila NO se borra. */
-  aprobado: boolean;
-  /** El TESTIGO: cuánto sugería el módulo al aprobar. No es lo que se paga. */
-  montoVisto: number;
-  por: string | null;
-  cuando: string | null;
 }
 
 /** Lo mínimo que hace falta saber de la persona en el cuadro. */
@@ -203,9 +221,9 @@ export interface PersonaEnCuadro {
   etiqueta: string;
   empresa: string | null;
   empresaEtiqueta: string | null;
-  /** Lo que HOY dice la casilla Préstamo de esta quincena. */
+  /** Lo que HOY dice la casilla Préstamo de esta quincena (lo escrito a mano). */
   enCasilla: number;
-  /** Lo que HOY dice la casilla «Terceros» de esta quincena. */
+  /** Lo que HOY dice la casilla «Terceros» de esta quincena (lo escrito a mano). */
   enCasillaTerceros: number;
 }
 
@@ -229,15 +247,10 @@ export interface SugerenciaPrestamo {
   nombrePrestamos: string;
   cuota: number;
   saldo: number;
-  /** El número que va (o fue) a la casilla. Siempre > 0. */
+  /** El número que va (o fue) a la casilla. Siempre > 0 en alguna de las dos cuentas. */
   sugerido: number;
   origen: OrigenSugerencia;
-  aprobado: boolean;
-  por: string | null;
-  cuando: string | null;
-  /** El testigo guardado. `null` si nunca se tocó. */
-  montoVisto: number | null;
-  /** Lo que HOY dice la casilla. */
+  /** Lo que HOY dice la casilla, escrito a mano. 0 = nada escrito. */
   enCasilla: number;
   /** 🔴 LA TERCERA CUENTA, con su propia casilla y su propio renglón en el
    *  papel. `min(cuotaTerceros, saldoTerceros)`, o lo ya descontado. */
@@ -245,13 +258,6 @@ export interface SugerenciaPrestamo {
   saldoTerceros: number;
   sugeridoTerceros: number;
   enCasillaTerceros: number;
-  /**
-   * 🔴 Aprobado, pero lo que hay ya no es lo que se aprobó — porque el módulo
-   * cambió (se registró un pago, se tomó otro préstamo) o porque alguien
-   * corrigió la casilla a mano. Se DICE con los dos números; no se corrige
-   * solo, porque una plata que se mueve sola es peor que una que se explica.
-   */
-  cambio: boolean;
 }
 
 /** Una ficha con saldo que no se le pudo atar a nadie. */
@@ -323,12 +329,10 @@ export interface OpcionesSugerencia {
   fichas: readonly FichaPrestamo[];
   /** La gente del cuadro de esta quincena, por código. */
   personas: readonly PersonaEnCuadro[];
-  /** código → decisión guardada. */
-  aprobaciones: ReadonlyMap<string, AprobacionPrestamo>;
 }
 
 /**
- * Lo que la pantalla muestra: una línea por PERSONA del cuadro que tenga algo
+ * Lo que el módulo propone: una línea por PERSONA del cuadro que tenga algo
  * que descontar.
  *
  * 🔑 SE AGRUPA POR CÓDIGO, no por ficha. En producción `RAMON MIRANDA` tiene
@@ -338,7 +342,8 @@ export interface OpcionesSugerencia {
  *
  * ⚠️ Solo entra quien está en el cuadro. Una ficha atada a alguien que esta
  * quincena no cobra (se fue, entró después) no propone nada: la baja ya la
- * decidió la capa de arriba y acá no se vuelve a decidir.
+ * decidió la capa de arriba y acá no se vuelve a decidir — pero SE DICE, ver
+ * `prestamosDeQuienNoCobra`.
  */
 export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[] {
   const personaDe = new Map(opts.personas.map((p) => [p.codigo, p]));
@@ -396,8 +401,6 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
   const out: SugerenciaPrestamo[] = [];
   for (const [codigo, a] of acumulado) {
     const p = personaDe.get(codigo)!;
-    const ap = opts.aprobaciones.get(codigo);
-    const aprobado = ap?.aprobado === true;
     out.push({
       codigo,
       etiqueta: p.etiqueta,
@@ -408,20 +411,11 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
       saldo: a.saldo,
       sugerido: a.monto,
       origen: a.origen,
-      aprobado,
-      por: ap?.por ?? null,
-      cuando: ap?.cuando ?? null,
-      montoVisto: ap ? ap.montoVisto : null,
       enCasilla: centavos(num(p.enCasilla)),
       cuotaTerceros: a.cuotaT,
       saldoTerceros: a.saldoT,
       sugeridoTerceros: a.montoT,
       enCasillaTerceros: centavos(num(p.enCasillaTerceros)),
-      // Solo tiene sentido avisar de un cambio sobre algo que SE aprobó.
-      cambio:
-        aprobado
-        && (centavos(num(ap!.montoVisto)) !== a.monto
-          || centavos(num(ap!.montoVisto)) !== centavos(num(p.enCasilla))),
     });
   }
 
@@ -434,24 +428,132 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
   );
 }
 
-/** Las que todavía no aprobó nadie. Son las que la planilla NO descontó. */
-export function prestamosSinAprobar(
-  sugerencias: readonly SugerenciaPrestamo[],
-): SugerenciaPrestamo[] {
-  // ⚠️ Sin aprobar Y sin monto en NINGUNA de las dos casillas automáticas. Si
-  // alguien ya lo escribió a mano, la planilla SÍ lo descontó y decir «no se
-  // descontó» sería mentir.
-  // ⚠️ `num()` y no `<= 0` a secas: un objeto SIN los campos de terceros —una
-  // respuesta guardada de antes del 10-sep-2026, o un fixture— daría
-  // `undefined <= 0` = false y APAGARÍA el freno en silencio. El freno del
-  // cierre no se puede apagar por un campo que todavía no llegó.
-  return sugerencias.filter(
-    (s) => !s.aprobado && num(s.enCasilla) <= 0 && num(s.enCasillaTerceros) <= 0,
-  );
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LA CUOTA ENTRA SOLA A LA LÍNEA (11-sep-2026)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lo que entró SOLO a cada casilla automática. 0 = nada (había algo escrito, o no propone). */
+export interface PrestamoAutomatico {
+  prestamo: number;
+  terceros: number;
 }
+
+/**
+ * 🔴 LO ESCRITO A MANO MANDA; VACÍO = LO QUE PROPONE EL MÓDULO.
+ *
+ * `enCasilla` es lo que hay en `asistencia_planilla_manual` (0 cuando nadie
+ * escribió nada). Un monto > 0 es una decisión de una persona y no se pisa;
+ * con 0 entra la propuesta. Vale para las DOS casillas automáticas, cada una
+ * por separado.
+ *
+ * ⚠️ Por eso mismo, HOY NO HAY FORMA DE «NO DESCONTAR ESTA QUINCENA» escribiendo
+ * un 0: el 0 se lee como «vacío». La tabla no distingue las dos cosas (la
+ * columna es `NOT NULL DEFAULT 0`). Es una decisión pendiente de Daniel, no un
+ * olvido, y queda dicha en `docs/estado-actual.md`.
+ */
+export function casillaAutomatica(enCasilla: number, sugerido: number): number {
+  const escrito = centavos(Math.max(0, num(enCasilla)));
+  if (escrito > 0) return 0;
+  return centavos(Math.max(0, num(sugerido)));
+}
+
+/**
+ * Mete la cuota en la línea del cuadro: en `dinero.prestamo` / `dinero.terceros`,
+ * en el total de deducciones y en el neto. NUNCA en `manuales` — esa es la foto
+ * de lo que hay en la tabla, y la pantalla la manda de vuelta entera al guardar
+ * cualquier otra casilla (el ISR, la mercancía): si la cuota viviera ahí, editar
+ * el ISR congelaría la cuota de hoy como si alguien la hubiera escrito.
+ *
+ * 🔑 Misma forma que `aplicarAjusteEnLinea`: el monto mueve el total de
+ * deducciones y el neto por la MISMA cuenta del motor
+ * (`neto = bruto − deducciones + otros servicios`), sin recalcular nada más.
+ * Sin `dinero` (servicio profesional, «Tú decides») no se toca nada. Sin nada
+ * que meter, vuelve la MISMA referencia.
+ */
+export function aplicarPrestamoEnLinea<
+  L extends { codigo: string; manuales: ManualesLinea; dinero: DineroLinea | null },
+>(
+  linea: L,
+  sugerencia: SugerenciaPrestamo | null | undefined,
+): L & { prestamoAutomatico?: PrestamoAutomatico } {
+  const d = linea.dinero;
+  if (!d || !sugerencia) return linea;
+  const prestamo = casillaAutomatica(linea.manuales.prestamo, sugerencia.sugerido);
+  const terceros = casillaAutomatica(linea.manuales.terceros, sugerencia.sugeridoTerceros);
+  if (prestamo <= 0 && terceros <= 0) return linea;
+  const extra = centavos(prestamo + terceros);
+  const dinero: DineroLinea = {
+    ...d,
+    prestamo: centavos(d.prestamo + prestamo),
+    terceros: centavos(d.terceros + terceros),
+    totalDeducciones: centavos(d.totalDeducciones + extra),
+    netoPagar: centavos(d.netoPagar - extra),
+  };
+  return { ...linea, dinero, prestamoAutomatico: { prestamo, terceros } };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LO QUE SE DICE — solo cuando algo no es lo de siempre
+// ─────────────────────────────────────────────────────────────────────────────
 
 function plata(n: number): string {
   return `$${n.toFixed(2)}`;
+}
+
+/** Un aviso del préstamo en la planilla. */
+export type AvisoPrestamo =
+  /** La cuota es mayor que el saldo: se descuenta el saldo y con eso termina de pagar. */
+  | { tipo: "ultima-cuota"; codigo: string; etiqueta: string; cuenta: "prestamo" | "terceros"; cuota: number; saldo: number }
+  /** Debe, pero no está en el cuadro de esta quincena: no se le descuenta. */
+  | { tipo: "no-cobra"; codigo: string; etiqueta: string; saldo: number };
+
+/**
+ * Las últimas cuotas: cuando la cuota es MAYOR que el saldo, la casilla dice el
+ * saldo (regla de `montoDeFicha`) y eso se dice, porque el número no es el de
+ * todas las quincenas. Solo sobre la propuesta (`origen: "cuota"`): un hecho
+ * consumado no es una estimación y no hay nada que explicar.
+ */
+export function avisosDeUltimaCuota(sugerencias: readonly SugerenciaPrestamo[]): AvisoPrestamo[] {
+  const out: AvisoPrestamo[] = [];
+  for (const s of sugerencias) {
+    if (s.origen !== "cuota") continue;
+    if (num(s.saldo) > 0 && num(s.cuota) > num(s.saldo) + 0.004) {
+      out.push({ tipo: "ultima-cuota", codigo: s.codigo, etiqueta: s.etiqueta, cuenta: "prestamo", cuota: centavos(num(s.cuota)), saldo: centavos(num(s.saldo)) });
+    }
+    if (num(s.saldoTerceros) > 0 && num(s.cuotaTerceros) > num(s.saldoTerceros) + 0.004) {
+      out.push({ tipo: "ultima-cuota", codigo: s.codigo, etiqueta: s.etiqueta, cuenta: "terceros", cuota: centavos(num(s.cuotaTerceros)), saldo: centavos(num(s.saldoTerceros)) });
+    }
+  }
+  return out;
+}
+
+/**
+ * 🔴 QUIEN DEBE Y NO ESTÁ EN EL CUADRO. Salió (fecha de salida), o su código
+ * está ignorado, o no cobra en esta empresa: la planilla no le descuenta nada
+ * y hay que decirlo — la deuda no desaparece porque la persona no esté.
+ *
+ * `fuera` son los códigos que la capa de arriba dejó afuera de esta quincena
+ * (bajas + ignorados); `nombreDe` resuelve el código al nombre de Asistencia,
+ * y si no lo sabe se usa el de Préstamos.
+ */
+export function prestamosDeQuienNoCobra(opts: {
+  fichas: readonly FichaPrestamo[];
+  fuera: ReadonlySet<string>;
+  nombreDe: (codigo: string) => string | null | undefined;
+}): AvisoPrestamo[] {
+  const porCodigo = new Map<string, { etiqueta: string; saldo: number }>();
+  for (const f of opts.fichas) {
+    const cod = (f.codigo ?? "").trim();
+    if (!cod || !opts.fuera.has(cod)) continue;
+    const saldo = centavos(num(f.saldo));
+    if (saldo <= 0.004) continue;
+    const prev = porCodigo.get(cod);
+    if (prev) prev.saldo = centavos(prev.saldo + saldo);
+    else porCodigo.set(cod, { etiqueta: (opts.nombreDe(cod) ?? "").trim() || f.nombre, saldo });
+  }
+  return [...porCodigo.entries()]
+    .map(([codigo, v]) => ({ tipo: "no-cobra" as const, codigo, etiqueta: v.etiqueta, saldo: v.saldo }))
+    .sort((a, b) => b.saldo - a.saldo || a.etiqueta.localeCompare(b.etiqueta, "es"));
 }
 
 /**
@@ -460,27 +562,18 @@ function plata(n: number): string {
  *
  * 🔴 VA CON NOMBRE Y MONTO, persona por persona. Misma regla de Daniel que ya
  * usan las horas extra y las vacaciones ya pagadas: *«lo que un guard rechaza
- * se DICE en pantalla»*. Rechazar sí, esconder no.
+ * se DICE en pantalla»*.
  */
-export function textoPrestamoSinAprobar(
-  items: readonly SugerenciaPrestamo[],
-): string | null {
-  if (items.length === 0) return null;
-  const detalle = items
-    .map((s) => {
-      // Se nombran las dos cuentas cuando las dos tienen algo: un solo monto
-      // escondería la mitad de lo que no se descontó.
-      const partes: string[] = [];
-      if (num(s.sugerido) > 0) partes.push(plata(num(s.sugerido)));
-      if (num(s.sugeridoTerceros) > 0) partes.push(`${plata(num(s.sugeridoTerceros))} a terceros`);
-      return `${s.etiqueta} · ${partes.join(" + ") || plata(0)}`;
-    })
-    .join(" — ");
-  const cabeza =
-    items.length === 1
-      ? "1 colaborador tiene préstamo por descontar sin aprobar: NO se descontó en este cuadro."
-      : `${items.length} colaboradores tienen préstamo por descontar sin aprobar: NO se descontó en este cuadro.`;
-  return `${cabeza} Se aprueba aquí arriba, en «Préstamos por descontar». ${detalle}`;
+export function textoAvisoPrestamo(avisos: readonly AvisoPrestamo[]): string | null {
+  if (avisos.length === 0) return null;
+  const frases = avisos.map((a) => {
+    if (a.tipo === "ultima-cuota") {
+      const que = a.cuenta === "terceros" ? "de terceros" : "del préstamo";
+      return `${a.etiqueta}: se le descuenta ${plata(a.saldo)} y no su cuota ${que} de ${plata(a.cuota)} — con eso termina de pagar.`;
+    }
+    return `${a.etiqueta} debe ${plata(a.saldo)} y no está en el cuadro de esta quincena (salió, o no cobra aquí): no se le descuenta nada. Si salió, descuéntalo de la liquidación.`;
+  });
+  return `Préstamos: ${frases.join(" ")}`;
 }
 
 /**
@@ -512,19 +605,4 @@ export function textoPrestamoSinAtar(
   // había forma de poner el código desde ninguna pantalla. Desde el 5-sep-2026
   // sí la hay — se elige a la persona de Asistencia en la ficha del préstamo.
   return `${cabeza} Se atan en Préstamos, eligiendo al colaborador en su ficha. ${detalle}`;
-}
-
-/** Cuántas faltan y cuánto suman. Es el contador del bloque. */
-export function resumenPrestamos(sugerencias: readonly SugerenciaPrestamo[]): {
-  pendientes: number;
-  monto: number;
-  /** Los códigos pendientes, para el botón «Aprobar todos». */
-  codigos: string[];
-} {
-  const faltan = sugerencias.filter((s) => !s.aprobado);
-  return {
-    pendientes: faltan.length,
-    monto: centavos(faltan.reduce((a, s) => a + num(s.sugerido) + num(s.sugeridoTerceros), 0)),
-    codigos: faltan.map((s) => s.codigo),
-  };
 }

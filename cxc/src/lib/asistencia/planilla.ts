@@ -1372,6 +1372,13 @@ export interface LineaPlanilla {
    * neto que se paga. Este número queda como TESTIGO (es lo que el cierre
    * congela en `ajuste_anterior`) — NO se vuelve a restar en ningún lado.
    */
+  /**
+   * 🔴 Lo que entró SOLO a las casillas «Préstamo» y «Terceros» (11-sep-2026,
+   * Daniel: *«quita lo de aprobación a préstamos, no es necesario»*). Ya está
+   * ADENTRO de `dinero`; `manuales` sigue siendo la foto de la tabla (lo que
+   * alguien escribió a mano, 0 = nada). Lo pone `aplicarPrestamoEnLinea`.
+   */
+  prestamoAutomatico?: { prestamo: number; terceros: number };
   ajusteAnterior?: number;
   /**
    * De qué días salió el ajuste y cuánto le entró a cada columna. Es lo que

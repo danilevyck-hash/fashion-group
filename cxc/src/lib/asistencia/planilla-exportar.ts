@@ -104,7 +104,10 @@ export interface DatosPlanillaExport {
    * en cero para alguien que sí debe plata es exactamente el número que nadie
    * va a poder explicar dentro de seis meses si el archivo no lo dice.
    */
-  avisoPrestamoSinAprobar?: string | null;
+  /** 🔴 El aviso del préstamo (11-sep-2026): la última cuota y quien debe pero no
+   *  cobra aquí. Hasta ese día decía «préstamos que no se descontaron por falta
+   *  de aprobación»; la aprobación se retiró. */
+  avisoPrestamo?: string | null;
   /**
    * Préstamos CON SALDO que no están atados a nadie de la planilla, o sea que
    * no se le están descontando a ninguna persona. También va impreso: es la
@@ -391,8 +394,8 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ...(d.avisoExtraSinAprobar
         ? [["Horas extra que no se pagaron", d.avisoExtraSinAprobar]]
         : []),
-      ...(d.avisoPrestamoSinAprobar
-        ? [["Préstamos que no se descontaron", d.avisoPrestamoSinAprobar]]
+      ...(d.avisoPrestamo
+        ? [["Préstamos", d.avisoPrestamo]]
         : []),
       ...(d.avisoPrestamoSinAtar
         ? [["Préstamos sin colaborador", d.avisoPrestamoSinAtar]]
@@ -490,7 +493,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     d.avisoSinFicha,
     d.avisoVacacionesNoPagadas,
     d.avisoExtraSinAprobar,
-    d.avisoPrestamoSinAprobar,
+    d.avisoPrestamo,
     d.avisoPrestamoSinAtar,
     conAusenciaPorTardanza
       ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`

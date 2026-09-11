@@ -49,7 +49,6 @@ const RUTAS = [
   ["GET",  "/api/asistencia/vacaciones"],
   ["GET",  "/api/asistencia/reloj"],
   ["POST", "/api/asistencia/aprobaciones"],   // cuerpo vacío -> 400 sin escribir
-  ["POST", "/api/asistencia/prestamos"],      // cuerpo vacío -> 400 sin escribir
 ];
 
 const DEFAULTS = {}; // se llena desde la app si hiciera falta; hoy todos tienen fila

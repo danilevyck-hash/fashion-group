@@ -23,7 +23,7 @@ import {
   cuentaDeMovimiento,
   type MovimientoParaSaldo,
 } from "@/lib/prestamos-saldo";
-import { CONCEPTOS_PAGO_DE_CUENTA } from "./prestamos-planilla";
+import { esDescuentoDeQuincena } from "./prestamos-planilla";
 import {
   planDeCierre,
   type DeudaDePersona,
@@ -49,6 +49,7 @@ interface FilaMovimiento extends MovimientoParaSaldo {
   fecha: string;
   concepto: string;
   monto: number | string;
+  origen_pago?: string | null;
 }
 
 const num = (v: unknown): number => {
@@ -86,7 +87,10 @@ export async function leerDeudas(
     (pedirCount, from, to) =>
       supabaseServer
         .from("prestamos_movimientos")
-        .select("id, empleado_id, fecha, concepto, monto, estado, deleted, cuenta",
+        // 🔴 `origen_pago` viaja (11-sep-2026): un abono de liquidación NO es el
+        // descuento de la quincena, y contarlo como tal dejaría el pago del
+        // cierre sin anotar («ya-registrado») — el sueldo bajaría y la deuda no.
+        .select("id, empleado_id, fecha, concepto, monto, estado, deleted, cuenta, origen_pago",
           pedirCount ? { count: "exact" } : {})
         .eq("estado", "aprobado")
         .or("deleted.is.null,deleted.eq.false")
@@ -109,7 +113,9 @@ export async function leerDeudas(
     else movsDe.set(emp, [m]);
     // Ventana EXACTA, sin tolerancia de días: los pagos caen justo en el borde
     // (el 15 y el 30) y ±3 días haría que el mismo pago entre en dos quincenas.
-    if ((CONCEPTOS_PAGO_DE_CUENTA as readonly string[]).includes(String(m.concepto))) {
+    // 🔴 Y solo lo que SALIÓ DE LA QUINCENA (`esDescuentoDeQuincena`, la misma
+    // regla que la casilla): el caso de CRISTIAM BLANCO, $125 de liquidación.
+    if (esDescuentoDeQuincena(m)) {
       const f = String(m.fecha).slice(0, 10);
       if (f >= desde && f <= hasta) {
         const destino =

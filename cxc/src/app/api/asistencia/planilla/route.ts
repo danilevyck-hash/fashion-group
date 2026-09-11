@@ -125,18 +125,17 @@ import {
 } from "@/lib/asistencia/aprobaciones";
 import { leerAprobaciones } from "@/lib/asistencia/aprobaciones-server";
 import {
-  prestamosSinAprobar,
+  aplicarPrestamoEnLinea,
+  avisosDeUltimaCuota,
+  prestamosDeQuienNoCobra,
   prestamosSinAtar,
   sugerirPrestamos,
-  textoPrestamoSinAprobar,
+  textoAvisoPrestamo,
   textoPrestamoSinAtar,
   type FichaPrestamo,
   type PersonaEnCuadro,
 } from "@/lib/asistencia/prestamos-planilla";
-import {
-  leerAprobacionesPrestamo,
-  leerPrestamosDeQuincena,
-} from "@/lib/asistencia/prestamos-planilla-server";
+import { leerPrestamosDeQuincena } from "@/lib/asistencia/prestamos-planilla-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -750,19 +749,15 @@ export async function GET(req: NextRequest) {
     // una cuota por días sería inventar plata. Es la MISMA condición con la que
     // ya se leen los montos manuales, unas líneas más arriba.
     const claveQ = q.claveManuales;
-    const [presRes, aprPresRes] = claveQ
-      ? await Promise.all([
-        // 🔴 Las fichas de préstamo con su amarre. Si no se pueden leer, la
-        // planilla no sale: «nadie atado» ante un error es exactamente cómo
-        // se perdieron los $700 de LUIS ADRIAN ARROYO (#651).
-        leerPrestamosDeQuincena(q.desde, q.hasta),
-        // 🔴 Qué descuentos están aprobados. Lo mismo.
-        leerAprobacionesPrestamo(claveQ),
-      ])
-      : [
-        { fichas: [] as FichaPrestamo[] },
-        { porCodigo: new Map() },
-      ];
+    // 🔴 Las fichas de préstamo con su amarre. Si no se pueden leer, la
+    // planilla no sale: «nadie atado» ante un error es exactamente cómo se
+    // perdieron los $700 de LUIS ADRIAN ARROYO (#651).
+    // 🩸 Hasta el 11-sep-2026 acá también se leía `asistencia_prestamo_aprobado`
+    // (qué descuentos estaban aprobados). Daniel: *«quita lo de aprobación a
+    // préstamos, no es necesario»* — la cuota entra sola, más abajo.
+    const presRes = claveQ
+      ? await leerPrestamosDeQuincena(q.desde, q.hasta)
+      : { fichas: [] as FichaPrestamo[] };
 
     // 🔑 La casilla de HOY sale de las MISMAS líneas del cuadro, no de una
     // segunda lectura de `asistencia_planilla_manual`: lo que la pantalla dice
@@ -781,13 +776,31 @@ export async function GET(req: NextRequest) {
     const prestamos = sugerirPrestamos({
       fichas: presRes.fichas,
       personas: enCuadro,
-      aprobaciones: aprPresRes.porCodigo,
     });
-    // 🔴 Lo que este cuadro NO descontó porque nadie lo aprobó, y los préstamos
-    // con saldo que no son de nadie. Los dos van con nombre y monto: es la
+
+    // ── 🔴 LA CUOTA ENTRA SOLA A LA LÍNEA (11-sep-2026) ──────────────────────
+    //
+    // Daniel: *«quita lo de aprobación a préstamos, no es necesario»*. La
+    // propuesta del módulo —préstamo y terceros, cada una capeada a su saldo—
+    // va DERECHO a `dinero.prestamo` / `dinero.terceros`, al total de
+    // deducciones y al neto, salvo que la casilla ya tenga un monto escrito a
+    // mano (ése manda). `manuales` NO se toca: es la foto de la tabla y la
+    // pantalla la manda de vuelta entera al guardar cualquier otra casilla.
+    // Sin nada que meter, la línea vuelve tal cual (misma referencia).
+    const sugerenciaDe = new Map(prestamos.map((s) => [s.codigo, s]));
+    const lineasConPrestamo = lineas.map((l) => aplicarPrestamoEnLinea(l, sugerenciaDe.get(l.codigo)));
+
+    // 🔴 Lo que se DICE, solo cuando algo no es lo de siempre: la última cuota
+    // (cuota mayor que el saldo: se descuenta el saldo) y quien debe pero NO
+    // está en el cuadro (salió, o no cobra aquí: no se le descuenta). Y los
+    // préstamos con saldo que no son de nadie. Todo con nombre y monto: la
     // misma regla de Daniel que ya cumplen las horas extra y las vacaciones ya
     // pagadas — rechazar sí, esconder no.
-    const prestamoSinAprobar = prestamosSinAprobar(prestamos);
+    const nombreDePersona = new Map(personasDb.filas.map((f) => [String(f.empleado_codigo), f.nombre ?? null]));
+    const prestamoAvisos = [
+      ...avisosDeUltimaCuota(prestamos),
+      ...prestamosDeQuienNoCobra({ fichas: presRes.fichas, fuera, nombreDe: (c) => nombreDePersona.get(c) }),
+    ];
     const prestamoSinAtar = prestamosSinAtar(presRes.fichas);
 
     // ── 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, ADENTRO DE CADA LÍNEA ──────────
@@ -798,7 +811,7 @@ export async function GET(req: NextRequest) {
     // tardanza— por `aplicarAjusteEnLinea` (11-sep-2026, la contadora: «valen
     // diferente»). Después de esto `dinero.netoPagar` ES el neto que se paga y
     // `totalizar` lo suma solo. `undefined` sin todo esto → el módulo de siempre.
-    let lineasFinal = lineas;
+    let lineasFinal = lineasConPrestamo;
     let totalAjuste = 0;
     let diasAjuste: { desde: string; hasta: string } | null = null;
     const ajustePersonas: { codigo: string; etiqueta: string; monto: number }[] = [];
@@ -806,7 +819,7 @@ export async function GET(req: NextRequest) {
       const medido = await medirAjusteAnterior(req, empresa, q.quincena);
       if (medido && medido.dinero.size) {
         diasAjuste = medido.dias;
-        lineasFinal = lineas.map((l) => aplicarAjusteEnLinea(l, medido.dinero.get(l.codigo), medido.dias));
+        lineasFinal = lineasConPrestamo.map((l) => aplicarAjusteEnLinea(l, medido.dinero.get(l.codigo), medido.dias));
         for (const l of lineasFinal) {
           const a = l.ajusteAnterior;
           if (a) { ajustePersonas.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto: a }); totalAjuste += a; }
@@ -837,10 +850,9 @@ export async function GET(req: NextRequest) {
       // no va a hacer nada con ella.
       aprobaciones: filasAprobacion,
       puedeAprobar,
-      // 🔴 LO QUE EL MÓDULO DE PRÉSTAMOS DICE QUE HAY QUE DESCONTAR ESTA
-      // QUINCENA, persona por persona, con su cuota, su saldo y si ya está
-      // aprobado. La contadora, textual: *«El préstamo si debe ser por
-      // aprobarlo»*. Vacío en un rango libre.
+      // 🔴 LO QUE EL MÓDULO DE PRÉSTAMOS PROPUSO ESTA QUINCENA, persona por
+      // persona, con su cuota y su saldo. Ya está ADENTRO de cada línea
+      // (`prestamoAutomatico`); acá viaja como testigo. Vacío en un rango libre.
       prestamos,
       // Los avisos que la pantalla tiene que poder pintar ANTES de que alguien
       // le descuente plata a nadie.
@@ -888,10 +900,11 @@ export async function GET(req: NextRequest) {
         // Con nombre y cantidad: rechazar sí, esconder no.
         extraSinAprobar,
         avisoExtraSinAprobar: textoExtraNoAprobada(extraSinAprobar),
-        // 🔴 Los descuentos de préstamo que este cuadro NO hizo porque nadie
-        // los aprobó. Misma regla, mismo formato.
-        prestamoSinAprobar,
-        avisoPrestamoSinAprobar: textoPrestamoSinAprobar(prestamoSinAprobar),
+        // 🔴 Lo que el préstamo tiene que DECIR esta quincena: la última cuota
+        // (se descuenta el saldo, no la cuota) y quien debe pero no cobra aquí
+        // (no se le descuenta). Solo cuando pasa; si no, `null`.
+        prestamoAvisos,
+        avisoPrestamo: textoAvisoPrestamo(prestamoAvisos),
         // 🔴 Y los préstamos CON SALDO que no están atados a nadie de la
         // planilla. Es plata que no se le está descontando a ninguna persona:
         // callarla es exactamente cómo se perdieron los $700 de LUIS ADRIAN
@@ -900,6 +913,8 @@ export async function GET(req: NextRequest) {
         avisoPrestamoSinAtar: textoPrestamoSinAtar(prestamoSinAtar),
         // Constantes desde el 3-sep-2026 — ver arriba.
         faltaMigracionAmarrePrestamos: null,
+        // ⚠️ Retirado el 11-sep-2026 con la aprobación quincenal; se conserva en
+        // `null` porque la respuesta guardada por SWR y un candado lo nombran.
         faltaMigracionPrestamoAprobado: null,
         faltaMigracionAprobaciones: null,
         faltaMigracionAprobador: null,

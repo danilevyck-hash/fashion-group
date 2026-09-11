@@ -140,8 +140,9 @@ interface Respuesta {
     personas: { codigo: string; etiqueta: string; monto: number }[];
     dias?: { desde: string; hasta: string } | null;
   };
-  /** 🔴 Lo que el módulo de Préstamos dice que hay que descontar esta quincena,
-   *  persona por persona. Vacío en un rango libre.
+  /** 🔴 Lo que el módulo de Préstamos propuso esta quincena, persona por
+   *  persona. Ya está ADENTRO de cada línea (`prestamoAutomatico`); acá viaja
+   *  como testigo. Vacío en un rango libre.
    *
    *  🩸 OPCIONAL A PROPÓSITO: una respuesta guardada por SWR de ANTES de este
    *  cambio no lo trae, y esa respuesta se pinta antes de que llegue la nueva.
@@ -195,13 +196,13 @@ interface Respuesta {
      *  cobró en UNA sola planilla, y sin este aviso nadie se enteraría. */
     repartosRechazados: RepartoRechazado[];
     avisoRepartoRechazado: string | null;
-    /** 🔴 Los descuentos de préstamo que este cuadro NO hizo porque nadie los
-     *  aprobó. Contadora, textual: *«El préstamo si debe ser por aprobarlo»*.
-     *  Nada se descarta en silencio: va con nombre y monto.
-     *  🩸 Opcionales por el mismo motivo que `prestamos`: una respuesta vieja
-     *  guardada por SWR no los trae. */
-    prestamoSinAprobar?: SugerenciaPrestamo[];
-    avisoPrestamoSinAprobar?: string | null;
+    /** 🔴 Lo que el préstamo tiene que DECIR esta quincena (11-sep-2026): la
+     *  última cuota (se descuenta el saldo, no la cuota) y quien debe pero no
+     *  está en el cuadro (no se le descuenta). Solo cuando pasa.
+     *  🩸 Hasta el 11-sep-2026 acá venía «lo que NO se descontó por falta de
+     *  aprobación»; Daniel: *«quita lo de aprobación a préstamos, no es
+     *  necesario»*. Opcional por el mismo motivo que `prestamos`. */
+    avisoPrestamo?: string | null;
     /** 🔴 Préstamos CON SALDO que no están atados a nadie de la planilla: no se
      *  le descuentan a ninguna persona. */
     prestamoSinAtar?: PrestamoSinAtar[];
@@ -209,8 +210,6 @@ interface Respuesta {
     /** Falta correr el SQL del amarre. La casilla se sigue escribiendo a mano,
      *  como hasta hoy — pero se dice. */
     faltaMigracionAmarrePrestamos?: string | null;
-    /** Falta correr el SQL de la aprobación del préstamo. Ídem. */
-    faltaMigracionPrestamoAprobado?: string | null;
   };
 }
 
@@ -578,53 +577,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
     [data, toast],
   );
 
-  // ── 🔴 APROBAR EL DESCUENTO DE PRÉSTAMO ────────────────────────────────────
-  //
-  // Contadora, textual: *«El préstamo si debe ser por aprobarlo»*. Aprobar
-  // ESCRIBE el monto en la casilla —que queda editable— y deja registro de
-  // quién lo hizo. Retirar la aprobación la vacía, salvo que alguien la haya
-  // corregido a mano: eso no se pisa, y el servidor lo devuelve en `noTocadas`.
-  const [aprobandoPrestamo, setAprobandoPrestamo] = useState(false);
-  const aprobarPrestamo = useCallback(
-    async (personas: Array<{ codigo: string; monto: number }>, aprobado: boolean) => {
-      if (!data || personas.length === 0) return;
-      // 🔴 LA CLAVE SALE DE LA RESPUESTA, no de un estado propio — mismo motivo
-      // que en `guardar`: una segunda definición de «a qué quincena pertenece
-      // este cuadro» terminaría guardando en una y leyendo de otra.
-      if (!data.periodo.claveManuales) return;
-      setAprobandoPrestamo(true);
-      try {
-        const res = await fetch("/api/asistencia/prestamos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ quincena: data.periodo.claveManuales, aprobado, personas }),
-        });
-        const j = await res.json();
-        if (!res.ok) throw new Error(j.error ?? "No se pudo guardar");
-        if (j.ok === false) {
-          toast(j.aviso ?? "No se pudo guardar", "error");
-        } else if (Array.isArray(j.noTocadas) && j.noTocadas.length > 0) {
-          // 🔴 Nada se descarta en silencio: si una casilla se dejó como estaba
-          // porque alguien la había corregido, se DICE.
-          toast(
-            `Se retiró la aprobación, pero ${j.noTocadas.length === 1 ? "1 casilla quedó" : `${j.noTocadas.length} casillas quedaron`} `
-            + "con el monto que alguien escribió a mano. Corrígelo en el cuadro si hace falta.",
-            "warning",
-          );
-        }
-        // 🔴 Mismo criterio que los montos a mano: aprobar mueve la plata, así
-        // que el cuadro queda VIEJO y se dice. No se recalcula por debajo.
-        setDesactualizada(true);
-        toast("Listo. Toca «Regenerar» para ver el cuadro con este cambio.", "success");
-      } catch (e) {
-        toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
-      } finally {
-        setAprobandoPrestamo(false);
-      }
-    },
-    [data, toast],
-  );
-
   // ── 🔴 CERRAR LA QUINCENA ──────────────────────────────────────────────────
   //
   // Se manda EMPRESA Y FECHAS, y nada más. Ni un monto: la ruta vuelve a pedirle
@@ -736,10 +688,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       // se pagaron y el archivo no, el archivo es el que va a decidir un pago
       // con menos información que la pantalla.
       avisoExtraSinAprobar: data.avisos.avisoExtraSinAprobar,
-      // 🔴 Y lo mismo con el préstamo: si la pantalla dice que a alguien no se
-      // le descontó su cuota y el papel no, el papel es el que va a decidir un
-      // pago con menos información que la pantalla.
-      avisoPrestamoSinAprobar: data.avisos.avisoPrestamoSinAprobar ?? null,
+      // 🔴 Y lo mismo con el préstamo: la última cuota y quien debe pero no
+      // cobra aquí van al papel, o el papel decide con menos información que
+      // la pantalla.
+      avisoPrestamo: data.avisos.avisoPrestamo ?? null,
       avisoPrestamoSinAtar: data.avisos.avisoPrestamoSinAtar ?? null,
     };
   }, [data]);
@@ -1266,13 +1218,12 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         </p>
       )}
 
-      {/* 🔴 Y LO MISMO CON EL PRÉSTAMO. Contadora, textual: *«El préstamo si
-          debe ser por aprobarlo»*. Lo que no se aprobó no se descontó — pero se
-          DICE, con nombre y monto. Es la lección del #651: un freno que esconde
-          plata es peor que no tener freno. */}
-      {data?.avisos.avisoPrestamoSinAprobar && (
+      {/* 🔴 EL PRÉSTAMO DICE SOLO LO QUE NO ES LO DE SIEMPRE (11-sep-2026): la
+          última cuota (se descuenta el saldo) y quien debe pero no cobra aquí.
+          La cuota entra sola a la casilla; ya no hay nada que aprobar. */}
+      {data?.avisos.avisoPrestamo && (
         <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-          {data.avisos.avisoPrestamoSinAprobar}
+          {data.avisos.avisoPrestamo}
         </p>
       )}
 
@@ -1287,12 +1238,6 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       {data?.avisos.faltaMigracionAmarrePrestamos && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           {data.avisos.faltaMigracionAmarrePrestamos}
-        </p>
-      )}
-
-      {data?.avisos.faltaMigracionPrestamoAprobado && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          {data.avisos.faltaMigracionPrestamoAprobado}
         </p>
       )}
 
@@ -1410,18 +1355,10 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
             </p>
           )}
 
-          {/* 🔴 EL PRÉSTAMO, TRAÍDO DEL MÓDULO Y CON APROBACIÓN. Va ACÁ ARRIBA
-              y no adentro de la fila de cada persona: es la decisión que hay
-              que tomar ANTES de mirar el cuadro, y tomarla treinta veces
-              abriendo treinta filas es lo que hacía que se tecleara mal. */}
-          <PrestamosPorDescontar
-            items={data.prestamos}
-            onAprobar={aprobarPrestamo}
-            // 🔴 Con la quincena cerrada no se aprueba nada: el descuento ya
-            // está congelado y aprobarlo ahora no lo cambia. Para tocarlo hay
-            // que reabrir, que es una decisión con motivo y firma.
-            trabajando={aprobandoPrestamo || !!cerrada}
-          />
+          {/* 🩸 Acá vivía el bloque «Préstamos por descontar» con «Aprobar» por
+              persona (2-sep → 11-sep-2026). Se retiró con la aprobación
+              quincenal: la cuota del módulo entra sola a la casilla de cada
+              fila (`prestamoAutomatico`) y la casilla sigue siendo editable. */}
 
           {/* ── ESCRITORIO: la tabla de 19 columnas ── */}
           <div className="hidden md:block">
@@ -1800,144 +1737,41 @@ function ModalCierre({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EL BLOQUE DE PRÉSTAMOS
-//
-// ── 🔴 POR QUÉ ESTÁ ACÁ Y NO EN LA PESTAÑA «APROBACIONES» ────────────────────
-//
-// Aquella pestaña la ve el usuario `bodega` —con el que trabaja Julio Garay—, y
-// a propósito NO le llega un solo sueldo: el servidor le recorta la respuesta
-// (ver `soloApruebaRoles()` en `roles.ts`). Un descuento de préstamo ES plata
-// del sueldo, así que vive donde vive la planilla y lo aprueba quien la arma.
-//
-// ── ⚠️ LO NO APROBADO NO SE ESCONDE ─────────────────────────────────────────
-//
-// Las ya aprobadas SIGUEN EN LA LISTA. Una lista de solo pendientes no deja
-// retirar nada, y un toque de más no puede ser irreversible. Es la misma forma
-// que la pantalla de horas extra.
-// ─────────────────────────────────────────────────────────────────────────────
-
-type OnAprobarPrestamo = (
-  personas: Array<{ codigo: string; monto: number }>,
-  aprobado: boolean,
-) => void;
-
-function PrestamosPorDescontar({
-  items, onAprobar, trabajando,
-}: {
-  // 🩸 `undefined` A PROPÓSITO, y no es defensa de más: esta pantalla se
-  // rehidrata con la respuesta que SWR dejó guardada, y una respuesta anterior
-  // a este cambio no trae el campo. Un `items.length` pelado revienta la
-  // planilla ENTERA en el primer render después del deploy — la pantalla con la
-  // que se paga, en blanco, por un bloque que es un extra.
-  items: SugerenciaPrestamo[] | undefined;
-  onAprobar: OnAprobarPrestamo;
-  trabajando: boolean;
-}) {
-  // Sin nada que descontar no hay bloque. Un cartel permanente es un cartel que
-  // se deja de leer — misma regla que el resto del módulo.
-  if (!items?.length) return null;
-
-  const pendientes = items.filter((s) => !s.aprobado);
-  const totalPendiente = pendientes.reduce((a, s) => a + s.sugerido, 0);
-
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3 py-2.5">
-        <div className="text-sm font-semibold text-gray-800">
-          Préstamos por descontar
-          <span className="ml-2 font-normal text-gray-500">
-            {pendientes.length === 0
-              ? `${items.length} ${items.length === 1 ? "aprobado" : "aprobados"}`
-              : `${pendientes.length} sin aprobar · $${$(totalPendiente)}`}
-          </span>
-        </div>
-        {pendientes.length > 1 && (
-          <button
-            type="button"
-            disabled={trabajando}
-            onClick={() =>
-              onAprobar(pendientes.map((s) => ({ codigo: s.codigo, monto: s.sugerido })), true)}
-            className="min-h-[44px] rounded-md bg-gray-900 px-3 text-[13px] font-medium text-white disabled:opacity-50"
-          >
-            Aprobar {pendientes.length}
-          </button>
-        )}
-      </div>
-
-      <ul className="divide-y divide-gray-100">
-        {items.map((s) => (
-          <li key={s.codigo} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-medium text-gray-900">
-                {s.etiqueta}
-                {/* 🔴 EL NOMBRE DE PRÉSTAMOS VA A LA VISTA cuando NO es el
-                    mismo. El amarre lo hizo una migración con una lista
-                    explícita, y quien mira tiene que poder verlo: es la única
-                    forma de que un amarre equivocado se note. */}
-                {s.nombrePrestamos.toUpperCase() !== s.etiqueta.toUpperCase() && (
-                  <span className="ml-1.5 font-normal text-gray-400">
-                    (en Préstamos: {s.nombrePrestamos})
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-gray-500">
-                {s.origen === "descontado"
-                  // 🔑 Ya lo registró el módulo en esta quincena: no es una
-                  // estimación, es lo que de verdad se le descontó.
-                  ? <>Ya descontado en Préstamos esta quincena · saldo ${$(s.saldo)}</>
-                  : <>Cuota ${$(s.cuota)} · saldo ${$(s.saldo)}</>}
-                {s.aprobado && s.por && <> · aprobó {s.por}</>}
-              </div>
-              {/* 🔴 Aprobado, pero lo que hay ya no es lo que se aprobó. Se dice
-                  con los DOS números y no se corrige solo: una plata que se
-                  mueve sola es peor que una que se explica. */}
-              {s.cambio && (
-                <div className="text-xs text-amber-700">
-                  Se aprobó ${$(s.montoVisto ?? 0)}; hoy el módulo dice ${$(s.sugerido)} y la
-                  casilla dice ${$(s.enCasilla)}.
-                </div>
-              )}
-            </div>
-            <div className="tabular-nums text-[13px] font-semibold text-gray-900">
-              ${$(s.sugerido)}
-            </div>
-            <button
-              type="button"
-              disabled={trabajando}
-              onClick={() => onAprobar([{ codigo: s.codigo, monto: s.sugerido }], !s.aprobado)}
-              className={`min-h-[44px] rounded-md px-3 text-[13px] font-medium disabled:opacity-50 ${
-                s.aprobado
-                  ? "border border-gray-300 text-gray-700"
-                  : "bg-gray-900 text-white"
-              }`}
-            >
-              {s.aprobado ? "Quitar" : "Aprobar"}
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <p className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
-        Aprobar escribe el monto en la casilla <b>Préstamo</b> del cuadro, y la casilla se
-        puede corregir a mano después. El saldo lo lleva el módulo de <b>Préstamos</b>: aquí no
-        se cambia.
-      </p>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 type OnGuardar = (codigo: string, campo: keyof ManualesLinea, valor: string) => void;
 
+/**
+ * 🔴 LO QUE LA CASILLA MUESTRA (11-sep-2026). «Préstamo» y «Terceros» entran
+ * solas desde el módulo (`prestamoAutomatico`, ya adentro de `dinero`) cuando
+ * nadie escribió nada; lo escrito a mano manda. Las otras tres son lo de
+ * siempre. Se lee de la LÍNEA, no de una segunda cuenta.
+ */
+function valorCasilla(l: LineaPlanilla, campo: keyof ManualesLinea): number {
+  const escrito = l.manuales[campo];
+  if (escrito > 0) return escrito;
+  if (campo === "prestamo") return l.prestamoAutomatico?.prestamo ?? 0;
+  if (campo === "terceros") return l.prestamoAutomatico?.terceros ?? 0;
+  return escrito;
+}
+
+/** ¿Este número lo puso el módulo de Préstamos, sin que nadie lo escribiera? */
+function esAutomatica(l: LineaPlanilla, campo: keyof ManualesLinea): boolean {
+  if (l.manuales[campo] > 0) return false;
+  if (campo === "prestamo") return (l.prestamoAutomatico?.prestamo ?? 0) > 0;
+  if (campo === "terceros") return (l.prestamoAutomatico?.terceros ?? 0) > 0;
+  return false;
+}
+
 /** Una celda de dinero que se escribe a mano. Guarda al salir del campo. */
 function CeldaManual({
-  codigo, campo, valor, onGuardar, ancho = "w-20", bloqueo,
+  codigo, campo, valor, onGuardar, ancho = "w-20", bloqueo, automatico = false,
 }: {
   codigo: string; campo: keyof ManualesLinea; valor: number; onGuardar: OnGuardar;
   ancho?: string;
   /** 🔴 Por qué está apagada. `null` = se puede escribir. */
   bloqueo?: Bloqueo;
+  /** El número lo puso el módulo de Préstamos: se ve igual, y el `title` lo dice. */
+  automatico?: boolean;
 }) {
   const bloqueada = !!bloqueo;
   // 🔑 Estado local mientras se escribe: si el valor viniera del padre en cada
@@ -1950,7 +1784,11 @@ function CeldaManual({
       type="text" inputMode="decimal" value={bloqueada ? "" : texto}
       placeholder={bloqueo ? bloqueo.placeholder : "—"}
       disabled={bloqueada}
-      title={bloqueo ? bloqueo.title : undefined}
+      title={bloqueo
+        ? bloqueo.title
+        : automatico
+          ? "Es la cuota que propone Préstamos. Escribe otro monto para corregirla en esta quincena."
+          : undefined}
       onChange={(e) => setTexto(e.target.value)}
       onBlur={() => onGuardar(codigo, campo, texto)}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
@@ -2068,8 +1906,8 @@ function Fila({
       {num(d.seguroEducativo)}
       {MANUALES.slice(0, 4).map(([campo]) => (
         <td key={campo} className="px-1 py-1.5 text-right">
-          <CeldaManual codigo={l.codigo} campo={campo} valor={l.manuales[campo]}
-            onGuardar={onGuardar} bloqueo={bloqueo} />
+          <CeldaManual codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
+            onGuardar={onGuardar} bloqueo={bloqueo} automatico={esAutomatica(l, campo)} />
         </td>
       ))}
       {num(d.totalDeducciones)}
@@ -2183,8 +2021,8 @@ function Tarjeta({
                   </span>
                 </span>
                 <CeldaManual
-                  codigo={l.codigo} campo={campo} valor={l.manuales[campo]}
-                  onGuardar={onGuardar} ancho="w-full" bloqueo={bloqueo}
+                  codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
+                  onGuardar={onGuardar} ancho="w-full" bloqueo={bloqueo} automatico={esAutomatica(l, campo)}
                 />
               </label>
             ))}

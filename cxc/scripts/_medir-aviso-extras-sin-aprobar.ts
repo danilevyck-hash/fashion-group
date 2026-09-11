@@ -144,7 +144,7 @@ async function main() {
   for (const [k, v] of porEmpresa) console.log(`  ${k.padEnd(20)} ${v.n} personas · ${horasBonitas(v.min)} · $${v.monto.toFixed(2)}`);
 
   console.log(`\naviso: ${textoExtraNoAprobada(ahora) ?? "(ninguno)"}`);
-  const frenos = frenosParaCerrar(lineas, []);
+  const frenos = frenosParaCerrar(lineas);
   console.log(`freno horas-extra: ${frenos.some((f) => f.tipo === "horas-extra") ? "SÍ frena" : "no frena"}`);
 }
 

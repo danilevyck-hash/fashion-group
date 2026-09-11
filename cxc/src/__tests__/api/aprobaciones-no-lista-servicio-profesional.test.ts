@@ -67,7 +67,6 @@ vi.mock("@/lib/asistencia/aprobador-empresa-server", () => ({
 }));
 vi.mock("@/lib/asistencia/prestamos-planilla-server", () => ({
   leerPrestamosDeQuincena: async () => ({ fichas: [] }),
-  leerAprobacionesPrestamo: async () => ({ porCodigo: new Map() }),
 }));
 vi.mock("@/lib/asistencia/config-server", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),

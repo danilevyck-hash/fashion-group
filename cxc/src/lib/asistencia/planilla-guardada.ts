@@ -61,7 +61,6 @@ import {
 import { EMPRESAS_ASISTENCIA } from "./config";
 import { asistenciaRoles } from "./roles";
 import { extrasNoAprobadas } from "./aprobaciones";
-import { prestamosSinAprobar, type SugerenciaPrestamo } from "./prestamos-planilla";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LA MIGRACIÓN QUE FALTA CORRER
@@ -474,7 +473,10 @@ export function versionSiguiente(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface FrenoCierre {
-  tipo: "horas-extra" | "prestamo";
+  /** 🔴 Solo las horas extra desde el 11-sep-2026: el préstamo ya no se aprueba
+   *  (Daniel: *«quita lo de aprobación a préstamos, no es necesario»*), así que
+   *  no hay nada suyo que pueda frenar el cierre. */
+  tipo: "horas-extra";
   /** Cuántas personas. Es lo que se cuenta en el texto. */
   personas: number;
   /** Los nombres, para que el freno se pueda actuar sin abrir nada. */
@@ -497,15 +499,16 @@ const lista = (xs: readonly string[]): string =>
 /**
  * Lo que impide cerrar. Vacío = se puede.
  *
- * Las dos fuentes son las MISMAS funciones que ya arman los avisos ámbar de la
- * pantalla (`extrasNoAprobadas`, `prestamosSinAprobar`): que el freno y el aviso
- * puedan decir cosas distintas del mismo hecho es exactamente lo que este módulo
- * viene evitando desde `minutosTardanzaMostrados`.
+ * La fuente es la MISMA función que ya arma el aviso ámbar de la pantalla
+ * (`extrasNoAprobadas`): que el freno y el aviso puedan decir cosas distintas
+ * del mismo hecho es exactamente lo que este módulo viene evitando desde
+ * `minutosTardanzaMostrados`.
+ *
+ * 🩸 Hasta el 11-sep-2026 había un segundo freno: «N colaboradores tienen un
+ * descuento de préstamo sin aprobar». Se fue con la aprobación quincenal — la
+ * cuota entra sola (`aplicarPrestamoEnLinea`) y ya no hay nada que aprobar.
  */
-export function frenosParaCerrar(
-  lineas: readonly LineaPlanilla[],
-  prestamos: readonly SugerenciaPrestamo[],
-): FrenoCierre[] {
+export function frenosParaCerrar(lineas: readonly LineaPlanilla[]): FrenoCierre[] {
   const frenos: FrenoCierre[] = [];
 
   const extras = extrasNoAprobadas(lineas);
@@ -521,21 +524,6 @@ export function frenosParaCerrar(
         + `(${lista(extras.map((e) => `${e.etiqueta} · ${e.minutos.toFixed(2)} min`))}). `
         + "Ve a la pestaña «Aprobaciones», aprueba o deja sin aprobar esas horas, y vuelve a cerrar. "
         + "Si se cierra así, esas horas no se pagan y no hay forma de arreglarlo después sin reabrir.",
-    });
-  }
-
-  const pres = prestamosSinAprobar(prestamos);
-  if (pres.length > 0) {
-    const quienes = pres.map((p) => p.etiqueta);
-    frenos.push({
-      tipo: "prestamo",
-      personas: pres.length,
-      quienes,
-      codigos: pres.map((p) => p.codigo),
-      texto:
-        `${pres.length === 1 ? "1 colaborador tiene" : `${pres.length} colaboradores tienen`} un descuento de préstamo sin aprobar `
-        + `(${lista(pres.map((p) => `${p.etiqueta} · ${plata(p.sugerido)}`))}). `
-        + "Apruébalo (o déjalo en cero) en el bloque «Préstamo por descontar» de esta misma pestaña, y vuelve a cerrar.",
     });
   }
 

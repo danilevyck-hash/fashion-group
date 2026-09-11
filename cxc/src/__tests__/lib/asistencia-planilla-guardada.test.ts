@@ -39,7 +39,6 @@ import {
   type CabeceraGuardada,
 } from "@/lib/asistencia/planilla-guardada";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
-import type { SugerenciaPrestamo } from "@/lib/asistencia/prestamos-planilla";
 
 import { HORAS_CERO, type DineroLinea, type LineaPlanilla } from "@/lib/asistencia/planilla";
 import { EMPRESAS_ASISTENCIA } from "@/lib/asistencia/config";
@@ -275,19 +274,13 @@ describe("🔴 los frenos del cierre — sin aprobar NO se cierra", () => {
     extraMedido: null,
     extraNoAprobada: { minutos: 40, diurnoMin: 40, nocturnoMin: 0, monto: 12.58 },
   });
-  const prestamo = (over: Partial<SugerenciaPrestamo> = {}): SugerenciaPrestamo => ({
-    codigo: "9", etiqueta: "LUIS ARROYO", empresa: "vistana", empresaEtiqueta: "Vistana",
-    nombrePrestamos: "LUIS ADRIAN ARROYO", cuota: 50, saldo: 700, sugerido: 50,
-    origen: "cuota", aprobado: false, por: null, cuando: null, montoVisto: null,
-    enCasilla: 0, ...over,
-  } as SugerenciaPrestamo);
 
   it("sin nada pendiente, no hay frenos", () => {
-    expect(frenosParaCerrar([linea()], [])).toEqual([]);
+    expect(frenosParaCerrar([linea()])).toEqual([]);
   });
 
   it("🔴 horas extra sin aprobar frenan, con el nombre y a qué pestaña ir", () => {
-    const f = frenosParaCerrar([conExtra], []);
+    const f = frenosParaCerrar([conExtra]);
     expect(f.length).toBe(1);
     expect(f[0].tipo).toBe("horas-extra");
     expect(f[0].personas).toBe(1);
@@ -296,37 +289,35 @@ describe("🔴 los frenos del cierre — sin aprobar NO se cierra", () => {
     expect(f[0].texto).toContain("Aprobaciones");
   });
 
-  it("🔴 un préstamo sin aprobar frena, con el monto", () => {
-    const f = frenosParaCerrar([linea()], [prestamo()]);
-    expect(f.length).toBe(1);
-    expect(f[0].tipo).toBe("prestamo");
-    expect(f[0].texto).toContain("LUIS ARROYO");
-    expect(f[0].texto).toContain("$50.00");
-  });
-
-  it("⚠️ un préstamo YA escrito en la casilla no frena: la planilla SÍ lo descontó", () => {
-    expect(frenosParaCerrar([linea()], [prestamo({ enCasilla: 50 })])).toEqual([]);
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Acá había dos casos: «un
+  // préstamo sin aprobar frena, con el monto» y «un préstamo YA escrito en la
+  // casilla no frena». Daniel: *«quita lo de aprobación a préstamos, no es
+  // necesario»* — la cuota entra sola a la casilla (`aplicarPrestamoEnLinea`) y
+  // no queda nada del préstamo que pueda frenar el cierre. El freno de las horas
+  // extra es el ÚNICO, y `frenosParaCerrar` ya no recibe préstamos.
+  it("🔴 el préstamo YA NO FRENA el cierre: el único freno es el de las horas extra", () => {
+    expect(frenosParaCerrar.length).toBe(1);
+    const f = frenosParaCerrar([conExtra]);
+    expect(f.map((x) => x.tipo)).toEqual(["horas-extra"]);
+    expect(textoFrenos(f)).not.toMatch(/préstamo/i);
   });
 
   it("una extra APROBADA no frena, y una de 0 minutos tampoco", () => {
-    expect(frenosParaCerrar([linea({ extraAprobada: true })], [])).toEqual([]);
-    expect(frenosParaCerrar([linea({ extraAprobada: false, extraMedido: null, extraNoAprobada: null })], [])).toEqual([]);
+    expect(frenosParaCerrar([linea({ extraAprobada: true })])).toEqual([]);
+    expect(frenosParaCerrar([linea({ extraAprobada: false, extraMedido: null, extraNoAprobada: null })])).toEqual([]);
     // 🩸 El rótulo en `false` con `extraMedido` cargado era lo que el freno leía
     // antes del 3-sep-2026, y era el número EQUIVOCADO: son las horas PAGADAS.
     expect(frenosParaCerrar([linea({
       extraAprobada: false,
       extraMedido: { minutos: 40, diurnoMin: 40, nocturnoMin: 0, monto: 12.58 },
       extraNoAprobada: null,
-    })], [])).toEqual([]);
+    })])).toEqual([]);
   });
 
-  it("los dos frenos a la vez salen los dos, en un solo mensaje", () => {
-    const f = frenosParaCerrar([conExtra], [prestamo()]);
-    expect(f.length).toBe(2);
-    const t = textoFrenos(f);
+  it("el mensaje del 409 dice que no se puede cerrar y a qué pestaña ir", () => {
+    const t = textoFrenos(frenosParaCerrar([conExtra]));
     expect(t).toContain("No se puede cerrar");
     expect(t).toContain("Aprobaciones");
-    expect(t).toContain("LUIS ARROYO");
   });
 });
 

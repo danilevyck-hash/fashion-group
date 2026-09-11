@@ -199,10 +199,9 @@ mutar "$PURO" \
   '  const extras = extrasNoAprobadas([]);' \
   'las horas extra sin aprobar dejan de frenar'
 
-mutar "$PURO" \
-  '  const pres = prestamosSinAprobar(prestamos);' \
-  '  const pres = prestamosSinAprobar([]);' \
-  'el préstamo sin aprobar deja de frenar'
+# ⚠️ 11-sep-2026: se fue la mutación «el préstamo sin aprobar deja de frenar» —
+# el préstamo ya no frena el cierre (la cuota entra sola; Daniel: «quita lo de
+# aprobación a préstamos, no es necesario»).
 
 mutar "$PURO" \
   '        + "Andá a la pestaña «Aprobaciones», aprobá o dejá sin aprobar esas horas, y volvé a cerrar. "' \

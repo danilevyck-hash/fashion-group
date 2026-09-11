@@ -291,7 +291,7 @@ export async function POST(req: NextRequest) {
     // está bien. Al cerrar ya no: lo que queda escrito sería un pago sin las
     // horas que alguien trabajó de verdad, y el aviso no le devuelve la plata.
     // Se rechaza con 409 y el texto dice a qué pestaña ir.
-    const frenos = frenosParaCerrar(lineas, cuadro.prestamos ?? []);
+    const frenos = frenosParaCerrar(lineas);
     if (frenos.length > 0) {
       return NextResponse.json(
         { ok: false, error: textoFrenos(frenos), frenos },

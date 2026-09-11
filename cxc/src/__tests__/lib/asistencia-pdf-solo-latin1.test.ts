@@ -269,7 +269,7 @@ function datosPlanilla(): DatosPlanillaExport {
     avisoVacacionesNoPagadas: AVISO_VACACIONES,
     avisoExtraSinAprobar: `No se pagaron horas extra sin aprobar: ${CINCO_PERSONAS
       .map((n) => `${n} · 12,5 h · $75,15`).join(" — ")}`,
-    avisoPrestamoSinAprobar: `Préstamos que no se descontaron porque nadie los aprobó: ${CINCO_PERSONAS
+    avisoPrestamo: `Préstamos: ${CINCO_PERSONAS
       .map((n) => `${n} · $120,00`).join(" — ")}`,
     avisoPrestamoSinAtar: "Hay 2 préstamos con saldo que no están atados a nadie"
       + " de esta planilla: $700,00.",

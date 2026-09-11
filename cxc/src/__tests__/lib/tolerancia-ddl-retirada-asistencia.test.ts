@@ -456,19 +456,17 @@ describe("6. prestamos-planilla-server.ts — «nadie atado» ante un error es c
     expect(lecturas.filter((l) => l.tabla === "prestamos_empleados")).toHaveLength(1);
   });
 
-  it("🔴 leerAprobacionesPrestamo con PGRST205 lanza — antes «nadie aprobado, la casilla a mano»", async () => {
-    porTabla["asistencia_prestamo_aprobado"] = { data: null, error: PGRST205("asistencia_prestamo_aprobado") };
-    const { leerAprobacionesPrestamo } = await import("@/lib/asistencia/prestamos-planilla-server");
-    await expect(leerAprobacionesPrestamo("2026-08-1")).rejects.toThrow(/asistencia_prestamo_aprobado/);
-  });
-
-  it("🔴 guardarAprobacionesPrestamo con PGRST205 lanza — antes devolvía `false` con aviso", async () => {
-    porTabla["asistencia_prestamo_aprobado"] = { data: null, error: PGRST205("asistencia_prestamo_aprobado") };
-    const { guardarAprobacionesPrestamo } = await import("@/lib/asistencia/prestamos-planilla-server");
-    await expect(guardarAprobacionesPrestamo({
-      quincena: "2026-08-1", items: [{ codigo: "49", monto: 50 }], aprobado: true,
-      por: "Contabilidad", cuando: "2026-08-04T12:00:00.000Z",
-    })).rejects.toThrow(/asistencia_prestamo_aprobado/);
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Acá había dos casos sobre
+  // `leerAprobacionesPrestamo` y `guardarAprobacionesPrestamo` (con PGRST205
+  // lanzaban en vez de degradar). Daniel: *«quita lo de aprobación a préstamos,
+  // no es necesario»*: las dos funciones se retiraron con la aprobación
+  // quincenal. Lo que se protege ahora es lo contrario — que el servidor de la
+  // planilla NO vuelva a leer esa tabla (queda sin lectores, patrón
+  // `mayor_lineas`). Ver `planilla-prestamo-sin-aprobacion.test.ts`.
+  it("🔴 la aprobación quincenal se retiró: el servidor ya no nombra `asistencia_prestamo_aprobado`", async () => {
+    const mod = await import("@/lib/asistencia/prestamos-planilla-server");
+    expect("leerAprobacionesPrestamo" in mod).toBe(false);
+    expect("guardarAprobacionesPrestamo" in mod).toBe(false);
   });
 });
 
@@ -704,7 +702,8 @@ describe("9. /api/asistencia/planilla — si una lectura falla, la PLANILLA NO S
     ["aprobaciones de extras", () => { porTabla["asistencia_horas_extra_aprobadas"] = { data: null, error: PGRST205("asistencia_horas_extra_aprobadas") }; }],
     ["justificaciones sin `hora_desde`", () => { porTabla["asistencia_justificaciones"] = sinColumna("asistencia_justificaciones", "hora_desde"); }],
     ["préstamos sin el amarre", () => { porTabla["prestamos_empleados"] = sinColumna("prestamos_empleados", "empleado_codigo"); }],
-    ["aprobación de préstamo", () => { porTabla["asistencia_prestamo_aprobado"] = { data: null, error: PGRST205("asistencia_prestamo_aprobado") }; }],
+    // ⚠️ 11-sep-2026: se fue el caso «aprobación de préstamo» (la tabla
+    // `asistencia_prestamo_aprobado` ya no se lee: la cuota entra sola).
     ["reglas", () => { porTabla["asistencia_reglas"] = { data: null, error: PGRST205("asistencia_reglas") }; }],
   ];
 

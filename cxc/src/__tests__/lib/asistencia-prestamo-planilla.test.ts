@@ -18,8 +18,14 @@
  *   5. LA FICHA ARCHIVADA NO PROPONE CUOTA NUEVA — misma condición que la RPC.
  *   6. `Abono extra` NO es un descuento de planilla. Descontar del sueldo lo
  *      que la persona ya pagó de su bolsillo es cobrarle dos veces.
- *   7. LO NO APROBADO SE DICE, con nombre Y monto. Rechazar sí, esconder no —
- *      y es la lección del #651, donde un freno escondió $700 durante 22 días.
+ *   7. 🔴 LA CUOTA ENTRA SOLA (11-sep-2026, Daniel: *«quita lo de aprobación a
+ *      préstamos, no es necesario»*): lo escrito a mano manda, vacío = lo que
+ *      propone el módulo. Se avisa SOLO la última cuota y quien debe pero no
+ *      cobra aquí. ⚠️ Hasta ese día el punto 7 decía «LO NO APROBADO SE DICE»;
+ *      cambió de dirección, no se borró: ya no hay nada sin aprobar.
+ *   8. 🩸 «YA DESCONTADO» ES SOLO LO QUE SALIÓ DE LA QUINCENA — el caso de
+ *      CRISTIAM BLANCO ($125 de liquidación el 7-sep, que la planilla le habría
+ *      vuelto a quitar del sueldo).
  * ─────────────────────────────────────────────────────────────────────────── */
 import { describe, it, expect } from "vitest";
 
@@ -27,18 +33,21 @@ import {
   CONCEPTOS_DESCUENTO,
   CONCEPTOS_DEUDA,
   CONCEPTOS_PAGO,
+  aplicarPrestamoEnLinea,
+  avisosDeUltimaCuota,
+  casillaAutomatica,
+  esDescuentoDeQuincena,
   montoDeFicha,
   montoTercerosDeFicha,
-  prestamosSinAprobar,
+  prestamosDeQuienNoCobra,
   prestamosSinAtar,
-  resumenPrestamos,
   sugerirPrestamos,
-  textoPrestamoSinAprobar,
+  textoAvisoPrestamo,
   textoPrestamoSinAtar,
-  type AprobacionPrestamo,
   type FichaPrestamo,
   type PersonaEnCuadro,
 } from "@/lib/asistencia/prestamos-planilla";
+import type { DineroLinea, ManualesLinea } from "@/lib/asistencia/planilla";
 
 // ── Andamiaje ───────────────────────────────────────────────────────────────
 function ficha(p: Partial<FichaPrestamo> & { nombre: string }): FichaPrestamo {
@@ -72,9 +81,6 @@ function persona(
   return { codigo, etiqueta, empresa: null, empresaEtiqueta: null, enCasilla, enCasillaTerceros };
 }
 
-function aprobacion(codigo: string, montoVisto: number, aprobado = true): AprobacionPrestamo {
-  return { codigo, aprobado, montoVisto, por: "daniel", cuando: "2026-08-27T12:00:00Z" };
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("de dónde sale el monto de la casilla", () => {
@@ -149,7 +155,6 @@ describe("de dónde sale el monto de la casilla", () => {
         saldoPrestamo: 220, saldoDano: 50, saldo: 270,
       })],
       personas: [persona("21", "RAMON MIRANDA")],
-      aprobaciones: new Map(),
     });
     expect(out).toHaveLength(1);
     expect(out[0].cuota).toBe(30);
@@ -187,7 +192,6 @@ describe("de dónde sale el monto de la casilla", () => {
         cuotaTerceros: 40, saldoTerceros: 79.94, saldo: 79.94,
       })],
       personas: [persona("23", "ANDRES GONZALEZ")],
-      aprobaciones: new Map(),
     });
     expect(out).toHaveLength(1);
     expect(out[0].sugerido).toBe(0);
@@ -208,7 +212,6 @@ describe("🔴 el amarre: nada por parecido", () => {
     const out = sugerirPrestamos({
       fichas: [ficha({ nombre: "LAURA CASIANI", codigo: null, cuota: 10, saldo: 300 })],
       personas: [persona("38", "Laura Lismari Casiano Vega")],
-      aprobaciones: new Map(),
     });
     expect(out).toHaveLength(0);
   });
@@ -231,7 +234,6 @@ describe("🔴 el amarre: nada por parecido", () => {
     const out = sugerirPrestamos({
       fichas: [ficha({ nombre: "SE FUE", codigo: "99", cuota: 50, saldo: 500 })],
       personas: [persona("7", "ANGELA GARCIA")],
-      aprobaciones: new Map(),
     });
     expect(out).toHaveLength(0);
   });
@@ -252,7 +254,6 @@ describe("🔑 se agrupa por CÓDIGO, no por ficha", () => {
     const out = sugerirPrestamos({
       fichas: dosFichasDeRamon,
       personas: [persona("21", "RAMON MIRANDA")],
-      aprobaciones: new Map(),
     });
     expect(out).toHaveLength(1);
     // 🔴 33,13 y no 30: la planilla tiene UNA casilla y le entra todo lo suyo.
@@ -266,102 +267,149 @@ describe("🔑 se agrupa por CÓDIGO, no por ficha", () => {
     const out = sugerirPrestamos({
       fichas: dosFichasDeRamon,
       personas: [persona("21", "RAMON MIRANDA")],
-      aprobaciones: new Map(),
     });
     expect(out[0].nombrePrestamos).toContain("RAMON MIRANDA");
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("la aprobación", () => {
+describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11-sep-2026", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN, NO SE BORRÓ. Esta sección se llamaba «la aprobación»
+  // y probaba que sin fila guardada NO se descontaba, que lo no aprobado se
+  // decía con nombre y monto, y que un cambio después de aprobar se avisaba.
+  // Daniel, 11-sep-2026, textual: *«quita lo de aprobación a préstamos, no es
+  // necesario»*. Medido ese día sobre la quincena 1–15 sep: 10 colaboradores con
+  // $495 de cuota que la planilla NO descontaba porque nadie había aprobado.
   const fichas = [
     ficha({ nombre: "KEVIN LUBO", codigo: "6", cuota: 50, saldo: 50 }),
     ficha({ nombre: "GABRIELA A. JARAMILLO P.", codigo: "53", cuota: 60, saldo: 360 }),
   ];
   const personas = [persona("6", "KEVIN LUBO"), persona("53", "GABRIELA JARAMILLO")];
 
-  it("sin fila guardada, NO está aprobado — el default es no descontar", () => {
-    const out = sugerirPrestamos({ fichas, personas, aprobaciones: new Map() });
-    expect(out.every((s) => !s.aprobado)).toBe(true);
-    expect(resumenPrestamos(out)).toEqual({
-      pendientes: 2,
-      monto: 110,
-      codigos: expect.arrayContaining(["6", "53"]),
-    });
+  const DINERO = (o: Partial<DineroLinea> = {}): DineroLinea => ({
+    rataHora: 3, valorMinuto: 0.05, salarioQuincenal: 260,
+    extraDiurno: 0, extraNocturno: 0, excedente: 0, domingos: 0, feriados: 0,
+    ausencias: 0, ausenciaPorTardanza: 0, ausenciaDeDiaCompleto: 0, vacacionesYaPagadas: 0,
+    tardanzas: 0, salidaTemprana: 0, totalBruto: 260, baseSeguros: null,
+    seguroSocial: 0, seguroEducativo: 0, isr: 0, prestamo: 0, terceros: 0, mercancia: 0,
+    totalDeducciones: 0, otrosServicios: 0, netoPagar: 260, ...o,
+  });
+  const MANUAL = (o: Partial<ManualesLinea> = {}): ManualesLinea => ({
+    isr: 0, prestamo: 0, terceros: 0, mercancia: 0, otrosServicios: 0, ...o,
   });
 
-  it("🔴 lo NO aprobado se dice, con nombre Y monto", () => {
-    const out = sugerirPrestamos({ fichas, personas, aprobaciones: new Map() });
-    const texto = textoPrestamoSinAprobar(prestamosSinAprobar(out))!;
-    expect(texto).toContain("KEVIN LUBO");
-    expect(texto).toContain("$50.00");
-    expect(texto).toContain("GABRIELA JARAMILLO");
-    expect(texto).toContain("$60.00");
-    expect(texto).toContain("NO se descontó");
-    expect(textoPrestamoSinAprobar([])).toBeNull();
+  it("la sugerencia ya no sabe de aprobaciones: ni `aprobado`, ni `montoVisto`, ni `cambio`", () => {
+    const out = sugerirPrestamos({ fichas, personas });
+    expect(out).toHaveLength(2);
+    for (const s of out) {
+      expect("aprobado" in s).toBe(false);
+      expect("montoVisto" in s).toBe(false);
+      expect("cambio" in s).toBe(false);
+    }
   });
 
-  it("⚠️ si la casilla YA tiene monto escrito a mano, NO se dice «no se descontó»", () => {
-    // La planilla SÍ lo descontó: decir lo contrario sería mentirle a quien paga.
+  it("🔴 vacía = lo que propone el módulo; escrito a mano = lo escrito (manda)", () => {
+    expect(casillaAutomatica(0, 50)).toBe(50);
+    expect(casillaAutomatica(35, 50)).toBe(0);   // hay algo escrito: no entra nada automático
+    expect(casillaAutomatica(0, 0)).toBe(0);
+    expect(casillaAutomatica(-3, 50)).toBe(50);  // basura negativa = vacío
+  });
+
+  it("🔴 la cuota entra a `dinero` (préstamo, deducciones y neto) y NUNCA a `manuales`", () => {
+    const [sug] = sugerirPrestamos({ fichas: [fichas[1]], personas: [personas[1]] });
+    const linea = { codigo: "53", manuales: MANUAL(), dinero: DINERO() };
+    const con = aplicarPrestamoEnLinea(linea, sug);
+    expect(con.dinero!.prestamo).toBe(60);
+    expect(con.dinero!.totalDeducciones).toBe(60);
+    expect(con.dinero!.netoPagar).toBe(200);
+    expect(con.prestamoAutomatico).toEqual({ prestamo: 60, terceros: 0 });
+    // 🔑 `manuales` es la foto de la tabla: la pantalla la manda de vuelta entera
+    // al guardar el ISR; si la cuota viviera ahí, editar el ISR la congelaría.
+    expect(con.manuales.prestamo).toBe(0);
+    // Y la línea original no se muta.
+    expect(linea.dinero.prestamo).toBe(0);
+  });
+
+  it("lo escrito a mano manda: con $35 en la casilla no entra la cuota de $60", () => {
+    const [sug] = sugerirPrestamos({ fichas: [fichas[1]], personas: [persona("53", "GABRIELA JARAMILLO", 35)] });
+    const linea = { codigo: "53", manuales: MANUAL({ prestamo: 35 }), dinero: DINERO({ prestamo: 35, totalDeducciones: 35, netoPagar: 225 }) };
+    const con = aplicarPrestamoEnLinea(linea, sug);
+    expect(con).toBe(linea); // misma referencia: nada que meter
+    expect(con.dinero!.prestamo).toBe(35);
+  });
+
+  it("terceros entra a SU casilla, aparte del préstamo", () => {
+    const f = ficha({ nombre: "CON TERCEROS", codigo: "23", cuota: 0, saldoPrestamo: 0, cuotaTerceros: 40, saldoTerceros: 79.94, saldo: 79.94 });
+    const [sug] = sugerirPrestamos({ fichas: [f], personas: [persona("23", "ANDRES GONZALEZ")] });
+    const con = aplicarPrestamoEnLinea({ codigo: "23", manuales: MANUAL(), dinero: DINERO() }, sug);
+    expect(con.dinero!.terceros).toBe(40);
+    expect(con.dinero!.prestamo).toBe(0);
+    expect(con.dinero!.netoPagar).toBe(220);
+    expect(con.prestamoAutomatico).toEqual({ prestamo: 0, terceros: 40 });
+  });
+
+  it("sin `dinero` (servicio profesional, «Tú decides») no se toca nada", () => {
+    const [sug] = sugerirPrestamos({ fichas: [fichas[1]], personas: [personas[1]] });
+    const linea = { codigo: "53", manuales: MANUAL(), dinero: null };
+    expect(aplicarPrestamoEnLinea(linea, sug)).toBe(linea);
+    expect(aplicarPrestamoEnLinea({ ...linea, dinero: DINERO() }, undefined).prestamoAutomatico).toBeUndefined();
+  });
+
+  it("🔴 se avisa la ÚLTIMA cuota: cuota $45 sobre saldo $40 → se descuenta $40, y se dice", () => {
     const out = sugerirPrestamos({
-      fichas,
-      personas: [persona("6", "KEVIN LUBO", 50), persona("53", "GABRIELA JARAMILLO")],
-      aprobaciones: new Map(),
+      fichas: [ficha({ nombre: "LUIS PARAJON", codigo: "10", cuota: 45, saldo: 40 })],
+      personas: [persona("10", "LUIS PARAJON")],
     });
-    const faltan = prestamosSinAprobar(out);
-    expect(faltan.map((s) => s.codigo)).toEqual(["53"]);
-  });
-
-  it("aprobada y con la casilla al día, no avisa ningún cambio", () => {
-    const out = sugerirPrestamos({
-      fichas,
-      personas: [persona("6", "KEVIN LUBO", 50), persona("53", "GABRIELA JARAMILLO", 60)],
-      aprobaciones: new Map([
-        ["6", aprobacion("6", 50)],
-        ["53", aprobacion("53", 60)],
-      ]),
-    });
-    expect(out.every((s) => s.aprobado && !s.cambio)).toBe(true);
-    expect(prestamosSinAprobar(out)).toHaveLength(0);
-  });
-
-  it("🔴 si el módulo cambió DESPUÉS de aprobar, se avisa — no se corrige solo", () => {
-    // Se aprobó $60 y hoy el saldo dejó una cuota de $40.
-    const out = sugerirPrestamos({
-      fichas: [ficha({ nombre: "G", codigo: "53", cuota: 60, saldo: 40 })],
-      personas: [persona("53", "GABRIELA JARAMILLO", 60)],
-      aprobaciones: new Map([["53", aprobacion("53", 60)]]),
-    });
-    expect(out[0].cambio).toBe(true);
     expect(out[0].sugerido).toBe(40);
-    // 🔑 La casilla NO se tocó: la aprobación sigue en pie y el número se
-    // explica en pantalla. Una plata que se mueve sola es peor.
-    expect(out[0].enCasilla).toBe(60);
+    const avisos = avisosDeUltimaCuota(out);
+    expect(avisos).toEqual([{ tipo: "ultima-cuota", codigo: "10", etiqueta: "LUIS PARAJON", cuenta: "prestamo", cuota: 45, saldo: 40 }]);
+    const texto = textoAvisoPrestamo(avisos)!;
+    expect(texto).toContain("LUIS PARAJON");
+    expect(texto).toContain("$40.00");
+    expect(texto).toContain("$45.00");
+    expect(texto).toContain("termina de pagar");
   });
 
-  it("🔴 si alguien CORRIGIÓ la casilla a mano, también se avisa", () => {
-    const out = sugerirPrestamos({
-      fichas: [ficha({ nombre: "G", codigo: "53", cuota: 60, saldo: 360 })],
-      personas: [persona("53", "GABRIELA JARAMILLO", 30)],
-      aprobaciones: new Map([["53", aprobacion("53", 60)]]),
+  it("una cuota normal NO avisa nada, y un hecho consumado tampoco", () => {
+    expect(avisosDeUltimaCuota(sugerirPrestamos({ fichas, personas }))).toEqual([]);
+    const ya = sugerirPrestamos({
+      fichas: [ficha({ nombre: "YA", codigo: "6", cuota: 50, saldo: 0, yaDescontado: 50 })],
+      personas: [persona("6", "KEVIN LUBO")],
     });
-    expect(out[0].cambio).toBe(true);
-    expect(out[0].enCasilla).toBe(30);
+    expect(avisosDeUltimaCuota(ya)).toEqual([]);
+    expect(textoAvisoPrestamo([])).toBeNull();
   });
 
-  it("desaprobada explícitamente NO es lo mismo que nunca mirada, pero las dos no descuentan", () => {
-    const out = sugerirPrestamos({
-      fichas,
-      personas,
-      aprobaciones: new Map([["6", aprobacion("6", 50, false)]]),
-    });
-    const kevin = out.find((s) => s.codigo === "6")!;
-    expect(kevin.aprobado).toBe(false);
-    // La fila existe: quedó registro de quién la tocó.
-    expect(kevin.por).toBe("daniel");
-    expect(kevin.montoVisto).toBe(50);
-    // Y no avisa «cambió»: no hay nada aprobado sobre lo que avisar.
-    expect(kevin.cambio).toBe(false);
+  it("🔴 quien debe y NO está en el cuadro (salió, o no cobra aquí) se DICE, y no se le descuenta", () => {
+    const f = ficha({ nombre: "BRICEIDA MONTERO", codigo: "8", cuota: 50, saldo: 100 });
+    // No está en `personas`: no propone nada…
+    expect(sugerirPrestamos({ fichas: [f], personas: [] })).toHaveLength(0);
+    // …pero si la capa de arriba la dejó afuera, se avisa con nombre y saldo.
+    const avisos = prestamosDeQuienNoCobra({ fichas: [f], fuera: new Set(["8"]), nombreDe: () => "Briceida Montero" });
+    expect(avisos).toEqual([{ tipo: "no-cobra", codigo: "8", etiqueta: "Briceida Montero", saldo: 100 }]);
+    const texto = textoAvisoPrestamo(avisos)!;
+    expect(texto).toContain("Briceida Montero");
+    expect(texto).toContain("$100.00");
+    expect(texto).toContain("no se le descuenta");
+    expect(texto).toContain("liquidación");
+    // Quien no está en `fuera` no es noticia; sin saldo, tampoco.
+    expect(prestamosDeQuienNoCobra({ fichas: [f], fuera: new Set(), nombreDe: () => null })).toEqual([]);
+    expect(prestamosDeQuienNoCobra({ fichas: [{ ...f, saldo: 0 }], fuera: new Set(["8"]), nombreDe: () => null })).toEqual([]);
+  });
+
+  it("🩸 «ya descontado» es SOLO lo que salió de la quincena — el caso de CRISTIAM BLANCO", () => {
+    // 7-sep-2026: canceló su préstamo con $125 de la LIQUIDACIÓN. Concepto
+    // «Pago», origen «Liquidación». NO es un descuento del sueldo.
+    expect(esDescuentoDeQuincena({ concepto: "Pago", origen_pago: "Liquidación" })).toBe(false);
+    expect(esDescuentoDeQuincena({ concepto: "Pago", origen_pago: "Efectivo" })).toBe(false);
+    expect(esDescuentoDeQuincena({ concepto: "Pago", origen_pago: "Décimo" })).toBe(false);
+    // Lo que sí: «Quincena», o sin origen (las filas anteriores al 5-sep-2026).
+    expect(esDescuentoDeQuincena({ concepto: "Pago", origen_pago: "Quincena" })).toBe(true);
+    expect(esDescuentoDeQuincena({ concepto: "Pago", origen_pago: null })).toBe(true);
+    expect(esDescuentoDeQuincena({ concepto: "Pago de terceros" })).toBe(true);
+    // Y un cargo nunca.
+    expect(esDescuentoDeQuincena({ concepto: "Préstamo", origen_pago: null })).toBe(false);
+    expect(esDescuentoDeQuincena({ concepto: "Abono extra", origen_pago: null })).toBe(false);
   });
 });
 
@@ -394,7 +442,6 @@ describe("el orden y los nombres", () => {
         ficha({ nombre: "grande", codigo: "2", cuota: 60, saldo: 600 }),
       ],
       personas: [persona("1", "CHICO"), persona("2", "GRANDE")],
-      aprobaciones: new Map(),
     });
     expect(out.map((s) => s.codigo)).toEqual(["2", "1"]);
   });
@@ -406,7 +453,6 @@ describe("el orden y los nombres", () => {
     const out = sugerirPrestamos({
       fichas: [ficha({ nombre: "GABRIELA A. JARAMILLO P.", codigo: "53", cuota: 60, saldo: 360 })],
       personas: [persona("53", "GABRIELA JARAMILLO")],
-      aprobaciones: new Map(),
     });
     expect(out[0].etiqueta).toBe("GABRIELA JARAMILLO");
     expect(out[0].nombrePrestamos).toBe("GABRIELA A. JARAMILLO P.");

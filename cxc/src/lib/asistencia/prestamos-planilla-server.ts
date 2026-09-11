@@ -5,27 +5,26 @@
  * Historia (2-sep-2026): IGUAL QUE `planilla-server.ts` Y
  * `aprobaciones-server.ts`, si las migraciones todavía no habían corrido esto
  * NO reventaba: sin la columna del amarre releía SIN ella (nadie atado, la
- * casilla a mano como hoy) y sin la tabla de aprobaciones devolvía cero con
- * `faltaTabla: true`. En este proyecto los DDL los corre Daniel a mano y varios
- * se quedaron pendientes semanas.
+ * casilla a mano como hoy). En este proyecto los DDL los corre Daniel a mano y
+ * varios se quedaron pendientes semanas.
  *
  * 🔴 TOLERANCIA RETIRADA EL 3-SEP-2026: `prestamos_empleados.empleado_codigo`
- * existe desde 20260902120000_prestamos_amarre_codigo.sql y
- * `asistencia_prestamo_aprobado` desde 20260902130000_planilla_prestamo_aprobado.sql
- * (verificado por PostgREST en producción). Degradar hoy sería exactamente
- * cómo se perdieron los $700 de LUIS ADRIAN ARROYO durante 22 días (#651): un
- * permiso o un timeout que devuelva el mismo código se leería como «nadie está
- * atado» y la planilla dejaría de descontar en silencio. El error se propaga.
+ * existe desde 20260902120000_prestamos_amarre_codigo.sql (verificado por
+ * PostgREST en producción). Degradar hoy sería exactamente cómo se perdieron
+ * los $700 de LUIS ADRIAN ARROYO durante 22 días (#651): un permiso o un
+ * timeout que devuelva el mismo código se leería como «nadie está atado» y la
+ * planilla dejaría de descontar en silencio. El error se propaga.
+ *
+ * 🔴 LA APROBACIÓN QUINCENAL SE RETIRÓ EL 11-SEP-2026 (Daniel: *«quita lo de
+ * aprobación a préstamos, no es necesario»*). Acá vivían
+ * `leerAprobacionesPrestamo` y `guardarAprobacionesPrestamo`, sobre
+ * `asistencia_prestamo_aprobado`. La tabla NO se dropea (patrón `mayor_lineas`)
+ * y este archivo ya no la nombra: hay candado que lo exige.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import {
-  CONCEPTOS_PAGO_DE_CUENTA,
-  TABLA_PRESTAMO_APROBADO,
-  type AprobacionPrestamo,
-  type FichaPrestamo,
-} from "./prestamos-planilla";
+import { esDescuentoDeQuincena, type FichaPrestamo } from "./prestamos-planilla";
 import {
   CUENTA_PRESTAMO,
   CUENTA_TERCEROS,
@@ -37,10 +36,11 @@ import {
 /** La columna del amarre (20260902120000). */
 export const COLUMNA_AMARRE = "empleado_codigo";
 
-// 🔑 Las tres listas de conceptos viven en el módulo PURO (`prestamos-planilla`)
-// y se importan de ahí. Escribirlas acá las dejaría fuera del alcance de los
-// tests —este archivo importa `supabase-server`— y el candado que impide que
-// «Abono extra» se cuele como descuento de planilla no podría existir.
+// 🔑 Las listas de conceptos y la regla de «qué es un descuento de quincena»
+// viven en el módulo PURO (`prestamos-planilla`) y se importan de ahí.
+// Escribirlas acá las dejaría fuera del alcance de los tests —este archivo
+// importa `supabase-server`— y el candado que impide que un abono de bolsillo
+// se cuele como descuento de planilla no podría existir.
 
 interface FilaEmpleado {
   id: string;
@@ -57,6 +57,7 @@ interface FilaMovimiento extends MovimientoParaSaldo {
   fecha: string;
   concepto: string;
   monto: number | string;
+  origen_pago?: string | null;
 }
 
 export interface PrestamosLeidos {
@@ -109,7 +110,10 @@ export async function leerPrestamosDeQuincena(
     (pedirCount, from, to) =>
       supabaseServer
         .from("prestamos_movimientos")
-        .select("id, empleado_id, fecha, concepto, monto, estado, deleted, cuenta", pedirCount ? { count: "exact" } : {})
+        // 🔴 `origen_pago` VIAJA (11-sep-2026): sin él no se distingue el
+        // descuento de la quincena de un abono de bolsillo. Ver el caso de
+        // CRISTIAM BLANCO en `prestamos-planilla.ts`.
+        .select("id, empleado_id, fecha, concepto, monto, estado, deleted, cuenta, origen_pago", pedirCount ? { count: "exact" } : {})
         .eq("estado", "aprobado")
         .or("deleted.is.null,deleted.eq.false")
         .order("id", { ascending: true })
@@ -141,7 +145,10 @@ export async function leerPrestamosDeQuincena(
     // terceros contado como «ya descontado» del préstamo dejaría al préstamo
     // sin descontar esa quincena (caso 1 de `montoDeFicha`) — la persona
     // pagaría una cuenta y se le perdonaría la otra en silencio.
-    if ((CONCEPTOS_PAGO_DE_CUENTA as readonly string[]).includes(String(m.concepto))) {
+    // 🔴 Y SOLO LO QUE SALIÓ DE LA QUINCENA (`esDescuentoDeQuincena`): un abono
+    // de liquidación, décimo, vacaciones o efectivo baja el saldo pero NO es
+    // plata que se le quitó del sueldo — contarlo acá se la quitaría otra vez.
+    if (esDescuentoDeQuincena(m)) {
       const f = String(m.fecha).slice(0, 10);
       if (f >= desde && f <= hasta) {
         const cuenta = cuentaDeMovimiento(m);
@@ -176,108 +183,4 @@ export async function leerPrestamosDeQuincena(
   });
 
   return { fichas };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LAS APROBACIONES
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface FilaAprobacionDb {
-  empleado_codigo: string;
-  aprobado: boolean | null;
-  monto_visto: number | string | null;
-  marcado_por: string | null;
-  marcado_en: string | null;
-}
-
-export interface AprobacionesPrestamoLeidas {
-  /** código → decisión. */
-  porCodigo: Map<string, AprobacionPrestamo>;
-}
-
-export async function leerAprobacionesPrestamo(
-  quincenaClave: string,
-): Promise<AprobacionesPrestamoLeidas> {
-  const { data, error } = await supabaseServer
-    .from(TABLA_PRESTAMO_APROBADO)
-    .select("empleado_codigo, aprobado, monto_visto, marcado_por, marcado_en")
-    .eq("quincena", quincenaClave);
-
-  if (error) {
-    throw new Error(`No se pudieron leer las aprobaciones de préstamo: ${error.message}`);
-  }
-
-  const porCodigo = new Map<string, AprobacionPrestamo>();
-  for (const f of (data ?? []) as FilaAprobacionDb[]) {
-    const codigo = String(f.empleado_codigo).trim();
-    porCodigo.set(codigo, {
-      codigo,
-      aprobado: f.aprobado === true,
-      montoVisto: num(f.monto_visto),
-      por: f.marcado_por ?? null,
-      cuando: f.marcado_en ?? null,
-    });
-  }
-  return { porCodigo };
-}
-
-export interface PrestamoAAprobar {
-  codigo: string;
-  /** Lo que el módulo sugiere AHORA para el PRÉSTAMO. Es el testigo y lo que
-   *  va a la casilla «Préstamo». */
-  monto: number;
-  /**
-   * 🔴 Lo que el módulo sugiere para «Descuento a terceros» (10-sep-2026), que
-   * va a SU casilla. Aprobar a una persona aprueba sus DOS descuentos
-   * automáticos de la quincena: son la misma decisión —«sí, descuéntenle lo que
-   * el módulo dice»— y partirla en dos casillas de aprobación obligaría a la
-   * contadora a firmar dos veces la misma cosa.
-   *
-   * ⚠️ El TESTIGO (`monto_visto`) sigue siendo el del préstamo: la tabla tiene
-   * una columna y no se amplía. Lo único que hace el testigo es detectar que
-   * alguien corrigió la casilla del préstamo a mano.
-   */
-  montoTerceros: number;
-}
-
-/**
- * Guarda (o retira) la aprobación del descuento de una o varias personas.
- *
- * 🔴 QUEDA REGISTRO DE QUIÉN Y CUÁNDO. La fila NUNCA se borra al desaprobar: se
- * pone `aprobado = false`. Un DELETE dejaría el mismo estado que «nadie lo miró
- * nunca», y son dos cosas distintas.
- *
- * ⚠️ Acá NO se toca la casilla. Escribir el monto en
- * `asistencia_planilla_manual` es un paso APARTE y explícito de la ruta, para
- * que se vea que son dos escrituras y en qué orden van.
- */
-export async function guardarAprobacionesPrestamo(opts: {
-  quincena: string;
-  items: readonly PrestamoAAprobar[];
-  aprobado: boolean;
-  por: string;
-  /** Momento en ISO. Entra por parámetro: nada de `new Date()` escondido. */
-  cuando: string;
-}): Promise<boolean> {
-  const filas = opts.items.map((i) => ({
-    quincena: opts.quincena,
-    empleado_codigo: String(i.codigo).trim(),
-    aprobado: opts.aprobado,
-    monto_visto: Math.max(0, Math.round(num(i.monto) * 100) / 100),
-    marcado_por: opts.por,
-    marcado_en: opts.cuando,
-  }));
-  if (filas.length === 0) return true;
-
-  const { error } = await supabaseServer
-    .from(TABLA_PRESTAMO_APROBADO)
-    .upsert(filas, { onConflict: "quincena,empleado_codigo" });
-
-  // Devuelve `true` cuando escribió. Historia: `false` = la tabla no existía
-  // (tolerancia retirada el 3-sep-2026). El `boolean` se conserva porque
-  // `prestamos/route.ts` (otra tanda) lo lee; ya solo vale `true`.
-  if (error) {
-    throw new Error(`No se pudieron guardar las aprobaciones de préstamo: ${error.message}`);
-  }
-  return true;
 }

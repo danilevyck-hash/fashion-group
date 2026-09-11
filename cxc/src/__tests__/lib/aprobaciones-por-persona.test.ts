@@ -116,7 +116,7 @@ describe("a. 🔴 la DECISIÓN en el motor: sí paga, no no paga y no es pendien
     const [l] = lineas;
     expect(pagado(l)).toBe(0);
     expect(l.extraNoAprobada!.minutos).toBeCloseTo(96, 6);
-    expect(frenosParaCerrar(lineas, []).some((f) => f.tipo === "horas-extra")).toBe(true);
+    expect(frenosParaCerrar(lineas).some((f) => f.tipo === "horas-extra")).toBe(true);
   });
 
   it("🔴 'no': NO paga (igual que pendiente) y NO es pendiente: sin aviso, sin freno", () => {
@@ -125,7 +125,7 @@ describe("a. 🔴 la DECISIÓN en el motor: sí paga, no no paga y no es pendien
     expect(pagado(l)).toBe(0);
     expect(l.extraNoAprobada).toBeNull();
     expect(extrasNoAprobadas(lineas)).toEqual([]);
-    expect(frenosParaCerrar(lineas, []).some((f) => f.tipo === "horas-extra")).toBe(false);
+    expect(frenosParaCerrar(lineas).some((f) => f.tipo === "horas-extra")).toBe(false);
   });
 
   it("mezcla: martes 'no', miércoles pendiente → el aviso dice SOLO el miércoles (74 min)", () => {
@@ -190,7 +190,7 @@ describe("b. 🔴 «cobra horas extra» en la ficha", () => {
     expect(l.extraMedido).toBeNull();
     expect(l.extraNoAprobada).toBeNull();
     expect(extrasNoAprobadas(lineas)).toEqual([]);
-    expect(frenosParaCerrar(lineas, []).some((f) => f.tipo === "horas-extra")).toBe(false);
+    expect(frenosParaCerrar(lineas).some((f) => f.tipo === "horas-extra")).toBe(false);
     expect(l.cobraHorasExtra).toBe(false);
     // Sigue en planilla, con su quincenal y su neto: no es servicio profesional.
     expect(l.fueraDePlanilla).toBe(false);
@@ -201,7 +201,7 @@ describe("b. 🔴 «cobra horas extra» en la ficha", () => {
   it("🔴 apagada y con extras PENDIENTES: tampoco avisa ni frena (no hay nada que decidir)", () => {
     const lineas = planilla({ ficha: { cobraHorasExtra: false } });
     expect(extrasNoAprobadas(lineas)).toEqual([]);
-    expect(frenosParaCerrar(lineas, []).some((f) => f.tipo === "horas-extra")).toBe(false);
+    expect(frenosParaCerrar(lineas).some((f) => f.tipo === "horas-extra")).toBe(false);
   });
 
   it("🔴 la tardanza y la ausencia se siguen contando igual", () => {

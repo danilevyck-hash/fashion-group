@@ -156,7 +156,7 @@ describe("a. 🔴 todo sin aprobar → el aviso SALE y el cierre FRENA", () => {
   });
 
   it("🔴 el cierre FRENA con el freno `horas-extra`", () => {
-    const frenos = frenosParaCerrar(lineas, []);
+    const frenos = frenosParaCerrar(lineas);
     expect(frenos.map((f) => f.tipo)).toEqual(["horas-extra"]);
     expect(frenos[0].personas).toBe(1);
     expect(frenos[0].quienes).toEqual(["KEVIN LUBO"]);
@@ -191,7 +191,7 @@ describe("b. 🔴 PARCIAL: martes aprobado, miércoles no", () => {
     // El número viejo —los minutos PAGADOS— no puede volver a colarse.
     expect(aviso[0].minutos).not.toBeCloseTo(22, 6);
     expect(textoExtraNoAprobada(aviso)).toContain("1,23 h");
-    expect(frenosParaCerrar(lineas, []).map((f) => f.tipo)).toEqual(["horas-extra"]);
+    expect(frenosParaCerrar(lineas).map((f) => f.tipo)).toEqual(["horas-extra"]);
   });
 
   it("pagado + sin aprobar = todo lo que midió el reloj", () => {
@@ -217,7 +217,7 @@ describe("c. CONTROL: todo aprobado → sin aviso, sin freno", () => {
     const aviso = extrasNoAprobadas(lineas);
     expect(aviso).toEqual([]);
     expect(textoExtraNoAprobada(aviso)).toBeNull();
-    expect(frenosParaCerrar(lineas, [])).toEqual([]);
+    expect(frenosParaCerrar(lineas)).toEqual([]);
   });
 });
 
@@ -230,7 +230,7 @@ describe("d. `exigirAprobacionExtra = false` → se paga todo, nada sin aprobar"
     expect(l.extraNoAprobada).toBeNull();
     expect(l.extraAprobada).toBe(true);
     expect(extrasNoAprobadas(lineas)).toEqual([]);
-    expect(frenosParaCerrar(lineas, [])).toEqual([]);
+    expect(frenosParaCerrar(lineas)).toEqual([]);
   });
 });
 
@@ -293,7 +293,7 @@ describe("f. sueldo repartido en dos empresas: el aviso sale UNA vez, donde se p
 
   it("el aviso y el freno cuentan UNA persona, no dos líneas", () => {
     expect(extrasNoAprobadas(lineas)).toHaveLength(1);
-    const frenos = frenosParaCerrar(lineas, []);
+    const frenos = frenosParaCerrar(lineas);
     expect(frenos).toHaveLength(1);
     expect(frenos[0].personas).toBe(1);
   });
@@ -339,7 +339,7 @@ describe("g. 🔴 SERVICIO PROFESIONAL: sin horas extra, con tardanzas y ausenci
     expect(l.fueraDePlanilla).toBe(false);
     expect(l.extraNoAprobada!.minutos).toBeCloseTo(22, 6);
     expect(extrasNoAprobadas(lineas).map((e) => e.codigo)).toEqual(["26"]);
-    expect(frenosParaCerrar(lineas, []).map((f) => f.tipo)).toEqual(["horas-extra"]);
+    expect(frenosParaCerrar(lineas).map((f) => f.tipo)).toEqual(["horas-extra"]);
     const dias = armarDiasAprobacion({
       lineas, personas: [YULISSA], reglas: R, aprobaciones: indexarAprobaciones([]),
     });
@@ -350,7 +350,7 @@ describe("g. 🔴 SERVICIO PROFESIONAL: sin horas extra, con tardanzas y ausenci
     const { lineas, l } = cuadro(FICHA_SP);
     expect(l.fueraDePlanilla).toBe(true);
     expect(extrasNoAprobadas(lineas)).toEqual([]);
-    expect(frenosParaCerrar(lineas, [])).toEqual([]);
+    expect(frenosParaCerrar(lineas)).toEqual([]);
   });
 
   it("🔴 `extraMedido` y `extraNoAprobada` en null; extras, excedente, domingo y feriado en cero", () => {
@@ -411,8 +411,8 @@ describe("g. 🔴 SERVICIO PROFESIONAL: sin horas extra, con tardanzas y ausenci
       diasExtraAprobados: new Set<string>(),
     });
     expect(extrasNoAprobadas(lineas).map((e) => e.codigo)).toEqual([COD]);
-    expect(frenosParaCerrar(lineas, [])[0].quienes).toEqual(["KEVIN LUBO"]);
-    expect(frenosParaCerrar(lineas, [])[0].codigos).toEqual([COD]);
+    expect(frenosParaCerrar(lineas)[0].quienes).toEqual(["KEVIN LUBO"]);
+    expect(frenosParaCerrar(lineas)[0].codigos).toEqual([COD]);
     const dias = armarDiasAprobacion({
       lineas, personas: [P, YULISSA], reglas: R, aprobaciones: indexarAprobaciones([]),
     });
