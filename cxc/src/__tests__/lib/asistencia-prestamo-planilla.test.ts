@@ -294,8 +294,10 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
     seguroSocial: 0, seguroEducativo: 0, isr: 0, prestamo: 0, terceros: 0, mercancia: 0,
     totalDeducciones: 0, otrosServicios: 0, netoPagar: 260, ...o,
   });
+  // ⚠️ Desde el 11-sep-2026 (migración 20261115120000) «nada escrito» en
+  // préstamo y terceros es `null`, no 0: el 0 pasó a ser «no descontar».
   const MANUAL = (o: Partial<ManualesLinea> = {}): ManualesLinea => ({
-    isr: 0, prestamo: 0, terceros: 0, mercancia: 0, otrosServicios: 0, ...o,
+    isr: 0, prestamo: null, terceros: null, mercancia: 0, otrosServicios: 0, ...o,
   });
 
   it("la sugerencia ya no sabe de aprobaciones: ni `aprobado`, ni `montoVisto`, ni `cambio`", () => {
@@ -309,9 +311,14 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
   });
 
   it("🔴 vacía = lo que propone el módulo; escrito a mano = lo escrito (manda)", () => {
-    expect(casillaAutomatica(0, 50)).toBe(50);
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 11-sep-2026 (migración 20261115120000): la
+    // casilla vacía es `null`, y el 0 es «esta quincena no se descuenta» —
+    // con 0 escrito NO entra la cuota. Antes `casillaAutomatica(0, 50)` daba 50.
+    expect(casillaAutomatica(null, 50)).toBe(50);
+    expect(casillaAutomatica(undefined, 50)).toBe(50);
+    expect(casillaAutomatica(0, 50)).toBe(0);    // 0 a propósito: nada entra
     expect(casillaAutomatica(35, 50)).toBe(0);   // hay algo escrito: no entra nada automático
-    expect(casillaAutomatica(0, 0)).toBe(0);
+    expect(casillaAutomatica(null, 0)).toBe(0);
     expect(casillaAutomatica(-3, 50)).toBe(50);  // basura negativa = vacío
   });
 
@@ -325,7 +332,7 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
     expect(con.prestamoAutomatico).toEqual({ prestamo: 60, terceros: 0 });
     // 🔑 `manuales` es la foto de la tabla: la pantalla la manda de vuelta entera
     // al guardar el ISR; si la cuota viviera ahí, editar el ISR la congelaría.
-    expect(con.manuales.prestamo).toBe(0);
+    expect(con.manuales.prestamo).toBeNull();
     // Y la línea original no se muta.
     expect(linea.dinero.prestamo).toBe(0);
   });

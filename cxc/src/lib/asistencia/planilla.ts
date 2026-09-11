@@ -73,6 +73,7 @@ import {
   type EmpresaAsistencia,
   type ReglasAsistencia,
 } from "./config";
+import { valorTecleado } from "./casilla-sin-descontar";
 import { PESTANA_FICHAS } from "./persona-en-el-centro";
 import { etiquetaPersona } from "./directorio";
 import { esHabil, fmtMin, type DiaReporte, type PersonaReporte } from "./reporte";
@@ -940,17 +941,27 @@ export function medirHoras(
 // EL DINERO
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Lo que NO sale del reloj y la contable escribe a mano. */
+/**
+ * Lo que NO sale del reloj y la contable escribe a mano.
+ *
+ * 🔴 «Préstamo» y «Terceros» tienen TRES estados (11-sep-2026, migración
+ * `20261115120000`): `null` = nadie escribió nada, va la cuota automática de
+ * Préstamos · `0` = escrito a propósito, ESTA quincena no se descuenta ·
+ * monto = se descuenta ese monto. Las otras tres no proponen cuota, así que en
+ * ellas 0 y vacío dicen lo mismo y siguen siendo `number`. La regla vive en
+ * `casilla-sin-descontar.ts`.
+ */
 export interface ManualesLinea {
   isr: number;
-  prestamo: number;
-  terceros: number;
+  prestamo: number | null;
+  terceros: number | null;
   mercancia: number;
   otrosServicios: number;
 }
 
+/** Nada escrito. ⚠️ Préstamo y terceros van en `null`, no en 0: 0 es «no descontar». */
 export const MANUALES_CERO: ManualesLinea = {
-  isr: 0, prestamo: 0, terceros: 0, mercancia: 0, otrosServicios: 0,
+  isr: 0, prestamo: null, terceros: null, mercancia: 0, otrosServicios: 0,
 };
 
 /** La ficha de planilla de una persona, tal como está guardada. */
@@ -1378,7 +1389,16 @@ export interface LineaPlanilla {
    * ADENTRO de `dinero`; `manuales` sigue siendo la foto de la tabla (lo que
    * alguien escribió a mano, 0 = nada). Lo pone `aplicarPrestamoEnLinea`.
    */
-  prestamoAutomatico?: { prestamo: number; terceros: number };
+  prestamoAutomatico?: {
+    prestamo: number;
+    terceros: number;
+    /**
+     * La cuota que Préstamos proponía y NO entró porque la casilla tiene un 0
+     * escrito a propósito («no descontar esta quincena», 11-sep-2026). 0 = no
+     * aplica. Es lo que la celda y «Antes de cerrar» dicen.
+     */
+    sinDescontar?: { prestamo: number; terceros: number };
+  };
   ajusteAnterior?: number;
   /**
    * De qué días salió el ajuste y cuánto le entró a cada columna. Es lo que
@@ -1457,8 +1477,11 @@ const num = (v: unknown): number => {
 export function normalizarManuales(m: Partial<ManualesLinea> | null | undefined): ManualesLinea {
   return {
     isr: num(m?.isr),
-    prestamo: num(m?.prestamo),
-    terceros: num(m?.terceros),
+    // 🔴 Las dos casillas automáticas conservan el `null` (vacía) y el `0`
+    // exacto (no descontar): son estados distintos. Basura y negativos caen en
+    // `null` — en la duda, la cuota de siempre. Ver `casilla-sin-descontar.ts`.
+    prestamo: valorTecleado("prestamo", m?.prestamo),
+    terceros: valorTecleado("terceros", m?.terceros),
     mercancia: num(m?.mercancia),
     otrosServicios: num(m?.otrosServicios),
   };
@@ -1645,8 +1668,11 @@ export function calcularDinero(
     : 0;
 
   const totalDeducciones = centavos(
-    seguroSocial + seguroEducativo + manuales.isr + manuales.prestamo
-    + manuales.terceros + manuales.mercancia,
+    // `null` en préstamo/terceros = nada escrito: suma 0 acá y la cuota
+    // automática entra después (`aplicarPrestamoEnLinea`). Un 0 escrito también
+    // suma 0 — y ahí la cuota NO entra: eso es «no descontar esta quincena».
+    seguroSocial + seguroEducativo + manuales.isr + (manuales.prestamo ?? 0)
+    + (manuales.terceros ?? 0) + manuales.mercancia,
   );
 
   // 🔴 "OTROS SERVICIOS" SUMA. NO ES UN DESCUENTO: ES UN PAGO EXTRA.
@@ -1676,8 +1702,8 @@ export function calcularDinero(
     // mostrar es «sin seguros», no una base que no se usó para nada.
     baseSeguros: conSeguros ? basePropia : null,
     seguroSocial, seguroEducativo,
-    isr: manuales.isr, prestamo: manuales.prestamo,
-    terceros: manuales.terceros, mercancia: manuales.mercancia,
+    isr: manuales.isr, prestamo: manuales.prestamo ?? 0,
+    terceros: manuales.terceros ?? 0, mercancia: manuales.mercancia,
     totalDeducciones, otrosServicios: manuales.otrosServicios, netoPagar,
   };
 }

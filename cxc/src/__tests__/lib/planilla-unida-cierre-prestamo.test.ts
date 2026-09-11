@@ -149,8 +149,10 @@ describe("C. LO QUE NO SE ESCRIBE, SE DICE — nunca en silencio", () => {
   });
 
   it("cada motivo tiene UNA sola redacción", () => {
+    // ⚠️ 11-sep-2026 (migración 20261115120000): entra «sin-descontar», el 0
+    // escrito a propósito. Su candado vive en `planilla-sin-descontar.test.ts`.
     expect(Object.keys(TEXTO_OMISION).sort()).toEqual(
-      ["casilla-en-cero", "sin-ficha", "sin-saldo", "ya-registrado"],
+      ["casilla-en-cero", "sin-descontar", "sin-ficha", "sin-saldo", "ya-registrado"],
     );
     for (const t of Object.values(TEXTO_OMISION)) expect(t.trim()).not.toBe("");
   });

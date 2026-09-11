@@ -582,7 +582,14 @@ describe("Los centavos y lo que se escribe a mano", () => {
 
   it("los montos manuales solo aceptan positivos: son descuentos", () => {
     const m = normalizarManuales({ prestamo: -10, isr: "25.5" as unknown as number, mercancia: null as unknown as number });
-    expect(m.prestamo).toBe(0);
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 11-sep-2026 (migración 20261115120000): en
+    // «Préstamo» y «Terceros» un negativo cae en `null` (vacía = la cuota de
+    // siempre), NO en 0 — porque 0 pasó a significar «esta quincena no se
+    // descuenta». CONTROL al revés: un 0 exacto se conserva como 0, y en las
+    // otras tres casillas la basura sigue cayendo en 0.
+    expect(m.prestamo).toBeNull();
+    expect(normalizarManuales({ prestamo: 0 }).prestamo).toBe(0);
+    expect(normalizarManuales({ terceros: -1 }).terceros).toBeNull();
     expect(m.isr).toBe(25.5);
     expect(m.mercancia).toBe(0);
     expect(m.otrosServicios).toBe(0);

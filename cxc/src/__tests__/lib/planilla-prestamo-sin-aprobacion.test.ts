@@ -79,9 +79,13 @@ describe("2. la pantalla: sin bloque de aprobación, y la casilla muestra lo aut
   });
 
   it("🔴 la casilla lee `prestamoAutomatico` de la LÍNEA y solo si no hay nada escrito", () => {
-    expect(pantalla).toMatch(/function valorCasilla\(l: LineaPlanilla, campo: keyof ManualesLinea\): number \{\s*const escrito = l\.manuales\[campo\];\s*if \(escrito > 0\) return escrito;/);
-    expect(pantalla).toMatch(/if \(campo === "prestamo"\) return l\.prestamoAutomatico\?\.prestamo \?\? 0;/);
-    expect(pantalla).toMatch(/if \(campo === "terceros"\) return l\.prestamoAutomatico\?\.terceros \?\? 0;/);
+    // ⚠️ CAMBIÓ DE DIRECCIÓN el 11-sep-2026 (migración 20261115120000): la
+    // casilla tiene TRES estados y los decide `estadoCasilla` (módulo puro), no
+    // un `escrito > 0` a mano. Lo que se protege sigue igual: lo escrito manda,
+    // y lo automático se lee de la LÍNEA.
+    expect(pantalla).toMatch(/function valorCasilla\(l: LineaPlanilla, campo: keyof ManualesLinea\): number \| null \{\s*const escrito = l\.manuales\[campo\];/);
+    expect(pantalla).toMatch(/if \(estado === "escrita"\) return escrito;/);
+    expect(pantalla).toMatch(/const auto = l\.prestamoAutomatico\?\.\[campo\] \?\? 0;/);
     // Las dos celdas (escritorio y tarjeta) la usan.
     expect((pantalla.match(/valor=\{valorCasilla\(l, campo\)\}/g) ?? []).length).toBe(2);
   });
@@ -90,8 +94,11 @@ describe("2. la pantalla: sin bloque de aprobación, y la casilla muestra lo aut
     // Si la cuota viviera en `manuales`, editar el ISR la congelaría como si
     // alguien la hubiera escrito. Por eso va en `dinero` y en `prestamoAutomatico`.
     expect(pantalla).toMatch(/\.\.\.linea\.manuales,\s*\[campo\]: limpio,/);
+    // ⚠️ 11-sep-2026 (migración 20261115120000): `prestamoAutomatico` ahora
+    // también lleva `sinDescontar` (la cuota saltada con un 0 a propósito); se
+    // arma en `auto` y sigue yendo a la LÍNEA, nunca a `manuales`.
     expect(sinComentarios("src/lib/asistencia/prestamos-planilla.ts"))
-      .toMatch(/return \{ \.\.\.linea, dinero, prestamoAutomatico: \{ prestamo, terceros \} \};/);
+      .toMatch(/return \{ \.\.\.linea, dinero, prestamoAutomatico: auto \};/);
   });
 
   it("el aviso ámbar que se pinta es `avisoPrestamo` (en la lista «Antes de cerrar»), y viaja al Excel y al PDF", () => {

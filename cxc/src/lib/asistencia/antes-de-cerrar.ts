@@ -24,6 +24,7 @@ import { enlaceAprobaciones, horasBonitas, type ExtraNoAprobada } from "./aproba
 import { fechaCortaCorte, fraseCorte } from "./elegir-quincena";
 import type { CodigoSinFicha } from "./periodo";
 import type { PrestamoSinAtar } from "./prestamos-planilla";
+import { textoSinDescontar, type SinDescontar } from "./casilla-sin-descontar";
 import { PESTANA_PRESTAMOS } from "@/lib/prestamos-una-puerta";
 
 /** Una persona detrás de una línea (las de «ver quiénes»). */
@@ -83,6 +84,12 @@ export interface EntradaAntesDeCerrar {
   prestamoSinAtar: readonly PrestamoSinAtar[];
   /** El aviso del préstamo (última cuota, quien no cobra aquí), ya redactado. */
   avisoPrestamo: string | null;
+  /**
+   * 🔴 Las casillas con un 0 a propósito («no descontar esta quincena»,
+   * 11-sep-2026). Van en la parte informativa: es una decisión de quien arma
+   * el cuadro, no algo que arreglar. Opcional: sin pasarlo, nada cambia.
+   */
+  sinDescontar?: readonly SinDescontar[];
   /** El aviso de las vacaciones ya pagadas, ya redactado (nombre, rango y monto). */
   avisoVacacionesNoPagadas: string | null;
   conSabado: number;
@@ -219,6 +226,12 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
   // 🔴 LO QUE MUEVE PLATA SE DICE CON NOMBRE Y MONTO, en ámbar (la regla de
   // Daniel que ya cumplían las cajas): no frena el cierre, pero no va en gris.
   if (e.avisoPrestamo) info.push({ clave: "prestamo", numero: null, texto: e.avisoPrestamo, enlace: null, tono: "plata" });
+  // 🔴 «N préstamos sin descontar esta quincena, a propósito» — informativo (lo
+  // decidió quien está armando el cuadro), pero con nombre y monto: es plata.
+  const sinDescontar = textoSinDescontar(e.sinDescontar ?? []);
+  if (sinDescontar) {
+    info.push({ clave: "sin-descontar", numero: e.sinDescontar!.length, texto: sinDescontar, enlace: null, tono: "info" });
+  }
   if (e.avisoVacacionesNoPagadas) info.push({ clave: "vacaciones", numero: null, texto: e.avisoVacacionesNoPagadas, enlace: null, tono: "plata" });
   if (e.conSabado > 0) {
     info.push({

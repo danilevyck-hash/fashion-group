@@ -87,6 +87,14 @@ import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { notaAjuste, notaCeldaAjuste } from "@/lib/asistencia/corte-quincena";
 import { armarAntesDeCerrar } from "@/lib/asistencia/antes-de-cerrar";
+import {
+  TEXTO_SIN_DESCONTAR,
+  TITULO_SIN_DESCONTAR,
+  esCasillaAutomatica,
+  estadoCasilla,
+  prestamosSinDescontar,
+  valorTecleado,
+} from "@/lib/asistencia/casilla-sin-descontar";
 import AntesDeCerrar from "./AntesDeCerrar";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
@@ -537,8 +545,11 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       if (!data) return;
       const linea = data.lineas.find((l) => l.codigo === codigo);
       if (!linea) return;
-      const n = Number(String(valor).replace(",", "."));
-      const limpio = Number.isFinite(n) && n > 0 ? n : 0;
+      // 🔴 Lo tecleado pasa por `valorTecleado` (módulo puro, 11-sep-2026): en
+      // «Préstamo» y «Terceros» vacío = null (vuelve la cuota) y «0» = 0 (esta
+      // quincena no se descuenta); en las otras tres, como siempre. Es la MISMA
+      // función que usa el servidor al guardar.
+      const limpio = valorTecleado(campo, valor);
       if (limpio === linea.manuales[campo]) return; // no se escribió nada nuevo
       // 🔴 SIN QUINCENA NO HAY DÓNDE GUARDARLO. El campo ya va deshabilitado en
       // un rango libre, pero el freno tiene que vivir también del lado que
@@ -1129,6 +1140,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           avisoRepartoRechazado: data.avisos.avisoRepartoRechazado ?? null,
           prestamoSinAtar: data.avisos.prestamoSinAtar ?? [],
           avisoPrestamo: data.avisos.avisoPrestamo ?? null,
+          // 🔴 Las casillas con 0 a propósito, calculadas de las MISMAS líneas
+          // que dibuja la tabla (11-sep-2026).
+          sinDescontar: prestamosSinDescontar(data.lineas),
           avisoVacacionesNoPagadas: data.avisos.avisoVacacionesNoPagadas ?? null,
           conSabado: data.avisos.conSabado ?? 0,
           rangoLibre: !!data.avisos.rangoLibre,
@@ -1563,59 +1577,89 @@ function ModalCierre({
 type OnGuardar = (codigo: string, campo: keyof ManualesLinea, valor: string) => void;
 
 /**
- * 🔴 LO QUE LA CASILLA MUESTRA (11-sep-2026). «Préstamo» y «Terceros» entran
- * solas desde el módulo (`prestamoAutomatico`, ya adentro de `dinero`) cuando
- * nadie escribió nada; lo escrito a mano manda. Las otras tres son lo de
- * siempre. Se lee de la LÍNEA, no de una segunda cuenta.
+ * 🔴 LO QUE LA CASILLA MUESTRA (11-sep-2026). «Préstamo» y «Terceros» tienen
+ * TRES estados (`casilla-sin-descontar.ts`): vacía → la cuota que entró sola
+ * (`prestamoAutomatico`, ya adentro de `dinero`) · escrita → lo escrito, que
+ * manda · 0 a propósito → «0», y la celda dice que esta quincena no se
+ * descuenta. Las otras tres son lo de siempre. `null` = la casilla se ve vacía.
+ * Se lee de la LÍNEA, no de una segunda cuenta.
  */
-function valorCasilla(l: LineaPlanilla, campo: keyof ManualesLinea): number {
+function valorCasilla(l: LineaPlanilla, campo: keyof ManualesLinea): number | null {
   const escrito = l.manuales[campo];
-  if (escrito > 0) return escrito;
-  if (campo === "prestamo") return l.prestamoAutomatico?.prestamo ?? 0;
-  if (campo === "terceros") return l.prestamoAutomatico?.terceros ?? 0;
-  return escrito;
+  if (esCasillaAutomatica(campo)) {
+    const estado = estadoCasilla(escrito);
+    if (estado === "escrita") return escrito;
+    // 🔑 El 0 se MUESTRA solo cuando había una cuota que saltar: un 0 sobre
+    // alguien sin préstamo no decide nada, y se ve vacío como siempre.
+    if (estado === "sin-descontar") return esSinDescontar(l, campo) ? 0 : null;
+    const auto = l.prestamoAutomatico?.[campo] ?? 0;
+    return auto > 0 ? auto : null;
+  }
+  return (escrito ?? 0) > 0 ? escrito : null;
 }
 
 /** ¿Este número lo puso el módulo de Préstamos, sin que nadie lo escribiera? */
 function esAutomatica(l: LineaPlanilla, campo: keyof ManualesLinea): boolean {
-  if (l.manuales[campo] > 0) return false;
-  if (campo === "prestamo") return (l.prestamoAutomatico?.prestamo ?? 0) > 0;
-  if (campo === "terceros") return (l.prestamoAutomatico?.terceros ?? 0) > 0;
-  return false;
+  if (!esCasillaAutomatica(campo)) return false;
+  if (estadoCasilla(l.manuales[campo]) !== "vacia") return false;
+  return (l.prestamoAutomatico?.[campo] ?? 0) > 0;
+}
+
+/** ¿Tiene un 0 escrito a propósito Y había una cuota que saltar? */
+function esSinDescontar(l: LineaPlanilla, campo: keyof ManualesLinea): boolean {
+  if (!esCasillaAutomatica(campo)) return false;
+  if (estadoCasilla(l.manuales[campo]) !== "sin-descontar") return false;
+  return (l.prestamoAutomatico?.sinDescontar?.[campo] ?? 0) > 0;
 }
 
 /** Una celda de dinero que se escribe a mano. Guarda al salir del campo. */
 function CeldaManual({
-  codigo, campo, valor, onGuardar, ancho = "w-20", bloqueo, automatico = false,
+  codigo, campo, valor, onGuardar, ancho = "w-20", bloqueo, automatico = false, sinDescontar = false,
 }: {
-  codigo: string; campo: keyof ManualesLinea; valor: number; onGuardar: OnGuardar;
+  codigo: string; campo: keyof ManualesLinea;
+  /** `null` = se ve vacía. `0` solo llega con `sinDescontar`. */
+  valor: number | null; onGuardar: OnGuardar;
   ancho?: string;
   /** 🔴 Por qué está apagada. `null` = se puede escribir. */
   bloqueo?: Bloqueo;
   /** El número lo puso el módulo de Préstamos: se ve igual, y el `title` lo dice. */
   automatico?: boolean;
+  /** 🔴 Hay un 0 escrito a propósito: se ve el 0 y, debajo, «No se descuenta esta quincena». */
+  sinDescontar?: boolean;
 }) {
   const bloqueada = !!bloqueo;
   // 🔑 Estado local mientras se escribe: si el valor viniera del padre en cada
   // tecla, el recargo de la fila pisaría lo que la persona está tecleando.
-  const [texto, setTexto] = useState(valor ? String(valor) : "");
-  useEffect(() => { setTexto(valor ? String(valor) : ""); }, [valor]);
+  // El 0 se muestra SOLO cuando es una decisión (`sinDescontar`); si no, vacío.
+  const mostrar = (v: number | null) => (v === null || (v === 0 && !sinDescontar) ? "" : String(v));
+  const [texto, setTexto] = useState(mostrar(valor));
+  useEffect(() => { setTexto(mostrar(valor)); }, [valor, sinDescontar]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <input
-      type="text" inputMode="decimal" value={bloqueada ? "" : texto}
-      placeholder={bloqueo ? bloqueo.placeholder : "—"}
-      disabled={bloqueada}
-      title={bloqueo
-        ? bloqueo.title
-        : automatico
-          ? "Es la cuota que propone Préstamos. Escribe otro monto para corregirla en esta quincena."
-          : undefined}
-      onChange={(e) => setTexto(e.target.value)}
-      onBlur={() => onGuardar(codigo, campo, texto)}
-      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-      className={`${ancho} min-h-[44px] rounded border border-gray-200 bg-white px-1.5 text-right text-sm tabular-nums outline-none transition focus:border-black disabled:bg-gray-100 disabled:text-gray-400 disabled:placeholder:text-[10px]`}
-    />
+    <>
+      <input
+        type="text" inputMode="decimal" value={bloqueada ? "" : texto}
+        placeholder={bloqueo ? bloqueo.placeholder : "—"}
+        disabled={bloqueada}
+        title={bloqueo
+          ? bloqueo.title
+          : sinDescontar
+            ? TITULO_SIN_DESCONTAR
+            : automatico
+              ? "Es la cuota que propone Préstamos. Escribe otro monto para corregirla en esta quincena, o 0 para no descontar."
+              : undefined}
+        onChange={(e) => setTexto(e.target.value)}
+        onBlur={() => onGuardar(codigo, campo, texto)}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        className={`${ancho} min-h-[44px] rounded border border-gray-200 bg-white px-1.5 text-right text-sm tabular-nums outline-none transition focus:border-black disabled:bg-gray-100 disabled:text-gray-400 disabled:placeholder:text-[10px]`}
+      />
+      {/* 🔴 Se ve, no solo en el `title`: en el iPad no hay mouse. */}
+      {sinDescontar && !bloqueada && (
+        <span className="block text-right text-[11px] leading-tight text-gray-500" data-testid="sin-descontar">
+          {TEXTO_SIN_DESCONTAR}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -1729,7 +1773,8 @@ function Fila({
       {MANUALES.slice(0, 4).map(([campo]) => (
         <td key={campo} className="px-1 py-1.5 text-right">
           <CeldaManual codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
-            onGuardar={onGuardar} bloqueo={bloqueo} automatico={esAutomatica(l, campo)} />
+            onGuardar={onGuardar} bloqueo={bloqueo} automatico={esAutomatica(l, campo)}
+            sinDescontar={esSinDescontar(l, campo)} />
         </td>
       ))}
       {num(d.totalDeducciones)}
@@ -1845,6 +1890,7 @@ function Tarjeta({
                 <CeldaManual
                   codigo={l.codigo} campo={campo} valor={valorCasilla(l, campo)}
                   onGuardar={onGuardar} ancho="w-full" bloqueo={bloqueo} automatico={esAutomatica(l, campo)}
+                  sinDescontar={esSinDescontar(l, campo)}
                 />
               </label>
             ))}

@@ -767,11 +767,13 @@ export async function GET(req: NextRequest) {
       etiqueta: l.etiqueta,
       empresa: l.empresa,
       empresaEtiqueta: l.empresaEtiqueta,
-      enCasilla: l.manuales.prestamo,
+      // `null` (vacía) y 0 (no descontar) se miran en `aplicarPrestamoEnLinea`;
+      // acá solo viaja el monto escrito, como testigo.
+      enCasilla: l.manuales.prestamo ?? 0,
       // 🔴 La casilla de la TERCERA cuenta. Sale de las MISMAS líneas del
       // cuadro, igual que la del préstamo: lo que la pantalla dice que hay y lo
       // que la planilla suma no pueden separarse.
-      enCasillaTerceros: l.manuales.terceros,
+      enCasillaTerceros: l.manuales.terceros ?? 0,
     }));
     const prestamos = sugerirPrestamos({
       fichas: presRes.fichas,

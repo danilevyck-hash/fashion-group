@@ -41,6 +41,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { centavos } from "./planilla";
+import { estadoCasilla } from "./casilla-sin-descontar";
 import type { LineaPlanilla } from "./planilla";
 import type { CuentaPrestamo } from "@/lib/prestamos-saldo";
 import { CUENTA_DANO, CUENTA_PRESTAMO, CUENTA_TERCEROS } from "@/lib/prestamos-saldo";
@@ -100,8 +101,14 @@ export interface PagoAEscribir {
 
 /** Por qué una persona con casilla en cero (o con pago ya hecho) no genera nada. */
 export type MotivoOmision =
-  /** La casilla dice 0: no se le descontó nada, no hay nada que anotar. */
+  /** La casilla está vacía y no entró cuota: no se le descontó nada, no hay nada que anotar. */
   | "casilla-en-cero"
+  /**
+   * 🔴 La casilla tiene un 0 ESCRITO A PROPÓSITO (11-sep-2026): esta quincena
+   * no se descuenta. No es un olvido ni un aviso: es una decisión, y el cierre
+   * la respeta — no anota pago y no la confunde con «casilla-en-cero».
+   */
+  | "sin-descontar"
   /** El módulo ya tenía el pago de esta quincena. Regla 2. */
   | "ya-registrado"
   /** No debe nada en ninguna de las dos cuentas. */
@@ -179,6 +186,16 @@ export function planDeCierre(opts: {
       const saldo = deuda ? n(deuda[c.saldo] as number) : 0;
 
       if (monto <= 0) {
+        // 🔴 UN 0 ESCRITO A PROPÓSITO NO ES UNA CASILLA EN CERO. La contadora
+        // decidió no descontar esta quincena: no se anota pago, y se dice como
+        // decisión, no como algo que faltó. Solo las dos casillas automáticas
+        // tienen este estado (`casilla-sin-descontar.ts`).
+        if (c.campo !== "mercancia" && estadoCasilla(l.manuales?.[c.campo]) === "sin-descontar") {
+          if (deuda && saldo > 0.004) {
+            omisiones.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto: 0, motivo: "sin-descontar" });
+          }
+          continue;
+        }
         // 🔑 Solo se NOMBRA la omisión de quien tiene una deuda viva EN ESA
         // CUENTA: decirle a la contadora «a estas 30 personas no se les
         // descontó nada» sobre gente que no debe nada es ruido, y el ruido es
@@ -241,6 +258,7 @@ export function textoPlan(plan: PlanDeCierre): string | null {
 /** Cómo se explica cada omisión. Un solo lugar, para que no haya dos redacciones. */
 export const TEXTO_OMISION: Readonly<Record<MotivoOmision, string>> = {
   "casilla-en-cero": "debe, pero esta quincena no se le descontó nada",
+  "sin-descontar": "esta quincena no se le descuenta, a propósito (casilla en 0)",
   "ya-registrado": "el pago de esta quincena ya estaba anotado en Préstamos",
   "sin-saldo": "se le descontó, pero ya no debe nada",
   "sin-ficha": "se le descontó, pero no está atado a ninguna ficha de Préstamos",

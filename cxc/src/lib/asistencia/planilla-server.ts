@@ -59,8 +59,11 @@ export async function leerManuales(quincenaClave: string): Promise<ManualesLeido
   for (const f of (data ?? []) as FilaManual[]) {
     porCodigo.set(String(f.empleado_codigo), normalizarManuales({
       isr: Number(f.isr ?? 0),
-      prestamo: Number(f.prestamo ?? 0),
-      terceros: Number(f.terceros ?? 0),
+      // 🔴 `null` se CONSERVA en préstamo y terceros (11-sep-2026): NULL = nadie
+      // escribió nada (va la cuota), 0 = «esta quincena no se descuenta».
+      // Un `?? 0` acá convertiría cada casilla vacía en un «no descontar».
+      prestamo: f.prestamo === null || f.prestamo === undefined ? null : Number(f.prestamo),
+      terceros: f.terceros === null || f.terceros === undefined ? null : Number(f.terceros),
       mercancia: Number(f.mercancia ?? 0),
       otrosServicios: Number(f.otros_servicios ?? 0),
     }));
@@ -83,6 +86,9 @@ export async function guardarManuales(
       quincena: quincenaClave,
       empleado_codigo: codigo,
       isr: m.isr,
+      // `null` viaja como NULL: la columna lo admite desde 20261115120000 y ya
+      // no tiene DEFAULT, así que lo que se guarda es exactamente lo que se
+      // decidió (vacía, 0 o un monto).
       prestamo: m.prestamo,
       terceros: m.terceros,
       mercancia: m.mercancia,

@@ -1965,9 +1965,8 @@ fechada (ninguno se borró): `asistencia-prestamo-planilla` · `asistencia-plani
 
 ### ⚠️ Dejado a propósito / pendiente de Daniel
 
-1. **No hay forma de «no descontar esta quincena» escribiendo un 0** en la casilla de préstamo: la
-   columna es `NOT NULL DEFAULT 0` y el 0 se lee como «vacío = la cuota». Distinguirlo pide una
-   migración (columna nullable). Hoy el camino es bajar la cuota en la ficha.
+1. ~~**No hay forma de «no descontar esta quincena» escribiendo un 0**~~ — **resuelto la misma
+   noche** (Daniel: *«sí»*), ver la sección siguiente.
 2. El tope de un sueldo **avisa y no frena**: si Daniel prefiere que frene sin aprobación, es un
    cambio de una línea en la ruta.
 3. El motor honra las horas de una justificación **sin mirar el motivo** (hoy no hay filas con horas
@@ -2041,3 +2040,54 @@ Clientes). Medición: `scripts/_medir-barras-pegajosas.mjs`.
    aportan (la de Clientes lleva el buscador y los filtros, la de Guías el estado y el «volver», la
    de grupo dice en qué fecha estás, la del catálogo es el único camino de vuelta al pedido). Si
    Daniel quiere retirar alguna, es decisión suya.
+
+---
+
+## 11-sep-2026 (noche) — Planilla: «No descontar el préstamo esta quincena» escribiendo 0
+
+Daniel, textual: *«sí»* a poder saltarse una quincena. Era el pendiente 1 de la sección anterior.
+
+**Dónde:** Asistencia › Planilla, la casilla «Préstamo» (y «Terceros») de cada fila — donde Yulissa está
+cuando decide. La ficha del préstamo (`/prestamos/[id]`) y «Anotar abono» **no se tocaron**.
+
+**Cómo estaba:** las dos columnas eran `NOT NULL DEFAULT 0` y el 0 se leía como «vacío → va la cuota».
+Borrar la casilla traía la cuota; escribir 0 traía la cuota. Para saltarse una quincena había que bajar
+la cuota en la ficha y volver a subirla después.
+
+**Cómo quedó — tres estados** (`lib/asistencia/casilla-sin-descontar.ts`, módulo puro):
+
+| La casilla | Se guarda | Qué pasa |
+|---|---|---|
+| vacía (se borró) | `NULL` | entra la cuota automática, como hoy |
+| **0** | `0` | **esta quincena no se descuenta**; la celda muestra el 0 y debajo, en gris y visible, «No se descuenta esta quincena» |
+| un monto | el monto | se descuenta ese monto, como hoy |
+
+- «Antes de cerrar» lo lista en la parte informativa: *«N préstamos sin descontar esta quincena, a
+  propósito (nombre · $cuota)»*. No frena el cierre.
+- El cierre respeta el 0: **no anota pago**, y en el plan sale como decisión (`sin-descontar`), no como
+  «casilla en cero».
+- El 0 se MUESTRA solo donde había una cuota que saltar: un 0 sobre alguien sin préstamo se ve vacío.
+- `valorTecleado` es UNA función para la pantalla y para `normalizarManuales` (la ruta): lo que se
+  guarda y lo que se suma no pueden separarse. La ruta devuelve el 0 como 0, no como vacío.
+
+**Migración `20261115120000_planilla_manual_prestamo_nullable.sql` — aplicada y verificada** (catálogo:
+`prestamo` y `terceros` `is_nullable = YES`, sin default; `isr`, `mercancia` y `otros_servicios` siguen
+`NOT NULL DEFAULT 0` porque no proponen cuota). **Backfill: todo 0 → NULL.** Medido antes: 28 filas
+(12 · 14 · 2 en 2026-08-1 · 08-2 · 09-1), `prestamo = 0` en **6** (5 + 1 + 0) y `terceros = 0` en las
+**28**, ninguna NULL. Después: 0 ceros, 6 + 28 NULL. **Criterio:** no se puede saber por columna si un 0
+llegó por el default o lo tecleó alguien (la pantalla escribe la fila entera y `updated_at` es de la
+fila), y no hace falta: hasta ese día un 0 solo podía significar «vacío» — ningún 0 pudo significar «no
+descontar» porque ese significado nace con la migración. Dejarlos en 0 sí habría apagado la cuota de 6
+personas en agosto.
+
+**Medido 1–15 sep, 3 empresas (`scripts/_medir-sin-descontar-esta-quincena.ts`, antes y después):** 12
+personas con préstamo en el cuadro (9 Boston · Luis Parajón · Andrea Pérez y Ángela García con $50
+escritos a mano), **$495,00 antes = $495,00 después, 0 cambian de neto**. Sin ningún 0 escrito a mano en
+esa quincena.
+
+**Candados:** `planilla-sin-descontar.test.ts` (los tres estados, la línea, el cierre, «Antes de
+cerrar», la migración, la pantalla) · `planilla-manual-cero-route.test.ts` (la ruta guarda 0 y devuelve
+0). Cambiaron de dirección con nota fechada: `asistencia-planilla` (negativo → `null`, no 0) ·
+`asistencia-prestamo-planilla` (`casillaAutomatica(0, 50)` ya da 0; vacía es `null`) ·
+`planilla-prestamo-sin-aprobacion` · `planilla-unida-cierre-prestamo` (entra `sin-descontar`).
+Verificación por mutación: `scripts/_mutar-candados-sin-descontar.sh`.

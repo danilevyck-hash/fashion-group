@@ -84,6 +84,7 @@
 import { centavos } from "./planilla";
 import type { DineroLinea, ManualesLinea } from "./planilla";
 import { ORIGEN_POR_DEFECTO } from "@/lib/prestamos-conceptos";
+import { estadoCasilla } from "./casilla-sin-descontar";
 
 /** Los archivos que Daniel tiene que correr. Se le muestran tal cual. */
 export const MIGRACION_AMARRE_PRESTAMOS =
@@ -436,24 +437,28 @@ export function sugerirPrestamos(opts: OpcionesSugerencia): SugerenciaPrestamo[]
 export interface PrestamoAutomatico {
   prestamo: number;
   terceros: number;
+  /**
+   * 🔴 La cuota que se proponía y NO entró porque la casilla tiene un 0 escrito
+   * a propósito («no descontar esta quincena»). 0 = no aplica. Lo leen la celda
+   * y «Antes de cerrar» (`prestamosSinDescontar`).
+   */
+  sinDescontar?: { prestamo: number; terceros: number };
 }
 
 /**
- * 🔴 LO ESCRITO A MANO MANDA; VACÍO = LO QUE PROPONE EL MÓDULO.
+ * 🔴 LO ESCRITO A MANO MANDA; VACÍA = LO QUE PROPONE EL MÓDULO; 0 = NADA.
  *
- * `enCasilla` es lo que hay en `asistencia_planilla_manual` (0 cuando nadie
- * escribió nada). Un monto > 0 es una decisión de una persona y no se pisa;
- * con 0 entra la propuesta. Vale para las DOS casillas automáticas, cada una
- * por separado.
+ * `enCasilla` es lo que hay en `asistencia_planilla_manual`: `null` cuando
+ * nadie escribió nada (entra la propuesta), un monto > 0 cuando una persona
+ * decidió otro número (no se pisa), y **0 cuando decidió que ESTA quincena no
+ * se descuenta** (11-sep-2026, Daniel: *«sí»*; migración `20261115120000`).
+ * Vale para las DOS casillas automáticas, cada una por separado.
  *
- * ⚠️ Por eso mismo, HOY NO HAY FORMA DE «NO DESCONTAR ESTA QUINCENA» escribiendo
- * un 0: el 0 se lee como «vacío». La tabla no distingue las dos cosas (la
- * columna es `NOT NULL DEFAULT 0`). Es una decisión pendiente de Daniel, no un
- * olvido, y queda dicha en `docs/estado-actual.md`.
+ * ⚠️ Hasta ese día el 0 se leía como «vacío» y no había forma de saltarse una
+ * quincena. Los tres estados viven en `casilla-sin-descontar.ts`.
  */
-export function casillaAutomatica(enCasilla: number, sugerido: number): number {
-  const escrito = centavos(Math.max(0, num(enCasilla)));
-  if (escrito > 0) return 0;
+export function casillaAutomatica(enCasilla: number | null | undefined, sugerido: number): number {
+  if (estadoCasilla(enCasilla) !== "vacia") return 0;
   return centavos(Math.max(0, num(sugerido)));
 }
 
@@ -480,7 +485,18 @@ export function aplicarPrestamoEnLinea<
   if (!d || !sugerencia) return linea;
   const prestamo = casillaAutomatica(linea.manuales.prestamo, sugerencia.sugerido);
   const terceros = casillaAutomatica(linea.manuales.terceros, sugerencia.sugeridoTerceros);
-  if (prestamo <= 0 && terceros <= 0) return linea;
+  // 🔴 Lo que se proponía y se dejó afuera A PROPÓSITO (casilla en 0). No mueve
+  // un centavo: se anota para que la celda y «Antes de cerrar» lo digan.
+  const saltado = (escrito: number | null, propuesto: number) =>
+    estadoCasilla(escrito) === "sin-descontar" ? centavos(Math.max(0, num(propuesto))) : 0;
+  const sinDescontar = {
+    prestamo: saltado(linea.manuales.prestamo, sugerencia.sugerido),
+    terceros: saltado(linea.manuales.terceros, sugerencia.sugeridoTerceros),
+  };
+  if (prestamo <= 0 && terceros <= 0) {
+    if (sinDescontar.prestamo <= 0 && sinDescontar.terceros <= 0) return linea;
+    return { ...linea, prestamoAutomatico: { prestamo: 0, terceros: 0, sinDescontar } };
+  }
   const extra = centavos(prestamo + terceros);
   const dinero: DineroLinea = {
     ...d,
@@ -489,7 +505,9 @@ export function aplicarPrestamoEnLinea<
     totalDeducciones: centavos(d.totalDeducciones + extra),
     netoPagar: centavos(d.netoPagar - extra),
   };
-  return { ...linea, dinero, prestamoAutomatico: { prestamo, terceros } };
+  const auto: PrestamoAutomatico = { prestamo, terceros };
+  if (sinDescontar.prestamo > 0 || sinDescontar.terceros > 0) auto.sinDescontar = sinDescontar;
+  return { ...linea, dinero, prestamoAutomatico: auto };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
