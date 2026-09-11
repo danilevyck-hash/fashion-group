@@ -8,6 +8,10 @@
  * persona. Acá la persona es el contexto, así que elegirla sería pedir dos
  * veces lo mismo — y es el campo donde se equivoca quien justifica de apuro.
  *
+ * 🔴 El formulario vive en `JustificarForm.tsx` desde el 11-sep-2026, porque
+ * también lo abre «Justificar» en la fila del día de la pestaña Asistencia
+ * (`JustificarDiaModal`). Acá arranca con HOY; allá, con ese día. Es UNO.
+ *
  * ⚠️ La lista de TODAS las justificaciones del período no desaparece: vive en
  * Reporte, que es donde explican las ausencias que ahí se ven.
  * ────────────────────────────────────────────────────────────────────────── */
@@ -15,10 +19,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useToast } from "@/components/ToastSystem";
-import RangoFechas from "@/components/ui/RangoFechas";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { fmtDate } from "@/lib/format";
 import Seccion, { Vacio } from "./Seccion";
+import JustificarForm from "../JustificarForm";
 
 interface Justificacion {
   id: string;
@@ -34,14 +38,8 @@ export default function SeccionJustificaciones({ codigo, refresco }: {
 }) {
   const { toast } = useToast();
   const [lista, setLista] = useState<Justificacion[]>([]);
-  const [motivos, setMotivos] = useState<string[]>([]);
   const [abierto, setAbierto] = useState(false);
-  const [guardando, setGuardando] = useState(false);
   const hoy = hoyPanama();
-  const [desde, setDesde] = useState(hoy);
-  const [hasta, setHasta] = useState(hoy);
-  const [motivo, setMotivo] = useState("");
-  const [nota, setNota] = useState("");
 
   const leer = useCallback(async () => {
     try {
@@ -51,35 +49,12 @@ export default function SeccionJustificaciones({ codigo, refresco }: {
       const todas = (d.justificaciones ?? []) as Justificacion[];
       // 🔑 Se filtra por CÓDIGO, nunca por nombre.
       setLista(todas.filter((j) => String(j.empleado_codigo) === String(codigo)));
-      setMotivos((d.motivos ?? []) as string[]);
-      setMotivo((m) => m || ((d.motivos ?? [])[0] ?? ""));
     } catch {
       setLista([]);
     }
   }, [codigo]);
 
   useEffect(() => { void leer(); }, [leer, refresco]);
-
-  async function agregar() {
-    setGuardando(true);
-    try {
-      const r = await fetch("/api/asistencia/justificaciones", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo, desde, hasta, motivo, nota }),
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error ?? "No se pudo guardar");
-      toast("Listo, guardado", "success");
-      setAbierto(false);
-      setNota("");
-      await leer();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
-    } finally {
-      setGuardando(false);
-    }
-  }
 
   async function quitar(id: string) {
     if (!window.confirm("¿Quitar esta justificación?")) return;
@@ -103,31 +78,13 @@ export default function SeccionJustificaciones({ codigo, refresco }: {
       onBoton={() => setAbierto((v) => !v)}
     >
       {abierto && (
-        <div className="mb-3 grid gap-3 rounded-md border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500">Motivo</span>
-            <select value={motivo} onChange={(e) => setMotivo(e.target.value)}
-              className="min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none focus:border-black sm:text-sm">
-              {motivos.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </label>
-          <div>
-            <RangoFechas desde={desde} hasta={hasta} label="Días"
-              onChange={(d, h) => { setDesde(d); setHasta(h); }} />
-          </div>
-          <label className="block sm:col-span-2">
-            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500">
-              Nota (opcional)
-            </span>
-            <input value={nota} onChange={(e) => setNota(e.target.value)}
-              className="min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none focus:border-black sm:text-sm" />
-          </label>
-          <div className="sm:col-span-2">
-            <button type="button" disabled={guardando || !motivo} onClick={() => void agregar()}
-              className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97] disabled:opacity-40">
-              {guardando ? "Guardando…" : "Agregar"}
-            </button>
-          </div>
+        <div className="mb-3">
+          <JustificarForm
+            codigo={codigo}
+            desdeInicial={hoy}
+            hastaInicial={hoy}
+            onGuardado={() => { setAbierto(false); void leer(); }}
+          />
         </div>
       )}
 

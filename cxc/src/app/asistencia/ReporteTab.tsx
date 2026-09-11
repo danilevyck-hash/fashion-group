@@ -21,9 +21,10 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 import EstadoReloj from "./EstadoReloj";
 import JustificacionesDelPeriodo from "./JustificacionesDelPeriodo";
-import { PERSONA_EN_EL_CENTRO, PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
+import { PERSONA_EN_EL_CENTRO, PESTANA_FICHAS, dondeSeCargaLaFicha } from "@/lib/asistencia/persona-en-el-centro";
 import { empresaParaPedir, nombreArchivoPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
+import JustificarDiaModal, { type DiaParaJustificar } from "./JustificarDiaModal";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -87,6 +88,12 @@ export default function ReporteTab({ empresa = "" }: {
   const [puedeCorregir, setPuedeCorregir] = useState(false);
   const [avisoCorreccion, setAvisoCorreccion] = useState<string | null>(null);
   const [corrigiendo, setCorrigiendo] = useState<MarcaParaCorregir | null>(null);
+  // «Justificar» desde la fila del día (11-sep-2026): el mismo formulario de la
+  // ficha, con el colaborador y ese día ya puestos.
+  const [justificando, setJustificando] = useState<DiaParaJustificar | null>(null);
+  // Sube cada vez que se guarda una justificación desde acá, para que la lista
+  // «Justificaciones del período» se vuelva a leer sin cambiar de rango.
+  const [refrescoJustificaciones, setRefrescoJustificaciones] = useState(0);
   // Cuántas personas quedaron fuera por no estar trabajando en este rango, y
   // cuál es el día que todavía va corriendo (`null` si el rango ya cerró).
   const [fueraDelRango, setFueraDelRango] = useState(0);
@@ -198,16 +205,19 @@ export default function ReporteTab({ empresa = "" }: {
           {/* 🔴 El enlace «Justificaciones del período» lo dibuja el componente,
               y SOLO cuando hay alguna (10-sep-2026): un título sobre una lista
               vacía es una palabra de más. */}
-          <JustificacionesDelPeriodo desde={desde} hasta={hasta} empresa={empresa} />
+          <JustificacionesDelPeriodo desde={desde} hasta={hasta} empresa={empresa} refresco={refrescoJustificaciones} />
         </div>
       )}
 
       {/* Sin horario fijado se asume 5:00 p.m., y con eso las extras y la salida
-          temprana pueden estar mal. Vale avisarlo antes de que descuente. */}
+          temprana pueden estar mal. Vale avisarlo antes de que descuente.
+          🩸 Decía «revísalo en Horarios» (11-sep-2026, Daniel lo vio): esa
+          pestaña ya no existe con el acomodo nuevo; la hora de salida se
+          confirma en la ficha del colaborador. El destino sale del módulo puro. */}
       {sinHorario > 0 && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           <b>{sinHorario}</b> {sinHorario === 1 ? "colaborador no tiene" : "colaboradores no tienen"} su hora de salida
-          confirmada. Mientras tanto se asume 5:00 p.m. — revísalo en <b>Horarios</b>.
+          confirmada. Mientras tanto se asume 5:00 p.m. — se confirma {dondeSeCargaLaFicha()}, en <b>{PESTANA_FICHAS}</b>.
         </p>
       )}
 
@@ -285,7 +295,8 @@ export default function ReporteTab({ empresa = "" }: {
                 <FilaPersona key={p.codigo} p={p} abierta={abierta === p.codigo}
                   onToggle={() => setAbierta(abierta === p.codigo ? null : p.codigo)}
                   puedeCorregir={puedeCorregir}
-                  onCorregir={setCorrigiendo} />
+                  onCorregir={setCorrigiendo}
+                  onJustificar={setJustificando} />
               ))}
             </tbody>
             <tfoot>
@@ -331,8 +342,12 @@ export default function ReporteTab({ empresa = "" }: {
             se le puede decir que está mal marcado—, y el reporte muestra solo a quien estaba
             trabajando en las fechas que pediste.
             Estos números se cambian en <b>{PESTANA_FICHAS}</b>.{" "}
-            <b>Corregir una hora</b> no borra lo que marcó el reloj: la corrección va encima,
-            con quién la puso y por qué, y se puede deshacer.
+            {/* 🔴 11-sep-2026: esto se explica UNA vez, acá. El recuadro que lo
+                repetía dentro de la ventana «Corregir la hora» se retiró. */}
+            <b>Corregir una hora</b> no borra nunca lo que marcó el reloj: la corrección va encima,
+            es la que cuenta para el pago, lleva quién la puso y por qué, y se puede deshacer.{" "}
+            <b>Justificar</b> desde la fila del día abre el mismo permiso de la ficha del colaborador
+            con ese día ya puesto.
           </p>
         </Ayuda>
       </div>
@@ -344,16 +359,24 @@ export default function ReporteTab({ empresa = "" }: {
           onGuardado={() => void cargar()}
         />
       )}
+      {justificando && (
+        <JustificarDiaModal
+          dia={justificando}
+          onCerrar={() => setJustificando(null)}
+          onGuardado={() => { setRefrescoJustificaciones((n) => n + 1); void cargar(); }}
+        />
+      )}
     </div>
   );
 }
 
-function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir }: {
+function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir, onJustificar }: {
   p: PersonaReporte;
   abierta: boolean;
   onToggle: () => void;
   puedeCorregir: boolean;
   onCorregir: (m: MarcaParaCorregir) => void;
+  onJustificar: (d: DiaParaJustificar) => void;
 }) {
   const r = p.resumen;
   const persona = p.nombre
@@ -436,7 +459,8 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir }: {
                 {p.dias.map((d) => (
                   <FilaDia key={d.fecha} d={d} codigo={p.codigo} persona={persona}
                     conExtra={cuentaHorasExtra(p)}
-                    puedeCorregir={puedeCorregir} onCorregir={onCorregir} />
+                    puedeCorregir={puedeCorregir} onCorregir={onCorregir}
+                    onJustificar={onJustificar} />
                 ))}
               </tbody>
             </table>
@@ -455,7 +479,7 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir }: {
  * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
  * cambió, por qué, quién y cuándo — sin abrir nada más.
  */
-function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir }: {
+function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir, onJustificar }: {
   d: DiaReporte;
   codigo: string;
   persona: string;
@@ -463,6 +487,7 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir }: {
   conExtra: boolean;
   puedeCorregir: boolean;
   onCorregir: (m: MarcaParaCorregir) => void;
+  onJustificar: (d: DiaParaJustificar) => void;
 }) {
   /** La corrección que produjo la marca de esa posición, si la hay. */
   const correccionDe = (idx: number) =>
@@ -492,6 +517,18 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir }: {
       relojHora: null,
     });
   }
+
+  /** 🔴 «Justificar» se ofrece donde una justificación puede cambiar algo:
+   *  no en un feriado, ni en vacaciones, ni en un día que ya está justificado
+   *  (un control que no ofrece nada no se dibuja). */
+  const seJustifica = !d.feriado && !d.vacacion && !d.justificado;
+  const justificar = () => onJustificar({ codigo, persona, fecha: d.fecha });
+  const enlaceJustificar = (
+    <button type="button" onClick={justificar}
+      className="ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
+      Justificar
+    </button>
+  );
 
   /** Una celda de hora. Tocable solo si se puede corregir. */
   function Hora({ idx, mostrar, tenue }: { idx: number; mostrar: boolean; tenue?: boolean }) {
@@ -586,6 +623,10 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir }: {
                   Agregar hora
                 </button>
               )}
+              {/* «Justificar» desde el día (11-sep-2026): el mismo permiso de la
+                  ficha, con el colaborador y ESTE día ya puestos. Nada más de
+                  la fila cambia. */}
+              {seJustifica && enlaceJustificar}
             </td>
           </>
         ) : (
@@ -628,6 +669,7 @@ function FilaDia({ d, codigo, persona, conExtra, puedeCorregir, onCorregir }: {
                 Agregar marcación
               </button>
             )}
+            {seJustifica && enlaceJustificar}
           </td>
         )}
       </tr>

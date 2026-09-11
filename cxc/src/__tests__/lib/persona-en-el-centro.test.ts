@@ -519,7 +519,14 @@ describe("H. 🔴 LAS CUATRO SECCIONES, CON LOS ENDPOINTS DE SIEMPRE", () => {
   it("🔴 cada una llama a SU ruta de siempre, con la persona ya puesta", () => {
     expect(puro("app/asistencia/colaboradores/SeccionPrestamos.tsx"))
       .toMatch(/\/api\/asistencia\/prestamos-deuda/);
-    const just = puro("app/asistencia/colaboradores/SeccionJustificaciones.tsx");
+    // 🔴 11-sep-2026: el formulario de justificar SALIÓ de la sección a
+    // `app/asistencia/JustificarForm.tsx`, porque también lo abre «Justificar»
+    // en la fila del día de la pestaña Asistencia. La sección lo monta con hoy;
+    // la REGLA no cambió: es la MISMA ruta y el MISMO cuerpo, sin selector de
+    // persona. Ver `asistencia-corregir-hora.test.ts`.
+    const seccion = puro("app/asistencia/colaboradores/SeccionJustificaciones.tsx");
+    expect(seccion).toMatch(/<JustificarForm[\s\S]*?codigo=\{codigo\}[\s\S]*?desdeInicial=\{hoy\}/);
+    const just = puro("app/asistencia/JustificarForm.tsx");
     // 🩸 La ruta PEGADA al método: suelta, la caza el GET de arriba y un POST
     // a un endpoint inventado se colaba.
     expect(just).toMatch(/fetch\(\s*"\/api\/asistencia\/justificaciones",\s*\{\s*method: "POST"/);
@@ -627,7 +634,10 @@ describe("I. 🔴 EL SALDO EN PERSONAS, LAS JUSTIFICACIONES EN REPORTE", () => {
     expect(src).toMatch(/PERSONA_EN_EL_CENTRO && \(/);
     // 🔴 10-sep-2026 (noche): la pestaña recibe la empresa del selector de todo
     // el módulo (`empresa={empresa}`). Ver `asistencia-empresa-para-todo.test.ts`.
-    expect(src).toMatch(/<JustificacionesDelPeriodo desde=\{desde\} hasta=\{hasta\} empresa=\{empresa\} \/>/);
+    // 🔴 11-sep-2026: y un `refresco` que sube al guardar una justificación
+    // desde la fila del día, para que la lista se vuelva a leer sin cambiar de
+    // rango. Ver `asistencia-corregir-hora.test.ts`.
+    expect(src).toMatch(/<JustificacionesDelPeriodo desde=\{desde\} hasta=\{hasta\} empresa=\{empresa\} refresco=\{refrescoJustificaciones\} \/>/);
     // 🔴 10-sep-2026: el enlace «Justificaciones del período» y el «arranca
     // cerrada» se mudaron ADENTRO del componente, que además no dibuja nada
     // cuando no hay ninguna (Daniel revisó la pantalla: un título sobre nada es

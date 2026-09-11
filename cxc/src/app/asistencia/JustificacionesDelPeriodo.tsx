@@ -38,9 +38,11 @@ interface Justificacion {
   nota: string | null;
 }
 
-export default function JustificacionesDelPeriodo({ desde, hasta, empresa = "" }: {
+export default function JustificacionesDelPeriodo({ desde, hasta, empresa = "", refresco = 0 }: {
   empresa?: string;
   desde: string; hasta: string;
+  /** Sube cuando se guardó una justificación desde la fila del día (11-sep-2026): se vuelve a leer. */
+  refresco?: number;
 }) {
   const { toast } = useToast();
   const [lista, setLista] = useState<Justificacion[] | null>(null);
@@ -66,7 +68,7 @@ export default function JustificacionesDelPeriodo({ desde, hasta, empresa = "" }
     }
   }, [desde, hasta, empresa]);
 
-  useEffect(() => { void leer(); }, [leer]);
+  useEffect(() => { void leer(); }, [leer, refresco]);
 
   async function quitar(id: string) {
     if (!window.confirm("¿Quitar esta justificación?")) return;
