@@ -26,6 +26,15 @@ import {
   efectoEnElNeto, netoConAjuste, repartirAjuste,
 } from "@/lib/asistencia/corte-quincena";
 import type { DineroLinea, LineaPlanilla } from "@/lib/asistencia/planilla";
+import { leerReglas } from "@/lib/asistencia/config-server";
+
+/**
+ * ⚠️ 11-sep-2026: el ajuste ganó la SALIDA TEMPRANA (Daniel: «la salida temprana
+ * incluirla») y los SEGUROS se recalculan sobre el bruto con ajuste (Daniel:
+ * «los seguros, va»). Con `ANTES=/ruta.json` (una corrida guardada con el código
+ * anterior) se imprime, por persona, cuánto cambió el neto.
+ */
+const ANTES = process.env.ANTES ? JSON.parse(fs.readFileSync(process.env.ANTES, "utf8")) as { empresas: Record<string, { filas: Array<{ codigo: string; netoDespues: number }> }> } : null;
 
 const EMPRESAS = ["confecciones_boston", "fashion_wear", "vistana"];
 const CORTO = { desde: "2026-08-29", hasta: "2026-08-31" };
@@ -46,6 +55,9 @@ async function llamar(params: Record<string, string>) {
 async function main() {
   const salida: Record<string, unknown> = { generado: new Date().toISOString(), corto: CORTO, recibe: RECIBE, empresas: {} };
   let filasTotal = 0, conAjuste = 0, difNetoMax = 0, difSumaMax = 0, salidaTempranaOlvidada = 0;
+  const { reglas } = await leerReglas();
+  const PCT = { seguroSocialPct: reglas.seguroSocialPct, seguroEducativoPct: reglas.seguroEducativoPct };
+  const cambios: string[] = [];
   const md: string[] = [];
   for (const empresa of EMPRESAS) {
     const corto = await llamar({ empresa, desde: CORTO.desde, hasta: CORTO.hasta });
@@ -53,8 +65,8 @@ async function main() {
     const dineroCorto = new Map<string, DineroLinea>();
     for (const l of corto.lineas) if (l.dinero) dineroCorto.set(l.codigo, l.dinero);
     md.push(`\n### ${recibe.empresaEtiqueta} — días sin medir ${CORTO.desde}..${CORTO.hasta} → quincena ${RECIBE}\n`);
-    md.push(`| Código | Colaborador | ${ORDEN_DEL_RELOJ.map((c) => ROTULO_DEL_RELOJ[c]).join(" | ")} | Ajuste viejo | Σ signo×reparto | Neto antes | Neto después | Salida temp. 29–31 (no entra) |`);
-    md.push(`|---|---|${ORDEN_DEL_RELOJ.map(() => "---:").join("|")}|---:|---:|---:|---:|---:|`);
+    md.push(`| Código | Colaborador | ${ORDEN_DEL_RELOJ.map((c) => ROTULO_DEL_RELOJ[c]).join(" | ")} | Ajuste viejo | Σ signo×reparto | Neto antes | Neto después | Δ seguros | vs ANTES |`);
+    md.push(`|---|---|${ORDEN_DEL_RELOJ.map(() => "---:").join("|")}|---:|---:|---:|---:|---:|---:|`);
     const filas: unknown[] = [];
     for (const l of recibe.lineas) {
       if (!l.dinero) continue;
@@ -64,9 +76,14 @@ async function main() {
       const reparto = repartirAjuste(dc);
       const suma = efectoEnElNeto(reparto);
       const netoAntes = netoConAjuste(l.dinero.netoPagar, viejo);
-      const despues = aplicarAjusteEnLinea(l, dc, CORTO);
+      const despues = aplicarAjusteEnLinea(l, dc, CORTO, PCT);
       const netoDespues = despues.dinero!.netoPagar;
       const st = r2(Number(dc?.salidaTemprana ?? 0));
+      const seg = despues.ajusteDetalle?.seguros;
+      const dSeg = seg ? r2(seg.seguroSocial + seg.seguroEducativo) : 0;
+      const antesFila = ANTES?.empresas?.[empresa]?.filas.find((f) => f.codigo === l.codigo);
+      const vsAntes = antesFila ? r2(netoDespues - antesFila.netoDespues) : null;
+      if (vsAntes !== null && vsAntes !== 0) cambios.push(`${recibe.empresaEtiqueta} · ${l.etiqueta} (${l.codigo}): ${vsAntes > 0 ? "+" : ""}${vsAntes.toFixed(2)}${st ? ` (salida temprana ${st.toFixed(2)})` : ""}${dSeg ? ` (seguros ${dSeg > 0 ? "+" : ""}${dSeg.toFixed(2)})` : ""}`);
       if (Object.keys(reparto).length) conAjuste += 1;
       difNetoMax = Math.max(difNetoMax, Math.abs(r2(netoAntes - netoDespues)));
       difSumaMax = Math.max(difSumaMax, Math.abs(r2(viejo - suma)));
@@ -76,9 +93,9 @@ async function main() {
         const esperado = r2(l.dinero[c] + (reparto[c] ?? 0));
         if (Math.abs(esperado - despues.dinero![c]) > 0.005) throw new Error(`columna ${c} no cuadra en ${l.codigo}`);
       }
-      const fila = { codigo: l.codigo, etiqueta: l.etiqueta, reparto, viejo, suma, netoAntes, netoDespues, salidaTempranaSinEntrar: st };
+      const fila = { codigo: l.codigo, etiqueta: l.etiqueta, reparto, viejo, suma, netoAntes, netoDespues, salidaTemprana: st, seguros: seg ?? null, vsAntes };
       filas.push(fila);
-      md.push(`| ${l.codigo} | ${l.etiqueta} | ${ORDEN_DEL_RELOJ.map((c) => f2(reparto[c] ?? 0)).join(" | ")} | ${viejo.toFixed(2)} | ${suma.toFixed(2)} | ${netoAntes.toFixed(2)} | ${netoDespues.toFixed(2)} | ${f2(st)} |`);
+      md.push(`| ${l.codigo} | ${l.etiqueta} | ${ORDEN_DEL_RELOJ.map((c) => f2(reparto[c] ?? 0)).join(" | ")} | ${viejo.toFixed(2)} | ${suma.toFixed(2)} | ${netoAntes.toFixed(2)} | ${netoDespues.toFixed(2)} | ${f2(dSeg)} | ${vsAntes === null ? "—" : f2(vsAntes)} |`);
     }
     (salida.empresas as Record<string, unknown>)[empresa] = { etiqueta: recibe.empresaEtiqueta, filas };
   }
@@ -87,7 +104,8 @@ async function main() {
     `Personas con dinero: **${filasTotal}** · con algo que repartir: **${conAjuste}** · `
     + `mayor diferencia de neto antes/después: **$${difNetoMax.toFixed(2)}** · `
     + `mayor diferencia Σreparto vs ajuste viejo: **$${difSumaMax.toFixed(2)}** · `
-    + `salida temprana del 29–31 que NO entra al ajuste (ni antes ni ahora): **$${salidaTempranaOlvidada.toFixed(2)}**`,
+    + `salida temprana del 29–31 (entra al ajuste desde el 11-sep-2026): **$${salidaTempranaOlvidada.toFixed(2)}**`,
+    ...(ANTES ? [`\nCambios de neto contra ANTES (${cambios.length}):\n${cambios.map((c) => `- ${c}`).join("\n") || "- ninguno"}\n`] : []),
   );
   Object.assign(salida, { filasTotal, conAjuste, difNetoMax, difSumaMax, salidaTempranaOlvidada });
   fs.writeFileSync(OUT, JSON.stringify(salida, null, 2));

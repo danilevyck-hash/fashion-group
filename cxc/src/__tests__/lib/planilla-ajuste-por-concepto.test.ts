@@ -35,7 +35,7 @@ import {
   repartirAjuste,
 } from "@/lib/asistencia/corte-quincena";
 import { HORAS_CERO, TOTALES_CERO, quincena, totalizar } from "@/lib/asistencia/planilla";
-import type { DineroLinea, LineaPlanilla } from "@/lib/asistencia/planilla";
+import { centavos, type DineroLinea, type LineaPlanilla } from "@/lib/asistencia/planilla";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
 import { CLAVES_RENGLON, armarComprobante } from "@/lib/asistencia/comprobante";
 import { construirExcelPlanilla, construirPdfPlanilla, type DatosPlanillaExport } from "@/lib/asistencia/planilla-exportar";
@@ -107,11 +107,29 @@ describe("B. EL REPARTO — solo lo que sale del reloj, y cada cosa en la suya",
     expect(r).toEqual({});
   });
 
-  it("los SIETE conceptos entran, cada uno por su nombre", () => {
-    const todo = DINERO({ ausencias: 1, tardanzas: 2, extraDiurno: 3, extraNocturno: 4, excedente: 5, domingos: 6, feriados: 7 });
+  // ⚠️ Eran SIETE hasta el 11-sep-2026. Daniel: *«la salida temprana incluirla»*
+  // — «Salida temprana» nació el 10-sep, después del corte, y quedaba afuera
+  // del ajuste. Cambió de número con nota, no de regla.
+  it("los OCHO conceptos entran, cada uno por su nombre — la salida temprana también", () => {
+    const todo = DINERO({ ausencias: 1, tardanzas: 2, salidaTemprana: 2.5, extraDiurno: 3, extraNocturno: 4, excedente: 5, domingos: 6, feriados: 7 });
     const r = repartirAjuste(todo);
     for (const { campo } of CONCEPTOS_DEL_RELOJ) expect(r[campo]).toBe(todo[campo]);
     expect(Object.keys(r).sort()).toEqual([...CONCEPTOS_DEL_RELOJ].map((c) => c.campo).sort());
+    expect(CONCEPTOS_DEL_RELOJ).toHaveLength(8);
+    // Con signo +: se descuenta después, igual que la tardanza.
+    expect(CONCEPTOS_DEL_RELOJ.find((c) => c.campo === "salidaTemprana")?.signo).toBe(1);
+  });
+
+  it("🔴 EL CASO DE ELOYN (29): salió temprano el 29–31 ago por $11,83 → entra en «Salida temprana» y baja el neto", () => {
+    const eloyn = LINEA({ codigo: "29", etiqueta: "ELOYN MENDOZA", dinero: DINERO({ totalBruto: 300, netoPagar: 267 }) });
+    const con = aplicarAjusteEnLinea(eloyn, DINERO({ salidaTemprana: 11.83 }), { desde: "2026-08-29", hasta: "2026-08-31" });
+    expect(con.dinero!.salidaTemprana).toBeCloseTo(11.83, 2);
+    expect(con.ajusteAnterior).toBeCloseTo(11.83, 2);
+    expect(con.dinero!.totalBruto).toBeCloseTo(300 - 11.83, 2);
+    expect(con.dinero!.netoPagar).toBeCloseTo(267 - 11.83, 2);
+    expect(con.ajusteDetalle?.reparto).toEqual({ salidaTemprana: 11.83 });
+    expect(ROTULO_DEL_RELOJ.salidaTemprana).toBe("Salida temprana");
+    expect(ORDEN_DEL_RELOJ.indexOf("salidaTemprana")).toBe(ORDEN_DEL_RELOJ.indexOf("tardanzas") + 1);
   });
 
   it("`ajusteDeDiasSinMedir` se DERIVA del reparto: Σ signo × monto", () => {
@@ -163,9 +181,11 @@ describe("C. APLICARLO A LA LÍNEA — las columnas suman lo suyo y nada más se
     expect(d.netoPagar).toBeCloseTo(252 - 1.5, 2);
   });
 
-  // ⚠️ Los seguros NO se recalculan sobre lo repartido (ni antes ni ahora los
-  // tocaba el ajuste). Decisión pendiente de Daniel, no un olvido.
-  it("los seguros, el ISR, el préstamo y lo escrito a mano quedan TAL CUAL", () => {
+  // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ. Decía «los seguros … quedan
+  // TAL CUAL» (decisión pendiente). Daniel: *«los seguros, va»*. Sin los
+  // porcentajes (como acá) siguen tal cual — es el CONTROL —; con ellos se
+  // recalculan sobre el bruto con el ajuste (ver la sección C2).
+  it("SIN los porcentajes, los seguros, el ISR, el préstamo y lo escrito a mano quedan TAL CUAL", () => {
     expect(d.seguroSocial).toBe(29.25);
     expect(d.seguroEducativo).toBe(3.75);
     expect(d.totalDeducciones).toBe(33);
@@ -173,6 +193,7 @@ describe("C. APLICARLO A LA LÍNEA — las columnas suman lo suyo y nada más se
     expect(d.prestamo).toBe(0);
     expect(d.otrosServicios).toBe(0);
     expect(d.salarioQuincenal).toBe(300);
+    expect(con.ajusteDetalle?.seguros).toBeUndefined();
   });
 
   it("los desgloses de la ausencia siguen siendo SUBCONJUNTOS de la ausencia", () => {
@@ -213,6 +234,72 @@ describe("C. APLICARLO A LA LÍNEA — las columnas suman lo suyo y nada más se
   it("y el testigo del cierre (`totalesDe`) tampoco lo resta otra vez", () => {
     const l = aplicarAjusteEnLinea(LINEA(), DIAS_DE_ANA, DIAS);
     expect(totalesDe([l]).totalNeto).toBeCloseTo(269, 2);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("C2. 🔴 LOS SEGUROS SE CALCULAN SOBRE LO QUE ENTRA POR EL AJUSTE (11-sep-2026)", () => {
+  // Daniel: *«los seguros, va»*. Yulissa calcula 9,75 % y 1,25 % sobre todo lo
+  // ganado en la quincena, extras incluidas.
+  const PCT = { seguroSocialPct: 9.75, seguroEducativoPct: 1.25 };
+
+  it("🔴 EL CASO DE ANA: $5 de extras del ajuste → +$0,49 de seguro social y +$0,06 de educativo", () => {
+    const con = aplicarAjusteEnLinea(LINEA(), DINERO({ extraDiurno: 5 }), DIAS, PCT);
+    const d = con.dinero!;
+    // Bruto 300 → 305. Seguros sobre 305: 29,74 y 3,81.
+    expect(d.totalBruto).toBeCloseTo(305, 2);
+    expect(d.seguroSocial).toBe(29.74);
+    expect(d.seguroEducativo).toBe(3.81);
+    expect(con.ajusteDetalle?.seguros).toEqual({ seguroSocial: 0.49, seguroEducativo: 0.06 });
+    // Deducciones 33 → 33,55; neto = 305 − 33,55 = 271,45 (= 267 + 5 − 0,55).
+    expect(d.totalDeducciones).toBe(33.55);
+    expect(d.netoPagar).toBe(271.45);
+  });
+
+  it("y con los días de Ana enteros (1 h tarde, 1 h extra): el neto por columna, con los seguros adentro", () => {
+    const con = aplicarAjusteEnLinea(LINEA(), DIAS_DE_ANA, DIAS, PCT);
+    const d = con.dinero!;
+    // Efecto neto del reparto: +3 tardanza − 5 extra = −2 (se le devuelven $2) → bruto 302.
+    expect(d.totalBruto).toBeCloseTo(302, 2);
+    expect(d.seguroSocial).toBe(centavos(302 * 0.0975));
+    expect(d.seguroEducativo).toBe(centavos(302 * 0.0125));
+    expect(d.netoPagar).toBe(centavos(302 - d.seguroSocial - d.seguroEducativo));
+  });
+
+  it("🔴 un ajuste NEGATIVO (más tardanza que extras) también baja la base — igual que una tardanza normal", () => {
+    const con = aplicarAjusteEnLinea(LINEA(), DINERO({ tardanzas: 10 }), DIAS, PCT);
+    const d = con.dinero!;
+    expect(d.totalBruto).toBeCloseTo(290, 2);
+    expect(d.seguroSocial).toBe(centavos(290 * 0.0975));   // 28.28 (bajó de 29.25)
+    expect(con.ajusteDetalle?.seguros?.seguroSocial).toBeLessThan(0);
+  });
+
+  it("respeta `paga_seguros`: apagado, nada se recalcula", () => {
+    const sin = aplicarAjusteEnLinea(
+      LINEA({ pagaSeguros: false, dinero: DINERO({ seguroSocial: 0, seguroEducativo: 0, totalDeducciones: 0, netoPagar: 300 }) }),
+      DINERO({ extraDiurno: 5 }), DIAS, PCT,
+    );
+    expect(sin.dinero!.seguroSocial).toBe(0);
+    expect(sin.dinero!.seguroEducativo).toBe(0);
+    expect(sin.dinero!.netoPagar).toBe(305);
+    expect(sin.ajusteDetalle?.seguros).toBeUndefined();
+  });
+
+  it("respeta `seguros_base_quincena`: con base propia el seguro no sale del bruto y no cambia", () => {
+    // RODRIGO: base $175 → 17,06 y 2,19, pase lo que pase con el bruto.
+    const rod = aplicarAjusteEnLinea(
+      LINEA({ baseSeguros: 175, dinero: DINERO({ baseSeguros: 175, seguroSocial: 17.06, seguroEducativo: 2.19, totalDeducciones: 19.25, netoPagar: 280.75 }) }),
+      DINERO({ extraDiurno: 5 }), DIAS, PCT,
+    );
+    expect(rod.dinero!.seguroSocial).toBe(17.06);
+    expect(rod.dinero!.seguroEducativo).toBe(2.19);
+    expect(rod.dinero!.netoPagar).toBe(285.75);
+    expect(rod.ajusteDetalle?.seguros).toBeUndefined();
+  });
+
+  it("la ruta pasa los porcentajes de las reglas vigentes", () => {
+    const ruta = leerSinComentarios("src/app/api/asistencia/planilla/route.ts");
+    expect(ruta).toMatch(/aplicarAjusteEnLinea\(\s*l, medido\.dinero\.get\(l\.codigo\), medido\.dias,\s*\{ seguroSocialPct: reglas\.seguroSocialPct, seguroEducativoPct: reglas\.seguroEducativoPct \},\s*\)/);
   });
 });
 
@@ -346,7 +433,10 @@ describe("E. LAS CUATRO SUPERFICIES — Planilla, Excel, PDF y comprobante", () 
 describe("F. EL CABLEADO DE LA RUTA", () => {
   const ruta = leerSinComentarios("src/app/api/asistencia/planilla/route.ts");
   it("el ajuste entra a la línea por `aplicarAjusteEnLinea`, y los totales salen de esas líneas", () => {
-    expect(ruta).toMatch(/aplicarAjusteEnLinea\(l, medido\.dinero\.get\(l\.codigo\), medido\.dias\)/);
+    // ⚠️ 11-sep-2026: la llamada ganó un cuarto argumento —los porcentajes de los
+    // seguros (Daniel: «los seguros, va»)— y se partió en varias líneas. La
+    // regla que protege no cambió: el ajuste entra por `aplicarAjusteEnLinea`.
+    expect(ruta).toMatch(/aplicarAjusteEnLinea\(\s*l, medido\.dinero\.get\(l\.codigo\), medido\.dias,/);
     expect(ruta).toMatch(/totales: totalizar\(lineasFinal\)/);
     expect(ruta).not.toMatch(/ajusteDeDiasSinMedir/);
   });

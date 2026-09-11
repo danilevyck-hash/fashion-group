@@ -819,7 +819,12 @@ export async function GET(req: NextRequest) {
       const medido = await medirAjusteAnterior(req, empresa, q.quincena);
       if (medido && medido.dinero.size) {
         diasAjuste = medido.dias;
-        lineasFinal = lineasConPrestamo.map((l) => aplicarAjusteEnLinea(l, medido.dinero.get(l.codigo), medido.dias));
+        // 🔴 Y los seguros se recalculan sobre el bruto CON el ajuste (11-sep-2026,
+        // Daniel: «los seguros, va»): van los porcentajes vigentes de las reglas.
+        lineasFinal = lineasConPrestamo.map((l) => aplicarAjusteEnLinea(
+          l, medido.dinero.get(l.codigo), medido.dias,
+          { seguroSocialPct: reglas.seguroSocialPct, seguroEducativoPct: reglas.seguroEducativoPct },
+        ));
         for (const l of lineasFinal) {
           const a = l.ajusteAnterior;
           if (a) { ajustePersonas.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto: a }); totalAjuste += a; }

@@ -44,8 +44,27 @@
 // Y `ajusteDeDiasSinMedir` se conserva, DERIVADA del reparto, para que el
 // número viejo siga siendo comprobable: Σ signo × reparto = el ajuste viejo.
 //
-// ⚠️ LOS SEGUROS NO SE RECALCULAN sobre lo repartido (ni antes ni ahora los
-// tocaba el ajuste). Decisión pendiente de Daniel, no un olvido.
+// ── 🔴 LA SALIDA TEMPRANA TAMBIÉN ENTRA (11-sep-2026) ─────────────────────────
+//
+// Daniel: *«la salida temprana incluirla»*. «Salida temprana» nació el 10-sep,
+// después del corte, y quedó fuera de los conceptos del reloj: medido el
+// 11-sep, Eloyn (29) salió temprano el 29–31 ago por $11,83 y ese descuento no
+// entraba a ninguna columna. Son OCHO conceptos, y la salida temprana va con
+// signo + (se descuenta después), como la tardanza.
+//
+// ── 🔴 LOS SEGUROS SE CALCULAN SOBRE LO QUE ENTRA POR EL AJUSTE (11-sep-2026) ─
+//
+// Daniel: *«los seguros, va»*. Yulissa calcula el seguro social (9,75 %) y el
+// educativo (1,25 %) sobre TODO lo ganado en la quincena, extras incluidas; en
+// su Excel el ajuste de extras de los días después del corte entra a esa base.
+// Hasta ese día el ajuste movía el bruto y dejaba los seguros como estaban —
+// decisión pendiente, no olvido—. Ahora `aplicarAjusteEnLinea` recalcula los
+// dos seguros sobre el bruto CON el ajuste (positivo o negativo: las tardanzas
+// del ajuste también bajan la base, igual que las tardanzas normales), con la
+// MISMA fórmula del motor (`centavos(base × pct ÷ 100)`), respetando
+// `paga_seguros` (apagado = nada) y `seguros_base_quincena` (con base propia
+// el seguro no depende del bruto: no cambia). Sin `reglas` a mano no se toca
+// nada — es lo que deja a los candados viejos diciendo lo mismo.
 //
 // ── 🔴 EL SUELDO NO SE PRORRATEA. NUNCA ─────────────────────────────────────
 //
@@ -122,16 +141,20 @@ export function diasSinMedir(
 }
 
 /**
- * 🔴 LOS SIETE CONCEPTOS QUE SALEN DEL RELOJ, y los únicos que se ajustan.
+ * 🔴 LOS OCHO CONCEPTOS QUE SALEN DEL RELOJ, y los únicos que se ajustan.
  *
  * Los que RESTAN del sueldo van con signo `+` (se le descuenta después) y los
  * que SUMAN van con `−` (se le devuelve después). Está escrito así, con la
  * lista a la vista, para que agregar un concepto nuevo al motor obligue a
  * decidir de qué lado cae en vez de quedarse afuera en silencio.
+ *
+ * 🩸 Eran SIETE hasta el 11-sep-2026: «Salida temprana» nació el 10-sep y se
+ * quedó afuera. Daniel: *«la salida temprana incluirla»*.
  */
 export const CONCEPTOS_DEL_RELOJ = [
   { campo: "ausencias", signo: +1 },
   { campo: "tardanzas", signo: +1 },
+  { campo: "salidaTemprana", signo: +1 },
   { campo: "extraDiurno", signo: -1 },
   { campo: "extraNocturno", signo: -1 },
   { campo: "excedente", signo: -1 },
@@ -139,7 +162,7 @@ export const CONCEPTOS_DEL_RELOJ = [
   { campo: "feriados", signo: -1 },
 ] as const satisfies readonly { campo: keyof DineroLinea; signo: 1 | -1 }[];
 
-/** Un concepto del reloj: los siete campos de `CONCEPTOS_DEL_RELOJ`. */
+/** Un concepto del reloj: los ocho campos de `CONCEPTOS_DEL_RELOJ`. */
 export type CampoDelReloj = (typeof CONCEPTOS_DEL_RELOJ)[number]["campo"];
 
 /**
@@ -161,7 +184,7 @@ export interface DiasDelAjuste { desde: string; hasta: string }
  * `dineroDeLosDiasSinMedir` es lo que el motor calculó para ESE rango corto y
  * NADA MÁS — nunca la quincena entera. Se le pasa la línea tal cual sale del
  * mismo `armarPlanilla` de siempre; acá no se recalcula ni un centavo, solo se
- * eligen los siete campos.
+ * eligen los ocho campos.
  *
  * 🔴 El SUELDO de esos días no entra: ya se pagó entero y no se vuelve a pagar.
  */
@@ -220,10 +243,29 @@ export function ajusteDeDiasSinMedir(
  * `ajusteDetalle` dice de qué días y cuánto por columna (para la nota).
  * Sin nada que repartir, la línea vuelve TAL CUAL.
  */
-export function aplicarAjusteEnLinea<L extends { dinero: DineroLinea | null }>(
+/** Los porcentajes con los que se recalculan los seguros sobre el bruto con ajuste. */
+export interface PorcentajesSeguros {
+  seguroSocialPct: number;
+  seguroEducativoPct: number;
+}
+
+/** Cuánto se movieron los seguros por el ajuste (positivo = más seguro, baja el neto). */
+export interface AjusteSeguros {
+  seguroSocial: number;
+  seguroEducativo: number;
+}
+
+export function aplicarAjusteEnLinea<
+  L extends { dinero: DineroLinea | null; pagaSeguros?: boolean },
+>(
   linea: L,
   dineroDeLosDiasSinMedir: DineroLinea | null | undefined,
   dias: DiasDelAjuste,
+  /**
+   * 🔴 Con los porcentajes, los seguros se recalculan sobre el bruto CON el
+   * ajuste (11-sep-2026, Daniel: *«los seguros, va»*). Sin ellos no se tocan.
+   */
+  seguros: PorcentajesSeguros | null = null,
 ): L & { ajusteAnterior?: number; ajusteDetalle?: AjusteDetalle } {
   const d = linea.dinero;
   const reparto = repartirAjuste(dineroDeLosDiasSinMedir);
@@ -240,16 +282,44 @@ export function aplicarAjusteEnLinea<L extends { dinero: DineroLinea | null }>(
   dinero.vacacionesYaPagadas = centavos(d.vacacionesYaPagadas + Number(s.vacacionesYaPagadas ?? 0));
   dinero.totalBruto = centavos(d.totalBruto - ajuste);
   dinero.netoPagar = netoConAjuste(d.netoPagar, ajuste);
+
+  // ── 🔴 LOS SEGUROS, SOBRE EL BRUTO CON EL AJUSTE ──────────────────────────
+  //
+  // Solo si se pasaron los porcentajes, la persona paga seguros y NO tiene base
+  // propia (`d.baseSeguros` es lo que de verdad se multiplicó: con base propia
+  // el seguro no sale del bruto y no cambia). Es la MISMA fórmula del motor
+  // —`centavos(base × pct ÷ 100)`— aplicada al bruto nuevo, y la diferencia va
+  // al total de deducciones y al neto. Negativo cuando el ajuste bajó el bruto
+  // (más tardanza que extras): el seguro baja, igual que con una tardanza normal.
+  let ajusteSeguros: AjusteSeguros | undefined;
+  if (seguros && linea.pagaSeguros !== false && d.baseSeguros === null && (d.seguroSocial > 0 || d.seguroEducativo > 0)) {
+    const nuevoSS = centavos(dinero.totalBruto * (Number(seguros.seguroSocialPct) / 100));
+    const nuevoSE = centavos(dinero.totalBruto * (Number(seguros.seguroEducativoPct) / 100));
+    const dSS = centavos(nuevoSS - d.seguroSocial);
+    const dSE = centavos(nuevoSE - d.seguroEducativo);
+    if (dSS !== 0 || dSE !== 0) {
+      dinero.seguroSocial = nuevoSS;
+      dinero.seguroEducativo = nuevoSE;
+      dinero.totalDeducciones = centavos(d.totalDeducciones + dSS + dSE);
+      dinero.netoPagar = centavos(dinero.netoPagar - dSS - dSE);
+      ajusteSeguros = { seguroSocial: dSS, seguroEducativo: dSE };
+    }
+  }
+
   return {
     ...linea,
     dinero,
     ajusteAnterior: ajuste,
-    ajusteDetalle: { desde: dias.desde, hasta: dias.hasta, reparto },
+    ajusteDetalle: { desde: dias.desde, hasta: dias.hasta, reparto, ...(ajusteSeguros ? { seguros: ajusteSeguros } : {}) },
   };
 }
 
 /** Lo que viaja en la línea para poder DECIR de dónde salió cada monto. */
-export interface AjusteDetalle extends DiasDelAjuste { reparto: RepartoAjuste }
+export interface AjusteDetalle extends DiasDelAjuste {
+  reparto: RepartoAjuste;
+  /** Cuánto movió el ajuste a los seguros (11-sep-2026). Sin esto, no los movió. */
+  seguros?: AjusteSeguros;
+}
 
 /** El nombre de cada columna, el MISMO de la planilla, el Excel y el PDF. */
 export const ROTULO_DEL_RELOJ: Readonly<Record<CampoDelReloj, string>> = {
@@ -260,11 +330,12 @@ export const ROTULO_DEL_RELOJ: Readonly<Record<CampoDelReloj, string>> = {
   feriados: "Feriados",
   ausencias: "Ausencias",
   tardanzas: "Tardanzas",
+  salidaTemprana: "Salida temprana",
 };
 
 /** El orden en que se nombran las columnas: el del cuadro de la contable. */
 export const ORDEN_DEL_RELOJ: readonly CampoDelReloj[] = [
-  "extraDiurno", "ausencias", "tardanzas", "extraNocturno", "excedente", "domingos", "feriados",
+  "extraDiurno", "ausencias", "tardanzas", "salidaTemprana", "extraNocturno", "excedente", "domingos", "feriados",
 ];
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];

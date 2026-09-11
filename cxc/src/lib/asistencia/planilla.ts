@@ -1389,7 +1389,7 @@ export interface LineaPlanilla {
     desde: string;
     hasta: string;
     reparto: Partial<Record<
-      "ausencias" | "tardanzas" | "extraDiurno" | "extraNocturno" | "excedente" | "domingos" | "feriados",
+      "ausencias" | "tardanzas" | "salidaTemprana" | "extraDiurno" | "extraNocturno" | "excedente" | "domingos" | "feriados",
       number
     >>;
   };

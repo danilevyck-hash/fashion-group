@@ -119,12 +119,15 @@ describe("B. EL AJUSTE — solo lo que sale del RELOJ, y el sueldo NUNCA", () =>
 
   // 🔴 LA LISTA ESTÁ A LA VISTA para que un concepto nuevo del motor obligue a
   // decidir de qué lado cae, en vez de quedarse afuera en silencio.
-  it("son SIETE conceptos, con su signo", () => {
+  // ⚠️ Eran SIETE hasta el 11-sep-2026. Daniel: *«la salida temprana incluirla»*
+  // (nació el 10-sep, después del corte, y quedaba afuera). Cambió de número
+  // con nota, no de regla: el sueldo sigue sin entrar nunca.
+  it("son OCHO conceptos, con su signo — la salida temprana descuenta, como la tardanza", () => {
     expect(CONCEPTOS_DEL_RELOJ.map((c) => c.campo).sort()).toEqual(
-      ["ausencias", "domingos", "excedente", "extraDiurno", "extraNocturno", "feriados", "tardanzas"],
+      ["ausencias", "domingos", "excedente", "extraDiurno", "extraNocturno", "feriados", "salidaTemprana", "tardanzas"],
     );
     const suman = CONCEPTOS_DEL_RELOJ.filter((c) => c.signo === +1).map((c) => c.campo);
-    expect(suman.sort()).toEqual(["ausencias", "tardanzas"]);
+    expect(suman.sort()).toEqual(["ausencias", "salidaTemprana", "tardanzas"]);
   });
 
   it("el aviso de pantalla distingue descontar de devolver, y calla en cero", () => {
@@ -361,7 +364,10 @@ describe("H. EL CORTE Y EL AJUSTE, CABLEADOS (10-sep-2026)", () => {
     // que lo reparte concepto por concepto (la contadora: «valen diferente»).
     expect(bloque).toMatch(/dinero\.set\(l\.codigo, l\.dinero\)/);
     expect(bloque).not.toMatch(/ajusteDeDiasSinMedir/);
-    expect(ruta).toMatch(/aplicarAjusteEnLinea\(l, medido\.dinero\.get\(l\.codigo\), medido\.dias\)/);
+    // ⚠️ 11-sep-2026: la llamada ganó un cuarto argumento —los porcentajes de los
+    // seguros (Daniel: «los seguros, va»)— y se partió en varias líneas. La
+    // regla que protege no cambió: el ajuste entra por `aplicarAjusteEnLinea`.
+    expect(ruta).toMatch(/aplicarAjusteEnLinea\(\s*l, medido\.dinero\.get\(l\.codigo\), medido\.dias,/);
     // Y los totales salen de las líneas YA con el ajuste adentro.
     expect(ruta).toMatch(/totales: totalizar\(lineasFinal\)/);
   });

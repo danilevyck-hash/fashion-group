@@ -1896,7 +1896,7 @@ function Fila({
         )}
       </td>
       {num(d.tardanzas, "text-red-700", conAjuste("tardanzas"))}
-      {num(d.salidaTemprana ?? 0, "text-red-700")}
+      {num(d.salidaTemprana ?? 0, "text-red-700", conAjuste("salidaTemprana"))}
       {num(d.extraNocturno, "", conAjuste("extraNocturno"))}
       {num(d.excedente, "", conAjuste("excedente"))}
       {num(d.domingos, "", conAjuste("domingos"))}
