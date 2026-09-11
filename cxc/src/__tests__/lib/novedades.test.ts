@@ -302,7 +302,12 @@ describe("🔴 6b · los 30 días se cuentan desde que se AVISA, no desde que ca
   });
 
   it("🔴 TODAS las novedades escritas están vigentes hoy — ninguna nació muerta", () => {
-    const muertas = NOVEDADES.filter((x) => !estaVigente(x, HOY)).map((x) => x.id);
+    // 11-sep-2026: este caso mira la LISTA REAL, así que su «hoy» es el día de
+    // la novedad más nueva (las tres del rediseño de Reclamos, 2026-09-11) y no
+    // el HOY fijo de los casos sintéticos de arriba. Se mueve cada vez que
+    // entra una novedad más nueva.
+    const HOY_DE_LA_LISTA = "2026-09-11";
+    const muertas = NOVEDADES.filter((x) => !estaVigente(x, HOY_DE_LA_LISTA)).map((x) => x.id);
     expect(muertas, "nadie las va a leer").toEqual([]);
   });
 });

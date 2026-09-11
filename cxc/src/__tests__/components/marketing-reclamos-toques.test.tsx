@@ -578,6 +578,10 @@ describe("🔴 el botón de entregar muebles dice POR QUÉ está apagado", () =>
 // 10. El género: se GUARDA en inglés, se MUESTRA en español
 // ════════════════════════════════════════════════════════════════════════════
 describe("🔴 el único campo en inglés del sistema", () => {
+  // 🔄 10-sep-2026: el formulario nuevo abre en orden desde el PDF (props
+  // nuevas: facturas como lista, fecha de factura, líneas leídas). Con el PDF
+  // ya puesto y sin líneas, la tabla de renglones es la de siempre — que es
+  // donde vive el género que este candado mira.
   function pintarReclamo() {
     const noop = () => {};
     render(
@@ -585,17 +589,21 @@ describe("🔴 el único campo en inglés del sistema", () => {
         <ReclamoForm
           fEmpresa="Tommy"
           setFEmpresa={noop}
-          fFecha="2026-08-01"
-          setFFecha={noop}
-          fFactura="F-1"
-          setFFactura={noop}
+          fFacturas={["F-1"]}
+          setFFacturas={noop}
+          fFechaFactura="2026-08-01"
+          setFFechaFactura={noop}
           fPedido="P-1"
           setFPedido={noop}
           fNotas=""
           setFNotas={noop}
           fItems={[emptyItem()]}
           setFItems={noop as never}
-          facturaPdfPath={null}
+          fLineas={[]}
+          setFLineas={noop}
+          fSeleccion={{}}
+          setFSeleccion={noop as never}
+          facturaPdfPath="x/factura.pdf"
           setFacturaPdfPath={noop}
           savedReclamoId={null}
           savedNroReclamo=""
@@ -605,12 +613,6 @@ describe("🔴 el único campo en inglés del sistema", () => {
           onRetryFotos={noop}
           saving={false}
           error={null}
-          customMotivos={[]}
-          setCustomMotivos={noop as never}
-          addingMotivo={null}
-          setAddingMotivo={noop}
-          newMotivoText=""
-          setNewMotivoText={noop}
           onSave={noop}
           onCancel={noop}
           onViewSaved={noop}

@@ -64,7 +64,11 @@ const EN_UN_AYUDA: Array<[string, string]> = [
   // ── Reclamos ─────────────────────────────────────────────────────────────
   ["app/reclamos/components/ReclamoForm.tsx", "la IA rellena proveedor, marca, factura, fecha y pedido"],
   ["app/reclamos/components/ReclamoForm.tsx", "se guardan junto con el reclamo en un solo paso"],
-  ["app/reclamos/components/ReclamoDetail.tsx", "para marcar Pagado es obligatorio (foto o PDF)"],
+  // 🔄 11-sep-2026: el ⓘ «Cuándo hace falta el comprobante» se fue de la
+  // pantalla del reclamo (mockup de Daniel: una sola fila de botones, sin ese
+  // enlace). La regla —comprobante obligatorio para marcar Pagado— NO se
+  // perdió: la dice la propia ventana de pago (SettlementModal, más abajo en
+  // esta misma lista) en el momento en que frena de verdad.
   ["app/reclamos/components/EnviarProveedorModal.tsx", "Se adjunta el Excel"],
   ["app/reclamos/components/EnviarProveedorModal.tsx", "la tabla resumen y la descarga"],
 

@@ -78,7 +78,7 @@ import { pctLabel, itbmsLabel, impLabel, reclamoTaxes, TASA_ITBMS } from "@/lib/
 import { esPendiente, soloPendientes, ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
 import { buildBulkReclamosPdf } from "@/lib/reclamos/pdf-bulk";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
-import EmpresaSelector from "@/app/reclamos/components/EmpresaSelector";
+import EmpresaList from "@/app/reclamos/components/EmpresaList";
 
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-reclamos"; });
 
@@ -336,13 +336,21 @@ describe("BUG 2 · la regla de «pendiente» vive en un solo lugar", () => {
   });
 });
 
-describe("BUG 2 · LA PANTALLA: se hace clic en ↓Excel y ↓PDF y se mira el POST", () => {
+describe("BUG 2 · LA PANTALLA: se hace clic en «Descargar Excel» y «Descargar PDF» y se mira el POST", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 10-sep-2026 (rediseño de Reclamos, mockup
+  // aprobado por Daniel). Los ↓Excel/↓PDF vivían en la TARJETA de la portada y
+  // eran los dos botones que se habían olvidado de `soloPendientes()`. La
+  // tarjeta ya no lleva botones; la descarga de «todo lo por cobrar» vive en la
+  // PÁGINA DE LA EMPRESA, que abre en «Por cobrar» y baja lo que se está
+  // mirando. La promesa es LA MISMA: los ya pagados no viajan al proveedor.
+  // Se pinta EmpresaList en vez de EmpresaSelector; el resto no cambió.
+  //
   // Réplica del peor caso medido en producción (Fashion Shoes: 4 ya pagados
-  // arrastrándose detrás de lo pendiente). La tarjeta dice el total de los
-  // pendientes; el archivo tiene que traer esos y nada más.
+  // arrastrándose detrás de lo pendiente).
   const mk = (n: string, estado: string, precio: number) => ({
     id: `id-${n}`, nro_reclamo: n, empresa: "Fashion Shoes", proveedor: "P", marca: "M",
-    nro_factura: `F-${n}`, nro_orden_compra: "OC", fecha_reclamo: "2026-08-01", estado, notas: "",
+    nro_factura: `F-${n}`, nro_orden_compra: "OC", fecha_reclamo: "2026-08-01", fecha_factura: "2026-08-01", estado, notas: "",
+    created_at: "2026-08-01T00:00:00Z",
     reclamo_items: [{ cantidad: 1, precio_unitario: precio }], reclamo_fotos: [],
   });
   const RECS = [
@@ -350,7 +358,7 @@ describe("BUG 2 · LA PANTALLA: se hace clic en ↓Excel y ↓PDF y se mira el P
     mk("R-P1", "Pagado", 1000), mk("R-P2", "Pagado", 2000), mk("R-P3", "Pagado", 3000), mk("R-P4", "Pagado", 4000),
   ];
 
-  function pintar() {
+  function pintar(recs = RECS) {
     const fetchSpy = vi.fn(async () => ({
       ok: true, blob: async () => new Blob(["x"]), json: async () => ({}),
     })) as unknown as typeof fetch;
@@ -360,31 +368,27 @@ describe("BUG 2 · LA PANTALLA: se hace clic en ↓Excel y ↓PDF y se mira el P
     // El <a>.click() de la descarga no hace nada útil en jsdom; se neutraliza.
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     render(
-      <EmpresaSelector
-        role="admin" reclamos={RECS as never} loading={false} contactos={[]}
-        globalSearch="" setGlobalSearch={() => {}}
-        expandedHistorial={{}} setExpandedHistorial={() => {}}
-        totalPendiente={0} pendientes={[] as never} alertas={0}
-        onNewReclamo={() => {}} onSelectEmpresa={() => {}} onLoadDetail={() => {}}
+      <EmpresaList
+        role="admin" activeEmpresa="Fashion Shoes" reclamos={recs as never} contactos={[]}
+        selectionMode={false} setSelectionMode={() => {}} selectedIds={[]} setSelectedIds={() => {}}
+        onBack={() => {}} onNewReclamo={() => {}} onLoadDetail={() => {}} onEditReclamo={() => {}}
+        onDeleteReclamo={() => {}} onDeleteSelected={() => {}} onReload={() => {}}
       />,
     );
     return fetchSpy as unknown as ReturnType<typeof vi.fn>;
   }
 
-  /** Los botones de la tarjeta de Fashion Shoes (hay una tarjeta por empresa). */
+  /** Los botones de arriba de la página de la empresa (los de «todo lo que se mira»). */
   function botonesDeFashionShoes() {
-    // La tarjeta de la empresa, subiendo desde su propio nombre.
-    const tarjeta = screen.getByText("Fashion Shoes").closest("div.rounded-lg")!;
-    const btns = Array.from(tarjeta.querySelectorAll("button"));
     return {
-      excel: btns.find((b) => b.textContent?.includes("Excel"))!,
-      pdf: btns.find((b) => b.textContent?.includes("PDF"))!,
+      excel: screen.queryByRole("button", { name: "Descargar Excel" }),
+      pdf: screen.queryByRole("button", { name: "Descargar PDF" }),
     };
   }
 
-  it("↓Excel manda SOLO los 3 pendientes — los 4 Pagados no viajan", async () => {
+  it("«Descargar Excel» manda SOLO los 3 pendientes — los 4 Pagados no viajan", async () => {
     const f = pintar();
-    fireEvent.click(botonesDeFashionShoes().excel);
+    fireEvent.click(botonesDeFashionShoes().excel!);
     await waitFor(() => expect(f).toHaveBeenCalled());
     const [url, init] = f.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/export-zip");
@@ -394,9 +398,9 @@ describe("BUG 2 · LA PANTALLA: se hace clic en ↓Excel y ↓PDF y se mira el P
     expect(ids).toHaveLength(3);
   });
 
-  it("↓PDF manda SOLO los 3 pendientes — el mismo criterio que el Excel", async () => {
+  it("«Descargar PDF» manda SOLO los 3 pendientes — el mismo criterio que el Excel", async () => {
     const f = pintar();
-    fireEvent.click(botonesDeFashionShoes().pdf);
+    fireEvent.click(botonesDeFashionShoes().pdf!);
     await waitFor(() => expect(f).toHaveBeenCalled());
     const [url, init] = f.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/export-pdf");
@@ -405,20 +409,20 @@ describe("BUG 2 · LA PANTALLA: se hace clic en ↓Excel y ↓PDF y se mira el P
     expect(ids).toHaveLength(3);
   });
 
-  it("🩸 el archivo CUADRA con la tarjeta: mismo conjunto, mismo total", async () => {
-    // Esta es la promesa que el bug rompía. La tarjeta dice "$X pendiente";
+  it("🩸 el archivo CUADRA con el chip «Por cobrar»: mismo conjunto, mismo total", async () => {
+    // Esta es la promesa que el bug rompía. El chip dice "Por cobrar N · $X";
     // el archivo tiene que sumar exactamente eso, ni un centavo más.
     const f = pintar();
-    const totalTarjeta = soloPendientes(RECS).reduce(
+    const totalChip = soloPendientes(RECS).reduce(
       (s, r) => s + reclamoTaxes(r.empresa, r.reclamo_items.reduce((a, i) => a + i.cantidad * i.precio_unitario, 0)).total, 0);
-    expect(screen.getAllByText(`$${totalTarjeta.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).length).toBeGreaterThan(0);
+    expect(document.body.textContent).toContain(`$${totalChip.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
-    fireEvent.click(botonesDeFashionShoes().excel);
+    fireEvent.click(botonesDeFashionShoes().excel!);
     await waitFor(() => expect(f).toHaveBeenCalled());
     const ids = JSON.parse(String((f.mock.calls[0] as [string, RequestInit])[1].body)).reclamo_ids as string[];
     const totalArchivo = RECS.filter((r) => ids.includes(r.id)).reduce(
       (s, r) => s + reclamoTaxes(r.empresa, r.reclamo_items.reduce((a, i) => a + i.cantidad * i.precio_unitario, 0)).total, 0);
-    expect(totalArchivo).toBeCloseTo(totalTarjeta, 6);
+    expect(totalArchivo).toBeCloseTo(totalChip, 6);
   });
 
   it("el nombre del archivo DICE que trae solo lo pendiente", async () => {
@@ -429,7 +433,7 @@ describe("BUG 2 · LA PANTALLA: se hace clic en ↓Excel y ↓PDF y se mira el P
       configurable: true, set(v: string) { bajado.push(v); }, get() { return bajado[bajado.length - 1]; },
     });
     try {
-      fireEvent.click(botonesDeFashionShoes().excel);
+      fireEvent.click(botonesDeFashionShoes().excel!);
       await waitFor(() => expect(bajado.length).toBeGreaterThan(0));
       expect(bajado[0]).toContain("Reclamos-pendientes-Fashion Shoes");
       expect(bajado[0]).toMatch(/\.xlsx$/);
@@ -440,22 +444,12 @@ describe("BUG 2 · LA PANTALLA: se hace clic en ↓Excel y ↓PDF y se mira el P
     expect(f).toHaveBeenCalled();
   });
 
-  it("empresa sin nada pendiente: no baja un archivo vacío, lo DICE", async () => {
-    const f = vi.fn(async () => ({ ok: true, blob: async () => new Blob(["x"]), json: async () => ({}) })) as unknown as typeof fetch;
-    vi.stubGlobal("fetch", f);
-    URL.createObjectURL = () => "blob:x";
-    URL.revokeObjectURL = () => {};
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    render(
-      <EmpresaSelector
-        role="admin" reclamos={[mk("R-P9", "Pagado", 500)] as never} loading={false} contactos={[]}
-        globalSearch="" setGlobalSearch={() => {}} expandedHistorial={{}} setExpandedHistorial={() => {}}
-        totalPendiente={0} pendientes={[] as never} alertas={0}
-        onNewReclamo={() => {}} onSelectEmpresa={() => {}} onLoadDetail={() => {}}
-      />,
-    );
-    fireEvent.click(botonesDeFashionShoes().excel);
-    await screen.findByText("Fashion Shoes no tiene reclamos pendientes");
+  it("empresa sin nada pendiente: no hay botón que baje un archivo vacío, y la pantalla lo DICE", async () => {
+    // Regla de la casa: un control que no ofrece nada no se dibuja.
+    const f = pintar([mk("R-P9", "Pagado", 500)]);
+    expect(botonesDeFashionShoes().excel).toBeNull();
+    expect(botonesDeFashionShoes().pdf).toBeNull();
+    await screen.findByText("Nada por cobrar a Fashion Shoes");
     expect(f).not.toHaveBeenCalled();
   });
 });

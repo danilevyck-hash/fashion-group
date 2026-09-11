@@ -111,7 +111,12 @@ describe("Tocables · 44 px de alto Y de ancho", () => {
 });
 
 describe("Reclamos › Nuevo · `sm:` no es escritorio", () => {
-  const src = leer("src/app/reclamos/components/ReclamoForm.tsx");
+  // 🔄 10-sep-2026: la tabla de renglones tecleados a mano salió de
+  // ReclamoForm a `ItemsEditor.tsx` (el formulario nuevo abre en orden desde el
+  // PDF). Los dos archivos son la misma pantalla, así que se miden juntos. El
+  // campo del motivo nuevo («+ Agregar motivo») se retiró — 0 usos —, por eso
+  // los campos de 44 px bajan de 9 a 8: uno menos que existe, no uno sin 44.
+  const src = leer("src/app/reclamos/components/ReclamoForm.tsx") + leer("src/app/reclamos/components/ItemsEditor.tsx");
 
   it("el alto denso se suelta en xl, no en sm (a 834 se usa con el dedo)", () => {
     expect(src).toContain("py-3 xl:py-1.5 text-base xl:text-sm");
@@ -126,7 +131,7 @@ describe("Reclamos › Nuevo · `sm:` no es escritorio", () => {
 
   it("los campos de la tabla de ítems miden 44 hasta xl", () => {
     const campos = (src.match(/min-h-\[44px\] xl:min-h-0 py-1 text-sm/g) ?? []).length;
-    expect(campos).toBe(9);
+    expect(campos).toBe(8);
     expect(src).not.toMatch(/border-gray-200 py-1 text-sm outline-none(?! )/);
   });
 
@@ -176,7 +181,8 @@ describe("La segunda pasada · lo que solo se ve midiendo otra vez", () => {
   });
 
   it("Reclamos › el campo de cantidad tenía alto pero medía 42 de ancho", () => {
-    const src = leer("src/app/reclamos/components/ReclamoForm.tsx");
+    // 10-sep-2026: la tabla vive en ItemsEditor (ver arriba).
+    const src = leer("src/app/reclamos/components/ItemsEditor.tsx");
     expect((src.match(/w-full min-w-\[44px\] border-b border-gray-200 min-h-\[44px\]/g) ?? []).length).toBe(2);
   });
 

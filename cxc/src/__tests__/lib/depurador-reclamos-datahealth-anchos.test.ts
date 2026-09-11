@@ -193,12 +193,18 @@ describe("Reclamos › Por empresa — la columna ACCIONES entra en iPad", () =>
     expect(src).not.toContain('className="sm:hidden space-y-2 mb-4"');
   });
 
-  it("los íconos densos de la TABLA se quedan en 26px a propósito", () => {
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 10-sep-2026. Los cinco íconos sin rótulo de la
+  // fila (sobre, flecha, hoja, lápiz, tacho) se fueron: quedan a la vista
+  // «Correo» y «Descargar» CON rótulo y un «···» con el resto (el patrón de
+  // Guías). El «::after de 9px» sigue prohibido —era lo que devolvía arrastre—
+  // y la columna no se ensancha porque son dos rótulos cortos y un menú.
+  it("la fila lleva «Correo», «Descargar» y «···», sin íconos mudos ni ::after", () => {
     const src = leer(EMPRESA_LIST);
-    // Darles 44px —o un ::after de 9px— ensancha la columna y devuelve 8px de
-    // arrastre a 1024 y 1440. El escritorio no puede empeorar.
     expect(src).not.toContain("after:-inset-[9px]");
-    expect(src).toContain("p-1.5 text-gray-400 hover:text-black rounded transition");
+    expect(src).not.toContain('title="Enviar al proveedor" aria-label="Enviar al proveedor"');
+    expect(src).toContain(">Correo</button>");
+    expect(src).toContain('{filaBusy === r.id ? "…" : "Descargar"}');
+    expect(src).toContain("<OverflowMenu");
   });
 
   it("las píldoras de estado y los íconos de la TARJETA sí son de 44px", () => {

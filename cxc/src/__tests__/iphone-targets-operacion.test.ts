@@ -87,18 +87,24 @@ describe("Modales · en iPhone no hay Escape, así que necesitan ✕", () => {
 });
 
 describe("Targets de 44px", () => {
-  it("Reclamos · ↓Excel y ↓PDF miden 44 de alto y van separados ≥8px", () => {
-    const excel = empresaSelector.match(/className="[^"]*rounded-full flex-shrink-0 font-medium[^"]*"/g) ?? [];
-    expect(excel.length).toBe(2);
-    for (const c of excel) expect(c).toContain("min-h-[44px]");
-    // gap-1.5 son 6px: por debajo del mínimo de separación.
-    expect(empresaSelector).toMatch(/flex gap-2 flex-wrap justify-end/);
+  // 🔄 CAMBIÓ DE DIRECCIÓN EL 10-sep-2026 (rediseño de Reclamos). Pedía que
+  // los ↓Excel/↓PDF y el toggle «Historial» de la TARJETA midieran 44. La
+  // tarjeta ya no lleva ninguno de los tres (mockup aprobado: contacto, «el
+  // más viejo lleva N días», la plata y el chip «sin reclamar»); las descargas
+  // viven en la página de la empresa (`EmpresaList`), donde SÍ miden 44.
+  it("Reclamos · la tarjeta de la portada ya no lleva ↓Excel/↓PDF ni «Historial»", () => {
+    expect(empresaSelector).not.toContain("↓ Excel");
+    expect(empresaSelector).not.toContain("setExpandedHistorial");
+    expect(empresaSelector).not.toContain("Historial (");
   });
 
-  it("Reclamos · el toggle de Historial deja de medir 16.5px", () => {
-    const i = empresaSelector.indexOf("onClick={() => setExpandedHistorial(");
+  it("Reclamos · «Descargar Excel» y «Descargar PDF» miden 44 en la página de la empresa", () => {
+    const lista = read("app", "reclamos", "components", "EmpresaList.tsx");
+    const i = lista.indexOf("const accion = ");
     expect(i).toBeGreaterThan(-1);
-    expect(empresaSelector.slice(i, i + 400)).toContain("min-h-[44px]");
+    expect(lista.slice(i, i + 200)).toContain("min-h-[44px]");
+    expect(lista).toContain("Descargar Excel");
+    expect(lista).toContain("Descargar PDF");
   });
 
   it("Saldos de Banco · Guardar llega a 44 (medía 41)", () => {
