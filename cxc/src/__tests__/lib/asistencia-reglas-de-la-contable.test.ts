@@ -154,7 +154,11 @@ describe("2. 🔴 salir antes de la hora se descuenta desde el minuto uno, sin t
     const ex = puro("src/lib/asistencia/planilla-exportar.ts");
     expect(ex).toMatch(/header: "Salida temprana"/);
     expect(ex).toMatch(/"Salida\\ntemprana"/);
-    expect(puro("src/app/asistencia/PlanillaTab.tsx")).toMatch(/"Salida\\ntemprana"/);
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026, NO SE BORRÓ: el encabezado ya no
+    // está escrito a mano en la pantalla. Vive en `columnas-dinero-planilla.ts`
+    // —UNA lista para el grupo y para Boston— y la pantalla la lee.
+    expect(puro("src/lib/asistencia/columnas-dinero-planilla.ts")).toMatch(/"Salida\\ntemprana"/);
+    expect(puro("src/app/asistencia/PlanillaTab.tsx")).toContain("ROTULOS_DINERO_PLANILLA.map(");
     // ⚠️ 11-sep-2026: la celda ganó la nota del ajuste (`conAjuste`): la salida
     // temprana también entra al ajuste del corte (Daniel: «la salida temprana
     // incluirla»). La columna sigue ahí, en rojo.

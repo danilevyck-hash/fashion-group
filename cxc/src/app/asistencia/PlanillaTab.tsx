@@ -86,6 +86,7 @@ import type {
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { notaAjuste, notaCeldaAjuste } from "@/lib/asistencia/corte-quincena";
+import { ROTULOS_DINERO_PLANILLA, montosDePlanilla } from "@/lib/asistencia/columnas-dinero-planilla";
 import { armarAntesDeCerrar } from "@/lib/asistencia/antes-de-cerrar";
 import {
   TEXTO_SIN_DESCONTAR,
@@ -752,6 +753,15 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   // 🔑 LOS MONTOS SON LOS DE ESTA PANTALLA. No se vuelve a pedir el cuadro ni
   // se recalcula nada: `data.lineas` es lo que ya está a la vista. Lo único que
   // se busca aparte son el cargo y la cédula, que la planilla no conoce.
+  /** Empresa y fechas DEL CUADRO que está a la vista — lo mismo que leen el Excel y el PDF. */
+  function nombreDelCuadro(d: Respuesta): { empresa: string; desde: string; hasta: string } {
+    return {
+      empresa: d.empresa ?? empresa,
+      desde: d.periodo?.desde ?? d.quincena?.desde ?? desde,
+      hasta: d.periodo?.hasta ?? d.quincena?.hasta ?? hasta,
+    };
+  }
+
   async function bajarComprobantes() {
     if (!data?.lineas.length) return;
     try {
@@ -789,8 +799,13 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         toast("Todavía no hay a quién hacerle comprobante en este cuadro.", "warning");
         return;
       }
+      // 🔴 EL NOMBRE DEL ARCHIVO ES EL DEL CUADRO, no el del selector (11-sep-2026).
+      // 🩸 Con el cuadro viejo (aviso ámbar «Los números que ves son de antes»)
+      // salían los montos de la quincena generada dentro de un PDF llamado como
+      // la otra. El Excel y el PDF ya se nombraban desde `data.periodo`; éste
+      // era el único que leía `desde`/`hasta` del selector.
       pdf.construirPdfComprobantes(hojas).save(
-        pdf.nombreArchivoComprobante({ empresa, desde, hasta }),
+        pdf.nombreArchivoComprobante(nombreDelCuadro(data)),
       );
       toast(
         hojas.length === 1
@@ -1203,15 +1218,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                 <thead>
                   <tr className="border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-400">
                     <th className="sticky left-0 z-10 bg-white px-3 py-2.5 text-left font-medium">Colaborador</th>
-                    {[
-                      "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas", "Salida\ntemprana",
-                      "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
-                      "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
-                      "Mercan-\ncía", "Total\ndeducc.",
-                      // El «(+)» no es adorno: es la única señal en la tabla de
-                      // que esta columna SUMA mientras las cuatro de al lado restan.
-                      "Otros\nservicios (+)", "Neto a\npagar",
-                    ].map((h) => (
+                    {/* 🔴 UNA sola lista para el grupo y para Boston
+                        (`columnas-dinero-planilla.ts`, 11-sep-2026). */}
+                    {ROTULOS_DINERO_PLANILLA.map((h) => (
                       <th key={h} className="whitespace-pre px-2 py-2.5 text-right font-medium">{h}</th>
                     ))}
                   </tr>
@@ -1275,15 +1284,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                       TOTAL · {data.totales.personas}{" "}
                       {data.totales.personas === 1 ? "colaborador" : "colaboradores"}
                     </td>
-                    {[
-                      data.totales.salarioQuincenal, data.totales.extraDiurno, data.totales.ausencias,
-                      data.totales.tardanzas, data.totales.salidaTemprana ?? 0, data.totales.extraNocturno, data.totales.excedente,
-                      data.totales.domingos, data.totales.feriados, data.totales.totalBruto,
-                      data.totales.seguroSocial, data.totales.seguroEducativo, data.totales.isr,
-                      data.totales.prestamo, data.totales.terceros, data.totales.mercancia,
-                      data.totales.totalDeducciones, data.totales.otrosServicios,
-                      data.totales.netoPagar,
-                    ].map((v, i) => (
+                    {montosDePlanilla(data.totales).map((v, i) => (
                       <td key={i} className="px-2 py-2.5 text-right tabular-nums">
                         {v === 0 ? <span className="text-gray-400">—</span> : $$(v)}
                       </td>
