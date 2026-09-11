@@ -134,14 +134,14 @@ mutar "mete los minutos DENTRO del rótulo de TARDANZAS" src/lib/asistencia/comp
               '"'"'R("tardanzas", `TARDANZAS (${notaTardanza(linea.horas) ?? ""})`, v(d?.tardanzas), "dato", false,'"'"')'
 mutar "los minutos salen de tardanzaMin (el total), no de los valuados" src/lib/asistencia/comprobante.ts \
   's = s.replace("  const m = minutosTardanzaMostrados(horas);", "  const m = horas.tardanzaMin;")'
-mutar "el ajuste se suma a AUSENCIA en vez de ir en su renglón" src/lib/asistencia/comprobante.ts \
-  's = s.replace('"'"'R("ausencia", "AUSENCIA", v(d?.ausencias), "dato", false),'"'"',
-              '"'"'R("ausencia", "AUSENCIA", centavos(v(d?.ausencias) + ajuste), "dato", false),'"'"')
-s = s.replace("    v(d?.prestamo) + v(d?.terceros) + compras + v(d?.mercancia) + ajuste,", "    v(d?.prestamo) + v(d?.terceros) + compras + v(d?.mercancia),")'
+# 11-sep-2026: el renglón «AJUSTE QUINCENA ANTERIOR» se retiró (el ajuste entra
+# en las columnas de siempre). La mutación de hoy es la inversa: que VUELVA.
+mutar "vuelve el renglón AJUSTE QUINCENA ANTERIOR" src/lib/asistencia/comprobante.ts \
+  's = s.replace("  \"mercancia\",\n  \"totalDescuentos\",", "  \"mercancia\",\n  \"ajusteAnterior\",\n  \"totalDescuentos\",")'
 mutar "el total de descuentos deja de incluir la mercancía" src/lib/asistencia/comprobante.ts \
-  's = s.replace("v(d?.prestamo) + v(d?.terceros) + v(d?.mercancia) + ajuste,", "v(d?.prestamo) + v(d?.terceros) + ajuste,")'
+  's = s.replace("v(d?.prestamo) + v(d?.terceros) + v(d?.mercancia));", "v(d?.prestamo) + v(d?.terceros));")'
 mutar "«otros servicios» se resta en vez de sumar" src/lib/asistencia/comprobante.ts \
-  's = s.replace("  const salarioAPagar = centavos(v(d?.netoPagar) - ajuste);", "  const salarioAPagar = centavos(v(d?.netoPagar) - ajuste - 2 * v(d?.otrosServicios));")'
+  's = s.replace("  const salarioAPagar = v(d?.netoPagar);", "  const salarioAPagar = centavos(v(d?.netoPagar) - 2 * v(d?.otrosServicios));")'
 mutar "una empresa desconocida sale con el nombre de Fashion Wear" src/lib/asistencia/comprobante.ts \
   's = s.replace("  const alterno = String(etiqueta ?? \"\").trim();", "  return EMPRESAS.fashion_wear;\n  const alterno = String(etiqueta ?? \"\").trim();")'
 mutar "un rango libre se disfraza de I QUINCENA" src/lib/asistencia/comprobante.ts \
