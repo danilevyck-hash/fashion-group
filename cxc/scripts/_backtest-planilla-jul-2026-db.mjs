@@ -1,0 +1,24 @@
+// SOLO LECTURA: mira qué hay en producción para la 2ª quincena de julio 2026.
+import { createClient } from "@supabase/supabase-js";
+import fs from "node:fs";
+const env = Object.fromEntries(fs.readFileSync(".env.local","utf8").split("\n").filter(l=>/^[A-Z_0-9]+=/.test(l)).map(l=>{const i=l.indexOf("=");return [l.slice(0,i), l.slice(i+1).replace(/^"|"$/g,"")];}));
+const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+const j = (x)=>JSON.stringify(x);
+const q = async (t, f) => { const { data, error } = await f(db.from(t)); if (error) throw new Error(t+": "+error.message); return data; };
+console.log("PERSONAS"); for (const p of await q("asistencia_personas", x=>x.select("*").order("empleado_codigo"))) console.log(j(p));
+console.log("HORARIOS"); for (const p of await q("asistencia_horarios", x=>x.select("*").order("empleado_codigo"))) console.log(j(p));
+console.log("REGLAS", j(await q("asistencia_reglas", x=>x.select("*"))));
+console.log("FERIADOS jul", j(await q("asistencia_feriados", x=>x.select("*").gte("fecha","2026-07-01").lte("fecha","2026-08-05"))));
+console.log("JUSTIFICACIONES jul", j(await q("asistencia_justificaciones", x=>x.select("*").lte("desde","2026-07-31").gte("hasta","2026-07-16"))));
+console.log("VACACIONES jul", j(await q("asistencia_vacaciones", x=>x.select("*").lte("desde","2026-07-31").gte("hasta","2026-07-16"))));
+console.log("MANUAL 2026-07-2", j(await q("asistencia_planilla_manual", x=>x.select("*").eq("quincena","2026-07-2"))));
+console.log("MANUAL todas las quincenas", j(await q("asistencia_planilla_manual", x=>x.select("quincena, empleado_codigo, isr, prestamo, terceros, mercancia, otros_servicios").order("quincena"))));
+console.log("EXTRAS APROBADAS jul", j(await q("asistencia_horas_extra_aprobadas", x=>x.select("*").gte("fecha","2026-07-16").lte("fecha","2026-07-31").order("fecha"))));
+console.log("EXTRAS APROBADAS min/max", j(await q("asistencia_horas_extra_aprobadas", x=>x.select("fecha").order("fecha").limit(1))), j(await q("asistencia_horas_extra_aprobadas", x=>x.select("fecha").order("fecha",{ascending:false}).limit(1))));
+console.log("CORRECCIONES jul", j(await q("asistencia_correcciones", x=>x.select("*").gte("fecha","2026-07-16").lte("fecha","2026-07-31"))));
+console.log("REPARTO", j(await q("asistencia_reparto_empresa", x=>x.select("*"))));
+console.log("PRESTAMO APROBADO 07-2", j(await q("asistencia_prestamo_aprobado", x=>x.select("*").eq("quincena","2026-07-2"))));
+console.log("PLANILLA GUARDADA", j(await q("asistencia_planilla_guardada", x=>x.select("*"))));
+console.log("IGNORADOS", j(await q("asistencia_codigos_ignorados", x=>x.select("*")).catch(e=>String(e))));
+const { count } = await db.from("asistencia_marcaciones").select("id",{count:"exact",head:true}).gte("ocurrio_en","2026-07-16T05:00:00Z").lt("ocurrio_en","2026-08-01T05:00:00Z");
+console.log("MARCACIONES 16-31 jul (hora Panamá):", count);

@@ -1233,3 +1233,30 @@ usa el módulo, los chips viejos no vuelven, el servidor falla abierto). Dos cam
 nota fechada, ninguno se borró: `persona-en-el-centro` («Sin saldo» → «Falta completar», con el
 control de que el nombre viejo no vuelve) y `asistencia-poda-textos` (el chip que se toca es «Falta
 completar»; «Falta para pagar» en cero no se dibuja).
+
+---
+
+## 10-sep-2026 (tarde) — Las 7 pantallas de Asistencia, revisadas por Daniel
+
+Ocho arreglos aprobados uno por uno, más una carga (el punto 9, abajo).
+
+| # | Qué | Dónde |
+|---|---|---|
+| 1 | Los totales del Reporte con dos decimales (eran `9544.499999999998`). **Verificado:** ningún total de pago se armaba con flotantes sin redondear — `totalizar` suma a centavos en cada paso, `totalesDe` redondea, Excel/PDF/comprobante leen `d.totales`. | `ReporteTab.tsx` |
+| 2 | Nombres capitalizados en el Reporte, como en la lista. Solo cómo se muestra. | `ReporteTab.tsx` |
+| 3 | «Justificaciones del período» no se dibuja sin justificaciones (el enlace vive en el componente; `null` vacío o cargando). | `JustificacionesDelPeriodo.tsx` |
+| 4 | Código sin ficha: «—» en Jornada (48 es relleno). | `ConfiguracionTab.tsx` |
+| 5 | Avisos del reloj en UNA línea por reloj; el párrafo pasó a un «?»; el error sigue a la vista; el botón se queda. *«debe de ser más chico, que no estorbe tanto»*. | `EstadoReloj.tsx` |
+| 6 | «QUÉ CAMBIÓ» se marca visto **al mostrarse** (localStorage + `novedades_vistas`, mismo mecanismo); la × sigue apagándolo. *«se muestra una vez y se va solo al cerrarlo; si no lo cierran, no se vuelve a mostrar»*. Vale para todos los usuarios y módulos. | `NovedadesAviso.tsx` |
+| 7 | Asistencia › Préstamos: «Descuento a terceros» solo cuando alguien lo tiene (columna y tarjeta). | `PrestamosTab.tsx` |
+| 8 | **Almuerzo por empresa**: 30 en las tres de siempre, **60 en Multifashion** (`ALMUERZO_POR_EMPRESA`, `almuerzoDeEmpresa`, `textoAlmuerzo`). El PUT de Horarios escribe el de la empresa de la ficha y conserva la entrada guardada. **Medido antes y después, quincena 1–15 sep, 45 colaboradores: 0 diferencias** (`scripts/_medir-almuerzo-por-empresa.ts`). | `config.ts` · `api/asistencia/horarios` |
+
+⚠️ Decidido al mínimo y anotado: el motor sigue leyendo `asistencia_horarios.almuerzo_minutos` por
+persona (donde el PUT lo deja escrito); quien no tiene fila cae a 30, como siempre. La columna
+«Terceros» de la PLANILLA (los cinco montos a mano) no se tocó: es otra pantalla. En Préstamos, la
+cuota que se muestra sigue siendo préstamo + daño.
+
+**Candados:** `asistencia-siete-pantallas.test.ts` (1-5, 7, 8) · `novedades-una-vez.test.tsx` (6).
+Tres cambiaron con nota fechada, ninguno se borró: `persona-en-el-centro` (el enlace de
+justificaciones vive en el componente), `asistencia-poda-textos` (la frase del almuerzo),
+`asistencia-almuerzo-fijo` (sus casos siguen valiendo: sin ficha se escribe 30).

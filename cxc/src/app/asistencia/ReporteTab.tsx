@@ -10,7 +10,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
-import { ALMUERZO_FIJO_MIN, MINUTOS_TARDE_QUE_SON_AUSENCIA } from "@/lib/asistencia/config";
+// 🔴 Los nombres se MUESTRAN capitalizados, como en la lista; lo guardado sigue
+// en mayúsculas (10-sep-2026: el Reporte mezclaba «YULISSA JUAREZ» con «Andrea Perez»).
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import { textoAlmuerzo, MINUTOS_TARDE_QUE_SON_AUSENCIA } from "@/lib/asistencia/config";
 import { esTrabajoDeVendedor, textoDiaJustificado } from "@/lib/asistencia/motivos";
 import { textoDiaVacaciones } from "@/lib/asistencia/vacaciones";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -72,7 +75,6 @@ export default function ReporteTab() {
    * el trabajo de esta pantalla es el reporte, y las justificaciones son la
    * explicación que se va a buscar cuando algo no cuadra.
    */
-  const [verJustificaciones, setVerJustificaciones] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Correcciones: cuántas hay en el rango, si se pueden hacer (la migración
@@ -185,16 +187,10 @@ export default function ReporteTab() {
           sigue siendo su propia pestaña y esto sería la misma lista dos veces. */}
       {PERSONA_EN_EL_CENTRO && (
         <div>
-          <button type="button" onClick={() => setVerJustificaciones((v) => !v)}
-            aria-expanded={verJustificaciones}
-            className="min-h-[44px] text-sm text-gray-500 underline-offset-2 transition hover:text-gray-900 hover:underline">
-            {verJustificaciones ? "Ocultar las justificaciones" : "Justificaciones del período"}
-          </button>
-          {verJustificaciones && (
-            <div className="mt-2">
-              <JustificacionesDelPeriodo desde={desde} hasta={hasta} />
-            </div>
-          )}
+          {/* 🔴 El enlace «Justificaciones del período» lo dibuja el componente,
+              y SOLO cuando hay alguna (10-sep-2026): un título sobre una lista
+              vacía es una palabra de más. */}
+          <JustificacionesDelPeriodo desde={desde} hasta={hasta} />
         </div>
       )}
 
@@ -289,10 +285,13 @@ export default function ReporteTab() {
                 <td className="px-3 py-2.5" colSpan={3}>{personas.length} {personas.length === 1 ? "colaborador" : "colaboradores"}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{tot.aus || "—"}</td>
                 <td className="px-2 py-2.5"></td>
-                <td className="px-2 py-2.5 text-right tabular-nums">{tot.tarde || "—"}</td>
+                {/* 🩸 Los minutos se miden al segundo y sumarlos da 9544.499999999998:
+                    el total se escribe con el MISMO formato que cada celda
+                    (`fmtMin`, dos decimales). Solo cambia cómo se muestra. */}
+                <td className="px-2 py-2.5 text-right tabular-nums">{tot.tarde ? fmtMin(tot.tarde) : "—"}</td>
                 <td className="px-2 py-2.5"></td><td className="px-2 py-2.5"></td>
-                <td className="px-2 py-2.5 text-right tabular-nums">{tot.noTrab || "—"}</td>
-                <td className="px-2 py-2.5 text-right tabular-nums">{tot.extra || "—"}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums">{tot.noTrab ? fmtMin(tot.noTrab) : "—"}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums">{tot.extra ? fmtMin(tot.extra) : "—"}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{tot.rev || "—"}</td>
               </tr>
             </tfoot>
@@ -307,7 +306,7 @@ export default function ReporteTab() {
         <Ayuda titulo="Cómo se leen estos números" etiqueta="Cómo se leen estos números">
           <p>
             Todo en minutos. Entrada 8:00 con {reglas?.toleranciaTardanzaMin ?? TOLERANCIA_MIN} de
-            tolerancia · almuerzo de {ALMUERZO_FIJO_MIN} minutos · extras desde{" "}
+            tolerancia · almuerzo de {textoAlmuerzo()} · extras desde{" "}
             {/* 🔴 1-sep-2026: la extra YA NO se netea contra el atraso del día.
                 Daniel, textual: *"No, van separadas"*. El mínimo es una PUERTA
                 —pasada, se paga desde el primer minuto— y el atraso sigue
@@ -349,7 +348,9 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir }: {
   onCorregir: (m: MarcaParaCorregir) => void;
 }) {
   const r = p.resumen;
-  const persona = etiquetaPersona(p.codigo, p.nombre);
+  const persona = p.nombre
+    ? capitalizarNombre(etiquetaPersona(p.codigo, p.nombre))
+    : etiquetaPersona(p.codigo, p.nombre);
   return (
     <>
       <tr onClick={onToggle} className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50">

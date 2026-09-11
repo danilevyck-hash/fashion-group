@@ -42,6 +42,8 @@ interface FichaDeuda {
   saldo: number;
   saldoPrestamo: number;
   saldoDano: number;
+  /** Lo que debe por «Descuento a terceros». Opcional: un payload viejo no lo trae. */
+  saldoTerceros?: number;
   cuota: number;
   cuotaDano: number;
   yaDescontado: number;
@@ -96,6 +98,11 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
     return <p className="text-sm text-gray-500">Leyendo la deuda…</p>;
   }
 
+  // 🔴 LA COLUMNA «Descuento a terceros» SOLO CUANDO ALGUIEN LO TIENE (10-sep-2026,
+  // Daniel: *«que aparezca solo cuando alguien lo tenga»*). Una columna de ceros
+  // es una columna que no dice nada.
+  const hayTerceros = fichas.some((f) => (f.saldoTerceros ?? 0) > 0);
+
   if (!fichas.length) {
     // 🔑 Nunca un «$0.00» grande: se dice con palabras qué pasa.
     return (
@@ -126,6 +133,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
               <th className="px-3 py-2 font-medium">Colaborador</th>
               <th className="px-3 py-2 text-right font-medium">Préstamo</th>
               <th className="px-3 py-2 text-right font-medium">Daño de mercancía</th>
+              {hayTerceros && <th className="px-3 py-2 text-right font-medium">{NOMBRE_CUENTA.terceros}</th>}
               <th className="px-3 py-2 text-right font-medium">Debe</th>
               <th className="px-3 py-2 text-right font-medium">Cuota</th>
               <th className="px-3 py-2 text-right font-medium">Esta quincena</th>
@@ -147,6 +155,11 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-600">{money(f.saldoPrestamo)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-600">{money(f.saldoDano)}</td>
+                {hayTerceros && (
+                  <td className="px-3 py-2 text-right tabular-nums text-gray-600">
+                    {(f.saldoTerceros ?? 0) > 0 ? money(f.saldoTerceros ?? 0) : <span className="text-gray-400">—</span>}
+                  </td>
+                )}
                 <td className="px-3 py-2 text-right tabular-nums font-medium text-gray-900">{money(f.saldo)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-600">{money(f.cuota + f.cuotaDano)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-600">
@@ -177,6 +190,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string } =
             </div>
             <p className="mt-1 text-sm text-gray-500">
               {NOMBRE_CUENTA.prestamo} {money(f.saldoPrestamo)} · {NOMBRE_CUENTA.dano} {money(f.saldoDano)}
+              {(f.saldoTerceros ?? 0) > 0 && ` · ${NOMBRE_CUENTA.terceros} ${money(f.saldoTerceros ?? 0)}`}
             </p>
             <p className="mt-0.5 text-sm text-gray-500">
               Cuota {money(f.cuota + f.cuotaDano)}

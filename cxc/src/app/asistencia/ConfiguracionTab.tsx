@@ -33,7 +33,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
 import {
-  ALMUERZO_FIJO_MIN,
+  textoAlmuerzo,
   EMPRESAS_ASISTENCIA,
   JORNADAS,
   etiquetaEmpresa,
@@ -1059,8 +1059,10 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                         <span className="truncate text-[13px] text-gray-600">
                           {p.empresa ? etiquetaEmpresa(p.empresa) : "—"}
                         </span>
+                        {/* Sin ficha, la jornada es un RELLENO (48 por defecto), no un
+                            dato: va con guion (10-sep-2026). */}
                         <span className="text-right text-[13px] tabular-nums text-gray-600">
-                          {p.jornadaSemanal} h
+                          {p.configurado ? `${p.jornadaSemanal} h` : "—"}
                         </span>
                         <span className="text-right text-[13px] tabular-nums text-gray-600">
                           {money(p.salarioMensual)}
@@ -1098,7 +1100,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                         )}
                         <span className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
                           <Dato etiqueta="Empresa" valor={p.empresa ? etiquetaEmpresa(p.empresa) : "—"} />
-                          <Dato etiqueta="Jornada" valor={`${p.jornadaSemanal} h/semana`} numero />
+                          <Dato etiqueta="Jornada" valor={p.configurado ? `${p.jornadaSemanal} h/semana` : "—"} numero />
                           <Dato etiqueta="Salario" valor={money(p.salarioMensual)} numero />
                           <Dato etiqueta="Rata / hora" valor={money(p.rataHora)} numero />
                           {personaEnElCentro && (
@@ -1857,7 +1859,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                     </Ayuda>
                   </div>
                   <ul className="mt-1 space-y-1 text-[12px] leading-relaxed text-gray-600">
-                    <li>· El almuerzo es de {ALMUERZO_FIJO_MIN} minutos, igual para todos.</li>
+                    <li>· El almuerzo es de {textoAlmuerzo()}.</li>
                     <li>· La ausencia se descuenta como horas × valor de la hora.</li>
                     <li>· La quincena va del 1 al 15 y del 16 al 30.</li>
                     <li>· El día 31 no se paga, pero sí se descuenta si se falta.</li>

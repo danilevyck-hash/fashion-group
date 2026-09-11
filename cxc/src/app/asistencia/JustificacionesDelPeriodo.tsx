@@ -43,6 +43,8 @@ export default function JustificacionesDelPeriodo({ desde, hasta }: {
   const { toast } = useToast();
   const [lista, setLista] = useState<Justificacion[] | null>(null);
   const [personas, setPersonas] = useState<PersonaListada[]>([]);
+  // 🩸 ARRANCA PLEGADA: el enlace se ve, la lista no.
+  const [abierta, setAbierta] = useState(false);
 
   const leer = useCallback(async () => {
     try {
@@ -84,18 +86,20 @@ export default function JustificacionesDelPeriodo({ desde, hasta }: {
     return capitalizarNombre(etiquetaPersona(codigo, p?.nombre ?? null));
   };
 
-  if (lista === null) return <p className="text-sm text-gray-500">Cargando…</p>;
-
-  if (lista.length === 0) {
-    return (
-      <p className="text-[13px] text-gray-400">
-        Ninguna justificación en estos días. Se cargan desde el colaborador, en Colaboradores.
-      </p>
-    );
-  }
+  // 🔴 SIN JUSTIFICACIONES NO SE DIBUJA NADA — ni el título (10-sep-2026,
+  // Daniel revisó la pantalla: un título sobre nada es una palabra de más).
+  // Mientras carga tampoco: un enlace que aparece y desaparece distrae.
+  if (lista === null || lista.length === 0) return null;
 
   return (
-    <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+    <>
+      <button type="button" onClick={() => setAbierta((v) => !v)}
+        aria-expanded={abierta}
+        className="min-h-[44px] text-sm text-gray-500 underline-offset-2 transition hover:text-gray-900 hover:underline">
+        {abierta ? "Ocultar las justificaciones" : `Justificaciones del período (${lista.length})`}
+      </button>
+      {abierta && (
+    <ul className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
       {lista.map((j) => (
         <li key={j.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
           <span className="min-w-0">
@@ -118,5 +122,7 @@ export default function JustificacionesDelPeriodo({ desde, hasta }: {
         </li>
       ))}
     </ul>
+      )}
+    </>
   );
 }

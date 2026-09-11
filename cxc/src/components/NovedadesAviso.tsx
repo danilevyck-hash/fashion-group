@@ -10,8 +10,14 @@
 // fixed`, no atrapa el teclado y la pantalla de abajo se usa igual con la tira
 // puesta. Hay candado que exige las tres cosas.
 //
-// 🔴 SE VE UNA VEZ POR PERSONA Y POR NOVEDAD. Lo leído se guarda en DOS lugares
-// a propósito, y los dos son de la persona:
+// 🔴 SE VE UNA VEZ POR PERSONA Y POR NOVEDAD — Y «UNA VEZ» ES MOSTRARLA, NO
+// CERRARLA (10-sep-2026). Daniel, textual: *«se muestra una vez y se va solo al
+// cerrarlo; si no lo cierran, no se vuelve a mostrar»*. Antes lo visto se
+// anotaba solo al tocar la ×, así que quien no la tocaba la veía en cada
+// visita. Ahora se anota EN EL MOMENTO EN QUE SE DIBUJA (`marcarVistas`), con
+// el MISMO mecanismo y en los mismos dos lugares; la × sigue apagándola en el
+// acto. Lo leído se guarda en DOS lugares a propósito, y los dos son de la
+// persona:
 //   · `novedades_vistas` en la base — es la fuente, la que viaja con ella a
 //     cualquier aparato y la que le deja a Daniel contar cuántos la vieron;
 //   · `localStorage` en este navegador — para que la × apague la tira EN EL
@@ -23,7 +29,7 @@
 // ⚠️ QUIÉN VE QUÉ LO DECIDE EL SERVIDOR, no este archivo: la ruta filtra por los
 // módulos de la cookie firmada. Acá solo se dibuja lo que llegó.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { NOVEDADES } from "@/lib/novedades/lista";
 import { novedadesParaMostrar, type Novedad } from "@/lib/novedades/seleccion";
@@ -115,18 +121,38 @@ export default function NovedadesAviso({ moduloKey }: Props) {
     modulosDelUsuario: moduloKey ? [moduloKey] : [],
   });
 
+  /** Anota «ya la vio» en el navegador y en la base. Idempotente: cada id una vez. */
+  const yaAnotadas = useRef<Set<string>>(new Set());
+  const marcarVistas = useCallback((ids: string[]) => {
+    const nuevas = ids.filter((id) => !yaAnotadas.current.has(id));
+    if (nuevas.length === 0) return;
+    for (const id of nuevas) yaAnotadas.current.add(id);
+    anotarLocal(nuevas);
+    fetch("/api/novedades", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: nuevas }),
+    }).catch(() => { /* queda anotado en este navegador; se reintenta al volver */ });
+  }, []);
+
+  // 🔴 MOSTRARLA YA CUENTA COMO VISTA (10-sep-2026). Se anota al dibujarse, sin
+  // tocar `locales`: la tira se queda en pantalla hasta la × o hasta que la
+  // persona se vaya, y a la próxima visita ya no vuelve.
+  // ⚠️ Solo lo que de verdad SE DIBUJA: con la tira cerrada, las que subirían
+  // en su lugar no se muestran y por eso tampoco se anotan.
+  const huella = aMostrar.map((n) => n.id).join("|");
+  useEffect(() => {
+    if (!huella || cerrada) return;
+    marcarVistas(huella.split("|"));
+  }, [huella, cerrada, marcarVistas]);
+
   const cerrar = useCallback(() => {
     const ids = aMostrar.map((n) => n.id);
     if (ids.length === 0) return;
     setCerrada(true);
-    anotarLocal(ids);
+    marcarVistas(ids);
     setLocales((prev) => Array.from(new Set([...prev, ...ids])));
-    fetch("/api/novedades", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
-    }).catch(() => { /* queda anotado en este navegador; se reintenta al volver */ });
-  }, [aMostrar]);
+  }, [aMostrar, marcarVistas]);
 
   if (cerrada || aMostrar.length === 0) return null;
 

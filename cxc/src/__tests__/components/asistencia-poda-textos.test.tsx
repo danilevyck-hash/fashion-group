@@ -529,7 +529,10 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     expect(screen.getByText(/La quincena va del 1 al 15 y del 16 al 30/)).toBeTruthy();
     // 🔴 El almuerzo pasó de ser una CASILLA a ser una regla declarada: es lo
     // que impide que vuelva a haber dos lugares diciendo cuánto dura.
-    expect(screen.getByText(/El almuerzo es de 30 minutos, igual para todos/)).toBeTruthy();
+    // 🔴 10-sep-2026: el almuerzo es por EMPRESA (60 en Multifashion, Daniel:
+    // *«entrada 10am, una hora de almuerzo»*). Sigue sin ser una casilla: la
+    // regla se DECLARA. Ver `asistencia-siete-pantallas.test.ts`.
+    expect(screen.getByText(/El almuerzo es de 30 minutos \(60 en Multifashion\)/)).toBeTruthy();
     expect(screen.queryByText("Almuerzo por defecto")).toBeNull();
     esperaDetrasDelInfo("Por qué no se pueden cambiar", /es la forma del cálculo/);
   });

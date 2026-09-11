@@ -612,10 +612,15 @@ describe("I. 🔴 EL SALDO EN PERSONAS, LAS JUSTIFICACIONES EN REPORTE", () => {
     const src = puro(REPORTE);
     expect(src).toMatch(/PERSONA_EN_EL_CENTRO && \(/);
     expect(src).toMatch(/<JustificacionesDelPeriodo desde=\{desde\} hasta=\{hasta\} \/>/);
-    // 🩸 ARRANCA CERRADA, y se pregunta por ESE estado: `useState(false)` a
-    // secas lo cumplen otros cinco estados del mismo archivo.
-    expect(src).toMatch(/const \[verJustificaciones, setVerJustificaciones\] = useState\(false\);/);
-    expect(leer(REPORTE)).toMatch(/Justificaciones del período/);
+    // 🔴 10-sep-2026: el enlace «Justificaciones del período» y el «arranca
+    // cerrada» se mudaron ADENTRO del componente, que además no dibuja nada
+    // cuando no hay ninguna (Daniel revisó la pantalla: un título sobre nada es
+    // una palabra de más). La regla no cambió: sigue siendo una VISTA plegada al
+    // lado de la tabla. Ver `asistencia-siete-pantallas.test.ts`.
+    const comp = puro("app/asistencia/JustificacionesDelPeriodo.tsx");
+    expect(comp).toMatch(/const \[abierta, setAbierta\] = useState\(false\);/);
+    expect(leer("app/asistencia/JustificacionesDelPeriodo.tsx")).toMatch(/Justificaciones del período/);
+    expect(src).not.toMatch(/verJustificaciones/);
   });
 
   it("🔴 en Reporte SOLO se mira y se quita: agregar es desde la persona", () => {

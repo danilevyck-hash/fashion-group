@@ -14,7 +14,7 @@ import { requireAsistencia } from "@/lib/asistencia/guard";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { salidaSugerida, minutosDelDia, diaPanama } from "@/lib/asistencia/reporte";
-import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
+import { ALMUERZO_FIJO_MIN, almuerzoDeEmpresa } from "@/lib/asistencia/config";
 import { leerDirectorio } from "@/lib/asistencia/config-server";
 import { compararPersonas } from "@/lib/asistencia/directorio";
 
@@ -126,17 +126,35 @@ export async function PUT(req: NextRequest) {
   const salida = (body.salida ?? "").trim();
   if (!/^\d{2}:\d{2}$/.test(salida)) return NextResponse.json({ error: "Hora de salida inválida" }, { status: 400 });
 
+  // 🔴 EL ALMUERZO LO DECIDE LA EMPRESA DE LA FICHA (10-sep-2026): 30 en las
+  // tres de siempre, 60 en Multifashion. Sin ficha, los 30 de siempre. Sigue
+  // sin leerse del cuerpo.
+  const { data: ficha } = await supabaseServer
+    .from("asistencia_personas")
+    .select("empresa")
+    .eq("empleado_codigo", codigo)
+    .maybeSingle();
+  const almuerzo = almuerzoDeEmpresa((ficha as { empresa?: string | null } | null)?.empresa);
+  // ⚠️ La entrada sigue siendo la GUARDADA si ya hay fila (Multifashion entra a
+  // las 10:00); sin fila, las 8:00 de siempre.
+  const { data: previa } = await supabaseServer
+    .from("asistencia_horarios")
+    .select("entrada")
+    .eq("empleado_codigo", codigo)
+    .maybeSingle();
+  const entrada = previa?.entrada ? String(previa.entrada).slice(0, 5) : "08:00";
+
   const { error } = await supabaseServer.from("asistencia_horarios").upsert(
     {
       empleado_codigo: codigo,
       empleado_nombre: body.nombre ?? null,
-      entrada: "08:00",
+      entrada,
       salida,
-      // 🔴 EL ALMUERZO SE ESCRIBE FIJO Y NO SE LEE DEL CUERPO. Es lo que hace que
-      // "ya no se puede elegir" sea verdad: esconder los botones de la pantalla
-      // es cosmético —cualquiera manda un PUT con 60— y el almuerzo entra en la
-      // jornada con la que se valúa una ausencia, o sea en plata.
-      almuerzo_minutos: ALMUERZO_FIJO_MIN,
+      // 🔴 EL ALMUERZO NO SE LEE DEL CUERPO. Es lo que hace que "ya no se puede
+      // elegir" sea verdad: esconder los botones de la pantalla es cosmético
+      // —cualquiera manda un PUT con 60— y el almuerzo entra en la jornada con
+      // la que se valúa una ausencia, o sea en plata. Lo decide la empresa.
+      almuerzo_minutos: almuerzo,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "empleado_codigo" },

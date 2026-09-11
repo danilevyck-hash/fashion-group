@@ -197,6 +197,47 @@ export const REGLAS_DEFAULT: ReglasAsistencia = {
 export const ALMUERZO_FIJO_MIN = 30;
 
 /* ─────────────────────────────────────────────────────────────────────────────
+ * 🔴 EL ALMUERZO ES POR EMPRESA DESDE EL 10-SEP-2026 — y sigue siendo FIJO.
+ *
+ * Daniel, textual, al configurar Multifashion: *«entrada 10am, una hora de
+ * almuerzo»*. Choca con lo que él mismo fijó el 13-ago (*«siempre es fijo 30
+ * mins»*) y se resuelve como el extra automático (`EXTRA_AUTOMATICO_POR_EMPRESA`):
+ * el número lo decide la EMPRESA, no la persona ni la pantalla. Las tres de
+ * siempre quedan en 30 (`ALMUERZO_FIJO_MIN`, que sigue siendo el de una empresa
+ * desconocida o de un código sin ficha); Multifashion, 60.
+ *
+ * 🔴 NO SE VUELVE UNA PERILLA: sigue sin haber casilla. El PUT de Horarios
+ * escribe el de la empresa de la ficha, y el motor sigue leyendo la columna por
+ * persona (`asistencia_horarios.almuerzo_minutos`), que es donde queda escrito.
+ * Medido contra producción antes y después del cambio: 0 diferencias en la
+ * quincena en curso para las tres empresas de siempre
+ * (`scripts/_medir-almuerzo-por-empresa.ts`).
+ * ────────────────────────────────────────────────────────────────────────── */
+export const ALMUERZO_POR_EMPRESA: Readonly<Record<EmpresaAsistencia, number>> = Object.freeze({
+  confecciones_boston: ALMUERZO_FIJO_MIN,
+  vistana: ALMUERZO_FIJO_MIN,
+  fashion_wear: ALMUERZO_FIJO_MIN,
+  american_classic: 60,
+});
+
+/** Los minutos de almuerzo de esta empresa. Desconocida o vacía → los 30 de siempre. */
+export function almuerzoDeEmpresa(empresa: string | null | undefined): number {
+  const k = String(empresa ?? "").trim();
+  const n = (ALMUERZO_POR_EMPRESA as Record<string, number>)[k];
+  return Number.isFinite(n) && n >= 0 ? n : ALMUERZO_FIJO_MIN;
+}
+
+/** «30 minutos (60 en Multifashion)» — la frase de las pantallas y los papeles. */
+export function textoAlmuerzo(): string {
+  const raros = EMPRESAS_ASISTENCIA
+    .filter((e) => ALMUERZO_POR_EMPRESA[e] !== ALMUERZO_FIJO_MIN)
+    .map((e) => `${ALMUERZO_POR_EMPRESA[e]} en ${etiquetaEmpresa(e)}`);
+  return raros.length
+    ? `${ALMUERZO_FIJO_MIN} minutos (${raros.join(", ")})`
+    : `${ALMUERZO_FIJO_MIN} minutos, igual para todos`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
  * CUÁNTOS MINUTOS TARDE DEJAN DE SER UNA TARDANZA Y PASAN A LLAMARSE AUSENCIA
  *
  * Daniel, 25-ago-2026, sobre la columna «Ausencia» que la contadora venía
@@ -248,9 +289,10 @@ export const MINUTOS_TARDE_QUE_SON_AUSENCIA = 30;
 //   3. EL DÍA 31 NO SE PAGA, PERO SÍ SE DESCUENTA SI SE FALTA. Es asimétrico a
 //      propósito y así lo trabaja la contable; expresarlo como una casilla
 //      invitaría a "arreglar" la asimetría, que es justo lo que no hay que hacer.
-//   4. EL ALMUERZO ES DE 30 MINUTOS PARA TODO EL MUNDO (`ALMUERZO_FIJO_MIN`).
-//      Lo fijó Daniel y es igual en las 33 personas con horario; tener dos
-//      perillas para eso solo servía para que dijeran cosas distintas.
+//   4. EL ALMUERZO ES FIJO Y LO DECIDE LA EMPRESA (`ALMUERZO_POR_EMPRESA`): 30
+//      minutos en las tres de siempre y 60 en Multifashion (10-sep-2026). Lo
+//      fijó Daniel; tener perillas para eso solo servía para que dijeran cosas
+//      distintas.
 //   5. PASADOS 30 MINUTOS TARDE, LA COLUMNA SE LLAMA «AUSENCIA»
 //      (`MINUTOS_TARDE_QUE_SON_AUSENCIA`). No cambia cuánto se descuenta —los
 //      minutos valen lo mismo de los dos lados—, solo dónde se muestra, así que

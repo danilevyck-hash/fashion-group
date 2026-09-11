@@ -18,7 +18,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "./reporte";
-import { ALMUERZO_FIJO_MIN } from "./config";
+import { textoAlmuerzo } from "./config";
 import { etiquetaPersona } from "./directorio";
 import { MOTIVO_TRABAJO_VENDEDOR, textoDiaJustificado } from "./motivos";
 import { textoDiaVacaciones } from "./vacaciones";
@@ -250,8 +250,8 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     [],
     ["Cómo se calcula"],
     ["Entrada", `8:00 a.m. con ${g.toleranciaTardanzaMin} minutos de tolerancia. Pasados los ${g.toleranciaTardanzaMin}, se cuenta desde las 8:00.`],
-    // El almuerzo NO sale de `reglas`: es fijo para todos (ver ALMUERZO_FIJO_MIN).
-    ["Almuerzo", `${ALMUERZO_FIJO_MIN} minutos, igual para todos. Se mide entre la 2ª y la 3ª marca del día.`],
+    // El almuerzo NO sale de `reglas`: es fijo y lo decide la empresa (ver ALMUERZO_POR_EMPRESA).
+    ["Almuerzo", `${textoAlmuerzo()}. Se mide entre la 2ª y la 3ª marca del día.`],
     // 🔴 1-sep-2026: acá decía "y se le resta el atraso del mismo día". Ya no:
     // *"No, van separadas"*. El mínimo es una PUERTA, no un descuento —pasada,
     // se paga TODO desde el primer minuto— y el atraso se cobra por su lado.
@@ -305,7 +305,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
   const PIE_PT = 7;
   const PIE_MARGEN = 14;
   const pie = armarPie(doc, [
-    `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${ALMUERZO_FIJO_MIN} min · `
+    `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${textoAlmuerzo()} · `
     // 🔴 Misma corrección que la hoja «Cómo se calcula»: la extra se paga
     // completa y el atraso va aparte (1-sep-2026). El pie del papel firmado
     // no puede decir una regla distinta de la que hizo los números.

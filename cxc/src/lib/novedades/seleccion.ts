@@ -13,7 +13,10 @@
 //
 // 🔴 LAS SIETE REGLAS, y cada una tiene su candado en
 // `src/__tests__/lib/novedades.test.ts`:
-//   1. Se ve UNA sola vez por persona y por novedad. Cerrada, no vuelve.
+//   1. Se ve UNA sola vez por persona y por novedad. MOSTRADA, no vuelve
+//      (10-sep-2026, Daniel: *«se muestra una vez y se va solo al cerrarlo; si
+//      no lo cierran, no se vuelve a mostrar»* — hasta ese día solo la × la
+//      anotaba). La × sigue apagándola en el acto.
 //   2. No bloquea nada: es una tira con una ×, no un modal.
 //   3. MÁXIMO 3 a la vez, las más nuevas.
 //   4. Cada novedad es UNA línea, en el idioma de ellos.

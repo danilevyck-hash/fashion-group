@@ -194,37 +194,50 @@ function TarjetaReloj({
   // de prender la PC y quiere que sea ahora, no en la vuelta que le toque.
   const puedePedir = !faltaMigracion && (!esperando || rendido);
 
+  // 🔴 UNA SOLA LÍNEA POR RELOJ (10-sep-2026). Daniel, textual: *«debe de ser
+  // más chico, que no estorbe tanto»*. El punto, el nombre (si hay dos), el
+  // título y el estado del pedido van en un renglón; el párrafo explicativo
+  // pasó a un «?» con el texto al pasar el cursor o al tocarlo. ⚠️ El error del
+  // reloj (`con_error`) SÍ se queda a la vista: es lo que dice qué revisar.
+  // Nada de la lógica cambió.
+  const estado = rendido
+    ? "La PC de la oficina no ha recogido el pedido: revisa que esté prendida."
+    : esperando
+      ? "Pedido enviado, la PC lo recoge en unos minutos."
+      : null;
+  const explicacion = reloj.salud === "con_error" ? null : reloj.detalle;
+
   return (
-    <div className={`rounded-lg border p-3 ${COLOR[reloj.salud]}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-[200px] flex-1">
+    <div className={`rounded-lg border px-3 py-1.5 ${COLOR[reloj.salud]}`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <p className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-gray-900">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${PUNTO[reloj.salud]}`} />
           {conNombre && (
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+            <span className="font-semibold uppercase tracking-wide text-[11px] text-gray-500">
               {nombreRelojEnPantalla(reloj.dispositivo)}
-            </p>
+            </span>
           )}
-          <p className="flex items-center gap-2 text-sm font-medium text-gray-900">
-            <span className={`h-2 w-2 shrink-0 rounded-full ${PUNTO[reloj.salud]}`} />
-            {reloj.titulo}
-          </p>
-          {reloj.detalle && (
-            <p className="mt-1 text-[13px] leading-relaxed text-gray-600">{reloj.detalle}</p>
+          <span className="font-medium">{reloj.titulo}</span>
+          {explicacion && (
+            <span
+              tabIndex={0}
+              title={explicacion}
+              aria-label={explicacion}
+              className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center rounded-full border border-gray-300 text-[11px] text-gray-500"
+            >
+              ?
+            </span>
           )}
-
-          {/* El estado del pedido, en tres frases posibles y ninguna ambigua. */}
-          {rendido ? (
-            <p className="mt-1 text-[13px] font-medium text-amber-800">
-              La PC de la oficina no ha recogido el pedido. Revisa que esté prendida — el pedido
-              queda guardado y se cumple solo cuando vuelva.
-            </p>
-          ) : esperando ? (
-            <p className="mt-1 text-[13px] text-gray-600">
-              Pedido enviado. La PC de la oficina lo recoge en un par de minutos.
-            </p>
-          ) : null}
-
-          {faltaMigracion && <p className="mt-1 text-[13px] text-amber-800">{avisoMigracion}</p>}
-        </div>
+          {reloj.salud === "con_error" && reloj.detalle && (
+            <span className="text-[12px] text-red-800">{reloj.detalle}</span>
+          )}
+          {estado && (
+            <span className={`text-[12px] ${rendido ? "font-medium text-amber-800" : "text-gray-600"}`}>
+              {estado}
+            </span>
+          )}
+          {faltaMigracion && <span className="text-[12px] text-amber-800">{avisoMigracion}</span>}
+        </p>
 
         <button
           type="button"

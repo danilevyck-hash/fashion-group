@@ -153,6 +153,11 @@ describe("el cálculo, que es lo que se paga", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 🔴 10-sep-2026: el almuerzo pasó a ser POR EMPRESA (`ALMUERZO_POR_EMPRESA`:
+// 60 en Multifashion, 30 en las demás — Daniel: *«entrada 10am, una hora de
+// almuerzo»*). Estos casos siguen valiendo tal cual: el mock no devuelve ficha,
+// y sin ficha —o con una de las tres de siempre— la ruta escribe 30 y sigue sin
+// leer el cuerpo. El caso de Multifashion vive en `asistencia-siete-pantallas.test.ts`.
 describe("🔴 EL CANDADO: la ruta escribe 30, mire lo que mire el cuerpo", () => {
   it("guarda 30 cuando el cuerpo NO trae almuerzo", async () => {
     const res = await putHorario(pedido({ codigo: "6", nombre: "Ángela", salida: "16:30" }));

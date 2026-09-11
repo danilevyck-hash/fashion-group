@@ -45,6 +45,9 @@ const dia = (over: Record<string, unknown>) => ({
 
 /** RODRIGO: dos días sin marcas, los dos de trabajo fuera. */
 const persona = (justificado: string | null, diasTrabajandoFuera: number) => ({
+  // 🔴 10-sep-2026: el Reporte muestra los nombres CAPITALIZADOS, como la lista
+  // (`capitalizarNombre`); lo guardado sigue en mayúsculas. Por eso la pantalla
+  // se busca por «Rodrigo Miranda». Ver `asistencia-siete-pantallas.test.ts`.
   codigo: "13", nombre: "RODRIGO MIRANDA", salida: "17:00", almuerzoMin: 30,
   dias: [
     dia({ fecha: "2026-08-05", justificado }),
@@ -73,7 +76,7 @@ describe("🔴 El reporte lo distingue A LA VISTA", () => {
   it("el renglón del día dice «Trabajando fuera de la oficina», sin la palabra ausencia", async () => {
     servir(conReporte(persona(MOTIVO_TRABAJO_VENDEDOR, 2)));
     montar(<ReporteTab />);
-    fireEvent.click(await screen.findByText(/RODRIGO MIRANDA/));
+    fireEvent.click(await screen.findByText(/Rodrigo Miranda/));
 
     const renglones = screen.getAllByText(/Trabajando fuera de la oficina/);
     expect(renglones.length).toBeGreaterThan(0);
@@ -89,14 +92,14 @@ describe("🔴 El reporte lo distingue A LA VISTA", () => {
   it("otro motivo retirado sigue diciendo «Ausencia justificada — …»", async () => {
     servir(conReporte(persona("Luto", 0)));
     montar(<ReporteTab />);
-    fireEvent.click(await screen.findByText(/RODRIGO MIRANDA/));
+    fireEvent.click(await screen.findByText(/Rodrigo Miranda/));
     expect(screen.getAllByText(/Ausencia justificada — Luto/).length).toBeGreaterThan(0);
   });
 
   it("🔴 se ve SIN abrir nada: el chip «N días trabajando fuera» en la fila", async () => {
     servir(conReporte(persona(MOTIVO_TRABAJO_VENDEDOR, 2)));
     montar(<ReporteTab />);
-    await screen.findByText(/RODRIGO MIRANDA/);
+    await screen.findByText(/Rodrigo Miranda/);
     // Sin tocar la fila.
     expect(screen.getByText(/2 días trabajando fuera/)).toBeTruthy();
   });
@@ -104,14 +107,14 @@ describe("🔴 El reporte lo distingue A LA VISTA", () => {
   it("el chip NO aparece cuando no hay días de trabajo fuera", async () => {
     servir(conReporte(persona("Luto", 0)));
     montar(<ReporteTab />);
-    await screen.findByText(/RODRIGO MIRANDA/);
+    await screen.findByText(/Rodrigo Miranda/);
     expect(screen.queryByText(/trabajando fuera/i)).toBeNull();
   });
 
   it("con UN solo día el chip está en singular — «1 día», no «1 días»", async () => {
     servir(conReporte({ ...persona(MOTIVO_TRABAJO_VENDEDOR, 1) }));
     montar(<ReporteTab />);
-    await screen.findByText(/RODRIGO MIRANDA/);
+    await screen.findByText(/Rodrigo Miranda/);
     expect(screen.getByText(/1 día trabajando fuera/)).toBeTruthy();
   });
 });

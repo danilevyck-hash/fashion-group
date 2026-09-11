@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
-import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
+import { textoAlmuerzo } from "@/lib/asistencia/config";
 import { Ayuda } from "@/components/shared/Ayuda";
 
 interface Fila {
@@ -94,7 +94,7 @@ export default function HorariosTab() {
             <b> cada quien sale de verdad</b>, medida de sus marcaciones.
           </p>
           <p className="mt-1.5">
-            El <b>almuerzo es de {ALMUERZO_FIJO_MIN} minutos para todos</b> y no se elige. Lo único
+            El <b>almuerzo es de {textoAlmuerzo()}</b> y no se elige. Lo único
             que se fija colaborador por colaborador es la hora de salida.
           </p>
         </Ayuda>
@@ -149,7 +149,7 @@ export default function HorariosTab() {
                   </td>
                   {/* Dato, no control: el almuerzo es igual para todos. */}
                   <td className="px-3 py-2 text-[13px] tabular-nums text-gray-500">
-                    {ALMUERZO_FIJO_MIN} minutos
+                    {f.almuerzoMinutos} minutos
                   </td>
                   <td className="px-3 py-2 text-[12px]">
                     {guardando === f.codigo ? <span className="text-gray-400">Guardando…</span>

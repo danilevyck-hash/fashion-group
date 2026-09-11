@@ -7,7 +7,7 @@
 // está al lado del número que genera la discusión. Sin jerga y sin fórmulas.
 
 import { useEffect, useState } from "react";
-import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
+import { textoAlmuerzo, REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
 import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
 
 /** Los motivos salen de la MISMA lista que ofrece el desplegable.
@@ -33,7 +33,7 @@ const reglasDe = (r: ReglasAsistencia): Array<{ t: string; d: string }> => {
     d: `Marcar hasta las ${limite} no cuenta como tarde. Pasadas las ${limite}, se cuentan los minutos desde las 8:00 — o sea que llegar ${unoMas} son ${tol + 1} minutos, no 1.`,
   },
   {
-    t: `El almuerzo es de ${ALMUERZO_FIJO_MIN} minutos, igual para todos`,
+    t: `El almuerzo es de ${textoAlmuerzo()}`,
     d: "Se mide entre la salida a almorzar y el regreso. Lo que pase de ahí cuenta como tiempo no trabajado.",
   },
   {
