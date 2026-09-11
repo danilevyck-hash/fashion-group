@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerPdfConAnthropic } from "@/lib/ia/anthropic";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,6 +10,12 @@ export const maxDuration = 60;
 // retirado por la API y devolvía 404 not_found_error → TODA factura fallaba con
 // "No se pudo leer la factura con IA". Sonnet 4.6 lee el PDF (texto + visual).
 const MODEL = "claude-sonnet-4-6";
+const MAX_TOKENS = 1024;
+
+// 🔴 La llamada a Anthropic pasa por `lib/ia/anthropic.ts`, el ÚNICO punto de
+// llamada del sistema: es el que avisa por 🔧 SISTEMA cuando la llave no sirve,
+// se acabó el crédito o la cuenta está topada (11-sep-2026). El prompt, el
+// modelo y el parser de esta ruta NO cambiaron.
 
 interface Body {
   path?: string;
@@ -79,14 +85,6 @@ export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY no configurada" },
-      { status: 500 },
-    );
-  }
-
   let body: Body;
   try {
     body = (await req.json()) as Body;
@@ -107,30 +105,13 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await fileData.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
 
-    const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: base64,
-              },
-            },
-            { type: "text", text: PROMPT },
-          ],
-        },
-      ],
+    const raw = await leerPdfConAnthropic({
+      origen: "marketing",
+      modelo: MODEL,
+      maxTokens: MAX_TOKENS,
+      pdfBase64: base64,
+      prompt: PROMPT,
     });
-
-    const textBlock = msg.content.find((b) => b.type === "text");
-    const raw = textBlock && textBlock.type === "text" ? textBlock.text : "";
     const extraido = parsearRespuesta(raw);
     if (!extraido) {
       return NextResponse.json(

@@ -1546,3 +1546,49 @@ Aprobado por Daniel el 10/11-sep con tres mockups (portada+empresa+nuevo, «Recl
 `reclamos-rediseno.test.ts` (puro + barridos) · `reclamos-rediseno.test.tsx` (las cuatro pantallas montadas); **34 mutaciones, 34 cazadas, 2 controles** (`scripts/_mutar-candados-reclamos-rediseno.sh`). Seis candados viejos cambiaron de dirección con nota fechada (ver CLAUDE.md).
 
 ⚠️ Al correr la suite completa fallaban además `guias-entrega-directa` y `guias-sin-rechazo` (13 casos) — **fallan igual en HEAD limpio**, no son de este cambio; y en el árbol había trabajo de Asistencia sin commitear de otra sesión (con errores de `tsc`), que no se tocó ni se commiteó.
+
+---
+
+## 11-sep-2026 — Telegram avisa cuando el lector de facturas deja de leer
+
+Cierra el pendiente #1 de arriba por el otro lado: la llave **ya se rotó**, pero nada impedía que
+volviera a pasar. La `ANTHROPIC_API_KEY` de producción estuvo inválida **un tiempo que no se puede
+medir** —no hay tabla que lo registre— y los dos lectores de PDF fallaron en silencio: Marketing
+(«+ Registrar gasto» y la pantalla del proyecto) y Reclamos. Las dos pantallas hacían lo correcto
+—«no se pudo leer», sigue tecleando a mano— y por eso nadie reportó nada y nadie rotó la llave.
+
+Daniel, textual: *«si se me acaba o algo que me llegue notificación a telegram»*.
+
+### Qué quedó
+- **Tres causas avisan** por 🔧 SISTEMA, y nada más: **llave que no sirve** (401/403, y también la
+  llave ausente), **crédito agotado** (402, o el 400 cuyo mensaje dice `credit balance`/`billing`)
+  y **tope de uso persistente** (429).
+- **Lo que NO avisa es la mitad del diseño**: PDF ilegible, 400 de documento, timeout, 500 y 529
+  «overloaded» no suenan — se arreglan volviendo a intentar y la pantalla ya lo dice.
+- «Persistente» está medido, no supuesto: el cliente fija `maxRetries` en **2**, así que un 429 que
+  llega al aviso ya se reintentó dos veces con espera.
+- **Un solo punto de llamada a Anthropic**: `src/lib/ia/anthropic.ts`. Antes cada ruta armaba su
+  cliente y su `try/catch` — dos copias del mismo silencio. **Ni un prompt ni un modelo cambiaron**
+  y el error se vuelve a lanzar tal cual: las dos rutas contestan el mismo 500 de siempre.
+- **Anti-loop de 7 días por CAUSA** (`cron_email_errors.tipo` = `lector_facturas:<causa>`), marcado
+  **después** de que Telegram confirme. La causa va en la llave para que una llave vencida no tape
+  que después se acabe el crédito.
+- El mensaje manda a la pantalla exacta: llave → API Keys y después Vercel; crédito → Billing («la
+  llave no hay que cambiarla»); tope → esperar y, si sigue, Limits.
+
+### Sin migración
+No hace falta DDL: el dedup vive en `cron_email_errors`, que ya existe y ya usan el guard de montos
+y el silencio de datos.
+
+### Candado
+`lector-facturas-avisa.test.ts` (29 casos): las tres causas, el CONTROL de que un 500 de PDF y un
+529 no avisan, el anti-loop en las cuatro direcciones (avisa · no repite · Telegram no confirma →
+no marca · fail-open) y el barrido que exige que **solo `lib/ia/anthropic.ts` importe el SDK**.
+
+### Pendiente de Daniel
+- Nada. Se comprueba subiendo un PDF en Marketing o en Reclamos; si la llave vuelve a fallar, el
+  aviso llega solo.
+
+⚠️ Al correr la suite completa fallaba `data-health-dentro-de-usuarios` — es el trabajo **en curso
+de otra sesión** (está retirando la pantalla Data Health y ya borró `DataHealthTab.tsx`), no de este
+cambio. Nada de ese árbol se tocó ni se commiteó.

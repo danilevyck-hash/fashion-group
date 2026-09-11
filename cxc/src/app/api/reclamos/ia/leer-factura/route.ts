@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { FACTURA_BUCKET } from "@/lib/reclamos/factura-storage";
 import { MODELO_LECTOR, MAX_TOKENS_LECTOR, PROMPT_LECTOR, parsearRespuestaLector } from "@/lib/reclamos/lector-factura";
+import { leerPdfConAnthropic } from "@/lib/ia/anthropic";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -11,6 +11,11 @@ export const maxDuration = 60;
 // El prompt y el parser viven en `lib/reclamos/lector-factura.ts` (puro): los
 // comparte con el backfill que relee los PDF viejos. Sonnet 4.6 lee el PDF
 // (texto + visual), el mismo modelo que Marketing.
+//
+// 🔴 La llamada a Anthropic pasa por `lib/ia/anthropic.ts`, el ÚNICO punto de
+// llamada del sistema: es el que avisa por 🔧 SISTEMA cuando la llave no sirve,
+// se acabó el crédito o la cuenta está topada (11-sep-2026). El prompt, el
+// modelo y el parser NO cambiaron.
 
 interface Body {
   path?: string;
@@ -23,14 +28,6 @@ interface Body {
 export async function POST(req: NextRequest) {
   const denied = requireAdminOSecretaria(req);
   if (denied) return denied;
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY no configurada" },
-      { status: 500 },
-    );
-  }
 
   let body: Body;
   try {
@@ -52,26 +49,13 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await fileData.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
 
-    const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create({
-      model: MODELO_LECTOR,
-      max_tokens: MAX_TOKENS_LECTOR,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: { type: "base64", media_type: "application/pdf", data: base64 },
-            },
-            { type: "text", text: PROMPT_LECTOR },
-          ],
-        },
-      ],
+    const raw = await leerPdfConAnthropic({
+      origen: "reclamos",
+      modelo: MODELO_LECTOR,
+      maxTokens: MAX_TOKENS_LECTOR,
+      pdfBase64: base64,
+      prompt: PROMPT_LECTOR,
     });
-
-    const textBlock = msg.content.find((b) => b.type === "text");
-    const raw = textBlock && textBlock.type === "text" ? textBlock.text : "";
     const extraido = parsearRespuestaLector(raw);
     if (!extraido) {
       return NextResponse.json(
