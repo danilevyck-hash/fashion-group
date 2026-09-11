@@ -73,6 +73,7 @@ import {
   type EmpresaAsistencia,
   type ReglasAsistencia,
 } from "./config";
+import { PESTANA_FICHAS } from "./persona-en-el-centro";
 import { etiquetaPersona } from "./directorio";
 import { esHabil, fmtMin, type DiaReporte, type PersonaReporte } from "./reporte";
 import { minutosExtraAutomaticos } from "./extra-automatico";
@@ -1352,7 +1353,7 @@ export interface LineaPlanilla {
  * queda afuera" y alguien se olvide de pintar uno.
  */
 export const FALTA = {
-  ficha: "sin ficha en Configuración",
+  ficha: `sin ficha en ${PESTANA_FICHAS}`,
   salario: "falta el salario",
   jornada: "falta la jornada (40 u 48 horas)",
   empresa: "falta la empresa",

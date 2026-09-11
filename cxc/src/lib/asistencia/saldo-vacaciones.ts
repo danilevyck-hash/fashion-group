@@ -132,6 +132,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import type { Resultado } from "./config";
+import { dondeSeCargaLaFicha } from "./persona-en-el-centro";
 import { esFechaValida } from "./vigencia";
 import { diasDeVacacion, type Vacacion } from "./vacaciones";
 
@@ -509,7 +510,8 @@ export function avisoSinSaldo(sinFecha: number, sinSaldo: number): string | null
   const total = f + s;
   if (total === 0) return null;
   const gente = total === 1 ? "1 colaborador no tiene saldo" : `${total} colaboradores no tienen saldo`;
-  const donde = "Se cargan en Configuración.";
+  // 🔴 Con el acomodo nuevo se cargan en la FICHA del colaborador (10-sep-2026).
+  const donde = `Se cargan ${dondeSeCargaLaFicha()}.`;
   if (f > 0 && s > 0) {
     return `${gente}: a ${f} les falta la fecha de ingreso y a ${s} el saldo. ${donde}`;
   }

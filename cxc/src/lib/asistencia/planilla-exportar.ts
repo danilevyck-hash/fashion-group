@@ -19,6 +19,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import type * as XLSX from "xlsx-js-style";
+import { PESTANA_FICHAS } from "./persona-en-el-centro";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
@@ -359,9 +360,9 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Total bruto", "Quincenal + extras + domingos + feriados − ausencias − tardanzas. ⚠ Que unos minutos se muestren en «Ausencias» en vez de en «Tardanzas» NO cambia este número: se resta lo mismo de los dos lados."],
       ["Neto a pagar", "Total bruto − total deducciones + otros servicios."],
       [""],
-      ["⚠ Quien aparece en rojo", "No tiene todo lo que hace falta para calcularle un número. NO vale $0: quedó fuera del total y hay que configurarlo en la pestaña Configuración."],
+      ["⚠ Quien aparece en rojo", `No tiene todo lo que hace falta para calcularle un número. NO vale $0: quedó fuera del total y hay que configurarlo en la pestaña ${PESTANA_FICHAS}.`],
       ["Quien aparece en gris", `No va en planilla (${EXPLICACION_SERVICIO_PROFESIONAL} No es un pendiente: es como se le paga), o lo decide una persona: está justificada, o entró o salió a mitad del período. En ese caso el motivo va escrito en su fila, junto con lo que le daría la quincena completa; para pagarle lo suyo se usa el rango de fechas.`],
-      ["Quien entró o salió a mitad del período", "Cobra los días TRABAJADOS: sueldo quincenal ÷ días hábiles (lunes a viernes) de la quincena × días hábiles desde que entró (o hasta que salió). El prorrateo se dice al lado de su nombre. (Daniel, 10-sep-2026: «se paga días trabajados».)"],
+      ["Quien entró o salió a mitad del período", "Cobra los días TRABAJADOS: cada día hábil (lunes a viernes) desde que entró (o hasta que salió) vale el sueldo mensual ÷ 26, la costumbre de Panamá. El prorrateo se dice al lado de su nombre. (Daniel, 10-sep-2026: «se paga días trabajados», y el día vale sueldo ÷ 26.)"],
       ["Salida temprana", "Salir antes de la hora se descuenta desde el primer minuto: minutos × valor del minuto, sin tolerancia (los 10 minutos de gracia son solo de la entrada). (Daniel, 10-sep-2026: «se descuenta obvio», «si salió 20 minutos antes no debería de haber tolerancia».)"],
       ["Días que todavía no pasaron", d.periodoAbierto
         ? `${d.periodoAbierto.texto} Un día que no pasó no cuenta como falta ni como presente: todavía no existe.`

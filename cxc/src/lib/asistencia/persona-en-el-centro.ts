@@ -244,6 +244,23 @@ export function abreEnEditar(codigo: string, existe: boolean): boolean {
   return esPersonaNueva(codigo) || !existe;
 }
 
+/**
+ * 🔴 CÓMO SE LLAMA LA PESTAÑA DONDE VIVEN LAS FICHAS (10-sep-2026). Los avisos
+ * («se arregla en …», «se le da de alta en …») la NOMBRAN, y con el acomodo
+ * nuevo esa pestaña es «Colaboradores», no «Configuración». Un aviso que manda a
+ * una pestaña que no existe manda a buscar algo que no está. Daniel, sobre el
+ * saldo de vacaciones: el aviso decía «Se cargan en Configuración».
+ */
+export function nombrePestanaFichas(prendido = PERSONA_EN_EL_CENTRO): string {
+  return prendido ? "Colaboradores" : "Configuración";
+}
+export const PESTANA_FICHAS = nombrePestanaFichas();
+
+/** «en la ficha de cada colaborador» / «en Configuración»: dónde se carga un dato de la ficha. */
+export function dondeSeCargaLaFicha(prendido = PERSONA_EN_EL_CENTRO): string {
+  return prendido ? "en la ficha de cada colaborador" : "en Configuración";
+}
+
 export function esPersonaNueva(codigo: string | null | undefined): boolean {
   return String(codigo ?? "").trim().toLowerCase() === "nueva";
 }

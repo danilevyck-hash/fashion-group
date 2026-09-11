@@ -1336,3 +1336,20 @@ quincena (Yeritza entró el 27-jul: en la 16–31 jul cobra $125,00).
 `asistencia-planilla-guardada` (25 cifras de dinero / 22 del reloj; la migración nueva entra al barrido),
 `asistencia-planilla-rango` (la columna nueva), `asistencia-dias-que-no-pasaron` (Yeishka cobra 5 de 10
 hábiles, $150, y sigue sin cobrar $300).
+
+---
+
+## 10-sep-2026 (noche, 2) — El día vale sueldo ÷ 26, y ningún aviso manda a «Configuración»
+
+1. **Prorrateo**: Daniel eligió **«a»** — cada día hábil (L–V) trabajado desde el ingreso (o hasta la
+   salida) vale **sueldo mensual ÷ 26**, la costumbre de Panamá y lo que la contable ya paga
+   (`DIAS_PAGADOS_POR_MES = 26`, factor `días ÷ 13` sobre el quincenal). Caso de control: Yeritza
+   (51), entró el 27-jul-2026, 5 días → **$115,38** con $600 (antes, con los hábiles de la quincena,
+   $125,00). Yeishka (10-ago, 5 días) también queda en $115,38. `asistencia-reglas-de-la-contable` y
+   `asistencia-dias-que-no-pasaron` cambiaron de dirección con nota fechada.
+2. **Avisos**: la pestaña de las fichas se nombra desde el módulo puro (`PESTANA_FICHAS` =
+   «Colaboradores» con el interruptor prendido) en Planilla, Reporte, Justificaciones, Vacaciones,
+   «Cómo funciona», el glosario del Excel/PDF y `FALTA.ficha`; el aviso del saldo de vacaciones dice
+   «Se cargan en la ficha de cada colaborador». Candado con barrido:
+   `asistencia-pestana-fichas-y-26.test.ts` (ningún texto visible de `src/app/asistencia` ni
+   `src/lib/asistencia` escribe «Configuración» ni «Personas» a mano).

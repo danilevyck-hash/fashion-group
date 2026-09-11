@@ -85,6 +85,7 @@ import type {
   SugerenciaPrestamo,
 } from "@/lib/asistencia/prestamos-planilla";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { netoConAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
@@ -1308,7 +1309,7 @@ export default function PlanillaTab() {
       {data?.avisos.avisoSinFicha && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           {data.avisos.avisoSinFicha}{" "}
-          Se le da de alta en <b>Configuración</b>.
+          Se le da de alta en <b>{PESTANA_FICHAS}</b>.
         </p>
       )}
       {/* 🔴 EL AVISO DEL RANGO LIBRE. Va PRIMERO y no se esconde detrás de un ⓘ:
@@ -1356,7 +1357,7 @@ export default function PlanillaTab() {
           {data.avisos.marcoDespuesDeIrse === 1
             ? "colaborador marcó en el reloj después de la fecha en que salió"
             : "colaboradores marcaron en el reloj después de la fecha en que salieron"}
-          . O volvieron a trabajar —hay que reactivarlas en <b>Configuración</b> o la planilla
+          . O volvieron a trabajar —hay que reactivarlas en <b>{PESTANA_FICHAS}</b> o la planilla
           les paga cero— o alguien más está usando su huella.
         </p>
       )}
@@ -1400,7 +1401,7 @@ export default function PlanillaTab() {
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {!cargando && !error && data?.lineas.length === 0 && (
         <p className="py-10 text-center text-sm text-gray-500">
-          No hay nadie en esta empresa para estas fechas. Revisa la pestaña <b>Configuración</b>.
+          No hay nadie en esta empresa para estas fechas. Revisa la pestaña <b>{PESTANA_FICHAS}</b>.
         </p>
       )}
 
@@ -1605,7 +1606,7 @@ export default function PlanillaTab() {
               <b>{fueraDePlanilla.length}</b>{" "}
               {fueraDePlanilla.length === 1 ? "colaborador no va" : "colaboradores no van"} en la planilla
               (servicio profesional). {EXPLICACION_SERVICIO_PROFESIONAL} Se cambia en{" "}
-              <b>Configuración</b>.
+              <b>{PESTANA_FICHAS}</b>.
             </p>
           )}
 
@@ -1629,7 +1630,7 @@ export default function PlanillaTab() {
               <b>Falta un dato:</b> {pendientes.length}{" "}
               {pendientes.length === 1 ? "colaborador quedó" : "colaboradores quedaron"} fuera del total
               porque falta configurarles algo. <b>No valen $0</b> — se arreglan en la pestaña{" "}
-              <b>Configuración</b>.
+              <b>{PESTANA_FICHAS}</b>.
             </p>
           )}
         </>
@@ -1657,7 +1658,7 @@ export default function PlanillaTab() {
           <p>{FORMULA_NETO}</p>
           <p className="mt-1.5">
             Los recargos, los porcentajes de seguro y la hora de corte se cambian en{" "}
-            <b>Configuración</b>. El ISR, el préstamo, los terceros, la mercancía y los otros
+            <b>{PESTANA_FICHAS}</b>. El ISR, el préstamo, los terceros, la mercancía y los otros
             servicios se escriben a mano aquí: no salen de ningún sistema.
           </p>
         </Ayuda>
@@ -2032,7 +2033,7 @@ function Fila({
         {l.prorrateo && (
           <span
             className="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-800"
-            title="Cobra los días trabajados: sueldo quincenal ÷ días hábiles de la quincena × días hábiles trabajados."
+            title="Cobra los días trabajados: cada día hábil vale el sueldo mensual ÷ 26."
           >
             {l.prorrateo}
           </span>

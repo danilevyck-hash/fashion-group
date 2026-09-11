@@ -161,13 +161,17 @@ describe("2. 🔴 salir antes de la hora se descuenta desde el minuto uno, sin t
 
 // ── 3 ─────────────────────────────────────────────────────────────────────────
 describe("3. 🔴 quien entra a mitad de la quincena cobra los días trabajados", () => {
-  it("Yeritza (51): entró el 27-jul-2026 → 5 de 12 días hábiles, quincenal $125,00", () => {
+  it("Yeritza (51): entró el 27-jul-2026 → 5 días hábiles × (600 ÷ 26) = $115,38", () => {
+    // 🔴 CAMBIÓ DE DIRECCIÓN esa misma noche (10-sep-2026): la primera versión
+    // dividía el quincenal entre los hábiles de la quincena ($125,00). Daniel
+    // eligió «a»: el día vale sueldo mensual ÷ 26, la costumbre de Panamá y lo
+    // que la contable ya paga. El caso de control es el suyo: 5 × $23,08.
     expect(diasHabilesEntre("2026-07-16", "2026-07-31")).toBe(12);
     expect(diasHabilesEntre("2026-07-27", "2026-07-31")).toBe(5);
     const pr = prorrateoPorVigencia({ fechaIngreso: "2026-07-27", fechaSalida: null, motivoSalida: null } as never, "2026-07-16", "2026-07-31")!;
     expect(pr).toMatchObject({ habilesPeriodo: 12, habilesTrabajados: 5 });
-    expect(pr.factor).toBeCloseTo(5 / 12, 6);
-    expect(pr.texto).toBe("entró el 27 de julio de 2026: 5 de 12 días hábiles");
+    expect(pr.factor).toBeCloseTo(5 / 13, 6);
+    expect(pr.texto).toBe("entró el 27 de julio de 2026: 5 días hábiles (sueldo ÷ 26 por día)");
     const lineas = armarPlanilla({
       personas: [persona("51", [])], fichas: new Map([["51", { ...FICHA, codigo: "51", salarioMensual: 600 }]]),
       jornadaDiariaMin: () => 480, reglas: R, empresa: null, factorBase: 1,
@@ -176,11 +180,8 @@ describe("3. 🔴 quien entra a mitad de la quincena cobra los días trabajados"
     const l = lineas.find((x) => x.codigo === "51")!;
     expect(l.decidirAMano).toBeNull();
     expect(l.prorrateo).toBe(pr.texto);
-    expect(l.dinero!.salarioQuincenal).toBe(125);
-    // ⚠️ La contable pagó 5 × $23,08 = $115,38 (divide el sueldo MENSUAL entre
-    // 26, los lunes-a-sábado del mes). La fórmula que Daniel definió divide el
-    // quincenal entre los hábiles L–V de la quincena (12): $9,62 de diferencia.
-    expect(125 - 5 * (600 / 26)).toBeCloseTo(9.62, 2);
+    expect(l.dinero!.salarioQuincenal).toBe(115.38);
+    expect(5 * (600 / 26)).toBeCloseTo(115.38, 2);
   });
 
   it("quien sale a mitad: hasta la fecha de salida; el período entero → null", () => {

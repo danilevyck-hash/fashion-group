@@ -7,6 +7,7 @@
 // Se guarda por RANGO: unas vacaciones son UNA fila, no diez.
 
 import { useCallback, useEffect, useState } from "react";
+import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -143,7 +144,7 @@ export default function JustificacionesTab() {
                 </optgroup>
               )}
               {sinNombre.length > 0 && (
-                <optgroup label="Falta ponerles nombre en Configuración">
+                <optgroup label={`Falta ponerles nombre en ${PESTANA_FICHAS}`}>
                   {sinNombre.map((p) => (
                     <option key={p.codigo} value={p.codigo}>Código {p.etiqueta}</option>
                   ))}

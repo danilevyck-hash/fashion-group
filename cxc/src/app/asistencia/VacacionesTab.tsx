@@ -18,6 +18,7 @@
 // campos es la fricción que este módulo viene sacando.
 
 import { useCallback, useEffect, useState } from "react";
+import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
 import RangoFechas from "@/components/ui/RangoFechas";
@@ -181,7 +182,7 @@ export default function VacacionesTab() {
                 </optgroup>
               )}
               {sinNombre.length > 0 && (
-                <optgroup label="Falta ponerles nombre en Configuración">
+                <optgroup label={`Falta ponerles nombre en ${PESTANA_FICHAS}`}>
                   {sinNombre.map((p) => (
                     <option key={p.codigo} value={p.codigo}>Código {p.etiqueta}</option>
                   ))}

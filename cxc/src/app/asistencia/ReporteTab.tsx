@@ -21,7 +21,7 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 import EstadoReloj from "./EstadoReloj";
 import JustificacionesDelPeriodo from "./JustificacionesDelPeriodo";
-import { PERSONA_EN_EL_CENTRO } from "@/lib/asistencia/persona-en-el-centro";
+import { PERSONA_EN_EL_CENTRO, PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -322,7 +322,7 @@ export default function ReporteTab() {
             cuentan. El día de <b>hoy</b> nunca entra ahí —sigue corriendo, así que todavía no
             se le puede decir que está mal marcado—, y el reporte muestra solo a quien estaba
             trabajando en las fechas que pediste.
-            Estos números se cambian en <b>Configuración</b>.{" "}
+            Estos números se cambian en <b>{PESTANA_FICHAS}</b>.{" "}
             <b>Corregir una hora</b> no borra lo que marcó el reloj: la corrección va encima,
             con quién la puso y por qué, y se puede deshacer.
           </p>
