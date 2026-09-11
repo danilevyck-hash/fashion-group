@@ -62,6 +62,13 @@ guía (Atrás + volver a filtrar). El N° del transportista por renglón se llen
 
 ## Packing Lists (`/packing-lists`, key `packing-lists`)
 
+> 🩸 **RETIRADO EL 10-SEP-2026.** Daniel, textual: *«packing list no se usa, eliminar»*. Todo lo que
+> sigue describe un módulo que **ya no existe**: se fueron la ficha, la pantalla, las tres rutas API,
+> el lector de PDF y el cron `cleanup-packing-lists`; `/packing-lists` redirige a `/home`. Las tablas
+> `packing_lists` y `pl_items` **no se dropearon** (0 filas). El porqué, con la medición completa,
+> vive en [docs/historico/superado.md](../historico/superado.md). Se conserva como está, verbatim.
+
+
 **Qué es y quién lo usa.** Convierte el PDF del proveedor en un PDF propio para que
 bodega saque muestras. Roles: admin, secretaria, bodega. **Hoy no lo usa nadie.**
 

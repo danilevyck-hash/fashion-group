@@ -277,13 +277,29 @@ describe("D. ninguna fila de cron_heartbeats sobrevive a su cron", () => {
     expect(new Set(FOTO_3_SEP_2026).size).toBe(75);
   });
 
-  it("en la foto del 3-sep-2026 el ÚNICO huérfano es sync-mayor", () => {
-    expect(heartbeatsHuerfanos(FOTO_3_SEP_2026, PROGRAMADOS)).toEqual(["sync-mayor"]);
+  // 10-sep-2026 · NOTA FECHADA — la FOTO no se toca (es una medición, y las 75
+  // filas son las que había ese 3-sep). Lo que cambió es cuántas de ellas
+  // quedaron huérfanas: se retiró el cron `cleanup-packing-lists` con el módulo
+  // Packing Lists (Daniel: «packing list no se usa, eliminar»), así que su fila
+  // —viva hasta el 10-sep-2026 03:00 UTC— pasa a ser el SEGUNDO huérfano. La
+  // barre la migración 20261110120000, el mismo camino de `sync-mayor`.
+  it("sobre la foto del 3-sep-2026 los huérfanos de hoy son sync-mayor y cleanup-packing-lists", () => {
+    expect(heartbeatsHuerfanos(FOTO_3_SEP_2026, PROGRAMADOS)).toEqual([
+      "cleanup-packing-lists",
+      "sync-mayor",
+    ]);
   });
 
-  it("después de la migración 20260914120000 no queda ninguno", () => {
-    const sinMayor = FOTO_3_SEP_2026.filter((n) => n !== "sync-mayor");
-    expect(heartbeatsHuerfanos(sinMayor, PROGRAMADOS)).toEqual([]);
+  it("después de las migraciones 20260914120000 y 20261110120000 no queda ninguno", () => {
+    const barridos = FOTO_3_SEP_2026.filter(
+      (n) => n !== "sync-mayor" && n !== "cleanup-packing-lists",
+    );
+    expect(heartbeatsHuerfanos(barridos, PROGRAMADOS)).toEqual([]);
+  });
+
+  it("🔴 CONTROL · barrer solo uno de los dos deja el otro denunciado", () => {
+    const soloMayor = FOTO_3_SEP_2026.filter((n) => n !== "sync-mayor");
+    expect(heartbeatsHuerfanos(soloMayor, PROGRAMADOS)).toEqual(["cleanup-packing-lists"]);
   });
 
   it("CONTROL: cada cron de vercel.json tiene derecho a su fila", () => {

@@ -119,7 +119,6 @@ import { GET as saldosBanco } from "@/app/api/saldos-banco/route";
 import { GET as gastosEgresos } from "@/app/api/gastos-contabilidad/egresos/route";
 import { GET as marketingProyectos } from "@/app/api/marketing/proyectos/route";
 import { GET as cajaPeriodos } from "@/app/api/caja/periodos/route";
-import { GET as packingLists } from "@/app/api/packing-lists/route";
 import { GET as asistenciaReporte } from "@/app/api/asistencia/reporte/route";
 
 // 13-ago-2026 18:00 UTC = 13:00 en Panamá.
@@ -295,7 +294,12 @@ const RUTAS_AJENAS: Array<[modulo: string, url: string, handler: Handler]> = [
   ["gastos (egresos)",    "/api/gastos-contabilidad/egresos?mes=2026-08", gastosEgresos as Handler],
   ["marketing",           "/api/marketing/proyectos",                     marketingProyectos as Handler],
   ["caja menuda",         "/api/caja/periodos",                           cajaPeriodos as Handler],
-  ["packing lists",       "/api/packing-lists",                           packingLists as Handler],
+  // 10-sep-2026 · NOTA FECHADA — la fila «packing lists» se fue porque el MÓDULO
+  // se retiró (Daniel: «packing list no se usa, eliminar»; `packing_lists` con
+  // 0 filas). La ruta `/api/packing-lists` ya no existe, así que no hay 403 que
+  // comprobar: lo que la reemplaza es `packing-lists-retirado.test.ts`, que exige
+  // que NO exista. El candado de gerente_acs NO se debilitó — las demás rutas ajenas
+  // siguen una por una.
   ["asistencia",          "/api/asistencia/reporte?desde=2026-08-01&hasta=2026-08-13", asistenciaReporte as Handler],
 ];
 

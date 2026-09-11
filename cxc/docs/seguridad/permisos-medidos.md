@@ -188,6 +188,10 @@ no se cumple; si el campo ya no sirve, sobra y confunde.
 `/api/packing-lists/[id]` (GET, **DELETE**) admiten `vendedor`, que **no tiene el
 módulo `packing-lists`**. No ven la ficha, pero por URL crean y borran.
 
+> ✅ **RESUELTO el 10-sep-2026 — se retiró el MÓDULO entero.** Daniel: *«packing list no se usa,
+> eliminar»*. Las dos rutas ya no existen, así que el acceso fantasma del vendedor tampoco. Ver
+> [historico/superado.md](../historico/superado.md).
+
 ### Secretarias (Ángela, Andrea) — 🔴 aquí está el problema
 
 Ver §5. Es el mismo agujero de Asistencia, **sin tapar, en otros dos módulos.**
@@ -373,8 +377,9 @@ Ordenado por gravedad. Nada de esto se tocó — es tu decisión.
 
 ### 🟡 Menor
 
-7. **Vendedores crean y borran packing lists** (`POST /api/packing-lists`,
-   `DELETE /api/packing-lists/[id]`) sin tener el módulo.
+7. ~~**Vendedores crean y borran packing lists** (`POST /api/packing-lists`,
+   `DELETE /api/packing-lists/[id]`) sin tener el módulo.~~ ✅ **RESUELTO el 10-sep-2026: el módulo
+   se retiró entero** (Daniel: *«packing list no se usa, eliminar»*). Las rutas no existen.
 
 8. **Seis crons comparan el secreto sin comprobar que exista.** Hoy no abre nada
    por una casualidad de JavaScript. Igualarlos a `canales-telegram`, que contesta

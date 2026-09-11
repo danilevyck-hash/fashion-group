@@ -55,10 +55,11 @@ const aplanar = (s: string) => s.replace(/\s+/g, " ").trim();
  */
 const EN_UN_AYUDA: Array<[string, string]> = [
   // ── Packing Lists ────────────────────────────────────────────────────────
-  ["app/packing-lists/PackingListsClient.tsx", "Bodega necesita esta información correcta para inventario"],
-  ["app/packing-lists/PackingListsClient.tsx", "confía en el total del PDF y colapsa a 1 item"],
-  ["app/packing-lists/PackingListsClient.tsx", "reconstruye el desglose por estilo"],
-  ["app/packing-lists/[id]/page.tsx", "Muestra = bulto con talla M o 32 · OS = otro tamaño"],
+  // 10-sep-2026 · NOTA FECHADA — las cuatro filas de Packing Lists se fueron
+  // porque se fue la PANTALLA: el módulo se retiró (Daniel: «packing list no se
+  // usa, eliminar»; `packing_lists` con 0 filas). La regla de este candado —la
+  // metodología vive dentro de un ⓘ— no cambió ni se debilitó: las 20 filas de
+  // los demás módulos siguen una por una.
 
   // ── Reclamos ─────────────────────────────────────────────────────────────
   ["app/reclamos/components/ReclamoForm.tsx", "la IA rellena proveedor, marca, factura, fecha y pedido"],
@@ -201,18 +202,11 @@ describe("🔴 lo que FRENA una acción sigue en pantalla, nunca adentro de un �
     ["components/SugerenciasCliente.tsx", "Hay que darlo de alta en Switch"],
     // Borrar una guía no se deshace.
     ["app/guias/page.tsx", "Esta acción no se puede deshacer"],
-    // Packing Lists: validar contra el PDF y la retención del historial.
-    ["app/packing-lists/PackingListsClient.tsx", "Valida cada PL contra el PDF original antes de guardar"],
-    // 🔄 5-sep-2026 — CAMBIO DE DIRECCIÓN, no borrado. Aquí decía la frase
-    // literal «Los PLs se eliminan automáticamente después de 7 días», y esa
-    // frase era FALSA en sus dos mitades: un PL activo no se borra nunca, y la
-    // retención son 90 días contados desde el borrado a mano. La regla de este
-    // candado —el aviso de caducidad se ve en pantalla, jamás dentro de un ⓘ—
-    // NO cambió: lo que cambió es que el texto ahora sale de una definición
-    // única (`textoRetencionPackingLists`, `lib/packing-lists/retencion.ts`)
-    // compartida con el cron, para que no se puedan volver a separar.
-    // Qué DICE ese texto lo cierra `packing-lists-retencion.test.ts`.
-    ["app/packing-lists/PackingListsClient.tsx", "{textoRetencionPackingLists()}"],
+    // 10-sep-2026 · NOTA FECHADA — las dos filas de Packing Lists (el aviso de
+    // «valida contra el PDF» y el de la retención del historial) se fueron con la
+    // PANTALLA: el módulo se retiró (Daniel: «packing list no se usa,
+    // eliminar»). La regla —lo que FRENA una acción se ve en pantalla, nunca
+    // dentro de un ⓘ— no cambió: las demás filas siguen intactas.
     // Reclamos: el comprobante es obligatorio para marcar Pagado.
     ["app/reclamos/components/SettlementModal.tsx", "obligatorio para marcar Pagado"],
     // Depurador: el bloqueo por descripciones nuevas.

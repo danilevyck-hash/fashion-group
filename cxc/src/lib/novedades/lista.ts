@@ -298,14 +298,10 @@ export const NOVEDADES: readonly Novedad[] = [
     texto: "La lista abre con el último mes y siempre agrupada por fecha; lo viejo está en «Ver guías más viejas», y arriba te avisa lo que falta despachar.",
   },
 
-  /* ── Packing Lists — módulo `packing-lists` ─────────────────────────────── */
-  {
-    id: "packing-lists-no-se-borran-a-los-7-dias",
-    modulo: "packing-lists",
-    fecha: "2026-09-05",
-    desde: ARRANQUE,
-    texto: "El Historial decía que se borran a los 7 días y no era cierto: uno activo no se borra nunca, y los que borras se guardan 90 días.",
-  },
+  /* ── Packing Lists — el módulo se RETIRÓ el 10-sep-2026 (Daniel: «packing
+     list no se usa, eliminar»), así que su única novedad se fue con él: sin
+     módulo no hay ruta donde mostrarla, y `novedades.test.ts` exige que el
+     `modulo` de cada novedad exista en `ALL_MODULE_KEYS`. ──────────────────── */
 
   /* ── Asistencia y Planilla — módulo `asistencia` ────────────────────────── */
   {

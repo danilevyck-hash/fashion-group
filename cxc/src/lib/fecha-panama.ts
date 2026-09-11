@@ -25,7 +25,8 @@ export function fechaPanamaDe(iso: string): string {
  * - Default: inicio del día Panamá (00:00 -05:00 = 05:00 UTC) — correcto para
  *   crons que corren después de las 05:00 UTC.
  * - earlyUtcRun: crons programados entre 00:00 y 05:00 UTC (acs-resumen-diario
- *   01:00, cleanup-packing-lists 03:00) registran su heartbeat ANTES de la
+ *   01:00; `cleanup-packing-lists` 03:00 lo fue hasta el 10-sep-2026, cuando se
+ *   retiró con su módulo) registran su heartbeat ANTES de la
  *   medianoche Panamá. Compararlos contra el inicio del día Panamá los declara
  *   "sin correr" TODOS los días aunque sí corrieron (incidente 17-jul-2026:
  *   "(recuperado)" duplicado del resumen ACS). Para ellos la ventana es el

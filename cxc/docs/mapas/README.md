@@ -24,7 +24,7 @@ cuestan hoy y cuántos podrían costar.
 | Catálogos | [catalogos.md](catalogos.md) | El 76% de las corridas no escribe nada (174 de 230 sesiones de Switch escribieron CERO); $33.912,00 en 7 pedidos vivos nunca llegaron a Switch y nada lo dice | pendiente |
 | Referencia | [referencia.md](referencia.md) | «VENDIDO no pasa de 100%» vale solo para el 57%: sin ficha de catálogo la cuenta es otra y puede decir 207%, y alcanza a 11.698 códigos (43%) | pendiente |
 | Reclamos | [reclamos.md](reclamos.md) | 26 de 34 reclamos vivos no se pueden editar sin rellenar 134 campos; $12.218,27 llevan más de 45 días sin un segundo correo | pendiente |
-| Packing Lists | [packing-lists.md](packing-lists.md) | El módulo está vacío: el cron borró las 28 listas el 14-may sin copia, y lo usó una sola persona 7 veces en abril | pendiente |
+| Packing Lists | [packing-lists.md](packing-lists.md) | El módulo está vacío: el cron borró las 28 listas el 14-may sin copia, y lo usó una sola persona 7 veces en abril | 🩸 **RETIRADO el 10-sep-2026** (Daniel: «packing list no se usa, eliminar») — ver [superado.md](../historico/superado.md) |
 | Marketing | [marketing.md](marketing.md) | `bultos` está lleno en 0 de 111 renglones y ocupa 6 de los 13 casilleros; borrar una entrega es un DELETE de verdad y falta la entrega 23 | pendiente |
 | Caja Menuda | [caja.md](caja.md) | Mueve $563,28 en 5 meses — el 0,07% de lo que ya se mide en Gastos; 93 gastos escritos en 18 días | pendiente |
 | Gastos | [gastos.md](gastos.md) | El módulo abre en septiembre y le dice a 7 empresas «este mes no salió plata» — Vistana saca $34.763,21 de caja al mes; Saldos de banco se usó UNA vez, el 10-ago | pendiente |

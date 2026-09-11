@@ -44,8 +44,9 @@
 //   con los otros (limpiar parcial es mejor que no limpiar), pero la respuesta
 //   es 500 y NO se registra heartbeat: así el watchdog lo ve caído.
 //
-// Horario 02:30 UTC: vecinos a ≥30 min (acs-resumen-diario 01:00,
-//   cleanup-packing-lists 03:00). No toca el API de Switch, así que la regla de
+// Horario 02:30 UTC: vecinos a ≥30 min (acs-resumen-diario 01:00; el de las
+//   03:00, cleanup-packing-lists, se retiró el 10-sep-2026 con su módulo y dejó
+//   esa franja libre). No toca el API de Switch, así que la regla de
 //   SEPARACION_MINIMA_MIN (un solo token de Switch por usuario, y un usuario
 //   por empresa) no aplica.
 //

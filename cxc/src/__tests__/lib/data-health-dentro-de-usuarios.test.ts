@@ -90,14 +90,18 @@ describe("el catálogo: Data Health ya no es un módulo suelto", () => {
  *  `catalogo-roles.test.ts`; acá se repite el invariante que importa para esta
  *  mudanza: que ninguno gane ni pierda nada.) */
 const NO_ADMIN_ESPERADO: Record<string, string[]> = {
-  secretaria: ["catalogos", "guias", "packing-lists", "asistencia", "reclamos", "cargar",
+  // 10-sep-2026 · NOTA FECHADA — sin «packing-lists» en secretaria ni en bodega:
+  // el módulo se RETIRÓ (Daniel: «packing list no se usa, eliminar»;
+  // `packing_lists` con 0 filas desde el 14-may-2026). Ningún rol gana nada;
+  // los dos que lo tenían lo pierden, y ninguno lo usaba.
+  secretaria: ["catalogos", "guias", "asistencia", "reclamos", "cargar",
     "comisiones", "marketing", "caja", "cheques", "directorio"],
   // 🔴 `asistencia` desde el 26-ago-2026: Daniel, textual *«julio usa el
   // usuario bodega, asi que ponlo ahi»* — para que Julio Garay apruebe las
   // horas extra que él mismo reporta. Cambio DELIBERADO, ajeno a esta mudanza.
   // ⚠️ Es la ficha, no la Planilla: ve UNA pestaña y la ruta le contesta sin un
   // solo sueldo (`api/asistencia-bodega-solo-aprueba.test.ts`).
-  bodega: ["asistencia", "referencia", "catalogos", "guias", "packing-lists"],
+  bodega: ["asistencia", "referencia", "catalogos", "guias"],
   // `saldos-banco` salió el 13-ago-2026: dejó de ser módulo (es la 2ª pestaña
   // de "Gastos"). La puerta al dato sigue abierta por `gastos-contabilidad`.
   // `comisiones` ENTRA el 25-ago-2026 — Daniel, textual: *"Q contabilidad vea
@@ -136,8 +140,12 @@ describe("quién ve qué — antes y después, rol por rol", () => {
 
   it("🔴 quien tiene `usuarios` a mano NO gana Data Health (el caso REAL de Angela)", () => {
     // Override medido en producción el 13-ago-2026 para `Angela` (secretaria).
+    // ⚠️ El override REAL de Angela traía además «packing-lists»; se quita de
+    // esta foto el 10-sep-2026 porque la migración 20261110120000 lo saca de su
+    // `modulos_override` en producción, con el módulo. Lo que este caso prueba
+    // —que tener `usuarios` a mano no regala Data Health— no depende de esa key.
     const angela = ["directorio", "marketing", "cheques", "caja", "comisiones", "guias",
-      "packing-lists", "reclamos", "catalogos", "cargar", "cxc", "usuarios"];
+      "reclamos", "catalogos", "cargar", "cxc", "usuarios"];
     const visibles = getVisibleModules("secretaria", angela).map((m) => m.key);
     // Lo que ya veía sigue igual (incluida la ficha `usuarios`, que la página le
     // rebota desde antes de este cambio — es un dato de la base, no del código).
@@ -153,9 +161,12 @@ describe("quién ve qué — antes y después, rol por rol", () => {
     // (Asistencia, para que Julio Garay apruebe horas extra) y gerente_acs
     // sigue teniendo 1 (redirige a Multifashion). Ninguno de los dos toca
     // Administración, así que esta mudanza no puede alterarlos.
-    // 🔑 Lo que importa acá es que bodega siga SIN redirigir: ya tenía 4, así
-    // que sumar uno no puede encender el atajo de «rol con un solo módulo».
-    expect(getVisibleModules("bodega").length).toBe(5);
+    // 🔑 Lo que importa acá es que bodega siga SIN redirigir.
+    // 10-sep-2026 · NOTA FECHADA — de 5 pasa a **4**: se retiró Packing Lists
+    // (Daniel: «packing list no se usa, eliminar»). 4 sigue siendo más de 1, así
+    // que el atajo de «rol con un solo módulo» sigue apagado para bodega — que
+    // es lo único que este candado protege.
+    expect(getVisibleModules("bodega").length).toBe(4);
     expect(getVisibleModules("gerente_acs").map((m) => m.href)).toEqual(["/multifashion"]);
     // Y admin, que es el único con Administración, está exento por código.
     expect(plano(leer("src/app/home/page.tsx"))).toContain('if (role === "admin") return;');

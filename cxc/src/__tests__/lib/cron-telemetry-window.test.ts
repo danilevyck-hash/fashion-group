@@ -5,7 +5,8 @@
 // (05:00 UTC), así que findMissingColaterales lo declaraba "sin correr" TODOS
 // los días y la primera pasada de reconciliación re-enviaba el resumen con
 // prefijo "(recuperado)" aunque el original sí salió. Mismo falso positivo en
-// cleanup-packing-lists (03:00 UTC), silencioso por ser idempotente.
+// cleanup-packing-lists (03:00 UTC), silencioso por ser idempotente — ese cron
+// se retiró el 10-sep-2026 con su módulo; el mecanismo `earlyUtcRun` no cambió.
 import { describe, it, expect } from "vitest";
 import { colateralDayStartIso } from "@/lib/fecha-panama";
 

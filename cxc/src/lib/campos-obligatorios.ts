@@ -76,13 +76,9 @@ export const CAMPOS_OBLIGATORIOS = {
   cxc_client_overrides: [
     { columna: "nombre_normalized", etiqueta: "el nombre del cliente" },
   ],
-  // `pl_items` se valida aparte en la ruta de packing lists: `pl_id` lo pone la
-  // RPC y `producto` se normaliza a vacío (ver el comentario de esa ruta).
-  pl_items: [
-    { columna: "pl_id", etiqueta: "el packing list" },
-    { columna: "estilo", etiqueta: "el estilo (SKU)" },
-    { columna: "producto", etiqueta: "el producto" },
-  ],
+  // `pl_items` salió de esta lista el 10-sep-2026 con el módulo Packing Lists
+  // (Daniel: «packing list no se usa, eliminar»). Ya no hay ruta que escriba
+  // esa tabla; la tabla se queda, vacía y sin lectores.
 } as const satisfies Record<string, readonly CampoObligatorio[]>;
 
 export type TablaConObligatorios = keyof typeof CAMPOS_OBLIGATORIOS;

@@ -729,7 +729,7 @@ Trece agentes en paralelo, **solo lectura de producción, cero cambios de códig
 6. **Una unión por NOMBRE viva, en Proveedores.** Confecciones Boston aparece en 5 empresas con 4 grafías y el mismo RUC (`655-544-133465`): la pantalla dibuja 3 fichas de un proveedor que es uno. Y funde en una los 7 `GENERAL`. El RUC está lleno en 57 de 65 filas pero tampoco está limpio: **es decisión de Daniel** cómo se identifica un proveedor entre empresas.
 7. **Tres funciones que la documentación promete y no ocurren**: `useSessionCheck`, `useBadges` y `useKeyboardShortcuts` no tienen un solo importador. El chequeo de sesión no pasa, el 🔔 no cuenta, y **ningún atajo de teclado funciona** salvo ⌘K. 🩸 Uno de esos archivos **se editó hoy**: el cambio completo fue `/cheques` → `/recordatorios`.
 8. **26 «avisame» (voseo) en mensajes de Telegram.** El candado tiene `avisale` pero no `avisame`: le falta la familia imperativo + `me`.
-9. **Packing Lists le miente al usuario**: dice «se eliminan automáticamente después de 7 días» y la retención real son 90 días desde el borrado a mano.
+9. ~~**Packing Lists le miente al usuario**: dice «se eliminan automáticamente después de 7 días» y la retención real son 90 días desde el borrado a mano.~~ ✅ **RESUELTO el 10-sep-2026 retirando el MÓDULO entero** — Daniel: *«packing list no se usa, eliminar»*. Ver [historico/superado.md](historico/superado.md).
 10. **`requireAdmin` deja pasar a `secretaria`** (`api-auth.ts`, `ADMIN_ROLES = ['admin','secretaria']`). Lo usan 10 rutas.
 
 ### ⚠️ Decisiones que solo puede tomar Daniel
@@ -1396,3 +1396,40 @@ apaga (dos toques = dos POST); una sola recarga, silenciosa, 1,5 s después del 
 servidor manda. Si el POST falla, la casilla vuelve a como estaba y sale el aviso. Nada cambia en la
 ruta ni en lo que se guarda. Candado: `aprobaciones-optimista.test.tsx` (toque sin esperar el fetch ·
 fallo revierte · N toques → una recarga · el servidor reemplaza lo local).
+
+---
+
+## 10-sep-2026 — Packing Lists se retiró
+
+Daniel, textual: ***«packing list no se usa, eliminar»***.
+
+**Medido contra producción ese día, antes de tocar nada:** `packing_lists` **0 filas** y `pl_items`
+**0 filas** —vacías desde el 14-may-2026, cuando el cron viejo borró de verdad las 28 que había, sin
+copia—; **34 rastros** en `activity_logs` en toda la historia del módulo (7 cargas + 3 borrados,
+todos con rol `admin`, entre el 18 y el 22-abr-2026, más 24 latidos del cron); **0 cargas de bodega
+y 0 de secretaria**, que eran quienes lo tenían en el menú. Ningún bucket de Storage era suyo.
+
+**Se fue:** la ficha (`modules.ts`) y su color teal, la pantalla `/packing-lists` (1.325 líneas el
+cliente), las 3 rutas API —incluida `fallback-bulto`, la que llamaba a Claude Haiku—, el lector de
+PDF (`parse-packing-list.ts`, 850 líneas), el cron **`cleanup-packing-lists`** con su colateral en la
+reconciliación (**82 → 81 crons**), la novedad del módulo, 3 tests, 8 scripts y el fixture del PDF.
+
+**Se queda:** las TABLAS `packing_lists` y `pl_items` (patrón `mayor_lineas`), los 34 rastros de
+`activity_logs`, la RPC `save_packing_list` inerte, y `/packing-lists` + `/packing-lists/<id>`
+redirigiendo a `/home` con **307**. Las dos tablas pasaron de clase `personas` a **`retirada`** en el
+respaldo — se puede porque no hay una sola fila que proteger.
+
+**Migración `20261110120000`** (aplicada): `array_remove` de la key en `role_permissions` (admin ·
+secretaria · bodega) y en los dos `modulos_override` (Angela y andrea), más el `DELETE` de la fila
+huérfana de `cron_heartbeats` — el mismo camino que `sync-mayor`.
+
+**De paso quedó corregida una línea vieja de CLAUDE.md**: decía que bodega hace «auto-redirect a
+Guías desde home (único módulo)» y hace tiempo que no: tenía 5 módulos y ahora tiene **4** (guías ·
+catálogos · referencia · asistencia).
+
+**Candado:** `packing-lists-retirado.test.ts` (24 casos, 3 controles al revés). Cambiaron de
+dirección con nota fechada, ninguno se borró: `boston-acceso` · `multifashion-acceso` ·
+`campos-obligatorios` · `catalogo-roles` · `data-health-dentro-de-usuarios` · `cron-registro` ·
+`poda-textos-ayuda` · `poda-textos-cxc-multifashion` · `novedades-dibujos` · `novedades` ·
+`cleanup-sessions`. El porqué completo, con la medición, en
+[historico/superado.md](historico/superado.md).

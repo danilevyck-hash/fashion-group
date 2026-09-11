@@ -1,5 +1,12 @@
 # Packing Lists — el mapa
 
+> 🩸 **RETIRADO EL 10-SEP-2026.** Daniel, textual: *«packing list no se usa, eliminar»*. Todo lo que
+> sigue describe un módulo que **ya no existe**: se fueron la ficha, la pantalla, las tres rutas API,
+> el lector de PDF y el cron `cleanup-packing-lists`; `/packing-lists` redirige a `/home`. Las tablas
+> `packing_lists` y `pl_items` **no se dropearon** (0 filas). El porqué, con la medición completa,
+> vive en [docs/historico/superado.md](../historico/superado.md). Se conserva como está, verbatim.
+
+
 > Medido contra producción el **5-sep-2026** (SQL de solo lectura + `src/app/packing-lists/**`, `src/app/api/packing-lists/**`, `src/lib/parse-packing-list.ts`, `src/lib/cleanup-packing-lists.ts`, historial de git).
 > Ruta: `/packing-lists`. Key del módulo: `packing-lists`.
 > **Ningún número de aquí sale de la documentación: todos se remidieron.**

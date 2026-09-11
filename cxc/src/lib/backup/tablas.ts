@@ -193,11 +193,6 @@ export const TABLAS_PERSONAS = [
   "prestamos_empleados",
   "prestamos_movimientos",
 
-  // ── Packing lists (la purga física a 90 d los borra de la base; el respaldo
-  // los retiene)
-  "packing_lists",
-  "pl_items",
-
   // ── Marketing
   "mk_facturas",
   "mk_marcas",
@@ -322,6 +317,17 @@ export const TABLAS_RETIRADAS = [
   // Carrito de Reebok del lado del servidor: hoy el carrito vive en el
   // navegador. 0 filas y ni un lector.
   "reebok_cart",
+  // 🩸 Packing Lists — módulo RETIRADO el 10-sep-2026. Daniel, textual:
+  // *«packing list no se usa, eliminar»*. Las dos tablas tienen **0 filas**
+  // desde el 14-may-2026, cuando el cron viejo borró de verdad las 28 que
+  // había; en toda su historia lo usó UNA persona (daniel), 7 cargas y 3
+  // borrados entre el 18 y el 22-abr-2026. Estuvieron clasificadas `personas`
+  // y dentro del respaldo hasta hoy: salen porque no hay una sola fila que
+  // proteger y ya no existe pantalla que las escriba. 🔴 Las TABLAS NO se
+  // dropean (patrón `mayor_lineas`) y hay candado que pone el build rojo si
+  // una migración las borra: `packing-lists-retirado.test.ts`.
+  "packing_lists",
+  "pl_items",
 ] as const;
 
 // ─── `vista` — nunca se respalda ────────────────────────────────────────────

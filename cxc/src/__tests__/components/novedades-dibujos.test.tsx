@@ -79,7 +79,10 @@ const SIN_DIBUJO_A_PROPOSITO = [
   "comisiones-abre-en-el-mes-cerrado",
   "reclamos-el-itbms-dice-7",
   "asistencia-la-hora-extra-arranca-a-los-10-minutos",
-  "packing-lists-no-se-borran-a-los-7-dias",
+  // 10-sep-2026 · NOTA FECHADA — «packing-lists-no-se-borran-a-los-7-dias» salió
+  // de este control porque salió la NOVEDAD, y salió con su módulo (Daniel:
+  // «packing list no se usa, eliminar»). El control no se debilitó: las otras
+  // ocho siguen exigiendo que un cambio de número, regla o texto no gane dibujo.
   "catalogos-el-excel-de-comprobantes-cuadra",
   "cxc-estado-de-cuenta-como-switch",
   "guias-westland-bien-escrito",

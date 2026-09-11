@@ -142,6 +142,21 @@ const nextConfig = {
       // query intacta, como las demás. La pestaña vieja (`?tab=personas`) la
       // resuelve el módulo puro (`persona-en-el-centro.ts`, MUDANZA).
       { source: "/asistencia/personas/:codigo", destination: "/asistencia/colaboradores/:codigo", permanent: false },
+      // 🩸 **Packing Lists se retiró el 10-sep-2026.** Daniel, textual: *«packing
+      // list no se usa, eliminar»*. Medido ese día: `packing_lists` y `pl_items`
+      // con 0 filas, y 0 desde el 14-may-2026; en toda su historia lo usó UNA
+      // persona (daniel, 7 cargas y 3 borrados en abril). La ficha, la pantalla,
+      // las tres rutas API y el cron `cleanup-packing-lists` se fueron; las
+      // TABLAS no (patrón `mayor_lineas`).
+      //
+      // La dirección tiene que seguir llegando: estuvo en el menú de admin,
+      // secretaria y bodega, así que puede estar en un marcador o en la pantalla
+      // de inicio de un teléfono. Va a `/home` —no hay a dónde llevarla— y las
+      // dos formas, la lista y el detalle de una lista (`/packing-lists/<id>`).
+      // Temporal (307) como TODOS los de este archivo: un 308 se quema en el
+      // caché del navegador.
+      { source: "/packing-lists", destination: "/home", permanent: false },
+      { source: "/packing-lists/:path*", destination: "/home", permanent: false },
     ];
   },
   experimental: {

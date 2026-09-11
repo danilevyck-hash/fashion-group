@@ -393,11 +393,14 @@ describe("🔴 las novedades se ESCRIBEN, no se generan del historial", () => {
     expect(campos).not.toEqual(PERMITIDOS.filter((c) => campos.includes(c)));
   });
 
-  it("🔴 «salen todas»: los 21 módulos tienen la suya, medida contra el código", () => {
+  it("🔴 «salen todas»: los 20 módulos tienen la suya, medida contra el código", () => {
     // Daniel, 9-sep-2026: *«Salen todas — que se enteren de todo aunque sea
     // viejo»*. En las dos semanas del 25-ago al 9-sep cambió algo VISIBLE en
     // los 21; si mañana nace un módulo, este candado obliga a decidir si lleva
     // novedad o no lleva ninguna a propósito.
+    // 10-sep-2026 · NOTA FECHADA — son **20**: Packing Lists se retiró (Daniel:
+    // «packing list no se usa, eliminar») y su única novedad se fue con él. La
+    // cuenta la DERIVA `ALL_MODULE_KEYS`, así que el candado no cambió.
     const con = new Set(NOVEDADES.map((x) => x.modulo));
     const sin = ALL_MODULE_KEYS.filter((k) => !con.has(k));
     expect(sin, "un módulo sin novedad: decide si es a propósito").toEqual([]);

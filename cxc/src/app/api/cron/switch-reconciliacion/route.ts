@@ -64,7 +64,6 @@ import { syncCatalogoCalvin } from "@/lib/switch-api/sync-catalogo-calvin";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { avisarNuevosSinFoto } from "@/lib/catalogos/fotos-nuevos";
 import { runIntegrityCheck } from "@/lib/integrity-check-run";
-import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
 import { runChequesAlert } from "@/lib/cheques-alert";
 import { calcularResumenDiario, buildMensajeHtml } from "@/lib/acs-resumen-diario";
 import {
@@ -407,19 +406,10 @@ const COLATERAL_CRONS: ColateralCron[] = [
       return { ok: true, detail: "vistas refrescadas (clientes_12m + ventas_rollup + cxc_aging)" };
     },
   },
-  {
-    // Purga física de packing lists soft-deleted con retención vencida (90d),
-    // con snapshot previo a activity_logs. Idempotente: re-correr ya no encuentra
-    // candidatos (los purgados se fueron) → deleted=0, sin snapshot nuevo. No
-    // alerta y corre temprano (03:00 UTC) → sin guard de hora.
-    cronName: "cleanup-packing-lists",
-    label: "cleanup-packing-lists",
-    earlyUtcRun: true, // corre 03:00 UTC, antes de la medianoche Panamá
-    recover: async () => {
-      const r = await runCleanupPackingLists();
-      return { ok: r.ok, detail: r.detail };
-    },
-  },
+  // El colateral `cleanup-packing-lists` se retiró el 10-sep-2026 junto con el
+  // módulo Packing Lists (Daniel: «packing list no se usa, eliminar»). No queda
+  // nada que purgar: `packing_lists` y `pl_items` tienen 0 filas y ya no hay
+  // pantalla que las escriba.
   {
     // Resumen mensual del grupo a Telegram (corre el día 1 a las 13:00 UTC —
     // era el día 3 hasta el 4-sep-2026; el porqué del cambio vive en

@@ -897,6 +897,13 @@ porque `facturas` es un sync de universo completo con historia suficiente.
 
 # Packing Lists (`/packing-lists`, key `packing-lists`)
 
+> 🩸 **RETIRADO EL 10-SEP-2026.** Daniel, textual: *«packing list no se usa, eliminar»*. Todo lo que
+> sigue describe un módulo que **ya no existe**: se fueron la ficha, la pantalla, las tres rutas API,
+> el lector de PDF y el cron `cleanup-packing-lists`; `/packing-lists` redirige a `/home`. Las tablas
+> `packing_lists` y `pl_items` **no se dropearon** (0 filas). El porqué, con la medición completa,
+> vive en [docs/historico/superado.md](../historico/superado.md). Se conserva como está, verbatim.
+
+
 > 🔴 **DATO DE ENTRADA, RE-VERIFICADO EL 5-SEP-2026: la tabla sigue VACÍA (0 filas en
 > `packing_lists` y 0 en `pl_items`) y nadie carga un PL desde el 22-abr-2026 — más de cuatro
 > meses.** El módulo entero sigue en pie, la pantalla funciona y el cron de limpieza corre todos los

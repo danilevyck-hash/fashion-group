@@ -33,7 +33,7 @@ Multifashion con Comisiones, Modo Viaje.
 
 ## Decisiones que solo puede tomar Daniel
 
-- **Packing Lists está vacío** (0 filas, último uso 22-abr-2026) y un cron lo limpia a diario para nada. ¿Se retira?
+- ✅ **DECIDIDO el 10-sep-2026 — Packing Lists SE RETIRÓ.** Daniel, textual: *«packing list no se usa, eliminar»*. Ver [superado.md](../historico/superado.md).
 - **Reclamos:** 29 de 34 llevan 143 días en «Creado» aunque ya se les mandó correo; el estado «En proceso» **nunca se usó**. ¿El estado sirve o estorba?
 - **Marketing:** los 25 proyectos están abiertos para siempre; ninguno se cerró jamás. 71 de 88 facturas siguen en «creado».
 - **Recordatorios: 0 filas desde que existe.** El flujo que Daniel pidió (crear desde el calendario) no se construyó: tocar un día no hace nada.

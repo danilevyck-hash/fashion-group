@@ -45,10 +45,6 @@
       "schedule": "30 3 * * *"
     },
     {
-      "path": "/api/cron/cleanup-packing-lists",
-      "schedule": "0 3 * * *"
-    },
-    {
       "path": "/api/cron/cleanup-depurador-archivos",
       "schedule": "20 3 * * *"
     },

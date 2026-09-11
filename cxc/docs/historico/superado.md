@@ -8,6 +8,95 @@
 
 ---
 
+> ## 🩸 PACKING LISTS SE RETIRÓ — el módulo que llevaba cuatro meses vacío (10-sep-2026)
+>
+> Daniel, textual: ***«packing list no se usa, eliminar»***.
+>
+> ### Lo medido contra producción ANTES de tocar nada (10-sep-2026)
+>
+> | Qué | Cuánto |
+> |---|---|
+> | `packing_lists` | **0 filas** |
+> | `pl_items` | **0 filas** |
+> | Desde cuándo está vacío | **14-may-2026** — 119 días |
+> | Rastros en `activity_logs` en toda su historia | **34** |
+> | · `packing_list_batch_create` | **7**, todos con rol `admin`, del 18 al 22-abr-2026 |
+> | · `packing_list_delete` | **3**, rol `admin` |
+> | · `packing_lists_cleanup` (el cron) | **24**, del 14-may al 6-jun-2026 |
+> | Cargas de **bodega** | **0** |
+> | Cargas de **secretaria** | **0** |
+> | Buckets de Storage suyos | **ninguno** (el PDF se leía en el navegador y nunca se subía) |
+> | `packing_list_purge_snapshot` | **la tabla no existe** — el «snapshot» del cron era una fila de `activity_logs` |
+>
+> **Quién lo tenía en el menú:** `role_permissions` → admin · secretaria · bodega; y a mano, los
+> `modulos_override` de **Angela** y **andrea**. Ninguno de los dos roles que lo usaban a diario en
+> el papel —bodega, para marcar bultos al abrir un contenedor— lo abrió jamás.
+>
+> **Por qué estaba vacío, y no es que la gente dejara de usarlo.** El 14-may-2026 el cron de
+> limpieza borró **las 28 listas activas**, físicamente y sin copia: el corte de entonces eran
+> 7 días sobre la fecha de CREACIÓN, no sobre un borrado. El arreglo (soft delete + 90 días desde
+> el borrado a mano, con snapshot previo) llegó el 7-jun, **24 días tarde**. Nadie se enteró.
+>
+> ### Qué se retiró
+>
+> La ficha del módulo (`src/lib/modules.ts`), su color (teal-500), la pantalla
+> (`src/app/packing-lists/**`, 1.325 líneas el cliente), las **tres rutas API**
+> (`/api/packing-lists`, `/api/packing-lists/[id]`, `/api/packing-lists/fallback-bulto` —la que
+> llamaba a Claude Haiku para leer un bulto que el parser no entendía), el lector de PDF
+> (`src/lib/parse-packing-list.ts`, 850 líneas), `src/lib/packing-lists/retencion.ts`,
+> `src/lib/cleanup-packing-lists.ts`, el cron **`cleanup-packing-lists`** (03:00 UTC) con su
+> colateral en la reconciliación, la novedad «no se borran a los 7 días», los tres tests que
+> probaban el parser y la retención, los ocho scripts de depuración de PL y el fixture del PDF.
+> **82 → 81 crons.**
+>
+> ### 🔴 Lo que NO se borró
+>
+> - **LAS TABLAS `packing_lists` y `pl_items` QUEDAN.** Mismo patrón que `mayor_lineas`,
+>   `cxc_favorites` y `directorio_clientes`: el código se va, la tabla se queda. Un test recorre
+>   TODAS las migraciones y pone el build **rojo** si alguna intenta dropearlas.
+> - **Los 34 rastros de `activity_logs`** se quedan: son historia.
+> - **La RPC `save_packing_list`** y sus índices quedan, inertes: sin ruta que la llame.
+> - **`/packing-lists` sigue llegando**: redirige a `/home` con **307** (temporal, como todos los
+>   de este repo), y también `/packing-lists/<id>` — la dirección pudo quedar en un marcador o en
+>   la pantalla de inicio de un teléfono.
+>
+> ### ⚠️ Lo que SÍ salió del respaldo, y por qué se pudo
+>
+> Las dos tablas pasaron de clase `personas` a **`retirada`** en `src/lib/backup/tablas.ts`, o sea
+> que dejan de copiarse. **Eso solo se puede hacer porque tienen 0 filas**: la regla de la casa es
+> que nada que no se pueda volver a conseguir se queda sin copia, y acá no hay nada que conseguir.
+> El día que alguien vuelva a escribir en ellas, vuelven a `personas` en el mismo cambio.
+>
+> ### La migración `20261110120000` (aditiva, quirúrgica)
+>
+> `array_remove` de la key `packing-lists` en `role_permissions.modulos` (3 roles) y en
+> `fg_users.modulos_override` (2 usuarias), más el `DELETE` de **una** fila de `cron_heartbeats`
+> por nombre EXACTO —el heartbeat huérfano del cron retirado, el mismo camino que `sync-mayor` el
+> 3-sep-2026—. No dropea nada, no toca `activity_logs`, no toca ninguna otra key.
+>
+> ### Lo que se decidió NO arreglar, porque se fue con el módulo
+>
+> El mapa del 5-sep-2026 (`docs/mapas/packing-lists.md`) dejó diez 🩸 abiertos. Se van todos con la
+> pantalla, y vale la pena dejarlos escritos porque explican por qué no valía la pena rescatarlo:
+> el vendedor entraba por URL aunque no tuviera el módulo; la RPC borraba físicamente una lista
+> guardada en la red de 90 días si se volvía a subir el mismo número; la primera pintada no
+> filtraba lo borrado y la segunda sí; en el iPhone era una tabla de 700 px sin vista de tarjetas
+> —siendo bodega el usuario de teléfono del sistema—; `created_by` existía y ningún código la
+> escribía; y el módulo nunca estuvo en la búsqueda global.
+>
+> **Candado:** `src/__tests__/lib/packing-lists-retirado.test.ts` (24 casos, con 3 controles al
+> revés). Candados que **cambiaron de dirección con nota fechada, ninguno se borró**:
+> `boston-acceso` y `multifashion-acceso` (se fue la fila «packing lists» de las rutas ajenas —ya
+> no hay 403 que comprobar—), `campos-obligatorios` (la sección 5, `pl_items`),
+> `catalogo-roles` y `data-health-dentro-de-usuarios` (las listas por rol; bodega pasa de 5 módulos
+> a 4 y sigue sin auto-redirect), `cron-registro` (la foto del 3-sep-2026 no se toca: lo que cambia
+> es que ahora denuncia DOS huérfanos, `sync-mayor` y `cleanup-packing-lists`), `poda-textos-ayuda`
+> y `poda-textos-cxc-multifashion` (las filas de la pantalla que se fue), `novedades-dibujos` y
+> `novedades` (la novedad y la cuenta de módulos, 21 → 20) y `cleanup-sessions` (su vecino de las
+> 03:00 ya no existe; la franja quedó libre).
+
+---
+
 > ## 🔴 EL MAYOR CONTABLE SE RETIRÓ — queda UNA sola fuente de gasto (13-ago-2026)
 >
 > Daniel, textual, después de entender que Vista General usaba el mayor y el módulo de Gastos usa Egresos Varios: ***"y entonces borra Mayor contable en el sistema"***.

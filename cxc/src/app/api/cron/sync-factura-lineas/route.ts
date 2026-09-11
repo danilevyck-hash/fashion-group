@@ -23,7 +23,8 @@
  * 02:30 y el candado de `cleanup-sessions` lo rechazó — ahí ya corre él, y esa
  * franja exige 30 min de margen entre crons. Medido contra `vercel.json`,
  * **03:30 es el ÚNICO hueco de toda la banda 00:00-05:00 que cumple**: queda a
- * 30 min de `cleanup-packing-lists` (03:00) y del backup de Storage (04:00), y
+ * 30 min de `cleanup-packing-lists` (03:00 — retirado el 10-sep-2026 con su
+ * módulo, así que esa franja quedó libre) y del backup de Storage (04:00), y
  * a 60 min del primer `sync-articulo-info` (04:30), que sí toca Switch.
  *
  * Ninguna sesión de Switch de estas 6 empresas está abierta a esa hora

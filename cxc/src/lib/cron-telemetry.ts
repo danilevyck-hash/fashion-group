@@ -209,7 +209,6 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "switch-articulos": 0,
   "sync-proveedores": 0,
   "refresh-clientes-views": 0,
-  "cleanup-packing-lists": 0,
   "acs-resumen-diario": 0,
   "integrity-check": 13, // su cron corre 12:00 UTC
   // Su cron corre **14:00 UTC (9:00 a.m. Panamá)** desde el 5-sep-2026 — antes
@@ -1071,7 +1070,11 @@ export const CRONS_FAIL_CLOSED = [
   "acs-resumen-diario",
   "backup",
   "cheques-alert",
-  "cleanup-packing-lists",
+  // "cleanup-packing-lists" — RETIRADO 10-sep-2026 con su módulo (Daniel:
+  // «packing list no se usa, eliminar»; `packing_lists` y `pl_items` con 0
+  // filas). Sin cron no hay heartbeat: dejarlo acá haría que health-crons
+  // devolviera 503 todos los días por un cron que ya no existe. Su fila vieja
+  // de cron_heartbeats la barre la migración 20261110120000.
   "cleanup-sessions",
   "grupo-resumen-mensual",
   "integrity-check",

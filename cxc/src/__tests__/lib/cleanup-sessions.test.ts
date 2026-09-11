@@ -195,7 +195,10 @@ describe("vercel.json — la entrada del cron", () => {
     expect(choques.map((c) => c.path)).toEqual([]);
   });
 
-  it("queda a ≥30 min de sus vecinos (acs-resumen-diario 01:00, cleanup-packing-lists 03:00)", () => {
+  // 10-sep-2026 · el vecino `cleanup-packing-lists` (03:00) se retiró con el
+  // módulo Packing Lists: la franja 03:00 quedó libre. El candado NO cambió —
+  // recorre TODOS los crons de 00:00-05:00 que haya, no una lista escrita a mano.
+  it("queda a ≥30 min de sus vecinos (hoy: acs-resumen-diario 01:00)", () => {
     const enMinutos = (schedule: string) => {
       const [min, hora] = schedule.split(" ");
       return Number(hora) * 60 + Number(min);

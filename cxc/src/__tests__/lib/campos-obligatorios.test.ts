@@ -49,7 +49,6 @@ import {
 import { POST as postResponsable } from "@/app/api/caja/responsables/route";
 import { POST as postVendor } from "@/app/api/vendors/route";
 import { POST as postContacto, PATCH as patchContacto } from "@/app/api/reclamos/contactos/route";
-import { POST as postPackingList } from "@/app/api/packing-lists/route";
 import { POST as postGuia } from "@/app/api/guias/route";
 import { POST as postOverride } from "@/app/api/overrides/route";
 
@@ -276,68 +275,14 @@ describe("PATCH /api/reclamos/contactos — parcial sí, vaciar un obligatorio n
 });
 
 // ── 5. pl_items.estilo / .producto ───────────────────────────────────────────
-
-function itemPL(over: Record<string, unknown> = {}) {
-  return { estilo: "40EM124110", producto: "CAMISA", totalPcs: 12, distribution: {}, bultoMuestra: "1", isOS: false, ...over };
-}
-
-describe("POST /api/packing-lists — un item sin estilo ya no tumba el PL entero", () => {
-  it("modo simple: item sin estilo → 400 que dice QUÉ FILA (antes: 500 y el PL perdido)", async () => {
-    mockRpc.mockResolvedValue({ data: "pl-1", error: null });
-    const res = await postPackingList(
-      req("/api/packing-lists", {
-        numeroPL: "PL-001",
-        items: [itemPL(), itemPL({ estilo: undefined }), itemPL()],
-      }),
-    );
-    expect(res.status).toBe(400);
-    expect((await cuerpo(res)).error).toContain("fila 2");
-    expect(mockRpc).not.toHaveBeenCalled();
-  });
-
-  it("modo lote: el PL malo se reporta y los BUENOS se guardan igual", async () => {
-    mockRpc.mockResolvedValue({ data: "pl-ok", error: null });
-    mockFrom.mockReturnValue({
-      select: () => ({ eq: () => ({ single: async () => ({ data: { total_bultos: 1, total_piezas: 12, total_estilos: 1 } }) }) }),
-    });
-    const res = await postPackingList(
-      req("/api/packing-lists", {
-        packingLists: [
-          { numeroPL: "PL-BUENO", indexRows: [itemPL()] },
-          { numeroPL: "PL-MALO", indexRows: [itemPL({ estilo: "  " })] },
-        ],
-      }),
-    );
-    expect(res.status).toBe(200);
-    const data = (await res.json()) as { totalSaved: number; totalFailed: number; results: { numeroPL: string; error?: string }[] };
-    expect(data.totalSaved).toBe(1);
-    expect(data.totalFailed).toBe(1);
-    expect(data.results.find((r) => r.numeroPL === "PL-MALO")?.error).toContain("fila 1");
-  });
-
-  it("producto vacío SÍ se guarda — el parser lo produce a propósito", async () => {
-    // `parse-packing-list.ts` hace `currentProducto = producto ? … : ""`.
-    // Rechazarlo sería inventar un error que el parser ya decidió que no lo es.
-    mockRpc.mockResolvedValue({ data: "pl-1", error: null });
-    const res = await postPackingList(
-      req("/api/packing-lists", { numeroPL: "PL-002", items: [itemPL({ producto: "" })] }),
-    );
-    expect(res.status).toBe(200);
-  });
-
-  it("producto AUSENTE se normaliza a '' — funciona con o sin la migración", async () => {
-    mockRpc.mockResolvedValue({ data: "pl-1", error: null });
-    const res = await postPackingList(
-      req("/api/packing-lists", { numeroPL: "PL-003", items: [itemPL({ producto: undefined })] }),
-    );
-    expect(res.status).toBe(200);
-    const payload = mockRpc.mock.calls[0][1] as { pl_items_payload: { producto: unknown }[] };
-    expect(payload.pl_items_payload[0].producto).toBe("");
-    // Y sobrevive al viaje por JSON, que es donde `undefined` desaparece.
-    const serializado = JSON.parse(JSON.stringify(payload.pl_items_payload[0])) as Record<string, unknown>;
-    expect(Object.prototype.hasOwnProperty.call(serializado, "producto")).toBe(true);
-  });
-});
+//
+// 10-sep-2026 · NOTA FECHADA — esta sección se retiró entera con el módulo
+// Packing Lists (Daniel: «packing list no se usa, eliminar»; `packing_lists` y
+// `pl_items` con 0 filas). Probaba `POST /api/packing-lists`, que ya no existe:
+// no se debilitó ningún candado, se fue la ruta que candaba. `pl_items` también
+// salió de `CAMPOS_OBLIGATORIOS` — la tabla se queda, sin escritores. Las otras
+// cinco secciones del barrido (reclamos, guías, cxc_client_overrides…) siguen
+// una por una, intactas.
 
 // ── 6. Los que aparecieron en el barrido, más allá de los 5 reportados ───────
 

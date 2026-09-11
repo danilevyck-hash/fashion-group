@@ -19,7 +19,6 @@ import {
   FileText,
   HandCoins,
   AlertTriangle,
-  ClipboardList,
   TrendingUp,
   ShoppingBag,
   Megaphone,
@@ -164,7 +163,17 @@ export const ALL_MODULES: AppModule[] = [
 
   // Operación
   { key: "guias",          label: "Guías de Despacho", href: "/guias",            icon: Truck,         roles: ["admin", "secretaria", "bodega", "vendedor"], group: "operacion" },
-  { key: "packing-lists",  label: "Packing Lists",     href: "/packing-lists",    icon: ClipboardList, roles: ["admin", "secretaria", "bodega"],             group: "operacion" },
+  // 🩸 "Packing Lists" (key `packing-lists`) se RETIRÓ el 10-sep-2026. Daniel,
+  // textual: *«packing list no se usa, eliminar»*. Medido contra producción ese
+  // día: `packing_lists` y `pl_items` con **0 filas** (vacías desde el
+  // 14-may-2026, cuando el cron viejo borró las 28 que había), y en toda su
+  // historia lo tocó UNA persona — 34 rastros en `activity_logs`: 7 cargas y 3
+  // borrados, todos de `daniel`, entre el 18 y el 22-abr-2026, más 24 latidos
+  // del cron. Bodega y las secretarias, que lo tenían en su menú, nunca lo
+  // usaron. Las tablas NO se dropean (patrón `mayor_lineas`): quedan
+  // clasificadas `retirada` en `src/lib/backup/tablas.ts`. `/packing-lists`
+  // redirige a `/home` en next.config.js. Candado:
+  // `packing-lists-retirado.test.ts`.
   // "Asistencia y Planilla" (13-ago-2026). Daniel, textual: *"y asistencia se
   // debe de llamar asistencia y planilla"*. El módulo ya calculaba la planilla
   // (sueldos, extras, deducciones, el Excel y el PDF que firma la contadora) y

@@ -233,7 +233,12 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
     "directorio",
     "catalogos",
     "guias",
-    "packing-lists",
+    // 10-sep-2026 · NOTA FECHADA — «packing-lists» salió de la lista porque el
+    // MÓDULO se retiró (Daniel: «packing list no se usa, eliminar»;
+    // `packing_lists` con 0 filas y una sola persona que lo usó, en abril). El
+    // candado NO se debilitó: sigue siendo el inventario literal de
+    // `modules.ts`, y un módulo que se le ABRA de rebote a secretaria lo pone
+    // rojo igual.
     "reclamos",
     "cargar",
     "comisiones",
@@ -259,7 +264,9 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   //    `ASISTENCIA_ROLES`, así que ve UNA pestaña y la ruta le contesta sin un
   //    solo número de sueldo. El candado de eso vive en
   //    `src/__tests__/api/asistencia-bodega-solo-aprueba.test.ts`.
-  bodega: ["asistencia", "catalogos", "guias", "packing-lists", "referencia"],
+  // 10-sep-2026 · NOTA FECHADA — sin «packing-lists»: el módulo se retiró (ver
+  // arriba). Bodega lo tenía en su menú y nunca subió ni abrió una sola lista.
+  bodega: ["asistencia", "catalogos", "guias", "referencia"],
   // `asistencia` se le abrió el 6-ago-2026 por pedido de Daniel: la planilla
   // quincenal la arma la contable a mano, y los minutos de tardanza, las horas
   // extra y las ausencias que necesita para llenarla salen de ese módulo.

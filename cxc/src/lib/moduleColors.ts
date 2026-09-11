@@ -29,7 +29,8 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
   boston:       { border: "border-stone-500",   text: "text-stone-500",   hex: "#78716c" },
   marketing:  { border: "border-fuchsia-500", text: "text-fuchsia-500", hex: "#d946ef" },
   reebok:          { border: "border-red-500",     text: "text-red-500",     hex: "#ef4444" },
-  "packing-lists": { border: "border-teal-500",    text: "text-teal-500",    hex: "#14b8a6" },
+  // `packing-lists` (teal-500) se retiró con su módulo el 10-sep-2026 — ver
+  // `src/lib/modules.ts`. El tono vuelve a estar libre.
   proveedores: { border: "border-purple-600",  text: "text-purple-600",  hex: "#9333ea" },
   cargar:      { border: "border-teal-600",     text: "text-teal-600",    hex: "#0d9488" },
   "gastos-contabilidad": { border: "border-green-600", text: "text-green-600", hex: "#16a34a" },
@@ -70,7 +71,6 @@ export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/boston"))          return "boston";
   if (pathname.startsWith("/marketing"))       return "marketing";
   if (pathname.startsWith("/catalogo/reebok")) return "reebok";
-  if (pathname.startsWith("/packing-lists"))   return "packing-lists";
   if (pathname.startsWith("/proveedores"))     return "proveedores";
   if (pathname.startsWith("/productos/cargar")) return "cargar";
   if (pathname.startsWith("/gastos-contabilidad")) return "gastos-contabilidad";

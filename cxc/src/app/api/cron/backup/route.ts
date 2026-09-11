@@ -219,9 +219,10 @@ const DATASETS: Dataset[] = [
   { table: "reebok_orders" },
   { table: "reebok_order_items" },
   { table: "reebok_pedidos_publicos" },
-  // Packing lists (la purga física a 90d los borra de la DB; el backup retiene)
-  { table: "packing_lists" },
-  { table: "pl_items" },
+  // `packing_lists` y `pl_items` salieron del respaldo el 10-sep-2026, con su
+  // módulo (Daniel: «packing list no se usa, eliminar»). Medido ese día: 0 filas
+  // en las dos, y 0 desde el 14-may-2026. Las TABLAS no se dropean (patrón
+  // `mayor_lineas`): quedan clasificadas `retirada` en `src/lib/backup/tablas.ts`.
   // Comisiones / vendedores / metas
   { table: "comision_vendedor_tasa" },
   { table: "vendedores" },
