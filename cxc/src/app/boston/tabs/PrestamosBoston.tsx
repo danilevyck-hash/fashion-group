@@ -18,6 +18,7 @@ interface EmpleadoPrestamo {
   id: string;
   nombre: string;
   empresa: string;
+  /** Préstamo + terceros: lo que la quincena le descuenta (11-sep-2026). */
   deduccionQuincenal: number;
   prestado: number;
   pagado: number;

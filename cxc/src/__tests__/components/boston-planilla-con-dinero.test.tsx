@@ -10,7 +10,7 @@
 // cuatro veces con el comentario que explicaba el cambio.
 //
 // Las DOS direcciones pesan igual:
-//   1. con `dinero` → las 18 columnas del grupo, en su orden, y el pie de TOTAL;
+//   1. con `dinero` → las 19 columnas del grupo, en su orden, y el pie de TOTAL;
 //   2. con `sinSueldos: true` → la tabla vuelve sola a las 5 de horas, sin un
 //      solo `$`. Si el flag se apaga, la pantalla no puede romperse.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,9 +44,13 @@ vi.mock("@/components/ui/RangoFechas", () => ({
   ),
 }));
 
-/** Las 18 columnas, en el orden EXACTO de `PlanillaTab` (la del grupo). */
+/** Las 19 columnas, en el orden EXACTO de `PlanillaTab` (la del grupo).
+ *  ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-SEP-2026: eran 18 escritas a mano y el 10-sep el
+ *  grupo ganó «Salida temprana» sin que Boston se enterara. Ahora las dos
+ *  pantallas leen `columnas-dinero-planilla.ts`, y este candado exige que lo
+ *  que Boston dibuja sea EXACTAMENTE esa lista (con la columna nueva adentro). */
 const COLUMNAS = [
-  "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas",
+  "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas", "Salida\ntemprana",
   "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
   "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
   "Mercan-\ncía", "Total\ndeducc.", "Otros\nservicios (+)", "Neto a\npagar",
@@ -169,7 +173,7 @@ describe("🔴 con los sueldos abiertos", () => {
     avisos: {},
   };
 
-  it("dibuja las 18 columnas del grupo, en su orden", async () => {
+  it("dibuja las 19 columnas del grupo, en su orden", async () => {
     responder(CON_DINERO);
     render(<PlanillaBoston />);
     elegirPeriodo();

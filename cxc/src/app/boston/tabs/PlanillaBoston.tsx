@@ -7,12 +7,20 @@
 // Excel. Una segunda aritmética de sueldos al lado de la buena tiene un solo
 // modo de fallo, y es que dos pantallas paguen distinto.
 //
-// 🔴 Y POR LO MISMO, LAS COLUMNAS SON LAS DE LA PLANILLA DEL GRUPO. Las 18 de
-// `PlanillaTab`, en el MISMO orden, con el mismo `$$` (cero → «—»), la misma
-// primera columna pegada al hacer scroll y el mismo pie de TOTAL. No se diseñó
-// una tabla «para Boston»: la contadora y David tienen que poder mirar la misma
-// fila y ver lo mismo. El único adorno propio —el «(+)» de «Otros servicios»—
-// también se copia: es la única señal de que esa columna SUMA.
+// 🔴 Y POR LO MISMO, LAS COLUMNAS SON LAS DE LA PLANILLA DEL GRUPO — y salen
+// de la MISMA lista (`lib/asistencia/columnas-dinero-planilla.ts`, 11-sep-2026),
+// con el mismo `$$` (cero → «—»), la misma primera columna pegada al hacer
+// scroll y el mismo pie de TOTAL. 🩸 Hasta hoy eran dos listas «en el mismo
+// orden»: el 10-sep la del grupo ganó «Salida temprana» y ésta se quedó en 18,
+// así que con alguien que saliera temprano las columnas de David no daban el
+// Total bruto ni el Neto. No se diseña una tabla «para Boston»: la contadora y
+// David tienen que poder mirar la misma fila y ver lo mismo.
+//
+// 🔴 Y EL CORTE ES EL MISMO QUE VE LA CONTADORA (11-sep-2026): el guardado de la
+// quincena cerrada, o el sugerido (13/28). Sin él, David leía el reloj hasta el
+// 15 mientras Yulissa cerraba el 13 — dos netos para la misma persona. Ver
+// `lib/boston/planilla-corte.ts`. El ajuste de la quincena anterior llega
+// adentro de las columnas, igual que en el grupo, y se dice al pie.
 //
 // ⚠️ SON DE SOLO LECTURA, y no es una decisión de diseño: los cinco montos que
 // en el grupo se escriben a mano (ISR, préstamo, terceros, mercancía, otros
@@ -29,11 +37,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { quincenasHasta } from "@/lib/asistencia/planilla";
+import { periodoDesdeRango, quincenasHasta } from "@/lib/asistencia/planilla";
 import { fmtMin } from "@/lib/asistencia/reporte";
 import { fmtDate } from "@/lib/format";
 import type { LineaSinDinero } from "@/lib/boston/planilla-sin-dinero";
 import type { DineroLinea, LineaPlanilla, TotalesPlanilla } from "@/lib/asistencia/planilla";
+import { COLUMNAS_DINERO_PLANILLA, montosDePlanilla } from "@/lib/asistencia/columnas-dinero-planilla";
+import { notaAjuste, notaCeldaAjuste } from "@/lib/asistencia/corte-quincena";
+import { fechaCortaCorte, fraseCorte } from "@/lib/asistencia/elegir-quincena";
+import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
+import { corteParaBoston } from "@/lib/boston/planilla-corte";
 
 import RangoFechas from "@/components/ui/RangoFechas";
 /** Una fila puede venir recortada o completa. La pantalla se banca las dos. */
@@ -53,6 +66,14 @@ interface Respuesta {
    *  Con los sueldos abiertos NO viene, y entonces llegan `dinero` y `totales`. */
   sinSueldos?: boolean;
   totales?: TotalesPlanilla;
+  /** 🔴 El corte con el que se midió (día 13/28). `null` = quincena entera. */
+  corte?: string | null;
+  /** 🔴 El ajuste de la quincena anterior, testigo: ya está ADENTRO de las columnas. */
+  ajusteQuincenaAnterior?: {
+    total: number;
+    personas: { codigo: string; etiqueta: string; monto: number }[];
+    dias?: { desde: string; hasta: string } | null;
+  };
   avisos?: { periodoAbierto?: { texto?: string } | null; avisoSinFicha?: string | null };
 }
 
@@ -61,36 +82,10 @@ interface Respuesta {
 const $ = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const $$ = (n: number) => (n === 0 ? "—" : `$${$(n)}`);
 
-/** Las 18 columnas de dinero, en el orden EXACTO de `PlanillaTab`. */
-const COLUMNAS_DINERO = [
-  "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas",
-  "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
-  "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
-  "Mercan-\ncía", "Total\ndeducc.",
-  // El «(+)» no es adorno: es la única señal de que esta columna SUMA mientras
-  // las cuatro de al lado restan. Se copia tal cual del grupo.
-  "Otros\nservicios (+)", "Neto a\npagar",
-] as const;
-
-/** Las 18 cifras que la tabla dibuja. 🔑 Es un tipo ESTRUCTURAL a propósito: lo
- *  cumplen `DineroLinea` (una fila) y `TotalesPlanilla` (el pie) sin castear
- *  nada, así que el día que alguien renombre un campo en `planilla.ts` esto se
- *  pone rojo en vez de compilar y dibujar la columna equivocada. */
-type Montos = Pick<DineroLinea,
-  | "salarioQuincenal" | "extraDiurno" | "ausencias" | "tardanzas"
-  | "extraNocturno" | "excedente" | "domingos" | "feriados" | "totalBruto"
-  | "seguroSocial" | "seguroEducativo" | "isr" | "prestamo" | "terceros"
-  | "mercancia" | "totalDeducciones" | "otrosServicios" | "netoPagar">;
-
-/** Los 18 montos, en el MISMO orden que `COLUMNAS_DINERO`. */
-function montosDe(d: Montos): number[] {
-  return [
-    d.salarioQuincenal, d.extraDiurno, d.ausencias, d.tardanzas,
-    d.extraNocturno, d.excedente, d.domingos, d.feriados, d.totalBruto,
-    d.seguroSocial, d.seguroEducativo, d.isr, d.prestamo, d.terceros,
-    d.mercancia, d.totalDeducciones, d.otrosServicios, d.netoPagar,
-  ];
-}
+/** Las columnas de dinero: LA lista del grupo, no una copia (11-sep-2026). */
+const COLUMNAS_DINERO = COLUMNAS_DINERO_PLANILLA;
+/** Los montos, en el MISMO orden que `COLUMNAS_DINERO`. La misma función del grupo. */
+const montosDe = montosDePlanilla;
 
 interface Horas {
   extraDiurnoMin: number;
@@ -116,9 +111,23 @@ export default function PlanillaBoston() {
     setCargando(true);
     setError(null);
     try {
+      // 🔴 EL CORTE: el guardado si la quincena ya se cerró, si no el sugerido
+      // (13/28) — el MISMO pedido que arma la contadora para esa quincena.
+      // Lo cerrado se pregunta a la MISMA ruta que usa el grupo; si no contesta,
+      // va el sugerido (el servidor sigue forzando la empresa).
+      let corteGuardado: string | null = null;
+      if (PLANILLA_UNIDA && periodoDesdeRango(desde, hasta)?.esQuincena) {
+        try {
+          const rg = await fetch(`/api/asistencia/planilla-guardada?${new URLSearchParams({ desde, hasta })}`, { cache: "no-store" });
+          const jg = (await rg.json()) as { cerrada?: { corte?: string | null } | null };
+          if (rg.ok) corteGuardado = jg.cerrada?.corte ?? null;
+        } catch { /* sin respuesta, el sugerido */ }
+      }
+      const corte = corteParaBoston(desde, hasta, corteGuardado);
       // 🔴 SIN `empresa`: la pone el servidor. Mandarla desde el navegador
       // sugeriría que se puede cambiar, y no se puede.
       const p = new URLSearchParams({ desde, hasta });
+      if (corte) p.set("corte", corte);
       const res = await fetch(`/api/asistencia/planilla?${p}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
@@ -149,6 +158,14 @@ export default function PlanillaBoston() {
           onChange={(d, h) => { setDesde(d); setHasta(h); setElegido(true); }}
         />
       </div>
+
+      {/* 🔴 EL CORTE SE DICE, como en el grupo: hasta dónde se leyó el reloj. */}
+      {!error && data?.corte && (
+        <p className="mb-3 flex flex-wrap items-center gap-2 text-[13px] text-gray-600" data-testid="corte-boston">
+          <span className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-700">Corte {fechaCortaCorte(data.corte)}</span>
+          <span>{fraseCorte(data.corte, hasta) ?? `Se lee el reloj hasta el ${fechaCortaCorte(data.corte)}.`}</span>
+        </p>
+      )}
 
       {data?.avisos?.periodoAbierto?.texto && (
         <p className="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-800">
@@ -235,8 +252,8 @@ export default function PlanillaBoston() {
                 <tr className="text-xs uppercase tracking-wide text-gray-500 border-b border-gray-100">
                   <th className="sticky left-0 z-10 bg-white text-left font-normal px-4 py-3">Persona</th>
                   {hayDinero ? (
-                    COLUMNAS_DINERO.map((h) => (
-                      <th key={h} className="whitespace-pre px-2 py-3 text-right font-normal">{h}</th>
+                    COLUMNAS_DINERO.map((c) => (
+                      <th key={c.campo} className="whitespace-pre px-2 py-3 text-right font-normal">{c.rotulo}</th>
                     ))
                   ) : (
                     <>
@@ -267,7 +284,10 @@ export default function PlanillaBoston() {
                       {hayDinero ? (
                         conDinero(l) ? (
                           montosDe(l.dinero).map((v, i) => (
-                            <td key={i} className="px-2 py-3 text-right tabular-nums">
+                            // El `title` de la celda repite el ajuste de la quincena
+                            // anterior cuando esa columna lo trae — igual que el grupo.
+                            <td key={i} className="px-2 py-3 text-right tabular-nums"
+                              title={notaCeldaAjuste(COLUMNAS_DINERO[i].campo as Parameters<typeof notaCeldaAjuste>[0], (l as LineaPlanilla).ajusteDetalle) ?? undefined}>
                               {v === 0 ? <span className="text-gray-300">—</span> : $$(v)}
                             </td>
                           ))
@@ -312,6 +332,12 @@ export default function PlanillaBoston() {
               )}
             </table>
           </div>
+
+          {/* 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, DICHO AL PIE — el mismo texto
+              del grupo (`notaAjuste`): qué columnas lo traen y de qué días. */}
+          {hayDinero && notaAjuste(lineas as LineaPlanilla[]) && (
+            <p className="pt-3 text-[12px] text-gray-600" data-testid="ajuste-boston">{notaAjuste(lineas as LineaPlanilla[])}</p>
+          )}
 
           {/* Con el flag apagado la pantalla vuelve a ser la de horas, y ahí este
               pie SÍ explica por qué no hay plata. Con los sueldos abiertos sería

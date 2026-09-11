@@ -67,7 +67,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAsistencia } from "@/lib/asistencia/guard";
+import { requireAsistencia, MODULOS_PLANILLA } from "@/lib/asistencia/guard";
+import { EMPRESA_BOSTON, ROL_BOSTON, esGerenteBoston } from "@/lib/boston/rol";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { GET as calcularPlanilla } from "@/app/api/asistencia/planilla/route";
 import {
@@ -122,8 +123,15 @@ function periodoDe(quincenaRaw: unknown, desde: string, hasta: string): Periodo 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const auth = requireAsistencia(req, asistenciaRoles());
+  // 🔴 LEER: Asistencia entera, y también `gerente_boston` (11-sep-2026) — su
+  // pestaña Planilla necesita saber si la quincena YA SE CERRÓ y con qué corte,
+  // para pedir el MISMO cuadro que la contadora. Solo el GET: cerrar y reabrir
+  // siguen siendo de `cerrarPlanillaRoles()`. Y a David la empresa se la pone
+  // el servidor, igual que en `/api/asistencia/planilla`: lo que pida por
+  // `?empresa=` se ignora, y un `?id=` de otra empresa contesta 404.
+  const auth = requireAsistencia(req, [...asistenciaRoles(), ROL_BOSTON], MODULOS_PLANILLA);
   if (auth instanceof NextResponse) return auth;
+  const deBoston = esGerenteBoston(auth.role);
 
   const sp = req.nextUrl.searchParams;
   const id = (sp.get("id") ?? "").trim();
@@ -131,7 +139,7 @@ export async function GET(req: NextRequest) {
   try {
     if (id) {
       const { cabecera } = await leerCabecera(id);
-      if (!cabecera) {
+      if (!cabecera || (deBoston && cabecera.empresa !== EMPRESA_BOSTON)) {
         return NextResponse.json({ error: "Esa planilla guardada no existe." }, { status: 404 });
       }
       // 🔴 Los renglones se devuelven TAL CUAL se congelaron. Acá no se
@@ -141,7 +149,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, cabecera, lineas, aviso: null });
     }
 
-    const empresa = (sp.get("empresa") ?? "").trim();
+    const empresa = deBoston ? EMPRESA_BOSTON : (sp.get("empresa") ?? "").trim();
     if (!empresa) {
       return NextResponse.json({ error: "Falta la empresa." }, { status: 400 });
     }
