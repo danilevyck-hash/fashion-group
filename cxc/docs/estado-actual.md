@@ -1197,3 +1197,39 @@ cambiaron de texto con nota fechada, ninguno se borró**: `persona-en-el-centro`
 `boston-planilla-con-dinero` · `planilla-aviso-lleva-a-aprobaciones` · `aprobaciones-excel` ·
 `asistencia-aprobador-empresa` · `asistencia-saldo-vacaciones` · `asistencia-vigencia` ·
 `planilla-aviso-extras-sin-aprobar` · `planilla-unida-cierre-prestamo` · `prestamos-una-puerta`.
+
+---
+
+## 10-sep-2026 (tarde) — Dos chips: «Falta para pagar» y «Falta completar»
+
+Daniel, textual: *«veo falta configurar 4 y sin saldo bastantes, todos deben de estar en sin
+configurar no?»* → sí. Y al definirlo mejor: **dos chips, separados por si el dato que falta
+hace que la quincena salga mal**.
+
+| | Qué cuenta | Dónde vive la regla |
+|---|---|---|
+| **Falta para pagar (N)** | sin ficha · sin empresa · sin salario (salvo servicio profesional) · sin horario (salvo quien cobra fijo y no marca) | `src/lib/asistencia/que-le-falta.ts` → `queLeFalta().paraPagar` |
+| **Falta completar (N)** | sin cargo · sin cédula · sin saldo de vacaciones (saldo **y** fecha de corte) · sin fecha de ingreso | `queLeFalta().completar` |
+
+- Solo ACTIVOS; uno puede estar en los dos; el chip en cero no se dibuja. Reemplazan a «Falta
+  configurar» y a «Sin saldo» (los dos retirados de la pantalla).
+- La fila lo dice en texto corto debajo del nombre, lo de pagar primero: «Falta horario, cargo y
+  cédula». Se retiró el chip ámbar «Falta» de la columna Estado (la fila ya lo dice).
+- La cabecera de la sección dice el MISMO número del chip de pagar («N faltan para pagar»).
+- El servidor (`/api/asistencia/configuracion`) manda `tieneHorario` leyendo `asistencia_horarios`;
+  **falla abierto**: sin lectura, `null`, y a nadie se le acusa de no tener horario.
+- ⚠️ Decisión mínima, anotada: un código sin ficha cuenta solo en «para pagar» y dice «Falta ficha»
+  — sin ficha no hay cargo ni cédula que revisar todavía.
+- **Nada de lo que se guarda cambia.**
+
+**Medido contra producción (solo lectura, `scripts/_medir-falta-configurar.ts`):** 47 activos
+(41 fichas + 10 códigos del reloj sin ficha, 0 ignorados). **ANTES:** «Falta configurar (10)» ·
+«Sin saldo (45)». **DESPUÉS:** «Falta para pagar (11)» · «Falta completar (37)», 1 en los dos
+(Enrique Sanchez, código 56: sin horario). Por faltante: cargo 37 · cédula 37 · saldo 35 · ficha 10
+· horario 1. Los 10 sin ficha: 2 · 3 · 39 · 55 · 9999 y **301–305** (los de Multifashion).
+
+**Candados:** nuevo `asistencia-falta-configurar.test.ts` (regla pura, texto de la fila, la pantalla
+usa el módulo, los chips viejos no vuelven, el servidor falla abierto). Dos cambiaron de texto con
+nota fechada, ninguno se borró: `persona-en-el-centro` («Sin saldo» → «Falta completar», con el
+control de que el nombre viejo no vuelve) y `asistencia-poda-textos` (el chip que se toca es «Falta
+completar»; «Falta para pagar» en cero no se dibuja).

@@ -104,6 +104,15 @@ import {
 } from "@/lib/asistencia/saldo-vacaciones";
 import { excepcionesDeLaFicha } from "@/lib/asistencia/ficha-persona";
 import { rutaDePersona, RUTA_PERSONA_NUEVA } from "@/lib/asistencia/persona-en-el-centro";
+// 🔴 LOS DOS CHIPS DE LA LISTA (10-sep-2026): qué le falta a cada colaborador,
+// separado por si la quincena sale mal. Regla en un módulo puro.
+import {
+  CHIP_COMPLETAR,
+  CHIP_PARA_PAGAR,
+  contarFaltantes,
+  queLeFalta,
+  textoFaltantes,
+} from "@/lib/asistencia/que-le-falta";
 import Link from "next/link";
 import { puedeCerrar } from "@/lib/asistencia/roles";
 import { textoConfirmar, textoIgnorados } from "@/lib/asistencia/codigos-ignorados";
@@ -137,6 +146,8 @@ interface Persona {
   posicion?: string | null;
   /** La cédula, para el pie del comprobante. `null` = se escribe a mano. */
   cedula?: string | null;
+  /** ¿Tiene fila en `asistencia_horarios`? `null`/ausente = no se pudo saber. */
+  tieneHorario?: boolean | null;
   /** 🔴 Su sueldo se paga entre DOS empresas. Vacío = cobra entero en la suya,
    *  que es el caso de 36 de las 37 fichas. Ver `lib/asistencia/reparto.ts`.
    *  Llega YA VALIDADO por el servidor: si el guard lo rechaza viene vacío.
@@ -327,7 +338,8 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
    * 🔴 EL MISMO COMPONENTE, EN MODO LISTA (10-sep-2026). Prendido:
    *   · la fila LLEVA a la página de esa persona en vez de desplegarse,
    *   · se ven sus excepciones y su saldo de vacaciones sin abrir nada,
-   *   · y aparece el chip «Sin saldo (N)» para filtrar.
+   *   · y los chips «Falta para pagar (N)» y «Falta completar (N)» filtran
+   *     por lo que le falta a cada quien (`lib/asistencia/que-le-falta.ts`).
    * Apagado —el default— la pantalla es EXACTAMENTE la de hoy: se despliega,
    * se edita en línea y se guarda solo. Ni un píxel cambia.
    */
@@ -389,7 +401,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
   }, [toast]);
   const [datos, setDatos] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filtro, setFiltro] = useState<"todos" | "faltan" | string>("todos");
+  const [filtro, setFiltro] = useState<"todos" | "para-pagar" | "completar" | string>("todos");
   const [abierta, setAbierta] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [estadoFila, setEstadoFila] = useState<string | null>(null);
@@ -814,29 +826,27 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
   const bajas = useMemo(() => (datos?.personas ?? []).filter((p) => !p.activo), [datos]);
 
   /**
-   * 🔴 A QUIÉN LE FALTA EL SALDO DE VACACIONES.
+   * 🔴 QUÉ LE FALTA A CADA QUIEN, EN DOS CHIPS (10-sep-2026).
    *
-   * 🩸 Esto era un BLOQUE de aviso en la pestaña Vacaciones («38 personas no
-   * tienen saldo…»): un cartel que decía un número y no se podía tocar. Ahora
-   * es un chip que FILTRA, así que enterarse y arreglarlo son el mismo gesto.
+   * Daniel: *«veo falta configurar 4 y sin saldo bastantes, todos deben de estar
+   * en sin configurar no?»* → sí, y separados por si la quincena sale mal:
+   * «Falta para pagar» (ficha · empresa · salario · horario) y «Falta completar»
+   * (cargo · cédula · saldo de vacaciones · fecha de ingreso). Uno puede estar
+   * en los dos. Reemplazan a «Falta configurar» (solo ficha y salario) y a
+   * «Sin saldo» (solo el saldo). La regla vive en `lib/asistencia/que-le-falta.ts`.
+   *
+   * 🩸 «Sin saldo» había nacido como el chip que reemplazó al cartel de la
+   * pestaña Vacaciones; sigue siendo un filtro que se toca — ahora adentro de
+   * «Falta completar», junto con lo demás que le falta a la ficha.
    */
-  const sinSaldo = useMemo(
-    () => activos.filter((p) => {
-      const s = saldos.get(String(p.codigo));
-      return !s || s.saldo === null || s.falta !== null;
-    }),
-    [activos, saldos],
-  );
+  const conteo = useMemo(() => contarFaltantes(activos), [activos]);
 
   const visibles = useMemo(() => {
     if (filtro === "todos") return activos;
-    if (filtro === "faltan") return activos.filter((p) => !p.configurado || p.faltaSalario);
-    if (filtro === "sin-saldo") {
-      const cods = new Set(sinSaldo.map((p) => p.codigo));
-      return activos.filter((p) => cods.has(p.codigo));
-    }
+    if (filtro === "para-pagar") return activos.filter((p) => queLeFalta(p).paraPagar.length > 0);
+    if (filtro === "completar") return activos.filter((p) => queLeFalta(p).completar.length > 0);
     return activos.filter((p) => p.empresa === filtro);
-  }, [activos, filtro, sinSaldo]);
+  }, [activos, filtro]);
 
   // UN solo aviso, con el desglose adentro. Antes eran dos carteles ámbar
   // apilados que decían casi lo mismo y competían entre ellos.
@@ -848,7 +858,9 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
   const set = (k: keyof ReglasAsistencia, v: string) =>
     setForm((f) => (f ? { ...f, [k]: v } : f));
 
-  const pendientes = datos ? datos.resumen.sinConfigurar + datos.resumen.sinSalario : 0;
+  // Lo que la cabecera de la sección resume: a cuántos les falta algo PARA
+  // PAGAR. Es el mismo número del chip, para que no haya dos cuentas.
+  const pendientes = conteo.paraPagar;
   // La rejilla del escritorio: con el acomodo nuevo lleva una columna más.
   const rejilla = personaEnElCentro ? COLUMNAS_CON_VACACIONES : COLUMNAS;
 
@@ -877,8 +889,8 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
             titulo="Colaboradores"
             resumen={
               pendientes > 0
-                ? `${datos.resumen.total} en la lista · ${pendientes} sin terminar`
-                : `${datos.resumen.total} en la lista · todos listos`
+                ? `${datos.resumen.total} en la lista · ${pendientes} ${pendientes === 1 ? "falta" : "faltan"} para pagar`
+                : `${datos.resumen.total} en la lista · todos listos para pagar`
             }
             alerta={pendientes > 0}
             abierta={!!seccion.personas}
@@ -958,10 +970,20 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                 className={`${PILL_BASE} ${filtro === "todos" ? PILL_ON : PILL_OFF}`}>
                 Todos ({datos.resumen.total})
               </button>
-              <button type="button" onClick={() => setFiltro("faltan")}
-                className={`${PILL_BASE} ${filtro === "faltan" ? PILL_ON : PILL_OFF}`}>
-                Falta configurar ({pendientes})
-              </button>
+              {/* 🔴 LOS DOS CHIPS. Con nadie adentro NO SE DIBUJAN: un chip en
+                  cero es un control que no ofrece nada. Lo de PAGAR va primero. */}
+              {conteo.paraPagar > 0 && (
+                <button type="button" onClick={() => setFiltro("para-pagar")}
+                  className={`${PILL_BASE} ${filtro === "para-pagar" ? PILL_ON : PILL_OFF}`}>
+                  {CHIP_PARA_PAGAR} ({conteo.paraPagar})
+                </button>
+              )}
+              {conteo.completar > 0 && (
+                <button type="button" onClick={() => setFiltro("completar")}
+                  className={`${PILL_BASE} ${filtro === "completar" ? PILL_ON : PILL_OFF}`}>
+                  {CHIP_COMPLETAR} ({conteo.completar})
+                </button>
+              )}
               {EMPRESAS_ASISTENCIA.map((e) => (
                 <button key={e} type="button" onClick={() => setFiltro(e)}
                   className={`${PILL_BASE} ${filtro === e ? PILL_ON : PILL_OFF}`}>
@@ -970,14 +992,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                   {etiquetaEmpresa(e)} ({activos.filter((p) => p.empresa === e).length})
                 </button>
               ))}
-              {/* 🔴 EL CHIP QUE REEMPLAZA AL CARTEL. Sin nadie sin saldo NO SE
-                  DIBUJA: un chip en cero es un control que no ofrece nada. */}
-              {personaEnElCentro && sinSaldo.length > 0 && (
-                <button type="button" onClick={() => setFiltro("sin-saldo")}
-                  className={`${PILL_BASE} ${filtro === "sin-saldo" ? PILL_ON : PILL_OFF}`}>
-                  Sin saldo ({sinSaldo.length})
-                </button>
-              )}
             </div>
 
             {/* 🔴 DAR DE ALTA A ALGUIEN ABRE DIRECTO EN EDITAR. Mostrarle una
@@ -1011,6 +1025,9 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
 
                 {visibles.map((p) => {
                   const falta = faltaEnPersona(p);
+                  // 🔴 LA FILA DICE QUÉ FALTA, en texto corto y sin chips extra:
+                  // «Falta cargo y cédula». Lo de pagar va primero.
+                  const queFalta = textoFaltantes(queLeFalta(p));
                   const abiertaEsta = abierta === p.codigo;
                   const saldo = saldos.get(String(p.codigo));
                   const saldoTexto = personaEnElCentro
@@ -1030,6 +1047,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                       <span className={`hidden ${rejilla}`}>
                         <span className="min-w-0">
                           <NombrePersona p={p} />
+                          {queFalta && <QueFalta texto={queFalta} />}
                           {excepciones.length > 0 && (
                             <span className="mt-1 flex flex-wrap gap-1">
                               {excepciones.map((e) => (
@@ -1060,7 +1078,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                           </span>
                         )}
                         <span className="text-right">
-                          <Indicador falta={falta.length} fueraDePlanilla={p.servicioProfesional} />
+                          <Indicador falta={!!queFalta} fueraDePlanilla={p.servicioProfesional} />
                         </span>
                       </span>
 
@@ -1068,8 +1086,9 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                       <span className="block lg:hidden">
                         <span className="flex items-start justify-between gap-3">
                           <NombrePersona p={p} />
-                          <Indicador falta={falta.length} fueraDePlanilla={p.servicioProfesional} />
+                          <Indicador falta={!!queFalta} fueraDePlanilla={p.servicioProfesional} />
                         </span>
+                        {queFalta && <QueFalta texto={queFalta} />}
                         {excepciones.length > 0 && (
                           <span className="mt-1.5 flex flex-wrap gap-1">
                             {excepciones.map((e) => (
@@ -2016,14 +2035,16 @@ function BloqueBaja({
  * cómo se le paga, no una alarma. En ámbar se leería como un pendiente, que es
  * exactamente lo que este cambio vino a dejar de decir de YULISSA.
  */
-function Indicador({ falta, fueraDePlanilla }: { falta: number; fueraDePlanilla?: boolean }) {
-  if (falta > 0) {
-    return (
-      <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[12px] font-semibold text-amber-800">
-        Falta
-      </span>
-    );
-  }
+/** «Falta cargo y cédula», debajo del nombre. Texto, no chip (10-sep-2026). */
+function QueFalta({ texto }: { texto: string }) {
+  return <span className="mt-0.5 block text-[12px] text-amber-700">{texto}</span>;
+}
+
+function Indicador({ falta, fueraDePlanilla }: { falta: boolean; fueraDePlanilla?: boolean }) {
+  // 🔴 Con algo que falta la fila YA lo dice debajo del nombre (`QueFalta`);
+  // acá no se repite ni se pinta un chip encima. Solo se dice el estado que la
+  // fila no dice: «No va en planilla» o «Listo».
+  if (falta && !fueraDePlanilla) return null;
   if (fueraDePlanilla) {
     return (
       <span className="inline-block whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-[12px] text-gray-600">

@@ -94,6 +94,15 @@ interface FilaMarca {
   dispositivo: string | null;
 }
 
+/** Los códigos con fila en `asistencia_horarios`. `null` si no se pudo leer. */
+async function leerCodigosConHorario(): Promise<Set<string> | null> {
+  const { data, error } = await supabaseServer
+    .from("asistencia_horarios")
+    .select("empleado_codigo");
+  if (error) return null;
+  return new Set((data ?? []).map((h) => String(h.empleado_codigo ?? "").trim()).filter(Boolean));
+}
+
 export async function GET(req: NextRequest) {
   const auth = requireAsistencia(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
@@ -120,7 +129,7 @@ export async function GET(req: NextRequest) {
 
     // Si cualquiera de las tres lecturas falla, se sale por el `catch` con un
     // 500 y el mensaje (tolerancia a la DDL retirada el 3-sep-2026).
-    const [{ reglas }, { filas }, repRes, deudaDe] = await Promise.all([
+    const [{ reglas }, { filas }, repRes, deudaDe, conHorario] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       leerRepartos(),
@@ -129,6 +138,11 @@ export async function GET(req: NextRequest) {
       // se marca la fecha de salida, que es cuando se decide la liquidación.
       // Nunca tumba esta pantalla: si Préstamos no contesta, el mapa viene vacío.
       leerDeudaPorCodigo(),
+      // 🔴 QUIÉN TIENE HORARIO (10-sep-2026). Sin horario la planilla no sabe a
+      // qué hora sale, así que entra al chip «Falta para pagar». Es la MISMA
+      // pregunta que hace el Reporte: ¿hay fila en `asistencia_horarios`?
+      // Falla ABIERTA: si la lectura falla viene `null` y no se acusa a nadie.
+      leerCodigosConHorario(),
     ]);
 
     // El día de hoy en Panamá. Solo decide cómo se REDACTA la baja («Renunció»
@@ -259,6 +273,9 @@ export async function GET(req: NextRequest) {
         // Ninguno de los dos toca el cálculo. Ver `datos-del-papel.ts`.
         posicion: f?.posicion ?? null,
         cedula: f?.cedula ?? null,
+        // 🔴 ¿Tiene hora de salida cargada? `null` = no se pudo leer (no se acusa).
+        // Lo lee `lib/asistencia/que-le-falta.ts` para el chip «Falta para pagar».
+        tieneHorario: conHorario ? conHorario.has(codigo) : null,
         // 🔴 Su sueldo se paga entre dos empresas y sale en las dos planillas.
         // Es de SOLO LECTURA en esta pantalla: la regla la fija la contadora y
         // los montos tienen que sumar el salario de la ficha. Ver `reparto.ts`.

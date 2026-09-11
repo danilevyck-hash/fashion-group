@@ -589,15 +589,23 @@ describe("I. 🔴 EL SALDO EN PERSONAS, LAS JUSTIFICACIONES EN REPORTE", () => {
 
   it("🔴 el aviso «N no tienen saldo» es ahora un chip QUE FILTRA", () => {
     // 🩸 Un cartel dice un número y no se puede tocar.
+    //
+    // 🔴 10-sep-2026 (tarde): el chip ya no se llama «Sin saldo». Daniel: *«veo
+    // falta configurar 4 y sin saldo bastantes, todos deben de estar en sin
+    // configurar no?»*. El saldo entró a «Falta completar», junto con el
+    // cargo, la cédula y la fecha de ingreso (`lib/asistencia/que-le-falta.ts`).
+    // La REGLA de este candado no cambió: sigue siendo un chip que filtra de
+    // verdad y que no se dibuja en cero. Ver `asistencia-falta-configurar.test.ts`.
     const src = puro(CONFIG);
-    expect(src).toMatch(/setFiltro\("sin-saldo"\)/);
-    // 🩸 QUE FILTRE DE VERDAD, no que el chip se pinte. `filtro === "sin-saldo"`
-    // a secas lo cumple el `className` del botón: borrar la rama que arma la
-    // lista dejaba un chip que se prende y no hace nada.
-    expect(src).toMatch(/if \(filtro === "sin-saldo"\) \{[\s\S]{0,220}return activos\.filter/);
-    expect(leer(CONFIG)).toMatch(/Sin saldo \(\{sinSaldo\.length\}\)/);
-    // 🔑 Y con nadie sin saldo NO se dibuja: un chip en cero no ofrece nada.
-    expect(src).toMatch(/personaEnElCentro && sinSaldo\.length > 0/);
+    expect(src).toMatch(/setFiltro\("completar"\)/);
+    // 🩸 QUE FILTRE DE VERDAD, no que el chip se pinte: borrar la rama que arma
+    // la lista dejaba un chip que se prende y no hace nada.
+    expect(src).toMatch(/if \(filtro === "completar"\) return activos\.filter\(\(p\) => queLeFalta\(p\)\.completar\.length > 0\)/);
+    expect(leer(CONFIG)).toMatch(/\{CHIP_COMPLETAR\} \(\{conteo\.completar\}\)/);
+    // 🔑 Y con nadie adentro NO se dibuja: un chip en cero no ofrece nada.
+    expect(src).toMatch(/conteo\.completar > 0 && \(/);
+    // CONTROL: el nombre viejo no vuelve.
+    expect(leer(CONFIG)).not.toMatch(/Sin saldo \(/);
   });
 
   it("Reporte trae «Justificaciones del período» como VISTA, no como bloque", () => {

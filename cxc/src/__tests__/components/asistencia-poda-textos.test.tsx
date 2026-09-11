@@ -536,7 +536,14 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
 
   it("el empty state genérico del filtro se fue", async () => {
     await abrirConfiguracion();
-    fireEvent.click(screen.getByText(/^Falta configurar \(/));
+    // 🔴 10-sep-2026: «Falta configurar» se partió en «Falta para pagar» y
+    // «Falta completar» (`lib/asistencia/que-le-falta.ts`). A la ficha del
+    // fixture le faltan cargo y cédula, así que el chip que se dibuja es el
+    // segundo; el primero, en cero, no se dibuja. La regla de este candado no
+    // cambió: el filtro no muestra un empty state genérico.
+    fireEvent.click(screen.getByText(/^Falta completar \(/));
+    expect(screen.queryByText(/^Falta para pagar \(/)).toBeNull();
+    expect(screen.queryByText(/^Falta configurar \(/)).toBeNull();
     expect(screen.queryByText(/No hay nadie en este filtro/)).toBeNull();
   });
 
