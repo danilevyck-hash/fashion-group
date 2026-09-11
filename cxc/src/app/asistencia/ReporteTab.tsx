@@ -6,8 +6,10 @@
 // Todo en MINUTOS, nunca horas decimales: "295 minutos" se le discute a una
 // persona, "4,92 horas" no le dice nada a nadie.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
+import { esFechaDeCalendario } from "@/lib/asistencia/planilla";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 // 🔴 Los nombres se MUESTRAN capitalizados, como en la lista; lo guardado sigue
@@ -57,18 +59,37 @@ export default function ReporteTab({ empresa = "" }: {
   // pantalla podría pedir hasta un día y el servidor marcar como "en curso"
   // otro. Una sola definición de hoy, y es `hoyPanama()`.
   const hoy = hoyPanama();
-  const [desde, setDesde] = useState(hoyPanama(new Date(Date.now() - 14 * 86_400_000)));
-  const [hasta, setHasta] = useState(hoy);
+  // ── 🔴 SE LLEGA DESDE LA FICHA DEL COLABORADOR, A SUS DÍAS (11-sep-2026) ──
+  //
+  // «Ver sus días ›» manda `?tab=asistencia&desde=…&hasta=…&q=<código>`. 🩸
+  // Hasta hoy esta pestaña no leía ninguno de los tres: aterrizaba en la lista
+  // de TODOS con el último rango guardado. Es el mismo camino que ya recorre
+  // Aprobaciones con `?persona=` — el rango de la URL manda sobre el recordado,
+  // y el código va al buscador. Se lee UNA vez, al montar.
+  // ⚠️ `useSearchParams()` puede ser `null` fuera del App Router (los tests que
+  // montan la pestaña sola): sin URL no hay llegada, y nada se rompe.
+  const sp = useSearchParams();
+  const llegada = useMemo(() => {
+    const d = sp?.get("desde") ?? "";
+    const h = sp?.get("hasta") ?? "";
+    const rango = esFechaDeCalendario(d) && esFechaDeCalendario(h) && d <= h ? { desde: d, hasta: h } : null;
+    return { rango, q: (sp?.get("q") ?? "").trim() };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [desde, setDesde] = useState(llegada.rango?.desde ?? hoyPanama(new Date(Date.now() - 14 * 86_400_000)));
+  const [hasta, setHasta] = useState(llegada.rango?.hasta ?? hoy);
 
   // 🔑 EL ÚLTIMO RANGO, por dispositivo. Es lo que reemplaza a los presets que
   // se fueron: el segundo día ya abre donde lo dejaste. Corre UNA vez al montar
-  // —si no, pisaría cada cambio del usuario con el valor guardado.
+  // —si no, pisaría cada cambio del usuario con el valor guardado. Con un rango
+  // en la URL no corre: lo que trae el enlace manda.
   useEffect(() => {
+    if (llegada.rango) return;
     const r = ultimoRango("asistencia_reporte");
     if (r) { setDesde(r.desde); setHasta(r.hasta); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(llegada.q);
   const [personas, setPersonas] = useState<PersonaReporte[] | null>(null);
   const [sinHorario, setSinHorario] = useState(0);
   // Los números con los que el SERVIDOR calculó. La pantalla no los inventa:
