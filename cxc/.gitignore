@@ -45,3 +45,6 @@ supabase/.temp/
 
 # Archivos que Daniel arrastra para que yo los vea. No se commitean.
 _paraclaude/
+
+# Scripts de backtesting de otros agentes: se miden en disco, nunca viajan al repo (10-sep-2026)
+scripts/_backtest-*
