@@ -2134,3 +2134,34 @@ ningún precio, existencia ni visibilidad de producto cambió; ningún cálculo 
   `SYSTEM_ROLES`, la misma de Usuarios.
 - Los hallazgos 🟡 de Multifashion que NO estaban en el encargo siguen abiertos: el `?subtab=` viejo no se
   normaliza en la URL, y en la pestaña espejo de Comisiones el año es el del arranque.
+
+---
+
+## 11-sep-2026 (noche) — Auditoría grupo 4: nueve defectos arreglados sin rediseñar (Asistencia · Planilla · Préstamos · Boston · Comisiones)
+
+Aprobados por Daniel uno por uno sobre `grupo-4.md` y la sección Boston de `grupo-2.md`. Arreglar, no rediseñar; lo que toca plata, medido antes y después contra producción (solo lectura).
+
+| # | Dónde | Antes | Ahora |
+|---|---|---|---|
+| 1 | Asistencia › ficha › «Ver sus días ›» | mandaba `desde/hasta/q` y la pestaña no leía nada: la lista de TODOS con el último rango | `ReporteTab` lee los tres de la URL al montar (como Aprobaciones); la URL le gana al rango recordado |
+| 2 | Asistencia › persona › Editar › Dar de baja | «Listo, guardado» y nada más; el aviso vivía en el panel viejo que ya no se dibuja | «Debe $X en Préstamos — descuéntalo de la liquidación» pegado al formulario y en el aviso de guardado (ámbar, 8 s). Texto en `lib/asistencia/salida-con-deuda.ts`; deuda = las tres cuentas |
+| 3 | Asistencia › selector de empresa | a `bodega` le ofrecía las 4; eligiendo Boston, pantalla vacía | `GET /api/asistencia/alcance` (la misma lectura que recorta el servidor) → solo las suyas; David sigue en Boston |
+| 4 | Planilla › Descargar › Comprobantes | nombre del archivo con el período del selector | con el del cuadro (`nombreDelCuadro`), como Excel y PDF |
+| 5 | Préstamos | aviso del tope en verde y 3 s; «+ Préstamo» de la ficha a la lista general; el alta ofrecía las 4 empresas | ámbar y 8 s (el tipo viaja con el mensaje; `ToastSystem` usa `duracionToastMs`); `?nuevo=<código>` abre el formulario con la persona; el alta respeta la empresa elegida |
+| 6 | `cron_heartbeats` | fila huérfana `prestamos-caducan` | migración `20261116120000` aplicada y verificada (0 filas) |
+| 7 | **Boston (David) — plata** | 18 columnas (sin «Salida temprana»); pedía SIN corte; Préstamos leía `deduccion_dano` y nunca terceros | 19 columnas de UNA lista (`columnas-dinero-planilla.ts`); corte guardado o sugerido (`corteParaBoston`); tres cuentas y cuota préstamo + terceros |
+| 8 | Comisiones › una empresa › «Todo el año» | tocar una fila: «mes inválido (1..12)» | mismo candado que Fashion Group: no abre y el pie dice «Elige un mes» |
+| 9 | Comisiones › Multifashion | año del arranque (`inicial.year`) | el año elegido (`year`) |
+
+**Medición de Boston (`integration/boston-planilla-mismos-numeros.test.ts`, `RUN_DB_TESTS=1`, el handler real contra producción, cero escrituras):**
+- **16–31 ago, corte 28-ago, 18 personas.** Sin corte (antes): 3 de 18 netos distintos — Alejandra Camaño 216,63 vs 217,25 · Andrés González 371,21 vs 371,98 · Yeritza Solís 247,10 vs 250,00; total 4.800,55 vs **4.804,84**. Con el corte (ahora): **David = Yulissa, 18 de 18**, $4.804,84.
+- **1–15 sep, corte 13-sep, 19 personas.** David = Yulissa, 19 de 19, $4.593,88 (el corte todavía no pasó, así que «sin corte» da igual hoy; la diferencia nace el 14). **18 de 19 traen plata en «Salida temprana»** — la columna que a Boston le faltaba.
+- Ningún neto cambia salvo lo que el arreglo corrige (el corte). Las columnas y las cuentas solo cambian qué se VE.
+
+**Candados nuevos:** `asistencia-reporte-desde-la-ficha.test.tsx` · `planilla-comprobantes-nombre-del-cuadro.test.ts` · `asistencia-alcance-route.test.ts` · `prestamos-tope-ambar-y-nuevo-desde-ficha.test.tsx` · `comisiones-por-empresa-todo-el-anio.test.tsx` · `boston-planilla-mismas-columnas.test.tsx` · `boston-prestamos-tres-cuentas.test.ts` · `integration/boston-planilla-mismos-numeros.test.ts`. **Cambiaron de dirección con nota fechada, ninguno se borró:** `prestamos-salida-con-deuda` (pasó a `.tsx`: monta la ficha en vez de barrer texto) · `boston-planilla-con-dinero` (19 columnas) · `asistencia-reglas-de-la-contable` (el rótulo vive en el módulo) · `multifashion-rediseno` (`selectedYear={year}`) · `persona-en-el-centro` y `prestamos-una-puerta` (`enlaceANuevoPrestamo(codigo)`) · `asistencia-empresa-para-todo` (sección E) · `multifashion-cerrado-y-espejo` (sección nueva).
+
+### ⚠️ Dejado a propósito / pendiente de Daniel
+- El selector de Asistencia muestra lo del rol hasta que `/api/asistencia/alcance` contesta (un parpadeo posible en la primera carga); el recorte de verdad sigue en cada ruta.
+- En Multifashion dentro de Comisiones el selector de período del shell sigue oculto (la vista trae sus chips): el año que recibe es el que se eligió ANTES de cambiar a Multifashion.
+- La pestaña Planilla de Boston sigue sin descargas (Excel/PDF/comprobantes): no estaba en el encargo.
+- `ToastSystem` ahora dura 8 s en TODOS los errores y avisos del sistema (era 3 s para todo): es la regla de CLAUDE.md, aplicada por fin en el componente.
