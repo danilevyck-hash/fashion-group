@@ -23,6 +23,28 @@ export const EMPRESAS_CON_RECLAMOS: readonly string[] = EMPRESAS.filter(
   (e) => !EMPRESAS_SIN_TARJETA.includes(e),
 );
 
+/**
+ * Las empresas que el formulario OFRECE al crear o editar un reclamo.
+ *
+ * 🩸 11-sep-2026. El formulario ofrecía las SEIS (`EMPRESAS`) mientras la
+ * portada dibuja cinco: un reclamo de Joystep sumaba en «Por cobrar» arriba y
+ * **no había dónde abrirlo** —solo aparecía buscándolo— y los tres totales de
+ * arriba dejaban de cuadrar con la suma de las tarjetas. Ahora las dos
+ * pantallas leen la MISMA lista.
+ *
+ * ⚠️ `actual` se conserva SIEMPRE: si un reclamo viejo quedó en una empresa que
+ * ya no se ofrece, su desplegable la sigue mostrando. Sacarle la opción al
+ * editar dejaría el campo en blanco y le cambiaría la empresa sin que nadie lo
+ * pidiera. Medido el 11-sep-2026: **0 reclamos vivos de Joystep** (Fashion Wear
+ * 21 · Vistana 6 · Fashion Shoes 5 · Active Shoes 1).
+ */
+export function empresasParaElegir(actual?: string | null): readonly string[] {
+  const a = String(actual ?? "").trim();
+  if (!a || EMPRESAS_CON_RECLAMOS.includes(a)) return EMPRESAS_CON_RECLAMOS;
+  // En el orden del mapa, no pegada al final.
+  return EMPRESAS.filter((e) => EMPRESAS_CON_RECLAMOS.includes(e) || e === a);
+}
+
 /** Lo que dice la tarjeta de una empresa que nunca reclamó (nunca «$0.00»). */
 export const TODAVIA_SIN_RECLAMOS = "Todavía sin reclamos";
 

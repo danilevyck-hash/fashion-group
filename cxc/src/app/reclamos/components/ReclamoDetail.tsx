@@ -6,7 +6,8 @@ import { fmt, fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Toast, ConfirmDeleteModal, FotoLightbox, ScrollableTable } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
-import { EMPRESAS, GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem, calcSub, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, esPendiente } from "./constants";
+import { GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem, calcSub, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, esPendiente } from "./constants";
+import { empresasParaElegir } from "@/lib/reclamos/empresas-con-reclamos";
 import FotoBadge from "./FotoBadge";
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 import FacturasChips from "./FacturasChips";
@@ -255,7 +256,7 @@ export default function ReclamoDetail({
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-500">Empresa *</span>
                 <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none bg-transparent min-h-[44px] xl:min-h-0">
-                  {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
+                  {empresasParaElegir(editEmpresa).map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </label>
               <label className="flex flex-col gap-1">

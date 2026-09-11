@@ -5,7 +5,8 @@ import { fmt, fmtDate } from "@/lib/format";
 import { RItem, LocalFoto } from "./types";
 import { AccordionContent, FotoLightbox } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
-import { EMPRESAS, EMPRESAS_MAP, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel } from "./constants";
+import { EMPRESAS_MAP, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel } from "./constants";
+import { empresasParaElegir } from "@/lib/reclamos/empresas-con-reclamos";
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 import FacturasChips from "./FacturasChips";
 import ItemsEditor from "./ItemsEditor";
@@ -139,7 +140,7 @@ export default function ReclamoForm({
               <label className="text-xs text-gray-500">Empresa *</label>
               <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none bg-transparent">
                 <option value="">Seleccionar...</option>
-                {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
+                {empresasParaElegir(fEmpresa).map((e) => <option key={e} value={e}>{e}</option>)}
               </select>
               {empInfo && <p className="text-xs text-gray-400 mt-1">Proveedor: {empInfo.proveedor} | Marca: {empInfo.marca}</p>}
             </div>

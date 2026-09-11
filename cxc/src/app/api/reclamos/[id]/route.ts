@@ -4,11 +4,10 @@ import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
-import { firmarFacturaPathSafe } from "@/lib/reclamos/factura-storage";
 import { validateReclamoHeader } from "@/lib/reclamos/validate";
 import { ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
 import { datosDeEmpresa } from "@/lib/reclamos/empresas";
-import { firmarFotoPathSafe, firmarFotos } from "@/lib/reclamos/fotos-storage";
+import { leerDetalleReclamo } from "@/lib/reclamos/leer-detalle";
 import { facturasATexto, facturasDe } from "@/lib/reclamos/facturas";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,32 +36,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const { id } = params;
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
-  const { data, error } = await supabaseServer
-    .from("reclamos")
-    .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*), reclamo_settlements(*)")
-    .eq("id", id)
-    .eq("deleted", false)
-    .single();
-
-  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
-
-  if (data?.reclamo_seguimiento) {
-    data.reclamo_seguimiento.sort((a: { created_at: string }, b: { created_at: string }) =>
-      b.created_at.localeCompare(a.created_at));
+  // 🔴 LA MISMA LECTURA QUE EL SSR DE `/reclamos?view=detail&id=…`
+  // (11-sep-2026). Eran dos, y la del SSR no traía `reclamo_settlements` ni
+  // firmaba un solo archivo: abrir un reclamo por enlace directo o recargar
+  // con F5 lo pintaba sin fotos, sin la factura del proveedor, sin comprobante
+  // y con «Recuperación 0%». Ver `lib/reclamos/leer-detalle.ts`.
+  let data: Record<string, unknown> | null;
+  try {
+    data = await leerDetalleReclamo(id);
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
-
-  // Firma el PDF de factura (signed URL TTL 1h) para "Ver factura". Nunca público.
-  if (data?.factura_pdf_path) {
-    data.factura_pdf_url = await firmarFacturaPathSafe(data.factura_pdf_path);
-  }
-  // 🔴 Las fotos y el comprobante también se firman (bucket privado desde el
-  // 11-sep-2026, «Link público ciérralo»): la URL guardada en la fila ya no abre.
-  if (Array.isArray(data?.reclamo_fotos)) {
-    data.reclamo_fotos = await firmarFotos(data.reclamo_fotos as { storage_path: string }[]);
-  }
-  if (data?.comprobante_path) {
-    data.comprobante_url = await firmarFotoPathSafe(data.comprobante_path);
-  }
+  if (!data) return NextResponse.json({ error: "Reclamo no encontrado" }, { status: 404 });
 
   return NextResponse.json(data);
 }
@@ -85,13 +71,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Obligatoriedad de cabecera al EDITAR: solo si el PATCH trae campos de cabecera
   // (no aplica a PATCH de solo-estado ni de solo-seguimiento). Evita dejar un
   // reclamo incompleto editando.
-  const editaCabecera = ["empresa", "nro_factura", "fecha_reclamo", "nro_orden_compra"].some(
+  const editaCabecera = ["empresa", "nro_factura", "fecha_factura", "fecha_reclamo", "nro_orden_compra"].some(
     (k) => fields[k] !== undefined,
   );
   if (editaCabecera) {
     const vErr = validateReclamoHeader({
       empresa: fields.empresa,
       nro_factura: Array.isArray(fields.nro_factura) ? facturasATexto(fields.nro_factura.map(String)) : fields.nro_factura,
+      fecha_factura: fields.fecha_factura,
       fecha_reclamo: fields.fecha_reclamo,
       nro_orden_compra: fields.nro_orden_compra,
     });

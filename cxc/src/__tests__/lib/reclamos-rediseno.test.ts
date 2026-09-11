@@ -297,7 +297,10 @@ describe("motivo capitalizado y la nota del correo, acortada", () => {
 
 /* ═══ 8 · PDF obligatorio al crear, no al editar ════════════════════════════ */
 describe("🔴 «PDF obligatorio» — al crear; editar un reclamo viejo sin PDF sigue guardando", () => {
-  const cab = { empresa: "Fashion Wear", nro_factura: "1", fecha_reclamo: "2026-09-10", nro_orden_compra: "OC" };
+  // 🔄 11-sep-2026 — la cabecera gana la FECHA DE LA FACTURA como obligatoria
+  // (estaba con asterisco en las dos pantallas y no la validaba nadie). Lo que
+  // estos casos miden —el PDF, al crear y no al editar— no cambió.
+  const cab = { empresa: "Fashion Wear", nro_factura: "1", fecha_factura: "2026-09-01", fecha_reclamo: "2026-09-10", nro_orden_compra: "OC" };
   const items = [{ referencia: "a", descripcion: "b", talla: "M", genero: "Men", cantidad: 1, precio_unitario: 1, motivo: "x" }];
   it("sin PDF el nuevo no pasa, y dice qué falta", () => {
     expect(validateReclamoNuevo({ ...cab, factura_pdf_path: null }, items)).toBe(FALTA_PDF);
@@ -356,7 +359,15 @@ describe("🔴 barridos: lo que no puede volver", () => {
     expect(LISTA).toContain('useUrlState("estado"');
     expect(LISTA).toContain('useUrlState("q"');
     expect(LISTA).toContain("filtroDesdeUrl(");
-    expect(LISTA).toContain("ordenarPorFactura(");
+    // 🔄 11-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. El orden dejó de ser
+    // fijo («la factura más vieja primero») y pasa a elegirse tocando cualquier
+    // encabezado, con el default en la factura más RECIENTE arriba — Daniel:
+    // *«reclamo debe ir sort el más nuevo arriba para verlo, pero con opción de
+    // sort en todas las columnas: más plata, más días, menos días, menos
+    // plata»*. Lo que este caso protege —que el estado de la pantalla viaja en
+    // la URL— no cambió, y ahora el orden también.
+    expect(LISTA).toContain("ordenarReclamos(");
+    expect(LISTA).toContain('useUrlState("orden"');
   });
   it("la fila: «Correo», «Descargar» y el «···» con el papel, editar y borrar", () => {
     expect(LISTA).toContain("<OverflowMenu");
@@ -445,9 +456,23 @@ describe("🔴 «Link público ciérralo»: nadie arma una URL pública de recla
     expect(src).not.toContain("getPublicUrl");
     expect(src).not.toContain("/object/public/");
   });
-  it("el detalle firma desde `fotos-storage`", () => {
-    expect(sinComentarios(leer("src/app/api/reclamos/[id]/route.ts"))).toContain("firmarFotos(");
-    expect(sinComentarios(leer("src/app/api/reclamos/[id]/route.ts"))).toContain("firmarFotoPathSafe(data.comprobante_path)");
+  // 🔄 11-sep-2026 — CAMBIA DE ANCLA, NO SE BORRA. El firmado se mudó a
+  // `lib/reclamos/leer-detalle.ts`, la lectura ÚNICA que ahora usan la ruta y
+  // el SSR de `/reclamos?view=detail&id=…`: eran dos lecturas distintas y la
+  // del SSR no firmaba nada, así que abrir un reclamo por enlace directo o
+  // recargar con F5 lo pintaba con las fotos rotas y sin comprobante. La regla
+  // que este caso protege —las tres clases de archivo se FIRMAN al leer— no
+  // cambió; lo que cambió es que ahora vale para las dos puertas.
+  it("el detalle firma desde `fotos-storage`, y por una sola puerta", () => {
+    const lector = sinComentarios(leer("src/lib/reclamos/leer-detalle.ts"));
+    expect(lector).toContain("firmarFotos(");
+    expect(lector).toContain("firmarFotoPathSafe(");
+    expect(lector).toContain("firmarFacturaPathSafe(");
+    // Las dos puertas leen por ahí.
+    expect(sinComentarios(leer("src/app/api/reclamos/[id]/route.ts"))).toContain("leerDetalleReclamo(");
+    expect(sinComentarios(leer("src/app/reclamos/page.tsx"))).toContain("leerDetalleReclamo(");
+    // Y el SSR ya no arma su propio `select` del detalle.
+    expect(sinComentarios(leer("src/app/reclamos/page.tsx"))).not.toContain("reclamo_seguimiento(*)");
   });
   it("la fila nueva de foto guarda url = null, y el pago mira el path", () => {
     expect(sinComentarios(leer("src/app/api/reclamos/[id]/fotos/route.ts"))).toContain("url: null");

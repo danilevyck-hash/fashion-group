@@ -104,13 +104,42 @@ describe("la página de una empresa", () => {
   }
   const filasTabla = () => Array.from(document.querySelectorAll('[data-vista="tabla"] tbody tr'));
 
-  it("abre en «Por cobrar N · $» y muestra solo los por cobrar, la factura más vieja primero y los sin fecha al final", () => {
+  // 🔄 11-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. El orden de apertura se
+  // dio vuelta por decisión de Daniel: *«reclamo debe ir sort el más nuevo
+  // arriba para verlo, pero con opción de sort en todas las columnas: más
+  // plata, más días, menos días, menos plata»*. Lo que este caso protege —que
+  // abre en «Por cobrar», que el cobrado no se dibuja y que **lo que no tiene
+  // fecha de factura va al FINAL**— no cambió.
+  it("abre en «Por cobrar N · $» y muestra solo los por cobrar, la factura más RECIENTE primero y los sin fecha al final", () => {
     pintar();
     expect(screen.getByRole("button", { name: /Por cobrar/ }).textContent).toContain("4 · $");
     expect(screen.getByRole("button", { name: /Cobrados/ }).textContent).toContain("1");
     const nros = filasTabla().map((tr) => tr.querySelector("td")!.textContent);
-    expect(nros).toEqual(["REC-0020", "FW-0001", "FW-0007", "SINFECHA"]);
+    expect(nros).toEqual(["FW-0007", "FW-0001", "REC-0020", "SINFECHA"]);
     expect(document.body.textContent).not.toContain("PAGADO");
+  });
+
+  it("🔴 cada encabezado ordena, y la flecha dice cuál manda", () => {
+    pintar();
+    const porTotal = screen.getByRole("button", { name: /Ordenar por Total/ });
+    fireEvent.click(porTotal);
+    // Más plata primero.
+    expect(filasTabla().map((tr) => tr.querySelector("td")!.textContent))
+      .toEqual(["FW-0001", "FW-0007", "REC-0020", "SINFECHA"]);
+    expect(porTotal.textContent).toContain("↓");
+    // Otro toque, menos plata primero.
+    fireEvent.click(porTotal);
+    expect(filasTabla().map((tr) => tr.querySelector("td")!.textContent))
+      .toEqual(["SINFECHA", "REC-0020", "FW-0007", "FW-0001"]);
+    expect(porTotal.textContent).toContain("↑");
+  });
+
+  it("🔴 «Días» ordena por la fecha de la factura, y lo que no la tiene sigue al final", () => {
+    pintar();
+    const porDias = screen.getByRole("button", { name: /Ordenar por Días/ });
+    fireEvent.click(porDias); // más días = la más vieja arriba
+    expect(filasTabla().map((tr) => tr.querySelector("td")!.textContent))
+      .toEqual(["REC-0020", "FW-0001", "FW-0007", "SINFECHA"]);
   });
   it("«Sin reclamar» en rojo, «Reclamado 17 jul», las facturas con «·», y «Falta la fecha de la factura»", () => {
     pintar();
@@ -122,6 +151,19 @@ describe("la página de una empresa", () => {
     expect(screen.getAllByText("Falta la fecha de la factura").length).toBeGreaterThan(0);
     expect(document.body.textContent).not.toContain("En proceso");
   });
+  it("🔴 en «Cobrados» la fila NO ofrece «Correo»: sería cobrarle dos veces al proveedor", () => {
+    pintar({ }, );
+    // Con el chip «Cobrados» puesto, la única fila es el reclamo pagado.
+    fireEvent.click(screen.getByRole("button", { name: /Cobrados/ }));
+    const filas = filasTabla();
+    expect(filas.map((tr) => tr.querySelector("td")!.textContent)).toEqual(["PAGADO"]);
+    expect(within(filas[0] as HTMLElement).queryByRole("button", { name: /Mandar por correo/ })).toBeNull();
+    // Lo demás de la fila sigue: descargar y el «···».
+    expect(within(filas[0] as HTMLElement).getByRole("button", { name: /Descargar el Excel/ })).toBeTruthy();
+    // Y el botón de LOTE tampoco aparece sobre los cobrados.
+    expect(screen.queryByRole("button", { name: /Mandar por correo al proveedor/ })).toBeNull();
+  });
+
   it("tocar la fila abre el reclamo; en la fila viven «Correo», «Descargar» y el «···»", () => {
     const { onLoadDetail } = pintar();
     const fila = filasTabla()[1];

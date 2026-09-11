@@ -313,7 +313,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     const nro_factura = facturasATexto(fFacturas);
     if (!reclamoId) {
       const vErr = validateReclamoNuevo(
-        { empresa: fEmpresa, nro_factura, fecha_reclamo: hoyPanama(), nro_orden_compra: fPedido, factura_pdf_path: fFacturaPdfPath },
+        { empresa: fEmpresa, nro_factura, fecha_factura: fFechaFactura, fecha_reclamo: hoyPanama(), nro_orden_compra: fPedido, factura_pdf_path: fFacturaPdfPath },
         items,
       );
       if (vErr) { setError(vErr); return; }
@@ -473,7 +473,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     if (!current) return;
     const nro_factura = facturasATexto(editFacturas);
     const vErr = validateReclamoFull(
-      { empresa: editEmpresa, nro_factura, fecha_reclamo: editFecha, nro_orden_compra: editPedido },
+      { empresa: editEmpresa, nro_factura, fecha_factura: editFechaFactura, fecha_reclamo: editFecha, nro_orden_compra: editPedido },
       editItems,
     );
     if (vErr) { setToast(vErr); setTimeout(() => setToast(null), 5000); return; }

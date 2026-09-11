@@ -282,12 +282,15 @@ describe("(4) el papel dice lo que el mockup pide, y en ese orden", () => {
 });
 
 describe("(5) el Excel del correo sigue sin un solo link", () => {
-  it("sin conLinks, el libro entero no contiene `http`", async () => {
+  // 🔄 11-sep-2026 — el `conLinks` se fue con la opción: desde «sin links»
+  // (Daniel, textual) el Excel NO lleva links en NINGUNA de sus dos salidas, así
+  // que no hay interruptor que pasar. Lo que este caso protege —que en el libro
+  // no aparece un solo `http`— no cambió; ahora vale sin condición.
+  it("el libro entero no contiene `http`", async () => {
     const buf = await buildBulkReclamosExcel(
       [{ ...REC_0026, factura_pdf_path: "r/f.pdf", reclamo_fotos: [{ storage_path: "r/1.jpg" }] }] as never,
       "Vistana International",
       CONTACTO,
-      { conLinks: false },
     );
     expect(textoDelLibro(buf)).not.toMatch(/http/i);
   });

@@ -7,6 +7,7 @@ import { fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/fetch
 import { reclamoTaxes } from "@/lib/reclamos/tax";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 import { marcarReclamados } from "@/lib/reclamos/marcar-reclamado";
+import { esPendiente } from "@/lib/reclamos/pendientes";
 import { notaCorreoEnviado } from "@/lib/reclamos/texto";
 import { candidatosDeReclamos } from "@/lib/reclamos/adjuntos";
 import {
@@ -93,6 +94,26 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     const reclamos = await fetchReclamosForEmpresa<ReclamoFull>(empresa, { reclamo_ids: body.reclamo_ids });
     if (!reclamos.length) {
       return NextResponse.json({ error: "No hay reclamos para enviar." }, { status: 404 });
+    }
+
+    // 🔴 UN RECLAMO YA COBRADO NO SE VUELVE A MANDAR (11-sep-2026).
+    //
+    // 🩸 Mandarlo es cobrarle DOS VECES al proveedor —medido: $5.306,62 en 5
+    // reclamos, 24-ago-2026— y la pantalla lo tenía escrito como invariante
+    // desde el 10-sep. El botón de LOTE y el detalle sí lo frenaban; la FILA de
+    // la pestaña «Cobrados» no, y esta ruta tampoco miraba el estado. Los dos
+    // lados se cerraron el mismo día: el freno de verdad es éste.
+    const cobrado = reclamos.find((r) => !esPendiente(r as { estado?: string | null }));
+    if (cobrado) {
+      const nro = (cobrado as { nro_reclamo?: string }).nro_reclamo || "";
+      return NextResponse.json(
+        {
+          error: nro
+            ? `El reclamo ${nro} ya está cobrado: no se le vuelve a mandar al proveedor.`
+            : "Ese reclamo ya está cobrado: no se le vuelve a mandar al proveedor.",
+        },
+        { status: 400 },
+      );
     }
 
     const { data: contactos } = await supabaseServer

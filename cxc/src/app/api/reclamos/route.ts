@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   const fecha_factura = typeof body.fecha_factura === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.fecha_factura) ? body.fecha_factura : null;
 
   // Obligatoriedad (PDF + cabecera + ítems). Solo notas / fotos opcionales.
-  const vErr = validateReclamoNuevo({ empresa, nro_factura, fecha_reclamo, nro_orden_compra, factura_pdf_path }, items);
+  const vErr = validateReclamoNuevo({ empresa, nro_factura, fecha_factura, fecha_reclamo, nro_orden_compra, factura_pdf_path }, items);
   if (vErr) return NextResponse.json({ error: vErr }, { status: 400 });
 
   // 🔴 El proveedor, la marca y su CÓDIGO salen del mapa del servidor, no del

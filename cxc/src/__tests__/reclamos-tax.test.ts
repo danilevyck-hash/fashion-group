@@ -89,7 +89,11 @@ describe("Active Shoes queda fuera del cambio de ITBMS", () => {
 });
 
 describe("Reclamos validación — N° pedido obligatorio salvo Active Shoes", () => {
-  const base = { nro_factura: "F1", fecha_reclamo: "2026-07-01" };
+  // 🔄 11-sep-2026 — la cabecera gana un obligatorio: la FECHA DE LA FACTURA,
+  // que estaba marcada con asterisco en las dos pantallas y no la validaba
+  // nadie. Estos casos son del N° de pedido y no cambian: la base lleva la
+  // fecha para que lo que se mide siga siendo el pedido.
+  const base = { nro_factura: "F1", fecha_factura: "2026-06-20", fecha_reclamo: "2026-07-01" };
   it("otra empresa sin pedido → error", () => {
     expect(validateReclamoHeader({ ...base, empresa: "Fashion Wear", nro_orden_compra: "" }))
       .toBe("Falta el N° de pedido.");
@@ -99,5 +103,9 @@ describe("Reclamos validación — N° pedido obligatorio salvo Active Shoes", (
   });
   it("Active Shoes sin pedido → OK (no es obligatorio)", () => {
     expect(validateReclamoHeader({ ...base, empresa: "Active Shoes", nro_orden_compra: "" })).toBeNull();
+  });
+  it("🔴 sin fecha de factura no pasa, y lo dice con la MISMA frase de la lista", () => {
+    expect(validateReclamoHeader({ ...base, fecha_factura: "", empresa: "Active Shoes", nro_orden_compra: "" }))
+      .toBe("Falta la fecha de la factura.");
   });
 });

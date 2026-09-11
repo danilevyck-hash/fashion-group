@@ -2,7 +2,8 @@
 // server (POST / PATCH / PUT items). Única fuente de verdad de qué es obligatorio.
 //
 // OBLIGATORIOS:
-//   Cabecera: empresa, nro_factura, fecha_reclamo, nro_orden_compra (N° pedido).
+//   Cabecera: empresa, nro_factura, fecha_factura, fecha_reclamo,
+//             nro_orden_compra (N° pedido).
 //     Excepción: Active Shoes NO usa N° pedido (no se pide ni se valida).
 //   Ítem: referencia (código), descripcion, talla, genero, cantidad (>0),
 //         precio_unitario (>=0), motivo. Y debe haber >= 1 ítem.
@@ -11,12 +12,14 @@
 // Devuelve un mensaje en español listo para mostrar, o null si todo está OK.
 
 import { ocultaPedido } from "./tax";
+import { FALTA_FECHA_FACTURA } from "./orden";
 
 export interface ReclamoHeaderInput {
   empresa?: unknown;
   nro_factura?: unknown;
   fecha_reclamo?: unknown;
   nro_orden_compra?: unknown;
+  fecha_factura?: unknown;
   /** Solo lo mira `validateReclamoNuevo`: el PDF es obligatorio al CREAR. */
   factura_pdf_path?: unknown;
 }
@@ -41,6 +44,18 @@ function s(v: unknown): string {
 export function validateReclamoHeader(h: ReclamoHeaderInput): string | null {
   if (!s(h.empresa)) return "Selecciona la empresa.";
   if (!s(h.nro_factura)) return "Falta el N° de factura.";
+  // 🔴 LA FECHA DE LA FACTURA ES OBLIGATORIA DE VERDAD (11-sep-2026).
+  //
+  // 🩸 Estaba marcada con asterisco en las DOS pantallas y no la miraba nadie,
+  // ni el cliente ni el servidor: el reclamo se guardaba sin ella y después la
+  // lista lo acusaba en rojo («Falta la fecha de la factura») y lo mandaba al
+  // final, porque de esa fecha salen los DÍAS y el orden entero. La frase es la
+  // MISMA que dice la lista — una sola manera de nombrar lo que falta.
+  //
+  // ⚠️ Medido contra producción el 11-sep-2026: de los **33 reclamos vivos, 0
+  // están sin fecha de factura**, así que exigirla no deja a nadie sin poder
+  // guardar una corrección.
+  if (!s(h.fecha_factura)) return `${FALTA_FECHA_FACTURA}.`;
   if (!s(h.fecha_reclamo)) return "Falta la fecha.";
   // Active Shoes no usa N° de pedido → no es obligatorio para esa empresa.
   if (!ocultaPedido(s(h.empresa)) && !s(h.nro_orden_compra)) return "Falta el N° de pedido.";

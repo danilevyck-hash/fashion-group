@@ -5,6 +5,7 @@ import { verifySession } from "@/lib/session-cookie";
 import ReclamosClient from "./ReclamosClient";
 import type { Reclamo, Contacto } from "./components/types";
 import { LISTA_SELECT } from "@/lib/reclamos/lista-select";
+import { leerDetalleReclamo } from "@/lib/reclamos/leer-detalle";
 
 const RECLAMOS_ROLES = ["admin", "secretaria"];
 
@@ -64,19 +65,29 @@ export default async function ReclamosPage({
       .select("*")
       .eq("activo", true)
       .order("empresa"),
+    // 🔴 EL DETALLE SE LEE POR LA MISMA PUERTA QUE AL NAVEGAR (11-sep-2026).
+    //
+    // 🩸 Acá vivía un `select` propio que NO traía `reclamo_settlements` y NO
+    // firmaba un solo archivo, y el cliente no vuelve a pedir el detalle en la
+    // primera corrida (el efecto se la salta a propósito). Abrir un reclamo por
+    // enlace directo —o recargar con F5— lo pintaba con las fotos rotas, sin
+    // «Factura del proveedor» en el menú Descargar, sin la tarjeta de
+    // Comprobante y con «Recuperación 0%» aunque hubiera notas de crédito.
+    // Entrando por la lista se veía bien, y por eso no se notaba.
+    //
+    // ⚠️ Falla ABIERTA: si la lectura del detalle se cae, la LISTA igual se
+    // dibuja (el cliente vuelve a pedir el detalle al tocar la fila).
     detailId
-      ? supabaseServer
-          .from("reclamos")
-          .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
-          .eq("id", detailId)
-          .eq("deleted", false)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+      ? leerDetalleReclamo(detailId).catch((err) => {
+          console.error("reclamos SSR detalle:", err);
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
 
   const reclamos = (reclamosRes.data || []) as Reclamo[];
   const contactos = (contactosRes.data || []) as Contacto[];
-  const detail = (detailRes.data ?? null) as Reclamo | null;
+  const detail = (detailRes ?? null) as Reclamo | null;
 
   return (
     <ReclamosClient
