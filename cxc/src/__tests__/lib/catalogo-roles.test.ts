@@ -233,6 +233,14 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
     "directorio",
     "catalogos",
     "guias",
+    // 11-sep-2026 · NOTA FECHADA — «cxc» ENTRA a la lista. Daniel, textual:
+    // *«a) sí, le doy CXC completo»*. Cambio DELIBERADO y ajeno a catálogos: la
+    // secretaria YA cobraba (la pantalla y las 12 rutas de `/api/cxc/*` la
+    // nombran desde siempre por `ROLES_CXC`), lo que faltaba era la PUERTA — el
+    // módulo no le salía ni en el Inicio ni en el sidebar. El candado hizo lo
+    // suyo y frenó el build hasta acá. Detalle en `cxc-secretaria-cobra.test.ts`
+    // y migración `20261117120000_cxc_para_secretaria.sql`.
+    "cxc",
     // 10-sep-2026 · NOTA FECHADA — «packing-lists» salió de la lista porque el
     // MÓDULO se retiró (Daniel: «packing list no se usa, eliminar»;
     // `packing_lists` con 0 filas y una sola persona que lo usó, en abril). El
@@ -330,7 +338,12 @@ describe("catálogos — los otros roles quedaron EXACTAMENTE igual", () => {
     // `saldos-banco` sale de esta lista el 13-ago-2026 por lo mismo que
     // `data-health`: dejó de ser un módulo (es pestaña de "Gastos"). Lo que
     // ahora cierra esa puerta es `gastos-contabilidad`, que sigue en la lista.
-    const prohibidos = ["cxc", "ventas", "vista-general", "multifashion", "proveedores",
+    // 11-sep-2026 · NOTA FECHADA — «cxc» SALE de los prohibidos (Daniel: «a) sí,
+    // le doy CXC completo»). Los otros siete se quedan, y con ellos el
+    // invariante: lo que se abrió es UN módulo decidido, no la compuerta.
+    // ⚠️ CONTROL de que no se aflojó de más: `boston` entra a la lista, porque
+    // la cartera de Boston sigue siendo de David y de nadie más.
+    const prohibidos = ["ventas", "vista-general", "multifashion", "boston", "proveedores",
       "gastos-contabilidad", "prestamos", "usuarios"];
     const suyos = getDefaultModulesForRole("secretaria");
     for (const m of prohibidos) {

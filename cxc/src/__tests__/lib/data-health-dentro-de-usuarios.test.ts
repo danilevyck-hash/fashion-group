@@ -118,8 +118,14 @@ const NO_ADMIN_ESPERADO: Record<string, string[]> = {
   // el módulo se RETIRÓ (Daniel: «packing list no se usa, eliminar»;
   // `packing_lists` con 0 filas desde el 14-may-2026). Ningún rol gana nada;
   // los dos que lo tenían lo pierden, y ninguno lo usaba.
+  // 🔴 `cxc` ENTRA el 11-sep-2026 — Daniel, textual: *«a) sí, le doy CXC
+  // completo»*. Cambio DELIBERADO y ajeno a esta mudanza: la secretaria ya
+  // cobraba (la pantalla y las 12 rutas de `/api/cxc/*` la nombran por
+  // `ROLES_CXC`), lo que faltaba era que el módulo le SALIERA en el menú. El
+  // candado hizo lo suyo y frenó el build hasta acá. Detalle en
+  // `cxc-secretaria-cobra.test.ts`.
   secretaria: ["catalogos", "guias", "asistencia", "reclamos", "cargar",
-    "comisiones", "marketing", "caja", "cheques", "directorio"],
+    "comisiones", "marketing", "caja", "cheques", "directorio", "cxc"],
   // 🔴 `asistencia` desde el 26-ago-2026: Daniel, textual *«julio usa el
   // usuario bodega, asi que ponlo ahi»* — para que Julio Garay apruebe las
   // horas extra que él mismo reporta. Cambio DELIBERADO, ajeno a esta mudanza.
