@@ -110,8 +110,8 @@ import {
   CHIP_COMPLETAR,
   CHIP_PARA_PAGAR,
   contarFaltantes,
+  lineasQueFalta,
   queLeFalta,
-  textoFaltantes,
 } from "@/lib/asistencia/que-le-falta";
 import Link from "next/link";
 import { puedeCerrar } from "@/lib/asistencia/roles";
@@ -276,8 +276,11 @@ const PILL_OFF = "border-gray-200 text-gray-600 hover:border-gray-400";
  * que solo existe al ejecutar no llega al CSS. El corte es `lg` (1024) porque
  * el iPad de 834 no aguanta seis columnas — ahí van las tarjetas.
  */
+// 🔴 SIN «Rata / hora» Y CON «Qué falta» AL FINAL (10-sep-2026, mockup aprobado):
+// la rata vive en la página de cada colaborador; la última columna dice qué
+// falta, en dos líneas, y por eso es ancha.
 const COLUMNAS =
-  "lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_5rem_6.5rem_6rem_5rem] lg:items-center lg:gap-x-3";
+  "lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_5rem_6.5rem_minmax(0,1fr)] lg:items-center lg:gap-x-3";
 
 /**
  * 🔴 LA MISMA REJILLA CON UNA COLUMNA MÁS: VACACIONES (10-sep-2026).
@@ -291,7 +294,7 @@ const COLUMNAS =
  * como texto y una clase armada con plantillas nunca llega al CSS.
  */
 const COLUMNAS_CON_VACACIONES =
-  "lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_5rem_6.5rem_6rem_7rem_5rem] lg:items-center lg:gap-x-3";
+  "lg:grid lg:grid-cols-[minmax(0,1fr)_9rem_5rem_6.5rem_5.5rem_minmax(0,1fr)] lg:items-center lg:gap-x-3";
 
 const money = (n: number | null, dec = 2) =>
   n === null
@@ -1018,22 +1021,23 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                   <span>Empresa</span>
                   <span className="text-right">Jornada</span>
                   <span className="text-right">Salario</span>
-                  <span className="text-right">Rata / hora</span>
                   {personaEnElCentro && <span className="text-right">Vacaciones</span>}
-                  <span className="text-right">Estado</span>
+                  <span>Qué falta</span>
                 </div>
 
                 {visibles.map((p) => {
                   const falta = faltaEnPersona(p);
-                  // 🔴 LA FILA DICE QUÉ FALTA, en texto corto y sin chips extra:
-                  // «Falta cargo y cédula». Lo de pagar va primero.
-                  const queFalta = textoFaltantes(queLeFalta(p));
+                  // 🔴 LA COLUMNA «Qué falta» (10-sep-2026): lo de pagar en rojo,
+                  // lo de completar en gris, vacía cuando no falta nada. Sale
+                  // del módulo puro, nunca de una segunda regla.
+                  const queFalta = lineasQueFalta(queLeFalta(p));
                   const abiertaEsta = abierta === p.codigo;
                   const saldo = saldos.get(String(p.codigo));
-                  const saldoTexto = personaEnElCentro
-                    ? (saldo ? textoSaldo(saldo) : "Falta el saldo")
-                    : "";
+                  // 🔴 SIN SALDO CARGADO, UN GUION GRIS (Daniel: *«un rojo que
+                  // sale siempre no avisa nada»*). Que falta ya lo dice «Qué
+                  // falta»; acá solo se muestra el número cuando existe.
                   const saldoFalta = !saldo || saldo.saldo === null || saldo.falta !== null;
+                  const saldoTexto = personaEnElCentro && saldo && !saldoFalta ? textoSaldo(saldo) : "—";
                   // 🔴 SOLO LO RARO. Una ficha normal no dibuja ni una etiqueta,
                   // y por eso cuando aparece una se mira. Ver `ficha-persona.ts`.
                   const excepciones = personaEnElCentro ? excepcionesDeLaFicha(p) : [];
@@ -1047,7 +1051,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                       <span className={`hidden ${rejilla}`}>
                         <span className="min-w-0">
                           <NombrePersona p={p} />
-                          {queFalta && <QueFalta texto={queFalta} />}
                           {excepciones.length > 0 && (
                             <span className="mt-1 flex flex-wrap gap-1">
                               {excepciones.map((e) => (
@@ -1067,30 +1070,18 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                         <span className="text-right text-[13px] tabular-nums text-gray-600">
                           {money(p.salarioMensual)}
                         </span>
-                        {/* 🔴 DOS decimales, no cuatro: es el número EXACTO con
-                            el que multiplica la planilla. Ver lib/asistencia/rata.ts */}
-                        <span className="text-right text-[13px] tabular-nums text-gray-600">
-                          {money(p.rataHora)}
-                        </span>
                         {personaEnElCentro && (
-                          <span className={`text-right text-[13px] tabular-nums ${
-                            saldoFalta ? "text-amber-700" : "text-gray-600"
-                          }`}>
+                          <span className="text-right text-[13px] tabular-nums text-gray-600">
                             {saldoTexto}
                           </span>
                         )}
-                        <span className="text-right">
-                          <Indicador falta={!!queFalta} fueraDePlanilla={p.servicioProfesional} />
-                        </span>
+                        <QueFaltaCelda lineas={queFalta} fueraDePlanilla={p.servicioProfesional} />
                       </span>
 
                       {/* ── CELULAR e iPAD: tarjeta (patrón PanelCxcMobile) ── */}
                       <span className="block lg:hidden">
-                        <span className="flex items-start justify-between gap-3">
-                          <NombrePersona p={p} />
-                          <Indicador falta={!!queFalta} fueraDePlanilla={p.servicioProfesional} />
-                        </span>
-                        {queFalta && <QueFalta texto={queFalta} />}
+                        <NombrePersona p={p} />
+                        <QueFaltaCelda lineas={queFalta} fueraDePlanilla={p.servicioProfesional} />
                         {excepciones.length > 0 && (
                           <span className="mt-1.5 flex flex-wrap gap-1">
                             {excepciones.map((e) => (
@@ -1102,9 +1093,8 @@ export default function ConfiguracionTab({ personaEnElCentro = false }: {
                           <Dato etiqueta="Empresa" valor={p.empresa ? etiquetaEmpresa(p.empresa) : "—"} />
                           <Dato etiqueta="Jornada" valor={p.configurado ? `${p.jornadaSemanal} h/semana` : "—"} numero />
                           <Dato etiqueta="Salario" valor={money(p.salarioMensual)} numero />
-                          <Dato etiqueta="Rata / hora" valor={money(p.rataHora)} numero />
                           {personaEnElCentro && (
-                            <Dato etiqueta="Vacaciones" valor={saldoTexto} numero ojo={saldoFalta} />
+                            <Dato etiqueta="Vacaciones" valor={saldoTexto} numero />
                           )}
                         </span>
                       </span>
@@ -2037,24 +2027,25 @@ function BloqueBaja({
  * cómo se le paga, no una alarma. En ámbar se leería como un pendiente, que es
  * exactamente lo que este cambio vino a dejar de decir de YULISSA.
  */
-/** «Falta cargo y cédula», debajo del nombre. Texto, no chip (10-sep-2026). */
-function QueFalta({ texto }: { texto: string }) {
-  return <span className="mt-0.5 block text-[12px] text-amber-700">{texto}</span>;
-}
-
-function Indicador({ falta, fueraDePlanilla }: { falta: boolean; fueraDePlanilla?: boolean }) {
-  // 🔴 Con algo que falta la fila YA lo dice debajo del nombre (`QueFalta`);
-  // acá no se repite ni se pinta un chip encima. Solo se dice el estado que la
-  // fila no dice: «No va en planilla» o «Listo».
-  if (falta && !fueraDePlanilla) return null;
-  if (fueraDePlanilla) {
-    return (
-      <span className="inline-block whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-[12px] text-gray-600">
-        No va en planilla
-      </span>
-    );
-  }
-  return <span className="text-[12px] text-gray-300">Listo</span>;
+/**
+ * 🔴 LA COLUMNA «Qué falta» (10-sep-2026, mockup aprobado por Daniel): lo de
+ * PAGAR en rojo («Para pagar: empresa, salario, horario»), lo de COMPLETAR en
+ * gris («Completar: cargo, cédula»), y VACÍA cuando no falta nada — reemplaza a
+ * «Estado» (Listo / Falta): nada de dos columnas diciendo lo mismo. Quien no
+ * va en planilla y no tiene nada que completar lo dice acá, en gris.
+ */
+function QueFaltaCelda({ lineas, fueraDePlanilla }: {
+  lineas: { paraPagar: string | null; completar: string | null };
+  fueraDePlanilla?: boolean;
+}) {
+  const nada = !lineas.paraPagar && !lineas.completar;
+  return (
+    <span className="mt-0.5 block text-[12px] leading-snug lg:mt-0">
+      {lineas.paraPagar && <span className="block text-red-700">{lineas.paraPagar}</span>}
+      {lineas.completar && <span className="block text-gray-500">{lineas.completar}</span>}
+      {nada && fueraDePlanilla && <span className="block text-gray-500">No va en planilla</span>}
+    </span>
+  );
 }
 
 /** Un par etiqueta/valor de la tarjeta de celular. En la tabla del escritorio la

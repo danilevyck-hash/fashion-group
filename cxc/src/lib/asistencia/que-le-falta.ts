@@ -16,13 +16,14 @@
 //
 // 🔴 Los dos cuentan solo ACTIVOS (eso lo filtra quien llama: la lista ya
 // separa a los que se fueron) y un colaborador puede estar en los dos.
-// 🔴 Un código SIN FICHA cuenta solo en «para pagar», y ahí dice «ficha»: sin
-// ficha no hay cargo ni cédula que revisar todavía, y listarle los cuatro
-// faltantes sería decir cuatro veces lo mismo.
+// 🔴 Un código SIN FICHA cuenta solo en «para pagar» — con lo que de verdad le
+// falta para cobrar: empresa, salario y horario (es lo que Daniel aprobó en el
+// mockup del 10-sep-2026: «Para pagar: empresa, salario, horario»). Sin ficha
+// no hay cargo ni cédula que revisar todavía, así que no entra a «completar».
 // 🔴 Nada de lo que se guarda cambia: esto solo LEE la ficha.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type FaltaParaPagar = "ficha" | "empresa" | "salario" | "horario";
+export type FaltaParaPagar = "empresa" | "salario" | "horario";
 export type FaltaCompletar = "cargo" | "cedula" | "saldo" | "ingreso";
 
 export interface Faltantes {
@@ -51,8 +52,6 @@ export interface FichaParaFaltantes {
 const vacio = (v: string | null | undefined) => !v || !String(v).trim();
 
 export function queLeFalta(p: FichaParaFaltantes): Faltantes {
-  if (!p.configurado) return { paraPagar: ["ficha"], completar: [] };
-
   const paraPagar: FaltaParaPagar[] = [];
   if (vacio(p.empresa)) paraPagar.push("empresa");
   if (
@@ -62,6 +61,9 @@ export function queLeFalta(p: FichaParaFaltantes): Faltantes {
     paraPagar.push("salario");
   }
   if (p.noMarcaReloj !== true && p.tieneHorario === false) paraPagar.push("horario");
+  // Sin ficha, lo de arriba ya dice lo que hace falta para cobrar; lo demás
+  // se mira cuando la ficha exista.
+  if (!p.configurado) return { paraPagar, completar: [] };
 
   const completar: FaltaCompletar[] = [];
   if (vacio(p.posicion)) completar.push("cargo");
@@ -82,7 +84,6 @@ export function queLeFalta(p: FichaParaFaltantes): Faltantes {
 
 /** Cómo se nombra cada faltante en la fila. Corto, sin artículo: «Falta cargo y cédula». */
 export const ROTULO_FALTANTE: Readonly<Record<FaltaParaPagar | FaltaCompletar, string>> = Object.freeze({
-  ficha: "ficha",
   empresa: "empresa",
   salario: "salario",
   horario: "horario",
@@ -106,6 +107,20 @@ export function textoFaltantes(f: Faltantes): string | null {
   const todos = [...f.paraPagar, ...f.completar].map((k) => ROTULO_FALTANTE[k]);
   if (todos.length === 0) return null;
   return `Falta ${enumerar(todos)}`;
+}
+
+/**
+ * 🔴 LAS DOS LÍNEAS DE LA COLUMNA «Qué falta» (10-sep-2026, mockup aprobado):
+ * «Para pagar: empresa, salario, horario» en ROJO y «Completar: cargo, cédula»
+ * en gris. `null` en la que no tiene nada. Reemplaza a la columna «Estado»
+ * (Listo / Falta): nada de dos columnas diciendo lo mismo.
+ */
+export function lineasQueFalta(f: Faltantes): { paraPagar: string | null; completar: string | null } {
+  const lista = (ks: readonly (FaltaParaPagar | FaltaCompletar)[]) => ks.map((k) => ROTULO_FALTANTE[k]).join(", ");
+  return {
+    paraPagar: f.paraPagar.length ? `Para pagar: ${lista(f.paraPagar)}` : null,
+    completar: f.completar.length ? `Completar: ${lista(f.completar)}` : null,
+  };
 }
 
 export const CHIP_PARA_PAGAR = "Falta para pagar";

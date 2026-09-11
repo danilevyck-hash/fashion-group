@@ -30,6 +30,9 @@ export interface PersonaFicha {
   empresa: string | null;
   salarioMensual: number | null;
   jornadaSemanal: number;
+  /** La rata por hora que multiplica la planilla (2 decimales). La lista ya no la
+   *  muestra (10-sep-2026): vive acá. `undefined` = un payload viejo no la trae. */
+  rataHora?: number | null;
   fechaIngreso: string | null;
   fechaSalida?: string | null;
   /** `true` = cobra fijo y no pasa por el reloj. */
@@ -99,6 +102,9 @@ export function datosDeLaFicha(
     { clave: "ingreso", etiqueta: "Empezó", valor: fecha(p.fechaIngreso) },
     { clave: "cedula", etiqueta: "Cédula", valor: texto(p.cedula) },
     { clave: "salario", etiqueta: "Salario", valor: money(p.salarioMensual), numero: true },
+    // 🔴 La rata por hora SALIÓ de la lista (10-sep-2026, Daniel) y queda acá,
+    // pegada al salario: es el número exacto con el que multiplica la planilla.
+    { clave: "rata", etiqueta: "Rata por hora", valor: money(p.rataHora ?? null), numero: true },
     { clave: "jornada", etiqueta: "Jornada", valor: `${p.jornadaSemanal} h/semana`, numero: true },
     // 🔑 El reloj y los seguros SÍ salen siempre, aunque su valor normal sea el
     // de todos: son las dos preguntas que la contadora hace en voz alta cuando

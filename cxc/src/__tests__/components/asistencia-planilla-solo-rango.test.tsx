@@ -200,6 +200,18 @@ function generar() {
 const control = () =>
   screen.getAllByRole("button", { name: /Elige el período|·\s*\d+\s*d[ií]as?/ })[0];
 
+/**
+ * 🔴 10-sep-2026 (mockup aprobado por Daniel): la quincena se elige con DOS
+ * BOTONES («1 – 15 sep» / «16 – 30 sep») y el calendario queda detrás de «Otro
+ * rango». Cuando lo elegido ES una quincena del mes, el que lo refleja es el
+ * botón prendido (`aria-pressed`), y el control del calendario sigue diciendo
+ * su texto vacío. Lo que este candado protege no cambió: se elige POR RANGO y
+ * lo elegido se ve. Ver `planilla-elegir-quincena.test.tsx`.
+ */
+const quincenaPrendida = () => screen.queryAllByRole("button", { pressed: true })[0] ?? null;
+const loElegidoSeVe = () =>
+  quincenaPrendida() !== null || !/Elige el período/.test(control().textContent ?? "");
+
 // ═════════════════════════════════════════════════════════════════════════════
 describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", () => {
   it("no hay control de modo — ni «Quincena» ni «Rango de fechas»", async () => {
@@ -234,7 +246,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     // El FORMATO de la etiqueta («1 ago – 15 ago 2026 · 15 días») se prueba
     // sobre el control real en `rango-fechas-calendario.test.tsx`. Acá alcanza
     // con que el control DEJE de decir «Elige el período» al haber elegido.
-    expect(control().textContent).not.toMatch(/Elige el período/);
+    expect(loElegidoSeVe()).toBe(true);
   });
 
   it("⛔ y NO quedó ningún `<input type=\"date\">` suelto de rango", async () => {
@@ -272,7 +284,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla?"))!;
     expect(get.url).toContain("desde=2026-08-01");
     expect(get.url).toContain("hasta=2026-08-15");
-    expect(control().textContent).not.toMatch(/Elige el período/);
+    expect(loElegidoSeVe()).toBe(true);
     vi.useRealTimers();
   });
 
@@ -313,7 +325,7 @@ describe("⛔ el modo «Quincena» se fue: queda el rango, y nada que elegir", (
     const get = llamadas.find((c) => c.url.includes("/api/asistencia/planilla?"))!;
     expect(get.url).toContain("desde=");
     expect(get.url).toContain("hasta=");
-    expect(control().textContent).not.toMatch(/Elige el período/);
+    expect(loElegidoSeVe()).toBe(true);
   });
 
 

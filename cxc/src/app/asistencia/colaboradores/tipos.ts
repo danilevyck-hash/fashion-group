@@ -22,6 +22,8 @@ export interface PersonaDeLaPagina {
   noMarcaReloj: boolean;
   posicion?: string | null;
   cedula?: string | null;
+  /** La rata por hora, ya calculada por el servidor. */
+  rataHora?: number | null;
   reparto?: { empresa: string; salarioMensual: number }[];
   fechaIngreso: string | null;
   fechaSalida: string | null;

@@ -1271,3 +1271,36 @@ Nadie más se tocó (el 1000 tampoco). Verificado con la regla de la lista
 (`_medir-falta-configurar.ts`): los 5 salen con Multifashion y en «Falta para pagar» **solo por el
 salario** (y en «Falta completar» por cargo, cédula, saldo y fecha de ingreso). Los chips quedan
 en **Falta para pagar (11) · Falta completar (42)**.
+
+---
+
+## 10-sep-2026 (tarde) — Lista de colaboradores y Planilla, con el mockup aprobado (puntos 7–10)
+
+Daniel aprobó el mockup «Colaboradores y Planilla, ahora vs después». Todo es PANTALLA: ni lo que
+se guarda ni lo que se calcula cambia.
+
+**Lista de colaboradores (`ConfiguracionTab.tsx`, la misma tabla):**
+
+| # | Antes | Después |
+|---|---|---|
+| 7 | «Falta el saldo» / «Faltan la fecha de ingreso y el saldo» en ROJO en la columna Vacaciones | `—` gris sin saldo cargado; «N días» con saldo. *«un rojo que sale siempre no avisa nada»* |
+| 8 | Columna «Rata / hora» | Se fue de la lista. Vive en la página del colaborador («Rata por hora», junto al salario). El cálculo no se tocó |
+| 9 | Columna «Estado» (Listo / Falta) + el texto «Falta cargo y cédula» bajo el nombre (segundo encargo) | Columna **«Qué falta»**: «Para pagar: empresa, salario, horario» en rojo · «Completar: cargo, cédula» en gris · vacía si no falta nada (`lineasQueFalta`, `que-le-falta.ts`). Sin ficha dice lo que le falta para cobrar, no «ficha» |
+
+**Planilla (`PlanillaTab.tsx`, punto 10):** dos botones «1 – 15 sep» / «16 – 30 sep» (mes en curso
+de Panamá, último día real del mes) + «Otro rango ⌄» (el calendario de siempre, `RangoFechas` con
+`textoVacio`). «Cortar el reloj el» se ve desde el inicio, con el corte propuesto (13 o 28) y la frase
+«Del 14 al 15 se paga normal y se ajusta en la siguiente.»; vacío = quincena entera. «Generar» negro.
+Excel / PDF / Comprobantes solo con la planilla generada. Módulo puro `lib/asistencia/elegir-quincena.ts`.
+🔴 **Mismo pedido**: candado que compara la URL del botón contra la del calendario para el mismo rango
+(`/api/asistencia/planilla?desde=2026-09-01&hasta=2026-09-15&empresa=…&corte=2026-09-13`).
+
+**Candados:** `asistencia-lista-que-falta.test.tsx` · `planilla-elegir-quincena.test.tsx`. Cambiaron con
+nota fechada, ninguno se borró: `persona-en-el-centro` (rejilla y el dato «rata»),
+`asistencia-falta-configurar` (columna en vez de texto bajo el nombre; sin ficha → empresa, salario,
+horario), `asistencia-planilla-cerrar-quincena` (el calendario ya no va en línea),
+`asistencia-planilla-solo-rango` (lo elegido se ve en el botón prendido).
+
+⚠️ Dejado a propósito: la columna «Terceros» de los montos a mano de la Planilla no se tocó (es otra
+cosa que Préstamos); en el celular la tarjeta muestra las mismas dos líneas de «Qué falta» bajo el
+nombre.

@@ -26,6 +26,7 @@ import {
   CHIP_PARA_PAGAR,
   ROTULO_FALTANTE,
   contarFaltantes,
+  lineasQueFalta,
   queLeFalta,
   textoFaltantes,
   type FichaParaFaltantes,
@@ -64,10 +65,14 @@ describe("A. 🔴 «Falta para pagar»: lo que hace que la quincena salga mal", 
   });
 
   it("🔴 un código del reloj SIN FICHA cuenta como «falta para pagar», y solo ahí", () => {
-    const f = queLeFalta({ ...COMPLETA, configurado: false });
-    expect(f.paraPagar).toEqual(["ficha"]);
+    // 🔴 10-sep-2026 (mockup aprobado): sin ficha se dice lo que de verdad le
+    // falta para cobrar —«empresa, salario, horario»—, no la palabra «ficha».
+    // Y no entra a «completar»: sin ficha no hay cargo ni cédula que revisar.
+    const f = queLeFalta({ ...COMPLETA, configurado: false, empresa: null, salarioMensual: null, tieneHorario: false });
+    expect(f.paraPagar).toEqual(["empresa", "salario", "horario"]);
     expect(f.completar).toEqual([]);
-    expect(textoFaltantes(f)).toBe("Falta ficha");
+    expect(textoFaltantes(f)).toBe("Falta empresa, salario y horario");
+    expect(lineasQueFalta(f)).toEqual({ paraPagar: "Para pagar: empresa, salario, horario", completar: null });
   });
 
   it("sin salario entra — salvo servicio profesional, que no cobra por planilla", () => {
@@ -116,7 +121,7 @@ describe("C. 🔴 uno puede estar en los dos, y la fila lo dice con lo de pagar 
   it("el conteo cuenta a cada quien una vez por chip", () => {
     const lista: FichaParaFaltantes[] = [
       COMPLETA,
-      { ...COMPLETA, configurado: false },
+      { ...COMPLETA, configurado: false, empresa: null, salarioMensual: null, tieneHorario: false },
       { ...COMPLETA, tieneHorario: false, posicion: null, cedula: null },
       { ...COMPLETA, posicion: null },
     ];
@@ -161,11 +166,17 @@ describe("D. 🔴 la pantalla usa el módulo puro, y los chips viejos no vuelven
     expect(src).not.toMatch(/setFiltro\("sin-saldo"\)/);
   });
 
-  it("🔴 la fila dice qué falta en TEXTO, debajo del nombre, y no repite un chip «Falta»", () => {
-    expect(src).toMatch(/const queFalta = textoFaltantes\(queLeFalta\(p\)\)/);
-    expect(src).toMatch(/\{queFalta && <QueFalta texto=\{queFalta\} \/>\}/);
+  it("🔴 la fila dice qué falta en TEXTO, en la columna «Qué falta», y no repite un chip «Falta»", () => {
+    // 🔴 10-sep-2026 (tarde, mockup aprobado por Daniel): el texto pasó de
+    // debajo del nombre a una COLUMNA «Qué falta», en dos líneas —lo de pagar
+    // en rojo, lo de completar en gris— que reemplaza a «Estado» (Listo /
+    // Falta). La regla no cambió: el módulo puro decide, la fila solo dibuja,
+    // y no hay chip «Falta». Ver `asistencia-lista-que-falta.test.tsx`.
+    expect(src).toMatch(/const queFalta = lineasQueFalta\(queLeFalta\(p\)\)/);
+    expect(src).toMatch(/<QueFaltaCelda lineas=\{queFalta\} fueraDePlanilla=\{p\.servicioProfesional\} \/>/);
     expect(src).not.toMatch(/>\s*Falta\s*<\/span>/);
-    expect(src).toMatch(/if \(falta && !fueraDePlanilla\) return null/);
+    expect(src).not.toMatch(/<Indicador /);
+    expect(src).not.toMatch(/>Listo</);
   });
 
   it("la cabecera de la sección resume el MISMO número del chip de pagar", () => {

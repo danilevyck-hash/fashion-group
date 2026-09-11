@@ -85,7 +85,7 @@ import type {
   SugerenciaPrestamo,
 } from "@/lib/asistencia/prestamos-planilla";
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
-import { corteSugerido, netoConAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
+import { netoConAjuste, textoCorte } from "@/lib/asistencia/corte-quincena";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { textoExtraAutomatico } from "@/lib/asistencia/extra-automatico";
@@ -114,6 +114,11 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { aIso, deIso } from "@/components/ui/rango-fechas-iso";
 
 import RangoFechas from "@/components/ui/RangoFechas";
+// 🔴 LA QUINCENA SE ELIGE CON DOS BOTONES (10-sep-2026, mockup aprobado por
+// Daniel); el calendario queda detrás de «Otro rango». Módulo puro.
+import {
+  corteInicial, esLaQuincena, fechaCortaCorte, fraseCorte, quincenasDelMes, rotuloQuincena,
+} from "@/lib/asistencia/elegir-quincena";
 interface Respuesta {
   quincena: Quincena;
   periodo: Periodo;
@@ -353,12 +358,24 @@ export default function PlanillaTab() {
   const [modal, setModal] = useState<"cerrar" | "reabrir" | null>(null);
   const [trabajandoCierre, setTrabajandoCierre] = useState(false);
   /**
-   * 🔴 El calendario arranca A LA VISTA y se pliega al generar. Daniel:
-   * *«no veo lo de poner las fechas, sigue igual pero no cortado»* — un
-   * desplegable que hay que descubrir no sirve para el PRIMER paso de la
-   * pantalla. Plegado, las 18 columnas de plata recuperan el ancho entero.
+   * 🔴 LA QUINCENA SE ELIGE CON DOS BOTONES (10-sep-2026): «1 – 15 sep» y
+   * «16 – 30 sep», con el mes en curso de Panamá y el último día real del mes.
+   * El calendario de siempre queda detrás de «Otro rango ⌄» para lo que no es
+   * una quincena. Reemplaza al calendario a la vista del 4-sep (Daniel: *«no
+   * veo lo de poner las fechas»*): dos toques menos por quincena, y las 18
+   * columnas de plata tienen el ancho entero desde el principio.
+   *
+   * 🔴 LO QUE SE PIDE NO CAMBIA: los botones ponen el mismo `desde`/`hasta`/
+   * `corte` que ponía el calendario, y `generar` arma el MISMO pedido.
    */
-  const [calendarioAbierto, setCalendarioAbierto] = useState(true);
+  const lasDosQuincenas = useMemo(() => quincenasDelMes(hoy), [hoy]);
+  const elegirQuincena = useCallback((q: (typeof lasDosQuincenas)[number]) => {
+    setDesde(q.desde);
+    setHasta(q.hasta);
+    setElegido(true);
+    // El corte viene PROPUESTO (13 o 28) y se cambia o se vacía si hace falta.
+    if (PLANILLA_UNIDA) setCorte(corteInicial(q));
+  }, []);
   // 🔑 El rol sale de `sessionStorage`, igual que en `AsistenciaClient` y
   // `AppHeader`. Arranca vacío: en el primer render no hay sessionStorage, y
   // dibujar el botón de cerrar para sacarlo un tick después es peor.
@@ -446,9 +463,6 @@ export default function PlanillaTab() {
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
       setData(j as Respuesta);
       setDesactualizada(false);
-      // Generado: el cuadro necesita el ancho. La píldora de arriba lo vuelve
-      // a abrir cuando haga falta.
-      setCalendarioAbierto(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setData(null);
@@ -825,10 +839,9 @@ export default function PlanillaTab() {
   /**
    * 🔴 UN SOLO BOTÓN, y cambia de nombre según lo que va a hacer: «Generar» la
    * primera vez y cuando lo elegido no es lo que está en pantalla; «Regenerar»
-   * cuando es el mismo cuadro. Va en el pie del calendario mientras está a la
-   * vista y al lado de la píldora cuando se plegó — el MISMO elemento, no dos:
-   * dos botones que hacen lo mismo en la misma pantalla es cómo se toca el que
-   * no era.
+   * cuando es el mismo cuadro. UN solo elemento, al lado de la quincena: dos
+   * botones que hacen lo mismo en la misma pantalla es cómo se toca el que no
+   * era. Negro mientras no haya cuadro, o cuando lo que hay quedó viejo.
    */
   const botonGenerar = (
     <button
@@ -849,21 +862,6 @@ export default function PlanillaTab() {
     <div className="space-y-4">
       {/* ── Elegir qué se va a pagar ── */}
       <div className="flex flex-wrap items-end gap-3">
-        {/* 🔴 LA PÍLDORA, solo cuando el calendario está plegado. Tocarla vuelve
-            a abrirlo (el desplegable de siempre), sin quitarle el ancho a la
-            tabla de 18 columnas que quedó abajo. */}
-        {!calendarioAbierto && (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500">Período</span>
-            <RangoFechas
-              desde={desde} hasta={hasta} label={null}
-              vacio={!elegido}
-              sugerido={diaSugerido}
-              onChange={(d, h) => { setDesde(d); setHasta(h); setElegido(true); }}
-            />
-          </div>
-        )}
-
         <label className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">Empresa</span>
           <select
@@ -877,19 +875,57 @@ export default function PlanillaTab() {
           </select>
         </label>
 
-        {/* 🔴 EL CORTE — hasta qué día se lee el reloj (día 13/28). Solo con el
-            interruptor y cuando el período es una quincena. Cambiarlo vuelve
-            viejo el cuadro; se aprieta «Regenerar» para verlo cortado. */}
-        {PLANILLA_UNIDA && !!data?.periodo.quincena && (
+        {/* 🔴 LA QUINCENA: dos botones con el mes en curso, y «Otro rango» para
+            el calendario. El botón prendido es el que coincide EXACTO con lo
+            elegido; un rango libre no prende ninguno. */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Quincena</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {lasDosQuincenas.map((q) => {
+              const prendido = elegido && esLaQuincena(q, desde, hasta);
+              return (
+                <button key={q.clave} type="button" onClick={() => elegirQuincena(q)}
+                  aria-pressed={prendido}
+                  className={`min-h-[44px] rounded-md border px-3 text-sm transition active:scale-[0.97] ${
+                    prendido ? "border-black font-medium text-gray-900" : "border-gray-300 text-gray-700 hover:border-black"
+                  }`}>
+                  {rotuloQuincena(q)}
+                </button>
+              );
+            })}
+            <RangoFechas
+              desde={desde} hasta={hasta} label={null}
+              vacio={!elegido || lasDosQuincenas.some((q) => esLaQuincena(q, desde, hasta))}
+              textoVacio="Otro rango"
+              sugerido={diaSugerido}
+              onChange={(d, h) => {
+                setDesde(d); setHasta(h); setElegido(true);
+                // Si el rango libre resulta ser una quincena, el corte viene
+                // propuesto igual; si no, quincena entera.
+                if (PLANILLA_UNIDA) {
+                  const q = lasDosQuincenas.find((x) => esLaQuincena(x, d, h));
+                  setCorte(q ? corteInicial(q) : "");
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* 🔴 EL CORTE — hasta qué día se lee el reloj (día 13/28). Se ve DESDE
+            EL INICIO, al lado de la quincena, con el corte propuesto ya puesto;
+            vacío = quincena entera, como siempre. Cambiarlo vuelve viejo el
+            cuadro; se aprieta «Regenerar» para verlo cortado. */}
+        {PLANILLA_UNIDA && (
           <label className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Cortar el reloj el</span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 type="date"
                 value={corte}
-                min={data.periodo.desde}
-                max={data.periodo.hasta}
+                min={elegido ? desde : undefined}
+                max={elegido ? hasta : undefined}
                 onChange={(e) => setCorte(e.target.value)}
+                aria-label="Cortar el reloj el"
                 className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
               />
               {corte && (
@@ -898,21 +934,21 @@ export default function PlanillaTab() {
                   Quincena entera
                 </button>
               )}
+              <span className="text-[12px] text-gray-500">
+                {corte && elegido
+                  ? (fraseCorte(corte, hasta) ?? `Se lee el reloj hasta el ${fechaCortaCorte(corte)}.`)
+                  : "Vacío: se lee la quincena entera."}
+              </span>
             </div>
-            {/* Un botón que llena el día sugerido (13 o 28) de un toque. */}
-            {!corte && data.periodo.quincena && corteSugerido(data.periodo.quincena) && (
-              <button type="button"
-                onClick={() => setCorte(corteSugerido(data.periodo.quincena!)!)}
-                className="self-start text-xs text-blue-700 underline">
-                Sugerido: día {Number((corteSugerido(data.periodo.quincena)!).slice(8, 10))}
-              </button>
-            )}
           </label>
         )}
 
-        {/* Plegado, el botón va acá; abierto, va en el pie del calendario. */}
-        {!calendarioAbierto && botonGenerar}
+        {botonGenerar}
 
+        {/* 🔴 Excel, PDF y Comprobantes SOLO con la planilla ya generada: un
+            botón apagado a la vista es una promesa que todavía no se puede
+            cumplir. */}
+        {!!data?.lineas.length && (
         <div className="flex gap-2">
           <button
             type="button" onClick={bajarExcel} disabled={!data?.lineas.length}
@@ -938,6 +974,7 @@ export default function PlanillaTab() {
             </button>
           )}
         </div>
+        )}
       </div>
 
       {/* 🔴 DÓNDE CONVIENE EMPEZAR. La quincena pasada terminó un día, y la que
@@ -951,19 +988,6 @@ export default function PlanillaTab() {
           <b>{fechaCorta(sugerido.inicio)}</b> — está marcado en el calendario. Puedes elegir otro
           día si hace falta.
         </p>
-      )}
-
-      {/* ── 🔴 EL CALENDARIO, A LA VISTA HASTA QUE SE GENERA ──────────────────
-          Dos meses en escritorio, uno con scroll en el teléfono, y abajo el
-          resumen con el botón. Es el primer paso de la pantalla: esconderlo
-          detrás de un desplegable es lo que Daniel encontró mal. */}
-      {calendarioAbierto && (
-        <RangoFechas
-          desde={desde} hasta={hasta} label={null} inline accion={botonGenerar}
-          vacio={!elegido}
-          sugerido={diaSugerido}
-          onChange={(d, h) => { setDesde(d); setHasta(h); setElegido(true); }}
-        />
       )}
 
       {/* ═══ EL ESTADO DE ESTA QUINCENA ═════════════════════════════════════ */}
@@ -1368,7 +1392,7 @@ export default function PlanillaTab() {
         <div className="rounded-lg border border-dashed border-gray-200 px-4 py-12 text-center">
           <p className="text-sm font-medium text-gray-700">Elige el período que vas a pagar</p>
           <p className="mt-1 text-[13px] text-gray-500">
-            Toca el primer día y el último en el calendario, y después <b>Generar</b>.
+            Toca la quincena arriba —o un rango en «Otro rango»— y después <b>Generar</b>.
           </p>
         </div>
       )}

@@ -123,10 +123,16 @@ interface Props {
    * más: es una sugerencia, y quien paga decide.
    */
   sugerido?: string | null;
+  /**
+   * Lo que dice el botón cuando está vacío. «Elige el período» de siempre; la
+   * Planilla lo llama «Otro rango» porque la quincena se elige con dos botones
+   * y el calendario queda para lo que no es una quincena (10-sep-2026).
+   */
+  textoVacio?: string;
 }
 
 export default function RangoFechas({
-  desde, hasta, onChange, recordarComo, label = "Período", vacio = false,
+  desde, hasta, onChange, recordarComo, label = "Período", vacio = false, textoVacio = "Elige el período",
   inline = false, accion, sugerido = null,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
@@ -201,7 +207,7 @@ export default function RangoFechas({
     >
       <span aria-hidden className="text-base leading-none">📅</span>
       <span className={vacio ? "text-gray-500" : "text-gray-900"}>
-        {vacio ? "Elige el período" : etiquetaRango(desde, hasta)}
+        {vacio ? textoVacio : etiquetaRango(desde, hasta)}
       </span>
     </button>
   );

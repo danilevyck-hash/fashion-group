@@ -181,10 +181,15 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); sessionS
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("🔴 el calendario a la vista, y el cuadro solo cuando se pide", () => {
-  it("antes de generar, el calendario está ABIERTO EN LÍNEA", async () => {
+  it("antes de generar, la quincena se elige con DOS botones y el calendario queda detrás de «Otro rango»", async () => {
+    // 🔴 10-sep-2026 (mockup aprobado por Daniel): el calendario a la vista del
+    // 4-sep se reemplazó por «1 – 15 ago» / «16 – 31 ago» + «Otro rango ⌄». El
+    // calendario ya no va en línea. Ver `planilla-elegir-quincena.test.tsx`.
     servir(guionBase());
     montar();
-    expect(screen.getByTestId("rango").getAttribute("data-inline")).toBe("si");
+    expect(screen.getByTestId("rango").getAttribute("data-inline")).toBe("no");
+    expect(screen.getByRole("button", { name: "1 – 15 ago" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "16 – 31 ago" })).toBeTruthy();
   });
 
   it("🔴 elegir el período NO pide el cuadro: hay que tocar Generar", async () => {

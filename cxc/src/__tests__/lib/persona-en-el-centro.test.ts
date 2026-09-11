@@ -239,9 +239,11 @@ describe("C. 🔴 LAS DIRECCIONES VIEJAS NO CAEN EN BLANCO", () => {
 describe("D. 🔴 LA FICHA SE LEE, Y SE EDITA CON UN BOTÓN «Editar»", () => {
   it("los datos salen en orden y con su etiqueta", () => {
     const d = datosDeLaFicha(NORMAL, (x) => x);
+    // 🔴 10-sep-2026: «rata» entró después del salario — la columna «Rata /
+    // hora» salió de la lista (Daniel, mockup) y el dato vive acá.
     expect(d.map((x) => x.clave)).toEqual([
       "codigo", "posicion", "empresa", "ingreso", "cedula",
-      "salario", "jornada", "reloj", "seguros",
+      "salario", "rata", "jornada", "reloj", "seguros",
     ]);
     expect(d.find((x) => x.clave === "salario")!.valor).toBe("$850.00");
     expect(d.find((x) => x.clave === "jornada")!.valor).toBe("40 h/semana");
@@ -583,8 +585,10 @@ describe("I. 🔴 EL SALDO EN PERSONAS, LAS JUSTIFICACIONES EN REPORTE", () => {
     expect(src).toMatch(/textoSaldo\(saldo\)/);
     expect(leer(CONFIG)).toMatch(/>Vacaciones</);
     // La rejilla del escritorio gana una columna, escrita completa.
+    // 🔴 10-sep-2026 (tarde): sin «Rata / hora» y con «Qué falta» ancha al final
+    // (mockup aprobado por Daniel). Ver `asistencia-lista-que-falta.test.tsx`.
     expect(src).toMatch(/COLUMNAS_CON_VACACIONES/);
-    expect(leer(CONFIG)).toMatch(/lg:grid-cols-\[minmax\(0,1fr\)_9rem_5rem_6\.5rem_6rem_7rem_5rem\]/);
+    expect(leer(CONFIG)).toMatch(/lg:grid-cols-\[minmax\(0,1fr\)_9rem_5rem_6\.5rem_5\.5rem_minmax\(0,1fr\)\]/);
   });
 
   it("🔴 el aviso «N no tienen saldo» es ahora un chip QUE FILTRA", () => {
