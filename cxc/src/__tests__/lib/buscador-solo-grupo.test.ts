@@ -102,7 +102,18 @@ describe("El ⌘K filtra las 3 puertas por donde entran clientes", () => {
   });
 
   it("las 3 secciones de cliente están filtradas, ni una de más ni una de menos", () => {
-    expect((route.match(/\.in\("(?:empresa|empresa_key|company_key)", EMPRESAS_DEL_GRUPO\)/g) ?? []).length).toBe(3);
+    // ⚠️ 11-sep-2026: el conteo pasó de 3 a **4** A PROPÓSITO, y el cuarto NO
+    // es una sección nueva. Es el PUENTE que resuelve el código del cliente de
+    // un resultado de Ventas (`switch_clientes`, por
+    // `(empresa_key, cliente_switch_id)`), para que tocarlo abra
+    // `/ventas?tab=clientes&cliente=<CÓDIGO>` en vez del `?search=<nombre>` que
+    // no leía nadie. Va acotado a las 6 por inclusión igual que los otros tres:
+    // un cliente de Boston no puede colarse ni por ahí.
+    expect((route.match(/\.in\("(?:empresa|empresa_key|company_key)", EMPRESAS_DEL_GRUPO\)/g) ?? []).length).toBe(4);
+  });
+
+  it("🔴 y el cuarto es el PUENTE al código, también acotado a las 6", () => {
+    expect(route).toMatch(/\.from\("switch_clientes"\)[\s\S]{0,200}\.in\("empresa_key", EMPRESAS_DEL_GRUPO\)/);
   });
 });
 

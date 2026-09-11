@@ -10,7 +10,7 @@ interface ReclamoResult { id: string; nro_reclamo: string; nro_factura: string; 
 interface GuiaResult { id: string; numero: number; fecha: string; transportista: string; estado: string }
 interface DirResult { id: string; nombre: string; empresa: string; correo: string; celular: string }
 interface ChequeResult { id: string; cliente: string; monto: number; fecha_deposito: string; estado: string }
-interface VentaResult { cliente: string; total: number; last_fecha: string; empresa: string }
+interface VentaResult { cliente: string; total: number; last_fecha: string; empresa: string; codigo?: string }
 interface PrestamoResult { id: string; nombre: string; empresa: string | null; saldo: number }
 interface CajaResult { id: string; descripcion: string; proveedor: string; total: number; fecha: string; periodo_id: string }
 
@@ -141,16 +141,26 @@ function flatten(r: SearchResults): FlatItem[] {
       module: "Guías",
       label: `Guía #${g.numero}`,
       sub: `${fmtDate(g.fecha)} — ${g.estado}`,
-      href: `/guias?id=${g.id}`,
+      // 🩸 11-sep-2026: decía `/guias?id=<id>`, y esa dirección tiene un
+      // redirect viejo en el middleware que la convierte en
+      // `/guias/<id>/imprimir`. O sea que buscar una guía abría la HOJA DE
+      // IMPRIMIR, no la guía. Se va derecho a la guía; el redirect no se toca,
+      // que cubre los enlaces viejos de WhatsApp y correo.
+      href: `/guias/${g.id}`,
       icon: "🚚",
     });
   }
   for (const d of r.directorio) {
+    // ⚠️ En esta sección `empresa` ES EL CÓDIGO del cliente: `/api/search` lo
+    // manda ahí desde que el Directorio dejó de ser la libreta vieja (5-sep).
+    // Con código se abre su FICHA (`/clientes/<codigo>`, viva desde ese mismo
+    // día); sin código —no debería pasar— se cae a la lista, como antes.
+    const codigo = (d.empresa || "").trim();
     items.push({
       module: "Directorio",
       label: d.nombre,
       sub: [d.empresa, d.correo, d.celular].filter(Boolean).join(" · "),
-      href: "/clientes",
+      href: codigo ? `/clientes/${encodeURIComponent(codigo)}` : "/clientes",
       icon: "📋",
     });
   }
@@ -168,7 +178,14 @@ function flatten(r: SearchResults): FlatItem[] {
       module: "Ventas",
       label: v.cliente,
       sub: `$${fmtMoney(v.total)} — ${v.empresa}${v.last_fecha ? ` — ${fmtDate(v.last_fecha)}` : ""}`,
-      href: `/ventas?search=${encodeURIComponent(v.cliente)}`,
+      // 🩸 `?search=` no lo leía NADIE: el resultado caía en la pestaña
+      // Resumen. El deep link vivo es `?tab=clientes&cliente=<CÓDIGO>`, que
+      // Ventas › Clientes lee al montar, preselecciona y resalta. Sin código
+      // (el cliente no cruzó el puente a `switch_clientes`) se abre la pestaña
+      // Clientes sin preseleccionar: al menos es la pantalla correcta.
+      href: v.codigo
+        ? `/ventas?tab=clientes&cliente=${encodeURIComponent(v.codigo)}`
+        : "/ventas?tab=clientes",
       icon: "💰",
     });
   }
@@ -192,7 +209,12 @@ function flatten(r: SearchResults): FlatItem[] {
       module: "Caja",
       label,
       sub,
-      href: cj.periodo_id ? `/caja?periodo=${cj.periodo_id}` : "/caja",
+      // 🩸 `?periodo=` tampoco lo leía nadie: el gasto encontrado dejaba en la
+      // lista de períodos. La dirección viva del período es `/caja/<id>`.
+      // ⚠️ El gasto NO queda resaltado dentro del período: resaltarlo pide
+      // tocar la pantalla de Caja, que hoy no lee ningún parámetro. Queda
+      // dicho como pendiente, no como olvido.
+      href: cj.periodo_id ? `/caja/${cj.periodo_id}` : "/caja",
       icon: "📦",
     });
   }

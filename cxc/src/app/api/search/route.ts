@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
     // Búsqueda fuzzy: total indicativo (subtotal_descuento magnitud, sin firmar NC).
     supabaseServer
       .from("switch_facturas")
-      .select("cliente:cliente_nombre, empresa:empresa_key, subtotal:subtotal_descuento, fecha")
+      .select("cliente:cliente_nombre, empresa:empresa_key, subtotal:subtotal_descuento, fecha, cliente_switch_id")
       .in("empresa_key", EMPRESAS_DEL_GRUPO)
       .ilike("cliente_nombre", pattern)
       .order("fecha", { ascending: false })
@@ -209,7 +209,7 @@ export async function GET(req: NextRequest) {
 
   // Aggregate ventas by client: latest date and total amount
   const ventasRaw = ventasRes.data || [];
-  const ventasMap = new Map<string, { cliente: string; total: number; last_fecha: string; empresa: string }>();
+  const ventasMap = new Map<string, { cliente: string; total: number; last_fecha: string; empresa: string; switchId: string | null; codigo: string }>();
   for (const row of ventasRaw) {
     const key = (row.cliente || "").toUpperCase().trim();
     if (!key) continue;
@@ -219,6 +219,7 @@ export async function GET(req: NextRequest) {
       if (row.fecha > existing.last_fecha) {
         existing.last_fecha = row.fecha;
         existing.empresa = row.empresa;
+        existing.switchId = row.cliente_switch_id ?? null;
       }
     } else {
       ventasMap.set(key, {
@@ -226,12 +227,49 @@ export async function GET(req: NextRequest) {
         total: Number(row.subtotal) || 0,
         last_fecha: row.fecha || "",
         empresa: row.empresa || "",
+        switchId: row.cliente_switch_id ?? null,
+        codigo: "",
       });
     }
   }
   const ventasDeduped = Array.from(ventasMap.values())
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 🔴 EL RESULTADO DE VENTAS VIAJA CON SU **CÓDIGO**, QUE ES SU IDENTIDAD.
+  //
+  // 11-sep-2026. Hasta hoy el resultado solo llevaba el NOMBRE y la pantalla
+  // armaba `/ventas?search=<nombre>` — un parámetro que `VentasShell` no lee en
+  // ninguna parte, así que tocar un resultado de Ventas caía en la pestaña
+  // Resumen y el cliente buscado no aparecía. El deep link que Ventas › Clientes
+  // sí lee desde el 5-sep es `?tab=clientes&cliente=<CÓDIGO>`.
+  //
+  // 🔴 El código NO se saca del nombre. El puente es el de siempre —el único
+  // que la casa permite— `switch_facturas (empresa_key, cliente_switch_id)` →
+  // `switch_clientes` → `codigo`; unir por nombre es lo que un día publicó
+  // $2,55 millones de venta que no existió. Se pregunta una sola vez, por los
+  // 5 clientes que quedaron después de agrupar, y el que no cruce se queda sin
+  // código: la pantalla lo lleva igual a la pestaña Clientes, sin preseleccionar.
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    const puentes = ventasDeduped.filter((v) => v.switchId && v.empresa);
+    if (puentes.length > 0) {
+      const { data: dirRows } = await supabaseServer
+        .from("switch_clientes")
+        .select("empresa_key, cliente_switch_id, codigo")
+        .in("empresa_key", EMPRESAS_DEL_GRUPO)
+        .in("cliente_switch_id", puentes.map((v) => v.switchId as string));
+      const porPuente = new Map<string, string>();
+      for (const row of dirRows || []) {
+        if (!row.codigo) continue;
+        porPuente.set(`${row.empresa_key}|${row.cliente_switch_id}`, row.codigo);
+      }
+      for (const v of puentes) {
+        v.codigo = porPuente.get(`${v.empresa}|${v.switchId}`) ?? "";
+      }
+    }
+  }
 
   // Calculate saldo for each prestamo employee
   interface PrestamoResult {
@@ -263,7 +301,8 @@ export async function GET(req: NextRequest) {
       id: d.id, nombre: d.nombre, empresa: d.codigo ?? "", correo: d.email ?? "", celular: d.celular ?? "",
     })),
     cheques: chequesRes.data || [],
-    ventas: ventasDeduped,
+    // `switchId` era solo el puente para resolver el código: no viaja al navegador.
+    ventas: ventasDeduped.map(({ switchId: _switchId, ...v }) => v),
     prestamos: prestamosData,
     caja: cajaRes.data || [],
   };
