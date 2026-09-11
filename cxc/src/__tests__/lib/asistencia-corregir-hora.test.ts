@@ -333,7 +333,7 @@ describe("4. 🔴 ningún aviso de Asistencia manda a «Horarios», que ya no es
     // («N sin hora de salida confirmada → Colaboradores ›»), armada en el módulo
     // puro con el nombre de la pestaña de las fichas. Sigue mandando a la ficha.
     const adc = puro("lib/asistencia/antes-de-cerrar.ts");
-    expect(adc).toMatch(/texto: "sin hora de salida confirmada",\s*enlace: fichas,/);
+    expect(adc).toMatch(/texto: "sin su hora de salida confirmada",\s*enlace: fichas,/);
     expect(adc).toMatch(/rotulo: `\$\{e\.pestanaFichas\} ›`, href: HREF_FICHAS/);
     expect(puro("app/asistencia/PlanillaTab.tsx")).toMatch(/pestanaFichas: PESTANA_FICHAS,/);
   });

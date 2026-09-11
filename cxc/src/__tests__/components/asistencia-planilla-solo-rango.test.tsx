@@ -423,9 +423,9 @@ describe("lo que el rango libre cambia en la PLATA se sigue diciendo", () => {
     servir(respuestaRangoLibre());
     montar();
     await elegirPeriodo();
-    // 🩸 El texto está partido en varios nodos (`<b>`), así que se lee el
-    // PÁRRAFO entero: `findByText` devuelve el `<b>` que matcheó, no la línea.
-    const aviso = (await screen.findByText(/no son una quincena/)).closest("p")!;
+    // ⚠️ 11-sep-2026: el aviso es una línea (`<li>`) de la lista «Antes de
+    // cerrar», ya no una caja con `<b>`. Se lee la línea entera.
+    const aviso = (await screen.findByText(/no son una quincena/)).closest("li")!;
     expect(aviso.textContent).toContain("17 días");
     expect(aviso.textContent).toContain("110.4 %");
   });

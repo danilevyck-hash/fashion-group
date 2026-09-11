@@ -155,7 +155,10 @@ describe("2. 🔴 salir antes de la hora se descuenta desde el minuto uno, sin t
     expect(ex).toMatch(/header: "Salida temprana"/);
     expect(ex).toMatch(/"Salida\\ntemprana"/);
     expect(puro("src/app/asistencia/PlanillaTab.tsx")).toMatch(/"Salida\\ntemprana"/);
-    expect(puro("src/app/asistencia/PlanillaTab.tsx")).toMatch(/num\(d\.salidaTemprana \?\? 0, "text-red-700"\)/);
+    // ⚠️ 11-sep-2026: la celda ganó la nota del ajuste (`conAjuste`): la salida
+    // temprana también entra al ajuste del corte (Daniel: «la salida temprana
+    // incluirla»). La columna sigue ahí, en rojo.
+    expect(puro("src/app/asistencia/PlanillaTab.tsx")).toMatch(/num\(d\.salidaTemprana \?\? 0, "text-red-700", conAjuste\("salidaTemprana"\)\)/);
   });
 });
 

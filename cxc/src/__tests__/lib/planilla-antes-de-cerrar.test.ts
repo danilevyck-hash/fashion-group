@@ -49,10 +49,10 @@ const VACIA: EntradaAntesDeCerrar = {
   hasta: "2026-09-15",
   fueraPorBaja: 0,
   marcoDespuesDeIrse: 0,
-  repartosRechazados: [],
+  avisoRepartoRechazado: null,
   prestamoSinAtar: [],
   avisoPrestamo: null,
-  vacacionesNoPagadas: [],
+  avisoVacacionesNoPagadas: null,
   conSabado: 0,
   rangoLibre: false,
   factorBase: 1,
@@ -106,10 +106,10 @@ describe("2. las tres líneas del mockup, con su número y su enlace", () => {
     expect(l.enlace).toEqual({ rotulo: "Colaboradores ›", href: "/asistencia?tab=colaboradores" });
   });
 
-  it("«1 sin hora de salida confirmada → Colaboradores ›»", () => {
+  it("«1 sin su hora de salida confirmada → Colaboradores ›»", () => {
     const l = r.arreglar.find((x) => x.clave === "sin-horario")!;
     expect(l.numero).toBe(1);
-    expect(l.texto).toBe("sin hora de salida confirmada");
+    expect(l.texto).toBe("sin su hora de salida confirmada");
     expect(l.enlace?.rotulo).toBe("Colaboradores ›");
   });
 
@@ -166,10 +166,10 @@ describe("5. ningún aviso que existía se pierde", () => {
     const r = armarAntesDeCerrar({
       ...VACIA,
       marcoDespuesDeIrse: 1,
-      repartosRechazados: [{ codigo: "11", etiqueta: "JULIO GARAY", motivo: "las partes no suman el salario" }],
+      avisoRepartoRechazado: "Un sueldo repartido no se aplicó y se pagó en una sola planilla, como antes: JULIO GARAY (las partes no suman el salario).",
       prestamoSinAtar: [{ nombre: "LAURA CASIANI", saldo: 300 }],
       avisoPrestamo: "Préstamos: LUIS PARAJON: se le descuenta $40.00 y no su cuota del préstamo de $45.00 — con eso termina de pagar.",
-      vacacionesNoPagadas: [{ codigo: "29", etiqueta: "ELOYN MENDOZA", rangos: [{ desde: "2026-09-01", hasta: "2026-09-05" }], dias: 5, monto: 120 }],
+      avisoVacacionesNoPagadas: "1 vacación marcada como «ya se le pagó»: ELOYN MENDOZA · 1 sep 2026 → 5 sep 2026 · 5 días · $120.00.",
       conSabado: 2,
       rangoLibre: true, factorBase: 0.5, diasCalendario: 8, esQuincena: false,
       migraciones: ["Falta correr el archivo X.sql en Supabase."],
@@ -179,6 +179,9 @@ describe("5. ningún aviso que existía se pierde", () => {
     expect(r.arreglar.find((x) => x.clave === "reparto")!.texto).toContain("JULIO GARAY");
     expect(r.info.map((x) => x.clave)).toEqual(["prestamo", "vacaciones", "sabado", "rango-libre"]);
     expect(r.info.find((x) => x.clave === "vacaciones")!.texto).toContain("ELOYN MENDOZA");
+    // 🔴 Lo que mueve plata va en ÁMBAR (tono «plata»), no en gris — y no frena.
+    expect(r.info.find((x) => x.clave === "vacaciones")!.tono).toBe("plata");
+    expect(r.info.find((x) => x.clave === "prestamo")!.tono).toBe("plata");
     expect(r.info.find((x) => x.clave === "rango-libre")!.texto).toContain("50.0 %");
     expect(r.encabezado).toBe("Antes de cerrar · borrador, faltan 3 días hábiles");
   });

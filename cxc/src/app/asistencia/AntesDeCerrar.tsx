@@ -17,13 +17,15 @@ import { TODO_LISTO, type AntesDeCerrar as Datos, type LineaAntesDeCerrar } from
 function Linea({ l }: { l: LineaAntesDeCerrar }) {
   const [verQuienes, setVerQuienes] = useState(false);
   const info = l.tono === "info";
+  const plata = l.tono === "plata";
+  const color = info ? "text-gray-500" : plata ? "text-amber-900" : "text-gray-900";
   return (
     <li
       data-testid={l.clave === "extras" ? "aviso-extra-sin-aprobar" : undefined}
-      className={`px-3 py-2 text-[13px] ${info ? "text-gray-500" : "text-gray-900"}`}
+      className={`px-3 py-2 text-[13px] ${color}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span className="min-w-0">
+        <span className={`min-w-0 ${color}`}>
           <span aria-hidden className={`mr-2 inline-block h-[7px] w-[7px] rounded-full ${info ? "bg-gray-400" : "bg-amber-500"}`} />
           {l.numero !== null && <b className="tabular-nums">{l.numero}</b>}
           {l.numero !== null ? " " : ""}

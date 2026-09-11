@@ -23,11 +23,7 @@
 import { enlaceAprobaciones, horasBonitas, type ExtraNoAprobada } from "./aprobaciones";
 import { fechaCortaCorte, fraseCorte } from "./elegir-quincena";
 import type { CodigoSinFicha } from "./periodo";
-import type { RepartoRechazado } from "./reparto";
-import type { VacacionNoPagada } from "./vacaciones";
 import type { PrestamoSinAtar } from "./prestamos-planilla";
-import { textoVacacionesNoPagadas } from "./vacaciones";
-import { textoRepartoRechazado } from "./reparto";
 import { PESTANA_PRESTAMOS } from "@/lib/prestamos-una-puerta";
 
 /** Una persona detrás de una línea (las de «ver quiénes»). */
@@ -47,8 +43,12 @@ export interface LineaAntesDeCerrar {
   texto: string;
   /** El enlace a la derecha: a dónde ir a arreglarlo. */
   enlace: { rotulo: string; href: string } | null;
-  /** Ámbar = hay que hacer algo antes de cerrar; gris = para saber. */
-  tono: "arreglar" | "info";
+  /**
+   * Ámbar con acción = hay que hacer algo antes de cerrar («arreglar»); ámbar
+   * sin acción = plata que se movió y se dice con nombre («plata»: vacaciones ya
+   * pagadas, la última cuota del préstamo); gris = para saber («info»).
+   */
+  tono: "arreglar" | "plata" | "info";
   /** Quiénes están detrás, para «ver quiénes» (solo las horas extra). */
   personas?: PersonaDeLinea[];
 }
@@ -78,11 +78,13 @@ export interface EntradaAntesDeCerrar {
   hasta: string;
   fueraPorBaja: number;
   marcoDespuesDeIrse: number;
-  repartosRechazados: readonly RepartoRechazado[];
+  /** El aviso del reparto rechazado, ya redactado por el servidor (con nombre y motivo). */
+  avisoRepartoRechazado: string | null;
   prestamoSinAtar: readonly PrestamoSinAtar[];
   /** El aviso del préstamo (última cuota, quien no cobra aquí), ya redactado. */
   avisoPrestamo: string | null;
-  vacacionesNoPagadas: readonly VacacionNoPagada[];
+  /** El aviso de las vacaciones ya pagadas, ya redactado (nombre, rango y monto). */
+  avisoVacacionesNoPagadas: string | null;
   conSabado: number;
   rangoLibre: boolean;
   factorBase: number;
@@ -169,7 +171,7 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
     arreglar.push({
       clave: "sin-horario",
       numero: e.sinHorario,
-      texto: "sin hora de salida confirmada",
+      texto: "sin su hora de salida confirmada",
       enlace: fichas,
       tono: "arreglar",
     });
@@ -179,20 +181,14 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
       clave: "marco-despues",
       numero: e.marcoDespuesDeIrse,
       texto: e.marcoDespuesDeIrse === 1
-        ? "marcó después de su fecha de salida: o volvió, o alguien usa su huella"
-        : "marcaron después de su fecha de salida: o volvieron, o alguien usa su huella",
+        ? "marcó después de su fecha de salida: o volvió a trabajar, o alguien más está usando su huella"
+        : "marcaron después de su fecha de salida: o volvieron a trabajar, o alguien más está usando su huella",
       enlace: fichas,
       tono: "arreglar",
     });
   }
-  if (e.repartosRechazados.length > 0) {
-    arreglar.push({
-      clave: "reparto",
-      numero: null,
-      texto: textoRepartoRechazado(e.repartosRechazados) ?? "",
-      enlace: fichas,
-      tono: "arreglar",
-    });
+  if (e.avisoRepartoRechazado) {
+    arreglar.push({ clave: "reparto", numero: null, texto: e.avisoRepartoRechazado, enlace: fichas, tono: "arreglar" });
   }
   if (e.prestamoSinAtar.length > 0) {
     const detalle = e.prestamoSinAtar.map((p) => `${p.nombre} · $${p.saldo.toFixed(2)}`).join(" — ");
@@ -220,9 +216,10 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
       tono: "info",
     });
   }
-  if (e.avisoPrestamo) info.push({ clave: "prestamo", numero: null, texto: e.avisoPrestamo, enlace: null, tono: "info" });
-  const vac = textoVacacionesNoPagadas(e.vacacionesNoPagadas);
-  if (vac) info.push({ clave: "vacaciones", numero: null, texto: vac, enlace: null, tono: "info" });
+  // 🔴 LO QUE MUEVE PLATA SE DICE CON NOMBRE Y MONTO, en ámbar (la regla de
+  // Daniel que ya cumplían las cajas): no frena el cierre, pero no va en gris.
+  if (e.avisoPrestamo) info.push({ clave: "prestamo", numero: null, texto: e.avisoPrestamo, enlace: null, tono: "plata" });
+  if (e.avisoVacacionesNoPagadas) info.push({ clave: "vacaciones", numero: null, texto: e.avisoVacacionesNoPagadas, enlace: null, tono: "plata" });
   if (e.conSabado > 0) {
     info.push({
       clave: "sabado",

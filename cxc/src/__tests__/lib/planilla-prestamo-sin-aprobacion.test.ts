@@ -94,9 +94,10 @@ describe("2. la pantalla: sin bloque de aprobación, y la casilla muestra lo aut
       .toMatch(/return \{ \.\.\.linea, dinero, prestamoAutomatico: \{ prestamo, terceros \} \};/);
   });
 
-  it("el aviso ámbar que se pinta es `avisoPrestamo`, y viaja al Excel y al PDF", () => {
-    expect(pantalla).toMatch(/data\?\.avisos\.avisoPrestamo &&/);
-    expect(pantalla).toMatch(/avisoPrestamo: data\.avisos\.avisoPrestamo \?\? null/);
+  it("el aviso ámbar que se pinta es `avisoPrestamo` (en la lista «Antes de cerrar»), y viaja al Excel y al PDF", () => {
+    // ⚠️ 11-sep-2026, más tarde: la caja pasó a una línea de «Antes de cerrar»;
+    // el texto es el mismo `avisoPrestamo` de la ruta (va a la lista y al papel).
+    expect((pantalla.match(/avisoPrestamo: data\.avisos\.avisoPrestamo \?\? null,/g) ?? []).length).toBe(2);
     const exportar = sinComentarios("src/lib/asistencia/planilla-exportar.ts");
     expect(exportar).toMatch(/d\.avisoPrestamo/);
     expect(exportar).not.toMatch(/avisoPrestamoSinAprobar/);
