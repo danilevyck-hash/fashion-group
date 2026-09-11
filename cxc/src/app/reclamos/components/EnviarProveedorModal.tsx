@@ -229,11 +229,20 @@ export default function EnviarProveedorModal({
         throw new Error(err?.error || "No se pudo enviar el correo.");
       }
       const data = await res.json().catch(() => ({}));
-      const viaLink = data?.mode === "link" ? " (enlace de descarga)" : "";
+      // Lo que viajó se dice con números: el Excel siempre, y cuántas facturas
+      // y fotos entraron. Lo que no entró también se dice — un adjunto que
+      // falta en silencio es el proveedor pidiéndolo por WhatsApp dos días
+      // después.
+      const facturas = Number(data?.facturasAdjuntas || 0);
+      const fotos = Number(data?.fotosAdjuntas || 0);
+      const piezas: string[] = [];
+      if (facturas > 0) piezas.push(`${facturas} factura${facturas === 1 ? "" : "s"}`);
+      if (fotos > 0) piezas.push(`${fotos} foto${fotos === 1 ? "" : "s"}`);
+      const adjuntos = piezas.length ? ` · con ${piezas.join(" y ")}` : "";
       const omitidas = Number(data?.fotosOmitidas || 0);
       const aviso = omitidas > 0 ? ` · ${omitidas} foto${omitidas === 1 ? "" : "s"} no se pudo incluir` : "";
       const ccAviso = cleanCc ? " (con copia)" : "";
-      onSent(`Correo enviado a ${cleanTo}${ccAviso}${viaLink}${aviso}`);
+      onSent(`Correo enviado a ${cleanTo}${ccAviso}${adjuntos}${aviso}`);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo enviar el correo.");
@@ -257,10 +266,10 @@ export default function EnviarProveedorModal({
             {/* Qué viaja en el correo se aprende una vez: al ⓘ. */}
             <Ayuda titulo="Qué se envía" className="-my-2">
               <p className="mb-1.5">
-                Se adjunta el Excel, con links a facturas y fotos que abren con un clic.
+                Se adjuntan el Excel, la factura en PDF de cada reclamo y sus fotos.
               </p>
               <p>
-                Debajo del mensaje se agrega automáticamente la tabla resumen y la descarga.
+                Debajo del mensaje se agrega automáticamente la tabla resumen.
               </p>
             </Ayuda>
           </div>

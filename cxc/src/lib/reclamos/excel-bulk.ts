@@ -1,5 +1,5 @@
 import XLSX from "xlsx-js-style";
-import { buildReclamoSheet } from "@/lib/excel-reclamo";
+import { buildReclamoSheet, type OpcionesHojaReclamo } from "@/lib/excel-reclamo";
 import { adjuntarFacturaUrls } from "./factura-storage";
 import { reclamoGaleriaUrl } from "./gallery-token";
 import { reclamoTaxes, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
@@ -56,12 +56,18 @@ interface Contacto {
 }
 
 /**
- * Hoja "Resumen" — reporte tabular estándar de la casa (buildReportSheet) con
- * 2 columnas de links WEB (Factura PDF firmada / galería de fotos) que abren
- * con un clic en el navegador, sin extraer ni permisos. buildReportSheet no
- * maneja hipervínculos → se parchean sobre las celdas ya estilizadas.
+ * Hoja "Resumen" — reporte tabular estándar de la casa (buildReportSheet).
+ *
+ * Con `conLinks` (el default) lleva 2 columnas de links WEB (Factura PDF
+ * firmada / galería de fotos) que abren con un clic en el navegador, sin
+ * extraer ni permisos. buildReportSheet no maneja hipervínculos → se parchean
+ * sobre las celdas ya estilizadas.
+ *
+ * 🔴 Sin links esas DOS columnas no salen (11-sep-2026): es el Excel del
+ * CORREO, donde la factura y las fotos viajan adjuntas. La columna «# Fotos»
+ * se queda — es un dato, no un camino a un archivo.
  */
-function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
+function buildResumenSheet(reclamos: ReclamoFull[], conLinks: boolean): XLSX.WorkSheet {
   let grandSub = 0;
   let grandImp = 0;
   let grandItbms = 0;
@@ -86,10 +92,10 @@ function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
 
     // Links WEB: factura = signed URL larga (bucket privado); fotos = galería
     // web del reclamo (todas las fotos, token HMAC).
-    if (rec.factura_pdf_url) links.push({ row: idx, col: 9, target: rec.factura_pdf_url, tooltip: "Ver factura" });
-    if (nFotos > 0) links.push({ row: idx, col: 10, target: reclamoGaleriaUrl(rec.id), tooltip: "Ver fotos" });
+    if (conLinks && rec.factura_pdf_url) links.push({ row: idx, col: 9, target: rec.factura_pdf_url, tooltip: "Ver factura" });
+    if (conLinks && nFotos > 0) links.push({ row: idx, col: 10, target: reclamoGaleriaUrl(rec.id), tooltip: "Ver fotos" });
 
-    return [
+    const fila: ReportCell[] = [
       { v: rec.nro_reclamo || "", bold: true },
       facturasEnPantalla(rec.nro_factura),
       fmtFechaExcel(rec.fecha_reclamo),
@@ -99,6 +105,10 @@ function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
       tx.itbms,
       { v: tx.total, bold: true },
       nFotos,
+    ];
+    if (!conLinks) return fila;
+    return [
+      ...fila,
       rec.factura_pdf_url ? { v: "Ver factura", fg: LINK_FG } : "—",
       nFotos > 0 ? { v: "Ver fotos", fg: LINK_FG } : "—",
     ];
@@ -115,11 +125,18 @@ function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
       { header: "ITBMS", wch: 14, align: "right", fmt: MONEY_FMT },
       { header: "Total", wch: 16, align: "right", fmt: MONEY_FMT },
       { header: "# Fotos", wch: 9, align: "center" },
-      { header: "Factura PDF", wch: 14, align: "center" },
-      { header: "Fotos", wch: 12, align: "center" },
+      ...(conLinks
+        ? [
+            { header: "Factura PDF", wch: 14, align: "center" as const },
+            { header: "Fotos", wch: 12, align: "center" as const },
+          ]
+        : []),
     ],
     rows,
-    totals: ["TOTAL GENERAL", null, null, null, grandSub, grandImp, grandItbms, grandTotal, grandFotos, null, null],
+    totals: [
+      "TOTAL GENERAL", null, null, null, grandSub, grandImp, grandItbms, grandTotal, grandFotos,
+      ...(conLinks ? [null, null] : []),
+    ],
   });
 
   // Layout de buildReportSheet: fila 0 título, 1 subtítulo, 2 separador,
@@ -154,22 +171,28 @@ export async function buildBulkReclamosExcel(
   // rutas que arman este Excel; sacarla del parámetro no compra nada.
   _empresa: string,
   _contacto: Contacto | null,
+  opts: OpcionesHojaReclamo = {},
 ): Promise<Buffer> {
+  const conLinks = opts.conLinks !== false;
   // Firma las facturas (1 año, lote) → cada reclamo lleva factura_pdf_url web.
-  const recs = await adjuntarFacturaUrls(reclamos);
+  // 🔴 Sin links NO se firma nada: firmar una URL de un año que nadie va a
+  // abrir es regalar un acceso al bucket privado por si acaso.
+  const recs = conLinks
+    ? await adjuntarFacturaUrls(reclamos)
+    : reclamos.map((r) => ({ ...r, factura_pdf_url: null as string | null }));
   const used = new Set<string>();
   const sheets: { name: string; ws: XLSX.WorkSheet }[] = [];
 
   // La hoja "Resumen" solo aporta con 2+ reclamos (es un consolidado). Con un
   // solo reclamo el Excel lleva únicamente la hoja de ese reclamo.
   if (recs.length >= 2) {
-    sheets.push({ name: safeSheetName("Resumen", used), ws: buildResumenSheet(recs) });
+    sheets.push({ name: safeSheetName("Resumen", used), ws: buildResumenSheet(recs, conLinks) });
   }
 
   for (const rec of recs) {
     const items = (rec.reclamo_items || []) as Record<string, unknown>[];
     const fotos = (rec.reclamo_fotos || []) as ReclamoFoto[];
-    const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos);
+    const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos, { conLinks });
     sheets.push({ name: safeSheetName(rec.nro_reclamo || "Reclamo", used), ws: sheet });
   }
 
@@ -180,4 +203,4 @@ export function reclamoBulkConstants() {
   return { TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL };
 }
 
-export type { ReclamoFull };
+export type { ReclamoFull, OpcionesHojaReclamo };

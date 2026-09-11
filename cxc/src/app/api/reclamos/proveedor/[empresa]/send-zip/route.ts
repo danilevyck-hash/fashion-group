@@ -8,9 +8,20 @@ import { reclamoTaxes } from "@/lib/reclamos/tax";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 import { marcarReclamados } from "@/lib/reclamos/marcar-reclamado";
 import { notaCorreoEnviado } from "@/lib/reclamos/texto";
+import { candidatosDeReclamos } from "@/lib/reclamos/adjuntos";
+import {
+  avisoDeAdjuntos,
+  avisoDeOmitidos,
+  contarPorClase,
+  repartirAdjuntos,
+} from "@/lib/reclamos/adjuntos-plan";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Bajar y achicar las fotos de un lote de reclamos toma más que armar un Excel.
+// Medido el 11-sep-2026 contra producción: las 4 facturas vivas pesan 4,57 MB y
+// las 14 fotos 2,03 MB en total — pero el techo se sube porque un lote de seis
+// reclamos con fotos de teléfono sí puede tardar.
+export const maxDuration = 120;
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
@@ -91,9 +102,12 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       .limit(1);
     const contacto = contactos?.[0] || null;
 
-    // Excel pelado con links WEB (factura firmada + fotos públicas). Abre con un
-    // clic en Mac/Windows, sin extraer ni permisos. Liviano → siempre se adjunta.
-    const buffer = await buildBulkReclamosExcel(reclamos, empresa, contacto);
+    // 🔴 El Excel del CORREO va SIN links (11-sep-2026). Daniel: *«se puede
+    // adjuntar directo al correo y quitarlo del excel? Va»* — la factura en PDF
+    // y las fotos viajan ADJUNTAS acá abajo, así que un link dentro del Excel
+    // sería un segundo camino al mismo archivo. El Excel que se DESCARGA sigue
+    // con sus links: ahí no hay correo que cargue los archivos.
+    const buffer = await buildBulkReclamosExcel(reclamos, empresa, contacto, { conLinks: false });
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
     const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
@@ -117,10 +131,20 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       })
       .join("");
 
-    // El Excel es liviano → siempre se adjunta. Los archivos (factura/fotos) abren
-    // desde los links WEB del propio Excel, así que no se adjuntan binarios.
-    const attachments = [{ filename, content: buffer }];
-    const downloadBlock = `<p style="font-size:13px;color:#444">Adjunto encontrará <strong>${esc(filename)}</strong>. Dentro del Excel, los enlaces <em>Ver factura</em> y <em>Ver fotos</em> abren los archivos en el navegador con un clic.</p>`;
+    // Los adjuntos: el Excel (liviano, siempre) + la factura en PDF de cada
+    // reclamo + sus fotos ya achicadas. Lo que no cabe en el tope de Resend se
+    // queda fuera y SE DICE — la decisión entera vive en `adjuntos-plan.ts`.
+    const { candidatos, noSePudieronBajar } = await candidatosDeReclamos(reclamos);
+    const { incluidos, omitidos } = repartirAdjuntos([
+      { nombre: filename, clase: "excel", nroReclamo: "", contenido: buffer },
+      ...candidatos,
+    ]);
+    const attachments = incluidos.map((a) => ({ filename: a.nombre, content: a.contenido }));
+    const cuenta = contarPorClase(incluidos);
+    const omitidosTexto = avisoDeOmitidos(omitidos);
+    const downloadBlock = `<p style="font-size:13px;color:#444">${esc(avisoDeAdjuntos(incluidos, filename))}${
+      omitidosTexto ? ` ${esc(omitidosTexto)}` : ""
+    }</p>`;
 
     const messageHtml = esc(message).replace(/\n/g, "<br>");
 
@@ -189,6 +213,11 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       ok: true,
       sent: reclamos.length,
       to: recipients,
+      facturasAdjuntas: cuenta.factura,
+      fotosAdjuntas: cuenta.foto,
+      // Lo que NO viajó, por las dos razones distintas: no cupo en el tope del
+      // correo, o no se pudo bajar del bucket. La pantalla suma las dos.
+      fotosOmitidas: contarPorClase(omitidos).foto + noSePudieronBajar,
     });
   } catch (err) {
     console.error("send-zip error:", err);

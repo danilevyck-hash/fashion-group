@@ -20,9 +20,23 @@ const VAL_BG = "FDFEFE";
 const LINK_FG = "0563C1"; // azul de hyperlink
 const CMAX = 7; // 8 columnas (0..7): Código, Descripción, Talla, Género, Cant., Precio, Subtotal, Motivo
 
+export interface OpcionesHojaReclamo {
+  /**
+   * 🔴 `false` = la hoja NO lleva la sección «Archivos y evidencia» (11-sep-2026).
+   * Es el Excel que va POR CORREO: ahí la factura y las fotos viajan ADJUNTAS,
+   * así que un link sería un segundo camino al mismo archivo — y uno que le
+   * dice al proveedor dónde vive nuestro Storage. Daniel: *«se puede adjuntar
+   * directo al correo y quitarlo del excel? Va»*.
+   * El Excel que se DESCARGA sigue con sus links: ahí no hay correo que cargue
+   * los archivos, y sin ellos Andrea se quedaría sin la factura y sin las fotos.
+   */
+  conLinks?: boolean;
+}
+
 /**
- * Hoja Excel de un reclamo. Los links son URLs WEB que abren con un clic en el
- * navegador (Mac/Windows), sin extraer nada ni permisos:
+ * Hoja Excel de un reclamo. Con `conLinks` (el default) los links son URLs WEB
+ * que abren con un clic en el navegador (Mac/Windows), sin extraer nada ni
+ * permisos:
  *   - Factura: rec.factura_pdf_url (signed URL larga; bucket privado, no expuesto).
  *   - Fotos:   galería web del reclamo (página con todas las fotos, token HMAC).
  * El caller adjunta factura_pdf_url vía adjuntarFacturaUrls (factura-storage.ts).
@@ -31,7 +45,9 @@ export function buildReclamoSheet(
   rec: Record<string, unknown>,
   items: Record<string, unknown>[],
   fotos: ReclamoFoto[] = [],
+  opts: OpcionesHojaReclamo = {},
 ): XLSX.WorkSheet {
+  const conLinks = opts.conLinks !== false;
   const facturaUrl = (rec.factura_pdf_url as string | null | undefined) || null;
   const nroReclamo = String(rec.nro_reclamo || "");
   const empresa = String(rec.empresa || "");
@@ -126,7 +142,7 @@ export function buildReclamoSheet(
     h[r] = 18; r++;
   };
 
-  const tieneSeccion = !!facturaUrl || fotos.length > 0;
+  const tieneSeccion = conLinks && (!!facturaUrl || fotos.length > 0);
   if (tieneSeccion) {
     // Spacer
     fillRow(ws, r, CMAX, "FFFFFF"); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 10; r++;

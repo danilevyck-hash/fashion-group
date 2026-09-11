@@ -69,8 +69,15 @@ const EN_UN_AYUDA: Array<[string, string]> = [
   // enlace). La regla —comprobante obligatorio para marcar Pagado— NO se
   // perdió: la dice la propia ventana de pago (SettlementModal, más abajo en
   // esta misma lista) en el momento en que frena de verdad.
-  ["app/reclamos/components/EnviarProveedorModal.tsx", "Se adjunta el Excel"],
-  ["app/reclamos/components/EnviarProveedorModal.tsx", "la tabla resumen y la descarga"],
+  // 🔄 11-sep-2026: el correo al proveedor dejó de mandar links adentro del
+  // Excel y pasó a ADJUNTAR la factura en PDF y las fotos (Daniel: «se puede
+  // adjuntar directo al correo y quitarlo del excel? Va»). El ⓘ sigue
+  // existiendo y sigue diciendo QUÉ viaja — cambió lo que viaja, no que se
+  // explique. Por eso las dos frases se actualizan y ninguna se borra: «Se
+  // adjunta el Excel» → «Se adjuntan el Excel…», y se fue «y la descarga»
+  // porque ya no hay descarga que anunciar.
+  ["app/reclamos/components/EnviarProveedorModal.tsx", "Se adjuntan el Excel"],
+  ["app/reclamos/components/EnviarProveedorModal.tsx", "la tabla resumen"],
 
   // ── Depurador ────────────────────────────────────────────────────────────
   ["app/productos/cargar/ReebokClient.tsx", "Vacío = hereda la fórmula de marca"],
