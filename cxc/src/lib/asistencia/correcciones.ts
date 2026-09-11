@@ -134,6 +134,61 @@ export function normalizarHora(hora: unknown): string | null {
   return `${p2(h)}:${p2(mi)}:${p2(s)}`;
 }
 
+/**
+ * La hora que se GUARDA cuando la ventana la elige con el selector del sistema
+ * (`<input type="time" step="1">`, 11-sep-2026).
+ *
+ * Daniel, textual: *«no me gusta texto libre para escribir la hora, enreda.
+ * algo que se sienta más seguro y que el formato vaya con el módulo»*. El
+ * selector devuelve "HH:MM:SS" cuando se tocaron los segundos y "HH:MM" cuando
+ * no (o cuando el navegador no los ofrece, como el iPhone). Los segundos son
+ * OPCIONALES y se completan así:
+ *
+ *   · vienen en el valor → se respetan;
+ *   · no vienen y la hora:minuto es la MISMA del reloj → se conservan los
+ *     segundos del reloj (corregir 13:22:02 sin tocarla no la vuelve 13:22:00);
+ *   · no vienen y la hora cambió → `:00`.
+ *
+ * Devuelve `null` si el valor no es una hora del día.
+ */
+export function completarSegundos(valor: unknown, relojHora: string | null | undefined): string | null {
+  const v = String(valor ?? "").trim();
+  if (/^\d{1,2}:\d{2}:\d{2}$/.test(v)) return normalizarHora(v);
+  if (!/^\d{1,2}:\d{2}$/.test(v)) return null;
+  const reloj = normalizarHora(relojHora ?? "");
+  if (reloj && reloj.slice(0, 5) === normalizarHora(v)?.slice(0, 5)) return reloj;
+  return normalizarHora(v);
+}
+
+const MESES_CORTOS = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const DIAS_CORTOS = ["dom","lun","mar","mié","jue","vie","sáb"];
+
+/** "2026-08-31" → "lun 31 ago". */
+export function diaCortoConSemana(fecha: string): string {
+  const [a, m, d] = fecha.split("-").map(Number);
+  const dow = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
+  return `${DIAS_CORTOS[dow]} ${d} ${MESES_CORTOS[m - 1]}`;
+}
+
+/**
+ * La línea de arriba de la ventana, UNA sola (11-sep-2026, mockup aprobado):
+ *     «Yulissa Juárez · lun 31 ago · el reloj marcó 13:22:02»
+ * y, cuando se agrega una marcación que el reloj no registró:
+ *     «Yulissa Juárez · lun 31 ago · el reloj no registró nada»
+ *
+ * Reemplaza al recuadro «Lo que marcó el reloj / Esto no se borra nunca…»: la
+ * explicación de que el reloj no se borra se lee UNA vez en el «?» de la
+ * pestaña, no en cada corrección.
+ */
+export function encabezadoCorreccion(
+  persona: string,
+  fecha: string,
+  relojHora: string | null | undefined,
+): string {
+  const reloj = relojHora ? `el reloj marcó ${relojHora}` : "el reloj no registró nada";
+  return `${persona} · ${diaCortoConSemana(fecha)} · ${reloj}`;
+}
+
 /** "2026-08-07" y que sea una fecha de verdad (no "2026-02-31"). */
 export function fechaValida(fecha: unknown): boolean {
   const s = String(fecha ?? "").trim();
