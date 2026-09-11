@@ -17,7 +17,19 @@ import EnviarProveedorModal from "./EnviarProveedorModal";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 import { diasDesde } from "@/lib/reclamos/dias";
 import { textoReclamado, estaReclamado } from "@/lib/reclamos/reclamado";
-import { FALTA_FECHA_FACTURA, filtroDesdeUrl, filtrarPorEstado, ordenarPorFactura, type FiltroEstado } from "@/lib/reclamos/orden";
+import {
+  FALTA_FECHA_FACTURA,
+  alTocarColumna,
+  filtroDesdeUrl,
+  filtrarPorEstado,
+  flechaDeColumna,
+  ordenAUrl,
+  ordenDesdeUrl,
+  ordenarReclamos,
+  type ColumnaOrden,
+  type FiltroEstado,
+  type Orden,
+} from "@/lib/reclamos/orden";
 
 interface Props {
   role: string;
@@ -55,6 +67,49 @@ function descargar(blob: Blob, nombre: string) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * UN ENCABEZADO QUE ORDENA.
+ *
+ * La flecha sale de `flechaDeColumna`: SOLO la columna ordenada la lleva — una
+ * flecha en las cinco no dice nada.
+ *
+ * ⚠️ Vive FUERA del componente de la página a propósito: definido adentro sería
+ * un tipo de componente NUEVO en cada render, y React desmontaría y volvería a
+ * montar los cinco encabezados cada vez que alguien toca uno.
+ */
+function Encabezado({
+  columna,
+  children,
+  orden,
+  onOrdenar,
+  alineacion = "left",
+  className = "",
+}: {
+  columna: ColumnaOrden;
+  children: React.ReactNode;
+  orden: Orden;
+  onOrdenar: (c: ColumnaOrden) => void;
+  alineacion?: "left" | "right";
+  className?: string;
+}) {
+  const flecha = flechaDeColumna(orden, columna);
+  const activa = orden.columna === columna;
+  return (
+    <th className={`pb-3 font-medium ${alineacion === "right" ? "text-right" : "text-left"} ${className}`}>
+      <button
+        type="button"
+        onClick={() => onOrdenar(columna)}
+        aria-label={`Ordenar por ${String(children)}`}
+        aria-sort={activa ? (orden.sentido === "asc" ? "ascending" : "descending") : "none"}
+        className={`inline-flex items-center gap-1 uppercase tracking-widest transition hover:text-black ${activa ? "text-black" : ""}`}
+      >
+        {children}
+        <span aria-hidden className="text-gray-400">{flecha}</span>
+      </button>
+    </th>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LA PÁGINA DE UNA EMPRESA (rediseño del 10-sep-2026, mockup aprobado).
 //
@@ -88,6 +143,12 @@ export default function EmpresaList({
   const [filtroUrl, setFiltroUrl] = useUrlState("estado", "");
   const filtro: FiltroEstado = filtroDesdeUrl(filtroUrl);
   const [search, setSearch] = useUrlState("q", "");
+  // 🔴 EL ORDEN LO ELIGE QUIEN MIRA (11-sep-2026). Daniel: *«reclamo debe ir
+  // sort el más nuevo arriba para verlo, pero con opción de sort en todas las
+  // columnas: más plata, más días, menos días, menos plata»*. Vive en la URL
+  // (`replace`, mismo nivel): se comparte por link y no ensucia el Atrás.
+  const [ordenUrl, setOrdenUrl] = useUrlState("orden", "");
+  const orden = ordenDesdeUrl(ordenUrl);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<Descarga | null>(null);
   const [filaBusy, setFilaBusy] = useState<string | null>(null);
@@ -99,9 +160,13 @@ export default function EmpresaList({
   const porCobrar = filtrarPorEstado(allEmpresaRecs, "por-cobrar");
   const cobrados = filtrarPorEstado(allEmpresaRecs, "cobrados");
   const montoPorCobrar = porCobrar.reduce((s, r) => s + reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total, 0);
-  const visibles = ordenarPorFactura(
+  const totalDe = (r: Reclamo) => reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
+  const visibles = ordenarReclamos(
     filtrarPorEstado(allEmpresaRecs, filtro).filter((r) => !search || matchReclamo(r, search) !== null),
+    orden,
+    totalDe,
   );
+  const ordenarPor = (columna: ColumnaOrden) => setOrdenUrl(ordenAUrl(alTocarColumna(orden, columna)));
   const c = contactos.find((ct) => ct.empresa === activeEmpresa) || null;
   const key = empresaKeyDeReclamo(activeEmpresa);
   const nombreCorto = key ? nombreCortoEmpresa(key) : activeEmpresa;
@@ -167,7 +232,16 @@ export default function EmpresaList({
   }
   const acciones = (r: Reclamo) => (
     <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-      <button type="button" onClick={() => setMailRec(r)} className={accion} aria-label={`Mandar por correo el reclamo ${r.nro_reclamo}`}>Correo</button>
+      {/* 🔴 «CORREO» NO SE OFRECE SOBRE UN RECLAMO YA COBRADO (11-sep-2026).
+          🩸 La invariante de arriba lo dice desde el 10-sep —mandar un reclamo
+          pagado es cobrarle dos veces al proveedor, medido: $5.306,62 en 5
+          reclamos— y el botón de LOTE sí tenía el candado (`filtro ===
+          "por-cobrar"`) y el detalle también; la FILA no. Desde el chip
+          «Cobrados» cualquier fila abría el modal con «Adjuntamos 1 reclamo
+          pendiente…» y lo mandaba. El servidor ahora también lo rechaza. */}
+      {esPendiente(r) && (
+        <button type="button" onClick={() => setMailRec(r)} className={accion} aria-label={`Mandar por correo el reclamo ${r.nro_reclamo}`}>Correo</button>
+      )}
       <button type="button" onClick={() => descargarUno(r, "excel")} disabled={filaBusy !== null} className={accion} aria-label={`Descargar el Excel del reclamo ${r.nro_reclamo}`}>{filaBusy === r.id ? "…" : "Descargar"}</button>
       <OverflowMenu
         ariaLabel={`Más opciones del reclamo ${r.nro_reclamo}`}
@@ -248,7 +322,7 @@ export default function EmpresaList({
               <button onClick={() => (allSelected ? setSelectedIds([]) : setSelectedIds(visibles.map((r) => r.id)))} className="text-sm text-gray-500 hover:text-black min-h-[44px] px-2 -mx-2">{allSelected ? "Quitar la selección" : `Seleccionar los ${visibles.length}`}</button>
             )}
             {visibles.map((r) => {
-              const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
+              const total = totalDe(r);
               const d = diasDesde(r.fecha_factura, hoy);
               return (
                 <div key={r.id} onClick={() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id))} className="border border-gray-200 rounded-lg p-4 active:bg-gray-50 transition cursor-pointer">
@@ -279,17 +353,17 @@ export default function EmpresaList({
                 <thead className="sticky top-0 bg-white z-10">
                   <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
                     {selectionMode && <th className="pb-3 w-8"><input type="checkbox" checked={allSelected} onChange={() => (allSelected ? setSelectedIds([]) : setSelectedIds(visibles.map((r) => r.id)))} className="accent-black" title="Seleccionar todos los visibles" /></th>}
-                    <th className="text-left pb-3 font-medium">N° Reclamo</th>
-                    <th className="text-left pb-3 font-medium">Factura(s)</th>
-                    <th className="text-right pb-3 font-medium">Días</th>
-                    <th className="text-left pb-3 pl-4 font-medium">Reclamado</th>
-                    <th className="text-right pb-3 font-medium">Total</th>
+                    <Encabezado columna="numero" orden={orden} onOrdenar={ordenarPor}>N° Reclamo</Encabezado>
+                    <Encabezado columna="factura" orden={orden} onOrdenar={ordenarPor}>Factura(s)</Encabezado>
+                    <Encabezado columna="dias" alineacion="right" orden={orden} onOrdenar={ordenarPor}>Días</Encabezado>
+                    <Encabezado columna="reclamado" className="pl-4" orden={orden} onOrdenar={ordenarPor}>Reclamado</Encabezado>
+                    <Encabezado columna="total" alineacion="right" orden={orden} onOrdenar={ordenarPor}>Total</Encabezado>
                     {!selectionMode && <th className="pb-3 text-right font-medium"><span className="sr-only">Acciones</span></th>}
                   </tr>
                 </thead>
                 <tbody>
                   {visibles.map((r) => {
-                    const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
+                    const total = totalDe(r);
                     return (
                       <tr key={r.id} onClick={() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id))} className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
                         {selectionMode && <td className="py-3"><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black" /></td>}
