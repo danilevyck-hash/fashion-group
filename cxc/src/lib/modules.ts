@@ -38,6 +38,8 @@ import {
 } from "lucide-react";
 import { asistenciaRoles, aprobacionesRoles } from "@/lib/asistencia/roles";
 import { MODULO_BOSTON, ROL_BOSTON, ROLES_MODULO_BOSTON } from "@/lib/boston/rol";
+import { ROLES_CXC } from "@/lib/cxc/roles";
+import { ROLES_CLIENTES } from "@/lib/clientes/roles";
 import { catalogoRoles } from "@/lib/catalogo/roles";
 import { MODULO_PRESTAMOS, moduloPrestamosEnElMenu } from "./prestamos-una-puerta";
 
@@ -130,7 +132,18 @@ export const ALL_MODULES: AppModule[] = [
   // redirige acá. Vendedor/bodega NO ven el margen (*"quita margen, lo demas
   // dejalo"* — gate en /api/ventas/referencia, no en la vista).
   { key: "referencia",    label: "Referencia",         href: "/referencia",       icon: ScanSearch,       roles: ["admin", "vendedor", "bodega"],               group: "ventas-clientes" },
-  { key: "cxc",           label: "Cuentas por Cobrar", href: "/cxc",            icon: CircleDollarSign, roles: ["admin", "vendedor"],                         group: "ventas-clientes" },
+  // 🔑 `roles[]` sale de `ROLES_CXC` en vez de escribirse acá — la MISMA lista
+  // que usan la pantalla `/cxc` y las 12 rutas de `/api/cxc/*`.
+  //
+  // 🩸 11-sep-2026. La copia a mano decía `["admin", "vendedor"]` y dejaba
+  // afuera a la **secretaria**, que es quien cobra: la pantalla la dejaba
+  // entrar (`allowedRoles`), las rutas también (`ROLES_CXC`) y desde la ficha
+  // del cliente mandaba estados de cuenta sin problema — pero el módulo no
+  // salía ni en el Inicio ni en el sidebar, así que para llegar había que
+  // saberse la dirección. Daniel, textual: *«a) sí, le doy CXC completo»*.
+  // ⚠️ Boston sigue afuera: esa cartera tiene su propia lista
+  // (`ROLES_MODULO_BOSTON`) y la secretaria no está en ella.
+  { key: "cxc",           label: "Cuentas por Cobrar", href: "/cxc",            icon: CircleDollarSign, roles: [...ROLES_CXC],                                group: "ventas-clientes" },
   { key: "multifashion",  label: "Multifashion",       href: "/multifashion",     icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                      group: "ventas-clientes" },
   // 🔴 CONFECCIONES BOSTON — el módulo de David (27-ago-2026).
   //
@@ -152,7 +165,10 @@ export const ALL_MODULES: AppModule[] = [
   // catálogo es exactamente el bug que dejó a los 3 vendedores tocando la
   // pestaña de Boston para recibir siempre un 403 (ver `boston-roles.ts`).
   { key: MODULO_BOSTON,   label: "Confecciones Boston", href: "/boston",         icon: Factory,          roles: [...ROLES_MODULO_BOSTON],                      group: "ventas-clientes" },
-  { key: "directorio",    label: "Clientes",           href: "/clientes",         icon: Contact,          roles: ["admin", "secretaria", "vendedor"],           group: "ventas-clientes" },
+  // 🔑 `roles[]` sale de `ROLES_CLIENTES` — la MISMA lista que los guards SSR
+  // de la lista y de la ficha. Las tres copias a mano fue lo que dejó a bodega
+  // entrando al directorio completo por la dirección (11-sep-2026).
+  { key: "directorio",    label: "Clientes",           href: "/clientes",         icon: Contact,          roles: [...ROLES_CLIENTES],                           group: "ventas-clientes" },
   { key: "proveedores",   label: "Proveedores",        href: "/proveedores",      icon: Building2,        roles: ["admin", "contabilidad"],                     group: "ventas-clientes" },
   // 🔑 `roles[]` sale de `catalogoRoles()` en vez de escribirse acá: es la MISMA
   // lista que usan el hub y el GET de `/api/catalogo/[marca]/products`, y hay
