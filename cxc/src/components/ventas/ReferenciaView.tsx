@@ -164,6 +164,47 @@ export function ReferenciaView() {
         </p>
       </form>
 
+      {/* ── La fila de acciones va SIEMPRE, entre por donde entres ──────────
+          🩸 11-sep-2026. «Actualizar datos de Switch» se dibujaba SOLO dentro
+          de `hayResultados`, así que quien entraba al módulo y no buscaba nada
+          no lo encontraba — mientras la novedad que le sale en pantalla dice
+          que el botón volvió y «ahora lo ve todo el que entra al módulo».
+          Ahora está desde que abres.
+
+          ⚠️ SIN BÚSQUEDA NO HAY QUÉ ACTUALIZAR, y se DICE: el catálogo de
+          Switch se trae POR EMPRESA y la empresa la dice lo que encontraste.
+          Actualizar las 6 a ciegas no es una opción — una sola (vistana) midió
+          155 s y 8.122 artículos, y son sesiones de Switch que tumban al cron
+          de esa empresa. El motivo va como TEXTO a la vista y no en un
+          `title`: en el iPad no hay mouse que pasar por encima. */}
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+        {!hayResultados && (
+          <span className="mr-auto text-xs text-gray-600">
+            Busca un código primero — se actualiza la empresa de lo que encuentres.
+          </span>
+        )}
+        <Button
+          variant="outline"
+          className="min-h-[44px]"
+          disabled={!hayResultados || actualizando || cargando}
+          onClick={() => void actualizar()}
+        >
+          <RefreshCw className={cn("mr-1.5 h-4 w-4", actualizando && "animate-spin")} />
+          {actualizando ? "Actualizando…" : "Actualizar datos de Switch"}
+        </Button>
+        {hayResultados && (
+          <Button
+            variant="outline"
+            className="min-h-[44px]"
+            // 🔴 El Excel baja LO MISMO que se ve: en modo pedido, en el orden
+            // en que se pegaron los códigos, y sin margen si el rol no lo ve.
+            onClick={() => void exportComprasToExcel(articulosOrdenados, resp!.hoyMes, { margen: mostrarMargen })}
+          >
+            <Download className="mr-1.5 h-4 w-4" /> Descargar Excel
+          </Button>
+        )}
+      </div>
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}
@@ -190,29 +231,6 @@ export function ReferenciaView() {
           No encontré {resp.noEncontrados.length === 1 ? "el código" : "los códigos"}{" "}
           <span className="font-medium">{resp.noEncontrados.join(", ")}</span> — ni en ventas ni en compras.
         </p>
-      )}
-
-      {hayResultados && (
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <Button
-            variant="outline"
-            className="min-h-[44px]"
-            disabled={actualizando || cargando}
-            onClick={() => void actualizar()}
-          >
-            <RefreshCw className={cn("mr-1.5 h-4 w-4", actualizando && "animate-spin")} />
-            {actualizando ? "Actualizando…" : "Actualizar datos de Switch"}
-          </Button>
-          <Button
-            variant="outline"
-            className="min-h-[44px]"
-            // 🔴 El Excel baja LO MISMO que se ve: en modo pedido, en el orden
-            // en que se pegaron los códigos, y sin margen si el rol no lo ve.
-            onClick={() => void exportComprasToExcel(articulosOrdenados, resp!.hoyMes, { margen: mostrarMargen })}
-          >
-            <Download className="mr-1.5 h-4 w-4" /> Descargar Excel
-          </Button>
-        </div>
       )}
 
       {modoPedido ? (

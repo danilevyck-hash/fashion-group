@@ -97,8 +97,37 @@ describe("🔴 el botón existe en /referencia", () => {
     expect(src).toContain("Actualizar datos de Switch");
     expect(src).toContain("Actualizando…");
     expect(src).toContain('fetch("/api/ventas/referencia/actualizar"');
-    // Y no se puede tocar dos veces mientras trabaja.
-    expect(src).toContain("disabled={actualizando || cargando}");
+    // ⚠️ CAMBIÓ DE DIRECCIÓN EL 11-sep-2026, no se borró. Decía
+    // `disabled={actualizando || cargando}` y el botón vivía DENTRO del bloque
+    // `{hayResultados && …}`: quien entraba al módulo y no buscaba nada no lo
+    // encontraba, mientras el aviso de novedades le decía que el botón volvió
+    // y «ahora lo ve todo el que entra al módulo». Ahora se dibuja siempre y
+    // lo que espera por la búsqueda es el `disabled`.
+    expect(src).toContain("disabled={!hayResultados || actualizando || cargando}");
+  });
+
+  it("🔴 se dibuja SIEMPRE, no solo después de buscar", () => {
+    const src = sinComentarios(VISTA);
+    // El botón NO puede estar dentro de un `{hayResultados && …}`: se comprueba
+    // que aparece ANTES del primer uso de esa bandera como condición de render.
+    const iBoton = src.indexOf("Actualizar datos de Switch");
+    const iCondicion = src.indexOf("{hayResultados && (");
+    expect(iBoton).toBeGreaterThan(-1);
+    expect(
+      iCondicion === -1 || iBoton < iCondicion,
+      "el botón volvió a quedar escondido detrás de una búsqueda con resultados",
+    ).toBe(true);
+    // Y el motivo de que arranque apagado se LEE en pantalla, no en un `title`:
+    // en el iPad no hay mouse que pasar por encima.
+    expect(src).toContain("Busca un código primero");
+  });
+
+  it("CONTROL: el Excel sigue apareciendo SOLO con resultados", () => {
+    const src = sinComentarios(VISTA);
+    const iExcel = src.indexOf("Descargar Excel");
+    const iCondicion = src.indexOf("{hayResultados && (");
+    expect(iCondicion).toBeGreaterThan(-1);
+    expect(iExcel).toBeGreaterThan(iCondicion);
   });
 
   it("CONTROL: el resto de la pantalla sigue (buscador y Excel)", () => {
