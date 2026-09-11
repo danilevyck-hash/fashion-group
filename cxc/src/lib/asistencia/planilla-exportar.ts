@@ -52,6 +52,16 @@ import type { AvisoPeriodoAbierto } from "./periodo";
 // 🔴 El pie se PARTE contra el ancho de la hoja. `doc.text` no envuelve solo:
 // la línea de avisos llegaba a 491 mm en una hoja de 335. Ver `pdf-pie.ts`.
 import { armarPie, dibujarPie } from "./pdf-pie";
+// 🔴 El ajuste de la quincena anterior ya viene ADENTRO de las columnas
+// (11-sep-2026); lo que este archivo agrega es la NOTA que dice de dónde
+// salió, y una hoja aparte con el detalle por concepto.
+import {
+  ORDEN_DEL_RELOJ,
+  ROTULO_DEL_RELOJ,
+  efectoEnElNeto,
+  etiquetaDiasSinMedir,
+  notaAjuste,
+} from "./corte-quincena";
 
 export interface DatosPlanillaExport {
   lineas: readonly LineaPlanilla[];
@@ -250,11 +260,15 @@ function filaTotales(t: TotalesPlanilla): ReportCell[] {
 // ── EXCEL ────────────────────────────────────────────────────────────────────
 
 export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
+  // 🔴 La nota del ajuste va al PIE de la hoja del cuadro, junto al aviso de
+  // rango libre si lo hay (los dos son lo que el archivo tiene que decir de sí
+  // mismo aunque nadie pregunte). Sin ajuste, la hoja es la de siempre.
+  const notaPlanilla = [avisoRangoLibre(d), notaAjuste(d.lineas)].filter(Boolean).join(" · ") || undefined;
   const hojaPlanilla = buildReportSheet({
     columns: COLUMNAS,
     rows: d.lineas.map(filaPlanilla),
     totals: filaTotales(d.totales),
-    nota: avisoRangoLibre(d),
+    nota: notaPlanilla,
   });
 
   // Hoja 2 — de dónde salió cada hora. Es la que se abre cuando alguien
@@ -364,6 +378,9 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Quien aparece en gris", `No va en planilla (${EXPLICACION_SERVICIO_PROFESIONAL} No es un pendiente: es como se le paga), o lo decide una persona: está justificada, o entró o salió a mitad del período. En ese caso el motivo va escrito en su fila, junto con lo que le daría la quincena completa; para pagarle lo suyo se usa el rango de fechas.`],
       ["Quien entró o salió a mitad del período", "Cobra los días TRABAJADOS: cada día hábil (lunes a viernes) desde que entró (o hasta que salió) vale el sueldo mensual ÷ 26, la costumbre de Panamá. El prorrateo se dice al lado de su nombre. (Daniel, 10-sep-2026: «se paga días trabajados», y el día vale sueldo ÷ 26.)"],
       ["Salida temprana", "Salir antes de la hora se descuenta desde el primer minuto: minutos × valor del minuto, sin tolerancia (los 10 minutos de gracia son solo de la entrada). (Daniel, 10-sep-2026: «se descuenta obvio», «si salió 20 minutos antes no debería de haber tolerancia».)"],
+      ...(notaAjuste(d.lineas)
+        ? [["Ajuste de la quincena anterior", `${notaAjuste(d.lineas)} Cada monto entró en SU columna —la extra en «Horas extra», la tardanza en «Tardanzas»— porque cada una tiene su rata. El detalle por colaborador está en la hoja «Ajuste anterior».`]]
+        : []),
       ["Días que todavía no pasaron", d.periodoAbierto
         ? `${d.periodoAbierto.texto} Un día que no pasó no cuenta como falta ni como presente: todavía no existe.`
         : "Este período ya terminó: todos sus días se contaron."],
@@ -387,11 +404,49 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
     ] as ReportCell[][],
   });
 
+  // Hoja 4 — SOLO cuando hay ajuste: de qué días y cuánto le entró a cada
+  // columna, colaborador por colaborador. Es lo que la contadora tiene que
+  // poder cotejar contra su propio cuadro.
+  const hojaAjuste = hojaAjusteAnterior(d.lineas);
+
   return workbookFromSheets([
     { name: "Planilla", ws: hojaPlanilla },
     { name: "Horas", ws: hojaHoras },
     { name: "Cómo se calcula", ws: hojaReglas },
+    ...(hojaAjuste ? [{ name: "Ajuste anterior", ws: hojaAjuste }] : []),
   ]);
+}
+
+/**
+ * La hoja «Ajuste anterior»: una fila por colaborador con ajuste, una columna
+ * por concepto del reloj (en el orden del cuadro) y el efecto en el neto
+ * (+ descuenta, − devuelve). `null` sin ajuste — la hoja no nace.
+ */
+function hojaAjusteAnterior(lineas: readonly LineaPlanilla[]): XLSX.WorkSheet | null {
+  const con = lineas.filter((l) => !!l.ajusteDetalle);
+  if (!con.length) return null;
+  const columns: ReportColumn[] = [
+    { header: "Colaborador", wch: 28 },
+    { header: "Código", wch: 8, align: "center" },
+    { header: "Días", wch: 14, align: "center" },
+    ...ORDEN_DEL_RELOJ.map((c) => ({ header: ROTULO_DEL_RELOJ[c], wch: 14, align: "right" as const, fmt: MONEY_FMT })),
+    { header: "Efecto en el neto", wch: 15, align: "right", fmt: MONEY_FMT },
+  ];
+  const rows = con.map((l) => {
+    const a = l.ajusteDetalle!;
+    return [
+      capitalizarNombre(l.etiqueta), l.codigo,
+      etiquetaDiasSinMedir(a.desde, a.hasta),
+      ...ORDEN_DEL_RELOJ.map((c) => c0(a.reparto[c] ?? 0)),
+      // El signo del cuadro: positivo = se le descontó, negativo = se le devolvió.
+      -efectoEnElNeto(a.reparto),
+    ] as ReportCell[];
+  });
+  return buildReportSheet({
+    columns,
+    rows,
+    nota: "Estos montos ya están sumados en las columnas de la hoja «Planilla». Efecto en el neto: positivo = se le devolvió, negativo = se le descontó.",
+  });
 }
 
 // ── PDF ──────────────────────────────────────────────────────────────────────
@@ -440,6 +495,9 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     conAusenciaPorTardanza
       ? `Llegar más de ${MINUTOS_TARDE_QUE_SON_AUSENCIA} minutos tarde se muestra en «Ausencias», no en «Tardanzas»: se descuentan los minutos igual que una tardanza y el total bruto no cambia.`
       : null,
+    // 🔴 El ajuste de la quincena anterior, dicho en el papel que se firma
+    // (11-sep-2026): qué columnas traen los días después del corte.
+    notaAjuste(d.lineas),
     FORMULA_NETO,
     "En rojo: falta configurar a ese colaborador — no vale $0 y NO entra al total.  "
     + "En gris: no se le calcula pago — o no va en planilla (servicio profesional), "
