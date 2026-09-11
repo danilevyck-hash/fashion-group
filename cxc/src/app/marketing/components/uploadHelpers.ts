@@ -11,6 +11,8 @@ export async function pedirUploadUrl(args: {
   proyectoId?: string;
   facturaId?: string;
   impulsadoraId?: string;
+  /** El PDF que todavía no tiene dueño, para que la IA lo lea. Ver la ruta. */
+  paraLeerConIA?: boolean;
 }): Promise<UploadUrlResponse> {
   const res = await fetch("/api/marketing/adjuntos/upload-url", {
     method: "POST",
@@ -19,6 +21,7 @@ export async function pedirUploadUrl(args: {
       proyectoId: args.proyectoId,
       facturaId: args.facturaId,
       impulsadoraId: args.impulsadoraId,
+      paraLeerConIA: args.paraLeerConIA,
       filename: args.file.name,
       contentType: args.file.type,
     }),

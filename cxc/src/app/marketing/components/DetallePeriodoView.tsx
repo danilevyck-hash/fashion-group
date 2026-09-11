@@ -21,9 +21,11 @@
 // (`esBucket`), sin chip de estado, sin Cerrar y sin Excel.
 //
 // 🔴 LA VUELTA ATRÁS DE ELIMINAR SE QUEDA. "Registrado por error — eliminar"
-// (anular + aviso con Deshacer) es el ÚNICO camino de restauración que le
-// queda al usuario — la pantalla "Anulados" se retiró. No quitar el menú ···
-// sin darle otra puerta a `papelera/restaurar`.
+// (anular + aviso con Deshacer) y, desde el 11-sep-2026, la lista "Eliminados"
+// al pie de la pantalla (`ProyectosEliminados`). 🩸 Hasta ese día el aviso con
+// "Deshacer" era el ÚNICO camino y vivía en `useState`: recargar con F5 dejaba
+// el proyecto fuera de Marketing para siempre. No quitar ninguna de las dos
+// puertas a `papelera/restaurar` sin poner otra.
 // ============================================================================
 
 import { useCallback, useState } from "react";
@@ -44,6 +46,7 @@ import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { useDescargasPeriodo } from "./useDescargasPeriodo";
 import CerrarPeriodoModal from "./CerrarPeriodoModal";
 import LoQueFalta from "./LoQueFalta";
+import ProyectosEliminados from "./ProyectosEliminados";
 import { ChipEstado, FilaNivel } from "./FilaNivel";
 import type { BloqueResumen } from "./InicioMarketing";
 import type { ProyectoListItem } from "./useMarcaPeriodos";
@@ -409,6 +412,15 @@ export default function DetallePeriodoView({
             );
           })}
         </div>
+      )}
+
+      {/* 🔴 LOS ELIMINADOS, AL PIE DE LA LISTA (11-sep-2026). Daniel: *«a) una
+          lista "Eliminados" con "Restaurar", como en Guías»*. Sin ninguno NO
+          se dibuja. Solo en el período ABIERTO (o en un bucket sin período):
+          un proyecto anulado no pertenece a un período cerrado, y repetirlo en
+          todos sería decir lo mismo tres veces. */}
+      {(abierto || esBucket) && (
+        <ProyectosEliminados bloque={marca.key} onRestaurado={recargar} />
       )}
 
       {cerrando && bloqueResumen && seccion.id && (

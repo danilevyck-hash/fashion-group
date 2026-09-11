@@ -31,6 +31,51 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
 
+  // 🔴 RESTAURAR UN GASTO BORRADO (11-sep-2026).
+  //
+  // 🩸 El aviso de eliminar prometía *«Podrás restaurarlo desde Gastos
+  // eliminados si es un error»* y esa pantalla era de SOLO LECTURA desde el
+  // 7-sep: el botón se había retirado por cero usos, y el aviso se quedó
+  // diciendo lo que ya no era cierto. Daniel, textual: *«a) vuelve
+  // Restaurar»*. El soft delete ya existía (`deleted`, `deleted_by`,
+  // `deleted_at`): lo único que faltaba era la puerta de vuelta.
+  //
+  // 🔴 Va en su propia rama y NO por `ALLOWED_FIELDS`: `deleted` no es un campo
+  // que se edite junto con la fecha o el monto. Y solo con el período ABIERTO,
+  // igual que borrar: devolver un gasto a un período cerrado le cambiaría el
+  // total a algo que ya se imprimió.
+  if (body?.restaurar === true) {
+    const { data: fila } = await supabaseServer
+      .from("caja_gastos")
+      .select("id, descripcion, total, deleted, caja_periodos(estado, deleted)")
+      .eq("id", params.id)
+      .maybeSingle();
+    if (!fila) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });
+    const per = Array.isArray(fila.caja_periodos) ? fila.caja_periodos[0] : fila.caja_periodos;
+    if (!per || per.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 400 });
+    if (per.estado !== "abierto") {
+      return NextResponse.json(
+        { error: "El período ya está cerrado: no se puede devolver un gasto." },
+        { status: 400 },
+      );
+    }
+    // Restaurar algo que no está borrado no es un error: no se escribe y listo.
+    if (fila.deleted !== true) return NextResponse.json({ ok: true });
+
+    const { error } = await supabaseServer
+      .from("caja_gastos")
+      .update({ deleted: false, deleted_by: null, deleted_at: null })
+      .eq("id", params.id);
+    if (error) return NextResponse.json({ error: "Error al restaurar gasto" }, { status: 500 });
+
+    await logActivity(auth.role, "caja_gasto_restore", "caja", {
+      gastoId: params.id,
+      descripcion: fila.descripcion,
+      total: fila.total,
+    }, auth.userName);
+    return NextResponse.json({ ok: true });
+  }
+
   const fields = pick(body, ALLOWED_FIELDS);
 
   // Validate the gasto belongs to an open, non-deleted period before touching it.

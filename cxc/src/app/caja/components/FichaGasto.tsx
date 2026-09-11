@@ -7,6 +7,7 @@ import OverflowMenu from "@/components/ui/OverflowMenu";
 import AutocompleteInput from "./AutocompleteInput";
 import ZonaFotos from "./ZonaFotos";
 import { centavos } from "@/lib/caja/dinero";
+import { accionesDelGasto, fotosSoloVer } from "@/lib/caja/menu-del-gasto";
 
 /**
  * UN GASTO EN PANTALLA ANGOSTA — la ficha (celular e iPad, por debajo de
@@ -152,11 +153,14 @@ export default function FichaGasto({
     );
   }
 
-  const items = [
-    { label: "Editar", onClick: onEditar },
-    { label: (g.fotos ?? 0) > 0 ? `Foto del recibo (${g.fotos})` : "Foto del recibo", onClick: () => setVerFotos((v) => !v) },
-    { label: "Eliminar", onClick: onEliminar, destructive: true },
-  ];
+  // 🔴 Con el período CERRADO el menú también se dibuja, con la foto del
+  // recibo y nada más — la misma lista que la tabla (`accionesDelGasto`).
+  const porAccion = {
+    editar: { label: "Editar", onClick: onEditar },
+    foto: { label: (g.fotos ?? 0) > 0 ? `Foto del recibo (${g.fotos})` : "Foto del recibo", onClick: () => setVerFotos((v) => !v) },
+    eliminar: { label: "Eliminar", onClick: onEliminar, destructive: true },
+  };
+  const items = accionesDelGasto(isOpen).map((a) => porAccion[a]);
 
   return (
     <div
@@ -178,11 +182,9 @@ export default function FichaGasto({
         <p className="caja-money caja-money-strong text-sm whitespace-nowrap" data-gasto-campo="total">
           ${fmt(g.total)}
         </p>
-        {isOpen && (
-          <div className="-my-2 -mr-2">
-            <OverflowMenu items={items} />
-          </div>
-        )}
+        <div className="-my-2 -mr-2">
+          <OverflowMenu items={items} />
+        </div>
       </div>
       <div className="mb-1" data-gasto-campo="categoria">
         <span className="inline-flex items-center gap-2 text-sm" style={{ color: "var(--caja-fg-default)" }}>
@@ -202,7 +204,7 @@ export default function FichaGasto({
       )}
       {verFotos && (
         <div className="mt-3">
-          <ZonaFotos gastoId={g.id} soloVer={!isOpen} />
+          <ZonaFotos gastoId={g.id} soloVer={fotosSoloVer(isOpen)} />
         </div>
       )}
     </div>

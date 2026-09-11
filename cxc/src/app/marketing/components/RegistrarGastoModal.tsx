@@ -372,19 +372,23 @@ export default function RegistrarGastoModal({
    * bucket privado y `/api/marketing/ia/leer-factura` lo lee de ahí. El `path`
    * queda anotado para que al guardar NO se vuelva a subir el mismo archivo.
    *
-   * ⚠️ Sin proyecto NO se puede subir todavía: la ruta que firma la subida
-   * exige un proyecto, una factura o una impulsadora, y en «Gasto de la marca ›
-   * Otro gasto» no hay ninguno hasta que la factura existe. Ahí se devuelve
-   * `null`: el PDF viaja igual y se cuelga al guardar (una sola subida), pero
-   * la IA no puede leerlo antes. Es una decisión pendiente de Daniel, no un
-   * olvido — y la pantalla no promete nada que no vaya a pasar.
+   * 🩸 SIN PROYECTO TAMPOCO SE PODÍA, Y LA PANTALLA LO PROMETÍA IGUAL
+   * (arreglado el 11-sep-2026). En «Gasto de la marca › Otro gasto» no hay
+   * proyecto hasta que la factura existe, la ruta que firma la subida exigía
+   * uno, y acá se cortaba con `return null`: se encendía el spinner «Leyendo
+   * factura con IA…», se apagaba, y los seis campos quedaban vacíos — sin
+   * éxito y sin error, porque el aviso vive dentro del `if (path)`. Ahora el
+   * PDF se sube igual, a `sin-dueno/…` (`paraLeerConIA`), la IA lo lee, y al
+   * guardar se cuelga de la factura recién creada con ESE mismo `path`: una
+   * sola subida, como en el camino Factura.
    */
   const subirPdfParaIA = useCallback(
     async (file: File): Promise<string | null> => {
       const proyectoId = proyecto?.id;
-      if (!proyectoId) return null;
       try {
-        const { uploadUrl, path } = await pedirUploadUrl({ file, proyectoId });
+        const { uploadUrl, path } = await pedirUploadUrl(
+          proyectoId ? { file, proyectoId } : { file, paraLeerConIA: true },
+        );
         await subirArchivoAStorage(uploadUrl, file);
         setPdfPathPreSubido(path);
         return path;

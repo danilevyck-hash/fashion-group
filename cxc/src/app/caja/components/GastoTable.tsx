@@ -9,6 +9,7 @@ import ZonaFotos from "./ZonaFotos";
 import { EmptyState, ScrollableTable } from "@/components/ui";
 import { centavos, sumaMontos, totalGastado } from "@/lib/caja/dinero";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import { accionesDelGasto, fotosSoloVer } from "@/lib/caja/menu-del-gasto";
 
 interface Props {
   gastos: CajaGasto[];
@@ -161,15 +162,23 @@ export default function GastoTable({
     });
   }
 
+  /**
+   * 🔴 EL «···» TAMBIÉN EXISTE CON EL PERÍODO CERRADO (11-sep-2026), con UNA
+   * sola cosa adentro: la foto del recibo, en solo lectura. Antes el menú no se
+   * dibujaba y el archivo de comprobantes quedaba inalcanzable apenas se
+   * cerraba el ciclo (hoy 2 de 3 períodos están cerrados). Qué se ofrece lo
+   * decide `accionesDelGasto`, no este archivo.
+   */
   function rowMenuItems(g: CajaGasto) {
-    return [
-      { label: "Editar", onClick: () => startEdit(g) },
-      {
+    const porAccion = {
+      editar: { label: "Editar", onClick: () => startEdit(g) },
+      foto: {
         label: (g.fotos ?? 0) > 0 ? `Foto del recibo (${g.fotos})` : "Foto del recibo",
         onClick: () => setFotosDeGasto(fotosDeGasto === g.id ? null : g.id),
       },
-      { label: "Eliminar", onClick: () => onDeleteGasto(g.id), destructive: true },
-    ];
+      eliminar: { label: "Eliminar", onClick: () => onDeleteGasto(g.id), destructive: true },
+    };
+    return accionesDelGasto(isOpen).map((a) => porAccion[a]);
   }
 
   // Desktop column count (excluding actions/⋯). Responsable salió de la tabla
@@ -488,18 +497,16 @@ export default function GastoTable({
                         <td className="py-3 px-4 text-right caja-money caja-money-strong" data-gasto-campo="total">
                           ${fmt(g.total)}
                         </td>
-                        {isOpen && (
-                          <td className="py-2 px-2 text-right">
-                            <OverflowMenu items={rowMenuItems(g)} />
-                          </td>
-                        )}
+                        <td className="py-2 px-2 text-right">
+                          <OverflowMenu items={rowMenuItems(g)} />
+                        </td>
                       </tr>
                       {/* La foto del recibo, en una fila que se abre debajo de
                           la suya: opcional, se arrastra o se toca. */}
                       {fotosDeGasto === g.id && (
                         <tr style={{ background: "var(--caja-bg-page)" }}>
-                          <td colSpan={dataCols + (isOpen ? 1 : 0)} className="px-4 py-3">
-                            <ZonaFotos gastoId={g.id} soloVer={!isOpen} />
+                          <td colSpan={dataCols + 1} className="px-4 py-3">
+                            <ZonaFotos gastoId={g.id} soloVer={fotosSoloVer(isOpen)} />
                           </td>
                         </tr>
                       )}

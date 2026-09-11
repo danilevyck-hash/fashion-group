@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaGasto } from "./types";
@@ -9,6 +9,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   deletedGastos: CajaGasto[];
+  /** ¿El período está abierto? Solo ahí se puede devolver un gasto. */
+  periodoAbierto?: boolean;
+  /** Recargar el período cuando uno vuelve. */
+  onRestaurado?: () => void;
 }
 
 function fmtDeletedAt(iso: string | null | undefined): string {
@@ -29,13 +33,17 @@ function fmtDeletedAt(iso: string | null | undefined): string {
 }
 
 /**
- * Los gastos eliminados de un período: se MIRAN, no se restauran.
+ * Los gastos eliminados de un período — y cómo devolverlos.
  *
- * 🩸 «Restaurar gasto» se retiró el 7-sep-2026: cero usos en toda la historia
- * del módulo (el registro no tiene una sola línea de `caja_gasto_restore`).
- * Un botón que nadie tocó nunca es un botón que solo puede sorprender. Lo
- * borrado se queda borrado y sigue estando a la vista, con quién lo borró y
- * cuándo — que es lo que sí se usaba de esta pantalla.
+ * 🔄 11-sep-2026 — VUELVE «RESTAURAR». Se había retirado el 7-sep por cero
+ * usos, pero el aviso de eliminar siguió prometiéndolo con todas las letras
+ * («Podrás restaurarlo desde Gastos eliminados si es un error») y esta
+ * pantalla era de solo lectura: la promesa quedó siendo falsa cuatro días.
+ * Daniel, textual: *«a) vuelve Restaurar»*. El soft delete ya estaba
+ * (`deleted`, `deleted_by`, `deleted_at`); lo único que faltaba era el botón.
+ *
+ * ⚠️ Solo con el período ABIERTO: devolver un gasto a un período cerrado le
+ * cambiaría el total a algo que ya se imprimió. El servidor lo rechaza igual.
  *
  * La columna «Responsable» también se fue: el gasto ya no lleva responsable
  * (es del PERÍODO). En su lugar va el proveedor, que es lo que distingue un
@@ -45,9 +53,35 @@ export default function DeletedGastosModal({
   open,
   onClose,
   deletedGastos,
+  periodoAbierto = false,
+  onRestaurado,
 }: Props) {
   // Lock body scroll mientras está abierto (hook compartido, ref-count).
   useBodyScrollLock(open);
+
+  const [restaurando, setRestaurando] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function restaurar(g: CajaGasto) {
+    setRestaurando(g.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/caja/gastos/${g.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ restaurar: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo devolver el gasto.");
+      }
+      onRestaurado?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo devolver el gasto.");
+    } finally {
+      setRestaurando(null);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -90,6 +124,10 @@ export default function DeletedGastosModal({
           </button>
         </header>
 
+        {error && (
+          <p className="px-5 pt-3 text-sm text-red-600">{error}</p>
+        )}
+
         <div className="flex-1 overflow-y-auto">
           {/* El encabezado ya dice "Gastos eliminados (0)": acá alcanza con que
               la lista vacía tenga algo que mirar. */}
@@ -106,6 +144,7 @@ export default function DeletedGastosModal({
                     <th className="text-right py-2 px-3 font-normal">Total</th>
                     <th className="text-left py-2 px-3 font-normal">Borrado por</th>
                     <th className="text-left py-2 px-3 font-normal">Borrado cuándo</th>
+                    {periodoAbierto && <th className="py-2 px-3"><span className="sr-only">Devolver</span></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -117,6 +156,18 @@ export default function DeletedGastosModal({
                       <td className="py-2 px-3 text-right tabular-nums">${fmt(g.total)}</td>
                       <td className="py-2 px-3 text-gray-500">{g.deleted_by_name || "—"}</td>
                       <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{fmtDeletedAt(g.deleted_at)}</td>
+                      {periodoAbierto && (
+                        <td className="py-2 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => { void restaurar(g); }}
+                            disabled={restaurando === g.id}
+                            className="text-xs text-gray-700 hover:text-black underline underline-offset-2 min-h-[44px] inline-flex items-center disabled:opacity-50"
+                          >
+                            {restaurando === g.id ? "Devolviendo…" : "Restaurar"}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

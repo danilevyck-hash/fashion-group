@@ -172,6 +172,8 @@ export default function PeriodoDetailPage() {
         open={showDeletedModal}
         onClose={() => setShowDeletedModal(false)}
         deletedGastos={current.deleted_gastos || []}
+        periodoAbierto={detailIsOpen}
+        onRestaurado={() => loadDetail(periodoId)}
       />
 
       <CerrarPeriodoModal

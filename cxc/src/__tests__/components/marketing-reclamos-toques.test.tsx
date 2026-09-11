@@ -708,7 +708,7 @@ describe("🔴 el borrado DEFINITIVO del proyecto dice que es definitivo", () =>
     fireEvent.click(await screen.findByRole("button", { name: /Eliminar definitivamente/ }));
     expect(await screen.findByText(/Esta acción NO se puede deshacer/i)).toBeTruthy();
     // Pide escribir el nombre exacto del proyecto…
-    const campo = screen.getByPlaceholderText(PROYECTO.nombre) as HTMLInputElement;
+    const campo = screen.getByPlaceholderText(String(PROYECTO.nombre)) as HTMLInputElement;
     // …y hasta que no coincida, el botón rojo del modal está APAGADO.
     const rojo = screen
       .getAllByRole("button")

@@ -301,10 +301,15 @@ describe("🔴 lo que ya funcionaba no cambió", () => {
     expect(adjuntosCreados()[0].cuerpo?.tipo).not.toBe("foto_proyecto");
   });
 
-  it("🔴 «Otro gasto» (sin cliente) NO intenta subir el PDF antes de tiempo", async () => {
-    // La ruta que firma la subida EXIGE proyecto, factura o impulsadora, y acá
-    // no hay ninguno hasta que la factura existe. El PDF viaja igual y se
-    // cuelga UNA vez al guardar; sin path no hay IA y no se promete ninguna.
+  // 🔄 11-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA. Este caso congelaba la
+  // decisión pendiente («acá la IA no puede leer antes de guardar»), y era un
+  // defecto con disfraz: la pantalla PROMETÍA la lectura igual —se encendía el
+  // spinner «Leyendo factura con IA…», se apagaba, y los seis campos quedaban
+  // vacíos, sin éxito ni error—. La ruta que firma la subida ahora acepta el
+  // PDF sin dueño (`paraLeerConIA`, carpeta `sin-dueno/`), así que «Otro gasto»
+  // lee como los demás caminos. Lo que este caso protege —que el mismo PDF se
+  // sube UNA sola vez— no cambió y se sigue midiendo acá.
+  it("🔴 «Otro gasto» (sin cliente) también le pasa el PDF a la IA — y lo sube UNA vez", async () => {
     abrir();
     fireEvent.click(document.querySelector('[data-camino="marca"]')!);
     fireEvent.click(document.querySelector('[data-subgasto="otro"]')!);
@@ -313,9 +318,15 @@ describe("🔴 lo que ya funcionaba no cambió", () => {
     await waitFor(() => expect(screen.getByText("factura.pdf")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /Continuar|Abriendo/ }));
     await waitFor(() => expect(screen.getByTestId("pdf-de-la-puerta")).toBeTruthy());
-    expect(firmasDeSubida()).toHaveLength(0);
-    expect(subidasDeArchivo()).toHaveLength(0);
-    expect(llamadas.filter((l) => l.url.includes("ia/leer-factura"))).toHaveLength(0);
+    await waitFor(() =>
+      expect(llamadas.filter((l) => l.url.includes("ia/leer-factura"))).toHaveLength(1),
+    );
+    expect(firmasDeSubida()).toHaveLength(1);
+    expect(subidasDeArchivo()).toHaveLength(1);
+    // 🔴 Sin dueño todavía: no se inventa un proyecto para poder subir.
+    const cuerpo = firmasDeSubida()[0].cuerpo as Record<string, unknown> | undefined;
+    expect(cuerpo?.paraLeerConIA).toBe(true);
+    expect(cuerpo?.proyectoId).toBeUndefined();
   });
 
   it("Impulsadora sigue abriendo el flujo de siempre, con su comprobante obligatorio", async () => {

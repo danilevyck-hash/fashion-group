@@ -121,14 +121,28 @@ describe("🔴 EL CÓDIGO NO VUELVE A TOCAR LO RETIRADO", () => {
     }
   });
 
-  it("«Aprobar reposición» y «Restaurar» no están en ninguna pantalla", () => {
+  // 🔄 11-sep-2026 — «RESTAURAR» SALE DE ESTA LISTA, con nota y a propósito.
+  // Se había retirado el 7-sep por cero usos, pero el aviso de eliminar siguió
+  // prometiéndolo con todas las letras («Podrás restaurarlo desde Gastos
+  // eliminados si es un error») y la pantalla de eliminados quedó de solo
+  // lectura: la promesa fue falsa cuatro días. Daniel, textual: *«a) vuelve
+  // Restaurar»*. Lo que este caso protege —«Aprobar reposición», el estado
+  // «repuesto» y la acción `restore` vieja, que NO vuelven— no cambió; su
+  // candado propio vive en `caja-y-marketing-defectos.test.ts`.
+  it("«Aprobar reposición» y el estado «repuesto» no están en ninguna pantalla", () => {
     for (const a of archivos) {
       const t = sinComentarios(a.texto);
       expect(t, `${a.ruta}`).not.toContain("Aprobar reposición");
-      expect(t, `${a.ruta}`).not.toContain("Restaurar");
       expect(t, `${a.ruta}`).not.toContain('action: "restore"');
       expect(t, `${a.ruta}`).not.toContain('"repuesto"');
     }
+  });
+
+  it("🔴 CONTROL — «Restaurar» vuelve SOLO en la lista de eliminados", () => {
+    const conRestaurar = archivos.filter((a) => sinComentarios(a.texto).includes("Restaurar"));
+    expect(conRestaurar.map((a) => a.ruta).sort()).toEqual([
+      "src/app/caja/components/DeletedGastosModal.tsx",
+    ]);
   });
 
   it("las columnas retiradas no se leen ni se escriben", () => {

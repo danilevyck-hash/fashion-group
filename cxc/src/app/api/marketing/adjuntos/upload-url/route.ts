@@ -13,6 +13,21 @@ interface UploadUrlRequest {
   // Comprobante de pago de impulsadora: se sube ANTES de crear la(s) factura(s),
   // por eso se ancla a la impulsadora (path impulsadora/{id}/…).
   impulsadoraId?: string;
+  /**
+   * 🔴 EL PDF QUE TODAVÍA NO TIENE DUEÑO, para que la IA pueda LEERLO
+   * (11-sep-2026).
+   *
+   * 🩸 «Gasto de la marca › Otro gasto» prometía la lectura con IA y nunca la
+   * corría: ese camino guarda con `proyecto_id = null`, y como esta ruta exigía
+   * proyecto, factura o impulsadora, `subirPdfParaIA` cortaba con `return null`
+   * — se encendía el spinner «Leyendo factura con IA…», se apagaba, y los seis
+   * campos quedaban vacíos, sin éxito ni error.
+   *
+   * El archivo se sube a `sin-dueno/…` y al guardar se cuelga de la factura
+   * recién creada con ESE mismo `path` (`adjuntarPdfDeFactura`): se sube UNA
+   * sola vez, como en el camino Factura.
+   */
+  paraLeerConIA?: boolean;
   filename: string;
   contentType?: string;
 }
@@ -37,7 +52,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (!body.proyectoId && !body.facturaId && !body.impulsadoraId) {
+    if (!body.proyectoId && !body.facturaId && !body.impulsadoraId && !body.paraLeerConIA) {
       return NextResponse.json(
         { error: "Se requiere proyectoId, facturaId o impulsadoraId" },
         { status: 400 },
@@ -69,7 +84,11 @@ export async function POST(req: NextRequest) {
     //   proyecto/factura → {proyectoId}/{facturaId?}/{ts}_{name}
     //   impulsadora      → impulsadora/{impulsadoraId}/{ts}_{name}
     const parts: string[] = [];
-    if (body.impulsadoraId) {
+    if (!body.proyectoId && !body.facturaId && !body.impulsadoraId) {
+      // Sin dueño todavía: es el PDF que la IA va a leer antes de que la
+      // factura exista. Se cuelga de la factura al guardar.
+      parts.push("sin-dueno");
+    } else if (body.impulsadoraId) {
       parts.push("impulsadora", body.impulsadoraId);
     } else {
       if (body.proyectoId) parts.push(body.proyectoId);
