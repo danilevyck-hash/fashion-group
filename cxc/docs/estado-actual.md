@@ -1433,3 +1433,46 @@ dirección con nota fechada, ninguno se borró: `boston-acceso` · `multifashion
 `poda-textos-ayuda` · `poda-textos-cxc-multifashion` · `novedades-dibujos` · `novedades` ·
 `cleanup-sessions`. El porqué completo, con la medición, en
 [historico/superado.md](historico/superado.md).
+
+---
+
+## 10-sep-2026 (noche, 5) — Aprobaciones: una sola lista de decisiones (Sí · No), por colaborador o por día
+
+Daniel, textual: *«Aprobaciones es una sola lista de decisiones. Cada renglón es una persona en la
+quincena, con sus horas extra sumadas. Dos botones: Sí y No. Se decide, y el renglón se va»* ·
+*«Cobra horas extra por default a todos sí»* · *«y si quiero poder ver por día y por persona? con un
+tab arriba que diga colaborador / día»*. Mockup aprobado.
+
+| | Antes | Después |
+|---|---|---|
+| Estados | aprobado true/false — **false era pendiente**; «no se paga» no existía | **Sí · No · Pendiente** (`decision`); un No deja de ser pendiente: sin aviso ámbar, sin freno del cierre. `aprobado` se sigue escribiendo derivado: **el motor paga igual** |
+| Pantalla | días con casillas (y una fila por semana) | **Colaborador** (abre): un renglón por persona, «N días · H:MM h», **Sí · No**, ⌄ con sus días. **Día**: lo mismo agrupado por día. Control `Colaborador · Día` (`?vista=`, recordado). «N por decidir · H:MM h» arriba; **«Ya decididas (N) ▸»** plegado abajo con «cambiar» |
+| Botón de arriba | «Aprobar todo» | **«Sí a todo lo pendiente»** (mismo comportamiento). Sin «No a todo» |
+| Ficha | — | **«¿Cobra horas extra?»** en Sí para todos (`cobra_horas_extra DEFAULT true`). En No: no sale en Aprobaciones ni en el aviso, cero recargo; tardanzas, ausencias y salida temprana siguen; sigue en planilla |
+| Excel | 11 columnas | + **«Decisión»** (Sí / No / Pendiente) |
+
+- Migración `20261105120000_aprobaciones_decision_y_cobra_horas_extra.sql` **aplicada** y verificada:
+  555 filas, 391 `aprobado = true` → 391 `decision = 'si'`, 0 `'no'`, 164 pendientes; 46 fichas, 0 con
+  `cobra_horas_extra = false`.
+- Módulos puros nuevos: `lib/asistencia/aprobaciones-vistas.ts` (los dos agrupamientos, una fuente) y
+  `lib/asistencia/cobra-horas-extra.ts`. La pestaña se partió en `app/asistencia/aprobaciones/`
+  (`BotonesSiNo` · `PorColaborador` · `PorDia` · `YaDecididas`); `AprobacionesTab.tsx` quedó en ~330 líneas.
+- Ruta `POST /api/asistencia/aprobaciones` acepta `decision: 'si' | 'no' | null` (y el `aprobado`
+  viejo: true = si, false = pendiente); cualquier otra cosa, 400.
+
+**Medido contra producción (solo lectura, `scripts/_medir-almuerzo-por-empresa.ts`, quincena 1–15 sep
+2026):** 45 colaboradores, 33 con neto (Vistana 7 · Fashion Wear 7 · Boston 19; los 5 de Multifashion
+sin salario todavía), neto total **$8.853,42 antes = $8.853,42 después, 0 diferencias** por colaborador.
+
+**Candados:** `aprobaciones-por-persona.test.ts` (27: la decisión en el motor real, la casilla, las dos
+vistas, la migración, el servidor, barrido de la pantalla) · `aprobaciones-por-persona.test.tsx` (11:
+control de vistas, domingo marcado, «Sí y No», la ficha); **19 mutaciones, 19 cazadas con 2 controles**
+(`scripts/_mutar-candados-aprobaciones-por-persona.sh`). Cambiaron de dirección con nota fechada,
+ninguno se borró: `asistencia-aprobaciones-pantalla`, `aprobaciones-optimista`,
+`planilla-aviso-lleva-a-aprobaciones`, `aprobaciones-excel`.
+
+⚠️ Dejado a propósito: un «No» sigue pagando los 30 min automáticos de Multifashion (son los minutos
+que no pasan por aprobación); el Reporte de asistencia muestra los minutos medidos de quien no cobra
+extra (es asistencia, no pago; el «—» sigue siendo solo del servicio profesional); «N por decidir»
+cuenta colaboradores en las dos vistas; la fila por semana no volvió.
+
