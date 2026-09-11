@@ -24,6 +24,7 @@
 // lee.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { COLUMNA_COBRA_HORAS_EXTRA, validarCobraHorasExtra } from "@/lib/asistencia/cobra-horas-extra";
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
@@ -50,6 +51,7 @@ import {
   pagaSegurosDeFila,
   baseSegurosDeFila,
   noMarcaRelojDeFila,
+  cobraHorasExtraDeFila,
   leerRepartos,
 } from "@/lib/asistencia/config-server";
 import {
@@ -222,6 +224,8 @@ export async function GET(req: NextRequest) {
       // 🔴 Sin ficha NO se puede cobrar fijo: la bandera vive en la ficha. Un
       // código que marca y nadie configuró sigue siendo un pendiente.
       const noMarcaReloj = f ? noMarcaRelojDeFila(f) : false;
+      // 🔑 Sin ficha SÍ cobra horas extra: es el default de siempre (10-sep-2026).
+      const cobraHorasExtra = f ? cobraHorasExtraDeFila(f) : true;
       // 🔴 EL REPARTO, ya validado. Vacío = cobra entero en su empresa, que es
       // el caso de 36 de las 37 fichas. `motivoReparto` trae el porqué cuando
       // hay filas cargadas y el guard las rechaza — rechazar sí, esconder no.
@@ -267,6 +271,9 @@ export async function GET(req: NextRequest) {
         // 🔴 Cobra fijo y no pasa por el reloj. Sigue en la planilla, con
         // seguros y todo; lo que se le ignora son las marcaciones.
         noMarcaReloj,
+        // 🔴 ¿Cobra horas extra? `true` para todos salvo que alguien lo apague
+        // en la ficha (10-sep-2026, Daniel: «por default a todos sí»).
+        cobraHorasExtra,
         // 🔴 LOS DOS TEXTOS QUE SOLO EXISTEN PARA EL COMPROBANTE DE PAGO: el
         // cargo («POSICION DESEMPEÑADA») y la cédula del pie. `null` = todavía
         // no se cargó, y el papel escribe un guion o deja la línea en blanco.
@@ -457,6 +464,11 @@ export async function PUT(req: NextRequest) {
   if (!rrel.ok) return NextResponse.json({ error: rrel.error }, { status: 400 });
   const noMarcaRelojValor = rrel.valor;
 
+  // Y lo mismo con «cobra horas extra» (10-sep-2026): OTRA pregunta, ausente = sí.
+  const rhe = validarCobraHorasExtra(body);
+  if (!rhe.ok) return NextResponse.json({ error: rhe.error }, { status: 400 });
+  const cobraHorasExtraValor = rhe.valor;
+
   // Y lo mismo con el saldo de vacaciones: es OTRA pregunta —cuántos días le
   // quedan— y no debería poder tumbar el guardado de un nombre.
   const rsal = validarSaldoInicial(body);
@@ -536,6 +548,7 @@ export async function PUT(req: NextRequest) {
   const conBaseSeguros = {
     ...conReloj,
     [COLUMNA_BASE_SEGUROS]: baseSeguros,
+    [COLUMNA_COBRA_HORAS_EXTRA]: cobraHorasExtraValor,
   };
   // 🔴 EL CARGO Y LA CÉDULA — los dos textos que SOLO existen para el papel.
   //
@@ -588,5 +601,5 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, saldoVacacionesDias, saldoVacacionesCorte } });
+  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, cobraHorasExtra: cobraHorasExtraValor, saldoVacacionesDias, saldoVacacionesCorte } });
 }

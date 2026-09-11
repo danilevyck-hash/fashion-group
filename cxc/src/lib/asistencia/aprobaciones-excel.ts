@@ -29,7 +29,7 @@ import {
   type ReportColumn,
 } from "@/lib/excel-export";
 import { nombreArchivoPorEmpresa } from "./empresa-para-todo";
-import type { DiaAprobacion } from "./aprobaciones";
+import { decisionDe, textoDecision, type DiaAprobacion } from "./aprobaciones";
 
 /** Minutos con dos decimales: se miden AL SEGUNDO desde el 13-ago-2026. */
 const MIN_FMT = "0.00";
@@ -44,6 +44,9 @@ const COLUMNAS: ReportColumn[] = [
   { header: "Extra 1.50 (min)", wch: 15, align: "right", fmt: MIN_FMT },
   { header: "Total (min)", wch: 12, align: "right", fmt: MIN_FMT },
   { header: "Estado", wch: 14, align: "center" },
+  // 🔴 Sí / No / Pendiente (10-sep-2026): «Sin aprobar» no distingue a quien
+  // dijo «No» de quien todavía no miró, y esa diferencia es toda la pestaña.
+  { header: "Decisión", wch: 11, align: "center" },
   { header: "Aprobó", wch: 16 },
   { header: "Cuándo", wch: 12, align: "center" },
 ];
@@ -72,11 +75,15 @@ export function construirExcelAprobaciones(opts: OpcionesExcelAprobaciones) {
   let sin = 0;
   let minApr = 0;
   let minSin = 0;
+  let no = 0;
+  let pend = 0;
 
   // El orden es el de la pantalla: por fecha, y dentro de la fecha como vino.
   for (const d of opts.dias) {
     for (const g of d.gente) {
+      const decision = decisionDe(g);
       if (g.aprobado) { apr += 1; minApr += g.minutos; } else { sin += 1; minSin += g.minutos; }
+      if (decision === "no") no += 1; else if (decision === null) pend += 1;
       rows.push([
         g.etiqueta,
         g.codigo,
@@ -88,6 +95,7 @@ export function construirExcelAprobaciones(opts: OpcionesExcelAprobaciones) {
         g.minutos,
         // 🔴 La palabra entera, no un ✓. Quien abre esto filtra por texto.
         g.aprobado ? "Aprobado" : "Sin aprobar",
+        textoDecision(decision),
         // ⚠️ Solo si el dato existe. Una aprobación vieja puede no tener firma;
         // inventar «—» ahí haría creer que alguien la firmó.
         g.aprobado ? (g.por ?? "") : "",
@@ -103,6 +111,7 @@ export function construirExcelAprobaciones(opts: OpcionesExcelAprobaciones) {
     { v: opts.dias.reduce((a, d) => a + d.gente.reduce((b, g) => b + g.nocturnoMin, 0), 0), fmt: MIN_FMT },
     { v: minApr + minSin, fmt: MIN_FMT },
     `${apr} aprobadas · ${sin} sin aprobar`,
+    `${apr} Sí · ${no} No · ${pend} pendientes`,
     null, null,
   ];
 

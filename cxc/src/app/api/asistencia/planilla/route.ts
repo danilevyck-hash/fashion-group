@@ -50,6 +50,7 @@ import {
   pagaSegurosDeFila,
   baseSegurosDeFila,
   noMarcaRelojDeFila,
+  cobraHorasExtraDeFila,
   leerJustificaciones,
   leerVacaciones,
   leerRepartos,
@@ -116,6 +117,7 @@ import {
 import {
   armarDiasAprobacion,
   estaAprobado,
+  estaRechazado,
   extrasNoAprobadas,
   indexarAprobaciones,
   textoExtraNoAprobada,
@@ -451,6 +453,9 @@ export async function GET(req: NextRequest) {
         // en vez del que sale de sus $175 de base ($17,06). Ver `seguros-base.ts`.
         baseSeguros: baseSegurosDeFila(f),
         noMarcaReloj: noMarcaRelojDeFila(f),
+        // 🔴 Sin esto la casilla «cobra horas extra» no llegaría al motor y a
+        // quien la tiene apagada se le seguirían pagando (10-sep-2026).
+        cobraHorasExtra: cobraHorasExtraDeFila(f),
         // 🔴 Sin esto el reparto no llegaría al motor y JULIO seguiría cobrando
         // sus $1.000 en una sola planilla, con el 11 % de seguros encima de sus
         // horas extra. Ver `reparto.ts`.
@@ -569,6 +574,10 @@ export async function GET(req: NextRequest) {
     // una llave por período volvía a preguntar todo con cada corrimiento.
     const diasExtraAprobados = new Set<string>();
     for (const [clave, a] of aprobaciones) if (estaAprobado(a)) diasExtraAprobados.add(clave);
+    // 🔴 Y los días que alguien decidió que NO se pagan (10-sep-2026): no se
+    // pagan y no cuentan como pendientes — ni aviso ámbar ni freno del cierre.
+    const diasExtraNo = new Set<string>();
+    for (const [clave, a] of aprobaciones) if (estaRechazado(a)) diasExtraNo.add(clave);
 
     const todasLasLineas = armarPlanilla({
       personas: personasVigentes,
@@ -579,6 +588,7 @@ export async function GET(req: NextRequest) {
       empresa,
       exigirAprobacionExtra,
       diasExtraAprobados,
+      diasExtraNo,
       // 🔴 Lo que prorratea el sueldo. 1 cuando el período es una quincena.
       factorBase: q.factorBase,
       decidirAMano,

@@ -19,22 +19,30 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { TABLA_APROBACIONES, type Aprobacion } from "./aprobaciones";
+import { TABLA_APROBACIONES, decisionDeToque, type Aprobacion, type Decision } from "./aprobaciones";
 
 interface FilaAprobacionDb {
   empleado_codigo: string;
   fecha: string;
   aprobado: boolean | null;
+  /** 'si' | 'no' | null (20261105120000). `null` = pendiente. */
+  decision?: string | null;
   minutos_vistos: number | string | null;
   marcado_por: string | null;
   marcado_en: string | null;
 }
 
 function aDominio(f: FilaAprobacionDb): Aprobacion {
+  // 🔴 La decisión manda; `aprobado` se deriva de ella. Una fila vieja sin
+  // decisión (no debería haber: el backfill puso 'si' a todo lo aprobado) se
+  // lee por `aprobado`, que es lo que siempre significó.
+  const decision: Decision =
+    f.decision === "si" || f.decision === "no" ? f.decision : f.aprobado === true ? "si" : null;
   return {
     codigo: String(f.empleado_codigo).trim(),
     fecha: String(f.fecha).slice(0, 10),
-    aprobado: f.aprobado === true,
+    aprobado: decision === "si",
+    decision,
     minutosVistos: Number(f.minutos_vistos ?? 0) || 0,
     por: f.marcado_por ?? null,
     cuando: f.marcado_en ?? null,
@@ -61,7 +69,7 @@ export async function leerAprobaciones(
     .from(TABLA_APROBACIONES)
     // Select EXPLÍCITO, nunca `*`: si mañana la tabla gana una columna, esta
     // consulta sigue trayendo lo mismo.
-    .select("empleado_codigo, fecha, aprobado, minutos_vistos, marcado_por, marcado_en")
+    .select("empleado_codigo, fecha, aprobado, decision, minutos_vistos, marcado_por, marcado_en")
     .gte("fecha", desde)
     .lte("fecha", hasta);
 
@@ -103,15 +111,25 @@ export interface DiaAAprobar {
 
 export async function guardarAprobaciones(opts: {
   dias: readonly DiaAAprobar[];
-  aprobado: boolean;
+  /**
+   * 🔴 Sí · No · pendiente (10-sep-2026). `aprobado` se escribe DERIVADO
+   * (`decision === 'si'`), así el motor de planilla paga exactamente como hoy.
+   * Un booleano sigue valiendo: `true` = 'si', `false` = pendiente (lo que la
+   * casilla vieja significaba).
+   */
+  decision?: Decision | boolean;
+  /** El nombre viejo del mismo dato. `true` = 'si', `false` = pendiente. */
+  aprobado?: boolean;
   por: string;
   /** Momento en ISO. Entra por parámetro: nada de `new Date()` escondido. */
   cuando: string;
 }): Promise<boolean> {
+  const decision = decisionDeToque(opts.decision ?? opts.aprobado ?? null);
   const filas = opts.dias.map((d) => ({
     empleado_codigo: String(d.codigo).trim(),
     fecha: d.fecha,
-    aprobado: opts.aprobado,
+    aprobado: decision === "si",
+    decision,
     minutos_vistos: Math.max(0, Math.round(Number(d.minutos) || 0)),
     marcado_por: opts.por,
     marcado_en: opts.cuando,

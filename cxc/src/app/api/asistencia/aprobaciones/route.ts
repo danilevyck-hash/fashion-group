@@ -1,7 +1,9 @@
 // POST /api/asistencia/aprobaciones
-//   { desde, hasta, aprobado, personas: [{ codigo, minutos }] }
+//   { decision: 'si' | 'no' | null, dias: [{ codigo, fecha, minutos }] }
+//   (o el viejo `aprobado: boolean` — true = 'si', false = pendiente)
 //
-// Aprobar (o desaprobar) las horas extra de una o varias personas en UN período.
+// Decidir las horas extra de una o varias personas, día por día: Sí (se paga),
+// No (no se paga, y deja de ser pendiente) o pendiente (10-sep-2026).
 //
 // ── 🔴 POR QUÉ ACÁ NO HAY GET ────────────────────────────────────────────────
 //
@@ -23,6 +25,8 @@ import { requireAsistencia } from "@/lib/asistencia/guard";
 import {
   avisoMigracionAprobaciones,
   claveDia,
+  decisionDeToque,
+  type Decision,
 } from "@/lib/asistencia/aprobaciones";
 import { guardarAprobaciones, type DiaAAprobar } from "@/lib/asistencia/aprobaciones-server";
 import { MODULOS_PLANILLA } from "@/lib/asistencia/guard";
@@ -47,7 +51,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-    const aprobado = body?.aprobado !== false;
+    // 🔴 LA DECISIÓN (10-sep-2026): 'si' · 'no' · null. Si el cuerpo trae el
+    // `aprobado` de antes, vale lo que siempre valió. Cualquier otra cosa se
+    // rechaza: acá no se adivina qué quiso decir un navegador viejo.
+    const cruda = body?.decision;
+    const decision: Decision | undefined =
+      cruda === "si" || cruda === "no" || cruda === null
+        ? cruda
+        : cruda === undefined
+          ? decisionDeToque(body?.aprobado !== false)
+          : undefined;
+    if (decision === undefined) {
+      return NextResponse.json({ error: "La decisión tiene que ser Sí, No o pendiente." }, { status: 400 });
+    }
+    const aprobado = decision === "si";
     const crudas = Array.isArray(body?.dias) ? (body!.dias as unknown[]) : [];
 
     // 🔑 `minutos` es el TESTIGO, no el pago. Nunca se multiplica por una rata:
@@ -127,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     const guardado = await guardarAprobaciones({
       dias,
-      aprobado,
+      decision,
       // Queda registro de QUIÉN. Lo pidió Daniel explícitamente.
       por: auth.userName || auth.role,
       cuando: new Date().toISOString(),
@@ -138,6 +155,7 @@ export async function POST(req: NextRequest) {
         ? {
           ok: true,
           aprobado,
+          decision,
           dias: dias.length,
           claves: [...porClave.keys()],
         }

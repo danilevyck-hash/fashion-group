@@ -36,6 +36,7 @@
  * siguen vivos en sus módulos puros porque los usan otros archivos.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import { COLUMNA_COBRA_HORAS_EXTRA, cobraHorasExtra } from "./cobra-horas-extra";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
@@ -140,6 +141,8 @@ export interface FilaPersonaDb {
   /** Sueldo fijo (20260826080000). `null` = SÍ marca el reloj, que es como
    *  estaban las 39 fichas. */
   no_marca_reloj?: boolean | null;
+  /** ¿Cobra horas extra? (20261105120000). `null` = SÍ, como las 46 fichas. */
+  cobra_horas_extra?: boolean | null;
   /** Base propia de seguros (20260826120000). `null` = los seguros salen del
    *  TOTAL BRUTO, que es como estaban las 40 fichas. Es el monto de UNA
    *  QUINCENA — ver `seguros-base.ts`.
@@ -207,6 +210,9 @@ const COLS_CON_BASE_SEGUROS = `${COLS_CON_RELOJ}, ${COLUMNA_BASE_SEGUROS}`;
  *  ⚠️ Ninguna de las tres toca el cálculo: son textos que se imprimen. Por eso
  *  van al final y por eso su ausencia no cambiaría un centavo. */
 const COLS_CON_PAPEL = `${COLS_CON_BASE_SEGUROS}, ${COLUMNAS_DEL_PAPEL.join(", ")}`;
+/** Todo, con la casilla «cobra horas extra» (10-sep-2026). Sale de
+ *  `cobra-horas-extra.ts`. Es LA lista que se pide. */
+const COLS_CON_HORAS_EXTRA = `${COLS_CON_PAPEL}, ${COLUMNA_COBRA_HORAS_EXTRA}`;
 
 /**
  * Las fichas guardadas — UN solo `select`, con todas las columnas.
@@ -228,7 +234,7 @@ const COLS_CON_PAPEL = `${COLS_CON_BASE_SEGUROS}, ${COLUMNAS_DEL_PAPEL.join(", "
  * error se propaga.
  */
 export async function leerPersonas(): Promise<PersonasLeidas> {
-  const { data, error } = await supabaseServer.from(TABLA_PERSONAS).select(COLS_CON_PAPEL);
+  const { data, error } = await supabaseServer.from(TABLA_PERSONAS).select(COLS_CON_HORAS_EXTRA);
   if (error) {
     throw new Error(`No se pudieron leer las fichas de asistencia: ${error.message}`);
   }
@@ -271,6 +277,16 @@ export function pagaSegurosDeFila(f: FilaPersonaDb): boolean {
  */
 export function noMarcaRelojDeFila(f: FilaPersonaDb): boolean {
   return noMarcaReloj(f.no_marca_reloj);
+}
+
+/**
+ * ¿A esta ficha se le pagan las horas extra? (10-sep-2026)
+ *
+ * Sin la columna —o con `null`— la respuesta es SÍ, que es como estaban las 46
+ * fichas: Daniel, *«por default a todos sí»*. Solo un `false` explícito apaga.
+ */
+export function cobraHorasExtraDeFila(f: FilaPersonaDb): boolean {
+  return cobraHorasExtra(f.cobra_horas_extra);
 }
 
 /**
