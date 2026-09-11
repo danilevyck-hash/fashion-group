@@ -355,7 +355,13 @@ describe("6 · la `nota` es la EXCEPCIÓN, no la puerta de atrás", () => {
     // pasar por acá— y Daniel lo mandó sacar: *«en ningún lado quiero exportar
     // CSV, solo Excel»*. Sube A PROPÓSITO: son dos hojas que ANTES no existían,
     // no dos que se duplicaron.
-    expect(total).toBe(27);
+    //
+    // 🔁 28 desde el 11-sep-2026: **la hoja «Ajuste anterior» del Excel de la
+    // Planilla** (`src/lib/asistencia/planilla-exportar.ts`). El ajuste de los
+    // días después del corte dejó de ser una columna neta y entró en las
+    // columnas de siempre (la contadora: *«valen diferente»*); esa hoja es el
+    // detalle por concepto y SOLO nace cuando hay ajuste. Sube A PROPÓSITO.
+    expect(total).toBe(28);
   });
 });
 
