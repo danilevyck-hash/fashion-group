@@ -92,6 +92,7 @@ import {
   quincenaDesdeClave,
   separarSinFicha,
   totalizar,
+  type DineroLinea,
   type FichaPlanilla,
   type LineaPlanilla,
   type ManualesLinea,
@@ -102,7 +103,7 @@ import {
 // o sea el módulo de siempre. Ver `planilla-unida.ts` y `corte-quincena.ts`.
 import { PLANILLA_UNIDA } from "@/lib/asistencia/planilla-unida";
 import {
-  ajusteDeDiasSinMedir,
+  aplicarAjusteEnLinea,
   corteValido,
   diasSinMedir,
 } from "@/lib/asistencia/corte-quincena";
@@ -157,11 +158,13 @@ function instante(dia: string, fin: boolean): string {
  * Se llega acá SOLO con el interruptor y en una quincena con empresa elegida.
  * Mira si la quincena anterior de esa empresa se cerró con un CORTE; si sí, mide
  * los días que quedaron afuera [corte+1 .. fin] volviendo a llamar a ESTE mismo
- * cálculo para ese rango corto —cero aritmética nueva— y saca el ajuste por
- * persona con `ajusteDeDiasSinMedir`.
+ * cálculo para ese rango corto —cero aritmética nueva— y devuelve el DINERO de
+ * esos días por persona, tal cual lo valuó el motor, para que
+ * `aplicarAjusteEnLinea` lo reparta concepto por concepto (11-sep-2026:
+ * la contadora no netea extras con tardanzas, «valen diferente»).
  *
  * 🔑 NO HAY RECURSIÓN: el rango corto no es una quincena (`esQuincena` false),
- * así que su propio bloque de ajuste no corre. Y `ajusteDeDiasSinMedir` solo lee
+ * así que su propio bloque de ajuste no corre. Y el reparto solo lee
  * ausencia/tardanza/extra, que se valúan por minuto y NO dependen del
  * `factorBase` del rango corto (ver `calcularDinero`).
  */
@@ -169,8 +172,8 @@ async function medirAjusteAnterior(
   req: NextRequest,
   empresa: string,
   quincenaActual: import("@/lib/asistencia/planilla").Quincena,
-): Promise<Map<string, number>> {
-  const vacio = new Map<string, number>();
+): Promise<{ dias: { desde: string; hasta: string }; dinero: Map<string, DineroLinea> } | null> {
+  const vacio = null;
   const prev = quincenaAnterior(quincenaActual);
   const { cabeceras } = await leerCabeceras(empresa);
   const cerrada = cabeceras.find(
@@ -193,13 +196,11 @@ async function medirAjusteAnterior(
   if (resp.status !== 200) return vacio;
   const cuadro = (await resp.json()) as { lineas?: LineaPlanilla[] };
 
-  const out = new Map<string, number>();
+  const dinero = new Map<string, DineroLinea>();
   for (const l of cuadro.lineas ?? []) {
-    if (!l.dinero) continue;
-    const a = ajusteDeDiasSinMedir(l.dinero);
-    if (a !== 0) out.set(l.codigo, a);
+    if (l.dinero) dinero.set(l.codigo, l.dinero);
   }
-  return out;
+  return { dias: restante, dinero };
 }
 
 export async function GET(req: NextRequest) {
@@ -789,24 +790,25 @@ export async function GET(req: NextRequest) {
     const prestamoSinAprobar = prestamosSinAprobar(prestamos);
     const prestamoSinAtar = prestamosSinAtar(presRes.fichas);
 
-    // ── 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, PEGADO A CADA LÍNEA ────────────
+    // ── 🔴 EL AJUSTE DE LA QUINCENA ANTERIOR, ADENTRO DE CADA LÍNEA ──────────
     //
     // Solo con el interruptor, en una quincena y con empresa elegida (cada
     // empresa cierra la suya, así que el ajuste es por empresa). Se calcula UNA
-    // vez y viaja en la línea; el neto real se saca con `netoConAjuste` en la
-    // pantalla y en el papel. `undefined` sin todo esto → el módulo de siempre.
+    // vez y ENTRA EN LAS COLUMNAS de siempre —extra en extra, tardanza en
+    // tardanza— por `aplicarAjusteEnLinea` (11-sep-2026, la contadora: «valen
+    // diferente»). Después de esto `dinero.netoPagar` ES el neto que se paga y
+    // `totalizar` lo suma solo. `undefined` sin todo esto → el módulo de siempre.
     let lineasFinal = lineas;
     let totalAjuste = 0;
+    let diasAjuste: { desde: string; hasta: string } | null = null;
     const ajustePersonas: { codigo: string; etiqueta: string; monto: number }[] = [];
     if (PLANILLA_UNIDA && q.esQuincena && q.quincena && empresa) {
-      const mapa = await medirAjusteAnterior(req, empresa, q.quincena);
-      if (mapa.size) {
-        lineasFinal = lineas.map((l) => {
-          const a = mapa.get(l.codigo);
-          return a ? { ...l, ajusteAnterior: a } : l;
-        });
-        for (const l of lineas) {
-          const a = mapa.get(l.codigo);
+      const medido = await medirAjusteAnterior(req, empresa, q.quincena);
+      if (medido && medido.dinero.size) {
+        diasAjuste = medido.dias;
+        lineasFinal = lineas.map((l) => aplicarAjusteEnLinea(l, medido.dinero.get(l.codigo), medido.dias));
+        for (const l of lineasFinal) {
+          const a = l.ajusteAnterior;
           if (a) { ajustePersonas.push({ codigo: l.codigo, etiqueta: l.etiqueta, monto: a }); totalAjuste += a; }
         }
         totalAjuste = Math.round(totalAjuste * 100) / 100;
@@ -825,8 +827,10 @@ export async function GET(req: NextRequest) {
       // 🔴 El corte con el que se midió (para que la pantalla lo muestre y el
       // cierre lo guarde) y el ajuste de la quincena anterior, con nombre y
       // monto — la misma regla de Daniel: lo que mueve plata se dice.
+      // ⚠️ `total` ya está ADENTRO de `totales.netoPagar` (11-sep-2026): es un
+      // testigo, no algo que haya que volver a restar.
       corte,
-      ajusteQuincenaAnterior: { total: totalAjuste, personas: ajustePersonas },
+      ajusteQuincenaAnterior: { total: totalAjuste, personas: ajustePersonas, dias: diasAjuste },
       reglas,
       // La lista de la pestaña Aprobaciones. `null` para quien no puede aprobar
       // o cuando no se pidió: no se manda una lista de nombres y horas a quien
