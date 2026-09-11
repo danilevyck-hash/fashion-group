@@ -14,6 +14,21 @@
   --fg-green: #059669;
   --fg-yellow: #d97706;
   --fg-red: #dc2626;
+
+  /* Alto del encabezado pegajoso de la pantalla. Lo MIDE y lo publica quien
+     dibuja el encabezado (AppHeader en la app, CatalogoNavbar en el catálogo
+     con sesión) — ver src/lib/ui/barra-pegajosa.ts. Arranca en 0 para que una
+     pantalla sin encabezado se comporte como siempre. */
+  --fg-altura-encabezado: 0px;
+}
+
+/* 🔴 LA ÚNICA FORMA DE PEGAR UNA BARRA DE CONTENIDO ARRIBA (11-sep-2026).
+   Se pega DEBAJO del encabezado —nunca encima— y con z-index por debajo de él.
+   El porqué, la medición y lo que queda afuera: src/lib/ui/barra-pegajosa.ts. */
+.fg-barra-pegajosa {
+  position: sticky;
+  top: var(--fg-altura-encabezado);
+  z-index: 9;
 }
 
 body {

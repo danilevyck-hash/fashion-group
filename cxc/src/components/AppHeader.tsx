@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useBackdropDismiss, useEscapeClose } from "@/lib/hooks/useModalDismiss";
@@ -10,6 +10,8 @@ import { getModuleColor } from "@/lib/moduleColors";
 import { ALL_MODULES, getVisibleGroups } from "@/lib/modules";
 import NovedadesAviso from "@/components/NovedadesAviso";
 import { moduloDeRuta } from "@/lib/novedades/seleccion";
+import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabezado";
+import { Z_ENCABEZADO } from "@/lib/ui/barra-pegajosa";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
@@ -39,6 +41,13 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
+
+  // El alto REAL de este bloque se publica en `--fg-altura-encabezado` para que
+  // las barras pegajosas de los módulos se peguen DEBAJO y no encima
+  // (11-sep-2026). Cambia solo: el breadcrumb existe en escritorio y no en
+  // celular, y envuelve en dos líneas cuando la ruta es larga.
+  const encabezadoRef = useRef<HTMLDivElement | null>(null);
+  usePublicarAlturaEncabezado(encabezadoRef);
 
   useEffect(() => {
     setUserName(sessionStorage.getItem("fg_user_name") || "");
@@ -80,7 +89,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
 
   return (
     <>
-      <div className={`w-full border-b bg-white sticky top-0 z-10 ${moduleColor ? moduleColor.border : "border-gray-200"}`} style={moduleColor ? { borderBottomWidth: "2px" } : undefined}>
+      <div ref={encabezadoRef} className={`w-full border-b bg-white sticky top-0 ${moduleColor ? moduleColor.border : "border-gray-200"}`} style={{ zIndex: Z_ENCABEZADO, ...(moduleColor ? { borderBottomWidth: "2px" } : {}) }}>
         <div className="h-11 flex items-center px-4 sm:px-6 gap-3">
           <FGLogo variant="icon" theme="light" size={22} />
           <div className="w-px h-4 bg-gray-200" />

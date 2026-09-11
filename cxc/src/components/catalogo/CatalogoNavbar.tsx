@@ -15,12 +15,19 @@
 // Pedidos", que es el camino que ya existía.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabezado";
 
 export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
   const [role, setRole] = useState("");
+
+  // El catálogo con sesión NO lleva `AppHeader`: su encabezado pegajoso es esta
+  // navbar, así que es ella la que publica el alto para las barras de adentro
+  // (hoy, la del modo pedido). Ver src/lib/ui/barra-pegajosa.ts.
+  const navRef = useRef<HTMLElement | null>(null);
+  usePublicarAlturaEncabezado(navRef);
 
   useEffect(() => {
     setRole(sessionStorage.getItem("cxc_role") || "");
@@ -30,7 +37,7 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
   const showInicio = theme.features.navInicioRequiereRol ? !!role && role !== "cliente" : true;
 
   return (
-    <nav className="sticky top-0 z-50 bg-white">
+    <nav ref={navRef} className="sticky top-0 z-50 bg-white">
       <div className={`h-[2px] ${theme.navbar.accentBar}`} />
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4 border-b border-gray-100">
         {showInicio && (
