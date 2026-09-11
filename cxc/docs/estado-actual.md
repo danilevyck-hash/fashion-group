@@ -1476,3 +1476,50 @@ que no pasan por aprobación); el Reporte de asistencia muestra los minutos medi
 extra (es asistencia, no pago; el «—» sigue siendo solo del servicio profesional); «N por decidir»
 cuenta colaboradores en las dos vistas; la fila por semana no volvió.
 
+---
+
+## 11-sep-2026 — Corregir una hora en Asistencia: selector, el porqué con botones, «Justificar» en la fila
+
+Daniel, textual: *«no me gusta texto libre para escribir la hora, enreda. algo que se sienta más
+seguro y que el formato vaya con el módulo»* · *«el porqué se corrige debe de ser obligatorio y campo
+libre con opciones rápidas de las más usadas (autocrear a medida de tiempo poniendo las más usadas y
+eliminando si una no se usa, empezar vacíos)»* · *«máximo 4»*. Mockup aprobado (caso real: Yulissa
+Juárez, lun 31 ago, el reloj marcó 13:22:02).
+
+| | Antes | Después |
+|---|---|---|
+| La hora | texto libre («Como 8:00 o 17:04…»), precargada `13:22` | **selector del sistema** (`type="time" step="1"`, ruedita en iPhone, flechas en PC), precargada `13:22:02`; segundos opcionales: sin tocarlos se conservan los del reloj, hora nueva → `:00` |
+| Arriba | título + «Yulissa Juarez · 31 ago 2026» + recuadro «Lo que marcó el reloj / Esto no se borra nunca…» | **una línea**: «Yulissa Juárez · lun 31 ago · el reloj marcó 13:22:02»; el «no se borra nunca / cuenta para el pago» vive UNA vez en el «?» de la pestaña |
+| El porqué | textarea obligatorio | textarea obligatorio **+ hasta 4 botones** con los motivos más escritos en 90 días (2+ usos, grafía más reciente, sin acentos ni mayúsculas para agrupar); tocar uno escribe en el campo. **Empiezan vacíos y se van solos** |
+| Botones | «Cerrar» · «Guardar corrección» / «Agregar marcación» | «Cerrar» · «Guardar» |
+| Fila del día | «Revisar» · «Agregar hora» | «Revisar» · «Agregar hora» · **«Justificar»** → el MISMO formulario de la ficha con el colaborador y ESE día puestos; al guardar se refresca la pestaña. Sin menú «···» |
+| Aviso ámbar | «…revísalo en **Horarios**» (pestaña que ya no existe) | «…se confirma en la ficha de cada colaborador, en **Colaboradores**» (Asistencia, Planilla y «Cómo funciona», desde `dondeSeCargaLaFicha()`) |
+
+- Módulo puro nuevo `lib/asistencia/motivos-frecuentes.ts` (clave, ventana de 90 días, 4 máximo,
+  2+ usos); `completarSegundos` y `encabezadoCorreccion` en `lib/asistencia/correcciones.ts`.
+  Ruta nueva **`GET /api/asistencia/correcciones/motivos`**, solo lectura, **sin tabla nueva**.
+- El formulario de justificar salió de `SeccionJustificaciones` a **`JustificarForm.tsx`** (lo montan
+  la ficha con hoy y `JustificarDiaModal` con el día de la fila); misma ruta, mismo cuerpo.
+- 🔴 Nada de lo que se guarda cambió: `asistencia_marcaciones` sigue sin tocarse; la corrección sigue
+  yendo a `asistencia_correcciones` con motivo y firma.
+
+**Medido contra producción (solo lectura):** 8 correcciones en la base (6 vivas), todas de los últimos
+90 días → con la regla salen **3 botones** («No marco salida» 2× · «Boda de Daniel» 2× ·
+«ENFERMEDAD» 2×); quedan fuera «Mensajería de Daniel» (1×) y «No marco la salida» (1×, otra clave a
+propósito: nada por parecido). Quincena 1–15 sep 2026 (`scripts/_medir-almuerzo-por-empresa.ts`):
+45 colaboradores, 33 con neto, **$8.793,42 antes = $8.793,42 después, 0 diferencias**; las 8
+correcciones siguen siendo 8.
+
+**Candados:** `asistencia-corregir-hora.test.ts` (30) · `asistencia-corregir-hora.test.tsx` (10);
+**31 mutaciones, 31 cazadas, 2 controles en verde** (`scripts/_mutar-candados-asistencia-corregir-hora.sh`).
+Cambiaron de dirección con nota fechada, ninguno se borró: `poda-textos-explicaciones` («Por qué»),
+`persona-en-el-centro` y `asistencia-siete-pantallas` (el POST vive en `JustificarForm`;
+`JustificacionesDelPeriodo` recibe `refresco`).
+
+⚠️ Dejado a propósito: los motivos frecuentes cuentan también las correcciones **anuladas** (un
+motivo escrito es un motivo usado); «Justificar» no se dibuja en feriados, vacaciones ni días ya
+justificados; el permiso de HORAS (desde/hasta hora) sigue solo en la pestaña vieja de
+Justificaciones, no en este formulario mínimo; en el iPhone el selector no ofrece segundos y por eso
+se conservan los del reloj. ⚠️ Al momento de subir, `guias-entrega-directa` y `guias-sin-rechazo`
+fallaban **en HEAD puro** (13 casos, ajenos a este trabajo): lo tiene que mirar quien tocó Guías.
+
