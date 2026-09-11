@@ -1813,3 +1813,49 @@ Medición y verificación: `scripts/_medir-reclamos-fecha-factura.mjs` ·
    decisión aparte.
 3. **Las 29 fechas de factura se pueden mejorar una por una** cuando Andrea tenga el papel a mano.
    Hoy son la fecha del reclamo y así queda dicho acá y en `CLAUDE.md`.
+
+---
+
+## 11-sep-2026 (tarde) — Reclamos: «sin links», y la galería pública se retira
+
+Daniel cerró la decisión de la mañana: *«sin links»*. No solo el Excel del correo — **el que se
+descarga tampoco**.
+
+### Un solo Excel, sin un `http`
+
+- La opción `conLinks` se retiró: **un Excel con links no se puede armar ni queriendo**. Las dos
+  columnas del Resumen («Factura PDF» y «Fotos») y la sección «Archivos y evidencia» de cada hoja
+  se fueron. La columna **«# Fotos» se queda**: es un dato, no un camino a un archivo.
+- 🔴 **No se firma nada.** Con los links se fueron `adjuntarFacturaUrls`, `firmarFacturasLote` y
+  `FACTURA_LINK_TTL_SECONDS` — el TTL de **UN AÑO** que el Excel exportado le metía adentro al
+  proveedor. Hoy lo único que se firma es lo que se MIRA en pantalla, y dura una hora.
+- La factura se baja desde **«Descargar › Factura del proveedor»** (encargo C de esta mañana) y las
+  fotos se miran en la página del reclamo. Al correo viajan **adjuntas** (encargo A).
+
+### 🩸 La galería pública se retiró entera
+
+`/reclamos/galeria/[id]` abría **sin ninguna sesión**, con un token HMAC **sin vencimiento**, y su
+único citador era el link «Ver fotos» del Excel. Al quedarse el Excel sin links se quedó sin un solo
+lector. Se fueron:
+
+| | |
+|---|---|
+| `src/app/reclamos/galeria/[id]/page.tsx` | la página pública |
+| `src/app/reclamos/galeria/[id]/GaleriaView.tsx` | su vista |
+| `src/lib/reclamos/galeria.ts` | la lectura |
+| `src/lib/reclamos/gallery-token.ts` | el token HMAC y `reclamoGaleriaUrl` |
+| `PUBLIC_PREFIXES` del middleware | **su exención de auth** |
+
+Sin esa última línea nada la puede volver a abrir sin pasar por la sesión.
+
+⚠️ **Los Excel VIEJOS que ya están en el correo de algún proveedor dejan de abrir sus fotos.** Daniel
+lo sabe y lo decidió así. ⚠️ El bucket `reclamo-fotos` **no se toca** (privado desde la mañana) y las
+fotos **no se pierden**.
+
+**Candados:** `reclamos-correo-adjuntos.test.ts` — el bloque (2) **cambió de dirección con nota y sin
+borrarse**: decía «CONTROL — el Excel que se DESCARGA conserva sus links» y ahora exige lo contrario,
+más tres casos nuevos (los cuatro archivos no existen, el middleware no la nombra, y un `git grep`
+exige que nadie firme ya un token de galería). También cambiaron de dirección con nota:
+`excel-exports-reclamos` (la hoja no puede tener NI UN hipervínculo, ni siquiera cuando se le pasa
+una `factura_pdf_url` ya firmada) y `reclamos-rediseno` (el barrido de URL públicas bajó de 5
+archivos a 3, porque dos ya no existen).

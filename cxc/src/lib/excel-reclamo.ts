@@ -16,17 +16,17 @@
 //     Importación N% · ITBMS N% · Total con raya arriba—, como el pie de la
 //     factura del proveedor. Se fue la banda «TOTAL A ACREDITAR».
 //
-// Los links son URLs WEB que abren con un clic en el navegador (Mac/Windows),
-// sin extraer nada ni permisos:
-//   - Factura: rec.factura_pdf_url (signed URL larga; bucket privado, no expuesto).
-//   - Fotos:   galería web del reclamo (página con todas las fotos, token HMAC).
-// El caller adjunta factura_pdf_url vía adjuntarFacturaUrls (factura-storage.ts).
-// 🔴 Con `conLinks: false` esa sección NO se dibuja: es el Excel del CORREO,
-// donde la factura y las fotos viajan ADJUNTAS.
+// 🔴 EL EXCEL NO LLEVA NI UN LINK, NI EL QUE SE MANDA NI EL QUE SE DESCARGA
+// (11-sep-2026). Daniel, textual: *«sin links»*. Llevaba dos: la factura
+// firmada por UN AÑO contra el bucket privado y una galería PÚBLICA de fotos
+// abierta con un token HMAC sin vencimiento. Los dos eran accesos de larga vida
+// a archivos nuestros, viajando dentro de un archivo que se reenvía. La factura
+// y las fotos se bajan desde la página del reclamo —«Descargar › Factura del
+// proveedor» y las fotos ahí mismo— y viajan ADJUNTAS al correo del proveedor.
+// Con eso la galería pública se quedó sin un solo lector y se retiró.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import XLSX from "xlsx-js-style";
-import { reclamoGaleriaUrl } from "@/lib/reclamos/gallery-token";
 import { fmtDate } from "@/lib/format";
 import {
   columnasDelPapel,
@@ -55,22 +55,11 @@ const { B, fillRow, hdr, td, tdN, band, palette } = makeCellStyles(CASA_PALETTE)
 // El helper no los provee — quedan como constantes del módulo.
 const LBL_BG = "EBF5FB";
 const VAL_BG = "FDFEFE";
-const LINK_FG = "0563C1"; // azul de hyperlink
 /** Ancho mínimo de la hoja en columnas, para que las bandas de arriba no queden
  *  apretadas cuando el reclamo trae pocas columnas con datos. */
 const COLUMNAS_MINIMAS = 7;
 
 export interface OpcionesHojaReclamo {
-  /**
-   * 🔴 `false` = la hoja NO lleva la sección «Archivos y evidencia» (11-sep-2026).
-   * Es el Excel que va POR CORREO: ahí la factura y las fotos viajan ADJUNTAS,
-   * así que un link sería un segundo camino al mismo archivo — y uno que le
-   * dice al proveedor dónde vive nuestro Storage. Daniel: *«se puede adjuntar
-   * directo al correo y quitarlo del excel? Va»*.
-   * El Excel que se DESCARGA sigue con sus links: ahí no hay correo que cargue
-   * los archivos, y sin ellos Andrea se quedaría sin la factura y sin las fotos.
-   */
-  conLinks?: boolean;
   /** El contacto del proveedor, para la ficha (mismo dato que la línea del PDF). */
   contacto?: ContactoDePapel | null;
 }
@@ -78,14 +67,14 @@ export interface OpcionesHojaReclamo {
 export function buildReclamoSheet(
   rec: Record<string, unknown>,
   items: Record<string, unknown>[],
-  fotos: ReclamoFoto[] = [],
+  // Las fotos ya NO se dibujan (no hay link que poner). Se conserva en la firma
+  // porque la pasan las tres rutas que arman este Excel, y sacarla del
+  // parámetro no compra nada.
+  _fotos: ReclamoFoto[] = [],
   opts: OpcionesHojaReclamo = {},
 ): XLSX.WorkSheet {
-  const conLinks = opts.conLinks !== false;
-  const facturaUrl = (rec.factura_pdf_url as string | null | undefined) || null;
   const nroReclamo = String(rec.nro_reclamo || "");
   const empresa = String(rec.empresa || "");
-  const reclamoId = String(rec.id || "");
 
   // 🔴 Los renglones y las columnas salen del módulo del papel. `items` llega
   // por parámetro (así lo llaman las 3 rutas), pero si el reclamo los trae
@@ -192,33 +181,10 @@ export function buildReclamoSheet(
     h[r] = t.fuerte ? 22 : 16; r++;
   }
 
-  // Archivos (factura + evidencia) — links WEB de un clic (celdas .l)
-  const linkRow = (label: string, linkText: string, target: string) => {
-    ws[addr(r, 0)] = { v: label, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: palette.pri }, name: "Calibri" }, fill: { fgColor: { rgb: LBL_BG } }, alignment: { horizontal: "left" }, border: B } };
-    ws[addr(r, 1)] = { v: linkText, t: "s", s: { font: { sz: 9, color: { rgb: LINK_FG }, underline: true, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" }, border: B }, l: { Target: target, Tooltip: linkText } };
-    for (let c = 2; c <= CMAX; c++) ws[addr(r, c)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } }, border: B } };
-    merges.push({ s: { r, c: 1 }, e: { r, c: CMAX } });
-    h[r] = 18; r++;
-  };
-
-  const tieneSeccion = conLinks && (!!facturaUrl || fotos.length > 0);
-  if (tieneSeccion) {
-    // Spacer
-    fillRow(ws, r, CMAX, "FFFFFF"); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 10; r++;
-    // Section header
-    band(ws, r, CMAX, merges, "ARCHIVOS Y EVIDENCIA", palette.mid, 11); h[r] = 22; r++;
-
-    // Factura PDF — link WEB (signed URL larga; bucket privado, no expuesto).
-    if (facturaUrl) {
-      linkRow("Factura", "Ver factura", facturaUrl);
-    }
-
-    // Fotos — galería web del reclamo: UN link a una página con TODAS las fotos
-    // (token HMAC), abre con un clic sin extraer ni permisos. Sin id no se firma.
-    if (fotos.length > 0 && reclamoId) {
-      linkRow("Fotos", `Ver fotos (${fotos.length})`, reclamoGaleriaUrl(reclamoId));
-    }
-  }
+  // 🩸 Acá iba la sección «ARCHIVOS Y EVIDENCIA», con un link a la factura
+  // firmada por un año y otro a la galería pública de fotos. Se retiró el
+  // 11-sep-2026 (Daniel: *«sin links»*) y con ella la galería entera: no hay
+  // una versión de este Excel que los lleve.
 
   ws["!ref"] = `A1:${XLSX.utils.encode_col(CMAX)}${r}`;
   ws["!merges"] = merges;

@@ -1,7 +1,5 @@
 import XLSX from "xlsx-js-style";
 import { buildReclamoSheet, type OpcionesHojaReclamo } from "@/lib/excel-reclamo";
-import { adjuntarFacturaUrls } from "./factura-storage";
-import { reclamoGaleriaUrl } from "./gallery-token";
 import { reclamoTaxes, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
 import { facturasEnPantalla } from "@/lib/reclamos/facturas";
 import {
@@ -13,8 +11,6 @@ import {
   MONEY_FMT,
   type ReportCell,
 } from "@/lib/excel-export";
-
-const LINK_FG = "0563C1"; // azul de hyperlink
 
 interface ReclamoItem {
   referencia?: string;
@@ -44,7 +40,6 @@ interface ReclamoFull {
   estado?: string;
   notas?: string;
   factura_pdf_path?: string | null;
-  factura_pdf_url?: string | null; // signed URL web (la adjunta adjuntarFacturaUrls)
   reclamo_items?: ReclamoItem[];
   reclamo_fotos?: ReclamoFoto[];
 }
@@ -59,22 +54,18 @@ interface Contacto {
 /**
  * Hoja "Resumen" — reporte tabular estándar de la casa (buildReportSheet).
  *
- * Con `conLinks` (el default) lleva 2 columnas de links WEB (Factura PDF
- * firmada / galería de fotos) que abren con un clic en el navegador, sin
- * extraer ni permisos. buildReportSheet no maneja hipervínculos → se parchean
- * sobre las celdas ya estilizadas.
- *
- * 🔴 Sin links esas DOS columnas no salen (11-sep-2026): es el Excel del
- * CORREO, donde la factura y las fotos viajan adjuntas. La columna «# Fotos»
- * se queda — es un dato, no un camino a un archivo.
+ * 🔴 SIN LAS DOS COLUMNAS DE LINKS (11-sep-2026, Daniel: *«sin links»*).
+ * Llevaba «Factura PDF» —una URL firmada por un año contra el bucket privado—
+ * y «Fotos» —la galería pública por token—, las dos dentro de un archivo que
+ * se reenvía. La columna «# Fotos» SE QUEDA: es un dato, no un camino a un
+ * archivo.
  */
-function buildResumenSheet(reclamos: ReclamoFull[], conLinks: boolean): XLSX.WorkSheet {
+function buildResumenSheet(reclamos: ReclamoFull[]): XLSX.WorkSheet {
   let grandSub = 0;
   let grandImp = 0;
   let grandItbms = 0;
   let grandTotal = 0;
   let grandFotos = 0;
-  const links: { row: number; col: number; target: string; tooltip: string }[] = [];
 
   const rows: ReportCell[][] = reclamos.map((rec, idx) => {
     const items = rec.reclamo_items || [];
@@ -91,11 +82,6 @@ function buildResumenSheet(reclamos: ReclamoFull[], conLinks: boolean): XLSX.Wor
     grandTotal += tx.total;
     grandFotos += nFotos;
 
-    // Links WEB: factura = signed URL larga (bucket privado); fotos = galería
-    // web del reclamo (todas las fotos, token HMAC).
-    if (conLinks && rec.factura_pdf_url) links.push({ row: idx, col: 9, target: rec.factura_pdf_url, tooltip: "Ver factura" });
-    if (conLinks && nFotos > 0) links.push({ row: idx, col: 10, target: reclamoGaleriaUrl(rec.id), tooltip: "Ver fotos" });
-
     const fila: ReportCell[] = [
       { v: rec.nro_reclamo || "", bold: true },
       facturasEnPantalla(rec.nro_factura),
@@ -107,12 +93,7 @@ function buildResumenSheet(reclamos: ReclamoFull[], conLinks: boolean): XLSX.Wor
       { v: tx.total, bold: true },
       nFotos,
     ];
-    if (!conLinks) return fila;
-    return [
-      ...fila,
-      rec.factura_pdf_url ? { v: "Ver factura", fg: LINK_FG } : "—",
-      nFotos > 0 ? { v: "Ver fotos", fg: LINK_FG } : "—",
-    ];
+    return fila;
   });
 
   const ws = buildReportSheet({
@@ -126,29 +107,11 @@ function buildResumenSheet(reclamos: ReclamoFull[], conLinks: boolean): XLSX.Wor
       { header: "ITBMS", wch: 14, align: "right", fmt: MONEY_FMT },
       { header: "Total", wch: 16, align: "right", fmt: MONEY_FMT },
       { header: "# Fotos", wch: 9, align: "center" },
-      ...(conLinks
-        ? [
-            { header: "Factura PDF", wch: 14, align: "center" as const },
-            { header: "Fotos", wch: 12, align: "center" as const },
-          ]
-        : []),
     ],
     rows,
-    totals: [
-      "TOTAL GENERAL", null, null, null, grandSub, grandImp, grandItbms, grandTotal, grandFotos,
-      ...(conLinks ? [null, null] : []),
-    ],
+    totals: ["TOTAL GENERAL", null, null, null, grandSub, grandImp, grandItbms, grandTotal, grandFotos],
   });
 
-  // Layout de buildReportSheet: fila 0 título, 1 subtítulo, 2 separador,
-  // 3 encabezados → datos desde la fila 4.
-  const DATA_START = 4;
-  for (const lk of links) {
-    const cell = ws[addr(DATA_START + lk.row, lk.col)];
-    if (!cell) continue;
-    cell.l = { Target: lk.target, Tooltip: lk.tooltip };
-    Object.assign(cell.s.font, { underline: true });
-  }
   return ws;
 }
 
@@ -175,27 +138,24 @@ export async function buildBulkReclamosExcel(
   contacto: Contacto | null,
   opts: OpcionesHojaReclamo = {},
 ): Promise<Buffer> {
-  const conLinks = opts.conLinks !== false;
-  // Firma las facturas (1 año, lote) → cada reclamo lleva factura_pdf_url web.
-  // 🔴 Sin links NO se firma nada: firmar una URL de un año que nadie va a
-  // abrir es regalar un acceso al bucket privado por si acaso.
-  const recs = conLinks
-    ? await adjuntarFacturaUrls(reclamos)
-    : reclamos.map((r) => ({ ...r, factura_pdf_url: null as string | null }));
+  // 🔴 NO SE FIRMA NADA (11-sep-2026): el Excel ya no lleva links, así que
+  // firmar una URL de un año contra el bucket privado sería regalar un acceso
+  // por si acaso. Con esto se retiró `adjuntarFacturaUrls`, que quedó sin un
+  // solo lector.
+  const recs = reclamos;
   const used = new Set<string>();
   const sheets: { name: string; ws: XLSX.WorkSheet }[] = [];
 
   // La hoja "Resumen" solo aporta con 2+ reclamos (es un consolidado). Con un
   // solo reclamo el Excel lleva únicamente la hoja de ese reclamo.
   if (recs.length >= 2) {
-    sheets.push({ name: safeSheetName("Resumen", used), ws: buildResumenSheet(recs, conLinks) });
+    sheets.push({ name: safeSheetName("Resumen", used), ws: buildResumenSheet(recs) });
   }
 
   for (const rec of recs) {
     const items = (rec.reclamo_items || []) as Record<string, unknown>[];
     const fotos = (rec.reclamo_fotos || []) as ReclamoFoto[];
     const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos, {
-      conLinks,
       contacto: contacto ?? null,
     });
     sheets.push({ name: safeSheetName(rec.nro_reclamo || "Reclamo", used), ws: sheet });

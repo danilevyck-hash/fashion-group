@@ -28,7 +28,10 @@ import { buildReclamoSheet } from "@/lib/excel-reclamo";
 import { buildBulkReclamosExcel } from "@/lib/reclamos/excel-bulk";
 
 beforeAll(() => {
-  // reclamoGaleriaUrl (link "Ver fotos") firma con HMAC — lee el secret al llamar.
+  // 🔄 11-sep-2026 (tarde): acá se fijaba el secret porque la hoja firmaba un
+  // token de galería al dibujar el link «Ver fotos». Ese link se fue con todos
+  // los demás; el secret se deja puesto para que el Excel no dependa de que no
+  // esté, y ya no hay nada que firmar.
   process.env.SESSION_SECRET = "test-secret-excel";
 });
 
@@ -77,7 +80,7 @@ function roundTrip(wb: XLSX.WorkBook): XLSX.WorkBook {
 }
 
 describe("buildReclamoSheet (ficha por reclamo)", () => {
-  it("round-trip: título, hipervínculos y moneda numérica", () => {
+  it("round-trip: título, SIN hipervínculos, y moneda numérica", () => {
     const ws = buildReclamoSheet(
       { ...rec1, factura_pdf_url: "https://signed.example/r1/factura.pdf" },
       items as unknown as Record<string, unknown>[],
@@ -97,10 +100,12 @@ describe("buildReclamoSheet (ficha por reclamo)", () => {
     expect(sheet.A1?.v).toBe("FASHION GROUP");
     expect(sheet.A2?.v).toBe("Fashion Wear");
 
-    // Hipervínculos web: factura firmada + galería de fotos
-    const targets = linkTargets(sheet);
-    expect(targets).toContain("https://signed.example/r1/factura.pdf");
-    expect(targets.some((t) => t.includes("/reclamos/galeria/"))).toBe(true);
+    // 🔄 11-sep-2026 (tarde) — ESTE CASO CAMBIÓ DE DIRECCIÓN, CON NOTA Y SIN
+    // BORRARSE. Exigía DOS hipervínculos —la factura firmada por un año y la
+    // galería pública de fotos—; Daniel los cerró los dos: *«sin links»*. La
+    // hoja no puede tener NI UN hipervínculo, ni siquiera cuando se le pasa una
+    // `factura_pdf_url` ya firmada, que es justo lo que se hace acá arriba.
+    expect(linkTargets(sheet)).toEqual([]);
 
     // 🔄 11-sep-2026: la fila del primer renglón se mide BUSCÁNDOLA, no contando
     // renglones de ficha a mano — la ficha dejó de tener 5 filas fijas (ahora
@@ -130,9 +135,12 @@ describe("buildBulkReclamosExcel (Resumen + hojas por reclamo)", () => {
     expect(rt.SheetNames).toEqual(["Resumen", "R-001", "R-002"]);
     const resumen = rt.Sheets["Resumen"];
 
-    // Encabezados en la fila 1: nada arriba de ellos.
+    // Encabezados en la fila 1: nada arriba de ellos. 🔄 11-sep-2026 (tarde):
+    // la última columna es «# Fotos» —un DATO— porque las dos de links,
+    // «Factura PDF» y «Fotos», se retiraron.
     expect(resumen.A1?.v).toBe("N° Reclamo");
-    expect(resumen.K1?.v).toBe("Fotos");
+    expect(resumen.I1?.v).toBe("# Fotos");
+    expect(resumen.J1?.v).toBeUndefined();
 
     // Fila de datos del rec1 (fila 2): subtotal 2×10.50 + 1×5 = 26, número real
     expect(resumen.A2?.v).toBe("R-001");
@@ -140,14 +148,8 @@ describe("buildBulkReclamosExcel (Resumen + hojas por reclamo)", () => {
     expect(resumen.E2?.v).toBe(26);
     expect(resumen.E2?.z).toBe(MONEY_FMT);
 
-    // Hipervínculos del Resumen: factura firmada (col J) + galería (col K)
-    const targets = linkTargets(resumen);
-    expect(targets).toContain("https://signed.example/r1/factura.pdf");
-    expect(targets.some((t) => t.includes(`/reclamos/galeria/${rec1.id}`))).toBe(true);
-
-    // rec2 sin factura ni fotos → "—" en ambas columnas de links
-    expect(resumen.J3?.v).toBe("—");
-    expect(resumen.K3?.v).toBe("—");
+    // 🔄 11-sep-2026 (tarde): el Resumen tampoco lleva un solo hipervínculo.
+    expect(linkTargets(resumen)).toEqual([]);
   });
 
   it("con 1 solo reclamo no genera hoja Resumen", async () => {

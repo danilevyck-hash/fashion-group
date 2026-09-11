@@ -25,7 +25,8 @@
  * el candado que se cumple con su propia explicación.
  * ─────────────────────────────────────────────────────────────────────────── */
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import XLSX from "xlsx-js-style";
 
@@ -119,23 +120,26 @@ const cand = (nombre: string, clase: CandidatoAdjunto["clase"], bytes: number, n
   contenido: Buffer.alloc(bytes, 1),
 });
 
-describe("(1) el Excel del CORREO no lleva ni un link", () => {
-  it("sin conLinks, el libro entero no contiene `http`", async () => {
+// 🔄 11-sep-2026 (tarde): Daniel cerró la decisión con un *«sin links»* que vale
+// para las DOS salidas. Ya no existe un Excel con links: se fue la opción
+// `conLinks`, y con ella la galería pública entera. Este bloque pasó de cubrir
+// «el Excel del correo» a cubrir EL Excel, y el CONTROL de abajo cambió de
+// dirección con su nota. Ningún caso se borró.
+describe("(1) el Excel NO lleva ni un link, ni el del correo ni el de la descarga", () => {
+  it("el libro entero no contiene `http`", async () => {
     const buf = await buildBulkReclamosExcel(
       [rec1, rec2] as unknown as Parameters<typeof buildBulkReclamosExcel>[0],
       "Fashion Wear",
       null,
-      { conLinks: false },
     );
     expect(textoDelLibro(buf)).not.toMatch(/http/i);
   });
 
-  it("sin conLinks, el Resumen pierde las DOS columnas de links y conserva «# Fotos»", async () => {
+  it("el Resumen no tiene las DOS columnas de links y conserva «# Fotos»", async () => {
     const buf = await buildBulkReclamosExcel(
       [rec1, rec2] as unknown as Parameters<typeof buildBulkReclamosExcel>[0],
       "Fashion Wear",
       null,
-      { conLinks: false },
     );
     const texto = textoDelLibro(buf);
     expect(texto).toContain("# Fotos");
@@ -144,12 +148,11 @@ describe("(1) el Excel del CORREO no lleva ni un link", () => {
     expect(texto).not.toContain("Ver fotos");
   });
 
-  it("sin conLinks, la hoja del reclamo no dibuja «Archivos y evidencia»", () => {
+  it("la hoja del reclamo no dibuja «Archivos y evidencia»", () => {
     const ws = buildReclamoSheet(
       { ...rec1, factura_pdf_url: "https://signed.example/r1/factura.pdf" },
       items as unknown as Record<string, unknown>[],
       fotos,
-      { conLinks: false },
     );
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "REC");
@@ -158,41 +161,96 @@ describe("(1) el Excel del CORREO no lleva ni un link", () => {
     expect(texto).not.toMatch(/http/i);
   });
 
-  it("la ruta del correo pide el Excel con conLinks: false", () => {
-    const ruta = sinComentarios("src/app/api/reclamos/proveedor/[empresa]/send-zip/route.ts");
-    expect(ruta).toMatch(/buildBulkReclamosExcel\([^)]*\{\s*conLinks:\s*false\s*\}/s);
+  it("YA NO EXISTE una forma de pedir el Excel CON links", () => {
+    // La opción `conLinks` se retiró: un Excel con links no se puede armar ni
+    // queriendo. Antes esto exigía que la ruta del correo pasara
+    // `conLinks: false`; ahora exige que esa perilla no vuelva a existir.
+    for (const ruta of [
+      "src/lib/excel-reclamo.ts",
+      "src/lib/reclamos/excel-bulk.ts",
+      "src/app/api/reclamos/proveedor/[empresa]/send-zip/route.ts",
+    ]) {
+      expect(sinComentarios(ruta), `${ruta} volvió a tener la perilla`).not.toContain("conLinks");
+    }
   });
 
-  it("la ruta del correo no cita la galería ni firma una URL de factura", () => {
-    const ruta = sinComentarios("src/app/api/reclamos/proveedor/[empresa]/send-zip/route.ts");
-    expect(ruta).not.toContain("reclamoGaleriaUrl");
-    expect(ruta).not.toContain("adjuntarFacturaUrls");
-    expect(ruta).not.toContain("Ver factura");
-    expect(ruta).not.toContain("Ver fotos");
+  it("ningún generador de Excel cita la galería ni firma una URL de factura", () => {
+    for (const ruta of [
+      "src/app/api/reclamos/proveedor/[empresa]/send-zip/route.ts",
+      "src/app/api/reclamos/proveedor/[empresa]/export-zip/route.ts",
+      "src/app/api/reclamos/proveedor/[empresa]/export-excel/route.ts",
+      "src/app/api/reclamos/[id]/excel/route.ts",
+      "src/app/api/reclamos/export-excel/route.ts",
+      "src/lib/excel-reclamo.ts",
+      "src/lib/reclamos/excel-bulk.ts",
+    ]) {
+      const src = sinComentarios(ruta);
+      expect(src, `${ruta} cita la galería`).not.toContain("reclamoGaleriaUrl");
+      expect(src, `${ruta} firma la factura por un año`).not.toContain("adjuntarFacturaUrls");
+      expect(src).not.toContain("Ver factura");
+      expect(src).not.toContain("Ver fotos");
+    }
   });
 });
 
-describe("(2) CONTROL — el Excel que se DESCARGA conserva sus links", () => {
-  it("por default (sin opciones) el libro sigue trayendo los links de siempre", async () => {
+/* 🔄 11-sep-2026 (tarde) — ESTE BLOQUE CAMBIÓ DE DIRECCIÓN, CON NOTA Y SIN
+ * BORRARSE. Decía «CONTROL — el Excel que se DESCARGA conserva sus links», y
+ * era cierto por la mañana: la factura y las fotos solo se podían alcanzar por
+ * ahí. Daniel lo cerró de otra forma —*«sin links»*— y con la factura bajándose
+ * desde «Descargar › Factura del proveedor» y las fotos a la vista en la página
+ * del reclamo, el link dejó de ser el único camino y pasó a ser el único
+ * riesgo. Lo que se exige ahora es lo contrario, y por eso está escrito acá y
+ * no borrado: el Excel de la DESCARGA tampoco lleva links. */
+describe("(2) el Excel que se DESCARGA tampoco lleva links", () => {
+  it("el libro de la descarga no contiene `http` ni nombra la galería", async () => {
     const buf = await buildBulkReclamosExcel(
       [rec1, rec2] as unknown as Parameters<typeof buildBulkReclamosExcel>[0],
       "Fashion Wear",
       null,
     );
     const texto = textoDelLibro(buf);
-    expect(texto).toContain("Ver factura");
-    expect(texto).toContain("Ver fotos");
-    expect(texto).toMatch(/https:\/\/signed\.example\//);
-    expect(texto).toMatch(/\/reclamos\/galeria\//);
+    expect(texto).not.toMatch(/http/i);
+    expect(texto).not.toContain("Ver factura");
+    expect(texto).not.toContain("Ver fotos");
+    expect(texto).not.toMatch(/\/reclamos\/galeria\//);
   });
 
-  it("las rutas de descarga NO pasan conLinks: false", () => {
-    for (const ruta of [
-      "src/app/api/reclamos/proveedor/[empresa]/export-zip/route.ts",
-      "src/app/api/reclamos/proveedor/[empresa]/export-excel/route.ts",
+  it("LA GALERÍA PÚBLICA SE RETIRÓ ENTERA: página, vista, token y su exención", () => {
+    for (const rel of [
+      "src/app/reclamos/galeria/[id]/page.tsx",
+      "src/app/reclamos/galeria/[id]/GaleriaView.tsx",
+      "src/lib/reclamos/galeria.ts",
+      "src/lib/reclamos/gallery-token.ts",
     ]) {
-      expect(sinComentarios(ruta)).not.toContain("conLinks");
+      expect(existsSync(join(RAIZ, rel)), `${rel} volvió`).toBe(false);
     }
+    // Y el middleware ya no la deja pasar sin sesión. El comentario que cuenta
+    // por qué se fue SÍ nombra la ruta, así que se borra antes de barrer.
+    const mw = sinComentarios("src/middleware.ts");
+    expect(mw).not.toContain("/reclamos/galeria/");
+  });
+
+  it("nadie en el repo firma ya un token de galería de reclamo", () => {
+    // `git grep -l` sale con código 1 cuando NO encuentra nada, y execFileSync
+    // lo convierte en excepción: ese es el caso bueno. Cualquier otra cosa —una
+    // salida con archivos, o un error que no sea «no encontré»— es el candado
+    // rojo. Se excluye este propio archivo, que nombra los símbolos para
+    // contar que se fueron.
+    let archivos = "";
+    try {
+      archivos = execFileSync(
+        "git",
+        ["grep", "-l", "-e", "reclamoGaleriaUrl", "-e", "signReclamoGalleryToken", "--", "src"],
+        { cwd: RAIZ, encoding: "utf8" },
+      ).trim();
+    } catch (err) {
+      const e = err as { status?: number };
+      if (e.status !== 1) throw err;
+    }
+    const restantes = archivos
+      .split("\n")
+      .filter((f) => f && !f.endsWith("reclamos-correo-adjuntos.test.ts"));
+    expect(restantes).toEqual([]);
   });
 });
 

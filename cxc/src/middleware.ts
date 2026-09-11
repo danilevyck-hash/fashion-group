@@ -41,7 +41,11 @@ const PUBLIC_PREFIXES = [
   "/marketing/galeria/",            // galería pública de fotos por cliente (token HMAC)
   "/api/marketing/facturas-pdf/",   // PDF combinado de facturas por cliente (token HMAC)
   "/api/marketing/entregas-pdf/",   // comprobante de entrega de mobiliario (token HMAC o sesión)
-  "/reclamos/galeria/",             // galería pública de fotos por reclamo (token HMAC)
+  // 🩸 Acá estaba "/reclamos/galeria/" — la galería PÚBLICA de fotos por
+  // reclamo, abierta con un token HMAC SIN VENCIMIENTO. Se retiró el
+  // 11-sep-2026 con el último link que la citaba (Daniel: *«sin links»*): las
+  // fotos viajan adjuntas al correo y se miran en la página del reclamo, con
+  // sesión. Nada la puede volver a abrir sin pasar por acá.
   "/pedido-reebok/",                // public order view page (no auth)
   "/api/catalogo/reebok/pedido-publico", // public order API (no auth)
   "/pedido-joybees/",               // Joybees public order view page (no auth)

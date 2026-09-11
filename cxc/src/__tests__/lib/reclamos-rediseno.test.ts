@@ -429,22 +429,25 @@ describe("🔴 la migración: aditiva, por id, el bucket privado", () => {
 
 /* ═══ 12 · fotos y comprobantes sin URL pública ═════════════════════════════ */
 describe("🔴 «Link público ciérralo»: nadie arma una URL pública de reclamo-fotos", () => {
+  // 🔄 11-sep-2026 (tarde): la GALERÍA PÚBLICA se retiró entera —página, vista,
+  // `galeria.ts`, `gallery-token.ts` y su exención del middleware— porque el
+  // último link que la citaba se fue del Excel (Daniel: *«sin links»*). Sus dos
+  // archivos salen de esta lista A PROPÓSITO: ya no hay de dónde sacar una URL
+  // pública porque ya no hay galería. Lo que el candado protege se REFUERZA, no
+  // se afloja, y abajo hay un caso que exige que no vuelva.
   const ARCHIVOS = [
     "src/app/api/reclamos/[id]/fotos/route.ts",
     "src/lib/reclamos/comprobante-storage.ts",
-    "src/lib/reclamos/galeria.ts",
     "src/app/reclamos/components/ReclamoDetail.tsx",
-    "src/app/reclamos/galeria/[id]/GaleriaView.tsx",
   ];
   it.each(ARCHIVOS)("%s: sin getPublicUrl ni /object/public/", (rel) => {
     const src = sinComentarios(leer(rel));
     expect(src).not.toContain("getPublicUrl");
     expect(src).not.toContain("/object/public/");
   });
-  it("el detalle y la galería firman desde `fotos-storage`", () => {
+  it("el detalle firma desde `fotos-storage`", () => {
     expect(sinComentarios(leer("src/app/api/reclamos/[id]/route.ts"))).toContain("firmarFotos(");
     expect(sinComentarios(leer("src/app/api/reclamos/[id]/route.ts"))).toContain("firmarFotoPathSafe(data.comprobante_path)");
-    expect(sinComentarios(leer("src/lib/reclamos/galeria.ts"))).toContain("firmarFotos(");
   });
   it("la fila nueva de foto guarda url = null, y el pago mira el path", () => {
     expect(sinComentarios(leer("src/app/api/reclamos/[id]/fotos/route.ts"))).toContain("url: null");

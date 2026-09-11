@@ -102,12 +102,9 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       .limit(1);
     const contacto = contactos?.[0] || null;
 
-    // 🔴 El Excel del CORREO va SIN links (11-sep-2026). Daniel: *«se puede
-    // adjuntar directo al correo y quitarlo del excel? Va»* — la factura en PDF
-    // y las fotos viajan ADJUNTAS acá abajo, así que un link dentro del Excel
-    // sería un segundo camino al mismo archivo. El Excel que se DESCARGA sigue
-    // con sus links: ahí no hay correo que cargue los archivos.
-    const buffer = await buildBulkReclamosExcel(reclamos, empresa, contacto, { conLinks: false });
+    // 🔴 El Excel NO lleva links, ni acá ni en la descarga (11-sep-2026, Daniel:
+    // *«sin links»*). La factura en PDF y las fotos viajan ADJUNTAS acá abajo.
+    const buffer = await buildBulkReclamosExcel(reclamos, empresa, contacto);
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
     const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
