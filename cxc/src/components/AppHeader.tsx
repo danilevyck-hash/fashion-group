@@ -12,11 +12,9 @@ import NovedadesAviso from "@/components/NovedadesAviso";
 import { moduloDeRuta } from "@/lib/novedades/seleccion";
 import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabezado";
 import { Z_ENCABEZADO } from "@/lib/ui/barra-pegajosa";
+import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
- contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
-};
+// Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
 interface AppHeaderProps {
   module: string;
@@ -115,7 +113,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
               <div className="text-right">
                 <div className="text-sm text-gray-700 font-medium leading-tight">{userName.split(" ")[0]}</div>
-                <div className="text-xs text-gray-400 leading-tight">{ROLE_LABELS[userRole] || userRole}</div>
+                <div className="text-xs text-gray-400 leading-tight">{etiquetaDeRol(userRole)}</div>
               </div>
               <button onClick={handleLogout} title="Cerrar sesión" aria-label="Cerrar sesión" className="inline-flex h-11 w-11 items-center justify-center text-gray-300 hover:text-gray-600 transition">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -202,7 +200,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs font-medium">{userName[0]}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-800 truncate">{userName}</div>
-                  <div className="text-xs text-gray-400">{ROLE_LABELS[userRole] || userRole}</div>
+                  <div className="text-xs text-gray-400">{etiquetaDeRol(userRole)}</div>
                 </div>
                 {/* El drawer es 100% móvil: acá no hay mouse, solo dedo. El -mr-2
                     recupera el aire que suma el área táctil para que el botón siga

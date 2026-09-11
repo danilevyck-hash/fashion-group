@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/select";
 import type { OpcionPeriodo } from "@/lib/multifashion/periodo";
 
+export const PLACEHOLDER_PERIODO = "Elige el período";
+
 interface PeriodoSelectProps {
   valor: string;
   opciones: OpcionPeriodo[];
@@ -38,7 +40,10 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled }: PeriodoSe
         className="h-11 w-auto min-w-[168px] gap-1.5 text-xs"
         disabled={disabled}
       >
-        <SelectValue />
+        {/* Si el mes de corte no tiene venta todavía (el día 1, antes del
+            primer sync) la opción no existe y el desplegable quedaba EN
+            BLANCO (11-sep-2026). Con el placeholder, dice qué hacer. */}
+        <SelectValue placeholder={PLACEHOLDER_PERIODO} />
       </SelectTrigger>
       <SelectContent className="max-h-[60vh]">
         {grupos.map((g) => (

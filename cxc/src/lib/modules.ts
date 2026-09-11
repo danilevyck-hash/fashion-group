@@ -245,11 +245,12 @@ export const SYSTEM_ROLES: { key: string; label: string }[] = [
   // Gerente de American Classic: SOLO Multifashion. Sus módulos salen de
   // role_permissions (fila gerente_acs) como los demás roles; el roles[] del
   // módulo arriba es el fallback si la tabla no responde.
-  { key: "gerente_acs", label: "Gerente ACS" },
+  // «Multifashion en todos lados» (Daniel, 6-sep-2026): el rol también.
+  { key: "gerente_acs", label: "Gerente Multifashion" },
   // Gerente de Confecciones Boston: SOLO el módulo Boston. Mismo molde que
   // `gerente_acs` — sus módulos salen de role_permissions (fila gerente_boston)
   // y el `roles[]` del módulo de arriba es el fallback si la tabla no responde.
-  { key: ROL_BOSTON, label: "Gerente Confecciones Boston" },
+  { key: ROL_BOSTON, label: "Gerente Boston" },
 ];
 
 /** Lista de keys de todos los roles del sistema. */

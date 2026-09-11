@@ -17,11 +17,9 @@ import { useSidebarCollapsed, writeSidebarCollapsed } from "@/lib/hooks/useSideb
 // sesión, que a Daniel se le veía más chico en el iPad que en el iPhone.
 import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { recordModuleClick } from "@/lib/module-frequents";
+import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
- contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
-};
+// Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
 
 // Acordeón EXCLUSIVO: un solo grupo abierto a la vez. Persistencia simple
@@ -381,7 +379,7 @@ export default function Sidebar() {
         >
           <div
             className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs font-medium flex-shrink-0"
-            title={collapsed ? `${userName} · ${ROLE_LABELS[userRole] || userRole}` : undefined}
+            title={collapsed ? `${userName} · ${etiquetaDeRol(userRole)}` : undefined}
           >
             {userName[0]}
           </div>
@@ -389,7 +387,7 @@ export default function Sidebar() {
             <>
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium text-gray-800 truncate">{userName}</div>
-                <div className="text-xs text-gray-400">{ROLE_LABELS[userRole] || userRole}</div>
+                <div className="text-xs text-gray-400">{etiquetaDeRol(userRole)}</div>
               </div>
               <button
                 onClick={handleLogout}

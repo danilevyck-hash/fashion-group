@@ -40,6 +40,7 @@ import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { resolverTabMultifashion, type TabMultifashion } from "@/lib/multifashion/pestanas";
 import {
   ajustarPeriodo, anioDelPeriodo, etiquetaPeriodo, opcionesPeriodo, periodoAUrl,
@@ -68,7 +69,9 @@ export function MultifashionShell({
 }: MultifashionShellProps) {
   // Mientras no esté chequeado no renderizamos contenido para no parpadear
   // data a un rol sin acceso (useAuth redirige si no pasa).
-  const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ["admin", "gerente_acs"] });
+  // 🔴 La lista se LEE de `acceso.ts` (derivada de `modules.ts`), nunca se
+  // escribe acá: era la única copia a mano que quedaba (11-sep-2026).
+  const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ROLES_MULTIFASHION });
 
   // 🔴 El corte es el mes de PANAMÁ (UTC−5 fijo), no el del navegador: es la
   // misma regla de borde de mes de todo el módulo.
@@ -151,8 +154,12 @@ export function MultifashionShell({
         variant="pill"
         prefix="Sincronizado"
       />
+      {/* 🩸 Sin `roles` el botón usaba su default (admin + secretaria) y
+          Jennifer —cuyo ÚNICO módulo es este— no tenía «Actualizar ahora»
+          (11-sep-2026). Los roles son los del módulo. */}
       <SyncNowButton
         opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
+        roles={ROLES_MULTIFASHION}
         onSuccess={async () => {
           await mutate();
           setSyncTick((t) => t + 1);
