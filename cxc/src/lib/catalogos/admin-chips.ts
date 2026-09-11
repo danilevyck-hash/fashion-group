@@ -29,6 +29,25 @@ export interface ProductoDeChip {
   image_url?: string | null;
   /** Toggle «Esconder» del admin. `true` = escondido a mano. */
   oculto_manual?: boolean | null;
+  /** Lo que el sync decidió (`false` = apagado por Switch, o escondido a mano). */
+  active?: boolean | null;
+}
+
+/**
+ * ¿Este producto entra a la pantalla de administrar?
+ *
+ * Lo que el sync APAGÓ (`active = false` sin esconder) no: no está en el
+ * catálogo y no hay nada que administrarle. Lo ESCONDIDO A MANO sí, aunque
+ * esconder también apague `active`.
+ *
+ * 🩸 Hasta el 11-sep-2026 la pantalla filtraba `active !== false` a secas, y
+ * como esconder pone `active = false` Y `oculto_manual = true`, tiraba las dos
+ * cosas juntas: el chip «Escondidos» daba siempre 0, nunca se dibujaba y
+ * «Mostrar» era código inalcanzable. 25 productos (Tommy 16 · Calvin 6 ·
+ * Joybees 2 · Reebok 1) solo volvían tocando la base a mano.
+ */
+export function seAdministra(p: ProductoDeChip): boolean {
+  return p.active !== false || estaEscondido(p);
 }
 
 export interface OpcionCategoria {

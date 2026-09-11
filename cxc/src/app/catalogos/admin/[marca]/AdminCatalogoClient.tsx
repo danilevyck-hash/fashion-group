@@ -38,7 +38,7 @@ import { catalogoAdminRoles } from "@/lib/catalogo/roles";
 import { normalizarSkuStorage } from "@/lib/catalogos/fotos-b2b";
 import { contarAlternativas, type StorageMarcaKey } from "@/lib/catalogos/variantes-paths";
 import {
-  categoriasDeLaMarca, chipValido, chipsDelCatalogo, pasaElChip,
+  categoriasDeLaMarca, chipValido, chipsDelCatalogo, pasaElChip, seAdministra,
 } from "@/lib/catalogos/admin-chips";
 import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
 import { coincideBusqueda, ordenarParaTrabajar } from "@/lib/catalogos/admin-lista";
@@ -117,8 +117,16 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   const products = useMemo(() => productsData ?? [], [productsData]);
   // Lo que el sync apagó (active=false) no es lo mismo que lo escondido a mano:
   // el GET de Joybees/Tommy/Calvin también trae inactivos y no deben ensuciar
-  // ni los chips ni la lista. En Reebok el scope=admin ya filtra y esto es no-op.
-  const vivos = useMemo(() => products.filter((p) => p.active !== false), [products]);
+  // ni los chips ni la lista. En Reebok el scope=admin ya trae vivos + escondidos.
+  //
+  // 🩸 LO ESCONDIDO A MANO SE QUEDA (11-sep-2026). Esconder pone `active=false`
+  // Y `oculto_manual=true`, y el filtro viejo (`active !== false` a secas)
+  // tiraba las dos cosas juntas: el chip «Escondidos» daba siempre 0, nunca se
+  // dibujaba, y «Mostrar» era código inalcanzable. Daniel: *«que yo pueda
+  // activar o desactivar»*. La regla vive en `seAdministra` (admin-chips.ts);
+  // `pasaElChip` sigue sacando lo escondido de «Todos», de las categorías y de
+  // «Sin foto»: solo se ve en SU chip.
+  const vivos = useMemo(() => products.filter(seAdministra), [products]);
 
   // Categorías de los chips: el mapa que YA existe por marca, nunca una lista
   // escrita en la pantalla (ver `marcas-ui` → `admin.categorias`).
