@@ -9,6 +9,15 @@ import ZonaFotos from "./ZonaFotos";
 import { EmptyState, ScrollableTable } from "@/components/ui";
 import { centavos, sumaMontos, totalGastado } from "@/lib/caja/dinero";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import {
+  LIMPIAR_BUSQUEDA,
+  PARAM_BUSCAR,
+  PLACEHOLDER_GASTO,
+  VACIO_GASTO,
+  vistaDeLista,
+} from "@/lib/buscar-en-lista";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { accionesDelGasto, fotosSoloVer } from "@/lib/caja/menu-del-gasto";
 
 interface Props {
@@ -124,23 +133,51 @@ export default function GastoTable({
   // Qué gasto tiene abierta su foto del recibo (una fila extra bajo la suya).
   const [fotosDeGasto, setFotosDeGasto] = useState<string | null>(null);
 
+  // ── 🔴 EL BUSCADOR DE LOS GASTOS DEL PERÍODO (11-sep-2026) ───────────────
+  //
+  // Daniel: *«pon buscador a lo que normalmente llevaría buscador»*. Un período
+  // son decenas de recibos y se entra a buscar UNO: «el taxi», «Do it Center»,
+  // el recibo 4471, los $12.50.
+  //
+  // Busca por PROVEEDOR, CATEGORÍA, N° de recibo, DESCRIPCIÓN y MONTO, con la
+  // regla de la casa: subcadena exacta normalizada, nunca por parecido. El monto
+  // entra como el número tal cual se imprime (`12.50`), y como la normalización
+  // se come el punto, tecleando «12.5» también cae.
+  //
+  // 🔴 EL TOTAL SIGUE AL FILTRO, que es la regla de `lib/buscar-en-lista.ts`:
+  // los registros, los chips de categoría, el total de arriba y los pies de las
+  // dos superficies se calculan sobre lo que se VE. ⚠️ El bloque de arriba
+  // (Fondo · Gastado · Saldo) NO se recorta y no es un descuido: es el estado de
+  // la CAJA, no la suma de estas filas — un «Saldo» recortado sería un saldo
+  // falso. Por eso esta línea dice «3 de 41 gastos» pegada a su total.
+  const [busqueda, setBusqueda] = useUrlState(PARAM_BUSCAR, "");
+  const { visibles: buscados, conteo, buscando, sinResultados } = useMemo(
+    () => vistaDeLista(
+      gastos,
+      busqueda,
+      (g) => [g.proveedor, g.categoria, g.nro_factura, g.descripcion, g.nombre, g.total.toFixed(2)],
+      ["gasto", "gastos"],
+    ),
+    [gastos, busqueda],
+  );
+
   const catTotals = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const g of gastos) {
+    for (const g of buscados) {
       const cat = g.categoria || "Sin categoría";
       map[cat] = centavos((map[cat] || 0) + centavos(g.total));
     }
     return map;
-  }, [gastos]);
+  }, [buscados]);
   const catEntries = useMemo(
     () => Object.entries(catTotals).sort((a, b) => b[1] - a[1]),
     [catTotals],
   );
-  const grandTotal = useMemo(() => totalGastado(gastos), [gastos]);
+  const grandTotal = useMemo(() => totalGastado(buscados), [buscados]);
 
   const filteredGastos = useMemo(
-    () => (selectedCat ? gastos.filter((g) => (g.categoria || "Sin categoría") === selectedCat) : gastos),
-    [gastos, selectedCat],
+    () => (selectedCat ? buscados.filter((g) => (g.categoria || "Sin categoría") === selectedCat) : buscados),
+    [buscados, selectedCat],
   );
   const totalSubtotal = sumaMontos(filteredGastos.map((g) => g.subtotal));
   const totalItbms = sumaMontos(filteredGastos.map((g) => g.itbms));
@@ -198,7 +235,7 @@ export default function GastoTable({
             className="text-xs mt-1"
             style={{ color: "var(--caja-fg-muted)" }}
           >
-            {gastos.length} {gastos.length === 1 ? "registro" : "registros"} ·
+            {buscados.length} {buscados.length === 1 ? "registro" : "registros"} ·
             {" "}
             <span className="caja-mono">${fmt(grandTotal)}</span> total
           </p>
@@ -220,7 +257,24 @@ export default function GastoTable({
           los acomoda solos y en escritorio siguen entrando en una fila, así
           que ahí no cambia nada. (Mismo cambio que #371 en los filtros del
           catálogo: correr el breakpoint no arreglaba nada, envolver sí.) */}
+      {/* 🔴 El buscador va ARRIBA de los chips: los chips describen lo que la
+          búsqueda dejó, así que primero se busca y después se elige categoría. */}
       {gastos.length > 0 && (
+        <BuscadorDeLista
+          className="mb-3"
+          valor={busqueda}
+          onCambiar={setBusqueda}
+          placeholder={PLACEHOLDER_GASTO}
+          etiqueta="Buscar gasto por proveedor, categoría, número de recibo o monto"
+          conteo={conteo}
+        />
+      )}
+
+      {sinResultados && (
+        <VacioDeBusqueda texto={VACIO_GASTO} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
+      )}
+
+      {buscados.length > 0 && (
         <div className="flex flex-wrap gap-2 pb-2 mb-3.5">
           <Chip
             label="Todas"
@@ -248,7 +302,7 @@ export default function GastoTable({
           entra con 26 px de aire — medido, no supuesto. */}
       <div className="lg:hidden space-y-3">
         {sortedGastos.length === 0 ? (
-          <EmptyState title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"} />
+          sinResultados ? null : <EmptyState title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"} />
         ) : (
           <>
             {sortedGastos.map((g) => (
@@ -320,7 +374,7 @@ export default function GastoTable({
               {sortedGastos.length === 0 ? (
                 <tr>
                   <td colSpan={dataCols + 1}>
-                    <EmptyState title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"} />
+                    {sinResultados ? null : <EmptyState title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"} />}
                   </td>
                 </tr>
               ) : (

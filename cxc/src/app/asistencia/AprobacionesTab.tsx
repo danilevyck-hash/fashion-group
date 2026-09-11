@@ -62,6 +62,7 @@ import {
   hm,
   separarPorDecidir,
   textoPorDecidir,
+  toquesDeEstos,
   toquesPendientes,
   vistaElegida,
   type Vista,
@@ -72,8 +73,8 @@ import {
   PARAM_BUSCAR,
   PLACEHOLDER_COLABORADOR,
   VACIO_BUSQUEDA,
-  filtrarPorTexto,
-  textoDeConteo,
+  rotuloDeLote,
+  vistaDeLista,
 } from "@/lib/buscar-en-lista";
 import PorColaborador from "./aprobaciones/PorColaborador";
 import PorDia from "./aprobaciones/PorDia";
@@ -175,25 +176,33 @@ export default function AprobacionesTab({ empresa = "" }: {
   const personas = useMemo(() => agruparPorColaborador(dias ?? []), [dias]);
   const { porDecidir, decididas } = useMemo(() => separarPorDecidir(personas), [personas]);
   const porDia = useMemo(() => agruparPorDia(dias ?? []), [dias]);
-  const minutosPendientes = useMemo(() => porDecidir.reduce((a, p) => a + p.minutosPendientes, 0), [porDecidir]);
 
   // ── 🔴 EL BUSCADOR DE «COLABORADOR» (11-sep-2026) ─────────────────────────
   //
-  // Tacha renglones de la vista «Colaborador» y NADA MÁS. En particular:
-  //   · El contador «N por decidir · H:MM h» sigue contando TODO lo pendiente
-  //     del período —es el trabajo que queda, no lo que se está mirando—.
-  //   · 🔴 «Sí a todo lo pendiente» sigue siendo de TODO lo pendiente de la
-  //     empresa elegida (`pendientes` sale de `toquesPendientes(dias)` y jamás
-  //     mira `busqueda`). Un botón que dijera «todo» y aprobara lo que quedó
-  //     filtrado dejaría horas sin decidir sin que nadie se entere.
-  //   · El Excel sale de `dias`, completo.
-  // Por nombre y por código, sin acentos y por subcadena exacta, nunca por parecido.
+  // Por nombre y por código, sin acentos y por subcadena exacta, nunca por
+  // parecido. Filtra lo ya cargado; cero peticiones nuevas.
+  //
+  // 🔴 EL TOTAL SIGUE AL FILTRO: con búsqueda escrita, el contador grande dice
+  // «3 por decidir · 2:40 h» de LOS TRES QUE SE VEN, y el buscador dice «3 de
+  // 15» al lado para que ese recorte no se lea como el total del período. Es la
+  // regla de `lib/buscar-en-lista.ts`: o el total sigue al filtro, o no hay
+  // buscador. 🩸 Nació al revés —el contador contaba a todos con la lista
+  // recortada— y se corrigió el mismo día.
+  //
+  // 🔴 Y EL BOTÓN DE LOTE DICE A CUÁNTOS AFECTA. Sin búsqueda es «Sí a todo lo
+  // pendiente» y manda todo lo pendiente de la empresa elegida; con búsqueda
+  // pasa a «Sí a los 3 que ves» y manda exactamente esos tres. Lo que nunca
+  // puede pasar es que diga «todo» y mande menos: eso dejaría horas sin decidir
+  // sin que nadie se entere. ⚠️ El Excel sale de `dias`, COMPLETO.
   const [busqueda, setBusqueda] = useUrlState(PARAM_BUSCAR, "");
-  const porDecidirVistas = useMemo(
-    () => filtrarPorTexto(porDecidir, busqueda, (p) => [p.etiqueta, p.codigo]),
+  const { visibles: porDecidirVistas, conteo, buscando, sinResultados } = useMemo(
+    () => vistaDeLista(porDecidir, busqueda, (p) => [p.etiqueta, p.codigo]),
     [porDecidir, busqueda],
   );
-  const buscando = busqueda.trim() !== "";
+  const minutosVistos = useMemo(
+    () => porDecidirVistas.reduce((a, p) => a + p.minutosPendientes, 0),
+    [porDecidirVistas],
+  );
 
   // ── La persona que trajo la URL ───────────────────────────────────────────
   const personaCodigo = persona.trim();
@@ -278,7 +287,14 @@ export default function AprobacionesTab({ empresa = "" }: {
   }, [dias, desde, hasta, empresa]);
 
   const bloqueado = !puedeAprobar || avisoMigracion !== null;
-  const pendientes = useMemo(() => toquesPendientes(dias ?? []), [dias]);
+  const todoLoPendiente = useMemo(() => toquesPendientes(dias ?? []), [dias]);
+  // 🔴 Lo que el botón de lote va a mandar: con búsqueda, solo los que se ven.
+  const pendientes = useMemo(
+    () => (buscando ? toquesDeEstos(todoLoPendiente, porDecidirVistas.map((p) => p.codigo)) : todoLoPendiente),
+    [buscando, todoLoPendiente, porDecidirVistas],
+  );
+  // 🔴 Y el rótulo lo DICE, para que nadie apriete «todo» creyendo que es todo.
+  const rotuloLote = rotuloDeLote(ROTULO_SI_A_TODO, porDecidirVistas.length, buscando);
 
   return (
     <div className="py-4">
@@ -300,7 +316,7 @@ export default function AprobacionesTab({ empresa = "" }: {
           onClick={() => void decidir(pendientes, "si")}
           className="min-h-[44px] rounded-md bg-black px-5 text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-30"
         >
-          {ROTULO_SI_A_TODO}
+          {rotuloLote}
         </button>
       </div>
 
@@ -368,19 +384,19 @@ export default function AprobacionesTab({ empresa = "" }: {
               onCambiar={setBusqueda}
               placeholder={PLACEHOLDER_COLABORADOR}
               etiqueta="Buscar colaborador por nombre o código"
-              conteo={textoDeConteo(porDecidirVistas.length, porDecidir.length, busqueda)}
+              conteo={conteo}
             />
           )}
           <div className="flex items-baseline gap-2 tabular-nums" data-testid="por-decidir">
-            {porDecidir.length === 0 ? (
+            {porDecidirVistas.length === 0 ? (
               <>
                 <span className="text-[30px] font-semibold leading-none text-emerald-700">✓</span>
                 <span className="text-sm text-gray-600">{textoPorDecidir(0, 0)}</span>
               </>
             ) : (
               <>
-                <span className="text-[30px] font-semibold leading-none tracking-tight">{porDecidir.length}</span>
-                <span className="text-sm text-gray-600">por decidir · {hm(minutosPendientes)} h</span>
+                <span className="text-[30px] font-semibold leading-none tracking-tight">{porDecidirVistas.length}</span>
+                <span className="text-sm text-gray-600">por decidir · {hm(minutosVistos)} h</span>
               </>
             )}
           </div>
@@ -407,7 +423,7 @@ export default function AprobacionesTab({ empresa = "" }: {
             personaResaltada={personaCodigo}
             refResaltada={filaResaltada}
           />
-        ) : buscando && porDecidirVistas.length === 0 ? (
+        ) : sinResultados ? (
           <VacioDeBusqueda texto={VACIO_BUSQUEDA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
         ) : (
           <PorColaborador

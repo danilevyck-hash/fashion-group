@@ -239,6 +239,25 @@ export function toquesPendientes(dias: readonly DiaAprobacion[]): ToqueAprobacio
   return out;
 }
 
+/**
+ * 🔴 LOS TOQUES DE ESTA GENTE Y NADIE MÁS (11-sep-2026).
+ *
+ * Es lo que «Sí a los N que ves» manda cuando hay búsqueda escrita. Daniel pidió
+ * que el botón **diga exactamente a cuántos afecta y afecte solo a esos**; sin
+ * búsqueda no se llama a esta función y el botón sigue siendo de todo lo
+ * pendiente de la empresa elegida.
+ *
+ * 🔑 Se compara por CÓDIGO, que es lo que el reloj manda y lo que la aprobación
+ * guarda — nunca por el nombre en pantalla, que va capitalizado.
+ */
+export function toquesDeEstos(
+  toques: readonly ToqueAprobacion[],
+  codigos: readonly string[],
+): ToqueAprobacion[] {
+  const permitidos = new Set(codigos);
+  return toques.filter((t) => permitidos.has(t.codigo));
+}
+
 /** `codigo|fecha` de cada toque, para saber qué está viajando. */
 export function clavesDe(items: readonly ToqueAprobacion[]): string[] {
   return items.map((i) => claveDia(i.codigo, i.fecha));

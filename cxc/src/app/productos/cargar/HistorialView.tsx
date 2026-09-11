@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { COMPANIAS_DEPURADOR } from "@/lib/depurador/logic";
+import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import {
+  LIMPIAR_BUSQUEDA,
+  PARAM_BUSCAR,
+  PLACEHOLDER_DESCARGA,
+  VACIO_DESCARGA,
+  vistaDeLista,
+} from "@/lib/buscar-en-lista";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 
 interface CargaRow {
   id: string;
@@ -52,8 +61,29 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
     return () => { alive = false; };
   }, [refreshKey]);
 
-  const visibles = (rows ?? []).filter(
-    (r) => !empresaFiltro || empresaCanonica(r.empresa) === empresaFiltro
+  // ── 🔴 EL BUSCADOR DEL HISTORIAL (11-sep-2026) ────────────────────────────
+  //
+  // Daniel: *«pon buscador a lo que normalmente llevaría buscador»*. Son **140
+  // descargas** y crecen 50-60 al mes; el único filtro era un desplegable de
+  // compañía. Y la lista existe justo para volver a bajar algo que ya se hizo
+  // —medido: el 27% de las descargas son repetición exacta—, así que se entra
+  // buscando una marca, una fecha o quién la corrió.
+  //
+  // ⚠️ Acá NO hay ningún total que seguir: la pantalla no suma nada. Por eso el
+  // conteo del buscador («3 de 140 descargas») es todo lo que hace falta decir.
+  const [busqueda, setBusqueda] = useUrlState(PARAM_BUSCAR, "");
+  const porCompania = useMemo(
+    () => (rows ?? []).filter((r) => !empresaFiltro || empresaCanonica(r.empresa) === empresaFiltro),
+    [rows, empresaFiltro],
+  );
+  const { visibles, conteo, buscando, sinResultados } = useMemo(
+    () => vistaDeLista(
+      porCompania,
+      busqueda,
+      (r) => [r.marca, r.usuario, empresaCanonica(r.empresa), fmtFecha(r.created_at)],
+      ["descarga", "descargas"],
+    ),
+    [porCompania, busqueda],
   );
 
   const botonDescargar = (r: CargaRow) =>
@@ -87,12 +117,21 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
             <option key={c.key} value={c.label}>{c.label}</option>
           ))}
         </select>
+        <BuscadorDeLista
+          valor={busqueda}
+          onCambiar={setBusqueda}
+          placeholder={PLACEHOLDER_DESCARGA}
+          etiqueta="Buscar descarga por marca, compañía, quién la hizo o fecha"
+          conteo={conteo}
+        />
         {/* Los archivos se guardan 90 días; la fila con los totales queda. */}
         <span className="text-[12px] text-stone-500">El Excel se puede volver a bajar por 90 días.</span>
       </div>
 
       {rows === null ? (
         <div className="py-16 text-center text-stone-500">Cargando…</div>
+      ) : sinResultados ? (
+        <VacioDeBusqueda texto={VACIO_DESCARGA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
       ) : visibles.length === 0 ? (
         <div className="py-16 text-center text-stone-500">Todavía no hay cargas registradas.</div>
       ) : (

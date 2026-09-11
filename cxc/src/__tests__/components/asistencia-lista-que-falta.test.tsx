@@ -13,12 +13,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, afterEach, vi } from "vitest";
 
-// 🔴 EL DOBLE DEL ROUTER (11-sep-2026). Desde que la Planilla y Colaboradores
-// llevan buscador, su texto vive en la URL (`useUrlState`, `replace`), y eso
-// llama a `useRouter()`: sin app router montado, jsdom tira «invariant expected
-// app router to be mounted» antes de dibujar una sola fila. El doble devuelve
-// una URL VACÍA a propósito — sin búsqueda escrita, la lista es la de siempre,
-// que es justo lo que estos candados miran.
+// 🔴 EL DOBLE DEL ROUTER (11-sep-2026). Colaboradores lleva buscador y su texto
+// vive en la URL (`useUrlState`, `replace`), que llama a `useRouter()`: sin app
+// router montado, jsdom tira «invariant expected app router to be mounted»
+// antes de dibujar una sola fila. El doble devuelve una URL VACÍA a propósito
+// —sin búsqueda escrita, la lista es la de siempre—, que es lo que estos
+// candados miran. ⚠️ La Planilla ya NO lo necesita: se le quitó el buscador.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => "/asistencia",

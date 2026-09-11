@@ -24,6 +24,36 @@ import type { CuentaEgreso } from "@/lib/egresos/reglas";
 import type { EmpresaEgresosResumen } from "./tipos";
 import { mesLargo, usd } from "./tipos";
 import { explicacionEgresos, muestraMontoEgresos } from "./ResumenEgresos";
+import { useMemo } from "react";
+import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import {
+  LIMPIAR_BUSQUEDA,
+  PARAM_BUSCAR,
+  PLACEHOLDER_CUENTA,
+  VACIO_CUENTA,
+  filtrarPorTexto,
+  textoDeConteo,
+} from "@/lib/buscar-en-lista";
+import { useUrlState } from "@/lib/hooks/useUrlState";
+
+/**
+ * 🔴 POR DÓNDE SE BUSCA UNA CUENTA (11-sep-2026).
+ *
+ * Por el NOMBRE («servicios profesionales»), por el CÓDIGO —el completo y el
+ * que se pinta, que son distintos— y por las REFERENCIAS de los pagos que
+ * cayeron ahí («DANIEL LEVY», «MUNICIOIO DE PANAMA»), que es como la contadora
+ * se acuerda de un pago.
+ *
+ * ⚠️ **Por N° INTERNO no se puede buscar, y no es un olvido**: el reporte de
+ * Egresos Varios sí lo trae, pero `resumirMesEgresos` agrupa por cuenta en el
+ * SERVIDOR y al navegador solo le llega cuántos documentos hubo (`documentos`),
+ * nunca cuáles. Buscar por N° interno pediría cambiar lo que la ruta devuelve.
+ */
+const camposDeCuenta = (c: CuentaEgreso) => [c.nombre, c.visible, c.cuenta, ...c.ejemplos];
+
+/** Los centavos de un montón de cuentas. Se suma acá para que el total siga al filtro. */
+const sumaCent = (cs: readonly CuentaEgreso[]) => cs.reduce((a, c) => a + c.totalCent, 0);
+const sumaRenglones = (cs: readonly CuentaEgreso[]) => cs.reduce((a, c) => a + c.renglones, 0);
 
 function FilaCuenta({ c }: { c: CuentaEgreso }) {
   return (
@@ -92,6 +122,46 @@ interface Props {
 export default function DetalleEgresos({ empresa, onVolver }: Props) {
   const r = empresa.resumen;
   const hayMonto = muestraMontoEgresos(r.estado);
+
+  // ── 🔴 EL BUSCADOR DE CUENTAS, Y EL TOTAL QUE LO SIGUE (11-sep-2026) ──────
+  //
+  // Daniel: *«pon buscador a lo que normalmente llevaría buscador»*. Un mes de
+  // Vistana son decenas de cuentas y se entra a buscar UNA.
+  //
+  // 🔴 EL TOTAL SIGUE AL FILTRO — la regla de `lib/buscar-en-lista.ts`: o el
+  // total sigue al filtro, o no hay buscador. 🩸 Acá cuesta un poco más porque
+  // los totales vienen SUMADOS DEL SERVIDOR (`r.totalSalidaCent`, etc.), así que
+  // con búsqueda escrita se vuelven a sumar en el navegador sobre las cuentas
+  // que quedaron — de sus propios `totalCent`, que son los mismos centavos
+  // enteros, sin volver a dividir ni redondear nada.
+  //
+  // ⚠️ **«en N documentos» desaparece mientras se busca, y es a propósito**: un
+  // documento puede tocar varias cuentas, así que no se puede sumar por cuenta
+  // y el navegador no tiene los N° internos. Dejarlo con el número del mes
+  // entero al lado de un total recortado sería justo la mezcla que esta regla
+  // prohíbe.
+  //
+  // 🔴 Y esto NO toca la regla de la casa: acá se ve UNA empresa y sus gastos
+  // nunca se suman con los de otra.
+  const [busqueda, setBusqueda] = useUrlState(PARAM_BUSCAR, "");
+  const buscando = busqueda.trim() !== "";
+  const gastoVistas = useMemo(
+    () => filtrarPorTexto(r.cuentasGasto, busqueda, camposDeCuenta),
+    [r.cuentasGasto, busqueda],
+  );
+  const noGastoVistas = useMemo(
+    () => filtrarPorTexto(r.cuentasNoGasto, busqueda, camposDeCuenta),
+    [r.cuentasNoGasto, busqueda],
+  );
+  const totalCuentas = r.cuentasGasto.length + r.cuentasNoGasto.length;
+  const vistas = gastoVistas.length + noGastoVistas.length;
+  const sinResultados = buscando && vistas === 0;
+  const conteo = textoDeConteo(vistas, totalCuentas, busqueda, ["cuenta", "cuentas"]);
+
+  const totalGastoCent = buscando ? sumaCent(gastoVistas) : r.totalGastoCent;
+  const totalNoGastoCent = buscando ? sumaCent(noGastoVistas) : r.totalNoGastoCent;
+  const totalSalidaCent = buscando ? totalGastoCent + totalNoGastoCent : r.totalSalidaCent;
+  const renglones = buscando ? sumaRenglones(gastoVistas) + sumaRenglones(noGastoVistas) : r.renglones;
   const explicacion = explicacionEgresos(
     r.estado,
     empresa.ultimoMesConMovimientos,
@@ -128,32 +198,57 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
         </div>
       ) : (
         <>
+          {/* 🔴 El buscador ARRIBA del total: lo que se escribe manda sobre lo
+              que el cuadro dice, y el conteo de al lado («3 de 41 cuentas»)
+              impide leer ese total recortado como el del mes. */}
+          {totalCuentas > 0 && (
+            <BuscadorDeLista
+              className="mb-3"
+              valor={busqueda}
+              onCambiar={setBusqueda}
+              placeholder={PLACEHOLDER_CUENTA}
+              etiqueta="Buscar cuenta por nombre, código o referencia"
+              conteo={conteo}
+            />
+          )}
+
           <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3">
-            <LineaTotal label="Salió de caja y banco" cent={r.totalSalidaCent} fuerte />
+            <LineaTotal label="Salió de caja y banco" cent={totalSalidaCent} fuerte />
             <div className="mt-1 border-t border-gray-100 pt-1">
-              <LineaTotal label="De eso, gastos" cent={r.totalGastoCent} />
-              {r.totalNoGastoCent !== 0 && (
-                <LineaTotal label="De eso, no es gasto" cent={r.totalNoGastoCent} />
+              <LineaTotal label="De eso, gastos" cent={totalGastoCent} />
+              {totalNoGastoCent !== 0 && (
+                <LineaTotal label="De eso, no es gasto" cent={totalNoGastoCent} />
               )}
             </div>
             <p className="mt-2 border-t border-gray-100 pt-2 text-sm text-gray-600">
-              {r.renglones} {r.renglones === 1 ? "pago" : "pagos"}
-              {r.documentos !== r.renglones && ` en ${r.documentos} documentos`}
+              {renglones} {renglones === 1 ? "pago" : "pagos"}
+              {!buscando && r.documentos !== r.renglones && ` en ${r.documentos} documentos`}
             </p>
           </div>
 
-          <h2 className="mb-2 text-sm font-semibold text-gray-900">En qué se gastó</h2>
-          <div className="rounded-lg border border-gray-200 bg-white px-3 py-1">
-            {r.cuentasGasto.length === 0 ? (
-              <p className="py-2.5 text-sm text-gray-600">
-                Este mes salió plata, pero nada de eso fue un gasto.
-              </p>
-            ) : (
-              r.cuentasGasto.map((c) => <FilaCuenta key={c.cuenta} c={c} />)
-            )}
-          </div>
+          {sinResultados && (
+            <VacioDeBusqueda texto={VACIO_CUENTA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
+          )}
 
-          {r.cuentasNoGasto.length > 0 && (
+          {/* 🔴 Con la búsqueda sin resultados no se dibuja ninguna de las dos
+              secciones: el aviso de arriba ya lo dijo, y repetir «nada de eso
+              fue un gasto» sería decir algo que no es cierto del mes. */}
+          {!sinResultados && (gastoVistas.length > 0 || !buscando) && (
+            <>
+              <h2 className="mb-2 text-sm font-semibold text-gray-900">En qué se gastó</h2>
+              <div className="rounded-lg border border-gray-200 bg-white px-3 py-1">
+                {gastoVistas.length === 0 ? (
+                  <p className="py-2.5 text-sm text-gray-600">
+                    Este mes salió plata, pero nada de eso fue un gasto.
+                  </p>
+                ) : (
+                  gastoVistas.map((c) => <FilaCuenta key={c.cuenta} c={c} />)
+                )}
+              </div>
+            </>
+          )}
+
+          {noGastoVistas.length > 0 && (
             <>
               <h2 className="mb-1 mt-4 text-sm font-semibold text-gray-900">
                 Salió, pero no es gasto
@@ -164,16 +259,18 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
                 (transferencias, anticipos), paga algo que ya se debía o cancela un préstamo.
               </p>
               <div className="rounded-lg border border-gray-200 bg-white px-3 py-1">
-                {r.cuentasNoGasto.map((c) => (
+                {noGastoVistas.map((c) => (
                   <FilaCuenta key={c.cuenta} c={c} />
                 ))}
               </div>
             </>
           )}
 
-          <div className="mt-4 rounded-lg border border-gray-200 bg-white px-3 py-1">
-            <LineaTotal label="Total que salió" cent={r.totalSalidaCent} fuerte />
-          </div>
+          {!sinResultados && (
+            <div className="mt-4 rounded-lg border border-gray-200 bg-white px-3 py-1">
+              <LineaTotal label="Total que salió" cent={totalSalidaCent} fuerte />
+            </div>
+          )}
         </>
       )}
     </div>

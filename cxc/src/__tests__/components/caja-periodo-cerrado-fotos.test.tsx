@@ -13,6 +13,19 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
+
+// 🔴 EL DOBLE DEL ROUTER (11-sep-2026). La lista de gastos lleva buscador y su
+// texto vive en la URL (`useUrlState`, `replace`), que llama a `useRouter()`:
+// sin app router montado, jsdom tira «invariant expected app router to be
+// mounted» antes de dibujar una sola fila. El doble devuelve una URL VACÍA a
+// propósito — sin búsqueda escrita, la lista es la de siempre, que es lo que
+// este candado mira.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/caja/p1",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import GastoTable from "@/app/caja/components/GastoTable";
 import type { CajaGasto } from "@/app/caja/components/types";

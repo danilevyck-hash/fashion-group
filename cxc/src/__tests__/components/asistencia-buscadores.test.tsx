@@ -5,9 +5,14 @@
  * Daniel: *«pon buscador en módulos o tabs que lo ameriten, como colaboradores
  * por ejemplo»* → *«sí a buscadores»*.
  *
- * Cuatro listas que no tenían cómo llegar a una persona: **Colaboradores** (42
- * filas), **Planilla** (19 por empresa, y se usa con prisa), **Préstamos** (12) y
- * **Aprobaciones › Colaborador** (15).
+ * 🔴 SON **TRES** LISTAS, NO CUATRO (corregido el 11-sep-2026, el mismo día).
+ * Llevan buscador **Colaboradores** (42 filas, la que más lo pedía),
+ * **Préstamos** (12) y **Aprobaciones › Colaborador** (15).
+ *
+ * **Planilla NO lo lleva**, y es una decisión, no un olvido. Lo estrenó por la
+ * mañana y se le quitó por la tarde: Daniel, al enterarse de que con un nombre
+ * escrito el total del pie y las descargas seguían siendo la quincena completa,
+ * dijo *«entonces no lo pongas en planilla»*. Ver la sección 3.
  *
  * 🔴 LO QUE ESTE ARCHIVO SOSTIENE, y por qué cada cosa:
  *
@@ -18,17 +23,22 @@
  *      personas distintas, y acá lo que se decide es plata.
  *   4. 🔴 EL TEXTO VIAJA EN LA URL (`?buscar=`, `replace`): se comparte el
  *      enlace y no se pierde al cambiar de pestaña.
- *   5. 🔴 LOS TOTALES NO CAMBIAN DE SIGNIFICADO. En las cuatro listas el pie
- *      sigue sumando TODO y quien dice cuántos se ven es el buscador («1 de 3
- *      colaboradores»). ⚠️ Es al revés que en Cuentas por Cobrar —allá la tira
- *      de totales suma lo filtrado— y es a propósito: acá el total es la plata
- *      de la quincena, no la de lo que se está mirando.
- *   6. 🔴 EN PLANILLA NO TOCA LA PLATA. El Excel y el PDF salen con TODAS las
- *      líneas aunque en pantalla quede una. Filtrar la descarga sería pagar una
- *      quincena a medias porque alguien dejó un nombre escrito en el campo.
- *   7. 🔴 EN APROBACIONES, «Sí a todo lo pendiente» SIGUE SIENDO DE TODO. Un
- *      botón que dijera «todo» y decidiera solo lo filtrado dejaría horas sin
- *      resolver sin que nadie se entere.
+ *   5. 🔴 **O EL TOTAL SIGUE AL FILTRO, O NO HAY BUSCADOR.** Es la regla
+ *      general, y vive escrita en `lib/buscar-en-lista.ts`. 🩸 Nació al revés
+ *      —el pie sumaba todo con la lista recortada, y un renglón de letra chica
+ *      lo explicaba—; se dio vuelta el mismo día. En Préstamos y en el contador
+ *      de Aprobaciones el total ahora se suma sobre lo que se VE, y el buscador
+ *      dice «1 de 2 colaboradores» al lado para que ese recorte no se lea como
+ *      el de todos.
+ *   6. 🔴 EN PLANILLA NO HAY BUSCADOR, JUSTAMENTE PORQUE AHÍ EL PIE ES PLATA
+ *      QUE SE PAGA. Es la otra salida de la misma regla. El Excel y el PDF
+ *      salen con TODAS las líneas —ese candado no cambió de dirección— y ahora
+ *      no hay forma de recortar la pantalla que pudiera contagiarlos.
+ *   7. 🔴 EN APROBACIONES, EL BOTÓN DE LOTE DICE A CUÁNTOS AFECTA. Sin búsqueda
+ *      es «Sí a todo lo pendiente» y manda todo; con búsqueda es «Sí a los 3
+ *      que ves» y manda esos tres. Las dos direcciones son plata: decir «todo»
+ *      y mandar menos deja horas sin resolver; decir «los 3» y mandar quince
+ *      aprueba horas que nadie miró.
  *   8. Sin resultados se dice con palabras y se ofrece la salida.
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -89,8 +99,9 @@ import {
 } from "@/lib/asistencia/planilla";
 import {
   LIMPIAR_BUSQUEDA, PARAM_BUSCAR, PLACEHOLDER_COLABORADOR, VACIO_BUSQUEDA,
-  filtrarPorTexto, textoDeConteo,
+  filtrarPorTexto, rotuloDeLote, textoDeConteo, vistaDeLista,
 } from "@/lib/buscar-en-lista";
+import { toquesDeEstos } from "@/lib/asistencia/aprobaciones-vistas";
 import ConfiguracionTab from "@/app/asistencia/ConfiguracionTab";
 import PlanillaTab from "@/app/asistencia/PlanillaTab";
 import PrestamosTab from "@/app/asistencia/PrestamosTab";
@@ -238,7 +249,7 @@ describe("🔴 Colaboradores: el buscador de las 42 filas", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 3. PLANILLA — el buscador NO toca la plata
+// 3. PLANILLA — 🔴 ACÁ NO HAY BUSCADOR, Y ES LA DECISIÓN (11-sep-2026)
 // ═════════════════════════════════════════════════════════════════════════════
 
 const Q = quincena(2026, 8, 1);
@@ -284,37 +295,60 @@ async function abrirPlanilla() {
   await screen.findAllByText(/Andrea Perez/);
 }
 
-describe("🔴 Planilla: el buscador tacha renglones y NADA MÁS", () => {
-  it("filtra las filas de la tabla", async () => {
+describe("🔴 Planilla: NO lleva buscador, y la plata sale completa", () => {
+  /**
+   * 🔴 CAMBIO DE DIRECCIÓN CON NOTA FECHADA — 11-sep-2026, el mismo día.
+   *
+   * La Planilla estrenó buscador por la mañana y se le quitó por la tarde.
+   * Daniel, al enterarse de que con un nombre escrito el total del pie y las
+   * descargas seguían siendo la quincena COMPLETA: *«entonces no lo pongas en
+   * planilla»*.
+   *
+   * 🔑 El motivo no es que el buscador estuviera mal: es que en esta pantalla
+   * **no se puede ver una lista recortada al lado de un total que no lo está**
+   * sin que alguien dude de cuál de los dos manda. Un renglón de letra chica
+   * explicándolo no arregla eso — lo confiesa. Las otras tres listas de
+   * Asistencia (Colaboradores, Préstamos y Aprobaciones › Colaborador) se
+   * quedan con el suyo: ahí el pie es un conteo, no la plata de una quincena.
+   *
+   * ⚠️ Los dos candados de PLATA de abajo **no cambiaron de dirección**: el
+   * Excel y el PDF salen con TODAS las líneas. Siguen valiendo, y ahora sin
+   * ninguna forma de recortar la pantalla que pudiera contagiarlos.
+   */
+
+  it("🔴 NO se dibuja ningún buscador en la Planilla", async () => {
     await abrirPlanilla();
-    teclear("andrea");
-    await waitFor(() => expect(screen.queryAllByText(/Julio Montero/).length).toBe(0));
-    expect(screen.getAllByText(/Andrea Perez/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByPlaceholderText(PLACEHOLDER_COLABORADOR)).toHaveLength(0);
+    expect(screen.queryAllByLabelText(/Buscar colaborador/)).toHaveLength(0);
   });
 
-  it("🔴 EL TOTAL NO CAMBIA: sigue siendo el de la quincena entera", async () => {
+  it("🔴 ni el renglón que avisaba que el pie no cambiaba: ya no hay nada que aclarar", async () => {
     await abrirPlanilla();
-    const antes = screen.getAllByText(/TOTAL · 3 colaboradores/).length;
-    expect(antes).toBeGreaterThan(0);
-    teclear("andrea");
-    await waitFor(() => expect(screen.queryAllByText(/Julio Montero/).length).toBe(0));
-    // Ni el número de personas ni el neto se mueven.
-    expect(screen.getAllByText(/TOTAL · 3 colaboradores/).length).toBe(antes);
+    expect(document.body.textContent).not.toContain("siguen siendo la quincena completa");
+  });
+
+  it("🔴 se ven TODAS las personas, siempre", async () => {
+    await abrirPlanilla();
+    for (const quien of [/Alejandra Camaño/, /Andrea Perez/, /Julio Montero/]) {
+      expect(screen.getAllByText(quien).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("🔴 y un `?buscar=` en la URL —traído de otra pestaña— NO tacha a nadie", async () => {
+    URL_ACTUAL = `${PARAM_BUSCAR}=andrea`;
+    await abrirPlanilla();
+    expect(screen.getAllByText(/Julio Montero/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Alejandra Camaño/).length).toBeGreaterThan(0);
+  });
+
+  it("el TOTAL es el de la quincena entera", async () => {
+    await abrirPlanilla();
+    expect(screen.getAllByText(/TOTAL · 3 colaboradores/).length).toBeGreaterThan(0);
     expect(document.body.textContent).toContain("1,200.00");
   });
 
-  it("🔴 y la pantalla lo DICE, para que nadie lea el pie como un subtotal", async () => {
+  it("🔴 EL EXCEL SALE COMPLETO — con las tres líneas y las tres personas", async () => {
     await abrirPlanilla();
-    teclear("andrea");
-    await waitFor(() =>
-      expect(screen.getByText(/El total de abajo y lo que se descarga siguen siendo la quincena completa/)).toBeTruthy(),
-    );
-  });
-
-  it("🔴 EL EXCEL SALE COMPLETO aunque en pantalla quede una sola fila", async () => {
-    await abrirPlanilla();
-    teclear("andrea");
-    await waitFor(() => expect(screen.queryAllByText(/Julio Montero/).length).toBe(0));
     fireEvent.click(screen.getByRole("button", { name: /Descargar/ }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Excel" }));
     await waitFor(() => expect(excelRecibio).toHaveBeenCalled());
@@ -325,19 +359,17 @@ describe("🔴 Planilla: el buscador tacha renglones y NADA MÁS", () => {
 
   it("🔴 Y EL PDF TAMBIÉN", async () => {
     await abrirPlanilla();
-    teclear("andrea");
-    await waitFor(() => expect(screen.queryAllByText(/Julio Montero/).length).toBe(0));
     fireEvent.click(screen.getByRole("button", { name: /Descargar/ }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "PDF" }));
     await waitFor(() => expect(pdfRecibio).toHaveBeenCalled());
     expect((pdfRecibio.mock.calls[0][0] as { lineas: unknown[] }).lineas).toHaveLength(3);
   });
 
-  it("sin resultados lo dice, y el total sigue ahí", async () => {
-    await abrirPlanilla();
-    teclear("zzzz");
-    await waitFor(() => expect(screen.getByText(new RegExp(VACIO_BUSQUEDA))).toBeTruthy());
-    expect(screen.getAllByText(/TOTAL · 3 colaboradores/).length).toBeGreaterThan(0);
+  it("🔴 y el archivo de la pantalla no vuelve a importar el buscador", async () => {
+    const { readFileSync } = await import("node:fs");
+    const fuente = readFileSync("src/app/asistencia/PlanillaTab.tsx", "utf8");
+    expect(fuente).not.toContain("BuscadorDeLista");
+    expect(fuente).not.toContain("buscar-en-lista");
   });
 });
 
@@ -359,7 +391,22 @@ async function abrirPrestamos() {
   await screen.findAllByText(/Andrea Perez/);
 }
 
-describe("🔴 Préstamos: el buscador no mueve la deuda", () => {
+describe("🔴 Préstamos: el TOTAL SIGUE AL FILTRO", () => {
+  /**
+   * 🔴 CAMBIO DE DIRECCIÓN CON NOTA FECHADA — 11-sep-2026, el mismo día.
+   *
+   * Por la mañana este candado exigía lo contrario: *«el TOTAL sigue siendo el
+   * de todos: $300.00 con uno solo a la vista»*. Daniel, después de ver esa
+   * misma mezcla en la Planilla: *«entonces no lo pongas en planilla»* y, sobre
+   * el resto, *«pon buscador a lo que normalmente llevaría buscador»*.
+   *
+   * 🔑 De ahí salió la regla general de `lib/buscar-en-lista.ts`: **o el total
+   * sigue al filtro, o no hay buscador**. Acá sigue al filtro —la deuda que se
+   * ve es la de quien se ve— y el conteo de al lado («1 de 2 colaboradores»)
+   * impide leer ese número recortado como si fuera el de todos. ⚠️ Acá el total
+   * es lo que se DEBE hoy, no una quincena que se paga: por eso hay buscador.
+   */
+
   it("filtra la lista", async () => {
     await abrirPrestamos();
     teclear("alejandra");
@@ -367,12 +414,31 @@ describe("🔴 Préstamos: el buscador no mueve la deuda", () => {
     expect(screen.getAllByText(/Alejandra Camaño/).length).toBeGreaterThan(0);
   });
 
-  it("🔴 el TOTAL sigue siendo el de todos: $300.00 con uno solo a la vista", async () => {
+  it("🔴 el TOTAL SIGUE AL FILTRO: $100.00 con Alejandra sola a la vista", async () => {
     await abrirPrestamos();
+    expect(document.body.textContent).toContain("$300.00");
     teclear("alejandra");
     await waitFor(() => expect(screen.queryAllByText(/Andrea Perez/).length).toBe(0));
-    expect(document.body.textContent).toContain("$300.00");
+    expect(document.body.textContent).toContain("$100.00");
+    expect(document.body.textContent).not.toContain("$300.00");
+  });
+
+  it("🔴 y el encabezado dice cuántos se ven, no cuántos hay", async () => {
+    await abrirPrestamos();
     expect(document.body.textContent).toContain("2 colaboradores con deuda");
+    teclear("alejandra");
+    await waitFor(() => expect(document.body.textContent).toContain("1 colaborador con deuda"));
+    // 🔴 Y el buscador dice contra qué se recortó: sin eso, «$100.00» se lee
+    // como la deuda de la empresa entera.
+    expect(screen.getByTestId("conteo-busqueda").textContent).toBe("1 de 2 colaboradores");
+  });
+
+  it("al borrar la búsqueda vuelve el total de todos", async () => {
+    await abrirPrestamos();
+    teclear("alejandra");
+    await waitFor(() => expect(document.body.textContent).toContain("$100.00"));
+    teclear("");
+    await waitFor(() => expect(document.body.textContent).toContain("$300.00"));
   });
 
   it("sin resultados lo dice y ofrece volver", async () => {
@@ -414,7 +480,25 @@ async function abrirAprobaciones(llamadas?: Array<{ url: string; body: unknown }
   await screen.findAllByText(/ALEJANDRA CAMAÑO|Alejandra Camaño/i);
 }
 
-describe("🔴 Aprobaciones › Colaborador: el buscador no decide por nadie", () => {
+describe("🔴 Aprobaciones › Colaborador: el botón DICE a cuántos afecta", () => {
+  /**
+   * 🔴 CAMBIO DE DIRECCIÓN CON NOTA FECHADA — 11-sep-2026, el mismo día.
+   *
+   * Por la mañana este candado exigía que «Sí a todo lo pendiente» mandara
+   * SIEMPRE a todos, con la lista filtrada debajo. Daniel: *«pon buscador a lo
+   * que normalmente llevaría buscador»* y, sobre este botón, que **diga
+   * exactamente a cuántos afecta y afecte solo a esos**.
+   *
+   * 🔑 Las dos direcciones son plata y las dos están probadas acá:
+   *   · **Sin búsqueda** el botón dice «Sí a todo lo pendiente» y manda TODO lo
+   *     pendiente de la empresa elegida. Que dijera «todo» y mandara menos
+   *     dejaría horas sin decidir sin que nadie se entere.
+   *   · **Con búsqueda** el botón dice «Sí a los N que ves» y manda exactamente
+   *     esos N. Que dijera «los 3 que ves» y aprobara quince sería peor: son
+   *     horas extra aprobadas que nadie miró.
+   * El contador grande sigue la misma regla del total que las demás listas.
+   */
+
   it("filtra los renglones de personas", async () => {
     await abrirAprobaciones();
     teclear("andrea");
@@ -422,29 +506,102 @@ describe("🔴 Aprobaciones › Colaborador: el buscador no decide por nadie", (
     expect(screen.getAllByText(/Andrea Perez/i).length).toBeGreaterThan(0);
   });
 
-  it("🔴 el contador «por decidir» sigue contando A TODOS", async () => {
-    await abrirAprobaciones();
-    teclear("andrea");
-    await waitFor(() => expect(screen.queryAllByText(/Alejandra Camaño/i).length).toBe(0));
-    expect(screen.getByTestId("por-decidir").textContent).toContain("2");
+  it("🔴 SIN BÚSQUEDA: el botón dice «Sí a todo lo pendiente» y manda LAS DOS", async () => {
+    const llamadas: Array<{ url: string; body: unknown }> = [];
+    await abrirAprobaciones(llamadas);
+    fireEvent.click(screen.getByRole("button", { name: /Sí a todo lo pendiente/ }));
+    await waitFor(() => expect(llamadas.some((l) => l.url.includes("/api/asistencia/aprobaciones"))).toBe(true));
+    const post = llamadas.find((l) => l.url.includes("/api/asistencia/aprobaciones"))!;
+    expect((post.body as { dias: Array<{ codigo: string }> }).dias.map((d) => d.codigo).sort()).toEqual(["16", "22"]);
   });
 
-  it("🔴 «Sí a todo lo pendiente» manda LAS DOS personas, no solo la filtrada", async () => {
+  it("🔴 CON BÚSQUEDA: el botón DICE «Sí al que ves» y manda SOLO a esa persona", async () => {
     const llamadas: Array<{ url: string; body: unknown }> = [];
     await abrirAprobaciones(llamadas);
     teclear("andrea");
     await waitFor(() => expect(screen.queryAllByText(/Alejandra Camaño/i).length).toBe(0));
-    fireEvent.click(screen.getByRole("button", { name: /Sí a todo lo pendiente/ }));
+    // 🔴 El rótulo cambió: nadie aprieta «todo» creyendo que es todo.
+    expect(screen.queryByRole("button", { name: /Sí a todo lo pendiente/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Sí al que ves/ }));
     await waitFor(() => expect(llamadas.some((l) => l.url.includes("/api/asistencia/aprobaciones"))).toBe(true));
     const post = llamadas.find((l) => l.url.includes("/api/asistencia/aprobaciones"))!;
-    const dias = (post.body as { dias: Array<{ codigo: string }> }).dias;
-    expect(dias.map((d) => d.codigo).sort()).toEqual(["16", "22"]);
+    expect((post.body as { dias: Array<{ codigo: string }> }).dias.map((d) => d.codigo)).toEqual(["16"]);
   });
 
-  it("sin resultados lo dice, sin apagar el botón de arriba", async () => {
+  it("🔴 con DOS a la vista el rótulo los cuenta: «Sí a los 2 que ves»", async () => {
+    await abrirAprobaciones();
+    // «a» aparece en los dos nombres: la búsqueda deja a las dos personas.
+    teclear("a");
+    await waitFor(() => expect(screen.getByTestId("conteo-busqueda").textContent).toBe("2 de 2 colaboradores"));
+    expect(screen.getByRole("button", { name: /Sí a los 2 que ves/ })).toBeTruthy();
+  });
+
+  it("🔴 el contador grande SIGUE AL FILTRO, y el buscador dice contra qué", async () => {
+    await abrirAprobaciones();
+    expect(screen.getByTestId("por-decidir").textContent).toContain("2");
+    expect(screen.getByTestId("por-decidir").textContent).toContain("3:00");
+    teclear("andrea");
+    await waitFor(() => expect(screen.getByTestId("por-decidir").textContent).toContain("2:00"));
+    expect(screen.getByTestId("por-decidir").textContent).not.toContain("3:00");
+    expect(screen.getByTestId("conteo-busqueda").textContent).toBe("1 de 2 colaboradores");
+  });
+
+  it("sin resultados lo dice, y el botón de arriba se apaga: no hay a quién decirle que sí", async () => {
     await abrirAprobaciones();
     teclear("zzzz");
     await waitFor(() => expect(screen.getByText(new RegExp(VACIO_BUSQUEDA))).toBeTruthy());
-    expect((screen.getByRole("button", { name: /Sí a todo lo pendiente/ }) as HTMLButtonElement).disabled).toBe(false);
+    const boton = screen.getByRole("button", { name: /Sí a/ }) as HTMLButtonElement;
+    expect(boton.disabled).toBe(true);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 6. LA REGLA DEL TOTAL Y EL RÓTULO DEL LOTE, EN EL MÓDULO PURO
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("🔴 la regla del total: o sigue al filtro, o no hay buscador", () => {
+  const gente = [
+    { nombre: "ALEJANDRA CAMAÑO", codigo: "22", saldo: 100 },
+    { nombre: "ANDREA PEREZ", codigo: "16", saldo: 200 },
+  ];
+
+  it("`vistaDeLista` devuelve juntas las filas y su conteo — no pueden separarse", () => {
+    const v = vistaDeLista(gente, "andrea", (p) => [p.nombre, p.codigo]);
+    expect(v.visibles.map((p) => p.codigo)).toEqual(["16"]);
+    expect(v.conteo).toBe("1 de 2 colaboradores");
+    expect(v.buscando).toBe(true);
+    expect(v.sinResultados).toBe(false);
+    // 🔴 El total se suma sobre `visibles`: eso es «seguir al filtro».
+    expect(v.visibles.reduce((a, p) => a + p.saldo, 0)).toBe(200);
+  });
+
+  it("sin búsqueda: la lista entera y ni una palabra de conteo", () => {
+    const v = vistaDeLista(gente, "", (p) => [p.nombre, p.codigo]);
+    expect(v.visibles).toHaveLength(2);
+    expect(v.conteo).toBe("");
+    expect(v.buscando).toBe(false);
+    expect(v.sinResultados).toBe(false);
+  });
+
+  it("sin resultados lo dice, y una lista nula no revienta", () => {
+    expect(vistaDeLista(gente, "zzz", (p) => [p.nombre]).sinResultados).toBe(true);
+    expect(vistaDeLista(null, "zzz", (p: { nombre: string }) => [p.nombre]).visibles).toEqual([]);
+  });
+
+  it("🔴 el rótulo del lote: sin búsqueda el de siempre; con búsqueda, cuántos", () => {
+    expect(rotuloDeLote("Sí a todo lo pendiente", 5, false)).toBe("Sí a todo lo pendiente");
+    expect(rotuloDeLote("Sí a todo lo pendiente", 3, true)).toBe("Sí a los 3 que ves");
+    expect(rotuloDeLote("Sí a todo lo pendiente", 1, true)).toBe("Sí al que ves");
+  });
+
+  it("🔴 `toquesDeEstos` recorta por CÓDIGO, nunca por nombre", () => {
+    const toques = [
+      { codigo: "22", fecha: "2026-08-05", minutos: 60 },
+      { codigo: "16", fecha: "2026-08-05", minutos: 120 },
+      { codigo: "16", fecha: "2026-08-06", minutos: 30 },
+    ];
+    expect(toquesDeEstos(toques, ["16"]).map((t) => t.fecha)).toEqual(["2026-08-05", "2026-08-06"]);
+    expect(toquesDeEstos(toques, [])).toEqual([]);
+    expect(toquesDeEstos(toques, ["16", "22"])).toHaveLength(3);
   });
 });

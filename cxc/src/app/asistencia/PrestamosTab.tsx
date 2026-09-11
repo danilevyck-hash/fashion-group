@@ -55,8 +55,7 @@ import {
   PARAM_BUSCAR,
   PLACEHOLDER_COLABORADOR,
   VACIO_BUSQUEDA,
-  filtrarPorTexto,
-  textoDeConteo,
+  vistaDeLista,
 } from "@/lib/buscar-en-lista";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import ElegirPersonaModal from "@/app/prestamos/components/ElegirPersonaModal";
@@ -195,20 +194,23 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
     } catch { toast("Sin conexión. Intenta de nuevo.", "error"); }
   }
 
-  // 🔴 EL TOTAL SIGUE SUMANDO TODO, aunque haya búsqueda escrita: es lo que se
-  // debe, no lo que se está mirando. Cuántos se ven lo dice el buscador.
-  const total = useMemo(
-    () => (fichas ?? []).reduce((a, f) => a + f.saldo, 0),
-    [fichas],
-  );
-
   // 🔴 Por nombre y por código, sin acentos ni mayúsculas y por subcadena
   // exacta — nunca por parecido. Filtra lo ya cargado; cero peticiones nuevas.
-  const visibles = useMemo(
-    () => filtrarPorTexto(fichas ?? [], busqueda, (f) => [f.nombre, f.codigo]),
+  const { visibles, conteo, buscando, sinResultados } = useMemo(
+    () => vistaDeLista(fichas, busqueda, (f) => [f.nombre, f.codigo]),
     [fichas, busqueda],
   );
-  const buscando = busqueda.trim() !== "";
+
+  // 🔴 EL TOTAL SIGUE AL FILTRO (11-sep-2026). Se suma sobre lo que se VE, no
+  // sobre la lista entera. 🩸 Nació al revés —sumaba todo con la lista
+  // recortada— y es la misma duda que hizo quitarle el buscador a la Planilla:
+  // un total que no corresponde a las filas de arriba hace dudar de cuál de los
+  // dos manda. Quién es «lo que se ve» lo dice el conteo de al lado, y acá el
+  // total no se paga: es lo que se debe hoy.
+  const total = useMemo(
+    () => visibles.reduce((a, f) => a + f.saldo, 0),
+    [visibles],
+  );
 
   if (fichas === null) {
     return <p className="text-sm text-gray-500">Leyendo la deuda…</p>;
@@ -288,7 +290,7 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-gray-600">
-          {fichas.length === 1 ? "1 colaborador con deuda" : `${fichas.length} colaboradores con deuda`}
+          {visibles.length === 1 ? "1 colaborador con deuda" : `${visibles.length} colaboradores con deuda`}
           <span className="text-gray-400"> · </span>
           <span className="text-gray-500">Total </span>
           <span className="font-medium tabular-nums text-gray-900">{money(total)}</span>
@@ -301,10 +303,10 @@ export default function PrestamosTab(props: { desde?: string; hasta?: string; em
         onCambiar={setBusqueda}
         placeholder={PLACEHOLDER_COLABORADOR}
         etiqueta="Buscar colaborador por nombre o código"
-        conteo={textoDeConteo(visibles.length, fichas.length, busqueda)}
+        conteo={conteo}
       />
 
-      {buscando && visibles.length === 0 && (
+      {sinResultados && (
         <VacioDeBusqueda texto={VACIO_BUSQUEDA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
       )}
 

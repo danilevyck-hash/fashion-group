@@ -2234,35 +2234,79 @@ Encargo de Daniel sobre `grupo-3.md`. **Arreglar, no rediseñar.** Trece puntos,
 
 ---
 
-## 11-sep-2026 (noche) — Buscador en las cuatro listas de Asistencia que lo pedían
+## 11-sep-2026 (noche) — Buscadores: o el total sigue al filtro, o no hay buscador
 
 Encargo de Daniel: *«pon buscador en módulos o tabs que lo ameriten, como colaboradores por ejemplo»* → *«sí a buscadores»*.
 
-**Medido antes:** ya tenían buscador Guías, CXC, Reclamos, Clientes, Proveedores, Catálogos, Marketing, Boston, Recordatorios, Plantilla Switch y la pestaña Asistencia. Las cuatro que faltaban son las cuatro listas de personas de `/asistencia`.
+**Medido antes:** ya tenían buscador Guías, CXC, Reclamos, Clientes, Proveedores, Catálogos, Marketing, Boston, Recordatorios, Plantilla Switch y la pestaña Asistencia. Las cuatro que faltaban son las cuatro listas de personas de `/asistencia`. **Se le puso a las cuatro y se le quitó a una** — ver «La vuelta atrás de Planilla» al final.
 
 | Dónde | Filas | Qué pasaba |
 |---|---|---|
 | **Colaboradores** (`ConfiguracionTab`) | 42 | llegar a alguien era rodar la pantalla entera |
-| **Planilla** (`PlanillaTab`) | 19 por empresa | 19 columnas × 19 filas, y se usa con prisa dos veces al mes |
+| ~~**Planilla** (`PlanillaTab`)~~ | 19 por empresa | 🔴 **se le quitó el mismo día** — ahí el pie es plata |
 | **Préstamos** (`PrestamosTab`) | 12 | — |
 | **Aprobaciones › Colaborador** | 15 | — |
 
-- 🔴 **UN SOLO COMPONENTE PARA LAS CUATRO**: `src/components/BuscadorDeLista.tsx` (el campo y su conteo) sobre el módulo puro `src/lib/buscar-en-lista.ts`. Mismo aspecto que Guías y CXC: 44 px, `text-base sm:text-sm` (por debajo de 16 px el iPhone hace zoom solo al tocar), borde inferior que se pone negro al escribir, y su `aria-label` — el `placeholder` desaparece al teclear.
+- 🔴 **UN SOLO COMPONENTE PARA LAS TRES**: `src/components/BuscadorDeLista.tsx` (el campo y su conteo) sobre el módulo puro `src/lib/buscar-en-lista.ts`. Mismo aspecto que Guías y CXC: 44 px, `text-base sm:text-sm` (por debajo de 16 px el iPhone hace zoom solo al tocar), borde inferior que se pone negro al escribir, y su `aria-label` — el `placeholder` desaparece al teclear.
 - 🔴 **FILTRA LO QUE YA ESTÁ CARGADO. Cero peticiones nuevas.** Por **nombre y código** —el código es lo que el reloj manda—, sin acentos ni mayúsculas, reusando `coincideBusqueda` (`buscar-normalizado.ts`). **Subcadena exacta normalizada, NUNCA por parecido**: es la regla de la casa y acá lo que se decide es plata.
-- 🔴 **EL TEXTO VIAJA EN LA URL** (`?buscar=`, `useUrlState` con `replace` — mismo nivel, no ensucia el Atrás), con **la MISMA llave en las cuatro pestañas**: se comparte el enlace y no se pierde al cambiar de pestaña.
+- 🔴 **EL TEXTO VIAJA EN LA URL** (`?buscar=`, `useUrlState` con `replace` — mismo nivel, no ensucia el Atrás), con **la MISMA llave en las tres pestañas**: se comparte el enlace y no se pierde al cambiar de pestaña.
 - 🔴 **LOS TOTALES NO CAMBIAN DE SIGNIFICADO: el pie sigue sumando TODO** y quien dice cuántos se ven es el buscador («1 de 3 colaboradores»). ⚠️ **Es al revés que en Cuentas por Cobrar**, donde la tira de totales SÍ suma lo filtrado, y es a propósito: allá el buscador es un filtro más de la misma pila (empresa · riesgo · sin pagar) y el total es de lo que se está mirando; acá el total es **la plata de la quincena** y en Planilla ni siquiera se calcula en el navegador (viene en `data.totales`, del servidor).
-- 🔴 **EN PLANILLA NO TOCA LA PLATA.** El Excel, el PDF, los comprobantes y el **CIERRE** salen de `data.lineas` / `data.totales`, completos, y ninguno mira la búsqueda. Con texto escrito la pantalla lo **dice**: «El total de abajo y lo que se descarga siguen siendo la quincena completa». Filtrar la descarga sería pagar una quincena a medias porque alguien dejó un nombre en el campo.
+- 🔴 **EN PLANILLA NO HAY BUSCADOR** (ver abajo). El Excel, el PDF, los comprobantes y el **CIERRE** salen de `data.lineas` / `data.totales`, completos — eso no cambió y sigue con candado.
 - 🔴 **EN APROBACIONES, «Sí a todo lo pendiente» SIGUE SIENDO DE TODO** lo pendiente de la empresa elegida, y el contador «N por decidir · H:MM h» también cuenta a todos. Un botón que dijera «todo» y decidiera solo lo filtrado dejaría horas sin resolver sin que nadie se entere. ⚠️ El buscador **solo se dibuja en la vista «Colaborador»**: en «Día» los renglones son fechas, no personas.
 - Sin resultados se dice con palabras —«No se encontró a nadie con ese nombre»— y se ofrece **«Ver a todos»**. Ninguna lista queda vacía sin salida.
 
-**Candado:** `src/__tests__/components/asistencia-buscadores.test.tsx` (**26 casos**), con los cinco puntos de arriba probados sobre las pantallas de verdad. **Dos mutaciones de plata, las dos cazadas**: que el Excel/PDF salga filtrado (2 casos rojos) y que «Sí a todo» respete el filtro (2 casos rojos).
-**Colateral:** nueve candados de Asistencia que montan `PlanillaTab` o `ConfiguracionTab` estrenan el doble de `next/navigation` — sin app router montado, `useUrlState` tira «invariant expected app router to be mounted». El doble devuelve una URL **vacía** a propósito: sin búsqueda escrita, esos candados miran exactamente lo que miraban.
+**Candado:** `src/__tests__/components/asistencia-buscadores.test.tsx` (**28 casos**), con los puntos de arriba probados sobre las pantallas de verdad. **Dos mutaciones de plata, las dos cazadas**: que el Excel/PDF salga filtrado y que «Sí a todo» respete el filtro.
+**Colateral:** cuatro candados de Asistencia que montan `ConfiguracionTab` estrenan el doble de `next/navigation` — sin app router montado, `useUrlState` tira «invariant expected app router to be mounted». El doble devuelve una URL **vacía** a propósito: sin búsqueda escrita, esos candados miran exactamente lo que miraban. ⚠️ A los cinco que montan **solo** `PlanillaTab` se les quitó al quitarle el buscador: ya no lo necesitan.
 
 ### ⚠️ Dejado a propósito / pendiente de Daniel
 - **La pestaña Asistencia (`ReporteTab`) conserva su propio buscador**, que filtra contra el SERVIDOR (`?q=`) y del que salen su Excel y su PDF: es otra pregunta y otro camino, y no se tocó.
 - **Los chips de Colaboradores («Falta para pagar», «Falta completar») siguen contando sobre la lista entera**, no sobre lo buscado: son el estado de la ficha, no de lo que se está mirando.
 - **«Ya no trabajan aquí» y «Ya decididas» no se filtran**: son bloques plegados aparte, no la lista.
 
+### 🔴 La vuelta atrás de Planilla (el mismo 11-sep-2026)
+
+Daniel, al enterarse de que con un nombre escrito en el campo el total del pie y las descargas seguían siendo la quincena COMPLETA: **textual, *«entonces no lo pongas en planilla»***.
+
+- 🔑 **El motivo no es que el buscador estuviera mal, es DÓNDE estaba.** En Colaboradores, Préstamos y Aprobaciones el pie es un **conteo de gente**; en Planilla es **la plata de una quincena**. Una lista recortada al lado de un total que no lo está hace dudar de cuál de los dos manda — y el renglón de letra chica que lo explicaba («El total de abajo y lo que se descarga siguen siendo la quincena completa») no arreglaba esa duda: la **confesaba**.
+- **Qué se fue:** el `BuscadorDeLista` de `PlanillaTab` (tabla del escritorio y tarjetas del celular), ese renglón de aviso, y el estado con su `?buscar=` — que en esta pestaña ya no se lee ni se escribe. Un `?buscar=` traído de otra pestaña **no tacha a nadie**, y hay candado que lo exige.
+- **Qué NO se tocó:** los buscadores de **Colaboradores, Préstamos y Aprobaciones › Colaborador**, ni `BuscadorDeLista`, ni `buscar-en-lista.ts` (los usan las otras tres).
+- **Los candados no se borraron: cambiaron de dirección con nota fechada.** La sección 3 de `asistencia-buscadores.test.tsx` pasó de «filtra sin tocar la plata» a «**Planilla NO tiene buscador**», más un barrido sobre `PlanillaTab.tsx` que pone el build rojo si vuelve a importarlo. **Los dos candados de plata siguen igual**: el Excel y el PDF salen con las tres líneas y las tres personas.
+
+### 🔴 La ampliación: «pon buscador a lo que normalmente llevaría buscador»
+
+Daniel, después de la vuelta atrás de Planilla: **textual, *«pon buscador a lo que normalmente llevaría buscador, no es tan complicado»***.
+
+**La regla general, escrita en el módulo puro** (`src/lib/buscar-en-lista.ts`) y en CLAUDE.md: **o el total sigue al filtro, o no hay buscador.** No hay tercera salida — y la nota al pie que explicaba la mezcla no cuenta como una.
+
+**Qué se corrigió de lo que el commit `16ae0067` dejó al revés:**
+
+| Dónde | Antes (la mañana) | Ahora |
+|---|---|---|
+| **Asistencia › Préstamos** | el total sumaba los 12 con 1 a la vista | **el total sigue al filtro** + «1 de 12 colaboradores» |
+| **Asistencia › Aprobaciones** | «N por decidir · H:MM h» contaba a todos | **sigue al filtro**, con su conteo al lado |
+| **Asistencia › Aprobaciones** | «Sí a todo lo pendiente» mandaba todo con la lista filtrada | **«Sí a los 3 que ves»** y manda esos tres; sin búsqueda, el rótulo y el alcance de siempre |
+| **Asistencia › Planilla** | buscador + letra chica | **sin buscador** (su pie es plata que se paga) |
+
+**Buscador nuevo, con el mismo `BuscadorDeLista`:**
+
+- 🔴 **Caja Menuda — los gastos de un período.** Busca por **proveedor · categoría · N° de recibo · descripción · monto** (el monto entra como se imprime, `12.50`, y como la normalización se come el punto, «12.5» también cae). **Siguen al filtro** los registros, el total de arriba, los **chips de categoría** y los pies de las dos superficies. ⚠️ El bloque de arriba (**Fondo · Gastado · Saldo**) **no se recorta y es deliberado**: es el estado de la CAJA, no la suma de esas filas — un «Saldo» recortado sería un saldo falso. Por eso la línea de la lista dice «3 de 41 gastos» pegada a su total. **Pendiente de Daniel** si prefiere que el bloque de arriba también se recorte.
+- 🔴 **Gastos (`/gastos-contabilidad`, pestaña Gastos) — las cuentas de una empresa.** Busca por **nombre de la cuenta, código (el completo y el que se pinta) y las referencias de los pagos**. Los cuatro totales venían **sumados del servidor** y ahora se vuelven a sumar en el navegador sobre las cuentas que quedaron, de sus propios centavos enteros. ⚠️ **«en N documentos» desaparece mientras se busca**: un documento toca varias cuentas, no es aditivo, y el navegador no tiene los N° internos. ⚠️ **Por N° interno no se puede buscar** — `resumirMesEgresos` agrupa por cuenta en el servidor y ese dato nunca llega; pedirlo sería cambiar lo que la ruta devuelve. 🔴 **La regla de la casa no se toca**: acá se ve UNA empresa y los gastos de las 8 nunca se suman entre sí.
+- 🔴 **Boston › Préstamos** (31 fichas de las tres empresas, sin ningún filtro; sus dos pantallas hermanas sobre los mismos datos ya tenían buscador). **Las tres tarjetas siguen al filtro**, con el MISMO criterio del servidor para «Con saldo» (saldo distinto de cero). 🩸 Los hooks van arriba de los `return` de error y de carga: abajo, React tira «Rendered more hooks than during the previous render».
+- 🔴 **Plantilla Switch › Historial** (**140 descargas**, creciendo 50-60/mes, con un solo desplegable de compañía). Busca por **marca · quién la hizo · compañía · fecha**, y la compañía se busca por el nombre que se VE («Facturas Tienda» se enseña como Multifashion). ⚠️ Acá **no hay ningún total que seguir**: la pantalla no suma nada.
+
+### El barrido del resto del sistema
+
+Se recorrieron los módulos buscando listas largas sin buscador. Las que quedaron **sin él, a propósito**, con el motivo:
+
+- **CXC › el cajón del estado de cuenta** (hasta **111 documentos**, la lista más larga del sistema sin buscador). Su total es el **cuadre contra el `saldoTotal` que manda Switch**: recortarlo rompería el aviso de desfase que se muestra antes de mandar el papel. Es la salida (b), la misma de la Planilla. **Decisión pendiente de Daniel.**
+- **Multifashion › Clientes identificados** (top 50): es un **ranking** —se lee de arriba hacia abajo— y ya tiene 4 chips de segmento más el período. **Pendiente de Daniel.**
+- **Planilla de Boston** (`PlanillaBoston`): el mismo cuadro de la Planilla, misma razón.
+- **Aprobaciones › vista «Día»**: los renglones son fechas, no personas.
+- Listas de ≤ 12 filas que no lo piden: Caja › períodos (**3** en toda la historia), Usuarios (**11**), Marketing › Impulsadoras (**2**) y Mobiliario (**6**), Guías › Configuración (transportistas **6**, destinos base **5**), Multifashion › Metas (**1** viva) y Vendedoras (**5**), Vista General (6-8 por tarjeta), Feriados (~12 por año).
+- **Referencia** ya ES un buscador; **Data Health** no tiene pantalla.
+
+**Candados:** `asistencia-buscadores.test.tsx` (37 casos) · `buscador-caja-y-gastos.test.tsx` (27 casos); **20 mutaciones, 20 cazadas** con 2 controles (`scripts/_mutar-candados-buscadores.sh`).
+**Colateral:** el doble de `next/navigation` quedó en los candados que montan `ConfiguracionTab` y en el de Caja que monta `GastoTable`; **se les quitó a los cinco que montan solo `PlanillaTab`**, que ya no lo necesitan.
 ---
 
 ## 11-sep-2026 (noche) — Ventas: los 13 cambios aprobados sobre el mockup, y ningún total se mueve

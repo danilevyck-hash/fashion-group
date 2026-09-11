@@ -12,7 +12,17 @@
 // porque no hay nada que escribir, y la pantalla de Contabilidad no se tocó.
 
 import useSWR from "swr";
+import { useMemo } from "react";
 import { fmt, fmtDate } from "@/lib/format";
+import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import {
+  LIMPIAR_BUSQUEDA,
+  PARAM_BUSCAR,
+  PLACEHOLDER_COLABORADOR,
+  VACIO_BUSQUEDA,
+  vistaDeLista,
+} from "@/lib/buscar-en-lista";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 
 interface EmpleadoPrestamo {
   id: string;
@@ -48,15 +58,46 @@ export default function PrestamosBoston() {
     revalidateOnFocus: false,
   });
 
+  // ── 🔴 EL BUSCADOR, Y EL TOTAL QUE LO SIGUE (11-sep-2026) ─────────────────
+  //
+  // Daniel: *«pon buscador a lo que normalmente llevaría buscador»*. Acá son 31
+  // fichas de las tres empresas, sin ningún filtro, y sus dos pantallas hermanas
+  // sobre los mismos datos —/prestamos y Asistencia › Préstamos— ya lo tienen.
+  //
+  // 🔴 LAS TRES TARJETAS SIGUEN AL FILTRO, que es la regla de
+  // `lib/buscar-en-lista.ts`. Vienen sumadas del servidor (`data.totales`), así
+  // que con búsqueda escrita se vuelven a contar en el navegador sobre las
+  // fichas que quedaron — con el MISMO criterio del servidor: «Con saldo» es
+  // quien debe algo distinto de cero.
+  // ⚠️ Acá el total es lo que se DEBE hoy, no una quincena que se paga: por eso
+  // hay buscador y no la salida de la Planilla.
+  //
+  // 🩸 Los hooks van ARRIBA de los `return` de error y de carga: puestos abajo,
+  // el primer render (cargando) corría menos hooks que el segundo y React tira
+  // «Rendered more hooks than during the previous render».
+  const [busqueda, setBusqueda] = useUrlState(PARAM_BUSCAR, "");
+  // Primero quien todavía debe, y dentro de esos quien debe más.
+  const orden = useMemo(
+    () => [...(data?.empleados ?? [])].sort(
+      (a, b) => b.saldo - a.saldo || a.nombre.localeCompare(b.nombre, "es"),
+    ),
+    [data],
+  );
+  const { visibles, conteo, buscando, sinResultados } = useMemo(
+    () => vistaDeLista(orden, busqueda, (e) => [e.nombre, e.empresa]),
+    [orden, busqueda],
+  );
+  const t = data?.totales;
+  const tarjetas = buscando
+    ? {
+        saldo: visibles.reduce((a, e) => a + e.saldo, 0),
+        conSaldo: visibles.filter((e) => e.saldo !== 0).length,
+        personas: visibles.length,
+      }
+    : { saldo: t?.saldo ?? 0, conSaldo: t?.conSaldo ?? 0, personas: t?.personas ?? 0 };
+
   if (error) return <p className="text-sm text-red-600 py-8">No se pudieron cargar los préstamos.</p>;
   if (isLoading) return <p className="text-sm text-gray-500 py-8">Cargando…</p>;
-
-  const empleados = data?.empleados ?? [];
-  const t = data?.totales;
-  // Primero quien todavía debe, y dentro de esos quien debe más.
-  const orden = [...empleados].sort(
-    (a, b) => b.saldo - a.saldo || a.nombre.localeCompare(b.nombre, "es"),
-  );
 
   return (
     <div>
@@ -64,19 +105,19 @@ export default function PrestamosBoston() {
         <div className="rounded-xl border border-gray-200 bg-white px-3 py-2">
           <span className="block text-xs uppercase tracking-wide text-gray-500">Por cobrar</span>
           <span className="block text-base sm:text-lg font-semibold tabular-nums text-gray-900">
-            ${fmt(t?.saldo ?? 0)}
+            ${fmt(tarjetas.saldo)}
           </span>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white px-3 py-2">
           <span className="block text-xs uppercase tracking-wide text-gray-500">Con saldo</span>
           <span className="block text-base sm:text-lg font-semibold tabular-nums text-gray-900">
-            {t?.conSaldo ?? 0}
+            {tarjetas.conSaldo}
           </span>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white px-3 py-2">
           <span className="block text-xs uppercase tracking-wide text-gray-500">Personas</span>
           <span className="block text-base sm:text-lg font-semibold tabular-nums text-gray-900">
-            {t?.personas ?? 0}
+            {tarjetas.personas}
           </span>
         </div>
       </div>
@@ -86,8 +127,21 @@ export default function PrestamosBoston() {
         Confecciones Boston.
       </p>
 
+      <BuscadorDeLista
+        className="mb-3"
+        valor={busqueda}
+        onCambiar={setBusqueda}
+        placeholder={PLACEHOLDER_COLABORADOR}
+        etiqueta="Buscar colaborador por nombre o empresa"
+        conteo={conteo}
+      />
+
+      {sinResultados && (
+        <VacioDeBusqueda texto={VACIO_BUSQUEDA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
+      )}
+
       <div className="space-y-2">
-        {orden.map((e) => (
+        {visibles.map((e) => (
           <div key={e.id} className="rounded-xl border border-gray-200 bg-white p-3">
             <div className="flex items-baseline justify-between gap-2">
               <span className="min-w-0">
@@ -122,7 +176,9 @@ export default function PrestamosBoston() {
             </p>
           </div>
         ))}
-        {orden.length === 0 && (
+        {/* 🔴 Con la búsqueda sin resultados ya se dijo arriba: repetir «no hay
+            préstamos activos» diría algo que no es cierto. */}
+        {orden.length === 0 && !buscando && (
           <p className="text-sm text-gray-500 py-8">No hay préstamos activos.</p>
         )}
       </div>
