@@ -49,6 +49,9 @@ import {
   resumenPendientes,
   type DiaAprobacion,
   type PersonaEnDia,
+  previoDe,
+  aplicarAprobacionLocal,
+  revertirAprobacionLocal,
 } from "@/lib/asistencia/aprobaciones";
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -115,6 +118,9 @@ function Casilla({
   );
 }
 
+/** La recarga completa del período va UNA vez, este tiempo después del último toque. */
+export const RECARGA_MS = 1500;
+
 export default function AprobacionesTab({ empresa = "" }: {
   /** El selector de arriba de las pestañas (10-sep-2026). «todas» o vacío = todas. */
   empresa?: string;
@@ -170,11 +176,21 @@ export default function AprobacionesTab({ empresa = "" }: {
   const [avisoAprobador, setAvisoAprobador] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
+  /**
+   * 🔴 SOLO LA CASILLA QUE VIAJA SE APAGA (10-sep-2026). Antes `guardando`
+   * apagaba la pantalla entera ~1 s por toque (Daniel: *«se pone como un
+   * segundo cada vez que aprieto»*). Ahora viajan las claves `codigo|fecha` en
+   * vuelo, y las demás siguen tocables: dos toques seguidos son dos POST.
+   */
+  const [enVuelo, setEnVuelo] = useState<ReadonlySet<string>>(new Set());
+  /** La recarga completa, UNA sola, 1,5 s después del último toque. */
+  const recarga = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
 
-  const cargar = useCallback(async () => {
-    setCargando(true);
+  const cargar = useCallback(async (silenciosa = false) => {
+    // 🔑 La recarga de después de un toque es SILENCIOSA: no tapa la lista con
+    // «Cargando…» — la pantalla ya dice lo que la persona hizo.
+    if (!silenciosa) setCargando(true);
     setError(null);
     try {
       // 🔴 POR EMPRESA (10-sep-2026, Daniel: *«Aprobaciones también se debería
@@ -251,7 +267,12 @@ export default function AprobacionesTab({ empresa = "" }: {
   const marcar = useCallback(
     async (items: Array<{ codigo: string; fecha: string; minutos: number }>, aprobado: boolean) => {
       if (items.length === 0) return;
-      setGuardando(true);
+      // 🔴 OPTIMISTA (CLAUDE.md › UX): la casilla y los contadores cambian EN EL
+      // ACTO desde el estado local; el POST va detrás; si falla, se revierte.
+      const claves = items.map((i) => claveDia(i.codigo, i.fecha));
+      let previo: ReadonlyMap<string, boolean> = new Map();
+      setDias((d) => { previo = previoDe(d ?? [], items); return aplicarAprobacionLocal(d ?? [], items, aprobado); });
+      setEnVuelo((v) => new Set([...v, ...claves]));
       try {
         // 🔴 Con empresa elegida, la ruta rechaza cualquier código de otra empresa.
         const emp = empresaParaPedir(empresa);
@@ -262,20 +283,23 @@ export default function AprobacionesTab({ empresa = "" }: {
         });
         const j = await res.json();
         if (!res.ok) throw new Error(j.error ?? "No se pudo guardar");
-        if (j.ok === false) {
-          toast(j.aviso ?? "No se pudo guardar", "error");
-        }
-        // Se recarga entero: aprobar cambia el pago, y pintar solo la casilla
-        // dejaría la pantalla diciendo una cosa y la planilla pagando otra.
-        await cargar();
+        if (j.ok === false) throw new Error(j.aviso ?? "No se pudo guardar");
       } catch (e) {
+        // 🔴 POST FALLA → LA CASILLA VUELVE A COMO ESTABA, y se dice.
+        setDias((d) => revertirAprobacionLocal(d ?? [], previo));
         toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
       } finally {
-        setGuardando(false);
+        setEnVuelo((v) => { const n = new Set(v); for (const k of claves) n.delete(k); return n; });
+        // 🔴 EL SERVIDOR MANDA: una sola recarga completa, 1,5 s después del último
+        // toque, para que los totales de plata queden como los calcula la planilla.
+        // Lo que diga reemplaza lo local.
+        if (recarga.current) clearTimeout(recarga.current);
+        recarga.current = setTimeout(() => { recarga.current = null; void cargar(true); }, RECARGA_MS);
       }
     },
-    [cargar, toast],
+    [cargar, toast, empresa],
   );
+  useEffect(() => () => { if (recarga.current) clearTimeout(recarga.current); }, []);
 
   // 🩸 La librería de Excel se baja al TOCAR el botón, no al abrir la pestaña:
   // `xlsx-js-style` pesa y esta pantalla se abre para aprobar, no para exportar.
@@ -304,7 +328,9 @@ export default function AprobacionesTab({ empresa = "" }: {
     return n === gente.length ? "si" : "medias";
   };
 
-  const bloqueado = !puedeAprobar || guardando || avisoMigracion !== null;
+  const bloqueado = !puedeAprobar || avisoMigracion !== null;
+  const viaja = (d: DiaAprobacion, codigo?: string) =>
+    codigo ? enVuelo.has(claveDia(codigo, d.fecha)) : d.gente.some((g) => enVuelo.has(claveDia(g.codigo, d.fecha)));
 
   return (
     <div className="py-4">
@@ -412,7 +438,7 @@ export default function AprobacionesTab({ empresa = "" }: {
             <label className="flex cursor-pointer items-center gap-3 px-1 pb-2 pt-1.5">
               <Casilla
                 estado={est}
-                disabled={bloqueado}
+                disabled={bloqueado || delaSemana.some((d) => viaja(d))}
                 label={`Aprobar la semana del ${lunes}`}
                 onChange={() =>
                   void marcar(delaSemana.flatMap(deDia), est !== "si")
@@ -442,7 +468,7 @@ export default function AprobacionesTab({ empresa = "" }: {
                     <label className="-ml-3.5 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center pl-3.5">
                       <Casilla
                         estado={e}
-                        disabled={bloqueado}
+                        disabled={bloqueado || viaja(d)}
                         label={`Aprobar ${etiquetaDia(d.fecha)}`}
                         onChange={() => void marcar(deDia(d), e !== "si")}
                       />
@@ -488,7 +514,7 @@ export default function AprobacionesTab({ empresa = "" }: {
                         >
                           <Casilla
                             estado={g.aprobado ? "si" : "no"}
-                            disabled={bloqueado}
+                            disabled={bloqueado || viaja(d, g.codigo)}
                             label={`Aprobar ${g.etiqueta} el ${d.etiqueta}`}
                             onChange={() =>
                               void marcar(

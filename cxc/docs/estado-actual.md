@@ -1383,3 +1383,16 @@ lectura, nombre del archivo, la ruta que rechaza otra empresa, y que cada pesta�
 selector). Cambiaron con nota fechada, ninguno se borró: `persona-en-el-centro`,
 `asistencia-colaboradores-no-personas`, `asistencia-siete-pantallas`, `asistencia-planilla`,
 `asistencia-config`, `asistencia-planilla-cerrar-quincena`, `aprobaciones-excel`, `peso-muerto-js`.
+
+---
+
+## 10-sep-2026 (noche, 4) — Aprobar no espera
+
+Daniel: *«¿por qué al seleccionar un colaborador en aprobaciones se pone como un segundo cada vez que
+aprieto? no debería ser así»*. Causa: cada toque hacía el POST y después recargaba el período entero
+apagando toda la pantalla (~1 s por toque). Arreglo (`AprobacionesTab.tsx`, optimista): la casilla
+y los contadores cambian en el acto desde lo local; el POST va detrás; solo la casilla que viaja se
+apaga (dos toques = dos POST); una sola recarga, silenciosa, 1,5 s después del último toque — y el
+servidor manda. Si el POST falla, la casilla vuelve a como estaba y sale el aviso. Nada cambia en la
+ruta ni en lo que se guarda. Candado: `aprobaciones-optimista.test.tsx` (toque sin esperar el fetch ·
+fallo revierte · N toques → una recarga · el servidor reemplaza lo local).

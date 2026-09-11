@@ -377,6 +377,56 @@ export function horasBonitas(minutos: number): string {
 }
 
 /** Cuántas faltan y cuántas horas suman. Es lo que dice el contador de arriba. */
+/**
+ * 🔴 LA CASILLA CAMBIA EN EL ACTO (10-sep-2026). Daniel: *«¿por qué al seleccionar
+ * un colaborador en aprobaciones se pone como un segundo cada vez que aprieto?»*.
+ * Cada toque hacía el POST y después volvía a pedir el período entero. Ahora la
+ * pantalla se actualiza LOCALMENTE con estas dos funciones puras, el POST va
+ * detrás y, si falla, se revierte con `previoDe`. 🔴 El servidor manda: la
+ * recarga completa sigue yendo (una sola, 1,5 s después del último toque) y lo
+ * que diga reemplaza lo local — es lo que la planilla paga.
+ */
+export interface ToqueAprobacion { codigo: string; fecha: string; minutos: number }
+
+/** El `aprobado` de cada persona-día ANTES de tocar, para poder volver atrás. */
+export function previoDe(dias: readonly DiaAprobacion[], items: readonly ToqueAprobacion[]): Map<string, boolean> {
+  const claves = new Set(items.map((i) => claveDia(i.codigo, i.fecha)));
+  const out = new Map<string, boolean>();
+  for (const d of dias) for (const g of d.gente) {
+    const k = claveDia(g.codigo, d.fecha);
+    if (claves.has(k)) out.set(k, g.aprobado);
+  }
+  return out;
+}
+
+/** Los mismos días con esas personas-día en `aprobado`. Nuevo arreglo, nada se muta. */
+export function aplicarAprobacionLocal(
+  dias: readonly DiaAprobacion[],
+  items: readonly ToqueAprobacion[],
+  aprobado: boolean,
+): DiaAprobacion[] {
+  const claves = new Set(items.map((i) => claveDia(i.codigo, i.fecha)));
+  return dias.map((d) => ({
+    ...d,
+    gente: d.gente.map((g) =>
+      claves.has(claveDia(g.codigo, d.fecha))
+        ? { ...g, aprobado, minutosVistos: aprobado ? g.minutos : g.minutosVistos, cambio: false }
+        : g,
+    ),
+  }));
+}
+
+/** Vuelve cada persona-día a lo que decía antes del toque que falló. */
+export function revertirAprobacionLocal(dias: readonly DiaAprobacion[], previo: ReadonlyMap<string, boolean>): DiaAprobacion[] {
+  return dias.map((d) => ({
+    ...d,
+    gente: d.gente.map((g) => {
+      const k = claveDia(g.codigo, d.fecha);
+      return previo.has(k) ? { ...g, aprobado: previo.get(k)! } : g;
+    }),
+  }));
+}
+
 export function resumenPendientes(dias: readonly DiaAprobacion[]): {
   /** Cuántas aprobaciones faltan — persona-día, que es la unidad. */
   pendientes: number;
